@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Validar Certificado — AVBA</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --azul:      #185FA5;
+      --azul-dark: #0C447C;
+      --verde:     #00c87a;
+      --rojo:      #e64646;
+      --gris:      #9999cc;
+      --fondo:     #080f1e;
+    }
+
+    html, body {
+      min-height: 100%;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      background: var(--fondo);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 48px;
+      transition: background 0.6s ease;
+    }
+
+    body.bg-vigente  { background: #071a10; }
+    body.bg-vencido  { background: #1a0707; }
+    body.bg-noenc    { background: #0d0d18; }
+    body.bg-neutro   { background: var(--fondo); }
+
+    /* ── BRAND ── */
+    .brand {
+      display: flex; flex-direction: column; align-items: center;
+      margin-bottom: 28px;
+    }
+    .brand-logo {
+      width: 58px; height: 58px; border-radius: 15px;
+      background: var(--azul);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 28px rgba(24,95,165,0.45);
+    }
+    .brand-logo svg { width: 30px; height: 30px; color: white; }
+    .brand-name { font-size: 20px; font-weight: 800; color: white; letter-spacing: -.3px; }
+    .brand-sub  { font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 4px; }
+
+    /* ── CARD ── */
+    .card {
+      width: 100%; max-width: 420px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 22px;
+      padding: 24px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+    }
+
+    .card-title {
+      font-size: 18px; font-weight: 800; color: white;
+      text-align: center; margin-bottom: 4px;
+    }
+    .card-sub {
+      font-size: 12px; color: rgba(255,255,255,0.4);
+      text-align: center; margin-bottom: 20px;
+    }
+
+    /* ── SCANNER ── */
+    .scanner-wrap {
+      position: relative; border-radius: 14px; overflow: hidden;
+      background: rgba(0,0,0,0.35);
+      border: 1.5px dashed rgba(255,255,255,0.12);
+      margin-bottom: 16px; min-height: 160px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: border-color .2s;
+    }
+    .scanner-wrap:hover { border-color: rgba(0,198,255,0.35); }
+    .scanner-wrap.activo { border-style: solid; border-color: rgba(0,198,255,0.4); }
+
+    #reader { width: 100% !important; }
+    #reader video { border-radius: 12px; }
+    #reader img { display: none !important; }
+
+    .scanner-placeholder {
+      display: flex; flex-direction: column; align-items: center;
+      padding: 28px 20px; gap: 8px;
+    }
+    .scanner-placeholder svg { width: 38px; height: 38px; color: rgba(255,255,255,0.25); }
+    .scanner-placeholder span { font-size: 12px; color: rgba(255,255,255,0.35); }
+
+    .scan-line {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, #00c6ff, transparent);
+      animation: scanLine 2.5s ease-in-out infinite;
+      pointer-events: none; z-index: 2;
+    }
+    @keyframes scanLine {
+      0%   { top: 10%; opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: 1; }
+      100% { top: 90%; opacity: 0; }
+    }
+
+    .btn-camara {
+      position: absolute; bottom: 10px; right: 10px;
+      padding: 6px 12px; border-radius: 20px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(0,0,0,0.5); color: rgba(255,255,255,0.7);
+      font-size: 11px; font-weight: 600; cursor: pointer;
+      display: flex; align-items: center; gap: 5px; z-index: 3;
+      transition: all .15s;
+    }
+    .btn-camara:hover { background: rgba(0,0,0,0.8); color: white; }
+    .btn-camara svg { width: 12px; height: 12px; }
+    .btn-camara.activo { background: rgba(200,0,0,0.6); border-color: rgba(255,0,0,0.3); }
+
+    /* ── DIVIDER ── */
+    .divider {
+      display: flex; align-items: center; gap: 10px; margin: 4px 0 14px;
+    }
+    .divider-line { flex: 1; height: 1px; background: rgba(255,255,255,0.08); }
+    .divider span { font-size: 11px; color: rgba(255,255,255,0.3); }
+
+    /* ── INPUT ── */
+    .input-wrap { position: relative; margin-bottom: 12px; }
+    .input-wrap .ico {
+      position: absolute; left: 13px; top: 50%;
+      transform: translateY(-50%);
+      width: 16px; height: 16px; color: rgba(0,0,0,0.35);
+      pointer-events: none;
+    }
+    .inp {
+      width: 100%; padding: 13px 13px 13px 38px;
+      border-radius: 11px; border: none; outline: none;
+      background: rgba(255,255,255,0.92); color: #1a1a2e;
+      font-size: 15px; font-family: monospace; font-weight: 600;
+      letter-spacing: .08em;
+      transition: all .2s;
+    }
+    .inp:focus {
+      box-shadow: 0 0 0 2.5px #00c6ff;
+      background: white;
+    }
+    .inp.err { box-shadow: 0 0 0 2.5px var(--rojo); }
+
+    /* ── CAPTCHA ── */
+    .captcha-section { margin-bottom: 12px; }
+    .captcha-label {
+      font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.35);
+      text-transform: uppercase; letter-spacing: .07em; margin-bottom: 6px;
+    }
+    .captcha-box {
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(0,0,0,0.3);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 11px; padding: 11px 14px;
+    }
+    .captcha-eq {
+      font-family: monospace; font-size: 17px; font-weight: 800;
+      color: white; letter-spacing: 3px;
+      text-shadow: 2px 1px 0 rgba(0,198,255,0.3), -1px -1px 0 rgba(255,100,100,0.2);
+      user-select: none;
+    }
+    .captcha-right { display: flex; align-items: center; gap: 8px; }
+    .captcha-inp {
+      width: 64px; padding: 8px 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.9);
+      font-size: 15px; font-weight: 700;
+      text-align: center; color: #1a1a2e; outline: none;
+    }
+    .captcha-inp:focus { box-shadow: 0 0 0 2px #00c6ff; }
+    .btn-refresh {
+      width: 30px; height: 30px; border-radius: 7px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(255,255,255,0.07);
+      color: rgba(255,255,255,0.5); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all .15s;
+    }
+    .btn-refresh:hover { background: rgba(255,255,255,0.15); color: white; }
+    .btn-refresh svg { width: 14px; height: 14px; }
+
+    /* ── RATE LIMIT ── */
+    .rate-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      margin-bottom: 14px; gap: 5px;
+    }
+    .rate-dots { display: flex; gap: 5px; }
+    .rate-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+      transition: background .3s;
+    }
+    .rate-dot.used { background: #00c6ff; }
+    .rate-dot.warn { background: #EF9F27; }
+    .rate-dot.gone { background: var(--rojo); }
+    .rate-label { font-size: 10px; color: rgba(255,255,255,0.3); }
+
+    /* ── BLOQUEO ── */
+    .bloqueo-box {
+      background: rgba(163,45,45,0.15);
+      border: 1px solid rgba(230,70,70,0.3);
+      border-radius: 11px; padding: 14px 16px;
+      text-align: center; margin-bottom: 12px;
+      display: none;
+    }
+    .bloqueo-box.show { display: block; }
+    .bloqueo-timer { font-size: 22px; font-weight: 800; color: var(--rojo); margin: 4px 0; }
+    .bloqueo-sub { font-size: 12px; color: rgba(255,255,255,0.45); }
+
+    /* ── ERROR MSG ── */
+    .error-msg {
+      font-size: 12px; color: #ff8080;
+      text-align: center; margin-bottom: 10px;
+      min-height: 16px;
+    }
+
+    /* ── BTN PRINCIPAL ── */
+    .btn-validar {
+      width: 100%; padding: 14px;
+      border-radius: 12px; border: none;
+      background: var(--azul); color: white;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; transition: all .2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-validar:hover:not(:disabled) {
+      background: var(--azul-dark); transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(24,95,165,0.4);
+    }
+    .btn-validar:active:not(:disabled) { transform: scale(0.98); }
+    .btn-validar:disabled { background: rgba(255,255,255,0.1); cursor: not-allowed; }
+    .btn-validar svg { width: 16px; height: 16px; }
+    .spin-btn {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── RESULTADO ── */
+    .resultado {
+      margin-top: 18px;
+      border-radius: 16px;
+      overflow: hidden;
+      animation: popIn .35s ease;
+    }
+    @keyframes popIn {
+      from { opacity: 0; transform: scale(0.95) translateY(8px); }
+      to   { opacity: 1; transform: scale(1)    translateY(0); }
+    }
+
+    .res-header {
+      padding: 22px 20px;
+      display: flex; flex-direction: column; align-items: center; text-align: center;
+    }
+    .res-icon {
+      width: 56px; height: 56px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 12px;
+    }
+    .res-icon svg { width: 28px; height: 28px; }
+    .res-title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+    .res-sub   { font-size: 12px; opacity: .65; }
+
+    .res-body { padding: 16px 20px 20px; }
+    .res-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.07);
+      font-size: 13px;
+    }
+    .res-row:last-child { border-bottom: none; }
+    .res-key { color: rgba(255,255,255,0.55); }
+    .res-val { font-weight: 700; text-align: right; }
+
+    /* Vigencia barra */
+    .vig-wrap { margin-top: 14px; }
+    .vig-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 6px; font-size: 11px;
+    }
+    .vig-label { color: rgba(255,255,255,0.5); font-weight: 600; }
+    .vig-dias  { font-weight: 800; }
+    .vig-track {
+      height: 7px; background: rgba(255,255,255,0.1);
+      border-radius: 4px; overflow: hidden; margin-bottom: 5px;
+    }
+    .vig-fill { height: 100%; border-radius: 4px; transition: width .6s ease; }
+    .vig-fechas {
+      display: flex; justify-content: space-between;
+      font-size: 10px; color: rgba(255,255,255,0.35);
+    }
+
+    /* Leyenda */
+    .leyenda {
+      margin-top: 14px; padding: 10px 14px;
+      background: rgba(255,200,0,0.08);
+      border: 1px solid rgba(255,200,0,0.18);
+      border-radius: 9px;
+      display: flex; gap: 8px; align-items: flex-start;
+      font-size: 11px; color: rgba(255,220,100,0.75); line-height: 1.5;
+    }
+    .leyenda svg { width: 13px; height: 13px; flex-shrink: 0; margin-top: 1px; color: rgba(255,200,0,0.6); }
+
+    /* Colores por estado */
+    .res-vigente {
+      background: linear-gradient(160deg, #071d10, #0b2e18);
+      border: 1px solid rgba(0,200,120,0.25);
+    }
+    .res-vigente .res-icon { background: rgba(0,200,120,0.18); }
+    .res-vigente .res-icon svg { color: var(--verde); }
+    .res-vigente .res-title { color: var(--verde); }
+    .res-vigente .vig-dias  { color: var(--verde); }
+
+    .res-vencido {
+      background: linear-gradient(160deg, #1d0707, #2e0b0b);
+      border: 1px solid rgba(230,70,70,0.25);
+    }
+    .res-vencido .res-icon { background: rgba(230,70,70,0.18); }
+    .res-vencido .res-icon svg { color: var(--rojo); }
+    .res-vencido .res-title { color: var(--rojo); }
+    .res-vencido .vig-dias  { color: var(--rojo); }
+
+    .res-noenc {
+      background: linear-gradient(160deg, #0f0f1c, #161626);
+      border: 1px solid rgba(150,150,200,0.18);
+    }
+    .res-noenc .res-icon { background: rgba(150,150,200,0.12); }
+    .res-noenc .res-icon svg { color: var(--gris); }
+    .res-noenc .res-title { color: var(--gris); }
+
+    /* ── FOOTER ── */
+    .page-footer {
+      margin-top: 24px;
+      font-size: 11px; color: rgba(255,255,255,0.2);
+      text-align: center; line-height: 1.7;
+    }
+    .page-footer a { color: rgba(255,255,255,0.35); text-decoration: none; }
+    .page-footer a:hover { color: rgba(255,255,255,0.6); }
+  </style>
+</head>
+<body class="bg-neutro">
+
+<!-- BRAND -->
+<div class="brand">
+  <div class="brand-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+      <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
+  </div>
+  <div class="brand-name">AVBA Inspections</div>
+  <div class="brand-sub">Verificación oficial de certificados</div>
+</div>
+
+<!-- CARD -->
+<div class="card">
+  <div class="card-title">Validar certificado</div>
+  <div class="card-sub">Escanea el código QR o ingresa el código de 10 dígitos</div>
+
+  <!-- SCANNER -->
+  <div class="scanner-wrap" id="scanner-wrap">
+    <div class="scan-line" id="scan-line"></div>
+    <div class="scanner-placeholder" id="scanner-placeholder">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="3" y="3" width="7" height="7"/>
+        <rect x="14" y="3" width="7" height="7"/>
+        <rect x="3" y="14" width="7" height="7"/>
+        <path d="M14 14h2v2M18 14v.5M14 18h4M18 16v2"/>
+      </svg>
+      <span id="scanner-msg">Toca para activar la cámara</span>
+    </div>
+    <div id="reader"></div>
+    <button class="btn-camara" id="btn-camara" onclick="toggleCamara()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <rect x="1.5" y="3.5" width="13" height="10" rx="2"/>
+        <circle cx="8" cy="8.5" r="2.5"/>
+        <path d="M6 3.5V2.5a1 1 0 011-1h2a1 1 0 011 1v1"/>
+      </svg>
+      Activar cámara
+    </button>
+  </div>
+
+  <div class="divider">
+    <div class="divider-line"></div>
+    <span>o ingresa el código</span>
+    <div class="divider-line"></div>
+  </div>
+
+  <!-- INPUT -->
+  <div class="input-wrap">
+    <svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+      <rect x="2" y="2" width="5" height="5"/>
+      <rect x="9" y="2" width="5" height="5"/>
+      <rect x="2" y="9" width="5" height="5"/>
+    </svg>
+    <input class="inp" type="text" id="qr-input"
+      placeholder="Ej: 0012300045 ó AB.12345-67890-2026MX"
+      maxlength="30"
+      autocomplete="off"
+      onkeydown="if(event.key==='Enter') validar()"
+      oninput="limpiarError()">
+  </div>
+
+  <!-- CAPTCHA -->
+  <div class="captcha-section">
+    <div class="captcha-label">Verificación de seguridad</div>
+    <div class="captcha-box">
+      <div style="display:flex;align-items:center;gap:10px">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5">
+          <path d="M8 2a6 6 0 100 12A6 6 0 008 2zM8 6v2.5L10 10"/>
+        </svg>
+        <span class="captcha-eq" id="cap-eq">? + ? = ?</span>
+      </div>
+      <div class="captcha-right">
+        <input class="captcha-inp" type="number" id="cap-inp"
+          placeholder="?" min="0" max="20"
+          onkeydown="if(event.key==='Enter') validar()">
+        <button class="btn-refresh" onclick="nuevoCaptcha()" title="Nuevo desafío">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M2 8a6 6 0 0110.5-4M14 2v4h-4"/>
+            <path d="M14 8a6 6 0 01-10.5 4M2 14v-4h4"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RATE LIMIT -->
+  <div class="rate-wrap">
+    <div class="rate-dots" id="rate-dots"></div>
+    <div class="rate-label" id="rate-label">5 consultas disponibles en esta sesión</div>
+  </div>
+
+  <!-- BLOQUEO TEMPORAL -->
+  <div class="bloqueo-box" id="bloqueo-box">
+    <div style="font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:4px">Demasiados intentos</div>
+    <div class="bloqueo-timer" id="bloqueo-timer">10:00</div>
+    <div class="bloqueo-sub">Espera para continuar realizando consultas</div>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-msg" id="error-msg"></div>
+
+  <!-- BOTÓN -->
+  <button class="btn-validar" id="btn-validar" onclick="validar()">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 8l3 3 7-7"/>
+    </svg>
+    Verificar certificado
+  </button>
+
+  <!-- RESULTADO -->
+  <div id="resultado"></div>
+</div>
+
+<!-- FOOTER -->
+<div class="page-footer">
+  <a href="https://avba.com.mx">avba.com.mx</a> · AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.<br>
+  Este portal es de uso exclusivo para verificación de certificados emitidos por AVBA.
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   CONFIGURACIÓN
+═══════════════════════════════════════ */
+const API          = "https://script.google.com/macros/s/AKfycbzpYYKgr3F64xKXaalBX2-LgPIJdvj9mrCX8XcTPPIa5yQVJLBBq5b9oB5CEsaxCtF8/exec";
+const MAX_CONSULTAS = 5;
+const BLOQUEO_MIN   = 10;
+const STORAGE_KEY   = "avba_validar";
+
+/* ═══════════════════════════════════════
+   ESTADO
+═══════════════════════════════════════ */
+let capA = 0, capB = 0;
+let consultasUsadas  = 0;
+let bloqueadoHasta   = 0;
+let timerBloqueo     = null;
+let scannerActivo    = false;
+let html5QrCode      = null;
+let beepOk, beepErr;
+
+/* ═══════════════════════════════════════
+   INIT
+═══════════════════════════════════════ */
+window.onload = function() {
+  cargarEstado();
+  nuevoCaptcha();
+  renderDots();
+  verificarBloqueo();
+
+  // Sonidos
+  beepOk  = new Audio("https://www.soundjay.com/buttons/sounds/button-3.mp3");
+  beepErr = new Audio("https://www.soundjay.com/buttons/sounds/button-10.mp3");
+
+  document.getElementById("qr-input").focus();
+};
+
+/* ═══════════════════════════════════════
+   PERSISTENCIA EN SESSION STORAGE
+═══════════════════════════════════════ */
+function cargarEstado() {
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return;
+    const s = JSON.parse(raw);
+    consultasUsadas = s.consultasUsadas || 0;
+    bloqueadoHasta  = s.bloqueadoHasta  || 0;
+  } catch(e) {}
+}
+
+function guardarEstado() {
+  sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ consultasUsadas, bloqueadoHasta }));
+}
+
+/* ═══════════════════════════════════════
+   CAPTCHA
+═══════════════════════════════════════ */
+function nuevoCaptcha() {
+  capA = Math.floor(Math.random() * 9) + 1;
+  capB = Math.floor(Math.random() * 9) + 1;
+  document.getElementById("cap-eq").textContent = capA + " + " + capB + " = ?";
+  document.getElementById("cap-inp").value = "";
+  limpiarError();
+}
+
+function validarCaptcha() {
+  const resp = parseInt(document.getElementById("cap-inp").value, 10);
+  return resp === capA + capB;
+}
+
+/* ═══════════════════════════════════════
+   RATE LIMITING
+═══════════════════════════════════════ */
+function renderDots() {
+  const cont = document.getElementById("rate-dots");
+  cont.innerHTML = "";
+  for (let i = 0; i < MAX_CONSULTAS; i++) {
+    const d = document.createElement("div");
+    d.className = "rate-dot";
+    if (i < consultasUsadas) {
+      d.classList.add(
+        consultasUsadas >= MAX_CONSULTAS ? "gone" :
+        consultasUsadas >= MAX_CONSULTAS - 1 ? "warn" : "used"
+      );
+    }
+    cont.appendChild(d);
+  }
+  const restantes = Math.max(0, MAX_CONSULTAS - consultasUsadas);
+  document.getElementById("rate-label").textContent =
+    restantes === 0
+      ? "Límite de consultas alcanzado"
+      : restantes + " consulta" + (restantes === 1 ? "" : "s") + " disponible" + (restantes === 1 ? "" : "s") + " en esta sesión";
+}
+
+function verificarBloqueo() {
+  if (bloqueadoHasta && Date.now() < bloqueadoHasta) {
+    activarBloqueo();
+    return true;
+  }
+  if (consultasUsadas >= MAX_CONSULTAS) {
+    bloqueadoHasta = Date.now() + BLOQUEO_MIN * 60 * 1000;
+    guardarEstado();
+    activarBloqueo();
+    return true;
+  }
+  return false;
+}
+
+function activarBloqueo() {
+  document.getElementById("bloqueo-box").classList.add("show");
+  document.getElementById("btn-validar").disabled = true;
+  clearInterval(timerBloqueo);
+
+  timerBloqueo = setInterval(() => {
+    const restante = bloqueadoHasta - Date.now();
+    if (restante <= 0) {
+      clearInterval(timerBloqueo);
+      consultasUsadas = 0;
+      bloqueadoHasta  = 0;
+      guardarEstado();
+      document.getElementById("bloqueo-box").classList.remove("show");
+      document.getElementById("btn-validar").disabled = false;
+      renderDots();
+      nuevoCaptcha();
+    } else {
+      const m = String(Math.floor(restante / 60000)).padStart(2, "0");
+      const s = String(Math.floor((restante % 60000) / 1000)).padStart(2, "0");
+      document.getElementById("bloqueo-timer").textContent = m + ":" + s;
+    }
+  }, 1000);
+}
+
+/* ═══════════════════════════════════════
+   ERRORES
+═══════════════════════════════════════ */
+function mostrarError(msg) {
+  document.getElementById("error-msg").textContent = msg;
+  document.getElementById("qr-input").classList.add("err");
+}
+
+function limpiarError() {
+  document.getElementById("error-msg").textContent = "";
+  document.getElementById("qr-input").classList.remove("err");
+}
+
+/* ═══════════════════════════════════════
+   VALIDAR
+═══════════════════════════════════════ */
+/**
+ * Extrae el folio de búsqueda del input.
+ * Acepta:
+ *   - 10 dígitos directos:      "0012300045"
+ *   - Número de certificado:    "AB.12345-67890-2026MX"  → extrae "12345-67890"
+ *   - URL de QR completa:       "https://...?id=12345-67890&..."  → extrae el código
+ */
+function extraerCodigo(valor) {
+  const v = valor.trim();
+
+  // Formato número de certificado: AB.XXXXX-YYYYY-2026MX (o variantes)
+  // Extrae la parte entre el primer "." y el último "-YEAR"
+  const matchCert = v.match(/^[A-Z]+\.(\d{5}-\d{5})-\d{4}[A-Z]+$/i);
+  if (matchCert) return matchCert[1]; // devuelve "XXXXX-YYYYY" = folio de col K
+
+  // URL completa del QR con parámetro id o qr
+  const matchUrl = v.match(/[?&](?:id|qr|code)=([^&]+)/i);
+  if (matchUrl) return decodeURIComponent(matchUrl[1]);
+
+  // 10 dígitos directos (código de col S)
+  if (/^\d{10}$/.test(v)) return v;
+
+  // Folio con guión (col K directamente): "XXXXX-YYYYY"
+  if (/^\d{5}-\d{5}$/.test(v)) return v;
+
+  return v; // devolver tal cual y dejar que el backend maneje
+}
+
+async function validar() {
+  limpiarError();
+
+  if (verificarBloqueo()) return;
+
+  const inputRaw = document.getElementById("qr-input").value.trim();
+
+  if (!inputRaw) {
+    mostrarError("Ingresa el código o número de certificado.");
+    return;
+  }
+
+  // Extraer el código según el formato ingresado
+  const codigo = extraerCodigo(inputRaw);
+
+  // Validar que sea un formato reconocido
+  const esCodigoQR    = /^\d{10}$/.test(codigo);
+  const esFolio       = /^\d{5}-\d{5}$/.test(codigo);
+  if (!esCodigoQR && !esFolio) {
+    mostrarError("Formato no reconocido. Usa el código de 10 dígitos o el número de certificado (Ej: AB.12345-67890-2026MX).");
+    document.getElementById("qr-input").classList.add("err");
+    return;
+  }
+
+  // Validar captcha
+  if (!validarCaptcha()) {
+    mostrarError("La respuesta de seguridad es incorrecta. Intenta de nuevo.");
+    nuevoCaptcha();
+    document.getElementById("cap-inp").focus();
+    return;
+  }
+
+  // Consumir consulta
+  consultasUsadas++;
+  guardarEstado();
+  renderDots();
+
+  // UI loading
+  const btn = document.getElementById("btn-validar");
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spin-btn"></div> Verificando...`;
+
+  try {
+    const res   = await fetch(`${API}?action=VALIDAR_QR&qr=${encodeURIComponent(codigo)}`);
+    const texto = await res.text();
+    const data  = JSON.parse(texto);
+
+    mostrarResultado(data);
+    nuevoCaptcha();
+
+  } catch(e) {
+    mostrarError("Error de conexión. Intenta de nuevo.");
+    consultasUsadas = Math.max(0, consultasUsadas - 1);
+    guardarEstado();
+    renderDots();
+    console.error("validar:", e);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l3 3 7-7"/></svg> Verificar certificado`;
+    verificarBloqueo();
+  }
+}
+
+/* ═══════════════════════════════════════
+   MOSTRAR RESULTADO
+═══════════════════════════════════════ */
+function mostrarResultado(data) {
+  const div = document.getElementById("resultado");
+
+  document.body.className = "";
+
+  // Sonido + vibración
+  try {
+    if (data.existe && data.vigente) beepOk.play();
+    else beepErr.play();
+  } catch(e) {}
+  if (navigator.vibrate) navigator.vibrate(data.existe && data.vigente ? [100] : [100,50,100]);
+
+  if (!data.existe) {
+    document.body.classList.add("bg-noenc");
+    div.innerHTML = `
+      <div class="resultado res-noenc">
+        <div class="res-header">
+          <div class="res-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v3M11 14v.5"/>
+            </svg>
+          </div>
+          <div class="res-title">NO ENCONTRADO</div>
+          <div class="res-sub">El código no corresponde a ningún certificado registrado</div>
+        </div>
+        <div class="res-body" style="text-align:center;padding-bottom:20px">
+          <p style="font-size:13px;color:rgba(255,255,255,0.5);line-height:1.7">
+            Verifica que el código esté escrito correctamente.<br>
+            Si el documento parece auténtico, contacta a AVBA.
+          </p>
+          <a href="https://avba.com.mx" style="display:inline-block;margin-top:14px;padding:8px 20px;border-radius:20px;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);font-size:12px;text-decoration:none">
+            Contactar a AVBA
+          </a>
+        </div>
+      </div>`;
+    setTimeout(resetBg, 20000);
+    return;
+  }
+
+  const d = data.datos;
+
+  // Calcular vigencia
+  let vigPct = 0, vigColor = "#00c87a", vigLabel = "";
+  if (data.dias !== undefined && data.dias !== null) {
+    const dias = data.dias;
+    vigPct  = Math.max(0, Math.min(100, Math.round((dias / 365) * 100)));
+    if (!data.vigente) {
+      vigColor = "#e64646";
+      vigLabel = "Vencido";
+      vigPct   = 100;
+    } else if (dias <= 30) {
+      vigColor = "#EF9F27";
+      vigLabel = `Vence en ${dias} día${dias===1?"":"s"}`;
+    } else {
+      vigColor = "#00c87a";
+      vigLabel = `${dias} días restantes`;
+    }
+  }
+
+  if (data.vigente) {
+    document.body.classList.add("bg-vigente");
+    div.innerHTML = `
+      <div class="resultado res-vigente">
+        <div class="res-header">
+          <div class="res-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+          </div>
+          <div class="res-title">CERTIFICADO VIGENTE</div>
+          <div class="res-sub">Documento verificado y autenticado por AVBA</div>
+        </div>
+        <div class="res-body">
+          ${filaHTML("Tipo de equipo", d.maquinaria||d.tipo||"—")}
+          ${filaHTML("Marca / Modelo", (d.marca||"") + " " + (d.modelo||""))}
+          ${filaHTML("No. de serie",   d.serie||"—")}
+          ${d.capacidad ? filaHTML("Capacidad", d.capacidad) : ""}
+          ${filaHTML("Certificado el", d.fecha||"—")}
+          ${filaHTML("Válido hasta",   d.vencimiento||"—")}
+          <div class="vig-wrap">
+            <div class="vig-header">
+              <span class="vig-label">Vigencia</span>
+              <span class="vig-dias" style="color:${vigColor}">${vigLabel}</span>
+            </div>
+            <div class="vig-track">
+              <div class="vig-fill" style="width:${100-vigPct}%;background:${vigColor}"></div>
+            </div>
+            <div class="vig-fechas">
+              <span>${d.fecha||""}</span>
+              <span>${d.vencimiento||""}</span>
+            </div>
+          </div>
+          <div class="leyenda">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M8 2l6 12H2L8 2z"/><path d="M8 7v3M8 11.5v.5"/>
+            </svg>
+            Los datos mostrados deben coincidir con el documento físico presentado. En caso de discrepancia, el documento no es auténtico.
+          </div>
+        </div>
+      </div>`;
+    setTimeout(resetBg, 30000);
+
+  } else {
+    document.body.classList.add("bg-vencido");
+    div.innerHTML = `
+      <div class="resultado res-vencido">
+        <div class="res-header">
+          <div class="res-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 2l9 16H3L12 2z"/><path d="M12 10v4M12 16v.5"/>
+            </svg>
+          </div>
+          <div class="res-title">CERTIFICADO VENCIDO</div>
+          <div class="res-sub">Este certificado ya no está vigente</div>
+        </div>
+        <div class="res-body">
+          ${filaHTML("Tipo de equipo", d.maquinaria||d.tipo||"—")}
+          ${filaHTML("Marca / Modelo", (d.marca||"") + " " + (d.modelo||""))}
+          ${filaHTML("No. de serie",   d.serie||"—")}
+          ${d.capacidad ? filaHTML("Capacidad", d.capacidad) : ""}
+          ${filaHTML("Certificado el", d.fecha||"—")}
+          <div class="res-row">
+            <span class="res-key">Venció el</span>
+            <span class="res-val" style="color:var(--rojo)">${d.vencimiento||"—"}</span>
+          </div>
+          <div class="vig-wrap">
+            <div class="vig-header">
+              <span class="vig-label">Vigencia</span>
+              <span class="vig-dias" style="color:var(--rojo)">Vencido</span>
+            </div>
+            <div class="vig-track">
+              <div class="vig-fill" style="width:100%;background:var(--rojo)"></div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    setTimeout(resetBg, 30000);
+  }
+}
+
+function filaHTML(key, val) {
+  return `<div class="res-row"><span class="res-key">${key}</span><span class="res-val">${val}</span></div>`;
+}
+
+function resetBg() {
+  document.body.className = "bg-neutro";
+  document.getElementById("resultado").innerHTML = "";
+  document.getElementById("qr-input").value = "";
+  document.getElementById("qr-input").focus();
+}
+
+/* ═══════════════════════════════════════
+   SCANNER QR (CÁMARA)
+═══════════════════════════════════════ */
+function esMovil() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
+async function toggleCamara() {
+  if (scannerActivo) {
+    await detenerCamara();
+  } else {
+    await iniciarCamara();
+  }
+}
+
+async function iniciarCamara() {
+  const placeholder = document.getElementById("scanner-placeholder");
+  const btnCam      = document.getElementById("btn-camara");
+  const wrap        = document.getElementById("scanner-wrap");
+
+  placeholder.style.display = "none";
+  wrap.classList.add("activo");
+  btnCam.classList.add("activo");
+  btnCam.innerHTML = `
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12">
+      <path d="M3 3l10 10M13 3L3 13"/>
+    </svg> Detener`;
+
+  try {
+    html5QrCode = new Html5Qrcode("reader");
+
+    const cameras = await Html5Qrcode.getCameras();
+    if (!cameras || cameras.length === 0) throw new Error("Sin cámaras disponibles");
+
+    // Preferir cámara trasera
+    const camara = cameras.find(c =>
+      c.label.toLowerCase().includes("back") ||
+      c.label.toLowerCase().includes("rear") ||
+      c.label.toLowerCase().includes("trasera")
+    ) || cameras[cameras.length - 1];
+
+    await html5QrCode.start(
+      camara.id,
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      async (qrCode) => {
+        await detenerCamara();
+        // Extraer código de 10 dígitos de la URL del QR si aplica
+        let codigo = qrCode;
+        const match = qrCode.match(/[?&](?:qr|id|code)=([^&]+)/i);
+        if (match) codigo = decodeURIComponent(match[1]);
+        // Quedarnos solo con los dígitos si hay más
+        const soloDigitos = codigo.replace(/\D/g, "").slice(0, 10);
+        if (soloDigitos.length === 10) codigo = soloDigitos;
+
+        document.getElementById("qr-input").value = codigo;
+        validar();
+      }
+    );
+    scannerActivo = true;
+  } catch(e) {
+    console.error("Cámara:", e);
+    placeholder.style.display = "flex";
+    wrap.classList.remove("activo");
+    btnCam.classList.remove("activo");
+    btnCam.innerHTML = `
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12">
+        <rect x="1.5" y="3.5" width="13" height="10" rx="2"/>
+        <circle cx="8" cy="8.5" r="2.5"/>
+      </svg> Activar cámara`;
+    document.getElementById("scanner-msg").textContent = "Cámara no disponible — usa el código manual";
+    scannerActivo = false;
+  }
+}
+
+async function detenerCamara() {
+  if (html5QrCode && scannerActivo) {
+    try { await html5QrCode.stop(); } catch(e) {}
+    html5QrCode = null;
+  }
+  scannerActivo = false;
+  const placeholder = document.getElementById("scanner-placeholder");
+  const btnCam      = document.getElementById("btn-camara");
+  const wrap        = document.getElementById("scanner-wrap");
+  placeholder.style.display = "flex";
+  wrap.classList.remove("activo");
+  btnCam.classList.remove("activo");
+  btnCam.innerHTML = `
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" width="12" height="12">
+      <rect x="1.5" y="3.5" width="13" height="10" rx="2"/>
+      <circle cx="8" cy="8.5" r="2.5"/>
+    </svg> Activar cámara`;
+  document.getElementById("scanner-msg").textContent = "Toca para activar la cámara";
+}
+
+/* ═══════════════════════════════════════
+   TAMBIÉN ACTUALIZAR validarQR EN APPS SCRIPT
+   para que devuelva dias y vencimiento:
+
+   En la función validarQR del Apps Script,
+   agrega en el objeto de retorno:
+     dias: diasRestantes,
+     vencimiento: vencimientoTexto,
+     datos: {
+       ...datos_actuales,
+       maquinaria: data[i][3],
+       vencimiento: vencimientoTexto
+     }
+═══════════════════════════════════════ */
+</script>
+</body>
+</html>
