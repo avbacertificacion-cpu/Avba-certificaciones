@@ -1,0 +1,1595 @@
+/**************************************
+ * 1. CONFIGURACIÓN GENERAL
+ **************************************/
+const ID_PLANTILLA_DOC = '1drBlBm97Ju_49XO8jWHPwpNeaA9HbajzybmbNIRaUaQ'; 
+const ID_CARPETA_RAIZ = '1rS58dcGgsfgM3OeGg1z-oZ5LlZbGXOpT'; 
+
+const CONFIG = {
+  HOJA_EQUIPO: 'EQUIPO',
+  COL_ESTADO: 17,              // Columna Q
+  COL_MOTIVO: 18,              // Columna R
+  ID_PLANTILLA: '1drBlBm97Ju_49XO8jWHPwpNeaA9HbajzybmbNIRaUaQ', 
+  ID_CARPETA_TEMPORALES: '1aW5Z3D3oC-ymHJTrK_gwjtLkVPV2gK1k',
+  // Nombres de encabezados para validación
+  HDR_CONTROL: 'Control',
+  HDR_CLIENTE: 'Cliente o Razon social',
+  HDR_MARCA: 'Marca',
+  HDR_SERIE: 'Serie',
+  HDR_FECHA_CERT: 'Fecha Certificación'
+};
+
+/**************************************
+ * 2. MOTOR DE COMUNICACIÓN WEB (doGet / doPost)
+ **************************************/
+
+/**
+ * Validación pública desde validar.html
+ */
+/**
+ * [APPSCRIPT] FUNCIÓN DOGET UNIFICADA
+ * Atiende tanto el portal de gestión como la validación de QR.
+ */
+/**
+ * [APPSCRIPT] FUNCIÓN DOGET UNIFICADA
+ * Determina si mostrar el Panel de Gestión o la Validación de QR
+ */
+function doGet(e) {
+
+  // 🔹 1. VALIDACIÓN DE CERTIFICADOS (tu lógica original)
+  if (e.parameter.id) {
+    return validarCertificadoPublico(e.parameter.id);
+  }
+
+  // 🔹 2. API PARA FRONTEND (Hostinger)
+  if (e.parameter.action) {
+
+    let data;
+
+    if (e.parameter.action === 'getMaquinaria') {
+      data = obtenerOpcionesMaquinaria();
+    } 
+    else if (e.parameter.action === 'getChecklist') {
+      data = obtenerChecklistPorEquipo(e.parameter.equipo);
+    }
+    else if (e.parameter.action === 'getDataCertificaciones') {
+      data = obtenerDataCertificaciones();
+    }
+    else if (e.parameter.action === 'getDataCalidad') {        // ← ESTE FALTABA
+  data = getDataCalidad();
+}
+  else if (e.parameter.action === "LISTAR_USUARIOS") {
+    data = listarUsuarios();
+  }
+
+
+    else if (e.parameter.action === "IMPRIMIR_PDF") {
+  data = imprimirPDF({
+    fila: e.parameter.fila
+  });
+}
+
+else if (e.parameter.action === "GENERAR_PDF") {
+  data = generarPDFEnvio({
+    fila: e.parameter.fila
+  });
+}
+else if (e.parameter.action === "IMPRIMIR_PDF_CERT") {
+  data = imprimirPDFCert({ fila: parseInt(e.parameter.fila) });
+}
+
+else if (e.parameter.action === "IMPRIMIR_PDF_DICT") {
+  data = imprimirPDFDict({ fila: parseInt(e.parameter.fila) });
+}
+
+else if (e.parameter.action === "ENVIAR_CERTIFICADO") {
+  data = enviarCertificado({
+    fila: e.parameter.fila,
+    fileId: e.parameter.fileId
+  });
+}
+
+    else if (e.parameter.action === "VALIDAR_QR") {
+
+  const result = validarQR({
+    qr: e.parameter.qr || ""
+  });
+
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+
+    // 👉 respuesta JSON
+    return ContentService
+      .createTextOutput(JSON.stringify(data))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // 🔹 3. CARGA NORMAL DEL SISTEMA (si entras directo)
+  return HtmlService
+    .createTemplateFromFile('index')
+    .evaluate()
+    .setTitle("Sistema de Gestión AVBA")
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+
+/**
+ * [APPSCRIPT] FUNCIÓN DE VALIDACIÓN CON COLUMNAS CORREGIDAS
+ */
+function validarCertificadoPublico(idBusqueda) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.HOJA_EQUIPO);
+  const data = sheet.getDataRange().getValues();
+  
+  // MAPEO DE COLUMNAS SEGÚN TU ESTRUCTURA REAL:
+  const colControl = 10;   // Columna K (Folio)
+  const colCliente = 1;    // Columna B (Cliente)
+  const colMarca   = 3;    // Columna D (Marca)
+  const colSerie   = 6;    // Columna G (Serie)
+  const colFechaCert = 8;  // COLUMNA I (Fecha Certificación) - ¡CORREGIDO!
+
+  const idLimpio = idBusqueda.trim().toUpperCase();
+  const hoy = new Date();
+  let registroEncontrado = null;
+
+  for (let i = 1; i < data.length; i++) {
+    let valorControl = data[i][colControl] ? data[i][colControl].toString().trim().toUpperCase() : "";
+    
+    if (valorControl === idLimpio) {
+      let fechaCertRaw = data[i][colFechaCert];
+      let fechaTexto = "Fecha no disponible";
+      let vencimientoTexto = "No disponible";
+      let estaVigente = false;
+
+      // VALIDACIÓN DE FECHA EN COLUMNA I
+      if (fechaCertRaw && (fechaCertRaw instanceof Date) && !isNaN(fechaCertRaw.getTime())) {
+        let fechaCert = fechaCertRaw;
+        let fechaVencimiento = new Date(fechaCert);
+        fechaVencimiento.setFullYear(fechaVencimiento.getFullYear() + 1);
+        
+        fechaTexto = Utilities.formatDate(fechaCert, "GMT-6", "dd/MM/yyyy");
+        vencimientoTexto = Utilities.formatDate(fechaVencimiento, "GMT-6", "dd/MM/yyyy");
+        estaVigente = hoy <= fechaVencimiento;
+      }
+
+      registroEncontrado = {
+        valido: true,
+        control: valorControl,
+        cliente: data[i][colCliente] || "N/A",
+        marca: data[i][colMarca] || "N/A",
+        serie: data[i][colSerie] || "N/A",
+        fechaCertificacion: fechaTexto,
+        fechaVencimiento: vencimientoTexto,
+        vigente: estaVigente
+      };
+      break; 
+    }
+  }
+
+  if (!registroEncontrado) {
+    registroEncontrado = { valido: false };
+  }
+
+  const template = HtmlService.createTemplateFromFile('resultado_qr');
+  template.datos = registroEncontrado;
+  
+  return template.evaluate()
+      .setTitle("Validación AVBA - " + idLimpio)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+/**
+ * Función de apoyo para respuestas JSON (mantenida por compatibilidad)
+ */
+function respuestaJSON(contenido) {
+  return ContentService.createTextOutput(JSON.stringify(contenido))
+      .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * Peticiones privadas (Login / Acciones)
+ */
+
+
+function respuestaJSON(objeto) {
+  return ContentService.createTextOutput(JSON.stringify(objeto)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/**************************************
+ * 3. INTERFAZ DE USUARIO (Menú)
+ **************************************/
+function onOpen() {
+  const ui = SpreadsheetApp.getUi();
+  ui.createMenu('⚙️ SISTEMA GESTIÓN')
+      .addItem('✅ [CALIDAD] Aceptar Registros', 'AceptarRegistrosCalidad')
+      .addSeparator()
+      .addItem('❌ [CERTIF.] Rechazar a Calidad', 'RechazarACalidad')
+      .addItem('🖨️ [CERTIF.] Imprimir PDF Temporal', 'imprimirPDFtemporal')
+      .addItem('📧 [CERTIF.] Generar y Enviar Correo', 'generarPDFyEnviar')
+      .addItem('📧 [CERTIF.] Generar Control', 'generarControl')
+      .addToUi();
+}
+
+
+
+
+/**
+ * Función unificada para generar el PDF del certificado AVBA.
+ * Se activa desde el botón actual o desde la llamada web.
+ */
+/**
+ * Versión para Web: Genera el PDF y retorna la URL para visualización inmediata.
+ */
+function imprimirPDFtemporal(filaWeb) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.HOJA_EQUIPO || 'EQUIPO');
+  
+  // Si viene de la web usa filaWeb, si se corre manual usa la celda activa
+  const fila = filaWeb || sheet.getActiveCell().getRow();
+  if (fila <= 1) return "Error: Fila no válida";
+
+  // Usamos los IDs de tu objeto CONFIG o los definidos en la función
+  const ID_PLANTILLA = "1Uwtiot9ickZh-nXmEu6xtGdyYfNIQRzWtdzCCak2wGI"; 
+  const ID_CARPETA_PDF = CONFIG.ID_CARPETA_TEMPORALES || "1aW5Z3D3oC-ymHJTrK_gwjtLkVPV2gK1k";
+
+  // Obtenemos los datos de la fila (Col A hasta T)
+  const registro = sheet.getRange(fila, 1, 1, 20).getValues()[0];
+  const formulaQR = sheet.getRange(fila, 19).getFormula(); // Columna S
+
+  try {
+    const datos = {
+      folio:      registro[10], // K
+      cliente:    registro[1],  // B
+      domicilio:  registro[13], // N
+      maquinaria: registro[3],  // D
+      marca:      registro[4],  // E
+      modelo:     registro[5],  // F
+      serie:      registro[6],  // G
+      idInterno:  registro[7],  // H
+      fecha:      registro[8],  // I
+      qrFormula:  String(formulaQR || "")
+    };
+
+    // Crear copia temporal del documento
+    const copiaDoc = DriveApp.getFileById(ID_PLANTILLA).makeCopy(`TEMP_${datos.folio}`, DriveApp.getFolderById(ID_CARPETA_PDF));
+    const doc = DocumentApp.openById(copiaDoc.getId());
+    const body = doc.getBody();
+
+    // Proceso de Reemplazo de Etiquetas
+    body.replaceText("{{FOLIO}}", datos.folio || "S/F");
+    body.replaceText("{{CLIENTE}}", datos.cliente || "");
+    body.replaceText("{{Domicilio}}", datos.domicilio || "");
+    body.replaceText("{{Maquinaria}}", datos.maquinaria || "");
+    body.replaceText("{{Marca}}", datos.marca || "");
+    body.replaceText("{{Modelo}}", datos.modelo || "");
+    body.replaceText("{{Serie}}", datos.serie || "");
+    body.replaceText("{{ID}}", datos.idInterno || "");
+    
+    const fTxt = datos.fecha instanceof Date ? Utilities.formatDate(datos.fecha, "GMT-6", "dd/MM/yyyy") : datos.fecha;
+    body.replaceText("{{FECHA}}", fTxt || "");
+
+    // Lógica para insertar la imagen del QR
+    const busquedaQR = body.findText("{{QR}}");
+    if (busquedaQR && datos.qrFormula.includes("http")) {
+      const urlQR = datos.qrFormula.match(/"([^"]+)"/)[1];
+      const img = UrlFetchApp.fetch(urlQR).getBlob();
+      const elemento = busquedaQR.getElement();
+      elemento.asText().setText("");
+      elemento.getParent().asParagraph().appendInlineImage(img).setWidth(100).setHeight(100);
+    }
+
+    doc.saveAndClose();
+    
+    // Convertir a PDF
+    const pdfBlob = copiaDoc.getAs(MimeType.PDF);
+    const pdfFile = DriveApp.getFolderById(ID_CARPETA_PDF).createFile(pdfBlob);
+    
+    // Limpieza: Borrar el DOC temporal (mantener solo el PDF)
+    DriveApp.getFileById(copiaDoc.getId()).setTrashed(true);
+
+    const urlFinal = pdfFile.getUrl();
+    
+    // Opcional: Guardar el enlace en la Columna T (20) para registro
+    sheet.getRange(fila, 20).setValue(urlFinal);
+    
+    return urlFinal; 
+
+  } catch (e) {
+    return "Error en el servidor: " + e.message;
+  }
+}
+
+/**
+ * FUNCIÓN DE AUTO-LIMPIEZA (Programar una vez al día)
+ * Elimina archivos de la carpeta temporal que tengan más de 24 horas.
+ */
+
+/**************************************
+ * 5. GEOLOCALIZACIÓN Y DISPARADORES
+ **************************************/
+
+
+/**************************************
+ * 6. SISTEMA DE CONTROL Y CORREO
+ **************************************/
+
+/**
+ * Genera el número de control único (NumA-NumB).
+ * @param {number} filaManual - (Opcional) Fila específica para procesar.
+ */
+/**
+ * Genera el número de control único y activa la creación del QR.
+ */
+/**
+ * Genera el número de control único (NumA-NumB).
+ * Bloquea duplicados, registra clientes nuevos y dispara el QR en Columna S.
+ * * @param {number} filaManual - Fila procesada por el disparador o manualmente.
+ */
+function generarControl(filaManual) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheetEquipo = ss.getSheetByName(CONFIG.HOJA_EQUIPO || 'EQUIPO');
+  const sheetClientes = ss.getSheetByName('Clientes_Registro');
+
+  // 1. Identificar fila y verificar si ya existe un folio
+  const filaDestino = filaManual || sheetEquipo.getActiveCell().getRow();
+  if (filaDestino <= 1) return; // Ignorar encabezados
+
+  const celdaControl = sheetEquipo.getRange(filaDestino, 11); // Columna K (Folio)
+  
+  // VERIFICACIÓN DE SEGURIDAD: No sobrescribir si ya hay un folio
+  if (celdaControl.getValue() !== "") {
+    console.log("Acción cancelada: La fila " + filaDestino + " ya tiene un folio asignado.");
+    return; 
+  }
+
+  // 2. Obtener nombre del cliente (Columna B)
+  const nombreCliente = sheetEquipo.getRange(filaDestino, 2).getValue();
+  if (!nombreCliente) {
+    ss.toast("Escribe el nombre del cliente en la Columna B primero.", "⚠️ Falta Dato", 3);
+    return;
+  }
+
+  // 3. Obtener o registrar ID de Cliente (NumA)
+  const clientesData = sheetClientes.getDataRange().getValues();
+  let numA = "";
+  let maxNumA = 0;
+
+  for (let i = 1; i < clientesData.length; i++) {
+    const idActual = parseInt(clientesData[i][1], 10);
+    if (!isNaN(idActual) && idActual > maxNumA) maxNumA = idActual;
+    
+    // Normalización para evitar duplicados por minúsculas/mayúsculas
+    if (clientesData[i][0].toString().trim().toUpperCase() === nombreCliente.toString().trim().toUpperCase()) {
+      numA = clientesData[i][1].toString().padStart(5, '0');
+    }
+  }
+
+  // Si el cliente es nuevo, se le asigna el siguiente ID global
+  if (numA === "") {
+    numA = (maxNumA + 1).toString().padStart(5, '0');
+    sheetClientes.appendRow([nombreCliente, numA]);
+  }
+
+  // 4. Calcular el consecutivo de Equipo (NumB)
+  const equipoData = sheetEquipo.getDataRange().getValues();
+  let maxNumB = 0;
+
+  for (let i = 1; i < equipoData.length; i++) {
+    const valorK = equipoData[i][10]; // Columna K
+    if (valorK && valorK.toString().includes('-')) {
+      const partes = valorK.toString().split('-');
+      const numBVal = parseInt(partes[1], 10);
+      if (!isNaN(numBVal) && numBVal > maxNumB) maxNumB = numBVal;
+    }
+  }
+
+  // 5. Construcción del Folio Final
+  const nuevoNumB = (maxNumB + 1).toString().padStart(5, '0');
+  const folioFinal = `${numA}-${nuevoNumB}`;
+
+  // 6. Escritura de resultados y Formato
+  celdaControl.setValue(folioFinal)
+              .setHorizontalAlignment("center")
+              .setFontWeight("bold")
+              .setBackground("#f3f3f3"); // Gris tenue para indicar que es automático
+
+  // 7. LANZAR GENERACIÓN DE QR EN COLUMNA S
+  try {
+    generarQR(filaDestino, folioFinal);
+  } catch(e) {
+    console.log("Error al generar QR: " + e);
+    ss.toast("Folio creado, pero el QR falló.", "⚠️ Aviso", 3);
+  }
+
+  ss.toast("Folio: " + folioFinal + " vinculado correctamente.", "✅ AVBA Sistema", 3);
+  return folioFinal;
+}
+/**
+ * Genera y envía el PDF solo si Calidad ha aprobado (Col P) 
+ * y si no se ha enviado antes (Col L).
+ */
+/**
+ * Genera, protege (aplana) y envía el certificado AVBA.
+ * Valida aprobación en Col P y evita duplicados con Col L.
+ */
+async function generarPDFyEnviarPorCorreo(filaManual) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('EQUIPO');
+  const fila = filaManual || sheet.getActiveCell().getRow();
+  
+  // --- CONFIGURACIÓN DE COLUMNAS ---
+  const COL_CANDADO_ENVIO = 12;   // Columna L
+  const COL_ESTADO_CALIDAD = 16;  // Columna P
+  const COL_LINK_PDF = 20;        // Columna T
+  const COL_REGISTRO_FECHA = 22;  // Columna V
+
+  // IDs de Drive (Asegúrate de poner tus IDs reales aquí)
+  const ID_PLANTILLA = "1Uwtiot9ickZh-nXmEu6xtGdyYfNIQRzWtdzCCak2wGI"; 
+  const ID_CARPETA_FINAL = "1rS58dcGgsfgM3OeGg1z-oZ5LlZbGXOpT"; 
+
+  if (fila <= 1) return "ERROR: Fila inválida";
+
+  // 1. VALIDACIÓN DE SEGURIDAD (DOBLE CANDADO)
+  const datosControl = sheet.getRange(fila, 1, 1, 22).getValues()[0];
+  const estatusCalidad = datosControl[COL_ESTADO_CALIDAD - 1]; // Col P
+  const estatusEnvio = datosControl[COL_CANDADO_ENVIO - 1];   // Col L
+
+  if (estatusCalidad !== "ACEPTADO") {
+    ss.toast("Bloqueo: Calidad aún no ha aceptado este registro (Col P).", "⚠️");
+    return "ERROR_CALIDAD_PENDIENTE";
+  }
+
+  if (estatusEnvio === "ENVIADO") {
+    ss.toast("Seguridad: Este folio ya fue enviado anteriormente.", "⚠️");
+    return "YA_ENVIADO";
+  }
+
+  try {
+    ss.toast("Generando y Protegiendo PDF...", "⏳ AVBA");
+
+    // 2. RECOPILACIÓN DE DATOS
+    const formulaQR = sheet.getRange(fila, 19).getFormula(); // Col S
+    const datos = {
+      folio:      datosControl[10], // Col K
+      cliente:    datosControl[1],  // Col B
+      email:      datosControl[9],  // Col J
+      domicilio:  datosControl[13], // Col N
+      maquinaria: datosControl[3],  
+      marca:      datosControl[4],
+      modelo:     datosControl[5],
+      serie:      datosControl[6],
+      idInterno:  datosControl[7],
+      fecha:      datosControl[8],
+      qrFormula:  String(formulaQR || "")
+    };
+
+    // 3. GENERACIÓN DEL DOCUMENTO TEMPORAL
+    const carpetaFinal = DriveApp.getFolderById(ID_CARPETA_FINAL);
+    const copiaDoc = DriveApp.getFileById(ID_PLANTILLA).makeCopy(`Temp_${datos.folio}`, carpetaFinal);
+    const doc = DocumentApp.openById(copiaDoc.getId());
+    const body = doc.getBody();
+
+    // Reemplazos de etiquetas
+    body.replaceText("{{FOLIO}}", datos.folio);
+    body.replaceText("{{CLIENTE}}", datos.cliente);
+    body.replaceText("{{Domicilio}}", datos.domicilio);
+    body.replaceText("{{Maquinaria}}", datos.maquinaria);
+    body.replaceText("{{Marca}}", datos.marca);
+    body.replaceText("{{Modelo}}", datos.modelo);
+    body.replaceText("{{Serie}}", datos.serie);
+    body.replaceText("{{ID}}", datos.idInterno);
+    
+    const fTxt = datos.fecha instanceof Date ? Utilities.formatDate(datos.fecha, "GMT-6", "dd/MM/yyyy") : datos.fecha;
+    body.replaceText("{{FECHA}}", fTxt);
+
+    // Inserción de QR
+    const busquedaQR = body.findText("{{QR}}");
+    if (busquedaQR && datos.qrFormula.includes("http")) {
+      const match = datos.qrFormula.match(/"([^"]+)"/);
+      if (match) {
+        const imgBlob = UrlFetchApp.fetch(match[1]).getBlob();
+        const el = busquedaQR.getElement();
+        el.asText().setText("");
+        el.getParent().asParagraph().appendInlineImage(imgBlob).setWidth(100).setHeight(100);
+      }
+    }
+    doc.saveAndClose();
+
+    // 4. PROCESO DE APLANADO (PROTECCIÓN)
+    const pdfBlobOriginal = copiaDoc.getAs(MimeType.PDF);
+    const lib = cargarPDFLib(); // Llamamos a la librería
+    const pdfDoc = await lib.PDFDocument.load(pdfBlobOriginal.getBytes());
+    
+    // El "Aplanado" (Flatten) bloquea campos y fija el contenido
+    const form = pdfDoc.getForm();
+    form.flatten(); 
+    
+    const pdfBytesProtegido = await pdfDoc.save();
+    const pdfBlobFinal = Utilities.newBlob(pdfBytesProtegido, MimeType.PDF, `Certificado_AVBA_${datos.folio}.pdf`);
+
+    // 5. GUARDAR Y ENVIAR
+    const archivoPdf = carpetaFinal.createFile(pdfBlobFinal);
+    DriveApp.getFileById(copiaDoc.getId()).setTrashed(true); // Borrar temporal
+
+    MailApp.sendEmail({
+      to: datos.email,
+      subject: `Certificado Oficial AVBA - Folio ${datos.folio}`,
+      htmlBody: `<h3>Certificado de Inspección</h3><p>Estimado cliente <b>${datos.cliente}</b>, adjuntamos su documento oficial.</p>`,
+      attachments: [pdfBlobFinal]
+    });
+
+    // 6. CIERRE DE REGISTRO
+    const ahora = Utilities.formatDate(new Date(), "GMT-6", "dd/MM/yyyy HH:mm");
+    sheet.getRange(fila, COL_CANDADO_ENVIO).setValue("ENVIADO").setBackground("#d9ead3").setFontWeight("bold");
+    sheet.getRange(fila, COL_LINK_PDF).setValue(archivoPdf.getUrl());
+    sheet.getRange(fila, COL_REGISTRO_FECHA).setValue(ahora);
+
+    ss.toast("Certificado generado, protegido y enviado.", "✅ Éxito");
+    return "EXITO";
+
+  } catch (e) {
+    Logger.log("Error: " + e.message);
+    return "ERROR: " + e.message;
+  }
+}
+
+/**************************************
+ * 7. GESTIÓN DE CARPETAS Y ARCHIVOS
+ **************************************/
+
+/**
+ * Busca o crea una carpeta para el cliente dentro de la carpeta raíz
+ */
+function obtenerCarpetaCliente(cliente, rootFolder) {
+  const folders = rootFolder.getFoldersByName(cliente);
+  if (folders.hasNext()) {
+    return folders.next();
+  }
+  return rootFolder.createFolder(cliente);
+}
+
+/**************************************
+ * 8. REGISTROS HISTÓRICOS (LOGS)
+ **************************************/
+
+/**
+ * Registra cada envío de correo exitoso en una hoja aparte
+ */
+function registrarHistorico(ss, record, nombreArchivo) {
+  let sheet = ss.getSheetByName('HISTORICO_ENVIOS');
+
+  if (!sheet) {
+    sheet = ss.insertSheet('HISTORICO_ENVIOS');
+    sheet.appendRow(['Fecha y hora', 'Cliente', 'Control', 'Correo', 'Archivo', 'Usuario']);
+    sheet.setFrozenRows(1);
+    sheet.getRange("A1:F1").setFontWeight("bold").setBackground("#f3f3f3");
+  }
+
+  sheet.appendRow([
+    new Date(),
+    record['Cliente o Razon social'],
+    record['Control'],
+    record['Correo electronico'],
+    nombreArchivo,
+    Session.getActiveUser().getEmail()
+  ]);
+}
+
+/**
+ * Función que procesa los cambios de celdas (individuales o masivos)
+ * para llevar una auditoría completa de quién movió qué.
+ */
+function procesarHistorialRobusto(e, ss, sheet, range) {
+  const NOMBRE_HOJA_HISTORIAL = 'HISTORIAL_GENERAL'; 
+  let sheetHistorial = ss.getSheetByName(NOMBRE_HOJA_HISTORIAL);
+  
+  if (!sheetHistorial) {
+    sheetHistorial = ss.insertSheet(NOMBRE_HOJA_HISTORIAL);
+    sheetHistorial.appendRow(['Fecha/Hora', 'Usuario', 'Fila', 'Columna', 'Encabezado', 'Valor Anterior', 'Valor Nuevo']);
+    sheetHistorial.setFrozenRows(1);
+    sheetHistorial.getRange("A1:G1").setFontWeight("bold").setBackground("#e6f4ea");
+  }
+
+  let usuario = "Usuario Anónimo";
+  try {
+    usuario = Session.getActiveUser().getEmail() || "Usuario sin Email";
+  } catch(err) {
+    usuario = "Permiso Denegado";
+  }
+
+  const fecha = new Date();
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  
+  const filaInicio = range.getRow();
+  const colInicio = range.getColumn();
+  const numFilas = range.getNumRows();
+  const numColumnas = range.getNumColumns();
+
+  // CASO A: Edición de una sola celda
+  if (numFilas === 1 && numColumnas === 1) {
+    const encabezado = headers[colInicio - 1] || `Columna ${colInicio}`;
+    sheetHistorial.appendRow([
+      fecha, usuario, filaInicio, colInicio, encabezado, 
+      e.oldValue || "(Vacío)", e.value || "(Eliminado/Vacío)"
+    ]);
+  } 
+  // CASO B: Edición masiva (Pegado de datos o borrado de bloques)
+  else {
+    const nuevosValores = range.getValues();
+    let registros = [];
+
+    for (let i = 0; i < numFilas; i++) {
+      for (let j = 0; j < numColumnas; j++) {
+        let filaActual = filaInicio + i;
+        let colActual = colInicio + j;
+        if (filaActual === 1) continue; 
+
+        let encabezado = headers[colActual - 1] || `Columna ${colActual}`;
+        let valorNuevo = nuevosValores[i][j];
+
+        registros.push([
+          fecha, usuario, filaActual, colActual, encabezado, 
+          "Cambio Masivo", valorNuevo === "" ? "(Borrado)" : valorNuevo
+        ]);
+      }
+    }
+
+    if (registros.length > 0) {
+      sheetHistorial.getRange(sheetHistorial.getLastRow() + 1, 1, registros.length, 7).setValues(registros);
+    }
+  }
+}
+
+/**
+ * Función puente que une el evento de edición con el historial y el GPS
+ */
+/**
+ * Función principal que actúa como disparador (On Edit).
+ * Controla la automatización de folios, GPS y auditoría.
+ */
+function RegistrarCambios(e) {
+  if (!e) return;
+  const range = e.range;
+  const sheet = range.getSheet();
+  const fila = range.getRow();
+  const col = range.getColumn();
+  
+  if (sheet.getName() !== (CONFIG.HOJA_EQUIPO || 'EQUIPO')) return;
+  if (fila <= 1) return;
+
+ 
+  // GESTIÓN DE FOLIOS (Columna B)
+  if (col === 2) {
+    const celdaK = sheet.getRange(fila, 11);
+    if (e.value && (celdaK.getValue() === "")) {
+      generarControl(fila);
+    }
+  }
+
+  // 2. AUDITORÍA (Historial)
+  procesarHistorialRobusto(e, e.source, sheet, range);
+}
+
+/**
+ * Crea el QR con un token de seguridad para evitar consultas manuales.
+ */
+/**
+ * Crea el QR con token de seguridad en la Columna S (19).
+ */
+function generarQR(fila, folio) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.HOJA_EQUIPO || 'EQUIPO');
+  
+  const urlBase = "https://gestion.avba.com.mx/validar.html";
+  const tokenSeguridad = "AVBA_PRIME_2026_SECURE"; 
+  const urlProtegida = `${urlBase}?id=${folio}&auth=${tokenSeguridad}`;
+  
+  // QuickChart API
+  const qrUrl = "https://quickchart.io/qr?text=" + encodeURIComponent(urlProtegida) + "&size=150";
+  
+  const celdaQR = sheet.getRange(fila, 19); // Columna S
+  
+  // Limpieza
+  celdaQR.clearContent();
+  celdaQR.setNumberFormat("General");
+  
+  // El modo '1' en la fórmula IMAGE ajusta la imagen al tamaño de la celda
+  // manteniendo las proporciones.
+  celdaQR.setFormula('=IMAGE("' + qrUrl + '"; 1)'); 
+  
+  // Alineación estética sin tocar el alto de la fila
+  celdaQR.setHorizontalAlignment("center").setVerticalAlignment("middle");
+  
+  SpreadsheetApp.flush();
+}
+
+/**
+ * Elimina archivos de la carpeta temporal que tengan más de 2 horas de antigüedad.
+ * Esto mantiene la carpeta limpia sin borrar lo que se acaba de generar.
+ */
+function limpiarCarpetaTemporal() {
+  const ID_CARPETA_TEMP = "1aW5Z3D3oC-ymHJTrK_gwjtLkVPV2gK1k"; // <--- ASEGÚRATE QUE SEA EL ID CORRECTO
+  const carpeta = DriveApp.getFolderById(ID_CARPETA_TEMP);
+  const archivos = carpeta.getFiles();
+  const ahora = new Date().getTime();
+  const dosHorasEnMilisegundos = 2 * 60 * 60 * 1000;
+  
+  while (archivos.hasNext()) {
+    const archivo = archivos.next();
+    const creado = archivo.getDateCreated().getTime();
+    
+    // Si el archivo tiene más de 2 horas, se va a la papelera
+    if (ahora - creado > dosHorasEnMilisegundos) {
+      archivo.setTrashed(true);
+      console.log("Archivo eliminado por antigüedad: " + archivo.getName());
+    }
+  }
+}
+
+/**
+ * Genera y envía la Carta de No Conformidad.
+ * Solo se permite si la Columna U es "NO CONFORME".
+ */
+async function enviarCartaNoConformidad(filaManual) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('EQUIPO');
+  const fila = filaManual || sheet.getActiveCell().getRow();
+
+  // Mapeo de Columnas
+  const COL_ESTADO_CALIDAD = 16;  // P
+  const COL_RESULTADO_INSP = 21;  // U
+  const COL_CANDADO_ENVIO = 12;   // L
+
+  const resultadoU = sheet.getRange(fila, COL_RESULTADO_INSP).getValue();
+
+  if (resultadoU !== "NO CONFORME") {
+    ss.toast("Este registro es CONFORME. Use el flujo de certificación estándar.", "⚠️");
+    return "ERROR_TIPO_INCORRECTO";
+  }
+
+  try {
+    ss.toast("Procesando Carta de No Conformidad...", "⏳");
+    
+    // --- Lógica de Generación de PDF (Usando la misma estructura de aplanado anterior) ---
+    // 1. Obtener datos (Folio, Cliente, Email en Col J)
+    // 2. Crear copia de Plantilla de Carta NC
+    // 3. Aplanar con PDFLib
+    
+    // Marcamos en la hoja que se envió una carta de rechazo
+    sheet.getRange(fila, COL_CANDADO_ENVIO).setValue("NC ENVIADA").setBackground("#fff2cc");
+    sheet.getRange(fila, COL_ESTADO_CALIDAD).setValue("RECHAZADO").setBackground("#ea9999");
+
+    ss.toast("Carta de No Conformidad enviada al cliente.", "✅");
+    return "EXITO_NC";
+  } catch (e) {
+    return "ERROR: " + e.message;
+  }
+}
+
+/**
+ * Verificación de seguridad para funciones que escriben en la hoja.
+ */
+function verificarPermisoEscritura() {
+  const rol = obtenerRolUsuario(); // La función que definimos antes
+  const rolesConEscritura = ["CALIDAD", "CERTIFICACIONES", "GERENCIA", "INSPECTOR"];
+  
+  if (rolesConEscritura.indexOf(rol) === -1) {
+    throw new Error("ACCESO_DENEGADO: Tu perfil (Operaciones) es de solo lectura.");
+  }
+}
+/**
+ * Obtiene el set de datos completo solo para Gerencia.
+ */
+function obtenerDatosGerencia() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('EQUIPO');
+  const data = sheet.getDataRange().getValues();
+  
+  // Enviamos todo el array de datos, incluyendo encabezados
+  return data; 
+}
+/**
+ * Traduce las coordenadas del clic en el mapa a una dirección física para la Col V.
+ */
+function obtenerDireccionNativa(lat, lon) {
+  try {
+    const respuesta = Maps.newGeocoder().reverseGeocode(lat, lon);
+    if (respuesta.status === 'OK' && respuesta.results.length > 0) {
+      // Retornamos la dirección para mostrarla en la web y guardarla
+      return respuesta.results[0].formatted_address;
+    }
+    return "Punto sin dirección conocida";
+  } catch (e) {
+    return "Error: " + e.toString();
+  }
+}
+/**
+ * Única función necesaria para el Inspector.
+ * Integra Lugar de Inspección (N) y Datos de Envío (V y W).
+ */
+
+/**
+ * Función maestra para el rol de CALIDAD.
+ * Cambia el estado a 'APROBADO POR CALIDAD' y dispara la generación del folio (Col K).
+ */
+/**
+ * [APPSCRIPT] FUNCIÓN ÚNICA PARA EL INSPECTOR
+ * Reúne datos técnicos, lugar de inspección (N) y datos de envío (V, W).
+ */
+/**
+ * [APPSCRIPT] FUNCIÓN MAESTRA PARA EL INSPECTOR
+ * Registra datos técnicos y geolocalización (Columnas N, V, W)[cite: 342, 343, 344].
+ */
+/**
+ * Crea una carpeta específica para el registro y sube las fotos.
+ * Retorna solo el link de la carpeta.
+ */
+function gestionarFotosyCarpeta(datos, archivosObjetos) {
+  const ID_CARPETA_RAIZ_FOTOS = "1TEnnU-U_J3nyLsXLltMsmw9555WC1IT5"; // Carpeta principal
+  const carpetaRaiz = DriveApp.getFolderById(ID_CARPETA_RAIZ_FOTOS);
+  
+  // Nombre de carpeta: FECHA - CLIENTE - SERIE
+  const fechaHoy = Utilities.formatDate(new Date(), "GMT-6", "yyyy-MM-dd");
+  const nombreCarpeta = `${fechaHoy} - ${datos.cliente} - ${datos.serie}`;
+  const nuevaCarpeta = carpetaRaiz.createFolder(nombreCarpeta);
+  
+  // Subir los archivos a la carpeta
+  archivosObjetos.forEach((obj) => {
+    const blob = Utilities.newBlob(Utilities.base64Decode(obj.data), obj.mimeType, obj.nombre);
+    nuevaCarpeta.createFile(blob);
+  });
+
+  // Retornamos solo el link de la carpeta creada
+  return nuevaCarpeta.getUrl();
+}
+
+/**
+ * Guarda el registro inicial del Inspector en la hoja EQUIPO
+ */
+/**
+ * Guarda el registro con direcciones legibles y coordenadas por separado
+ */
+function guardarInspeccionDesdeWeb(datos, linkCarpeta) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName(CONFIG.HOJA_EQUIPO);
+  
+  const fechaInspeccion = Utilities.formatDate(new Date(), "GMT-6", "dd/MM/yyyy");
+
+  // Geocodificación inversa para obtener la dirección legible
+  const obtenerDireccionStr = (coords) => {
+    if (!coords) return "";
+    try {
+      const lat = coords.split(",")[0];
+      const lng = coords.split(",")[1];
+      const response = Maps.newGeocoder().reverseGeocode(lat, lng);
+      if (response.status === 'OK') return response.results[0].formatted_address;
+    } catch (e) { return "Dirección no encontrada"; }
+    return "";
+  };
+
+  const dirInspeccion = obtenerDireccionStr(datos.ubicacionN);
+  const dirEnvio = obtenerDireccionStr(datos.ubicacionV);
+
+  // MAPEO DE COLUMNAS ACTUALIZADO:
+  let fila   = new Array(23).fill("");
+  const nuevaFila = [];
+  nuevaFila[0]  = fechaInspeccion;    // A: Fecha
+  nuevaFila[1]  = datos.cliente;      // B: Cliente
+  nuevaFila[2]  = datos.ubicacionN;   // C: COORDENADAS INSPECCIÓN (¡Cambio!)
+  nuevaFila[3]  = datos.marca;        // D: Marca
+  nuevaFila[4]  = datos.modelo;       // E: Modelo
+  nuevaFila[6]  = datos.serie;        // G: Serie
+  nuevaFila[7]  = datos.idEquipo;     // H: ID DEL EQUIPO (Etiqueta corregida)
+  nuevaFila[12] = linkCarpeta;        // M: Link Carpeta
+  nuevaFila[13] = dirInspeccion;      // N: DIRECCIÓN COMPLETA (¡Cambio!)
+  nuevaFila[16] = "PENDIENTE";        // Q: Estado
+  nuevaFila[21] = datos.ubicacionV;   // V: COORDENADAS ENVÍO (¡Cambio!)
+  nuevaFila[22] = dirEnvio;           // W: DIRECCIÓN ENVÍO COMPLETA
+  fila[14] = info.capacidad || "";    // O: Capacidad del equipo
+
+
+  sheet.appendRow(nuevaFila);
+  return "Registro guardado exitosamente";
+}
+
+
+
+/**
+ *desde aqui iniciamos nuevamente, estamos con el inspector
+
+
+
+
+ noooooo toooocarrrr
+ */
+
+function doPost(e) {
+  var resultado;
+  var data;
+
+  try {
+    if (e.postData && e.postData.contents) {
+      data = JSON.parse(e.postData.contents);
+    } else {
+      data = e.parameter;
+    }
+
+    if (data.action === 'NUEVA_INSPECCION') {
+      resultado = guardarInspeccionDesdeWeb(data.payload);
+    } 
+    else if (data.action === "VALIDAR_CALIDAD") {
+      resultado = aprobarCalidad(data.payload);
+    }
+      else if (data.action === "LOGIN") {
+    resultado = loginUsuario(data.payload);
+  }
+  else if (data.action === "CREAR_USUARIO") {
+    resultado = crearUsuario(data.payload);
+  }
+  else if (data.action === "EDITAR_USUARIO") {
+    resultado = editarUsuario(data.payload);
+  }
+  else if (data.action === "DESACTIVAR_USUARIO") {
+    resultado = desactivarUsuario(data.payload);
+  }
+  else if (data.action === "OBTENER_DATOS_CLIENTE") {
+    resultado = obtenerDatosCliente(data.payload);
+  }
+
+    // 🔥 ESTA ES LA QUE TE FALTA
+    else if (data.action === "ACTUALIZAR_CALIDAD") {
+      resultado = actualizarCalidad(data.payload);
+    }
+    else if (data.action === "IMPRIMIR_PDF") {
+  resultado = imprimirPDF(data.payload);
+}
+
+
+
+else if (data.action === "GENERAR_CERT_ENVIAR") {
+  resultado = generarCertEnviar(data.payload);
+}
+
+else if (data.action === "GENERAR_TODO_ENVIAR") {
+  resultado = generarTodoEnviar(data.payload);
+}
+
+else if (data.action === "RECHAZAR_CERTIFICACION") {
+  resultado = rechazarACertificacion(data.payload);
+}
+
+else if (data.action === "GUARDAR_ENVIO_CERT") {
+  resultado = guardarEnvioCert(data.payload);
+}
+
+
+
+else if (e.parameter.action === 'getDataCertificaciones') {
+  data = obtenerDataCertificaciones();
+}
+else if (data.action === "GUARDAR_ENVIO") {
+  resultado = guardarEnvio(data.payload);
+}
+
+    else {
+      resultado = { status: 'error', message: 'Acción no identificada' };
+    }
+
+    return ContentService
+      .createTextOutput(JSON.stringify(resultado))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({
+      status: "error",
+      message: err.toString()
+    })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * 2. OBTIENE LAS PREGUNTAS DEL CHECKLIST SEGÚN EL EQUIPO
+ * Lee la hoja que se llama igual que el equipo seleccionado. VALIDADA NO CAMBIAR
+ */
+function obtenerChecklistPorEquipo(nombreEquipo) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(nombreEquipo);
+    if (!sheet) return [];
+    
+    const datos = sheet.getRange(1, 1, sheet.getLastRow(), 2).getValues();
+    return datos.map(fila => ({
+      pregunta: fila[0],
+      tag: fila[1] // Ejemplo: {{e1_e1}}
+    }));
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Obtiene las opciones de maquinaria desde la hoja 'maquinaria VALIDADA NO CAMBIAR'
+ */
+function obtenerOpcionesMaquinaria() {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName("MAQUINARIA");
+    if (!sheet) throw new Error("No se encontró la hoja MAQUINARIA");
+    
+    const datos = sheet.getRange(2, 1, sheet.getLastRow() - 1, 2).getValues();
+    return datos.map(fila => ({
+      nombre: fila[0],
+      idPlantilla: fila[1]
+    }));
+  } catch (e) {
+    console.error("Error en obtenerOpcionesMaquinaria: " + e.toString());
+    return [];
+  }
+}
+/**
+ * 3. FUNCIÓN MAESTRA: GUARDAR INSPECCIÓN DESDE WEB
+ * Recibe todos los datos, guarda en Excel, crea carpeta y genera PDF VALIDADAD NO MODIFICAR.
+ */
+function guardarInspeccionDesdeWeb(payload) {
+  try {
+    const info = payload.info;
+    const checklist = payload.checklist;
+    const fotosBase64 = payload.fotos; // Estas son las fotos que vienen de Hostinger
+
+    // 1. Crear carpeta y obtener URL
+    const idCarpeta = crearCarpetaInspeccion(info.cliente, info.serie);
+    const carpeta = DriveApp.getFolderById(idCarpeta);
+    const urlCarpeta = carpeta.getUrl();
+
+    // 2. Guardar fotos individuales en la carpeta de Drive
+    if (fotosBase64 && fotosBase64.length > 0) {
+      fotosBase64.forEach((foto, index) => {
+        const bytes = Utilities.base64Decode(foto.base64);
+        const blob = Utilities.newBlob(bytes, foto.mimeType, `Evidencia_${index + 1}_${info.serie}.jpg`);
+        carpeta.createFile(blob); 
+      });
+    }
+
+    // 3. Mapeo a la HOJA DE EQUIPO
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    const hoja = ss.getSheetByName("EQUIPO");
+    let fila = new Array(23).fill(""); 
+
+    fila[0] = new Date(); 
+    fila[1] = info.cliente;
+    fila[2] = info.coords_insp;
+    fila[3] = info.maquinaria;
+    fila[4] = info.marca;
+    fila[5] = info.modelo;
+    fila[6] = info.serie;
+    fila[7] = info.id_cliente;
+    fila[8] = Utilities.formatDate(new Date(), "GMT-6", "dd/MM/yyyy"); 
+    fila[9] = info.email_cliente;
+    fila[12] = urlCarpeta; 
+    fila[13] = info.direccion_inspeccion_legible; 
+    fila[16] = info.semaforo;
+    fila[21] = info.direccion_envio_legible; 
+    fila[22] = info.coords_envio; 
+
+    hoja.appendRow(fila);
+
+    // --- EL CAMBIO CLAVE ---
+    // Le pasamos 'fotosBase64' como CUARTO argumento
+    generarPDF(info, checklist, idCarpeta, fotosBase64);
+
+    return { status: 'success', url: urlCarpeta };
+  } catch (e) {
+    return { status: 'error', message: e.toString() };
+  }
+}
+
+/**
+ * Crea la carpeta única y devuelve el ID
+ */
+function crearCarpetaInspeccion(cliente, serie) {
+  const folderRaiz = DriveApp.getFolderById("1TEnnU-U_J3nyLsXLltMsmw9555WC1IT5");
+  const fechaFold = Utilities.formatDate(new Date(), "GMT-6", "yyyy-MM-dd");
+  const nombre = `${fechaFold} - ${cliente} - ${serie}`;
+  return folderRaiz.createFolder(nombre).getId();
+}
+
+/**
+ * Convierte coordenadas en dirección de texto usando Google Maps
+ */
+function obtenerDireccionTexto(coords) {
+  if (!coords) return "Sin coordenadas";
+  try {
+    const partes = coords.split(',');
+    const response = Maps.newGeocoder().reverseGeocode(partes[0].trim(), partes[1].trim());
+    return response.status === 'OK' ? response.results[0].formatted_address : "Dirección no encontrada";
+  } catch (e) {
+    return "Error en geocodificación";
+  }
+}
+
+/**
+ * Genera el PDF inyectando comentarios y fotos al final
+ */
+// 1. Función para buscar el ID de la plantilla según el equipo seleccionado
+function obtenerIdPlantilla(nombreMaquinaria) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hojaMaquinaria = ss.getSheetByName("MAQUINARIA"); 
+  if (!hojaMaquinaria) return null;
+
+  const datos = hojaMaquinaria.getDataRange().getValues();
+  for (let i = 0; i < datos.length; i++) {
+    if (datos[i][0] === nombreMaquinaria) {
+      return datos[i][1]; 
+    }
+  }
+  return null; 
+}
+
+// 2. Función maestra para crear el PDF
+// AÑADIMOS 'fotos' a los parámetros de la función
+function generarPDF(info, checklist, idCarpeta, fotos) {
+  let copiaId = null;
+  try {
+    const idPlantilla = obtenerIdPlantilla(info.maquinaria);
+    if (!idPlantilla) return false;
+
+    const nombreArchivo = "Reporte_" + info.serie;
+    const carpetaDestino = DriveApp.getFolderById(idCarpeta);
+    
+    const archivoCopia = DriveApp.getFileById(idPlantilla).makeCopy(nombreArchivo, carpetaDestino);
+    copiaId = archivoCopia.getId();
+    const doc = DocumentApp.openById(copiaId);
+    const body = doc.getBody();
+
+    // --- 1. DATOS Y CHECKLIST ---
+    body.replaceText("{{DIRECCION}}", info.direccion_inspeccion_legible || "");
+    body.replaceText("{{TIPO_MAQUINARIA}}", info.maquinaria || "");
+    body.replaceText("{{MARCA}}", info.marca || "");
+    body.replaceText("{{MODELO}}", info.modelo || "");
+    body.replaceText("{{SERIE}}", info.serie || "");
+    body.replaceText("{{ID_EQUIPO}}", info.id_cliente || "");
+    body.replaceText("{{FECHA}}", Utilities.formatDate(new Date(), "GMT-6", "dd/MM/yyyy"));
+    body.replaceText("(?i){{comentarios}}", info.comentarios || "");
+
+    if (checklist) {
+      for (var clave in checklist) {
+        var valor = checklist[clave];
+        var texto = (valor === "C") ? "CONFORME" : (valor === "NC" ? "NO CONFORME" : valor);
+        body.replaceText("(?i){{" + clave.replace(/[{}]/g, '') + "}}", texto);
+      }
+    }
+
+// --- 3. INSERCIÓN DE FOTOS POR IDENTIFICADOR FIJO (F1 a F6) ---
+// --- 3. INSERCIÓN DE FOTOS POR IDENTIFICADOR FIJO (F1 a F6) ---
+    for (let i = 1; i <= 6; i++) {
+      let etiqueta = "{{F" + i + "}}";
+      let buscador = body.findText(etiqueta);
+      
+      if (buscador) {
+        let elementoTexto = buscador.getElement();
+        let celda = elementoTexto.getParent();
+        
+        while (celda && celda.getType() !== DocumentApp.ElementType.TABLE_CELL) {
+          celda = celda.getParent();
+        }
+
+        if (celda) {
+          let celdaTab = celda.asTableCell();
+          celdaTab.clear(); 
+
+          if (fotos && fotos[i - 1] && fotos[i - 1].base64) {
+            try {
+              let f = fotos[i - 1];
+              let rawData = f.base64.replace(/^data:image\/(png|jpg|jpeg);base64,/, "").replace(/\s/g, "");
+              let bytes = Utilities.base64Decode(rawData);
+              let blob = Utilities.newBlob(bytes, f.mimeType || "image/jpeg");
+              
+              let img = celdaTab.appendImage(blob);
+              let anchoRef = 170; 
+              let ratio = anchoRef / img.getWidth();
+              img.setWidth(anchoRef).setHeight(img.getHeight() * ratio);
+              
+              celdaTab.getChild(0).asParagraph().setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+            } catch (err) {
+              console.error("Error en foto " + i + ": " + err.toString());
+            }
+          }
+        }
+      }
+    }
+
+    // --- 4. CIERRE Y CONVERSIÓN (FLUJO ÚNICO) ---
+    // Paso 1: Guardar y forzar renderizado
+    // Paso 1: Guardar y cerrar (Esto es lo que realmente asienta las fotos)
+    doc.saveAndClose(); 
+    
+    // Paso 2: Pausa de seguridad para que el servidor procese el archivo
+    Utilities.sleep(6000); 
+
+    try {
+      // Paso 3: Obtener el archivo y convertir a PDF
+      var archivoDoc = DriveApp.getFileById(copiaId);
+      
+      // REFUERZO DEL NOMBRE: Nos aseguramos de que no venga vacío
+      var serieFinal = (info && info.serie) ? info.serie : "S_N";
+      var nombreFinalPdf = "Reporte_Inspeccion_" + serieFinal + ".pdf";
+
+      var pdfBlob = archivoDoc.getAs(MimeType.PDF);
+      pdfBlob.setName(nombreFinalPdf); // Asignamos el nombre reforzado
+      
+      carpetaDestino.createFile(pdfBlob);
+      
+      // Paso 4: Limpieza
+      archivoDoc.setTrashed(true);
+      return true;
+
+
+    } catch (e) {
+      console.error("Error en fase de PDF: " + e.toString());
+      // Si falla el PDF, dejamos el Doc vivo para que no pierdas la info
+      DriveApp.getFileById(copiaId).setName("REVISAR_IMAGENES_" + info.serie);
+      return false;
+    }
+  } catch (e) {
+    // Esto nos dirá exactamente qué línea y qué error es
+    var errorDetallado = e.stack ? e.stack.split('\n')[0] : e.toString();
+    console.error("Fallo crítico: " + errorDetallado);
+    
+    if (typeof copiaId !== 'undefined' && copiaId) {
+      // El nombre del archivo ahora será el mensaje de error real
+      var nombreError = ("ERR_" + errorDetallado).substring(0, 100);
+      DriveApp.getFileById(copiaId).setName(nombreError);
+    }
+    return false;
+  }
+}
+
+
+
+// iniciamos con calidad
+
+
+
+function getDataCalidad() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('EQUIPO');
+  const data  = sheet.getDataRange().getValues();
+  let resultados = [];
+
+  for (let i = 1; i < data.length; i++) {
+    // Ignorar filas vacías
+    if (!data[i][1] && !data[i][6]) continue;
+
+    try {
+      resultados.push({
+        fila:       i + 1,
+        cliente:    String(data[i][1]  || ""),
+        maquinaria: String(data[i][3]  || ""),
+        marca:      String(data[i][4]  || ""),
+        modelo:     String(data[i][5]  || ""),
+        serie:      String(data[i][6]  || ""),
+        id:         String(data[i][7]  || ""),
+        fecha:      formatearFecha(data[i][8]),
+        correo:     String(data[i][9]  || ""),
+        control:    String(data[i][10] || ""),
+        enviado:    String(data[i][11] || ""),
+        evidencia:  String(data[i][12] || ""),
+        direccion:  String(data[i][13] || ""),
+        capacidad:  String(data[i][14] || ""),   // ← NUEVO: Columna O
+        estado:     String(data[i][16] || "PENDIENTE"),
+        motivo:     String(data[i][17] || ""),
+        link:       String(data[i][19] || ""),
+        dictamen:   String(data[i][20] || ""),
+        envio:      String(data[i][21] || ""),
+        
+      });
+    } catch(e) {
+      console.log("Error en fila " + (i+1) + ": " + e.toString());
+    }
+  }
+
+  return resultados;
+}
+function formatearFecha(fecha) {
+  if (!fecha) return "";
+  try {
+    const f = new Date(fecha);
+    if (isNaN(f.getTime())) return "";
+    const dia = String(f.getDate()).padStart(2, '0');
+    const mes = String(f.getMonth() + 1).padStart(2, '0');
+    const anio = f.getFullYear();
+    return `${dia}/${mes}/${anio}`;
+  } catch(e) {
+    return "";
+  }
+}
+
+function aprobarCalidad(payload) {
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('EQUIPO');
+
+  const fila = payload.fila;
+  const qr = payload.qr;
+
+  const COL_SEMAFORO = 17;
+  const COL_QR = 19;
+
+  // Guardar QR manual
+  sheet.getRange(fila, COL_QR).setValue(qr);
+
+  // Cambiar estado
+  sheet.getRange(fila, COL_SEMAFORO)
+    .setValue("APROBADO CALIDAD")
+    .setBackground("#d9ead3");
+
+  // Generar control
+  const folio = generarControl(fila);
+
+  return {
+    status: "success",
+    folio: folio
+  };
+}
+function actualizarCalidad(payload) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('EQUIPO');
+  const fila  = payload.fila;
+
+  if (payload.cliente)    sheet.getRange(fila, 2).setValue(payload.cliente);
+  if (payload.maquinaria) sheet.getRange(fila, 4).setValue(payload.maquinaria);
+  if (payload.marca)      sheet.getRange(fila, 5).setValue(payload.marca);
+  if (payload.modelo)     sheet.getRange(fila, 6).setValue(payload.modelo);
+  if (payload.serie)      sheet.getRange(fila, 7).setValue(payload.serie);
+  if (payload.id)         sheet.getRange(fila, 8).setValue(payload.id);
+  if (payload.fecha)      sheet.getRange(fila, 9).setValue(payload.fecha);
+  if (payload.correo)     sheet.getRange(fila, 10).setValue(payload.correo);
+  if (payload.direccion)  sheet.getRange(fila, 14).setValue(payload.direccion);
+  if (payload.capacidad !== undefined)  sheet.getRange(fila, 15).setValue(payload.capacidad);
+
+  // Estado NO CONFORME con motivo en columna R (18)
+  if (payload.estado === "NO CONFORME") {
+    sheet.getRange(fila, 17).setValue("NO CONFORME").setBackground("#ea9999");
+    sheet.getRange(fila, 18).setValue(payload.motivo || "");
+  }
+
+  return { status: "success" };
+}
+
+
+
+//comenzamos con certificaciones
+
+
+function generarPDFBase(fila, templateId) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('EQUIPO');
+  const data = sheet.getRange(fila, 1, 1, 23).getValues()[0];
+
+  const copia = DriveApp.getFileById(templateId)
+    .makeCopy(`TEMP_${data[10]}`);
+
+  const doc = DocumentApp.openById(copia.getId());
+  const body = doc.getBody();
+
+  body.replaceText("{{FOLIO}}", data[10]);
+  body.replaceText("{{CLIENTE}}", data[1]);
+  body.replaceText("{{Domicilio}}", data[13]);
+  body.replaceText("{{Maquinaria}}", data[3]);
+  body.replaceText("{{Marca}}", data[4]);
+  body.replaceText("{{Modelo}}", data[5]);
+  body.replaceText("{{Serie}}", data[6]);
+  body.replaceText("{{ID}}", data[7]);
+
+  const fecha = Utilities.formatDate(new Date(data[8]), Session.getScriptTimeZone(), "dd/MM/yyyy");
+  body.replaceText("{{FECHA}}", fecha);
+
+  doc.saveAndClose();
+
+  const pdf = copia.getAs(MimeType.PDF);
+  copia.setTrashed(true);
+
+  return pdf;
+}
+
+function imprimirPDF(payload) {
+
+  const TEMPLATE_SIN_FONDO = "1LVwyULHVUmU14wTsRHf7CqOv_vwEP6FeQoPcq_CeszI";
+  const CARPETA = "1aW5Z3D3oC-ymHJTrK_gwjtLkVPV2gK1k";
+
+  const pdfBlob = generarPDFBase(payload.fila, TEMPLATE_SIN_FONDO);
+
+  const folder = DriveApp.getFolderById(CARPETA);
+  const archivo = folder.createFile(pdfBlob);
+
+  return {
+    status: "success",
+    url: archivo.getUrl()
+  };
+}
+
+
+async function generarPDF(fila) {
+
+  const res = await fetch(`${URL}?action=GENERAR_PDF&fila=${fila}`);
+  const data = await res.json();
+
+  alert("PDF generado");
+  return data.fileId;
+}
+
+
+
+function obtenerDataCertificaciones() {
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("EQUIPO");
+  const data = sheet.getDataRange().getValues();
+
+  const resultado = [];
+
+  for (let i = 1; i < data.length; i++) {
+
+    const fila = data[i];
+
+    resultado.push({
+      fila: i + 1,
+      cliente: fila[1],
+      domicilio: fila[2],
+      maquinaria: fila[3],
+      marca: fila[4],
+      modelo: fila[5],
+      serie: fila[6],
+      id: fila[7],
+      fecha: Utilities.formatDate(new Date(fila[8]), Session.getScriptTimeZone(), "dd/MM/yyyy"),
+      correo: fila[9],
+      evidencia: fila[12],
+      direccion: fila[13],
+      estado: fila[16] || "PENDIENTE",
+      motivo: fila[17],
+      envio: fila[21],
+coordenadas: fila[22]
+    });
+  }
+
+  return resultado;
+}
+
+function guardarEnvio(payload) {
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('EQUIPO');
+
+  sheet.getRange(payload.fila, 22).setValue(payload.envio);
+  sheet.getRange(payload.fila, 23).setValue(payload.coordenadas);
+
+  return { status: "success" };
+}
+
+// validar QR
+
+
+
+function responderJSON(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+
+
+function generarPDFyEnviar() {
+
+  const ss = SpreadsheetApp.getActive();
+  const sheet = ss.getActiveSheet();
+  const data = sheet.getDataRange().getValues();
+  const headers = data.shift();
+
+  const rootFolder = DriveApp.getFolderById(ID_CARPETA_RAIZ);
+  const tz = Session.getScriptTimeZone();
+
+  const enviadoIndex = headers.indexOf('Enviado');
+
+  const total = data.filter(row => row[enviadoIndex] === 'SI').length;
+  let contador = 0;
+
+  data.forEach((row, index) => {
+
+    let record = {};
+    headers.forEach((h, i) => {
+
+      let value = row[i];
+
+      if (value === '' || value === null) value = 'N/A';
+      if (value instanceof Date) {
+        value = Utilities.formatDate(value, tz, 'dd/MM/yyyy');
+      }
+
+      record[h] = value;
+    });
+
+    // Solo procesa los marcados como SI
+    if (record['Enviado'] !== 'SI') return;
+    if (record['Correo electronico'] === 'N/A') return;
+
+    contador++;
+    ss.toast(
+      `Generando certificados ${contador} de ${total}`,
+      'Progreso',
+      3
+    );
+
+    // Generar Control automático
+    if (record['Control'] === 'N/A') {
+      const nuevoControl = generarControl(sheet, headers, index + 2);
+      record['Control'] = nuevoControl;
+
+      sheet.getRange(index + 2, headers.indexOf('Control') + 1)
+        .setValue(nuevoControl);
+    }
+
+    // Carpeta por cliente
+    const carpetaCliente = obtenerCarpetaCliente(
+      record['Cliente o Razon social'],
+      rootFolder
+    );
+
+    // Copiar plantilla
+    const copy = DriveApp.getFileById(ID_PLANTILLA_DOC)
+      .makeCopy(`Certificado_${record['Control']}`, carpetaCliente);
+
+    const doc = DocumentApp.openById(copy.getId());
+    const body = doc.getBody();
+
+    for (let key in record) {
+  let valor = record[key];
+
+  if (typeof valor === 'string') {
+    valor = valor.toUpperCase();
+  }
+
+  body.replaceText(`{{${key}}}`, valor);
+}
+
+    doc.saveAndClose();
+
+    // Convertir a PDF
+    const pdf = DriveApp.getFileById(copy.getId()).getAs(MimeType.PDF);
+
+    // Enviar correo
+    GmailApp.sendEmail(
+  record['Correo electronico'],
+  'Certificado de Inspección',
+  `Estimado(a) cliente:
+
+Reciba un cordial saludo.
+
+Por medio del presente, hacemos llegar el Certificado de Inspección correspondiente a la evaluación realizada, el cual se adjunta en formato PDF para su conocimiento y resguardo.
+
+El documento avala que el equipo inspeccionado cumple con los criterios técnicos y de seguridad aplicables, conforme a la revisión efectuada en la fecha indicada.
+
+Agradecemos la confianza depositada en nuestros servicios. Para cualquier aclaración o información adicional, quedamos a sus órdenes.
+
+Atentamente,
+
+AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.`,
+  {
+    attachments: [pdf],
+    from: 'certificaciones@avba.com.mx',
+    name: 'Depto AVBA Inspections'
+  }
+);
+
+    // Marcar como ENVIADO
+    sheet.getRange(index + 2, enviadoIndex + 1)
+      .setValue('ENVIADO');
+
+    // Registrar histórico
+    ;
+  });
+
+  ss.toast(
+    'Proceso finalizado correctamente',
+    'Certificados',
+    5
+  );
+}
