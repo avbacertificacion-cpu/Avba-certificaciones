@@ -1,0 +1,18 @@
+{
+  "name": "avba/certificaciones",
+  "description": "Sistema de Gestión de Certificaciones AVBA — PHP + MySQL",
+  "type": "project",
+  "require": {
+    "php": ">=8.0",
+    "phpmailer/phpmailer": "^6.9",
+    "dompdf/dompdf": "^2.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Avba\\": "src/"
+    }
+  },
+  "config": {
+    "optimize-autoloader": true
+  }
+}

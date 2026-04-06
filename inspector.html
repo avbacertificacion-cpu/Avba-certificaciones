@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inspector AVBA</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    :root {
+      --azul:       #185FA5;
+      --azul-dark:  #0C447C;
+      --azul-light: #E6F1FB;
+      --verde:      #3B6D11;
+      --verde-light:#EAF3DE;
+      --rojo:       #A32D2D;
+      --rojo-light: #FCEBEB;
+      --gris-bg:    #f4f7fb;
+      --borde:      #dfe5ef;
+      --texto:      #1a1a2e;
+      --texto-sub:  #5a6072;
+      --texto-hint: #9299a8;
+      --blanco:     #ffffff;
+      --radio:      10px;
+      --radio-lg:   16px;
+      --sombra:     0 2px 16px rgba(0,0,0,0.08);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--gris-bg);
+      min-height: 100vh;
+      padding: 0 0 40px;
+    }
+
+    /* ─── HEADER ─── */
+    .header {
+      background: var(--azul);
+      padding: 16px 20px 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(24,95,165,0.3);
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .logo {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 15px;
+      color: white;
+      flex-shrink: 0;
+      border: 1.5px solid rgba(255,255,255,0.25);
+    }
+
+    .header-info { flex: 1; }
+    .header-title { font-size: 16px; font-weight: 600; color: white; }
+    .header-sub   { font-size: 12px; color: rgba(255,255,255,0.65); margin-top: 1px; }
+
+    /* ─── BARRA DE PASOS ─── */
+    .steps-track {
+      display: flex;
+      align-items: center;
+      padding-bottom: 14px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .steps-track::-webkit-scrollbar { display: none; }
+
+    .step-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      flex-shrink: 0;
+    }
+
+    .step-circle {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 600;
+      transition: all 0.25s;
+      background: rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.5);
+      border: 1.5px solid rgba(255,255,255,0.2);
+    }
+    .step-circle.done   { background: #5DCAA5; color: #04342C; border-color: #5DCAA5; }
+    .step-circle.active { background: white;   color: var(--azul); border-color: white; }
+
+    .step-name {
+      font-size: 10px;
+      color: rgba(255,255,255,0.45);
+      white-space: nowrap;
+      transition: color 0.2s;
+    }
+    .step-name.active { color: white; font-weight: 600; }
+    .step-name.done   { color: rgba(255,255,255,0.7); }
+
+    .step-connector {
+      flex: 1;
+      height: 2px;
+      background: rgba(255,255,255,0.15);
+      margin: 0 4px;
+      margin-bottom: 18px;
+      border-radius: 2px;
+      min-width: 20px;
+      transition: background 0.3s;
+    }
+    .step-connector.done { background: #5DCAA5; }
+
+    /* ─── CONTENEDOR ─── */
+    .contenedor {
+      max-width: 600px;
+      margin: 20px auto 0;
+      padding: 0 14px;
+    }
+
+    /* ─── CARD ─── */
+    .card {
+      background: var(--blanco);
+      border-radius: var(--radio-lg);
+      box-shadow: var(--sombra);
+      padding: 22px 20px;
+      margin-bottom: 14px;
+      border: 1px solid rgba(0,0,0,0.05);
+    }
+
+    .card-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--azul);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .card-title svg { width: 15px; height: 15px; opacity: 0.7; }
+
+    /* ─── PASO ─── */
+    .paso { display: none; }
+    .paso.activo {
+      display: block;
+      animation: fadeUp 0.25s ease;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ─── FIELDS ─── */
+    .field { margin-bottom: 14px; }
+
+    .field label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--texto);
+      margin-bottom: 6px;
+    }
+    .field label .req { color: #E24B4A; font-size: 11px; }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: 11px 14px;
+      border: 1.5px solid var(--borde);
+      border-radius: var(--radio);
+      font-size: 14px;
+      color: var(--texto);
+      background: var(--blanco);
+      transition: border-color 0.15s, box-shadow 0.15s;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      border-color: var(--azul);
+      box-shadow: 0 0 0 3px rgba(24,95,165,0.1);
+    }
+    .field input[readonly] {
+      background: var(--gris-bg);
+      color: var(--texto-sub);
+      cursor: default;
+    }
+    .field input.err,
+    .field select.err {
+      border-color: #E24B4A;
+      box-shadow: 0 0 0 3px rgba(226,75,74,0.1);
+    }
+    .field .hint  { font-size: 11px; color: var(--texto-hint); margin-top: 4px; }
+    .field .errmsg { font-size: 11px; color: #A32D2D; margin-top: 4px; display: none; }
+    .field.has-error .errmsg { display: block; }
+
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 420px) { .row2 { grid-template-columns: 1fr; } }
+
+    /* ─── MAPA ─── */
+    .mapa-info {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: var(--azul-light);
+      border-radius: var(--radio);
+      padding: 10px 13px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: var(--azul-dark);
+    }
+    .mapa-info svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+
+    .mapa {
+      height: 300px;
+      border-radius: var(--radio);
+      border: 1.5px solid var(--borde);
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* ─── CHECKLIST ─── */
+    .check-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--gris-bg);
+    }
+    .check-item:last-child { border-bottom: none; }
+
+    .check-pregunta {
+      font-size: 13px;
+      color: var(--texto);
+      flex: 1;
+      padding-right: 14px;
+      line-height: 1.4;
+    }
+
+    .btn-group-check { display: flex; gap: 6px; }
+
+    .btn-c, .btn-nc {
+      padding: 6px 16px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid var(--borde);
+      background: white;
+      color: var(--texto-sub);
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-c:hover  { border-color: #639922; color: #3B6D11; }
+    .btn-nc:hover { border-color: #E24B4A; color: #A32D2D; }
+    .btn-c.sel  { background: var(--verde-light); border-color: #639922; color: #27500A; }
+    .btn-nc.sel { background: var(--rojo-light);  border-color: #E24B4A; color: #791F1F; }
+
+    .check-loading {
+      text-align: center;
+      padding: 24px;
+      color: var(--texto-hint);
+      font-size: 13px;
+    }
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 2px solid var(--borde);
+      border-top-color: var(--azul);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── FOTOS ─── */
+    .fotos-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .foto-slot {
+      aspect-ratio: 1;
+      border-radius: var(--radio);
+      border: 1.5px dashed var(--borde);
+      background: var(--gris-bg);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: var(--texto-hint);
+      font-size: 11px;
+      gap: 5px;
+      transition: all 0.15s;
+      position: relative;
+      overflow: hidden;
+    }
+    .foto-slot:hover { border-color: var(--azul); color: var(--azul); background: var(--azul-light); }
+    .foto-slot svg { width: 22px; height: 22px; }
+    .foto-slot img {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .foto-slot .remove-btn {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 20px;
+      height: 20px;
+      background: rgba(0,0,0,0.55);
+      color: white;
+      border: none;
+      border-radius: 50%;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 2;
+      line-height: 1;
+    }
+
+    /* ─── RESUMEN ─── */
+    .resumen-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--gris-bg);
+      font-size: 13px;
+    }
+    .resumen-item:last-child { border-bottom: none; }
+    .resumen-key { color: var(--texto-sub); flex-shrink: 0; margin-right: 16px; }
+    .resumen-val { color: var(--texto); font-weight: 600; text-align: right; word-break: break-word; max-width: 220px; }
+
+    .semaforo-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .badge-verde  { background: var(--verde-light); color: var(--verde); }
+    .badge-rojo   { background: var(--rojo-light); color: var(--rojo); }
+    .badge-amarillo { background: #FAEEDA; color: #854F0B; }
+
+    /* ─── PROGRESS ENVÍO ─── */
+    .progress-box {
+      background: var(--gris-bg);
+      border-radius: var(--radio);
+      padding: 18px;
+      text-align: center;
+      display: none;
+    }
+    .progress-title { font-size: 14px; font-weight: 600; color: var(--texto); margin-bottom: 12px; }
+    .progress-track { height: 8px; background: var(--borde); border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+    .progress-fill  { height: 100%; background: var(--azul); border-radius: 4px; transition: width 0.5s ease; width: 0%; }
+    .progress-pct   { font-size: 12px; color: var(--texto-sub); }
+    .progress-stage { font-size: 12px; color: var(--texto-hint); margin-top: 4px; }
+
+    /* ─── BOTONES NAV ─── */
+    .nav-btns {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .btn-ant {
+      padding: 12px 18px;
+      border-radius: var(--radio);
+      border: 1.5px solid var(--borde);
+      background: white;
+      color: var(--texto-sub);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-ant:hover { background: var(--gris-bg); }
+
+    .btn-sig {
+      flex: 1;
+      padding: 13px;
+      border-radius: var(--radio);
+      border: none;
+      background: var(--azul);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn-sig:hover    { background: var(--azul-dark); }
+    .btn-sig:active   { transform: scale(0.98); }
+    .btn-sig:disabled { background: var(--borde); cursor: not-allowed; }
+
+    .btn-enviar {
+      flex: 1;
+      padding: 13px;
+      border-radius: var(--radio);
+      border: none;
+      background: var(--verde);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+    }
+    .btn-enviar:hover  { background: #27500A; }
+    .btn-enviar:active { transform: scale(0.98); }
+    .btn-enviar:disabled { background: var(--borde); cursor: not-allowed; }
+
+    /* ─── ÉXITO ─── */
+    .success-box {
+      text-align: center;
+      padding: 32px 20px;
+      display: none;
+    }
+    .success-icon {
+      width: 64px;
+      height: 64px;
+      background: var(--verde-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .success-icon svg { width: 32px; height: 32px; color: var(--verde); }
+    .success-title { font-size: 18px; font-weight: 700; color: var(--texto); margin-bottom: 8px; }
+    .success-msg   { font-size: 13px; color: var(--texto-sub); line-height: 1.6; }
+    .btn-nueva {
+      margin-top: 20px;
+      padding: 12px 28px;
+      border-radius: var(--radio);
+      border: none;
+      background: var(--azul);
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<!-- HEADER STICKY -->
+<div class="header">
+  <div class="header-top">
+    <div class="logo">A</div>
+    <div class="header-info">
+      <div class="header-title">Nueva inspección</div>
+      <div class="header-sub" id="header-sub">Paso 1 de 5 — Datos del equipo</div>
+    </div>
+  </div>
+  <div class="steps-track" id="steps-track">
+    <!-- generado por JS -->
+  </div>
+</div>
+
+<div class="contenedor">
+
+  <!-- ══════════ PASO 1: DATOS ══════════ -->
+  <div class="paso activo" id="paso1">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 6h6M5 9h4"/></svg>
+        Información del equipo
+      </div>
+
+      <div class="field" id="f-cliente">
+        <label>Cliente <span class="req">*</span></label>
+        <input type="text" id="cliente" placeholder="Nombre de la empresa u organización" autocomplete="organization">
+        <div class="errmsg">El nombre del cliente es obligatorio</div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Fecha de inspección</label>
+          <input type="text" id="fecha" readonly>
+        </div>
+        <div class="field" id="f-maquinaria">
+          <label>Tipo de maquinaria <span class="req">*</span></label>
+          <select id="maquinaria" onchange="actualizarChecklist()">
+            <option value="">Cargando...</option>
+          </select>
+          <div class="errmsg">Selecciona un tipo de maquinaria</div>
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field">
+          <label>Marca</label>
+          <input type="text" id="marca" placeholder="Ej: Caterpillar">
+        </div>
+        <div class="field">
+          <label>Modelo</label>
+          <input type="text" id="modelo" placeholder="Ej: 320D">
+        </div>
+      </div>
+
+      <div class="row2">
+        <div class="field" id="f-serie">
+          <label>No. de serie <span class="req">*</span></label>
+          <input type="text" id="serie" placeholder="Ej: SN-00123">
+          <div class="errmsg">El número de serie es obligatorio</div>
+        </div>
+        <div class="field">
+          <label>ID del equipo</label>
+          <input type="text" id="id_cliente" placeholder="Ej: CLI-99">
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Capacidad del equipo</label>
+        <input type="text" id="capacidad" placeholder="Ej: 3 toneladas, 500 kg, 10 m³">
+        <div class="hint">Capacidad nominal o de carga del equipo</div>
+      </div>
+
+      <div class="field">
+        <label>Correo del cliente</label>
+        <input type="email" id="email_cliente" placeholder="correo@empresa.com" autocomplete="email">
+        <div class="hint">Se usará para enviar el certificado final</div>
+      </div>
+
+      <div class="nav-btns">
+        <button class="btn-sig" onclick="irA(2)">Siguiente — Ubicación de inspección →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ PASO 2: MAPA INSPECCIÓN ══════════ -->
+  <div class="paso" id="paso2">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5C5.5 1.5 3.5 3.5 3.5 6c0 3.5 4.5 8.5 4.5 8.5S12.5 9.5 12.5 6c0-2.5-2-4.5-4.5-4.5z"/><circle cx="8" cy="6" r="1.5"/></svg>
+        Ubicación de la inspección
+      </div>
+      <div class="mapa-info">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5L10 10"/></svg>
+        <span>Arrastra el marcador al punto exacto donde se realizó la inspección. El GPS se activa automáticamente.</span>
+      </div>
+      <div id="mapaInsp" class="mapa"></div>
+      <div class="nav-btns">
+        <button class="btn-ant" onclick="irA(1)">← Atrás</button>
+        <button class="btn-sig" onclick="irA(3)">Confirmar ubicación →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ PASO 3: MAPA ENVÍO ══════════ -->
+  <div class="paso" id="paso3">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12l-1.5 8H3.5L2 4z"/><path d="M5.5 4V3a2.5 2.5 0 015 0v1"/></svg>
+        Ubicación de envío de documentos
+      </div>
+      <div class="mapa-info">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5L10 10"/></svg>
+        <span>Arrastra el marcador a la oficina o domicilio donde se entregarán los documentos físicos.</span>
+      </div>
+      <div id="mapaEnvio" class="mapa"></div>
+      <div class="nav-btns">
+        <button class="btn-ant" onclick="irA(2)">← Atrás</button>
+        <button class="btn-sig" onclick="irA(4)">Ver checklist →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ PASO 4: CHECKLIST ══════════ -->
+  <div class="paso" id="paso4">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8l3 3 7-7"/></svg>
+        Checklist de inspección
+      </div>
+      <div style="font-size:12px;color:var(--texto-sub);margin-bottom:14px;padding:8px 12px;background:var(--gris-bg);border-radius:8px;">
+        Equipo: <strong id="equipo-label">—</strong> &nbsp;·&nbsp; Marca cada ítem como <strong style="color:#27500A">C</strong> (Conforme) o <strong style="color:#791F1F">NC</strong> (No conforme)
+      </div>
+      <div id="contenedorCheck">
+        <div class="check-loading">
+          <div class="spinner"></div>
+          Cargando preguntas...
+        </div>
+      </div>
+      <div id="check-stats" style="display:none;margin-top:12px;padding:10px 13px;border-radius:8px;font-size:12px;background:var(--gris-bg);color:var(--texto-sub);display:flex;gap:14px;flex-wrap:wrap;"></div>
+      <div class="nav-btns">
+        <button class="btn-ant" onclick="irA(3)">← Atrás</button>
+        <button class="btn-sig" onclick="irA(5)">Siguiente — Evidencia →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ PASO 5: EVIDENCIA + RESUMEN ══════════ -->
+  <div class="paso" id="paso5">
+
+    <!-- FOTOS -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="3.5" width="13" height="10" rx="2"/><circle cx="8" cy="8.5" r="2.5"/><path d="M5.5 3.5V2.5a1 1 0 011-1h3a1 1 0 011 1v1"/></svg>
+        Evidencia fotográfica
+      </div>
+      <div style="font-size:12px;color:var(--texto-sub);margin-bottom:2px;">Hasta 6 fotografías del equipo inspeccionado</div>
+      <div class="fotos-grid" id="fotos-grid">
+        <!-- generado por JS -->
+      </div>
+      <input type="file" id="fotos-input" multiple accept="image/*" style="display:none" onchange="procesarFotosSeleccionadas()">
+    </div>
+
+    <!-- COMENTARIOS -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 3h12v9H9.5L8 14l-1.5-2H2V3z"/></svg>
+        Comentarios del inspector
+      </div>
+      <div class="field">
+        <textarea id="comentarios" rows="3" placeholder="Observaciones adicionales, hallazgos relevantes o notas para el equipo de calidad..."></textarea>
+      </div>
+    </div>
+
+    <!-- RESUMEN -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 2h12v12H2z"/><path d="M5 6h6M5 9h4"/></svg>
+        Resumen de la inspección
+      </div>
+      <div id="resumen-contenido"></div>
+    </div>
+
+    <!-- PROGRESO -->
+    <div class="card" id="card-progress" style="display:none;">
+      <div class="progress-box" id="progress-box" style="display:block;">
+        <div class="progress-title" id="prog-title">Enviando inspección...</div>
+        <div class="progress-track">
+          <div class="progress-fill" id="prog-fill"></div>
+        </div>
+        <div class="progress-pct" id="prog-pct">0%</div>
+        <div class="progress-stage" id="prog-stage">Iniciando...</div>
+      </div>
+      <div class="success-box" id="success-box">
+        <div class="success-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+        </div>
+        <div class="success-title">¡Inspección enviada!</div>
+        <div class="success-msg">El reporte fue guardado y el PDF está siendo generado.<br>Recibirás confirmación en el correo registrado.</div>
+        <button class="btn-nueva" onclick="location.reload()">Nueva inspección</button>
+      </div>
+    </div>
+
+    <div class="nav-btns" id="btns-paso5">
+      <button class="btn-ant" onclick="irA(4)">← Atrás</button>
+      <button class="btn-enviar" id="btn-enviar" onclick="enviarFormulario()">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M10 4l4 4-4 4"/></svg>
+        Finalizar y enviar
+      </button>
+    </div>
+
+  </div>
+</div><!-- /contenedor -->
+
+<script>
+/* ════════════════════════════════════════
+   CONFIGURACIÓN
+════════════════════════════════════════ */
+const WEB_APP_URL = "/api/";
+
+// Interceptor: inyecta token automáticamente en todas las llamadas a /api/
+(function() {
+  const _fetch = window.fetch;
+  window.fetch = function(url, opts = {}) {
+    if (typeof url === 'string' && url.startsWith('/api/')) {
+      const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+      const t = s.token || '';
+      if (opts.method === 'POST') {
+        try { const b = JSON.parse(opts.body || '{}'); b.token = t; opts.body = JSON.stringify(b); } catch(e) {}
+      } else {
+        url = url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
+      }
+    }
+    return _fetch.call(this, url, opts);
+  };
+}());
+
+const PASOS_INFO = [
+  { num: 1, label: "Datos"      },
+  { num: 2, label: "Inspección" },
+  { num: 3, label: "Envío"      },
+  { num: 4, label: "Checklist"  },
+  { num: 5, label: "Evidencia"  }
+];
+
+const PASOS_NOMBRE = [
+  "", "Datos del equipo", "Ubicación de inspección",
+  "Ubicación de envío", "Checklist", "Evidencia y envío"
+];
+
+/* ════════════════════════════════════════
+   ESTADO GLOBAL
+════════════════════════════════════════ */
+let pasoActual      = 1;
+let maps            = { insp: null, env: null };
+let markers         = { insp: null, env: null };
+let respuestasCheck = {};
+let fotosData       = [];       // [{base64, mimeType, nombre}]
+let enviando        = false;
+
+/* ════════════════════════════════════════
+   INIT
+════════════════════════════════════════ */
+window.onload = function () {
+  // Fecha
+  const hoy = new Date();
+  document.getElementById("fecha").value =
+    String(hoy.getDate()).padStart(2,"0") + "/" +
+    String(hoy.getMonth()+1).padStart(2,"0") + "/" +
+    hoy.getFullYear();
+
+  // Barra de pasos
+  renderStepsBar(1);
+
+  // Maquinaria
+  cargarMaquinaria();
+
+  // Grid de fotos
+  renderFotosGrid();
+
+  // Quitar error al escribir
+  document.querySelectorAll("input,select,textarea").forEach(el => {
+    el.addEventListener("input", () => {
+      const f = el.closest(".field");
+      if (f) { f.classList.remove("has-error"); el.classList.remove("err"); }
+    });
+  });
+};
+
+/* ════════════════════════════════════════
+   BARRA DE PASOS
+════════════════════════════════════════ */
+function renderStepsBar(activo) {
+  const track = document.getElementById("steps-track");
+  let html = "";
+  PASOS_INFO.forEach((p, i) => {
+    const estado = p.num < activo ? "done" : p.num === activo ? "active" : "";
+    const circleTxt = p.num < activo ? "✓" : p.num;
+    html += `<div class="step-node">
+      <div class="step-circle ${estado}" id="dot${p.num}">${circleTxt}</div>
+      <div class="step-name ${estado}" id="lbl${p.num}">${p.label}</div>
+    </div>`;
+    if (i < PASOS_INFO.length - 1) {
+      html += `<div class="step-connector ${p.num < activo ? 'done' : ''}" id="line${p.num}"></div>`;
+    }
+  });
+  track.innerHTML = html;
+
+  // Scroll para mostrar paso activo
+  const dot = document.getElementById("dot" + activo);
+  if (dot) dot.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+
+  document.getElementById("header-sub").textContent =
+    `Paso ${activo} de 5 — ${PASOS_NOMBRE[activo]}`;
+}
+
+/* ════════════════════════════════════════
+   NAVEGACIÓN ENTRE PASOS
+════════════════════════════════════════ */
+function irA(n) {
+  if (n > pasoActual && !validarPaso(pasoActual)) return;
+
+  document.querySelectorAll(".paso").forEach(p => p.classList.remove("activo"));
+  document.getElementById("paso" + n).classList.add("activo");
+  pasoActual = n;
+  renderStepsBar(n);
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  if (n === 2) setTimeout(() => initMapa("mapaInsp", "insp"), 300);
+  if (n === 3) setTimeout(() => initMapa("mapaEnvio", "env"), 300);
+  if (n === 4) {
+    const eq = document.getElementById("maquinaria").value;
+    document.getElementById("equipo-label").textContent = eq || "—";
+  }
+  if (n === 5) renderResumen();
+}
+
+/* ════════════════════════════════════════
+   VALIDACIÓN POR PASO
+════════════════════════════════════════ */
+function validarPaso(n) {
+  if (n !== 1) return true;
+
+  const reglas = [
+    { campo: "cliente",    fieldId: "f-cliente",    msg: "El nombre del cliente es obligatorio" },
+    { campo: "maquinaria", fieldId: "f-maquinaria", msg: "Selecciona un tipo de maquinaria"     },
+    { campo: "serie",      fieldId: "f-serie",      msg: "El número de serie es obligatorio"    }
+  ];
+
+  let ok = true;
+  reglas.forEach(r => {
+    const el    = document.getElementById(r.campo);
+    const field = document.getElementById(r.fieldId);
+    if (!el.value.trim()) {
+      field.classList.add("has-error");
+      el.classList.add("err");
+      ok = false;
+    }
+  });
+
+  if (!ok) {
+    // Scroll al primer error
+    const primer = document.querySelector(".has-error");
+    if (primer) primer.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+  return ok;
+}
+
+/* ════════════════════════════════════════
+   MAQUINARIA
+════════════════════════════════════════ */
+async function cargarMaquinaria() {
+  const select = document.getElementById("maquinaria");
+  try {
+    const res  = await fetch(WEB_APP_URL + "?action=getMaquinaria");
+    const opts = await res.json();
+    select.innerHTML = '<option value="">Selecciona un equipo...</option>';
+    opts.forEach(o => {
+      const el = document.createElement("option");
+      el.value = o.nombre;
+      el.dataset.plantilla = o.idPlantilla;
+      el.textContent = o.nombre;
+      select.appendChild(el);
+    });
+  } catch (e) {
+    select.innerHTML = '<option value="">Error de conexión — recarga</option>';
+    console.error("cargarMaquinaria:", e);
+  }
+}
+
+/* ════════════════════════════════════════
+   CHECKLIST
+════════════════════════════════════════ */
+async function actualizarChecklist() {
+  const equipo    = document.getElementById("maquinaria").value;
+  const contenedor = document.getElementById("contenedorCheck");
+  respuestasCheck  = {};
+
+  if (!equipo) return;
+  contenedor.innerHTML = `<div class="check-loading"><div class="spinner"></div>Cargando preguntas...</div>`;
+
+  try {
+    const res      = await fetch(WEB_APP_URL + "?action=getChecklist&equipo=" + encodeURIComponent(equipo));
+    const preguntas = await res.json();
+
+    if (!preguntas.length) {
+      contenedor.innerHTML = `<div class="check-loading">No hay preguntas para este equipo.</div>`;
+      return;
+    }
+
+    contenedor.innerHTML = "";
+    preguntas.forEach(p => {
+      const div = document.createElement("div");
+      div.className = "check-item";
+      div.innerHTML = `
+        <span class="check-pregunta">${p.pregunta}</span>
+        <div class="btn-group-check">
+          <button class="btn-c"  onclick="marcar(this,'${p.tag}','C')">C</button>
+          <button class="btn-nc" onclick="marcar(this,'${p.tag}','NC')">NC</button>
+        </div>`;
+      contenedor.appendChild(div);
+    });
+
+  } catch (e) {
+    contenedor.innerHTML = `<div class="check-loading" style="color:#A32D2D">Error al cargar. Verifica la conexión.</div>`;
+    console.error("actualizarChecklist:", e);
+  }
+}
+
+function marcar(btn, tag, valor) {
+  btn.parentElement.querySelectorAll(".btn-c,.btn-nc").forEach(b => b.classList.remove("sel"));
+  btn.classList.add("sel");
+  respuestasCheck[tag] = valor;
+  actualizarCheckStats();
+}
+
+function actualizarCheckStats() {
+  const vals  = Object.values(respuestasCheck);
+  const total = document.querySelectorAll(".check-item").length;
+  const c     = vals.filter(v => v === "C").length;
+  const nc    = vals.filter(v => v === "NC").length;
+  const rest  = total - vals.length;
+
+  const stats = document.getElementById("check-stats");
+  if (vals.length === 0) { stats.style.display = "none"; return; }
+  stats.style.display = "flex";
+  stats.innerHTML = `
+    <span>✔ Conformes: <strong style="color:#27500A">${c}</strong></span>
+    <span>✖ No conformes: <strong style="color:#791F1F">${nc}</strong></span>
+    ${rest > 0 ? `<span>— Pendientes: <strong>${rest}</strong></span>` : ""}
+  `;
+}
+
+/* ════════════════════════════════════════
+   MAPAS (LEAFLET)
+════════════════════════════════════════ */
+function initMapa(id, tipo) {
+  if (maps[tipo]) {
+    setTimeout(() => maps[tipo].invalidateSize(), 200);
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => crearMapa(id, tipo, pos.coords.latitude, pos.coords.longitude),
+    ()  => crearMapa(id, tipo, 19.4326, -99.1332)
+  );
+}
+
+function crearMapa(id, tipo, lat, lng) {
+  maps[tipo] = L.map(id, { zoomControl: true }).setView([lat, lng], 16);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap"
+  }).addTo(maps[tipo]);
+
+  markers[tipo] = L.marker([lat, lng], { draggable: true }).addTo(maps[tipo]);
+
+  markers[tipo].on("dragend", () => {
+    const p = markers[tipo].getLatLng();
+    console.log(`${tipo}: ${p.lat},${p.lng}`);
+  });
+
+  setTimeout(() => maps[tipo].invalidateSize(), 250);
+}
+
+/* ════════════════════════════════════════
+   FOTOS
+════════════════════════════════════════ */
+function renderFotosGrid() {
+  const grid = document.getElementById("fotos-grid");
+  grid.innerHTML = "";
+  for (let i = 0; i < 6; i++) {
+    const slot = document.createElement("div");
+    slot.className = "foto-slot";
+    slot.id = "slot-" + i;
+    if (fotosData[i]) {
+      slot.innerHTML = `
+        <img src="data:${fotosData[i].mimeType};base64,${fotosData[i].base64}" alt="foto ${i+1}">
+        <button class="remove-btn" onclick="eliminarFoto(event,${i})">×</button>`;
+    } else {
+      slot.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M9 5l1.5-2h3L15 5"/></svg>
+        <span>Foto ${i+1}</span>`;
+      slot.onclick = () => document.getElementById("fotos-input").click();
+    }
+    grid.appendChild(slot);
+  }
+}
+
+function procesarFotosSeleccionadas() {
+  const input   = document.getElementById("fotos-input");
+  const archivos = Array.from(input.files);
+  const espacios = 6 - fotosData.length;
+  const aCargar  = archivos.slice(0, espacios);
+
+  let procesadas = 0;
+  aCargar.forEach(file => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const MAX = 1400;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = h * (MAX / w); w = MAX; }
+      canvas.width = w; canvas.height = h;
+      canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+      const base64 = canvas.toDataURL("image/jpeg", 0.75).split(",")[1];
+      fotosData.push({ base64, mimeType: "image/jpeg", nombre: file.name });
+      procesadas++;
+      if (procesadas === aCargar.length) renderFotosGrid();
+    };
+    img.src = URL.createObjectURL(file);
+  });
+  input.value = "";
+}
+
+function eliminarFoto(e, idx) {
+  e.stopPropagation();
+  fotosData.splice(idx, 1);
+  renderFotosGrid();
+}
+
+/* ════════════════════════════════════════
+   RESUMEN
+════════════════════════════════════════ */
+function renderResumen() {
+  const c  = v => v || "<span style='color:var(--texto-hint)'>—</span>";
+  const nc = Object.values(respuestasCheck).filter(v => v === "NC").length;
+  const co = Object.values(respuestasCheck).filter(v => v === "C").length;
+
+  let semaforo = "";
+  if (nc > 0) {
+    semaforo = `<span class="semaforo-badge badge-rojo">No conforme (${nc} ítem${nc>1?"s":""})</span>`;
+  } else if (co > 0) {
+    semaforo = `<span class="semaforo-badge badge-verde">Conforme</span>`;
+  } else {
+    semaforo = `<span class="semaforo-badge badge-amarillo">Checklist pendiente</span>`;
+  }
+
+  document.getElementById("resumen-contenido").innerHTML = `
+    <div class="resumen-item"><span class="resumen-key">Cliente</span><span class="resumen-val">${c(document.getElementById("cliente").value)}</span></div>
+    <div class="resumen-item"><span class="resumen-key">Maquinaria</span><span class="resumen-val">${c(document.getElementById("maquinaria").value)}</span></div>
+    <div class="resumen-item"><span class="resumen-key">Marca / Modelo</span><span class="resumen-val">${c(document.getElementById("marca").value)} ${document.getElementById("modelo").value || ""}</span></div>
+    <div class="resumen-item"><span class="resumen-key">No. de serie</span><span class="resumen-val">${c(document.getElementById("serie").value)}</span></div>
+    <div class="resumen-item"><span class="resumen-key">ID del equipo</span><span class="resumen-val">${c(document.getElementById("id_cliente").value)}</span></div>
+    <div class="resumen-item"><span class="resumen-key">Capacidad</span><span class="resumen-val">${c(document.getElementById("capacidad").value)}</span></div>
+    <div class="resumen-item"><span class="resumen-key">Correo</span><span class="resumen-val">${c(document.getElementById("email_cliente").value)}</span></div>
+    <div class="resumen-item"><span class="resumen-key">Fecha</span><span class="resumen-val">${document.getElementById("fecha").value}</span></div>
+    <div class="resumen-item"><span class="resumen-key">Fotos</span><span class="resumen-val">${fotosData.length} de 6</span></div>
+    <div class="resumen-item"><span class="resumen-key">Resultado</span><span class="resumen-val">${semaforo}</span></div>
+  `;
+}
+
+/* ════════════════════════════════════════
+   ENVÍO
+════════════════════════════════════════ */
+async function obtenerDireccion(lat, lng) {
+  try {
+    const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
+    const data = await res.json();
+    return data.display_name || "Dirección no encontrada";
+  } catch {
+    return "Error al obtener dirección";
+  }
+}
+
+function setProgreso(pct, stage) {
+  document.getElementById("prog-fill").style.width  = pct + "%";
+  document.getElementById("prog-pct").textContent   = pct + "%";
+  document.getElementById("prog-stage").textContent = stage;
+}
+
+async function enviarFormulario() {
+  if (enviando) return;
+  enviando = true;
+
+  const btnEnviar  = document.getElementById("btn-enviar");
+  const btnsPaso5  = document.getElementById("btns-paso5");
+  const cardProg   = document.getElementById("card-progress");
+  const successBox = document.getElementById("success-box");
+  const progBox    = document.getElementById("progress-box");
+
+  btnsPaso5.style.display = "none";
+  cardProg.style.display  = "block";
+  progBox.style.display   = "block";
+
+  try {
+    setProgreso(10, "Obteniendo coordenadas...");
+
+    const latLngInsp = markers.insp ? markers.insp.getLatLng() : null;
+    const latLngEnv  = markers.env  ? markers.env.getLatLng()  : null;
+
+    setProgreso(25, "Obteniendo direcciones...");
+    const dirInsp = latLngInsp ? await obtenerDireccion(latLngInsp.lat, latLngInsp.lng) : "No definida";
+    const dirEnv  = latLngEnv  ? await obtenerDireccion(latLngEnv.lat,  latLngEnv.lng)  : "No definida";
+
+    setProgreso(45, "Preparando fotos...");
+
+    // Calcular semáforo
+    const vals = Object.values(respuestasCheck);
+    const semaforo = vals.includes("NC") ? "NO CONFORME" : vals.length > 0 ? "CONFORME" : "PENDIENTE";
+
+    setProgreso(65, "Enviando datos a Google Sheets...");
+
+    const payload = {
+      action: "NUEVA_INSPECCION",
+      payload: {
+        info: {
+          cliente:                       document.getElementById("cliente").value,
+          maquinaria:                    document.getElementById("maquinaria").value,
+          marca:                         document.getElementById("marca").value,
+          modelo:                        document.getElementById("modelo").value,
+          serie:                         document.getElementById("serie").value,
+          id_cliente:                    document.getElementById("id_cliente").value,
+          capacidad:                     document.getElementById("capacidad").value,
+          email_cliente:                 document.getElementById("email_cliente").value,
+          coords_insp:                   latLngInsp ? `${latLngInsp.lat},${latLngInsp.lng}` : "0,0",
+          coords_envio:                  latLngEnv  ? `${latLngEnv.lat},${latLngEnv.lng}`   : "0,0",
+          direccion_inspeccion_legible:  dirInsp,
+          direccion_envio_legible:       dirEnv,
+          comentarios:                   document.getElementById("comentarios").value,
+          semaforo
+        },
+        checklist: { ...respuestasCheck },
+        fotos: fotosData
+      }
+    };
+
+    setProgreso(80, "Generando reporte PDF...");
+
+    const response = await fetch(WEB_APP_URL, {
+      method:  "POST",
+      body:    JSON.stringify(payload),
+      headers: { "Content-Type": "text/plain" }
+    });
+
+    const texto    = await response.text();
+    const resultado = JSON.parse(texto);
+
+    setProgreso(100, "¡Inspección completada!");
+
+    await new Promise(r => setTimeout(r, 600));
+
+    if (resultado.status === "success") {
+      progBox.style.display   = "none";
+      successBox.style.display = "block";
+    } else {
+      throw new Error(resultado.message || "Error desconocido del servidor");
+    }
+
+  } catch (err) {
+    console.error("enviarFormulario:", err);
+    enviando = false;
+    cardProg.style.display  = "none";
+    btnsPaso5.style.display = "flex";
+    alert("Error al enviar: " + err.message + "\n\nRevisa la consola para más detalles.");
+  }
+}
+
+/* ════════════════════════════════════════
+   SERVICE WORKER (PWA)
+════════════════════════════════════════ */
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/service-worker.js")
+    .catch(e => console.log("SW no registrado:", e));
+}
+</script>
+</body>
+</html>
