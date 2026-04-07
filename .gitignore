@@ -1,0 +1,12 @@
+# Configuración local con credenciales reales — NO subir al repo
+config/config.php
+
+# Dependencias de Composer
+vendor/
+
+# Uploads generados
+uploads/certificados/
+uploads/evidencias/
+
+# Archivos de instalación
+install.php
