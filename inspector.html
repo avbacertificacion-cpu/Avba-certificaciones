@@ -698,12 +698,12 @@
 /* ════════════════════════════════════════
    CONFIGURACIÓN
 ════════════════════════════════════════ */
-const WEB_APP_URL = "/api/index.php";
+const WEB_APP_URL = "api/index.php";
 // Interceptor: inyecta token en llamadas a /api/index.php
 (function() {
   const _fetch = window.fetch;
   window.fetch = function(url, opts = {}) {
-    if (typeof url === 'string' && url.startsWith('/api/index.php')) {
+    if (typeof url === 'string' && url.includes('api/index.php')) {
       const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
       const t = s.token || '';
       if (opts.method === 'POST') {
