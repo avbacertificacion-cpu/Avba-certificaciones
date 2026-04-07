@@ -9,9 +9,9 @@
 
 // ── Base de datos (Hostinger MySQL) ──────────────────────
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'u######_avba');      // <- cambia por tu nombre de BD en Hostinger
-define('DB_USER', 'u######_avba');      // <- cambia por tu usuario de BD
-define('DB_PASS', 'TU_PASSWORD_AQUI'); // <- cambia por tu contraseña
+define('DB_NAME', 'u218429682_avba');      // <- cambia por tu nombre de BD en Hostinger
+define('DB_USER', 'u218429682_marcos');      // <- cambia por tu usuario de BD
+define('DB_PASS', 'Avba1234.'); // <- cambia por tu contraseña
 
 // ── URL base del sitio ────────────────────────────────────
 define('SITE_URL',  'https://gestion.avba.com.mx'); // <- dominio en Hostinger
