@@ -229,13 +229,13 @@
 </div>
 
 <script>
-const API = "/api/";
+const API = "/api/index.php";
 
-// Interceptor: inyecta token automáticamente en todas las llamadas a /api/
+// Interceptor: inyecta token automáticamente en todas las llamadas a /api/index.php
 (function() {
   const _fetch = window.fetch;
   window.fetch = function(url, opts = {}) {
-    if (typeof url === 'string' && url.startsWith('/api/')) {
+    if (typeof url === 'string' && url.startsWith('/api/index.php')) {
       const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
       const t = s.token || '';
       if (opts.method === 'POST') {
