@@ -1,6 +1,0 @@
-function cargarPDFLib() {
-  const url = 'https://unpkg.com/pdf-lib/dist/pdf-lib.min.js';
-  const scriptText = UrlFetchApp.fetch(url).getContentText();
-  eval(scriptText);
-  return PDFLib;
-}
