@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Cliente — AVBA</title>
+  <style>
+    :root {
+      --azul:#185FA5; --azul-dark:#0C447C; --azul-light:#E6F1FB;
+      --verde:#3B6D11; --verde-light:#EAF3DE;
+      --ambar:#854F0B; --ambar-light:#FAEEDA;
+      --rojo:#A32D2D; --rojo-light:#FCEBEB;
+      --gris-bg:#f4f7fb; --borde:#dfe5ef;
+      --texto:#1a1a2e; --texto-sub:#5a6072; --texto-hint:#9299a8;
+      --blanco:#ffffff;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Segoe UI',system-ui,sans-serif; background:var(--gris-bg); }
+
+    /* ── HEADER ── */
+    .header {
+      background: var(--azul); padding: 0 20px;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 60px; box-shadow: 0 2px 12px rgba(24,95,165,0.25);
+      position: sticky; top: 0; z-index: 50;
+    }
+    .hdr-l { display:flex; align-items:center; gap:10px; }
+    .hdr-logo {
+      width:32px; height:32px; border-radius:8px;
+      background:rgba(255,255,255,0.15);
+      display:flex; align-items:center; justify-content:center;
+    }
+    .hdr-logo svg { width:16px; height:16px; color:white; }
+    .hdr-t { font-size:15px; font-weight:600; color:white; }
+    .hdr-s { font-size:11px; color:rgba(255,255,255,0.6); }
+    .hdr-r { display:flex; align-items:center; gap:10px; }
+    .hdr-user { text-align:right; }
+    .hdr-user-t { font-size:13px; font-weight:600; color:white; }
+    .hdr-user-s { font-size:11px; color:rgba(255,255,255,0.6); }
+    .btn-logout-hdr {
+      padding:6px 12px; border-radius:7px;
+      border:1px solid rgba(255,255,255,0.3);
+      background:rgba(255,255,255,0.1); color:white;
+      font-size:12px; font-weight:600; cursor:pointer;
+      transition:background .15s;
+    }
+    .btn-logout-hdr:hover { background:rgba(255,255,255,0.2); }
+
+    .wrap { max-width:960px; margin:0 auto; padding:20px 16px 60px; }
+
+    /* ── BIENVENIDA ── */
+    .welcome {
+      background:var(--blanco); border-radius:14px;
+      border:1px solid rgba(0,0,0,0.05);
+      padding:20px 22px; margin-bottom:18px;
+      display:flex; align-items:center; gap:16px;
+      box-shadow:0 2px 12px rgba(0,0,0,0.05);
+    }
+    .welcome-icon {
+      width:50px; height:50px; border-radius:12px;
+      background:var(--azul-light); flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .welcome-icon svg { width:24px; height:24px; color:var(--azul); }
+    .welcome-t { font-size:17px; font-weight:700; color:var(--texto); }
+    .welcome-s { font-size:13px; color:var(--texto-sub); margin-top:3px; }
+
+    /* ── STATS ── */
+    .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+    @media(max-width:500px) { .stats { grid-template-columns:1fr 1fr; } }
+    .stat { background:var(--blanco); border-radius:12px; padding:14px 16px; border:1px solid rgba(0,0,0,0.05); box-shadow:0 2px 10px rgba(0,0,0,0.04); }
+    .stat-n { font-size:24px; font-weight:700; }
+    .stat-l { font-size:12px; color:var(--texto-sub); margin-top:2px; }
+
+    /* ── EQUIPOS ── */
+    .equipos-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:14px; }
+
+    .equipo-card {
+      background:var(--blanco); border-radius:14px;
+      border:1px solid rgba(0,0,0,0.05);
+      box-shadow:0 2px 12px rgba(0,0,0,0.05);
+      overflow:hidden; transition:transform .2s, box-shadow .2s;
+    }
+    .equipo-card:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(0,0,0,0.09); }
+
+    .card-top {
+      padding:16px 18px 14px;
+      border-bottom:1px solid var(--borde);
+      display:flex; align-items:flex-start; gap:12px;
+    }
+    .card-maquinaria-icon {
+      width:40px; height:40px; border-radius:10px; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .card-maquinaria-icon svg { width:20px; height:20px; }
+    .card-folio { font-family:monospace; font-size:11px; color:var(--texto-hint); margin-bottom:2px; }
+    .card-nombre { font-size:14px; font-weight:700; color:var(--texto); }
+    .card-serie  { font-size:12px; color:var(--texto-sub); margin-top:2px; }
+
+    .card-body { padding:14px 18px; }
+
+    .info-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #f0f2f7; font-size:13px; }
+    .info-row:last-child { border-bottom:none; }
+    .info-key { color:var(--texto-sub); }
+    .info-val { font-weight:600; color:var(--texto); text-align:right; }
+
+    /* Vigencia barra */
+    .vigencia-wrap { margin:12px 0 0; }
+    .vig-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+    .vig-label  { font-size:11px; color:var(--texto-sub); font-weight:600; }
+    .vig-dias   { font-size:12px; font-weight:700; }
+    .vig-track  { height:6px; background:var(--borde); border-radius:3px; overflow:hidden; }
+    .vig-fill   { height:100%; border-radius:3px; transition:width .5s; }
+
+    .card-footer {
+      padding:12px 18px; background:var(--gris-bg);
+      border-top:1px solid var(--borde);
+      display:flex; gap:8px; flex-wrap:wrap;
+    }
+    .btn-doc {
+      flex:1; min-width:100px; padding:9px 10px; border-radius:8px;
+      font-size:12px; font-weight:600; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; gap:6px;
+      transition:all .15s; text-decoration:none; border:1.5px solid;
+    }
+    .btn-doc svg { width:13px; height:13px; flex-shrink:0; }
+    .btn-cert { background:var(--azul-light); border-color:var(--azul); color:var(--azul-dark); }
+    .btn-dict { background:var(--verde-light); border-color:#639922;   color:var(--verde); }
+    .btn-cert:hover { background:#B5D4F4; }
+    .btn-dict:hover { background:#C0DD97; }
+    .btn-doc.disabled { opacity:.4; pointer-events:none; cursor:not-allowed; }
+
+    /* Estado badge */
+    .badge-vigente  { background:var(--verde-light); color:var(--verde); }
+    .badge-vence    { background:var(--ambar-light); color:var(--ambar); }
+    .badge-vencido  { background:var(--rojo-light);  color:var(--rojo); }
+    .badge {
+      display:inline-flex; align-items:center; gap:4px;
+      padding:3px 9px; border-radius:20px; font-size:11px; font-weight:600;
+    }
+
+    /* Modal QR */
+    .overlay { position:fixed; inset:0; background:rgba(10,20,40,0.5); z-index:200; display:none; align-items:center; justify-content:center; padding:20px; }
+    .overlay.open { display:flex; }
+    .modal-qr {
+      background:var(--blanco); border-radius:16px; padding:28px 24px;
+      text-align:center; max-width:320px; width:100%;
+      box-shadow:0 24px 60px rgba(0,0,0,0.2);
+      animation:popIn .22s ease;
+    }
+    @keyframes popIn { from{opacity:0;transform:scale(0.95)} to{opacity:1;transform:scale(1)} }
+    .qr-folio { font-family:monospace; font-size:20px; font-weight:700; color:var(--texto); margin-bottom:4px; }
+    .qr-sub   { font-size:12px; color:var(--texto-sub); margin-bottom:16px; }
+    .qr-img   { width:180px; height:180px; margin:0 auto 16px; border-radius:10px; border:1px solid var(--borde); padding:8px; }
+    .qr-img img { width:100%; height:100%; }
+    .btn-cerrar-qr {
+      width:100%; padding:11px; border-radius:9px; border:none;
+      background:var(--azul); color:white; font-size:13px; font-weight:600; cursor:pointer;
+    }
+
+    /* Loading / Empty */
+    .spin { width:20px; height:20px; border:2px solid var(--borde); border-top-color:var(--azul); border-radius:50%; animation:giro .7s linear infinite; display:inline-block; }
+    @keyframes giro { to{transform:rotate(360deg)} }
+    .empty-state { text-align:center; padding:48px 20px; color:var(--texto-hint); }
+    .empty-state svg { width:48px; height:48px; opacity:.3; margin-bottom:12px; }
+    .empty-title { font-size:15px; font-weight:600; color:var(--texto-sub); margin-bottom:6px; }
+    .empty-sub   { font-size:13px; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="hdr-l">
+    <div class="hdr-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    </div>
+    <div>
+      <div class="hdr-t">AVBA Inspections</div>
+      <div class="hdr-s">Portal de certificados</div>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <div class="hdr-user">
+      <div class="hdr-user-t" id="hdr-nombre">—</div>
+      <div class="hdr-user-s">Cliente</div>
+    </div>
+    <button class="btn-logout-hdr" onclick="cerrarSesion()">Salir</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="welcome">
+    <div class="welcome-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20 7H4a2 2 0 00-2 2v9a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM16 3H8l-2 4h12l-2-4z"/></svg>
+    </div>
+    <div>
+      <div class="welcome-t" id="welcome-nombre">Bienvenido</div>
+      <div class="welcome-s">Aquí puedes consultar y descargar todos tus certificados y dictámenes.</div>
+    </div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-n" id="s-total"    style="color:var(--azul)">—</div><div class="stat-l">Equipos certificados</div></div>
+    <div class="stat"><div class="stat-n" id="s-vigentes" style="color:var(--verde)">—</div><div class="stat-l">Certificados vigentes</div></div>
+    <div class="stat"><div class="stat-n" id="s-vencen"   style="color:var(--ambar)">—</div><div class="stat-l">Por vencer (30 días)</div></div>
+  </div>
+
+  <div id="contenedor-equipos">
+    <div style="text-align:center;padding:40px">
+      <span class="spin"></span>
+      <p style="margin-top:12px;color:var(--texto-hint);font-size:13px">Cargando tus certificados...</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL QR -->
+<div class="overlay" id="overlay-qr">
+  <div class="modal-qr">
+    <div class="qr-folio" id="qr-folio">—</div>
+    <div class="qr-sub">Código de validación del certificado</div>
+    <div class="qr-img"><img id="qr-img" src="" alt="QR"></div>
+    <p style="font-size:11px;color:var(--texto-hint);margin-bottom:14px">
+      Escanea este código para verificar la autenticidad del certificado en cualquier momento.
+    </p>
+    <button class="btn-cerrar-qr" onclick="cerrarQR()">Cerrar</button>
+  </div>
+</div>
+
+<script>
+const API = "/api/";
+
+// Interceptor: inyecta token automáticamente en todas las llamadas a /api/
+(function() {
+  const _fetch = window.fetch;
+  window.fetch = function(url, opts = {}) {
+    if (typeof url === 'string' && url.startsWith('/api/')) {
+      const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+      const t = s.token || '';
+      if (opts.method === 'POST') {
+        try { const b = JSON.parse(opts.body || '{}'); b.token = t; opts.body = JSON.stringify(b); } catch(e) {}
+      } else {
+        url = url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
+      }
+    }
+    return _fetch.call(this, url, opts);
+  };
+}());
+
+let sesion  = null;
+let equipos = [];
+
+window.onload = async function() {
+  const raw = localStorage.getItem("avba_session");
+  if (!raw) { window.location.href = "login.html"; return; }
+  try {
+    sesion = JSON.parse(raw);
+    if (sesion.rol !== "CLIENTE") { window.location.href = "login.html"; return; }
+    if (Date.now() - sesion.ts > 8 * 60 * 60 * 1000) {
+      localStorage.removeItem("avba_session");
+      window.location.href = "login.html"; return;
+    }
+    document.getElementById("hdr-nombre").textContent    = sesion.nombre || "Cliente";
+    document.getElementById("welcome-nombre").textContent = "Bienvenido, " + (sesion.nombre || "Cliente");
+    await cargarEquipos();
+  } catch(e) {
+    window.location.href = "login.html";
+  }
+};
+
+async function cargarEquipos() {
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      body:   JSON.stringify({ action:"OBTENER_DATOS_CLIENTE", payload:{ id_cliente: sesion.id_cliente } })
+    });
+    const data = JSON.parse(await res.text());
+
+    if (data.status !== "success") {
+      mostrarError(data.message || "Error al cargar");
+      return;
+    }
+
+    equipos = data.equipos || [];
+    renderEstadisticas(equipos);
+    renderEquipos(equipos);
+
+  } catch(e) {
+    mostrarError("Error de conexión. Intenta de nuevo.");
+    console.error(e);
+  }
+}
+
+function renderEstadisticas(data) {
+  const vigentes = data.filter(e => e.vigente).length;
+  const vencen   = data.filter(e => e.dias !== null && e.dias >= 0 && e.dias <= 30).length;
+  document.getElementById("s-total").textContent    = data.length;
+  document.getElementById("s-vigentes").textContent = vigentes;
+  document.getElementById("s-vencen").textContent   = vencen;
+}
+
+function renderEquipos(data) {
+  const cont = document.getElementById("contenedor-equipos");
+
+  if (!data.length) {
+    cont.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 12h8M12 8v8"/></svg>
+        <div class="empty-title">Sin certificados</div>
+        <div class="empty-sub">No tienes certificados emitidos aún.<br>Contacta a AVBA si crees que esto es un error.</div>
+      </div>`;
+    return;
+  }
+
+  // Ordenar: primero los que vencen pronto, luego los vigentes, al final vencidos
+  const sorted = [...data].sort((a,b) => {
+    if (a.dias === null && b.dias === null) return 0;
+    if (a.dias === null) return 1;
+    if (b.dias === null) return -1;
+    return a.dias - b.dias;
+  });
+
+  cont.innerHTML = `<div class="equipos-grid">${sorted.map(e => cardHTML(e)).join("")}</div>`;
+}
+
+function cardHTML(e) {
+  const tieneC = e.link_cert && e.link_cert.trim() !== "";
+  const tieneD = e.link_dict && e.link_dict.trim() !== "";
+  const tieneQ = e.qr_url   && e.qr_url.trim()    !== "";
+
+  // Vigencia
+  let badgeHtml = "", vigColor = "#639922", vigPct = 0, vigLabel = "—";
+  if (e.dias !== null) {
+    vigPct  = Math.max(0, Math.min(100, Math.round((e.dias / 365) * 100)));
+    if (!e.vigente) {
+      badgeHtml = `<span class="badge badge-vencido">Vencido</span>`;
+      vigColor  = "#E24B4A"; vigPct = 100; vigLabel = "Vencido";
+    } else if (e.dias <= 30) {
+      badgeHtml = `<span class="badge badge-vence">Vence en ${e.dias}d</span>`;
+      vigColor  = "#EF9F27"; vigLabel = `${e.dias} días restantes`;
+    } else {
+      badgeHtml = `<span class="badge badge-vigente">Vigente</span>`;
+      vigColor  = "#639922"; vigLabel = `${e.dias} días restantes`;
+    }
+  }
+
+  // Color del ícono según maquinaria
+  const iconBg    = "#E6F1FB";
+  const iconColor = "#185FA5";
+
+  return `
+  <div class="equipo-card">
+    <div class="card-top">
+      <div class="card-maquinaria-icon" style="background:${iconBg}">
+        <svg viewBox="0 0 16 16" fill="none" stroke="${iconColor}" stroke-width="1.5">
+          <rect x="1" y="5" width="14" height="9" rx="1.5"/>
+          <path d="M4 5V3a1 1 0 011-1h6a1 1 0 011 1v2"/>
+          <path d="M8 9v2M6 9h4"/>
+        </svg>
+      </div>
+      <div style="flex:1">
+        <div class="card-folio">Folio: ${e.folio}</div>
+        <div class="card-nombre">${e.maquinaria}</div>
+        <div class="card-serie">${e.marca} ${e.modelo} · Serie: ${e.serie}</div>
+      </div>
+      ${badgeHtml}
+    </div>
+
+    <div class="card-body">
+      <div class="info-row"><span class="info-key">ID del equipo</span><span class="info-val">${e.id_equipo || "—"}</span></div>
+      <div class="info-row"><span class="info-key">Fecha certificación</span><span class="info-val">${e.fecha}</span></div>
+      <div class="info-row"><span class="info-key">Fecha vencimiento</span><span class="info-val">${e.vencimiento}</span></div>
+
+      <div class="vigencia-wrap">
+        <div class="vig-header">
+          <span class="vig-label">Vigencia del certificado</span>
+          <span class="vig-dias" style="color:${vigColor}">${vigLabel}</span>
+        </div>
+        <div class="vig-track">
+          <div class="vig-fill" style="width:${vigPct}%;background:${vigColor}"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card-footer">
+      <a href="${tieneC ? e.link_cert : "#"}"
+         target="${tieneC ? "_blank" : ""}"
+         class="btn-doc btn-cert ${tieneC ? "" : "disabled"}"
+         title="${tieneC ? "Ver certificado PDF" : "Certificado no disponible"}">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="1" width="10" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
+        Certificado
+      </a>
+      <a href="${tieneD ? e.link_dict : "#"}"
+         target="${tieneD ? "_blank" : ""}"
+         class="btn-doc btn-dict ${tieneD ? "" : "disabled"}"
+         title="${tieneD ? "Ver dictamen PDF" : "Dictamen no disponible"}">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="1" width="10" height="14" rx="1.5"/><path d="M5 5h4M5 8h4"/></svg>
+        Dictamen
+      </a>
+      ${tieneQ ? `
+      <button onclick="verQR('${e.folio}','${e.qr_url}')"
+        style="padding:9px 10px;border-radius:8px;border:1.5px solid var(--borde);background:var(--blanco);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:5px;color:var(--texto-sub);transition:all .15s"
+        onmouseover="this.style.borderColor='var(--azul)';this.style.color='var(--azul)'"
+        onmouseout="this.style.borderColor='var(--borde)';this.style.color='var(--texto-sub)'">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5"/><rect x="9" y="2" width="5" height="5"/><rect x="2" y="9" width="5" height="5"/></svg>
+        QR
+      </button>` : ""}
+    </div>
+  </div>`;
+}
+
+function verQR(folio, url) {
+  document.getElementById("qr-folio").textContent = folio;
+  document.getElementById("qr-img").src = url;
+  document.getElementById("overlay-qr").classList.add("open");
+}
+
+function cerrarQR() {
+  document.getElementById("overlay-qr").classList.remove("open");
+}
+
+function mostrarError(msg) {
+  document.getElementById("contenedor-equipos").innerHTML = `
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 8v4M12 15v.5"/></svg>
+      <div class="empty-title">Error al cargar</div>
+      <div class="empty-sub">${msg}</div>
+    </div>`;
+}
+
+function cerrarSesion() {
+  localStorage.removeItem("avba_session");
+  window.location.href = "login.html";
+}
+
+document.getElementById("overlay-qr").addEventListener("click", function(e) {
+  if (e.target === this) cerrarQR();
+});
+</script>
+</body>
+</html>
