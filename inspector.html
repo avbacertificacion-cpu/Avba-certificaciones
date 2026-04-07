@@ -698,7 +698,23 @@
 /* ════════════════════════════════════════
    CONFIGURACIÓN
 ════════════════════════════════════════ */
-const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbzpYYKgr3F64xKXaalBX2-LgPIJdvj9mrCX8XcTPPIa5yQVJLBBq5b9oB5CEsaxCtF8/exec";
+const WEB_APP_URL = "/api/index.php";
+// Interceptor: inyecta token en llamadas a /api/index.php
+(function() {
+  const _fetch = window.fetch;
+  window.fetch = function(url, opts = {}) {
+    if (typeof url === 'string' && url.startsWith('/api/index.php')) {
+      const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+      const t = s.token || '';
+      if (opts.method === 'POST') {
+        try { const b = JSON.parse(opts.body || '{}'); b.token = t; opts.body = JSON.stringify(b); } catch(e) {}
+      } else {
+        url = url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
+      }
+    }
+    return _fetch.call(this, url, opts);
+  };
+}());
 
 const PASOS_INFO = [
   { num: 1, label: "Datos"      },
