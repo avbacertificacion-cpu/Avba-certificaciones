@@ -11,7 +11,7 @@
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'u218429682_avba');      // <- cambia por tu nombre de BD en Hostinger
 define('DB_USER', 'u218429682_marcos');      // <- cambia por tu usuario de BD
-define('DB_PASS', 'Avba1394.-'); // <- cambia por tu contraseña
+define('DB_PASS', 'Db#2026!Avba-Marcos7'); // <- cambia por tu contraseña
 
 // ── URL base del sitio ────────────────────────────────────
 define('SITE_URL',  'https://gestion.avba.com.mx'); // <- dominio en Hostinger
