@@ -99,10 +99,6 @@ class Inspecciones {
                 }
             }
 
-            // Asignar QR automáticamente al crear
-            $codigoQR = generarCodigoQR($this->pdo);
-            $this->pdo->prepare("UPDATE equipos SET qr_codigo = ? WHERE id = ?")->execute([$codigoQR, $equipoId]);
-
             // Historial
             registrarHistorial($this->pdo, $usuarioActual, $equipoId, 'estado', null, 'PENDIENTE', 'INSERT');
 
@@ -110,7 +106,6 @@ class Inspecciones {
                 'status'   => 'success',
                 'message'  => 'Inspección registrada correctamente.',
                 'control'  => $control,
-                'qr'       => $codigoQR,
                 'url'      => $urlCarpeta,
             ];
         } catch (Exception $e) {

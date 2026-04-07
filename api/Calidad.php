@@ -40,21 +40,41 @@ class Calidad {
     // ── Aprobar inspección ─────────────────────────────────
     public function aprobarCalidad(array $payload, string $usuario): array {
         $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
+        $qr = trim($payload['qr'] ?? '');
+
         if (!$id) return ['status' => 'error', 'message' => 'ID de equipo requerido.'];
+        if (!$qr)  return ['status' => 'error', 'message' => 'El código QR es requerido.'];
 
         $row = $this->obtenerEquipo($id);
         if (!$row) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
+        // Validar que el QR existe y no está usado
+        $stmtQR = $this->pdo->prepare(
+            "SELECT id, usado FROM qr_codigos WHERE identificador = ?"
+        );
+        $stmtQR->execute([$qr]);
+        $qrRow = $stmtQR->fetch();
+
+        if (!$qrRow) return ['status' => 'error', 'message' => 'Código QR no válido.'];
+        if ($qrRow['usado']) return ['status' => 'error', 'message' => 'Código QR ya está en uso.'];
+
         $estadoAnterior = $row['estado'];
         $nuevoEstado    = 'APROBADO CALIDAD';
 
+        // Asignar QR al equipo y aprobar
         $this->pdo->prepare(
-            "UPDATE equipos SET estado = ?, motivo = NULL WHERE id = ?"
-        )->execute([$nuevoEstado, $id]);
+            "UPDATE equipos SET estado = ?, motivo = NULL, qr_codigo = ? WHERE id = ?"
+        )->execute([$nuevoEstado, $qr, $id]);
+
+        // Marcar QR como usado
+        $this->pdo->prepare(
+            "UPDATE qr_codigos SET usado = 1, equipo_id = ? WHERE id = ?"
+        )->execute([$id, $qrRow['id']]);
 
         registrarHistorial($this->pdo, $usuario, $id, 'estado', $estadoAnterior, $nuevoEstado);
+        registrarHistorial($this->pdo, $usuario, $id, 'qr_codigo', $row['qr_codigo'] ?? null, $qr);
 
-        return ['status' => 'success', 'message' => 'Inspección aprobada por calidad.'];
+        return ['status' => 'success', 'message' => 'Inspección aprobada y QR asignado correctamente.'];
     }
 
     // ── Actualizar datos en calidad ────────────────────────
