@@ -14,7 +14,7 @@ define('DB_USER', 'u218429682_marcos');      // <- cambia por tu usuario de BD
 <<<<<<< HEAD
 define('DB_PASS', 'Db#2026!Avba-Marcos7'); // <- cambia por tu contraseña
 =======
-define('DB_PASS', 'Avba1234.'); // <- cambia por tu contraseña
+define('DB_PASS', 'Db#2026!Avba-Marcos7'); // <- cambia por tu contraseña
 >>>>>>> 5a9cc1470b3e1fddb1343d923f6bcaa018bff823
 
 // ── URL base del sitio ────────────────────────────────────
