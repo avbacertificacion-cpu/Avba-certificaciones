@@ -21,6 +21,9 @@ echo "════════════════════════�
 // 1. Ejecutar schema.sql
 $sql = file_get_contents(__DIR__ . '/sql/schema.sql');
 
+// Eliminar comentarios de línea (-- ...) antes de dividir
+$sql = preg_replace('/--[^\n]*\n/', "\n", $sql);
+
 // Dividir en sentencias individuales y ejecutar
 $sentencias = array_filter(array_map('trim', explode(';', $sql)));
 
@@ -28,7 +31,7 @@ $ok  = 0;
 $err = 0;
 
 foreach ($sentencias as $sentencia) {
-    if (empty($sentencia) || strpos($sentencia, '--') === 0) continue;
+    if (empty($sentencia)) continue;
     try {
         $pdo->exec($sentencia);
         $ok++;
