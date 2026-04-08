@@ -110,7 +110,7 @@ class Inspecciones {
             registrarHistorial($this->pdo, $usuarioActual, $equipoId, 'estado', null, 'PENDIENTE', 'INSERT');
 
             // Generar reporte PDF de inspección
-            $reporte     = ReporteInspeccion::generar($this->pdo, $equipoId);
+            $reporte     = ReporteInspeccion::generar($this->pdo, $equipoId, $usuarioActual);
             $reporteUrl  = $reporte['url'] ?? null;
             $reporteMsg  = ($reporte['status'] !== 'success') ? ($reporte['message'] ?? 'Error desconocido') : null;
 

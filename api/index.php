@@ -234,7 +234,7 @@ if ($method === 'POST') {
         case 'REGENERAR_REPORTE':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($admin->regenerarReporte($payload));
+            respuesta($admin->regenerarReporte($payload, $usr['usuario']));
 
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);

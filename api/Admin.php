@@ -145,11 +145,11 @@ class Admin {
     }
 
     // ── Regenerar reporte de inspección ───────────────────────
-    public function regenerarReporte(array $payload): array {
+    public function regenerarReporte(array $payload, string $usuario = ''): array {
         $equipoId = (int) ($payload['equipo_id'] ?? 0);
         if (!$equipoId) return ['status' => 'error', 'message' => 'equipo_id requerido.'];
 
         require_once __DIR__ . '/ReporteInspeccion.php';
-        return ReporteInspeccion::generar($this->pdo, $equipoId);
+        return ReporteInspeccion::generar($this->pdo, $equipoId, $usuario);
     }
 }

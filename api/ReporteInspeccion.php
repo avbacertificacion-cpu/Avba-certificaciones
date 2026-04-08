@@ -14,7 +14,7 @@ class ReporteInspeccion {
      * Genera el PDF del reporte de inspección y guarda la URL en equipos.
      * Retorna ['status'=>'success','url'=>'...'] o ['status'=>'error','message'=>'...']
      */
-    public static function generar(PDO $pdo, int $equipoId): array {
+    public static function generar(PDO $pdo, int $equipoId, string $usuarioLogin = ''): array {
         try {
             // Verificar que autoload esté disponible
             if (!class_exists('Dompdf\Dompdf')) {
@@ -23,6 +23,15 @@ class ReporteInspeccion {
                     return ['status' => 'error', 'message' => 'Composer vendor no encontrado. Ejecuta composer install.'];
                 }
                 require_once $autoload;
+            }
+
+            // Obtener nombre completo del inspector
+            $nombreInspector = $usuarioLogin;
+            if ($usuarioLogin) {
+                $stmtU = $pdo->prepare("SELECT nombre FROM usuarios WHERE usuario = ?");
+                $stmtU->execute([$usuarioLogin]);
+                $u = $stmtU->fetch();
+                if ($u && $u['nombre']) $nombreInspector = $u['nombre'];
             }
             // Cargar datos del equipo
             $stmt = $pdo->prepare(
@@ -68,7 +77,7 @@ class ReporteInspeccion {
             $fotos = self::obtenerFotos($equipo['evidencia_url'] ?? '');
 
             // Construir HTML
-            $html = self::buildHtml($equipo, $checklist, $fotos);
+            $html = self::buildHtml($equipo, $checklist, $fotos, $nombreInspector);
 
             // Generar PDF con DOMPDF
             if (!class_exists('Dompdf\Dompdf')) {
@@ -134,7 +143,7 @@ class ReporteInspeccion {
     }
 
     // ── Construir HTML del reporte ────────────────────────────
-    private static function buildHtml(array $eq, array $checklist, array $fotos): string {
+    private static function buildHtml(array $eq, array $checklist, array $fotos, string $inspector = ''): string {
 
         $gdDisponible = extension_loaded('gd');
 
@@ -299,8 +308,11 @@ class ReporteInspeccion {
     </td>
   </tr>
   <tr>
-    <td colspan='4' style='padding:3px 6px;border:1px solid #ccc'>
+    <td colspan='2' style='padding:3px 6px;border:1px solid #ccc'>
       Folio de control: <strong>{$control}</strong>
+    </td>
+    <td colspan='2' style='padding:3px 6px;border:1px solid #ccc'>
+      Elaborado por: <strong>" . htmlspecialchars($inspector) . "</strong>
     </td>
   </tr>
 </table>
