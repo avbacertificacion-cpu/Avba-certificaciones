@@ -1361,11 +1361,15 @@ function renderTipoCard(t) {
   return `
   <div class="tipo-card" id="tipo-card-${t.id}">
     <div class="tipo-card-hdr" onclick="toggleTipo(${t.id})">
-      <div>
+      <div style="flex:1;min-width:0">
         <div class="tipo-nombre">${esc(t.nombre)}</div>
         <div class="tipo-meta">${nSecs} sección${nSecs!==1?'es':''} · ${nItems} ítem${nItems!==1?'s':''} en checklist</div>
       </div>
-      <span class="chevron">⌄</span>
+      <div style="display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
+        <button class="btn-add-item" style="font-size:12px" onclick="editarTipo(${t.id},'${esc(t.nombre)}')">✏ Renombrar</button>
+        <button class="btn-add-item" style="border-color:var(--rojo);color:var(--rojo);font-size:12px" onclick="eliminarTipo(${t.id},'${esc(t.nombre)}')">✕ Eliminar</button>
+      </div>
+      <span class="chevron" style="margin-left:8px">⌄</span>
     </div>
     <div class="tipo-body">
 
@@ -1504,6 +1508,42 @@ async function guardarItem(tipoId, secCodigo) {
     alert(data.message || "Error al guardar ítem");
   }
 }
+/* ── Editar tipo de equipo ── */
+async function editarTipo(tipoId, nombreActual) {
+  const nuevoNombre = prompt("Nuevo nombre para el tipo de equipo:", nombreActual);
+  if (!nuevoNombre || nuevoNombre.trim() === nombreActual) return;
+
+  const res  = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({ action: "EDITAR_TIPO_EQUIPO", payload: { tipo_id: tipoId, nombre: nuevoNombre.trim() } })
+  });
+  const data = await res.json();
+  if (data.status === "success") {
+    tiposCargados = false;
+    cargarTipos(true);
+  } else {
+    alert(data.message || "Error al editar tipo");
+  }
+}
+
+/* ── Eliminar tipo de equipo ── */
+async function eliminarTipo(tipoId, nombre) {
+  if (!confirm(`¿Eliminar el tipo "${nombre}"?\n\nSe eliminarán también todas sus secciones, ítems y plantillas.`)) return;
+
+  const res  = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({ action: "ELIMINAR_TIPO_EQUIPO", payload: { tipo_id: tipoId } })
+  });
+  const data = await res.json();
+  if (data.status === "success") {
+    openTipos.delete(tipoId);
+    tiposCargados = false;
+    cargarTipos();
+  } else {
+    alert(data.message || "Error al eliminar tipo");
+  }
+}
+
 /* ── Editar sección ── */
 async function editarSeccion(tipoId, secId, secCodigo) {
   const lbl = document.getElementById("sec-lbl-" + tipoId + "-" + secId);

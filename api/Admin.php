@@ -98,6 +98,41 @@ class Admin {
         return ['status' => 'success', 'message' => 'Tipo de equipo creado.', 'id' => $tipoId];
     }
 
+    // ── Editar nombre de tipo de equipo ────────────────────────
+    public function editarTipoEquipo(array $payload): array {
+        $id     = (int) ($payload['tipo_id'] ?? 0);
+        $nombre = trim($payload['nombre'] ?? '');
+
+        if (!$id || !$nombre)
+            return ['status' => 'error', 'message' => 'tipo_id y nombre son requeridos.'];
+
+        // Evitar duplicados
+        $dup = $this->pdo->prepare("SELECT id FROM maquinaria_tipos WHERE nombre = ? AND id != ?");
+        $dup->execute([$nombre, $id]);
+        if ($dup->fetch())
+            return ['status' => 'error', 'message' => 'Ya existe otro tipo con ese nombre.'];
+
+        $this->pdo->prepare("UPDATE maquinaria_tipos SET nombre = ? WHERE id = ?")
+            ->execute([$nombre, $id]);
+
+        return ['status' => 'success', 'message' => 'Tipo de equipo actualizado.'];
+    }
+
+    // ── Eliminar tipo de equipo (con secciones e ítems) ────────
+    public function eliminarTipoEquipo(array $payload): array {
+        $id = (int) ($payload['tipo_id'] ?? 0);
+        if (!$id) return ['status' => 'error', 'message' => 'tipo_id requerido.'];
+
+        // checklist_items y checklist_secciones tienen FK con ON DELETE CASCADE
+        // hacia maquinaria_tipos, por lo que se eliminan automáticamente.
+        // Si no hay FK cascade, los eliminamos explícitamente:
+        $this->pdo->prepare("DELETE FROM checklist_items    WHERE maquinaria_tipo_id = ?")->execute([$id]);
+        $this->pdo->prepare("DELETE FROM checklist_secciones WHERE maquinaria_tipo_id = ?")->execute([$id]);
+        $this->pdo->prepare("DELETE FROM maquinaria_tipos   WHERE id = ?")->execute([$id]);
+
+        return ['status' => 'success', 'message' => 'Tipo de equipo eliminado.'];
+    }
+
     // ── Agregar sección a un tipo existente ────────────────────
     public function agregarSeccion(array $payload): array {
         $tipoId = (int) ($payload['tipo_id'] ?? 0);
