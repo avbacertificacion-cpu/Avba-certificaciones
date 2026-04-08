@@ -15,7 +15,10 @@ class Admin {
     // ── Listar tipos de equipo con sus secciones ───────────────
     public function listarTiposEquipo(): array {
         $tipos = $this->pdo->query(
-            "SELECT id, nombre, plantilla, plantilla_cert, plantilla_dict FROM maquinaria_tipos ORDER BY id"
+            "SELECT id, nombre, plantilla,
+                    plantilla_cert, plantilla_dict,
+                    plantilla_cert_envio, plantilla_dict_envio
+             FROM maquinaria_tipos ORDER BY id"
         )->fetchAll();
 
         foreach ($tipos as &$tipo) {
@@ -191,6 +194,15 @@ class Admin {
         if ($ext !== 'docx')
             return ['status' => 'error', 'message' => 'Solo se aceptan archivos .docx'];
 
+        $colMap = [
+            'cert'       => 'plantilla_cert',
+            'dict'       => 'plantilla_dict',
+            'cert_envio' => 'plantilla_cert_envio',
+            'dict_envio' => 'plantilla_dict_envio',
+        ];
+        if (!array_key_exists($docTipo, $colMap))
+            return ['status' => 'error', 'message' => 'doc_tipo inválido. Usa: cert, dict, cert_envio, dict_envio'];
+
         $dir = __DIR__ . '/../uploads/plantillas/';
         if (!is_dir($dir) && !mkdir($dir, 0755, true))
             return ['status' => 'error', 'message' => 'No se pudo crear el directorio de plantillas.'];
@@ -201,7 +213,7 @@ class Admin {
         if (!move_uploaded_file($file['tmp_name'], $destPath))
             return ['status' => 'error', 'message' => 'Error al guardar el archivo en el servidor.'];
 
-        $col = ($docTipo === 'cert') ? 'plantilla_cert' : 'plantilla_dict';
+        $col = $colMap[$docTipo];
         $this->pdo->prepare("UPDATE maquinaria_tipos SET `{$col}` = ? WHERE id = ?")
             ->execute([$filename, $tipoId]);
 

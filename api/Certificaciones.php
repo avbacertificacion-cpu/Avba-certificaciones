@@ -93,7 +93,7 @@ class Certificaciones {
             $rutaCert    = $rutaDir . $archivoCert;
             $urlCert     = UPLOAD_URL . "certificados/{$archivoCert}";
 
-            $html = $this->resolverHTML('certificado', $datos);
+            $html = $this->resolverHTML('certificado', $datos, 'envio');
             $this->htmlAPDF($html, $rutaCert);
 
             // Enviar correo
@@ -134,14 +134,14 @@ class Certificaciones {
             $archivoCert = "Certificado_AVBA_{$folio}.pdf";
             $rutaCert    = $rutaDir . $archivoCert;
             $urlCert     = UPLOAD_URL . "certificados/{$archivoCert}";
-            $html = $this->resolverHTML('certificado', $datos);
+            $html = $this->resolverHTML('certificado', $datos, 'envio');
             $this->htmlAPDF($html, $rutaCert);
 
             // Dictamen
             $archivoDict = "Dictamen_AVBA_{$folio}.pdf";
             $rutaDict    = $rutaDir . $archivoDict;
             $urlDict     = UPLOAD_URL . "certificados/{$archivoDict}";
-            $html = $this->resolverHTML('dictamen', $datos);
+            $html = $this->resolverHTML('dictamen', $datos, 'envio');
             $this->htmlAPDF($html, $rutaDict);
 
             // Enviar correo con ambos adjuntos
@@ -233,20 +233,37 @@ class Certificaciones {
 
     /**
      * Decide si usar plantilla Word o la plantilla HTML embebida.
-     * $tipo: 'certificado' | 'dictamen'
+     *
+     * $tipo:    'certificado' | 'dictamen'
+     * $contexto: 'impresion' (default) | 'envio'
+     *
+     * Prioridad de plantilla:
+     *   1. Plantilla específica para el contexto (cert_envio / dict_envio)
+     *   2. Plantilla genérica del tipo (cert / dict)
+     *   3. Plantilla HTML embebida (fallback)
      */
-    private function resolverHTML(string $tipo, array $datos): string {
-        $col = ($tipo === 'dictamen') ? 'plantilla_dict' : 'plantilla_cert';
+    private function resolverHTML(string $tipo, array $datos, string $contexto = 'impresion'): string {
+        $esDict  = ($tipo === 'dictamen');
+        $colPrim = $esDict
+            ? ($contexto === 'envio' ? 'plantilla_dict_envio' : 'plantilla_dict')
+            : ($contexto === 'envio' ? 'plantilla_cert_envio' : 'plantilla_cert');
+        $colFall = $esDict ? 'plantilla_dict' : 'plantilla_cert';
+
         $stmt = $this->pdo->prepare(
-            "SELECT `{$col}` AS plantilla_file FROM maquinaria_tipos WHERE nombre = ? LIMIT 1"
+            "SELECT plantilla_cert, plantilla_dict, plantilla_cert_envio, plantilla_dict_envio
+             FROM maquinaria_tipos WHERE nombre = ? LIMIT 1"
         );
         $stmt->execute([$datos['maquinaria'] ?? '']);
         $row = $stmt->fetch();
 
-        if (!empty($row['plantilla_file'])) {
-            $rutaDocx = __DIR__ . '/../uploads/plantillas/' . $row['plantilla_file'];
-            if (file_exists($rutaDocx)) {
-                return $this->generarDesdePlantillaWord($rutaDocx, $datos, $tipo);
+        // Intentar plantilla específica de contexto, luego la genérica
+        foreach ([$colPrim, $colFall] as $col) {
+            $archivo = $row[$col] ?? null;
+            if (!empty($archivo)) {
+                $rutaDocx = __DIR__ . '/../uploads/plantillas/' . $archivo;
+                if (file_exists($rutaDocx)) {
+                    return $this->generarDesdePlantillaWord($rutaDocx, $datos, $tipo);
+                }
             }
         }
 

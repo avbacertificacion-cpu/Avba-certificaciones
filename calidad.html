@@ -1294,9 +1294,24 @@ function renderTipos() {
   });
 }
 
+/* Helper: genera un bloque de plantilla */
+function plantillaBox(t, docTipo, etiqueta, archivo) {
+  const ok = !!archivo;
+  return `
+  <div class="plantilla-box ${ok ? 'tiene' : ''}">
+    <div class="plantilla-info">
+      <div class="plantilla-tipo">${esc(etiqueta)}</div>
+      <div class="plantilla-estado">${ok ? '✓ ' + esc(archivo) : 'Sin plantilla'}</div>
+    </div>
+    <label class="btn-upload">
+      ${ok ? 'Cambiar' : 'Subir .docx'}
+      <input type="file" accept=".docx" style="display:none"
+             onchange="subirPlantilla(event,${t.id},'${docTipo}')">
+    </label>
+  </div>`;
+}
+
 function renderTipoCard(t) {
-  const certOk  = !!t.plantilla_cert;
-  const dictOk  = !!t.plantilla_dict;
   const nItems  = (t.checklist || []).length;
   const nSecs   = (t.secciones || []).length;
 
@@ -1353,26 +1368,10 @@ function renderTipoCard(t) {
       <!-- Plantillas Word -->
       <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Plantillas Word (.docx)</div>
       <div class="plantillas-row">
-        <div class="plantilla-box ${certOk ? 'tiene' : ''}">
-          <div class="plantilla-info">
-            <div class="plantilla-tipo">Certificado</div>
-            <div class="plantilla-estado">${certOk ? '✓ ' + esc(t.plantilla_cert) : 'Sin plantilla'}</div>
-          </div>
-          <label class="btn-upload">
-            ${certOk ? 'Cambiar' : 'Subir .docx'}
-            <input type="file" accept=".docx" style="display:none" onchange="subirPlantilla(event,${t.id},'cert')">
-          </label>
-        </div>
-        <div class="plantilla-box ${dictOk ? 'tiene' : ''}">
-          <div class="plantilla-info">
-            <div class="plantilla-tipo">Dictamen</div>
-            <div class="plantilla-estado">${dictOk ? '✓ ' + esc(t.plantilla_dict) : 'Sin plantilla'}</div>
-          </div>
-          <label class="btn-upload">
-            ${dictOk ? 'Cambiar' : 'Subir .docx'}
-            <input type="file" accept=".docx" style="display:none" onchange="subirPlantilla(event,${t.id},'dict')">
-          </label>
-        </div>
+        ${plantillaBox(t, 'cert',       'Imprimir certificado',  t.plantilla_cert)}
+        ${plantillaBox(t, 'dict',       'Imprimir dictamen',     t.plantilla_dict)}
+        ${plantillaBox(t, 'cert_envio', 'Enviar certificado',    t.plantilla_cert_envio)}
+        ${plantillaBox(t, 'dict_envio', 'Enviar dictamen',       t.plantilla_dict_envio)}
       </div>
 
       <!-- Secciones y checklist -->
