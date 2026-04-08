@@ -347,12 +347,14 @@
     .btn-imprimir-cert  { background: var(--blanco);       border-color: var(--borde);   color: var(--texto); }
     .btn-imprimir-dict  { background: var(--blanco);       border-color: var(--borde);   color: var(--texto); }
     .btn-enviar-cert    { background: var(--azul-light);   border-color: var(--azul);    color: var(--azul-dark); }
+    .btn-enviar-dict    { background: var(--ambar-light);  border-color: #D4922A;        color: var(--ambar); }
     .btn-enviar-todo    { background: var(--azul);         border-color: var(--azul);    color: white; }
     .btn-rechazar       { background: var(--rojo-light);   border-color: #F09595;        color: var(--rojo); }
 
     .btn-imprimir-cert:hover { background: var(--gris-bg); }
     .btn-imprimir-dict:hover { background: var(--gris-bg); }
     .btn-enviar-cert:hover   { background: #B5D4F4; }
+    .btn-enviar-dict:hover   { background: #F2D9A8; }
     .btn-enviar-todo:hover   { background: var(--azul-dark); }
     .btn-rechazar:hover      { background: #F7C1C1; }
 
@@ -802,7 +804,7 @@ function render(data) {
         <span style="color:var(--texto-sub);font-size:12px">${r.maquinaria || "—"}</span><br>
         <span style="font-size:11px;color:var(--texto-hint);font-family:monospace">${r.serie || "—"}</span>
       </td>
-      <td><span style="font-family:monospace;font-size:12px;font-weight:600;color:var(--azul-dark)">${r.control || "—"}</span></td>
+      <td><span style="font-family:monospace;font-size:12px;font-weight:600;color:var(--azul-dark)">${formatoFolio(r.control)}</span></td>
       <td style="color:var(--texto-sub);font-size:12px">${r.fecha || "—"}</td>
       <td>${diasBadge}</td>
       <td><span class="badge ${bc}">${lbl}</span></td>
@@ -849,7 +851,7 @@ function ver(fila) {
   const ini = (d.cliente || "--").split(" ").slice(0,2).map(w => w[0]||"").join("").toUpperCase();
   document.getElementById("m-avatar").textContent = ini;
   document.getElementById("m-title").textContent  = d.cliente || "Sin nombre";
-  document.getElementById("m-sub").textContent    = `${d.serie || "—"} · ${d.maquinaria || "—"} · Folio: ${d.control || "—"}`;
+  document.getElementById("m-sub").textContent    = `${d.serie || "—"} · ${d.maquinaria || "—"} · Folio: ${formatoFolio(d.control)}`;
 
   const dias = diasRestantes(d.fecha);
   const bc   = d.estado === "ENVIADO" ? "b-env" : "b-apro";
@@ -1134,6 +1136,12 @@ function renderAcciones(d) {
       fn: "confirmarAccion('ENVIAR_CERT')"
     },
     {
+      label: "Enviar dictamen",
+      clase: "btn-accion btn-enviar-dict",
+      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12v8H2V4zm0 0l6 5 6-5M11 2v4M13 4H9"/></svg>`,
+      fn: "confirmarAccion('ENVIAR_DICT')"
+    },
+    {
       label: "Enviar todo (cert + dictamen)",
       clase: "btn-accion btn-enviar-todo",
       icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M10 4l4 4-4 4"/></svg>`,
@@ -1157,13 +1165,19 @@ function renderAcciones(d) {
 /* ═══════════════════════════════
    ACCIONES — LÓGICA
 ═══════════════════════════════ */
+/* Formatea folio para visualización */
+function formatoFolio(control) {
+  if (!control) return "—";
+  return "AB." + control + "-" + new Date().getFullYear() + "MX";
+}
+
 async function imprimirPDF(tipo) {
   const d = registroActual;
   if (!d) return;
   const action = tipo === "CERT" ? "IMPRIMIR_PDF_CERT" : "IMPRIMIR_PDF_DICT";
   try {
     mostrarToast("Generando PDF para impresión...", "info");
-    const res  = await fetch(API + `?action=${action}&fila=${d.fila}`);
+    const res  = await fetch(API + `?action=${action}&id=${d.fila}`);
     const data = await res.json();
     if (data.status === "success" && data.url) {
       window.open(data.url, "_blank");
@@ -1188,6 +1202,13 @@ function confirmarAccion(accion) {
       titulo: "Enviar certificado",
       sub: `Se generará el PDF del certificado y se enviará al correo <strong>${d.correo || "del cliente"}</strong>. La URL se guardará en la columna T.`,
       btnColor: "#185FA5", btnLabel: "Enviar certificado"
+    },
+    ENVIAR_DICT: {
+      color: "#854F0B", bg: "#FAEEDA",
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#854F0B" stroke-width="2"><path d="M4 4h16v12H4V4zm0 0l8 8 8-8"/></svg>`,
+      titulo: "Enviar dictamen",
+      sub: `Se generará el PDF del dictamen y se enviará al correo <strong>${d.correo || "del cliente"}</strong>. La URL se guardará en el registro.`,
+      btnColor: "#854F0B", btnLabel: "Enviar dictamen"
     },
     ENVIAR_TODO: {
       color: "#0C447C", bg: "#E6F1FB",
@@ -1224,6 +1245,7 @@ async function ejecutarAccion(accion) {
 
   const mapaAcciones = {
     ENVIAR_CERT: { action: "GENERAR_CERT_ENVIAR",  msg: "Generando y enviando certificado..." },
+    ENVIAR_DICT: { action: "GENERAR_DICT_ENVIAR",  msg: "Generando y enviando dictamen..." },
     ENVIAR_TODO: { action: "GENERAR_TODO_ENVIAR",   msg: "Generando y enviando certificado + dictamen..." },
     RECHAZAR:    { action: "RECHAZAR_CERTIFICACION", msg: "Rechazando registro..." }
   };

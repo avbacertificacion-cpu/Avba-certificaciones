@@ -198,6 +198,11 @@ if ($method === 'POST') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cert->generarCertEnviar($payload, $usr['usuario']));
 
+        case 'GENERAR_DICT_ENVIAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cert->generarDictEnviar($payload, $usr['usuario']));
+
         case 'GENERAR_TODO_ENVIAR':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

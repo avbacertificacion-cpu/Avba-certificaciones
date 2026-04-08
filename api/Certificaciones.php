@@ -166,6 +166,48 @@ class Certificaciones {
         }
     }
 
+    // ── Generar y enviar solo el dictamen ─────────────────
+    public function generarDictEnviar(array $payload, string $usuario): array {
+        $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
+        if (!$id) return ['status' => 'error', 'message' => 'ID de equipo requerido.'];
+
+        $datos = $this->obtenerDatosEquipo($id);
+        if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+
+        $correo = trim($datos['correo'] ?? '');
+        if (!$correo) return ['status' => 'error', 'message' => 'El registro no tiene correo registrado.'];
+
+        try {
+            $folio   = $datos['control'] ?? $id;
+            $rutaDir = UPLOAD_DIR . 'certificados/';
+            if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
+
+            // Generar PDF del dictamen
+            $archivoDict = "Dictamen_AVBA_{$folio}.pdf";
+            $rutaDict    = $rutaDir . $archivoDict;
+            $urlDict     = UPLOAD_URL . "certificados/{$archivoDict}";
+
+            $html = $this->resolverHTML('dictamen', $datos, 'envio');
+            $this->htmlAPDF($html, $rutaDict);
+
+            // Enviar correo
+            $this->enviarCorreo($correo, $datos['cliente'], $folio, 'dictamen', [$rutaDict => $archivoDict]);
+
+            // Actualizar BD
+            $this->pdo->prepare(
+                "UPDATE equipos SET dictamen_url = ?, estado = 'ENVIADO', fecha_enviado = NOW() WHERE id = ?"
+            )->execute([$urlDict, $id]);
+
+            // Registrar en histórico
+            $this->registrarEnvio($datos, $archivoDict, $usuario);
+            registrarHistorial($this->pdo, $usuario, $id, 'estado', $datos['estado'], 'ENVIADO');
+
+            return ['status' => 'success', 'url' => $urlDict];
+        } catch (Exception $e) {
+            return ['status' => 'error', 'message' => $e->getMessage()];
+        }
+    }
+
     // ── Rechazar a calidad ─────────────────────────────────
     public function rechazarACertificacion(array $payload, string $usuario): array {
         $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
