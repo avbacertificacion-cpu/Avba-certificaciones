@@ -1257,7 +1257,7 @@ async function enviarFormulario() {
    SERVICE WORKER (PWA)
 ════════════════════════════════════════ */
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/service-worker.js")
+  navigator.serviceWorker.register("service-worker.js")
     .catch(e => console.log("SW no registrado:", e));
 }
 </script>
