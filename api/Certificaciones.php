@@ -232,43 +232,50 @@ class Certificaciones {
     }
 
     /**
-     * Decide si usar plantilla Word o la plantilla HTML embebida.
+     * Carga la plantilla Word obligatoria y genera el HTML para DOMPDF.
      *
-     * $tipo:    'certificado' | 'dictamen'
-     * $contexto: 'impresion' (default) | 'envio'
+     * $tipo:     'certificado' | 'dictamen'
+     * $contexto: 'impresion'  → usa plantilla_cert  / plantilla_dict
+     *            'envio'      → usa plantilla_cert_envio / plantilla_dict_envio
      *
-     * Prioridad de plantilla:
-     *   1. Plantilla específica para el contexto (cert_envio / dict_envio)
-     *   2. Plantilla genérica del tipo (cert / dict)
-     *   3. Plantilla HTML embebida (fallback)
+     * Lanza RuntimeException si la plantilla no está configurada o el archivo no existe.
+     * Los certificados y dictámenes son documentos oficiales: NO hay HTML de respaldo.
      */
     private function resolverHTML(string $tipo, array $datos, string $contexto = 'impresion'): string {
-        $esDict  = ($tipo === 'dictamen');
-        $colPrim = $esDict
-            ? ($contexto === 'envio' ? 'plantilla_dict_envio' : 'plantilla_dict')
-            : ($contexto === 'envio' ? 'plantilla_cert_envio' : 'plantilla_cert');
-        $colFall = $esDict ? 'plantilla_dict' : 'plantilla_cert';
+        $colMap = [
+            'certificado_impresion' => 'plantilla_cert',
+            'dictamen_impresion'    => 'plantilla_dict',
+            'certificado_envio'     => 'plantilla_cert_envio',
+            'dictamen_envio'        => 'plantilla_dict_envio',
+        ];
 
-        $stmt = $this->pdo->prepare(
-            "SELECT plantilla_cert, plantilla_dict, plantilla_cert_envio, plantilla_dict_envio
-             FROM maquinaria_tipos WHERE nombre = ? LIMIT 1"
-        );
+        $col  = $colMap["{$tipo}_{$contexto}"]
+              ?? throw new \RuntimeException("Combinación de tipo/contexto no válida: {$tipo}/{$contexto}.");
+
+        $stmt = $this->pdo->prepare("SELECT `{$col}` AS archivo FROM maquinaria_tipos WHERE nombre = ? LIMIT 1");
         $stmt->execute([$datos['maquinaria'] ?? '']);
         $row = $stmt->fetch();
 
-        // Intentar plantilla específica de contexto, luego la genérica
-        foreach ([$colPrim, $colFall] as $col) {
-            $archivo = $row[$col] ?? null;
-            if (!empty($archivo)) {
-                $rutaDocx = __DIR__ . '/../uploads/plantillas/' . $archivo;
-                if (file_exists($rutaDocx)) {
-                    return $this->generarDesdePlantillaWord($rutaDocx, $datos, $tipo);
-                }
-            }
+        $maquinaria = $datos['maquinaria'] ?? '(desconocido)';
+        $archivo    = $row['archivo'] ?? null;
+
+        if (empty($archivo)) {
+            throw new \RuntimeException(
+                "No hay plantilla configurada para '{$tipo}' ({$contexto}) " .
+                "en el tipo de equipo '{$maquinaria}'. " .
+                "Sube el archivo .docx desde el panel de Calidad → Tipos de Equipo."
+            );
         }
 
-        // Fallback: plantilla HTML embebida
-        return $this->renderizarPlantilla($tipo, $datos);
+        $rutaDocx = __DIR__ . '/../uploads/plantillas/' . $archivo;
+        if (!file_exists($rutaDocx)) {
+            throw new \RuntimeException(
+                "El archivo de plantilla '{$archivo}' no se encontró en el servidor. " .
+                "Vuelve a subir la plantilla desde el panel de Calidad."
+            );
+        }
+
+        return $this->generarDesdePlantillaWord($rutaDocx, $datos, $tipo);
     }
 
     /**
