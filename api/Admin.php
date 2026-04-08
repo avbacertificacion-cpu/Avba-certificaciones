@@ -177,8 +177,8 @@ class Admin {
         $tipoId  = (int)($post['tipo_id']  ?? 0);
         $docTipo = trim($post['doc_tipo']  ?? '');
 
-        if (!$tipoId || !in_array($docTipo, ['cert', 'dict'], true))
-            return ['status' => 'error', 'message' => 'tipo_id y doc_tipo (cert|dict) son requeridos.'];
+        if (!$tipoId || !in_array($docTipo, ['cert', 'dict', 'cert_envio', 'dict_envio'], true))
+            return ['status' => 'error', 'message' => 'tipo_id y doc_tipo (cert|dict|cert_envio|dict_envio) son requeridos.'];
 
         // Verificar que el tipo existe
         $chk = $this->pdo->prepare("SELECT id FROM maquinaria_tipos WHERE id = ?");
