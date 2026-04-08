@@ -1260,9 +1260,11 @@ async function crearTipo() {
 }
 
 /* ── Cargar lista de tipos ── */
-async function cargarTipos() {
+async function cargarTipos(silent = false) {
   const cont = document.getElementById("lista-tipos");
-  cont.innerHTML = `<div class="empty-tipos"><div class="spin" style="margin:0 auto 10px"></div>Cargando...</div>`;
+  if (!silent) {
+    cont.innerHTML = `<div class="empty-tipos"><div class="spin" style="margin:0 auto 10px"></div>Cargando...</div>`;
+  }
   try {
     const res  = await fetch(API + "?action=LISTAR_TIPOS_EQUIPO");
     const data = await res.json();
@@ -1271,7 +1273,9 @@ async function cargarTipos() {
     tiposCargados = true;
     renderTipos();
   } catch (e) {
-    cont.innerHTML = `<div class="empty-tipos">Error al cargar. <button onclick="cargarTipos()" style="color:var(--azul);background:none;border:none;cursor:pointer;font-size:13px;text-decoration:underline">Reintentar</button></div>`;
+    if (!silent) {
+      cont.innerHTML = `<div class="empty-tipos">Error al cargar. <button onclick="cargarTipos()" style="color:var(--azul);background:none;border:none;cursor:pointer;font-size:13px;text-decoration:underline">Reintentar</button></div>`;
+    }
   }
 }
 
@@ -1283,6 +1287,11 @@ function renderTipos() {
     return;
   }
   cont.innerHTML = tiposGlobal.map(t => renderTipoCard(t)).join("");
+  // Restaurar tarjetas que estaban abiertas
+  openTipos.forEach(id => {
+    const card = document.getElementById("tipo-card-" + id);
+    if (card) card.classList.add("open");
+  });
 }
 
 function renderTipoCard(t) {
@@ -1375,7 +1384,6 @@ function renderTipoCard(t) {
       <!-- Agregar sección -->
       <button class="btn-add-sec" onclick="mostrarFormSec(${t.id})">+ Agregar sección</button>
       <div class="sec-form" id="sec-form-${t.id}">
-        <input type="text" id="sec-codigo-${t.id}" placeholder="Código (Ej: E1)" style="max-width:90px">
         <input type="text" id="sec-nombre-${t.id}" placeholder="Nombre de la sección"
                onkeydown="if(event.key==='Enter') guardarSeccion(${t.id})">
         <button class="btn-save"    style="padding:7px 12px;font-size:12px" onclick="guardarSeccion(${t.id})">Agregar</button>
@@ -1386,9 +1394,15 @@ function renderTipoCard(t) {
   </div>`;
 }
 
+/* ── Seguimiento de tarjetas abiertas ── */
+const openTipos = new Set();
+
 /* ── Toggle card tipo ── */
 function toggleTipo(id) {
-  document.getElementById("tipo-card-" + id).classList.toggle("open");
+  const card = document.getElementById("tipo-card-" + id);
+  card.classList.toggle("open");
+  if (card.classList.contains("open")) openTipos.add(id);
+  else openTipos.delete(id);
 }
 
 /* ── Subir plantilla Word ── */
@@ -1422,20 +1436,20 @@ async function subirPlantilla(event, tipoId, docTipo) {
 /* ── Secciones ── */
 function mostrarFormSec(tipoId) {
   document.getElementById("sec-form-" + tipoId).classList.add("open");
-  document.getElementById("sec-codigo-" + tipoId).focus();
+  document.getElementById("sec-nombre-" + tipoId).focus();
 }
 function ocultarFormSec(tipoId) {
   document.getElementById("sec-form-" + tipoId).classList.remove("open");
-  document.getElementById("sec-codigo-" + tipoId).value = "";
   document.getElementById("sec-nombre-" + tipoId).value = "";
 }
 async function guardarSeccion(tipoId) {
-  const codigo = document.getElementById("sec-codigo-" + tipoId).value.trim().toUpperCase();
   const nombre = document.getElementById("sec-nombre-" + tipoId).value.trim();
-  if (!codigo || !nombre) return;
+  if (!nombre) return;
 
-  const tipo   = tiposGlobal.find(t => t.id == tipoId);
-  const orden  = (tipo?.secciones?.length || 0) + 1;
+  const tipo  = tiposGlobal.find(t => t.id == tipoId);
+  const orden = (tipo?.secciones?.length || 0) + 1;
+  // Código auto-generado: E1, E2, E3…
+  const codigo = "E" + orden;
 
   const res  = await fetch(API, {
     method: "POST",
@@ -1444,7 +1458,8 @@ async function guardarSeccion(tipoId) {
   const data = await res.json();
   if (data.status === "success") {
     tiposCargados = false;
-    cargarTipos();
+    ocultarFormSec(tipoId);
+    cargarTipos(true);
   } else {
     alert(data.message || "Error al guardar sección");
   }
@@ -1480,7 +1495,8 @@ async function guardarItem(tipoId, secCodigo) {
   const data = await res.json();
   if (data.status === "success") {
     tiposCargados = false;
-    cargarTipos();
+    ocultarFormItem(tipoId, secCodigo);
+    cargarTipos(true);
   } else {
     alert(data.message || "Error al guardar ítem");
   }
@@ -1494,7 +1510,7 @@ async function eliminarItem(tipoId, itemId) {
   const data = await res.json();
   if (data.status === "success") {
     tiposCargados = false;
-    cargarTipos();
+    cargarTipos(true);
   } else {
     alert(data.message || "Error al eliminar ítem");
   }
