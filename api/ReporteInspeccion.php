@@ -130,7 +130,7 @@ class ReporteInspeccion {
         if (!$archivos) return [];
 
         sort($archivos);
-        return array_slice($archivos, 0, 6);
+        return array_slice($archivos, 0, 9);
     }
 
     // ── Construir HTML del reporte ────────────────────────────
@@ -161,24 +161,23 @@ class ReporteInspeccion {
         $capacidad  = htmlspecialchars($eq['capacidad']        ?? '');
         $control    = htmlspecialchars($eq['control']          ?? '');
 
-        // ── Grilla de fotos ───────────────────────────────────
-        $fotosHtml = '';
-        for ($i = 0; $i < 6; $i++) {
-            if ($gdDisponible && isset($fotos[$i]) && file_exists($fotos[$i])) {
+        // ── Grilla de fotos (3x3, solo celdas con foto) ──────────
+        $fotosHtml  = '';
+        $totalFotos = min(9, count($fotos));
+        for ($i = 0; $i < 9; $i++) {
+            $tienesFoto = $gdDisponible && isset($fotos[$i]) && file_exists($fotos[$i]);
+            if ($tienesFoto) {
                 $b64  = base64_encode(file_get_contents($fotos[$i]));
                 $ext  = strtolower(pathinfo($fotos[$i], PATHINFO_EXTENSION));
                 $mime = ($ext === 'png') ? 'image/png' : 'image/jpeg';
-                $fotosHtml .= "<td style='border:1px solid #ccc;width:33%;height:150px;text-align:center;vertical-align:middle;padding:4px'>
-                    <img src='data:{$mime};base64,{$b64}' style='max-width:100%;max-height:140px;object-fit:contain'>
+                $fotosHtml .= "<td style='border:1px solid #ccc;width:33%;height:140px;text-align:center;vertical-align:middle;padding:3px'>
+                    <img src='data:{$mime};base64,{$b64}' style='max-width:100%;max-height:132px;object-fit:contain'>
                 </td>";
             } else {
-                $num   = $i + 1;
-                $label = (!$gdDisponible && isset($fotos[$i])) ? "Foto {$num} (sin GD)" : "Foto {$num}";
-                $fotosHtml .= "<td style='border:1px solid #ccc;width:33%;height:150px;text-align:center;vertical-align:middle;color:#aaa;font-size:12px'>
-                    {$label}
-                </td>";
+                // Celda vacía sin texto
+                $fotosHtml .= "<td style='border:1px solid #eee;width:33%;height:140px;background:#fafafa'></td>";
             }
-            if ($i === 2) $fotosHtml .= '</tr><tr>';
+            if ($i === 2 || $i === 5) $fotosHtml .= '</tr><tr>';
         }
 
         // ── Checklist por secciones ───────────────────────────
@@ -313,9 +312,7 @@ class ReporteInspeccion {
 </div>
 
 <table style='width:100%;border-collapse:collapse;margin-bottom:8px'>
-  <tr>
-    {$fotosHtml}
-  </tr>
+  <tr>{$fotosHtml}</tr>
 </table>
 
 <!-- ══ PÁGINA 2+: INSPECCIÓN (Checklist) ══ -->

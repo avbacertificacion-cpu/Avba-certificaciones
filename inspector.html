@@ -686,7 +686,7 @@
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="3.5" width="13" height="10" rx="2"/><circle cx="8" cy="8.5" r="2.5"/><path d="M5.5 3.5V2.5a1 1 0 011-1h3a1 1 0 011 1v1"/></svg>
         Evidencia fotográfica
       </div>
-      <div style="font-size:12px;color:var(--texto-sub);margin-bottom:2px;">Hasta 6 fotografías del equipo inspeccionado</div>
+      <div style="font-size:12px;color:var(--texto-sub);margin-bottom:2px;">Hasta 9 fotografías del equipo inspeccionado</div>
       <div class="fotos-grid" id="fotos-grid">
         <!-- generado por JS -->
       </div>
@@ -1066,7 +1066,7 @@ function crearMapa(id, tipo, lat, lng) {
 function renderFotosGrid() {
   const grid = document.getElementById("fotos-grid");
   grid.innerHTML = "";
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 9; i++) {
     const slot = document.createElement("div");
     slot.className = "foto-slot";
     slot.id = "slot-" + i;
@@ -1082,12 +1082,15 @@ function renderFotosGrid() {
     }
     grid.appendChild(slot);
   }
+  // Actualizar conteo de fotos en el resumen sin re-renderizar todo
+  const resumenFotos = document.getElementById("resumen-fotos-val");
+  if (resumenFotos) resumenFotos.textContent = fotosData.length + " de 9";
 }
 
 function procesarFotosSeleccionadas() {
   const input   = document.getElementById("fotos-input");
   const archivos = Array.from(input.files);
-  const espacios = 6 - fotosData.length;
+  const espacios = 9 - fotosData.length;
   const aCargar  = archivos.slice(0, espacios);
 
   let procesadas = 0;
@@ -1142,7 +1145,7 @@ function renderResumen() {
     <div class="resumen-item"><span class="resumen-key">Capacidad</span><span class="resumen-val">${c(document.getElementById("capacidad").value)}</span></div>
     <div class="resumen-item"><span class="resumen-key">Correo</span><span class="resumen-val">${c(document.getElementById("email_cliente").value)}</span></div>
     <div class="resumen-item"><span class="resumen-key">Fecha</span><span class="resumen-val">${document.getElementById("fecha").value}</span></div>
-    <div class="resumen-item"><span class="resumen-key">Fotos</span><span class="resumen-val">${fotosData.length} de 6</span></div>
+    <div class="resumen-item"><span class="resumen-key">Fotos</span><span class="resumen-val" id="resumen-fotos-val">${fotosData.length} de 9</span></div>
     <div class="resumen-item"><span class="resumen-key">Resultado</span><span class="resumen-val">${semaforo}</span></div>
   `;
 }
