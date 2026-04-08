@@ -4,6 +4,9 @@
  * Migración de Codigo.gs (guardarInspeccionDesdeWeb, obtenerMaquinaria, getChecklist)
  */
 
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/ReporteInspeccion.php';
+
 class Inspecciones {
     private PDO $pdo;
 
@@ -102,11 +105,16 @@ class Inspecciones {
             // Historial
             registrarHistorial($this->pdo, $usuarioActual, $equipoId, 'estado', null, 'PENDIENTE', 'INSERT');
 
+            // Generar reporte PDF de inspección
+            $reporte = ReporteInspeccion::generar($this->pdo, $equipoId);
+            $reporteUrl = $reporte['url'] ?? null;
+
             return [
-                'status'   => 'success',
-                'message'  => 'Inspección registrada correctamente.',
-                'control'  => $control,
-                'url'      => $urlCarpeta,
+                'status'      => 'success',
+                'message'     => 'Inspección registrada correctamente.',
+                'control'     => $control,
+                'url'         => $urlCarpeta,
+                'reporte_url' => $reporteUrl,
             ];
         } catch (Exception $e) {
             return ['status' => 'error', 'message' => $e->getMessage()];

@@ -16,6 +16,7 @@ require_once __DIR__ . '/Inspecciones.php';
 require_once __DIR__ . '/Calidad.php';
 require_once __DIR__ . '/Certificaciones.php';
 require_once __DIR__ . '/ValidarQR.php';
+require_once __DIR__ . '/Admin.php';
 
 // ── Headers ───────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -29,12 +30,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // ── PDO + módulos ─────────────────────────────────────────
-$pdo  = Database::getConnection();
-$auth = new Auth($pdo);
-$insp = new Inspecciones($pdo);
-$cal  = new Calidad($pdo);
-$cert = new Certificaciones($pdo);
-$qr   = new ValidarQR($pdo);
+$pdo   = Database::getConnection();
+$auth  = new Auth($pdo);
+$insp  = new Inspecciones($pdo);
+$cal   = new Calidad($pdo);
+$cert  = new Certificaciones($pdo);
+$qr    = new ValidarQR($pdo);
+$admin = new Admin($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -107,6 +109,12 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($auth->listarUsuarios());
+
+        // Tipos de equipo (ADMIN + CALIDAD)
+        case 'LISTAR_TIPOS_EQUIPO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->listarTiposEquipo());
 
         // Imprimir PDF certificado (preview)
         case 'IMPRIMIR_PDF_CERT':
@@ -201,6 +209,32 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cert->guardarEnvioCert($payload));
+
+        // ── Admin: tipos de equipo ────────────────────────
+        case 'CREAR_TIPO_EQUIPO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->crearTipoEquipo($payload));
+
+        case 'AGREGAR_SECCION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->agregarSeccion($payload));
+
+        case 'GUARDAR_ITEM_CHECKLIST':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->guardarItemChecklist($payload));
+
+        case 'ELIMINAR_ITEM_CHECKLIST':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->eliminarItemChecklist($payload));
+
+        case 'REGENERAR_REPORTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->regenerarReporte($payload));
 
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);
