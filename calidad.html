@@ -420,6 +420,182 @@
     }
     .qr-field input:focus { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(24,95,165,0.12); }
     .qr-hint { font-size: 11px; color: var(--azul); margin-top: 5px; }
+
+    /* ── TABS ── */
+    .tabs-nav {
+      background: var(--blanco);
+      border-bottom: 1px solid var(--borde);
+      display: flex;
+      gap: 0;
+      padding: 0 24px;
+    }
+    .tab-btn {
+      padding: 13px 20px;
+      border: none; background: none; cursor: pointer;
+      font-size: 13px; font-weight: 600; color: var(--texto-sub);
+      border-bottom: 2.5px solid transparent;
+      margin-bottom: -1px;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn.active { color: var(--azul); border-bottom-color: var(--azul); }
+    .tab-btn:hover:not(.active) { color: var(--texto); }
+
+    /* ── TIPOS DE EQUIPO ── */
+    .top-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px;
+    }
+    .top-bar h2 { font-size: 15px; font-weight: 700; color: var(--texto); }
+    .btn-crear {
+      padding: 9px 18px; border-radius: var(--radio);
+      border: none; background: var(--azul); color: white;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .btn-crear:hover { background: var(--azul-dark); }
+
+    .form-nuevo {
+      background: var(--blanco);
+      border: 1.5px solid var(--azul);
+      border-radius: var(--radio-lg);
+      padding: 18px 20px;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .form-nuevo.open { display: block; }
+    .form-nuevo h3 { font-size: 14px; font-weight: 700; margin-bottom: 14px; color: var(--azul-dark); }
+    .form-row { display: flex; gap: 10px; align-items: flex-end; }
+    .form-group { flex: 1; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--texto-sub); display: block; margin-bottom: 5px; }
+    .form-group input {
+      width: 100%; padding: 9px 12px;
+      border: 1.5px solid var(--borde); border-radius: 8px;
+      font-size: 13px; color: var(--texto); background: var(--blanco); outline: none;
+    }
+    .form-group input:focus { border-color: var(--azul); }
+    .btn-save {
+      padding: 9px 18px; border-radius: var(--radio);
+      border: none; background: var(--verde); color: white;
+      font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+    }
+    .btn-save:hover { background: #2A5009; }
+    .btn-cancel2 {
+      padding: 9px 14px; border-radius: var(--radio);
+      border: 1.5px solid var(--borde); background: var(--blanco);
+      color: var(--texto-sub); font-size: 13px; cursor: pointer;
+    }
+
+    .tipo-card {
+      background: var(--blanco);
+      border: 1px solid rgba(0,0,0,0.06);
+      border-radius: var(--radio-lg);
+      box-shadow: var(--sombra);
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .tipo-card-hdr {
+      padding: 14px 18px;
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer;
+      border-bottom: 1px solid transparent;
+      transition: background .12s;
+    }
+    .tipo-card-hdr:hover { background: var(--gris-bg); }
+    .tipo-card.open .tipo-card-hdr { border-bottom-color: var(--borde); }
+    .tipo-nombre { font-size: 14px; font-weight: 700; color: var(--texto); }
+    .tipo-meta { font-size: 12px; color: var(--texto-hint); margin-top: 2px; }
+    .chevron { font-size: 18px; color: var(--texto-hint); transition: transform .2s; }
+    .tipo-card.open .chevron { transform: rotate(180deg); }
+
+    .tipo-body { display: none; padding: 16px 18px; }
+    .tipo-card.open .tipo-body { display: block; }
+
+    .plantillas-row {
+      display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap;
+    }
+    .plantilla-box {
+      flex: 1; min-width: 200px;
+      border: 1.5px dashed var(--borde);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .plantilla-box.tiene { border-color: var(--verde); border-style: solid; background: var(--verde-light); }
+    .plantilla-info { font-size: 12px; }
+    .plantilla-tipo { font-weight: 700; color: var(--texto-sub); margin-bottom: 3px; }
+    .plantilla-estado { color: var(--texto-hint); }
+    .plantilla-box.tiene .plantilla-estado { color: var(--verde); font-weight: 600; }
+    .btn-upload {
+      padding: 6px 12px; border-radius: 7px;
+      border: 1.5px solid var(--azul); background: var(--azul-light);
+      color: var(--azul); font-size: 12px; font-weight: 600; cursor: pointer;
+      white-space: nowrap;
+    }
+    .btn-upload:hover { background: var(--azul); color: white; }
+
+    .seccion-blk { margin-bottom: 14px; }
+    .seccion-hdr {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--azul-light); border-radius: 8px 8px 0 0;
+      border: 1px solid #C7DEFF;
+    }
+    .seccion-nombre { font-size: 12px; font-weight: 700; color: var(--azul-dark); }
+    .seccion-codigo { font-size: 11px; color: var(--azul); background: white; padding: 2px 7px; border-radius: 20px; margin-right: 8px; }
+    .btn-add-item {
+      padding: 4px 10px; border-radius: 6px;
+      border: 1.5px solid var(--azul); background: white;
+      color: var(--azul); font-size: 11px; font-weight: 600; cursor: pointer;
+    }
+    .btn-add-item:hover { background: var(--azul); color: white; }
+    .items-lista {
+      border: 1px solid #C7DEFF; border-top: none;
+      border-radius: 0 0 8px 8px; overflow: hidden;
+    }
+    .item-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid #e8f0fb;
+      font-size: 12px; color: var(--texto);
+    }
+    .item-row:last-child { border-bottom: none; }
+    .item-row:hover { background: #fafbff; }
+    .btn-del-item {
+      background: none; border: none; cursor: pointer;
+      color: var(--rojo); font-size: 16px; line-height: 1;
+      padding: 0 4px; opacity: .5;
+    }
+    .btn-del-item:hover { opacity: 1; }
+    .item-form-row {
+      display: flex; gap: 6px; padding: 8px 10px;
+      border: 1px solid #C7DEFF; border-top: none;
+      border-radius: 0 0 8px 8px; background: #fafcff;
+    }
+    .item-form-row input {
+      flex: 1; padding: 7px 10px;
+      border: 1.5px solid var(--borde); border-radius: 7px;
+      font-size: 12px; color: var(--texto); outline: none;
+    }
+    .item-form-row input:focus { border-color: var(--azul); }
+    .btn-add-sec {
+      margin-top: 10px; width: 100%; padding: 9px;
+      border: 1.5px dashed var(--borde); border-radius: 8px;
+      background: none; color: var(--texto-hint);
+      font-size: 12px; cursor: pointer;
+    }
+    .btn-add-sec:hover { border-color: var(--azul); color: var(--azul); background: var(--azul-light); }
+    .sec-form {
+      display: none; gap: 8px; margin-top: 8px; padding: 12px;
+      border: 1.5px solid var(--azul); border-radius: 8px; background: var(--azul-light);
+    }
+    .sec-form.open { display: flex; }
+    .sec-form input {
+      flex: 1; padding: 8px 10px;
+      border: 1.5px solid #85B7EB; border-radius: 7px;
+      font-size: 12px; color: var(--texto); background: white; outline: none;
+    }
+    .empty-tipos {
+      text-align: center; padding: 40px; color: var(--texto-hint); font-size: 13px;
+    }
   </style>
 </head>
 <body>
@@ -433,7 +609,13 @@
   </div>
 </div>
 
-<div class="wrap">
+<!-- TABS NAV -->
+<div class="tabs-nav">
+  <button class="tab-btn active" id="tab-btn-inspecciones" onclick="verTab('inspecciones')">Inspecciones</button>
+  <button class="tab-btn"        id="tab-btn-tipos"        onclick="verTab('tipos')">Tipos de Equipo</button>
+</div>
+
+<div id="tab-inspecciones" class="wrap">
 
   <!-- STATS -->
   <div class="stats">
@@ -496,7 +678,41 @@
     </div>
   </div>
 
-</div><!-- /wrap -->
+</div><!-- /tab-inspecciones -->
+
+
+<!-- ══════════════════════════════════════════
+     TAB: TIPOS DE EQUIPO
+═══════════════════════════════════════════ -->
+<div id="tab-tipos" class="wrap" style="display:none">
+
+  <div class="top-bar">
+    <h2>Tipos de equipo y plantillas</h2>
+    <button class="btn-crear" onclick="toggleFormNuevo()">+ Nuevo tipo</button>
+  </div>
+
+  <!-- Formulario nuevo tipo -->
+  <div class="form-nuevo" id="form-nuevo">
+    <h3>Crear nuevo tipo de equipo</h3>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Nombre del equipo</label>
+        <input type="text" id="nuevo-nombre" placeholder="Ej: GRÚA TORRE, MONTACARGAS...">
+      </div>
+      <button class="btn-save"    onclick="crearTipo()">Crear</button>
+      <button class="btn-cancel2" onclick="toggleFormNuevo()">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Lista de tipos -->
+  <div id="lista-tipos">
+    <div class="empty-tipos">
+      <div class="spin" style="margin:0 auto 10px"></div>
+      Cargando tipos de equipo...
+    </div>
+  </div>
+
+</div><!-- /tab-tipos -->
 
 
 <!-- ══ MODAL DETALLE ══ -->
@@ -589,7 +805,10 @@ const API = "api/index.php";
       const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
       const t = s.token || '';
       if (opts.method === 'POST') {
-        try { const b = JSON.parse(opts.body || '{}'); b.token = t; opts.body = JSON.stringify(b); } catch(e) {}
+        // FormData: token ya incluido manualmente; JSON: inyectar en body
+        if (!(opts.body instanceof FormData)) {
+          try { const b = JSON.parse(opts.body || '{}'); b.token = t; opts.body = JSON.stringify(b); } catch(e) {}
+        }
       } else {
         url = url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
       }
@@ -995,6 +1214,291 @@ async function ejecutarAprobacion() {
    ARRANQUE
 ═══════════════════════════════════════ */
 cargar();
+
+
+/* ═══════════════════════════════════════
+   TABS
+═══════════════════════════════════════ */
+function verTab(tab) {
+  document.getElementById("tab-inspecciones").style.display = tab === "inspecciones" ? "" : "none";
+  document.getElementById("tab-tipos").style.display        = tab === "tipos"        ? "" : "none";
+  document.getElementById("tab-btn-inspecciones").classList.toggle("active", tab === "inspecciones");
+  document.getElementById("tab-btn-tipos").classList.toggle("active", tab === "tipos");
+  if (tab === "tipos" && !tiposCargados) cargarTipos();
+}
+
+/* ═══════════════════════════════════════
+   TIPOS DE EQUIPO — estado
+═══════════════════════════════════════ */
+let tiposCargados = false;
+let tiposGlobal   = [];
+
+/* ── Formulario nuevo tipo ── */
+function toggleFormNuevo() {
+  const f = document.getElementById("form-nuevo");
+  f.classList.toggle("open");
+  if (f.classList.contains("open")) document.getElementById("nuevo-nombre").focus();
+}
+
+async function crearTipo() {
+  const nombre = document.getElementById("nuevo-nombre").value.trim();
+  if (!nombre) { document.getElementById("nuevo-nombre").focus(); return; }
+
+  const res  = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({ action: "CREAR_TIPO_EQUIPO", payload: { nombre } })
+  });
+  const data = await res.json();
+  if (data.status === "success") {
+    document.getElementById("nuevo-nombre").value = "";
+    toggleFormNuevo();
+    tiposCargados = false;
+    cargarTipos();
+  } else {
+    alert(data.message || "Error al crear tipo");
+  }
+}
+
+/* ── Cargar lista de tipos ── */
+async function cargarTipos() {
+  const cont = document.getElementById("lista-tipos");
+  cont.innerHTML = `<div class="empty-tipos"><div class="spin" style="margin:0 auto 10px"></div>Cargando...</div>`;
+  try {
+    const res  = await fetch(API + "?action=LISTAR_TIPOS_EQUIPO");
+    const data = await res.json();
+    if (data.status !== "success") throw new Error(data.message);
+    tiposGlobal   = data.data || [];
+    tiposCargados = true;
+    renderTipos();
+  } catch (e) {
+    cont.innerHTML = `<div class="empty-tipos">Error al cargar. <button onclick="cargarTipos()" style="color:var(--azul);background:none;border:none;cursor:pointer;font-size:13px;text-decoration:underline">Reintentar</button></div>`;
+  }
+}
+
+/* ── Render lista de tipos ── */
+function renderTipos() {
+  const cont = document.getElementById("lista-tipos");
+  if (!tiposGlobal.length) {
+    cont.innerHTML = `<div class="empty-tipos">No hay tipos de equipo. Crea uno con el botón de arriba.</div>`;
+    return;
+  }
+  cont.innerHTML = tiposGlobal.map(t => renderTipoCard(t)).join("");
+}
+
+function renderTipoCard(t) {
+  const certOk  = !!t.plantilla_cert;
+  const dictOk  = !!t.plantilla_dict;
+  const nItems  = (t.checklist || []).length;
+  const nSecs   = (t.secciones || []).length;
+
+  // Agrupar ítems por sección
+  const secMap = {};
+  (t.secciones || []).forEach(s => { secMap[s.codigo] = s; });
+
+  const itemsPorSec = {};
+  (t.checklist || []).forEach(i => {
+    if (!itemsPorSec[i.seccion]) itemsPorSec[i.seccion] = [];
+    itemsPorSec[i.seccion].push(i);
+  });
+
+  const seccionesHtml = (t.secciones || []).map(s => {
+    const items = itemsPorSec[s.codigo] || [];
+    const itemsHtml = items.map(it => `
+      <div class="item-row">
+        <span>${esc(it.descripcion)}</span>
+        <button class="btn-del-item" onclick="eliminarItem(${t.id},${it.id})" title="Eliminar">×</button>
+      </div>`).join("");
+
+    return `
+    <div class="seccion-blk" id="sec-blk-${t.id}-${s.codigo}">
+      <div class="seccion-hdr">
+        <div>
+          <span class="seccion-codigo">${esc(s.codigo)}</span>
+          <span class="seccion-nombre">${esc(s.nombre)}</span>
+        </div>
+        <button class="btn-add-item" onclick="mostrarFormItem(${t.id},'${s.codigo}')">+ Ítem</button>
+      </div>
+      <div class="items-lista" id="items-${t.id}-${s.codigo}">
+        ${itemsHtml || `<div class="item-row" style="color:var(--texto-hint)">Sin ítems aún</div>`}
+      </div>
+      <div class="item-form-row" id="item-form-${t.id}-${s.codigo}" style="display:none">
+        <input type="text" id="item-desc-${t.id}-${s.codigo}" placeholder="Descripción del ítem..."
+               onkeydown="if(event.key==='Enter') guardarItem(${t.id},'${s.codigo}')">
+        <button class="btn-save" style="padding:7px 12px;font-size:12px" onclick="guardarItem(${t.id},'${s.codigo}')">Agregar</button>
+        <button class="btn-cancel2" style="padding:7px 10px;font-size:12px" onclick="ocultarFormItem(${t.id},'${s.codigo}')">✕</button>
+      </div>
+    </div>`;
+  }).join("");
+
+  return `
+  <div class="tipo-card" id="tipo-card-${t.id}">
+    <div class="tipo-card-hdr" onclick="toggleTipo(${t.id})">
+      <div>
+        <div class="tipo-nombre">${esc(t.nombre)}</div>
+        <div class="tipo-meta">${nSecs} sección${nSecs!==1?'es':''} · ${nItems} ítem${nItems!==1?'s':''} en checklist</div>
+      </div>
+      <span class="chevron">⌄</span>
+    </div>
+    <div class="tipo-body">
+
+      <!-- Plantillas Word -->
+      <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Plantillas Word (.docx)</div>
+      <div class="plantillas-row">
+        <div class="plantilla-box ${certOk ? 'tiene' : ''}">
+          <div class="plantilla-info">
+            <div class="plantilla-tipo">Certificado</div>
+            <div class="plantilla-estado">${certOk ? '✓ ' + esc(t.plantilla_cert) : 'Sin plantilla'}</div>
+          </div>
+          <label class="btn-upload">
+            ${certOk ? 'Cambiar' : 'Subir .docx'}
+            <input type="file" accept=".docx" style="display:none" onchange="subirPlantilla(event,${t.id},'cert')">
+          </label>
+        </div>
+        <div class="plantilla-box ${dictOk ? 'tiene' : ''}">
+          <div class="plantilla-info">
+            <div class="plantilla-tipo">Dictamen</div>
+            <div class="plantilla-estado">${dictOk ? '✓ ' + esc(t.plantilla_dict) : 'Sin plantilla'}</div>
+          </div>
+          <label class="btn-upload">
+            ${dictOk ? 'Cambiar' : 'Subir .docx'}
+            <input type="file" accept=".docx" style="display:none" onchange="subirPlantilla(event,${t.id},'dict')">
+          </label>
+        </div>
+      </div>
+
+      <!-- Secciones y checklist -->
+      <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Secciones y checklist</div>
+      <div id="secciones-${t.id}">
+        ${seccionesHtml || `<div style="color:var(--texto-hint);font-size:13px;margin-bottom:10px">Sin secciones aún.</div>`}
+      </div>
+
+      <!-- Agregar sección -->
+      <button class="btn-add-sec" onclick="mostrarFormSec(${t.id})">+ Agregar sección</button>
+      <div class="sec-form" id="sec-form-${t.id}">
+        <input type="text" id="sec-codigo-${t.id}" placeholder="Código (Ej: E1)" style="max-width:90px">
+        <input type="text" id="sec-nombre-${t.id}" placeholder="Nombre de la sección"
+               onkeydown="if(event.key==='Enter') guardarSeccion(${t.id})">
+        <button class="btn-save"    style="padding:7px 12px;font-size:12px" onclick="guardarSeccion(${t.id})">Agregar</button>
+        <button class="btn-cancel2" style="padding:7px 10px;font-size:12px" onclick="ocultarFormSec(${t.id})">✕</button>
+      </div>
+
+    </div>
+  </div>`;
+}
+
+/* ── Toggle card tipo ── */
+function toggleTipo(id) {
+  document.getElementById("tipo-card-" + id).classList.toggle("open");
+}
+
+/* ── Subir plantilla Word ── */
+async function subirPlantilla(event, tipoId, docTipo) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const form = new FormData();
+  form.append("action",    "SUBIR_PLANTILLA");
+  form.append("token",     s.token || "");
+  form.append("tipo_id",   tipoId);
+  form.append("doc_tipo",  docTipo);
+  form.append("plantilla", file);
+
+  try {
+    const res  = await fetch(API, { method: "POST", body: form });
+    const data = await res.json();
+    if (data.status === "success") {
+      tiposCargados = false;
+      cargarTipos();
+    } else {
+      alert("Error: " + (data.message || "No se pudo subir la plantilla"));
+    }
+  } catch (e) {
+    alert("Error de conexión al subir la plantilla.");
+  }
+  event.target.value = "";
+}
+
+/* ── Secciones ── */
+function mostrarFormSec(tipoId) {
+  document.getElementById("sec-form-" + tipoId).classList.add("open");
+  document.getElementById("sec-codigo-" + tipoId).focus();
+}
+function ocultarFormSec(tipoId) {
+  document.getElementById("sec-form-" + tipoId).classList.remove("open");
+  document.getElementById("sec-codigo-" + tipoId).value = "";
+  document.getElementById("sec-nombre-" + tipoId).value = "";
+}
+async function guardarSeccion(tipoId) {
+  const codigo = document.getElementById("sec-codigo-" + tipoId).value.trim().toUpperCase();
+  const nombre = document.getElementById("sec-nombre-" + tipoId).value.trim();
+  if (!codigo || !nombre) return;
+
+  const tipo   = tiposGlobal.find(t => t.id == tipoId);
+  const orden  = (tipo?.secciones?.length || 0) + 1;
+
+  const res  = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({ action: "AGREGAR_SECCION", payload: { tipo_id: tipoId, codigo, nombre, orden } })
+  });
+  const data = await res.json();
+  if (data.status === "success") {
+    tiposCargados = false;
+    cargarTipos();
+  } else {
+    alert(data.message || "Error al guardar sección");
+  }
+}
+
+/* ── Ítems checklist ── */
+function mostrarFormItem(tipoId, secCodigo) {
+  const f = document.getElementById("item-form-" + tipoId + "-" + secCodigo);
+  if (f) { f.style.display = "flex"; document.getElementById("item-desc-" + tipoId + "-" + secCodigo)?.focus(); }
+}
+function ocultarFormItem(tipoId, secCodigo) {
+  const f = document.getElementById("item-form-" + tipoId + "-" + secCodigo);
+  if (f) { f.style.display = "none"; }
+  const inp = document.getElementById("item-desc-" + tipoId + "-" + secCodigo);
+  if (inp) inp.value = "";
+}
+async function guardarItem(tipoId, secCodigo) {
+  const desc = document.getElementById("item-desc-" + tipoId + "-" + secCodigo)?.value.trim();
+  if (!desc) return;
+
+  const tipo   = tiposGlobal.find(t => t.id == tipoId);
+  const items  = (tipo?.checklist || []).filter(i => i.seccion === secCodigo);
+  const tag    = secCodigo + "_" + (items.length + 1).toString().padStart(2, "0");
+  const orden  = items.length + 1;
+
+  const res  = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({
+      action: "GUARDAR_ITEM_CHECKLIST",
+      payload: { tipo_id: tipoId, seccion: secCodigo, tag, descripcion: desc, orden }
+    })
+  });
+  const data = await res.json();
+  if (data.status === "success") {
+    tiposCargados = false;
+    cargarTipos();
+  } else {
+    alert(data.message || "Error al guardar ítem");
+  }
+}
+async function eliminarItem(tipoId, itemId) {
+  if (!confirm("¿Eliminar este ítem del checklist?")) return;
+  const res  = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({ action: "ELIMINAR_ITEM_CHECKLIST", payload: { item_id: itemId } })
+  });
+  const data = await res.json();
+  if (data.status === "success") {
+    tiposCargados = false;
+    cargarTipos();
+  } else {
+    alert(data.message || "Error al eliminar ítem");
+  }
+}
 </script>
 </body>
 </html>

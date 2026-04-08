@@ -103,11 +103,16 @@ class Auth {
 
     // ── EDITAR USUARIO ─────────────────────────────────────
     public function editarUsuario(array $payload, string $usuarioEditor): array {
-        $usuario = strtolower(trim($payload['usuario'] ?? ''));
-        if (!$usuario) return ['status' => 'error', 'message' => 'Usuario requerido.'];
-
-        $stmt = $this->pdo->prepare("SELECT id FROM usuarios WHERE usuario = ?");
-        $stmt->execute([$usuario]);
+        // Aceptar búsqueda por id o por usuario
+        if (!empty($payload['id'])) {
+            $stmt = $this->pdo->prepare("SELECT id FROM usuarios WHERE id = ?");
+            $stmt->execute([(int)$payload['id']]);
+        } else {
+            $usuario = strtolower(trim($payload['usuario'] ?? ''));
+            if (!$usuario) return ['status' => 'error', 'message' => 'id o usuario requerido.'];
+            $stmt = $this->pdo->prepare("SELECT id FROM usuarios WHERE usuario = ?");
+            $stmt->execute([$usuario]);
+        }
         $row = $stmt->fetch();
         if (!$row) return ['status' => 'error', 'message' => 'Usuario no encontrado.'];
 
@@ -148,12 +153,15 @@ class Auth {
 
     // ── DESACTIVAR USUARIO ─────────────────────────────────
     public function desactivarUsuario(array $payload): array {
-        $usuario = strtolower(trim($payload['usuario'] ?? ''));
-        if (!$usuario) return ['status' => 'error', 'message' => 'Usuario requerido.'];
-
-        $stmt = $this->pdo->prepare("UPDATE usuarios SET activo = 0 WHERE usuario = ?");
-        $stmt->execute([$usuario]);
-
+        if (!empty($payload['id'])) {
+            $stmt = $this->pdo->prepare("UPDATE usuarios SET activo = 0 WHERE id = ?");
+            $stmt->execute([(int)$payload['id']]);
+        } else {
+            $usuario = strtolower(trim($payload['usuario'] ?? ''));
+            if (!$usuario) return ['status' => 'error', 'message' => 'id o usuario requerido.'];
+            $stmt = $this->pdo->prepare("UPDATE usuarios SET activo = 0 WHERE usuario = ?");
+            $stmt->execute([$usuario]);
+        }
         if ($stmt->rowCount() === 0) return ['status' => 'error', 'message' => 'Usuario no encontrado.'];
         return ['status' => 'success', 'message' => 'Usuario desactivado.'];
     }
@@ -161,7 +169,7 @@ class Auth {
     // ── LISTAR USUARIOS ────────────────────────────────────
     public function listarUsuarios(): array {
         $stmt = $this->pdo->query(
-            "SELECT usuario, rol, nombre, id_cliente, activo,
+            "SELECT id, usuario, rol, nombre, id_cliente, activo,
                     DATE_FORMAT(fecha_alta, '%d/%m/%Y %H:%i') AS fecha_alta,
                     DATE_FORMAT(ultimo_acceso, '%d/%m/%Y %H:%i') AS ultimo_acceso
              FROM usuarios ORDER BY id"
