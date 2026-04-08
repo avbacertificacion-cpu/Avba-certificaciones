@@ -1336,11 +1336,15 @@ function renderTipoCard(t) {
     return `
     <div class="seccion-blk" id="sec-blk-${t.id}-${s.codigo}">
       <div class="seccion-hdr">
-        <div>
+        <div style="display:flex;align-items:center;gap:6px;flex:1;min-width:0">
           <span class="seccion-codigo">${esc(s.codigo)}</span>
-          <span class="seccion-nombre">${esc(s.nombre)}</span>
+          <span class="seccion-nombre" id="sec-lbl-${t.id}-${s.id}">${esc(s.nombre)}</span>
         </div>
-        <button class="btn-add-item" onclick="mostrarFormItem(${t.id},'${s.codigo}')">+ Ítem</button>
+        <div style="display:flex;gap:5px;flex-shrink:0">
+          <button class="btn-add-item" onclick="mostrarFormItem(${t.id},'${s.codigo}')">+ Ítem</button>
+          <button class="btn-add-item" style="border-color:#854F0B;color:#854F0B" onclick="editarSeccion(${t.id},${s.id},'${s.codigo}')">✏</button>
+          <button class="btn-add-item" style="border-color:var(--rojo);color:var(--rojo)" onclick="eliminarSeccion(${t.id},${s.id},'${esc(s.nombre)}')">✕</button>
+        </div>
       </div>
       <div class="items-lista" id="items-${t.id}-${s.codigo}">
         ${itemsHtml || `<div class="item-row" style="color:var(--texto-hint)">Sin ítems aún</div>`}
@@ -1500,6 +1504,43 @@ async function guardarItem(tipoId, secCodigo) {
     alert(data.message || "Error al guardar ítem");
   }
 }
+/* ── Editar sección ── */
+async function editarSeccion(tipoId, secId, secCodigo) {
+  const lbl = document.getElementById("sec-lbl-" + tipoId + "-" + secId);
+  const nombreActual = lbl ? lbl.textContent.trim() : "";
+  const nuevoNombre  = prompt("Nuevo nombre para la sección " + secCodigo + ":", nombreActual);
+  if (!nuevoNombre || nuevoNombre.trim() === nombreActual) return;
+
+  const res  = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({ action: "EDITAR_SECCION", payload: { seccion_id: secId, nombre: nuevoNombre.trim() } })
+  });
+  const data = await res.json();
+  if (data.status === "success") {
+    tiposCargados = false;
+    cargarTipos(true);
+  } else {
+    alert(data.message || "Error al editar sección");
+  }
+}
+
+/* ── Eliminar sección ── */
+async function eliminarSeccion(tipoId, secId, secNombre) {
+  if (!confirm("¿Eliminar la sección \"" + secNombre + "\" y todos sus ítems?")) return;
+
+  const res  = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({ action: "ELIMINAR_SECCION", payload: { seccion_id: secId } })
+  });
+  const data = await res.json();
+  if (data.status === "success") {
+    tiposCargados = false;
+    cargarTipos(true);
+  } else {
+    alert(data.message || "Error al eliminar sección");
+  }
+}
+
 async function eliminarItem(tipoId, itemId) {
   if (!confirm("¿Eliminar este ítem del checklist?")) return;
   const res  = await fetch(API, {

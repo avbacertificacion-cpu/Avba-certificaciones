@@ -117,6 +117,45 @@ class Admin {
         return ['status' => 'success', 'message' => 'Sección guardada.'];
     }
 
+    // ── Editar nombre de sección ───────────────────────────────
+    public function editarSeccion(array $payload): array {
+        $id     = (int) ($payload['seccion_id'] ?? 0);
+        $nombre = trim($payload['nombre'] ?? '');
+
+        if (!$id || !$nombre)
+            return ['status' => 'error', 'message' => 'seccion_id y nombre son requeridos.'];
+
+        $this->pdo->prepare("UPDATE checklist_secciones SET nombre = ? WHERE id = ?")
+            ->execute([$nombre, $id]);
+
+        return ['status' => 'success', 'message' => 'Sección actualizada.'];
+    }
+
+    // ── Eliminar sección y sus ítems ───────────────────────────
+    public function eliminarSeccion(array $payload): array {
+        $id = (int) ($payload['seccion_id'] ?? 0);
+        if (!$id) return ['status' => 'error', 'message' => 'seccion_id requerido.'];
+
+        // Obtener codigo y maquinaria_tipo_id para eliminar también sus ítems
+        $stmt = $this->pdo->prepare(
+            "SELECT maquinaria_tipo_id, codigo FROM checklist_secciones WHERE id = ?"
+        );
+        $stmt->execute([$id]);
+        $sec = $stmt->fetch();
+
+        if (!$sec) return ['status' => 'error', 'message' => 'Sección no encontrada.'];
+
+        // Eliminar ítems de esa sección
+        $this->pdo->prepare(
+            "DELETE FROM checklist_items WHERE maquinaria_tipo_id = ? AND seccion = ?"
+        )->execute([$sec['maquinaria_tipo_id'], $sec['codigo']]);
+
+        // Eliminar la sección
+        $this->pdo->prepare("DELETE FROM checklist_secciones WHERE id = ?")->execute([$id]);
+
+        return ['status' => 'success', 'message' => 'Sección e ítems eliminados.'];
+    }
+
     // ── Agregar/editar item del checklist ──────────────────────
     public function guardarItemChecklist(array $payload): array {
         $tipoId = (int) ($payload['tipo_id'] ?? 0);
