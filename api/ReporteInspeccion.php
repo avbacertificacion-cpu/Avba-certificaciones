@@ -16,6 +16,14 @@ class ReporteInspeccion {
      */
     public static function generar(PDO $pdo, int $equipoId): array {
         try {
+            // Verificar que autoload esté disponible
+            if (!class_exists('Dompdf\Dompdf')) {
+                $autoload = __DIR__ . '/../vendor/autoload.php';
+                if (!file_exists($autoload)) {
+                    return ['status' => 'error', 'message' => 'Composer vendor no encontrado. Ejecuta composer install.'];
+                }
+                require_once $autoload;
+            }
             // Cargar datos del equipo
             $stmt = $pdo->prepare(
                 "SELECT e.*,
@@ -78,15 +86,21 @@ class ReporteInspeccion {
             $dompdf->render();
 
             // Guardar PDF
-            $carpeta = UPLOAD_DIR . 'reportes/';
-            if (!is_dir($carpeta)) mkdir($carpeta, 0755, true);
+            $carpeta = rtrim(UPLOAD_DIR, '/\\') . DIRECTORY_SEPARATOR . 'reportes' . DIRECTORY_SEPARATOR;
+            if (!is_dir($carpeta) && !mkdir($carpeta, 0755, true)) {
+                return ['status' => 'error', 'message' => "No se pudo crear carpeta: {$carpeta}"];
+            }
 
             $control  = preg_replace('/[^a-zA-Z0-9\-_]/', '_', $equipo['control'] ?? $equipoId);
             $archivo  = "Reporte_AVBA_{$control}.pdf";
             $rutaPDF  = $carpeta . $archivo;
-            $urlPDF   = UPLOAD_URL . 'reportes/' . $archivo;
+            $urlPDF   = rtrim(UPLOAD_URL, '/') . '/reportes/' . $archivo;
 
-            file_put_contents($rutaPDF, $dompdf->output());
+            $bytes = $dompdf->output();
+            if (!$bytes) return ['status' => 'error', 'message' => 'DOMPDF no generó contenido.'];
+            if (file_put_contents($rutaPDF, $bytes) === false) {
+                return ['status' => 'error', 'message' => "No se pudo escribir el archivo: {$rutaPDF}"];
+            }
 
             // Guardar URL en equipos
             $pdo->prepare("UPDATE equipos SET reporte_url = ? WHERE id = ?")
