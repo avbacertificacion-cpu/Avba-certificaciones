@@ -11,6 +11,16 @@ function generarToken(): string {
 }
 
 /**
+ * Formatea el folio para mostrar en documentos.
+ * "24568-45698" → "AB.24568-45698-2026MX"
+ * La BD guarda el valor sin formato.
+ */
+function formatoFolio(string $control): string {
+    if (!$control) return '';
+    return 'AB.' . $control . '-' . date('Y') . 'MX';
+}
+
+/**
  * Genera el folio de control (NNNNN-NNNNN).
  * Crea el cliente si no existe.
  */

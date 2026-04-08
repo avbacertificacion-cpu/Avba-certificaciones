@@ -235,7 +235,7 @@ class Certificaciones {
      * Renderiza la plantilla HTML del certificado o dictamen con los datos del equipo.
      */
     private function renderizarPlantilla(string $tipo, array $datos): string {
-        $folio      = htmlspecialchars($datos['control']      ?? '');
+        $folio      = htmlspecialchars(formatoFolio($datos['control'] ?? ''));
         $cliente    = htmlspecialchars($datos['cliente']      ?? '');
         $domicilio  = htmlspecialchars($datos['direccion']    ?? '');
         $maquinaria = htmlspecialchars($datos['maquinaria']   ?? '');

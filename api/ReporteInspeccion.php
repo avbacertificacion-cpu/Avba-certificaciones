@@ -168,7 +168,7 @@ class ReporteInspeccion {
         $idEquipo   = htmlspecialchars($eq['id_equipo']        ?? '');
         $fecha      = htmlspecialchars($eq['fecha_fmt']        ?? '');
         $capacidad  = htmlspecialchars($eq['capacidad']        ?? '');
-        $control    = htmlspecialchars($eq['control']          ?? '');
+        $control    = htmlspecialchars(formatoFolio($eq['control'] ?? ''));
 
         // ── Grilla de fotos (3x3, solo celdas con foto) ──────────
         $fotosHtml  = '';
