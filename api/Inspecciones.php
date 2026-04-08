@@ -25,11 +25,15 @@ class Inspecciones {
         if (!$nombreEquipo) return [];
 
         $stmt = $this->pdo->prepare(
-            "SELECT ci.tag, ci.descripcion AS pregunta, ci.seccion
+            "SELECT ci.tag, ci.descripcion AS pregunta, ci.seccion,
+                    COALESCE(cs.nombre, ci.seccion) AS seccion_nombre,
+                    COALESCE(cs.orden, 0) AS seccion_orden
              FROM checklist_items ci
              INNER JOIN maquinaria_tipos mt ON mt.id = ci.maquinaria_tipo_id
+             LEFT JOIN checklist_secciones cs ON cs.maquinaria_tipo_id = mt.id
+                 AND cs.codigo = ci.seccion
              WHERE mt.nombre = ?
-             ORDER BY ci.orden"
+             ORDER BY cs.orden, ci.orden"
         );
         $stmt->execute([trim($nombreEquipo)]);
         return $stmt->fetchAll();

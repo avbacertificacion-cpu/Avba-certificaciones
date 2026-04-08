@@ -4,9 +4,13 @@ config/config.php
 # Dependencias de Composer
 vendor/
 
-# Uploads generados
-uploads/certificados/
-uploads/evidencias/
+# Uploads generados (mantener carpetas vacías con .gitkeep)
+uploads/certificados/*
+uploads/evidencias/*
+uploads/reportes/*
+!uploads/certificados/.gitkeep
+!uploads/evidencias/.gitkeep
+!uploads/reportes/.gitkeep
 
 # Archivos de instalación
 install.php

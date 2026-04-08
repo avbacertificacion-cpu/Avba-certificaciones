@@ -243,11 +243,59 @@
     }
 
     /* ─── CHECKLIST ─── */
+    /* ─── SECCIÓN DEL CHECKLIST ─── */
+    .check-seccion {
+      margin-bottom: 14px;
+      border: 1px solid var(--borde);
+      border-radius: var(--radio);
+      overflow: hidden;
+    }
+    .check-seccion-header {
+      background: var(--azul-light);
+      border-bottom: 1px solid var(--borde);
+      padding: 9px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .check-seccion-nombre {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--azul-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      flex: 1;
+    }
+    .check-bloque-btns {
+      display: flex;
+      gap: 5px;
+    }
+    .btn-bloque {
+      padding: 4px 11px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      border: 1.5px solid var(--borde);
+      background: white;
+      color: var(--texto-sub);
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .btn-bloque-c  { border-color: #639922; color: #3B6D11; }
+    .btn-bloque-nc { border-color: #E24B4A; color: #A32D2D; }
+    .btn-bloque-na { border-color: #999;    color: #555; }
+    .btn-bloque-c:hover  { background: var(--verde-light); }
+    .btn-bloque-nc:hover { background: var(--rojo-light); }
+    .btn-bloque-na:hover { background: var(--gris-bg); }
+    .check-seccion-items { padding: 4px 0; }
+
     .check-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 0;
+      padding: 10px 14px;
       border-bottom: 1px solid var(--gris-bg);
     }
     .check-item:last-child { border-bottom: none; }
@@ -262,10 +310,10 @@
 
     .btn-group-check { display: flex; gap: 6px; }
 
-    .btn-c, .btn-nc {
-      padding: 6px 16px;
+    .btn-c, .btn-nc, .btn-na {
+      padding: 5px 13px;
       border-radius: 20px;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 600;
       cursor: pointer;
       border: 1.5px solid var(--borde);
@@ -276,8 +324,10 @@
     }
     .btn-c:hover  { border-color: #639922; color: #3B6D11; }
     .btn-nc:hover { border-color: #E24B4A; color: #A32D2D; }
+    .btn-na:hover { border-color: #999;    color: #555; }
     .btn-c.sel  { background: var(--verde-light); border-color: #639922; color: #27500A; }
     .btn-nc.sel { background: var(--rojo-light);  border-color: #E24B4A; color: #791F1F; }
+    .btn-na.sel { background: var(--gris-bg);     border-color: #999;    color: #333; }
 
     .check-loading {
       text-align: center;
@@ -873,7 +923,7 @@ async function cargarMaquinaria() {
    CHECKLIST
 ════════════════════════════════════════ */
 async function actualizarChecklist() {
-  const equipo    = document.getElementById("maquinaria").value;
+  const equipo     = document.getElementById("maquinaria").value;
   const contenedor = document.getElementById("contenedorCheck");
   respuestasCheck  = {};
 
@@ -889,17 +939,48 @@ async function actualizarChecklist() {
       return;
     }
 
-    contenedor.innerHTML = "";
+    // Agrupar por sección
+    const secciones = {};
     preguntas.forEach(p => {
-      const div = document.createElement("div");
-      div.className = "check-item";
-      div.innerHTML = `
-        <span class="check-pregunta">${p.pregunta}</span>
-        <div class="btn-group-check">
-          <button class="btn-c"  onclick="marcar(this,'${p.tag}','C')">C</button>
-          <button class="btn-nc" onclick="marcar(this,'${p.tag}','NC')">NC</button>
-        </div>`;
-      contenedor.appendChild(div);
+      const cod = p.seccion;
+      if (!secciones[cod]) secciones[cod] = { nombre: p.seccion_nombre || cod, items: [] };
+      secciones[cod].items.push(p);
+    });
+
+    contenedor.innerHTML = "";
+    Object.entries(secciones).forEach(([cod, sec]) => {
+      const secDiv = document.createElement("div");
+      secDiv.className = "check-seccion";
+      secDiv.dataset.seccion = cod;
+
+      // Header con nombre y botones de bloque
+      secDiv.innerHTML = `
+        <div class="check-seccion-header">
+          <span class="check-seccion-nombre">${sec.nombre}</span>
+          <div class="check-bloque-btns">
+            <button class="btn-bloque btn-bloque-c"  onclick="marcarBloque('${cod}','C')">Todo C</button>
+            <button class="btn-bloque btn-bloque-nc" onclick="marcarBloque('${cod}','NC')">Todo NC</button>
+            <button class="btn-bloque btn-bloque-na" onclick="marcarBloque('${cod}','NA')">Todo N/A</button>
+          </div>
+        </div>
+        <div class="check-seccion-items" id="sec-${cod}"></div>`;
+
+      contenedor.appendChild(secDiv);
+
+      const itemsContainer = document.getElementById(`sec-${cod}`);
+      sec.items.forEach(p => {
+        const div = document.createElement("div");
+        div.className = "check-item";
+        div.dataset.tag = p.tag;
+        div.innerHTML = `
+          <span class="check-pregunta">${p.pregunta}</span>
+          <div class="btn-group-check">
+            <button class="btn-c"  onclick="marcar(this,'${p.tag}','C')">C</button>
+            <button class="btn-nc" onclick="marcar(this,'${p.tag}','NC')">NC</button>
+            <button class="btn-na" onclick="marcar(this,'${p.tag}','NA')">N/A</button>
+          </div>`;
+        itemsContainer.appendChild(div);
+      });
     });
 
   } catch (e) {
@@ -909,9 +990,23 @@ async function actualizarChecklist() {
 }
 
 function marcar(btn, tag, valor) {
-  btn.parentElement.querySelectorAll(".btn-c,.btn-nc").forEach(b => b.classList.remove("sel"));
+  btn.parentElement.querySelectorAll(".btn-c,.btn-nc,.btn-na").forEach(b => b.classList.remove("sel"));
   btn.classList.add("sel");
   respuestasCheck[tag] = valor;
+  actualizarCheckStats();
+}
+
+function marcarBloque(seccion, valor) {
+  const secDiv = document.querySelector(`.check-seccion[data-seccion="${seccion}"]`);
+  if (!secDiv) return;
+  secDiv.querySelectorAll(".check-item").forEach(item => {
+    const tag = item.dataset.tag;
+    const btns = item.querySelectorAll(".btn-c,.btn-nc,.btn-na");
+    btns.forEach(b => b.classList.remove("sel"));
+    const target = item.querySelector(valor === 'C' ? '.btn-c' : valor === 'NC' ? '.btn-nc' : '.btn-na');
+    if (target) target.classList.add("sel");
+    respuestasCheck[tag] = valor;
+  });
   actualizarCheckStats();
 }
 
@@ -920,6 +1015,7 @@ function actualizarCheckStats() {
   const total = document.querySelectorAll(".check-item").length;
   const c     = vals.filter(v => v === "C").length;
   const nc    = vals.filter(v => v === "NC").length;
+  const na    = vals.filter(v => v === "NA").length;
   const rest  = total - vals.length;
 
   const stats = document.getElementById("check-stats");
@@ -928,7 +1024,8 @@ function actualizarCheckStats() {
   stats.innerHTML = `
     <span>✔ Conformes: <strong style="color:#27500A">${c}</strong></span>
     <span>✖ No conformes: <strong style="color:#791F1F">${nc}</strong></span>
-    ${rest > 0 ? `<span>— Pendientes: <strong>${rest}</strong></span>` : ""}
+    <span>— N/A: <strong>${na}</strong></span>
+    ${rest > 0 ? `<span style="color:#A32D2D">⚠ Pendientes: <strong>${rest}</strong></span>` : ""}
   `;
 }
 
