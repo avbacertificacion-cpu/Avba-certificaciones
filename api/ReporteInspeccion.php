@@ -136,12 +136,18 @@ class ReporteInspeccion {
     // ── Construir HTML del reporte ────────────────────────────
     private static function buildHtml(array $eq, array $checklist, array $fotos): string {
 
-        // Logo en base64
-        $logoPath = __DIR__ . '/../icon-192.png';
-        $logoTag  = '';
-        if (file_exists($logoPath)) {
-            $b64     = base64_encode(file_get_contents($logoPath));
-            $logoTag = "<img src='data:image/png;base64,{$b64}' style='width:60px;height:60px;object-fit:contain'>";
+        $gdDisponible = extension_loaded('gd');
+
+        // Logo en base64 (solo si GD está disponible)
+        $logoTag = '';
+        if ($gdDisponible) {
+            $logoPath = __DIR__ . '/../icon-192.png';
+            if (file_exists($logoPath)) {
+                $b64     = base64_encode(file_get_contents($logoPath));
+                $logoTag = "<img src='data:image/png;base64,{$b64}' style='width:60px;height:60px;object-fit:contain'>";
+            }
+        } else {
+            $logoTag = "<div style='width:60px;height:60px;background:#185FA5;color:white;font-size:10px;font-weight:bold;display:flex;align-items:center;justify-content:center;border-radius:8px'>AVBA</div>";
         }
 
         $cliente    = htmlspecialchars($eq['cliente']          ?? '');
@@ -158,17 +164,18 @@ class ReporteInspeccion {
         // ── Grilla de fotos ───────────────────────────────────
         $fotosHtml = '';
         for ($i = 0; $i < 6; $i++) {
-            if (isset($fotos[$i]) && file_exists($fotos[$i])) {
-                $b64 = base64_encode(file_get_contents($fotos[$i]));
-                $ext = strtolower(pathinfo($fotos[$i], PATHINFO_EXTENSION));
+            if ($gdDisponible && isset($fotos[$i]) && file_exists($fotos[$i])) {
+                $b64  = base64_encode(file_get_contents($fotos[$i]));
+                $ext  = strtolower(pathinfo($fotos[$i], PATHINFO_EXTENSION));
                 $mime = ($ext === 'png') ? 'image/png' : 'image/jpeg';
                 $fotosHtml .= "<td style='border:1px solid #ccc;width:33%;height:150px;text-align:center;vertical-align:middle;padding:4px'>
                     <img src='data:{$mime};base64,{$b64}' style='max-width:100%;max-height:140px;object-fit:contain'>
                 </td>";
             } else {
-                $num = $i + 1;
+                $num   = $i + 1;
+                $label = (!$gdDisponible && isset($fotos[$i])) ? "Foto {$num} (sin GD)" : "Foto {$num}";
                 $fotosHtml .= "<td style='border:1px solid #ccc;width:33%;height:150px;text-align:center;vertical-align:middle;color:#aaa;font-size:12px'>
-                    Foto {$num}
+                    {$label}
                 </td>";
             }
             if ($i === 2) $fotosHtml .= '</tr><tr>';
