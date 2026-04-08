@@ -51,6 +51,10 @@ $raw    = file_get_contents('php://input');
 if ($raw) {
     $body = json_decode($raw, true) ?? [];
 }
+// Soporte multipart/form-data (subida de archivos)
+if (empty($body) && !empty($_POST)) {
+    $body = $_POST;
+}
 if (!$token && isset($body['token'])) {
     $token = $body['token'];
 }
@@ -235,6 +239,12 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->regenerarReporte($payload, $usr['usuario']));
+
+        // Subir plantilla Word para certificado/dictamen (multipart/form-data)
+        case 'SUBIR_PLANTILLA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->subirPlantilla($payload, $_FILES));
 
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);

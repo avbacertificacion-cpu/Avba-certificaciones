@@ -8,9 +8,11 @@ vendor/
 uploads/certificados/*
 uploads/evidencias/*
 uploads/reportes/*
+uploads/plantillas/*
 !uploads/certificados/.gitkeep
 !uploads/evidencias/.gitkeep
 !uploads/reportes/.gitkeep
+!uploads/plantillas/.gitkeep
 
 # Archivos de instalación
 install.php

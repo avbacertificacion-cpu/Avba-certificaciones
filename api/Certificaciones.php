@@ -63,7 +63,7 @@ class Certificaciones {
                 mkdir(UPLOAD_DIR . 'certificados/', 0755, true);
             }
 
-            $html = $this->renderizarPlantilla($tipoPDF, $datos);
+            $html = $this->resolverHTML($tipoPDF, $datos);
             $this->htmlAPDF($html, $rutaPDF);
 
             return ['status' => 'success', 'url' => $urlPDF];
@@ -93,7 +93,7 @@ class Certificaciones {
             $rutaCert    = $rutaDir . $archivoCert;
             $urlCert     = UPLOAD_URL . "certificados/{$archivoCert}";
 
-            $html = $this->renderizarPlantilla('certificado', $datos);
+            $html = $this->resolverHTML('certificado', $datos);
             $this->htmlAPDF($html, $rutaCert);
 
             // Enviar correo
@@ -134,14 +134,14 @@ class Certificaciones {
             $archivoCert = "Certificado_AVBA_{$folio}.pdf";
             $rutaCert    = $rutaDir . $archivoCert;
             $urlCert     = UPLOAD_URL . "certificados/{$archivoCert}";
-            $html = $this->renderizarPlantilla('certificado', $datos);
+            $html = $this->resolverHTML('certificado', $datos);
             $this->htmlAPDF($html, $rutaCert);
 
             // Dictamen
             $archivoDict = "Dictamen_AVBA_{$folio}.pdf";
             $rutaDict    = $rutaDir . $archivoDict;
             $urlDict     = UPLOAD_URL . "certificados/{$archivoDict}";
-            $html = $this->renderizarPlantilla('dictamen', $datos);
+            $html = $this->resolverHTML('dictamen', $datos);
             $this->htmlAPDF($html, $rutaDict);
 
             // Enviar correo con ambos adjuntos
@@ -229,6 +229,129 @@ class Certificaciones {
         $datos['qr_url'] = $datos['qr_codigo'] ? urlQR($datos['qr_codigo']) : '';
 
         return $datos;
+    }
+
+    /**
+     * Decide si usar plantilla Word o la plantilla HTML embebida.
+     * $tipo: 'certificado' | 'dictamen'
+     */
+    private function resolverHTML(string $tipo, array $datos): string {
+        $col = ($tipo === 'dictamen') ? 'plantilla_dict' : 'plantilla_cert';
+        $stmt = $this->pdo->prepare(
+            "SELECT `{$col}` AS plantilla_file FROM maquinaria_tipos WHERE nombre = ? LIMIT 1"
+        );
+        $stmt->execute([$datos['maquinaria'] ?? '']);
+        $row = $stmt->fetch();
+
+        if (!empty($row['plantilla_file'])) {
+            $rutaDocx = __DIR__ . '/../uploads/plantillas/' . $row['plantilla_file'];
+            if (file_exists($rutaDocx)) {
+                return $this->generarDesdePlantillaWord($rutaDocx, $datos, $tipo);
+            }
+        }
+
+        // Fallback: plantilla HTML embebida
+        return $this->renderizarPlantilla($tipo, $datos);
+    }
+
+    /**
+     * Procesa una plantilla .docx con PhpWord TemplateProcessor,
+     * reemplaza etiquetas ${variable} y convierte a HTML para DOMPDF.
+     *
+     * Etiquetas soportadas: ${folio}, ${cliente}, ${domicilio}, ${maquinaria},
+     * ${marca}, ${modelo}, ${serie}, ${id_equipo}, ${capacidad}, ${fecha},
+     * ${vigencia}, ${qr_codigo}, ${anio}
+     *
+     * Para dictamen (fila de tabla a clonar):
+     * ${item_seccion}, ${item_descripcion}, ${item_valor}
+     */
+    private function generarDesdePlantillaWord(string $rutaDocx, array $datos, string $tipo): string {
+        if (!class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
+            require_once __DIR__ . '/../vendor/autoload.php';
+        }
+
+        $processor = new \PhpOffice\PhpWord\TemplateProcessor($rutaDocx);
+
+        // Calcular vigencia
+        $vigencia = '';
+        if (!empty($datos['fecha_inspeccion'])) {
+            $fv = new DateTime($datos['fecha_inspeccion']);
+            $fv->modify('+1 year');
+            $vigencia = $fv->format('d/m/Y');
+        }
+
+        // Variables simples
+        $vars = [
+            'folio'      => formatoFolio($datos['control']   ?? ''),
+            'cliente'    => $datos['cliente']    ?? '',
+            'domicilio'  => $datos['direccion']  ?? '',
+            'maquinaria' => $datos['maquinaria'] ?? '',
+            'marca'      => $datos['marca']      ?? '',
+            'modelo'     => $datos['modelo']     ?? '',
+            'serie'      => $datos['serie']      ?? '',
+            'id_equipo'  => $datos['id_equipo']  ?? '',
+            'capacidad'  => $datos['capacidad']  ?? '',
+            'fecha'      => $datos['fecha_fmt']  ?? '',
+            'vigencia'   => $vigencia,
+            'qr_codigo'  => $datos['qr_codigo']  ?? '',
+            'anio'       => date('Y'),
+        ];
+        foreach ($vars as $key => $val) {
+            $processor->setValue($key, htmlspecialchars((string)$val));
+        }
+
+        // Para dictamen: clonar filas de checklist
+        if ($tipo === 'dictamen') {
+            $stmtItems = $this->pdo->prepare(
+                "SELECT ci.descripcion, ic.valor,
+                        COALESCE(cs.nombre, ci.seccion) AS seccion_nombre
+                 FROM inspeccion_checklist ic
+                 INNER JOIN checklist_items ci
+                        ON ci.tag = ic.tag
+                       AND ci.maquinaria_tipo_id = (
+                             SELECT id FROM maquinaria_tipos WHERE nombre = ? LIMIT 1
+                           )
+                 LEFT JOIN checklist_secciones cs
+                        ON cs.maquinaria_tipo_id = ci.maquinaria_tipo_id
+                       AND cs.codigo = ci.seccion
+                 WHERE ic.equipo_id = ?
+                 ORDER BY ci.seccion, ci.orden"
+            );
+            $stmtItems->execute([$datos['maquinaria'] ?? '', $datos['id']]);
+            $items = $stmtItems->fetchAll();
+
+            if (!empty($items)) {
+                $processor->cloneRow('item_descripcion', count($items));
+                foreach ($items as $i => $item) {
+                    $n   = $i + 1;
+                    $val = $item['valor'] ?? '';
+                    $label = match ($val) {
+                        'C'  => 'CONFORME',
+                        'NC' => 'NO CONFORME',
+                        'NA' => 'N/A',
+                        default => '—',
+                    };
+                    $processor->setValue("item_seccion#{$n}",      htmlspecialchars($item['seccion_nombre'] ?? ''));
+                    $processor->setValue("item_descripcion#{$n}",  htmlspecialchars($item['descripcion']    ?? ''));
+                    $processor->setValue("item_valor#{$n}",        $label);
+                }
+            }
+        }
+
+        // Guardar .docx procesado en temporal
+        $tempDocx = sys_get_temp_dir() . '/avba_' . uniqid() . '.docx';
+        $processor->saveAs($tempDocx);
+
+        // Convertir .docx → HTML → usar DOMPDF
+        $phpWord  = \PhpOffice\PhpWord\IOFactory::load($tempDocx);
+        $tempHtml = sys_get_temp_dir() . '/avba_' . uniqid() . '.html';
+        \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'HTML')->save($tempHtml);
+        $html = file_get_contents($tempHtml);
+
+        @unlink($tempDocx);
+        @unlink($tempHtml);
+
+        return $html ?: $this->renderizarPlantilla($tipo, $datos);
     }
 
     /**

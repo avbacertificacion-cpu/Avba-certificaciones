@@ -15,7 +15,7 @@ class Admin {
     // ── Listar tipos de equipo con sus secciones ───────────────
     public function listarTiposEquipo(): array {
         $tipos = $this->pdo->query(
-            "SELECT id, nombre, plantilla FROM maquinaria_tipos ORDER BY id"
+            "SELECT id, nombre, plantilla, plantilla_cert, plantilla_dict FROM maquinaria_tipos ORDER BY id"
         )->fetchAll();
 
         foreach ($tipos as &$tipo) {
@@ -142,6 +142,70 @@ class Admin {
 
         $this->pdo->prepare("DELETE FROM checklist_items WHERE id = ?")->execute([$id]);
         return ['status' => 'success', 'message' => 'Item eliminado.'];
+    }
+
+    // ── Subir plantilla Word para certificado o dictamen ──────
+    /**
+     * Recibe un archivo .docx vía multipart/form-data.
+     * Parámetros POST: tipo_id (int), doc_tipo ('cert'|'dict')
+     * Parámetro FILE:  plantilla (el archivo .docx)
+     *
+     * Etiquetas disponibles en la plantilla Word:
+     *   ${folio}         → AB.XXXXX-XXXXX-2026MX
+     *   ${cliente}       → Nombre del cliente
+     *   ${domicilio}     → Dirección
+     *   ${maquinaria}    → Tipo de equipo
+     *   ${marca}         → Marca
+     *   ${modelo}        → Modelo
+     *   ${serie}         → Número de serie
+     *   ${id_equipo}     → ID del equipo
+     *   ${capacidad}     → Capacidad
+     *   ${fecha}         → Fecha de inspección (dd/mm/yyyy)
+     *   ${vigencia}      → Fecha de vencimiento (dd/mm/yyyy)
+     *   ${qr_codigo}     → Código QR (texto)
+     *   ${anio}          → Año actual
+     *
+     *   Para dictamen — fila de tabla a clonar:
+     *   ${item_seccion}      → Nombre de sección
+     *   ${item_descripcion}  → Descripción del ítem
+     *   ${item_valor}        → CONFORME / NO CONFORME / N/A
+     */
+    public function subirPlantilla(array $post, array $files): array {
+        $tipoId  = (int)($post['tipo_id']  ?? 0);
+        $docTipo = trim($post['doc_tipo']  ?? '');
+
+        if (!$tipoId || !in_array($docTipo, ['cert', 'dict'], true))
+            return ['status' => 'error', 'message' => 'tipo_id y doc_tipo (cert|dict) son requeridos.'];
+
+        // Verificar que el tipo existe
+        $chk = $this->pdo->prepare("SELECT id FROM maquinaria_tipos WHERE id = ?");
+        $chk->execute([$tipoId]);
+        if (!$chk->fetch())
+            return ['status' => 'error', 'message' => 'Tipo de equipo no encontrado.'];
+
+        $file = $files['plantilla'] ?? null;
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK)
+            return ['status' => 'error', 'message' => 'No se recibió archivo o hubo un error al subirlo.'];
+
+        $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if ($ext !== 'docx')
+            return ['status' => 'error', 'message' => 'Solo se aceptan archivos .docx'];
+
+        $dir = __DIR__ . '/../uploads/plantillas/';
+        if (!is_dir($dir) && !mkdir($dir, 0755, true))
+            return ['status' => 'error', 'message' => 'No se pudo crear el directorio de plantillas.'];
+
+        $filename = "tipo_{$tipoId}_{$docTipo}.docx";
+        $destPath = $dir . $filename;
+
+        if (!move_uploaded_file($file['tmp_name'], $destPath))
+            return ['status' => 'error', 'message' => 'Error al guardar el archivo en el servidor.'];
+
+        $col = ($docTipo === 'cert') ? 'plantilla_cert' : 'plantilla_dict';
+        $this->pdo->prepare("UPDATE maquinaria_tipos SET `{$col}` = ? WHERE id = ?")
+            ->execute([$filename, $tipoId]);
+
+        return ['status' => 'success', 'message' => 'Plantilla guardada correctamente.', 'archivo' => $filename];
     }
 
     // ── Regenerar reporte de inspección ───────────────────────
