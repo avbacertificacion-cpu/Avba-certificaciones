@@ -324,6 +324,7 @@ class Certificaciones {
 
         // ── Etiquetas de texto ────────────────────────────────
         // IMPORTANTE: PhpWord escapa XML internamente, pasar texto plano (sin htmlspecialchars).
+        // qr_codigo NO se incluye aquí — se reemplaza como imagen más abajo.
         $vars = [
             'folio'      => formatoFolio($datos['control']   ?? ''),
             'cliente'    => $datos['cliente']    ?? '',
@@ -336,14 +337,15 @@ class Certificaciones {
             'capacidad'  => $datos['capacidad']  ?? '',
             'fecha'      => $datos['fecha_fmt']  ?? '',
             'vigencia'   => $vigencia,
-            'qr_codigo'  => $datos['qr_codigo']  ?? '',
             'anio'       => date('Y'),
         ];
         foreach ($vars as $key => $val) {
             try { $processor->setValue($key, (string)$val); } catch (\Exception $e) { /* placeholder no existe */ }
         }
 
-        // ── QR como imagen (etiqueta ${qr_imagen}) ────────────
+        // ── QR como imagen ────────────────────────────────────
+        // Soporta ${qr_codigo} y ${qr_imagen} como placeholders de imagen.
+        // Si falla la descarga, cae a texto como último recurso.
         $qrTemp   = null;
         $qrCodigo = $datos['qr_codigo'] ?? '';
         if ($qrCodigo) {
@@ -354,16 +356,19 @@ class Certificaciones {
 
             if ($qrContent !== false) {
                 file_put_contents($qrTemp, $qrContent);
-                try {
-                    $processor->setImageValue('qr_imagen', [
-                        'path'   => $qrTemp,
-                        'width'  => 100,
-                        'height' => 100,
-                        'ratio'  => false,
-                    ]);
-                } catch (\Exception $e) {
-                    // ${qr_imagen} no está en la plantilla, ignorar
-                }
+                $imgParams = [
+                    'path'   => $qrTemp,
+                    'width'  => 100,
+                    'height' => 100,
+                    'ratio'  => false,
+                ];
+                // ${qr_codigo} → imagen QR (reemplaza el placeholder principal)
+                try { $processor->setImageValue('qr_codigo', $imgParams); } catch (\Exception $e) {}
+                // ${qr_imagen} → imagen QR (placeholder alternativo)
+                try { $processor->setImageValue('qr_imagen', $imgParams); } catch (\Exception $e) {}
+            } else {
+                // Sin conexión a quickchart: poner el código como texto de respaldo
+                try { $processor->setValue('qr_codigo', $qrCodigo); } catch (\Exception $e) {}
             }
         }
 
