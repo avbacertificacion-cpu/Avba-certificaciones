@@ -346,31 +346,41 @@ class Certificaciones {
         // ── QR como imagen ────────────────────────────────────
         // Soporta ${qr_codigo} y ${qr_imagen} como placeholders de imagen.
         // Si falla la descarga, cae a texto como último recurso.
+        // ── QR como imagen (obligatorio — documento oficial) ─
         $qrTemp   = null;
         $qrCodigo = $datos['qr_codigo'] ?? '';
-        if ($qrCodigo) {
-            $qrUrl     = urlQR($qrCodigo);
-            $qrTemp    = sys_get_temp_dir() . '/avba_qr_' . md5($qrCodigo) . '.png';
+        if (!$qrCodigo) {
+            throw new \RuntimeException(
+                'El registro no tiene código QR asignado. ' .
+                'Verifica el registro en la base de datos.'
+            );
+        }
+
+        $qrUrl  = urlQR($qrCodigo);
+        $qrTemp = sys_get_temp_dir() . '/avba_qr_' . md5($qrCodigo) . '.png';
+
+        // Hasta 3 intentos con 2 s de espera entre ellos
+        $qrContent = false;
+        for ($intento = 1; $intento <= 3; $intento++) {
             $ctx       = stream_context_create(['http' => ['timeout' => 10]]);
             $qrContent = @file_get_contents($qrUrl, false, $ctx);
-
-            if ($qrContent !== false) {
-                file_put_contents($qrTemp, $qrContent);
-                $imgParams = [
-                    'path'   => $qrTemp,
-                    'width'  => 100,
-                    'height' => 100,
-                    'ratio'  => false,
-                ];
-                // ${qr_codigo} → imagen QR (reemplaza el placeholder principal)
-                try { $processor->setImageValue('qr_codigo', $imgParams); } catch (\Exception $e) {}
-                // ${qr_imagen} → imagen QR (placeholder alternativo)
-                try { $processor->setImageValue('qr_imagen', $imgParams); } catch (\Exception $e) {}
-            } else {
-                // Sin conexión a quickchart: poner el código como texto de respaldo
-                try { $processor->setValue('qr_codigo', $qrCodigo); } catch (\Exception $e) {}
-            }
+            if ($qrContent !== false) break;
+            if ($intento < 3) sleep(2);
         }
+
+        if ($qrContent === false) {
+            throw new \RuntimeException(
+                'No se pudo descargar la imagen del código QR después de 3 intentos. ' .
+                'Verifica la conexión a internet del servidor e intenta de nuevo.'
+            );
+        }
+
+        file_put_contents($qrTemp, $qrContent);
+        $imgParams = ['path' => $qrTemp, 'width' => 100, 'height' => 100, 'ratio' => false];
+
+        // Soporta ${qr_codigo} y ${qr_imagen} como placeholders en la plantilla
+        try { $processor->setImageValue('qr_codigo', $imgParams); } catch (\Exception $e) {}
+        try { $processor->setImageValue('qr_imagen', $imgParams); } catch (\Exception $e) {}
 
         // ── Checklist para dictamen (clonar filas de tabla) ───
         if ($tipo === 'dictamen') {
