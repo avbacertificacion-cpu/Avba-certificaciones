@@ -19,9 +19,9 @@ class Calidad {
                     cliente, coords_inspeccion, maquinaria, marca, modelo, serie,
                     id_equipo,
                     DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
-                    correo, control, evidencia_url, direccion, capacidad,
+                    correo, control, evidencia_url AS evidencia, direccion, capacidad,
                     disponibilidad, estado, motivo, qr_codigo,
-                    certificado_url, dictamen_url, envio_direccion, coordenadas_envio
+                    certificado_url AS link, dictamen_url AS dictamen, envio_direccion, coordenadas_envio
              FROM equipos
              WHERE estado IN ('PENDIENTE', 'CONFORME', 'NO CONFORME', 'RECHAZADO')
              ORDER BY marca_temporal DESC"

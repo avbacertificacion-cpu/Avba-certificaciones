@@ -30,8 +30,8 @@ class Certificaciones {
                     DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
                     correo, control,
                     DATE_FORMAT(fecha_enviado, '%d/%m/%Y %H:%i') AS enviado,
-                    evidencia_url, direccion, capacidad, estado, motivo,
-                    qr_codigo, certificado_url, dictamen_url,
+                    evidencia_url AS evidencia, direccion, capacidad, estado, motivo,
+                    qr_codigo, certificado_url AS link, dictamen_url AS dictamen,
                     envio_direccion, coordenadas_envio
              FROM equipos
              WHERE estado IN ('APROBADO CALIDAD', 'ENVIADO')
