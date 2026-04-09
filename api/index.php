@@ -120,18 +120,6 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->listarTiposEquipo());
 
-        // Imprimir PDF certificado (preview)
-        case 'IMPRIMIR_PDF_CERT':
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cert->imprimirPDF((int)($_GET['id'] ?? 0), 'cert'));
-
-        // Imprimir PDF dictamen (preview)
-        case 'IMPRIMIR_PDF_DICT':
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cert->imprimirPDF((int)($_GET['id'] ?? 0), 'dict'));
-
         default:
             respuesta(['status' => 'error', 'message' => "Acción GET desconocida: {$action}"], 400);
     }
@@ -193,6 +181,16 @@ if ($method === 'POST') {
             respuesta($cal->rechazarCalidad($payload, $usr['usuario']));
 
         // ── Certificaciones ───────────────────────────────
+        case 'IMPRIMIR_PDF_CERT':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cert->imprimirPDF((int)($payload['id'] ?? $payload['fila'] ?? 0), 'cert'));
+
+        case 'IMPRIMIR_PDF_DICT':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cert->imprimirPDF((int)($payload['id'] ?? $payload['fila'] ?? 0), 'dict'));
+
         case 'GENERAR_CERT_ENVIAR':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

@@ -1175,9 +1175,13 @@ async function imprimirPDF(tipo) {
   const d = registroActual;
   if (!d) return;
   const action = tipo === "CERT" ? "IMPRIMIR_PDF_CERT" : "IMPRIMIR_PDF_DICT";
+  const id = d.id ?? d.fila;
   try {
     mostrarToast("Generando PDF para impresión...", "info");
-    const res  = await fetch(API + `?action=${action}&id=${d.fila}`);
+    const res  = await fetch(API, {
+      method: "POST",
+      body: JSON.stringify({ action, payload: { id } })
+    });
     const data = await res.json();
     if (data.status === "success" && data.url) {
       window.open(data.url, "_blank");
