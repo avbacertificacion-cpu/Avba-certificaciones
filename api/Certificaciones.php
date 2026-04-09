@@ -1,19 +1,18 @@
 <?php
 /**
  * AVBA Certificaciones — Módulo de Certificaciones
- * Migración de Certificaciones.gs → PHP
  *
- * NOTA SOBRE PDFs:
- * Los PDFs se generan con DOMPDF a partir de plantillas HTML en /templates/.
- * Los documentos finales se guardan en /uploads/certificados/.
+ * Flujo de documentos:
+ *   1. Calidad sube plantilla .docx con etiquetas ${variable} y ${qr_imagen}
+ *   2. PHP sustituye etiquetas con PhpWord TemplateProcessor (sin tocar el formato)
+ *   3. Para el QR descarga la imagen y la inserta con setImageValue()
+ *   4. Si LibreOffice está disponible convierte a PDF; si no, sirve el .docx
  */
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
-use Dompdf\Dompdf;
-use Dompdf\Options;
 
 class Certificaciones {
     private PDO $pdo;
@@ -48,25 +47,25 @@ class Certificaciones {
         return $rows;
     }
 
-    // ── Imprimir PDF (preview) ─────────────────────────────
+    // ── Imprimir / previsualizar documento ────────────────
     public function imprimirPDF(int $id, string $tipo): array {
         $datos = $this->obtenerDatosEquipo($id);
         if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
         try {
-            $tipoPDF   = ($tipo === 'dict') ? 'dictamen' : 'certificado';
-            $nombrePDF = strtoupper($tipoPDF) . '_' . ($datos['control'] ?? $id) . '_preview.pdf';
-            $rutaPDF   = UPLOAD_DIR . 'certificados/' . $nombrePDF;
-            $urlPDF    = UPLOAD_URL . 'certificados/' . $nombrePDF;
+            $tipoPDF  = ($tipo === 'dict') ? 'dictamen' : 'certificado';
+            $rutaDocx = $this->resolverDocx($tipoPDF, $datos);
 
-            if (!is_dir(UPLOAD_DIR . 'certificados/')) {
-                mkdir(UPLOAD_DIR . 'certificados/', 0755, true);
-            }
+            // Intentar convertir a PDF con LibreOffice; si no, devolver .docx
+            $rutaFinal   = $this->docxAPdf($rutaDocx);
+            $urlFinal    = UPLOAD_URL . 'certificados/' . basename($rutaFinal);
+            $esDocx      = str_ends_with($rutaFinal, '.docx');
 
-            $html = $this->resolverHTML($tipoPDF, $datos);
-            $this->htmlAPDF($html, $rutaPDF);
-
-            return ['status' => 'success', 'url' => $urlPDF];
+            return [
+                'status' => 'success',
+                'url'    => $urlFinal,
+                'docx'   => $esDocx,   // true → descarga Word, false → abre PDF
+            ];
         } catch (Exception $e) {
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
@@ -84,28 +83,20 @@ class Certificaciones {
         if (!$correo) return ['status' => 'error', 'message' => 'El registro no tiene correo registrado.'];
 
         try {
-            $folio   = $datos['control'] ?? $id;
-            $rutaDir = UPLOAD_DIR . 'certificados/';
-            if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
+            $folio = $datos['control'] ?? $id;
 
-            // Generar PDF del certificado
-            $archivoCert = "Certificado_AVBA_{$folio}.pdf";
-            $rutaCert    = $rutaDir . $archivoCert;
-            $urlCert     = UPLOAD_URL . "certificados/{$archivoCert}";
+            $rutaDocx  = $this->resolverDocx('certificado', $datos, 'envio');
+            $rutaCert  = $this->docxAPdf($rutaDocx);
+            $nombreCert = basename($rutaCert);
+            $urlCert   = UPLOAD_URL . 'certificados/' . $nombreCert;
 
-            $html = $this->resolverHTML('certificado', $datos, 'envio');
-            $this->htmlAPDF($html, $rutaCert);
+            $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'certificado', [$rutaCert => $nombreCert]);
 
-            // Enviar correo
-            $this->enviarCorreo($correo, $datos['cliente'], $folio, 'certificado', [$rutaCert => $archivoCert]);
-
-            // Actualizar BD
             $this->pdo->prepare(
                 "UPDATE equipos SET certificado_url = ?, estado = 'ENVIADO', fecha_enviado = NOW() WHERE id = ?"
             )->execute([$urlCert, $id]);
 
-            // Registrar en histórico
-            $this->registrarEnvio($datos, $archivoCert, $usuario);
+            $this->registrarEnvio($datos, $nombreCert, $usuario);
             registrarHistorial($this->pdo, $usuario, $id, 'estado', $datos['estado'], 'ENVIADO');
 
             return ['status' => 'success', 'url' => $urlCert];
@@ -126,38 +117,30 @@ class Certificaciones {
         if (!$correo) return ['status' => 'error', 'message' => 'El registro no tiene correo registrado.'];
 
         try {
-            $folio   = $datos['control'] ?? $id;
-            $rutaDir = UPLOAD_DIR . 'certificados/';
-            if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
+            $folio = $datos['control'] ?? $id;
 
-            // Certificado
-            $archivoCert = "Certificado_AVBA_{$folio}.pdf";
-            $rutaCert    = $rutaDir . $archivoCert;
-            $urlCert     = UPLOAD_URL . "certificados/{$archivoCert}";
-            $html = $this->resolverHTML('certificado', $datos, 'envio');
-            $this->htmlAPDF($html, $rutaCert);
+            $rutaDocxCert  = $this->resolverDocx('certificado', $datos, 'envio');
+            $rutaCert      = $this->docxAPdf($rutaDocxCert);
+            $nombreCert    = basename($rutaCert);
+            $urlCert       = UPLOAD_URL . 'certificados/' . $nombreCert;
 
-            // Dictamen
-            $archivoDict = "Dictamen_AVBA_{$folio}.pdf";
-            $rutaDict    = $rutaDir . $archivoDict;
-            $urlDict     = UPLOAD_URL . "certificados/{$archivoDict}";
-            $html = $this->resolverHTML('dictamen', $datos, 'envio');
-            $this->htmlAPDF($html, $rutaDict);
+            $rutaDocxDict  = $this->resolverDocx('dictamen', $datos, 'envio');
+            $rutaDict      = $this->docxAPdf($rutaDocxDict);
+            $nombreDict    = basename($rutaDict);
+            $urlDict       = UPLOAD_URL . 'certificados/' . $nombreDict;
 
-            // Enviar correo con ambos adjuntos
-            $this->enviarCorreo($correo, $datos['cliente'], $folio, 'certificado y dictamen', [
-                $rutaCert => $archivoCert,
-                $rutaDict => $archivoDict,
+            $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'certificado y dictamen', [
+                $rutaCert => $nombreCert,
+                $rutaDict => $nombreDict,
             ]);
 
-            // Actualizar BD
             $this->pdo->prepare(
                 "UPDATE equipos
                  SET certificado_url = ?, dictamen_url = ?, estado = 'ENVIADO', fecha_enviado = NOW()
                  WHERE id = ?"
             )->execute([$urlCert, $urlDict, $id]);
 
-            $this->registrarEnvio($datos, "{$archivoCert}, {$archivoDict}", $usuario);
+            $this->registrarEnvio($datos, "{$nombreCert}, {$nombreDict}", $usuario);
             registrarHistorial($this->pdo, $usuario, $id, 'estado', $datos['estado'], 'ENVIADO');
 
             return ['status' => 'success', 'urlCert' => $urlCert, 'urlDict' => $urlDict];
@@ -178,28 +161,20 @@ class Certificaciones {
         if (!$correo) return ['status' => 'error', 'message' => 'El registro no tiene correo registrado.'];
 
         try {
-            $folio   = $datos['control'] ?? $id;
-            $rutaDir = UPLOAD_DIR . 'certificados/';
-            if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
+            $folio = $datos['control'] ?? $id;
 
-            // Generar PDF del dictamen
-            $archivoDict = "Dictamen_AVBA_{$folio}.pdf";
-            $rutaDict    = $rutaDir . $archivoDict;
-            $urlDict     = UPLOAD_URL . "certificados/{$archivoDict}";
+            $rutaDocxDict = $this->resolverDocx('dictamen', $datos, 'envio');
+            $rutaDict     = $this->docxAPdf($rutaDocxDict);
+            $nombreDict   = basename($rutaDict);
+            $urlDict      = UPLOAD_URL . 'certificados/' . $nombreDict;
 
-            $html = $this->resolverHTML('dictamen', $datos, 'envio');
-            $this->htmlAPDF($html, $rutaDict);
+            $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'dictamen', [$rutaDict => $nombreDict]);
 
-            // Enviar correo
-            $this->enviarCorreo($correo, $datos['cliente'], $folio, 'dictamen', [$rutaDict => $archivoDict]);
-
-            // Actualizar BD
             $this->pdo->prepare(
                 "UPDATE equipos SET dictamen_url = ?, estado = 'ENVIADO', fecha_enviado = NOW() WHERE id = ?"
             )->execute([$urlDict, $id]);
 
-            // Registrar en histórico
-            $this->registrarEnvio($datos, $archivoDict, $usuario);
+            $this->registrarEnvio($datos, $nombreDict, $usuario);
             registrarHistorial($this->pdo, $usuario, $id, 'estado', $datos['estado'], 'ENVIADO');
 
             return ['status' => 'success', 'url' => $urlDict];
@@ -274,16 +249,14 @@ class Certificaciones {
     }
 
     /**
-     * Carga la plantilla Word obligatoria y genera el HTML para DOMPDF.
+     * Resuelve la plantilla Word correcta y devuelve la ruta al .docx procesado.
      *
      * $tipo:     'certificado' | 'dictamen'
-     * $contexto: 'impresion'  → usa plantilla_cert  / plantilla_dict
-     *            'envio'      → usa plantilla_cert_envio / plantilla_dict_envio
+     * $contexto: 'impresion' | 'envio'
      *
      * Lanza RuntimeException si la plantilla no está configurada o el archivo no existe.
-     * Los certificados y dictámenes son documentos oficiales: NO hay HTML de respaldo.
      */
-    private function resolverHTML(string $tipo, array $datos, string $contexto = 'impresion'): string {
+    private function resolverDocx(string $tipo, array $datos, string $contexto = 'impresion'): string {
         $colMap = [
             'certificado_impresion' => 'plantilla_cert',
             'dictamen_impresion'    => 'plantilla_dict',
@@ -291,8 +264,8 @@ class Certificaciones {
             'dictamen_envio'        => 'plantilla_dict_envio',
         ];
 
-        $col  = $colMap["{$tipo}_{$contexto}"]
-              ?? throw new \RuntimeException("Combinación de tipo/contexto no válida: {$tipo}/{$contexto}.");
+        $col = $colMap["{$tipo}_{$contexto}"]
+             ?? throw new \RuntimeException("Combinación de tipo/contexto no válida: {$tipo}/{$contexto}.");
 
         $stmt = $this->pdo->prepare("SELECT `{$col}` AS archivo FROM maquinaria_tipos WHERE nombre = ? LIMIT 1");
         $stmt->execute([$datos['maquinaria'] ?? '']);
@@ -309,36 +282,39 @@ class Certificaciones {
             );
         }
 
-        $rutaDocx = __DIR__ . '/../uploads/plantillas/' . $archivo;
-        if (!file_exists($rutaDocx)) {
+        $rutaPlantilla = __DIR__ . '/../uploads/plantillas/' . $archivo;
+        if (!file_exists($rutaPlantilla)) {
             throw new \RuntimeException(
                 "El archivo de plantilla '{$archivo}' no se encontró en el servidor. " .
                 "Vuelve a subir la plantilla desde el panel de Calidad."
             );
         }
 
-        return $this->generarDesdePlantillaWord($rutaDocx, $datos, $tipo);
+        return $this->procesarPlantillaDocx($rutaPlantilla, $datos, $tipo);
     }
 
     /**
-     * Procesa una plantilla .docx con PhpWord TemplateProcessor,
-     * reemplaza etiquetas ${variable} y convierte a HTML para DOMPDF.
+     * Aplica sustitución de etiquetas sobre la plantilla .docx sin tocar el formato.
      *
-     * Etiquetas soportadas: ${folio}, ${cliente}, ${domicilio}, ${maquinaria},
-     * ${marca}, ${modelo}, ${serie}, ${id_equipo}, ${capacidad}, ${fecha},
-     * ${vigencia}, ${qr_codigo}, ${anio}
+     * Etiquetas de texto: ${folio} ${cliente} ${domicilio} ${maquinaria}
+     *   ${marca} ${modelo} ${serie} ${id_equipo} ${capacidad}
+     *   ${fecha} ${vigencia} ${qr_codigo} ${anio}
+     *
+     * Etiqueta de imagen QR: ${qr_imagen}  → inserta la imagen real del QR
      *
      * Para dictamen (fila de tabla a clonar):
-     * ${item_seccion}, ${item_descripcion}, ${item_valor}
+     *   ${item_seccion} ${item_descripcion} ${item_valor}
+     *
+     * Devuelve la ruta al .docx procesado guardado en uploads/certificados/.
      */
-    private function generarDesdePlantillaWord(string $rutaDocx, array $datos, string $tipo): string {
+    private function procesarPlantillaDocx(string $rutaPlantilla, array $datos, string $tipo): string {
         if (!class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
             require_once __DIR__ . '/../vendor/autoload.php';
         }
 
-        $processor = new \PhpOffice\PhpWord\TemplateProcessor($rutaDocx);
+        $processor = new \PhpOffice\PhpWord\TemplateProcessor($rutaPlantilla);
 
-        // Calcular vigencia
+        // Calcular vigencia (1 año desde la inspección)
         $vigencia = '';
         if (!empty($datos['fecha_inspeccion'])) {
             $fv = new DateTime($datos['fecha_inspeccion']);
@@ -346,7 +322,8 @@ class Certificaciones {
             $vigencia = $fv->format('d/m/Y');
         }
 
-        // Variables simples
+        // ── Etiquetas de texto ────────────────────────────────
+        // IMPORTANTE: PhpWord escapa XML internamente, pasar texto plano (sin htmlspecialchars).
         $vars = [
             'folio'      => formatoFolio($datos['control']   ?? ''),
             'cliente'    => $datos['cliente']    ?? '',
@@ -363,10 +340,34 @@ class Certificaciones {
             'anio'       => date('Y'),
         ];
         foreach ($vars as $key => $val) {
-            $processor->setValue($key, htmlspecialchars((string)$val));
+            try { $processor->setValue($key, (string)$val); } catch (\Exception $e) { /* placeholder no existe */ }
         }
 
-        // Para dictamen: clonar filas de checklist
+        // ── QR como imagen (etiqueta ${qr_imagen}) ────────────
+        $qrTemp   = null;
+        $qrCodigo = $datos['qr_codigo'] ?? '';
+        if ($qrCodigo) {
+            $qrUrl     = urlQR($qrCodigo);
+            $qrTemp    = sys_get_temp_dir() . '/avba_qr_' . md5($qrCodigo) . '.png';
+            $ctx       = stream_context_create(['http' => ['timeout' => 10]]);
+            $qrContent = @file_get_contents($qrUrl, false, $ctx);
+
+            if ($qrContent !== false) {
+                file_put_contents($qrTemp, $qrContent);
+                try {
+                    $processor->setImageValue('qr_imagen', [
+                        'path'   => $qrTemp,
+                        'width'  => 100,
+                        'height' => 100,
+                        'ratio'  => false,
+                    ]);
+                } catch (\Exception $e) {
+                    // ${qr_imagen} no está en la plantilla, ignorar
+                }
+            }
+        }
+
+        // ── Checklist para dictamen (clonar filas de tabla) ───
         if ($tipo === 'dictamen') {
             $stmtItems = $this->pdo->prepare(
                 "SELECT ci.descripcion, ic.valor,
@@ -387,169 +388,85 @@ class Certificaciones {
             $items = $stmtItems->fetchAll();
 
             if (!empty($items)) {
-                $processor->cloneRow('item_descripcion', count($items));
-                foreach ($items as $i => $item) {
-                    $n   = $i + 1;
-                    $val = $item['valor'] ?? '';
-                    $label = match ($val) {
-                        'C'  => 'CONFORME',
-                        'NC' => 'NO CONFORME',
-                        'NA' => 'N/A',
-                        default => '—',
-                    };
-                    $processor->setValue("item_seccion#{$n}",      htmlspecialchars($item['seccion_nombre'] ?? ''));
-                    $processor->setValue("item_descripcion#{$n}",  htmlspecialchars($item['descripcion']    ?? ''));
-                    $processor->setValue("item_valor#{$n}",        $label);
+                try {
+                    $processor->cloneRow('item_descripcion', count($items));
+                    foreach ($items as $i => $item) {
+                        $n     = $i + 1;
+                        $val   = $item['valor'] ?? '';
+                        $label = match ($val) {
+                            'C'  => 'CONFORME',
+                            'NC' => 'NO CONFORME',
+                            'NA' => 'N/A',
+                            default => '—',
+                        };
+                        $processor->setValue("item_seccion#{$n}",     (string)($item['seccion_nombre'] ?? ''));
+                        $processor->setValue("item_descripcion#{$n}", (string)($item['descripcion']    ?? ''));
+                        $processor->setValue("item_valor#{$n}",       $label);
+                    }
+                } catch (\Exception $e) {
+                    // No hay tabla de checklist en la plantilla
                 }
             }
         }
 
-        // Guardar .docx procesado en temporal
-        $tempDocx = sys_get_temp_dir() . '/avba_' . uniqid() . '.docx';
-        $processor->saveAs($tempDocx);
+        // ── Guardar .docx procesado ───────────────────────────
+        $folio   = $datos['control'] ?? (string)($datos['id'] ?? 'doc');
+        $nombre  = strtoupper($tipo) . '_AVBA_' . $folio . '.docx';
+        $rutaDir = UPLOAD_DIR . 'certificados/';
+        if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
 
-        // Convertir .docx → HTML → usar DOMPDF
-        $phpWord  = \PhpOffice\PhpWord\IOFactory::load($tempDocx);
-        $tempHtml = sys_get_temp_dir() . '/avba_' . uniqid() . '.html';
-        \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'HTML')->save($tempHtml);
-        $html = file_get_contents($tempHtml);
+        $destino = $rutaDir . $nombre;
+        $processor->saveAs($destino);
 
-        @unlink($tempDocx);
-        @unlink($tempHtml);
+        if ($qrTemp && file_exists($qrTemp)) @unlink($qrTemp);
 
-        return $html ?: $this->renderizarPlantilla($tipo, $datos);
+        return $destino;
     }
 
     /**
-     * Renderiza la plantilla HTML del certificado o dictamen con los datos del equipo.
+     * Convierte un .docx a PDF usando LibreOffice si está disponible.
+     * Si no, devuelve la ruta al .docx sin convertir.
+     *
+     * @return string  Ruta al archivo final (.pdf o .docx)
      */
-    private function renderizarPlantilla(string $tipo, array $datos): string {
-        $folio      = htmlspecialchars(formatoFolio($datos['control'] ?? ''));
-        $cliente    = htmlspecialchars($datos['cliente']      ?? '');
-        $domicilio  = htmlspecialchars($datos['direccion']    ?? '');
-        $maquinaria = htmlspecialchars($datos['maquinaria']   ?? '');
-        $marca      = htmlspecialchars($datos['marca']        ?? '');
-        $modelo     = htmlspecialchars($datos['modelo']       ?? '');
-        $serie      = htmlspecialchars($datos['serie']        ?? '');
-        $idEquipo   = htmlspecialchars($datos['id_equipo']    ?? '');
-        $fecha      = htmlspecialchars($datos['fecha_fmt']    ?? '');
-        $capacidad  = htmlspecialchars($datos['capacidad']    ?? '');
-        $qrUrl      = $datos['qr_url'] ?? '';
+    private function docxAPdf(string $rutaDocx): string {
+        $dir     = dirname($rutaDocx);
+        $rutaPdf = $dir . '/' . basename($rutaDocx, '.docx') . '.pdf';
 
-        // Cargar el checklist de este equipo para el dictamen
-        $checklistHtml = '';
-        if ($tipo === 'dictamen') {
-            $stmt = $this->pdo->prepare(
-                "SELECT ci.seccion, ci.descripcion, ic.valor
-                 FROM inspeccion_checklist ic
-                 INNER JOIN checklist_items ci ON ci.tag = ic.tag
-                     AND ci.maquinaria_tipo_id = (SELECT id FROM maquinaria_tipos WHERE nombre = ? LIMIT 1)
-                 WHERE ic.equipo_id = ?
-                 ORDER BY ci.orden"
-            );
-            $stmt->execute([$datos['maquinaria'] ?? '', $datos['id']]);
-            $items = $stmt->fetchAll();
-
-            $seccionActual = '';
-            foreach ($items as $item) {
-                if ($item['seccion'] !== $seccionActual) {
-                    if ($seccionActual !== '') $checklistHtml .= '</table>';
-                    $seccionActual = $item['seccion'];
-                    $checklistHtml .= "<h4 style='margin:8px 0 4px;color:#185FA5'>Sección {$seccionActual}</h4>";
-                    $checklistHtml .= '<table style="width:100%;border-collapse:collapse;font-size:10px">';
-                    $checklistHtml .= '<tr style="background:#E6F1FB"><th style="text-align:left;padding:4px">Elemento</th><th style="padding:4px">Resultado</th></tr>';
-                }
-                $val   = $item['valor'] ?? '—';
-                $color = ($val === 'C') ? '#2e7d32' : (($val === 'NC') ? '#c62828' : '#555');
-                $label = ($val === 'C') ? 'CONFORME' : (($val === 'NC') ? 'NO CONFORME' : ($val === 'NA' ? 'N/A' : '—'));
-                $checklistHtml .= "<tr style='border-bottom:1px solid #eee'>
-                    <td style='padding:3px 4px'>" . htmlspecialchars($item['descripcion']) . "</td>
-                    <td style='text-align:center;color:{$color};font-weight:bold;padding:3px'>{$label}</td>
-                </tr>";
+        $bin = $this->encontrarLibreoffice();
+        if ($bin) {
+            $cmd = escapeshellarg($bin)
+                 . ' --headless --convert-to pdf --outdir '
+                 . escapeshellarg($dir) . ' '
+                 . escapeshellarg($rutaDocx)
+                 . ' 2>&1';
+            exec($cmd, $output, $code);
+            if ($code === 0 && file_exists($rutaPdf)) {
+                return $rutaPdf;
             }
-            if ($seccionActual !== '') $checklistHtml .= '</table>';
         }
 
-        $qrImg = $qrUrl
-            ? "<img src='{$qrUrl}' style='width:90px;height:90px' alt='QR'>"
-            : '';
-
-        $titulo = ($tipo === 'dictamen') ? 'DICTAMEN DE INSPECCIÓN' : 'CERTIFICADO DE INSPECCIÓN';
-
-        return "<!DOCTYPE html>
-<html lang='es'>
-<head><meta charset='UTF-8'>
-<style>
-  body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a2e; margin: 20px; }
-  .header { background: #185FA5; color: white; padding: 16px; text-align: center; border-radius: 6px; }
-  .header h1 { margin: 0; font-size: 18px; }
-  .header p  { margin: 4px 0 0; font-size: 12px; opacity: 0.8; }
-  .folio-box { background: #E6F1FB; border-left: 4px solid #185FA5; padding: 10px 14px; margin: 14px 0; }
-  table.datos { width: 100%; border-collapse: collapse; margin: 10px 0; }
-  table.datos td { padding: 5px 8px; border: 1px solid #ddd; }
-  table.datos td:first-child { font-weight: bold; width: 35%; background: #f5f9ff; }
-  .qr-block { text-align: center; margin: 12px 0; }
-  .footer { margin-top: 20px; border-top: 1px solid #ddd; padding-top: 8px; text-align: center; font-size: 10px; color: #888; }
-  .firma-box { border-top: 1px solid #333; width: 200px; margin: 30px auto 0; text-align: center; padding-top: 4px; font-size: 10px; }
-</style>
-</head>
-<body>
-<div class='header'>
-  <h1>AVBA Inspections</h1>
-  <p>Certifications and Maintenance</p>
-</div>
-
-<div class='folio-box'>
-  <strong style='font-size:13px;color:#0C447C'>{$titulo}</strong><br>
-  <span style='font-size:12px'>Folio: <strong style='color:#185FA5'>{$folio}</strong></span>
-</div>
-
-<table class='datos'>
-  <tr><td>Cliente</td><td>{$cliente}</td></tr>
-  <tr><td>Domicilio</td><td>{$domicilio}</td></tr>
-  <tr><td>Maquinaria</td><td>{$maquinaria}</td></tr>
-  <tr><td>Marca</td><td>{$marca}</td></tr>
-  <tr><td>Modelo</td><td>{$modelo}</td></tr>
-  <tr><td>Serie</td><td>{$serie}</td></tr>
-  <tr><td>ID Equipo</td><td>{$idEquipo}</td></tr>
-  <tr><td>Capacidad</td><td>{$capacidad}</td></tr>
-  <tr><td>Fecha de inspección</td><td>{$fecha}</td></tr>
-  <tr><td>Folio de control</td><td>{$folio}</td></tr>
-</table>
-
-{$checklistHtml}
-
-<div class='qr-block'>
-  {$qrImg}
-  <br><small style='color:#555'>Código de verificación: {$datos['qr_codigo']}</small>
-</div>
-
-<div class='firma-box'>
-  Firma del Inspector<br>AVBA Inspections
-</div>
-
-<div class='footer'>
-  AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. &nbsp;|&nbsp;
-  Vigencia: 1 año a partir de la fecha de emisión &nbsp;|&nbsp;
-  avba.com.mx
-</div>
-</body></html>";
+        // Sin LibreOffice: devolver el .docx directamente
+        return $rutaDocx;
     }
 
     /**
-     * Convierte HTML a PDF usando Dompdf y lo guarda en $rutaDestino.
+     * Busca el ejecutable de LibreOffice/soffice en el sistema.
      */
-    private function htmlAPDF(string $html, string $rutaDestino): void {
-        $options = new Options();
-        $options->set('defaultFont', 'Arial');
-        $options->set('isRemoteEnabled', true);
-
-        $dompdf = new Dompdf($options);
-        $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('Letter', 'portrait');
-        $dompdf->render();
-
-        file_put_contents($rutaDestino, $dompdf->output());
+    private function encontrarLibreoffice(): ?string {
+        $candidatos = [
+            '/usr/bin/libreoffice',
+            '/usr/bin/soffice',
+            '/usr/local/bin/libreoffice',
+            '/opt/libreoffice/program/soffice',
+            'C:\\Program Files\\LibreOffice\\program\\soffice.exe',
+            'C:\\Program Files (x86)\\LibreOffice\\program\\soffice.exe',
+        ];
+        foreach ($candidatos as $ruta) {
+            if (@file_exists($ruta)) return $ruta;
+        }
+        $which = @shell_exec('which libreoffice 2>/dev/null || which soffice 2>/dev/null');
+        return ($which && trim($which)) ? trim($which) : null;
     }
 
     /**

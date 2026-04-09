@@ -1184,8 +1184,15 @@ async function imprimirPDF(tipo) {
     });
     const data = await res.json();
     if (data.status === "success" && data.url) {
-      window.open(data.url, "_blank");
-      mostrarToast("PDF listo", "ok");
+      if (data.docx) {
+        // LibreOffice no disponible → descarga el .docx procesado
+        const a = document.createElement("a");
+        a.href = data.url; a.download = ""; a.click();
+        mostrarToast("Documento generado — ábrelo en Word para imprimir", "ok");
+      } else {
+        window.open(data.url, "_blank");
+        mostrarToast("PDF listo", "ok");
+      }
     } else {
       mostrarToast("Error al generar PDF: " + (data.message || ""), "err");
     }
