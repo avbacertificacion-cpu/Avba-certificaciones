@@ -350,6 +350,8 @@
     .btn-enviar-dict    { background: var(--ambar-light);  border-color: #D4922A;        color: var(--ambar); }
     .btn-enviar-todo    { background: var(--azul);         border-color: var(--azul);    color: white; }
     .btn-rechazar       { background: var(--rojo-light);   border-color: #F09595;        color: var(--rojo); }
+    .btn-word-cert      { background: #EBF5EB;             border-color: #4CAF50;        color: #2E7D32; }
+    .btn-word-dict      { background: #EBF5EB;             border-color: #4CAF50;        color: #2E7D32; }
 
     .btn-imprimir-cert:hover { background: var(--gris-bg); }
     .btn-imprimir-dict:hover { background: var(--gris-bg); }
@@ -357,6 +359,8 @@
     .btn-enviar-dict:hover   { background: #F2D9A8; }
     .btn-enviar-todo:hover   { background: var(--azul-dark); }
     .btn-rechazar:hover      { background: #F7C1C1; }
+    .btn-word-cert:hover     { background: #D4EDDA; }
+    .btn-word-dict:hover     { background: #D4EDDA; }
 
     /* spinner en botón */
     .btn-loading { opacity: .7; pointer-events: none; }
@@ -1118,16 +1122,28 @@ function renderAcciones(d) {
 
   const acciones = [
     {
-      label: "Imprimir certificado",
+      label: "Ver PDF certificado",
       clase: "btn-accion btn-imprimir-cert",
       icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6V2h8v4M4 12H2V7h12v5h-2M4 10h8v4H4v-4z"/></svg>`,
       fn: "imprimirPDF('CERT')"
     },
     {
-      label: "Imprimir dictamen",
+      label: "Ver PDF dictamen",
       clase: "btn-accion btn-imprimir-dict",
       icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6V2h8v4M4 12H2V7h12v5h-2M4 10h8v4H4v-4z"/></svg>`,
       fn: "imprimirPDF('DICT')"
+    },
+    {
+      label: "Descargar Word certificado",
+      clase: "btn-accion btn-word-cert",
+      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 2H4v12h8V6L9 2zm0 0v4h3M5 9l1.5 4L8 9l1.5 4L11 9"/></svg>`,
+      fn: "descargarDocx('CERT')"
+    },
+    {
+      label: "Descargar Word dictamen",
+      clase: "btn-accion btn-word-dict",
+      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 2H4v12h8V6L9 2zm0 0v4h3M5 9l1.5 4L8 9l1.5 4L11 9"/></svg>`,
+      fn: "descargarDocx('DICT')"
     },
     {
       label: "Enviar certificado",
@@ -1177,28 +1193,45 @@ async function imprimirPDF(tipo) {
   const action = tipo === "CERT" ? "IMPRIMIR_PDF_CERT" : "IMPRIMIR_PDF_DICT";
   const id = d.id ?? d.fila;
   try {
-    mostrarToast("Generando PDF para impresión...", "info");
+    mostrarToast("Generando PDF...", "info");
     const res  = await fetch(API, {
       method: "POST",
       body: JSON.stringify({ action, payload: { id } })
     });
     const data = await res.json();
     if (data.status === "success" && data.url) {
-      if (data.docx) {
-        // LibreOffice no disponible → descarga el .docx procesado
-        const a = document.createElement("a");
-        a.href = data.url; a.download = ""; a.click();
-        mostrarToast("Documento generado — ábrelo en Word para imprimir", "ok");
-      } else {
-        window.open(data.url, "_blank");
-        mostrarToast("PDF listo", "ok");
-      }
+      window.open(data.url, "_blank");
+      mostrarToast("PDF generado correctamente", "ok");
     } else {
-      mostrarToast("Error al generar PDF: " + (data.message || ""), "err");
+      mostrarToast("Error: " + (data.message || "No se pudo generar el PDF"), "err");
     }
   } catch (e) {
     mostrarToast("Error de conexión", "err");
     console.error("imprimirPDF:", e);
+  }
+}
+
+async function descargarDocx(tipo) {
+  const d = registroActual;
+  if (!d) return;
+  const action = tipo === "CERT" ? "DESCARGAR_DOCX_CERT" : "DESCARGAR_DOCX_DICT";
+  const id = d.id ?? d.fila;
+  try {
+    mostrarToast("Generando documento Word...", "info");
+    const res  = await fetch(API, {
+      method: "POST",
+      body: JSON.stringify({ action, payload: { id } })
+    });
+    const data = await res.json();
+    if (data.status === "success" && data.url) {
+      const a = document.createElement("a");
+      a.href = data.url; a.download = ""; a.click();
+      mostrarToast("Archivo Word descargado", "ok");
+    } else {
+      mostrarToast("Error: " + (data.message || ""), "err");
+    }
+  } catch (e) {
+    mostrarToast("Error de conexión", "err");
   }
 }
 

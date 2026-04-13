@@ -191,6 +191,16 @@ if ($method === 'POST') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cert->imprimirPDF((int)($payload['id'] ?? $payload['fila'] ?? 0), 'dict'));
 
+        case 'DESCARGAR_DOCX_CERT':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cert->descargarDocx((int)($payload['id'] ?? $payload['fila'] ?? 0), 'cert'));
+
+        case 'DESCARGAR_DOCX_DICT':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cert->descargarDocx((int)($payload['id'] ?? $payload['fila'] ?? 0), 'dict'));
+
         case 'GENERAR_CERT_ENVIAR':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
