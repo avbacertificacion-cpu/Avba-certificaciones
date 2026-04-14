@@ -649,6 +649,111 @@
     }
 
     #pantalla-inspeccion { display: none; }
+    #pantalla-historial  { display: none; }
+
+    /* ── Tarjetas del historial ── */
+    .hist-card {
+      background: var(--blanco);
+      border: 1.5px solid var(--borde);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      cursor: pointer;
+      transition: border-color 0.18s, box-shadow 0.18s;
+    }
+    .hist-card:hover {
+      border-color: var(--azul);
+      box-shadow: 0 4px 18px rgba(24,95,165,0.11);
+    }
+    .hist-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .hist-card-cliente {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--texto);
+      line-height: 1.3;
+    }
+    .hist-card-maq {
+      font-size: 12px;
+      color: var(--texto-sub);
+      margin-top: 2px;
+    }
+    .hist-card-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      gap: 8px;
+    }
+    .hist-folio {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--azul);
+      letter-spacing: .04em;
+    }
+    .hist-fecha {
+      font-size: 11px;
+      color: var(--texto-sub);
+    }
+    .badge-estado {
+      font-size: 10.5px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 20px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .badge-PENDIENTE        { background:#FFF3CD; color:#856404; }
+    .badge-CONFORME         { background:#D1E7DD; color:#0F5132; }
+    .badge-NOCONFORME       { background:#F8D7DA; color:#842029; }
+    .badge-APROBADO         { background:#D1E7DD; color:#0F5132; }
+    .badge-ENVIADO          { background:#D3E2FA; color:#0C447C; }
+
+    /* ── Modal detalle ── */
+    .det-section { margin-bottom: 18px; }
+    .det-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--azul);
+      margin-bottom: 8px;
+      padding-bottom: 5px;
+      border-bottom: 1.5px solid var(--borde);
+    }
+    .det-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 14px;
+    }
+    .det-item label { font-size: 10.5px; color: var(--texto-sub); display: block; margin-bottom: 1px; }
+    .det-item span  { font-size: 13px; color: var(--texto); font-weight: 600; }
+    .checklist-seccion-title {
+      font-size: 11px;
+      font-weight: 700;
+      background: var(--gris-bg);
+      color: var(--texto-sub);
+      padding: 4px 10px;
+      border-radius: 6px;
+      margin: 8px 0 4px;
+      letter-spacing: .05em;
+    }
+    .checklist-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 10px;
+      border-bottom: 1px solid var(--borde);
+      font-size: 12.5px;
+    }
+    .checklist-item:last-child { border-bottom: none; }
+    .chip-C  { background:#D1E7DD; color:#0F5132; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+    .chip-NC { background:#F8D7DA; color:#842029; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
+    .chip-NA { background:#E9ECEF; color:#6c757d; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:700; }
   </style>
 </head>
 <body>
@@ -711,17 +816,16 @@
     </div>
 
     <!-- Cursos -->
-    <div class="menu-card proximamente">
-      <span class="prox-badge">Pronto</span>
+    <div class="menu-card" onclick="abrirModulo('historial')">
       <div class="menu-card-icon mc-ambar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <path d="M12 14l-8-5 8-5 8 5-8 5z"/>
-          <path d="M4 9v6c0 2 3.5 4 8 4s8-2 8-4V9"/>
-          <path d="M20 9v7"/>
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+          <rect x="9" y="3" width="6" height="4" rx="1"/>
+          <path d="M9 12h6M9 16h4"/>
         </svg>
       </div>
-      <div class="menu-card-title">Cursos</div>
-      <div class="menu-card-desc">Gestión y seguimiento de cursos de capacitación</div>
+      <div class="menu-card-title">Mis Inspecciones</div>
+      <div class="menu-card-desc">Historial y detalle de tus inspecciones realizadas</div>
     </div>
 
     <!-- Accesorios -->
@@ -737,6 +841,70 @@
       <div class="menu-card-desc">Registro de accesorios certificados</div>
     </div>
 
+  </div>
+</div>
+
+<!-- ══════════ PANEL HISTORIAL ══════════ -->
+<div id="pantalla-historial" style="display:none">
+  <div style="max-width:760px;margin:0 auto;padding:18px 16px 60px">
+
+    <!-- Buscador -->
+    <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center">
+      <div style="position:relative;flex:1">
+        <svg viewBox="0 0 16 16" fill="none" stroke="#9299a8" stroke-width="1.5"
+             style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;pointer-events:none">
+          <circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/>
+        </svg>
+        <input id="hist-buscar" type="search" placeholder="Buscar por cliente, serie, folio…"
+               oninput="filtrarHistorial()"
+               style="width:100%;padding:9px 12px 9px 32px;border:1.5px solid var(--borde);border-radius:10px;font-size:13px;background:var(--blanco);color:var(--texto);outline:none;box-sizing:border-box">
+      </div>
+      <select id="hist-estado" onchange="filtrarHistorial()"
+              style="padding:9px 12px;border:1.5px solid var(--borde);border-radius:10px;font-size:13px;background:var(--blanco);color:var(--texto);outline:none">
+        <option value="">Todos los estados</option>
+        <option value="PENDIENTE">Pendiente</option>
+        <option value="CONFORME">Conforme</option>
+        <option value="NO CONFORME">No Conforme</option>
+        <option value="APROBADO CALIDAD">Aprobado Calidad</option>
+        <option value="ENVIADO">Enviado</option>
+      </select>
+    </div>
+
+    <!-- Contador -->
+    <div id="hist-contador" style="font-size:12px;color:var(--texto-sub);margin-bottom:12px"></div>
+
+    <!-- Lista de inspecciones -->
+    <div id="hist-lista">
+      <div style="text-align:center;padding:48px 0;color:var(--texto-sub)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+             style="width:36px;height:36px;margin-bottom:10px;display:block;margin:0 auto 10px">
+          <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
+        </svg>
+        Cargando inspecciones…
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL DETALLE INSPECCIÓN ══════════ -->
+<div id="modal-insp" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.45);overflow-y:auto">
+  <div style="max-width:700px;margin:24px auto;background:var(--blanco);border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+
+    <!-- Header modal -->
+    <div style="background:var(--azul);padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:white" id="modal-titulo">Detalle de inspección</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.75)" id="modal-folio"></div>
+      </div>
+      <button onclick="cerrarModal()"
+              style="background:rgba(255,255,255,0.18);border:none;border-radius:8px;color:white;
+                     font-size:12px;padding:6px 12px;cursor:pointer;font-weight:600">
+        Cerrar ✕
+      </button>
+    </div>
+
+    <!-- Contenido modal -->
+    <div id="modal-cuerpo" style="padding:20px 22px 28px;overflow-y:auto;max-height:80vh"></div>
   </div>
 </div>
 
@@ -992,38 +1160,54 @@ let enviando        = false;
 /* ════════════════════════════════════════
    MENÚ PRINCIPAL
 ════════════════════════════════════════ */
-function abrirModulo(modulo) {
-  if (modulo !== 'inspeccion') return;
-
-  document.getElementById('pantalla-menu').style.display = 'none';
-  document.getElementById('pantalla-inspeccion').style.display = 'block';
-  document.getElementById('steps-track').style.display = 'flex';
-  document.getElementById('header-title').textContent = 'Nueva inspección';
-  document.getElementById('header-sub').textContent = 'Paso 1 de 5 — Datos del equipo';
+function ocultarTodas() {
+  ['pantalla-inspeccion', 'pantalla-historial'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById('steps-track').style.display = 'none';
   document.getElementById('btn-volver-menu').style.display = 'flex';
   document.getElementById('btn-logout').style.display = 'none';
+  document.getElementById('pantalla-menu').style.display = 'none';
+}
 
-  // Inicializar formulario si es la primera vez
-  if (!document.getElementById('fecha').value) {
-    const hoy = new Date();
-    document.getElementById('fecha').value =
-      String(hoy.getDate()).padStart(2,'0') + '/' +
-      String(hoy.getMonth()+1).padStart(2,'0') + '/' +
-      hoy.getFullYear();
-    cargarMaquinaria();
-    renderFotosGrid();
-    document.querySelectorAll('input,select,textarea').forEach(el => {
-      el.addEventListener('input', () => {
-        const f = el.closest('.field');
-        if (f) { f.classList.remove('has-error'); el.classList.remove('err'); }
+function abrirModulo(modulo) {
+  ocultarTodas();
+
+  if (modulo === 'inspeccion') {
+    document.getElementById('pantalla-inspeccion').style.display = 'block';
+    document.getElementById('steps-track').style.display = 'flex';
+    document.getElementById('header-title').textContent = 'Nueva inspección';
+    document.getElementById('header-sub').textContent = 'Paso 1 de 5 — Datos del equipo';
+
+    if (!document.getElementById('fecha').value) {
+      const hoy = new Date();
+      document.getElementById('fecha').value =
+        String(hoy.getDate()).padStart(2,'0') + '/' +
+        String(hoy.getMonth()+1).padStart(2,'0') + '/' +
+        hoy.getFullYear();
+      cargarMaquinaria();
+      renderFotosGrid();
+      document.querySelectorAll('input,select,textarea').forEach(el => {
+        el.addEventListener('input', () => {
+          const f = el.closest('.field');
+          if (f) { f.classList.remove('has-error'); el.classList.remove('err'); }
+        });
       });
-    });
+    }
+    renderStepsBar(pasoActual);
+
+  } else if (modulo === 'historial') {
+    document.getElementById('pantalla-historial').style.display = 'block';
+    document.getElementById('header-title').textContent = 'Mis Inspecciones';
+    document.getElementById('header-sub').textContent = 'Historial de inspecciones realizadas';
+    cargarHistorial();
   }
-  renderStepsBar(pasoActual);
 }
 
 function volverMenu() {
-  document.getElementById('pantalla-inspeccion').style.display = 'none';
+  ['pantalla-inspeccion', 'pantalla-historial'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
   document.getElementById('steps-track').style.display = 'none';
   document.getElementById('pantalla-menu').style.display = 'block';
   document.getElementById('header-title').textContent = 'Panel Inspector';
@@ -1031,6 +1215,230 @@ function volverMenu() {
   document.getElementById('btn-volver-menu').style.display = 'none';
   document.getElementById('btn-logout').style.display = 'flex';
 }
+
+/* ════════════════════════════════════════
+   HISTORIAL DE INSPECCIONES
+════════════════════════════════════════ */
+let historialData = [];
+
+async function cargarHistorial() {
+  const lista = document.getElementById('hist-lista');
+  lista.innerHTML = `<div style="text-align:center;padding:48px 0;color:var(--texto-sub)">Cargando…</div>`;
+
+  try {
+    const res  = await fetch(`${WEB_APP_URL}?action=GET_MIS_INSPECCIONES`);
+    const data = await res.json();
+
+    if (!Array.isArray(data)) {
+      lista.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rojo)">Error al cargar inspecciones.</div>`;
+      return;
+    }
+
+    historialData = data;
+    filtrarHistorial();
+
+  } catch (e) {
+    lista.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rojo)">Error de conexión.</div>`;
+  }
+}
+
+function filtrarHistorial() {
+  const buscar = (document.getElementById('hist-buscar')?.value || '').toLowerCase();
+  const estado = document.getElementById('hist-estado')?.value || '';
+
+  const filtrados = historialData.filter(r => {
+    const matchBuscar = !buscar || [r.cliente, r.serie, r.folio, r.maquinaria, r.control]
+      .some(v => (v || '').toLowerCase().includes(buscar));
+    const matchEstado = !estado || r.estado === estado;
+    return matchBuscar && matchEstado;
+  });
+
+  renderHistorial(filtrados);
+}
+
+const ESTADO_BADGE = {
+  'PENDIENTE':        ['badge-PENDIENTE',  'Pendiente'],
+  'CONFORME':         ['badge-CONFORME',   'Conforme'],
+  'NO CONFORME':      ['badge-NOCONFORME', 'No Conforme'],
+  'APROBADO CALIDAD': ['badge-APROBADO',   'Aprobado Calidad'],
+  'RECHAZADO':        ['badge-NOCONFORME', 'Rechazado'],
+  'ENVIADO':          ['badge-ENVIADO',    'Enviado'],
+};
+
+function renderHistorial(lista) {
+  const cont = document.getElementById('hist-lista');
+  const ctr  = document.getElementById('hist-contador');
+  ctr.textContent = `${lista.length} inspección${lista.length !== 1 ? 'es' : ''}`;
+
+  if (lista.length === 0) {
+    cont.innerHTML = `
+      <div style="text-align:center;padding:52px 0;color:var(--texto-sub)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3"
+             style="width:40px;height:40px;display:block;margin:0 auto 12px">
+          <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+          <rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 12h6M9 16h4"/>
+        </svg>
+        No se encontraron inspecciones
+      </div>`;
+    return;
+  }
+
+  cont.innerHTML = lista.map((r, i) => {
+    const [bdgClass, bdgLabel] = ESTADO_BADGE[r.estado] || ['badge-PENDIENTE', r.estado];
+    const maqInfo = [r.maquinaria, r.marca, r.modelo].filter(Boolean).join(' · ');
+    return `
+    <div class="hist-card" onclick="abrirDetalleInspeccion(${i})">
+      <div class="hist-card-top">
+        <div>
+          <div class="hist-card-cliente">${r.cliente || '—'}</div>
+          <div class="hist-card-maq">${maqInfo || '—'} ${r.serie ? '· S/N: ' + r.serie : ''}</div>
+        </div>
+        <span class="badge-estado ${bdgClass}">${bdgLabel}</span>
+      </div>
+      <div class="hist-card-bottom">
+        <span class="hist-folio">${r.folio || r.control || '—'}</span>
+        <span class="hist-fecha">${r.fecha_inspeccion || r.fecha_registro || '—'}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Guardar referencia filtrada para el modal
+  window._histFiltrado = lista;
+}
+
+function abrirDetalleInspeccion(idx) {
+  const lista = window._histFiltrado || historialData;
+  const r = lista[idx];
+  if (!r) return;
+
+  const [bdgClass, bdgLabel] = ESTADO_BADGE[r.estado] || ['badge-PENDIENTE', r.estado];
+
+  document.getElementById('modal-titulo').textContent = r.cliente || 'Detalle de inspección';
+  document.getElementById('modal-folio').textContent  = r.folio || r.control || '';
+
+  // Construir cuerpo
+  let html = '';
+
+  // Datos del equipo
+  html += `<div class="det-section">
+    <div class="det-section-title">Datos del equipo</div>
+    <div class="det-grid">
+      <div class="det-item"><label>Cliente</label><span>${r.cliente || '—'}</span></div>
+      <div class="det-item"><label>Tipo de equipo</label><span>${r.maquinaria || '—'}</span></div>
+      <div class="det-item"><label>Marca</label><span>${r.marca || '—'}</span></div>
+      <div class="det-item"><label>Modelo</label><span>${r.modelo || '—'}</span></div>
+      <div class="det-item"><label>No. de Serie</label><span>${r.serie || '—'}</span></div>
+      <div class="det-item"><label>No. Económico</label><span>${r.id_equipo || '—'}</span></div>
+      <div class="det-item"><label>Capacidad</label><span>${r.capacidad || '—'}</span></div>
+      <div class="det-item"><label>Fecha de inspección</label><span>${r.fecha_inspeccion || '—'}</span></div>
+      <div class="det-item"><label>Domicilio</label><span>${r.direccion || '—'}</span></div>
+      <div class="det-item"><label>Correo cliente</label><span>${r.correo || '—'}</span></div>
+    </div>
+  </div>`;
+
+  // Estado y folio
+  html += `<div class="det-section">
+    <div class="det-section-title">Estado del proceso</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="badge-estado ${bdgClass}" style="font-size:12px;padding:5px 14px">${bdgLabel}</span>
+      ${r.folio ? `<span style="font-size:13px;color:var(--azul);font-weight:600">${r.folio}</span>` : ''}
+      ${r.motivo ? `<span style="font-size:12px;color:var(--rojo)">Motivo: ${r.motivo}</span>` : ''}
+    </div>
+  </div>`;
+
+  // Evidencia fotográfica
+  if (r.evidencia_url) {
+    html += `<div class="det-section">
+      <div class="det-section-title">Evidencia fotográfica</div>
+      <a href="${r.evidencia_url}" target="_blank"
+         style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
+                background:var(--gris-bg);border:1.5px solid var(--borde);border-radius:8px;
+                color:var(--azul);font-size:12px;font-weight:600;text-decoration:none">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
+          <rect x="1" y="3" width="14" height="10" rx="2"/>
+          <circle cx="8" cy="8" r="2.5"/>
+        </svg>
+        Ver carpeta de evidencias
+      </a>
+    </div>`;
+  }
+
+  // Checklist
+  if (r.checklist && r.checklist.length > 0) {
+    let seccionActual = '';
+    let clHtml = '';
+    let totC = 0, totNC = 0, totNA = 0;
+
+    r.checklist.forEach(item => {
+      if (item.seccion_nombre !== seccionActual) {
+        seccionActual = item.seccion_nombre;
+        clHtml += `<div class="checklist-seccion-title">${seccionActual || 'General'}</div>`;
+      }
+      const chip = item.valor === 'C'
+        ? `<span class="chip-C">Conforme</span>`
+        : item.valor === 'NC'
+        ? `<span class="chip-NC">No Conforme</span>`
+        : `<span class="chip-NA">N/A</span>`;
+
+      if (item.valor === 'C') totC++;
+      else if (item.valor === 'NC') totNC++;
+      else totNA++;
+
+      clHtml += `<div class="checklist-item"><span>${item.descripcion}</span>${chip}</div>`;
+    });
+
+    const total = r.checklist.length;
+    const pct   = total > 0 ? Math.round((totC / total) * 100) : 0;
+
+    html += `<div class="det-section">
+      <div class="det-section-title">Checklist de inspección</div>
+      <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+        <span style="background:#D1E7DD;color:#0F5132;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700">✓ ${totC} Conformes</span>
+        <span style="background:#F8D7DA;color:#842029;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700">✗ ${totNC} No Conformes</span>
+        <span style="background:#E9ECEF;color:#6c757d;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700">— ${totNA} N/A</span>
+        <span style="background:#D3E2FA;color:#0C447C;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700">${pct}% Conforme</span>
+      </div>
+      <div style="border:1px solid var(--borde);border-radius:10px;overflow:hidden">
+        ${clHtml}
+      </div>
+    </div>`;
+  }
+
+  // Documentos generados
+  if (r.certificado_url || r.dictamen_url) {
+    html += `<div class="det-section">
+      <div class="det-section-title">Documentos generados</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">`;
+    if (r.certificado_url)
+      html += `<a href="${r.certificado_url}" target="_blank"
+                  style="padding:7px 14px;background:var(--azul-light);border:1.5px solid var(--azul);
+                         border-radius:8px;color:var(--azul-dark);font-size:12px;font-weight:600;text-decoration:none">
+                  📄 Certificado
+               </a>`;
+    if (r.dictamen_url)
+      html += `<a href="${r.dictamen_url}" target="_blank"
+                  style="padding:7px 14px;background:#FFF3E0;border:1.5px solid #D4922A;
+                         border-radius:8px;color:#854F0B;font-size:12px;font-weight:600;text-decoration:none">
+                  📋 Dictamen
+               </a>`;
+    html += `</div></div>`;
+  }
+
+  document.getElementById('modal-cuerpo').innerHTML = html;
+  document.getElementById('modal-insp').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function cerrarModal() {
+  document.getElementById('modal-insp').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+// Cerrar modal al dar clic fuera
+document.addEventListener('click', e => {
+  const modal = document.getElementById('modal-insp');
+  if (e.target === modal) cerrarModal();
+});
 
 function cerrarSesion() {
   localStorage.removeItem('avba_session');

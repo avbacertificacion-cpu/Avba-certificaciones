@@ -69,8 +69,8 @@ class Inspecciones {
                 "INSERT INTO equipos
                  (marca_temporal, cliente, coords_inspeccion, maquinaria, marca, modelo, serie,
                   id_equipo, fecha_inspeccion, correo, control, evidencia_url, direccion,
-                  capacidad, estado, envio_direccion, coordenadas_envio)
-                 VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?)"
+                  capacidad, estado, envio_direccion, coordenadas_envio, inspector)
+                 VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?)"
             );
             $stmt->execute([
                 $cliente,
@@ -88,6 +88,7 @@ class Inspecciones {
                 $info['capacidad']                     ?? null,
                 $info['direccion_envio_legible']       ?? null,
                 $info['coords_envio']                  ?? null,
+                $usuarioActual,
             ]);
 
             $equipoId = (int) $this->pdo->lastInsertId();
@@ -155,5 +156,52 @@ class Inspecciones {
         }
 
         return $urlDir;
+    }
+
+    // ── Historial de inspecciones del inspector ────────────
+    public function getMisInspecciones(string $usuario): array {
+        $stmt = $this->pdo->prepare(
+            "SELECT id,
+                    DATE_FORMAT(marca_temporal, '%d/%m/%Y %H:%i') AS fecha_registro,
+                    DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y')      AS fecha_inspeccion,
+                    cliente, maquinaria, marca, modelo, serie, id_equipo,
+                    capacidad, direccion, correo, control, estado,
+                    evidencia_url, certificado_url, dictamen_url,
+                    motivo, qr_codigo
+             FROM equipos
+             WHERE inspector = ?
+             ORDER BY marca_temporal DESC"
+        );
+        $stmt->execute([$usuario]);
+        $rows = $stmt->fetchAll();
+
+        foreach ($rows as &$r) {
+            $r['folio']   = formatoFolio($r['control'] ?? '');
+            $r['qr_url']  = $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '';
+            $r['checklist'] = $this->getChecklistEquipo((int)$r['id']);
+        }
+        unset($r);
+        return $rows;
+    }
+
+    private function getChecklistEquipo(int $equipoId): array {
+        $stmt = $this->pdo->prepare(
+            "SELECT ci.descripcion, ci.tag, ic.valor,
+                    COALESCE(cs.nombre, ci.seccion) AS seccion_nombre
+             FROM inspeccion_checklist ic
+             INNER JOIN checklist_items ci  ON ci.tag = ic.tag
+                AND ci.maquinaria_tipo_id = (
+                      SELECT e.id FROM maquinaria_tipos e
+                      INNER JOIN equipos eq ON eq.maquinaria = e.nombre
+                      WHERE eq.id = ? LIMIT 1
+                    )
+             LEFT JOIN checklist_secciones cs
+                    ON cs.maquinaria_tipo_id = ci.maquinaria_tipo_id
+                   AND cs.codigo = ci.seccion
+             WHERE ic.equipo_id = ?
+             ORDER BY ci.seccion, ci.orden"
+        );
+        $stmt->execute([$equipoId, $equipoId]);
+        return $stmt->fetchAll();
     }
 }

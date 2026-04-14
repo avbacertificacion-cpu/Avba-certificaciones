@@ -17,6 +17,7 @@ require_once __DIR__ . '/Calidad.php';
 require_once __DIR__ . '/Certificaciones.php';
 require_once __DIR__ . '/ValidarQR.php';
 require_once __DIR__ . '/Admin.php';
+require_once __DIR__ . '/Personal.php';
 
 // ── Headers ───────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -31,12 +32,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 
 // ── PDO + módulos ─────────────────────────────────────────
 $pdo   = Database::getConnection();
-$auth  = new Auth($pdo);
-$insp  = new Inspecciones($pdo);
-$cal   = new Calidad($pdo);
-$cert  = new Certificaciones($pdo);
-$qr    = new ValidarQR($pdo);
-$admin = new Admin($pdo);
+$auth     = new Auth($pdo);
+$insp     = new Inspecciones($pdo);
+$cal      = new Calidad($pdo);
+$cert     = new Certificaciones($pdo);
+$qr       = new ValidarQR($pdo);
+$admin    = new Admin($pdo);
+$personal = new Personal($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -119,6 +121,42 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->listarTiposEquipo());
+
+        // Inspector: historial propio
+        case 'GET_MIS_INSPECCIONES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($insp->getMisInspecciones($usr['usuario']));
+
+        // Personal: catálogos públicos (autenticados)
+        case 'LISTAR_CURSOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->listarCursos());
+
+        case 'LISTAR_OCUPACIONES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->listarOcupaciones());
+
+        case 'LISTAR_OCUPACIONES_ADMIN':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->listarOcupacionesAdmin());
+
+        case 'LISTAR_PARTICIPANTES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->listarParticipantes([
+                'curso_id' => $_GET['curso_id'] ?? '',
+                'buscar'   => $_GET['buscar']   ?? '',
+            ]));
+
+        case 'OBTENER_PARTICIPANTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $p = $personal->obtenerParticipante((int)($_GET['id'] ?? 0));
+            respuesta($p ? $p : ['status' => 'error', 'message' => 'No encontrado.'], $p ? 200 : 404);
 
         default:
             respuesta(['status' => 'error', 'message' => "Acción GET desconocida: {$action}"], 400);
@@ -278,6 +316,37 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->subirPlantilla($payload, $_FILES));
+
+        // ── Personal / Cursos ─────────────────────────────
+        case 'GUARDAR_PARTICIPANTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->guardarParticipante($payload, $_FILES, $usr['usuario']));
+
+        case 'ELIMINAR_PARTICIPANTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->eliminarParticipante((int)($payload['id'] ?? 0)));
+
+        case 'GUARDAR_CURSO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->guardarCurso($payload, $usr['usuario']));
+
+        case 'ELIMINAR_CURSO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->eliminarCurso((int)($payload['id'] ?? 0)));
+
+        case 'GUARDAR_OCUPACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->guardarOcupacion($payload));
+
+        case 'ELIMINAR_OCUPACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->eliminarOcupacion((int)($payload['id'] ?? 0)));
 
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);
