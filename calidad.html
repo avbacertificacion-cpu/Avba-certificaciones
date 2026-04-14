@@ -615,6 +615,7 @@
   <button class="tab-btn"        id="tab-btn-tipos"        onclick="verTab('tipos')">Tipos de Equipo</button>
   <button class="tab-btn"        id="tab-btn-cursos"       onclick="verTab('cursos')">Cursos</button>
   <button class="tab-btn"        id="tab-btn-ocupaciones"  onclick="verTab('ocupaciones')">Ocupaciones</button>
+  <button class="tab-btn"        id="tab-btn-accesorios"   onclick="verTab('accesorios')">Accesorios</button>
 </div>
 
 <div id="tab-inspecciones" class="wrap">
@@ -805,6 +806,40 @@
 </div><!-- /tab-ocupaciones -->
 
 
+<!-- ══════════════════════════════════════════════════════════
+     TAB: TIPOS DE ACCESORIOS
+═══════════════════════════════════════════ -->
+<div id="tab-accesorios" class="wrap" style="display:none">
+
+  <div class="top-bar">
+    <h2>Tipos de accesorio de izaje</h2>
+    <button class="btn-crear" onclick="abrirModalAccTipo()">+ Nuevo tipo</button>
+  </div>
+
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Catálogo de tipos de accesorio</span>
+      <span class="tabla-count" id="acc-tipo-count">—</span>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:72%">Nombre del tipo</th>
+            <th style="width:16%;text-align:center">Estado</th>
+            <th style="width:12%"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-acc-tipos">
+          <tr><td colspan="3" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /tab-accesorios -->
+
+
 <!-- ══ MODAL CURSO ══ -->
 <div class="overlay" id="overlay-curso" style="display:none" onclick="if(event.target===this)cerrarModalCurso()">
   <div class="modal" style="max-width:480px">
@@ -880,6 +915,42 @@
     <div class="modal-footer" style="justify-content:flex-end;gap:8px">
       <button class="btn-nc-cancel" onclick="cerrarModalOcupacion()">Cancelar</button>
       <button class="btn-save" onclick="guardarOcupacion()" style="padding:9px 22px">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL TIPO ACCESORIO ══ -->
+<div class="overlay" id="overlay-acc-tipo" style="display:none" onclick="if(event.target===this)cerrarModalAccTipo()">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:var(--verde)">A</div>
+        <div>
+          <div class="m-title" id="acc-tipo-modal-titulo">Nuevo tipo de accesorio</div>
+          <div class="m-sub">Catálogo de accesorios de izaje</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarModalAccTipo()">×</button>
+    </div>
+    <div style="padding:20px 22px 8px">
+      <input type="hidden" id="acc-tipo-id">
+      <div class="form-group" style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">Nombre del tipo <span style="color:var(--rojo)">*</span></label>
+        <input type="text" id="acc-tipo-nombre" placeholder="Ej: Eslinga de cable, Grillete, Gancho..."
+               style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none"
+               onkeydown="if(event.key==='Enter')guardarAccTipo()">
+      </div>
+      <div class="form-group" style="margin-bottom:20px">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">Estado</label>
+        <select id="acc-tipo-activo" style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none;background:white">
+          <option value="1">Activo</option>
+          <option value="0">Inactivo</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:flex-end;gap:8px">
+      <button class="btn-nc-cancel" onclick="cerrarModalAccTipo()">Cancelar</button>
+      <button class="btn-save" onclick="guardarAccTipo()" style="padding:9px 22px">Guardar</button>
     </div>
   </div>
 </div>
@@ -1442,13 +1513,14 @@ cargar();
    TABS
 ═══════════════════════════════════════ */
 function verTab(tab) {
-  ["inspecciones","tipos","cursos","ocupaciones"].forEach(t => {
+  ["inspecciones","tipos","cursos","ocupaciones","accesorios"].forEach(t => {
     document.getElementById("tab-" + t).style.display = tab === t ? "" : "none";
     document.getElementById("tab-btn-" + t).classList.toggle("active", tab === t);
   });
   if (tab === "tipos"       && !tiposCargados)    cargarTipos();
   if (tab === "cursos"      && !cursosCargados)   cargarCursos();
   if (tab === "ocupaciones" && !ocupCargados)     cargarOcupaciones();
+  if (tab === "accesorios")                       cargarAccTipos();
 }
 
 /* ════════════════════════════════════════
@@ -1675,6 +1747,102 @@ async function eliminarOcupacion(id, nombre) {
     if (data.status === "success") { ocupCargados = false; cargarOcupaciones(); }
     else alert(data.message || "No se pudo eliminar");
   } catch (e) { alert("Error de conexión"); }
+}
+
+// ══════════════════════════════════════════════════
+//  TIPOS DE ACCESORIOS
+// ══════════════════════════════════════════════════
+let accTiposData = [];
+
+async function cargarAccTipos() {
+  try {
+    const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res = await fetch(`${API}?action=LISTAR_TIPOS_ACCESORIO_ADMIN&token=${s.token || ''}`);
+    const data = await res.json();
+    accTiposData = Array.isArray(data.data) ? data.data : [];
+    renderAccTipos();
+  } catch (e) {
+    console.error('Error cargando tipos de accesorio:', e);
+  }
+}
+
+function renderAccTipos() {
+  const tbody = document.getElementById('tbody-acc-tipos');
+  document.getElementById('acc-tipo-count').textContent = accTiposData.length + ' tipo(s)';
+
+  if (!accTiposData.length) {
+    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:28px;color:var(--texto-hint)">Sin tipos registrados</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = accTiposData.map(t => `
+    <tr>
+      <td style="font-weight:500">${t.nombre}</td>
+      <td style="text-align:center">
+        <span style="font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;
+              background:${t.activo == 1 ? 'var(--verde-light)' : '#f0f0f0'};
+              color:${t.activo == 1 ? 'var(--verde)' : '#888'}">
+          ${t.activo == 1 ? 'Activo' : 'Inactivo'}
+        </span>
+      </td>
+      <td style="text-align:right">
+        <button onclick="abrirModalAccTipo(${t.id})"
+                style="font-size:11px;padding:4px 10px;border:1.5px solid var(--borde);border-radius:6px;background:white;cursor:pointer;color:var(--texto-sub)">
+          ✏ Editar
+        </button>
+      </td>
+    </tr>`).join('');
+}
+
+function abrirModalAccTipo(id) {
+  document.getElementById('acc-tipo-id').value    = id || '';
+  document.getElementById('acc-tipo-nombre').value = '';
+  document.getElementById('acc-tipo-activo').value = '1';
+  document.getElementById('acc-tipo-modal-titulo').textContent = id ? 'Editar tipo de accesorio' : 'Nuevo tipo de accesorio';
+
+  if (id) {
+    const t = accTiposData.find(x => x.id == id);
+    if (t) {
+      document.getElementById('acc-tipo-nombre').value = t.nombre;
+      document.getElementById('acc-tipo-activo').value = String(t.activo);
+    }
+  }
+
+  document.getElementById('overlay-acc-tipo').style.display = 'flex';
+  setTimeout(() => document.getElementById('acc-tipo-nombre').focus(), 100);
+}
+
+function cerrarModalAccTipo() {
+  document.getElementById('overlay-acc-tipo').style.display = 'none';
+}
+
+async function guardarAccTipo() {
+  const id     = document.getElementById('acc-tipo-id').value;
+  const nombre = document.getElementById('acc-tipo-nombre').value.trim();
+  const activo = document.getElementById('acc-tipo-activo').value;
+
+  if (!nombre) { alert('El nombre es obligatorio.'); return; }
+
+  const action  = id ? 'EDITAR_TIPO_ACCESORIO' : 'CREAR_TIPO_ACCESORIO';
+  const payload = id ? { id: parseInt(id), nombre, activo: parseInt(activo) } : { nombre };
+
+  try {
+    const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (s.token || '') },
+      body: JSON.stringify({ action, payload })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      cerrarModalAccTipo();
+      cargarAccTipos();
+    } else {
+      alert(data.message || 'Error al guardar.');
+    }
+  } catch (e) {
+    alert('Error de conexión.');
+  }
 }
 
 function escH(s) {

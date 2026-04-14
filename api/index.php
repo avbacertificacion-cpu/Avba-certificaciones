@@ -18,6 +18,7 @@ require_once __DIR__ . '/Certificaciones.php';
 require_once __DIR__ . '/ValidarQR.php';
 require_once __DIR__ . '/Admin.php';
 require_once __DIR__ . '/Personal.php';
+require_once __DIR__ . '/Accesorios.php';
 
 // ── Headers ───────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -39,6 +40,7 @@ $cert     = new Certificaciones($pdo);
 $qr       = new ValidarQR($pdo);
 $admin    = new Admin($pdo);
 $personal = new Personal($pdo);
+$accesorios = new Accesorios($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -157,6 +159,16 @@ if ($method === 'GET') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             $p = $personal->obtenerParticipante((int)($_GET['id'] ?? 0));
             respuesta($p ? $p : ['status' => 'error', 'message' => 'No encontrado.'], $p ? 200 : 404);
+
+        case 'LISTAR_TIPOS_ACCESORIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->listarTipos());
+
+        case 'LISTAR_TIPOS_ACCESORIO_ADMIN':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->listarTiposAdmin());
 
         default:
             respuesta(['status' => 'error', 'message' => "Acción GET desconocida: {$action}"], 400);
@@ -356,6 +368,31 @@ if ($method === 'POST') {
                 trim($payload['tipo']  ?? ''),
                 $usr['usuario']
             ));
+
+        case 'CREAR_TIPO_ACCESORIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->crearTipo($payload));
+
+        case 'EDITAR_TIPO_ACCESORIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->editarTipo($payload));
+
+        case 'ELIMINAR_TIPO_ACCESORIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->eliminarTipo($payload));
+
+        case 'CREAR_SESION_ACCESORIOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->crearSesion($payload, $usr['usuario']));
+
+        case 'GUARDAR_ACCESORIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->guardarAccesorio($_POST, $_FILES, $usr['usuario']));
 
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);
