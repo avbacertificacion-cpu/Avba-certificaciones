@@ -650,6 +650,182 @@
 
     #pantalla-inspeccion { display: none; }
     #pantalla-historial  { display: none; }
+    #pantalla-cursos     { display: none; }
+
+    /* ── Módulo Cursos ── */
+    .cur-wrap {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 18px 16px 80px;
+    }
+    .cur-section {
+      background: var(--blanco);
+      border: 1.5px solid var(--borde);
+      border-radius: 16px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    .cur-section-hdr {
+      background: var(--gris-bg);
+      padding: 11px 16px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      color: var(--azul-dark);
+      border-bottom: 1px solid var(--borde);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .cur-section-body { padding: 16px; }
+    .cur-field {
+      margin-bottom: 13px;
+    }
+    .cur-field:last-child { margin-bottom: 0; }
+    .cur-field label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--texto-sub);
+      display: block;
+      margin-bottom: 5px;
+    }
+    .cur-field label .req { color: var(--rojo); }
+    .cur-input {
+      width: 100%;
+      padding: 10px 13px;
+      border: 1.5px solid var(--borde);
+      border-radius: 10px;
+      font-size: 13.5px;
+      color: var(--texto);
+      background: var(--blanco);
+      outline: none;
+      transition: border-color .15s;
+      box-sizing: border-box;
+    }
+    .cur-input:focus { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+    .cur-input.err   { border-color: var(--rojo); }
+    .cur-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 480px) { .cur-row2 { grid-template-columns: 1fr; gap: 8px; } }
+    .cur-errmsg { font-size: 11px; color: var(--rojo); margin-top: 4px; display: none; }
+    .cur-errmsg.show { display: block; }
+    .cur-hint { font-size: 11px; color: var(--texto-hint); margin-top: 4px; }
+
+    /* OCR */
+    .ocr-zone {
+      border: 2px dashed var(--borde);
+      border-radius: 12px;
+      padding: 18px 14px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .ocr-zone:hover { border-color: var(--azul); background: var(--azul-light); }
+    .ocr-zone.has-img { border-style: solid; border-color: var(--azul); background: var(--azul-light); }
+    .ocr-preview {
+      max-width: 100%;
+      max-height: 140px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      display: none;
+    }
+    .ocr-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      background: var(--azul);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 8px;
+    }
+    .ocr-btn:disabled { opacity: .6; cursor: not-allowed; }
+    .ocr-result {
+      font-size: 11.5px;
+      margin-top: 7px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      display: none;
+    }
+    .ocr-result.ok  { background: var(--verde-light); color: var(--verde); display: block; }
+    .ocr-result.err { background: var(--rojo-light);  color: var(--rojo);  display: block; }
+
+    /* Foto participante */
+    .foto-zone {
+      border: 2px dashed var(--borde);
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color .2s;
+    }
+    .foto-zone:hover { border-color: var(--azul); }
+    .foto-preview {
+      width: 120px;
+      height: 150px;
+      object-fit: cover;
+      border-radius: 10px;
+      margin-bottom: 6px;
+      display: none;
+      border: 2px solid var(--borde);
+    }
+    /* Empresa toggle */
+    .empresa-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 16px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .empresa-toggle span { font-size: 13px; font-weight: 600; color: var(--texto-sub); }
+    .empresa-toggle .chev {
+      transition: transform .2s;
+      color: var(--texto-hint);
+    }
+    .empresa-toggle.open .chev { transform: rotate(180deg); }
+    .empresa-body { padding: 0 16px 16px; display: none; }
+    .empresa-body.open { display: block; }
+
+    /* Botón enviar */
+    .cur-submit {
+      width: 100%;
+      padding: 14px;
+      background: var(--azul);
+      color: white;
+      border: none;
+      border-radius: 14px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background .15s;
+    }
+    .cur-submit:hover    { background: var(--azul-dark); }
+    .cur-submit:disabled { opacity: .6; cursor: not-allowed; }
+
+    /* Pantalla éxito cursos */
+    .cur-exito {
+      display: none;
+      text-align: center;
+      padding: 52px 24px;
+      background: var(--blanco);
+      border-radius: 16px;
+      border: 1.5px solid var(--borde);
+    }
+    .cur-exito-icon {
+      width: 64px; height: 64px;
+      background: var(--verde-light);
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .cur-exito-titulo { font-size: 18px; font-weight: 700; color: var(--texto); margin-bottom: 6px; }
+    .cur-exito-sub    { font-size: 13px; color: var(--texto-sub); margin-bottom: 22px; }
 
     /* ── Tarjetas del historial ── */
     .hist-card {
@@ -828,17 +1004,17 @@
       <div class="menu-card-desc">Historial y detalle de tus inspecciones realizadas</div>
     </div>
 
-    <!-- Accesorios -->
-    <div class="menu-card proximamente">
-      <span class="prox-badge">Pronto</span>
+    <!-- Cursos -->
+    <div class="menu-card" onclick="abrirModulo('cursos')">
       <div class="menu-card-icon mc-morado">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-          <circle cx="12" cy="12" r="3"/>
-          <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+          <path d="M12 14l-8-5 8-5 8 5-8 5z"/>
+          <path d="M4 9v6c0 2 3.5 4 8 4s8-2 8-4V9"/>
+          <path d="M20 9v7"/>
         </svg>
       </div>
-      <div class="menu-card-title">Accesorios</div>
-      <div class="menu-card-desc">Registro de accesorios certificados</div>
+      <div class="menu-card-title">Cursos</div>
+      <div class="menu-card-desc">Registro de participantes en cursos de capacitación</div>
     </div>
 
   </div>
@@ -907,6 +1083,238 @@
     <div id="modal-cuerpo" style="padding:20px 22px 28px;overflow-y:auto;max-height:80vh"></div>
   </div>
 </div>
+
+<!-- ══════════ MÓDULO CURSOS ══════════ -->
+<div id="pantalla-cursos">
+<div class="cur-wrap">
+
+  <!-- Pantalla éxito -->
+  <div class="cur-exito" id="cur-exito">
+    <div class="cur-exito-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--verde)" stroke-width="2.5" style="width:32px;height:32px">
+        <path d="M20 6L9 17l-5-5"/>
+      </svg>
+    </div>
+    <div class="cur-exito-titulo">Registro guardado</div>
+    <div class="cur-exito-sub" id="cur-exito-sub">El participante fue registrado correctamente.</div>
+    <button class="btn-nueva" onclick="curNuevoRegistro()" style="margin:0 auto;display:inline-flex">
+      + Nuevo registro
+    </button>
+  </div>
+
+  <!-- Formulario -->
+  <div id="cur-form-wrap">
+
+    <!-- ── Sección 1: Datos del participante ── -->
+    <div class="cur-section">
+      <div class="cur-section-hdr">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
+          <circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
+        </svg>
+        Datos del participante
+      </div>
+      <div class="cur-section-body">
+
+        <!-- Foto del documento (OCR) -->
+        <div class="cur-field">
+          <label>Foto del documento (CURP / INE)</label>
+          <div class="ocr-zone" id="ocr-zone" onclick="document.getElementById('ocr-file').click()">
+            <img id="ocr-preview" class="ocr-preview" alt="Documento">
+            <div id="ocr-placeholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="var(--azul)" stroke-width="1.5"
+                   style="width:28px;height:28px;display:block;margin:0 auto 6px">
+                <rect x="3" y="5" width="18" height="14" rx="2"/>
+                <path d="M3 9h18M8 5V3M16 5V3"/>
+              </svg>
+              <div style="font-size:13px;font-weight:600;color:var(--azul)">Toca para seleccionar foto del documento</div>
+              <div style="font-size:11px;color:var(--texto-hint);margin-top:3px">CURP, INE u otro documento oficial</div>
+            </div>
+            <input type="file" id="ocr-file" accept="image/*" style="display:none" onchange="ocr_previewDoc(event)">
+          </div>
+          <button class="ocr-btn" id="ocr-btn" onclick="ocr_procesar()" disabled>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px">
+              <path d="M2 6V3h3M14 6V3h-3M2 10v3h3M14 10v3h-3"/><rect x="5" y="5" width="6" height="6" rx="1"/>
+            </svg>
+            <span id="ocr-btn-label">Extraer datos con OCR</span>
+          </button>
+          <div class="ocr-result" id="ocr-result"></div>
+        </div>
+
+        <!-- Nombre y CURP -->
+        <div class="cur-row2">
+          <div class="cur-field">
+            <label>Nombre completo <span class="req">*</span></label>
+            <input type="text" class="cur-input" id="cur-nombre" placeholder="Nombre(s) y apellidos"
+                   oninput="curClearErr('cur-nombre')">
+            <div class="cur-errmsg" id="err-cur-nombre">El nombre es obligatorio</div>
+          </div>
+          <div class="cur-field">
+            <label>CURP <span class="req">*</span></label>
+            <input type="text" class="cur-input" id="cur-curp" placeholder="AAAA000000XXXXXX00"
+                   maxlength="18" style="text-transform:uppercase"
+                   oninput="this.value=this.value.toUpperCase();curClearErr('cur-curp')">
+            <div class="cur-errmsg" id="err-cur-curp">CURP inválida (18 caracteres)</div>
+          </div>
+        </div>
+
+        <!-- Puesto y Ocupación -->
+        <div class="cur-row2">
+          <div class="cur-field">
+            <label>Puesto</label>
+            <input type="text" class="cur-input" id="cur-puesto" placeholder="Ej: Operador, Supervisor">
+          </div>
+          <div class="cur-field">
+            <label>Ocupación específica</label>
+            <select class="cur-input" id="cur-ocupacion">
+              <option value="">— Seleccionar —</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Capacidad y Teléfono -->
+        <div class="cur-row2">
+          <div class="cur-field">
+            <label>Capacidad</label>
+            <input type="text" class="cur-input" id="cur-capacidad" placeholder="Ej: 2.5 ton"
+                   id="cur-capacidad-input">
+            <label style="margin-top:6px;font-size:12px;font-weight:500;color:var(--texto-sub);
+                          display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" id="cur-cap-na" onchange="curCapNA(this)"> No aplica
+            </label>
+          </div>
+          <div class="cur-field">
+            <label>Teléfono</label>
+            <input type="tel" class="cur-input" id="cur-telefono" placeholder="10 dígitos">
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ── Sección 2: Datos del curso ── -->
+    <div class="cur-section">
+      <div class="cur-section-hdr">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
+          <path d="M8 10l-5-3 5-3 5 3-5 3z"/><path d="M3 7v3c0 1.1 2 2.5 5 2.5s5-1.4 5-2.5V7"/>
+        </svg>
+        Datos del curso
+      </div>
+      <div class="cur-section-body">
+        <div class="cur-row2">
+          <div class="cur-field">
+            <label>Curso <span class="req">*</span></label>
+            <select class="cur-input" id="cur-curso" oninput="curClearErr('cur-curso')">
+              <option value="">— Seleccionar curso —</option>
+            </select>
+            <div class="cur-errmsg" id="err-cur-curso">Selecciona un curso</div>
+          </div>
+          <div class="cur-field">
+            <label>Fecha del curso <span class="req">*</span></label>
+            <input type="date" class="cur-input" id="cur-fecha" oninput="curClearErr('cur-fecha')">
+            <div class="cur-errmsg" id="err-cur-fecha">La fecha es obligatoria</div>
+          </div>
+        </div>
+        <!-- Info del curso seleccionado -->
+        <div id="cur-curso-info" style="display:none;padding:10px 12px;background:var(--azul-light);
+             border-radius:10px;font-size:12px;color:var(--azul-dark);margin-top:4px">
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Sección 3: Datos de la empresa (colapsable) ── -->
+    <div class="cur-section">
+      <div class="empresa-toggle" id="empresa-toggle" onclick="curToggleEmpresa()">
+        <span>
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
+               style="width:13px;height:13px;vertical-align:middle;margin-right:6px">
+            <rect x="2" y="4" width="12" height="9" rx="1"/><path d="M5 4V3h6v1M8 7v4"/>
+          </svg>
+          Datos de la empresa <span style="font-size:11px;color:var(--texto-hint);font-weight:400">(opcional)</span>
+        </span>
+        <svg class="chev" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"
+             style="width:14px;height:14px">
+          <path d="M4 6l4 4 4-4"/>
+        </svg>
+      </div>
+      <div class="empresa-body" id="empresa-body">
+        <div class="cur-field">
+          <label>Nombre de la empresa</label>
+          <input type="text" class="cur-input" id="cur-empresa" placeholder="Razón social">
+        </div>
+        <div class="cur-row2">
+          <div class="cur-field">
+            <label>RFC</label>
+            <input type="text" class="cur-input" id="cur-rfc" placeholder="RFC de la empresa"
+                   style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <div class="cur-field">
+            <label>Representante</label>
+            <input type="text" class="cur-input" id="cur-representante" placeholder="Nombre del representante">
+          </div>
+        </div>
+        <div class="cur-field">
+          <label>Dirección de la empresa</label>
+          <input type="text" class="cur-input" id="cur-direccion-empresa" placeholder="Calle, colonia, ciudad">
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Sección 4: Fotografías ── -->
+    <div class="cur-section">
+      <div class="cur-section-hdr">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
+          <rect x="1" y="3" width="14" height="10" rx="2"/><circle cx="8" cy="8" r="2.5"/>
+        </svg>
+        Fotografías
+      </div>
+      <div class="cur-section-body">
+        <div class="cur-row2">
+          <!-- Foto del documento ya puede estar (subida en OCR) -->
+          <div class="cur-field">
+            <label>Foto del documento
+              <span style="font-weight:400;color:var(--texto-hint)">(CURP / INE)</span>
+            </label>
+            <div style="font-size:11px;color:var(--verde);padding:6px 10px;background:var(--verde-light);
+                        border-radius:8px" id="cur-doc-status">
+              Usa la foto del documento de arriba o selecciona otra
+            </div>
+            <button type="button" onclick="document.getElementById('ocr-file').click()"
+                    style="margin-top:8px;padding:6px 12px;background:var(--gris-bg);border:1.5px solid var(--borde);
+                           border-radius:8px;font-size:12px;font-weight:600;color:var(--texto-sub);cursor:pointer">
+              Cambiar foto del documento
+            </button>
+          </div>
+          <!-- Foto del participante -->
+          <div class="cur-field">
+            <label>Foto del participante <span class="req">*</span></label>
+            <div class="foto-zone" onclick="document.getElementById('foto-persona-file').click()">
+              <img id="foto-persona-preview" class="foto-preview" alt="Participante">
+              <div id="foto-persona-placeholder">
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--texto-hint)" stroke-width="1.5"
+                     style="width:26px;height:26px;display:block;margin:0 auto 5px">
+                  <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                </svg>
+                <div style="font-size:12px;font-weight:600;color:var(--texto-sub)">Foto medio cuerpo</div>
+                <div style="font-size:11px;color:var(--texto-hint)">Toca para seleccionar</div>
+              </div>
+              <input type="file" id="foto-persona-file" accept="image/*" style="display:none"
+                     onchange="curPreviewPersona(event)">
+            </div>
+            <div class="cur-errmsg" id="err-foto-persona">La foto del participante es obligatoria</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Botón enviar -->
+    <button class="cur-submit" id="cur-submit-btn" onclick="curEnviar()">
+      Guardar registro
+    </button>
+
+  </div><!-- /cur-form-wrap -->
+</div><!-- /cur-wrap -->
+</div><!-- /pantalla-cursos -->
+
 
 <!-- ══════════ MÓDULO INSPECCIÓN ══════════ -->
 <div id="pantalla-inspeccion">
@@ -1161,7 +1569,7 @@ let enviando        = false;
    MENÚ PRINCIPAL
 ════════════════════════════════════════ */
 function ocultarTodas() {
-  ['pantalla-inspeccion', 'pantalla-historial'].forEach(id => {
+  ['pantalla-inspeccion', 'pantalla-historial', 'pantalla-cursos'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
   document.getElementById('steps-track').style.display = 'none';
@@ -1201,11 +1609,17 @@ function abrirModulo(modulo) {
     document.getElementById('header-title').textContent = 'Mis Inspecciones';
     document.getElementById('header-sub').textContent = 'Historial de inspecciones realizadas';
     cargarHistorial();
+
+  } else if (modulo === 'cursos') {
+    document.getElementById('pantalla-cursos').style.display = 'block';
+    document.getElementById('header-title').textContent = 'Registro de Cursos';
+    document.getElementById('header-sub').textContent = 'Registro de participantes en capacitación';
+    initCursos();
   }
 }
 
 function volverMenu() {
-  ['pantalla-inspeccion', 'pantalla-historial'].forEach(id => {
+  ['pantalla-inspeccion', 'pantalla-historial', 'pantalla-cursos'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
   document.getElementById('steps-track').style.display = 'none';
@@ -1899,6 +2313,331 @@ async function enviarFormulario() {
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("service-worker.js")
     .catch(e => console.log("SW no registrado:", e));
+}
+
+/* ════════════════════════════════════════
+   MÓDULO CURSOS
+════════════════════════════════════════ */
+let curCursos     = [];
+let curOcupaciones = [];
+let curDocFile    = null;   // Archivo foto documento
+let curPersonaFile = null;  // Archivo foto participante
+
+// ── Abrir módulo: carga catálogos ─────────
+async function initCursos() {
+  if (curCursos.length && curOcupaciones.length) return;
+  try {
+    const [rC, rO] = await Promise.all([
+      fetch(`${WEB_APP_URL}?action=LISTAR_CURSOS`).then(r => r.json()),
+      fetch(`${WEB_APP_URL}?action=LISTAR_OCUPACIONES`).then(r => r.json()),
+    ]);
+
+    curCursos      = Array.isArray(rC) ? rC.filter(c => c.activo == 1) : [];
+    curOcupaciones = Array.isArray(rO) ? rO : [];
+
+    const selCurso = document.getElementById('cur-curso');
+    selCurso.innerHTML = '<option value="">— Seleccionar curso —</option>' +
+      curCursos.map(c => `<option value="${c.id}">${c.nombre} (${c.duracion_horas}h)</option>`).join('');
+
+    const selOcup = document.getElementById('cur-ocupacion');
+    selOcup.innerHTML = '<option value="">— Seleccionar —</option>' +
+      curOcupaciones.map(o => `<option value="${o.id}">${o.nombre}</option>`).join('');
+
+    // Mostrar info del curso al cambiar
+    selCurso.addEventListener('change', function() {
+      const c = curCursos.find(x => x.id == this.value);
+      const info = document.getElementById('cur-curso-info');
+      if (c) {
+        info.style.display = 'block';
+        info.innerHTML = `<strong>${c.nombre}</strong> — ${c.duracion_horas} horas · ${c.area_tematica}`;
+      } else {
+        info.style.display = 'none';
+      }
+    });
+
+  } catch (e) {
+    console.error('Error cargando catálogos de cursos:', e);
+  }
+}
+
+// ── Capacidad N/A ─────────────────────────
+function curCapNA(cb) {
+  const input = document.getElementById('cur-capacidad');
+  input.disabled = cb.checked;
+  if (cb.checked) { input.value = ''; input.placeholder = 'No aplica'; }
+  else            { input.placeholder = 'Ej: 2.5 ton'; }
+}
+
+// ── Toggle empresa ────────────────────────
+function curToggleEmpresa() {
+  const toggle = document.getElementById('empresa-toggle');
+  const body   = document.getElementById('empresa-body');
+  toggle.classList.toggle('open');
+  body.classList.toggle('open');
+}
+
+// ── Limpiar error de campo ────────────────
+function curClearErr(id) {
+  document.getElementById(id)?.classList.remove('err');
+  const errId = 'err-' + id;
+  document.getElementById(errId)?.classList.remove('show');
+}
+
+function curShowErr(id, msg) {
+  const el  = document.getElementById(id);
+  const err = document.getElementById('err-' + id);
+  if (el) el.classList.add('err');
+  if (err) { if (msg) err.textContent = msg; err.classList.add('show'); }
+}
+
+// ── OCR: preview del documento ────────────
+function ocr_previewDoc(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  curDocFile = file;
+
+  const preview = document.getElementById('ocr-preview');
+  const holder  = document.getElementById('ocr-placeholder');
+  const zone    = document.getElementById('ocr-zone');
+  const btn     = document.getElementById('ocr-btn');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    holder.style.display  = 'none';
+    zone.classList.add('has-img');
+    btn.disabled = false;
+  };
+  reader.readAsDataURL(file);
+
+  // Actualizar estado en sección Fotografías
+  document.getElementById('cur-doc-status').innerHTML =
+    `<strong>✓</strong> Foto del documento cargada: ${file.name}`;
+  document.getElementById('cur-doc-status').style.background = 'var(--verde-light)';
+  document.getElementById('cur-doc-status').style.color = 'var(--verde)';
+}
+
+// ── OCR: procesar imagen con OCR.space ────
+async function ocr_procesar() {
+  if (!curDocFile) return;
+  const btn   = document.getElementById('ocr-btn');
+  const label = document.getElementById('ocr-btn-label');
+  const res   = document.getElementById('ocr-result');
+
+  btn.disabled  = true;
+  label.textContent = 'Procesando…';
+  res.className = 'ocr-result';
+
+  try {
+    const formData = new FormData();
+    formData.append('file', curDocFile);
+    formData.append('language',          'spa');
+    formData.append('isOverlayRequired', 'false');
+    formData.append('detectOrientation', 'true');
+    formData.append('scale',             'true');
+    formData.append('apikey',            'helloworld'); // clave gratuita de OCR.space
+
+    const resp = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      body: formData,
+    });
+    const data  = await resp.json();
+    const texto = (data?.ParsedResults?.[0]?.ParsedText || '').toUpperCase();
+
+    if (!texto) {
+      res.className = 'ocr-result err';
+      res.textContent = 'No se pudo leer texto en la imagen. Intenta con mejor iluminación o mayor resolución.';
+      return;
+    }
+
+    let campos = [];
+
+    // ── Extraer CURP ─────────────────────────
+    const curpMatch = texto.match(/[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d/);
+    if (curpMatch) {
+      document.getElementById('cur-curp').value = curpMatch[0];
+      curClearErr('cur-curp');
+      campos.push('CURP');
+    }
+
+    // ── Extraer nombre (doc CURP de RENAPO) ──
+    // Formato: "NOMBRE(S):\n JUAN" o "NOMBRE: JUAN PÉREZ"
+    const nombreMatch = texto.match(/NOMBRE[S\s]*[:()]*\s*\n?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{2,40})/);
+    const ap1Match    = texto.match(/PRIMER\s+APELLIDO[^:]*:\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{1,25})/);
+    const ap2Match    = texto.match(/SEGUNDO\s+APELLIDO[^:]*:\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{1,25})/);
+
+    if (ap1Match || nombreMatch) {
+      const apellido1 = (ap1Match?.[1] || '').trim();
+      const apellido2 = (ap2Match?.[1] || '').trim();
+      const nombres   = (nombreMatch?.[1] || '').trim();
+
+      let nombreCompleto = '';
+      if (apellido1 && nombres) {
+        nombreCompleto = `${apellido1} ${apellido2 ? apellido2 + ' ' : ''}${nombres}`.trim();
+      } else if (nombres) {
+        nombreCompleto = nombres;
+      }
+
+      if (nombreCompleto && nombreCompleto.length > 3) {
+        // Convertir a Title Case
+        nombreCompleto = nombreCompleto.split(' ')
+          .map(p => p.charAt(0) + p.slice(1).toLowerCase())
+          .join(' ');
+        document.getElementById('cur-nombre').value = nombreCompleto;
+        curClearErr('cur-nombre');
+        campos.push('nombre');
+      }
+    }
+
+    if (campos.length) {
+      res.className   = 'ocr-result ok';
+      res.textContent = `✓ Datos extraídos: ${campos.join(', ')}. Verifica que sean correctos.`;
+    } else {
+      res.className   = 'ocr-result err';
+      res.textContent = 'No se encontraron datos reconocibles. Ingresa los datos manualmente.';
+    }
+
+  } catch (e) {
+    res.className   = 'ocr-result err';
+    res.textContent = 'Error al conectar con el servicio OCR. Ingresa los datos manualmente.';
+    console.error('OCR error:', e);
+  } finally {
+    btn.disabled  = false;
+    label.textContent = 'Extraer datos con OCR';
+  }
+}
+
+// ── Preview foto participante ─────────────
+function curPreviewPersona(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+  curPersonaFile = file;
+
+  const preview = document.getElementById('foto-persona-preview');
+  const holder  = document.getElementById('foto-persona-placeholder');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.src = e.target.result;
+    preview.style.display  = 'block';
+    holder.style.display   = 'none';
+  };
+  reader.readAsDataURL(file);
+  curClearErr('foto-persona');
+}
+
+// ── Validar y enviar ──────────────────────
+async function curEnviar() {
+  let valido = true;
+
+  const nombre  = document.getElementById('cur-nombre').value.trim();
+  const curp    = document.getElementById('cur-curp').value.trim().toUpperCase();
+  const cursoId = document.getElementById('cur-curso').value;
+  const fecha   = document.getElementById('cur-fecha').value;
+
+  if (!nombre)  { curShowErr('cur-nombre', 'El nombre es obligatorio');          valido = false; }
+  if (!curp || !/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/.test(curp))
+                { curShowErr('cur-curp', 'CURP inválida (18 caracteres)');        valido = false; }
+  if (!cursoId) { curShowErr('cur-curso', 'Selecciona un curso');                 valido = false; }
+  if (!fecha)   { curShowErr('cur-fecha', 'La fecha del curso es obligatoria');   valido = false; }
+  if (!curPersonaFile)
+                { curShowErr('foto-persona', 'La foto del participante es obligatoria'); valido = false; }
+
+  if (!valido) {
+    document.querySelector('.cur-input.err')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  const btn = document.getElementById('cur-submit-btn');
+  btn.disabled    = true;
+  btn.textContent = 'Guardando…';
+
+  try {
+    const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+
+    const fd = new FormData();
+    fd.append('action',               'GUARDAR_PARTICIPANTE');
+    fd.append('token',                s.token || '');
+    fd.append('nombre_completo',      nombre);
+    fd.append('curp',                 curp);
+    fd.append('puesto',               document.getElementById('cur-puesto').value.trim());
+    fd.append('ocupacion_id',         document.getElementById('cur-ocupacion').value || '');
+    fd.append('capacidad',            document.getElementById('cur-capacidad').value.trim());
+    fd.append('capacidad_na',         document.getElementById('cur-cap-na').checked ? '1' : '0');
+    fd.append('telefono',             document.getElementById('cur-telefono').value.trim());
+    fd.append('curso_id',             cursoId);
+    fd.append('fecha_curso',          fecha);
+    fd.append('empresa_nombre',       document.getElementById('cur-empresa').value.trim());
+    fd.append('empresa_rfc',          document.getElementById('cur-rfc').value.trim());
+    fd.append('empresa_representante',document.getElementById('cur-representante').value.trim());
+    fd.append('empresa_direccion',    document.getElementById('cur-direccion-empresa').value.trim());
+    if (curDocFile)     fd.append('foto_documentacion', curDocFile,     curDocFile.name);
+    if (curPersonaFile) fd.append('foto_persona',       curPersonaFile, curPersonaFile.name);
+
+    const res  = await fetch(WEB_APP_URL, { method: 'POST', body: fd });
+    const data = await res.json();
+
+    if (data.status === 'success') {
+      const curso = curCursos.find(c => c.id == cursoId);
+      document.getElementById('cur-exito-sub').textContent =
+        `${nombre} fue registrado en "${curso?.nombre || 'el curso'}" correctamente.`;
+      document.getElementById('cur-form-wrap').style.display = 'none';
+      document.getElementById('cur-exito').style.display     = 'block';
+    } else {
+      alert('Error: ' + (data.message || 'No se pudo guardar el registro.'));
+    }
+
+  } catch (e) {
+    alert('Error de conexión. Intenta de nuevo.');
+    console.error('curEnviar:', e);
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = 'Guardar registro';
+  }
+}
+
+// ── Resetear formulario ───────────────────
+function curNuevoRegistro() {
+  // Limpiar todos los campos
+  ['cur-nombre','cur-curp','cur-puesto','cur-capacidad','cur-telefono',
+   'cur-empresa','cur-rfc','cur-representante','cur-direccion-empresa'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('cur-curso').value    = '';
+  document.getElementById('cur-ocupacion').value= '';
+  document.getElementById('cur-fecha').value    = '';
+  document.getElementById('cur-cap-na').checked = false;
+  document.getElementById('cur-capacidad').disabled = false;
+
+  // Reset OCR
+  curDocFile    = null;
+  curPersonaFile = null;
+  document.getElementById('ocr-preview').style.display = 'none';
+  document.getElementById('ocr-placeholder').style.display = '';
+  document.getElementById('ocr-zone').classList.remove('has-img');
+  document.getElementById('ocr-btn').disabled = true;
+  document.getElementById('ocr-result').className = 'ocr-result';
+  document.getElementById('ocr-file').value = '';
+
+  // Reset foto persona
+  document.getElementById('foto-persona-preview').style.display = 'none';
+  document.getElementById('foto-persona-placeholder').style.display = '';
+  document.getElementById('foto-persona-file').value = '';
+
+  // Reset empresa
+  const toggle = document.getElementById('empresa-toggle');
+  const body   = document.getElementById('empresa-body');
+  toggle.classList.remove('open');
+  body.classList.remove('open');
+
+  // Reset info curso
+  document.getElementById('cur-curso-info').style.display = 'none';
+
+  // Mostrar formulario, ocultar éxito
+  document.getElementById('cur-form-wrap').style.display = '';
+  document.getElementById('cur-exito').style.display     = 'none';
 }
 </script>
 </body>
