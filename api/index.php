@@ -348,6 +348,15 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->eliminarOcupacion((int)($payload['id'] ?? 0)));
 
+        case 'GENERAR_DOC_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->generarDocumento(
+                (int)($payload['id']   ?? 0),
+                trim($payload['tipo']  ?? ''),
+                $usr['usuario']
+            ));
+
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);
     }

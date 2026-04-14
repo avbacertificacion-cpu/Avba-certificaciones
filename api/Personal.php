@@ -9,6 +9,9 @@
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+use Dompdf\Dompdf;
+use Dompdf\Options;
+
 class Personal {
     private PDO $pdo;
 
@@ -270,6 +273,32 @@ class Personal {
     }
 
     // ══════════════════════════════════════════════════════
+    //  GENERACIÓN DE DOCUMENTOS
+    // ══════════════════════════════════════════════════════
+
+    public function generarDocumento(int $id, string $tipo, string $usuario): array {
+        $p = $this->obtenerParticipante($id);
+        if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        $tiposValidos = ['dc3', 'diploma'];
+        if (!in_array($tipo, $tiposValidos, true))
+            return ['status' => 'error', 'message' => 'Tipo de documento no válido.'];
+
+        $html = ($tipo === 'dc3') ? $this->htmlDC3($p) : $this->htmlDiploma($p);
+
+        $folio = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
+        $url   = $this->htmlAPdf($html, $folio, $tipo);
+
+        // Registrar documento generado
+        $this->pdo->prepare(
+            "INSERT INTO participantes_documentos (participante_id, tipo_doc, url, generado_por)
+             VALUES (?, ?, ?, ?)"
+        )->execute([$id, strtoupper($tipo), $url, $usuario]);
+
+        return ['status' => 'success', 'url' => $url];
+    }
+
+    // ══════════════════════════════════════════════════════
     //  HELPERS PRIVADOS
     // ══════════════════════════════════════════════════════
 
@@ -299,5 +328,223 @@ class Personal {
         if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha))
             return $fecha;
         return null;
+    }
+
+    private function htmlAPdf(string $html, string $folio, string $tipo): string {
+        $opts = new Options();
+        $opts->set('isRemoteEnabled', false);
+        $opts->set('defaultFont', 'DejaVu Sans');
+
+        $dompdf = new Dompdf($opts);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        $dir = UPLOAD_DIR . 'personal/docs/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+        $nombre = strtoupper($tipo) . '_' . $folio . '_' . date('Ymd_His') . '.pdf';
+        file_put_contents($dir . $nombre, $dompdf->output());
+
+        return UPLOAD_URL . 'personal/docs/' . $nombre;
+    }
+
+    private function htmlDC3(array $p): string {
+        $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+
+        $nombre   = $esc($p['nombre_completo']);
+        $curp     = $esc($p['curp']);
+        $curso    = $esc($p['curso_nombre']);
+        $horas    = $esc($p['duracion_horas']);
+        $area     = $esc($p['area_tematica'] ?? '');
+        $puesto   = $esc($p['puesto'] ?? '');
+        $empresa  = $esc($p['empresa_nombre'] ?? 'Sin especificar');
+        $rfc      = $esc($p['empresa_rfc'] ?? '');
+        $rep      = $esc($p['empresa_representante'] ?? '');
+        $dir      = $esc($p['empresa_direccion'] ?? '');
+        $ocupacion = $esc($p['ocupacion_nombre'] ?? '');
+        $capacidad = $esc($p['capacidad'] ?? ($p['capacidad_na'] ? 'N/A' : ''));
+        $fecha    = $p['fecha_curso'] ? date('d \d\e F \d\e Y', strtotime($p['fecha_curso'])) : '';
+
+        $mesesES = ['January'=>'enero','February'=>'febrero','March'=>'marzo','April'=>'abril',
+                    'May'=>'mayo','June'=>'junio','July'=>'julio','August'=>'agosto',
+                    'September'=>'septiembre','October'=>'octubre','November'=>'noviembre','December'=>'diciembre'];
+        foreach ($mesesES as $en => $es) {
+            $fecha = str_replace($en, $es, $fecha);
+        }
+
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 10pt; color: #1a1a2e; margin: 0; padding: 28px 36px; }
+  .page-border { border: 3px solid #185FA5; border-radius: 4px; padding: 24px; min-height: 750px; }
+  .hdr { text-align: center; border-bottom: 2px solid #185FA5; padding-bottom: 14px; margin-bottom: 18px; }
+  .hdr-logo { font-size: 22pt; font-weight: bold; color: #185FA5; letter-spacing: 2px; }
+  .hdr-sub { font-size: 10pt; color: #185FA5; margin-top: 2px; }
+  .dc3-title { text-align: center; font-size: 15pt; font-weight: bold; color: #185FA5; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+  .dc3-subtitle { text-align: center; font-size: 11pt; color: #444; margin-bottom: 20px; }
+  .section-title { font-size: 8pt; font-weight: bold; color: #185FA5; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid #185FA5; padding-bottom: 3px; margin: 14px 0 8px; }
+  table.data { width: 100%; border-collapse: collapse; }
+  table.data td { padding: 5px 8px; border-bottom: 1px solid #dfe5ef; font-size: 9.5pt; vertical-align: top; }
+  table.data td.lbl { font-weight: bold; color: #5a6072; width: 38%; font-size: 9pt; }
+  table.data td.val { color: #1a1a2e; }
+  .folio-box { float: right; border: 1px solid #185FA5; padding: 4px 12px; border-radius: 6px; font-size: 8.5pt; color: #185FA5; font-weight: bold; }
+  .firma-section { margin-top: 40px; }
+  table.firmas { width: 100%; border-collapse: collapse; }
+  table.firmas td { text-align: center; padding: 0 20px; vertical-align: bottom; }
+  .firma-line { border-top: 1px solid #333; margin-top: 50px; padding-top: 5px; font-size: 8.5pt; color: #444; }
+  .nota { margin-top: 20px; font-size: 8pt; color: #888; text-align: center; border-top: 1px solid #dfe5ef; padding-top: 8px; }
+  .stps-ref { font-size: 7.5pt; color: #aaa; text-align: center; margin-top: 4px; }
+  .clearfix::after { content: ''; display: table; clear: both; }
+</style>
+</head>
+<body>
+<div class="page-border">
+
+<div class="hdr">
+  <div class="clearfix">
+    <div class="folio-box">FOLIO: {$esc($p['id'] ? 'DC3-' . str_pad($p['id'], 5, '0', STR_PAD_LEFT) : '')}</div>
+  </div>
+  <div class="hdr-logo">AVBA</div>
+  <div class="hdr-sub">CERTIFICACIONES</div>
+</div>
+
+<div class="dc3-title">Constancia de Habilidades Laborales</div>
+<div class="dc3-subtitle">(DC-3)</div>
+
+<div class="section-title">Datos del Trabajador</div>
+<table class="data">
+  <tr><td class="lbl">Nombre completo:</td><td class="val">{$nombre}</td></tr>
+  <tr><td class="lbl">CURP:</td><td class="val">{$curp}</td></tr>
+  <tr><td class="lbl">Puesto / Función:</td><td class="val">{$puesto}</td></tr>
+  <tr><td class="lbl">Ocupación específica:</td><td class="val">{$ocupacion}</td></tr>
+</table>
+
+<div class="section-title">Datos de la Empresa</div>
+<table class="data">
+  <tr><td class="lbl">Razón social:</td><td class="val">{$empresa}</td></tr>
+  <tr><td class="lbl">RFC:</td><td class="val">{$rfc}</td></tr>
+  <tr><td class="lbl">Representante:</td><td class="val">{$rep}</td></tr>
+  <tr><td class="lbl">Domicilio:</td><td class="val">{$dir}</td></tr>
+</table>
+
+<div class="section-title">Datos de la Capacitación</div>
+<table class="data">
+  <tr><td class="lbl">Nombre del curso:</td><td class="val">{$curso}</td></tr>
+  <tr><td class="lbl">Área temática:</td><td class="val">{$area}</td></tr>
+  <tr><td class="lbl">Duración:</td><td class="val">{$horas} horas</td></tr>
+  <tr><td class="lbl">Fecha de realización:</td><td class="val">{$fecha}</td></tr>
+  <tr><td class="lbl">Capacidad adquirida:</td><td class="val">{$capacidad}</td></tr>
+</table>
+
+<div class="firma-section">
+  <table class="firmas">
+    <tr>
+      <td><div class="firma-line">Instructor / Capacitador</div></td>
+      <td><div class="firma-line">Representante de la Empresa</div></td>
+      <td><div class="firma-line">Trabajador</div></td>
+    </tr>
+  </table>
+</div>
+
+<div class="nota">Este documento ampara la capacitación impartida y acredita las habilidades laborales obtenidas.</div>
+<div class="stps-ref">Generado por AVBA Certificaciones — Fecha de emisión: {$esc(date('d/m/Y'))}</div>
+
+</div>
+</body>
+</html>
+HTML;
+    }
+
+    private function htmlDiploma(array $p): string {
+        $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+
+        $nombre  = $esc($p['nombre_completo']);
+        $curso   = $esc($p['curso_nombre']);
+        $horas   = $esc($p['duracion_horas']);
+        $area    = $esc($p['area_tematica'] ?? '');
+        $fecha   = $p['fecha_curso'] ? date('d \d\e F \d\e Y', strtotime($p['fecha_curso'])) : '';
+
+        $mesesES = ['January'=>'enero','February'=>'febrero','March'=>'marzo','April'=>'abril',
+                    'May'=>'mayo','June'=>'junio','July'=>'julio','August'=>'agosto',
+                    'September'=>'septiembre','October'=>'octubre','November'=>'noviembre','December'=>'diciembre'];
+        foreach ($mesesES as $en => $es) {
+            $fecha = str_replace($en, $es, $fecha);
+        }
+
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  body { font-family: DejaVu Sans, Arial, sans-serif; margin: 0; padding: 0; background: #fff; }
+  .diploma {
+    border: 6px double #185FA5;
+    margin: 24px;
+    padding: 36px 48px;
+    min-height: 680px;
+    text-align: center;
+    position: relative;
+  }
+  .dip-corner {
+    position: absolute; width: 30px; height: 30px;
+    border-color: #C9A84C; border-style: solid;
+  }
+  .dip-corner.tl { top: 8px; left: 8px;  border-width: 3px 0 0 3px; }
+  .dip-corner.tr { top: 8px; right: 8px; border-width: 3px 3px 0 0; }
+  .dip-corner.bl { bottom: 8px; left: 8px;  border-width: 0 0 3px 3px; }
+  .dip-corner.br { bottom: 8px; right: 8px; border-width: 0 3px 3px 0; }
+  .org-name { font-size: 26pt; font-weight: bold; color: #185FA5; letter-spacing: 4px; margin-bottom: 2px; }
+  .org-sub  { font-size: 10pt; color: #5a6072; letter-spacing: 2px; margin-bottom: 28px; }
+  .dip-title { font-size: 17pt; font-weight: bold; color: #C9A84C; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 22px; }
+  .otorga { font-size: 10pt; color: #5a6072; margin-bottom: 10px; letter-spacing: .5px; }
+  .dip-nombre { font-size: 24pt; color: #1a1a2e; font-style: italic; margin: 6px 0 24px; border-bottom: 1.5px solid #C9A84C; display: inline-block; padding-bottom: 4px; }
+  .por-completar { font-size: 10pt; color: #5a6072; margin-bottom: 8px; }
+  .dip-curso { font-size: 15pt; font-weight: bold; color: #185FA5; margin-bottom: 8px; }
+  .dip-meta { font-size: 9pt; color: #888; margin-bottom: 28px; }
+  .dip-fecha { font-size: 10pt; color: #5a6072; margin-top: 10px; margin-bottom: 36px; }
+  table.firmas { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  table.firmas td { text-align: center; padding: 0 24px; vertical-align: bottom; }
+  .firma-line { border-top: 1px solid #888; margin-top: 52px; padding-top: 6px; font-size: 9pt; color: #555; }
+  .folio { font-size: 7.5pt; color: #bbb; margin-top: 18px; }
+</style>
+</head>
+<body>
+<div class="diploma">
+  <div class="dip-corner tl"></div>
+  <div class="dip-corner tr"></div>
+  <div class="dip-corner bl"></div>
+  <div class="dip-corner br"></div>
+
+  <div class="org-name">AVBA</div>
+  <div class="org-sub">CERTIFICACIONES</div>
+
+  <div class="dip-title">Diploma de Participación</div>
+
+  <div class="otorga">Se otorga el presente diploma a:</div>
+  <div class="dip-nombre">{$nombre}</div>
+
+  <div class="por-completar">Por haber concluido satisfactoriamente el curso:</div>
+  <div class="dip-curso">{$curso}</div>
+  <div class="dip-meta">Área temática: {$area} &nbsp;|&nbsp; Duración: {$horas} horas</div>
+
+  <div class="dip-fecha">Realizado el {$fecha}</div>
+
+  <table class="firmas">
+    <tr>
+      <td><div class="firma-line">Director de Capacitación</div></td>
+      <td><div class="firma-line">Instructor del Curso</div></td>
+    </tr>
+  </table>
+
+  <div class="folio">AVBA Certificaciones — Emisión: {$esc(date('d/m/Y'))}</div>
+</div>
+</body>
+</html>
+HTML;
     }
 }
