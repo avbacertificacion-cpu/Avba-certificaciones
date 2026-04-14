@@ -44,6 +44,13 @@ class Admin {
             );
             $stmtItems->execute([$tipo['id']]);
             $tipo['checklist'] = $stmtItems->fetchAll();
+
+            $stmtNormas = $this->pdo->prepare(
+                "SELECT id, norma, orden FROM maquinaria_normas
+                 WHERE maquinaria_tipo_id = ? ORDER BY orden"
+            );
+            $stmtNormas->execute([$tipo['id']]);
+            $tipo['normas'] = $stmtNormas->fetchAll();
         }
         unset($tipo);
 
@@ -95,10 +102,13 @@ class Admin {
             ]);
         }
 
+        // Insertar normas (máx. 6)
+        $this->guardarNormasParaTipo($tipoId, $payload['normas'] ?? []);
+
         return ['status' => 'success', 'message' => 'Tipo de equipo creado.', 'id' => $tipoId];
     }
 
-    // ── Editar nombre de tipo de equipo ────────────────────────
+    // ── Editar tipo de equipo (nombre + normas) ────────────────
     public function editarTipoEquipo(array $payload): array {
         $id     = (int) ($payload['tipo_id'] ?? 0);
         $nombre = trim($payload['nombre'] ?? '');
@@ -115,7 +125,29 @@ class Admin {
         $this->pdo->prepare("UPDATE maquinaria_tipos SET nombre = ? WHERE id = ?")
             ->execute([$nombre, $id]);
 
+        // Actualizar normas si vienen en el payload
+        if (array_key_exists('normas', $payload)) {
+            $this->guardarNormasParaTipo($id, $payload['normas']);
+        }
+
         return ['status' => 'success', 'message' => 'Tipo de equipo actualizado.'];
+    }
+
+    // ── Guardar normas de un tipo (reemplaza todas) ────────────
+    private function guardarNormasParaTipo(int $tipoId, array $normas): void {
+        $this->pdo->prepare("DELETE FROM maquinaria_normas WHERE maquinaria_tipo_id = ?")
+            ->execute([$tipoId]);
+
+        $normasFiltradas = array_slice(
+            array_filter(array_map('trim', $normas), fn($n) => $n !== ''),
+            0, 6
+        );
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO maquinaria_normas (maquinaria_tipo_id, norma, orden) VALUES (?, ?, ?)"
+        );
+        foreach ($normasFiltradas as $orden => $norma) {
+            $stmt->execute([$tipoId, $norma, $orden + 1]);
+        }
     }
 
     // ── Eliminar tipo de equipo (con secciones e ítems) ────────
@@ -123,12 +155,10 @@ class Admin {
         $id = (int) ($payload['tipo_id'] ?? 0);
         if (!$id) return ['status' => 'error', 'message' => 'tipo_id requerido.'];
 
-        // checklist_items y checklist_secciones tienen FK con ON DELETE CASCADE
-        // hacia maquinaria_tipos, por lo que se eliminan automáticamente.
-        // Si no hay FK cascade, los eliminamos explícitamente:
-        $this->pdo->prepare("DELETE FROM checklist_items    WHERE maquinaria_tipo_id = ?")->execute([$id]);
-        $this->pdo->prepare("DELETE FROM checklist_secciones WHERE maquinaria_tipo_id = ?")->execute([$id]);
-        $this->pdo->prepare("DELETE FROM maquinaria_tipos   WHERE id = ?")->execute([$id]);
+        $this->pdo->prepare("DELETE FROM maquinaria_normas    WHERE maquinaria_tipo_id = ?")->execute([$id]);
+        $this->pdo->prepare("DELETE FROM checklist_items      WHERE maquinaria_tipo_id = ?")->execute([$id]);
+        $this->pdo->prepare("DELETE FROM checklist_secciones  WHERE maquinaria_tipo_id = ?")->execute([$id]);
+        $this->pdo->prepare("DELETE FROM maquinaria_tipos     WHERE id = ?")->execute([$id]);
 
         return ['status' => 'success', 'message' => 'Tipo de equipo eliminado.'];
     }

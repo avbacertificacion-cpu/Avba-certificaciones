@@ -698,10 +698,28 @@
     <h3>Crear nuevo tipo de equipo</h3>
     <div class="form-row">
       <div class="form-group">
-        <label>Nombre del equipo</label>
-        <input type="text" id="nuevo-nombre" placeholder="Ej: GRÚA TORRE, MONTACARGAS...">
+        <label>Nombre del equipo <span style="color:var(--rojo)">*</span></label>
+        <input type="text" id="nuevo-nombre" placeholder="Ej: GRÚA TORRE, MONTACARGAS..."
+               onkeydown="if(event.key==='Enter')crearTipo()">
       </div>
-      <button class="btn-save"    onclick="crearTipo()">Crear</button>
+    </div>
+    <div style="margin-top:14px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub)">
+          Normas aplicables
+          <span style="font-weight:400;color:var(--texto-hint);margin-left:4px">(máx. 6)</span>
+        </label>
+        <button type="button" id="btn-add-norma-nuevo" onclick="nuevoAgregarNorma()"
+                style="font-size:11px;padding:4px 10px;border:1.5px solid var(--azul);
+                       border-radius:6px;background:var(--azul-light);color:var(--azul);
+                       cursor:pointer;font-weight:600">
+          + Agregar norma
+        </button>
+      </div>
+      <div id="nuevo-normas-list"></div>
+    </div>
+    <div class="form-row" style="margin-top:14px">
+      <button class="btn-save"    onclick="crearTipo()">Crear tipo</button>
       <button class="btn-cancel2" onclick="toggleFormNuevo()">Cancelar</button>
     </div>
   </div>
@@ -862,6 +880,58 @@
     <div class="modal-footer" style="justify-content:flex-end;gap:8px">
       <button class="btn-nc-cancel" onclick="cerrarModalOcupacion()">Cancelar</button>
       <button class="btn-save" onclick="guardarOcupacion()" style="padding:9px 22px">Guardar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL EDITAR TIPO ══ -->
+<div class="overlay" id="overlay-tipo" style="display:none" onclick="if(event.target===this)cerrarModalTipo()">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:#5C3FA0">E</div>
+        <div>
+          <div class="m-title">Editar tipo de equipo</div>
+          <div class="m-sub">Nombre y normas aplicables</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarModalTipo()">×</button>
+    </div>
+    <div style="padding:20px 22px 8px">
+      <input type="hidden" id="tipo-modal-id">
+      <div class="form-group" style="margin-bottom:18px">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">
+          Nombre del equipo <span style="color:var(--rojo)">*</span>
+        </label>
+        <input type="text" id="tipo-modal-nombre" placeholder="Ej: GRÚA TORRE"
+               style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;
+                      font-size:13px;color:var(--texto);outline:none"
+               onkeydown="if(event.key==='Enter')guardarModalTipo()">
+      </div>
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <label style="font-size:12px;font-weight:600;color:var(--texto-sub)">
+            Normas aplicables
+            <span style="font-weight:400;color:var(--texto-hint);margin-left:4px">(máx. 6)</span>
+          </label>
+          <button type="button" id="btn-add-norma-modal" onclick="modalAgregarNorma()"
+                  style="font-size:11px;padding:4px 10px;border:1.5px solid var(--azul);
+                         border-radius:6px;background:var(--azul-light);color:var(--azul);
+                         cursor:pointer;font-weight:600">
+            + Agregar
+          </button>
+        </div>
+        <div id="modal-normas-list"></div>
+        <p id="modal-normas-vacio" style="font-size:12px;color:var(--texto-hint);display:none;
+                                          padding:10px 0;text-align:center">
+          Sin normas asignadas — usa "+ Agregar" para añadir
+        </p>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:flex-end;gap:8px">
+      <button class="btn-nc-cancel" onclick="cerrarModalTipo()">Cancelar</button>
+      <button class="btn-save" onclick="guardarModalTipo()" style="padding:9px 22px">Guardar</button>
     </div>
   </div>
 </div>
@@ -1618,23 +1688,74 @@ let tiposCargados = false;
 let tiposGlobal   = [];
 
 /* ── Formulario nuevo tipo ── */
+let nuevoNormasList = [];
+
 function toggleFormNuevo() {
   const f = document.getElementById("form-nuevo");
   f.classList.toggle("open");
-  if (f.classList.contains("open")) document.getElementById("nuevo-nombre").focus();
+  if (f.classList.contains("open")) {
+    document.getElementById("nuevo-nombre").focus();
+  } else {
+    nuevoNormasList = [];
+    renderNuevoNormas();
+    document.getElementById("nuevo-nombre").value = "";
+  }
+}
+
+function renderNuevoNormas() {
+  const list = document.getElementById("nuevo-normas-list");
+  list.innerHTML = nuevoNormasList.map((n, i) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:11px;color:var(--texto-hint);min-width:14px;flex-shrink:0">${i+1}.</span>
+      <input type="text" value="${escH(n)}"
+             oninput="nuevoNormasList[${i}]=this.value"
+             placeholder="Ej: NOM-006-STPS-2014, ISO 9001..."
+             style="flex:1;padding:8px 10px;border:1.5px solid var(--borde);border-radius:7px;
+                    font-size:12px;color:var(--texto);outline:none;background:var(--blanco)"
+             onfocus="this.style.borderColor='var(--azul)'"
+             onblur="this.style.borderColor='var(--borde)'">
+      <button onclick="nuevoRemoverNorma(${i})"
+              style="width:26px;height:26px;border-radius:50%;background:var(--rojo-light);
+                     color:var(--rojo);border:1.5px solid var(--rojo);cursor:pointer;
+                     font-size:15px;display:flex;align-items:center;justify-content:center;
+                     flex-shrink:0">×</button>
+    </div>`).join("");
+
+  const btn = document.getElementById("btn-add-norma-nuevo");
+  if (btn) btn.style.display = nuevoNormasList.length >= 6 ? "none" : "";
+}
+
+function nuevoAgregarNorma() {
+  if (nuevoNormasList.length >= 6) return;
+  nuevoNormasList.push("");
+  renderNuevoNormas();
+  // Focus the new input
+  const inputs = document.getElementById("nuevo-normas-list").querySelectorAll("input");
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+function nuevoRemoverNorma(idx) {
+  nuevoNormasList.splice(idx, 1);
+  renderNuevoNormas();
 }
 
 async function crearTipo() {
   const nombre = document.getElementById("nuevo-nombre").value.trim();
   if (!nombre) { document.getElementById("nuevo-nombre").focus(); return; }
 
+  // Recoger valores actuales de los inputs de normas
+  const inputs = document.getElementById("nuevo-normas-list").querySelectorAll("input");
+  const normas = [...inputs].map(inp => inp.value.trim()).filter(v => v);
+
   const res  = await fetch(API, {
     method: "POST",
-    body: JSON.stringify({ action: "CREAR_TIPO_EQUIPO", payload: { nombre } })
+    body: JSON.stringify({ action: "CREAR_TIPO_EQUIPO", payload: { nombre, normas } })
   });
   const data = await res.json();
   if (data.status === "success") {
     document.getElementById("nuevo-nombre").value = "";
+    nuevoNormasList = [];
+    renderNuevoNormas();
     toggleFormNuevo();
     tiposCargados = false;
     cargarTipos();
@@ -1698,6 +1819,7 @@ function plantillaBox(t, docTipo, etiqueta, archivo) {
 function renderTipoCard(t) {
   const nItems  = (t.checklist || []).length;
   const nSecs   = (t.secciones || []).length;
+  const nNormas = (t.normas   || []).length;
 
   // Agrupar ítems por sección
   const secMap = {};
@@ -1747,15 +1869,34 @@ function renderTipoCard(t) {
     <div class="tipo-card-hdr" onclick="toggleTipo(${t.id})">
       <div style="flex:1;min-width:0">
         <div class="tipo-nombre">${esc(t.nombre)}</div>
-        <div class="tipo-meta">${nSecs} sección${nSecs!==1?'es':''} · ${nItems} ítem${nItems!==1?'s':''} en checklist</div>
+        <div class="tipo-meta">${nSecs} sección${nSecs!==1?'es':''} · ${nItems} ítem${nItems!==1?'s':''} · ${nNormas} norma${nNormas!==1?'s':''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
-        <button class="btn-add-item" style="font-size:12px" onclick="editarTipo(${t.id},'${esc(t.nombre)}')">✏ Renombrar</button>
+        <button class="btn-add-item" style="font-size:12px" onclick="abrirModalTipo(${t.id})">✏ Editar</button>
         <button class="btn-add-item" style="border-color:var(--rojo);color:var(--rojo);font-size:12px" onclick="eliminarTipo(${t.id},'${esc(t.nombre)}')">✕ Eliminar</button>
       </div>
       <span class="chevron" style="margin-left:8px">⌄</span>
     </div>
     <div class="tipo-body">
+
+      <!-- Normas -->
+      <div style="margin-bottom:16px">
+        <div style="font-size:12px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;
+                    letter-spacing:.05em;margin-bottom:8px">
+          Normas aplicables
+        </div>
+        ${(t.normas && t.normas.length)
+          ? `<div style="display:flex;flex-wrap:wrap;gap:6px">
+               ${(t.normas).map(n => `
+                 <span style="display:inline-block;padding:4px 12px;background:var(--azul-light);
+                               color:var(--azul-dark);border-radius:20px;font-size:11.5px;
+                               font-weight:600;border:1px solid #85B7EB">
+                   ${esc(n.norma)}
+                 </span>`).join('')}
+             </div>`
+          : `<span style="font-size:12px;color:var(--texto-hint)">Sin normas asignadas — usa ✏ Editar para agregar.</span>`
+        }
+      </div>
 
       <!-- Plantillas Word -->
       <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Plantillas Word (.docx)</div>
@@ -1892,21 +2033,93 @@ async function guardarItem(tipoId, secCodigo) {
     alert(data.message || "Error al guardar ítem");
   }
 }
-/* ── Editar tipo de equipo ── */
-async function editarTipo(tipoId, nombreActual) {
-  const nuevoNombre = prompt("Nuevo nombre para el tipo de equipo:", nombreActual);
-  if (!nuevoNombre || nuevoNombre.trim() === nombreActual) return;
+/* ── Modal editar tipo (nombre + normas) ── */
+let tipoModalId     = null;
+let tipoModalNormas = [];
+
+function abrirModalTipo(tipoId) {
+  const t = tiposGlobal.find(x => x.id == tipoId);
+  if (!t) return;
+  tipoModalId     = tipoId;
+  tipoModalNormas = (t.normas || []).map(n => n.norma);
+
+  document.getElementById("tipo-modal-id").value    = tipoId;
+  document.getElementById("tipo-modal-nombre").value = t.nombre;
+  renderModalNormas();
+
+  document.getElementById("overlay-tipo").style.display = "flex";
+  document.getElementById("overlay-tipo").classList.add("open");
+  setTimeout(() => document.getElementById("tipo-modal-nombre").focus(), 80);
+}
+
+function cerrarModalTipo() {
+  document.getElementById("overlay-tipo").style.display = "none";
+  document.getElementById("overlay-tipo").classList.remove("open");
+  tipoModalId     = null;
+  tipoModalNormas = [];
+}
+
+function renderModalNormas() {
+  const list = document.getElementById("modal-normas-list");
+  const vacio = document.getElementById("modal-normas-vacio");
+  vacio.style.display = tipoModalNormas.length ? "none" : "block";
+
+  list.innerHTML = tipoModalNormas.map((n, i) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <span style="font-size:11px;color:var(--texto-hint);min-width:14px;flex-shrink:0">${i+1}.</span>
+      <input type="text" value="${escH(n)}"
+             oninput="tipoModalNormas[${i}]=this.value"
+             placeholder="Ej: NOM-006-STPS-2014, ISO 9001..."
+             style="flex:1;padding:8px 10px;border:1.5px solid var(--borde);border-radius:7px;
+                    font-size:12px;color:var(--texto);outline:none;background:var(--blanco)"
+             onfocus="this.style.borderColor='var(--azul)'"
+             onblur="this.style.borderColor='var(--borde)'">
+      <button onclick="modalRemoverNorma(${i})"
+              style="width:26px;height:26px;border-radius:50%;background:var(--rojo-light);
+                     color:var(--rojo);border:1.5px solid var(--rojo);cursor:pointer;
+                     font-size:15px;display:flex;align-items:center;justify-content:center;
+                     flex-shrink:0">×</button>
+    </div>`).join("");
+
+  const btn = document.getElementById("btn-add-norma-modal");
+  if (btn) btn.style.display = tipoModalNormas.length >= 6 ? "none" : "";
+}
+
+function modalAgregarNorma() {
+  if (tipoModalNormas.length >= 6) return;
+  tipoModalNormas.push("");
+  renderModalNormas();
+  const inputs = document.getElementById("modal-normas-list").querySelectorAll("input");
+  if (inputs.length) inputs[inputs.length - 1].focus();
+}
+
+function modalRemoverNorma(idx) {
+  tipoModalNormas.splice(idx, 1);
+  renderModalNormas();
+}
+
+async function guardarModalTipo() {
+  const nombre = document.getElementById("tipo-modal-nombre").value.trim();
+  if (!nombre) { document.getElementById("tipo-modal-nombre").focus(); return; }
+
+  // Recoger valores actuales de los inputs
+  const inputs = document.getElementById("modal-normas-list").querySelectorAll("input");
+  const normas = [...inputs].map(inp => inp.value.trim()).filter(v => v);
 
   const res  = await fetch(API, {
     method: "POST",
-    body: JSON.stringify({ action: "EDITAR_TIPO_EQUIPO", payload: { tipo_id: tipoId, nombre: nuevoNombre.trim() } })
+    body: JSON.stringify({
+      action: "EDITAR_TIPO_EQUIPO",
+      payload: { tipo_id: tipoModalId, nombre, normas }
+    })
   });
   const data = await res.json();
   if (data.status === "success") {
+    cerrarModalTipo();
     tiposCargados = false;
     cargarTipos(true);
   } else {
-    alert(data.message || "Error al editar tipo");
+    alert(data.message || "Error al guardar");
   }
 }
 
