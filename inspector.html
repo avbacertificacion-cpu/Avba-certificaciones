@@ -773,6 +773,97 @@
       display: none;
       border: 2px solid var(--borde);
     }
+
+    /* ── Botones galería / cámara ── */
+    .foto-opciones {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .foto-opt-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid var(--borde);
+      transition: all .15s;
+    }
+    .foto-opt-galeria {
+      background: var(--blanco);
+      color: var(--texto-sub);
+    }
+    .foto-opt-galeria:hover { background: var(--gris-bg); border-color: var(--azul); color: var(--azul); }
+    .foto-opt-camara {
+      background: var(--azul);
+      color: white;
+      border-color: var(--azul);
+    }
+    .foto-opt-camara:hover { background: var(--azul-dark); }
+
+    /* ── Overlay cámara ── */
+    .cam-overlay {
+      position: fixed;
+      inset: 0;
+      background: #000;
+      z-index: 500;
+      display: none;
+      flex-direction: column;
+    }
+    .cam-overlay.open { display: flex; }
+    .cam-video {
+      flex: 1;
+      width: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .cam-canvas { display: none; }
+    .cam-bar {
+      background: rgba(0,0,0,0.85);
+      padding: 16px 24px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    .cam-label {
+      color: rgba(255,255,255,0.75);
+      font-size: 12px;
+      font-weight: 500;
+      max-width: 120px;
+    }
+    .cam-capture-btn {
+      width: 66px; height: 66px;
+      border-radius: 50%;
+      background: white;
+      border: 5px solid rgba(255,255,255,0.35);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 0 3px rgba(255,255,255,0.2);
+      transition: transform .1s;
+      flex-shrink: 0;
+    }
+    .cam-capture-btn:active { transform: scale(.9); }
+    .cam-capture-btn svg { width: 26px; height: 26px; color: var(--azul-dark); }
+    .cam-close-btn {
+      padding: 10px 18px;
+      background: rgba(255,255,255,0.12);
+      color: white;
+      border: 1.5px solid rgba(255,255,255,0.25);
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
     /* Empresa toggle */
     .empresa-toggle {
       display: flex;
@@ -1118,7 +1209,7 @@
         <!-- Foto del documento (OCR) -->
         <div class="cur-field">
           <label>Foto del documento (CURP / INE)</label>
-          <div class="ocr-zone" id="ocr-zone" onclick="document.getElementById('ocr-file').click()">
+          <div class="ocr-zone" id="ocr-zone">
             <img id="ocr-preview" class="ocr-preview" alt="Documento">
             <div id="ocr-placeholder">
               <svg viewBox="0 0 24 24" fill="none" stroke="var(--azul)" stroke-width="1.5"
@@ -1126,10 +1217,20 @@
                 <rect x="3" y="5" width="18" height="14" rx="2"/>
                 <path d="M3 9h18M8 5V3M16 5V3"/>
               </svg>
-              <div style="font-size:13px;font-weight:600;color:var(--azul)">Toca para seleccionar foto del documento</div>
-              <div style="font-size:11px;color:var(--texto-hint);margin-top:3px">CURP, INE u otro documento oficial</div>
+              <div style="font-size:13px;font-weight:600;color:var(--azul)">Foto del documento oficial</div>
+              <div style="font-size:11px;color:var(--texto-hint);margin-top:3px">CURP, INE u otro documento</div>
             </div>
             <input type="file" id="ocr-file" accept="image/*" style="display:none" onchange="ocr_previewDoc(event)">
+          </div>
+          <div class="foto-opciones">
+            <button type="button" class="foto-opt-btn foto-opt-galeria"
+                    onclick="document.getElementById('ocr-file').click()">
+              📁 Galería
+            </button>
+            <button type="button" class="foto-opt-btn foto-opt-camara"
+                    onclick="curOpenCamera('doc')">
+              📷 Cámara
+            </button>
           </div>
           <button class="ocr-btn" id="ocr-btn" onclick="ocr_procesar()" disabled>
             <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px">
@@ -1274,20 +1375,26 @@
             <label>Foto del documento
               <span style="font-weight:400;color:var(--texto-hint)">(CURP / INE)</span>
             </label>
-            <div style="font-size:11px;color:var(--verde);padding:6px 10px;background:var(--verde-light);
-                        border-radius:8px" id="cur-doc-status">
-              Usa la foto del documento de arriba o selecciona otra
+            <div id="cur-doc-status"
+                 style="font-size:11px;padding:6px 10px;background:var(--ambar-light);
+                        color:var(--ambar);border-radius:8px;margin-bottom:6px">
+              Sin foto — usa la sección de arriba o captura aquí
             </div>
-            <button type="button" onclick="document.getElementById('ocr-file').click()"
-                    style="margin-top:8px;padding:6px 12px;background:var(--gris-bg);border:1.5px solid var(--borde);
-                           border-radius:8px;font-size:12px;font-weight:600;color:var(--texto-sub);cursor:pointer">
-              Cambiar foto del documento
-            </button>
+            <div class="foto-opciones">
+              <button type="button" class="foto-opt-btn foto-opt-galeria"
+                      onclick="document.getElementById('ocr-file').click()">
+                📁 Galería
+              </button>
+              <button type="button" class="foto-opt-btn foto-opt-camara"
+                      onclick="curOpenCamera('doc')">
+                📷 Cámara
+              </button>
+            </div>
           </div>
           <!-- Foto del participante -->
           <div class="cur-field">
             <label>Foto del participante <span class="req">*</span></label>
-            <div class="foto-zone" onclick="document.getElementById('foto-persona-file').click()">
+            <div class="foto-zone" id="foto-persona-zone">
               <img id="foto-persona-preview" class="foto-preview" alt="Participante">
               <div id="foto-persona-placeholder">
                 <svg viewBox="0 0 24 24" fill="none" stroke="var(--texto-hint)" stroke-width="1.5"
@@ -1295,10 +1402,20 @@
                   <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
                 </svg>
                 <div style="font-size:12px;font-weight:600;color:var(--texto-sub)">Foto medio cuerpo</div>
-                <div style="font-size:11px;color:var(--texto-hint)">Toca para seleccionar</div>
+                <div style="font-size:11px;color:var(--texto-hint)">Sin foto todavía</div>
               </div>
               <input type="file" id="foto-persona-file" accept="image/*" style="display:none"
                      onchange="curPreviewPersona(event)">
+            </div>
+            <div class="foto-opciones">
+              <button type="button" class="foto-opt-btn foto-opt-galeria"
+                      onclick="document.getElementById('foto-persona-file').click()">
+                📁 Galería
+              </button>
+              <button type="button" class="foto-opt-btn foto-opt-camara"
+                      onclick="curOpenCamera('persona')">
+                📷 Cámara
+              </button>
             </div>
             <div class="cur-errmsg" id="err-foto-persona">La foto del participante es obligatoria</div>
           </div>
@@ -1519,6 +1636,22 @@
   </div>
 </div><!-- /contenedor -->
 </div><!-- /pantalla-inspeccion -->
+
+<!-- ── OVERLAY CÁMARA ── -->
+<div class="cam-overlay" id="cam-overlay">
+  <video id="cam-video" class="cam-video" autoplay playsinline muted></video>
+  <canvas id="cam-canvas" class="cam-canvas"></canvas>
+  <div class="cam-bar">
+    <div class="cam-label" id="cam-label">Apunta al documento</div>
+    <button class="cam-capture-btn" onclick="curCapturarFoto()" title="Capturar foto">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="12" cy="12" r="9"/>
+        <circle cx="12" cy="12" r="4" fill="currentColor" stroke="none"/>
+      </svg>
+    </button>
+    <button class="cam-close-btn" onclick="curCerrarCamara()">Cancelar</button>
+  </div>
+</div>
 
 <script>
 /* ════════════════════════════════════════
@@ -2638,6 +2771,82 @@ function curNuevoRegistro() {
   // Mostrar formulario, ocultar éxito
   document.getElementById('cur-form-wrap').style.display = '';
   document.getElementById('cur-exito').style.display     = 'none';
+}
+
+// ══════════════════════════════════════════════════════
+//  CÁMARA — captura en tiempo real
+// ══════════════════════════════════════════════════════
+
+let camStream = null;   // MediaStream activo
+let camTarget = null;   // 'doc' | 'persona'
+
+async function curOpenCamera(target) {
+  camTarget = target;
+
+  document.getElementById('cam-label').textContent = target === 'doc'
+    ? 'Apunta al documento oficial'
+    : 'Foto de medio cuerpo del participante';
+
+  if (!navigator.mediaDevices?.getUserMedia) {
+    alert('Tu navegador no soporta acceso a la cámara. Usa la opción Galería.');
+    return;
+  }
+
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1920 },
+        height: { ideal: 1080 }
+      },
+      audio: false
+    });
+
+    const video = document.getElementById('cam-video');
+    video.srcObject = camStream;
+    document.getElementById('cam-overlay').classList.add('open');
+  } catch (err) {
+    console.error('Camera error:', err);
+    if (err.name === 'NotAllowedError') {
+      alert('Permiso de cámara denegado. Acepta el permiso en tu navegador e intenta de nuevo.');
+    } else {
+      alert('No se pudo acceder a la cámara. Verifica que no esté en uso por otra aplicación.');
+    }
+  }
+}
+
+function curCapturarFoto() {
+  const video  = document.getElementById('cam-video');
+  const canvas = document.getElementById('cam-canvas');
+
+  canvas.width  = video.videoWidth  || 1280;
+  canvas.height = video.videoHeight || 720;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+
+  canvas.toBlob(blob => {
+    const nombre = `foto_${camTarget}_${Date.now()}.jpg`;
+    const file   = new File([blob], nombre, { type: 'image/jpeg' });
+
+    curCerrarCamara();
+
+    // Reutilizar las funciones de preview existentes con evento simulado
+    const fakeEvt = { target: { files: [file] } };
+    if (camTarget === 'doc') {
+      ocr_previewDoc(fakeEvt);
+    } else {
+      curPreviewPersona(fakeEvt);
+    }
+  }, 'image/jpeg', 0.92);
+}
+
+function curCerrarCamara() {
+  if (camStream) {
+    camStream.getTracks().forEach(t => t.stop());
+    camStream = null;
+  }
+  const video = document.getElementById('cam-video');
+  video.srcObject = null;
+  document.getElementById('cam-overlay').classList.remove('open');
 }
 </script>
 </body>
