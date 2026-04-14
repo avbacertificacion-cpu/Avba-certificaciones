@@ -613,6 +613,8 @@
 <div class="tabs-nav">
   <button class="tab-btn active" id="tab-btn-inspecciones" onclick="verTab('inspecciones')">Inspecciones</button>
   <button class="tab-btn"        id="tab-btn-tipos"        onclick="verTab('tipos')">Tipos de Equipo</button>
+  <button class="tab-btn"        id="tab-btn-cursos"       onclick="verTab('cursos')">Cursos</button>
+  <button class="tab-btn"        id="tab-btn-ocupaciones"  onclick="verTab('ocupaciones')">Ocupaciones</button>
 </div>
 
 <div id="tab-inspecciones" class="wrap">
@@ -713,6 +715,156 @@
   </div>
 
 </div><!-- /tab-tipos -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     TAB: CURSOS
+═══════════════════════════════════════════ -->
+<div id="tab-cursos" class="wrap" style="display:none">
+
+  <div class="top-bar">
+    <h2>Cursos de capacitación</h2>
+    <button class="btn-crear" onclick="abrirModalCurso()">+ Nuevo curso</button>
+  </div>
+
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Listado de cursos</span>
+      <span class="tabla-count" id="cursos-count">—</span>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:36%">Nombre del curso</th>
+            <th style="width:16%;text-align:center">Horas</th>
+            <th style="width:30%">Área temática</th>
+            <th style="width:10%;text-align:center">Estado</th>
+            <th style="width:8%"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-cursos">
+          <tr><td colspan="5" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /tab-cursos -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     TAB: OCUPACIONES ESPECÍFICAS
+═══════════════════════════════════════════ -->
+<div id="tab-ocupaciones" class="wrap" style="display:none">
+
+  <div class="top-bar">
+    <h2>Ocupaciones específicas</h2>
+    <button class="btn-crear" onclick="abrirModalOcupacion()">+ Nueva ocupación</button>
+  </div>
+
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Listado de ocupaciones</span>
+      <span class="tabla-count" id="ocup-count">—</span>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:72%">Nombre de la ocupación</th>
+            <th style="width:16%;text-align:center">Estado</th>
+            <th style="width:12%"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-ocupaciones">
+          <tr><td colspan="3" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /tab-ocupaciones -->
+
+
+<!-- ══ MODAL CURSO ══ -->
+<div class="overlay" id="overlay-curso" style="display:none" onclick="if(event.target===this)cerrarModalCurso()">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:var(--azul)">C</div>
+        <div>
+          <div class="m-title" id="curso-modal-titulo">Nuevo curso</div>
+          <div class="m-sub">Datos del curso de capacitación</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarModalCurso()">×</button>
+    </div>
+    <div style="padding:20px 22px 8px">
+      <input type="hidden" id="curso-id">
+      <div class="form-group" style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">Nombre del curso <span style="color:var(--rojo)">*</span></label>
+        <input type="text" id="curso-nombre" placeholder="Ej: Manejo de montacargas" style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">Duración (horas) <span style="color:var(--rojo)">*</span></label>
+          <input type="number" id="curso-horas" placeholder="8" min="0.5" step="0.5" style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none">
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">Estado</label>
+          <select id="curso-activo" style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none;background:white">
+            <option value="1">Activo</option>
+            <option value="0">Inactivo</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:20px">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">Área temática <span style="color:var(--rojo)">*</span></label>
+        <input type="text" id="curso-area" placeholder="Ej: Seguridad Industrial, Operación de Equipos..." style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none">
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:flex-end;gap:8px">
+      <button class="btn-nc-cancel" onclick="cerrarModalCurso()">Cancelar</button>
+      <button class="btn-save" onclick="guardarCurso()" style="padding:9px 22px">Guardar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL OCUPACIÓN ══ -->
+<div class="overlay" id="overlay-ocupacion" style="display:none" onclick="if(event.target===this)cerrarModalOcupacion()">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:var(--verde)">O</div>
+        <div>
+          <div class="m-title" id="ocup-modal-titulo">Nueva ocupación</div>
+          <div class="m-sub">Ocupación específica para participantes</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarModalOcupacion()">×</button>
+    </div>
+    <div style="padding:20px 22px 8px">
+      <input type="hidden" id="ocup-id">
+      <div class="form-group" style="margin-bottom:14px">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">Nombre de la ocupación <span style="color:var(--rojo)">*</span></label>
+        <input type="text" id="ocup-nombre" placeholder="Ej: Operador de montacargas" style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none">
+      </div>
+      <div class="form-group" style="margin-bottom:20px">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">Estado</label>
+        <select id="ocup-activo" style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none;background:white">
+          <option value="1">Activo</option>
+          <option value="0">Inactivo</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer" style="justify-content:flex-end;gap:8px">
+      <button class="btn-nc-cancel" onclick="cerrarModalOcupacion()">Cancelar</button>
+      <button class="btn-save" onclick="guardarOcupacion()" style="padding:9px 22px">Guardar</button>
+    </div>
+  </div>
+</div>
 
 
 <!-- ══ MODAL DETALLE ══ -->
@@ -1220,11 +1372,243 @@ cargar();
    TABS
 ═══════════════════════════════════════ */
 function verTab(tab) {
-  document.getElementById("tab-inspecciones").style.display = tab === "inspecciones" ? "" : "none";
-  document.getElementById("tab-tipos").style.display        = tab === "tipos"        ? "" : "none";
-  document.getElementById("tab-btn-inspecciones").classList.toggle("active", tab === "inspecciones");
-  document.getElementById("tab-btn-tipos").classList.toggle("active", tab === "tipos");
-  if (tab === "tipos" && !tiposCargados) cargarTipos();
+  ["inspecciones","tipos","cursos","ocupaciones"].forEach(t => {
+    document.getElementById("tab-" + t).style.display = tab === t ? "" : "none";
+    document.getElementById("tab-btn-" + t).classList.toggle("active", tab === t);
+  });
+  if (tab === "tipos"       && !tiposCargados)    cargarTipos();
+  if (tab === "cursos"      && !cursosCargados)   cargarCursos();
+  if (tab === "ocupaciones" && !ocupCargados)     cargarOcupaciones();
+}
+
+/* ════════════════════════════════════════
+   CURSOS
+════════════════════════════════════════ */
+let cursosCargados = false;
+let cursosData     = [];
+
+async function cargarCursos() {
+  const tbody = document.getElementById("tbody-cursos");
+  tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>`;
+  try {
+    const res  = await fetch(API + "?action=LISTAR_CURSOS");
+    const data = await res.json();
+    cursosData    = Array.isArray(data) ? data : [];
+    cursosCargados = true;
+    renderCursos();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:28px;color:var(--rojo)">Error de conexión</td></tr>`;
+  }
+}
+
+function renderCursos() {
+  const tbody = document.getElementById("tbody-cursos");
+  document.getElementById("cursos-count").textContent = cursosData.length + " curso" + (cursosData.length !== 1 ? "s" : "");
+
+  if (!cursosData.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">
+      No hay cursos registrados. Agrega el primero con el botón "+ Nuevo curso".</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = cursosData.map(c => `
+    <tr>
+      <td style="font-weight:600;color:var(--texto)">${escH(c.nombre)}</td>
+      <td style="text-align:center;font-weight:700;color:var(--azul)">${c.duracion_horas}h</td>
+      <td style="color:var(--texto-sub)">${escH(c.area_tematica)}</td>
+      <td style="text-align:center">
+        <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;
+              background:${c.activo=='1'?'var(--verde-light)':'var(--rojo-light)'};
+              color:${c.activo=='1'?'var(--verde)':'var(--rojo)'}">
+          ${c.activo=='1'?'Activo':'Inactivo'}
+        </span>
+      </td>
+      <td style="text-align:right">
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button onclick="editarCurso(${c.id})"
+                  style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;
+                         padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Editar</button>
+          <button onclick="eliminarCurso(${c.id},'${escH(c.nombre)}')"
+                  style="background:var(--rojo-light);border:none;color:var(--rojo);border-radius:6px;
+                         padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Eliminar</button>
+        </div>
+      </td>
+    </tr>`).join("");
+}
+
+function abrirModalCurso(datos = null) {
+  document.getElementById("curso-id").value     = datos?.id    || "";
+  document.getElementById("curso-nombre").value = datos?.nombre || "";
+  document.getElementById("curso-horas").value  = datos?.duracion_horas || "";
+  document.getElementById("curso-area").value   = datos?.area_tematica || "";
+  document.getElementById("curso-activo").value = datos?.activo ?? "1";
+  document.getElementById("curso-modal-titulo").textContent = datos ? "Editar curso" : "Nuevo curso";
+  document.getElementById("overlay-curso").style.display = "flex";
+  setTimeout(() => document.getElementById("curso-nombre").focus(), 80);
+}
+
+function cerrarModalCurso() {
+  document.getElementById("overlay-curso").style.display = "none";
+}
+
+function editarCurso(id) {
+  const c = cursosData.find(x => x.id == id);
+  if (c) abrirModalCurso(c);
+}
+
+async function guardarCurso() {
+  const nombre = document.getElementById("curso-nombre").value.trim();
+  const horas  = document.getElementById("curso-horas").value;
+  const area   = document.getElementById("curso-area").value.trim();
+  const activo = document.getElementById("curso-activo").value;
+  const id     = document.getElementById("curso-id").value;
+
+  if (!nombre) { alert("El nombre del curso es obligatorio."); document.getElementById("curso-nombre").focus(); return; }
+  if (!horas || parseFloat(horas) <= 0) { alert("Ingresa la duración en horas."); document.getElementById("curso-horas").focus(); return; }
+  if (!area)  { alert("El área temática es obligatoria."); document.getElementById("curso-area").focus(); return; }
+
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ action:"GUARDAR_CURSO", payload:{ id:id||null, nombre, duracion_horas:horas, area_tematica:area, activo } })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      cerrarModalCurso();
+      cursosCargados = false;
+      cargarCursos();
+    } else {
+      alert(data.message || "Error al guardar");
+    }
+  } catch (e) { alert("Error de conexión"); }
+}
+
+async function eliminarCurso(id, nombre) {
+  if (!confirm(`¿Eliminar el curso "${nombre}"?\nSolo es posible si no tiene participantes registrados.`)) return;
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ action:"ELIMINAR_CURSO", payload:{ id } })
+    });
+    const data = await res.json();
+    if (data.status === "success") { cursosCargados = false; cargarCursos(); }
+    else alert(data.message || "No se pudo eliminar");
+  } catch (e) { alert("Error de conexión"); }
+}
+
+/* ════════════════════════════════════════
+   OCUPACIONES ESPECÍFICAS
+════════════════════════════════════════ */
+let ocupCargados = false;
+let ocupData     = [];
+
+async function cargarOcupaciones() {
+  const tbody = document.getElementById("tbody-ocupaciones");
+  tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>`;
+  try {
+    const res  = await fetch(API + "?action=LISTAR_OCUPACIONES_ADMIN");
+    const data = await res.json();
+    ocupData     = Array.isArray(data) ? data : [];
+    ocupCargados = true;
+    renderOcupaciones();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:28px;color:var(--rojo)">Error de conexión</td></tr>`;
+  }
+}
+
+function renderOcupaciones() {
+  const tbody = document.getElementById("tbody-ocupaciones");
+  document.getElementById("ocup-count").textContent = ocupData.length + " ocupación" + (ocupData.length !== 1 ? "es" : "");
+
+  if (!ocupData.length) {
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:36px;color:var(--texto-hint)">
+      No hay ocupaciones registradas. Agrega la primera con "+ Nueva ocupación".</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = ocupData.map(o => `
+    <tr>
+      <td style="font-weight:600;color:var(--texto)">${escH(o.nombre)}</td>
+      <td style="text-align:center">
+        <span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;
+              background:${o.activo=='1'?'var(--verde-light)':'var(--rojo-light)'};
+              color:${o.activo=='1'?'var(--verde)':'var(--rojo)'}">
+          ${o.activo=='1'?'Activa':'Inactiva'}
+        </span>
+      </td>
+      <td style="text-align:right">
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button onclick="editarOcupacion(${o.id})"
+                  style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;
+                         padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Editar</button>
+          <button onclick="eliminarOcupacion(${o.id},'${escH(o.nombre)}')"
+                  style="background:var(--rojo-light);border:none;color:var(--rojo);border-radius:6px;
+                         padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Eliminar</button>
+        </div>
+      </td>
+    </tr>`).join("");
+}
+
+function abrirModalOcupacion(datos = null) {
+  document.getElementById("ocup-id").value     = datos?.id     || "";
+  document.getElementById("ocup-nombre").value = datos?.nombre || "";
+  document.getElementById("ocup-activo").value = datos?.activo ?? "1";
+  document.getElementById("ocup-modal-titulo").textContent = datos ? "Editar ocupación" : "Nueva ocupación";
+  document.getElementById("overlay-ocupacion").style.display = "flex";
+  setTimeout(() => document.getElementById("ocup-nombre").focus(), 80);
+}
+
+function cerrarModalOcupacion() {
+  document.getElementById("overlay-ocupacion").style.display = "none";
+}
+
+function editarOcupacion(id) {
+  const o = ocupData.find(x => x.id == id);
+  if (o) abrirModalOcupacion(o);
+}
+
+async function guardarOcupacion() {
+  const nombre = document.getElementById("ocup-nombre").value.trim();
+  const activo = document.getElementById("ocup-activo").value;
+  const id     = document.getElementById("ocup-id").value;
+
+  if (!nombre) { alert("El nombre de la ocupación es obligatorio."); document.getElementById("ocup-nombre").focus(); return; }
+
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ action:"GUARDAR_OCUPACION", payload:{ id:id||null, nombre, activo } })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      cerrarModalOcupacion();
+      ocupCargados = false;
+      cargarOcupaciones();
+    } else {
+      alert(data.message || "Error al guardar");
+    }
+  } catch (e) { alert("Error de conexión"); }
+}
+
+async function eliminarOcupacion(id, nombre) {
+  if (!confirm(`¿Eliminar la ocupación "${nombre}"?`)) return;
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({ action:"ELIMINAR_OCUPACION", payload:{ id } })
+    });
+    const data = await res.json();
+    if (data.status === "success") { ocupCargados = false; cargarOcupaciones(); }
+    else alert(data.message || "No se pudo eliminar");
+  } catch (e) { alert("Error de conexión"); }
+}
+
+function escH(s) {
+  return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
 /* ═══════════════════════════════════════
