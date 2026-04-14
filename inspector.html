@@ -918,6 +918,125 @@
     .cur-exito-titulo { font-size: 18px; font-weight: 700; color: var(--texto); margin-bottom: 6px; }
     .cur-exito-sub    { font-size: 13px; color: var(--texto-sub); margin-bottom: 22px; }
 
+    /* ── Submenu: selección de modo ── */
+    .cur-submenu-wrap { max-width: 560px; margin: 0 auto; padding: 20px 16px 60px; }
+    .cur-modos-grid   { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 20px; }
+    @media (max-width:440px) { .cur-modos-grid { grid-template-columns: 1fr; } }
+    .cur-modo-card {
+      background: var(--blanco);
+      border: 2px solid var(--borde);
+      border-radius: var(--radio-lg);
+      padding: 26px 18px 22px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .18s;
+      box-shadow: var(--sombra);
+    }
+    .cur-modo-card:hover {
+      border-color: var(--azul);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(24,95,165,0.13);
+    }
+    .cur-modo-card:active { transform: translateY(0); }
+    .cur-modo-icon  { font-size: 38px; margin-bottom: 10px; }
+    .cur-modo-titulo{ font-size: 16px; font-weight: 700; color: var(--texto); margin-bottom: 6px; }
+    .cur-modo-desc  { font-size: 12px; color: var(--texto-sub); line-height: 1.45; }
+
+    /* ── Sesión: configuración ── */
+    .ses-wrap { max-width: 560px; margin: 0 auto; padding: 16px 16px 60px; }
+    .ses-back-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: none; border: none; font-size: 13px; font-weight: 600;
+      color: var(--texto-sub); cursor: pointer; margin-bottom: 14px; padding: 6px 0;
+    }
+    .ses-back-btn:hover { color: var(--azul); }
+    .ses-titulo { font-size: 16px; font-weight: 700; color: var(--texto); margin-bottom: 4px; }
+    .ses-subtitulo { font-size: 12px; color: var(--texto-sub); margin-bottom: 18px; }
+    .ses-nombre-preview {
+      margin-top: 10px; padding: 10px 14px;
+      background: var(--azul-light); border-radius: var(--radio);
+      border-left: 3px solid var(--azul);
+      font-size: 13px; font-weight: 700; color: var(--azul-dark);
+      letter-spacing: .03em; display: none;
+    }
+    .ses-pregunta {
+      font-size: 14px; font-weight: 600; color: var(--texto);
+      margin: 16px 0 10px;
+    }
+    .ses-empresa-toggle {
+      display: flex; gap: 10px; margin-bottom: 14px;
+    }
+    .ses-toggle-btn {
+      flex: 1; padding: 11px;
+      border: 2px solid var(--borde); border-radius: var(--radio);
+      background: var(--blanco);
+      font-size: 13px; font-weight: 600; color: var(--texto-sub);
+      cursor: pointer; transition: all .15s;
+    }
+    .ses-toggle-btn.si { border-color: var(--verde); background: var(--verde-light); color: var(--verde); }
+    .ses-toggle-btn.no { border-color: var(--rojo);  background: var(--rojo-light);  color: var(--rojo); }
+    .ses-continuar-btn {
+      width: 100%; margin-top: 18px; padding: 13px;
+      background: var(--azul); color: white; border: none;
+      border-radius: var(--radio); font-size: 14px; font-weight: 700;
+      cursor: pointer; transition: background .15s;
+    }
+    .ses-continuar-btn:hover { background: var(--azul-dark); }
+
+    /* ── Sesión: lista de participantes ── */
+    .ses-header-card {
+      background: var(--azul); border-radius: var(--radio-lg);
+      padding: 16px 18px; margin-bottom: 14px; color: white;
+    }
+    .ses-header-nombre { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+    .ses-header-meta   { font-size: 12px; color: rgba(255,255,255,0.72); }
+    .ses-part-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 14px; background: var(--blanco);
+      border-radius: var(--radio); border: 1px solid rgba(0,0,0,0.05);
+      box-shadow: var(--sombra); margin-bottom: 8px;
+      animation: aparece .22s ease;
+    }
+    @keyframes aparece { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
+    .ses-part-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--verde-light); color: var(--verde);
+      font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .ses-part-info { flex: 1; }
+    .ses-part-nombre { font-size: 13px; font-weight: 600; color: var(--texto); }
+    .ses-part-curp   { font-size: 11px; color: var(--texto-hint); margin-top: 2px; }
+    .ses-agregar-btn {
+      width: 100%; padding: 13px; margin-bottom: 10px;
+      border: 2px dashed var(--borde); border-radius: var(--radio);
+      background: var(--blanco); font-size: 13px; font-weight: 600;
+      color: var(--texto-sub); cursor: pointer; transition: all .15s;
+    }
+    .ses-agregar-btn:hover { border-color: var(--azul); color: var(--azul); background: var(--azul-light); }
+    .ses-finalizar-btn {
+      width: 100%; padding: 14px; background: var(--verde); color: white;
+      border: none; border-radius: var(--radio);
+      font-size: 14px; font-weight: 700; cursor: pointer; transition: background .15s;
+    }
+    .ses-finalizar-btn:hover { background: #2A5009; }
+    .ses-finalizar-btn:disabled { opacity: .55; cursor: not-allowed; }
+
+    /* ── Insignia de modo en el form ── */
+    .cur-modo-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 12px; border-radius: 20px;
+      font-size: 11px; font-weight: 700; margin-bottom: 10px;
+    }
+    .cur-modo-badge.sesion { background: var(--azul-light); color: var(--azul-dark); border: 1px solid #85B7EB; }
+    .cur-modo-badge.indep  { background: var(--gris-bg); color: var(--texto-sub); border: 1px solid var(--borde); }
+    .ses-locked-info {
+      padding: 10px 14px; background: var(--azul-light);
+      border-radius: var(--radio); border-left: 3px solid var(--azul);
+      font-size: 12px; color: var(--azul-dark); margin-bottom: 4px; display: none;
+    }
+    .ses-locked-info strong { font-weight: 700; }
+
     /* ── Tarjetas del historial ── */
     .hist-card {
       background: var(--blanco);
@@ -1177,9 +1296,122 @@
 
 <!-- ══════════ MÓDULO CURSOS ══════════ -->
 <div id="pantalla-cursos">
-<div class="cur-wrap">
 
-  <!-- Pantalla éxito -->
+<!-- ══ SUBMENU: MODO ══ -->
+<div id="cur-submenu" style="display:none">
+  <div class="cur-submenu-wrap">
+    <button class="ses-back-btn" onclick="volverMenu()">← Menú principal</button>
+    <div class="ses-titulo">Registro de participantes</div>
+    <div class="ses-subtitulo">Selecciona el tipo de registro que deseas realizar</div>
+    <div class="cur-modos-grid">
+      <div class="cur-modo-card" onclick="curSelModo('curso')">
+        <div class="cur-modo-icon">📚</div>
+        <div class="cur-modo-titulo">Curso</div>
+        <div class="cur-modo-desc">Registra varios participantes para el mismo curso y fecha</div>
+      </div>
+      <div class="cur-modo-card" onclick="curSelModo('independiente')">
+        <div class="cur-modo-icon">👤</div>
+        <div class="cur-modo-titulo">Independiente</div>
+        <div class="cur-modo-desc">Registra un solo participante de forma individual</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ SESIÓN: CONFIGURACIÓN ══ -->
+<div id="cur-sesion-setup" style="display:none">
+  <div class="ses-wrap">
+    <button class="ses-back-btn" onclick="curMostrar('submenu')">← Atrás</button>
+    <div class="ses-titulo">Configurar sesión de curso</div>
+    <div class="ses-subtitulo">Define el curso y la empresa (si aplica)</div>
+
+    <div class="cur-section">
+      <div class="cur-section-hdr">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
+          <path d="M8 10l-5-3 5-3 5 3-5 3z"/><path d="M3 7v3c0 1.1 2 2.5 5 2.5s5-1.4 5-2.5V7"/>
+        </svg>
+        Curso y fecha
+      </div>
+      <div class="cur-section-body">
+        <div class="cur-field">
+          <label>Curso <span class="req">*</span></label>
+          <select class="cur-input" id="ses-curso-id" oninput="sesActualizarNombre()">
+            <option value="">— Seleccionar curso —</option>
+          </select>
+        </div>
+        <div class="cur-field">
+          <label>Fecha del curso <span class="req">*</span></label>
+          <input type="date" class="cur-input" id="ses-fecha" oninput="sesActualizarNombre()">
+        </div>
+        <div class="ses-nombre-preview" id="ses-nombre-preview"></div>
+      </div>
+    </div>
+
+    <div class="cur-section">
+      <div class="cur-section-hdr">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
+          <rect x="2" y="6" width="12" height="8" rx="1"/><path d="M5 6V4a3 3 0 016 0v2"/>
+        </svg>
+        Empresa
+      </div>
+      <div class="cur-section-body">
+        <div class="ses-pregunta">¿Los participantes son de la misma empresa?</div>
+        <div class="ses-empresa-toggle">
+          <button type="button" id="ses-btn-si" class="ses-toggle-btn" onclick="sesMismaEmpresa(true)">✓ Sí, misma empresa</button>
+          <button type="button" id="ses-btn-no" class="ses-toggle-btn" onclick="sesMismaEmpresa(false)">✗ No / Varía</button>
+        </div>
+        <div id="ses-empresa-form" style="display:none">
+          <div class="cur-field">
+            <label>Nombre de la empresa</label>
+            <input type="text" class="cur-input" id="ses-empresa" placeholder="Razón social">
+          </div>
+          <div class="cur-row2">
+            <div class="cur-field">
+              <label>RFC</label>
+              <input type="text" class="cur-input" id="ses-rfc" placeholder="RFC de la empresa"
+                     oninput="this.value=this.value.toUpperCase()">
+            </div>
+            <div class="cur-field">
+              <label>Representante</label>
+              <input type="text" class="cur-input" id="ses-representante" placeholder="Nombre del rep.">
+            </div>
+          </div>
+          <div class="cur-field">
+            <label>Dirección</label>
+            <input type="text" class="cur-input" id="ses-direccion" placeholder="Dirección de la empresa">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <button class="ses-continuar-btn" onclick="sesContinuar()">Continuar →</button>
+  </div>
+</div>
+
+<!-- ══ SESIÓN: LISTA DE PARTICIPANTES ══ -->
+<div id="cur-sesion-lista" style="display:none">
+  <div class="ses-wrap">
+    <div class="ses-header-card">
+      <div class="ses-header-nombre" id="ses-lista-nombre">—</div>
+      <div class="ses-header-meta" id="ses-lista-meta">0 participantes registrados</div>
+    </div>
+
+    <div id="ses-lista-items"></div>
+
+    <button class="ses-agregar-btn" onclick="sesAgregarParticipante()">
+      + Agregar participante
+    </button>
+    <button class="ses-finalizar-btn" id="ses-finalizar-btn"
+            onclick="sesFinalizarSesion()" disabled>
+      ✓ Finalizar sesión
+    </button>
+  </div>
+</div>
+
+<!-- ══ FORMULARIO PARTICIPANTE ══ -->
+<div class="cur-wrap" id="cur-wrap" style="display:none">
+
+  <!-- Pantalla éxito (modo independiente) -->
   <div class="cur-exito" id="cur-exito">
     <div class="cur-exito-icon">
       <svg viewBox="0 0 24 24" fill="none" stroke="var(--verde)" stroke-width="2.5" style="width:32px;height:32px">
@@ -1195,6 +1427,11 @@
 
   <!-- Formulario -->
   <div id="cur-form-wrap">
+    <!-- Insignia de modo + info sesión bloqueada -->
+    <div style="padding:14px 16px 0">
+      <div id="cur-modo-badge" class="cur-modo-badge indep">👤 Independiente</div>
+      <div class="ses-locked-info" id="ses-locked-info"></div>
+    </div>
 
     <!-- ── Sección 1: Datos del participante ── -->
     <div class="cur-section">
@@ -1423,10 +1660,20 @@
       </div>
     </div>
 
-    <!-- Botón enviar -->
-    <button class="cur-submit" id="cur-submit-btn" onclick="curEnviar()">
-      Guardar registro
-    </button>
+    <!-- Botones de acción -->
+    <div style="padding:0 0 16px">
+      <button class="cur-submit" id="cur-submit-btn" onclick="curEnviar()"
+              style="margin-bottom:10px">
+        Guardar registro
+      </button>
+      <button id="cur-volver-lista-btn"
+              onclick="curMostrar('lista')"
+              style="display:none;width:calc(100% - 32px);margin:0 16px;padding:11px;
+                     background:none;border:1.5px solid var(--borde);border-radius:var(--radio);
+                     font-size:13px;font-weight:600;color:var(--texto-sub);cursor:pointer">
+        ← Volver a la lista sin guardar
+      </button>
+    </div>
 
   </div><!-- /cur-form-wrap -->
 </div><!-- /cur-wrap -->
@@ -1748,6 +1995,7 @@ function abrirModulo(modulo) {
     document.getElementById('header-title').textContent = 'Registro de Cursos';
     document.getElementById('header-sub').textContent = 'Registro de participantes en capacitación';
     initCursos();
+    curMostrar('submenu');
   }
 }
 
@@ -2451,12 +2699,27 @@ if ("serviceWorker" in navigator) {
 /* ════════════════════════════════════════
    MÓDULO CURSOS
 ════════════════════════════════════════ */
-let curCursos     = [];
+let curCursos      = [];
 let curOcupaciones = [];
-let curDocFile    = null;   // Archivo foto documento
-let curPersonaFile = null;  // Archivo foto participante
+let curDocFile     = null;
+let curPersonaFile = null;
 
-// ── Abrir módulo: carga catálogos ─────────
+// Estado de sesión grupal
+let curModo        = 'independiente'; // 'curso' | 'independiente'
+let curSesion      = null;            // { curso_id, curso_nombre, fecha, nombre_sesion, misma_empresa, empresa }
+let curSesionParts = [];              // participantes guardados en la sesión
+
+// ── Pantallas del módulo Cursos ───────────
+const CUR_PANTALLAS = ['cur-submenu','cur-sesion-setup','cur-sesion-lista','cur-wrap'];
+function curMostrar(cual) {
+  const mapa = { submenu:'cur-submenu', setup:'cur-sesion-setup', lista:'cur-sesion-lista', form:'cur-wrap' };
+  const target = mapa[cual] || cual;
+  CUR_PANTALLAS.forEach(id => {
+    document.getElementById(id).style.display = id === target ? 'block' : 'none';
+  });
+}
+
+// ── Carga inicial de catálogos ────────────
 async function initCursos() {
   if (curCursos.length && curOcupaciones.length) return;
   try {
@@ -2468,29 +2731,187 @@ async function initCursos() {
     curCursos      = Array.isArray(rC) ? rC.filter(c => c.activo == 1) : [];
     curOcupaciones = Array.isArray(rO) ? rO : [];
 
-    const selCurso = document.getElementById('cur-curso');
-    selCurso.innerHTML = '<option value="">— Seleccionar curso —</option>' +
+    const opsCurso = '<option value="">— Seleccionar curso —</option>' +
       curCursos.map(c => `<option value="${c.id}">${c.nombre} (${c.duracion_horas}h)</option>`).join('');
+
+    // Selector en formulario individual
+    const selCurso = document.getElementById('cur-curso');
+    selCurso.innerHTML = opsCurso;
+    selCurso.addEventListener('change', function() {
+      const c = curCursos.find(x => x.id == this.value);
+      const info = document.getElementById('cur-curso-info');
+      if (c) { info.style.display = 'block'; info.innerHTML = `<strong>${c.nombre}</strong> — ${c.duracion_horas}h · ${c.area_tematica}`; }
+      else   { info.style.display = 'none'; }
+    });
+
+    // Selector en setup de sesión
+    document.getElementById('ses-curso-id').innerHTML = opsCurso;
 
     const selOcup = document.getElementById('cur-ocupacion');
     selOcup.innerHTML = '<option value="">— Seleccionar —</option>' +
       curOcupaciones.map(o => `<option value="${o.id}">${o.nombre}</option>`).join('');
 
-    // Mostrar info del curso al cambiar
-    selCurso.addEventListener('change', function() {
-      const c = curCursos.find(x => x.id == this.value);
-      const info = document.getElementById('cur-curso-info');
-      if (c) {
-        info.style.display = 'block';
-        info.innerHTML = `<strong>${c.nombre}</strong> — ${c.duracion_horas} horas · ${c.area_tematica}`;
-      } else {
-        info.style.display = 'none';
-      }
-    });
-
   } catch (e) {
-    console.error('Error cargando catálogos de cursos:', e);
+    console.error('Error cargando catálogos:', e);
   }
+}
+
+// ── Selección de modo ─────────────────────
+function curSelModo(modo) {
+  curModo = modo;
+  if (modo === 'independiente') {
+    curSesion     = null;
+    curSesionParts = [];
+    curPrepararForm('independiente');
+    curMostrar('form');
+  } else {
+    curMostrar('setup');
+    // Reset setup
+    document.getElementById('ses-curso-id').value = '';
+    document.getElementById('ses-fecha').value    = '';
+    document.getElementById('ses-nombre-preview').style.display = 'none';
+    document.getElementById('ses-empresa-form').style.display   = 'none';
+    document.getElementById('ses-btn-si').className = 'ses-toggle-btn';
+    document.getElementById('ses-btn-no').className = 'ses-toggle-btn';
+    ['ses-empresa','ses-rfc','ses-representante','ses-direccion'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+  }
+}
+
+// ── Sesión: nombre auto DDMMAA + curso ────
+function sesActualizarNombre() {
+  const cursoId = document.getElementById('ses-curso-id').value;
+  const fecha   = document.getElementById('ses-fecha').value;  // yyyy-mm-dd
+  const prev    = document.getElementById('ses-nombre-preview');
+  if (!cursoId || !fecha) { prev.style.display = 'none'; return; }
+  const c = curCursos.find(x => x.id == cursoId);
+  if (!c) return;
+  const [y, m, d] = fecha.split('-');
+  const ddmmaa = (d||'').padStart(2,'0') + (m||'').padStart(2,'0') + (y||'').slice(-2);
+  const nombre = ddmmaa + ' ' + c.nombre.toUpperCase();
+  prev.textContent = nombre;
+  prev.style.display = 'block';
+}
+
+// ── Sesión: toggle misma empresa ─────────
+function sesMismaEmpresa(si) {
+  document.getElementById('ses-btn-si').className = 'ses-toggle-btn' + (si ? ' si' : '');
+  document.getElementById('ses-btn-no').className = 'ses-toggle-btn' + (!si ? ' no' : '');
+  document.getElementById('ses-empresa-form').style.display = si ? 'block' : 'none';
+}
+
+// ── Sesión: Continuar → lista ─────────────
+function sesContinuar() {
+  const cursoId = document.getElementById('ses-curso-id').value;
+  const fecha   = document.getElementById('ses-fecha').value;
+  if (!cursoId) { alert('Selecciona un curso.'); return; }
+  if (!fecha)   { alert('Selecciona la fecha del curso.'); return; }
+
+  const c = curCursos.find(x => x.id == cursoId);
+  const [y, m, d] = fecha.split('-');
+  const ddmmaa = (d||'').padStart(2,'0') + (m||'').padStart(2,'0') + (y||'').slice(-2);
+  const nombreSesion = ddmmaa + ' ' + (c?.nombre || '').toUpperCase();
+
+  const mismaEmpresa = document.getElementById('ses-btn-si').classList.contains('si');
+  const empresa = {
+    nombre:        document.getElementById('ses-empresa').value.trim(),
+    rfc:           document.getElementById('ses-rfc').value.trim(),
+    representante: document.getElementById('ses-representante').value.trim(),
+    direccion:     document.getElementById('ses-direccion').value.trim(),
+  };
+
+  curSesion = { curso_id: cursoId, curso_nombre: c?.nombre || '', fecha, nombre_sesion: nombreSesion, misma_empresa: mismaEmpresa, empresa };
+  curSesionParts = [];
+
+  // Actualizar cabecera de la lista
+  document.getElementById('ses-lista-nombre').textContent = nombreSesion;
+  document.getElementById('ses-lista-meta').textContent   = '0 participantes registrados';
+  document.getElementById('ses-lista-items').innerHTML    = '';
+  document.getElementById('ses-finalizar-btn').disabled   = true;
+
+  curMostrar('lista');
+}
+
+// ── Sesión: agregar participante ──────────
+function sesAgregarParticipante() {
+  curPrepararForm('curso');
+  curMostrar('form');
+}
+
+// ── Sesión: renderizar lista ──────────────
+function sesRenderLista() {
+  const lista = document.getElementById('ses-lista-items');
+  lista.innerHTML = curSesionParts.map((p, i) => `
+    <div class="ses-part-item">
+      <div class="ses-part-num">${i + 1}</div>
+      <div class="ses-part-info">
+        <div class="ses-part-nombre">${p.nombre}</div>
+        <div class="ses-part-curp">${p.curp}</div>
+      </div>
+      <span style="color:var(--verde);font-size:18px">✓</span>
+    </div>`).join('');
+
+  const n = curSesionParts.length;
+  document.getElementById('ses-lista-meta').textContent = `${n} participante${n !== 1 ? 's' : ''} registrado${n !== 1 ? 's' : ''}`;
+  document.getElementById('ses-finalizar-btn').disabled = n === 0;
+}
+
+// ── Sesión: finalizar ─────────────────────
+function sesFinalizarSesion() {
+  const n = curSesionParts.length;
+  curMostrar('submenu');
+  curSesion      = null;
+  curSesionParts = [];
+  alert(`✓ Sesión finalizada. ${n} participante${n !== 1 ? 's' : ''} registrado${n !== 1 ? 's' : ''} correctamente.`);
+}
+
+// ── Preparar formulario según modo ────────
+function curPrepararForm(modo) {
+  const badge     = document.getElementById('cur-modo-badge');
+  const lockInfo  = document.getElementById('ses-locked-info');
+  const secCurso  = document.getElementById('cur-curso').closest('.cur-section');
+  const btnVolver = document.getElementById('cur-volver-lista-btn');
+  const btnEnviar = document.getElementById('cur-submit-btn');
+
+  if (modo === 'curso' && curSesion) {
+    badge.className  = 'cur-modo-badge sesion';
+    badge.textContent = '📚 Sesión: ' + curSesion.nombre_sesion;
+
+    lockInfo.style.display = 'block';
+    lockInfo.innerHTML = `<strong>${curSesion.curso_nombre}</strong> · ${
+      new Date(curSesion.fecha + 'T12:00:00').toLocaleDateString('es-MX', {day:'2-digit',month:'long',year:'numeric'})
+    }`;
+
+    // Ocultar sección 2 (curso/fecha) — ya están fijos
+    if (secCurso) secCurso.style.display = 'none';
+
+    // Pre-llenar empresa si es misma empresa
+    if (curSesion.misma_empresa && curSesion.empresa.nombre) {
+      document.getElementById('cur-empresa').value          = curSesion.empresa.nombre;
+      document.getElementById('cur-rfc').value              = curSesion.empresa.rfc;
+      document.getElementById('cur-representante').value    = curSesion.empresa.representante;
+      document.getElementById('cur-direccion-empresa').value = curSesion.empresa.direccion;
+      // Abrir panel empresa
+      const body = document.getElementById('empresa-body');
+      const tog  = document.getElementById('empresa-toggle');
+      if (!body.classList.contains('open')) { body.classList.add('open'); tog.classList.add('open'); }
+    }
+
+    btnVolver.style.display = 'block';
+    btnEnviar.textContent   = '+ Guardar y agregar otro';
+
+  } else {
+    badge.className  = 'cur-modo-badge indep';
+    badge.textContent = '👤 Independiente';
+    lockInfo.style.display = 'none';
+    if (secCurso) secCurso.style.display = '';
+    btnVolver.style.display = 'none';
+    btnEnviar.textContent   = 'Guardar registro';
+  }
+
+  // Limpiar campos del participante
+  curLimpiarFormParticipante();
 }
 
 // ── Capacidad N/A ─────────────────────────
@@ -2660,25 +3081,60 @@ function curPreviewPersona(event) {
   curClearErr('foto-persona');
 }
 
+// ── Limpiar sólo los campos del participante (no empresa, no curso) ─
+function curLimpiarFormParticipante() {
+  ['cur-nombre','cur-curp','cur-puesto','cur-capacidad','cur-telefono'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  document.getElementById('cur-ocupacion').value     = '';
+  document.getElementById('cur-cap-na').checked      = false;
+  document.getElementById('cur-capacidad').disabled  = false;
+
+  // Reset OCR
+  curDocFile = null;
+  document.getElementById('ocr-preview').style.display    = 'none';
+  document.getElementById('ocr-placeholder').style.display = '';
+  document.getElementById('ocr-zone').classList.remove('has-img');
+  document.getElementById('ocr-btn').disabled              = true;
+  document.getElementById('ocr-result').className          = 'ocr-result';
+  document.getElementById('ocr-file').value                = '';
+  const docStatus = document.getElementById('cur-doc-status');
+  if (docStatus) { docStatus.innerHTML = 'Sin foto — usa la sección de arriba o captura aquí'; docStatus.style.cssText = ''; }
+
+  // Reset foto persona
+  curPersonaFile = null;
+  document.getElementById('foto-persona-preview').style.display    = 'none';
+  document.getElementById('foto-persona-placeholder').style.display = '';
+  document.getElementById('foto-persona-file').value                = '';
+
+  // Reset errores
+  document.querySelectorAll('.cur-errmsg.show').forEach(e => e.classList.remove('show'));
+  document.querySelectorAll('.cur-input.err').forEach(e => e.classList.remove('err'));
+}
+
 // ── Validar y enviar ──────────────────────
 async function curEnviar() {
-  let valido = true;
+  const esSesion = curModo === 'curso' && curSesion;
 
   const nombre  = document.getElementById('cur-nombre').value.trim();
   const curp    = document.getElementById('cur-curp').value.trim().toUpperCase();
-  const cursoId = document.getElementById('cur-curso').value;
-  const fecha   = document.getElementById('cur-fecha').value;
+  const cursoId = esSesion ? curSesion.curso_id : document.getElementById('cur-curso').value;
+  const fecha   = esSesion ? curSesion.fecha     : document.getElementById('cur-fecha').value;
 
-  if (!nombre)  { curShowErr('cur-nombre', 'El nombre es obligatorio');          valido = false; }
+  let valido = true;
+  if (!nombre)  { curShowErr('cur-nombre', 'El nombre es obligatorio');           valido = false; }
   if (!curp || !/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/.test(curp))
-                { curShowErr('cur-curp', 'CURP inválida (18 caracteres)');        valido = false; }
-  if (!cursoId) { curShowErr('cur-curso', 'Selecciona un curso');                 valido = false; }
-  if (!fecha)   { curShowErr('cur-fecha', 'La fecha del curso es obligatoria');   valido = false; }
-  if (!curPersonaFile)
-                { curShowErr('foto-persona', 'La foto del participante es obligatoria'); valido = false; }
+                { curShowErr('cur-curp',   'CURP inválida (18 caracteres)');      valido = false; }
+  if (!esSesion) {
+    if (!cursoId) { curShowErr('cur-curso', 'Selecciona un curso');               valido = false; }
+    if (!fecha)   { curShowErr('cur-fecha', 'La fecha del curso es obligatoria'); valido = false; }
+  }
+  if (!curPersonaFile) { curShowErr('foto-persona', 'La foto del participante es obligatoria'); valido = false; }
 
   if (!valido) {
-    document.querySelector('.cur-input.err')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.querySelector('.cur-input.err, .cur-errmsg.show')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
   }
 
@@ -2687,24 +3143,23 @@ async function curEnviar() {
   btn.textContent = 'Guardando…';
 
   try {
-    const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
-
+    const s  = JSON.parse(localStorage.getItem('avba_session') || '{}');
     const fd = new FormData();
-    fd.append('action',               'GUARDAR_PARTICIPANTE');
-    fd.append('token',                s.token || '');
-    fd.append('nombre_completo',      nombre);
-    fd.append('curp',                 curp);
-    fd.append('puesto',               document.getElementById('cur-puesto').value.trim());
-    fd.append('ocupacion_id',         document.getElementById('cur-ocupacion').value || '');
-    fd.append('capacidad',            document.getElementById('cur-capacidad').value.trim());
-    fd.append('capacidad_na',         document.getElementById('cur-cap-na').checked ? '1' : '0');
-    fd.append('telefono',             document.getElementById('cur-telefono').value.trim());
-    fd.append('curso_id',             cursoId);
-    fd.append('fecha_curso',          fecha);
-    fd.append('empresa_nombre',       document.getElementById('cur-empresa').value.trim());
-    fd.append('empresa_rfc',          document.getElementById('cur-rfc').value.trim());
-    fd.append('empresa_representante',document.getElementById('cur-representante').value.trim());
-    fd.append('empresa_direccion',    document.getElementById('cur-direccion-empresa').value.trim());
+    fd.append('action',                'GUARDAR_PARTICIPANTE');
+    fd.append('token',                 s.token || '');
+    fd.append('nombre_completo',       nombre);
+    fd.append('curp',                  curp);
+    fd.append('puesto',                document.getElementById('cur-puesto').value.trim());
+    fd.append('ocupacion_id',          document.getElementById('cur-ocupacion').value || '');
+    fd.append('capacidad',             document.getElementById('cur-capacidad').value.trim());
+    fd.append('capacidad_na',          document.getElementById('cur-cap-na').checked ? '1' : '0');
+    fd.append('telefono',              document.getElementById('cur-telefono').value.trim());
+    fd.append('curso_id',              cursoId);
+    fd.append('fecha_curso',           fecha);
+    fd.append('empresa_nombre',        document.getElementById('cur-empresa').value.trim());
+    fd.append('empresa_rfc',           document.getElementById('cur-rfc').value.trim());
+    fd.append('empresa_representante', document.getElementById('cur-representante').value.trim());
+    fd.append('empresa_direccion',     document.getElementById('cur-direccion-empresa').value.trim());
     if (curDocFile)     fd.append('foto_documentacion', curDocFile,     curDocFile.name);
     if (curPersonaFile) fd.append('foto_persona',       curPersonaFile, curPersonaFile.name);
 
@@ -2712,11 +3167,19 @@ async function curEnviar() {
     const data = await res.json();
 
     if (data.status === 'success') {
-      const curso = curCursos.find(c => c.id == cursoId);
-      document.getElementById('cur-exito-sub').textContent =
-        `${nombre} fue registrado en "${curso?.nombre || 'el curso'}" correctamente.`;
-      document.getElementById('cur-form-wrap').style.display = 'none';
-      document.getElementById('cur-exito').style.display     = 'block';
+      if (esSesion) {
+        // Modo sesión: agregar a la lista y volver
+        curSesionParts.push({ nombre, curp, id: data.id });
+        sesRenderLista();
+        curMostrar('lista');
+      } else {
+        // Modo independiente: pantalla de éxito
+        const curso = curCursos.find(c => c.id == cursoId);
+        document.getElementById('cur-exito-sub').textContent =
+          `${nombre} fue registrado en "${curso?.nombre || 'el curso'}" correctamente.`;
+        document.getElementById('cur-form-wrap').style.display = 'none';
+        document.getElementById('cur-exito').style.display     = 'block';
+      }
     } else {
       alert('Error: ' + (data.message || 'No se pudo guardar el registro.'));
     }
@@ -2726,51 +3189,37 @@ async function curEnviar() {
     console.error('curEnviar:', e);
   } finally {
     btn.disabled    = false;
-    btn.textContent = 'Guardar registro';
+    btn.textContent = esSesion ? '+ Guardar y agregar otro' : 'Guardar registro';
   }
 }
 
-// ── Resetear formulario ───────────────────
+// ── Nuevo registro (modo independiente) ───
 function curNuevoRegistro() {
-  // Limpiar todos los campos
   ['cur-nombre','cur-curp','cur-puesto','cur-capacidad','cur-telefono',
    'cur-empresa','cur-rfc','cur-representante','cur-direccion-empresa'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
-  document.getElementById('cur-curso').value    = '';
-  document.getElementById('cur-ocupacion').value= '';
-  document.getElementById('cur-fecha').value    = '';
-  document.getElementById('cur-cap-na').checked = false;
-  document.getElementById('cur-capacidad').disabled = false;
+  document.getElementById('cur-curso').value         = '';
+  document.getElementById('cur-ocupacion').value     = '';
+  document.getElementById('cur-fecha').value         = '';
+  document.getElementById('cur-cap-na').checked      = false;
+  document.getElementById('cur-capacidad').disabled  = false;
+  document.getElementById('cur-curso-info').style.display = 'none';
 
-  // Reset OCR
-  curDocFile    = null;
-  curPersonaFile = null;
-  document.getElementById('ocr-preview').style.display = 'none';
-  document.getElementById('ocr-placeholder').style.display = '';
-  document.getElementById('ocr-zone').classList.remove('has-img');
-  document.getElementById('ocr-btn').disabled = true;
-  document.getElementById('ocr-result').className = 'ocr-result';
-  document.getElementById('ocr-file').value = '';
+  curLimpiarFormParticipante();
 
-  // Reset foto persona
-  document.getElementById('foto-persona-preview').style.display = 'none';
-  document.getElementById('foto-persona-placeholder').style.display = '';
-  document.getElementById('foto-persona-file').value = '';
-
-  // Reset empresa
   const toggle = document.getElementById('empresa-toggle');
   const body   = document.getElementById('empresa-body');
   toggle.classList.remove('open');
   body.classList.remove('open');
 
-  // Reset info curso
-  document.getElementById('cur-curso-info').style.display = 'none';
-
-  // Mostrar formulario, ocultar éxito
   document.getElementById('cur-form-wrap').style.display = '';
   document.getElementById('cur-exito').style.display     = 'none';
+
+  // Volver al submenu en modo independiente
+  curModo = 'independiente';
+  curMostrar('submenu');
 }
 
 // ══════════════════════════════════════════════════════
