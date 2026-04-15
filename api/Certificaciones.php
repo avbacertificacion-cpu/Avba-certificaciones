@@ -9,7 +9,10 @@
  *   4. Si hay plantilla Word configurada, también se genera el .docx para descarga
  */
 
-require_once __DIR__ . '/../vendor/autoload.php';
+// Cargar Composer autoload solo si está disponible (no requerido para PDF con coordenadas)
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+}
 
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\SMTP;
@@ -90,7 +93,14 @@ class Certificaciones {
         $resultado = $this->generarPdfDesdeTemplatePdf($id, $tipo);
         if ($resultado['status'] === 'success') return $resultado;
 
-        // Si no hay plantilla PDF configurada, continuar con Word
+        // Si no hay plantilla PDF configurada y tampoco vendor/, no podemos continuar
+        if (!file_exists(__DIR__ . '/../vendor/autoload.php')) {
+            return ['status' => 'error',
+                    'message' => 'No hay plantilla PDF configurada para este tipo de equipo. '
+                               . 'Súbela desde Calidad → Tipos de Equipo → Plantillas PDF.'];
+        }
+
+        // Si no hay plantilla PDF configurada, continuar con Word (requiere vendor/)
         $datos = $this->obtenerDatosEquipo($id);
         if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
@@ -438,79 +448,91 @@ class Certificaciones {
         $campos = json_decode($camposJson ?: '[]', true) ?: [];
 
         try {
-            $rutaDir  = UPLOAD_DIR . 'certificados/';
+            // Cargar FPDF + FPDI (no requiere Composer, archivos incluidos en lib/)
+            require_once __DIR__ . '/../lib/fpdi_loader.php';
+
+            $rutaDir = UPLOAD_DIR . 'certificados/';
             if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
 
-            $folio     = $datos['control'] ?? (string)($datos['id'] ?? 'doc');
-            $sufijo    = strtoupper($tipo === 'dict' ? 'DICT' : 'CERT');
-            $rutaPdf   = $rutaDir . $sufijo . '_PDF_' . $folio . '_prot.pdf';
-            $ownerPass = 'AVBA' . strtoupper(substr(md5($folio . $tipo), 0, 10));
+            $folio   = $datos['control'] ?? (string)($datos['id'] ?? 'doc');
+            $sufijo  = strtoupper($tipo === 'dict' ? 'DICT' : 'CERT');
+            $rutaPdf = $rutaDir . $sufijo . '_PDF_' . $folio . '.pdf';
 
-            $mpdfTmp = sys_get_temp_dir() . '/mpdf_' . uniqid();
-            if (!is_dir($mpdfTmp)) mkdir($mpdfTmp, 0755, true);
+            // Detectar dimensiones de la primera página del template
+            $fpiDim = new \setasign\Fpdi\Fpdi();
+            $fpiDim->setSourceFile($rutaTpl);
+            $tplIdx = $fpiDim->importPage(1);
+            $size   = $fpiDim->getTemplateSize($tplIdx);
+            $w      = $size['width'];
+            $h      = $size['height'];
+            $orient = ($w > $h) ? 'L' : 'P';
+            unset($fpiDim);
 
-            // Obtener dimensiones de la plantilla PDF
-            // mPDF usará la plantilla completa como fondo de cada página
-            $mpdf = new \Mpdf\Mpdf([
-                'tempDir'       => $mpdfTmp,
-                'margin_left'   => 0,
-                'margin_right'  => 0,
-                'margin_top'    => 0,
-                'margin_bottom' => 0,
-                'default_font'  => 'dejavusans',
-            ]);
+            // Crear nuevo PDF con las mismas dimensiones
+            $pdf = new \setasign\Fpdi\Fpdi($orient, 'mm', [$w, $h]);
+            $pdf->SetAutoPageBreak(false);
+            $pdf->SetMargins(0, 0, 0);
+            $pdf->SetCreator('AVBA Certificaciones');
 
-            // Cargar PDF base como plantilla de fondo
-            $mpdf->SetDocTemplate($rutaTpl, true);
-            $mpdf->AddPage();
+            // Número de páginas del template
+            $pdf->setSourceFile($rutaTpl);
+            $totalPaginas = $pdf->setSourceFile($rutaTpl);
 
-            // Superponer cada campo
-            $valoresResueltos = $this->resolverValoresCampos($datos);
-            $qrImagenEscrita  = false;
+            for ($p = 1; $p <= $totalPaginas; $p++) {
+                $tpl = $pdf->importPage($p);
+                $sz  = $pdf->getTemplateSize($tpl);
+                $pdf->AddPage(($sz['width'] > $sz['height']) ? 'L' : 'P', [$sz['width'], $sz['height']]);
+                // Fondo: página del PDF original
+                $pdf->useTemplate($tpl, 0, 0, $sz['width'], $sz['height']);
 
-            foreach ($campos as $campo) {
-                $nombreCampo = $campo['campo'] ?? '';
-                if (!$nombreCampo) continue;
+                // Campos que van en esta página
+                $valoresResueltos = $this->resolverValoresCampos($datos);
 
-                $x      = (float)($campo['x']      ?? 0);
-                $y      = (float)($campo['y']      ?? 0);
-                $tamano = (int)  ($campo['tamano'] ?? 10);
-                $negrita= !empty($campo['negrita']) ? 'B' : '';
-                $fuente = $campo['fuente'] ?? 'dejavusans';
-                $color  = $campo['color']  ?? '000000';
-                $ancho  = (float)($campo['ancho']  ?? 0);
+                foreach ($campos as $campo) {
+                    $nombreCampo = $campo['campo'] ?? '';
+                    $pagCampo    = (int)($campo['pagina'] ?? 1);
+                    if (!$nombreCampo || $pagCampo !== $p) continue;
 
-                // Color de texto
-                list($r, $g, $b) = sscanf(str_pad($color, 6, '0', STR_PAD_LEFT), '%02x%02x%02x');
-                $mpdf->SetTextColor($r ?? 0, $g ?? 0, $b ?? 0);
+                    $x      = (float)($campo['x']      ?? 0);
+                    $y      = (float)($campo['y']      ?? 0);
+                    $tamano = (int)  ($campo['tamano'] ?? 10);
+                    $negrita= !empty($campo['negrita']) ? 'B' : '';
+                    $ancho  = (float)($campo['ancho']  ?? 0);
+                    $color  = str_pad($campo['color'] ?? '000000', 6, '0', STR_PAD_LEFT);
 
-                if ($nombreCampo === 'qr_imagen') {
-                    // Insertar imagen QR
-                    $qrCodigo = $datos['qr_codigo'] ?? '';
-                    if ($qrCodigo) {
-                        $alto = (float)($campo['alto'] ?? $ancho ?: 25);
-                        $qrUrl = 'https://quickchart.io/qr?text=' . urlencode($qrCodigo) . '&size=300';
-                        $qrTmp = sys_get_temp_dir() . '/avba_qr_' . uniqid() . '.png';
-                        $qrData = @file_get_contents($qrUrl);
-                        if ($qrData) {
-                            file_put_contents($qrTmp, $qrData);
-                            $mpdf->Image($qrTmp, $x, $y, $ancho ?: 25, $alto);
-                            @unlink($qrTmp);
+                    // Mapeo de nombre de fuente FPDF
+                    $fuenteMap = ['Helvetica' => 'Helvetica', 'Times' => 'Times', 'Courier' => 'Courier'];
+                    $fuente = $fuenteMap[$campo['fuente'] ?? ''] ?? 'Helvetica';
+
+                    // Color de texto (hex → RGB)
+                    [$r, $g, $b] = sscanf($color, '%02x%02x%02x');
+                    $pdf->SetTextColor($r ?? 0, $g ?? 0, $b ?? 0);
+
+                    if ($nombreCampo === 'qr_imagen') {
+                        $qrCodigo = $valoresResueltos['qr_codigo'] ?? '';
+                        if ($qrCodigo) {
+                            $alto  = (float)($campo['alto'] ?? $ancho ?: 25);
+                            $qrUrl = 'https://quickchart.io/qr?text=' . urlencode($qrCodigo) . '&size=300';
+                            $qrTmp = sys_get_temp_dir() . '/avba_qr_' . uniqid() . '.png';
+                            $qrData = @file_get_contents($qrUrl);
+                            if ($qrData) {
+                                file_put_contents($qrTmp, $qrData);
+                                $pdf->Image($qrTmp, $x, $y, $ancho ?: 25, $alto);
+                                @unlink($qrTmp);
+                            }
                         }
-                    }
-                } else {
-                    $valor = (string)($valoresResueltos[$nombreCampo] ?? '');
-                    if ($valor === '') continue;
+                    } else {
+                        $valor = (string)($valoresResueltos[$nombreCampo] ?? '');
+                        if ($valor === '') continue;
 
-                    $mpdf->SetFont($fuente, $negrita, $tamano);
-                    $mpdf->SetXY($x, $y);
-                    $mpdf->Cell($ancho, 0, $valor, 0, 0, '');
+                        $pdf->SetFont($fuente, $negrita, $tamano);
+                        $pdf->SetXY($x, $y);
+                        $pdf->Cell($ancho ?: 0, 0, $valor, 0, 0, '');
+                    }
                 }
             }
 
-            // Solo impresión habilitada, sin edición ni copia
-            $mpdf->SetProtection(['print'], '', $ownerPass);
-            $mpdf->Output($rutaPdf, 'F');
+            $pdf->Output('F', $rutaPdf);
 
             return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
 
@@ -624,7 +646,11 @@ class Certificaciones {
      */
     private function procesarPlantillaDocx(string $rutaPlantilla, array $datos, string $tipo): string {
         if (!class_exists('\PhpOffice\PhpWord\TemplateProcessor')) {
-            require_once __DIR__ . '/../vendor/autoload.php';
+            if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+                require_once __DIR__ . '/../vendor/autoload.php';
+            } else {
+                throw new \RuntimeException('PHPWord no disponible (vendor/ no instalado).');
+            }
         }
 
         $processor = new \PhpOffice\PhpWord\TemplateProcessor($rutaPlantilla);
