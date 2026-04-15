@@ -1322,28 +1322,16 @@ function renderAcciones(d) {
 
   const acciones = [
     {
-      label: "Ver PDF certificado",
-      clase: "btn-accion btn-imprimir-cert",
-      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6V2h8v4M4 12H2V7h12v5h-2M4 10h8v4H4v-4z"/></svg>`,
-      fn: "imprimirPDF('CERT')"
-    },
-    {
-      label: "Ver PDF dictamen",
-      clase: "btn-accion btn-imprimir-dict",
-      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 6V2h8v4M4 12H2V7h12v5h-2M4 10h8v4H4v-4z"/></svg>`,
-      fn: "imprimirPDF('DICT')"
-    },
-    {
-      label: "Descargar Word certificado",
+      label: "Ver Certificado",
       clase: "btn-accion btn-word-cert",
-      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 2H4v12h8V6L9 2zm0 0v4h3M5 9l1.5 4L8 9l1.5 4L11 9"/></svg>`,
-      fn: "descargarDocx('CERT')"
+      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 2H4v12h8V6L9 2zm0 0v4h3"/><path d="M5 8h6M5 11h4"/></svg>`,
+      fn: "verDocPDF('CERT')"
     },
     {
-      label: "Descargar Word dictamen",
+      label: "Ver Dictamen",
       clase: "btn-accion btn-word-dict",
-      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 2H4v12h8V6L9 2zm0 0v4h3M5 9l1.5 4L8 9l1.5 4L11 9"/></svg>`,
-      fn: "descargarDocx('DICT')"
+      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 2H4v12h8V6L9 2zm0 0v4h3"/><path d="M5 8h4M5 11h6"/></svg>`,
+      fn: "verDocPDF('DICT')"
     },
     {
       label: "Enviar certificado",
@@ -1387,13 +1375,14 @@ function formatoFolio(control) {
   return "AB." + control + "-" + new Date().getFullYear() + "MX";
 }
 
-async function imprimirPDF(tipo) {
+async function verDocPDF(tipo) {
   const d = registroActual;
   if (!d) return;
-  const action = tipo === "CERT" ? "IMPRIMIR_PDF_CERT" : "IMPRIMIR_PDF_DICT";
+  const action = tipo === "CERT" ? "GENERAR_PDF_WORD_CERT" : "GENERAR_PDF_WORD_DICT";
+  const label  = tipo === "CERT" ? "certificado" : "dictamen";
   const id = d.id ?? d.fila;
   try {
-    mostrarToast("Generando PDF...", "info");
+    mostrarToast("Generando PDF del " + label + "...", "info");
     const res  = await fetch(API, {
       method: "POST",
       body: JSON.stringify({ action, payload: { id } })
@@ -1407,31 +1396,7 @@ async function imprimirPDF(tipo) {
     }
   } catch (e) {
     mostrarToast("Error de conexión", "err");
-    console.error("imprimirPDF:", e);
-  }
-}
-
-async function descargarDocx(tipo) {
-  const d = registroActual;
-  if (!d) return;
-  const action = tipo === "CERT" ? "DESCARGAR_DOCX_CERT" : "DESCARGAR_DOCX_DICT";
-  const id = d.id ?? d.fila;
-  try {
-    mostrarToast("Generando documento Word...", "info");
-    const res  = await fetch(API, {
-      method: "POST",
-      body: JSON.stringify({ action, payload: { id } })
-    });
-    const data = await res.json();
-    if (data.status === "success" && data.url) {
-      const a = document.createElement("a");
-      a.href = data.url; a.download = ""; a.click();
-      mostrarToast("Archivo Word descargado", "ok");
-    } else {
-      mostrarToast("Error: " + (data.message || ""), "err");
-    }
-  } catch (e) {
-    mostrarToast("Error de conexión", "err");
+    console.error("verDocPDF:", e);
   }
 }
 

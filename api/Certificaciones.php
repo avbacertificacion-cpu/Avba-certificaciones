@@ -81,6 +81,65 @@ class Certificaciones {
         }
     }
 
+    // ── Generar PDF protegido desde plantilla Word ─────────
+    // Convierte el .docx procesado a PDF con LibreOffice y lo
+    // protege con qpdf (solo impresión habilitada).
+    public function generarPdfDesdeWord(int $id, string $tipo): array {
+        $datos = $this->obtenerDatosEquipo($id);
+        if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+
+        try {
+            $tipoPDF  = ($tipo === 'dict') ? 'dictamen' : 'certificado';
+
+            // 1. Generar / recuperar el .docx procesado
+            $rutaDocx = $this->resolverDocx($tipoPDF, $datos);
+            $rutaDir  = UPLOAD_DIR . 'certificados/';
+            $baseName = pathinfo($rutaDocx, PATHINFO_FILENAME);
+            $rutaPdfRaw  = $rutaDir . $baseName . '.pdf';
+            $rutaPdfProt = $rutaDir . $baseName . '_prot.pdf';
+
+            // Siempre regenerar para mantener contenido actualizado
+            if (file_exists($rutaPdfRaw))  @unlink($rutaPdfRaw);
+            if (file_exists($rutaPdfProt)) @unlink($rutaPdfProt);
+
+            // 2. Convertir DOCX → PDF con LibreOffice headless
+            $cmd = 'HOME=/tmp soffice --headless --convert-to pdf --outdir '
+                 . escapeshellarg($rutaDir) . ' '
+                 . escapeshellarg($rutaDocx) . ' 2>&1';
+            exec($cmd, $outLO, $codeLO);
+
+            if ($codeLO !== 0 || !file_exists($rutaPdfRaw)) {
+                throw new \RuntimeException(
+                    'Error al convertir a PDF con LibreOffice. '
+                    . implode(' | ', $outLO)
+                );
+            }
+
+            // 3. Proteger con qpdf: solo impresión, sin copiar ni modificar
+            $ownerPass = 'AVBA' . strtoupper(substr(md5(basename($rutaDocx)), 0, 10));
+            $cmd = 'qpdf --encrypt "" ' . escapeshellarg($ownerPass) . ' 128 '
+                 . '--print=full --modify=none --extract=n '
+                 . '-- ' . escapeshellarg($rutaPdfRaw) . ' ' . escapeshellarg($rutaPdfProt)
+                 . ' 2>&1';
+            exec($cmd, $outQP, $codeQP);
+
+            @unlink($rutaPdfRaw); // eliminar PDF sin protección
+
+            if ($codeQP !== 0 || !file_exists($rutaPdfProt)) {
+                throw new \RuntimeException(
+                    'Error al proteger el PDF con qpdf. '
+                    . implode(' | ', $outQP)
+                );
+            }
+
+            $urlPdf = UPLOAD_URL . 'certificados/' . basename($rutaPdfProt);
+            return ['status' => 'success', 'url' => $urlPdf];
+
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => $e->getMessage()];
+        }
+    }
+
     // ── Generar y enviar certificado ───────────────────────
     public function generarCertEnviar(array $payload, string $usuario): array {
         $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
