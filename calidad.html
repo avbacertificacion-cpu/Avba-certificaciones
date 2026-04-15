@@ -440,6 +440,21 @@
     .tab-btn.active { color: var(--azul); border-bottom-color: var(--azul); }
     .tab-btn:hover:not(.active) { color: var(--texto); }
 
+    /* ── SUB-NAVEGACIÓN ── */
+    .sub-nav {
+      background: var(--gris-bg);
+      border-bottom: 1px solid var(--borde);
+      display: flex; gap: 6px; padding: 8px 24px; flex-wrap: wrap;
+    }
+    .sub-btn {
+      padding: 6px 16px;
+      border: 1.5px solid var(--borde); background: var(--blanco);
+      cursor: pointer; font-size: 12px; font-weight: 600;
+      color: var(--texto-sub); border-radius: 20px; transition: all .15s;
+    }
+    .sub-btn.active { background: var(--azul); color: white; border-color: var(--azul); }
+    .sub-btn:hover:not(.active) { border-color: var(--azul); color: var(--azul); }
+
     /* ── TIPOS DE EQUIPO ── */
     .top-bar {
       display: flex; align-items: center; justify-content: space-between;
@@ -609,16 +624,35 @@
   </div>
 </div>
 
-<!-- TABS NAV -->
+<!-- SECCIÓN NAV PRINCIPAL -->
 <div class="tabs-nav">
-  <button class="tab-btn active" id="tab-btn-inspecciones" onclick="verTab('inspecciones')">Inspecciones</button>
-  <button class="tab-btn"        id="tab-btn-tipos"        onclick="verTab('tipos')">Tipos de Equipo</button>
-  <button class="tab-btn"        id="tab-btn-cursos"       onclick="verTab('cursos')">Cursos</button>
-  <button class="tab-btn"        id="tab-btn-ocupaciones"  onclick="verTab('ocupaciones')">Ocupaciones</button>
-  <button class="tab-btn"        id="tab-btn-accesorios"   onclick="verTab('accesorios')">Accesorios</button>
+  <button class="tab-btn active" id="sec-btn-maquinaria" onclick="verSeccion('maquinaria')">🔧 Maquinaria</button>
+  <button class="tab-btn"        id="sec-btn-accesorios" onclick="verSeccion('accesorios')">🔗 Accesorios</button>
+  <button class="tab-btn"        id="sec-btn-personal"   onclick="verSeccion('personal')">👤 Personal</button>
+  <button class="tab-btn"        id="sec-btn-catalogos"  onclick="verSeccion('catalogos')">⚙️ Catálogos</button>
 </div>
 
-<div id="tab-inspecciones" class="wrap">
+<!-- sub-nav Accesorios -->
+<div class="sub-nav" id="sub-nav-accesorios" style="display:none">
+  <button class="sub-btn active" id="sub-btn-acc-insp"  onclick="verSubTab('accesorios','inspeccionados')">Inspeccionados</button>
+  <button class="sub-btn"        id="sub-btn-acc-tipos" onclick="verSubTab('accesorios','tipos')">Tipos de accesorio</button>
+</div>
+
+<!-- sub-nav Personal -->
+<div class="sub-nav" id="sub-nav-personal" style="display:none">
+  <button class="sub-btn active" id="sub-btn-per-cursos" onclick="verSubTab('personal','cursos')">Cursos impartidos</button>
+  <button class="sub-btn"        id="sub-btn-per-indep"  onclick="verSubTab('personal','independiente')">Independiente</button>
+</div>
+
+<!-- sub-nav Catálogos -->
+<div class="sub-nav" id="sub-nav-catalogos" style="display:none">
+  <button class="sub-btn active" id="sub-btn-cat-equipos" onclick="verSubTab('catalogos','equipos')">Tipos de Equipo</button>
+  <button class="sub-btn"        id="sub-btn-cat-acctip"  onclick="verSubTab('catalogos','acc-tipos')">Tipos de Accesorio</button>
+  <button class="sub-btn"        id="sub-btn-cat-cursos"  onclick="verSubTab('catalogos','cursos')">Cursos</button>
+  <button class="sub-btn"        id="sub-btn-cat-ocup"    onclick="verSubTab('catalogos','ocupaciones')">Ocupaciones</button>
+</div>
+
+<div id="sec-maquinaria" class="wrap">
 
   <!-- STATS -->
   <div class="stats">
@@ -681,13 +715,13 @@
     </div>
   </div>
 
-</div><!-- /tab-inspecciones -->
+</div><!-- /sec-maquinaria -->
 
 
 <!-- ══════════════════════════════════════════
      TAB: TIPOS DE EQUIPO
 ═══════════════════════════════════════════ -->
-<div id="tab-tipos" class="wrap" style="display:none">
+<div id="tab-tipos" class="wrap" style="display:none" data-cat="equipos">
 
   <div class="top-bar">
     <h2>Tipos de equipo y plantillas</h2>
@@ -739,7 +773,7 @@
 <!-- ══════════════════════════════════════════════════════════
      TAB: CURSOS
 ═══════════════════════════════════════════ -->
-<div id="tab-cursos" class="wrap" style="display:none">
+<div id="tab-cursos" class="wrap" style="display:none" data-cat="cursos">
 
   <div class="top-bar">
     <h2>Cursos de capacitación</h2>
@@ -775,7 +809,7 @@
 <!-- ══════════════════════════════════════════════════════════
      TAB: OCUPACIONES ESPECÍFICAS
 ═══════════════════════════════════════════ -->
-<div id="tab-ocupaciones" class="wrap" style="display:none">
+<div id="tab-ocupaciones" class="wrap" style="display:none" data-cat="ocupaciones">
 
   <div class="top-bar">
     <h2>Ocupaciones específicas</h2>
@@ -809,7 +843,7 @@
 <!-- ══════════════════════════════════════════════════════════
      TAB: TIPOS DE ACCESORIOS
 ═══════════════════════════════════════════ -->
-<div id="tab-accesorios" class="wrap" style="display:none">
+<div id="tab-accesorios" class="wrap" style="display:none" data-cat="acc-tipos">
 
   <div class="top-bar">
     <h2>Tipos de accesorio de izaje</h2>
@@ -838,6 +872,176 @@
   </div>
 
 </div><!-- /tab-accesorios -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     SECCIÓN: ACCESORIOS INSPECCIONADOS
+═══════════════════════════════════════════ -->
+<div id="sec-acc-inspeccionados" class="wrap" style="display:none">
+
+  <div class="stats" id="acc-stats">
+    <div class="stat">
+      <div class="stat-n" id="acc-s-sesiones" style="color:var(--azul)">—</div>
+      <div class="stat-l">Sesiones</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n" id="acc-s-total" style="color:var(--texto)">—</div>
+      <div class="stat-l">Accesorios</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n" id="acc-s-cumple" style="color:var(--verde)">—</div>
+      <div class="stat-l">Cumplen</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n" id="acc-s-nocumple" style="color:var(--rojo)">—</div>
+      <div class="stat-l">No cumplen</div>
+    </div>
+  </div>
+
+  <div class="filtros-card" style="gap:8px">
+    <input id="acc-f-cliente" placeholder="Buscar cliente..." oninput="filtrarSesionesAcc()">
+    <input id="acc-f-fecha"   placeholder="Fecha (dd/mm/aaaa)" oninput="filtrarSesionesAcc()">
+  </div>
+
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Sesiones de inspección</span>
+      <span class="tabla-count" id="acc-count">—</span>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th style="width:110px">Fecha</th>
+            <th style="width:90px;text-align:center">Accesorios</th>
+            <th style="width:80px;text-align:center">Cumplen</th>
+            <th style="width:90px;text-align:center">No cumplen</th>
+            <th style="width:80px;text-align:center">Inspector</th>
+            <th style="width:50px"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-acc-sesiones">
+          <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /sec-acc-inspeccionados -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     SECCIÓN: PERSONAL — CURSOS IMPARTIDOS
+═══════════════════════════════════════════ -->
+<div id="sec-personal-cursos" class="wrap" style="display:none">
+
+  <div class="filtros-card" style="gap:8px">
+    <input id="per-c-buscar"  placeholder="Buscar curso o empresa..." oninput="filtrarCursosSesiones()">
+    <input id="per-c-fecha"   placeholder="Fecha del curso..." oninput="filtrarCursosSesiones()">
+  </div>
+
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Cursos impartidos</span>
+      <span class="tabla-count" id="per-cursos-count">—</span>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Curso</th>
+            <th style="width:110px">Fecha</th>
+            <th style="width:100px;text-align:center">Participantes</th>
+            <th style="width:180px">Empresa</th>
+            <th style="width:50px"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-per-cursos">
+          <tr><td colspan="5" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /sec-personal-cursos -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     SECCIÓN: PERSONAL — INDEPENDIENTE
+═══════════════════════════════════════════ -->
+<div id="sec-personal-indep" class="wrap" style="display:none">
+
+  <div class="filtros-card" style="gap:8px">
+    <input id="per-i-buscar" placeholder="Nombre o CURP..." oninput="filtrarIndep()">
+    <select id="per-i-curso" onchange="filtrarIndep()" style="padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);background:white;outline:none">
+      <option value="">Todos los cursos</option>
+    </select>
+  </div>
+
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Participantes registrados</span>
+      <span class="tabla-count" id="per-indep-count">—</span>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th style="width:145px">CURP</th>
+            <th style="width:150px">Curso</th>
+            <th style="width:100px">Fecha</th>
+            <th style="width:100px">Empresa</th>
+            <th style="width:50px"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-per-indep">
+          <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /sec-personal-indep -->
+
+
+<!-- ══ MODAL DETALLE SESIÓN ACCESORIOS ══ -->
+<div class="overlay" id="overlay-acc-sesion" style="display:none" onclick="if(event.target===this)cerrarDetAccSesion()">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:var(--verde)">A</div>
+        <div>
+          <div class="m-title" id="acc-ses-titulo">Detalle de sesión</div>
+          <div class="m-sub"   id="acc-ses-sub">—</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarDetAccSesion()">×</button>
+    </div>
+    <div style="padding:16px 22px 20px;max-height:70vh;overflow-y:auto" id="acc-ses-body">
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL DETALLE PARTICIPANTE (Personal) ══ -->
+<div class="overlay" id="overlay-per-det" style="display:none" onclick="if(event.target===this)cerrarDetPer()">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:var(--azul)">P</div>
+        <div>
+          <div class="m-title" id="per-det-nombre">Participante</div>
+          <div class="m-sub"   id="per-det-sub">—</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarDetPer()">×</button>
+    </div>
+    <div style="padding:16px 22px 20px;max-height:70vh;overflow-y:auto" id="per-det-body">
+    </div>
+  </div>
+</div>
 
 
 <!-- ══ MODAL CURSO ══ -->
@@ -1510,17 +1714,70 @@ cargar();
 
 
 /* ═══════════════════════════════════════
-   TABS
+   NAVEGACIÓN POR SECCIONES
 ═══════════════════════════════════════ */
-function verTab(tab) {
-  ["inspecciones","tipos","cursos","ocupaciones","accesorios"].forEach(t => {
-    document.getElementById("tab-" + t).style.display = tab === t ? "" : "none";
-    document.getElementById("tab-btn-" + t).classList.toggle("active", tab === t);
+const TODOS_CONTENIDOS = [
+  'sec-maquinaria',
+  'sec-acc-inspeccionados', 'tab-accesorios',
+  'sec-personal-cursos',    'sec-personal-indep',
+  'tab-tipos', 'tab-cursos', 'tab-ocupaciones',
+];
+
+function verSeccion(sec) {
+  ['maquinaria','accesorios','personal','catalogos'].forEach(s => {
+    document.getElementById('sec-btn-' + s).classList.toggle('active', s === sec);
   });
-  if (tab === "tipos"       && !tiposCargados)    cargarTipos();
-  if (tab === "cursos"      && !cursosCargados)   cargarCursos();
-  if (tab === "ocupaciones" && !ocupCargados)     cargarOcupaciones();
-  if (tab === "accesorios")                       cargarAccTipos();
+  ['accesorios','personal','catalogos'].forEach(s => {
+    document.getElementById('sub-nav-' + s).style.display = 'none';
+  });
+  TODOS_CONTENIDOS.forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+
+  if (sec === 'maquinaria') {
+    document.getElementById('sec-maquinaria').style.display = '';
+  } else if (sec === 'accesorios') {
+    document.getElementById('sub-nav-accesorios').style.display = '';
+    verSubTab('accesorios', 'inspeccionados');
+  } else if (sec === 'personal') {
+    document.getElementById('sub-nav-personal').style.display = '';
+    verSubTab('personal', 'cursos');
+  } else if (sec === 'catalogos') {
+    document.getElementById('sub-nav-catalogos').style.display = '';
+    verSubTab('catalogos', 'equipos');
+  }
+}
+
+function verSubTab(sec, sub) {
+  const subBtns = {
+    accesorios: { inspeccionados:'sub-btn-acc-insp',  tipos:'sub-btn-acc-tipos' },
+    personal:   { cursos:'sub-btn-per-cursos', independiente:'sub-btn-per-indep' },
+    catalogos:  { equipos:'sub-btn-cat-equipos','acc-tipos':'sub-btn-cat-acctip',
+                  cursos:'sub-btn-cat-cursos', ocupaciones:'sub-btn-cat-ocup' },
+  };
+  Object.entries(subBtns[sec] || {}).forEach(([s, btnId]) => {
+    document.getElementById(btnId).classList.toggle('active', s === sub);
+  });
+
+  TODOS_CONTENIDOS.forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+
+  const contentMap = {
+    accesorios: { inspeccionados:'sec-acc-inspeccionados', tipos:'tab-accesorios' },
+    personal:   { cursos:'sec-personal-cursos', independiente:'sec-personal-indep' },
+    catalogos:  { equipos:'tab-tipos','acc-tipos':'tab-accesorios', cursos:'tab-cursos', ocupaciones:'tab-ocupaciones' },
+  };
+  const targetId = contentMap[sec]?.[sub];
+  if (targetId) document.getElementById(targetId).style.display = '';
+
+  if (sec === 'accesorios' && sub === 'inspeccionados' && !accSesionesCargadas) cargarSesionesAcc();
+  if (sec === 'accesorios' && sub === 'tipos')                                   cargarAccTipos();
+  if (sec === 'personal'   && !perCargados)                                      cargarPersonal();
+  if (sec === 'catalogos'  && sub === 'equipos'     && !tiposCargados)           cargarTipos();
+  if (sec === 'catalogos'  && sub === 'cursos'      && !cursosCargados)          cargarCursos();
+  if (sec === 'catalogos'  && sub === 'ocupaciones' && !ocupCargados)            cargarOcupaciones();
+  if (sec === 'catalogos'  && sub === 'acc-tipos')                               cargarAccTipos();
 }
 
 /* ════════════════════════════════════════
@@ -1848,6 +2105,244 @@ async function guardarAccTipo() {
 function escH(s) {
   return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
+
+/* ════════════════════════════════════════
+   ACCESORIOS INSPECCIONADOS
+════════════════════════════════════════ */
+let accSesionesCargadas = false;
+let accSesionesData     = [];
+
+async function cargarSesionesAcc() {
+  const tbody = document.getElementById('tbody-acc-sesiones');
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>`;
+  try {
+    const res  = await fetch(API + '?action=LISTAR_SESIONES_ACCESORIOS');
+    const data = await res.json();
+    accSesionesData    = Array.isArray(data.data) ? data.data : [];
+    accSesionesCargadas = true;
+    const total    = accSesionesData.reduce((s,r)=>s+(+r.total),    0);
+    const cumple   = accSesionesData.reduce((s,r)=>s+(+r.cumple),   0);
+    const nocumple = accSesionesData.reduce((s,r)=>s+(+r.no_cumple),0);
+    document.getElementById('acc-s-sesiones').textContent = accSesionesData.length;
+    document.getElementById('acc-s-total').textContent    = total;
+    document.getElementById('acc-s-cumple').textContent   = cumple;
+    document.getElementById('acc-s-nocumple').textContent = nocumple;
+    filtrarSesionesAcc();
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--rojo)">Error de conexión</td></tr>`;
+  }
+}
+
+function filtrarSesionesAcc() {
+  const q  = document.getElementById('acc-f-cliente').value.toLowerCase();
+  const qf = document.getElementById('acc-f-fecha').value.toLowerCase();
+  renderSesionesAcc(accSesionesData.filter(r =>
+    (!q  || r.cliente.toLowerCase().includes(q)) &&
+    (!qf || (r.fecha||'').toLowerCase().includes(qf))
+  ));
+}
+
+function renderSesionesAcc(data) {
+  const tbody = document.getElementById('tbody-acc-sesiones');
+  document.getElementById('acc-count').textContent = data.length + ' sesión' + (data.length!==1?'es':'');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin registros</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td style="font-weight:600">${escH(r.cliente)}</td>
+      <td>${r.fecha||'—'}</td>
+      <td style="text-align:center;font-weight:700;color:var(--azul)">${r.total}</td>
+      <td style="text-align:center">
+        <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--verde-light);color:var(--verde)">${r.cumple}</span>
+      </td>
+      <td style="text-align:center">
+        <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;
+              ${+r.no_cumple>0?'background:var(--rojo-light);color:var(--rojo)':'background:#f0f0f0;color:#888'}">${r.no_cumple}</span>
+      </td>
+      <td style="text-align:center;font-size:11px;color:var(--texto-sub)">${escH(r.usuario||'—')}</td>
+      <td style="text-align:right">
+        <button onclick="abrirDetAccSesion(${r.id})"
+                style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
+      </td>
+    </tr>`).join('');
+}
+
+async function abrirDetAccSesion(id) {
+  document.getElementById('overlay-acc-sesion').style.display = 'flex';
+  document.getElementById('acc-ses-body').innerHTML = `<div style="text-align:center;padding:32px;color:var(--texto-hint)">Cargando...</div>`;
+  try {
+    const res  = await fetch(API + `?action=DETALLE_SESION_ACCESORIOS&id=${id}`);
+    const data = await res.json();
+    if (data.status !== 'success') throw new Error(data.message);
+    const s = data.data;
+    document.getElementById('acc-ses-titulo').textContent = s.cliente;
+    document.getElementById('acc-ses-sub').textContent    = (s.fecha||'') + (s.usuario ? ' · '+s.usuario : '');
+    document.getElementById('acc-ses-body').innerHTML = (s.accesorios||[]).map((a,i) => `
+      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--borde)">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--azul-light);color:var(--azul);
+                    font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--texto)">${escH(a.tipo_nombre||'—')}</div>
+          <div style="font-size:11px;color:var(--texto-sub);margin-top:2px">
+            ${[a.id_accesorio,a.marca,a.modelo,a.serie].filter(Boolean).map(escH).join(' · ')||'—'}
+            ${a.capacidad?' · '+escH(a.capacidad):''}${a.medidas?' · '+escH(a.medidas):''}
+          </div>
+          ${+a.total_fotos>0?`<div style="font-size:10px;color:var(--azul);margin-top:2px">📷 ${a.total_fotos} foto${a.total_fotos!=1?'s':''}</div>`:''}
+        </div>
+        <span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0;
+              ${a.estado==='CUMPLE'?'background:var(--verde-light);color:var(--verde)':'background:var(--rojo-light);color:var(--rojo)'}">
+          ${a.estado==='CUMPLE'?'✓ Cumple':'✗ No cumple'}
+        </span>
+      </div>`).join('') || `<div style="text-align:center;padding:32px;color:var(--texto-hint)">Sin accesorios</div>`;
+  } catch (e) {
+    document.getElementById('acc-ses-body').innerHTML = `<div style="text-align:center;padding:32px;color:var(--rojo)">Error al cargar.</div>`;
+  }
+}
+
+function cerrarDetAccSesion() {
+  document.getElementById('overlay-acc-sesion').style.display = 'none';
+}
+
+/* ════════════════════════════════════════
+   PERSONAL (cursos + independiente)
+════════════════════════════════════════ */
+let perCargados = false;
+let perData     = [];
+
+async function cargarPersonal() {
+  try {
+    const res  = await fetch(API + '?action=LISTAR_PARTICIPANTES');
+    const data = await res.json();
+    perData     = Array.isArray(data) ? data : [];
+    perCargados = true;
+    // Dropdown de cursos para filtro independiente
+    const cursosUnicos = [...new Map(perData.map(p=>[p.curso_nombre,p])).values()];
+    const sel = document.getElementById('per-i-curso');
+    sel.innerHTML = '<option value="">Todos los cursos</option>' +
+      cursosUnicos.map(p=>`<option value="${escH(p.curso_nombre)}">${escH(p.curso_nombre||'—')}</option>`).join('');
+    filtrarCursosSesiones();
+    filtrarIndep();
+  } catch (e) { console.error('Error cargando personal:', e); }
+}
+
+function filtrarCursosSesiones() {
+  const q  = (document.getElementById('per-c-buscar').value||'').toLowerCase();
+  const qf = (document.getElementById('per-c-fecha').value ||'').toLowerCase();
+  const grupos = {};
+  perData.forEach(p => {
+    const key = (p.curso_nombre||'') + '||' + (p.fecha_curso||'');
+    if (!grupos[key]) grupos[key] = { curso_nombre:p.curso_nombre||'—', fecha_curso:p.fecha_curso||'—', empresa:p.empresa_nombre||'', participantes:[] };
+    grupos[key].participantes.push(p);
+    if (p.empresa_nombre && !grupos[key].empresa) grupos[key].empresa = p.empresa_nombre;
+  });
+  let lista = Object.values(grupos).sort((a,b)=>b.fecha_curso.localeCompare(a.fecha_curso));
+  if (q)  lista = lista.filter(g=>g.curso_nombre.toLowerCase().includes(q)||(g.empresa||'').toLowerCase().includes(q));
+  if (qf) lista = lista.filter(g=>(g.fecha_curso||'').includes(qf));
+  renderCursosSesiones(lista);
+}
+
+function renderCursosSesiones(lista) {
+  const tbody = document.getElementById('tbody-per-cursos');
+  document.getElementById('per-cursos-count').textContent = lista.length + ' sesión' + (lista.length!==1?'es':'');
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin sesiones registradas</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = lista.map(g => `
+    <tr>
+      <td style="font-weight:600;color:var(--texto)">${escH(g.curso_nombre)}</td>
+      <td>${escH(g.fecha_curso)}</td>
+      <td style="text-align:center">
+        <span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--azul-light);color:var(--azul)">${g.participantes.length}</span>
+      </td>
+      <td style="font-size:12px;color:var(--texto-sub)">${escH(g.empresa||'—')}</td>
+      <td style="text-align:right">
+        <button onclick='abrirSesionParticipantes(${JSON.stringify({curso_nombre:g.curso_nombre,fecha_curso:g.fecha_curso,empresa:g.empresa,participantes:g.participantes.map(p=>({id:p.id,nombre_completo:p.nombre_completo,curp:p.curp,puesto:p.puesto}))}).replace(/'/g,"&#39;")})'
+                style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
+      </td>
+    </tr>`).join('');
+}
+
+function filtrarIndep() {
+  const q  = (document.getElementById('per-i-buscar').value||'').toLowerCase();
+  const qc =  document.getElementById('per-i-curso').value||'';
+  renderIndep(perData.filter(p=>
+    (!q  || p.nombre_completo.toLowerCase().includes(q)||(p.curp||'').toLowerCase().includes(q)) &&
+    (!qc || p.curso_nombre===qc)
+  ));
+}
+
+function renderIndep(data) {
+  const tbody = document.getElementById('tbody-per-indep');
+  document.getElementById('per-indep-count').textContent = data.length + ' participante' + (data.length!==1?'s':'');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin participantes</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(p => `
+    <tr>
+      <td style="font-weight:600">${escH(p.nombre_completo)}</td>
+      <td style="font-size:11px;color:var(--texto-sub);letter-spacing:.03em">${escH(p.curp||'—')}</td>
+      <td style="font-size:12px">${escH(p.curso_nombre||'—')}</td>
+      <td style="font-size:12px">${escH(p.fecha_curso||'—')}</td>
+      <td style="font-size:12px;color:var(--texto-sub)">${escH(p.empresa_nombre||'—')}</td>
+      <td style="text-align:right">
+        <button onclick="abrirDetPer(${p.id})"
+                style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
+      </td>
+    </tr>`).join('');
+}
+
+function abrirSesionParticipantes(g) {
+  if (typeof g === 'string') g = JSON.parse(g);
+  document.getElementById('per-det-nombre').textContent = g.curso_nombre;
+  document.getElementById('per-det-sub').textContent    = (g.fecha_curso||'') + (g.empresa?' · '+g.empresa:'');
+  document.getElementById('per-det-body').innerHTML = g.participantes.map(p => `
+    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--borde)">
+      <div style="flex:1">
+        <div style="font-size:13px;font-weight:600;color:var(--texto)">${escH(p.nombre_completo)}</div>
+        <div style="font-size:11px;color:var(--texto-sub);margin-top:2px">${escH(p.curp||'—')}${p.puesto?' · '+escH(p.puesto):''}</div>
+      </div>
+      <button onclick="abrirDetPer(${p.id})"
+              style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer">Detalle</button>
+    </div>`).join('');
+  document.getElementById('overlay-per-det').style.display = 'flex';
+}
+
+async function abrirDetPer(id) {
+  document.getElementById('overlay-per-det').style.display = 'flex';
+  document.getElementById('per-det-body').innerHTML = `<div style="text-align:center;padding:32px;color:var(--texto-hint)">Cargando...</div>`;
+  try {
+    const res  = await fetch(API + `?action=OBTENER_PARTICIPANTE&id=${id}`);
+    const p    = await res.json();
+    if (!p || p.status === 'error') throw new Error(p?.message);
+    document.getElementById('per-det-nombre').textContent = p.nombre_completo;
+    document.getElementById('per-det-sub').textContent    = (p.curso_nombre||'') + ' · ' + (p.fecha_curso||'');
+    document.getElementById('per-det-body').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;font-size:13px;margin-bottom:14px">
+        <div><span style="font-size:11px;color:var(--texto-sub);display:block">CURP</span>${escH(p.curp||'—')}</div>
+        <div><span style="font-size:11px;color:var(--texto-sub);display:block">Puesto</span>${escH(p.puesto||'—')}</div>
+        <div><span style="font-size:11px;color:var(--texto-sub);display:block">Ocupación</span>${escH(p.ocupacion_nombre||'—')}</div>
+        <div><span style="font-size:11px;color:var(--texto-sub);display:block">Capacidad</span>${p.capacidad_na?'N/A':escH(p.capacidad||'—')}</div>
+        <div><span style="font-size:11px;color:var(--texto-sub);display:block">Teléfono</span>${escH(p.telefono||'—')}</div>
+        <div><span style="font-size:11px;color:var(--texto-sub);display:block">Empresa</span>${escH(p.empresa_nombre||'—')}</div>
+        ${p.empresa_rfc?`<div><span style="font-size:11px;color:var(--texto-sub);display:block">RFC</span>${escH(p.empresa_rfc)}</div>`:''}
+        ${p.empresa_representante?`<div><span style="font-size:11px;color:var(--texto-sub);display:block">Representante</span>${escH(p.empresa_representante)}</div>`:''}
+      </div>
+      ${p.foto_persona_url?`<div style="margin-bottom:12px"><span style="font-size:11px;color:var(--texto-sub);display:block;margin-bottom:6px">Fotografía</span><img src="${escH(p.foto_persona_url)}" style="max-width:120px;border-radius:8px;border:1px solid var(--borde)"></div>`:''}
+      ${p.foto_documentacion_url?`<div style="margin-bottom:12px"><span style="font-size:11px;color:var(--texto-sub);display:block;margin-bottom:6px">Documento</span><img src="${escH(p.foto_documentacion_url)}" style="max-width:200px;border-radius:8px;border:1px solid var(--borde)"></div>`:''}
+      ${p.documentos?.length?`<div><span style="font-size:11px;color:var(--texto-sub);display:block;margin-bottom:6px">Documentos</span>${p.documentos.map(d=>`<div style="font-size:12px;padding:4px 0">${escH(d.tipo_doc)} — ${escH(d.fecha)} <a href="${escH(d.url)}" target="_blank" style="color:var(--azul)">Descargar</a></div>`).join('')}</div>`:''}`;
+  } catch (e) {
+    document.getElementById('per-det-body').innerHTML = `<div style="text-align:center;padding:32px;color:var(--rojo)">Error al cargar.</div>`;
+  }
+}
+
+function cerrarDetPer() {
+  document.getElementById('overlay-per-det').style.display = 'none';
+}
+
 
 /* ═══════════════════════════════════════
    TIPOS DE EQUIPO — estado

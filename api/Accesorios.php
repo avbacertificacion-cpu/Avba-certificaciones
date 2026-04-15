@@ -174,4 +174,48 @@ class Accesorios {
             'tipo_nombre' => $tipoNombre,
         ];
     }
+
+    // ── Listar sesiones con resumen de accesorios ──────────
+    public function listarSesiones(): array {
+        $rows = $this->pdo->query(
+            "SELECT s.id, s.cliente,
+                    DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha,
+                    s.coordenadas, s.usuario,
+                    DATE_FORMAT(s.fecha_registro,'%d/%m/%Y %H:%i') AS fecha_registro,
+                    COUNT(a.id)                                           AS total,
+                    SUM(a.estado = 'CUMPLE')                              AS cumple,
+                    SUM(a.estado = 'NO CUMPLE')                           AS no_cumple
+             FROM accesorios_sesiones s
+             LEFT JOIN accesorios_izaje a ON a.sesion_id = s.id
+             GROUP BY s.id
+             ORDER BY s.fecha_registro DESC"
+        )->fetchAll();
+
+        return ['status' => 'success', 'data' => $rows];
+    }
+
+    // ── Detalle de una sesión con sus accesorios ───────────
+    public function detalleSesion(int $id): array {
+        $chk = $this->pdo->prepare("SELECT id, cliente, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, coordenadas, usuario FROM accesorios_sesiones WHERE id = ?");
+        $chk->execute([$id]);
+        $sesion = $chk->fetch();
+        if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+
+        $stmt = $this->pdo->prepare(
+            "SELECT a.id, a.id_accesorio, t.nombre AS tipo_nombre,
+                    a.marca, a.modelo, a.serie, a.capacidad, a.medidas,
+                    a.estado, a.orden,
+                    COUNT(f.id) AS total_fotos
+             FROM accesorios_izaje a
+             LEFT JOIN accesorios_tipos t ON t.id = a.tipo_id
+             LEFT JOIN accesorios_fotos f ON f.accesorio_id = a.id
+             WHERE a.sesion_id = ?
+             GROUP BY a.id
+             ORDER BY a.orden"
+        );
+        $stmt->execute([$id]);
+        $sesion['accesorios'] = $stmt->fetchAll();
+
+        return ['status' => 'success', 'data' => $sesion];
+    }
 }
