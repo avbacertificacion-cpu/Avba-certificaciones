@@ -82,59 +82,111 @@ class Certificaciones {
     }
 
     // ── Generar PDF protegido desde plantilla Word ─────────
-    // Convierte el .docx procesado a PDF con LibreOffice y lo
-    // protege con qpdf (solo impresión habilitada).
+    // Estrategia 1: Microservicio VPS (LibreOffice + qpdf)
+    // Estrategia 2: Fallback PHP puro (PHPWord → mPDF)
     public function generarPdfDesdeWord(int $id, string $tipo): array {
         $datos = $this->obtenerDatosEquipo($id);
         if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
         try {
-            $tipoPDF  = ($tipo === 'dict') ? 'dictamen' : 'certificado';
-
-            // 1. Generar / recuperar el .docx procesado
-            $rutaDocx = $this->resolverDocx($tipoPDF, $datos);
-            $rutaDir  = UPLOAD_DIR . 'certificados/';
-            $baseName = pathinfo($rutaDocx, PATHINFO_FILENAME);
-            $rutaPdfRaw  = $rutaDir . $baseName . '.pdf';
+            $tipoPDF     = ($tipo === 'dict') ? 'dictamen' : 'certificado';
+            $rutaDocx    = $this->resolverDocx($tipoPDF, $datos);
+            $rutaDir     = UPLOAD_DIR . 'certificados/';
+            $baseName    = pathinfo($rutaDocx, PATHINFO_FILENAME);
             $rutaPdfProt = $rutaDir . $baseName . '_prot.pdf';
+            $ownerPass   = 'AVBA' . strtoupper(substr(md5(basename($rutaDocx)), 0, 10));
 
-            // Siempre regenerar para mantener contenido actualizado
-            if (file_exists($rutaPdfRaw))  @unlink($rutaPdfRaw);
             if (file_exists($rutaPdfProt)) @unlink($rutaPdfProt);
 
-            // 2. Convertir DOCX → PDF con LibreOffice headless
-            $cmd = 'HOME=/tmp soffice --headless --convert-to pdf --outdir '
-                 . escapeshellarg($rutaDir) . ' '
-                 . escapeshellarg($rutaDocx);
-            [$outLO, $codeLO] = $this->runCmd($cmd);
+            // ── Estrategia 1: microservicio ───────────────────
+            $serviceUrl = defined('CONVERT_SERVICE_URL') ? CONVERT_SERVICE_URL : '';
+            $serviceKey = defined('CONVERT_SERVICE_KEY') ? CONVERT_SERVICE_KEY : '';
 
-            if ($codeLO !== 0 || !file_exists($rutaPdfRaw)) {
-                throw new \RuntimeException(
-                    'Error al convertir a PDF con LibreOffice. ' . implode(' | ', $outLO)
-                );
+            if ($serviceUrl) {
+                $this->convertirViaServicio($rutaDocx, $rutaPdfProt, $serviceUrl, $serviceKey, $ownerPass);
+                if (file_exists($rutaPdfProt)) {
+                    return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdfProt)];
+                }
             }
 
-            // 3. Proteger con qpdf: solo impresión, sin copiar ni modificar
-            $ownerPass = 'AVBA' . strtoupper(substr(md5(basename($rutaDocx)), 0, 10));
-            $cmd = 'qpdf --encrypt "" ' . escapeshellarg($ownerPass) . ' 128 '
-                 . '--print=full --modify=none --extract=n '
-                 . '-- ' . escapeshellarg($rutaPdfRaw) . ' ' . escapeshellarg($rutaPdfProt);
-            [$outQP, $codeQP] = $this->runCmd($cmd);
+            // ── Estrategia 2: PHPWord → mPDF (fallback) ──────
+            $phpWord = \PhpOffice\PhpWord\IOFactory::load($rutaDocx);
+            $tmpHtml = sys_get_temp_dir() . '/avba_' . uniqid() . '.html';
+            \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'HTML')->save($tmpHtml);
+            $html = (string) file_get_contents($tmpHtml);
+            @unlink($tmpHtml);
 
-            @unlink($rutaPdfRaw); // eliminar PDF sin protección
+            $mpdfTmp = sys_get_temp_dir() . '/mpdf_' . uniqid();
+            if (!is_dir($mpdfTmp)) mkdir($mpdfTmp, 0755, true);
 
-            if ($codeQP !== 0 || !file_exists($rutaPdfProt)) {
-                throw new \RuntimeException(
-                    'Error al proteger el PDF con qpdf. ' . implode(' | ', $outQP)
-                );
-            }
+            $mpdf = new \Mpdf\Mpdf([
+                'tempDir'       => $mpdfTmp,
+                'margin_left'   => 15, 'margin_right'  => 15,
+                'margin_top'    => 16, 'margin_bottom' => 16,
+                'default_font'  => 'dejavusans',
+            ]);
+            $mpdf->SetProtection(['print'], '', $ownerPass);
+            $mpdf->WriteHTML($html);
+            $mpdf->Output($rutaPdfProt, 'F');
 
-            $urlPdf = UPLOAD_URL . 'certificados/' . basename($rutaPdfProt);
-            return ['status' => 'success', 'url' => $urlPdf];
+            return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdfProt)];
 
         } catch (\Exception $e) {
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Envía el .docx al microservicio VPS y guarda el PDF protegido devuelto.
+     */
+    private function convertirViaServicio(
+        string $rutaDocx,
+        string $rutaPdfProt,
+        string $url,
+        string $apiKey,
+        string $ownerPass
+    ): void {
+        if (!function_exists('curl_init')) {
+            throw new \RuntimeException('cURL no está disponible en este servidor.');
+        }
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 90,
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_POSTFIELDS     => [
+                'file'       => new \CURLFile(
+                                    $rutaDocx,
+                                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                    basename($rutaDocx)
+                                ),
+                'api_key'    => $apiKey,
+                'owner_pass' => $ownerPass,
+            ],
+        ]);
+
+        $response    = curl_exec($ch);
+        $httpCode    = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $curlError   = curl_error($ch);
+        curl_close($ch);
+
+        if ($curlError) {
+            throw new \RuntimeException('Error de conexión con el microservicio: ' . $curlError);
+        }
+        if ($httpCode !== 200) {
+            $err = @json_decode((string)$response, true);
+            throw new \RuntimeException('Microservicio error ' . $httpCode . ': ' . ($err['error'] ?? $response));
+        }
+        if (strpos($contentType, 'application/pdf') === false) {
+            throw new \RuntimeException('Respuesta inesperada del microservicio (no es PDF).');
+        }
+
+        $rutaDir = dirname($rutaPdfProt);
+        if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
+        file_put_contents($rutaPdfProt, $response);
     }
 
     /**
