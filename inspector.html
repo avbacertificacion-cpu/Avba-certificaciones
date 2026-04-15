@@ -2196,8 +2196,10 @@ function abrirModulo(modulo) {
 
   } else if (modulo === 'historial') {
     document.getElementById('pantalla-historial').style.display = 'block';
-    document.getElementById('header-title').textContent = 'Mis Inspecciones';
-    document.getElementById('header-sub').textContent = 'Historial de inspecciones realizadas';
+    const _sH = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const _esAdmin = ['ADMIN','CALIDAD'].includes(_sH.rol);
+    document.getElementById('header-title').textContent = _esAdmin ? 'Todas las Inspecciones' : 'Mis Inspecciones';
+    document.getElementById('header-sub').textContent = _esAdmin ? 'Historial completo de inspecciones' : 'Historial de inspecciones realizadas';
     cargarHistorial();
 
   } else if (modulo === 'cursos') {
@@ -2238,7 +2240,7 @@ async function cargarHistorial() {
 
   try {
     const s      = JSON.parse(localStorage.getItem('avba_session') || '{}');
-    const action = s.rol === 'ADMIN' ? 'GET_TODAS_INSPECCIONES' : 'GET_MIS_INSPECCIONES';
+    const action = ['ADMIN','CALIDAD'].includes(s.rol) ? 'GET_TODAS_INSPECCIONES' : 'GET_MIS_INSPECCIONES';
     const res    = await fetch(`${WEB_APP_URL}?action=${action}`);
     const data   = await res.json();
 
