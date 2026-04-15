@@ -81,10 +81,16 @@ class Certificaciones {
         }
     }
 
-    // ── Generar PDF protegido desde plantilla Word ─────────
-    // Estrategia 1: Microservicio VPS (LibreOffice + qpdf)
-    // Estrategia 2: Fallback PHP puro (PHPWord → mPDF)
+    // ── Generar PDF del documento ─────────────────────────────
+    // Estrategia 1: Plantilla PDF + coordenadas (calidad perfecta, PHP puro)
+    // Estrategia 2: Microservicio VPS (LibreOffice + qpdf, plantilla Word)
+    // Estrategia 3: Fallback PHPWord → mPDF (PHP puro, plantilla Word)
     public function generarPdfDesdeWord(int $id, string $tipo): array {
+        // Intentar primero con plantilla PDF si existe
+        $resultado = $this->generarPdfDesdeTemplatePdf($id, $tipo);
+        if ($resultado['status'] === 'success') return $resultado;
+
+        // Si no hay plantilla PDF configurada, continuar con Word
         $datos = $this->obtenerDatosEquipo($id);
         if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
@@ -392,6 +398,153 @@ class Certificaciones {
     // ══════════════════════════════════════════════════════
     //  MÉTODOS PRIVADOS
     // ══════════════════════════════════════════════════════
+
+    // ── Generar PDF desde plantilla PDF + coordenadas ────────
+    // Carga la plantilla PDF como fondo, superpone los campos
+    // del equipo en las coordenadas configuradas y protege el
+    // resultado (solo impresión habilitada).
+    public function generarPdfDesdeTemplatePdf(int $id, string $tipo): array {
+        $datos = $this->obtenerDatosEquipo($id);
+        if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+
+        // Obtener plantilla PDF y campos configurados
+        $stmt = $this->pdo->prepare(
+            "SELECT plantilla_cert_pdf, plantilla_dict_pdf,
+                    cert_pdf_campos, dict_pdf_campos
+             FROM maquinaria_tipos WHERE nombre = ? LIMIT 1"
+        );
+        $stmt->execute([$datos['maquinaria'] ?? '']);
+        $row = $stmt->fetch();
+
+        $colPdf    = ($tipo === 'dict') ? 'plantilla_dict_pdf'  : 'plantilla_cert_pdf';
+        $colCampos = ($tipo === 'dict') ? 'dict_pdf_campos'      : 'cert_pdf_campos';
+
+        $archivoTpl = $row[$colPdf]    ?? null;
+        $camposJson = $row[$colCampos] ?? null;
+
+        if (empty($archivoTpl)) {
+            return ['status' => 'error', 'message' =>
+                'No hay plantilla PDF configurada para este tipo de equipo. '
+                . 'Súbela desde Calidad → Tipos de Equipo.'];
+        }
+
+        $rutaTpl = __DIR__ . '/../uploads/plantillas/' . $archivoTpl;
+        if (!file_exists($rutaTpl)) {
+            return ['status' => 'error', 'message' =>
+                "Archivo de plantilla PDF '{$archivoTpl}' no encontrado. "
+                . 'Vuelve a subirlo desde Calidad.'];
+        }
+
+        $campos = json_decode($camposJson ?: '[]', true) ?: [];
+
+        try {
+            $rutaDir  = UPLOAD_DIR . 'certificados/';
+            if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
+
+            $folio     = $datos['control'] ?? (string)($datos['id'] ?? 'doc');
+            $sufijo    = strtoupper($tipo === 'dict' ? 'DICT' : 'CERT');
+            $rutaPdf   = $rutaDir . $sufijo . '_PDF_' . $folio . '_prot.pdf';
+            $ownerPass = 'AVBA' . strtoupper(substr(md5($folio . $tipo), 0, 10));
+
+            $mpdfTmp = sys_get_temp_dir() . '/mpdf_' . uniqid();
+            if (!is_dir($mpdfTmp)) mkdir($mpdfTmp, 0755, true);
+
+            // Obtener dimensiones de la plantilla PDF
+            // mPDF usará la plantilla completa como fondo de cada página
+            $mpdf = new \Mpdf\Mpdf([
+                'tempDir'       => $mpdfTmp,
+                'margin_left'   => 0,
+                'margin_right'  => 0,
+                'margin_top'    => 0,
+                'margin_bottom' => 0,
+                'default_font'  => 'dejavusans',
+            ]);
+
+            // Cargar PDF base como plantilla de fondo
+            $mpdf->SetDocTemplate($rutaTpl, true);
+            $mpdf->AddPage();
+
+            // Superponer cada campo
+            $valoresResueltos = $this->resolverValoresCampos($datos);
+            $qrImagenEscrita  = false;
+
+            foreach ($campos as $campo) {
+                $nombreCampo = $campo['campo'] ?? '';
+                if (!$nombreCampo) continue;
+
+                $x      = (float)($campo['x']      ?? 0);
+                $y      = (float)($campo['y']      ?? 0);
+                $tamano = (int)  ($campo['tamano'] ?? 10);
+                $negrita= !empty($campo['negrita']) ? 'B' : '';
+                $fuente = $campo['fuente'] ?? 'dejavusans';
+                $color  = $campo['color']  ?? '000000';
+                $ancho  = (float)($campo['ancho']  ?? 0);
+
+                // Color de texto
+                list($r, $g, $b) = sscanf(str_pad($color, 6, '0', STR_PAD_LEFT), '%02x%02x%02x');
+                $mpdf->SetTextColor($r ?? 0, $g ?? 0, $b ?? 0);
+
+                if ($nombreCampo === 'qr_imagen') {
+                    // Insertar imagen QR
+                    $qrCodigo = $datos['qr_codigo'] ?? '';
+                    if ($qrCodigo) {
+                        $alto = (float)($campo['alto'] ?? $ancho ?: 25);
+                        $qrUrl = 'https://quickchart.io/qr?text=' . urlencode($qrCodigo) . '&size=300';
+                        $qrTmp = sys_get_temp_dir() . '/avba_qr_' . uniqid() . '.png';
+                        $qrData = @file_get_contents($qrUrl);
+                        if ($qrData) {
+                            file_put_contents($qrTmp, $qrData);
+                            $mpdf->Image($qrTmp, $x, $y, $ancho ?: 25, $alto);
+                            @unlink($qrTmp);
+                        }
+                    }
+                } else {
+                    $valor = (string)($valoresResueltos[$nombreCampo] ?? '');
+                    if ($valor === '') continue;
+
+                    $mpdf->SetFont($fuente, $negrita, $tamano);
+                    $mpdf->SetXY($x, $y);
+                    $mpdf->Cell($ancho, 0, $valor, 0, 0, '');
+                }
+            }
+
+            // Solo impresión habilitada, sin edición ni copia
+            $mpdf->SetProtection(['print'], '', $ownerPass);
+            $mpdf->Output($rutaPdf, 'F');
+
+            return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
+
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => 'Error generando PDF: ' . $e->getMessage()];
+        }
+    }
+
+    /** Devuelve todos los valores resueltos para los campos de la plantilla. */
+    private function resolverValoresCampos(array $datos): array {
+        $fecha   = $datos['fecha_inspeccion'] ?? null;
+        $fechaFmt= $fecha ? (new \DateTime($fecha))->format('d/m/Y') : '';
+        $vigencia= '';
+        if ($fecha) {
+            $v = new \DateTime($fecha);
+            $v->modify('+1 year');
+            $vigencia = $v->format('d/m/Y');
+        }
+        return [
+            'folio'      => $datos['control']     ? 'AB.' . $datos['control'] . '-' . date('Y') . 'MX' : '',
+            'cliente'    => $datos['cliente']     ?? '',
+            'domicilio'  => $datos['direccion']   ?? '',
+            'maquinaria' => $datos['maquinaria']  ?? '',
+            'marca'      => $datos['marca']       ?? '',
+            'modelo'     => $datos['modelo']      ?? '',
+            'serie'      => $datos['serie']       ?? '',
+            'id_equipo'  => $datos['id_equipo']   ?? '',
+            'capacidad'  => $datos['capacidad']   ?? '',
+            'fecha'      => $fechaFmt,
+            'vigencia'   => $vigencia,
+            'anio'       => date('Y'),
+            'qr_codigo'  => $datos['qr_codigo']   ?? '',
+        ];
+    }
 
     private function obtenerDatosEquipo(int $id): ?array {
         $stmt = $this->pdo->prepare("SELECT * FROM equipos WHERE id = ?");

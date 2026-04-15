@@ -1212,6 +1212,54 @@
 </div>
 
 
+<!-- ══ MODAL CAMPOS PDF ══ -->
+<div class="overlay" id="overlay-campos-pdf" onclick="if(event.target===this)cerrarModalCamposPdf()">
+  <div class="modal" style="max-width:900px;width:95vw">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:#c0392b">P</div>
+        <div>
+          <div class="m-title" id="campos-pdf-titulo">Campos PDF</div>
+          <div class="m-sub">Coordenadas de posición en mm desde borde superior-izquierdo</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarModalCamposPdf()">×</button>
+    </div>
+    <div style="padding:12px 16px 0;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
+        <thead>
+          <tr style="background:var(--gris-bg);border-bottom:2px solid var(--borde)">
+            <th style="padding:8px 6px;text-align:left;min-width:110px">Campo</th>
+            <th style="padding:8px 6px;text-align:center;min-width:55px">Pág.</th>
+            <th style="padding:8px 6px;text-align:center;min-width:65px">X (mm)</th>
+            <th style="padding:8px 6px;text-align:center;min-width:65px">Y (mm)</th>
+            <th style="padding:8px 6px;text-align:center;min-width:100px">Fuente</th>
+            <th style="padding:8px 6px;text-align:center;min-width:55px">Tamaño</th>
+            <th style="padding:8px 6px;text-align:center;min-width:50px">Negrita</th>
+            <th style="padding:8px 6px;text-align:center;min-width:65px">Ancho</th>
+            <th style="padding:8px 6px;text-align:center;min-width:36px"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-campos-pdf">
+          <tr><td colspan="9" style="text-align:center;padding:16px;color:var(--texto-hint)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;gap:8px">
+      <button onclick="agregarCampoPdf()"
+              style="padding:8px 16px;border:1.5px solid var(--azul);background:var(--azul-light);
+                     color:var(--azul);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
+        + Agregar campo
+      </button>
+      <div style="display:flex;gap:8px">
+        <button class="btn-nc-cancel" onclick="cerrarModalCamposPdf()">Cancelar</button>
+        <button class="btn-save" onclick="guardarCamposPdf()" style="padding:9px 22px">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <!-- ══ MODAL DETALLE ══ -->
 <div class="overlay" id="overlay-det">
   <div class="modal" id="modal-det">
@@ -2462,7 +2510,7 @@ function renderTipos() {
   });
 }
 
-/* Helper: genera un bloque de plantilla */
+/* Helper: genera un bloque de plantilla Word */
 function plantillaBox(t, docTipo, etiqueta, archivo) {
   const ok = !!archivo;
   return `
@@ -2475,6 +2523,24 @@ function plantillaBox(t, docTipo, etiqueta, archivo) {
       ${ok ? 'Cambiar' : 'Subir .docx'}
       <input type="file" accept=".docx" style="display:none"
              onchange="subirPlantilla(event,${t.id},'${docTipo}')">
+    </label>
+  </div>`;
+}
+
+/* Helper: genera un bloque de plantilla PDF */
+function plantillaPdfBox(t, docTipo, etiqueta, archivo) {
+  const ok = !!archivo;
+  const nombre = archivo ? archivo.split('/').pop() : '';
+  return `
+  <div class="plantilla-box ${ok ? 'tiene' : ''}">
+    <div class="plantilla-info">
+      <div class="plantilla-tipo">${esc(etiqueta)}</div>
+      <div class="plantilla-estado">${ok ? '✓ ' + esc(nombre) : 'Sin plantilla PDF'}</div>
+    </div>
+    <label class="btn-upload">
+      ${ok ? 'Cambiar' : 'Subir .pdf'}
+      <input type="file" accept=".pdf" style="display:none"
+             onchange="subirPlantillaPdf(event,${t.id},'${docTipo}')">
     </label>
   </div>`;
 }
@@ -2570,6 +2636,23 @@ function renderTipoCard(t) {
         ${plantillaBox(t, 'dict_envio', 'Enviar dictamen',       t.plantilla_dict_envio)}
       </div>
 
+      <!-- Plantillas PDF -->
+      <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:8px;margin-top:16px;text-transform:uppercase;letter-spacing:.05em">Plantillas PDF (con coordenadas)</div>
+      <div class="plantillas-row">
+        ${plantillaPdfBox(t, 'cert_pdf', 'Certificado PDF', t.plantilla_cert_pdf)}
+        ${plantillaPdfBox(t, 'dict_pdf', 'Dictamen PDF',    t.plantilla_dict_pdf)}
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-add-item" style="font-size:12px;padding:6px 14px"
+                onclick="abrirModalCamposPdf(${t.id},'cert')">
+          ⚙ Campos cert. PDF
+        </button>
+        <button class="btn-add-item" style="font-size:12px;padding:6px 14px"
+                onclick="abrirModalCamposPdf(${t.id},'dict')">
+          ⚙ Campos dict. PDF
+        </button>
+      </div>
+
       <!-- Secciones y checklist -->
       <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">Secciones y checklist</div>
       <div id="secciones-${t.id}">
@@ -2626,6 +2709,157 @@ async function subirPlantilla(event, tipoId, docTipo) {
     alert("Error de conexión al subir la plantilla.");
   }
   event.target.value = "";
+}
+
+/* ── Subir plantilla PDF ── */
+async function subirPlantillaPdf(event, tipoId, docTipo) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const form = new FormData();
+  form.append("action",    "SUBIR_PLANTILLA_PDF");
+  form.append("token",     s.token || "");
+  form.append("tipo_id",   tipoId);
+  form.append("doc_tipo",  docTipo);
+  form.append("plantilla", file);
+
+  try {
+    const res  = await fetch(API, { method: "POST", body: form });
+    const data = await res.json();
+    if (data.status === "success") {
+      tiposCargados = false;
+      cargarTipos();
+    } else {
+      alert("Error: " + (data.message || "No se pudo subir la plantilla PDF"));
+    }
+  } catch (e) {
+    alert("Error de conexión al subir la plantilla PDF.");
+  }
+  event.target.value = "";
+}
+
+/* ── Modal: configurar campos PDF ── */
+let camposPdfTipoId   = 0;
+let camposPdfDocTipo  = "";  // "cert" | "dict"
+
+const CAMPOS_DISPONIBLES = [
+  "folio","cliente","domicilio","maquinaria","marca","modelo",
+  "serie","id_equipo","capacidad","fecha","vigencia","anio","qr_imagen"
+];
+
+// Estado local de los campos mientras se edita
+let camposPdfLocal = [];
+
+async function abrirModalCamposPdf(tipoId, docTipo) {
+  camposPdfTipoId  = tipoId;
+  camposPdfDocTipo = docTipo;
+  const tipo = tiposGlobal.find(t => t.id == tipoId);
+  document.getElementById("campos-pdf-titulo").textContent =
+    `Campos PDF — ${tipo?.nombre || tipoId} — ${docTipo === "cert" ? "Certificado" : "Dictamen"}`;
+
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    const res  = await fetch(`${API}?action=OBTENER_CAMPOS_PDF&tipo_id=${tipoId}&token=${s.token||""}`);
+    const data = await res.json();
+    camposPdfLocal = data.status === "success"
+      ? (docTipo === "cert" ? (data.cert_pdf_campos || []) : (data.dict_pdf_campos || []))
+      : [];
+  } catch {
+    camposPdfLocal = [];
+  }
+
+  renderTablaCamposPdf(camposPdfLocal);
+  document.getElementById("overlay-campos-pdf").classList.add("open");
+}
+
+function cerrarModalCamposPdf() {
+  document.getElementById("overlay-campos-pdf").classList.remove("open");
+}
+
+function renderTablaCamposPdf(campos) {
+  const tbody = document.getElementById("tbody-campos-pdf");
+  if (!campos.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:16px;color:var(--texto-hint)">
+      Sin campos configurados. Usa "+ Agregar campo" para añadir.
+    </td></tr>`;
+    return;
+  }
+  tbody.innerHTML = campos.map((c, i) => `
+    <tr id="campo-row-${i}">
+      <td>
+        <select onchange="actualizarCampoPdf(${i},'campo',this.value)" style="width:100%;font-size:12px;padding:3px">
+          ${CAMPOS_DISPONIBLES.map(f => `<option value="${f}" ${c.campo===f?'selected':''}>${f}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" value="${c.pagina||1}" min="1" style="width:50px;font-size:12px;padding:3px"
+                 onchange="actualizarCampoPdf(${i},'pagina',+this.value)"></td>
+      <td><input type="number" value="${c.x||0}" step="0.1" style="width:60px;font-size:12px;padding:3px"
+                 onchange="actualizarCampoPdf(${i},'x',+this.value)"></td>
+      <td><input type="number" value="${c.y||0}" step="0.1" style="width:60px;font-size:12px;padding:3px"
+                 onchange="actualizarCampoPdf(${i},'y',+this.value)"></td>
+      <td>
+        <select onchange="actualizarCampoPdf(${i},'fuente',this.value)" style="width:90px;font-size:12px;padding:3px">
+          ${['Helvetica','Times','Courier'].map(f=>`<option value="${f}" ${(c.fuente||'Helvetica')===f?'selected':''}>${f}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" value="${c.tamano||11}" min="6" max="72" style="width:50px;font-size:12px;padding:3px"
+                 onchange="actualizarCampoPdf(${i},'tamano',+this.value)"></td>
+      <td style="text-align:center">
+        <input type="checkbox" ${c.negrita?'checked':''} onchange="actualizarCampoPdf(${i},'negrita',this.checked)">
+      </td>
+      <td><input type="number" value="${c.ancho||0}" min="0" step="0.5" style="width:55px;font-size:12px;padding:3px"
+                 title="0 = sin límite" onchange="actualizarCampoPdf(${i},'ancho',+this.value)"></td>
+      <td style="text-align:center">
+        <button onclick="eliminarCampoPdf(${i})" style="background:none;border:none;color:var(--rojo);cursor:pointer;font-size:16px;line-height:1">×</button>
+      </td>
+    </tr>`).join('');
+}
+
+function actualizarCampoPdf(idx, campo, valor) {
+  if (!camposPdfLocal[idx]) return;
+  camposPdfLocal[idx][campo] = valor;
+}
+
+function agregarCampoPdf() {
+  camposPdfLocal.push({
+    campo: "folio", pagina: 1, x: 0, y: 0,
+    fuente: "Helvetica", tamano: 11, negrita: false, ancho: 0
+  });
+  renderTablaCamposPdf(camposPdfLocal);
+}
+
+function eliminarCampoPdf(idx) {
+  camposPdfLocal.splice(idx, 1);
+  renderTablaCamposPdf(camposPdfLocal);
+}
+
+async function guardarCamposPdf() {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Token": s.token || "" },
+      body: JSON.stringify({
+        action: "GUARDAR_CAMPOS_PDF",
+        payload: {
+          tipo_id:  camposPdfTipoId,
+          doc_tipo: camposPdfDocTipo,
+          campos:   camposPdfLocal
+        }
+      })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      cerrarModalCamposPdf();
+      tiposCargados = false;
+      cargarTipos();
+    } else {
+      alert("Error: " + (data.message || "No se pudieron guardar los campos"));
+    }
+  } catch (e) {
+    alert("Error de conexión al guardar campos PDF.");
+  }
 }
 
 /* ── Secciones ── */

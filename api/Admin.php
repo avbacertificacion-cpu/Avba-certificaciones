@@ -324,6 +324,88 @@ class Admin {
         return ['status' => 'success', 'message' => 'Plantilla guardada correctamente.', 'archivo' => $filename];
     }
 
+    // ── Subir plantilla PDF para certificado / dictamen ──────
+    public function subirPlantillaPdf(array $post, array $files): array {
+        $tipoId  = (int)($post['tipo_id']  ?? 0);
+        $docTipo = trim($post['doc_tipo']  ?? ''); // cert_pdf | dict_pdf
+
+        if (!$tipoId || !in_array($docTipo, ['cert_pdf', 'dict_pdf'], true))
+            return ['status' => 'error', 'message' => 'tipo_id y doc_tipo (cert_pdf|dict_pdf) son requeridos.'];
+
+        $chk = $this->pdo->prepare("SELECT id FROM maquinaria_tipos WHERE id = ?");
+        $chk->execute([$tipoId]);
+        if (!$chk->fetch())
+            return ['status' => 'error', 'message' => 'Tipo de equipo no encontrado.'];
+
+        $file = $files['plantilla'] ?? null;
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK)
+            return ['status' => 'error', 'message' => 'No se recibió archivo o hubo un error al subirlo.'];
+
+        $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if ($ext !== 'pdf')
+            return ['status' => 'error', 'message' => 'Solo se aceptan archivos .pdf'];
+
+        $dir = __DIR__ . '/../uploads/plantillas/';
+        if (!is_dir($dir) && !mkdir($dir, 0755, true))
+            return ['status' => 'error', 'message' => 'No se pudo crear el directorio de plantillas.'];
+
+        $colMap = ['cert_pdf' => 'plantilla_cert_pdf', 'dict_pdf' => 'plantilla_dict_pdf'];
+        $col      = $colMap[$docTipo];
+        $filename = "tipo_{$tipoId}_{$docTipo}.pdf";
+
+        if (!move_uploaded_file($file['tmp_name'], $dir . $filename))
+            return ['status' => 'error', 'message' => 'Error al guardar el archivo en el servidor.'];
+
+        $this->pdo->prepare("UPDATE maquinaria_tipos SET `{$col}` = ? WHERE id = ?")
+            ->execute([$filename, $tipoId]);
+
+        return ['status' => 'success', 'message' => 'Plantilla PDF guardada.', 'archivo' => $filename];
+    }
+
+    // ── Guardar campos / coordenadas del PDF ──────────────────
+    public function guardarCamposPdf(array $payload): array {
+        $tipoId  = (int)($payload['tipo_id']  ?? 0);
+        $docTipo = trim($payload['doc_tipo']  ?? ''); // cert | dict
+        $campos  = $payload['campos'] ?? '[]';
+
+        if (!$tipoId || !in_array($docTipo, ['cert', 'dict'], true))
+            return ['status' => 'error', 'message' => 'tipo_id y doc_tipo (cert|dict) requeridos.'];
+
+        // Validar JSON
+        $decoded = is_string($campos) ? json_decode($campos, true) : $campos;
+        if (!is_array($decoded))
+            return ['status' => 'error', 'message' => 'El parámetro campos debe ser un array JSON.'];
+
+        $colMap = ['cert' => 'cert_pdf_campos', 'dict' => 'dict_pdf_campos'];
+        $col    = $colMap[$docTipo];
+        $json   = json_encode($decoded, JSON_UNESCAPED_UNICODE);
+
+        $this->pdo->prepare("UPDATE maquinaria_tipos SET `{$col}` = ? WHERE id = ?")
+            ->execute([$json, $tipoId]);
+
+        return ['status' => 'success', 'message' => 'Campos PDF guardados.'];
+    }
+
+    // ── Obtener campos PDF de un tipo de equipo ───────────────
+    public function obtenerCamposPdf(int $tipoId): array {
+        $stmt = $this->pdo->prepare(
+            "SELECT plantilla_cert_pdf, plantilla_dict_pdf,
+                    cert_pdf_campos, dict_pdf_campos
+             FROM maquinaria_tipos WHERE id = ?"
+        );
+        $stmt->execute([$tipoId]);
+        $row = $stmt->fetch();
+        if (!$row) return ['status' => 'error', 'message' => 'Tipo no encontrado.'];
+
+        return [
+            'status'          => 'success',
+            'plantilla_cert_pdf' => $row['plantilla_cert_pdf'] ?? null,
+            'plantilla_dict_pdf' => $row['plantilla_dict_pdf'] ?? null,
+            'cert_pdf_campos' => json_decode($row['cert_pdf_campos'] ?? '[]', true) ?: [],
+            'dict_pdf_campos' => json_decode($row['dict_pdf_campos'] ?? '[]', true) ?: [],
+        ];
+    }
+
     // ── Regenerar reporte de inspección ───────────────────────
     public function regenerarReporte(array $payload, string $usuario = ''): array {
         $equipoId = (int) ($payload['equipo_id'] ?? 0);

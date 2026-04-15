@@ -179,6 +179,11 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->listarTiposAdmin());
 
+        case 'OBTENER_CAMPOS_PDF':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->obtenerCamposPdf((int)($_GET['tipo_id'] ?? 0)));
+
         case 'LISTAR_SESIONES_ACCESORIOS':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -357,6 +362,18 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->subirPlantilla($payload, $_FILES));
+
+        // Subir plantilla PDF (multipart/form-data)
+        case 'SUBIR_PLANTILLA_PDF':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->subirPlantillaPdf($_POST, $_FILES));
+
+        // Guardar coordenadas de campos para plantilla PDF
+        case 'GUARDAR_CAMPOS_PDF':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->guardarCamposPdf($payload));
 
         // ── Personal / Cursos ─────────────────────────────
         case 'GUARDAR_PARTICIPANTE':
