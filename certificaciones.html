@@ -1614,14 +1614,15 @@ async function cargarAccCert() {
     `<tr><td colspan="7" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
   try {
     const res  = await fetch(API + '?action=LISTAR_SESIONES_ACCESORIOS');
-    const data = await res.json();
-    if (!Array.isArray(data)) throw new Error('Respuesta inválida');
+    const raw  = await res.json();
+    if (raw.status !== 'success') throw new Error(raw.message || 'Error del servidor');
+    const data  = Array.isArray(raw.data) ? raw.data : [];
     accCertData     = data;
     accCertCargados = true;
     renderAccCert(data);
     const total    = data.length;
-    const cumple   = data.reduce((s, r) => s + (parseInt(r.total_cumple)   || 0), 0);
-    const nocumple = data.reduce((s, r) => s + (parseInt(r.total_no_cumple)|| 0), 0);
+    const cumple   = data.reduce((s, r) => s + (parseInt(r.cumple)    || 0), 0);
+    const nocumple = data.reduce((s, r) => s + (parseInt(r.no_cumple) || 0), 0);
     document.getElementById('ac-total').textContent    = total;
     document.getElementById('ac-cumple').textContent   = cumple;
     document.getElementById('ac-nocumple').textContent = nocumple;
@@ -1657,10 +1658,10 @@ function renderAccCert(data) {
   tbody.innerHTML = data.map(r => `<tr>
     <td style="font-weight:600">${r.cliente||'—'}</td>
     <td style="color:var(--texto-sub);font-size:12px">${r.fecha||'—'}</td>
-    <td style="font-size:12px;color:var(--texto-sub)">${r.direccion ? r.direccion.substring(0,45)+'…' : '—'}</td>
-    <td style="font-weight:600;text-align:center">${r.total_accesorios||0}</td>
-    <td style="text-align:center"><span class="badge b-apro">${r.total_cumple||0}</span></td>
-    <td style="text-align:center"><span class="badge b-vencido">${r.total_no_cumple||0}</span></td>
+    <td style="font-size:12px;color:var(--texto-sub)">${r.usuario ? r.usuario.substring(0,40) : '—'}</td>
+    <td style="font-weight:600;text-align:center">${r.total||0}</td>
+    <td style="text-align:center"><span class="badge b-apro">${r.cumple||0}</span></td>
+    <td style="text-align:center"><span class="badge b-vencido">${r.no_cumple||0}</span></td>
     <td><button class="btn-ver" onclick="abrirAccCert(${r.id})">Ver</button></td>
   </tr>`).join('');
 }
@@ -1671,7 +1672,9 @@ async function abrirAccCert(sesionId) {
   document.getElementById('overlay-acc-cert').classList.add('open');
   try {
     const res  = await fetch(`${API}?action=DETALLE_SESION_ACCESORIOS&id=${sesionId}`);
-    const data = await res.json();
+    const raw  = await res.json();
+    if (raw.status !== 'success') throw new Error(raw.message || 'Error del servidor');
+    const data = raw.data;
     document.getElementById('acc-det-cliente').textContent = data.cliente || '—';
     document.getElementById('acc-det-fecha').textContent   = (data.fecha || '—') + (data.direccion ? ' · ' + data.direccion.substring(0,60) : '');
     let html = '';
