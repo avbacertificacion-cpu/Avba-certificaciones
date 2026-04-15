@@ -105,13 +105,12 @@ class Certificaciones {
             // 2. Convertir DOCX → PDF con LibreOffice headless
             $cmd = 'HOME=/tmp soffice --headless --convert-to pdf --outdir '
                  . escapeshellarg($rutaDir) . ' '
-                 . escapeshellarg($rutaDocx) . ' 2>&1';
-            exec($cmd, $outLO, $codeLO);
+                 . escapeshellarg($rutaDocx);
+            [$outLO, $codeLO] = $this->runCmd($cmd);
 
             if ($codeLO !== 0 || !file_exists($rutaPdfRaw)) {
                 throw new \RuntimeException(
-                    'Error al convertir a PDF con LibreOffice. '
-                    . implode(' | ', $outLO)
+                    'Error al convertir a PDF con LibreOffice. ' . implode(' | ', $outLO)
                 );
             }
 
@@ -119,16 +118,14 @@ class Certificaciones {
             $ownerPass = 'AVBA' . strtoupper(substr(md5(basename($rutaDocx)), 0, 10));
             $cmd = 'qpdf --encrypt "" ' . escapeshellarg($ownerPass) . ' 128 '
                  . '--print=full --modify=none --extract=n '
-                 . '-- ' . escapeshellarg($rutaPdfRaw) . ' ' . escapeshellarg($rutaPdfProt)
-                 . ' 2>&1';
-            exec($cmd, $outQP, $codeQP);
+                 . '-- ' . escapeshellarg($rutaPdfRaw) . ' ' . escapeshellarg($rutaPdfProt);
+            [$outQP, $codeQP] = $this->runCmd($cmd);
 
             @unlink($rutaPdfRaw); // eliminar PDF sin protección
 
             if ($codeQP !== 0 || !file_exists($rutaPdfProt)) {
                 throw new \RuntimeException(
-                    'Error al proteger el PDF con qpdf. '
-                    . implode(' | ', $outQP)
+                    'Error al proteger el PDF con qpdf. ' . implode(' | ', $outQP)
                 );
             }
 
@@ -138,6 +135,54 @@ class Certificaciones {
         } catch (\Exception $e) {
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
+    }
+
+    /**
+     * Ejecuta un comando de shell usando el método disponible en el servidor.
+     * Prueba proc_open → exec → shell_exec → system en orden.
+     *
+     * @return array{0: string[], 1: int}  [líneas de salida, código de salida]
+     */
+    private function runCmd(string $cmd): array
+    {
+        // proc_open: más robusto, normalmente habilitado aunque exec esté deshabilitado
+        if (function_exists('proc_open')) {
+            $desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+            $proc = @proc_open($cmd, $desc, $pipes);
+            if (is_resource($proc)) {
+                $stdout = stream_get_contents($pipes[1]);
+                $stderr = stream_get_contents($pipes[2]);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+                $code = proc_close($proc);
+                $out  = array_filter(explode("\n", trim($stdout . ' ' . $stderr)));
+                return [array_values($out), $code];
+            }
+        }
+
+        if (function_exists('exec')) {
+            $out = []; $code = 0;
+            exec($cmd . ' 2>&1', $out, $code);
+            return [$out, $code];
+        }
+
+        if (function_exists('shell_exec')) {
+            $raw  = (string) shell_exec($cmd . ' 2>&1');
+            return [array_filter(explode("\n", trim($raw))), 0];
+        }
+
+        if (function_exists('system')) {
+            ob_start();
+            system($cmd . ' 2>&1', $code);
+            $raw = (string) ob_get_clean();
+            return [array_filter(explode("\n", trim($raw))), $code];
+        }
+
+        throw new \RuntimeException(
+            'El servidor tiene deshabilitadas todas las funciones de ejecución de shell '
+            . '(proc_open, exec, shell_exec, system). '
+            . 'Habilita al menos proc_open en php.ini para poder convertir documentos.'
+        );
     }
 
     // ── Generar y enviar certificado ───────────────────────
