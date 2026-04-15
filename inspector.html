@@ -2237,8 +2237,10 @@ async function cargarHistorial() {
   lista.innerHTML = `<div style="text-align:center;padding:48px 0;color:var(--texto-sub)">Cargando…</div>`;
 
   try {
-    const res  = await fetch(`${WEB_APP_URL}?action=GET_MIS_INSPECCIONES`);
-    const data = await res.json();
+    const s      = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const action = s.rol === 'ADMIN' ? 'GET_TODAS_INSPECCIONES' : 'GET_MIS_INSPECCIONES';
+    const res    = await fetch(`${WEB_APP_URL}?action=${action}`);
+    const data   = await res.json();
 
     if (!Array.isArray(data)) {
       lista.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rojo)">Error al cargar inspecciones.</div>`;
@@ -2460,10 +2462,20 @@ function cerrarSesion() {
    INIT
 ════════════════════════════════════════ */
 window.onload = function () {
-  // Mostrar nombre de usuario en el menú
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   if (!s.token) { location.href = 'login.html'; return; }
-  document.getElementById('menu-usuario').textContent = s.usuario || 'inspector';
+  const rolesPermitidos = ['INSPECTOR','ADMIN','CALIDAD'];
+  if (!rolesPermitidos.includes(s.rol)) { location.href = 'login.html'; return; }
+  document.getElementById('menu-usuario').textContent = (s.nombre || s.usuario || 'inspector') + (s.rol !== 'INSPECTOR' ? ' (' + s.rol + ')' : '');
+
+  // Botón volver a Admin si el rol es ADMIN
+  if (s.rol === 'ADMIN') {
+    const btnAdmin = document.createElement('button');
+    btnAdmin.className = 'btn-header-action';
+    btnAdmin.innerHTML = '← Admin';
+    btnAdmin.onclick = () => location.href = 'admin.html';
+    document.getElementById('btn-logout').before(btnAdmin);
+  }
 };
 
 /* ════════════════════════════════════════

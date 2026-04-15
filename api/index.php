@@ -139,6 +139,11 @@ if ($method === 'GET') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($insp->getMisInspecciones($usr['usuario']));
 
+        case 'GET_TODAS_INSPECCIONES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($insp->getTodasInspecciones());
+
         // Personal: catálogos públicos (autenticados)
         case 'LISTAR_CURSOS':
             $usr = validarToken($pdo, $token);

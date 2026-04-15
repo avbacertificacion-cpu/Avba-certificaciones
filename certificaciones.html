@@ -454,9 +454,16 @@
     <div class="hdr-s">Generación y envío de certificados AVBA</div>
   </div>
   <div class="hdr-actions">
+    <span id="hdr-user-cert" style="font-size:12px;color:rgba(255,255,255,0.7);margin-right:4px"></span>
     <button class="btn-hdr" onclick="cargar()">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8a6 6 0 1010.5-4M14 2v4h-4"/></svg>
       Actualizar
+    </button>
+    <button id="btn-volver-admin-cert" class="btn-hdr" onclick="location.href='admin.html'" style="display:none">
+      ← Admin
+    </button>
+    <button class="btn-hdr" onclick="localStorage.removeItem('avba_session');location.href='login.html'">
+      Cerrar sesión
     </button>
   </div>
 </div>
@@ -846,6 +853,20 @@ const API = "api/index.php";
     }
     return _fetch.call(this, url, opts);
   };
+}());
+
+// Guard + header
+(function() {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  if (!s.token) { location.href = 'login.html'; return; }
+  const roles = ['CERTIFICACIONES','ADMIN','CALIDAD'];
+  if (!roles.includes(s.rol)) { location.href = 'login.html'; return; }
+  const el = document.getElementById('hdr-user-cert');
+  if (el) el.textContent = (s.nombre || s.usuario || '') + ' · ' + s.rol;
+  if (s.rol === 'ADMIN') {
+    const btn = document.getElementById('btn-volver-admin-cert');
+    if (btn) btn.style.display = '';
+  }
 }());
 
 // Días de alerta antes del vencimiento

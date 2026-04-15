@@ -386,6 +386,9 @@
       <span id="userDisplay">Cargando...</span>
       <span class="rol" id="rolDisplay"></span>
     </div>
+    <button id="btn-back-admin-per" onclick="location.href='admin.html'" style="display:none;padding:6px 12px;
+            border-radius:7px;border:1.5px solid rgba(255,255,255,0.3);background:transparent;
+            color:white;font-size:12px;cursor:pointer">← Admin</button>
     <button class="btn-logout" onclick="logout()">Cerrar sesión</button>
   </div>
 </div>
@@ -494,26 +497,24 @@ let selectedParticipante = null;
 // ══════════════════════════════════════════════════════
 
 function checkAuth() {
-  const token = localStorage.getItem('avba_token');
-  if (!token) {
+  const sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  if (!sesion.token) {
     document.getElementById('loginOverlay').style.display = 'flex';
     return false;
   }
-
-  const userData = localStorage.getItem('avba_user');
-  if (userData) {
-    currentUser = JSON.parse(userData);
-    document.getElementById('userDisplay').textContent = currentUser.usuario;
-    document.getElementById('rolDisplay').textContent = currentUser.rol;
-    document.getElementById('loginOverlay').style.display = 'none';
-    return true;
+  currentUser = sesion;
+  document.getElementById('userDisplay').textContent = sesion.usuario || sesion.nombre || '—';
+  document.getElementById('rolDisplay').textContent  = sesion.rol || '';
+  document.getElementById('loginOverlay').style.display = 'none';
+  if (sesion.rol === 'ADMIN') {
+    const btn = document.getElementById('btn-back-admin-per');
+    if (btn) btn.style.display = '';
   }
-  return false;
+  return true;
 }
 
 function logout() {
-  localStorage.removeItem('avba_token');
-  localStorage.removeItem('avba_user');
+  localStorage.removeItem('avba_session');
   window.location.href = 'login.html';
 }
 
@@ -523,12 +524,21 @@ function logout() {
 
 const originalFetch = window.fetch;
 window.fetch = function(...args) {
-  const token = localStorage.getItem('avba_token');
+  const sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const token  = sesion.token || '';
   const [resource, config = {}] = args;
 
   if (token) {
-    config.headers = config.headers || {};
-    config.headers['Authorization'] = `Bearer ${token}`;
+    if (typeof resource === 'string' && resource.includes('api/index.php')) {
+      if (config.method === 'POST') {
+        if (!(config.body instanceof FormData)) {
+          try { const b = JSON.parse(config.body || '{}'); b.token = token; config.body = JSON.stringify(b); } catch(e) {}
+        }
+      } else {
+        const sep = resource.includes('?') ? '&' : '?';
+        return originalFetch.apply(this, [resource + sep + 'token=' + encodeURIComponent(token), config]);
+      }
+    }
   }
 
   return originalFetch.apply(this, [resource, config]);

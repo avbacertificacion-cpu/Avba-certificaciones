@@ -622,6 +622,19 @@
     <div class="t">Panel de calidad</div>
     <div class="s">Revisión y aprobación de inspecciones</div>
   </div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+    <span id="hdr-user-cal" style="font-size:12px;color:rgba(255,255,255,0.7)"></span>
+    <button id="btn-volver-admin" onclick="location.href='admin.html'"
+            style="display:none;padding:5px 12px;border-radius:7px;border:1.5px solid rgba(255,255,255,0.3);
+                   background:transparent;color:white;font-size:12px;cursor:pointer">
+      ← Admin
+    </button>
+    <button onclick="(function(){localStorage.removeItem('avba_session');location.href='login.html';})()"
+            style="padding:5px 12px;border-radius:7px;border:1.5px solid rgba(255,255,255,0.3);
+                   background:transparent;color:white;font-size:12px;cursor:pointer">
+      Cerrar sesión
+    </button>
+  </div>
 </div>
 
 <!-- SECCIÓN NAV PRINCIPAL -->
@@ -1360,6 +1373,18 @@ const API = "api/index.php";
     }
     return _fetch.call(this, url, opts);
   };
+}());
+
+/* ═══════════════════════════════════════
+   GUARD + HEADER
+═══════════════════════════════════════ */
+(function() {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  if (!s.token) { location.href = 'login.html'; return; }
+  const roles = ['CALIDAD','ADMIN','CERTIFICACIONES'];
+  if (!roles.includes(s.rol)) { location.href = 'login.html'; return; }
+  document.getElementById('hdr-user-cal').textContent = (s.nombre || s.usuario || '') + ' · ' + s.rol;
+  if (s.rol === 'ADMIN') document.getElementById('btn-volver-admin').style.display = '';
 }());
 
 /* ═══════════════════════════════════════

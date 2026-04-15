@@ -167,17 +167,34 @@ class Inspecciones {
                     cliente, maquinaria, marca, modelo, serie, id_equipo,
                     capacidad, direccion, correo, control, estado,
                     evidencia_url, certificado_url, dictamen_url,
-                    motivo, qr_codigo
+                    motivo, qr_codigo, inspector
              FROM equipos
              WHERE inspector = ?
              ORDER BY marca_temporal DESC"
         );
         $stmt->execute([$usuario]);
-        $rows = $stmt->fetchAll();
+        return $this->formatearInspecciones($stmt->fetchAll());
+    }
 
+    public function getTodasInspecciones(): array {
+        $stmt = $this->pdo->query(
+            "SELECT id,
+                    DATE_FORMAT(marca_temporal, '%d/%m/%Y %H:%i') AS fecha_registro,
+                    DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y')      AS fecha_inspeccion,
+                    cliente, maquinaria, marca, modelo, serie, id_equipo,
+                    capacidad, direccion, correo, control, estado,
+                    evidencia_url, certificado_url, dictamen_url,
+                    motivo, qr_codigo, inspector
+             FROM equipos
+             ORDER BY marca_temporal DESC"
+        );
+        return $this->formatearInspecciones($stmt->fetchAll());
+    }
+
+    private function formatearInspecciones(array $rows): array {
         foreach ($rows as &$r) {
-            $r['folio']   = formatoFolio($r['control'] ?? '');
-            $r['qr_url']  = $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '';
+            $r['folio']     = formatoFolio($r['control'] ?? '');
+            $r['qr_url']    = $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '';
             $r['checklist'] = $this->getChecklistEquipo((int)$r['id']);
         }
         unset($r);
