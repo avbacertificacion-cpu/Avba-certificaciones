@@ -15,6 +15,8 @@
       --ambar-light:#FAEEDA;
       --rojo:       #A32D2D;
       --rojo-light: #FCEBEB;
+      --violeta:    #5B1FA3;
+      --violeta-l:  #F0E6FB;
       --gris-bg:    #f4f7fb;
       --borde:      #dfe5ef;
       --texto:      #1a1a2e;
@@ -28,23 +30,25 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--gris-bg); min-height: 100vh; }
 
+    /* ── HEADER ── */
     .header {
       background: var(--azul-dark);
-      padding: 16px 24px;
+      padding: 0 24px;
       display: flex; align-items: center; gap: 14px;
+      height: 60px;
       box-shadow: 0 2px 12px rgba(12,68,124,0.3);
       position: sticky; top: 0; z-index: 50;
     }
     .logo {
-      width: 36px; height: 36px; border-radius: 50%;
+      width: 34px; height: 34px; border-radius: 50%;
       background: rgba(255,255,255,0.15); border: 1.5px solid rgba(255,255,255,0.25);
       display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 15px; color: white;
+      font-weight: 700; font-size: 14px; color: white; flex-shrink: 0;
     }
-    .header-text .t { font-size: 16px; font-weight: 600; color: white; }
-    .header-text .s { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 1px; }
+    .header-text .t { font-size: 15px; font-weight: 600; color: white; }
+    .header-text .s { font-size: 11px; color: rgba(255,255,255,0.55); }
     .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-    .header-user { font-size: 12px; color: rgba(255,255,255,0.75); }
+    .header-user { font-size: 12px; color: rgba(255,255,255,0.7); }
     .btn-logout {
       padding: 6px 14px; border-radius: 7px;
       border: 1.5px solid rgba(255,255,255,0.3); background: transparent;
@@ -52,70 +56,103 @@
     }
     .btn-logout:hover { background: rgba(255,255,255,0.1); }
 
-    .wrap { max-width: 900px; margin: 0 auto; padding: 24px 16px 40px; }
+    /* ── ACCESOS RÁPIDOS ── */
+    .accesos {
+      background: var(--blanco);
+      border-bottom: 1px solid var(--borde);
+      padding: 10px 24px;
+      display: flex; gap: 8px; flex-wrap: wrap;
+      align-items: center;
+    }
+    .accesos-label {
+      font-size: 11px; font-weight: 600; color: var(--texto-hint);
+      margin-right: 4px; white-space: nowrap;
+    }
+    .acceso-btn {
+      display: flex; align-items: center; gap: 7px;
+      padding: 6px 13px; border-radius: 8px;
+      border: 1.5px solid var(--borde); background: var(--blanco);
+      color: var(--texto-sub); font-size: 12px; font-weight: 600;
+      cursor: pointer; text-decoration: none; transition: all .15s;
+    }
+    .acceso-btn:hover { border-color: var(--azul); color: var(--azul); background: var(--azul-light); }
+    .acceso-btn .ico { font-size: 14px; }
 
-    .stats { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 20px; }
-    @media(max-width:600px) { .stats { grid-template-columns: repeat(2,1fr); } }
+    /* ── WRAP ── */
+    .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+
+    /* ── STATS ── */
+    .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 22px; }
+    @media(max-width:700px) { .stats { grid-template-columns: repeat(2,1fr); } }
     .stat {
       background: var(--blanco); border-radius: var(--radio);
       border: 1px solid rgba(0,0,0,0.05); padding: 14px 16px; box-shadow: var(--sombra);
     }
-    .stat-n { font-size: 26px; font-weight: 600; }
-    .stat-l { font-size: 12px; color: var(--texto-sub); margin-top: 2px; }
+    .stat-n { font-size: 24px; font-weight: 700; }
+    .stat-l { font-size: 11px; color: var(--texto-sub); margin-top: 2px; }
 
+    /* ── PANEL ── */
     .panel {
       background: var(--blanco); border-radius: var(--radio-lg);
-      border: 1px solid rgba(0,0,0,0.05); box-shadow: var(--sombra); overflow: hidden;
+      border: 1px solid rgba(0,0,0,0.05); box-shadow: var(--sombra);
+      overflow: hidden; margin-bottom: 22px;
     }
     .panel-hdr {
       padding: 14px 18px; border-bottom: 1px solid var(--borde);
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+      flex-wrap: wrap;
     }
     .panel-title { font-size: 14px; font-weight: 700; color: var(--texto); }
+    .panel-sub   { font-size: 12px; color: var(--texto-hint); margin-top: 2px; }
 
+    /* ── BOTONES ── */
     .btn-primary {
       padding: 8px 16px; border-radius: var(--radio);
       border: none; background: var(--azul); color: white;
-      font-size: 13px; font-weight: 600; cursor: pointer;
+      font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
     }
     .btn-primary:hover { background: var(--azul-dark); }
     .btn-danger {
-      padding: 6px 12px; border-radius: 7px;
+      padding: 5px 10px; border-radius: 6px;
       border: 1.5px solid var(--rojo); background: var(--rojo-light);
-      color: var(--rojo); font-size: 12px; font-weight: 600; cursor: pointer;
+      color: var(--rojo); font-size: 11px; font-weight: 600; cursor: pointer;
     }
     .btn-danger:hover { background: var(--rojo); color: white; }
     .btn-edit {
-      padding: 6px 12px; border-radius: 7px;
+      padding: 5px 10px; border-radius: 6px;
       border: 1.5px solid var(--borde); background: var(--blanco);
-      color: var(--texto-sub); font-size: 12px; cursor: pointer;
+      color: var(--texto-sub); font-size: 11px; cursor: pointer;
     }
     .btn-edit:hover { border-color: var(--azul); color: var(--azul); }
 
-    table { width: 100%; border-collapse: collapse; }
+    /* ── TABLA ── */
+    table { width: 100%; border-collapse: collapse; min-width: 500px; }
     th {
       font-size: 11px; font-weight: 600; color: var(--texto-sub);
-      text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--borde);
+      text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--borde);
       text-transform: uppercase; letter-spacing: .05em; background: var(--gris-bg);
     }
-    td { font-size: 13px; padding: 11px 14px; border-bottom: 1px solid #f0f2f7; vertical-align: middle; }
+    td { font-size: 12.5px; padding: 10px 14px; border-bottom: 1px solid #f0f2f7; vertical-align: middle; }
     tr:last-child td { border-bottom: none; }
     tr:hover td { background: #fafbff; }
+    .td-actions { display: flex; gap: 5px; }
+    .table-scroll { overflow-x: auto; }
 
+    /* ── BADGES ── */
     .badge {
       display: inline-flex; align-items: center;
-      padding: 3px 10px; border-radius: 20px;
-      font-size: 11px; font-weight: 600;
+      padding: 3px 9px; border-radius: 20px;
+      font-size: 11px; font-weight: 600; white-space: nowrap;
     }
-    .b-admin { background:#F0E6FB; color:#5B1FA3; }
-    .b-cal   { background: var(--azul-light); color: var(--azul-dark); }
-    .b-insp  { background: var(--ambar-light); color: var(--ambar); }
-    .b-cert  { background: var(--verde-light); color: var(--verde); }
-    .b-inact { background: #f0f0f0; color: #888; }
-    .b-activo{ background: var(--verde-light); color: var(--verde); }
+    .b-admin   { background: var(--violeta-l);    color: var(--violeta); }
+    .b-cal     { background: var(--azul-light);   color: var(--azul-dark); }
+    .b-insp    { background: var(--ambar-light);  color: var(--ambar); }
+    .b-cert    { background: var(--verde-light);  color: var(--verde); }
+    .b-cliente { background: #FFF3CD;             color: #856404; }
+    .b-activo  { background: var(--verde-light);  color: var(--verde); }
+    .b-inact   { background: #f0f0f0;             color: #888; }
 
-    .td-actions { display: flex; gap: 6px; }
-
+    /* ── OVERLAY / MODAL ── */
     .overlay {
       position: fixed; inset: 0;
       background: rgba(0,0,0,0.45); backdrop-filter: blur(2px);
@@ -125,22 +162,25 @@
     .overlay.open { opacity: 1; pointer-events: all; }
     .modal {
       background: var(--blanco); border-radius: var(--radio-lg);
-      width: 100%; max-width: 440px;
+      width: 100%; max-width: 460px;
       box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-      padding: 28px 24px;
+      padding: 28px 24px; max-height: 90vh; overflow-y: auto;
       animation: slideUp .22s ease;
     }
-    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } }
+    @keyframes slideUp { from { transform: translateY(18px); opacity: 0; } }
     .modal-title { font-size: 17px; font-weight: 700; color: var(--texto); margin-bottom: 20px; }
     .field { margin-bottom: 14px; }
-    .field label { font-size: 12px; font-weight: 600; color: var(--texto-sub); display: block; margin-bottom: 5px; }
+    .field label {
+      font-size: 12px; font-weight: 600; color: var(--texto-sub);
+      display: block; margin-bottom: 5px;
+    }
     .field input, .field select {
       width: 100%; padding: 10px 12px;
       border: 1.5px solid var(--borde); border-radius: 8px;
       font-size: 13px; color: var(--texto); background: var(--blanco); outline: none;
     }
     .field input:focus, .field select:focus { border-color: var(--azul); }
-    .field .hint { font-size: 11px; color: var(--texto-hint); margin-top: 4px; }
+    .field .hint { font-size: 11px; color: var(--texto-hint); margin-top: 5px; line-height: 1.5; }
     .modal-btns { display: flex; gap: 8px; margin-top: 20px; }
     .modal-btns button { flex: 1; }
     .btn-cancel {
@@ -155,16 +195,17 @@
     }
     .btn-confirm:hover { background: var(--azul-dark); }
 
-    .loading-row td { text-align:center; padding:36px; color:var(--texto-hint); font-size:13px; }
+    /* ── HELPERS ── */
+    .loading-row td { text-align: center; padding: 32px; color: var(--texto-hint); font-size: 13px; }
     .spin {
-      width: 20px; height: 20px; border: 2px solid var(--borde);
+      width: 18px; height: 18px; border: 2px solid var(--borde);
       border-top-color: var(--azul); border-radius: 50%;
       animation: giro .7s linear infinite; margin: 0 auto 8px;
     }
     @keyframes giro { to { transform: rotate(360deg); } }
-
-    .activo-toggle { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .activo-toggle { display: flex; align-items: center; gap: 8px; padding-top: 6px; }
     .activo-toggle input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
+    .divider { height: 1px; background: var(--borde); margin: 16px 0 14px; }
   </style>
 </head>
 <body>
@@ -182,16 +223,36 @@
   </div>
 </div>
 
+<!-- ACCESOS RÁPIDOS A OTROS PANELES -->
+<div class="accesos">
+  <span class="accesos-label">Acceder a:</span>
+  <a class="acceso-btn" href="calidad.html">
+    <span class="ico">🔬</span> Calidad
+  </a>
+  <a class="acceso-btn" href="certificaciones.html">
+    <span class="ico">📋</span> Certificaciones
+  </a>
+  <a class="acceso-btn" href="inspector.html">
+    <span class="ico">🔧</span> Inspector
+  </a>
+  <a class="acceso-btn" href="personal.html">
+    <span class="ico">👤</span> Personal
+  </a>
+  <a class="acceso-btn" href="portal-cliente.html">
+    <span class="ico">🏢</span> Portal Cliente
+  </a>
+</div>
+
 <div class="wrap">
 
-  <!-- Stats -->
+  <!-- STATS -->
   <div class="stats">
     <div class="stat">
-      <div class="stat-n" id="s-total"    style="color:var(--azul)">—</div>
-      <div class="stat-l">Total usuarios</div>
+      <div class="stat-n" id="s-total"     style="color:var(--azul)">—</div>
+      <div class="stat-l">Usuarios internos</div>
     </div>
     <div class="stat">
-      <div class="stat-n" id="s-activos"  style="color:var(--verde)">—</div>
+      <div class="stat-n" id="s-activos"   style="color:var(--verde)">—</div>
       <div class="stat-l">Activos</div>
     </div>
     <div class="stat">
@@ -199,18 +260,25 @@
       <div class="stat-l">Inactivos</div>
     </div>
     <div class="stat">
-      <div class="stat-n" id="s-roles"    style="color:var(--ambar)">—</div>
+      <div class="stat-n" id="s-clientes"  style="color:var(--ambar)">—</div>
+      <div class="stat-l">Cuentas cliente</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n" id="s-roles"     style="color:var(--violeta)">—</div>
       <div class="stat-l">Roles distintos</div>
     </div>
   </div>
 
-  <!-- Tabla usuarios -->
+  <!-- TABLA: USUARIOS INTERNOS -->
   <div class="panel">
     <div class="panel-hdr">
-      <span class="panel-title">Usuarios del sistema</span>
-      <button class="btn-primary" onclick="abrirCrear()">+ Nuevo usuario</button>
+      <div>
+        <div class="panel-title">Usuarios del sistema</div>
+        <div class="panel-sub">ADMIN · CALIDAD · CERTIFICACIONES · INSPECTOR</div>
+      </div>
+      <button class="btn-primary" onclick="abrirCrear('interno')">+ Nuevo usuario</button>
     </div>
-    <div style="overflow-x:auto">
+    <div class="table-scroll">
       <table>
         <thead>
           <tr>
@@ -222,10 +290,36 @@
             <th></th>
           </tr>
         </thead>
-        <tbody id="tabla-usuarios">
-          <tr class="loading-row">
-            <td colspan="6"><div class="spin"></div>Cargando...</td>
+        <tbody id="tbody-internos">
+          <tr class="loading-row"><td colspan="6"><div class="spin"></div>Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- TABLA: CUENTAS DE CLIENTE -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div>
+        <div class="panel-title">Cuentas de cliente</div>
+        <div class="panel-sub">Acceso al portal de consulta de certificados</div>
+      </div>
+      <button class="btn-primary" onclick="abrirCrear('cliente')">+ Nueva cuenta cliente</button>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Nombre / Empresa</th>
+            <th>ID Cliente</th>
+            <th>Estado</th>
+            <th>Último acceso</th>
+            <th></th>
           </tr>
+        </thead>
+        <tbody id="tbody-clientes">
+          <tr class="loading-row"><td colspan="6"><div class="spin"></div>Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -240,6 +334,7 @@
     <div class="modal-title" id="modal-usr-title">Nuevo usuario</div>
 
     <input type="hidden" id="usr-id">
+    <input type="hidden" id="usr-tipo"><!-- interno | cliente -->
 
     <div class="field">
       <label>Usuario <span style="color:var(--rojo)">*</span></label>
@@ -247,14 +342,16 @@
     </div>
     <div class="field">
       <label>Nombre completo <span style="color:var(--rojo)">*</span></label>
-      <input type="text" id="usr-nombre" placeholder="Juan Pérez">
+      <input type="text" id="usr-nombre" placeholder="Juan Pérez o Empresa S.A.">
     </div>
     <div class="field">
       <label>Contraseña <span id="pass-req" style="color:var(--rojo)">*</span></label>
       <input type="password" id="usr-password" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
       <div class="hint" id="pass-hint"></div>
     </div>
-    <div class="field">
+
+    <!-- Rol (solo para usuarios internos) -->
+    <div class="field" id="campo-rol">
       <label>Rol <span style="color:var(--rojo)">*</span></label>
       <select id="usr-rol">
         <option value="">— Seleccionar rol —</option>
@@ -264,11 +361,23 @@
         <option value="ADMIN">ADMIN</option>
       </select>
     </div>
+
+    <!-- ID Cliente (solo para cuentas cliente) -->
+    <div class="field" id="campo-id-cliente" style="display:none">
+      <label>ID Cliente <span style="color:var(--rojo)">*</span></label>
+      <input type="text" id="usr-id-cliente" placeholder="Ej: 10001" autocomplete="off">
+      <div class="hint">
+        Prefijo numérico de los folios del cliente.<br>
+        Ejemplo: si los folios son <strong>10001-0042</strong>, el ID es <strong>10001</strong>.
+      </div>
+    </div>
+
+    <!-- Estado (solo en edición) -->
     <div class="field" id="campo-activo" style="display:none">
-      <label>Estado</label>
+      <div class="divider"></div>
       <div class="activo-toggle">
         <input type="checkbox" id="usr-activo" checked>
-        <span style="font-size:13px;color:var(--texto)">Usuario activo</span>
+        <span style="font-size:13px;color:var(--texto)">Cuenta activa</span>
       </div>
     </div>
 
@@ -292,7 +401,11 @@ const API = "api/index.php";
       const t = s.token || '';
       if (opts.method === 'POST') {
         if (!(opts.body instanceof FormData)) {
-          try { const b = JSON.parse(opts.body || '{}'); b.token = t; opts.body = JSON.stringify(b); } catch(e) {}
+          try {
+            const b = JSON.parse(opts.body || '{}');
+            b.token = t;
+            opts.body = JSON.stringify(b);
+          } catch(e) {}
         }
       } else {
         url = url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
@@ -323,32 +436,60 @@ async function cargar() {
   try {
     const res  = await fetch(API + "?action=LISTAR_USUARIOS");
     const data = await res.json();
-    if (!Array.isArray(data)) throw new Error("Respuesta inválida");
+    if (!Array.isArray(data)) throw new Error();
     usuariosGlobal = data;
-    render(data);
-    actualizarStats(data);
-  } catch (e) {
-    document.getElementById("tabla-usuarios").innerHTML =
-      `<tr class="loading-row"><td colspan="6">Error al cargar. <button onclick="cargar()" style="color:var(--azul);background:none;border:none;cursor:pointer;font-size:13px;text-decoration:underline">Reintentar</button></td></tr>`;
+    const internos = data.filter(u => u.rol !== 'CLIENTE');
+    const clientes = data.filter(u => u.rol === 'CLIENTE');
+    renderInternos(internos);
+    renderClientes(clientes);
+    actualizarStats(internos, clientes);
+  } catch {
+    const err = `<tr class="loading-row"><td colspan="6">
+      Error al cargar.
+      <button onclick="cargar()" style="color:var(--azul);background:none;border:none;cursor:pointer;font-size:13px;text-decoration:underline">
+        Reintentar
+      </button>
+    </td></tr>`;
+    document.getElementById("tbody-internos").innerHTML = err;
+    document.getElementById("tbody-clientes").innerHTML = err;
   }
 }
 
-function actualizarStats(d) {
-  document.getElementById("s-total").textContent     = d.length;
-  document.getElementById("s-activos").textContent   = d.filter(u => u.activo == 1).length;
-  document.getElementById("s-inactivos").textContent = d.filter(u => u.activo == 0).length;
-  document.getElementById("s-roles").textContent     = [...new Set(d.map(u => u.rol))].length;
+function actualizarStats(internos, clientes) {
+  document.getElementById("s-total").textContent     = internos.length;
+  document.getElementById("s-activos").textContent   = internos.filter(u => u.activo == 1).length;
+  document.getElementById("s-inactivos").textContent = internos.filter(u => u.activo == 0).length;
+  document.getElementById("s-clientes").textContent  = clientes.length;
+  document.getElementById("s-roles").textContent     = [...new Set(internos.map(u => u.rol))].length;
 }
 
 function rolBadge(rol) {
-  const cls = { ADMIN:'b-admin', CALIDAD:'b-cal', INSPECTOR:'b-insp', CERTIFICACIONES:'b-cert' };
+  const cls = {
+    ADMIN:'b-admin', CALIDAD:'b-cal',
+    INSPECTOR:'b-insp', CERTIFICACIONES:'b-cert', CLIENTE:'b-cliente'
+  };
   return `<span class="badge ${cls[rol] || ''}">${esc(rol)}</span>`;
 }
 
-function render(data) {
-  const tbody = document.getElementById("tabla-usuarios");
+function estadoBadge(activo) {
+  return activo == 1
+    ? `<span class="badge b-activo">Activo</span>`
+    : `<span class="badge b-inact">Inactivo</span>`;
+}
+
+function accionesTd(u) {
+  return `<div class="td-actions">
+    <button class="btn-edit"   onclick="abrirEditar(${u.id})">Editar</button>
+    ${u.activo == 1
+      ? `<button class="btn-danger" onclick="desactivar(${u.id})">Desactivar</button>`
+      : `<button class="btn-edit"   onclick="reactivar(${u.id})">Reactivar</button>`}
+  </div>`;
+}
+
+function renderInternos(data) {
+  const tbody = document.getElementById("tbody-internos");
   if (!data.length) {
-    tbody.innerHTML = `<tr class="loading-row"><td colspan="6">No hay usuarios registrados.</td></tr>`;
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="6">No hay usuarios internos registrados.</td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(u => `
@@ -356,54 +497,82 @@ function render(data) {
       <td><strong>${esc(u.usuario)}</strong></td>
       <td>${esc(u.nombre || '—')}</td>
       <td>${rolBadge(u.rol)}</td>
-      <td>${u.activo == 1
-        ? `<span class="badge b-activo">Activo</span>`
-        : `<span class="badge b-inact">Inactivo</span>`}</td>
-      <td style="color:var(--texto-hint);font-size:12px">${esc(u.ultimo_acceso || '—')}</td>
-      <td>
-        <div class="td-actions">
-          <button class="btn-edit" onclick="abrirEditar(${u.id})">Editar</button>
-          ${u.activo == 1
-            ? `<button class="btn-danger" onclick="desactivar(${u.id})">Desactivar</button>`
-            : `<button class="btn-edit"   onclick="reactivar(${u.id})">Reactivar</button>`}
-        </div>
-      </td>
-    </tr>`).join("");
+      <td>${estadoBadge(u.activo)}</td>
+      <td style="color:var(--texto-hint);font-size:11.5px">${esc(u.ultimo_acceso || '—')}</td>
+      <td>${accionesTd(u)}</td>
+    </tr>`).join('');
 }
 
-/* ── Modal crear ── */
-function abrirCrear() {
+function renderClientes(data) {
+  const tbody = document.getElementById("tbody-clientes");
+  if (!data.length) {
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="6">Sin cuentas de cliente. Usa "+ Nueva cuenta cliente".</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(u => `
+    <tr>
+      <td><strong>${esc(u.usuario)}</strong></td>
+      <td>${esc(u.nombre || '—')}</td>
+      <td>
+        <span style="font-family:monospace;font-size:12px;background:var(--gris-bg);
+                     padding:2px 8px;border-radius:5px;border:1px solid var(--borde)">
+          ${esc(u.id_cliente || '—')}
+        </span>
+      </td>
+      <td>${estadoBadge(u.activo)}</td>
+      <td style="color:var(--texto-hint);font-size:11.5px">${esc(u.ultimo_acceso || '—')}</td>
+      <td>${accionesTd(u)}</td>
+    </tr>`).join('');
+}
+
+/* ── Abrir modal crear ── */
+function abrirCrear(tipo) {
   modoEdicion = false;
-  document.getElementById("modal-usr-title").textContent  = "Nuevo usuario";
+  const esCliente = tipo === 'cliente';
+
+  document.getElementById("modal-usr-title").textContent  = esCliente ? "Nueva cuenta cliente" : "Nuevo usuario";
   document.getElementById("usr-id").value                 = "";
+  document.getElementById("usr-tipo").value               = tipo;
   document.getElementById("usr-usuario").value            = "";
   document.getElementById("usr-usuario").disabled         = false;
   document.getElementById("usr-nombre").value             = "";
   document.getElementById("usr-password").value           = "";
   document.getElementById("usr-rol").value                = "";
+  document.getElementById("usr-id-cliente").value         = "";
+  document.getElementById("usr-activo").checked           = true;
   document.getElementById("pass-req").textContent         = "*";
   document.getElementById("pass-hint").textContent        = "";
-  document.getElementById("campo-activo").style.display   = "none";
+  document.getElementById("campo-activo").style.display      = "none";
+  document.getElementById("campo-rol").style.display         = esCliente ? "none" : "";
+  document.getElementById("campo-id-cliente").style.display  = esCliente ? "" : "none";
+
   document.getElementById("overlay-usr").classList.add("open");
   setTimeout(() => document.getElementById("usr-usuario").focus(), 150);
 }
 
-/* ── Modal editar ── */
+/* ── Abrir modal editar ── */
 function abrirEditar(id) {
   const u = usuariosGlobal.find(x => x.id == id);
   if (!u) return;
+  const esCliente = u.rol === 'CLIENTE';
   modoEdicion = true;
-  document.getElementById("modal-usr-title").textContent  = "Editar usuario";
+
+  document.getElementById("modal-usr-title").textContent  = esCliente ? "Editar cuenta cliente" : "Editar usuario";
   document.getElementById("usr-id").value                 = u.id;
+  document.getElementById("usr-tipo").value               = esCliente ? 'cliente' : 'interno';
   document.getElementById("usr-usuario").value            = u.usuario;
   document.getElementById("usr-usuario").disabled         = true;
   document.getElementById("usr-nombre").value             = u.nombre || "";
   document.getElementById("usr-password").value           = "";
   document.getElementById("usr-rol").value                = u.rol;
+  document.getElementById("usr-id-cliente").value         = u.id_cliente || "";
   document.getElementById("usr-activo").checked           = u.activo == 1;
   document.getElementById("pass-req").textContent         = "";
   document.getElementById("pass-hint").textContent        = "Dejar en blanco para no cambiar la contraseña";
-  document.getElementById("campo-activo").style.display   = "block";
+  document.getElementById("campo-activo").style.display      = "block";
+  document.getElementById("campo-rol").style.display         = esCliente ? "none" : "";
+  document.getElementById("campo-id-cliente").style.display  = esCliente ? "" : "none";
+
   document.getElementById("overlay-usr").classList.add("open");
   setTimeout(() => document.getElementById("usr-nombre").focus(), 150);
 }
@@ -414,27 +583,37 @@ function cerrarModal() {
 
 /* ── Guardar ── */
 async function guardarUsuario() {
-  const usuario  = document.getElementById("usr-usuario").value.trim();
-  const nombre   = document.getElementById("usr-nombre").value.trim();
-  const password = document.getElementById("usr-password").value;
-  const rol      = document.getElementById("usr-rol").value;
-  const activo   = document.getElementById("usr-activo").checked ? 1 : 0;
-  const id       = document.getElementById("usr-id").value;
+  const usuario   = document.getElementById("usr-usuario").value.trim();
+  const nombre    = document.getElementById("usr-nombre").value.trim();
+  const password  = document.getElementById("usr-password").value;
+  const tipo      = document.getElementById("usr-tipo").value;
+  const esCliente = tipo === 'cliente';
+  const rol       = esCliente ? "CLIENTE" : document.getElementById("usr-rol").value;
+  const idCliente = document.getElementById("usr-id-cliente").value.trim();
+  const activo    = document.getElementById("usr-activo").checked ? 1 : 0;
+  const id        = document.getElementById("usr-id").value;
 
-  if (!nombre || !rol) { alert("Nombre y rol son obligatorios."); return; }
-  if (!modoEdicion && (!usuario || !password)) { alert("Usuario y contraseña son obligatorios."); return; }
-  if (password && password.length < 6) { alert("La contraseña debe tener al menos 6 caracteres."); return; }
+  if (!nombre)                          { alert("El nombre es obligatorio."); return; }
+  if (!rol)                             { alert("Selecciona un rol."); return; }
+  if (esCliente && !idCliente)          { alert("El ID Cliente es obligatorio."); return; }
+  if (!modoEdicion && !usuario)         { alert("El nombre de usuario es obligatorio."); return; }
+  if (!modoEdicion && !password)        { alert("La contraseña es obligatoria."); return; }
+  if (password && password.length < 6)  { alert("La contraseña debe tener al menos 6 caracteres."); return; }
 
   const action  = modoEdicion ? "EDITAR_USUARIO" : "CREAR_USUARIO";
   const payload = modoEdicion
-    ? { id: parseInt(id), nombre, ...(password ? { password } : {}), rol, activo }
-    : { usuario, nombre, password, rol };
+    ? {
+        id: parseInt(id), nombre, rol, activo,
+        ...(password                  ? { password }               : {}),
+        ...(esCliente                 ? { id_cliente: idCliente }  : {})
+      }
+    : {
+        usuario, nombre, password, rol,
+        ...(esCliente                 ? { id_cliente: idCliente }  : {})
+      };
 
   try {
-    const res  = await fetch(API, {
-      method: "POST",
-      body: JSON.stringify({ action, payload })
-    });
+    const res  = await fetch(API, { method: "POST", body: JSON.stringify({ action, payload }) });
     const data = await res.json();
     if (data.status === "success") {
       cerrarModal();
@@ -442,7 +621,7 @@ async function guardarUsuario() {
     } else {
       alert("Error: " + (data.message || "No se pudo guardar"));
     }
-  } catch (e) {
+  } catch {
     alert("Error de conexión.");
   }
 }
@@ -450,7 +629,7 @@ async function guardarUsuario() {
 /* ── Desactivar ── */
 async function desactivar(id) {
   const u = usuariosGlobal.find(x => x.id == id);
-  if (!confirm(`¿Desactivar al usuario "${u?.usuario}"?`)) return;
+  if (!confirm(`¿Desactivar la cuenta "${u?.usuario}"?`)) return;
   const res  = await fetch(API, {
     method: "POST",
     body: JSON.stringify({ action: "DESACTIVAR_USUARIO", payload: { id } })
@@ -460,7 +639,7 @@ async function desactivar(id) {
   else alert(data.message || "Error al desactivar");
 }
 
-/* ── Reactivar (editar con activo=1) ── */
+/* ── Reactivar ── */
 async function reactivar(id) {
   const res  = await fetch(API, {
     method: "POST",
