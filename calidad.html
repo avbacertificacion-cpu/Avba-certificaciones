@@ -2510,23 +2510,6 @@ function renderTipos() {
   });
 }
 
-/* Helper: genera un bloque de plantilla Word */
-function plantillaBox(t, docTipo, etiqueta, archivo) {
-  const ok = !!archivo;
-  return `
-  <div class="plantilla-box ${ok ? 'tiene' : ''}">
-    <div class="plantilla-info">
-      <div class="plantilla-tipo">${esc(etiqueta)}</div>
-      <div class="plantilla-estado">${ok ? '✓ ' + esc(archivo) : 'Sin plantilla'}</div>
-    </div>
-    <label class="btn-upload">
-      ${ok ? 'Cambiar' : 'Subir .docx'}
-      <input type="file" accept=".docx" style="display:none"
-             onchange="subirPlantilla(event,${t.id},'${docTipo}')">
-    </label>
-  </div>`;
-}
-
 /* Helper: genera un bloque de plantilla PDF */
 function plantillaPdfBox(t, docTipo, etiqueta, archivo) {
   const ok = !!archivo;
@@ -2627,17 +2610,8 @@ function renderTipoCard(t) {
         }
       </div>
 
-      <!-- Plantillas Word -->
-      <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Plantillas Word (.docx)</div>
-      <div class="plantillas-row">
-        ${plantillaBox(t, 'cert',       'Imprimir certificado',  t.plantilla_cert)}
-        ${plantillaBox(t, 'dict',       'Imprimir dictamen',     t.plantilla_dict)}
-        ${plantillaBox(t, 'cert_envio', 'Enviar certificado',    t.plantilla_cert_envio)}
-        ${plantillaBox(t, 'dict_envio', 'Enviar dictamen',       t.plantilla_dict_envio)}
-      </div>
-
       <!-- Plantillas PDF -->
-      <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:8px;margin-top:16px;text-transform:uppercase;letter-spacing:.05em">Plantillas PDF (con coordenadas)</div>
+      <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Plantillas PDF (con coordenadas)</div>
       <div class="plantillas-row">
         ${plantillaPdfBox(t, 'cert_pdf', 'Certificado PDF', t.plantilla_cert_pdf)}
         ${plantillaPdfBox(t, 'dict_pdf', 'Dictamen PDF',    t.plantilla_dict_pdf)}
@@ -2681,34 +2655,6 @@ function toggleTipo(id) {
   card.classList.toggle("open");
   if (card.classList.contains("open")) openTipos.add(id);
   else openTipos.delete(id);
-}
-
-/* ── Subir plantilla Word ── */
-async function subirPlantilla(event, tipoId, docTipo) {
-  const file = event.target.files[0];
-  if (!file) return;
-
-  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
-  const form = new FormData();
-  form.append("action",    "SUBIR_PLANTILLA");
-  form.append("token",     s.token || "");
-  form.append("tipo_id",   tipoId);
-  form.append("doc_tipo",  docTipo);
-  form.append("plantilla", file);
-
-  try {
-    const res  = await fetch(API, { method: "POST", body: form });
-    const data = await res.json();
-    if (data.status === "success") {
-      tiposCargados = false;
-      cargarTipos();
-    } else {
-      alert("Error: " + (data.message || "No se pudo subir la plantilla"));
-    }
-  } catch (e) {
-    alert("Error de conexión al subir la plantilla.");
-  }
-  event.target.value = "";
 }
 
 /* ── Subir plantilla PDF ── */

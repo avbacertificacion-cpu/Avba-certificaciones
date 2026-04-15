@@ -14,10 +14,14 @@ class Admin {
 
     // ── Listar tipos de equipo con sus secciones ───────────────
     public function listarTiposEquipo(): array {
+        // Auto-aplicar migration_007 si las columnas PDF no existen todavía
+        $this->ensureColumnsPdf();
+
         $tipos = $this->pdo->query(
             "SELECT id, nombre, plantilla,
                     plantilla_cert, plantilla_dict,
-                    plantilla_cert_envio, plantilla_dict_envio
+                    plantilla_cert_envio, plantilla_dict_envio,
+                    plantilla_cert_pdf, plantilla_dict_pdf
              FROM maquinaria_tipos ORDER BY id"
         )->fetchAll();
 
@@ -325,7 +329,34 @@ class Admin {
     }
 
     // ── Subir plantilla PDF para certificado / dictamen ──────
+    // ── Auto-migración: agrega columnas PDF si no existen ─────
+    private function ensureColumnsPdf(): void {
+        // Comprueba si la columna ya existe
+        $check = $this->pdo->query(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE()
+               AND TABLE_NAME   = 'maquinaria_tipos'
+               AND COLUMN_NAME  = 'plantilla_cert_pdf'"
+        )->fetchColumn();
+
+        if ($check) return; // Ya existe, nada que hacer
+
+        $this->pdo->exec("
+            ALTER TABLE maquinaria_tipos
+              ADD COLUMN IF NOT EXISTS plantilla_cert_pdf VARCHAR(500) NULL
+                  AFTER plantilla_cert,
+              ADD COLUMN IF NOT EXISTS plantilla_dict_pdf VARCHAR(500) NULL
+                  AFTER plantilla_dict,
+              ADD COLUMN IF NOT EXISTS cert_pdf_campos    JSON          NULL
+                  AFTER plantilla_cert_pdf,
+              ADD COLUMN IF NOT EXISTS dict_pdf_campos    JSON          NULL
+                  AFTER plantilla_dict_pdf
+        ");
+    }
+
     public function subirPlantillaPdf(array $post, array $files): array {
+        // Garantizar que las columnas existen antes de actualizar
+        $this->ensureColumnsPdf();
         $tipoId  = (int)($post['tipo_id']  ?? 0);
         $docTipo = trim($post['doc_tipo']  ?? ''); // cert_pdf | dict_pdf
 
