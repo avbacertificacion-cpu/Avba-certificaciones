@@ -409,6 +409,39 @@
     .toast.ok   { background: var(--verde); }
     .toast.err  { background: var(--rojo); }
     .toast svg  { width: 16px; height: 16px; flex-shrink: 0; }
+
+    /* ── SECTION NAV ── */
+    .tabs-nav {
+      background: var(--blanco);
+      border-bottom: 1px solid var(--borde);
+      display: flex; gap: 0;
+      padding: 0 16px;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      padding: 12px 20px; font-size: 13px; font-weight: 600;
+      color: var(--texto-sub); cursor: pointer; white-space: nowrap;
+      border: none; border-bottom: 2.5px solid transparent;
+      background: none; transition: all .15s;
+    }
+    .tab-btn:hover { color: var(--azul); background: var(--azul-light); }
+    .tab-btn.active { color: var(--azul); border-bottom-color: var(--azul); }
+
+    .sub-nav {
+      background: var(--gris-bg);
+      border-bottom: 1px solid var(--borde);
+      display: flex; gap: 6px;
+      padding: 8px 20px;
+      overflow-x: auto;
+    }
+    .sub-btn {
+      padding: 6px 16px; font-size: 12px; font-weight: 600;
+      color: var(--texto-sub); cursor: pointer; white-space: nowrap;
+      border: 1.5px solid var(--borde); border-radius: 20px;
+      background: var(--blanco); transition: all .15s;
+    }
+    .sub-btn:hover { border-color: var(--azul); color: var(--azul); }
+    .sub-btn.active { background: var(--azul); border-color: var(--azul); color: white; }
   </style>
 </head>
 <body>
@@ -428,7 +461,18 @@
   </div>
 </div>
 
-<div class="wrap">
+<!-- SECTION NAV -->
+<div class="tabs-nav">
+  <button class="tab-btn active" id="sec-btn-maquinaria" onclick="verSeccion('maquinaria')">🔧 Maquinaria</button>
+  <button class="tab-btn" id="sec-btn-accesorios" onclick="verSeccion('accesorios')">🔗 Accesorios</button>
+  <button class="tab-btn" id="sec-btn-personal" onclick="verSeccion('personal')">👤 Personal</button>
+</div>
+<div class="sub-nav" id="sub-nav-personal" style="display:none">
+  <button class="sub-btn active" id="sub-btn-per-cursos" onclick="verSubTabCert('cursos')">Cursos impartidos</button>
+  <button class="sub-btn" id="sub-btn-per-indep" onclick="verSubTabCert('independiente')">Independiente</button>
+</div>
+
+<div id="sec-maquinaria" class="wrap">
 
   <!-- ALERTAS VENCIMIENTO -->
   <div class="alertas-section" id="alertas-section"></div>
@@ -483,7 +527,123 @@
     </div>
   </div>
 
-</div><!-- /wrap -->
+</div><!-- /sec-maquinaria -->
+
+
+<!-- ══ SECCIÓN: ACCESORIOS ══ -->
+<div id="sec-accesorios" class="wrap" style="display:none">
+
+  <div class="stats" id="acc-stats-cert" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat"><div class="stat-n" id="ac-total"    style="color:var(--azul)">—</div><div class="stat-l">Sesiones</div></div>
+    <div class="stat"><div class="stat-n" id="ac-cumple"   style="color:var(--verde)">—</div><div class="stat-l">Cumplen</div></div>
+    <div class="stat"><div class="stat-n" id="ac-nocumple" style="color:var(--rojo)">—</div><div class="stat-l">No cumplen</div></div>
+  </div>
+
+  <div class="filtros-card">
+    <input id="ac-fCliente" placeholder="Cliente...">
+    <input id="ac-fFecha"   placeholder="Fecha..." style="max-width:200px">
+    <button class="btn-filtrar" onclick="filtrarAccCert()">Filtrar</button>
+    <button class="btn-limpiar" onclick="limpiarAccCert()">Limpiar</button>
+  </div>
+
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Sesiones de inspección de accesorios</span>
+      <span class="tabla-count" id="acc-cert-count">—</span>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Cliente</th>
+            <th>Fecha</th>
+            <th>Ubicación</th>
+            <th>Total</th>
+            <th>Cumplen</th>
+            <th>No cumplen</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="acc-cert-tabla">
+          <tr><td colspan="7" style="text-align:center;padding:36px;color:var(--texto-hint)">Selecciona esta sección para cargar datos.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /sec-accesorios -->
+
+
+<!-- ══ SECCIÓN: PERSONAL CURSOS ══ -->
+<div id="sec-per-cursos" class="wrap" style="display:none">
+
+  <div class="filtros-card">
+    <input id="pc-fBuscar" placeholder="Buscar curso o empresa...">
+    <input id="pc-fFecha"  placeholder="Fecha..." style="max-width:200px">
+    <button class="btn-filtrar" onclick="filtrarPerCursosCert()">Filtrar</button>
+    <button class="btn-limpiar" onclick="limpiarPerCursosCert()">Limpiar</button>
+  </div>
+
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Cursos impartidos</span>
+      <span class="tabla-count" id="pc-count">—</span>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Curso</th>
+            <th>Fecha</th>
+            <th>Participantes</th>
+            <th>Empresa</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="pc-tabla">
+          <tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Selecciona esta sección para cargar datos.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /sec-per-cursos -->
+
+
+<!-- ══ SECCIÓN: PERSONAL INDEPENDIENTE ══ -->
+<div id="sec-per-indep" class="wrap" style="display:none">
+
+  <div class="filtros-card">
+    <input id="pi-fNombre" placeholder="Nombre o CURP...">
+    <input id="pi-fCurso"  placeholder="Curso...">
+    <button class="btn-filtrar" onclick="filtrarPerIndepCert()">Filtrar</button>
+    <button class="btn-limpiar" onclick="limpiarPerIndepCert()">Limpiar</button>
+  </div>
+
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Personal independiente</span>
+      <span class="tabla-count" id="pi-count">—</span>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>CURP</th>
+            <th>Curso</th>
+            <th>Fecha</th>
+            <th>Documentos</th>
+          </tr>
+        </thead>
+        <tbody id="pi-tabla">
+          <tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Selecciona esta sección para cargar datos.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /sec-per-indep -->
 
 
 <!-- ══ MODAL DETALLE ══ -->
@@ -615,6 +775,46 @@
     <div class="confirm-btns">
       <button class="btn-confirm-cancel" id="confirm-cancel" onclick="cerrarConfirm()">Cancelar</button>
       <button class="btn-confirm-ok"     id="confirm-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL DETALLE SESIÓN ACCESORIO ══ -->
+<div class="overlay" id="overlay-acc-cert">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar">🔗</div>
+        <div>
+          <div class="m-title" id="acc-det-cliente">—</div>
+          <div class="m-sub"   id="acc-det-fecha">—</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarAccCert()">×</button>
+    </div>
+    <div class="modal-body" id="acc-det-body" style="max-height:65vh">
+      <div style="text-align:center;padding:24px;color:var(--texto-hint)">Cargando...</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL PARTICIPANTES CURSO ══ -->
+<div class="overlay" id="overlay-pc-det">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar">👤</div>
+        <div>
+          <div class="m-title" id="pc-det-curso">—</div>
+          <div class="m-sub"   id="pc-det-info">—</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarPcDet()">×</button>
+    </div>
+    <div class="modal-body" id="pc-det-body" style="max-height:65vh">
+      <div style="text-align:center;padding:24px;color:var(--texto-hint)">Cargando...</div>
     </div>
   </div>
 </div>
@@ -1359,6 +1559,323 @@ function mostrarToast(msg, tipo = "info") {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
 }
+
+/* ═══════════════════════════════
+   NAVEGACIÓN POR SECCIONES
+═══════════════════════════════ */
+const CERT_SECCIONES = ['sec-maquinaria','sec-accesorios','sec-per-cursos','sec-per-indep'];
+
+function verSeccion(sec) {
+  CERT_SECCIONES.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+  document.getElementById('sub-nav-personal').style.display = 'none';
+  ['maquinaria','accesorios','personal'].forEach(s => {
+    document.getElementById('sec-btn-' + s)?.classList.remove('active');
+  });
+  document.getElementById('sec-btn-' + sec)?.classList.add('active');
+
+  if (sec === 'maquinaria') {
+    document.getElementById('sec-maquinaria').style.display = '';
+  } else if (sec === 'accesorios') {
+    document.getElementById('sec-accesorios').style.display = '';
+    cargarAccCert();
+  } else if (sec === 'personal') {
+    document.getElementById('sub-nav-personal').style.display = 'flex';
+    verSubTabCert('cursos');
+  }
+}
+
+function verSubTabCert(sub) {
+  ['sec-per-cursos','sec-per-indep'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  document.getElementById('sub-btn-per-cursos')?.classList.remove('active');
+  document.getElementById('sub-btn-per-indep')?.classList.remove('active');
+
+  if (sub === 'cursos') {
+    document.getElementById('sec-per-cursos').style.display = '';
+    document.getElementById('sub-btn-per-cursos')?.classList.add('active');
+    cargarPerCursosCert();
+  } else {
+    document.getElementById('sec-per-indep').style.display = '';
+    document.getElementById('sub-btn-per-indep')?.classList.add('active');
+    cargarPerIndepCert();
+  }
+}
+
+/* ═══════════════════════════════
+   ACCESORIOS — CERTIFICACIONES
+═══════════════════════════════ */
+let accCertData    = [];
+let accCertCargados = false;
+
+async function cargarAccCert() {
+  if (accCertCargados) return;
+  document.getElementById('acc-cert-tabla').innerHTML =
+    `<tr><td colspan="7" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
+  try {
+    const res  = await fetch(API + '?action=LISTAR_SESIONES_ACCESORIOS');
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('Respuesta inválida');
+    accCertData     = data;
+    accCertCargados = true;
+    renderAccCert(data);
+    const total    = data.length;
+    const cumple   = data.reduce((s, r) => s + (parseInt(r.total_cumple)   || 0), 0);
+    const nocumple = data.reduce((s, r) => s + (parseInt(r.total_no_cumple)|| 0), 0);
+    document.getElementById('ac-total').textContent    = total;
+    document.getElementById('ac-cumple').textContent   = cumple;
+    document.getElementById('ac-nocumple').textContent = nocumple;
+  } catch(e) {
+    document.getElementById('acc-cert-tabla').innerHTML =
+      `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--rojo)">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function filtrarAccCert() {
+  const cli  = document.getElementById('ac-fCliente').value.toLowerCase();
+  const fech = document.getElementById('ac-fFecha').value;
+  const fil  = accCertData.filter(r =>
+    (!cli  || (r.cliente||'').toLowerCase().includes(cli)) &&
+    (!fech || (r.fecha  ||'').includes(fech))
+  );
+  renderAccCert(fil);
+}
+
+function limpiarAccCert() {
+  document.getElementById('ac-fCliente').value = '';
+  document.getElementById('ac-fFecha').value   = '';
+  renderAccCert(accCertData);
+}
+
+function renderAccCert(data) {
+  const tbody = document.getElementById('acc-cert-tabla');
+  document.getElementById('acc-cert-count').textContent = data.length + ' sesión' + (data.length !== 1 ? 'es' : '');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin resultados.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(r => `<tr>
+    <td style="font-weight:600">${r.cliente||'—'}</td>
+    <td style="color:var(--texto-sub);font-size:12px">${r.fecha||'—'}</td>
+    <td style="font-size:12px;color:var(--texto-sub)">${r.direccion ? r.direccion.substring(0,45)+'…' : '—'}</td>
+    <td style="font-weight:600;text-align:center">${r.total_accesorios||0}</td>
+    <td style="text-align:center"><span class="badge b-apro">${r.total_cumple||0}</span></td>
+    <td style="text-align:center"><span class="badge b-vencido">${r.total_no_cumple||0}</span></td>
+    <td><button class="btn-ver" onclick="abrirAccCert(${r.id})">Ver</button></td>
+  </tr>`).join('');
+}
+
+async function abrirAccCert(sesionId) {
+  document.getElementById('acc-det-body').innerHTML =
+    `<div style="text-align:center;padding:24px"><span class="spin"></span>Cargando...</div>`;
+  document.getElementById('overlay-acc-cert').classList.add('open');
+  try {
+    const res  = await fetch(`${API}?action=DETALLE_SESION_ACCESORIOS&id=${sesionId}`);
+    const data = await res.json();
+    document.getElementById('acc-det-cliente').textContent = data.cliente || '—';
+    document.getElementById('acc-det-fecha').textContent   = (data.fecha || '—') + (data.direccion ? ' · ' + data.direccion.substring(0,60) : '');
+    let html = '';
+    if (!data.accesorios || !data.accesorios.length) {
+      html = `<div style="text-align:center;padding:24px;color:var(--texto-hint)">Sin accesorios registrados.</div>`;
+    } else {
+      data.accesorios.forEach((a, i) => {
+        const ec = a.estado === 'CUMPLE' ? 'b-apro' : 'b-vencido';
+        html += `<div style="padding:14px 0;border-bottom:1px solid var(--borde)">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+            <span style="font-weight:600;font-size:14px">Accesorio ${i + 1}</span>
+            <span class="badge ${ec}">${a.estado||'—'}</span>
+          </div>
+          <div class="grid2">
+            <div class="field"><label>ID</label><input disabled value="${a.id_accesorio||'—'}"></div>
+            <div class="field"><label>Tipo</label><input disabled value="${a.tipo_nombre||'—'}"></div>
+            <div class="field"><label>Marca</label><input disabled value="${a.marca||'—'}"></div>
+            <div class="field"><label>Modelo</label><input disabled value="${a.modelo||'—'}"></div>
+            <div class="field"><label>Serie</label><input disabled value="${a.serie||'—'}"></div>
+            <div class="field"><label>Capacidad</label><input disabled value="${a.capacidad||'—'}"></div>
+          </div>
+        </div>`;
+      });
+    }
+    document.getElementById('acc-det-body').innerHTML = html;
+  } catch(e) {
+    document.getElementById('acc-det-body').innerHTML =
+      `<div style="text-align:center;padding:24px;color:var(--rojo)">Error: ${e.message}</div>`;
+  }
+}
+
+function cerrarAccCert() {
+  document.getElementById('overlay-acc-cert').classList.remove('open');
+}
+
+/* ═══════════════════════════════
+   PERSONAL — CURSOS
+═══════════════════════════════ */
+let perCertData    = [];
+let perCertCargados = false;
+
+async function cargarPerCursosCert() {
+  if (perCertCargados) return;
+  document.getElementById('pc-tabla').innerHTML =
+    `<tr><td colspan="5" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
+  try {
+    const res  = await fetch(API + '?action=LISTAR_PARTICIPANTES');
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('Respuesta inválida');
+    perCertData     = data;
+    perCertCargados = true;
+    renderCursosCert(agruparCursosCert(data));
+    renderIndepCert(data);
+  } catch(e) {
+    document.getElementById('pc-tabla').innerHTML =
+      `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--rojo)">Error: ${e.message}</td></tr>`;
+  }
+}
+
+function agruparCursosCert(data) {
+  const map = {};
+  data.forEach(p => {
+    const key = (p.curso_nombre||'') + '|' + (p.fecha_curso||'');
+    if (!map[key]) map[key] = { curso: p.curso_nombre||'—', fecha: p.fecha_curso||'—', empresa: p.empresa||'—', participantes: [] };
+    map[key].participantes.push(p);
+  });
+  return Object.values(map);
+}
+
+function filtrarPerCursosCert() {
+  const bus  = document.getElementById('pc-fBuscar').value.toLowerCase();
+  const fech = document.getElementById('pc-fFecha').value;
+  const grupos = agruparCursosCert(perCertData).filter(g =>
+    (!bus  || g.curso.toLowerCase().includes(bus) || g.empresa.toLowerCase().includes(bus)) &&
+    (!fech || g.fecha.includes(fech))
+  );
+  renderCursosCert(grupos);
+}
+
+function limpiarPerCursosCert() {
+  document.getElementById('pc-fBuscar').value = '';
+  document.getElementById('pc-fFecha').value  = '';
+  renderCursosCert(agruparCursosCert(perCertData));
+}
+
+function renderCursosCert(grupos) {
+  const tbody = document.getElementById('pc-tabla');
+  document.getElementById('pc-count').textContent = grupos.length + ' grupo' + (grupos.length !== 1 ? 's' : '');
+  if (!grupos.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin resultados.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = grupos.map((g, i) => `<tr>
+    <td style="font-weight:600">${g.curso}</td>
+    <td style="color:var(--texto-sub);font-size:12px">${g.fecha}</td>
+    <td style="text-align:center"><span class="badge b-env">${g.participantes.length}</span></td>
+    <td style="color:var(--texto-sub);font-size:12px">${g.empresa}</td>
+    <td><button class="btn-ver" onclick="abrirCursoCert(${i})">Ver participantes</button></td>
+  </tr>`).join('');
+  window._cursosCertGrupos = grupos;
+}
+
+function abrirCursoCert(idx) {
+  const g = window._cursosCertGrupos?.[idx];
+  if (!g) return;
+  document.getElementById('pc-det-curso').textContent = g.curso;
+  document.getElementById('pc-det-info').textContent  = g.fecha + ' · ' + g.participantes.length + ' participante' + (g.participantes.length !== 1 ? 's' : '');
+  let html = g.participantes.map(p => `
+    <div style="padding:12px 0;border-bottom:1px solid var(--borde);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:600;font-size:13px">${p.nombre_completo||'—'}</div>
+        <div style="font-size:11px;color:var(--texto-hint);margin-top:2px">${p.curp||''} ${p.ocupacion ? '· ' + p.ocupacion : ''}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn-ver" style="font-size:11px" onclick="generarDocPersonal(${p.id},'DC3')">DC-3</button>
+        <button class="btn-ver" style="font-size:11px" onclick="generarDocPersonal(${p.id},'DIPLOMA')">Diploma</button>
+      </div>
+    </div>`).join('');
+  if (!html) html = `<div style="text-align:center;padding:24px;color:var(--texto-hint)">Sin participantes.</div>`;
+  document.getElementById('pc-det-body').innerHTML = html;
+  document.getElementById('overlay-pc-det').classList.add('open');
+}
+
+function cerrarPcDet() {
+  document.getElementById('overlay-pc-det').classList.remove('open');
+}
+
+/* ═══════════════════════════════
+   PERSONAL — INDEPENDIENTE
+═══════════════════════════════ */
+async function cargarPerIndepCert() {
+  if (perCertCargados) { renderIndepCert(perCertData); return; }
+  document.getElementById('pi-tabla').innerHTML =
+    `<tr><td colspan="5" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
+  await cargarPerCursosCert();
+}
+
+function filtrarPerIndepCert() {
+  const nom = document.getElementById('pi-fNombre').value.toLowerCase();
+  const cur = document.getElementById('pi-fCurso').value.toLowerCase();
+  const fil = perCertData.filter(p =>
+    (!nom || (p.nombre_completo||'').toLowerCase().includes(nom) || (p.curp||'').toLowerCase().includes(nom)) &&
+    (!cur || (p.curso_nombre  ||'').toLowerCase().includes(cur))
+  );
+  renderIndepCert(fil);
+}
+
+function limpiarPerIndepCert() {
+  document.getElementById('pi-fNombre').value = '';
+  document.getElementById('pi-fCurso').value  = '';
+  renderIndepCert(perCertData);
+}
+
+function renderIndepCert(data) {
+  const tbody = document.getElementById('pi-tabla');
+  if (!tbody) return;
+  document.getElementById('pi-count').textContent = data.length + ' registro' + (data.length !== 1 ? 's' : '');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin resultados.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(p => `<tr>
+    <td style="font-weight:600">${p.nombre_completo||'—'}</td>
+    <td style="font-size:12px;font-family:monospace;color:var(--texto-sub)">${p.curp||'—'}</td>
+    <td style="font-size:12px">${p.curso_nombre||'—'}</td>
+    <td style="font-size:12px;color:var(--texto-sub)">${p.fecha_curso||'—'}</td>
+    <td>
+      <div style="display:flex;gap:6px">
+        <button class="btn-ver" style="font-size:11px" onclick="generarDocPersonal(${p.id},'DC3')">DC-3</button>
+        <button class="btn-ver" style="font-size:11px" onclick="generarDocPersonal(${p.id},'DIPLOMA')">Diploma</button>
+      </div>
+    </td>
+  </tr>`).join('');
+}
+
+/* ═══════════════════════════════
+   GENERAR DOCUMENTO PERSONAL
+═══════════════════════════════ */
+async function generarDocPersonal(participanteId, tipo) {
+  try {
+    mostrarToast(`Generando ${tipo}...`, 'info');
+    const res  = await fetch(API, {
+      method: 'POST',
+      body:   JSON.stringify({ action: 'GENERAR_DOC_PERSONAL', payload: { id: participanteId, tipo } })
+    });
+    const data = await res.json();
+    if (data.status === 'success' && data.url) {
+      window.open(data.url, '_blank');
+      mostrarToast(`${tipo} generado correctamente`, 'ok');
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
+    }
+  } catch(e) {
+    mostrarToast('Error de conexión', 'err');
+  }
+}
+
+["overlay-acc-cert","overlay-pc-det"].forEach(id => {
+  document.getElementById(id).addEventListener("click", function(e) {
+    if (e.target !== this) return;
+    if (id === "overlay-acc-cert") cerrarAccCert();
+    if (id === "overlay-pc-det")   cerrarPcDet();
+  });
+});
 
 /* ═══════════════════════════════
    ARRANQUE
