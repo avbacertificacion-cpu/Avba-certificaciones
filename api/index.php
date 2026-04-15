@@ -172,12 +172,12 @@ if ($method === 'GET') {
 
         case 'LISTAR_SESIONES_ACCESORIOS':
             $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->listarSesiones());
 
         case 'DETALLE_SESION_ACCESORIOS':
             $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->detalleSesion((int)($_GET['id'] ?? 0)));
 
         default:
