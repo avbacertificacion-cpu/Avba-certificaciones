@@ -224,6 +224,37 @@ class Accesorios {
         return ['status' => 'success', 'data' => $sesion];
     }
 
+    // ── Editar accesorio inspeccionado ────────────────────
+    public function editarAccesorio(array $payload): array {
+        $id        = (int)($payload['id']           ?? 0);
+        $tipoId    = (int)($payload['tipo_id']       ?? 0) ?: null;
+        $idAcc     = trim($payload['id_accesorio']   ?? '');
+        $marca     = trim($payload['marca']          ?? '');
+        $modelo    = trim($payload['modelo']         ?? '');
+        $serie     = trim($payload['serie']          ?? '');
+        $capacidad = trim($payload['capacidad']      ?? '');
+        $medidas   = trim($payload['medidas']        ?? '');
+        $estado    = trim($payload['estado']         ?? '');
+
+        if ($id <= 0) return ['status' => 'error', 'message' => 'id requerido.'];
+
+        $estadosValidos = ['APTO','CONDICIONADO','NO APTO','CUMPLE','NO CUMPLE'];
+        if ($estado && !in_array($estado, $estadosValidos, true))
+            return ['status' => 'error', 'message' => 'Estado no válido.'];
+
+        $chk = $this->pdo->prepare("SELECT id FROM accesorios_izaje WHERE id = ?");
+        $chk->execute([$id]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Accesorio no encontrado.'];
+
+        $this->pdo->prepare(
+            "UPDATE accesorios_izaje
+             SET tipo_id=?, id_accesorio=?, marca=?, modelo=?, serie=?, capacidad=?, medidas=?, estado=?
+             WHERE id=?"
+        )->execute([$tipoId, $idAcc, $marca, $modelo, $serie, $capacidad, $medidas, $estado, $id]);
+
+        return ['status' => 'success', 'message' => 'Accesorio actualizado.'];
+    }
+
     // ── Obtener config de plantilla de fondo ──────────────
     public function obtenerPlantillaAcc(): array {
         $this->ensurePlantillaAccTable();

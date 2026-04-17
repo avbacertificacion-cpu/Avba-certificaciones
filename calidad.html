@@ -1057,7 +1057,7 @@
 
 <!-- ══ MODAL DETALLE SESIÓN ACCESORIOS ══ -->
 <div class="overlay" id="overlay-acc-sesion" style="display:none" onclick="if(event.target===this)cerrarDetAccSesion()">
-  <div class="modal" style="max-width:640px">
+  <div class="modal" style="max-width:660px">
     <div class="modal-hdr">
       <div class="modal-hdr-l">
         <div class="m-avatar" style="background:var(--verde)">A</div>
@@ -1068,7 +1068,73 @@
       </div>
       <button class="btn-close" onclick="cerrarDetAccSesion()">×</button>
     </div>
-    <div style="padding:16px 22px 20px;max-height:70vh;overflow-y:auto" id="acc-ses-body">
+    <div style="padding:16px 22px 20px;max-height:72vh;overflow-y:auto" id="acc-ses-body">
+    </div>
+  </div>
+</div>
+
+<!-- ══ MODAL: EDITAR ACCESORIO ══ -->
+<div class="overlay" id="overlay-edit-acc" onclick="if(event.target===this)cerrarEditAcc()">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:var(--ambar)">✏</div>
+        <div>
+          <div class="m-title">Editar accesorio</div>
+          <div class="m-sub" id="edit-acc-sub">—</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarEditAcc()">×</button>
+    </div>
+    <div style="padding:18px 22px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Tipo de accesorio</label>
+        <select id="edit-acc-tipo" style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px"></select>
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">ID Accesorio</label>
+        <input id="edit-acc-id-acc" type="text" placeholder="A-001"
+               style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Marca</label>
+        <input id="edit-acc-marca" type="text" placeholder="Certex"
+               style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Modelo</label>
+        <input id="edit-acc-modelo" type="text" placeholder="EW-60"
+               style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">No. Serie</label>
+        <input id="edit-acc-serie" type="text" placeholder="CB2024-0112"
+               style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Capacidad</label>
+        <input id="edit-acc-capacidad" type="text" placeholder="3 Ton"
+               style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Medidas</label>
+        <input id="edit-acc-medidas" type="text" placeholder="60mm × 4m"
+               style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
+      </div>
+      <div>
+        <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Estado</label>
+        <select id="edit-acc-estado" style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
+          <option value="APTO">APTO</option>
+          <option value="CONDICIONADO">CONDICIONADO</option>
+          <option value="NO APTO">NO APTO</option>
+          <option value="CUMPLE">CUMPLE</option>
+          <option value="NO CUMPLE">NO CUMPLE</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-nc-cancel" onclick="cerrarEditAcc()">Cancelar</button>
+      <button class="btn-save" id="btn-guardar-edit-acc" onclick="guardarEditAcc()" style="padding:9px 22px">Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -2387,14 +2453,16 @@ async function abrirDetAccSesion(id) {
   document.getElementById('overlay-acc-sesion').style.display = 'flex';
   document.getElementById('acc-ses-body').innerHTML = `<div style="text-align:center;padding:32px;color:var(--texto-hint)">Cargando...</div>`;
   try {
-    const res  = await fetch(API + `?action=DETALLE_SESION_ACCESORIOS&id=${id}`);
+    const _s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res  = await fetch(API + `?action=DETALLE_SESION_ACCESORIOS&id=${id}&token=${_s.token||''}`);
     const data = await res.json();
     if (data.status !== 'success') throw new Error(data.message);
     const s = data.data;
     document.getElementById('acc-ses-titulo').textContent = s.cliente;
     document.getElementById('acc-ses-sub').textContent    = (s.fecha||'') + (s.usuario ? ' · '+s.usuario : '');
+    accSesionActual = s;
     document.getElementById('acc-ses-body').innerHTML = (s.accesorios||[]).map((a,i) => `
-      <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--borde)">
+      <div id="acc-row-${a.id}" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--borde)">
         <div style="width:28px;height:28px;border-radius:50%;background:var(--azul-light);color:var(--azul);
                     font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
         <div style="flex:1;min-width:0">
@@ -2405,10 +2473,15 @@ async function abrirDetAccSesion(id) {
           </div>
           ${+a.total_fotos>0?`<div style="font-size:10px;color:var(--azul);margin-top:2px">📷 ${a.total_fotos} foto${a.total_fotos!=1?'s':''}</div>`:''}
         </div>
-        <span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0;
-              ${a.estado==='CUMPLE'?'background:var(--verde-light);color:var(--verde)':'background:var(--rojo-light);color:var(--rojo)'}">
-          ${a.estado==='CUMPLE'?'✓ Cumple':'✗ No cumple'}
+        <span id="acc-badge-${a.id}" style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0;${estadoBadgeStyle(a.estado)}">
+          ${escH(a.estado||'—')}
         </span>
+        <button onclick="abrirEditAcc(${JSON.stringify(a).replace(/"/g,'&quot;')})"
+                style="padding:4px 10px;border-radius:6px;border:1.5px solid var(--ambar);
+                       color:var(--ambar);font-size:11px;font-weight:600;
+                       background:var(--ambar-light);cursor:pointer;flex-shrink:0">
+          ✏ Editar
+        </button>
       </div>`).join('') || `<div style="text-align:center;padding:32px;color:var(--texto-hint)">Sin accesorios</div>`;
   } catch (e) {
     document.getElementById('acc-ses-body').innerHTML = `<div style="text-align:center;padding:32px;color:var(--rojo)">Error al cargar.</div>`;
@@ -2417,6 +2490,87 @@ async function abrirDetAccSesion(id) {
 
 function cerrarDetAccSesion() {
   document.getElementById('overlay-acc-sesion').style.display = 'none';
+}
+
+/* ── Helpers de estado ── */
+function estadoBadgeStyle(estado) {
+  const e = (estado||'').toUpperCase();
+  if (e === 'APTO'   || e === 'CUMPLE')    return 'background:var(--verde-light);color:var(--verde)';
+  if (e === 'NO APTO'|| e === 'NO CUMPLE') return 'background:var(--rojo-light);color:var(--rojo)';
+  return 'background:var(--ambar-light);color:var(--ambar)';
+}
+
+/* ── Editar accesorio ── */
+let accSesionActual = null;
+let editAccId       = 0;
+
+function abrirEditAcc(a) {
+  editAccId = a.id;
+  document.getElementById('edit-acc-sub').textContent = a.tipo_nombre || '—';
+
+  // Llenar select de tipos con los ya cargados (o cargar si vacío)
+  const sel = document.getElementById('edit-acc-tipo');
+  if (!accTiposData.length) {
+    cargarAccTipos();
+  }
+  sel.innerHTML = accTiposData.map(t =>
+    `<option value="${t.id}" ${t.id == a.tipo_id ? 'selected' : ''}>${escH(t.nombre)}</option>`
+  ).join('');
+
+  document.getElementById('edit-acc-id-acc').value  = a.id_accesorio || '';
+  document.getElementById('edit-acc-marca').value   = a.marca    || '';
+  document.getElementById('edit-acc-modelo').value  = a.modelo   || '';
+  document.getElementById('edit-acc-serie').value   = a.serie    || '';
+  document.getElementById('edit-acc-capacidad').value = a.capacidad || '';
+  document.getElementById('edit-acc-medidas').value = a.medidas  || '';
+  document.getElementById('edit-acc-estado').value  = a.estado   || 'APTO';
+
+  document.getElementById('overlay-edit-acc').classList.add('open');
+}
+
+function cerrarEditAcc() {
+  document.getElementById('overlay-edit-acc').classList.remove('open');
+}
+
+async function guardarEditAcc() {
+  const btn = document.getElementById('btn-guardar-edit-acc');
+  btn.disabled = true;
+  btn.textContent = 'Guardando…';
+
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res  = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body: JSON.stringify({
+        action: 'EDITAR_ACCESORIO',
+        payload: {
+          id:           editAccId,
+          tipo_id:      +document.getElementById('edit-acc-tipo').value,
+          id_accesorio: document.getElementById('edit-acc-id-acc').value.trim(),
+          marca:        document.getElementById('edit-acc-marca').value.trim(),
+          modelo:       document.getElementById('edit-acc-modelo').value.trim(),
+          serie:        document.getElementById('edit-acc-serie').value.trim(),
+          capacidad:    document.getElementById('edit-acc-capacidad').value.trim(),
+          medidas:      document.getElementById('edit-acc-medidas').value.trim(),
+          estado:       document.getElementById('edit-acc-estado').value,
+        }
+      })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      cerrarEditAcc();
+      // Refrescar el detalle de la sesión en el modal abierto
+      if (accSesionActual) abrirDetAccSesion(accSesionActual.id);
+    } else {
+      alert('Error: ' + (data.message || 'No se pudo guardar'));
+    }
+  } catch (e) {
+    alert('Error de conexión al guardar.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar cambios';
+  }
 }
 
 /* ════════════════════════════════════════

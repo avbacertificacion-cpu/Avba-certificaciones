@@ -504,6 +504,11 @@ if ($method === 'POST') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->guardarAccesorio($_POST, $_FILES, $usr['usuario']));
 
+        case 'EDITAR_ACCESORIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->editarAccesorio($payload));
+
         case 'SUBIR_PLANTILLA_ACC':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
