@@ -562,8 +562,50 @@ if ($method === 'POST') {
 
         case 'PREVISUALIZAR_CERT_ACC':
             $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->previsualizarCertAcc($payload));
+
+        case 'GENERAR_CERT_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->generarCertAcc((int)($payload['sesion_id'] ?? 0), $usr['usuario']));
+
+        case 'EMITIR_CERT_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->emitirCertAcc((int)($payload['sesion_id'] ?? 0), $usr['usuario']));
+
+        case 'ENVIAR_CERT_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->enviarCertAcc(
+                (int)   ($payload['sesion_id'] ?? 0),
+                (string)($payload['correo']    ?? ''),
+                $usr['usuario']
+            ));
+
+        case 'ENVIAR_INFORME_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->enviarInformeAcc(
+                (int)   ($payload['sesion_id'] ?? 0),
+                (string)($payload['correo']    ?? ''),
+                $usr['usuario']
+            ));
+
+        case 'GENERAR_INFORME_CUMPLE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->generarInformeCumple((int)($payload['sesion_id'] ?? 0), $usr['usuario']));
+
+        case 'ENVIAR_INFORME_CUMPLE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->enviarInformeCumple(
+                (int)   ($payload['sesion_id'] ?? 0),
+                (string)($payload['correo']    ?? ''),
+                $usr['usuario']
+            ));
 
         case 'PREVISUALIZAR_INFORME_ACC':
             $usr = validarToken($pdo, $token);
