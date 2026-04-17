@@ -427,6 +427,12 @@ class Accesorios {
         if (!$campos) {
             return ['status' => 'error', 'message' => 'Configura al menos un campo antes de previsualizar.'];
         }
+
+        // Cargar FPDI desde lib/ como fallback si Composer no lo tiene
+        if (!class_exists('setasign\Fpdi\Fpdi')) {
+            $loader = __DIR__ . '/../lib/fpdi_loader.php';
+            if (file_exists($loader)) require_once $loader;
+        }
         if (!class_exists('setasign\Fpdi\Fpdi')) {
             return ['status' => 'error', 'message' => 'Librería FPDI no disponible en el servidor.'];
         }
