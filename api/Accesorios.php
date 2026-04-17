@@ -269,9 +269,17 @@ class Accesorios {
     // ── Aprobar sesión → APROBADO_CALIDAD ────────────────
     public function aprobarSesion(int $id, string $usuario): array {
         $this->ensureEstatusColumn('accesorios_sesiones');
-        $chk = $this->pdo->prepare("SELECT id FROM accesorios_sesiones WHERE id = ?");
+        $chk = $this->pdo->prepare("SELECT id, cliente, control FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
-        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+        $sesion = $chk->fetch();
+        if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+
+        // Generar control si la sesión no lo tiene (registros previos a migration_009)
+        if (empty($sesion['control'])) {
+            $control = generarControl($this->pdo, $sesion['cliente']);
+            $this->pdo->prepare("UPDATE accesorios_sesiones SET control = ? WHERE id = ?")
+                ->execute([$control, $id]);
+        }
 
         $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'APROBADO_CALIDAD' WHERE id = ?")
             ->execute([$id]);

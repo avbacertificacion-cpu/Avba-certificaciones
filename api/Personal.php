@@ -176,9 +176,18 @@ class Personal {
     // ── Aprobar participante → APROBADO_CALIDAD ────────────
     public function aprobarParticipante(int $id, string $usuario): array {
         $this->ensureEstatusColumn();
-        $chk = $this->pdo->prepare("SELECT id FROM participantes_cursos WHERE id = ?");
+        $chk = $this->pdo->prepare("SELECT id, nombre_completo, empresa_nombre, control FROM participantes_cursos WHERE id = ?");
         $chk->execute([$id]);
-        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+        $p = $chk->fetch();
+        if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        // Generar control si el participante no lo tiene (registros previos a migration_009)
+        if (empty($p['control'])) {
+            $clienteNombre = $p['empresa_nombre'] ?: $p['nombre_completo'];
+            $control = generarControl($this->pdo, $clienteNombre);
+            $this->pdo->prepare("UPDATE participantes_cursos SET control = ? WHERE id = ?")
+                ->execute([$control, $id]);
+        }
 
         $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'APROBADO_CALIDAD' WHERE id = ?")
             ->execute([$id]);
