@@ -554,6 +554,227 @@ class Accesorios {
         $usuario = $esc($s['usuario']);
         $accs    = $s['accesorios'] ?? [];
 
+        // ── Resumen de estados (solo CUMPLE / NO CUMPLE) ──
+        $total    = count($accs);
+        $cumple   = count(array_filter($accs, fn($a) => strtoupper($a['estado']) === 'CUMPLE'));
+        $noCumple = $total - $cumple;
+
+        // ── Filas de la tabla ─────────────────────────────
+        $filas = '';
+        foreach ($accs as $i => $a) {
+            $bg  = ($i % 2 === 0) ? '#ffffff' : '#f4f7fb';
+            $est = strtoupper($a['estado'] ?? '');
+            if ($est === 'CUMPLE') {
+                $estBg = '#EAF3DE'; $estColor = '#3B6D11'; $estBd = '#3B6D11';
+            } else {
+                $estBg = '#FCEBEB'; $estColor = '#A32D2D'; $estBd = '#A32D2D';
+            }
+            $filas .= '
+            <tr style="background:' . $bg . '">
+              <td style="padding:6px 8px;border:1px solid #dfe5ef;text-align:center;font-size:9pt">' . $esc($a['id_accesorio']) . '</td>
+              <td style="padding:6px 8px;border:1px solid #dfe5ef;font-size:9pt">' . $esc($a['tipo_nombre'] ?? '') . '</td>
+              <td style="padding:6px 8px;border:1px solid #dfe5ef;font-size:9pt">' . $esc($a['marca'] ?? '') . '</td>
+              <td style="padding:6px 8px;border:1px solid #dfe5ef;font-size:9pt">' . $esc($a['modelo'] ?? '') . '</td>
+              <td style="padding:6px 8px;border:1px solid #dfe5ef;font-size:9pt;font-family:monospace">' . $esc($a['serie'] ?? '') . '</td>
+              <td style="padding:6px 8px;border:1px solid #dfe5ef;text-align:center;font-size:9pt">' . $esc($a['capacidad'] ?? '') . '</td>
+              <td style="padding:6px 8px;border:1px solid #dfe5ef;text-align:center;font-size:9pt">' . $esc($a['medidas'] ?? '') . '</td>
+              <td style="padding:4px 6px;border:1px solid #dfe5ef;text-align:center">
+                <span style="display:inline-block;padding:3px 8px;border-radius:10px;
+                             background:' . $estBg . ';color:' . $estColor . ';
+                             border:1px solid ' . $estBd . ';font-size:8pt;font-weight:bold;white-space:nowrap">
+                  ' . $esc($a['estado'] ?? '') . '
+                </span>
+              </td>
+            </tr>';
+        }
+
+        if (!$filas) {
+            $filas = '<tr><td colspan="8" style="padding:20px;text-align:center;color:#9299a8;font-size:9pt;border:1px solid #dfe5ef">Sin accesorios registrados en esta sesión.</td></tr>';
+        }
+
+        // ── Logo AVBA (base64 para Dompdf) ─────────────────
+        $logoPath = __DIR__ . '/../icon-192.png';
+        $logoTag  = '';
+        if (file_exists($logoPath)) {
+            $b64     = base64_encode(file_get_contents($logoPath));
+            $logoTag = '<img src="data:image/png;base64,' . $b64 . '" style="height:52px;width:auto">';
+        }
+
+        return <<<HTML
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 10pt; color: #1a1a2e; background: #fff; padding: 28px 32px; }
+  .page-break { page-break-before: always; }
+  .divider { border: none; border-top: 3px solid #185FA5; margin: 14px 0; }
+  .info-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  .info-cell { padding: 7px 12px; border: 1px solid #ccd9ee; background: #E6F1FB; vertical-align: top; }
+  .info-label { font-size: 8.5pt; font-weight: bold; color: #0C447C; display: block; margin-bottom: 2px; }
+  .info-value { font-size: 10pt; color: #1a1a2e; }
+  .intro-text { font-size: 9.5pt; color: #3a3a50; line-height: 1.7; text-align: justify;
+                font-style: italic; margin: 14px 0 18px; padding: 12px 16px;
+                border-left: 4px solid #185FA5; background: #f4f7fb; }
+  .acc-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .acc-table th { background: #185FA5; color: #ffffff; padding: 7px 8px;
+                  font-size: 8.5pt; font-weight: bold; text-align: center;
+                  border: 1px solid #0C447C; }
+  .acc-table th.left { text-align: left; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 8px;
+           font-size: 8pt; font-weight: bold; border: 1px solid; margin-right: 8px; }
+  .firma-table { width: 100%; border-collapse: collapse; margin-top: 40px; }
+  .firma-cell { text-align: center; padding: 0 24px; vertical-align: bottom; width: 50%; }
+  .firma-line { border-top: 1.5px solid #1a1a2e; padding-top: 6px; margin-top: 52px; font-size: 8.5pt; color: #5a6072; }
+  .firma-sub { font-size: 7.5pt; color: #9299a8; margin-top: 2px; }
+  .footer-strip { margin-top: 24px; padding-top: 8px; border-top: 1px solid #dfe5ef;
+                  display: table; width: 100%; }
+  .footer-l { display: table-cell; font-size: 7.5pt; color: #9299a8; vertical-align: middle; }
+  .footer-r { display: table-cell; font-size: 7.5pt; color: #9299a8; text-align: right; vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<!-- ── ENCABEZADO ── -->
+<table style="width:100%;border-collapse:collapse;margin-bottom:18px">
+  <tr>
+    <td style="width:140px;vertical-align:middle">{$logoTag}</td>
+    <td style="vertical-align:middle;text-align:center;padding:0 12px">
+      <div style="font-size:17pt;font-weight:bold;color:#1a1a2e;margin-bottom:4px">Informe de Integridad Operativa</div>
+      <div style="font-size:9pt;color:#5a6072;font-style:italic">Evaluación de la condición, seguridad y confiabilidad de accesorios de izaje</div>
+    </td>
+    <td style="width:170px;vertical-align:top;text-align:right">
+      <div style="background:#185FA5;color:#fff;padding:5px 10px;border-radius:5px;font-size:8pt;font-weight:bold;white-space:nowrap;display:inline-block">{$esc($folio)}</div>
+      <div style="font-size:7.5pt;color:#9299a8;margin-top:4px">{$esc(date('d/m/Y'))}</div>
+    </td>
+  </tr>
+</table>
+<hr class="divider">
+
+<!-- ── DATOS GENERALES ── -->
+<table class="info-table">
+  <tr>
+    <td class="info-cell" style="width:60%">
+      <span class="info-label">Cliente</span>
+      <span class="info-value">{$cliente}</span>
+    </td>
+    <td style="width:8px"></td>
+    <td class="info-cell" style="width:40%">
+      <span class="info-label">Fecha de inspección</span>
+      <span class="info-value">{$fecha}</span>
+    </td>
+  </tr>
+  <tr><td colspan="3" style="height:5px"></td></tr>
+  <tr>
+    <td class="info-cell" style="width:60%">
+      <span class="info-label">Domicilio</span>
+      <span class="info-value">{$dir}</span>
+    </td>
+    <td style="width:8px"></td>
+    <td class="info-cell" style="width:40%">
+      <span class="info-label">Inspector</span>
+      <span class="info-value">{$usuario}</span>
+    </td>
+  </tr>
+</table>
+
+<!-- ── TEXTO INTRODUCTORIO ── -->
+<div class="intro-text">
+  El presente informe integra una evaluación de los accesorios inspeccionados,
+  permitiendo identificar niveles de criticidad y priorizar acciones correctivas de manera eficiente.
+  Los resultados aquí descritos corresponden al estado físico y operativo observado en la fecha indicada.
+</div>
+
+<!-- ── RESUMEN ── -->
+<table style="width:100%;border-collapse:collapse;margin-top:18px">
+  <tr>
+    <td style="width:33%;padding-right:8px">
+      <div style="padding:10px 14px;border-radius:6px;text-align:center;background:#E6F1FB;border:1px solid #185FA5">
+        <div style="font-size:20pt;font-weight:bold;color:#185FA5">{$total}</div>
+        <div style="font-size:8pt;color:#5a6072;margin-top:2px">Total accesorios</div>
+      </div>
+    </td>
+    <td style="width:33%;padding-right:8px">
+      <div style="padding:10px 14px;border-radius:6px;text-align:center;background:#EAF3DE;border:1px solid #3B6D11">
+        <div style="font-size:20pt;font-weight:bold;color:#3B6D11">{$cumple}</div>
+        <div style="font-size:8pt;color:#3B6D11;margin-top:2px">Cumplen</div>
+      </div>
+    </td>
+    <td style="width:33%">
+      <div style="padding:10px 14px;border-radius:6px;text-align:center;background:#FCEBEB;border:1px solid #A32D2D">
+        <div style="font-size:20pt;font-weight:bold;color:#A32D2D">{$noCumple}</div>
+        <div style="font-size:8pt;color:#A32D2D;margin-top:2px">No cumplen</div>
+      </div>
+    </td>
+  </tr>
+</table>
+
+<!-- ── TABLA DE ACCESORIOS ── -->
+<div style="font-size:10pt;font-weight:bold;color:#185FA5;margin:18px 0 6px;
+            text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid #185FA5;
+            padding-bottom:4px">
+  Registro de accesorios inspeccionados
+</div>
+<table class="acc-table">
+  <thead>
+    <tr>
+      <th style="width:8%">ID</th>
+      <th class="left" style="width:16%">Tipo</th>
+      <th class="left" style="width:12%">Marca</th>
+      <th class="left" style="width:12%">Modelo</th>
+      <th style="width:14%">No. Serie</th>
+      <th style="width:12%">Capacidad</th>
+      <th style="width:12%">Medidas</th>
+      <th style="width:14%">Estado</th>
+    </tr>
+  </thead>
+  <tbody>
+    {$filas}
+  </tbody>
+</table>
+
+<!-- ── LEYENDA ── -->
+<div style="margin-top:14px;font-size:8pt;color:#5a6072">
+  <strong>Leyenda: </strong>
+  <span class="badge" style="background:#EAF3DE;color:#3B6D11;border-color:#3B6D11">CUMPLE</span>
+  El accesorio se encuentra en condiciones seguras de operación. &nbsp;
+  <span class="badge" style="background:#FCEBEB;color:#A32D2D;border-color:#A32D2D">NO CUMPLE</span>
+  Fuera de servicio o con deficiencias que impiden su uso.
+</div>
+
+<!-- ── FIRMAS ── -->
+<table class="firma-table">
+  <tr>
+    <td class="firma-cell">
+      <div class="firma-line">Inspector responsable</div>
+      <div class="firma-sub">{$usuario}</div>
+    </td>
+    <td class="firma-cell">
+      <div class="firma-line">Recibió / Vo. Bo.</div>
+      <div class="firma-sub">Representante del cliente</div>
+    </td>
+  </tr>
+</table>
+
+<!-- ── PIE DE PÁGINA ── -->
+<div class="footer-strip">
+  <div class="footer-l">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. &nbsp;·&nbsp; Generado el {$esc(date('d/m/Y H:i'))}</div>
+  <div class="footer-r">Folio: {$esc($folio)}</div>
+</div>
+
+</body>
+</html>
+HTML;
+    }
+}
+
+        $cliente = $esc($s['cliente']);
+        $dir     = $esc($s['direccion'] ?? '');
+        $fecha   = $esc($s['fecha']);
+        $usuario = $esc($s['usuario']);
+        $accs    = $s['accesorios'] ?? [];
+
         // ── Resumen de estados ────────────────────────────
         $total   = count($accs);
         $aptos   = count(array_filter($accs, fn($a) => strtoupper($a['estado']) === 'APTO'));
