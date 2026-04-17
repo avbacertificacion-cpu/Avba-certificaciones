@@ -1729,7 +1729,7 @@ async function prevInformeAcc(sesionId) {
     const res  = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Token': tok },
-      body: JSON.stringify({ action: 'PREVISUALIZAR_INFORME_ACC', payload: {} })
+      body: JSON.stringify({ action: 'GENERAR_INFORME_ACCESORIOS', payload: { sesion_id: sesionId } })
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {
