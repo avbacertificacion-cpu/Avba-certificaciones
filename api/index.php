@@ -494,6 +494,11 @@ if ($method === 'POST') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->guardarAccesorio($_POST, $_FILES, $usr['usuario']));
 
+        case 'GENERAR_INFORME_ACCESORIOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->generarInforme((int)($payload['sesion_id'] ?? 0), $usr['usuario']));
+
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);
     }
