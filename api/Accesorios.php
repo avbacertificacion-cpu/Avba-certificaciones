@@ -83,12 +83,14 @@ class Accesorios {
             $fecha = "{$m[3]}-{$m[2]}-{$m[1]}";
         }
 
-        $this->pdo->prepare(
-            "INSERT INTO accesorios_sesiones (cliente, fecha, coordenadas, direccion, usuario)
-             VALUES (?, ?, ?, ?, ?)"
-        )->execute([$cliente, $fecha, $coords, $dir, $usuario]);
+        $control = generarControl($this->pdo, $cliente);
 
-        return ['status' => 'success', 'sesion_id' => (int)$this->pdo->lastInsertId()];
+        $this->pdo->prepare(
+            "INSERT INTO accesorios_sesiones (cliente, fecha, coordenadas, direccion, usuario, control)
+             VALUES (?, ?, ?, ?, ?, ?)"
+        )->execute([$cliente, $fecha, $coords, $dir, $usuario, $control]);
+
+        return ['status' => 'success', 'sesion_id' => (int)$this->pdo->lastInsertId(), 'control' => $control];
     }
 
     // ── Guardar un accesorio (multipart) ───────────────────
@@ -183,7 +185,7 @@ class Accesorios {
     // ── Listar sesiones con resumen de accesorios ──────────
     public function listarSesiones(): array {
         $rows = $this->pdo->query(
-            "SELECT s.id, s.cliente,
+            "SELECT s.id, s.cliente, s.control,
                     DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha,
                     s.coordenadas, s.usuario,
                     DATE_FORMAT(s.fecha_registro,'%d/%m/%Y %H:%i') AS fecha_registro,
@@ -201,7 +203,7 @@ class Accesorios {
 
     // ── Detalle de una sesión con sus accesorios ───────────
     public function detalleSesion(int $id): array {
-        $chk = $this->pdo->prepare("SELECT id, cliente, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, coordenadas, direccion, usuario FROM accesorios_sesiones WHERE id = ?");
+        $chk = $this->pdo->prepare("SELECT id, cliente, control, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, coordenadas, direccion, usuario FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
         $sesion = $chk->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
@@ -447,7 +449,9 @@ class Accesorios {
             return ['status' => 'error', 'message' => 'Motor PDF no disponible en el servidor.'];
         }
 
-        $folio = 'ACC-' . str_pad((string)$sesionId, 5, '0', STR_PAD_LEFT);
+        $folio = $sesion['control']
+            ? 'AB.' . $sesion['control'] . '-' . date('Y') . 'MX'
+            : 'ACC-' . str_pad((string)$sesionId, 5, '0', STR_PAD_LEFT);
         $html  = $this->htmlInforme($sesion, $folio);
 
         $opts = new \Dompdf\Options();

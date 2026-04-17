@@ -45,13 +45,18 @@ function generarControl(PDO $pdo, string $nombreCliente): string {
         $ins->execute([$nombreCliente, $newId]);
     }
 
-    // Calcular el siguiente consecutivo global (NumB)
-    $stmt = $pdo->query(
-        "SELECT MAX(CAST(SUBSTRING_INDEX(control, '-', -1) AS UNSIGNED)) AS max_b
-         FROM equipos WHERE control LIKE '%-%'"
-    );
-    $r    = $stmt->fetch();
-    $numB = str_pad(($r['max_b'] ?? 0) + 1, 5, '0', STR_PAD_LEFT);
+    // Consecutivo global: MAX entre equipos, accesorios_sesiones y participantes_cursos
+    $maxB = 0;
+    foreach (['equipos', 'accesorios_sesiones', 'participantes_cursos'] as $tabla) {
+        try {
+            $r = $pdo->query(
+                "SELECT MAX(CAST(SUBSTRING_INDEX(control,'-',-1) AS UNSIGNED)) AS max_b
+                 FROM `{$tabla}` WHERE control LIKE '%-%'"
+            )->fetch();
+            $maxB = max($maxB, (int)($r['max_b'] ?? 0));
+        } catch (\PDOException $e) { /* tabla o columna aún no existe */ }
+    }
+    $numB = str_pad($maxB + 1, 5, '0', STR_PAD_LEFT);
 
     return "{$numA}-{$numB}";
 }

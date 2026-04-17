@@ -946,15 +946,16 @@
           <tr>
             <th>Cliente</th>
             <th style="width:110px">Fecha</th>
-            <th style="width:90px;text-align:center">Accesorios</th>
-            <th style="width:80px;text-align:center">Cumplen</th>
-            <th style="width:90px;text-align:center">No cumplen</th>
-            <th style="width:80px;text-align:center">Inspector</th>
+            <th style="width:130px">No. Control</th>
+            <th style="width:80px;text-align:center">Accesorios</th>
+            <th style="width:75px;text-align:center">Cumplen</th>
+            <th style="width:85px;text-align:center">No cumplen</th>
+            <th style="width:75px;text-align:center">Inspector</th>
             <th style="width:50px"></th>
           </tr>
         </thead>
         <tbody id="tbody-acc-sesiones">
-          <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
+          <tr><td colspan="8" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -2423,13 +2424,16 @@ function renderSesionesAcc(data) {
   const tbody = document.getElementById('tbody-acc-sesiones');
   document.getElementById('acc-count').textContent = data.length + ' sesión' + (data.length!==1?'es':'');
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin registros</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin registros</td></tr>`;
     return;
   }
-  tbody.innerHTML = data.map(r => `
+  tbody.innerHTML = data.map(r => {
+    const folio = r.control ? 'AB.'+r.control+'-'+new Date().getFullYear()+'MX' : '—';
+    return `
     <tr>
       <td style="font-weight:600">${escH(r.cliente)}</td>
       <td>${r.fecha||'—'}</td>
+      <td style="font-size:11px;font-family:monospace;color:var(--azul-dark)">${escH(folio)}</td>
       <td style="text-align:center;font-weight:700;color:var(--azul)">${r.total}</td>
       <td style="text-align:center">
         <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--verde-light);color:var(--verde)">${r.cumple}</span>
@@ -2443,7 +2447,7 @@ function renderSesionesAcc(data) {
         <button onclick="abrirDetAccSesion(${r.id})"
                 style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
       </td>
-    </tr>`).join('');
+    </tr>`; }).join('');
 }
 
 async function abrirDetAccSesion(id) {
@@ -2456,7 +2460,9 @@ async function abrirDetAccSesion(id) {
     if (data.status !== 'success') throw new Error(data.message);
     const s = data.data;
     document.getElementById('acc-ses-titulo').textContent = s.cliente;
-    document.getElementById('acc-ses-sub').textContent    = (s.fecha||'') + (s.usuario ? ' · '+s.usuario : '');
+    const folioAcc = s.control ? 'AB.' + s.control + '-' + new Date().getFullYear() + 'MX' : '';
+    document.getElementById('acc-ses-sub').textContent =
+      (s.fecha||'') + (s.usuario ? ' · '+s.usuario : '') + (folioAcc ? ' · ' + folioAcc : '');
     accSesionActual = s;
     document.getElementById('acc-ses-body').innerHTML = (s.accesorios||[]).map((a,i) => `
       <div id="acc-row-${a.id}" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--borde)">
@@ -2683,8 +2689,13 @@ async function abrirDetPer(id) {
     const p    = await res.json();
     if (!p || p.status === 'error') throw new Error(p?.message);
     document.getElementById('per-det-nombre').textContent = p.nombre_completo;
-    document.getElementById('per-det-sub').textContent    = (p.curso_nombre||'') + ' · ' + (p.fecha_curso||'');
+    const folioP = p.control ? 'AB.'+p.control+'-'+new Date().getFullYear()+'MX' : '';
+    document.getElementById('per-det-sub').textContent =
+      (p.curso_nombre||'') + ' · ' + (p.fecha_curso||'') + (folioP ? ' · ' + folioP : '');
     document.getElementById('per-det-body').innerHTML = `
+      ${folioP ? `<div style="background:var(--azul-light);border:1px solid #85B7EB;border-radius:7px;padding:8px 14px;margin-bottom:12px;font-size:12px;color:var(--azul-dark)">
+        <strong>No. Control:</strong> <span style="font-family:monospace;font-weight:700">${escH(folioP)}</span>
+      </div>` : ''}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;font-size:13px;margin-bottom:14px">
         <div><span style="font-size:11px;color:var(--texto-sub);display:block">CURP</span>${escH(p.curp||'—')}</div>
         <div><span style="font-size:11px;color:var(--texto-sub);display:block">Puesto</span>${escH(p.puesto||'—')}</div>

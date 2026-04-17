@@ -41,8 +41,8 @@ class Personal {
         }
 
         $sql = "SELECT p.id, p.nombre_completo, p.curp, p.puesto,
-                       p.telefono, p.capacidad, p.capacidad_na,
-                       p.fecha_curso, p.estado,
+                       p.telefono, p.correo, p.capacidad, p.capacidad_na,
+                       p.control, p.fecha_curso, p.estado,
                        c.nombre AS curso_nombre, c.duracion_horas,
                        o.nombre AS ocupacion_nombre,
                        p.foto_documentacion_url, p.foto_persona_url,
@@ -146,7 +146,9 @@ class Personal {
             $this->pdo->prepare("UPDATE participantes_cursos SET " . implode(', ', $sets) . " WHERE id = ?")
                       ->execute($values);
         } else {
-            // Insertar
+            // Insertar — asignar número de control
+            $clienteNombre = $campos['empresa_nombre'] ?? $campos['nombre_completo'];
+            $campos['control']          = generarControl($this->pdo, $clienteNombre);
             $campos['usuario_registro'] = $usuario;
             $cols   = implode(', ', array_map(fn($k) => "`{$k}`", array_keys($campos)));
             $marks  = implode(', ', array_fill(0, count($campos), '?'));
@@ -449,7 +451,9 @@ class Personal {
     private function resolverValoresCamposPersonal(array $p): array {
         $fechaCurso = $p['fecha_curso'] ?? null;
         $fechaFmt   = $fechaCurso ? (new \DateTime($fechaCurso))->format('d/m/Y') : '';
-        $folio      = 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
+        $folio      = $p['control']
+            ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'
+            : 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
 
         return [
             'nombre_completo'       => $p['nombre_completo']       ?? '',
