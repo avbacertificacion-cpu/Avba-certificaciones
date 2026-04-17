@@ -183,9 +183,17 @@ class Accesorios {
     }
 
     // ── Listar sesiones con resumen de accesorios ──────────
-    public function listarSesiones(): array {
+    public function listarSesiones(string $soloEstatus = ''): array {
+        $this->ensureEstatusColumn('accesorios_sesiones');
+        if ($soloEstatus === 'APROBADO_CALIDAD') {
+            $where = "WHERE s.estatus IN ('APROBADO_CALIDAD','EMITIDO')";
+        } elseif ($soloEstatus) {
+            $where = "WHERE s.estatus = " . $this->pdo->quote($soloEstatus);
+        } else {
+            $where = '';
+        }
         $rows = $this->pdo->query(
-            "SELECT s.id, s.cliente, s.control,
+            "SELECT s.id, s.cliente, s.control, s.estatus,
                     DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha,
                     s.coordenadas, s.usuario,
                     DATE_FORMAT(s.fecha_registro,'%d/%m/%Y %H:%i') AS fecha_registro,
@@ -194,6 +202,7 @@ class Accesorios {
                     SUM(a.estado = 'NO CUMPLE')                           AS no_cumple
              FROM accesorios_sesiones s
              LEFT JOIN accesorios_izaje a ON a.sesion_id = s.id
+             {$where}
              GROUP BY s.id
              ORDER BY s.fecha_registro DESC"
         )->fetchAll();
@@ -203,7 +212,8 @@ class Accesorios {
 
     // ── Detalle de una sesión con sus accesorios ───────────
     public function detalleSesion(int $id): array {
-        $chk = $this->pdo->prepare("SELECT id, cliente, control, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, coordenadas, direccion, usuario FROM accesorios_sesiones WHERE id = ?");
+        $this->ensureEstatusColumn('accesorios_sesiones');
+        $chk = $this->pdo->prepare("SELECT id, cliente, control, estatus, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, coordenadas, direccion, usuario FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
         $sesion = $chk->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
@@ -254,6 +264,42 @@ class Accesorios {
         )->execute([$tipoId, $idAcc, $marca, $modelo, $serie, $capacidad, $medidas, $estado, $id]);
 
         return ['status' => 'success', 'message' => 'Accesorio actualizado.'];
+    }
+
+    // ── Aprobar sesión → APROBADO_CALIDAD ────────────────
+    public function aprobarSesion(int $id, string $usuario): array {
+        $this->ensureEstatusColumn('accesorios_sesiones');
+        $chk = $this->pdo->prepare("SELECT id FROM accesorios_sesiones WHERE id = ?");
+        $chk->execute([$id]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'APROBADO_CALIDAD' WHERE id = ?")
+            ->execute([$id]);
+        return ['status' => 'success', 'message' => 'Sesión aprobada y enviada a Certificaciones.'];
+    }
+
+    // ── Devolver sesión → DEVUELTO ─────────────────────
+    public function devolverSesion(int $id, string $usuario): array {
+        $this->ensureEstatusColumn('accesorios_sesiones');
+        $chk = $this->pdo->prepare("SELECT id FROM accesorios_sesiones WHERE id = ?");
+        $chk->execute([$id]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'DEVUELTO' WHERE id = ?")
+            ->execute([$id]);
+        return ['status' => 'success', 'message' => 'Sesión devuelta a Calidad.'];
+    }
+
+    // ── Emitir informe → genera PDF + EMITIDO ─────────
+    public function emitirInforme(int $sesionId, string $usuario): array {
+        $resultado = $this->generarInforme($sesionId, $usuario);
+        if ($resultado['status'] !== 'success') return $resultado;
+
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'EMITIDO' WHERE id = ?")
+            ->execute([$sesionId]);
+
+        $resultado['message'] = 'Informe emitido correctamente.';
+        return $resultado;
     }
 
     // ── Obtener config de plantilla de fondo ──────────────
@@ -420,6 +466,12 @@ class Accesorios {
         $pdf->Output('F', $dir . $nombre);
 
         return ['status' => 'success', 'url' => 'uploads/reportes/' . $nombre];
+    }
+
+    private function ensureEstatusColumn(string $tabla): void {
+        try {
+            $this->pdo->exec("ALTER TABLE `{$tabla}` ADD COLUMN IF NOT EXISTS estatus VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE'");
+        } catch (\PDOException $e) { /* column already exists */ }
     }
 
     private function ensurePlantillaAccTable(): void {

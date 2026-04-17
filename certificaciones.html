@@ -541,7 +541,7 @@
 <div id="sec-accesorios" class="wrap" style="display:none">
 
   <div class="stats" id="acc-stats-cert" style="grid-template-columns:repeat(3,1fr)">
-    <div class="stat"><div class="stat-n" id="ac-total"    style="color:var(--azul)">—</div><div class="stat-l">Sesiones</div></div>
+    <div class="stat"><div class="stat-n" id="ac-total"    style="color:var(--azul)">—</div><div class="stat-l">Aprobadas</div></div>
     <div class="stat"><div class="stat-n" id="ac-cumple"   style="color:var(--verde)">—</div><div class="stat-l">Cumplen</div></div>
     <div class="stat"><div class="stat-n" id="ac-nocumple" style="color:var(--rojo)">—</div><div class="stat-l">No cumplen</div></div>
   </div>
@@ -555,7 +555,7 @@
 
   <div class="tabla-card">
     <div class="tabla-header">
-      <span class="tabla-title">Sesiones de inspección de accesorios</span>
+      <span class="tabla-title">Sesiones aprobadas por Calidad</span>
       <span class="tabla-count" id="acc-cert-count">—</span>
     </div>
     <div class="tabla-wrap">
@@ -563,16 +563,17 @@
         <thead>
           <tr>
             <th>Cliente</th>
-            <th>Fecha</th>
-            <th>Ubicación</th>
-            <th>Total</th>
-            <th>Cumplen</th>
-            <th>No cumplen</th>
-            <th></th>
+            <th style="width:100px">Fecha</th>
+            <th style="width:145px">No. Control</th>
+            <th style="width:60px;text-align:center">Total</th>
+            <th style="width:70px;text-align:center">Cumplen</th>
+            <th style="width:80px;text-align:center">No cumplen</th>
+            <th style="width:85px;text-align:center">Estatus</th>
+            <th style="width:200px"></th>
           </tr>
         </thead>
         <tbody id="acc-cert-tabla">
-          <tr><td colspan="7" style="text-align:center;padding:36px;color:var(--texto-hint)">Selecciona esta sección para cargar datos.</td></tr>
+          <tr><td colspan="8" style="text-align:center;padding:36px;color:var(--texto-hint)">Selecciona esta sección para cargar datos.</td></tr>
         </tbody>
       </table>
     </div>
@@ -593,7 +594,7 @@
 
   <div class="tabla-card">
     <div class="tabla-header">
-      <span class="tabla-title">Cursos impartidos</span>
+      <span class="tabla-title">Cursos aprobados por Calidad</span>
       <span class="tabla-count" id="pc-count">—</span>
     </div>
     <div class="tabla-wrap">
@@ -601,9 +602,9 @@
         <thead>
           <tr>
             <th>Curso</th>
-            <th>Fecha</th>
-            <th>Participantes</th>
-            <th>Empresa</th>
+            <th style="width:100px">Fecha</th>
+            <th style="width:110px;text-align:center">Aprobados</th>
+            <th style="width:160px">Empresa</th>
             <th></th>
           </tr>
         </thead>
@@ -629,7 +630,7 @@
 
   <div class="tabla-card">
     <div class="tabla-header">
-      <span class="tabla-title">Personal independiente</span>
+      <span class="tabla-title">Participantes aprobados por Calidad</span>
       <span class="tabla-count" id="pi-count">—</span>
     </div>
     <div class="tabla-wrap">
@@ -637,14 +638,15 @@
         <thead>
           <tr>
             <th>Nombre</th>
-            <th>CURP</th>
-            <th>Curso</th>
-            <th>Fecha</th>
-            <th>Documentos</th>
+            <th style="width:140px">CURP</th>
+            <th style="width:140px">Curso</th>
+            <th style="width:95px">Fecha</th>
+            <th style="width:85px;text-align:center">Estatus</th>
+            <th style="width:240px">Documentos</th>
           </tr>
         </thead>
         <tbody id="pi-tabla">
-          <tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Selecciona esta sección para cargar datos.</td></tr>
+          <tr><td colspan="6" style="text-align:center;padding:36px;color:var(--texto-hint)">Selecciona esta sección para cargar datos.</td></tr>
         </tbody>
       </table>
     </div>
@@ -1563,6 +1565,7 @@ function verSeccion(sec) {
     document.getElementById('sec-maquinaria').style.display = '';
   } else if (sec === 'accesorios') {
     document.getElementById('sec-accesorios').style.display = '';
+    accCertCargados = false;
     cargarAccCert();
   } else if (sec === 'personal') {
     document.getElementById('sub-nav-personal').style.display = 'flex';
@@ -1595,37 +1598,36 @@ let accCertData    = [];
 let accCertCargados = false;
 
 async function cargarAccCert() {
-  if (accCertCargados) return;
+  accCertCargados = false;
   document.getElementById('acc-cert-tabla').innerHTML =
-    `<tr><td colspan="7" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
+    `<tr><td colspan="8" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
   try {
-    const res  = await fetch(API + '?action=LISTAR_SESIONES_ACCESORIOS');
+    const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+    const res  = await fetch(API + '?action=LISTAR_SESIONES_ACCESORIOS&estatus=APROBADO_CALIDAD&token=' + encodeURIComponent(tok));
     const raw  = await res.json();
     if (raw.status !== 'success') throw new Error(raw.message || 'Error del servidor');
     const data  = Array.isArray(raw.data) ? raw.data : [];
     accCertData     = data;
     accCertCargados = true;
     renderAccCert(data);
-    const total    = data.length;
     const cumple   = data.reduce((s, r) => s + (parseInt(r.cumple)    || 0), 0);
     const nocumple = data.reduce((s, r) => s + (parseInt(r.no_cumple) || 0), 0);
-    document.getElementById('ac-total').textContent    = total;
+    document.getElementById('ac-total').textContent    = data.length;
     document.getElementById('ac-cumple').textContent   = cumple;
     document.getElementById('ac-nocumple').textContent = nocumple;
   } catch(e) {
     document.getElementById('acc-cert-tabla').innerHTML =
-      `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--rojo)">Error: ${e.message}</td></tr>`;
+      `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--rojo)">Error: ${e.message}</td></tr>`;
   }
 }
 
 function filtrarAccCert() {
   const cli  = document.getElementById('ac-fCliente').value.toLowerCase();
   const fech = document.getElementById('ac-fFecha').value;
-  const fil  = accCertData.filter(r =>
+  renderAccCert(accCertData.filter(r =>
     (!cli  || (r.cliente||'').toLowerCase().includes(cli)) &&
     (!fech || (r.fecha  ||'').includes(fech))
-  );
-  renderAccCert(fil);
+  ));
 }
 
 function limpiarAccCert() {
@@ -1634,22 +1636,42 @@ function limpiarAccCert() {
   renderAccCert(accCertData);
 }
 
+function estatusCertBadge(e) {
+  if (e === 'EMITIDO') return `<span class="badge b-env" style="font-size:10px">Emitido</span>`;
+  return `<span class="badge b-apro" style="font-size:10px">Aprobado</span>`;
+}
+
 function renderAccCert(data) {
   const tbody = document.getElementById('acc-cert-tabla');
   document.getElementById('acc-cert-count').textContent = data.length + ' sesión' + (data.length !== 1 ? 'es' : '');
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin resultados.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin sesiones aprobadas por Calidad.</td></tr>`;
     return;
   }
-  tbody.innerHTML = data.map(r => `<tr>
-    <td style="font-weight:600">${r.cliente||'—'}</td>
-    <td style="color:var(--texto-sub);font-size:12px">${r.fecha||'—'}</td>
-    <td style="font-size:12px;color:var(--texto-sub)">${r.usuario ? r.usuario.substring(0,40) : '—'}</td>
-    <td style="font-weight:600;text-align:center">${r.total||0}</td>
-    <td style="text-align:center"><span class="badge b-apro">${r.cumple||0}</span></td>
-    <td style="text-align:center"><span class="badge b-vencido">${r.no_cumple||0}</span></td>
-    <td><button class="btn-ver" onclick="abrirAccCert(${r.id})">Ver</button></td>
-  </tr>`).join('');
+  tbody.innerHTML = data.map(r => {
+    const folio = r.control ? 'AB.'+r.control+'-'+new Date().getFullYear()+'MX' : '—';
+    const emitido = r.estatus === 'EMITIDO';
+    return `<tr>
+      <td style="font-weight:600">${r.cliente||'—'}</td>
+      <td style="color:var(--texto-sub);font-size:12px">${r.fecha||'—'}</td>
+      <td style="font-size:11px;font-family:monospace;color:var(--azul-dark)">${folio}</td>
+      <td style="text-align:center;font-weight:700">${r.total||0}</td>
+      <td style="text-align:center"><span class="badge b-apro" style="font-size:10px">${r.cumple||0}</span></td>
+      <td style="text-align:center"><span class="badge b-vencido" style="font-size:10px">${r.no_cumple||0}</span></td>
+      <td style="text-align:center">${estatusCertBadge(r.estatus)}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
+          <button class="btn-ver" style="font-size:11px" onclick="abrirAccCert(${r.id})">Ver</button>
+          <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
+                  onclick="prevInformeAcc(${r.id})">👁 Preview</button>
+          ${!emitido ? `<button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
+                  onclick="emitirInformeAcc(${r.id},this)">Emitir</button>` : ''}
+          <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
+                  onclick="devolverAcc(${r.id})">↩ Devolver</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 async function abrirAccCert(sesionId) {
@@ -1657,12 +1679,16 @@ async function abrirAccCert(sesionId) {
     `<div style="text-align:center;padding:24px"><span class="spin"></span>Cargando...</div>`;
   document.getElementById('overlay-acc-cert').classList.add('open');
   try {
-    const res  = await fetch(`${API}?action=DETALLE_SESION_ACCESORIOS&id=${sesionId}`);
+    const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+    const res  = await fetch(`${API}?action=DETALLE_SESION_ACCESORIOS&id=${sesionId}&token=${encodeURIComponent(tok)}`);
     const raw  = await res.json();
     if (raw.status !== 'success') throw new Error(raw.message || 'Error del servidor');
     const data = raw.data;
     document.getElementById('acc-det-cliente').textContent = data.cliente || '—';
-    document.getElementById('acc-det-fecha').textContent   = (data.fecha || '—') + (data.direccion ? ' · ' + data.direccion.substring(0,60) : '');
+    const folio = data.control ? 'AB.'+data.control+'-'+new Date().getFullYear()+'MX' : '';
+    document.getElementById('acc-det-fecha').textContent   =
+      (data.fecha || '—') + (data.direccion ? ' · ' + data.direccion.substring(0,60) : '') +
+      (folio ? ' · ' + folio : '');
     let html = '';
     if (!data.accesorios || !data.accesorios.length) {
       html = `<div style="text-align:center;padding:24px;color:var(--texto-hint)">Sin accesorios registrados.</div>`;
@@ -1696,6 +1722,79 @@ function cerrarAccCert() {
   document.getElementById('overlay-acc-cert').classList.remove('open');
 }
 
+async function prevInformeAcc(sesionId) {
+  mostrarToast('Generando vista previa…', 'info');
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'PREVISUALIZAR_INFORME_ACC', payload: {} })
+    });
+    const data = await res.json();
+    if (data.status === 'success' && data.url) {
+      window.open(data.url, '_blank');
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
+    }
+  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+}
+
+async function emitirInformeAcc(sesionId, btn) {
+  if (!confirm('¿Emitir el informe? Se generará el PDF y se marcará como Emitido.')) return;
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = '…';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'EMITIR_INFORME_ACC', payload: { sesion_id: sesionId } })
+    });
+    const data = await res.json();
+    if (data.status === 'success' && data.url) {
+      mostrarToast('Informe emitido correctamente', 'ok');
+      // Abrir PDF
+      window.open(data.url, '_blank');
+      // Ofrecer imprimir
+      setTimeout(() => {
+        if (confirm('¿Imprimir el informe ahora?')) {
+          const w = window.open(data.url, '_blank');
+          if (w) { w.onload = () => w.print(); }
+        }
+      }, 500);
+      accCertCargados = false;
+      cargarAccCert();
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo emitir'), 'err');
+      btn.disabled = false; btn.textContent = orig;
+    }
+  } catch(e) {
+    mostrarToast('Error de conexión', 'err');
+    btn.disabled = false; btn.textContent = orig;
+  }
+}
+
+async function devolverAcc(sesionId) {
+  if (!confirm('¿Devolver esta sesión a Calidad para revisión?')) return;
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'DEVOLVER_SESION_ACC', payload: { id: sesionId } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast('Sesión devuelta a Calidad', 'ok');
+      accCertCargados = false;
+      cargarAccCert();
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo devolver'), 'err');
+    }
+  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+}
+
 /* ═══════════════════════════════
    PERSONAL — CURSOS
 ═══════════════════════════════ */
@@ -1703,17 +1802,17 @@ let perCertData    = [];
 let perCertCargados = false;
 
 async function cargarPerCursosCert() {
-  if (perCertCargados) return;
+  perCertCargados = false;
   document.getElementById('pc-tabla').innerHTML =
     `<tr><td colspan="5" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
   try {
-    const res  = await fetch(API + '?action=LISTAR_PARTICIPANTES');
+    const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+    const res  = await fetch(API + '?action=LISTAR_PARTICIPANTES&estatus=APROBADO_CALIDAD&token=' + encodeURIComponent(tok));
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error('Respuesta inválida');
     perCertData     = data;
     perCertCargados = true;
     renderCursosCert(agruparCursosCert(data));
-    renderIndepCert(data);
   } catch(e) {
     document.getElementById('pc-tabla').innerHTML =
       `<tr><td colspan="5" style="text-align:center;padding:24px;color:var(--rojo)">Error: ${e.message}</td></tr>`;
@@ -1733,11 +1832,10 @@ function agruparCursosCert(data) {
 function filtrarPerCursosCert() {
   const bus  = document.getElementById('pc-fBuscar').value.toLowerCase();
   const fech = document.getElementById('pc-fFecha').value;
-  const grupos = agruparCursosCert(perCertData).filter(g =>
+  renderCursosCert(agruparCursosCert(perCertData).filter(g =>
     (!bus  || g.curso.toLowerCase().includes(bus) || g.empresa.toLowerCase().includes(bus)) &&
     (!fech || g.fecha.includes(fech))
-  );
-  renderCursosCert(grupos);
+  ));
 }
 
 function limpiarPerCursosCert() {
@@ -1750,13 +1848,13 @@ function renderCursosCert(grupos) {
   const tbody = document.getElementById('pc-tabla');
   document.getElementById('pc-count').textContent = grupos.length + ' grupo' + (grupos.length !== 1 ? 's' : '');
   if (!grupos.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin resultados.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin participantes aprobados por Calidad.</td></tr>`;
     return;
   }
   tbody.innerHTML = grupos.map((g, i) => `<tr>
     <td style="font-weight:600">${g.curso}</td>
     <td style="color:var(--texto-sub);font-size:12px">${g.fecha}</td>
-    <td style="text-align:center"><span class="badge b-env">${g.participantes.length}</span></td>
+    <td style="text-align:center"><span class="badge b-apro">${g.participantes.length}</span></td>
     <td style="color:var(--texto-sub);font-size:12px">${g.empresa}</td>
     <td><button class="btn-ver" onclick="abrirCursoCert(${i})">Ver participantes</button></td>
   </tr>`).join('');
@@ -1768,17 +1866,33 @@ function abrirCursoCert(idx) {
   if (!g) return;
   document.getElementById('pc-det-curso').textContent = g.curso;
   document.getElementById('pc-det-info').textContent  = g.fecha + ' · ' + g.participantes.length + ' participante' + (g.participantes.length !== 1 ? 's' : '');
-  let html = g.participantes.map(p => `
-    <div style="padding:12px 0;border-bottom:1px solid var(--borde);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-      <div>
-        <div style="font-weight:600;font-size:13px">${p.nombre_completo||'—'}</div>
-        <div style="font-size:11px;color:var(--texto-hint);margin-top:2px">${p.curp||''} ${p.ocupacion_nombre ? '· ' + p.ocupacion_nombre : ''}</div>
+  let html = g.participantes.map(p => {
+    const emitido = p.estatus === 'EMITIDO';
+    return `
+    <div style="padding:12px 0;border-bottom:1px solid var(--borde)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+        <div>
+          <div style="font-weight:600;font-size:13px">${p.nombre_completo||'—'}</div>
+          <div style="font-size:11px;color:var(--texto-hint);margin-top:2px">${p.curp||''} ${p.ocupacion_nombre ? '· ' + p.ocupacion_nombre : ''}</div>
+        </div>
+        ${emitido ? `<span class="badge b-env" style="font-size:10px">Emitido</span>` :
+                    `<span class="badge b-apro" style="font-size:10px">Aprobado</span>`}
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
-        <button class="btn-ver" style="font-size:11px" onclick="generarDocPersonal(${p.id},'DC3')">DC-3</button>
-        <button class="btn-ver" style="font-size:11px" onclick="generarDocPersonal(${p.id},'DIPLOMA')">Diploma</button>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
+                onclick="prevDocPersonal(${p.id},'dc3')">👁 DC-3</button>
+        <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
+                onclick="prevDocPersonal(${p.id},'diploma')">👁 Diploma</button>
+        ${!emitido ? `
+        <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
+                onclick="emitirDocPersonal(${p.id},'dc3',this)">Emitir DC-3</button>
+        <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
+                onclick="emitirDocPersonal(${p.id},'diploma',this)">Emitir Diploma</button>` : ''}
+        <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
+                onclick="devolverParticipante(${p.id})">↩ Devolver</button>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   if (!html) html = `<div style="text-align:center;padding:24px;color:var(--texto-hint)">Sin participantes.</div>`;
   document.getElementById('pc-det-body').innerHTML = html;
   document.getElementById('overlay-pc-det').classList.add('open');
@@ -1792,20 +1906,30 @@ function cerrarPcDet() {
    PERSONAL — INDEPENDIENTE
 ═══════════════════════════════ */
 async function cargarPerIndepCert() {
-  if (perCertCargados) { renderIndepCert(perCertData); return; }
+  perCertCargados = false;
   document.getElementById('pi-tabla').innerHTML =
-    `<tr><td colspan="5" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
-  await cargarPerCursosCert();
+    `<tr><td colspan="6" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
+  try {
+    const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+    const res  = await fetch(API + '?action=LISTAR_PARTICIPANTES&estatus=APROBADO_CALIDAD&token=' + encodeURIComponent(tok));
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('Respuesta inválida');
+    perCertData     = data;
+    perCertCargados = true;
+    renderIndepCert(data);
+  } catch(e) {
+    document.getElementById('pi-tabla').innerHTML =
+      `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--rojo)">Error: ${e.message}</td></tr>`;
+  }
 }
 
 function filtrarPerIndepCert() {
   const nom = document.getElementById('pi-fNombre').value.toLowerCase();
   const cur = document.getElementById('pi-fCurso').value.toLowerCase();
-  const fil = perCertData.filter(p =>
+  renderIndepCert(perCertData.filter(p =>
     (!nom || (p.nombre_completo||'').toLowerCase().includes(nom) || (p.curp||'').toLowerCase().includes(nom)) &&
     (!cur || (p.curso_nombre  ||'').toLowerCase().includes(cur))
-  );
-  renderIndepCert(fil);
+  ));
 }
 
 function limpiarPerIndepCert() {
@@ -1819,43 +1943,120 @@ function renderIndepCert(data) {
   if (!tbody) return;
   document.getElementById('pi-count').textContent = data.length + ' registro' + (data.length !== 1 ? 's' : '');
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin resultados.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin participantes aprobados por Calidad.</td></tr>`;
     return;
   }
-  tbody.innerHTML = data.map(p => `<tr>
-    <td style="font-weight:600">${p.nombre_completo||'—'}</td>
-    <td style="font-size:12px;font-family:monospace;color:var(--texto-sub)">${p.curp||'—'}</td>
-    <td style="font-size:12px">${p.curso_nombre||'—'}</td>
-    <td style="font-size:12px;color:var(--texto-sub)">${p.fecha_curso||'—'}</td>
-    <td>
-      <div style="display:flex;gap:6px">
-        <button class="btn-ver" style="font-size:11px" onclick="generarDocPersonal(${p.id},'DC3')">DC-3</button>
-        <button class="btn-ver" style="font-size:11px" onclick="generarDocPersonal(${p.id},'DIPLOMA')">Diploma</button>
-      </div>
-    </td>
-  </tr>`).join('');
+  tbody.innerHTML = data.map(p => {
+    const emitido = p.estatus === 'EMITIDO';
+    return `<tr>
+      <td style="font-weight:600">${p.nombre_completo||'—'}</td>
+      <td style="font-size:12px;font-family:monospace;color:var(--texto-sub)">${p.curp||'—'}</td>
+      <td style="font-size:12px">${p.curso_nombre||'—'}</td>
+      <td style="font-size:12px;color:var(--texto-sub)">${p.fecha_curso||'—'}</td>
+      <td style="text-align:center">${emitido
+        ? `<span class="badge b-env" style="font-size:10px">Emitido</span>`
+        : `<span class="badge b-apro" style="font-size:10px">Aprobado</span>`}</td>
+      <td>
+        <div style="display:flex;gap:4px;flex-wrap:wrap">
+          <button class="btn-ver" style="font-size:10px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
+                  onclick="prevDocPersonal(${p.id},'dc3')">👁 DC-3</button>
+          <button class="btn-ver" style="font-size:10px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
+                  onclick="prevDocPersonal(${p.id},'diploma')">👁 Diploma</button>
+          ${!emitido ? `
+          <button class="btn-ver" style="font-size:10px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
+                  onclick="emitirDocPersonal(${p.id},'dc3',this)">Emitir DC-3</button>
+          <button class="btn-ver" style="font-size:10px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
+                  onclick="emitirDocPersonal(${p.id},'diploma',this)">Emitir Diploma</button>` : ''}
+          <button class="btn-ver" style="font-size:10px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
+                  onclick="devolverParticipante(${p.id})">↩</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 /* ═══════════════════════════════
-   GENERAR DOCUMENTO PERSONAL
+   EMISIÓN DOCUMENTOS PERSONAL
 ═══════════════════════════════ */
-async function generarDocPersonal(participanteId, tipo) {
+async function prevDocPersonal(participanteId, tipo) {
+  mostrarToast('Generando vista previa…', 'info');
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
   try {
-    mostrarToast(`Generando ${tipo}...`, 'info');
     const res  = await fetch(API, {
       method: 'POST',
-      body:   JSON.stringify({ action: 'GENERAR_DOC_PERSONAL', payload: { id: participanteId, tipo } })
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'GENERAR_DOC_PERSONAL', payload: { id: participanteId, tipo } })
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {
       window.open(data.url, '_blank');
-      mostrarToast(`${tipo} generado correctamente`, 'ok');
     } else {
       mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
     }
+  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+}
+
+async function emitirDocPersonal(participanteId, tipo, btn) {
+  if (!confirm(`¿Emitir ${tipo.toUpperCase()} para este participante?`)) return;
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  const orig = btn.textContent; btn.disabled = true; btn.textContent = '…';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'EMITIR_DOC_PERSONAL', payload: { id: participanteId, tipo } })
+    });
+    const data = await res.json();
+    if (data.status === 'success' && data.url) {
+      mostrarToast(`${tipo.toUpperCase()} emitido`, 'ok');
+      window.open(data.url, '_blank');
+      setTimeout(() => {
+        if (confirm('¿Imprimir el documento ahora?')) {
+          const w = window.open(data.url, '_blank');
+          if (w) { w.onload = () => w.print(); }
+        }
+      }, 500);
+      // Reload to reflect emitido status
+      perCertCargados = false;
+      cerrarPcDet();
+      if (document.getElementById('sub-btn-per-indep')?.classList.contains('active')) {
+        cargarPerIndepCert();
+      } else {
+        cargarPerCursosCert();
+      }
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo emitir'), 'err');
+      btn.disabled = false; btn.textContent = orig;
+    }
   } catch(e) {
     mostrarToast('Error de conexión', 'err');
+    btn.disabled = false; btn.textContent = orig;
   }
+}
+
+async function devolverParticipante(participanteId) {
+  if (!confirm('¿Devolver este participante a Calidad para revisión?')) return;
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'DEVOLVER_PARTICIPANTE', payload: { id: participanteId } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast('Participante devuelto a Calidad', 'ok');
+      perCertCargados = false;
+      cerrarPcDet();
+      if (document.getElementById('sub-btn-per-indep')?.classList.contains('active')) {
+        cargarPerIndepCert();
+      } else {
+        cargarPerCursosCert();
+      }
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo devolver'), 'err');
+    }
+  } catch(e) { mostrarToast('Error de conexión', 'err'); }
 }
 
 ["overlay-acc-cert","overlay-pc-det"].forEach(id => {

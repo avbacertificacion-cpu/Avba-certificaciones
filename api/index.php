@@ -166,6 +166,7 @@ if ($method === 'GET') {
             respuesta($personal->listarParticipantes([
                 'curso_id' => $_GET['curso_id'] ?? '',
                 'buscar'   => $_GET['buscar']   ?? '',
+                'estatus'  => $_GET['estatus']  ?? '',
             ]));
 
         case 'OBTENER_PARTICIPANTE':
@@ -202,7 +203,7 @@ if ($method === 'GET') {
         case 'LISTAR_SESIONES_ACCESORIOS':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($accesorios->listarSesiones());
+            respuesta($accesorios->listarSesiones($_GET['estatus'] ?? ''));
 
         case 'DETALLE_SESION_ACCESORIOS':
             $usr = validarToken($pdo, $token);
@@ -450,6 +451,26 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->eliminarParticipante((int)($payload['id'] ?? 0)));
 
+        case 'APROBAR_PARTICIPANTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->aprobarParticipante((int)($payload['id'] ?? 0), $usr['usuario']));
+
+        case 'DEVOLVER_PARTICIPANTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->devolverParticipante((int)($payload['id'] ?? 0), $usr['usuario']));
+
+        case 'EMITIR_DOC_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->emitirDocumentoPersonal(
+                (int)   ($payload['id']     ?? 0),
+                (string)($payload['tipo']   ?? ''),
+                (string)($payload['correo'] ?? ''),
+                $usr['usuario']
+            ));
+
         case 'GUARDAR_CURSO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -472,7 +493,7 @@ if ($method === 'POST') {
 
         case 'GENERAR_DOC_PERSONAL':
             $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->generarDocumento(
                 (int)($payload['id']   ?? 0),
                 trim($payload['tipo']  ?? ''),
@@ -509,6 +530,21 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->editarAccesorio($payload));
 
+        case 'APROBAR_SESION_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->aprobarSesion((int)($payload['id'] ?? 0), $usr['usuario']));
+
+        case 'DEVOLVER_SESION_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->devolverSesion((int)($payload['id'] ?? 0), $usr['usuario']));
+
+        case 'EMITIR_INFORME_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->emitirInforme((int)($payload['sesion_id'] ?? 0), $usr['usuario']));
+
         case 'SUBIR_PLANTILLA_ACC':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -531,7 +567,7 @@ if ($method === 'POST') {
 
         case 'PREVISUALIZAR_INFORME_ACC':
             $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->previsualizarInformeAcc($usr['usuario']));
 
         case 'GENERAR_INFORME_ACCESORIOS':

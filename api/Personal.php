@@ -39,10 +39,18 @@ class Personal {
             $params[] = '%' . $filtros['buscar'] . '%';
             $params[] = '%' . $filtros['buscar'] . '%';
         }
+        if (!empty($filtros['estatus'])) {
+            if ($filtros['estatus'] === 'APROBADO_CALIDAD') {
+                $where[]  = "p.estatus IN ('APROBADO_CALIDAD','EMITIDO')";
+            } else {
+                $where[]  = 'p.estatus = ?';
+                $params[] = $filtros['estatus'];
+            }
+        }
 
         $sql = "SELECT p.id, p.nombre_completo, p.curp, p.puesto,
                        p.telefono, p.correo, p.capacidad, p.capacidad_na,
-                       p.control, p.fecha_curso, p.estado,
+                       p.control, p.estatus, p.fecha_curso, p.estado,
                        c.nombre AS curso_nombre, c.duracion_horas,
                        o.nombre AS ocupacion_nombre,
                        p.foto_documentacion_url, p.foto_persona_url,
@@ -163,6 +171,54 @@ class Personal {
     public function eliminarParticipante(int $id): array {
         $this->pdo->prepare("DELETE FROM participantes_cursos WHERE id = ?")->execute([$id]);
         return ['status' => 'success'];
+    }
+
+    // ── Aprobar participante → APROBADO_CALIDAD ────────────
+    public function aprobarParticipante(int $id, string $usuario): array {
+        $this->ensureEstatusColumn();
+        $chk = $this->pdo->prepare("SELECT id FROM participantes_cursos WHERE id = ?");
+        $chk->execute([$id]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'APROBADO_CALIDAD' WHERE id = ?")
+            ->execute([$id]);
+        return ['status' => 'success', 'message' => 'Participante aprobado y enviado a Certificaciones.'];
+    }
+
+    // ── Devolver participante → DEVUELTO ──────────────────
+    public function devolverParticipante(int $id, string $usuario): array {
+        $this->ensureEstatusColumn();
+        $chk = $this->pdo->prepare("SELECT id FROM participantes_cursos WHERE id = ?");
+        $chk->execute([$id]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'DEVUELTO' WHERE id = ?")
+            ->execute([$id]);
+        return ['status' => 'success', 'message' => 'Participante devuelto a Calidad.'];
+    }
+
+    // ── Emitir documento y marcar como EMITIDO ─────────────
+    public function emitirDocumentoPersonal(int $id, string $tipo, string $correoDestino, string $usuario): array {
+        $this->ensureEstatusColumn();
+        $resultado = $this->generarDocumento($id, $tipo, $usuario);
+        if ($resultado['status'] !== 'success') return $resultado;
+
+        // Marcar como emitido
+        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO' WHERE id = ?")
+            ->execute([$id]);
+
+        // Enviar correo si se proporcionó dirección
+        if ($correoDestino && filter_var($correoDestino, FILTER_VALIDATE_EMAIL)) {
+            $this->enviarDocumento($id, $tipo, $correoDestino, $usuario);
+        }
+
+        return $resultado;
+    }
+
+    private function ensureEstatusColumn(): void {
+        try {
+            $this->pdo->exec("ALTER TABLE participantes_cursos ADD COLUMN IF NOT EXISTS estatus VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE'");
+        } catch (\PDOException $e) { /* column already exists */ }
     }
 
     // ══════════════════════════════════════════════════════

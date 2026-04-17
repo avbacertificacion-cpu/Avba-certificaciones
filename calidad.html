@@ -951,7 +951,8 @@
             <th style="width:75px;text-align:center">Cumplen</th>
             <th style="width:85px;text-align:center">No cumplen</th>
             <th style="width:75px;text-align:center">Inspector</th>
-            <th style="width:50px"></th>
+            <th style="width:90px">Estatus</th>
+            <th style="width:130px"></th>
           </tr>
         </thead>
         <tbody id="tbody-acc-sesiones">
@@ -1026,7 +1027,8 @@
             <th style="width:150px">Curso</th>
             <th style="width:100px">Fecha</th>
             <th style="width:100px">Empresa</th>
-            <th style="width:50px"></th>
+            <th style="width:90px">Estatus</th>
+            <th style="width:130px"></th>
           </tr>
         </thead>
         <tbody id="tbody-per-indep">
@@ -2420,15 +2422,23 @@ function filtrarSesionesAcc() {
   ));
 }
 
+function estatusAccBadge(e) {
+  if (e === 'APROBADO_CALIDAD') return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--verde-light);color:var(--verde)">Aprobado</span>`;
+  if (e === 'EMITIDO')          return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--azul-light);color:var(--azul-dark)">Emitido</span>`;
+  if (e === 'DEVUELTO')         return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--rojo-light);color:var(--rojo)">Devuelto</span>`;
+  return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#f0f0f0;color:#888">Pendiente</span>`;
+}
+
 function renderSesionesAcc(data) {
   const tbody = document.getElementById('tbody-acc-sesiones');
   document.getElementById('acc-count').textContent = data.length + ' sesión' + (data.length!==1?'es':'');
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin registros</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin registros</td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(r => {
     const folio = r.control ? 'AB.'+r.control+'-'+new Date().getFullYear()+'MX' : '—';
+    const puedAprobar = !r.estatus || r.estatus === 'PENDIENTE' || r.estatus === 'DEVUELTO';
     return `
     <tr>
       <td style="font-weight:600">${escH(r.cliente)}</td>
@@ -2443,9 +2453,14 @@ function renderSesionesAcc(data) {
               ${+r.no_cumple>0?'background:var(--rojo-light);color:var(--rojo)':'background:#f0f0f0;color:#888'}">${r.no_cumple}</span>
       </td>
       <td style="text-align:center;font-size:11px;color:var(--texto-sub)">${escH(r.usuario||'—')}</td>
+      <td>${estatusAccBadge(r.estatus)}</td>
       <td style="text-align:right">
-        <button onclick="abrirDetAccSesion(${r.id})"
-                style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
+        <div style="display:flex;gap:5px;justify-content:flex-end">
+          <button onclick="abrirDetAccSesion(${r.id})"
+                  style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
+          ${puedAprobar ? `<button onclick="aprobarSesionAcc(${r.id})"
+                  style="background:var(--verde-light);border:1px solid var(--verde);color:var(--verde);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Aprobar</button>` : ''}
+        </div>
       </td>
     </tr>`; }).join('');
 }
@@ -2464,7 +2479,8 @@ async function abrirDetAccSesion(id) {
     document.getElementById('acc-ses-sub').textContent =
       (s.fecha||'') + (s.usuario ? ' · '+s.usuario : '') + (folioAcc ? ' · ' + folioAcc : '');
     accSesionActual = s;
-    document.getElementById('acc-ses-body').innerHTML = (s.accesorios||[]).map((a,i) => `
+    const puedAprobar = !s.estatus || s.estatus === 'PENDIENTE' || s.estatus === 'DEVUELTO';
+    const accsHtml = (s.accesorios||[]).map((a,i) => `
       <div id="acc-row-${a.id}" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--borde)">
         <div style="width:28px;height:28px;border-radius:50%;background:var(--azul-light);color:var(--azul);
                     font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
@@ -2486,6 +2502,18 @@ async function abrirDetAccSesion(id) {
           ✏ Editar
         </button>
       </div>`).join('') || `<div style="text-align:center;padding:32px;color:var(--texto-hint)">Sin accesorios</div>`;
+
+    const aprobarBtnHtml = puedAprobar ? `
+      <div style="padding:14px 0 4px;text-align:right">
+        <button onclick="aprobarSesionAcc(${s.id})"
+                style="padding:8px 20px;border-radius:8px;border:none;background:var(--verde);
+                       color:white;font-size:13px;font-weight:600;cursor:pointer">
+          ✓ Aprobar sesión → Certificaciones
+        </button>
+      </div>` : `
+      <div style="padding:12px 0 4px;text-align:right">${estatusAccBadge(s.estatus)}</div>`;
+
+    document.getElementById('acc-ses-body').innerHTML = accsHtml + aprobarBtnHtml;
   } catch (e) {
     document.getElementById('acc-ses-body').innerHTML = `<div style="text-align:center;padding:32px;color:var(--rojo)">Error al cargar.</div>`;
   }
@@ -2493,6 +2521,26 @@ async function abrirDetAccSesion(id) {
 
 function cerrarDetAccSesion() {
   document.getElementById('overlay-acc-sesion').style.display = 'none';
+}
+
+async function aprobarSesionAcc(id) {
+  if (!confirm('¿Aprobar esta sesión y enviarla a Certificaciones?')) return;
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body: JSON.stringify({ action: 'APROBAR_SESION_ACC', payload: { id } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      accSesionesCargadas = false;
+      cargarSesionesAcc();
+      cerrarDetAccSesion();
+    } else {
+      alert('Error: ' + (data.message || 'No se pudo aprobar'));
+    }
+  } catch(e) { alert('Error de conexión'); }
 }
 
 /* ── Helpers de estado ── */
@@ -2644,25 +2692,39 @@ function filtrarIndep() {
   ));
 }
 
+function estatusPerBadge(e) {
+  if (e === 'APROBADO_CALIDAD') return `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--verde-light);color:var(--verde)">Aprobado</span>`;
+  if (e === 'EMITIDO')          return `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--azul-light);color:var(--azul-dark)">Emitido</span>`;
+  if (e === 'DEVUELTO')         return `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--rojo-light);color:var(--rojo)">Devuelto</span>`;
+  return `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:#f0f0f0;color:#888">Pendiente</span>`;
+}
+
 function renderIndep(data) {
   const tbody = document.getElementById('tbody-per-indep');
   document.getElementById('per-indep-count').textContent = data.length + ' participante' + (data.length!==1?'s':'');
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin participantes</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin participantes</td></tr>`;
     return;
   }
-  tbody.innerHTML = data.map(p => `
+  tbody.innerHTML = data.map(p => {
+    const puedAprobar = !p.estatus || p.estatus === 'PENDIENTE' || p.estatus === 'DEVUELTO';
+    return `
     <tr>
       <td style="font-weight:600">${escH(p.nombre_completo)}</td>
       <td style="font-size:11px;color:var(--texto-sub);letter-spacing:.03em">${escH(p.curp||'—')}</td>
       <td style="font-size:12px">${escH(p.curso_nombre||'—')}</td>
       <td style="font-size:12px">${escH(p.fecha_curso||'—')}</td>
       <td style="font-size:12px;color:var(--texto-sub)">${escH(p.empresa_nombre||'—')}</td>
+      <td>${estatusPerBadge(p.estatus)}</td>
       <td style="text-align:right">
-        <button onclick="abrirDetPer(${p.id})"
-                style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
+        <div style="display:flex;gap:5px;justify-content:flex-end">
+          <button onclick="abrirDetPer(${p.id})"
+                  style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
+          ${puedAprobar ? `<button onclick="aprobarParticipante(${p.id})"
+                  style="background:var(--verde-light);border:1px solid var(--verde);color:var(--verde);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Aprobar</button>` : ''}
+        </div>
       </td>
-    </tr>`).join('');
+    </tr>`; }).join('');
 }
 
 function abrirSesionParticipantes(g) {
@@ -2692,10 +2754,20 @@ async function abrirDetPer(id) {
     const folioP = p.control ? 'AB.'+p.control+'-'+new Date().getFullYear()+'MX' : '';
     document.getElementById('per-det-sub').textContent =
       (p.curso_nombre||'') + ' · ' + (p.fecha_curso||'') + (folioP ? ' · ' + folioP : '');
+    const puedAprobarP = !p.estatus || p.estatus === 'PENDIENTE' || p.estatus === 'DEVUELTO';
     document.getElementById('per-det-body').innerHTML = `
-      ${folioP ? `<div style="background:var(--azul-light);border:1px solid #85B7EB;border-radius:7px;padding:8px 14px;margin-bottom:12px;font-size:12px;color:var(--azul-dark)">
-        <strong>No. Control:</strong> <span style="font-family:monospace;font-weight:700">${escH(folioP)}</span>
-      </div>` : ''}
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap">
+        ${folioP ? `<div style="background:var(--azul-light);border:1px solid #85B7EB;border-radius:7px;padding:6px 12px;font-size:12px;color:var(--azul-dark);flex:1">
+          <strong>No. Control:</strong> <span style="font-family:monospace;font-weight:700">${escH(folioP)}</span>
+        </div>` : '<div></div>'}
+        <div style="display:flex;align-items:center;gap:8px">
+          ${estatusPerBadge(p.estatus)}
+          ${puedAprobarP ? `<button onclick="aprobarParticipante(${p.id})"
+            style="padding:5px 14px;border-radius:7px;border:none;background:var(--verde);color:white;font-size:12px;font-weight:600;cursor:pointer">
+            ✓ Aprobar → Certificaciones
+          </button>` : ''}
+        </div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;font-size:13px;margin-bottom:14px">
         <div><span style="font-size:11px;color:var(--texto-sub);display:block">CURP</span>${escH(p.curp||'—')}</div>
         <div><span style="font-size:11px;color:var(--texto-sub);display:block">Puesto</span>${escH(p.puesto||'—')}</div>
@@ -2716,6 +2788,26 @@ async function abrirDetPer(id) {
 
 function cerrarDetPer() {
   document.getElementById('overlay-per-det').style.display = 'none';
+}
+
+async function aprobarParticipante(id) {
+  if (!confirm('¿Aprobar este participante y enviarlo a Certificaciones?')) return;
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body: JSON.stringify({ action: 'APROBAR_PARTICIPANTE', payload: { id } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      perCargados = false;
+      cargarPersonal();
+      cerrarDetPer();
+    } else {
+      alert('Error: ' + (data.message || 'No se pudo aprobar'));
+    }
+  } catch(e) { alert('Error de conexión'); }
 }
 
 
