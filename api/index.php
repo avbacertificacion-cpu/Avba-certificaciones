@@ -209,6 +209,11 @@ if ($method === 'GET') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->detalleSesion((int)($_GET['id'] ?? 0)));
 
+        case 'OBTENER_PLANTILLA_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->obtenerPlantillaAcc());
+
         default:
             respuesta(['status' => 'error', 'message' => "Acción GET desconocida: {$action}"], 400);
     }
@@ -493,6 +498,21 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->guardarAccesorio($_POST, $_FILES, $usr['usuario']));
+
+        case 'SUBIR_PLANTILLA_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->subirPlantillaAcc($_POST, $_FILES));
+
+        case 'ELIMINAR_PLANTILLA_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->eliminarPlantillaAcc());
+
+        case 'PREVISUALIZAR_INFORME_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->previsualizarInformeAcc($usr['usuario']));
 
         case 'GENERAR_INFORME_ACCESORIOS':
             $usr = validarToken($pdo, $token);

@@ -224,6 +224,101 @@ class Accesorios {
         return ['status' => 'success', 'data' => $sesion];
     }
 
+    // ── Obtener config de plantilla de fondo ──────────────
+    public function obtenerPlantillaAcc(): array {
+        $this->ensurePlantillaAccTable();
+        $row = $this->pdo->query("SELECT plantilla_pdf FROM acc_plantilla_informe WHERE id = 1")->fetch();
+        return ['status' => 'success', 'data' => ['plantilla_pdf' => $row['plantilla_pdf'] ?? null]];
+    }
+
+    // ── Subir plantilla PDF de fondo ──────────────────────
+    public function subirPlantillaAcc(array $post, array $files): array {
+        $this->ensurePlantillaAccTable();
+
+        $file = $files['plantilla'] ?? null;
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK)
+            return ['status' => 'error', 'message' => 'No se recibió archivo o hubo un error al subirlo.'];
+
+        $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if ($ext !== 'pdf')
+            return ['status' => 'error', 'message' => 'Solo se aceptan archivos .pdf'];
+
+        $dir = __DIR__ . '/../uploads/plantillas/';
+        if (!is_dir($dir) && !mkdir($dir, 0755, true))
+            return ['status' => 'error', 'message' => 'No se pudo crear el directorio.'];
+
+        $filename = 'acc_informe_fondo.pdf';
+        if (!move_uploaded_file($file['tmp_name'], $dir . $filename))
+            return ['status' => 'error', 'message' => 'Error al guardar el archivo.'];
+
+        $this->pdo->prepare("INSERT INTO acc_plantilla_informe (id, plantilla_pdf) VALUES (1, ?)
+                             ON DUPLICATE KEY UPDATE plantilla_pdf = ?")
+            ->execute([$filename, $filename]);
+
+        return ['status' => 'success', 'message' => 'Plantilla guardada.'];
+    }
+
+    // ── Eliminar plantilla de fondo ───────────────────────
+    public function eliminarPlantillaAcc(): array {
+        $this->ensurePlantillaAccTable();
+        $this->pdo->exec("UPDATE acc_plantilla_informe SET plantilla_pdf = NULL WHERE id = 1");
+        return ['status' => 'success', 'message' => 'Plantilla eliminada.'];
+    }
+
+    // ── Previsualizar informe con datos de ejemplo ────────
+    public function previsualizarInformeAcc(string $usuario): array {
+        if (!class_exists('Dompdf\Dompdf')) {
+            return ['status' => 'error', 'message' => 'Motor PDF no disponible en el servidor.'];
+        }
+
+        $sesionDemo = [
+            'id'         => 0,
+            'cliente'    => 'Empresa Ejemplo S.A. de C.V.',
+            'fecha'      => date('d/m/Y'),
+            'direccion'  => 'Av. Industrial 1200, Col. Parque Norte, Monterrey, N.L.',
+            'usuario'    => $usuario ?: 'Inspector Demo',
+            'accesorios' => [
+                ['id_accesorio'=>'A-001','tipo_nombre'=>'Eslinga de Banda',  'marca'=>'Certex',           'modelo'=>'EW-60',  'serie'=>'CB2024-0112','capacidad'=>'3 Ton', 'medidas'=>'60mm×4m','estado'=>'APTO'],
+                ['id_accesorio'=>'A-002','tipo_nombre'=>'Grillete de Arco',  'marca'=>'Columbus McKinnon','modelo'=>'S-209',  'serie'=>'CM2023-8847','capacidad'=>'5 Ton', 'medidas'=>'5/8"',   'estado'=>'APTO'],
+                ['id_accesorio'=>'A-003','tipo_nombre'=>'Eslinga de Cable',  'marca'=>'Pfeifer',          'modelo'=>'PC-14',  'serie'=>'PF2022-3341','capacidad'=>'2 Ton', 'medidas'=>'14mm×6m','estado'=>'CONDICIONADO'],
+                ['id_accesorio'=>'A-004','tipo_nombre'=>'Gancho con Seguro', 'marca'=>'Crosby',           'modelo'=>'G-4163', 'serie'=>'CR2024-5521','capacidad'=>'10 Ton','medidas'=>'—',      'estado'=>'APTO'],
+                ['id_accesorio'=>'A-005','tipo_nombre'=>'Cadena de Izado',   'marca'=>'Pewag',            'modelo'=>'G80 RBG','serie'=>'PW2021-0098','capacidad'=>'4 Ton', 'medidas'=>'13mm×3m','estado'=>'NO APTO'],
+            ],
+        ];
+
+        $folio = 'PREVIEW-ACC';
+        $html  = $this->htmlInforme($sesionDemo, $folio);
+
+        $opts = new \Dompdf\Options();
+        $opts->setIsRemoteEnabled(true);
+        $opts->setIsHtml5ParserEnabled(true);
+
+        $pdf = new \Dompdf\Dompdf($opts);
+        $pdf->loadHtml($html, 'UTF-8');
+        $pdf->setPaper('A4', 'portrait');
+        $pdf->render();
+
+        $dir = __DIR__ . '/../uploads/reportes/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+        $nombre = 'PREVIEW_INFORME_ACC.pdf';
+        file_put_contents($dir . $nombre, $pdf->output());
+
+        return ['status' => 'success', 'url' => 'uploads/reportes/' . $nombre];
+    }
+
+    private function ensurePlantillaAccTable(): void {
+        $this->pdo->exec("
+            CREATE TABLE IF NOT EXISTS acc_plantilla_informe (
+              id           TINYINT UNSIGNED NOT NULL DEFAULT 1,
+              plantilla_pdf VARCHAR(500) NULL,
+              actualizado  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+        $this->pdo->exec("INSERT IGNORE INTO acc_plantilla_informe (id) VALUES (1)");
+    }
+
     // ── Generar informe PDF de una sesión ──────────────────
     public function generarInforme(int $sesionId, string $usuario): array {
         $det = $this->detalleSesion($sesionId);

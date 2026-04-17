@@ -647,8 +647,9 @@
 
 <!-- sub-nav Accesorios -->
 <div class="sub-nav" id="sub-nav-accesorios" style="display:none">
-  <button class="sub-btn active" id="sub-btn-acc-insp"  onclick="verSubTab('accesorios','inspeccionados')">Inspeccionados</button>
-  <button class="sub-btn"        id="sub-btn-acc-tipos" onclick="verSubTab('accesorios','tipos')">Tipos de accesorio</button>
+  <button class="sub-btn active" id="sub-btn-acc-insp"       onclick="verSubTab('accesorios','inspeccionados')">Inspeccionados</button>
+  <button class="sub-btn"        id="sub-btn-acc-tipos"      onclick="verSubTab('accesorios','tipos')">Tipos de accesorio</button>
+  <button class="sub-btn"        id="sub-btn-acc-plantilla"  onclick="verSubTab('accesorios','plantilla')">Plantilla PDF</button>
 </div>
 
 <!-- sub-nav Personal -->
@@ -661,7 +662,6 @@
 <!-- sub-nav Catálogos -->
 <div class="sub-nav" id="sub-nav-catalogos" style="display:none">
   <button class="sub-btn active" id="sub-btn-cat-equipos" onclick="verSubTab('catalogos','equipos')">Tipos de Equipo</button>
-  <button class="sub-btn"        id="sub-btn-cat-acctip"  onclick="verSubTab('catalogos','acc-tipos')">Tipos de Accesorio</button>
   <button class="sub-btn"        id="sub-btn-cat-cursos"  onclick="verSubTab('catalogos','cursos')">Cursos</button>
   <button class="sub-btn"        id="sub-btn-cat-ocup"    onclick="verSubTab('catalogos','ocupaciones')">Ocupaciones</button>
 </div>
@@ -886,6 +886,24 @@
   </div>
 
 </div><!-- /tab-accesorios -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     SECCIÓN: ACCESORIOS — PLANTILLA PDF
+═══════════════════════════════════════════ -->
+<div id="sec-acc-plantilla" class="wrap" style="display:none">
+
+  <div style="font-size:13px;color:var(--texto-sub);margin-bottom:20px;line-height:1.6">
+    Sube una plantilla PDF de fondo para el <strong>Informe de Integridad Operativa</strong>.
+    El sistema superpondrá el contenido del informe sobre la plantilla.
+    Usa el botón <em>Previsualizar</em> para ver cómo quedará el informe con datos de ejemplo.
+  </div>
+
+  <div id="acc-plantilla-cont">
+    <div style="text-align:center;padding:32px;color:var(--texto-hint)">Cargando…</div>
+  </div>
+
+</div><!-- /sec-acc-plantilla -->
 
 
 <!-- ══════════════════════════════════════════════════════════
@@ -1867,7 +1885,7 @@ cargar();
 ═══════════════════════════════════════ */
 const TODOS_CONTENIDOS = [
   'sec-maquinaria',
-  'sec-acc-inspeccionados', 'tab-accesorios',
+  'sec-acc-inspeccionados', 'tab-accesorios', 'sec-acc-plantilla',
   'sec-personal-cursos',    'sec-personal-indep',    'sec-personal-plantillas',
   'tab-tipos', 'tab-cursos', 'tab-ocupaciones',
 ];
@@ -1899,10 +1917,9 @@ function verSeccion(sec) {
 
 function verSubTab(sec, sub) {
   const subBtns = {
-    accesorios: { inspeccionados:'sub-btn-acc-insp',  tipos:'sub-btn-acc-tipos' },
+    accesorios: { inspeccionados:'sub-btn-acc-insp', tipos:'sub-btn-acc-tipos', plantilla:'sub-btn-acc-plantilla' },
     personal:   { cursos:'sub-btn-per-cursos', independiente:'sub-btn-per-indep', plantillas:'sub-btn-per-plantillas' },
-    catalogos:  { equipos:'sub-btn-cat-equipos','acc-tipos':'sub-btn-cat-acctip',
-                  cursos:'sub-btn-cat-cursos', ocupaciones:'sub-btn-cat-ocup' },
+    catalogos:  { equipos:'sub-btn-cat-equipos', cursos:'sub-btn-cat-cursos', ocupaciones:'sub-btn-cat-ocup' },
   };
   Object.entries(subBtns[sec] || {}).forEach(([s, btnId]) => {
     document.getElementById(btnId).classList.toggle('active', s === sub);
@@ -1913,21 +1930,21 @@ function verSubTab(sec, sub) {
   });
 
   const contentMap = {
-    accesorios: { inspeccionados:'sec-acc-inspeccionados', tipos:'tab-accesorios' },
+    accesorios: { inspeccionados:'sec-acc-inspeccionados', tipos:'tab-accesorios', plantilla:'sec-acc-plantilla' },
     personal:   { cursos:'sec-personal-cursos', independiente:'sec-personal-indep', plantillas:'sec-personal-plantillas' },
-    catalogos:  { equipos:'tab-tipos','acc-tipos':'tab-accesorios', cursos:'tab-cursos', ocupaciones:'tab-ocupaciones' },
+    catalogos:  { equipos:'tab-tipos', cursos:'tab-cursos', ocupaciones:'tab-ocupaciones' },
   };
   const targetId = contentMap[sec]?.[sub];
   if (targetId) document.getElementById(targetId).style.display = '';
 
   if (sec === 'accesorios' && sub === 'inspeccionados' && !accSesionesCargadas) cargarSesionesAcc();
   if (sec === 'accesorios' && sub === 'tipos')                                   cargarAccTipos();
-  if (sec === 'personal'   && sub !== 'plantillas'  && !perCargados)            cargarPersonal();
-  if (sec === 'personal'   && sub === 'plantillas')                             cargarPlantillasPersonal();
+  if (sec === 'accesorios' && sub === 'plantilla')                               cargarPlantillaAccesorios();
+  if (sec === 'personal'   && sub !== 'plantillas'  && !perCargados)             cargarPersonal();
+  if (sec === 'personal'   && sub === 'plantillas')                              cargarPlantillasPersonal();
   if (sec === 'catalogos'  && sub === 'equipos'     && !tiposCargados)           cargarTipos();
   if (sec === 'catalogos'  && sub === 'cursos'      && !cursosCargados)          cargarCursos();
   if (sec === 'catalogos'  && sub === 'ocupaciones' && !ocupCargados)            cargarOcupaciones();
-  if (sec === 'catalogos'  && sub === 'acc-tipos')                               cargarAccTipos();
 }
 
 /* ════════════════════════════════════════
@@ -3169,6 +3186,136 @@ async function eliminarItem(tipoId, itemId) {
     cargarTipos(true);
   } else {
     alert(data.message || "Error al eliminar ítem");
+  }
+}
+
+/* ══════════════════════════════════════════════════════════
+   PLANTILLA PDF — ACCESORIOS (Informe de Integridad Operativa)
+══════════════════════════════════════════════════════════ */
+
+async function cargarPlantillaAccesorios() {
+  const cont = document.getElementById("acc-plantilla-cont");
+  cont.innerHTML = `<div style="text-align:center;padding:32px;color:var(--texto-hint)">
+    <div class="spin" style="margin:0 auto 10px"></div>Cargando…</div>`;
+  try {
+    const s   = JSON.parse(localStorage.getItem("avba_session") || "{}");
+    const res = await fetch(`${API}?action=OBTENER_PLANTILLA_ACC&token=${s.token||""}`);
+    const data = await res.json();
+    if (data.status !== "success") throw new Error(data.message);
+    cont.innerHTML = renderPlantillaAccCard(data.data || {});
+  } catch (e) {
+    cont.innerHTML = `<div style="text-align:center;padding:32px;color:var(--rojo)">
+      Error al cargar.
+      <button onclick="cargarPlantillaAccesorios()"
+              style="color:var(--azul);background:none;border:none;cursor:pointer;
+                     text-decoration:underline;margin-left:6px">Reintentar</button></div>`;
+  }
+}
+
+function renderPlantillaAccCard(tpl) {
+  const tieneArchivo = !!tpl.plantilla_pdf;
+  const nombreArchivo = tieneArchivo ? tpl.plantilla_pdf.split("/").pop() : "";
+  return `
+  <div class="tipo-card" style="border-radius:var(--radio-lg)">
+    <div style="padding:16px 20px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--borde)">
+      <span style="font-size:28px">📋</span>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:var(--texto)">Informe de Integridad Operativa</div>
+        <div style="font-size:12px;color:var(--texto-sub);margin-top:2px">
+          ${tieneArchivo
+            ? `<span style="color:var(--verde)">✓ ${esc(nombreArchivo)}</span> — plantilla de fondo activa`
+            : `<span style="color:var(--texto-hint)">Sin plantilla de fondo — se usa diseño predeterminado</span>`}
+        </div>
+      </div>
+    </div>
+    <div style="padding:14px 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <label style="cursor:pointer;padding:7px 14px;border-radius:var(--radio);
+             border:1.5px solid var(--azul);color:var(--azul);font-size:12px;font-weight:600;
+             background:var(--azul-light)">
+        ${tieneArchivo ? "Cambiar .pdf" : "Subir .pdf"}
+        <input type="file" accept=".pdf" style="display:none"
+               onchange="subirPlantillaAcc(event)">
+      </label>
+      <button onclick="previsualizarInformeAcc(this)"
+              style="padding:7px 14px;border-radius:var(--radio);border:1.5px solid #854F0B;
+                     color:#854F0B;font-size:12px;font-weight:600;background:#FAEEDA;cursor:pointer">
+        👁 Previsualizar informe
+      </button>
+      ${tieneArchivo ? `
+      <button onclick="eliminarPlantillaAcc()"
+              style="padding:7px 14px;border-radius:var(--radio);border:1.5px solid var(--rojo);
+                     color:var(--rojo);font-size:12px;font-weight:600;background:var(--rojo-light);cursor:pointer">
+        🗑 Quitar plantilla
+      </button>` : ""}
+    </div>
+    <div style="padding:0 20px 16px;font-size:11.5px;color:var(--texto-hint);line-height:1.6">
+      La plantilla PDF se usa como fondo de página. El contenido del informe (encabezado, tabla de
+      accesorios, firmas) se superpone automáticamente. Si no hay plantilla, se genera con el
+      diseño AVBA estándar.
+    </div>
+  </div>`;
+}
+
+async function subirPlantillaAcc(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const s    = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const form = new FormData();
+  form.append("action",    "SUBIR_PLANTILLA_ACC");
+  form.append("token",     s.token || "");
+  form.append("plantilla", file);
+  try {
+    const res  = await fetch(API, { method: "POST", body: form });
+    const data = await res.json();
+    if (data.status === "success") {
+      cargarPlantillaAccesorios();
+    } else {
+      alert("Error: " + (data.message || "No se pudo subir la plantilla"));
+    }
+  } catch (e) {
+    alert("Error de conexión al subir la plantilla.");
+  }
+  event.target.value = "";
+}
+
+async function eliminarPlantillaAcc() {
+  if (!confirm("¿Quitar la plantilla de fondo? El informe usará el diseño estándar.")) return;
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Token": s.token || "" },
+      body: JSON.stringify({ action: "ELIMINAR_PLANTILLA_ACC", payload: {} })
+    });
+    const data = await res.json();
+    if (data.status === "success") cargarPlantillaAccesorios();
+    else alert("Error: " + (data.message || "No se pudo eliminar"));
+  } catch (e) {
+    alert("Error de conexión.");
+  }
+}
+
+async function previsualizarInformeAcc(btn) {
+  btn.disabled = true;
+  btn.textContent = "Generando…";
+  try {
+    const s   = JSON.parse(localStorage.getItem("avba_session") || "{}");
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Token": s.token || "" },
+      body: JSON.stringify({ action: "PREVISUALIZAR_INFORME_ACC", payload: {} })
+    });
+    const data = await res.json();
+    if (data.status === "success" && data.url) {
+      window.open(data.url + "?t=" + Date.now(), "_blank");
+    } else {
+      alert("Error: " + (data.message || "No se pudo generar la vista previa."));
+    }
+  } catch (e) {
+    alert("Error de conexión al generar vista previa.");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "&#128065; Previsualizar informe";
   }
 }
 
