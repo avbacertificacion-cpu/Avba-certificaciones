@@ -475,7 +475,7 @@ class Admin {
             $r['pdf_campos'] = json_decode($r['pdf_campos'] ?? '[]', true) ?: [];
         }
         unset($r);
-        return $rows;
+        return ['status' => 'success', 'data' => $rows];
     }
 
     public function subirPlantillaPdfPersonal(array $post, array $files): array {
