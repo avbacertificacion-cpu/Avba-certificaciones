@@ -445,4 +445,99 @@ class Admin {
         require_once __DIR__ . '/ReporteInspeccion.php';
         return ReporteInspeccion::generar($this->pdo, $equipoId, $usuario);
     }
+
+    // ══════════════════════════════════════════════════════
+    //  PLANTILLAS PDF — PERSONAL / CAPACITACIÓN
+    // ══════════════════════════════════════════════════════
+
+    private function ensurePlantillasPersonal(): void {
+        $this->pdo->exec("
+            CREATE TABLE IF NOT EXISTS plantillas_personal (
+              tipo          ENUM('diploma','certificado','dc3') NOT NULL,
+              plantilla_pdf VARCHAR(500)  NULL,
+              pdf_campos    JSON          NULL,
+              actualizado   TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              PRIMARY KEY (tipo)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        $this->pdo->exec("INSERT IGNORE INTO plantillas_personal (tipo) VALUES ('diploma'),('certificado'),('dc3')");
+    }
+
+    public function listarPlantillasPersonal(): array {
+        $this->ensurePlantillasPersonal();
+        $stmt = $this->pdo->query(
+            "SELECT tipo, plantilla_pdf, pdf_campos
+             FROM plantillas_personal
+             ORDER BY FIELD(tipo,'diploma','certificado','dc3')"
+        );
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$r) {
+            $r['pdf_campos'] = json_decode($r['pdf_campos'] ?? '[]', true) ?: [];
+        }
+        unset($r);
+        return $rows;
+    }
+
+    public function subirPlantillaPdfPersonal(array $post, array $files): array {
+        $this->ensurePlantillasPersonal();
+        $tipo = trim($post['tipo'] ?? '');
+        if (!in_array($tipo, ['diploma','certificado','dc3'], true))
+            return ['status' => 'error', 'message' => 'tipo debe ser diploma, certificado o dc3.'];
+
+        $file = $files['plantilla'] ?? null;
+        if (!$file || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK)
+            return ['status' => 'error', 'message' => 'No se recibió archivo o hubo un error al subirlo.'];
+
+        $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if ($ext !== 'pdf')
+            return ['status' => 'error', 'message' => 'Solo se aceptan archivos .pdf'];
+
+        $dir = __DIR__ . '/../uploads/plantillas/';
+        if (!is_dir($dir) && !mkdir($dir, 0755, true))
+            return ['status' => 'error', 'message' => 'No se pudo crear el directorio de plantillas.'];
+
+        $filename = "personal_{$tipo}.pdf";
+        if (!move_uploaded_file($file['tmp_name'], $dir . $filename))
+            return ['status' => 'error', 'message' => 'Error al guardar el archivo en el servidor.'];
+
+        $this->pdo->prepare("UPDATE plantillas_personal SET plantilla_pdf = ? WHERE tipo = ?")
+            ->execute([$filename, $tipo]);
+
+        return ['status' => 'success', 'message' => 'Plantilla PDF guardada.', 'archivo' => $filename];
+    }
+
+    public function guardarCamposPdfPersonal(array $payload): array {
+        $this->ensurePlantillasPersonal();
+        $tipo   = trim($payload['tipo']   ?? '');
+        $campos = $payload['campos'] ?? [];
+
+        if (!in_array($tipo, ['diploma','certificado','dc3'], true))
+            return ['status' => 'error', 'message' => 'tipo debe ser diploma, certificado o dc3.'];
+
+        $decoded = is_string($campos) ? json_decode($campos, true) : $campos;
+        if (!is_array($decoded))
+            return ['status' => 'error', 'message' => 'campos debe ser un array JSON.'];
+
+        $this->pdo->prepare("UPDATE plantillas_personal SET pdf_campos = ? WHERE tipo = ?")
+            ->execute([json_encode($decoded, JSON_UNESCAPED_UNICODE), $tipo]);
+
+        return ['status' => 'success', 'message' => 'Campos PDF guardados.'];
+    }
+
+    public function obtenerCamposPdfPersonal(string $tipo): array {
+        $this->ensurePlantillasPersonal();
+        if (!in_array($tipo, ['diploma','certificado','dc3'], true))
+            return ['status' => 'error', 'message' => 'tipo inválido.'];
+
+        $stmt = $this->pdo->prepare("SELECT plantilla_pdf, pdf_campos FROM plantillas_personal WHERE tipo = ?");
+        $stmt->execute([$tipo]);
+        $row = $stmt->fetch();
+        if (!$row) return ['status' => 'error', 'message' => 'Tipo no encontrado.'];
+
+        return [
+            'status'        => 'success',
+            'plantilla_pdf' => $row['plantilla_pdf'] ?? null,
+            'pdf_campos'    => json_decode($row['pdf_campos'] ?? '[]', true) ?: [],
+        ];
+    }
 }

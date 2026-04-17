@@ -485,12 +485,54 @@
   </div>
 </div>
 
+<!-- ── MODAL ENVIAR DOCUMENTO ── -->
+<div class="overlay" id="overlayEnviar" onclick="if(event.target===this)cerrarEnviarDoc()">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:var(--verde)">✉</div>
+        <div>
+          <div class="m-title" id="enviarDocTitulo">Enviar documento</div>
+          <div class="m-sub">Se enviará el último documento generado de este tipo</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarEnviarDoc()">×</button>
+    </div>
+    <div style="padding:20px">
+      <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:6px">
+        Correo electrónico destinatario
+      </label>
+      <input type="email" id="enviarCorreoInput"
+             placeholder="ejemplo@correo.com"
+             style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);
+                    border-radius:var(--radio);font-size:13px;outline:none">
+      <p style="font-size:11px;color:var(--texto-hint);margin-top:6px">
+        Se pre-llenará con el correo del participante si está registrado.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button onclick="cerrarEnviarDoc()"
+              style="padding:9px 18px;border-radius:7px;border:1.5px solid var(--borde);
+                     background:white;font-size:13px;cursor:pointer">
+        Cancelar
+      </button>
+      <button id="btn-enviar-doc" onclick="confirmarEnvio()"
+              style="padding:9px 22px;border-radius:7px;border:none;
+                     background:var(--verde);color:white;font-size:13px;
+                     font-weight:600;cursor:pointer">
+        ✉ Enviar
+      </button>
+    </div>
+  </div>
+</div>
+
 <script>
 const API_URL = 'api/';
 let currentUser = null;
 let participantes = [];
 let cursos = [];
 let selectedParticipante = null;
+let enviarDocTipo = "";
 
 // ══════════════════════════════════════════════════════
 //  AUTENTICACIÓN
@@ -675,7 +717,18 @@ async function abrirDetalle(idx) {
             <div class="doc-name">${doc.tipo_doc}</div>
             <div class="doc-date">${doc.fecha}</div>
           </div>
-          <a href="${doc.url}" target="_blank" style="color: var(--azul); font-weight: 600; font-size: 12px;">Descargar</a>
+          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
+            <a href="${doc.url}" target="_blank"
+               style="color:var(--azul);font-weight:600;font-size:12px;text-decoration:none">
+              Descargar
+            </a>
+            <button onclick="abrirEnviarDoc('${doc.tipo_doc.toLowerCase()}')"
+                    style="padding:3px 10px;border-radius:6px;border:1.5px solid var(--verde);
+                           color:var(--verde);font-size:11px;font-weight:600;
+                           background:var(--verde-light);cursor:pointer">
+              ✉ Enviar
+            </button>
+          </div>
         </div>
       `;
     });
@@ -689,6 +742,7 @@ async function abrirDetalle(idx) {
     <div style="display: flex; gap: 8px; flex-wrap: wrap;">
       <button class="btn-doc-gen" onclick="generar('dc3')">📋 DC-3</button>
       <button class="btn-doc-gen" onclick="generar('diploma')">🎓 Diploma</button>
+      <button class="btn-doc-gen" onclick="generar('certificado')">📜 Certificado</button>
     </div>
   `;
 
@@ -710,6 +764,10 @@ async function abrirDetalle(idx) {
       <div class="field">
         <label>Teléfono</label>
         <div class="field-value">${escH(p.telefono || '—')}</div>
+      </div>
+      <div class="field">
+        <label>Correo electrónico</label>
+        <div class="field-value">${escH(p.correo || '—')}</div>
       </div>
       <div class="field">
         <label>Ocupación específica</label>
@@ -781,9 +839,10 @@ async function generar(tipo) {
   if (!selectedParticipante) return;
 
   try {
+    const sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
     const resp = await fetch(API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Token': sesion.token || '' },
       body: JSON.stringify({
         action: 'GENERAR_DOC_PERSONAL',
         payload: {
@@ -843,6 +902,62 @@ async function confirmarEliminacion() {
   } catch (e) {
     console.error('Error eliminando:', e);
     alert('Error eliminando participante');
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  ENVIAR DOCUMENTO POR CORREO
+// ══════════════════════════════════════════════════════
+
+function abrirEnviarDoc(tipo) {
+  if (!selectedParticipante) return;
+  enviarDocTipo = tipo;
+  const labels = { dc3: 'Constancia DC3', diploma: 'Diploma', certificado: 'Certificado' };
+  document.getElementById('enviarDocTitulo').textContent =
+    'Enviar — ' + (labels[tipo] || tipo.toUpperCase());
+  document.getElementById('enviarCorreoInput').value = selectedParticipante.correo || '';
+  document.getElementById('overlayEnviar').classList.add('open');
+}
+
+function cerrarEnviarDoc() {
+  document.getElementById('overlayEnviar').classList.remove('open');
+  enviarDocTipo = '';
+}
+
+async function confirmarEnvio() {
+  const correo = document.getElementById('enviarCorreoInput').value.trim();
+  if (!correo) { alert('Ingresa un correo electrónico.'); return; }
+
+  const btn = document.getElementById('btn-enviar-doc');
+  btn.disabled = true;
+  btn.textContent = 'Enviando…';
+
+  try {
+    const sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const resp = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': sesion.token || '' },
+      body: JSON.stringify({
+        action: 'ENVIAR_DOC_PERSONAL',
+        payload: {
+          id:     selectedParticipante.id,
+          tipo:   enviarDocTipo,
+          correo: correo
+        }
+      })
+    });
+    const data = await resp.json();
+    if (data.status === 'success') {
+      cerrarEnviarDoc();
+      alert('Documento enviado correctamente a ' + correo);
+    } else {
+      alert('Error: ' + (data.message || 'No se pudo enviar el documento'));
+    }
+  } catch (e) {
+    alert('Error de conexión al enviar el documento.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✉ Enviar';
   }
 }
 

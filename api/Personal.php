@@ -7,10 +7,13 @@
  * Catálogos: cursos y ocupaciones específicas (gestionados por Calidad).
  */
 
-require_once __DIR__ . '/../vendor/autoload.php';
+if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
+    require_once __DIR__ . '/../vendor/autoload.php';
+}
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
+use PHPMailer\PHPMailer\PHPMailer;
 
 class Personal {
     private PDO $pdo;
@@ -124,6 +127,7 @@ class Personal {
             'capacidad'             => trim($payload['capacidad'] ?? '') ?: null,
             'capacidad_na'          => !empty($payload['capacidad_na']) ? 1 : 0,
             'telefono'              => trim($payload['telefono'] ?? '') ?: null,
+            'correo'                => trim($payload['correo'] ?? '') ?: null,
             'empresa_nombre'        => trim($payload['empresa_nombre'] ?? '') ?: null,
             'empresa_rfc'           => strtoupper(trim($payload['empresa_rfc'] ?? '')) ?: null,
             'empresa_direccion'     => trim($payload['empresa_direccion'] ?? '') ?: null,
@@ -280,22 +284,212 @@ class Personal {
         $p = $this->obtenerParticipante($id);
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
-        $tiposValidos = ['dc3', 'diploma'];
+        $tiposValidos = ['dc3', 'diploma', 'certificado'];
         if (!in_array($tipo, $tiposValidos, true))
             return ['status' => 'error', 'message' => 'Tipo de documento no válido.'];
 
-        $html = ($tipo === 'dc3') ? $this->htmlDC3($p) : $this->htmlDiploma($p);
+        // Intentar usar plantilla PDF configurada en la BD
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT plantilla_pdf, pdf_campos FROM plantillas_personal WHERE tipo = ? LIMIT 1"
+            );
+            $stmt->execute([$tipo]);
+            $tpl = $stmt->fetch();
+            if ($tpl && !empty($tpl['plantilla_pdf'])) {
+                $rutaTpl = __DIR__ . '/../uploads/plantillas/' . $tpl['plantilla_pdf'];
+                if (file_exists($rutaTpl)) {
+                    $camposTpl = json_decode($tpl['pdf_campos'] ?? '[]', true) ?: [];
+                    return $this->generarConTemplatePdf($p, $tipo, $usuario, $rutaTpl, $camposTpl);
+                }
+            }
+        } catch (\Exception $e) {
+            // tabla aún no existe o error puntual → continúa con fallback
+        }
 
+        // Fallback: generar con Dompdf (requiere vendor/)
+        if (!class_exists('Dompdf\Dompdf')) {
+            return ['status' => 'error',
+                    'message' => 'No hay plantilla PDF configurada. Súbela desde Calidad → Personal → Plantillas PDF.'];
+        }
+
+        $html  = match($tipo) {
+            'dc3'         => $this->htmlDC3($p),
+            'certificado' => $this->htmlCertificado($p),
+            default       => $this->htmlDiploma($p),
+        };
         $folio = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
         $url   = $this->htmlAPdf($html, $folio, $tipo);
 
-        // Registrar documento generado
         $this->pdo->prepare(
             "INSERT INTO participantes_documentos (participante_id, tipo_doc, url, generado_por)
              VALUES (?, ?, ?, ?)"
         )->execute([$id, strtoupper($tipo), $url, $usuario]);
 
         return ['status' => 'success', 'url' => $url];
+    }
+
+    public function enviarDocumento(int $id, string $tipo, string $correoDestino, string $usuario): array {
+        $p = $this->obtenerParticipante($id);
+        if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        $correo = trim($correoDestino) ?: trim($p['correo'] ?? '');
+        if (!$correo || !filter_var($correo, FILTER_VALIDATE_EMAIL))
+            return ['status' => 'error', 'message' => 'Correo de destino inválido o no registrado.'];
+
+        // Buscar último documento generado de ese tipo
+        $stmt = $this->pdo->prepare(
+            "SELECT url FROM participantes_documentos
+             WHERE participante_id = ? AND tipo_doc = ?
+             ORDER BY fecha_generacion DESC LIMIT 1"
+        );
+        $stmt->execute([$id, strtoupper($tipo)]);
+        $doc = $stmt->fetch();
+        if (!$doc) return ['status' => 'error', 'message' => 'Genera el documento primero antes de enviarlo.'];
+
+        // Convertir URL a ruta local
+        $rutaArchivo = str_replace(UPLOAD_URL, UPLOAD_DIR, $doc['url']);
+        if (!file_exists($rutaArchivo))
+            return ['status' => 'error', 'message' => 'El archivo del documento no se encontró en el servidor.'];
+
+        if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
+            return ['status' => 'error', 'message' => 'Servicio de correo no disponible en este servidor.'];
+
+        $tipoLabel = ['diploma' => 'Diploma', 'certificado' => 'Certificado', 'dc3' => 'Constancia DC-3'][$tipo] ?? ucfirst($tipo);
+        $nombre    = $p['nombre_completo'] ?? 'Participante';
+
+        try {
+            $mail = new PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host       = MAIL_HOST;
+            $mail->SMTPAuth   = true;
+            $mail->Username   = MAIL_USER;
+            $mail->Password   = MAIL_PASS;
+            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
+            $mail->Port       = MAIL_PORT;
+            $mail->CharSet    = 'UTF-8';
+            $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
+            $mail->addAddress($correo);
+            $mail->Subject    = "{$tipoLabel} de Capacitación — AVBA Inspections";
+            $mail->isHTML(true);
+            $mail->Body       = $this->plantillaCorreoPersonal($nombre, $tipoLabel, $p['curso_nombre'] ?? '');
+            $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
+            $mail->send();
+
+            return ['status' => 'success', 'message' => "Documento enviado a {$correo}."];
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => 'Error al enviar correo: ' . $e->getMessage()];
+        }
+    }
+
+    private function generarConTemplatePdf(array $p, string $tipo, string $usuario, string $rutaTpl, array $campos): array {
+        require_once __DIR__ . '/../lib/fpdi_loader.php';
+
+        $folio   = 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
+        $dir     = UPLOAD_DIR . 'personal/docs/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+        $nombre  = strtoupper($tipo) . '_PDF_' . $folio . '_' . date('Ymd_His') . '.pdf';
+        $rutaPdf = $dir . $nombre;
+
+        $fpiDim = new \setasign\Fpdi\Fpdi();
+        $fpiDim->setSourceFile($rutaTpl);
+        $tplIdx = $fpiDim->importPage(1);
+        $size   = $fpiDim->getTemplateSize($tplIdx);
+        $orient = ($size['width'] > $size['height']) ? 'L' : 'P';
+        unset($fpiDim);
+
+        $pdf = new \setasign\Fpdi\Fpdi($orient, 'mm', [$size['width'], $size['height']]);
+        $pdf->SetAutoPageBreak(false);
+        $pdf->SetMargins(0, 0, 0);
+        $totalPaginas     = $pdf->setSourceFile($rutaTpl);
+        $valoresResueltos = $this->resolverValoresCamposPersonal($p);
+
+        for ($pg = 1; $pg <= $totalPaginas; $pg++) {
+            $tpl = $pdf->importPage($pg);
+            $sz  = $pdf->getTemplateSize($tpl);
+            $pdf->AddPage(($sz['width'] > $sz['height']) ? 'L' : 'P', [$sz['width'], $sz['height']]);
+            $pdf->useTemplate($tpl, 0, 0, $sz['width'], $sz['height']);
+
+            foreach ($campos as $campo) {
+                $nombreCampo = $campo['campo'] ?? '';
+                $pagCampo    = (int)($campo['pagina'] ?? 1);
+                if (!$nombreCampo || $pagCampo !== $pg) continue;
+
+                $x       = (float)($campo['x']      ?? 0);
+                $y       = (float)($campo['y']      ?? 0);
+                $tamano  = (int)  ($campo['tamano'] ?? 10);
+                $negrita = !empty($campo['negrita']) ? 'B' : '';
+                $ancho   = (float)($campo['ancho']  ?? 0);
+                $color   = str_pad($campo['color'] ?? '000000', 6, '0', STR_PAD_LEFT);
+                $fuente  = ['Helvetica'=>'Helvetica','Times'=>'Times','Courier'=>'Courier'][$campo['fuente']??''] ?? 'Helvetica';
+
+                [$r, $g, $b] = sscanf($color, '%02x%02x%02x');
+                $pdf->SetTextColor($r ?? 0, $g ?? 0, $b ?? 0);
+
+                $valor = (string)($valoresResueltos[$nombreCampo] ?? '');
+                if ($valor === '') continue;
+
+                $pdf->SetFont($fuente, $negrita, $tamano);
+                $pdf->SetXY($x, $y);
+                $pdf->Cell($ancho ?: 0, 0, $valor, 0, 0, '');
+            }
+        }
+
+        $pdf->Output('F', $rutaPdf);
+        $url = UPLOAD_URL . 'personal/docs/' . $nombre;
+
+        $this->pdo->prepare(
+            "INSERT INTO participantes_documentos (participante_id, tipo_doc, url, generado_por)
+             VALUES (?, ?, ?, ?)"
+        )->execute([$p['id'], strtoupper($tipo), $url, $usuario]);
+
+        return ['status' => 'success', 'url' => $url];
+    }
+
+    private function resolverValoresCamposPersonal(array $p): array {
+        $fechaCurso = $p['fecha_curso'] ?? null;
+        $fechaFmt   = $fechaCurso ? (new \DateTime($fechaCurso))->format('d/m/Y') : '';
+        $folio      = 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
+
+        return [
+            'nombre_completo'       => $p['nombre_completo']       ?? '',
+            'curp'                  => $p['curp']                  ?? '',
+            'puesto'                => $p['puesto']                ?? '',
+            'ocupacion'             => $p['ocupacion_nombre']      ?? '',
+            'empresa_nombre'        => $p['empresa_nombre']        ?? '',
+            'empresa_rfc'           => $p['empresa_rfc']           ?? '',
+            'empresa_direccion'     => $p['empresa_direccion']     ?? '',
+            'empresa_representante' => $p['empresa_representante'] ?? '',
+            'curso_nombre'          => $p['curso_nombre']          ?? '',
+            'area_tematica'         => $p['area_tematica']         ?? '',
+            'duracion_horas'        => (string)($p['duracion_horas'] ?? ''),
+            'fecha_curso'           => $fechaFmt,
+            'capacidad'             => $p['capacidad_na'] ? 'N/A' : ($p['capacidad'] ?? ''),
+            'folio'                 => $folio,
+            'anio'                  => date('Y'),
+        ];
+    }
+
+    private function plantillaCorreoPersonal(string $nombre, string $tipoLabel, string $curso): string {
+        return "<!DOCTYPE html><html><body style=\"font-family:'Segoe UI',sans-serif;background:#f4f7fb;margin:0;padding:20px\">
+<div style=\"max-width:540px;margin:auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08)\">
+  <div style=\"background:#185FA5;padding:24px;text-align:center\">
+    <h1 style=\"color:white;font-size:20px;margin:0\">AVBA Inspections</h1>
+    <p style=\"color:rgba(255,255,255,0.75);font-size:13px;margin:6px 0 0\">Capacitación y Certificación</p>
+  </div>
+  <div style=\"padding:28px 32px\">
+    <p style=\"font-size:15px;color:#1a1a2e;margin:0 0 12px\">Estimado(a) <strong>{$nombre}</strong>,</p>
+    <p style=\"font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px\">
+      Adjuntamos su <strong>{$tipoLabel}</strong> del curso <strong>{$curso}</strong>,
+      emitido por AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.
+    </p>
+  </div>
+  <div style=\"background:#f4f7fb;padding:16px 32px;border-top:1px solid #dfe5ef;text-align:center\">
+    <p style=\"font-size:12px;color:#9299a8;margin:0\">
+      AVBA Inspections — <a href=\"https://avba.com.mx\" style=\"color:#185FA5\">avba.com.mx</a>
+    </p>
+  </div>
+</div></body></html>";
     }
 
     // ══════════════════════════════════════════════════════
@@ -545,6 +739,56 @@ HTML;
 </div>
 </body>
 </html>
+HTML;
+    }
+
+    private function htmlCertificado(array $p): string {
+        $esc    = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+        $nombre = $esc($p['nombre_completo']);
+        $curp   = $esc($p['curp']);
+        $curso  = $esc($p['curso_nombre']);
+        $horas  = $esc($p['duracion_horas']);
+        $area   = $esc($p['area_tematica'] ?? '');
+        $folio  = 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
+        $fecha  = $p['fecha_curso'] ? date('d/m/Y', strtotime($p['fecha_curso'])) : date('d/m/Y');
+
+        return <<<HTML
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<style>
+  body { font-family: DejaVu Sans, Arial, sans-serif; margin:0; padding:0; background:#fff; }
+  .cert { border: 4px double #185FA5; margin: 30px; padding: 40px 50px; text-align: center; min-height: 680px; position: relative; }
+  .cert-logo { font-size:28pt; font-weight:bold; color:#185FA5; letter-spacing:3px; margin-bottom:4px; }
+  .cert-sub { font-size:10pt; color:#666; margin-bottom:30px; }
+  .cert-title { font-size:22pt; font-weight:bold; color:#185FA5; text-transform:uppercase; letter-spacing:2px; margin-bottom:6px; }
+  .cert-sub2 { font-size:10pt; color:#555; margin-bottom:24px; }
+  .cert-nombre { font-size:24pt; color:#1a1a2e; font-weight:bold; border-bottom:2px solid #185FA5; display:inline-block; padding-bottom:6px; margin:10px 0 20px; }
+  .cert-text { font-size:12pt; color:#444; line-height:1.8; margin-bottom:8px; }
+  .cert-curso { font-size:14pt; color:#185FA5; font-weight:bold; margin:6px 0; }
+  .cert-detalles { font-size:10pt; color:#666; margin:16px 0 30px; }
+  .firmas { width:80%; margin:40px auto 0; border-collapse:collapse; }
+  .firmas td { text-align:center; padding:0 30px; vertical-align:bottom; }
+  .firma-line { border-top:1px solid #333; padding-top:6px; font-size:9pt; color:#555; }
+  .folio { position:absolute; bottom:20px; right:30px; font-size:8pt; color:#aaa; }
+</style></head><body>
+<div class="cert">
+  <div class="cert-logo">AVBA</div>
+  <div class="cert-sub">Inspections, Certifications and Maintenance S.A.S. de C.V.</div>
+  <div class="cert-title">Certificado de Capacitación</div>
+  <div class="cert-sub2">Otorga el presente certificado a:</div>
+  <div class="cert-nombre">{$nombre}</div>
+  <div class="cert-text">CURP: <strong>{$curp}</strong></div>
+  <div class="cert-text">Por haber completado satisfactoriamente el curso:</div>
+  <div class="cert-curso">{$curso}</div>
+  <div class="cert-detalles">Área temática: {$area} &nbsp;·&nbsp; Duración: {$horas} horas &nbsp;·&nbsp; Fecha: {$fecha}</div>
+  <table class="firmas">
+    <tr>
+      <td><div class="firma-line">Director de Capacitación</div></td>
+      <td><div class="firma-line">Instructor del Curso</div></td>
+    </tr>
+  </table>
+  <div class="folio">Folio: {$esc($folio)} — Emitido: {$esc(date('d/m/Y'))}</div>
+</div>
+</body></html>
 HTML;
     }
 }

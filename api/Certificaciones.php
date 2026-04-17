@@ -1292,6 +1292,129 @@ HTML;
         ]);
     }
 
+    // ── Vista previa de plantilla personal con datos de ejemplo ─
+    public function previsualizarPdfPersonal(string $tipo, array $campos): array {
+        $tiposValidos = ['diploma', 'certificado', 'dc3'];
+        if (!in_array($tipo, $tiposValidos, true))
+            return ['status' => 'error', 'message' => 'tipo debe ser diploma, certificado o dc3.'];
+
+        // Obtener plantilla desde plantillas_personal
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT plantilla_pdf FROM plantillas_personal WHERE tipo = ? LIMIT 1"
+            );
+            $stmt->execute([$tipo]);
+            $row = $stmt->fetch();
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => 'Tabla plantillas_personal no encontrada. Guarda primero la configuración.'];
+        }
+
+        $archivoTpl = $row['plantilla_pdf'] ?? null;
+        if (empty($archivoTpl))
+            return ['status' => 'error', 'message' => 'No hay plantilla PDF configurada para este tipo. Súbela primero.'];
+
+        $rutaTpl = __DIR__ . '/../uploads/plantillas/' . $archivoTpl;
+        if (!file_exists($rutaTpl))
+            return ['status' => 'error', 'message' => "Plantilla '{$archivoTpl}' no encontrada. Vuelve a subirla."];
+
+        // Datos de ejemplo para la vista previa
+        $datos = [
+            'id'                    => 1,
+            'nombre_completo'       => 'JUAN EJEMPLO PÉREZ DEMO',
+            'curp'                  => 'EXPJ800101HDFRZN01',
+            'puesto'                => 'Operador de Montacargas',
+            'ocupacion_nombre'      => 'Operación de Equipo',
+            'empresa_nombre'        => 'EMPRESA DE EJEMPLO S.A. DE C.V.',
+            'empresa_rfc'           => 'EDE800101ABC',
+            'empresa_direccion'     => 'AV. EJEMPLO 123, COL. CENTRO, MONTERREY, N.L.',
+            'empresa_representante' => 'REPRESENTANTE LEGAL DEMO',
+            'curso_nombre'          => 'Operación Segura de Montacargas',
+            'area_tematica'         => 'Seguridad Industrial',
+            'duracion_horas'        => '16',
+            'fecha_curso'           => date('Y-m-d'),
+            'capacidad'             => 'Operar montacargas de manera segura y eficiente',
+            'capacidad_na'          => 0,
+        ];
+
+        try {
+            require_once __DIR__ . '/../lib/fpdi_loader.php';
+
+            $rutaDir = UPLOAD_DIR . 'personal/docs/';
+            if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
+
+            $rufaPdf = $rutaDir . 'PREVIEW_' . strtoupper($tipo) . '.pdf';
+
+            $fpiDim = new \setasign\Fpdi\Fpdi();
+            $fpiDim->setSourceFile($rutaTpl);
+            $tplIdx = $fpiDim->importPage(1);
+            $size   = $fpiDim->getTemplateSize($tplIdx);
+            $orient = ($size['width'] > $size['height']) ? 'L' : 'P';
+            unset($fpiDim);
+
+            $pdf = new \setasign\Fpdi\Fpdi($orient, 'mm', [$size['width'], $size['height']]);
+            $pdf->SetAutoPageBreak(false);
+            $pdf->SetMargins(0, 0, 0);
+            $totalPaginas = $pdf->setSourceFile($rutaTpl);
+
+            // Resolver valores de campos personales
+            $fechaFmt = date('d/m/Y');
+            $valores  = [
+                'nombre_completo'       => $datos['nombre_completo'],
+                'curp'                  => $datos['curp'],
+                'puesto'                => $datos['puesto'],
+                'ocupacion'             => $datos['ocupacion_nombre'],
+                'empresa_nombre'        => $datos['empresa_nombre'],
+                'empresa_rfc'           => $datos['empresa_rfc'],
+                'empresa_direccion'     => $datos['empresa_direccion'],
+                'empresa_representante' => $datos['empresa_representante'],
+                'curso_nombre'          => $datos['curso_nombre'],
+                'area_tematica'         => $datos['area_tematica'],
+                'duracion_horas'        => $datos['duracion_horas'],
+                'fecha_curso'           => $fechaFmt,
+                'capacidad'             => $datos['capacidad'],
+                'folio'                 => 'PART-00001',
+                'anio'                  => date('Y'),
+            ];
+
+            for ($pg = 1; $pg <= $totalPaginas; $pg++) {
+                $tpl = $pdf->importPage($pg);
+                $sz  = $pdf->getTemplateSize($tpl);
+                $pdf->AddPage(($sz['width'] > $sz['height']) ? 'L' : 'P', [$sz['width'], $sz['height']]);
+                $pdf->useTemplate($tpl, 0, 0, $sz['width'], $sz['height']);
+
+                foreach ($campos as $campo) {
+                    $nombreCampo = $campo['campo'] ?? '';
+                    $pagCampo    = (int)($campo['pagina'] ?? 1);
+                    if (!$nombreCampo || $pagCampo !== $pg) continue;
+
+                    $x       = (float)($campo['x']      ?? 0);
+                    $y       = (float)($campo['y']      ?? 0);
+                    $tamano  = (int)  ($campo['tamano'] ?? 10);
+                    $negrita = !empty($campo['negrita']) ? 'B' : '';
+                    $ancho   = (float)($campo['ancho']  ?? 0);
+                    $color   = str_pad($campo['color'] ?? '000000', 6, '0', STR_PAD_LEFT);
+                    $fuente  = ['Helvetica'=>'Helvetica','Times'=>'Times','Courier'=>'Courier'][$campo['fuente']??''] ?? 'Helvetica';
+
+                    [$r, $g, $b] = sscanf($color, '%02x%02x%02x');
+                    $pdf->SetTextColor($r ?? 0, $g ?? 0, $b ?? 0);
+
+                    $valor = (string)($valores[$nombreCampo] ?? '');
+                    if ($valor === '') continue;
+
+                    $pdf->SetFont($fuente, $negrita, $tamano);
+                    $pdf->SetXY($x, $y);
+                    $pdf->Cell($ancho ?: 0, 0, $valor, 0, 0, '');
+                }
+            }
+
+            $pdf->Output('F', $rufaPdf);
+            return ['status' => 'success', 'url' => UPLOAD_URL . 'personal/docs/' . basename($rufaPdf)];
+
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => 'Error generando vista previa: ' . $e->getMessage()];
+        }
+    }
+
     // ── Vista previa de plantilla PDF con datos reales ──────
     public function previsualizarPdf(int $tipoId, string $docTipo, array $campos): array {
         $stmt = $this->pdo->prepare(

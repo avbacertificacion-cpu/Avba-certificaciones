@@ -189,6 +189,16 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->obtenerCamposPdf((int)($_GET['tipo_id'] ?? 0)));
 
+        case 'LISTAR_PLANTILLAS_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->listarPlantillasPersonal());
+
+        case 'OBTENER_CAMPOS_PDF_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->obtenerCamposPdfPersonal($_GET['tipo'] ?? ''));
+
         case 'LISTAR_SESIONES_ACCESORIOS':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -388,6 +398,35 @@ if ($method === 'POST') {
                 (int)($payload['tipo_id']  ?? 0),
                 (string)($payload['doc_tipo'] ?? 'cert'),
                 (array)($payload['campos']  ?? [])
+            ));
+
+        // ── Personal: plantillas PDF ─────────────────────────
+        case 'SUBIR_PLANTILLA_PDF_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->subirPlantillaPdfPersonal($_POST, $_FILES));
+
+        case 'GUARDAR_CAMPOS_PDF_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->guardarCamposPdfPersonal($payload));
+
+        case 'PREVISUALIZAR_PDF_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cert->previsualizarPdfPersonal(
+                (string)($payload['tipo']   ?? ''),
+                (array) ($payload['campos'] ?? [])
+            ));
+
+        case 'ENVIAR_DOC_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->enviarDocumento(
+                (int)   ($payload['id']     ?? 0),
+                (string)($payload['tipo']   ?? ''),
+                (string)($payload['correo'] ?? ''),
+                $usr['usuario']
             ));
 
         // ── Personal / Cursos ─────────────────────────────
