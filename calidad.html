@@ -1258,13 +1258,18 @@
         </tbody>
       </table>
     </div>
-    <div class="modal-footer" style="justify-content:space-between;gap:8px">
+    <div class="modal-footer" style="justify-content:space-between;gap:8px;flex-wrap:wrap">
       <button onclick="agregarCampoPdf()"
               style="padding:8px 16px;border:1.5px solid var(--azul);background:var(--azul-light);
                      color:var(--azul);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
         + Agregar campo
       </button>
-      <div style="display:flex;gap:8px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="btn-preview-pdf" onclick="previsualizarPdf()"
+                style="padding:8px 16px;border:1.5px solid #6d4c41;background:#fdf0eb;
+                       color:#6d4c41;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
+          &#128065; Previsualizar
+        </button>
         <button class="btn-nc-cancel" onclick="cerrarModalCamposPdf()">Cancelar</button>
         <button class="btn-save" onclick="guardarCamposPdf()" style="padding:9px 22px">Guardar</button>
       </div>
@@ -2830,6 +2835,40 @@ async function guardarCamposPdf() {
     }
   } catch (e) {
     alert("Error de conexión al guardar campos PDF.");
+  }
+}
+
+async function previsualizarPdf() {
+  if (!camposPdfLocal.length) {
+    alert("Agrega al menos un campo antes de previsualizar.");
+    return;
+  }
+  const btn = document.getElementById("btn-preview-pdf");
+  btn.disabled = true;
+  btn.textContent = "Generando…";
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "PREVISUALIZAR_PDF",
+        payload: {
+          tipo_id:  camposPdfTipoId,
+          doc_tipo: camposPdfDocTipo,
+          campos:   camposPdfLocal
+        }
+      })
+    });
+    const data = await res.json();
+    if (data.status === "success" && data.url) {
+      window.open(data.url + "?t=" + Date.now(), "_blank");
+    } else {
+      alert("Error: " + (data.message || "No se pudo generar la vista previa."));
+    }
+  } catch (e) {
+    alert("Error de conexión al generar vista previa.");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "&#128065; Previsualizar";
   }
 }
 

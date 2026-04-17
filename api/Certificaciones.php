@@ -1291,4 +1291,118 @@ HTML;
             $datos['id']       ?? null,
         ]);
     }
+
+    // ── Vista previa de plantilla PDF con datos reales ──────
+    public function previsualizarPdf(int $tipoId, string $docTipo, array $campos): array {
+        $stmt = $this->pdo->prepare(
+            "SELECT nombre, plantilla_cert_pdf, plantilla_dict_pdf FROM maquinaria_tipos WHERE id = ? LIMIT 1"
+        );
+        $stmt->execute([$tipoId]);
+        $tipo = $stmt->fetch();
+        if (!$tipo) return ['status' => 'error', 'message' => 'Tipo de equipo no encontrado.'];
+
+        $colPdf     = ($docTipo === 'dict') ? 'plantilla_dict_pdf' : 'plantilla_cert_pdf';
+        $archivoTpl = $tipo[$colPdf] ?? null;
+        if (empty($archivoTpl)) {
+            return ['status' => 'error', 'message' => 'No hay plantilla PDF configurada para este tipo. Súbela primero desde Calidad.'];
+        }
+
+        $rutaTpl = __DIR__ . '/../uploads/plantillas/' . $archivoTpl;
+        if (!file_exists($rutaTpl)) {
+            return ['status' => 'error', 'message' => "Plantilla '{$archivoTpl}' no encontrada en el servidor. Vuelve a subirla."];
+        }
+
+        // Primer registro real de ese tipo de equipo; si no hay, usar datos de ejemplo
+        $stmtEq = $this->pdo->prepare(
+            "SELECT * FROM equipos WHERE maquinaria = ? ORDER BY id ASC LIMIT 1"
+        );
+        $stmtEq->execute([$tipo['nombre']]);
+        $datos = $stmtEq->fetch() ?: [
+            'control'          => '00001-00001',
+            'cliente'          => 'CLIENTE DE EJEMPLO S.A. DE C.V.',
+            'direccion'        => 'AV. EJEMPLO 1234, COL. CENTRO, MONTERREY, N.L.',
+            'maquinaria'       => $tipo['nombre'],
+            'marca'            => 'MARCA DEMO',
+            'modelo'           => 'MODELO X',
+            'serie'            => 'SERIE-DEMO-0001',
+            'id_equipo'        => 'ID-DEMO-001',
+            'capacidad'        => '10 TON',
+            'fecha_inspeccion' => date('Y-m-d'),
+            'qr_codigo'        => '0000000001',
+        ];
+
+        try {
+            require_once __DIR__ . '/../lib/fpdi_loader.php';
+
+            $rutaDir = UPLOAD_DIR . 'certificados/';
+            if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
+
+            $sufijo  = strtoupper($docTipo === 'dict' ? 'DICT' : 'CERT');
+            $rutaPdf = $rutaDir . 'PREVIEW_' . $sufijo . '_tipo' . $tipoId . '.pdf';
+
+            $fpiDim = new \setasign\Fpdi\Fpdi();
+            $fpiDim->setSourceFile($rutaTpl);
+            $tplIdx = $fpiDim->importPage(1);
+            $size   = $fpiDim->getTemplateSize($tplIdx);
+            $orient = ($size['width'] > $size['height']) ? 'L' : 'P';
+            unset($fpiDim);
+
+            $pdf = new \setasign\Fpdi\Fpdi($orient, 'mm', [$size['width'], $size['height']]);
+            $pdf->SetAutoPageBreak(false);
+            $pdf->SetMargins(0, 0, 0);
+            $totalPaginas     = $pdf->setSourceFile($rutaTpl);
+            $valoresResueltos = $this->resolverValoresCampos($datos);
+
+            for ($p = 1; $p <= $totalPaginas; $p++) {
+                $tpl = $pdf->importPage($p);
+                $sz  = $pdf->getTemplateSize($tpl);
+                $pdf->AddPage(($sz['width'] > $sz['height']) ? 'L' : 'P', [$sz['width'], $sz['height']]);
+                $pdf->useTemplate($tpl, 0, 0, $sz['width'], $sz['height']);
+
+                foreach ($campos as $campo) {
+                    $nombreCampo = $campo['campo'] ?? '';
+                    $pagCampo    = (int)($campo['pagina'] ?? 1);
+                    if (!$nombreCampo || $pagCampo !== $p) continue;
+
+                    $x       = (float)($campo['x']      ?? 0);
+                    $y       = (float)($campo['y']      ?? 0);
+                    $tamano  = (int)  ($campo['tamano'] ?? 10);
+                    $negrita = !empty($campo['negrita']) ? 'B' : '';
+                    $ancho   = (float)($campo['ancho']  ?? 0);
+                    $color   = str_pad($campo['color'] ?? '000000', 6, '0', STR_PAD_LEFT);
+                    $fuente  = ['Helvetica' => 'Helvetica', 'Times' => 'Times', 'Courier' => 'Courier'][$campo['fuente'] ?? ''] ?? 'Helvetica';
+
+                    [$r, $g, $b] = sscanf($color, '%02x%02x%02x');
+                    $pdf->SetTextColor($r ?? 0, $g ?? 0, $b ?? 0);
+
+                    if ($nombreCampo === 'qr_imagen') {
+                        $qrCodigo = $valoresResueltos['qr_codigo'] ?? '';
+                        if ($qrCodigo) {
+                            $alto   = (float)($campo['alto'] ?? $ancho ?: 25);
+                            $qrUrl  = 'https://quickchart.io/qr?text=' . urlencode($qrCodigo) . '&size=300';
+                            $qrTmp  = sys_get_temp_dir() . '/avba_qr_prev_' . uniqid() . '.png';
+                            $qrData = @file_get_contents($qrUrl);
+                            if ($qrData) {
+                                file_put_contents($qrTmp, $qrData);
+                                $pdf->Image($qrTmp, $x, $y, $ancho ?: 25, $alto);
+                                @unlink($qrTmp);
+                            }
+                        }
+                    } else {
+                        $valor = (string)($valoresResueltos[$nombreCampo] ?? '');
+                        if ($valor === '') continue;
+                        $pdf->SetFont($fuente, $negrita, $tamano);
+                        $pdf->SetXY($x, $y);
+                        $pdf->Cell($ancho ?: 0, 0, $valor, 0, 0, '');
+                    }
+                }
+            }
+
+            $pdf->Output('F', $rutaPdf);
+            return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
+
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => 'Error generando vista previa: ' . $e->getMessage()];
+        }
+    }
 }

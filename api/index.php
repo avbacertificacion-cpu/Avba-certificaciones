@@ -380,6 +380,16 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->guardarCamposPdf($payload));
 
+        // Vista previa de plantilla PDF con datos del primer registro
+        case 'PREVISUALIZAR_PDF':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cert->previsualizarPdf(
+                (int)($payload['tipo_id']  ?? 0),
+                (string)($payload['doc_tipo'] ?? 'cert'),
+                (array)($payload['campos']  ?? [])
+            ));
+
         // ── Personal / Cursos ─────────────────────────────
         case 'GUARDAR_PARTICIPANTE':
             $usr = validarToken($pdo, $token);

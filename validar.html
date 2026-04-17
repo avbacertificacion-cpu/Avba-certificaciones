@@ -910,14 +910,7 @@ async function iniciarCamara() {
       { fps: 10, qrbox: { width: 220, height: 220 } },
       async (qrCode) => {
         await detenerCamara();
-        // Extraer código de 10 dígitos de la URL del QR si aplica
-        let codigo = qrCode;
-        const match = qrCode.match(/[?&](?:qr|id|code)=([^&]+)/i);
-        if (match) codigo = decodeURIComponent(match[1]);
-        // Quedarnos solo con los dígitos si hay más
-        const soloDigitos = codigo.replace(/\D/g, "").slice(0, 10);
-        if (soloDigitos.length === 10) codigo = soloDigitos;
-
+        const codigo = extraerCodigo(qrCode);
         document.getElementById("qr-input").value = codigo;
         validar();
       }
