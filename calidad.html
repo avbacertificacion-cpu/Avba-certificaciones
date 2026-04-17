@@ -894,9 +894,9 @@
 <div id="sec-acc-plantilla" class="wrap" style="display:none">
 
   <div style="font-size:13px;color:var(--texto-sub);margin-bottom:20px;line-height:1.6">
-    Sube una plantilla PDF de fondo para el <strong>Informe de Integridad Operativa</strong>.
-    El sistema superpondrá el contenido del informe sobre la plantilla.
-    Usa el botón <em>Previsualizar</em> para ver cómo quedará el informe con datos de ejemplo.
+    Configura la plantilla PDF y las coordenadas para el <strong>certificado individual de accesorio</strong>.
+    El sistema superpondrá los datos de cada accesorio inspeccionado sobre la plantilla.
+    El <em>Informe de Integridad Operativa</em> (tabla completa) se genera automáticamente al finalizar la sesión.
   </div>
 
   <div id="acc-plantilla-cont">
@@ -1313,6 +1313,53 @@
   </div>
 </div>
 
+
+<!-- ══ MODAL: CAMPOS PDF ACCESORIOS ══ -->
+<div class="overlay" id="overlay-campos-pdf-acc" onclick="if(event.target===this)cerrarModalCamposPdfAcc()">
+  <div class="modal" style="max-width:900px;width:95vw">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:#185FA5">A</div>
+        <div>
+          <div class="m-title">Campos PDF — Certificado de Accesorio</div>
+          <div class="m-sub">Coordenadas de posición en mm desde borde superior-izquierdo</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarModalCamposPdfAcc()">×</button>
+    </div>
+    <div style="padding:12px 16px 0;overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
+        <thead>
+          <tr style="background:var(--gris-bg);border-bottom:2px solid var(--borde)">
+            <th style="padding:8px 6px;text-align:left;min-width:140px">Campo</th>
+            <th style="padding:8px 6px;text-align:center;min-width:55px">Pág.</th>
+            <th style="padding:8px 6px;text-align:center;min-width:65px">X (mm)</th>
+            <th style="padding:8px 6px;text-align:center;min-width:65px">Y (mm)</th>
+            <th style="padding:8px 6px;text-align:center;min-width:100px">Fuente</th>
+            <th style="padding:8px 6px;text-align:center;min-width:55px">Tamaño</th>
+            <th style="padding:8px 6px;text-align:center;min-width:50px">Negrita</th>
+            <th style="padding:8px 6px;text-align:center;min-width:65px">Ancho</th>
+            <th style="padding:8px 6px;text-align:center;min-width:36px"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-campos-pdf-acc">
+          <tr><td colspan="9" style="text-align:center;padding:16px;color:var(--texto-hint)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <button onclick="agregarCampoPdfAcc()"
+              style="padding:8px 16px;border:1.5px solid var(--azul);background:var(--azul-light);
+                     color:var(--azul);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
+        + Agregar campo
+      </button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn-nc-cancel" onclick="cerrarModalCamposPdfAcc()">Cancelar</button>
+        <button class="btn-save" onclick="guardarCamposPdfAcc()" style="padding:9px 22px">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ══ MODAL: CAMPOS PDF PERSONAL ══ -->
 <div class="overlay" id="overlay-campos-pdf-per" onclick="if(event.target===this)cerrarModalCamposPdfPer()">
@@ -3215,16 +3262,18 @@ async function cargarPlantillaAccesorios() {
 function renderPlantillaAccCard(tpl) {
   const tieneArchivo = !!tpl.plantilla_pdf;
   const nombreArchivo = tieneArchivo ? tpl.plantilla_pdf.split("/").pop() : "";
+  const nCampos = Array.isArray(tpl.pdf_campos) ? tpl.pdf_campos.length : 0;
   return `
   <div class="tipo-card" style="border-radius:var(--radio-lg)">
     <div style="padding:16px 20px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--borde)">
-      <span style="font-size:28px">📋</span>
+      <span style="font-size:28px">📜</span>
       <div style="flex:1">
-        <div style="font-size:15px;font-weight:700;color:var(--texto)">Informe de Integridad Operativa</div>
+        <div style="font-size:15px;font-weight:700;color:var(--texto)">Certificado individual de accesorio</div>
         <div style="font-size:12px;color:var(--texto-sub);margin-top:2px">
           ${tieneArchivo
-            ? `<span style="color:var(--verde)">✓ ${esc(nombreArchivo)}</span> — plantilla de fondo activa`
-            : `<span style="color:var(--texto-hint)">Sin plantilla de fondo — se usa diseño predeterminado</span>`}
+            ? `<span style="color:var(--verde)">✓ ${esc(nombreArchivo)}</span>`
+            : `<span style="color:var(--texto-hint)">Sin plantilla PDF</span>`}
+          &nbsp;·&nbsp; ${nCampos} campo${nCampos !== 1 ? "s" : ""} configurado${nCampos !== 1 ? "s" : ""}
         </div>
       </div>
     </div>
@@ -3236,12 +3285,17 @@ function renderPlantillaAccCard(tpl) {
         <input type="file" accept=".pdf" style="display:none"
                onchange="subirPlantillaAcc(event)">
       </label>
-      <button onclick="previsualizarInformeAcc(this)"
-              style="padding:7px 14px;border-radius:var(--radio);border:1.5px solid #854F0B;
-                     color:#854F0B;font-size:12px;font-weight:600;background:#FAEEDA;cursor:pointer">
-        👁 Previsualizar informe
+      <button onclick="abrirModalCamposPdfAcc()"
+              style="padding:7px 14px;border-radius:var(--radio);border:1.5px solid var(--azul);
+                     color:var(--azul);font-size:12px;font-weight:600;background:white;cursor:pointer">
+        ⚙ Configurar campos
       </button>
       ${tieneArchivo ? `
+      <button onclick="previsualizarCertAcc(this)"
+              style="padding:7px 14px;border-radius:var(--radio);border:1.5px solid #854F0B;
+                     color:#854F0B;font-size:12px;font-weight:600;background:#FAEEDA;cursor:pointer">
+        👁 Previsualizar certificado
+      </button>
       <button onclick="eliminarPlantillaAcc()"
               style="padding:7px 14px;border-radius:var(--radio);border:1.5px solid var(--rojo);
                      color:var(--rojo);font-size:12px;font-weight:600;background:var(--rojo-light);cursor:pointer">
@@ -3249,9 +3303,9 @@ function renderPlantillaAccCard(tpl) {
       </button>` : ""}
     </div>
     <div style="padding:0 20px 16px;font-size:11.5px;color:var(--texto-hint);line-height:1.6">
-      La plantilla PDF se usa como fondo de página. El contenido del informe (encabezado, tabla de
-      accesorios, firmas) se superpone automáticamente. Si no hay plantilla, se genera con el
-      diseño AVBA estándar.
+      Sube un PDF como plantilla de fondo y configura las coordenadas donde se imprimirá cada campo
+      del accesorio. El <strong>Informe de Integridad Operativa</strong> (tabla completa) se genera
+      automáticamente al finalizar la sesión en el panel del inspector.
     </div>
   </div>`;
 }
@@ -3295,7 +3349,111 @@ async function eliminarPlantillaAcc() {
   }
 }
 
-async function previsualizarInformeAcc(btn) {
+/* ── Modal: configurar campos PDF del certificado de accesorio ── */
+let camposPdfAccLocal = [];
+
+const CAMPOS_ACC_DISPONIBLES = [
+  "id_accesorio","tipo","marca","modelo","serie",
+  "capacidad","medidas","estado",
+  "cliente","fecha_inspeccion","inspector","folio"
+];
+
+async function abrirModalCamposPdfAcc() {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    const res  = await fetch(`${API}?action=OBTENER_CAMPOS_PDF_ACC&token=${s.token||""}`);
+    const data = await res.json();
+    camposPdfAccLocal = data.status === "success" ? (data.pdf_campos || []) : [];
+  } catch {
+    camposPdfAccLocal = [];
+  }
+  renderTablaCamposPdfAcc(camposPdfAccLocal);
+  document.getElementById("overlay-campos-pdf-acc").classList.add("open");
+}
+
+function cerrarModalCamposPdfAcc() {
+  document.getElementById("overlay-campos-pdf-acc").classList.remove("open");
+}
+
+function renderTablaCamposPdfAcc(campos) {
+  const tbody = document.getElementById("tbody-campos-pdf-acc");
+  if (!campos.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:16px;color:var(--texto-hint)">
+      Sin campos configurados. Usa "+ Agregar campo" para añadir.
+    </td></tr>`;
+    return;
+  }
+  tbody.innerHTML = campos.map((c, i) => `
+    <tr>
+      <td>
+        <select onchange="actualizarCampoPdfAcc(${i},'campo',this.value)" style="width:100%;font-size:12px;padding:3px">
+          ${CAMPOS_ACC_DISPONIBLES.map(f => `<option value="${f}" ${c.campo===f?'selected':''}>${f}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" value="${c.pagina||1}" min="1" style="width:50px;font-size:12px;padding:3px"
+                 onchange="actualizarCampoPdfAcc(${i},'pagina',+this.value)"></td>
+      <td><input type="number" value="${c.x||0}" step="0.1" style="width:60px;font-size:12px;padding:3px"
+                 onchange="actualizarCampoPdfAcc(${i},'x',+this.value)"></td>
+      <td><input type="number" value="${c.y||0}" step="0.1" style="width:60px;font-size:12px;padding:3px"
+                 onchange="actualizarCampoPdfAcc(${i},'y',+this.value)"></td>
+      <td>
+        <select onchange="actualizarCampoPdfAcc(${i},'fuente',this.value)" style="width:90px;font-size:12px;padding:3px">
+          ${['Helvetica','Times','Courier'].map(f=>`<option value="${f}" ${(c.fuente||'Helvetica')===f?'selected':''}>${f}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" value="${c.tamano||11}" min="6" max="72" style="width:50px;font-size:12px;padding:3px"
+                 onchange="actualizarCampoPdfAcc(${i},'tamano',+this.value)"></td>
+      <td style="text-align:center">
+        <input type="checkbox" ${c.negrita?'checked':''} onchange="actualizarCampoPdfAcc(${i},'negrita',this.checked)">
+      </td>
+      <td><input type="number" value="${c.ancho||0}" min="0" step="0.5" style="width:55px;font-size:12px;padding:3px"
+                 onchange="actualizarCampoPdfAcc(${i},'ancho',+this.value)"></td>
+      <td style="text-align:center">
+        <button onclick="eliminarCampoPdfAcc(${i})"
+                style="background:none;border:none;color:var(--rojo);cursor:pointer;font-size:16px;line-height:1">×</button>
+      </td>
+    </tr>`).join('');
+}
+
+function actualizarCampoPdfAcc(idx, campo, valor) {
+  if (camposPdfAccLocal[idx]) camposPdfAccLocal[idx][campo] = valor;
+}
+
+function agregarCampoPdfAcc() {
+  camposPdfAccLocal.push({ campo:"id_accesorio", pagina:1, x:0, y:0, fuente:"Helvetica", tamano:11, negrita:false, ancho:0 });
+  renderTablaCamposPdfAcc(camposPdfAccLocal);
+}
+
+function eliminarCampoPdfAcc(idx) {
+  camposPdfAccLocal.splice(idx, 1);
+  renderTablaCamposPdfAcc(camposPdfAccLocal);
+}
+
+async function guardarCamposPdfAcc() {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Token": s.token || "" },
+      body: JSON.stringify({ action: "GUARDAR_CAMPOS_PDF_ACC", payload: { campos: camposPdfAccLocal } })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      cerrarModalCamposPdfAcc();
+      cargarPlantillaAccesorios();
+    } else {
+      alert("Error: " + (data.message || "No se pudieron guardar los campos"));
+    }
+  } catch (e) {
+    alert("Error de conexión al guardar campos PDF.");
+  }
+}
+
+async function previsualizarCertAcc(btn) {
+  if (!camposPdfAccLocal.length) {
+    alert("Configura al menos un campo antes de previsualizar.");
+    return;
+  }
   btn.disabled = true;
   btn.textContent = "Generando…";
   try {
@@ -3303,7 +3461,7 @@ async function previsualizarInformeAcc(btn) {
     const res = await fetch(API, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Token": s.token || "" },
-      body: JSON.stringify({ action: "PREVISUALIZAR_INFORME_ACC", payload: {} })
+      body: JSON.stringify({ action: "PREVISUALIZAR_CERT_ACC", payload: { campos: camposPdfAccLocal } })
     });
     const data = await res.json();
     if (data.status === "success" && data.url) {
@@ -3315,7 +3473,7 @@ async function previsualizarInformeAcc(btn) {
     alert("Error de conexión al generar vista previa.");
   } finally {
     btn.disabled = false;
-    btn.innerHTML = "&#128065; Previsualizar informe";
+    btn.innerHTML = "&#128065; Previsualizar certificado";
   }
 }
 

@@ -214,6 +214,11 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->obtenerPlantillaAcc());
 
+        case 'OBTENER_CAMPOS_PDF_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->obtenerCamposPdfAcc());
+
         default:
             respuesta(['status' => 'error', 'message' => "Acción GET desconocida: {$action}"], 400);
     }
@@ -508,6 +513,16 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->eliminarPlantillaAcc());
+
+        case 'GUARDAR_CAMPOS_PDF_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->guardarCamposPdfAcc($payload));
+
+        case 'PREVISUALIZAR_CERT_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->previsualizarCertAcc($payload));
 
         case 'PREVISUALIZAR_INFORME_ACC':
             $usr = validarToken($pdo, $token);

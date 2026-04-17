@@ -2087,6 +2087,14 @@
         <div class="cur-exito-icon">✓</div>
         <div class="cur-exito-titulo">Sesión finalizada</div>
         <div class="cur-exito-sub" id="iza-exito-sub">Accesorios registrados correctamente.</div>
+        <div id="iza-informe-row" style="display:none;margin:14px 0 4px">
+          <a id="iza-informe-link" href="#" target="_blank"
+             style="display:inline-block;padding:10px 22px;border-radius:8px;
+                    background:#185FA5;color:#fff;font-size:13px;font-weight:600;
+                    text-decoration:none">
+            📄 Descargar Informe PDF
+          </a>
+        </div>
         <button class="cur-nuevo-btn" onclick="izaNuevo()">Registrar nueva sesión</button>
       </div>
     </div>
@@ -3847,10 +3855,34 @@ function izaLimpiarForm() {
 }
 
 // ── Finalizar sesión ──────────────────────────────────
-function izaFinalizar() {
-  const n = izaAccesorios.length;
-  document.getElementById('iza-exito-sub').textContent =
-    `${n} accesorio${n !== 1 ? 's' : ''} de "${izaSesionInfo?.cliente || ''}" registrado${n !== 1 ? 's' : ''} correctamente.`;
+async function izaFinalizar() {
+  const n   = izaAccesorios.length;
+  const btn = document.getElementById('iza-btn-finalizar');
+  btn.disabled = true;
+  btn.textContent = 'Generando informe…';
+
+  const sub = document.getElementById('iza-exito-sub');
+  sub.textContent = `${n} accesorio${n !== 1 ? 's' : ''} de "${izaSesionInfo?.cliente || ''}" registrado${n !== 1 ? 's' : ''} correctamente.`;
+
+  // Generar informe PDF automáticamente
+  try {
+    const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res = await fetch(WEB_APP_URL, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body:    JSON.stringify({ action: 'GENERAR_INFORME_ACCESORIOS', payload: { sesion_id: izaSesionId } })
+    });
+    const data = await res.json();
+    if (data.status === 'success' && data.url) {
+      document.getElementById('iza-informe-link').href = data.url;
+      document.getElementById('iza-informe-row').style.display = 'block';
+    }
+  } catch (e) {
+    // El informe no bloqueará el flujo — solo no se mostrará el link
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✓ Finalizar sesión';
   izaMostrar('exito');
 }
 
@@ -3861,6 +3893,8 @@ function izaNuevo() {
   izaAccesorios = [];
   izaFotos      = [];
   izaEstadoVal  = 'CUMPLE';
+  document.getElementById('iza-informe-row').style.display = 'none';
+  document.getElementById('iza-informe-link').href = '#';
   izaIniciar();
 }
 </script>

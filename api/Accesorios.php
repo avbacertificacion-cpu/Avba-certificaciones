@@ -227,8 +227,11 @@ class Accesorios {
     // ── Obtener config de plantilla de fondo ──────────────
     public function obtenerPlantillaAcc(): array {
         $this->ensurePlantillaAccTable();
-        $row = $this->pdo->query("SELECT plantilla_pdf FROM acc_plantilla_informe WHERE id = 1")->fetch();
-        return ['status' => 'success', 'data' => ['plantilla_pdf' => $row['plantilla_pdf'] ?? null]];
+        $row = $this->pdo->query("SELECT plantilla_pdf, pdf_campos FROM acc_plantilla_informe WHERE id = 1")->fetch();
+        return ['status' => 'success', 'data' => [
+            'plantilla_pdf' => $row['plantilla_pdf'] ?? null,
+            'pdf_campos'    => json_decode($row['pdf_campos'] ?? '[]', true) ?: [],
+        ]];
     }
 
     // ── Subir plantilla PDF de fondo ──────────────────────
@@ -307,16 +310,101 @@ class Accesorios {
         return ['status' => 'success', 'url' => 'uploads/reportes/' . $nombre];
     }
 
+    // ── Obtener campos de coordenadas del certificado ─────
+    public function obtenerCamposPdfAcc(): array {
+        $this->ensurePlantillaAccTable();
+        $row = $this->pdo->query("SELECT pdf_campos FROM acc_plantilla_informe WHERE id = 1")->fetch();
+        $campos = json_decode($row['pdf_campos'] ?? '[]', true) ?: [];
+        return ['status' => 'success', 'pdf_campos' => $campos];
+    }
+
+    // ── Guardar campos de coordenadas del certificado ─────
+    public function guardarCamposPdfAcc(array $payload): array {
+        $this->ensurePlantillaAccTable();
+        $campos  = $payload['campos'] ?? [];
+        $decoded = is_string($campos) ? json_decode($campos, true) : $campos;
+        if (!is_array($decoded))
+            return ['status' => 'error', 'message' => 'campos debe ser un array JSON.'];
+
+        $this->pdo->prepare("UPDATE acc_plantilla_informe SET pdf_campos = ? WHERE id = 1")
+            ->execute([json_encode($decoded, JSON_UNESCAPED_UNICODE)]);
+        return ['status' => 'success', 'message' => 'Campos guardados.'];
+    }
+
+    // ── Previsualizar certificado con FPDI ────────────────
+    public function previsualizarCertAcc(array $payload): array {
+        $this->ensurePlantillaAccTable();
+        $row = $this->pdo->query("SELECT plantilla_pdf, pdf_campos FROM acc_plantilla_informe WHERE id = 1")->fetch();
+
+        $campos = $payload['campos']
+            ?? (json_decode($row['pdf_campos'] ?? '[]', true) ?: []);
+
+        $rutaTpl = $row['plantilla_pdf']
+            ? __DIR__ . '/../uploads/plantillas/' . $row['plantilla_pdf']
+            : null;
+
+        if (!$rutaTpl || !file_exists($rutaTpl)) {
+            return ['status' => 'error', 'message' => 'Primero sube una plantilla PDF para el certificado.'];
+        }
+        if (!$campos) {
+            return ['status' => 'error', 'message' => 'Configura al menos un campo antes de previsualizar.'];
+        }
+        if (!class_exists('setasign\Fpdi\Fpdi')) {
+            return ['status' => 'error', 'message' => 'Librería FPDI no disponible en el servidor.'];
+        }
+
+        $dummy = [
+            'id_accesorio'     => 'A-001',
+            'tipo'             => 'Eslinga de Banda',
+            'marca'            => 'Certex',
+            'modelo'           => 'EW-60',
+            'serie'            => 'CB2024-0112',
+            'capacidad'        => '3 Ton',
+            'medidas'          => '60 mm × 4 m',
+            'estado'           => 'APTO',
+            'cliente'          => 'Empresa Ejemplo S.A. de C.V.',
+            'fecha_inspeccion' => date('d/m/Y'),
+            'inspector'        => 'Inspector Demo',
+            'folio'            => 'CERT-ACC-00001',
+        ];
+
+        $pdf = new \setasign\Fpdi\Fpdi();
+        $pdf->setSourceFile($rutaTpl);
+        $tplIdx = $pdf->importPage(1);
+        $sz = $pdf->getTemplateSize($tplIdx);
+        $pdf->AddPage($sz['width'] > $sz['height'] ? 'L' : 'P', [$sz['width'], $sz['height']]);
+        $pdf->useTemplate($tplIdx);
+
+        foreach ($campos as $c) {
+            $val = $dummy[$c['campo']] ?? '';
+            $pdf->SetFont($c['fuente'] ?? 'Helvetica', $c['negrita'] ? 'B' : '', $c['tamano'] ?? 11);
+            $pdf->SetXY($c['x'] ?? 0, $c['y'] ?? 0);
+            $pdf->Cell($c['ancho'] ?? 0, 0, $val);
+        }
+
+        $dir = __DIR__ . '/../uploads/reportes/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+        $nombre = 'PREVIEW_CERT_ACC.pdf';
+        $pdf->Output('F', $dir . $nombre);
+
+        return ['status' => 'success', 'url' => 'uploads/reportes/' . $nombre];
+    }
+
     private function ensurePlantillaAccTable(): void {
         $this->pdo->exec("
             CREATE TABLE IF NOT EXISTS acc_plantilla_informe (
-              id           TINYINT UNSIGNED NOT NULL DEFAULT 1,
-              plantilla_pdf VARCHAR(500) NULL,
-              actualizado  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              id            TINYINT UNSIGNED NOT NULL DEFAULT 1,
+              plantilla_pdf VARCHAR(500)     NULL,
+              pdf_campos    JSON             NULL,
+              actualizado   TIMESTAMP        DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
               PRIMARY KEY (id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
         $this->pdo->exec("INSERT IGNORE INTO acc_plantilla_informe (id) VALUES (1)");
+        // Add pdf_campos column if upgrading from previous version
+        try {
+            $this->pdo->exec("ALTER TABLE acc_plantilla_informe ADD COLUMN IF NOT EXISTS pdf_campos JSON NULL");
+        } catch (\PDOException $e) { /* column already exists */ }
     }
 
     // ── Generar informe PDF de una sesión ──────────────────
