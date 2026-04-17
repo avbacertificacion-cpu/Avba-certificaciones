@@ -1124,11 +1124,8 @@
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Estado</label>
         <select id="edit-acc-estado" style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
-          <option value="APTO">APTO</option>
-          <option value="CONDICIONADO">CONDICIONADO</option>
-          <option value="NO APTO">NO APTO</option>
-          <option value="CUMPLE">CUMPLE</option>
-          <option value="NO CUMPLE">NO CUMPLE</option>
+          <option value="CUMPLE">Cumple</option>
+          <option value="NO CUMPLE">No cumple</option>
         </select>
       </div>
     </div>
@@ -2494,10 +2491,9 @@ function cerrarDetAccSesion() {
 
 /* ── Helpers de estado ── */
 function estadoBadgeStyle(estado) {
-  const e = (estado||'').toUpperCase();
-  if (e === 'APTO'   || e === 'CUMPLE')    return 'background:var(--verde-light);color:var(--verde)';
-  if (e === 'NO APTO'|| e === 'NO CUMPLE') return 'background:var(--rojo-light);color:var(--rojo)';
-  return 'background:var(--ambar-light);color:var(--ambar)';
+  return (estado||'').toUpperCase() === 'CUMPLE'
+    ? 'background:var(--verde-light);color:var(--verde)'
+    : 'background:var(--rojo-light);color:var(--rojo)';
 }
 
 /* ── Editar accesorio ── */

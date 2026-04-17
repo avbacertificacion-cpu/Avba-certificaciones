@@ -238,9 +238,8 @@ class Accesorios {
 
         if ($id <= 0) return ['status' => 'error', 'message' => 'id requerido.'];
 
-        $estadosValidos = ['APTO','CONDICIONADO','NO APTO','CUMPLE','NO CUMPLE'];
-        if ($estado && !in_array($estado, $estadosValidos, true))
-            return ['status' => 'error', 'message' => 'Estado no válido.'];
+        if ($estado && !in_array($estado, ['CUMPLE','NO CUMPLE'], true))
+            return ['status' => 'error', 'message' => 'Estado no válido. Use CUMPLE o NO CUMPLE.'];
 
         $chk = $this->pdo->prepare("SELECT id FROM accesorios_izaje WHERE id = ?");
         $chk->execute([$id]);
