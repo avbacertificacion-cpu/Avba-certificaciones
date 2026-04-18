@@ -149,20 +149,21 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 </div>
 
 <script>
-// ── Fetch interceptor ──────────────────────────────────────────────────────
+// ── Fetch interceptor (usa mismo avba_session que los demás módulos) ────────
 const _origFetch = window.fetch.bind(window);
 window.fetch = function(url, opts = {}) {
-  const t = localStorage.getItem('token');
-  if (t) {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const t = s.token || '';
+  if (t && typeof url === 'string' && url.includes('api/index.php')) {
     if (!opts.method || opts.method.toUpperCase() === 'GET') {
       opts.headers = Object.assign({}, opts.headers || {}, {
         'Authorization': 'Bearer ' + t,
         'X-Token': t
       });
     } else {
-      if (opts.body && typeof opts.body === 'string') {
+      if (!(opts.body instanceof FormData)) {
         try {
-          const b = JSON.parse(opts.body);
+          const b = JSON.parse(opts.body || '{}');
           if (!b.token) { b.token = t; opts.body = JSON.stringify(b); }
         } catch(_) {}
       }
@@ -174,9 +175,10 @@ window.fetch = function(url, opts = {}) {
 const API = 'api/index.php';
 
 // ── Session guard ──────────────────────────────────────────────────────────
-const _tok = localStorage.getItem('token');
-const _rol = localStorage.getItem('rol');
-if (!_tok || _rol !== 'CLIENTE') { localStorage.clear(); location.href = 'login.html'; }
+const _sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
+if (!_sesion.token) { location.href = 'login.html'; }
+// Solo CLIENTE y ADMIN pueden acceder a esta vista
+if (!['CLIENTE', 'ADMIN'].includes(_sesion.rol)) { location.href = 'login.html'; }
 
 // ── Tab switching ──────────────────────────────────────────────────────────
 function verTab(id, btn) {
@@ -195,7 +197,7 @@ function verQR(folio, qrUrl) {
 function cerrarQR() { document.getElementById('qr-overlay').classList.remove('open'); }
 
 // ── Logout ─────────────────────────────────────────────────────────────────
-function cerrarSesion() { localStorage.clear(); location.href = 'login.html'; }
+function cerrarSesion() { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
 
 // ── Badge ──────────────────────────────────────────────────────────────────
 // PHP devuelve: vigente(bool) y dias(int) para maquinaria; cumple/no_cumple para accesorios
@@ -330,7 +332,7 @@ async function cargarDatos() {
     const res  = await fetch(API, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'OBTENER_DATOS_CLIENTE'}) });
     const json = await res.json();
     if (json.status !== 'success') throw new Error(json.message || 'Error al cargar datos');
-    document.getElementById('hdr-nombre').textContent = localStorage.getItem('nombre') || json.nombre_cliente || '—';
+    document.getElementById('hdr-nombre').textContent = _sesion.nombre || json.nombre_cliente || '—';
     renderMaquinaria(json.equipos    || []);
     renderAccesorios(json.accesorios || []);
     renderPersonal(json.personal     || []);
