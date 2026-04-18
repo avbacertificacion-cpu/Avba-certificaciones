@@ -194,67 +194,70 @@ function cerrarQR() { document.getElementById('qr-overlay').classList.remove('op
 // ── Logout ─────────────────────────────────────────────────────────────────
 function cerrarSesion() { localStorage.clear(); location.href = 'login.html'; }
 
-// ── Vigencia bar ───────────────────────────────────────────────────────────
-function vigenciaBar(fechaInicio, meses) {
-  if (!fechaInicio || !meses) return '';
-  const inicio = new Date(fechaInicio);
-  const fin = new Date(inicio);
-  fin.setMonth(fin.getMonth() + parseInt(meses, 10));
-  const hoy = new Date();
-  const pct = Math.min(100, Math.max(0, Math.round(((hoy - inicio) / (fin - inicio)) * 100)));
-  const diasRest = Math.max(0, Math.round((fin - hoy) / 86400000));
-  const vencido = hoy > fin;
-  const color = vencido ? 'var(--rojo)' : pct < 60 ? 'var(--verde)' : pct < 85 ? 'var(--ambar)' : 'var(--rojo)';
+// ── Badge ──────────────────────────────────────────────────────────────────
+// PHP devuelve: vigente(bool) y dias(int) para maquinaria; cumple/no_cumple para accesorios
+function badgeVigencia(vigente, dias) {
+  if (dias === null || dias === undefined) return '<span class="badge">Sin fecha</span>';
+  if (!vigente) return '<span class="badge b-vencido">⚠ VENCIDA</span>';
+  if (dias <= 30) return `<span class="badge b-vence">Por vencer (${dias}d)</span>`;
+  return `<span class="badge b-vigente">Vigente</span>`;
+}
+
+// ── Vigencia bar (usa datos precalculados por PHP) ─────────────────────────
+function vigenciaBar(dias, vencimiento, vigente) {
+  if (dias === null || dias === undefined || !vencimiento) return '';
+  const pct = vigente ? Math.max(5, 100 - Math.round((dias / 365) * 100)) : 100;
+  const color = !vigente ? 'var(--rojo)' : dias <= 30 ? 'var(--ambar)' : 'var(--verde)';
   return `<div class="vig-wrap">
     <div class="vig-hdr">
       <span class="vig-lbl">Vigencia</span>
-      <span class="vig-dias" style="color:${color}">${vencido ? '⚠ VENCIDA' : diasRest + ' días'}</span>
+      <span class="vig-dias" style="color:${color}">${vigente ? dias + ' días restantes' : '⚠ VENCIDA'}</span>
     </div>
     <div class="vig-track"><div class="vig-fill" style="width:${pct}%;background:${color}"></div></div>
-    <div style="font-size:11px;color:var(--texto-hint);margin-top:3px;text-align:right">Vence: ${fin.toLocaleDateString('es-MX')}</div>
+    <div style="font-size:11px;color:var(--texto-hint);margin-top:3px;text-align:right">Vence: ${vencimiento}</div>
   </div>`;
 }
 
-// ── Badge ──────────────────────────────────────────────────────────────────
-function badge(estado) {
-  const cls = {
-    'VIGENTE':'b-vigente','EMITIDO':'b-vigente','CUMPLE':'b-cumple',
-    'POR VENCER':'b-vence','VENCIDO':'b-vencido','SUSPENDIDO':'b-vencido',
-    'NO_CUMPLE':'b-nocumple','NO CUMPLE':'b-nocumple'
-  };
-  return `<span class="badge ${cls[estado]||''}">${estado||'—'}</span>`;
-}
-
 // ── Render Maquinaria ──────────────────────────────────────────────────────
+// PHP retorna: folio, maquinaria, marca, modelo, serie, id_equipo,
+//              fecha, vencimiento, dias, vigente, link_cert, link_dict, qr_url
 function renderMaquinaria(data) {
-  const load = document.getElementById('maq-load');
+  document.getElementById('maq-load').style.display = 'none';
   const cont = document.getElementById('maq-cont');
-  load.style.display = 'none';
   if (!data || !data.length) {
-    cont.innerHTML = '<div class="empty"><div class="empty-t">Sin maquinaria registrada</div><div class="empty-s">No hay equipos asociados a esta cuenta.</div></div>';
+    cont.innerHTML = '<div class="empty"><div class="empty-t">Sin maquinaria registrada</div><div class="empty-s">No hay equipos certificados asociados a esta cuenta.</div></div>';
     cont.style.display = 'block';
     return;
   }
   document.getElementById('s-eq').textContent = data.length;
   let html = '<div class="cards-grid">';
   data.forEach(eq => {
+    const vigBadge = badgeVigencia(eq.vigente, eq.dias);
+    let footer = '';
+    if (eq.link_cert || eq.link_dict || eq.qr_url) {
+      footer = '<div class="card-footer">';
+      if (eq.link_cert) footer += `<a class="btn-doc btn-cert" href="${eq.link_cert}" target="_blank">📄 Certificado</a>`;
+      if (eq.link_dict) footer += `<a class="btn-doc btn-dict" href="${eq.link_dict}" target="_blank">📋 Dictamen</a>`;
+      if (eq.qr_url)    footer += `<button class="btn-doc btn-qr" onclick="verQR('${eq.folio}','${eq.qr_url}')">🔗 QR</button>`;
+      footer += '</div>';
+    }
     html += `<div class="card">
       <div class="card-top">
         <div class="card-icon">🔧</div>
         <div style="flex:1">
-          <div class="card-folio">${eq.control || '—'}</div>
-          <div class="card-nombre">${eq.descripcion || eq.tipo || 'Equipo'}</div>
-          <div class="card-serie">${eq.numero_serie ? 'S/N: ' + eq.numero_serie : ''}</div>
+          <div class="card-folio">${eq.folio || '—'}</div>
+          <div class="card-nombre">${eq.maquinaria || '—'}</div>
+          <div class="card-serie">${eq.serie ? 'S/N: ' + eq.serie : ''}</div>
         </div>
-        ${badge(eq.estatus)}
+        ${vigBadge}
       </div>
       <div class="card-body">
         <div class="info-row"><span class="info-key">Marca / Modelo</span><span class="info-val">${eq.marca || '—'}${eq.modelo ? ' / ' + eq.modelo : ''}</span></div>
-        <div class="info-row"><span class="info-key">Capacidad</span><span class="info-val">${eq.capacidad || '—'}</span></div>
-        <div class="info-row"><span class="info-key">Fecha inspección</span><span class="info-val">${eq.fecha_inspeccion || eq.fecha || '—'}</span></div>
-        ${vigenciaBar(eq.fecha_inspeccion || eq.fecha, eq.vigencia_meses || 12)}
+        <div class="info-row"><span class="info-key">No. Equipo</span><span class="info-val">${eq.id_equipo || '—'}</span></div>
+        <div class="info-row"><span class="info-key">Fecha inspección</span><span class="info-val">${eq.fecha || '—'}</span></div>
+        ${vigenciaBar(eq.dias, eq.vencimiento, eq.vigente)}
       </div>
-      ${eq.pdf_url ? `<div class="card-footer"><a class="btn-doc btn-cert" href="${eq.pdf_url}" target="_blank">📄 Ver certificado</a></div>` : ''}
+      ${footer}
     </div>`;
   });
   html += '</div>';
@@ -263,28 +266,25 @@ function renderMaquinaria(data) {
 }
 
 // ── Render Accesorios ──────────────────────────────────────────────────────
+// PHP retorna: id, folio, fecha, total, cumple, no_cumple
 function renderAccesorios(data) {
   const cont = document.getElementById('acc-cont');
   if (!data || !data.length) {
-    cont.innerHTML = '<div class="empty"><div class="empty-t">Sin accesorios registrados</div><div class="empty-s">No hay sesiones de accesorios asociadas.</div></div>';
+    cont.innerHTML = '<div class="empty"><div class="empty-t">Sin accesorios registrados</div><div class="empty-s">No hay sesiones de accesorios emitidas.</div></div>';
     return;
   }
   document.getElementById('s-acc').textContent = data.length;
   let html = '<div class="acc-grid">';
   data.forEach(ses => {
-    const accs = ses.accesorios || [];
-    const cumple   = accs.filter(a => (a.estado||'').toUpperCase() === 'CUMPLE').length;
-    const noCumple = accs.filter(a => (a.estado||'').toUpperCase() !== 'CUMPLE').length;
     html += `<div class="acc-card">
-      <div class="acc-folio">${ses.folio || ses.control || ses.id || '—'}</div>
+      <div class="acc-folio">${ses.folio || '—'}</div>
       <div class="acc-fecha">${ses.fecha || '—'}</div>
-      <div style="font-size:12px;color:var(--texto-sub);margin-bottom:8px">Inspector: ${ses.inspector || '—'} &bull; ${accs.length} accesorio${accs.length!==1?'s':''}</div>
+      <div style="font-size:12px;color:var(--texto-sub);margin-bottom:10px">${ses.total || 0} accesorio${ses.total!==1?'s':''} inspeccionados</div>
       <div class="acc-badges">
-        ${cumple ? `<span class="badge b-cumple">✔ ${cumple} CUMPLE</span>` : ''}
-        ${noCumple ? `<span class="badge b-nocumple">✖ ${noCumple} NO CUMPLE</span>` : ''}
-        ${badge(ses.estatus || 'PENDIENTE')}
+        ${ses.cumple    ? `<span class="badge b-cumple">✔ ${ses.cumple} CUMPLE</span>`       : ''}
+        ${ses.no_cumple ? `<span class="badge b-nocumple">✖ ${ses.no_cumple} NO CUMPLE</span>` : ''}
+        ${!ses.cumple && !ses.no_cumple ? '<span class="badge">Sin resultados</span>' : ''}
       </div>
-      ${ses.pdf_url ? `<div style="margin-top:10px"><a class="btn-doc btn-cert" href="${ses.pdf_url}" target="_blank">📄 Ver informe</a></div>` : ''}
     </div>`;
   });
   html += '</div>';
@@ -292,6 +292,8 @@ function renderAccesorios(data) {
 }
 
 // ── Render Personal ────────────────────────────────────────────────────────
+// PHP retorna: id, nombre, folio, curso, empresa, fecha_curso,
+//              url_certificado, url_diploma, url_dc3
 function renderPersonal(data) {
   const cont = document.getElementById('per-cont');
   if (!data || !data.length) {
@@ -299,19 +301,18 @@ function renderPersonal(data) {
     return;
   }
   document.getElementById('s-per').textContent = data.length;
-  let html = '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Nombre</th><th>Curso</th><th>Folio</th><th>Fecha</th><th>Resultado</th><th>Docs</th></tr></thead><tbody>';
+  let html = '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Nombre</th><th>Curso</th><th>Folio</th><th>Fecha</th><th>Documentos</th></tr></thead><tbody>';
   data.forEach(p => {
     let docs = '';
-    if (p.constancia_url) docs += `<a class="btn-sm btn-sm-cert" href="${p.constancia_url}" target="_blank">Cert.</a> `;
-    if (p.diploma_url)    docs += `<a class="btn-sm btn-sm-dip"  href="${p.diploma_url}"    target="_blank">Dip.</a> `;
-    if (p.dc3_url)        docs += `<a class="btn-sm btn-sm-dc3"  href="${p.dc3_url}"        target="_blank">DC3</a>`;
+    if (p.url_certificado) docs += `<a class="btn-sm btn-sm-cert" href="${p.url_certificado}" target="_blank">Cert.</a> `;
+    if (p.url_diploma)     docs += `<a class="btn-sm btn-sm-dip"  href="${p.url_diploma}"     target="_blank">Dip.</a> `;
+    if (p.url_dc3)         docs += `<a class="btn-sm btn-sm-dc3"  href="${p.url_dc3}"         target="_blank">DC3</a>`;
     if (!docs) docs = '—';
     html += `<tr>
-      <td>${p.nombre || p.participante || '—'}</td>
-      <td>${p.curso || p.nombre_curso || '—'}</td>
-      <td style="font-family:monospace;font-size:12px">${p.control || p.folio || '—'}</td>
-      <td>${p.fecha || p.fecha_certificacion || '—'}</td>
-      <td>${badge(p.resultado || p.estatus || '—')}</td>
+      <td>${p.nombre || '—'}</td>
+      <td>${p.curso  || '—'}</td>
+      <td style="font-family:monospace;font-size:12px">${p.folio || '—'}</td>
+      <td>${p.fecha_curso || '—'}</td>
       <td>${docs}</td>
     </tr>`;
   });
@@ -322,14 +323,14 @@ function renderPersonal(data) {
 // ── Load all data ──────────────────────────────────────────────────────────
 async function cargarDatos() {
   try {
+    // La API retorna los datos directamente en la raíz (no en .data)
     const res  = await fetch(API, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({action:'OBTENER_DATOS_CLIENTE'}) });
     const json = await res.json();
     if (json.status !== 'success') throw new Error(json.message || 'Error al cargar datos');
-    const d = json.data;
-    document.getElementById('hdr-nombre').textContent = localStorage.getItem('nombre') || d.cliente || '—';
-    renderMaquinaria(d.equipos   || []);
-    renderAccesorios(d.accesorios || []);
-    renderPersonal(d.personal    || []);
+    document.getElementById('hdr-nombre').textContent = localStorage.getItem('nombre') || json.nombre_cliente || '—';
+    renderMaquinaria(json.equipos    || []);
+    renderAccesorios(json.accesorios || []);
+    renderPersonal(json.personal     || []);
   } catch(e) {
     ['maq-cont','acc-cont','per-cont'].forEach(id => {
       const el = document.getElementById(id);
