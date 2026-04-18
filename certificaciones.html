@@ -848,9 +848,14 @@ const API = "api/index.php";
       const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
       const t = s.token || '';
       if (opts.method === 'POST') {
-        try { const b = JSON.parse(opts.body || '{}'); b.token = t; opts.body = JSON.stringify(b); } catch(e) {}
+        if (!(opts.body instanceof FormData)) {
+          try { const b = JSON.parse(opts.body || '{}'); b.token = t; opts.body = JSON.stringify(b); } catch(e) {}
+        }
       } else {
-        opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t });
+        opts.headers = Object.assign({}, opts.headers || {}, {
+          'Authorization': 'Bearer ' + t,
+          'X-Token': t
+        });
       }
     }
     return _fetch.call(this, url, opts);
@@ -1678,7 +1683,7 @@ async function abrirAccCert(sesionId) {
   document.getElementById('overlay-acc-cert').classList.add('open');
   try {
     const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
-    const res  = await fetch(`${API}?action=DETALLE_SESION_ACCESORIOS&id=${sesionId}``);
+    const res  = await fetch(`${API}?action=DETALLE_SESION_ACCESORIOS&id=${sesionId}`);
     const raw  = await res.json();
     if (raw.status !== 'success') throw new Error(raw.message || 'Error del servidor');
     const data = raw.data;

@@ -2133,7 +2133,10 @@ const WEB_APP_URL = "api/index.php";
       if (opts.method === 'POST') {
         try { const b = JSON.parse(opts.body || '{}'); b.token = t; opts.body = JSON.stringify(b); } catch(e) {}
       } else {
-        opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t });
+        opts.headers = Object.assign({}, opts.headers || {}, {
+          'Authorization': 'Bearer ' + t,
+          'X-Token': t
+        });
       }
     }
     return _fetch.call(this, url, opts);

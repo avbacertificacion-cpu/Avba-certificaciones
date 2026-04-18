@@ -1,1 +1,4 @@
 DirectoryIndex login.html
+# Pasar el header Authorization a PHP (necesario en Apache mod_php)
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

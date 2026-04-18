@@ -408,7 +408,10 @@ const API = "api/index.php";
           } catch(e) {}
         }
       } else {
-        opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t });
+        opts.headers = Object.assign({}, opts.headers || {}, {
+          'Authorization': 'Bearer ' + t,
+          'X-Token': t
+        });
       }
     }
     return _fetch.call(this, url, opts);

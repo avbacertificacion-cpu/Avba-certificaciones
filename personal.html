@@ -577,7 +577,10 @@ window.fetch = function(...args) {
           try { const b = JSON.parse(config.body || '{}'); b.token = token; config.body = JSON.stringify(b); } catch(e) {}
         }
       } else {
-        config.headers = Object.assign({}, config.headers || {}, { 'Authorization': 'Bearer ' + token });
+        config.headers = Object.assign({}, config.headers || {}, {
+          'Authorization': 'Bearer ' + token,
+          'X-Token': token
+        });
       }
     }
   }

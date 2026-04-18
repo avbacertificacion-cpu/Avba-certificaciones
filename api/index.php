@@ -54,9 +54,16 @@ $accesorios = new Accesorios($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
-$authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['HTTP_X_TOKEN'] ?? '';
+// Authorization: Bearer <token>  (directo o via REDIRECT_ en algunos configs de Apache)
+$authHeader = $_SERVER['HTTP_AUTHORIZATION']
+    ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION']
+    ?? '';
 if (preg_match('/Bearer\s+(.+)/i', $authHeader, $m)) {
-    $token = $m[1];
+    $token = trim($m[1]);
+}
+// X-Token: <token>  (header personalizado, sin prefijo Bearer)
+if (!$token && !empty($_SERVER['HTTP_X_TOKEN'])) {
+    $token = trim($_SERVER['HTTP_X_TOKEN']);
 }
 
 // ── Leer body (POST) ──────────────────────────────────────

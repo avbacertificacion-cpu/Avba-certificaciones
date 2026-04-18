@@ -155,7 +155,10 @@ window.fetch = function(url, opts = {}) {
   const t = localStorage.getItem('token');
   if (t) {
     if (!opts.method || opts.method.toUpperCase() === 'GET') {
-      opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t });
+      opts.headers = Object.assign({}, opts.headers || {}, {
+        'Authorization': 'Bearer ' + t,
+        'X-Token': t
+      });
     } else {
       if (opts.body && typeof opts.body === 'string') {
         try {
