@@ -1,996 +1,335 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Personal — Cursos AVBA</title>
-  <style>
-    :root {
-      --azul:       #185FA5;
-      --azul-dark:  #0C447C;
-      --azul-light: #E6F1FB;
-      --verde:      #3B6D11;
-      --verde-light:#EAF3DE;
-      --ambar:      #854F0B;
-      --ambar-light:#FAEEDA;
-      --rojo:       #A32D2D;
-      --rojo-light: #FCEBEB;
-      --gris-bg:    #f4f7fb;
-      --borde:      #dfe5ef;
-      --texto:      #1a1a2e;
-      --texto-sub:  #5a6072;
-      --texto-hint: #9299a8;
-      --blanco:     #ffffff;
-      --radio:      10px;
-      --radio-lg:   15px;
-      --sombra:     0 2px 16px rgba(0,0,0,0.07);
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: var(--gris-bg);
-      min-height: 100vh;
-    }
-
-    /* ── OVERLAY LOGIN ── */
-    .login-overlay {
-      position: fixed; inset: 0;
-      background: rgba(10,20,40,0.6);
-      z-index: 999; display: flex;
-      align-items: center; justify-content: center;
-      padding: 20px;
-    }
-    .login-box {
-      background: var(--blanco);
-      border-radius: var(--radio-lg);
-      padding: 32px;
-      box-shadow: 0 16px 48px rgba(0,0,0,0.15);
-      width: 100%; max-width: 380px;
-      text-align: center;
-    }
-    .login-box h2 {
-      font-size: 18px; color: var(--azul);
-      margin-bottom: 8px;
-    }
-    .login-box p {
-      font-size: 13px; color: var(--texto-sub);
-      margin-bottom: 20px;
-    }
-    .login-box button {
-      width: 100%;
-      padding: 10px 16px;
-      background: var(--azul);
-      color: white;
-      border: none;
-      border-radius: var(--radio);
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .login-box button:hover { background: var(--azul-dark); }
-
-    /* ── HEADER ── */
-    .header {
-      background: var(--azul);
-      padding: 16px 24px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      box-shadow: 0 2px 12px rgba(24,95,165,0.25);
-      position: sticky;
-      top: 0;
-      z-index: 50;
-    }
-    .logo {
-      width: 36px; height: 36px; border-radius: 50%;
-      background: rgba(255,255,255,0.15);
-      border: 1.5px solid rgba(255,255,255,0.25);
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 15px; color: white; flex-shrink: 0;
-    }
-    .header-text .t { font-size: 16px; font-weight: 600; color: white; }
-    .header-text .s { font-size: 12px; color: rgba(255,255,255,0.6); margin-top: 1px; }
-    .header-actions {
-      margin-left: auto;
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-    .user-info {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      color: rgba(255,255,255,0.9);
-      font-size: 12px;
-    }
-    .user-info .rol {
-      font-size: 10px;
-      color: rgba(255,255,255,0.6);
-    }
-    .btn-logout {
-      padding: 7px 14px;
-      border-radius: 8px;
-      border: 1.5px solid rgba(255,255,255,0.3);
-      background: rgba(255,255,255,0.1);
-      color: white;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .btn-logout:hover { background: rgba(255,255,255,0.2); }
-
-    /* ── WRAP ── */
-    .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 60px; }
-
-    /* ── STATS ── */
-    .stats {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-    @media (max-width: 700px) { .stats { grid-template-columns: repeat(2, 1fr); } }
-    .stat {
-      background: var(--blanco);
-      border-radius: var(--radio);
-      border: 1px solid rgba(0,0,0,0.05);
-      padding: 14px 16px;
-      box-shadow: var(--sombra);
-    }
-    .stat-n { font-size: 26px; font-weight: 600; }
-    .stat-l { font-size: 12px; color: var(--texto-sub); margin-top: 2px; }
-
-    /* ── FILTROS ── */
-    .filtros-card {
-      background: var(--blanco); border-radius: var(--radio-lg);
-      border: 1px solid rgba(0,0,0,0.05); box-shadow: var(--sombra);
-      padding: 14px 16px; margin-bottom: 14px;
-      display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
-    }
-    .filtros-card input,
-    .filtros-card select {
-      flex: 1; min-width: 130px;
-      padding: 9px 12px; border: 1.5px solid var(--borde);
-      border-radius: var(--radio); font-size: 13px;
-      color: var(--texto); background: var(--blanco); outline: none;
-    }
-    .filtros-card input:focus,
-    .filtros-card select:focus { border-color: var(--azul); }
-    .btn-filtrar {
-      padding: 9px 18px; border-radius: var(--radio);
-      border: none; background: var(--azul); color: white;
-      font-size: 13px; font-weight: 600; cursor: pointer;
-    }
-    .btn-filtrar:hover { background: var(--azul-dark); }
-
-    /* ── TABLA ── */
-    .tabla-card {
-      background: var(--blanco); border-radius: var(--radio-lg);
-      border: 1px solid rgba(0,0,0,0.05); box-shadow: var(--sombra);
-      overflow: hidden;
-    }
-    .tabla-header {
-      padding: 14px 18px; border-bottom: 1px solid var(--borde);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .tabla-title { font-size: 14px; font-weight: 600; color: var(--texto); }
-    .tabla-count { font-size: 12px; color: var(--texto-hint); }
-    .tabla-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; min-width: 900px; }
-    th {
-      font-size: 11px; font-weight: 600; color: var(--texto-sub);
-      text-align: left; padding: 10px 14px;
-      border-bottom: 1px solid var(--borde);
-      background: var(--gris-bg);
-      text-transform: uppercase; letter-spacing: .05em;
-    }
-    td {
-      font-size: 13px; padding: 11px 14px;
-      border-bottom: 1px solid #f0f2f7;
-      color: var(--texto); vertical-align: middle;
-    }
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: #fafbff; }
-
-    .badge {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 4px 11px; border-radius: 20px;
-      font-size: 11px; font-weight: 600; white-space: nowrap;
-    }
-    .b-ok { background: var(--verde-light); color: var(--verde); }
-    .b-pend { background: var(--ambar-light); color: var(--ambar); }
-
-    .btn-accion {
-      padding: 6px 12px; border: 1.5px solid var(--borde);
-      border-radius: 7px; background: var(--blanco);
-      font-size: 12px; font-weight: 600; cursor: pointer; color: var(--texto);
-      transition: all .15s; white-space: nowrap; margin-right: 4px;
-    }
-    .btn-accion:hover { background: var(--azul-light); border-color: var(--azul); color: var(--azul-dark); }
-    .btn-accion.btn-doc {
-      background: #EBF5EB;
-      border-color: #4CAF50;
-      color: #2E7D32;
-    }
-    .btn-accion.btn-doc:hover { background: #4CAF50; color: white; }
-    .btn-accion.btn-eliminar {
-      background: var(--rojo-light);
-      border-color: var(--rojo);
-      color: var(--rojo);
-    }
-    .btn-accion.btn-eliminar:hover { background: var(--rojo); color: white; }
-
-    /* ── OVERLAY MODAL ── */
-    .overlay {
-      position: fixed; inset: 0;
-      background: rgba(10,20,40,0.5);
-      z-index: 200; display: none;
-      align-items: flex-start; justify-content: center;
-      padding: 20px 12px; overflow-y: auto;
-    }
-    .overlay.open { display: flex; }
-
-    .modal {
-      background: var(--blanco); border-radius: var(--radio-lg);
-      width: 100%; max-width: 700px;
-      box-shadow: 0 24px 60px rgba(0,0,0,0.2);
-      overflow: hidden; animation: slideUp .22s ease;
-      margin-top: 40px;
-    }
-    @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
-
-    .modal-hdr {
-      background: var(--azul); padding: 16px 20px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .m-avatar {
-      width: 40px; height: 40px; border-radius: 50%;
-      background: rgba(255,255,255,0.2);
-      border: 1.5px solid rgba(255,255,255,0.3);
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; font-size: 15px; color: white; flex-shrink: 0;
-    }
-    .m-title { font-size: 15px; font-weight: 600; color: white; }
-    .m-sub { font-size: 12px; color: rgba(255,255,255,0.65); margin-top: 2px; }
-    .btn-close {
-      width: 30px; height: 30px; border-radius: 50%;
-      border: 1.5px solid rgba(255,255,255,0.3);
-      background: rgba(255,255,255,0.1);
-      color: white; font-size: 18px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: background .15s;
-    }
-    .btn-close:hover { background: rgba(255,255,255,0.25); }
-
-    .modal-body { padding: 20px; max-height: 70vh; overflow-y: auto; }
-
-    .sec-label {
-      font-size: 10px; font-weight: 700; color: var(--texto-hint);
-      text-transform: uppercase; letter-spacing: .07em;
-      margin: 16px 0 10px; padding-bottom: 6px;
-      border-bottom: 1px solid var(--borde);
-    }
-    .sec-label:first-child { margin-top: 0; }
-
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
-
-    .field { margin-bottom: 10px; }
-    .field label { display: block; font-size: 12px; font-weight: 600; color: var(--texto-sub); margin-bottom: 5px; }
-    .field-value { font-size: 13px; color: var(--texto); }
-    .field-foto { width: 120px; height: 120px; border-radius: var(--radio); border: 1px solid var(--borde); margin: 4px 0; object-fit: cover; }
-
-    .docs-section {
-      background: var(--gris-bg);
-      border-radius: var(--radio);
-      padding: 14px;
-      margin: 14px 0;
-    }
-    .docs-title { font-size: 12px; font-weight: 600; color: var(--texto-sub); margin-bottom: 10px; }
-    .docs-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .doc-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 8px 12px;
-      background: var(--blanco);
-      border-radius: var(--radio);
-      border: 1px solid var(--borde);
-    }
-    .doc-icon { width: 20px; height: 20px; font-size: 14px; }
-    .doc-info { flex: 1; font-size: 12px; }
-    .doc-name { font-weight: 600; color: var(--texto); }
-    .doc-date { font-size: 11px; color: var(--texto-hint); margin-top: 2px; }
-    .btn-doc-gen {
-      padding: 6px 12px;
-      background: #EBF5EB;
-      border: 1.5px solid #4CAF50;
-      color: #2E7D32;
-      border-radius: var(--radio);
-      font-size: 11px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .btn-doc-gen:hover { background: #4CAF50; color: white; }
-
-    .modal-footer {
-      padding: 14px 20px;
-      border-top: 1px solid var(--borde);
-      background: var(--gris-bg);
-      display: flex;
-      gap: 10px;
-      justify-content: flex-end;
-    }
-    .btn-primario {
-      padding: 8px 18px;
-      background: var(--azul);
-      color: white;
-      border: none;
-      border-radius: var(--radio);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s;
-    }
-    .btn-primario:hover { background: var(--azul-dark); }
-    .btn-secundario {
-      padding: 8px 18px;
-      background: var(--blanco);
-      color: var(--texto);
-      border: 1.5px solid var(--borde);
-      border-radius: var(--radio);
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .btn-secundario:hover { background: var(--gris-bg); border-color: var(--texto); }
-
-    .vacio {
-      text-align: center;
-      padding: 40px 20px;
-      color: var(--texto-hint);
-    }
-    .vacio-icon { font-size: 40px; margin-bottom: 10px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Personal — Supervisión AVBA</title>
+<style>
+:root{--azul:#185FA5;--azul-dark:#0C447C;--azul-light:#E6F1FB;--verde:#3B6D11;--verde-light:#EAF3DE;--ambar:#854F0B;--ambar-light:#FAEEDA;--rojo:#A32D2D;--rojo-light:#FCEBEB;--gris-bg:#f4f7fb;--borde:#dfe5ef;--texto:#1a1a2e;--texto-sub:#5a6072;--texto-hint:#9299a8;--blanco:#fff;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);min-height:100vh;}
+/* Header */
+.header{background:var(--azul);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(24,95,165,.25);position:sticky;top:0;z-index:50;}
+.hdr-l{display:flex;align-items:center;gap:12px;}
+.hdr-t{font-size:15px;font-weight:600;color:#fff;}
+.hdr-s{font-size:11px;color:rgba(255,255,255,.6);margin-top:1px;}
+.hdr-r{display:flex;align-items:center;gap:10px;}
+.hdr-user{font-size:13px;font-weight:600;color:#fff;}
+.btn-hdr{padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;font-size:12px;font-weight:600;cursor:pointer;}
+.btn-hdr:hover{background:rgba(255,255,255,.2);}
+/* Wrap */
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 60px;}
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px;}
+@media(max-width:700px){.stats{grid-template-columns:repeat(3,1fr);}}
+.stat{background:var(--blanco);border-radius:10px;padding:12px 14px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.04);}
+.stat-n{font-size:22px;font-weight:700;}
+.stat-l{font-size:11px;color:var(--texto-sub);margin-top:2px;}
+/* Filters */
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+.filters input,.filters select{padding:8px 12px;border:1px solid var(--borde);border-radius:8px;font-size:13px;background:var(--blanco);color:var(--texto);min-width:160px;}
+.filters input{flex:1;}
+.btn-buscar{padding:8px 18px;background:var(--azul);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+.btn-buscar:hover{background:var(--azul-dark);}
+/* Table */
+.tbl-wrap{background:var(--blanco);border-radius:12px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 10px rgba(0,0,0,.04);overflow:hidden;}
+.tbl-hdr{padding:12px 16px;border-bottom:1px solid var(--borde);display:flex;align-items:center;justify-content:space-between;}
+.tbl-title{font-size:14px;font-weight:600;color:var(--texto);}
+.tbl-count{font-size:12px;color:var(--texto-hint);}
+table{width:100%;border-collapse:collapse;}
+thead th{background:var(--azul);color:#fff;padding:10px 14px;font-size:12px;font-weight:600;text-align:left;}
+tbody td{padding:9px 14px;border-bottom:1px solid var(--borde);font-size:13px;color:var(--texto);}
+tbody tr:last-child td{border-bottom:none;}
+tbody tr:hover td{background:#f8faff;cursor:pointer;}
+/* Badges */
+.badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+.b-pend{background:var(--ambar-light);color:var(--ambar);}
+.b-apro{background:var(--azul-light);color:var(--azul-dark);}
+.b-emit{background:var(--verde-light);color:var(--verde);}
+.b-dev{background:var(--rojo-light);color:var(--rojo);}
+/* Modal */
+.overlay{position:fixed;inset:0;background:rgba(10,20,40,.5);z-index:200;display:none;align-items:center;justify-content:center;padding:20px;}
+.overlay.open{display:flex;}
+.modal{background:var(--blanco);border-radius:14px;width:100%;max-width:680px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 24px 60px rgba(0,0,0,.2);}
+.modal-hdr{padding:18px 20px;border-bottom:1px solid var(--borde);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:15px;font-weight:700;color:var(--texto);}
+.modal-sub{font-size:12px;color:var(--texto-hint);margin-top:2px;}
+.btn-close{padding:5px 10px;border:1px solid var(--borde);border-radius:7px;background:var(--blanco);cursor:pointer;font-size:16px;color:var(--texto-sub);}
+.modal-body{padding:20px;overflow-y:auto;flex:1;}
+.sec-title{font-size:11px;font-weight:700;color:var(--texto-hint);letter-spacing:.06em;text-transform:uppercase;margin:16px 0 8px;}
+.sec-title:first-child{margin-top:0;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+@media(max-width:500px){.grid2{grid-template-columns:1fr;}}
+.field{background:var(--gris-bg);border-radius:8px;padding:9px 12px;}
+.field-l{font-size:11px;color:var(--texto-hint);margin-bottom:2px;}
+.field-v{font-size:13px;font-weight:600;color:var(--texto);}
+.docs-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+.btn-doc{padding:7px 14px;border-radius:8px;border:1.5px solid;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px;}
+.btn-cert{background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark);}
+.btn-dip{background:var(--verde-light);border-color:#5a8f1e;color:var(--verde);}
+.btn-dc3{background:var(--ambar-light);border-color:var(--ambar);color:var(--ambar);}
+/* Util */
+.spin{width:18px;height:18px;border:2px solid var(--borde);border-top-color:var(--azul);border-radius:50%;animation:giro .7s linear infinite;display:inline-block;vertical-align:middle;}
+@keyframes giro{to{transform:rotate(360deg)}}
+.empty-row td{text-align:center;padding:40px;color:var(--texto-hint);font-size:13px;}
+.loading-row td{text-align:center;padding:30px;}
+</style>
 </head>
 <body>
 
-<!-- ── LOGIN OVERLAY ── -->
-<div class="login-overlay" id="loginOverlay">
-  <div class="login-box">
-    <h2>Acceso Restringido</h2>
-    <p>Se requiere autenticación para acceder a esta sección.</p>
-    <button onclick="window.location.href='login.html'">Volver al Login</button>
-  </div>
-</div>
-
-<!-- ── HEADER ── -->
 <div class="header">
-  <div class="logo">P</div>
-  <div class="header-text">
-    <div class="t">Personal / Cursos</div>
-    <div class="s">AVBA Certificaciones</div>
-  </div>
-  <div class="header-actions">
-    <div class="user-info">
-      <span id="userDisplay">Cargando...</span>
-      <span class="rol" id="rolDisplay"></span>
+  <div class="hdr-l">
+    <button class="btn-hdr" onclick="location.href='admin.html'">← Admin</button>
+    <div>
+      <div class="hdr-t">Personal / Cursos</div>
+      <div class="hdr-s">Vista de supervisión — solo lectura</div>
     </div>
-    <button id="btn-back-admin-per" onclick="location.href='admin.html'" style="display:none;padding:6px 12px;
-            border-radius:7px;border:1.5px solid rgba(255,255,255,0.3);background:transparent;
-            color:white;font-size:12px;cursor:pointer">← Admin</button>
-    <button class="btn-logout" onclick="logout()">Cerrar sesión</button>
+  </div>
+  <div class="hdr-r">
+    <span class="hdr-user" id="hdr-user">—</span>
+    <button class="btn-hdr" onclick="logout()">Salir</button>
   </div>
 </div>
 
-<!-- ── CONTENEDOR ── -->
 <div class="wrap">
 
-  <!-- ── STATS ── -->
   <div class="stats">
-    <div class="stat">
-      <div class="stat-n" id="totalParts">0</div>
-      <div class="stat-l">Participantes</div>
-    </div>
-    <div class="stat">
-      <div class="stat-n" id="cursosCount">0</div>
-      <div class="stat-l">Cursos activos</div>
-    </div>
-    <div class="stat">
-      <div class="stat-n" id="docsGenerados">0</div>
-      <div class="stat-l">Documentos generados</div>
-    </div>
-    <div class="stat">
-      <div class="stat-n" id="estasMes">0</div>
-      <div class="stat-l">Registros este mes</div>
-    </div>
+    <div class="stat"><div class="stat-n" id="s-total" style="color:var(--azul)">—</div><div class="stat-l">Total</div></div>
+    <div class="stat"><div class="stat-n" id="s-pend"  style="color:var(--ambar)">—</div><div class="stat-l">Pendientes</div></div>
+    <div class="stat"><div class="stat-n" id="s-apro"  style="color:var(--azul)">—</div><div class="stat-l">Aprobados</div></div>
+    <div class="stat"><div class="stat-n" id="s-emit"  style="color:var(--verde)">—</div><div class="stat-l">Emitidos</div></div>
+    <div class="stat"><div class="stat-n" id="s-dev"   style="color:var(--rojo)">—</div><div class="stat-l">Devueltos</div></div>
   </div>
 
-  <!-- ── FILTROS ── -->
-  <div class="filtros-card">
-    <input type="text" id="buscarInput" placeholder="Buscar por nombre o CURP..."
-           onkeyup="aplicarFiltros()">
-    <select id="cursoFilter" onchange="aplicarFiltros()">
-      <option value="">Todos los cursos</option>
+  <div class="filters">
+    <input id="f-buscar" placeholder="Buscar nombre, CURP..." onkeydown="if(event.key==='Enter')cargarParticipantes()">
+    <select id="f-curso"><option value="">Todos los cursos</option></select>
+    <select id="f-estatus">
+      <option value="">Todos los estatus</option>
+      <option value="PENDIENTE">Pendiente</option>
+      <option value="APROBADO_CALIDAD">Aprobado calidad</option>
+      <option value="EMITIDO">Emitido</option>
+      <option value="DEVUELTO">Devuelto</option>
     </select>
-    <button class="btn-filtrar" onclick="aplicarFiltros()">Buscar</button>
+    <button class="btn-buscar" onclick="cargarParticipantes()">Buscar</button>
   </div>
 
-  <!-- ── TABLA ── -->
-  <div class="tabla-card">
-    <div class="tabla-header">
-      <div>
-        <div class="tabla-title">Participantes Registrados</div>
-      </div>
-      <div class="tabla-count" id="tableCount">0 registros</div>
+  <div class="tbl-wrap">
+    <div class="tbl-hdr">
+      <div class="tbl-title">Participantes en cursos</div>
+      <div class="tbl-count" id="tbl-count">—</div>
     </div>
-    <div class="tabla-wrap">
-      <table id="tablaParticipantes">
+    <div style="overflow-x:auto">
+      <table>
         <thead>
           <tr>
-            <th>Nombre</th>
-            <th>CURP</th>
-            <th>Curso</th>
-            <th>Empresa</th>
-            <th>Fecha</th>
-            <th>Acciones</th>
+            <th>Nombre</th><th>CURP</th><th>Empresa</th><th>Curso</th><th>Fecha</th><th>Estatus</th><th>Documentos</th>
           </tr>
         </thead>
-        <tbody id="tbodyParticipantes">
+        <tbody id="tabla">
+          <tr class="loading-row"><td colspan="7"><span class="spin"></span></td></tr>
         </tbody>
       </table>
-      <div class="vacio" id="emptyMsg" style="display: none;">
-        <div class="vacio-icon">📋</div>
-        <p>No hay participantes registrados</p>
-      </div>
     </div>
   </div>
-
 </div>
 
-<!-- ── MODAL DETALLE ── -->
-<div class="overlay" id="overlayDetalle">
+<!-- Modal detalle (solo lectura) -->
+<div class="overlay" id="overlayDetalle" onclick="if(event.target===this)cerrarDetalle()">
   <div class="modal">
-
     <div class="modal-hdr">
-      <div class="modal-hdr-l">
-        <div class="m-avatar" id="avatarDet">P</div>
-        <div>
-          <div class="m-title" id="nomDetalle">Participante</div>
-          <div class="m-sub" id="cursoDetalle">Curso</div>
-        </div>
+      <div>
+        <div class="modal-title" id="det-nombre">—</div>
+        <div class="modal-sub" id="det-folio">—</div>
       </div>
-      <button class="btn-close" onclick="cerrarDetalle()">×</button>
+      <button class="btn-close" onclick="cerrarDetalle()">✕</button>
     </div>
-
     <div class="modal-body" id="detalleBody">
-      <!-- Se carga dinámicamente -->
-    </div>
-
-    <div class="modal-footer">
-      <button class="btn-secundario" onclick="cerrarDetalle()">Cerrar</button>
-      <button class="btn-primario" onclick="confirmarEliminacion()">Eliminar</button>
-    </div>
-
-  </div>
-</div>
-
-<!-- ── MODAL ENVIAR DOCUMENTO ── -->
-<div class="overlay" id="overlayEnviar" onclick="if(event.target===this)cerrarEnviarDoc()">
-  <div class="modal" style="max-width:420px">
-    <div class="modal-hdr">
-      <div class="modal-hdr-l">
-        <div class="m-avatar" style="background:var(--verde)">✉</div>
-        <div>
-          <div class="m-title" id="enviarDocTitulo">Enviar documento</div>
-          <div class="m-sub">Se enviará el último documento generado de este tipo</div>
-        </div>
-      </div>
-      <button class="btn-close" onclick="cerrarEnviarDoc()">×</button>
-    </div>
-    <div style="padding:20px">
-      <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:6px">
-        Correo electrónico destinatario
-      </label>
-      <input type="email" id="enviarCorreoInput"
-             placeholder="ejemplo@correo.com"
-             style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);
-                    border-radius:var(--radio);font-size:13px;outline:none">
-      <p style="font-size:11px;color:var(--texto-hint);margin-top:6px">
-        Se pre-llenará con el correo del participante si está registrado.
-      </p>
-    </div>
-    <div class="modal-footer">
-      <button onclick="cerrarEnviarDoc()"
-              style="padding:9px 18px;border-radius:7px;border:1.5px solid var(--borde);
-                     background:white;font-size:13px;cursor:pointer">
-        Cancelar
-      </button>
-      <button id="btn-enviar-doc" onclick="confirmarEnvio()"
-              style="padding:9px 22px;border-radius:7px;border:none;
-                     background:var(--verde);color:white;font-size:13px;
-                     font-weight:600;cursor:pointer">
-        ✉ Enviar
-      </button>
+      <div style="text-align:center;padding:40px"><span class="spin"></span></div>
     </div>
   </div>
 </div>
 
 <script>
-const API_URL = 'api/';
-let currentUser = null;
-let participantes = [];
-let cursos = [];
-let selectedParticipante = null;
-let enviarDocTipo = "";
+const API = 'api/index.php';
 
-// ══════════════════════════════════════════════════════
-//  AUTENTICACIÓN
-// ══════════════════════════════════════════════════════
-
-function checkAuth() {
-  const sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
-  if (!sesion.token) {
-    document.getElementById('loginOverlay').style.display = 'flex';
-    return false;
-  }
-  currentUser = sesion;
-  document.getElementById('userDisplay').textContent = sesion.usuario || sesion.nombre || '—';
-  document.getElementById('rolDisplay').textContent  = sesion.rol || '';
-  document.getElementById('loginOverlay').style.display = 'none';
-  if (sesion.rol === 'ADMIN') {
-    const btn = document.getElementById('btn-back-admin-per');
-    if (btn) btn.style.display = '';
-  }
-  return true;
-}
-
-function logout() {
-  localStorage.removeItem('avba_session');
-  window.location.href = 'login.html';
-}
-
-// ══════════════════════════════════════════════════════
-//  FETCH CON INTERCEPTOR DE TOKEN
-// ══════════════════════════════════════════════════════
-
-const originalFetch = window.fetch;
-window.fetch = function(...args) {
-  const sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
-  const token  = sesion.token || '';
-  const [resource, config = {}] = args;
-
-  if (token) {
-    if (typeof resource === 'string' && resource.includes('api/index.php')) {
-      if (config.method === 'POST') {
-        if (!(config.body instanceof FormData)) {
-          try { const b = JSON.parse(config.body || '{}'); b.token = token; config.body = JSON.stringify(b); } catch(e) {}
-        }
-      } else {
-        config.headers = Object.assign({}, config.headers || {}, {
-          'Authorization': 'Bearer ' + token,
-          'X-Token': token
-        });
+// ── Fetch interceptor ──────────────────────────────────────────────────────
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(url, opts = {}) {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const t = s.token || '';
+  if (t && typeof url === 'string' && url.includes('api/index.php')) {
+    if (!opts.method || opts.method.toUpperCase() === 'GET') {
+      opts.headers = Object.assign({}, opts.headers || {}, {
+        'Authorization': 'Bearer ' + t,
+        'X-Token': t
+      });
+    } else {
+      if (!(opts.body instanceof FormData)) {
+        try { const b = JSON.parse(opts.body || '{}'); if (!b.token) { b.token = t; opts.body = JSON.stringify(b); } } catch(_) {}
       }
     }
   }
-
-  return originalFetch.apply(this, [resource, config]);
+  return _origFetch(url, opts);
 };
 
-// ══════════════════════════════════════════════════════
-//  CARGA INICIAL
-// ══════════════════════════════════════════════════════
+// ── Session guard ──────────────────────────────────────────────────────────
+const _s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+if (!_s.token || !['ADMIN','CALIDAD'].includes(_s.rol)) { location.href = 'login.html'; }
+document.getElementById('hdr-user').textContent = (_s.nombre || _s.usuario || '—') + ' · ' + _s.rol;
 
-async function init() {
-  if (!checkAuth()) return;
+function logout() { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
 
-  await cargarCursos();
-  await cargarParticipantes();
-  actualizarStats();
+// ── Helpers ────────────────────────────────────────────────────────────────
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function badgeEstatus(e) {
+  const map = {
+    'PENDIENTE':      'b-pend',
+    'APROBADO_CALIDAD':'b-apro',
+    'EMITIDO':        'b-emit',
+    'DEVUELTO':       'b-dev'
+  };
+  const label = { 'APROBADO_CALIDAD':'Aprobado' };
+  return `<span class="badge ${map[e]||''}">${esc(label[e]||e||'—')}</span>`;
 }
 
+// ── Cargar cursos para filtro ──────────────────────────────────────────────
 async function cargarCursos() {
   try {
-    const resp = await fetch(`${API_URL}?action=LISTAR_CURSOS`);
-    const data = await resp.json();
-    if (Array.isArray(data)) {
-      cursos = data;
-      const sel = document.getElementById('cursoFilter');
-      data.forEach(c => {
-        const opt = document.createElement('option');
-        opt.value = c.id;
-        opt.textContent = c.nombre;
-        sel.appendChild(opt);
-      });
-    }
-  } catch (e) {
-    console.error('Error cargando cursos:', e);
-  }
+    const res  = await fetch(API + '?action=LISTAR_CURSOS');
+    const data = await res.json();
+    const sel  = document.getElementById('f-curso');
+    (Array.isArray(data) ? data : []).forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c.id; opt.textContent = c.nombre;
+      sel.appendChild(opt);
+    });
+  } catch(_) {}
 }
 
+// ── Cargar participantes ───────────────────────────────────────────────────
 async function cargarParticipantes() {
+  document.getElementById('tabla').innerHTML = '<tr class="loading-row"><td colspan="7"><span class="spin"></span></td></tr>';
+  const buscar  = encodeURIComponent(document.getElementById('f-buscar').value.trim());
+  const curso   = encodeURIComponent(document.getElementById('f-curso').value);
+  const estatus = encodeURIComponent(document.getElementById('f-estatus').value);
   try {
-    const resp = await fetch(`${API_URL}?action=LISTAR_PARTICIPANTES`);
-    const data = await resp.json();
-    participantes = Array.isArray(data) ? data : [];
-    renderTabla();
-  } catch (e) {
-    console.error('Error cargando participantes:', e);
+    const res  = await fetch(`${API}?action=LISTAR_PARTICIPANTES&buscar=${buscar}&curso_id=${curso}&estatus=${estatus}`);
+    const data = await res.json();
+    const rows = Array.isArray(data) ? data : (data.data || []);
+    renderTabla(rows);
+    actualizarStats(rows);
+  } catch(e) {
+    document.getElementById('tabla').innerHTML = `<tr class="empty-row"><td colspan="7">Error al cargar: ${esc(e.message)}</td></tr>`;
+    document.getElementById('tbl-count').textContent = '';
   }
 }
 
-// ══════════════════════════════════════════════════════
-//  RENDER TABLA
-// ══════════════════════════════════════════════════════
-
-function escH(s) {
-  return (s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function actualizarStats(rows) {
+  document.getElementById('s-total').textContent = rows.length;
+  document.getElementById('s-pend').textContent  = rows.filter(r => r.estatus === 'PENDIENTE').length;
+  document.getElementById('s-apro').textContent  = rows.filter(r => r.estatus === 'APROBADO_CALIDAD').length;
+  document.getElementById('s-emit').textContent  = rows.filter(r => r.estatus === 'EMITIDO').length;
+  document.getElementById('s-dev').textContent   = rows.filter(r => r.estatus === 'DEVUELTO').length;
 }
 
-function renderTabla() {
-  const tbody = document.getElementById('tbodyParticipantes');
-  const emptyMsg = document.getElementById('emptyMsg');
-
-  if (participantes.length === 0) {
-    tbody.innerHTML = '';
-    emptyMsg.style.display = 'block';
-    document.getElementById('tableCount').textContent = '0 registros';
+function renderTabla(rows) {
+  document.getElementById('tbl-count').textContent = rows.length + ' registro' + (rows.length !== 1 ? 's' : '');
+  if (!rows.length) {
+    document.getElementById('tabla').innerHTML = '<tr class="empty-row"><td colspan="7">Sin registros para los filtros seleccionados.</td></tr>';
     return;
   }
-
-  emptyMsg.style.display = 'none';
-  tbody.innerHTML = participantes.map((p, idx) => `
-    <tr>
-      <td><strong>${escH(p.nombre_completo)}</strong></td>
-      <td>${escH(p.curp)}</td>
-      <td>${escH(p.curso_nombre || '')}</td>
-      <td>${escH(p.empresa_nombre || '')}</td>
-      <td>${p.fecha_registro ? new Date(p.fecha_registro).toLocaleDateString('es-MX') : ''}</td>
-      <td>
-        <button class="btn-accion" onclick="abrirDetalle(${idx})">Ver detalles</button>
-        <button class="btn-accion btn-eliminar" onclick="confirmarElim(${idx})" title="Eliminar">🗑</button>
-      </td>
-    </tr>
-  `).join('');
-
-  document.getElementById('tableCount').textContent = `${participantes.length} registro${participantes.length !== 1 ? 's' : ''}`;
+  document.getElementById('tabla').innerHTML = rows.map(r => {
+    const docs = [
+      r.url_certificado ? '📜' : '',
+      r.url_diploma     ? '🎓' : '',
+      r.url_dc3         ? '📋' : ''
+    ].filter(Boolean).join(' ') || '—';
+    return `<tr onclick="abrirDetalle(${r.id})">
+      <td><strong>${esc(r.nombre_completo || r.nombre || '—')}</strong></td>
+      <td style="font-family:monospace;font-size:11px">${esc(r.curp || '—')}</td>
+      <td>${esc(r.empresa_nombre || r.empresa || '—')}</td>
+      <td>${esc(r.nombre_curso || r.curso || '—')}</td>
+      <td>${esc(r.fecha_curso || r.fecha || '—')}</td>
+      <td>${badgeEstatus(r.estatus)}</td>
+      <td style="font-size:16px">${docs}</td>
+    </tr>`;
+  }).join('');
 }
 
-// ══════════════════════════════════════════════════════
-//  FILTROS
-// ══════════════════════════════════════════════════════
-
-async function aplicarFiltros() {
-  const buscar = document.getElementById('buscarInput').value.trim();
-  const cursoId = document.getElementById('cursoFilter').value;
-
-  try {
-    const params = new URLSearchParams();
-    if (buscar) params.append('buscar', buscar);
-    if (cursoId) params.append('curso_id', cursoId);
-
-    const resp = await fetch(`${API_URL}?action=LISTAR_PARTICIPANTES&${params}`);
-    const data = await resp.json();
-    participantes = Array.isArray(data) ? data : [];
-    renderTabla();
-  } catch (e) {
-    console.error('Error en filtros:', e);
-  }
-}
-
-// ══════════════════════════════════════════════════════
-//  MODAL DETALLE
-// ══════════════════════════════════════════════════════
-
-async function abrirDetalle(idx) {
-  selectedParticipante = participantes[idx];
-  const p = selectedParticipante;
-
-  document.getElementById('nomDetalle').textContent = escH(p.nombre_completo);
-  document.getElementById('cursoDetalle').textContent = escH(p.curso_nombre || 'Sin curso');
-
-  const body = document.getElementById('detalleBody');
-  let fotosHtml = '';
-  if (p.foto_persona_url) {
-    fotosHtml += `<img src="${p.foto_persona_url}" class="field-foto" alt="Foto participante">`;
-  }
-  if (p.foto_documentacion_url) {
-    fotosHtml += `<img src="${p.foto_documentacion_url}" class="field-foto" alt="Foto documentación">`;
-  }
-
-  let docsHtml = '<div class="docs-section"><div class="docs-title">📄 Documentos generados</div><div class="docs-list">';
-  if (p.documentos && p.documentos.length > 0) {
-    p.documentos.forEach(doc => {
-      docsHtml += `
-        <div class="doc-item">
-          <div class="doc-icon">📑</div>
-          <div class="doc-info">
-            <div class="doc-name">${doc.tipo_doc}</div>
-            <div class="doc-date">${doc.fecha}</div>
-          </div>
-          <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
-            <a href="${doc.url}" target="_blank"
-               style="color:var(--azul);font-weight:600;font-size:12px;text-decoration:none">
-              Descargar
-            </a>
-            <button onclick="abrirEnviarDoc('${doc.tipo_doc.toLowerCase()}')"
-                    style="padding:3px 10px;border-radius:6px;border:1.5px solid var(--verde);
-                           color:var(--verde);font-size:11px;font-weight:600;
-                           background:var(--verde-light);cursor:pointer">
-              ✉ Enviar
-            </button>
-          </div>
-        </div>
-      `;
-    });
-  } else {
-    docsHtml += '<p style="font-size: 12px; color: var(--texto-hint); text-align: center; padding: 20px 0;">Aún no se han generado documentos</p>';
-  }
-  docsHtml += '</div></div>';
-
-  const genDocsHtml = `
-    <div class="sec-label">Generar nuevos documentos</div>
-    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-      <button class="btn-doc-gen" onclick="generar('dc3')">📋 DC-3</button>
-      <button class="btn-doc-gen" onclick="generar('diploma')">🎓 Diploma</button>
-      <button class="btn-doc-gen" onclick="generar('certificado')">📜 Certificado</button>
-    </div>
-  `;
-
-  body.innerHTML = `
-    <div class="sec-label">Datos personales</div>
-    <div class="grid2">
-      <div class="field">
-        <label>Nombre completo</label>
-        <div class="field-value">${escH(p.nombre_completo)}</div>
-      </div>
-      <div class="field">
-        <label>CURP</label>
-        <div class="field-value">${escH(p.curp)}</div>
-      </div>
-      <div class="field">
-        <label>Puesto</label>
-        <div class="field-value">${escH(p.puesto || '—')}</div>
-      </div>
-      <div class="field">
-        <label>Teléfono</label>
-        <div class="field-value">${escH(p.telefono || '—')}</div>
-      </div>
-      <div class="field">
-        <label>Correo electrónico</label>
-        <div class="field-value">${escH(p.correo || '—')}</div>
-      </div>
-      <div class="field">
-        <label>Ocupación específica</label>
-        <div class="field-value">${escH(p.ocupacion_nombre || '—')}</div>
-      </div>
-      <div class="field">
-        <label>Capacidad</label>
-        <div class="field-value">${p.capacidad_na ? 'N/A' : (escH(p.capacidad) || '—')}</div>
-      </div>
-    </div>
-
-    <div class="sec-label">Datos del curso</div>
-    <div class="grid2">
-      <div class="field">
-        <label>Curso</label>
-        <div class="field-value">${escH(p.curso_nombre || '—')}</div>
-      </div>
-      <div class="field">
-        <label>Área temática</label>
-        <div class="field-value">${escH(p.area_tematica || '—')}</div>
-      </div>
-      <div class="field">
-        <label>Duración</label>
-        <div class="field-value">${p.duracion_horas ? p.duracion_horas + ' horas' : '—'}</div>
-      </div>
-      <div class="field">
-        <label>Fecha del curso</label>
-        <div class="field-value">${p.fecha_curso ? new Date(p.fecha_curso).toLocaleDateString('es-MX') : '—'}</div>
-      </div>
-    </div>
-
-    ${p.empresa_nombre ? `
-      <div class="sec-label">Datos de la empresa</div>
-      <div class="grid2">
-        <div class="field">
-          <label>Empresa</label>
-          <div class="field-value">${escH(p.empresa_nombre)}</div>
-        </div>
-        <div class="field">
-          <label>RFC</label>
-          <div class="field-value">${escH(p.empresa_rfc || '—')}</div>
-        </div>
-        <div class="field">
-          <label>Representante</label>
-          <div class="field-value">${escH(p.empresa_representante || '—')}</div>
-        </div>
-        <div class="field">
-          <label>Dirección</label>
-          <div class="field-value">${escH(p.empresa_direccion || '—')}</div>
-        </div>
-      </div>
-    ` : ''}
-
-    ${fotosHtml ? `
-      <div class="sec-label">Fotografías</div>
-      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-        ${fotosHtml}
-      </div>
-    ` : ''}
-
-    ${docsHtml}
-    ${genDocsHtml}
-  `;
-
+// ── Detalle (solo lectura) ─────────────────────────────────────────────────
+async function abrirDetalle(id) {
+  document.getElementById('det-nombre').textContent = 'Cargando...';
+  document.getElementById('det-folio').textContent  = '';
+  document.getElementById('detalleBody').innerHTML  = '<div style="text-align:center;padding:40px"><span class="spin"></span></div>';
   document.getElementById('overlayDetalle').classList.add('open');
-}
-
-async function generar(tipo) {
-  if (!selectedParticipante) return;
-
   try {
-    const sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
-    const resp = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Token': sesion.token || '' },
-      body: JSON.stringify({
-        action: 'GENERAR_DOC_PERSONAL',
-        payload: {
-          id: selectedParticipante.id,
-          tipo: tipo
-        }
-      })
-    });
-
-    const data = await resp.json();
-    if (data.status === 'success') {
-      alert(`${tipo.toUpperCase()} generado correctamente`);
-      const idx = participantes.findIndex(p => p.id === selectedParticipante.id);
-      if (idx !== -1) {
-        await cargarParticipantes();
-        abrirDetalle(idx);
-      }
-    } else {
-      alert('Error: ' + (data.message || 'Ocurrió un error'));
-    }
-  } catch (e) {
-    console.error('Error generando documento:', e);
-    alert('Error generando documento');
+    const res  = await fetch(`${API}?action=OBTENER_PARTICIPANTE&id=${id}`);
+    const json = await res.json();
+    const d    = json.data || json;
+    document.getElementById('det-nombre').textContent = d.nombre_completo || d.nombre || '—';
+    document.getElementById('det-folio').textContent  = d.control || d.folio || '';
+    renderDetalle(d);
+  } catch(e) {
+    document.getElementById('detalleBody').innerHTML = `<p style="color:var(--rojo);text-align:center;padding:20px">Error: ${esc(e.message)}</p>`;
   }
 }
 
-function cerrarDetalle() {
-  document.getElementById('overlayDetalle').classList.remove('open');
-  selectedParticipante = null;
+function campo(label, val) {
+  return `<div class="field"><div class="field-l">${label}</div><div class="field-v">${esc(val||'—')}</div></div>`;
 }
 
-function confirmarElim(idx) {
-  selectedParticipante = participantes[idx];
-}
-
-async function confirmarEliminacion() {
-  if (!selectedParticipante || !confirm('¿Eliminar este participante y todos sus registros?')) return;
-
-  try {
-    const resp = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        action: 'ELIMINAR_PARTICIPANTE',
-        payload: { id: selectedParticipante.id }
-      })
-    });
-
-    const data = await resp.json();
-    if (data.status === 'success') {
-      cerrarDetalle();
-      await cargarParticipantes();
-      alert('Participante eliminado');
-    } else {
-      alert('Error: ' + (data.message || 'No se pudo eliminar'));
-    }
-  } catch (e) {
-    console.error('Error eliminando:', e);
-    alert('Error eliminando participante');
+function renderDetalle(d) {
+  let docs = '';
+  if (d.url_certificado || d.url_diploma || d.url_dc3) {
+    docs = `<div class="sec-title">Documentos generados</div><div class="docs-row">
+      ${d.url_certificado ? `<a class="btn-doc btn-cert" href="${esc(d.url_certificado)}" target="_blank">📜 Certificado</a>` : ''}
+      ${d.url_diploma     ? `<a class="btn-doc btn-dip"  href="${esc(d.url_diploma)}"     target="_blank">🎓 Diploma</a>` : ''}
+      ${d.url_dc3         ? `<a class="btn-doc btn-dc3"  href="${esc(d.url_dc3)}"         target="_blank">📋 DC-3</a>` : ''}
+    </div>`;
   }
+
+  document.getElementById('detalleBody').innerHTML = `
+    <div class="sec-title">Datos del participante</div>
+    <div class="grid2">
+      ${campo('Nombre completo', d.nombre_completo || d.nombre)}
+      ${campo('CURP', d.curp)}
+      ${campo('Puesto / Cargo', d.puesto)}
+      ${campo('Teléfono', d.telefono)}
+      ${campo('Correo', d.correo)}
+      ${campo('Ocupación', d.ocupacion)}
+    </div>
+    <div class="sec-title">Empresa</div>
+    <div class="grid2">
+      ${campo('Empresa', d.empresa_nombre || d.empresa)}
+      ${campo('RFC', d.empresa_rfc || d.rfc)}
+      ${campo('Representante', d.representante)}
+    </div>
+    <div class="sec-title">Curso</div>
+    <div class="grid2">
+      ${campo('Curso', d.nombre_curso || d.curso)}
+      ${campo('Fecha', d.fecha_curso || d.fecha)}
+      ${campo('Duración', d.duracion ? d.duracion + ' hrs' : '')}
+      ${campo('Capacidad adquirida', d.capacidad)}
+    </div>
+    <div class="sec-title">Control de flujo</div>
+    <div class="grid2">
+      ${campo('Folio / Control', d.control || d.folio)}
+      ${campo('Estatus', d.estatus)}
+      ${campo('Registrado', d.fecha_alta || d.fecha_registro)}
+      ${campo('Aprobado por', d.aprobado_por || '')}
+    </div>
+    ${docs}`;
 }
 
-// ══════════════════════════════════════════════════════
-//  ENVIAR DOCUMENTO POR CORREO
-// ══════════════════════════════════════════════════════
+function cerrarDetalle() { document.getElementById('overlayDetalle').classList.remove('open'); }
 
-function abrirEnviarDoc(tipo) {
-  if (!selectedParticipante) return;
-  enviarDocTipo = tipo;
-  const labels = { dc3: 'Constancia DC3', diploma: 'Diploma', certificado: 'Certificado' };
-  document.getElementById('enviarDocTitulo').textContent =
-    'Enviar — ' + (labels[tipo] || tipo.toUpperCase());
-  document.getElementById('enviarCorreoInput').value = selectedParticipante.correo || '';
-  document.getElementById('overlayEnviar').classList.add('open');
-}
-
-function cerrarEnviarDoc() {
-  document.getElementById('overlayEnviar').classList.remove('open');
-  enviarDocTipo = '';
-}
-
-async function confirmarEnvio() {
-  const correo = document.getElementById('enviarCorreoInput').value.trim();
-  if (!correo) { alert('Ingresa un correo electrónico.'); return; }
-
-  const btn = document.getElementById('btn-enviar-doc');
-  btn.disabled = true;
-  btn.textContent = 'Enviando…';
-
-  try {
-    const sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
-    const resp = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Token': sesion.token || '' },
-      body: JSON.stringify({
-        action: 'ENVIAR_DOC_PERSONAL',
-        payload: {
-          id:     selectedParticipante.id,
-          tipo:   enviarDocTipo,
-          correo: correo
-        }
-      })
-    });
-    const data = await resp.json();
-    if (data.status === 'success') {
-      cerrarEnviarDoc();
-      alert('Documento enviado correctamente a ' + correo);
-    } else {
-      alert('Error: ' + (data.message || 'No se pudo enviar el documento'));
-    }
-  } catch (e) {
-    alert('Error de conexión al enviar el documento.');
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '✉ Enviar';
-  }
-}
-
-// ══════════════════════════════════════════════════════
-//  STATS
-// ══════════════════════════════════════════════════════
-
-function actualizarStats() {
-  document.getElementById('totalParts').textContent = participantes.length;
-
-  const activeCursos = new Set(participantes.map(p => p.curso_id)).size;
-  document.getElementById('cursosCount').textContent = activeCursos;
-
-  const conDocs = participantes.reduce((sum, p) => sum + (p.documentos?.length || 0), 0);
-  document.getElementById('docsGenerados').textContent = conDocs;
-
-  const esteMes = participantes.filter(p => {
-    if (!p.fecha_registro) return false;
-    const d = new Date(p.fecha_registro);
-    const ahora = new Date();
-    return d.getFullYear() === ahora.getFullYear() && d.getMonth() === ahora.getMonth();
-  }).length;
-  document.getElementById('estasMes').textContent = esteMes;
-}
-
-// ══════════════════════════════════════════════════════
-//  INICIAR
-// ══════════════════════════════════════════════════════
-
-document.addEventListener('DOMContentLoaded', init);
+// ── Init ───────────────────────────────────────────────────────────────────
+(async function init() {
+  await cargarCursos();
+  await cargarParticipantes();
+})();
 </script>
-
 </body>
 </html>
