@@ -577,8 +577,7 @@ window.fetch = function(...args) {
           try { const b = JSON.parse(config.body || '{}'); b.token = token; config.body = JSON.stringify(b); } catch(e) {}
         }
       } else {
-        const sep = resource.includes('?') ? '&' : '?';
-        return originalFetch.apply(this, [resource + sep + 'token=' + encodeURIComponent(token), config]);
+        config.headers = Object.assign({}, config.headers || {}, { 'Authorization': 'Bearer ' + token });
       }
     }
   }

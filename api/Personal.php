@@ -413,10 +413,13 @@ class Personal {
         $doc = $stmt->fetch();
         if (!$doc) return ['status' => 'error', 'message' => 'Genera el documento primero antes de enviarlo.'];
 
-        // Convertir URL a ruta local
+        // Convertir URL a ruta local y validar path traversal
         $rutaArchivo = str_replace(UPLOAD_URL, UPLOAD_DIR, $doc['url']);
-        if (!file_exists($rutaArchivo))
+        $realArchivo = realpath($rutaArchivo);
+        $realUpload  = realpath(UPLOAD_DIR);
+        if (!$realArchivo || !$realUpload || strncmp($realArchivo, $realUpload, strlen($realUpload)) !== 0) {
             return ['status' => 'error', 'message' => 'El archivo del documento no se encontró en el servidor.'];
+        }
 
         if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
             return ['status' => 'error', 'message' => 'Servicio de correo no disponible en este servidor.'];
@@ -572,6 +575,16 @@ class Personal {
             return ['status' => 'error', 'message' => 'Solo se permiten imágenes JPG o PNG.'];
         if ($file['size'] > 8 * 1024 * 1024)
             return ['status' => 'error', 'message' => 'La imagen no debe superar 8 MB.'];
+
+        // Verificar MIME real del archivo (no solo la extensión)
+        $allowedMimes = ['image/jpeg', 'image/png', 'image/webp'];
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+        if (!in_array($mime, $allowedMimes, true))
+            return ['status' => 'error', 'message' => 'Tipo de archivo no permitido.'];
+        if (!getimagesize($file['tmp_name']))
+            return ['status' => 'error', 'message' => 'El archivo no es una imagen válida.'];
 
         $dir = UPLOAD_DIR . $subdir . '/';
         if (!is_dir($dir)) mkdir($dir, 0755, true);

@@ -15,9 +15,21 @@ class Auth {
     public function login(array $payload): array {
         $usuario = strtolower(trim($payload['usuario'] ?? ''));
         $pass    = trim($payload['password'] ?? '');
+        $ip      = $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 
         if (!$usuario || !$pass) {
             return ['status' => 'error', 'message' => 'Usuario y contraseña requeridos.'];
+        }
+
+        // ── Rate limiting ──────────────────────────────
+        $this->ensureLoginIntentosTable();
+        $blk = $this->pdo->prepare(
+            "SELECT intentos, bloqueado_hasta FROM login_intentos WHERE usuario = ? LIMIT 1"
+        );
+        $blk->execute([$usuario]);
+        $intento = $blk->fetch();
+        if ($intento && $intento['bloqueado_hasta'] && $intento['bloqueado_hasta'] > date('Y-m-d H:i:s')) {
+            return ['status' => 'error', 'message' => 'Demasiados intentos fallidos. Espera ' . LOGIN_BLOQUEO_MIN . ' minutos e intenta de nuevo.'];
         }
 
         $stmt = $this->pdo->prepare(
@@ -27,28 +39,24 @@ class Auth {
         $stmt->execute([$usuario]);
         $row = $stmt->fetch();
 
-        if (!$row) {
-            return ['status' => 'error', 'message' => 'Usuario no encontrado.'];
-        }
-        if (!$row['activo']) {
-            return ['status' => 'error', 'message' => 'Esta cuenta está desactivada.'];
-        }
+        // Siempre verificar para evitar timing attacks
+        $hashVerificar = $row['password_hash'] ?? '$2y$10$invalidhashpadding000000000000000000000000000000000000000';
+        $valido = $row && $row['activo'] && password_verify($pass, $hashVerificar);
 
-        // Soportar bcrypt (nuevo) y MD5 heredado (migración)
-        $valido = false;
-        if (password_verify($pass, $row['password_hash'])) {
-            $valido = true;
-            // Actualizar a bcrypt si aún estaba en MD5
-        } elseif ($row['password_hash'] === md5($pass)) {
-            $valido = true;
-            // Migrar a bcrypt automáticamente
+        // Migración silenciosa de MD5 heredado al primer login exitoso
+        if (!$valido && $row && $row['activo'] && strlen($row['password_hash']) === 32
+            && $row['password_hash'] === md5($pass)) {
             $nuevoHash = password_hash($pass, PASSWORD_BCRYPT);
             $this->pdo->prepare("UPDATE usuarios SET password_hash = ? WHERE id = ?")->execute([$nuevoHash, $row['id']]);
+            $valido = true;
         }
 
         if (!$valido) {
-            return ['status' => 'error', 'message' => 'Contraseña incorrecta.'];
+            $this->registrarIntento($usuario, $ip, false);
+            return ['status' => 'error', 'message' => 'Credenciales inválidas.'];
         }
+
+        $this->registrarIntento($usuario, $ip, true);
 
         // Generar token y guardarlo
         $token   = generarToken();
@@ -65,6 +73,36 @@ class Auth {
             'id_cliente' => $row['id_cliente'] ?? '',
             'token'      => $token,
         ];
+    }
+
+    private function ensureLoginIntentosTable(): void {
+        $this->pdo->exec("
+            CREATE TABLE IF NOT EXISTS login_intentos (
+              id              INT AUTO_INCREMENT PRIMARY KEY,
+              usuario         VARCHAR(50) NOT NULL,
+              intentos        TINYINT UNSIGNED NOT NULL DEFAULT 0,
+              bloqueado_hasta DATETIME NULL,
+              ultima_vez      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              UNIQUE KEY uk_usuario (usuario)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    }
+
+    private function registrarIntento(string $usuario, string $ip, bool $exitoso): void {
+        if ($exitoso) {
+            $this->pdo->prepare("DELETE FROM login_intentos WHERE usuario = ?")->execute([$usuario]);
+            return;
+        }
+        $maxIntentos = defined('LOGIN_MAX_INTENTOS') ? LOGIN_MAX_INTENTOS : 5;
+        $bloqueoMin  = defined('LOGIN_BLOQUEO_MIN')  ? LOGIN_BLOQUEO_MIN  : 15;
+
+        $this->pdo->prepare("
+            INSERT INTO login_intentos (usuario, intentos, bloqueado_hasta)
+            VALUES (?, 1, NULL)
+            ON DUPLICATE KEY UPDATE
+              intentos        = intentos + 1,
+              bloqueado_hasta = IF(intentos + 1 >= ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), NULL)
+        ")->execute([$usuario, $maxIntentos, $bloqueoMin]);
     }
 
     // ── CREAR USUARIO ──────────────────────────────────────

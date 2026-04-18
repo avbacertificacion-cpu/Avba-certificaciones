@@ -154,6 +154,13 @@ class Accesorios {
                     $ext = strtolower(pathinfo($fotosArr['name'][$i] ?? '', PATHINFO_EXTENSION));
                     if (!in_array($ext, ['jpg','jpeg','png','webp','heic'])) continue;
 
+                    // Verificar MIME real
+                    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+                    $mime  = finfo_file($finfo, $tmpName);
+                    finfo_close($finfo);
+                    $allowedMimes = ['image/jpeg','image/png','image/webp'];
+                    if (!in_array($mime, $allowedMimes, true) || !getimagesize($tmpName)) continue;
+
                     $fname = "acc_{$accesorioId}_{$fotoOrden}.{$ext}";
                     if (move_uploaded_file($tmpName, $uploadDir . $fname)) {
                         $url = "uploads/accesorios/{$sesionId}/{$fname}";

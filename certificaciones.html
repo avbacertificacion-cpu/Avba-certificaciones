@@ -850,7 +850,7 @@ const API = "api/index.php";
       if (opts.method === 'POST') {
         try { const b = JSON.parse(opts.body || '{}'); b.token = t; opts.body = JSON.stringify(b); } catch(e) {}
       } else {
-        url = url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
+        opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t });
       }
     }
     return _fetch.call(this, url, opts);
@@ -1603,7 +1603,7 @@ async function cargarAccCert() {
     `<tr><td colspan="8" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
   try {
     const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
-    const res  = await fetch(API + '?action=LISTAR_SESIONES_ACCESORIOS&estatus=APROBADO_CALIDAD&token=' + encodeURIComponent(tok));
+    const res  = await fetch(API + '?action=LISTAR_SESIONES_ACCESORIOS&estatus=APROBADO_CALIDAD');
     const raw  = await res.json();
     if (raw.status !== 'success') throw new Error(raw.message || 'Error del servidor');
     const data  = Array.isArray(raw.data) ? raw.data : [];
@@ -1678,7 +1678,7 @@ async function abrirAccCert(sesionId) {
   document.getElementById('overlay-acc-cert').classList.add('open');
   try {
     const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
-    const res  = await fetch(`${API}?action=DETALLE_SESION_ACCESORIOS&id=${sesionId}&token=${encodeURIComponent(tok)}`);
+    const res  = await fetch(`${API}?action=DETALLE_SESION_ACCESORIOS&id=${sesionId}``);
     const raw  = await res.json();
     if (raw.status !== 'success') throw new Error(raw.message || 'Error del servidor');
     const data = raw.data;
@@ -2009,7 +2009,7 @@ async function cargarPerCursosCert() {
     `<tr><td colspan="5" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
   try {
     const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
-    const res  = await fetch(API + '?action=LISTAR_PARTICIPANTES&estatus=APROBADO_CALIDAD&token=' + encodeURIComponent(tok));
+    const res  = await fetch(API + '?action=LISTAR_PARTICIPANTES&estatus=APROBADO_CALIDAD');
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error('Respuesta inválida');
     perCertData     = data;
@@ -2113,7 +2113,7 @@ async function cargarPerIndepCert() {
     `<tr><td colspan="6" style="text-align:center;padding:36px"><span class="spin"></span>Cargando...</td></tr>`;
   try {
     const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
-    const res  = await fetch(API + '?action=LISTAR_PARTICIPANTES&estatus=APROBADO_CALIDAD&token=' + encodeURIComponent(tok));
+    const res  = await fetch(API + '?action=LISTAR_PARTICIPANTES&estatus=APROBADO_CALIDAD');
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error('Respuesta inválida');
     perCertData     = data;

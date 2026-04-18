@@ -110,7 +110,7 @@ class Certificaciones {
             $rutaDir     = UPLOAD_DIR . 'certificados/';
             $baseName    = pathinfo($rutaDocx, PATHINFO_FILENAME);
             $rutaPdfProt = $rutaDir . $baseName . '_prot.pdf';
-            $ownerPass   = 'AVBA' . strtoupper(substr(md5(basename($rutaDocx)), 0, 10));
+            $ownerPass   = 'AVBA' . strtoupper(bin2hex(random_bytes(8)));
 
             if (file_exists($rutaPdfProt)) @unlink($rutaPdfProt);
 

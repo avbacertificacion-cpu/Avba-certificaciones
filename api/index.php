@@ -22,7 +22,17 @@ require_once __DIR__ . '/Accesorios.php';
 
 // ── Headers ───────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
+
+// CORS: solo orígenes explícitamente permitidos
+$requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
+$allowedOrigins = array_map('trim', explode(',', defined('CORS_ORIGINS') ? CORS_ORIGINS : ''));
+if ($requestOrigin && in_array($requestOrigin, $allowedOrigins, true)) {
+    header('Access-Control-Allow-Origin: ' . $requestOrigin);
+    header('Vary: Origin');
+} elseif (!$requestOrigin) {
+    // Misma origen (sin header Origin) — petición directa del servidor o mismo dominio
+    header('Access-Control-Allow-Origin: ' . ($allowedOrigins[0] ?? '*'));
+}
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Token');
 
@@ -81,11 +91,12 @@ if ($method === 'GET') {
 //  RUTAS GET (lectura pública o autenticada)
 // ══════════════════════════════════════════════════════════
 set_exception_handler(function(Throwable $e) {
+    error_log('[AVBA] ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
     if (!headers_sent()) {
         header('Content-Type: application/json; charset=utf-8');
         http_response_code(500);
     }
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    echo json_encode(['status' => 'error', 'message' => 'Error interno del servidor.']);
     exit;
 });
 
@@ -221,7 +232,7 @@ if ($method === 'GET') {
             respuesta($accesorios->obtenerCamposPdfAcc());
 
         default:
-            respuesta(['status' => 'error', 'message' => "Acción GET desconocida: {$action}"], 400);
+            respuesta(['status' => 'error', 'message' => 'Acción no reconocida.'], 400);
     }
 }
 

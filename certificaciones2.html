@@ -239,7 +239,7 @@ const API = "api/index.php";
       if (opts.method === 'POST') {
         try { const b = JSON.parse(opts.body || '{}'); b.token = t; opts.body = JSON.stringify(b); } catch(e) {}
       } else {
-        url = url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
+        opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t });
       }
     }
     return _fetch.call(this, url, opts);

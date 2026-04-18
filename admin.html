@@ -408,7 +408,7 @@ const API = "api/index.php";
           } catch(e) {}
         }
       } else {
-        url = url + (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(t);
+        opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t });
       }
     }
     return _fetch.call(this, url, opts);
