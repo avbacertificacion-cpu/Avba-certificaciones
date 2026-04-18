@@ -182,7 +182,9 @@ class Auth {
         $idCliente = trim($idCliente);
         if (!$idCliente) return ['status' => 'error', 'message' => 'id_cliente requerido.'];
 
-        // Los folios del cliente tienen formato: XXXXX-YYYYY donde XXXXX = id_cliente
+        $like = $idCliente . '-%';
+
+        // ── Equipos ──────────────────────────────────────
         $stmt = $this->pdo->prepare(
             "SELECT id, cliente, maquinaria, marca, modelo, serie, id_equipo,
                     DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
@@ -191,7 +193,7 @@ class Auth {
              WHERE control LIKE ? AND estado = 'ENVIADO'
              ORDER BY fecha_inspeccion DESC"
         );
-        $stmt->execute([$idCliente . '-%']);
+        $stmt->execute([$like]);
         $rows = $stmt->fetchAll();
 
         $equipos = [];
@@ -199,16 +201,12 @@ class Auth {
 
         foreach ($rows as $r) {
             if (!$nombreCliente) $nombreCliente = $r['cliente'];
-            $vigencia = calcularVigencia($r['fecha'] ? (new DateTime($r['fecha'] ?? 'now'))->format('Y-m-d') : null);
-
-            // Reconstruir fecha desde string dd/mm/yyyy para calcular vigencia
             $fechaParaVigencia = null;
             if ($r['fecha']) {
                 $parts = explode('/', $r['fecha']);
                 if (count($parts) === 3) $fechaParaVigencia = "{$parts[2]}-{$parts[1]}-{$parts[0]}";
             }
             $vigencia = calcularVigencia($fechaParaVigencia);
-
             $equipos[] = [
                 'folio'       => $r['control'],
                 'maquinaria'  => $r['maquinaria'],
@@ -226,10 +224,76 @@ class Auth {
             ];
         }
 
+        // ── Accesorios ────────────────────────────────────
+        $accesorios = [];
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT s.id, s.cliente, s.control,
+                        DATE_FORMAT(s.fecha, '%d/%m/%Y') AS fecha,
+                        COUNT(a.id)            AS total,
+                        SUM(a.estado='CUMPLE') AS cumple,
+                        SUM(a.estado!='CUMPLE') AS no_cumple
+                 FROM accesorios_sesiones s
+                 LEFT JOIN accesorios_izaje a ON a.sesion_id = s.id
+                 WHERE s.control LIKE ? AND s.estatus = 'EMITIDO'
+                 GROUP BY s.id
+                 ORDER BY s.fecha DESC"
+            );
+            $stmt->execute([$like]);
+            foreach ($stmt->fetchAll() as $r) {
+                if (!$nombreCliente) $nombreCliente = $r['cliente'];
+                $accesorios[] = [
+                    'id'       => (int)$r['id'],
+                    'folio'    => $r['control'],
+                    'fecha'    => $r['fecha'],
+                    'total'    => (int)$r['total'],
+                    'cumple'   => (int)$r['cumple'],
+                    'no_cumple'=> (int)$r['no_cumple'],
+                ];
+            }
+        } catch (\PDOException $e) { /* tabla o columna aún no existe */ }
+
+        // ── Personal (cursos) ─────────────────────────────
+        $personal = [];
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT p.id, p.nombre_completo, p.control, p.empresa_nombre,
+                        DATE_FORMAT(p.fecha_curso, '%d/%m/%Y') AS fecha_curso,
+                        c.nombre AS curso_nombre,
+                        MAX(CASE WHEN pd.tipo_doc='CERTIFICADO' THEN pd.url END) AS url_certificado,
+                        MAX(CASE WHEN pd.tipo_doc='DIPLOMA'     THEN pd.url END) AS url_diploma,
+                        MAX(CASE WHEN pd.tipo_doc='DC3'         THEN pd.url END) AS url_dc3
+                 FROM participantes_cursos p
+                 LEFT JOIN cursos c ON c.id = p.curso_id
+                 LEFT JOIN participantes_documentos pd ON pd.participante_id = p.id
+                 WHERE p.control LIKE ? AND p.estatus = 'EMITIDO'
+                 GROUP BY p.id, p.nombre_completo, p.control, p.empresa_nombre,
+                          p.fecha_curso, c.nombre
+                 ORDER BY p.fecha_curso DESC"
+            );
+            $stmt->execute([$like]);
+            foreach ($stmt->fetchAll() as $r) {
+                if (!$nombreCliente && $r['empresa_nombre']) $nombreCliente = $r['empresa_nombre'];
+                $personal[] = [
+                    'id'              => (int)$r['id'],
+                    'nombre'          => $r['nombre_completo'],
+                    'folio'           => $r['control'],
+                    'curso'           => $r['curso_nombre'],
+                    'empresa'         => $r['empresa_nombre'],
+                    'fecha_curso'     => $r['fecha_curso'],
+                    'url_certificado' => $r['url_certificado'],
+                    'url_diploma'     => $r['url_diploma'],
+                    'url_dc3'         => $r['url_dc3'],
+                ];
+            }
+        } catch (\PDOException $e) { /* tabla aún no existe */ }
+
         return [
-            'status'          => 'success',
-            'nombre_cliente'  => $nombreCliente,
-            'equipos'         => $equipos,
+            'status'         => 'success',
+            'nombre_cliente' => $nombreCliente,
+            'equipos'        => $equipos,
+            'accesorios'     => $accesorios,
+            'personal'       => $personal,
         ];
     }
 }
