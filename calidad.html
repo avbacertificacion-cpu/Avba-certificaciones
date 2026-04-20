@@ -4295,8 +4295,7 @@ function pickerRenderMarkers() {
     const pin = document.createElement('div');
     pin.className = 'pk-pin';
     pin.style.cssText = `left:${x}px;top:${y}px;transform:translate(-5px,-5px);z-index:${isActive?20:10}`;
-    pin.innerHTML = `<div class="pk-dot" style="background:${color};${isActive?'transform:scale(1.4);border-color:#185FA5;':''}"></div>
-      <div class="pk-lbl" style="background:${color};${isActive?'outline:2px solid #185FA5;':''}">${c.campo}</div>`;
+    pin.innerHTML = `<div class="pk-dot" style="background:${color};${isActive?'transform:scale(1.4);border-color:#185FA5;':''}"></div>`;
     pin.onclick = e => { e.stopPropagation(); pickerSetActive(i); };
     wrap.appendChild(pin);
 
