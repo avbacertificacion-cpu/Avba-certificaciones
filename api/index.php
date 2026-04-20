@@ -115,6 +115,33 @@ if ($method === 'GET') {
         case 'VALIDAR_QR':
             respuesta($qr->validarQR($_GET['qr'] ?? ''));
 
+        // Listar imágenes de carpeta de evidencia
+        case 'LISTAR_EVIDENCIAS': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $url = $_GET['url'] ?? '';
+            if (!$url) respuesta(['status' => 'error', 'message' => 'url requerido.']);
+            // Convertir URL a ruta local y listar imágenes
+            $localPath = rtrim(str_replace(
+                rtrim(UPLOAD_URL, '/'),
+                rtrim(UPLOAD_DIR, '/'),
+                rtrim($url, '/')
+            ), '/') . '/';
+            $realPath  = realpath($localPath);
+            $realBase  = realpath(UPLOAD_DIR);
+            if (!$realPath || !$realBase || strncmp($realPath, $realBase, strlen($realBase)) !== 0) {
+                respuesta(['status' => 'success', 'imagenes' => []]);
+            }
+            $archivos = glob($realPath . '*.{jpg,jpeg,png,JPG,JPEG,PNG,webp,WEBP}', GLOB_BRACE) ?: [];
+            sort($archivos);
+            $imagenes = array_map(fn($f) => str_replace(
+                rtrim(UPLOAD_DIR, '/'),
+                rtrim(UPLOAD_URL, '/'),
+                $f
+            ), array_slice($archivos, 0, 30));
+            respuesta(['status' => 'success', 'imagenes' => array_values($imagenes)]);
+        }
+
         // Opciones de maquinaria para el selector
         case 'getMaquinaria':
         case 'GET_MAQUINARIA':
