@@ -4314,15 +4314,6 @@ document.getElementById('pk-canvas-wrap').addEventListener('click', function(e) 
   if (pkContext === 'acc')       renderTablaCamposPdfAcc(camposPdfAccLocal);
   if (pkContext === 'personal')  renderTablaCamposPdfPer(camposPdfPerLocal);
   if (pkRenderFn) pkRenderFn();
-
-  // Auto-advance to next campo
-  if (pkActive < pkCampos.length - 1) {
-    pkActive++;
-    pickerRenderList();
-    const c = pkCampos[pkActive];
-    document.getElementById('pk-active-info').textContent =
-      `▶ Ahora posiciona "${c.campo}"`;
-  }
 });
 
 async function pickerPrevPage() {
