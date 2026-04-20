@@ -428,12 +428,15 @@ class Admin {
         $row = $stmt->fetch();
         if (!$row) return ['status' => 'error', 'message' => 'Tipo no encontrado.'];
 
+        $base = rtrim(UPLOAD_URL, '/') . '/certificados/';
         return [
-            'status'          => 'success',
+            'status'             => 'success',
             'plantilla_cert_pdf' => $row['plantilla_cert_pdf'] ?? null,
             'plantilla_dict_pdf' => $row['plantilla_dict_pdf'] ?? null,
-            'cert_pdf_campos' => json_decode($row['cert_pdf_campos'] ?? '[]', true) ?: [],
-            'dict_pdf_campos' => json_decode($row['dict_pdf_campos'] ?? '[]', true) ?: [],
+            'cert_pdf_url'       => $row['plantilla_cert_pdf'] ? $base . $row['plantilla_cert_pdf'] : null,
+            'dict_pdf_url'       => $row['plantilla_dict_pdf'] ? $base . $row['plantilla_dict_pdf'] : null,
+            'cert_pdf_campos'    => json_decode($row['cert_pdf_campos'] ?? '[]', true) ?: [],
+            'dict_pdf_campos'    => json_decode($row['dict_pdf_campos'] ?? '[]', true) ?: [],
         ];
     }
 
@@ -534,10 +537,14 @@ class Admin {
         $row = $stmt->fetch();
         if (!$row) return ['status' => 'error', 'message' => 'Tipo no encontrado.'];
 
+        $pdfUrl = ($row['plantilla_pdf'] ?? null)
+            ? rtrim(UPLOAD_URL, '/') . '/plantillas/' . $row['plantilla_pdf']
+            : null;
         return [
             'status'        => 'success',
             'plantilla_pdf' => $row['plantilla_pdf'] ?? null,
             'pdf_campos'    => json_decode($row['pdf_campos'] ?? '[]', true) ?: [],
+            'pdf_url'       => $pdfUrl,
         ];
     }
 }

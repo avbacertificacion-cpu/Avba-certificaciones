@@ -406,9 +406,12 @@ class Accesorios {
     // ── Obtener campos de coordenadas del certificado ─────
     public function obtenerCamposPdfAcc(): array {
         $this->ensurePlantillaAccTable();
-        $row = $this->pdo->query("SELECT pdf_campos FROM acc_plantilla_informe WHERE id = 1")->fetch();
+        $row = $this->pdo->query("SELECT plantilla_pdf, pdf_campos FROM acc_plantilla_informe WHERE id = 1")->fetch();
         $campos = json_decode($row['pdf_campos'] ?? '[]', true) ?: [];
-        return ['status' => 'success', 'pdf_campos' => $campos];
+        $pdfUrl = ($row['plantilla_pdf'] ?? null)
+            ? rtrim(UPLOAD_URL, '/') . '/plantillas/' . $row['plantilla_pdf']
+            : null;
+        return ['status' => 'success', 'pdf_campos' => $campos, 'pdf_url' => $pdfUrl];
     }
 
     // ── Guardar campos de coordenadas del certificado ─────

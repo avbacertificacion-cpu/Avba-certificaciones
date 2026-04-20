@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel de Calidad — AVBA</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     :root {
       --azul:       #185FA5;
@@ -1338,7 +1339,14 @@
           <div class="m-sub">Coordenadas de posición en mm desde borde superior-izquierdo</div>
         </div>
       </div>
-      <button class="btn-close" onclick="cerrarModalCamposPdf()">×</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button id="btn-abrir-picker" onclick="abrirPicker(camposPdfUrl, camposPdfLocal, 'equipo')"
+          style="display:none;padding:7px 14px;border-radius:8px;border:1.5px solid #185FA5;
+                 background:#E6F1FB;color:#0C447C;font-size:12px;font-weight:700;cursor:pointer;">
+          📍 Posicionar en PDF
+        </button>
+        <button class="btn-close" onclick="cerrarModalCamposPdf()">×</button>
+      </div>
     </div>
     <div style="padding:12px 16px 0;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
@@ -1391,7 +1399,14 @@
           <div class="m-sub">Coordenadas de posición en mm desde borde superior-izquierdo</div>
         </div>
       </div>
-      <button class="btn-close" onclick="cerrarModalCamposPdfAcc()">×</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button id="btn-abrir-picker-acc" onclick="abrirPicker(camposPdfAccUrl, camposPdfAccLocal, 'acc')"
+          style="display:none;padding:7px 14px;border-radius:8px;border:1.5px solid #185FA5;
+                 background:#E6F1FB;color:#0C447C;font-size:12px;font-weight:700;cursor:pointer;">
+          📍 Posicionar en PDF
+        </button>
+        <button class="btn-close" onclick="cerrarModalCamposPdfAcc()">×</button>
+      </div>
     </div>
     <div style="padding:12px 16px 0;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
@@ -1438,7 +1453,14 @@
           <div class="m-sub">Coordenadas de posición en mm desde borde superior-izquierdo</div>
         </div>
       </div>
-      <button class="btn-close" onclick="cerrarModalCamposPdfPer()">×</button>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button id="btn-abrir-picker-per" onclick="abrirPicker(camposPdfPerUrl, camposPdfPerLocal, 'personal')"
+          style="display:none;padding:7px 14px;border-radius:8px;border:1.5px solid #3B6D11;
+                 background:#EAF4E1;color:#2A5009;font-size:12px;font-weight:700;cursor:pointer;">
+          📍 Posicionar en PDF
+        </button>
+        <button class="btn-close" onclick="cerrarModalCamposPdfPer()">×</button>
+      </div>
     </div>
     <div style="padding:12px 16px 0;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
@@ -3118,6 +3140,7 @@ const CAMPOS_DISPONIBLES = [
 
 // Estado local de los campos mientras se edita
 let camposPdfLocal = [];
+let camposPdfUrl   = null;  // URL de la plantilla activa para el picker
 
 async function abrirModalCamposPdf(tipoId, docTipo) {
   camposPdfTipoId  = tipoId;
@@ -3133,11 +3156,18 @@ async function abrirModalCamposPdf(tipoId, docTipo) {
     camposPdfLocal = data.status === "success"
       ? (docTipo === "cert" ? (data.cert_pdf_campos || []) : (data.dict_pdf_campos || []))
       : [];
+    camposPdfUrl = data.status === "success"
+      ? (docTipo === "cert" ? (data.cert_pdf_url || null) : (data.dict_pdf_url || null))
+      : null;
   } catch {
     camposPdfLocal = [];
+    camposPdfUrl   = null;
   }
 
   renderTablaCamposPdf(camposPdfLocal);
+  // Mostrar/ocultar botón posicionar según haya plantilla
+  const btnPos = document.getElementById("btn-abrir-picker");
+  if (btnPos) btnPos.style.display = camposPdfUrl ? '' : 'none';
   document.getElementById("overlay-campos-pdf").classList.add("open");
 }
 
@@ -3607,6 +3637,7 @@ async function eliminarPlantillaAcc() {
 
 /* ── Modal: configurar campos PDF del certificado de accesorio ── */
 let camposPdfAccLocal = [];
+let camposPdfAccUrl   = null;
 
 const CAMPOS_ACC_DISPONIBLES = [
   "id_accesorio","tipo","marca","modelo","serie",
@@ -3620,9 +3651,13 @@ async function abrirModalCamposPdfAcc() {
     const res  = await fetch(`${API}?action=OBTENER_CAMPOS_PDF_ACC&token=${s.token||""}`);
     const data = await res.json();
     camposPdfAccLocal = data.status === "success" ? (data.pdf_campos || []) : [];
+    camposPdfAccUrl   = data.pdf_url || null;
   } catch {
     camposPdfAccLocal = [];
+    camposPdfAccUrl   = null;
   }
+  const btnAcc = document.getElementById("btn-abrir-picker-acc");
+  if (btnAcc) btnAcc.style.display = camposPdfAccUrl ? '' : 'none';
   renderTablaCamposPdfAcc(camposPdfAccLocal);
   document.getElementById("overlay-campos-pdf-acc").classList.add("open");
 }
@@ -3747,6 +3782,7 @@ const CAMPOS_PERSONAL_DISPONIBLES = [
 let plantillasPersonalGlobal = [];
 let camposPdfPerTipo   = "";   // "diploma" | "certificado" | "dc3"
 let camposPdfPerLocal  = [];
+let camposPdfPerUrl    = null;
 
 /* ── Cargar lista de plantillas ── */
 async function cargarPlantillasPersonal() {
@@ -3855,10 +3891,14 @@ async function abrirModalCamposPdfPersonal(tipo) {
     const res  = await fetch(`${API}?action=OBTENER_CAMPOS_PDF_PERSONAL&tipo=${tipo}&token=${s.token||""}`);
     const data = await res.json();
     camposPdfPerLocal = data.status === "success" ? (data.pdf_campos || []) : [];
+    camposPdfPerUrl   = data.pdf_url || null;
   } catch {
     camposPdfPerLocal = [];
+    camposPdfPerUrl   = null;
   }
 
+  const btnPer = document.getElementById("btn-abrir-picker-per");
+  if (btnPer) btnPer.style.display = camposPdfPerUrl ? '' : 'none';
   renderTablaCamposPdfPer(camposPdfPerLocal);
   document.getElementById("overlay-campos-pdf-per").classList.add("open");
 }
@@ -4020,6 +4060,270 @@ async function verEvidencia(url) {
     grid.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rojo)">Error al cargar: ${e.message}</div>`;
   }
   document.getElementById('ev-lightbox').classList.remove('open');
+}
+</script>
+
+<!-- ══════════════════════════════════════════════════════════════════════
+     PICKER DE COORDENADAS PDF
+══════════════════════════════════════════════════════════════════════ -->
+<style>
+#modal-picker{position:fixed;inset:0;background:rgba(10,20,40,.7);z-index:450;display:none;align-items:center;justify-content:center;padding:12px;}
+#modal-picker.open{display:flex;}
+.pk-wrap{background:#fff;border-radius:14px;width:98vw;max-width:1280px;height:92vh;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(0,0,0,.35);overflow:hidden;}
+.pk-hdr{padding:12px 18px;border-bottom:1px solid #dfe5ef;display:flex;align-items:center;gap:10px;flex-shrink:0;background:#f4f7fb;}
+.pk-hdr-title{font-size:14px;font-weight:700;color:#1a1a2e;}
+.pk-page-ctrl{display:flex;align-items:center;gap:6px;margin-left:auto;}
+.pk-btn-pg{padding:5px 11px;border:1px solid #dfe5ef;border-radius:7px;background:#fff;cursor:pointer;font-size:13px;font-weight:600;color:#185FA5;}
+.pk-btn-pg:hover{background:#E6F1FB;}
+.pk-btn-pg:disabled{opacity:.35;cursor:default;}
+#pk-page-info{font-size:12px;color:#5a6072;min-width:90px;text-align:center;}
+.pk-body{display:flex;flex:1;overflow:hidden;}
+/* Canvas area */
+.pk-canvas-area{flex:1;overflow:auto;background:#666;display:flex;justify-content:center;align-items:flex-start;padding:18px;}
+#pk-canvas-wrap{position:relative;display:inline-block;cursor:crosshair;box-shadow:0 4px 24px rgba(0,0,0,.5);}
+#pk-canvas{display:block;}
+#pk-markers{position:absolute;inset:0;pointer-events:none;}
+#pk-markers .pk-pin{pointer-events:all;position:absolute;cursor:pointer;}
+#pk-markers .pk-dot{width:10px;height:10px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);transition:transform .1s;}
+#pk-markers .pk-pin:hover .pk-dot{transform:scale(1.4);}
+#pk-markers .pk-lbl{position:absolute;left:13px;top:-3px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);color:#fff;pointer-events:none;}
+/* Sidebar */
+.pk-sidebar{width:270px;border-left:1px solid #dfe5ef;display:flex;flex-direction:column;flex-shrink:0;background:#fff;}
+.pk-sidebar-hdr{padding:10px 14px;font-size:11px;font-weight:700;color:#9299a8;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #dfe5ef;background:#f4f7fb;}
+#pk-campo-list{flex:1;overflow-y:auto;padding:8px;}
+.pk-item{padding:8px 10px;border-radius:8px;margin-bottom:4px;cursor:pointer;border:1.5px solid transparent;transition:all .12s;}
+.pk-item:hover{background:#f4f7fb;}
+.pk-item.active{background:#E6F1FB;border-color:#185FA5;}
+.pk-item-top{display:flex;align-items:center;gap:6px;margin-bottom:2px;}
+.pk-dot-sm{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.pk-item-name{font-size:12px;font-weight:700;color:#1a1a2e;}
+.pk-item-page{margin-left:auto;font-size:10px;color:#9299a8;}
+.pk-item-coords{font-size:11px;color:#5a6072;padding-left:15px;}
+.pk-footer{padding:12px 14px;border-top:1px solid #dfe5ef;background:#f4f7fb;}
+.pk-hint{font-size:11px;color:#5a6072;line-height:1.4;}
+#pk-active-info{font-size:12px;font-weight:600;color:#185FA5;margin-top:6px;min-height:16px;}
+</style>
+
+<div id="modal-picker">
+  <div class="pk-wrap">
+    <div class="pk-hdr">
+      <span style="font-size:18px">📍</span>
+      <div>
+        <div class="pk-hdr-title">Posicionar campos en el PDF</div>
+        <div style="font-size:11px;color:#9299a8">Selecciona un campo → haz clic en el PDF para ubicarlo</div>
+      </div>
+      <div class="pk-page-ctrl">
+        <button class="pk-btn-pg" id="pk-btn-prev" onclick="pickerPrevPage()">‹ Anterior</button>
+        <span id="pk-page-info">Página 1 de 1</span>
+        <button class="pk-btn-pg" id="pk-btn-next" onclick="pickerNextPage()">Siguiente ›</button>
+        <div style="width:1px;height:24px;background:#dfe5ef;margin:0 4px"></div>
+        <button onclick="cerrarPicker()" style="padding:6px 14px;border-radius:8px;border:1px solid #dfe5ef;background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:#5a6072;">✕ Cerrar</button>
+      </div>
+    </div>
+    <div class="pk-body">
+      <div class="pk-canvas-area">
+        <div id="pk-canvas-wrap">
+          <canvas id="pk-canvas"></canvas>
+          <div id="pk-markers"></div>
+        </div>
+      </div>
+      <div class="pk-sidebar">
+        <div class="pk-sidebar-hdr">Campos — selecciona para posicionar</div>
+        <div id="pk-campo-list"></div>
+        <div class="pk-footer">
+          <div class="pk-hint">💡 Haz clic en el PDF para colocar el campo activo. Los marcadores muestran la posición actual de cada campo.</div>
+          <div id="pk-active-info"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════
+   PICKER DE COORDENADAS PDF — PDF.js
+══════════════════════════════════════════════════════════════════════ */
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+const PK_COLORS = ['#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6','#1abc9c','#e67e22','#16a085','#8e44ad','#2c3e50'];
+
+let pkPdf        = null;
+let pkPage       = 1;
+let pkNumPages   = 1;
+let pkScale      = 1;
+let pkMmW        = 0;   // page width in mm
+let pkMmH        = 0;   // page height in mm
+let pkActive     = 0;   // index of selected campo
+let pkCampos     = null; // reference to the campos array being edited
+let pkRenderFn   = null; // callback to refresh the table after changes
+let pkContext    = '';   // 'equipo' | 'acc' | 'personal'
+
+async function abrirPicker(pdfUrl, camposArr, context, renderCallback) {
+  if (!pdfUrl) { alert('Esta plantilla no tiene PDF cargado todavía.'); return; }
+  pkCampos   = camposArr;
+  pkContext  = context || 'equipo';
+  pkRenderFn = renderCallback || null;
+  pkPage     = 1;
+  pkActive   = 0;
+  document.getElementById('pk-active-info').textContent = '';
+  document.getElementById('modal-picker').classList.add('open');
+
+  // Render placeholder while loading
+  const canvas = document.getElementById('pk-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = 500; canvas.height = 700;
+  ctx.fillStyle = '#e0e0e0';
+  ctx.fillRect(0, 0, 500, 700);
+  ctx.fillStyle = '#888';
+  ctx.font = '14px sans-serif';
+  ctx.fillText('Cargando PDF...', 180, 355);
+  document.getElementById('pk-markers').innerHTML = '';
+
+  try {
+    pkPdf = await pdfjsLib.getDocument({ url: pdfUrl, cMapPacked: true }).promise;
+    pkNumPages = pkPdf.numPages;
+    await pickerRenderPage();
+    pickerRenderList();
+  } catch(e) {
+    ctx.fillStyle = '#c0392b';
+    ctx.fillText('Error al cargar PDF: ' + e.message, 20, 355);
+  }
+}
+
+async function pickerRenderPage() {
+  const page = await pkPdf.getPage(pkPage);
+  // page.view = [x0, y0, width, height] in pt (1 pt = 1/72 inch)
+  const ptW = page.view[2];
+  const ptH = page.view[3];
+  pkMmW = ptW / 72 * 25.4;
+  pkMmH = ptH / 72 * 25.4;
+
+  // Scale to fit canvas area (~820px wide max)
+  const maxW = Math.min(820, window.innerWidth * 0.62);
+  pkScale = maxW / ptW;
+  const vp = page.getViewport({ scale: pkScale });
+
+  const canvas = document.getElementById('pk-canvas');
+  canvas.width  = Math.round(vp.width);
+  canvas.height = Math.round(vp.height);
+  await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+
+  document.getElementById('pk-page-info').textContent = `Página ${pkPage} de ${pkNumPages}`;
+  document.getElementById('pk-btn-prev').disabled = pkPage <= 1;
+  document.getElementById('pk-btn-next').disabled = pkPage >= pkNumPages;
+
+  pickerRenderMarkers();
+}
+
+function pkMmToPx(xMm, yMm) {
+  const pxPerMm = pkScale * 72 / 25.4;
+  return { x: xMm * pxPerMm, y: yMm * pxPerMm };
+}
+function pkPxToMm(px, py) {
+  const pxPerMm = pkScale * 72 / 25.4;
+  return { x: +(px / pxPerMm).toFixed(1), y: +(py / pxPerMm).toFixed(1) };
+}
+
+function pickerRenderMarkers() {
+  const wrap = document.getElementById('pk-markers');
+  wrap.innerHTML = '';
+  if (!pkCampos) return;
+  pkCampos.forEach((c, i) => {
+    if ((c.pagina || 1) !== pkPage) return;
+    const { x, y } = pkMmToPx(c.x || 0, c.y || 0);
+    const color = PK_COLORS[i % PK_COLORS.length];
+    const isActive = i === pkActive;
+    const pin = document.createElement('div');
+    pin.className = 'pk-pin';
+    pin.style.cssText = `left:${x}px;top:${y}px;transform:translate(-5px,-5px);z-index:${isActive?20:10}`;
+    pin.innerHTML = `<div class="pk-dot" style="background:${color};${isActive?'transform:scale(1.4);border-color:#185FA5;':''}"></div>
+      <div class="pk-lbl" style="background:${color};${isActive?'outline:2px solid #185FA5;':''}">${c.campo}</div>`;
+    pin.onclick = e => { e.stopPropagation(); pickerSetActive(i); };
+    wrap.appendChild(pin);
+  });
+}
+
+function pickerSetActive(idx) {
+  pkActive = idx;
+  const c = pkCampos[idx];
+  // Navigate to campo's page if needed
+  const targetPage = c.pagina || 1;
+  if (targetPage !== pkPage) {
+    pkPage = targetPage;
+    pickerRenderPage();
+  } else {
+    pickerRenderMarkers();
+  }
+  pickerRenderList();
+  document.getElementById('pk-active-info').textContent =
+    `"${c.campo}" — x: ${c.x||0} mm, y: ${c.y||0} mm, pág. ${c.pagina||1}`;
+}
+
+function pickerRenderList() {
+  const list = document.getElementById('pk-campo-list');
+  if (!pkCampos || !pkCampos.length) {
+    list.innerHTML = '<div style="text-align:center;padding:24px;color:#9299a8;font-size:12px">Sin campos configurados</div>';
+    return;
+  }
+  list.innerHTML = pkCampos.map((c, i) =>
+    `<div class="pk-item${i===pkActive?' active':''}" onclick="pickerSetActive(${i})">
+       <div class="pk-item-top">
+         <div class="pk-dot-sm" style="background:${PK_COLORS[i%PK_COLORS.length]}"></div>
+         <span class="pk-item-name">${c.campo}</span>
+         <span class="pk-item-page">p.${c.pagina||1}</span>
+       </div>
+       <div class="pk-item-coords">x: ${c.x||0} &nbsp;y: ${c.y||0} mm</div>
+     </div>`
+  ).join('');
+}
+
+// Click on canvas → place active campo
+document.getElementById('pk-canvas-wrap').addEventListener('click', function(e) {
+  if (!pkCampos || !pkCampos.length) return;
+  if (pkActive >= pkCampos.length) pkActive = 0;
+
+  const rect = document.getElementById('pk-canvas').getBoundingClientRect();
+  const scaleX = document.getElementById('pk-canvas').width  / rect.width;
+  const scaleY = document.getElementById('pk-canvas').height / rect.height;
+  const rawX = (e.clientX - rect.left) * scaleX;
+  const rawY = (e.clientY - rect.top)  * scaleY;
+  const { x, y } = pkPxToMm(rawX, rawY);
+
+  pkCampos[pkActive].x      = x;
+  pkCampos[pkActive].y      = y;
+  pkCampos[pkActive].pagina = pkPage;
+
+  document.getElementById('pk-active-info').textContent =
+    `"${pkCampos[pkActive].campo}" colocado → x: ${x} mm, y: ${y} mm, pág. ${pkPage}`;
+
+  pickerRenderMarkers();
+  pickerRenderList();
+
+  // Sync back to the table
+  if (pkContext === 'equipo')    renderTablaCamposPdf(camposPdfLocal);
+  if (pkContext === 'acc')       renderTablaCamposPdfAcc(camposPdfAccLocal);
+  if (pkContext === 'personal')  renderTablaCamposPdfPer(camposPdfPerLocal);
+  if (pkRenderFn) pkRenderFn();
+
+  // Auto-advance to next campo
+  if (pkActive < pkCampos.length - 1) {
+    pkActive++;
+    pickerRenderList();
+    const c = pkCampos[pkActive];
+    document.getElementById('pk-active-info').textContent =
+      `▶ Ahora posiciona "${c.campo}"`;
+  }
+});
+
+async function pickerPrevPage() {
+  if (pkPage > 1) { pkPage--; await pickerRenderPage(); }
+}
+async function pickerNextPage() {
+  if (pkPage < pkNumPages) { pkPage++; await pickerRenderPage(); }
+}
+function cerrarPicker() {
+  document.getElementById('modal-picker').classList.remove('open');
 }
 </script>
 
