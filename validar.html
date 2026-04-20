@@ -501,11 +501,23 @@ window.onload = function() {
   renderDots();
   verificarBloqueo();
 
-  // Sonidos
   beepOk  = new Audio("https://www.soundjay.com/buttons/sounds/button-3.mp3");
   beepErr = new Audio("https://www.soundjay.com/buttons/sounds/button-10.mp3");
 
-  document.getElementById("qr-input").focus();
+  // Si viene con ?qr= en la URL (escaneado desde el documento físico),
+  // pre-llenar el campo y enfocar directamente el captcha
+  const params   = new URLSearchParams(window.location.search);
+  const qrParam  = params.get('qr') || params.get('code') || params.get('id');
+  if (qrParam) {
+    const codigo = extraerCodigo(qrParam);
+    document.getElementById('qr-input').value = codigo;
+    setTimeout(() => {
+      document.getElementById('cap-inp').focus();
+      document.getElementById('cap-inp').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 200);
+  } else {
+    document.getElementById("qr-input").focus();
+  }
 };
 
 /* ═══════════════════════════════════════
@@ -920,7 +932,12 @@ async function iniciarCamara() {
         await detenerCamara();
         const codigo = extraerCodigo(qrCode);
         document.getElementById("qr-input").value = codigo;
-        validar();
+        limpiarError();
+        // Enfocar captcha para que el usuario solo tenga que responderlo y validar
+        setTimeout(() => {
+          document.getElementById('cap-inp').focus();
+          document.getElementById('cap-inp').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 250);
       }
     );
     scannerActivo = true;

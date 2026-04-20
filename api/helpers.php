@@ -76,11 +76,14 @@ function generarCodigoQR(PDO $pdo): string {
 }
 
 /**
- * Construye la URL del QR usando quickchart.io (igual que AppScript).
+ * Construye la URL del QR usando quickchart.io.
+ * El QR codifica la URL de validación completa para que al escanearlo
+ * con cualquier cámara abra directamente la página con el código prellenado.
  */
 function urlQR(string $codigo): string {
     if (!$codigo) return '';
-    return 'https://quickchart.io/qr?text=' . urlencode($codigo) . '&size=300';
+    $validarUrl = rtrim(SITE_URL, '/') . '/validar.html?qr=' . urlencode($codigo);
+    return 'https://quickchart.io/qr?text=' . urlencode($validarUrl) . '&size=300';
 }
 
 /**
