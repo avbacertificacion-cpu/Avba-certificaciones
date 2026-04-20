@@ -137,4 +137,83 @@ class Calidad {
         $stmt->execute([$id]);
         return $stmt->fetch() ?: null;
     }
+
+    // ── Listar info de códigos QR ──────────────────────────
+    public function listarQrInfo(string $filtro = 'todos'): array {
+        $this->ensureQrTable();
+
+        $total      = (int) $this->pdo->query("SELECT COUNT(*) FROM qr_codigos")->fetchColumn();
+        $usados     = (int) $this->pdo->query("SELECT COUNT(*) FROM qr_codigos WHERE usado = 1")->fetchColumn();
+        $disponibles = $total - $usados;
+        $ultimo     = $this->pdo->query("SELECT MAX(CAST(identificador AS UNSIGNED)) FROM qr_codigos")->fetchColumn();
+
+        $where = match($filtro) {
+            'disponibles' => 'WHERE usado = 0',
+            'usados'      => 'WHERE usado = 1',
+            default       => '',
+        };
+        $codigos = $this->pdo->query(
+            "SELECT identificador, usado FROM qr_codigos {$where}
+             ORDER BY CAST(identificador AS UNSIGNED) DESC LIMIT 200"
+        )->fetchAll();
+
+        return [
+            'status'      => 'success',
+            'total'       => $total,
+            'usados'      => $usados,
+            'disponibles' => $disponibles,
+            'ultimo'      => $ultimo ?: null,
+            'codigos'     => $codigos,
+        ];
+    }
+
+    // ── Generar lote de códigos QR consecutivos ────────────
+    public function generarQrLote(array $payload): array {
+        $this->ensureQrTable();
+
+        $hasta = trim($payload['hasta'] ?? '');
+        if (!preg_match('/^\d{10}$/', $hasta)) {
+            return ['status' => 'error', 'message' => 'El número debe tener exactamente 10 dígitos.'];
+        }
+
+        $ultimoRaw = $this->pdo->query(
+            "SELECT MAX(CAST(identificador AS UNSIGNED)) FROM qr_codigos"
+        )->fetchColumn();
+        $ultimo = $ultimoRaw ? (int) $ultimoRaw : 0;
+        $hastaInt = (int) $hasta;
+
+        if ($hastaInt <= $ultimo) {
+            return ['status' => 'error', 'message' => "El número debe ser mayor que el último registrado ({$ultimo})."];
+        }
+
+        $desde = $ultimo + 1;
+        $cantidad = $hastaInt - $ultimo;
+
+        $stmt = $this->pdo->prepare(
+            "INSERT IGNORE INTO qr_codigos (identificador, usado) VALUES (?, 0)"
+        );
+        $this->pdo->beginTransaction();
+        try {
+            for ($n = $desde; $n <= $hastaInt; $n++) {
+                $stmt->execute([str_pad((string) $n, 10, '0', STR_PAD_LEFT)]);
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            return ['status' => 'error', 'message' => 'Error al insertar códigos: ' . $e->getMessage()];
+        }
+
+        return ['status' => 'success', 'message' => "{$cantidad} códigos generados correctamente.", 'cantidad' => $cantidad];
+    }
+
+    private function ensureQrTable(): void {
+        $this->pdo->exec("
+            CREATE TABLE IF NOT EXISTS qr_codigos (
+                id            INT AUTO_INCREMENT PRIMARY KEY,
+                identificador VARCHAR(20) NOT NULL UNIQUE,
+                usado         TINYINT(1)  DEFAULT 0,
+                equipo_id     INT         DEFAULT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    }
 }

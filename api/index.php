@@ -159,6 +159,11 @@ if ($method === 'GET') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cal->getDataCalidad());
 
+        case 'LISTAR_QR_INFO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->listarQrInfo($_GET['filtro'] ?? 'todos'));
+
         // Panel de Certificaciones
         case 'getDataCertificaciones':
         case 'GET_DATA_CERTIFICACIONES':
@@ -324,6 +329,11 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cal->rechazarCalidad($payload, $usr['usuario']));
+
+        case 'GENERAR_QR_LOTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->generarQrLote($payload));
 
         // ── Certificaciones ───────────────────────────────
         case 'IMPRIMIR_PDF_CERT':

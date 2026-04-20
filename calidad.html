@@ -440,6 +440,9 @@
     }
     .tab-btn.active { color: var(--azul); border-bottom-color: var(--azul); }
     .tab-btn:hover:not(.active) { color: var(--texto); }
+    .qr-stat-card{background:#fff;border:1px solid var(--borde);border-radius:10px;padding:14px 18px;min-width:130px;flex:1;}
+    .qr-stat-val{font-size:26px;font-weight:800;color:var(--texto);line-height:1;}
+    .qr-stat-lbl{font-size:11px;color:var(--texto-hint);margin-top:4px;}
 
     /* ── SUB-NAVEGACIÓN ── */
     .sub-nav {
@@ -644,6 +647,7 @@
   <button class="tab-btn"        id="sec-btn-accesorios" onclick="verSeccion('accesorios')">🔗 Accesorios</button>
   <button class="tab-btn"        id="sec-btn-personal"   onclick="verSeccion('personal')">👤 Personal</button>
   <button class="tab-btn"        id="sec-btn-catalogos"  onclick="verSeccion('catalogos')">⚙️ Catálogos</button>
+  <button class="tab-btn"        id="sec-btn-qr"         onclick="verSeccion('qr')">🔢 Códigos QR</button>
 </div>
 
 <!-- sub-nav Accesorios -->
@@ -1057,6 +1061,81 @@
   </div>
 
 </div><!-- /sec-personal-plantillas -->
+
+
+<!-- ══ SECCIÓN: CÓDIGOS QR ══ -->
+<div id="sec-qr" class="wrap" style="display:none">
+
+  <!-- Stats row -->
+  <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px">
+    <div class="qr-stat-card">
+      <div class="qr-stat-val" id="qr-stat-total">—</div>
+      <div class="qr-stat-lbl">Total registrados</div>
+    </div>
+    <div class="qr-stat-card" style="border-color:var(--verde)">
+      <div class="qr-stat-val" style="color:var(--verde)" id="qr-stat-disp">—</div>
+      <div class="qr-stat-lbl">Disponibles</div>
+    </div>
+    <div class="qr-stat-card" style="border-color:var(--texto-hint)">
+      <div class="qr-stat-val" style="color:var(--texto-hint)" id="qr-stat-used">—</div>
+      <div class="qr-stat-lbl">Usados</div>
+    </div>
+    <div class="qr-stat-card" style="border-color:var(--azul)">
+      <div class="qr-stat-val" style="color:var(--azul);font-family:monospace;font-size:20px" id="qr-stat-ultimo">—</div>
+      <div class="qr-stat-lbl">Último número</div>
+    </div>
+  </div>
+
+  <!-- Generator form -->
+  <div style="background:#fff;border:1px solid var(--borde);border-radius:12px;padding:20px 22px;max-width:520px;margin-bottom:24px">
+    <div style="font-size:14px;font-weight:700;color:var(--texto);margin-bottom:4px">Generar lote de códigos QR</div>
+    <div style="font-size:12px;color:var(--texto-sub);margin-bottom:16px">
+      Los códigos son números consecutivos de 10 dígitos. Ingresa el número hasta el que deseas generar.
+    </div>
+    <div style="display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap">
+      <div style="flex:1;min-width:180px">
+        <label style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">Generar hasta el número</label>
+        <input type="number" id="qr-hasta-input" min="1000000000" max="9999999999" step="1"
+               placeholder="Ej: 1000000050"
+               style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;
+                      font-size:13px;font-family:monospace;box-sizing:border-box">
+        <div style="font-size:11px;color:var(--texto-hint);margin-top:4px" id="qr-hasta-hint"></div>
+      </div>
+      <button onclick="generarLoteQR()"
+              style="padding:10px 20px;background:var(--azul);color:#fff;border:none;border-radius:8px;
+                     font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap">
+        + Generar lote
+      </button>
+    </div>
+  </div>
+
+  <!-- Table of codes -->
+  <div style="background:#fff;border:1px solid var(--borde);border-radius:12px;overflow:hidden">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--borde);display:flex;align-items:center;justify-content:space-between">
+      <span style="font-size:13px;font-weight:700;color:var(--texto)">Códigos registrados</span>
+      <select id="qr-filtro" onchange="cargarInfoQR()" style="font-size:12px;padding:4px 8px;border:1px solid var(--borde);border-radius:6px">
+        <option value="todos">Todos</option>
+        <option value="disponibles">Disponibles</option>
+        <option value="usados">Usados</option>
+      </select>
+    </div>
+    <div style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead>
+          <tr style="background:var(--gris-bg)">
+            <th style="padding:9px 14px;text-align:left;font-weight:600;color:var(--texto-sub)">Código</th>
+            <th style="padding:9px 14px;text-align:center;font-weight:600;color:var(--texto-sub)">Estado</th>
+          </tr>
+        </thead>
+        <tbody id="qr-tabla-body">
+          <tr><td colspan="2" style="text-align:center;padding:24px;color:var(--texto-hint)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div id="qr-paginacion" style="padding:10px 14px;border-top:1px solid var(--borde);font-size:12px;color:var(--texto-sub);display:none"></div>
+  </div>
+
+</div><!-- /sec-qr -->
 
 
 <!-- ══ MODAL DETALLE SESIÓN ACCESORIOS ══ -->
@@ -2043,10 +2122,11 @@ const TODOS_CONTENIDOS = [
   'sec-acc-inspeccionados', 'tab-accesorios', 'sec-acc-plantilla',
   'sec-personal-cursos',    'sec-personal-indep',    'sec-personal-plantillas',
   'tab-tipos', 'tab-cursos', 'tab-ocupaciones',
+  'sec-qr',
 ];
 
 function verSeccion(sec) {
-  ['maquinaria','accesorios','personal','catalogos'].forEach(s => {
+  ['maquinaria','accesorios','personal','catalogos','qr'].forEach(s => {
     document.getElementById('sec-btn-' + s).classList.toggle('active', s === sec);
   });
   ['accesorios','personal','catalogos'].forEach(s => {
@@ -2067,6 +2147,9 @@ function verSeccion(sec) {
   } else if (sec === 'catalogos') {
     document.getElementById('sub-nav-catalogos').style.display = '';
     verSubTab('catalogos', 'equipos');
+  } else if (sec === 'qr') {
+    document.getElementById('sec-qr').style.display = '';
+    cargarInfoQR();
   }
 }
 
@@ -4036,6 +4119,104 @@ async function verEvidencia(url) {
     grid.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rojo)">Error al cargar: ${e.message}</div>`;
   }
   document.getElementById('ev-lightbox').classList.remove('open');
+}
+
+/* ════════════════════════════════════════
+   CÓDIGOS QR
+════════════════════════════════════════ */
+let qrInfoCache = null;
+
+async function cargarInfoQR() {
+  const filtro = document.getElementById('qr-filtro')?.value || 'todos';
+  try {
+    const res  = await fetch(`${API}?action=LISTAR_QR_INFO&filtro=${filtro}`);
+    const data = await res.json();
+    if (data.status !== 'success') return;
+
+    qrInfoCache = data;
+    document.getElementById('qr-stat-total').textContent  = data.total  ?? '—';
+    document.getElementById('qr-stat-disp').textContent   = data.disponibles ?? '—';
+    document.getElementById('qr-stat-used').textContent   = data.usados ?? '—';
+    document.getElementById('qr-stat-ultimo').textContent = data.ultimo ?? '—';
+
+    // Hint en el input
+    const hint = document.getElementById('qr-hasta-hint');
+    if (data.ultimo) {
+      hint.textContent = `El siguiente disponible es ${BigInt(data.ultimo) + 1n}`;
+      document.getElementById('qr-hasta-input').min = String(BigInt(data.ultimo) + 1n);
+    } else {
+      hint.textContent = 'No hay códigos registrados aún. El primer código será 1000000001.';
+      document.getElementById('qr-hasta-input').min = '1000000001';
+    }
+
+    // Tabla
+    const tbody = document.getElementById('qr-tabla-body');
+    const codigos = data.codigos || [];
+    if (!codigos.length) {
+      tbody.innerHTML = `<tr><td colspan="2" style="text-align:center;padding:24px;color:var(--texto-hint)">Sin códigos${filtro !== 'todos' ? ' con ese filtro' : ''}.</td></tr>`;
+    } else {
+      tbody.innerHTML = codigos.map(c => `
+        <tr style="border-bottom:1px solid var(--gris-bg)">
+          <td style="padding:9px 14px;font-family:monospace;font-size:13px;letter-spacing:.04em">${c.identificador}</td>
+          <td style="padding:9px 14px;text-align:center">
+            ${c.usado
+              ? `<span style="background:var(--gris-bg);color:var(--texto-hint);padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600">Usado</span>`
+              : `<span style="background:var(--verde-light);color:var(--verde);padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600">Disponible</span>`
+            }
+          </td>
+        </tr>`).join('');
+    }
+
+    const pag = document.getElementById('qr-paginacion');
+    if (data.total > codigos.length) {
+      pag.style.display = '';
+      pag.textContent   = `Mostrando ${codigos.length} de ${data.total} códigos`;
+    } else {
+      pag.style.display = 'none';
+    }
+  } catch(e) {
+    console.error('cargarInfoQR:', e);
+  }
+}
+
+async function generarLoteQR() {
+  const input = document.getElementById('qr-hasta-input');
+  const hasta = input.value.trim();
+
+  input.style.borderColor = '';
+  if (!hasta || !/^\d{10}$/.test(hasta)) {
+    input.style.borderColor = 'var(--rojo)';
+    input.focus();
+    alert('El número debe tener exactamente 10 dígitos.');
+    return;
+  }
+
+  const ultimo = qrInfoCache?.ultimo ? BigInt(qrInfoCache.ultimo) : 0n;
+  if (BigInt(hasta) <= ultimo) {
+    input.style.borderColor = 'var(--rojo)';
+    input.focus();
+    alert(`El número debe ser mayor que el último registrado (${ultimo}).`);
+    return;
+  }
+
+  const cantidad = Number(BigInt(hasta) - ultimo);
+  if (cantidad > 10000) {
+    if (!confirm(`Se generarán ${cantidad.toLocaleString()} códigos. ¿Continuar?`)) return;
+  }
+
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'GENERAR_QR_LOTE', payload: { hasta } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      input.value = '';
+      cargarInfoQR();
+    } else {
+      alert('Error: ' + (data.message || 'No se pudo generar el lote'));
+    }
+  } catch(e) { alert('Error de conexión'); }
 }
 </script>
 
