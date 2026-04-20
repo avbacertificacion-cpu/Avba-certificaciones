@@ -274,12 +274,26 @@ class Accesorios {
     }
 
     // ── Aprobar sesión → APROBADO_CALIDAD ────────────────
-    public function aprobarSesion(int $id, string $usuario): array {
+    public function aprobarSesion(int $id, string $usuario, string $qr): array {
         $this->ensureEstatusColumn('accesorios_sesiones');
+        // Garantizar columna qr_codigo
+        try {
+            $this->pdo->exec("ALTER TABLE accesorios_sesiones ADD COLUMN IF NOT EXISTS qr_codigo VARCHAR(20) NULL");
+        } catch (\Throwable $e) {}
+
         $chk = $this->pdo->prepare("SELECT id, cliente, control FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
         $sesion = $chk->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+
+        if (!$qr) return ['status' => 'error', 'message' => 'El código QR es requerido.'];
+
+        // Validar QR existe y no está usado
+        $stmtQR = $this->pdo->prepare("SELECT id, usado FROM qr_codigos WHERE identificador = ?");
+        $stmtQR->execute([$qr]);
+        $qrRow = $stmtQR->fetch();
+        if (!$qrRow)        return ['status' => 'error', 'message' => 'Código QR no válido.'];
+        if ($qrRow['usado']) return ['status' => 'error', 'message' => 'Código QR ya está en uso.'];
 
         // Generar control si la sesión no lo tiene (registros previos a migration_009)
         if (empty($sesion['control'])) {
@@ -288,8 +302,13 @@ class Accesorios {
                 ->execute([$control, $id]);
         }
 
-        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'APROBADO_CALIDAD' WHERE id = ?")
-            ->execute([$id]);
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'APROBADO_CALIDAD', qr_codigo = ? WHERE id = ?")
+            ->execute([$qr, $id]);
+
+        // Marcar QR como usado
+        $this->pdo->prepare("UPDATE qr_codigos SET usado = 1 WHERE id = ?")
+            ->execute([$qrRow['id']]);
+
         return ['status' => 'success', 'message' => 'Sesión aprobada y enviada a Certificaciones.'];
     }
 

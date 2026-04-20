@@ -499,7 +499,7 @@ if ($method === 'POST') {
         case 'APROBAR_PARTICIPANTE':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($personal->aprobarParticipante((int)($payload['id'] ?? 0), $usr['usuario']));
+            respuesta($personal->aprobarParticipante((int)($payload['id'] ?? 0), $usr['usuario'], trim($payload['qr'] ?? '')));
 
         case 'DEVOLVER_PARTICIPANTE':
             $usr = validarToken($pdo, $token);
@@ -578,7 +578,7 @@ if ($method === 'POST') {
         case 'APROBAR_SESION_ACC':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($accesorios->aprobarSesion((int)($payload['id'] ?? 0), $usr['usuario']));
+            respuesta($accesorios->aprobarSesion((int)($payload['id'] ?? 0), $usr['usuario'], trim($payload['qr'] ?? '')));
 
         case 'DEVOLVER_SESION_ACC':
             $usr = validarToken($pdo, $token);

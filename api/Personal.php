@@ -174,12 +174,26 @@ class Personal {
     }
 
     // ── Aprobar participante → APROBADO_CALIDAD ────────────
-    public function aprobarParticipante(int $id, string $usuario): array {
+    public function aprobarParticipante(int $id, string $usuario, string $qr): array {
         $this->ensureEstatusColumn();
+        // Garantizar columna qr_codigo
+        try {
+            $this->pdo->exec("ALTER TABLE participantes_cursos ADD COLUMN IF NOT EXISTS qr_codigo VARCHAR(20) NULL");
+        } catch (\Throwable $e) {}
+
         $chk = $this->pdo->prepare("SELECT id, nombre_completo, empresa_nombre, control FROM participantes_cursos WHERE id = ?");
         $chk->execute([$id]);
         $p = $chk->fetch();
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        if (!$qr) return ['status' => 'error', 'message' => 'El código QR es requerido.'];
+
+        // Validar QR existe y no está usado
+        $stmtQR = $this->pdo->prepare("SELECT id, usado FROM qr_codigos WHERE identificador = ?");
+        $stmtQR->execute([$qr]);
+        $qrRow = $stmtQR->fetch();
+        if (!$qrRow)        return ['status' => 'error', 'message' => 'Código QR no válido.'];
+        if ($qrRow['usado']) return ['status' => 'error', 'message' => 'Código QR ya está en uso.'];
 
         // Generar control si el participante no lo tiene (registros previos a migration_009)
         if (empty($p['control'])) {
@@ -189,8 +203,13 @@ class Personal {
                 ->execute([$control, $id]);
         }
 
-        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'APROBADO_CALIDAD' WHERE id = ?")
-            ->execute([$id]);
+        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'APROBADO_CALIDAD', qr_codigo = ? WHERE id = ?")
+            ->execute([$qr, $id]);
+
+        // Marcar QR como usado
+        $this->pdo->prepare("UPDATE qr_codigos SET usado = 1 WHERE id = ?")
+            ->execute([$qrRow['id']]);
+
         return ['status' => 'success', 'message' => 'Participante aprobado y enviado a Certificaciones.'];
     }
 

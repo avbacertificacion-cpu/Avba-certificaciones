@@ -1946,8 +1946,14 @@ async function confirmarNC() {
 /* ═══════════════════════════════════════
    APROBACIÓN
 ═══════════════════════════════════════ */
-function abrirApro() {
+let aproContext = 'equipo'; // 'equipo' | 'acc' | 'per'
+let aproId      = 0;
+
+function abrirApro(context, id) {
+  aproContext = context || 'equipo';
+  aproId      = id     || 0;
   document.getElementById("qr-input").value = "";
+  document.getElementById("qr-input").style.borderColor = "";
   document.getElementById("apro-paso-qr").style.display = "block";
   document.getElementById("apro-paso-ok").style.display = "none";
   document.getElementById("overlay-apro").classList.add("open");
@@ -1958,7 +1964,9 @@ function cerrarApro() {
 }
 function cerrarAproFinal() {
   cerrarApro();
-  cargar(); // Recargar desde la API para reflejar el folio real
+  if (aproContext === 'acc') { accSesionesCargadas = false; cargarSesionesAcc(); cerrarDetAccSesion(); }
+  else if (aproContext === 'per') { perCargados = false; cargarPersonal(); cerrarDetPer(); }
+  else cargar();
 }
 
 async function ejecutarAprobacion() {
@@ -1970,26 +1978,35 @@ async function ejecutarAprobacion() {
   }
 
   try {
+    let action, payload;
+    if (aproContext === 'acc') {
+      action  = 'APROBAR_SESION_ACC';
+      payload = { id: aproId, qr };
+    } else if (aproContext === 'per') {
+      action  = 'APROBAR_PARTICIPANTE';
+      payload = { id: aproId, qr };
+    } else {
+      action  = 'VALIDAR_CALIDAD';
+      payload = { fila: filaActual, qr };
+    }
+
     const res  = await fetch(API, {
       method: "POST",
-      body:   JSON.stringify({
-        action:  "VALIDAR_CALIDAD",
-        payload: { fila: filaActual, qr }
-      })
+      body:   JSON.stringify({ action, payload })
     });
     const data = await res.json();
 
     if (data.status === "success") {
-      const d = datosGlobal.find(x => x.fila === filaActual);
-      if (d) { d.estado = "APROBADO CALIDAD"; }
-
-      document.getElementById("folio-val").textContent = data.folio || "—";
+      if (aproContext === 'equipo') {
+        const d = datosGlobal.find(x => x.fila === filaActual);
+        if (d) { d.estado = "APROBADO CALIDAD"; }
+        render(datosGlobal);
+        actualizarStats(datosGlobal);
+        cerrarDet();
+      }
+      document.getElementById("folio-val").textContent = data.folio || data.control || "—";
       document.getElementById("apro-paso-qr").style.display = "none";
       document.getElementById("apro-paso-ok").style.display  = "block";
-
-      cerrarDet();
-      render(datosGlobal);
-      actualizarStats(datosGlobal);
     } else {
       alert("Error al aprobar: " + (data.message || "Error desconocido"));
     }
@@ -2483,7 +2500,7 @@ function renderSesionesAcc(data) {
         <div style="display:flex;gap:5px;justify-content:flex-end">
           <button onclick="abrirDetAccSesion(${r.id})"
                   style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
-          ${puedAprobar ? `<button onclick="aprobarSesionAcc(${r.id})"
+          ${puedAprobar ? `<button onclick="abrirApro('acc',${r.id})"
                   style="background:var(--verde-light);border:1px solid var(--verde);color:var(--verde);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Aprobar</button>` : ''}
         </div>
       </td>
@@ -2530,7 +2547,7 @@ async function abrirDetAccSesion(id) {
 
     const aprobarBtnHtml = puedAprobar ? `
       <div style="padding:14px 0 4px;text-align:right">
-        <button onclick="aprobarSesionAcc(${s.id})"
+        <button onclick="abrirApro('acc',${s.id})"
                 style="padding:8px 20px;border-radius:8px;border:none;background:var(--verde);
                        color:white;font-size:13px;font-weight:600;cursor:pointer">
           ✓ Aprobar sesión → Certificaciones
@@ -2546,26 +2563,6 @@ async function abrirDetAccSesion(id) {
 
 function cerrarDetAccSesion() {
   document.getElementById('overlay-acc-sesion').style.display = 'none';
-}
-
-async function aprobarSesionAcc(id) {
-  if (!confirm('¿Aprobar esta sesión y enviarla a Certificaciones?')) return;
-  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
-  try {
-    const res  = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
-      body: JSON.stringify({ action: 'APROBAR_SESION_ACC', payload: { id } })
-    });
-    const data = await res.json();
-    if (data.status === 'success') {
-      accSesionesCargadas = false;
-      cargarSesionesAcc();
-      cerrarDetAccSesion();
-    } else {
-      alert('Error: ' + (data.message || 'No se pudo aprobar'));
-    }
-  } catch(e) { alert('Error de conexión'); }
 }
 
 /* ── Helpers de estado ── */
@@ -2745,7 +2742,7 @@ function renderIndep(data) {
         <div style="display:flex;gap:5px;justify-content:flex-end">
           <button onclick="abrirDetPer(${p.id})"
                   style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
-          ${puedAprobar ? `<button onclick="aprobarParticipante(${p.id})"
+          ${puedAprobar ? `<button onclick="abrirApro('per',${p.id})"
                   style="background:var(--verde-light);border:1px solid var(--verde);color:var(--verde);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Aprobar</button>` : ''}
         </div>
       </td>
@@ -2787,7 +2784,7 @@ async function abrirDetPer(id) {
         </div>` : '<div></div>'}
         <div style="display:flex;align-items:center;gap:8px">
           ${estatusPerBadge(p.estatus)}
-          ${puedAprobarP ? `<button onclick="aprobarParticipante(${p.id})"
+          ${puedAprobarP ? `<button onclick="abrirApro('per',${p.id})"
             style="padding:5px 14px;border-radius:7px;border:none;background:var(--verde);color:white;font-size:12px;font-weight:600;cursor:pointer">
             ✓ Aprobar → Certificaciones
           </button>` : ''}
@@ -2814,27 +2811,6 @@ async function abrirDetPer(id) {
 function cerrarDetPer() {
   document.getElementById('overlay-per-det').style.display = 'none';
 }
-
-async function aprobarParticipante(id) {
-  if (!confirm('¿Aprobar este participante y enviarlo a Certificaciones?')) return;
-  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
-  try {
-    const res  = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
-      body: JSON.stringify({ action: 'APROBAR_PARTICIPANTE', payload: { id } })
-    });
-    const data = await res.json();
-    if (data.status === 'success') {
-      perCargados = false;
-      cargarPersonal();
-      cerrarDetPer();
-    } else {
-      alert('Error: ' + (data.message || 'No se pudo aprobar'));
-    }
-  } catch(e) { alert('Error de conexión'); }
-}
-
 
 /* ═══════════════════════════════════════
    TIPOS DE EQUIPO — estado
