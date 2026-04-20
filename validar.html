@@ -755,9 +755,8 @@ function mostrarResultado(data) {
   const d      = data.datos;
   const modulo = data.modulo || 'equipo';
 
-  // Vigencia (no aplica a personal)
   let vigPct = 0, vigColor = "#00c87a", vigLabel = "", vigHTML = "";
-  if (modulo !== 'personal' && data.dias !== undefined && data.dias !== null) {
+  if (data.dias !== undefined && data.dias !== null) {
     const dias = data.dias;
     vigPct  = Math.max(0, Math.min(100, Math.round((dias / 365) * 100)));
     if (!data.vigente) {
@@ -787,11 +786,11 @@ function mostrarResultado(data) {
   function filasModulo() {
     if (modulo === 'personal') {
       return [
-        filaHTML("Participante",  d.nombre||"—"),
-        filaHTML("CURP",          d.curp||"—"),
-        filaHTML("Empresa",       d.empresa||"—"),
-        filaHTML("Curso",         d.curso||"—"),
+        filaHTML("Participante",    d.nombre||"—"),
+        filaHTML("CURP",            d.curp||"—"),
+        filaHTML("Curso",           d.curso||"—"),
         filaHTML("Fecha del curso", d.fecha||"—"),
+        d.vencimiento ? filaHTML("Válido hasta", d.vencimiento) : "",
       ].join('');
     }
     if (modulo === 'accesorio') {
@@ -800,7 +799,6 @@ function mostrarResultado(data) {
         (d.marca||d.modelo) ? filaHTML("Marca / Modelo", [d.marca,d.modelo].filter(Boolean).join(' ')) : "",
         d.serie     ? filaHTML("No. de serie",  d.serie)    : "",
         d.capacidad ? filaHTML("Capacidad",     d.capacidad): "",
-        filaHTML("Cliente",        d.cliente||"—"),
         filaHTML("Inspeccionado el", d.fecha||"—"),
         d.vencimiento ? filaHTML("Válido hasta", d.vencimiento) : "",
       ].join('');

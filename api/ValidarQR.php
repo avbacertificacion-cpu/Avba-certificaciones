@@ -158,23 +158,21 @@ class ValidarQR {
             $row = $stmt->fetch();
             if (!$row) return null;
 
-            // Los documentos de capacitación no tienen vencimiento por defecto
             $v = calcularVigencia($row['fecha_curso']);
             return [
                 'status'  => 'ok',
                 'existe'  => true,
                 'modulo'  => 'personal',
-                'vigente' => true,
-                'dias'    => null,
+                'vigente' => $v['vigente'],
+                'dias'    => $v['dias'],
                 'datos'   => [
-                    'titulo'        => 'Constancia de Capacitación',
-                    'nombre'        => $row['nombre_completo'],
-                    'curp'          => $row['curp'],
-                    'empresa'       => $row['empresa_nombre'],
-                    'curso'         => $row['curso_nombre'] ?? '—',
-                    'fecha'         => $row['fecha_curso']
+                    'titulo'      => 'Constancia de Capacitación',
+                    'nombre'      => $row['nombre_completo'],
+                    'curp'        => $row['curp'],
+                    'curso'       => $row['curso_nombre'] ?? '—',
+                    'fecha'       => $row['fecha_curso']
                         ? (new DateTime($row['fecha_curso']))->format('d/m/Y') : '',
-                    'vencimiento'   => '',
+                    'vencimiento' => $v['vencimiento'],
                 ],
             ];
         } catch (\Throwable $e) {
