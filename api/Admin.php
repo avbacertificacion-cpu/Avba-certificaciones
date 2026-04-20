@@ -428,7 +428,7 @@ class Admin {
         $row = $stmt->fetch();
         if (!$row) return ['status' => 'error', 'message' => 'Tipo no encontrado.'];
 
-        $base = rtrim(UPLOAD_URL, '/') . '/certificados/';
+        $base = rtrim(UPLOAD_URL, '/') . '/plantillas/';
         return [
             'status'             => 'success',
             'plantilla_cert_pdf' => $row['plantilla_cert_pdf'] ?? null,

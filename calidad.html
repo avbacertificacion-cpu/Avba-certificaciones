@@ -4181,13 +4181,22 @@ async function abrirPicker(pdfUrl, camposArr, context, renderCallback) {
   document.getElementById('pk-markers').innerHTML = '';
 
   try {
-    pkPdf = await pdfjsLib.getDocument({ url: pdfUrl, cMapPacked: true }).promise;
+    // Fetch bytes through the browser (handles same-origin, cookies, CORS)
+    const resp = await fetch(pdfUrl);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status} — archivo no encontrado`);
+    const buf  = await resp.arrayBuffer();
+    pkPdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
     pkNumPages = pkPdf.numPages;
     await pickerRenderPage();
     pickerRenderList();
   } catch(e) {
     ctx.fillStyle = '#c0392b';
-    ctx.fillText('Error al cargar PDF: ' + e.message, 20, 355);
+    ctx.font = '13px sans-serif';
+    ctx.fillText('Error al cargar PDF:', 20, 340);
+    ctx.fillText(e.message, 20, 362);
+    ctx.fillStyle = '#555';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('URL: ' + pdfUrl, 20, 390);
   }
 }
 
