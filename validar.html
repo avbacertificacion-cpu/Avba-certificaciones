@@ -752,25 +752,72 @@ function mostrarResultado(data) {
     return;
   }
 
-  const d = data.datos;
+  const d      = data.datos;
+  const modulo = data.modulo || 'equipo';
 
-  // Calcular vigencia
-  let vigPct = 0, vigColor = "#00c87a", vigLabel = "";
-  if (data.dias !== undefined && data.dias !== null) {
+  // Vigencia (no aplica a personal)
+  let vigPct = 0, vigColor = "#00c87a", vigLabel = "", vigHTML = "";
+  if (modulo !== 'personal' && data.dias !== undefined && data.dias !== null) {
     const dias = data.dias;
     vigPct  = Math.max(0, Math.min(100, Math.round((dias / 365) * 100)));
     if (!data.vigente) {
-      vigColor = "#e64646";
-      vigLabel = "Vencido";
-      vigPct   = 100;
+      vigColor = "#e64646"; vigLabel = "Vencido"; vigPct = 100;
     } else if (dias <= 30) {
-      vigColor = "#EF9F27";
-      vigLabel = `Vence en ${dias} día${dias===1?"":"s"}`;
+      vigColor = "#EF9F27"; vigLabel = `Vence en ${dias} día${dias===1?"":"s"}`;
     } else {
-      vigColor = "#00c87a";
-      vigLabel = `${dias} días restantes`;
+      vigColor = "#00c87a"; vigLabel = `${dias} días restantes`;
     }
+    vigHTML = `
+      <div class="vig-wrap">
+        <div class="vig-header">
+          <span class="vig-label">Vigencia</span>
+          <span class="vig-dias" style="color:${vigColor}">${vigLabel}</span>
+        </div>
+        <div class="vig-track">
+          <div class="vig-fill" style="width:${data.vigente ? (100-vigPct) : 100}%;background:${vigColor}"></div>
+        </div>
+        <div class="vig-fechas">
+          <span>${d.fecha||""}</span>
+          <span>${d.vencimiento||""}</span>
+        </div>
+      </div>`;
   }
+
+  // Filas por módulo
+  function filasModulo() {
+    if (modulo === 'personal') {
+      return [
+        filaHTML("Participante",  d.nombre||"—"),
+        filaHTML("CURP",          d.curp||"—"),
+        filaHTML("Empresa",       d.empresa||"—"),
+        filaHTML("Curso",         d.curso||"—"),
+        filaHTML("Fecha del curso", d.fecha||"—"),
+      ].join('');
+    }
+    if (modulo === 'accesorio') {
+      return [
+        filaHTML("Tipo de accesorio", d.tipo||"—"),
+        (d.marca||d.modelo) ? filaHTML("Marca / Modelo", [d.marca,d.modelo].filter(Boolean).join(' ')) : "",
+        d.serie     ? filaHTML("No. de serie",  d.serie)    : "",
+        d.capacidad ? filaHTML("Capacidad",     d.capacidad): "",
+        filaHTML("Cliente",        d.cliente||"—"),
+        filaHTML("Inspeccionado el", d.fecha||"—"),
+        d.vencimiento ? filaHTML("Válido hasta", d.vencimiento) : "",
+      ].join('');
+    }
+    // equipo (default)
+    return [
+      filaHTML("Tipo de equipo", d.maquinaria||"—"),
+      filaHTML("Marca / Modelo", [d.marca,d.modelo].filter(Boolean).join(' ')||"—"),
+      filaHTML("No. de serie",   d.serie||"—"),
+      d.capacidad   ? filaHTML("Capacidad",    d.capacidad)   : "",
+      filaHTML("Certificado el", d.fecha||"—"),
+      filaHTML("Válido hasta",   d.vencimiento||"—"),
+    ].join('');
+  }
+
+  const subTitulo = { equipo:'Maquinaria', accesorio:'Accesorio de Izaje', personal:'Personal / Capacitación' };
+  const badge = `<div style="font-size:10px;font-weight:700;letter-spacing:.08em;opacity:.55;text-transform:uppercase;margin-bottom:6px">${subTitulo[modulo]||''}</div>`;
 
   if (data.vigente) {
     document.body.classList.add("bg-vigente");
@@ -778,37 +825,17 @@ function mostrarResultado(data) {
       <div class="resultado res-vigente">
         <div class="res-header">
           <div class="res-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M20 6L9 17l-5-5"/>
-            </svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>
           </div>
-          <div class="res-title">CERTIFICADO VIGENTE</div>
+          ${badge}
+          <div class="res-title">${modulo==='personal' ? 'CONSTANCIA VÁLIDA' : 'CERTIFICADO VIGENTE'}</div>
           <div class="res-sub">Documento verificado y autenticado por AVBA</div>
         </div>
         <div class="res-body">
-          ${filaHTML("Tipo de equipo", d.maquinaria||d.tipo||"—")}
-          ${filaHTML("Marca / Modelo", (d.marca||"") + " " + (d.modelo||""))}
-          ${filaHTML("No. de serie",   d.serie||"—")}
-          ${d.capacidad ? filaHTML("Capacidad", d.capacidad) : ""}
-          ${filaHTML("Certificado el", d.fecha||"—")}
-          ${filaHTML("Válido hasta",   d.vencimiento||"—")}
-          <div class="vig-wrap">
-            <div class="vig-header">
-              <span class="vig-label">Vigencia</span>
-              <span class="vig-dias" style="color:${vigColor}">${vigLabel}</span>
-            </div>
-            <div class="vig-track">
-              <div class="vig-fill" style="width:${100-vigPct}%;background:${vigColor}"></div>
-            </div>
-            <div class="vig-fechas">
-              <span>${d.fecha||""}</span>
-              <span>${d.vencimiento||""}</span>
-            </div>
-          </div>
+          ${filasModulo()}
+          ${vigHTML}
           <div class="leyenda">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M8 2l6 12H2L8 2z"/><path d="M8 7v3M8 11.5v.5"/>
-            </svg>
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 2l6 12H2L8 2z"/><path d="M8 7v3M8 11.5v.5"/></svg>
             Los datos mostrados deben coincidir con el documento físico presentado. En caso de discrepancia, el documento no es auténtico.
           </div>
         </div>
@@ -821,32 +848,15 @@ function mostrarResultado(data) {
       <div class="resultado res-vencido">
         <div class="res-header">
           <div class="res-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <path d="M12 2l9 16H3L12 2z"/><path d="M12 10v4M12 16v.5"/>
-            </svg>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2l9 16H3L12 2z"/><path d="M12 10v4M12 16v.5"/></svg>
           </div>
+          ${badge}
           <div class="res-title">CERTIFICADO VENCIDO</div>
           <div class="res-sub">Este certificado ya no está vigente</div>
         </div>
         <div class="res-body">
-          ${filaHTML("Tipo de equipo", d.maquinaria||d.tipo||"—")}
-          ${filaHTML("Marca / Modelo", (d.marca||"") + " " + (d.modelo||""))}
-          ${filaHTML("No. de serie",   d.serie||"—")}
-          ${d.capacidad ? filaHTML("Capacidad", d.capacidad) : ""}
-          ${filaHTML("Certificado el", d.fecha||"—")}
-          <div class="res-row">
-            <span class="res-key">Venció el</span>
-            <span class="res-val" style="color:var(--rojo)">${d.vencimiento||"—"}</span>
-          </div>
-          <div class="vig-wrap">
-            <div class="vig-header">
-              <span class="vig-label">Vigencia</span>
-              <span class="vig-dias" style="color:var(--rojo)">Vencido</span>
-            </div>
-            <div class="vig-track">
-              <div class="vig-fill" style="width:100%;background:var(--rojo)"></div>
-            </div>
-          </div>
+          ${filasModulo()}
+          ${vigHTML}
         </div>
       </div>`;
     setTimeout(resetBg, 30000);
