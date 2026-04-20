@@ -1263,7 +1263,7 @@ function initMapa() {
           document.getElementById("d-envio").value = data.display_name;
           markerMapa.bindPopup(data.display_name).openPopup();
         }
-      } catch(e) { console.log("Geocodificación fallida", e); }
+      } catch(_) {}
     });
 
     // Al hacer clic en el mapa: mover marcador
@@ -1277,7 +1277,7 @@ function initMapa() {
           document.getElementById("d-envio").value = data.display_name;
           markerMapa.bindPopup(data.display_name).openPopup();
         }
-      } catch(e) { console.log("Geocodificación fallida", e); }
+      } catch(_) {}
     });
 
     setTimeout(() => mapInstance.invalidateSize(), 200);

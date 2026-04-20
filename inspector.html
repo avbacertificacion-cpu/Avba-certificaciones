@@ -2727,7 +2727,6 @@ function crearMapa(id, tipo, lat, lng) {
 
   markers[tipo].on("dragend", () => {
     const p = markers[tipo].getLatLng();
-    console.log(`${tipo}: ${p.lat},${p.lng}`);
   });
 
   setTimeout(() => maps[tipo].invalidateSize(), 250);
@@ -2934,7 +2933,7 @@ async function enviarFormulario() {
 ════════════════════════════════════════ */
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("service-worker.js")
-    .catch(e => console.log("SW no registrado:", e));
+    .catch(() => {});
 }
 
 /* ════════════════════════════════════════
