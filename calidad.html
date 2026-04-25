@@ -1439,11 +1439,12 @@
             <th style="padding:8px 6px;text-align:center;min-width:55px">Tamaño</th>
             <th style="padding:8px 6px;text-align:center;min-width:50px">Negrita</th>
             <th style="padding:8px 6px;text-align:center;min-width:65px">Ancho</th>
+            <th style="padding:8px 6px;text-align:center;min-width:44px">Color</th>
             <th style="padding:8px 6px;text-align:center;min-width:36px"></th>
           </tr>
         </thead>
         <tbody id="tbody-campos-pdf">
-          <tr><td colspan="9" style="text-align:center;padding:16px;color:var(--texto-hint)">Cargando...</td></tr>
+          <tr><td colspan="10" style="text-align:center;padding:16px;color:var(--texto-hint)">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -1499,11 +1500,12 @@
             <th style="padding:8px 6px;text-align:center;min-width:55px">Tamaño</th>
             <th style="padding:8px 6px;text-align:center;min-width:50px">Negrita</th>
             <th style="padding:8px 6px;text-align:center;min-width:65px">Ancho</th>
+            <th style="padding:8px 6px;text-align:center;min-width:44px">Color</th>
             <th style="padding:8px 6px;text-align:center;min-width:36px"></th>
           </tr>
         </thead>
         <tbody id="tbody-campos-pdf-acc">
-          <tr><td colspan="9" style="text-align:center;padding:16px;color:var(--texto-hint)">Cargando...</td></tr>
+          <tr><td colspan="10" style="text-align:center;padding:16px;color:var(--texto-hint)">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -1553,11 +1555,12 @@
             <th style="padding:8px 6px;text-align:center;min-width:55px">Tamaño</th>
             <th style="padding:8px 6px;text-align:center;min-width:50px">Negrita</th>
             <th style="padding:8px 6px;text-align:center;min-width:65px">Ancho</th>
+            <th style="padding:8px 6px;text-align:center;min-width:44px">Color</th>
             <th style="padding:8px 6px;text-align:center;min-width:36px"></th>
           </tr>
         </thead>
         <tbody id="tbody-campos-pdf-per">
-          <tr><td colspan="9" style="text-align:center;padding:16px;color:var(--texto-hint)">Cargando...</td></tr>
+          <tr><td colspan="10" style="text-align:center;padding:16px;color:var(--texto-hint)">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -3237,7 +3240,7 @@ function cerrarModalCamposPdf() {
 function renderTablaCamposPdf(campos) {
   const tbody = document.getElementById("tbody-campos-pdf");
   if (!campos.length) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:16px;color:var(--texto-hint)">
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:16px;color:var(--texto-hint)">
       Sin campos configurados. Usa "+ Agregar campo" para añadir.
     </td></tr>`;
     return;
@@ -3268,6 +3271,10 @@ function renderTablaCamposPdf(campos) {
       <td><input type="number" value="${c.ancho||0}" min="0" step="0.5" style="width:55px;font-size:12px;padding:3px"
                  title="0 = sin límite" onchange="actualizarCampoPdf(${i},'ancho',+this.value)"></td>
       <td style="text-align:center">
+        <input type="color" value="${c.color||'#000000'}" style="width:32px;height:28px;padding:1px;border:1px solid #ccc;border-radius:4px;cursor:pointer"
+               onchange="actualizarCampoPdf(${i},'color',this.value)">
+      </td>
+      <td style="text-align:center">
         <button onclick="eliminarCampoPdf(${i})" style="background:none;border:none;color:var(--rojo);cursor:pointer;font-size:16px;line-height:1">×</button>
       </td>
     </tr>`).join('');
@@ -3281,7 +3288,7 @@ function actualizarCampoPdf(idx, campo, valor) {
 function agregarCampoPdf() {
   camposPdfLocal.push({
     campo: "folio", pagina: 1, x: 0, y: 0,
-    fuente: "Helvetica", tamano: 11, negrita: false, ancho: 0
+    fuente: "Helvetica", tamano: 11, negrita: false, ancho: 0, color: "#000000"
   });
   renderTablaCamposPdf(camposPdfLocal);
 }
@@ -3728,7 +3735,7 @@ function cerrarModalCamposPdfAcc() {
 function renderTablaCamposPdfAcc(campos) {
   const tbody = document.getElementById("tbody-campos-pdf-acc");
   if (!campos.length) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:16px;color:var(--texto-hint)">
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:16px;color:var(--texto-hint)">
       Sin campos configurados. Usa "+ Agregar campo" para añadir.
     </td></tr>`;
     return;
@@ -3759,6 +3766,10 @@ function renderTablaCamposPdfAcc(campos) {
       <td><input type="number" value="${c.ancho||0}" min="0" step="0.5" style="width:55px;font-size:12px;padding:3px"
                  onchange="actualizarCampoPdfAcc(${i},'ancho',+this.value)"></td>
       <td style="text-align:center">
+        <input type="color" value="${c.color||'#000000'}" style="width:32px;height:28px;padding:1px;border:1px solid #ccc;border-radius:4px;cursor:pointer"
+               onchange="actualizarCampoPdfAcc(${i},'color',this.value)">
+      </td>
+      <td style="text-align:center">
         <button onclick="eliminarCampoPdfAcc(${i})"
                 style="background:none;border:none;color:var(--rojo);cursor:pointer;font-size:16px;line-height:1">×</button>
       </td>
@@ -3770,7 +3781,7 @@ function actualizarCampoPdfAcc(idx, campo, valor) {
 }
 
 function agregarCampoPdfAcc() {
-  camposPdfAccLocal.push({ campo:"id_accesorio", pagina:1, x:0, y:0, fuente:"Helvetica", tamano:11, negrita:false, ancho:0 });
+  camposPdfAccLocal.push({ campo:"id_accesorio", pagina:1, x:0, y:0, fuente:"Helvetica", tamano:11, negrita:false, ancho:0, color:"#000000" });
   renderTablaCamposPdfAcc(camposPdfAccLocal);
 }
 
@@ -3969,7 +3980,7 @@ function cerrarModalCamposPdfPer() {
 function renderTablaCamposPdfPer(campos) {
   const tbody = document.getElementById("tbody-campos-pdf-per");
   if (!campos.length) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:16px;color:var(--texto-hint)">
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:16px;color:var(--texto-hint)">
       Sin campos configurados. Usa "+ Agregar campo" para añadir.
     </td></tr>`;
     return;
@@ -4000,6 +4011,10 @@ function renderTablaCamposPdfPer(campos) {
       <td><input type="number" value="${c.ancho||0}" min="0" step="0.5" style="width:55px;font-size:12px;padding:3px"
                  title="0 = sin límite" onchange="actualizarCampoPdfPer(${i},'ancho',+this.value)"></td>
       <td style="text-align:center">
+        <input type="color" value="${c.color||'#000000'}" style="width:32px;height:28px;padding:1px;border:1px solid #ccc;border-radius:4px;cursor:pointer"
+               onchange="actualizarCampoPdfPer(${i},'color',this.value)">
+      </td>
+      <td style="text-align:center">
         <button onclick="eliminarCampoPdfPer(${i})"
                 style="background:none;border:none;color:var(--rojo);cursor:pointer;font-size:16px;line-height:1">×</button>
       </td>
@@ -4014,7 +4029,7 @@ function actualizarCampoPdfPer(idx, campo, valor) {
 function agregarCampoPdfPer() {
   camposPdfPerLocal.push({
     campo: "nombre_completo", pagina: 1, x: 0, y: 0,
-    fuente: "Helvetica", tamano: 11, negrita: false, ancho: 0
+    fuente: "Helvetica", tamano: 11, negrita: false, ancho: 0, color: "#000000"
   });
   renderTablaCamposPdfPer(camposPdfPerLocal);
 }
@@ -4236,14 +4251,16 @@ async function generarLoteQR() {
 #pk-page-info{font-size:12px;color:#5a6072;min-width:90px;text-align:center;}
 .pk-body{display:flex;flex:1;overflow:hidden;}
 /* Canvas area */
-.pk-canvas-area{flex:1;overflow:auto;background:#666;display:flex;justify-content:center;align-items:flex-start;padding:18px;}
+.pk-canvas-area{flex:1;overflow:auto;background:#555;display:flex;flex-direction:column;align-items:center;padding:18px;gap:8px;}
 #pk-canvas-wrap{position:relative;display:inline-block;cursor:crosshair;box-shadow:0 4px 24px rgba(0,0,0,.5);}
 #pk-canvas{display:block;}
 #pk-markers{position:absolute;inset:0;pointer-events:none;}
-#pk-markers .pk-pin{pointer-events:all;position:absolute;cursor:pointer;}
+#pk-markers .pk-pin{pointer-events:all;position:absolute;cursor:grab;}
+#pk-markers .pk-pin.dragging{cursor:grabbing;}
 #pk-markers .pk-dot{width:10px;height:10px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.5);transition:transform .1s;}
 #pk-markers .pk-pin:hover .pk-dot{transform:scale(1.4);}
 #pk-markers .pk-lbl{position:absolute;left:13px;top:-3px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);color:#fff;pointer-events:none;}
+#pk-coords-bar{background:rgba(0,0,0,.55);color:#fff;font-size:12px;font-family:monospace;padding:4px 14px;border-radius:6px;min-width:220px;text-align:center;letter-spacing:.03em;flex-shrink:0;align-self:flex-start;}
 /* Sidebar */
 .pk-sidebar{width:270px;border-left:1px solid #dfe5ef;display:flex;flex-direction:column;flex-shrink:0;background:#fff;}
 .pk-sidebar-hdr{padding:10px 14px;font-size:11px;font-weight:700;color:#9299a8;letter-spacing:.05em;text-transform:uppercase;border-bottom:1px solid #dfe5ef;background:#f4f7fb;}
@@ -4282,6 +4299,7 @@ async function generarLoteQR() {
     </div>
     <div class="pk-body">
       <div class="pk-canvas-area">
+        <div id="pk-coords-bar">Mueve el cursor sobre el PDF para ver coordenadas</div>
         <div id="pk-canvas-wrap">
           <canvas id="pk-canvas"></canvas>
           <div id="pk-markers"></div>
@@ -4291,7 +4309,7 @@ async function generarLoteQR() {
         <div class="pk-sidebar-hdr">Campos — selecciona para posicionar</div>
         <div id="pk-campo-list"></div>
         <div class="pk-footer">
-          <div class="pk-hint">💡 Haz clic en el PDF para colocar el campo activo. Los marcadores muestran la posición actual de cada campo.</div>
+          <div class="pk-hint">💡 Haz clic para colocar · Arrastra el pin para mover · ↑↓←→ nudge 0.5 mm · Shift+flechas 0.1 mm</div>
           <div id="pk-active-info"></div>
         </div>
       </div>
@@ -4362,6 +4380,9 @@ let pkActive     = 0;   // index of selected campo
 let pkCampos     = null; // reference to the campos array being edited
 let pkRenderFn   = null; // callback to refresh the table after changes
 let pkContext    = '';   // 'equipo' | 'acc' | 'personal'
+let pkDragging   = false;
+let pkDragIdx    = -1;
+let pkJustDragged = false;
 
 async function abrirPicker(pdfUrl, camposArr, context, renderCallback) {
   if (!pdfUrl) { alert('Esta plantilla no tiene PDF cargado todavía.'); return; }
@@ -4445,18 +4466,21 @@ function pickerRenderMarkers() {
   pkCampos.forEach((c, i) => {
     if ((c.pagina || 1) !== pkPage) return;
     const { x, y } = pkMmToPx(c.x || 0, c.y || 0);
-    const color = PK_COLORS[i % PK_COLORS.length];
-    const isActive = i === pkActive;
+    const pinColor  = PK_COLORS[i % PK_COLORS.length]; // identification color for dot
+    const textColor = c.color || '#000000';              // actual text color for preview
+    const isActive  = i === pkActive;
 
-    // Pin dot + campo-name label
+    // Pin dot (draggable)
     const pin = document.createElement('div');
     pin.className = 'pk-pin';
+    pin.dataset.idx = i;
     pin.style.cssText = `left:${x}px;top:${y}px;transform:translate(-5px,-5px);z-index:${isActive?20:10}`;
-    pin.innerHTML = `<div class="pk-dot" style="background:${color};${isActive?'transform:scale(1.4);border-color:#185FA5;':''}"></div>`;
-    pin.onclick = e => { e.stopPropagation(); pickerSetActive(i); };
+    pin.innerHTML = `<div class="pk-dot" style="background:${pinColor};${isActive?'transform:scale(1.4);border-color:#185FA5;':''}"></div>`;
+    pin.onclick  = e => { e.stopPropagation(); if (!pkJustDragged) pickerSetActive(i); };
+    pin.onmousedown = e => { e.stopPropagation(); pkDragging = true; pkDragIdx = i; pickerSetActive(i); };
     wrap.appendChild(pin);
 
-    // Sample text preview at the exact campo position
+    // Sample text preview using the campo's own color
     const font = pkCssFont(c);
     const sample = document.createElement('div');
     sample.className = 'pk-sample';
@@ -4465,8 +4489,8 @@ function pickerRenderMarkers() {
       `font-size:${font.size}px`,
       `font-family:${font.family}`,
       `font-weight:${font.bold ? '700' : '400'}`,
-      `color:${color}`,
-      `outline:${isActive ? '1.5px dashed ' + color : 'none'}`,
+      `color:${textColor}`,
+      `outline:${isActive ? '1.5px dashed ' + pinColor : 'none'}`,
       `z-index:${isActive ? 19 : 9}`,
     ].join(';');
     sample.textContent = pkSampleText(c.campo);
@@ -4508,33 +4532,92 @@ function pickerRenderList() {
   ).join('');
 }
 
+// ── Helper: get mm coords from mouse event on canvas ──────────────
+function pkEventToMm(e) {
+  const canvas = document.getElementById('pk-canvas');
+  const rect   = canvas.getBoundingClientRect();
+  const scaleX = canvas.width  / rect.width;
+  const scaleY = canvas.height / rect.height;
+  return pkPxToMm((e.clientX - rect.left) * scaleX, (e.clientY - rect.top) * scaleY);
+}
+
+function pkSyncTable() {
+  if (pkContext === 'equipo')   renderTablaCamposPdf(camposPdfLocal);
+  if (pkContext === 'acc')      renderTablaCamposPdfAcc(camposPdfAccLocal);
+  if (pkContext === 'personal') renderTablaCamposPdfPer(camposPdfPerLocal);
+  if (pkRenderFn) pkRenderFn();
+}
+
 // Click on canvas → place active campo
 document.getElementById('pk-canvas-wrap').addEventListener('click', function(e) {
+  if (pkJustDragged) return;
   if (!pkCampos || !pkCampos.length) return;
   if (pkActive >= pkCampos.length) pkActive = 0;
-
-  const rect = document.getElementById('pk-canvas').getBoundingClientRect();
-  const scaleX = document.getElementById('pk-canvas').width  / rect.width;
-  const scaleY = document.getElementById('pk-canvas').height / rect.height;
-  const rawX = (e.clientX - rect.left) * scaleX;
-  const rawY = (e.clientY - rect.top)  * scaleY;
-  const { x, y } = pkPxToMm(rawX, rawY);
-
+  const { x, y } = pkEventToMm(e);
   pkCampos[pkActive].x      = x;
   pkCampos[pkActive].y      = y;
   pkCampos[pkActive].pagina = pkPage;
-
   document.getElementById('pk-active-info').textContent =
     `"${pkCampos[pkActive].campo}" colocado → x: ${x} mm, y: ${y} mm, pág. ${pkPage}`;
-
   pickerRenderMarkers();
   pickerRenderList();
+  pkSyncTable();
+});
 
-  // Sync back to the table
-  if (pkContext === 'equipo')    renderTablaCamposPdf(camposPdfLocal);
-  if (pkContext === 'acc')       renderTablaCamposPdfAcc(camposPdfAccLocal);
-  if (pkContext === 'personal')  renderTablaCamposPdfPer(camposPdfPerLocal);
-  if (pkRenderFn) pkRenderFn();
+// Mousemove → live coordinate display + drag
+document.getElementById('pk-canvas-wrap').addEventListener('mousemove', function(e) {
+  if (!pkPdf) return;
+  const { x, y } = pkEventToMm(e);
+  const coordBar = document.getElementById('pk-coords-bar');
+  if (coordBar) coordBar.textContent = `X: ${x.toFixed(1)} mm  |  Y: ${y.toFixed(1)} mm`;
+
+  if (pkDragging && pkDragIdx >= 0 && pkCampos && pkCampos[pkDragIdx]) {
+    pkCampos[pkDragIdx].x      = x;
+    pkCampos[pkDragIdx].y      = y;
+    pkCampos[pkDragIdx].pagina = pkPage;
+    pickerRenderMarkers();
+    document.getElementById('pk-active-info').textContent =
+      `"${pkCampos[pkDragIdx].campo}" → x: ${x.toFixed(1)} mm, y: ${y.toFixed(1)} mm`;
+  }
+});
+
+document.getElementById('pk-canvas-wrap').addEventListener('mouseleave', function() {
+  const coordBar = document.getElementById('pk-coords-bar');
+  if (coordBar) coordBar.textContent = 'Mueve el cursor sobre el PDF para ver coordenadas';
+});
+
+// Mouseup anywhere → end drag, sync table
+document.addEventListener('mouseup', function() {
+  if (!pkDragging) return;
+  pkDragging    = false;
+  pkDragIdx     = -1;
+  pkJustDragged = true;
+  setTimeout(() => { pkJustDragged = false; }, 80);
+  if (pkCampos) {
+    pickerRenderList();
+    pkSyncTable();
+  }
+});
+
+// Keyboard nudge when picker is open
+document.addEventListener('keydown', function(e) {
+  if (!document.getElementById('modal-picker').classList.contains('open')) return;
+  if (!pkCampos || !pkCampos.length) return;
+  const campo = pkCampos[pkActive];
+  if (!campo) return;
+  const step  = e.shiftKey ? 0.1 : 0.5;
+  let moved = false;
+  if (e.key === 'ArrowLeft')  { campo.x = +((campo.x || 0) - step).toFixed(1); moved = true; }
+  if (e.key === 'ArrowRight') { campo.x = +((campo.x || 0) + step).toFixed(1); moved = true; }
+  if (e.key === 'ArrowUp')    { campo.y = +((campo.y || 0) - step).toFixed(1); moved = true; }
+  if (e.key === 'ArrowDown')  { campo.y = +((campo.y || 0) + step).toFixed(1); moved = true; }
+  if (!moved) return;
+  e.preventDefault();
+  pickerRenderMarkers();
+  pickerRenderList();
+  document.getElementById('pk-active-info').textContent =
+    `"${campo.campo}" → x: ${campo.x} mm, y: ${campo.y} mm, pág. ${campo.pagina||1}`;
+  pkSyncTable();
 });
 
 async function pickerPrevPage() {
