@@ -4277,8 +4277,8 @@ async function generarLoteQR() {
 .pk-hint{font-size:11px;color:#5a6072;line-height:1.4;}
 #pk-active-info{font-size:12px;font-weight:600;color:#185FA5;margin-top:6px;min-height:16px;}
 /* Sample text preview */
-.pk-sample{position:absolute;pointer-events:none;white-space:nowrap;opacity:.82;
-           text-shadow:0 1px 3px rgba(0,0,0,.55);line-height:1;}
+.pk-sample{position:absolute;white-space:nowrap;opacity:.82;
+           text-shadow:0 1px 3px rgba(0,0,0,.55);line-height:1;user-select:none;}
 </style>
 
 <div id="modal-picker">
@@ -4477,7 +4477,7 @@ function pickerRenderMarkers() {
     pin.style.cssText = `left:${x}px;top:${y}px;transform:translate(-5px,-5px);z-index:${isActive?20:10}`;
     pin.innerHTML = `<div class="pk-dot" style="background:${pinColor};${isActive?'transform:scale(1.4);border-color:#185FA5;':''}"></div>`;
     pin.onclick  = e => { e.stopPropagation(); if (!pkJustDragged) pickerSetActive(i); };
-    pin.onmousedown = e => { e.stopPropagation(); pkDragging = true; pkDragIdx = i; pickerSetActive(i); };
+    pin.onmousedown = e => { e.stopPropagation(); pkDragging = true; pkDragIdx = i; document.getElementById('pk-canvas-wrap').style.cursor = 'grabbing'; pickerSetActive(i); };
     wrap.appendChild(pin);
 
     // Sample text preview using the campo's own color
@@ -4492,8 +4492,12 @@ function pickerRenderMarkers() {
       `color:${textColor}`,
       `outline:${isActive ? '1.5px dashed ' + pinColor : 'none'}`,
       `z-index:${isActive ? 19 : 9}`,
+      `pointer-events:all`,
+      `cursor:grab`,
     ].join(';');
     sample.textContent = pkSampleText(c.campo);
+    sample.onclick     = e => { e.stopPropagation(); if (!pkJustDragged) pickerSetActive(i); };
+    sample.onmousedown = e => { e.stopPropagation(); pkDragging = true; pkDragIdx = i; document.getElementById('pk-canvas-wrap').style.cursor = 'grabbing'; pickerSetActive(i); };
     wrap.appendChild(sample);
   });
 }
@@ -4592,6 +4596,7 @@ document.addEventListener('mouseup', function() {
   pkDragging    = false;
   pkDragIdx     = -1;
   pkJustDragged = true;
+  document.getElementById('pk-canvas-wrap').style.cursor = 'crosshair';
   setTimeout(() => { pkJustDragged = false; }, 80);
   if (pkCampos) {
     pickerRenderList();
