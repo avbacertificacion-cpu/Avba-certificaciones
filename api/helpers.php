@@ -149,10 +149,37 @@ function registrarHistorial(PDO $pdo, string $usuario, ?int $equipoId, string $c
 }
 
 /**
+ * Corrige UTF-8 doblemente codificado que ocurre cuando datos se insertaron
+ * con una conexión latin1 hacia columnas utf8/utf8mb4.
+ * Ejemplo: "JuÃ¡rez" → "Juárez"
+ * Si el string ya es UTF-8 correcto, lo deja intacto.
+ */
+function fixEncoding(mixed $v): mixed {
+    if (is_string($v)) {
+        // Solo strings con bytes multi-byte (≥ 0x80)
+        if (!preg_match('/[\x80-\xff]/', $v)) return $v;
+        // Convertir cada carácter UTF-8 a su equivalente ISO-8859-1
+        $decoded = mb_convert_encoding($v, 'ISO-8859-1', 'UTF-8');
+        // Si el resultado es diferente Y es UTF-8 válido, era doble-codificado
+        if ($decoded !== $v && mb_check_encoding($decoded, 'UTF-8')) {
+            return $decoded;
+        }
+        return $v;
+    }
+    if (is_array($v)) {
+        foreach ($v as $k => $item) {
+            $v[$k] = fixEncoding($item);
+        }
+        return $v;
+    }
+    return $v;
+}
+
+/**
  * Devuelve una respuesta JSON y termina la ejecución.
  */
 function respuesta(array $data, int $httpCode = 200): void {
     http_response_code($httpCode);
-    echo json_encode($data, JSON_UNESCAPED_UNICODE);
+    echo json_encode(fixEncoding($data), JSON_UNESCAPED_UNICODE);
     exit;
 }
