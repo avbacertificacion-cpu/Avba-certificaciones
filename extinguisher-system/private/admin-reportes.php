@@ -1,338 +1,268 @@
 <?php
 require_once '../config/config.php';
-
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
-    header('Location: ../public/login.html');
-    exit;
+    header('Location: ../public/login.html'); exit;
 }
-
-$nombre_usuario = $_SESSION['nombre'];
+$nombre = $_SESSION['nombre'];
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Revisar Reportes - Gestión de Extintores</title>
+    <title>Reportes Mensuales – Admin</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',sans-serif;background:#f4f6fb}
+        .navbar{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+        .navbar a{color:#fff;text-decoration:none;font-size:13px;margin-left:16px}
+        .container{max-width:1100px;margin:32px auto;padding:0 20px}
+        .toolbar{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;align-items:center}
+        .toolbar select{padding:10px 14px;border:1px solid #ddd;border-radius:6px;font-size:14px}
+        .btn{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;transition:.2s}
+        .btn-primary{background:#667eea;color:#fff}.btn-primary:hover{background:#5568d3}
+        .btn-success{background:#27ae60;color:#fff}.btn-success:hover{background:#1e8449}
+        .btn-warning{background:#f39c12;color:#fff}.btn-warning:hover{background:#d68910}
+        .btn-danger{background:#e74c3c;color:#fff}.btn-danger:hover{background:#c0392b}
+        .btn-sm{padding:6px 12px;font-size:12px}
+        table{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+        thead{background:#667eea;color:#fff}
+        th,td{padding:13px 16px;text-align:left;font-size:13px}
+        tbody tr:hover{background:#f0f3ff}
+        .badge{display:inline-block;padding:4px 10px;border-radius:12px;font-size:11px;font-weight:700}
+        .b-borrador{background:#e2e3e5;color:#383d41}
+        .b-generado{background:#d1ecf1;color:#0c5460}
+        .b-publicado{background:#d4edda;color:#155724}
+        .empty{text-align:center;padding:50px;color:#aaa}
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-        }
+        /* Modal */
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;justify-content:center;align-items:center}
+        .modal-overlay.open{display:flex}
+        .modal{background:#fff;border-radius:12px;padding:32px;width:100%;max-width:500px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+        .modal h2{margin-bottom:24px}
+        .form-group{margin-bottom:18px}
+        .form-group label{display:block;font-size:13px;font-weight:700;color:#444;margin-bottom:6px}
+        .form-group select,.form-group input,.form-group textarea{width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit}
+        .form-group textarea{resize:vertical;min-height:80px}
+        .form-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+        .modal-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:20px;padding-top:18px;border-top:1px solid #eee}
+        .alert{padding:12px;border-radius:6px;margin-bottom:14px;font-size:13px}
+        .alert-success{background:#d4edda;color:#155724}
+        .alert-error{background:#f8d7da;color:#721c24}
 
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px 40px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .navbar a {
-            color: white;
-            text-decoration: none;
-            margin-right: 20px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        .filters {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        .filter-row {
-            display: flex;
-            gap: 15px;
-            flex-wrap: wrap;
-        }
-
-        .filter-group {
-            flex: 1;
-            min-width: 150px;
-        }
-
-        .filter-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-            font-size: 12px;
-            color: #666;
-        }
-
-        .filter-group select {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 13px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: white;
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-
-        thead {
-            background: #667eea;
-            color: white;
-        }
-
-        th {
-            padding: 15px;
-            text-align: left;
-            font-weight: 600;
-        }
-
-        td {
-            padding: 15px;
-            border-bottom: 1px solid #eee;
-        }
-
-        tr:hover {
-            background: #f9f9f9;
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 5px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-
-        .status-borrador {
-            background: #e0e0e0;
-            color: #666;
-        }
-
-        .status-pendiente {
-            background: #fff3cd;
-            color: #856404;
-        }
-
-        .status-aprobado {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .status-rechazado {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 12px;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #5568d3;
-        }
-
-        .btn-success {
-            background: #28a745;
-            color: white;
-            margin-right: 5px;
-        }
-
-        .btn-danger {
-            background: #dc3545;
-            color: white;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #999;
-        }
-
-        .empty-state .icon {
-            font-size: 60px;
-            margin-bottom: 20px;
-        }
+        .info-publicado{background:#d4edda;border:1px solid #c3e6cb;border-radius:8px;padding:12px 16px;font-size:13px;color:#155724;margin-bottom:20px}
     </style>
 </head>
 <body>
-    <div class="navbar">
-        <h1>🔥 Revisar Reportes</h1>
-        <div>
-            <a href="../dashboard.php">← Atrás</a>
-            <span><?php echo htmlspecialchars($nombre_usuario); ?></span>
-        </div>
+<div class="navbar">
+    <h1>📊 Reportes Mensuales</h1>
+    <div>
+        <a href="admin-dashboard.php">← Panel</a>
+        <span style="margin-left:16px;font-size:13px"><?= htmlspecialchars($nombre) ?></span>
+    </div>
+</div>
+
+<div class="container">
+    <div id="alert-box"></div>
+
+    <div class="info-publicado">
+        💡 Solo los reportes con estado <strong>Publicado</strong> son visibles para el cliente.
+        Los reportes en estado Borrador o Generado son privados.
     </div>
 
-    <div class="container">
-        <div class="filters">
-            <div class="filter-row">
-                <div class="filter-group">
-                    <label>Estado</label>
-                    <select id="filterEstado" onchange="cargarReportes()">
-                        <option value="">Todos</option>
-                        <option value="borrador">Borrador</option>
-                        <option value="pendiente_aprobacion">Pendiente Aprobación</option>
-                        <option value="aprobado">Aprobado</option>
-                        <option value="rechazado">Rechazado</option>
-                    </select>
-                </div>
+    <div class="toolbar">
+        <select id="filtroEmpresa" onchange="cargar()">
+            <option value="">Todas las empresas</option>
+        </select>
+        <button class="btn btn-primary" onclick="abrirModal()">+ Nuevo reporte</button>
+    </div>
+
+    <div id="tabla"></div>
+</div>
+
+<!-- Modal crear reporte -->
+<div class="modal-overlay" id="modalReporte">
+    <div class="modal">
+        <h2>Nuevo Reporte Mensual</h2>
+        <div id="modal-alert"></div>
+        <div class="form-group">
+            <label>Empresa *</label>
+            <select id="r-empresa"></select>
+        </div>
+        <div class="form-group">
+            <label>Plantilla *</label>
+            <select id="r-plantilla"></select>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Mes *</label>
+                <select id="r-mes">
+                    <?php
+                    $meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+                              'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+                    for ($m = 1; $m <= 12; $m++) {
+                        $sel = $m == date('n') ? 'selected' : '';
+                        echo "<option value=\"$m\" $sel>{$meses[$m]}</option>";
+                    }
+                    ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Año *</label>
+                <input type="number" id="r-anio" value="<?= date('Y') ?>" min="2020" max="2099">
             </div>
         </div>
-
-        <div id="reportesTable"></div>
+        <div class="form-group">
+            <label>Observaciones</label>
+            <textarea id="r-obs" placeholder="Notas del reporte…"></textarea>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-warning" onclick="cerrarModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="crearReporte()">Crear</button>
+        </div>
     </div>
+</div>
 
-    <script>
-        async function cargarReportes() {
-            try {
-                const response = await fetch('../api/reportes.php?action=listar');
-                const data = await response.json();
+<script>
+const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
+               'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
-                if (data.success) {
-                    mostrarReportes(data.data);
-                } else {
-                    mostrarMensajeVacio();
+async function init() {
+    await Promise.all([cargarEmpresas(), cargarPlantillas()]);
+    cargar();
+}
+
+async function cargarEmpresas() {
+    const r = await fetch('../api/usuarios.php?action=listar_empresas');
+    const d = await r.json();
+    if (!d.success) return;
+    const sel1 = document.getElementById('filtroEmpresa');
+    const sel2 = document.getElementById('r-empresa');
+    d.data.forEach(e => {
+        sel1.innerHTML += `<option value="${e.id}">${e.nombre}</option>`;
+        sel2.innerHTML += `<option value="${e.id}">${e.nombre}</option>`;
+    });
+}
+
+async function cargarPlantillas() {
+    const r = await fetch('../api/plantillas.php?action=listar');
+    const d = await r.json();
+    if (!d.success) return;
+    const sel = document.getElementById('r-plantilla');
+    sel.innerHTML = d.data.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+}
+
+async function cargar() {
+    const emp = document.getElementById('filtroEmpresa').value;
+    const url = '../api/reportes_mensuales.php?action=listar' + (emp ? `&empresa_id=${emp}` : '');
+    const r   = await fetch(url);
+    const d   = await r.json();
+
+    const c = document.getElementById('tabla');
+    if (!d.success || !d.data.length) {
+        c.innerHTML = '<div class="empty">No hay reportes. Crea el primero.</div>'; return;
+    }
+
+    c.innerHTML = `
+    <table>
+        <thead><tr>
+            <th>Número</th><th>Empresa</th><th>Plantilla</th><th>Período</th>
+            <th>Estado</th><th>Acciones</th>
+        </tr></thead>
+        <tbody>
+        ${d.data.map(rep => `<tr>
+            <td><strong>${rep.numero_reporte}</strong></td>
+            <td>${rep.empresa_nombre}</td>
+            <td>${rep.nombre_plantilla}</td>
+            <td>${meses[rep.mes]} ${rep.anio}</td>
+            <td><span class="badge b-${rep.estado}">${estadoLabel(rep.estado)}</span></td>
+            <td style="white-space:nowrap">
+                ${rep.estado !== 'publicado'
+                    ? `<button class="btn btn-sm btn-success" onclick="publicar(${rep.id})">✅ Publicar</button>`
+                    : `<button class="btn btn-sm btn-warning" onclick="despublicar(${rep.id})">🔒 Ocultar</button>`
                 }
-            } catch (error) {
-                mostrarMensajeVacio();
-            }
-        }
+                <button class="btn btn-sm btn-primary" onclick="verPDF(${rep.id})">📄 PDF</button>
+                <button class="btn btn-sm btn-danger" onclick="eliminar(${rep.id})">🗑️</button>
+            </td>
+        </tr>`).join('')}
+        </tbody>
+    </table>`;
+}
 
-        function mostrarReportes(reportes) {
-            const container = document.getElementById('reportesTable');
-            const filtroEstado = document.getElementById('filterEstado').value;
+function estadoLabel(s) {
+    return {borrador:'Borrador', generado:'Generado', publicado:'Publicado ✓'}[s] ?? s;
+}
 
-            let reportesFiltrados = reportes;
-            if (filtroEstado) {
-                reportesFiltrados = reportes.filter(r => r.estado === filtroEstado);
-            }
+// ── Publicar / Despublicar ────────────────────────────────────────────────────
+async function publicar(id) {
+    if (!confirm('¿Publicar este reporte? El cliente podrá verlo y descargarlo.')) return;
+    const r = await fetch(`../api/reportes_mensuales.php?action=publicar&id=${id}`);
+    const d = await r.json();
+    if (d.success) { showAlert('Reporte publicado – visible para el cliente', 'success'); cargar(); }
+    else showAlert(d.error, 'error');
+}
 
-            if (reportesFiltrados.length === 0) {
-                mostrarMensajeVacio();
-                return;
-            }
+async function despublicar(id) {
+    if (!confirm('¿Ocultar este reporte? El cliente dejará de verlo.')) return;
+    const r = await fetch(`../api/reportes_mensuales.php?action=despublicar&id=${id}`);
+    const d = await r.json();
+    if (d.success) { showAlert('Reporte ocultado', 'success'); cargar(); }
+    else showAlert(d.error, 'error');
+}
 
-            const html = `
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Número</th>
-                            <th>Plantilla</th>
-                            <th>Empresa</th>
-                            <th>Inspector</th>
-                            <th>Fecha</th>
-                            <th>Estado</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${reportesFiltrados.map(r => `
-                            <tr>
-                                <td><strong>${r.numero_reporte}</strong></td>
-                                <td>${r.plantilla_nombre}</td>
-                                <td>${r.empresa_nombre}</td>
-                                <td>${r.inspector_nombre || 'N/A'}</td>
-                                <td>${new Date(r.fecha_creacion).toLocaleDateString('es-MX')}</td>
-                                <td><span class="status-badge status-${r.estado}">${getStatusLabel(r.estado)}</span></td>
-                                <td>
-                                    <button class="btn btn-primary" onclick="verReporte(${r.id})">Ver</button>
-                                    ${r.estado === 'pendiente_aprobacion' ? `
-                                        <button class="btn btn-success" onclick="aprobarReporte(${r.id})">Aprobar</button>
-                                        <button class="btn btn-danger" onclick="rechazarReporte(${r.id})">Rechazar</button>
-                                    ` : ''}
-                                </td>
-                            </tr>
-                        `).join('')}
-                    </tbody>
-                </table>
-            `;
-            container.innerHTML = html;
-        }
+async function eliminar(id) {
+    if (!confirm('¿Eliminar este reporte definitivamente?')) return;
+    const r = await fetch(`../api/reportes_mensuales.php?action=eliminar&id=${id}`);
+    const d = await r.json();
+    if (d.success) { showAlert('Reporte eliminado', 'success'); cargar(); }
+    else showAlert(d.error, 'error');
+}
 
-        function getStatusLabel(status) {
-            const labels = {
-                'borrador': 'Borrador',
-                'pendiente_aprobacion': 'Pendiente',
-                'aprobado': 'Aprobado',
-                'rechazado': 'Rechazado'
-            };
-            return labels[status] || status;
-        }
+function verPDF(id) {
+    window.open(`../api/reportes_mensuales.php?action=pdf&id=${id}`, '_blank');
+}
 
-        function verReporte(id) {
-            // Implementar vista detallada
-            alert('Funcionalidad en desarrollo');
-        }
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function abrirModal() { document.getElementById('modalReporte').classList.add('open'); }
+function cerrarModal() { document.getElementById('modalReporte').classList.remove('open'); }
 
-        function aprobarReporte(id) {
-            if (confirm('¿Deseas aprobar este reporte?')) {
-                fetch('../api/reportes.php?action=aprobar', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, estado: 'aprobado' })
-                })
-                .then(() => {
-                    alert('Reporte aprobado');
-                    cargarReportes();
-                })
-                .catch(() => alert('Error al aprobar'));
-            }
-        }
+async function crearReporte() {
+    const body = {
+        empresa_id:   parseInt(document.getElementById('r-empresa').value),
+        plantilla_id: parseInt(document.getElementById('r-plantilla').value),
+        mes:          parseInt(document.getElementById('r-mes').value),
+        anio:         parseInt(document.getElementById('r-anio').value),
+        observaciones: document.getElementById('r-obs').value || null,
+    };
+    if (!body.empresa_id || !body.plantilla_id) {
+        document.getElementById('modal-alert').innerHTML =
+            '<div class="alert alert-error">Empresa y Plantilla son requeridos</div>'; return;
+    }
 
-        function rechazarReporte(id) {
-            if (confirm('¿Deseas rechazar este reporte?')) {
-                fetch('../api/reportes.php?action=aprobar', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, estado: 'rechazado' })
-                })
-                .then(() => {
-                    alert('Reporte rechazado');
-                    cargarReportes();
-                })
-                .catch(() => alert('Error al rechazar'));
-            }
-        }
+    const r = await fetch('../api/reportes_mensuales.php?action=crear', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.success) {
+        cerrarModal();
+        showAlert(`Reporte ${d.numero_reporte} creado. Publícalo cuando esté listo.`, 'success');
+        cargar();
+    } else {
+        document.getElementById('modal-alert').innerHTML =
+            `<div class="alert alert-error">${d.error}</div>`;
+    }
+}
 
-        function mostrarMensajeVacio() {
-            document.getElementById('reportesTable').innerHTML = `
-                <div class="empty-state">
-                    <div class="icon">📋</div>
-                    <h3>No hay reportes</h3>
-                    <p>No hay reportes para mostrar en este momento</p>
-                </div>
-            `;
-        }
+// ── Alertas ───────────────────────────────────────────────────────────────────
+function showAlert(msg, tipo) {
+    const b = document.getElementById('alert-box');
+    b.innerHTML = `<div class="alert alert-${tipo}" style="padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:14px">${msg}</div>`;
+    setTimeout(() => b.innerHTML = '', 5000);
+}
 
-        cargarReportes();
-    </script>
+init();
+</script>
 </body>
 </html>

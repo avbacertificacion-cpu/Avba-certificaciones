@@ -8,6 +8,13 @@ if (!isset($_SESSION['usuario_id'])) {
     exit;
 }
 
+// Cliente no tiene acceso a inspecciones individuales
+if ($_SESSION['rol'] === ROLE_CLIENTE) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Sin permiso']);
+    exit;
+}
+
 $rol    = $_SESSION['rol'];
 $uid    = $_SESSION['usuario_id'];
 $action = $_GET['action'] ?? '';

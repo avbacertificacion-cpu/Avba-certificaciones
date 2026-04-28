@@ -101,7 +101,8 @@ CREATE TABLE reportes_mensuales (
     anio            SMALLINT NOT NULL,
     numero_reporte  VARCHAR(20),                   -- REV-001
     ruta_pdf        VARCHAR(255),
-    estado          ENUM('borrador','generado','enviado') DEFAULT 'borrador',
+    -- 'publicado' = visible para el cliente; 'borrador'/'generado' solo admin lo ve
+    estado          ENUM('borrador','generado','publicado') DEFAULT 'borrador',
     observaciones   TEXT,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (plantilla_id) REFERENCES plantillas(id),
