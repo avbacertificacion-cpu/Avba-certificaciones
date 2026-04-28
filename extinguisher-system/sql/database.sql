@@ -37,6 +37,7 @@ CREATE TABLE extintores (
     ubicacion       VARCHAR(255) NOT NULL,
     tipo            ENUM('PQS','CO2','agua','espuma','halotron','otro') NOT NULL,
     capacidad       VARCHAR(30),                   -- ej: 6 kg, 2.5 kg
+    seccion         VARCHAR(150),                  -- ej: EDIFICIO DE VIGILANCIA
     fecha_recarga   DATE,
     fecha_ph        DATE,                          -- prueba hidrostática
     estado          ENUM('activo','inactivo','en_prestamo') DEFAULT 'activo',

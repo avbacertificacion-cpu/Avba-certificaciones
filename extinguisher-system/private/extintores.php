@@ -117,8 +117,13 @@ $es_admin = $rol === ROLE_ADMIN;
             </div>
         </div>
         <div class="form-group">
-            <label>Ubicación / Área *</label>
-            <input type="text" id="ext-ubicacion" placeholder="Ej: Exterior caseta vigilancia">
+            <label>Sección / Edificio</label>
+            <input type="text" id="ext-seccion" placeholder="Ej: EDIFICIO DE VIGILANCIA" style="text-transform:uppercase">
+            <small style="color:#888;font-size:11px">Agrupa los extintores en el reporte mensual</small>
+        </div>
+        <div class="form-group">
+            <label>Ubicación / Área específica *</label>
+            <input type="text" id="ext-ubicacion" placeholder="Ej: Caseta vigilancia baños">
         </div>
         <div class="form-row">
             <div class="form-group">
@@ -283,6 +288,7 @@ function editarExtintor(id) {
     document.getElementById('ext-id').value        = ext.id;
     document.getElementById('ext-codigo').value    = ext.codigo_manual;
     document.getElementById('ext-empresa').value   = ext.empresa_id;
+    document.getElementById('ext-seccion').value   = ext.seccion || '';
     document.getElementById('ext-ubicacion').value = ext.ubicacion;
     document.getElementById('ext-tipo').value      = ext.tipo;
     document.getElementById('ext-capacidad').value = ext.capacidad || '';
@@ -294,7 +300,7 @@ function editarExtintor(id) {
 }
 
 function limpiarModal() {
-    ['ext-id','ext-codigo','ext-ubicacion','ext-capacidad','ext-recarga','ext-ph','ext-obs']
+    ['ext-id','ext-codigo','ext-seccion','ext-ubicacion','ext-capacidad','ext-recarga','ext-ph','ext-obs']
         .forEach(id => document.getElementById(id).value = '');
     document.getElementById('ext-tipo').value   = 'PQS';
     document.getElementById('ext-estado').value = 'activo';
@@ -316,6 +322,7 @@ async function guardarExtintor() {
 
     const body = {
         empresa_id:     parseInt(empresa),
+        seccion:        document.getElementById('ext-seccion').value.trim().toUpperCase() || null,
         ubicacion,
         tipo:           document.getElementById('ext-tipo').value,
         capacidad:      document.getElementById('ext-capacidad').value || null,

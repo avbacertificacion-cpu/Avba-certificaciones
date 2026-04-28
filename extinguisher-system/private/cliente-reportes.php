@@ -75,7 +75,7 @@ async function cargar() {
 }
 
 function descargar(id) {
-    window.open(`../api/reportes_mensuales.php?action=pdf&id=${id}`, '_blank');
+    window.open(`../api/reporte_pdf.php?reporte_id=${id}&preview=1`, '_blank');
 }
 
 function mesNombre(m) {

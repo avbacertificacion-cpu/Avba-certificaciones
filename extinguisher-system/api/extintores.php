@@ -163,14 +163,15 @@ function crear() {
     try {
         $stmt = $pdo->prepare("
             INSERT INTO extintores
-                (codigo_qr, codigo_manual, empresa_id, ubicacion, tipo, capacidad,
+                (codigo_qr, codigo_manual, empresa_id, seccion, ubicacion, tipo, capacidad,
                  fecha_recarga, fecha_ph, estado, observaciones, creado_por)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute([
             $codigo_qr,
             $codigo_manual,
             $d['empresa_id'],
+            $d['seccion']       ?? null,
             $d['ubicacion'],
             $d['tipo'],
             $d['capacidad']     ?? null,
@@ -215,6 +216,7 @@ function editar() {
 
     $stmt = $pdo->prepare("
         UPDATE extintores SET
+            seccion       = ?,
             ubicacion     = ?,
             tipo          = ?,
             capacidad     = ?,
@@ -225,6 +227,7 @@ function editar() {
         WHERE id = ?
     ");
     $stmt->execute([
+        $d['seccion']       ?? null,
         $d['ubicacion']     ?? '',
         $d['tipo']          ?? '',
         $d['capacidad']     ?? null,
