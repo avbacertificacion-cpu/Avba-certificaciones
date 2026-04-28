@@ -1,456 +1,251 @@
 <?php
 require_once '../config/config.php';
-
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
-    header('Location: ../public/login.html');
-    exit;
+    header('Location: ../public/login.html'); exit;
 }
-
-$nombre_usuario = $_SESSION['nombre'];
+$nombre = $_SESSION['nombre'];
 ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crear Plantilla - Gestión de Extintores</title>
+    <title>Plantillas de Reporte</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',sans-serif;background:#f4f6fb}
+        .navbar{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+        .navbar a{color:#fff;text-decoration:none;font-size:13px;margin-left:16px}
+        .container{max-width:1100px;margin:32px auto;padding:0 20px}
+        .toolbar{margin-bottom:24px}
+        .btn{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;transition:.2s}
+        .btn-primary{background:#667eea;color:#fff}.btn-primary:hover{background:#5568d3}
+        .btn-warning{background:#f39c12;color:#fff}.btn-warning:hover{background:#d68910}
+        .btn-danger{background:#e74c3c;color:#fff}.btn-danger:hover{background:#c0392b}
+        .btn-sm{padding:6px 12px;font-size:12px}
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f5f5f5;
-        }
+        .plantillas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;margin-top:20px}
+        .plantilla-card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.08);border-top:4px solid #667eea}
+        .plantilla-card h3{color:#333;margin-bottom:8px;font-size:16px}
+        .plantilla-card p{color:#666;font-size:13px;margin-bottom:16px;min-height:40px}
+        .plantilla-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;font-size:12px;color:#888}
+        .plantilla-actions{display:flex;gap:8px}
 
-        .navbar {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px 40px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
+        .empty{text-align:center;padding:60px 20px;color:#aaa}
 
-        .navbar a {
-            color: white;
-            text-decoration: none;
-            margin-right: 20px;
-            font-size: 14px;
-        }
+        /* Modal */
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;justify-content:center;align-items:center}
+        .modal-overlay.open{display:flex}
+        .modal{background:#fff;border-radius:12px;padding:32px;width:100%;max-width:600px;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+        .modal h2{margin-bottom:24px}
+        .form-group{margin-bottom:16px}
+        .form-group label{display:block;font-size:13px;font-weight:700;color:#444;margin-bottom:6px}
+        .form-group input,.form-group select,.form-group textarea{width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit}
+        .form-group textarea{resize:vertical;min-height:80px}
+        .modal-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:20px;padding-top:18px;border-top:1px solid #eee}
+        .alert{padding:12px;border-radius:6px;margin-bottom:14px;font-size:13px}
+        .alert-success{background:#d4edda;color:#155724}
+        .alert-error{background:#f8d7da;color:#721c24}
 
-        .navbar a:hover {
-            text-decoration: underline;
-        }
-
-        .container {
-            max-width: 1000px;
-            margin: 40px auto;
-            padding: 0 20px;
-        }
-
-        .card {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-
-        .card h2 {
-            margin-bottom: 20px;
-            color: #333;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 500;
-            color: #333;
-        }
-
-        input[type="text"],
-        input[type="email"],
-        textarea,
-        select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        textarea {
-            resize: vertical;
-            min-height: 100px;
-        }
-
-        .btn {
-            padding: 12px 24px;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-            font-weight: 600;
-            transition: all 0.3s;
-        }
-
-        .btn-primary {
-            background: #667eea;
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: #5568d3;
-        }
-
-        .btn-secondary {
-            background: #e0e0e0;
-            color: #333;
-            margin-left: 10px;
-        }
-
-        .btn-secondary:hover {
-            background: #d0d0d0;
-        }
-
-        .btn-small {
-            padding: 8px 16px;
-            font-size: 12px;
-        }
-
-        .areas-list {
-            margin-top: 30px;
-            border-top: 1px solid #ddd;
-            padding-top: 20px;
-        }
-
-        .area-item {
-            background: #f9f9f9;
-            padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-            border-left: 4px solid #667eea;
-        }
-
-        .area-item h4 {
-            margin-bottom: 10px;
-            color: #333;
-        }
-
-        .campos-list {
-            margin-top: 15px;
-            padding-left: 20px;
-        }
-
-        .campo-item {
-            background: white;
-            padding: 10px;
-            border-radius: 3px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border: 1px solid #eee;
-        }
-
-        .alert {
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        .two-columns {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        @media (max-width: 768px) {
-            .two-columns {
-                grid-template-columns: 1fr;
-            }
-        }
+        .areas-list{margin-top:16px;padding-top:16px;border-top:1px solid #eee}
+        .area-item{background:#f9f9f9;padding:12px;border-radius:8px;margin-bottom:8px;border-left:3px solid #667eea}
+        .area-nombre{font-weight:600;color:#333;margin-bottom:4px}
+        .area-campos{font-size:12px;color:#666;margin-left:8px}
     </style>
 </head>
 <body>
-    <div class="navbar">
-        <h1>🔥 Crear Plantilla</h1>
-        <div>
-            <a href="../dashboard.php">← Atrás</a>
-            <span><?php echo htmlspecialchars($nombre_usuario); ?></span>
-        </div>
+<div class="navbar">
+    <h1>📋 Plantillas de Reporte</h1>
+    <div>
+        <a href="admin-dashboard.php">← Panel</a>
+        <span style="margin-left:16px;font-size:13px"><?= htmlspecialchars($nombre) ?></span>
+    </div>
+</div>
+
+<div class="container">
+    <div id="alert-box"></div>
+
+    <div class="toolbar">
+        <button class="btn btn-primary" onclick="abrirModalNuevo()">+ Nueva plantilla</button>
     </div>
 
-    <div class="container">
-        <div id="alert-container"></div>
+    <div id="grid"></div>
+</div>
 
-        <div class="card">
-            <h2>Nueva Plantilla de Inspección</h2>
-            <form id="plantillaForm">
-                <div class="two-columns">
-                    <div class="form-group">
-                        <label for="nombre">Nombre de la Plantilla *</label>
-                        <input type="text" id="nombre" name="nombre" required placeholder="Ej: Inspección Quantum Energía">
-                    </div>
-                    <div class="form-group">
-                        <label for="empresa_id">Empresa (Opcional)</label>
-                        <input type="text" id="empresa_id" name="empresa_id" placeholder="ID de empresa">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label for="descripcion">Descripción</label>
-                    <textarea id="descripcion" name="descripcion" placeholder="Descripción de la plantilla..."></textarea>
-                </div>
-                <button type="submit" class="btn btn-primary">Crear Plantilla</button>
-            </form>
+<!-- Modal Crear Plantilla -->
+<div class="modal-overlay" id="modalPlantilla">
+    <div class="modal">
+        <h2 id="modalTitulo">Nueva Plantilla</h2>
+        <div id="modal-alert"></div>
+        <input type="hidden" id="p-id">
+
+        <div class="form-group">
+            <label>Nombre *</label>
+            <input type="text" id="p-nombre" placeholder="Ej: Inspección Quantum Energía">
         </div>
 
-        <div class="card" id="areasCard" style="display: none;">
-            <h2>Agregar Áreas</h2>
-            <form id="areaForm">
-                <div class="two-columns">
-                    <div class="form-group">
-                        <label for="nombreArea">Nombre del Área *</label>
-                        <input type="text" id="nombreArea" name="nombreArea" required placeholder="Ej: Exterior costado caseta">
-                    </div>
-                    <div class="form-group">
-                        <label for="descripcionArea">Descripción (Opcional)</label>
-                        <input type="text" id="descripcionArea" name="descripcionArea" placeholder="Descripción del área">
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary btn-small">+ Agregar Área</button>
-            </form>
-
-            <div class="areas-list" id="areasList"></div>
+        <div class="form-group">
+            <label>Descripción</label>
+            <textarea id="p-desc" placeholder="Descripción de la plantilla…"></textarea>
         </div>
 
-        <div class="card" id="camposCard" style="display: none;">
-            <h2>Agregar Campos a Área</h2>
-            <form id="campoForm">
-                <div class="form-group">
-                    <label for="areaSelect">Seleccionar Área *</label>
-                    <select id="areaSelect" name="areaSelect" required></select>
-                </div>
-                <div class="two-columns">
-                    <div class="form-group">
-                        <label for="nombreCampo">Nombre del Campo *</label>
-                        <input type="text" id="nombreCampo" name="nombreCampo" required placeholder="Ej: SER, MG, PO, PH, SG...">
-                    </div>
-                    <div class="form-group">
-                        <label for="tipoCampo">Tipo de Campo</label>
-                        <input type="text" id="tipoCampo" name="tipoCampo" placeholder="Ej: text, number, select">
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary btn-small">+ Agregar Campo</button>
-            </form>
+        <div class="form-group">
+            <label>Empresa (opcional)</label>
+            <select id="p-empresa">
+                <option value="">Sin empresa específica</option>
+            </select>
         </div>
 
-        <div class="card">
-            <h2>Plantillas Existentes</h2>
-            <button class="btn btn-secondary" onclick="cargarPlantillas()">Recargar</button>
-            <div id="plantillasList" style="margin-top: 20px;"></div>
+        <div class="modal-actions">
+            <button class="btn btn-warning" onclick="cerrarModal()">Cancelar</button>
+            <button class="btn btn-primary" onclick="crearPlantilla()">Crear Plantilla</button>
         </div>
     </div>
+</div>
 
-    <script>
-        let plantillaActual = null;
+<script>
+let plantillas = [];
+let empresas = [];
 
-        document.getElementById('plantillaForm').addEventListener('submit', crearPlantilla);
-        document.getElementById('areaForm').addEventListener('submit', agregarArea);
-        document.getElementById('campoForm').addEventListener('submit', agregarCampo);
+// ── Cargar ────────────────────────────────────────────────────────────────────
+async function init() {
+    await cargarEmpresas();
+    await cargar();
+}
 
-        async function crearPlantilla(e) {
-            e.preventDefault();
+async function cargarEmpresas() {
+    const r = await fetch('../api/usuarios.php?action=listar_empresas');
+    const d = await r.json();
+    if (d.success) {
+        empresas = d.data;
+        const sel = document.getElementById('p-empresa');
+        d.data.forEach(e => {
+            const opt = document.createElement('option');
+            opt.value = e.id;
+            opt.textContent = e.nombre;
+            sel.appendChild(opt);
+        });
+    }
+}
 
-            const nombre = document.getElementById('nombre').value;
-            const descripcion = document.getElementById('descripcion').value;
-            const empresa_id = document.getElementById('empresa_id').value;
+async function cargar() {
+    const r = await fetch('../api/plantillas.php?action=listar');
+    const d = await r.json();
+    plantillas = d.success ? d.data : [];
+    render(plantillas);
+}
 
-            try {
-                const response = await fetch('../api/plantillas.php?action=crear', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ nombre, descripcion, empresa_id: empresa_id || null })
-                });
+// ── Render ────────────────────────────────────────────────────────────────────
+function render(data) {
+    const c = document.getElementById('grid');
+    if (!data.length) {
+        c.innerHTML = '<div class="empty"><div style="font-size:56px;margin-bottom:16px">📋</div><p>Sin plantillas creadas</p></div>';
+        return;
+    }
 
-                const data = await response.json();
+    c.innerHTML = `
+    <div class="plantillas-grid">
+    ${data.map(p => `
+        <div class="plantilla-card">
+            <h3>${htmlEscape(p.nombre)}</h3>
+            <p>${htmlEscape(p.descripcion || 'Sin descripción')}</p>
+            <div class="plantilla-meta">
+                <div><strong>${p.numero_reporte}</strong></div>
+                <div>${p.empresa_nombre || 'General'}</div>
+            </div>
+            <div class="plantilla-actions">
+                <button class="btn btn-sm btn-primary" onclick="verDetalles(${p.id})">👁️ Ver</button>
+                <button class="btn btn-sm btn-danger" onclick="eliminar(${p.id})">🗑️</button>
+            </div>
+        </div>
+    `).join('')}
+    </div>`;
+}
 
-                if (data.success) {
-                    plantillaActual = data.id;
-                    mostrarAlerta(`Plantilla creada: ${data.numero_reporte}`, 'success');
-                    document.getElementById('areasCard').style.display = 'block';
-                    document.getElementById('camposCard').style.display = 'block';
-                    document.getElementById('plantillaForm').style.display = 'none';
-                    document.getElementById('areasList').innerHTML = '';
-                    cargarPlantillas();
-                } else {
-                    mostrarAlerta(data.error, 'error');
-                }
-            } catch (error) {
-                mostrarAlerta('Error de conexión', 'error');
-            }
-        }
+function htmlEscape(s) {
+    const p = document.createElement('p');
+    p.textContent = s;
+    return p.innerHTML;
+}
 
-        async function agregarArea(e) {
-            e.preventDefault();
+// ── Modal ─────────────────────────────────────────────────────────────────────
+function abrirModalNuevo() {
+    limpiarModal();
+    document.getElementById('modalTitulo').textContent = 'Nueva Plantilla';
+    document.getElementById('modalPlantilla').classList.add('open');
+}
 
-            if (!plantillaActual) {
-                mostrarAlerta('Primero crea una plantilla', 'error');
-                return;
-            }
+function limpiarModal() {
+    document.getElementById('p-id').value = '';
+    document.getElementById('p-nombre').value = '';
+    document.getElementById('p-desc').value = '';
+    document.getElementById('p-empresa').value = '';
+    document.getElementById('modal-alert').innerHTML = '';
+}
 
-            const nombre = document.getElementById('nombreArea').value;
-            const descripcion = document.getElementById('descripcionArea').value;
+function cerrarModal() {
+    document.getElementById('modalPlantilla').classList.remove('open');
+}
 
-            try {
-                const response = await fetch('../api/plantillas.php?action=agregar-area', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ plantilla_id: plantillaActual, nombre, descripcion })
-                });
+// ── Crear plantilla ───────────────────────────────────────────────────────────
+async function crearPlantilla() {
+    const nombre = document.getElementById('p-nombre').value.trim();
+    if (!nombre) {
+        modalAlert('El nombre es requerido', 'error'); return;
+    }
 
-                const data = await response.json();
+    const body = {
+        nombre,
+        descripcion: document.getElementById('p-desc').value || null,
+        empresa_id: document.getElementById('p-empresa').value || null,
+    };
 
-                if (data.success) {
-                    document.getElementById('areaForm').reset();
-                    mostrarAlerta('Área agregada', 'success');
-                    cargarPlantilla(plantillaActual);
-                } else {
-                    mostrarAlerta(data.error, 'error');
-                }
-            } catch (error) {
-                mostrarAlerta('Error de conexión', 'error');
-            }
-        }
+    const r = await fetch('../api/plantillas.php?action=crear', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+    });
+    const d = await r.json();
 
-        async function agregarCampo(e) {
-            e.preventDefault();
+    if (d.success) {
+        cerrarModal();
+        showAlert(`Plantilla ${d.numero_reporte} creada. Ahora puedes agregar áreas.`, 'success');
+        cargar();
+    } else {
+        modalAlert(d.error || 'Error', 'error');
+    }
+}
 
-            const area_id = document.getElementById('areaSelect').value;
-            const nombre_campo = document.getElementById('nombreCampo').value;
-            const tipo = document.getElementById('tipoCampo').value;
+// ── Ver detalles / eliminar ───────────────────────────────────────────────────
+async function verDetalles(id) {
+    alert('Funcionalidad en desarrollo: agregar áreas y campos a plantillas');
+}
 
-            try {
-                const response = await fetch('../api/plantillas.php?action=agregar-campo', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ area_id, nombre_campo, tipo })
-                });
+async function eliminar(id) {
+    if (!confirm('¿Eliminar esta plantilla?')) return;
+    const r = await fetch(`../api/plantillas.php?action=eliminar&id=${id}`);
+    const d = await r.json();
+    if (d.success) {
+        showAlert('Plantilla eliminada', 'success');
+        cargar();
+    } else {
+        showAlert(d.error, 'error');
+    }
+}
 
-                const data = await response.json();
+// ── Alertas ───────────────────────────────────────────────────────────────────
+function showAlert(msg, tipo) {
+    const b = document.getElementById('alert-box');
+    b.innerHTML = `<div class="alert alert-${tipo}">${msg}</div>`;
+    setTimeout(() => b.innerHTML = '', 4000);
+}
 
-                if (data.success) {
-                    document.getElementById('campoForm').reset();
-                    mostrarAlerta('Campo agregado', 'success');
-                    cargarPlantilla(plantillaActual);
-                } else {
-                    mostrarAlerta(data.error, 'error');
-                }
-            } catch (error) {
-                mostrarAlerta('Error de conexión', 'error');
-            }
-        }
+function modalAlert(msg, tipo) {
+    document.getElementById('modal-alert').innerHTML =
+        `<div class="alert alert-${tipo}">${msg}</div>`;
+}
 
-        async function cargarPlantilla(id) {
-            try {
-                const response = await fetch(`../api/plantillas.php?action=obtener&id=${id}`);
-                const data = await response.json();
-
-                if (data.success) {
-                    const plantilla = data.data;
-                    mostrarAreas(plantilla.areas);
-                    actualizarSelectAreas(plantilla.areas);
-                }
-            } catch (error) {
-                console.error('Error al cargar plantilla', error);
-            }
-        }
-
-        function mostrarAreas(areas) {
-            const areasList = document.getElementById('areasList');
-            areasList.innerHTML = '';
-
-            areas.forEach(area => {
-                const areaDiv = document.createElement('div');
-                areaDiv.className = 'area-item';
-                areaDiv.innerHTML = `
-                    <h4>${area.nombre}</h4>
-                    <p>${area.descripcion || ''}</p>
-                    <div class="campos-list">
-                        ${area.campos.map(c => `<div class="campo-item">${c.nombre_campo} (${c.tipo})</div>`).join('')}
-                    </div>
-                `;
-                areasList.appendChild(areaDiv);
-            });
-        }
-
-        function actualizarSelectAreas(areas) {
-            const select = document.getElementById('areaSelect');
-            select.innerHTML = '<option value="">Seleccionar área...</option>';
-            areas.forEach(area => {
-                const option = document.createElement('option');
-                option.value = area.id;
-                option.textContent = area.nombre;
-                select.appendChild(option);
-            });
-        }
-
-        async function cargarPlantillas() {
-            try {
-                const response = await fetch('../api/plantillas.php?action=listar');
-                const data = await response.json();
-
-                if (data.success) {
-                    const list = document.getElementById('plantillasList');
-                    list.innerHTML = data.data.map(p => `
-                        <div class="area-item" style="border-left-color: #28a745;">
-                            <h4>${p.nombre}</h4>
-                            <p>${p.numero_reporte}</p>
-                            <button class="btn btn-small btn-secondary" onclick="cargarPlantilla(${p.id})">Editar</button>
-                        </div>
-                    `).join('');
-                }
-            } catch (error) {
-                console.error('Error al cargar plantillas', error);
-            }
-        }
-
-        function mostrarAlerta(mensaje, tipo) {
-            const container = document.getElementById('alert-container');
-            const div = document.createElement('div');
-            div.className = `alert alert-${tipo}`;
-            div.textContent = mensaje;
-            container.innerHTML = '';
-            container.appendChild(div);
-
-            setTimeout(() => {
-                div.remove();
-            }, 5000);
-        }
-
-        cargarPlantillas();
-    </script>
+init();
+</script>
 </body>
 </html>
