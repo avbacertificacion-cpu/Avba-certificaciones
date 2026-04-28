@@ -13,25 +13,52 @@ $nombre = $_SESSION['nombre'];
     <title>Plantillas de Reporte</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Segoe UI',sans-serif;background:#f4f6fb}
-        .navbar{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
-        .navbar a{color:#fff;text-decoration:none;font-size:13px;margin-left:16px}
-        .container{max-width:1100px;margin:32px auto;padding:0 20px}
+        html{scroll-behavior:smooth}
+        body{font-family:'Segoe UI',sans-serif;background:#f0f4ff;color:#333}
+
+        .navbar{background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:50;box-shadow:0 4px 12px rgba(102,126,234,.15)}
+        .navbar h1{font-size:20px;font-weight:700}
+        .navbar a{color:#fff;text-decoration:none;font-size:13px;transition:.2s}
+        .navbar a:hover{opacity:.8}
+
+        .container{max-width:1200px;margin:24px auto;padding:0 16px}
+
+        .page-header{margin-bottom:28px}
+        .page-header h2{font-size:28px;color:#333;margin-bottom:8px}
+        .page-header p{color:#888;font-size:14px}
+
         .toolbar{margin-bottom:24px}
-        .btn{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;transition:.2s}
-        .btn-primary{background:#667eea;color:#fff}.btn-primary:hover{background:#5568d3}
-        .btn-warning{background:#f39c12;color:#fff}.btn-warning:hover{background:#d68910}
-        .btn-danger{background:#e74c3c;color:#fff}.btn-danger:hover{background:#c0392b}
-        .btn-sm{padding:6px 12px;font-size:12px}
+        .btn{padding:12px 20px;border:none;border-radius:8px;cursor:pointer;font-weight:700;font-size:13px;transition:.2s;display:inline-flex;align-items:center;gap:8px}
+        .btn:active{transform:scale(.98)}
+        .btn:disabled{opacity:.5;cursor:not-allowed}
 
-        .plantillas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:20px;margin-top:20px}
-        .plantilla-card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,.08);border-top:4px solid #667eea}
-        .plantilla-card h3{color:#333;margin-bottom:8px;font-size:16px}
-        .plantilla-card p{color:#666;font-size:13px;margin-bottom:16px;min-height:40px}
+        .btn-primary{background:#667eea;color:#fff}.btn-primary:hover{background:#5568d3;box-shadow:0 4px 12px rgba(102,126,234,.3)}
+        .btn-warning{background:#f39c12;color:#fff}.btn-warning:hover{background:#d68910;box-shadow:0 4px 12px rgba(243,156,18,.3)}
+        .btn-danger{background:#e74c3c;color:#fff}.btn-danger:hover{background:#c0392b;box-shadow:0 4px 12px rgba(231,76,60,.3)}
+        .btn-sm{padding:8px 12px;font-size:12px}
+
+        .plantillas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:20px;margin-top:20px}
+        .plantilla-card{background:#fff;border-radius:12px;padding:20px;box-shadow:0 2px 8px rgba(0,0,0,.06);border-top:4px solid #667eea;transition:.2s;display:flex;flex-direction:column}
+        .plantilla-card:hover{box-shadow:0 8px 20px rgba(0,0,0,.1);transform:translateY(-4px)}
+
+        .plantilla-card h3{color:#333;margin-bottom:8px;font-size:16px;font-weight:700}
+        .plantilla-card p{color:#666;font-size:13px;margin-bottom:16px;min-height:40px;flex:1}
         .plantilla-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;font-size:12px;color:#888}
-        .plantilla-actions{display:flex;gap:8px}
+        .plantilla-meta div{background:#f9f9f9;padding:8px;border-radius:6px;text-align:center;border-left:3px solid #667eea}
 
-        .empty{text-align:center;padding:60px 20px;color:#aaa}
+        .plantilla-actions{display:flex;gap:8px;margin-top:auto}
+        .plantilla-actions .btn{flex:1;justify-content:center}
+
+        .empty{text-align:center;padding:60px 20px;background:#fff;border-radius:12px;color:#aaa}
+        .empty .icon{font-size:64px;margin-bottom:16px}
+
+        @media(max-width:768px){
+            .navbar h1{font-size:18px}
+            .page-header h2{font-size:22px}
+            .plantillas-grid{grid-template-columns:1fr}
+            .btn{width:100%;justify-content:center}
+            .plantilla-actions{flex-direction:column}
+        }
 
         /* Modal */
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;justify-content:center;align-items:center}
@@ -55,14 +82,19 @@ $nombre = $_SESSION['nombre'];
 </head>
 <body>
 <div class="navbar">
-    <h1>📋 Plantillas de Reporte</h1>
+    <h1>📋 Plantillas</h1>
     <div>
-        <a href="admin-dashboard.php">← Panel</a>
+        <a href="admin-dashboard.php">← Volver</a>
         <span style="margin-left:16px;font-size:13px"><?= htmlspecialchars($nombre) ?></span>
     </div>
 </div>
 
 <div class="container">
+    <div class="page-header">
+        <h2>📋 Plantillas de Reporte</h2>
+        <p>Crea y gestiona plantillas reutilizables para inspecciones mensuales</p>
+    </div>
+
     <div id="alert-box"></div>
 
     <div class="toolbar">
@@ -73,27 +105,30 @@ $nombre = $_SESSION['nombre'];
 </div>
 
 <!-- Modal Crear Plantilla -->
-<div class="modal-overlay" id="modalPlantilla">
+<div class="modal-overlay" id="modalPlantilla" onclick="if(event.target===this) cerrarModal()">
     <div class="modal">
         <h2 id="modalTitulo">Nueva Plantilla</h2>
         <div id="modal-alert"></div>
         <input type="hidden" id="p-id">
 
         <div class="form-group">
-            <label>Nombre *</label>
-            <input type="text" id="p-nombre" placeholder="Ej: Inspección Quantum Energía">
+            <label>Nombre de la plantilla *</label>
+            <input type="text" id="p-nombre" placeholder="Ej: Inspección Quantum Energía" required>
+            <small>Nombre único para identificar esta plantilla</small>
         </div>
 
         <div class="form-group">
             <label>Descripción</label>
-            <textarea id="p-desc" placeholder="Descripción de la plantilla…"></textarea>
+            <textarea id="p-desc" placeholder="Describe para qué sirve esta plantilla…" style="resize:vertical;min-height:80px"></textarea>
+            <small>Texto que aparecerá en los reportes generados con esta plantilla</small>
         </div>
 
         <div class="form-group">
             <label>Empresa (opcional)</label>
             <select id="p-empresa">
-                <option value="">Sin empresa específica</option>
+                <option value="">Plantilla general (todas las empresas)</option>
             </select>
+            <small>Deja vacío para que cualquier empresa pueda usar esta plantilla</small>
         </div>
 
         <div class="modal-actions">
@@ -139,7 +174,7 @@ async function cargar() {
 function render(data) {
     const c = document.getElementById('grid');
     if (!data.length) {
-        c.innerHTML = '<div class="empty"><div style="font-size:56px;margin-bottom:16px">📋</div><p>Sin plantillas creadas</p></div>';
+        c.innerHTML = '<div class="empty"><div class="icon">📋</div><p>No hay plantillas aún. Crea la primera para comenzar.</p></div>';
         return;
     }
 
@@ -147,31 +182,32 @@ function render(data) {
     <div class="plantillas-grid">
     ${data.map(p => `
         <div class="plantilla-card">
-            <h3>${htmlEscape(p.nombre)}</h3>
-            <p>${htmlEscape(p.descripcion || 'Sin descripción')}</p>
+            <h3>${sanitize(p.nombre)}</h3>
+            <p>${sanitize(p.descripcion || 'Sin descripción')}</p>
             <div class="plantilla-meta">
-                <div><strong>${p.numero_reporte}</strong></div>
-                <div>${p.empresa_nombre || 'General'}</div>
+                <div>📄 ${sanitize(p.numero_reporte)}</div>
+                <div>🏢 ${sanitize(p.empresa_nombre || 'General')}</div>
             </div>
             <div class="plantilla-actions">
-                <button class="btn btn-sm btn-primary" onclick="verDetalles(${p.id})">👁️ Ver</button>
-                <button class="btn btn-sm btn-danger" onclick="eliminar(${p.id})">🗑️</button>
+                <button class="btn btn-sm btn-primary" onclick="verDetalles(${parseInt(p.id)})" title="Ver detalles">👁️ Ver</button>
+                <button class="btn btn-sm btn-danger" onclick="eliminar(${parseInt(p.id)})" title="Eliminar plantilla">🗑️</button>
             </div>
         </div>
     `).join('')}
     </div>`;
 }
 
-function htmlEscape(s) {
-    const p = document.createElement('p');
-    p.textContent = s;
-    return p.innerHTML;
+function sanitize(str) {
+    if (typeof str !== 'string') return String(str);
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
-// ── Modal ─────────────────────────────────────────────────────────────────────
 function abrirModalNuevo() {
     limpiarModal();
     document.getElementById('modalTitulo').textContent = 'Nueva Plantilla';
+    document.getElementById('p-nombre').focus();
     document.getElementById('modalPlantilla').classList.add('open');
 }
 
@@ -185,64 +221,89 @@ function limpiarModal() {
 
 function cerrarModal() {
     document.getElementById('modalPlantilla').classList.remove('open');
+    limpiarModal();
 }
 
-// ── Crear plantilla ───────────────────────────────────────────────────────────
 async function crearPlantilla() {
     const nombre = document.getElementById('p-nombre').value.trim();
-    if (!nombre) {
-        modalAlert('El nombre es requerido', 'error'); return;
+    const desc = document.getElementById('p-desc').value.trim();
+    const empresa = document.getElementById('p-empresa').value;
+
+    if (!nombre || nombre.length < 3) {
+        modalAlert('El nombre debe tener al menos 3 caracteres', 'error');
+        document.getElementById('p-nombre').focus();
+        return;
     }
 
-    const body = {
-        nombre,
-        descripcion: document.getElementById('p-desc').value || null,
-        empresa_id: document.getElementById('p-empresa').value || null,
-    };
+    try {
+        const body = {
+            nombre,
+            descripcion: desc || null,
+            empresa_id: empresa || null,
+        };
 
-    const r = await fetch('../api/plantillas.php?action=crear', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify(body)
-    });
-    const d = await r.json();
+        const r = await fetch('../api/plantillas.php?action=crear', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(body),
+            credentials: 'same-origin'
+        });
 
-    if (d.success) {
-        cerrarModal();
-        showAlert(`Plantilla ${d.numero_reporte} creada. Ahora puedes agregar áreas.`, 'success');
-        cargar();
-    } else {
-        modalAlert(d.error || 'Error', 'error');
+        if (!r.ok) throw new Error(`Error ${r.status}`);
+
+        const d = await r.json();
+
+        if (d.success) {
+            cerrarModal();
+            showAlert(`✓ Plantilla "${d.numero_reporte}" creada correctamente`, 'success');
+            await cargar();
+        } else {
+            modalAlert(d.error || 'Error al crear plantilla', 'error');
+        }
+    } catch(e) {
+        modalAlert('Error de conexión: ' + e.message, 'error');
     }
 }
 
-// ── Ver detalles / eliminar ───────────────────────────────────────────────────
 async function verDetalles(id) {
-    alert('Funcionalidad en desarrollo: agregar áreas y campos a plantillas');
+    const plantilla = plantillas.find(p => p.id === id);
+    if (!plantilla) return;
+    showAlert('✓ Funcionalidad en desarrollo: agregar áreas y campos a plantillas', 'success');
 }
 
 async function eliminar(id) {
-    if (!confirm('¿Eliminar esta plantilla?')) return;
-    const r = await fetch(`../api/plantillas.php?action=eliminar&id=${id}`);
-    const d = await r.json();
-    if (d.success) {
-        showAlert('Plantilla eliminada', 'success');
-        cargar();
-    } else {
-        showAlert(d.error, 'error');
+    const plantilla = plantillas.find(p => p.id === id);
+    if (!plantilla) return;
+
+    if (!confirm(`¿Estás seguro de que deseas eliminar la plantilla "${plantilla.nombre}"?`)) return;
+
+    try {
+        const r = await fetch(`../api/plantillas.php?action=eliminar&id=${parseInt(id)}`);
+        if (!r.ok) throw new Error(`Error ${r.status}`);
+
+        const d = await r.json();
+
+        if (d.success) {
+            showAlert(`✓ Plantilla "${plantilla.nombre}" eliminada correctamente`, 'success');
+            await cargar();
+        } else {
+            showAlert(d.error || 'Error al eliminar', 'error');
+        }
+    } catch(e) {
+        showAlert('Error de conexión: ' + e.message, 'error');
     }
 }
 
-// ── Alertas ───────────────────────────────────────────────────────────────────
 function showAlert(msg, tipo) {
     const b = document.getElementById('alert-box');
-    b.innerHTML = `<div class="alert alert-${tipo}">${msg}</div>`;
-    setTimeout(() => b.innerHTML = '', 4000);
+    const icon = tipo === 'success' ? '✓' : '✕';
+    b.innerHTML = `<div class="alert alert-${tipo}"><span class="alert-icon">${icon}</span><span>${msg}</span></div>`;
+    setTimeout(() => b.innerHTML = '', 5000);
 }
 
 function modalAlert(msg, tipo) {
-    document.getElementById('modal-alert').innerHTML =
-        `<div class="alert alert-${tipo}">${msg}</div>`;
+    const icon = tipo === 'success' ? '✓' : '⚠';
+    document.getElementById('modal-alert').innerHTML = `<div class="alert alert-${tipo}"><span class="alert-icon">${icon}</span><span>${msg}</span></div>`;
 }
 
 init();
