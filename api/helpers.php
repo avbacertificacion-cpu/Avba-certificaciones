@@ -176,6 +176,14 @@ function fixEncoding(mixed $v): mixed {
 }
 
 /**
+ * Convierte un string UTF-8 a ISO-8859-1 para FPDF (que es Latin-1).
+ * Aplica fixEncoding primero por si el dato viene doble-codificado de la BD.
+ */
+function fpdfStr(string $s): string {
+    return mb_convert_encoding(fixEncoding($s), 'ISO-8859-1', 'UTF-8');
+}
+
+/**
  * Devuelve una respuesta JSON y termina la ejecución.
  */
 function respuesta(array $data, int $httpCode = 200): void {
