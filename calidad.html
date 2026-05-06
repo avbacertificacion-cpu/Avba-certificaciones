@@ -4328,39 +4328,39 @@ const PK_COLORS = ['#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6','#1abc9c','
 
 const PK_SAMPLE = {
   // Equipo / Certificado
-  folio:             'AVBA-00123',
-  cliente:           'Constructora Jalisco S.A. de C.V.',
-  domicilio:         'Av. Revolución 1234, Guadalajara, Jal.',
-  maquinaria:        'Grúa Torre 5 Toneladas',
-  marca:             'LIEBHERR',
-  modelo:            'EC-B 8 L12',
-  serie:             'SN-4872651',
-  id_equipo:         '42',
-  capacidad:         '5 Toneladas',
-  fecha:             '15 de Abril de 2025',
-  vigencia:          '15 de Abril de 2026',
-  anio:              '2025',
-  qr_imagen:         '[CÓDIGO QR]',
+  folio:             'AB.45180-25656-2026MX',
+  cliente:           'HYH CONSTRUCCIONES Y ARRENDAMIENTO DEL GOLFO S.A DE C.V.',
+  domicilio:         'CALLE VIALIDAD PERÍMETRO DUPORT, FRAC. LOS OLIVOS, ALTAMIRA, TAMAULIPAS, 89603, MÉXICO',
+  maquinaria:        'GRUA HIDRAULICA MONTADA SOBRE CAMION',
+  marca:             'MANITEX',
+  modelo:            '1770C',
+  serie:             '129476',
+  id_equipo:         'H&H 01',
+  capacidad:         '34,000 LBS / 15,422 KG',
+  fecha:             '26/03/2026',
+  vigencia:          '26/03/2027',
+  anio:              '2026',
+  qr_imagen:         '__QR_IMAGE__',   // valor especial → se renderiza como imagen
   // Accesorio
   id_accesorio:      '001',
   tipo:              'Eslinga de Cadena',
   medidas:           '1" × 3 m',
   estado:            'Bueno',
-  fecha_inspeccion:  '15 de Abril de 2025',
-  inspector:         'Ing. Juan Pérez López',
+  fecha_inspeccion:  '26/03/2026',
+  inspector:         'Ing. José Marcos González Calderón',
   // Personal
   nombre_completo:   'Juan Carlos Pérez López',
   curp:              'PELJ850315HDFRZN04',
   puesto:            'Operador de Grúa',
   ocupacion:         'Operador de Maquinaria Pesada',
-  empresa_nombre:    'Constructora Jalisco S.A. de C.V.',
-  empresa_rfc:       'CJA850315AB1',
-  empresa_direccion: 'Av. Revolución 1234, Guadalajara, Jal.',
+  empresa_nombre:    'HYH CONSTRUCCIONES Y ARRENDAMIENTO DEL GOLFO S.A DE C.V.',
+  empresa_rfc:       'HCA850315AB1',
+  empresa_direccion: 'CALLE VIALIDAD PERÍMETRO DUPORT, ALTAMIRA, TAMAULIPAS',
   empresa_representante: 'Lic. María García Sánchez',
   curso_nombre:      'Operación Segura de Grúas Industriales',
   area_tematica:     'Seguridad e Higiene Industrial',
   duracion_horas:    '16 horas',
-  fecha_curso:       '10 al 12 de Marzo de 2025',
+  fecha_curso:       '10 al 12 de Marzo de 2026',
 };
 function pkSampleText(campo) {
   return PK_SAMPLE[campo] ?? campo;
@@ -4382,7 +4382,8 @@ let pkRenderFn   = null; // callback to refresh the table after changes
 let pkContext    = '';   // 'equipo' | 'acc' | 'personal'
 let pkDragging   = false;
 let pkDragIdx    = -1;
-let pkJustDragged = false;
+let pkDidDrag    = false;   // true si el mouse realmente se movió durante el drag
+let pkJustDragged = false;  // bloquea el click del canvas tras un drag real
 
 async function abrirPicker(pdfUrl, camposArr, context, renderCallback) {
   if (!pdfUrl) { alert('Esta plantilla no tiene PDF cargado todavía.'); return; }
@@ -4463,42 +4464,81 @@ function pickerRenderMarkers() {
   const wrap = document.getElementById('pk-markers');
   wrap.innerHTML = '';
   if (!pkCampos) return;
+  const pxPerMm = pkScale * 72 / 25.4;
+
+  const startDrag = (e, idx) => {
+    e.stopPropagation();
+    pkDragging = true;
+    pkDragIdx  = idx;
+    pkDidDrag  = false;
+    pkActive   = idx;  // actualiza activo sin re-renderizar
+    document.getElementById('pk-canvas-wrap').style.cursor = 'grabbing';
+  };
+
   pkCampos.forEach((c, i) => {
     if ((c.pagina || 1) !== pkPage) return;
     const { x, y } = pkMmToPx(c.x || 0, c.y || 0);
-    const pinColor  = PK_COLORS[i % PK_COLORS.length]; // identification color for dot
-    const textColor = c.color || '#000000';              // actual text color for preview
+    const pinColor  = PK_COLORS[i % PK_COLORS.length];
+    const textColor = c.color || '#000000';
     const isActive  = i === pkActive;
 
-    // Pin dot (draggable)
+    // ── Pin: solo anillo de color, sin relleno ──────────────
     const pin = document.createElement('div');
     pin.className = 'pk-pin';
     pin.dataset.idx = i;
-    pin.style.cssText = `left:${x}px;top:${y}px;transform:translate(-5px,-5px);z-index:${isActive?20:10}`;
-    pin.innerHTML = `<div class="pk-dot" style="background:${pinColor};${isActive?'transform:scale(1.4);border-color:#185FA5;':''}"></div>`;
-    pin.onclick  = e => { e.stopPropagation(); if (!pkJustDragged) pickerSetActive(i); };
-    pin.onmousedown = e => { e.stopPropagation(); pkDragging = true; pkDragIdx = i; document.getElementById('pk-canvas-wrap').style.cursor = 'grabbing'; pickerSetActive(i); };
+    pin.style.cssText = `left:${x}px;top:${y}px;transform:translate(-5px,-5px);z-index:${isActive?22:12}`;
+    pin.innerHTML = `<div class="pk-dot" style="
+      background:transparent;
+      border:${isActive?'3px':'2.5px'} solid ${pinColor};
+      ${isActive?'transform:scale(1.3);':''}
+    "></div>`;
+    pin.onclick     = e => { e.stopPropagation(); pickerSetActive(i); };
+    pin.onmousedown = e => startDrag(e, i);
     wrap.appendChild(pin);
 
-    // Sample text preview using the campo's own color
-    const font = pkCssFont(c);
-    const sample = document.createElement('div');
-    sample.className = 'pk-sample';
-    sample.style.cssText = [
-      `left:${x}px`, `top:${y}px`,
-      `font-size:${font.size}px`,
-      `font-family:${font.family}`,
-      `font-weight:${font.bold ? '700' : '400'}`,
-      `color:${textColor}`,
-      `outline:${isActive ? '1.5px dashed ' + pinColor : 'none'}`,
-      `z-index:${isActive ? 19 : 9}`,
-      `pointer-events:all`,
-      `cursor:grab`,
-    ].join(';');
-    sample.textContent = pkSampleText(c.campo);
-    sample.onclick     = e => { e.stopPropagation(); if (!pkJustDragged) pickerSetActive(i); };
-    sample.onmousedown = e => { e.stopPropagation(); pkDragging = true; pkDragIdx = i; document.getElementById('pk-canvas-wrap').style.cursor = 'grabbing'; pickerSetActive(i); };
-    wrap.appendChild(sample);
+    // ── Sample: texto de muestra o imagen QR ────────────────
+    const sampleVal = PK_SAMPLE[c.campo];
+    const isQR = sampleVal === '__QR_IMAGE__';
+
+    if (isQR) {
+      // Imagen QR de muestra — tamaño determinado por 'ancho' o 35mm por defecto
+      const sizePx = Math.round(((c.ancho || 35) * pxPerMm));
+      const img = document.createElement('img');
+      img.src = 'https://quickchart.io/qr?text=AVBA-CERTIFICACIONES-MUESTRA&size=120';
+      img.style.cssText = [
+        `position:absolute`,
+        `left:${x}px`, `top:${y}px`,
+        `width:${sizePx}px`, `height:${sizePx}px`,
+        `object-fit:contain`,
+        `pointer-events:all`,
+        `cursor:grab`,
+        `outline:${isActive ? '2px dashed ' + pinColor : 'none'}`,
+        `z-index:${isActive ? 19 : 9}`,
+        `opacity:.9`,
+      ].join(';');
+      img.onclick     = e => { e.stopPropagation(); pickerSetActive(i); };
+      img.onmousedown = e => startDrag(e, i);
+      wrap.appendChild(img);
+    } else {
+      const font = pkCssFont(c);
+      const sample = document.createElement('div');
+      sample.className = 'pk-sample';
+      sample.style.cssText = [
+        `left:${x}px`, `top:${y}px`,
+        `font-size:${font.size}px`,
+        `font-family:${font.family}`,
+        `font-weight:${font.bold ? '700' : '400'}`,
+        `color:${textColor}`,
+        `outline:${isActive ? '1.5px dashed ' + pinColor : 'none'}`,
+        `z-index:${isActive ? 19 : 9}`,
+        `pointer-events:all`,
+        `cursor:grab`,
+      ].join(';');
+      sample.textContent = sampleVal ?? c.campo;
+      sample.onclick     = e => { e.stopPropagation(); pickerSetActive(i); };
+      sample.onmousedown = e => startDrag(e, i);
+      wrap.appendChild(sample);
+    }
   });
 }
 
@@ -4576,6 +4616,7 @@ document.getElementById('pk-canvas-wrap').addEventListener('mousemove', function
   if (coordBar) coordBar.textContent = `X: ${x.toFixed(1)} mm  |  Y: ${y.toFixed(1)} mm`;
 
   if (pkDragging && pkDragIdx >= 0 && pkCampos && pkCampos[pkDragIdx]) {
+    pkDidDrag = true;
     pkCampos[pkDragIdx].x      = x;
     pkCampos[pkDragIdx].y      = y;
     pkCampos[pkDragIdx].pagina = pkPage;
@@ -4593,15 +4634,19 @@ document.getElementById('pk-canvas-wrap').addEventListener('mouseleave', functio
 // Mouseup anywhere → end drag, sync table
 document.addEventListener('mouseup', function() {
   if (!pkDragging) return;
-  pkDragging    = false;
-  pkDragIdx     = -1;
-  pkJustDragged = true;
+  const wasDrag = pkDidDrag;
+  pkDragging = false;
+  pkDragIdx  = -1;
+  pkDidDrag  = false;
   document.getElementById('pk-canvas-wrap').style.cursor = 'crosshair';
-  setTimeout(() => { pkJustDragged = false; }, 80);
-  if (pkCampos) {
-    pickerRenderList();
-    pkSyncTable();
+  if (wasDrag) {
+    // Solo bloquear el canvas-click si hubo movimiento real
+    pkJustDragged = true;
+    setTimeout(() => { pkJustDragged = false; }, 80);
+    pickerRenderMarkers();
+    if (pkCampos) { pickerRenderList(); pkSyncTable(); }
   }
+  // Si fue solo click (sin movimiento), el onclick del elemento dispara pickerSetActive
 });
 
 // Keyboard nudge when picker is open
