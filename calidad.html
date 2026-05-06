@@ -4521,6 +4521,7 @@ function pickerRenderMarkers() {
         `z-index:${isActive ? 19 : 9}`,
         `opacity:.9`,
       ].join(';');
+      img.dataset.idx  = i;
       img.onclick     = e => { e.stopPropagation(); pickerSetActive(i); };
       img.onmousedown = e => startDrag(e, i);
       wrap.appendChild(img);
@@ -4540,6 +4541,7 @@ function pickerRenderMarkers() {
         `cursor:grab`,
       ].join(';');
       sample.textContent = sampleVal ?? c.campo;
+      sample.dataset.idx  = i;
       sample.onclick     = e => { e.stopPropagation(); pickerSetActive(i); };
       sample.onmousedown = e => startDrag(e, i);
       wrap.appendChild(sample);
@@ -4613,7 +4615,19 @@ document.getElementById('pk-canvas-wrap').addEventListener('click', function(e) 
   pkSyncTable();
 });
 
-// Mousemove → live coordinate display + drag
+// Mueve los nodos DOM del campo arrastrado sin reconstruir todo el DOM
+function pickerMoveDragItem(xMm, yMm) {
+  const { x: px, y: py } = pkMmToPx(xMm, yMm);
+  const idx = pkDragIdx;
+  // pin: translate(-5,-5) para centrar el anillo en la coordenada
+  const pin = document.querySelector(`#pk-markers .pk-pin[data-idx="${idx}"]`);
+  if (pin) { pin.style.left = px + 'px'; pin.style.top = py + 'px'; }
+  // sample / img
+  const item = document.querySelector(`#pk-markers [data-idx="${idx}"]:not(.pk-pin)`);
+  if (item) { item.style.left = px + 'px'; item.style.top = py + 'px'; }
+}
+
+// Mousemove → live coordinate display + drag (sin reconstruir DOM durante drag)
 document.getElementById('pk-canvas-wrap').addEventListener('mousemove', function(e) {
   if (!pkPdf) return;
   const { x, y } = pkEventToMm(e);
@@ -4628,7 +4642,7 @@ document.getElementById('pk-canvas-wrap').addEventListener('mousemove', function
     pkCampos[pkDragIdx].x      = x;
     pkCampos[pkDragIdx].y      = y;
     pkCampos[pkDragIdx].pagina = pkPage;
-    pickerRenderMarkers();
+    pickerMoveDragItem(x, y);   // mover nodos directamente, sin rebuild
     document.getElementById('pk-active-info').textContent =
       `"${pkCampos[pkDragIdx].campo}" → x: ${x.toFixed(1)} mm, y: ${y.toFixed(1)} mm`;
   }
