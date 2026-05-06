@@ -1317,22 +1317,22 @@ HTML;
         if (!file_exists($rutaTpl))
             return ['status' => 'error', 'message' => "Plantilla '{$archivoTpl}' no encontrada. Vuelve a subirla."];
 
-        // Datos de ejemplo para la vista previa
+        // Datos de muestra para la vista previa (coinciden con el picker)
         $datos = [
             'id'                    => 1,
-            'nombre_completo'       => 'JUAN EJEMPLO PÉREZ DEMO',
-            'curp'                  => 'EXPJ800101HDFRZN01',
-            'puesto'                => 'Operador de Montacargas',
-            'ocupacion_nombre'      => 'Operación de Equipo',
-            'empresa_nombre'        => 'EMPRESA DE EJEMPLO S.A. DE C.V.',
-            'empresa_rfc'           => 'EDE800101ABC',
-            'empresa_direccion'     => 'AV. EJEMPLO 123, COL. CENTRO, MONTERREY, N.L.',
-            'empresa_representante' => 'REPRESENTANTE LEGAL DEMO',
-            'curso_nombre'          => 'Operación Segura de Montacargas',
-            'area_tematica'         => 'Seguridad Industrial',
+            'nombre_completo'       => 'Juan Carlos Pérez López',
+            'curp'                  => 'PELJ850315HDFRZN04',
+            'puesto'                => 'Operador de Grúa',
+            'ocupacion_nombre'      => 'Operador de Maquinaria Pesada',
+            'empresa_nombre'        => 'HYH CONSTRUCCIONES Y ARRENDAMIENTO DEL GOLFO S.A DE C.V.',
+            'empresa_rfc'           => 'HCA850315AB1',
+            'empresa_direccion'     => 'CALLE VIALIDAD PERÍMETRO DUPORT, ALTAMIRA, TAMAULIPAS',
+            'empresa_representante' => 'Lic. María García Sánchez',
+            'curso_nombre'          => 'Operación Segura de Grúas Industriales',
+            'area_tematica'         => 'Seguridad e Higiene Industrial',
             'duracion_horas'        => '16',
-            'fecha_curso'           => date('Y-m-d'),
-            'capacidad'             => 'Operar montacargas de manera segura y eficiente',
+            'fecha_curso'           => '2026-03-26',
+            'capacidad'             => 'Operar grúas industriales de manera segura',
             'capacidad_na'          => 0,
         ];
 
@@ -1435,22 +1435,18 @@ HTML;
             return ['status' => 'error', 'message' => "Plantilla '{$archivoTpl}' no encontrada en el servidor. Vuelve a subirla."];
         }
 
-        // Primer registro real de ese tipo de equipo; si no hay, usar datos de ejemplo
-        $stmtEq = $this->pdo->prepare(
-            "SELECT * FROM equipos WHERE maquinaria = ? ORDER BY id ASC LIMIT 1"
-        );
-        $stmtEq->execute([$tipo['nombre']]);
-        $datos = $stmtEq->fetch() ?: [
-            'control'          => '00001-00001',
-            'cliente'          => 'CLIENTE DE EJEMPLO S.A. DE C.V.',
-            'direccion'        => 'AV. EJEMPLO 1234, COL. CENTRO, MONTERREY, N.L.',
-            'maquinaria'       => $tipo['nombre'],
-            'marca'            => 'MARCA DEMO',
-            'modelo'           => 'MODELO X',
-            'serie'            => 'SERIE-DEMO-0001',
-            'id_equipo'        => 'ID-DEMO-001',
-            'capacidad'        => '10 TON',
-            'fecha_inspeccion' => date('Y-m-d'),
+        // Siempre usar datos de muestra en la previsualización
+        $datos = [
+            'control'          => '45180-25656',
+            'cliente'          => 'HYH CONSTRUCCIONES Y ARRENDAMIENTO DEL GOLFO S.A DE C.V.',
+            'direccion'        => 'CALLE VIALIDAD PERÍMETRO DUPORT, FRAC. LOS OLIVOS, ALTAMIRA, TAMAULIPAS, 89603, MÉXICO',
+            'maquinaria'       => 'GRUA HIDRAULICA MONTADA SOBRE CAMION',
+            'marca'            => 'MANITEX',
+            'modelo'           => '1770C',
+            'serie'            => '129476',
+            'id_equipo'        => 'H&H 01',
+            'capacidad'        => '34,000 LBS / 15,422 KG',
+            'fecha_inspeccion' => '2026-03-26',
             'qr_codigo'        => '0000000001',
         ];
 

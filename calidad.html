@@ -4380,10 +4380,13 @@ let pkActive     = 0;   // index of selected campo
 let pkCampos     = null; // reference to the campos array being edited
 let pkRenderFn   = null; // callback to refresh the table after changes
 let pkContext    = '';   // 'equipo' | 'acc' | 'personal'
-let pkDragging   = false;
-let pkDragIdx    = -1;
-let pkDidDrag    = false;   // true si el mouse realmente se movió durante el drag
-let pkJustDragged = false;  // bloquea el click del canvas tras un drag real
+let pkDragging    = false;
+let pkDragIdx     = -1;
+let pkDidDrag     = false;   // true si el mouse superó el umbral de movimiento
+let pkJustDragged = false;   // bloquea el click del canvas tras un drag real
+let pkDragStartX  = 0;       // posición del mousedown para calcular desplazamiento
+let pkDragStartY  = 0;
+const PK_DRAG_THRESHOLD = 5; // píxeles mínimos para considerar un drag real
 
 async function abrirPicker(pdfUrl, camposArr, context, renderCallback) {
   if (!pdfUrl) { alert('Esta plantilla no tiene PDF cargado todavía.'); return; }
@@ -4468,10 +4471,12 @@ function pickerRenderMarkers() {
 
   const startDrag = (e, idx) => {
     e.stopPropagation();
-    pkDragging = true;
-    pkDragIdx  = idx;
-    pkDidDrag  = false;
-    pkActive   = idx;  // actualiza activo sin re-renderizar
+    pkDragging   = true;
+    pkDragIdx    = idx;
+    pkDidDrag    = false;
+    pkDragStartX = e.clientX;
+    pkDragStartY = e.clientY;
+    pkActive     = idx;  // actualiza activo sin re-renderizar
     document.getElementById('pk-canvas-wrap').style.cursor = 'grabbing';
   };
 
@@ -4616,6 +4621,9 @@ document.getElementById('pk-canvas-wrap').addEventListener('mousemove', function
   if (coordBar) coordBar.textContent = `X: ${x.toFixed(1)} mm  |  Y: ${y.toFixed(1)} mm`;
 
   if (pkDragging && pkDragIdx >= 0 && pkCampos && pkCampos[pkDragIdx]) {
+    const dx = e.clientX - pkDragStartX;
+    const dy = e.clientY - pkDragStartY;
+    if (!pkDidDrag && Math.sqrt(dx * dx + dy * dy) < PK_DRAG_THRESHOLD) return;
     pkDidDrag = true;
     pkCampos[pkDragIdx].x      = x;
     pkCampos[pkDragIdx].y      = y;

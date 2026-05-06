@@ -475,18 +475,18 @@ class Accesorios {
         }
 
         $dummy = [
-            'id_accesorio'     => 'A-001',
-            'tipo'             => 'Eslinga de Banda',
-            'marca'            => 'Certex',
-            'modelo'           => 'EW-60',
-            'serie'            => 'CB2024-0112',
-            'capacidad'        => '3 Ton',
-            'medidas'          => '60 mm × 4 m',
+            'id_accesorio'     => '001',
+            'tipo'             => 'Eslinga de Cadena',
+            'marca'            => 'CROSBY',
+            'modelo'           => 'G-100',
+            'serie'            => 'SC2026-0129',
+            'capacidad'        => '3.25 Ton',
+            'medidas'          => '1" × 3 m',
             'estado'           => 'APTO',
-            'cliente'          => 'Empresa Ejemplo S.A. de C.V.',
-            'fecha_inspeccion' => date('d/m/Y'),
-            'inspector'        => 'Inspector Demo',
-            'folio'            => 'CERT-ACC-00001',
+            'cliente'          => 'HYH CONSTRUCCIONES Y ARRENDAMIENTO DEL GOLFO S.A DE C.V.',
+            'fecha_inspeccion' => '26/03/2026',
+            'inspector'        => 'Ing. José Marcos González Calderón',
+            'folio'            => 'AB.45180-25656-2026MX',
         ];
 
         $pdf = new \setasign\Fpdi\Fpdi();
