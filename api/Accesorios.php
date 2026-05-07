@@ -220,7 +220,7 @@ class Accesorios {
     // ── Detalle de una sesión con sus accesorios ───────────
     public function detalleSesion(int $id): array {
         $this->ensureEstatusColumn('accesorios_sesiones');
-        $chk = $this->pdo->prepare("SELECT id, cliente, control, estatus, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, coordenadas, direccion, usuario FROM accesorios_sesiones WHERE id = ?");
+        $chk = $this->pdo->prepare("SELECT id, cliente, control, estatus, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, coordenadas, direccion, usuario, qr_codigo FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
         $sesion = $chk->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
@@ -507,17 +507,32 @@ class Accesorios {
         } catch (\Exception $e) {}
 
         foreach ($campos as $c) {
+            $x     = (float)($c['x']     ?? 0);
+            $y     = (float)($c['y']     ?? 0);
+            $ancho = (float)($c['ancho'] ?? 0);
             if ($c['campo'] === 'firma_inspector') {
                 if ($firmaRutaPreview && file_exists($firmaRutaPreview)) {
-                    $ancho = (float)($c['ancho'] ?? 0);
-                    $alto  = (float)($c['alto']  ?? ($ancho ?: 20));
-                    $pdf->Image($firmaRutaPreview, (float)($c['x'] ?? 0), (float)($c['y'] ?? 0), $ancho ?: 40, $alto);
+                    $alto = (float)($c['alto'] ?? ($ancho ?: 20));
+                    $pdf->Image($firmaRutaPreview, $x, $y, $ancho ?: 40, $alto);
+                }
+                continue;
+            }
+            if ($c['campo'] === 'qr_imagen') {
+                // Usar un QR de muestra apuntando a la URL de validación
+                $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(rtrim(SITE_URL, '/') . '/validar.html?qr=PREVIEW') . '&size=300';
+                $qrTmp = sys_get_temp_dir() . '/avba_qr_prev_acc.png';
+                $qrData = @file_get_contents($qrUrl);
+                if ($qrData) {
+                    file_put_contents($qrTmp, $qrData);
+                    $alto = (float)($c['alto'] ?? ($ancho ?: 25));
+                    $pdf->Image($qrTmp, $x, $y, $ancho ?: 25, $alto);
+                    @unlink($qrTmp);
                 }
                 continue;
             }
             $val = $dummy[$c['campo']] ?? '';
             $pdf->SetFont($c['fuente'] ?? 'Helvetica', $c['negrita'] ? 'B' : '', $c['tamano'] ?? 11);
-            pdfCell($pdf, (float)($c['x'] ?? 0), (float)($c['y'] ?? 0), (float)($c['ancho'] ?? 0), (int)($c['tamano'] ?? 11), fpdfStr((string)$val));
+            pdfCell($pdf, $x, $y, $ancho, (int)($c['tamano'] ?? 11), fpdfStr((string)$val));
         }
 
         $dir = __DIR__ . '/../uploads/reportes/';
@@ -676,18 +691,36 @@ class Accesorios {
                 } catch (\Exception $e) {}
             }
 
+            $qrCodigo = $sesion['qr_codigo'] ?? '';
+
             foreach ($campos as $c) {
+                $x     = (float)($c['x']     ?? 0);
+                $y     = (float)($c['y']     ?? 0);
+                $ancho = (float)($c['ancho'] ?? 0);
                 if ($c['campo'] === 'firma_inspector') {
                     if ($firmaRuta && file_exists($firmaRuta)) {
-                        $ancho = (float)($c['ancho'] ?? 0);
-                        $alto  = (float)($c['alto']  ?? ($ancho ?: 20));
-                        $pdf->Image($firmaRuta, (float)($c['x'] ?? 0), (float)($c['y'] ?? 0), $ancho ?: 40, $alto);
+                        $alto = (float)($c['alto'] ?? ($ancho ?: 20));
+                        $pdf->Image($firmaRuta, $x, $y, $ancho ?: 40, $alto);
+                    }
+                    continue;
+                }
+                if ($c['campo'] === 'qr_imagen') {
+                    if ($qrCodigo) {
+                        $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(rtrim(SITE_URL, '/') . '/validar.html?qr=' . urlencode($qrCodigo)) . '&size=300';
+                        $qrTmp = sys_get_temp_dir() . '/avba_qr_acc_' . uniqid() . '.png';
+                        $qrData = @file_get_contents($qrUrl);
+                        if ($qrData) {
+                            file_put_contents($qrTmp, $qrData);
+                            $alto = (float)($c['alto'] ?? ($ancho ?: 25));
+                            $pdf->Image($qrTmp, $x, $y, $ancho ?: 25, $alto);
+                            @unlink($qrTmp);
+                        }
                     }
                     continue;
                 }
                 $val = $valores[$c['campo']] ?? '';
                 $pdf->SetFont($c['fuente'] ?? 'Helvetica', ($c['negrita'] ?? false) ? 'B' : '', $c['tamano'] ?? 11);
-                pdfCell($pdf, (float)($c['x'] ?? 0), (float)($c['y'] ?? 0), (float)($c['ancho'] ?? 0), (int)($c['tamano'] ?? 11), fpdfStr((string)$val));
+                pdfCell($pdf, $x, $y, $ancho, (int)($c['tamano'] ?? 11), fpdfStr((string)$val));
             }
         }
 
