@@ -328,30 +328,29 @@ class Admin {
         return ['status' => 'success', 'message' => 'Plantilla guardada correctamente.', 'archivo' => $filename];
     }
 
-    // ── Subir plantilla PDF para certificado / dictamen ──────
     // ── Auto-migración: agrega columnas PDF si no existen ─────
     private function ensureColumnsPdf(): void {
-        // Comprueba si la columna ya existe
-        $check = $this->pdo->query(
-            "SELECT COUNT(*) FROM information_schema.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE()
-               AND TABLE_NAME   = 'maquinaria_tipos'
-               AND COLUMN_NAME  = 'plantilla_cert_pdf'"
-        )->fetchColumn();
+        // Verifica y agrega cada columna individualmente.
+        // Compatible con MySQL 5.x (no tiene ADD COLUMN IF NOT EXISTS)
+        // y con MySQL 8.x.
+        $needed = [
+            'plantilla_cert_pdf' => "ALTER TABLE maquinaria_tipos ADD COLUMN plantilla_cert_pdf VARCHAR(500) NULL AFTER plantilla_cert",
+            'plantilla_dict_pdf' => "ALTER TABLE maquinaria_tipos ADD COLUMN plantilla_dict_pdf VARCHAR(500) NULL AFTER plantilla_dict",
+            'cert_pdf_campos'    => "ALTER TABLE maquinaria_tipos ADD COLUMN cert_pdf_campos    JSON          NULL",
+            'dict_pdf_campos'    => "ALTER TABLE maquinaria_tipos ADD COLUMN dict_pdf_campos    JSON          NULL",
+        ];
 
-        if ($check) return; // Ya existe, nada que hacer
-
-        $this->pdo->exec("
-            ALTER TABLE maquinaria_tipos
-              ADD COLUMN IF NOT EXISTS plantilla_cert_pdf VARCHAR(500) NULL
-                  AFTER plantilla_cert,
-              ADD COLUMN IF NOT EXISTS plantilla_dict_pdf VARCHAR(500) NULL
-                  AFTER plantilla_dict,
-              ADD COLUMN IF NOT EXISTS cert_pdf_campos    JSON          NULL
-                  AFTER plantilla_cert_pdf,
-              ADD COLUMN IF NOT EXISTS dict_pdf_campos    JSON          NULL
-                  AFTER plantilla_dict_pdf
-        ");
+        foreach ($needed as $col => $ddl) {
+            $exists = (int) $this->pdo->query(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME   = 'maquinaria_tipos'
+                   AND COLUMN_NAME  = '{$col}'"
+            )->fetchColumn();
+            if (!$exists) {
+                try { $this->pdo->exec($ddl); } catch (\PDOException $e) { /* ignore */ }
+            }
+        }
     }
 
     public function subirPlantillaPdf(array $post, array $files): array {
@@ -387,8 +386,14 @@ class Admin {
         if (!move_uploaded_file($file['tmp_name'], $dir . $filename))
             return ['status' => 'error', 'message' => 'Error al guardar el archivo en el servidor.'];
 
-        $this->pdo->prepare("UPDATE maquinaria_tipos SET `{$col}` = ? WHERE id = ?")
-            ->execute([$filename, $tipoId]);
+        try {
+            $stmt = $this->pdo->prepare("UPDATE maquinaria_tipos SET `{$col}` = ? WHERE id = ?");
+            $stmt->execute([$filename, $tipoId]);
+            if ($stmt->rowCount() === 0)
+                return ['status' => 'error', 'message' => 'No se actualizó el registro en la base de datos (rowCount=0). Verifica que el tipo de equipo exista.'];
+        } catch (\PDOException $e) {
+            return ['status' => 'error', 'message' => 'Error al guardar en la base de datos: ' . $e->getMessage()];
+        }
 
         return ['status' => 'success', 'message' => 'Plantilla PDF guardada.', 'archivo' => $filename];
     }
