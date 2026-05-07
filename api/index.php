@@ -301,6 +301,16 @@ if ($method === 'POST') {
             if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($auth->desactivarUsuario($payload));
 
+        case 'SUBIR_FIRMA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auth->subirFirma((int)($_POST['usuario_id'] ?? 0), $_FILES['firma'] ?? []));
+
+        case 'ELIMINAR_FIRMA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auth->eliminarFirma((int)($payload['usuario_id'] ?? 0)));
+
         case 'OBTENER_DATOS_CLIENTE':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

@@ -496,7 +496,22 @@ class Accesorios {
         $pdf->AddPage($sz['width'] > $sz['height'] ? 'L' : 'P', [$sz['width'], $sz['height']]);
         $pdf->useTemplate($tplIdx);
 
+        // Firma de muestra: primer inspector con firma registrada
+        $firmaRutaPreview = '';
+        try {
+            $r = $this->pdo->query("SELECT firma_imagen FROM usuarios WHERE rol='INSPECTOR' AND firma_imagen IS NOT NULL LIMIT 1")->fetch();
+            if (!empty($r['firma_imagen'])) $firmaRutaPreview = __DIR__ . '/../' . $r['firma_imagen'];
+        } catch (\Exception $e) {}
+
         foreach ($campos as $c) {
+            if ($c['campo'] === 'firma_inspector') {
+                if ($firmaRutaPreview && file_exists($firmaRutaPreview)) {
+                    $ancho = (float)($c['ancho'] ?? 0);
+                    $alto  = (float)($c['alto']  ?? ($ancho ?: 20));
+                    $pdf->Image($firmaRutaPreview, (float)($c['x'] ?? 0), (float)($c['y'] ?? 0), $ancho ?: 40, $alto);
+                }
+                continue;
+            }
             $val = $dummy[$c['campo']] ?? '';
             $pdf->SetFont($c['fuente'] ?? 'Helvetica', $c['negrita'] ? 'B' : '', $c['tamano'] ?? 11);
             pdfCell($pdf, (float)($c['x'] ?? 0), (float)($c['y'] ?? 0), (float)($c['ancho'] ?? 0), (int)($c['tamano'] ?? 11), fpdfStr((string)$val));
@@ -640,7 +655,27 @@ class Accesorios {
                 'folio'            => $folio . '-' . str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT),
             ];
 
+            // Firma del inspector
+            $firmaRuta = '';
+            $inspectorUsuario = $sesion['usuario'] ?? '';
+            if ($inspectorUsuario) {
+                try {
+                    $st = $this->pdo->prepare("SELECT firma_imagen FROM usuarios WHERE usuario = ? LIMIT 1");
+                    $st->execute([$inspectorUsuario]);
+                    $row = $st->fetch();
+                    if (!empty($row['firma_imagen'])) $firmaRuta = __DIR__ . '/../' . $row['firma_imagen'];
+                } catch (\Exception $e) {}
+            }
+
             foreach ($campos as $c) {
+                if ($c['campo'] === 'firma_inspector') {
+                    if ($firmaRuta && file_exists($firmaRuta)) {
+                        $ancho = (float)($c['ancho'] ?? 0);
+                        $alto  = (float)($c['alto']  ?? ($ancho ?: 20));
+                        $pdf->Image($firmaRuta, (float)($c['x'] ?? 0), (float)($c['y'] ?? 0), $ancho ?: 40, $alto);
+                    }
+                    continue;
+                }
                 $val = $valores[$c['campo']] ?? '';
                 $pdf->SetFont($c['fuente'] ?? 'Helvetica', ($c['negrita'] ?? false) ? 'B' : '', $c['tamano'] ?? 11);
                 pdfCell($pdf, (float)($c['x'] ?? 0), (float)($c['y'] ?? 0), (float)($c['ancho'] ?? 0), (int)($c['tamano'] ?? 11), fpdfStr((string)$val));

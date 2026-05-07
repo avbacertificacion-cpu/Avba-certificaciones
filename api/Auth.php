@@ -9,6 +9,13 @@ class Auth {
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
+        $this->ensureFirmaColumn();
+    }
+
+    private function ensureFirmaColumn(): void {
+        try {
+            $this->pdo->exec("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS firma_imagen VARCHAR(500) NULL");
+        } catch (\PDOException $e) {}
     }
 
     // ── LOGIN ─────────────────────────────────────────────
@@ -209,10 +216,73 @@ class Auth {
         $stmt = $this->pdo->query(
             "SELECT id, usuario, rol, nombre, id_cliente, activo,
                     DATE_FORMAT(fecha_alta, '%d/%m/%Y %H:%i') AS fecha_alta,
-                    DATE_FORMAT(ultimo_acceso, '%d/%m/%Y %H:%i') AS ultimo_acceso
+                    DATE_FORMAT(ultimo_acceso, '%d/%m/%Y %H:%i') AS ultimo_acceso,
+                    firma_imagen
              FROM usuarios ORDER BY id"
         );
-        return $stmt->fetchAll();
+        $rows = $stmt->fetchAll();
+        foreach ($rows as &$r) {
+            $r['firma_url'] = ($r['firma_imagen'] ?? null)
+                ? rtrim(SITE_URL, '/') . '/' . ltrim($r['firma_imagen'], '/')
+                : null;
+        }
+        return $rows;
+    }
+
+    // ── SUBIR FIRMA ────────────────────────────────────────
+    public function subirFirma(int $usuarioId, array $file): array {
+        $stmt = $this->pdo->prepare("SELECT id, firma_imagen FROM usuarios WHERE id = ?");
+        $stmt->execute([$usuarioId]);
+        $u = $stmt->fetch();
+        if (!$u) return ['status' => 'error', 'message' => 'Usuario no encontrado.'];
+
+        if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+            return ['status' => 'error', 'message' => 'Archivo inválido.'];
+        }
+
+        $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if (!in_array($ext, ['png', 'jpg', 'jpeg', 'gif', 'webp'], true)) {
+            return ['status' => 'error', 'message' => 'Formato no permitido. Use PNG, JPG, GIF o WEBP.'];
+        }
+
+        // Eliminar firma anterior si existe
+        if ($u['firma_imagen']) {
+            $old = __DIR__ . '/../' . $u['firma_imagen'];
+            if (file_exists($old)) @unlink($old);
+        }
+
+        $dir = __DIR__ . '/../uploads/firmas/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+        $nombre  = 'firma_' . $usuarioId . '.' . $ext;
+        $destino = $dir . $nombre;
+
+        if (!move_uploaded_file($file['tmp_name'], $destino)) {
+            return ['status' => 'error', 'message' => 'Error al guardar la firma.'];
+        }
+
+        $ruta = 'uploads/firmas/' . $nombre;
+        $this->pdo->prepare("UPDATE usuarios SET firma_imagen = ? WHERE id = ?")->execute([$ruta, $usuarioId]);
+
+        return [
+            'status'    => 'success',
+            'message'   => 'Firma actualizada.',
+            'firma_url' => rtrim(SITE_URL, '/') . '/' . $ruta,
+        ];
+    }
+
+    // ── ELIMINAR FIRMA ─────────────────────────────────────
+    public function eliminarFirma(int $usuarioId): array {
+        $stmt = $this->pdo->prepare("SELECT firma_imagen FROM usuarios WHERE id = ?");
+        $stmt->execute([$usuarioId]);
+        $u = $stmt->fetch();
+        if (!$u) return ['status' => 'error', 'message' => 'Usuario no encontrado.'];
+
+        if ($u['firma_imagen']) {
+            $path = __DIR__ . '/../' . $u['firma_imagen'];
+            if (file_exists($path)) @unlink($path);
+            $this->pdo->prepare("UPDATE usuarios SET firma_imagen = NULL WHERE id = ?")->execute([$usuarioId]);
+        }
+        return ['status' => 'success', 'message' => 'Firma eliminada.'];
     }
 
     // ── PORTAL CLIENTE ─────────────────────────────────────

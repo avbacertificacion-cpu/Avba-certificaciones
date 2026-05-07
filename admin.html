@@ -287,6 +287,7 @@
             <th>Rol</th>
             <th>Estado</th>
             <th>Último acceso</th>
+            <th>Firma</th>
             <th></th>
           </tr>
         </thead>
@@ -436,8 +437,9 @@ let modoEdicion    = false;
 
 /* ── Cargar usuarios ── */
 async function cargar() {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
   try {
-    const res  = await fetch(API + "?action=LISTAR_USUARIOS");
+    const res  = await fetch(API + "?action=LISTAR_USUARIOS&token=" + encodeURIComponent(s.token || ""));
     const data = await res.json();
     if (!Array.isArray(data)) throw new Error();
     usuariosGlobal = data;
@@ -489,10 +491,26 @@ function accionesTd(u) {
   </div>`;
 }
 
+function firmaTd(u) {
+  if (u.rol !== 'INSPECTOR') return '<td></td>';
+  if (u.firma_url) {
+    return `<td style="text-align:center">
+      <img src="${esc(u.firma_url)}" alt="Firma" style="max-height:36px;max-width:90px;object-fit:contain;border:1px solid #ddd;border-radius:4px;padding:2px;background:#fff">
+      <br><button class="btn-danger" style="font-size:11px;padding:2px 8px;margin-top:3px" onclick="eliminarFirma(${u.id})">Quitar</button>
+    </td>`;
+  }
+  return `<td style="text-align:center">
+    <label style="cursor:pointer">
+      <span style="font-size:12px;color:var(--azul);text-decoration:underline">Subir firma</span>
+      <input type="file" accept="image/*" style="display:none" onchange="subirFirma(${u.id}, this)">
+    </label>
+  </td>`;
+}
+
 function renderInternos(data) {
   const tbody = document.getElementById("tbody-internos");
   if (!data.length) {
-    tbody.innerHTML = `<tr class="loading-row"><td colspan="6">No hay usuarios internos registrados.</td></tr>`;
+    tbody.innerHTML = `<tr class="loading-row"><td colspan="7">No hay usuarios internos registrados.</td></tr>`;
     return;
   }
   tbody.innerHTML = data.map(u => `
@@ -502,6 +520,7 @@ function renderInternos(data) {
       <td>${rolBadge(u.rol)}</td>
       <td>${estadoBadge(u.activo)}</td>
       <td style="color:var(--texto-hint);font-size:11.5px">${esc(u.ultimo_acceso || '—')}</td>
+      ${firmaTd(u)}
       <td>${accionesTd(u)}</td>
     </tr>`).join('');
 }
@@ -651,6 +670,37 @@ async function reactivar(id) {
   const data = await res.json();
   if (data.status === "success") cargar();
   else alert(data.message || "Error al reactivar");
+}
+
+/* ── Firma del inspector ── */
+async function subirFirma(usuarioId, input) {
+  const file = input.files[0];
+  if (!file) return;
+  const form = new FormData();
+  form.append("action", "SUBIR_FIRMA");
+  form.append("usuario_id", usuarioId);
+  form.append("firma", file);
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  form.append("token", s.token || "");
+  try {
+    const res  = await fetch(API, { method: "POST", body: form });
+    const data = await res.json();
+    if (data.status === "success") cargar();
+    else alert(data.message || "Error al subir la firma");
+  } catch { alert("Error de conexión"); }
+}
+
+async function eliminarFirma(usuarioId) {
+  if (!confirm("¿Quitar la firma de este inspector?")) return;
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const res  = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({ action: "ELIMINAR_FIRMA", payload: { usuario_id: usuarioId }, token: s.token || "" }),
+    headers: { "Content-Type": "application/json" }
+  });
+  const data = await res.json();
+  if (data.status === "success") cargar();
+  else alert(data.message || "Error al eliminar la firma");
 }
 
 /* ── Escape HTML ── */

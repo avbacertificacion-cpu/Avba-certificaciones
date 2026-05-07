@@ -521,6 +521,12 @@ class Certificaciones {
                                 @unlink($qrTmp);
                             }
                         }
+                    } elseif ($nombreCampo === 'firma_inspector') {
+                        $firmaRuta = $valoresResueltos['firma_ruta'] ?? '';
+                        if ($firmaRuta && file_exists($firmaRuta)) {
+                            $alto = (float)($campo['alto'] ?? ($ancho ?: 20));
+                            $pdf->Image($firmaRuta, $x, $y, $ancho ?: 40, $alto);
+                        }
                     } else {
                         $valor = (string)($valoresResueltos[$nombreCampo] ?? '');
                         if ($valor === '') continue;
@@ -550,6 +556,25 @@ class Certificaciones {
             $v->modify('+1 year');
             $vigencia = $v->format('d/m/Y');
         }
+
+        // Buscar firma del inspector (o cualquier inspector disponible para preview)
+        $firmaRuta = '';
+        $inspectorUsuario = $datos['inspector'] ?? '';
+        try {
+            if ($inspectorUsuario) {
+                $st = $this->pdo->prepare("SELECT firma_imagen FROM usuarios WHERE usuario = ? LIMIT 1");
+                $st->execute([$inspectorUsuario]);
+                $row = $st->fetch();
+            } else {
+                $row = $this->pdo->query(
+                    "SELECT firma_imagen FROM usuarios WHERE rol = 'INSPECTOR' AND firma_imagen IS NOT NULL LIMIT 1"
+                )->fetch();
+            }
+            if (!empty($row['firma_imagen'])) {
+                $firmaRuta = __DIR__ . '/../' . $row['firma_imagen'];
+            }
+        } catch (\Exception $e) {}
+
         return [
             'folio'      => $datos['control']     ? 'AB.' . $datos['control'] . '-' . date('Y') . 'MX' : '',
             'cliente'    => $datos['cliente']     ?? '',
@@ -564,6 +589,7 @@ class Certificaciones {
             'vigencia'   => $vigencia,
             'anio'       => date('Y'),
             'qr_codigo'  => $datos['qr_codigo']   ?? '',
+            'firma_ruta' => $firmaRuta,
         ];
     }
 
@@ -1397,6 +1423,10 @@ HTML;
                     [$r, $g, $b] = sscanf($color, '%02x%02x%02x');
                     $pdf->SetTextColor($r ?? 0, $g ?? 0, $b ?? 0);
 
+                    if ($nombreCampo === 'firma_inspector') {
+                        // Personal docs: skip firma silenciosamente
+                        continue;
+                    }
                     $valor = (string)($valores[$nombreCampo] ?? '');
                     if ($valor === '') continue;
 
@@ -1504,6 +1534,12 @@ HTML;
                                 $pdf->Image($qrTmp, $x, $y, $ancho ?: 25, $alto);
                                 @unlink($qrTmp);
                             }
+                        }
+                    } elseif ($nombreCampo === 'firma_inspector') {
+                        $firmaRuta = $valoresResueltos['firma_ruta'] ?? '';
+                        if ($firmaRuta && file_exists($firmaRuta)) {
+                            $alto = (float)($campo['alto'] ?? ($ancho ?: 20));
+                            $pdf->Image($firmaRuta, $x, $y, $ancho ?: 40, $alto);
                         }
                     } else {
                         $valor = (string)($valoresResueltos[$nombreCampo] ?? '');
