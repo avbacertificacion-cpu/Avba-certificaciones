@@ -371,11 +371,11 @@ class Certificaciones {
 
         $this->pdo->prepare(
             "UPDATE equipos
-             SET estado = 'PENDIENTE', certificado_url = NULL, dictamen_url = NULL, fecha_enviado = NULL
+             SET estado = 'RETORNADO', certificado_url = NULL, dictamen_url = NULL, fecha_enviado = NULL
              WHERE id = ?"
         )->execute([$id]);
 
-        registrarHistorial($this->pdo, $usuario, $id, 'estado', $datos['estado'], 'PENDIENTE');
+        registrarHistorial($this->pdo, $usuario, $id, 'estado', $datos['estado'], 'RETORNADO');
 
         return ['status' => 'success'];
     }

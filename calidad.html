@@ -173,6 +173,7 @@
     .b-pend { background: var(--ambar-light); color: var(--ambar); }
     .b-apro { background: var(--verde-light); color: var(--verde); }
     .b-nc   { background: var(--rojo-light);  color: var(--rojo);  }
+    .b-ret  { background: #FDE8D8;            color: #A63D00;       }
 
     .btn-ver {
       padding: 6px 14px;
@@ -678,6 +679,10 @@
     <div class="stat">
       <div class="stat-n" id="s-pend" style="color:var(--ambar)">—</div>
       <div class="stat-l">Pendientes</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n" id="s-ret" style="color:#854F0B">—</div>
+      <div class="stat-l">Retornados</div>
     </div>
     <div class="stat">
       <div class="stat-n" id="s-nc" style="color:var(--rojo)">—</div>
@@ -1642,6 +1647,10 @@
         <label>Código QR del certificado</label>
         <input type="text" id="qr-input" placeholder="Ej: AVBA-00123-2026" autocomplete="off">
         <div class="qr-hint">Escanea o escribe el código manualmente</div>
+        <div id="qr-hint-existente" style="display:none;margin-top:6px;font-size:11px;padding:6px 10px;
+             background:#FDE8D8;border-radius:6px;color:#A63D00">
+          Este registro ya tiene un QR asignado. Puedes conservarlo o cambiarlo por otro disponible.
+        </div>
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn-nc-cancel" onclick="cerrarApro()">Cancelar</button>
@@ -1736,6 +1745,7 @@ async function cargar() {
 ═══════════════════════════════════════ */
 function actualizarStats(d) {
   document.getElementById("s-pend").textContent  = d.filter(x => x.estado === "PENDIENTE").length;
+  document.getElementById("s-ret").textContent   = d.filter(x => x.estado === "RETORNADO").length;
   document.getElementById("s-nc").textContent    = d.filter(x => x.estado === "NO CONFORME").length;
   document.getElementById("s-apro").textContent  = d.filter(x => x.estado === "APROBADO CALIDAD").length;
   document.getElementById("s-total").textContent = d.length;
@@ -1745,7 +1755,7 @@ function actualizarStats(d) {
    RENDER TABLA
 ═══════════════════════════════════════ */
 function ordenEstado(e) {
-  return e === "PENDIENTE" ? 0 : e === "NO CONFORME" ? 1 : 2;
+  return e === "RETORNADO" ? 0 : e === "PENDIENTE" ? 1 : e === "NO CONFORME" ? 2 : 3;
 }
 
 function render(data) {
@@ -1760,11 +1770,13 @@ function render(data) {
   const sorted = [...data].sort((a, b) => ordenEstado(a.estado) - ordenEstado(b.estado));
 
   tbody.innerHTML = sorted.map(r => {
-    const bc  = r.estado === "PENDIENTE"      ? "b-pend"
+    const bc  = r.estado === "RETORNADO"      ? "b-ret"
+              : r.estado === "PENDIENTE"       ? "b-pend"
               : r.estado === "NO CONFORME"     ? "b-nc"
               : "b-apro";
     const lbl = r.estado === "APROBADO CALIDAD" ? "Aprobado"
               : r.estado === "NO CONFORME"       ? "No conforme"
+              : r.estado === "RETORNADO"         ? "Retornado"
               : "Pendiente";
     return `<tr>
       <td style="font-weight:600">${r.cliente || "—"}</td>
@@ -1816,11 +1828,19 @@ function ver(fila) {
   document.getElementById("m-title").textContent  = d.cliente || "Sin nombre";
   document.getElementById("m-sub").textContent    = `${d.serie || "—"} · ${d.maquinaria || "—"} · ${d.fecha || "—"}`;
 
-  const editable = d.estado === "PENDIENTE" || d.estado === "NO CONFORME";
+  const editable = d.estado === "PENDIENTE" || d.estado === "NO CONFORME" || d.estado === "RETORNADO";
   const dis      = editable ? "" : "disabled";
 
   // ── Construir cuerpo del modal ──
   let body = "";
+
+  // Alerta si es RETORNADO
+  if (d.estado === "RETORNADO") {
+    body += `<div class="alerta-nc" style="background:#FDE8D8;border-color:#F4A261;color:#A63D00">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h10M8 4l4 4-4 4"/></svg>
+      <span><strong>Retornado desde Certificaciones.</strong> El registro puede editarse y aprobarse nuevamente.</span>
+    </div>`;
+  }
 
   // Alerta si es NO CONFORME
   if (d.estado === "NO CONFORME") {
@@ -2039,8 +2059,20 @@ let aproId      = 0;
 function abrirApro(context, id) {
   aproContext = context || 'equipo';
   aproId      = id     || 0;
-  document.getElementById("qr-input").value = "";
+
+  // Pre-llenar QR si el registro ya tiene uno asignado (retornado)
+  let qrExistente = "";
+  if (aproContext === 'equipo' && filaActual) {
+    const d = datosGlobal.find(x => x.fila === filaActual);
+    qrExistente = d?.qr_codigo || "";
+  }
+  document.getElementById("qr-input").value = qrExistente;
   document.getElementById("qr-input").style.borderColor = "";
+
+  // Mostrar hint si hay QR previo
+  const hint = document.getElementById("qr-hint-existente");
+  if (hint) hint.style.display = qrExistente ? "" : "none";
+
   document.getElementById("apro-paso-qr").style.display = "block";
   document.getElementById("apro-paso-ok").style.display = "none";
   document.getElementById("overlay-apro").classList.add("open");

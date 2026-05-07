@@ -23,7 +23,7 @@ class Calidad {
                     disponibilidad, estado, motivo, qr_codigo,
                     certificado_url AS link, dictamen_url AS dictamen, envio_direccion, coordenadas_envio
              FROM equipos
-             WHERE estado IN ('PENDIENTE', 'CONFORME', 'NO CONFORME', 'RECHAZADO')
+             WHERE estado IN ('PENDIENTE', 'CONFORME', 'NO CONFORME', 'RECHAZADO', 'RETORNADO')
              ORDER BY marca_temporal DESC"
         );
         $rows = $stmt->fetchAll();
@@ -48,18 +48,29 @@ class Calidad {
         $row = $this->obtenerEquipo($id);
         if (!$row) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
-        // Validar que el QR existe y no está usado
+        // Validar que el QR existe
         $stmtQR = $this->pdo->prepare(
-            "SELECT id, usado FROM qr_codigos WHERE identificador = ?"
+            "SELECT id, usado, equipo_id FROM qr_codigos WHERE identificador = ?"
         );
         $stmtQR->execute([$qr]);
         $qrRow = $stmtQR->fetch();
 
         if (!$qrRow) return ['status' => 'error', 'message' => 'Código QR no válido.'];
-        if ($qrRow['usado']) return ['status' => 'error', 'message' => 'Código QR ya está en uso.'];
+
+        $qrYaEsDeEsteEquipo = $qrRow['usado'] && (int)$qrRow['equipo_id'] === $id;
+        if ($qrRow['usado'] && !$qrYaEsDeEsteEquipo)
+            return ['status' => 'error', 'message' => 'Código QR ya está en uso por otro registro.'];
 
         $estadoAnterior = $row['estado'];
         $nuevoEstado    = 'APROBADO CALIDAD';
+        $qrAnterior     = $row['qr_codigo'] ?? '';
+
+        // Si hay un QR previo diferente, liberarlo
+        if ($qrAnterior && $qrAnterior !== $qr) {
+            $this->pdo->prepare(
+                "UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?"
+            )->execute([$qrAnterior]);
+        }
 
         // Asignar QR al equipo y aprobar
         $this->pdo->prepare(
