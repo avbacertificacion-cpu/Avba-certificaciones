@@ -542,7 +542,8 @@ class Certificaciones {
             return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
 
         } catch (\Exception $e) {
-            return ['status' => 'error', 'message' => 'Error generando PDF: ' . $e->getMessage()];
+            $comp = fpdiMsgCompresion($e);
+            return ['status' => 'error', 'message' => $comp ?? ('Error generando PDF: ' . $e->getMessage())];
         }
     }
 
@@ -1439,7 +1440,8 @@ HTML;
             return ['status' => 'success', 'url' => UPLOAD_URL . 'personal/docs/' . basename($rufaPdf)];
 
         } catch (\Exception $e) {
-            return ['status' => 'error', 'message' => 'Error generando vista previa: ' . $e->getMessage()];
+            $comp = fpdiMsgCompresion($e);
+            return ['status' => 'error', 'message' => $comp ?? ('Error generando vista previa: ' . $e->getMessage())];
         }
     }
 
@@ -1554,7 +1556,8 @@ HTML;
             return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
 
         } catch (\Exception $e) {
-            return ['status' => 'error', 'message' => 'Error generando vista previa: ' . $e->getMessage()];
+            $comp = fpdiMsgCompresion($e);
+            return ['status' => 'error', 'message' => $comp ?? ('Error generando vista previa: ' . $e->getMessage())];
         }
     }
 }

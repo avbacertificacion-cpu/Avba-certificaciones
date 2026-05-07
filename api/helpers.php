@@ -176,6 +176,20 @@ function fixEncoding(mixed $v): mixed {
 }
 
 /**
+ * Detecta el error de compresión de FPDI y devuelve un mensaje amigable.
+ * Retorna null si el error es de otro tipo.
+ */
+function fpdiMsgCompresion(\Exception $e): ?string {
+    if (str_contains($e->getMessage(), 'compression technique')) {
+        return 'La plantilla PDF usa compresión no compatible (PDF 1.5+). '
+             . 'Re-guárdala como PDF 1.4: en Adobe Acrobat → Guardar como → '
+             . 'Compatibilidad: Acrobat 5 (PDF 1.4); o usa LibreOffice '
+             . '→ Exportar como PDF → Versión PDF 1.4.';
+    }
+    return null;
+}
+
+/**
  * Convierte un string UTF-8 a ISO-8859-1 para FPDF (que es Latin-1).
  * Aplica fixEncoding primero por si el dato viene doble-codificado de la BD.
  */

@@ -1427,6 +1427,11 @@
         <button class="btn-close" onclick="cerrarModalCamposPdf()">×</button>
       </div>
     </div>
+    <div id="campos-pdf-warn-mismo" style="display:none;margin:8px 16px 0;padding:8px 12px;
+         background:#FFF3CD;border:1px solid #FBBF24;border-radius:6px;font-size:12px;color:#92400E">
+      ⚠️ La plantilla del dictamen es el mismo archivo que la del certificado. Sube una plantilla PDF diferente
+      para el dictamen usando el botón <strong>"Cambiar"</strong> en la tarjeta <em>Dictamen PDF</em>.
+    </div>
     <div style="padding:12px 16px 0;overflow-x:auto">
       <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:700px">
         <thead>
@@ -3212,14 +3217,15 @@ async function abrirModalCamposPdf(tipoId, docTipo) {
     `Campos PDF — ${tipo?.nombre || tipoId} — ${docTipo === "cert" ? "Certificado" : "Dictamen"}`;
 
   const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  let apiData = null;
   try {
     const res  = await fetch(`${API}?action=OBTENER_CAMPOS_PDF&tipo_id=${tipoId}&token=${s.token||""}`);
-    const data = await res.json();
-    camposPdfLocal = data.status === "success"
-      ? (docTipo === "cert" ? (data.cert_pdf_campos || []) : (data.dict_pdf_campos || []))
+    apiData = await res.json();
+    camposPdfLocal = apiData.status === "success"
+      ? (docTipo === "cert" ? (apiData.cert_pdf_campos || []) : (apiData.dict_pdf_campos || []))
       : [];
-    camposPdfUrl = data.status === "success"
-      ? (docTipo === "cert" ? (data.cert_pdf_url || null) : (data.dict_pdf_url || null))
+    camposPdfUrl = apiData.status === "success"
+      ? (docTipo === "cert" ? (apiData.cert_pdf_url || null) : (apiData.dict_pdf_url || null))
       : null;
   } catch {
     camposPdfLocal = [];
@@ -3227,9 +3233,17 @@ async function abrirModalCamposPdf(tipoId, docTipo) {
   }
 
   renderTablaCamposPdf(camposPdfLocal);
-  // Mostrar/ocultar botón posicionar según haya plantilla
   const btnPos = document.getElementById("btn-abrir-picker");
   if (btnPos) btnPos.style.display = camposPdfUrl ? '' : 'none';
+
+  // Advertir si cert y dict comparten el mismo archivo PDF
+  const warnEl = document.getElementById("campos-pdf-warn-mismo");
+  if (warnEl) {
+    const certUrl = apiData?.cert_pdf_url || null;
+    const dictUrl = apiData?.dict_pdf_url || null;
+    warnEl.style.display = (docTipo === 'dict' && dictUrl && certUrl === dictUrl) ? '' : 'none';
+  }
+
   document.getElementById("overlay-campos-pdf").classList.add("open");
 }
 
@@ -3334,11 +3348,13 @@ async function previsualizarPdf() {
   const btn = document.getElementById("btn-preview-pdf");
   btn.disabled = true;
   btn.textContent = "Generando…";
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
   try {
     const res  = await fetch(API, {
       method: "POST",
       body: JSON.stringify({
         action: "PREVISUALIZAR_PDF",
+        token:  s.token || "",
         payload: {
           tipo_id:  camposPdfTipoId,
           doc_tipo: camposPdfDocTipo,
@@ -4566,6 +4582,14 @@ function pickerRenderMarkers() {
         `cursor:grab`,
       ].join(';');
       sample.textContent = sampleVal ?? c.campo;
+      // Si tiene ancho definido, mostrar el mismo wrapping que tendrá en el PDF
+      if (c.ancho > 0) {
+        const maxWPx = Math.round(c.ancho * pxPerMm);
+        sample.style.maxWidth      = maxWPx + 'px';
+        sample.style.whiteSpace    = 'normal';
+        sample.style.overflowWrap  = 'break-word';
+        sample.style.lineHeight    = '1.2';
+      }
       sample.dataset.idx  = i;
       sample.onclick     = e => { e.stopPropagation(); pickerSetActive(i); };
       sample.onmousedown = e => startDrag(e, i);

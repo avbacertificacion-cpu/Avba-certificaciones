@@ -489,6 +489,7 @@ class Accesorios {
             'folio'            => 'AB.45180-25656-2026MX',
         ];
 
+        try {
         $pdf = new \setasign\Fpdi\Fpdi();
         $pdf->setSourceFile($rutaTpl);
         $tplIdx = $pdf->importPage(1);
@@ -521,8 +522,12 @@ class Accesorios {
         if (!is_dir($dir)) mkdir($dir, 0755, true);
         $nombre = 'PREVIEW_CERT_ACC.pdf';
         $pdf->Output('F', $dir . $nombre);
-
         return ['status' => 'success', 'url' => 'uploads/reportes/' . $nombre];
+
+        } catch (\Exception $e) {
+            $comp = fpdiMsgCompresion($e);
+            return ['status' => 'error', 'message' => $comp ?? ('Error generando vista previa: ' . $e->getMessage())];
+        }
     }
 
     private function ensureEstatusColumn(string $tabla): void {
