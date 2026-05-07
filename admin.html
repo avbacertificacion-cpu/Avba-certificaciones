@@ -326,6 +326,54 @@
     </div>
   </div>
 
+  <!-- CONFIGURACIÓN SMTP -->
+  <div class="panel" id="panel-smtp">
+    <div class="panel-hdr">
+      <div>
+        <div class="panel-title">Configuración de correo (SMTP)</div>
+        <div class="panel-sub">Servidor de salida para envío de certificados y documentos</div>
+      </div>
+      <button class="btn-primary" onclick="probarSmtp()">Probar conexión</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:4px 0 10px">
+      <div class="field">
+        <label>Servidor SMTP (Host)</label>
+        <input type="text" id="smtp-host" placeholder="smtp.hostinger.com">
+      </div>
+      <div class="field">
+        <label>Puerto</label>
+        <input type="number" id="smtp-port" placeholder="465 (SSL) o 587 (TLS)" style="width:100%">
+      </div>
+      <div class="field">
+        <label>Cifrado</label>
+        <select id="smtp-enc" style="width:100%;padding:8px 10px;border:1px solid var(--borde);border-radius:6px;font-size:13px;background:var(--fondo)">
+          <option value="ssl">SSL (puerto 465)</option>
+          <option value="tls">STARTTLS (puerto 587)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Usuario / Email</label>
+        <input type="email" id="smtp-user" placeholder="notificaciones@avba.com.mx">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="smtp-pass" placeholder="Dejar vacío para no cambiar" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label>Email remitente (From)</label>
+        <input type="email" id="smtp-from" placeholder="notificaciones@avba.com.mx">
+      </div>
+      <div class="field" style="grid-column:1/-1">
+        <label>Nombre remitente</label>
+        <input type="text" id="smtp-from-name" placeholder="AVBA Certificaciones">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn-primary" onclick="guardarSmtp()">Guardar configuración</button>
+      <span id="smtp-msg" style="font-size:13px;color:var(--texto-hint)"></span>
+    </div>
+  </div>
+
 </div><!-- /wrap -->
 
 
@@ -716,6 +764,80 @@ document.getElementById("overlay-usr").addEventListener("click", function(e) {
 });
 
 cargar();
+
+/* ── SMTP ── */
+async function cargarSmtp() {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    const r = await fetch(API + "?action=GET_SMTP_CONFIG&token=" + encodeURIComponent(s.token || ""));
+    const d = await r.json();
+    if (d.status !== "success") return;
+    const c = d.config;
+    document.getElementById("smtp-host").value      = c.host       || "";
+    document.getElementById("smtp-port").value      = c.port       || 465;
+    document.getElementById("smtp-user").value      = c.username   || "";
+    document.getElementById("smtp-from").value      = c.from_email || "";
+    document.getElementById("smtp-from-name").value = c.from_name  || "";
+    const encSel = document.getElementById("smtp-enc");
+    encSel.value = (c.encryption || "ssl").toLowerCase() === "tls" ? "tls" : "ssl";
+  } catch(e) {}
+}
+
+async function guardarSmtp() {
+  const s    = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const msg  = document.getElementById("smtp-msg");
+  const pass = document.getElementById("smtp-pass").value;
+  const payload = {
+    host:       document.getElementById("smtp-host").value.trim(),
+    port:       parseInt(document.getElementById("smtp-port").value) || 465,
+    encryption: document.getElementById("smtp-enc").value,
+    username:   document.getElementById("smtp-user").value.trim(),
+    from_email: document.getElementById("smtp-from").value.trim(),
+    from_name:  document.getElementById("smtp-from-name").value.trim(),
+  };
+  if (pass) payload.password = pass;
+
+  msg.style.color = "var(--texto-hint)";
+  msg.textContent = "Guardando...";
+  try {
+    const r = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "SAVE_SMTP_CONFIG", token: s.token || "", payload })
+    });
+    const d = await r.json();
+    msg.style.color = d.status === "success" ? "var(--verde)" : "var(--rojo)";
+    msg.textContent = d.message;
+    if (d.status === "success") document.getElementById("smtp-pass").value = "";
+  } catch(e) {
+    msg.style.color = "var(--rojo)";
+    msg.textContent = "Error de red.";
+  }
+}
+
+async function probarSmtp() {
+  const s      = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const msg    = document.getElementById("smtp-msg");
+  const correo = prompt("Ingresa el correo al que deseas enviar el mensaje de prueba:");
+  if (!correo) return;
+  msg.style.color = "var(--texto-hint)";
+  msg.textContent = "Enviando prueba...";
+  try {
+    const r = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "TEST_SMTP_CONFIG", token: s.token || "", payload: { correo } })
+    });
+    const d = await r.json();
+    msg.style.color = d.status === "success" ? "var(--verde)" : "var(--rojo)";
+    msg.textContent = d.message;
+  } catch(e) {
+    msg.style.color = "var(--rojo)";
+    msg.textContent = "Error de red.";
+  }
+}
+
+cargarSmtp();
 </script>
 </body>
 </html>

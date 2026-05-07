@@ -270,6 +270,11 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->obtenerCamposPdfAcc());
 
+        case 'GET_SMTP_CONFIG':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->getSmtpConfig());
+
         default:
             respuesta(['status' => 'error', 'message' => 'Acción no reconocida.'], 400);
     }
@@ -681,6 +686,16 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->generarInforme((int)($payload['sesion_id'] ?? 0), $usr['usuario']));
+
+        case 'SAVE_SMTP_CONFIG':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->saveSmtpConfig($payload));
+
+        case 'TEST_SMTP_CONFIG':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->testSmtpConfig($payload));
 
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);

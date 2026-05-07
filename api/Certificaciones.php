@@ -1250,16 +1250,7 @@ HTML;
     private function enviarCorreo(string $to, string $cliente, string $folio, string $tipoDocs, array $adjuntos): void {
         $mail = new PHPMailer(true);
 
-        $mail->isSMTP();
-        $mail->Host       = MAIL_HOST;
-        $mail->SMTPAuth   = true;
-        $mail->Username   = MAIL_USER;
-        $mail->Password   = MAIL_PASS;
-        $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-        $mail->Port       = MAIL_PORT;
-        $mail->CharSet    = 'UTF-8';
-
-        $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
+        configurarMailer($mail, $this->pdo);
         $mail->addAddress($to);
         $mail->Subject = "Certificado de Inspección AVBA — Folio {$folio}";
         $mail->isHTML(true);

@@ -227,3 +227,64 @@ function respuesta(array $data, int $httpCode = 200): void {
     echo json_encode(fixEncoding($data), JSON_UNESCAPED_UNICODE);
     exit;
 }
+
+/**
+ * Lee la configuración SMTP desde la BD (tabla avba_smtp_config).
+ * Si no existe o está vacía, cae en las constantes de config.php.
+ */
+function getSmtpConfig(PDO $pdo): array {
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS avba_smtp_config (
+            id          TINYINT UNSIGNED NOT NULL DEFAULT 1,
+            host        VARCHAR(200)     NULL,
+            port        SMALLINT         NOT NULL DEFAULT 465,
+            encryption  VARCHAR(10)      NOT NULL DEFAULT 'ssl',
+            username    VARCHAR(200)     NULL,
+            password    VARCHAR(500)     NULL,
+            from_email  VARCHAR(200)     NULL,
+            from_name   VARCHAR(200)     NULL DEFAULT 'AVBA Certificaciones',
+            PRIMARY KEY (id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $pdo->exec("INSERT IGNORE INTO avba_smtp_config (id) VALUES (1)");
+        $row = $pdo->query("SELECT * FROM avba_smtp_config WHERE id = 1")->fetch();
+        if ($row && !empty($row['host']) && !empty($row['username'])) {
+            return (array) $row;
+        }
+    } catch (\PDOException $e) {}
+
+    return [
+        'host'       => defined('MAIL_HOST')      ? MAIL_HOST      : '',
+        'port'       => defined('MAIL_PORT')       ? (int)MAIL_PORT : 465,
+        'encryption' => 'ssl',
+        'username'   => defined('MAIL_USER')       ? MAIL_USER      : '',
+        'password'   => defined('MAIL_PASS')       ? MAIL_PASS      : '',
+        'from_email' => defined('MAIL_FROM')       ? MAIL_FROM      : '',
+        'from_name'  => defined('MAIL_FROM_NAME')  ? MAIL_FROM_NAME : 'AVBA Certificaciones',
+    ];
+}
+
+/**
+ * Configura un objeto PHPMailer con los datos de getSmtpConfig().
+ * Aplica host, puerto, autenticación, cifrado y remitente.
+ */
+function configurarMailer(object $mail, PDO $pdo): void {
+    $cfg = getSmtpConfig($pdo);
+    $mail->isSMTP();
+    $mail->Host     = $cfg['host'];
+    $mail->SMTPAuth = true;
+    $mail->Username = $cfg['username'];
+    $mail->Password = $cfg['password'];
+    $mail->Port     = (int)($cfg['port'] ?? 465);
+    $mail->CharSet  = 'UTF-8';
+    $enc = strtolower($cfg['encryption'] ?? 'ssl');
+    if (class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+        $mail->SMTPSecure = ($enc === 'tls')
+            ? \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS
+            : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+    } else {
+        $mail->SMTPSecure = ($enc === 'tls') ? 'tls' : 'ssl';
+    }
+    $fromEmail = !empty($cfg['from_email']) ? $cfg['from_email'] : $cfg['username'];
+    $fromName  = !empty($cfg['from_name'])  ? $cfg['from_name']  : 'AVBA Certificaciones';
+    $mail->setFrom($fromEmail, $fromName);
+}

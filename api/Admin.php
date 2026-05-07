@@ -561,4 +561,57 @@ class Admin {
             'pdf_url'       => $pdfUrl,
         ];
     }
+
+    // ── Configuración SMTP ────────────────────────────────────
+
+    public function getSmtpConfig(): array {
+        $cfg = getSmtpConfig($this->pdo);
+        unset($cfg['password']); // no exponer contraseña
+        return ['status' => 'success', 'config' => $cfg];
+    }
+
+    public function saveSmtpConfig(array $payload): array {
+        getSmtpConfig($this->pdo); // ensures table + row exist
+
+        $allowed = ['host', 'port', 'encryption', 'username', 'password', 'from_email', 'from_name'];
+        $sets = [];
+        $params = [];
+        foreach ($allowed as $f) {
+            if (array_key_exists($f, $payload)) {
+                $sets[]   = "`{$f}` = ?";
+                $params[] = ($f === 'port') ? (int)$payload[$f] : ($payload[$f] === '' ? null : $payload[$f]);
+            }
+        }
+        if (empty($sets)) return ['status' => 'error', 'message' => 'Sin campos para actualizar.'];
+
+        try {
+            $params[] = 1;
+            $this->pdo->prepare("UPDATE avba_smtp_config SET " . implode(', ', $sets) . " WHERE id = ?")->execute($params);
+            return ['status' => 'success', 'message' => 'Configuración SMTP guardada.'];
+        } catch (\PDOException $e) {
+            return ['status' => 'error', 'message' => 'Error al guardar: ' . $e->getMessage()];
+        }
+    }
+
+    public function testSmtpConfig(array $payload): array {
+        $correo = trim($payload['correo'] ?? '');
+        if (!$correo || !filter_var($correo, FILTER_VALIDATE_EMAIL))
+            return ['status' => 'error', 'message' => 'Correo de prueba inválido.'];
+
+        if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
+            return ['status' => 'error', 'message' => 'PHPMailer no está disponible en el servidor.'];
+
+        try {
+            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            configurarMailer($mail, $this->pdo);
+            $mail->addAddress($correo);
+            $mail->Subject = 'Prueba de configuración SMTP — AVBA Certificaciones';
+            $mail->isHTML(true);
+            $mail->Body = '<p>Este es un correo de prueba enviado desde el panel de administración de AVBA Certificaciones.</p><p>Si recibiste este mensaje, la configuración SMTP es correcta.</p>';
+            $mail->send();
+            return ['status' => 'success', 'message' => "Correo de prueba enviado a {$correo}."];
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => 'Error: ' . $e->getMessage()];
+        }
+    }
 }

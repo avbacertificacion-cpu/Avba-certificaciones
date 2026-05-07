@@ -448,15 +448,7 @@ class Personal {
 
         try {
             $mail = new PHPMailer(true);
-            $mail->isSMTP();
-            $mail->Host       = MAIL_HOST;
-            $mail->SMTPAuth   = true;
-            $mail->Username   = MAIL_USER;
-            $mail->Password   = MAIL_PASS;
-            $mail->SMTPSecure = PHPMailer::ENCRYPTION_SMTPS;
-            $mail->Port       = MAIL_PORT;
-            $mail->CharSet    = 'UTF-8';
-            $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
+            configurarMailer($mail, $this->pdo);
             $mail->addAddress($correo);
             $mail->Subject    = "{$tipoLabel} de Capacitación — AVBA Inspections";
             $mail->isHTML(true);

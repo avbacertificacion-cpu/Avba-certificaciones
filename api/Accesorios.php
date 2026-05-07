@@ -759,15 +759,7 @@ class Accesorios {
 
         try {
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
-            $mail->isSMTP();
-            $mail->Host       = MAIL_HOST;
-            $mail->SMTPAuth   = true;
-            $mail->Username   = MAIL_USER;
-            $mail->Password   = MAIL_PASS;
-            $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
-            $mail->Port       = MAIL_PORT;
-            $mail->CharSet    = 'UTF-8';
-            $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
+            configurarMailer($mail, $this->pdo);
             $mail->addAddress($correo);
             $mail->Subject = 'Certificado de Inspección de Accesorios de Izaje — AVBA Inspections';
             $mail->isHTML(true);
@@ -837,15 +829,7 @@ class Accesorios {
 
         try {
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
-            $mail->isSMTP();
-            $mail->Host       = MAIL_HOST;
-            $mail->SMTPAuth   = true;
-            $mail->Username   = MAIL_USER;
-            $mail->Password   = MAIL_PASS;
-            $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
-            $mail->Port       = MAIL_PORT;
-            $mail->CharSet    = 'UTF-8';
-            $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
+            configurarMailer($mail, $this->pdo);
             $mail->addAddress($correo);
             $mail->Subject = 'Informe de Integridad Operativa — AVBA Inspections';
             $mail->isHTML(true);
@@ -875,15 +859,7 @@ class Accesorios {
 
         try {
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
-            $mail->isSMTP();
-            $mail->Host       = MAIL_HOST;
-            $mail->SMTPAuth   = true;
-            $mail->Username   = MAIL_USER;
-            $mail->Password   = MAIL_PASS;
-            $mail->SMTPSecure = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
-            $mail->Port       = MAIL_PORT;
-            $mail->CharSet    = 'UTF-8';
-            $mail->setFrom(MAIL_FROM, MAIL_FROM_NAME);
+            configurarMailer($mail, $this->pdo);
             $mail->addAddress($correo);
             $mail->Subject = 'Informe de Accesorios Aprobados — AVBA Inspections';
             $mail->isHTML(true);
