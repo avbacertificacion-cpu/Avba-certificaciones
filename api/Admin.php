@@ -387,10 +387,8 @@ class Admin {
             return ['status' => 'error', 'message' => 'Error al guardar el archivo en el servidor.'];
 
         try {
-            $stmt = $this->pdo->prepare("UPDATE maquinaria_tipos SET `{$col}` = ? WHERE id = ?");
-            $stmt->execute([$filename, $tipoId]);
-            if ($stmt->rowCount() === 0)
-                return ['status' => 'error', 'message' => 'No se actualizó el registro en la base de datos (rowCount=0). Verifica que el tipo de equipo exista.'];
+            $this->pdo->prepare("UPDATE maquinaria_tipos SET `{$col}` = ? WHERE id = ?")
+                ->execute([$filename, $tipoId]);
         } catch (\PDOException $e) {
             return ['status' => 'error', 'message' => 'Error al guardar en la base de datos: ' . $e->getMessage()];
         }
