@@ -380,8 +380,19 @@ class Admin {
             return ['status' => 'error', 'message' => 'No se pudo crear el directorio de plantillas.'];
 
         $colMap = ['cert_pdf' => 'plantilla_cert_pdf', 'dict_pdf' => 'plantilla_dict_pdf'];
-        $col      = $colMap[$docTipo];
-        $filename = "tipo_{$tipoId}_{$docTipo}.pdf";
+        $col    = $colMap[$docTipo];
+
+        // Borrar el archivo anterior si existe
+        $anterior = $this->pdo->prepare("SELECT `{$col}` FROM maquinaria_tipos WHERE id = ?");
+        $anterior->execute([$tipoId]);
+        $oldFile = ($anterior->fetchColumn()) ?: '';
+        if ($oldFile && file_exists($dir . $oldFile)) {
+            @unlink($dir . $oldFile);
+        }
+
+        // Nombre único que preserva el nombre original + timestamp
+        $baseName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', pathinfo($file['name'] ?? 'plantilla', PATHINFO_FILENAME));
+        $filename = "tipo_{$tipoId}_{$docTipo}_{$baseName}_" . time() . ".pdf";
 
         if (!move_uploaded_file($file['tmp_name'], $dir . $filename))
             return ['status' => 'error', 'message' => 'Error al guardar el archivo en el servidor.'];
