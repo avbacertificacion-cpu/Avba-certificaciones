@@ -1108,20 +1108,18 @@ function ver(fila) {
   document.getElementById("d-capacidad").value  = d.capacidad  || "";
   document.getElementById("d-direccion").value  = d.direccion  || "";
 
-  // Links documentos
-  const tieneC = d.link     && d.link.trim()     !== "";
-  const tieneD = d.dictamen && d.dictamen.trim() !== "";
+  // Links documentos — siempre regeneran con la plantilla actual
   document.getElementById("docs-links").innerHTML = `
-    <a href="${tieneC ? d.link : "#"}" target="${tieneC?"_blank":""}"
-       style="display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:8px;border:1.5px solid ${tieneC?"var(--azul)":"var(--borde)"};background:${tieneC?"var(--azul-light)":"var(--gris-bg)"};color:${tieneC?"var(--azul-dark)":"var(--texto-hint)"};font-size:12px;font-weight:600;text-decoration:none;${tieneC?"":"pointer-events:none"}">
+    <button onclick="verDocPDF('CERT')"
+       style="display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:8px;border:1.5px solid var(--azul);background:var(--azul-light);color:var(--azul-dark);font-size:12px;font-weight:600;cursor:pointer;">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="1" width="10" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg>
       Certificado
-    </a>
-    <a href="${tieneD ? d.dictamen : "#"}" target="${tieneD?"_blank":""}"
-       style="display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:8px;border:1.5px solid ${tieneD?"var(--azul)":"var(--borde)"};background:${tieneD?"var(--azul-light)":"var(--gris-bg)"};color:${tieneD?"var(--azul-dark)":"var(--texto-hint)"};font-size:12px;font-weight:600;text-decoration:none;${tieneD?"":"pointer-events:none"}">
+    </button>
+    <button onclick="verDocPDF('DICT')"
+       style="display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:8px;border:1.5px solid var(--azul);background:var(--azul-light);color:var(--azul-dark);font-size:12px;font-weight:600;cursor:pointer;">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="1" width="10" height="14" rx="1.5"/><path d="M5 5h4M5 8h4"/></svg>
       Dictamen
-    </a>
+    </button>
     ${d.evidencia ? `<button onclick="verEvidencia('${d.evidencia}')" style="display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:8px;border:1.5px solid var(--borde);background:var(--gris-bg);color:var(--texto-sub);font-size:12px;font-weight:600;cursor:pointer;">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="3" width="14" height="10" rx="2"/><circle cx="8" cy="8" r="2.5"/></svg>
       📷 Evidencia
@@ -1409,11 +1407,13 @@ async function verDocPDF(tipo) {
   const action = tipo === "CERT" ? "GENERAR_PDF_WORD_CERT" : "GENERAR_PDF_WORD_DICT";
   const label  = tipo === "CERT" ? "certificado" : "dictamen";
   const id = d.id ?? d.fila;
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
   try {
     mostrarToast("Generando PDF del " + label + "...", "info");
     const res  = await fetch(API, {
       method: "POST",
-      body: JSON.stringify({ action, payload: { id } })
+      headers: { "Content-Type": "application/json", "X-Token": s.token || "" },
+      body: JSON.stringify({ action, token: s.token || "", payload: { id } })
     });
     const data = await res.json();
     if (data.status === "success" && data.url) {
@@ -1490,10 +1490,12 @@ async function ejecutarAccion(accion) {
   const cfg = mapaAcciones[accion];
   mostrarToast(cfg.msg, "info");
 
+  const _s = JSON.parse(localStorage.getItem("avba_session") || "{}");
   try {
     const res  = await fetch(API, {
       method: "POST",
-      body:   JSON.stringify({ action: cfg.action, payload: { fila: d.fila } })
+      headers: { "Content-Type": "application/json", "X-Token": _s.token || "" },
+      body:   JSON.stringify({ action: cfg.action, token: _s.token || "", payload: { fila: d.fila } })
     });
     const texto = await res.text();
     const data  = JSON.parse(texto);
