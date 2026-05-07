@@ -4411,7 +4411,7 @@ async function abrirPicker(pdfUrl, camposArr, context, renderCallback) {
 
   try {
     // Fetch bytes through the browser (handles same-origin, cookies, CORS)
-    const resp = await fetch(pdfUrl);
+    const resp = await fetch(pdfUrl + (pdfUrl.includes('?') ? '&' : '?') + '_v=' + Date.now(), { cache: 'no-store' });
     if (!resp.ok) throw new Error(`HTTP ${resp.status} — archivo no encontrado`);
     const buf  = await resp.arrayBuffer();
     pkPdf = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
