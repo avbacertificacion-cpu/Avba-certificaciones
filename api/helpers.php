@@ -184,6 +184,28 @@ function fpdfStr(string $s): string {
 }
 
 /**
+ * Escribe texto en el PDF con ajuste de línea automático si no cabe en el ancho disponible.
+ * Llama a SetXY internamente; SetFont debe haberse llamado antes.
+ *
+ * @param mixed $pdf   Instancia de FPDF/FPDI
+ * @param float $x     Posición X en mm
+ * @param float $y     Posición Y en mm
+ * @param float $ancho Ancho de la celda (0 = resto de la página)
+ * @param int   $tamano Tamaño de fuente en puntos (para calcular alto de línea)
+ * @param string $text Texto ya convertido a ISO-8859-1 (usar fpdfStr() antes)
+ */
+function pdfCell($pdf, float $x, float $y, float $ancho, int $tamano, string $text): void {
+    $avail = $ancho > 0 ? $ancho : ($pdf->GetPageWidth() - $x - 5);
+    $pdf->SetXY($x, $y);
+    if ($pdf->GetStringWidth($text) > $avail + 0.5) {
+        $lineH = max(3.5, round($tamano * 0.4, 1));
+        $pdf->MultiCell($avail, $lineH, $text, 0, '');
+    } else {
+        $pdf->Cell($ancho ?: 0, 0, $text, 0, 0, '');
+    }
+}
+
+/**
  * Devuelve una respuesta JSON y termina la ejecución.
  */
 function respuesta(array $data, int $httpCode = 200): void {

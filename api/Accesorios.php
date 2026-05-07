@@ -499,8 +499,7 @@ class Accesorios {
         foreach ($campos as $c) {
             $val = $dummy[$c['campo']] ?? '';
             $pdf->SetFont($c['fuente'] ?? 'Helvetica', $c['negrita'] ? 'B' : '', $c['tamano'] ?? 11);
-            $pdf->SetXY($c['x'] ?? 0, $c['y'] ?? 0);
-            $pdf->Cell($c['ancho'] ?? 0, 0, fpdfStr((string)$val));
+            pdfCell($pdf, (float)($c['x'] ?? 0), (float)($c['y'] ?? 0), (float)($c['ancho'] ?? 0), (int)($c['tamano'] ?? 11), fpdfStr((string)$val));
         }
 
         $dir = __DIR__ . '/../uploads/reportes/';
@@ -644,8 +643,7 @@ class Accesorios {
             foreach ($campos as $c) {
                 $val = $valores[$c['campo']] ?? '';
                 $pdf->SetFont($c['fuente'] ?? 'Helvetica', ($c['negrita'] ?? false) ? 'B' : '', $c['tamano'] ?? 11);
-                $pdf->SetXY($c['x'] ?? 0, $c['y'] ?? 0);
-                $pdf->Cell($c['ancho'] ?? 0, 0, fpdfStr((string)$val));
+                pdfCell($pdf, (float)($c['x'] ?? 0), (float)($c['y'] ?? 0), (float)($c['ancho'] ?? 0), (int)($c['tamano'] ?? 11), fpdfStr((string)$val));
             }
         }
 

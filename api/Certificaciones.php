@@ -526,8 +526,7 @@ class Certificaciones {
                         if ($valor === '') continue;
 
                         $pdf->SetFont($fuente, $negrita, $tamano);
-                        $pdf->SetXY($x, $y);
-                        $pdf->Cell($ancho ?: 0, 0, fpdfStr($valor), 0, 0, '');
+                        pdfCell($pdf, $x, $y, $ancho, $tamano, fpdfStr($valor));
                     }
                 }
             }
@@ -1402,8 +1401,7 @@ HTML;
                     if ($valor === '') continue;
 
                     $pdf->SetFont($fuente, $negrita, $tamano);
-                    $pdf->SetXY($x, $y);
-                    $pdf->Cell($ancho ?: 0, 0, fpdfStr($valor), 0, 0, '');
+                    pdfCell($pdf, $x, $y, $ancho, $tamano, fpdfStr($valor));
                 }
             }
 
@@ -1511,8 +1509,7 @@ HTML;
                         $valor = (string)($valoresResueltos[$nombreCampo] ?? '');
                         if ($valor === '') continue;
                         $pdf->SetFont($fuente, $negrita, $tamano);
-                        $pdf->SetXY($x, $y);
-                        $pdf->Cell($ancho ?: 0, 0, fpdfStr($valor), 0, 0, '');
+                        pdfCell($pdf, $x, $y, $ancho, $tamano, fpdfStr($valor));
                     }
                 }
             }
