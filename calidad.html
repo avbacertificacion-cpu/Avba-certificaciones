@@ -3724,7 +3724,8 @@ let camposPdfAccUrl   = null;
 const CAMPOS_ACC_DISPONIBLES = [
   "id_accesorio","tipo","marca","modelo","serie",
   "capacidad","medidas","estado",
-  "cliente","fecha_inspeccion","inspector","folio","firma_inspector"
+  "cliente","fecha_inspeccion","inspector","folio",
+  "total_accesorios","lugar_inspeccion","firma_inspector"
 ];
 
 async function abrirModalCamposPdfAcc() {
@@ -4365,6 +4366,8 @@ const PK_SAMPLE = {
   estado:            'Bueno',
   fecha_inspeccion:  '26/03/2026',
   inspector:         'Ing. José Marcos González Calderón',
+  total_accesorios:  '15',
+  lugar_inspeccion:  'Altamira, Tamaulipas',
   // Personal
   nombre_completo:   'Juan Carlos Pérez López',
   curp:              'PELJ850315HDFRZN04',

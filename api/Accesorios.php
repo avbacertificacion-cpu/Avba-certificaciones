@@ -485,8 +485,10 @@ class Accesorios {
             'estado'           => 'APTO',
             'cliente'          => 'HYH CONSTRUCCIONES Y ARRENDAMIENTO DEL GOLFO S.A DE C.V.',
             'fecha_inspeccion' => '26/03/2026',
-            'inspector'        => 'Ing. José Marcos González Calderón',
-            'folio'            => 'AB.45180-25656-2026MX',
+            'inspector'          => 'Ing. José Marcos González Calderón',
+            'folio'              => 'AB.45180-25656-2026MX',
+            'total_accesorios'   => '15',
+            'lugar_inspeccion'   => 'Altamira, Tamaulipas',
         ];
 
         try {
@@ -658,6 +660,8 @@ class Accesorios {
                 'fecha_inspeccion' => $sesion['fecha']   ?? '',
                 'inspector'        => $sesion['usuario'] ?? '',
                 'folio'            => $folio . '-' . str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT),
+                'total_accesorios' => (string)count($accs),
+                'lugar_inspeccion' => $sesion['direccion'] ?? '',
             ];
 
             // Firma del inspector
