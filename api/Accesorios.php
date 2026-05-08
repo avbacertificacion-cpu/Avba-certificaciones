@@ -328,6 +328,9 @@ class Accesorios {
             ->execute([$sesionId]);
 
         $resultado['message'] = 'Informe emitido correctamente.';
+        // Save URL so portal can show the link
+        $informeUrl = rtrim(UPLOAD_URL, '/') . '/' . ltrim($resultado['url'], '/');
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET informe_url = ? WHERE id = ?")->execute([$informeUrl, $sesionId]);
         return $resultado;
     }
 
@@ -544,9 +547,11 @@ class Accesorios {
 
     private function ensureAccSesionesColumns(): void {
         $needed = [
-            'estatus'   => "ALTER TABLE accesorios_sesiones ADD COLUMN estatus    VARCHAR(30)  NOT NULL DEFAULT 'PENDIENTE'",
-            'qr_codigo' => "ALTER TABLE accesorios_sesiones ADD COLUMN qr_codigo  VARCHAR(20)  NULL",
-            'direccion' => "ALTER TABLE accesorios_sesiones ADD COLUMN direccion  VARCHAR(500) NULL",
+            'estatus'    => "ALTER TABLE accesorios_sesiones ADD COLUMN estatus    VARCHAR(30)  NOT NULL DEFAULT 'PENDIENTE'",
+            'qr_codigo'  => "ALTER TABLE accesorios_sesiones ADD COLUMN qr_codigo  VARCHAR(20)  NULL",
+            'direccion'  => "ALTER TABLE accesorios_sesiones ADD COLUMN direccion  VARCHAR(500) NULL",
+            'cert_url'   => "ALTER TABLE accesorios_sesiones ADD COLUMN cert_url    VARCHAR(500) NULL",
+            'informe_url' => "ALTER TABLE accesorios_sesiones ADD COLUMN informe_url VARCHAR(500) NULL",
         ];
         foreach ($needed as $col => $ddl) {
             $exists = (int) $this->pdo->query(
@@ -758,6 +763,9 @@ class Accesorios {
         $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'EMITIDO' WHERE id = ?")
             ->execute([$sesionId]);
         $resultado['message'] = 'Certificado emitido correctamente.';
+        // Save URL so portal can show the link
+        $certUrl = rtrim(UPLOAD_URL, '/') . '/' . ltrim($resultado['url'], '/');
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET cert_url = ? WHERE id = ?")->execute([$certUrl, $sesionId]);
         return $resultado;
     }
 

@@ -55,6 +55,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 .btn-doc{flex:1;min-width:90px;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;text-decoration:none;border:1.5px solid;transition:all .15s;}
 .btn-cert{background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark);}
 .btn-dict{background:var(--verde-light);border-color:#639922;color:var(--verde);}
+.btn-rep{background:var(--ambar-light);border-color:var(--ambar);color:var(--ambar);}
+.btn-qr-sm{background:var(--blanco);border-color:var(--borde);color:var(--texto-sub);}
 .btn-qr{background:var(--blanco);border-color:var(--borde);color:var(--texto-sub);}
 .btn-doc.dis{opacity:.4;pointer-events:none;}
 /* Badges */
@@ -195,6 +197,7 @@ function verQR(folio, qrUrl) {
   document.getElementById('qr-overlay').classList.add('open');
 }
 function cerrarQR() { document.getElementById('qr-overlay').classList.remove('open'); }
+function escQ(s) { return (s||'').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 
 // ── Logout ─────────────────────────────────────────────────────────────────
 function cerrarSesion() { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
@@ -238,19 +241,15 @@ function renderMaquinaria(data) {
   let html = '<div class="cards-grid">';
   data.forEach(eq => {
     const vigBadge = badgeVigencia(eq.vigente, eq.dias);
-    let footer = '';
-    if (eq.link_cert || eq.link_dict || eq.qr_url) {
-      footer = '<div class="card-footer">';
-      if (eq.link_cert) footer += `<a class="btn-doc btn-cert" href="${eq.link_cert}" target="_blank">📄 Certificado</a>`;
-      if (eq.link_dict) footer += `<a class="btn-doc btn-dict" href="${eq.link_dict}" target="_blank">📋 Dictamen</a>`;
-      if (eq.qr_url)    footer += `<button class="btn-doc btn-qr" onclick="verQR('${eq.folio}','${eq.qr_url}')">🔗 QR</button>`;
-      footer += '</div>';
-    }
+    const folio = eq.folio ? 'AB.' + eq.folio + '-' + new Date().getFullYear() + 'MX' : '—';
+    const certBtn  = eq.link_cert ? `<a class="btn-doc btn-cert" href="${eq.link_cert}" target="_blank">📄 Certificado</a>` : `<span class="btn-doc btn-cert dis">📄 Certificado</span>`;
+    const dictBtn  = eq.link_dict ? `<a class="btn-doc btn-dict" href="${eq.link_dict}" target="_blank">📋 Dictamen</a>`    : `<span class="btn-doc btn-dict dis">📋 Dictamen</span>`;
+    const qrBtn    = eq.qr_url    ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(eq.qr_url)}')">🔗 QR</button>` : `<span class="btn-doc btn-qr dis">🔗 QR</span>`;
     html += `<div class="card">
       <div class="card-top">
         <div class="card-icon">🔧</div>
         <div style="flex:1">
-          <div class="card-folio">${eq.folio || '—'}</div>
+          <div class="card-folio">${folio}</div>
           <div class="card-nombre">${eq.maquinaria || '—'}</div>
           <div class="card-serie">${eq.serie ? 'S/N: ' + eq.serie : ''}</div>
         </div>
@@ -262,7 +261,7 @@ function renderMaquinaria(data) {
         <div class="info-row"><span class="info-key">Fecha inspección</span><span class="info-val">${eq.fecha || '—'}</span></div>
         ${vigenciaBar(eq.dias, eq.vencimiento, eq.vigente)}
       </div>
-      ${footer}
+      <div class="card-footer">${certBtn}${dictBtn}${qrBtn}</div>
     </div>`;
   });
   html += '</div>';
@@ -271,7 +270,7 @@ function renderMaquinaria(data) {
 }
 
 // ── Render Accesorios ──────────────────────────────────────────────────────
-// PHP retorna: id, folio, fecha, total, cumple, no_cumple
+// PHP retorna: id, folio, fecha, total, cumple, no_cumple, qr_url, cert_url, informe_url
 function renderAccesorios(data) {
   const cont = document.getElementById('acc-cont');
   if (!data || !data.length) {
@@ -281,15 +280,20 @@ function renderAccesorios(data) {
   document.getElementById('s-acc').textContent = data.length;
   let html = '<div class="acc-grid">';
   data.forEach(ses => {
+    const folio = ses.folio ? 'AB.' + ses.folio + '-' + new Date().getFullYear() + 'MX' : '—';
+    const certBtn    = ses.cert_url    ? `<a class="btn-doc btn-cert" href="${ses.cert_url}" target="_blank">📄 Certificado</a>`   : `<span class="btn-doc btn-cert dis">📄 Certificado</span>`;
+    const repBtn     = ses.informe_url ? `<a class="btn-doc btn-rep"  href="${ses.informe_url}" target="_blank">📊 Reporte</a>`    : `<span class="btn-doc btn-rep dis">📊 Reporte</span>`;
+    const qrBtn      = ses.qr_url      ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(ses.qr_url)}')">🔗 QR</button>` : `<span class="btn-doc btn-qr dis">🔗 QR</span>`;
     html += `<div class="acc-card">
-      <div class="acc-folio">${ses.folio || '—'}</div>
+      <div class="acc-folio">${folio}</div>
       <div class="acc-fecha">${ses.fecha || '—'}</div>
       <div style="font-size:12px;color:var(--texto-sub);margin-bottom:10px">${ses.total || 0} accesorio${ses.total!==1?'s':''} inspeccionados</div>
-      <div class="acc-badges">
+      <div class="acc-badges" style="margin-bottom:12px">
         ${ses.cumple    ? `<span class="badge b-cumple">✔ ${ses.cumple} CUMPLE</span>`       : ''}
         ${ses.no_cumple ? `<span class="badge b-nocumple">✖ ${ses.no_cumple} NO CUMPLE</span>` : ''}
         ${!ses.cumple && !ses.no_cumple ? '<span class="badge">Sin resultados</span>' : ''}
       </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${certBtn}${repBtn}${qrBtn}</div>
     </div>`;
   });
   html += '</div>';
@@ -298,7 +302,7 @@ function renderAccesorios(data) {
 
 // ── Render Personal ────────────────────────────────────────────────────────
 // PHP retorna: id, nombre, folio, curso, empresa, fecha_curso,
-//              url_certificado, url_diploma, url_dc3
+//              qr_url, url_certificado, url_diploma, url_dc3
 function renderPersonal(data) {
   const cont = document.getElementById('per-cont');
   if (!data || !data.length) {
@@ -306,22 +310,30 @@ function renderPersonal(data) {
     return;
   }
   document.getElementById('s-per').textContent = data.length;
-  let html = '<div style="overflow-x:auto"><table class="tbl"><thead><tr><th>Nombre</th><th>Curso</th><th>Folio</th><th>Fecha</th><th>Documentos</th></tr></thead><tbody>';
+  let html = '<div class="cards-grid">';
   data.forEach(p => {
-    let docs = '';
-    if (p.url_certificado) docs += `<a class="btn-sm btn-sm-cert" href="${p.url_certificado}" target="_blank">Cert.</a> `;
-    if (p.url_diploma)     docs += `<a class="btn-sm btn-sm-dip"  href="${p.url_diploma}"     target="_blank">Dip.</a> `;
-    if (p.url_dc3)         docs += `<a class="btn-sm btn-sm-dc3"  href="${p.url_dc3}"         target="_blank">DC3</a>`;
-    if (!docs) docs = '—';
-    html += `<tr>
-      <td>${p.nombre || '—'}</td>
-      <td>${p.curso  || '—'}</td>
-      <td style="font-family:monospace;font-size:12px">${p.folio || '—'}</td>
-      <td>${p.fecha_curso || '—'}</td>
-      <td>${docs}</td>
-    </tr>`;
+    const folio = p.folio ? 'AB.' + p.folio + '-' + new Date().getFullYear() + 'MX' : '—';
+    const certBtn = p.url_certificado ? `<a class="btn-doc btn-cert" href="${p.url_certificado}" target="_blank">📄 Certificado</a>` : `<span class="btn-doc btn-cert dis">📄 Certificado</span>`;
+    const dipBtn  = p.url_diploma     ? `<a class="btn-doc btn-dict" href="${p.url_diploma}"     target="_blank">🎓 Diploma</a>`     : `<span class="btn-doc btn-dict dis">🎓 Diploma</span>`;
+    const dc3Btn  = p.url_dc3         ? `<a class="btn-doc btn-rep"  href="${p.url_dc3}"         target="_blank">📋 DC-3</a>`        : `<span class="btn-doc btn-rep dis">📋 DC-3</span>`;
+    const qrBtn   = p.qr_url          ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(p.qr_url)}')">🔗 QR</button>` : `<span class="btn-doc btn-qr dis">🔗 QR</span>`;
+    html += `<div class="card">
+      <div class="card-top">
+        <div class="card-icon" style="background:var(--ambar-light)">👷</div>
+        <div style="flex:1">
+          <div class="card-folio">${folio}</div>
+          <div class="card-nombre">${p.nombre || '—'}</div>
+          <div class="card-serie">${p.empresa || ''}</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="info-row"><span class="info-key">Curso</span><span class="info-val">${p.curso || '—'}</span></div>
+        <div class="info-row"><span class="info-key">Fecha</span><span class="info-val">${p.fecha_curso || '—'}</span></div>
+      </div>
+      <div class="card-footer">${certBtn}${dipBtn}${dc3Btn}${qrBtn}</div>
+    </div>`;
   });
-  html += '</tbody></table></div>';
+  html += '</div>';
   cont.innerHTML = html;
 }
 

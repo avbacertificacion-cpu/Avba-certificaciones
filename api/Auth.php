@@ -338,25 +338,29 @@ class Auth {
             $stmt = $this->pdo->prepare(
                 "SELECT s.id, s.cliente, s.control,
                         DATE_FORMAT(s.fecha, '%d/%m/%Y') AS fecha,
-                        COUNT(a.id)            AS total,
-                        SUM(a.estado='CUMPLE') AS cumple,
+                        s.qr_codigo, s.cert_url, s.informe_url,
+                        COUNT(a.id)             AS total,
+                        SUM(a.estado='CUMPLE')  AS cumple,
                         SUM(a.estado!='CUMPLE') AS no_cumple
                  FROM accesorios_sesiones s
                  LEFT JOIN accesorios_izaje a ON a.sesion_id = s.id
                  WHERE s.control LIKE ? AND s.estatus = 'EMITIDO'
-                 GROUP BY s.id
+                 GROUP BY s.id, s.qr_codigo, s.cert_url, s.informe_url
                  ORDER BY s.fecha DESC"
             );
             $stmt->execute([$like]);
             foreach ($stmt->fetchAll() as $r) {
                 if (!$nombreCliente) $nombreCliente = $r['cliente'];
                 $accesorios[] = [
-                    'id'       => (int)$r['id'],
-                    'folio'    => $r['control'],
-                    'fecha'    => $r['fecha'],
-                    'total'    => (int)$r['total'],
-                    'cumple'   => (int)$r['cumple'],
-                    'no_cumple'=> (int)$r['no_cumple'],
+                    'id'          => (int)$r['id'],
+                    'folio'       => $r['control'],
+                    'fecha'       => $r['fecha'],
+                    'total'       => (int)$r['total'],
+                    'cumple'      => (int)$r['cumple'],
+                    'no_cumple'   => (int)$r['no_cumple'],
+                    'qr_url'      => $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '',
+                    'cert_url'    => $r['cert_url'] ?? '',
+                    'informe_url' => $r['informe_url'] ?? '',
                 ];
             }
         } catch (\PDOException $e) { /* tabla o columna aún no existe */ }
@@ -365,7 +369,7 @@ class Auth {
         $personal = [];
         try {
             $stmt = $this->pdo->prepare(
-                "SELECT p.id, p.nombre_completo, p.control, p.empresa_nombre,
+                "SELECT p.id, p.nombre_completo, p.control, p.empresa_nombre, p.qr_codigo,
                         DATE_FORMAT(p.fecha_curso, '%d/%m/%Y') AS fecha_curso,
                         c.nombre AS curso_nombre,
                         MAX(CASE WHEN pd.tipo_doc='CERTIFICADO' THEN pd.url END) AS url_certificado,
@@ -376,7 +380,7 @@ class Auth {
                  LEFT JOIN participantes_documentos pd ON pd.participante_id = p.id
                  WHERE p.control LIKE ? AND p.estatus = 'EMITIDO'
                  GROUP BY p.id, p.nombre_completo, p.control, p.empresa_nombre,
-                          p.fecha_curso, c.nombre
+                          p.qr_codigo, p.fecha_curso, c.nombre
                  ORDER BY p.fecha_curso DESC"
             );
             $stmt->execute([$like]);
@@ -389,6 +393,7 @@ class Auth {
                     'curso'           => $r['curso_nombre'],
                     'empresa'         => $r['empresa_nombre'],
                     'fecha_curso'     => $r['fecha_curso'],
+                    'qr_url'          => $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '',
                     'url_certificado' => $r['url_certificado'],
                     'url_diploma'     => $r['url_diploma'],
                     'url_dc3'         => $r['url_dc3'],
