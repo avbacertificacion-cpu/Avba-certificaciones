@@ -219,7 +219,7 @@ class Accesorios {
 
     // ── Detalle de una sesión con sus accesorios ───────────
     public function detalleSesion(int $id): array {
-        $this->ensureEstatusColumn('accesorios_sesiones');
+        $this->ensureAccSesionesColumns();
         $chk = $this->pdo->prepare("SELECT id, cliente, control, estatus, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, coordenadas, direccion, usuario, qr_codigo FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
         $sesion = $chk->fetch();
@@ -275,12 +275,7 @@ class Accesorios {
 
     // ── Aprobar sesión → APROBADO_CALIDAD ────────────────
     public function aprobarSesion(int $id, string $usuario, string $qr): array {
-        $this->ensureEstatusColumn('accesorios_sesiones');
-        // Garantizar columna qr_codigo
-        try {
-            $this->pdo->exec("ALTER TABLE accesorios_sesiones ADD COLUMN IF NOT EXISTS qr_codigo VARCHAR(20) NULL");
-        } catch (\Throwable $e) {}
-
+        $this->ensureAccSesionesColumns();
         $chk = $this->pdo->prepare("SELECT id, cliente, control FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
         $sesion = $chk->fetch();
@@ -547,10 +542,34 @@ class Accesorios {
         }
     }
 
+    private function ensureAccSesionesColumns(): void {
+        $needed = [
+            'estatus'   => "ALTER TABLE accesorios_sesiones ADD COLUMN estatus    VARCHAR(30)  NOT NULL DEFAULT 'PENDIENTE'",
+            'qr_codigo' => "ALTER TABLE accesorios_sesiones ADD COLUMN qr_codigo  VARCHAR(20)  NULL",
+            'direccion' => "ALTER TABLE accesorios_sesiones ADD COLUMN direccion  VARCHAR(500) NULL",
+        ];
+        foreach ($needed as $col => $ddl) {
+            $exists = (int) $this->pdo->query(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                   AND TABLE_NAME   = 'accesorios_sesiones'
+                   AND COLUMN_NAME  = '{$col}'"
+            )->fetchColumn();
+            if (!$exists) {
+                try { $this->pdo->exec($ddl); } catch (\PDOException $e) {}
+            }
+        }
+    }
+
     private function ensureEstatusColumn(string $tabla): void {
+        // Kept for backward compat; accesorios_sesiones now uses ensureAccSesionesColumns
+        if ($tabla === 'accesorios_sesiones') {
+            $this->ensureAccSesionesColumns();
+            return;
+        }
         try {
             $this->pdo->exec("ALTER TABLE `{$tabla}` ADD COLUMN IF NOT EXISTS estatus VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE'");
-        } catch (\PDOException $e) { /* column already exists */ }
+        } catch (\PDOException $e) {}
     }
 
     private function ensurePlantillaAccTable(): void {
