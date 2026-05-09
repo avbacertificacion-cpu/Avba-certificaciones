@@ -306,6 +306,11 @@ if ($method === 'POST') {
             if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($auth->desactivarUsuario($payload));
 
+        case 'ELIMINAR_USUARIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auth->eliminarUsuario((int)($payload['id'] ?? 0), $usr['usuario']));
+
         case 'SUBIR_FIRMA':
             $usr = validarToken($pdo, $token);
             if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

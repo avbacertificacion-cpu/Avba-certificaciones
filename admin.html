@@ -591,6 +591,7 @@ function accionesTd(u) {
     ${u.activo == 1
       ? `<button class="btn-danger" onclick="desactivar(${u.id})">Desactivar</button>`
       : `<button class="btn-edit"   onclick="reactivar(${u.id})">Reactivar</button>`}
+    <button class="btn-danger" onclick="eliminarUsuario(${u.id})" style="opacity:.75">Eliminar</button>
   </div>`;
 }
 
@@ -773,6 +774,24 @@ async function reactivar(id) {
   const data = await res.json();
   if (data.status === "success") cargar();
   else alert(data.message || "Error al reactivar");
+}
+
+/* ── Eliminar usuario ── */
+async function eliminarUsuario(id) {
+  const u = usuariosGlobal.find(x => x.id == id);
+  if (!u) return;
+  if (!confirm(`¿Eliminar permanentemente la cuenta "${u.usuario}"?\n\nEsta acción no se puede deshacer.`)) return;
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      body: JSON.stringify({ action: "ELIMINAR_USUARIO", payload: { id } })
+    });
+    const data = await res.json();
+    if (data.status === "success") cargar();
+    else alert("Error: " + (data.message || "No se pudo eliminar"));
+  } catch {
+    alert("Error de conexión.");
+  }
 }
 
 /* ── Firma del inspector ── */

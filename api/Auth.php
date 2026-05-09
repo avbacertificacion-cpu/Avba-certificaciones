@@ -285,6 +285,24 @@ class Auth {
         return ['status' => 'success', 'message' => 'Firma eliminada.'];
     }
 
+    // ── ELIMINAR USUARIO ──────────────────────────────────
+    public function eliminarUsuario(int $id, string $usuarioActual): array {
+        $stmt = $this->pdo->prepare("SELECT id, usuario, firma_imagen FROM usuarios WHERE id = ?");
+        $stmt->execute([$id]);
+        $u = $stmt->fetch();
+        if (!$u) return ['status' => 'error', 'message' => 'Usuario no encontrado.'];
+        if ($u['usuario'] === $usuarioActual)
+            return ['status' => 'error', 'message' => 'No puedes eliminar tu propia cuenta.'];
+
+        if ($u['firma_imagen']) {
+            $path = __DIR__ . '/../' . $u['firma_imagen'];
+            if (file_exists($path)) @unlink($path);
+        }
+
+        $this->pdo->prepare("DELETE FROM usuarios WHERE id = ?")->execute([$id]);
+        return ['status' => 'success', 'message' => 'Usuario eliminado.'];
+    }
+
     // ── PORTAL CLIENTE ─────────────────────────────────────
     public function obtenerDatosCliente(string $idCliente): array {
         $idCliente = trim($idCliente);
