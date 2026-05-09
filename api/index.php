@@ -121,33 +121,50 @@ if ($method === 'GET') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             $url = $_GET['url'] ?? '';
             if (!$url) respuesta(['status' => 'error', 'message' => 'url requerido.']);
-            // Convertir URL→ruta local. Usa parse_url para ignorar diferencias http/https.
-            $uploadUrlPath = rtrim(parse_url(UPLOAD_URL, PHP_URL_PATH) ?: '', '/');
-            $urlPath       = rtrim(parse_url($url,       PHP_URL_PATH) ?: '', '/');
-            if ($uploadUrlPath && strpos($urlPath, $uploadUrlPath) === 0) {
-                $relPath   = substr($urlPath, strlen($uploadUrlPath));
-                $localPath = rtrim(UPLOAD_DIR, '/') . $relPath . '/';
-            } else {
-                // Fallback: reemplazo directo de prefijo
-                $localPath = rtrim(str_replace(
-                    rtrim(UPLOAD_URL, '/'),
-                    rtrim(UPLOAD_DIR, '/'),
-                    rtrim($url, '/')
-                ), '/') . '/';
+
+            // Estrategia 1: extraer la porción relativa usando el path de UPLOAD_URL
+            // (ignora protocolo y host, resuelve diferencias http/https)
+            $uploadUrlPath = rtrim(parse_url(UPLOAD_URL, PHP_URL_PATH) ?: '', '/') . '/';
+            $urlPath       = rtrim(parse_url($url,       PHP_URL_PATH) ?: $url, '/') . '/';
+            $relPath       = '';
+            if ($uploadUrlPath !== '/' && strpos($urlPath, $uploadUrlPath) === 0) {
+                $relPath = trim(substr($urlPath, strlen($uploadUrlPath)), '/');
             }
-            $realPath  = realpath($localPath);
-            $realBase  = realpath(UPLOAD_DIR);
-            if (!$realPath || !$realBase || strncmp($realPath, $realBase, strlen($realBase)) !== 0) {
+            // Estrategia 2 (fallback): tomar solo el último segmento del path
+            if (!$relPath) {
+                $relPath = basename(rtrim(parse_url($url, PHP_URL_PATH) ?: $url, '/'));
+            }
+
+            // Seguridad: sin traversal ni caracteres nulos
+            if (!$relPath || strpos($relPath, '..') !== false || strpos($relPath, "\0") !== false) {
                 respuesta(['status' => 'success', 'imagenes' => []]);
             }
-            $archivos = glob($realPath . '*.{jpg,jpeg,png,JPG,JPEG,PNG,webp,WEBP}', GLOB_BRACE) ?: [];
+
+            $localPath = rtrim(UPLOAD_DIR, '/') . '/' . $relPath . '/';
+            $dirExists = is_dir($localPath);
+            $debug     = ['url' => $url, 'relPath' => $relPath, 'localPath' => $localPath, 'dirExists' => $dirExists];
+
+            // Usar is_dir() en lugar de realpath() para no fallar con symlinks
+            if (!$dirExists) {
+                respuesta(['status' => 'success', 'imagenes' => [], '_debug' => $debug]);
+            }
+
+            // Verificación de seguridad (solo falla si realpath devuelve algo fuera de UPLOAD_DIR)
+            $realPath = realpath($localPath);
+            $realBase = realpath(UPLOAD_DIR);
+            if ($realPath && $realBase && strncmp($realPath, $realBase, strlen($realBase)) !== 0) {
+                respuesta(['status' => 'success', 'imagenes' => [], '_debug' => $debug]);
+            }
+
+            $archivos = glob($localPath . '*.{jpg,jpeg,png,JPG,JPEG,PNG,webp,WEBP}', GLOB_BRACE) ?: [];
             sort($archivos);
             $imagenes = array_map(fn($f) => str_replace(
                 rtrim(UPLOAD_DIR, '/'),
                 rtrim(UPLOAD_URL, '/'),
                 $f
             ), array_slice($archivos, 0, 30));
-            respuesta(['status' => 'success', 'imagenes' => array_values($imagenes)]);
+            $debug['archivos'] = count($archivos);
+            respuesta(['status' => 'success', 'imagenes' => array_values($imagenes), '_debug' => $debug]);
         }
 
         // Opciones de maquinaria para el selector

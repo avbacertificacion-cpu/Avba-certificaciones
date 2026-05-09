@@ -3922,12 +3922,16 @@ async function verEvidencia(url) {
   try {
     const res  = await fetch(`api/index.php?action=LISTAR_EVIDENCIAS&url=${encodeURIComponent(url)}`);
     const data = await res.json();
+    if (data._debug) console.log('[AVBA evidencia debug]', data._debug);
     const imgs = data.imagenes || [];
     if (!imgs.length) {
+      const dbg = data._debug || {};
       grid.innerHTML = `<div style="text-align:center;padding:40px;color:#9299a8;grid-column:1/-1">
         <div style="font-size:40px;margin-bottom:12px">🖼️</div>
         <div style="font-weight:600;margin-bottom:8px;color:#5a6072">Sin imágenes en esta carpeta</div>
         <a href="${url}" target="_blank" style="color:#185FA5;font-size:12px">Abrir carpeta directamente ↗</a>
+        ${dbg.dirExists===false?`<div style="font-size:11px;margin-top:8px;color:#c0392b">Carpeta no encontrada en servidor:<br><code style="font-size:10px">${dbg.localPath||''}</code></div>`:''}
+        ${dbg.dirExists&&dbg.archivos===0?`<div style="font-size:11px;margin-top:8px;color:#c0392b">Carpeta vacía (sin imágenes jpg/png)</div>`:''}
       </div>`;
     } else {
       grid.innerHTML = imgs.map((src, i) =>
