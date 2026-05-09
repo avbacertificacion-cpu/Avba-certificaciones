@@ -80,6 +80,13 @@
 
     /* ── WRAP ── */
     .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
+    /* ── Tabs ── */
+    .tabs-admin { display:flex; gap:4px; background:var(--blanco); border-radius:12px; padding:5px; border:1px solid rgba(0,0,0,.05); box-shadow:var(--sombra); margin-bottom:20px; }
+    .tab-a { flex:1; padding:9px 14px; border-radius:8px; border:none; background:transparent; font-size:13px; font-weight:600; color:var(--texto-sub); cursor:pointer; transition:all .15s; }
+    .tab-a.active { background:var(--azul-dark); color:#fff; }
+    .tab-a:hover:not(.active) { background:var(--gris-bg); }
+    .tab-sec { display:none; }
+    .tab-sec.active { display:block; }
 
     /* ── STATS ── */
     .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 22px; }
@@ -269,110 +276,125 @@
     </div>
   </div>
 
-  <!-- TABLA: USUARIOS INTERNOS -->
-  <div class="panel">
-    <div class="panel-hdr">
-      <div>
-        <div class="panel-title">Usuarios del sistema</div>
-        <div class="panel-sub">ADMIN · CALIDAD · CERTIFICACIONES · INSPECTOR</div>
-      </div>
-      <button class="btn-primary" onclick="abrirCrear('interno')">+ Nuevo usuario</button>
-    </div>
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>Usuario</th>
-            <th>Nombre</th>
-            <th>Rol</th>
-            <th>Estado</th>
-            <th>Último acceso</th>
-            <th>Firma</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="tbody-internos">
-          <tr class="loading-row"><td colspan="6"><div class="spin"></div>Cargando...</td></tr>
-        </tbody>
-      </table>
-    </div>
+  <!-- TABS -->
+  <div class="tabs-admin">
+    <button class="tab-a active" id="tab-btn-usuarios" onclick="verTabAdmin('usuarios',this)">👥 Usuarios</button>
+    <button class="tab-a"        id="tab-btn-smtp"     onclick="verTabAdmin('smtp',this)">📧 Correo SMTP</button>
   </div>
 
-  <!-- TABLA: CUENTAS DE CLIENTE -->
-  <div class="panel">
-    <div class="panel-hdr">
-      <div>
-        <div class="panel-title">Cuentas de cliente</div>
-        <div class="panel-sub">Acceso al portal de consulta de certificados</div>
-      </div>
-      <button class="btn-primary" onclick="abrirCrear('cliente')">+ Nueva cuenta cliente</button>
-    </div>
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr>
-            <th>Usuario</th>
-            <th>Nombre / Empresa</th>
-            <th>ID Cliente</th>
-            <th>Estado</th>
-            <th>Último acceso</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="tbody-clientes">
-          <tr class="loading-row"><td colspan="6"><div class="spin"></div>Cargando...</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
+  <!-- SECCIÓN: USUARIOS -->
+  <div class="tab-sec active" id="tab-sec-usuarios">
 
-  <!-- CONFIGURACIÓN SMTP -->
-  <div class="panel" id="panel-smtp">
-    <div class="panel-hdr">
-      <div>
-        <div class="panel-title">Configuración de correo (SMTP)</div>
-        <div class="panel-sub">Servidor de salida para envío de certificados y documentos</div>
+    <!-- TABLA: USUARIOS INTERNOS -->
+    <div class="panel">
+      <div class="panel-hdr">
+        <div>
+          <div class="panel-title">Usuarios del sistema</div>
+          <div class="panel-sub">ADMIN · CALIDAD · CERTIFICACIONES · INSPECTOR</div>
+        </div>
+        <button class="btn-primary" onclick="abrirCrear('interno')">+ Nuevo usuario</button>
       </div>
-      <button class="btn-primary" onclick="probarSmtp()">Probar conexión</button>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:4px 0 10px">
-      <div class="field">
-        <label>Servidor SMTP (Host)</label>
-        <input type="text" id="smtp-host" placeholder="smtp.hostinger.com">
-      </div>
-      <div class="field">
-        <label>Puerto</label>
-        <input type="number" id="smtp-port" placeholder="465 (SSL) o 587 (TLS)" style="width:100%">
-      </div>
-      <div class="field">
-        <label>Cifrado</label>
-        <select id="smtp-enc" style="width:100%;padding:8px 10px;border:1px solid var(--borde);border-radius:6px;font-size:13px;background:var(--fondo)">
-          <option value="ssl">SSL (puerto 465)</option>
-          <option value="tls">STARTTLS (puerto 587)</option>
-        </select>
-      </div>
-      <div class="field">
-        <label>Usuario / Email</label>
-        <input type="email" id="smtp-user" placeholder="notificaciones@avba.com.mx">
-      </div>
-      <div class="field">
-        <label>Contraseña</label>
-        <input type="password" id="smtp-pass" placeholder="Dejar vacío para no cambiar" autocomplete="new-password">
-      </div>
-      <div class="field">
-        <label>Email remitente (From)</label>
-        <input type="email" id="smtp-from" placeholder="notificaciones@avba.com.mx">
-      </div>
-      <div class="field" style="grid-column:1/-1">
-        <label>Nombre remitente</label>
-        <input type="text" id="smtp-from-name" placeholder="AVBA Certificaciones">
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Nombre</th>
+              <th>Rol</th>
+              <th>Estado</th>
+              <th>Último acceso</th>
+              <th>Firma</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-internos">
+            <tr class="loading-row"><td colspan="6"><div class="spin"></div>Cargando...</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button class="btn-primary" onclick="guardarSmtp()">Guardar configuración</button>
-      <span id="smtp-msg" style="font-size:13px;color:var(--texto-hint)"></span>
+
+    <!-- TABLA: CUENTAS DE CLIENTE -->
+    <div class="panel">
+      <div class="panel-hdr">
+        <div>
+          <div class="panel-title">Cuentas de cliente</div>
+          <div class="panel-sub">Acceso al portal de consulta de certificados</div>
+        </div>
+        <button class="btn-primary" onclick="abrirCrear('cliente')">+ Nueva cuenta cliente</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Usuario</th>
+              <th>Nombre / Empresa</th>
+              <th>ID Cliente</th>
+              <th>Estado</th>
+              <th>Último acceso</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-clientes">
+            <tr class="loading-row"><td colspan="6"><div class="spin"></div>Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
-  </div>
+
+  </div><!-- /tab-sec-usuarios -->
+
+  <!-- SECCIÓN: SMTP -->
+  <div class="tab-sec" id="tab-sec-smtp">
+    <div class="panel">
+      <div class="panel-hdr">
+        <div>
+          <div class="panel-title">Configuración de correo (SMTP)</div>
+          <div class="panel-sub">Servidor de salida para envío de certificados y documentos</div>
+        </div>
+        <button class="btn-primary" onclick="probarSmtp()">Probar conexión</button>
+      </div>
+      <div style="padding:18px 20px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+          <div class="field" style="margin:0">
+            <label>Servidor SMTP (Host)</label>
+            <input type="text" id="smtp-host" placeholder="smtp.hostinger.com">
+          </div>
+          <div class="field" style="margin:0">
+            <label>Puerto</label>
+            <input type="number" id="smtp-port" placeholder="465 (SSL) ó 587 (TLS)">
+          </div>
+          <div class="field" style="margin:0">
+            <label>Cifrado</label>
+            <select id="smtp-enc" style="width:100%;padding:10px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);background:var(--blanco)">
+              <option value="ssl">SSL (puerto 465)</option>
+              <option value="tls">STARTTLS (puerto 587)</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0">
+            <label>Usuario / Email de envío</label>
+            <input type="email" id="smtp-user" placeholder="notificaciones@avba.com.mx">
+          </div>
+          <div class="field" style="margin:0">
+            <label>Contraseña</label>
+            <input type="password" id="smtp-pass" placeholder="Dejar vacío para no cambiar" autocomplete="new-password">
+          </div>
+          <div class="field" style="margin:0">
+            <label>Email remitente (From)</label>
+            <input type="email" id="smtp-from" placeholder="notificaciones@avba.com.mx">
+          </div>
+          <div class="field" style="margin:0;grid-column:1/-1">
+            <label>Nombre remitente</label>
+            <input type="text" id="smtp-from-name" placeholder="AVBA Certificaciones">
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="btn-primary" onclick="guardarSmtp()">Guardar configuración</button>
+          <span id="smtp-msg" style="font-size:13px;color:var(--texto-hint)"></span>
+        </div>
+      </div>
+    </div>
+  </div><!-- /tab-sec-smtp -->
 
 </div><!-- /wrap -->
 
@@ -765,6 +787,15 @@ document.getElementById("overlay-usr").addEventListener("click", function(e) {
 
 cargar();
 
+/* ── Tab admin switching ── */
+function verTabAdmin(id, btn) {
+  document.querySelectorAll('.tab-sec').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-a').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-sec-' + id).classList.add('active');
+  btn.classList.add('active');
+  if (id === 'smtp') cargarSmtp();
+}
+
 /* ── SMTP ── */
 async function cargarSmtp() {
   const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
@@ -837,7 +868,6 @@ async function probarSmtp() {
   }
 }
 
-cargarSmtp();
 </script>
 </body>
 </html>
