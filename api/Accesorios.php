@@ -790,7 +790,9 @@ class Accesorios {
             $mail->addAddress($correo);
             $mail->Subject = 'Certificado de Inspección de Accesorios de Izaje — AVBA Inspections';
             $mail->isHTML(true);
-            $mail->Body    = "<p>Estimado/a,<br><br>Adjunto encontrará el certificado de inspección de accesorios de izaje para <strong>{$cliente}</strong>.<br><br>Atentamente,<br>AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</p>";
+            $mail->Body = plantillaCorreoHtml($this->pdo,
+                "<p style=\"font-size:14px;color:#5a6072;line-height:1.7\">Estimado/a,<br><br>Adjunto encontrará el <strong>certificado de inspección de accesorios de izaje</strong> para <strong>" . htmlspecialchars($cliente) . "</strong>.</p>"
+            );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             $mail->send();
             return ['status' => 'success', 'message' => "Certificado enviado a {$correo}."];
@@ -860,7 +862,9 @@ class Accesorios {
             $mail->addAddress($correo);
             $mail->Subject = 'Informe de Integridad Operativa — AVBA Inspections';
             $mail->isHTML(true);
-            $mail->Body    = "<p>Estimado/a,<br><br>Adjunto encontrará el informe de integridad operativa de accesorios de izaje para <strong>{$cliente}</strong>.<br><br>Atentamente,<br>AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</p>";
+            $mail->Body = plantillaCorreoHtml($this->pdo,
+                "<p style=\"font-size:14px;color:#5a6072;line-height:1.7\">Estimado/a,<br><br>Adjunto encontrará el <strong>informe de integridad operativa</strong> de accesorios de izaje para <strong>" . htmlspecialchars($cliente) . "</strong>.</p>"
+            );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             $mail->send();
             return ['status' => 'success', 'message' => "Informe enviado a {$correo}."];
@@ -890,7 +894,9 @@ class Accesorios {
             $mail->addAddress($correo);
             $mail->Subject = 'Informe de Accesorios Aprobados — AVBA Inspections';
             $mail->isHTML(true);
-            $mail->Body    = "<p>Estimado/a,<br><br>Adjunto encontrará el informe de accesorios en estado CUMPLE para <strong>{$cliente}</strong>.<br><br>Atentamente,<br>AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</p>";
+            $mail->Body = plantillaCorreoHtml($this->pdo,
+                "<p style=\"font-size:14px;color:#5a6072;line-height:1.7\">Estimado/a,<br><br>Adjunto encontrará el <strong>informe de accesorios aprobados (CUMPLE)</strong> para <strong>" . htmlspecialchars($cliente) . "</strong>.</p>"
+            );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             $mail->send();
             return ['status' => 'success', 'message' => "Informe enviado a {$correo}."];

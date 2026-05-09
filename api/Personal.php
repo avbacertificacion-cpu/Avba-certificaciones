@@ -554,25 +554,13 @@ class Personal {
     }
 
     private function plantillaCorreoPersonal(string $nombre, string $tipoLabel, string $curso): string {
-        return "<!DOCTYPE html><html><body style=\"font-family:'Segoe UI',sans-serif;background:#f4f7fb;margin:0;padding:20px\">
-<div style=\"max-width:540px;margin:auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08)\">
-  <div style=\"background:#185FA5;padding:24px;text-align:center\">
-    <h1 style=\"color:white;font-size:20px;margin:0\">AVBA Inspections</h1>
-    <p style=\"color:rgba(255,255,255,0.75);font-size:13px;margin:6px 0 0\">Capacitación y Certificación</p>
-  </div>
-  <div style=\"padding:28px 32px\">
-    <p style=\"font-size:15px;color:#1a1a2e;margin:0 0 12px\">Estimado(a) <strong>{$nombre}</strong>,</p>
-    <p style=\"font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px\">
-      Adjuntamos su <strong>{$tipoLabel}</strong> del curso <strong>{$curso}</strong>,
-      emitido por AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.
-    </p>
-  </div>
-  <div style=\"background:#f4f7fb;padding:16px 32px;border-top:1px solid #dfe5ef;text-align:center\">
-    <p style=\"font-size:12px;color:#9299a8;margin:0\">
-      AVBA Inspections — <a href=\"https://avba.com.mx\" style=\"color:#185FA5\">avba.com.mx</a>
-    </p>
-  </div>
-</div></body></html>";
+        $cuerpo = "
+      <p style=\"font-size:15px;color:#1a1a2e;margin:0 0 12px\">Estimado(a) <strong>" . htmlspecialchars($nombre) . "</strong>,</p>
+      <p style=\"font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px\">
+        Adjuntamos su <strong>" . htmlspecialchars($tipoLabel) . "</strong>
+        del curso <strong>" . htmlspecialchars($curso) . "</strong>.
+      </p>";
+        return plantillaCorreoHtml($this->pdo, $cuerpo);
     }
 
     // ══════════════════════════════════════════════════════

@@ -243,8 +243,17 @@ function getSmtpConfig(PDO $pdo): array {
             password    VARCHAR(500)     NULL,
             from_email  VARCHAR(200)     NULL,
             from_name   VARCHAR(200)     NULL DEFAULT 'AVBA Certificaciones',
+            firma_nombre  VARCHAR(300) NULL DEFAULT 'AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.',
+            firma_web     VARCHAR(200) NULL DEFAULT 'avba.com.mx',
+            firma_extra   VARCHAR(500) NULL,
             PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        foreach (['firma_nombre' => "ALTER TABLE avba_smtp_config ADD COLUMN firma_nombre VARCHAR(300) NULL DEFAULT 'AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.'",
+                  'firma_web'    => "ALTER TABLE avba_smtp_config ADD COLUMN firma_web    VARCHAR(200) NULL DEFAULT 'avba.com.mx'",
+                  'firma_extra'  => "ALTER TABLE avba_smtp_config ADD COLUMN firma_extra  VARCHAR(500) NULL"] as $col => $ddl) {
+            $exists = (int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'avba_smtp_config' AND COLUMN_NAME = '{$col}'")->fetchColumn();
+            if (!$exists) { try { $pdo->exec($ddl); } catch (\PDOException $e) {} }
+        }
         $pdo->exec("INSERT IGNORE INTO avba_smtp_config (id) VALUES (1)");
         $row = $pdo->query("SELECT * FROM avba_smtp_config WHERE id = 1")->fetch();
         if ($row && !empty($row['host']) && !empty($row['username'])) {
@@ -287,4 +296,36 @@ function configurarMailer(object $mail, PDO $pdo): void {
     $fromEmail = !empty($cfg['from_email']) ? $cfg['from_email'] : $cfg['username'];
     $fromName  = !empty($cfg['from_name'])  ? $cfg['from_name']  : 'AVBA Certificaciones';
     $mail->setFrom($fromEmail, $fromName);
+}
+
+/**
+ * Genera el HTML de correo estándar con la firma configurada en BD.
+ * $cuerpo debe ser HTML interno (párrafos, etc.)
+ */
+function plantillaCorreoHtml(PDO $pdo, string $cuerpo): string {
+    $cfg      = getSmtpConfig($pdo);
+    $empresa  = htmlspecialchars($cfg['firma_nombre'] ?? 'AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.');
+    $webRaw   = trim($cfg['firma_web'] ?? 'avba.com.mx');
+    $webUrl   = (strpos($webRaw, 'http') === 0) ? $webRaw : 'https://' . $webRaw;
+    $webLabel = htmlspecialchars($webRaw);
+    $extra    = trim($cfg['firma_extra'] ?? '');
+    $extraHtml = $extra ? '<br>' . nl2br(htmlspecialchars($extra)) : '';
+
+    return "<!DOCTYPE html>
+<html>
+<body style=\"font-family:'Segoe UI',sans-serif;background:#f4f7fb;margin:0;padding:20px\">
+<div style=\"max-width:560px;margin:auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08)\">
+  <div style=\"background:#185FA5;padding:24px;text-align:center\">
+    <h1 style=\"color:white;font-size:20px;margin:0\">{$empresa}</h1>
+  </div>
+  <div style=\"padding:28px 32px\">{$cuerpo}</div>
+  <div style=\"background:#f4f7fb;padding:16px 32px;border-top:1px solid #dfe5ef;text-align:center\">
+    <p style=\"font-size:12px;color:#9299a8;margin:0\">
+      {$empresa}<br>
+      <a href=\"{$webUrl}\" style=\"color:#185FA5\">{$webLabel}</a>{$extraHtml}
+    </p>
+  </div>
+</div>
+</body>
+</html>";
 }

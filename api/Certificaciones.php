@@ -1264,35 +1264,18 @@ HTML;
     }
 
     private function plantillaCorreo(string $cliente, string $folio, string $tipoDocs): string {
-        return "<!DOCTYPE html>
-<html>
-<body style=\"font-family:'Segoe UI',sans-serif;background:#f4f7fb;margin:0;padding:20px\">
-<div style=\"max-width:560px;margin:auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.08)\">
-  <div style=\"background:#185FA5;padding:24px;text-align:center\">
-    <h1 style=\"color:white;font-size:20px;margin:0\">AVBA Inspections</h1>
-    <p style=\"color:rgba(255,255,255,0.75);font-size:13px;margin:6px 0 0\">Certificaciones y Mantenimiento</p>
-  </div>
-  <div style=\"padding:28px 32px\">
-    <p style=\"font-size:15px;color:#1a1a2e;margin:0 0 12px\">Estimado(a) cliente <strong>{$cliente}</strong>,</p>
-    <p style=\"font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px\">
-      Adjuntamos su <strong>{$tipoDocs}</strong> de inspección con folio
-      <strong style=\"color:#185FA5\">{$folio}</strong>,
-      el cual acredita que el equipo inspeccionado cumple con los criterios técnicos y de seguridad aplicables.
-    </p>
-    <div style=\"background:#E6F1FB;border-radius:8px;padding:14px 18px;margin-bottom:20px\">
-      <p style=\"font-size:13px;color:#0C447C;margin:0\"><strong>Folio:</strong> {$folio}</p>
-      <p style=\"font-size:12px;color:#185FA5;margin:6px 0 0\">Vigencia: 1 año a partir de la fecha de emisión</p>
-    </div>
-  </div>
-  <div style=\"background:#f4f7fb;padding:16px 32px;border-top:1px solid #dfe5ef;text-align:center\">
-    <p style=\"font-size:12px;color:#9299a8;margin:0\">
-      AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.<br>
-      <a href=\"https://avba.com.mx\" style=\"color:#185FA5\">avba.com.mx</a>
-    </p>
-  </div>
-</div>
-</body>
-</html>";
+        $cuerpo = "
+      <p style=\"font-size:15px;color:#1a1a2e;margin:0 0 12px\">Estimado(a) cliente <strong>" . htmlspecialchars($cliente) . "</strong>,</p>
+      <p style=\"font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px\">
+        Adjuntamos su <strong>{$tipoDocs}</strong> de inspección con folio
+        <strong style=\"color:#185FA5\">{$folio}</strong>,
+        el cual acredita que el equipo inspeccionado cumple con los criterios técnicos y de seguridad aplicables.
+      </p>
+      <div style=\"background:#E6F1FB;border-radius:8px;padding:14px 18px;margin-bottom:20px\">
+        <p style=\"font-size:13px;color:#0C447C;margin:0\"><strong>Folio:</strong> {$folio}</p>
+        <p style=\"font-size:12px;color:#185FA5;margin:6px 0 0\">Vigencia: 1 año a partir de la fecha de emisión</p>
+      </div>";
+        return plantillaCorreoHtml($this->pdo, $cuerpo);
     }
 
     private function registrarEnvio(array $datos, string $archivo, string $usuario): void {

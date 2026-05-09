@@ -387,6 +387,21 @@
             <label>Nombre remitente</label>
             <input type="text" id="smtp-from-name" placeholder="AVBA Certificaciones">
           </div>
+          <div style="grid-column:1/-1;border-top:1px solid var(--borde);margin:4px 0 8px;padding-top:14px">
+            <div style="font-size:12px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Firma del correo</div>
+          </div>
+          <div class="field" style="margin:0;grid-column:1/-1">
+            <label>Nombre de la empresa (firma)</label>
+            <input type="text" id="smtp-firma-nombre" placeholder="AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.">
+          </div>
+          <div class="field" style="margin:0">
+            <label>Sitio web</label>
+            <input type="text" id="smtp-firma-web" placeholder="avba.com.mx">
+          </div>
+          <div class="field" style="margin:0">
+            <label>Datos adicionales (teléfono, dirección, etc.)</label>
+            <input type="text" id="smtp-firma-extra" placeholder="Tel. 81 1234 5678 · Monterrey, N.L.">
+          </div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
           <button class="btn-primary" onclick="guardarSmtp()">Guardar configuración</button>
@@ -809,6 +824,9 @@ async function cargarSmtp() {
     document.getElementById("smtp-user").value      = c.username   || "";
     document.getElementById("smtp-from").value      = c.from_email || "";
     document.getElementById("smtp-from-name").value = c.from_name  || "";
+    document.getElementById("smtp-firma-nombre").value = c.firma_nombre || "";
+    document.getElementById("smtp-firma-web").value    = c.firma_web    || "";
+    document.getElementById("smtp-firma-extra").value  = c.firma_extra  || "";
     const encSel = document.getElementById("smtp-enc");
     encSel.value = (c.encryption || "ssl").toLowerCase() === "tls" ? "tls" : "ssl";
   } catch(e) {}
@@ -823,8 +841,11 @@ async function guardarSmtp() {
     port:       parseInt(document.getElementById("smtp-port").value) || 465,
     encryption: document.getElementById("smtp-enc").value,
     username:   document.getElementById("smtp-user").value.trim(),
-    from_email: document.getElementById("smtp-from").value.trim(),
-    from_name:  document.getElementById("smtp-from-name").value.trim(),
+    from_email:  document.getElementById("smtp-from").value.trim(),
+    from_name:   document.getElementById("smtp-from-name").value.trim(),
+    firma_nombre: document.getElementById("smtp-firma-nombre").value.trim(),
+    firma_web:    document.getElementById("smtp-firma-web").value.trim(),
+    firma_extra:  document.getElementById("smtp-firma-extra").value.trim(),
   };
   if (pass) payload.password = pass;
 
