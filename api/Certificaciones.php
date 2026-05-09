@@ -1250,9 +1250,17 @@ HTML;
     private function enviarCorreo(string $to, string $cliente, string $folio, string $tipoDocs, array $adjuntos): void {
         $mail = new PHPMailer(true);
 
+        $cfg = getSmtpConfig($this->pdo);
         configurarMailer($mail, $this->pdo);
         $mail->addAddress($to);
-        $mail->Subject = "Certificado de Inspección AVBA — Folio {$folio}";
+
+        $asunto = trim($cfg['asunto_cert'] ?? '');
+        if ($asunto) {
+            $asunto = str_replace(['{folio}', '{cliente}'], [$folio, $cliente], $asunto);
+        } else {
+            $asunto = "Certificado de Inspección AVBA — Folio {$folio}";
+        }
+        $mail->Subject = $asunto;
         $mail->isHTML(true);
         $mail->Body    = $this->plantillaCorreo($cliente, $folio, $tipoDocs);
 
@@ -1264,13 +1272,29 @@ HTML;
     }
 
     private function plantillaCorreo(string $cliente, string $folio, string $tipoDocs): string {
-        $cuerpo = "
-      <p style=\"font-size:15px;color:#1a1a2e;margin:0 0 12px\">Estimado(a) cliente <strong>" . htmlspecialchars($cliente) . "</strong>,</p>
-      <p style=\"font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px\">
+        $cfg         = getSmtpConfig($this->pdo);
+        $introConfig = trim($cfg['cuerpo_intro'] ?? '');
+
+        if ($introConfig) {
+            $introEscaped = htmlspecialchars($introConfig);
+            $introEscaped = str_replace(
+                ['{folio}', '{cliente}', '{tipoDocs}'],
+                [$folio, htmlspecialchars($cliente), $tipoDocs],
+                $introEscaped
+            );
+            $introHtml = "<p style=\"font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px\">"
+                       . nl2br($introEscaped) . "</p>";
+        } else {
+            $introHtml = "<p style=\"font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px\">
         Adjuntamos su <strong>{$tipoDocs}</strong> de inspección con folio
         <strong style=\"color:#185FA5\">{$folio}</strong>,
         el cual acredita que el equipo inspeccionado cumple con los criterios técnicos y de seguridad aplicables.
-      </p>
+      </p>";
+        }
+
+        $cuerpo = "
+      <p style=\"font-size:15px;color:#1a1a2e;margin:0 0 12px\">Estimado(a) cliente <strong>" . htmlspecialchars($cliente) . "</strong>,</p>
+      {$introHtml}
       <div style=\"background:#E6F1FB;border-radius:8px;padding:14px 18px;margin-bottom:20px\">
         <p style=\"font-size:13px;color:#0C447C;margin:0\"><strong>Folio:</strong> {$folio}</p>
         <p style=\"font-size:12px;color:#185FA5;margin:6px 0 0\">Vigencia: 1 año a partir de la fecha de emisión</p>

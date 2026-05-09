@@ -246,11 +246,17 @@ function getSmtpConfig(PDO $pdo): array {
             firma_nombre  VARCHAR(300) NULL DEFAULT 'AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.',
             firma_web     VARCHAR(200) NULL DEFAULT 'avba.com.mx',
             firma_extra   VARCHAR(500) NULL,
+            asunto_cert   VARCHAR(300) NULL,
+            cuerpo_intro  TEXT NULL,
+            firma_html    TEXT NULL,
             PRIMARY KEY (id)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         foreach (['firma_nombre' => "ALTER TABLE avba_smtp_config ADD COLUMN firma_nombre VARCHAR(300) NULL DEFAULT 'AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.'",
                   'firma_web'    => "ALTER TABLE avba_smtp_config ADD COLUMN firma_web    VARCHAR(200) NULL DEFAULT 'avba.com.mx'",
-                  'firma_extra'  => "ALTER TABLE avba_smtp_config ADD COLUMN firma_extra  VARCHAR(500) NULL"] as $col => $ddl) {
+                  'firma_extra'  => "ALTER TABLE avba_smtp_config ADD COLUMN firma_extra  VARCHAR(500) NULL",
+                  'asunto_cert'  => "ALTER TABLE avba_smtp_config ADD COLUMN asunto_cert  VARCHAR(300) NULL",
+                  'cuerpo_intro' => "ALTER TABLE avba_smtp_config ADD COLUMN cuerpo_intro TEXT NULL",
+                  'firma_html'   => "ALTER TABLE avba_smtp_config ADD COLUMN firma_html   TEXT NULL"] as $col => $ddl) {
             $exists = (int) $pdo->query("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'avba_smtp_config' AND COLUMN_NAME = '{$col}'")->fetchColumn();
             if (!$exists) { try { $pdo->exec($ddl); } catch (\PDOException $e) {} }
         }
@@ -311,6 +317,11 @@ function plantillaCorreoHtml(PDO $pdo, string $cuerpo): string {
     $extra    = trim($cfg['firma_extra'] ?? '');
     $extraHtml = $extra ? '<br>' . nl2br(htmlspecialchars($extra)) : '';
 
+    $firmaHtml   = trim($cfg['firma_html'] ?? '');
+    $footerInner = $firmaHtml
+        ? $firmaHtml
+        : "<p style=\"font-size:12px;color:#9299a8;margin:0\">{$empresa}<br><a href=\"{$webUrl}\" style=\"color:#185FA5\">{$webLabel}</a>{$extraHtml}</p>";
+
     return "<!DOCTYPE html>
 <html>
 <body style=\"font-family:'Segoe UI',sans-serif;background:#f4f7fb;margin:0;padding:20px\">
@@ -320,10 +331,7 @@ function plantillaCorreoHtml(PDO $pdo, string $cuerpo): string {
   </div>
   <div style=\"padding:28px 32px\">{$cuerpo}</div>
   <div style=\"background:#f4f7fb;padding:16px 32px;border-top:1px solid #dfe5ef;text-align:center\">
-    <p style=\"font-size:12px;color:#9299a8;margin:0\">
-      {$empresa}<br>
-      <a href=\"{$webUrl}\" style=\"color:#185FA5\">{$webLabel}</a>{$extraHtml}
-    </p>
+    {$footerInner}
   </div>
 </div>
 </body>

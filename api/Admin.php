@@ -573,7 +573,7 @@ class Admin {
     public function saveSmtpConfig(array $payload): array {
         getSmtpConfig($this->pdo); // ensures table + row exist
 
-        $allowed = ['host', 'port', 'encryption', 'username', 'password', 'from_email', 'from_name', 'firma_nombre', 'firma_web', 'firma_extra'];
+        $allowed = ['host', 'port', 'encryption', 'username', 'password', 'from_email', 'from_name', 'firma_nombre', 'firma_web', 'firma_extra', 'asunto_cert', 'cuerpo_intro', 'firma_html'];
         $sets = [];
         $params = [];
         foreach ($allowed as $f) {

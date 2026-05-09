@@ -384,7 +384,7 @@
             <input type="email" id="smtp-from" placeholder="notificaciones@avba.com.mx">
           </div>
           <div class="field" style="margin:0;grid-column:1/-1">
-            <label>Nombre remitente</label>
+            <label>Alias / Nombre remitente</label>
             <input type="text" id="smtp-from-name" placeholder="AVBA Certificaciones">
           </div>
           <div style="grid-column:1/-1;border-top:1px solid var(--borde);margin:4px 0 8px;padding-top:14px">
@@ -401,6 +401,24 @@
           <div class="field" style="margin:0">
             <label>Datos adicionales (teléfono, dirección, etc.)</label>
             <input type="text" id="smtp-firma-extra" placeholder="Tel. 81 1234 5678 · Monterrey, N.L.">
+          </div>
+          <div style="grid-column:1/-1;border-top:1px solid var(--borde);margin:4px 0 8px;padding-top:14px">
+            <div style="font-size:12px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px">Plantilla del correo — Certificaciones</div>
+          </div>
+          <div class="field" style="margin:0;grid-column:1/-1">
+            <label>Asunto del correo</label>
+            <input type="text" id="smtp-asunto-cert" placeholder="Certificado de Inspección AVBA — Folio {folio}">
+            <div class="hint">Variables disponibles: <code>{folio}</code>, <code>{cliente}</code> · Aplica a correos de certificado y dictamen de maquinaria</div>
+          </div>
+          <div class="field" style="margin:0;grid-column:1/-1">
+            <label>Cuerpo del correo (texto de introducción)</label>
+            <textarea id="smtp-cuerpo-intro" rows="3" style="width:100%;padding:10px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical;color:var(--texto);outline:none" placeholder="Adjuntamos su {tipoDocs} de inspección con folio {folio}..."></textarea>
+            <div class="hint">Variables: <code>{folio}</code>, <code>{cliente}</code>, <code>{tipoDocs}</code> · Si se deja vacío se usa el texto predeterminado</div>
+          </div>
+          <div class="field" style="margin:0;grid-column:1/-1">
+            <label>Firma del correo (HTML)</label>
+            <textarea id="smtp-firma-html" rows="5" style="width:100%;padding:10px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:12px;font-family:monospace;resize:vertical;color:var(--texto);outline:none" placeholder="<p style=&quot;color:#555&quot;>AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</p>&#10;<p><a href=&quot;https://avba.com.mx&quot;>avba.com.mx</a></p>"></textarea>
+            <div class="hint">HTML de la firma del correo. Si se deja vacío se usará el nombre/web/datos adicionales configurados arriba. Aplica a todos los módulos.</div>
           </div>
         </div>
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
@@ -827,6 +845,9 @@ async function cargarSmtp() {
     document.getElementById("smtp-firma-nombre").value = c.firma_nombre || "";
     document.getElementById("smtp-firma-web").value    = c.firma_web    || "";
     document.getElementById("smtp-firma-extra").value  = c.firma_extra  || "";
+    document.getElementById("smtp-asunto-cert").value  = c.asunto_cert  || "";
+    document.getElementById("smtp-cuerpo-intro").value = c.cuerpo_intro || "";
+    document.getElementById("smtp-firma-html").value   = c.firma_html   || "";
     const encSel = document.getElementById("smtp-enc");
     encSel.value = (c.encryption || "ssl").toLowerCase() === "tls" ? "tls" : "ssl";
   } catch(e) {}
@@ -846,6 +867,9 @@ async function guardarSmtp() {
     firma_nombre: document.getElementById("smtp-firma-nombre").value.trim(),
     firma_web:    document.getElementById("smtp-firma-web").value.trim(),
     firma_extra:  document.getElementById("smtp-firma-extra").value.trim(),
+    asunto_cert:  document.getElementById("smtp-asunto-cert").value.trim(),
+    cuerpo_intro: document.getElementById("smtp-cuerpo-intro").value,
+    firma_html:   document.getElementById("smtp-firma-html").value,
   };
   if (pass) payload.password = pass;
 
