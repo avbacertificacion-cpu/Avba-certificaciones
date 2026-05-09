@@ -2372,11 +2372,12 @@ function abrirDetalleInspeccion(idx) {
     </div>
   </div>`;
 
-  // Evidencia fotográfica
-  if (r.evidencia_url) {
-    html += `<div class="det-section">
-      <div class="det-section-title">Evidencia fotográfica</div>
-      <button onclick="verEvidencia('${r.evidencia_url}')"
+  // Documentos: evidencia fotográfica + reporte
+  if (r.evidencia_url || r.reporte_url) {
+    html += `<div class="det-section"><div class="det-section-title">Documentos</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">`;
+    if (r.evidencia_url) {
+      html += `<button onclick="verEvidencia('${r.evidencia_url}')"
          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
                 background:var(--gris-bg);border:1.5px solid var(--borde);border-radius:8px;
                 color:var(--azul);font-size:12px;font-weight:600;cursor:pointer;">
@@ -2385,8 +2386,20 @@ function abrirDetalleInspeccion(idx) {
           <circle cx="8" cy="8" r="2.5"/>
         </svg>
         📷 Ver evidencia fotográfica
-      </button>
-    </div>`;
+      </button>`;
+    }
+    if (r.reporte_url) {
+      html += `<a href="${r.reporte_url}" target="_blank" rel="noopener"
+         style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
+                background:var(--azul-light);border:1.5px solid var(--azul);border-radius:8px;
+                color:var(--azul);font-size:12px;font-weight:600;text-decoration:none;">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
+          <path d="M3 2h7l3 3v9H3V2z"/><path d="M10 2v3h3"/><path d="M5 7h6M5 10h4"/>
+        </svg>
+        📄 Ver reporte de inspección
+      </a>`;
+    }
+    html += `</div></div>`;
   }
 
   // Checklist

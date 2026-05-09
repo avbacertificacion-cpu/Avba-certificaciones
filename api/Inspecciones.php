@@ -166,7 +166,7 @@ class Inspecciones {
                     DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y')      AS fecha_inspeccion,
                     cliente, maquinaria, marca, modelo, serie, id_equipo,
                     capacidad, direccion, correo, control, estado,
-                    evidencia_url, certificado_url, dictamen_url,
+                    evidencia_url, reporte_url, certificado_url, dictamen_url,
                     motivo, qr_codigo, inspector
              FROM equipos
              WHERE inspector = ?
@@ -183,7 +183,7 @@ class Inspecciones {
                     DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y')      AS fecha_inspeccion,
                     cliente, maquinaria, marca, modelo, serie, id_equipo,
                     capacidad, direccion, correo, control, estado,
-                    evidencia_url, certificado_url, dictamen_url,
+                    evidencia_url, reporte_url, certificado_url, dictamen_url,
                     motivo, qr_codigo, inspector
              FROM equipos
              ORDER BY marca_temporal DESC"

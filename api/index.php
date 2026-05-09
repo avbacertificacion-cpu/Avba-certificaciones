@@ -121,12 +121,20 @@ if ($method === 'GET') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             $url = $_GET['url'] ?? '';
             if (!$url) respuesta(['status' => 'error', 'message' => 'url requerido.']);
-            // Convertir URL a ruta local y listar imágenes
-            $localPath = rtrim(str_replace(
-                rtrim(UPLOAD_URL, '/'),
-                rtrim(UPLOAD_DIR, '/'),
-                rtrim($url, '/')
-            ), '/') . '/';
+            // Convertir URL→ruta local. Usa parse_url para ignorar diferencias http/https.
+            $uploadUrlPath = rtrim(parse_url(UPLOAD_URL, PHP_URL_PATH) ?: '', '/');
+            $urlPath       = rtrim(parse_url($url,       PHP_URL_PATH) ?: '', '/');
+            if ($uploadUrlPath && strpos($urlPath, $uploadUrlPath) === 0) {
+                $relPath   = substr($urlPath, strlen($uploadUrlPath));
+                $localPath = rtrim(UPLOAD_DIR, '/') . $relPath . '/';
+            } else {
+                // Fallback: reemplazo directo de prefijo
+                $localPath = rtrim(str_replace(
+                    rtrim(UPLOAD_URL, '/'),
+                    rtrim(UPLOAD_DIR, '/'),
+                    rtrim($url, '/')
+                ), '/') . '/';
+            }
             $realPath  = realpath($localPath);
             $realBase  = realpath(UPLOAD_DIR);
             if (!$realPath || !$realBase || strncmp($realPath, $realBase, strlen($realBase)) !== 0) {
