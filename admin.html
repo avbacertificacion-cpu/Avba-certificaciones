@@ -861,6 +861,7 @@ async function probarSmtp() {
     });
     const d = await r.json();
     msg.style.color = d.status === "success" ? "var(--verde)" : "var(--rojo)";
+    msg.style.whiteSpace = "pre-wrap";
     msg.textContent = d.message;
   } catch(e) {
     msg.style.color = "var(--rojo)";

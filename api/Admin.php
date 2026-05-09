@@ -601,17 +601,35 @@ class Admin {
         if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
             return ['status' => 'error', 'message' => 'PHPMailer no está disponible en el servidor.'];
 
+        $cfg = getSmtpConfig($this->pdo);
+        $info = sprintf('Host:%s | Puerto:%s | Cifrado:%s | Usuario:%s | Pass:%s',
+            $cfg['host']       ?: '(vacío)',
+            $cfg['port']       ?: '(vacío)',
+            $cfg['encryption'] ?: '(vacío)',
+            $cfg['username']   ?: '(vacío)',
+            !empty($cfg['password']) ? '***(' . strlen((string)$cfg['password']) . ' chars)' : '(vacío)'
+        );
+
+        $debugLog = '';
         try {
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $mail->SMTPDebug   = \PHPMailer\PHPMailer\SMTP::DEBUG_SERVER;
+            $mail->Debugoutput = function(string $msg, int $level) use (&$debugLog) {
+                $debugLog .= trim($msg) . "\n";
+            };
             configurarMailer($mail, $this->pdo);
             $mail->addAddress($correo);
-            $mail->Subject = 'Prueba de configuración SMTP — AVBA Certificaciones';
+            $mail->Subject = 'Prueba SMTP — AVBA Certificaciones';
             $mail->isHTML(true);
-            $mail->Body = '<p>Este es un correo de prueba enviado desde el panel de administración de AVBA Certificaciones.</p><p>Si recibiste este mensaje, la configuración SMTP es correcta.</p>';
+            $mail->Body    = '<p>Correo de prueba desde el panel de administración AVBA.</p>';
             $mail->send();
-            return ['status' => 'success', 'message' => "Correo de prueba enviado a {$correo}."];
+            return ['status' => 'success', 'message' => "Correo enviado a {$correo}. Config: {$info}"];
         } catch (\Exception $e) {
-            return ['status' => 'error', 'message' => 'Error: ' . $e->getMessage()];
+            return [
+                'status'  => 'error',
+                'message' => 'Error: ' . $e->getMessage() . "\n\nConfig usada: " . $info . "\n\nDebug SMTP:\n" . ($debugLog ?: '(sin debug)')
+            ];
+        }
         }
     }
 }
