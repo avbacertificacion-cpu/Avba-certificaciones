@@ -630,6 +630,5 @@ class Admin {
                 'message' => 'Error: ' . $e->getMessage() . "\n\nConfig usada: " . $info . "\n\nDebug SMTP:\n" . ($debugLog ?: '(sin debug)')
             ];
         }
-        }
     }
 }
