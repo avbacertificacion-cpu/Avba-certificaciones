@@ -825,7 +825,8 @@
     .cam-canvas { display: none; }
     .cam-bar {
       background: rgba(0,0,0,0.85);
-      padding: 16px 24px 28px;
+      padding: 16px 24px;
+      padding-bottom: max(28px, calc(16px + env(safe-area-inset-bottom)));
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -2104,7 +2105,7 @@
 
 <!-- ── OVERLAY CÁMARA ── -->
 <div class="cam-overlay" id="cam-overlay">
-  <video id="cam-video" class="cam-video" autoplay playsinline muted></video>
+  <video id="cam-video" class="cam-video" autoplay playsinline webkit-playsinline muted></video>
   <canvas id="cam-canvas" class="cam-canvas"></canvas>
   <div class="cam-bar">
     <div class="cam-label" id="cam-label">Apunta al documento</div>
@@ -3497,25 +3498,38 @@ async function curOpenCamera(target) {
     return;
   }
 
-  try {
-    camStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: 'environment' },
-        width:  { ideal: 1920 },
-        height: { ideal: 1080 }
-      },
-      audio: false
-    });
+  // Mostrar overlay ANTES de obtener el stream — iOS Safari requiere que el
+  // elemento <video> sea visible al momento de asignar srcObject y llamar play()
+  document.getElementById('cam-overlay').classList.add('open');
 
+  try {
+    let stream;
+    try {
+      // Intentar cámara trasera; sin constraints de resolución para máxima compatibilidad
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+    } catch (_) {
+      // Fallback: cualquier cámara disponible
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+
+    camStream = stream;
     const video = document.getElementById('cam-video');
-    video.srcObject = camStream;
-    document.getElementById('cam-overlay').classList.add('open');
+    video.srcObject = stream;
+
+    // iOS Safari no respeta autoplay al asignar srcObject dinámicamente;
+    // play() explícito es obligatorio
+    try { await video.play(); } catch (_) {}
+
   } catch (err) {
+    document.getElementById('cam-overlay').classList.remove('open');
     console.error('Camera error:', err);
     if (err.name === 'NotAllowedError') {
       alert('Permiso de cámara denegado. Acepta el permiso en tu navegador e intenta de nuevo.');
     } else {
-      alert('No se pudo acceder a la cámara. Verifica que no esté en uso por otra aplicación.');
+      alert('No se pudo acceder a la cámara: ' + (err.message || err.name));
     }
   }
 }
@@ -3524,17 +3538,26 @@ function curCapturarFoto() {
   const video  = document.getElementById('cam-video');
   const canvas = document.getElementById('cam-canvas');
 
-  canvas.width  = video.videoWidth  || 1280;
-  canvas.height = video.videoHeight || 720;
-  canvas.getContext('2d').drawImage(video, 0, 0);
+  const w = video.videoWidth;
+  const h = video.videoHeight;
+
+  // Si el video aún no tiene dimensiones (iOS puede tardar unos frames), reintentar
+  if (!w || !h) {
+    setTimeout(curCapturarFoto, 150);
+    return;
+  }
+
+  canvas.width  = w;
+  canvas.height = h;
+  canvas.getContext('2d').drawImage(video, 0, 0, w, h);
 
   canvas.toBlob(blob => {
+    if (!blob) { alert('No se pudo capturar la foto. Intenta de nuevo.'); return; }
     const nombre = `foto_${camTarget}_${Date.now()}.jpg`;
     const file   = new File([blob], nombre, { type: 'image/jpeg' });
 
     curCerrarCamara();
 
-    // Reutilizar las funciones de preview existentes con evento simulado
     const fakeEvt = { target: { files: [file] } };
     if (camTarget === 'doc') {
       ocr_previewDoc(fakeEvt);
