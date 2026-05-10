@@ -627,111 +627,386 @@ class Personal {
     private function htmlDC3(array $p): string {
         $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
 
-        $nombre   = $esc($p['nombre_completo']);
-        $curp     = $esc($p['curp']);
-        $curso    = $esc($p['curso_nombre']);
-        $horas    = $esc($p['duracion_horas']);
-        $area     = $esc($p['area_tematica'] ?? '');
-        $puesto   = $esc($p['puesto'] ?? '');
-        $empresa  = $esc($p['empresa_nombre'] ?? 'Sin especificar');
-        $rfc      = $esc($p['empresa_rfc'] ?? '');
-        $rep      = $esc($p['empresa_representante'] ?? '');
-        $dir      = $esc($p['empresa_direccion'] ?? '');
-        $ocupacion = $esc($p['ocupacion_nombre'] ?? '');
-        $capacidad = $esc($p['capacidad'] ?? ($p['capacidad_na'] ? 'N/A' : ''));
-        $fecha    = $p['fecha_curso'] ? date('d \d\e F \d\e Y', strtotime($p['fecha_curso'])) : '';
+        // ── Datos ──────────────────────────────────────────────────────────
+        $nombre   = strtoupper(trim($p['nombre_completo'] ?? ''));
+        $curp     = strtoupper(trim($p['curp'] ?? ''));
+        $puesto   = strtoupper(trim($p['puesto'] ?? ''));
+        $ocupacion = trim($p['ocupacion_nombre'] ?? '');
+        $empresa  = strtoupper(trim($p['empresa_nombre'] ?? ''));
+        $rfcRaw   = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $p['empresa_rfc'] ?? ''));
+        $agente   = strtoupper(trim($p['empresa_representante'] ?? ''));
+        $patron   = strtoupper(trim($p['empresa_representante'] ?? ''));
+        $curso    = strtoupper(trim($p['curso_nombre'] ?? ''));
+        $horas    = trim($p['duracion_horas'] ?? '');
+        $area     = trim($p['area_tematica'] ?? '');
+        $fechaYmd = $p['fecha_curso'] ?? null;   // YYYY-MM-DD
 
-        $mesesES = ['January'=>'enero','February'=>'febrero','March'=>'marzo','April'=>'abril',
-                    'May'=>'mayo','June'=>'junio','July'=>'julio','August'=>'agosto',
-                    'September'=>'septiembre','October'=>'octubre','November'=>'noviembre','December'=>'diciembre'];
-        foreach ($mesesES as $en => $es) {
-            $fecha = str_replace($en, $es, $fecha);
+        // RFC con guiones para mostrar (LLLL-YYMMDD-XXX)
+        $rfcFmt = $rfcRaw;
+        if (preg_match('/^([A-Z]{3,4})(\d{6})([A-Z0-9]{2,3})$/', $rfcRaw, $m)) {
+            $rfcFmt = $m[1] . '-' . $m[2] . '-' . $m[3];
         }
 
-        return <<<HTML
-<!DOCTYPE html>
-<html lang="es">
-<head>
-<meta charset="UTF-8">
-<style>
-  body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 10pt; color: #1a1a2e; margin: 0; padding: 28px 36px; }
-  .page-border { border: 3px solid #185FA5; border-radius: 4px; padding: 24px; min-height: 750px; }
-  .hdr { text-align: center; border-bottom: 2px solid #185FA5; padding-bottom: 14px; margin-bottom: 18px; }
-  .hdr-logo { font-size: 22pt; font-weight: bold; color: #185FA5; letter-spacing: 2px; }
-  .hdr-sub { font-size: 10pt; color: #185FA5; margin-top: 2px; }
-  .dc3-title { text-align: center; font-size: 15pt; font-weight: bold; color: #185FA5; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
-  .dc3-subtitle { text-align: center; font-size: 11pt; color: #444; margin-bottom: 20px; }
-  .section-title { font-size: 8pt; font-weight: bold; color: #185FA5; text-transform: uppercase; letter-spacing: 0.08em; border-bottom: 1px solid #185FA5; padding-bottom: 3px; margin: 14px 0 8px; }
-  table.data { width: 100%; border-collapse: collapse; }
-  table.data td { padding: 5px 8px; border-bottom: 1px solid #dfe5ef; font-size: 9.5pt; vertical-align: top; }
-  table.data td.lbl { font-weight: bold; color: #5a6072; width: 38%; font-size: 9pt; }
-  table.data td.val { color: #1a1a2e; }
-  .folio-box { float: right; border: 1px solid #185FA5; padding: 4px 12px; border-radius: 6px; font-size: 8.5pt; color: #185FA5; font-weight: bold; }
-  .firma-section { margin-top: 40px; }
-  table.firmas { width: 100%; border-collapse: collapse; }
-  table.firmas td { text-align: center; padding: 0 20px; vertical-align: bottom; }
-  .firma-line { border-top: 1px solid #333; margin-top: 50px; padding-top: 5px; font-size: 8.5pt; color: #444; }
-  .nota { margin-top: 20px; font-size: 8pt; color: #888; text-align: center; border-top: 1px solid #dfe5ef; padding-top: 8px; }
-  .stps-ref { font-size: 7.5pt; color: #aaa; text-align: center; margin-top: 4px; }
-  .clearfix::after { content: ''; display: table; clear: both; }
-</style>
-</head>
-<body>
-<div class="page-border">
+        // ── Generadores de cajas de caracteres ─────────────────────────────
+        $cellStyle = 'width:13px;height:17px;border:1px solid #333;text-align:center;'
+                   . 'font-size:7.5pt;font-weight:bold;padding:0;vertical-align:middle';
 
-<div class="hdr">
-  <div class="clearfix">
-    <div class="folio-box">FOLIO: {$esc($p['id'] ? 'DC3-' . str_pad($p['id'], 5, '0', STR_PAD_LEFT) : '')}</div>
-  </div>
-  <div class="hdr-logo">AVBA</div>
-  <div class="hdr-sub">CERTIFICACIONES</div>
-</div>
+        $boxes = function(string $str, int $pad = 0) use ($cellStyle, $esc): string {
+            if ($pad) $str = str_pad($str, $pad);
+            $out = '';
+            foreach (str_split($str) as $c) {
+                $out .= '<td style="' . $cellStyle . '">'
+                      . ($c !== ' ' ? $esc($c) : '&nbsp;') . '</td>';
+            }
+            return $out;
+        };
 
-<div class="dc3-title">Constancia de Habilidades Laborales</div>
-<div class="dc3-subtitle">(DC-3)</div>
+        $boxRow = function(string $str, int $pad = 0) use ($boxes): string {
+            return '<table style="border-collapse:collapse"><tr>' . $boxes($str, $pad) . '</tr></table>';
+        };
 
-<div class="section-title">Datos del Trabajador</div>
-<table class="data">
-  <tr><td class="lbl">Nombre completo:</td><td class="val">{$nombre}</td></tr>
-  <tr><td class="lbl">CURP:</td><td class="val">{$curp}</td></tr>
-  <tr><td class="lbl">Puesto / Función:</td><td class="val">{$puesto}</td></tr>
-  <tr><td class="lbl">Ocupación específica:</td><td class="val">{$ocupacion}</td></tr>
+        // Cajas para fecha (YYYY-MM-DD → 4+2+2 celdas separadas por espacio)
+        $dateBoxes = function(?string $ymd) use ($boxes): string {
+            [$y, $mo, $d] = ['    ', '  ', '  '];
+            if ($ymd && preg_match('/(\d{4})-(\d{2})-(\d{2})/', $ymd, $mt)) {
+                [$y, $mo, $d] = [$mt[1], $mt[2], $mt[3]];
+            }
+            return '<table style="border-collapse:collapse"><tr>'
+                 . $boxes($y) . '<td style="width:4px"></td>'
+                 . $boxes($mo) . '<td style="width:4px"></td>'
+                 . $boxes($d)
+                 . '</tr></table>';
+        };
+
+        // ── Estilo base Dompdf ─────────────────────────────────────────────
+        $css = <<<'CSS'
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family: Arial, sans-serif; font-size: 8.5pt; color: #000; margin: 14px 18px; }
+.doc { width:100%; border-collapse:collapse; border:1.5px solid #000; }
+.doc td, .doc th { border:1px solid #555; padding:0; vertical-align:top; }
+.sec-hdr td { background:#000; color:#fff; text-align:center; font-weight:bold;
+               font-size:8pt; letter-spacing:0.5px; padding:3px 4px; border-color:#000; }
+.lbl { font-size:7pt; color:#444; padding:3px 5px 1px; }
+.val { font-weight:bold; font-size:8.5pt; padding:2px 5px 4px; }
+.val-inline { padding:3px 5px; }
+.sig-cell { text-align:center; vertical-align:bottom; padding:6px 10px; }
+.sig-name { font-weight:bold; font-size:7.5pt; border-top:1px solid #000;
+            padding-top:3px; margin-top:44px; }
+.sig-sub  { font-size:7pt; color:#444; }
+.instruct { font-size:7pt; line-height:1.55; padding:5px 6px; }
+.page2 { page-break-before: always; }
+.rev-hdr { text-align:center; font-weight:bold; font-size:8pt;
+           border-bottom:1px solid #000; padding:4px 0 6px; margin-bottom:8px; }
+.rev-tbl { width:100%; border-collapse:collapse; font-size:7pt; }
+.rev-tbl th { font-weight:bold; border-bottom:1.5px solid #000; padding:2px 4px; text-align:left; }
+.rev-tbl td { padding:1.5px 4px; vertical-align:top; }
+.rev-tbl tr:nth-child(even) td { background:#f5f5f5; }
+.dc3-label { text-align:right; font-size:8pt; font-weight:bold; margin-top:8px; }
+CSS;
+
+        // ── ANVERSO ────────────────────────────────────────────────────────
+        $curpPad  = str_pad($curp, 18);
+        $rfcPad   = str_pad($rfcFmt, 14);
+        $horasStr = $esc($horas) . ' HORAS';
+
+        // Header columns: Año Mes Día
+        $hdrFechas = '<table style="border-collapse:collapse"><tr>'
+            . '<td style="width:52px;text-align:center;font-size:6.5pt;padding:0 1px">Año</td>'
+            . '<td style="width:4px"></td>'
+            . '<td style="width:26px;text-align:center;font-size:6.5pt;padding:0 1px">Mes</td>'
+            . '<td style="width:4px"></td>'
+            . '<td style="width:26px;text-align:center;font-size:6.5pt;padding:0 1px">Día</td>'
+            . '</tr></table>';
+
+        $anverso = <<<HTML
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<style>{$css}</style></head><body>
+
+<!-- TÍTULO -->
+<table class="doc" style="margin-bottom:0">
+  <tr>
+    <td style="width:14%;padding:6px 8px;border-right:1px solid #555;vertical-align:middle">
+      <div style="font-size:7pt;font-weight:bold;color:#185FA5;text-align:center">AVBA<br>CERTIFICACIONES</div>
+    </td>
+    <td style="text-align:center;padding:8px 6px;border-right:1px solid #555">
+      <div style="font-size:11pt;font-weight:bold">FORMATO DC-3</div>
+      <div style="font-size:9pt;font-weight:bold">CONSTANCIA DE COMPETENCIAS O DE HABILIDADES LABORALES</div>
+    </td>
+    <td style="width:10%;padding:6px;text-align:center;vertical-align:middle;font-size:7pt;color:#999">
+      QR
+    </td>
+  </tr>
 </table>
 
-<div class="section-title">Datos de la Empresa</div>
-<table class="data">
-  <tr><td class="lbl">Razón social:</td><td class="val">{$empresa}</td></tr>
-  <tr><td class="lbl">RFC:</td><td class="val">{$rfc}</td></tr>
-  <tr><td class="lbl">Representante:</td><td class="val">{$rep}</td></tr>
-  <tr><td class="lbl">Domicilio:</td><td class="val">{$dir}</td></tr>
+<!-- DATOS DEL TRABAJADOR -->
+<table class="doc" style="margin-top:-1px">
+  <tr class="sec-hdr"><td colspan="2"><b>DATOS DEL TRABAJADOR</b></td></tr>
+
+  <!-- Nombre -->
+  <tr>
+    <td colspan="2" style="padding:0">
+      <div class="lbl">Nombre (Anotar apellido paterno, apellido materno y nombre (s))</div>
+      <div class="val">{$esc($nombre)}</div>
+    </td>
+  </tr>
+
+  <!-- CURP + Ocupación -->
+  <tr>
+    <td style="width:55%;border-right:1px solid #555;padding:0">
+      <div class="lbl">Clave Única de Registro de Población</div>
+      <div class="val-inline">{$boxRow($curpPad)}</div>
+    </td>
+    <td style="padding:0">
+      <div class="lbl">Ocupación específica (Catálogo Nacional de Ocupaciones) <sup>1/</sup></div>
+      <div class="val">{$esc($ocupacion)}</div>
+    </td>
+  </tr>
+
+  <!-- Puesto -->
+  <tr>
+    <td colspan="2" style="padding:0">
+      <div class="lbl">Puesto*</div>
+      <div class="val">{$esc($puesto)}</div>
+    </td>
+  </tr>
 </table>
 
-<div class="section-title">Datos de la Capacitación</div>
-<table class="data">
-  <tr><td class="lbl">Nombre del curso:</td><td class="val">{$curso}</td></tr>
-  <tr><td class="lbl">Área temática:</td><td class="val">{$area}</td></tr>
-  <tr><td class="lbl">Duración:</td><td class="val">{$horas} horas</td></tr>
-  <tr><td class="lbl">Fecha de realización:</td><td class="val">{$fecha}</td></tr>
-  <tr><td class="lbl">Capacidad adquirida:</td><td class="val">{$capacidad}</td></tr>
+<!-- DATOS DE LA EMPRESA -->
+<table class="doc" style="margin-top:-1px">
+  <tr class="sec-hdr"><td colspan="2"><b>DATOS DE LA EMPRESA</b></td></tr>
+
+  <tr>
+    <td colspan="2" style="padding:0">
+      <div class="lbl">Nombre o razón social (En caso de persona física, anotar apellido paterno, apellido materno y nombre(s))</div>
+      <div class="val">{$esc($empresa)}</div>
+    </td>
+  </tr>
+
+  <tr>
+    <td colspan="2" style="padding:0">
+      <div class="lbl">Registro Federal de Contribuyentes con homoclave (SHCP)</div>
+      <div class="val-inline">{$boxRow($rfcPad)}</div>
+    </td>
+  </tr>
 </table>
 
-<div class="firma-section">
-  <table class="firmas">
-    <tr>
-      <td><div class="firma-line">Instructor / Capacitador</div></td>
-      <td><div class="firma-line">Representante de la Empresa</div></td>
-      <td><div class="firma-line">Trabajador</div></td>
-    </tr>
-  </table>
-</div>
+<!-- DATOS DEL PROGRAMA -->
+<table class="doc" style="margin-top:-1px">
+  <tr class="sec-hdr"><td colspan="3"><b>DATOS DEL PROGRAMA DE CAPACITACIÓN, ADIESTRAMIENTO Y PRODUCTIVIDAD</b></td></tr>
 
-<div class="nota">Este documento ampara la capacitación impartida y acredita las habilidades laborales obtenidas.</div>
-<div class="stps-ref">Generado por AVBA Certificaciones — Fecha de emisión: {$esc(date('d/m/Y'))}</div>
+  <!-- Curso -->
+  <tr>
+    <td colspan="3" style="padding:0">
+      <div class="lbl">Nombre del curso</div>
+      <div class="val">{$esc($curso)}</div>
+    </td>
+  </tr>
 
-</div>
-</body>
-</html>
+  <!-- Duración + Período -->
+  <tr>
+    <td style="width:22%;border-right:1px solid #555;padding:0">
+      <div class="lbl">Duración en horas</div>
+      <div class="val">{$horasStr}</div>
+    </td>
+    <td colspan="2" style="padding:4px 6px">
+      <table style="border-collapse:collapse;width:100%">
+        <tr>
+          <td style="font-size:7.5pt;white-space:nowrap;padding-right:6px;vertical-align:top">
+            Periodo de<br>ejecución:
+          </td>
+          <td>
+            <table style="border-collapse:collapse">
+              <tr>
+                <td style="font-size:7pt;padding-right:4px">De</td>
+                <td>{$hdrFechas}</td>
+                <td style="width:12px"></td>
+                <td style="font-size:7pt;padding-right:4px">a</td>
+                <td>{$hdrFechas}</td>
+              </tr>
+              <tr>
+                <td></td>
+                <td>{$dateBoxes($fechaYmd)}</td>
+                <td></td>
+                <td></td>
+                <td>{$dateBoxes($fechaYmd)}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Área temática -->
+  <tr>
+    <td colspan="3" style="padding:0">
+      <div class="lbl">Área temática del curso <sup>2/</sup></div>
+      <div class="val">{$esc($area)}</div>
+    </td>
+  </tr>
+
+  <!-- Agente capacitador -->
+  <tr>
+    <td colspan="3" style="padding:0">
+      <div class="lbl">Nombre del agente capacitador o STPS <sup>3/</sup></div>
+      <div class="val">{$esc($agente)}</div>
+    </td>
+  </tr>
+</table>
+
+<!-- FIRMAS -->
+<table class="doc" style="margin-top:-1px">
+  <tr>
+    <td colspan="3" style="padding:5px 8px;font-size:7.5pt;text-align:center;background:#f9f9f9">
+      Los datos se asientan en esta constancia bajo protesta de decir verdad, apercibidos de la responsabilidad en que incurre todo
+      <br><b>aquel que no se conduce con verdad.</b>
+    </td>
+  </tr>
+  <tr>
+    <td class="sig-cell" style="width:33%;border-right:1px solid #555">
+      <div class="sig-name">{$esc($agente)}</div>
+      <div class="sig-sub">Nombre y firma</div>
+      <div style="font-size:7pt;color:#555;margin-top:2px">Instructor o tutor</div>
+    </td>
+    <td class="sig-cell" style="width:33%;border-right:1px solid #555">
+      <div class="sig-name">{$esc($patron)}</div>
+      <div class="sig-sub">Nombre y firma</div>
+      <div style="font-size:7pt;color:#555;margin-top:2px">Patrón o representante legal <sup>4/</sup></div>
+    </td>
+    <td class="sig-cell" style="width:34%">
+      <div class="sig-name">&nbsp;</div>
+      <div class="sig-sub">Nombre y firma</div>
+      <div style="font-size:7pt;color:#555;margin-top:2px">Representante de los trabajadores <sup>5/</sup></div>
+    </td>
+  </tr>
+</table>
+
+<!-- INSTRUCCIONES -->
+<table class="doc" style="margin-top:-1px">
+  <tr>
+    <td class="instruct">
+      <b>INSTRUCCIONES</b><br>
+      &nbsp;- Llenar a máquina o con letra de molde.<br>
+      &nbsp;- Deberá entregarse al trabajador dentro de los veinte días hábiles siguientes al término del curso de capacitación aprobado.<br>
+      <sup>1/</sup> Las áreas y subáreas ocupacionales del Catálogo Nacional de Ocupaciones se encuentran disponibles en el reverso de este formato y en la página www.stps.gob.mx<br>
+      <sup>2/</sup> Las áreas temáticas de los cursos se encuentran disponibles en el reverso de este formato y en la página www.stps.gob.mx<br>
+      <sup>3/</sup> Cursos impartidos por el área competente de la Secretaría del Trabajo y Previsión Social.<br>
+      <sup>4/</sup> Para empresas con menos de 51 trabajadores. Para empresas con más de 50 trabajadores firmaría el representante del patrón ante la Comisión mixta de capacitación, adiestramiento y productividad.<br>
+      <sup>5/</sup> Solo para empresas con más de 50 trabajadores.<br>
+      * Dato no obligatorio.
+    </td>
+  </tr>
+</table>
+
+<div class="dc3-label">DC-3<br>ANVERSO</div>
 HTML;
+
+        // ── REVERSO (CNO catalog) ──────────────────────────────────────────
+        $cnoLeft = [
+            ['01','Cultivo, crianza y aprovechamiento'],['01.1','Agricultura y silvicultura'],
+            ['01.2','Ganadería'],['01.3','Pesca y acuacultura'],
+            ['02','Extracción y suministro'],['02.1','Exploración'],['02.2','Extracción'],
+            ['02.3','Refinación y beneficio'],['02.4','Provisión de energía'],['02.5','Provisión de agua'],
+            ['03','Construcción'],['03.1','Planeación y dirección de obras'],
+            ['03.2','Edificación y urbanización'],['03.3','Acabado'],
+            ['03.4','Instalación y mantenimiento'],
+            ['04','Tecnología'],['04.1','Mecánica'],['04.2','Electricidad'],['04.3','Electrónica'],
+            ['04.4','Informática'],['04.5','Telecomunicaciones'],['04.6','Procesos industriales'],
+            ['05','Procesamiento y fabricación'],['05.1','Minerales no metálicos'],['05.2','Metales'],
+            ['05.3','Alimentos y bebidas'],['05.4','Textiles y prendas de vestir'],
+            ['05.5','Materia orgánica'],['05.6','Productos químicos'],
+            ['05.7','Productos metálicos y de hule y plástico'],
+            ['05.8','Productos eléctricos y electrónicos'],['05.9','Productos impresos'],
+        ];
+        $cnoRight = [
+            ['06','Transporte'],['06.1','Ferroviario'],['06.2','Autotransporte'],['06.3','Aéreo'],
+            ['06.4','Marítimo y fluvial'],['06.5','Servicios de apoyo'],
+            ['07','Provisión de bienes y servicios'],['07.1','Comercio'],
+            ['07.2','Alimentación y hospedaje'],['07.3','Turismo'],['07.4','Deporte y esparcimiento'],
+            ['07.5','Servicios personales'],
+            ['07.6','Reparación de artículos de uso doméstico y personal'],
+            ['07.7','Limpieza'],['07.8','Servicio postal y mensajería'],
+            ['08','Gestión y soporte administrativo'],['08.1','Bolsa, banca y seguros'],
+            ['08.2','Administración'],['08.3','Servicios legales'],
+            ['09','Salud y protección social'],['09.1','Servicios médicos'],
+            ['09.2','Inspección sanitaria y del medio ambiente'],['09.3','Seguridad social'],
+            ['09.4','Protección de bienes y/o personas'],
+            ['10','Comunicación'],['10.1','Publicación'],['10.2','Radio, cine, televisión y teatro'],
+            ['10.3','Interpretación artística'],['10.4','Traducción e interpretación lingüística'],
+            ['10.5','Publicidad, propaganda y relaciones públicas'],
+            ['11','Desarrollo y extensión del conocimiento'],
+            ['11.1','Investigación'],['11.2','Enseñanza'],['11.3','Difusión cultural'],
+        ];
+
+        $cnoRows = '';
+        $maxRows = max(count($cnoLeft), count($cnoRight));
+        for ($i = 0; $i < $maxRows; $i++) {
+            $lv = $cnoLeft[$i]  ?? ['',''];
+            $rv = $cnoRight[$i] ?? ['',''];
+            $boldL = strlen($lv[0]) <= 2 ? 'font-weight:bold' : '';
+            $boldR = strlen($rv[0]) <= 2 ? 'font-weight:bold' : '';
+            $cnoRows .= '<tr>'
+                . "<td style=\"width:8%;padding:1px 3px;{$boldL}\">{$esc($lv[0])}</td>"
+                . "<td style=\"width:42%;padding:1px 3px;{$boldL}\">{$esc($lv[1])}</td>"
+                . "<td style=\"width:8%;padding:1px 3px;{$boldR}\">{$esc($rv[0])}</td>"
+                . "<td style=\"width:42%;padding:1px 3px;{$boldR}\">{$esc($rv[1])}</td>"
+                . '</tr>';
+        }
+
+        $temasRows = '';
+        $temas = [
+            ['1000','Producción general'],['2000','Servicios'],
+            ['3000','Administración, contabilidad y economía'],['4000','Comercialización'],
+            ['5000','Mantenimiento y reparación'],['6000','Seguridad'],
+            ['7000','Desarrollo personal y familiar'],
+            ['8000','Uso de tecnologías de la información y comunicación'],
+            ['9000','Participación social'],
+        ];
+        $half = (int)ceil(count($temas) / 2);
+        for ($i = 0; $i < $half; $i++) {
+            $l = $temas[$i];
+            $r = $temas[$i + $half] ?? ['',''];
+            $temasRows .= '<tr>'
+                . "<td style=\"width:8%;padding:1px 3px;font-weight:bold\">{$esc($l[0])}</td>"
+                . "<td style=\"width:42%;padding:1px 3px\">{$esc($l[1])}</td>"
+                . "<td style=\"width:8%;padding:1px 3px;font-weight:bold\">{$esc($r[0])}</td>"
+                . "<td style=\"width:42%;padding:1px 3px\">{$esc($r[1])}</td>"
+                . '</tr>';
+        }
+
+        $reverso = <<<HTML
+<div class="page2">
+  <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+    <div style="font-size:7pt;font-weight:bold;color:#185FA5">AVBA CERTIFICACIONES</div>
+  </div>
+
+  <div class="rev-hdr">CLAVES Y DENOMINACIONES DE ÁREAS Y SUBÁREAS DEL CATÁLOGO NACIONAL DE OCUPACIONES</div>
+  <table class="rev-tbl">
+    <thead>
+      <tr>
+        <th>CLAVE DEL ÁREA/SUBÁREA</th><th>DENOMINACIÓN</th>
+        <th>CLAVE DEL ÁREA/SUBÁREA</th><th>DENOMINACIÓN</th>
+      </tr>
+    </thead>
+    <tbody>{$cnoRows}</tbody>
+  </table>
+
+  <div class="rev-hdr" style="margin-top:10px">CLAVES Y DENOMINACIONES DEL CATÁLOGO DE ÁREAS TEMÁTICAS DE LOS CURSOS</div>
+  <table class="rev-tbl">
+    <thead>
+      <tr>
+        <th>CLAVE DEL ÁREA</th><th>DENOMINACIÓN</th>
+        <th>CLAVE DEL ÁREA</th><th>DENOMINACIÓN</th>
+      </tr>
+    </thead>
+    <tbody>{$temasRows}</tbody>
+  </table>
+
+  <div class="dc3-label">DC-3<br>REVERSO</div>
+</div>
+HTML;
+
+        return $anverso . $reverso . '</body></html>';
     }
 
     private function htmlDiploma(array $p): string {
