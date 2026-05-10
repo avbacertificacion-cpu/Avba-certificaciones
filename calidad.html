@@ -1519,6 +1519,16 @@
         </tbody>
       </table>
     </div>
+    <!-- Vista previa inline (pdf.js) -->
+    <div id="acc-preview-section" style="display:none;padding:0 16px 12px">
+      <div style="padding-top:12px;border-top:1px solid var(--borde);margin-top:4px;
+                  font-size:12px;font-weight:600;color:var(--texto-sub);margin-bottom:8px">
+        Vista previa — pág. 1
+      </div>
+      <canvas id="acc-preview-canvas"
+              style="display:block;width:100%;border:1px solid var(--borde);
+                     border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,.08)"></canvas>
+    </div>
     <div class="modal-footer" style="justify-content:space-between;gap:8px;flex-wrap:wrap">
       <button onclick="agregarCampoPdfAcc()"
               style="padding:8px 16px;border:1.5px solid var(--azul);background:var(--azul-light);
@@ -1526,6 +1536,11 @@
         + Agregar campo
       </button>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button id="btn-preview-pdf-acc" onclick="previsualizarCertAccInline()"
+                style="padding:8px 16px;border:1.5px solid #6d4c41;background:#fdf0eb;
+                       color:#6d4c41;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
+          &#128065; Previsualizar
+        </button>
         <button class="btn-nc-cancel" onclick="cerrarModalCamposPdfAcc()">Cancelar</button>
         <button class="btn-save" onclick="guardarCamposPdfAcc()" style="padding:9px 22px">Guardar</button>
       </div>
@@ -3691,7 +3706,7 @@ function renderPlantillaAccCard(tpl) {
         ⚙ Configurar campos
       </button>
       ${tieneArchivo ? `
-      <button onclick="previsualizarCertAcc(this)"
+      <button onclick="abrirPreviewAcc()"
               style="padding:7px 14px;border-radius:var(--radio);border:1.5px solid #854F0B;
                      color:#854F0B;font-size:12px;font-weight:600;background:#FAEEDA;cursor:pointer">
         👁 Previsualizar certificado
@@ -3779,6 +3794,54 @@ async function abrirModalCamposPdfAcc() {
 
 function cerrarModalCamposPdfAcc() {
   document.getElementById("overlay-campos-pdf-acc").classList.remove("open");
+  document.getElementById("acc-preview-section").style.display = 'none';
+}
+
+async function previsualizarCertAccInline() {
+  if (!camposPdfAccLocal.length) {
+    alert("Agrega al menos un campo antes de previsualizar.");
+    return;
+  }
+  const btn = document.getElementById("btn-preview-pdf-acc");
+  btn.disabled    = true;
+  btn.textContent = "Generando…";
+  try {
+    const s   = JSON.parse(localStorage.getItem("avba_session") || "{}");
+    const res = await fetch(API, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json", "X-Token": s.token || "" },
+      body:    JSON.stringify({ action: "PREVISUALIZAR_CERT_ACC", payload: { campos: camposPdfAccLocal } })
+    });
+    const data = await res.json();
+    if (data.status === "success" && data.url) {
+      const url    = data.url + "?t=" + Date.now();
+      const sec    = document.getElementById("acc-preview-section");
+      const canvas = document.getElementById("acc-preview-canvas");
+
+      const resp = await fetch(url, { cache: "no-store" });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const buf  = await resp.arrayBuffer();
+      const pdf  = await pdfjsLib.getDocument({ data: new Uint8Array(buf) }).promise;
+      const page = await pdf.getPage(1);
+
+      const modalW = document.querySelector("#overlay-campos-pdf-acc .modal")?.clientWidth || 860;
+      const maxW   = Math.min(840, modalW - 32);
+      const vp     = page.getViewport({ scale: maxW / page.view[2] });
+      canvas.width  = Math.round(vp.width);
+      canvas.height = Math.round(vp.height);
+      await page.render({ canvasContext: canvas.getContext("2d"), viewport: vp }).promise;
+
+      sec.style.display = "";
+      sec.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } else {
+      alert("Error: " + (data.message || "No se pudo generar la vista previa."));
+    }
+  } catch (e) {
+    alert("Error al generar vista previa: " + e.message);
+  } finally {
+    btn.disabled    = false;
+    btn.innerHTML   = "&#128065; Previsualizar";
+  }
 }
 
 function renderTablaCamposPdfAcc(campos) {
@@ -3859,32 +3922,9 @@ async function guardarCamposPdfAcc() {
   }
 }
 
-async function previsualizarCertAcc(btn) {
-  if (!camposPdfAccLocal.length) {
-    alert("Configura al menos un campo antes de previsualizar.");
-    return;
-  }
-  btn.disabled = true;
-  btn.textContent = "Generando…";
-  try {
-    const s   = JSON.parse(localStorage.getItem("avba_session") || "{}");
-    const res = await fetch(API, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Token": s.token || "" },
-      body: JSON.stringify({ action: "PREVISUALIZAR_CERT_ACC", payload: { campos: camposPdfAccLocal } })
-    });
-    const data = await res.json();
-    if (data.status === "success" && data.url) {
-      window.open(data.url + "?t=" + Date.now(), "_blank");
-    } else {
-      alert("Error: " + (data.message || "No se pudo generar la vista previa."));
-    }
-  } catch (e) {
-    alert("Error de conexión al generar vista previa.");
-  } finally {
-    btn.disabled = false;
-    btn.innerHTML = "&#128065; Previsualizar certificado";
-  }
+async function abrirPreviewAcc() {
+  await abrirModalCamposPdfAcc();
+  previsualizarCertAccInline();
 }
 
 /* ══════════════════════════════════════════════════════════
