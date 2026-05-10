@@ -501,7 +501,7 @@ class Personal {
                 $tamano  = (int)  ($campo['tamano'] ?? 10);
                 $negrita = !empty($campo['negrita']) ? 'B' : '';
                 $ancho   = (float)($campo['ancho']  ?? 0);
-                $color   = str_pad($campo['color'] ?? '000000', 6, '0', STR_PAD_LEFT);
+                $color   = str_pad(ltrim($campo['color'] ?? '000000', '#'), 6, '0', STR_PAD_LEFT);
                 $fuente  = ['Helvetica'=>'Helvetica','Times'=>'Times','Courier'=>'Courier'][$campo['fuente']??''] ?? 'Helvetica';
 
                 [$r, $g, $b] = sscanf($color, '%02x%02x%02x');

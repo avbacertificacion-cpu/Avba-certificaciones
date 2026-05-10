@@ -528,7 +528,10 @@ class Accesorios {
                 }
                 continue;
             }
-            $val = $dummy[$c['campo']] ?? '';
+            $val   = $dummy[$c['campo']] ?? '';
+            $color = str_pad(ltrim($c['color'] ?? '000000', '#'), 6, '0', STR_PAD_LEFT);
+            [$r, $g, $b] = sscanf($color, '%02x%02x%02x');
+            $pdf->SetTextColor($r ?? 0, $g ?? 0, $b ?? 0);
             $pdf->SetFont($c['fuente'] ?? 'Helvetica', $c['negrita'] ? 'B' : '', $c['tamano'] ?? 11);
             pdfCell($pdf, $x, $y, $ancho, (int)($c['tamano'] ?? 11), fpdfStr((string)$val));
         }
@@ -742,7 +745,10 @@ class Accesorios {
                     }
                     continue;
                 }
-                $val = $valores[$c['campo']] ?? '';
+                $val   = $valores[$c['campo']] ?? '';
+                $color = str_pad(ltrim($c['color'] ?? '000000', '#'), 6, '0', STR_PAD_LEFT);
+                [$r, $g, $b] = sscanf($color, '%02x%02x%02x');
+                $pdf->SetTextColor($r ?? 0, $g ?? 0, $b ?? 0);
                 $pdf->SetFont($c['fuente'] ?? 'Helvetica', ($c['negrita'] ?? false) ? 'B' : '', $c['tamano'] ?? 11);
                 pdfCell($pdf, $x, $y, $ancho, (int)($c['tamano'] ?? 11), fpdfStr((string)$val));
             }
