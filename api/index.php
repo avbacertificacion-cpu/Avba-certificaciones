@@ -384,6 +384,14 @@ if ($method === 'GET') {
             if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->getSmtpConfig());
 
+        // Datos para portal de participante autenticado
+        case 'PARTICIPANTE_MIS_DATOS': {
+            $sesion = $auth->validarTokenParticipante($token);
+            if (!$sesion) respuesta(['status' => 'error', 'message' => 'Sesión expirada o cerrada.'], 401);
+            $participantes = $auth->getParticipantesEnSesion($sesion['id']);
+            respuesta(['status' => 'success', 'participantes' => $participantes, 'sesion_nombre' => $sesion['sesion_nombre']]);
+        }
+
         default:
             respuesta(['status' => 'error', 'message' => 'Acción no reconocida.'], 400);
     }
@@ -399,6 +407,23 @@ if ($method === 'POST') {
         // ── Auth ─────────────────────────────────────────
         case 'LOGIN':
             respuesta($auth->login($payload));
+
+        // ── Sesión de acceso para participantes ──────────
+        case 'CREAR_SESION_ACCESO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','INSPECTOR'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auth->crearSesionAcceso($payload, (int)$usr['id']));
+
+        case 'CERRAR_SESION_ACCESO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','INSPECTOR'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auth->cerrarSesionAcceso((int)($payload['sesion_id'] ?? 0), (int)$usr['id']));
+
+        case 'PARTICIPANTE_GUARDAR': {
+            $sesion = $auth->validarTokenParticipante($token);
+            if (!$sesion) respuesta(['status' => 'error', 'message' => 'Sesión expirada o cerrada.'], 401);
+            respuesta($personal->participanteAutoGuardar($payload, $sesion['id']));
+        }
 
         case 'CREAR_USUARIO':
             $usr = validarToken($pdo, $token);

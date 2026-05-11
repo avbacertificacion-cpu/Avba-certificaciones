@@ -1027,6 +1027,31 @@
     .ses-finalizar-btn:hover { background: #2A5009; }
     .ses-finalizar-btn:disabled { opacity: .55; cursor: not-allowed; }
 
+    /* ── Acceso de participantes ── */
+    .ses-acceso-card {
+      background: var(--azul-light); border: 1.5px solid #85B7EB;
+      border-radius: var(--radio); padding: 14px 16px; margin-top: 16px;
+    }
+    .ses-acceso-title {
+      font-size: 13px; font-weight: 700; color: var(--azul-dark); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .ses-acceso-ident-row {
+      font-size: 14px; color: var(--texto); margin-bottom: 4px;
+    }
+    .ses-acceso-ident-row strong { font-family: monospace; font-size: 16px; letter-spacing: .5px; }
+    .ses-acceso-hint {
+      font-size: 11px; color: var(--texto-sub); margin-bottom: 10px;
+    }
+    .ses-acceso-qr-wrap { text-align: center; margin: 8px 0 12px; }
+    .ses-acceso-qr-wrap img { max-width: 130px; border-radius: 8px; border: 2px solid var(--borde); }
+    .ses-cerrar-acceso-btn {
+      width: 100%; padding: 10px; background: var(--rojo-light);
+      color: var(--rojo); border: 1.5px solid #F09595;
+      border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .ses-cerrar-acceso-btn:hover { background: #F8D7D7; }
+
     /* ── Accesorios de Izaje ── */
     #pantalla-accesorios { display: none; }
     .iza-wrap { max-width: 680px; margin: 0 auto; padding: 16px 16px 60px; }
@@ -1476,6 +1501,53 @@
     </div>
 
     <div id="ses-lista-items"></div>
+
+    <!-- Acceso de participantes -->
+    <div id="ses-acceso-section" style="display:none">
+      <!-- Sin acceso activo -->
+      <div id="ses-acceso-inactivo">
+        <div style="font-size:13px;color:var(--texto-sub);margin-bottom:12px;padding:0 2px">
+          Permite que los participantes ingresen desde el portal para completar su nombre y CURP pendientes.
+        </div>
+        <div class="cur-field" style="margin-bottom:10px">
+          <label>Contraseña de acceso</label>
+          <input type="text" class="cur-input" id="ses-acceso-pwd"
+                 placeholder="Ej: Curso2025" autocomplete="off">
+        </div>
+        <button class="ses-continuar-btn" style="padding:11px 18px;font-size:14px"
+                onclick="sesHabilitarAcceso()">
+          🔓 Habilitar acceso de participantes
+        </button>
+      </div>
+      <!-- Acceso activo -->
+      <div id="ses-acceso-activo" style="display:none">
+        <div class="ses-acceso-card">
+          <div class="ses-acceso-title">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
+                 style="width:14px;height:14px">
+              <rect x="3" y="7" width="10" height="8" rx="2"/>
+              <path d="M5 7V5a3 3 0 016 0v2"/>
+            </svg>
+            Acceso activo
+          </div>
+          <div class="ses-acceso-ident-row">
+            Identificador: <strong id="ses-acceso-ident">—</strong>
+          </div>
+          <div class="ses-acceso-hint">
+            Los participantes ingresan con este identificador y la contraseña que asignaste.
+          </div>
+          <div class="ses-acceso-qr-wrap">
+            <img id="ses-acceso-qr" src="" alt="QR de acceso">
+            <div style="font-size:11px;color:var(--texto-sub);margin-top:4px">
+              Escanear para ingresar
+            </div>
+          </div>
+          <button class="ses-cerrar-acceso-btn" onclick="sesCerrarAcceso()">
+            🔒 Cerrar acceso de participantes
+          </button>
+        </div>
+      </div>
+    </div>
 
     <button class="ses-agregar-btn" onclick="sesAgregarParticipante()">
       + Agregar participante
@@ -2985,9 +3057,11 @@ let curDocFile     = null;
 let curPersonaFile = null;
 
 // Estado de sesión grupal
-let curModo        = 'independiente'; // 'curso' | 'independiente'
-let curSesion      = null;            // { curso_id, curso_nombre, fecha, nombre_sesion, misma_empresa, empresa }
-let curSesionParts = [];              // participantes guardados en la sesión
+let curModo           = 'independiente'; // 'curso' | 'independiente'
+let curSesion         = null;            // { curso_id, curso_nombre, fecha, nombre_sesion, misma_empresa, empresa }
+let curSesionParts    = [];              // participantes guardados en la sesión
+let curSesionAccesoId = null;            // ID de la sesión de acceso activa
+let curSesionAccesoIdent = null;         // Identificador de la sesión activa
 
 // ── Pantallas del módulo Cursos ───────────
 const CUR_PANTALLAS = ['cur-submenu','cur-sesion-setup','cur-sesion-lista','cur-wrap'];
@@ -3102,13 +3176,17 @@ function sesContinuar() {
   };
 
   curSesion = { curso_id: cursoId, curso_nombre: c?.nombre || '', fecha, nombre_sesion: nombreSesion, misma_empresa: mismaEmpresa, empresa };
-  curSesionParts = [];
+  curSesionParts    = [];
+  curSesionAccesoId = null;
+  curSesionAccesoIdent = null;
 
   // Actualizar cabecera de la lista
   document.getElementById('ses-lista-nombre').textContent = nombreSesion;
   document.getElementById('ses-lista-meta').textContent   = '0 participantes registrados';
   document.getElementById('ses-lista-items').innerHTML    = '';
   document.getElementById('ses-finalizar-btn').disabled   = true;
+  document.getElementById('ses-acceso-section').style.display = 'none';
+  sesRenderAcceso(false, null);
 
   curMostrar('lista');
 }
@@ -3126,8 +3204,8 @@ function sesRenderLista() {
     <div class="ses-part-item">
       <div class="ses-part-num">${i + 1}</div>
       <div class="ses-part-info">
-        <div class="ses-part-nombre">${p.nombre}</div>
-        <div class="ses-part-curp">${p.curp}</div>
+        <div class="ses-part-nombre">${p.nombre || '(sin nombre)'}</div>
+        <div class="ses-part-curp">${p.curp || '—'}</div>
       </div>
       <span style="color:var(--verde);font-size:18px">✓</span>
     </div>`).join('');
@@ -3135,15 +3213,91 @@ function sesRenderLista() {
   const n = curSesionParts.length;
   document.getElementById('ses-lista-meta').textContent = `${n} participante${n !== 1 ? 's' : ''} registrado${n !== 1 ? 's' : ''}`;
   document.getElementById('ses-finalizar-btn').disabled = n === 0;
+
+  // Mostrar panel de acceso si hay participantes
+  const accesoSection = document.getElementById('ses-acceso-section');
+  accesoSection.style.display = n > 0 ? 'block' : 'none';
 }
 
 // ── Sesión: finalizar ─────────────────────
 function sesFinalizarSesion() {
   const n = curSesionParts.length;
-  curSesion      = null;
-  curSesionParts = [];
+  // Cerrar acceso de participantes si sigue activo
+  if (curSesionAccesoId) sesCerrarAcceso(true);
+  curSesion            = null;
+  curSesionParts       = [];
+  curSesionAccesoId    = null;
+  curSesionAccesoIdent = null;
   mostrarToast(`Sesión finalizada. ${n} participante${n !== 1 ? 's' : ''} registrado${n !== 1 ? 's' : ''} correctamente.`, 'ok');
   setTimeout(() => volverMenu(), 2000);
+}
+
+// ── Habilitar acceso de participantes ─────
+async function sesHabilitarAcceso() {
+  const pwd = document.getElementById('ses-acceso-pwd').value.trim();
+  if (!pwd) { mostrarToast('Ingresa una contraseña de acceso.', 'err'); return; }
+  const ids = curSesionParts.map(p => p.id).filter(Boolean);
+  if (ids.length === 0) { mostrarToast('Registra al menos un participante primero.', 'err'); return; }
+
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body: JSON.stringify({
+        action: 'CREAR_SESION_ACCESO',
+        payload: {
+          sesion_nombre:    curSesion.nombre_sesion,
+          password:         pwd,
+          participante_ids: ids
+        }
+      })
+    });
+    const data = await res.json();
+    if (data.status !== 'success') { mostrarToast(data.message || 'Error al crear acceso.', 'err'); return; }
+
+    curSesionAccesoId    = data.id;
+    curSesionAccesoIdent = data.identificador;
+    sesRenderAcceso(true, data.identificador);
+    mostrarToast('Acceso habilitado. Los participantes ya pueden ingresar.', 'ok');
+  } catch(e) {
+    mostrarToast('Error de conexión.', 'err');
+  }
+}
+
+// ── Cerrar acceso de participantes ────────
+async function sesCerrarAcceso(silencioso = false) {
+  if (!curSesionAccesoId) return;
+  const s  = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const id = curSesionAccesoId;
+  curSesionAccesoId    = null;
+  curSesionAccesoIdent = null;
+  sesRenderAcceso(false, null);
+  try {
+    await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body: JSON.stringify({ action: 'CERRAR_SESION_ACCESO', payload: { sesion_id: id } })
+    });
+  } catch(e) {}
+  if (!silencioso) mostrarToast('Acceso de participantes cerrado.', 'ok');
+}
+
+// ── Renderizar panel de acceso ─────────────
+function sesRenderAcceso(activo, identificador) {
+  document.getElementById('ses-acceso-inactivo').style.display = activo ? 'none' : 'block';
+  document.getElementById('ses-acceso-activo').style.display   = activo ? 'block' : 'none';
+  if (activo && identificador) {
+    document.getElementById('ses-acceso-ident').textContent = identificador;
+    const loginUrl = window.location.origin +
+      window.location.pathname.replace(/inspector\.html.*$/, 'login.html') +
+      '?sesion=' + encodeURIComponent(identificador);
+    document.getElementById('ses-acceso-qr').src =
+      'https://quickchart.io/qr?text=' + encodeURIComponent(loginUrl) + '&size=200';
+  } else {
+    document.getElementById('ses-acceso-pwd').value = '';
+    document.getElementById('ses-acceso-qr').src = '';
+  }
 }
 
 // ── Preparar formulario según modo ────────

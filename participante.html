@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>AVBA — Portal de Participante</title>
+  <style>
+    :root {
+      --azul:      #185FA5;
+      --azul-dark: #0C447C;
+      --azul-light:#E6F1FB;
+      --verde:     #3B6D11;
+      --verde-light:#EAF4E0;
+      --rojo:      #A32D2D;
+      --rojo-light:#FCEBEB;
+      --gris-bg:   #f0f4f9;
+      --borde:     #dfe5ef;
+      --texto:     #1a1a2e;
+      --texto-sub: #5a6072;
+      --blanco:    #ffffff;
+      --radio:     10px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--gris-bg);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--azul);
+      padding: 14px 20px;
+      display: flex; align-items: center; gap: 12px;
+      color: white;
+    }
+    .header-logo {
+      width: 36px; height: 36px;
+      background: rgba(255,255,255,0.15); border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .header-logo svg { width: 20px; height: 20px; color: white; }
+    .header-title { font-size: 15px; font-weight: 700; }
+    .header-sub   { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 1px; }
+    .header-logout {
+      margin-left: auto; padding: 7px 12px;
+      background: rgba(255,255,255,0.15); border: none; border-radius: 8px;
+      color: white; font-size: 12px; font-weight: 600; cursor: pointer;
+    }
+    .header-logout:hover { background: rgba(255,255,255,0.25); }
+
+    /* ── Main container ── */
+    .main { max-width: 540px; margin: 0 auto; padding: 20px 16px 80px; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #1a1a2e; color: white; padding: 11px 18px; border-radius: 30px;
+      font-size: 13px; font-weight: 500; white-space: nowrap;
+      opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 9999;
+      max-width: 88vw; overflow: hidden; text-overflow: ellipsis;
+    }
+    .toast.show { opacity: 1; }
+    .toast.ok  { background: #2A5009; }
+    .toast.err { background: var(--rojo); }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--blanco); border-radius: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      border: 1px solid rgba(0,0,0,0.05);
+      padding: 20px; margin-bottom: 14px;
+    }
+    .card-title {
+      font-size: 15px; font-weight: 700; color: var(--texto); margin-bottom: 4px;
+    }
+    .card-sub {
+      font-size: 13px; color: var(--texto-sub); margin-bottom: 16px;
+    }
+
+    /* ── Participant list ── */
+    .part-list { display: flex; flex-direction: column; gap: 8px; }
+    .part-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 14px; border-radius: 10px;
+      border: 1.5px solid var(--borde); cursor: pointer;
+      transition: border-color .15s, background .15s;
+    }
+    .part-item:hover { border-color: var(--azul); background: var(--azul-light); }
+    .part-item.selected { border-color: var(--azul); background: var(--azul-light); }
+    .part-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--azul-light); color: var(--azul-dark);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 700; flex-shrink: 0;
+    }
+    .part-info { flex: 1; min-width: 0; }
+    .part-nombre { font-size: 14px; font-weight: 600; color: var(--texto); }
+    .part-estado { font-size: 11px; color: var(--texto-sub); margin-top: 2px; }
+    .part-estado.pendiente { color: #B45309; }
+    .part-estado.ok { color: var(--verde); }
+    .part-arrow { color: var(--texto-sub); font-size: 16px; }
+
+    /* ── Form ── */
+    .form-section { display: none; }
+    .back-btn {
+      display: inline-flex; align-items: center; gap: 6px;
+      color: var(--azul); font-size: 13px; font-weight: 600;
+      cursor: pointer; margin-bottom: 16px; background: none; border: none; padding: 0;
+    }
+    .back-btn:hover { text-decoration: underline; }
+
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: var(--texto-sub); margin-bottom: 6px;
+    }
+    .field input {
+      width: 100%; padding: 11px 13px;
+      border: 1.5px solid var(--borde); border-radius: var(--radio);
+      font-size: 14px; color: var(--texto); background: var(--blanco);
+      outline: none; transition: border-color .15s;
+    }
+    .field input:focus { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+    .field input.err { border-color: var(--rojo); }
+    .field .hint { font-size: 11px; color: var(--texto-sub); margin-top: 4px; }
+    .field .err-msg { font-size: 11px; color: var(--rojo); margin-top: 4px; display: none; }
+
+    .btn-guardar {
+      width: 100%; padding: 13px; border: none; border-radius: var(--radio);
+      background: var(--azul); color: white; font-size: 15px; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-guardar:hover { background: var(--azul-dark); }
+    .btn-guardar:disabled { background: var(--borde); cursor: not-allowed; }
+
+    /* ── Éxito ── */
+    .exito-section {
+      display: none; text-align: center; padding: 30px 20px;
+    }
+    .exito-icon {
+      width: 60px; height: 60px; background: var(--verde-light);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .exito-titulo { font-size: 20px; font-weight: 700; color: var(--verde); margin-bottom: 8px; }
+    .exito-sub    { font-size: 14px; color: var(--texto-sub); line-height: 1.5; }
+
+    /* ── Loading ── */
+    .spin {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
+      border-radius: 50%; animation: giro .6s linear infinite;
+    }
+    @keyframes giro { to { transform: rotate(360deg); } }
+
+    .loading-wrap {
+      text-align: center; padding: 40px 20px; color: var(--texto-sub); font-size: 14px;
+    }
+    .loading-wrap .spin {
+      border-color: var(--borde); border-top-color: var(--azul);
+      width: 28px; height: 28px; border-width: 3px;
+      display: block; margin: 0 auto 12px;
+    }
+
+    /* ── Sesión cerrada ── */
+    .sesion-cerrada {
+      text-align: center; padding: 40px 20px;
+    }
+    .sesion-cerrada-icon { font-size: 40px; margin-bottom: 12px; }
+    .sesion-cerrada-titulo { font-size: 18px; font-weight: 700; color: var(--rojo); margin-bottom: 8px; }
+    .sesion-cerrada-sub    { font-size: 13px; color: var(--texto-sub); }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+      <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
+  </div>
+  <div>
+    <div class="header-title">Portal de Participante</div>
+    <div class="header-sub" id="header-sesion">Cargando…</div>
+  </div>
+  <button class="header-logout" onclick="cerrarSesion()">Salir</button>
+</div>
+
+<div class="main">
+
+  <!-- Cargando -->
+  <div id="loading-section" class="loading-wrap">
+    <div class="spin"></div>
+    Cargando…
+  </div>
+
+  <!-- Sesión cerrada por inspector -->
+  <div id="sesion-cerrada-section" class="card sesion-cerrada" style="display:none">
+    <div class="sesion-cerrada-icon">🔒</div>
+    <div class="sesion-cerrada-titulo">Sesión cerrada</div>
+    <div class="sesion-cerrada-sub">
+      El inspector ha cerrado el acceso a esta sesión. Si necesitas modificar tus datos,
+      comunícate con tu instructor.
+    </div>
+  </div>
+
+  <!-- Lista de participantes -->
+  <div id="lista-section" style="display:none">
+    <div class="card">
+      <div class="card-title">Selecciona tu nombre</div>
+      <div class="card-sub">Toca tu nombre para ingresar o completar tu información.</div>
+      <div class="part-list" id="part-list"></div>
+    </div>
+  </div>
+
+  <!-- Formulario de datos -->
+  <div id="form-section" class="form-section">
+    <button class="back-btn" onclick="volverLista()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
+        <path d="M10 4l-4 4 4 4"/>
+      </svg>
+      Volver a la lista
+    </button>
+
+    <div class="card">
+      <div class="card-title" id="form-nombre-titulo">Mis datos</div>
+      <div class="card-sub">Completa o verifica tu información para el certificado.</div>
+
+      <div class="field">
+        <label>Nombre completo</label>
+        <input type="text" id="inp-nombre" placeholder="Como aparece en tu identificación"
+               autocomplete="name" oninput="limpiarError('nombre')">
+        <div class="hint">Escríbelo exactamente como aparece en tu INE o CURP.</div>
+        <div class="err-msg" id="err-nombre">Ingresa tu nombre completo.</div>
+      </div>
+
+      <div class="field">
+        <label>CURP</label>
+        <input type="text" id="inp-curp" placeholder="18 caracteres" maxlength="18"
+               autocomplete="off" style="text-transform:uppercase"
+               oninput="this.value=this.value.toUpperCase();limpiarError('curp')">
+        <div class="hint">18 caracteres. Puedes encontrarlo en tu INE, acta de nacimiento o en gob.mx/curp.</div>
+        <div class="err-msg" id="err-curp">CURP inválida. Verifica los 18 caracteres.</div>
+      </div>
+
+      <button class="btn-guardar" id="btn-guardar" onclick="guardarDatos()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px">
+          <path d="M13 2H4a1 1 0 00-1 1v10a1 1 0 001 1h9a1 1 0 001-1V5l-2-3z"/>
+          <path d="M12 2v4H5"/>
+        </svg>
+        Guardar mis datos
+      </button>
+    </div>
+  </div>
+
+  <!-- Éxito -->
+  <div id="exito-section" class="card exito-section">
+    <div class="exito-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--verde)" stroke-width="2.5" style="width:30px;height:30px">
+        <path d="M20 6L9 17l-5-5"/>
+      </svg>
+    </div>
+    <div class="exito-titulo">Datos guardados</div>
+    <div class="exito-sub" id="exito-sub">Tu información fue registrada correctamente.</div>
+    <button class="back-btn" style="margin:20px auto 0;display:inline-flex"
+            onclick="volverLista()">
+      ← Volver a la lista
+    </button>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = "api/index.php";
+
+let sesionToken     = null;
+let sesionNombre    = null;
+let participantes   = [];
+let participanteSeleccionado = null;
+
+function mostrarToast(msg, tipo = '') {
+  const t = document.getElementById('toast');
+  t.textContent  = msg;
+  t.className    = 'toast show' + (tipo ? ' ' + tipo : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+function mostrar(seccion) {
+  ['loading-section','sesion-cerrada-section','lista-section','form-section','exito-section']
+    .forEach(id => document.getElementById(id).style.display = 'none');
+  document.getElementById(seccion).style.display = '';
+  if (seccion === 'form-section') document.getElementById('form-section').style.display = 'block';
+}
+
+function cerrarSesion() {
+  localStorage.removeItem('avba_session');
+  window.location.href = 'login.html';
+}
+
+function volverLista() {
+  mostrar('lista-section');
+  participanteSeleccionado = null;
+}
+
+function limpiarError(campo) {
+  document.getElementById('inp-' + campo).classList.remove('err');
+  document.getElementById('err-' + campo).style.display = 'none';
+}
+
+// Cargar datos de la sesión
+async function cargarDatos() {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  if (!s.token || s.rol !== 'PARTICIPANTE') {
+    window.location.href = 'login.html';
+    return;
+  }
+  sesionToken  = s.token;
+  sesionNombre = s.nombre || 'Sesión de curso';
+  document.getElementById('header-sesion').textContent = sesionNombre;
+
+  try {
+    const res = await fetch(API + '?action=PARTICIPANTE_MIS_DATOS', {
+      headers: { 'X-Token': sesionToken }
+    });
+    const data = await res.json();
+
+    if (data.status !== 'success') {
+      mostrar('sesion-cerrada-section');
+      return;
+    }
+
+    participantes = data.participantes || [];
+    renderLista();
+    mostrar('lista-section');
+  } catch(e) {
+    mostrarToast('Error de conexión. Recarga la página.', 'err');
+  }
+}
+
+function renderLista() {
+  const lista = document.getElementById('part-list');
+  if (participantes.length === 0) {
+    lista.innerHTML = '<div style="text-align:center;color:var(--texto-sub);font-size:13px;padding:20px 0">No hay participantes registrados en esta sesión.</div>';
+    return;
+  }
+
+  lista.innerHTML = participantes.map((p, i) => {
+    const tieneNombre = p.nombre_completo && p.nombre_completo.trim();
+    const tieneCurp   = p.curp && p.curp.trim();
+    const completo    = tieneNombre && tieneCurp;
+    const inicial     = tieneNombre ? p.nombre_completo.trim()[0].toUpperCase() : (i + 1);
+    const estadoClass = completo ? 'ok' : 'pendiente';
+    const estadoText  = completo ? 'Datos completos' : (!tieneNombre && !tieneCurp ? 'Nombre y CURP pendientes' : !tieneNombre ? 'Nombre pendiente' : 'CURP pendiente');
+    return `<div class="part-item" onclick="seleccionarParticipante(${i})">
+      <div class="part-avatar">${inicial}</div>
+      <div class="part-info">
+        <div class="part-nombre">${tieneNombre ? escHtml(p.nombre_completo) : '<em style="color:var(--texto-sub);font-style:normal">Sin nombre registrado</em>'}</div>
+        <div class="part-estado ${estadoClass}">${estadoText}</div>
+      </div>
+      <div class="part-arrow">›</div>
+    </div>`;
+  }).join('');
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function seleccionarParticipante(idx) {
+  participanteSeleccionado = participantes[idx];
+  const p = participanteSeleccionado;
+
+  document.getElementById('form-nombre-titulo').textContent =
+    p.nombre_completo ? p.nombre_completo : 'Mis datos';
+  document.getElementById('inp-nombre').value = p.nombre_completo || '';
+  document.getElementById('inp-curp').value   = p.curp || '';
+  limpiarError('nombre'); limpiarError('curp');
+
+  mostrar('form-section');
+  document.getElementById('inp-nombre').focus();
+}
+
+async function guardarDatos() {
+  if (!participanteSeleccionado) return;
+
+  const nombre = document.getElementById('inp-nombre').value.trim();
+  const curp   = document.getElementById('inp-curp').value.trim().toUpperCase();
+
+  let ok = true;
+  if (!nombre) {
+    document.getElementById('inp-nombre').classList.add('err');
+    document.getElementById('err-nombre').style.display = 'block';
+    ok = false;
+  }
+  if (curp && !/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/.test(curp)) {
+    document.getElementById('inp-curp').classList.add('err');
+    document.getElementById('err-curp').style.display = 'block';
+    ok = false;
+  }
+  if (!ok) return;
+
+  const btn = document.getElementById('btn-guardar');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Guardando…';
+
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': sesionToken },
+      body: JSON.stringify({
+        action: 'PARTICIPANTE_GUARDAR',
+        payload: {
+          participante_id: participanteSeleccionado.id,
+          nombre_completo: nombre,
+          curp: curp || undefined
+        }
+      })
+    });
+    const data = await res.json();
+
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M13 2H4a1 1 0 00-1 1v10a1 1 0 001 1h9a1 1 0 001-1V5l-2-3z"/><path d="M12 2v4H5"/></svg> Guardar mis datos`;
+
+    if (data.status !== 'success') {
+      mostrarToast(data.message || 'Error al guardar.', 'err');
+      return;
+    }
+
+    // Actualizar datos locales
+    participanteSeleccionado.nombre_completo = nombre;
+    if (curp) participanteSeleccionado.curp = curp;
+    const idx = participantes.findIndex(p => p.id === participanteSeleccionado.id);
+    if (idx !== -1) participantes[idx] = { ...participantes[idx], nombre_completo: nombre, curp: curp || participantes[idx].curp };
+
+    document.getElementById('exito-sub').textContent =
+      `Tu información fue registrada correctamente, ${nombre.split(' ')[0]}.`;
+    mostrar('exito-section');
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M13 2H4a1 1 0 00-1 1v10a1 1 0 001 1h9a1 1 0 001-1V5l-2-3z"/><path d="M12 2v4H5"/></svg> Guardar mis datos`;
+    mostrarToast('Error de conexión. Intenta de nuevo.', 'err');
+  }
+}
+
+// Inicializar
+cargarDatos();
+</script>
+</body>
+</html>

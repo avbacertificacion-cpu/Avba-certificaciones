@@ -18,6 +18,153 @@ class Auth {
         } catch (\PDOException $e) {}
     }
 
+    // ── TABLAS PARTICIPANTE ────────────────────────────────
+    private function ensureParticipanteTables(): void {
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS curso_sesiones_acceso (
+                  id            INT AUTO_INCREMENT PRIMARY KEY,
+                  sesion_nombre VARCHAR(200) NOT NULL,
+                  identificador VARCHAR(100) NOT NULL,
+                  password_hash VARCHAR(255) NOT NULL,
+                  inspector_id  INT NOT NULL,
+                  activa        TINYINT UNSIGNED NOT NULL DEFAULT 1,
+                  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  UNIQUE KEY uk_ident (identificador)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS sesion_acceso_participantes (
+                  sesion_acceso_id INT NOT NULL,
+                  participante_id  INT NOT NULL,
+                  PRIMARY KEY (sesion_acceso_id, participante_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS sesion_acceso_tokens (
+                  token            CHAR(64) NOT NULL PRIMARY KEY,
+                  sesion_acceso_id INT NOT NULL,
+                  expires_at       DATETIME NOT NULL,
+                  created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\PDOException $e) {}
+    }
+
+    // ── CREAR SESIÓN DE ACCESO PARA PARTICIPANTES ──────────
+    public function crearSesionAcceso(array $payload, int $inspectorId): array {
+        $this->ensureParticipanteTables();
+
+        $nombre       = trim($payload['sesion_nombre'] ?? '');
+        $password     = trim($payload['password'] ?? '');
+        $participantes = array_filter(array_map('intval', $payload['participante_ids'] ?? []), fn($v) => $v > 0);
+
+        if (!$nombre || !$password || empty($participantes)) {
+            return ['status' => 'error', 'message' => 'Datos incompletos.'];
+        }
+
+        // Generar identificador único tipo CUR-XXXXXX
+        $identificador = '';
+        for ($i = 0; $i < 10; $i++) {
+            $candidato = 'CUR-' . strtoupper(substr(base_convert(bin2hex(random_bytes(3)), 16, 36), 0, 6));
+            $chk = $this->pdo->prepare("SELECT id FROM curso_sesiones_acceso WHERE identificador = ?");
+            $chk->execute([$candidato]);
+            if (!$chk->fetch()) { $identificador = $candidato; break; }
+        }
+        if (!$identificador) return ['status' => 'error', 'message' => 'No se pudo generar identificador.'];
+
+        $hash = password_hash($password, PASSWORD_BCRYPT);
+        $this->pdo->prepare(
+            "INSERT INTO curso_sesiones_acceso (sesion_nombre, identificador, password_hash, inspector_id) VALUES (?, ?, ?, ?)"
+        )->execute([$nombre, $identificador, $hash, $inspectorId]);
+
+        $sesionId = (int)$this->pdo->lastInsertId();
+
+        $ins = $this->pdo->prepare(
+            "INSERT IGNORE INTO sesion_acceso_participantes (sesion_acceso_id, participante_id) VALUES (?, ?)"
+        );
+        foreach ($participantes as $pId) {
+            $ins->execute([$sesionId, $pId]);
+        }
+
+        return ['status' => 'success', 'id' => $sesionId, 'identificador' => $identificador];
+    }
+
+    // ── CERRAR SESIÓN DE ACCESO ────────────────────────────
+    public function cerrarSesionAcceso(int $sesionId, int $inspectorId): array {
+        $this->ensureParticipanteTables();
+        $stmt = $this->pdo->prepare(
+            "UPDATE curso_sesiones_acceso SET activa = 0 WHERE id = ? AND inspector_id = ?"
+        );
+        $stmt->execute([$sesionId, $inspectorId]);
+        if ($stmt->rowCount() === 0) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+        return ['status' => 'success', 'message' => 'Acceso cerrado.'];
+    }
+
+    // ── LOGIN DE PARTICIPANTE (desde curso_sesiones_acceso) ─
+    public function loginParticipante(string $identificador, string $password): ?array {
+        $this->ensureParticipanteTables();
+        $ident = strtoupper(trim($identificador));
+
+        $stmt = $this->pdo->prepare(
+            "SELECT id, sesion_nombre, password_hash FROM curso_sesiones_acceso WHERE identificador = ? AND activa = 1"
+        );
+        $stmt->execute([$ident]);
+        $sesion = $stmt->fetch();
+
+        if (!$sesion || !password_verify($password, $sesion['password_hash'])) return null;
+
+        $token   = generarToken();
+        $expires = date('Y-m-d H:i:s', time() + 7200);
+        $this->pdo->prepare(
+            "INSERT INTO sesion_acceso_tokens (token, sesion_acceso_id, expires_at) VALUES (?, ?, ?)"
+        )->execute([$token, $sesion['id'], $expires]);
+
+        return [
+            'status'    => 'success',
+            'rol'       => 'PARTICIPANTE',
+            'nombre'    => $sesion['sesion_nombre'],
+            'usuario'   => $ident,
+            'sesion_id' => $sesion['id'],
+            'token'     => $token,
+        ];
+    }
+
+    // ── VALIDAR TOKEN DE PARTICIPANTE ─────────────────────
+    public function validarTokenParticipante(string $token): ?array {
+        $this->ensureParticipanteTables();
+        $stmt = $this->pdo->prepare(
+            "SELECT t.sesion_acceso_id, a.sesion_nombre, a.activa
+             FROM sesion_acceso_tokens t
+             JOIN curso_sesiones_acceso a ON a.id = t.sesion_acceso_id
+             WHERE t.token = ? AND t.expires_at > NOW()"
+        );
+        $stmt->execute([$token]);
+        $row = $stmt->fetch();
+        if (!$row || !$row['activa']) return null;
+        return [
+            'id'            => (int)$row['sesion_acceso_id'],
+            'rol'           => 'PARTICIPANTE',
+            'sesion_nombre' => $row['sesion_nombre'],
+        ];
+    }
+
+    // ── OBTENER PARTICIPANTES EN SESIÓN ───────────────────
+    public function getParticipantesEnSesion(int $sesionId): array {
+        $this->ensureParticipanteTables();
+        $stmt = $this->pdo->prepare(
+            "SELECT p.id, p.nombre_completo, p.curp, p.foto_documentacion_url,
+                    c.nombre AS curso_nombre
+             FROM sesion_acceso_participantes s
+             JOIN participantes_cursos p ON p.id = s.participante_id
+             LEFT JOIN cursos c ON c.id = p.curso_id
+             WHERE s.sesion_acceso_id = ?
+             ORDER BY p.nombre_completo"
+        );
+        $stmt->execute([$sesionId]);
+        return $stmt->fetchAll();
+    }
+
     // ── LOGIN ─────────────────────────────────────────────
     public function login(array $payload): array {
         $usuario = strtolower(trim($payload['usuario'] ?? ''));
@@ -59,6 +206,11 @@ class Auth {
         }
 
         if (!$valido) {
+            // Si no existe usuario regular, intentar como sesión de participante
+            if (!$row) {
+                $partResult = $this->loginParticipante($usuario, $pass);
+                if ($partResult) return $partResult;
+            }
             $this->registrarIntento($usuario, $ip, false);
             return ['status' => 'error', 'message' => 'Credenciales inválidas.'];
         }

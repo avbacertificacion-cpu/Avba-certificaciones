@@ -159,7 +159,15 @@
 
   <div class="login-card">
     <div class="card-title">Iniciar sesión</div>
-    <div class="card-sub">Ingresa tus credenciales para continuar</div>
+    <div class="card-sub" id="card-sub">Ingresa tus credenciales para continuar</div>
+
+    <!-- Banner para participantes (visible solo cuando viene ?sesion=) -->
+    <div id="participante-banner" style="display:none;background:#E6F1FB;border:1px solid #85B7EB;border-radius:8px;padding:10px 13px;font-size:13px;color:#0C447C;margin-bottom:16px;align-items:center;gap:8px">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:15px;height:15px;flex-shrink:0">
+        <circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/>
+      </svg>
+      <span>Acceso de participantes — ingresa la contraseña de tu curso</span>
+    </div>
 
     <div class="error-box" id="error-box">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -219,7 +227,8 @@ const DESTINOS = {
   INSPECTOR:       "inspector.html",
   CALIDAD:         "calidad.html",
   CERTIFICACIONES: "certificaciones.html",
-  CLIENTE:         "portal-cliente.html"
+  CLIENTE:         "portal-cliente.html",
+  PARTICIPANTE:    "participante.html"
 };
 
 function focusPass() { document.getElementById("password").focus(); }
@@ -309,7 +318,18 @@ window.onload = function() {
   // Limpiar cualquier sesión previa al llegar al login
   // (evita el loop de redirección)
   localStorage.removeItem("avba_session");
-  document.getElementById("usuario").focus();
+
+  // Pre-llenar identificador si viene de sesión de participante
+  const params = new URLSearchParams(window.location.search);
+  const sesionId = params.get("sesion");
+  if (sesionId) {
+    document.getElementById("usuario").value = sesionId;
+    document.getElementById("card-sub").textContent = "Ingresa la contraseña de tu curso para continuar.";
+    document.getElementById("participante-banner").style.display = "flex";
+    document.getElementById("password").focus();
+  } else {
+    document.getElementById("usuario").focus();
+  }
 };
 </script>
 </body>

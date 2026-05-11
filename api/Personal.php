@@ -1136,6 +1136,44 @@ HTML;
 HTML;
     }
 
+    // ── AUTOGUARDADO POR PARTICIPANTE ─────────────────────
+    public function participanteAutoGuardar(array $payload, int $sesionId): array {
+        $participanteId = (int)($payload['participante_id'] ?? 0);
+        if (!$participanteId) return ['status' => 'error', 'message' => 'participante_id requerido.'];
+
+        // Verificar que el participante pertenece a esta sesión
+        $stmt = $this->pdo->prepare(
+            "SELECT 1 FROM sesion_acceso_participantes WHERE sesion_acceso_id = ? AND participante_id = ?"
+        );
+        $stmt->execute([$sesionId, $participanteId]);
+        if (!$stmt->fetch()) return ['status' => 'error', 'message' => 'Participante no pertenece a esta sesión.'];
+
+        $sets   = [];
+        $params = [];
+
+        if (!empty($payload['nombre_completo'])) {
+            $sets[]   = 'nombre_completo = ?';
+            $params[] = trim($payload['nombre_completo']);
+        }
+        if (!empty($payload['curp'])) {
+            $curp = strtoupper(trim($payload['curp']));
+            if (!preg_match('/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/', $curp)) {
+                return ['status' => 'error', 'message' => 'CURP inválida. Verifica el formato (18 caracteres).'];
+            }
+            $sets[]   = 'curp = ?';
+            $params[] = $curp;
+        }
+
+        if (empty($sets)) return ['status' => 'success', 'message' => 'Sin cambios.'];
+
+        $params[] = $participanteId;
+        $this->pdo->prepare(
+            "UPDATE participantes_cursos SET " . implode(', ', $sets) . " WHERE id = ?"
+        )->execute($params);
+
+        return ['status' => 'success', 'message' => 'Datos guardados correctamente.'];
+    }
+
     private function htmlCertificado(array $p): string {
         $esc    = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
         $nombre = $esc($p['nombre_completo']);
