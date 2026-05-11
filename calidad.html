@@ -3012,28 +3012,68 @@ async function perExtraerOCR(id) {
   const btn    = document.getElementById('btn-ocr-extraer');
   const status = document.getElementById('per-ocr-status');
   const panel  = document.getElementById('per-ocr-panel');
-  if (!btn) return;
+  const imgEl  = document.querySelector('#per-det-body img[src*="personal/docs"]')
+              || document.querySelector('#per-det-body img');
+  if (!btn || !imgEl) return;
 
   btn.disabled = true;
-  btn.textContent = 'Extrayendo…';
   status.style.color = 'var(--texto-hint)';
-  status.textContent = 'Analizando imagen con OCR, esto puede tardar unos segundos…';
+  status.textContent = 'Cargando motor OCR… (primera vez ~20 s, después será rápido)';
   panel.style.display = 'none';
 
   try {
-    const res  = await fetch(`${API}?action=OCR_EXTRAER_PARTICIPANTE&id=${id}`);
-    const data = await res.json();
-
-    if (data.status !== 'success') {
-      status.style.color = 'var(--rojo)';
-      status.textContent = 'Error: ' + (data.message || 'No se pudo procesar la imagen.');
-      return;
+    // Carga lazy de Tesseract.js — se cachea en el navegador tras la primera descarga
+    if (!window.Tesseract) {
+      await new Promise((resolve, reject) => {
+        const s   = document.createElement('script');
+        s.src     = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+        s.onload  = resolve;
+        s.onerror = reject;
+        document.head.appendChild(s);
+      });
     }
 
-    document.getElementById('per-ocr-nombre-inp').value = data.nombre || '';
-    document.getElementById('per-ocr-curp-inp').value   = data.curp   || '';
+    status.textContent = 'Analizando imagen… (puede tardar 15-30 s)';
 
-    if (!data.nombre && !data.curp) {
+    const worker = await Tesseract.createWorker('spa', 1, {
+      logger: m => {
+        if (m.status === 'recognizing text') {
+          const pct = Math.round((m.progress || 0) * 100);
+          status.textContent = `Analizando imagen… ${pct}%`;
+        }
+      }
+    });
+
+    const { data: { text } } = await worker.recognize(imgEl.src);
+    await worker.terminate();
+
+    const texto = text.toUpperCase();
+
+    // Extraer CURP
+    let curp = '';
+    const curpMatch = texto.match(/[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d/);
+    if (curpMatch) curp = curpMatch[0];
+
+    // Extraer nombre (documento CURP RENAPO)
+    let nombre = '';
+    const ap1Match  = texto.match(/PRIMER\s+APELLIDO[^:\n]*:\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{1,25})/u);
+    const ap2Match  = texto.match(/SEGUNDO\s+APELLIDO[^:\n]*:\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{1,25})/u);
+    const nomMatch  = texto.match(/NOMBRES?[^:\n]*:\s*\n?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{2,40})/u);
+    const ap1 = (ap1Match?.[1] || '').trim();
+    const ap2 = (ap2Match?.[1] || '').trim();
+    const nom = (nomMatch?.[1]  || '').trim();
+    if (ap1 && nom)  nombre = `${ap1} ${ap2 ? ap2 + ' ' : ''}${nom}`.trim();
+    else if (nom)    nombre = nom;
+    if (nombre) {
+      nombre = nombre.split(' ')
+        .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ');
+    }
+
+    document.getElementById('per-ocr-nombre-inp').value = nombre;
+    document.getElementById('per-ocr-curp-inp').value   = curp;
+
+    if (!nombre && !curp) {
       status.style.color = 'var(--rojo)';
       status.textContent = 'No se encontraron datos reconocibles. Ingrésalos manualmente en el panel.';
     } else {
@@ -3044,7 +3084,8 @@ async function perExtraerOCR(id) {
 
   } catch (e) {
     status.style.color = 'var(--rojo)';
-    status.textContent = 'Error de conexión. Intenta de nuevo.';
+    status.textContent = 'Error al procesar la imagen. Ingrésalos manualmente.';
+    panel.style.display = 'block';
     console.error('OCR error:', e);
   } finally {
     btn.disabled = false;
