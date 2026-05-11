@@ -216,12 +216,23 @@ class Personal {
     // ── Devolver participante → DEVUELTO ──────────────────
     public function devolverParticipante(int $id, string $usuario): array {
         $this->ensureEstatusColumn();
-        $chk = $this->pdo->prepare("SELECT id FROM participantes_cursos WHERE id = ?");
+        $this->ensureQrColumn();
+        $chk = $this->pdo->prepare("SELECT id, qr_codigo FROM participantes_cursos WHERE id = ?");
         $chk->execute([$id]);
-        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+        $row = $chk->fetch();
+        if (!$row) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
-        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'DEVUELTO' WHERE id = ?")
-            ->execute([$id]);
+        // Liberar QR para que pueda ser reasignado en calidad
+        $qrAnterior = $row['qr_codigo'] ?? '';
+        if ($qrAnterior) {
+            $this->pdo->prepare(
+                "UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?"
+            )->execute([$qrAnterior]);
+        }
+
+        $this->pdo->prepare(
+            "UPDATE participantes_cursos SET estatus = 'DEVUELTO', qr_codigo = NULL WHERE id = ?"
+        )->execute([$id]);
         return ['status' => 'success', 'message' => 'Participante devuelto a Calidad.'];
     }
 
@@ -246,6 +257,12 @@ class Personal {
     private function ensureEstatusColumn(): void {
         try {
             $this->pdo->exec("ALTER TABLE participantes_cursos ADD COLUMN IF NOT EXISTS estatus VARCHAR(30) NOT NULL DEFAULT 'PENDIENTE'");
+        } catch (\PDOException $e) { /* column already exists */ }
+    }
+
+    private function ensureQrColumn(): void {
+        try {
+            $this->pdo->exec("ALTER TABLE participantes_cursos ADD COLUMN IF NOT EXISTS qr_codigo VARCHAR(20) NULL");
         } catch (\PDOException $e) { /* column already exists */ }
     }
 

@@ -267,7 +267,7 @@ class Certificaciones {
         try {
             $folio = $datos['control'] ?? $id;
 
-            $rutaCert   = $this->resolverPdf('certificado', $datos);
+            $rutaCert   = $this->resolverPdfEnvio('certificado', $id, $datos);
             $nombreCert = basename($rutaCert);
             $urlCert    = UPLOAD_URL . 'certificados/' . $nombreCert;
 
@@ -300,11 +300,11 @@ class Certificaciones {
         try {
             $folio = $datos['control'] ?? $id;
 
-            $rutaCert   = $this->resolverPdf('certificado', $datos);
+            $rutaCert   = $this->resolverPdfEnvio('certificado', $id, $datos);
             $nombreCert = basename($rutaCert);
             $urlCert    = UPLOAD_URL . 'certificados/' . $nombreCert;
 
-            $rutaDict   = $this->resolverPdf('dictamen', $datos);
+            $rutaDict   = $this->resolverPdfEnvio('dictamen', $id, $datos);
             $nombreDict = basename($rutaDict);
             $urlDict    = UPLOAD_URL . 'certificados/' . $nombreDict;
 
@@ -342,7 +342,7 @@ class Certificaciones {
         try {
             $folio = $datos['control'] ?? $id;
 
-            $rutaDict   = $this->resolverPdf('dictamen', $datos);
+            $rutaDict   = $this->resolverPdfEnvio('dictamen', $id, $datos);
             $nombreDict = basename($rutaDict);
             $urlDict    = UPLOAD_URL . 'certificados/' . $nombreDict;
 
@@ -369,9 +369,18 @@ class Certificaciones {
         $datos = $this->obtenerDatosEquipo($id);
         if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
+        // Liberar QR asociado para que pueda ser reasignado en calidad
+        $qrAnterior = $datos['qr_codigo'] ?? '';
+        if ($qrAnterior) {
+            $this->pdo->prepare(
+                "UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?"
+            )->execute([$qrAnterior]);
+        }
+
         $this->pdo->prepare(
             "UPDATE equipos
-             SET estado = 'RETORNADO', certificado_url = NULL, dictamen_url = NULL, fecha_enviado = NULL
+             SET estado = 'RETORNADO', certificado_url = NULL, dictamen_url = NULL,
+                 fecha_enviado = NULL, qr_codigo = NULL
              WHERE id = ?"
         )->execute([$id]);
 
@@ -824,6 +833,25 @@ class Certificaciones {
         }
 
         return $this->htmlAPdf($html, $datos['control'] ?? (string)($datos['id'] ?? 'doc'), $tipo);
+    }
+
+    /**
+     * Para envío: intenta primero plantilla PDF configurada; si no existe, genera desde HTML.
+     * $tipo acepta 'certificado'|'cert' para certificado, 'dictamen'|'dict' para dictamen.
+     * Devuelve la ruta local al PDF generado.
+     */
+    private function resolverPdfEnvio(string $tipo, int $id, array $datos): string {
+        $esDict = in_array($tipo, ['dict', 'dictamen'], true);
+        $tipoTemplate = $esDict ? 'dict'      : 'certificado';
+        $tipoHtml     = $esDict ? 'dictamen'  : 'certificado';
+        $sufijo       = $esDict ? 'DICT'      : 'CERT';
+
+        $resultado = $this->generarPdfDesdeTemplatePdf($id, $tipoTemplate);
+        if ($resultado['status'] === 'success') {
+            $folio = $datos['control'] ?? (string)$id;
+            return UPLOAD_DIR . 'certificados/' . $sufijo . '_PDF_' . $folio . '.pdf';
+        }
+        return $this->resolverPdf($tipoHtml, $datos);
     }
 
     /**
