@@ -250,6 +250,90 @@ if ($method === 'GET') {
             $p = $personal->obtenerParticipante((int)($_GET['id'] ?? 0));
             respuesta($p ? $p : ['status' => 'error', 'message' => 'No encontrado.'], $p ? 200 : 404);
 
+        // ── OCR: extraer nombre/CURP desde foto del documento ─────
+        case 'OCR_EXTRAER_PARTICIPANTE': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+
+            $id = (int)($_GET['id'] ?? 0);
+            if (!$id) respuesta(['status' => 'error', 'message' => 'ID requerido.']);
+
+            $p = $personal->obtenerParticipante($id);
+            if (!$p) respuesta(['status' => 'error', 'message' => 'Participante no encontrado.'], 404);
+
+            $fotoUrl = $p['foto_documentacion_url'] ?? '';
+            if (!$fotoUrl) respuesta(['status' => 'error', 'message' => 'Este participante no tiene foto del documento.']);
+
+            if (!function_exists('curl_init'))
+                respuesta(['status' => 'error', 'message' => 'cURL no disponible en el servidor.']);
+
+            // Descargar la imagen del documento
+            $ch = curl_init($fotoUrl);
+            curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15, CURLOPT_FOLLOWLOCATION => true]);
+            $imgData = curl_exec($ch);
+            $curlErr = curl_error($ch);
+            curl_close($ch);
+            if ($imgData === false || !$imgData)
+                respuesta(['status' => 'error', 'message' => 'No se pudo descargar la imagen: ' . $curlErr]);
+
+            // Guardar temporalmente
+            $tmpFile = sys_get_temp_dir() . '/avba_ocr_' . $id . '_' . time() . '.jpg';
+            file_put_contents($tmpFile, $imgData);
+
+            // Enviar a OCR.space
+            $apiKey = defined('OCR_API_KEY') ? OCR_API_KEY : 'helloworld';
+            $ch2 = curl_init('https://api.ocr.space/parse/image');
+            curl_setopt_array($ch2, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_POSTFIELDS     => [
+                    'apikey'            => $apiKey,
+                    'language'          => 'spa',
+                    'isOverlayRequired' => 'false',
+                    'detectOrientation' => 'true',
+                    'scale'             => 'true',
+                    'file'              => new CURLFile($tmpFile, 'image/jpeg', 'documento.jpg'),
+                ],
+            ]);
+            $ocrRaw = curl_exec($ch2);
+            curl_close($ch2);
+            @unlink($tmpFile);
+
+            if ($ocrRaw === false) respuesta(['status' => 'error', 'message' => 'Error al conectar con OCR.']);
+
+            $ocrData = json_decode($ocrRaw, true);
+            if (!empty($ocrData['IsErroredOnProcessing'])) {
+                $msg = is_array($ocrData['ErrorMessage'] ?? '') ? implode('; ', $ocrData['ErrorMessage']) : ($ocrData['ErrorMessage'] ?? 'Error OCR');
+                respuesta(['status' => 'error', 'message' => $msg]);
+            }
+
+            $texto = strtoupper($ocrData['ParsedResults'][0]['ParsedText'] ?? '');
+            if (!$texto) respuesta(['status' => 'error', 'message' => 'No se pudo leer texto en la imagen.']);
+
+            // Extraer CURP
+            $curp = '';
+            if (preg_match('/[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d/', $texto, $m)) {
+                $curp = $m[0];
+            }
+
+            // Extraer nombre (CURP doc RENAPO: PRIMER APELLIDO + SEGUNDO APELLIDO + NOMBRE)
+            $nombre = '';
+            $ap1 = $ap2 = $nom = '';
+            if (preg_match('/PRIMER\s+APELLIDO[^:]*:\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{1,25})/u', $texto, $m)) $ap1 = trim($m[1]);
+            if (preg_match('/SEGUNDO\s+APELLIDO[^:]*:\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{1,25})/u', $texto, $m)) $ap2 = trim($m[1]);
+            if (preg_match('/NOMBRES?[^:]*:\s*\n?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{2,40})/u', $texto, $m)) $nom = trim($m[1]);
+            if ($ap1 && $nom)  $nombre = trim("$ap1 $ap2 $nom");
+            elseif ($nom)      $nombre = $nom;
+            // Title case
+            if ($nombre) {
+                $nombre = implode(' ', array_map(fn($w) => mb_strtoupper(mb_substr($w,0,1)) . mb_strtolower(mb_substr($w,1)), explode(' ', $nombre)));
+            }
+
+            respuesta(['status' => 'success', 'curp' => $curp, 'nombre' => $nombre, 'texto_ocr' => $texto]);
+        }
+
         case 'LISTAR_TIPOS_ACCESORIO':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -560,6 +644,11 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->devolverParticipante((int)($payload['id'] ?? 0), $usr['usuario']));
+
+        case 'ACTUALIZAR_DATOS_OCR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->actualizarDatosOCR($payload));
 
         case 'EMITIR_DOC_PERSONAL':
             $usr = validarToken($pdo, $token);

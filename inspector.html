@@ -1522,9 +1522,9 @@
       </div>
       <div class="cur-section-body">
 
-        <!-- Foto del documento (OCR) -->
+        <!-- Foto del documento -->
         <div class="cur-field">
-          <label>Foto del documento (CURP / INE)</label>
+          <label>Foto del documento <span style="font-size:11px;color:var(--texto-hint);font-weight:400">(INE, CURP, licencia — Calidad extraerá los datos)</span></label>
           <div class="ocr-zone" id="ocr-zone">
             <img id="ocr-preview" class="ocr-preview" alt="Documento">
             <div id="ocr-placeholder">
@@ -1534,7 +1534,7 @@
                 <path d="M3 9h18M8 5V3M16 5V3"/>
               </svg>
               <div style="font-size:13px;font-weight:600;color:var(--azul)">Foto del documento oficial</div>
-              <div style="font-size:11px;color:var(--texto-hint);margin-top:3px">CURP, INE u otro documento</div>
+              <div style="font-size:11px;color:var(--texto-hint);margin-top:3px">INE, CURP, licencia u otro</div>
             </div>
             <input type="file" id="ocr-file" accept="image/*" style="display:none" onchange="ocr_previewDoc(event)">
           </div>
@@ -1548,29 +1548,19 @@
               📷 Cámara
             </button>
           </div>
-          <button class="ocr-btn" id="ocr-btn" onclick="ocr_procesar()" disabled>
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px">
-              <path d="M2 6V3h3M14 6V3h-3M2 10v3h3M14 10v3h-3"/><rect x="5" y="5" width="6" height="6" rx="1"/>
-            </svg>
-            <span id="ocr-btn-label">Extraer datos con OCR</span>
-          </button>
-          <div class="ocr-result" id="ocr-result"></div>
         </div>
 
         <!-- Nombre y CURP -->
         <div class="cur-row2">
           <div class="cur-field">
-            <label>Nombre completo <span class="req">*</span></label>
-            <input type="text" class="cur-input" id="cur-nombre" placeholder="Nombre(s) y apellidos"
-                   oninput="curClearErr('cur-nombre')">
-            <div class="cur-errmsg" id="err-cur-nombre">El nombre es obligatorio</div>
+            <label>Nombre completo <span style="font-size:11px;color:var(--texto-hint);font-weight:400">(opcional — Calidad verificará)</span></label>
+            <input type="text" class="cur-input" id="cur-nombre" placeholder="Nombre(s) y apellidos">
           </div>
           <div class="cur-field">
-            <label>CURP <span class="req">*</span></label>
-            <input type="text" class="cur-input" id="cur-curp" placeholder="AAAA000000XXXXXX00"
+            <label>CURP <span style="font-size:11px;color:var(--texto-hint);font-weight:400">(opcional — Calidad extraerá)</span></label>
+            <input type="text" class="cur-input" id="cur-curp" placeholder="Calidad lo completará"
                    maxlength="18" style="text-transform:uppercase"
-                   oninput="this.value=this.value.toUpperCase();curClearErr('cur-curp')">
-            <div class="cur-errmsg" id="err-cur-curp">CURP inválida (18 caracteres)</div>
+                   oninput="this.value=this.value.toUpperCase()">
           </div>
         </div>
 
@@ -3415,9 +3405,6 @@ async function curEnviar() {
   const fecha   = esSesion ? curSesion.fecha     : document.getElementById('cur-fecha').value;
 
   let valido = true;
-  if (!nombre)  { curShowErr('cur-nombre', 'El nombre es obligatorio');           valido = false; }
-  if (!curp || !/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/.test(curp))
-                { curShowErr('cur-curp',   'CURP inválida (18 caracteres)');      valido = false; }
   if (!esSesion) {
     if (!cursoId) { curShowErr('cur-curso', 'Selecciona un curso');               valido = false; }
     if (!fecha)   { curShowErr('cur-fecha', 'La fecha del curso es obligatoria'); valido = false; }

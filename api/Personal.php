@@ -95,18 +95,15 @@ class Personal {
         $id      = (int)($payload['id'] ?? 0);
         $cursoId = (int)($payload['curso_id'] ?? 0);
 
-        if (!trim($payload['nombre_completo'] ?? ''))
-            return ['status' => 'error', 'message' => 'El nombre completo es obligatorio.'];
-        if (!trim($payload['curp'] ?? ''))
-            return ['status' => 'error', 'message' => 'La CURP es obligatoria.'];
         if (!$cursoId)
             return ['status' => 'error', 'message' => 'Selecciona un curso.'];
         if (!trim($payload['fecha_curso'] ?? ''))
             return ['status' => 'error', 'message' => 'La fecha del curso es obligatoria.'];
 
-        // Normalizar CURP
-        $curp = strtoupper(trim($payload['curp']));
-        if (!preg_match('/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/', $curp)) {
+        // Normalizar CURP si se proporcionó
+        $curpRaw = strtoupper(trim($payload['curp'] ?? ''));
+        $curp    = $curpRaw ?: null;
+        if ($curp && !preg_match('/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/', $curp)) {
             return ['status' => 'error', 'message' => 'El formato de la CURP no es válido.'];
         }
 
@@ -128,7 +125,7 @@ class Personal {
         }
 
         $campos = [
-            'nombre_completo'       => trim($payload['nombre_completo']),
+            'nombre_completo'       => trim($payload['nombre_completo'] ?? '') ?: null,
             'curp'                  => $curp,
             'puesto'                => trim($payload['puesto'] ?? '') ?: null,
             'ocupacion_id'          => ($payload['ocupacion_id'] ?? 0) ?: null,
@@ -234,6 +231,30 @@ class Personal {
             "UPDATE participantes_cursos SET estatus = 'DEVUELTO', qr_codigo = NULL WHERE id = ?"
         )->execute([$id]);
         return ['status' => 'success', 'message' => 'Participante devuelto a Calidad.'];
+    }
+
+    // ── Actualizar nombre y CURP extraídos por OCR ────────────
+    public function actualizarDatosOCR(array $payload): array {
+        $id     = (int)($payload['id'] ?? 0);
+        $nombre = trim($payload['nombre_completo'] ?? '');
+        $curp   = strtoupper(trim($payload['curp'] ?? ''));
+
+        if (!$id) return ['status' => 'error', 'message' => 'ID requerido.'];
+        if (!$nombre && !$curp) return ['status' => 'error', 'message' => 'Se requiere al menos nombre o CURP.'];
+
+        if ($curp && !preg_match('/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/', $curp)) {
+            return ['status' => 'error', 'message' => 'Formato de CURP inválido.'];
+        }
+
+        $sets = []; $vals = [];
+        if ($nombre) { $sets[] = 'nombre_completo = ?'; $vals[] = $nombre; }
+        if ($curp)   { $sets[] = 'curp = ?';            $vals[] = $curp;   }
+        $vals[] = $id;
+
+        $this->pdo->prepare("UPDATE participantes_cursos SET " . implode(', ', $sets) . " WHERE id = ?")
+                  ->execute($vals);
+
+        return ['status' => 'success'];
     }
 
     // ── Emitir documento y marcar como EMITIDO ─────────────
