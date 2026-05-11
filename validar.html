@@ -241,6 +241,20 @@
     .btn-validar:active:not(:disabled) { transform: scale(0.98); }
     .btn-validar:disabled { background: rgba(255,255,255,0.1); cursor: not-allowed; }
     .btn-validar svg { width: 16px; height: 16px; }
+    /* Scan confirmation banner */
+    .scan-ok {
+      display: none;
+      align-items: center; gap: 10px;
+      background: rgba(0,200,120,0.18);
+      border: 1.5px solid rgba(0,200,120,0.4);
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px; font-weight: 600;
+      color: #00e896;
+      margin-top: 2px;
+    }
+    .scan-ok.show { display: flex; }
+    .scan-ok svg  { width: 18px; height: 18px; flex-shrink: 0; }
     .spin-btn {
       width: 16px; height: 16px;
       border: 2px solid rgba(255,255,255,0.3);
@@ -393,6 +407,14 @@
     </button>
   </div>
 
+  <!-- Confirmación de escaneo exitoso -->
+  <div class="scan-ok" id="scan-ok">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <path d="M20 6L9 17l-5-5"/>
+    </svg>
+    <span id="scan-ok-msg">Código capturado — completa la verificación de seguridad para continuar.</span>
+  </div>
+
   <div class="divider">
     <div class="divider-line"></div>
     <span>o ingresa el código</span>
@@ -411,7 +433,7 @@
       maxlength="30"
       autocomplete="off"
       onkeydown="if(event.key==='Enter') validar()"
-      oninput="limpiarError()">
+      oninput="limpiarError(); limpiarScanOk()">
   </div>
 
   <!-- CAPTCHA -->
@@ -621,6 +643,10 @@ function activarBloqueo() {
 function mostrarError(msg) {
   document.getElementById("error-msg").textContent = msg;
   document.getElementById("qr-input").classList.add("err");
+}
+
+function limpiarScanOk() {
+  document.getElementById("scan-ok")?.classList.remove("show");
 }
 
 function limpiarError() {
@@ -882,6 +908,7 @@ function resetBg() {
   document.getElementById("resultado").innerHTML = "";
   document.getElementById("qr-input").value = "";
   document.getElementById("qr-input").focus();
+  limpiarScanOk();
 }
 
 /* ═══════════════════════════════════════
@@ -933,6 +960,11 @@ async function iniciarCamara() {
         const codigo = extraerCodigo(qrCode);
         document.getElementById("qr-input").value = codigo;
         limpiarError();
+        // Mostrar confirmación de escaneo
+        const scanOk = document.getElementById("scan-ok");
+        document.getElementById("scan-ok-msg").textContent =
+          `✓ Código capturado: ${codigo} — completa la verificación para continuar.`;
+        scanOk.classList.add("show");
         // Enfocar captcha para que el usuario solo tenga que responderlo y validar
         setTimeout(() => {
           document.getElementById('cap-inp').focus();

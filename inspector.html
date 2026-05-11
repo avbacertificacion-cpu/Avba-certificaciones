@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Inspector AVBA</title>
   <link rel="manifest" href="manifest.json">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
@@ -814,24 +814,27 @@
       z-index: 1100;
       display: none;
       flex-direction: column;
+      overflow: hidden;
     }
     .cam-overlay.open { display: flex; }
     .cam-video {
-      flex: 1;
+      flex: 1 1 0;
       width: 100%;
+      min-height: 0;       /* permite que flex-shrink funcione en Safari/Chrome móvil */
       object-fit: cover;
       display: block;
     }
     .cam-canvas { display: none; }
     .cam-bar {
       background: rgba(0,0,0,0.85);
-      padding: 16px 24px;
-      padding-bottom: max(28px, calc(16px + env(safe-area-inset-bottom)));
+      padding: 20px 24px;
+      padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 12px;
       flex-shrink: 0;
+      min-height: 96px;
     }
     .cam-label {
       color: rgba(255,255,255,0.75);
@@ -863,6 +866,7 @@
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
+      min-width: 80px;
     }
 
     /* Empresa toggle */
@@ -3270,20 +3274,22 @@ async function ocr_procesar() {
   res.className = 'ocr-result';
 
   try {
+    const s        = JSON.parse(localStorage.getItem('avba_session') || '{}');
     const formData = new FormData();
-    formData.append('file', curDocFile);
-    formData.append('language',          'spa');
-    formData.append('isOverlayRequired', 'false');
-    formData.append('detectOrientation', 'true');
-    formData.append('scale',             'true');
-    formData.append('apikey',            'helloworld'); // clave gratuita de OCR.space
+    formData.append('action', 'OCR_PROXY');
+    formData.append('token',  s.token || '');
+    formData.append('file',   curDocFile);
 
-    const resp = await fetch('https://api.ocr.space/parse/image', {
-      method: 'POST',
-      body: formData,
-    });
-    const data  = await resp.json();
-    const texto = (data?.ParsedResults?.[0]?.ParsedText || '').toUpperCase();
+    const resp = await fetch(WEB_APP_URL, { method: 'POST', body: formData });
+    const data = await resp.json();
+
+    if (data.status !== 'success') {
+      res.className   = 'ocr-result err';
+      res.textContent = 'Error OCR: ' + (data.message || 'No se pudo procesar la imagen.');
+      return;
+    }
+
+    const texto = data.texto || '';
 
     if (!texto) {
       res.className = 'ocr-result err';
@@ -3340,7 +3346,7 @@ async function ocr_procesar() {
 
   } catch (e) {
     res.className   = 'ocr-result err';
-    res.textContent = 'Error al conectar con el servicio OCR. Ingresa los datos manualmente.';
+    res.textContent = 'Error de conexión con el servicio OCR. Ingresa los datos manualmente.';
     console.error('OCR error:', e);
   } finally {
     btn.disabled  = false;

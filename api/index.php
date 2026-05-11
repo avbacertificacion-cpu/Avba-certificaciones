@@ -727,6 +727,61 @@ if ($method === 'POST') {
             if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->testSmtpConfig($payload));
 
+        // ── Proxy OCR (evita CORS y oculta API key) ───────────────
+        case 'OCR_PROXY': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+
+            if (empty($_FILES['file']['tmp_name'])) {
+                respuesta(['status' => 'error', 'message' => 'No se recibió imagen.'], 400);
+            }
+
+            if (!function_exists('curl_init')) {
+                respuesta(['status' => 'error', 'message' => 'cURL no disponible en el servidor.']);
+            }
+
+            $apiKey  = defined('OCR_API_KEY') ? OCR_API_KEY : 'helloworld';
+            $tmpFile = $_FILES['file']['tmp_name'];
+            $mime    = mime_content_type($tmpFile) ?: 'image/jpeg';
+
+            $ch = curl_init('https://api.ocr.space/parse/image');
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_POST           => true,
+                CURLOPT_TIMEOUT        => 30,
+                CURLOPT_POSTFIELDS     => [
+                    'apikey'            => $apiKey,
+                    'language'          => 'spa',
+                    'isOverlayRequired' => 'false',
+                    'detectOrientation' => 'true',
+                    'scale'             => 'true',
+                    'file'              => new CURLFile($tmpFile, $mime, 'documento.jpg'),
+                ],
+            ]);
+
+            $ocrRaw  = curl_exec($ch);
+            $curlErr = curl_error($ch);
+            curl_close($ch);
+
+            if ($ocrRaw === false) {
+                respuesta(['status' => 'error', 'message' => 'Error de conexión OCR: ' . $curlErr]);
+            }
+
+            $ocrData = json_decode($ocrRaw, true);
+            if (!$ocrData) {
+                respuesta(['status' => 'error', 'message' => 'Respuesta OCR inválida.']);
+            }
+            if (!empty($ocrData['IsErroredOnProcessing']) || !empty($ocrData['ErrorMessage'])) {
+                $msg = is_array($ocrData['ErrorMessage'])
+                    ? implode('; ', $ocrData['ErrorMessage'])
+                    : ($ocrData['ErrorMessage'] ?? 'Error OCR desconocido');
+                respuesta(['status' => 'error', 'message' => $msg]);
+            }
+
+            $texto = strtoupper($ocrData['ParsedResults'][0]['ParsedText'] ?? '');
+            respuesta(['status' => 'success', 'texto' => $texto]);
+        }
+
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);
     }
