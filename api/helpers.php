@@ -4,6 +4,40 @@
  */
 
 /**
+ * Valida la CURP: formato + dígito verificador matemático (algoritmo RENAPO).
+ * @return array ['valida' => bool, 'error' => string|null]
+ */
+function validarCURPCompleta(string $curp): array {
+    $curp = strtoupper(trim($curp));
+
+    if (strlen($curp) !== 18) {
+        return ['valida' => false, 'error' => 'La CURP debe tener exactamente 18 caracteres.'];
+    }
+    if (!preg_match('/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/', $curp)) {
+        return ['valida' => false, 'error' => 'El formato de la CURP no es válido.'];
+    }
+
+    $tabla  = '0123456789ABCDEFGHIJKLMNÑOPQRSTUVWXYZ';
+    $chars  = preg_split('//u', $tabla, -1, PREG_SPLIT_NO_EMPTY);
+    $mapa   = array_flip($chars);
+
+    $curpChars = preg_split('//u', $curp, -1, PREG_SPLIT_NO_EMPTY);
+    $suma = 0;
+    for ($i = 0; $i < 17; $i++) {
+        $val = $mapa[$curpChars[$i]] ?? -1;
+        if ($val < 0) return ['valida' => false, 'error' => 'Carácter no reconocido en la CURP.'];
+        $suma += $val * (18 - $i);
+    }
+    $digitoEsperado = (10 - ($suma % 10)) % 10;
+    $digitoReal     = (int)$curpChars[17];
+
+    if ($digitoEsperado !== $digitoReal) {
+        return ['valida' => false, 'error' => "CURP inválida: dígito verificador incorrecto (esperado {$digitoEsperado})."];
+    }
+    return ['valida' => true, 'error' => null];
+}
+
+/**
  * Genera un token seguro de 64 caracteres hex.
  */
 function generarToken(): string {

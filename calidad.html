@@ -3100,6 +3100,10 @@ async function perConfirmarOCR(id) {
     alert('Ingresa al menos el nombre o la CURP antes de confirmar.');
     return;
   }
+  if (curp) {
+    const v = validarCURPCompleta(curp);
+    if (!v.valida) { alert('CURP inválida: ' + v.error); return; }
+  }
   try {
     const res  = await fetch(API, {
       method:  'POST',
@@ -5035,5 +5039,6 @@ function cerrarPicker() {
 <div id="ev-lightbox" onclick="this.classList.remove('open')">
   <img id="ev-lightbox-img" src="" alt="Evidencia">
 </div>
+<script src="js/utils.js"></script>
 </body>
 </html>

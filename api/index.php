@@ -384,7 +384,28 @@ if ($method === 'GET') {
             if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->getSmtpConfig());
 
-        // Datos para portal de participante autenticado
+        // Buscar empresa/cliente en la BD (para autocomplete inspector)
+        case 'BUSCAR_CLIENTE': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $q = trim($_GET['q'] ?? '');
+            if (strlen($q) < 2) respuesta(['status' => 'success', 'clientes' => []]);
+            $stmt = $pdo->prepare(
+                "SELECT nombre_cliente, primera_parte FROM clientes
+                 WHERE nombre_cliente LIKE ? ORDER BY nombre_cliente LIMIT 12"
+            );
+            $stmt->execute(['%' . $q . '%']);
+            respuesta(['status' => 'success', 'clientes' => $stmt->fetchAll()]);
+        }
+
+        // Info de sesión para participante (cursos, empresas, fecha)
+        case 'SESION_INFO': {
+            $sesion = $auth->validarTokenParticipante($token);
+            if (!$sesion) respuesta(['status' => 'error', 'message' => 'Sesión expirada o cerrada.'], 401);
+            respuesta($auth->getSesionInfo($sesion['id']));
+        }
+
+        // Datos para portal de participante autenticado (lista de ya-registrados)
         case 'PARTICIPANTE_MIS_DATOS': {
             $sesion = $auth->validarTokenParticipante($token);
             if (!$sesion) respuesta(['status' => 'error', 'message' => 'Sesión expirada o cerrada.'], 401);
@@ -418,6 +439,17 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','INSPECTOR'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($auth->cerrarSesionAcceso((int)($payload['sesion_id'] ?? 0), (int)$usr['id']));
+
+        case 'SESION_AGREGAR_EMPRESA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','INSPECTOR'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auth->agregarEmpresaSesion($payload, (int)$usr['id']));
+
+        case 'PARTICIPANTE_REGISTRAR': {
+            $sesion = $auth->validarTokenParticipante($token);
+            if (!$sesion) respuesta(['status' => 'error', 'message' => 'Sesión expirada o cerrada.'], 401);
+            respuesta($personal->participanteRegistrar($payload, $_FILES, $sesion['id']));
+        }
 
         case 'PARTICIPANTE_GUARDAR': {
             $sesion = $auth->validarTokenParticipante($token);

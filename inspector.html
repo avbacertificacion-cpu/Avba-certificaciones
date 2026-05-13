@@ -1427,68 +1427,80 @@
   <div class="ses-wrap">
     <button class="ses-back-btn" onclick="curMostrar('submenu')">← Atrás</button>
     <div class="ses-titulo">Configurar sesión de curso</div>
-    <div class="ses-subtitulo">Define el curso y la empresa (si aplica)</div>
+    <div class="ses-subtitulo">El inspector configura la sesión; los participantes se registran con el QR</div>
 
+    <!-- Fecha -->
+    <div class="cur-section">
+      <div class="cur-section-hdr">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
+          <rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 1v2M11 1v2M2 6h12"/>
+        </svg>
+        Fecha del curso
+      </div>
+      <div class="cur-section-body">
+        <div class="cur-field">
+          <label>Fecha <span class="req">*</span></label>
+          <input type="date" class="cur-input" id="ses-fecha">
+        </div>
+      </div>
+    </div>
+
+    <!-- Cursos disponibles -->
     <div class="cur-section">
       <div class="cur-section-hdr">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
           <path d="M8 10l-5-3 5-3 5 3-5 3z"/><path d="M3 7v3c0 1.1 2 2.5 5 2.5s5-1.4 5-2.5V7"/>
         </svg>
-        Curso y fecha
+        Cursos disponibles en la sesión
       </div>
       <div class="cur-section-body">
-        <div class="cur-field">
-          <label>Curso <span class="req">*</span></label>
-          <select class="cur-input" id="ses-curso-id" oninput="sesActualizarNombre()">
-            <option value="">— Seleccionar curso —</option>
-          </select>
+        <div class="ses-subtitulo" style="margin-bottom:10px;font-size:12px">Selecciona uno o más cursos que apliquen en esta sesión</div>
+        <div id="ses-cursos-lista" style="display:flex;flex-direction:column;gap:6px">
+          <!-- populated by JS -->
         </div>
-        <div class="cur-field">
-          <label>Fecha del curso <span class="req">*</span></label>
-          <input type="date" class="cur-input" id="ses-fecha" oninput="sesActualizarNombre()">
-        </div>
-        <div class="ses-nombre-preview" id="ses-nombre-preview"></div>
       </div>
     </div>
 
+    <!-- Empresas -->
     <div class="cur-section">
       <div class="cur-section-hdr">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
           <rect x="2" y="6" width="12" height="8" rx="1"/><path d="M5 6V4a3 3 0 016 0v2"/>
         </svg>
-        Empresa
+        Empresas participantes
       </div>
       <div class="cur-section-body">
-        <div class="ses-pregunta">¿Los participantes son de la misma empresa?</div>
-        <div class="ses-empresa-toggle">
-          <button type="button" id="ses-btn-si" class="ses-toggle-btn" onclick="sesMismaEmpresa(true)">✓ Sí, misma empresa</button>
-          <button type="button" id="ses-btn-no" class="ses-toggle-btn" onclick="sesMismaEmpresa(false)">✗ No / Varía</button>
+        <div class="ses-subtitulo" style="margin-bottom:10px;font-size:12px">Busca y agrega las empresas que participan. Se vincularán a clientes existentes automáticamente.</div>
+        <div style="position:relative;margin-bottom:8px">
+          <input type="text" class="cur-input" id="ses-emp-buscar"
+                 placeholder="Buscar empresa por nombre..." autocomplete="off">
+          <input type="hidden" id="ses-emp-id">
         </div>
-        <div id="ses-empresa-form" style="display:none">
-          <div class="cur-field">
-            <label>Nombre de la empresa</label>
-            <input type="text" class="cur-input" id="ses-empresa" placeholder="Razón social">
-          </div>
-          <div class="cur-row2">
-            <div class="cur-field">
-              <label>RFC</label>
-              <input type="text" class="cur-input" id="ses-rfc" placeholder="RFC de la empresa"
-                     oninput="this.value=this.value.toUpperCase()">
-            </div>
-            <div class="cur-field">
-              <label>Representante</label>
-              <input type="text" class="cur-input" id="ses-representante" placeholder="Nombre del rep.">
-            </div>
-          </div>
-          <div class="cur-field">
-            <label>Dirección</label>
-            <input type="text" class="cur-input" id="ses-direccion" placeholder="Dirección de la empresa">
-          </div>
+        <button type="button" class="ses-continuar-btn"
+                style="padding:8px 14px;font-size:13px;width:auto;margin-bottom:12px"
+                onclick="sesAgregarEmpresa()">+ Agregar empresa</button>
+        <div id="ses-empresas-lista" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+    </div>
+
+    <!-- Contraseña -->
+    <div class="cur-section">
+      <div class="cur-section-hdr">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
+          <rect x="3" y="7" width="10" height="8" rx="2"/><path d="M5 7V5a3 3 0 016 0v2"/>
+        </svg>
+        Contraseña de acceso
+      </div>
+      <div class="cur-section-body">
+        <div class="cur-field">
+          <label>Contraseña que compartirás con los participantes <span class="req">*</span></label>
+          <input type="text" class="cur-input" id="ses-pwd"
+                 placeholder="Ej: Curso2025" autocomplete="off">
         </div>
       </div>
     </div>
 
-    <button class="ses-continuar-btn" onclick="sesContinuar()">Continuar →</button>
+    <button class="ses-continuar-btn" onclick="sesContinuar()">🔓 Crear sesión y generar acceso →</button>
   </div>
 </div>
 
@@ -1497,64 +1509,83 @@
   <div class="ses-wrap">
     <div class="ses-header-card">
       <div class="ses-header-nombre" id="ses-lista-nombre">—</div>
-      <div class="ses-header-meta" id="ses-lista-meta">0 participantes registrados</div>
+      <div class="ses-header-meta" id="ses-lista-meta">Sesión activa</div>
     </div>
 
-    <div id="ses-lista-items"></div>
+    <!-- QR de acceso -->
+    <div id="ses-qr-card" class="ses-acceso-card" style="text-align:center">
+      <div class="ses-acceso-title" style="justify-content:center">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
+          <rect x="3" y="7" width="10" height="8" rx="2"/><path d="M5 7V5a3 3 0 016 0v2"/>
+        </svg>
+        Acceso activo
+      </div>
+      <div style="font-size:13px;margin-bottom:4px">
+        Identificador: <strong id="ses-qr-ident" style="font-family:monospace;font-size:15px;letter-spacing:.5px">—</strong>
+      </div>
+      <div style="font-size:11px;color:var(--texto-sub);margin-bottom:10px">
+        Los participantes escanean el QR o escriben el identificador en el login
+      </div>
+      <div style="margin:0 auto 10px">
+        <img id="ses-qr-img" src="" alt="QR" style="max-width:160px;border-radius:8px;border:2px solid var(--borde)">
+      </div>
+    </div>
 
-    <!-- Acceso de participantes -->
-    <div id="ses-acceso-section" style="display:none">
-      <!-- Sin acceso activo -->
-      <div id="ses-acceso-inactivo">
-        <div style="font-size:13px;color:var(--texto-sub);margin-bottom:12px;padding:0 2px">
-          Permite que los participantes ingresen desde el portal para completar su nombre y CURP pendientes.
-        </div>
-        <div class="cur-field" style="margin-bottom:10px">
-          <label>Contraseña de acceso</label>
-          <input type="text" class="cur-input" id="ses-acceso-pwd"
-                 placeholder="Ej: Curso2025" autocomplete="off">
-        </div>
-        <button class="ses-continuar-btn" style="padding:11px 18px;font-size:14px"
-                onclick="sesHabilitarAcceso()">
-          🔓 Habilitar acceso de participantes
+    <!-- Empresas de la sesión -->
+    <div style="margin-top:12px">
+      <div style="font-size:13px;font-weight:700;color:var(--texto);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+        <span>Empresas en la sesión</span>
+        <button type="button" onclick="sesModalAgregarEmpresa()"
+                style="font-size:12px;padding:5px 10px;background:var(--azul-light);color:var(--azul-dark);border:1px solid #85B7EB;border-radius:8px;cursor:pointer;font-weight:600">
+          + Agregar empresa
         </button>
       </div>
-      <!-- Acceso activo -->
-      <div id="ses-acceso-activo" style="display:none">
-        <div class="ses-acceso-card">
-          <div class="ses-acceso-title">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"
-                 style="width:14px;height:14px">
-              <rect x="3" y="7" width="10" height="8" rx="2"/>
-              <path d="M5 7V5a3 3 0 016 0v2"/>
-            </svg>
-            Acceso activo
-          </div>
-          <div class="ses-acceso-ident-row">
-            Identificador: <strong id="ses-acceso-ident">—</strong>
-          </div>
-          <div class="ses-acceso-hint">
-            Los participantes ingresan con este identificador y la contraseña que asignaste.
-          </div>
-          <div class="ses-acceso-qr-wrap">
-            <img id="ses-acceso-qr" src="" alt="QR de acceso">
-            <div style="font-size:11px;color:var(--texto-sub);margin-top:4px">
-              Escanear para ingresar
-            </div>
-          </div>
-          <button class="ses-cerrar-acceso-btn" onclick="sesCerrarAcceso()">
-            🔒 Cerrar acceso de participantes
+      <div id="ses-lista-empresas" style="display:flex;flex-direction:column;gap:6px"></div>
+    </div>
+
+    <!-- Participantes -->
+    <div style="margin-top:14px">
+      <div style="font-size:13px;font-weight:700;color:var(--texto);margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+        <span>Participantes registrados</span>
+        <button type="button" onclick="sesRefrescarParticipantes()"
+                style="font-size:12px;padding:5px 10px;background:#f0f4f9;border:1px solid var(--borde);border-radius:8px;cursor:pointer">
+          ↻ Actualizar
+        </button>
+      </div>
+      <div id="ses-lista-items" style="display:flex;flex-direction:column;gap:6px"></div>
+      <div id="ses-lista-empty" style="display:none;text-align:center;color:var(--texto-sub);font-size:13px;padding:16px 0">
+        Aún no hay participantes. Comparte el QR para que se registren.
+      </div>
+    </div>
+
+    <!-- Modal agregar empresa en caliente -->
+    <div id="ses-modal-empresa" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center">
+      <div style="background:#fff;border-radius:14px;padding:20px;width:90%;max-width:400px">
+        <div style="font-size:15px;font-weight:700;margin-bottom:14px">Agregar empresa</div>
+        <div style="position:relative;margin-bottom:8px">
+          <input type="text" class="cur-input" id="ses-modal-emp-buscar"
+                 placeholder="Buscar empresa..." autocomplete="off">
+          <input type="hidden" id="ses-modal-emp-id">
+        </div>
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <button onclick="document.getElementById('ses-modal-empresa').style.display='none'"
+                  style="flex:1;padding:11px;border:1.5px solid var(--borde);border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;background:#fff">
+            Cancelar
+          </button>
+          <button onclick="sesConfirmarAgregarEmpresa()"
+                  style="flex:1;padding:11px;background:var(--azul);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer">
+            Agregar
           </button>
         </div>
       </div>
     </div>
 
-    <button class="ses-agregar-btn" onclick="sesAgregarParticipante()">
-      + Agregar participante
+    <button class="ses-agregar-btn" onclick="sesAgregarParticipanteManual()">
+      + Agregar participante manualmente
     </button>
     <button class="ses-finalizar-btn" id="ses-finalizar-btn"
-            onclick="sesFinalizarSesion()" disabled>
-      ✓ Finalizar sesión
+            onclick="sesFinalizarSesion()">
+      ✓ Cerrar sesión
     </button>
   </div>
 </div>
@@ -1718,7 +1749,10 @@
       <div class="empresa-body" id="empresa-body">
         <div class="cur-field">
           <label>Nombre de la empresa</label>
-          <input type="text" class="cur-input" id="cur-empresa" placeholder="Razón social">
+          <div style="position:relative">
+            <input type="text" class="cur-input" id="cur-empresa" placeholder="Razón social" autocomplete="off">
+            <input type="hidden" id="cur-empresa-id" value="">
+          </div>
         </div>
         <div class="cur-row2">
           <div class="cur-field">
@@ -1835,7 +1869,10 @@
 
       <div class="field" id="f-cliente">
         <label>Cliente <span class="req">*</span></label>
-        <input type="text" id="cliente" placeholder="Nombre de la empresa u organización" autocomplete="organization">
+        <div style="position:relative">
+          <input type="text" id="cliente" placeholder="Nombre de la empresa u organización" autocomplete="off">
+          <input type="hidden" id="cliente-id" value="">
+        </div>
         <div class="errmsg">El nombre del cliente es obligatorio</div>
       </div>
 
@@ -2039,7 +2076,10 @@
 
         <div class="field" id="iza-f-cliente">
           <label>Cliente <span class="req">*</span></label>
-          <input type="text" id="iza-cliente" placeholder="Nombre de la empresa u organización" autocomplete="organization">
+          <div style="position:relative">
+            <input type="text" id="iza-cliente" placeholder="Nombre de la empresa u organización" autocomplete="off">
+            <input type="hidden" id="iza-cliente-id" value="">
+          </div>
           <div class="errmsg">El nombre del cliente es obligatorio</div>
         </div>
 
@@ -2593,6 +2633,19 @@ window.onload = function () {
   if (!rolesPermitidos.includes(s.rol)) { location.href = 'login.html'; return; }
   document.getElementById('menu-usuario').textContent = (s.nombre || s.usuario || 'inspector') + (s.rol !== 'INSPECTOR' ? ' (' + s.rol + ')' : '');
 
+  // Autocomplete empresa en formulario de inspección (paso 1)
+  initEmpresaSearch(
+    document.getElementById('cliente'),
+    document.getElementById('cliente-id'),
+    { dropdownId: 'drop-cliente' }
+  );
+  // Autocomplete empresa en formulario de participante (inspector agrega manualmente)
+  initEmpresaSearch(
+    document.getElementById('cur-empresa'),
+    document.getElementById('cur-empresa-id'),
+    { dropdownId: 'drop-cur-empresa' }
+  );
+
   // Botón volver a Admin si el rol es ADMIN
   if (s.rol === 'ADMIN') {
     const btnAdmin = document.createElement('button');
@@ -3057,11 +3110,15 @@ let curDocFile     = null;
 let curPersonaFile = null;
 
 // Estado de sesión grupal
-let curModo           = 'independiente'; // 'curso' | 'independiente'
-let curSesion         = null;            // { curso_id, curso_nombre, fecha, nombre_sesion, misma_empresa, empresa }
-let curSesionParts    = [];              // participantes guardados en la sesión
-let curSesionAccesoId = null;            // ID de la sesión de acceso activa
-let curSesionAccesoIdent = null;         // Identificador de la sesión activa
+let curModo              = 'independiente';
+let curSesion            = null;   // { nombre_sesion, fecha, cursos[], empresas[] }
+let curSesionAccesoId    = null;
+let curSesionAccesoIdent = null;
+let curSesionCursos      = [];
+let curSesionEmpresas    = [];
+let curSesionParts       = [];     // lista de participantes (cargada del servidor)
+let curSesionEmpPreBuild = [];     // empresas agregadas antes de crear sesión
+const API = WEB_APP_URL;
 
 // ── Pantallas del módulo Cursos ───────────
 const CUR_PANTALLAS = ['cur-submenu','cur-sesion-setup','cur-sesion-lista','cur-wrap'];
@@ -3098,8 +3155,8 @@ async function initCursos() {
       else   { info.style.display = 'none'; }
     });
 
-    // Selector en setup de sesión
-    document.getElementById('ses-curso-id').innerHTML = opsCurso;
+    // Checkboxes en setup de sesión
+    sesRenderCursos(curCursos);
 
     const selOcup = document.getElementById('cur-ocupacion');
     selOcup.innerHTML = '<option value="">— Seleccionar —</option>' +
@@ -3121,123 +3178,49 @@ function curSelModo(modo) {
   } else {
     curMostrar('setup');
     // Reset setup
-    document.getElementById('ses-curso-id').value = '';
-    document.getElementById('ses-fecha').value    = '';
-    document.getElementById('ses-nombre-preview').style.display = 'none';
-    document.getElementById('ses-empresa-form').style.display   = 'none';
-    document.getElementById('ses-btn-si').className = 'ses-toggle-btn';
-    document.getElementById('ses-btn-no').className = 'ses-toggle-btn';
-    ['ses-empresa','ses-rfc','ses-representante','ses-direccion'].forEach(id => {
-      document.getElementById(id).value = '';
-    });
+    document.getElementById('ses-fecha').value = '';
+    document.getElementById('ses-pwd').value   = '';
+    sesRenderCursos(curCursos);
+    curSesionEmpPreBuild = [];
+    sesRenderEmpresasSetup();
+    initEmpresaSearch(
+      document.getElementById('ses-emp-buscar'),
+      document.getElementById('ses-emp-id'),
+      { dropdownId: 'drop-ses-emp' }
+    );
   }
 }
 
-// ── Sesión: nombre auto DDMMAA + curso ────
-function sesActualizarNombre() {
-  const cursoId = document.getElementById('ses-curso-id').value;
-  const fecha   = document.getElementById('ses-fecha').value;  // yyyy-mm-dd
-  const prev    = document.getElementById('ses-nombre-preview');
-  if (!cursoId || !fecha) { prev.style.display = 'none'; return; }
-  const c = curCursos.find(x => x.id == cursoId);
-  if (!c) return;
-  const [y, m, d] = fecha.split('-');
-  const ddmmaa = (d||'').padStart(2,'0') + (m||'').padStart(2,'0') + (y||'').slice(-2);
-  const nombre = ddmmaa + ' ' + c.nombre.toUpperCase();
-  prev.textContent = nombre;
-  prev.style.display = 'block';
+// ── Sesión: render cursos como checkboxes ──
+function sesRenderCursos(lista) {
+  const el = document.getElementById('ses-cursos-lista');
+  if (!el) return;
+  el.innerHTML = lista.map(c => `
+    <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;cursor:pointer">
+      <input type="checkbox" value="${c.id}" style="width:16px;height:16px;cursor:pointer">
+      <span style="font-size:13px;font-weight:500">${escHtmlInsp(c.nombre)}</span>
+    </label>`).join('');
+  curSesionCursos = lista;
 }
 
-// ── Sesión: toggle misma empresa ─────────
-function sesMismaEmpresa(si) {
-  document.getElementById('ses-btn-si').className = 'ses-toggle-btn' + (si ? ' si' : '');
-  document.getElementById('ses-btn-no').className = 'ses-toggle-btn' + (!si ? ' no' : '');
-  document.getElementById('ses-empresa-form').style.display = si ? 'block' : 'none';
-}
+// ── Sesión: Continuar → crear sesión ──────
+async function sesContinuar() {
+  const fecha = document.getElementById('ses-fecha').value;
+  if (!fecha) { mostrarToast('Selecciona la fecha del curso.', 'err'); return; }
 
-// ── Sesión: Continuar → lista ─────────────
-function sesContinuar() {
-  const cursoId = document.getElementById('ses-curso-id').value;
-  const fecha   = document.getElementById('ses-fecha').value;
-  if (!cursoId) { alert('Selecciona un curso.'); return; }
-  if (!fecha)   { alert('Selecciona la fecha del curso.'); return; }
+  // Cursos seleccionados
+  const cursoIds = [...document.querySelectorAll('#ses-cursos-lista input[type=checkbox]:checked')]
+    .map(cb => parseInt(cb.value)).filter(Boolean);
+  if (cursoIds.length === 0) { mostrarToast('Selecciona al menos un curso.', 'err'); return; }
 
-  const c = curCursos.find(x => x.id == cursoId);
-  const [y, m, d] = fecha.split('-');
-  const ddmmaa = (d||'').padStart(2,'0') + (m||'').padStart(2,'0') + (y||'').slice(-2);
-  const nombreSesion = ddmmaa + ' ' + (c?.nombre || '').toUpperCase();
-
-  const mismaEmpresa = document.getElementById('ses-btn-si').classList.contains('si');
-  const empresa = {
-    nombre:        document.getElementById('ses-empresa').value.trim(),
-    rfc:           document.getElementById('ses-rfc').value.trim(),
-    representante: document.getElementById('ses-representante').value.trim(),
-    direccion:     document.getElementById('ses-direccion').value.trim(),
-  };
-
-  curSesion = { curso_id: cursoId, curso_nombre: c?.nombre || '', fecha, nombre_sesion: nombreSesion, misma_empresa: mismaEmpresa, empresa };
-  curSesionParts    = [];
-  curSesionAccesoId = null;
-  curSesionAccesoIdent = null;
-
-  // Actualizar cabecera de la lista
-  document.getElementById('ses-lista-nombre').textContent = nombreSesion;
-  document.getElementById('ses-lista-meta').textContent   = '0 participantes registrados';
-  document.getElementById('ses-lista-items').innerHTML    = '';
-  document.getElementById('ses-finalizar-btn').disabled   = true;
-  document.getElementById('ses-acceso-section').style.display = 'none';
-  sesRenderAcceso(false, null);
-
-  curMostrar('lista');
-}
-
-// ── Sesión: agregar participante ──────────
-function sesAgregarParticipante() {
-  curPrepararForm('curso');
-  curMostrar('form');
-}
-
-// ── Sesión: renderizar lista ──────────────
-function sesRenderLista() {
-  const lista = document.getElementById('ses-lista-items');
-  lista.innerHTML = curSesionParts.map((p, i) => `
-    <div class="ses-part-item">
-      <div class="ses-part-num">${i + 1}</div>
-      <div class="ses-part-info">
-        <div class="ses-part-nombre">${p.nombre || '(sin nombre)'}</div>
-        <div class="ses-part-curp">${p.curp || '—'}</div>
-      </div>
-      <span style="color:var(--verde);font-size:18px">✓</span>
-    </div>`).join('');
-
-  const n = curSesionParts.length;
-  document.getElementById('ses-lista-meta').textContent = `${n} participante${n !== 1 ? 's' : ''} registrado${n !== 1 ? 's' : ''}`;
-  document.getElementById('ses-finalizar-btn').disabled = n === 0;
-
-  // Mostrar panel de acceso si hay participantes
-  const accesoSection = document.getElementById('ses-acceso-section');
-  accesoSection.style.display = n > 0 ? 'block' : 'none';
-}
-
-// ── Sesión: finalizar ─────────────────────
-function sesFinalizarSesion() {
-  const n = curSesionParts.length;
-  // Cerrar acceso de participantes si sigue activo
-  if (curSesionAccesoId) sesCerrarAcceso(true);
-  curSesion            = null;
-  curSesionParts       = [];
-  curSesionAccesoId    = null;
-  curSesionAccesoIdent = null;
-  mostrarToast(`Sesión finalizada. ${n} participante${n !== 1 ? 's' : ''} registrado${n !== 1 ? 's' : ''} correctamente.`, 'ok');
-  setTimeout(() => volverMenu(), 2000);
-}
-
-// ── Habilitar acceso de participantes ─────
-async function sesHabilitarAcceso() {
-  const pwd = document.getElementById('ses-acceso-pwd').value.trim();
+  const pwd = document.getElementById('ses-pwd').value.trim();
   if (!pwd) { mostrarToast('Ingresa una contraseña de acceso.', 'err'); return; }
-  const ids = curSesionParts.map(p => p.id).filter(Boolean);
-  if (ids.length === 0) { mostrarToast('Registra al menos un participante primero.', 'err'); return; }
+
+  // Nombre de sesión
+  const [y, m, d] = fecha.split('-');
+  const ddmmaa = (d||'').padStart(2,'0') + (m||'').padStart(2,'0') + (y||'').slice(-2);
+  const cursosNames = curSesionCursos.filter(c => cursoIds.includes(c.id)).map(c => c.nombre).join(' / ');
+  const nombreSesion = ddmmaa + ' ' + cursosNames.toUpperCase();
 
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   try {
@@ -3247,22 +3230,128 @@ async function sesHabilitarAcceso() {
       body: JSON.stringify({
         action: 'CREAR_SESION_ACCESO',
         payload: {
-          sesion_nombre:    curSesion.nombre_sesion,
+          sesion_nombre:    nombreSesion,
           password:         pwd,
-          participante_ids: ids
+          fecha_curso:      fecha,
+          curso_ids:        cursoIds,
+          empresas:         curSesionEmpPreBuild,
         }
       })
     });
     const data = await res.json();
-    if (data.status !== 'success') { mostrarToast(data.message || 'Error al crear acceso.', 'err'); return; }
+    if (data.status !== 'success') { mostrarToast(data.message || 'Error al crear sesión.', 'err'); return; }
 
     curSesionAccesoId    = data.id;
     curSesionAccesoIdent = data.identificador;
-    sesRenderAcceso(true, data.identificador);
-    mostrarToast('Acceso habilitado. Los participantes ya pueden ingresar.', 'ok');
+    curSesion            = { nombre_sesion: nombreSesion, fecha };
+    curSesionParts       = [];
+    curSesionEmpresas    = [...curSesionEmpPreBuild];
+
+    // Render session list
+    document.getElementById('ses-lista-nombre').textContent = nombreSesion;
+    document.getElementById('ses-lista-meta').textContent   = 'Sesión activa — ' + new Date(fecha + 'T12:00:00').toLocaleDateString('es-MX', {day:'2-digit',month:'long',year:'numeric'});
+    document.getElementById('ses-qr-ident').textContent     = data.identificador;
+    const loginUrl = window.location.origin +
+      window.location.pathname.replace(/inspector\.html.*$/, 'login.html') +
+      '?sesion=' + encodeURIComponent(data.identificador);
+    document.getElementById('ses-qr-img').src =
+      'https://quickchart.io/qr?text=' + encodeURIComponent(loginUrl) + '&size=200';
+
+    sesRenderEmpresasLista();
+    sesRefrescarParticipantes();
+    curMostrar('lista');
+    mostrarToast('Sesión creada. Comparte el QR con los participantes.', 'ok');
   } catch(e) {
     mostrarToast('Error de conexión.', 'err');
   }
+}
+
+// ── Sesión: agregar empresa (setup) ───────
+function sesAgregarEmpresa() {
+  const nombre = document.getElementById('ses-emp-buscar').value.trim();
+  const id     = document.getElementById('ses-emp-id').value.trim();
+  if (!nombre) { mostrarToast('Escribe el nombre de la empresa.', 'err'); return; }
+  curSesionEmpPreBuild.push({ nombre_empresa: nombre, primera_parte: id || null });
+  document.getElementById('ses-emp-buscar').value = '';
+  document.getElementById('ses-emp-id').value     = '';
+  sesRenderEmpresasSetup();
+}
+
+function sesRenderEmpresasSetup() {
+  const lista = document.getElementById('ses-empresas-lista');
+  lista.innerHTML = curSesionEmpPreBuild.map((e, i) => `
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f9fbff;border:1px solid var(--borde);border-radius:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600">${escHtmlInsp(e.nombre_empresa)}</div>
+        ${e.primera_parte ? `<div style="font-size:11px;color:var(--texto-sub)">ID: ${e.primera_parte}</div>` : ''}
+      </div>
+      <button onclick="sesQuitarEmpresaSetup(${i})" style="color:var(--rojo);background:none;border:none;font-size:16px;cursor:pointer;padding:2px">✕</button>
+    </div>`).join('') || '<div style="font-size:12px;color:var(--texto-sub);padding:4px 0">No hay empresas agregadas aún</div>';
+}
+
+function sesQuitarEmpresaSetup(i) {
+  curSesionEmpPreBuild.splice(i, 1);
+  sesRenderEmpresasSetup();
+}
+
+function sesRenderEmpresasLista() {
+  const lista = document.getElementById('ses-lista-empresas');
+  lista.innerHTML = curSesionEmpresas.map(e => `
+    <div style="padding:8px 12px;background:#f9fbff;border:1px solid var(--borde);border-radius:8px;font-size:13px">
+      <strong>${escHtmlInsp(e.nombre_empresa)}</strong>
+      ${e.primera_parte ? `<span style="font-size:11px;color:var(--texto-sub);margin-left:6px">ID: ${e.primera_parte}</span>` : ''}
+    </div>`).join('') || '<div style="font-size:12px;color:var(--texto-sub);padding:4px 0">Sin empresas configuradas</div>';
+}
+
+function escHtmlInsp(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Sesión: agregar participante manual ───
+function sesAgregarParticipanteManual() {
+  curModo = 'curso';
+  curPrepararForm('curso');
+  curMostrar('form');
+}
+
+// ── Sesión: renderizar lista participantes ─
+function sesRenderLista() {
+  const lista  = document.getElementById('ses-lista-items');
+  const empty  = document.getElementById('ses-lista-empty');
+  if (!curSesionParts.length) {
+    lista.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+  lista.innerHTML = curSesionParts.map((p, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f9fbff;border:1px solid var(--borde);border-radius:10px">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--azul-light);color:var(--azul-dark);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--texto);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${p.nombre_completo || '<em style="color:var(--texto-sub)">Sin nombre</em>'}</div>
+        <div style="font-size:11px;color:var(--texto-sub)">${p.curso_nombre || ''}${p.empresa_nombre ? ' · ' + p.empresa_nombre : ''}</div>
+      </div>
+      <span style="color:var(--verde);font-size:16px">✓</span>
+    </div>`).join('');
+}
+
+async function sesRefrescarParticipantes() {
+  if (!curSesionAccesoId) return;
+  // Placeholder: participantes se registran desde el portal del participante
+  sesRenderLista();
+}
+
+// ── Sesión: finalizar ─────────────────────
+function sesFinalizarSesion() {
+  if (curSesionAccesoId) sesCerrarAcceso(true);
+  curSesion            = null;
+  curSesionParts       = [];
+  curSesionAccesoId    = null;
+  curSesionAccesoIdent = null;
+  curSesionEmpresas    = [];
+  curSesionEmpPreBuild = [];
+  mostrarToast('Sesión cerrada correctamente.', 'ok');
+  setTimeout(() => volverMenu(), 2000);
 }
 
 // ── Cerrar acceso de participantes ────────
@@ -3272,7 +3361,6 @@ async function sesCerrarAcceso(silencioso = false) {
   const id = curSesionAccesoId;
   curSesionAccesoId    = null;
   curSesionAccesoIdent = null;
-  sesRenderAcceso(false, null);
   try {
     await fetch(API, {
       method: 'POST',
@@ -3283,20 +3371,43 @@ async function sesCerrarAcceso(silencioso = false) {
   if (!silencioso) mostrarToast('Acceso de participantes cerrado.', 'ok');
 }
 
-// ── Renderizar panel de acceso ─────────────
-function sesRenderAcceso(activo, identificador) {
-  document.getElementById('ses-acceso-inactivo').style.display = activo ? 'none' : 'block';
-  document.getElementById('ses-acceso-activo').style.display   = activo ? 'block' : 'none';
-  if (activo && identificador) {
-    document.getElementById('ses-acceso-ident').textContent = identificador;
-    const loginUrl = window.location.origin +
-      window.location.pathname.replace(/inspector\.html.*$/, 'login.html') +
-      '?sesion=' + encodeURIComponent(identificador);
-    document.getElementById('ses-acceso-qr').src =
-      'https://quickchart.io/qr?text=' + encodeURIComponent(loginUrl) + '&size=200';
-  } else {
-    document.getElementById('ses-acceso-pwd').value = '';
-    document.getElementById('ses-acceso-qr').src = '';
+// ── Modal: agregar empresa en sesión activa ─
+function sesModalAgregarEmpresa() {
+  document.getElementById('ses-modal-emp-buscar').value = '';
+  document.getElementById('ses-modal-emp-id').value     = '';
+  document.getElementById('ses-modal-empresa').style.display = 'flex';
+  initEmpresaSearch(
+    document.getElementById('ses-modal-emp-buscar'),
+    document.getElementById('ses-modal-emp-id'),
+    { dropdownId: 'drop-modal-emp' }
+  );
+}
+
+async function sesConfirmarAgregarEmpresa() {
+  const nombre = document.getElementById('ses-modal-emp-buscar').value.trim();
+  const id     = document.getElementById('ses-modal-emp-id').value.trim();
+  if (!nombre) { mostrarToast('Escribe el nombre de la empresa.', 'err'); return; }
+  if (!curSesionAccesoId) { mostrarToast('No hay sesión activa.', 'err'); return; }
+
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body: JSON.stringify({
+        action: 'SESION_AGREGAR_EMPRESA',
+        payload: { sesion_id: curSesionAccesoId, nombre_empresa: nombre, primera_parte: id || null }
+      })
+    });
+    const data = await res.json();
+    if (data.status !== 'success') { mostrarToast(data.message || 'Error.', 'err'); return; }
+
+    curSesionEmpresas.push({ id: data.id, nombre_empresa: nombre, primera_parte: id || null });
+    sesRenderEmpresasLista();
+    document.getElementById('ses-modal-empresa').style.display = 'none';
+    mostrarToast('Empresa agregada.', 'ok');
+  } catch(e) {
+    mostrarToast('Error de conexión.', 'err');
   }
 }
 
@@ -3558,6 +3669,12 @@ async function curEnviar() {
   const cursoId = esSesion ? curSesion.curso_id : document.getElementById('cur-curso').value;
   const fecha   = esSesion ? curSesion.fecha     : document.getElementById('cur-fecha').value;
 
+  // Validación matemática de CURP (si se proporcionó)
+  if (curp) {
+    const rv = validarCURPCompleta(curp);
+    if (!rv.valida) { curShowErr('cur-curp', rv.error); return; }
+  }
+
   let valido = true;
   if (!esSesion) {
     if (!cursoId) { curShowErr('cur-curso', 'Selecciona un curso');               valido = false; }
@@ -3812,9 +3929,15 @@ async function izaIniciar() {
   izaFotos      = [];
   izaEstadoVal  = 'CUMPLE';
 
-  // Limpiar campo cliente
-  document.getElementById('iza-cliente').value = '';
+  // Limpiar campo cliente e inicializar autocomplete
+  document.getElementById('iza-cliente').value    = '';
+  document.getElementById('iza-cliente-id').value = '';
   document.getElementById('iza-f-cliente').classList.remove('has-error');
+  initEmpresaSearch(
+    document.getElementById('iza-cliente'),
+    document.getElementById('iza-cliente-id'),
+    { dropdownId: 'drop-iza-cliente' }
+  );
 
   // Mostrar pantalla de datos e inicializar mapa
   izaMostrar('datos');
@@ -4185,5 +4308,6 @@ async function verEvidencia(url) {
   <span id="toast-msg"></span>
 </div>
 
+<script src="js/utils.js"></script>
 </body>
 </html>

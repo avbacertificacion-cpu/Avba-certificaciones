@@ -28,11 +28,15 @@ class Auth {
                   identificador VARCHAR(100) NOT NULL,
                   password_hash VARCHAR(255) NOT NULL,
                   inspector_id  INT NOT NULL,
+                  fecha_curso   DATE NULL,
                   activa        TINYINT UNSIGNED NOT NULL DEFAULT 1,
                   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                   UNIQUE KEY uk_ident (identificador)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
+            // Añadir fecha_curso si la tabla ya existía sin esa columna
+            try { $this->pdo->exec("ALTER TABLE curso_sesiones_acceso ADD COLUMN IF NOT EXISTS fecha_curso DATE NULL"); } catch (\PDOException $e) {}
+
             $this->pdo->exec("
                 CREATE TABLE IF NOT EXISTS sesion_acceso_participantes (
                   sesion_acceso_id INT NOT NULL,
@@ -48,6 +52,27 @@ class Auth {
                   created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
+            // Cursos disponibles en la sesión
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS sesion_cursos (
+                  sesion_acceso_id INT NOT NULL,
+                  curso_id         INT NOT NULL,
+                  PRIMARY KEY (sesion_acceso_id, curso_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+            // Empresas configuradas en la sesión
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS sesion_empresas (
+                  id               INT AUTO_INCREMENT PRIMARY KEY,
+                  sesion_acceso_id INT NOT NULL,
+                  nombre_empresa   VARCHAR(300) NOT NULL,
+                  primera_parte    VARCHAR(10)  NULL,
+                  rfc              VARCHAR(20)  NULL,
+                  representante    VARCHAR(200) NULL,
+                  direccion        VARCHAR(500) NULL,
+                  KEY idx_sa (sesion_acceso_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
         } catch (\PDOException $e) {}
     }
 
@@ -55,12 +80,14 @@ class Auth {
     public function crearSesionAcceso(array $payload, int $inspectorId): array {
         $this->ensureParticipanteTables();
 
-        $nombre       = trim($payload['sesion_nombre'] ?? '');
-        $password     = trim($payload['password'] ?? '');
-        $participantes = array_filter(array_map('intval', $payload['participante_ids'] ?? []), fn($v) => $v > 0);
+        $nombre    = trim($payload['sesion_nombre'] ?? '');
+        $password  = trim($payload['password'] ?? '');
+        $fecha     = trim($payload['fecha_curso'] ?? '');
+        $cursoIds  = array_filter(array_map('intval', $payload['curso_ids']  ?? []), fn($v) => $v > 0);
+        $empresas  = $payload['empresas'] ?? [];
 
-        if (!$nombre || !$password || empty($participantes)) {
-            return ['status' => 'error', 'message' => 'Datos incompletos.'];
+        if (!$nombre || !$password) {
+            return ['status' => 'error', 'message' => 'Nombre de sesión y contraseña son obligatorios.'];
         }
 
         // Generar identificador único tipo CUR-XXXXXX
@@ -75,19 +102,104 @@ class Auth {
 
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $this->pdo->prepare(
-            "INSERT INTO curso_sesiones_acceso (sesion_nombre, identificador, password_hash, inspector_id) VALUES (?, ?, ?, ?)"
-        )->execute([$nombre, $identificador, $hash, $inspectorId]);
+            "INSERT INTO curso_sesiones_acceso (sesion_nombre, identificador, password_hash, inspector_id, fecha_curso)
+             VALUES (?, ?, ?, ?, ?)"
+        )->execute([$nombre, $identificador, $hash, $inspectorId, $fecha ?: null]);
 
         $sesionId = (int)$this->pdo->lastInsertId();
 
-        $ins = $this->pdo->prepare(
-            "INSERT IGNORE INTO sesion_acceso_participantes (sesion_acceso_id, participante_id) VALUES (?, ?)"
-        );
-        foreach ($participantes as $pId) {
-            $ins->execute([$sesionId, $pId]);
+        // Registrar cursos habilitados
+        if ($cursoIds) {
+            $insCurso = $this->pdo->prepare(
+                "INSERT IGNORE INTO sesion_cursos (sesion_acceso_id, curso_id) VALUES (?, ?)"
+            );
+            foreach ($cursoIds as $cId) $insCurso->execute([$sesionId, $cId]);
+        }
+
+        // Registrar empresas configuradas
+        if ($empresas) {
+            $insEmp = $this->pdo->prepare(
+                "INSERT INTO sesion_empresas (sesion_acceso_id, nombre_empresa, primera_parte, rfc, representante, direccion)
+                 VALUES (?, ?, ?, ?, ?, ?)"
+            );
+            foreach ($empresas as $emp) {
+                $insEmp->execute([
+                    $sesionId,
+                    trim($emp['nombre_empresa'] ?? ''),
+                    trim($emp['primera_parte']  ?? '') ?: null,
+                    trim($emp['rfc']            ?? '') ?: null,
+                    trim($emp['representante']  ?? '') ?: null,
+                    trim($emp['direccion']      ?? '') ?: null,
+                ]);
+            }
         }
 
         return ['status' => 'success', 'id' => $sesionId, 'identificador' => $identificador];
+    }
+
+    // ── AGREGAR EMPRESA A SESIÓN ABIERTA ──────────────────
+    public function agregarEmpresaSesion(array $payload, int $inspectorId): array {
+        $this->ensureParticipanteTables();
+        $sesionId = (int)($payload['sesion_id'] ?? 0);
+        $nombre   = trim($payload['nombre_empresa'] ?? '');
+        if (!$sesionId || !$nombre) return ['status' => 'error', 'message' => 'Datos incompletos.'];
+
+        // Verificar que la sesión pertenece al inspector y está activa
+        $stmt = $this->pdo->prepare(
+            "SELECT id FROM curso_sesiones_acceso WHERE id = ? AND inspector_id = ? AND activa = 1"
+        );
+        $stmt->execute([$sesionId, $inspectorId]);
+        if (!$stmt->fetch()) return ['status' => 'error', 'message' => 'Sesión no encontrada o cerrada.'];
+
+        $this->pdo->prepare(
+            "INSERT INTO sesion_empresas (sesion_acceso_id, nombre_empresa, primera_parte, rfc, representante, direccion)
+             VALUES (?, ?, ?, ?, ?, ?)"
+        )->execute([
+            $sesionId,
+            $nombre,
+            trim($payload['primera_parte'] ?? '') ?: null,
+            trim($payload['rfc']           ?? '') ?: null,
+            trim($payload['representante'] ?? '') ?: null,
+            trim($payload['direccion']     ?? '') ?: null,
+        ]);
+
+        $id = (int)$this->pdo->lastInsertId();
+        return ['status' => 'success', 'id' => $id, 'message' => 'Empresa agregada.'];
+    }
+
+    // ── INFO DE SESIÓN PARA PARTICIPANTE ──────────────────
+    public function getSesionInfo(int $sesionId): array {
+        $this->ensureParticipanteTables();
+
+        $stmt = $this->pdo->prepare(
+            "SELECT sesion_nombre, fecha_curso FROM curso_sesiones_acceso WHERE id = ? AND activa = 1"
+        );
+        $stmt->execute([$sesionId]);
+        $sesion = $stmt->fetch();
+        if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada o cerrada.'];
+
+        // Cursos habilitados
+        $cursos = $this->pdo->prepare(
+            "SELECT c.id, c.nombre FROM sesion_cursos sc
+             JOIN cursos c ON c.id = sc.curso_id
+             WHERE sc.sesion_acceso_id = ? ORDER BY c.nombre"
+        );
+        $cursos->execute([$sesionId]);
+
+        // Empresas configuradas
+        $empresas = $this->pdo->prepare(
+            "SELECT id, nombre_empresa, primera_parte, rfc FROM sesion_empresas
+             WHERE sesion_acceso_id = ? ORDER BY nombre_empresa"
+        );
+        $empresas->execute([$sesionId]);
+
+        return [
+            'status'        => 'success',
+            'sesion_nombre' => $sesion['sesion_nombre'],
+            'fecha_curso'   => $sesion['fecha_curso'],
+            'cursos'        => $cursos->fetchAll(),
+            'empresas'      => $empresas->fetchAll(),
+        ];
     }
 
     // ── CERRAR SESIÓN DE ACCESO ────────────────────────────

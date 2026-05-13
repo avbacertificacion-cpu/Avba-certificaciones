@@ -13,6 +13,8 @@
       --verde-light:#EAF4E0;
       --rojo:      #A32D2D;
       --rojo-light:#FCEBEB;
+      --ambar:     #92620A;
+      --ambar-light:#FFF8E1;
       --gris-bg:   #f0f4f9;
       --borde:     #dfe5ef;
       --texto:     #1a1a2e;
@@ -21,171 +23,149 @@
       --radio:     10px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Segoe UI', system-ui, sans-serif;
-      background: var(--gris-bg);
-      min-height: 100vh;
-    }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--gris-bg); min-height: 100vh; }
 
-    /* ── Header ── */
+    /* Header */
     .header {
-      background: var(--azul);
-      padding: 14px 20px;
-      display: flex; align-items: center; gap: 12px;
-      color: white;
+      background: var(--azul); padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px; color: white;
     }
     .header-logo {
-      width: 36px; height: 36px;
-      background: rgba(255,255,255,0.15); border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
+      width: 36px; height: 36px; background: rgba(255,255,255,0.15);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     }
-    .header-logo svg { width: 20px; height: 20px; color: white; }
+    .header-logo svg { width: 20px; height: 20px; }
     .header-title { font-size: 15px; font-weight: 700; }
-    .header-sub   { font-size: 12px; color: rgba(255,255,255,0.75); margin-top: 1px; }
+    .header-sub   { font-size: 11px; color: rgba(255,255,255,0.75); margin-top: 1px; }
     .header-logout {
       margin-left: auto; padding: 7px 12px;
       background: rgba(255,255,255,0.15); border: none; border-radius: 8px;
       color: white; font-size: 12px; font-weight: 600; cursor: pointer;
     }
-    .header-logout:hover { background: rgba(255,255,255,0.25); }
 
-    /* ── Main container ── */
-    .main { max-width: 540px; margin: 0 auto; padding: 20px 16px 80px; }
+    /* Main */
+    .main { max-width: 560px; margin: 0 auto; padding: 16px 14px 100px; }
 
-    /* ── Toast ── */
+    /* Toast */
     .toast {
       position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
       background: #1a1a2e; color: white; padding: 11px 18px; border-radius: 30px;
-      font-size: 13px; font-weight: 500; white-space: nowrap;
-      opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 9999;
-      max-width: 88vw; overflow: hidden; text-overflow: ellipsis;
+      font-size: 13px; font-weight: 500; opacity: 0; transition: opacity .25s;
+      pointer-events: none; z-index: 9999; max-width: 88vw; text-align: center;
     }
-    .toast.show { opacity: 1; }
-    .toast.ok  { background: #2A5009; }
-    .toast.err { background: var(--rojo); }
+    .toast.show  { opacity: 1; }
+    .toast.ok    { background: #2A5009; }
+    .toast.err   { background: var(--rojo); }
 
-    /* ── Cards ── */
+    /* Card */
     .card {
       background: var(--blanco); border-radius: 14px;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-      border: 1px solid rgba(0,0,0,0.05);
-      padding: 20px; margin-bottom: 14px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07); border: 1px solid rgba(0,0,0,0.05);
+      padding: 18px; margin-bottom: 12px;
     }
-    .card-title {
-      font-size: 15px; font-weight: 700; color: var(--texto); margin-bottom: 4px;
-    }
-    .card-sub {
-      font-size: 13px; color: var(--texto-sub); margin-bottom: 16px;
-    }
+    .card-title { font-size: 15px; font-weight: 700; color: var(--texto); margin-bottom: 12px; }
 
-    /* ── Participant list ── */
-    .part-list { display: flex; flex-direction: column; gap: 8px; }
-    .part-item {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 14px; border-radius: 10px;
-      border: 1.5px solid var(--borde); cursor: pointer;
-      transition: border-color .15s, background .15s;
-    }
-    .part-item:hover { border-color: var(--azul); background: var(--azul-light); }
-    .part-item.selected { border-color: var(--azul); background: var(--azul-light); }
-    .part-avatar {
-      width: 36px; height: 36px; border-radius: 50%;
-      background: var(--azul-light); color: var(--azul-dark);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 15px; font-weight: 700; flex-shrink: 0;
-    }
-    .part-info { flex: 1; min-width: 0; }
-    .part-nombre { font-size: 14px; font-weight: 600; color: var(--texto); }
-    .part-estado { font-size: 11px; color: var(--texto-sub); margin-top: 2px; }
-    .part-estado.pendiente { color: #B45309; }
-    .part-estado.ok { color: var(--verde); }
-    .part-arrow { color: var(--texto-sub); font-size: 16px; }
-
-    /* ── Form ── */
-    .form-section { display: none; }
-    .back-btn {
-      display: inline-flex; align-items: center; gap: 6px;
-      color: var(--azul); font-size: 13px; font-weight: 600;
-      cursor: pointer; margin-bottom: 16px; background: none; border: none; padding: 0;
-    }
-    .back-btn:hover { text-decoration: underline; }
-
-    .field { margin-bottom: 14px; }
-    .field label {
-      display: block; font-size: 12px; font-weight: 600;
-      color: var(--texto-sub); margin-bottom: 6px;
-    }
-    .field input {
+    /* Fields */
+    .field { margin-bottom: 13px; }
+    .field label { display: block; font-size: 12px; font-weight: 600; color: var(--texto-sub); margin-bottom: 5px; }
+    .field label .req { color: var(--rojo); margin-left: 2px; }
+    .field input, .field select, .field textarea {
       width: 100%; padding: 11px 13px;
       border: 1.5px solid var(--borde); border-radius: var(--radio);
       font-size: 14px; color: var(--texto); background: var(--blanco);
-      outline: none; transition: border-color .15s;
+      outline: none; transition: border-color .15s; appearance: none;
     }
-    .field input:focus { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
-    .field input.err { border-color: var(--rojo); }
-    .field .hint { font-size: 11px; color: var(--texto-sub); margin-top: 4px; }
+    .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath d='M4 6l4 4 4-4' fill='none' stroke='%235a6072' stroke-width='1.5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px; }
+    .field input:focus, .field select:focus { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+    .field input.err, .field select.err { border-color: var(--rojo); }
+    .field .hint    { font-size: 11px; color: var(--texto-sub); margin-top: 4px; }
     .field .err-msg { font-size: 11px; color: var(--rojo); margin-top: 4px; display: none; }
+    .field .err-msg.show { display: block; }
 
-    .btn-guardar {
+    /* Upload zones */
+    .upload-zone {
+      border: 2px dashed var(--borde); border-radius: var(--radio);
+      padding: 18px; text-align: center; cursor: pointer; transition: border-color .15s;
+    }
+    .upload-zone:hover { border-color: var(--azul); }
+    .upload-zone.has-file { border-color: var(--verde); border-style: solid; background: var(--verde-light); }
+    .upload-zone.err-border { border-color: var(--rojo); }
+    .upload-icon { font-size: 28px; margin-bottom: 6px; }
+    .upload-label { font-size: 13px; font-weight: 600; color: var(--texto); }
+    .upload-hint  { font-size: 11px; color: var(--texto-sub); margin-top: 3px; }
+    .upload-preview { max-width: 100%; max-height: 140px; border-radius: 8px; margin-top: 8px; }
+    .upload-filename { font-size: 12px; color: var(--verde); font-weight: 600; margin-top: 6px; }
+
+    /* Multi-doc list */
+    .doc-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; background: #f9fbff;
+      border: 1px solid var(--borde); border-radius: 8px; margin-bottom: 6px;
+    }
+    .doc-item-name { flex: 1; font-size: 12px; color: var(--texto); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .doc-rm { color: var(--rojo); background: none; border: none; font-size: 16px; cursor: pointer; padding: 0 4px; }
+
+    /* Buttons */
+    .btn-primary {
       width: 100%; padding: 13px; border: none; border-radius: var(--radio);
       background: var(--azul); color: white; font-size: 15px; font-weight: 600;
-      cursor: pointer; transition: background .15s;
-      display: flex; align-items: center; justify-content: center; gap: 8px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: background .15s;
     }
-    .btn-guardar:hover { background: var(--azul-dark); }
-    .btn-guardar:disabled { background: var(--borde); cursor: not-allowed; }
+    .btn-primary:hover { background: var(--azul-dark); }
+    .btn-primary:disabled { background: var(--borde); cursor: not-allowed; }
+    .btn-secondary {
+      padding: 9px 16px; border: 1.5px solid var(--borde); border-radius: var(--radio);
+      background: var(--blanco); color: var(--texto); font-size: 13px; font-weight: 600;
+      cursor: pointer;
+    }
 
-    /* ── Éxito ── */
-    .exito-section {
-      display: none; text-align: center; padding: 30px 20px;
-    }
-    .exito-icon {
-      width: 60px; height: 60px; background: var(--verde-light);
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      margin: 0 auto 16px;
-    }
-    .exito-titulo { font-size: 20px; font-weight: 700; color: var(--verde); margin-bottom: 8px; }
-    .exito-sub    { font-size: 14px; color: var(--texto-sub); line-height: 1.5; }
-
-    /* ── Loading ── */
+    /* Loading */
     .spin {
       display: inline-block; width: 16px; height: 16px;
       border: 2px solid rgba(255,255,255,0.3); border-top-color: white;
       border-radius: 50%; animation: giro .6s linear infinite;
     }
     @keyframes giro { to { transform: rotate(360deg); } }
-
-    .loading-wrap {
-      text-align: center; padding: 40px 20px; color: var(--texto-sub); font-size: 14px;
-    }
-    .loading-wrap .spin {
+    .loading-wrap { text-align: center; padding: 50px 20px; color: var(--texto-sub); }
+    .loading-wrap .spin-lg {
+      width: 30px; height: 30px; border-width: 3px;
       border-color: var(--borde); border-top-color: var(--azul);
-      width: 28px; height: 28px; border-width: 3px;
-      display: block; margin: 0 auto 12px;
+      display: block; margin: 0 auto 14px; animation: giro .6s linear infinite;
+      border-radius: 50%;
     }
 
-    /* ── Sesión cerrada ── */
-    .sesion-cerrada {
-      text-align: center; padding: 40px 20px;
+    /* Success */
+    .exito {
+      text-align: center; padding: 32px 20px;
     }
-    .sesion-cerrada-icon { font-size: 40px; margin-bottom: 12px; }
-    .sesion-cerrada-titulo { font-size: 18px; font-weight: 700; color: var(--rojo); margin-bottom: 8px; }
-    .sesion-cerrada-sub    { font-size: 13px; color: var(--texto-sub); }
+    .exito-icon {
+      width: 64px; height: 64px; border-radius: 50%; background: var(--verde-light);
+      display: flex; align-items: center; justify-content: center; margin: 0 auto 16px;
+    }
+    .exito-titulo { font-size: 20px; font-weight: 700; color: var(--verde); margin-bottom: 8px; }
+    .exito-sub    { font-size: 14px; color: var(--texto-sub); line-height: 1.55; margin-bottom: 20px; }
+    .exito-folio  { font-family: monospace; font-size: 16px; font-weight: 700; color: var(--azul); background: var(--azul-light); padding: 6px 14px; border-radius: 8px; display: inline-block; margin-bottom: 16px; }
+
+    /* Session closed */
+    .cerrada { text-align: center; padding: 50px 20px; }
+    .cerrada-icon  { font-size: 44px; margin-bottom: 14px; }
+    .cerrada-titulo { font-size: 18px; font-weight: 700; color: var(--rojo); margin-bottom: 8px; }
+    .cerrada-sub    { font-size: 13px; color: var(--texto-sub); line-height: 1.5; }
   </style>
 </head>
 <body>
 
 <div class="header">
   <div class="header-logo">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" color="white">
       <path d="M12 2L2 7l10 5 10-5-10-5z"/>
       <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
     </svg>
   </div>
   <div>
     <div class="header-title">Portal de Participante</div>
-    <div class="header-sub" id="header-sesion">Cargando…</div>
+    <div class="header-sub" id="header-sesion">Cargando sesión…</div>
   </div>
   <button class="header-logout" onclick="cerrarSesion()">Salir</button>
 </div>
@@ -193,110 +173,146 @@
 <div class="main">
 
   <!-- Cargando -->
-  <div id="loading-section" class="loading-wrap">
-    <div class="spin"></div>
-    Cargando…
+  <div id="sec-loading" class="card loading-wrap">
+    <div class="spin-lg"></div>
+    Cargando sesión…
   </div>
 
-  <!-- Sesión cerrada por inspector -->
-  <div id="sesion-cerrada-section" class="card sesion-cerrada" style="display:none">
-    <div class="sesion-cerrada-icon">🔒</div>
-    <div class="sesion-cerrada-titulo">Sesión cerrada</div>
-    <div class="sesion-cerrada-sub">
-      El inspector ha cerrado el acceso a esta sesión. Si necesitas modificar tus datos,
-      comunícate con tu instructor.
+  <!-- Sesión cerrada -->
+  <div id="sec-cerrada" class="card cerrada" style="display:none">
+    <div class="cerrada-icon">🔒</div>
+    <div class="cerrada-titulo">Sesión cerrada</div>
+    <div class="cerrada-sub">
+      El inspector ha cerrado el acceso a esta sesión.<br>
+      Si necesitas registrarte, comunícate con tu instructor.
     </div>
   </div>
 
-  <!-- Lista de participantes -->
-  <div id="lista-section" style="display:none">
-    <div class="card">
-      <div class="card-title">Selecciona tu nombre</div>
-      <div class="card-sub">Toca tu nombre para ingresar o completar tu información.</div>
-      <div class="part-list" id="part-list"></div>
-    </div>
-  </div>
-
-  <!-- Formulario de datos -->
-  <div id="form-section" class="form-section">
-    <button class="back-btn" onclick="volverLista()">
-      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px">
-        <path d="M10 4l-4 4 4 4"/>
-      </svg>
-      Volver a la lista
-    </button>
+  <!-- Formulario de registro -->
+  <div id="sec-form" style="display:none">
 
     <div class="card">
-      <div class="card-title" id="form-nombre-titulo">Mis datos</div>
-      <div class="card-sub">Completa o verifica tu información para el certificado.</div>
+      <div class="card-title">📋 Completa tus datos</div>
 
+      <!-- Nombre -->
       <div class="field">
-        <label>Nombre completo</label>
-        <input type="text" id="inp-nombre" placeholder="Como aparece en tu identificación"
-               autocomplete="name" oninput="limpiarError('nombre')">
-        <div class="hint">Escríbelo exactamente como aparece en tu INE o CURP.</div>
-        <div class="err-msg" id="err-nombre">Ingresa tu nombre completo.</div>
+        <label>Nombre completo <span class="req">*</span></label>
+        <input type="text" id="inp-nombre" placeholder="Como aparece en tu identificación oficial"
+               autocomplete="name" oninput="limpiarErr('nombre')">
+        <div class="err-msg" id="err-nombre">El nombre es obligatorio.</div>
       </div>
 
+      <!-- CURP -->
       <div class="field">
         <label>CURP</label>
         <input type="text" id="inp-curp" placeholder="18 caracteres" maxlength="18"
-               autocomplete="off" style="text-transform:uppercase"
-               oninput="this.value=this.value.toUpperCase();limpiarError('curp')">
-        <div class="hint">18 caracteres. Puedes encontrarlo en tu INE, acta de nacimiento o en gob.mx/curp.</div>
-        <div class="err-msg" id="err-curp">CURP inválida. Verifica los 18 caracteres.</div>
+               style="text-transform:uppercase;letter-spacing:.05em"
+               oninput="this.value=this.value.toUpperCase();limpiarErr('curp')">
+        <div class="hint">Puedes encontrarlo en tu INE, acta de nacimiento o en gob.mx/curp.</div>
+        <div class="err-msg" id="err-curp">CURP inválida — verifica los 18 caracteres y el dígito verificador.</div>
       </div>
 
-      <button class="btn-guardar" id="btn-guardar" onclick="guardarDatos()">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px">
-          <path d="M13 2H4a1 1 0 00-1 1v10a1 1 0 001 1h9a1 1 0 001-1V5l-2-3z"/>
-          <path d="M12 2v4H5"/>
-        </svg>
-        Guardar mis datos
-      </button>
+      <!-- Puesto -->
+      <div class="field">
+        <label>Puesto / Cargo</label>
+        <input type="text" id="inp-puesto" placeholder="Ej: Operador de grúa, Supervisor, Maniobrista…">
+      </div>
+
+      <!-- Curso -->
+      <div class="field">
+        <label>Curso que te corresponde <span class="req">*</span></label>
+        <select id="inp-curso" oninput="limpiarErr('curso')">
+          <option value="">— Selecciona tu curso —</option>
+        </select>
+        <div class="err-msg" id="err-curso">Selecciona el curso que te corresponde.</div>
+      </div>
+
+      <!-- Empresa -->
+      <div class="field">
+        <label>Empresa</label>
+        <select id="inp-empresa">
+          <option value="">— Sin empresa / Independiente —</option>
+        </select>
+        <div class="hint">Si tu empresa no aparece en la lista, déjalo en blanco.</div>
+      </div>
     </div>
+
+    <!-- Foto de medio cuerpo -->
+    <div class="card">
+      <div class="card-title">📷 Fotografía de medio cuerpo <span style="color:var(--rojo);font-size:13px">*</span></div>
+      <div class="upload-zone" id="zone-foto" onclick="document.getElementById('file-foto').click()">
+        <div class="upload-icon">🤳</div>
+        <div class="upload-label">Selecciona tu foto</div>
+        <div class="upload-hint">Una fotografía reciente de medio cuerpo (JPG o PNG)</div>
+        <img id="prev-foto" class="upload-preview" style="display:none" alt="Vista previa">
+        <div class="upload-filename" id="name-foto" style="display:none"></div>
+      </div>
+      <input type="file" id="file-foto" accept="image/jpeg,image/png,image/webp" style="display:none"
+             onchange="onFotoChange()">
+      <div class="err-msg" id="err-foto" style="margin-top:6px">La fotografía de medio cuerpo es obligatoria.</div>
+    </div>
+
+    <!-- Documentos -->
+    <div class="card">
+      <div class="card-title">📄 Documentos de identificación</div>
+      <div class="upload-zone" id="zone-docs" onclick="document.getElementById('file-docs').click()">
+        <div class="upload-icon">📑</div>
+        <div class="upload-label">Agregar documento</div>
+        <div class="upload-hint">INE, CURP, licencia, acta de nacimiento… (imagen o PDF, pueden ser varios)</div>
+      </div>
+      <input type="file" id="file-docs"
+             accept="image/jpeg,image/png,image/webp,application/pdf"
+             multiple style="display:none" onchange="onDocChange()">
+      <div id="docs-lista" style="margin-top:10px"></div>
+    </div>
+
+    <button class="btn-primary" id="btn-guardar" onclick="guardar()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px">
+        <path d="M13 2H4a1 1 0 00-1 1v10a1 1 0 001 1h9a1 1 0 001-1V5l-2-3z"/>
+        <path d="M12 2v4H5M8 8v4M6 10h4"/>
+      </svg>
+      Enviar mi registro
+    </button>
   </div>
 
   <!-- Éxito -->
-  <div id="exito-section" class="card exito-section">
+  <div id="sec-exito" class="card exito" style="display:none">
     <div class="exito-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="var(--verde)" stroke-width="2.5" style="width:30px;height:30px">
+      <svg viewBox="0 0 24 24" fill="none" stroke="var(--verde)" stroke-width="2.5" style="width:32px;height:32px">
         <path d="M20 6L9 17l-5-5"/>
       </svg>
     </div>
-    <div class="exito-titulo">Datos guardados</div>
+    <div class="exito-titulo">¡Registro exitoso!</div>
+    <div id="exito-nombre" style="font-size:15px;font-weight:600;color:var(--texto);margin-bottom:8px"></div>
     <div class="exito-sub" id="exito-sub">Tu información fue registrada correctamente.</div>
-    <button class="back-btn" style="margin:20px auto 0;display:inline-flex"
-            onclick="volverLista()">
-      ← Volver a la lista
-    </button>
+    <div class="exito-folio" id="exito-folio"></div>
+    <div style="font-size:13px;color:var(--texto-sub)">
+      Guarda este folio. Calidad lo usará para generar tu certificado.
+    </div>
   </div>
 
 </div>
 
 <div class="toast" id="toast"></div>
 
+<script src="js/utils.js"></script>
 <script>
-const API = "api/index.php";
+const API = 'api/index.php';
 
-let sesionToken     = null;
-let sesionNombre    = null;
-let participantes   = [];
-let participanteSeleccionado = null;
+let sesionToken  = null;
+let sesionInfo   = null;   // { sesion_nombre, fecha_curso, cursos[], empresas[] }
+let docFiles     = [];     // File objects para documentos
 
-function mostrarToast(msg, tipo = '') {
+function toast(msg, tipo = '') {
   const t = document.getElementById('toast');
-  t.textContent  = msg;
-  t.className    = 'toast show' + (tipo ? ' ' + tipo : '');
-  clearTimeout(t._timer);
-  t._timer = setTimeout(() => t.classList.remove('show'), 3500);
+  t.textContent = msg; t.className = 'toast show' + (tipo ? ' ' + tipo : '');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 3800);
 }
 
-function mostrar(seccion) {
-  ['loading-section','sesion-cerrada-section','lista-section','form-section','exito-section']
+function mostrar(sec) {
+  ['sec-loading','sec-cerrada','sec-form','sec-exito']
     .forEach(id => document.getElementById(id).style.display = 'none');
-  document.getElementById(seccion).style.display = '';
-  if (seccion === 'form-section') document.getElementById('form-section').style.display = 'block';
+  document.getElementById(sec).style.display = '';
 }
 
 function cerrarSesion() {
@@ -304,154 +320,178 @@ function cerrarSesion() {
   window.location.href = 'login.html';
 }
 
-function volverLista() {
-  mostrar('lista-section');
-  participanteSeleccionado = null;
+function limpiarErr(campo) {
+  document.getElementById('inp-' + campo)?.classList.remove('err');
+  const em = document.getElementById('err-' + campo);
+  if (em) { em.classList.remove('show'); }
 }
 
-function limpiarError(campo) {
-  document.getElementById('inp-' + campo).classList.remove('err');
-  document.getElementById('err-' + campo).style.display = 'none';
+function mostrarErr(campo, msg) {
+  const inp = document.getElementById('inp-' + campo);
+  const em  = document.getElementById('err-' + campo);
+  if (inp) inp.classList.add('err');
+  if (em)  { if (msg) em.textContent = msg; em.classList.add('show'); }
 }
 
-// Cargar datos de la sesión
-async function cargarDatos() {
+// ── Foto de medio cuerpo ──────────────────
+function onFotoChange() {
+  const file = document.getElementById('file-foto').files[0];
+  if (!file) return;
+  const zone = document.getElementById('zone-foto');
+  const prev = document.getElementById('prev-foto');
+  const name = document.getElementById('name-foto');
+  zone.classList.add('has-file');
+  name.textContent = file.name; name.style.display = 'block';
+  const url = URL.createObjectURL(file);
+  prev.src = url; prev.style.display = 'block';
+  document.getElementById('err-foto').classList.remove('show');
+}
+
+// ── Documentos múltiples ──────────────────
+function onDocChange() {
+  const newFiles = [...document.getElementById('file-docs').files];
+  newFiles.forEach(f => {
+    if (!docFiles.find(x => x.name === f.name && x.size === f.size)) {
+      docFiles.push(f);
+    }
+  });
+  renderDocs();
+  document.getElementById('file-docs').value = '';
+}
+
+function renderDocs() {
+  const lista = document.getElementById('docs-lista');
+  lista.innerHTML = docFiles.map((f, i) => `
+    <div class="doc-item">
+      <span style="font-size:16px">${f.type === 'application/pdf' ? '📄' : '🖼️'}</span>
+      <span class="doc-item-name">${escH(f.name)}</span>
+      <span style="font-size:11px;color:var(--texto-sub)">${(f.size/1024).toFixed(0)} KB</span>
+      <button class="doc-rm" onclick="quitarDoc(${i})">✕</button>
+    </div>`).join('');
+}
+
+function quitarDoc(i) {
+  docFiles.splice(i, 1);
+  renderDocs();
+}
+
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Guardar ───────────────────────────────
+async function guardar() {
+  let ok = true;
+
+  const nombre  = document.getElementById('inp-nombre').value.trim();
+  const curp    = document.getElementById('inp-curp').value.trim().toUpperCase();
+  const cursoId = document.getElementById('inp-curso').value;
+  const fotoFile = document.getElementById('file-foto').files[0];
+
+  if (!nombre)  { mostrarErr('nombre'); ok = false; }
+  if (curp) {
+    const v = validarCURPCompleta(curp);
+    if (!v.valida) { mostrarErr('curp', v.error); ok = false; }
+  }
+  if (!cursoId) { mostrarErr('curso'); ok = false; }
+  if (!fotoFile) {
+    document.getElementById('err-foto').classList.add('show');
+    document.getElementById('zone-foto').classList.add('err-border');
+    ok = false;
+  }
+  if (!ok) { toast('Corrige los campos marcados.', 'err'); return; }
+
+  const btn = document.getElementById('btn-guardar');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Enviando…';
+
+  const fd = new FormData();
+  fd.append('action', 'PARTICIPANTE_REGISTRAR');
+  fd.append('nombre_completo', nombre);
+  if (curp) fd.append('curp', curp);
+  fd.append('puesto', document.getElementById('inp-puesto').value.trim());
+  fd.append('curso_id', cursoId);
+  const empresaVal = document.getElementById('inp-empresa').value;
+  if (empresaVal) fd.append('sesion_empresa_id', empresaVal);
+  fd.append('foto_persona', fotoFile);
+  docFiles.forEach((f, i) => fd.append('documento_' + i, f));
+
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'X-Token': sesionToken },
+      body: fd
+    });
+    const data = await res.json();
+
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M13 2H4a1 1 0 00-1 1v10a1 1 0 001 1h9a1 1 0 001-1V5l-2-3z"/><path d="M12 2v4H5M8 8v4M6 10h4"/></svg> Enviar mi registro`;
+
+    if (data.status !== 'success') {
+      toast(data.message || 'Error al guardar.', 'err');
+      return;
+    }
+
+    // Mostrar éxito
+    document.getElementById('exito-nombre').textContent = nombre;
+    document.getElementById('exito-sub').textContent =
+      'Tu información fue registrada correctamente' +
+      (sesionInfo?.sesion_nombre ? ' en la sesión: ' + sesionInfo.sesion_nombre + '.' : '.');
+    document.getElementById('exito-folio').textContent = 'Folio: ' + (data.control || data.id);
+    mostrar('sec-exito');
+
+  } catch(e) {
+    btn.disabled = false;
+    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M13 2H4a1 1 0 00-1 1v10a1 1 0 001 1h9a1 1 0 001-1V5l-2-3z"/><path d="M12 2v4H5M8 8v4M6 10h4"/></svg> Enviar mi registro`;
+    toast('Error de conexión. Intenta de nuevo.', 'err');
+  }
+}
+
+// ── Inicialización ────────────────────────
+async function init() {
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   if (!s.token || s.rol !== 'PARTICIPANTE') {
     window.location.href = 'login.html';
     return;
   }
-  sesionToken  = s.token;
-  sesionNombre = s.nombre || 'Sesión de curso';
-  document.getElementById('header-sesion').textContent = sesionNombre;
+  sesionToken = s.token;
 
   try {
-    const res = await fetch(API + '?action=PARTICIPANTE_MIS_DATOS', {
+    const res = await fetch(API + '?action=SESION_INFO', {
       headers: { 'X-Token': sesionToken }
     });
     const data = await res.json();
 
     if (data.status !== 'success') {
-      mostrar('sesion-cerrada-section');
+      mostrar('sec-cerrada');
       return;
     }
 
-    participantes = data.participantes || [];
-    renderLista();
-    mostrar('lista-section');
-  } catch(e) {
-    mostrarToast('Error de conexión. Recarga la página.', 'err');
-  }
-}
+    sesionInfo = data;
+    document.getElementById('header-sesion').textContent = data.sesion_nombre || 'Sesión de curso';
 
-function renderLista() {
-  const lista = document.getElementById('part-list');
-  if (participantes.length === 0) {
-    lista.innerHTML = '<div style="text-align:center;color:var(--texto-sub);font-size:13px;padding:20px 0">No hay participantes registrados en esta sesión.</div>';
-    return;
-  }
-
-  lista.innerHTML = participantes.map((p, i) => {
-    const tieneNombre = p.nombre_completo && p.nombre_completo.trim();
-    const tieneCurp   = p.curp && p.curp.trim();
-    const completo    = tieneNombre && tieneCurp;
-    const inicial     = tieneNombre ? p.nombre_completo.trim()[0].toUpperCase() : (i + 1);
-    const estadoClass = completo ? 'ok' : 'pendiente';
-    const estadoText  = completo ? 'Datos completos' : (!tieneNombre && !tieneCurp ? 'Nombre y CURP pendientes' : !tieneNombre ? 'Nombre pendiente' : 'CURP pendiente');
-    return `<div class="part-item" onclick="seleccionarParticipante(${i})">
-      <div class="part-avatar">${inicial}</div>
-      <div class="part-info">
-        <div class="part-nombre">${tieneNombre ? escHtml(p.nombre_completo) : '<em style="color:var(--texto-sub);font-style:normal">Sin nombre registrado</em>'}</div>
-        <div class="part-estado ${estadoClass}">${estadoText}</div>
-      </div>
-      <div class="part-arrow">›</div>
-    </div>`;
-  }).join('');
-}
-
-function escHtml(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-function seleccionarParticipante(idx) {
-  participanteSeleccionado = participantes[idx];
-  const p = participanteSeleccionado;
-
-  document.getElementById('form-nombre-titulo').textContent =
-    p.nombre_completo ? p.nombre_completo : 'Mis datos';
-  document.getElementById('inp-nombre').value = p.nombre_completo || '';
-  document.getElementById('inp-curp').value   = p.curp || '';
-  limpiarError('nombre'); limpiarError('curp');
-
-  mostrar('form-section');
-  document.getElementById('inp-nombre').focus();
-}
-
-async function guardarDatos() {
-  if (!participanteSeleccionado) return;
-
-  const nombre = document.getElementById('inp-nombre').value.trim();
-  const curp   = document.getElementById('inp-curp').value.trim().toUpperCase();
-
-  let ok = true;
-  if (!nombre) {
-    document.getElementById('inp-nombre').classList.add('err');
-    document.getElementById('err-nombre').style.display = 'block';
-    ok = false;
-  }
-  if (curp && !/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/.test(curp)) {
-    document.getElementById('inp-curp').classList.add('err');
-    document.getElementById('err-curp').style.display = 'block';
-    ok = false;
-  }
-  if (!ok) return;
-
-  const btn = document.getElementById('btn-guardar');
-  btn.disabled = true;
-  btn.innerHTML = '<div class="spin"></div> Guardando…';
-
-  try {
-    const res = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Token': sesionToken },
-      body: JSON.stringify({
-        action: 'PARTICIPANTE_GUARDAR',
-        payload: {
-          participante_id: participanteSeleccionado.id,
-          nombre_completo: nombre,
-          curp: curp || undefined
-        }
-      })
+    // Poblar cursos
+    const sel = document.getElementById('inp-curso');
+    (data.cursos || []).forEach(c => {
+      const o = document.createElement('option');
+      o.value = c.id; o.textContent = c.nombre;
+      sel.appendChild(o);
     });
-    const data = await res.json();
 
-    btn.disabled = false;
-    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M13 2H4a1 1 0 00-1 1v10a1 1 0 001 1h9a1 1 0 001-1V5l-2-3z"/><path d="M12 2v4H5"/></svg> Guardar mis datos`;
+    // Poblar empresas
+    const selEmp = document.getElementById('inp-empresa');
+    (data.empresas || []).forEach(e => {
+      const o = document.createElement('option');
+      o.value = e.id;
+      o.textContent = e.nombre_empresa + (e.primera_parte ? ' (ID: ' + e.primera_parte + ')' : '');
+      selEmp.appendChild(o);
+    });
 
-    if (data.status !== 'success') {
-      mostrarToast(data.message || 'Error al guardar.', 'err');
-      return;
-    }
-
-    // Actualizar datos locales
-    participanteSeleccionado.nombre_completo = nombre;
-    if (curp) participanteSeleccionado.curp = curp;
-    const idx = participantes.findIndex(p => p.id === participanteSeleccionado.id);
-    if (idx !== -1) participantes[idx] = { ...participantes[idx], nombre_completo: nombre, curp: curp || participantes[idx].curp };
-
-    document.getElementById('exito-sub').textContent =
-      `Tu información fue registrada correctamente, ${nombre.split(' ')[0]}.`;
-    mostrar('exito-section');
-
+    mostrar('sec-form');
   } catch(e) {
-    btn.disabled = false;
-    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px"><path d="M13 2H4a1 1 0 00-1 1v10a1 1 0 001 1h9a1 1 0 001-1V5l-2-3z"/><path d="M12 2v4H5"/></svg> Guardar mis datos`;
-    mostrarToast('Error de conexión. Intenta de nuevo.', 'err');
+    toast('Error de conexión. Recarga la página.', 'err');
   }
 }
 
-// Inicializar
-cargarDatos();
+init();
 </script>
 </body>
 </html>

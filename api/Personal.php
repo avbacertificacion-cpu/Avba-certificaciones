@@ -103,8 +103,9 @@ class Personal {
         // Normalizar CURP si se proporcionó
         $curpRaw = strtoupper(trim($payload['curp'] ?? ''));
         $curp    = $curpRaw ?: null;
-        if ($curp && !preg_match('/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/', $curp)) {
-            return ['status' => 'error', 'message' => 'El formato de la CURP no es válido.'];
+        if ($curp) {
+            $curpCheck = validarCURPCompleta($curp);
+            if (!$curpCheck['valida']) return ['status' => 'error', 'message' => $curpCheck['error']];
         }
 
         // Subir fotografías si se enviaron
@@ -242,8 +243,9 @@ class Personal {
         if (!$id) return ['status' => 'error', 'message' => 'ID requerido.'];
         if (!$nombre && !$curp) return ['status' => 'error', 'message' => 'Se requiere al menos nombre o CURP.'];
 
-        if ($curp && !preg_match('/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/', $curp)) {
-            return ['status' => 'error', 'message' => 'Formato de CURP inválido.'];
+        if ($curp) {
+            $curpCheck = validarCURPCompleta($curp);
+            if (!$curpCheck['valida']) return ['status' => 'error', 'message' => $curpCheck['error']];
         }
 
         $sets = []; $vals = [];
@@ -1136,6 +1138,148 @@ HTML;
 HTML;
     }
 
+    // ── AUTOREGISTRO COMPLETO POR PARTICIPANTE ────────────
+    public function participanteRegistrar(array $payload, array $files, int $sesionId): array {
+        $nombre    = trim($payload['nombre_completo'] ?? '');
+        $curp      = strtoupper(trim($payload['curp'] ?? ''));
+        $puesto    = trim($payload['puesto'] ?? '');
+        $cursoId   = (int)($payload['curso_id'] ?? 0);
+        $empresaId = (int)($payload['sesion_empresa_id'] ?? 0); // ID en sesion_empresas
+
+        if (!$nombre)   return ['status' => 'error', 'message' => 'El nombre completo es obligatorio.'];
+        if (!$cursoId)  return ['status' => 'error', 'message' => 'Selecciona el curso que te corresponde.'];
+
+        // Validar CURP si se proporcionó
+        if ($curp) {
+            $curpCheck = validarCURPCompleta($curp);
+            if (!$curpCheck['valida']) return ['status' => 'error', 'message' => $curpCheck['error']];
+        }
+
+        // Verificar que el curso pertenece a esta sesión
+        $stmtC = $this->pdo->prepare(
+            "SELECT 1 FROM sesion_cursos WHERE sesion_acceso_id = ? AND curso_id = ?"
+        );
+        $stmtC->execute([$sesionId, $cursoId]);
+        if (!$stmtC->fetch()) return ['status' => 'error', 'message' => 'El curso seleccionado no pertenece a esta sesión.'];
+
+        // Obtener datos de la sesión
+        $stmtS = $this->pdo->prepare(
+            "SELECT sesion_nombre, fecha_curso FROM curso_sesiones_acceso WHERE id = ? AND activa = 1"
+        );
+        $stmtS->execute([$sesionId]);
+        $sesion = $stmtS->fetch();
+        if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada o cerrada.'];
+
+        // Obtener datos de empresa desde sesion_empresas
+        $empresaNombre = '';
+        $empresaRfc    = '';
+        $empresaRep    = '';
+        $empresaDir    = '';
+        $primeraParte  = null;
+        if ($empresaId) {
+            $stmtE = $this->pdo->prepare(
+                "SELECT nombre_empresa, rfc, representante, direccion, primera_parte
+                 FROM sesion_empresas WHERE id = ? AND sesion_acceso_id = ?"
+            );
+            $stmtE->execute([$empresaId, $sesionId]);
+            $emp = $stmtE->fetch();
+            if ($emp) {
+                $empresaNombre = $emp['nombre_empresa'];
+                $empresaRfc    = $emp['rfc']           ?? '';
+                $empresaRep    = $emp['representante']  ?? '';
+                $empresaDir    = $emp['direccion']      ?? '';
+                $primeraParte  = $emp['primera_parte']  ?? null;
+            }
+        }
+
+        // Generar control de folio
+        $control = generarControl($this->pdo, $empresaNombre ?: $nombre);
+
+        // Subir foto de medio cuerpo (requerida)
+        $fotoPersonaUrl = null;
+        if (!empty($files['foto_persona']['tmp_name']) && is_uploaded_file($files['foto_persona']['tmp_name'])) {
+            $res = $this->subirFoto($files['foto_persona'], 'participantes/persona');
+            if ($res['status'] !== 'success') return $res;
+            $fotoPersonaUrl = $res['url'];
+        }
+
+        // Subir documentos (múltiples: imágenes o PDF)
+        $fotoDocUrl = null;
+        $docsUrls   = [];
+        $docKeys    = array_filter(array_keys($files), fn($k) => str_starts_with($k, 'documento_'));
+        foreach ($docKeys as $key) {
+            $file = $files[$key];
+            if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) continue;
+            $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+            if ($ext === 'pdf') {
+                $res = $this->subirArchivoPdf($file, 'participantes/documentos');
+            } else {
+                $res = $this->subirFoto($file, 'participantes/documentos');
+            }
+            if ($res['status'] === 'success') $docsUrls[] = $res['url'];
+        }
+        if ($docsUrls) $fotoDocUrl = $docsUrls[0]; // primer doc como foto_documentacion_url
+
+        // Insertar registro en participantes_cursos
+        $this->ensureEstatusColumn();
+        $this->ensureQrColumn();
+
+        $stmt = $this->pdo->prepare(
+            "INSERT INTO participantes_cursos
+             (nombre_completo, curp, puesto, curso_id, fecha_curso, control,
+              empresa_nombre, empresa_rfc, empresa_representante, empresa_direccion,
+              foto_persona_url, foto_documentacion_url, estatus, usuario_registro)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,'PENDIENTE','PARTICIPANTE')"
+        );
+        $stmt->execute([
+            $nombre,
+            $curp    ?: null,
+            $puesto  ?: null,
+            $cursoId,
+            $sesion['fecha_curso'],
+            $control,
+            $empresaNombre ?: null,
+            $empresaRfc    ?: null,
+            $empresaRep    ?: null,
+            $empresaDir    ?: null,
+            $fotoPersonaUrl,
+            $fotoDocUrl,
+        ]);
+        $participanteId = (int)$this->pdo->lastInsertId();
+
+        // Vincular a la sesión
+        $this->pdo->prepare(
+            "INSERT IGNORE INTO sesion_acceso_participantes (sesion_acceso_id, participante_id) VALUES (?,?)"
+        )->execute([$sesionId, $participanteId]);
+
+        // Actualizar cliente si viene de empresa existente
+        if ($primeraParte) {
+            try {
+                $this->pdo->prepare(
+                    "INSERT IGNORE INTO clientes (nombre_cliente, primera_parte) VALUES (?,?)"
+                )->execute([$empresaNombre, $primeraParte]);
+            } catch (\PDOException $e) {}
+        }
+
+        return ['status' => 'success', 'message' => 'Registro guardado correctamente.', 'id' => $participanteId, 'control' => $control];
+    }
+
+    // ── SUBIR PDF ─────────────────────────────────────────
+    private function subirArchivoPdf(array $file, string $subdir): array {
+        $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if ($ext !== 'pdf') return ['status' => 'error', 'message' => 'Solo se permiten archivos PDF.'];
+
+        $dir = rtrim(UPLOAD_DIR, '/') . '/' . $subdir . '/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+        $nombre  = uniqid('doc_', true) . '.pdf';
+        $destino = $dir . $nombre;
+        if (!move_uploaded_file($file['tmp_name'], $destino)) {
+            return ['status' => 'error', 'message' => 'Error al guardar el archivo.'];
+        }
+        $url = rtrim(UPLOAD_URL, '/') . '/' . $subdir . '/' . $nombre;
+        return ['status' => 'success', 'url' => $url];
+    }
+
     // ── AUTOGUARDADO POR PARTICIPANTE ─────────────────────
     public function participanteAutoGuardar(array $payload, int $sesionId): array {
         $participanteId = (int)($payload['participante_id'] ?? 0);
@@ -1156,10 +1300,9 @@ HTML;
             $params[] = trim($payload['nombre_completo']);
         }
         if (!empty($payload['curp'])) {
-            $curp = strtoupper(trim($payload['curp']));
-            if (!preg_match('/^[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d$/', $curp)) {
-                return ['status' => 'error', 'message' => 'CURP inválida. Verifica el formato (18 caracteres).'];
-            }
+            $curp      = strtoupper(trim($payload['curp']));
+            $curpCheck = validarCURPCompleta($curp);
+            if (!$curpCheck['valida']) return ['status' => 'error', 'message' => $curpCheck['error']];
             $sets[]   = 'curp = ?';
             $params[] = $curp;
         }
