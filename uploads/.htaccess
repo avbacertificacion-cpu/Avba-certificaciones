@@ -1,5 +1,24 @@
-# Bloquear ejecución de PHP en uploads (seguridad)
-<FilesMatch "\.php$">
+# uploads/ — Solo archivos estáticos; nunca ejecutar código
+Options -Indexes -ExecCGI
+
+# Bloquear ejecución de PHP y otros lenguajes de servidor
+<FilesMatch "\.(php\d*|php\.bak|phtml|phar|pl|py|cgi|sh|asp|aspx|htm|html|shtml)$">
     Order Allow,Deny
     Deny from all
 </FilesMatch>
+
+# Forzar descarga de tipos potencialmente peligrosos (SVG con scripts, etc.)
+<IfModule mod_headers.c>
+    <FilesMatch "\.(svg|svgz|xml)$">
+        Header set Content-Disposition "attachment"
+        Header set X-Content-Type-Options "nosniff"
+    </FilesMatch>
+</IfModule>
+
+# Solo permitir imágenes, PDF y documentos Office
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule \.(jpg|jpeg|png|webp|pdf|docx|gif)$ - [L]
+    RewriteRule .* - [F,L]
+</IfModule>

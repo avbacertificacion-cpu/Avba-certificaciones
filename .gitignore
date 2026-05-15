@@ -1,18 +1,35 @@
-# Configuración local con credenciales reales — NO subir al repo
+# ── Credenciales y configuración local ───────────────────
 config/config.php
+.env
+.env.*
 
-# Dependencias de Composer
+# ── Dependencias de Composer ──────────────────────────────
 vendor/
 
-# Uploads generados (mantener carpetas vacías con .gitkeep)
+# ── Uploads generados (mantener carpetas vacías con .gitkeep)
 uploads/certificados/*
 uploads/evidencias/*
 uploads/reportes/*
 uploads/plantillas/*
+uploads/personal/*
+uploads/accesorios/*
+uploads/participantes/*
 !uploads/certificados/.gitkeep
 !uploads/evidencias/.gitkeep
 !uploads/reportes/.gitkeep
 !uploads/plantillas/.gitkeep
 
-# Archivos de instalación
+# ── Archivos de instalación/deploy ───────────────────────
 install.php
+deploy.php
+
+# ── Logs ──────────────────────────────────────────────────
+*.log
+error_log
+
+# ── Temporales del sistema ───────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~

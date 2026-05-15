@@ -1,0 +1,5 @@
+# convert-service/ — Microservicio para VPS externo
+# Este directorio NO debe estar expuesto en el hosting principal.
+# Desplegar convert.php en un VPS separado con LibreOffice instalado.
+Order Allow,Deny
+Deny from all

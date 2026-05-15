@@ -1,0 +1,18 @@
+# ──────────────────────────────────────────────────────────
+#  api/ — Solo index.php es el punto de entrada
+# ──────────────────────────────────────────────────────────
+
+# Denegar acceso directo a cualquier archivo PHP excepto index.php
+<FilesMatch "^(?!index\.php$).*\.php$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Bloquear acceso a archivos de configuración y backups
+<FilesMatch "\.(bak|sql|log|ini|sh|env)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# Deshabilitar listado de directorio
+Options -Indexes

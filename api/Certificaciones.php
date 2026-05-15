@@ -205,54 +205,6 @@ class Certificaciones {
         file_put_contents($rutaPdfProt, $response);
     }
 
-    /**
-     * Ejecuta un comando de shell usando el método disponible en el servidor.
-     * Prueba proc_open → exec → shell_exec → system en orden.
-     *
-     * @return array{0: string[], 1: int}  [líneas de salida, código de salida]
-     */
-    private function runCmd(string $cmd): array
-    {
-        // proc_open: más robusto, normalmente habilitado aunque exec esté deshabilitado
-        if (function_exists('proc_open')) {
-            $desc = [1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
-            $proc = @proc_open($cmd, $desc, $pipes);
-            if (is_resource($proc)) {
-                $stdout = stream_get_contents($pipes[1]);
-                $stderr = stream_get_contents($pipes[2]);
-                fclose($pipes[1]);
-                fclose($pipes[2]);
-                $code = proc_close($proc);
-                $out  = array_filter(explode("\n", trim($stdout . ' ' . $stderr)));
-                return [array_values($out), $code];
-            }
-        }
-
-        if (function_exists('exec')) {
-            $out = []; $code = 0;
-            exec($cmd . ' 2>&1', $out, $code);
-            return [$out, $code];
-        }
-
-        if (function_exists('shell_exec')) {
-            $raw  = (string) shell_exec($cmd . ' 2>&1');
-            return [array_filter(explode("\n", trim($raw))), 0];
-        }
-
-        if (function_exists('system')) {
-            ob_start();
-            system($cmd . ' 2>&1', $code);
-            $raw = (string) ob_get_clean();
-            return [array_filter(explode("\n", trim($raw))), $code];
-        }
-
-        throw new \RuntimeException(
-            'El servidor tiene deshabilitadas todas las funciones de ejecución de shell '
-            . '(proc_open, exec, shell_exec, system). '
-            . 'Habilita al menos proc_open en php.ini para poder convertir documentos.'
-        );
-    }
-
     // ── Generar y enviar certificado ───────────────────────
     public function generarCertEnviar(array $payload, string $usuario): array {
         $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);

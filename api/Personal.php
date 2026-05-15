@@ -1266,12 +1266,29 @@ HTML;
 
     // ── SUBIR PDF ─────────────────────────────────────────
     private function subirArchivoPdf(array $file, string $subdir): array {
+        if (($file['size'] ?? 0) > 20 * 1024 * 1024)
+            return ['status' => 'error', 'message' => 'El archivo no debe superar 20 MB.'];
+
         $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
         if ($ext !== 'pdf') return ['status' => 'error', 'message' => 'Solo se permiten archivos PDF.'];
 
+        // Verificar MIME real (no confiar solo en la extensión del cliente)
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime  = finfo_file($finfo, $file['tmp_name']);
+        finfo_close($finfo);
+        if ($mime !== 'application/pdf')
+            return ['status' => 'error', 'message' => 'El archivo no es un PDF válido.'];
+
+        // Verificar que empieza con la firma de PDF (%PDF-)
+        $fh = fopen($file['tmp_name'], 'rb');
+        $header = fread($fh, 5);
+        fclose($fh);
+        if ($header !== '%PDF-')
+            return ['status' => 'error', 'message' => 'El archivo no es un PDF válido.'];
+
         $dir = rtrim(UPLOAD_DIR, '/') . '/' . $subdir . '/';
         if (!is_dir($dir)) mkdir($dir, 0755, true);
-        $nombre  = uniqid('doc_', true) . '.pdf';
+        $nombre  = date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.pdf';
         $destino = $dir . $nombre;
         if (!move_uploaded_file($file['tmp_name'], $destino)) {
             return ['status' => 'error', 'message' => 'Error al guardar el archivo.'];

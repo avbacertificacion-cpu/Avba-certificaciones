@@ -1,4 +1,67 @@
+# ──────────────────────────────────────────────────────────
+#  AVBA Certificaciones — Configuración Apache raíz
+# ──────────────────────────────────────────────────────────
+
+# ── Página de inicio ──────────────────────────────────────
 DirectoryIndex login.html
-# Pasar el header Authorization a PHP (necesario en Apache mod_php)
+
+# ── Pasar Authorization header a PHP ─────────────────────
 RewriteEngine On
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# ── Cabeceras de seguridad HTTP ───────────────────────────
+<IfModule mod_headers.c>
+    # Evita que la app sea enmarcada en iframes (clickjacking)
+    Header always set X-Frame-Options "SAMEORIGIN"
+    # Evita sniffing de MIME type
+    Header always set X-Content-Type-Options "nosniff"
+    # Fuerza HTTPS por 1 año (activar solo cuando el sitio use HTTPS en producción)
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    # Controla la información de referrer
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    # Política de permisos: deshabilitar acceso a cámara/micrófono desde el servidor
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+    # Content Security Policy básica
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https://quickchart.io https://*.openstreetmap.org https://*.tile.openstreetmap.org; connect-src 'self'; frame-src 'none'; object-src 'none'"
+    # Eliminar header de versión del servidor
+    Header unset X-Powered-By
+    Header always unset X-Powered-By
+</IfModule>
+
+# ── Deshabilitar listado de directorios ───────────────────
+Options -Indexes
+
+# ── Proteger archivos sensibles en la raíz ────────────────
+<FilesMatch "^(composer\.(json|lock)|\.env.*|\.gitignore|\.git.*)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# ── Bloquear acceso directo a archivos PHP en raíz ────────
+# (Solo api/index.php y convert-service/convert.php deben ser accesibles)
+<FilesMatch "\.php$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# ── Tipos MIME ────────────────────────────────────────────
+<IfModule mod_mime.c>
+    AddType application/javascript .js
+    AddType text/css .css
+    AddType image/webp .webp
+</IfModule>
+
+# ── Cache para assets estáticos ───────────────────────────
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/png "access plus 30 days"
+    ExpiresByType image/jpeg "access plus 30 days"
+    ExpiresByType image/webp "access plus 30 days"
+    ExpiresByType text/css "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+</IfModule>
+
+# ── Compresión GZIP ───────────────────────────────────────
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
+</IfModule>

@@ -20,8 +20,14 @@ require_once __DIR__ . '/Admin.php';
 require_once __DIR__ . '/Personal.php';
 require_once __DIR__ . '/Accesorios.php';
 
-// ── Headers ───────────────────────────────────────────────
+// ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+
+// Eliminar header que expone versión de PHP
+header_remove('X-Powered-By');
 
 // CORS: solo orígenes explícitamente permitidos
 $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -30,7 +36,7 @@ if ($requestOrigin && in_array($requestOrigin, $allowedOrigins, true)) {
     header('Access-Control-Allow-Origin: ' . $requestOrigin);
     header('Vary: Origin');
 } elseif (!$requestOrigin) {
-    // Misma origen (sin header Origin) — petición directa del servidor o mismo dominio
+    // Misma origen (sin header Origin)
     header('Access-Control-Allow-Origin: ' . ($allowedOrigins[0] ?? '*'));
 }
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
