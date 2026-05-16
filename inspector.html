@@ -4439,7 +4439,8 @@ async function izaIniciar() {
   // Cargar catálogo de tipos si aún no está cargado
   if (!izaTipos.length) {
     try {
-      const res  = await fetch(`${WEB_APP_URL}?action=LISTAR_TIPOS_ACCESORIO`);
+      const s2   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+      const res  = await fetch(`${WEB_APP_URL}?action=LISTAR_TIPOS_ACCESORIO`, { headers: { 'X-Token': s2.token || '' } });
       const data = await res.json();
       izaTipos = Array.isArray(data.data) ? data.data : [];
     } catch (e) { console.error('Error cargando tipos accesorio:', e); }
