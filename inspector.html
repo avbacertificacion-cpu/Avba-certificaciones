@@ -3374,6 +3374,16 @@ function actualizarCheckStats() {
 /* ════════════════════════════════════════
    MAPAS (LEAFLET)
 ════════════════════════════════════════ */
+
+// Leaflet cargado desde CDN no puede resolver las rutas relativas de sus iconos.
+// Se sobreescriben explícitamente con las URLs del mismo CDN.
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconUrl:       'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  shadowUrl:     'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
+
 function initMapa(id, tipo) {
   if (maps[tipo]) {
     setTimeout(() => maps[tipo].invalidateSize(), 200);
