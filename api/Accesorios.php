@@ -189,6 +189,28 @@ class Accesorios {
         ];
     }
 
+    // ── Mis sesiones de accesorios (filtradas por inspector) ──
+    public function getMisSesiones(string $usuario): array {
+        $this->ensureEstatusColumn('accesorios_sesiones');
+        $stmt = $this->pdo->prepare(
+            "SELECT s.id, s.cliente, s.control, s.estatus,
+                    DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha,
+                    s.coordenadas, s.direccion, s.usuario,
+                    s.informe_url, s.qr_codigo,
+                    DATE_FORMAT(s.fecha_registro,'%d/%m/%Y %H:%i') AS fecha_registro,
+                    COUNT(a.id)                  AS total,
+                    SUM(a.estado = 'CUMPLE')     AS cumple,
+                    SUM(a.estado = 'NO CUMPLE')  AS no_cumple
+             FROM accesorios_sesiones s
+             LEFT JOIN accesorios_izaje a ON a.sesion_id = s.id
+             WHERE s.usuario = ?
+             GROUP BY s.id
+             ORDER BY s.fecha_registro DESC"
+        );
+        $stmt->execute([$usuario]);
+        return ['status' => 'success', 'data' => $stmt->fetchAll()];
+    }
+
     // ── Listar sesiones con resumen de accesorios ──────────
     public function listarSesiones(string $soloEstatus = ''): array {
         $this->ensureEstatusColumn('accesorios_sesiones');
@@ -220,7 +242,7 @@ class Accesorios {
     // ── Detalle de una sesión con sus accesorios ───────────
     public function detalleSesion(int $id): array {
         $this->ensureAccSesionesColumns();
-        $chk = $this->pdo->prepare("SELECT id, cliente, control, estatus, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, coordenadas, direccion, usuario, qr_codigo FROM accesorios_sesiones WHERE id = ?");
+        $chk = $this->pdo->prepare("SELECT id, cliente, control, estatus, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, coordenadas, direccion, usuario, qr_codigo, informe_url FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
         $sesion = $chk->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
@@ -238,7 +260,24 @@ class Accesorios {
              ORDER BY a.orden"
         );
         $stmt->execute([$id]);
-        $sesion['accesorios'] = $stmt->fetchAll();
+        $accesorios = $stmt->fetchAll();
+
+        // Cargar URLs de fotos por accesorio
+        $fotoStmt = $this->pdo->prepare(
+            "SELECT accesorio_id, url FROM accesorios_fotos WHERE accesorio_id IN
+             (SELECT id FROM accesorios_izaje WHERE sesion_id = ?) ORDER BY orden"
+        );
+        $fotoStmt->execute([$id]);
+        $fotoMap = [];
+        foreach ($fotoStmt->fetchAll() as $f) {
+            $fotoMap[$f['accesorio_id']][] = $f['url'];
+        }
+        foreach ($accesorios as &$acc) {
+            $acc['fotos'] = $fotoMap[$acc['id']] ?? [];
+        }
+        unset($acc);
+
+        $sesion['accesorios'] = $accesorios;
 
         return ['status' => 'success', 'data' => $sesion];
     }

@@ -225,6 +225,16 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($insp->getTodasInspecciones());
 
+        case 'GET_MIS_ACCESORIOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->getMisSesiones($usr['usuario']));
+
+        case 'GET_MIS_CURSOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->listarParticipantes(['inspector' => $usr['usuario']]));
+
         // Personal: catálogos públicos (autenticados)
         case 'LISTAR_CURSOS':
             $usr = validarToken($pdo, $token);

@@ -47,6 +47,10 @@ class Personal {
                 $params[] = $filtros['estatus'];
             }
         }
+        if (!empty($filtros['inspector'])) {
+            $where[]  = 'p.usuario_registro = ?';
+            $params[] = $filtros['inspector'];
+        }
 
         $sql = "SELECT p.id, p.nombre_completo, p.curp, p.puesto,
                        p.telefono, p.correo, p.capacidad, p.capacidad_na,

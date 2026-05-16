@@ -1126,6 +1126,51 @@
     .ses-locked-info strong { font-weight: 700; }
 
     /* ── Tarjetas del historial ── */
+    /* ── Historial sub-menú ── */
+    .hist-submenu-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin: 6px 0 24px;
+    }
+    @media (max-width: 480px) { .hist-submenu-grid { grid-template-columns: 1fr; gap: 10px; } }
+    .hist-sub-card {
+      background: var(--blanco);
+      border: 1.5px solid var(--borde);
+      border-radius: 14px;
+      padding: 22px 14px 18px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 9px;
+      cursor: pointer;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.18s;
+      text-align: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hist-sub-card:active { transform: scale(0.97); }
+    .hist-sub-card:hover {
+      border-color: var(--azul);
+      box-shadow: 0 6px 20px rgba(24,95,165,0.12);
+      transform: translateY(-2px);
+    }
+    .hist-sub-icon {
+      width: 54px; height: 54px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .hist-sub-icon svg { width: 26px; height: 26px; }
+    .hist-sub-title { font-size: 13px; font-weight: 700; color: var(--texto); }
+    .hist-sub-count { font-size: 11px; color: var(--texto-sub); min-height: 15px; }
+    .hist-seccion-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+    }
+    .hist-seccion-header button {
+      background: none; border: none; color: var(--azul); font-size: 13px;
+      font-weight: 600; cursor: pointer; padding: 6px 0; display: flex; align-items: center; gap: 4px;
+    }
+    .hist-seccion-titulo { font-size: 16px; font-weight: 700; color: var(--texto); }
+
     .hist-card {
       background: var(--blanco);
       border: 1.5px solid var(--borde);
@@ -1338,41 +1383,123 @@
 <div id="pantalla-historial" style="display:none">
   <div style="max-width:760px;margin:0 auto;padding:18px 16px 60px">
 
-    <!-- Buscador -->
-    <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center">
-      <div style="position:relative;flex:1">
-        <svg viewBox="0 0 16 16" fill="none" stroke="#9299a8" stroke-width="1.5"
-             style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;pointer-events:none">
-          <circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/>
-        </svg>
-        <input id="hist-buscar" type="search" placeholder="Buscar por cliente, serie, folio…"
-               oninput="filtrarHistorial()"
-               style="width:100%;padding:9px 12px 9px 32px;border:1.5px solid var(--borde);border-radius:10px;font-size:13px;background:var(--blanco);color:var(--texto);outline:none;box-sizing:border-box">
+    <!-- ══ Sub-menú ══ -->
+    <div id="hist-submenu">
+      <div class="hist-submenu-grid">
+
+        <!-- Grúas -->
+        <div class="hist-sub-card" onclick="histAbrirSeccion('gruas')">
+          <div class="hist-sub-icon mc-azul">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M3 21h18M5 21V9l7-6 7 6v12M9 21v-6h6v6"/>
+            </svg>
+          </div>
+          <div class="hist-sub-title">Grúas</div>
+          <div class="hist-sub-count" id="hist-cnt-gruas">—</div>
+        </div>
+
+        <!-- Accesorios de Izaje -->
+        <div class="hist-sub-card" onclick="histAbrirSeccion('accesorios')">
+          <div class="hist-sub-icon mc-verde">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+              <path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <div class="hist-sub-title">Accesorios</div>
+          <div class="hist-sub-count" id="hist-cnt-acc">—</div>
+        </div>
+
+        <!-- Cursos -->
+        <div class="hist-sub-card" onclick="histAbrirSeccion('cursos')">
+          <div class="hist-sub-icon mc-morado">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M12 14l9-5-9-5-9 5 9 5z"/>
+              <path d="M12 14l6.16-3.422A12.083 12.083 0 0112 21a12.083 12.083 0 01-6.16-10.422L12 14z"/>
+            </svg>
+          </div>
+          <div class="hist-sub-title">Cursos</div>
+          <div class="hist-sub-count" id="hist-cnt-cur">—</div>
+        </div>
       </div>
-      <select id="hist-estado" onchange="filtrarHistorial()"
-              style="padding:9px 12px;border:1.5px solid var(--borde);border-radius:10px;font-size:13px;background:var(--blanco);color:var(--texto);outline:none">
-        <option value="">Todos los estados</option>
-        <option value="PENDIENTE">Pendiente</option>
-        <option value="CONFORME">Conforme</option>
-        <option value="NO CONFORME">No Conforme</option>
-        <option value="APROBADO CALIDAD">Aprobado Calidad</option>
-        <option value="ENVIADO">Enviado</option>
-      </select>
     </div>
 
-    <!-- Contador -->
-    <div id="hist-contador" style="font-size:12px;color:var(--texto-sub);margin-bottom:12px"></div>
-
-    <!-- Lista de inspecciones -->
-    <div id="hist-lista">
-      <div style="text-align:center;padding:48px 0;color:var(--texto-sub)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
-             style="width:36px;height:36px;margin-bottom:10px;display:block;margin:0 auto 10px">
-          <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>
-        </svg>
-        Cargando inspecciones…
+    <!-- ══ Sección: Grúas ══ -->
+    <div id="hist-gruas" style="display:none">
+      <div class="hist-seccion-header">
+        <button onclick="histVolverSubmenu()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M10 3L5 8l5 5"/></svg>
+          Volver
+        </button>
+        <span class="hist-seccion-titulo">Inspecciones de Grúas</span>
+      </div>
+      <!-- Filtros -->
+      <div style="display:flex;gap:10px;margin-bottom:12px;align-items:center">
+        <div style="position:relative;flex:1">
+          <svg viewBox="0 0 16 16" fill="none" stroke="#9299a8" stroke-width="1.5"
+               style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;pointer-events:none">
+            <circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/>
+          </svg>
+          <input id="hist-buscar" type="search" placeholder="Buscar por cliente, serie, folio…"
+                 oninput="filtrarHistorial()"
+                 style="width:100%;padding:9px 12px 9px 32px;border:1.5px solid var(--borde);border-radius:10px;font-size:13px;background:var(--blanco);color:var(--texto);outline:none;box-sizing:border-box">
+        </div>
+        <select id="hist-estado" onchange="filtrarHistorial()"
+                style="padding:9px 12px;border:1.5px solid var(--borde);border-radius:10px;font-size:13px;background:var(--blanco);color:var(--texto);outline:none;flex-shrink:0">
+          <option value="">Todos los estados</option>
+          <option value="PENDIENTE">Pendiente</option>
+          <option value="CONFORME">Conforme</option>
+          <option value="NO CONFORME">No Conforme</option>
+          <option value="APROBADO CALIDAD">Aprobado Calidad</option>
+          <option value="ENVIADO">Enviado</option>
+        </select>
+      </div>
+      <div id="hist-contador" style="font-size:12px;color:var(--texto-sub);margin-bottom:12px"></div>
+      <div id="hist-lista">
+        <div style="text-align:center;padding:48px 0;color:var(--texto-sub)">Cargando…</div>
       </div>
     </div>
+
+    <!-- ══ Sección: Accesorios ══ -->
+    <div id="hist-accesorios" style="display:none">
+      <div class="hist-seccion-header">
+        <button onclick="histVolverSubmenu()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M10 3L5 8l5 5"/></svg>
+          Volver
+        </button>
+        <span class="hist-seccion-titulo">Accesorios de Izaje</span>
+      </div>
+      <div id="hist-acc-lista">
+        <div style="text-align:center;padding:48px 0;color:var(--texto-sub)">Cargando…</div>
+      </div>
+    </div>
+
+    <!-- ══ Sección: Cursos ══ -->
+    <div id="hist-cursos" style="display:none">
+      <div class="hist-seccion-header">
+        <button onclick="histVolverSubmenu()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M10 3L5 8l5 5"/></svg>
+          Volver
+        </button>
+        <span class="hist-seccion-titulo">Cursos Registrados</span>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:12px;align-items:center">
+        <div style="position:relative;flex:1">
+          <svg viewBox="0 0 16 16" fill="none" stroke="#9299a8" stroke-width="1.5"
+               style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;pointer-events:none">
+            <circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l3 3"/>
+          </svg>
+          <input id="hist-cur-buscar" type="search" placeholder="Buscar por participante, curso, empresa…"
+                 oninput="filtrarMisCursos()"
+                 style="width:100%;padding:9px 12px 9px 32px;border:1.5px solid var(--borde);border-radius:10px;font-size:13px;background:var(--blanco);color:var(--texto);outline:none;box-sizing:border-box">
+        </div>
+      </div>
+      <div id="hist-cur-contador" style="font-size:12px;color:var(--texto-sub);margin-bottom:12px"></div>
+      <div id="hist-cur-lista">
+        <div style="text-align:center;padding:48px 0;color:var(--texto-sub)">Cargando…</div>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1395,6 +1522,40 @@
 
     <!-- Contenido modal -->
     <div id="modal-cuerpo" style="padding:20px 22px 28px;overflow-y:auto;max-height:80vh"></div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL DETALLE ACCESORIO ══════════ -->
+<div id="modal-acc" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.45);overflow-y:auto">
+  <div style="max-width:700px;margin:24px auto;background:var(--blanco);border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+    <div style="background:var(--verde);padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:white" id="modal-acc-titulo">Detalle de sesión</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.8)" id="modal-acc-sub"></div>
+      </div>
+      <button onclick="document.getElementById('modal-acc').style.display='none'"
+              style="background:rgba(255,255,255,0.2);border:none;border-radius:8px;color:white;font-size:12px;padding:6px 12px;cursor:pointer;font-weight:600">
+        Cerrar ✕
+      </button>
+    </div>
+    <div id="modal-acc-cuerpo" style="padding:20px 22px 28px;overflow-y:auto;max-height:80vh"></div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL DETALLE CURSO/PARTICIPANTE ══════════ -->
+<div id="modal-cur" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.45);overflow-y:auto">
+  <div style="max-width:700px;margin:24px auto;background:var(--blanco);border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+    <div style="background:#5B21B6;padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:white" id="modal-cur-titulo">Detalle del participante</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.8)" id="modal-cur-sub"></div>
+      </div>
+      <button onclick="document.getElementById('modal-cur').style.display='none'"
+              style="background:rgba(255,255,255,0.2);border:none;border-radius:8px;color:white;font-size:12px;padding:6px 12px;cursor:pointer;font-weight:600">
+        Cerrar ✕
+      </button>
+    </div>
+    <div id="modal-cur-cuerpo" style="padding:20px 22px 28px;overflow-y:auto;max-height:80vh"></div>
   </div>
 </div>
 
@@ -2346,11 +2507,10 @@ function abrirModulo(modulo) {
 
   } else if (modulo === 'historial') {
     document.getElementById('pantalla-historial').style.display = 'block';
-    const _sH = JSON.parse(localStorage.getItem('avba_session') || '{}');
-    const _esAdmin = ['ADMIN','CALIDAD'].includes(_sH.rol);
-    document.getElementById('header-title').textContent = _esAdmin ? 'Todas las Inspecciones' : 'Mis Inspecciones';
-    document.getElementById('header-sub').textContent = _esAdmin ? 'Historial completo de inspecciones' : 'Historial de inspecciones realizadas';
-    cargarHistorial();
+    document.getElementById('header-title').textContent = 'Mis Inspecciones';
+    document.getElementById('header-sub').textContent = 'Historial de registros realizados';
+    histMostrar('submenu');
+    histPrecargarContadores();
 
   } else if (modulo === 'cursos') {
     document.getElementById('pantalla-cursos').style.display = 'block';
@@ -2382,26 +2542,363 @@ function volverMenu() {
 /* ════════════════════════════════════════
    HISTORIAL DE INSPECCIONES
 ════════════════════════════════════════ */
-let historialData = [];
+/* ════════════════════════════════════════
+   HISTORIAL — NAVEGACIÓN POR SUB-SECCIONES
+════════════════════════════════════════ */
+let historialData  = [];
+let accesoriosData = [];
+let cursosData     = [];
+let _cursFiltrado  = [];
+
+const HIST_SECCIONES = ['hist-submenu', 'hist-gruas', 'hist-accesorios', 'hist-cursos'];
+
+function histMostrar(cual) {
+  HIST_SECCIONES.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = id === 'hist-' + cual || id === cual ? 'block' : 'none';
+  });
+}
+
+function histAbrirSeccion(cual) {
+  histMostrar(cual);
+  const titulos = {
+    gruas:      ['Grúas', 'Inspecciones de equipos de izaje'],
+    accesorios: ['Accesorios', 'Inspecciones de accesorios de izaje'],
+    cursos:     ['Cursos', 'Participantes registrados en capacitación'],
+  };
+  const [t, s] = titulos[cual] || ['Mis Inspecciones', ''];
+  document.getElementById('header-title').textContent = t;
+  document.getElementById('header-sub').textContent   = s;
+
+  if (cual === 'gruas'      && !historialData.length)  cargarHistorial();
+  if (cual === 'accesorios' && !accesoriosData.length) cargarMisAccesorios();
+  if (cual === 'cursos'     && !cursosData.length)     cargarMisCursos();
+}
+
+function histVolverSubmenu() {
+  histMostrar('submenu');
+  document.getElementById('header-title').textContent = 'Mis Inspecciones';
+  document.getElementById('header-sub').textContent   = 'Historial de registros realizados';
+}
+
+async function histPrecargarContadores() {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const tk = s.token || '';
+  try {
+    const [rG, rA, rC] = await Promise.all([
+      fetch(`${WEB_APP_URL}?action=GET_MIS_INSPECCIONES`, { headers: { 'X-Token': tk } }).then(r => r.json()),
+      fetch(`${WEB_APP_URL}?action=GET_MIS_ACCESORIOS`,  { headers: { 'X-Token': tk } }).then(r => r.json()),
+      fetch(`${WEB_APP_URL}?action=GET_MIS_CURSOS`,      { headers: { 'X-Token': tk } }).then(r => r.json()),
+    ]);
+    if (Array.isArray(rG)) {
+      historialData = rG;
+      document.getElementById('hist-cnt-gruas').textContent = rG.length + (rG.length === 1 ? ' registro' : ' registros');
+    }
+    if (rA?.status === 'success' && Array.isArray(rA.data)) {
+      accesoriosData = rA.data;
+      document.getElementById('hist-cnt-acc').textContent = rA.data.length + (rA.data.length === 1 ? ' sesión' : ' sesiones');
+    }
+    if (Array.isArray(rC)) {
+      cursosData = rC;
+      document.getElementById('hist-cnt-cur').textContent = rC.length + (rC.length === 1 ? ' participante' : ' participantes');
+    }
+  } catch(e) { /* silencioso */ }
+}
+
+/* ════════════════════════════════════════
+   HISTORIAL — ACCESORIOS DE IZAJE
+════════════════════════════════════════ */
+async function cargarMisAccesorios() {
+  const lista = document.getElementById('hist-acc-lista');
+  lista.innerHTML = `<div style="text-align:center;padding:40px;color:var(--texto-sub)">Cargando…</div>`;
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res  = await fetch(`${WEB_APP_URL}?action=GET_MIS_ACCESORIOS`, { headers: { 'X-Token': s.token || '' } });
+    const data = await res.json();
+    if (data.status !== 'success') { lista.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rojo)">Error al cargar.</div>`; return; }
+    accesoriosData = data.data || [];
+    document.getElementById('hist-cnt-acc').textContent = accesoriosData.length + (accesoriosData.length === 1 ? ' sesión' : ' sesiones');
+    renderMisAccesorios();
+  } catch(e) {
+    lista.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rojo)">Error de conexión.</div>`;
+  }
+}
+
+function renderMisAccesorios() {
+  const lista = document.getElementById('hist-acc-lista');
+  if (!accesoriosData.length) {
+    lista.innerHTML = `<div style="text-align:center;padding:52px 0;color:var(--texto-sub)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" style="width:40px;height:40px;display:block;margin:0 auto 12px">
+        <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
+      No tienes sesiones de accesorios registradas</div>`;
+    return;
+  }
+  lista.innerHTML = accesoriosData.map((s, i) => {
+    const cumple   = parseInt(s.cumple || 0);
+    const noCumple = parseInt(s.no_cumple || 0);
+    const total    = parseInt(s.total || 0);
+    const estadoBadge = s.estatus === 'APROBADO_CALIDAD' || s.estatus === 'EMITIDO'
+      ? `<span class="badge-estado badge-APROBADO">Aprobado</span>`
+      : s.estatus === 'FINALIZADO'
+      ? `<span class="badge-estado badge-CONFORME">Finalizado</span>`
+      : `<span class="badge-estado badge-PENDIENTE">${s.estatus || 'Pendiente'}</span>`;
+    return `
+    <div class="hist-card" onclick="abrirDetalleAccesorio(${i})">
+      <div class="hist-card-top">
+        <div>
+          <div class="hist-card-cliente">${s.cliente || '—'}</div>
+          <div class="hist-card-maq">${total} accesorio${total!==1?'s':''} · ${cumple} cumplen · ${noCumple} no cumplen</div>
+        </div>
+        ${estadoBadge}
+      </div>
+      <div class="hist-card-bottom">
+        <span class="hist-folio">${s.control || '—'}</span>
+        <span class="hist-fecha">${s.fecha || s.fecha_registro || '—'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function abrirDetalleAccesorio(idx) {
+  const sesionResumen = accesoriosData[idx];
+  if (!sesionResumen) return;
+
+  document.getElementById('modal-acc-titulo').textContent = sesionResumen.cliente || 'Sesión de accesorios';
+  document.getElementById('modal-acc-sub').textContent    = sesionResumen.control || '';
+  document.getElementById('modal-acc-cuerpo').innerHTML   = `<div style="text-align:center;padding:32px;color:var(--texto-sub)">Cargando detalle…</div>`;
+  document.getElementById('modal-acc').style.display = 'block';
+
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res  = await fetch(`${WEB_APP_URL}?action=DETALLE_SESION_ACCESORIOS&id=${sesionResumen.id}`, { headers: { 'X-Token': s.token || '' } });
+    const data = await res.json();
+    if (data.status !== 'success') { document.getElementById('modal-acc-cuerpo').innerHTML = `<div style="color:var(--rojo);padding:20px">Error al cargar.</div>`; return; }
+    const d = data.data;
+    let html = '';
+
+    // Datos de la sesión
+    html += `<div class="det-section">
+      <div class="det-section-title">Datos de la sesión</div>
+      <div class="det-grid">
+        <div class="det-item"><label>Cliente</label><span>${d.cliente||'—'}</span></div>
+        <div class="det-item"><label>Control</label><span>${d.control||'—'}</span></div>
+        <div class="det-item"><label>Fecha</label><span>${d.fecha||'—'}</span></div>
+        <div class="det-item"><label>Dirección</label><span>${d.direccion||'—'}</span></div>
+        <div class="det-item"><label>Inspector</label><span>${d.usuario||'—'}</span></div>
+        <div class="det-item"><label>Estado</label><span>${d.estatus||'—'}</span></div>
+      </div>
+    </div>`;
+
+    // Informe PDF si existe
+    if (d.informe_url) {
+      html += `<div class="det-section"><div class="det-section-title">Documentos</div>
+        <a href="${d.informe_url}" target="_blank" rel="noopener"
+           style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--azul-light);border:1.5px solid var(--azul);border-radius:8px;color:var(--azul);font-size:12px;font-weight:600;text-decoration:none">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px"><path d="M3 2h7l3 3v9H3V2z"/><path d="M10 2v3h3"/><path d="M5 7h6M5 10h4"/></svg>
+          📄 Ver informe de inspección
+        </a>
+      </div>`;
+    }
+
+    // Lista de accesorios
+    if (d.accesorios && d.accesorios.length) {
+      const cumpleT   = d.accesorios.filter(a => a.estado === 'CUMPLE').length;
+      const noCumpleT = d.accesorios.filter(a => a.estado === 'NO CUMPLE').length;
+      html += `<div class="det-section">
+        <div class="det-section-title">Accesorios inspeccionados (${d.accesorios.length})</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+          <span style="background:#D1E7DD;color:#0F5132;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700">✓ ${cumpleT} Cumplen</span>
+          <span style="background:#F8D7DA;color:#842029;padding:3px 10px;border-radius:10px;font-size:11px;font-weight:700">✗ ${noCumpleT} No cumplen</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">`;
+      d.accesorios.forEach(acc => {
+        const chip = acc.estado === 'CUMPLE'
+          ? `<span class="chip-C">Cumple</span>`
+          : `<span class="chip-NC">No Cumple</span>`;
+        const fotos = Array.isArray(acc.fotos) && acc.fotos.length ? acc.fotos.map(url =>
+          `<a href="${url}" target="_blank" rel="noopener">
+             <img src="${url}" style="width:60px;height:60px;object-fit:cover;border-radius:6px;border:1px solid var(--borde)" loading="lazy">
+           </a>`).join('') : '';
+        html += `<div style="border:1.5px solid var(--borde);border-radius:10px;padding:12px 14px">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
+            <div>
+              <div style="font-size:13px;font-weight:700">${acc.tipo_nombre||'Accesorio'}</div>
+              <div style="font-size:11px;color:var(--texto-sub);margin-top:2px">${[acc.marca,acc.modelo,acc.serie].filter(Boolean).join(' · ')||'—'}</div>
+            </div>
+            ${chip}
+          </div>
+          ${acc.capacidad||acc.medidas ? `<div style="font-size:11px;color:var(--texto-sub)">${acc.capacidad?'Cap: '+acc.capacidad:''} ${acc.medidas?'· '+acc.medidas:''}</div>` : ''}
+          ${fotos ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${fotos}</div>` : ''}
+        </div>`;
+      });
+      html += `</div></div>`;
+    }
+
+    document.getElementById('modal-acc-cuerpo').innerHTML = html;
+  } catch(e) {
+    document.getElementById('modal-acc-cuerpo').innerHTML = `<div style="color:var(--rojo);padding:20px">Error de conexión.</div>`;
+  }
+}
+
+/* ════════════════════════════════════════
+   HISTORIAL — CURSOS / PARTICIPANTES
+════════════════════════════════════════ */
+async function cargarMisCursos() {
+  const lista = document.getElementById('hist-cur-lista');
+  lista.innerHTML = `<div style="text-align:center;padding:40px;color:var(--texto-sub)">Cargando…</div>`;
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res  = await fetch(`${WEB_APP_URL}?action=GET_MIS_CURSOS`, { headers: { 'X-Token': s.token || '' } });
+    const data = await res.json();
+    if (!Array.isArray(data)) { lista.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rojo)">Error al cargar.</div>`; return; }
+    cursosData    = data;
+    _cursFiltrado = data;
+    document.getElementById('hist-cnt-cur').textContent = data.length + (data.length === 1 ? ' participante' : ' participantes');
+    renderMisCursos(_cursFiltrado);
+  } catch(e) {
+    lista.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rojo)">Error de conexión.</div>`;
+  }
+}
+
+function filtrarMisCursos() {
+  const q = (document.getElementById('hist-cur-buscar')?.value || '').toLowerCase();
+  _cursFiltrado = !q ? cursosData : cursosData.filter(p =>
+    [p.nombre_completo, p.curp, p.curso_nombre, p.empresa_nombre, p.control]
+      .some(v => (v || '').toLowerCase().includes(q))
+  );
+  renderMisCursos(_cursFiltrado);
+}
+
+const ESTATUS_BADGE_CUR = {
+  'PENDIENTE':        ['badge-PENDIENTE',  'Pendiente'],
+  'APROBADO_CALIDAD': ['badge-APROBADO',   'Aprobado Calidad'],
+  'EMITIDO':          ['badge-ENVIADO',    'Emitido'],
+  'DEVUELTO':         ['badge-NOCONFORME', 'Devuelto'],
+};
+
+function renderMisCursos(lista) {
+  const cont = document.getElementById('hist-cur-lista');
+  const ctr  = document.getElementById('hist-cur-contador');
+  ctr.textContent = `${lista.length} participante${lista.length !== 1 ? 's' : ''}`;
+
+  if (!lista.length) {
+    cont.innerHTML = `<div style="text-align:center;padding:52px 0;color:var(--texto-sub)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" style="width:40px;height:40px;display:block;margin:0 auto 12px">
+        <path d="M12 14l9-5-9-5-9 5 9 5z"/>
+        <path d="M12 14l6.16-3.422A12.083 12.083 0 0112 21a12.083 12.083 0 01-6.16-10.422L12 14z"/>
+      </svg>
+      No se encontraron participantes</div>`;
+    return;
+  }
+  cont.innerHTML = lista.map((p, i) => {
+    const [bClass, bLabel] = ESTATUS_BADGE_CUR[p.estatus] || ['badge-PENDIENTE', p.estatus || 'Pendiente'];
+    return `
+    <div class="hist-card" onclick="abrirDetalleCurso(${i})">
+      <div class="hist-card-top">
+        <div>
+          <div class="hist-card-cliente">${p.nombre_completo || '—'}</div>
+          <div class="hist-card-maq">${p.curso_nombre || '—'} ${p.empresa_nombre ? '· ' + p.empresa_nombre : ''}</div>
+        </div>
+        <span class="badge-estado ${bClass}">${bLabel}</span>
+      </div>
+      <div class="hist-card-bottom">
+        <span class="hist-folio">${p.control || '—'}</span>
+        <span class="hist-fecha">${p.fecha_curso || p.fecha_registro || '—'}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function abrirDetalleCurso(idx) {
+  const p = _cursFiltrado[idx];
+  if (!p) return;
+
+  document.getElementById('modal-cur-titulo').textContent = p.nombre_completo || 'Participante';
+  document.getElementById('modal-cur-sub').textContent    = p.control || '';
+
+  let html = '';
+
+  // Datos personales
+  html += `<div class="det-section">
+    <div class="det-section-title">Datos del participante</div>
+    <div class="det-grid">
+      <div class="det-item"><label>Nombre completo</label><span>${p.nombre_completo||'—'}</span></div>
+      <div class="det-item"><label>CURP</label><span style="font-family:monospace;font-size:11px">${p.curp||'—'}</span></div>
+      <div class="det-item"><label>Puesto</label><span>${p.puesto||'—'}</span></div>
+      <div class="det-item"><label>Teléfono</label><span>${p.telefono||'—'}</span></div>
+      <div class="det-item"><label>Correo</label><span>${p.correo||'—'}</span></div>
+      <div class="det-item"><label>Capacidad / N.° Lic.</label><span>${p.capacidad_na=='1'||p.capacidad_na===true?'N/A':p.capacidad||'—'}</span></div>
+    </div>
+  </div>`;
+
+  // Curso y empresa
+  html += `<div class="det-section">
+    <div class="det-section-title">Curso y empresa</div>
+    <div class="det-grid">
+      <div class="det-item"><label>Curso</label><span>${p.curso_nombre||'—'}</span></div>
+      <div class="det-item"><label>Duración</label><span>${p.duracion_horas ? p.duracion_horas + ' h' : '—'}</span></div>
+      <div class="det-item"><label>Fecha del curso</label><span>${p.fecha_curso||'—'}</span></div>
+      <div class="det-item"><label>Empresa</label><span>${p.empresa_nombre||'—'}</span></div>
+      <div class="det-item"><label>Ocupación</label><span>${p.ocupacion_nombre||'—'}</span></div>
+    </div>
+  </div>`;
+
+  // Estado del proceso
+  const [bClass, bLabel] = ESTATUS_BADGE_CUR[p.estatus] || ['badge-PENDIENTE', p.estatus || 'Pendiente'];
+  html += `<div class="det-section">
+    <div class="det-section-title">Estado del proceso</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="badge-estado ${bClass}" style="font-size:12px;padding:5px 14px">${bLabel}</span>
+      ${p.control ? `<span style="font-size:13px;color:var(--azul);font-weight:600">${p.control}</span>` : ''}
+    </div>
+  </div>`;
+
+  // Documentos / fotos
+  const docs = [];
+  if (p.foto_persona_url)       docs.push({ label: '📷 Foto del participante', url: p.foto_persona_url, es_img: true });
+  if (p.foto_documentacion_url) docs.push({ label: '📄 Documentación', url: p.foto_documentacion_url, es_img: /\.(jpg|jpeg|png|webp)$/i.test(p.foto_documentacion_url) });
+
+  if (docs.length) {
+    html += `<div class="det-section">
+      <div class="det-section-title">Evidencia y documentos</div>
+      <div style="display:flex;flex-wrap:wrap;gap:12px">`;
+    docs.forEach(doc => {
+      if (doc.es_img) {
+        html += `<a href="${doc.url}" target="_blank" rel="noopener" style="display:flex;flex-direction:column;align-items:center;gap:5px;text-decoration:none">
+          <img src="${doc.url}" style="width:90px;height:90px;object-fit:cover;border-radius:10px;border:1.5px solid var(--borde)" loading="lazy">
+          <span style="font-size:10px;color:var(--texto-sub)">${doc.label}</span>
+        </a>`;
+      } else {
+        html += `<a href="${doc.url}" target="_blank" rel="noopener"
+          style="display:inline-flex;align-items:center;gap:6px;padding:9px 16px;background:var(--azul-light);border:1.5px solid var(--azul);border-radius:8px;color:var(--azul);font-size:12px;font-weight:600;text-decoration:none">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px"><path d="M3 2h7l3 3v9H3V2z"/><path d="M10 2v3h3"/><path d="M5 7h6M5 10h4"/></svg>
+          ${doc.label}
+        </a>`;
+      }
+    });
+    html += `</div></div>`;
+  }
+
+  document.getElementById('modal-cur-cuerpo').innerHTML = html;
+  document.getElementById('modal-cur').style.display = 'block';
+}
 
 async function cargarHistorial() {
   const lista = document.getElementById('hist-lista');
   lista.innerHTML = `<div style="text-align:center;padding:48px 0;color:var(--texto-sub)">Cargando…</div>`;
-
   try {
     const s      = JSON.parse(localStorage.getItem('avba_session') || '{}');
     const action = ['ADMIN','CALIDAD'].includes(s.rol) ? 'GET_TODAS_INSPECCIONES' : 'GET_MIS_INSPECCIONES';
-    const res    = await fetch(`${WEB_APP_URL}?action=${action}`);
+    const res    = await fetch(`${WEB_APP_URL}?action=${action}`, { headers: { 'X-Token': s.token || '' } });
     const data   = await res.json();
-
     if (!Array.isArray(data)) {
       lista.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rojo)">Error al cargar inspecciones.</div>`;
       return;
     }
-
     historialData = data;
+    document.getElementById('hist-cnt-gruas').textContent = data.length + (data.length === 1 ? ' registro' : ' registros');
     filtrarHistorial();
-
   } catch (e) {
     lista.innerHTML = `<div style="text-align:center;padding:40px;color:var(--rojo)">Error de conexión.</div>`;
   }
