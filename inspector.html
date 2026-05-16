@@ -2550,9 +2550,9 @@ function volverMenu() {
 /* ════════════════════════════════════════
    HISTORIAL — NAVEGACIÓN POR SUB-SECCIONES
 ════════════════════════════════════════ */
-let historialData  = [];
-let accesoriosData = [];
-let cursosData     = [];
+let historialData  = null;
+let accesoriosData = null;
+let cursosData     = null;
 let _cursFiltrado  = [];
 
 const HIST_SECCIONES = ['hist-submenu', 'hist-gruas', 'hist-accesorios', 'hist-cursos'];
@@ -2575,9 +2575,9 @@ function histAbrirSeccion(cual) {
   document.getElementById('header-title').textContent = t;
   document.getElementById('header-sub').textContent   = s;
 
-  if (cual === 'gruas'      && !historialData.length)  cargarHistorial();
-  if (cual === 'accesorios' && !accesoriosData.length) cargarMisAccesorios();
-  if (cual === 'cursos'     && !cursosData.length)     cargarMisCursos();
+  if (cual === 'gruas')      { historialData  !== null ? renderHistorial(historialData)       : cargarHistorial();      }
+  if (cual === 'accesorios') { accesoriosData !== null ? renderMisAccesorios()                : cargarMisAccesorios();  }
+  if (cual === 'cursos')     { cursosData     !== null ? renderMisCursos(cursosData)          : cargarMisCursos();      }
 }
 
 function histVolverSubmenu() {
@@ -2767,6 +2767,7 @@ async function cargarMisCursos() {
 }
 
 function filtrarMisCursos() {
+  if (!cursosData) return;
   const q = (document.getElementById('hist-cur-buscar')?.value || '').toLowerCase();
   _cursFiltrado = !q ? cursosData : cursosData.filter(p =>
     [p.nombre_completo, p.curp, p.curso_nombre, p.empresa_nombre, p.control]
@@ -2910,6 +2911,7 @@ async function cargarHistorial() {
 }
 
 function filtrarHistorial() {
+  if (!historialData) return;
   const buscar = (document.getElementById('hist-buscar')?.value || '').toLowerCase();
   const estado = document.getElementById('hist-estado')?.value || '';
 
