@@ -167,7 +167,13 @@ class Personal {
             $id = (int)$this->pdo->lastInsertId();
         }
 
-        return ['status' => 'success', 'id' => $id];
+        $control = $campos['control'] ?? null;
+        if (!$control) {
+            $rowCtrl = $this->pdo->prepare("SELECT control FROM participantes_cursos WHERE id = ?");
+            $rowCtrl->execute([$id]);
+            $control = $rowCtrl->fetchColumn() ?: null;
+        }
+        return ['status' => 'success', 'id' => $id, 'control' => $control];
     }
 
     public function eliminarParticipante(int $id): array {

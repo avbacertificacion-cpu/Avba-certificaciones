@@ -1766,6 +1766,9 @@
     <button class="btn-nueva" onclick="curNuevoRegistro()" style="margin:0 auto;display:inline-flex">
       + Nuevo registro
     </button>
+    <button class="btn-nueva" style="background:var(--azul-dark);margin:8px auto 0;display:inline-flex" onclick="volverMenu()">
+      ← Volver al menú
+    </button>
   </div>
 
   <!-- Formulario -->
@@ -2205,6 +2208,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
         </div>
         <div class="success-title">¡Inspección enviada!</div>
+        <div id="success-folio" style="display:none;font-size:13px;font-weight:700;color:var(--azul);margin:4px 0 8px;letter-spacing:.04em"></div>
         <div class="success-msg">El reporte fue guardado y el PDF está siendo generado.<br>Recibirás confirmación en el correo registrado.</div>
         <button class="btn-nueva" onclick="location.reload()">Nueva inspección</button>
         <button class="btn-nueva" style="background:var(--azul-dark);margin-top:10px" onclick="volverMenu()">← Volver al menú</button>
@@ -2381,6 +2385,7 @@
           </a>
         </div>
         <button class="cur-nuevo-btn" onclick="izaNuevo()">Registrar nueva sesión</button>
+        <button class="cur-nuevo-btn" style="background:var(--azul-dark);margin-top:8px" onclick="volverMenu()">← Volver al menú</button>
       </div>
     </div>
   </div>
@@ -3575,8 +3580,14 @@ async function enviarFormulario() {
     await new Promise(r => setTimeout(r, 600));
 
     if (resultado.status === "success") {
-      progBox.style.display   = "none";
+      progBox.style.display    = "none";
       successBox.style.display = "block";
+      // Mostrar número de control si viene en la respuesta
+      if (resultado.control) {
+        const folioEl = document.getElementById('success-folio');
+        folioEl.textContent = 'No. de control: ' + resultado.control;
+        folioEl.style.display = 'block';
+      }
     } else {
       throw new Error(resultado.message || "Error desconocido del servidor");
     }
@@ -3586,7 +3597,7 @@ async function enviarFormulario() {
     enviando = false;
     cardProg.style.display  = "none";
     btnsPaso5.style.display = "flex";
-    alert("Error al enviar: " + err.message + "\n\nRevisa la consola para más detalles.");
+    mostrarToast("Error al enviar: " + err.message, "err");
   }
 }
 
@@ -4219,11 +4230,17 @@ async function curEnviar() {
         curSesionParts.push({ nombre, curp, id: data.id });
         sesRenderLista();
         curMostrar('lista');
-        mostrarToast('Participante registrado correctamente', 'ok');
+        mostrarToast('✓ Participante registrado correctamente', 'ok');
       } else {
-        // Modo independiente: notificación + volver al menú
-        mostrarToast('Participante registrado correctamente', 'ok');
-        setTimeout(() => volverMenu(), 1800);
+        // Modo independiente: mostrar pantalla de éxito con folio
+        const subEl = document.getElementById('cur-exito-sub');
+        if (subEl) {
+          subEl.innerHTML = `Participante registrado correctamente.<br>
+            ${data.control ? `<strong style="color:var(--azul)">No. de control: ${data.control}</strong>` : ''}`;
+        }
+        document.getElementById('cur-form-wrap').style.display = 'none';
+        document.getElementById('cur-exito').style.display     = 'flex';
+        mostrarToast('✓ Participante registrado correctamente', 'ok');
       }
     } else {
       mostrarToast('Error: ' + (data.message || 'No se pudo guardar el registro.'), 'err');
@@ -4285,7 +4302,7 @@ async function curOpenCamera(target) {
   document.getElementById('cam-label').textContent = labelMap[target] || 'Capturar foto';
 
   if (!navigator.mediaDevices?.getUserMedia) {
-    alert('Tu navegador no soporta acceso a la cámara. Usa la opción Galería.');
+    mostrarToast('Tu navegador no soporta acceso a la cámara. Usa la opción Galería.', 'err');
     return;
   }
 
@@ -4318,9 +4335,9 @@ async function curOpenCamera(target) {
     document.getElementById('cam-overlay').classList.remove('open');
     console.error('Camera error:', err);
     if (err.name === 'NotAllowedError') {
-      alert('Permiso de cámara denegado. Acepta el permiso en tu navegador e intenta de nuevo.');
+      mostrarToast('Permiso de cámara denegado. Acepta el permiso en tu navegador e intenta de nuevo.', 'err');
     } else {
-      alert('No se pudo acceder a la cámara: ' + (err.message || err.name));
+      mostrarToast('No se pudo acceder a la cámara: ' + (err.message || err.name), 'err');
     }
   }
 }
@@ -4343,7 +4360,7 @@ function curCapturarFoto() {
   canvas.getContext('2d').drawImage(video, 0, 0, w, h);
 
   canvas.toBlob(blob => {
-    if (!blob) { alert('No se pudo capturar la foto. Intenta de nuevo.'); return; }
+    if (!blob) { mostrarToast('No se pudo capturar la foto. Intenta de nuevo.', 'err'); return; }
     const nombre = `foto_${camTarget}_${Date.now()}.jpg`;
     const file   = new File([blob], nombre, { type: 'image/jpeg' });
 
@@ -4522,11 +4539,12 @@ async function izaContinuar() {
 
       izaLimpiarForm();
       izaMostrar('form');
+      mostrarToast('Sesión iniciada. Registra los accesorios.', 'ok');
     } else {
-      alert('Error: ' + (data.message || 'No se pudo crear la sesión.'));
+      mostrarToast('Error: ' + (data.message || 'No se pudo crear la sesión.'), 'err');
     }
   } catch (e) {
-    alert('Error de conexión. Intenta de nuevo.');
+    mostrarToast('Error de conexión. Intenta de nuevo.', 'err');
     console.error('izaContinuar:', e);
   } finally {
     btn.disabled    = false;
@@ -4585,7 +4603,7 @@ function izaEliminarFoto(evt, idx) {
 
 // Callback desde la cámara
 function izaCapturarFotoCallback(file) {
-  if (izaFotos.length >= 6) { alert('Ya alcanzaste el máximo de 6 fotos.'); return; }
+  if (izaFotos.length >= 6) { mostrarToast('Ya alcanzaste el máximo de 6 fotos por accesorio.', 'err'); return; }
   izaFotos.push(file);
   izaRenderFotos();
 }
@@ -4719,8 +4737,8 @@ async function izaFinalizar() {
 
   btn.disabled = false;
   btn.textContent = '✓ Finalizar sesión';
+  izaMostrar('exito');
   mostrarToast(`Sesión finalizada. ${n} accesorio${n !== 1 ? 's' : ''} registrado${n !== 1 ? 's' : ''} correctamente.`, 'ok');
-  setTimeout(() => volverMenu(), 2000);
 }
 
 // ── Nueva sesión ──────────────────────────────────────
