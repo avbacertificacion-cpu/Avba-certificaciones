@@ -37,13 +37,6 @@ Options -Indexes
     Deny from all
 </FilesMatch>
 
-# ── Bloquear acceso directo a archivos PHP en raíz ────────
-# (Solo api/index.php y convert-service/convert.php deben ser accesibles)
-<FilesMatch "\.php$">
-    Order Allow,Deny
-    Deny from all
-</FilesMatch>
-
 # ── Tipos MIME ────────────────────────────────────────────
 <IfModule mod_mime.c>
     AddType application/javascript .js
