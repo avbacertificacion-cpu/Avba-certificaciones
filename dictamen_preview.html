@@ -19,7 +19,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 /* ── HEADER ── */
 .hdr{display:grid;grid-template-columns:62mm 1fr 76mm;align-items:stretch;background:var(--azul);position:relative;overflow:hidden;}
 .hdr::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.04) 0%,transparent 60%);pointer-events:none;}
-.hdr-logo{display:flex;align-items:center;justify-content:center;padding:12px 14px;border-right:1px solid rgba(255,255,255,.1);}
+.hdr-logo{display:flex;align-items:center;justify-content:center;padding:8px 10px;border-right:1px solid rgba(255,255,255,.1);}
 .hdr-title{text-align:center;padding:12px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;}
 .hdr-title-es{font-family:'Montserrat',sans-serif;font-size:17pt;font-weight:900;color:#fff;letter-spacing:2px;text-transform:uppercase;text-shadow:0 2px 10px rgba(0,0,0,.3);}
 .hdr-sep{width:52px;height:2.5px;background:var(--dorado);margin:5px auto;border-radius:2px;}
@@ -37,8 +37,8 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 }
 /* AVBA: drop-shadow para visibilidad sin fondo blanco */
 .avba-img {
-  max-width:108px; max-height:50px;
-  filter: brightness(1.25) drop-shadow(0 0 6px rgba(255,255,255,0.30));
+  max-width:155px; max-height:72px; width:100%;
+  filter: brightness(1.45) contrast(1.1) drop-shadow(0 0 10px rgba(255,255,255,0.55));
 }
 /* Logos externos: blancos sobre azul usando inversión + tono */
 .logo-ext {
@@ -145,14 +145,15 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 
 /* ── RECOMENDACIONES ── */
 .rec{margin-top:4px;}
-.rec-head{display:flex;align-items:center;gap:9px;padding:6px 14px;background:var(--gris);border:1px solid var(--borde);border-bottom:none;}
-.rec-num{width:22px;height:22px;border-radius:50%;background:var(--azul);color:#fff;display:flex;align-items:center;justify-content:center;font-size:8pt;font-weight:700;flex-shrink:0;}
-.rec-head-title{font-size:8.5pt;font-weight:700;color:var(--azul);text-transform:uppercase;letter-spacing:.3px;}
-.rec-body{border:1px solid var(--borde);padding:6px 14px 6px 44px;background:#fff;}
+.rec-head{display:flex;align-items:flex-start;gap:9px;padding:7px 14px;background:var(--gris);border:1px solid var(--borde);border-bottom:none;}
+.rec-num{width:22px;height:22px;border-radius:50%;background:var(--azul);color:#fff;display:flex;align-items:center;justify-content:center;font-size:8pt;font-weight:700;flex-shrink:0;margin-top:1px;}
+.rec-head-title{font-size:8.5pt;font-weight:700;color:var(--azul);text-transform:uppercase;letter-spacing:.3px;line-height:1.4;}
+.rec-body{border:1px solid var(--borde);padding:7px 14px 7px 44px;background:#fff;}
 .rec-body ul{list-style:none;padding:0;}
-.rec-body ul li{font-size:8pt;line-height:1.6;display:flex;align-items:flex-start;gap:6px;}
-.rec-body ul li::before{content:'–';color:var(--dorado);font-weight:700;flex-shrink:0;}
-.rec-body ul ul{padding-left:14px;}
+.rec-body ul li{font-size:8pt;line-height:1.6;display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin-bottom:3px;}
+.rec-body ul li:last-child{margin-bottom:0;}
+.rec-body ul li::before{content:'–';color:var(--dorado);font-weight:700;flex-shrink:0;margin-top:.1em;}
+.rec-body ul ul{padding-left:0;width:100%;margin-top:4px;margin-bottom:2px;}
 .rec-body ul ul li::before{content:'·';color:#94a3b8;}
 .footer-note{border-top:2px solid var(--dorado);padding:8px 14px;margin-top:10px;text-align:center;font-size:7.5pt;color:var(--sub);}
 .footer-note strong{color:var(--azul);}
@@ -547,12 +548,12 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <li>El operador deberá estar certificado por un organismo externo que avale su capacidad.</li>
     </ul></div></div>
     <div class="rec"><div class="rec-head"><div class="rec-num">6</div><div class="rec-head-title">Recomendaciones Administrativas y de Cumplimiento</div></div><div class="rec-body"><ul>
-      <li>El dictamen tendrá una vigencia de un año a partir del <strong>15 / 05 / 2026</strong>, siempre que:<ul>
-        <li>Se mantengan programas de mantenimiento preventivo y correctivo.</li>
-        <li>No existan modificaciones relevantes en el equipo.</li>
-      </ul></li>
-      <li>Cualquier modificación o cambio importante deberá ser reportado y evaluado nuevamente.</li>
-      <li>El dictamen tiene como finalidad informar que el equipo cumple con normatividad aplicable, especificaciones del fabricante y condiciones seguras de operación.</li>
+      <li><span>Este dictamen tiene vigencia de <strong>un (1) año</strong> a partir del <strong>15 de mayo de 2026</strong>, condicionado a que:<ul>
+        <li>Se mantengan activos los programas de mantenimiento preventivo y correctivo.</li>
+        <li>No se realicen modificaciones estructurales o mecánicas relevantes al equipo.</li>
+      </ul></span></li>
+      <li><span>Cualquier modificación o cambio importante en el equipo deberá ser reportado a AVBA Inspections y evaluado nuevamente.</span></li>
+      <li><span>Este dictamen certifica que el equipo cumple con la normatividad aplicable, las especificaciones del fabricante y las condiciones seguras de operación en la fecha de inspección.</span></li>
     </ul></div></div>
     <div class="footer-note"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong><br>Este dictamen es válido únicamente para las condiciones observadas en la fecha de inspección indicada. &nbsp;·&nbsp; Folio: <strong style="color:var(--dorado)">AB.45198-00247-2026MX</strong></div>
   </div>
