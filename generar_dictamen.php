@@ -30,6 +30,9 @@ $config = [
 
 $mpdf = new \Mpdf\Mpdf($config);
 
+// Set base path so mPDF resolves relative asset paths (assets/logos/*.svg)
+$mpdf->SetBasePath(__DIR__ . '/');
+
 // Suppress default footer
 $mpdf->SetHTMLFooter('');
 
