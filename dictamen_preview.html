@@ -5,6 +5,7 @@
 <title>Dictamen de Inspección — AVBA</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Montserrat:wght@700;800;900&display=swap');
+@page { size: 215mm 279mm; margin: 0; }
 :root {
   --azul:#0B2545; --azul-m:#134074; --azul-l:#1e5fa8;
   --dorado:#C49A28; --dorado-l:#e8c547;
@@ -35,10 +36,11 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   border-left:1px solid rgba(255,255,255,.1);
   flex-wrap:wrap;
 }
-/* AVBA: drop-shadow para visibilidad sin fondo blanco */
+/* AVBA: blanco puro — compatible con WeasyPrint y print */
 .avba-img {
-  max-width:190px; max-height:90px; width:100%;
-  filter: brightness(1.45) contrast(1.1) drop-shadow(0 0 10px rgba(255,255,255,0.55));
+  max-width:185px; max-height:78px; width:100%;
+  filter: brightness(0) invert(1);
+  opacity: 0.92;
 }
 /* Logos externos: blancos sobre azul usando inversión + tono */
 .logo-ext {
@@ -46,12 +48,11 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   filter: brightness(0) invert(1);
   opacity: 0.88;
 }
-/* STPS tiene fondo negro → screen lo elimina */
+/* STPS: mismo tratamiento que EMA/OSHA */
 .logo-stps {
   max-height:34px; width:auto;
-  mix-blend-mode: screen;
-  filter: brightness(1.4);
-  opacity: 0.92;
+  filter: brightness(0) invert(1);
+  opacity: 0.88;
 }
 
 
@@ -134,9 +135,9 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 .pc-diag-val{font-size:14pt;font-weight:900;color:var(--azul);line-height:1.1;margin-top:3px;}
 .pc-diag-val .unit{font-size:8pt;font-weight:600;color:var(--sub);margin-left:2px;}
 .pc-diag-badge{margin-top:3px;display:inline-flex;align-items:center;gap:3px;font-size:7pt;font-weight:700;color:var(--verde);}
-.pc-obs-row{border:1px solid var(--borde);border-top:none;display:flex;}
-.pc-obs-label{background:var(--azul-m);color:#fff;writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);padding:8px 5px;font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:center;min-width:22px;}
-.pc-obs-content{flex:1;padding:8px 12px;font-size:8pt;line-height:1.6;color:var(--texto);background:#fffdf5;border-left:3px solid var(--dorado);}
+.pc-obs-row{border:1px solid var(--borde);border-top:none;display:flex;flex-direction:column;}
+.pc-obs-label{background:var(--azul-m);color:#fff;padding:4px 12px;font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-left:3px solid var(--dorado);}
+.pc-obs-content{padding:7px 12px;font-size:8pt;line-height:1.6;color:var(--texto);background:#fffdf5;border-left:3px solid var(--dorado);}
 .pc-result-strip{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border:1px solid var(--borde);border-top:none;background:var(--azul);}
 .pc-result-left{display:flex;flex-direction:column;}
 .pc-result-lbl{font-size:6.5pt;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.4px;}
@@ -144,20 +145,23 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 .pc-norma{font-size:7pt;color:rgba(255,255,255,.55);font-style:italic;text-align:right;}
 
 /* ── RECOMENDACIONES ── */
-.rec{margin-top:4px;}
-.rec-head{display:flex;align-items:flex-start;gap:9px;padding:7px 14px;background:var(--gris);border:1px solid var(--borde);border-bottom:none;}
+.rec{margin-top:3px;}
+.rec-head{display:flex;align-items:flex-start;gap:9px;padding:5px 14px;background:var(--gris);border:1px solid var(--borde);border-bottom:none;}
 .rec-num{width:22px;height:22px;border-radius:50%;background:var(--azul);color:#fff;display:flex;align-items:center;justify-content:center;font-size:8pt;font-weight:700;flex-shrink:0;margin-top:1px;}
 .rec-head-title{font-size:8.5pt;font-weight:700;color:var(--azul);text-transform:uppercase;letter-spacing:.3px;line-height:1.4;}
-.rec-body{border:1px solid var(--borde);padding:7px 14px 7px 44px;background:#fff;}
+.rec-body{border:1px solid var(--borde);padding:5px 14px 5px 44px;background:#fff;}
 .rec-body ul{list-style:none;padding:0;}
-.rec-body ul li{font-size:8pt;line-height:1.6;display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin-bottom:3px;}
+.rec-body ul li{font-size:8pt;line-height:1.5;display:flex;align-items:flex-start;gap:6px;flex-wrap:wrap;margin-bottom:2px;}
 .rec-body ul li:last-child{margin-bottom:0;}
+.rec-body ul li > span{flex:1;min-width:0;}
 .rec-body ul li::before{content:'–';color:var(--dorado);font-weight:700;flex-shrink:0;margin-top:.1em;}
-.rec-body ul ul{padding-left:0;width:100%;margin-top:4px;margin-bottom:2px;}
+.rec-body ul ul{padding-left:0;width:100%;margin-top:3px;margin-bottom:2px;}
 .rec-body ul ul li::before{content:'·';color:#94a3b8;}
-.footer-note{border-top:2px solid var(--dorado);padding:8px 14px;margin-top:10px;text-align:center;font-size:7.5pt;color:var(--sub);}
+.footer-note{border-top:2px solid var(--dorado);padding:6px 14px;margin-top:6px;text-align:center;font-size:7.5pt;color:var(--sub);break-before:avoid;break-inside:avoid;}
 .footer-note strong{color:var(--azul);}
+.page-foot{break-before:avoid;break-inside:avoid;}
 @media print{body{background:#fff;}.page{margin:0;box-shadow:none;}}
+.page + .page { break-before: page; }
 </style>
 </head>
 <body>
