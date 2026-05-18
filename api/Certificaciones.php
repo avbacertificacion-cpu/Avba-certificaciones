@@ -93,6 +93,22 @@ class Certificaciones {
         $resultado = $this->generarPdfDesdeTemplatePdf($id, $tipo);
         if ($resultado['status'] === 'success') return $resultado;
 
+        // Para certificados, intentar con la plantilla HTML + mPDF antes que Word
+        if ($tipo !== 'dict' && file_exists(__DIR__ . '/../certificado_preview.html')) {
+            $datos = $this->obtenerDatosEquipo($id);
+            if ($datos) {
+                try {
+                    $qrB64   = $this->descargarQrB64($datos['qr_codigo'] ?? '');
+                    $html    = $this->renderCertTemplate($datos, $qrB64);
+                    $folio   = $datos['control'] ?? (string)$id;
+                    $rutaPdf = $this->htmlToPdfMpdf($html, $folio, 'CERT');
+                    return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
+                } catch (\Exception $e) {
+                    // Continuar con el flujo Word si falla
+                }
+            }
+        }
+
         // Si no hay plantilla PDF configurada y tampoco vendor/, no podemos continuar
         if (!file_exists(__DIR__ . '/../vendor/autoload.php')) {
             return ['status' => 'error',
@@ -101,7 +117,7 @@ class Certificaciones {
         }
 
         // Si no hay plantilla PDF configurada, continuar con Word (requiere vendor/)
-        $datos = $this->obtenerDatosEquipo($id);
+        $datos = $datos ?? $this->obtenerDatosEquipo($id);
         if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
         try {
@@ -780,11 +796,87 @@ class Certificaciones {
         if ($tipo === 'dictamen') {
             $items = $this->obtenerChecklistEquipo((int)($datos['id'] ?? 0), $datos['maquinaria'] ?? '');
             $html  = $this->htmlDictamen($datos, $qrB64, $items);
-        } else {
-            $html = $this->htmlCertificado($datos, $qrB64);
+            return $this->htmlAPdf($html, $datos['control'] ?? (string)($datos['id'] ?? 'doc'), $tipo);
         }
 
-        return $this->htmlAPdf($html, $datos['control'] ?? (string)($datos['id'] ?? 'doc'), $tipo);
+        // Certificado: usar plantilla HTML + mPDF
+        $html = $this->renderCertTemplate($datos, $qrB64);
+        return $this->htmlToPdfMpdf($html, $datos['control'] ?? (string)($datos['id'] ?? 'doc'), 'CERT');
+    }
+
+    /**
+     * Carga certificado_preview.html, sustituye los tokens {campo} y retorna HTML listo para mPDF.
+     */
+    private function renderCertTemplate(array $d, string $qrB64): string {
+        $templatePath = __DIR__ . '/../certificado_preview.html';
+        if (!file_exists($templatePath)) {
+            // Fallback al HTML inline heredado
+            return $this->htmlCertificado($d, $qrB64);
+        }
+
+        $vigencia = '';
+        if (!empty($d['fecha_inspeccion'])) {
+            $fv = new \DateTime($d['fecha_inspeccion']);
+            $fv->modify('+1 year');
+            $vigencia = $fv->format('d/m/Y');
+        }
+
+        $e   = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        $html = file_get_contents($templatePath);
+
+        $map = [
+            '{folio}'             => $e(formatoFolio($d['control'] ?? '')),
+            '{cliente}'           => $e($d['cliente']        ?? ''),
+            '{domicilio}'         => $e($d['direccion']      ?? ''),
+            '{tipo_maquinaria}'   => $e($d['maquinaria']     ?? ''),
+            '{capacidad}'         => $e($d['capacidad']      ?? ''),
+            '{marca}'             => $e($d['marca']          ?? ''),
+            '{modelo}'            => $e($d['modelo']         ?? ''),
+            '{no_serie}'          => $e($d['serie']          ?? ''),
+            '{no_identificacion}' => $e($d['id_equipo']      ?? ''),
+            '{fecha_inspeccion}'  => $e($d['fecha_fmt']      ?? ''),
+            '{vigencia}'          => $e($vigencia),
+            '{no_acreditacion}'   => defined('NO_ACREDITACION') ? $e(NO_ACREDITACION) : '0147-I-0022',
+            '{qr_imagen}'         => $qrB64,
+        ];
+
+        return str_replace(array_keys($map), array_values($map), $html);
+    }
+
+    /**
+     * Convierte HTML a PDF con mPDF (para plantillas CSS avanzadas como certificado_preview.html).
+     * @return string  Ruta absoluta al .pdf generado
+     */
+    private function htmlToPdfMpdf(string $html, string $folio, string $sufijo = 'CERT'): string {
+        if (!class_exists('\\Mpdf\\Mpdf')) {
+            throw new \RuntimeException('mPDF no disponible. Verifica vendor/autoload.php.');
+        }
+
+        $rutaDir = UPLOAD_DIR . 'certificados/';
+        if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
+
+        $config = [
+            'mode'          => 'utf-8',
+            'format'        => [215, 279],
+            'margin_left'   => 0, 'margin_right'  => 0,
+            'margin_top'    => 0, 'margin_bottom' => 0,
+            'margin_header' => 0, 'margin_footer' => 0,
+            'dpi'           => 96,
+            'default_font'  => 'dejavusans',
+            'tempDir'       => sys_get_temp_dir() . '/mpdf',
+        ];
+
+        $mpdf = new \Mpdf\Mpdf($config);
+        $mpdf->SetBasePath(__DIR__ . '/../');
+        $mpdf->SetHTMLFooter('');
+        $mpdf->use_kwt          = false;
+        $mpdf->useSubstitutions = true;
+        $mpdf->WriteHTML($html);
+
+        $nombre  = $sufijo . '_AVBA_' . $folio . '.pdf';
+        $destino = $rutaDir . $nombre;
+        $mpdf->Output($destino, 'F');
+        return $destino;
     }
 
     /**
