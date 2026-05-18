@@ -805,41 +805,77 @@ class Certificaciones {
     }
 
     /**
-     * Carga certificado_preview.html, sustituye los tokens {campo} y retorna HTML listo para mPDF.
+     * Carga la plantilla de certificado correcta, sustituye los tokens {campo} y retorna HTML listo para mPDF.
+     * El tipo de plantilla se resuelve así (mayor a menor prioridad):
+     *   1. $d['plantilla_tipo']  — pasado explícitamente por el llamador
+     *   2. $_SESSION['plantilla_tipo'] — selección guardada por Calidad
+     *   3. 'equipos' — fallback por defecto
      */
     private function renderCertTemplate(array $d, string $qrB64): string {
-        $templatePath = __DIR__ . '/../certificado_preview.html';
+        $registros    = require __DIR__ . '/../config/plantillas.php';
+        $tipoPlantilla = $d['plantilla_tipo']
+            ?? ($_SESSION['plantilla_tipo'] ?? null)
+            ?? 'equipos';
+        if (!isset($registros[$tipoPlantilla])) $tipoPlantilla = 'equipos';
+
+        $templatePath = __DIR__ . '/../' . $registros[$tipoPlantilla]['archivo'];
         if (!file_exists($templatePath)) {
-            // Fallback al HTML inline heredado
             return $this->htmlCertificado($d, $qrB64);
         }
 
+        $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+
         $vigencia = '';
         if (!empty($d['fecha_inspeccion'])) {
-            $fv = new \DateTime($d['fecha_inspeccion']);
-            $fv->modify('+1 year');
-            $vigencia = $fv->format('d/m/Y');
+            try {
+                $fv = new \DateTime($d['fecha_inspeccion']);
+                $fv->modify('+1 year');
+                $vigencia = $fv->format('d/m/Y');
+            } catch (\Exception $ex) {}
         }
 
-        $e   = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
-        $html = file_get_contents($templatePath);
+        $noAcreditacion = defined('NO_ACREDITACION') ? NO_ACREDITACION : '0147-I-0022';
 
+        // Mapa común + campos específicos por tipo
         $map = [
-            '{folio}'             => $e(formatoFolio($d['control'] ?? '')),
-            '{cliente}'           => $e($d['cliente']        ?? ''),
-            '{domicilio}'         => $e($d['direccion']      ?? ''),
-            '{tipo_maquinaria}'   => $e($d['maquinaria']     ?? ''),
-            '{capacidad}'         => $e($d['capacidad']      ?? ''),
-            '{marca}'             => $e($d['marca']          ?? ''),
-            '{modelo}'            => $e($d['modelo']         ?? ''),
-            '{no_serie}'          => $e($d['serie']          ?? ''),
-            '{no_identificacion}' => $e($d['id_equipo']      ?? ''),
-            '{fecha_inspeccion}'  => $e($d['fecha_fmt']      ?? ''),
-            '{vigencia}'          => $e($vigencia),
-            '{no_acreditacion}'   => defined('NO_ACREDITACION') ? $e(NO_ACREDITACION) : '0147-I-0022',
-            '{qr_imagen}'         => $qrB64,
+            '{folio}'           => $e(formatoFolio($d['control'] ?? '')),
+            '{no_acreditacion}' => $e($noAcreditacion),
+            '{qr_imagen}'       => $qrB64,
         ];
 
+        if ($tipoPlantilla === 'personal') {
+            $map += [
+                '{participante}'  => $e($d['participante']  ?? $d['nombre']     ?? ''),
+                '{puesto}'        => $e($d['puesto']         ?? $d['cargo']      ?? ''),
+                '{curp}'          => $e($d['curp']           ?? ''),
+                '{fecha_emision}' => $e($d['fecha_fmt']      ?? ''),
+                '{programa}'      => $e($d['programa']       ?? $d['curso']      ?? ''),
+                '{empresa}'       => $e($d['empresa']        ?? $d['cliente']    ?? ''),
+            ];
+        } elseif ($tipoPlantilla === 'accesorios') {
+            $map += [
+                '{cliente}'          => $e($d['cliente']       ?? ''),
+                '{domicilio}'        => $e($d['direccion']     ?? ''),
+                '{resumen_items}'    => $e($d['resumen_items'] ?? $d['descripcion'] ?? ''),
+                '{fecha_inspeccion}' => $e($d['fecha_fmt']     ?? ''),
+                '{vigencia}'         => $e($vigencia),
+            ];
+        } else { // equipos (default)
+            $map += [
+                '{cliente}'           => $e($d['cliente']    ?? ''),
+                '{domicilio}'         => $e($d['direccion']  ?? ''),
+                '{tipo_maquinaria}'   => $e($d['maquinaria'] ?? ''),
+                '{capacidad}'         => $e($d['capacidad']  ?? ''),
+                '{marca}'             => $e($d['marca']       ?? ''),
+                '{modelo}'            => $e($d['modelo']      ?? ''),
+                '{no_serie}'          => $e($d['serie']       ?? ''),
+                '{no_identificacion}' => $e($d['id_equipo']  ?? ''),
+                '{fecha_inspeccion}'  => $e($d['fecha_fmt']  ?? ''),
+                '{vigencia}'          => $e($vigencia),
+            ];
+        }
+
+        $html = file_get_contents($templatePath);
         return str_replace(array_keys($map), array_values($map), $html);
     }
 
