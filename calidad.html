@@ -776,19 +776,32 @@
       </div>
     </div>
     <div style="margin-top:14px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <label style="font-size:12px;font-weight:600;color:var(--texto-sub)">
-          Normas aplicables
-          <span style="font-weight:400;color:var(--texto-hint);margin-left:4px">(máx. 6)</span>
-        </label>
-        <button type="button" id="btn-add-norma-nuevo" onclick="nuevoAgregarNorma()"
-                style="font-size:11px;padding:4px 10px;border:1.5px solid var(--azul);
-                       border-radius:6px;background:var(--azul-light);color:var(--azul);
-                       cursor:pointer;font-weight:600">
-          + Agregar norma
-        </button>
+      <!-- Normas Acreditadas -->
+      <div style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label style="font-size:12px;font-weight:600;color:var(--azul)">
+            Normas Acreditadas
+          </label>
+          <button type="button" id="btn-add-acred-nuevo" onclick="nuevoAgregarNorma('acreditada')"
+                  style="font-size:11px;padding:3px 9px;border:1.5px solid var(--azul);
+                         border-radius:6px;background:var(--azul-light);color:var(--azul);
+                         cursor:pointer;font-weight:600">+ Agregar</button>
+        </div>
+        <div id="nuevo-normas-acred-list"></div>
       </div>
-      <div id="nuevo-normas-list"></div>
+      <!-- Normas de Referencia -->
+      <div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <label style="font-size:12px;font-weight:600;color:var(--verde)">
+            Normas de Referencia
+          </label>
+          <button type="button" id="btn-add-ref-nuevo" onclick="nuevoAgregarNorma('referencia')"
+                  style="font-size:11px;padding:3px 9px;border:1.5px solid var(--verde);
+                         border-radius:6px;background:var(--verde-light);color:var(--verde);
+                         cursor:pointer;font-weight:600">+ Agregar</button>
+        </div>
+        <div id="nuevo-normas-ref-list"></div>
+      </div>
     </div>
     <div class="form-row" style="margin-top:14px">
       <button class="btn-save"    onclick="crearTipo()">Crear tipo</button>
@@ -1398,23 +1411,30 @@
                onkeydown="if(event.key==='Enter')guardarModalTipo()">
       </div>
       <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <label style="font-size:12px;font-weight:600;color:var(--texto-sub)">
-            Normas aplicables
-            <span style="font-weight:400;color:var(--texto-hint);margin-left:4px">(máx. 6)</span>
-          </label>
-          <button type="button" id="btn-add-norma-modal" onclick="modalAgregarNorma()"
-                  style="font-size:11px;padding:4px 10px;border:1.5px solid var(--azul);
-                         border-radius:6px;background:var(--azul-light);color:var(--azul);
-                         cursor:pointer;font-weight:600">
-            + Agregar
-          </button>
+        <!-- Normas Acreditadas -->
+        <div style="margin-bottom:12px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <label style="font-size:12px;font-weight:600;color:var(--azul)">Normas Acreditadas</label>
+            <button type="button" onclick="modalAgregarNorma('acreditada')"
+                    style="font-size:11px;padding:3px 9px;border:1.5px solid var(--azul);
+                           border-radius:6px;background:var(--azul-light);color:var(--azul);
+                           cursor:pointer;font-weight:600">+ Agregar</button>
+          </div>
+          <div id="modal-normas-acred-list"></div>
+          <p id="modal-acred-vacio" style="font-size:11px;color:var(--texto-hint);margin:4px 0 0;display:none">Sin normas acreditadas</p>
         </div>
-        <div id="modal-normas-list"></div>
-        <p id="modal-normas-vacio" style="font-size:12px;color:var(--texto-hint);display:none;
-                                          padding:10px 0;text-align:center">
-          Sin normas asignadas — usa "+ Agregar" para añadir
-        </p>
+        <!-- Normas de Referencia -->
+        <div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+            <label style="font-size:12px;font-weight:600;color:var(--verde)">Normas de Referencia</label>
+            <button type="button" onclick="modalAgregarNorma('referencia')"
+                    style="font-size:11px;padding:3px 9px;border:1.5px solid var(--verde);
+                           border-radius:6px;background:var(--verde-light);color:var(--verde);
+                           cursor:pointer;font-weight:600">+ Agregar</button>
+          </div>
+          <div id="modal-normas-ref-list"></div>
+          <p id="modal-ref-vacio" style="font-size:11px;color:var(--texto-hint);margin:4px 0 0;display:none">Sin normas de referencia</p>
+        </div>
       </div>
     </div>
     <div class="modal-footer" style="justify-content:flex-end;gap:8px">
@@ -3146,7 +3166,8 @@ let tiposCargados = false;
 let tiposGlobal   = [];
 
 /* ── Formulario nuevo tipo ── */
-let nuevoNormasList = [];
+let nuevoNormasAcred = [];
+let nuevoNormasRef   = [];
 
 function toggleFormNuevo() {
   const f = document.getElementById("form-nuevo");
@@ -3154,65 +3175,81 @@ function toggleFormNuevo() {
   if (f.classList.contains("open")) {
     document.getElementById("nuevo-nombre").focus();
   } else {
-    nuevoNormasList = [];
+    nuevoNormasAcred = [];
+    nuevoNormasRef   = [];
     renderNuevoNormas();
     document.getElementById("nuevo-nombre").value = "";
   }
 }
 
-function renderNuevoNormas() {
-  const list = document.getElementById("nuevo-normas-list");
-  list.innerHTML = nuevoNormasList.map((n, i) => `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+function renderNuevoNormasGroup(arr, listId, btnId, tipo) {
+  const brd   = tipo === 'acreditada' ? 'var(--azul)' : 'var(--verde)';
+  const list  = document.getElementById(listId);
+  if (!list) return;
+  list.innerHTML = arr.map((n, i) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
       <span style="font-size:11px;color:var(--texto-hint);min-width:14px;flex-shrink:0">${i+1}.</span>
       <input type="text" value="${escH(n)}"
-             oninput="nuevoNormasList[${i}]=this.value"
-             placeholder="Ej: NOM-006-STPS-2014, ISO 9001..."
-             style="flex:1;padding:8px 10px;border:1.5px solid var(--borde);border-radius:7px;
+             oninput="${tipo==='acreditada'?'nuevoNormasAcred':'nuevoNormasRef'}[${i}]=this.value"
+             placeholder="Ej: NOM-006-STPS-2014..."
+             style="flex:1;padding:7px 10px;border:1.5px solid var(--borde);border-radius:7px;
                     font-size:12px;color:var(--texto);outline:none;background:var(--blanco)"
-             onfocus="this.style.borderColor='var(--azul)'"
+             onfocus="this.style.borderColor='${brd}'"
              onblur="this.style.borderColor='var(--borde)'">
-      <button onclick="nuevoRemoverNorma(${i})"
-              style="width:26px;height:26px;border-radius:50%;background:var(--rojo-light);
+      <button onclick="nuevoRemoverNorma('${tipo}',${i})"
+              style="width:24px;height:24px;border-radius:50%;background:var(--rojo-light);
                      color:var(--rojo);border:1.5px solid var(--rojo);cursor:pointer;
-                     font-size:15px;display:flex;align-items:center;justify-content:center;
-                     flex-shrink:0">×</button>
+                     font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
     </div>`).join("");
-
-  const btn = document.getElementById("btn-add-norma-nuevo");
-  if (btn) btn.style.display = nuevoNormasList.length >= 6 ? "none" : "";
+  const btn = document.getElementById(btnId);
+  if (btn) btn.style.display = arr.length >= 6 ? "none" : "";
 }
 
-function nuevoAgregarNorma() {
-  if (nuevoNormasList.length >= 6) return;
-  nuevoNormasList.push("");
-  renderNuevoNormas();
-  // Focus the new input
-  const inputs = document.getElementById("nuevo-normas-list").querySelectorAll("input");
-  if (inputs.length) inputs[inputs.length - 1].focus();
+function renderNuevoNormas() {
+  renderNuevoNormasGroup(nuevoNormasAcred, "nuevo-normas-acred-list", "btn-add-acred-nuevo", "acreditada");
+  renderNuevoNormasGroup(nuevoNormasRef,   "nuevo-normas-ref-list",   "btn-add-ref-nuevo",   "referencia");
 }
 
-function nuevoRemoverNorma(idx) {
-  nuevoNormasList.splice(idx, 1);
-  renderNuevoNormas();
+function nuevoAgregarNorma(tipo) {
+  if (tipo === 'acreditada') {
+    if (nuevoNormasAcred.length >= 6) return;
+    nuevoNormasAcred.push("");
+    renderNuevoNormasGroup(nuevoNormasAcred, "nuevo-normas-acred-list", "btn-add-acred-nuevo", "acreditada");
+    const inputs = document.getElementById("nuevo-normas-acred-list").querySelectorAll("input");
+    if (inputs.length) inputs[inputs.length-1].focus();
+  } else {
+    if (nuevoNormasRef.length >= 6) return;
+    nuevoNormasRef.push("");
+    renderNuevoNormasGroup(nuevoNormasRef, "nuevo-normas-ref-list", "btn-add-ref-nuevo", "referencia");
+    const inputs = document.getElementById("nuevo-normas-ref-list").querySelectorAll("input");
+    if (inputs.length) inputs[inputs.length-1].focus();
+  }
+}
+
+function nuevoRemoverNorma(tipo, idx) {
+  if (tipo === 'acreditada') { nuevoNormasAcred.splice(idx,1); renderNuevoNormasGroup(nuevoNormasAcred,"nuevo-normas-acred-list","btn-add-acred-nuevo","acreditada"); }
+  else                       { nuevoNormasRef.splice(idx,1);   renderNuevoNormasGroup(nuevoNormasRef,"nuevo-normas-ref-list","btn-add-ref-nuevo","referencia"); }
 }
 
 async function crearTipo() {
   const nombre = document.getElementById("nuevo-nombre").value.trim();
   if (!nombre) { document.getElementById("nuevo-nombre").focus(); return; }
 
-  // Recoger valores actuales de los inputs de normas
-  const inputs = document.getElementById("nuevo-normas-list").querySelectorAll("input");
-  const normas = [...inputs].map(inp => inp.value.trim()).filter(v => v);
+  // Recoger normas por tipo
+  const inputsAcred = document.getElementById("nuevo-normas-acred-list").querySelectorAll("input");
+  const inputsRef   = document.getElementById("nuevo-normas-ref-list").querySelectorAll("input");
+  const normas_acreditadas = [...inputsAcred].map(i=>i.value.trim()).filter(v=>v);
+  const normas_referencia  = [...inputsRef].map(i=>i.value.trim()).filter(v=>v);
 
   const res  = await fetch(API, {
     method: "POST",
-    body: JSON.stringify({ action: "CREAR_TIPO_EQUIPO", payload: { nombre, normas } })
+    body: JSON.stringify({ action: "CREAR_TIPO_EQUIPO", payload: { nombre, normas_acreditadas, normas_referencia } })
   });
   const data = await res.json();
   if (data.status === "success") {
     document.getElementById("nuevo-nombre").value = "";
-    nuevoNormasList = [];
+    nuevoNormasAcred = [];
+    nuevoNormasRef   = [];
     renderNuevoNormas();
     toggleFormNuevo();
     tiposCargados = false;
@@ -3341,20 +3378,22 @@ function renderTipoCard(t) {
       <!-- Normas -->
       <div style="margin-bottom:16px">
         <div style="font-size:12px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;
-                    letter-spacing:.05em;margin-bottom:8px">
+                    letter-spacing:.05em;margin-bottom:10px">
           Normas aplicables
         </div>
-        ${(t.normas && t.normas.length)
-          ? `<div style="display:flex;flex-wrap:wrap;gap:6px">
-               ${(t.normas).map(n => `
-                 <span style="display:inline-block;padding:4px 12px;background:var(--azul-light);
-                               color:var(--azul-dark);border-radius:20px;font-size:11.5px;
-                               font-weight:600;border:1px solid #85B7EB">
-                   ${esc(n.norma)}
-                 </span>`).join('')}
-             </div>`
-          : `<span style="font-size:12px;color:var(--texto-hint)">Sin normas asignadas — usa ✏ Editar para agregar.</span>`
-        }
+        ${(() => {
+          const acred = (t.normas||[]).filter(n=>n.tipo==='acreditada'||!n.tipo);
+          const ref   = (t.normas||[]).filter(n=>n.tipo==='referencia');
+          if (!t.normas || !t.normas.length) {
+            return `<span style="font-size:12px;color:var(--texto-hint)">Sin normas asignadas — usa ✏ Editar para agregar.</span>`;
+          }
+          const chips = (arr, bg, clr, brd) => arr.map(n =>
+            `<span style="display:inline-block;padding:3px 10px;background:${bg};color:${clr};border-radius:20px;font-size:11px;font-weight:600;border:1px solid ${brd}">${esc(n.norma)}</span>`
+          ).join('');
+          return `
+            ${acred.length ? `<div style="margin-bottom:7px"><span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--azul);letter-spacing:.05em;display:block;margin-bottom:4px">Acreditadas</span><div style="display:flex;flex-wrap:wrap;gap:5px">${chips(acred,'var(--azul-light)','var(--azul-dark)','#85B7EB')}</div></div>` : ''}
+            ${ref.length   ? `<div><span style="font-size:10px;font-weight:700;text-transform:uppercase;color:var(--verde);letter-spacing:.05em;display:block;margin-bottom:4px">Referencia</span><div style="display:flex;flex-wrap:wrap;gap:5px">${chips(ref,'var(--verde-light)','var(--verde)','var(--verde)')}</div></div>` : ''}`;
+        })()}
       </div>
 
       <!-- Plantilla HTML de Dictamen -->
@@ -3730,7 +3769,8 @@ async function guardarItem(tipoId, secCodigo) {
 }
 /* ── Modal editar tipo (nombre + normas) ── */
 let tipoModalId     = null;
-let tipoModalNormas = [];
+let tipoModalNormasAcred = [];
+let tipoModalNormasRef   = [];
 
 function abrirModalTipo(tipoId) {
   const t = tiposGlobal.find(x => x.id == tipoId);
