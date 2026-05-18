@@ -86,8 +86,8 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 .foto-section-title .dot{width:8px;height:8px;border-radius:50%;background:var(--azul-l);flex-shrink:0;}
 .foto-grid-3x3{display:table;width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;}
 .foto-grid-ganchos{display:table;width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;}
-.foto-card{background:#fff;display:table-cell;width:33.33%;vertical-align:top;border:1px solid var(--borde);height:95px;overflow:hidden;}
-.foto-placeholder{display:block;height:72px;overflow:hidden;text-align:center;padding:4px;background:linear-gradient(145deg,#f8fafc,#eef2f7);color:#94a3b8;}
+.foto-card{background:#fff;display:table-cell;width:33.33%;vertical-align:top;border:1px solid var(--borde);height:85px;overflow:hidden;}
+.foto-placeholder{display:block;height:62px;overflow:hidden;text-align:center;padding:3px;background:linear-gradient(145deg,#f8fafc,#eef2f7);color:#94a3b8;}
 .fp-num{position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:50%;background:var(--azul);color:#fff;display:flex;align-items:center;justify-content:center;font-size:7.5pt;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,.2);}
 .foto-caption{padding:3px 6px;font-size:6.5pt;color:var(--sub);font-weight:500;border-top:1px solid var(--borde);background:#fff;text-align:center;}
 .ganchos-header{display:flex;align-items:center;gap:8px;padding:5px 12px;background:var(--azul);color:#fff;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-left:4px solid var(--dorado);}
@@ -238,18 +238,23 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   <div class="sec-title">Conclusiones</div>
   <div class="sec-body" style="padding:8px 14px">Se concluye que mecánicamente el equipo <strong>GRÚA MÓVIL TELESCÓPICA GROVE GMK 3050-2</strong>, No. de Serie <strong>GR-2019-GMK-00458</strong>, es apto para realizar las operaciones para lo cual fue diseñado, con apego a la normatividad aplicable, tabla de capacidades y especificaciones del fabricante.</div>
 
-  <div class="result-row" style="margin-top:6px">
-    <div class="result-cell"><div class="result-lbl">Resultado de la Inspección</div><div class="badge badge-ok"><span class="badge-dot"></span> SATISFACTORIA</div></div>
-    <div class="result-cell"><div class="result-lbl">Estado del Equipo · Equipment Status</div><div class="badge badge-op"><span class="badge-dot"></span> OPERATIVO</div></div>
-  </div>
-  <div class="sig-row">
-    <div class="sig-cell"><div class="sig-role">Firma del Inspector · Realizado Por</div><div class="sig-line"></div><div class="sig-name">ING. CARLOS HDEZ. RAMÍREZ</div><div class="sig-detail">Inspector-607695-27940089</div></div>
-    <div class="sig-cell"><div class="sig-role">Aprobado Por</div><div class="sig-line"></div><div class="sig-name">ING. JOSÉ MARCOS GONZÁLEZ CALDERÓN</div><div class="sig-detail">Director General</div></div>
-  </div>
-  <div class="page-foot" style="margin-top:1px;"><span class="f-lbl">Folio de Control</span><span class="f-val">AB.45198-00247-2026MX</span><span class="f-lbl">Vigencia: 15 / 05 / 2027 · Página 1 de 3</span></div>
+  <table class="result-row" style="margin-top:6px;width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;" cellpadding="0" cellspacing="0"><tr>
+    <td class="result-cell"><div class="result-lbl">Resultado de la Inspección</div><div class="badge badge-ok"><span class="badge-dot"></span> SATISFACTORIA</div></td>
+    <td class="result-cell" style="border-right:none;"><div class="result-lbl">Estado del Equipo · Equipment Status</div><div class="badge badge-op"><span class="badge-dot"></span> OPERATIVO</div></td>
+  </tr></table>
+  <table class="sig-row" style="width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;" cellpadding="0" cellspacing="0"><tr>
+    <td class="sig-cell" style="border-right:1px solid var(--borde);"><div class="sig-role">Firma del Inspector · Realizado Por</div><div class="sig-line"></div><div class="sig-name">ING. CARLOS HDEZ. RAMÍREZ</div><div class="sig-detail">Inspector-607695-27940089</div></td>
+    <td class="sig-cell" style="border-right:none;"><div class="sig-role">Aprobado Por</div><div class="sig-line"></div><div class="sig-name">ING. JOSÉ MARCOS GONZÁLEZ CALDERÓN</div><div class="sig-detail">Director General</div></td>
+  </tr></table>
+  <table class="page-foot" style="margin-top:1px;width:100%;" cellpadding="0" cellspacing="0"><tr>
+    <td><span class="f-lbl">Folio de Control</span></td>
+    <td style="text-align:center;"><span class="f-val">AB.45198-00247-2026MX</span></td>
+    <td style="text-align:right;"><span class="f-lbl">Vigencia: 15 / 05 / 2027 · Página 1 de 3</span></td>
+  </tr></table>
 </div>
 
 
+<div style="page-break-after:always;height:0;line-height:0;font-size:0;overflow:hidden;"></div>
 <!-- ════════ PÁGINA 2 ════════ -->
 <div class="page">
   <table class="hdr" width="100%" cellpadding="0" cellspacing="0">
@@ -270,7 +275,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <div class="foto-section-title"><span class="dot"></span> Inspección General del Equipo · GROVE GMK 3050-2</div>
       <table class="foto-grid-3x3" width="100%" cellpadding="0" cellspacing="0">
 <tr>
-<td class="foto-card" style="height:95px;overflow:hidden;"><div class="foto-placeholder" style="height:72px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
     <span class="fp-num">01</span>
     <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
@@ -280,7 +285,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     </svg>
     <span style="font-size:7pt">Fotografía 01</span>
   </div><div class="foto-caption">Vista general del equipo</div></td>
-<td class="foto-card" style="height:95px;overflow:hidden;"><div class="foto-placeholder" style="height:72px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
     <span class="fp-num">02</span>
     <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
@@ -290,7 +295,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     </svg>
     <span style="font-size:7pt">Fotografía 02</span>
   </div><div class="foto-caption">Placa de identificación</div></td>
-<td class="foto-card" style="height:95px;overflow:hidden;"><div class="foto-placeholder" style="height:72px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
     <span class="fp-num">03</span>
     <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
@@ -302,7 +307,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   </div><div class="foto-caption">Estructura principal y pluma</div></td>
 </tr>
 <tr>
-<td class="foto-card" style="height:95px;overflow:hidden;"><div class="foto-placeholder" style="height:72px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
     <span class="fp-num">04</span>
     <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
@@ -312,7 +317,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     </svg>
     <span style="font-size:7pt">Fotografía 04</span>
   </div><div class="foto-caption">Sistema hidráulico</div></td>
-<td class="foto-card" style="height:95px;overflow:hidden;"><div class="foto-placeholder" style="height:72px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
     <span class="fp-num">05</span>
     <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
@@ -322,7 +327,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     </svg>
     <span style="font-size:7pt">Fotografía 05</span>
   </div><div class="foto-caption">Cabina y controles del operador</div></td>
-<td class="foto-card" style="height:95px;overflow:hidden;"><div class="foto-placeholder" style="height:72px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
     <span class="fp-num">06</span>
     <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
@@ -343,7 +348,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       </div>
       <table class="foto-grid-ganchos" width="100%" cellpadding="0" cellspacing="0">
 <tr>
-<td class="foto-card" style="height:95px;overflow:hidden;"><div class="foto-placeholder" style="height:72px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
     <span class="fp-num">07</span>
     <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
@@ -353,7 +358,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     </svg>
     <span style="font-size:7pt">Fotografía 07</span>
   </div><div class="foto-caption">Gancho principal — vista general</div></td>
-<td class="foto-card" style="height:95px;overflow:hidden;"><div class="foto-placeholder" style="height:72px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
     <span class="fp-num">08</span>
     <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
@@ -363,7 +368,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     </svg>
     <span style="font-size:7pt">Fotografía 08</span>
   </div><div class="foto-caption">Gancho principal — seguro y desgaste</div></td>
-<td class="foto-card" style="height:95px;overflow:hidden;"><div class="foto-placeholder" style="height:72px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
     <span class="fp-num">09</span>
     <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
@@ -379,11 +384,11 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 
     <div class="sec-title">Prueba de Carga <span style="font-size:7pt;font-weight:400;opacity:.6;margin-left:6px">· Load Test</span></div>
     <div class="sec-body" style="padding:0">
-      <div class="pc-header-strip">
-        <div class="pc-equip-cell"><div class="pc-equip-lbl">Equipo Inspeccionado</div><div class="pc-equip-val">GRÚA MÓVIL TELESCÓPICA · GROVE GMK 3050-2</div></div>
-        <div class="pc-equip-cell" style="flex:0 0 auto;min-width:110px"><div class="pc-equip-lbl">Capacidad Nominal</div><div class="pc-equip-val">50 TON</div></div>
-        <div class="pc-equip-cell" style="flex:0 0 auto;min-width:120px"><div class="pc-equip-lbl">Fecha de Prueba</div><div class="pc-equip-val">15 / 05 / 2026</div></div>
-      </div>
+      <table class="pc-header-strip" style="width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;" cellpadding="0" cellspacing="0"><tr>
+        <td class="pc-equip-cell"><div class="pc-equip-lbl">Equipo Inspeccionado</div><div class="pc-equip-val">GRÚA MÓVIL TELESCÓPICA · GROVE GMK 3050-2</div></td>
+        <td class="pc-equip-cell" style="width:110px;border-right:1px solid var(--borde);"><div class="pc-equip-lbl">Capacidad Nominal</div><div class="pc-equip-val">50 TON</div></td>
+        <td class="pc-equip-cell" style="width:120px;border-right:none;"><div class="pc-equip-lbl">Fecha de Prueba</div><div class="pc-equip-val">15 / 05 / 2026</div></td>
+      </tr></table>
       <table class="pc-table">
         <thead><tr class="pc-thead-row">
           <th style="width:18%;text-align:left;padding-left:12px">Prueba<span class="pc-thead-sub">Test</span></th>
@@ -412,8 +417,9 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
           </tr>
         </tbody>
       </table>
-      <div class="pc-diagram-row">
-        <div class="pc-diagram"><svg viewBox="0 0 180 140" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:100%;display:block">
+      <table class="pc-diagram-row" style="width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;background:linear-gradient(135deg,#f4f8ff,#e8f0fb);" cellpadding="0" cellspacing="0">
+        <tr>
+          <td rowspan="2" style="width:175px;padding:6px;border-right:1px solid var(--borde);vertical-align:middle;text-align:center;"><svg viewBox="0 0 180 140" xmlns="http://www.w3.org/2000/svg" style="width:163px;height:127px;display:block">
   <defs><path id="boom-path2" d="M 42.0,102.0 L 98.0,37.2"/></defs>
   <line x1="2" y1="123" x2="178" y2="123" stroke="#cdd8e3" stroke-width="2.5"/>
   <rect x="2" y="123" width="176" height="10" fill="#e8edf3"/>
@@ -449,28 +455,34 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   <rect x="68" y="102" width="42" height="14" rx="3" fill="#fef3c7"/>
   <text x="89" y="113" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="8.5" font-weight="800" fill="#92400e">&#945; = 56.3&#176;</text>
   <text x="80" y="112" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="6.5" fill="#64748b">90°</text>
-</svg></div>
-        <div class="pc-diagram-data">
-          <div class="pc-diag-cell"><div class="pc-diag-lbl">Radio de Operación <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">6.0<span class="unit">m</span></div></div>
-          <div class="pc-diag-cell"><div class="pc-diag-lbl">Longitud de Pluma <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">10.8<span class="unit">m</span></div></div>
-          <div class="pc-diag-cell"><div class="pc-diag-lbl">Ángulo de Trabajo <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:var(--dorado)">56.3<span class="unit">°</span></div><div class="pc-diag-badge">✔ arccos(r / L)</div></div>
-          <div class="pc-diag-cell"><div class="pc-diag-lbl">Altura de Izaje <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:var(--verde)">8.98<span class="unit">m</span></div><div class="pc-diag-badge">✔ √(L² − r²)</div></div>
-        </div>
-      </div>
+</svg></td>
+          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid var(--borde);border-right:1px solid var(--borde);"><div class="pc-diag-lbl">Radio de Operación <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">6.0<span class="unit">m</span></div></td>
+          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid var(--borde);border-right:none;"><div class="pc-diag-lbl">Longitud de Pluma <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">10.8<span class="unit">m</span></div></td>
+        </tr>
+        <tr>
+          <td class="pc-diag-cell" style="border-right:1px solid var(--borde);border-bottom:none;"><div class="pc-diag-lbl">Ángulo de Trabajo <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:var(--dorado)">56.3<span class="unit">°</span></div><div class="pc-diag-badge">✔ arccos(r / L)</div></td>
+          <td class="pc-diag-cell" style="border-right:none;border-bottom:none;"><div class="pc-diag-lbl">Altura de Izaje <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:var(--verde)">8.98<span class="unit">m</span></div><div class="pc-diag-badge">✔ √(L² − r²)</div></td>
+        </tr>
+      </table>
       <div class="pc-obs-row">
         <div class="pc-obs-label">Observaciones</div>
-        <div class="pc-obs-content">El equipo <strong>GROVE GMK 3050-2</strong> No. Serie <strong>GR-2019-GMK-00458</strong> respondió correctamente en ambas pruebas realizadas. Durante la prueba sin carga se verificó el funcionamiento de todos los sistemas (hidráulico, eléctrico y mecánico) sin detectar anomalías. En la prueba con carga a radio de operación de <strong>6.0 m</strong> y longitud de pluma de <strong>10.8 m</strong>, se obtuvo un ángulo de trabajo de <strong>56.3°</strong> y una altura de izaje efectiva de <strong>8.98 m</strong>. <br><strong>Sin observaciones de riesgo. El equipo se considera apto para operar bajo las condiciones inspeccionadas.</strong></div>
+        <div class="pc-obs-content">El equipo <strong>GROVE GMK 3050-2</strong> No. Serie <strong>GR-2019-GMK-00458</strong> respondió correctamente en ambas pruebas realizadas. Durante la prueba sin carga se verificó el funcionamiento de todos los sistemas (hidráulico, eléctrico y mecánico) sin detectar anomalías. En la prueba con carga a radio de operación de <strong>6.0 m</strong> y longitud de pluma de <strong>10.8 m</strong>, se obtuvo un ángulo de trabajo de <strong>56.3°</strong> y una altura de izaje efectiva de <strong>8.98 m</strong>. <strong>Sin observaciones de riesgo. El equipo se considera apto para operar bajo las condiciones inspeccionadas.</strong></div>
       </div>
-      <div class="pc-result-strip">
-        <div class="pc-result-left"><span class="pc-result-lbl">Resultado General de la Prueba de Carga</span><span class="pc-result-val">✔ PRUEBA APROBADA</span></div>
-        <div class="pc-norma">NOM-005-STPS-1998 · NOM-006-STPS-2014<br>ASME B30.5 · OSHA 1926.1412</div>
-      </div>
+      <table class="pc-result-strip" style="width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;background:var(--azul);padding:0;" cellpadding="0" cellspacing="0"><tr>
+        <td style="padding:8px 14px;vertical-align:middle;"><div class="pc-result-left"><span class="pc-result-lbl">Resultado General de la Prueba de Carga</span><span class="pc-result-val">✔ PRUEBA APROBADA</span></div></td>
+        <td style="padding:8px 14px;text-align:right;vertical-align:middle;"><div class="pc-norma">NOM-005-STPS-1998 · NOM-006-STPS-2014<br>ASME B30.5 · OSHA 1926.1412</div></td>
+      </tr></table>
     </div>
   </div>
-  <div class="page-foot" style="margin-top:6px"><span class="f-lbl">Folio</span><span class="f-val">AB.45198-00247-2026MX</span><span class="f-lbl">Vigencia: 15 / 05 / 2027 · Página 2 de 3</span></div>
+  <table class="page-foot" style="margin-top:6px;width:100%;" cellpadding="0" cellspacing="0"><tr>
+    <td><span class="f-lbl">Folio</span></td>
+    <td style="text-align:center;"><span class="f-val">AB.45198-00247-2026MX</span></td>
+    <td style="text-align:right;"><span class="f-lbl">Vigencia: 15 / 05 / 2027 · Página 2 de 3</span></td>
+  </tr></table>
 </div>
 
 
+<div style="page-break-after:always;height:0;line-height:0;font-size:0;overflow:hidden;"></div>
 <!-- ════════ PÁGINA 3 ════════ -->
 <div class="page">
   <table class="hdr" width="100%" cellpadding="0" cellspacing="0">
@@ -526,7 +538,11 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     </ul></div></div>
     <div class="footer-note"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong><br>Este dictamen es válido únicamente para las condiciones observadas en la fecha de inspección indicada. &nbsp;·&nbsp; Folio: <strong style="color:var(--dorado)">AB.45198-00247-2026MX</strong></div>
   </div>
-  <div class="page-foot"><span class="f-lbl">Vigencia hasta: 15 / 05 / 2027</span><span class="f-val">AB.45198-00247-2026MX</span><span class="f-lbl">AVBA Inspections · Página 3 de 3</span></div>
+  <table class="page-foot" style="width:100%;" cellpadding="0" cellspacing="0"><tr>
+    <td><span class="f-lbl">Vigencia hasta: 15 / 05 / 2027</span></td>
+    <td style="text-align:center;"><span class="f-val">AB.45198-00247-2026MX</span></td>
+    <td style="text-align:right;"><span class="f-lbl">AVBA Inspections · Página 3 de 3</span></td>
+  </tr></table>
 </div>
 
 </body></html>

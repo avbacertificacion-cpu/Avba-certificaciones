@@ -14,6 +14,13 @@ if (!file_exists($htmlFile)) {
 }
 $html = file_get_contents($htmlFile);
 
+// Strip browser-preview-only styles so mPDF renders clean page flow
+$mpdfOverride = '<style>'
+    . '.page{min-height:0!important;margin:0!important;box-shadow:none!important;}'
+    . 'body{background:#fff!important;}'
+    . '</style>';
+$html = str_replace('</head>', $mpdfOverride . '</head>', $html);
+
 // mPDF configuration
 $config = [
     'mode'          => 'utf-8',
