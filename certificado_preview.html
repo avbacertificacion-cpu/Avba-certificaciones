@@ -56,9 +56,9 @@
 
   /* Content fields */
   .flabel { font-size:7pt; font-weight:bold; color:#5070a0; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:1.5mm; margin-top:0; }
-  .fval   { font-size:10.5pt; color:#0d1a2a; font-weight:700; border-bottom:1.5px solid #b0c8d8; padding-bottom:5mm; margin-bottom:2mm; line-height:1.5; }
-  .fval.lg{ font-size:12pt; padding-bottom:6mm; }
-  .fdiv   { height:1px; background:#c8d8e8; margin:5mm 0 6mm; }
+  .fval   { font-size:10.5pt; color:#0d1a2a; font-weight:700; border-bottom:1.5px solid #b0c8d8; padding-bottom:4mm; margin-bottom:1mm; line-height:1.5; }
+  .fval.lg{ font-size:12pt; }
+  .fdiv   { height:1px; background:#c8d8e8; margin:4mm 0 6mm; }
 
   /* Text paragraphs */
   .ctext { font-size:9pt; color:#1a2a3a; line-height:1.85; margin-bottom:5mm; text-align:justify; }
@@ -151,54 +151,50 @@
 
     <!-- CLIENTE -->
     <div class="flabel">CLIENTE - Customer</div>
-    <div class="fval lg" style="margin-bottom:5mm;">{cliente}</div>
+    <div class="fval lg" style="margin-bottom:4mm;">{cliente}</div>
 
     <!-- DOMICILIO -->
     <div class="flabel">DOMICILIO - Address</div>
-    <div class="fval" style="margin-bottom:5mm;">{domicilio}</div>
+    <div class="fval" style="margin-bottom:4mm;">{domicilio}</div>
 
     <div class="fdiv"></div>
 
-    <!-- MAQUINARIA + CAPACIDAD -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:5mm;">
+    <!-- EQUIPMENT FIELDS — single table so all 3rd-column fields align -->
+    <table width="100%" cellpadding="0" cellspacing="0">
+    <col width="30%"><col width="35%"><col width="35%">
+    <!-- Row 1: MAQUINARIA + CAPACIDAD -->
     <tr>
-      <td style="width:62%;padding-right:4mm;vertical-align:top;">
+      <td colspan="2" style="padding-right:5mm;vertical-align:top;padding-bottom:6mm;">
         <div class="flabel">MAQUINARIA - Machinery</div>
         <div class="fval">{tipo_maquinaria}</div>
       </td>
-      <td style="width:38%;vertical-align:top;">
+      <td style="vertical-align:top;padding-bottom:6mm;">
         <div class="flabel">CAPACIDAD - Capacity</div>
         <div class="fval">{capacidad}</div>
       </td>
     </tr>
-    </table>
-
-    <!-- MARCA + MODELO + NO.SERIE -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:5mm;">
+    <!-- Row 2: MARCA + MODELO + NO.SERIE -->
     <tr>
-      <td style="width:34%;padding-right:3mm;vertical-align:top;">
+      <td style="padding-right:3mm;vertical-align:top;padding-bottom:6mm;">
         <div class="flabel">MARCA - Manufacturer</div>
         <div class="fval">{marca}</div>
       </td>
-      <td style="width:33%;padding-right:3mm;vertical-align:top;">
+      <td style="padding-right:3mm;vertical-align:top;padding-bottom:6mm;">
         <div class="flabel">MODELO - Model</div>
         <div class="fval">{modelo}</div>
       </td>
-      <td style="width:33%;vertical-align:top;">
+      <td style="vertical-align:top;padding-bottom:6mm;">
         <div class="flabel">NO. SERIE - Serial Number</div>
         <div class="fval">{no_serie}</div>
       </td>
     </tr>
-    </table>
-
-    <!-- NO.IDENTIFICACIÓN + FECHA -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:2mm;">
+    <!-- Row 3: NO. IDENTIFICACIÓN + FECHA -->
     <tr>
-      <td style="width:50%;padding-right:4mm;vertical-align:top;">
+      <td colspan="2" style="padding-right:5mm;vertical-align:top;">
         <div class="flabel">NO. IDENTIFICACIÓN - ID Number</div>
         <div class="fval">{no_identificacion}</div>
       </td>
-      <td style="width:50%;vertical-align:top;">
+      <td style="vertical-align:top;">
         <div class="flabel">FECHA DE INSPECCIÓN - Issue Date</div>
         <div class="fval">{fecha_inspeccion}</div>
       </td>
