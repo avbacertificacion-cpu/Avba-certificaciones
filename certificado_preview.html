@@ -198,44 +198,48 @@
     </tr>
     <!-- Row 3: NO. IDENTIFICACIÓN + FECHA -->
     <tr>
-      <td colspan="2" style="padding-right:5mm;vertical-align:top;padding-bottom:2mm;">
+      <td colspan="2" style="padding-right:5mm;vertical-align:top;padding-bottom:5mm;">
         <div class="flabel">NO. IDENTIFICACIÓN - ID Number</div>
         <div class="fval">{no_identificacion}</div>
       </td>
-      <td style="vertical-align:top;padding-bottom:2mm;">
+      <td style="vertical-align:top;padding-bottom:5mm;">
         <div class="flabel">FECHA DE INSPECCIÓN - Issue Date</div>
         <div class="fval">{fecha_inspeccion}</div>
       </td>
     </tr>
+    <!-- Separator row — reliable mPDF spacing before text section -->
+    <tr>
+      <td colspan="3" style="padding:3mm 0 4mm;">
+        <div style="height:1px;background:#c8d8e8;"></div>
+      </td>
+    </tr>
     </table>
-
-    <div class="fdiv"></div>
 
     <!-- CERTIFICATION TEXT — table cells so padding-bottom is respected by mPDF -->
     <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
       <td style="padding-bottom:5mm;">
-        <div class="ctext"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong>, como Unidad de Inspección competente y con base en los procedimientos internos y las normas aplicables, certifica que el ítem descrito en este documento fue inspeccionado conforme a los requisitos técnicos establecidos.</div>
+        <div class="ctext"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong>, en su carácter de Unidad de Inspección Tipo A, acreditada por la Entidad Mexicana de Acreditación (EMA) bajo el número <strong>{no_acreditacion}</strong>, certifica que el equipo descrito en el presente documento fue inspeccionado conforme a los procedimientos técnicos internos y las normas aplicables vigentes.</div>
       </td>
     </tr>
     <tr>
       <td style="padding-bottom:5mm;">
-        <div class="ctext">La evaluación se realizó mediante inspección visual, funcional y documental, verificando condiciones de seguridad, integridad estructural, dispositivos de protección, capacidad nominal y cumplimiento con las especificaciones del fabricante.</div>
+        <div class="ctext">La inspección fue llevada a cabo mediante evaluación visual, funcional y documental, verificando las condiciones de seguridad operacional, integridad estructural, dispositivos de protección, capacidad de carga nominal y conformidad con las especificaciones del fabricante.</div>
       </td>
     </tr>
     <tr>
       <td style="padding-bottom:5mm;">
-        <div class="ctext">Con base en la evidencia recopilada, se determina que:</div>
+        <div class="ctext">Con base en la evidencia técnica recopilada durante la inspección, se determina que:</div>
       </td>
     </tr>
     <tr>
       <td style="padding-bottom:5mm;">
-        <div class="ctext seguras-block">El equipo se encuentra en condiciones <strong>SEGURAS para operación</strong>, bajo los criterios evaluados en la fecha de inspección.</div>
+        <div class="ctext seguras-block">El equipo se encuentra en condiciones <strong>SEGURAS para su operación</strong>, de conformidad con los criterios técnicos evaluados. La vigencia del presente certificado es hasta el <strong>{vigencia}</strong>.</div>
       </td>
     </tr>
     <tr>
       <td>
-        <div class="ctext italic-note"><em>Este certificado es válido únicamente para la configuración y condiciones observadas durante la inspección.</em></div>
+        <div class="ctext italic-note"><em>Este certificado es válido únicamente para la configuración, estado y condiciones observadas durante la inspección. Cualquier modificación al equipo invalida el presente documento.</em></div>
       </td>
     </tr>
     </table>
