@@ -60,15 +60,15 @@
   .fval.lg{ font-size:12pt; }
   .fdiv   { height:1px; background:#c8d8e8; margin:4mm 0 6mm; }
 
-  /* Text paragraphs */
-  .ctext { font-size:9pt; color:#1a2a3a; line-height:1.85; margin-bottom:5mm; text-align:justify; }
+  /* Text paragraphs — padding-bottom instead of margin-bottom; mPDF collapses <p>/<div> margins */
+  .ctext { font-size:9pt; color:#1a2a3a; line-height:1.85; padding-bottom:5mm; margin:0; text-align:justify; }
   .ctext strong { font-weight:700; color:#0d1a2a; }
 
   /* SEGURAS block */
-  .seguras-block { color:#1a5580; padding:3.5mm 4mm 3.5mm 6mm; border-left:4px solid #2060a8; margin-left:2mm; margin-bottom:4.5mm; font-size:9.5pt; line-height:1.7; }
+  .seguras-block { color:#1a5580; padding:3.5mm 4mm 3.5mm 6mm; border-left:4px solid #2060a8; margin-left:2mm; margin-bottom:0; font-size:9.5pt; line-height:1.7; }
   .seguras-block strong { color:#1a5580; }
   /* Italic disclaimer */
-  .italic-note { font-size:8.5pt; color:#2060a8; font-style:italic; margin-top:3mm; line-height:1.5; }
+  .italic-note { font-size:8.5pt; color:#2060a8; font-style:italic; padding-bottom:0; margin:0; line-height:1.5; }
 
   /* ── SIGNATURES ──────────────────────────────────── */
   .sigs { width:100%; border-collapse:collapse; }
@@ -151,11 +151,13 @@
 
     <!-- CLIENTE -->
     <div class="flabel">CLIENTE - Customer</div>
-    <div class="fval lg" style="margin-bottom:4mm;">{cliente}</div>
+    <div class="fval lg">{cliente}</div>
+    <div style="height:4mm;"></div>
 
     <!-- DOMICILIO -->
     <div class="flabel">DOMICILIO - Address</div>
-    <div class="fval" style="margin-bottom:4mm;">{domicilio}</div>
+    <div class="fval">{domicilio}</div>
+    <div style="height:3mm;"></div>
 
     <div class="fdiv"></div>
 
@@ -190,11 +192,11 @@
     </tr>
     <!-- Row 3: NO. IDENTIFICACIÓN + FECHA -->
     <tr>
-      <td colspan="2" style="padding-right:5mm;vertical-align:top;">
+      <td colspan="2" style="padding-right:5mm;vertical-align:top;padding-bottom:2mm;">
         <div class="flabel">NO. IDENTIFICACIÓN - ID Number</div>
         <div class="fval">{no_identificacion}</div>
       </td>
-      <td style="vertical-align:top;">
+      <td style="vertical-align:top;padding-bottom:2mm;">
         <div class="flabel">FECHA DE INSPECCIÓN - Issue Date</div>
         <div class="fval">{fecha_inspeccion}</div>
       </td>
@@ -203,22 +205,22 @@
 
     <div class="fdiv"></div>
 
-    <!-- CERTIFICATION TEXT -->
-    <p class="ctext">
+    <!-- CERTIFICATION TEXT — use div+padding-bottom; mPDF collapses <p> margins -->
+    <div class="ctext">
       <strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong>, como Unidad de Inspección competente y con base en los procedimientos internos y las normas aplicables, certifica que el ítem descrito en este documento fue inspeccionado conforme a los requisitos técnicos establecidos.
-    </p>
-    <p class="ctext">
+    </div>
+    <div class="ctext">
       La evaluación se realizó mediante inspección visual, funcional y documental, verificando condiciones de seguridad, integridad estructural, dispositivos de protección, capacidad nominal y cumplimiento con las especificaciones del fabricante.
-    </p>
-    <p class="ctext">
+    </div>
+    <div class="ctext">
       Con base en la evidencia recopilada, se determina que:
-    </p>
-    <p class="ctext seguras-block">
+    </div>
+    <div class="ctext seguras-block">
       El equipo se encuentra en condiciones <strong>SEGURAS para operación</strong>, bajo los criterios evaluados en la fecha de inspección.
-    </p>
-    <p class="ctext italic-note">
+    </div>
+    <div class="ctext italic-note">
       <em>Este certificado es válido únicamente para la configuración y condiciones observadas durante la inspección.</em>
-    </p>
+    </div>
 
   </td>
 </tr>
