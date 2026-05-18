@@ -190,30 +190,30 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 
   <div class="band-blue">
     Número de Certificado AVBA Inspections
-    <span class="cert-num">AB.45198-00247-2026MX</span>
+    <span class="cert-num">{folio}</span>
   </div>
   <table class="data-table">
     <tr>
-      <td style="width:65%"><div class="cell-lbl">Nombre del Cliente <span class="cell-lbl-en">· Customer</span></div><div class="cell-val">GRÚAS Y TRANSPORTES GARZA S.A. DE C.V.</div></td>
-      <td><div class="cell-lbl">Unidad de Inspección</div><div class="cell-val">Tipo A</div></td>
+      <td style="width:65%"><div class="cell-lbl">Nombre del Cliente <span class="cell-lbl-en">· Customer</span></div><div class="cell-val">{cliente}</div></td>
+      <td><div class="cell-lbl">Unidad de Inspección</div><div class="cell-val">{tipo_maquinaria}</div></td>
     </tr>
     <tr>
-      <td colspan="2"><div class="cell-lbl">Domicilio / Lugar de Inspección <span class="cell-lbl-en">· Address</span></div><div class="cell-val">BLVD. MANUEL ÁVILA CAMACHO 2828, PARQUE IND. FINSA, SAN NICOLÁS DE LOS GARZA, N.L.</div></td>
+      <td colspan="2"><div class="cell-lbl">Domicilio / Lugar de Inspección <span class="cell-lbl-en">· Address</span></div><div class="cell-val">{domicilio}</div></td>
     </tr>
   </table>
 
   <div class="band-gold" style="margin-top:5px">Maquinaria · Machinery &nbsp;|&nbsp; Capacidad · Capacity &nbsp;|&nbsp; Datos Técnicos</div>
   <table class="data-table">
     <tr>
-      <td style="width:32%"><div class="cell-lbl">Tipo de Maquinaria</div><div class="cell-val">GRÚA MÓVIL TELESCÓPICA</div></td>
-      <td style="width:13%"><div class="cell-lbl">Capacidad</div><div class="cell-val">50 TON</div></td>
-      <td style="width:13%"><div class="cell-lbl">Marca</div><div class="cell-val">GROVE</div></td>
-      <td style="width:20%"><div class="cell-lbl">Modelo</div><div class="cell-val">GMK 3050-2</div></td>
-      <td><div class="cell-lbl">No. Serie</div><div class="cell-val">GR-2019-GMK-00458</div></td>
+      <td style="width:32%"><div class="cell-lbl">Tipo de Maquinaria</div><div class="cell-val">{tipo_maquinaria}</div></td>
+      <td style="width:13%"><div class="cell-lbl">Capacidad</div><div class="cell-val">{capacidad}</div></td>
+      <td style="width:13%"><div class="cell-lbl">Marca</div><div class="cell-val">{marca}</div></td>
+      <td style="width:20%"><div class="cell-lbl">Modelo</div><div class="cell-val">{modelo}</div></td>
+      <td><div class="cell-lbl">No. Serie</div><div class="cell-val">{no_serie}</div></td>
     </tr>
     <tr>
-      <td colspan="2"><div class="cell-lbl">No. Identificación <span class="cell-lbl-en">· ID</span></div><div class="cell-val">AVBA-INS-2026-0089</div></td>
-      <td colspan="3"><div class="cell-lbl">Fecha de Inspección <span class="cell-lbl-en">· Issue Date</span></div><div class="cell-val">15 / 05 / 2026</div></td>
+      <td colspan="2"><div class="cell-lbl">No. Identificación <span class="cell-lbl-en">· ID</span></div><div class="cell-val">{no_identificacion}</div></td>
+      <td colspan="3"><div class="cell-lbl">Fecha de Inspección <span class="cell-lbl-en">· Issue Date</span></div><div class="cell-val">{fecha_inspeccion}</div></td>
     </tr>
   </table>
 
@@ -245,7 +245,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 </table></div>
 
   <div class="sec-title">Conclusiones</div>
-  <div class="sec-body" style="padding:8px 14px">Se concluye que mecánicamente el equipo <strong>GRÚA MÓVIL TELESCÓPICA GROVE GMK 3050-2</strong>, No. de Serie <strong>GR-2019-GMK-00458</strong>, es apto para realizar las operaciones para lo cual fue diseñado, con apego a la normatividad aplicable, tabla de capacidades y especificaciones del fabricante.</div>
+  <div class="sec-body" style="padding:8px 14px">Se concluye que mecánicamente el equipo <strong>{tipo_maquinaria} {marca} {modelo}</strong>, No. de Serie <strong>{no_serie}</strong>, es apto para realizar las operaciones para lo cual fue diseñado, con apego a la normatividad aplicable, tabla de capacidades y especificaciones del fabricante.</div>
 
   <table class="result-row" style="margin-top:6px;width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
     <td class="result-cell"><div class="result-lbl">Resultado de la Inspección</div><table style="margin:0 auto;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tr><td style="background:#e6f7ef;color:#1a7a4a;border:1.5px solid #34c472;padding:4px 14px;font-size:9.5pt;font-weight:700;letter-spacing:.5px;"><svg style="width:8px;height:8px;display:inline-block;vertical-align:middle;margin-right:4px;" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#1a7a4a"/></svg>SATISFACTORIA</td></tr></table></td>
@@ -280,8 +280,8 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   </tr></table>
   <table class="page-foot" style="margin-top:1px;width:100%;" cellpadding="0" cellspacing="0"><tr>
     <td><span class="f-lbl">Folio de Control</span></td>
-    <td style="text-align:center;"><span class="f-val">AB.45198-00247-2026MX</span></td>
-    <td style="text-align:right;"><span class="f-lbl">Vigencia: 15 / 05 / 2027 · Página 1 de 3</span></td>
+    <td style="text-align:center;"><span class="f-val">{folio}</span></td>
+    <td style="text-align:right;"><span class="f-lbl">Vigencia: {vigencia} · Página 1 de 3</span></td>
   </tr></table>
 </div>
 
@@ -297,14 +297,14 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <div class="hdr-sep"></div>
       <div class="hdr-title-en">Photographic Report &amp; Load Test · Prueba de Carga</div>
     </td>
-  <td class="hdr-cert" width="64mm"><span class="hdr-cert-lbl">No. Certificado</span><span class="hdr-cert-val">AB.45198-00247-2026MX</span></td>
+  <td class="hdr-cert" width="64mm"><span class="hdr-cert-lbl">No. Certificado</span><span class="hdr-cert-val">{folio}</span></td>
 </tr>
 </table>
   <div class="gold-bar"></div>
   <div style="padding:8px 12px 6px">
     <div class="sec-title" style="margin-top:0">Reporte Fotográfico <span style="font-size:7pt;font-weight:400;opacity:.6;margin-left:6px">· 9 Evidencias visuales de la inspección</span></div>
     <div class="sec-body" style="padding:0">
-      <div class="foto-section-title"><span class="dot"></span> Inspección General del Equipo · GROVE GMK 3050-2</div>
+      <div class="foto-section-title"><span class="dot"></span> Inspección General del Equipo · {marca} {modelo}</div>
       <table class="foto-grid-3x3" width="100%" cellpadding="0" cellspacing="0">
 <tr>
 <td class="foto-card"><div class="foto-placeholder" style="padding:4px;">
@@ -417,8 +417,8 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     <div class="sec-title">Prueba de Carga <span style="font-size:7pt;font-weight:400;opacity:.6;margin-left:6px">· Load Test</span></div>
     <div class="sec-body" style="padding:0">
       <table class="pc-header-strip" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
-        <td class="pc-equip-cell"><div class="pc-equip-lbl">Equipo Inspeccionado</div><div class="pc-equip-val">GRÚA MÓVIL TELESCÓPICA · GROVE GMK 3050-2</div></td>
-        <td class="pc-equip-cell" style="width:110px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Capacidad Nominal</div><div class="pc-equip-val">50 TON</div></td>
+        <td class="pc-equip-cell"><div class="pc-equip-lbl">Equipo Inspeccionado</div><div class="pc-equip-val">{tipo_maquinaria} · {marca} {modelo}</div></td>
+        <td class="pc-equip-cell" style="width:110px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Capacidad Nominal</div><div class="pc-equip-val">{capacidad}</div></td>
         <td class="pc-equip-cell" style="width:115px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Peso de Prueba</div><div class="pc-equip-val">42.5 TON</div></td>
         <td class="pc-equip-cell" style="width:120px;border-right:none;"><div class="pc-equip-lbl">Fecha de Prueba</div><div class="pc-equip-val">15 / 05 / 2026</div></td>
       </tr></table>
@@ -502,7 +502,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       </table>
       <div class="pc-obs-row">
         <div class="pc-obs-label">Observaciones</div>
-        <div class="pc-obs-content">El equipo <strong>GROVE GMK 3050-2</strong> No. Serie <strong>GR-2019-GMK-00458</strong> respondió correctamente en ambas pruebas realizadas. Durante la prueba sin carga se verificó el funcionamiento de todos los sistemas (hidráulico, eléctrico y mecánico) sin detectar anomalías. En la prueba con carga a radio de operación de <strong>6.0 m</strong> y longitud de pluma de <strong>10.8 m</strong>, se obtuvo un ángulo de trabajo de <strong>56.3°</strong> y una altura de izaje efectiva de <strong>8.98 m</strong>. <strong>Sin observaciones de riesgo. El equipo se considera apto para operar bajo las condiciones inspeccionadas.</strong></div>
+        <div class="pc-obs-content">El equipo <strong>{marca} {modelo}</strong> No. Serie <strong>{no_serie}</strong> respondió correctamente en ambas pruebas realizadas. Durante la prueba sin carga se verificó el funcionamiento de todos los sistemas (hidráulico, eléctrico y mecánico) sin detectar anomalías. En la prueba con carga a radio de operación de <strong>6.0 m</strong> y longitud de pluma de <strong>10.8 m</strong>, se obtuvo un ángulo de trabajo de <strong>56.3°</strong> y una altura de izaje efectiva de <strong>8.98 m</strong>. <strong>Sin observaciones de riesgo. El equipo se considera apto para operar bajo las condiciones inspeccionadas.</strong></div>
       </div>
       <table class="pc-result-strip" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;background:#0B2545;padding:0;" cellpadding="0" cellspacing="0"><tr>
         <td style="padding:8px 14px;vertical-align:middle;"><div class="pc-result-left"><span class="pc-result-lbl">Resultado General de la Prueba de Carga</span><span class="pc-result-val">✔ PRUEBA APROBADA</span></div></td>
@@ -512,8 +512,8 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   </div>
   <table class="page-foot" style="margin-top:6px;width:100%;" cellpadding="0" cellspacing="0"><tr>
     <td><span class="f-lbl">Folio</span></td>
-    <td style="text-align:center;"><span class="f-val">AB.45198-00247-2026MX</span></td>
-    <td style="text-align:right;"><span class="f-lbl">Vigencia: 15 / 05 / 2027 · Página 2 de 3</span></td>
+    <td style="text-align:center;"><span class="f-val">{folio}</span></td>
+    <td style="text-align:right;"><span class="f-lbl">Vigencia: {vigencia} · Página 2 de 3</span></td>
   </tr></table>
 </div>
 
@@ -529,7 +529,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <div class="hdr-sep"></div>
       <div class="hdr-title-en">Recomendaciones Generales · General Recommendations</div>
     </td>
-  <td class="hdr-cert" width="64mm"><span class="hdr-cert-lbl">No. Certificado</span><span class="hdr-cert-val">AB.45198-00247-2026MX</span></td>
+  <td class="hdr-cert" width="64mm"><span class="hdr-cert-lbl">No. Certificado</span><span class="hdr-cert-val">{folio}</span></td>
 </tr>
 </table>
   <div class="gold-bar"></div>
@@ -572,11 +572,11 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <li><span>Cualquier modificación o cambio importante en el equipo deberá ser reportado a AVBA Inspections y evaluado nuevamente.</span></li>
       <li><span>Este dictamen certifica que el equipo cumple con la normatividad aplicable, las especificaciones del fabricante y las condiciones seguras de operación en la fecha de inspección.</span></li>
     </ul></div></div>
-    <div class="footer-note"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong><br>Este dictamen es válido únicamente para las condiciones observadas en la fecha de inspección indicada. &nbsp;·&nbsp; Folio: <strong style="color:#C49A28">AB.45198-00247-2026MX</strong></div>
+    <div class="footer-note"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong><br>Este dictamen es válido únicamente para las condiciones observadas en la fecha de inspección indicada. &nbsp;·&nbsp; Folio: <strong style="color:#C49A28">{folio}</strong></div>
   </div>
   <table class="page-foot" style="width:100%;" cellpadding="0" cellspacing="0"><tr>
-    <td><span class="f-lbl">Vigencia hasta: 15 / 05 / 2027</span></td>
-    <td style="text-align:center;"><span class="f-val">AB.45198-00247-2026MX</span></td>
+    <td><span class="f-lbl">Vigencia hasta: {vigencia}</span></td>
+    <td style="text-align:center;"><span class="f-val">{folio}</span></td>
     <td style="text-align:right;"><span class="f-lbl">AVBA Inspections · Página 3 de 3</span></td>
   </tr></table>
 </div>
