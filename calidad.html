@@ -679,7 +679,7 @@
 <div class="sub-nav" id="sub-nav-accesorios" style="display:none">
   <button class="sub-btn active" id="sub-btn-acc-insp"       onclick="verSubTab('accesorios','inspeccionados')">Inspeccionados</button>
   <button class="sub-btn"        id="sub-btn-acc-tipos"      onclick="verSubTab('accesorios','tipos')">Tipos de accesorio</button>
-  <button class="sub-btn"        id="sub-btn-acc-plantilla"  onclick="verSubTab('accesorios','plantilla')">Plantilla PDF</button>
+  <button class="sub-btn"        id="sub-btn-acc-plantilla"  onclick="verSubTab('accesorios','plantilla')">Plantilla Certificado</button>
 </div>
 
 <!-- sub-nav Personal -->
@@ -936,14 +936,13 @@
 
 
 <!-- ══════════════════════════════════════════════════════════
-     SECCIÓN: ACCESORIOS — PLANTILLA PDF
+     SECCIÓN: ACCESORIOS — PLANTILLA HTML CERTIFICADO
 ═══════════════════════════════════════════ -->
 <div id="sec-acc-plantilla" class="wrap" style="display:none">
 
   <div style="font-size:13px;color:var(--texto-sub);margin-bottom:20px;line-height:1.6">
-    Configura la plantilla PDF y las coordenadas para el <strong>certificado individual de accesorio</strong>.
-    El sistema superpondrá los datos de cada accesorio inspeccionado sobre la plantilla.
-    El <em>Informe de Integridad Operativa</em> (tabla completa) se genera automáticamente al finalizar la sesión.
+    Selecciona la plantilla HTML para el <strong>certificado de accesorios</strong>.
+    La vista previa muestra el certificado real con datos de ejemplo.
   </div>
 
   <div id="acc-plantilla-cont">
@@ -2282,7 +2281,7 @@ function verSubTab(sec, sub) {
 
   if (sec === 'accesorios' && sub === 'inspeccionados' && !accSesionesCargadas) cargarSesionesAcc();
   if (sec === 'accesorios' && sub === 'tipos')                                   cargarAccTipos();
-  if (sec === 'accesorios' && sub === 'plantilla')                               cargarPlantillaAccesorios();
+  if (sec === 'accesorios' && sub === 'plantilla')                               { cargarPlantillaAccesorios(); cargarPlantillaActual(); }
   if (sec === 'personal'   && sub !== 'plantillas'  && !perCargados)             cargarPersonal();
   if (sec === 'personal'   && sub === 'plantillas')                              cargarPlantillasPersonal();
   if (sec === 'catalogos'  && sub === 'equipos'     && !tiposCargados)           { cargarTipos(); cargarPlantillaActual(); }
@@ -4005,72 +4004,31 @@ async function eliminarItem(tipoId, itemId) {
    PLANTILLA PDF — ACCESORIOS (Informe de Integridad Operativa)
 ══════════════════════════════════════════════════════════ */
 
-async function cargarPlantillaAccesorios() {
+function cargarPlantillaAccesorios() {
   const cont = document.getElementById("acc-plantilla-cont");
-  cont.innerHTML = `<div style="text-align:center;padding:32px;color:var(--texto-hint)">
-    <div class="spin" style="margin:0 auto 10px"></div>Cargando…</div>`;
-  try {
-    const s   = JSON.parse(localStorage.getItem("avba_session") || "{}");
-    const res = await fetch(`${API}?action=OBTENER_PLANTILLA_ACC&token=${s.token||""}`);
-    const data = await res.json();
-    if (data.status !== "success") throw new Error(data.message);
-    cont.innerHTML = renderPlantillaAccCard(data.data || {});
-  } catch (e) {
-    cont.innerHTML = `<div style="text-align:center;padding:32px;color:var(--rojo)">
-      Error al cargar.
-      <button onclick="cargarPlantillaAccesorios()"
-              style="color:var(--azul);background:none;border:none;cursor:pointer;
-                     text-decoration:underline;margin-left:6px">Reintentar</button></div>`;
-  }
+  cont.innerHTML = renderPlantillaAccCard();
 }
 
-function renderPlantillaAccCard(tpl) {
-  const tieneArchivo = !!tpl.plantilla_pdf;
-  const nombreArchivo = tieneArchivo ? tpl.plantilla_pdf.split("/").pop() : "";
-  const nCampos = Array.isArray(tpl.pdf_campos) ? tpl.pdf_campos.length : 0;
+function renderPlantillaAccCard() {
   return `
   <div class="tipo-card" style="border-radius:var(--radio-lg)">
-    <div style="padding:16px 20px;display:flex;align-items:center;gap:14px;border-bottom:1px solid var(--borde)">
-      <span style="font-size:28px">📜</span>
-      <div style="flex:1">
-        <div style="font-size:15px;font-weight:700;color:var(--texto)">Certificado individual de accesorio</div>
-        <div style="font-size:12px;color:var(--texto-sub);margin-top:2px">
-          ${tieneArchivo
-            ? `<span style="color:var(--verde)">✓ ${esc(nombreArchivo)}</span>`
-            : `<span style="color:var(--texto-hint)">Sin plantilla PDF</span>`}
-          &nbsp;·&nbsp; ${nCampos} campo${nCampos !== 1 ? "s" : ""} configurado${nCampos !== 1 ? "s" : ""}
-        </div>
+    <div style="padding:16px 20px;border-bottom:1px solid var(--borde)">
+      <div style="font-size:14px;font-weight:700;color:var(--texto);margin-bottom:14px">
+        Plantilla HTML de Certificado
       </div>
-    </div>
-    <div style="padding:14px 20px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-      <label style="cursor:pointer;padding:7px 14px;border-radius:var(--radio);
-             border:1.5px solid var(--azul);color:var(--azul);font-size:12px;font-weight:600;
-             background:var(--azul-light)">
-        ${tieneArchivo ? "Cambiar .pdf" : "Subir .pdf"}
-        <input type="file" accept=".pdf" style="display:none"
-               onchange="subirPlantillaAcc(event)">
-      </label>
-      <button onclick="abrirModalCamposPdfAcc()"
-              style="padding:7px 14px;border-radius:var(--radio);border:1.5px solid var(--azul);
-                     color:var(--azul);font-size:12px;font-weight:600;background:white;cursor:pointer">
-        ⚙ Configurar campos
-      </button>
-      ${tieneArchivo ? `
-      <button onclick="abrirPreviewAcc()"
-              style="padding:7px 14px;border-radius:var(--radio);border:1.5px solid #854F0B;
-                     color:#854F0B;font-size:12px;font-weight:600;background:#FAEEDA;cursor:pointer">
-        👁 Previsualizar certificado
-      </button>
-      <button onclick="eliminarPlantillaAcc()"
-              style="padding:7px 14px;border-radius:var(--radio);border:1.5px solid var(--rojo);
-                     color:var(--rojo);font-size:12px;font-weight:600;background:var(--rojo-light);cursor:pointer">
-        🗑 Quitar plantilla
-      </button>` : ""}
-    </div>
-    <div style="padding:0 20px 16px;font-size:11.5px;color:var(--texto-hint);line-height:1.6">
-      Sube un PDF como plantilla de fondo y configura las coordenadas donde se imprimirá cada campo
-      del accesorio. El <strong>Informe de Integridad Operativa</strong> (tabla completa) se genera
-      automáticamente al finalizar la sesión en el panel del inspector.
+      <div class="cert-html-opts">
+        <button class="btn-cert-opt ${plantillaSeleccionada==='equipos'?'activa':''}"
+                data-tipo="equipos" onclick="seleccionarPlantillaCert('equipos')">Equipos</button>
+        <button class="btn-cert-opt ${plantillaSeleccionada==='accesorios'?'activa':''}"
+                data-tipo="accesorios" onclick="seleccionarPlantillaCert('accesorios')">Accesorios</button>
+        <button class="btn-cert-opt ${plantillaSeleccionada==='personal'?'activa':''}"
+                data-tipo="personal" onclick="seleccionarPlantillaCert('personal')">Personal</button>
+        <button class="btn-add-item" style="font-size:12px;padding:6px 14px;margin-left:auto"
+                onclick="abrirSelectorPlantilla()">Ver previsualizaciones</button>
+      </div>
+      <div style="font-size:11px;color:var(--texto-hint);margin-top:8px">
+        Define el formato HTML del certificado para sesiones de accesorios
+      </div>
     </div>
   </div>`;
 }
