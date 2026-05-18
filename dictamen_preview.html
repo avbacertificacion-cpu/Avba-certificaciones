@@ -47,54 +47,54 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 
 /* ── RESTO ── */
 .gold-bar{height:3px;background:linear-gradient(90deg,var(--dorado),var(--dorado-l),var(--dorado));}
-.band-blue{background:var(--azul);color:#fff;padding:5px 14px;font-weight:700;font-size:8pt;letter-spacing:.5px;text-transform:uppercase;border-left:4px solid var(--dorado);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.band-blue{background:var(--azul);color:#fff;padding:5px 14px;font-weight:700;font-size:8pt;letter-spacing:.5px;text-transform:uppercase;border-left:4px solid var(--dorado);}
 .band-blue .cert-num{background:var(--dorado);color:var(--azul);padding:1px 10px;border-radius:99px;font-size:8.5pt;font-weight:800;letter-spacing:.5px;}
 .band-gold{background:linear-gradient(90deg,var(--dorado),#d4a82a);color:#fff;padding:5px 14px;font-weight:700;font-size:7.5pt;text-transform:uppercase;letter-spacing:.4px;}
 .data-table{width:100%;border-collapse:collapse;}
 .data-table td{border:1px solid var(--borde);border-top:none;padding:6px 12px;vertical-align:top;}
-.cell-lbl{font-size:6.5pt;font-weight:600;text-transform:uppercase;color:var(--sub);letter-spacing:.4px;display:flex;align-items:center;gap:3px;}
+.cell-lbl{font-size:6.5pt;font-weight:600;text-transform:uppercase;color:var(--sub);letter-spacing:.4px;display:block;}
 .cell-lbl-en{font-weight:400;font-style:italic;color:#a0adb8;}
 .cell-val{font-size:9.5pt;font-weight:600;color:var(--azul);margin-top:2px;}
-.sec-title{display:flex;align-items:center;gap:8px;background:var(--azul-m);color:#fff;padding:4px 14px;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-left:4px solid var(--dorado);margin-top:7px;}
+.sec-title{display:block;background:var(--azul-m);color:#fff;padding:4px 14px;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-left:4px solid var(--dorado);margin-top:7px;}
 .sec-body{border:1px solid var(--borde);border-top:none;background:#fafcff;}
 .scope-grid{width:100%;border-collapse:collapse;padding:4px 6px;}
 .scope-grid td{width:50%;vertical-align:top;padding:3px 8px;font-size:8pt;}
-.scope-num{min-width:18px;height:18px;border-radius:50%;background:var(--azul);color:#fff;display:flex;align-items:center;justify-content:center;font-size:6.5pt;font-weight:700;flex-shrink:0;margin-top:1px;}
-.result-row{display:flex;border:1px solid var(--borde);border-top:none;}
-.result-cell{flex:1;border-right:1px solid var(--borde);padding:10px 8px;text-align:center;background:var(--gris);}
+.scope-num{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:50%;background:var(--azul);color:#fff;text-align:center;font-size:6.5pt;font-weight:700;margin-right:4px;vertical-align:middle;}
+.result-row{border:1px solid var(--borde);border-top:none;}
+.result-cell{border-right:1px solid var(--borde);padding:10px 8px;text-align:center;background:var(--gris);}
 .result-cell:last-child{border-right:none;}
 .result-lbl{font-size:6.5pt;font-weight:700;text-transform:uppercase;color:var(--sub);letter-spacing:.4px;margin-bottom:5px;}
-.badge{display:inline-flex;align-items:center;gap:5px;padding:4px 16px;border-radius:99px;font-size:9.5pt;font-weight:700;letter-spacing:.5px;}
+.badge{display:inline-block;padding:4px 16px;border-radius:99px;font-size:9.5pt;font-weight:700;letter-spacing:.5px;}
 .badge-ok{background:var(--verde-l);color:var(--verde);border:1.5px solid #34c472;}
 .badge-op{background:#e0edff;color:var(--azul-m);border:1.5px solid var(--azul-l);}
-.badge-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.badge-dot{display:inline-block;width:7px;height:7px;border-radius:50%;vertical-align:middle;margin-right:3px;}
 .badge-ok .badge-dot{background:var(--verde);}
 .badge-op .badge-dot{background:var(--azul-m);}
-.sig-row{display:flex;border:1px solid var(--borde);border-top:none;}
-.sig-cell{flex:1;border-right:1px solid var(--borde);padding:12px 14px;text-align:center;display:flex;flex-direction:column;align-items:center;}
+.sig-row{border:1px solid var(--borde);border-top:none;}
+.sig-cell{padding:12px 14px;text-align:center;display:block;}
 .sig-cell:last-child{border-right:none;}
 .sig-role{font-size:6.5pt;font-weight:700;text-transform:uppercase;color:var(--sub);letter-spacing:.5px;margin-bottom:14px;}
 .sig-line{width:72%;height:1px;background:var(--azul);margin-bottom:5px;}
 .sig-name{font-size:8.5pt;font-weight:700;color:var(--azul);}
 .sig-detail{font-size:7.5pt;color:var(--sub);margin-top:1px;}
-.page-foot{background:var(--azul);padding:5px 14px;display:flex;align-items:center;justify-content:space-between;margin-top:8px;}
+.page-foot{background:var(--azul);padding:0;margin-top:8px;}.page-foot td{padding:5px 14px;}
 .f-lbl{font-size:6.5pt;color:rgba(255,255,255,.4);text-transform:uppercase;}
 .f-val{font-size:8pt;font-weight:700;color:var(--dorado);letter-spacing:.5px;}
 
 /* ── FOTOS ── */
-.foto-section-title{display:flex;align-items:center;gap:8px;padding:5px 12px;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--sub);border-bottom:1px solid var(--borde);background:var(--gris);}
-.foto-section-title .dot{width:8px;height:8px;border-radius:50%;background:var(--azul-l);flex-shrink:0;}
-.foto-grid-3x3{display:table;width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;}
-.foto-grid-ganchos{display:table;width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;}
-.foto-card{background:#fff;display:table-cell;width:33.33%;vertical-align:top;border:1px solid var(--borde);height:85px;overflow:hidden;}
-.foto-placeholder{display:block;height:62px;overflow:hidden;text-align:center;padding:3px;background:linear-gradient(145deg,#f8fafc,#eef2f7);color:#94a3b8;}
-.fp-num{position:absolute;top:4px;left:4px;width:18px;height:18px;border-radius:50%;background:var(--azul);color:#fff;display:flex;align-items:center;justify-content:center;font-size:7.5pt;font-weight:800;box-shadow:0 1px 4px rgba(0,0,0,.2);}
+.foto-section-title{display:block;padding:5px 12px;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--sub);border-bottom:1px solid var(--borde);background:var(--gris);}
+.foto-section-title .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--azul-l);vertical-align:middle;margin-right:4px;}
+.foto-grid-3x3{width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;}
+.foto-grid-ganchos{width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;}
+.foto-card{background:#fff;width:33.33%;vertical-align:top;border:1px solid var(--borde);}
+.foto-placeholder{display:block;text-align:center;padding:4px;background:linear-gradient(145deg,#f8fafc,#eef2f7);color:#94a3b8;}
+.fp-num{display:inline-block;width:18px;height:18px;line-height:18px;border-radius:50%;background:var(--azul);color:#fff;font-size:7.5pt;font-weight:800;text-align:center;vertical-align:middle;margin-right:4px;}
 .foto-caption{padding:3px 6px;font-size:6.5pt;color:var(--sub);font-weight:500;border-top:1px solid var(--borde);background:#fff;text-align:center;}
-.ganchos-header{display:flex;align-items:center;gap:8px;padding:5px 12px;background:var(--azul);color:#fff;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-left:4px solid var(--dorado);}
+.ganchos-header{display:block;padding:5px 12px;background:var(--azul);color:#fff;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-left:4px solid var(--dorado);}
 
 /* ── PRUEBA DE CARGA ── */
-.pc-header-strip{display:flex;align-items:stretch;border:1px solid var(--borde);border-top:none;}
-.pc-equip-cell{flex:1;padding:5px 10px;border-right:1px solid var(--borde);display:flex;flex-direction:column;}
+.pc-header-strip{border:1px solid var(--borde);border-top:none;}
+.pc-equip-cell{padding:5px 10px;border-right:1px solid var(--borde);display:block;}
 .pc-equip-cell:last-child{border-right:none;}
 .pc-equip-lbl{font-size:6pt;font-weight:700;text-transform:uppercase;color:var(--sub);letter-spacing:.4px;}
 .pc-equip-val{font-size:9pt;font-weight:700;color:var(--azul);margin-top:1px;}
@@ -114,36 +114,36 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 .pc-calc-val{font-size:9.5pt;font-weight:800;color:var(--azul-l);}
 .pc-calc-unit{font-size:7pt;color:var(--sub);font-weight:500;}
 .pc-ok-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:7.5pt;font-weight:700;background:var(--verde-l);color:var(--verde);border:1px solid #34c472;}
-.pc-diagram-row{display:flex;align-items:stretch;border:1px solid var(--borde);border-top:none;background:linear-gradient(135deg,#f4f8ff,#e8f0fb);}
-.pc-diagram{flex:0 0 175px;display:flex;align-items:center;justify-content:center;padding:6px;border-right:1px solid var(--borde);min-height:130px;}
-.pc-diagram-data{flex:1;display:table;width:100%;border-collapse:collapse;}
-.pc-diag-cell{display:table-cell;width:50%;padding:6px 12px;border-right:1px solid var(--borde);border-bottom:1px solid var(--borde);vertical-align:middle;}
-.pc-diag-cell:nth-child(even){border-right:none;}
-.pc-diag-cell:nth-child(n+3){border-bottom:none;}
+.pc-diagram-row{border:1px solid var(--borde);border-top:none;background:linear-gradient(135deg,#f4f8ff,#e8f0fb);}
+.pc-diagram{padding:6px;border-right:1px solid var(--borde);}
+.pc-diagram-data{width:100%;border-collapse:collapse;}
+.pc-diag-cell{padding:6px 12px;vertical-align:middle;}
+
+
 .pc-diag-lbl{font-size:6.5pt;font-weight:700;text-transform:uppercase;color:var(--sub);letter-spacing:.4px;}
 .pc-diag-val{font-size:12pt;font-weight:900;color:var(--azul);line-height:1.1;margin-top:2px;}
 .pc-diag-val .unit{font-size:8pt;font-weight:600;color:var(--sub);margin-left:2px;}
 .pc-diag-badge{margin-top:3px;display:inline-flex;align-items:center;gap:3px;font-size:7pt;font-weight:700;color:var(--verde);}
-.pc-obs-row{border:1px solid var(--borde);border-top:none;display:flex;flex-direction:column;}
+.pc-obs-row{border:1px solid var(--borde);border-top:none;display:block;}
 .pc-obs-label{background:var(--azul-m);color:#fff;padding:4px 12px;font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-left:3px solid var(--dorado);}
 .pc-obs-content{padding:5px 10px;font-size:7.5pt;line-height:1.5;color:var(--texto);background:#fffdf5;border-left:3px solid var(--dorado);}
-.pc-result-strip{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border:1px solid var(--borde);border-top:none;background:var(--azul);}
-.pc-result-left{display:flex;flex-direction:column;}
+.pc-result-strip{border:1px solid var(--borde);border-top:none;background:var(--azul);}
+.pc-result-left{display:block;}
 .pc-result-lbl{font-size:6.5pt;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.4px;}
 .pc-result-val{font-size:11pt;font-weight:900;color:var(--dorado);letter-spacing:.5px;margin-top:1px;}
 .pc-norma{font-size:7pt;color:rgba(255,255,255,.55);font-style:italic;text-align:right;}
 
 /* ── RECOMENDACIONES ── */
 .rec{margin-top:1px;}
-.rec-head{display:flex;align-items:flex-start;gap:9px;padding:3px 12px;background:var(--gris);border:1px solid var(--borde);border-bottom:none;}
-.rec-num{width:22px;height:22px;border-radius:50%;background:var(--azul);color:#fff;display:flex;align-items:center;justify-content:center;font-size:8pt;font-weight:700;flex-shrink:0;margin-top:1px;}
+.rec-head{display:block;padding:3px 12px;background:var(--gris);border:1px solid var(--borde);border-bottom:none;}
+.rec-num{display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;background:var(--azul);color:#fff;text-align:center;font-size:8pt;font-weight:700;vertical-align:middle;margin-right:6px;}
 .rec-head-title{font-size:8pt;font-weight:700;color:var(--azul);text-transform:uppercase;letter-spacing:.3px;line-height:1.3;}
 .rec-body{border:1px solid var(--borde);padding:3px 12px 3px 42px;background:#fff;}
 .rec-body ul{list-style:none;padding:0;}
-.rec-body ul li{font-size:7.5pt;line-height:1.35;display:flex;align-items:flex-start;gap:5px;flex-wrap:wrap;margin-bottom:0;}
+.rec-body ul li{font-size:7.5pt;line-height:1.5;display:block;margin-bottom:1px;}
 .rec-body ul li:last-child{margin-bottom:0;}
-.rec-body ul li > span{flex:1;min-width:0;}
-.rec-body ul li::before{content:'–';color:var(--dorado);font-weight:700;flex-shrink:0;margin-top:.1em;}
+.rec-body ul li > span{display:inline;}
+.rec-body ul li::before{content:'– ';color:var(--dorado);font-weight:700;}
 .rec-body ul ul{padding-left:0;width:100%;margin-top:3px;margin-bottom:2px;}
 .rec-body ul ul li::before{content:'·';color:#94a3b8;}
 .footer-note{border-top:2px solid var(--dorado);padding:4px 12px;margin-top:3px;text-align:center;font-size:7.5pt;color:var(--sub);page-break-before:avoid;page-break-inside:avoid;break-before:avoid;}
@@ -275,72 +275,72 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <div class="foto-section-title"><span class="dot"></span> Inspección General del Equipo · GROVE GMK 3050-2</div>
       <table class="foto-grid-3x3" width="100%" cellpadding="0" cellspacing="0">
 <tr>
-<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card"><div class="foto-placeholder" style="padding:4px;">
     <span class="fp-num">01</span>
-    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
+    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" style="width:36px;height:28px;display:inline-block;vertical-align:middle;">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
       <circle cx="22" cy="18" r="8.5"/><circle cx="22" cy="18" r="4" fill="#94a3b8" stroke="none" opacity=".4"/>
       <rect x="15" y="1" width="14" height="5" rx="2"/>
       <circle cx="36" cy="9" r="2.5" fill="#94a3b8" stroke="none" opacity=".3"/>
     </svg>
-    <span style="font-size:7pt">Fotografía 01</span>
+    <span style="display:block;font-size:7pt;">Fotografía 01</span>
   </div><div class="foto-caption">Vista general del equipo</div></td>
-<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card"><div class="foto-placeholder" style="padding:4px;">
     <span class="fp-num">02</span>
-    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
+    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" style="width:36px;height:28px;display:inline-block;vertical-align:middle;">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
       <circle cx="22" cy="18" r="8.5"/><circle cx="22" cy="18" r="4" fill="#94a3b8" stroke="none" opacity=".4"/>
       <rect x="15" y="1" width="14" height="5" rx="2"/>
       <circle cx="36" cy="9" r="2.5" fill="#94a3b8" stroke="none" opacity=".3"/>
     </svg>
-    <span style="font-size:7pt">Fotografía 02</span>
+    <span style="display:block;font-size:7pt;">Fotografía 02</span>
   </div><div class="foto-caption">Placa de identificación</div></td>
-<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card"><div class="foto-placeholder" style="padding:4px;">
     <span class="fp-num">03</span>
-    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
+    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" style="width:36px;height:28px;display:inline-block;vertical-align:middle;">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
       <circle cx="22" cy="18" r="8.5"/><circle cx="22" cy="18" r="4" fill="#94a3b8" stroke="none" opacity=".4"/>
       <rect x="15" y="1" width="14" height="5" rx="2"/>
       <circle cx="36" cy="9" r="2.5" fill="#94a3b8" stroke="none" opacity=".3"/>
     </svg>
-    <span style="font-size:7pt">Fotografía 03</span>
+    <span style="display:block;font-size:7pt;">Fotografía 03</span>
   </div><div class="foto-caption">Estructura principal y pluma</div></td>
 </tr>
 <tr>
-<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card"><div class="foto-placeholder" style="padding:4px;">
     <span class="fp-num">04</span>
-    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
+    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" style="width:36px;height:28px;display:inline-block;vertical-align:middle;">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
       <circle cx="22" cy="18" r="8.5"/><circle cx="22" cy="18" r="4" fill="#94a3b8" stroke="none" opacity=".4"/>
       <rect x="15" y="1" width="14" height="5" rx="2"/>
       <circle cx="36" cy="9" r="2.5" fill="#94a3b8" stroke="none" opacity=".3"/>
     </svg>
-    <span style="font-size:7pt">Fotografía 04</span>
+    <span style="display:block;font-size:7pt;">Fotografía 04</span>
   </div><div class="foto-caption">Sistema hidráulico</div></td>
-<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card"><div class="foto-placeholder" style="padding:4px;">
     <span class="fp-num">05</span>
-    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
+    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" style="width:36px;height:28px;display:inline-block;vertical-align:middle;">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
       <circle cx="22" cy="18" r="8.5"/><circle cx="22" cy="18" r="4" fill="#94a3b8" stroke="none" opacity=".4"/>
       <rect x="15" y="1" width="14" height="5" rx="2"/>
       <circle cx="36" cy="9" r="2.5" fill="#94a3b8" stroke="none" opacity=".3"/>
     </svg>
-    <span style="font-size:7pt">Fotografía 05</span>
+    <span style="display:block;font-size:7pt;">Fotografía 05</span>
   </div><div class="foto-caption">Cabina y controles del operador</div></td>
-<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card"><div class="foto-placeholder" style="padding:4px;">
     <span class="fp-num">06</span>
-    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
+    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" style="width:36px;height:28px;display:inline-block;vertical-align:middle;">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
       <circle cx="22" cy="18" r="8.5"/><circle cx="22" cy="18" r="4" fill="#94a3b8" stroke="none" opacity=".4"/>
       <rect x="15" y="1" width="14" height="5" rx="2"/>
       <circle cx="36" cy="9" r="2.5" fill="#94a3b8" stroke="none" opacity=".3"/>
     </svg>
-    <span style="font-size:7pt">Fotografía 06</span>
+    <span style="display:block;font-size:7pt;">Fotografía 06</span>
   </div><div class="foto-caption">Sistemas de estabilización</div></td>
 </tr>
 </table>
       <div class="ganchos-header">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" width="13" height="13">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px;display:inline-block;vertical-align:middle;">
           <path d="M10 2a4 4 0 014 4v1h2M10 6v6m0 0a3 3 0 11-3 3"/>
           <circle cx="10" cy="6" r="1.5" fill="currentColor" stroke="none"/>
         </svg>
@@ -348,35 +348,35 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       </div>
       <table class="foto-grid-ganchos" width="100%" cellpadding="0" cellspacing="0">
 <tr>
-<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card"><div class="foto-placeholder" style="padding:4px;">
     <span class="fp-num">07</span>
-    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
+    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" style="width:36px;height:28px;display:inline-block;vertical-align:middle;">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
       <circle cx="22" cy="18" r="8.5"/><circle cx="22" cy="18" r="4" fill="#94a3b8" stroke="none" opacity=".4"/>
       <rect x="15" y="1" width="14" height="5" rx="2"/>
       <circle cx="36" cy="9" r="2.5" fill="#94a3b8" stroke="none" opacity=".3"/>
     </svg>
-    <span style="font-size:7pt">Fotografía 07</span>
+    <span style="display:block;font-size:7pt;">Fotografía 07</span>
   </div><div class="foto-caption">Gancho principal — vista general</div></td>
-<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card"><div class="foto-placeholder" style="padding:4px;">
     <span class="fp-num">08</span>
-    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
+    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" style="width:36px;height:28px;display:inline-block;vertical-align:middle;">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
       <circle cx="22" cy="18" r="8.5"/><circle cx="22" cy="18" r="4" fill="#94a3b8" stroke="none" opacity=".4"/>
       <rect x="15" y="1" width="14" height="5" rx="2"/>
       <circle cx="36" cy="9" r="2.5" fill="#94a3b8" stroke="none" opacity=".3"/>
     </svg>
-    <span style="font-size:7pt">Fotografía 08</span>
+    <span style="display:block;font-size:7pt;">Fotografía 08</span>
   </div><div class="foto-caption">Gancho principal — seguro y desgaste</div></td>
-<td class="foto-card" style="height:85px;overflow:hidden;"><div class="foto-placeholder" style="height:62px;overflow:hidden;display:block;padding:4px;">
+<td class="foto-card"><div class="foto-placeholder" style="padding:4px;">
     <span class="fp-num">09</span>
-    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" width="36" height="28">
+    <svg viewBox="0 0 44 36" fill="none" stroke="#94a3b8" stroke-width="1.4" style="width:36px;height:28px;display:inline-block;vertical-align:middle;">
       <rect x="1" y="4" width="42" height="28" rx="3.5"/>
       <circle cx="22" cy="18" r="8.5"/><circle cx="22" cy="18" r="4" fill="#94a3b8" stroke="none" opacity=".4"/>
       <rect x="15" y="1" width="14" height="5" rx="2"/>
       <circle cx="36" cy="9" r="2.5" fill="#94a3b8" stroke="none" opacity=".3"/>
     </svg>
-    <span style="font-size:7pt">Fotografía 09</span>
+    <span style="display:block;font-size:7pt;">Fotografía 09</span>
   </div><div class="foto-caption">Gancho auxiliar — condición</div></td>
 </tr>
 </table>
@@ -498,19 +498,19 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 </table>
   <div class="gold-bar"></div>
   <div style="padding:10px 14px 14px">
-    <div class="rec"><div class="rec-head"><div class="rec-num">1</div><div class="rec-head-title">Recomendaciones Operativas</div></div><div class="rec-body"><ul>
+    <div class="rec"><div class="rec-head"><table width="100%" cellpadding="0" cellspacing="0"><tr><td width="30" style="vertical-align:middle;"><div class="rec-num">1</div></td><td class="rec-head-title" style="vertical-align:middle;">Recomendaciones Operativas</td></tr></table></div><div class="rec-body"><ul>
       <li>La grúa no deberá trabajar en un rango mayor al 85% de su capacidad nominal, conforme a la tabla del fabricante.</li>
       <li>El levantamiento de cada carga debe basarse estrictamente en la tabla de capacidades del fabricante.</li>
       <li>La extensión de la pluma durante las maniobras deberá realizarse conforme a las recomendaciones del fabricante.</li>
       <li>La inspección y pruebas de equipos deben ser debidamente planeadas y programadas.</li>
     </ul></div></div>
-    <div class="rec"><div class="rec-head"><div class="rec-num">2</div><div class="rec-head-title">Recomendaciones de Mantenimiento</div></div><div class="rec-body"><ul>
+    <div class="rec"><div class="rec-head"><table width="100%" cellpadding="0" cellspacing="0"><tr><td width="30" style="vertical-align:middle;"><div class="rec-num">2</div></td><td class="rec-head-title" style="vertical-align:middle;">Recomendaciones de Mantenimiento</td></tr></table></div><div class="rec-body"><ul>
       <li>Mantener una bitácora actualizada con características técnicas e historial de mantenimientos.</li>
       <li>Adecuar y/o complementar el programa de mantenimiento preventivo y correctivo.</li>
       <li>Documentar los mantenimientos relevantes mediante evidencias (hojas de trabajo, fotografías, etc.).</li>
       <li>Es obligatorio reportar cualquier mantenimiento mayor realizado al equipo inspeccionado.</li>
     </ul></div></div>
-    <div class="rec"><div class="rec-head"><div class="rec-num">3</div><div class="rec-head-title">Recomendaciones de Inspección y Control</div></div><div class="rec-body"><ul>
+    <div class="rec"><div class="rec-head"><table width="100%" cellpadding="0" cellspacing="0"><tr><td width="30" style="vertical-align:middle;"><div class="rec-num">3</div></td><td class="rec-head-title" style="vertical-align:middle;">Recomendaciones de Inspección y Control</td></tr></table></div><div class="rec-body"><ul>
       <li>Antes de cada maniobra, realizar una inspección visual completa del equipo.</li>
       <li>Registrar periódicamente la medición de estrobos del gancho principal y auxiliar.</li>
       <li>En caso de desarmado y rearmado del equipo:<ul>
@@ -519,16 +519,16 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
         <li>Se deberá realizar una nueva inspección visual.</li>
       </ul></li>
     </ul></div></div>
-    <div class="rec"><div class="rec-head"><div class="rec-num">4</div><div class="rec-head-title">Recomendaciones de Seguridad</div></div><div class="rec-body"><ul>
+    <div class="rec"><div class="rec-head"><table width="100%" cellpadding="0" cellspacing="0"><tr><td width="30" style="vertical-align:middle;"><div class="rec-num">4</div></td><td class="rec-head-title" style="vertical-align:middle;">Recomendaciones de Seguridad</td></tr></table></div><div class="rec-body"><ul>
       <li>Delimitar el área de operación mediante barreras físicas, cintas o señalización preventiva.</li>
       <li>Notificar a todo el personal presente sobre las maniobras a realizar.</li>
       <li>Bajo ninguna circunstancia se deben utilizar componentes hechizos o no certificados.</li>
     </ul></div></div>
-    <div class="rec"><div class="rec-head"><div class="rec-num">5</div><div class="rec-head-title">Recomendaciones sobre el Personal</div></div><div class="rec-body"><ul>
+    <div class="rec"><div class="rec-head"><table width="100%" cellpadding="0" cellspacing="0"><tr><td width="30" style="vertical-align:middle;"><div class="rec-num">5</div></td><td class="rec-head-title" style="vertical-align:middle;">Recomendaciones sobre el Personal</td></tr></table></div><div class="rec-body"><ul>
       <li>El operador debe demostrar competencia técnica comprobable.</li>
       <li>El operador deberá estar certificado por un organismo externo que avale su capacidad.</li>
     </ul></div></div>
-    <div class="rec"><div class="rec-head"><div class="rec-num">6</div><div class="rec-head-title">Recomendaciones Administrativas y de Cumplimiento</div></div><div class="rec-body"><ul>
+    <div class="rec"><div class="rec-head"><table width="100%" cellpadding="0" cellspacing="0"><tr><td width="30" style="vertical-align:middle;"><div class="rec-num">6</div></td><td class="rec-head-title" style="vertical-align:middle;">Recomendaciones Administrativas y de Cumplimiento</td></tr></table></div><div class="rec-body"><ul>
       <li><span>Este dictamen tiene vigencia de <strong>un (1) año a partir de la fecha de inspección</strong>, condicionado a que:<ul>
         <li>Se mantengan activos los programas de mantenimiento preventivo y correctivo.</li>
         <li>No se realicen modificaciones estructurales o mecánicas relevantes al equipo.</li>
