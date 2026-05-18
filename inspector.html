@@ -3682,13 +3682,22 @@ function renderResumen() {
    ENVÍO
 ════════════════════════════════════════ */
 async function obtenerDireccion(lat, lng) {
-  try {
-    const res  = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
-    const data = await res.json();
-    return data.display_name || "Dirección no encontrada";
-  } catch {
-    return "Error al obtener dirección";
+  const coordFallback = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+  for (let intento = 0; intento < 2; intento++) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const res  = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+        { signal: ctrl.signal, headers: { 'Accept-Language': 'es' } }
+      );
+      clearTimeout(timer);
+      if (!res.ok) break;
+      const data = await res.json();
+      return data.display_name || coordFallback;
+    } catch { /* retry o fallback */ }
   }
+  return coordFallback;
 }
 
 function setProgreso(pct, stage) {

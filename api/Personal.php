@@ -129,19 +129,21 @@ class Personal {
             $fotoPersonaUrl = $r['url'];
         }
 
+        $u = fn($v) => strtoupper(trim($v ?? '')) ?: null;
+
         $campos = [
-            'nombre_completo'       => trim($payload['nombre_completo'] ?? '') ?: null,
+            'nombre_completo'       => $u($payload['nombre_completo']    ?? ''),
             'curp'                  => $curp,
-            'puesto'                => trim($payload['puesto'] ?? '') ?: null,
+            'puesto'                => $u($payload['puesto']             ?? ''),
             'ocupacion_id'          => ($payload['ocupacion_id'] ?? 0) ?: null,
-            'capacidad'             => trim($payload['capacidad'] ?? '') ?: null,
+            'capacidad'             => $u($payload['capacidad']          ?? ''),
             'capacidad_na'          => !empty($payload['capacidad_na']) ? 1 : 0,
             'telefono'              => trim($payload['telefono'] ?? '') ?: null,
-            'correo'                => trim($payload['correo'] ?? '') ?: null,
-            'empresa_nombre'        => trim($payload['empresa_nombre'] ?? '') ?: null,
+            'correo'                => strtolower(trim($payload['correo'] ?? '')) ?: null,
+            'empresa_nombre'        => $u($payload['empresa_nombre']        ?? ''),
             'empresa_rfc'           => strtoupper(trim($payload['empresa_rfc'] ?? '')) ?: null,
-            'empresa_direccion'     => trim($payload['empresa_direccion'] ?? '') ?: null,
-            'empresa_representante' => trim($payload['empresa_representante'] ?? '') ?: null,
+            'empresa_direccion'     => $u($payload['empresa_direccion']     ?? ''),
+            'empresa_representante' => $u($payload['empresa_representante'] ?? ''),
             'curso_id'              => $cursoId,
             'fecha_curso'           => $this->parseFecha($payload['fecha_curso'] ?? ''),
             'foto_documentacion_url'=> $fotoDocUrl,

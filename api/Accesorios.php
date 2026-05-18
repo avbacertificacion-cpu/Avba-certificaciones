@@ -70,10 +70,10 @@ class Accesorios {
 
     // ── Crear sesión (cliente + ubicación + fecha) ─────────
     public function crearSesion(array $payload, string $usuario): array {
-        $cliente = trim($payload['cliente'] ?? '');
+        $cliente = strtoupper(trim($payload['cliente'] ?? ''));
         $fecha   = trim($payload['fecha']   ?? '');  // DD/MM/YYYY
         $coords  = trim($payload['coordenadas'] ?? '');
-        $dir     = trim($payload['direccion']   ?? '');
+        $dir     = strtoupper(trim($payload['direccion'] ?? ''));
 
         if (!$cliente) return ['status' => 'error', 'message' => 'El cliente es requerido.'];
         if (!$fecha)   return ['status' => 'error', 'message' => 'La fecha es requerida.'];
@@ -117,13 +117,13 @@ class Accesorios {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )->execute([
             $sesionId,
-            trim($post['id_accesorio'] ?? ''),
+            strtoupper(trim($post['id_accesorio'] ?? '')),
             $tipoId,
-            trim($post['marca']    ?? ''),
-            trim($post['modelo']   ?? ''),
-            trim($post['serie']    ?? ''),
-            trim($post['capacidad']?? ''),
-            trim($post['medidas']  ?? ''),
+            strtoupper(trim($post['marca']    ?? '')),
+            strtoupper(trim($post['modelo']   ?? '')),
+            strtoupper(trim($post['serie']    ?? '')),
+            strtoupper(trim($post['capacidad']?? '')),
+            strtoupper(trim($post['medidas']  ?? '')),
             $estado,
             $orden,
         ]);
@@ -286,12 +286,12 @@ class Accesorios {
     public function editarAccesorio(array $payload): array {
         $id        = (int)($payload['id']           ?? 0);
         $tipoId    = (int)($payload['tipo_id']       ?? 0) ?: null;
-        $idAcc     = trim($payload['id_accesorio']   ?? '');
-        $marca     = trim($payload['marca']          ?? '');
-        $modelo    = trim($payload['modelo']         ?? '');
-        $serie     = trim($payload['serie']          ?? '');
-        $capacidad = trim($payload['capacidad']      ?? '');
-        $medidas   = trim($payload['medidas']        ?? '');
+        $idAcc     = strtoupper(trim($payload['id_accesorio']   ?? ''));
+        $marca     = strtoupper(trim($payload['marca']          ?? ''));
+        $modelo    = strtoupper(trim($payload['modelo']         ?? ''));
+        $serie     = strtoupper(trim($payload['serie']          ?? ''));
+        $capacidad = strtoupper(trim($payload['capacidad']      ?? ''));
+        $medidas   = strtoupper(trim($payload['medidas']        ?? ''));
         $estado    = trim($payload['estado']         ?? '');
 
         if ($id <= 0) return ['status' => 'error', 'message' => 'id requerido.'];

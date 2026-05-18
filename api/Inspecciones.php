@@ -48,10 +48,10 @@ class Inspecciones {
             $checklist = $payload['checklist'] ?? [];
             $fotos     = $payload['fotos']     ?? [];
 
-            // Campos requeridos
-            $cliente  = trim($info['cliente']   ?? '');
-            $serie    = trim($info['serie']     ?? '');
-            $maquinaria = trim($info['maquinaria'] ?? '');
+            // Campos requeridos — todo en mayúsculas antes de guardar
+            $cliente    = strtoupper(trim($info['cliente']    ?? ''));
+            $serie      = strtoupper(trim($info['serie']      ?? ''));
+            $maquinaria = strtoupper(trim($info['maquinaria'] ?? ''));
 
             if (!$cliente || !$serie || !$maquinaria) {
                 return ['status' => 'error', 'message' => 'cliente, serie y maquinaria son requeridos.'];
@@ -85,22 +85,24 @@ class Inspecciones {
                   capacidad, estado, envio_direccion, coordenadas_envio, inspector, prueba_carga)
                  VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?, ?)"
             );
+            $u = fn($v) => $v !== null && $v !== '' ? strtoupper(trim($v)) : null;
+
             $stmt->execute([
                 $cliente,
-                $info['coords_insp']                   ?? null,
+                $info['coords_insp']                             ?? null,
                 $maquinaria,
-                $info['marca']                         ?? null,
-                $info['modelo']                        ?? null,
+                $u($info['marca']                         ?? ''),
+                $u($info['modelo']                        ?? ''),
                 $serie,
-                $info['id_cliente']                    ?? null,
+                $u($info['id_cliente']                    ?? ''),
                 date('Y-m-d'),
-                $info['email_cliente']                 ?? null,
+                strtolower(trim($info['email_cliente']    ?? '')) ?: null,
                 $control,
                 $urlCarpeta ?: null,
-                $info['direccion_inspeccion_legible']  ?? null,
-                $info['capacidad']                     ?? null,
-                $info['direccion_envio_legible']       ?? null,
-                $info['coords_envio']                  ?? null,
+                $u($info['direccion_inspeccion_legible']  ?? ''),
+                $u($info['capacidad']                     ?? ''),
+                $u($info['direccion_envio_legible']       ?? ''),
+                $info['coords_envio']                            ?? null,
                 $usuarioActual,
                 $pruebaCargaJson,
             ]);
@@ -181,7 +183,8 @@ class Inspecciones {
                     cliente, maquinaria, marca, modelo, serie, id_equipo,
                     capacidad, direccion, correo, control, estado,
                     evidencia_url, reporte_url, certificado_url, dictamen_url,
-                    motivo, qr_codigo, inspector, prueba_carga
+                    motivo, qr_codigo, inspector, prueba_carga,
+                    envio_direccion AS envio, coordenadas_envio
              FROM equipos
              WHERE inspector = ?
              ORDER BY marca_temporal DESC"
@@ -198,7 +201,8 @@ class Inspecciones {
                     cliente, maquinaria, marca, modelo, serie, id_equipo,
                     capacidad, direccion, correo, control, estado,
                     evidencia_url, reporte_url, certificado_url, dictamen_url,
-                    motivo, qr_codigo, inspector, prueba_carga
+                    motivo, qr_codigo, inspector, prueba_carga,
+                    envio_direccion AS envio, coordenadas_envio
              FROM equipos
              ORDER BY marca_temporal DESC"
         );
