@@ -51,8 +51,9 @@ class Admin {
             $tipo['checklist'] = $stmtItems->fetchAll();
 
             $stmtNormas = $this->pdo->prepare(
-                "SELECT id, norma, orden FROM maquinaria_normas
-                 WHERE maquinaria_tipo_id = ? ORDER BY orden"
+                "SELECT id, norma, tipo, orden FROM maquinaria_normas
+                 WHERE maquinaria_tipo_id = ?
+                 ORDER BY FIELD(tipo,'acreditada','referencia'), orden"
             );
             $stmtNormas->execute([$tipo['id']]);
             $tipo['normas'] = $stmtNormas->fetchAll();
@@ -108,7 +109,7 @@ class Admin {
         }
 
         // Insertar normas (máx. 6)
-        $this->guardarNormasParaTipo($tipoId, $payload['normas'] ?? []);
+        $this->guardarNormasParaTipo($tipoId, $payload);
 
         return ['status' => 'success', 'message' => 'Tipo de equipo creado.', 'id' => $tipoId];
     }
@@ -131,27 +132,63 @@ class Admin {
             ->execute([$nombre, $id]);
 
         // Actualizar normas si vienen en el payload
-        if (array_key_exists('normas', $payload)) {
-            $this->guardarNormasParaTipo($id, $payload['normas']);
+        if (array_key_exists('normas', $payload) || array_key_exists('normas_acreditadas', $payload) || array_key_exists('normas_referencia', $payload)) {
+            $this->guardarNormasParaTipo($id, $payload);
         }
 
         return ['status' => 'success', 'message' => 'Tipo de equipo actualizado.'];
     }
 
     // ── Guardar normas de un tipo (reemplaza todas) ────────────
-    private function guardarNormasParaTipo(int $tipoId, array $normas): void {
+    // Accepts either:
+    //   new format: payload has normas_acreditadas[] + normas_referencia[]
+    //   legacy format: plain normas[] array (treated as acreditadas)
+    private function guardarNormasParaTipo(int $tipoId, array $payload): void {
+        // Auto-add tipo column if migration_012 not applied yet
+        try {
+            $this->pdo->exec(
+                "ALTER TABLE maquinaria_normas
+                 ADD COLUMN IF NOT EXISTS tipo ENUM('acreditada','referencia')
+                 NOT NULL DEFAULT 'acreditada' AFTER norma"
+            );
+        } catch (\Throwable $e) {}
+
         $this->pdo->prepare("DELETE FROM maquinaria_normas WHERE maquinaria_tipo_id = ?")
             ->execute([$tipoId]);
 
-        $normasFiltradas = array_slice(
-            array_filter(array_map('trim', $normas), fn($n) => $n !== ''),
-            0, 6
-        );
         $stmt = $this->pdo->prepare(
-            "INSERT INTO maquinaria_normas (maquinaria_tipo_id, norma, orden) VALUES (?, ?, ?)"
+            "INSERT INTO maquinaria_normas (maquinaria_tipo_id, norma, tipo, orden)
+             VALUES (?, ?, ?, ?)"
         );
-        foreach ($normasFiltradas as $orden => $norma) {
-            $stmt->execute([$tipoId, $norma, $orden + 1]);
+
+        // New format: separate arrays
+        if (array_key_exists('normas_acreditadas', $payload) || array_key_exists('normas_referencia', $payload)) {
+            $acreditadas = array_slice(
+                array_filter(array_map('trim', $payload['normas_acreditadas'] ?? []), fn($n) => $n !== ''),
+                0, 6
+            );
+            $referencia = array_slice(
+                array_filter(array_map('trim', $payload['normas_referencia'] ?? []), fn($n) => $n !== ''),
+                0, 6
+            );
+            foreach ($acreditadas as $i => $norma) {
+                $stmt->execute([$tipoId, $norma, 'acreditada', $i + 1]);
+            }
+            foreach ($referencia as $i => $norma) {
+                $stmt->execute([$tipoId, $norma, 'referencia', $i + 1]);
+            }
+        } else {
+            // Legacy: plain normas array → acreditadas
+            $normas = is_array($payload['normas'] ?? null)
+                ? $payload['normas']
+                : (is_array($payload) && !isset($payload['normas_acreditadas']) ? $payload : []);
+            $filtradas = array_slice(
+                array_filter(array_map('trim', $normas), fn($n) => $n !== ''),
+                0, 6
+            );
+            foreach ($filtradas as $i => $norma) {
+                $stmt->execute([$tipoId, $norma, 'acreditada', $i + 1]);
+            }
         }
     }
 
