@@ -1093,8 +1093,9 @@
 <div id="sec-personal-plantillas" class="wrap" style="display:none">
 
   <div style="font-size:13px;color:var(--texto-sub);margin-bottom:16px;line-height:1.6">
-    Configura la plantilla PDF y las coordenadas de cada campo para los tres tipos de documento
-    de capacitación. Los documentos se generarán superponiendo texto sobre la plantilla.
+    Configura las plantillas para los documentos de capacitación.
+    El <strong>Certificado</strong> usa plantilla HTML con vista previa;
+    el <strong>Diploma</strong> y la <strong>Constancia DC3</strong> usan plantilla PDF con coordenadas.
   </div>
 
   <div id="personal-plantillas-cont" style="display:grid;gap:16px">
@@ -2283,7 +2284,7 @@ function verSubTab(sec, sub) {
   if (sec === 'accesorios' && sub === 'tipos')                                   cargarAccTipos();
   if (sec === 'accesorios' && sub === 'plantilla')                               { cargarPlantillaAccesorios(); cargarPlantillaActual(); }
   if (sec === 'personal'   && sub !== 'plantillas'  && !perCargados)             cargarPersonal();
-  if (sec === 'personal'   && sub === 'plantillas')                              cargarPlantillasPersonal();
+  if (sec === 'personal'   && sub === 'plantillas')                              { cargarPlantillasPersonal(); cargarPlantillaActual(); }
   if (sec === 'catalogos'  && sub === 'equipos'     && !tiposCargados)           { cargarTipos(); cargarPlantillaActual(); }
   if (sec === 'catalogos'  && sub === 'cursos'      && !cursosCargados)          cargarCursos();
   if (sec === 'catalogos'  && sub === 'ocupaciones' && !ocupCargados)            cargarOcupaciones();
@@ -4280,8 +4281,34 @@ function renderPlantillaPersonalCard(tpl) {
   const icons  = { diploma: "🎓", certificado: "📜", dc3: "📋" };
   const label  = labels[tpl.tipo] || tpl.tipo;
   const icon   = icons[tpl.tipo]  || "📄";
-  const tieneArchivo = !!tpl.plantilla_pdf;
-  const nCampos = Array.isArray(tpl.pdf_campos) ? tpl.pdf_campos.length : 0;
+
+  // Certificado usa selector HTML en lugar de upload PDF
+  if (tpl.tipo === 'certificado') {
+    return `
+    <div class="tipo-card" style="border-radius:var(--radio-lg)">
+      <div style="padding:16px 20px;border-bottom:1px solid var(--borde)">
+        <div style="font-size:14px;font-weight:700;color:var(--texto);margin-bottom:14px">
+          ${icon} ${esc(label)} — Plantilla HTML
+        </div>
+        <div class="cert-html-opts">
+          <button class="btn-cert-opt ${plantillaSeleccionada==='equipos'?'activa':''}"
+                  data-tipo="equipos" onclick="seleccionarPlantillaCert('equipos')">Equipos</button>
+          <button class="btn-cert-opt ${plantillaSeleccionada==='accesorios'?'activa':''}"
+                  data-tipo="accesorios" onclick="seleccionarPlantillaCert('accesorios')">Accesorios</button>
+          <button class="btn-cert-opt ${plantillaSeleccionada==='personal'?'activa':''}"
+                  data-tipo="personal" onclick="seleccionarPlantillaCert('personal')">Personal</button>
+          <button class="btn-add-item" style="font-size:12px;padding:6px 14px;margin-left:auto"
+                  onclick="abrirSelectorPlantilla()">Ver previsualizaciones</button>
+        </div>
+        <div style="font-size:11px;color:var(--texto-hint);margin-top:8px">
+          Define el formato HTML del certificado para programas de capacitación
+        </div>
+      </div>
+    </div>`;
+  }
+
+  const tieneArchivo  = !!tpl.plantilla_pdf;
+  const nCampos       = Array.isArray(tpl.pdf_campos) ? tpl.pdf_campos.length : 0;
   const nombreArchivo = tieneArchivo ? tpl.plantilla_pdf.split("/").pop() : "";
 
   return `
