@@ -3776,7 +3776,8 @@ function abrirModalTipo(tipoId) {
   const t = tiposGlobal.find(x => x.id == tipoId);
   if (!t) return;
   tipoModalId     = tipoId;
-  tipoModalNormas = (t.normas || []).map(n => n.norma);
+  tipoModalNormasAcred = (t.normas||[]).filter(n=>n.tipo==='acreditada'||!n.tipo).map(n=>n.norma);
+  tipoModalNormasRef   = (t.normas||[]).filter(n=>n.tipo==='referencia').map(n=>n.norma);
 
   document.getElementById("tipo-modal-id").value    = tipoId;
   document.getElementById("tipo-modal-nombre").value = t.nombre;
@@ -3790,62 +3791,75 @@ function abrirModalTipo(tipoId) {
 function cerrarModalTipo() {
   document.getElementById("overlay-tipo").style.display = "none";
   document.getElementById("overlay-tipo").classList.remove("open");
-  tipoModalId     = null;
-  tipoModalNormas = [];
+  tipoModalId          = null;
+  tipoModalNormasAcred = [];
+  tipoModalNormasRef   = [];
+}
+
+function renderModalNormasGroup(arr, listId, vacioId, tipo) {
+  const brd  = tipo === 'acreditada' ? 'var(--azul)' : 'var(--verde)';
+  const list = document.getElementById(listId);
+  if (!list) return;
+  list.innerHTML = arr.map((n, i) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
+      <span style="font-size:11px;color:var(--texto-hint);min-width:14px;flex-shrink:0">${i+1}.</span>
+      <input type="text" value="${escH(n)}"
+             oninput="${tipo==='acreditada'?'tipoModalNormasAcred':'tipoModalNormasRef'}[${i}]=this.value"
+             placeholder="Ej: NOM-006-STPS-2014..."
+             style="flex:1;padding:7px 10px;border:1.5px solid var(--borde);border-radius:7px;
+                    font-size:12px;color:var(--texto);outline:none;background:var(--blanco)"
+             onfocus="this.style.borderColor='${brd}'"
+             onblur="this.style.borderColor='var(--borde)'">
+      <button onclick="modalRemoverNorma('${tipo}',${i})"
+              style="width:24px;height:24px;border-radius:50%;background:var(--rojo-light);
+                     color:var(--rojo);border:1.5px solid var(--rojo);cursor:pointer;
+                     font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
+    </div>`).join("");
+  const vacio = document.getElementById(vacioId);
+  if (vacio) vacio.style.display = arr.length ? "none" : "block";
 }
 
 function renderModalNormas() {
-  const list = document.getElementById("modal-normas-list");
-  const vacio = document.getElementById("modal-normas-vacio");
-  vacio.style.display = tipoModalNormas.length ? "none" : "block";
-
-  list.innerHTML = tipoModalNormas.map((n, i) => `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-      <span style="font-size:11px;color:var(--texto-hint);min-width:14px;flex-shrink:0">${i+1}.</span>
-      <input type="text" value="${escH(n)}"
-             oninput="tipoModalNormas[${i}]=this.value"
-             placeholder="Ej: NOM-006-STPS-2014, ISO 9001..."
-             style="flex:1;padding:8px 10px;border:1.5px solid var(--borde);border-radius:7px;
-                    font-size:12px;color:var(--texto);outline:none;background:var(--blanco)"
-             onfocus="this.style.borderColor='var(--azul)'"
-             onblur="this.style.borderColor='var(--borde)'">
-      <button onclick="modalRemoverNorma(${i})"
-              style="width:26px;height:26px;border-radius:50%;background:var(--rojo-light);
-                     color:var(--rojo);border:1.5px solid var(--rojo);cursor:pointer;
-                     font-size:15px;display:flex;align-items:center;justify-content:center;
-                     flex-shrink:0">×</button>
-    </div>`).join("");
-
-  const btn = document.getElementById("btn-add-norma-modal");
-  if (btn) btn.style.display = tipoModalNormas.length >= 6 ? "none" : "";
+  renderModalNormasGroup(tipoModalNormasAcred, "modal-normas-acred-list", "modal-acred-vacio", "acreditada");
+  renderModalNormasGroup(tipoModalNormasRef,   "modal-normas-ref-list",   "modal-ref-vacio",   "referencia");
 }
 
-function modalAgregarNorma() {
-  if (tipoModalNormas.length >= 6) return;
-  tipoModalNormas.push("");
-  renderModalNormas();
-  const inputs = document.getElementById("modal-normas-list").querySelectorAll("input");
-  if (inputs.length) inputs[inputs.length - 1].focus();
+function modalAgregarNorma(tipo) {
+  if (tipo === 'acreditada') {
+    if (tipoModalNormasAcred.length >= 6) return;
+    tipoModalNormasAcred.push("");
+    renderModalNormasGroup(tipoModalNormasAcred, "modal-normas-acred-list", "modal-acred-vacio", "acreditada");
+    const inputs = document.getElementById("modal-normas-acred-list").querySelectorAll("input");
+    if (inputs.length) inputs[inputs.length-1].focus();
+  } else {
+    if (tipoModalNormasRef.length >= 6) return;
+    tipoModalNormasRef.push("");
+    renderModalNormasGroup(tipoModalNormasRef, "modal-normas-ref-list", "modal-ref-vacio", "referencia");
+    const inputs = document.getElementById("modal-normas-ref-list").querySelectorAll("input");
+    if (inputs.length) inputs[inputs.length-1].focus();
+  }
 }
 
-function modalRemoverNorma(idx) {
-  tipoModalNormas.splice(idx, 1);
-  renderModalNormas();
+function modalRemoverNorma(tipo, idx) {
+  if (tipo === 'acreditada') { tipoModalNormasAcred.splice(idx,1); renderModalNormasGroup(tipoModalNormasAcred,"modal-normas-acred-list","modal-acred-vacio","acreditada"); }
+  else                       { tipoModalNormasRef.splice(idx,1);   renderModalNormasGroup(tipoModalNormasRef,"modal-normas-ref-list","modal-ref-vacio","referencia"); }
 }
 
 async function guardarModalTipo() {
   const nombre = document.getElementById("tipo-modal-nombre").value.trim();
   if (!nombre) { document.getElementById("tipo-modal-nombre").focus(); return; }
 
-  // Recoger valores actuales de los inputs
-  const inputs = document.getElementById("modal-normas-list").querySelectorAll("input");
-  const normas = [...inputs].map(inp => inp.value.trim()).filter(v => v);
+  // Recoger normas por tipo
+  const iAcred = document.getElementById("modal-normas-acred-list").querySelectorAll("input");
+  const iRef   = document.getElementById("modal-normas-ref-list").querySelectorAll("input");
+  const normas_acreditadas = [...iAcred].map(i=>i.value.trim()).filter(v=>v);
+  const normas_referencia  = [...iRef].map(i=>i.value.trim()).filter(v=>v);
 
   const res  = await fetch(API, {
     method: "POST",
     body: JSON.stringify({
       action: "EDITAR_TIPO_EQUIPO",
-      payload: { tipo_id: tipoModalId, nombre, normas }
+      payload: { tipo_id: tipoModalId, nombre, normas_acreditadas, normas_referencia }
     })
   });
   const data = await res.json();
