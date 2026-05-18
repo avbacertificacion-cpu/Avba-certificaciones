@@ -12,7 +12,22 @@
  * POST ?accion=guardar → guarda en sesión y devuelve JSON {ok, tipo}
  */
 
-session_start();
+ini_set('display_errors', 0);
+ini_set('log_errors', 1);
+error_reporting(E_ALL);
+
+register_shutdown_function(function() {
+    $e = error_get_last();
+    if ($e && in_array($e['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR])) {
+        if (!headers_sent()) { http_response_code(500); header('Content-Type: text/html; charset=utf-8'); }
+        echo '<pre style="padding:20px;color:red;font-family:monospace">Error fatal: '
+           . htmlspecialchars($e['message']) . "\n" . $e['file'] . ':' . $e['line'] . '</pre>';
+    }
+});
+
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 // ── Guardar selección vía POST (AJAX) ────────────────────────────
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'guardar') {

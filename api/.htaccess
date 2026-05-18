@@ -2,8 +2,8 @@
 #  api/ — Solo index.php es el punto de entrada
 # ──────────────────────────────────────────────────────────
 
-# Denegar acceso directo a cualquier archivo PHP excepto index.php
-<FilesMatch "^(?!index\.php$).*\.php$">
+# Denegar acceso directo a cualquier archivo PHP excepto los permitidos explícitamente
+<FilesMatch "^(?!index\.php$|preview_plantilla\.php$|plantilla_session\.php$).*\.php$">
     Order Allow,Deny
     Deny from all
 </FilesMatch>
