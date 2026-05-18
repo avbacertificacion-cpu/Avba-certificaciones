@@ -15,9 +15,9 @@ if (!file_exists($htmlFile)) {
 
 $html = file_get_contents($htmlFile);
 
+// Only strip page box-shadow/margin — preserve body background-image for pattern
 $mpdfOverride = '<style>'
     . '.page{min-height:0!important;margin:0!important;box-shadow:none!important;}'
-    . 'body{background:#fff!important;}'
     . '</style>';
 $html = str_replace('</head>', $mpdfOverride . '</head>', $html);
 
