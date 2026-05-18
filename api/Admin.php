@@ -21,7 +21,8 @@ class Admin {
             "SELECT id, nombre, plantilla,
                     plantilla_cert, plantilla_dict,
                     plantilla_cert_envio, plantilla_dict_envio,
-                    plantilla_cert_pdf, plantilla_dict_pdf
+                    plantilla_cert_pdf, plantilla_dict_pdf,
+                    plantilla_dict_html
              FROM maquinaria_tipos ORDER BY id"
         )->fetchAll();
 
@@ -630,5 +631,42 @@ class Admin {
                 'message' => 'Error: ' . $e->getMessage() . "\n\nConfig usada: " . $info . "\n\nDebug SMTP:\n" . ($debugLog ?: '(sin debug)')
             ];
         }
+    }
+
+    // ── Asignar plantilla HTML de dictamen a tipo de equipo ───
+    public function setPlantillaDictHtml(array $payload): array {
+        $tipoId = (int) ($payload['tipo_id'] ?? 0);
+        $html   = trim($payload['plantilla_dict_html'] ?? '');
+
+        if (!$tipoId) return ['status' => 'error', 'message' => 'tipo_id requerido.'];
+
+        $this->ensureColumnsPdf(); // auto-aplicar migration_011 si es necesario
+
+        // Ensure the column exists (migration_011)
+        try {
+            $this->pdo->exec(
+                "ALTER TABLE maquinaria_tipos
+                 ADD COLUMN IF NOT EXISTS plantilla_dict_html VARCHAR(100) NULL"
+            );
+        } catch (\Throwable $e) {}
+
+        $allowed = [
+            '', 'dictamen_preview.html', 'dictamen_montacargas.html',
+            'dictamen_izaje.html', 'dictamen_ptem.html',
+            'dictamen_grua_torre.html', 'dictamen_telehandler.html',
+        ];
+        if (!in_array($html, $allowed, true)) {
+            return ['status' => 'error', 'message' => 'Plantilla HTML no válida.'];
+        }
+
+        $chk = $this->pdo->prepare("SELECT id FROM maquinaria_tipos WHERE id = ?");
+        $chk->execute([$tipoId]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Tipo de equipo no encontrado.'];
+
+        $this->pdo->prepare(
+            "UPDATE maquinaria_tipos SET plantilla_dict_html = ? WHERE id = ?"
+        )->execute([$html ?: null, $tipoId]);
+
+        return ['status' => 'success', 'message' => 'Plantilla HTML de dictamen asignada.'];
     }
 }

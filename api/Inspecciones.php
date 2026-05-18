@@ -18,7 +18,7 @@ class Inspecciones {
 
     // ── Opciones de maquinaria ─────────────────────────────
     public function obtenerOpcionesMaquinaria(): array {
-        $stmt = $this->pdo->query("SELECT nombre, clave_drive AS idPlantilla FROM maquinaria_tipos ORDER BY id");
+        $stmt = $this->pdo->query("SELECT nombre, clave_drive AS idPlantilla, plantilla_dict_html FROM maquinaria_tipos ORDER BY id");
         return $stmt->fetchAll();
     }
 
@@ -66,13 +66,24 @@ class Inspecciones {
                 $urlCarpeta = $this->guardarFotos($fotos, $cliente, $serie);
             }
 
-            // Insertar registro principal en equipos
+            // Auto-add prueba_carga column if migration_011 not applied yet
+            try {
+                $this->pdo->exec(
+                    "ALTER TABLE equipos ADD COLUMN IF NOT EXISTS prueba_carga JSON NULL"
+                );
+            } catch (\Throwable $e) {}
+
+            $pruebaCargaJson = null;
+            if (!empty($payload['prueba_carga'])) {
+                $pruebaCargaJson = json_encode($payload['prueba_carga'], JSON_UNESCAPED_UNICODE);
+            }
+
             $stmt = $this->pdo->prepare(
                 "INSERT INTO equipos
                  (marca_temporal, cliente, coords_inspeccion, maquinaria, marca, modelo, serie,
                   id_equipo, fecha_inspeccion, correo, control, evidencia_url, direccion,
-                  capacidad, estado, envio_direccion, coordenadas_envio, inspector)
-                 VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?)"
+                  capacidad, estado, envio_direccion, coordenadas_envio, inspector, prueba_carga)
+                 VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?, ?)"
             );
             $stmt->execute([
                 $cliente,
@@ -91,6 +102,7 @@ class Inspecciones {
                 $info['direccion_envio_legible']       ?? null,
                 $info['coords_envio']                  ?? null,
                 $usuarioActual,
+                $pruebaCargaJson,
             ]);
 
             $equipoId = (int) $this->pdo->lastInsertId();
@@ -169,7 +181,7 @@ class Inspecciones {
                     cliente, maquinaria, marca, modelo, serie, id_equipo,
                     capacidad, direccion, correo, control, estado,
                     evidencia_url, reporte_url, certificado_url, dictamen_url,
-                    motivo, qr_codigo, inspector
+                    motivo, qr_codigo, inspector, prueba_carga
              FROM equipos
              WHERE inspector = ?
              ORDER BY marca_temporal DESC"
@@ -186,7 +198,7 @@ class Inspecciones {
                     cliente, maquinaria, marca, modelo, serie, id_equipo,
                     capacidad, direccion, correo, control, estado,
                     evidencia_url, reporte_url, certificado_url, dictamen_url,
-                    motivo, qr_codigo, inspector
+                    motivo, qr_codigo, inspector, prueba_carga
              FROM equipos
              ORDER BY marca_temporal DESC"
         );

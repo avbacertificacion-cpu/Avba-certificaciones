@@ -603,6 +603,19 @@
       font-size: 12px; cursor: pointer;
     }
     .btn-add-sec:hover { border-color: var(--azul); color: var(--azul); background: var(--azul-light); }
+    .dictamen-html-sel {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1.5px solid var(--borde);
+      border-radius: var(--radio);
+      font-size: 13px;
+      background: var(--blanco);
+      color: var(--texto);
+      cursor: pointer;
+      transition: border-color .15s;
+    }
+    .dictamen-html-sel:focus { outline: none; border-color: var(--azul); }
+    .dictamen-html-sel.asignada { border-color: var(--verde); background: var(--verde-light); }
     .sec-form {
       display: none; gap: 8px; margin-top: 8px; padding: 12px;
       border: 1.5px solid var(--azul); border-radius: 8px; background: var(--azul-light);
@@ -3344,6 +3357,23 @@ function renderTipoCard(t) {
         }
       </div>
 
+      <!-- Plantilla HTML de Dictamen -->
+      <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Plantilla HTML de Dictamen</div>
+      <div style="margin-bottom:16px">
+        <select class="dictamen-html-sel ${t.plantilla_dict_html ? 'asignada' : ''}"
+                id="dict-html-sel-${t.id}"
+                onchange="guardarPlantillaDictHtml(${t.id},this)">
+          <option value="">Sin plantilla HTML</option>
+          <option value="dictamen_preview.html"     ${t.plantilla_dict_html==='dictamen_preview.html'     ? 'selected' : ''}>Grúa Móvil</option>
+          <option value="dictamen_montacargas.html" ${t.plantilla_dict_html==='dictamen_montacargas.html' ? 'selected' : ''}>Montacargas</option>
+          <option value="dictamen_izaje.html"       ${t.plantilla_dict_html==='dictamen_izaje.html'       ? 'selected' : ''}>Elemento de Izaje / Separador de Carga</option>
+          <option value="dictamen_ptem.html"        ${t.plantilla_dict_html==='dictamen_ptem.html'        ? 'selected' : ''}>PTEM — Plataforma de Elevación Móvil</option>
+          <option value="dictamen_grua_torre.html"  ${t.plantilla_dict_html==='dictamen_grua_torre.html'  ? 'selected' : ''}>Grúa Torre</option>
+          <option value="dictamen_telehandler.html" ${t.plantilla_dict_html==='dictamen_telehandler.html' ? 'selected' : ''}>Telehandler</option>
+        </select>
+        <div style="font-size:11px;color:var(--texto-hint);margin-top:5px">Define el formato del dictamen para el inspector de este tipo de equipo</div>
+      </div>
+
       <!-- Plantillas PDF -->
       <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:8px;text-transform:uppercase;letter-spacing:.05em">Plantillas PDF (con coordenadas)</div>
       <div class="plantillas-row">
@@ -3389,6 +3419,37 @@ function toggleTipo(id) {
   card.classList.toggle("open");
   if (card.classList.contains("open")) openTipos.add(id);
   else openTipos.delete(id);
+}
+
+/* ── Guardar plantilla HTML de dictamen ── */
+async function guardarPlantillaDictHtml(tipoId, sel) {
+  const valor = sel.value;
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "SET_PLANTILLA_DICT_HTML",
+        token: s.token || "",
+        payload: { tipo_id: tipoId, plantilla_dict_html: valor }
+      })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      sel.classList.toggle("asignada", !!valor);
+      // Update local cache
+      const tipo = tiposGlobal.find(t => t.id === tipoId);
+      if (tipo) tipo.plantilla_dict_html = valor || null;
+    } else {
+      alert("Error: " + (data.message || "No se pudo guardar"));
+      // Revert select
+      const tipo = tiposGlobal.find(t => t.id === tipoId);
+      if (tipo) sel.value = tipo.plantilla_dict_html || "";
+    }
+  } catch (e) {
+    alert("Error de conexión al guardar la plantilla HTML.");
+  }
 }
 
 /* ── Subir plantilla PDF ── */

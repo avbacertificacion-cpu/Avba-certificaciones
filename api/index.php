@@ -658,6 +658,12 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->guardarCamposPdf($payload));
 
+        // Asignar plantilla HTML de dictamen
+        case 'SET_PLANTILLA_DICT_HTML':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->setPlantillaDictHtml($payload));
+
         // Vista previa de plantilla PDF con datos del primer registro
         case 'PREVISUALIZAR_PDF':
             $usr = validarToken($pdo, $token);
