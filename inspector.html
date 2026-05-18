@@ -1251,6 +1251,11 @@
     }
     .det-item label { font-size: 10.5px; color: var(--texto-sub); display: block; margin-bottom: 1px; }
     .det-item span  { font-size: 13px; color: var(--texto); font-weight: 600; }
+    /* ── Prueba de Carga ── */
+    #prueba-carga-form table input,
+    #prueba-carga-form table select {
+      min-width: 70px;
+    }
     .checklist-seccion-title {
       font-size: 11px;
       font-weight: 700;
@@ -2152,13 +2157,35 @@
       <div id="check-stats" style="display:none;margin-top:12px;padding:10px 13px;border-radius:8px;font-size:12px;background:var(--gris-bg);color:var(--texto-sub);display:flex;gap:14px;flex-wrap:wrap;"></div>
       <div class="nav-btns">
         <button class="btn-ant" onclick="irA(3)">← Atrás</button>
-        <button class="btn-sig" onclick="irA(5)">Siguiente — Evidencia →</button>
+        <button class="btn-sig" onclick="irA(5)">Siguiente — Prueba de Carga →</button>
       </div>
     </div>
   </div>
 
-  <!-- ══════════ PASO 5: EVIDENCIA + RESUMEN ══════════ -->
+  <!-- ══════════ PASO 5: PRUEBA DE CARGA ══════════ -->
   <div class="paso" id="paso5">
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 13V7l5-5 5 5v6H10v-4H6v4H3z"/></svg>
+        Prueba de Carga
+      </div>
+      <div id="prueba-carga-info" style="font-size:12px;color:var(--texto-sub);margin-bottom:14px;padding:8px 12px;background:var(--gris-bg);border-radius:8px;">
+        Equipo: <strong id="pc-equipo-label">—</strong>
+      </div>
+      <div id="prueba-carga-form">
+        <div style="color:var(--texto-hint);font-size:13px;text-align:center;padding:24px 0">
+          Selecciona un tipo de maquinaria en el Paso 1 para ver el formulario de prueba de carga.
+        </div>
+      </div>
+      <div class="nav-btns">
+        <button class="btn-ant" onclick="irA(4)">← Atrás</button>
+        <button class="btn-sig" onclick="irA(6)">Siguiente — Evidencia →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ PASO 6: EVIDENCIA + RESUMEN ══════════ -->
+  <div class="paso" id="paso6">
 
     <!-- FOTOS -->
     <div class="card">
@@ -2215,8 +2242,8 @@
       </div>
     </div>
 
-    <div class="nav-btns" id="btns-paso5">
-      <button class="btn-ant" onclick="irA(4)">← Atrás</button>
+    <div class="nav-btns" id="btns-paso6">
+      <button class="btn-ant" onclick="irA(5)">← Atrás</button>
       <button class="btn-enviar" id="btn-enviar" onclick="enviarFormulario()">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M10 4l4 4-4 4"/></svg>
         Finalizar y enviar
@@ -2453,12 +2480,13 @@ const PASOS_INFO = [
   { num: 2, label: "Inspección" },
   { num: 3, label: "Envío"      },
   { num: 4, label: "Checklist"  },
-  { num: 5, label: "Evidencia"  }
+  { num: 5, label: "Prueba"     },
+  { num: 6, label: "Evidencia"  }
 ];
 
 const PASOS_NOMBRE = [
   "", "Datos del equipo", "Ubicación de inspección",
-  "Ubicación de envío", "Checklist", "Evidencia y envío"
+  "Ubicación de envío", "Checklist", "Prueba de Carga", "Evidencia y envío"
 ];
 
 /* ════════════════════════════════════════
@@ -2469,7 +2497,79 @@ let maps            = { insp: null, env: null };
 let markers         = { insp: null, env: null };
 let respuestasCheck = {};
 let fotosData       = [];       // [{base64, mimeType, nombre}]
+let pruebaCargaData = {};
 let enviando        = false;
+
+// Definición de campos de prueba de carga por plantilla
+const PC_TEMPLATES = {
+  'dictamen_preview.html': {
+    label: 'Grúa Móvil',
+    rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
+    cols: [
+      { id:'peso',      label:'Peso de Prueba',      unit:'TON' },
+      { id:'radio',     label:'Radio de Operación',  unit:'m'   },
+      { id:'pluma',     label:'Long. de Pluma',       unit:'m'   },
+      { id:'angulo',    label:'Ángulo de Trabajo',    unit:'°'   },
+      { id:'altura',    label:'Altura de Izaje',      unit:'m'   },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  },
+  'dictamen_grua_torre.html': {
+    label: 'Grúa Torre',
+    rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
+    cols: [
+      { id:'peso',      label:'Peso de Prueba',      unit:'TON' },
+      { id:'radio',     label:'Radio de Operación',  unit:'m'   },
+      { id:'pluma',     label:'Long. de Pluma',       unit:'m'   },
+      { id:'altura',    label:'Altura de Izaje',      unit:'m'   },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  },
+  'dictamen_montacargas.html': {
+    label: 'Montacargas',
+    rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
+    cols: [
+      { id:'peso',     label:'Peso de Prueba',       unit:'TON' },
+      { id:'altura',   label:'Altura de Elevación',  unit:'m'   },
+      { id:'duracion', label:'Duración',              unit:'min' },
+      { id:'inclin',   label:'Inclinación de Mástil', unit:'°'  },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  },
+  'dictamen_izaje.html': {
+    label: 'Elemento de Izaje',
+    rows: [{ key:'trabajo', label:'Carga de Trabajo' }, { key:'sobrecarga', label:'Prueba de Sobrecarga' }],
+    cols: [
+      { id:'cml',          label:'CML (Carga de Trabajo)',   unit:'ton' },
+      { id:'prueba',       label:'Carga de Prueba (2×CML)',  unit:'ton' },
+      { id:'duracion',     label:'Duración',                 unit:'min' },
+      { id:'deformacion',  label:'Deformación posterior',    unit:'mm'  },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  },
+  'dictamen_ptem.html': {
+    label: 'PTEM',
+    rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
+    cols: [
+      { id:'peso',        label:'Carga de Prueba', unit:'kg'  },
+      { id:'altura',      label:'Altura de Trabajo', unit:'m' },
+      { id:'duracion',    label:'Duración',         unit:'min'},
+      { id:'estabilidad', label:'Estabilidad', type:'select', options:['OK','NO OK'] },
+      { id:'resultado',   label:'Resultado',   type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  },
+  'dictamen_telehandler.html': {
+    label: 'Telehandler',
+    rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
+    cols: [
+      { id:'peso',      label:'Peso de Prueba',    unit:'TON' },
+      { id:'extension', label:'Extensión de Pluma', unit:'m'  },
+      { id:'altura',    label:'Altura de Trabajo',  unit:'m'  },
+      { id:'angulo',    label:'Ángulo de Pluma',    unit:'°'  },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  }
+};
 
 /* ════════════════════════════════════════
    MENÚ PRINCIPAL
@@ -2491,7 +2591,7 @@ function abrirModulo(modulo) {
     document.getElementById('pantalla-inspeccion').style.display = 'block';
     document.getElementById('steps-track').style.display = 'flex';
     document.getElementById('header-title').textContent = 'Nueva inspección';
-    document.getElementById('header-sub').textContent = 'Paso 1 de 5 — Datos del equipo';
+    document.getElementById('header-sub').textContent = 'Paso 1 de 6 — Datos del equipo';
 
     if (!document.getElementById('fecha').value) {
       const hoy = new Date();
@@ -3184,7 +3284,7 @@ function renderStepsBar(activo) {
   if (dot) dot.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
 
   document.getElementById("header-sub").textContent =
-    `Paso ${activo} de 5 — ${PASOS_NOMBRE[activo]}`;
+    `Paso ${activo} de 6 — ${PASOS_NOMBRE[activo]}`;
 }
 
 /* ════════════════════════════════════════
@@ -3205,7 +3305,8 @@ function irA(n) {
     const eq = document.getElementById("maquinaria").value;
     document.getElementById("equipo-label").textContent = eq || "—";
   }
-  if (n === 5) renderResumen();
+  if (n === 5) renderPruebaCarga();
+  if (n === 6) renderResumen();
 }
 
 /* ════════════════════════════════════════
@@ -3251,7 +3352,8 @@ async function cargarMaquinaria() {
     opts.forEach(o => {
       const el = document.createElement("option");
       el.value = o.nombre;
-      el.dataset.plantilla = o.idPlantilla;
+      el.dataset.plantilla = o.idPlantilla || '';
+      el.dataset.dictHtml  = o.plantilla_dict_html || '';
       el.textContent = o.nombre;
       select.appendChild(el);
     });
@@ -3264,6 +3366,81 @@ async function cargarMaquinaria() {
 /* ════════════════════════════════════════
    CHECKLIST
 ════════════════════════════════════════ */
+/* ════════════════════════════════════════
+   PRUEBA DE CARGA
+════════════════════════════════════════ */
+function renderPruebaCarga() {
+  const sel    = document.getElementById("maquinaria");
+  const opt    = sel.options[sel.selectedIndex];
+  const equipo = sel.value;
+  const dictHtml = opt ? (opt.dataset.dictHtml || '') : '';
+
+  document.getElementById("pc-equipo-label").textContent = equipo || "—";
+
+  const cont = document.getElementById("prueba-carga-form");
+  const tpl  = PC_TEMPLATES[dictHtml];
+
+  if (!equipo || !tpl) {
+    cont.innerHTML = `<div style="color:var(--texto-hint);font-size:13px;text-align:center;padding:24px 0">
+      ${!equipo ? 'Selecciona un tipo de maquinaria en el Paso 1.' : 'Este tipo de equipo no tiene plantilla de prueba de carga asignada. Puedes continuar sin ella.'}
+    </div>`;
+    return;
+  }
+
+  let html = `<div style="font-size:12px;color:var(--texto-sub);margin-bottom:12px">Plantilla: <strong>${tpl.label}</strong></div>`;
+  html += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">`;
+  html += `<thead><tr>`;
+  html += `<th style="padding:7px 10px;background:var(--azul-dark);color:#fff;text-align:left;border-right:1px solid rgba(255,255,255,.15);font-size:11px">Prueba</th>`;
+  tpl.cols.forEach(c => {
+    html += `<th style="padding:7px 8px;background:var(--azul-dark);color:#fff;text-align:center;border-right:1px solid rgba(255,255,255,.15);font-size:11px">${c.label}${c.unit ? '<br><span style="font-weight:400;opacity:.7">'+c.unit+'</span>' : ''}</th>`;
+  });
+  html += `</tr></thead><tbody>`;
+
+  tpl.rows.forEach((row, ri) => {
+    const bg = ri % 2 === 0 ? 'var(--gris-bg)' : '#fff';
+    html += `<tr style="background:${bg}">`;
+    html += `<td style="padding:8px 10px;font-weight:600;font-size:12px;border:1px solid var(--borde);white-space:nowrap">${row.label}</td>`;
+    tpl.cols.forEach(c => {
+      const fid = `pc_${row.key}_${c.id}`;
+      if (c.type === 'select') {
+        html += `<td style="padding:5px 6px;border:1px solid var(--borde)"><select id="${fid}" style="width:100%;padding:5px 6px;border:1px solid var(--borde);border-radius:5px;font-size:12px;background:#fff" onchange="pcGuardar()">`;
+        html += `<option value="">—</option>`;
+        c.options.forEach(op => { html += `<option>${op}</option>`; });
+        html += `</select></td>`;
+      } else {
+        html += `<td style="padding:5px 6px;border:1px solid var(--borde)"><input type="text" id="${fid}" placeholder="—" style="width:100%;padding:5px 7px;border:1px solid var(--borde);border-radius:5px;font-size:12px;text-align:center" oninput="pcGuardar()"></td>`;
+      }
+    });
+    html += `</tr>`;
+  });
+  html += `</tbody></table></div>`;
+
+  cont.innerHTML = html;
+  pcGuardar();
+}
+
+function pcGuardar() {
+  const sel     = document.getElementById("maquinaria");
+  const opt     = sel.options[sel.selectedIndex];
+  const dictHtml = opt ? (opt.dataset.dictHtml || '') : '';
+  const tpl     = PC_TEMPLATES[dictHtml];
+  if (!tpl) { pruebaCargaData = {}; return; }
+
+  const result = { plantilla: dictHtml };
+  tpl.rows.forEach(row => {
+    result[row.key] = {};
+    tpl.cols.forEach(c => {
+      const el = document.getElementById(`pc_${row.key}_${c.id}`);
+      result[row.key][c.id] = el ? el.value.trim() : '';
+    });
+  });
+  pruebaCargaData = result;
+}
+
+function getPruebaCargaData() {
+  return Object.keys(pruebaCargaData).length ? pruebaCargaData : null;
+}
+
 async function actualizarChecklist() {
   const equipo     = document.getElementById("maquinaria").value;
   const contenedor = document.getElementById("contenedorCheck");
@@ -3525,7 +3702,7 @@ async function enviarFormulario() {
   enviando = true;
 
   const btnEnviar  = document.getElementById("btn-enviar");
-  const btnsPaso5  = document.getElementById("btns-paso5");
+  const btnsPaso5  = document.getElementById("btns-paso6");
   const cardProg   = document.getElementById("card-progress");
   const successBox = document.getElementById("success-box");
   const progBox    = document.getElementById("progress-box");
@@ -3572,6 +3749,7 @@ async function enviarFormulario() {
           semaforo
         },
         checklist: { ...respuestasCheck },
+        prueba_carga: getPruebaCargaData(),
         fotos: fotosData
       }
     };
