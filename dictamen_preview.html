@@ -71,10 +71,12 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 .badge-ok .badge-dot{background:#1a7a4a;}
 .badge-op .badge-dot{background:#134074;}
 .sig-row{border:1px solid #cdd8e3;border-top:none;}
-.sig-cell{padding:12px 14px;text-align:center;display:block;}
+.sig-cell{padding:8px 14px 10px;text-align:center;display:block;}
 .sig-cell:last-child{border-right:none;}
-.sig-role{font-size:6.5pt;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;margin-bottom:14px;}
-.sig-line{width:72%;height:1px;background:#0B2545;margin-bottom:5px;}
+.sig-role{font-size:6.5pt;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;margin-bottom:6px;}
+.sig-img-area{display:block;height:58px;width:100%;text-align:center;}
+.sig-img-area img{max-height:58px;max-width:160px;width:auto;}
+.sig-line{width:72%;height:1px;background:#cdd8e3;margin:0 auto 5px;}
 .sig-name{font-size:8.5pt;font-weight:700;color:#0B2545;}
 .sig-detail{font-size:7.5pt;color:#64748b;margin-top:1px;}
 .page-foot{background:#0B2545;padding:0;margin-top:8px;}.page-foot td{padding:5px 14px;}
@@ -250,8 +252,28 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     <td class="result-cell" style="border-right:none;"><div class="result-lbl">Estado del Equipo · Equipment Status</div><table style="margin:0 auto;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tr><td style="background:#e0edff;color:#134074;border:1.5px solid #1e5fa8;padding:4px 14px;font-size:9.5pt;font-weight:700;letter-spacing:.5px;"><svg style="width:8px;height:8px;display:inline-block;vertical-align:middle;margin-right:4px;" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#134074"/></svg>OPERATIVO</td></tr></table></td>
   </tr></table>
   <table class="sig-row" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
-    <td class="sig-cell" style="border-right:1px solid #cdd8e3;"><div class="sig-role">Firma del Inspector · Realizado Por</div><div class="sig-line"></div><div class="sig-name">ING. CARLOS HDEZ. RAMÍREZ</div><div class="sig-detail">Inspector-607695-27940089</div></td>
-    <td class="sig-cell" style="border-right:none;"><div class="sig-role">Aprobado Por</div><div class="sig-line"></div><div class="sig-name">ING. JOSÉ MARCOS GONZÁLEZ CALDERÓN</div><div class="sig-detail">Director General</div></td>
+    <td class="sig-cell" style="border-right:1px solid #cdd8e3;">
+      <div class="sig-role">Firma del Inspector · Realizado Por</div>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>
+        <td style="height:60px;text-align:center;vertical-align:middle;"><!-- FIRMA_INSPECTOR --></td>
+      </tr></table>
+      <table width="72%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 auto 5px;"><tr>
+        <td style="border-bottom:1px solid #cdd8e3;height:0;font-size:0;line-height:0;">&nbsp;</td>
+      </tr></table>
+      <div class="sig-name">ING. CARLOS HDEZ. RAMÍREZ</div>
+      <div class="sig-detail">Inspector-607695-27940089</div>
+    </td>
+    <td class="sig-cell" style="border-right:none;">
+      <div class="sig-role">Aprobado Por</div>
+      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>
+        <td style="height:60px;text-align:center;vertical-align:middle;"><!-- FIRMA_DIRECTOR --></td>
+      </tr></table>
+      <table width="72%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 auto 5px;"><tr>
+        <td style="border-bottom:1px solid #cdd8e3;height:0;font-size:0;line-height:0;">&nbsp;</td>
+      </tr></table>
+      <div class="sig-name">ING. JOSÉ MARCOS GONZÁLEZ CALDERÓN</div>
+      <div class="sig-detail">Director General</div>
+    </td>
   </tr></table>
   <table class="page-foot" style="margin-top:1px;width:100%;" cellpadding="0" cellspacing="0"><tr>
     <td><span class="f-lbl">Folio de Control</span></td>
@@ -394,7 +416,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <table class="pc-header-strip" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
         <td class="pc-equip-cell"><div class="pc-equip-lbl">Equipo Inspeccionado</div><div class="pc-equip-val">GRÚA MÓVIL TELESCÓPICA · GROVE GMK 3050-2</div></td>
         <td class="pc-equip-cell" style="width:110px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Capacidad Nominal</div><div class="pc-equip-val">50 TON</div></td>
-        <td class="pc-equip-cell" style="width:115px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Peso de Prueba <span style="font-weight:400;font-style:italic;color:#a0adb8">· Test Load</span></div><div class="pc-equip-val" style="color:#1e5fa8">42.5 TON</div></td>
+        <td class="pc-equip-cell" style="width:115px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Peso de Prueba</div><div class="pc-equip-val">42.5 TON</div></td>
         <td class="pc-equip-cell" style="width:120px;border-right:none;"><div class="pc-equip-lbl">Fecha de Prueba</div><div class="pc-equip-val">15 / 05 / 2026</div></td>
       </tr></table>
       <table class="pc-table">
