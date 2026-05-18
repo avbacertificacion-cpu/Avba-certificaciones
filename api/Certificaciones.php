@@ -86,27 +86,36 @@ class Certificaciones {
 
     // ── Generar PDF del documento ─────────────────────────────
     // Estrategia 1: Plantilla PDF + coordenadas (calidad perfecta, PHP puro)
-    // Estrategia 2: Microservicio VPS (LibreOffice + qpdf, plantilla Word)
-    // Estrategia 3: Fallback PHPWord → mPDF (PHP puro, plantilla Word)
+    // Estrategia 2: Plantilla HTML (certificado o dictamen) con mPDF
+    // Estrategia 3: Microservicio VPS (LibreOffice + qpdf, plantilla Word)
+    // Estrategia 4: Fallback PHPWord → mPDF (PHP puro, plantilla Word)
     public function generarPdfDesdeWord(int $id, string $tipo): array {
         // Intentar primero con plantilla PDF si existe
         $resultado = $this->generarPdfDesdeTemplatePdf($id, $tipo);
         if ($resultado['status'] === 'success') return $resultado;
 
-        // Para certificados, intentar con la plantilla HTML + mPDF antes que Word
-        if ($tipo !== 'dict' && file_exists(__DIR__ . '/../certificado_preview.html')) {
-            $datos = $this->obtenerDatosEquipo($id);
-            if ($datos) {
-                try {
-                    $qrB64   = $this->descargarQrB64($datos['qr_codigo'] ?? '');
-                    $html    = $this->renderCertTemplate($datos, $qrB64);
-                    $folio   = $datos['control'] ?? (string)$id;
-                    $rutaPdf = $this->htmlToPdfMpdf($html, $folio, 'CERT');
-                    return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
-                } catch (\Exception $e) {
-                    // Continuar con el flujo Word si falla
-                }
+        $datos = $this->obtenerDatosEquipo($id);
+        if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+
+        // Para dictámenes: usar plantilla HTML configurada o htmlDictamen() — NO Word
+        if ($tipo === 'dict') {
+            try {
+                $rutaPdf = $this->resolverPdf('dictamen', $datos);
+                return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
+            } catch (\Exception $e) {
+                return ['status' => 'error', 'message' => $e->getMessage()];
             }
+        }
+
+        // Para certificados: intentar con la plantilla HTML + mPDF antes que Word
+        try {
+            $qrB64   = $this->descargarQrB64($datos['qr_codigo'] ?? '');
+            $html    = $this->renderCertTemplate($datos, $qrB64);
+            $folio   = $datos['control'] ?? (string)$id;
+            $rutaPdf = $this->htmlToPdfMpdf($html, $folio, 'CERT');
+            return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
+        } catch (\Exception $e) {
+            // Continuar con el flujo Word si falla
         }
 
         // Si no hay plantilla PDF configurada y tampoco vendor/, no podemos continuar
@@ -115,10 +124,6 @@ class Certificaciones {
                     'message' => 'No hay plantilla PDF configurada para este tipo de equipo. '
                                . 'Súbela desde Calidad → Tipos de Equipo → Plantillas PDF.'];
         }
-
-        // Si no hay plantilla PDF configurada, continuar con Word (requiere vendor/)
-        $datos = $datos ?? $this->obtenerDatosEquipo($id);
-        if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
         try {
             $tipoPDF     = ($tipo === 'dict') ? 'dictamen' : 'certificado';
@@ -794,14 +799,139 @@ class Certificaciones {
         $qrB64 = $this->descargarQrB64($datos['qr_codigo'] ?? '');
 
         if ($tipo === 'dictamen') {
-            $items = $this->obtenerChecklistEquipo((int)($datos['id'] ?? 0), $datos['maquinaria'] ?? '');
-            $html  = $this->htmlDictamen($datos, $qrB64, $items);
+            $items         = $this->obtenerChecklistEquipo((int)($datos['id'] ?? 0), $datos['maquinaria'] ?? '');
+            $plantillaHtml = $this->obtenerPlantillaDictHtml($datos['maquinaria'] ?? '');
+
+            if ($plantillaHtml) {
+                $html = $this->renderDictamenHtmlTemplate($plantillaHtml, $datos, $qrB64, $items);
+                return $this->htmlToPdfMpdf($html, $datos['control'] ?? (string)($datos['id'] ?? 'doc'), 'DICT');
+            }
+
+            // Fallback: dictamen programático
+            $html = $this->htmlDictamen($datos, $qrB64, $items);
             return $this->htmlAPdf($html, $datos['control'] ?? (string)($datos['id'] ?? 'doc'), $tipo);
         }
 
         // Certificado: usar plantilla HTML + mPDF
         $html = $this->renderCertTemplate($datos, $qrB64);
         return $this->htmlToPdfMpdf($html, $datos['control'] ?? (string)($datos['id'] ?? 'doc'), 'CERT');
+    }
+
+    /** Lee el archivo de plantilla HTML para dictamen configurado en maquinaria_tipos. */
+    private function obtenerPlantillaDictHtml(string $maquinaria): ?string {
+        if (!$maquinaria) return null;
+        $stmt = $this->pdo->prepare(
+            "SELECT plantilla_dict_html FROM maquinaria_tipos WHERE nombre = ? LIMIT 1"
+        );
+        $stmt->execute([$maquinaria]);
+        $row = $stmt->fetch();
+        return !empty($row['plantilla_dict_html']) ? $row['plantilla_dict_html'] : null;
+    }
+
+    /**
+     * Carga la plantilla HTML de dictamen y sustituye tokens {campo} con los datos reales.
+     * Tokens soportados: {folio} {cliente} {domicilio} {tipo_maquinaria} {capacidad}
+     *   {marca} {modelo} {no_serie} {no_identificacion} {fecha_inspeccion} {vigencia}
+     *   {qr_imagen} {checklist_rows} {{normas_acreditadas}} {{normas_referencia}}
+     */
+    private function renderDictamenHtmlTemplate(string $archivo, array $d, string $qrB64, array $items): string {
+        $templatePath = __DIR__ . '/../' . $archivo;
+        if (!file_exists($templatePath)) {
+            return $this->htmlDictamen($d, $qrB64, $items);
+        }
+
+        $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+
+        $vigencia = '';
+        if (!empty($d['fecha_inspeccion'])) {
+            try {
+                $fv = new \DateTime($d['fecha_inspeccion']);
+                $fv->modify('+1 year');
+                $vigencia = $fv->format('d/m/Y');
+            } catch (\Exception $ex) {}
+        }
+
+        // Construir normas desde maquinaria_tipos
+        [$normasAcredHtml, $normasRefHtml] = $this->obtenerNormasHtml($d['maquinaria'] ?? '');
+
+        $folio = $e(formatoFolio($d['control'] ?? ''));
+
+        $map = [
+            '{folio}'             => $folio,
+            '{cliente}'           => $e($d['cliente']    ?? ''),
+            '{domicilio}'         => $e($d['direccion']  ?? ''),
+            '{tipo_maquinaria}'   => $e($d['maquinaria'] ?? ''),
+            '{capacidad}'         => $e($d['capacidad']  ?? ''),
+            '{marca}'             => $e($d['marca']       ?? ''),
+            '{modelo}'            => $e($d['modelo']      ?? ''),
+            '{no_serie}'          => $e($d['serie']       ?? ''),
+            '{no_identificacion}' => $e($d['id_equipo']  ?? ''),
+            '{fecha_inspeccion}'  => $e($d['fecha_fmt']  ?? ''),
+            '{vigencia}'          => $e($vigencia),
+            '{qr_imagen}'         => $qrB64,
+            '{checklist_rows}'    => $this->buildDictamenChecklistRows($items),
+            '{{normas_acreditadas}}' => $normasAcredHtml,
+            '{{normas_referencia}}'  => $normasRefHtml,
+        ];
+
+        $html = file_get_contents($templatePath);
+        $html = str_replace(array_keys($map), array_values($map), $html);
+
+        // Ajuste para mPDF
+        $override = '<style>body{background:#fff!important;}.page{box-shadow:none!important;margin:0!important;}</style>';
+        return str_replace('</head>', $override . '</head>', $html);
+    }
+
+    /** Genera el HTML de las filas del checklist para inyectar en plantillas de dictamen. */
+    private function buildDictamenChecklistRows(array $items): string {
+        if (empty($items)) return '<tr><td colspan="2" style="padding:6px 12px;font-size:8pt;color:#64748b">Sin ítems registrados</td></tr>';
+
+        $rows = '';
+        $seccionActual = '';
+        foreach ($items as $item) {
+            $sec  = htmlspecialchars($item['seccion_nombre'] ?? '', ENT_QUOTES, 'UTF-8');
+            $desc = htmlspecialchars($item['descripcion']   ?? '', ENT_QUOTES, 'UTF-8');
+            $val  = $item['valor'] ?? '';
+
+            if ($val === 'C')        { $label = '✓ CONFORME';     $color = '#1a7a4a'; $bg = '#e6f7ef'; }
+            elseif ($val === 'NC')   { $label = '✗ NO CONFORME';  $color = '#c62828'; $bg = '#fdf3f3'; }
+            else                     { $label = 'N/A';             $color = '#64748b'; $bg = '#f9fafb'; }
+
+            if ($sec !== $seccionActual) {
+                $rows .= "<tr><td colspan=\"2\" style=\"background:#0B2545;color:#fff;font-weight:700;"
+                       . "font-size:7.5pt;padding:3px 10px;letter-spacing:.5px;\">{$sec}</td></tr>\n";
+                $seccionActual = $sec;
+            }
+            $rows .= "<tr style=\"background:{$bg}\">"
+                   . "<td style=\"padding:3px 10px;font-size:8pt;border-bottom:1px solid #e8edf4;width:70%\">{$desc}</td>"
+                   . "<td style=\"padding:3px 10px;font-size:8pt;font-weight:700;color:{$color};"
+                   . "border-bottom:1px solid #e8edf4;text-align:center\">{$label}</td>"
+                   . "</tr>\n";
+        }
+        return $rows;
+    }
+
+    /** Devuelve [html_normas_acreditadas, html_normas_referencia] para el tipo de maquinaria. */
+    private function obtenerNormasHtml(string $maquinaria): array {
+        if (!$maquinaria) return ['—', '—'];
+        $stmt = $this->pdo->prepare(
+            "SELECT mn.norma, mn.tipo
+             FROM maquinaria_normas mn
+             INNER JOIN maquinaria_tipos t ON t.id = mn.maquinaria_tipo_id
+             WHERE t.nombre = ? ORDER BY mn.tipo, mn.norma"
+        );
+        $stmt->execute([$maquinaria]);
+        $rows = $stmt->fetchAll();
+
+        $acred = array_filter($rows, fn($r) => ($r['tipo'] ?? 'acreditada') !== 'referencia');
+        $ref   = array_filter($rows, fn($r) => ($r['tipo'] ?? '') === 'referencia');
+
+        $fmt = fn($arr) => implode(' · ', array_map(
+            fn($r) => htmlspecialchars($r['norma'], ENT_QUOTES, 'UTF-8'),
+            $arr
+        )) ?: '—';
+
+        return [$fmt($acred), $fmt($ref)];
     }
 
     /**
