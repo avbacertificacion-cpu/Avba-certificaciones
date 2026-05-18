@@ -21,7 +21,8 @@ class Calidad {
                     DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
                     correo, control, evidencia_url AS evidencia, direccion, capacidad,
                     disponibilidad, estado, motivo, qr_codigo,
-                    certificado_url AS link, dictamen_url AS dictamen, envio_direccion, coordenadas_envio,
+                    certificado_url AS link, dictamen_url AS dictamen,
+                    envio_direccion AS envio, coordenadas_envio,
                     reporte_url
              FROM equipos
              WHERE estado IN ('PENDIENTE', 'CONFORME', 'NO CONFORME', 'RECHAZADO', 'RETORNADO')

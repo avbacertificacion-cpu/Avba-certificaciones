@@ -87,22 +87,31 @@ class Inspecciones {
             );
             $u = fn($v) => $v !== null && $v !== '' ? strtoupper(trim($v)) : null;
 
+            $coordsInsp = trim($info['coords_insp']  ?? '');
+            $coordsEnv  = trim($info['coords_envio'] ?? '');
+
+            // Geocodificar server-side para obtener dirección legible confiable
+            $dirInsp = $this->geocodificarCoordenadas($coordsInsp)
+                       ?: $u($info['direccion_inspeccion_legible'] ?? '') ?: null;
+            $dirEnv  = $this->geocodificarCoordenadas($coordsEnv)
+                       ?: $u($info['direccion_envio_legible']      ?? '') ?: null;
+
             $stmt->execute([
                 $cliente,
-                $info['coords_insp']                             ?? null,
+                $coordsInsp ?: null,
                 $maquinaria,
-                $u($info['marca']                         ?? ''),
-                $u($info['modelo']                        ?? ''),
+                $u($info['marca']      ?? ''),
+                $u($info['modelo']     ?? ''),
                 $serie,
-                $u($info['id_cliente']                    ?? ''),
+                $u($info['id_cliente'] ?? ''),
                 date('Y-m-d'),
-                strtolower(trim($info['email_cliente']    ?? '')) ?: null,
+                strtolower(trim($info['email_cliente'] ?? '')) ?: null,
                 $control,
                 $urlCarpeta ?: null,
-                $u($info['direccion_inspeccion_legible']  ?? ''),
-                $u($info['capacidad']                     ?? ''),
-                $u($info['direccion_envio_legible']       ?? ''),
-                $info['coords_envio']                            ?? null,
+                $dirInsp,
+                $u($info['capacidad']  ?? ''),
+                $dirEnv,
+                $coordsEnv ?: null,
                 $usuarioActual,
                 $pruebaCargaJson,
             ]);
@@ -238,5 +247,27 @@ class Inspecciones {
         );
         $stmt->execute([$equipoId, $equipoId]);
         return $stmt->fetchAll();
+    }
+
+    // ── Geocodificación inversa server-side ────────────────
+    private function geocodificarCoordenadas(string $coords): string {
+        if (!$coords || $coords === '0,0') return '';
+        $parts = explode(',', $coords, 2);
+        if (count($parts) !== 2) return $coords;
+        [$lat, $lng] = array_map('trim', $parts);
+        if (!is_numeric($lat) || !is_numeric($lng)) return $coords;
+
+        $url = "https://nominatim.openstreetmap.org/reverse?format=json&lat={$lat}&lon={$lng}&accept-language=es";
+        $ctx = stream_context_create(['http' => [
+            'timeout' => 10,
+            'header'  => "User-Agent: AVBA-Certificaciones/1.0 (gestion.avba.com.mx)\r\n"
+                       . "Accept: application/json\r\n",
+        ]]);
+        $json = @file_get_contents($url, false, $ctx);
+        if ($json) {
+            $data = json_decode($json, true);
+            if (!empty($data['display_name'])) return strtoupper($data['display_name']);
+        }
+        return strtoupper("{$lat}, {$lng}");
     }
 }

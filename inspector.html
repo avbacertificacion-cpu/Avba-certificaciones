@@ -3681,24 +3681,7 @@ function renderResumen() {
 /* ════════════════════════════════════════
    ENVÍO
 ════════════════════════════════════════ */
-async function obtenerDireccion(lat, lng) {
-  const coordFallback = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
-  for (let intento = 0; intento < 2; intento++) {
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 8000);
-      const res  = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
-        { signal: ctrl.signal, headers: { 'Accept-Language': 'es' } }
-      );
-      clearTimeout(timer);
-      if (!res.ok) break;
-      const data = await res.json();
-      return data.display_name || coordFallback;
-    } catch { /* retry o fallback */ }
-  }
-  return coordFallback;
-}
+// La geocodificación inversa se realiza server-side al guardar la inspección
 
 function setProgreso(pct, stage) {
   document.getElementById("prog-fill").style.width  = pct + "%";
@@ -3721,40 +3704,34 @@ async function enviarFormulario() {
   progBox.style.display   = "block";
 
   try {
-    setProgreso(10, "Obteniendo coordenadas...");
+    setProgreso(20, "Obteniendo coordenadas...");
 
     const latLngInsp = markers.insp ? markers.insp.getLatLng() : null;
     const latLngEnv  = markers.env  ? markers.env.getLatLng()  : null;
 
-    setProgreso(25, "Obteniendo direcciones...");
-    const dirInsp = latLngInsp ? await obtenerDireccion(latLngInsp.lat, latLngInsp.lng) : "No definida";
-    const dirEnv  = latLngEnv  ? await obtenerDireccion(latLngEnv.lat,  latLngEnv.lng)  : "No definida";
-
-    setProgreso(45, "Preparando fotos...");
+    setProgreso(40, "Preparando fotos...");
 
     // Calcular semáforo
     const vals = Object.values(respuestasCheck);
     const semaforo = vals.includes("NC") ? "NO CONFORME" : vals.length > 0 ? "CONFORME" : "PENDIENTE";
 
-    setProgreso(65, "Enviando datos a Google Sheets...");
+    setProgreso(60, "Enviando inspección...");
 
     const payload = {
       action: "NUEVA_INSPECCION",
       payload: {
         info: {
-          cliente:                       document.getElementById("cliente").value,
-          maquinaria:                    document.getElementById("maquinaria").value,
-          marca:                         document.getElementById("marca").value,
-          modelo:                        document.getElementById("modelo").value,
-          serie:                         document.getElementById("serie").value,
-          id_cliente:                    document.getElementById("id_cliente").value,
-          capacidad:                     document.getElementById("capacidad").value,
-          email_cliente:                 document.getElementById("email_cliente").value,
-          coords_insp:                   latLngInsp ? `${latLngInsp.lat},${latLngInsp.lng}` : "0,0",
-          coords_envio:                  latLngEnv  ? `${latLngEnv.lat},${latLngEnv.lng}`   : "0,0",
-          direccion_inspeccion_legible:  dirInsp,
-          direccion_envio_legible:       dirEnv,
-          comentarios:                   document.getElementById("comentarios").value,
+          cliente:       document.getElementById("cliente").value,
+          maquinaria:    document.getElementById("maquinaria").value,
+          marca:         document.getElementById("marca").value,
+          modelo:        document.getElementById("modelo").value,
+          serie:         document.getElementById("serie").value,
+          id_cliente:    document.getElementById("id_cliente").value,
+          capacidad:     document.getElementById("capacidad").value,
+          email_cliente: document.getElementById("email_cliente").value,
+          coords_insp:   latLngInsp ? `${latLngInsp.lat},${latLngInsp.lng}` : "0,0",
+          coords_envio:  latLngEnv  ? `${latLngEnv.lat},${latLngEnv.lng}`   : "0,0",
+          comentarios:   document.getElementById("comentarios").value,
           semaforo
         },
         checklist: { ...respuestasCheck },
