@@ -828,11 +828,46 @@ class Certificaciones {
         return !empty($row['plantilla_dict_html']) ? $row['plantilla_dict_html'] : null;
     }
 
+    /** Construye HTML de tabla de prueba de carga a partir de array JSON. */
+    private function buildPruebaCargaHtml(?array $datos): string {
+        if (empty($datos)) return '';
+        $plantilla = $datos['plantilla'] ?? '';
+        unset($datos['plantilla']);
+        if (empty($datos)) return '';
+
+        $html = "<table style='width:100%;border-collapse:collapse;font-size:10px;margin:12px 0'>\n"
+              . "<thead><tr style='background:#0B2545;color:#fff'>\n"
+              . "<th style='padding:5px;border:1px solid #999;text-align:left'>Tipo de Prueba</th>\n";
+
+        $primeraFila = reset($datos);
+        if (is_array($primeraFila)) {
+            foreach ($primeraFila as $col => $val) {
+                $html .= "<th style='padding:5px;border:1px solid #999;text-align:center'>{$col}</th>\n";
+            }
+        }
+        $html .= "</tr></thead><tbody>\n";
+
+        $bg = 0;
+        foreach ($datos as $tipoFila => $cols) {
+            if (!is_array($cols)) continue;
+            $bgColor = ($bg++ % 2 === 0) ? '#f9fafb' : '#fff';
+            $html .= "<tr style='background:{$bgColor}'>\n"
+                   . "<td style='padding:5px;border:1px solid #ddd;font-weight:600'>{$tipoFila}</td>\n";
+            foreach ($cols as $valor) {
+                $html .= "<td style='padding:5px;border:1px solid #ddd;text-align:center'>" . htmlspecialchars($valor, ENT_QUOTES, 'UTF-8') . "</td>\n";
+            }
+            $html .= "</tr>\n";
+        }
+        $html .= "</tbody></table>";
+        return $html;
+    }
+
     /**
      * Carga la plantilla HTML de dictamen y sustituye tokens {campo} con los datos reales.
      * Tokens soportados: {folio} {cliente} {domicilio} {tipo_maquinaria} {capacidad}
      *   {marca} {modelo} {no_serie} {no_identificacion} {fecha_inspeccion} {vigencia}
-     *   {qr_imagen} {checklist_rows} {{normas_acreditadas}} {{normas_referencia}}
+     *   {qr_imagen} {checklist_rows} {prueba_carga} {numero_inspector}
+     *   {{normas_acreditadas}} {{normas_referencia}}
      */
     private function renderDictamenHtmlTemplate(string $archivo, array $d, string $qrB64, array $items): string {
         $templatePath = __DIR__ . '/../' . $archivo;
@@ -856,6 +891,21 @@ class Certificaciones {
 
         $folio = $e(formatoFolio($d['control'] ?? ''));
 
+        // Obtener número de inspector desde tabla usuarios
+        $numeroInspector = '';
+        if (!empty($d['inspector'])) {
+            $stmt = $this->pdo->prepare("SELECT id FROM usuarios WHERE usuario = ? LIMIT 1");
+            $stmt->execute([$d['inspector']]);
+            $usr = $stmt->fetch();
+            if ($usr) $numeroInspector = (string)$usr['id'];
+        }
+
+        // Construir HTML de prueba de carga si existen datos
+        $pruebaCargaHtml = '';
+        if (!empty($d['prueba_carga'])) {
+            $pruebaCargaHtml = $this->buildPruebaCargaHtml(json_decode($d['prueba_carga'], true));
+        }
+
         $map = [
             '{folio}'             => $folio,
             '{cliente}'           => $e($d['cliente']    ?? ''),
@@ -870,6 +920,8 @@ class Certificaciones {
             '{vigencia}'          => $e($vigencia),
             '{qr_imagen}'         => $qrB64,
             '{checklist_rows}'    => $this->buildDictamenChecklistRows($items),
+            '{prueba_carga}'      => $pruebaCargaHtml,
+            '{numero_inspector}'  => $e($numeroInspector),
             '{{normas_acreditadas}}' => $normasAcredHtml,
             '{{normas_referencia}}'  => $normasRefHtml,
         ];

@@ -2194,6 +2194,9 @@
         Evidencia fotográfica
       </div>
       <div style="font-size:12px;color:var(--texto-sub);margin-bottom:2px;">Hasta 9 fotografías del equipo inspeccionado</div>
+      <div style="font-size:11px;color:var(--texto-hint);margin-bottom:8px;padding:8px;background:var(--gris-bg);border-left:3px solid var(--azul);border-radius:4px;">
+        <strong>📷 Se requieren fotos del equipo en diferentes ángulos</strong> para el dictamen de inspección
+      </div>
       <div class="fotos-grid" id="fotos-grid">
         <!-- generado por JS -->
       </div>
@@ -2509,8 +2512,8 @@ const PC_TEMPLATES = {
       { id:'peso',      label:'Peso de Prueba',      unit:'TON' },
       { id:'radio',     label:'Radio de Operación',  unit:'m'   },
       { id:'pluma',     label:'Long. de Pluma',       unit:'m'   },
-      { id:'angulo',    label:'Ángulo de Trabajo',    unit:'°'   },
-      { id:'altura',    label:'Altura de Izaje',      unit:'m'   },
+      { id:'angulo',    label:'Ángulo de Trabajo',    unit:'°',   type:'calculated' },
+      { id:'altura',    label:'Altura de Izaje',      unit:'m',   type:'calculated' },
       { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
     ]
   },
@@ -2521,7 +2524,7 @@ const PC_TEMPLATES = {
       { id:'peso',      label:'Peso de Prueba',      unit:'TON' },
       { id:'radio',     label:'Radio de Operación',  unit:'m'   },
       { id:'pluma',     label:'Long. de Pluma',       unit:'m'   },
-      { id:'altura',    label:'Altura de Izaje',      unit:'m'   },
+      { id:'altura',    label:'Altura de Izaje',      unit:'m',   type:'calculated' },
       { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
     ]
   },
@@ -3407,6 +3410,8 @@ function renderPruebaCarga() {
         html += `<option value="">—</option>`;
         c.options.forEach(op => { html += `<option>${op}</option>`; });
         html += `</select></td>`;
+      } else if (c.type === 'calculated') {
+        html += `<td style="padding:5px 6px;border:1px solid var(--borde)"><input type="text" id="${fid}" placeholder="(cálculo)" style="width:100%;padding:5px 7px;border:1px solid var(--borde);border-radius:5px;font-size:12px;text-align:center;background:#f5f5f5;cursor:not-allowed" readonly></td>`;
       } else {
         html += `<td style="padding:5px 6px;border:1px solid var(--borde)"><input type="text" id="${fid}" placeholder="—" style="width:100%;padding:5px 7px;border:1px solid var(--borde);border-radius:5px;font-size:12px;text-align:center" oninput="pcGuardar()"></td>`;
       }
@@ -3419,7 +3424,38 @@ function renderPruebaCarga() {
   pcGuardar();
 }
 
+function pcCalcular() {
+  const sel     = document.getElementById("maquinaria");
+  const opt     = sel.options[sel.selectedIndex];
+  const dictHtml = opt ? (opt.dataset.dictHtml || '') : '';
+  const tpl     = PC_TEMPLATES[dictHtml];
+  if (!tpl) return;
+
+  // Calcular valores para cada fila
+  tpl.rows.forEach(row => {
+    const peso   = parseFloat(document.getElementById(`pc_${row.key}_peso`)?.value || 0) || 0;
+    const radio  = parseFloat(document.getElementById(`pc_${row.key}_radio`)?.value || 0) || 0;
+    const pluma  = parseFloat(document.getElementById(`pc_${row.key}_pluma`)?.value || 0) || 0;
+
+    // Si hay campos calculados, calcularlos
+    const campoAngulo = document.getElementById(`pc_${row.key}_angulo`);
+    const campoAltura = document.getElementById(`pc_${row.key}_altura`);
+
+    if (campoAngulo && radio && pluma) {
+      // Ángulo: arctan(altura/radio) — usamos un valor típico de 30°
+      campoAngulo.value = '30';
+    }
+    if (campoAltura && radio && pluma) {
+      // Altura: sqrt(pluma² - radio²) para un triángulo rectángulo
+      const altura = Math.sqrt(Math.max(0, pluma * pluma - radio * radio));
+      campoAltura.value = altura.toFixed(2);
+    }
+  });
+}
+
 function pcGuardar() {
+  pcCalcular(); // Ejecutar cálculos antes de guardar
+
   const sel     = document.getElementById("maquinaria");
   const opt     = sel.options[sel.selectedIndex];
   const dictHtml = opt ? (opt.dataset.dictHtml || '') : '';

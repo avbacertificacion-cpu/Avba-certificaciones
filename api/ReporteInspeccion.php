@@ -25,23 +25,37 @@ class ReporteInspeccion {
                 require_once $autoload;
             }
 
-            // Obtener nombre completo del inspector
+            // Obtener nombre completo del inspector y su firma
             $nombreInspector = $usuarioLogin;
+            $firmaImagenUrl = '';
+            $numeroInspector = '';
             if ($usuarioLogin) {
-                $stmtU = $pdo->prepare("SELECT nombre FROM usuarios WHERE usuario = ?");
+                $stmtU = $pdo->prepare("SELECT id, nombre, firma_imagen FROM usuarios WHERE usuario = ?");
                 $stmtU->execute([$usuarioLogin]);
                 $u = $stmtU->fetch();
-                if ($u && $u['nombre']) $nombreInspector = $u['nombre'];
+                if ($u && $u['nombre']) {
+                    $nombreInspector = $u['nombre'];
+                    $firmaImagenUrl = $u['firma_imagen'] ?? '';
+                    $numeroInspector = (string)$u['id'];
+                }
             }
+
             // Cargar datos del equipo
             $stmt = $pdo->prepare(
                 "SELECT e.*,
-                        DATE_FORMAT(e.fecha_inspeccion, '%d/%m/%Y') AS fecha_fmt
+                        DATE_FORMAT(e.fecha_inspeccion, '%d/%m/%Y') AS fecha_fmt,
+                        e.prueba_carga
                  FROM equipos e WHERE e.id = ?"
             );
             $stmt->execute([$equipoId]);
             $equipo = $stmt->fetch();
             if (!$equipo) return ['status' => 'error', 'message' => 'Equipo no encontrado.'];
+
+            // Decodificar prueba_carga JSON
+            $pruebaCarga = [];
+            if (!empty($equipo['prueba_carga'])) {
+                $pruebaCarga = json_decode($equipo['prueba_carga'], true) ?? [];
+            }
 
             // Cargar checklist con nombres de sección
             $stmt2 = $pdo->prepare(
@@ -73,11 +87,11 @@ class ReporteInspeccion {
                 $checklist[$sec]['items'][] = $item;
             }
 
-            // Obtener fotos (máximo 6)
+            // Obtener fotos (máximo 9)
             $fotos = self::obtenerFotos($equipo['evidencia_url'] ?? '');
 
             // Construir HTML
-            $html = self::buildHtml($equipo, $checklist, $fotos, $nombreInspector);
+            $html = self::buildHtml($equipo, $checklist, $fotos, $nombreInspector, $numeroInspector, $pruebaCarga, $firmaImagenUrl);
 
             // Generar PDF con DOMPDF
             if (!class_exists('Dompdf\Dompdf')) {
@@ -123,6 +137,43 @@ class ReporteInspeccion {
     }
 
     // ── Obtener rutas locales de fotos ────────────────────────
+    private static function buildPruebaCargaHtml(array $pruebaCarga): string {
+        if (empty($pruebaCarga)) return '';
+        $plantilla = $pruebaCarga['plantilla'] ?? '';
+        unset($pruebaCarga['plantilla']);
+        if (empty($pruebaCarga)) return '';
+
+        $html = "<div style='margin-top:12px;page-break-before:avoid'>
+<div style='text-align:center;font-size:11px;font-weight:bold;margin-bottom:6px'>
+  RESULTADO DE PRUEBA DE CARGA
+</div>
+<table style='width:100%;border-collapse:collapse;font-size:9px'>
+<thead><tr style='background:#d0d8e8;border:1px solid #999'>
+  <th style='padding:5px;border-right:1px solid #999;text-align:left;font-weight:bold'>Tipo de Prueba</th>";
+
+        // Obtener nombres de columnas del primer row
+        if (!empty($pruebaCarga)) {
+            $primeraFila = reset($pruebaCarga);
+            foreach ($primeraFila as $col => $val) {
+                $html .= "<th style='padding:5px;border-right:1px solid #999;text-align:center;font-weight:bold'>{$col}</th>";
+            }
+        }
+
+        $html .= "</tr></thead><tbody>";
+        $bg = 0;
+        foreach ($pruebaCarga as $tipoFila => $datos) {
+            $bgColor = ($bg++ % 2 === 0) ? '#f5f5f5' : '#fff';
+            $html .= "<tr style='background:{$bgColor};border:1px solid #ccc'>
+  <td style='padding:4px 5px;border-right:1px solid #ccc;font-weight:600'>{$tipoFila}</td>";
+            foreach ($datos as $valor) {
+                $html .= "<td style='padding:4px 5px;border-right:1px solid #ccc;text-align:center'>{$valor}</td>";
+            }
+            $html .= "</tr>";
+        }
+        $html .= "</tbody></table></div>";
+        return $html;
+    }
+
     private static function obtenerFotos(string $evidenciaUrl): array {
         if (!$evidenciaUrl) return [];
 
@@ -143,7 +194,7 @@ class ReporteInspeccion {
     }
 
     // ── Construir HTML del reporte ────────────────────────────
-    private static function buildHtml(array $eq, array $checklist, array $fotos, string $inspector = ''): string {
+    private static function buildHtml(array $eq, array $checklist, array $fotos, string $inspector = '', string $numeroInsp = '', array $pruebaCarga = [], string $firmaUrl = ''): string {
 
         $gdDisponible = extension_loaded('gd');
 
@@ -169,6 +220,7 @@ class ReporteInspeccion {
         $fecha      = htmlspecialchars($eq['fecha_fmt']        ?? '');
         $capacidad  = htmlspecialchars($eq['capacidad']        ?? '');
         $control    = htmlspecialchars(formatoFolio($eq['control'] ?? ''));
+        $numeroStr  = htmlspecialchars($numeroInsp ?? '');
 
         // ── Grilla de fotos (3x3, solo celdas con foto) ──────────
         $fotosHtml  = '';
@@ -311,7 +363,11 @@ class ReporteInspeccion {
     <td colspan='2' style='padding:3px 6px;border:1px solid #ccc'>
       Folio de control: <strong>{$control}</strong>
     </td>
-    <td colspan='2' style='padding:3px 6px;border:1px solid #ccc'>
+    <td style='padding:3px 6px;border:1px solid #ccc'>
+      <span style='font-size:8px;color:#555'>No. Inspector</span><br>
+      {$numeroStr}
+    </td>
+    <td style='padding:3px 6px;border:1px solid #ccc'>
       Elaborado por: <strong>" . htmlspecialchars($inspector) . "</strong>
     </td>
   </tr>
@@ -325,7 +381,34 @@ class ReporteInspeccion {
 
 <table style='width:100%;border-collapse:collapse;margin-bottom:8px'>
   <tr>{$fotosHtml}</tr>
-</table>
+</table>";
+
+        // Agregar tabla de prueba de carga si existen datos
+        if (!empty($pruebaCarga)) {
+            $html .= self::buildPruebaCargaHtml($pruebaCarga);
+        }
+
+        // Agregar firma del inspector si existe
+        if ($firmaUrl) {
+            $firmaTag = '';
+            if (file_exists(rtrim(UPLOAD_DIR, '/\\') . '/' . ltrim($firmaUrl, '/'))) {
+                $firmaPath = rtrim(UPLOAD_DIR, '/\\') . '/' . ltrim($firmaUrl, '/');
+                if (extension_loaded('gd') && file_exists($firmaPath)) {
+                    $b64 = base64_encode(file_get_contents($firmaPath));
+                    $firmaTag = "<img src='data:image/png;base64,{$b64}' style='width:120px;height:60px;object-fit:contain'>";
+                }
+            }
+            if ($firmaTag) {
+                $html .= "
+<div style='margin-top:16px;text-align:center'>
+  <div style='font-size:11px;font-weight:bold;margin-bottom:8px'>Firma del Inspector</div>
+  <div style='border-top:1px solid #333;padding-top:4px'>{$firmaTag}</div>
+  <div style='font-size:9px;margin-top:4px'>" . htmlspecialchars($inspector) . "</div>
+</div>";
+            }
+        }
+
+        $html .= "
 
 <!-- ══ PÁGINA 2+: INSPECCIÓN (Checklist) ══ -->
 <div class='page-break'></div>
