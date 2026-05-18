@@ -14,23 +14,23 @@
   --verde:#1a7a4a; --verde-l:#e6f7ef;
 }
 *{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color:var(--texto);}
+body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color:#1a2940;}
 .page{width:215mm;min-height:277mm;margin:22px auto;background:#fff;box-shadow:0 8px 40px rgba(0,0,0,.22);overflow:hidden;}
 
 /* ── HEADER ── */
 .hdr{display:table;width:100%;table-layout:fixed;border-collapse:collapse;background:#2E3D4E;position:relative;}
 .hdr::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.05) 0%,transparent 60%);pointer-events:none;}
-.hdr-logo{display:table-cell;width:72mm;vertical-align:middle;text-align:center;padding:8px 12px;border-right:3px solid var(--dorado);background:white;}
+.hdr-logo{display:table-cell;width:72mm;vertical-align:middle;text-align:center;padding:8px 12px;border-right:3px solid #C49A28;background:white;}
 .hdr-title{display:table-cell;text-align:center;padding:12px 8px;vertical-align:middle;background:#2E3D4E;}
 .hdr-title-es{font-family:'Montserrat',sans-serif;font-size:13pt;font-weight:900;color:#fff;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;}
-.hdr-sep{width:52px;height:2.5px;background:var(--dorado);margin:5px auto;border-radius:2px;}
+.hdr-sep{width:52px;height:2.5px;background:#C49A28;margin:5px auto;border-radius:2px;}
 .hdr-title-en{font-size:7.5pt;color:rgba(255,255,255,.6);font-style:italic;}
 .hdr-title-co{font-size:6pt;color:rgba(255,255,255,.4);margin-top:2px;}
-.hdr-cert{display:table-cell;width:64mm;vertical-align:middle;text-align:center;padding:10px 14px;border-left:3px solid var(--dorado);background:white;}
+.hdr-cert{display:table-cell;width:64mm;vertical-align:middle;text-align:center;padding:10px 14px;border-left:3px solid #C49A28;background:white;}
 .hdr-cert-lbl{font-size:6pt;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.5px;}
-.hdr-cert-val{font-size:9pt;font-weight:800;color:var(--dorado);letter-spacing:.3px;margin-top:2px;text-align:center;}
+.hdr-cert-val{font-size:9pt;font-weight:800;color:#C49A28;letter-spacing:.3px;margin-top:2px;text-align:center;}
 
-.hdr-logos{display:table-cell;width:76mm;vertical-align:middle;text-align:center;padding:6px 8px;border-left:3px solid var(--dorado);background:white;}
+.hdr-logos{display:table-cell;width:76mm;vertical-align:middle;text-align:center;padding:6px 8px;border-left:3px solid #C49A28;background:white;}
 /* AVBA: SVG con colores nativos, sin filtro */
 .avba-img {
   max-width:130px; max-height:60px; width:auto;
@@ -46,108 +46,109 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 
 
 /* ── RESTO ── */
-.gold-bar{height:3px;background:linear-gradient(90deg,var(--dorado),var(--dorado-l),var(--dorado));}
-.band-blue{background:var(--azul);color:#fff;padding:5px 14px;font-weight:700;font-size:8pt;letter-spacing:.5px;text-transform:uppercase;border-left:4px solid var(--dorado);}
-.band-blue .cert-num{background:var(--dorado);color:var(--azul);padding:1px 10px;border-radius:99px;font-size:8.5pt;font-weight:800;letter-spacing:.5px;}
-.band-gold{background:linear-gradient(90deg,var(--dorado),#d4a82a);color:#fff;padding:5px 14px;font-weight:700;font-size:7.5pt;text-transform:uppercase;letter-spacing:.4px;}
+.gold-bar{height:3px;background:linear-gradient(90deg,#C49A28,#e8c547,#C49A28);}
+.band-blue{background:#0B2545;color:#fff;padding:5px 14px;font-weight:700;font-size:8pt;letter-spacing:.5px;text-transform:uppercase;border-left:4px solid #C49A28;}
+.band-blue .cert-num{background:#C49A28;color:#0B2545;padding:1px 10px;border-radius:99px;font-size:8.5pt;font-weight:800;letter-spacing:.5px;}
+.band-gold{background:linear-gradient(90deg,#C49A28,#d4a82a);color:#fff;padding:5px 14px;font-weight:700;font-size:7.5pt;text-transform:uppercase;letter-spacing:.4px;}
 .data-table{width:100%;border-collapse:collapse;}
-.data-table td{border:1px solid var(--borde);border-top:none;padding:6px 12px;vertical-align:top;}
-.cell-lbl{font-size:6.5pt;font-weight:600;text-transform:uppercase;color:var(--sub);letter-spacing:.4px;display:block;}
+.data-table td{border:1px solid #cdd8e3;border-top:none;padding:6px 12px;vertical-align:top;}
+.cell-lbl{font-size:6.5pt;font-weight:600;text-transform:uppercase;color:#64748b;letter-spacing:.4px;display:block;}
 .cell-lbl-en{font-weight:400;font-style:italic;color:#a0adb8;}
-.cell-val{font-size:9.5pt;font-weight:600;color:var(--azul);margin-top:2px;}
-.sec-title{display:block;background:var(--azul-m);color:#fff;padding:4px 14px;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-left:4px solid var(--dorado);margin-top:7px;}
-.sec-body{border:1px solid var(--borde);border-top:none;background:#fafcff;}
+.cell-val{font-size:9.5pt;font-weight:600;color:#0B2545;margin-top:2px;}
+.sec-title{display:block;background:#134074;color:#fff;padding:4px 14px;font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-left:4px solid #C49A28;margin-top:7px;}
+.sec-body{border:1px solid #cdd8e3;border-top:none;background:#fafcff;}
 .scope-grid{width:100%;border-collapse:collapse;padding:4px 6px;}
 .scope-grid td{width:50%;vertical-align:top;padding:3px 8px;font-size:8pt;}
-.scope-num{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:50%;background:var(--azul);color:#fff;text-align:center;font-size:6.5pt;font-weight:700;margin-right:4px;vertical-align:middle;}
-.result-row{border:1px solid var(--borde);border-top:none;}
-.result-cell{border-right:1px solid var(--borde);padding:10px 8px;text-align:center;background:var(--gris);}
+.scope-num{display:inline-block;min-width:18px;height:18px;line-height:18px;border-radius:50%;background:#0B2545;color:#fff;text-align:center;font-size:6.5pt;font-weight:700;margin-right:4px;vertical-align:middle;}
+.result-row{border:1px solid #cdd8e3;border-top:none;}
+.result-cell{border-right:1px solid #cdd8e3;padding:10px 8px;text-align:center;background:#f4f7fb;}
 .result-cell:last-child{border-right:none;}
-.result-lbl{font-size:6.5pt;font-weight:700;text-transform:uppercase;color:var(--sub);letter-spacing:.4px;margin-bottom:5px;}
+.result-lbl{font-size:6.5pt;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px;margin-bottom:5px;}
 .badge{display:inline-block;padding:4px 16px;border-radius:99px;font-size:9.5pt;font-weight:700;letter-spacing:.5px;}
-.badge-ok{background:var(--verde-l);color:var(--verde);border:1.5px solid #34c472;}
-.badge-op{background:#e0edff;color:var(--azul-m);border:1.5px solid var(--azul-l);}
+.badge-ok{background:#e6f7ef;color:#1a7a4a;border:1.5px solid #34c472;}
+.badge-op{background:#e0edff;color:#134074;border:1.5px solid #1e5fa8;}
 .badge-dot{display:inline-block;width:7px;height:7px;border-radius:50%;vertical-align:middle;margin-right:3px;}
-.badge-ok .badge-dot{background:var(--verde);}
-.badge-op .badge-dot{background:var(--azul-m);}
-.sig-row{border:1px solid var(--borde);border-top:none;}
+.badge-ok .badge-dot{background:#1a7a4a;}
+.badge-op .badge-dot{background:#134074;}
+.sig-row{border:1px solid #cdd8e3;border-top:none;}
 .sig-cell{padding:12px 14px;text-align:center;display:block;}
 .sig-cell:last-child{border-right:none;}
-.sig-role{font-size:6.5pt;font-weight:700;text-transform:uppercase;color:var(--sub);letter-spacing:.5px;margin-bottom:14px;}
-.sig-line{width:72%;height:1px;background:var(--azul);margin-bottom:5px;}
-.sig-name{font-size:8.5pt;font-weight:700;color:var(--azul);}
-.sig-detail{font-size:7.5pt;color:var(--sub);margin-top:1px;}
-.page-foot{background:var(--azul);padding:0;margin-top:8px;}.page-foot td{padding:5px 14px;}
+.sig-role{font-size:6.5pt;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.5px;margin-bottom:14px;}
+.sig-line{width:72%;height:1px;background:#0B2545;margin-bottom:5px;}
+.sig-name{font-size:8.5pt;font-weight:700;color:#0B2545;}
+.sig-detail{font-size:7.5pt;color:#64748b;margin-top:1px;}
+.page-foot{background:#0B2545;padding:0;margin-top:8px;}.page-foot td{padding:5px 14px;}
 .f-lbl{font-size:6.5pt;color:rgba(255,255,255,.4);text-transform:uppercase;}
-.f-val{font-size:8pt;font-weight:700;color:var(--dorado);letter-spacing:.5px;}
+.f-val{font-size:8pt;font-weight:700;color:#C49A28;letter-spacing:.5px;}
 
 /* ── FOTOS ── */
-.foto-section-title{display:block;padding:5px 12px;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--sub);border-bottom:1px solid var(--borde);background:var(--gris);}
-.foto-section-title .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--azul-l);vertical-align:middle;margin-right:4px;}
-.foto-grid-3x3{width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;}
-.foto-grid-ganchos{width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;}
-.foto-card{background:#fff;width:33.33%;vertical-align:top;border:1px solid var(--borde);}
+.foto-section-title{display:block;padding:5px 12px;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#64748b;border-bottom:1px solid #cdd8e3;background:#f4f7fb;}
+.foto-section-title .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#1e5fa8;vertical-align:middle;margin-right:4px;}
+.foto-grid-3x3{width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;}
+.foto-grid-ganchos{width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;}
+.foto-card{background:#fff;width:33.33%;vertical-align:top;border:1px solid #cdd8e3;}
 .foto-placeholder{display:block;text-align:center;padding:4px;background:linear-gradient(145deg,#f8fafc,#eef2f7);color:#94a3b8;}
-.fp-num{display:inline-block;width:18px;height:18px;line-height:18px;border-radius:50%;background:var(--azul);color:#fff;font-size:7.5pt;font-weight:800;text-align:center;vertical-align:middle;margin-right:4px;}
-.foto-caption{padding:3px 6px;font-size:6.5pt;color:var(--sub);font-weight:500;border-top:1px solid var(--borde);background:#fff;text-align:center;}
-.ganchos-header{display:block;padding:5px 12px;background:var(--azul);color:#fff;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-left:4px solid var(--dorado);}
+.fp-num{display:inline-block;width:18px;height:18px;line-height:18px;border-radius:50%;background:#0B2545;color:#fff;font-size:7.5pt;font-weight:800;text-align:center;vertical-align:middle;margin-right:4px;}
+.foto-caption{padding:3px 6px;font-size:6.5pt;color:#64748b;font-weight:500;border-top:1px solid #cdd8e3;background:#fff;text-align:center;}
+.ganchos-header{display:block;padding:5px 12px;background:#0B2545;color:#fff;font-size:7pt;font-weight:700;text-transform:uppercase;letter-spacing:.5px;border-left:4px solid #C49A28;}
 
 /* ── PRUEBA DE CARGA ── */
-.pc-header-strip{border:1px solid var(--borde);border-top:none;}
-.pc-equip-cell{padding:5px 10px;border-right:1px solid var(--borde);display:block;}
+.pc-header-strip{border:1px solid #cdd8e3;border-top:none;}
+.pc-equip-cell{padding:5px 10px;border-right:1px solid #cdd8e3;display:block;}
 .pc-equip-cell:last-child{border-right:none;}
-.pc-equip-lbl{font-size:6pt;font-weight:700;text-transform:uppercase;color:var(--sub);letter-spacing:.4px;}
-.pc-equip-val{font-size:9pt;font-weight:700;color:var(--azul);margin-top:1px;}
+.pc-equip-lbl{font-size:6pt;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px;}
+.pc-equip-val{font-size:9pt;font-weight:700;color:#0B2545;margin-top:1px;}
 .pc-table{width:100%;border-collapse:collapse;}
-.pc-thead-row th{background:var(--azul);color:#fff;padding:4px 8px;font-size:7pt;font-weight:700;text-align:center;letter-spacing:.3px;border-right:1px solid rgba(255,255,255,.12);}
+.pc-thead-row th{background:#0B2545;color:#fff;padding:4px 8px;font-size:7pt;font-weight:700;text-align:center;letter-spacing:.3px;border-right:1px solid rgba(255,255,255,.12);}
 .pc-thead-row th:last-child{border-right:none;}
 .pc-thead-sub{display:block;font-weight:400;font-size:6pt;opacity:.6;margin-top:1px;}
-.pc-test-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:7.5pt;font-weight:700;white-space:nowrap;}
-.pc-badge-sin{background:#f0f4f8;color:var(--azul-m);border:1px solid var(--borde);}
+.pc-test-badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:7.5pt;font-weight:700;white-space:nowrap;}
+.pc-badge-sin{background:#f0f4f8;color:#134074;border:1px solid #cdd8e3;}
 .pc-badge-con{background:#fff8e1;color:#7a5500;border:1px solid #f0c040;}
-.pc-td{padding:5px 8px;font-size:8pt;font-weight:600;text-align:center;border:1px solid var(--borde);color:var(--azul);}
-.pc-td-desc{padding:5px 10px;font-size:8pt;text-align:left;border:1px solid var(--borde);}
+.pc-td{padding:5px 8px;font-size:8pt;font-weight:600;text-align:center;border:1px solid #cdd8e3;color:#0B2545;}
+.pc-td-desc{padding:5px 10px;font-size:8pt;text-align:left;border:1px solid #cdd8e3;}
 .pc-row-sin td{background:#f8fafc;}
 .pc-row-con td{background:#fffdf5;}
-.pc-input-hint{display:block;font-size:6pt;color:var(--sub);font-weight:400;margin-top:1px;}
-.pc-calc{display:flex;align-items:center;gap:3px;justify-content:center;}
-.pc-calc-val{font-size:9.5pt;font-weight:800;color:var(--azul-l);}
-.pc-calc-unit{font-size:7pt;color:var(--sub);font-weight:500;}
-.pc-ok-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:99px;font-size:7.5pt;font-weight:700;background:var(--verde-l);color:var(--verde);border:1px solid #34c472;}
-.pc-diagram-row{border:1px solid var(--borde);border-top:none;background:linear-gradient(135deg,#f4f8ff,#e8f0fb);}
-.pc-diagram{padding:6px;border-right:1px solid var(--borde);}
+.pc-input-hint{display:block;font-size:6pt;color:#64748b;font-weight:400;margin-top:1px;}
+.pc-calc{display:block;text-align:center;}
+.pc-calc-val{font-size:9.5pt;font-weight:800;color:#1e5fa8;}
+.pc-calc-unit{font-size:7pt;color:#64748b;font-weight:500;}
+.pc-ok-badge{display:inline-block;padding:3px 10px;border-radius:99px;font-size:7.5pt;font-weight:700;background:#e6f7ef;color:#1a7a4a;border:1px solid #34c472;}
+.pc-diagram-row{border:1px solid #cdd8e3;border-top:none;background:linear-gradient(135deg,#f4f8ff,#e8f0fb);}
+.pc-diagram{padding:6px;border-right:1px solid #cdd8e3;}
 .pc-diagram-data{width:100%;border-collapse:collapse;}
 .pc-diag-cell{padding:6px 12px;vertical-align:middle;}
 
 
-.pc-diag-lbl{font-size:6.5pt;font-weight:700;text-transform:uppercase;color:var(--sub);letter-spacing:.4px;}
-.pc-diag-val{font-size:12pt;font-weight:900;color:var(--azul);line-height:1.1;margin-top:2px;}
-.pc-diag-val .unit{font-size:8pt;font-weight:600;color:var(--sub);margin-left:2px;}
-.pc-diag-badge{margin-top:3px;display:inline-flex;align-items:center;gap:3px;font-size:7pt;font-weight:700;color:var(--verde);}
-.pc-obs-row{border:1px solid var(--borde);border-top:none;display:block;}
-.pc-obs-label{background:var(--azul-m);color:#fff;padding:4px 12px;font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-left:3px solid var(--dorado);}
-.pc-obs-content{padding:5px 10px;font-size:7.5pt;line-height:1.5;color:var(--texto);background:#fffdf5;border-left:3px solid var(--dorado);}
-.pc-result-strip{border:1px solid var(--borde);border-top:none;background:var(--azul);}
+.pc-diag-lbl{font-size:6.5pt;font-weight:700;text-transform:uppercase;color:#64748b;letter-spacing:.4px;}
+.pc-diag-val{font-size:12pt;font-weight:900;color:#0B2545;line-height:1.1;margin-top:2px;}
+.pc-diag-val .unit{font-size:8pt;font-weight:600;color:#64748b;margin-left:2px;}
+.pc-diag-badge{margin-top:3px;display:inline-block;font-size:7pt;font-weight:700;color:#1a7a4a;}
+.pc-obs-row{border:1px solid #cdd8e3;border-top:none;display:block;}
+.pc-obs-label{background:#134074;color:#fff;padding:4px 12px;font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.6px;border-left:3px solid #C49A28;}
+.pc-obs-content{padding:5px 10px;font-size:7.5pt;line-height:1.5;color:#1a2940;background:#fffdf5;border-left:3px solid #C49A28;}
+.pc-result-strip{border:1px solid #cdd8e3;border-top:none;background:#0B2545;}
 .pc-result-left{display:block;}
 .pc-result-lbl{font-size:6.5pt;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.4px;}
-.pc-result-val{font-size:11pt;font-weight:900;color:var(--dorado);letter-spacing:.5px;margin-top:1px;}
+.pc-result-val{font-size:11pt;font-weight:900;color:#C49A28;letter-spacing:.5px;margin-top:1px;}
 .pc-norma{font-size:7pt;color:rgba(255,255,255,.55);font-style:italic;text-align:right;}
 
 /* ── RECOMENDACIONES ── */
 .rec{margin-top:1px;}
-.rec-head{display:block;padding:3px 12px;background:var(--gris);border:1px solid var(--borde);border-bottom:none;}
-.rec-num{display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;background:var(--azul);color:#fff;text-align:center;font-size:8pt;font-weight:700;vertical-align:middle;margin-right:6px;}
-.rec-head-title{font-size:8pt;font-weight:700;color:var(--azul);text-transform:uppercase;letter-spacing:.3px;line-height:1.3;}
-.rec-body{border:1px solid var(--borde);padding:3px 12px 3px 42px;background:#fff;}
+.rec-head{display:block;padding:3px 12px;background:#f4f7fb;border:1px solid #cdd8e3;border-bottom:none;}
+.rec-num{display:inline-block;width:22px;height:22px;line-height:22px;border-radius:50%;background:#0B2545;color:#fff;text-align:center;font-size:8pt;font-weight:700;vertical-align:middle;margin-right:6px;}
+.rec-head-title{font-size:8pt;font-weight:700;color:#0B2545;text-transform:uppercase;letter-spacing:.3px;line-height:1.3;}
+.rec-body{border:1px solid #cdd8e3;padding:3px 12px 3px 42px;background:#fff;}
 .rec-body ul{list-style:none;padding:0;}
 .rec-body ul li{font-size:7.5pt;line-height:1.5;display:block;margin-bottom:1px;}
 .rec-body ul li:last-child{margin-bottom:0;}
 .rec-body ul li > span{display:inline;}
-.rec-body ul li::before{content:'– ';color:var(--dorado);font-weight:700;}
+.rec-body ul li::before{content:'– ';color:#C49A28;font-weight:700;}
 .rec-body ul ul{padding-left:0;width:100%;margin-top:3px;margin-bottom:2px;}
-.rec-body ul ul li::before{content:'·';color:#94a3b8;}
-.footer-note{border-top:2px solid var(--dorado);padding:4px 12px;margin-top:3px;text-align:center;font-size:7.5pt;color:var(--sub);page-break-before:avoid;page-break-inside:avoid;break-before:avoid;}
-.footer-note strong{color:var(--azul);}
+.rec-body ul ul li{color:#1a2940;}
+.rec-body ul ul li::before{content:'· ';color:#94a3b8;}
+.footer-note{border-top:2px solid #C49A28;padding:4px 12px;margin-top:3px;text-align:center;font-size:7.5pt;color:#64748b;page-break-before:avoid;page-break-inside:avoid;break-before:avoid;}
+.footer-note strong{color:#0B2545;}
 .page-foot{page-break-before:avoid;page-break-inside:avoid;break-before:avoid;}
 @media print{body{background:#fff;}.page{margin:0;box-shadow:none;}}
 .page + .page { break-before: page; }
@@ -238,12 +239,12 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   <div class="sec-title">Conclusiones</div>
   <div class="sec-body" style="padding:8px 14px">Se concluye que mecánicamente el equipo <strong>GRÚA MÓVIL TELESCÓPICA GROVE GMK 3050-2</strong>, No. de Serie <strong>GR-2019-GMK-00458</strong>, es apto para realizar las operaciones para lo cual fue diseñado, con apego a la normatividad aplicable, tabla de capacidades y especificaciones del fabricante.</div>
 
-  <table class="result-row" style="margin-top:6px;width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;" cellpadding="0" cellspacing="0"><tr>
+  <table class="result-row" style="margin-top:6px;width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
     <td class="result-cell"><div class="result-lbl">Resultado de la Inspección</div><div class="badge badge-ok"><span class="badge-dot"></span> SATISFACTORIA</div></td>
     <td class="result-cell" style="border-right:none;"><div class="result-lbl">Estado del Equipo · Equipment Status</div><div class="badge badge-op"><span class="badge-dot"></span> OPERATIVO</div></td>
   </tr></table>
-  <table class="sig-row" style="width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;" cellpadding="0" cellspacing="0"><tr>
-    <td class="sig-cell" style="border-right:1px solid var(--borde);"><div class="sig-role">Firma del Inspector · Realizado Por</div><div class="sig-line"></div><div class="sig-name">ING. CARLOS HDEZ. RAMÍREZ</div><div class="sig-detail">Inspector-607695-27940089</div></td>
+  <table class="sig-row" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
+    <td class="sig-cell" style="border-right:1px solid #cdd8e3;"><div class="sig-role">Firma del Inspector · Realizado Por</div><div class="sig-line"></div><div class="sig-name">ING. CARLOS HDEZ. RAMÍREZ</div><div class="sig-detail">Inspector-607695-27940089</div></td>
     <td class="sig-cell" style="border-right:none;"><div class="sig-role">Aprobado Por</div><div class="sig-line"></div><div class="sig-name">ING. JOSÉ MARCOS GONZÁLEZ CALDERÓN</div><div class="sig-detail">Director General</div></td>
   </tr></table>
   <table class="page-foot" style="margin-top:1px;width:100%;" cellpadding="0" cellspacing="0"><tr>
@@ -384,9 +385,9 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 
     <div class="sec-title">Prueba de Carga <span style="font-size:7pt;font-weight:400;opacity:.6;margin-left:6px">· Load Test</span></div>
     <div class="sec-body" style="padding:0">
-      <table class="pc-header-strip" style="width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;" cellpadding="0" cellspacing="0"><tr>
+      <table class="pc-header-strip" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
         <td class="pc-equip-cell"><div class="pc-equip-lbl">Equipo Inspeccionado</div><div class="pc-equip-val">GRÚA MÓVIL TELESCÓPICA · GROVE GMK 3050-2</div></td>
-        <td class="pc-equip-cell" style="width:110px;border-right:1px solid var(--borde);"><div class="pc-equip-lbl">Capacidad Nominal</div><div class="pc-equip-val">50 TON</div></td>
+        <td class="pc-equip-cell" style="width:110px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Capacidad Nominal</div><div class="pc-equip-val">50 TON</div></td>
         <td class="pc-equip-cell" style="width:120px;border-right:none;"><div class="pc-equip-lbl">Fecha de Prueba</div><div class="pc-equip-val">15 / 05 / 2026</div></td>
       </tr></table>
       <table class="pc-table">
@@ -401,25 +402,25 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
         <tbody>
           <tr class="pc-row-sin">
             <td class="pc-td-desc"><span class="pc-test-badge pc-badge-sin">⬜ Sin Carga</span></td>
-            <td class="pc-td" style="color:var(--sub);font-style:italic;font-size:7.5pt">— (pluma vertical)</td>
-            <td class="pc-td"><div style="font-weight:700;color:var(--azul)">10.8 m</div><span class="pc-input-hint">↑ ingresado</span></td>
+            <td class="pc-td" style="color:#64748b;font-style:italic;font-size:7.5pt">— (pluma vertical)</td>
+            <td class="pc-td"><div style="font-weight:700;color:#0B2545">10.8 m</div><span class="pc-input-hint">↑ ingresado</span></td>
             <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">90°</span></div><span class="pc-input-hint">pluma vertical</span></td>
             <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">10.8</span><span class="pc-calc-unit">m</span></div><span class="pc-input-hint">= longitud pluma</span></td>
             <td class="pc-td"><span class="pc-ok-badge">✔ CUMPLE</span></td>
           </tr>
           <tr class="pc-row-con">
             <td class="pc-td-desc"><span class="pc-test-badge pc-badge-con">⬛ Con Carga</span></td>
-            <td class="pc-td"><div style="font-weight:700;color:var(--azul-l)">6.0 m</div><span class="pc-input-hint">↑ ingresado</span></td>
-            <td class="pc-td"><div style="font-weight:700;color:var(--azul-l)">10.8 m</div><span class="pc-input-hint">↑ ingresado</span></td>
+            <td class="pc-td"><div style="font-weight:700;color:#1e5fa8">6.0 m</div><span class="pc-input-hint">↑ ingresado</span></td>
+            <td class="pc-td"><div style="font-weight:700;color:#1e5fa8">10.8 m</div><span class="pc-input-hint">↑ ingresado</span></td>
             <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">56.3°</span></div><span class="pc-input-hint">arccos(r/L)</span></td>
             <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">8.98</span><span class="pc-calc-unit">m</span></div><span class="pc-input-hint">√(L²−r²)</span></td>
             <td class="pc-td"><span class="pc-ok-badge">✔ CUMPLE</span></td>
           </tr>
         </tbody>
       </table>
-      <table class="pc-diagram-row" style="width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;background:linear-gradient(135deg,#f4f8ff,#e8f0fb);" cellpadding="0" cellspacing="0">
+      <table class="pc-diagram-row" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;background:linear-gradient(135deg,#f4f8ff,#e8f0fb);" cellpadding="0" cellspacing="0">
         <tr>
-          <td rowspan="2" style="width:175px;padding:6px;border-right:1px solid var(--borde);vertical-align:middle;text-align:center;"><svg viewBox="0 0 180 140" xmlns="http://www.w3.org/2000/svg" style="width:163px;height:127px;display:block">
+          <td rowspan="2" style="width:175px;padding:6px;border-right:1px solid #cdd8e3;vertical-align:middle;text-align:center;"><svg viewBox="0 0 180 140" xmlns="http://www.w3.org/2000/svg" style="width:163px;height:127px;display:block">
   <defs><path id="boom-path2" d="M 42.0,102.0 L 98.0,37.2"/></defs>
   <line x1="2" y1="123" x2="178" y2="123" stroke="#cdd8e3" stroke-width="2.5"/>
   <rect x="2" y="123" width="176" height="10" fill="#e8edf3"/>
@@ -456,19 +457,19 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   <text x="89" y="113" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="8.5" font-weight="800" fill="#92400e">&#945; = 56.3&#176;</text>
   <text x="80" y="112" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="6.5" fill="#64748b">90°</text>
 </svg></td>
-          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid var(--borde);border-right:1px solid var(--borde);"><div class="pc-diag-lbl">Radio de Operación <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">6.0<span class="unit">m</span></div></td>
-          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid var(--borde);border-right:none;"><div class="pc-diag-lbl">Longitud de Pluma <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">10.8<span class="unit">m</span></div></td>
+          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;border-right:1px solid #cdd8e3;"><div class="pc-diag-lbl">Radio de Operación <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">6.0<span class="unit">m</span></div></td>
+          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;border-right:none;"><div class="pc-diag-lbl">Longitud de Pluma <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">10.8<span class="unit">m</span></div></td>
         </tr>
         <tr>
-          <td class="pc-diag-cell" style="border-right:1px solid var(--borde);border-bottom:none;"><div class="pc-diag-lbl">Ángulo de Trabajo <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:var(--dorado)">56.3<span class="unit">°</span></div><div class="pc-diag-badge">✔ arccos(r / L)</div></td>
-          <td class="pc-diag-cell" style="border-right:none;border-bottom:none;"><div class="pc-diag-lbl">Altura de Izaje <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:var(--verde)">8.98<span class="unit">m</span></div><div class="pc-diag-badge">✔ √(L² − r²)</div></td>
+          <td class="pc-diag-cell" style="border-right:1px solid #cdd8e3;border-bottom:none;"><div class="pc-diag-lbl">Ángulo de Trabajo <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:#C49A28">56.3<span class="unit">°</span></div><div class="pc-diag-badge">✔ arccos(r / L)</div></td>
+          <td class="pc-diag-cell" style="border-right:none;border-bottom:none;"><div class="pc-diag-lbl">Altura de Izaje <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:#1a7a4a">8.98<span class="unit">m</span></div><div class="pc-diag-badge">✔ √(L² − r²)</div></td>
         </tr>
       </table>
       <div class="pc-obs-row">
         <div class="pc-obs-label">Observaciones</div>
         <div class="pc-obs-content">El equipo <strong>GROVE GMK 3050-2</strong> No. Serie <strong>GR-2019-GMK-00458</strong> respondió correctamente en ambas pruebas realizadas. Durante la prueba sin carga se verificó el funcionamiento de todos los sistemas (hidráulico, eléctrico y mecánico) sin detectar anomalías. En la prueba con carga a radio de operación de <strong>6.0 m</strong> y longitud de pluma de <strong>10.8 m</strong>, se obtuvo un ángulo de trabajo de <strong>56.3°</strong> y una altura de izaje efectiva de <strong>8.98 m</strong>. <strong>Sin observaciones de riesgo. El equipo se considera apto para operar bajo las condiciones inspeccionadas.</strong></div>
       </div>
-      <table class="pc-result-strip" style="width:100%;border-collapse:collapse;border:1px solid var(--borde);border-top:none;background:var(--azul);padding:0;" cellpadding="0" cellspacing="0"><tr>
+      <table class="pc-result-strip" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;background:#0B2545;padding:0;" cellpadding="0" cellspacing="0"><tr>
         <td style="padding:8px 14px;vertical-align:middle;"><div class="pc-result-left"><span class="pc-result-lbl">Resultado General de la Prueba de Carga</span><span class="pc-result-val">✔ PRUEBA APROBADA</span></div></td>
         <td style="padding:8px 14px;text-align:right;vertical-align:middle;"><div class="pc-norma">NOM-005-STPS-1998 · NOM-006-STPS-2014<br>ASME B30.5 · OSHA 1926.1412</div></td>
       </tr></table>
@@ -536,7 +537,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <li><span>Cualquier modificación o cambio importante en el equipo deberá ser reportado a AVBA Inspections y evaluado nuevamente.</span></li>
       <li><span>Este dictamen certifica que el equipo cumple con la normatividad aplicable, las especificaciones del fabricante y las condiciones seguras de operación en la fecha de inspección.</span></li>
     </ul></div></div>
-    <div class="footer-note"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong><br>Este dictamen es válido únicamente para las condiciones observadas en la fecha de inspección indicada. &nbsp;·&nbsp; Folio: <strong style="color:var(--dorado)">AB.45198-00247-2026MX</strong></div>
+    <div class="footer-note"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong><br>Este dictamen es válido únicamente para las condiciones observadas en la fecha de inspección indicada. &nbsp;·&nbsp; Folio: <strong style="color:#C49A28">AB.45198-00247-2026MX</strong></div>
   </div>
   <table class="page-foot" style="width:100%;" cellpadding="0" cellspacing="0"><tr>
     <td><span class="f-lbl">Vigencia hasta: 15 / 05 / 2027</span></td>
