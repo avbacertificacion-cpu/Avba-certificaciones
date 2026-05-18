@@ -183,15 +183,15 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 
   <div class="band-blue">
     Número de Certificado AVBA Inspections
-    <span class="cert-num">___________</span>
+    <span class="cert-num">{folio}</span>
   </div>
   <table class="data-table">
     <tr>
-      <td style="width:65%"><div class="cell-lbl">Nombre del Cliente <span class="cell-lbl-en">· Customer</span></div><div class="cell-val">___________</div></td>
-      <td><div class="cell-lbl">Unidad de Inspección</div><div class="cell-val">___________</div></td>
+      <td style="width:65%"><div class="cell-lbl">Nombre del Cliente <span class="cell-lbl-en">· Customer</span></div><div class="cell-val">{cliente}</div></td>
+      <td><div class="cell-lbl">Unidad de Inspección</div><div class="cell-val">{tipo_maquinaria}</div></td>
     </tr>
     <tr>
-      <td colspan="2"><div class="cell-lbl">Domicilio / Lugar de Inspección <span class="cell-lbl-en">· Address</span></div><div class="cell-val">___________</div></td>
+      <td colspan="2"><div class="cell-lbl">Domicilio / Lugar de Inspección <span class="cell-lbl-en">· Address</span></div><div class="cell-val">{domicilio}</div></td>
     </tr>
   </table>
 
@@ -199,14 +199,14 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   <table class="data-table">
     <tr>
       <td style="width:32%"><div class="cell-lbl">Tipo de Maquinaria</div><div class="cell-val">GRÚA TORRE</div></td>
-      <td style="width:13%"><div class="cell-lbl">Capacidad</div><div class="cell-val">___________</div></td>
-      <td style="width:13%"><div class="cell-lbl">Marca</div><div class="cell-val">___________</div></td>
-      <td style="width:20%"><div class="cell-lbl">Modelo</div><div class="cell-val">___________</div></td>
-      <td><div class="cell-lbl">No. Serie</div><div class="cell-val">___________</div></td>
+      <td style="width:13%"><div class="cell-lbl">Capacidad</div><div class="cell-val">{capacidad}</div></td>
+      <td style="width:13%"><div class="cell-lbl">Marca</div><div class="cell-val">{marca}</div></td>
+      <td style="width:20%"><div class="cell-lbl">Modelo</div><div class="cell-val">{modelo}</div></td>
+      <td><div class="cell-lbl">No. Serie</div><div class="cell-val">{no_serie}</div></td>
     </tr>
     <tr>
-      <td colspan="2"><div class="cell-lbl">No. Identificación <span class="cell-lbl-en">· ID</span></div><div class="cell-val">___________</div></td>
-      <td colspan="3"><div class="cell-lbl">Fecha de Inspección <span class="cell-lbl-en">· Issue Date</span></div><div class="cell-val">___________</div></td>
+      <td colspan="2"><div class="cell-lbl">No. Identificación <span class="cell-lbl-en">· ID</span></div><div class="cell-val">{no_identificacion}</div></td>
+      <td colspan="3"><div class="cell-lbl">Fecha de Inspección <span class="cell-lbl-en">· Issue Date</span></div><div class="cell-val">{fecha_inspeccion}</div></td>
     </tr>
   </table>
 
@@ -235,7 +235,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 </table></div>
 
   <div class="sec-title">Conclusiones</div>
-  <div class="sec-body" style="padding:8px 14px">Se concluye que mecánicamente el equipo <strong>GRÚA TORRE ___________</strong>, No. de Serie <strong>___________</strong>, es apto para realizar las operaciones para lo cual fue diseñado, con apego a la normatividad aplicable, tabla de capacidades y especificaciones del fabricante.</div>
+  <div class="sec-body" style="padding:8px 14px">Se concluye que mecánicamente el equipo <strong>GRÚA TORRE {marca} {modelo}</strong>, No. de Serie <strong>{no_serie}</strong>, es apto para realizar las operaciones para lo cual fue diseñado, con apego a la normatividad aplicable, tabla de capacidades y especificaciones del fabricante.</div>
 
   <table class="result-row" style="margin-top:6px;width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
     <td class="result-cell"><div class="result-lbl">Resultado de la Inspección</div><table style="margin:0 auto;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tr><td style="background:#e6f7ef;color:#1a7a4a;border:1.5px solid #34c472;padding:4px 14px;font-size:9.5pt;font-weight:700;letter-spacing:.5px;"><svg style="width:8px;height:8px;display:inline-block;vertical-align:middle;margin-right:4px;" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#1a7a4a"/></svg>SATISFACTORIA</td></tr></table></td>
@@ -270,8 +270,8 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   </tr></table>
   <table class="page-foot" style="margin-top:1px;width:100%;" cellpadding="0" cellspacing="0"><tr>
     <td><span class="f-lbl">Folio de Control</span></td>
-    <td style="text-align:center;"><span class="f-val">___________</span></td>
-    <td style="text-align:right;"><span class="f-lbl">Vigencia: ___________ · Página 1 de 3</span></td>
+    <td style="text-align:center;"><span class="f-val">{folio}</span></td>
+    <td style="text-align:right;"><span class="f-lbl">Vigencia: {vigencia} · Página 1 de 3</span></td>
   </tr></table>
 </div>
 
@@ -415,9 +415,9 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     <div class="sec-body" style="padding:0">
       <table class="pc-header-strip" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
         <td class="pc-equip-cell"><div class="pc-equip-lbl">Equipo Inspeccionado</div><div class="pc-equip-val">Equipo Inspeccionado: GRÚA TORRE · [Marca/Modelo]</div></td>
-        <td class="pc-equip-cell" style="width:110px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Capacidad Nominal</div><div class="pc-equip-val">___________</div></td>
+        <td class="pc-equip-cell" style="width:110px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Capacidad Nominal</div><div class="pc-equip-val">{capacidad}</div></td>
         <td class="pc-equip-cell" style="width:115px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Peso de Prueba</div><div class="pc-equip-val">___________</div></td>
-        <td class="pc-equip-cell" style="width:120px;border-right:none;"><div class="pc-equip-lbl">Fecha de Prueba</div><div class="pc-equip-val">___________</div></td>
+        <td class="pc-equip-cell" style="width:120px;border-right:none;"><div class="pc-equip-lbl">Fecha de Prueba</div><div class="pc-equip-val">{fecha_inspeccion}</div></td>
       </tr></table>
       <table class="pc-table">
         <thead><tr class="pc-thead-row">
@@ -460,8 +460,8 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   </div>
   <table class="page-foot" style="margin-top:6px;width:100%;" cellpadding="0" cellspacing="0"><tr>
     <td><span class="f-lbl">Folio</span></td>
-    <td style="text-align:center;"><span class="f-val">___________</span></td>
-    <td style="text-align:right;"><span class="f-lbl">Vigencia: ___________ · Página 2 de 3</span></td>
+    <td style="text-align:center;"><span class="f-val">{folio}</span></td>
+    <td style="text-align:right;"><span class="f-lbl">Vigencia: {vigencia} · Página 2 de 3</span></td>
   </tr></table>
 </div>
 
@@ -475,7 +475,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <div class="hdr-sep"></div>
       <div class="hdr-title-en">Recomendaciones Generales · General Recommendations</div>
     </td>
-  <td class="hdr-cert" width="64mm"><span class="hdr-cert-lbl">No. Certificado</span><span class="hdr-cert-val">___________</span></td>
+  <td class="hdr-cert" width="64mm"><span class="hdr-cert-lbl">No. Certificado</span><span class="hdr-cert-val">{folio}</span></td>
 </tr>
 </table>
   <div class="gold-bar"></div>
@@ -518,11 +518,11 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <li><span>Cualquier modificación o cambio importante en el equipo deberá ser reportado a AVBA Inspections y evaluado nuevamente.</span></li>
       <li><span>Este dictamen certifica que el equipo cumple con la normatividad aplicable, las especificaciones del fabricante y las condiciones seguras de operación en la fecha de inspección.</span></li>
     </ul></div></div>
-    <div class="footer-note"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong><br>Este dictamen es válido únicamente para las condiciones observadas en la fecha de inspección indicada. &nbsp;·&nbsp; Folio: <strong style="color:#C49A28">___________</strong></div>
+    <div class="footer-note"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong><br>Este dictamen es válido únicamente para las condiciones observadas en la fecha de inspección indicada. &nbsp;·&nbsp; Folio: <strong style="color:#C49A28">{folio}</strong></div>
   </div>
   <table class="page-foot" style="width:100%;" cellpadding="0" cellspacing="0"><tr>
-    <td><span class="f-lbl">Vigencia hasta: ___________</span></td>
-    <td style="text-align:center;"><span class="f-val">___________</span></td>
+    <td><span class="f-lbl">Vigencia hasta: {vigencia}</span></td>
+    <td style="text-align:center;"><span class="f-val">{folio}</span></td>
     <td style="text-align:right;"><span class="f-lbl">AVBA Inspections · Página 3 de 3</span></td>
   </tr></table>
 </div>
