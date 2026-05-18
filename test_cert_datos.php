@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
     $templates = [
         'equipos'    => __DIR__ . '/certificado_preview.html',
         'accesorios' => __DIR__ . '/certificado_accesorios_preview.html',
+        'personal'   => __DIR__ . '/certificado_personal_preview.html',
     ];
     $templatePath = $templates[$tipo] ?? $templates['equipos'];
 
@@ -24,46 +25,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
 
     $e = fn($k, $def = '') => htmlspecialchars(trim($_POST[$k] ?? $def), ENT_QUOTES, 'UTF-8');
 
-    $folio           = $e('folio',           'CERT-TEST-001');
-    $cliente         = $e('cliente',         'EMPRESA DE PRUEBA SA DE CV');
-    $domicilio       = $e('domicilio',       'AV. REFORMA 123, COL. CENTRO, CDMX CP 06600');
-    $fecha_inspeccion = $e('fecha_inspeccion', date('d/m/Y'));
-    $no_acreditacion  = $e('no_acreditacion',  '0147-I-0022');
+    $e_raw = fn($k, $def = '') => trim($_POST[$k] ?? $def);
+    $folio           = htmlspecialchars($e_raw('folio',           'CERT-TEST-001'),           ENT_QUOTES, 'UTF-8');
+    $no_acreditacion = htmlspecialchars($e_raw('no_acreditacion', '0147-I-0022'),             ENT_QUOTES, 'UTF-8');
+    $qr_placeholder  = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
 
-    // Vigencia = fecha inspección + 1 año
-    $vigencia = '';
-    try {
-        $fv = DateTime::createFromFormat('d/m/Y', $fecha_inspeccion)
-              ?: new DateTime($fecha_inspeccion);
-        $fv->modify('+1 year');
-        $vigencia = $fv->format('d/m/Y');
-    } catch (Exception $ex) {
-        $vigencia = '—';
-    }
+    $map = ['{folio}' => $folio, '{no_acreditacion}' => $no_acreditacion, '{qr_imagen}' => $qr_placeholder];
 
-    $qr_placeholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
+    if ($tipo === 'personal') {
+        // Personal certificate — different field names, no vigencia
+        $map['{participante}'] = htmlspecialchars($e_raw('participante', 'JUAN PÉREZ GARCÍA'),         ENT_QUOTES, 'UTF-8');
+        $map['{puesto}']       = htmlspecialchars($e_raw('puesto',       'OPERADOR DE MONTACARGAS'),   ENT_QUOTES, 'UTF-8');
+        $map['{curp}']         = htmlspecialchars($e_raw('curp',         'PEGJ850101HDFRRN09'),        ENT_QUOTES, 'UTF-8');
+        $map['{fecha_emision}']= htmlspecialchars($e_raw('fecha_emision', date('d/m/Y')),              ENT_QUOTES, 'UTF-8');
+        $map['{programa}']     = htmlspecialchars($e_raw('programa',     'OPERACIÓN SEGURA DE MONTACARGAS'), ENT_QUOTES, 'UTF-8');
+        $map['{empresa}']      = htmlspecialchars($e_raw('empresa',      'EMPRESA DE PRUEBA SA DE CV'),ENT_QUOTES, 'UTF-8');
+    } else {
+        // Equipment / accessories — shared cliente/domicilio/fecha/vigencia
+        $cliente          = htmlspecialchars($e_raw('cliente',          'EMPRESA DE PRUEBA SA DE CV'),          ENT_QUOTES, 'UTF-8');
+        $domicilio        = htmlspecialchars($e_raw('domicilio',        'AV. REFORMA 123, COL. CENTRO, CDMX CP 06600'), ENT_QUOTES, 'UTF-8');
+        $fecha_inspeccion = htmlspecialchars($e_raw('fecha_inspeccion', date('d/m/Y')),                          ENT_QUOTES, 'UTF-8');
 
-    // Campos comunes
-    $map = [
-        '{folio}'           => $folio,
-        '{cliente}'         => $cliente,
-        '{domicilio}'       => $domicilio,
-        '{fecha_inspeccion}'=> $fecha_inspeccion,
-        '{vigencia}'        => $vigencia,
-        '{no_acreditacion}' => $no_acreditacion,
-        '{qr_imagen}'       => $qr_placeholder,
-    ];
+        $vigencia = '';
+        try {
+            $fv = DateTime::createFromFormat('d/m/Y', $fecha_inspeccion) ?: new DateTime($fecha_inspeccion);
+            $fv->modify('+1 year');
+            $vigencia = $fv->format('d/m/Y');
+        } catch (Exception $ex) { $vigencia = '—'; }
 
-    // Campos específicos por tipo
-    if ($tipo === 'equipos') {
-        $map['{tipo_maquinaria}']   = $e('tipo_maquinaria',   'MONTACARGAS ELÉCTRICO');
-        $map['{capacidad}']         = $e('capacidad',         '3,000 KG');
-        $map['{marca}']             = $e('marca',             'TOYOTA');
-        $map['{modelo}']            = $e('modelo',            '8FGU30');
-        $map['{no_serie}']          = $e('no_serie',          '8FGU30-00001');
-        $map['{no_identificacion}'] = $e('no_identificacion', 'MF-001');
-    } elseif ($tipo === 'accesorios') {
-        $map['{resumen_items}'] = $e('resumen_items', '3 eslingas cadena G80 / 2 grilletes forjados 3/4" / 1 gancho de seguridad');
+        $map['{cliente}']          = $cliente;
+        $map['{domicilio}']        = $domicilio;
+        $map['{fecha_inspeccion}'] = $fecha_inspeccion;
+        $map['{vigencia}']         = $vigencia;
+
+        if ($tipo === 'equipos') {
+            $map['{tipo_maquinaria}']   = htmlspecialchars($e_raw('tipo_maquinaria',   'MONTACARGAS ELÉCTRICO'), ENT_QUOTES, 'UTF-8');
+            $map['{capacidad}']         = htmlspecialchars($e_raw('capacidad',         '3,000 KG'),             ENT_QUOTES, 'UTF-8');
+            $map['{marca}']             = htmlspecialchars($e_raw('marca',             'TOYOTA'),               ENT_QUOTES, 'UTF-8');
+            $map['{modelo}']            = htmlspecialchars($e_raw('modelo',            '8FGU30'),               ENT_QUOTES, 'UTF-8');
+            $map['{no_serie}']          = htmlspecialchars($e_raw('no_serie',          '8FGU30-00001'),         ENT_QUOTES, 'UTF-8');
+            $map['{no_identificacion}'] = htmlspecialchars($e_raw('no_identificacion', 'MF-001'),               ENT_QUOTES, 'UTF-8');
+        } elseif ($tipo === 'accesorios') {
+            $map['{resumen_items}'] = htmlspecialchars($e_raw('resumen_items', '3 eslingas cadena G80 / 2 grilletes forjados 3/4"'), ENT_QUOTES, 'UTF-8');
+        }
     }
 
     $html = file_get_contents($templatePath);
@@ -153,8 +157,9 @@ input[type=text]:focus, textarea:focus { outline: none; border-color: #2060a8; b
 <div class="card">
 
   <div class="tabs">
-    <a class="tab <?= $tipo_activo === 'equipos' ? 'active' : '' ?>" href="?tipo=equipos">Certificado de Equipos</a>
-    <a class="tab <?= $tipo_activo === 'accesorios' ? 'active' : '' ?>" href="?tipo=accesorios">Certificado de Accesorios</a>
+    <a class="tab <?= $tipo_activo === 'equipos'    ? 'active' : '' ?>" href="?tipo=equipos">Equipos</a>
+    <a class="tab <?= $tipo_activo === 'accesorios' ? 'active' : '' ?>" href="?tipo=accesorios">Accesorios</a>
+    <a class="tab <?= $tipo_activo === 'personal'   ? 'active' : '' ?>" href="?tipo=personal">Personal</a>
   </div>
 
   <div class="form-body">
@@ -245,6 +250,49 @@ input[type=text]:focus, textarea:focus { outline: none; border-color: #2060a8; b
       <div class="info-row">
         <strong>Plantilla:</strong> certificado_accesorios_preview.html &nbsp;·&nbsp;
         <strong>Vigencia:</strong> +1 año a la fecha de inspección
+      </div>
+    </form>
+
+<?php elseif ($tipo_activo === 'personal'): ?>
+
+    <h1>Certificado de Personal — Prueba</h1>
+    <p class="subtitle">Completa los datos y genera el PDF para verificar en Hostinger</p>
+
+    <form method="POST" target="_blank">
+      <input type="hidden" name="tipo" value="personal">
+
+      <div class="section-title">Identificación del certificado</div>
+      <div class="grid grid-2">
+        <div><label>Folio</label><input type="text" name="folio" value="PER-TEST-001"></div>
+        <div><label>No. Acreditación EMA</label><input type="text" name="no_acreditacion" value="0147-I-0022"></div>
+      </div>
+
+      <div class="section-title">Datos del participante</div>
+      <div class="grid">
+        <div><label>Nombre completo</label><input type="text" name="participante" value="JUAN PÉREZ GARCÍA"></div>
+      </div>
+      <div class="grid grid-2">
+        <div><label>Puesto</label><input type="text" name="puesto" value="OPERADOR DE MONTACARGAS"></div>
+        <div><label>CURP</label><input type="text" name="curp" value="PEGJ850101HDFRRN09"></div>
+      </div>
+      <div class="grid grid-2">
+        <div><label>Empresa</label><input type="text" name="empresa" value="EMPRESA DE PRUEBA SA DE CV"></div>
+        <div><label>Fecha de emisión (dd/mm/aaaa)</label><input type="text" name="fecha_emision" value="<?= date('d/m/Y') ?>"></div>
+      </div>
+
+      <div class="section-title">Programa</div>
+      <div class="grid">
+        <div><label>Programa acreditado satisfactoriamente</label><input type="text" name="programa" value="OPERACIÓN SEGURA DE MONTACARGAS"></div>
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-primary" type="submit" name="accion" value="ver">▶ Ver PDF</button>
+        <button class="btn btn-secondary" type="submit" name="accion" value="descargar">⬇ Descargar PDF</button>
+      </div>
+
+      <div class="info-row">
+        <strong>Plantilla:</strong> certificado_personal_preview.html &nbsp;·&nbsp;
+        <strong>Sin vigencia</strong> (certificado de capacitación)
       </div>
     </form>
 
