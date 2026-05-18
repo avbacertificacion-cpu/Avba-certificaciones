@@ -55,17 +55,17 @@
   .sb-tipo { border:2px solid #C9A84C; border-radius:3px; padding:2.5mm 4mm; margin-top:0; font-size:7pt; font-weight:bold; color:#0d2244; text-transform:uppercase; letter-spacing:0.5px; line-height:1.7; }
 
   /* Content fields */
-  .flabel { font-size:7pt; font-weight:bold; color:#5070a0; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:1.5mm; }
-  .fval   { font-size:10.5pt; color:#0d1a2a; font-weight:700; border-bottom:1.5px solid #b0c8d8; padding-bottom:8mm; margin-bottom:4mm; line-height:1.5; }
-  .fval.lg{ font-size:12pt; padding-bottom:9mm; }
-  .fdiv   { height:1px; background:#c8d8e8; margin:4mm 0 5mm; }
+  .flabel { font-size:7pt; font-weight:bold; color:#5070a0; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:1.5mm; margin-top:0; }
+  .fval   { font-size:10.5pt; color:#0d1a2a; font-weight:700; border-bottom:1.5px solid #b0c8d8; padding-bottom:5mm; margin-bottom:2mm; line-height:1.5; }
+  .fval.lg{ font-size:12pt; padding-bottom:6mm; }
+  .fdiv   { height:1px; background:#c8d8e8; margin:5mm 0 6mm; }
 
   /* Text paragraphs */
-  .ctext { font-size:9pt; color:#1a2a3a; line-height:1.75; margin-bottom:4.5mm; text-align:justify; }
+  .ctext { font-size:9pt; color:#1a2a3a; line-height:1.85; margin-bottom:5mm; text-align:justify; }
   .ctext strong { font-weight:700; color:#0d1a2a; }
 
   /* SEGURAS block */
-  .seguras-block { color:#1a5580; padding:3mm 4mm 3mm 6mm; border-left:4px solid #2060a8; margin-left:2mm; margin-bottom:4mm; font-size:9.5pt; line-height:1.65; }
+  .seguras-block { color:#1a5580; padding:3.5mm 4mm 3.5mm 6mm; border-left:4px solid #2060a8; margin-left:2mm; margin-bottom:4.5mm; font-size:9.5pt; line-height:1.7; }
   .seguras-block strong { color:#1a5580; }
   /* Italic disclaimer */
   .italic-note { font-size:8.5pt; color:#2060a8; font-style:italic; margin-top:3mm; line-height:1.5; }
@@ -151,16 +151,16 @@
 
     <!-- CLIENTE -->
     <div class="flabel">CLIENTE - Customer</div>
-    <div class="fval lg">{cliente}</div>
+    <div class="fval lg" style="margin-bottom:5mm;">{cliente}</div>
 
     <!-- DOMICILIO -->
     <div class="flabel">DOMICILIO - Address</div>
-    <div class="fval">{domicilio}</div>
+    <div class="fval" style="margin-bottom:5mm;">{domicilio}</div>
 
     <div class="fdiv"></div>
 
     <!-- MAQUINARIA + CAPACIDAD -->
-    <table width="100%" cellpadding="0" cellspacing="0">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:5mm;">
     <tr>
       <td style="width:62%;padding-right:4mm;vertical-align:top;">
         <div class="flabel">MAQUINARIA - Machinery</div>
@@ -174,7 +174,7 @@
     </table>
 
     <!-- MARCA + MODELO + NO.SERIE -->
-    <table width="100%" cellpadding="0" cellspacing="0">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:5mm;">
     <tr>
       <td style="width:34%;padding-right:3mm;vertical-align:top;">
         <div class="flabel">MARCA - Manufacturer</div>
@@ -192,7 +192,7 @@
     </table>
 
     <!-- NO.IDENTIFICACIÓN + FECHA -->
-    <table width="100%" cellpadding="0" cellspacing="0">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:2mm;">
     <tr>
       <td style="width:50%;padding-right:4mm;vertical-align:top;">
         <div class="flabel">NO. IDENTIFICACIÓN - ID Number</div>
