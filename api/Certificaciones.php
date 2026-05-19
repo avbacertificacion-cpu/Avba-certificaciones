@@ -1169,50 +1169,34 @@ SVG;
 
         $total = count($fotos);
 
-        if ($total === 9) {
-            // Todas las fotos presentes: reemplazar cada placeholder en su posición original
-            $idx = 0;
-            $html = preg_replace_callback(
-                '/<div\s+class="foto-placeholder"[^>]*>.*?<\/div>/s',
-                function ($match) use ($fotos, &$idx) {
-                    if (!isset($fotos[$idx])) { $idx++; return $match[0]; }
-                    $f = $fotos[$idx++];
-                    return "<div class=\"foto-placeholder\" style=\"padding:2px;background:#fff;display:flex;align-items:center;justify-content:center;min-height:90px\">"
-                         . "<img src=\"data:{$f['mime']};base64,{$f['b64']}\" style=\"max-width:100%;max-height:110px;object-fit:contain;display:block;\">"
-                         . "</div>";
-                },
-                $html
-            );
-        } else {
-            // Fotos parciales: reconstruir la sección como cuadrícula general (sin sub-títulos ni descripciones)
-            $filas = '';
-            foreach (array_chunk($fotos, 3) as $fila) {
-                $filas .= '<tr>';
-                foreach ($fila as $f) {
-                    $filas .= '<td class="foto-card" style="padding:4px;text-align:center;vertical-align:middle;">'
-                            . "<img src=\"data:{$f['mime']};base64,{$f['b64']}\" "
-                            . 'style="max-width:100%;max-height:120px;object-fit:contain;display:block;margin:0 auto;">'
-                            . '</td>';
-                }
-                // Rellenar celdas vacías en la última fila
-                $vacias = 3 - count($fila);
-                for ($i = 0; $i < $vacias; $i++) {
-                    $filas .= '<td class="foto-card" style="background:#f9fafb;"></td>';
-                }
-                $filas .= '</tr>';
+        // Siempre reconstruir como cuadrícula general (sin sub-títulos ni descripciones)
+        $filas = '';
+        foreach (array_chunk($fotos, 3) as $fila) {
+            $filas .= '<tr>';
+            foreach ($fila as $f) {
+                $filas .= '<td class="foto-card" style="padding:4px;text-align:center;vertical-align:middle;">'
+                        . "<img src=\"data:{$f['mime']};base64,{$f['b64']}\" "
+                        . 'style="max-width:100%;max-height:120px;object-fit:contain;display:block;margin:0 auto;">'
+                        . '</td>';
             }
-
-            $nuevaSeccion = '<table width="100%" cellpadding="0" cellspacing="0" '
-                          . 'style="border-collapse:collapse;border:1px solid #cdd8e3;">'
-                          . $filas . '</table>';
-
-            // Reemplazar desde <div class="foto-section-title"> hasta el cierre de foto-grid-ganchos
-            $html = preg_replace(
-                '/<div\s+class="foto-section-title"[^>]*>.*?<table\s[^>]*class="foto-grid-ganchos"[^>]*>.*?<\/table>/s',
-                $nuevaSeccion,
-                $html
-            );
+            // Rellenar celdas vacías en la última fila
+            $vacias = 3 - count($fila);
+            for ($i = 0; $i < $vacias; $i++) {
+                $filas .= '<td class="foto-card" style="background:#f9fafb;"></td>';
+            }
+            $filas .= '</tr>';
         }
+
+        $nuevaSeccion = '<table width="100%" cellpadding="0" cellspacing="0" '
+                      . 'style="border-collapse:collapse;border:1px solid #cdd8e3;">'
+                      . $filas . '</table>';
+
+        // Reemplazar desde <div class="foto-section-title"> hasta el cierre de foto-grid-ganchos
+        $html = preg_replace(
+            '/<div\s+class="foto-section-title"[^>]*>.*?<table\s[^>]*class="foto-grid-ganchos"[^>]*>.*?<\/table>/s',
+            $nuevaSeccion,
+            $html
+        );
 
         // Actualizar el contador de evidencias en el título de sección
         $html = str_replace(
