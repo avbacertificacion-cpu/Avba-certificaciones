@@ -1364,7 +1364,7 @@ SVG;
 
         ini_set('pcre.backtrack_limit', $prevBacktrack);
 
-        $mpdf->SetProtection(['print', 'print-hi'], '', 'Avba@Cert2024!');
+        $mpdf->SetProtection(['print'], '', 'Avba@Cert2024!');
 
         $nombre  = $sufijo . '_AVBA_' . $folio . '.pdf';
         $destino = $rutaDir . $nombre;
