@@ -519,7 +519,7 @@ class Certificaciones {
                 }
             }
 
-            $pdf->Output('F', $rutaPdf);
+            file_put_contents($rutaPdf, protegerPdf($pdf->Output('S')));
 
             return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
 
@@ -1369,6 +1369,8 @@ SVG;
 
         ini_set('pcre.backtrack_limit', $prevBacktrack);
 
+        $mpdf->SetProtection(['print', 'print-hi'], '', 'Avba@Cert2024!');
+
         $nombre  = $sufijo . '_AVBA_' . $folio . '.pdf';
         $destino = $rutaDir . $nombre;
         $mpdf->Output($destino, 'F');
@@ -1463,7 +1465,7 @@ SVG;
         if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
 
         $destino = $rutaDir . $nombre;
-        file_put_contents($destino, $dompdf->output());
+        file_put_contents($destino, protegerPdf($dompdf->output()));
         return $destino;
     }
 
@@ -2008,7 +2010,7 @@ HTML;
                 }
             }
 
-            $pdf->Output('F', $rufaPdf);
+            file_put_contents($rufaPdf, protegerPdf($pdf->Output('S')));
             return ['status' => 'success', 'url' => UPLOAD_URL . 'personal/docs/' . basename($rufaPdf)];
 
         } catch (\Exception $e) {
@@ -2124,7 +2126,7 @@ HTML;
                 }
             }
 
-            $pdf->Output('F', $rutaPdf);
+            file_put_contents($rutaPdf, protegerPdf($pdf->Output('S')));
             return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
 
         } catch (\Exception $e) {

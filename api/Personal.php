@@ -679,7 +679,7 @@ class Personal {
         if (!is_dir($dir)) mkdir($dir, 0755, true);
 
         $nombre = strtoupper($tipo) . '_' . $folio . '_' . date('Ymd_His') . '.pdf';
-        file_put_contents($dir . $nombre, $dompdf->output());
+        file_put_contents($dir . $nombre, protegerPdf($dompdf->output()));
 
         return UPLOAD_URL . 'personal/docs/' . $nombre;
     }

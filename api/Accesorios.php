@@ -464,7 +464,7 @@ class Accesorios {
         if (!is_dir($dir)) mkdir($dir, 0755, true);
 
         $nombre = 'PREVIEW_INFORME_ACC.pdf';
-        file_put_contents($dir . $nombre, $pdf->output());
+        file_put_contents($dir . $nombre, protegerPdf($pdf->output()));
 
         return ['status' => 'success', 'url' => 'uploads/reportes/' . $nombre];
     }
@@ -588,7 +588,7 @@ class Accesorios {
         $dir = __DIR__ . '/../uploads/reportes/';
         if (!is_dir($dir)) mkdir($dir, 0755, true);
         $nombre = 'PREVIEW_CERT_ACC.pdf';
-        $pdf->Output('F', $dir . $nombre);
+        file_put_contents($dir . $nombre, protegerPdf($pdf->Output('S')));
         return ['status' => 'success', 'url' => 'uploads/reportes/' . $nombre];
 
         } catch (\Exception $e) {
@@ -676,7 +676,7 @@ class Accesorios {
 
         $nombre  = $folio . '_' . date('Ymd_His') . '.pdf';
         $rutaAbs = $dir . $nombre;
-        file_put_contents($rutaAbs, $pdf->output());
+        file_put_contents($rutaAbs, protegerPdf($pdf->output()));
 
         return [
             'status' => 'success',
@@ -806,7 +806,7 @@ class Accesorios {
         $dir = __DIR__ . '/../uploads/reportes/';
         if (!is_dir($dir)) mkdir($dir, 0755, true);
         $nombre = $folio . '_CERT_' . date('Ymd_His') . '.pdf';
-        $pdf->Output('F', $dir . $nombre);
+        file_put_contents($dir . $nombre, protegerPdf($pdf->Output('S')));
 
         return ['status' => 'success', 'url' => 'uploads/reportes/' . $nombre, 'folio' => $folio];
     }
@@ -891,7 +891,7 @@ class Accesorios {
         $dir = __DIR__ . '/../uploads/reportes/';
         if (!is_dir($dir)) mkdir($dir, 0755, true);
         $nombre = $folio . '_' . date('Ymd_His') . '.pdf';
-        file_put_contents($dir . $nombre, $pdf->output());
+        file_put_contents($dir . $nombre, protegerPdf($pdf->output()));
 
         return ['status' => 'success', 'url' => 'uploads/reportes/' . $nombre, 'folio' => $folio];
     }
