@@ -1916,7 +1916,7 @@ function ver(fila) {
     <div class="field"><label>Marca</label>      <input id="e-marca"     value="${esc(d.marca)}"      ${dis}></div>
     <div class="field"><label>Modelo</label>     <input id="e-modelo"    value="${esc(d.modelo)}"     ${dis}></div>
     <div class="field"><label>No. de serie</label><input id="e-serie"   value="${esc(d.serie)}"      ${dis}></div>
-    <div class="field"><label>ID del equipo</label><input id="e-id"     value="${esc(d.id)}"         ${dis}></div>
+    <div class="field"><label>ID del equipo</label><input id="e-id"     value="${esc(d.id_equipo || '')}" ${dis}></div>
     <div class="field"><label>Fecha</label>       <input id="e-fecha"   value="${esc(d.fecha)}"      ${dis}></div>
     <div class="field"><label>Capacidad</label>   <input id="e-capacidad" value="${esc(d.capacidad || '')}" ${dis}></div>
   </div>`;
@@ -2035,7 +2035,7 @@ async function guardar() {
     marca:      document.getElementById("e-marca")?.value    || "",
     modelo:     document.getElementById("e-modelo")?.value   || "",
     serie:      document.getElementById("e-serie")?.value    || "",
-    id:         document.getElementById("e-id")?.value       || "",
+    id_equipo:  document.getElementById("e-id")?.value       || "",
     fecha:      document.getElementById("e-fecha")?.value    || "",
     correo:     document.getElementById("e-correo")?.value   || "",
     direccion:  document.getElementById("e-direccion")?.value  || "",
