@@ -107,80 +107,25 @@ class Certificaciones {
             }
         }
 
-        // Para certificados: intentar con la plantilla HTML + mPDF antes que Word
+        // Para certificados: plantilla HTML + mPDF (única estrategia — sin Word)
+        if (!class_exists('\\Mpdf\\Mpdf') && file_exists(__DIR__ . '/../vendor/autoload.php')) {
+            require_once __DIR__ . '/../vendor/autoload.php';
+        }
+
+        // QR como base64; si falla la descarga se genera sin imagen QR
         try {
-            // Cargar autoloader para mPDF (si aún no está cargado)
-            if (!class_exists('\\Mpdf\\Mpdf') && file_exists(__DIR__ . '/../vendor/autoload.php')) {
-                require_once __DIR__ . '/../vendor/autoload.php';
-            }
+            $qrB64 = $this->descargarQrB64($datos['qr_codigo'] ?? '');
+        } catch (\Exception $qrEx) {
+            $qrB64 = '';
+        }
 
-            // QR como base64; si falla la descarga se genera el cert sin imagen QR
-            try {
-                $qrB64 = $this->descargarQrB64($datos['qr_codigo'] ?? '');
-            } catch (\Exception $qrEx) {
-                $qrB64 = '';
-            }
-
+        try {
             $html    = $this->renderCertTemplate($datos, $qrB64);
             $folio   = $datos['control'] ?? (string)$id;
             $rutaPdf = $this->htmlToPdfMpdf($html, $folio, 'CERT');
             return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdf)];
         } catch (\Exception $e) {
-            // Continuar con el flujo Word si falla
-        }
-
-        // Si no hay plantilla PDF configurada y tampoco vendor/, no podemos continuar
-        if (!file_exists(__DIR__ . '/../vendor/autoload.php')) {
-            return ['status' => 'error',
-                    'message' => 'No hay plantilla PDF configurada para este tipo de equipo. '
-                               . 'Súbela desde Calidad → Tipos de Equipo → Plantillas PDF.'];
-        }
-
-        try {
-            $tipoPDF     = ($tipo === 'dict') ? 'dictamen' : 'certificado';
-            $rutaDocx    = $this->resolverDocx($tipoPDF, $datos);
-            $rutaDir     = UPLOAD_DIR . 'certificados/';
-            $baseName    = pathinfo($rutaDocx, PATHINFO_FILENAME);
-            $rutaPdfProt = $rutaDir . $baseName . '_prot.pdf';
-            $ownerPass   = 'AVBA' . strtoupper(bin2hex(random_bytes(8)));
-
-            if (file_exists($rutaPdfProt)) @unlink($rutaPdfProt);
-
-            // ── Estrategia 1: microservicio ───────────────────
-            $serviceUrl = defined('CONVERT_SERVICE_URL') ? CONVERT_SERVICE_URL : '';
-            $serviceKey = defined('CONVERT_SERVICE_KEY') ? CONVERT_SERVICE_KEY : '';
-
-            if ($serviceUrl) {
-                $this->convertirViaServicio($rutaDocx, $rutaPdfProt, $serviceUrl, $serviceKey, $ownerPass);
-                if (file_exists($rutaPdfProt)) {
-                    return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdfProt)];
-                }
-            }
-
-            // ── Estrategia 2: PHPWord → mPDF (fallback) ──────
-            $phpWord = \PhpOffice\PhpWord\IOFactory::load($rutaDocx);
-            $tmpHtml = sys_get_temp_dir() . '/avba_' . uniqid() . '.html';
-            \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'HTML')->save($tmpHtml);
-            $html = (string) file_get_contents($tmpHtml);
-            @unlink($tmpHtml);
-
-            $mpdfTmp = sys_get_temp_dir() . '/mpdf_' . uniqid();
-            if (!is_dir($mpdfTmp)) mkdir($mpdfTmp, 0755, true);
-
-            $mpdf = new \Mpdf\Mpdf([
-                'tempDir'       => $mpdfTmp,
-                'margin_left'   => 15, 'margin_right'  => 15,
-                'margin_top'    => 16, 'margin_bottom' => 16,
-                'default_font'  => 'dejavusans',
-            ]);
-            $mpdf->SetProtection(['print'], '', $ownerPass);
-            $mpdf->WriteHTML($html);
-            $mpdf->Output($rutaPdfProt, 'F');
-
-            return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($rutaPdfProt)];
-
-        } catch (\Exception $e) {
-            return ['status' => 'error', 'message' => $e->getMessage()];
+            return ['status' => 'error', 'message' => 'Error al generar el certificado: ' . $e->getMessage()];
         }
     }
 
