@@ -109,7 +109,18 @@ class Certificaciones {
 
         // Para certificados: intentar con la plantilla HTML + mPDF antes que Word
         try {
-            $qrB64   = $this->descargarQrB64($datos['qr_codigo'] ?? '');
+            // Cargar autoloader para mPDF (si aún no está cargado)
+            if (!class_exists('\\Mpdf\\Mpdf') && file_exists(__DIR__ . '/../vendor/autoload.php')) {
+                require_once __DIR__ . '/../vendor/autoload.php';
+            }
+
+            // QR como base64; si falla la descarga se genera el cert sin imagen QR
+            try {
+                $qrB64 = $this->descargarQrB64($datos['qr_codigo'] ?? '');
+            } catch (\Exception $qrEx) {
+                $qrB64 = '';
+            }
+
             $html    = $this->renderCertTemplate($datos, $qrB64);
             $folio   = $datos['control'] ?? (string)$id;
             $rutaPdf = $this->htmlToPdfMpdf($html, $folio, 'CERT');
@@ -796,7 +807,17 @@ class Certificaciones {
      * No requiere plantilla Word — usa una plantilla HTML/CSS mantenida en código.
      */
     private function resolverPdf(string $tipo, array $datos): string {
-        $qrB64 = $this->descargarQrB64($datos['qr_codigo'] ?? '');
+        // Asegurar que mPDF esté disponible
+        if (!class_exists('\\Mpdf\\Mpdf') && file_exists(__DIR__ . '/../vendor/autoload.php')) {
+            require_once __DIR__ . '/../vendor/autoload.php';
+        }
+
+        // QR como base64; si falla se continúa sin él
+        try {
+            $qrB64 = $this->descargarQrB64($datos['qr_codigo'] ?? '');
+        } catch (\Exception $qrEx) {
+            $qrB64 = '';
+        }
 
         if ($tipo === 'dictamen') {
             $items         = $this->obtenerChecklistEquipo((int)($datos['id'] ?? 0), $datos['maquinaria'] ?? '');
@@ -1340,6 +1361,10 @@ SVG;
      * @return string  Ruta absoluta al .pdf generado
      */
     private function htmlToPdfMpdf(string $html, string $folio, string $sufijo = 'CERT'): string {
+        if (!class_exists('\\Mpdf\\Mpdf')) {
+            $autoload = __DIR__ . '/../vendor/autoload.php';
+            if (file_exists($autoload)) require_once $autoload;
+        }
         if (!class_exists('\\Mpdf\\Mpdf')) {
             throw new \RuntimeException('mPDF no disponible. Verifica vendor/autoload.php.');
         }
