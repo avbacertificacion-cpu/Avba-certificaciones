@@ -101,7 +101,7 @@ class Calidad {
         $row = $this->obtenerEquipo($id);
         if (!$row) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
-        $campos  = ['cliente','maquinaria','marca','modelo','serie','capacidad','correo','id_equipo','estado','motivo'];
+        $campos  = ['cliente','maquinaria','marca','modelo','serie','capacidad','correo','id_equipo','estado','motivo','direccion'];
         $sets    = [];
         $params  = [];
 

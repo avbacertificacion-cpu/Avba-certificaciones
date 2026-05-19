@@ -640,6 +640,22 @@
     .empty-tipos {
       text-align: center; padding: 40px; color: var(--texto-hint); font-size: 13px;
     }
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--texto); color: white;
+      padding: 12px 18px; border-radius: 10px;
+      font-size: 13px; font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0,0,0,.2);
+      z-index: 9999; opacity: 0;
+      transform: translateY(8px);
+      transition: all .25s;
+      display: flex; align-items: center; gap: 8px;
+      max-width: 320px; pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.ok  { background: #22c55e; }
+    .toast.err { background: #ef4444; }
+    .toast svg { width: 16px; height: 16px; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -2144,6 +2160,21 @@ function pcCalidadRecalc() {
   });
 }
 
+let _toastTimer = null;
+function mostrarToast(msg, tipo = "info") {
+  const t   = document.getElementById("toast");
+  const ico = document.getElementById("toast-icon");
+  if (!t) return;
+  t.className = "toast";
+  if (tipo === "ok")  { t.classList.add("ok");  ico.innerHTML = `<path d="M13 3L6 10l-3-3" stroke-linecap="round" stroke-linejoin="round"/>`; }
+  if (tipo === "err") { t.classList.add("err"); ico.innerHTML = `<circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11v.5" stroke-linecap="round"/>`; }
+  if (tipo === "info"){ ico.innerHTML = `<circle cx="8" cy="8" r="6"/><path d="M8 5v3.5M8 11v.5" stroke-linecap="round"/>`; }
+  document.getElementById("toast-msg").textContent = msg;
+  t.classList.add("show");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
+}
+
 /* ═══════════════════════════════════════
    GUARDAR CAMBIOS
 ═══════════════════════════════════════ */
@@ -2151,54 +2182,55 @@ async function guardar() {
   if (guardando) return;
   guardando = true;
 
-  const payload = {
-    fila:       filaActual,
-    cliente:    document.getElementById("e-cliente")?.value  || "",
-    maquinaria: document.getElementById("e-maq")?.value      || "",
-    marca:      document.getElementById("e-marca")?.value    || "",
-    modelo:     document.getElementById("e-modelo")?.value   || "",
-    serie:      document.getElementById("e-serie")?.value    || "",
-    id_equipo:  document.getElementById("e-id")?.value       || "",
-    fecha:      document.getElementById("e-fecha")?.value    || "",
-    correo:     document.getElementById("e-correo")?.value   || "",
-    direccion:  document.getElementById("e-direccion")?.value  || "",
-    capacidad:  document.getElementById("e-capacidad")?.value  || "",
-  };
-
-  // Recoger cambios de prueba de carga si existe la sección
-  const pcPlantillaEl = document.getElementById('pc-plantilla');
-  if (pcPlantillaEl) {
-    const updates = { plantilla: pcPlantillaEl.value };
-    document.querySelectorAll('[id^="pc_"]').forEach(el => {
-      const parts = el.id.split('_');
-      if (parts.length >= 3) {
-        const rk = parts[1];
-        const fk = parts.slice(2).join('_');
-        if (!updates[rk]) updates[rk] = {};
-        updates[rk][fk] = el.value.trim();
-      }
-    });
-    payload.prueba_carga_updates = updates;
-  }
-
   try {
+    const payload = {
+      fila:       filaActual,
+      cliente:    document.getElementById("e-cliente")?.value  || "",
+      maquinaria: document.getElementById("e-maq")?.value      || "",
+      marca:      document.getElementById("e-marca")?.value    || "",
+      modelo:     document.getElementById("e-modelo")?.value   || "",
+      serie:      document.getElementById("e-serie")?.value    || "",
+      id_equipo:  document.getElementById("e-id")?.value       || "",
+      fecha:      document.getElementById("e-fecha")?.value    || "",
+      correo:     document.getElementById("e-correo")?.value   || "",
+      direccion:  document.getElementById("e-direccion")?.value  || "",
+      capacidad:  document.getElementById("e-capacidad")?.value  || "",
+    };
+
+    // Recoger cambios de prueba de carga si existe la sección
+    const pcPlantillaEl = document.getElementById('pc-plantilla');
+    if (pcPlantillaEl) {
+      const updates = { plantilla: pcPlantillaEl.value };
+      document.querySelectorAll('[id^="pc_"]').forEach(el => {
+        const parts = el.id.split('_');
+        if (parts.length >= 3) {
+          const rk = parts[1];
+          const fk = parts.slice(2).join('_');
+          if (!updates[rk]) updates[rk] = {};
+          updates[rk][fk] = el.value.trim();
+        }
+      });
+      payload.prueba_carga_updates = updates;
+    }
+
     const res  = await fetch(API, {
-      method: "POST",
-      body:   JSON.stringify({ action: "ACTUALIZAR_CALIDAD", payload })
+      method:  "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: "ACTUALIZAR_CALIDAD", payload })
     });
     const data = await res.json();
 
     if (data.status === "success") {
-      // Actualizar datos locales
       const d = datosGlobal.find(x => x.fila === filaActual);
       if (d) Object.assign(d, payload);
       cerrarDet();
       render(datosGlobal);
+      mostrarToast("Cambios guardados correctamente", "ok");
     } else {
-      alert("Error al guardar: " + (data.message || "Error desconocido"));
+      mostrarToast("Error al guardar: " + (data.message || "Error desconocido"), "err");
     }
   } catch (e) {
-    alert("Error de conexión al guardar.");
+    mostrarToast("Error de conexión al guardar.", "err");
     console.error("guardar:", e);
   } finally {
     guardando = false;
@@ -5327,5 +5359,10 @@ function cerrarPicker() {
   <iframe id="iframe-selector-plantilla" src=""
           style="width:100%;height:calc(90vh - 60px);border:none;display:block"></iframe>
 </dialog>
+
+<div class="toast" id="toast">
+  <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" id="toast-icon"></svg>
+  <span id="toast-msg"></span>
+</div>
 </body>
 </html>
