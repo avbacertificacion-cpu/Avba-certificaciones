@@ -6,7 +6,8 @@ USE extinguisher_management;
 CREATE TABLE usuarios (
     id          INT PRIMARY KEY AUTO_INCREMENT,
     nombre      VARCHAR(100) NOT NULL,
-    email       VARCHAR(100) UNIQUE NOT NULL,
+    username    VARCHAR(50) UNIQUE NOT NULL,
+    email       VARCHAR(100) UNIQUE,
     password    VARCHAR(255) NOT NULL,
     rol         ENUM('administrador','inspector','cliente') NOT NULL,
     empresa_id  INT,
@@ -140,13 +141,13 @@ CREATE INDEX idx_usuario_empresa     ON usuarios(empresa_id);
 INSERT INTO empresas (nombre, rfc, email, contacto) VALUES
     ('Empresa Demo', 'EMP123456789', 'demo@empresa.com', 'Contacto Demo');
 
-INSERT INTO usuarios (nombre, email, password, rol, empresa_id) VALUES
-    ('Administrador', 'admin@sistema.com',
+INSERT INTO usuarios (nombre, username, email, password, rol, empresa_id) VALUES
+    ('Administrador', 'admin', 'admin@sistema.com',
      '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
      'administrador', NULL),
-    ('Inspector Demo', 'inspector@sistema.com',
+    ('Inspector Demo', 'inspector', 'inspector@sistema.com',
      '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
      'inspector', NULL),
-    ('Cliente Demo', 'cliente@sistema.com',
+    ('Cliente Demo', 'cliente', 'cliente@sistema.com',
      '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
      'cliente', 1);

@@ -30,7 +30,7 @@ function listar() {
     }
 
     $stmt = $pdo->query("
-        SELECT u.id, u.nombre, u.email, u.rol, u.estado, u.created_at,
+        SELECT u.id, u.nombre, u.username, u.email, u.rol, u.estado, u.empresa_id, u.created_at,
                e.nombre AS empresa_nombre
         FROM usuarios u
         LEFT JOIN empresas e ON e.id = u.empresa_id
@@ -56,10 +56,14 @@ function crear() {
 
     $d = json_decode(file_get_contents('php://input'), true);
 
-    foreach (['nombre','email','password','rol'] as $c) {
+    foreach (['nombre','username','password','rol'] as $c) {
         if (empty($d[$c])) {
             http_response_code(400); echo json_encode(['error' => "Campo requerido: $c"]); return;
         }
+    }
+
+    if (!preg_match('/^[a-z0-9_]{3,50}$/', strtolower($d['username']))) {
+        http_response_code(400); echo json_encode(['error' => 'Usuario inválido: solo letras, números y _ (mín. 3 caracteres)']); return;
     }
 
     if (!in_array($d['rol'], ['administrador','inspector','cliente'])) {
@@ -68,24 +72,25 @@ function crear() {
 
     try {
         $stmt = $pdo->prepare("
-            INSERT INTO usuarios (nombre, email, password, rol, empresa_id, estado)
-            VALUES (?,?,?,?,?,'activo')
+            INSERT INTO usuarios (nombre, username, email, password, rol, empresa_id, estado)
+            VALUES (?,?,?,?,?,?,'activo')
         ");
         $stmt->execute([
             $d['nombre'],
-            $d['email'],
+            strtolower(trim($d['username'])),
+            !empty($d['email']) ? strtolower(trim($d['email'])) : null,
             password_hash($d['password'], PASSWORD_BCRYPT),
             $d['rol'],
             !empty($d['empresa_id']) ? $d['empresa_id'] : null,
         ]);
 
         $newId = $pdo->lastInsertId();
-        audit($uid, "Crear usuario {$d['email']} rol {$d['rol']}", 'usuarios', $newId);
+        audit($uid, "Crear usuario {$d['username']} rol {$d['rol']}", 'usuarios', $newId);
 
         echo json_encode(['success' => true, 'id' => $newId]);
     } catch (PDOException $e) {
         if ($e->getCode() == 23000) {
-            http_response_code(409); echo json_encode(['error' => 'El email ya está registrado']);
+            http_response_code(409); echo json_encode(['error' => 'El nombre de usuario ya está en uso']);
         } else {
             http_response_code(500); echo json_encode(['error' => 'Error al crear usuario']);
         }
@@ -105,11 +110,12 @@ function editar() {
     if (!$id) { http_response_code(400); echo json_encode(['error' => 'ID requerido']); return; }
 
     $stmt = $pdo->prepare("
-        UPDATE usuarios SET nombre=?, email=?, rol=?, empresa_id=?, estado=? WHERE id=?
+        UPDATE usuarios SET nombre=?, username=?, email=?, rol=?, empresa_id=?, estado=? WHERE id=?
     ");
     $stmt->execute([
         $d['nombre'],
-        $d['email'],
+        strtolower(trim($d['username'] ?? '')),
+        !empty($d['email']) ? strtolower(trim($d['email'])) : null,
         $d['rol'],
         !empty($d['empresa_id']) ? $d['empresa_id'] : null,
         $d['estado'] ?? 'activo',

@@ -182,8 +182,17 @@ $nombre = $_SESSION['nombre'];
                 <input type="text" id="u-nombre" placeholder="Ej: Juan Pérez García" required>
             </div>
             <div class="form-group">
-                <label>Email *</label>
-                <input type="email" id="u-email" placeholder="juan@empresa.com" required>
+                <label>Usuario (para login) *</label>
+                <input type="text" id="u-username" placeholder="Ej: juanperez" autocomplete="off" required>
+                <small>Sin espacios ni caracteres especiales</small>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group full">
+                <label>Email</label>
+                <input type="email" id="u-email" placeholder="juan@empresa.com (opcional)">
+                <small>El login se hace con usuario y contraseña, no con email</small>
             </div>
         </div>
 
@@ -276,12 +285,12 @@ function render(data) {
     c.innerHTML = `
     <table>
         <thead><tr>
-            <th>Nombre</th><th>Email</th><th>Rol</th><th>Empresa</th><th>Estado</th><th style="text-align:right">Acciones</th>
+            <th>Nombre</th><th>Usuario</th><th>Rol</th><th>Empresa</th><th>Estado</th><th style="text-align:right">Acciones</th>
         </tr></thead>
         <tbody>
         ${data.map(u => `<tr>
             <td><strong>${sanitize(u.nombre)}</strong></td>
-            <td>${sanitize(u.email)}</td>
+            <td><code style="background:#f0f0f0;padding:2px 6px;border-radius:4px;font-size:12px">${sanitize(u.username)}</code></td>
             <td><span class="badge b-${sanitize(u.rol)}">${rolLabel(u.rol)}</span></td>
             <td>${sanitize(u.empresa_nombre || '—')}</td>
             <td><span class="badge b-${sanitize(u.estado)}">${estadoLabel(u.estado)}</span></td>
@@ -318,7 +327,7 @@ function filtrar() {
     const e = document.getElementById('filtroEstado').value;
 
     render(usuarios.filter(u =>
-        (!q || u.nombre.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)) &&
+        (!q || u.nombre.toLowerCase().includes(q) || (u.username||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q)) &&
         (!r || u.rol === r) &&
         (!e || u.estado === e)
     ));
@@ -343,7 +352,8 @@ function editarUsuario(id) {
     document.getElementById('modalSubtitulo').textContent = 'Modifica los datos de este usuario';
     document.getElementById('u-id').value = u.id;
     document.getElementById('u-nombre').value = u.nombre;
-    document.getElementById('u-email').value = u.email;
+    document.getElementById('u-username').value = u.username;
+    document.getElementById('u-email').value = u.email || '';
     document.getElementById('u-rol').value = u.rol;
     document.getElementById('u-empresa').value = u.empresa_id || '';
     document.getElementById('u-estado').value = u.estado;
@@ -358,6 +368,7 @@ function editarUsuario(id) {
 function limpiarModal() {
     document.getElementById('u-id').value = '';
     document.getElementById('u-nombre').value = '';
+    document.getElementById('u-username').value = '';
     document.getElementById('u-email').value = '';
     document.getElementById('u-rol').value = 'administrador';
     document.getElementById('u-empresa').value = '';
@@ -413,6 +424,7 @@ function actualizarFuerzaPassword() {
 async function guardarUsuario() {
     const id       = document.getElementById('u-id').value;
     const nombre   = document.getElementById('u-nombre').value.trim();
+    const username = document.getElementById('u-username').value.trim().toLowerCase();
     const email    = document.getElementById('u-email').value.trim().toLowerCase();
     const rol      = document.getElementById('u-rol').value;
     const empresa  = document.getElementById('u-empresa').value;
@@ -426,8 +438,14 @@ async function guardarUsuario() {
         return;
     }
 
-    if (!validarEmail(email)) {
-        modalAlert('Por favor ingresa un email válido', 'error');
+    if (!username || username.length < 3 || !/^[a-z0-9_]+$/.test(username)) {
+        modalAlert('El usuario debe tener al menos 3 caracteres (solo letras, números y _)', 'error');
+        document.getElementById('u-username').focus();
+        return;
+    }
+
+    if (email && !validarEmail(email)) {
+        modalAlert('El email ingresado no es válido', 'error');
         document.getElementById('u-email').focus();
         return;
     }
@@ -454,7 +472,7 @@ async function guardarUsuario() {
     btn.innerHTML = '<span class="spinner"></span> Guardando...';
 
     try {
-        const body = { nombre, email, rol, estado };
+        const body = { nombre, username, email: email || null, rol, estado };
         if (rol !== 'administrador') body.empresa_id = empresa || null;
         if (password) body.password = password;
         if (id) body.id = parseInt(id);

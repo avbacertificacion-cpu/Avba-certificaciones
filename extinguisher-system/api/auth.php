@@ -27,18 +27,18 @@ function handleLogin() {
     global $pdo;
 
     $data = json_decode(file_get_contents('php://input'), true);
-    $email = $data['email'] ?? '';
+    $username = trim($data['username'] ?? '');
     $password = $data['password'] ?? '';
 
-    if (empty($email) || empty($password)) {
+    if (empty($username) || empty($password)) {
         http_response_code(400);
-        echo json_encode(['error' => 'Email y contraseña requeridos']);
+        echo json_encode(['error' => 'Usuario y contraseña requeridos']);
         return;
     }
 
     try {
-        $stmt = $pdo->prepare('SELECT * FROM usuarios WHERE email = ? AND estado = "activo"');
-        $stmt->execute([$email]);
+        $stmt = $pdo->prepare('SELECT * FROM usuarios WHERE username = ? AND estado = "activo"');
+        $stmt->execute([$username]);
         $usuario = $stmt->fetch(PDO::FETCH_ASSOC);
 
         if ($usuario && password_verify($password, $usuario['password'])) {
