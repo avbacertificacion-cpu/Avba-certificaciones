@@ -461,6 +461,13 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','INSPECTOR'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($auth->agregarEmpresaSesion($payload, (int)$usr['id']));
 
+        case 'OBTENER_PARTICIPANTES_SESION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $sesionId = (int)($payload['sesion_id'] ?? 0);
+            if (!$sesionId) respuesta(['status' => 'error', 'message' => 'sesion_id requerido.']);
+            respuesta(['status' => 'success', 'participantes' => $auth->getParticipantesEnSesion($sesionId)]);
+
         case 'PARTICIPANTE_REGISTRAR': {
             $sesion = $auth->validarTokenParticipante($token);
             if (!$sesion) respuesta(['status' => 'error', 'message' => 'Sesión expirada o cerrada.'], 401);

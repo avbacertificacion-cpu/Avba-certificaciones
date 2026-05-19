@@ -4226,8 +4226,26 @@ function sesRenderLista() {
 
 async function sesRefrescarParticipantes() {
   if (!curSesionAccesoId) return;
-  // Placeholder: participantes se registran desde el portal del participante
-  sesRenderLista();
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body: JSON.stringify({
+        action: 'OBTENER_PARTICIPANTES_SESION',
+        payload: { sesion_id: curSesionAccesoId }
+      })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      curSesionParts = data.participantes || [];
+      sesRenderLista();
+    } else {
+      mostrarToast(data.message || 'Error al cargar participantes.', 'err');
+    }
+  } catch(e) {
+    mostrarToast('Error de conexión.', 'err');
+  }
 }
 
 // ── Sesión: finalizar ─────────────────────
