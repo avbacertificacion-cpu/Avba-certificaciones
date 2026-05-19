@@ -886,6 +886,7 @@ let datosGlobal    = [];
 let registroActual = null;
 let mapInstance    = null;
 let alertasAtendidas = JSON.parse(localStorage.getItem("alertasAtendidas") || "[]");
+const isAdminCert = (JSON.parse(localStorage.getItem('avba_session') || '{}')).rol === 'ADMIN';
 
 /* ═══════════════════════════════
    CARGA
@@ -1385,11 +1386,55 @@ function renderAcciones(d) {
     },
   ];
 
+  if (isAdminCert) {
+    acciones.push({
+      label: "Eliminar registro",
+      clase: "btn-accion",
+      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M6 4V2h4v2M5 4v9h6V4H5zm2 2v5m2-5v5"/></svg>`,
+      fn: `eliminarEquipoCert(${d.fila},'${(d.cliente||'').replace(/'/g,'')}')`
+    });
+  }
+
   grid.innerHTML = acciones.map(a =>
-    `<button class="${a.clase}" onclick="${a.fn}" id="btn-${a.fn.split("'")[1]||a.fn.split("(")[0]}">
+    `<button class="${a.clase}" onclick="${a.fn}" id="btn-${a.fn.split("'")[1]||a.fn.split("(")[0]}"
+      ${a.fn.includes('eliminarEquipo') ? 'style="background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"' : ''}>
       ${a.icon} ${a.label}
     </button>`
   ).join("");
+}
+
+/* ═══════════════════════════════
+   ELIMINAR REGISTROS (ADMIN)
+═══════════════════════════════ */
+async function eliminarEquipoCert(id, desc) {
+  if (!confirm(`¿Eliminar permanentemente el registro "${desc}"?\nEl QR asociado quedará disponible.`)) return;
+  try {
+    const res  = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'ELIMINAR_EQUIPO', payload: { id } }) });
+    const data = await res.json();
+    if (data.status !== 'success') { alert(data.message || 'Error al eliminar.'); return; }
+    document.getElementById('overlay-det')?.classList.remove('open');
+    cargarDatos();
+  } catch(e) { alert('Error de conexión.'); }
+}
+
+async function eliminarSesionAccCert(id, desc) {
+  if (!confirm(`¿Eliminar permanentemente la sesión "${desc}"?\nEl QR asociado quedará disponible.`)) return;
+  try {
+    const res  = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'ELIMINAR_SESION_ACC', payload: { id } }) });
+    const data = await res.json();
+    if (data.status !== 'success') { alert(data.message || 'Error al eliminar.'); return; }
+    cargarAccCert();
+  } catch(e) { alert('Error de conexión.'); }
+}
+
+async function eliminarParticipanteCert(id, nombre) {
+  if (!confirm(`¿Eliminar permanentemente al participante "${nombre}"?\nEl QR asociado quedará disponible.`)) return;
+  try {
+    const res  = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'ELIMINAR_PARTICIPANTE', payload: { id } }) });
+    const data = await res.json();
+    if (data.status !== 'success') { alert(data.message || 'Error al eliminar.'); return; }
+    cargarPerIndepCert();
+  } catch(e) { alert('Error de conexión.'); }
 }
 
 /* ═══════════════════════════════
@@ -1670,6 +1715,8 @@ function renderAccCert(data) {
           <button class="btn-ver" style="font-size:11px" onclick="abrirAccCert(${r.id})">📋 Ver / Documentos</button>
           <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
                   onclick="devolverAcc(${r.id})">↩ Devolver</button>
+          ${isAdminCert ? `<button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
+                  onclick="eliminarSesionAccCert(${r.id},'${(r.cliente||'').replace(/'/g,'')}')">🗑</button>` : ''}
         </div>
       </td>
     </tr>`;
@@ -2178,6 +2225,8 @@ function renderIndepCert(data) {
                   onclick="emitirDocPersonal(${p.id},'diploma',this)">Emitir Diploma</button>` : ''}
           <button class="btn-ver" style="font-size:10px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
                   onclick="devolverParticipante(${p.id})">↩</button>
+          ${isAdminCert ? `<button class="btn-ver" style="font-size:10px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
+                  onclick="eliminarParticipanteCert(${p.id},'${(p.nombre_completo||'').replace(/'/g,'')}')">🗑</button>` : ''}
         </div>
       </td>
     </tr>`;

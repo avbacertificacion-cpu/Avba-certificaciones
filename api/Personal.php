@@ -179,8 +179,16 @@ class Personal {
     }
 
     public function eliminarParticipante(int $id): array {
+        $row = $this->pdo->prepare("SELECT qr_codigo FROM participantes_cursos WHERE id = ?");
+        $row->execute([$id]);
+        $p = $row->fetch();
+        if (!empty($p['qr_codigo'])) {
+            $this->pdo->prepare(
+                "UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?"
+            )->execute([$p['qr_codigo']]);
+        }
         $this->pdo->prepare("DELETE FROM participantes_cursos WHERE id = ?")->execute([$id]);
-        return ['status' => 'success'];
+        return ['status' => 'success', 'message' => 'Participante eliminado correctamente.'];
     }
 
     // ── Aprobar participante → APROBADO_CALIDAD ────────────

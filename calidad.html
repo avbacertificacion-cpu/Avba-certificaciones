@@ -1780,6 +1780,8 @@ const API = "api/index.php";
 let datosGlobal   = [];
 let filaActual    = null;
 let guardando     = false;
+const _sesRol = (JSON.parse(localStorage.getItem('avba_session') || '{}')).rol || '';
+const isAdminCal = _sesRol === 'ADMIN';
 
 /* ═══════════════════════════════════════
    CARGA INICIAL
@@ -1993,18 +1995,57 @@ function ver(fila) {
 
   // ── Footer según estado ──
   let footer = "";
+  const btnEliminar = isAdminCal
+    ? `<button style="background:var(--rojo-light);border:1px solid var(--rojo);color:var(--rojo);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer"
+         onclick="eliminarEquipo(${d.fila},'${esc(d.cliente)}')">🗑 Eliminar</button>`
+    : '';
   if (editable) {
     footer = `
       <button class="btn-sec"       onclick="cerrarDet()">Cerrar</button>
+      ${btnEliminar}
       <button class="btn-nc-action" onclick="abrirNC()">Marcar No conforme</button>
       <button class="btn-guardar"   onclick="guardar()">Guardar cambios</button>
       <button class="btn-aprobar"   onclick="abrirApro()">Aprobar registro</button>`;
   } else {
-    footer = `<button class="btn-sec" style="flex:1" onclick="cerrarDet()">Cerrar</button>`;
+    footer = `<button class="btn-sec" onclick="cerrarDet()">Cerrar</button>${btnEliminar}`;
   }
   document.getElementById("modal-footer").innerHTML = footer;
 
   document.getElementById("overlay-det").classList.add("open");
+}
+
+async function eliminarEquipo(id, desc) {
+  if (!confirm(`¿Eliminar permanentemente el registro "${desc}"?\nEl QR asociado quedará disponible.`)) return;
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res  = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'ELIMINAR_EQUIPO', payload: { id } }) });
+    const data = await res.json();
+    if (data.status !== 'success') { alert(data.message || 'Error al eliminar.'); return; }
+    cerrarDet();
+    await cargar();
+  } catch(e) { alert('Error de conexión.'); }
+}
+
+async function eliminarSesionAccCal(id, desc) {
+  if (!confirm(`¿Eliminar permanentemente la sesión "${desc}"?\nEl QR asociado quedará disponible.`)) return;
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res  = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'ELIMINAR_SESION_ACC', payload: { id } }) });
+    const data = await res.json();
+    if (data.status !== 'success') { alert(data.message || 'Error al eliminar.'); return; }
+    cargarSesionesAcc();
+  } catch(e) { alert('Error de conexión.'); }
+}
+
+async function eliminarParticipanteCal(id, nombre) {
+  if (!confirm(`¿Eliminar permanentemente al participante "${nombre}"?\nEl QR asociado quedará disponible.`)) return;
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res  = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'ELIMINAR_PARTICIPANTE', payload: { id } }) });
+    const data = await res.json();
+    if (data.status !== 'success') { alert(data.message || 'Error al eliminar.'); return; }
+    perCargados = false; cargarPersonal();
+  } catch(e) { alert('Error de conexión.'); }
 }
 
 function cerrarDet() {
@@ -2690,6 +2731,8 @@ function renderSesionesAcc(data) {
                   style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
           ${puedAprobar ? `<button onclick="abrirApro('acc',${r.id})"
                   style="background:var(--verde-light);border:1px solid var(--verde);color:var(--verde);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Aprobar</button>` : ''}
+          ${isAdminCal ? `<button onclick="eliminarSesionAccCal(${r.id},'${(r.cliente||'').replace(/'/g,'')}')"
+                  style="background:var(--rojo-light);border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">🗑</button>` : ''}
         </div>
       </td>
     </tr>`; }).join('');
@@ -2932,6 +2975,8 @@ function renderIndep(data) {
                   style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
           ${puedAprobar ? `<button onclick="abrirApro('per',${p.id})"
                   style="background:var(--verde-light);border:1px solid var(--verde);color:var(--verde);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Aprobar</button>` : ''}
+          ${isAdminCal ? `<button onclick="eliminarParticipanteCal(${p.id},'${(p.nombre_completo||'').replace(/'/g,'')}')"
+                  style="background:var(--rojo-light);border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">🗑</button>` : ''}
         </div>
       </td>
     </tr>`; }).join('');

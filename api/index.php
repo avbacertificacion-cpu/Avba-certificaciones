@@ -716,9 +716,19 @@ if ($method === 'POST') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->guardarParticipante($payload, $_FILES, $usr['usuario']));
 
+        case 'ELIMINAR_EQUIPO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->eliminarEquipo((int)($payload['id'] ?? 0)));
+
+        case 'ELIMINAR_SESION_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->eliminarSesionAcc((int)($payload['id'] ?? 0)));
+
         case 'ELIMINAR_PARTICIPANTE':
             $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->eliminarParticipante((int)($payload['id'] ?? 0)));
 
         case 'APROBAR_PARTICIPANTE':
