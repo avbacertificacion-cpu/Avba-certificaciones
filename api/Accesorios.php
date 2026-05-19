@@ -1191,19 +1191,17 @@ HTML;
         $sesion = $row->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
 
-        $this->pdo->beginTransaction();
         try {
             if (!empty($sesion['qr_codigo'])) {
                 $this->pdo->prepare(
                     "UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?"
                 )->execute([$sesion['qr_codigo']]);
             }
+            // Eliminar accesorios relacionados primero (FK sin CASCADE)
             $this->pdo->prepare("DELETE FROM accesorios_izaje WHERE sesion_id = ?")->execute([$id]);
             $this->pdo->prepare("DELETE FROM accesorios_sesiones WHERE id = ?")->execute([$id]);
-            $this->pdo->commit();
             return ['status' => 'success', 'message' => 'Sesión eliminada correctamente.'];
         } catch (\Throwable $e) {
-            $this->pdo->rollBack();
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
     }

@@ -1406,35 +1406,38 @@ function renderAcciones(d) {
 /* ═══════════════════════════════
    ELIMINAR REGISTROS (ADMIN)
 ═══════════════════════════════ */
+async function _apiEliminarCert(action, id) {
+  const res  = await fetch(API, { method: 'POST', headers: {'Content-Type':'application/json'},
+                                   body: JSON.stringify({ action, payload: { id } }) });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const data = await res.json();
+  if (data.status !== 'success') throw new Error(data.message || 'Error al eliminar.');
+  return data;
+}
+
 async function eliminarEquipoCert(id, desc) {
   if (!confirm(`¿Eliminar permanentemente el registro "${desc}"?\nEl QR asociado quedará disponible.`)) return;
   try {
-    const res  = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'ELIMINAR_EQUIPO', payload: { id } }) });
-    const data = await res.json();
-    if (data.status !== 'success') { alert(data.message || 'Error al eliminar.'); return; }
+    await _apiEliminarCert('ELIMINAR_EQUIPO', id);
     document.getElementById('overlay-det')?.classList.remove('open');
     cargarDatos();
-  } catch(e) { alert('Error de conexión.'); }
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 async function eliminarSesionAccCert(id, desc) {
   if (!confirm(`¿Eliminar permanentemente la sesión "${desc}"?\nEl QR asociado quedará disponible.`)) return;
   try {
-    const res  = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'ELIMINAR_SESION_ACC', payload: { id } }) });
-    const data = await res.json();
-    if (data.status !== 'success') { alert(data.message || 'Error al eliminar.'); return; }
+    await _apiEliminarCert('ELIMINAR_SESION_ACC', id);
     cargarAccCert();
-  } catch(e) { alert('Error de conexión.'); }
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 async function eliminarParticipanteCert(id, nombre) {
   if (!confirm(`¿Eliminar permanentemente al participante "${nombre}"?\nEl QR asociado quedará disponible.`)) return;
   try {
-    const res  = await fetch(API, { method: 'POST', body: JSON.stringify({ action: 'ELIMINAR_PARTICIPANTE', payload: { id } }) });
-    const data = await res.json();
-    if (data.status !== 'success') { alert(data.message || 'Error al eliminar.'); return; }
+    await _apiEliminarCert('ELIMINAR_PARTICIPANTE', id);
     cargarPerIndepCert();
-  } catch(e) { alert('Error de conexión.'); }
+  } catch(e) { alert('Error: ' + e.message); }
 }
 
 /* ═══════════════════════════════

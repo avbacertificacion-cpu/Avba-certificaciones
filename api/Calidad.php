@@ -237,20 +237,17 @@ class Calidad {
         $equipo = $row->fetch();
         if (!$equipo) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
-        $this->pdo->beginTransaction();
         try {
             if (!empty($equipo['qr_codigo'])) {
                 $this->pdo->prepare(
                     "UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?"
                 )->execute([$equipo['qr_codigo']]);
             }
-            $this->pdo->prepare("DELETE FROM inspeccion_checklist WHERE equipo_id = ?")->execute([$id]);
-            $this->pdo->prepare("DELETE FROM historial_general WHERE equipo_id = ?")->execute([$id]);
+            // inspeccion_checklist tiene ON DELETE CASCADE → se borra automáticamente
+            // historial_general tiene ON DELETE SET NULL → no bloquea el DELETE
             $this->pdo->prepare("DELETE FROM equipos WHERE id = ?")->execute([$id]);
-            $this->pdo->commit();
             return ['status' => 'success', 'message' => 'Registro eliminado correctamente.'];
         } catch (\Throwable $e) {
-            $this->pdo->rollBack();
             return ['status' => 'error', 'message' => $e->getMessage()];
         }
     }
