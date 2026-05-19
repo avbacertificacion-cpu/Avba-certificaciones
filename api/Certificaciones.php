@@ -1026,13 +1026,13 @@ class Certificaciones {
         return $html;
     }
 
-    /** Inserta bloque de firma del inspector antes del div.footer-note en el dictamen. */
+    /** Inserta bloque de firma del inspector al final de la página 1 del dictamen. */
     private function inyectarFirmaInspectorDictamen(string $html, string $nombre, string $numero, string $firmaUrl): string {
         if (!$nombre && !$firmaUrl) return $html;
 
         $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 
-        // Intentar cargar imagen de firma en base64
+        // Cargar imagen de firma en base64
         $firmaTag = '';
         if ($firmaUrl) {
             $localPath = rtrim(UPLOAD_DIR, '/\\') . '/' . ltrim($firmaUrl, '/');
@@ -1040,33 +1040,32 @@ class Certificaciones {
                 $ext  = strtolower(pathinfo($localPath, PATHINFO_EXTENSION));
                 $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';
                 $b64  = base64_encode(file_get_contents($localPath));
-                $firmaTag = "<img src='data:{$mime};base64,{$b64}' style='max-width:140px;max-height:55px;object-fit:contain;display:block;margin:0 auto'>";
+                $firmaTag = "<img src='data:{$mime};base64,{$b64}' style='max-width:130px;max-height:50px;object-fit:contain;display:block;margin:0 auto'>";
             }
         }
 
         $bloqueFirma = "
-<table style='width:100%;border-collapse:collapse;margin:14px 0 8px;font-size:8pt;color:#0B2545'>
+<table style='width:280px;border-collapse:collapse;margin:10px 0 6px;font-size:8pt;color:#0B2545'>
   <tr>
-    <td style='width:50%;padding:6px 10px;border:1px solid #cdd8e3;text-align:center;vertical-align:bottom'>
-      <div style='min-height:55px;display:flex;align-items:center;justify-content:center'>{$firmaTag}</div>
-      <div style='border-top:1px solid #0B2545;padding-top:4px;margin-top:6px;font-weight:700'>" . $e($nombre) . "</div>
-      <div style='font-size:7pt;color:#64748b'>Inspector · No. " . $e($numero) . "</div>
-    </td>
-    <td style='width:50%;padding:6px 10px;border:1px solid #cdd8e3;text-align:center;vertical-align:bottom'>
-      <div style='min-height:55px'></div>
-      <div style='border-top:1px solid #0B2545;padding-top:4px;margin-top:6px;font-weight:700'>Responsable Técnico AVBA</div>
-      <div style='font-size:7pt;color:#64748b'>AVBA Inspections, Certifications and Maintenance</div>
+    <td style='padding:5px 10px;border:1px solid #cdd8e3;text-align:center;vertical-align:bottom'>
+      <div style='min-height:50px;display:flex;align-items:center;justify-content:center'>{$firmaTag}</div>
+      <div style='border-top:1px solid #0B2545;padding-top:3px;margin-top:5px;font-weight:700'>" . $e($nombre) . "</div>
+      <div style='font-size:7pt;color:#64748b'>Inspector No. " . $e($numero) . "</div>
     </td>
   </tr>
 </table>";
 
-        // Insertar antes del div.footer-note
-        return preg_replace(
-            '/(<div\s+class="footer-note">)/',
-            $bloqueFirma . '$1',
-            $html,
-            1
-        );
+        // Insertar antes del PRIMER page-break-after:always (fin de página 1)
+        $anchor = 'page-break-after:always';
+        $pos = strpos($html, $anchor);
+        if ($pos === false) return $html;
+
+        // Buscar el <div que contiene ese estilo (retroceder desde $pos)
+        $before   = substr($html, 0, $pos);
+        $divStart = strrpos($before, '<div');
+        if ($divStart === false) return $html;
+
+        return substr($html, 0, $divStart) . $bloqueFirma . substr($html, $divStart);
     }
 
     /** Reemplaza cada div.foto-placeholder en el HTML del dictamen con la imagen real en base64. */
