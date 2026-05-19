@@ -1005,7 +1005,14 @@ class Certificaciones {
                     : '<svg style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;" viewBox="0 0 12 12"><rect width="12" height="12" rx="1" fill="#fff8e1" stroke="#f0c040" stroke-width="1.5"/></svg>';
                 $tbodyHtml .= "<tr class=\"{$rowCls}\">\n";
                 $tbodyHtml .= "<td class=\"pc-td-desc\"><span class=\"pc-test-badge\">{$badge} " . $e($tipoFila) . "</span></td>\n";
+                $rowRadio = (float)($datos['radio'] ?? 0);
+                $rowPluma = (float)($datos['pluma'] ?? 0);
                 foreach ($datos as $campo => $valor) {
+                    if ($campo === 'angulo' && $rowRadio > 0 && $rowPluma >= $rowRadio) {
+                        $valor = number_format(rad2deg(acos($rowRadio / $rowPluma)), 1);
+                    } elseif ($campo === 'altura' && $rowPluma > 0) {
+                        $valor = number_format(sqrt(max(0, $rowPluma * $rowPluma - $rowRadio * $rowRadio)), 2);
+                    }
                     if ($campo === 'resultado') {
                         $ok = strtoupper(trim($valor)) === 'CONFORME' || strtoupper(trim($valor)) === 'OK';
                         $badge = $ok
