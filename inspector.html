@@ -3527,20 +3527,40 @@ function pcCalcular() {
 }
 
 function pcGuardar() {
-  pcCalcular(); // Ejecutar cálculos antes de guardar
-
-  const sel     = document.getElementById("maquinaria");
-  const opt     = sel.options[sel.selectedIndex];
+  const sel      = document.getElementById("maquinaria");
+  const opt      = sel.options[sel.selectedIndex];
   const dictHtml = opt ? (opt.dataset.dictHtml || '') : '';
-  const tpl     = PC_TEMPLATES[dictHtml];
+  const tpl      = PC_TEMPLATES[dictHtml];
   if (!tpl) { pruebaCargaData = {}; return; }
 
   const result = { plantilla: dictHtml };
   tpl.rows.forEach(row => {
+    // Leer radio y pluma para calcular campos derivados
+    const radio = parseFloat(document.getElementById(`pc_${row.key}_radio`)?.value || 0) || 0;
+    const pluma = parseFloat(document.getElementById(`pc_${row.key}_pluma`)?.value || 0) || 0;
+
     result[row.key] = {};
     tpl.cols.forEach(c => {
-      const el = document.getElementById(`pc_${row.key}_${c.id}`);
-      result[row.key][c.id] = el ? el.value.trim() : '';
+      if (c.type === 'calculated') {
+        // Calcular aquí directamente; no depender del valor del DOM
+        if (c.id === 'angulo' && radio > 0 && pluma >= radio) {
+          const val = (Math.acos(radio / pluma) * 180 / Math.PI).toFixed(1);
+          result[row.key][c.id] = val;
+          const el = document.getElementById(`pc_${row.key}_${c.id}`);
+          if (el) el.value = val; // actualizar visual también
+        } else if (c.id === 'altura' && pluma > 0 && radio >= 0) {
+          const val = Math.sqrt(Math.max(0, pluma * pluma - radio * radio)).toFixed(2);
+          result[row.key][c.id] = val;
+          const el = document.getElementById(`pc_${row.key}_${c.id}`);
+          if (el) el.value = val;
+        } else {
+          const el = document.getElementById(`pc_${row.key}_${c.id}`);
+          result[row.key][c.id] = el ? el.value.trim() : '';
+        }
+      } else {
+        const el = document.getElementById(`pc_${row.key}_${c.id}`);
+        result[row.key][c.id] = el ? el.value.trim() : '';
+      }
     });
   });
   pruebaCargaData = result;

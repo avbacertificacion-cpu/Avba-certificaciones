@@ -75,7 +75,19 @@ class Inspecciones {
 
             $pruebaCargaJson = null;
             if (!empty($payload['prueba_carga'])) {
-                $pruebaCargaJson = json_encode($payload['prueba_carga'], JSON_UNESCAPED_UNICODE);
+                $pc = $payload['prueba_carga'];
+                // Recalcular ángulo server-side: arccos(radio/pluma) para cada fila
+                foreach ($pc as $key => &$row) {
+                    if (!is_array($row)) continue;
+                    $r = (float)($row['radio'] ?? 0);
+                    $l = (float)($row['pluma'] ?? 0);
+                    if ($r > 0 && $l >= $r) {
+                        $row['angulo'] = round(rad2deg(acos($r / $l)), 1);
+                        $row['altura'] = round(sqrt(max(0, $l * $l - $r * $r)), 2);
+                    }
+                }
+                unset($row);
+                $pruebaCargaJson = json_encode($pc, JSON_UNESCAPED_UNICODE);
             }
 
             $stmt = $this->pdo->prepare(
