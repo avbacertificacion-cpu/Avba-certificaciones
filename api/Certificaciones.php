@@ -891,13 +891,19 @@ class Certificaciones {
 
         $folio = $e(formatoFolio($d['control'] ?? ''));
 
-        // Obtener número de inspector desde tabla usuarios
+        // Obtener número, nombre y firma del inspector
         $numeroInspector = '';
+        $nombreInspector = '';
+        $firmaInspector  = '';
         if (!empty($d['inspector'])) {
-            $stmt = $this->pdo->prepare("SELECT id FROM usuarios WHERE usuario = ? LIMIT 1");
+            $stmt = $this->pdo->prepare("SELECT id, nombre, firma_imagen FROM usuarios WHERE usuario = ? LIMIT 1");
             $stmt->execute([$d['inspector']]);
             $usr = $stmt->fetch();
-            if ($usr) $numeroInspector = (string)$usr['id'];
+            if ($usr) {
+                $numeroInspector = (string)$usr['id'];
+                $nombreInspector = $usr['nombre'] ?? '';
+                $firmaInspector  = $usr['firma_imagen'] ?? '';
+            }
         }
 
         // Construir HTML de prueba de carga si existen datos
@@ -922,6 +928,7 @@ class Certificaciones {
             '{checklist_rows}'    => $this->buildDictamenChecklistRows($items),
             '{prueba_carga}'      => $pruebaCargaHtml,
             '{numero_inspector}'  => $e($numeroInspector),
+            '{nombre_inspector}'  => $e($nombreInspector),
             '{{normas_acreditadas}}' => $normasAcredHtml,
             '{{normas_referencia}}'  => $normasRefHtml,
         ];
@@ -932,9 +939,134 @@ class Certificaciones {
         // Inyectar fotos reales sobre los divs foto-placeholder
         $html = $this->inyectarFotosDictamen($html, $d['evidencia_url'] ?? '');
 
+        // Inyectar datos de prueba de carga en la tabla pc-table
+        if (!empty($d['prueba_carga'])) {
+            $pc = json_decode($d['prueba_carga'], true) ?? [];
+            $html = $this->inyectarPruebaCargaDictamen($html, $pc, $d);
+        }
+
+        // Inyectar bloque de firma del inspector antes del footer-note
+        $html = $this->inyectarFirmaInspectorDictamen($html, $nombreInspector, $numeroInspector, $firmaInspector);
+
         // Ajuste para mPDF
         $override = '<style>body{background:#fff!important;}.page{box-shadow:none!important;margin:0!important;}</style>';
         return str_replace('</head>', $override . '</head>', $html);
+    }
+
+    /**
+     * Inyecta los datos del JSON prueba_carga en el header y tbody de pc-table,
+     * y corrige el texto hardcodeado "Equipo Inspeccionado: ...".
+     */
+    private function inyectarPruebaCargaDictamen(string $html, array $pc, array $d): string {
+        $e   = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        unset($pc['plantilla']);
+
+        // 1. Corregir celda "Equipo Inspeccionado" — puede ser hardcoded en algunas plantillas
+        $equipoStr = $e(($d['maquinaria'] ?? '') . ' · ' . ($d['marca'] ?? '') . ' ' . ($d['modelo'] ?? ''));
+        $html = preg_replace(
+            '/<div class="pc-equip-val">Equipo Inspeccionado:[^<]*<\/div>/',
+            '<div class="pc-equip-val">' . $equipoStr . '</div>',
+            $html
+        );
+
+        // 2. Inyectar peso de prueba en el header (primer valor "peso" del primer row del JSON)
+        $pesoPrueba = '';
+        foreach ($pc as $rowData) {
+            if (is_array($rowData) && isset($rowData['peso']) && $rowData['peso'] !== '') {
+                $pesoPrueba = $e($rowData['peso']);
+                break;
+            }
+        }
+        if ($pesoPrueba) {
+            // Reemplazar la celda Peso de Prueba del header (pc-header-strip)
+            $html = preg_replace(
+                '/(<div class="pc-equip-lbl">Peso de Prueba<\/div><div class="pc-equip-val">)[^<]*(<\/div>)/',
+                '${1}' . $pesoPrueba . '${2}',
+                $html
+            );
+        }
+
+        // 3. Reemplazar el <tbody> de la pc-table con los datos reales del JSON
+        if (!empty($pc)) {
+            $tbodyHtml = "<tbody>\n";
+            $rowIndex  = 0;
+            foreach ($pc as $tipoFila => $datos) {
+                if (!is_array($datos)) continue;
+                $rowCls = $rowIndex === 0 ? 'pc-row-sin' : 'pc-row-con';
+                $badge  = $rowIndex === 0
+                    ? '<svg style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;" viewBox="0 0 12 12"><rect width="12" height="12" rx="1" fill="#f0f4f8" stroke="#cdd8e3" stroke-width="1.2"/></svg>'
+                    : '<svg style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;" viewBox="0 0 12 12"><rect width="12" height="12" rx="1" fill="#fff8e1" stroke="#f0c040" stroke-width="1.5"/></svg>';
+                $tbodyHtml .= "<tr class=\"{$rowCls}\">\n";
+                $tbodyHtml .= "<td class=\"pc-td-desc\"><span class=\"pc-test-badge\">{$badge} " . $e($tipoFila) . "</span></td>\n";
+                foreach ($datos as $campo => $valor) {
+                    if ($campo === 'resultado') {
+                        $ok = strtoupper(trim($valor)) === 'CONFORME' || strtoupper(trim($valor)) === 'OK';
+                        $badge = $ok
+                            ? '<span class="pc-ok-badge">✔ ' . $e($valor) . '</span>'
+                            : '<span style="color:#c62828;font-weight:700">✘ ' . $e($valor) . '</span>';
+                        $tbodyHtml .= "<td class=\"pc-td\">{$badge}</td>\n";
+                    } else {
+                        $val = $valor !== '' ? $e($valor) : '<span style="color:#94a3b8;font-style:italic">—</span>';
+                        $tbodyHtml .= "<td class=\"pc-td\">{$val}</td>\n";
+                    }
+                }
+                $tbodyHtml .= "</tr>\n";
+                $rowIndex++;
+            }
+            $tbodyHtml .= "</tbody>";
+
+            // Reemplazar el tbody completo dentro de pc-table
+            $html = preg_replace(
+                '/(<table\s+class="pc-table"[^>]*>.*?<\/thead>)\s*<tbody>.*?<\/tbody>/s',
+                '$1' . "\n" . $tbodyHtml,
+                $html
+            );
+        }
+
+        return $html;
+    }
+
+    /** Inserta bloque de firma del inspector antes del div.footer-note en el dictamen. */
+    private function inyectarFirmaInspectorDictamen(string $html, string $nombre, string $numero, string $firmaUrl): string {
+        if (!$nombre && !$firmaUrl) return $html;
+
+        $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+
+        // Intentar cargar imagen de firma en base64
+        $firmaTag = '';
+        if ($firmaUrl) {
+            $localPath = rtrim(UPLOAD_DIR, '/\\') . '/' . ltrim($firmaUrl, '/');
+            if (file_exists($localPath)) {
+                $ext  = strtolower(pathinfo($localPath, PATHINFO_EXTENSION));
+                $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';
+                $b64  = base64_encode(file_get_contents($localPath));
+                $firmaTag = "<img src='data:{$mime};base64,{$b64}' style='max-width:140px;max-height:55px;object-fit:contain;display:block;margin:0 auto'>";
+            }
+        }
+
+        $bloqueFirma = "
+<table style='width:100%;border-collapse:collapse;margin:14px 0 8px;font-size:8pt;color:#0B2545'>
+  <tr>
+    <td style='width:50%;padding:6px 10px;border:1px solid #cdd8e3;text-align:center;vertical-align:bottom'>
+      <div style='min-height:55px;display:flex;align-items:center;justify-content:center'>{$firmaTag}</div>
+      <div style='border-top:1px solid #0B2545;padding-top:4px;margin-top:6px;font-weight:700'>" . $e($nombre) . "</div>
+      <div style='font-size:7pt;color:#64748b'>Inspector · No. " . $e($numero) . "</div>
+    </td>
+    <td style='width:50%;padding:6px 10px;border:1px solid #cdd8e3;text-align:center;vertical-align:bottom'>
+      <div style='min-height:55px'></div>
+      <div style='border-top:1px solid #0B2545;padding-top:4px;margin-top:6px;font-weight:700'>Responsable Técnico AVBA</div>
+      <div style='font-size:7pt;color:#64748b'>AVBA Inspections, Certifications and Maintenance</div>
+    </td>
+  </tr>
+</table>";
+
+        // Insertar antes del div.footer-note
+        return preg_replace(
+            '/(<div\s+class="footer-note">)/',
+            $bloqueFirma . '$1',
+            $html,
+            1
+        );
     }
 
     /** Reemplaza cada div.foto-placeholder en el HTML del dictamen con la imagen real en base64. */
