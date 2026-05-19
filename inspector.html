@@ -3513,9 +3513,10 @@ function pcCalcular() {
     const campoAngulo = document.getElementById(`pc_${row.key}_angulo`);
     const campoAltura = document.getElementById(`pc_${row.key}_altura`);
 
-    if (campoAngulo && radio && pluma) {
-      // Ángulo: arctan(altura/radio) — usamos un valor típico de 30°
-      campoAngulo.value = '30';
+    if (campoAngulo && radio > 0 && pluma > 0 && radio <= pluma) {
+      // θ = arccos(radio / pluma) — radio es cateto adyacente, pluma es hipotenusa
+      const angRad = Math.acos(radio / pluma);
+      campoAngulo.value = (angRad * 180 / Math.PI).toFixed(1);
     }
     if (campoAltura && radio && pluma) {
       // Altura: sqrt(pluma² - radio²) para un triángulo rectángulo

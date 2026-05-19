@@ -1030,7 +1030,105 @@ class Certificaciones {
             );
         }
 
+        // 4. Inyectar datos del diagrama de grúa (tokens {pc_crane_svg}, {pc_diag_*}, {pc_obs_*})
+        if (strpos($html, '{pc_crane_svg}') !== false) {
+            // Usar la fila "con" carga; si no existe, usar la primera disponible
+            $diagRow = $pc['con'] ?? $pc['sin'] ?? reset($pc);
+            if (is_array($diagRow)) {
+                $dRadio  = (float) ($diagRow['radio']  ?? 0);
+                $dPluma  = (float) ($diagRow['pluma']  ?? 0);
+                $dAltura = (float) ($diagRow['altura'] ?? 0);
+                $dAngulo = $dRadio > 0 && $dPluma > 0 && $dRadio <= $dPluma
+                    ? round(rad2deg(acos($dRadio / $dPluma)), 1)
+                    : (float) ($diagRow['angulo'] ?? 0);
+
+                $html = str_replace('{pc_crane_svg}',    $this->buildCraneSvg($dRadio, $dPluma, $dAltura, $dAngulo), $html);
+                $html = str_replace('{pc_diag_radio}',   number_format($dRadio,  1), $html);
+                $html = str_replace('{pc_diag_pluma}',   number_format($dPluma,  1), $html);
+                $html = str_replace('{pc_diag_angulo}',  number_format($dAngulo, 1), $html);
+                $html = str_replace('{pc_diag_altura}',  number_format($dAltura, 2), $html);
+                $html = str_replace('{pc_obs_radio}',    number_format($dRadio,  1), $html);
+                $html = str_replace('{pc_obs_pluma}',    number_format($dPluma,  1), $html);
+                $html = str_replace('{pc_obs_angulo}',   number_format($dAngulo, 1), $html);
+                $html = str_replace('{pc_obs_altura}',   number_format($dAltura, 2), $html);
+            }
+        }
+
         return $html;
+    }
+
+    /** Genera el SVG de diagrama de grúa con coordenadas calculadas a partir de los valores reales. */
+    private function buildCraneSvg(float $radio, float $pluma, float $altura, float $angulo): string {
+        $pivX = 48; $pivY = 108; $gndY = 123;
+
+        // Escala para que el diagrama quepa en el viewport (180x140)
+        $availW = 152 - $pivX;
+        $availH = $pivY - 20;
+        $scale  = $radio > 0 && $altura > 0
+            ? min($availW / $radio, $availH / max($altura, 0.1))
+            : 8.0;
+        $scale  = max(min($scale, 13.0), 3.5);
+
+        $tipX = round($pivX + $radio * $scale, 1);
+        $tipY = round($pivY - $altura * $scale, 1);
+
+        // Ángulo del arco (radio 18 px desde la base del pivote)
+        $arcR    = 18;
+        $arcSX   = $pivX + $arcR;
+        $arcSY   = $gndY;
+        $radAng  = deg2rad($angulo);
+        $arcEX   = round($pivX + $arcR * cos($radAng), 1);
+        $arcEY   = round($pivY  - $arcR * sin($radAng), 1);
+
+        // Esquina del ángulo recto
+        $cL = $tipX - 6;
+        $cT = $gndY  - 6;
+
+        // Posiciones de etiquetas
+        $lbRadX = round(($pivX + $tipX) / 2);   $lbRadY = $gndY + 10;
+        $lbAltX = min($tipX + 28, 172);          $lbAltY = round(($tipY + $gndY) / 2 + 4);
+        $lbAngX = $pivX + 22;                    $lbAngY = $pivY - 5;
+
+        // Path auxiliar en defs (para textPath de pluma)
+        $defSX = $pivX - 6; $defSY = $pivY - 6;
+
+        $rF = number_format($radio,  1);
+        $pF = number_format($pluma,  1);
+        $hF = number_format($altura, 2);
+        $aF = number_format($angulo, 1);
+
+        return <<<SVG
+<svg viewBox="0 0 180 140" xmlns="http://www.w3.org/2000/svg" style="width:163px;height:127px;display:block">
+  <defs><path id="boom-path2" d="M {$defSX},{$defSY} L {$tipX},{$tipY}"/></defs>
+  <line x1="2" y1="{$gndY}" x2="178" y2="{$gndY}" stroke="#cdd8e3" stroke-width="2.5"/>
+  <rect x="2" y="{$gndY}" width="176" height="10" fill="#e8edf3"/>
+  <ellipse cx="34" cy="{$gndY}" rx="8" ry="5" fill="#2d3748"/>
+  <ellipse cx="34" cy="{$gndY}" rx="5" ry="3" fill="#4a5568"/>
+  <ellipse cx="54" cy="{$gndY}" rx="8" ry="5" fill="#2d3748"/>
+  <ellipse cx="54" cy="{$gndY}" rx="5" ry="3" fill="#4a5568"/>
+  <rect x="26" y="108" width="36" height="14" rx="2" fill="#134074"/>
+  <rect x="26" y="94" width="16" height="14" rx="2" fill="#1e5fa8"/>
+  <rect x="28" y="96" width="5" height="5" rx="1" fill="#90cdf4" opacity=".7"/>
+  <rect x="35" y="96" width="5" height="5" rx="1" fill="#90cdf4" opacity=".7"/>
+  <rect x="56" y="100" width="8" height="8" rx="1" fill="#0B2545"/>
+  <circle cx="{$pivX}" cy="{$pivY}" r="5" fill="#C49A28"/>
+  <circle cx="{$pivX}" cy="{$pivY}" r="2.5" fill="#fff"/>
+  <line x1="{$pivX}" y1="{$pivY}" x2="{$tipX}" y2="{$tipY}" stroke="#C49A28" stroke-width="3.8" stroke-linecap="round"/>
+  <line x1="{$pivX}" y1="{$pivY}" x2="{$tipX}" y2="{$tipY}" stroke="#e8c547" stroke-width="1.2" stroke-linecap="round" opacity=".6"/>
+  <line x1="{$pivX}" y1="{$gndY}" x2="{$tipX}" y2="{$gndY}" stroke="#1e5fa8" stroke-width="2" stroke-dasharray="5,3"/>
+  <line x1="{$tipX}" y1="{$gndY}" x2="{$tipX}" y2="{$tipY}" stroke="#1a7a4a" stroke-width="2" stroke-dasharray="5,3"/>
+  <polyline points="{$cL},{$gndY} {$cL},{$cT} {$tipX},{$cT}" fill="none" stroke="#1e5fa8" stroke-width="1.3"/>
+  <path d="M {$arcSX},{$arcSY} A {$arcR},{$arcR} 0 0,0 {$arcEX},{$arcEY}" fill="#C49A28" opacity=".15"/>
+  <path d="M {$arcSX},{$arcSY} A {$arcR},{$arcR} 0 0,0 {$arcEX},{$arcEY}" fill="none" stroke="#C49A28" stroke-width="1.6"/>
+  <rect x="{$lbRadX}" y="{$lbRadY}" width="52" height="12" rx="3" fill="#dbeafe" transform="translate(-26,0)"/>
+  <text x="{$lbRadX}" y="{$lbRadY}" dy="9" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1e5fa8">Radio = {$rF} m</text>
+  <rect x="{$lbAltX}" y="{$lbAltY}" width="48" height="14" rx="3" fill="#dcfce7" transform="translate(-24,-9)"/>
+  <text x="{$lbAltX}" y="{$lbAltY}" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1a7a4a">h = {$hF} m</text>
+  <text text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#7a5500"><textPath href="#boom-path2" startOffset="45%">Pluma {$pF} m</textPath></text>
+  <rect x="{$lbAngX}" y="{$lbAngY}" width="44" height="14" rx="3" fill="#fef3c7" transform="translate(-22,-10)"/>
+  <text x="{$lbAngX}" y="{$lbAngY}" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="8.5" font-weight="800" fill="#92400e">&#945; = {$aF}&#176;</text>
+</svg>
+SVG;
     }
 
     /** Reemplaza cada div.foto-placeholder en el HTML del dictamen con la imagen real en base64. */
