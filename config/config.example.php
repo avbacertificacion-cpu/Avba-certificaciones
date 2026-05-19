@@ -26,6 +26,9 @@ define('LOGIN_BLOQUEO_MIN', 15);      // minutos de bloqueo
 // ── CORS ──────────────────────────────────────────────────
 define('CORS_ORIGINS', 'https://mi-dominio.com,https://www.mi-dominio.com');
 
+// ── URL pública del sitio (sin barra final) ───────────────
+define('SITE_URL', 'https://mi-dominio.com');
+
 // ── Rutas de uploads ──────────────────────────────────────
 define('UPLOAD_DIR', __DIR__ . '/../uploads/');
 define('UPLOAD_URL', 'uploads/');

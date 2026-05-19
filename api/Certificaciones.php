@@ -494,7 +494,7 @@ class Certificaciones {
                         $qrCodigo = $valoresResueltos['qr_codigo'] ?? '';
                         if ($qrCodigo) {
                             $alto  = (float)($campo['alto'] ?? $ancho ?: 25);
-                            $qrUrl = 'https://quickchart.io/qr?text=' . urlencode($qrCodigo) . '&size=300';
+                            $qrUrl = urlQR($qrCodigo);
                             $qrTmp = sys_get_temp_dir() . '/avba_qr_' . uniqid() . '.png';
                             $qrData = @file_get_contents($qrUrl);
                             if ($qrData) {
@@ -2100,7 +2100,7 @@ HTML;
                         $qrCodigo = $valoresResueltos['qr_codigo'] ?? '';
                         if ($qrCodigo) {
                             $alto   = (float)($campo['alto'] ?? $ancho ?: 25);
-                            $qrUrl  = 'https://quickchart.io/qr?text=' . urlencode($qrCodigo) . '&size=300';
+                            $qrUrl  = urlQR($qrCodigo);
                             $qrTmp  = sys_get_temp_dir() . '/avba_qr_prev_' . uniqid() . '.png';
                             $qrData = @file_get_contents($qrUrl);
                             if ($qrData) {
