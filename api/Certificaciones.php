@@ -929,9 +929,57 @@ class Certificaciones {
         $html = file_get_contents($templatePath);
         $html = str_replace(array_keys($map), array_values($map), $html);
 
+        // Inyectar fotos reales sobre los divs foto-placeholder
+        $html = $this->inyectarFotosDictamen($html, $d['evidencia_url'] ?? '');
+
         // Ajuste para mPDF
         $override = '<style>body{background:#fff!important;}.page{box-shadow:none!important;margin:0!important;}</style>';
         return str_replace('</head>', $override . '</head>', $html);
+    }
+
+    /** Reemplaza cada div.foto-placeholder en el HTML del dictamen con la imagen real en base64. */
+    private function inyectarFotosDictamen(string $html, string $evidenciaUrl): string {
+        if (!$evidenciaUrl) return $html;
+
+        // Resolver ruta local
+        $localPath = rtrim(str_replace(
+            rtrim(UPLOAD_URL, '/'),
+            rtrim(UPLOAD_DIR, '/'),
+            rtrim($evidenciaUrl, '/')
+        ), '/') . '/';
+
+        if (!is_dir($localPath)) return $html;
+
+        $archivos = glob($localPath . '*.{jpg,jpeg,png,JPG,JPEG,PNG,webp,WEBP}', GLOB_BRACE);
+        if (empty($archivos)) return $html;
+
+        sort($archivos);
+        $archivos = array_slice($archivos, 0, 9);
+
+        // Reemplazar cada div.foto-placeholder con la foto correspondiente
+        $idx = 0;
+        $html = preg_replace_callback(
+            '/<div\s+class="foto-placeholder"[^>]*>.*?<\/div>/s',
+            function ($match) use ($archivos, &$idx) {
+                if (!isset($archivos[$idx])) {
+                    $idx++;
+                    return $match[0]; // sin foto: mantener placeholder
+                }
+                $path = $archivos[$idx++];
+                if (!file_exists($path)) return $match[0];
+
+                $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+                $mime = in_array($ext, ['png']) ? 'image/png' : (in_array($ext, ['webp']) ? 'image/webp' : 'image/jpeg');
+                $b64  = base64_encode(file_get_contents($path));
+
+                return "<div class=\"foto-placeholder\" style=\"padding:2px;background:#fff;display:flex;align-items:center;justify-content:center;min-height:90px\">"
+                     . "<img src=\"data:{$mime};base64,{$b64}\" style=\"max-width:100%;max-height:110px;object-fit:contain;display:block;\">"
+                     . "</div>";
+            },
+            $html
+        );
+
+        return $html;
     }
 
     /** Genera el HTML de las filas del checklist para inyectar en plantillas de dictamen. */
