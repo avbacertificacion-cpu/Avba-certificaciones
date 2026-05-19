@@ -3584,7 +3584,7 @@ let camposPdfDocTipo  = "";  // "cert" | "dict"
 
 const CAMPOS_DISPONIBLES = [
   "folio","cliente","domicilio","maquinaria","marca","modelo",
-  "serie","id_equipo","capacidad","fecha","vigencia","anio","qr_imagen","firma_inspector"
+  "serie","id_equipo","capacidad","fecha","vigencia","anio","qr_imagen"
 ];
 
 // Estado local de los campos mientras se edita
@@ -4081,7 +4081,7 @@ const CAMPOS_ACC_DISPONIBLES = [
   "id_accesorio","tipo","marca","modelo","serie",
   "capacidad","medidas","estado",
   "cliente","fecha_inspeccion","inspector","folio",
-  "total_accesorios","lugar_inspeccion","qr_imagen","firma_inspector"
+  "total_accesorios","lugar_inspeccion","qr_imagen"
 ];
 
 async function abrirModalCamposPdfAcc() {
@@ -4766,7 +4766,6 @@ const PK_SAMPLE = {
   vigencia:          '26/03/2027',
   anio:              '2026',
   qr_imagen:         '__QR_IMAGE__',      // valor especial → se renderiza como imagen QR
-  firma_inspector:   '__FIRMA_IMAGE__',  // valor especial → se renderiza como imagen de firma
   // Accesorio
   id_accesorio:      '001',
   tipo:              'Eslinga de Cadena',
@@ -4934,10 +4933,9 @@ function pickerRenderMarkers() {
     pin.onmousedown = e => startDrag(e, i);
     wrap.appendChild(pin);
 
-    // ── Sample: texto de muestra, imagen QR o firma ─────────
+    // ── Sample: texto de muestra o imagen QR ─────────
     const sampleVal = PK_SAMPLE[c.campo];
     const isQR    = sampleVal === '__QR_IMAGE__';
-    const isFirma = sampleVal === '__FIRMA_IMAGE__';
 
     if (isQR) {
       // Imagen QR de muestra — tamaño determinado por 'ancho' o 35mm por defecto
@@ -4959,29 +4957,6 @@ function pickerRenderMarkers() {
       img.onclick     = e => { e.stopPropagation(); pickerSetActive(i); };
       img.onmousedown = e => startDrag(e, i);
       wrap.appendChild(img);
-    } else if (isFirma) {
-      // Placeholder de firma — rectángulo con texto "FIRMA"
-      const fW = Math.round((c.ancho || 40) * pxPerMm);
-      const fH = Math.round((c.alto  || 20) * pxPerMm);
-      const box = document.createElement('div');
-      box.dataset.idx = i;
-      box.style.cssText = [
-        `position:absolute`,
-        `left:${x}px`, `top:${y}px`,
-        `width:${fW}px`, `height:${fH}px`,
-        `border:1.5px dashed ${isActive ? pinColor : '#888'}`,
-        `border-radius:3px`,
-        `display:flex`, `align-items:center`, `justify-content:center`,
-        `font-size:10px`, `color:#555`, `font-family:sans-serif`,
-        `background:rgba(255,255,255,.6)`,
-        `pointer-events:all`, `cursor:grab`,
-        `z-index:${isActive ? 19 : 9}`,
-        `outline:${isActive ? '2px dashed ' + pinColor : 'none'}`,
-      ].join(';');
-      box.textContent = '✍ FIRMA INSPECTOR';
-      box.onclick     = e => { e.stopPropagation(); pickerSetActive(i); };
-      box.onmousedown = e => startDrag(e, i);
-      wrap.appendChild(box);
     } else {
       const font = pkCssFont(c);
       const sample = document.createElement('div');

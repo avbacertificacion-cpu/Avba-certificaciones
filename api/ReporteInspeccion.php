@@ -437,6 +437,7 @@ class ReporteInspeccion {
 
 </body>
 </html>";
+        return $html;
     }
 
     private static function valorLabel(string $val): string {
