@@ -892,9 +892,9 @@ class Certificaciones {
         $folio = $e(formatoFolio($d['control'] ?? ''));
 
         // Obtener número, nombre y firma del inspector
-        $numeroInspector = '';
-        $nombreInspector = '';
-        $firmaInspector  = '';
+        $numeroInspector  = '';
+        $nombreInspector  = '';
+        $firmaInspectorImg = '';
         if (!empty($d['inspector'])) {
             $stmt = $this->pdo->prepare("SELECT id, nombre, firma_imagen FROM usuarios WHERE usuario = ? LIMIT 1");
             $stmt->execute([$d['inspector']]);
@@ -902,7 +902,16 @@ class Certificaciones {
             if ($usr) {
                 $numeroInspector = (string)$usr['id'];
                 $nombreInspector = $usr['nombre'] ?? '';
-                $firmaInspector  = $usr['firma_imagen'] ?? '';
+                $firmaUrl = $usr['firma_imagen'] ?? '';
+                if ($firmaUrl) {
+                    $localPath = rtrim(UPLOAD_DIR, '/\\') . '/' . ltrim($firmaUrl, '/');
+                    if (file_exists($localPath)) {
+                        $ext  = strtolower(pathinfo($localPath, PATHINFO_EXTENSION));
+                        $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';
+                        $b64  = base64_encode(file_get_contents($localPath));
+                        $firmaInspectorImg = "<img src='data:{$mime};base64,{$b64}' style='max-width:120px;max-height:50px;object-fit:contain;'>";
+                    }
+                }
             }
         }
 
@@ -927,8 +936,9 @@ class Certificaciones {
             '{qr_imagen}'         => $qrB64,
             '{checklist_rows}'    => $this->buildDictamenChecklistRows($items),
             '{prueba_carga}'      => $pruebaCargaHtml,
-            '{numero_inspector}'  => $e($numeroInspector),
-            '{nombre_inspector}'  => $e($nombreInspector),
+            '{numero_inspector}'   => $e($numeroInspector),
+            '{nombre_inspector}'   => $e($nombreInspector),
+            '{firma_inspector_img}' => $firmaInspectorImg,
             '{{normas_acreditadas}}' => $normasAcredHtml,
             '{{normas_referencia}}'  => $normasRefHtml,
         ];
@@ -944,9 +954,6 @@ class Certificaciones {
             $pc = json_decode($d['prueba_carga'], true) ?? [];
             $html = $this->inyectarPruebaCargaDictamen($html, $pc, $d);
         }
-
-        // Inyectar bloque de firma del inspector antes del footer-note
-        $html = $this->inyectarFirmaInspectorDictamen($html, $nombreInspector, $numeroInspector, $firmaInspector);
 
         // Ajuste para mPDF
         $override = '<style>body{background:#fff!important;}.page{box-shadow:none!important;margin:0!important;}</style>';
@@ -1024,48 +1031,6 @@ class Certificaciones {
         }
 
         return $html;
-    }
-
-    /** Inserta bloque de firma del inspector al final de la página 1 del dictamen. */
-    private function inyectarFirmaInspectorDictamen(string $html, string $nombre, string $numero, string $firmaUrl): string {
-        if (!$nombre && !$firmaUrl) return $html;
-
-        $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
-
-        // Cargar imagen de firma en base64
-        $firmaTag = '';
-        if ($firmaUrl) {
-            $localPath = rtrim(UPLOAD_DIR, '/\\') . '/' . ltrim($firmaUrl, '/');
-            if (file_exists($localPath)) {
-                $ext  = strtolower(pathinfo($localPath, PATHINFO_EXTENSION));
-                $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';
-                $b64  = base64_encode(file_get_contents($localPath));
-                $firmaTag = "<img src='data:{$mime};base64,{$b64}' style='max-width:130px;max-height:50px;object-fit:contain;display:block;margin:0 auto'>";
-            }
-        }
-
-        $bloqueFirma = "
-<table style='width:280px;border-collapse:collapse;margin:10px 0 6px;font-size:8pt;color:#0B2545'>
-  <tr>
-    <td style='padding:5px 10px;border:1px solid #cdd8e3;text-align:center;vertical-align:bottom'>
-      <div style='min-height:50px;display:flex;align-items:center;justify-content:center'>{$firmaTag}</div>
-      <div style='border-top:1px solid #0B2545;padding-top:3px;margin-top:5px;font-weight:700'>" . $e($nombre) . "</div>
-      <div style='font-size:7pt;color:#64748b'>Inspector No. " . $e($numero) . "</div>
-    </td>
-  </tr>
-</table>";
-
-        // Insertar antes del PRIMER page-break-after:always (fin de página 1)
-        $anchor = 'page-break-after:always';
-        $pos = strpos($html, $anchor);
-        if ($pos === false) return $html;
-
-        // Buscar el <div que contiene ese estilo (retroceder desde $pos)
-        $before   = substr($html, 0, $pos);
-        $divStart = strrpos($before, '<div');
-        if ($divStart === false) return $html;
-
-        return substr($html, 0, $divStart) . $bloqueFirma . substr($html, $divStart);
     }
 
     /** Reemplaza cada div.foto-placeholder en el HTML del dictamen con la imagen real en base64. */
