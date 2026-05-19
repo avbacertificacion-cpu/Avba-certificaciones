@@ -904,7 +904,7 @@ class Certificaciones {
                 $nombreInspector = $usr['nombre'] ?? '';
                 $firmaUrl = $usr['firma_imagen'] ?? '';
                 if ($firmaUrl) {
-                    $localPath = rtrim(UPLOAD_DIR, '/\\') . '/' . ltrim($firmaUrl, '/');
+                    $localPath = __DIR__ . '/../' . ltrim($firmaUrl, '/');
                     if (file_exists($localPath)) {
                         $ext  = strtolower(pathinfo($localPath, PATHINFO_EXTENSION));
                         $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';

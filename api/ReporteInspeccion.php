@@ -391,8 +391,8 @@ class ReporteInspeccion {
         // Agregar firma del inspector si existe
         if ($firmaUrl) {
             $firmaTag = '';
-            if (file_exists(rtrim(UPLOAD_DIR, '/\\') . '/' . ltrim($firmaUrl, '/'))) {
-                $firmaPath = rtrim(UPLOAD_DIR, '/\\') . '/' . ltrim($firmaUrl, '/');
+            $firmaPath = __DIR__ . '/../' . ltrim($firmaUrl, '/');
+            if (file_exists($firmaPath)) {
                 if (extension_loaded('gd') && file_exists($firmaPath)) {
                     $b64 = base64_encode(file_get_contents($firmaPath));
                     $firmaTag = "<img src='data:image/png;base64,{$b64}' style='width:120px;height:60px;object-fit:contain'>";
