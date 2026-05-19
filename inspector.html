@@ -242,6 +242,59 @@
       position: relative;
     }
 
+    /* ─── BÚSQUEDA DE DIRECCIÓN ─── */
+    .dir-buscar { position: relative; margin-bottom: 8px; }
+    .dir-buscar input {
+      width: 100%; box-sizing: border-box;
+      padding: 9px 36px 9px 12px;
+      border: 1.5px solid var(--borde); border-radius: var(--radio);
+      font-size: 14px; background: var(--fondo-campo, #f8fafc);
+      outline: none; transition: border-color .2s;
+    }
+    .dir-buscar input:focus { border-color: var(--azul); }
+    .dir-buscar .buscar-ico {
+      position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+      color: #94a3b8; pointer-events: none;
+    }
+    .dir-suger {
+      position: absolute; left: 0; right: 0; z-index: 9999;
+      background: #fff; border: 1.5px solid var(--borde);
+      border-top: none; border-radius: 0 0 var(--radio) var(--radio);
+      box-shadow: 0 4px 12px rgba(0,0,0,.12);
+      max-height: 220px; overflow-y: auto; display: none;
+    }
+    .dir-suger li {
+      padding: 9px 12px; cursor: pointer; font-size: 13px;
+      border-bottom: 1px solid #f1f5f9; list-style: none;
+    }
+    .dir-suger li:last-child { border-bottom: none; }
+    .dir-suger li:hover { background: #f0f6ff; color: var(--azul); }
+
+    /* ─── MULTI-EMAIL ─── */
+    .emails-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .email-row { display: flex; gap: 6px; align-items: center; }
+    .email-row input[type="email"] {
+      flex: 1; padding: 9px 12px;
+      border: 1.5px solid var(--borde); border-radius: var(--radio);
+      font-size: 14px; background: var(--fondo-campo, #f8fafc);
+      outline: none; transition: border-color .2s;
+    }
+    .email-row input[type="email"]:focus { border-color: var(--azul); }
+    .email-row .btn-rm-email {
+      width: 32px; height: 32px; border-radius: 50%;
+      border: 1.5px solid #fca5a5; background: #fff5f5;
+      color: #dc2626; font-size: 18px; line-height: 1;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .btn-add-email {
+      display: flex; align-items: center; gap: 5px;
+      padding: 7px 12px; border-radius: var(--radio);
+      border: 1.5px dashed var(--azul); background: #f0f6ff;
+      color: var(--azul); font-size: 13px; cursor: pointer; margin-top: 2px;
+    }
+    .btn-add-email:hover { background: #e0edff; }
+
     /* ─── CHECKLIST ─── */
     /* ─── SECCIÓN DEL CHECKLIST ─── */
     .check-seccion {
@@ -2089,9 +2142,17 @@
       </div>
 
       <div class="field">
-        <label>Correo del cliente</label>
-        <input type="email" id="email_cliente" placeholder="correo@empresa.com" autocomplete="email">
-        <div class="hint">Se usará para enviar el certificado final</div>
+        <label>Correo(s) del cliente</label>
+        <div class="emails-wrap" id="emails-wrap">
+          <div class="email-row">
+            <input type="email" class="email-input" placeholder="correo@empresa.com" autocomplete="email">
+          </div>
+        </div>
+        <button type="button" class="btn-add-email" onclick="agregarEmail()">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M8 3v10M3 8h10"/></svg>
+          Agregar otro correo
+        </button>
+        <div class="hint">Se usarán para enviar el certificado final. Puedes agregar varios.</div>
       </div>
 
       <div class="nav-btns">
@@ -2109,7 +2170,12 @@
       </div>
       <div class="mapa-info">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5L10 10"/></svg>
-        <span>Arrastra el marcador al punto exacto donde se realizó la inspección. El GPS se activa automáticamente.</span>
+        <span>Escribe una dirección o arrastra el marcador al punto exacto. El GPS se activa automáticamente.</span>
+      </div>
+      <div class="dir-buscar">
+        <input type="text" id="buscar-insp" placeholder="Buscar dirección de inspección..." autocomplete="off">
+        <svg class="buscar-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px"><circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l2.5 2.5"/></svg>
+        <ul class="dir-suger" id="suger-insp"></ul>
       </div>
       <div id="mapaInsp" class="mapa"></div>
       <div class="nav-btns">
@@ -2128,7 +2194,12 @@
       </div>
       <div class="mapa-info">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5L10 10"/></svg>
-        <span>Arrastra el marcador a la oficina o domicilio donde se entregarán los documentos físicos.</span>
+        <span>Escribe una dirección o arrastra el marcador a donde se entregarán los documentos físicos.</span>
+      </div>
+      <div class="dir-buscar">
+        <input type="text" id="buscar-envio" placeholder="Buscar dirección de envío..." autocomplete="off">
+        <svg class="buscar-ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:16px;height:16px"><circle cx="6.5" cy="6.5" r="4"/><path d="M11 11l2.5 2.5"/></svg>
+        <ul class="dir-suger" id="suger-envio"></ul>
       </div>
       <div id="mapaEnvio" class="mapa"></div>
       <div class="nav-btns">
@@ -3622,6 +3693,78 @@ function crearMapa(id, tipo, lat, lng) {
   });
 
   setTimeout(() => maps[tipo].invalidateSize(), 250);
+
+  // Activar buscador de dirección para este mapa
+  const buscarId = tipo === 'insp' ? 'buscar-insp' : 'buscar-envio';
+  const sugerId  = tipo === 'insp' ? 'suger-insp'  : 'suger-envio';
+  initBuscarDir(buscarId, sugerId, tipo);
+}
+
+/* ─── BUSCADOR DE DIRECCIÓN CON AUTOCOMPLETE ─── */
+function initBuscarDir(inputId, sugerId, tipo) {
+  const inp = document.getElementById(inputId);
+  const ul  = document.getElementById(sugerId);
+  if (!inp || !ul) return;
+
+  let timer;
+  inp.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = inp.value.trim();
+    if (q.length < 3) { ul.innerHTML = ''; ul.style.display = 'none'; return; }
+
+    timer = setTimeout(async () => {
+      try {
+        const res  = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6&accept-language=es`,
+          { headers: { 'Accept': 'application/json' } }
+        );
+        const data = await res.json();
+        ul.innerHTML = '';
+        if (!data.length) { ul.style.display = 'none'; return; }
+        data.forEach(item => {
+          const li = document.createElement('li');
+          li.textContent = item.display_name;
+          li.addEventListener('mousedown', e => {
+            e.preventDefault(); // evitar que el input pierda foco antes del click
+            const lat = parseFloat(item.lat);
+            const lng = parseFloat(item.lon);
+            if (maps[tipo] && markers[tipo]) {
+              maps[tipo].setView([lat, lng], 16);
+              markers[tipo].setLatLng([lat, lng]);
+            }
+            inp.value = item.display_name;
+            ul.innerHTML = '';
+            ul.style.display = 'none';
+          });
+          ul.appendChild(li);
+        });
+        ul.style.display = 'block';
+      } catch { ul.style.display = 'none'; }
+    }, 400);
+  });
+
+  inp.addEventListener('blur', () => {
+    setTimeout(() => { ul.style.display = 'none'; }, 150);
+  });
+}
+
+/* ─── MULTI-EMAIL ─── */
+function agregarEmail() {
+  const wrap = document.getElementById('emails-wrap');
+  const row  = document.createElement('div');
+  row.className = 'email-row';
+  row.innerHTML = `
+    <input type="email" class="email-input" placeholder="correo@empresa.com" autocomplete="email">
+    <button type="button" class="btn-rm-email" onclick="this.parentElement.remove()" title="Eliminar">×</button>`;
+  wrap.appendChild(row);
+  row.querySelector('input').focus();
+}
+
+function obtenerEmails() {
+  return [...document.querySelectorAll('#emails-wrap .email-input')]
+    .map(i => i.value.trim().toLowerCase())
+    .filter(v => v && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))
+    .join(',');
 }
 
 /* ════════════════════════════════════════
@@ -3764,7 +3907,7 @@ async function enviarFormulario() {
           serie:         document.getElementById("serie").value,
           id_cliente:    document.getElementById("id_cliente").value,
           capacidad:     document.getElementById("capacidad").value,
-          email_cliente: document.getElementById("email_cliente").value,
+          email_cliente: obtenerEmails(),
           coords_insp:   latLngInsp ? `${latLngInsp.lat},${latLngInsp.lng}` : "0,0",
           coords_envio:  latLngEnv  ? `${latLngEnv.lat},${latLngEnv.lng}`   : "0,0",
           comentarios:   document.getElementById("comentarios").value,

@@ -105,7 +105,7 @@ class Inspecciones {
                 $serie,
                 $u($info['id_cliente'] ?? ''),
                 date('Y-m-d'),
-                strtolower(trim($info['email_cliente'] ?? '')) ?: null,
+                $this->normalizarEmails($info['email_cliente'] ?? '') ?: null,
                 $control,
                 $urlCarpeta ?: null,
                 $dirInsp,
@@ -269,5 +269,14 @@ class Inspecciones {
             if (!empty($data['display_name'])) return strtoupper($data['display_name']);
         }
         return strtoupper("{$lat}, {$lng}");
+    }
+
+    // Normaliza lista de correos separados por coma: minúsculas, sin espacios, válidos
+    private function normalizarEmails(string $raw): string {
+        $emails = array_filter(
+            array_map('trim', explode(',', strtolower($raw))),
+            fn($e) => filter_var($e, FILTER_VALIDATE_EMAIL)
+        );
+        return implode(',', $emails);
     }
 }

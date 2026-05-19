@@ -1715,7 +1715,13 @@ HTML;
 
         $cfg = getSmtpConfig($this->pdo);
         configurarMailer($mail, $this->pdo);
-        $mail->addAddress($to);
+
+        // Soporta múltiples destinatarios separados por coma
+        foreach (array_filter(array_map('trim', explode(',', $to))) as $addr) {
+            if (filter_var($addr, FILTER_VALIDATE_EMAIL)) {
+                $mail->addAddress($addr);
+            }
+        }
 
         $asunto = trim($cfg['asunto_cert'] ?? '');
         if ($asunto) {
