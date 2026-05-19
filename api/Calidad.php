@@ -23,16 +23,19 @@ class Calidad {
                     disponibilidad, estado, motivo, qr_codigo,
                     certificado_url AS link, dictamen_url AS dictamen,
                     envio_direccion AS envio, coordenadas_envio,
-                    reporte_url
+                    reporte_url, prueba_carga
              FROM equipos
              WHERE estado IN ('PENDIENTE', 'CONFORME', 'NO CONFORME', 'RECHAZADO', 'RETORNADO')
              ORDER BY marca_temporal DESC"
         );
         $rows = $stmt->fetchAll();
 
-        // Agregar URL del QR
+        // Agregar URL del QR y decodificar prueba_carga
         foreach ($rows as &$r) {
             $r['qr_url'] = $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '';
+            $r['prueba_carga'] = !empty($r['prueba_carga'])
+                ? (json_decode($r['prueba_carga'], true) ?? null)
+                : null;
         }
         unset($r);
 
@@ -115,6 +118,41 @@ class Calidad {
             $sets[]  = '`qr_codigo` = ?';
             $params[] = $payload['qr_codigo'];
             registrarHistorial($this->pdo, $usuario, $id, 'qr_codigo', $row['qr_codigo'] ?? null, $payload['qr_codigo']);
+        }
+
+        // Prueba de carga (solo editable: peso, radio, pluma; recalcula angulo/altura)
+        if (!empty($payload['prueba_carga_updates']) && is_array($payload['prueba_carga_updates'])) {
+            $updates = $payload['prueba_carga_updates'];
+            if (!empty($updates['plantilla'])) {
+                $pc = !empty($row['prueba_carga'])
+                    ? (json_decode($row['prueba_carga'], true) ?? [])
+                    : [];
+                $pc['plantilla'] = $updates['plantilla'];
+
+                foreach ($updates as $rowKey => $fields) {
+                    if ($rowKey === 'plantilla' || !is_array($fields)) continue;
+                    if (!isset($pc[$rowKey])) $pc[$rowKey] = [];
+
+                    foreach (['peso', 'radio', 'pluma'] as $f) {
+                        if (array_key_exists($f, $fields)) {
+                            $pc[$rowKey][$f] = $fields[$f];
+                        }
+                    }
+
+                    // Recalcular campos derivados
+                    $radio = (float)($pc[$rowKey]['radio'] ?? 0);
+                    $pluma = (float)($pc[$rowKey]['pluma'] ?? 0);
+                    if ($radio > 0 && $pluma > 0 && $radio <= $pluma) {
+                        $pc[$rowKey]['angulo'] = (string)round(acos($radio / $pluma) * 180 / M_PI, 1);
+                        $pc[$rowKey]['altura'] = (string)round(sqrt($pluma * $pluma - $radio * $radio), 2);
+                    }
+                }
+
+                $pcJson = json_encode($pc, JSON_UNESCAPED_UNICODE);
+                $sets[]   = '`prueba_carga` = ?';
+                $params[]  = $pcJson;
+                registrarHistorial($this->pdo, $usuario, $id, 'prueba_carga', $row['prueba_carga'] ?? null, $pcJson);
+            }
         }
 
         if (empty($sets)) return ['status' => 'success', 'message' => 'Sin cambios.'];

@@ -1783,6 +1783,24 @@ let guardando     = false;
 const _sesRol = (JSON.parse(localStorage.getItem('avba_session') || '{}')).rol || '';
 const isAdminCal = _sesRol === 'ADMIN';
 
+/* ─── Definición de plantillas de prueba de carga ─── */
+const PC_DEF = {
+  'dictamen_preview.html':     { label: 'Grúa Móvil',       rows: [{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}] },
+  'dictamen_grua_torre.html':  { label: 'Grúa Torre',        rows: [{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}] },
+  'dictamen_montacargas.html': { label: 'Montacargas',       rows: [{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}] },
+  'dictamen_izaje.html':       { label: 'Elemento de Izaje', rows: [{k:'trabajo',l:'Carga de Trabajo'},{k:'sobrecarga',l:'Sobrecarga'}] },
+  'dictamen_ptem.html':        { label: 'PTEM',              rows: [{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}] },
+  'dictamen_telehandler.html': { label: 'Telehandler',       rows: [{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}] },
+};
+const PC_EDITABLE    = ['peso','radio','pluma'];
+const PC_CALCULATED  = ['angulo','altura'];
+const PC_LABELS = {
+  peso:'Peso (TON)', radio:'Radio (m)', pluma:'Long. Pluma (m)',
+  angulo:'Ángulo (°)', altura:'Altura (m)', resultado:'Resultado',
+  duracion:'Duración (min)', inclin:'Inclinación (°)', estabilidad:'Estabilidad',
+  extension:'Extensión (m)', cml:'CML (ton)', prueba:'Carga Prueba (ton)', deformacion:'Deformación (mm)'
+};
+
 /* ═══════════════════════════════════════
    CARGA INICIAL
 ═══════════════════════════════════════ */
@@ -1958,6 +1976,49 @@ function ver(fila) {
       : ''}
   </div>`;
 
+  // Prueba de carga
+  const pcData = d.prueba_carga && typeof d.prueba_carga === 'object' ? d.prueba_carga : null;
+  if (pcData && pcData.plantilla) {
+    const def    = PC_DEF[pcData.plantilla];
+    const filas  = def ? def.rows
+      : Object.keys(pcData).filter(k => k !== 'plantilla').map(k => ({k, l: k}));
+    const sample   = pcData[filas[0]?.k] || {};
+    const fieldKeys = Object.keys(sample);
+    const thStyle  = 'padding:7px 8px;background:var(--azul-dark);color:#fff;text-align:center;font-size:11px;white-space:nowrap';
+    const tdBase   = 'padding:5px 6px;border:1px solid var(--borde)';
+    const inpBase  = 'width:100%;min-width:55px;padding:4px 6px;border:1px solid var(--borde);border-radius:5px;font-size:12px;text-align:center;box-sizing:border-box';
+
+    body += `<div class="sec-label">Prueba de Carga${def ? ' — ' + def.label : ''}</div>`;
+    body += `<div style="overflow-x:auto;margin-bottom:8px"><table style="width:100%;border-collapse:collapse;font-size:12px">`;
+    body += `<thead><tr>`;
+    body += `<th style="${thStyle};text-align:left;padding-left:10px">Prueba</th>`;
+    fieldKeys.forEach(fk => {
+      body += `<th style="${thStyle}">${PC_LABELS[fk] || fk}</th>`;
+    });
+    body += `</tr></thead><tbody>`;
+
+    filas.forEach((row, ri) => {
+      const rowData = pcData[row.k] || {};
+      const bg = ri % 2 === 0 ? 'var(--gris-bg)' : '#fff';
+      body += `<tr style="background:${bg}">`;
+      body += `<td style="padding:8px 10px;font-weight:600;font-size:12px;border:1px solid var(--borde);white-space:nowrap">${row.l}</td>`;
+      fieldKeys.forEach(fk => {
+        const val = rowData[fk] ?? '';
+        if (editable && PC_EDITABLE.includes(fk)) {
+          body += `<td style="${tdBase}"><input type="text" id="pc_${row.k}_${fk}" value="${esc(val)}" style="${inpBase}" oninput="pcCalidadRecalc()"></td>`;
+        } else if (PC_CALCULATED.includes(fk)) {
+          body += `<td style="${tdBase}"><input type="text" id="pc_${row.k}_${fk}" value="${esc(val)}" style="${inpBase};background:#f5f5f5" readonly></td>`;
+        } else {
+          body += `<td style="${tdBase};text-align:center">${esc(val) || '—'}</td>`;
+        }
+      });
+      body += `</tr>`;
+    });
+
+    body += `</tbody></table></div>`;
+    body += `<input type="hidden" id="pc-plantilla" value="${esc(pcData.plantilla)}">`;
+  }
+
   // Si está aprobado: botones de certificado y dictamen
   if (d.estado === "APROBADO CALIDAD") {
     const tieneC = d.link && d.link.trim() !== "";
@@ -2062,6 +2123,27 @@ function esc(v) {
     .replace(/>/g,"&gt;");
 }
 
+/* Recalcular ángulo y altura al editar radio o pluma en prueba de carga */
+function pcCalidadRecalc() {
+  const rowKeys = new Set();
+  document.querySelectorAll('[id^="pc_"]').forEach(el => {
+    const parts = el.id.split('_');
+    if (parts.length >= 3) rowKeys.add(parts[1]);
+  });
+  rowKeys.forEach(rk => {
+    const radio = parseFloat(document.getElementById(`pc_${rk}_radio`)?.value || 0) || 0;
+    const pluma = parseFloat(document.getElementById(`pc_${rk}_pluma`)?.value || 0) || 0;
+    const elAng = document.getElementById(`pc_${rk}_angulo`);
+    const elAlt = document.getElementById(`pc_${rk}_altura`);
+    if (elAng && radio > 0 && pluma >= radio) {
+      elAng.value = (Math.acos(radio / pluma) * 180 / Math.PI).toFixed(1);
+    }
+    if (elAlt && pluma > 0) {
+      elAlt.value = Math.sqrt(Math.max(0, pluma * pluma - radio * radio)).toFixed(2);
+    }
+  });
+}
+
 /* ═══════════════════════════════════════
    GUARDAR CAMBIOS
 ═══════════════════════════════════════ */
@@ -2082,6 +2164,22 @@ async function guardar() {
     direccion:  document.getElementById("e-direccion")?.value  || "",
     capacidad:  document.getElementById("e-capacidad")?.value  || "",
   };
+
+  // Recoger cambios de prueba de carga si existe la sección
+  const pcPlantillaEl = document.getElementById('pc-plantilla');
+  if (pcPlantillaEl) {
+    const updates = { plantilla: pcPlantillaEl.value };
+    document.querySelectorAll('[id^="pc_"]').forEach(el => {
+      const parts = el.id.split('_');
+      if (parts.length >= 3) {
+        const rk = parts[1];
+        const fk = parts.slice(2).join('_');
+        if (!updates[rk]) updates[rk] = {};
+        updates[rk][fk] = el.value.trim();
+      }
+    });
+    payload.prueba_carga_updates = updates;
+  }
 
   try {
     const res  = await fetch(API, {

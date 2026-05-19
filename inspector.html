@@ -2570,6 +2570,8 @@ let pasoActual      = 1;
 let maps            = { insp: null, env: null };
 let markers         = { insp: null, env: null };
 let dirManual       = { insp: '', env: '' };  // dirección elegida del buscador
+let pendingMapPos   = { insp: null, env: null }; // posición seleccionada antes de que exista el mapa
+let buscarDirInited = { insp: false, env: false }; // evita doble-binding del buscador
 let respuestasCheck = {};
 let fotosData       = [];       // [{base64, mimeType, nombre}]
 let pruebaCargaData = {};
@@ -3374,8 +3376,14 @@ function irA(n) {
   renderStepsBar(n);
   window.scrollTo({ top: 0, behavior: "smooth" });
 
-  if (n === 2) setTimeout(() => initMapa("mapaInsp", "insp"), 300);
-  if (n === 3) setTimeout(() => initMapa("mapaEnvio", "env"), 300);
+  if (n === 2) {
+    initBuscarDir('buscar-insp', 'suger-insp', 'insp');
+    setTimeout(() => initMapa("mapaInsp", "insp"), 300);
+  }
+  if (n === 3) {
+    initBuscarDir('buscar-envio', 'suger-envio', 'env');
+    setTimeout(() => initMapa("mapaEnvio", "env"), 300);
+  }
   if (n === 4) {
     const eq = document.getElementById("maquinaria").value;
     document.getElementById("equipo-label").textContent = eq || "—";
@@ -3703,6 +3711,12 @@ function initMapa(id, tipo) {
 }
 
 function crearMapa(id, tipo, lat, lng) {
+  // Si el usuario ya seleccionó una dirección antes de que el mapa existiera, usar esas coords
+  if (pendingMapPos[tipo]) {
+    lat = pendingMapPos[tipo].lat;
+    lng = pendingMapPos[tipo].lng;
+  }
+
   maps[tipo] = L.map(id, { zoomControl: true }).setView([lat, lng], 16);
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     attribution: "© OpenStreetMap"
@@ -3710,13 +3724,27 @@ function crearMapa(id, tipo, lat, lng) {
 
   markers[tipo] = L.marker([lat, lng], { draggable: true }).addTo(maps[tipo]);
 
-  markers[tipo].on("dragend", () => {
+  markers[tipo].on("dragend", async () => {
     const p = markers[tipo].getLatLng();
+    pendingMapPos[tipo] = { lat: p.lat, lng: p.lng };
+    try {
+      const res  = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${p.lat}&lon=${p.lng}`,
+        { headers: { 'Accept': 'application/json' } }
+      );
+      const data = await res.json();
+      if (data && data.display_name) {
+        const inputId = tipo === 'insp' ? 'buscar-insp' : 'buscar-envio';
+        const inp = document.getElementById(inputId);
+        if (inp) inp.value = data.display_name;
+        dirManual[tipo] = data.display_name;
+      }
+    } catch {}
   });
 
   setTimeout(() => maps[tipo].invalidateSize(), 250);
 
-  // Activar buscador de dirección para este mapa
+  // Activar buscador de dirección (el guard interno evita doble-binding)
   const buscarId = tipo === 'insp' ? 'buscar-insp' : 'buscar-envio';
   const sugerId  = tipo === 'insp' ? 'suger-insp'  : 'suger-envio';
   initBuscarDir(buscarId, sugerId, tipo);
@@ -3724,9 +3752,11 @@ function crearMapa(id, tipo, lat, lng) {
 
 /* ─── BUSCADOR DE DIRECCIÓN CON AUTOCOMPLETE ─── */
 function initBuscarDir(inputId, sugerId, tipo) {
+  if (buscarDirInited[tipo]) return;
   const inp = document.getElementById(inputId);
   const ul  = document.getElementById(sugerId);
   if (!inp || !ul) return;
+  buscarDirInited[tipo] = true;
 
   let timer;
   inp.addEventListener('input', () => {
@@ -3751,6 +3781,7 @@ function initBuscarDir(inputId, sugerId, tipo) {
             e.preventDefault(); // evitar que el input pierda foco antes del click
             const lat = parseFloat(item.lat);
             const lng = parseFloat(item.lon);
+            pendingMapPos[tipo] = { lat, lng }; // persistir aunque el mapa aún no exista
             if (maps[tipo] && markers[tipo]) {
               maps[tipo].setView([lat, lng], 16);
               markers[tipo].setLatLng([lat, lng]);
