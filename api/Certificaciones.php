@@ -1157,26 +1157,67 @@ SVG;
         sort($archivos);
         $archivos = array_slice($archivos, 0, 9);
 
-        // Reemplazar cada div.foto-placeholder con la foto correspondiente
-        $idx = 0;
-        $html = preg_replace_callback(
-            '/<div\s+class="foto-placeholder"[^>]*>.*?<\/div>/s',
-            function ($match) use ($archivos, &$idx) {
-                if (!isset($archivos[$idx])) {
-                    $idx++;
-                    return $match[0]; // sin foto: mantener placeholder
+        // Convertir todas las fotos a base64
+        $fotos = [];
+        foreach ($archivos as $path) {
+            if (!file_exists($path)) continue;
+            $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+            $mime = in_array($ext, ['png']) ? 'image/png' : (in_array($ext, ['webp']) ? 'image/webp' : 'image/jpeg');
+            $fotos[] = ['mime' => $mime, 'b64' => base64_encode(file_get_contents($path))];
+        }
+        if (empty($fotos)) return $html;
+
+        $total = count($fotos);
+
+        if ($total === 9) {
+            // Todas las fotos presentes: reemplazar cada placeholder en su posición original
+            $idx = 0;
+            $html = preg_replace_callback(
+                '/<div\s+class="foto-placeholder"[^>]*>.*?<\/div>/s',
+                function ($match) use ($fotos, &$idx) {
+                    if (!isset($fotos[$idx])) { $idx++; return $match[0]; }
+                    $f = $fotos[$idx++];
+                    return "<div class=\"foto-placeholder\" style=\"padding:2px;background:#fff;display:flex;align-items:center;justify-content:center;min-height:90px\">"
+                         . "<img src=\"data:{$f['mime']};base64,{$f['b64']}\" style=\"max-width:100%;max-height:110px;object-fit:contain;display:block;\">"
+                         . "</div>";
+                },
+                $html
+            );
+        } else {
+            // Fotos parciales: reconstruir la sección como cuadrícula general (sin sub-títulos ni descripciones)
+            $filas = '';
+            foreach (array_chunk($fotos, 3) as $fila) {
+                $filas .= '<tr>';
+                foreach ($fila as $f) {
+                    $filas .= '<td class="foto-card" style="padding:4px;text-align:center;vertical-align:middle;">'
+                            . "<img src=\"data:{$f['mime']};base64,{$f['b64']}\" "
+                            . 'style="max-width:100%;max-height:120px;object-fit:contain;display:block;margin:0 auto;">'
+                            . '</td>';
                 }
-                $path = $archivos[$idx++];
-                if (!file_exists($path)) return $match[0];
+                // Rellenar celdas vacías en la última fila
+                $vacias = 3 - count($fila);
+                for ($i = 0; $i < $vacias; $i++) {
+                    $filas .= '<td class="foto-card" style="background:#f9fafb;"></td>';
+                }
+                $filas .= '</tr>';
+            }
 
-                $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-                $mime = in_array($ext, ['png']) ? 'image/png' : (in_array($ext, ['webp']) ? 'image/webp' : 'image/jpeg');
-                $b64  = base64_encode(file_get_contents($path));
+            $nuevaSeccion = '<table width="100%" cellpadding="0" cellspacing="0" '
+                          . 'style="border-collapse:collapse;border:1px solid #cdd8e3;">'
+                          . $filas . '</table>';
 
-                return "<div class=\"foto-placeholder\" style=\"padding:2px;background:#fff;display:flex;align-items:center;justify-content:center;min-height:90px\">"
-                     . "<img src=\"data:{$mime};base64,{$b64}\" style=\"max-width:100%;max-height:110px;object-fit:contain;display:block;\">"
-                     . "</div>";
-            },
+            // Reemplazar desde <div class="foto-section-title"> hasta el cierre de foto-grid-ganchos
+            $html = preg_replace(
+                '/<div\s+class="foto-section-title"[^>]*>.*?<table\s[^>]*class="foto-grid-ganchos"[^>]*>.*?<\/table>/s',
+                $nuevaSeccion,
+                $html
+            );
+        }
+
+        // Actualizar el contador de evidencias en el título de sección
+        $html = str_replace(
+            '9 Evidencias visuales de la inspección',
+            "{$total} Evidencias visuales de la inspección",
             $html
         );
 
