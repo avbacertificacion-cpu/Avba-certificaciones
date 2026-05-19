@@ -90,11 +90,13 @@ class Inspecciones {
             $coordsInsp = trim($info['coords_insp']  ?? '');
             $coordsEnv  = trim($info['coords_envio'] ?? '');
 
-            // Geocodificar server-side para obtener dirección legible confiable
-            $dirInsp = $this->geocodificarCoordenadas($coordsInsp)
-                       ?: $u($info['direccion_inspeccion_legible'] ?? '') ?: null;
-            $dirEnv  = $this->geocodificarCoordenadas($coordsEnv)
-                       ?: $u($info['direccion_envio_legible']      ?? '') ?: null;
+            // Si el inspector seleccionó del buscador, usar ese texto directamente.
+            // Solo reverse-geocodificar cuando el pin fue arrastrado sin buscar.
+            $dirInspManual = strtoupper(trim($info['dir_insp_manual']  ?? ''));
+            $dirEnvManual  = strtoupper(trim($info['dir_envio_manual'] ?? ''));
+
+            $dirInsp = $dirInspManual ?: ($this->geocodificarCoordenadas($coordsInsp) ?: null);
+            $dirEnv  = $dirEnvManual  ?: ($this->geocodificarCoordenadas($coordsEnv)  ?: null);
 
             $stmt->execute([
                 $cliente,

@@ -2569,6 +2569,7 @@ const PASOS_NOMBRE = [
 let pasoActual      = 1;
 let maps            = { insp: null, env: null };
 let markers         = { insp: null, env: null };
+let dirManual       = { insp: '', env: '' };  // dirección elegida del buscador
 let respuestasCheck = {};
 let fotosData       = [];       // [{base64, mimeType, nombre}]
 let pruebaCargaData = {};
@@ -3709,6 +3710,7 @@ function initBuscarDir(inputId, sugerId, tipo) {
   let timer;
   inp.addEventListener('input', () => {
     clearTimeout(timer);
+    dirManual[tipo] = ''; // el usuario modificó el texto; limpiar hasta que seleccione de nuevo
     const q = inp.value.trim();
     if (q.length < 3) { ul.innerHTML = ''; ul.style.display = 'none'; return; }
 
@@ -3733,6 +3735,7 @@ function initBuscarDir(inputId, sugerId, tipo) {
               markers[tipo].setLatLng([lat, lng]);
             }
             inp.value = item.display_name;
+            dirManual[tipo] = item.display_name; // guardar texto completo seleccionado
             ul.innerHTML = '';
             ul.style.display = 'none';
           });
@@ -3910,6 +3913,8 @@ async function enviarFormulario() {
           email_cliente: obtenerEmails(),
           coords_insp:   latLngInsp ? `${latLngInsp.lat},${latLngInsp.lng}` : "0,0",
           coords_envio:  latLngEnv  ? `${latLngEnv.lat},${latLngEnv.lng}`   : "0,0",
+          dir_insp_manual:  dirManual.insp  || '',
+          dir_envio_manual: dirManual.env   || '',
           comentarios:   document.getElementById("comentarios").value,
           semaforo
         },
