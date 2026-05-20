@@ -206,9 +206,9 @@ $nombre = $_SESSION['nombre'];
                 </select>
             </div>
             <div class="form-group" id="empresa-group" style="display:none">
-                <label>Empresa (para Inspectores y Clientes)</label>
+                <label>Empresa (solo para Clientes) *</label>
                 <select id="u-empresa"></select>
-                <small>Selecciona la empresa a la que pertenece este usuario</small>
+                <small>Los inspectores trabajan para AVBA, los clientes para empresas específicas</small>
             </div>
         </div>
 
@@ -386,7 +386,7 @@ function cerrarModal() {
 function actualizarVisibilidadEmpresa() {
     const rol = document.getElementById('u-rol').value;
     const grupo = document.getElementById('empresa-group');
-    grupo.style.display = (rol !== 'administrador') ? 'block' : 'none';
+    grupo.style.display = (rol === 'cliente') ? 'block' : 'none';
 }
 
 function actualizarFuerzaPassword() {
@@ -462,8 +462,8 @@ async function guardarUsuario() {
         return;
     }
 
-    if (rol !== 'administrador' && !empresa) {
-        modalAlert('Debes seleccionar una empresa para inspectores y clientes', 'error');
+    if (rol === 'cliente' && !empresa) {
+        modalAlert('Debes seleccionar una empresa para clientes', 'error');
         document.getElementById('u-empresa').focus();
         return;
     }
@@ -473,7 +473,7 @@ async function guardarUsuario() {
 
     try {
         const body = { nombre, username, email: email || null, rol, estado };
-        if (rol !== 'administrador') body.empresa_id = empresa || null;
+        if (rol === 'cliente') body.empresa_id = empresa || null;
         if (password) body.password = password;
         if (id) body.id = parseInt(id);
 
