@@ -214,6 +214,8 @@ function formularioInspeccion(ext) {
         {key:'ob',  label:'OB – Obstruido'},
         {key:'dan', label:'DAÑ – Daño'},
         {key:'pin', label:'PIN – Pintura y etiqueta'},
+        {key:'fn',  label:'FN – Funda'},
+        {key:'gb',  label:'GB – Gabinete'},
     ];
 
     const filas = items.map(it => `

@@ -68,6 +68,8 @@ CREATE TABLE inspecciones (
     ob   ENUM('OK','NC','NA','PO') DEFAULT NULL,   -- Obstruido
     dan  ENUM('OK','NC','NA','PO') DEFAULT NULL,   -- Daño
     pin  ENUM('OK','NC','NA','PO') DEFAULT NULL,   -- Pintura y etiqueta
+    fn   ENUM('OK','NC','NA','PO') DEFAULT NULL,   -- Funda
+    gb   ENUM('OK','NC','NA','PO') DEFAULT NULL,   -- Gabinete
 
     tipo_inspeccion  VARCHAR(50),                  -- tipo, capacidad, PH, recarga (de plantilla)
     capacidad_insp   VARCHAR(30),
