@@ -75,13 +75,19 @@ function crear() {
             INSERT INTO usuarios (nombre, username, email, password, rol, empresa_id, estado)
             VALUES (?,?,?,?,?,?,'activo')
         ");
+        // Solo clientes se asignan a empresas
+        $empresa_id = null;
+        if ($d['rol'] === 'cliente' && !empty($d['empresa_id'])) {
+            $empresa_id = $d['empresa_id'];
+        }
+
         $stmt->execute([
             $d['nombre'],
             strtolower(trim($d['username'])),
             !empty($d['email']) ? strtolower(trim($d['email'])) : null,
             password_hash($d['password'], PASSWORD_BCRYPT),
             $d['rol'],
-            !empty($d['empresa_id']) ? $d['empresa_id'] : null,
+            $empresa_id,
         ]);
 
         $newId = $pdo->lastInsertId();
@@ -109,6 +115,12 @@ function editar() {
     $id = intval($d['id'] ?? 0);
     if (!$id) { http_response_code(400); echo json_encode(['error' => 'ID requerido']); return; }
 
+    // Solo clientes se asignan a empresas
+    $empresa_id = null;
+    if ($d['rol'] === 'cliente' && !empty($d['empresa_id'])) {
+        $empresa_id = $d['empresa_id'];
+    }
+
     $stmt = $pdo->prepare("
         UPDATE usuarios SET nombre=?, username=?, email=?, rol=?, empresa_id=?, estado=? WHERE id=?
     ");
@@ -117,7 +129,7 @@ function editar() {
         strtolower(trim($d['username'] ?? '')),
         !empty($d['email']) ? strtolower(trim($d['email'])) : null,
         $d['rol'],
-        !empty($d['empresa_id']) ? $d['empresa_id'] : null,
+        $empresa_id,
         $d['estado'] ?? 'activo',
         $id,
     ]);
