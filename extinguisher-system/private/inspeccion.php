@@ -245,6 +245,12 @@ function formularioInspeccion(ext) {
             <div class="legend-item"><div class="legend-dot dot-po"></div> PO – En préstamo</div>
         </div>
 
+        <div style="margin-bottom:10px;text-align:right">
+            <button class="btn" style="background:#2196F3;color:#fff;padding:6px 14px;font-size:13px" onclick="marcarTodosOK()">
+                ✔ Marcar todos OK
+            </button>
+        </div>
+
         <table>
             <thead><tr><th>Elemento</th><th>Resultado</th></tr></thead>
             <tbody>${filas}</tbody>
@@ -264,6 +270,14 @@ function formularioInspeccion(ext) {
             </button>
         </div>
     </div>`;
+}
+
+// ── Marcar todos los items como OK ───────────────────────────────────────────
+function marcarTodosOK() {
+    ['ser','mg','po','ph','sg','ps','ob','dan','pin','fn','gb','rv'].forEach(key => {
+        const radio = document.getElementById(`${key}-OK`);
+        if (radio) radio.checked = true;
+    });
 }
 
 // ── Guardar inspección ────────────────────────────────────────────────────────
