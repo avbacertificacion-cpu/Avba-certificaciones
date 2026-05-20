@@ -1,4 +1,6 @@
 <?php
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 require_once '../config/config.php';
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -110,6 +112,10 @@ if (!empty($pagina_actual)) {
 }
 
 $total_paginas = count($paginas);
+
+if ($total_paginas === 0) {
+    exit('No hay extintores registrados para la empresa "' . htmlspecialchars($reporte['empresa_nombre']) . '". Agrega extintores primero.');
+}
 
 // ─── Helper: badge ────────────────────────────────────────────────────────────
 function badge(?string $val): string {
