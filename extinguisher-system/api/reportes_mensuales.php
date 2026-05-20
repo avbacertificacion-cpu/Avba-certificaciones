@@ -37,11 +37,9 @@ function listar() {
     $stmt = $pdo->prepare("
         SELECT r.*,
                emp.nombre AS empresa_nombre,
-               p.nombre   AS nombre_plantilla,
                u.nombre   AS generado_por_nombre
         FROM reportes_mensuales r
         JOIN empresas  emp ON emp.id = r.empresa_id
-        JOIN plantillas p  ON p.id  = r.plantilla_id
         JOIN usuarios   u  ON u.id  = r.generado_por
         $where
         ORDER BY r.anio DESC, r.mes DESC
@@ -64,10 +62,8 @@ function listarCliente() {
     }
 
     $stmt = $pdo->prepare("
-        SELECT r.id, r.numero_reporte, r.mes, r.anio, r.created_at,
-               p.nombre AS nombre_plantilla
+        SELECT r.id, r.numero_reporte, r.mes, r.anio, r.created_at
         FROM reportes_mensuales r
-        JOIN plantillas p ON p.id = r.plantilla_id
         WHERE r.empresa_id = ? AND r.estado = 'publicado'
         ORDER BY r.anio DESC, r.mes DESC
     ");
@@ -85,7 +81,7 @@ function crear() {
 
     $d = json_decode(file_get_contents('php://input'), true);
 
-    foreach (['plantilla_id','empresa_id','mes','anio'] as $c) {
+    foreach (['empresa_id','mes','anio'] as $c) {
         if (empty($d[$c])) {
             http_response_code(400); echo json_encode(['error' => "Campo requerido: $c"]); return;
         }
@@ -99,11 +95,10 @@ function crear() {
 
     $stmt = $pdo->prepare("
         INSERT INTO reportes_mensuales
-            (plantilla_id, empresa_id, generado_por, mes, anio, numero_reporte, estado, observaciones)
-        VALUES (?,?,?,?,?,?,'borrador',?)
+            (empresa_id, generado_por, mes, anio, numero_reporte, estado, observaciones)
+        VALUES (?,?,?,?,?,'borrador',?)
     ");
     $stmt->execute([
-        $d['plantilla_id'],
         $d['empresa_id'],
         $uid,
         $d['mes'],
@@ -174,10 +169,9 @@ function generarPDF() {
 
     // Cliente solo puede ver reportes publicados de su empresa
     $stmt = $pdo->prepare("
-        SELECT r.*, emp.nombre AS empresa_nombre, p.nombre AS plantilla_nombre
+        SELECT r.*, emp.nombre AS empresa_nombre
         FROM reportes_mensuales r
         JOIN empresas   emp ON emp.id = r.empresa_id
-        JOIN plantillas p   ON p.id  = r.plantilla_id
         WHERE r.id = ?
     ");
     $stmt->execute([$id]);

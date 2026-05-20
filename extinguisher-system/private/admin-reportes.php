@@ -89,10 +89,6 @@ $nombre = $_SESSION['nombre'];
             <label>Empresa *</label>
             <select id="r-empresa"></select>
         </div>
-        <div class="form-group">
-            <label>Plantilla *</label>
-            <select id="r-plantilla"></select>
-        </div>
         <div class="form-row">
             <div class="form-group">
                 <label>Mes *</label>
@@ -128,7 +124,7 @@ const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
                'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
 async function init() {
-    await Promise.all([cargarEmpresas(), cargarPlantillas()]);
+    await cargarEmpresas();
     cargar();
 }
 
@@ -142,14 +138,6 @@ async function cargarEmpresas() {
         sel1.innerHTML += `<option value="${e.id}">${e.nombre}</option>`;
         sel2.innerHTML += `<option value="${e.id}">${e.nombre}</option>`;
     });
-}
-
-async function cargarPlantillas() {
-    const r = await fetch('../api/plantillas.php?action=listar');
-    const d = await r.json();
-    if (!d.success) return;
-    const sel = document.getElementById('r-plantilla');
-    sel.innerHTML = d.data.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
 }
 
 async function cargar() {
@@ -166,14 +154,13 @@ async function cargar() {
     c.innerHTML = `
     <table>
         <thead><tr>
-            <th>Número</th><th>Empresa</th><th>Plantilla</th><th>Período</th>
+            <th>Número</th><th>Empresa</th><th>Período</th>
             <th>Estado</th><th>Acciones</th>
         </tr></thead>
         <tbody>
         ${d.data.map(rep => `<tr>
             <td><strong>${rep.numero_reporte}</strong></td>
             <td>${rep.empresa_nombre}</td>
-            <td>${rep.nombre_plantilla}</td>
             <td>${meses[rep.mes]} ${rep.anio}</td>
             <td><span class="badge b-${rep.estado}">${estadoLabel(rep.estado)}</span></td>
             <td style="white-space:nowrap">
@@ -228,15 +215,14 @@ function cerrarModal() { document.getElementById('modalReporte').classList.remov
 
 async function crearReporte() {
     const body = {
-        empresa_id:   parseInt(document.getElementById('r-empresa').value),
-        plantilla_id: parseInt(document.getElementById('r-plantilla').value),
-        mes:          parseInt(document.getElementById('r-mes').value),
-        anio:         parseInt(document.getElementById('r-anio').value),
+        empresa_id:    parseInt(document.getElementById('r-empresa').value),
+        mes:           parseInt(document.getElementById('r-mes').value),
+        anio:          parseInt(document.getElementById('r-anio').value),
         observaciones: document.getElementById('r-obs').value || null,
     };
-    if (!body.empresa_id || !body.plantilla_id) {
+    if (!body.empresa_id) {
         document.getElementById('modal-alert').innerHTML =
-            '<div class="alert alert-error">Empresa y Plantilla son requeridos</div>'; return;
+            '<div class="alert alert-error">Selecciona una empresa</div>'; return;
     }
 
     const r = await fetch('../api/reportes_mensuales.php?action=crear', {
