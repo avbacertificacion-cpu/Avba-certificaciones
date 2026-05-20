@@ -63,28 +63,25 @@ function guardar() {
             INSERT INTO inspecciones
                 (extintor_id, inspector_id, fecha, hora,
                  ser, mg, po, ph, sg, ps, ob, dan, pin, fn, gb, rv,
-                 tipo_inspeccion, capacidad_insp,
                  observaciones)
-            VALUES (?,?,CURDATE(),CURTIME(),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,CURDATE(),CURTIME(),?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute([
             $d['extintor_id'],
             $uid,
-            $d['ser']             ?? null,
-            $d['mg']              ?? null,
-            $d['po']              ?? null,
-            $d['ph']              ?? null,
-            $d['sg']              ?? null,
-            $d['ps']              ?? null,
-            $d['ob']              ?? null,
-            $d['dan']             ?? null,
-            $d['pin']             ?? null,
-            $d['fn']              ?? null,
-            $d['gb']              ?? null,
-            $d['rv']              ?? null,
-            $d['tipo_inspeccion'] ?? null,
-            $d['capacidad_insp']  ?? null,
-            $d['observaciones']   ?? null,
+            $d['ser']           ?? null,
+            $d['mg']            ?? null,
+            $d['po']            ?? null,
+            $d['ph']            ?? null,
+            $d['sg']            ?? null,
+            $d['ps']            ?? null,
+            $d['ob']            ?? null,
+            $d['dan']           ?? null,
+            $d['pin']           ?? null,
+            $d['fn']            ?? null,
+            $d['gb']            ?? null,
+            $d['rv']            ?? null,
+            $d['observaciones'] ?? null,
         ]);
 
         $id = $pdo->lastInsertId();
