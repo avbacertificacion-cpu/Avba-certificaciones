@@ -109,8 +109,8 @@ $nombre = $_SESSION['nombre'];
             </div>
         </div>
         <div class="form-group">
-            <label>Observaciones</label>
-            <textarea id="r-obs" placeholder="Notas del reporte…"></textarea>
+            <label>Ubicación</label>
+            <input type="text" id="r-obs" placeholder="Ej: EAA, PLANTA NORTE…" style="text-transform:uppercase">
         </div>
         <div class="modal-actions">
             <button class="btn btn-warning" onclick="cerrarModal()">Cancelar</button>

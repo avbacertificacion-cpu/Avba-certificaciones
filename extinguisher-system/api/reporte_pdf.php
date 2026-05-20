@@ -13,11 +13,9 @@ if (!$reporte_id) exit('ID de reporte requerido');
 
 // ─── Cargar datos del reporte ─────────────────────────────────────────────────
 $stmt = $pdo->prepare("
-    SELECT r.*, emp.nombre AS empresa_nombre, emp.domicilio AS empresa_domicilio,
-           p.nombre AS plantilla_nombre
+    SELECT r.*, emp.nombre AS empresa_nombre, emp.domicilio AS empresa_domicilio
     FROM reportes_mensuales r
-    JOIN empresas   emp ON emp.id = r.empresa_id
-    JOIN plantillas p   ON p.id  = r.plantilla_id
+    JOIN empresas emp ON emp.id = r.empresa_id
     WHERE r.id = ?
 ");
 $stmt->execute([$reporte_id]);
