@@ -157,11 +157,6 @@ try {
             <h3>Reportes</h3>
             <p>Generar y publicar reportes mensuales</p>
         </div>
-        <div class="menu-item" onclick="go('admin-plantillas.php')">
-            <div class="icon">📋</div>
-            <h3>Plantillas</h3>
-            <p>Diseñar formatos para los reportes</p>
-        </div>
         <div class="menu-item" onclick="go('admin-usuarios.php')">
             <div class="icon">👥</div>
             <h3>Usuarios</h3>
