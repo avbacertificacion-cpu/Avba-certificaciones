@@ -275,8 +275,15 @@ async function guardarInspeccion() {
         return sel ? sel.value : null;
     };
 
+    // Capturar fecha y hora del cliente
+    const ahora = new Date();
+    const fecha = ahora.toISOString().split('T')[0]; // YYYY-MM-DD
+    const hora = ahora.toTimeString().slice(0, 8); // HH:MM:SS
+
     const body = {
         extintor_id:     extActual.id,
+        fecha:           fecha,
+        hora:            hora,
         ser:             getRadio('ser'),
         mg:              getRadio('mg'),
         po:              getRadio('po'),

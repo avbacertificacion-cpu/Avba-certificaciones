@@ -46,6 +46,18 @@ function guardar() {
         return;
     }
 
+    if (empty($d['fecha'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'fecha requerida']);
+        return;
+    }
+
+    if (empty($d['hora'])) {
+        http_response_code(400);
+        echo json_encode(['error' => 'hora requerida']);
+        return;
+    }
+
     $campos_checklist = ['ser','mg','po','ph','sg','ps','ob','dan','pin','fn','gb','rv'];
     $valores_validos  = ['OK','NC','NA','PO',null];
 
@@ -64,11 +76,13 @@ function guardar() {
                 (extintor_id, inspector_id, fecha, hora,
                  ser, mg, po, ph, sg, ps, ob, dan, pin, fn, gb, rv,
                  observaciones)
-            VALUES (?,?,CURDATE(),CURTIME(),?,?,?,?,?,?,?,?,?,?,?,?,?)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $stmt->execute([
             $d['extintor_id'],
             $uid,
+            $d['fecha'],
+            $d['hora'],
             $d['ser']           ?? null,
             $d['mg']            ?? null,
             $d['po']            ?? null,
