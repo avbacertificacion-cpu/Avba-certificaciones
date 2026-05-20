@@ -70,11 +70,10 @@ CREATE TABLE inspecciones (
     pin  ENUM('OK','NC','NA','PO') DEFAULT NULL,   -- Pintura y etiqueta
     fn   ENUM('OK','NC','NA','PO') DEFAULT NULL,   -- Funda
     gb   ENUM('OK','NC','NA','PO') DEFAULT NULL,   -- Gabinete
+    rv   ENUM('OK','NC','NA','PO') DEFAULT NULL,   -- Recarga vigente
 
-    tipo_inspeccion  VARCHAR(50),                  -- tipo, capacidad, PH, recarga (de plantilla)
-    capacidad_insp   VARCHAR(30),
-    ph_vigente       TINYINT(1) DEFAULT 0,
-    recarga_vigente  TINYINT(1) DEFAULT 0,
+    tipo_inspeccion  VARCHAR(50),                  -- tipo de extintor inspeccionado
+    capacidad_insp   VARCHAR(30),                  -- capacidad inspeccionada
 
     observaciones   TEXT,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

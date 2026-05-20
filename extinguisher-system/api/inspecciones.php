@@ -46,7 +46,7 @@ function guardar() {
         return;
     }
 
-    $campos_checklist = ['ser','mg','po','ph','sg','ps','ob','dan','pin','fn','gb'];
+    $campos_checklist = ['ser','mg','po','ph','sg','ps','ob','dan','pin','fn','gb','rv'];
     $valores_validos  = ['OK','NC','NA','PO',null];
 
     foreach ($campos_checklist as $c) {
@@ -62,8 +62,8 @@ function guardar() {
         $stmt = $pdo->prepare("
             INSERT INTO inspecciones
                 (extintor_id, inspector_id, fecha, hora,
-                 ser, mg, po, ph, sg, ps, ob, dan, pin, fn, gb,
-                 tipo_inspeccion, capacidad_insp, ph_vigente, recarga_vigente,
+                 ser, mg, po, ph, sg, ps, ob, dan, pin, fn, gb, rv,
+                 tipo_inspeccion, capacidad_insp,
                  observaciones)
             VALUES (?,?,CURDATE(),CURTIME(),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
@@ -81,10 +81,9 @@ function guardar() {
             $d['pin']             ?? null,
             $d['fn']              ?? null,
             $d['gb']              ?? null,
+            $d['rv']              ?? null,
             $d['tipo_inspeccion'] ?? null,
             $d['capacidad_insp']  ?? null,
-            $d['ph_vigente']      ? 1 : 0,
-            $d['recarga_vigente'] ? 1 : 0,
             $d['observaciones']   ?? null,
         ]);
 

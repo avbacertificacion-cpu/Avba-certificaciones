@@ -301,18 +301,18 @@ if (!$logo_html) {
                 <th class="th-dark" rowspan="3" style="width:54px">CAPACIDAD</th>
                 <th class="th-dark" rowspan="3" style="width:38px">PH</th>
                 <th class="th-dark" rowspan="3" style="width:46px">RECARGA</th>
-                <th class="th-dark" colspan="12">Inspección en campo</th>
+                <th class="th-dark" colspan="13">Inspección en campo</th>
             </tr>
             <tr>
-                <th class="th-desc" colspan="11">
+                <th class="th-desc" colspan="12">
                     SEÑ-Señalamiento y soporte, MG-Manguera, PO Extintor de prestado, PH- Prueba hidrostática,
                     SG-Seguro (pasador y cincho), PS-Presión, OB- Obstruido, DAÑ-Daño, PIN-Pintura y etiqueta,
-                    FN-Funda, GB-Gabinete
+                    FN-Funda, GB-Gabinete, RV-Recarga vigente
                 </th>
                 <th class="th-dark" rowspan="2" style="min-width:70px;font-size:7pt">Observaciones</th>
             </tr>
             <tr>
-                <?php foreach(['SEÑ','MG','PO','PH','SG','PS','OB','DAÑ','PIN','FN','GB'] as $col): ?>
+                <?php foreach(['SEÑ','MG','PO','PH','SG','PS','OB','DAÑ','PIN','FN','GB','RV'] as $col): ?>
                 <th class="th-gray" style="width:28px"><?= $col ?></th>
                 <?php endforeach; ?>
             </tr>
@@ -321,12 +321,12 @@ if (!$logo_html) {
         <?php foreach ($filas_pagina as $fila):
             if ($fila['tipo'] === 'seccion'): ?>
             <tr class="row-seccion">
-                <td colspan="18"><?= htmlspecialchars($fila['texto']) ?></td>
+                <td colspan="19"><?= htmlspecialchars($fila['texto']) ?></td>
             </tr>
             <?php else:
                 $ext  = $fila['ext'];
                 $insp = $ext['inspeccion'];
-                $keys = ['ser','mg','po','ph','sg','ps','ob','dan','pin','fn','gb'];
+                $keys = ['ser','mg','po','ph','sg','ps','ob','dan','pin','fn','gb','rv'];
             ?>
             <tr>
                 <td><?= $ext['numero'] ?></td>
@@ -341,7 +341,7 @@ if (!$logo_html) {
                     <?php endforeach; ?>
                     <td class="td-obs"><?= htmlspecialchars($insp['observaciones'] ?? '') ?></td>
                 <?php else: ?>
-                    <?php for ($i = 0; $i < 12; $i++): ?>
+                    <?php for ($i = 0; $i < 13; $i++): ?>
                     <td></td>
                     <?php endfor; ?>
                 <?php endif; ?>
