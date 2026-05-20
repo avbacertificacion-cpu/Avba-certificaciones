@@ -250,19 +250,8 @@ function formularioInspeccion(ext) {
             <tbody>${filas}</tbody>
         </table>
 
-        <h3 style="margin-top:24px;margin-bottom:12px">Datos del extintor</h3>
-        <div class="datos-grid">
-            <div class="form-group">
-                <label>Tipo inspeccionado</label>
-                <input type="text" id="tipo-insp" value="${ext.tipo}" placeholder="Tipo de extintor">
-            </div>
-            <div class="form-group">
-                <label>Capacidad inspeccionada</label>
-                <input type="text" id="cap-insp" value="${ext.capacidad || ''}" placeholder="Ej: 6 kg">
-            </div>
-        </div>
-        <div class="form-group" style="margin-top:12px">
-            <label>Observaciones</label>
+        <h3 style="margin-top:24px;margin-bottom:12px">Observaciones</h3>
+        <div class="form-group">
             <textarea id="obs-insp" placeholder="Notas, condiciones especiales…"></textarea>
         </div>
 
@@ -300,8 +289,6 @@ async function guardarInspeccion() {
         fn:              getRadio('fn'),
         gb:              getRadio('gb'),
         rv:              getRadio('rv'),
-        tipo_inspeccion: document.getElementById('tipo-insp').value  || null,
-        capacidad_insp:  document.getElementById('cap-insp').value   || null,
         observaciones:   document.getElementById('obs-insp').value   || null,
     };
 
