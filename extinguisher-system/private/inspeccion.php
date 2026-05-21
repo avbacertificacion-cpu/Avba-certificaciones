@@ -309,6 +309,15 @@ function mostrarExtintor(ext) {
 
         ${formularioInspeccion(ext)}
     `;
+
+    // Establecer valores por defecto: fecha y hora actual
+    setTimeout(() => {
+        const ahora = new Date();
+        const fecha = ahora.toISOString().split('T')[0];
+        const hora = ahora.toTimeString().slice(0, 5);
+        document.getElementById('fecha-insp').value = fecha;
+        document.getElementById('hora-insp').value = hora;
+    }, 100);
 }
 
 // ── Extintor NO encontrado ────────────────────────────────────────────────────
@@ -370,7 +379,7 @@ function formularioInspeccion(ext) {
             <div class="legend-item"><div class="legend-dot dot-po"></div> PO – En préstamo</div>
         </div>
 
-        <div style="margin-bottom:10px;text-align:right">
+        <div style="margin-bottom:16px;text-align:right">
             <button class="btn" style="background:#2196F3;color:#fff;padding:6px 14px;font-size:13px" onclick="marcarTodosOK()">
                 ✔ Marcar todos OK
             </button>
@@ -380,6 +389,18 @@ function formularioInspeccion(ext) {
             <thead><tr><th>Elemento</th><th>Resultado</th></tr></thead>
             <tbody>${filas}</tbody>
         </table>
+
+        <h3 style="margin-top:24px;margin-bottom:12px">📅 Fecha y Hora de Inspección</h3>
+        <div class="datos-grid">
+            <div class="form-group">
+                <label>Fecha *</label>
+                <input type="date" id="fecha-insp" required>
+            </div>
+            <div class="form-group">
+                <label>Hora *</label>
+                <input type="time" id="hora-insp" required>
+            </div>
+        </div>
 
         <h3 style="margin-top:24px;margin-bottom:12px">Observaciones</h3>
         <div class="form-group">
@@ -414,16 +435,20 @@ async function guardarInspeccion() {
         return sel ? sel.value : null;
     };
 
-    // Capturar fecha y hora del cliente
-    const ahora = new Date();
-    const fecha = ahora.toISOString().split('T')[0]; // YYYY-MM-DD
-    const hora = ahora.toTimeString().slice(0, 8); // HH:MM:SS
+    // Obtener fecha y hora del formulario
+    const fecha = document.getElementById('fecha-insp').value;
+    const hora = document.getElementById('hora-insp').value;
+
+    if (!fecha || !hora) {
+        showAlert('Ingresa fecha y hora de inspección', 'error');
+        return;
+    }
 
     const body = {
         extintor_id:     extActual.id,
         empresa_id:      empresaInspeccion,
         fecha:           fecha,
-        hora:            hora,
+        hora:            hora + ':00', // Agregar segundos para formato HH:MM:SS
         ser:             getRadio('ser'),
         mg:              getRadio('mg'),
         po:              getRadio('po'),
