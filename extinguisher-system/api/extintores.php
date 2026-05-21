@@ -226,6 +226,7 @@ function editar() {
 
     $stmt = $pdo->prepare("
         UPDATE extintores SET
+            empresa_id    = ?,
             seccion       = ?,
             ubicacion     = ?,
             tipo          = ?,
@@ -237,6 +238,7 @@ function editar() {
         WHERE id = ?
     ");
     $stmt->execute([
+        $d['empresa_id']    ?? null,
         $d['seccion']       ?? null,
         $d['ubicacion']     ?? '',
         $d['tipo']          ?? '',
