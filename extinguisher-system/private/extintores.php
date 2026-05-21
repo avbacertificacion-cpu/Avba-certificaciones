@@ -83,6 +83,11 @@ $es_admin = $rol === ROLE_ADMIN;
 
     <div class="toolbar">
         <input type="text" id="busqueda" placeholder="Buscar por código, ubicación…" oninput="filtrar()">
+        <?php if ($es_admin): ?>
+        <select id="filtroEmpresa" onchange="filtrar()">
+            <option value="">Todas las empresas</option>
+        </select>
+        <?php endif; ?>
         <select id="filtroEstado" onchange="filtrar()">
             <option value="">Todos los estados</option>
             <option value="activo">Activo</option>
@@ -207,6 +212,13 @@ async function cargarEmpresas() {
             empresas = d.data;
             const sel = document.getElementById('ext-empresa');
             sel.innerHTML = empresas.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+
+            // Cargar filtro de empresa para admin
+            const filtro = document.getElementById('filtroEmpresa');
+            if (filtro) {
+                filtro.innerHTML = '<option value="">Todas las empresas</option>' +
+                    empresas.map(e => `<option value="${e.id}">${e.nombre}</option>`).join('');
+            }
         }
     } catch(e) {}
 }
@@ -267,9 +279,11 @@ function estadoLabel(s) {
 function filtrar() {
     const q = document.getElementById('busqueda').value.toLowerCase();
     const e = document.getElementById('filtroEstado').value;
+    const empr = document.getElementById('filtroEmpresa')?.value || '';
     renderTabla(extintores.filter(x =>
         (!q || x.codigo_manual.toLowerCase().includes(q) || x.ubicacion.toLowerCase().includes(q)) &&
-        (!e || x.estado === e)
+        (!e || x.estado === e) &&
+        (!empr || x.empresa_id == empr)
     ));
 }
 
