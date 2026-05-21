@@ -33,7 +33,7 @@ CREATE TABLE empresas (
 CREATE TABLE extintores (
     id              INT PRIMARY KEY AUTO_INCREMENT,
     codigo_qr       VARCHAR(64) UNIQUE NOT NULL,   -- hash único para QR
-    codigo_manual   VARCHAR(30) UNIQUE NOT NULL,   -- ej: EXT-001
+    codigo_manual   VARCHAR(30) NOT NULL,          -- ej: EXT-001 (único por empresa)
     empresa_id      INT NOT NULL,
     ubicacion       VARCHAR(255) NOT NULL,
     tipo            ENUM('PQS','CO2','agua','espuma','halotron','otro') NOT NULL,
@@ -47,7 +47,8 @@ CREATE TABLE extintores (
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (empresa_id) REFERENCES empresas(id),
-    FOREIGN KEY (creado_por) REFERENCES usuarios(id)
+    FOREIGN KEY (creado_por) REFERENCES usuarios(id),
+    UNIQUE KEY uk_extintor_empresa_codigo (empresa_id, codigo_manual)
 );
 
 -- ─── INSPECCIONES (checklist por extintor) ───────────────────────────────────
@@ -129,7 +130,7 @@ CREATE TABLE auditoria (
 -- ─── ÍNDICES ─────────────────────────────────────────────────────────────────
 CREATE INDEX idx_extintor_empresa    ON extintores(empresa_id);
 CREATE INDEX idx_extintor_codigo_qr  ON extintores(codigo_qr);
-CREATE INDEX idx_extintor_codigo_man ON extintores(codigo_manual);
+CREATE INDEX idx_extintor_empresa ON extintores(empresa_id);
 CREATE INDEX idx_inspeccion_extintor ON inspecciones(extintor_id);
 CREATE INDEX idx_inspeccion_fecha    ON inspecciones(fecha);
 CREATE INDEX idx_reporte_empresa     ON reportes_mensuales(empresa_id);
