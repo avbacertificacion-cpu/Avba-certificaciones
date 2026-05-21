@@ -16,7 +16,7 @@ if (isset($_GET['cambiar_empresa'])) {
 }
 
 // Manejar selección de empresa
-if ($_POST['action'] === 'seleccionar_empresa' && !empty($_POST['empresa_id'])) {
+if (($_POST['action'] ?? null) === 'seleccionar_empresa' && !empty($_POST['empresa_id'])) {
     $_SESSION['empresa_inspeccion'] = intval($_POST['empresa_id']);
     header('Location: inspeccion.php');
     exit;
