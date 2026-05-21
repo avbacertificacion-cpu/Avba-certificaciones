@@ -11,12 +11,13 @@ $uid    = $_SESSION['usuario_id'];
 $action = $_GET['action'] ?? '';
 
 switch ($action) {
-    case 'listar':          listar();         break;
-    case 'listar_empresas': listarEmpresas(); break;
-    case 'crear':           crear();          break;
-    case 'editar':          editar();         break;
-    case 'eliminar':        eliminar();       break;
-    case 'crear_empresa':   crearEmpresa();   break;
+    case 'listar':               listar();               break;
+    case 'listar_empresas':      listarEmpresas();       break;
+    case 'crear':                crear();                break;
+    case 'editar':               editar();               break;
+    case 'eliminar':             eliminar();             break;
+    case 'crear_empresa':        crearEmpresa();         break;
+    case 'desactivar_empresa':   desactivarEmpresa();    break;
     default:
         http_response_code(400); echo json_encode(['error' => 'Acción no válida']);
 }
@@ -175,19 +176,71 @@ function crearEmpresa() {
         http_response_code(400); echo json_encode(['error' => 'Nombre requerido']); return;
     }
 
-    $stmt = $pdo->prepare("INSERT INTO empresas (nombre,rfc,domicilio,telefono,email,contacto) VALUES (?,?,?,?,?,?)");
-    $stmt->execute([
-        $d['nombre'],
-        $d['rfc']      ?? null,
-        $d['domicilio'] ?? null,
-        $d['telefono'] ?? null,
-        $d['email']    ?? null,
-        $d['contacto'] ?? null,
-    ]);
+    $id = $d['id'] ?? null;
 
-    $id = $pdo->lastInsertId();
-    audit($uid, "Crear empresa {$d['nombre']}", 'empresas', $id);
+    if ($id) {
+        // Editar empresa existente
+        $stmt = $pdo->prepare("
+            UPDATE empresas
+            SET nombre=?, rfc=?, domicilio=?, telefono=?, email=?, contacto=?
+            WHERE id=?
+        ");
+        $stmt->execute([
+            $d['nombre'],
+            $d['rfc']       ?? null,
+            $d['domicilio'] ?? null,
+            $d['telefono']  ?? null,
+            $d['email']     ?? null,
+            $d['contacto']  ?? null,
+            $id
+        ]);
+        audit($uid, "Editar empresa {$d['nombre']}", 'empresas', $id);
+    } else {
+        // Crear empresa nueva
+        $stmt = $pdo->prepare("INSERT INTO empresas (nombre,rfc,domicilio,telefono,email,contacto) VALUES (?,?,?,?,?,?)");
+        $stmt->execute([
+            $d['nombre'],
+            $d['rfc']       ?? null,
+            $d['domicilio'] ?? null,
+            $d['telefono']  ?? null,
+            $d['email']     ?? null,
+            $d['contacto']  ?? null,
+        ]);
+        $id = $pdo->lastInsertId();
+        audit($uid, "Crear empresa {$d['nombre']}", 'empresas', $id);
+    }
+
     echo json_encode(['success' => true, 'id' => $id]);
+}
+
+// ─── DESACTIVAR EMPRESA (SOFT DELETE) ──────────────────────────────────────────
+function desactivarEmpresa() {
+    global $pdo, $rol, $uid;
+
+    if ($rol !== ROLE_ADMIN) {
+        http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
+    }
+
+    $id = intval($_GET['id'] ?? 0);
+    if (!$id) {
+        http_response_code(400); echo json_encode(['error' => 'ID requerido']); return;
+    }
+
+    // Obtener nombre de la empresa para el audit
+    $stmt = $pdo->prepare("SELECT nombre FROM empresas WHERE id=?");
+    $stmt->execute([$id]);
+    $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$empresa) {
+        http_response_code(404); echo json_encode(['error' => 'Empresa no encontrada']); return;
+    }
+
+    // Desactivar (soft delete)
+    $stmt = $pdo->prepare("UPDATE empresas SET estado='inactivo' WHERE id=?");
+    $stmt->execute([$id]);
+
+    audit($uid, "Desactivar empresa {$empresa['nombre']}", 'empresas', $id);
+    echo json_encode(['success' => true]);
 }
 
 // ─── HELPER ──────────────────────────────────────────────────────────────────

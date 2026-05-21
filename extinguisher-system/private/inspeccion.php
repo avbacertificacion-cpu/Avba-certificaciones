@@ -310,13 +310,11 @@ function mostrarExtintor(ext) {
         ${formularioInspeccion(ext)}
     `;
 
-    // Establecer valores por defecto: fecha y hora actual
+    // Establecer valor por defecto: fecha actual
     setTimeout(() => {
         const ahora = new Date();
         const fecha = ahora.toISOString().split('T')[0];
-        const hora = ahora.toTimeString().slice(0, 5);
         document.getElementById('fecha-insp').value = fecha;
-        document.getElementById('hora-insp').value = hora;
     }, 100);
 }
 
@@ -390,15 +388,11 @@ function formularioInspeccion(ext) {
             <tbody>${filas}</tbody>
         </table>
 
-        <h3 style="margin-top:24px;margin-bottom:12px">📅 Fecha y Hora de Inspección</h3>
-        <div class="datos-grid">
+        <h3 style="margin-top:24px;margin-bottom:12px">📅 Fecha de Inspección</h3>
+        <div style="max-width:250px">
             <div class="form-group">
                 <label>Fecha *</label>
                 <input type="date" id="fecha-insp" required>
-            </div>
-            <div class="form-group">
-                <label>Hora *</label>
-                <input type="time" id="hora-insp" required>
             </div>
         </div>
 
@@ -435,20 +429,23 @@ async function guardarInspeccion() {
         return sel ? sel.value : null;
     };
 
-    // Obtener fecha y hora del formulario
+    // Obtener fecha del formulario
     const fecha = document.getElementById('fecha-insp').value;
-    const hora = document.getElementById('hora-insp').value;
 
-    if (!fecha || !hora) {
-        showAlert('Ingresa fecha y hora de inspección', 'error');
+    if (!fecha) {
+        showAlert('Ingresa fecha de inspección', 'error');
         return;
     }
+
+    // Usar hora actual automáticamente
+    const ahora = new Date();
+    const hora = ahora.toTimeString().slice(0, 8);
 
     const body = {
         extintor_id:     extActual.id,
         empresa_id:      empresaInspeccion,
         fecha:           fecha,
-        hora:            hora + ':00', // Agregar segundos para formato HH:MM:SS
+        hora:            hora,
         ser:             getRadio('ser'),
         mg:              getRadio('mg'),
         po:              getRadio('po'),
