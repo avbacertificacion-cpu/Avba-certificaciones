@@ -84,35 +84,83 @@ function guardar() {
     }
 
     try {
-        $stmt = $pdo->prepare("
-            INSERT INTO inspecciones
-                (extintor_id, inspector_id, fecha, hora,
-                 ser, mg, po, ph, sg, ps, ob, dan, pin, fn, gb, rv,
-                 observaciones)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-        ");
-        $stmt->execute([
-            $d['extintor_id'],
-            $uid,
-            $d['fecha'],
-            $d['hora'],
-            $d['ser']           ?? null,
-            $d['mg']            ?? null,
-            $d['po']            ?? null,
-            $d['ph']            ?? null,
-            $d['sg']            ?? null,
-            $d['ps']            ?? null,
-            $d['ob']            ?? null,
-            $d['dan']           ?? null,
-            $d['pin']           ?? null,
-            $d['fn']            ?? null,
-            $d['gb']            ?? null,
-            $d['rv']            ?? null,
-            $d['observaciones'] ?? null,
-        ]);
+        // Extraer mes y año de la fecha
+        $fecha_parts = explode('-', $d['fecha']);
+        $mes = intval($fecha_parts[1]);
+        $anio = intval($fecha_parts[0]);
 
-        $id = $pdo->lastInsertId();
-        audit($uid, "Inspección extintor #{$d['extintor_id']}", 'inspecciones', $id);
+        // Buscar inspección existente del mismo extintor en el mismo mes/año
+        $stmt = $pdo->prepare("
+            SELECT id FROM inspecciones
+            WHERE extintor_id = ? AND MONTH(fecha) = ? AND YEAR(fecha) = ?
+            LIMIT 1
+        ");
+        $stmt->execute([$d['extintor_id'], $mes, $anio]);
+        $inspeccion_existente = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $id = null;
+
+        if ($inspeccion_existente) {
+            // UPDATE: Reemplazar inspección del mismo mes
+            $id = $inspeccion_existente['id'];
+            $stmt = $pdo->prepare("
+                UPDATE inspecciones
+                SET inspector_id=?, fecha=?, hora=?,
+                    ser=?, mg=?, po=?, ph=?, sg=?, ps=?, ob=?, dan=?, pin=?, fn=?, gb=?, rv=?,
+                    observaciones=?
+                WHERE id=?
+            ");
+            $stmt->execute([
+                $uid,
+                $d['fecha'],
+                $d['hora'],
+                $d['ser']           ?? null,
+                $d['mg']            ?? null,
+                $d['po']            ?? null,
+                $d['ph']            ?? null,
+                $d['sg']            ?? null,
+                $d['ps']            ?? null,
+                $d['ob']            ?? null,
+                $d['dan']           ?? null,
+                $d['pin']           ?? null,
+                $d['fn']            ?? null,
+                $d['gb']            ?? null,
+                $d['rv']            ?? null,
+                $d['observaciones'] ?? null,
+                $id
+            ]);
+            audit($uid, "Actualizar inspección extintor #{$d['extintor_id']}", 'inspecciones', $id);
+        } else {
+            // INSERT: Nueva inspección de otro mes
+            $stmt = $pdo->prepare("
+                INSERT INTO inspecciones
+                    (extintor_id, inspector_id, fecha, hora,
+                     ser, mg, po, ph, sg, ps, ob, dan, pin, fn, gb, rv,
+                     observaciones)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            ");
+            $stmt->execute([
+                $d['extintor_id'],
+                $uid,
+                $d['fecha'],
+                $d['hora'],
+                $d['ser']           ?? null,
+                $d['mg']            ?? null,
+                $d['po']            ?? null,
+                $d['ph']            ?? null,
+                $d['sg']            ?? null,
+                $d['ps']            ?? null,
+                $d['ob']            ?? null,
+                $d['dan']           ?? null,
+                $d['pin']           ?? null,
+                $d['fn']            ?? null,
+                $d['gb']            ?? null,
+                $d['rv']            ?? null,
+                $d['observaciones'] ?? null,
+            ]);
+            $id = $pdo->lastInsertId();
+            audit($uid, "Crear inspección extintor #{$d['extintor_id']}", 'inspecciones', $id);
+        }
 
         echo json_encode(['success' => true, 'id' => $id]);
     } catch (Exception $e) {
