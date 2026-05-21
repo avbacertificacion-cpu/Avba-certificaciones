@@ -101,16 +101,26 @@ function buscarQR() {
     global $pdo;
 
     $codigo = trim($_GET['codigo'] ?? '');
+    $empresa_id = isset($_GET['empresa_id']) ? intval($_GET['empresa_id']) : null;
+
     if (!$codigo) { http_response_code(400); echo json_encode(['error' => 'Código requerido']); return; }
+
+    $where = "WHERE (e.codigo_qr = ? OR e.codigo_manual = ?)";
+    $params = [$codigo, $codigo];
+
+    if ($empresa_id) {
+        $where .= " AND e.empresa_id = ?";
+        $params[] = $empresa_id;
+    }
 
     $stmt = $pdo->prepare("
         SELECT e.*, emp.nombre AS empresa_nombre
         FROM extintores e
         JOIN empresas emp ON emp.id = e.empresa_id
-        WHERE e.codigo_qr = ? OR e.codigo_manual = ?
+        $where
         LIMIT 1
     ");
-    $stmt->execute([$codigo, $codigo]);
+    $stmt->execute($params);
     $ext = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if (!$ext) {

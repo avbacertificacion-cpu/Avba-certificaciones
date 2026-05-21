@@ -32,9 +32,9 @@ switch ($action) {
 function guardar() {
     global $pdo, $rol, $uid;
 
-    if ($rol !== ROLE_INSPECTOR) {
+    if (!in_array($rol, [ROLE_INSPECTOR, ROLE_ADMIN])) {
         http_response_code(403);
-        echo json_encode(['error' => 'Solo inspectores pueden registrar inspecciones']);
+        echo json_encode(['error' => 'No tienes permiso para registrar inspecciones']);
         return;
     }
 
@@ -56,6 +56,19 @@ function guardar() {
         http_response_code(400);
         echo json_encode(['error' => 'hora requerida']);
         return;
+    }
+
+    // Validar que el extintor pertenece a la empresa seleccionada (si se proporciona)
+    if (!empty($d['empresa_id'])) {
+        $stmt = $pdo->prepare("SELECT empresa_id FROM extintores WHERE id = ?");
+        $stmt->execute([$d['extintor_id']]);
+        $extintor = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$extintor || $extintor['empresa_id'] != $d['empresa_id']) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Extintor no pertenece a la empresa seleccionada']);
+            return;
+        }
     }
 
     $campos_checklist = ['ser','mg','po','ph','sg','ps','ob','dan','pin','fn','gb','rv'];

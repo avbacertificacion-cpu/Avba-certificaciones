@@ -19,7 +19,7 @@ CREATE TABLE usuarios (
 -- ─── EMPRESAS ────────────────────────────────────────────────────────────────
 CREATE TABLE empresas (
     id          INT PRIMARY KEY AUTO_INCREMENT,
-    nombre      VARCHAR(150) NOT NULL,
+    nombre      VARCHAR(150) NOT NULL UNIQUE,
     rfc         VARCHAR(13),
     domicilio   TEXT,
     telefono    VARCHAR(20),

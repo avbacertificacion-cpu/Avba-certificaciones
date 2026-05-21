@@ -1,11 +1,42 @@
 <?php
 require_once '../config/config.php';
-if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_INSPECTOR) {
+if (!isset($_SESSION['usuario_id']) || !in_array($_SESSION['rol'], [ROLE_INSPECTOR, ROLE_ADMIN])) {
     header('Location: ../public/login.html'); exit;
 }
+
 $nombre    = $_SESSION['nombre'];
 $inspector = $_SESSION['usuario_id'];
 $qr_param  = htmlspecialchars($_GET['qr'] ?? '');
+
+// Manejar cambio de empresa
+if (isset($_GET['cambiar_empresa'])) {
+    unset($_SESSION['empresa_inspeccion']);
+    header('Location: inspeccion.php');
+    exit;
+}
+
+// Manejar selección de empresa
+if ($_POST['action'] === 'seleccionar_empresa' && !empty($_POST['empresa_id'])) {
+    $_SESSION['empresa_inspeccion'] = intval($_POST['empresa_id']);
+    header('Location: inspeccion.php');
+    exit;
+}
+
+// Verificar si hay empresa seleccionada
+$empresa_inspeccion = $_SESSION['empresa_inspeccion'] ?? null;
+$empresa_nombre = '';
+$empresas_lista = [];
+
+// Cargar lista de empresas (para mostrar selector si no hay seleccionada)
+$stmt = $pdo->prepare("SELECT id, nombre FROM empresas WHERE estado='activo' ORDER BY nombre ASC");
+$stmt->execute();
+$empresas_lista = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+if ($empresa_inspeccion) {
+    $stmt = $pdo->prepare("SELECT nombre FROM empresas WHERE id=? AND estado='activo'");
+    $stmt->execute([$empresa_inspeccion]);
+    $empresa_nombre = $stmt->fetchColumn() ?: '';
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -80,6 +111,30 @@ $qr_param  = htmlspecialchars($_GET['qr'] ?? '');
         .last-insp{background:#fff3cd;padding:12px 16px;border-radius:8px;font-size:13px;margin-bottom:16px;color:#856404}
 
         #form-inspeccion{display:none}
+
+        /* Modal empresa selector */
+        .modal-overlay{display:flex;align-items:center;justify-content:center;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:1000}
+        .modal-content{background:#fff;border-radius:16px;padding:32px;max-width:500px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.2)}
+        .modal-header{font-size:24px;font-weight:700;color:#333;margin-bottom:8px}
+        .modal-subtitle{font-size:14px;color:#888;margin-bottom:24px}
+        .empresa-list{display:grid;grid-template-columns:1fr;gap:12px;max-height:400px;overflow-y:auto}
+        .empresa-item{padding:16px;border:2px solid #ddd;border-radius:10px;cursor:pointer;transition:.2s;background:#f9f9f9}
+        .empresa-item:hover{border-color:#667eea;background:#f0f3ff}
+        .empresa-item.selected{border-color:#667eea;background:#f0f3ff;color:#667eea}
+        .empresa-item-name{font-weight:600;margin-bottom:4px;font-size:14px}
+        .empresa-item-id{font-size:12px;color:#999}
+        .modal-actions{display:flex;gap:12px;margin-top:24px}
+        .modal-actions button{flex:1;padding:12px;border:none;border-radius:8px;font-weight:700;cursor:pointer;transition:.2s}
+        .modal-btn-cancel{background:#eee;color:#333}
+        .modal-btn-cancel:hover{background:#ddd}
+        .modal-btn-confirm{background:#667eea;color:#fff}
+        .modal-btn-confirm:hover{background:#5568d3}
+        .modal-btn-confirm:disabled{background:#ccc;cursor:not-allowed}
+
+        @media (max-width:768px) {
+            .modal-content{max-width:90%;padding:24px}
+            .modal-header{font-size:20px}
+        }
     </style>
 </head>
 <body>
@@ -88,41 +143,110 @@ $qr_param  = htmlspecialchars($_GET['qr'] ?? '');
     <h1>🔍 Inspección de Extintor</h1>
     <div>
         <a href="inspector-dashboard.php">← Panel</a>
+        <?php if ($empresa_inspeccion): ?>
+        <span style="margin-left:16px;font-size:13px">📍 <?= htmlspecialchars($empresa_nombre) ?></span>
+        <a href="?cambiar_empresa=1" style="color:#ffd700;margin-left:6px">Cambiar</a>
+        <?php endif; ?>
         <span style="margin-left:16px;font-size:13px"><?= htmlspecialchars($nombre) ?></span>
     </div>
 </div>
 
-<div class="container">
-    <div id="alert-box"></div>
+<?php if (!$empresa_inspeccion): ?>
+    <!-- MODAL: Seleccionar Empresa -->
+    <div class="modal-overlay">
+        <div class="modal-content">
+            <div class="modal-header">📍 Selecciona Empresa</div>
+            <div class="modal-subtitle">Selecciona la empresa donde realizarás las inspecciones</div>
 
-    <!-- Buscar extintor -->
-    <div class="scan-box">
-        <h2>🔍 Buscar Extintor</h2>
-        <p style="color:#888;font-size:13px;margin-bottom:20px">
-            Escanea el código QR o ingresa el código manual (ej: EXT-001)
-        </p>
-        <div class="input-group">
-            <input type="text" id="codigo-input" placeholder="EXT-001 o código QR"
-                   value="<?= $qr_param ?>" onkeydown="if(event.key==='Enter') buscarExtintor()">
-            <button class="btn btn-primary" onclick="buscarExtintor()">Buscar</button>
+            <form id="form-seleccionar-empresa" onsubmit="seleccionarEmpresa(event)">
+                <div class="empresa-list" id="empresas-container">
+                    <?php foreach ($empresas_lista as $emp): ?>
+                    <label class="empresa-item" onclick="document.getElementById('emp-radio-<?= $emp['id'] ?>').checked=true; actualizarSeleccion(<?= $emp['id'] ?>)">
+                        <input type="radio" id="emp-radio-<?= $emp['id'] ?>" name="empresa_id" value="<?= $emp['id'] ?>" style="display:none">
+                        <div class="empresa-item-name"><?= htmlspecialchars($emp['nombre']) ?></div>
+                        <div class="empresa-item-id">ID: <?= $emp['id'] ?></div>
+                    </label>
+                    <?php endforeach; ?>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="modal-btn-cancel" onclick="window.location.href='inspector-dashboard.php'">
+                        Cancelar
+                    </button>
+                    <button type="submit" class="modal-btn-confirm" id="btn-confirmar" disabled>
+                        Continuar
+                    </button>
+                </div>
+            </form>
         </div>
-        <p style="margin-top:16px;font-size:12px;color:#aaa">
-            Si el extintor no existe, podrás crearlo al buscar
-        </p>
     </div>
+<?php else: ?>
+    <!-- INTERFAZ: Inspeccionar Extintores -->
+    <div class="container">
+        <div id="alert-box"></div>
 
-    <!-- Contenido dinámico -->
-    <div id="contenido"></div>
-</div>
+        <!-- Buscar extintor -->
+        <div class="scan-box">
+            <h2>🔍 Buscar Extintor</h2>
+            <p style="color:#888;font-size:13px;margin-bottom:20px">
+                Escanea el código QR o ingresa el código manual (ej: EXT-001)
+            </p>
+            <div class="input-group">
+                <input type="text" id="codigo-input" placeholder="EXT-001 o código QR"
+                       value="<?= $qr_param ?>" onkeydown="if(event.key==='Enter') buscarExtintor()">
+                <button class="btn btn-primary" onclick="buscarExtintor()">Buscar</button>
+            </div>
+            <p style="margin-top:16px;font-size:12px;color:#aaa">
+                Si el extintor no existe, podrás crearlo al buscar
+            </p>
+        </div>
+
+        <!-- Contenido dinámico -->
+        <div id="contenido"></div>
+    </div>
+<?php endif; ?>
 
 <script>
 const inspectorNombre = '<?= htmlspecialchars($nombre) ?>';
+const empresaInspeccion = <?= json_encode($empresa_inspeccion) ?>;
 let extActual = null;
 
-// Auto-buscar si viene QR en URL
+// ── Selección de Empresa ──────────────────────────────────────────────────────
+function actualizarSeleccion(empresaId) {
+    const btn = document.getElementById('btn-confirmar');
+    btn.disabled = !empresaId;
+    document.querySelectorAll('.empresa-item').forEach(item => {
+        const radio = item.querySelector('input[type="radio"]');
+        item.classList.toggle('selected', radio?.checked);
+    });
+}
+
+function seleccionarEmpresa(e) {
+    e.preventDefault();
+    const empresaId = document.querySelector('input[name="empresa_id"]:checked')?.value;
+    if (!empresaId) {
+        showAlert('Selecciona una empresa', 'error');
+        return;
+    }
+
+    const fd = new FormData();
+    fd.append('action', 'seleccionar_empresa');
+    fd.append('empresa_id', empresaId);
+
+    fetch(window.location.href, {
+        method: 'POST',
+        body: fd
+    }).then(() => {
+        window.location.reload();
+    });
+}
+
+// Auto-buscar si viene QR en URL y empresa ya seleccionada
 window.onload = () => {
-    const q = document.getElementById('codigo-input').value.trim();
-    if (q) buscarExtintor();
+    if (empresaInspeccion && document.getElementById('codigo-input')) {
+        const q = document.getElementById('codigo-input').value.trim();
+        if (q) buscarExtintor();
+    }
 };
 
 // ── Buscar extintor ───────────────────────────────────────────────────────────
@@ -130,7 +254,8 @@ async function buscarExtintor() {
     const codigo = document.getElementById('codigo-input').value.trim().toUpperCase();
     if (!codigo) { showAlert('Ingresa un código', 'error'); return; }
 
-    const r = await fetch(`../api/extintores.php?action=buscar_qr&codigo=${encodeURIComponent(codigo)}`);
+    const url = `../api/extintores.php?action=buscar_qr&codigo=${encodeURIComponent(codigo)}&empresa_id=${empresaInspeccion}`;
+    const r = await fetch(url);
     const d = await r.json();
 
     if (d.found) {
@@ -296,6 +421,7 @@ async function guardarInspeccion() {
 
     const body = {
         extintor_id:     extActual.id,
+        empresa_id:      empresaInspeccion,
         fecha:           fecha,
         hora:            hora,
         ser:             getRadio('ser'),
