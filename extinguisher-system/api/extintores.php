@@ -224,8 +224,32 @@ function editar() {
     $id = intval($d['id'] ?? 0);
     if (!$id) { http_response_code(400); echo json_encode(['error' => 'ID requerido']); return; }
 
+    // Si se cambia el codigo_manual, validar que no exista en la misma empresa
+    if (!empty($d['codigo_manual'])) {
+        $stmt = $pdo->prepare("
+            SELECT empresa_id FROM extintores WHERE id = ?
+        ");
+        $stmt->execute([$id]);
+        $extintor = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($extintor) {
+            $stmt = $pdo->prepare("
+                SELECT id FROM extintores
+                WHERE empresa_id = ? AND codigo_manual = ? AND id != ?
+                LIMIT 1
+            ");
+            $stmt->execute([$extintor['empresa_id'], $d['codigo_manual'], $id]);
+            if ($stmt->fetch()) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Este código ya existe en la empresa']);
+                return;
+            }
+        }
+    }
+
     $stmt = $pdo->prepare("
         UPDATE extintores SET
+            codigo_manual = ?,
             empresa_id    = ?,
             seccion       = ?,
             ubicacion     = ?,
@@ -238,6 +262,7 @@ function editar() {
         WHERE id = ?
     ");
     $stmt->execute([
+        $d['codigo_manual'] ?? null,
         $d['empresa_id']    ?? null,
         $d['seccion']       ?? null,
         $d['ubicacion']     ?? '',
