@@ -57,7 +57,8 @@ class Pnd {
     // ── Registrar nueva inspección PND ─────────────────────
     public function nueva(array $payload, string $usuario): array {
         try {
-            $control     = $this->generarControl();
+            $cliente = strtoupper(trim($payload['cliente'] ?? 'CLIENTE'));
+            $control = generarControl($this->pdo, $cliente);
             $fotos       = $payload['fotos'] ?? [];
             $evidenciaUrl = '';
             if (!empty($fotos)) {
@@ -305,18 +306,10 @@ class Pnd {
         if (!$id) return ['status' => 'error', 'message' => 'ID de inspección requerido.'];
 
         $this->pdo->prepare(
-            "UPDATE pnd_inspecciones SET estado = 'NO CONFORME', motivo = ? WHERE id = ?"
+            "UPDATE pnd_inspecciones SET estado = 'RECHAZADO', motivo = ? WHERE id = ?"
         )->execute([$motivo ?: null, $id]);
 
-        return ['status' => 'success', 'message' => 'Inspección PND marcada como No Conforme.'];
-    }
-
-    // ── Generar folio de control ───────────────────────────
-    private function generarControl(): string {
-        $count = (int)$this->pdo->query(
-            "SELECT COUNT(*) FROM pnd_inspecciones"
-        )->fetchColumn();
-        return sprintf('PND-%s-%04d', date('Y'), $count + 1);
+        return ['status' => 'success', 'message' => 'Inspección PND rechazada.'];
     }
 
     // ── Guardar fotos en disco ─────────────────────────────

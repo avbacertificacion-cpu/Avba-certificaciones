@@ -683,12 +683,38 @@ class Auth {
             }
         } catch (\PDOException $e) { /* tabla aún no existe */ }
 
+        // ── PND (Pruebas No Destructivas) ────────────────────
+        $pnd = [];
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, control, cliente,
+                        DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
+                        componente, identificacion, resultado, reporte_url
+                 FROM pnd_inspecciones
+                 WHERE control LIKE ? AND estado = 'APROBADO'
+                 ORDER BY fecha_inspeccion DESC"
+            );
+            $stmt->execute([$like]);
+            foreach ($stmt->fetchAll() as $r) {
+                if (!$nombreCliente) $nombreCliente = $r['cliente'];
+                $pnd[] = [
+                    'folio'        => $r['control'],
+                    'componente'   => $r['componente'],
+                    'identificacion' => $r['identificacion'],
+                    'fecha'        => $r['fecha'],
+                    'resultado'    => $r['resultado'],
+                    'reporte_url'  => $r['reporte_url'] ?? '',
+                ];
+            }
+        } catch (\PDOException $e) { /* tabla aún no existe */ }
+
         return [
             'status'         => 'success',
             'nombre_cliente' => $nombreCliente,
             'equipos'        => $equipos,
             'accesorios'     => $accesorios,
             'personal'       => $personal,
+            'pnd'            => $pnd,
         ];
     }
 }

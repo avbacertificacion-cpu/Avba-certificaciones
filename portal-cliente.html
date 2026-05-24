@@ -119,12 +119,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
     <div class="stat"><div class="stat-n" id="s-eq" style="color:var(--azul)">—</div><div class="stat-l">Equipos certificados</div></div>
     <div class="stat"><div class="stat-n" id="s-acc" style="color:var(--verde)">—</div><div class="stat-l">Sesiones accesorios</div></div>
     <div class="stat"><div class="stat-n" id="s-per" style="color:var(--ambar)">—</div><div class="stat-l">Personal certificado</div></div>
+    <div class="stat"><div class="stat-n" id="s-pnd" style="color:#0d9488">—</div><div class="stat-l">Reportes PND</div></div>
   </div>
 
   <div class="tabs">
     <button class="tab-btn active" onclick="verTab('maq',this)">🔧 Maquinaria</button>
     <button class="tab-btn" onclick="verTab('acc',this)">🔗 Accesorios de Izaje</button>
     <button class="tab-btn" onclick="verTab('per',this)">👷 Personal</button>
+    <button class="tab-btn" onclick="verTab('pnd',this)">🔬 PND</button>
   </div>
 
   <div id="tab-maq" class="tab-panel active">
@@ -138,6 +140,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 
   <div id="tab-per" class="tab-panel">
     <div id="per-cont"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+
+  <div id="tab-pnd" class="tab-panel">
+    <div id="pnd-cont"><div class="loading"><span class="spin"></span></div></div>
   </div>
 </div>
 
@@ -337,6 +343,40 @@ function renderPersonal(data) {
   cont.innerHTML = html;
 }
 
+// ── Render PND ─────────────────────────────────────────────────────────────
+// PHP retorna: folio, componente, identificacion, fecha, resultado, reporte_url
+function renderPND(data) {
+  const cont = document.getElementById('pnd-cont');
+  if (!data || !data.length) {
+    cont.innerHTML = '<div class="empty"><div class="empty-t">Sin reportes PND</div><div class="empty-s">No hay inspecciones de líquidos penetrantes aprobadas.</div></div>';
+    return;
+  }
+  document.getElementById('s-pnd').textContent = data.length;
+  let html = '<div class="acc-grid">';
+  data.forEach(r => {
+    const folio = r.folio ? 'AB.' + r.folio + '-' + new Date().getFullYear() + 'MX' : '—';
+    const esConf = r.resultado === 'CONFORME';
+    const resBadge = r.resultado
+      ? `<span class="badge" style="background:${esConf?'var(--verde-light,#dcfce7)':'#fee2e2'};color:${esConf?'#15803d':'#b91c1c'}">${r.resultado}</span>`
+      : '';
+    const repBtn = r.reporte_url
+      ? `<a class="btn-doc btn-cert" href="${r.reporte_url}" target="_blank">📄 Reporte PT</a>`
+      : `<span class="btn-doc btn-cert dis">📄 Reporte PT</span>`;
+    html += `<div class="acc-card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px">
+        <div class="acc-folio">${folio}</div>
+        ${resBadge}
+      </div>
+      <div class="acc-fecha">${r.fecha || '—'}</div>
+      <div style="font-size:12px;color:var(--texto-sub);margin-bottom:10px">${r.componente || '—'}</div>
+      ${r.identificacion ? `<div style="font-size:11px;color:var(--texto-hint);margin-bottom:10px">ID: ${r.identificacion}</div>` : ''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${repBtn}</div>
+    </div>`;
+  });
+  html += '</div>';
+  cont.innerHTML = html;
+}
+
 // ── Load all data ──────────────────────────────────────────────────────────
 async function cargarDatos() {
   try {
@@ -348,8 +388,9 @@ async function cargarDatos() {
     renderMaquinaria(json.equipos    || []);
     renderAccesorios(json.accesorios || []);
     renderPersonal(json.personal     || []);
+    renderPND(json.pnd               || []);
   } catch(e) {
-    ['maq-cont','acc-cont','per-cont'].forEach(id => {
+    ['maq-cont','acc-cont','per-cont','pnd-cont'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = `<p style="color:var(--rojo);text-align:center;padding:20px">Error al cargar: ${e.message}</p>`;
     });

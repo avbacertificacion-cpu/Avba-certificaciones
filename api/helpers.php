@@ -79,9 +79,9 @@ function generarControl(PDO $pdo, string $nombreCliente): string {
         $ins->execute([$nombreCliente, $newId]);
     }
 
-    // Consecutivo global: MAX entre equipos, accesorios_sesiones y participantes_cursos
+    // Consecutivo global: MAX entre todas las tablas con control
     $maxB = 0;
-    foreach (['equipos', 'accesorios_sesiones', 'participantes_cursos'] as $tabla) {
+    foreach (['equipos', 'accesorios_sesiones', 'participantes_cursos', 'pnd_inspecciones'] as $tabla) {
         try {
             $r = $pdo->query(
                 "SELECT MAX(CAST(SUBSTRING_INDEX(control,'-',-1) AS UNSIGNED)) AS max_b
