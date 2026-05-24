@@ -689,6 +689,7 @@
   <button class="tab-btn"        id="sec-btn-personal"   onclick="verSeccion('personal')">👤 Personal</button>
   <button class="tab-btn"        id="sec-btn-catalogos"  onclick="verSeccion('catalogos')">⚙️ Catálogos</button>
   <button class="tab-btn"        id="sec-btn-qr"         onclick="verSeccion('qr')">🔢 Códigos QR</button>
+  <button class="tab-btn"        id="sec-btn-pnd"        onclick="verSeccion('pnd')">🔬 PND</button>
 </div>
 
 <!-- sub-nav Accesorios -->
@@ -1194,6 +1195,111 @@
   </div>
 
 </div><!-- /sec-qr -->
+
+
+<!-- ══════════ SECCIÓN PND ══════════ -->
+<div id="sec-pnd" class="wrap" style="display:none">
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-n" id="pnd-s-pend" style="color:var(--ambar)">—</div>
+      <div class="stat-l">Pendientes</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n" id="pnd-s-apr" style="color:var(--verde)">—</div>
+      <div class="stat-l">Aprobados</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n" id="pnd-s-rech" style="color:var(--rojo)">—</div>
+      <div class="stat-l">Rechazados</div>
+    </div>
+    <div class="stat">
+      <div class="stat-n" id="pnd-s-total" style="color:var(--azul)">—</div>
+      <div class="stat-l">Total</div>
+    </div>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="filtros-card">
+    <input id="pnd-fCliente"    placeholder="Buscar cliente...">
+    <input id="pnd-fControl"    placeholder="Folio PND...">
+    <select id="pnd-fEstado">
+      <option value="">Todos los estados</option>
+      <option value="PENDIENTE">Pendiente</option>
+      <option value="APROBADO">Aprobado</option>
+      <option value="RECHAZADO">Rechazado</option>
+    </select>
+    <button class="btn-filtrar" onclick="filtrarPND()">Filtrar</button>
+    <button class="btn-limpiar" onclick="limpiarFiltrosPND()">Limpiar</button>
+  </div>
+
+  <!-- TABLA -->
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Registros PND — Líquidos Penetrantes</span>
+      <span class="tabla-count" id="pnd-tabla-count">Cargando...</span>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Folio</th>
+            <th>Cliente</th>
+            <th>Componente</th>
+            <th>Fecha</th>
+            <th>Estado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="pnd-tabla">
+          <tr class="loading-row"><td colspan="6">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /sec-pnd -->
+
+<!-- ══ OVERLAY DETALLE PND ══ -->
+<div class="overlay" id="overlay-pnd" style="display:none" onclick="if(event.target===this)cerrarDetPND()">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" id="pnd-m-avatar" style="background:#0d9488">P</div>
+        <div>
+          <div class="m-title" id="pnd-m-title">Detalle PND</div>
+          <div class="m-sub"   id="pnd-m-sub">—</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="cerrarDetPND()">✕</button>
+    </div>
+
+    <div class="modal-body" id="pnd-modal-body">
+      <!-- Renderizado dinámico -->
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-guardar"  onclick="guardarPND()">Guardar</button>
+      <button class="btn-sec"      onclick="generarReportePND()" id="pnd-btn-reporte">Generar reporte</button>
+      <button class="btn-sec"      onclick="aprobarPND()"  id="pnd-btn-aprobar">Aprobar</button>
+      <button class="btn-rechazar" onclick="abrirRechazoPND()">Rechazar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ OVERLAY RECHAZO PND ══ -->
+<div class="overlay" id="overlay-pnd-nc" style="display:none" onclick="if(event.target===this)cerrarRechazoPND()">
+  <div class="modal modal-nc" style="max-width:420px">
+    <div class="modal-nc-title">Rechazar inspección PND</div>
+    <div class="modal-nc-sub">Especifique el motivo del rechazo. Este mensaje será visible en el historial.</div>
+    <textarea id="pnd-motivo-input" rows="4" style="width:100%;box-sizing:border-box;border:1.5px solid var(--borde);border-radius:8px;padding:10px;font-size:14px;resize:vertical" placeholder="Motivo del rechazo..."></textarea>
+    <div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end">
+      <button class="btn-sec" onclick="cerrarRechazoPND()">Cancelar</button>
+      <button class="btn-rechazar" onclick="confirmarRechazoPND()">Confirmar rechazo</button>
+    </div>
+  </div>
+</div>
 
 
 <!-- ══ MODAL DETALLE SESIÓN ACCESORIOS ══ -->
@@ -2399,10 +2505,11 @@ const TODOS_CONTENIDOS = [
   'sec-personal-cursos',    'sec-personal-indep',    'sec-personal-plantillas',
   'tab-tipos', 'tab-cursos', 'tab-ocupaciones',
   'sec-qr',
+  'sec-pnd',
 ];
 
 function verSeccion(sec) {
-  ['maquinaria','accesorios','personal','catalogos','qr'].forEach(s => {
+  ['maquinaria','accesorios','personal','catalogos','qr','pnd'].forEach(s => {
     document.getElementById('sec-btn-' + s).classList.toggle('active', s === sec);
   });
   ['accesorios','personal','catalogos'].forEach(s => {
@@ -2426,6 +2533,9 @@ function verSeccion(sec) {
   } else if (sec === 'qr') {
     document.getElementById('sec-qr').style.display = '';
     cargarInfoQR();
+  } else if (sec === 'pnd') {
+    document.getElementById('sec-pnd').style.display = '';
+    cargarPND();
   }
 }
 
@@ -4832,6 +4942,358 @@ async function generarLoteQR() {
       alert('Error: ' + (data.message || 'No se pudo generar el lote'));
     }
   } catch(e) { alert('Error de conexión'); }
+}
+
+/* ══════════════════════════════════════════════════════
+   PND — Pruebas No Destructivas (Líquidos Penetrantes)
+══════════════════════════════════════════════════════ */
+let datosGlobalPND = [];
+let pndFilaActual  = null;
+let pndGuardando   = false;
+
+async function cargarPND() {
+  try {
+    const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+    const res  = await fetch(`${API}?action=GET_DATA_PND&token=${s.token || ''}`);
+    const data = await res.json();
+    if (data.status !== 'success') throw new Error(data.message || 'Error');
+    datosGlobalPND = data.data || [];
+    renderPND(datosGlobalPND);
+    actualizarStatsPND(datosGlobalPND);
+  } catch (e) {
+    document.getElementById("pnd-tabla").innerHTML =
+      `<tr class="loading-row"><td colspan="6">Error al cargar PND. <button onclick="cargarPND()" style="color:var(--azul);background:none;border:none;cursor:pointer;font-size:13px;text-decoration:underline">Reintentar</button></td></tr>`;
+    document.getElementById("pnd-tabla-count").textContent = "Error";
+    console.error("cargarPND:", e);
+  }
+}
+
+function actualizarStatsPND(d) {
+  document.getElementById("pnd-s-pend").textContent  = d.filter(x => x.estado === "PENDIENTE").length;
+  document.getElementById("pnd-s-apr").textContent   = d.filter(x => x.estado === "APROBADO").length;
+  document.getElementById("pnd-s-rech").textContent  = d.filter(x => x.estado === "RECHAZADO").length;
+  document.getElementById("pnd-s-total").textContent = d.length;
+}
+
+function renderPND(data) {
+  const tbody = document.getElementById("pnd-tabla");
+  document.getElementById("pnd-tabla-count").textContent = data.length + " registro" + (data.length !== 1 ? "s" : "");
+  if (!data.length) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">Sin registros.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(r => {
+    const bc  = r.estado === "PENDIENTE"  ? "b-pend"
+              : r.estado === "APROBADO"   ? "b-apro"
+              : "b-nc";
+    const lbl = r.estado === "APROBADO"   ? "Aprobado"
+              : r.estado === "RECHAZADO"  ? "Rechazado"
+              : "Pendiente";
+    return `<tr>
+      <td style="font-family:monospace;font-size:12px">${r.control || '—'}</td>
+      <td style="font-weight:600">${r.cliente || '—'}</td>
+      <td style="color:var(--texto-sub);font-size:12px">${(r.componente || '—').substring(0,50)}</td>
+      <td style="color:var(--texto-sub)">${r.fecha_inspeccion_fmt || '—'}</td>
+      <td><span class="badge ${bc}">${lbl}</span></td>
+      <td><button class="btn-ver" onclick="verPND(${r.id})">Ver detalle</button></td>
+    </tr>`;
+  }).join("");
+}
+
+function filtrarPND() {
+  const cli = document.getElementById("pnd-fCliente").value.toLowerCase();
+  const ctl = document.getElementById("pnd-fControl").value.toLowerCase();
+  const est = document.getElementById("pnd-fEstado").value;
+  const fil = datosGlobalPND.filter(d =>
+    (d.cliente  || "").toLowerCase().includes(cli) &&
+    (d.control  || "").toLowerCase().includes(ctl) &&
+    (!est || d.estado === est)
+  );
+  renderPND(fil);
+}
+
+function limpiarFiltrosPND() {
+  ["pnd-fCliente","pnd-fControl"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("pnd-fEstado").value = "";
+  renderPND(datosGlobalPND);
+}
+
+function verPND(id) {
+  const d = datosGlobalPND.find(x => x.id === id);
+  if (!d) return;
+  pndFilaActual = id;
+
+  const ini = (d.cliente || 'P').substring(0,2).toUpperCase();
+  document.getElementById("pnd-m-avatar").textContent = ini;
+  document.getElementById("pnd-m-title").textContent  = d.cliente || 'Detalle PND';
+  document.getElementById("pnd-m-sub").textContent    = (d.control || '') + (d.fecha_inspeccion_fmt ? ' — ' + d.fecha_inspeccion_fmt : '');
+
+  const esAprobado = d.estado === 'APROBADO';
+  document.getElementById("pnd-btn-aprobar").style.display  = esAprobado ? 'none' : '';
+
+  const indsHtml = (d.indicaciones && d.indicaciones.length)
+    ? `<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:6px">
+        <thead><tr style="background:var(--gris-bg)">
+          <th style="padding:5px 8px;text-align:left">Tipo</th>
+          <th style="padding:5px 8px;text-align:left">Ubicación</th>
+          <th style="padding:5px 8px;text-align:left">Long.(mm)</th>
+          <th style="padding:5px 8px;text-align:left">Disposición</th>
+        </tr></thead>
+        <tbody>${d.indicaciones.map(i => `
+          <tr style="border-bottom:1px solid var(--borde)">
+            <td style="padding:5px 8px">${esc(i.tipo || '')}</td>
+            <td style="padding:5px 8px">${esc(i.ubicacion || '')}</td>
+            <td style="padding:5px 8px">${esc(i.longitud || '')}</td>
+            <td style="padding:5px 8px">
+              <span style="background:${i.disposicion==='CONFORME'?'var(--verde-light)':'#FEE2E2'};color:${i.disposicion==='CONFORME'?'var(--verde)':'var(--rojo)'};padding:2px 8px;border-radius:10px;font-size:11px">${esc(i.disposicion || '')}</span>
+            </td>
+          </tr>`).join('')}
+        </tbody>
+      </table>`
+    : `<p style="color:var(--texto-hint);font-size:13px;margin:4px 0">Sin indicaciones registradas.</p>`;
+
+  document.getElementById("pnd-modal-body").innerHTML = `
+    <div style="display:grid;gap:10px">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+          Cliente
+          <input id="pnd-e-cliente" value="${esc(d.cliente)}" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+        </label>
+        <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+          Planta / Ubicación
+          <input id="pnd-e-planta" value="${esc(d.planta)}" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+        </label>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+          Correo
+          <input id="pnd-e-correo" value="${esc(d.correo)}" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+        </label>
+        <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+          Norma
+          <input id="pnd-e-norma" value="${esc(d.norma)}" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+        </label>
+      </div>
+
+      <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+        Componente
+        <textarea id="pnd-e-componente" rows="2" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical">${esc(d.componente)}</textarea>
+      </label>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+          Material
+          <input id="pnd-e-material" value="${esc(d.material)}" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+        </label>
+        <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+          Técnica
+          <input id="pnd-e-tecnica" value="${esc(d.tecnica)}" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+        </label>
+        <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+          Temperatura (°C)
+          <input id="pnd-e-temperatura" value="${esc(d.temperatura)}" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+        </label>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+          Tiempo penetración (min)
+          <input id="pnd-e-t-penetracion" type="number" value="${esc(d.tiempo_penetracion)}" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+        </label>
+        <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+          Tiempo revelado (min)
+          <input id="pnd-e-t-revelado" type="number" value="${esc(d.tiempo_revelado)}" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+        </label>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+          Resultado
+          <select id="pnd-e-resultado" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+            <option value="">— Sin definir —</option>
+            <option value="CONFORME"${d.resultado==='CONFORME'?' selected':''}>CONFORME</option>
+            <option value="NO CONFORME"${d.resultado==='NO CONFORME'?' selected':''}>NO CONFORME</option>
+          </select>
+        </label>
+        <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+          Estado
+          <select id="pnd-e-estado" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+            <option value="PENDIENTE"${d.estado==='PENDIENTE'?' selected':''}>PENDIENTE</option>
+            <option value="APROBADO"${d.estado==='APROBADO'?' selected':''}>APROBADO</option>
+            <option value="RECHAZADO"${d.estado==='RECHAZADO'?' selected':''}>RECHAZADO</option>
+          </select>
+        </label>
+      </div>
+
+      <label style="font-size:13px;font-weight:600;color:var(--texto-sub);display:block">
+        Observaciones
+        <textarea id="pnd-e-observaciones" rows="2" style="margin-top:4px;width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;resize:vertical">${esc(d.observaciones)}</textarea>
+      </label>
+
+      <div style="border:1px solid var(--borde);border-radius:10px;padding:12px">
+        <div style="font-size:13px;font-weight:600;color:var(--texto-sub);margin-bottom:8px">Indicaciones encontradas</div>
+        ${indsHtml}
+      </div>
+
+      ${d.reporte_url ? `<div style="border:1px solid var(--borde);border-radius:10px;padding:12px">
+        <div style="font-size:13px;font-weight:600;color:var(--texto-sub);margin-bottom:6px">Reporte generado</div>
+        <a href="${esc(d.reporte_url)}" target="_blank" style="color:var(--azul);font-size:13px">Ver reporte PDF</a>
+      </div>` : ''}
+
+      ${d.evidencia_url ? `<div style="border:1px solid var(--borde);border-radius:10px;padding:12px">
+        <div style="font-size:13px;font-weight:600;color:var(--texto-sub);margin-bottom:6px">Evidencia fotográfica</div>
+        <a href="${esc(d.evidencia_url)}" target="_blank" style="color:var(--azul);font-size:13px">Ver carpeta de evidencia</a>
+      </div>` : ''}
+
+    </div>`;
+
+  document.getElementById("overlay-pnd").style.display = 'flex';
+}
+
+function cerrarDetPND() {
+  document.getElementById("overlay-pnd").style.display = 'none';
+  pndFilaActual = null;
+}
+
+async function guardarPND() {
+  if (pndGuardando) return;
+  pndGuardando = true;
+  try {
+    const payload = {
+      id:               pndFilaActual,
+      cliente:          document.getElementById("pnd-e-cliente")?.value        || "",
+      planta:           document.getElementById("pnd-e-planta")?.value         || "",
+      correo:           document.getElementById("pnd-e-correo")?.value         || "",
+      norma:            document.getElementById("pnd-e-norma")?.value          || "",
+      componente:       document.getElementById("pnd-e-componente")?.value     || "",
+      material:         document.getElementById("pnd-e-material")?.value       || "",
+      tecnica:          document.getElementById("pnd-e-tecnica")?.value        || "",
+      temperatura:      document.getElementById("pnd-e-temperatura")?.value    || "",
+      tiempo_penetracion: document.getElementById("pnd-e-t-penetracion")?.value || "",
+      tiempo_revelado:  document.getElementById("pnd-e-t-revelado")?.value     || "",
+      resultado:        document.getElementById("pnd-e-resultado")?.value      || "",
+      observaciones:    document.getElementById("pnd-e-observaciones")?.value  || "",
+    };
+    const est = document.getElementById("pnd-e-estado")?.value;
+    if (est) payload.estado = est;
+
+    const res  = await fetch(API, {
+      method:  "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: "ACTUALIZAR_PND", payload })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      const d = datosGlobalPND.find(x => x.id === pndFilaActual);
+      if (d) Object.assign(d, payload);
+      cerrarDetPND();
+      renderPND(datosGlobalPND);
+      actualizarStatsPND(datosGlobalPND);
+      mostrarToast("Cambios guardados correctamente", "ok");
+    } else {
+      mostrarToast("Error: " + (data.message || "Error desconocido"), "err");
+    }
+  } catch (e) {
+    mostrarToast("Error de conexión al guardar.", "err");
+    console.error("guardarPND:", e);
+  } finally {
+    pndGuardando = false;
+  }
+}
+
+async function generarReportePND() {
+  const btn = document.getElementById("pnd-btn-reporte");
+  btn.disabled = true;
+  btn.textContent = "Generando…";
+  try {
+    const res  = await fetch(API, {
+      method:  "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: "GENERAR_REPORTE_PND", payload: { id: pndFilaActual } })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      const d = datosGlobalPND.find(x => x.id === pndFilaActual);
+      if (d) d.reporte_url = data.url;
+      mostrarToast("Reporte generado correctamente", "ok");
+      if (data.url) window.open(data.url + "?t=" + Date.now(), "_blank");
+    } else {
+      mostrarToast("Error: " + (data.message || "No se pudo generar el reporte"), "err");
+    }
+  } catch (e) {
+    mostrarToast("Error de conexión.", "err");
+    console.error("generarReportePND:", e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Generar reporte";
+  }
+}
+
+async function aprobarPND() {
+  const btn = document.getElementById("pnd-btn-aprobar");
+  btn.disabled = true;
+  try {
+    const res  = await fetch(API, {
+      method:  "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: "APROBAR_PND", payload: { id: pndFilaActual } })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      const d = datosGlobalPND.find(x => x.id === pndFilaActual);
+      if (d) d.estado = 'APROBADO';
+      cerrarDetPND();
+      renderPND(datosGlobalPND);
+      actualizarStatsPND(datosGlobalPND);
+      mostrarToast("Inspección PND aprobada", "ok");
+    } else {
+      mostrarToast("Error: " + (data.message || "Error desconocido"), "err");
+    }
+  } catch (e) {
+    mostrarToast("Error de conexión.", "err");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function abrirRechazoPND() {
+  document.getElementById("pnd-motivo-input").value = "";
+  document.getElementById("overlay-pnd-nc").style.display = 'flex';
+}
+function cerrarRechazoPND() {
+  document.getElementById("overlay-pnd-nc").style.display = 'none';
+}
+
+async function confirmarRechazoPND() {
+  const motivo = document.getElementById("pnd-motivo-input").value.trim();
+  if (!motivo) {
+    document.getElementById("pnd-motivo-input").style.borderColor = "var(--rojo)";
+    document.getElementById("pnd-motivo-input").focus();
+    return;
+  }
+  try {
+    const res  = await fetch(API, {
+      method:  "POST",
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: "RECHAZAR_PND", payload: { id: pndFilaActual, motivo } })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      const d = datosGlobalPND.find(x => x.id === pndFilaActual);
+      if (d) { d.estado = 'RECHAZADO'; d.motivo = motivo; }
+      cerrarRechazoPND();
+      cerrarDetPND();
+      renderPND(datosGlobalPND);
+      actualizarStatsPND(datosGlobalPND);
+      mostrarToast("Inspección PND rechazada", "ok");
+    } else {
+      mostrarToast("Error: " + (data.message || "Error desconocido"), "err");
+    }
+  } catch (e) {
+    mostrarToast("Error de conexión.", "err");
+  }
 }
 </script>
 

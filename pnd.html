@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>PND — Líquidos Penetrantes | AVBA</title>
+  <style>
+    :root {
+      --azul:        #0B2545;
+      --azul-dark:   #091c36;
+      --texto:       #1a1a2e;
+      --texto-sub:   #4b5563;
+      --texto-hint:  #9ca3af;
+      --borde:       #dde3ec;
+      --gris-bg:     #f3f6fb;
+      --blanco:      #ffffff;
+      --teal:        #0d9488;
+      --teal-dark:   #0b7a70;
+      --teal-light:  #e6f7f5;
+      --rojo:        #dc2626;
+      --rojo-light:  #fee2e2;
+      --radio:       10px;
+      --radio-lg:    16px;
+      --sombra:      0 2px 16px rgba(0,0,0,0.07);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--gris-bg);
+      min-height: 100vh;
+      padding-bottom: 60px;
+    }
+
+    /* ─── HEADER ─── */
+    .header {
+      background: var(--azul);
+      padding: 0 16px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    }
+
+    .header-back {
+      background: rgba(255,255,255,0.12);
+      border: 1.5px solid rgba(255,255,255,0.22);
+      color: white;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .header-back:hover { background: rgba(255,255,255,0.22); }
+    .header-back svg { width: 13px; height: 13px; }
+
+    .header-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: white;
+      text-align: center;
+      flex: 1;
+      line-height: 1.3;
+    }
+    @media (max-width: 480px) {
+      .header-title { font-size: 13px; }
+    }
+
+    .header-user {
+      font-size: 12px;
+      color: rgba(255,255,255,0.78);
+      white-space: nowrap;
+      flex-shrink: 0;
+      max-width: 110px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      text-align: right;
+    }
+
+    /* ─── CONTENT WRAPPER ─── */
+    .content {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 80px 16px 40px;
+    }
+
+    /* ─── SECTION CARD ─── */
+    .section-card {
+      background: var(--blanco);
+      border-radius: var(--radio-lg);
+      box-shadow: var(--sombra);
+      border: 1px solid rgba(0,0,0,0.05);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .section-header {
+      padding: 14px 20px 12px;
+      border-bottom: 1px solid var(--borde);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-left: 4px solid var(--teal);
+    }
+
+    .section-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--teal-light);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    .section-icon svg { width: 16px; height: 16px; color: var(--teal); }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--azul);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .section-body {
+      padding: 20px 20px 16px;
+    }
+
+    /* ─── FIELDS ─── */
+    .field {
+      margin-bottom: 14px;
+    }
+    .field:last-child { margin-bottom: 0; }
+
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--texto);
+      margin-bottom: 6px;
+    }
+    .field label .req {
+      color: var(--rojo);
+      margin-left: 2px;
+      font-size: 11px;
+    }
+
+    .field input,
+    .field select,
+    .field textarea {
+      width: 100%;
+      padding: 10px 13px;
+      border: 1.5px solid var(--borde);
+      border-radius: var(--radio);
+      font-size: 14px;
+      color: var(--texto);
+      background: var(--blanco);
+      outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      -webkit-appearance: none;
+      appearance: none;
+      font-family: inherit;
+    }
+    .field input:focus,
+    .field select:focus,
+    .field textarea:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 3px rgba(13,148,136,0.12);
+    }
+    .field input.err,
+    .field select.err,
+    .field textarea.err {
+      border-color: var(--rojo);
+      box-shadow: 0 0 0 3px rgba(220,38,38,0.1);
+    }
+    .field select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      padding-right: 34px;
+    }
+    .field textarea { resize: vertical; }
+
+    .field .hint {
+      font-size: 11px;
+      color: var(--texto-hint);
+      margin-top: 4px;
+    }
+
+    .row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    @media (max-width: 440px) {
+      .row2 { grid-template-columns: 1fr; gap: 0; }
+      .row2 .field { margin-bottom: 14px; }
+    }
+
+    /* Inline input+label row */
+    .inline-field {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .inline-field input {
+      width: 120px;
+      flex-shrink: 0;
+    }
+    .inline-field .inline-label {
+      font-size: 13px;
+      color: var(--texto-sub);
+      font-weight: 500;
+    }
+
+    /* ─── CHECKBOX ─── */
+    .checkbox-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      background: var(--teal-light);
+      border: 1.5px solid #a7e8e3;
+      border-radius: var(--radio);
+      cursor: pointer;
+      user-select: none;
+      margin-bottom: 14px;
+    }
+    .checkbox-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--teal);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .checkbox-row label {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--teal-dark);
+      cursor: pointer;
+      margin: 0;
+    }
+
+    /* ─── INDICACIONES TABLE ─── */
+    .ind-subtitle {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--texto-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+
+    .ind-table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radio);
+      border: 1.5px solid var(--borde);
+      margin-bottom: 12px;
+    }
+
+    .ind-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 580px;
+      font-size: 13px;
+    }
+
+    .ind-table thead tr {
+      background: var(--gris-bg);
+    }
+    .ind-table thead th {
+      padding: 9px 10px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--texto-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border-bottom: 1.5px solid var(--borde);
+      white-space: nowrap;
+    }
+    .ind-table tbody tr {
+      border-bottom: 1px solid var(--borde);
+    }
+    .ind-table tbody tr:last-child { border-bottom: none; }
+    .ind-table tbody td {
+      padding: 7px 6px;
+      vertical-align: middle;
+    }
+    .ind-table tbody td:first-child {
+      padding-left: 10px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--texto-hint);
+      width: 30px;
+    }
+    .ind-table tbody td:last-child { width: 36px; }
+
+    .ind-table input,
+    .ind-table select {
+      width: 100%;
+      padding: 7px 8px;
+      border: 1.5px solid var(--borde);
+      border-radius: 7px;
+      font-size: 12px;
+      color: var(--texto);
+      background: var(--blanco);
+      outline: none;
+      font-family: inherit;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .ind-table select {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 7px center;
+      padding-right: 24px;
+    }
+    .ind-table input:focus,
+    .ind-table select:focus {
+      border-color: var(--teal);
+      box-shadow: 0 0 0 2px rgba(13,148,136,0.1);
+    }
+
+    .btn-rm-row {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      border: 1.5px solid #fca5a5;
+      background: #fff5f5;
+      color: var(--rojo);
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.12s;
+    }
+    .btn-rm-row:hover { background: var(--rojo-light); }
+
+    .btn-add-ind {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: var(--radio);
+      border: 1.5px dashed var(--teal);
+      background: var(--teal-light);
+      color: var(--teal-dark);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .btn-add-ind:hover { background: #c8f0ec; }
+
+    /* ─── RESULTADO GENERAL ─── */
+    .resultado-field {
+      margin-top: 14px;
+    }
+
+    /* ─── FOTOS ─── */
+    .fotos-drop {
+      border: 2px dashed var(--borde);
+      border-radius: var(--radio);
+      padding: 20px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      margin-bottom: 12px;
+    }
+    .fotos-drop:hover {
+      border-color: var(--teal);
+      background: var(--teal-light);
+    }
+    .fotos-drop input[type="file"] { display: none; }
+    .fotos-drop-icon {
+      font-size: 28px;
+      margin-bottom: 6px;
+    }
+    .fotos-drop-text {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--texto-sub);
+      margin-bottom: 2px;
+    }
+    .fotos-drop-hint {
+      font-size: 11px;
+      color: var(--texto-hint);
+    }
+
+    .fotos-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    .foto-thumb {
+      aspect-ratio: 1;
+      border-radius: var(--radio);
+      border: 1.5px solid var(--borde);
+      overflow: hidden;
+      position: relative;
+    }
+    .foto-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .foto-thumb .foto-rm {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.6);
+      border: none;
+      color: white;
+      font-size: 13px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .foto-thumb .foto-name {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(0,0,0,0.5);
+      color: white;
+      font-size: 9px;
+      padding: 3px 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ─── SUBMIT BUTTON ─── */
+    .btn-submit {
+      width: 100%;
+      padding: 14px;
+      background: var(--teal);
+      color: white;
+      border: none;
+      border-radius: var(--radio-lg);
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      transition: background 0.15s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-family: inherit;
+    }
+    .btn-submit:hover { background: var(--teal-dark); }
+    .btn-submit:active { transform: scale(0.99); }
+    .btn-submit:disabled {
+      background: var(--texto-hint);
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* ─── SUCCESS SCREEN ─── */
+    #pantalla-exito {
+      display: none;
+    }
+    .exito-wrap {
+      max-width: 480px;
+      margin: 100px auto 0;
+      padding: 0 16px;
+      text-align: center;
+    }
+    .exito-icon {
+      width: 72px;
+      height: 72px;
+      background: var(--teal-light);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+    }
+    .exito-icon svg { width: 36px; height: 36px; color: var(--teal); }
+    .exito-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--texto);
+      margin-bottom: 8px;
+    }
+    .exito-sub {
+      font-size: 14px;
+      color: var(--texto-sub);
+      margin-bottom: 6px;
+      line-height: 1.6;
+    }
+    .exito-folio {
+      display: inline-block;
+      background: var(--teal-light);
+      color: var(--teal-dark);
+      border: 1.5px solid #a7e8e3;
+      border-radius: var(--radio);
+      padding: 8px 20px;
+      font-size: 16px;
+      font-weight: 700;
+      font-family: monospace;
+      letter-spacing: 0.05em;
+      margin: 12px 0 24px;
+    }
+    .btn-volver {
+      padding: 12px 28px;
+      background: var(--azul);
+      color: white;
+      border: none;
+      border-radius: var(--radio);
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: inherit;
+      transition: background 0.15s;
+    }
+    .btn-volver:hover { background: var(--azul-dark); }
+
+    /* ─── ERROR BANNER ─── */
+    .error-banner {
+      display: none;
+      background: var(--rojo-light);
+      border: 1.5px solid #fca5a5;
+      border-radius: var(--radio);
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #991b1b;
+      margin-bottom: 14px;
+      font-weight: 500;
+    }
+    .error-banner.show { display: block; }
+
+    /* ─── SPINNER ─── */
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 420px) {
+      .content { padding: 72px 12px 40px; }
+      .section-body { padding: 16px 14px 12px; }
+      .section-header { padding: 12px 14px 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- FIXED HEADER -->
+<div class="header">
+  <button class="header-back" onclick="history.back()">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M10 3L5 8l5 5"/>
+    </svg>
+    Volver
+  </button>
+  <div class="header-title">🔬 Nueva PND — Líquidos Penetrantes</div>
+  <div class="header-user" id="header-user">—</div>
+</div>
+
+<!-- FORM CONTENT -->
+<div class="content" id="pantalla-form">
+  <div id="error-banner" class="error-banner"></div>
+
+  <form id="pnd-form" onsubmit="return false;" novalidate>
+
+    <!-- ════ SECCIÓN 1: DATOS DEL CLIENTE ════ -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+            <circle cx="9" cy="7" r="4"/>
+            <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>
+          </svg>
+        </div>
+        <span class="section-title">1 — Datos del Cliente</span>
+      </div>
+      <div class="section-body">
+        <div class="field">
+          <label>Cliente <span class="req">*</span></label>
+          <input type="text" id="cliente" name="cliente" required placeholder="Nombre de la empresa o cliente">
+        </div>
+        <div class="field">
+          <label>Planta / Ubicación <span class="req">*</span></label>
+          <input type="text" id="planta" name="planta" required placeholder="Planta / Ubicación">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Correo electrónico</label>
+            <input type="email" id="correo" name="correo" placeholder="contacto@empresa.com">
+          </div>
+          <div class="field">
+            <label>Fecha de inspección <span class="req">*</span></label>
+            <input type="date" id="fecha_inspeccion" name="fecha_inspeccion" required>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SECCIÓN 2: COMPONENTE ════ -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"/>
+          </svg>
+        </div>
+        <span class="section-title">2 — Componente a Inspeccionar</span>
+      </div>
+      <div class="section-body">
+        <div class="field">
+          <label>Descripción del componente <span class="req">*</span></label>
+          <textarea id="componente" name="componente" rows="3" required placeholder="Descripción del componente o soldadura a inspeccionar"></textarea>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>ID / TAG del componente</label>
+            <input type="text" id="identificacion" name="identificacion" placeholder="ID / TAG del componente">
+          </div>
+          <div class="field">
+            <label>Material</label>
+            <input type="text" id="material" name="material" placeholder="Ej: Acero al carbono ASTM A36">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Proceso de fabricación</label>
+            <select id="proceso" name="proceso">
+              <option value="">— Seleccionar —</option>
+              <option value="Soldadura">Soldadura</option>
+              <option value="Fundición">Fundición</option>
+              <option value="Forja">Forja</option>
+              <option value="Laminado">Laminado</option>
+              <option value="Otro">Otro</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Longitud / Área</label>
+            <input type="text" id="longitud_area" name="longitud_area" placeholder="Ej: 2.5 m de longitud / 0.8 m² de área">
+          </div>
+        </div>
+        <div class="field">
+          <label>Condición de la superficie</label>
+          <select id="condicion_superficie" name="condicion_superficie">
+            <option value="">— Seleccionar —</option>
+            <option value="Maquinada">Maquinada</option>
+            <option value="Rectificada">Rectificada</option>
+            <option value="Como soldada">Como soldada</option>
+            <option value="Con pintura">Con pintura</option>
+            <option value="Con óxido superficial">Con óxido superficial</option>
+            <option value="Limpia con cepillo">Limpia con cepillo</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SECCIÓN 3: PARÁMETROS DEL ENSAYO ════ -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18"/>
+          </svg>
+        </div>
+        <span class="section-title">3 — Parámetros del Ensayo</span>
+      </div>
+      <div class="section-body">
+        <div class="row2">
+          <div class="field">
+            <label>Norma / Procedimiento <span class="req">*</span></label>
+            <input type="text" id="norma" name="norma" required value="ASME Section V Article 6" placeholder="Norma / Procedimiento aplicado">
+          </div>
+          <div class="field">
+            <label>Criterio de aceptación</label>
+            <input type="text" id="criterio_aceptacion" name="criterio_aceptacion" placeholder="Ej: ASME Section VIII Div. 1, AWS D1.1">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Técnica de penetrante</label>
+            <select id="tecnica" name="tecnica">
+              <option value="">— Seleccionar —</option>
+              <option value="Tipo I — Lavable con agua">Tipo I — Lavable con agua</option>
+              <option value="Tipo II — Solvente removible">Tipo II — Solvente removible</option>
+              <option value="Tipo III — Post-emulsificable">Tipo III — Post-emulsificable</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Tipo de penetrante</label>
+            <select id="tipo_penetrante" name="tipo_penetrante">
+              <option value="">— Seleccionar —</option>
+              <option value="Visible (color rojo/fluorescente)">Visible (color rojo/fluorescente)</option>
+              <option value="Fluorescente (UV)">Fluorescente (UV)</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Temperatura superficial</label>
+          <div class="inline-field">
+            <input type="text" id="temperatura" name="temperatura" placeholder="°C" style="width:120px">
+            <span class="inline-label">°C temperatura superficial</span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Penetrante — producto</label>
+          <input type="text" id="penetrante_producto" name="penetrante_producto" placeholder="Marca y nombre del penetrante">
+        </div>
+        <div class="field">
+          <label>Removedor / Limpiador — producto</label>
+          <input type="text" id="removedor_producto" name="removedor_producto" placeholder="Marca y nombre del removedor / limpiador">
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Tipo de revelador</label>
+            <select id="tipo_revelador" name="tipo_revelador">
+              <option value="">— Seleccionar —</option>
+              <option value="Seco (polvo)">Seco (polvo)</option>
+              <option value="Acuoso">Acuoso</option>
+              <option value="No acuoso">No acuoso</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Revelador — producto</label>
+            <input type="text" id="revelador_producto" name="revelador_producto" placeholder="Marca y nombre del revelador">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SECCIÓN 4: TIEMPOS Y CONDICIONES ════ -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+        </div>
+        <span class="section-title">4 — Tiempos y Condiciones</span>
+      </div>
+      <div class="section-body">
+        <div class="row2">
+          <div class="field">
+            <label>Tiempo de penetración</label>
+            <input type="number" id="tiempo_penetracion" name="tiempo_penetracion" min="5" max="60" placeholder="min">
+            <div class="hint">Mín. 5 min — Máx. 60 min</div>
+          </div>
+          <div class="field">
+            <label>Tiempo de revelado</label>
+            <input type="number" id="tiempo_revelado" name="tiempo_revelado" min="7" max="30" placeholder="min">
+            <div class="hint">Mín. 7 min — Máx. 30 min</div>
+          </div>
+        </div>
+        <div class="field">
+          <label>Condición de iluminación</label>
+          <input type="text" id="condicion_iluminacion" name="condicion_iluminacion"
+                 placeholder="Ej: ≥ 1000 lux (luz visible) / ≥ 1000 µW/cm² (UV)">
+        </div>
+      </div>
+    </div>
+
+    <!-- ════ SECCIÓN 5: RESULTADOS ════ -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M9 11l3 3L22 4"/>
+            <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+          </svg>
+        </div>
+        <span class="section-title">5 — Resultados</span>
+      </div>
+      <div class="section-body">
+
+        <!-- Sin indicaciones checkbox -->
+        <div class="checkbox-row" onclick="toggleSinInd()">
+          <input type="checkbox" id="chk-sin-ind" onchange="toggleSinInd()" onclick="event.stopPropagation()">
+          <label for="chk-sin-ind">Sin indicaciones relevantes detectadas</label>
+        </div>
+
+        <!-- Tabla de indicaciones -->
+        <div id="ind-tabla-wrap">
+          <div class="ind-subtitle">Indicaciones encontradas</div>
+          <div class="ind-table-wrap">
+            <table class="ind-table">
+              <thead>
+                <tr>
+                  <th>N°</th>
+                  <th>Ubicación</th>
+                  <th>Tipo</th>
+                  <th>Dimensión</th>
+                  <th>¿Relevante?</th>
+                  <th>Disposición</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="ind-tbody">
+                <!-- rows added by JS -->
+              </tbody>
+            </table>
+          </div>
+          <button type="button" class="btn-add-ind" onclick="addIndicacion()">
+            ＋ Agregar indicación
+          </button>
+        </div>
+
+        <!-- Resultado general -->
+        <div class="field resultado-field">
+          <label>Resultado general <span class="req">*</span></label>
+          <select id="resultado" name="resultado" required>
+            <option value="">— Seleccionar —</option>
+            <option value="CONFORME">CONFORME</option>
+            <option value="NO CONFORME">NO CONFORME</option>
+          </select>
+        </div>
+
+        <!-- Observaciones -->
+        <div class="field">
+          <label>Observaciones</label>
+          <textarea id="observaciones" name="observaciones" rows="3"
+                    placeholder="Notas adicionales, condiciones especiales, recomendaciones…"></textarea>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ════ SECCIÓN 6: EVIDENCIA FOTOGRÁFICA ════ -->
+    <div class="section-card">
+      <div class="section-header">
+        <div class="section-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+            <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        </div>
+        <span class="section-title">6 — Evidencia Fotográfica</span>
+      </div>
+      <div class="section-body">
+        <div class="fotos-drop" onclick="document.getElementById('input-fotos').click()">
+          <input type="file" id="input-fotos" accept="image/*" multiple onchange="handleFotos(this)">
+          <div class="fotos-drop-icon">📷</div>
+          <div class="fotos-drop-text">Toca para agregar fotos</div>
+          <div class="fotos-drop-hint">Máximo 20 fotos · JPG, PNG, WEBP</div>
+        </div>
+        <div class="fotos-grid" id="fotos-grid"></div>
+      </div>
+    </div>
+
+    <!-- BOTÓN ENVIAR -->
+    <button type="button" class="btn-submit" id="btn-submit" onclick="enviar()">
+      Registrar Inspección PND
+    </button>
+
+  </form>
+</div>
+
+<!-- PANTALLA ÉXITO -->
+<div id="pantalla-exito">
+  <div class="exito-wrap">
+    <div class="exito-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/>
+        <polyline points="22 4 12 14.01 9 11.01"/>
+      </svg>
+    </div>
+    <div class="exito-title">¡Inspección registrada!</div>
+    <div class="exito-sub">La PND de Líquidos Penetrantes ha sido guardada correctamente.</div>
+    <div class="exito-folio" id="exito-folio">—</div>
+    <div class="exito-sub" id="exito-msg" style="margin-bottom:24px"></div>
+    <button class="btn-volver" onclick="history.back()">← Volver al menú</button>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════
+   FETCH INTERCEPTOR — inject token
+════════════════════════════════════════ */
+(function () {
+  const _fetch = window.fetch;
+  window.fetch = function (url, opts) {
+    opts = opts || {};
+    if (typeof url === 'string' && url.includes('api/index.php')) {
+      const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+      const t = s.token || '';
+      if (opts.method === 'POST') {
+        try {
+          const b = JSON.parse(opts.body || '{}');
+          b.token = t;
+          opts.body = JSON.stringify(b);
+        } catch (e) {}
+      } else {
+        opts.headers = Object.assign({}, opts.headers || {}, {
+          'Authorization': 'Bearer ' + t,
+          'X-Token': t
+        });
+      }
+    }
+    return _fetch.call(this, url, opts);
+  };
+}());
+
+/* ════════════════════════════════════════
+   STATE
+════════════════════════════════════════ */
+let fotosData    = [];   // [{base64, mimeType, nombre}]
+let indRowCount  = 0;
+let enviando     = false;
+
+/* ════════════════════════════════════════
+   AUTH + INIT
+════════════════════════════════════════ */
+window.onload = function () {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  if (!s.token) { location.href = 'login.html'; return; }
+  const rolesPermitidos = ['INSPECTOR', 'ADMIN', 'CALIDAD'];
+  if (!rolesPermitidos.includes(s.rol)) { location.href = 'login.html'; return; }
+
+  // Show user name
+  const nombre = s.nombre || s.usuario || 'Inspector';
+  document.getElementById('header-user').textContent = nombre;
+
+  // Default date to today
+  const hoy = new Date();
+  const yyyy = hoy.getFullYear();
+  const mm   = String(hoy.getMonth() + 1).padStart(2, '0');
+  const dd   = String(hoy.getDate()).padStart(2, '0');
+  document.getElementById('fecha_inspeccion').value = yyyy + '-' + mm + '-' + dd;
+};
+
+/* ════════════════════════════════════════
+   SIN INDICACIONES TOGGLE
+════════════════════════════════════════ */
+function toggleSinInd() {
+  const chk  = document.getElementById('chk-sin-ind');
+  const wrap = document.getElementById('ind-tabla-wrap');
+  if (chk.checked) {
+    wrap.style.display = 'none';
+    // clear all indication rows
+    document.getElementById('ind-tbody').innerHTML = '';
+    indRowCount = 0;
+  } else {
+    wrap.style.display = 'block';
+  }
+}
+
+/* ════════════════════════════════════════
+   INDICACIONES TABLE
+════════════════════════════════════════ */
+function addIndicacion() {
+  indRowCount++;
+  const tbody = document.getElementById('ind-tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>${indRowCount}</td>
+    <td><input type="text" placeholder="Zona / coordenada" style="min-width:110px"></td>
+    <td>
+      <select style="min-width:100px">
+        <option value="Lineal">Lineal</option>
+        <option value="Redondeada">Redondeada</option>
+        <option value="Puntual">Puntual</option>
+      </select>
+    </td>
+    <td><input type="text" placeholder="mm / cm" style="min-width:70px"></td>
+    <td>
+      <select style="min-width:60px">
+        <option value="Sí">Sí</option>
+        <option value="No">No</option>
+      </select>
+    </td>
+    <td>
+      <select style="min-width:100px">
+        <option value="Aceptable">Aceptable</option>
+        <option value="Rechazada">Rechazada</option>
+      </select>
+    </td>
+    <td><button type="button" class="btn-rm-row" onclick="removeIndicacion(this)" title="Eliminar fila">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+}
+
+function removeIndicacion(btn) {
+  const tr = btn.closest('tr');
+  tr.remove();
+  renumerarIndicaciones();
+}
+
+function renumerarIndicaciones() {
+  const tbody = document.getElementById('ind-tbody');
+  const rows  = tbody.querySelectorAll('tr');
+  rows.forEach(function (tr, i) {
+    tr.cells[0].textContent = i + 1;
+  });
+  indRowCount = rows.length;
+}
+
+function getIndicaciones() {
+  const tbody = document.getElementById('ind-tbody');
+  const rows  = tbody.querySelectorAll('tr');
+  const arr   = [];
+  rows.forEach(function (tr) {
+    const inputs  = tr.querySelectorAll('input');
+    const selects = tr.querySelectorAll('select');
+    arr.push({
+      ubicacion:   inputs[0]  ? inputs[0].value.trim()  : '',
+      tipo:        selects[0] ? selects[0].value         : '',
+      dimension:   inputs[1]  ? inputs[1].value.trim()  : '',
+      relevante:   selects[1] ? selects[1].value         : '',
+      disposicion: selects[2] ? selects[2].value         : ''
+    });
+  });
+  return arr;
+}
+
+/* ════════════════════════════════════════
+   PHOTO HANDLING
+════════════════════════════════════════ */
+function handleFotos(input) {
+  const MAX = 20;
+  const files = Array.from(input.files);
+  const remaining = MAX - fotosData.length;
+  const toAdd = files.slice(0, remaining);
+
+  toAdd.forEach(function (file) {
+    const reader = new FileReader();
+    reader.onload = function (e) {
+      const b64 = e.target.result;
+      const idx = fotosData.length;
+      fotosData.push({
+        base64:   b64,
+        mimeType: file.type,
+        nombre:   file.name
+      });
+      renderFotoThumb(b64, file.name, idx);
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Reset input so same file can be re-added if removed
+  input.value = '';
+}
+
+function renderFotoThumb(src, nombre, idx) {
+  const grid = document.getElementById('fotos-grid');
+  const div  = document.createElement('div');
+  div.className = 'foto-thumb';
+  div.dataset.idx = idx;
+  div.innerHTML = `
+    <img src="${src}" alt="${escHtml(nombre)}">
+    <button type="button" class="foto-rm" onclick="removeFoto(this)" title="Eliminar foto">✕</button>
+    <div class="foto-name">${escHtml(nombre)}</div>
+  `;
+  grid.appendChild(div);
+}
+
+function removeFoto(btn) {
+  const thumb = btn.closest('.foto-thumb');
+  const idx   = parseInt(thumb.dataset.idx, 10);
+  fotosData.splice(idx, 1);
+  thumb.remove();
+  // Re-index remaining thumbs
+  const grid   = document.getElementById('fotos-grid');
+  const thumbs = grid.querySelectorAll('.foto-thumb');
+  thumbs.forEach(function (t, i) { t.dataset.idx = i; });
+}
+
+function escHtml(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+/* ════════════════════════════════════════
+   VALIDATION
+════════════════════════════════════════ */
+function validateForm() {
+  let firstErr = null;
+  const required = [
+    { id: 'cliente',          msg: 'Ingresa el nombre del cliente' },
+    { id: 'planta',           msg: 'Ingresa la planta / ubicación' },
+    { id: 'fecha_inspeccion', msg: 'Selecciona la fecha de inspección' },
+    { id: 'componente',       msg: 'Describe el componente a inspeccionar' },
+    { id: 'norma',            msg: 'Ingresa la norma o procedimiento aplicado' },
+    { id: 'resultado',        msg: 'Selecciona el resultado general' }
+  ];
+
+  // Clear previous errors
+  required.forEach(function (r) {
+    const el = document.getElementById(r.id);
+    if (el) el.classList.remove('err');
+  });
+
+  required.forEach(function (r) {
+    const el = document.getElementById(r.id);
+    if (!el) return;
+    const val = el.value.trim();
+    if (!val) {
+      el.classList.add('err');
+      if (!firstErr) firstErr = el;
+    }
+  });
+
+  if (firstErr) {
+    firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    firstErr.focus();
+    return false;
+  }
+  return true;
+}
+
+/* ════════════════════════════════════════
+   SUBMIT
+════════════════════════════════════════ */
+async function enviar() {
+  if (enviando) return;
+
+  // Clear error banner
+  const banner = document.getElementById('error-banner');
+  banner.classList.remove('show');
+  banner.textContent = '';
+
+  if (!validateForm()) {
+    banner.textContent = 'Por favor completa los campos obligatorios marcados en rojo.';
+    banner.classList.add('show');
+    banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  const s     = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const token = s.token || '';
+
+  // Collect all field values
+  const g = function (id) {
+    const el = document.getElementById(id);
+    return el ? el.value.trim() : '';
+  };
+
+  const payload = {
+    cliente:              g('cliente'),
+    planta:               g('planta'),
+    correo:               g('correo'),
+    fecha_inspeccion:     g('fecha_inspeccion'),
+    componente:           g('componente'),
+    identificacion:       g('identificacion'),
+    material:             g('material'),
+    proceso:              g('proceso'),
+    longitud_area:        g('longitud_area'),
+    condicion_superficie: g('condicion_superficie'),
+    norma:                g('norma'),
+    criterio_aceptacion:  g('criterio_aceptacion'),
+    tecnica:              g('tecnica'),
+    tipo_penetrante:      g('tipo_penetrante'),
+    temperatura:          g('temperatura'),
+    penetrante_producto:  g('penetrante_producto'),
+    removedor_producto:   g('removedor_producto'),
+    tipo_revelador:       g('tipo_revelador'),
+    revelador_producto:   g('revelador_producto'),
+    tiempo_penetracion:   g('tiempo_penetracion'),
+    tiempo_revelado:      g('tiempo_revelado'),
+    condicion_iluminacion: g('condicion_iluminacion'),
+    sin_indicaciones:     document.getElementById('chk-sin-ind').checked,
+    indicaciones:         getIndicaciones(),
+    resultado:            g('resultado'),
+    observaciones:        g('observaciones'),
+    fotos:                fotosData
+  };
+
+  // Loading state
+  enviando = true;
+  const btn = document.getElementById('btn-submit');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div> Enviando...';
+
+  try {
+    const res = await fetch('api/index.php', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: 'NUEVA_PND', token: token, payload: payload })
+    });
+
+    let data;
+    try { data = await res.json(); } catch (e) { data = {}; }
+
+    if (!res.ok || data.error) {
+      throw new Error(data.error || data.message || ('Error del servidor: ' + res.status));
+    }
+
+    // SUCCESS
+    const folio = data.folio || data.control || data.id || '—';
+    document.getElementById('pantalla-form').style.display    = 'none';
+    document.getElementById('pantalla-exito').style.display   = 'block';
+    document.getElementById('exito-folio').textContent        = 'N° de control: ' + folio;
+    document.getElementById('exito-msg').textContent          = data.mensaje || 'La inspección fue registrada exitosamente en el sistema.';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  } catch (err) {
+    banner.textContent = '⚠ ' + (err.message || 'Error al enviar. Intenta de nuevo.');
+    banner.classList.add('show');
+    banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } finally {
+    enviando     = false;
+    btn.disabled = false;
+    btn.innerHTML = 'Registrar Inspección PND';
+  }
+}
+</script>
+</body>
+</html>

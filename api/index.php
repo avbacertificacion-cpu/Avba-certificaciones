@@ -19,6 +19,7 @@ require_once __DIR__ . '/ValidarQR.php';
 require_once __DIR__ . '/Admin.php';
 require_once __DIR__ . '/Personal.php';
 require_once __DIR__ . '/Accesorios.php';
+require_once __DIR__ . '/Pnd.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -57,6 +58,7 @@ $qr       = new ValidarQR($pdo);
 $admin    = new Admin($pdo);
 $personal = new Personal($pdo);
 $accesorios = new Accesorios($pdo);
+$pnd        = new Pnd($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -234,6 +236,18 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->listarParticipantes(['inspector' => $usr['usuario']]));
+
+        // PND: inspector — historial propio
+        case 'GET_MIS_PND':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta(['status' => 'success', 'data' => $pnd->getMisInspecciones($usr['usuario'])]);
+
+        // PND: calidad — todos los registros
+        case 'GET_DATA_PND':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta(['status' => 'success', 'data' => $pnd->getDataCalidad()]);
 
         // Personal: catálogos públicos (autenticados)
         case 'LISTAR_CURSOS':
@@ -543,6 +557,32 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cal->generarQrLote($payload));
+
+        // ── PND (Pruebas No Destructivas) ─────────────────
+        case 'NUEVA_PND':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pnd->nueva($payload, $usr['usuario']));
+
+        case 'ACTUALIZAR_PND':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pnd->actualizar($payload, $usr['usuario']));
+
+        case 'GENERAR_REPORTE_PND':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pnd->generarReporte((int)($payload['id'] ?? 0)));
+
+        case 'APROBAR_PND':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pnd->aprobar($payload, $usr['usuario']));
+
+        case 'RECHAZAR_PND':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pnd->rechazar($payload, $usr['usuario']));
 
         // ── Certificaciones ───────────────────────────────
         case 'IMPRIMIR_PDF_CERT':
