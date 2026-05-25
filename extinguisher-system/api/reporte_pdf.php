@@ -138,7 +138,12 @@ function fmtFecha(?string $fecha): string {
 
 // ─── Logo en base64 si existe ─────────────────────────────────────────────────
 $logo_html = '';
-$logo_paths = ['../assets/img/logo.png', '../assets/img/logo.jpg', '../public/img/logo.png'];
+$logo_paths = [
+    '../public/assets/logos/avba_logo.png',
+    '../assets/img/logo.png',
+    '../assets/img/logo.jpg',
+    '../public/img/logo.png'
+];
 foreach ($logo_paths as $lp) {
     if (file_exists($lp)) {
         $ext_img = pathinfo($lp, PATHINFO_EXTENSION);
