@@ -98,9 +98,10 @@ CREATE TABLE plantillas (
 -- ─── REPORTES MENSUALES (generados por admin para cliente) ───────────────────
 CREATE TABLE reportes_mensuales (
     id              INT PRIMARY KEY AUTO_INCREMENT,
-    plantilla_id    INT NOT NULL,
+    plantilla_id    INT,
     empresa_id      INT NOT NULL,
     generado_por    INT NOT NULL,
+    inspector_id    INT NOT NULL,                  -- Inspector responsable para el reporte
     mes             TINYINT NOT NULL,              -- 1-12
     anio            SMALLINT NOT NULL,
     numero_reporte  VARCHAR(20),                   -- REV-001
@@ -111,7 +112,8 @@ CREATE TABLE reportes_mensuales (
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (plantilla_id) REFERENCES plantillas(id),
     FOREIGN KEY (empresa_id) REFERENCES empresas(id),
-    FOREIGN KEY (generado_por) REFERENCES usuarios(id)
+    FOREIGN KEY (generado_por) REFERENCES usuarios(id),
+    FOREIGN KEY (inspector_id) REFERENCES usuarios(id)
 );
 
 -- ─── AUDITORÍA ───────────────────────────────────────────────────────────────

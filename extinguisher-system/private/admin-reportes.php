@@ -109,6 +109,10 @@ $nombre = $_SESSION['nombre'];
             </div>
         </div>
         <div class="form-group">
+            <label>Inspector Responsable *</label>
+            <select id="r-inspector"></select>
+        </div>
+        <div class="form-group">
             <label>Ubicación</label>
             <input type="text" id="r-obs" placeholder="Ej: EAA, PLANTA NORTE…" style="text-transform:uppercase">
         </div>
@@ -125,6 +129,7 @@ const meses = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
 
 async function init() {
     await cargarEmpresas();
+    await cargarInspectores();
     cargar();
 }
 
@@ -137,6 +142,17 @@ async function cargarEmpresas() {
     d.data.forEach(e => {
         sel1.innerHTML += `<option value="${e.id}">${e.nombre}</option>`;
         sel2.innerHTML += `<option value="${e.id}">${e.nombre}</option>`;
+    });
+}
+
+async function cargarInspectores() {
+    const r = await fetch('../api/usuarios.php?action=listar_inspectores');
+    const d = await r.json();
+    if (!d.success) return;
+    const sel = document.getElementById('r-inspector');
+    sel.innerHTML = '<option value="">-- Selecciona un inspector --</option>';
+    d.data.forEach(u => {
+        sel.innerHTML += `<option value="${u.id}">${u.nombre}</option>`;
     });
 }
 
@@ -216,6 +232,7 @@ function cerrarModal() { document.getElementById('modalReporte').classList.remov
 async function crearReporte() {
     const body = {
         empresa_id:    parseInt(document.getElementById('r-empresa').value),
+        inspector_id:  parseInt(document.getElementById('r-inspector').value),
         mes:           parseInt(document.getElementById('r-mes').value),
         anio:          parseInt(document.getElementById('r-anio').value),
         observaciones: document.getElementById('r-obs').value || null,
@@ -223,6 +240,10 @@ async function crearReporte() {
     if (!body.empresa_id) {
         document.getElementById('modal-alert').innerHTML =
             '<div class="alert alert-error">Selecciona una empresa</div>'; return;
+    }
+    if (!body.inspector_id) {
+        document.getElementById('modal-alert').innerHTML =
+            '<div class="alert alert-error">Selecciona un inspector responsable</div>'; return;
     }
 
     const r = await fetch('../api/reportes_mensuales.php?action=crear', {

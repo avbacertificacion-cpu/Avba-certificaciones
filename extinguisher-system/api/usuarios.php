@@ -13,6 +13,7 @@ $action = $_GET['action'] ?? '';
 switch ($action) {
     case 'listar':               listar();               break;
     case 'listar_empresas':      listarEmpresas();       break;
+    case 'listar_inspectores':   listarInspectores();    break;
     case 'crear':                crear();                break;
     case 'editar':               editar();               break;
     case 'eliminar':             eliminar();             break;
@@ -44,6 +45,17 @@ function listar() {
 function listarEmpresas() {
     global $pdo;
     $stmt = $pdo->query("SELECT id, nombre FROM empresas WHERE estado='activo' ORDER BY nombre");
+    echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+// ─── LISTAR INSPECTORES ──────────────────────────────────────────────────────
+function listarInspectores() {
+    global $pdo;
+    $stmt = $pdo->query("
+        SELECT id, nombre FROM usuarios
+        WHERE rol='inspector' AND estado='activo'
+        ORDER BY nombre
+    ");
     echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 

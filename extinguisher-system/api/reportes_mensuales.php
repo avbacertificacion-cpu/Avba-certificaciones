@@ -81,7 +81,7 @@ function crear() {
 
     $d = json_decode(file_get_contents('php://input'), true);
 
-    foreach (['empresa_id','mes','anio'] as $c) {
+    foreach (['empresa_id','inspector_id','mes','anio'] as $c) {
         if (empty($d[$c])) {
             http_response_code(400); echo json_encode(['error' => "Campo requerido: $c"]); return;
         }
@@ -95,12 +95,13 @@ function crear() {
 
     $stmt = $pdo->prepare("
         INSERT INTO reportes_mensuales
-            (empresa_id, generado_por, mes, anio, numero_reporte, estado, observaciones)
-        VALUES (?,?,?,?,?,'borrador',?)
+            (empresa_id, generado_por, inspector_id, mes, anio, numero_reporte, estado, observaciones)
+        VALUES (?,?,?,?,?,?,'borrador',?)
     ");
     $stmt->execute([
         $d['empresa_id'],
         $uid,
+        $d['inspector_id'],
         $d['mes'],
         $d['anio'],
         $numero,
