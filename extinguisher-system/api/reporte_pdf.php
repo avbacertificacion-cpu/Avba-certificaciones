@@ -15,9 +15,11 @@ if (!$reporte_id) exit('ID de reporte requerido');
 
 // ─── Cargar datos del reporte ─────────────────────────────────────────────────
 $stmt = $pdo->prepare("
-    SELECT r.*, emp.nombre AS empresa_nombre, emp.domicilio AS empresa_domicilio
+    SELECT r.*, emp.nombre AS empresa_nombre, emp.domicilio AS empresa_domicilio,
+           u.nombre AS inspector_nombre
     FROM reportes_mensuales r
     JOIN empresas emp ON emp.id = r.empresa_id
+    JOIN usuarios u ON u.id = r.inspector_id
     WHERE r.id = ?
 ");
 $stmt->execute([$reporte_id]);
@@ -55,19 +57,15 @@ $stmt = $pdo->prepare("
     LIMIT 1
 ");
 
-$inspectores_del_mes = [];
-
 foreach ($extintores as &$ext) {
     $stmt->execute([$ext['id'], $mes, $anio]);
     $insp = $stmt->fetch(PDO::FETCH_ASSOC);
     $ext['inspeccion'] = $insp ?: null;
-    if ($insp && !in_array($insp['inspector_nombre'], $inspectores_del_mes)) {
-        $inspectores_del_mes[] = strtoupper($insp['inspector_nombre']);
-    }
 }
 unset($ext);
 
-$inspector_header = implode(', ', $inspectores_del_mes) ?: '—';
+// Usar el inspector asignado al reporte
+$inspector_header = strtoupper($reporte['inspector_nombre']);
 
 $meses_es = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
              'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
