@@ -73,9 +73,6 @@ CREATE TABLE inspecciones (
     gb   ENUM('OK','NC','NA','PO') DEFAULT NULL,   -- Gabinete
     rv   ENUM('OK','NC','NA','PO') DEFAULT NULL,   -- Recarga vigente
 
-    tipo_inspeccion  VARCHAR(50),                  -- tipo de extintor inspeccionado
-    capacidad_insp   VARCHAR(30),                  -- capacidad inspeccionada
-
     observaciones   TEXT,
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (extintor_id) REFERENCES extintores(id),
@@ -132,7 +129,6 @@ CREATE TABLE auditoria (
 -- ─── ÍNDICES ─────────────────────────────────────────────────────────────────
 CREATE INDEX idx_extintor_empresa    ON extintores(empresa_id);
 CREATE INDEX idx_extintor_codigo_qr  ON extintores(codigo_qr);
-CREATE INDEX idx_extintor_empresa ON extintores(empresa_id);
 CREATE INDEX idx_inspeccion_extintor ON inspecciones(extintor_id);
 CREATE INDEX idx_inspeccion_fecha    ON inspecciones(fecha);
 CREATE INDEX idx_reporte_empresa     ON reportes_mensuales(empresa_id);

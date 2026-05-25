@@ -8,16 +8,16 @@ if (!isset($_SESSION['usuario_id'])) {
     exit;
 }
 
-// Cliente no tiene acceso a extintores directamente
-if ($_SESSION['rol'] === ROLE_CLIENTE) {
+$rol    = $_SESSION['rol'];
+$uid    = $_SESSION['usuario_id'];
+$action = $_GET['action'] ?? '';
+
+// Cliente solo puede listar (ver sus extintores)
+if ($rol === ROLE_CLIENTE && !in_array($action, ['listar'])) {
     http_response_code(403);
     echo json_encode(['error' => 'Sin permiso']);
     exit;
 }
-
-$rol    = $_SESSION['rol'];
-$uid    = $_SESSION['usuario_id'];
-$action = $_GET['action'] ?? '';
 
 switch ($action) {
     case 'listar':    listar();    break;
