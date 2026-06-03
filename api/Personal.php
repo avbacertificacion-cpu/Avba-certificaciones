@@ -192,7 +192,7 @@ class Personal {
     }
 
     // ── Aprobar participante → APROBADO_CALIDAD ────────────
-    public function aprobarParticipante(int $id, string $usuario, string $qr): array {
+    public function aprobarParticipante(int $id, string $usuario, string $qr = ''): array {
         $this->ensureEstatusColumn();
         // Garantizar columna qr_codigo
         try {
@@ -204,14 +204,20 @@ class Personal {
         $p = $chk->fetch();
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
-        if (!$qr) return ['status' => 'error', 'message' => 'El código QR es requerido.'];
-
-        // Validar QR existe y no está usado
-        $stmtQR = $this->pdo->prepare("SELECT id, usado FROM qr_codigos WHERE identificador = ?");
-        $stmtQR->execute([$qr]);
-        $qrRow = $stmtQR->fetch();
-        if (!$qrRow)        return ['status' => 'error', 'message' => 'Código QR no válido.'];
-        if ($qrRow['usado']) return ['status' => 'error', 'message' => 'Código QR ya está en uso.'];
+        // Auto-asignar el siguiente QR disponible
+        if (!$qr) {
+            $qrRow = $this->pdo->query(
+                "SELECT id, identificador FROM qr_codigos WHERE usado = 0 ORDER BY CAST(identificador AS UNSIGNED) LIMIT 1"
+            )->fetch();
+            if (!$qrRow) return ['status' => 'error', 'message' => 'Sin QR disponibles. Genera un lote en Códigos QR.'];
+            $qr = $qrRow['identificador'];
+        } else {
+            $stmtQR = $this->pdo->prepare("SELECT id, usado FROM qr_codigos WHERE identificador = ?");
+            $stmtQR->execute([$qr]);
+            $qrRow = $stmtQR->fetch();
+            if (!$qrRow)         return ['status' => 'error', 'message' => 'Código QR no válido.'];
+            if ($qrRow['usado']) return ['status' => 'error', 'message' => 'Código QR ya está en uso.'];
+        }
 
         // Generar control si el participante no lo tiene (registros previos a migration_009)
         if (empty($p['control'])) {
@@ -228,7 +234,11 @@ class Personal {
         $this->pdo->prepare("UPDATE qr_codigos SET usado = 1 WHERE id = ?")
             ->execute([$qrRow['id']]);
 
-        return ['status' => 'success', 'message' => 'Participante aprobado y enviado a Certificaciones.'];
+        return [
+            'status'  => 'success',
+            'message' => 'Participante aprobado y QR asignado automáticamente.',
+            'qr'      => $qr,
+        ];
     }
 
     // ── Devolver participante → DEVUELTO ──────────────────
@@ -252,6 +262,33 @@ class Personal {
             "UPDATE participantes_cursos SET estatus = 'DEVUELTO', qr_codigo = NULL WHERE id = ?"
         )->execute([$id]);
         return ['status' => 'success', 'message' => 'Participante devuelto a Calidad.'];
+    }
+
+    // ── Actualizar datos de empresa (para DC3) ────────────────
+    public function actualizarEmpresa(array $payload, string $usuario): array {
+        $id = (int)($payload['id'] ?? 0);
+        if (!$id) return ['status' => 'error', 'message' => 'ID requerido.'];
+
+        $chk = $this->pdo->prepare("SELECT id FROM participantes_cursos WHERE id = ?");
+        $chk->execute([$id]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        $campos = ['empresa_nombre', 'empresa_rfc', 'empresa_representante', 'empresa_direccion'];
+        $sets   = [];
+        $params = [];
+        foreach ($campos as $c) {
+            if (array_key_exists($c, $payload)) {
+                $sets[]   = "`{$c}` = ?";
+                $params[] = $payload[$c] === '' ? null : trim($payload[$c]);
+            }
+        }
+        if (empty($sets)) return ['status' => 'success', 'message' => 'Sin cambios.'];
+
+        $params[] = $id;
+        $this->pdo->prepare("UPDATE participantes_cursos SET " . implode(', ', $sets) . " WHERE id = ?")
+            ->execute($params);
+
+        return ['status' => 'success', 'message' => 'Datos de empresa actualizados.'];
     }
 
     // ── Actualizar nombre y CURP extraídos por OCR ────────────

@@ -781,6 +781,11 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->devolverParticipante((int)($payload['id'] ?? 0), $usr['usuario']));
 
+        case 'ACTUALIZAR_EMPRESA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->actualizarEmpresa($payload, $usr['usuario']));
+
         case 'ACTUALIZAR_DATOS_OCR':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

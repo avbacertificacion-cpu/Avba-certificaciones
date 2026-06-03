@@ -2402,6 +2402,12 @@ function abrirApro(context, id) {
   aproContext = context || 'equipo';
   aproId      = id     || 0;
 
+  // Para personal: aprobación directa sin modal de QR
+  if (aproContext === 'per') {
+    aprobarPersonalDirecto(id);
+    return;
+  }
+
   // Pre-llenar QR si el registro ya tiene uno asignado (retornado)
   let qrExistente = "";
   if (aproContext === 'equipo' && filaActual) {
@@ -2419,6 +2425,28 @@ function abrirApro(context, id) {
   document.getElementById("apro-paso-ok").style.display = "none";
   document.getElementById("overlay-apro").classList.add("open");
   setTimeout(() => document.getElementById("qr-input").focus(), 200);
+}
+
+async function aprobarPersonalDirecto(id) {
+  if (!confirm('¿Aprobar este participante? Se le asignará automáticamente el siguiente QR disponible.')) return;
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      body:   JSON.stringify({ action: 'APROBAR_PARTICIPANTE', payload: { id } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast('Participante aprobado · QR: ' + (data.qr || '—'), 'ok');
+      perCargados = false;
+      cargarPersonal();
+      cerrarDetPer();
+    } else {
+      mostrarToast('Error: ' + (data.message || 'Error desconocido'), 'err');
+    }
+  } catch (e) {
+    mostrarToast('Error de conexión.', 'err');
+    console.error('aprobarPersonalDirecto:', e);
+  }
 }
 function cerrarApro() {
   document.getElementById("overlay-apro").classList.remove("open");
@@ -3278,9 +3306,36 @@ async function abrirDetPer(id) {
         <div><span style="font-size:11px;color:var(--texto-sub);display:block">Ocupación</span>${escH(p.ocupacion_nombre||'—')}</div>
         <div><span style="font-size:11px;color:var(--texto-sub);display:block">Capacidad</span>${p.capacidad_na?'N/A':escH(p.capacidad||'—')}</div>
         <div><span style="font-size:11px;color:var(--texto-sub);display:block">Teléfono</span>${escH(p.telefono||'—')}</div>
-        <div><span style="font-size:11px;color:var(--texto-sub);display:block">Empresa</span>${escH(p.empresa_nombre||'—')}</div>
-        ${p.empresa_rfc?`<div><span style="font-size:11px;color:var(--texto-sub);display:block">RFC</span>${escH(p.empresa_rfc)}</div>`:''}
-        ${p.empresa_representante?`<div><span style="font-size:11px;color:var(--texto-sub);display:block">Representante</span>${escH(p.empresa_representante)}</div>`:''}
+      </div>
+
+      <!-- ── Datos de empresa (editables para DC3) ── -->
+      <div style="border:1.5px solid var(--borde);border-radius:10px;padding:14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:10px;display:flex;align-items:center;gap:6px">
+          📋 Datos de empresa <span style="font-size:10px;background:#FFF3CD;color:#856404;border-radius:4px;padding:1px 8px;font-weight:600">requeridos para DC3</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Empresa
+            <input id="per-emp-nombre" value="${escH(p.empresa_nombre||'')}" placeholder="Razón social"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+          </label>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">RFC
+            <input id="per-emp-rfc" value="${escH(p.empresa_rfc||'')}" placeholder="RFC de la empresa"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px;text-transform:uppercase"
+              oninput="this.value=this.value.toUpperCase()">
+          </label>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Representante legal
+            <input id="per-emp-representante" value="${escH(p.empresa_representante||'')}" placeholder="Nombre del representante"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+          </label>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Dirección
+            <input id="per-emp-direccion" value="${escH(p.empresa_direccion||'')}" placeholder="Dirección de la empresa"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+          </label>
+        </div>
+        <button onclick="guardarEmpresaPer(${p.id})"
+          style="padding:6px 16px;background:var(--azul);color:white;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
+          Guardar datos empresa
+        </button>
       </div>
       ${p.foto_persona_url?`<div style="margin-bottom:12px"><span style="font-size:11px;color:var(--texto-sub);display:block;margin-bottom:6px">Fotografía</span><img src="${escH(p.foto_persona_url)}" style="max-width:120px;border-radius:8px;border:1px solid var(--borde)"></div>`:''}
       ${p.foto_documentacion_url ? `
@@ -3335,6 +3390,33 @@ async function abrirDetPer(id) {
 
 function cerrarDetPer() {
   document.getElementById('overlay-per-det').style.display = 'none';
+}
+
+async function guardarEmpresaPer(id) {
+  const payload = {
+    id,
+    empresa_nombre:        document.getElementById('per-emp-nombre')?.value        || '',
+    empresa_rfc:           document.getElementById('per-emp-rfc')?.value           || '',
+    empresa_representante: document.getElementById('per-emp-representante')?.value || '',
+    empresa_direccion:     document.getElementById('per-emp-direccion')?.value     || '',
+  };
+  try {
+    const res  = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: 'ACTUALIZAR_EMPRESA_PERSONAL', payload })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast('Datos de empresa guardados', 'ok');
+      perCargados = false;
+    } else {
+      mostrarToast('Error: ' + (data.message || 'Error desconocido'), 'err');
+    }
+  } catch (e) {
+    mostrarToast('Error de conexión.', 'err');
+    console.error('guardarEmpresaPer:', e);
+  }
 }
 
 async function perExtraerOCR(id) {
