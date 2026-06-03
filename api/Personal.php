@@ -511,37 +511,18 @@ class Personal {
         if (!in_array($tipo, $tiposValidos, true))
             return ['status' => 'error', 'message' => 'Tipo de documento no válido.'];
 
-        // Intentar usar plantilla PDF configurada en la BD
-        try {
-            $stmt = $this->pdo->prepare(
-                "SELECT plantilla_pdf, pdf_campos FROM plantillas_personal WHERE tipo = ? LIMIT 1"
-            );
-            $stmt->execute([$tipo]);
-            $tpl = $stmt->fetch();
-            if ($tpl && !empty($tpl['plantilla_pdf'])) {
-                $rutaTpl = __DIR__ . '/../uploads/plantillas/' . $tpl['plantilla_pdf'];
-                if (file_exists($rutaTpl)) {
-                    $camposTpl = json_decode($tpl['pdf_campos'] ?? '[]', true) ?: [];
-                    return $this->generarConTemplatePdf($p, $tipo, $usuario, $rutaTpl, $camposTpl);
-                }
-            }
-        } catch (\Exception $e) {
-            // tabla aún no existe o error puntual → continúa con fallback
-        }
-
-        // Fallback: generar con Dompdf (requiere vendor/)
         if (!class_exists('Dompdf\Dompdf')) {
-            return ['status' => 'error',
-                    'message' => 'No hay plantilla PDF configurada. Súbela desde Calidad → Personal → Plantillas PDF.'];
+            return ['status' => 'error', 'message' => 'Dompdf no disponible. Instala las dependencias del proyecto.'];
         }
 
-        $html  = match($tipo) {
+        $html        = match($tipo) {
             'dc3'         => $this->htmlDC3($p),
             'certificado' => $this->htmlCertificado($p),
             default       => $this->htmlDiploma($p),
         };
-        $folio = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
-        $url   = $this->htmlAPdf($html, $folio, $tipo);
+        $folio       = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
+        $orientation = ($tipo === 'diploma') ? 'landscape' : 'portrait';
+        $url         = $this->htmlAPdf($html, $folio, $tipo, $orientation);
 
         $this->pdo->prepare(
             "INSERT INTO participantes_documentos (participante_id, tipo_doc, url, generado_por)
@@ -742,14 +723,14 @@ class Personal {
         return null;
     }
 
-    private function htmlAPdf(string $html, string $folio, string $tipo): string {
+    private function htmlAPdf(string $html, string $folio, string $tipo, string $orientation = 'portrait'): string {
         $opts = new Options();
         $opts->set('isRemoteEnabled', false);
         $opts->set('defaultFont', 'DejaVu Sans');
 
         $dompdf = new Dompdf($opts);
         $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->setPaper('A4', $orientation);
         $dompdf->render();
 
         $dir = UPLOAD_DIR . 'personal/docs/';
@@ -821,8 +802,8 @@ class Personal {
 body { font-family: Arial, sans-serif; font-size: 8.5pt; color: #000; margin: 14px 18px; }
 .doc { width:100%; border-collapse:collapse; border:1.5px solid #000; }
 .doc td, .doc th { border:1px solid #555; padding:0; vertical-align:top; }
-.sec-hdr td { background:#000; color:#fff; text-align:center; font-weight:bold;
-               font-size:8pt; letter-spacing:0.5px; padding:3px 4px; border-color:#000; }
+.sec-hdr td { background:#1B2A6B; color:#fff; text-align:center; font-weight:bold;
+               font-size:8pt; letter-spacing:0.5px; padding:3px 4px; border-color:#1B2A6B; }
 .lbl { font-size:7pt; color:#444; padding:3px 5px 1px; }
 .val { font-weight:bold; font-size:8.5pt; padding:2px 5px 4px; }
 .val-inline { padding:3px 5px; }
@@ -832,8 +813,8 @@ body { font-family: Arial, sans-serif; font-size: 8.5pt; color: #000; margin: 14
 .sig-sub  { font-size:7pt; color:#444; }
 .instruct { font-size:7pt; line-height:1.55; padding:5px 6px; }
 .page2 { page-break-before: always; }
-.rev-hdr { text-align:center; font-weight:bold; font-size:8pt;
-           border-bottom:1px solid #000; padding:4px 0 6px; margin-bottom:8px; }
+.rev-hdr { text-align:center; font-weight:bold; font-size:8pt; color:#1B2A6B;
+           border-bottom:1.5px solid #1B2A6B; padding:4px 0 6px; margin-bottom:8px; }
 .rev-tbl { width:100%; border-collapse:collapse; font-size:7pt; }
 .rev-tbl th { font-weight:bold; border-bottom:1.5px solid #000; padding:2px 4px; text-align:left; }
 .rev-tbl td { padding:1.5px 4px; vertical-align:top; }
@@ -863,7 +844,7 @@ CSS;
 <table class="doc" style="margin-bottom:0">
   <tr>
     <td style="width:14%;padding:6px 8px;border-right:1px solid #555;vertical-align:middle">
-      <div style="font-size:7pt;font-weight:bold;color:#185FA5;text-align:center">AVBA<br>CERTIFICACIONES</div>
+      <div style="font-size:7pt;font-weight:bold;color:#1B2A6B;text-align:center">AVBA<br>CERTIFICACIONES</div>
     </td>
     <td style="text-align:center;padding:8px 6px;border-right:1px solid #555">
       <div style="font-size:11pt;font-weight:bold">FORMATO DC-3</div>
@@ -1114,7 +1095,7 @@ HTML;
         $reverso = <<<HTML
 <div class="page2">
   <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-    <div style="font-size:7pt;font-weight:bold;color:#185FA5">AVBA CERTIFICACIONES</div>
+    <div style="font-size:7pt;font-weight:bold;color:#1B2A6B">AVBA CERTIFICACIONES</div>
   </div>
 
   <div class="rev-hdr">CLAVES Y DENOMINACIONES DE ÁREAS Y SUBÁREAS DEL CATÁLOGO NACIONAL DE OCUPACIONES</div>
@@ -1153,6 +1134,12 @@ HTML;
         $curso   = $esc($p['curso_nombre']);
         $horas   = $esc($p['duracion_horas']);
         $area    = $esc($p['area_tematica'] ?? '');
+        $folio   = $esc(
+            $p['control']
+                ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'
+                : 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT)
+        );
+        $emision = $esc(date('d/m/Y'));
         $fecha   = $p['fecha_curso'] ? date('d \d\e F \d\e Y', strtotime($p['fecha_curso'])) : '';
 
         $mesesES = ['January'=>'enero','February'=>'febrero','March'=>'marzo','April'=>'abril',
@@ -1168,67 +1155,116 @@ HTML;
 <head>
 <meta charset="UTF-8">
 <style>
-  body { font-family: DejaVu Sans, Arial, sans-serif; margin: 0; padding: 0; background: #fff; }
-  .diploma {
-    border: 6px double #185FA5;
-    margin: 24px;
-    padding: 36px 48px;
-    min-height: 680px;
-    text-align: center;
-    position: relative;
-  }
-  .dip-corner {
-    position: absolute; width: 30px; height: 30px;
-    border-color: #C9A84C; border-style: solid;
-  }
-  .dip-corner.tl { top: 8px; left: 8px;  border-width: 3px 0 0 3px; }
-  .dip-corner.tr { top: 8px; right: 8px; border-width: 3px 3px 0 0; }
-  .dip-corner.bl { bottom: 8px; left: 8px;  border-width: 0 0 3px 3px; }
-  .dip-corner.br { bottom: 8px; right: 8px; border-width: 0 3px 3px 0; }
-  .org-name { font-size: 26pt; font-weight: bold; color: #185FA5; letter-spacing: 4px; margin-bottom: 2px; }
-  .org-sub  { font-size: 10pt; color: #5a6072; letter-spacing: 2px; margin-bottom: 28px; }
-  .dip-title { font-size: 17pt; font-weight: bold; color: #C9A84C; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 22px; }
-  .otorga { font-size: 10pt; color: #5a6072; margin-bottom: 10px; letter-spacing: .5px; }
-  .dip-nombre { font-size: 24pt; color: #1a1a2e; font-style: italic; margin: 6px 0 24px; border-bottom: 1.5px solid #C9A84C; display: inline-block; padding-bottom: 4px; }
-  .por-completar { font-size: 10pt; color: #5a6072; margin-bottom: 8px; }
-  .dip-curso { font-size: 15pt; font-weight: bold; color: #185FA5; margin-bottom: 8px; }
-  .dip-meta { font-size: 9pt; color: #888; margin-bottom: 28px; }
-  .dip-fecha { font-size: 10pt; color: #5a6072; margin-top: 10px; margin-bottom: 36px; }
-  table.firmas { width: 100%; border-collapse: collapse; margin-top: 20px; }
-  table.firmas td { text-align: center; padding: 0 24px; vertical-align: bottom; }
-  .firma-line { border-top: 1px solid #888; margin-top: 52px; padding-top: 6px; font-size: 9pt; color: #555; }
-  .folio { font-size: 7.5pt; color: #bbb; margin-top: 18px; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DejaVu Serif', Georgia, serif; background: #FDFAF3; color: #1B2A6B; }
+.diploma {
+  margin: 13px;
+  padding: 26px 44px 20px;
+  min-height: 648px;
+  text-align: center;
+  position: relative;
+  background: #FDFAF3;
+  border: 3px solid #C9A84C;
+}
+.inner-frame {
+  position: absolute; top: 9px; left: 9px; right: 9px; bottom: 9px;
+  border: 1.5px solid #1B2A6B;
+}
+.corner { position: absolute; width: 24px; height: 24px; border-color: #C9A84C; border-style: solid; }
+.corner.tl { top: 16px;    left: 16px;    border-width: 2px 0 0 2px; }
+.corner.tr { top: 16px;    right: 16px;   border-width: 2px 2px 0 0; }
+.corner.bl { bottom: 16px; left: 16px;    border-width: 0 0 2px 2px; }
+.corner.br { bottom: 16px; right: 16px;   border-width: 0 2px 2px 0; }
+.org-name {
+  font-family: 'DejaVu Sans', Arial, sans-serif;
+  font-size: 19pt; font-weight: bold; color: #1B2A6B;
+  letter-spacing: 5px; margin-bottom: 3px; margin-top: 8px;
+}
+.org-sub {
+  font-family: 'DejaVu Sans', Arial, sans-serif;
+  font-size: 7pt; color: #9a9a9a; letter-spacing: 3px;
+  text-transform: uppercase; margin-bottom: 8px;
+}
+.gold-rule { width: 54px; height: 3px; background: #C9A84C; margin: 0 auto 14px; }
+.dip-title {
+  font-size: 18pt; font-weight: bold; color: #C9A84C;
+  letter-spacing: 2px; text-transform: uppercase; margin-bottom: 3px;
+}
+.dip-tag {
+  font-size: 8.5pt; color: #888; letter-spacing: 1px; font-style: italic; margin-bottom: 12px;
+}
+.otorga {
+  font-family: 'DejaVu Sans', Arial, sans-serif;
+  font-size: 9pt; color: #666; margin-bottom: 5px;
+}
+.nombre { font-size: 25pt; font-style: italic; color: #1B2A6B; line-height: 1.15; }
+.nombre-rule { width: 190px; height: 1.5px; background: #C9A84C; margin: 6px auto 12px; }
+.completar {
+  font-family: 'DejaVu Sans', Arial, sans-serif;
+  font-size: 9pt; color: #666; margin-bottom: 4px;
+}
+.curso {
+  font-family: 'DejaVu Sans', Arial, sans-serif;
+  font-size: 13pt; font-weight: bold; color: #1B2A6B; margin-bottom: 4px;
+}
+.meta {
+  font-family: 'DejaVu Sans', Arial, sans-serif;
+  font-size: 8pt; color: #888; margin-bottom: 5px;
+}
+.fecha-txt {
+  font-family: 'DejaVu Sans', Arial, sans-serif;
+  font-size: 9pt; color: #666; margin-bottom: 16px;
+}
+table.firmas { width: 78%; margin: 0 auto; border-collapse: collapse; }
+.firma-col   { text-align: center; padding: 0 28px; }
+.firma-line  {
+  margin-top: 48px; border-top: 1px solid #1B2A6B; padding-top: 4px;
+  font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 8pt; color: #555;
+}
+.firma-sub {
+  font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 7pt; color: #bbb; margin-top: 1px;
+}
+.folio-txt {
+  font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 6.5pt; color: #ccc; margin-top: 14px;
+}
 </style>
 </head>
 <body>
 <div class="diploma">
-  <div class="dip-corner tl"></div>
-  <div class="dip-corner tr"></div>
-  <div class="dip-corner bl"></div>
-  <div class="dip-corner br"></div>
+  <div class="inner-frame"></div>
+  <div class="corner tl"></div><div class="corner tr"></div>
+  <div class="corner bl"></div><div class="corner br"></div>
 
-  <div class="org-name">AVBA</div>
-  <div class="org-sub">CERTIFICACIONES</div>
+  <div class="org-name">AVBA CERTIFICACIONES</div>
+  <div class="org-sub">Inspección Industrial &amp; Capacitación Especializada</div>
+  <div class="gold-rule"></div>
 
   <div class="dip-title">Diploma de Participación</div>
+  <div class="dip-tag">Otorga el presente reconocimiento a quien a continuación se menciona:</div>
 
-  <div class="otorga">Se otorga el presente diploma a:</div>
-  <div class="dip-nombre">{$nombre}</div>
+  <div class="otorga">Se hace constar que:</div>
+  <div class="nombre">{$nombre}</div>
+  <div class="nombre-rule"></div>
 
-  <div class="por-completar">Por haber concluido satisfactoriamente el curso:</div>
-  <div class="dip-curso">{$curso}</div>
-  <div class="dip-meta">Área temática: {$area} &nbsp;|&nbsp; Duración: {$horas} horas</div>
-
-  <div class="dip-fecha">Realizado el {$fecha}</div>
+  <div class="completar">Ha concluido satisfactoriamente el curso de capacitación:</div>
+  <div class="curso">{$curso}</div>
+  <div class="meta">Área temática: {$area} &nbsp;·&nbsp; Duración: {$horas} horas</div>
+  <div class="fecha-txt">Realizado el {$fecha}</div>
 
   <table class="firmas">
     <tr>
-      <td><div class="firma-line">Director de Capacitación</div></td>
-      <td><div class="firma-line">Instructor del Curso</div></td>
+      <td class="firma-col">
+        <div class="firma-line">Director de Capacitación</div>
+        <div class="firma-sub">AVBA Certificaciones</div>
+      </td>
+      <td class="firma-col">
+        <div class="firma-line">Instructor del Curso</div>
+        <div class="firma-sub">AVBA Certificaciones</div>
+      </td>
     </tr>
   </table>
 
-  <div class="folio">AVBA Certificaciones — Emisión: {$esc(date('d/m/Y'))}</div>
+  <div class="folio-txt">AVBA Certificaciones &nbsp;·&nbsp; {$folio} &nbsp;·&nbsp; Emisión: {$emision}</div>
 </div>
 </body>
 </html>
@@ -1446,13 +1482,13 @@ HTML;
 <style>
   body { font-family: DejaVu Sans, Arial, sans-serif; margin:0; padding:0; background:#fff; }
   .cert { border: 4px double #185FA5; margin: 30px; padding: 40px 50px; text-align: center; min-height: 680px; position: relative; }
-  .cert-logo { font-size:28pt; font-weight:bold; color:#185FA5; letter-spacing:3px; margin-bottom:4px; }
+  .cert-logo { font-size:28pt; font-weight:bold; color:#1B2A6B; letter-spacing:3px; margin-bottom:4px; }
   .cert-sub { font-size:10pt; color:#666; margin-bottom:30px; }
-  .cert-title { font-size:22pt; font-weight:bold; color:#185FA5; text-transform:uppercase; letter-spacing:2px; margin-bottom:6px; }
+  .cert-title { font-size:22pt; font-weight:bold; color:#1B2A6B; text-transform:uppercase; letter-spacing:2px; margin-bottom:6px; }
   .cert-sub2 { font-size:10pt; color:#555; margin-bottom:24px; }
   .cert-nombre { font-size:24pt; color:#1a1a2e; font-weight:bold; border-bottom:2px solid #185FA5; display:inline-block; padding-bottom:6px; margin:10px 0 20px; }
   .cert-text { font-size:12pt; color:#444; line-height:1.8; margin-bottom:8px; }
-  .cert-curso { font-size:14pt; color:#185FA5; font-weight:bold; margin:6px 0; }
+  .cert-curso { font-size:14pt; color:#1B2A6B; font-weight:bold; margin:6px 0; }
   .cert-detalles { font-size:10pt; color:#666; margin:16px 0 30px; }
   .firmas { width:80%; margin:40px auto 0; border-collapse:collapse; }
   .firmas td { text-align:center; padding:0 30px; vertical-align:bottom; }
