@@ -1,0 +1,5 @@
+codigo_manual,ubicacion,tipo,capacidad,seccion,empresa_id,fecha_recarga,fecha_ph,observaciones
+EXT-001,Almacén General,PQS,6 kg,EDIFICIO A,1,2026-05-20,2025-10-15,Extintor principal
+EXT-002,Oficina Gerencia,CO2,2.5 kg,EDIFICIO A,1,2026-03-10,2025-09-20,Con manguera
+EXT-003,Pasillo Planta Baja,agua,9 kg,PLANTA BAJA,1,2026-04-05,2025-11-30,Junto a escaleras
+EXT-004,Zona de Carga,espuma,25 kg,ZONA DE CARGA,1,2026-06-15,2025-12-10,Para combustibles
