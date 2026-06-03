@@ -3313,9 +3313,20 @@ async function abrirDetPer(id) {
         <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:10px;display:flex;align-items:center;gap:6px">
           📋 Datos de empresa <span style="font-size:10px;background:#FFF3CD;color:#856404;border-radius:4px;padding:1px 8px;font-weight:600">requeridos para DC3</span>
         </div>
+        <!-- Buscador en catálogo -->
+        <div style="position:relative;margin-bottom:12px" id="per-emp-buscar-wrap">
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:4px">Buscar empresa en catálogo</label>
+          <input id="per-emp-buscar" type="text" placeholder="Escribe el nombre de la empresa…" autocomplete="off"
+            oninput="buscarEmpresaCatalogo(this.value)"
+            style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--azul);border-radius:7px;font-size:13px">
+          <div id="per-emp-suger" style="display:none;position:absolute;top:100%;left:0;right:0;background:white;
+               border:1.5px solid var(--borde);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.12);
+               z-index:99;max-height:220px;overflow-y:auto;margin-top:3px"></div>
+        </div>
+        <!-- Campos editables -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Empresa
-            <input id="per-emp-nombre" value="${escH(p.empresa_nombre||'')}" placeholder="Razón social"
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Razón social
+            <input id="per-emp-nombre" value="${escH(p.empresa_nombre||'')}" placeholder="Nombre de la empresa"
               style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
           </label>
           <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">RFC
@@ -3334,7 +3345,7 @@ async function abrirDetPer(id) {
         </div>
         <button onclick="guardarEmpresaPer(${p.id})"
           style="padding:6px 16px;background:var(--azul);color:white;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
-          Guardar datos empresa
+          Guardar y actualizar catálogo
         </button>
       </div>
       ${p.foto_persona_url?`<div style="margin-bottom:12px"><span style="font-size:11px;color:var(--texto-sub);display:block;margin-bottom:6px">Fotografía</span><img src="${escH(p.foto_persona_url)}" style="max-width:120px;border-radius:8px;border:1px solid var(--borde)"></div>`:''}
@@ -3392,6 +3403,55 @@ function cerrarDetPer() {
   document.getElementById('overlay-per-det').style.display = 'none';
 }
 
+// ── Buscador de empresa en catálogo ───────────────────────
+let _empBuscarTimer = null;
+
+async function buscarEmpresaCatalogo(q) {
+  clearTimeout(_empBuscarTimer);
+  const suger = document.getElementById('per-emp-suger');
+  if (!suger) return;
+  if (!q || q.length < 2) { suger.style.display = 'none'; return; }
+
+  _empBuscarTimer = setTimeout(async () => {
+    try {
+      const res  = await fetch(`${API}?action=BUSCAR_CLIENTE&q=${encodeURIComponent(q)}`);
+      const data = await res.json();
+      const list = data.clientes || [];
+      if (!list.length) { suger.style.display = 'none'; return; }
+      suger.innerHTML = list.map(c => `
+        <div onclick='seleccionarEmpresaCatalogo(${JSON.stringify(c).replace(/'/g,"&#39;")})'
+          style="padding:9px 12px;cursor:pointer;border-bottom:1px solid var(--gris-bg);font-size:13px"
+          onmouseover="this.style.background='var(--gris-bg)'"
+          onmouseout="this.style.background=''">
+          <div style="font-weight:600;color:var(--texto)">${escH(c.nombre_cliente)}</div>
+          ${c.rfc ? `<div style="font-size:11px;color:var(--texto-hint);margin-top:1px">${escH(c.rfc)}</div>` : ''}
+        </div>`).join('');
+      suger.style.display = 'block';
+    } catch (e) { suger.style.display = 'none'; }
+  }, 260);
+}
+
+function seleccionarEmpresaCatalogo(c) {
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  set('per-emp-nombre',        c.nombre_cliente);
+  set('per-emp-rfc',           c.rfc);
+  set('per-emp-representante', c.representante);
+  set('per-emp-direccion',     c.direccion);
+  const buscar = document.getElementById('per-emp-buscar');
+  if (buscar) buscar.value = c.nombre_cliente;
+  const suger = document.getElementById('per-emp-suger');
+  if (suger) suger.style.display = 'none';
+}
+
+// Cerrar sugerencias al hacer clic fuera
+document.addEventListener('click', e => {
+  const wrap = document.getElementById('per-emp-buscar-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    const suger = document.getElementById('per-emp-suger');
+    if (suger) suger.style.display = 'none';
+  }
+});
+
 async function guardarEmpresaPer(id) {
   const payload = {
     id,
@@ -3408,7 +3468,7 @@ async function guardarEmpresaPer(id) {
     });
     const data = await res.json();
     if (data.status === 'success') {
-      mostrarToast('Datos de empresa guardados', 'ok');
+      mostrarToast('Datos de empresa guardados y catálogo actualizado', 'ok');
       perCargados = false;
     } else {
       mostrarToast('Error: ' + (data.message || 'Error desconocido'), 'err');

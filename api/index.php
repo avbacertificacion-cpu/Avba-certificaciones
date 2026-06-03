@@ -421,8 +421,12 @@ if ($method === 'GET') {
             $q = trim($_GET['q'] ?? '');
             if (strlen($q) < 2) respuesta(['status' => 'success', 'clientes' => []]);
             $stmt = $pdo->prepare(
-                "SELECT nombre_cliente, primera_parte FROM clientes
-                 WHERE nombre_cliente LIKE ? ORDER BY nombre_cliente LIMIT 12"
+                "SELECT nombre_cliente, primera_parte,
+                        COALESCE(rfc,'') AS rfc,
+                        COALESCE(representante,'') AS representante,
+                        COALESCE(direccion,'') AS direccion
+                 FROM clientes
+                 WHERE nombre_cliente LIKE ? ORDER BY nombre_cliente LIMIT 15"
             );
             $stmt->execute(['%' . $q . '%']);
             respuesta(['status' => 'success', 'clientes' => $stmt->fetchAll()]);

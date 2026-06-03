@@ -269,9 +269,18 @@ class Personal {
         $id = (int)($payload['id'] ?? 0);
         if (!$id) return ['status' => 'error', 'message' => 'ID requerido.'];
 
-        $chk = $this->pdo->prepare("SELECT id FROM participantes_cursos WHERE id = ?");
+        $chk = $this->pdo->prepare("SELECT id, empresa_nombre FROM participantes_cursos WHERE id = ?");
         $chk->execute([$id]);
-        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+        $part = $chk->fetch();
+        if (!$part) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        // Garantizar columnas en clientes
+        try {
+            $this->pdo->exec("ALTER TABLE clientes
+                ADD COLUMN IF NOT EXISTS rfc           VARCHAR(20)  DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS representante VARCHAR(200) DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS direccion     VARCHAR(300) DEFAULT NULL");
+        } catch (\Throwable $e) {}
 
         $campos = ['empresa_nombre', 'empresa_rfc', 'empresa_representante', 'empresa_direccion'];
         $sets   = [];
@@ -287,6 +296,37 @@ class Personal {
         $params[] = $id;
         $this->pdo->prepare("UPDATE participantes_cursos SET " . implode(', ', $sets) . " WHERE id = ?")
             ->execute($params);
+
+        // Persistir en catálogo de clientes
+        $nombreEmpresa = $payload['empresa_nombre'] ?? $part['empresa_nombre'] ?? '';
+        if ($nombreEmpresa) {
+            $clienteRow = $this->pdo->prepare(
+                "SELECT id FROM clientes WHERE UPPER(TRIM(nombre_cliente)) = UPPER(TRIM(?))"
+            );
+            $clienteRow->execute([$nombreEmpresa]);
+            $cliente = $clienteRow->fetch();
+            if ($cliente) {
+                $cSets   = [];
+                $cParams = [];
+                if (array_key_exists('empresa_rfc', $payload)) {
+                    $cSets[]   = 'rfc = ?';
+                    $cParams[] = $payload['empresa_rfc'] === '' ? null : trim($payload['empresa_rfc']);
+                }
+                if (array_key_exists('empresa_representante', $payload)) {
+                    $cSets[]   = 'representante = ?';
+                    $cParams[] = $payload['empresa_representante'] === '' ? null : trim($payload['empresa_representante']);
+                }
+                if (array_key_exists('empresa_direccion', $payload)) {
+                    $cSets[]   = 'direccion = ?';
+                    $cParams[] = $payload['empresa_direccion'] === '' ? null : trim($payload['empresa_direccion']);
+                }
+                if (!empty($cSets)) {
+                    $cParams[] = $cliente['id'];
+                    $this->pdo->prepare("UPDATE clientes SET " . implode(', ', $cSets) . " WHERE id = ?")
+                        ->execute($cParams);
+                }
+            }
+        }
 
         return ['status' => 'success', 'message' => 'Datos de empresa actualizados.'];
     }
