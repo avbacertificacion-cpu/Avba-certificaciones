@@ -1256,7 +1256,7 @@ SVG;
             } catch (\Exception $ex) {}
         }
 
-        $noAcreditacion = defined('NO_ACREDITACION') ? NO_ACREDITACION : '0147-I-0022';
+        $noAcreditacion = defined('NO_ACREDITACION') ? NO_ACREDITACION : 'UVNMX 057';
 
         // Mapa común + campos específicos por tipo
         $map = [

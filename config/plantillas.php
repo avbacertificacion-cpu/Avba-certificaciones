@@ -26,7 +26,7 @@ return [
             '{no_identificacion}' => 'MF-001',
             '{fecha_inspeccion}'  => '',   // filled at runtime
             '{vigencia}'          => '',   // filled at runtime
-            '{no_acreditacion}'   => '0147-I-0022',
+            '{no_acreditacion}'   => 'UVNMX 057',
             '{qr_imagen}'         => '',   // filled at runtime
         ],
     ],
@@ -47,7 +47,7 @@ return [
             '{resumen_items}'   => "3 eslingas cadena G80 1/2\" cap. 3.5 t\n2 grilletes forjados 3/4\"\n1 gancho de seguridad c/pasador",
             '{fecha_inspeccion}'=> '',
             '{vigencia}'        => '',
-            '{no_acreditacion}' => '0147-I-0022',
+            '{no_acreditacion}' => 'UVNMX 057',
             '{qr_imagen}'       => '',
         ],
     ],
@@ -69,7 +69,7 @@ return [
             '{fecha_emision}'  => '',
             '{programa}'       => 'OPERACIÓN SEGURA DE MONTACARGAS',
             '{empresa}'        => 'INDUSTRIAS MODELO SA DE CV',
-            '{no_acreditacion}'=> '0147-I-0022',
+            '{no_acreditacion}'=> 'UVNMX 057',
             '{qr_imagen}'      => '',
         ],
     ],

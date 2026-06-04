@@ -34,7 +34,7 @@ define('UPLOAD_DIR', __DIR__ . '/../uploads/');
 define('UPLOAD_URL', 'uploads/');
 
 // ── Datos de la Unidad de Inspección ──────────────────────
-define('NO_ACREDITACION', '0147-I-0022');  // Número de acreditación EMA
+define('NO_ACREDITACION', 'UVNMX 057');  // Número de registro oficial
 
 // ── Microservicio de conversión (opcional) ────────────────
 define('CONVERT_SERVICE_URL', 'https://mi-vps.com/convert.php');

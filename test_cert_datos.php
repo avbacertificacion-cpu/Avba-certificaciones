@@ -27,7 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['accion'])) {
 
     $e_raw = fn($k, $def = '') => trim($_POST[$k] ?? $def);
     $folio           = htmlspecialchars($e_raw('folio',           'CERT-TEST-001'),           ENT_QUOTES, 'UTF-8');
-    $no_acreditacion = htmlspecialchars($e_raw('no_acreditacion', '0147-I-0022'),             ENT_QUOTES, 'UTF-8');
+    $no_acreditacion = htmlspecialchars($e_raw('no_acreditacion', 'UVNMX 057'),             ENT_QUOTES, 'UTF-8');
     $qr_placeholder  = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==';
 
     $map = ['{folio}' => $folio, '{no_acreditacion}' => $no_acreditacion, '{qr_imagen}' => $qr_placeholder];
@@ -178,7 +178,7 @@ input[type=text]:focus, textarea:focus { outline: none; border-color: #2060a8; b
       <div class="section-title">Identificación del certificado</div>
       <div class="grid grid-2">
         <div><label>Folio</label><input type="text" name="folio" value="CERT-TEST-001"></div>
-        <div><label>No. Acreditación EMA</label><input type="text" name="no_acreditacion" value="0147-I-0022"></div>
+        <div><label>No. Acreditación EMA</label><input type="text" name="no_acreditacion" value="UVNMX 057"></div>
       </div>
 
       <div class="section-title">Datos del cliente</div>
@@ -224,7 +224,7 @@ input[type=text]:focus, textarea:focus { outline: none; border-color: #2060a8; b
       <div class="section-title">Identificación del certificado</div>
       <div class="grid grid-2">
         <div><label>Folio</label><input type="text" name="folio" value="ACC-TEST-001"></div>
-        <div><label>No. Acreditación EMA</label><input type="text" name="no_acreditacion" value="0147-I-0022"></div>
+        <div><label>No. Acreditación EMA</label><input type="text" name="no_acreditacion" value="UVNMX 057"></div>
       </div>
 
       <div class="section-title">Datos del cliente</div>
@@ -264,7 +264,7 @@ input[type=text]:focus, textarea:focus { outline: none; border-color: #2060a8; b
       <div class="section-title">Identificación del certificado</div>
       <div class="grid grid-2">
         <div><label>Folio</label><input type="text" name="folio" value="PER-TEST-001"></div>
-        <div><label>No. Acreditación EMA</label><input type="text" name="no_acreditacion" value="0147-I-0022"></div>
+        <div><label>No. Acreditación EMA</label><input type="text" name="no_acreditacion" value="UVNMX 057"></div>
       </div>
 
       <div class="section-title">Datos del participante</div>
