@@ -1828,13 +1828,15 @@ HTML;
      * $adjuntos = ['/ruta/archivo.pdf' => 'nombre.pdf']
      */
     private function gestionarCredencialesCliente(string $clienteNombre, string $correo): array {
-        // Buscar el id_cliente (primera_parte) en la tabla clientes
+        // Buscar primera_parte del cliente y cero-padear a 5 dígitos (igual que el control)
         $stmt = $this->pdo->prepare(
             "SELECT primera_parte FROM clientes WHERE nombre_cliente = ? LIMIT 1"
         );
         $stmt->execute([$clienteNombre]);
-        $cliente   = $stmt->fetch();
-        $idCliente = $cliente ? (string)($cliente['primera_parte'] ?? '') : '';
+        $clienteRow = $stmt->fetch();
+        $idCliente  = $clienteRow
+            ? str_pad((string)($clienteRow['primera_parte'] ?? ''), 5, '0', STR_PAD_LEFT)
+            : '';
 
         // Generar contraseña segura aleatoria
         $chars    = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
@@ -1857,10 +1859,8 @@ HTML;
             }
         }
 
-        // Crear nuevo usuario: derivar username del correo o del nombre del cliente
-        $base    = strtolower(preg_replace('/[^a-z0-9]/i', '', explode('@', $correo)[0]));
-        $usuario = strlen($base) >= 3 ? $base
-                 : 'cliente' . ($idCliente ?: str_pad((string)random_int(1, 99999), 5, '0', STR_PAD_LEFT));
+        // Username = primera_parte con cero-padding (ej. 00042); fallback a random si no hay id
+        $usuario = $idCliente ?: ('cli' . str_pad((string)random_int(1, 99999), 5, '0', STR_PAD_LEFT));
 
         // Garantizar unicidad del username
         $raiz   = $usuario;

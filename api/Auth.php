@@ -572,6 +572,11 @@ class Auth {
         $idCliente = trim($idCliente);
         if (!$idCliente) return ['status' => 'error', 'message' => 'id_cliente requerido.'];
 
+        // Normalizar a 5 dígitos con ceros (el control se almacena como 00042-00001)
+        if (ctype_digit($idCliente)) {
+            $idCliente = str_pad($idCliente, 5, '0', STR_PAD_LEFT);
+        }
+
         $like = $idCliente . '-%';
 
         // ── Equipos ──────────────────────────────────────
