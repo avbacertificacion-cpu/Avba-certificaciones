@@ -3404,22 +3404,23 @@ async function abrirDetPer(id) {
             <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
               <input id="per-info-capacidad" type="text" value="${p.capacidad_na?'':escH(p.capacidad||'')}"
                 placeholder="Ej: 75 TON" ${p.capacidad_na?'disabled':''}
+                oninput="actualizarPreviewCert()"
                 style="flex:1;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px;box-sizing:border-box">
               <label style="font-size:11px;font-weight:normal;white-space:nowrap;display:flex;align-items:center;gap:4px;cursor:pointer">
                 <input type="checkbox" id="per-info-cap-na" ${p.capacidad_na?'checked':''}
-                  onchange="document.getElementById('per-info-capacidad').disabled=this.checked;if(this.checked)document.getElementById('per-info-capacidad').value=''">
+                  onchange="document.getElementById('per-info-capacidad').disabled=this.checked;if(this.checked)document.getElementById('per-info-capacidad').value='';actualizarPreviewCert()">
                 N/A
               </label>
             </div>
           </label>
         </div>
         ${(()=>{
-          const cap = p.capacidad_na ? 'N/A' : (p.capacidad||'');
           const tbase = (p.texto_certificado||'').trim();
+          const cap   = p.capacidad_na ? 'N/A' : (p.capacidad||'');
           const tcomp = tbase ? tbase.replace('{capacidad}', cap) : '';
-          return tcomp ? \`<div style="margin-bottom:10px;padding:9px 12px;background:#EAF3FB;border:1.5px solid #85B7EB;border-radius:8px;font-size:11px;color:#0C447C">
+          return tbase ? \`<div id="per-cert-preview" data-template="\${escH(tbase)}" style="margin-bottom:10px;padding:9px 12px;background:#EAF3FB;border:1.5px solid #85B7EB;border-radius:8px;font-size:11px;color:#0C447C\${tcomp?'':';display:none'}">
             <span style="font-weight:700">Texto certificado:</span>
-            <span style="font-weight:600;text-transform:uppercase">\${escH(tcomp)}</span>
+            <span id="per-cert-preview-txt" style="font-weight:600;text-transform:uppercase">\${escH(tcomp)}</span>
           </div>\` : '';
         })()}
         <button onclick="guardarInfoPer(${p.id})"
@@ -3715,6 +3716,19 @@ async function perConfirmarOCR(id) {
     alert('Error de conexión al guardar.');
     console.error('perConfirmarOCR:', e);
   }
+}
+
+function actualizarPreviewCert() {
+  const prev = document.getElementById('per-cert-preview');
+  if (!prev) return;
+  const tbase = prev.dataset.template || '';
+  const naChk = document.getElementById('per-info-cap-na');
+  const capInput = document.getElementById('per-info-capacidad');
+  const cap = naChk?.checked ? 'N/A' : (capInput?.value || '');
+  const tcomp = tbase.replace('{capacidad}', cap);
+  const span  = document.getElementById('per-cert-preview-txt');
+  if (span) span.textContent = tcomp.toUpperCase();
+  prev.style.display = tcomp ? '' : 'none';
 }
 
 async function guardarInfoPer(id) {
