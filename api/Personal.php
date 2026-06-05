@@ -27,7 +27,10 @@ class Personal {
     // ══════════════════════════════════════════════════════
 
     public function listarParticipantes(array $filtros = []): array {
-        // Garantizar que la columna exista antes de usarla en la subconsulta
+        // Garantizar columnas de workflow y datos antes de consultarlas
+        $this->ensureEstatusColumn();
+        $this->ensureParticipanteColumns();
+        try { $this->pdo->exec("ALTER TABLE participantes_cursos ADD COLUMN IF NOT EXISTS control VARCHAR(30) NULL"); } catch (\Throwable $e) {}
         try { $this->pdo->exec("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS correo_contacto VARCHAR(200) DEFAULT NULL"); } catch (\Throwable $e) {}
 
         $where  = ['1=1'];
@@ -57,7 +60,7 @@ class Personal {
 
         $sql = "SELECT p.id, p.nombre_completo, p.curp, p.puesto,
                        p.telefono, p.correo, p.capacidad, p.capacidad_na,
-                       p.control, p.estatus, p.fecha_curso, p.estado,
+                       p.control, p.estatus, p.fecha_curso,
                        c.nombre AS curso_nombre, c.duracion_horas,
                        o.nombre AS ocupacion_nombre,
                        p.foto_documentacion_url, p.foto_persona_url,
