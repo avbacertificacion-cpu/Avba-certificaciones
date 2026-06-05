@@ -241,19 +241,14 @@ function renderTabla(rows) {
     return;
   }
   document.getElementById('tabla').innerHTML = rows.map(r => {
-    const docs = [
-      r.url_certificado ? '📜' : '',
-      r.url_diploma     ? '🎓' : '',
-      r.url_dc3         ? '📋' : ''
-    ].filter(Boolean).join(' ') || '—';
     return `<tr onclick="abrirDetalle(${r.id})">
-      <td><strong>${esc(r.nombre_completo || r.nombre || '—')}</strong></td>
+      <td><strong>${esc(r.nombre_completo || '—')}</strong></td>
       <td style="font-family:monospace;font-size:11px">${esc(r.curp || '—')}</td>
-      <td>${esc(r.empresa_nombre || r.empresa || '—')}</td>
-      <td>${esc(r.nombre_curso || r.curso || '—')}</td>
-      <td>${esc(r.fecha_curso || r.fecha || '—')}</td>
+      <td>${esc(r.empresa_nombre || '—')}</td>
+      <td>${esc(r.curso_nombre || '—')}</td>
+      <td>${esc(r.fecha_curso || '—')}</td>
       <td>${badgeEstatus(r.estatus)}</td>
-      <td style="font-size:16px">${docs}</td>
+      <td style="font-size:16px">${r.estatus === 'EMITIDO' ? '✅' : '—'}</td>
     </tr>`;
   }).join('');
 }
