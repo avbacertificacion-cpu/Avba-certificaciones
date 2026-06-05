@@ -391,7 +391,7 @@ class Personal {
     }
 
     // ── Emitir documento y marcar como EMITIDO ─────────────
-    public function emitirDocumentoPersonal(int $id, string $tipo, string $correoDestino, string $usuario): array {
+    public function emitirDocumentoPersonal(int $id, string $tipo, string $correoDestino, string $usuario, bool $enviarCredenciales = false): array {
         $this->ensureEstatusColumn();
         $resultado = $this->generarDocumento($id, $tipo, $usuario);
         if ($resultado['status'] !== 'success') return $resultado;
@@ -400,9 +400,15 @@ class Personal {
         $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO' WHERE id = ?")
             ->execute([$id]);
 
-        // Enviar correo si se proporcionó dirección
-        if ($correoDestino && filter_var($correoDestino, FILTER_VALIDATE_EMAIL)) {
-            $this->enviarDocumento($id, $tipo, $correoDestino, $usuario);
+        // Enviar correo con o sin credenciales
+        $p      = $this->obtenerParticipante($id);
+        $correo = trim($correoDestino) ?: trim($p['correo'] ?? '');
+        if ($correo && filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+            $credenciales = [];
+            if ($enviarCredenciales && $p) {
+                $credenciales = $this->gestionarCredencialesParticipante($p, $correo);
+            }
+            $this->enviarDocumento($id, $tipo, $correo, $usuario, $credenciales);
         }
 
         return $resultado;
@@ -566,7 +572,67 @@ class Personal {
         return ['status' => 'success', 'url' => $url];
     }
 
-    public function enviarDocumento(int $id, string $tipo, string $correoDestino, string $usuario): array {
+    // ── Gestionar credenciales portal para participante ──────
+    private function gestionarCredencialesParticipante(array $p, string $correo): array {
+        // Determinar id_cliente: empresa_nombre tiene prioridad, luego primera parte del control
+        $idCliente = '';
+        if (!empty($p['empresa_nombre'])) {
+            $stmt = $this->pdo->prepare("SELECT primera_parte FROM clientes WHERE nombre_cliente = ? LIMIT 1");
+            $stmt->execute([$p['empresa_nombre']]);
+            $row = $stmt->fetch();
+            if ($row) {
+                $idCliente = str_pad((string)($row['primera_parte'] ?? ''), 5, '0', STR_PAD_LEFT);
+            }
+        }
+        if (!$idCliente && !empty($p['control'])) {
+            $parts     = explode('-', $p['control']);
+            $idCliente = str_pad($parts[0], 5, '0', STR_PAD_LEFT);
+        }
+        if (!$idCliente) {
+            $idCliente = str_pad((string)($p['id'] ?? 0), 5, '0', STR_PAD_LEFT);
+        }
+
+        // Generar contraseña aleatoria
+        $chars    = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789@#$!';
+        $password = '';
+        for ($i = 0; $i < 10; $i++) {
+            $password .= $chars[random_int(0, strlen($chars) - 1)];
+        }
+
+        // Verificar usuario existente
+        $stmt = $this->pdo->prepare(
+            "SELECT id, usuario FROM usuarios WHERE id_cliente = ? AND rol = 'CLIENTE' LIMIT 1"
+        );
+        $stmt->execute([$idCliente]);
+        $existing = $stmt->fetch();
+
+        if ($existing) {
+            $this->pdo->prepare("UPDATE usuarios SET password_hash = ? WHERE id = ?")
+                      ->execute([password_hash($password, PASSWORD_DEFAULT), $existing['id']]);
+            return ['usuario' => $existing['usuario'], 'password' => $password, 'es_nuevo' => false];
+        }
+
+        // Crear nuevo usuario — garantizar unicidad del nombre de usuario
+        $usuario = $idCliente;
+        $counter = 0;
+        while (true) {
+            $chk = $this->pdo->prepare("SELECT id FROM usuarios WHERE usuario = ?");
+            $chk->execute([$usuario]);
+            if (!$chk->fetch()) break;
+            $counter++;
+            $usuario = $idCliente . '_' . $counter;
+        }
+
+        $nombreCuenta = !empty($p['empresa_nombre']) ? $p['empresa_nombre'] : ($p['nombre_completo'] ?? '');
+        $this->pdo->prepare(
+            "INSERT INTO usuarios (usuario, password_hash, rol, id_cliente, nombre, correo, activo)
+             VALUES (?, ?, 'CLIENTE', ?, ?, ?, 1)"
+        )->execute([$usuario, password_hash($password, PASSWORD_DEFAULT), $idCliente, $nombreCuenta, $correo]);
+
+        return ['usuario' => $usuario, 'password' => $password, 'es_nuevo' => true];
+    }
+
+    public function enviarDocumento(int $id, string $tipo, string $correoDestino, string $usuario, array $credenciales = []): array {
         $p = $this->obtenerParticipante($id);
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
@@ -604,7 +670,7 @@ class Personal {
             $mail->addAddress($correo);
             $mail->Subject    = "{$tipoLabel} de Capacitación — AVBA Inspections";
             $mail->isHTML(true);
-            $mail->Body       = $this->plantillaCorreoPersonal($nombre, $tipoLabel, $p['curso_nombre'] ?? '');
+            $mail->Body       = $this->plantillaCorreoPersonal($nombre, $tipoLabel, $p['curso_nombre'] ?? '', $credenciales);
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             $mail->send();
 
@@ -705,13 +771,41 @@ class Personal {
         ];
     }
 
-    private function plantillaCorreoPersonal(string $nombre, string $tipoLabel, string $curso): string {
+    private function plantillaCorreoPersonal(string $nombre, string $tipoLabel, string $curso, array $credenciales = []): string {
+        $esc = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
         $cuerpo = "
-      <p style=\"font-size:15px;color:#1a1a2e;margin:0 0 12px\">Estimado(a) <strong>" . htmlspecialchars($nombre) . "</strong>,</p>
+      <p style=\"font-size:15px;color:#1a1a2e;margin:0 0 12px\">Estimado(a) <strong>{$esc($nombre)}</strong>,</p>
       <p style=\"font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px\">
-        Adjuntamos su <strong>" . htmlspecialchars($tipoLabel) . "</strong>
-        del curso <strong>" . htmlspecialchars($curso) . "</strong>.
+        Adjuntamos su <strong>{$esc($tipoLabel)}</strong>
+        del curso <strong>{$esc($curso)}</strong>.
       </p>";
+
+        if (!empty($credenciales)) {
+            $usuario   = $esc($credenciales['usuario'] ?? '');
+            $password  = $esc($credenciales['password'] ?? '');
+            $portalUrl = rtrim(defined('SITE_URL') ? SITE_URL : '', '/') . '/portal-cliente.html';
+            $accion    = ($credenciales['es_nuevo'] ?? true)
+                ? 'Se ha creado su cuenta en el portal AVBA'
+                : 'Se ha actualizado su contraseña del portal AVBA';
+            $cuerpo .= "
+      <div style=\"margin-top:20px;padding:16px 18px;background:#F0F7ED;border-left:4px solid #2e7d32;border-radius:6px\">
+        <p style=\"font-weight:700;color:#1b5e20;margin:0 0 10px;font-size:14px\">{$esc($accion)}</p>
+        <table style=\"border-collapse:collapse\">
+          <tr>
+            <td style=\"padding:3px 14px 3px 0;color:#5a6072;font-size:13px\">Usuario:</td>
+            <td style=\"font-family:monospace;font-weight:700;color:#1a1a2e;font-size:14px\">{$usuario}</td>
+          </tr>
+          <tr>
+            <td style=\"padding:3px 14px 3px 0;color:#5a6072;font-size:13px\">Contraseña:</td>
+            <td style=\"font-family:monospace;font-weight:700;color:#1a1a2e;font-size:14px\">{$password}</td>
+          </tr>
+        </table>
+        <p style=\"margin:10px 0 0;font-size:12px;color:#5a6072\">Accede en:
+          <a href=\"{$portalUrl}\" style=\"color:#185FA5\">{$portalUrl}</a>
+        </p>
+      </div>";
+        }
+
         return plantillaCorreoHtml($this->pdo, $cuerpo);
     }
 

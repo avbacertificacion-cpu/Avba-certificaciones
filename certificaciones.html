@@ -796,6 +796,33 @@
 </div>
 
 
+<!-- ══ MODAL EMISIÓN DOCUMENTO PERSONAL ══ -->
+<div class="overlay" id="overlay-emit-per" onclick="if(event.target===this)cerrarEmitPer()">
+  <div class="modal-sm">
+    <div class="confirm-icon" style="background:#EAF3DE">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#3B6D11" stroke-width="2" style="width:26px;height:26px">
+        <path d="M9 12l2 2 4-4"/><rect x="3" y="3" width="18" height="18" rx="3"/>
+      </svg>
+    </div>
+    <div class="confirm-t" id="emit-per-t">Emitir documento</div>
+    <div class="confirm-s" id="emit-per-s"></div>
+    <div style="margin-top:12px;padding:11px 14px;background:#f0f7ff;border-radius:8px;text-align:left">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#0C447C">
+        <input type="checkbox" id="chk-emit-per-creds" style="width:16px;height:16px;cursor:pointer">
+        <span>Incluir usuario y contraseña de acceso al portal</span>
+      </label>
+      <p style="font-size:11px;color:#5a6072;margin:6px 0 0 26px">
+        Si la empresa o persona no tiene cuenta se creará una nueva. Si ya tiene, se generará una nueva contraseña.
+      </p>
+    </div>
+    <div class="confirm-btns" style="margin-top:16px">
+      <button class="btn-confirm-cancel" onclick="cerrarEmitPer()">Cancelar</button>
+      <button class="btn-confirm-ok" id="emit-per-ok" style="background:var(--verde)">Emitir</button>
+    </div>
+  </div>
+</div>
+
+
 <!-- ══ MODAL DETALLE SESIÓN ACCESORIO ══ -->
 <div class="overlay" id="overlay-acc-cert">
   <div class="modal">
@@ -2269,27 +2296,40 @@ async function prevDocPersonal(participanteId, tipo) {
   } catch(e) { mostrarToast('Error de conexión', 'err'); }
 }
 
-async function emitirDocPersonal(participanteId, tipo, btn) {
-  if (!confirm(`¿Emitir ${tipo.toUpperCase()} para este participante?`)) return;
+let _emitPerBtn = null;
+
+function emitirDocPersonal(participanteId, tipo, btn) {
+  _emitPerBtn = btn;
+  const tipoLabel = { dc3: 'Constancia DC-3', diploma: 'Diploma', certificado: 'Certificado' }[tipo] || tipo.toUpperCase();
+  document.getElementById('emit-per-t').textContent = `Emitir ${tipoLabel}`;
+  document.getElementById('emit-per-s').textContent = 'El documento se generará, marcará como emitido y se enviará por correo al participante.';
+  document.getElementById('chk-emit-per-creds').checked = false;
+  document.getElementById('emit-per-ok').onclick = () => ejecutarEmitirPer(participanteId, tipo);
+  document.getElementById('overlay-emit-per').classList.add('open');
+}
+
+function cerrarEmitPer() {
+  document.getElementById('overlay-emit-per').classList.remove('open');
+}
+
+async function ejecutarEmitirPer(participanteId, tipo) {
+  cerrarEmitPer();
+  const btn  = _emitPerBtn;
+  const orig = btn?.textContent;
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  const enviarCredenciales = document.getElementById('chk-emit-per-creds')?.checked ?? false;
   const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
-  const orig = btn.textContent; btn.disabled = true; btn.textContent = '…';
+  mostrarToast('Emitiendo documento…', 'info');
   try {
     const res  = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Token': tok },
-      body: JSON.stringify({ action: 'EMITIR_DOC_PERSONAL', payload: { id: participanteId, tipo } })
+      body: JSON.stringify({ action: 'EMITIR_DOC_PERSONAL', payload: { id: participanteId, tipo, enviar_credenciales: enviarCredenciales } })
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {
       mostrarToast(`${tipo.toUpperCase()} emitido`, 'ok');
       window.open(data.url, '_blank');
-      setTimeout(() => {
-        if (confirm('¿Imprimir el documento ahora?')) {
-          const w = window.open(data.url, '_blank');
-          if (w) { w.onload = () => w.print(); }
-        }
-      }, 500);
-      // Reload to reflect emitido status
       perCertCargados = false;
       cerrarPcDet();
       if (document.getElementById('sub-btn-per-indep')?.classList.contains('active')) {
@@ -2299,11 +2339,11 @@ async function emitirDocPersonal(participanteId, tipo, btn) {
       }
     } else {
       mostrarToast('Error: ' + (data.message || 'No se pudo emitir'), 'err');
-      btn.disabled = false; btn.textContent = orig;
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
     }
   } catch(e) {
     mostrarToast('Error de conexión', 'err');
-    btn.disabled = false; btn.textContent = orig;
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
   }
 }
 

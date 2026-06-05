@@ -804,10 +804,11 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->emitirDocumentoPersonal(
-                (int)   ($payload['id']     ?? 0),
-                (string)($payload['tipo']   ?? ''),
-                (string)($payload['correo'] ?? ''),
-                $usr['usuario']
+                (int)   ($payload['id']                  ?? 0),
+                (string)($payload['tipo']                ?? ''),
+                (string)($payload['correo']              ?? ''),
+                $usr['usuario'],
+                !empty($payload['enviar_credenciales'])
             ));
 
         case 'GUARDAR_CURSO':
