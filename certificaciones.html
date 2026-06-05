@@ -863,8 +863,11 @@
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:5px 10px;border:1.5px solid var(--borde);border-radius:7px">
           <input type="radio" name="envSes-tipo" value="diploma" id="envSes-r-diploma"> Diploma
         </label>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:5px 10px;border:1.5px solid var(--borde);border-radius:7px">
+          <input type="radio" name="envSes-tipo" value="certificado" id="envSes-r-certificado"> Certificado
+        </label>
         <label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:5px 10px;border:1.5px solid var(--borde);border-radius:7px;background:var(--verde-light);border-color:var(--verde)">
-          <input type="radio" name="envSes-tipo" value="todo"   id="envSes-r-todo" checked> Ambos
+          <input type="radio" name="envSes-tipo" value="todo"   id="envSes-r-todo" checked> Todo
         </label>
       </div>
     </div>
@@ -2169,7 +2172,7 @@ async function cargarPerCursosCert() {
 
 function agruparCursosCert(data) {
   const map = {};
-  data.forEach(p => {
+  data.filter(p => p.empresa_nombre).forEach(p => {
     const key = (p.curso_nombre||'') + '|' + (p.fecha_curso||'') + '|' + (p.empresa_nombre||'');
     if (!map[key]) map[key] = {
       curso:          p.curso_nombre  || '—',
@@ -2221,11 +2224,13 @@ function renderCursosCert(grupos) {
       <div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">
         <button class="btn-ver" style="font-size:11px" onclick="abrirCursoCert(${i})">Ver</button>
         <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
-                onclick="abrirEnviarSesionPer(${i},'todo')">✉ Enviar todo</button>
+                onclick="abrirEnviarSesionPer(${i},'todo')">✉ Todo</button>
         <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                 onclick="abrirEnviarSesionPer(${i},'dc3')">DC-3</button>
         <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                 onclick="abrirEnviarSesionPer(${i},'diploma')">Diploma</button>
+        <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
+                onclick="abrirEnviarSesionPer(${i},'certificado')">Cert</button>
       </div>
     </td>
   </tr>`;
@@ -2248,6 +2253,8 @@ function abrirCursoCert(idx) {
               onclick="cerrarPcDet();abrirEnviarSesionPer(${idx},'dc3')">DC-3</button>
       <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
               onclick="cerrarPcDet();abrirEnviarSesionPer(${idx},'diploma')">Diploma</button>
+      <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
+              onclick="cerrarPcDet();abrirEnviarSesionPer(${idx},'certificado')">Cert</button>
     </div>`;
 
   let html = g.participantes.map(p => {
@@ -2267,6 +2274,11 @@ function abrirCursoCert(idx) {
                 onclick="prevDocPersonal(${p.id},'dc3')">👁 DC-3</button>
         <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                 onclick="prevDocPersonal(${p.id},'diploma')">👁 Diploma</button>
+        <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
+                onclick="prevDocPersonal(${p.id},'certificado')">👁 Cert</button>
+        ${!emitido ? `
+        <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
+                onclick="emitirDocPersonal(${p.id},'certificado',this)">Emitir Cert</button>` : ''}
         <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
                 onclick="devolverParticipante(${p.id})">↩ Devolver</button>
         ${isAdminCert ? `<button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
@@ -2290,7 +2302,7 @@ function abrirEnviarSesionPer(idx, tipo) {
   if (!g) return;
   _envSesGrupIdx = idx;
   const count = g.participantes.length;
-  const tipoLabel = { dc3: 'Constancias DC-3', diploma: 'Diplomas', todo: 'DC-3 + Diplomas' }[tipo] || tipo;
+  const tipoLabel = { dc3: 'Constancias DC-3', diploma: 'Diplomas', certificado: 'Certificados', todo: 'DC-3 + Diploma + Cert' }[tipo] || tipo;
   document.getElementById('envSes-t').textContent = `Enviar ${tipoLabel}`;
   document.getElementById('envSes-s').textContent = `${count} participante${count!==1?'s':''} · ${escH(g.curso)} · ${escH(g.fecha)}${g.empresa ? ' · ' + escH(g.empresa) : ''}`;
   // Pre-seleccionar tipo
@@ -2390,14 +2402,15 @@ function limpiarPerIndepCert() {
 }
 
 function renderIndepCert(data) {
+  const indep = data.filter(p => !p.empresa_nombre);
   const tbody = document.getElementById('pi-tabla');
   if (!tbody) return;
-  document.getElementById('pi-count').textContent = data.length + ' registro' + (data.length !== 1 ? 's' : '');
-  if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin participantes aprobados por Calidad.</td></tr>`;
+  document.getElementById('pi-count').textContent = indep.length + ' registro' + (indep.length !== 1 ? 's' : '');
+  if (!indep.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin participantes independientes aprobados.</td></tr>`;
     return;
   }
-  tbody.innerHTML = data.map(p => {
+  tbody.innerHTML = indep.map(p => {
     const emitido = p.estatus === 'EMITIDO';
     return `<tr>
       <td style="font-weight:600">${p.nombre_completo||'—'}</td>
@@ -2413,11 +2426,15 @@ function renderIndepCert(data) {
                   onclick="prevDocPersonal(${p.id},'dc3')">👁 DC-3</button>
           <button class="btn-ver" style="font-size:10px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                   onclick="prevDocPersonal(${p.id},'diploma')">👁 Diploma</button>
+          <button class="btn-ver" style="font-size:10px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
+                  onclick="prevDocPersonal(${p.id},'certificado')">👁 Cert</button>
           ${!emitido ? `
           <button class="btn-ver" style="font-size:10px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                   onclick="emitirDocPersonal(${p.id},'dc3',this)">Emitir DC-3</button>
           <button class="btn-ver" style="font-size:10px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
-                  onclick="emitirDocPersonal(${p.id},'diploma',this)">Emitir Diploma</button>` : ''}
+                  onclick="emitirDocPersonal(${p.id},'diploma',this)">Emitir Diploma</button>
+          <button class="btn-ver" style="font-size:10px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
+                  onclick="emitirDocPersonal(${p.id},'certificado',this)">Emitir Cert</button>` : ''}
           <button class="btn-ver" style="font-size:10px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
                   onclick="devolverParticipante(${p.id})">↩</button>
           ${isAdminCert ? `<button class="btn-ver" style="font-size:10px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"

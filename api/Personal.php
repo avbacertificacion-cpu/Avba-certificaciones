@@ -300,9 +300,10 @@ class Personal {
 
         // Determinar tipos de documentos a generar
         $tipos = match($tipo) {
-            'dc3'    => ['dc3'],
-            'diploma'=> ['diploma'],
-            default  => ['dc3', 'diploma'],
+            'dc3'          => ['dc3'],
+            'diploma'      => ['diploma'],
+            'certificado'  => ['certificado'],
+            default        => ['dc3', 'diploma', 'certificado'],
         };
 
         // Generar documentos y recopilar adjuntos
@@ -357,7 +358,7 @@ class Personal {
         if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
             return ['status' => 'error', 'message' => 'Servicio de correo no disponible.'];
 
-        $tipoLabel = ['dc3' => 'Constancias DC-3', 'diploma' => 'Diplomas', 'todo' => 'Documentos de capacitación'][$tipo] ?? 'Documentos';
+        $tipoLabel = ['dc3' => 'Constancias DC-3', 'diploma' => 'Diplomas', 'certificado' => 'Certificados', 'todo' => 'Documentos de capacitación'][$tipo] ?? 'Documentos';
         try {
             $mail = new PHPMailer(true);
             configurarMailer($mail, $this->pdo);
@@ -751,6 +752,21 @@ class Personal {
         if (!in_array($tipo, $tiposValidos, true))
             return ['status' => 'error', 'message' => 'Tipo de documento no válido.'];
 
+        // Intentar con plantilla PDF (FPDI) si está configurada
+        try {
+            $stmt = $this->pdo->prepare("SELECT plantilla_pdf, pdf_campos FROM plantillas_personal WHERE tipo = ? LIMIT 1");
+            $stmt->execute([$tipo]);
+            $tpl = $stmt->fetch();
+            if (!empty($tpl['plantilla_pdf'])) {
+                $rutaTpl = __DIR__ . '/../uploads/plantillas/' . $tpl['plantilla_pdf'];
+                if (file_exists($rutaTpl)) {
+                    $campos = json_decode($tpl['pdf_campos'] ?: '[]', true) ?: [];
+                    return $this->generarConTemplatePdf($p, $tipo, $usuario, $rutaTpl, $campos);
+                }
+            }
+        } catch (\Throwable $e) {}
+
+        // Fallback: generar con HTML (Dompdf)
         if (!class_exists('Dompdf\Dompdf')) {
             return ['status' => 'error', 'message' => 'Dompdf no disponible. Instala las dependencias del proyecto.'];
         }
@@ -952,6 +968,12 @@ class Personal {
             ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'
             : 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
 
+        $capacidadVal  = $p['capacidad_na'] ? 'N/A' : ($p['capacidad'] ?? '');
+        $textoCertBase = trim($p['texto_certificado'] ?? '');
+        $textoCertComp = $textoCertBase
+            ? str_replace('{capacidad}', $capacidadVal, $textoCertBase)
+            : $capacidadVal;
+
         return [
             'nombre_completo'       => $p['nombre_completo']       ?? '',
             'curp'                  => $p['curp']                  ?? '',
@@ -965,7 +987,8 @@ class Personal {
             'area_tematica'         => $p['area_tematica']         ?? '',
             'duracion_horas'        => (string)($p['duracion_horas'] ?? ''),
             'fecha_curso'           => $fechaFmt,
-            'capacidad'             => $p['capacidad_na'] ? 'N/A' : ($p['capacidad'] ?? ''),
+            'capacidad'             => $capacidadVal,
+            'texto_certificado'     => $textoCertComp,
             'folio'                 => $folio,
             'anio'                  => date('Y'),
         ];
