@@ -1435,9 +1435,19 @@
           </select>
         </div>
       </div>
-      <div class="form-group" style="margin-bottom:20px">
+      <div class="form-group" style="margin-bottom:14px">
         <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">Área temática <span style="color:var(--rojo)">*</span></label>
         <input type="text" id="curso-area" placeholder="Ej: Seguridad Industrial, Operación de Equipos..." style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none">
+      </div>
+      <div class="form-group" style="margin-bottom:20px">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">
+          Texto para certificado
+          <span style="font-size:10px;font-weight:normal;color:var(--texto-hint)">— usa <code style="background:#f0f0f0;padding:1px 4px;border-radius:3px">{capacidad}</code> como marcador</span>
+        </label>
+        <input type="text" id="curso-texto-cert"
+          placeholder="Ej: OPERADOR DE GRUA PUENTE CON CAPACIDAD DE {capacidad}"
+          style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none;text-transform:uppercase">
+        <div style="font-size:10px;color:var(--texto-hint);margin-top:4px">Este texto aparecerá en el certificado reemplazando {capacidad} con el valor del participante.</div>
       </div>
     </div>
     <div class="modal-footer" style="justify-content:flex-end;gap:8px">
@@ -2655,11 +2665,12 @@ function renderCursos() {
 }
 
 function abrirModalCurso(datos = null) {
-  document.getElementById("curso-id").value     = datos?.id    || "";
-  document.getElementById("curso-nombre").value = datos?.nombre || "";
-  document.getElementById("curso-horas").value  = datos?.duracion_horas || "";
-  document.getElementById("curso-area").value   = datos?.area_tematica || "";
-  document.getElementById("curso-activo").value = datos?.activo ?? "1";
+  document.getElementById("curso-id").value         = datos?.id    || "";
+  document.getElementById("curso-nombre").value     = datos?.nombre || "";
+  document.getElementById("curso-horas").value      = datos?.duracion_horas || "";
+  document.getElementById("curso-area").value       = datos?.area_tematica || "";
+  document.getElementById("curso-activo").value     = datos?.activo ?? "1";
+  document.getElementById("curso-texto-cert").value = datos?.texto_certificado || "";
   document.getElementById("curso-modal-titulo").textContent = datos ? "Editar curso" : "Nuevo curso";
   document.getElementById("overlay-curso").style.display = "flex";
   setTimeout(() => document.getElementById("curso-nombre").focus(), 80);
@@ -2675,11 +2686,12 @@ function editarCurso(id) {
 }
 
 async function guardarCurso() {
-  const nombre = document.getElementById("curso-nombre").value.trim();
-  const horas  = document.getElementById("curso-horas").value;
-  const area   = document.getElementById("curso-area").value.trim();
-  const activo = document.getElementById("curso-activo").value;
-  const id     = document.getElementById("curso-id").value;
+  const nombre     = document.getElementById("curso-nombre").value.trim();
+  const horas      = document.getElementById("curso-horas").value;
+  const area       = document.getElementById("curso-area").value.trim();
+  const activo     = document.getElementById("curso-activo").value;
+  const id         = document.getElementById("curso-id").value;
+  const textoCert  = document.getElementById("curso-texto-cert").value.trim().toUpperCase();
 
   if (!nombre) { alert("El nombre del curso es obligatorio."); document.getElementById("curso-nombre").focus(); return; }
   if (!horas || parseFloat(horas) <= 0) { alert("Ingresa la duración en horas."); document.getElementById("curso-horas").focus(); return; }
@@ -2689,7 +2701,7 @@ async function guardarCurso() {
     const res  = await fetch(API, {
       method: "POST",
       headers: {"Content-Type":"application/json"},
-      body: JSON.stringify({ action:"GUARDAR_CURSO", payload:{ id:id||null, nombre, duracion_horas:horas, area_tematica:area, activo } })
+      body: JSON.stringify({ action:"GUARDAR_CURSO", payload:{ id:id||null, nombre, duracion_horas:horas, area_tematica:area, activo, texto_certificado:textoCert||null } })
     });
     const data = await res.json();
     if (data.status === "success") {
@@ -3383,9 +3395,18 @@ async function abrirDetPer(id) {
           <div><span style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:3px">Ocupación</span>
             <span style="font-size:12px">${escH(p.ocupacion_nombre||'—')}</span>
           </div>
-          <div><span style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:3px">Capacidad</span>
-            <span style="font-size:12px">${p.capacidad_na?'N/A':escH(p.capacidad||'—')}</span>
-          </div>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Capacidad
+            <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+              <input id="per-info-capacidad" type="text" value="${p.capacidad_na?'':escH(p.capacidad||'')}"
+                placeholder="Ej: 75 TON" ${p.capacidad_na?'disabled':''} id="per-info-capacidad"
+                style="flex:1;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px;box-sizing:border-box">
+              <label style="font-size:11px;font-weight:normal;white-space:nowrap;display:flex;align-items:center;gap:4px;cursor:pointer">
+                <input type="checkbox" id="per-info-cap-na" ${p.capacidad_na?'checked':''}
+                  onchange="document.getElementById('per-info-capacidad').disabled=this.checked;if(this.checked)document.getElementById('per-info-capacidad').value=''">
+                N/A
+              </label>
+            </div>
+          </label>
         </div>
         <button onclick="guardarInfoPer(${p.id})"
           style="padding:6px 16px;background:var(--azul);color:white;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
@@ -3683,11 +3704,14 @@ async function perConfirmarOCR(id) {
 }
 
 async function guardarInfoPer(id) {
-  const nombre   = (document.getElementById('per-ocr-nombre-txt')?.value || '').trim();
-  const curp     = (document.getElementById('per-ocr-curp-txt')?.value   || '').trim().toUpperCase();
-  const puesto   = (document.getElementById('per-info-puesto')?.value    || '').trim();
-  const telefono = (document.getElementById('per-info-telefono')?.value  || '').trim();
-  if (!nombre && !curp && !puesto && !telefono) {
+  const nombre    = (document.getElementById('per-ocr-nombre-txt')?.value || '').trim();
+  const curp      = (document.getElementById('per-ocr-curp-txt')?.value   || '').trim().toUpperCase();
+  const puesto    = (document.getElementById('per-info-puesto')?.value    || '').trim();
+  const telefono  = (document.getElementById('per-info-telefono')?.value  || '').trim();
+  const capNaEl   = document.getElementById('per-info-cap-na');
+  const capacidad_na = capNaEl ? capNaEl.checked : false;
+  const capacidad = capacidad_na ? '' : (document.getElementById('per-info-capacidad')?.value || '').trim();
+  if (!nombre && !curp && !puesto && !telefono && capacidad === '' && !capNaEl) {
     mostrarToast('No hay datos para guardar.', 'err');
     return;
   }
@@ -3699,7 +3723,7 @@ async function guardarInfoPer(id) {
     const res  = await fetch(API, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ action: 'ACTUALIZAR_INFO_PARTICIPANTE', payload: { id, nombre_completo: nombre, curp, puesto, telefono } })
+      body:    JSON.stringify({ action: 'ACTUALIZAR_INFO_PARTICIPANTE', payload: { id, nombre_completo: nombre, curp, puesto, telefono, capacidad, capacidad_na } })
     });
     const data = await res.json();
     if (data.status === 'success') {

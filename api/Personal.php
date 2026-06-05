@@ -75,6 +75,7 @@ class Personal {
         $stmt = $this->pdo->prepare(
             "SELECT p.*,
                     c.nombre AS curso_nombre, c.duracion_horas, c.area_tematica,
+                    COALESCE(c.texto_certificado,'') AS texto_certificado,
                     o.nombre AS ocupacion_nombre
              FROM participantes_cursos p
              LEFT JOIN cursos c ON c.id = p.curso_id
@@ -543,7 +544,7 @@ class Personal {
         $chk->execute([$id]);
         if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
-        $allowed = ['nombre_completo', 'curp', 'puesto', 'telefono'];
+        $allowed = ['nombre_completo', 'curp', 'puesto', 'telefono', 'capacidad'];
         $sets    = [];
         $params  = [];
 
@@ -558,6 +559,11 @@ class Personal {
                 $sets[]   = "`{$field}` = ?";
                 $params[] = $val === '' ? null : $val;
             }
+        }
+        // capacidad_na es booleano, manejo separado
+        if (array_key_exists('capacidad_na', $payload)) {
+            $sets[]   = "`capacidad_na` = ?";
+            $params[] = $payload['capacidad_na'] ? 1 : 0;
         }
         if (empty($sets)) return ['status' => 'success', 'message' => 'Sin cambios.'];
 
@@ -609,8 +615,10 @@ class Personal {
     // ══════════════════════════════════════════════════════
 
     public function listarCursos(): array {
+        $this->ensureTextoCertificadoColumn();
         $stmt = $this->pdo->query(
             "SELECT id, nombre, duracion_horas, area_tematica, activo,
+                    COALESCE(texto_certificado,'') AS texto_certificado,
                     DATE_FORMAT(fecha_creacion,'%d/%m/%Y') AS fecha_creacion
              FROM cursos ORDER BY nombre"
         );
@@ -618,6 +626,7 @@ class Personal {
     }
 
     public function guardarCurso(array $payload, string $usuario): array {
+        $this->ensureTextoCertificadoColumn();
         $id = (int)($payload['id'] ?? 0);
 
         if (!trim($payload['nombre'] ?? ''))
@@ -627,29 +636,42 @@ class Personal {
         if (!trim($payload['area_tematica'] ?? ''))
             return ['status' => 'error', 'message' => 'El área temática es obligatoria.'];
 
+        $textoCert = trim($payload['texto_certificado'] ?? '') ?: null;
+
         if ($id) {
             $this->pdo->prepare(
-                "UPDATE cursos SET nombre=?, duracion_horas=?, area_tematica=?, activo=? WHERE id=?"
+                "UPDATE cursos SET nombre=?, duracion_horas=?, area_tematica=?, activo=?, texto_certificado=? WHERE id=?"
             )->execute([
                 trim($payload['nombre']),
                 (float)$payload['duracion_horas'],
                 trim($payload['area_tematica']),
                 isset($payload['activo']) ? (int)(bool)$payload['activo'] : 1,
+                $textoCert,
                 $id,
             ]);
         } else {
             $this->pdo->prepare(
-                "INSERT INTO cursos (nombre, duracion_horas, area_tematica, creado_por) VALUES (?,?,?,?)"
+                "INSERT INTO cursos (nombre, duracion_horas, area_tematica, texto_certificado, creado_por) VALUES (?,?,?,?,?)"
             )->execute([
                 trim($payload['nombre']),
                 (float)$payload['duracion_horas'],
                 trim($payload['area_tematica']),
+                $textoCert,
                 $usuario,
             ]);
             $id = (int)$this->pdo->lastInsertId();
         }
 
         return ['status' => 'success', 'id' => $id];
+    }
+
+    private function ensureTextoCertificadoColumn(): void {
+        try {
+            $cols = $this->pdo->query("SHOW COLUMNS FROM cursos LIKE 'texto_certificado'")->fetchAll();
+            if (empty($cols)) {
+                $this->pdo->exec("ALTER TABLE cursos ADD COLUMN texto_certificado VARCHAR(500) NULL AFTER area_tematica");
+            }
+        } catch (\Throwable $e) {}
     }
 
     public function eliminarCurso(int $id): array {
@@ -1783,6 +1805,16 @@ HTML;
         $folio  = 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
         $fecha  = $p['fecha_curso'] ? date('d/m/Y', strtotime($p['fecha_curso'])) : date('d/m/Y');
 
+        // Texto de capacidad para el certificado (ej: "OPERADOR DE GRUA PUENTE CON CAPACIDAD DE 5 TON")
+        $capacidadVal  = $p['capacidad_na'] ? 'N/A' : ($p['capacidad'] ?? '');
+        $textoCertBase = trim($p['texto_certificado'] ?? '');
+        $textoCert     = $textoCertBase
+            ? $esc(str_replace('{capacidad}', $capacidadVal, $textoCertBase))
+            : '';
+        $bloqueCert    = $textoCert
+            ? "<div class=\"cert-capacidad\">{$textoCert}</div>"
+            : '';
+
         return <<<HTML
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
 <style>
@@ -1795,6 +1827,7 @@ HTML;
   .cert-nombre { font-size:24pt; color:#1a1a2e; font-weight:bold; border-bottom:2px solid #185FA5; display:inline-block; padding-bottom:6px; margin:10px 0 20px; }
   .cert-text { font-size:12pt; color:#444; line-height:1.8; margin-bottom:8px; }
   .cert-curso { font-size:14pt; color:#1B2A6B; font-weight:bold; margin:6px 0; }
+  .cert-capacidad { font-size:13pt; color:#1B2A6B; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin:12px 0 4px; border:1.5px solid #185FA5; border-radius:6px; display:inline-block; padding:6px 20px; }
   .cert-detalles { font-size:10pt; color:#666; margin:16px 0 30px; }
   .firmas { width:80%; margin:40px auto 0; border-collapse:collapse; }
   .firmas td { text-align:center; padding:0 30px; vertical-align:bottom; }
@@ -1810,6 +1843,7 @@ HTML;
   <div class="cert-text">CURP: <strong>{$curp}</strong></div>
   <div class="cert-text">Por haber completado satisfactoriamente el curso:</div>
   <div class="cert-curso">{$curso}</div>
+  {$bloqueCert}
   <div class="cert-detalles">Área temática: {$area} &nbsp;·&nbsp; Duración: {$horas} horas &nbsp;·&nbsp; Fecha: {$fecha}</div>
   <table class="firmas">
     <tr>
