@@ -281,12 +281,16 @@ function campo(label, val) {
 }
 
 function renderDetalle(d) {
+  const tipoLabel = { DC3: '📋 DC-3', DIPLOMA: '🎓 Diploma', CERTIFICADO: '📜 Certificado' };
   let docs = '';
-  if (d.url_certificado || d.url_diploma || d.url_dc3) {
+  if (Array.isArray(d.documentos) && d.documentos.length) {
+    // Latest doc per type
+    const latest = {};
+    d.documentos.forEach(doc => { latest[doc.tipo_doc] = doc; });
     docs = `<div class="sec-title">Documentos generados</div><div class="docs-row">
-      ${d.url_certificado ? `<a class="btn-doc btn-cert" href="${esc(d.url_certificado)}" target="_blank">📜 Certificado</a>` : ''}
-      ${d.url_diploma     ? `<a class="btn-doc btn-dip"  href="${esc(d.url_diploma)}"     target="_blank">🎓 Diploma</a>` : ''}
-      ${d.url_dc3         ? `<a class="btn-doc btn-dc3"  href="${esc(d.url_dc3)}"         target="_blank">📋 DC-3</a>` : ''}
+      ${Object.values(latest).map(doc =>
+        `<a class="btn-doc" href="${esc(doc.url)}" target="_blank">${tipoLabel[doc.tipo_doc] || doc.tipo_doc} <span style="font-size:10px;color:inherit;opacity:.7">${esc(doc.fecha)}</span></a>`
+      ).join('')}
     </div>`;
   }
 
@@ -298,27 +302,27 @@ function renderDetalle(d) {
       ${campo('Puesto / Cargo', d.puesto)}
       ${campo('Teléfono', d.telefono)}
       ${campo('Correo', d.correo)}
-      ${campo('Ocupación', d.ocupacion)}
+      ${campo('Ocupación', d.ocupacion_nombre || d.ocupacion)}
     </div>
     <div class="sec-title">Empresa</div>
     <div class="grid2">
       ${campo('Empresa', d.empresa_nombre || d.empresa)}
       ${campo('RFC', d.empresa_rfc || d.rfc)}
-      ${campo('Representante', d.representante)}
+      ${campo('Representante', d.empresa_representante || d.representante)}
     </div>
     <div class="sec-title">Curso</div>
     <div class="grid2">
-      ${campo('Curso', d.nombre_curso || d.curso)}
+      ${campo('Curso', d.curso_nombre || d.nombre_curso || d.curso)}
       ${campo('Fecha', d.fecha_curso || d.fecha)}
-      ${campo('Duración', d.duracion ? d.duracion + ' hrs' : '')}
-      ${campo('Capacidad adquirida', d.capacidad)}
+      ${campo('Duración', d.duracion_horas ? d.duracion_horas + ' hrs' : '')}
+      ${campo('Capacidad adquirida', d.capacidad_na ? 'N/A' : (d.capacidad || ''))}
     </div>
     <div class="sec-title">Control de flujo</div>
     <div class="grid2">
       ${campo('Folio / Control', d.control || d.folio)}
       ${campo('Estatus', d.estatus)}
       ${campo('Registrado', d.fecha_alta || d.fecha_registro)}
-      ${campo('Aprobado por', d.aprobado_por || '')}
+      ${campo('QR asignado', d.qr_codigo || '')}
     </div>
     ${docs}`;
 }
