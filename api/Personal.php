@@ -1760,8 +1760,15 @@ HTML;
     }
 
     private function htmlCertificado(array $p, string $qrB64 = ''): string {
+        // CSS y estructura IDENTICOS al certificado de equipo (Certificaciones.php)
+        // Solo cambian los datos: participante/curso en vez de cliente/equipo
         $esc = fn($v) => htmlspecialchars($this->sinAcentos((string)($v ?? '')), ENT_QUOTES, 'UTF-8');
 
+        $folio   = $esc(
+            $p['control']
+                ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'
+                : 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT)
+        );
         $nombre  = $esc($p['nombre_completo'] ?? '');
         $curp    = $esc($p['curp'] ?? '');
         $puesto  = $esc($p['puesto'] ?? '');
@@ -1769,13 +1776,7 @@ HTML;
         $curso   = $esc($p['curso_nombre'] ?? '');
         $horas   = $esc($p['duracion_horas'] ?? '');
         $area    = $esc($p['area_tematica'] ?? '');
-        $folio   = $esc(
-            $p['control']
-                ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'
-                : 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT)
-        );
         $fecha   = $esc($p['fecha_curso'] ? date('d/m/Y', strtotime($p['fecha_curso'])) : date('d/m/Y'));
-        $emision = $esc(date('d/m/Y'));
         $anio    = date('Y');
 
         $capVal        = $p['capacidad_na'] ? 'N/A' : trim($p['capacidad'] ?? '');
@@ -1784,23 +1785,19 @@ HTML;
             ? str_ireplace('{capacidad}', $capVal, $textoCertBase)
             : ($p['curso_nombre'] ?? '')));
 
-        $logoB64  = $this->assetB64('logos/avba.png');          // 520×240 → 2.167:1
-        $firmaB64 = $this->assetB64('logos/firma_director.png'); // 200×96  → 2.083:1
-        $selloB64 = $this->assetB64('sellos/sello.png');          // 183×162 → 1.130:1
-
-        // Dimensiones calculadas por aspect ratio real (sin object-fit que Dompdf ignora)
-        $logoHtml  = $logoB64
-            ? "<img src=\"{$logoB64}\" style=\"width:72px;height:33px;display:block;\" alt=\"AVBA\">"
-            : '';
+        // firma_director.png 200x96 (2.083:1) → 88x42 px
+        $firmaB64  = $this->assetB64('logos/firma_director.png');
         $firmaHtml = $firmaB64
             ? "<img src=\"{$firmaB64}\" style=\"width:88px;height:42px;display:block;margin:0 auto 4px;\" alt=\"Firma\">"
             : '<div style="height:42px;"></div>';
+
+        // sello.png 183x162 (1.130:1) → 80x71 px
+        $selloB64  = $this->assetB64('sellos/sello.png');
         $selloHtml = $selloB64
-            ? "<img src=\"{$selloB64}\" style=\"width:78px;height:69px;display:block;margin:0 auto;\" alt=\"Sello\">"
+            ? "<img src=\"{$selloB64}\" style=\"width:80px;height:71px;display:block;margin:0 auto;\" alt=\"Sello\">"
             : '<div class="seal"><div class="seal-text">AVBA<br>CERT.<br>' . $anio . '</div></div>';
-        $qrHtml    = $qrB64
-            ? "<img src=\"{$qrB64}\" alt=\"QR\" style=\"width:100px;height:100px;border:1px solid #dde5f0;padding:2px;display:block;margin:0 auto;\">"
-            : '';
+
+        $qrSrc = $qrB64 ?: '';
 
         return <<<HTML
 <!DOCTYPE html>
@@ -1830,6 +1827,7 @@ HTML;
   .bottom-table { width: 100%; border-collapse: collapse; margin-top: 14px; }
   .bottom-table td { vertical-align: middle; padding: 0 6px; }
   .qr-box { text-align: center; width: 115px; }
+  .qr-box img { width: 100px; height: 100px; border: 1px solid #dde5f0; padding: 2px; }
   .qr-box .qr-label { font-size: 7pt; color: #5a6072; margin-top: 3px; }
   .valid-box { text-align: center; padding: 0 10px; }
   .valid-badge { border: 2px solid #185FA5; border-radius: 6px; padding: 6px 14px; display: inline-block; }
@@ -1851,7 +1849,6 @@ HTML;
 
 <div class="header">
   <table class="header-table"><tr>
-    <td style="width:82px;padding-right:10px;">{$logoHtml}</td>
     <td>
       <div class="header-title">AVBA Certificaciones</div>
       <div class="header-sub">Inspecciones, Certificaciones y Mantenimiento S.A.S. de C.V.</div>
@@ -1885,31 +1882,35 @@ HTML;
     <td class="lbl">DURACION</td><td class="val">{$horas} horas</td>
     <td class="lbl">FECHA</td><td class="val">{$fecha}</td>
   </tr>
+</table>
+
+<div class="section-label">RESULTADO</div>
+<table class="data-table">
+  <tr>
+    <td class="lbl">FECHA DE CAPACITACION</td><td class="val">{$fecha}</td>
+    <td class="lbl">FOLIO</td><td class="val">{$folio}</td>
+  </tr>
+  <tr>
+    <td class="lbl">RESULTADO</td>
+    <td class="val" colspan="3"><strong style="color:#2e7d32">&#10003; APROBADO — Capacitacion completada satisfactoriamente</strong></td>
+  </tr>
   <tr>
     <td class="lbl">ACREDITACION</td>
     <td class="val" colspan="3" style="font-weight:bold;color:#0C447C;">{$textoCert}</td>
   </tr>
 </table>
 
-<div class="section-label">RESULTADO</div>
-<table class="data-table">
-  <tr>
-    <td class="lbl">RESULTADO</td>
-    <td class="val" colspan="3"><strong style="color:#2e7d32">&#10003; APROBADO — Capacitacion completada satisfactoriamente</strong></td>
-  </tr>
-</table>
-
 <table class="bottom-table">
   <tr>
     <td class="qr-box">
-      {$qrHtml}
+      <img src="{$qrSrc}" alt="QR">
       <div class="qr-label">Escanea para validar</div>
     </td>
     <td class="valid-box">
       <div class="valid-badge">
         <div class="vb-title">CERTIFICADO DE CAPACITACION</div>
         <div class="vb-date">{$fecha}</div>
-        <div class="vb-sub">Emision: {$emision}</div>
+        <div class="vb-sub">Folio: {$folio}</div>
       </div>
     </td>
     <td style="text-align:center; padding: 0 10px;">
