@@ -65,7 +65,7 @@ class Personal {
                        o.nombre AS ocupacion_nombre,
                        p.foto_documentacion_url, p.foto_persona_url,
                        p.empresa_nombre, p.fecha_registro,
-                       COALESCE((SELECT cl.correo_contacto FROM clientes cl WHERE cl.nombre_cliente = p.empresa_nombre AND cl.correo_contacto IS NOT NULL AND cl.correo_contacto <> '' LIMIT 1),'') AS empresa_correo
+                       COALESCE((SELECT cl.correo_contacto FROM clientes cl WHERE cl.nombre_cliente = p.empresa_nombre COLLATE utf8mb4_general_ci AND cl.correo_contacto IS NOT NULL AND cl.correo_contacto <> '' LIMIT 1),'') AS empresa_correo
                 FROM participantes_cursos p
                 LEFT JOIN cursos c ON c.id = p.curso_id
                 LEFT JOIN ocupaciones_especificas o ON o.id = p.ocupacion_id
@@ -343,7 +343,7 @@ class Personal {
         // Guardar correo en la empresa del catálogo
         if ($empresa !== '') {
             try {
-                $stmt = $this->pdo->prepare("SELECT id FROM clientes WHERE nombre_cliente = ? LIMIT 1");
+                $stmt = $this->pdo->prepare("SELECT id FROM clientes WHERE nombre_cliente COLLATE utf8mb4_general_ci = ? LIMIT 1");
                 $stmt->execute([$empresa]);
                 $cli = $stmt->fetch();
                 if ($cli) {
@@ -488,7 +488,7 @@ class Personal {
         $nombreEmpresa = $payload['empresa_nombre'] ?? $part['empresa_nombre'] ?? '';
         if ($nombreEmpresa) {
             $clienteRow = $this->pdo->prepare(
-                "SELECT id FROM clientes WHERE UPPER(TRIM(nombre_cliente)) = UPPER(TRIM(?))"
+                "SELECT id FROM clientes WHERE UPPER(TRIM(nombre_cliente COLLATE utf8mb4_general_ci)) = UPPER(TRIM(?))"
             );
             $clienteRow->execute([$nombreEmpresa]);
             $cliente = $clienteRow->fetch();
@@ -800,7 +800,7 @@ class Personal {
         // Determinar id_cliente: empresa_nombre tiene prioridad, luego primera parte del control
         $idCliente = '';
         if (!empty($p['empresa_nombre'])) {
-            $stmt = $this->pdo->prepare("SELECT primera_parte FROM clientes WHERE nombre_cliente = ? LIMIT 1");
+            $stmt = $this->pdo->prepare("SELECT primera_parte FROM clientes WHERE nombre_cliente COLLATE utf8mb4_general_ci = ? LIMIT 1");
             $stmt->execute([$p['empresa_nombre']]);
             $row = $stmt->fetch();
             if ($row) {
