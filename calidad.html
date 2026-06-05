@@ -3171,10 +3171,14 @@ function filtrarCursosSesiones() {
   const qf = (document.getElementById('per-c-fecha').value ||'').toLowerCase();
   const grupos = {};
   perData.forEach(p => {
-    const key = (p.curso_nombre||'') + '||' + (p.fecha_curso||'');
-    if (!grupos[key]) grupos[key] = { curso_nombre:p.curso_nombre||'—', fecha_curso:p.fecha_curso||'—', empresa:p.empresa_nombre||'', participantes:[] };
+    const key = (p.curso_nombre||'') + '||' + (p.fecha_curso||'') + '||' + (p.empresa_nombre||'');
+    if (!grupos[key]) grupos[key] = {
+      curso_nombre: p.curso_nombre||'—',
+      fecha_curso:  p.fecha_curso||'—',
+      empresa:      p.empresa_nombre||'',
+      participantes: []
+    };
     grupos[key].participantes.push(p);
-    if (p.empresa_nombre && !grupos[key].empresa) grupos[key].empresa = p.empresa_nombre;
   });
   let lista = Object.values(grupos).sort((a,b)=>b.fecha_curso.localeCompare(a.fecha_curso));
   if (q)  lista = lista.filter(g=>g.curso_nombre.toLowerCase().includes(q)||(g.empresa||'').toLowerCase().includes(q));
@@ -3189,19 +3193,30 @@ function renderCursosSesiones(lista) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin sesiones registradas</td></tr>`;
     return;
   }
-  tbody.innerHTML = lista.map(g => `
+  tbody.innerHTML = lista.map(g => {
+    const pend    = g.participantes.filter(p => !p.estatus || p.estatus==='PENDIENTE'||p.estatus==='DEVUELTO').length;
+    const apro    = g.participantes.filter(p => p.estatus==='APROBADO_CALIDAD'||p.estatus==='EMITIDO').length;
+    const g64     = btoa(unescape(encodeURIComponent(JSON.stringify({
+      curso_nombre:  g.curso_nombre,
+      fecha_curso:   g.fecha_curso,
+      empresa:       g.empresa,
+      participantes: g.participantes.map(p=>({id:p.id, nombre_completo:p.nombre_completo, curp:p.curp, puesto:p.puesto, estatus:p.estatus}))
+    }))));
+    return `
     <tr>
       <td style="font-weight:600;color:var(--texto)">${escH(g.curso_nombre)}</td>
       <td>${escH(g.fecha_curso)}</td>
-      <td style="text-align:center">
-        <span style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;background:var(--azul-light);color:var(--azul)">${g.participantes.length}</span>
-      </td>
       <td style="font-size:12px;color:var(--texto-sub)">${escH(g.empresa||'—')}</td>
-      <td style="text-align:right">
-        <button onclick='abrirSesionParticipantes(${JSON.stringify({curso_nombre:g.curso_nombre,fecha_curso:g.fecha_curso,empresa:g.empresa,participantes:g.participantes.map(p=>({id:p.id,nombre_completo:p.nombre_completo,curp:p.curp,puesto:p.puesto}))}).replace(/'/g,"&#39;")})'
-                style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
+      <td style="text-align:center">
+        ${pend  ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--ambar-light);color:var(--ambar)">${pend} pend.</span> ` : ''}
+        ${apro  ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--verde-light);color:var(--verde)">${apro} apro.</span>` : ''}
       </td>
-    </tr>`).join('');
+      <td style="text-align:right">
+        <button onclick="abrirSesionParticipantes('${g64}')"
+                style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver sesión</button>
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 function filtrarIndep() {
@@ -3250,20 +3265,74 @@ function renderIndep(data) {
     </tr>`; }).join('');
 }
 
-function abrirSesionParticipantes(g) {
-  if (typeof g === 'string') g = JSON.parse(g);
+function abrirSesionParticipantes(g64) {
+  let g;
+  try { g = JSON.parse(decodeURIComponent(escape(atob(g64)))); }
+  catch(e) { try { g = JSON.parse(g64); } catch(_) { return; } }
+
   document.getElementById('per-det-nombre').textContent = g.curso_nombre;
-  document.getElementById('per-det-sub').textContent    = (g.fecha_curso||'') + (g.empresa?' · '+g.empresa:'');
-  document.getElementById('per-det-body').innerHTML = g.participantes.map(p => `
-    <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--borde)">
-      <div style="flex:1">
-        <div style="font-size:13px;font-weight:600;color:var(--texto)">${escH(p.nombre_completo)}</div>
-        <div style="font-size:11px;color:var(--texto-sub);margin-top:2px">${escH(p.curp||'—')}${p.puesto?' · '+escH(p.puesto):''}</div>
-      </div>
-      <button onclick="abrirDetPer(${p.id})"
-              style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer">Detalle</button>
-    </div>`).join('');
+  document.getElementById('per-det-sub').textContent    = (g.fecha_curso||'') + (g.empresa ? ' · ' + g.empresa : '');
+
+  const pendientes = g.participantes.filter(p => !p.estatus || p.estatus==='PENDIENTE' || p.estatus==='DEVUELTO');
+  const aproBarHtml = pendientes.length ? `
+    <div style="padding:10px 0 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:2px solid var(--borde);margin-bottom:4px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;color:var(--texto-sub)">
+        <input type="checkbox" id="chk-per-todos" onchange="toggleTodosPer(this)" style="width:15px;height:15px">
+        Seleccionar todos
+      </label>
+      <button onclick="aprobarSeleccionadosPer()"
+        style="margin-left:auto;padding:7px 18px;background:var(--verde);color:white;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">
+        ✓ Aprobar seleccionados → Certificaciones
+      </button>
+    </div>` : '';
+
+  document.getElementById('per-det-body').innerHTML = aproBarHtml +
+    g.participantes.map(p => {
+      const pend = !p.estatus || p.estatus==='PENDIENTE' || p.estatus==='DEVUELTO';
+      return `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--borde)">
+        ${pend
+          ? `<input type="checkbox" class="chk-per-item" data-id="${p.id}" style="width:15px;height:15px;flex-shrink:0;cursor:pointer">`
+          : `<div style="width:15px;flex-shrink:0"></div>`}
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--texto);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(p.nombre_completo)}</div>
+          <div style="font-size:11px;color:var(--texto-sub);margin-top:2px">${escH(p.curp||'—')}${p.puesto?' · '+escH(p.puesto):''}</div>
+        </div>
+        ${estatusPerBadge(p.estatus)}
+        <button onclick="abrirDetPer(${p.id})"
+          style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Ver</button>
+      </div>`;
+    }).join('');
+
   document.getElementById('overlay-per-det').style.display = 'flex';
+}
+
+function toggleTodosPer(chkAll) {
+  document.querySelectorAll('.chk-per-item').forEach(c => c.checked = chkAll.checked);
+}
+
+async function aprobarSeleccionadosPer() {
+  const seleccionados = [...document.querySelectorAll('.chk-per-item:checked')];
+  if (!seleccionados.length) { mostrarToast('Selecciona al menos un participante.', 'err'); return; }
+  const ids = seleccionados.map(c => parseInt(c.dataset.id));
+  if (!confirm(`¿Aprobar ${ids.length} participante(s) y enviarlos a Certificaciones?`)) return;
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'APROBAR_SELECCIONADOS_PERSONAL', payload: { ids } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast(data.message, 'ok');
+      perCargados = false;
+      cargarPersonal();
+      cerrarDetPer();
+    } else {
+      mostrarToast('Error: ' + (data.message || 'Error desconocido'), 'err');
+    }
+  } catch(e) {
+    mostrarToast('Error de conexión.', 'err');
+  }
 }
 
 async function abrirDetPer(id) {

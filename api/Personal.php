@@ -58,10 +58,12 @@ class Personal {
                        c.nombre AS curso_nombre, c.duracion_horas,
                        o.nombre AS ocupacion_nombre,
                        p.foto_documentacion_url, p.foto_persona_url,
-                       p.empresa_nombre, p.fecha_registro
+                       p.empresa_nombre, p.fecha_registro,
+                       COALESCE(cl.correo_contacto,'') AS empresa_correo
                 FROM participantes_cursos p
                 LEFT JOIN cursos c ON c.id = p.curso_id
                 LEFT JOIN ocupaciones_especificas o ON o.id = p.ocupacion_id
+                LEFT JOIN clientes cl ON cl.nombre_cliente = p.empresa_nombre
                 WHERE " . implode(' AND ', $where) . "
                 ORDER BY p.fecha_registro DESC";
 
@@ -239,6 +241,183 @@ class Personal {
             'message' => 'Participante aprobado y QR asignado automáticamente.',
             'qr'      => $qr,
         ];
+    }
+
+    // ── Aprobar múltiples participantes en batch ──────────
+    public function aprobarSeleccionados(array $ids, string $usuario): array {
+        $aprobados = 0;
+        $errores   = [];
+        foreach ($ids as $id) {
+            $res = $this->aprobarParticipante((int)$id, $usuario);
+            if ($res['status'] === 'success') {
+                $aprobados++;
+            } else {
+                $errores[] = "ID {$id}: " . ($res['message'] ?? 'Error');
+            }
+        }
+        if ($aprobados === 0) {
+            return ['status' => 'error', 'message' => implode('; ', $errores) ?: 'No se aprobó ningún participante.'];
+        }
+        $msg = "{$aprobados} participante(s) aprobados y enviados a Certificaciones.";
+        if ($errores) $msg .= ' Sin QR disponible para: ' . implode(', ', $errores);
+        return ['status' => 'success', 'message' => $msg, 'aprobados' => $aprobados];
+    }
+
+    // ── Enviar sesión completa con todos los documentos ───
+    public function enviarSesionPersonal(array $payload, string $usuario): array {
+        $cursoNombre  = trim($payload['curso_nombre']  ?? '');
+        $fechaCurso   = trim($payload['fecha_curso']   ?? '');
+        $empresa      = trim($payload['empresa']       ?? '');
+        $tipo         = trim($payload['tipo']          ?? 'todo');
+        $correo       = trim($payload['correo']        ?? '');
+        $enviarCreds  = !empty($payload['enviar_credenciales']);
+
+        if (!$correo || !filter_var($correo, FILTER_VALIDATE_EMAIL))
+            return ['status' => 'error', 'message' => 'Correo de envío inválido.'];
+
+        // Garantizar columna correo_contacto en clientes
+        try { $this->pdo->exec("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS correo_contacto VARCHAR(200) DEFAULT NULL"); } catch (\Throwable $e) {}
+
+        // Obtener participantes de la sesión aprobados o emitidos
+        $params = [$cursoNombre, $fechaCurso];
+        if ($empresa !== '') {
+            $empCond  = "AND p.empresa_nombre = ?";
+            $params[] = $empresa;
+        } else {
+            $empCond  = "AND (p.empresa_nombre IS NULL OR p.empresa_nombre = '')";
+        }
+        $stmt = $this->pdo->prepare(
+            "SELECT p.* FROM participantes_cursos p
+             LEFT JOIN cursos c ON c.id = p.curso_id
+             WHERE c.nombre = ? AND p.fecha_curso = ? {$empCond}
+             AND p.estatus IN ('APROBADO_CALIDAD','EMITIDO')
+             ORDER BY p.nombre_completo"
+        );
+        $stmt->execute($params);
+        $participantes = $stmt->fetchAll();
+        if (empty($participantes))
+            return ['status' => 'error', 'message' => 'Sin participantes aprobados en esta sesión.'];
+
+        // Determinar tipos de documentos a generar
+        $tipos = match($tipo) {
+            'dc3'    => ['dc3'],
+            'diploma'=> ['diploma'],
+            default  => ['dc3', 'diploma'],
+        };
+
+        // Generar documentos y recopilar adjuntos
+        $adjuntos = [];
+        $errores  = [];
+        foreach ($participantes as $p) {
+            foreach ($tipos as $t) {
+                $res = $this->generarDocumento((int)$p['id'], $t, $usuario);
+                if ($res['status'] === 'success' && !empty($res['url'])) {
+                    $ruta = realpath(str_replace(UPLOAD_URL, UPLOAD_DIR, $res['url']));
+                    if ($ruta) {
+                        $safe  = preg_replace('/[^A-Za-z0-9_\-]/', '_', $p['nombre_completo'] ?? 'doc');
+                        $adjuntos[] = ['path' => $ruta, 'name' => strtoupper($t) . '_' . $safe . '.pdf'];
+                    }
+                } else {
+                    $errores[] = ($p['nombre_completo'] ?? 'N/A') . ' · ' . $t;
+                }
+            }
+        }
+
+        if (empty($adjuntos))
+            return ['status' => 'error', 'message' => 'No se pudo generar ningún documento.' . ($errores ? ' Errores: ' . implode(', ', $errores) : '')];
+
+        // Marcar todos como EMITIDO
+        $ids = array_map(fn($p) => (int)$p['id'], $participantes);
+        $ph  = implode(',', array_fill(0, count($ids), '?'));
+        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO' WHERE id IN ({$ph})")
+                  ->execute($ids);
+
+        // Guardar correo en la empresa del catálogo
+        if ($empresa !== '') {
+            try {
+                $stmt = $this->pdo->prepare("SELECT id FROM clientes WHERE nombre_cliente = ? LIMIT 1");
+                $stmt->execute([$empresa]);
+                $cli = $stmt->fetch();
+                if ($cli) {
+                    $this->pdo->prepare("UPDATE clientes SET correo_contacto = ? WHERE id = ?")
+                              ->execute([$correo, $cli['id']]);
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // Gestionar credenciales si se solicitó
+        $credenciales = [];
+        if ($enviarCreds && !empty($participantes)) {
+            try {
+                $credenciales = $this->gestionarCredencialesParticipante($participantes[0], $correo);
+            } catch (\Throwable $e) {}
+        }
+
+        // Enviar correo
+        if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
+            return ['status' => 'error', 'message' => 'Servicio de correo no disponible.'];
+
+        $tipoLabel = ['dc3' => 'Constancias DC-3', 'diploma' => 'Diplomas', 'todo' => 'Documentos de capacitación'][$tipo] ?? 'Documentos';
+        try {
+            $mail = new PHPMailer(true);
+            configurarMailer($mail, $this->pdo);
+            $mail->addAddress($correo);
+            $mail->Subject = "{$tipoLabel} — {$cursoNombre} — AVBA Inspections";
+            $mail->isHTML(true);
+            $mail->Body    = $this->plantillaCorreoSesion($cursoNombre, $fechaCurso, $empresa, count($participantes), $tipoLabel, $credenciales);
+            foreach ($adjuntos as $adj) {
+                $mail->addAttachment($adj['path'], $adj['name']);
+            }
+            $mail->send();
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => 'Error al enviar correo: ' . $e->getMessage()];
+        }
+
+        $msg = "Correo enviado a {$correo} con " . count($participantes) . " participante(s).";
+        if ($errores) $msg .= ' Sin documento para: ' . implode(', ', array_slice($errores, 0, 3));
+        return ['status' => 'success', 'message' => $msg, 'count' => count($participantes)];
+    }
+
+    private function plantillaCorreoSesion(string $curso, string $fecha, string $empresa, int $count, string $tipoLabel, array $credenciales = []): string {
+        $esc = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        $empresaHtml = $empresa ? " de <strong>{$esc($empresa)}</strong>" : '';
+        $fechaHtml   = $fecha   ? " del día <strong>{$esc($fecha)}</strong>"  : '';
+        $cuerpo = "
+      <p style='font-size:15px;color:#1a1a2e;margin:0 0 12px'>
+        Estimado(a) equipo{$empresaHtml},
+      </p>
+      <p style='font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 8px'>
+        Adjuntamos los <strong>{$esc($tipoLabel)}</strong> correspondientes al curso
+        <strong>{$esc($curso)}</strong>{$fechaHtml}
+        para <strong>{$count} participante(s)</strong>.
+      </p>";
+
+        if (!empty($credenciales)) {
+            $usuario   = $esc($credenciales['usuario'] ?? '');
+            $password  = $esc($credenciales['password'] ?? '');
+            $portalUrl = rtrim(defined('SITE_URL') ? SITE_URL : '', '/') . '/portal-cliente.html';
+            $accion    = ($credenciales['es_nuevo'] ?? true)
+                ? 'Se ha creado su cuenta en el portal AVBA'
+                : 'Se ha actualizado su contraseña del portal AVBA';
+            $cuerpo .= "
+      <div style='margin-top:20px;padding:16px 18px;background:#F0F7ED;border-left:4px solid #2e7d32;border-radius:6px'>
+        <p style='font-weight:700;color:#1b5e20;margin:0 0 10px;font-size:14px'>{$esc($accion)}</p>
+        <table style='border-collapse:collapse'>
+          <tr>
+            <td style='padding:3px 14px 3px 0;color:#5a6072;font-size:13px'>Usuario:</td>
+            <td style='font-family:monospace;font-weight:700;color:#1a1a2e;font-size:14px'>{$usuario}</td>
+          </tr>
+          <tr>
+            <td style='padding:3px 14px 3px 0;color:#5a6072;font-size:13px'>Contraseña:</td>
+            <td style='font-family:monospace;font-weight:700;color:#1a1a2e;font-size:14px'>{$password}</td>
+          </tr>
+        </table>
+        <p style='margin:10px 0 0;font-size:12px;color:#5a6072'>Accede en:
+          <a href='{$portalUrl}' style='color:#185FA5'>{$portalUrl}</a>
+        </p>
+      </div>";
+        }
+        return plantillaCorreoHtml($this->pdo, $cuerpo);
     }
 
     // ── Devolver participante → DEVUELTO ──────────────────

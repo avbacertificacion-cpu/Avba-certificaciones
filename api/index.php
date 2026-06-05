@@ -780,6 +780,18 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->aprobarParticipante((int)($payload['id'] ?? 0), $usr['usuario'], trim($payload['qr'] ?? '')));
 
+        case 'APROBAR_SELECCIONADOS_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $ids = array_filter(array_map('intval', (array)($payload['ids'] ?? [])));
+            if (empty($ids)) respuesta(['status' => 'error', 'message' => 'IDs requeridos.']);
+            respuesta($personal->aprobarSeleccionados($ids, $usr['usuario']));
+
+        case 'ENVIAR_SESION_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->enviarSesionPersonal($payload, $usr['usuario']));
+
         case 'DEVOLVER_PARTICIPANTE':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
