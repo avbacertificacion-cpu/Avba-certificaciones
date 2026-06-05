@@ -381,33 +381,5 @@ function plantillaCorreoHtml(PDO $pdo, string $cuerpo): string {
  */
 function protegerPdf(string $pdfBytes): string
 {
-    static $loaded = false;
-    if (!$loaded) {
-        require_once __DIR__ . '/../lib/FpdiProtected.php';
-        $loaded = true;
-    }
-
-    $tmp = tempnam(sys_get_temp_dir(), 'avba_pdf_');
-    file_put_contents($tmp, $pdfBytes);
-
-    try {
-        $pdf = new FpdiProtected();
-        $pdf->SetAutoPageBreak(false);
-        $count = $pdf->setSourceFile($tmp);
-
-        for ($i = 1; $i <= $count; $i++) {
-            $tpl    = $pdf->importPage($i);
-            $sz     = $pdf->getTemplateSize($tpl);
-            $orient = ($sz['width'] > $sz['height']) ? 'L' : 'P';
-            $pdf->AddPage($orient, [$sz['width'], $sz['height']]);
-            $pdf->useTemplate($tpl, 0, 0, $sz['width'], $sz['height']);
-        }
-
-        // Permite solo visualización e impresión (alta y baja resolución)
-        $pdf->SetProtection(['print', 'print-hi'], '', 'Avba@Cert2024!');
-
-        return $pdf->Output('', 'S');
-    } finally {
-        @unlink($tmp);
-    }
+    return $pdfBytes;
 }

@@ -755,21 +755,6 @@ class Personal {
         if (!in_array($tipo, $tiposValidos, true))
             return ['status' => 'error', 'message' => 'Tipo de documento no válido.'];
 
-        // Intentar con plantilla PDF (FPDI) si está configurada
-        try {
-            $stmt = $this->pdo->prepare("SELECT plantilla_pdf, pdf_campos FROM plantillas_personal WHERE tipo = ? LIMIT 1");
-            $stmt->execute([$tipo]);
-            $tpl = $stmt->fetch();
-            if (!empty($tpl['plantilla_pdf'])) {
-                $rutaTpl = __DIR__ . '/../uploads/plantillas/' . $tpl['plantilla_pdf'];
-                if (file_exists($rutaTpl)) {
-                    $campos = json_decode($tpl['pdf_campos'] ?: '[]', true) ?: [];
-                    return $this->generarConTemplatePdf($p, $tipo, $usuario, $rutaTpl, $campos);
-                }
-            }
-        } catch (\Throwable $e) {}
-
-        // Fallback: generar con HTML (Dompdf)
         if (!class_exists('Dompdf\Dompdf')) {
             return ['status' => 'error', 'message' => 'Dompdf no disponible. Instala las dependencias del proyecto.'];
         }
@@ -897,104 +882,6 @@ class Personal {
         } catch (\Exception $e) {
             return ['status' => 'error', 'message' => 'Error al enviar correo: ' . $e->getMessage()];
         }
-    }
-
-    private function generarConTemplatePdf(array $p, string $tipo, string $usuario, string $rutaTpl, array $campos): array {
-        require_once __DIR__ . '/../lib/fpdi_loader.php';
-
-        $folio   = 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
-        $dir     = UPLOAD_DIR . 'personal/docs/';
-        if (!is_dir($dir)) mkdir($dir, 0755, true);
-
-        $nombre  = strtoupper($tipo) . '_PDF_' . $folio . '_' . date('Ymd_His') . '.pdf';
-        $rutaPdf = $dir . $nombre;
-
-        $fpiDim = new \setasign\Fpdi\Fpdi();
-        $fpiDim->setSourceFile($rutaTpl);
-        $tplIdx = $fpiDim->importPage(1);
-        $size   = $fpiDim->getTemplateSize($tplIdx);
-        $orient = ($size['width'] > $size['height']) ? 'L' : 'P';
-        unset($fpiDim);
-
-        $pdf = new \setasign\Fpdi\Fpdi($orient, 'mm', [$size['width'], $size['height']]);
-        $pdf->SetAutoPageBreak(false);
-        $pdf->SetMargins(0, 0, 0);
-        $totalPaginas     = $pdf->setSourceFile($rutaTpl);
-        $valoresResueltos = $this->resolverValoresCamposPersonal($p);
-
-        for ($pg = 1; $pg <= $totalPaginas; $pg++) {
-            $tpl = $pdf->importPage($pg);
-            $sz  = $pdf->getTemplateSize($tpl);
-            $pdf->AddPage(($sz['width'] > $sz['height']) ? 'L' : 'P', [$sz['width'], $sz['height']]);
-            $pdf->useTemplate($tpl, 0, 0, $sz['width'], $sz['height']);
-
-            foreach ($campos as $campo) {
-                $nombreCampo = $campo['campo'] ?? '';
-                $pagCampo    = (int)($campo['pagina'] ?? 1);
-                if (!$nombreCampo || $pagCampo !== $pg) continue;
-
-                $x       = (float)($campo['x']      ?? 0);
-                $y       = (float)($campo['y']      ?? 0);
-                $tamano  = (int)  ($campo['tamano'] ?? 10);
-                $negrita = !empty($campo['negrita']) ? 'B' : '';
-                $ancho   = (float)($campo['ancho']  ?? 0);
-                $color   = str_pad(ltrim($campo['color'] ?? '000000', '#'), 6, '0', STR_PAD_LEFT);
-                $fuente  = ['Helvetica'=>'Helvetica','Times'=>'Times','Courier'=>'Courier'][$campo['fuente']??''] ?? 'Helvetica';
-
-                [$r, $g, $b] = sscanf($color, '%02x%02x%02x');
-                $pdf->SetTextColor($r ?? 0, $g ?? 0, $b ?? 0);
-
-                $valor = (string)($valoresResueltos[$nombreCampo] ?? '');
-                if ($valor === '') continue;
-
-                $pdf->SetFont($fuente, $negrita, $tamano);
-                $pdf->SetXY($x, $y);
-                $pdf->Cell($ancho ?: 0, 0, $valor, 0, 0, '');
-            }
-        }
-
-        $pdf->Output('F', $rutaPdf);
-        $url = UPLOAD_URL . 'personal/docs/' . $nombre;
-
-        $this->pdo->prepare(
-            "INSERT INTO participantes_documentos (participante_id, tipo_doc, url, generado_por)
-             VALUES (?, ?, ?, ?)"
-        )->execute([$p['id'], strtoupper($tipo), $url, $usuario]);
-
-        return ['status' => 'success', 'url' => $url];
-    }
-
-    private function resolverValoresCamposPersonal(array $p): array {
-        $fechaCurso = $p['fecha_curso'] ?? null;
-        $fechaFmt   = $fechaCurso ? (new \DateTime($fechaCurso))->format('d/m/Y') : '';
-        $folio      = $p['control']
-            ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'
-            : 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
-
-        $capacidadVal  = $p['capacidad_na'] ? 'N/A' : ($p['capacidad'] ?? '');
-        $textoCertBase = trim($p['texto_certificado'] ?? '');
-        $textoCertComp = $textoCertBase
-            ? str_replace('{capacidad}', $capacidadVal, $textoCertBase)
-            : $capacidadVal;
-
-        return [
-            'nombre_completo'       => $p['nombre_completo']       ?? '',
-            'curp'                  => $p['curp']                  ?? '',
-            'puesto'                => $p['puesto']                ?? '',
-            'ocupacion'             => $p['ocupacion_nombre']      ?? '',
-            'empresa_nombre'        => $p['empresa_nombre']        ?? '',
-            'empresa_rfc'           => $p['empresa_rfc']           ?? '',
-            'empresa_direccion'     => $p['empresa_direccion']     ?? '',
-            'empresa_representante' => $p['empresa_representante'] ?? '',
-            'curso_nombre'          => $p['curso_nombre']          ?? '',
-            'area_tematica'         => $p['area_tematica']         ?? '',
-            'duracion_horas'        => (string)($p['duracion_horas'] ?? ''),
-            'fecha_curso'           => $fechaFmt,
-            'capacidad'             => $capacidadVal,
-            'texto_certificado'     => $textoCertComp,
-            'folio'                 => $folio,
-            'anio'                  => date('Y'),
-        ];
     }
 
     private function plantillaCorreoPersonal(string $nombre, string $tipoLabel, string $curso, array $credenciales = []): string {
@@ -1484,24 +1371,35 @@ HTML;
     private function htmlDiploma(array $p): string {
         $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
 
-        $nombre  = $esc($p['nombre_completo']);
-        $curso   = $esc($p['curso_nombre']);
-        $horas   = $esc($p['duracion_horas']);
-        $area    = $esc($p['area_tematica'] ?? '');
+        $nombre  = $esc(strtoupper(trim($p['nombre_completo'] ?? '')));
+        $horas   = $esc($p['duracion_horas'] ?? '');
+        $area    = $esc(trim($p['area_tematica'] ?? ''));
         $folio   = $esc(
             $p['control']
                 ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'
                 : 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT)
         );
         $emision = $esc(date('d/m/Y'));
-        $fecha   = $p['fecha_curso'] ? date('d \d\e F \d\e Y', strtotime($p['fecha_curso'])) : '';
 
-        $mesesES = ['January'=>'enero','February'=>'febrero','March'=>'marzo','April'=>'abril',
-                    'May'=>'mayo','June'=>'junio','July'=>'julio','August'=>'agosto',
-                    'September'=>'septiembre','October'=>'octubre','November'=>'noviembre','December'=>'diciembre'];
-        foreach ($mesesES as $en => $es) {
-            $fecha = str_replace($en, $es, $fecha);
+        // Resolver texto del certificado (con capacidad)
+        $capVal  = $p['capacidad_na'] ? 'N/A' : trim($p['capacidad'] ?? '');
+        $tbase   = trim($p['texto_certificado'] ?? '');
+        $textoCert = $esc(strtoupper($tbase
+            ? str_replace('{capacidad}', $capVal, $tbase)
+            : ($p['curso_nombre'] ?? '')));
+
+        // Fecha del curso en español
+        $fecha = '';
+        if (!empty($p['fecha_curso'])) {
+            $fecha = date('d \d\e F \d\e Y', strtotime($p['fecha_curso']));
+            foreach (['January'=>'enero','February'=>'febrero','March'=>'marzo','April'=>'abril',
+                      'May'=>'mayo','June'=>'junio','July'=>'julio','August'=>'agosto',
+                      'September'=>'septiembre','October'=>'octubre','November'=>'noviembre','December'=>'diciembre']
+                     as $en => $es) {
+                $fecha = str_replace($en, $es, $fecha);
+            }
         }
+        $fechaEsc = $esc($fecha);
 
         return <<<HTML
 <!DOCTYPE html>
@@ -1510,115 +1408,164 @@ HTML;
 <meta charset="UTF-8">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'DejaVu Serif', Georgia, serif; background: #FDFAF3; color: #1B2A6B; }
-.diploma {
-  margin: 13px;
-  padding: 26px 44px 20px;
-  min-height: 648px;
-  text-align: center;
+body {
+  font-family: 'DejaVu Serif', Georgia, serif;
+  background: #F9F6EE;
+  width: 277mm;
+}
+.page {
+  width: 272mm;
+  min-height: 185mm;
+  margin: 3mm;
+  background: #F9F6EE;
+  border: 5px solid #B8882A;
   position: relative;
-  background: #FDFAF3;
-  border: 3px solid #C9A84C;
 }
-.inner-frame {
-  position: absolute; top: 9px; left: 9px; right: 9px; bottom: 9px;
-  border: 1.5px solid #1B2A6B;
+.inner {
+  position: absolute;
+  top: 7px; left: 7px; right: 7px; bottom: 7px;
+  border: 1px solid #1B2A6B;
 }
-.corner { position: absolute; width: 24px; height: 24px; border-color: #C9A84C; border-style: solid; }
-.corner.tl { top: 16px;    left: 16px;    border-width: 2px 0 0 2px; }
-.corner.tr { top: 16px;    right: 16px;   border-width: 2px 2px 0 0; }
-.corner.bl { bottom: 16px; left: 16px;    border-width: 0 0 2px 2px; }
-.corner.br { bottom: 16px; right: 16px;   border-width: 0 2px 2px 0; }
-.org-name {
+.corner {
+  position: absolute;
+  width: 22px; height: 22px;
+  border-color: #B8882A; border-style: solid;
+}
+.tl { top: 14px;    left: 14px;    border-width: 2px 0 0 2px; }
+.tr { top: 14px;    right: 14px;   border-width: 2px 2px 0 0; }
+.bl { bottom: 14px; left: 14px;    border-width: 0 0 2px 2px; }
+.br { bottom: 14px; right: 14px;   border-width: 0 2px 2px 0; }
+/* Header */
+.hdr {
+  background: #0D1B4B;
+  padding: 13px 44px 11px;
+  text-align: center;
+}
+.hdr-logo {
   font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 19pt; font-weight: bold; color: #1B2A6B;
-  letter-spacing: 5px; margin-bottom: 3px; margin-top: 8px;
+  font-size: 15pt; font-weight: bold;
+  color: #C9A84C; letter-spacing: 7px;
+  margin-bottom: 2px;
 }
-.org-sub {
+.hdr-sub {
   font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 7pt; color: #9a9a9a; letter-spacing: 3px;
-  text-transform: uppercase; margin-bottom: 8px;
+  font-size: 6.5pt; color: #7A94C4;
+  letter-spacing: 2.5px; text-transform: uppercase;
 }
-.gold-rule { width: 54px; height: 3px; background: #C9A84C; margin: 0 auto 14px; }
+/* Body */
+.body { padding: 14px 52px 12px; text-align: center; }
 .dip-title {
-  font-size: 18pt; font-weight: bold; color: #C9A84C;
-  letter-spacing: 2px; text-transform: uppercase; margin-bottom: 3px;
-}
-.dip-tag {
-  font-size: 8.5pt; color: #888; letter-spacing: 1px; font-style: italic; margin-bottom: 12px;
-}
-.otorga {
   font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 9pt; color: #666; margin-bottom: 5px;
+  font-size: 20pt; font-weight: bold;
+  color: #B8882A; letter-spacing: 9px;
+  text-transform: uppercase; margin-bottom: 2px;
 }
-.nombre { font-size: 25pt; font-style: italic; color: #1B2A6B; line-height: 1.15; }
-.nombre-rule { width: 190px; height: 1.5px; background: #C9A84C; margin: 6px auto 12px; }
-.completar {
+.dip-sub {
   font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 9pt; color: #666; margin-bottom: 4px;
+  font-size: 7.5pt; color: #888; letter-spacing: 0.5px;
+  font-style: italic; margin-bottom: 10px;
 }
-.curso {
+.gold-bar { width: 64px; height: 2px; background: #C9A84C; margin: 0 auto 10px; }
+.se-otorga {
   font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 13pt; font-weight: bold; color: #1B2A6B; margin-bottom: 4px;
+  font-size: 8.5pt; color: #555; margin-bottom: 5px;
 }
-.meta {
+.nombre {
+  font-size: 23pt; font-style: italic;
+  color: #0D1B4B; line-height: 1.2; margin-bottom: 3px;
+}
+.nombre-line { width: 180px; height: 1.5px; background: #C9A84C; margin: 3px auto 10px; }
+.ha-completado {
   font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 8pt; color: #888; margin-bottom: 5px;
+  font-size: 8pt; color: #555; margin-bottom: 6px;
+}
+.texto-cert {
+  font-family: 'DejaVu Sans', Arial, sans-serif;
+  font-size: 12pt; font-weight: bold;
+  color: #0D1B4B; letter-spacing: 0.5px;
+  text-transform: uppercase; margin-bottom: 5px;
+  padding: 6px 24px;
+  border-top: 1px solid #C9A84C;
+  border-bottom: 1px solid #C9A84C;
+}
+.curso-meta {
+  font-family: 'DejaVu Sans', Arial, sans-serif;
+  font-size: 7pt; color: #999; margin-bottom: 3px;
 }
 .fecha-txt {
   font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 9pt; color: #666; margin-bottom: 16px;
+  font-size: 8pt; color: #555; margin-bottom: 13px;
 }
-table.firmas { width: 78%; margin: 0 auto; border-collapse: collapse; }
-.firma-col   { text-align: center; padding: 0 28px; }
-.firma-line  {
-  margin-top: 48px; border-top: 1px solid #1B2A6B; padding-top: 4px;
-  font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 8pt; color: #555;
+table.firmas { width: 72%; margin: 0 auto; border-collapse: collapse; }
+td.firma-td { text-align: center; padding: 0 32px; vertical-align: bottom; }
+.firma-esp { height: 38px; }
+.firma-raya {
+  border-top: 1px solid #0D1B4B;
+  padding-top: 3px;
 }
-.firma-sub {
-  font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 7pt; color: #bbb; margin-top: 1px;
+.firma-cargo {
+  font-family: 'DejaVu Sans', Arial, sans-serif;
+  font-size: 7.5pt; font-weight: bold; color: #333;
 }
-.folio-txt {
-  font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 6.5pt; color: #ccc; margin-top: 14px;
+.firma-inst {
+  font-family: 'DejaVu Sans', Arial, sans-serif;
+  font-size: 6.5pt; color: #AAA; margin-top: 1px;
+}
+.folio-pie {
+  font-family: 'DejaVu Mono', Courier, monospace;
+  font-size: 5.5pt; color: #CCC; margin-top: 10px;
+  letter-spacing: 1px;
 }
 </style>
 </head>
 <body>
-<div class="diploma">
-  <div class="inner-frame"></div>
-  <div class="corner tl"></div><div class="corner tr"></div>
-  <div class="corner bl"></div><div class="corner br"></div>
+<div class="page">
+  <div class="inner"></div>
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
 
-  <div class="org-name">AVBA CERTIFICACIONES</div>
-  <div class="org-sub">Inspección Industrial &amp; Capacitación Especializada</div>
-  <div class="gold-rule"></div>
+  <div class="hdr">
+    <div class="hdr-logo">AVBA CERTIFICACIONES</div>
+    <div class="hdr-sub">Inspección Industrial &amp; Capacitación Especializada</div>
+  </div>
 
-  <div class="dip-title">Diploma de Participación</div>
-  <div class="dip-tag">Otorga el presente reconocimiento a quien a continuación se menciona:</div>
+  <div class="body">
+    <div class="dip-title">Diploma</div>
+    <div class="dip-sub">Otorga el presente reconocimiento a:</div>
+    <div class="gold-bar"></div>
 
-  <div class="otorga">Se hace constar que:</div>
-  <div class="nombre">{$nombre}</div>
-  <div class="nombre-rule"></div>
+    <div class="se-otorga">Se hace constar que</div>
+    <div class="nombre">{$nombre}</div>
+    <div class="nombre-line"></div>
 
-  <div class="completar">Ha concluido satisfactoriamente el curso de capacitación:</div>
-  <div class="curso">{$curso}</div>
-  <div class="meta">Área temática: {$area} &nbsp;·&nbsp; Duración: {$horas} horas</div>
-  <div class="fecha-txt">Realizado el {$fecha}</div>
+    <div class="ha-completado">Ha concluido satisfactoriamente el programa de capacitación:</div>
+    <div class="texto-cert">{$textoCert}</div>
+    <div class="curso-meta">Área: {$area} &nbsp;&bull;&nbsp; Duración: {$horas} horas</div>
+    <div class="fecha-txt">Celebrado el {$fechaEsc}</div>
 
-  <table class="firmas">
-    <tr>
-      <td class="firma-col">
-        <div class="firma-line">Director de Capacitación</div>
-        <div class="firma-sub">AVBA Certificaciones</div>
-      </td>
-      <td class="firma-col">
-        <div class="firma-line">Instructor del Curso</div>
-        <div class="firma-sub">AVBA Certificaciones</div>
-      </td>
-    </tr>
-  </table>
+    <table class="firmas">
+      <tr>
+        <td class="firma-td">
+          <div class="firma-esp"></div>
+          <div class="firma-raya">
+            <div class="firma-cargo">Director de Capacitación</div>
+            <div class="firma-inst">AVBA Certificaciones</div>
+          </div>
+        </td>
+        <td class="firma-td">
+          <div class="firma-esp"></div>
+          <div class="firma-raya">
+            <div class="firma-cargo">Instructor del Curso</div>
+            <div class="firma-inst">AVBA Certificaciones</div>
+          </div>
+        </td>
+      </tr>
+    </table>
 
-  <div class="folio-txt">AVBA Certificaciones &nbsp;·&nbsp; {$folio} &nbsp;·&nbsp; Emisión: {$emision}</div>
+    <div class="folio-pie">AVBA Certificaciones &nbsp;&bull;&nbsp; {$folio} &nbsp;&bull;&nbsp; Emisión: {$emision}</div>
+  </div>
 </div>
 </body>
 </html>

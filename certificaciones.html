@@ -2288,6 +2288,10 @@ function abrirCursoCert(idx) {
                 onclick="prevDocPersonal(${p.id},'certificado')">👁 Cert</button>
         ${!emitido ? `
         <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
+                onclick="emitirDocPersonal(${p.id},'dc3',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir DC-3</button>
+        <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
+                onclick="emitirDocPersonal(${p.id},'diploma',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir Diploma</button>
+        <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                 onclick="emitirDocPersonal(${p.id},'certificado',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir Cert</button>` : ''}
         <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
                 onclick="devolverParticipante(${p.id})">↩ Devolver</button>
