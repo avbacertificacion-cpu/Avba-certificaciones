@@ -261,10 +261,14 @@ async function abrirDetalle(id) {
   document.getElementById('overlayDetalle').classList.add('open');
   try {
     const res  = await fetch(`${API}?action=OBTENER_PARTICIPANTE&id=${id}`);
-    const json = await res.json();
-    const d    = json.data || json;
-    document.getElementById('det-nombre').textContent = d.nombre_completo || d.nombre || '—';
-    document.getElementById('det-folio').textContent  = d.control || d.folio || '';
+    const d    = await res.json();
+    if (!d || d.status === 'error') {
+      document.getElementById('det-nombre').textContent = 'Error';
+      document.getElementById('detalleBody').innerHTML = `<p style="color:var(--rojo);text-align:center;padding:20px">${esc(d?.message || 'No se pudo cargar el participante.')}</p>`;
+      return;
+    }
+    document.getElementById('det-nombre').textContent = d.nombre_completo || '—';
+    document.getElementById('det-folio').textContent  = d.control || '';
     renderDetalle(d);
   } catch(e) {
     document.getElementById('detalleBody').innerHTML = `<p style="color:var(--rojo);text-align:center;padding:20px">Error: ${esc(e.message)}</p>`;

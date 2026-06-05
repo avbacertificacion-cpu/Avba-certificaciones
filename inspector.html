@@ -3025,7 +3025,7 @@ function abrirDetalleCurso(idx) {
       <div class="det-item"><label>Puesto</label><span>${p.puesto||'—'}</span></div>
       <div class="det-item"><label>Teléfono</label><span>${p.telefono||'—'}</span></div>
       <div class="det-item"><label>Correo</label><span>${p.correo||'—'}</span></div>
-      <div class="det-item"><label>Capacidad / N.° Lic.</label><span>${p.capacidad_na=='1'||p.capacidad_na===true?'N/A':p.capacidad||'—'}</span></div>
+      <div class="det-item"><label>Capacidad / N.° Lic.</label><span>${p.capacidad_na?'N/A':p.capacidad||'—'}</span></div>
     </div>
   </div>`;
 
