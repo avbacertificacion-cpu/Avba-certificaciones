@@ -772,15 +772,23 @@ class Personal {
 
         $tiposValidos = ['dc3', 'diploma', 'certificado'];
         if (!in_array($tipo, $tiposValidos, true))
-            return ['status' => 'error', 'message' => 'Tipo de documento no válido.'];
+            return ['status' => 'error', 'message' => 'Tipo de documento no valido.'];
 
         if (!class_exists('Dompdf\Dompdf')) {
             return ['status' => 'error', 'message' => 'Dompdf no disponible. Instala las dependencias del proyecto.'];
         }
 
+        // Pre-descargar QR como base64 para incrustarlo en el PDF
+        $qrB64 = '';
+        if (!empty($p['qr_codigo']) && defined('SITE_URL')) {
+            $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(SITE_URL . '/validar.html?qr=' . $p['qr_codigo']) . '&size=120&margin=1';
+            $data  = @file_get_contents($qrUrl, false, stream_context_create(['http' => ['timeout' => 4]]));
+            if ($data) $qrB64 = 'data:image/png;base64,' . base64_encode($data);
+        }
+
         $html        = match($tipo) {
-            'dc3'         => $this->htmlDC3($p),
-            'certificado' => $this->htmlCertificado($p),
+            'dc3'         => $this->htmlDC3($p, $qrB64),
+            'certificado' => $this->htmlCertificado($p, $qrB64),
             default       => $this->htmlDiploma($p),
         };
         $folio       = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
@@ -983,6 +991,28 @@ class Personal {
         return null;
     }
 
+    // Elimina acentos y caracteres especiales para compatibilidad con Dompdf
+    private function sinAcentos(string $s): string {
+        return str_replace(
+            ['á','é','í','ó','ú','ü','ñ','Á','É','Í','Ó','Ú','Ü','Ñ','¿','¡'],
+            ['a','e','i','o','u','u','n','A','E','I','O','U','U','N','',''],
+            $s
+        );
+    }
+
+    // Carga un asset como data URI base64 para incrustar en HTML/Dompdf
+    private function assetB64(string $rel): string {
+        $path = dirname(__DIR__) . '/assets/' . ltrim($rel, '/');
+        if (!file_exists($path)) return '';
+        $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mime = match($ext) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif'         => 'image/gif',
+            default       => 'image/png',
+        };
+        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
+    }
+
     private function htmlAPdf(string $html, string $folio, string $tipo, string $orientation = 'portrait'): string {
         $opts = new Options();
         $opts->set('isRemoteEnabled', false);
@@ -1002,8 +1032,8 @@ class Personal {
         return UPLOAD_URL . 'personal/docs/' . $nombre;
     }
 
-    private function htmlDC3(array $p): string {
-        $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+    private function htmlDC3(array $p, string $qrB64 = ''): string {
+        $esc = fn($v) => htmlspecialchars($this->sinAcentos((string)($v ?? '')), ENT_QUOTES, 'UTF-8');
 
         // ── Datos ──────────────────────────────────────────────────────────
         $nombre   = strtoupper(trim($p['nombre_completo'] ?? ''));
@@ -1012,7 +1042,7 @@ class Personal {
         $ocupacion = trim($p['ocupacion_nombre'] ?? '');
         $empresa  = strtoupper(trim($p['empresa_nombre'] ?? ''));
         $rfcRaw   = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $p['empresa_rfc'] ?? ''));
-        $agente   = strtoupper(trim($p['empresa_representante'] ?? ''));
+        $agente   = 'AVBA CERTIFICACIONES';
         $patron   = strtoupper(trim($p['empresa_representante'] ?? ''));
         $curso    = strtoupper(trim($p['curso_nombre'] ?? ''));
         $horas    = trim($p['duracion_horas'] ?? '');
@@ -1024,6 +1054,24 @@ class Personal {
         if (preg_match('/^([A-Z]{3,4})(\d{6})([A-Z0-9]{2,3})$/', $rfcRaw, $m)) {
             $rfcFmt = $m[1] . '-' . $m[2] . '-' . $m[3];
         }
+
+        // ── Assets ──────────────────────────────────────────────────────────
+        $logoB64  = $this->assetB64('logos/avba.png');
+        $firmaB64 = $this->assetB64('logos/firma_director.png');
+        $selloB64 = $this->assetB64('sellos/sello.png');
+
+        $logoHdr   = $logoB64
+            ? "<img src=\"{$logoB64}\" style=\"width:48px;height:48px;object-fit:contain;\" alt=\"AVBA\">"
+            : '<div style="font-size:8pt;font-weight:bold;color:#1B2A6B;text-align:center">AVBA<br>CERT.</div>';
+        $qrHdr     = $qrB64
+            ? "<img src=\"{$qrB64}\" style=\"width:52px;height:52px;\" alt=\"QR\">"
+            : '<div style="font-size:6pt;color:#aaa;text-align:center">QR</div>';
+        $firmaHtml = $firmaB64
+            ? "<img src=\"{$firmaB64}\" style=\"height:30px;max-width:100px;display:block;margin:0 auto 2px;\" alt=\"Firma\">"
+            : '<div style="height:30px;"></div>';
+        $selloHtml = $selloB64
+            ? "<img src=\"{$selloB64}\" style=\"width:50px;height:50px;display:block;margin:0 auto;\" alt=\"Sello\">"
+            : '';
 
         // ── Generadores de cajas de caracteres ─────────────────────────────
         $cellStyle = 'width:13px;height:17px;border:1px solid #333;text-align:center;'
@@ -1103,15 +1151,16 @@ CSS;
 <!-- TÍTULO -->
 <table class="doc" style="margin-bottom:0">
   <tr>
-    <td style="width:14%;padding:6px 8px;border-right:1px solid #555;vertical-align:middle">
-      <div style="font-size:7pt;font-weight:bold;color:#1B2A6B;text-align:center">AVBA<br>CERTIFICACIONES</div>
+    <td style="width:14%;padding:4px 6px;border-right:1px solid #555;vertical-align:middle;text-align:center">
+      {$logoHdr}
+      <div style="font-size:5.5pt;color:#1B2A6B;margin-top:2px;font-weight:bold">AVBA CERTIFICACIONES</div>
     </td>
     <td style="text-align:center;padding:8px 6px;border-right:1px solid #555">
       <div style="font-size:11pt;font-weight:bold">FORMATO DC-3</div>
       <div style="font-size:9pt;font-weight:bold">CONSTANCIA DE COMPETENCIAS O DE HABILIDADES LABORALES</div>
     </td>
-    <td style="width:10%;padding:6px;text-align:center;vertical-align:middle;font-size:7pt;color:#999">
-      QR
+    <td style="width:10%;padding:4px;text-align:center;vertical-align:middle">
+      {$qrHdr}
     </td>
   </tr>
 </table>
@@ -1123,7 +1172,7 @@ CSS;
   <!-- Nombre -->
   <tr>
     <td colspan="2" style="padding:0">
-      <div class="lbl">Nombre (Anotar apellido paterno, apellido materno y nombre (s))</div>
+      <div class="lbl">Nombre (Anotar apellido paterno, apellido materno y nombre(s))</div>
       <div class="val">{$esc($nombre)}</div>
     </td>
   </tr>
@@ -1131,11 +1180,11 @@ CSS;
   <!-- CURP + Ocupación -->
   <tr>
     <td style="width:55%;border-right:1px solid #555;padding:0">
-      <div class="lbl">Clave Única de Registro de Población</div>
+      <div class="lbl">Clave Unica de Registro de Poblacion</div>
       <div class="val-inline">{$boxRow($curpPad)}</div>
     </td>
     <td style="padding:0">
-      <div class="lbl">Ocupación específica (Catálogo Nacional de Ocupaciones) <sup>1/</sup></div>
+      <div class="lbl">Ocupacion especifica (Catalogo Nacional de Ocupaciones) <sup>1/</sup></div>
       <div class="val">{$esc($ocupacion)}</div>
     </td>
   </tr>
@@ -1155,7 +1204,7 @@ CSS;
 
   <tr>
     <td colspan="2" style="padding:0">
-      <div class="lbl">Nombre o razón social (En caso de persona física, anotar apellido paterno, apellido materno y nombre(s))</div>
+      <div class="lbl">Nombre o razon social (En caso de persona fisica, anotar apellido paterno, apellido materno y nombre(s))</div>
       <div class="val">{$esc($empresa)}</div>
     </td>
   </tr>
@@ -1242,16 +1291,18 @@ CSS;
   </tr>
   <tr>
     <td class="sig-cell" style="width:33%;border-right:1px solid #555">
-      <div class="sig-name">{$esc($agente)}</div>
+      {$firmaHtml}
+      <div class="sig-name">Ing. Jose Marcos Gonzalez Calderon</div>
       <div class="sig-sub">Nombre y firma</div>
       <div style="font-size:7pt;color:#555;margin-top:2px">Instructor o tutor</div>
     </td>
     <td class="sig-cell" style="width:33%;border-right:1px solid #555">
       <div class="sig-name">{$esc($patron)}</div>
       <div class="sig-sub">Nombre y firma</div>
-      <div style="font-size:7pt;color:#555;margin-top:2px">Patrón o representante legal <sup>4/</sup></div>
+      <div style="font-size:7pt;color:#555;margin-top:2px">Patron o representante legal <sup>4/</sup></div>
     </td>
     <td class="sig-cell" style="width:34%">
+      {$selloHtml}
       <div class="sig-name">&nbsp;</div>
       <div class="sig-sub">Nombre y firma</div>
       <div style="font-size:7pt;color:#555;margin-top:2px">Representante de los trabajadores <sup>5/</sup></div>
@@ -1264,13 +1315,13 @@ CSS;
   <tr>
     <td class="instruct">
       <b>INSTRUCCIONES</b><br>
-      &nbsp;- Llenar a máquina o con letra de molde.<br>
-      &nbsp;- Deberá entregarse al trabajador dentro de los veinte días hábiles siguientes al término del curso de capacitación aprobado.<br>
-      <sup>1/</sup> Las áreas y subáreas ocupacionales del Catálogo Nacional de Ocupaciones se encuentran disponibles en el reverso de este formato y en la página www.stps.gob.mx<br>
-      <sup>2/</sup> Las áreas temáticas de los cursos se encuentran disponibles en el reverso de este formato y en la página www.stps.gob.mx<br>
-      <sup>3/</sup> Cursos impartidos por el área competente de la Secretaría del Trabajo y Previsión Social.<br>
-      <sup>4/</sup> Para empresas con menos de 51 trabajadores. Para empresas con más de 50 trabajadores firmaría el representante del patrón ante la Comisión mixta de capacitación, adiestramiento y productividad.<br>
-      <sup>5/</sup> Solo para empresas con más de 50 trabajadores.<br>
+      &nbsp;- Llenar a maquina o con letra de molde.<br>
+      &nbsp;- Debera entregarse al trabajador dentro de los veinte dias habiles siguientes al termino del curso de capacitacion aprobado.<br>
+      <sup>1/</sup> Las areas y subareas ocupacionales del Catalogo Nacional de Ocupaciones se encuentran disponibles en el reverso de este formato y en la pagina www.stps.gob.mx<br>
+      <sup>2/</sup> Las areas tematicas de los cursos se encuentran disponibles en el reverso de este formato y en la pagina www.stps.gob.mx<br>
+      <sup>3/</sup> Cursos impartidos por el area competente de la Secretaria del Trabajo y Prevision Social.<br>
+      <sup>4/</sup> Para empresas con menos de 51 trabajadores. Para empresas con mas de 50 trabajadores firmaria el representante del patron ante la Comision mixta de capacitacion, adiestramiento y productividad.<br>
+      <sup>5/</sup> Solo para empresas con mas de 50 trabajadores.<br>
       * Dato no obligatorio.
     </td>
   </tr>
@@ -1388,7 +1439,7 @@ HTML;
     }
 
     private function htmlDiploma(array $p): string {
-        $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+        $esc = fn($v) => htmlspecialchars($this->sinAcentos((string)($v ?? '')), ENT_QUOTES, 'UTF-8');
 
         $nombre  = $esc(strtoupper(trim($p['nombre_completo'] ?? '')));
         $horas   = $esc($p['duracion_horas'] ?? '');
@@ -1400,14 +1451,14 @@ HTML;
         );
         $emision = $esc(date('d/m/Y'));
 
-        // Resolver texto del certificado (con capacidad)
-        $capVal  = $p['capacidad_na'] ? 'N/A' : trim($p['capacidad'] ?? '');
-        $tbase   = trim($p['texto_certificado'] ?? '');
+        // Resolver texto del certificado — str_ireplace para {CAPACIDAD} en cualquier capitalización
+        $capVal    = $p['capacidad_na'] ? 'N/A' : trim($p['capacidad'] ?? '');
+        $tbase     = trim($p['texto_certificado'] ?? '');
         $textoCert = $esc(strtoupper($tbase
-            ? str_replace('{capacidad}', $capVal, $tbase)
+            ? str_ireplace('{capacidad}', $capVal, $tbase)
             : ($p['curso_nombre'] ?? '')));
 
-        // Fecha del curso en español
+        // Fecha del curso en español (sin acentos)
         $fecha = '';
         if (!empty($p['fecha_curso'])) {
             $fecha = date('d \d\e F \d\e Y', strtotime($p['fecha_curso']));
@@ -1420,6 +1471,14 @@ HTML;
         }
         $fechaEsc = $esc($fecha);
 
+        $logoB64  = $this->assetB64('logos/avba.png');
+        $firmaB64 = $this->assetB64('logos/firma_director.png');
+        $selloB64 = $this->assetB64('sellos/sello.png');
+
+        $logoHtml  = $logoB64  ? "<img src=\"{$logoB64}\" style=\"width:46px;height:46px;object-fit:contain;\" alt=\"AVBA\">" : '';
+        $firmaHtml = $firmaB64 ? "<img src=\"{$firmaB64}\" style=\"height:36px;max-width:120px;display:block;margin:0 auto 4px;\" alt=\"Firma\">" : '<div style="height:36px;"></div>';
+        $selloHtml = $selloB64 ? "<img src=\"{$selloB64}\" style=\"width:60px;height:60px;display:block;margin:0 auto;\" alt=\"Sello\">" : '';
+
         return <<<HTML
 <!DOCTYPE html>
 <html lang="es">
@@ -1427,127 +1486,58 @@ HTML;
 <meta charset="UTF-8">
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: 'DejaVu Serif', Georgia, serif;
-  background: #F9F6EE;
-  width: 277mm;
-}
+body { font-family: 'DejaVu Serif', Georgia, serif; background: #F9F6EE; width: 277mm; }
 .page {
-  width: 272mm;
-  min-height: 185mm;
-  margin: 3mm;
-  background: #F9F6EE;
-  border: 5px solid #B8882A;
-  position: relative;
+  width: 272mm; min-height: 185mm; margin: 3mm;
+  background: #F9F6EE; border: 5px solid #B8882A; position: relative;
 }
-.inner {
-  position: absolute;
-  top: 7px; left: 7px; right: 7px; bottom: 7px;
-  border: 1px solid #1B2A6B;
-}
-.corner {
-  position: absolute;
-  width: 22px; height: 22px;
-  border-color: #B8882A; border-style: solid;
-}
+.inner { position: absolute; top: 7px; left: 7px; right: 7px; bottom: 7px; border: 1px solid #1B2A6B; }
+.corner { position: absolute; width: 22px; height: 22px; border-color: #B8882A; border-style: solid; }
 .tl { top: 14px;    left: 14px;    border-width: 2px 0 0 2px; }
 .tr { top: 14px;    right: 14px;   border-width: 2px 2px 0 0; }
 .bl { bottom: 14px; left: 14px;    border-width: 0 0 2px 2px; }
 .br { bottom: 14px; right: 14px;   border-width: 0 2px 2px 0; }
-/* Header */
-.hdr {
-  background: #0D1B4B;
-  padding: 13px 44px 11px;
-  text-align: center;
-}
-.hdr-logo {
-  font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 15pt; font-weight: bold;
-  color: #C9A84C; letter-spacing: 7px;
-  margin-bottom: 2px;
-}
-.hdr-sub {
-  font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 6.5pt; color: #7A94C4;
-  letter-spacing: 2.5px; text-transform: uppercase;
-}
-/* Body */
-.body { padding: 14px 52px 12px; text-align: center; }
-.dip-title {
-  font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 20pt; font-weight: bold;
-  color: #B8882A; letter-spacing: 9px;
-  text-transform: uppercase; margin-bottom: 2px;
-}
-.dip-sub {
-  font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 7.5pt; color: #888; letter-spacing: 0.5px;
-  font-style: italic; margin-bottom: 10px;
-}
-.gold-bar { width: 64px; height: 2px; background: #C9A84C; margin: 0 auto 10px; }
-.se-otorga {
-  font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 8.5pt; color: #555; margin-bottom: 5px;
-}
-.nombre {
-  font-size: 23pt; font-style: italic;
-  color: #0D1B4B; line-height: 1.2; margin-bottom: 3px;
-}
+.hdr { background: #0D1B4B; padding: 11px 24px; }
+.hdr-logo { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 15pt; font-weight: bold; color: #C9A84C; letter-spacing: 7px; margin-bottom: 2px; }
+.hdr-sub  { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 6.5pt; color: #7A94C4; letter-spacing: 2.5px; text-transform: uppercase; }
+.body { padding: 12px 52px 10px; text-align: center; }
+.dip-title { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 20pt; font-weight: bold; color: #B8882A; letter-spacing: 9px; text-transform: uppercase; margin-bottom: 2px; }
+.dip-sub   { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 7.5pt; color: #888; font-style: italic; margin-bottom: 10px; }
+.gold-bar  { width: 64px; height: 2px; background: #C9A84C; margin: 0 auto 10px; }
+.se-otorga { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 8.5pt; color: #555; margin-bottom: 5px; }
+.nombre { font-size: 23pt; font-style: italic; color: #0D1B4B; line-height: 1.2; margin-bottom: 3px; }
 .nombre-line { width: 180px; height: 1.5px; background: #C9A84C; margin: 3px auto 10px; }
-.ha-completado {
-  font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 8pt; color: #555; margin-bottom: 6px;
-}
+.ha-completado { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 8pt; color: #555; margin-bottom: 6px; }
 .texto-cert {
-  font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 12pt; font-weight: bold;
-  color: #0D1B4B; letter-spacing: 0.5px;
-  text-transform: uppercase; margin-bottom: 5px;
-  padding: 6px 24px;
-  border-top: 1px solid #C9A84C;
-  border-bottom: 1px solid #C9A84C;
+  font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 11pt; font-weight: bold;
+  color: #0D1B4B; letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 5px;
+  padding: 5px 24px; border-top: 1px solid #C9A84C; border-bottom: 1px solid #C9A84C;
 }
-.curso-meta {
-  font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 7pt; color: #999; margin-bottom: 3px;
-}
-.fecha-txt {
-  font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 8pt; color: #555; margin-bottom: 13px;
-}
-table.firmas { width: 72%; margin: 0 auto; border-collapse: collapse; }
-td.firma-td { text-align: center; padding: 0 32px; vertical-align: bottom; }
-.firma-esp { height: 38px; }
-.firma-raya {
-  border-top: 1px solid #0D1B4B;
-  padding-top: 3px;
-}
-.firma-cargo {
-  font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 7.5pt; font-weight: bold; color: #333;
-}
-.firma-inst {
-  font-family: 'DejaVu Sans', Arial, sans-serif;
-  font-size: 6.5pt; color: #AAA; margin-top: 1px;
-}
-.folio-pie {
-  font-family: 'DejaVu Mono', Courier, monospace;
-  font-size: 5.5pt; color: #CCC; margin-top: 10px;
-  letter-spacing: 1px;
-}
+.curso-meta { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 7pt; color: #999; margin-bottom: 3px; }
+.fecha-txt  { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 8pt; color: #555; margin-bottom: 10px; }
+table.firmas { width: 90%; margin: 0 auto; border-collapse: collapse; }
+td.firma-td { text-align: center; padding: 0 10px; vertical-align: bottom; }
+.firma-raya { border-top: 1px solid #0D1B4B; padding-top: 3px; }
+.firma-cargo { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 7pt; font-weight: bold; color: #333; }
+.firma-inst  { font-family: 'DejaVu Sans', Arial, sans-serif; font-size: 6pt; color: #AAA; margin-top: 1px; }
+.folio-pie { font-family: 'DejaVu Mono', Courier, monospace; font-size: 5.5pt; color: #CCC; margin-top: 10px; letter-spacing: 1px; }
 </style>
 </head>
 <body>
 <div class="page">
   <div class="inner"></div>
-  <div class="corner tl"></div>
-  <div class="corner tr"></div>
-  <div class="corner bl"></div>
-  <div class="corner br"></div>
+  <div class="corner tl"></div><div class="corner tr"></div>
+  <div class="corner bl"></div><div class="corner br"></div>
 
   <div class="hdr">
-    <div class="hdr-logo">AVBA CERTIFICACIONES</div>
-    <div class="hdr-sub">Inspección Industrial &amp; Capacitación Especializada</div>
+    <table style="width:100%;border-collapse:collapse;"><tr>
+      <td style="width:56px;vertical-align:middle;">{$logoHtml}</td>
+      <td style="text-align:center;vertical-align:middle;">
+        <div class="hdr-logo">AVBA CERTIFICACIONES</div>
+        <div class="hdr-sub">Inspeccion Industrial &amp; Capacitacion Especializada</div>
+      </td>
+      <td style="width:56px;"></td>
+    </tr></table>
   </div>
 
   <div class="body">
@@ -1559,22 +1549,25 @@ td.firma-td { text-align: center; padding: 0 32px; vertical-align: bottom; }
     <div class="nombre">{$nombre}</div>
     <div class="nombre-line"></div>
 
-    <div class="ha-completado">Ha concluido satisfactoriamente el programa de capacitación:</div>
+    <div class="ha-completado">Ha concluido satisfactoriamente el programa de capacitacion:</div>
     <div class="texto-cert">{$textoCert}</div>
-    <div class="curso-meta">Área: {$area} &nbsp;&bull;&nbsp; Duración: {$horas} horas</div>
+    <div class="curso-meta">Area: {$area} &nbsp;&bull;&nbsp; Duracion: {$horas} horas</div>
     <div class="fecha-txt">Celebrado el {$fechaEsc}</div>
 
     <table class="firmas">
       <tr>
-        <td class="firma-td">
-          <div class="firma-esp"></div>
+        <td class="firma-td" style="width:40%;">
+          {$firmaHtml}
           <div class="firma-raya">
-            <div class="firma-cargo">Director de Capacitación</div>
-            <div class="firma-inst">AVBA Certificaciones</div>
+            <div class="firma-cargo">Ing. Jose Marcos Gonzalez Calderon</div>
+            <div class="firma-inst">Director de Capacitacion — AVBA Certificaciones</div>
           </div>
         </td>
-        <td class="firma-td">
-          <div class="firma-esp"></div>
+        <td class="firma-td" style="width:20%;">
+          {$selloHtml}
+        </td>
+        <td class="firma-td" style="width:40%;">
+          <div style="height:36px;"></div>
           <div class="firma-raya">
             <div class="firma-cargo">Instructor del Curso</div>
             <div class="firma-inst">AVBA Certificaciones</div>
@@ -1583,7 +1576,7 @@ td.firma-td { text-align: center; padding: 0 32px; vertical-align: bottom; }
       </tr>
     </table>
 
-    <div class="folio-pie">AVBA Certificaciones &nbsp;&bull;&nbsp; {$folio} &nbsp;&bull;&nbsp; Emisión: {$emision}</div>
+    <div class="folio-pie">AVBA Certificaciones &nbsp;&bull;&nbsp; {$folio} &nbsp;&bull;&nbsp; Emision: {$emision}</div>
   </div>
 </div>
 </body>
@@ -1788,65 +1781,158 @@ HTML;
         return ['status' => 'success', 'message' => 'Datos guardados correctamente.'];
     }
 
-    private function htmlCertificado(array $p): string {
-        $esc    = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
-        $nombre = $esc($p['nombre_completo']);
-        $curp   = $esc($p['curp']);
-        $curso  = $esc($p['curso_nombre']);
-        $horas  = $esc($p['duracion_horas']);
-        $area   = $esc($p['area_tematica'] ?? '');
-        $folio  = 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT);
-        $fecha  = $p['fecha_curso'] ? date('d/m/Y', strtotime($p['fecha_curso'])) : date('d/m/Y');
+    private function htmlCertificado(array $p, string $qrB64 = ''): string {
+        $esc = fn($v) => htmlspecialchars($this->sinAcentos((string)($v ?? '')), ENT_QUOTES, 'UTF-8');
 
-        // Texto de capacidad para el certificado (ej: "OPERADOR DE GRUA PUENTE CON CAPACIDAD DE 5 TON")
-        $capacidadVal  = $p['capacidad_na'] ? 'N/A' : ($p['capacidad'] ?? '');
+        $nombre  = $esc($p['nombre_completo'] ?? '');
+        $curp    = $esc($p['curp'] ?? '');
+        $puesto  = $esc($p['puesto'] ?? '');
+        $empresa = $esc($p['empresa_nombre'] ?? '');
+        $curso   = $esc($p['curso_nombre'] ?? '');
+        $horas   = $esc($p['duracion_horas'] ?? '');
+        $area    = $esc($p['area_tematica'] ?? '');
+        $folio   = $esc(
+            $p['control']
+                ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'
+                : 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT)
+        );
+        $fecha   = $esc($p['fecha_curso'] ? date('d/m/Y', strtotime($p['fecha_curso'])) : date('d/m/Y'));
+        $anio    = date('Y');
+
+        // Texto de acreditacion — str_ireplace para {CAPACIDAD} en cualquier capitalización
+        $capVal        = $p['capacidad_na'] ? 'N/A' : trim($p['capacidad'] ?? '');
         $textoCertBase = trim($p['texto_certificado'] ?? '');
-        $textoCert     = $textoCertBase
-            ? $esc(str_replace('{capacidad}', $capacidadVal, $textoCertBase))
-            : '';
-        $bloqueCert    = $textoCert
-            ? "<div class=\"cert-capacidad\">{$textoCert}</div>"
-            : '';
+        $textoCert     = $esc(strtoupper($textoCertBase
+            ? str_ireplace('{capacidad}', $capVal, $textoCertBase)
+            : ($p['curso_nombre'] ?? '')));
+
+        $logoB64  = $this->assetB64('logos/avba.png');
+        $firmaB64 = $this->assetB64('logos/firma_director.png');
+        $selloB64 = $this->assetB64('sellos/sello.png');
+
+        $logoHtml  = $logoB64  ? "<img src=\"{$logoB64}\" style=\"width:38px;height:38px;object-fit:contain;vertical-align:middle;margin-right:8px;\" alt=\"AVBA\">" : '';
+        $firmaHtml = $firmaB64 ? "<img src=\"{$firmaB64}\" style=\"height:36px;max-width:120px;display:block;margin:0 auto 4px;\" alt=\"Firma\">" : '<div style="height:36px;"></div>';
+        $selloHtml = $selloB64 ? "<img src=\"{$selloB64}\" style=\"width:70px;height:70px;display:block;margin:0 auto;\" alt=\"Sello\">" : '';
+        $qrHtml    = $qrB64   ? "<img src=\"{$qrB64}\" style=\"width:90px;height:90px;border:1px solid #dde5f0;padding:2px;display:block;margin:0 auto;\" alt=\"QR\">" : '';
 
         return <<<HTML
-<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
 <style>
-  body { font-family: DejaVu Sans, Arial, sans-serif; margin:0; padding:0; background:#fff; }
-  .cert { border: 4px double #185FA5; margin: 30px; padding: 40px 50px; text-align: center; min-height: 680px; position: relative; }
-  .cert-logo { font-size:28pt; font-weight:bold; color:#1B2A6B; letter-spacing:3px; margin-bottom:4px; }
-  .cert-sub { font-size:10pt; color:#666; margin-bottom:30px; }
-  .cert-title { font-size:22pt; font-weight:bold; color:#1B2A6B; text-transform:uppercase; letter-spacing:2px; margin-bottom:6px; }
-  .cert-sub2 { font-size:10pt; color:#555; margin-bottom:24px; }
-  .cert-nombre { font-size:24pt; color:#1a1a2e; font-weight:bold; border-bottom:2px solid #185FA5; display:inline-block; padding-bottom:6px; margin:10px 0 20px; }
-  .cert-text { font-size:12pt; color:#444; line-height:1.8; margin-bottom:8px; }
-  .cert-curso { font-size:14pt; color:#1B2A6B; font-weight:bold; margin:6px 0; }
-  .cert-capacidad { font-size:13pt; color:#1B2A6B; font-weight:700; text-transform:uppercase; letter-spacing:1px; margin:12px 0 4px; border:1.5px solid #185FA5; border-radius:6px; display:inline-block; padding:6px 20px; }
-  .cert-detalles { font-size:10pt; color:#666; margin:16px 0 30px; }
-  .firmas { width:80%; margin:40px auto 0; border-collapse:collapse; }
-  .firmas td { text-align:center; padding:0 30px; vertical-align:bottom; }
-  .firma-line { border-top:1px solid #333; padding-top:6px; font-size:9pt; color:#555; }
-  .folio { position:absolute; bottom:20px; right:30px; font-size:8pt; color:#aaa; }
-</style></head><body>
-<div class="cert">
-  <div class="cert-logo">AVBA</div>
-  <div class="cert-sub">Inspections, Certifications and Maintenance S.A.S. de C.V.</div>
-  <div class="cert-title">Certificado de Capacitación</div>
-  <div class="cert-sub2">Otorga el presente certificado a:</div>
-  <div class="cert-nombre">{$nombre}</div>
-  <div class="cert-text">CURP: <strong>{$curp}</strong></div>
-  <div class="cert-text">Por haber completado satisfactoriamente el curso:</div>
-  <div class="cert-curso">{$curso}</div>
-  {$bloqueCert}
-  <div class="cert-detalles">Área temática: {$area} &nbsp;·&nbsp; Duración: {$horas} horas &nbsp;·&nbsp; Fecha: {$fecha}</div>
-  <table class="firmas">
-    <tr>
-      <td><div class="firma-line">Director de Capacitación</div></td>
-      <td><div class="firma-line">Instructor del Curso</div></td>
-    </tr>
-  </table>
-  <div class="folio">Folio: {$esc($folio)} — Emitido: {$esc(date('d/m/Y'))}</div>
+  @page { margin: 12mm 14mm 12mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9.5pt; color: #1a1a2e; margin: 0; }
+  .header { background: #185FA5; color: white; padding: 10px 18px; }
+  .header-table { width: 100%; border-collapse: collapse; }
+  .header-table td { padding: 0; vertical-align: middle; }
+  .header-title { font-size: 15pt; font-weight: bold; color: white; margin: 0; }
+  .header-sub { font-size: 8pt; color: rgba(255,255,255,0.82); margin: 2px 0 0; }
+  .header-right { text-align: right; font-size: 8pt; color: rgba(255,255,255,0.75); }
+  .title-bar { background: #0C447C; text-align: center; padding: 8px 0; }
+  .title-bar h2 { color: white; font-size: 13pt; letter-spacing: 3px; margin: 0; }
+  .folio-bar { background: #E6F1FB; text-align: center; padding: 5px 0; border-bottom: 2px solid #185FA5; }
+  .folio-bar span { font-size: 11pt; color: #0C447C; font-weight: bold; letter-spacing: 1px; }
+  .section-label { background: #185FA5; color: white; font-size: 8pt; font-weight: bold;
+                   letter-spacing: 1px; padding: 4px 10px; margin: 10px 0 0; }
+  .data-table { width: 100%; border-collapse: collapse; margin: 0; }
+  .data-table td { padding: 5px 10px; border-bottom: 1px solid #dde5f0; font-size: 9pt; }
+  .data-table .lbl { width: 28%; font-weight: bold; color: #185FA5; background: #f5f8fd; }
+  .data-table .val { color: #1a1a2e; }
+  .bottom-table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+  .bottom-table td { vertical-align: middle; padding: 0 8px; }
+  .qr-box { text-align: center; width: 110px; }
+  .qr-box .qr-label { font-size: 7pt; color: #5a6072; margin-top: 3px; }
+  .sign-box { text-align: center; }
+  .sign-line { border-top: 1px solid #333; width: 150px; margin: 0 auto 4px; }
+  .sign-title { font-size: 8pt; color: #1a1a2e; font-weight: bold; }
+  .sign-sub   { font-size: 7.5pt; color: #5a6072; }
+  .sello-box  { text-align: center; width: 90px; }
+  .legal { margin-top: 12px; padding: 8px 10px; background: #f5f8fd;
+           border-top: 1px solid #dde5f0; font-size: 7.5pt; color: #7a8494; text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <table class="header-table"><tr>
+    <td style="width:50px;">{$logoHtml}</td>
+    <td>
+      <div class="header-title">AVBA Certificaciones</div>
+      <div class="header-sub">Inspecciones, Certificaciones y Mantenimiento S.A.S. de C.V.</div>
+    </td>
+    <td class="header-right">Capacitacion Industrial<br>avba.com.mx</td>
+  </tr></table>
 </div>
-</body></html>
+
+<div class="title-bar"><h2>CERTIFICADO DE CAPACITACION</h2></div>
+<div class="folio-bar"><span>Folio: {$folio}</span></div>
+
+<div class="section-label">DATOS DEL PARTICIPANTE</div>
+<table class="data-table">
+  <tr><td class="lbl">NOMBRE COMPLETO</td><td class="val" colspan="3"><strong>{$nombre}</strong></td></tr>
+  <tr>
+    <td class="lbl">CURP</td><td class="val">{$curp}</td>
+    <td class="lbl">PUESTO / CARGO</td><td class="val">{$puesto}</td>
+  </tr>
+  <tr><td class="lbl">EMPRESA</td><td class="val" colspan="3">{$empresa}</td></tr>
+</table>
+
+<div class="section-label">DATOS DEL CURSO</div>
+<table class="data-table">
+  <tr><td class="lbl">CURSO</td><td class="val" colspan="3"><strong>{$curso}</strong></td></tr>
+  <tr>
+    <td class="lbl">AREA TEMATICA</td><td class="val">{$area}</td>
+    <td class="lbl">DURACION</td><td class="val">{$horas} horas</td>
+  </tr>
+  <tr>
+    <td class="lbl">FECHA</td><td class="val">{$fecha}</td>
+    <td class="lbl">FOLIO</td><td class="val">{$folio}</td>
+  </tr>
+</table>
+
+<div class="section-label">RESULTADO</div>
+<table class="data-table">
+  <tr>
+    <td class="lbl">RESULTADO</td>
+    <td class="val" colspan="3"><strong style="color:#2e7d32">&#10003; APROBADO — Capacitacion completada satisfactoriamente</strong></td>
+  </tr>
+  <tr>
+    <td class="lbl">ACREDITACION</td>
+    <td class="val" colspan="3" style="font-weight:bold;color:#0C447C;">{$textoCert}</td>
+  </tr>
+</table>
+
+<table class="bottom-table">
+  <tr>
+    <td class="qr-box">
+      {$qrHtml}
+      <div class="qr-label">Escanea para validar</div>
+    </td>
+    <td class="sello-box">{$selloHtml}</td>
+    <td class="sign-box">
+      {$firmaHtml}
+      <div class="sign-line"></div>
+      <div class="sign-title">Ing. Jose Marcos Gonzalez Calderon</div>
+      <div class="sign-sub">Director de Capacitacion — AVBA Certificaciones</div>
+    </td>
+    <td class="sign-box">
+      <div style="height:36px;"></div>
+      <div class="sign-line"></div>
+      <div class="sign-title">Instructor del Curso</div>
+      <div class="sign-sub">AVBA Certificaciones</div>
+    </td>
+  </tr>
+</table>
+
+<div class="legal">
+  Este certificado acredita que el participante ha completado satisfactoriamente el programa de capacitacion indicado,
+  conforme a los criterios de AVBA Certificaciones. Folio: <strong>{$folio}</strong> — {$anio} AVBA Certificaciones, Inspecciones, Certificaciones y Mantenimiento S.A.S. de C.V.
+</div>
+
+</body>
+</html>
 HTML;
     }
 }
