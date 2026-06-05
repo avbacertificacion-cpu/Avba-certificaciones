@@ -1049,9 +1049,9 @@
           <tr>
             <th>Curso</th>
             <th style="width:110px">Fecha</th>
-            <th style="width:100px;text-align:center">Participantes</th>
             <th style="width:180px">Empresa</th>
-            <th style="width:50px"></th>
+            <th style="width:160px;text-align:center">Estatus</th>
+            <th style="width:90px"></th>
           </tr>
         </thead>
         <tbody id="tbody-per-cursos">
@@ -3186,33 +3186,30 @@ function filtrarCursosSesiones() {
   renderCursosSesiones(lista);
 }
 
+let _calSesiones = [];
+
 function renderCursosSesiones(lista) {
+  _calSesiones = lista;
   const tbody = document.getElementById('tbody-per-cursos');
   document.getElementById('per-cursos-count').textContent = lista.length + ' sesión' + (lista.length!==1?'es':'');
   if (!lista.length) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin sesiones registradas</td></tr>`;
     return;
   }
-  tbody.innerHTML = lista.map(g => {
-    const pend    = g.participantes.filter(p => !p.estatus || p.estatus==='PENDIENTE'||p.estatus==='DEVUELTO').length;
-    const apro    = g.participantes.filter(p => p.estatus==='APROBADO_CALIDAD'||p.estatus==='EMITIDO').length;
-    const g64     = btoa(unescape(encodeURIComponent(JSON.stringify({
-      curso_nombre:  g.curso_nombre,
-      fecha_curso:   g.fecha_curso,
-      empresa:       g.empresa,
-      participantes: g.participantes.map(p=>({id:p.id, nombre_completo:p.nombre_completo, curp:p.curp, puesto:p.puesto, estatus:p.estatus}))
-    }))));
+  tbody.innerHTML = lista.map((g, i) => {
+    const pend = g.participantes.filter(p => !p.estatus || p.estatus==='PENDIENTE'||p.estatus==='DEVUELTO').length;
+    const apro = g.participantes.filter(p => p.estatus==='APROBADO_CALIDAD'||p.estatus==='EMITIDO').length;
     return `
     <tr>
       <td style="font-weight:600;color:var(--texto)">${escH(g.curso_nombre)}</td>
       <td>${escH(g.fecha_curso)}</td>
       <td style="font-size:12px;color:var(--texto-sub)">${escH(g.empresa||'—')}</td>
       <td style="text-align:center">
-        ${pend  ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--ambar-light);color:var(--ambar)">${pend} pend.</span> ` : ''}
-        ${apro  ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--verde-light);color:var(--verde)">${apro} apro.</span>` : ''}
+        ${pend ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--ambar-light);color:var(--ambar)">${pend} pend.</span> ` : ''}
+        ${apro ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--verde-light);color:var(--verde)">${apro} apro.</span>` : ''}
       </td>
       <td style="text-align:right">
-        <button onclick="abrirSesionParticipantes('${g64}')"
+        <button onclick="abrirSesionParticipantes(${i})"
                 style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver sesión</button>
       </td>
     </tr>`;
@@ -3265,10 +3262,9 @@ function renderIndep(data) {
     </tr>`; }).join('');
 }
 
-function abrirSesionParticipantes(g64) {
-  let g;
-  try { g = JSON.parse(decodeURIComponent(escape(atob(g64)))); }
-  catch(e) { try { g = JSON.parse(g64); } catch(_) { return; } }
+function abrirSesionParticipantes(idx) {
+  const g = _calSesiones[idx];
+  if (!g) return;
 
   document.getElementById('per-det-nombre').textContent = g.curso_nombre;
   document.getElementById('per-det-sub').textContent    = (g.fecha_curso||'') + (g.empresa ? ' · ' + g.empresa : '');

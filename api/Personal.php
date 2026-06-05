@@ -27,6 +27,9 @@ class Personal {
     // ══════════════════════════════════════════════════════
 
     public function listarParticipantes(array $filtros = []): array {
+        // Garantizar columna correo_contacto antes de consultarla
+        try { $this->pdo->exec("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS correo_contacto VARCHAR(200) DEFAULT NULL"); } catch (\Throwable $e) {}
+
         $where  = ['1=1'];
         $params = [];
 
