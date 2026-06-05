@@ -3392,13 +3392,18 @@ async function abrirDetPer(id) {
               placeholder="Número de teléfono"
               style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
           </label>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Correo electrónico
+            <input id="per-info-correo" type="email" value="${escH(p.correo||'')}"
+              placeholder="correo@ejemplo.com"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+          </label>
           <div><span style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:3px">Ocupación</span>
             <span style="font-size:12px">${escH(p.ocupacion_nombre||'—')}</span>
           </div>
           <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Capacidad
             <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
               <input id="per-info-capacidad" type="text" value="${p.capacidad_na?'':escH(p.capacidad||'')}"
-                placeholder="Ej: 75 TON" ${p.capacidad_na?'disabled':''} id="per-info-capacidad"
+                placeholder="Ej: 75 TON" ${p.capacidad_na?'disabled':''}
                 style="flex:1;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px;box-sizing:border-box">
               <label style="font-size:11px;font-weight:normal;white-space:nowrap;display:flex;align-items:center;gap:4px;cursor:pointer">
                 <input type="checkbox" id="per-info-cap-na" ${p.capacidad_na?'checked':''}
@@ -3408,6 +3413,15 @@ async function abrirDetPer(id) {
             </div>
           </label>
         </div>
+        ${(()=>{
+          const cap = p.capacidad_na ? 'N/A' : (p.capacidad||'');
+          const tbase = (p.texto_certificado||'').trim();
+          const tcomp = tbase ? tbase.replace('{capacidad}', cap) : '';
+          return tcomp ? \`<div style="margin-bottom:10px;padding:9px 12px;background:#EAF3FB;border:1.5px solid #85B7EB;border-radius:8px;font-size:11px;color:#0C447C">
+            <span style="font-weight:700">Texto certificado:</span>
+            <span style="font-weight:600;text-transform:uppercase">\${escH(tcomp)}</span>
+          </div>\` : '';
+        })()}
         <button onclick="guardarInfoPer(${p.id})"
           style="padding:6px 16px;background:var(--azul);color:white;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
           Guardar información personal
@@ -3711,10 +3725,7 @@ async function guardarInfoPer(id) {
   const capNaEl   = document.getElementById('per-info-cap-na');
   const capacidad_na = capNaEl ? capNaEl.checked : false;
   const capacidad = capacidad_na ? '' : (document.getElementById('per-info-capacidad')?.value || '').trim();
-  if (!nombre && !curp && !puesto && !telefono && capacidad === '' && !capNaEl) {
-    mostrarToast('No hay datos para guardar.', 'err');
-    return;
-  }
+  const correo    = (document.getElementById('per-info-correo')?.value || '').trim().toLowerCase();
   if (curp && curp !== '—') {
     const v = validarCURPCompleta(curp);
     if (!v.valida) { mostrarToast('CURP inválida: ' + v.error, 'err'); return; }
@@ -3723,7 +3734,7 @@ async function guardarInfoPer(id) {
     const res  = await fetch(API, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ action: 'ACTUALIZAR_INFO_PARTICIPANTE', payload: { id, nombre_completo: nombre, curp, puesto, telefono, capacidad, capacidad_na } })
+      body:    JSON.stringify({ action: 'ACTUALIZAR_INFO_PARTICIPANTE', payload: { id, nombre_completo: nombre, curp, puesto, telefono, correo, capacidad, capacidad_na } })
     });
     const data = await res.json();
     if (data.status === 'success') {

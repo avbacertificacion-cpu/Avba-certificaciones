@@ -806,7 +806,14 @@
     </div>
     <div class="confirm-t" id="emit-per-t">Emitir documento</div>
     <div class="confirm-s" id="emit-per-s"></div>
-    <div style="margin-top:12px;padding:11px 14px;background:#f0f7ff;border-radius:8px;text-align:left">
+    <div style="margin:12px 0 8px;text-align:left">
+      <label style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:4px">
+        Correo destino <span style="font-weight:400;color:var(--texto-hint)">(opcional — si está vacío no se envía)</span>
+      </label>
+      <input type="email" id="emit-per-correo" placeholder="correo@ejemplo.com"
+        style="width:100%;box-sizing:border-box;padding:8px 11px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+    </div>
+    <div style="padding:11px 14px;background:#f0f7ff;border-radius:8px;text-align:left">
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#0C447C">
         <input type="checkbox" id="chk-emit-per-creds" style="width:16px;height:16px;cursor:pointer">
         <span>Incluir usuario y contraseña de acceso al portal</span>
@@ -2278,7 +2285,7 @@ function abrirCursoCert(idx) {
                 onclick="prevDocPersonal(${p.id},'certificado')">👁 Cert</button>
         ${!emitido ? `
         <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
-                onclick="emitirDocPersonal(${p.id},'certificado',this)">Emitir Cert</button>` : ''}
+                onclick="emitirDocPersonal(${p.id},'certificado',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir Cert</button>` : ''}
         <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
                 onclick="devolverParticipante(${p.id})">↩ Devolver</button>
         ${isAdminCert ? `<button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
@@ -2430,11 +2437,11 @@ function renderIndepCert(data) {
                   onclick="prevDocPersonal(${p.id},'certificado')">👁 Cert</button>
           ${!emitido ? `
           <button class="btn-ver" style="font-size:10px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
-                  onclick="emitirDocPersonal(${p.id},'dc3',this)">Emitir DC-3</button>
+                  onclick="emitirDocPersonal(${p.id},'dc3',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir DC-3</button>
           <button class="btn-ver" style="font-size:10px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
-                  onclick="emitirDocPersonal(${p.id},'diploma',this)">Emitir Diploma</button>
+                  onclick="emitirDocPersonal(${p.id},'diploma',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir Diploma</button>
           <button class="btn-ver" style="font-size:10px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
-                  onclick="emitirDocPersonal(${p.id},'certificado',this)">Emitir Cert</button>` : ''}
+                  onclick="emitirDocPersonal(${p.id},'certificado',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir Cert</button>` : ''}
           <button class="btn-ver" style="font-size:10px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
                   onclick="devolverParticipante(${p.id})">↩</button>
           ${isAdminCert ? `<button class="btn-ver" style="font-size:10px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
@@ -2468,12 +2475,13 @@ async function prevDocPersonal(participanteId, tipo) {
 
 let _emitPerBtn = null;
 
-function emitirDocPersonal(participanteId, tipo, btn) {
+function emitirDocPersonal(participanteId, tipo, btn, correoParticipante = '') {
   _emitPerBtn = btn;
   const tipoLabel = { dc3: 'Constancia DC-3', diploma: 'Diploma', certificado: 'Certificado' }[tipo] || tipo.toUpperCase();
   document.getElementById('emit-per-t').textContent = `Emitir ${tipoLabel}`;
-  document.getElementById('emit-per-s').textContent = 'El documento se generará, marcará como emitido y se enviará por correo al participante.';
+  document.getElementById('emit-per-s').textContent = 'El documento se generará y marcará como emitido. Si hay correo, se enviará automáticamente.';
   document.getElementById('chk-emit-per-creds').checked = false;
+  document.getElementById('emit-per-correo').value = correoParticipante || '';
   document.getElementById('emit-per-ok').onclick = () => ejecutarEmitirPer(participanteId, tipo);
   document.getElementById('overlay-emit-per').classList.add('open');
 }
@@ -2488,13 +2496,14 @@ async function ejecutarEmitirPer(participanteId, tipo) {
   const orig = btn?.textContent;
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   const enviarCredenciales = document.getElementById('chk-emit-per-creds')?.checked ?? false;
+  const correo = (document.getElementById('emit-per-correo')?.value || '').trim();
   const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
   mostrarToast('Emitiendo documento…', 'info');
   try {
     const res  = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Token': tok },
-      body: JSON.stringify({ action: 'EMITIR_DOC_PERSONAL', payload: { id: participanteId, tipo, enviar_credenciales: enviarCredenciales } })
+      body: JSON.stringify({ action: 'EMITIR_DOC_PERSONAL', payload: { id: participanteId, tipo, correo, enviar_credenciales: enviarCredenciales } })
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {

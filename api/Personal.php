@@ -545,7 +545,7 @@ class Personal {
         $chk->execute([$id]);
         if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
-        $allowed = ['nombre_completo', 'curp', 'puesto', 'telefono', 'capacidad'];
+        $allowed = ['nombre_completo', 'curp', 'puesto', 'telefono', 'correo', 'capacidad'];
         $sets    = [];
         $params  = [];
 
@@ -556,6 +556,9 @@ class Personal {
                     $val = strtoupper($val);
                     $check = validarCURPCompleta($val);
                     if (!$check['valida']) return ['status' => 'error', 'message' => $check['error']];
+                }
+                if ($field === 'correo' && $val !== '') {
+                    $val = strtolower($val);
                 }
                 $sets[]   = "`{$field}` = ?";
                 $params[] = $val === '' ? null : $val;
