@@ -3291,21 +3291,40 @@ async function abrirDetPer(id) {
           </button>` : ''}
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 16px;font-size:13px;margin-bottom:14px">
-        <div>
-          <span style="font-size:11px;color:var(--texto-sub);display:block">Nombre</span>
-          <span id="per-ocr-nombre-txt" style="font-weight:600">${escH(p.nombre_completo||'—')}</span>
-          ${!p.nombre_completo ? '<span style="font-size:10px;background:#FFF3CD;color:#856404;border-radius:4px;padding:1px 6px;margin-left:4px">pendiente</span>' : ''}
+      <div style="border:1.5px solid var(--borde);border-radius:10px;padding:14px;margin-bottom:14px">
+        <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:10px">Información personal</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Nombre completo
+            <input id="per-ocr-nombre-txt" type="text" value="${escH(p.nombre_completo||'')}"
+              placeholder="Nombre del participante"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+          </label>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">CURP
+            <input id="per-ocr-curp-txt" type="text" value="${escH(p.curp||'')}" maxlength="18"
+              placeholder="18 caracteres" oninput="this.value=this.value.toUpperCase()"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px;font-family:monospace;text-transform:uppercase">
+          </label>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Puesto
+            <input id="per-info-puesto" type="text" value="${escH(p.puesto||'')}"
+              placeholder="Puesto de trabajo"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+          </label>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Teléfono
+            <input id="per-info-telefono" type="text" value="${escH(p.telefono||'')}"
+              placeholder="Número de teléfono"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+          </label>
+          <div><span style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:3px">Ocupación</span>
+            <span style="font-size:12px">${escH(p.ocupacion_nombre||'—')}</span>
+          </div>
+          <div><span style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:3px">Capacidad</span>
+            <span style="font-size:12px">${p.capacidad_na?'N/A':escH(p.capacidad||'—')}</span>
+          </div>
         </div>
-        <div>
-          <span style="font-size:11px;color:var(--texto-sub);display:block">CURP</span>
-          <span id="per-ocr-curp-txt" style="font-family:monospace;font-size:12px">${escH(p.curp||'—')}</span>
-          ${!p.curp ? '<span style="font-size:10px;background:#FFF3CD;color:#856404;border-radius:4px;padding:1px 6px;margin-left:4px">pendiente</span>' : ''}
-        </div>
-        <div><span style="font-size:11px;color:var(--texto-sub);display:block">Puesto</span>${escH(p.puesto||'—')}</div>
-        <div><span style="font-size:11px;color:var(--texto-sub);display:block">Ocupación</span>${escH(p.ocupacion_nombre||'—')}</div>
-        <div><span style="font-size:11px;color:var(--texto-sub);display:block">Capacidad</span>${p.capacidad_na?'N/A':escH(p.capacidad||'—')}</div>
-        <div><span style="font-size:11px;color:var(--texto-sub);display:block">Teléfono</span>${escH(p.telefono||'—')}</div>
+        <button onclick="guardarInfoPer(${p.id})"
+          style="padding:6px 16px;background:var(--azul);color:white;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
+          Guardar información personal
+        </button>
       </div>
 
       <!-- ── Datos de empresa (editables para DC3) ── -->
@@ -3586,14 +3605,46 @@ async function perConfirmarOCR(id) {
       alert('Error al guardar: ' + (data.message || 'intenta de nuevo.'));
       return;
     }
-    if (nombre) document.getElementById('per-ocr-nombre-txt').textContent = nombre;
-    if (curp)   document.getElementById('per-ocr-curp-txt').textContent   = curp;
+    if (nombre) document.getElementById('per-ocr-nombre-txt').value = nombre;
+    if (curp)   document.getElementById('per-ocr-curp-txt').value   = curp;
     document.getElementById('per-ocr-status').style.color  = 'var(--verde)';
     document.getElementById('per-ocr-status').textContent  = '✓ Datos guardados correctamente.';
     document.getElementById('per-ocr-panel').style.display = 'none';
   } catch (e) {
     alert('Error de conexión al guardar.');
     console.error('perConfirmarOCR:', e);
+  }
+}
+
+async function guardarInfoPer(id) {
+  const nombre   = (document.getElementById('per-ocr-nombre-txt')?.value || '').trim();
+  const curp     = (document.getElementById('per-ocr-curp-txt')?.value   || '').trim().toUpperCase();
+  const puesto   = (document.getElementById('per-info-puesto')?.value    || '').trim();
+  const telefono = (document.getElementById('per-info-telefono')?.value  || '').trim();
+  if (!nombre && !curp && !puesto && !telefono) {
+    mostrarToast('No hay datos para guardar.', 'err');
+    return;
+  }
+  if (curp && curp !== '—') {
+    const v = validarCURPCompleta(curp);
+    if (!v.valida) { mostrarToast('CURP inválida: ' + v.error, 'err'); return; }
+  }
+  try {
+    const res  = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: 'ACTUALIZAR_INFO_PARTICIPANTE', payload: { id, nombre_completo: nombre, curp, puesto, telefono } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast('Información personal guardada.', 'ok');
+      perCargados = false;
+    } else {
+      mostrarToast('Error: ' + (data.message || 'intenta de nuevo.'), 'err');
+    }
+  } catch (e) {
+    mostrarToast('Error de conexión.', 'err');
+    console.error('guardarInfoPer:', e);
   }
 }
 

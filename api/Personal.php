@@ -356,6 +356,40 @@ class Personal {
         return ['status' => 'success'];
     }
 
+    // ── Actualizar información personal básica ────────────
+    public function actualizarInfoParticipante(array $payload, string $usuario): array {
+        $id = (int)($payload['id'] ?? 0);
+        if (!$id) return ['status' => 'error', 'message' => 'ID requerido.'];
+
+        $chk = $this->pdo->prepare("SELECT id FROM participantes_cursos WHERE id = ?");
+        $chk->execute([$id]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        $allowed = ['nombre_completo', 'curp', 'puesto', 'telefono'];
+        $sets    = [];
+        $params  = [];
+
+        foreach ($allowed as $field) {
+            if (array_key_exists($field, $payload)) {
+                $val = trim((string)($payload[$field] ?? ''));
+                if ($field === 'curp' && $val !== '') {
+                    $val = strtoupper($val);
+                    $check = validarCURPCompleta($val);
+                    if (!$check['valida']) return ['status' => 'error', 'message' => $check['error']];
+                }
+                $sets[]   = "`{$field}` = ?";
+                $params[] = $val === '' ? null : $val;
+            }
+        }
+        if (empty($sets)) return ['status' => 'success', 'message' => 'Sin cambios.'];
+
+        $params[] = $id;
+        $this->pdo->prepare("UPDATE participantes_cursos SET " . implode(', ', $sets) . " WHERE id = ?")
+                  ->execute($params);
+
+        return ['status' => 'success', 'message' => 'Información personal actualizada.'];
+    }
+
     // ── Emitir documento y marcar como EMITIDO ─────────────
     public function emitirDocumentoPersonal(int $id, string $tipo, string $correoDestino, string $usuario): array {
         $this->ensureEstatusColumn();
