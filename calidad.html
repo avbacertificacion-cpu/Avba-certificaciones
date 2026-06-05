@@ -3173,10 +3173,11 @@ function filtrarCursosSesiones() {
   perData.forEach(p => {
     const key = (p.curso_nombre||'') + '||' + (p.fecha_curso||'') + '||' + (p.empresa_nombre||'');
     if (!grupos[key]) grupos[key] = {
-      curso_nombre: p.curso_nombre||'—',
-      fecha_curso:  p.fecha_curso||'—',
-      empresa:      p.empresa_nombre||'',
-      participantes: []
+      curso_nombre:   p.curso_nombre||'—',
+      fecha_curso:    p.fecha_curso||'—',
+      empresa:        p.empresa_nombre||'',
+      empresa_correo: p.empresa_correo||'',
+      participantes:  []
     };
     grupos[key].participantes.push(p);
   });

@@ -27,8 +27,16 @@ class Personal {
     // ══════════════════════════════════════════════════════
 
     public function listarParticipantes(array $filtros = []): array {
-        // Garantizar columna correo_contacto antes de consultarla
-        try { $this->pdo->exec("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS correo_contacto VARCHAR(200) DEFAULT NULL"); } catch (\Throwable $e) {}
+        // Garantizar columna correo_contacto (compatible con todas las versiones de MySQL/MariaDB)
+        try {
+            $cols = $this->pdo->query("SHOW COLUMNS FROM clientes LIKE 'correo_contacto'")->fetchAll();
+            if (empty($cols)) {
+                $this->pdo->exec("ALTER TABLE clientes ADD COLUMN correo_contacto VARCHAR(200) DEFAULT NULL");
+            }
+            $tieneCorreoContacto = true;
+        } catch (\Throwable $e) {
+            $tieneCorreoContacto = false;
+        }
 
         $where  = ['1=1'];
         $params = [];
@@ -55,18 +63,25 @@ class Personal {
             $params[] = $filtros['inspector'];
         }
 
+        $correoJoin   = $tieneCorreoContacto
+            ? "LEFT JOIN clientes cl ON cl.nombre_cliente = p.empresa_nombre"
+            : "";
+        $correoSelect = $tieneCorreoContacto
+            ? ", COALESCE(cl.correo_contacto,'') AS empresa_correo"
+            : ", '' AS empresa_correo";
+
         $sql = "SELECT p.id, p.nombre_completo, p.curp, p.puesto,
                        p.telefono, p.correo, p.capacidad, p.capacidad_na,
                        p.control, p.estatus, p.fecha_curso, p.estado,
                        c.nombre AS curso_nombre, c.duracion_horas,
                        o.nombre AS ocupacion_nombre,
                        p.foto_documentacion_url, p.foto_persona_url,
-                       p.empresa_nombre, p.fecha_registro,
-                       COALESCE(cl.correo_contacto,'') AS empresa_correo
+                       p.empresa_nombre, p.fecha_registro
+                       {$correoSelect}
                 FROM participantes_cursos p
                 LEFT JOIN cursos c ON c.id = p.curso_id
                 LEFT JOIN ocupaciones_especificas o ON o.id = p.ocupacion_id
-                LEFT JOIN clientes cl ON cl.nombre_cliente = p.empresa_nombre
+                {$correoJoin}
                 WHERE " . implode(' AND ', $where) . "
                 ORDER BY p.fecha_registro DESC";
 
