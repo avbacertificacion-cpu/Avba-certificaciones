@@ -200,7 +200,12 @@ class Certificaciones {
             $nombreCert = basename($rutaCert);
             $urlCert    = UPLOAD_URL . 'certificados/' . $nombreCert;
 
-            $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'certificado', [$rutaCert => $nombreCert]);
+            $credenciales = [];
+            if (!empty($payload['enviar_credenciales'])) {
+                $credenciales = $this->gestionarCredencialesCliente($datos['cliente'], $correo);
+            }
+
+            $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'certificado', [$rutaCert => $nombreCert], $credenciales);
 
             $this->pdo->prepare(
                 "UPDATE equipos SET certificado_url = ?, estado = 'ENVIADO', fecha_enviado = NOW() WHERE id = ?"
@@ -237,10 +242,15 @@ class Certificaciones {
             $nombreDict = basename($rutaDict);
             $urlDict    = UPLOAD_URL . 'certificados/' . $nombreDict;
 
+            $credenciales = [];
+            if (!empty($payload['enviar_credenciales'])) {
+                $credenciales = $this->gestionarCredencialesCliente($datos['cliente'], $correo);
+            }
+
             $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'certificado y dictamen', [
                 $rutaCert => $nombreCert,
                 $rutaDict => $nombreDict,
-            ]);
+            ], $credenciales);
 
             $this->pdo->prepare(
                 "UPDATE equipos
@@ -275,7 +285,12 @@ class Certificaciones {
             $nombreDict = basename($rutaDict);
             $urlDict    = UPLOAD_URL . 'certificados/' . $nombreDict;
 
-            $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'dictamen', [$rutaDict => $nombreDict]);
+            $credenciales = [];
+            if (!empty($payload['enviar_credenciales'])) {
+                $credenciales = $this->gestionarCredencialesCliente($datos['cliente'], $correo);
+            }
+
+            $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'dictamen', [$rutaDict => $nombreDict], $credenciales);
 
             $this->pdo->prepare(
                 "UPDATE equipos SET dictamen_url = ?, estado = 'ENVIADO', fecha_enviado = NOW() WHERE id = ?"
@@ -1812,7 +1827,60 @@ HTML;
      * Envía correo con PHPMailer.
      * $adjuntos = ['/ruta/archivo.pdf' => 'nombre.pdf']
      */
-    private function enviarCorreo(string $to, string $cliente, string $folio, string $tipoDocs, array $adjuntos): void {
+    private function gestionarCredencialesCliente(string $clienteNombre, string $correo): array {
+        // Buscar el id_cliente (primera_parte) en la tabla clientes
+        $stmt = $this->pdo->prepare(
+            "SELECT primera_parte FROM clientes WHERE nombre_cliente = ? LIMIT 1"
+        );
+        $stmt->execute([$clienteNombre]);
+        $cliente   = $stmt->fetch();
+        $idCliente = $cliente ? (string)($cliente['primera_parte'] ?? '') : '';
+
+        // Generar contraseña segura aleatoria
+        $chars    = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+        $password = '';
+        for ($i = 0; $i < 10; $i++) $password .= $chars[random_int(0, strlen($chars) - 1)];
+        $hash = password_hash($password, PASSWORD_BCRYPT);
+
+        // Si ya existe un usuario CLIENTE para este cliente, actualizar su contraseña
+        if ($idCliente) {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, usuario FROM usuarios WHERE rol = 'CLIENTE' AND id_cliente = ? LIMIT 1"
+            );
+            $stmt->execute([$idCliente]);
+            $existing = $stmt->fetch();
+
+            if ($existing) {
+                $this->pdo->prepare("UPDATE usuarios SET password_hash = ? WHERE id = ?")
+                    ->execute([$hash, $existing['id']]);
+                return ['usuario' => $existing['usuario'], 'password' => $password, 'es_nuevo' => false];
+            }
+        }
+
+        // Crear nuevo usuario: derivar username del correo o del nombre del cliente
+        $base    = strtolower(preg_replace('/[^a-z0-9]/i', '', explode('@', $correo)[0]));
+        $usuario = strlen($base) >= 3 ? $base
+                 : 'cliente' . ($idCliente ?: str_pad((string)random_int(1, 99999), 5, '0', STR_PAD_LEFT));
+
+        // Garantizar unicidad del username
+        $raiz   = $usuario;
+        $sufijo = 1;
+        while (true) {
+            $chk = $this->pdo->prepare("SELECT id FROM usuarios WHERE usuario = ? LIMIT 1");
+            $chk->execute([$usuario]);
+            if (!$chk->fetch()) break;
+            $usuario = $raiz . $sufijo++;
+        }
+
+        $this->pdo->prepare(
+            "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo)
+             VALUES (?, ?, 'CLIENTE', ?, ?, 1)"
+        )->execute([$usuario, $hash, strtoupper($clienteNombre), $idCliente ?: null]);
+
+        return ['usuario' => $usuario, 'password' => $password, 'es_nuevo' => true];
+    }
+
+    private function enviarCorreo(string $to, string $cliente, string $folio, string $tipoDocs, array $adjuntos, array $credenciales = []): void {
         $mail = new PHPMailer(true);
 
         $cfg = getSmtpConfig($this->pdo);
@@ -1833,7 +1901,7 @@ HTML;
         }
         $mail->Subject = $asunto;
         $mail->isHTML(true);
-        $mail->Body    = $this->plantillaCorreo($cliente, $folio, $tipoDocs);
+        $mail->Body    = $this->plantillaCorreo($cliente, $folio, $tipoDocs, $credenciales);
 
         foreach ($adjuntos as $ruta => $nombre) {
             $mail->addAttachment($ruta, $nombre);
@@ -1842,7 +1910,7 @@ HTML;
         $mail->send();
     }
 
-    private function plantillaCorreo(string $cliente, string $folio, string $tipoDocs): string {
+    private function plantillaCorreo(string $cliente, string $folio, string $tipoDocs, array $credenciales = []): string {
         $cfg         = getSmtpConfig($this->pdo);
         $introConfig = trim($cfg['cuerpo_intro'] ?? '');
 
@@ -1858,9 +1926,29 @@ HTML;
         } else {
             $introHtml = "<p style=\"font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px\">
         Adjuntamos su <strong>{$tipoDocs}</strong> de inspección con folio
-        <strong style=\"color:#185FA5\">{$folio}</strong>,
+        <strong style=\"color:#1B2A6B\">{$folio}</strong>,
         el cual acredita que el equipo inspeccionado cumple con los criterios técnicos y de seguridad aplicables.
       </p>";
+        }
+
+        // Bloque de credenciales de acceso al portal
+        $credsHtml = '';
+        if (!empty($credenciales)) {
+            $portalUrl  = rtrim(defined('SITE_URL') ? SITE_URL : '', '/') . '/portal-cliente.html';
+            $esNuevo    = $credenciales['es_nuevo'] ?? false;
+            $textoTitulo = $esNuevo
+                ? 'Se ha creado su cuenta de acceso al portal de clientes AVBA:'
+                : 'Sus credenciales de acceso al portal de clientes AVBA:';
+            $usr = htmlspecialchars($credenciales['usuario'] ?? '');
+            $pwd = htmlspecialchars($credenciales['password'] ?? '');
+            $url = htmlspecialchars($portalUrl);
+            $credsHtml = "
+      <div style=\"margin-top:20px;padding:16px 18px;background:#F0F7ED;border-left:4px solid #2e7d32;border-radius:4px\">
+        <p style=\"font-size:13px;color:#1b5e20;font-weight:bold;margin:0 0 10px\">{$textoTitulo}</p>
+        <p style=\"font-size:13px;color:#333;margin:4px 0\"><strong>Usuario:</strong> {$usr}</p>
+        <p style=\"font-size:13px;color:#333;margin:4px 0\"><strong>Contraseña:</strong> {$pwd}</p>
+        <p style=\"font-size:13px;color:#555;margin:12px 0 0\">Acceda al portal en: <a href=\"{$url}\" style=\"color:#1B2A6B\">{$url}</a></p>
+      </div>";
         }
 
         $cuerpo = "
@@ -1868,8 +1956,9 @@ HTML;
       {$introHtml}
       <div style=\"background:#E6F1FB;border-radius:8px;padding:14px 18px;margin-bottom:20px\">
         <p style=\"font-size:13px;color:#0C447C;margin:0\"><strong>Folio:</strong> {$folio}</p>
-        <p style=\"font-size:12px;color:#185FA5;margin:6px 0 0\">Vigencia: 1 año a partir de la fecha de emisión</p>
-      </div>";
+        <p style=\"font-size:12px;color:#1B2A6B;margin:6px 0 0\">Vigencia: 1 año a partir de la fecha de emisión</p>
+      </div>
+      {$credsHtml}";
         return plantillaCorreoHtml($this->pdo, $cuerpo);
     }
 

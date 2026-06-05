@@ -781,6 +781,13 @@
     <div class="confirm-icon" id="confirm-icon"></div>
     <div class="confirm-t" id="confirm-t"></div>
     <div class="confirm-s" id="confirm-s"></div>
+    <div id="confirm-creds-toggle" style="display:none;margin-top:12px;padding:11px 14px;background:#f0f7ff;border-radius:8px;text-align:left">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#0C447C">
+        <input type="checkbox" id="chk-enviar-creds" style="width:16px;height:16px;cursor:pointer">
+        <span>Incluir usuario y contraseña de acceso al portal</span>
+      </label>
+      <p style="font-size:11px;color:#5a6072;margin:6px 0 0 26px">Si el cliente no tiene cuenta se creará una nueva. Si ya tiene, se generará una nueva contraseña.</p>
+    </div>
     <div class="confirm-btns">
       <button class="btn-confirm-cancel" id="confirm-cancel" onclick="cerrarConfirm()">Cancelar</button>
       <button class="btn-confirm-ok"     id="confirm-ok">Confirmar</button>
@@ -1520,6 +1527,10 @@ function confirmarAccion(accion) {
   document.getElementById("confirm-ok").style.background = cfg.btnColor;
   document.getElementById("confirm-ok").onclick = () => ejecutarAccion(accion);
 
+  const esEnvio = ['ENVIAR_CERT', 'ENVIAR_DICT', 'ENVIAR_TODO'].includes(accion);
+  document.getElementById('confirm-creds-toggle').style.display = esEnvio ? 'block' : 'none';
+  document.getElementById('chk-enviar-creds').checked = false;
+
   document.getElementById("overlay-confirm").classList.add("open");
 }
 
@@ -1538,12 +1549,13 @@ async function ejecutarAccion(accion) {
   const cfg = mapaAcciones[accion];
   mostrarToast(cfg.msg, "info");
 
+  const enviarCreds = document.getElementById('chk-enviar-creds')?.checked ?? false;
   const _s = JSON.parse(localStorage.getItem("avba_session") || "{}");
   try {
     const res  = await fetch(API, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Token": _s.token || "" },
-      body:   JSON.stringify({ action: cfg.action, token: _s.token || "", payload: { fila: d.fila } })
+      body:   JSON.stringify({ action: cfg.action, token: _s.token || "", payload: { fila: d.fila, enviar_credenciales: enviarCreds } })
     });
     const texto = await res.text();
     const data  = JSON.parse(texto);
