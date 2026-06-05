@@ -933,6 +933,9 @@
 /* ═══════════════════════════════
    CONFIGURACIÓN
 ═══════════════════════════════ */
+function escH(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 const API = "api/index.php";
 // Interceptor: inyecta token en llamadas a /api/index.php
 (function() {
