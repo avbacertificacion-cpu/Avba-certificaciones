@@ -98,6 +98,7 @@ class Personal {
     }
 
     public function guardarParticipante(array $payload, array $files, string $usuario): array {
+        $this->ensureParticipanteColumns();
         $id      = (int)($payload['id'] ?? 0);
         $cursoId = (int)($payload['curso_id'] ?? 0);
 
@@ -612,6 +613,18 @@ class Personal {
         try {
             $this->pdo->exec("ALTER TABLE participantes_cursos ADD COLUMN IF NOT EXISTS qr_codigo VARCHAR(20) NULL");
         } catch (\PDOException $e) { /* column already exists */ }
+    }
+
+    private function ensureParticipanteColumns(): void {
+        try {
+            $this->pdo->exec("ALTER TABLE participantes_cursos
+                ADD COLUMN IF NOT EXISTS empresa_rfc           VARCHAR(20)  DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS empresa_representante VARCHAR(200) DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS empresa_direccion     VARCHAR(300) DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS capacidad             VARCHAR(100) DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS capacidad_na          TINYINT(1)   NOT NULL DEFAULT 0,
+                ADD COLUMN IF NOT EXISTS correo                VARCHAR(200) DEFAULT NULL");
+        } catch (\Throwable $e) {}
     }
 
     // ══════════════════════════════════════════════════════
@@ -1657,6 +1670,7 @@ HTML;
         // Insertar registro en participantes_cursos
         $this->ensureEstatusColumn();
         $this->ensureQrColumn();
+        $this->ensureParticipanteColumns();
 
         $stmt = $this->pdo->prepare(
             "INSERT INTO participantes_cursos
