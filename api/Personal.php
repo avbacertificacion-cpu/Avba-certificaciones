@@ -1517,7 +1517,7 @@ body { font-family: DejaVu Sans, Arial, sans-serif; background: #B8882A; padding
 
   <!-- CABECERA NAVY -->
   <tr>
-    <td style="background:#0D1B4B;padding:8px 22px;border-bottom:3px solid #B8882A;height:24mm">
+    <td style="background:#0D1B4B;padding:8px 20px;border-bottom:3px solid #B8882A;height:22mm">
       <table style="width:100%;border-collapse:collapse"><tr>
         <td style="width:100px;vertical-align:middle">{$logoHtml}</td>
         <td style="text-align:center;vertical-align:middle">
@@ -1533,7 +1533,7 @@ body { font-family: DejaVu Sans, Arial, sans-serif; background: #B8882A; padding
 
   <!-- CUERPO PRINCIPAL -->
   <tr>
-    <td style="padding:20px 64px 16px;text-align:center;vertical-align:middle;height:148mm">
+    <td style="padding:18px 56px 14px;text-align:center;vertical-align:middle;height:145mm">
 
       <div style="font-family:DejaVu Serif,Georgia,serif;font-size:40pt;font-weight:bold;color:#B8882A;letter-spacing:12px;text-transform:uppercase">Diploma</div>
       <div style="width:110px;height:3px;background:#C9A84C;margin:8px auto 14px"></div>
@@ -1556,7 +1556,7 @@ body { font-family: DejaVu Sans, Arial, sans-serif; background: #B8882A; padding
 
   <!-- FIRMAS — fondo navy -->
   <tr>
-    <td style="background:#0D1B4B;padding:10px 36px;border-top:3px solid #B8882A;height:20mm">
+    <td style="background:#0D1B4B;padding:9px 34px;border-top:3px solid #B8882A;height:18mm">
       <table style="width:100%;border-collapse:collapse"><tr>
         <td style="width:40%;text-align:center;padding:0 12px;vertical-align:bottom">
           {$firmaHtml}
@@ -1579,7 +1579,7 @@ body { font-family: DejaVu Sans, Arial, sans-serif; background: #B8882A; padding
 
   <!-- FOLIO -->
   <tr>
-    <td style="background:#09102C;padding:5px 16px;text-align:center;height:8mm">
+    <td style="background:#09102C;padding:4px 16px;text-align:center;height:7mm">
       <div style="font-size:5.5pt;color:#5A6888;letter-spacing:0.5px">AVBA Certificaciones &nbsp;·&nbsp; {$folio} &nbsp;·&nbsp; Emision: {$emision}</div>
     </td>
   </tr>
@@ -1790,40 +1790,36 @@ HTML;
 
     private function htmlCertificado(array $p, string $qrB64 = ''): string {
         // CSS y estructura IDENTICOS al certificado de equipo (Certificaciones.php)
-        // Solo cambian los datos: participante/curso en vez de cliente/equipo
-        $esc = fn($v) => htmlspecialchars($this->sinAcentos((string)($v ?? '')), ENT_QUOTES, 'UTF-8');
+        $e = fn($s) => htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8');
 
-        $folio   = $esc(
+        $folio   = $e(
             $p['control']
                 ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'
                 : 'PART-' . str_pad((string)$p['id'], 5, '0', STR_PAD_LEFT)
         );
-        $nombre  = $esc($p['nombre_completo'] ?? '');
-        $curp    = $esc($p['curp'] ?? '');
-        $puesto  = $esc($p['puesto'] ?? '');
-        $empresa = $esc($p['empresa_nombre'] ?? '');
-        $curso   = $esc($p['curso_nombre'] ?? '');
-        $horas   = $esc($p['duracion_horas'] ?? '');
-        $area    = $esc($p['area_tematica'] ?? '');
-        $fecha   = $esc($p['fecha_curso'] ? date('d/m/Y', strtotime($p['fecha_curso'])) : date('d/m/Y'));
+        $nombre  = $e($p['nombre_completo'] ?? '');
+        $curp    = $e($p['curp'] ?? '');
+        $puesto  = $e($p['puesto'] ?? '');
+        $empresa = $e($p['empresa_nombre'] ?? '');
+        $curso   = $e($p['curso_nombre'] ?? '');
+        $horas   = $e($p['duracion_horas'] ?? '');
+        $area    = $e($p['area_tematica'] ?? '');
+        $fecha   = $e($p['fecha_curso'] ? date('d/m/Y', strtotime($p['fecha_curso'])) : date('d/m/Y'));
         $anio    = date('Y');
 
         $capVal        = $p['capacidad_na'] ? 'N/A' : trim($p['capacidad'] ?? '');
         $textoCertBase = trim($p['texto_certificado'] ?? '');
-        $textoCert     = $esc(strtoupper($textoCertBase
+        $textoCert     = $e(mb_strtoupper($textoCertBase
             ? str_ireplace('{capacidad}', $capVal, $textoCertBase)
-            : ($p['curso_nombre'] ?? '')));
+            : ($p['curso_nombre'] ?? ''), 'UTF-8'));
 
-        // firma_director.png 200x96 (2.083:1) → 88x42 px
-        $firmaB64  = $this->assetB64('logos/firma_director.png');
-        $firmaHtml = $firmaB64
-            ? "<img src=\"{$firmaB64}\" style=\"width:88px;height:42px;display:block;margin:0 auto 4px;\" alt=\"Firma\">"
-            : '<div style="height:42px;"></div>';
-
-        // Usar sello CSS igual que el certificado de equipo (no imagen)
+        // Sello CSS identico al certificado de equipo
         $selloHtml = '<div class="seal"><div class="seal-text">AVBA<br>CERT.<br>' . $anio . '</div></div>';
 
-        $qrSrc = $qrB64 ?: '';
+        // QR: si no hay codigo asignado mostrar recuadro en blanco en lugar de imagen rota
+        $qrImg = $qrB64
+            ? "<img src=\"{$qrB64}\" alt=\"QR\">"
+            : '<div style="width:100px;height:100px;border:1px solid #dde5f0;display:inline-block;text-align:center;padding-top:36px;font-size:7pt;color:#aaa;">SIN QR</div>';
 
         return <<<HTML
 <!DOCTYPE html>
@@ -1929,7 +1925,7 @@ HTML;
 <table class="bottom-table">
   <tr>
     <td class="qr-box">
-      <img src="{$qrSrc}" alt="QR">
+      {$qrImg}
       <div class="qr-label">Escanea para validar</div>
     </td>
     <td class="valid-box">
