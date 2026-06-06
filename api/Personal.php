@@ -1061,7 +1061,7 @@ class Personal {
         $selloB64 = $this->assetB64('sellos/sello.png');
 
         $logoHdr   = $logoB64
-            ? "<img src=\"{$logoB64}\" style=\"width:48px;height:48px;object-fit:contain;\" alt=\"AVBA\">"
+            ? "<img src=\"{$logoB64}\" style=\"width:84px;height:39px;display:block;\" alt=\"AVBA\">"
             : '<div style="font-size:8pt;font-weight:bold;color:#1B2A6B;text-align:center">AVBA<br>CERT.</div>';
         $qrHdr     = $qrB64
             ? "<img src=\"{$qrB64}\" style=\"width:52px;height:52px;\" alt=\"QR\">"
@@ -1070,7 +1070,7 @@ class Personal {
             ? "<img src=\"{$firmaB64}\" style=\"height:30px;max-width:100px;display:block;margin:0 auto 2px;\" alt=\"Firma\">"
             : '<div style="height:30px;"></div>';
         $selloHtml = $selloB64
-            ? "<img src=\"{$selloB64}\" style=\"width:50px;height:50px;display:block;margin:0 auto;\" alt=\"Sello\">"
+            ? "<img src=\"{$selloB64}\" style=\"width:50px;height:44px;display:block;margin:0 auto;\" alt=\"Sello\">"
             : '';
 
         // ── Generadores de cajas de caracteres ─────────────────────────────

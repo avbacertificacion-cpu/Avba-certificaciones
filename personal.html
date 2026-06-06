@@ -283,12 +283,13 @@ function renderDetalle(d) {
   const tipoLabel = { DC3: '📋 DC-3', DIPLOMA: '🎓 Diploma', CERTIFICADO: '📜 Certificado' };
   let docs = '';
   if (Array.isArray(d.documentos) && d.documentos.length) {
-    // Latest doc per type
+    // Latest doc per type — always regenerate on click so user sees latest design
     const latest = {};
     d.documentos.forEach(doc => { latest[doc.tipo_doc] = doc; });
+    const colorCls = { DC3: 'btn-dc3', DIPLOMA: 'btn-dip', CERTIFICADO: 'btn-cert' };
     docs = `<div class="sec-title">Documentos generados</div><div class="docs-row">
       ${Object.values(latest).map(doc =>
-        `<a class="btn-doc" href="${esc(doc.url)}" target="_blank">${tipoLabel[doc.tipo_doc] || doc.tipo_doc} <span style="font-size:10px;color:inherit;opacity:.7">${esc(doc.fecha)}</span></a>`
+        `<button class="btn-doc ${colorCls[doc.tipo_doc]||'btn-cert'}" onclick="prevDocPersonal(${d.id},'${doc.tipo_doc.toLowerCase()}')">${tipoLabel[doc.tipo_doc] || doc.tipo_doc} <span style="font-size:10px;opacity:.7">${esc(doc.fecha)}</span></button>`
       ).join('')}
     </div>`;
   }
@@ -327,6 +328,23 @@ function renderDetalle(d) {
 }
 
 function cerrarDetalle() { document.getElementById('overlayDetalle').classList.remove('open'); }
+
+// ── Regenerar documento ────────────────────────────────────────────────────
+async function prevDocPersonal(participanteId, tipo) {
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'GENERAR_DOC_PERSONAL', payload: { id: participanteId, tipo } })
+    });
+    const data = await res.json();
+    if (data.status === 'success' && data.url) {
+      window.open(data.url, '_blank');
+    } else {
+      alert('Error: ' + (data.message || 'No se pudo generar el documento'));
+    }
+  } catch(e) { alert('Error de conexion'); }
+}
 
 // ── Init ───────────────────────────────────────────────────────────────────
 (async function init() {
