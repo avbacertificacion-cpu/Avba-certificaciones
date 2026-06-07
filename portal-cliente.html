@@ -177,6 +177,12 @@ window.fetch = function(url, opts = {}) {
       }
     }
   }
+  if (typeof url === 'string' && url.includes('api/index.php')) {
+    return _origFetch(url, opts).then(function(r) {
+      if (r.status === 401) { localStorage.removeItem('avba_session'); setTimeout(function(){ location.href='login.html'; }, 50); }
+      return r;
+    });
+  }
   return _origFetch(url, opts);
 };
 
@@ -184,9 +190,9 @@ const API = 'api/index.php';
 
 // ── Session guard ──────────────────────────────────────────────────────────
 const _sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
-if (!_sesion.token) { location.href = 'login.html'; }
+if (!_sesion.token || (_sesion.ts && (Date.now() - _sesion.ts) > 28800000)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
 // Solo CLIENTE y ADMIN pueden acceder a esta vista
-if (!['CLIENTE', 'ADMIN'].includes(_sesion.rol)) { location.href = 'login.html'; }
+if (!['CLIENTE', 'ADMIN'].includes(_sesion.rol)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
 
 // ── Tab switching ──────────────────────────────────────────────────────────
 function verTab(id, btn) {

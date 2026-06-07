@@ -2543,6 +2543,16 @@ function mostrarToast(msg, tipo = "info") {
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
 }
+// Guard anticipado: redirige antes de que se renderice la página
+(function() {
+  const _sg = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const _roles = ['INSPECTOR','ADMIN','CALIDAD'];
+  if (!_sg.token || !_roles.includes(_sg.rol) || (_sg.ts && (Date.now() - _sg.ts) > 28800000)) {
+    localStorage.removeItem('avba_session');
+    location.replace('login.html');
+  }
+}());
+
 // Interceptor: inyecta token en llamadas a /api/index.php
 (function() {
   const _fetch = window.fetch;
@@ -2558,6 +2568,10 @@ function mostrarToast(msg, tipo = "info") {
           'X-Token': t
         });
       }
+      return _fetch.call(this, url, opts).then(function(r) {
+        if (r.status === 401) { localStorage.removeItem('avba_session'); setTimeout(function(){ location.href='login.html'; }, 50); }
+        return r;
+      });
     }
     return _fetch.call(this, url, opts);
   };
@@ -3323,9 +3337,9 @@ function cerrarSesion() {
 ════════════════════════════════════════ */
 window.onload = function () {
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
-  if (!s.token) { location.href = 'login.html'; return; }
+  if (!s.token || (s.ts && (Date.now() - s.ts) > 28800000)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; return; }
   const rolesPermitidos = ['INSPECTOR','ADMIN','CALIDAD'];
-  if (!rolesPermitidos.includes(s.rol)) { location.href = 'login.html'; return; }
+  if (!rolesPermitidos.includes(s.rol)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; return; }
   document.getElementById('menu-usuario').textContent = (s.nombre || s.usuario || 'inspector') + (s.rol !== 'INSPECTOR' ? ' (' + s.rol + ')' : '');
 
   // Autocomplete empresa en formulario de inspección (paso 1)

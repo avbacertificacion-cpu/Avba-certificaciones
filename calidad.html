@@ -1890,6 +1890,11 @@ const API = "api/index.php";
         });
       }
     }
+      return _fetch.call(this, url, opts).then(function(r) {
+        if (r.status === 401) { localStorage.removeItem('avba_session'); setTimeout(function(){ location.href='login.html'; }, 50); }
+        return r;
+      });
+    }
     return _fetch.call(this, url, opts);
   };
 }());
@@ -1899,9 +1904,10 @@ const API = "api/index.php";
 ═══════════════════════════════════════ */
 (function() {
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
-  if (!s.token) { location.href = 'login.html'; return; }
+  const _now = Date.now();
+  if (!s.token || (s.ts && (_now - s.ts) > 28800000)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; return; }
   const roles = ['CALIDAD','ADMIN','CERTIFICACIONES'];
-  if (!roles.includes(s.rol)) { location.href = 'login.html'; return; }
+  if (!roles.includes(s.rol)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; return; }
   document.getElementById('hdr-user-cal').textContent = (s.nombre || s.usuario || '') + ' · ' + s.rol;
   if (s.rol === 'ADMIN') document.getElementById('btn-volver-admin').style.display = '';
 }());

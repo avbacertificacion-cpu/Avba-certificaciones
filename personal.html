@@ -170,12 +170,18 @@ window.fetch = function(url, opts = {}) {
       }
     }
   }
+  if (typeof url === 'string' && url.includes('api/index.php')) {
+    return _origFetch(url, opts).then(function(r) {
+      if (r.status === 401) { localStorage.removeItem('avba_session'); setTimeout(function(){ location.href='login.html'; }, 50); }
+      return r;
+    });
+  }
   return _origFetch(url, opts);
 };
 
 // ── Session guard ──────────────────────────────────────────────────────────
 const _s = JSON.parse(localStorage.getItem('avba_session') || '{}');
-if (!_s.token || !['ADMIN','CALIDAD'].includes(_s.rol)) { location.href = 'login.html'; }
+if (!_s.token || !['ADMIN','CALIDAD'].includes(_s.rol) || (_s.ts && (Date.now() - _s.ts) > 28800000)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
 document.getElementById('hdr-user').textContent = (_s.nombre || _s.usuario || '—') + ' · ' + _s.rol;
 
 function logout() { localStorage.removeItem('avba_session'); location.href = 'login.html'; }

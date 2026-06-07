@@ -518,13 +518,19 @@ const API = "api/index.php";
         });
       }
     }
+      return _fetch.call(this, url, opts).then(function(r) {
+        if (r.status === 401) { localStorage.removeItem('avba_session'); setTimeout(function(){ location.href='login.html'; }, 50); }
+        return r;
+      });
+    }
     return _fetch.call(this, url, opts);
   };
 }());
 
 /* ── Auth guard ── */
 const sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
-if (!sesion.token || sesion.rol !== 'ADMIN') {
+if (!sesion.token || sesion.rol !== 'ADMIN' || (sesion.ts && (Date.now() - sesion.ts) > 28800000)) {
+  localStorage.removeItem('avba_session');
   location.href = 'login.html';
 }
 document.getElementById('header-user').textContent = sesion.nombre || sesion.usuario || '';
