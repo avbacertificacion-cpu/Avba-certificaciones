@@ -1804,42 +1804,29 @@ HTML;
         $fechaEsc = $esc($fecha);
 
         $instrNombre    = trim($p['instructor_nombre'] ?? '');
-        $instrNombreFmt = $esc($instrNombre ? mb_strtoupper($instrNombre, 'UTF-8') : 'ING. JOSE MARCOS GONZALEZ CALDERON');
-
-        // Firma del instructor (propia o fallback director)
-        $instrFirmaPath = trim($p['instructor_firma_imagen'] ?? '');
-        $instrFirmaB64  = '';
-        if ($instrFirmaPath) {
-            $absPath = dirname(__DIR__) . '/' . ltrim($instrFirmaPath, '/');
-            if (file_exists($absPath)) {
-                $ext  = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
-                $mime = in_array($ext, ['jpg','jpeg']) ? 'image/jpeg' : 'image/png';
-                $instrFirmaB64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($absPath));
-            }
-        }
-        if (!$instrFirmaB64) $instrFirmaB64 = $this->assetB64('logos/firma_director.png');
-
-        $logoB64  = $this->assetB64('logos/avba.png');
-        $selloB64 = $this->assetB64('sellos/sello.png');
+        // Diploma: firma siempre del Director General
+        $firmaB64  = $this->assetB64('logos/firma_director.png');
+        $logoB64   = $this->assetB64('logos/avba.png');
+        $selloB64  = $this->assetB64('sellos/sello.png');
 
         $logoHtml  = $logoB64
-            ? "<img src=\"{$logoB64}\" style=\"width:72px;height:34px;display:block;\" alt=\"AVBA\">"
-            : '<span style="font-size:9pt;font-weight:bold;color:#C9A84C;">AVBA</span>';
-        $firmaHtml = $instrFirmaB64
-            ? "<img src=\"{$instrFirmaB64}\" style=\"width:100px;height:48px;display:block;margin:0 auto 2px;\" alt=\"Firma\">"
-            : '<div style="height:48px;"></div>';
+            ? "<img src=\"{$logoB64}\" style=\"width:110px;height:52px;display:block;\" alt=\"AVBA\">"
+            : '<span style="font-size:11pt;font-weight:bold;color:#C9A84C;">AVBA</span>';
+        $firmaHtml = $firmaB64
+            ? "<img src=\"{$firmaB64}\" style=\"width:110px;height:52px;display:block;margin:0 auto 2px;\" alt=\"Firma\">"
+            : '<div style="height:52px;"></div>';
         $selloHtml = $selloB64
-            ? "<img src=\"{$selloB64}\" style=\"width:64px;height:56px;display:block;margin:0 auto;\" alt=\"Sello\">"
+            ? "<img src=\"{$selloB64}\" style=\"width:68px;height:60px;display:block;margin:0 auto;\" alt=\"Sello\">"
             : '';
         $qrHtml = $qrB64
-            ? "<img src=\"{$qrB64}\" style=\"width:58px;height:58px;display:block;margin:0 auto;\" alt=\"QR\">"
+            ? "<img src=\"{$qrB64}\" style=\"width:60px;height:60px;display:block;margin:0 auto;\" alt=\"QR\">"
             : '';
 
         $infoParts = array_filter([$area, $horasStr ? "Duración: {$horasStr}" : '', $fechaEsc]);
         $infoLine  = implode(' &nbsp;·&nbsp; ', $infoParts);
 
-        $qrSelloCell = "<td style=\"vertical-align:middle;padding:0 4px;\">{$selloHtml}</td>"
-                     . ($qrHtml ? "<td style=\"vertical-align:middle;padding:0 6px;\">{$qrHtml}</td>" : '');
+        $qrSelloCell = "<td style=\"vertical-align:middle;padding:0 5px;\">{$selloHtml}</td>"
+                     . ($qrHtml ? "<td style=\"vertical-align:middle;padding:0 5px;\">{$qrHtml}</td>" : '');
 
         return <<<HTML
 <!DOCTYPE html>
@@ -1855,28 +1842,28 @@ table table td { border: none; }
 </head>
 <body>
 
-<!-- OUTER FRAME — height forzado a página completa A4-L -->
+<!-- OUTER FRAME -->
 <table style="width:100%;height:197mm;border-collapse:collapse;border:3px double #C9A84C;background:#FFFDF5;">
 
   <!-- ① HEADER AZUL -->
   <tr>
-    <td style="background:#0D1B4B;padding:5mm 10mm;border-bottom:3px solid #C9A84C;">
+    <td style="background:#0D1B4B;padding:4mm 10mm;border-bottom:3px solid #C9A84C;">
       <table style="width:100%;border-collapse:collapse;"><tr>
-        <td style="width:80px;vertical-align:middle;">{$logoHtml}</td>
+        <td style="width:120px;vertical-align:middle;">{$logoHtml}</td>
         <td style="text-align:center;vertical-align:middle;">
           <div style="font-size:13pt;font-weight:bold;color:#C9A84C;letter-spacing:5px;">AVBA CERTIFICACIONES</div>
           <div style="font-size:6pt;color:#7A94C4;letter-spacing:2px;margin-top:1.5mm;">INSPECCIÓN INDUSTRIAL &nbsp;·&nbsp; CAPACITACIÓN ESPECIALIZADA</div>
         </td>
-        <td style="width:80px;text-align:right;vertical-align:middle;">
+        <td style="width:120px;text-align:right;vertical-align:middle;">
           <span style="font-size:6pt;color:#5A6888;font-style:italic;">avba.com.mx</span>
         </td>
       </tr></table>
     </td>
   </tr>
 
-  <!-- ② LÍNEA DORADA SUPERIOR + ROMBO -->
+  <!-- ② LÍNEA DORADA SUPERIOR -->
   <tr>
-    <td style="background:#FFFDF5;padding:5mm 16mm 0;">
+    <td style="background:#FFFDF5;padding:4mm 16mm 0;">
       <table style="width:100%;border-collapse:collapse;"><tr>
         <td style="border-bottom:1.5px solid #C9A84C;height:1px;"></td>
         <td style="width:18px;text-align:center;font-size:10pt;color:#C9A84C;padding:0 4px;">&#9670;</td>
@@ -1885,37 +1872,37 @@ table table td { border: none; }
     </td>
   </tr>
 
-  <!-- ③ CONTENIDO PRINCIPAL — ocupa todo el espacio restante -->
+  <!-- ③ CONTENIDO PRINCIPAL -->
   <tr>
-    <td style="text-align:center;padding:6mm 20mm 4mm;background:#FFFDF5;vertical-align:middle;">
+    <td style="text-align:center;padding:5mm 20mm 3mm;background:#FFFDF5;vertical-align:middle;">
 
       <div style="font-family:DejaVu Serif,Georgia,serif;font-size:60pt;font-weight:bold;
-                  color:#B8882A;letter-spacing:16px;line-height:1;margin-bottom:4mm;">DIPLOMA</div>
+                  color:#B8882A;letter-spacing:16px;line-height:1;margin-bottom:3mm;">DIPLOMA</div>
 
-      <table style="margin:0 auto 4mm;border-collapse:collapse;width:220px;"><tr>
+      <table style="margin:0 auto 3mm;border-collapse:collapse;width:220px;"><tr>
         <td style="border-bottom:1.5px solid #C9A84C;height:1px;"></td>
         <td style="width:14px;text-align:center;font-size:8pt;color:#C9A84C;padding:0 3px;">&#9670;</td>
         <td style="border-bottom:1.5px solid #C9A84C;height:1px;"></td>
       </tr></table>
 
-      <div style="font-size:10pt;color:#999;font-style:italic;margin-bottom:4mm;">Se hace constar que</div>
+      <div style="font-size:10pt;color:#999;font-style:italic;margin-bottom:3mm;">Se hace constar que</div>
 
       <div style="font-family:DejaVu Serif,Georgia,serif;font-size:30pt;font-style:italic;
-                  color:#0D1B4B;line-height:1.2;margin-bottom:3mm;">{$nombre}</div>
+                  color:#0D1B4B;line-height:1.2;margin-bottom:2.5mm;">{$nombre}</div>
 
-      <div style="width:70%;height:1.5px;background:linear-gradient(to right,transparent,#C9A84C,transparent);margin:0 auto 4mm;"></div>
+      <div style="width:70%;height:1.5px;background:#C9A84C;margin:0 auto 3mm;"></div>
 
-      <div style="font-size:10pt;color:#555;margin-bottom:4mm;">Ha concluido satisfactoriamente el programa de capacitación:</div>
+      <div style="font-size:10pt;color:#555;margin-bottom:3mm;">Ha concluido satisfactoriamente el programa de capacitación:</div>
 
-      <table style="margin:0 auto 4mm;border-collapse:collapse;"><tr>
+      <table style="margin:0 auto 3mm;border-collapse:collapse;"><tr>
         <td style="font-size:14pt;font-weight:bold;color:#0D1B4B;text-transform:uppercase;
-                   letter-spacing:1px;padding:4mm 35px;
+                   letter-spacing:1px;padding:3.5mm 35px;
                    border-top:3px solid #C9A84C;border-bottom:3px solid #C9A84C;">{$textoCert}</td>
       </tr></table>
 
-      <div style="font-size:8.5pt;color:#777;margin-bottom:4mm;">{$infoLine}</div>
+      <div style="font-size:8.5pt;color:#777;margin-bottom:3mm;">{$infoLine}</div>
 
-      <div style="font-size:8pt;color:#666;line-height:1.8;padding:3mm 20mm;
+      <div style="font-size:8pt;color:#666;line-height:1.8;padding:2.5mm 20mm;
                   border-top:1px solid #E0D5B0;border-bottom:1px solid #E0D5B0;">
         En reconocimiento a su dedicación, esfuerzo y participación activa durante el programa
         de capacitación, y en cumplimiento de los criterios de evaluación establecidos, se expide
@@ -1926,9 +1913,9 @@ table table td { border: none; }
     </td>
   </tr>
 
-  <!-- ④ LÍNEA DORADA INFERIOR + ROMBO -->
+  <!-- ④ LÍNEA DORADA INFERIOR -->
   <tr>
-    <td style="background:#FFFDF5;padding:0 16mm 4mm;">
+    <td style="background:#FFFDF5;padding:0 16mm 3mm;">
       <table style="width:100%;border-collapse:collapse;"><tr>
         <td style="border-bottom:1.5px solid #C9A84C;height:1px;"></td>
         <td style="width:18px;text-align:center;font-size:10pt;color:#C9A84C;padding:0 4px;">&#9670;</td>
@@ -1937,36 +1924,27 @@ table table td { border: none; }
     </td>
   </tr>
 
-  <!-- ⑤ FOOTER AZUL CON FIRMAS -->
+  <!-- ⑤ FOOTER AZUL — solo Director General + sello/QR centrados -->
   <tr>
-    <td style="background:#0D1B4B;padding:5mm 12mm;border-top:3px solid #C9A84C;">
+    <td style="background:#0D1B4B;padding:4mm 12mm;border-top:3px solid #C9A84C;">
       <table style="width:100%;border-collapse:collapse;"><tr>
 
-        <!-- Instructor/Director -->
-        <td style="width:33%;text-align:center;padding:0 8mm;vertical-align:bottom;">
+        <!-- Firma Director General (izquierda) -->
+        <td style="width:40%;text-align:center;padding:0 8mm;vertical-align:bottom;">
           {$firmaHtml}
           <div style="border-top:1.5px solid #C9A84C;padding-top:2mm;margin-top:1mm;">
-            <div style="font-size:8pt;font-weight:bold;color:#C9A84C;">{$instrNombreFmt}</div>
-            <div style="font-size:6pt;color:#7A94C4;margin-top:1mm;">Instructor del Curso &nbsp;·&nbsp; AVBA Certificaciones</div>
+            <div style="font-size:8.5pt;font-weight:bold;color:#C9A84C;">ING. JOSÉ MARCOS GONZÁLEZ CALDERÓN</div>
+            <div style="font-size:6pt;color:#7A94C4;margin-top:1mm;">Director General &nbsp;·&nbsp; AVBA Certificaciones</div>
           </div>
         </td>
 
-        <!-- Centro: sello + QR + folio -->
-        <td style="width:34%;text-align:center;padding:0 4mm;vertical-align:middle;">
+        <!-- Sello + QR + folio (centro-derecha) -->
+        <td style="width:60%;text-align:center;padding:0 8mm;vertical-align:middle;">
           <table style="margin:0 auto;border-collapse:collapse;"><tr>
             {$qrSelloCell}
           </tr></table>
-          <div style="font-size:5.5pt;color:#5A6888;margin-top:2mm;letter-spacing:0.3px;">
+          <div style="font-size:6pt;color:#5A6888;margin-top:2mm;letter-spacing:0.3px;">
             {$folio} &nbsp;·&nbsp; Emisión: {$emision}
-          </div>
-        </td>
-
-        <!-- Espacio firma empresa -->
-        <td style="width:33%;text-align:center;padding:0 8mm;vertical-align:bottom;">
-          <div style="height:48px;"></div>
-          <div style="border-top:1.5px solid #C9A84C;padding-top:2mm;margin-top:1mm;">
-            <div style="font-size:8pt;font-weight:bold;color:#C9A84C;">Representante de la Empresa</div>
-            <div style="font-size:6pt;color:#7A94C4;margin-top:1mm;">Nombre y firma</div>
           </div>
         </td>
 
