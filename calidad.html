@@ -1431,12 +1431,15 @@
 <!-- ══ MODAL EMPRESA DC-3 ══ -->
 <div class="overlay" id="overlay-empresa-dc3" style="display:none" onclick="if(event.target===this)cerrarModalEmpresaDC3()">
   <div class="modal" style="max-width:580px">
-    <div class="m-header" style="padding:16px 22px 12px;border-bottom:1px solid var(--borde)">
-      <div>
-        <div class="m-title" id="empresa-dc3-titulo">Nueva Empresa</div>
-        <div class="m-sub">Datos para constancia DC-3</div>
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:var(--azul)">E</div>
+        <div>
+          <div class="m-title" id="empresa-dc3-titulo">Nueva Empresa</div>
+          <div class="m-sub">Datos para constancia DC-3</div>
+        </div>
       </div>
-      <button class="m-close" onclick="cerrarModalEmpresaDC3()">✕</button>
+      <button class="btn-close" onclick="cerrarModalEmpresaDC3()">×</button>
     </div>
     <div style="padding:18px 22px 20px;max-height:72vh;overflow-y:auto">
       <input type="hidden" id="emp-dc3-id" value="0">
@@ -2999,8 +3002,12 @@ async function cargarEmpresas() {
         <td style="font-size:12px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.representante_trabajadores) || '<span style="color:var(--texto-hint)">—</span>'}</td>
         <td style="font-size:12px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.correo_contacto) || '<span style="color:var(--texto-hint)">—</span>'}</td>
         <td style="text-align:center;white-space:nowrap">
-          <button class="btn-icon" title="Editar" onclick="abrirModalEmpresaDC3(${e.id})" style="margin-right:4px">✏️</button>
-          <button class="btn-icon btn-icon-del" title="Eliminar" onclick="eliminarEmpresaDC3(${e.id},'${escH(e.nombre_cliente).replace(/'/g,"\\'")}')">🗑️</button>
+          <button onclick="abrirModalEmpresaDC3(${e.id})"
+                  style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;
+                         padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;margin-right:4px">Editar</button>
+          <button onclick="eliminarEmpresaDC3(${e.id},'${escH(e.nombre_cliente)}')"
+                  style="background:var(--rojo-light);border:none;color:var(--rojo);border-radius:6px;
+                         padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Eliminar</button>
         </td>
       </tr>
     `).join('');

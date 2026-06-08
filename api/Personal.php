@@ -944,11 +944,11 @@ class Personal {
             };
             $folio = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
             if ($tipo === 'diploma') {
-                $url = $this->htmlToPdfMpdf($html, $folio, 'DIPLOMA', 'A4-L');
+                $url = $this->htmlToPdfMpdf($html, $folio, 'DIPLOMA', 'A4-L', 5, 5);
             } elseif ($tipo === 'certificado') {
                 $url = $this->htmlToPdfMpdf($html, $folio, 'CERT', 'A4');
             } else {
-                $url = $this->htmlToPdfMpdf($html, $folio, 'DC3', 'A4');
+                $url = $this->htmlToPdfMpdf($html, $folio, 'DC3', 'A4', 10, 12);
             }
         } catch (\Throwable $e) {
             error_log('[AVBA] generarDocumento error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
@@ -1290,7 +1290,7 @@ class Personal {
 
         // ── Estilo base Dompdf ─────────────────────────────────────────────
         $css = <<<'CSS'
-@page { size: A4 portrait; margin: 10mm 12mm; }
+@page { size: A4 portrait; }
 * { margin:0; padding:0; box-sizing:border-box; }
 body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8.5pt; color: #000; }
 .doc { width:100%; border-collapse:collapse; border:1.5px solid #000; }
@@ -1352,7 +1352,7 @@ CSS;
 </table>
 
 <!-- DATOS DEL TRABAJADOR -->
-<table class="doc" style="margin-top:-1px">
+<table class="doc" style="margin-top:0;border-top:none">
   <tr class="sec-hdr"><td colspan="2"><b>DATOS DEL TRABAJADOR</b></td></tr>
 
   <!-- Nombre -->
@@ -1385,7 +1385,7 @@ CSS;
 </table>
 
 <!-- DATOS DE LA EMPRESA -->
-<table class="doc" style="margin-top:-1px">
+<table class="doc" style="margin-top:0;border-top:none">
   <tr class="sec-hdr"><td colspan="2"><b>DATOS DE LA EMPRESA</b></td></tr>
 
   <tr>
@@ -1404,7 +1404,7 @@ CSS;
 </table>
 
 <!-- DATOS DEL PROGRAMA -->
-<table class="doc" style="margin-top:-1px">
+<table class="doc" style="margin-top:0;border-top:none">
   <tr class="sec-hdr"><td colspan="3"><b>DATOS DEL PROGRAMA DE CAPACITACIÓN, ADIESTRAMIENTO Y PRODUCTIVIDAD</b></td></tr>
 
   <!-- Curso -->
@@ -1468,7 +1468,7 @@ CSS;
 </table>
 
 <!-- FIRMAS -->
-<table class="doc" style="margin-top:-1px">
+<table class="doc" style="margin-top:0;border-top:none">
   <tr>
     <td colspan="3" style="padding:5px 8px;font-size:7.5pt;text-align:center;background:#f9f9f9">
       Los datos se asientan en esta constancia bajo protesta de decir verdad, apercibidos de la responsabilidad en que incurre todo
@@ -1510,7 +1510,7 @@ CSS;
 </table>
 
 <!-- INSTRUCCIONES -->
-<table class="doc" style="margin-top:-1px">
+<table class="doc" style="margin-top:0;border-top:none">
   <tr>
     <td class="instruct">
       <b>INSTRUCCIONES</b><br>
@@ -1701,7 +1701,7 @@ HTML;
 <head>
 <meta charset="UTF-8">
 <style>
-@page { size: A4 landscape; margin: 5mm; }
+@page { size: A4 landscape; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: DejaVu Sans, Arial, sans-serif; background: #0B1938; margin: 0; }
 </style>
@@ -1731,9 +1731,9 @@ body { font-family: DejaVu Sans, Arial, sans-serif; background: #0B1938; margin:
   <tr>
     <td style="background:#FFFDF5;padding:3mm 14mm 0;">
       <table style="width:100%;border-collapse:collapse;"><tr>
-        <td style="border-bottom:1.5px solid #C9A84C;height:0;"></td>
+        <td style="border-bottom:1.5px solid #C9A84C;height:1px;"></td>
         <td style="width:16px;text-align:center;font-size:9pt;color:#C9A84C;padding:0 3px;">&#9670;</td>
-        <td style="border-bottom:1.5px solid #C9A84C;height:0;"></td>
+        <td style="border-bottom:1.5px solid #C9A84C;height:1px;"></td>
       </tr></table>
     </td>
   </tr>
@@ -1746,9 +1746,9 @@ body { font-family: DejaVu Sans, Arial, sans-serif; background: #0B1938; margin:
                   color:#B8882A;letter-spacing:14px;line-height:1;margin-bottom:1.5mm;">DIPLOMA</div>
 
       <table style="margin:0 auto 1.5mm;border-collapse:collapse;width:180px;"><tr>
-        <td style="border-bottom:1px solid #C9A84C;height:0;"></td>
+        <td style="border-bottom:1px solid #C9A84C;height:1px;"></td>
         <td style="width:12px;text-align:center;font-size:7pt;color:#C9A84C;padding:0 2px;">&#9670;</td>
-        <td style="border-bottom:1px solid #C9A84C;height:0;"></td>
+        <td style="border-bottom:1px solid #C9A84C;height:1px;"></td>
       </tr></table>
 
       <div style="font-size:9pt;color:#999;font-style:italic;margin-bottom:2.5mm;">Se hace constar que</div>
@@ -1783,9 +1783,9 @@ body { font-family: DejaVu Sans, Arial, sans-serif; background: #0B1938; margin:
   <tr>
     <td style="background:#FFFDF5;padding:0 14mm 1.5mm;">
       <table style="width:100%;border-collapse:collapse;"><tr>
-        <td style="border-bottom:1.5px solid #C9A84C;height:0;"></td>
+        <td style="border-bottom:1.5px solid #C9A84C;height:1px;"></td>
         <td style="width:16px;text-align:center;font-size:9pt;color:#C9A84C;padding:0 3px;">&#9670;</td>
-        <td style="border-bottom:1.5px solid #C9A84C;height:0;"></td>
+        <td style="border-bottom:1.5px solid #C9A84C;height:1px;"></td>
       </tr></table>
     </td>
   </tr>
@@ -2031,7 +2031,7 @@ HTML;
         return ['status' => 'success', 'message' => 'Datos guardados correctamente.'];
     }
 
-    private function htmlToPdfMpdf(string $html, string $folio, string $sufijo = 'CERT', $format = 'A4'): string {
+    private function htmlToPdfMpdf(string $html, string $folio, string $sufijo = 'CERT', $format = 'A4', float $marginV = 0, float $marginH = 0): string {
         if (!class_exists('\\Mpdf\\Mpdf')) {
             $autoload = __DIR__ . '/../vendor/autoload.php';
             if (file_exists($autoload)) require_once $autoload;
@@ -2046,8 +2046,8 @@ HTML;
         $config = [
             'mode'          => 'utf-8',
             'format'        => $format,
-            'margin_left'   => 0, 'margin_right'  => 0,
-            'margin_top'    => 0, 'margin_bottom' => 0,
+            'margin_left'   => $marginH, 'margin_right'  => $marginH,
+            'margin_top'    => $marginV, 'margin_bottom' => $marginV,
             'margin_header' => 0, 'margin_footer' => 0,
             'dpi'           => 96,
             'default_font'  => 'dejavusans',
