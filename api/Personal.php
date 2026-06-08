@@ -1498,8 +1498,8 @@ HTML;
 
         $reverso = <<<HTML
 <div class="page2">
-  <div style="display:flex;justify-content:space-between;margin-bottom:6px">
-    <div style="font-size:7pt;font-weight:bold;color:#1B2A6B">AVBA CERTIFICACIONES</div>
+  <div style="margin-bottom:6px">
+    <span style="font-size:7pt;font-weight:bold;color:#1B2A6B">AVBA CERTIFICACIONES</span>
   </div>
 
   <div class="rev-hdr">CLAVES Y DENOMINACIONES DE ÁREAS Y SUBÁREAS DEL CATÁLOGO NACIONAL DE OCUPACIONES</div>
@@ -1996,11 +1996,11 @@ HTML;
             : '<div style="height:38px;"></div>';
         $selloHtml = $selloB64
             ? "<img src=\"{$selloB64}\" style=\"width:60px;height:53px;display:block;margin:0 auto;\" alt=\"Sello\">"
-            : '<div style="width:60px;height:53px;border:2px solid #C9A84C;border-radius:50%;margin:0 auto;display:table-cell;vertical-align:middle;text-align:center;font-size:7pt;color:#C9A84C;padding:4px;">AVBA<br>CERT.</div>';
+            : '<div style="width:60px;height:53px;border:2px solid #C9A84C;border-radius:50%;margin:0 auto;text-align:center;font-size:7pt;color:#C9A84C;padding:16px 4px 0;">AVBA<br>CERT.</div>';
 
         $qrImg = $qrB64
             ? "<img src=\"{$qrB64}\" style=\"width:80px;height:80px;display:block;margin:0 auto;\" alt=\"QR\">"
-            : '<div style="width:80px;height:80px;border:1px solid #7A94C4;margin:0 auto;display:table-cell;vertical-align:middle;text-align:center;font-size:6pt;color:#7A94C4;">SIN QR</div>';
+            : '<div style="width:80px;height:80px;border:1px solid #7A94C4;margin:0 auto;text-align:center;font-size:6pt;color:#7A94C4;padding:32px 4px 0;">SIN QR</div>';
 
         return <<<HTML
 <!DOCTYPE html>
@@ -2050,11 +2050,10 @@ body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8.5pt; color: #1A
 
             <!-- Badge capacitacion -->
             <div style="border:2.5px solid #1B4F8C;border-radius:50%;width:70px;height:70px;
-                        margin:0 auto 10px;padding:6px;text-align:center;vertical-align:middle;
-                        display:table-cell">
-              <div style="font-size:6.5pt;font-weight:bold;color:#1B4F8C;line-height:1.3;padding-top:4px">
+                        margin:0 auto 10px;padding:14px 6px 0;text-align:center;">
+              <div style="font-size:6.5pt;font-weight:bold;color:#1B4F8C;line-height:1.3;">
                 CAPACITACION<br>INDUSTRIAL<br>
-                <div style="font-size:9pt;color:#C9A84C;font-weight:bold;margin-top:2px">&#10003;</div>
+                <span style="font-size:9pt;color:#C9A84C;font-weight:bold;">&#10003;</span>
               </div>
             </div>
 
