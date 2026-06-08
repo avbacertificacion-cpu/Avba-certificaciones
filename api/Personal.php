@@ -1812,9 +1812,10 @@ HTML;
         $logoHtml  = $logoB64
             ? "<img src=\"{$logoB64}\" style=\"width:110px;height:52px;display:block;\" alt=\"AVBA\">"
             : '<span style="font-size:11pt;font-weight:bold;color:#C9A84C;">AVBA</span>';
+        // Firma wrapped in cream box so dark signature is visible on dark-blue footer
         $firmaHtml = $firmaB64
-            ? "<img src=\"{$firmaB64}\" style=\"width:110px;height:52px;display:block;margin:0 auto 2px;\" alt=\"Firma\">"
-            : '<div style="height:52px;"></div>';
+            ? "<table style=\"margin:0 auto 3px;border-collapse:collapse;\"><tr><td style=\"background:#FFFDF5;padding:4px 10px;\"><img src=\"{$firmaB64}\" style=\"width:110px;height:52px;display:block;\" alt=\"Firma\"></td></tr></table>"
+            : '<div style="height:60px;"></div>';
         $selloHtml = $selloB64
             ? "<img src=\"{$selloB64}\" style=\"width:68px;height:60px;display:block;margin:0 auto;\" alt=\"Sello\">"
             : '';
@@ -1932,10 +1933,9 @@ table table td { border: none; }
         <!-- Firma Director General (izquierda) -->
         <td style="width:40%;text-align:center;padding:0 8mm;vertical-align:bottom;">
           {$firmaHtml}
-          <div style="border-top:1.5px solid #C9A84C;padding-top:2mm;margin-top:1mm;">
-            <div style="font-size:8.5pt;font-weight:bold;color:#C9A84C;">ING. JOSÉ MARCOS GONZÁLEZ CALDERÓN</div>
-            <div style="font-size:6pt;color:#7A94C4;margin-top:1mm;">Director General &nbsp;·&nbsp; AVBA Certificaciones</div>
-          </div>
+          <div style="width:90%;height:1.5px;background:#C9A84C;margin:0 auto 2mm;"></div>
+          <div style="font-size:8.5pt;font-weight:bold;color:#C9A84C;">ING. JOSÉ MARCOS GONZÁLEZ CALDERÓN</div>
+          <div style="font-size:6pt;color:#7A94C4;margin-top:1mm;">Director General &nbsp;·&nbsp; AVBA Certificaciones</div>
         </td>
 
         <!-- Sello + QR + folio (centro-derecha) -->
