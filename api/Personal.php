@@ -944,7 +944,7 @@ class Personal {
             };
             $folio = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
             if ($tipo === 'diploma') {
-                $url = $this->htmlToPdfMpdf($html, $folio, 'DIPLOMA', [297, 210]);
+                $url = $this->htmlToPdfMpdf($html, $folio, 'DIPLOMA', 'A4-L');
             } elseif ($tipo === 'certificado') {
                 $url = $this->htmlToPdfMpdf($html, $folio, 'CERT', 'A4');
             } else {
@@ -1701,13 +1701,9 @@ HTML;
 <head>
 <meta charset="UTF-8">
 <style>
-@page {
-    size: A4 landscape;
-    margin: 5mm;
-    background-color: #0B1938;
-}
+@page { size: A4 landscape; margin: 5mm; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: DejaVu Sans, Arial, sans-serif; background: transparent; }
+body { font-family: DejaVu Sans, Arial, sans-serif; background: #0B1938; margin: 0; }
 </style>
 </head>
 <body>
@@ -2065,27 +2061,10 @@ HTML;
         $prevBacktrack = (int) ini_get('pcre.backtrack_limit');
         ini_set('pcre.backtrack_limit', 10000000);
 
-        $css      = '';
-        $bodyHtml = $html;
-        $p = 0;
-        while (($s = stripos($bodyHtml, '<style', $p)) !== false) {
-            $sEnd = strpos($bodyHtml, '>', $s);
-            if ($sEnd === false) break;
-            $eTag = stripos($bodyHtml, '</style>', $sEnd + 1);
-            if ($eTag === false) break;
-            $css     .= substr($bodyHtml, $sEnd + 1, $eTag - $sEnd - 1) . "\n";
-            $bodyHtml = substr($bodyHtml, 0, $s) . substr($bodyHtml, $eTag + 8);
-            $p = $s;
-        }
-        $bOpen = stripos($bodyHtml, '<body');
-        if ($bOpen !== false) {
-            $bOpen  = strpos($bodyHtml, '>', $bOpen) + 1;
-            $bClose = strripos($bodyHtml, '</body>');
-            if ($bClose !== false) $bodyHtml = substr($bodyHtml, $bOpen, $bClose - $bOpen);
-        }
-
-        if ($css !== '') $mpdf->WriteHTML($css, \Mpdf\HTMLParserMode::HEADER_CSS);
-        $mpdf->WriteHTML($bodyHtml, \Mpdf\HTMLParserMode::HTML_BODY);
+        // Feed the full HTML document so mPDF applies @page rules (margins, size,
+        // background) correctly. Splitting into HEADER_CSS + HTML_BODY causes @page
+        // directives to be ignored, producing blank/multi-page PDFs.
+        $mpdf->WriteHTML($html);
 
         ini_set('pcre.backtrack_limit', $prevBacktrack);
 
