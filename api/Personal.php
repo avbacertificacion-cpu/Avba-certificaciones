@@ -88,13 +88,16 @@ class Personal {
                     u.nombre AS instructor_nombre,
                     u.registro_stps AS instructor_stps,
                     cl.logo AS empresa_logo_b64,
-                    COALESCE(cl.representante, p.empresa_representante) AS empresa_representante,
+                    COALESCE(
+                        cl.representante COLLATE utf8mb4_general_ci,
+                        p.empresa_representante
+                    ) AS empresa_representante,
                     cl.representante_trabajadores AS empresa_rep_trabajadores
              FROM participantes_cursos p
              LEFT JOIN cursos c ON c.id = p.curso_id
              LEFT JOIN ocupaciones_especificas o ON o.id = p.ocupacion_id
-             LEFT JOIN usuarios u ON u.usuario = p.usuario_registro
-             LEFT JOIN clientes cl ON UPPER(TRIM(cl.nombre_cliente COLLATE utf8mb4_general_ci)) = UPPER(TRIM(p.empresa_nombre COLLATE utf8mb4_general_ci))
+             LEFT JOIN usuarios u ON u.usuario COLLATE utf8mb4_general_ci = p.usuario_registro
+             LEFT JOIN clientes cl ON UPPER(TRIM(cl.nombre_cliente COLLATE utf8mb4_general_ci)) = UPPER(TRIM(p.empresa_nombre))
              WHERE p.id = ?"
         );
         $stmt->execute([$id]);
