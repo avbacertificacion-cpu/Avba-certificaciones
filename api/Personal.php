@@ -968,7 +968,7 @@ class Personal {
     public function listarUsuariosInstructor(): array {
         $stmt = $this->pdo->query(
             "SELECT usuario, COALESCE(nombre, usuario) AS nombre, rol
-             FROM usuarios ORDER BY nombre"
+             FROM usuarios WHERE rol = 'INSPECTOR' ORDER BY nombre"
         );
         return ['status' => 'success', 'data' => $stmt->fetchAll()];
     }
