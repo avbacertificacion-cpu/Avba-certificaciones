@@ -1527,6 +1527,43 @@
   </div>
 </div>
 
+<!-- ══ MODAL CAMBIAR INSTRUCTOR ══ -->
+<div class="overlay" id="overlay-cambiar-instructor" style="display:none" onclick="if(event.target===this)cerrarCambiarInstructor()">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:var(--azul)">I</div>
+        <div>
+          <div class="m-title">Cambiar instructor</div>
+          <div class="m-sub" id="ci-subtitulo">—</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarCambiarInstructor()">×</button>
+    </div>
+    <div style="padding:18px 22px 20px">
+      <input type="hidden" id="ci-ids" value="">
+      <div style="margin-bottom:14px;padding:10px 12px;background:var(--fondo);border-radius:8px;font-size:12px;line-height:1.6">
+        <span style="color:var(--texto-sub)">Instructor actual: </span>
+        <strong id="ci-instructor-actual">—</strong><br>
+        <span id="ci-n-participantes" style="color:var(--texto-hint);font-size:11px"></span>
+      </div>
+      <div class="form-group">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">
+          Nuevo instructor <span style="color:var(--rojo)">*</span>
+        </label>
+        <select id="ci-nuevo-instructor"
+                style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none">
+          <option value="">— Seleccionar —</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;border-top:1px solid var(--borde);padding-top:14px">
+        <button class="btn-cancel2" onclick="cerrarCambiarInstructor()">Cancelar</button>
+        <button class="btn-save"    onclick="guardarCambiarInstructor()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL DETALLE PARTICIPANTE (Personal) ══ -->
 <div class="overlay" id="overlay-per-det" style="display:none" onclick="if(event.target===this)cerrarDetPer()">
   <div class="modal" style="max-width:560px">
@@ -2061,7 +2098,8 @@ let datosGlobal   = [];
 let filaActual    = null;
 let guardando     = false;
 const _sesRol = (JSON.parse(localStorage.getItem('avba_session') || '{}')).rol || '';
-const isAdminCal = _sesRol === 'ADMIN';
+const isAdminCal          = _sesRol === 'ADMIN';
+const canManageInstructor = _sesRol === 'ADMIN' || _sesRol === 'CALIDAD';
 
 /* ─── Definición de plantillas de prueba de carga ─── */
 const PC_DEF = {
@@ -3536,9 +3574,12 @@ function filtrarCursosSesiones() {
       fecha_curso:    p.fecha_curso||'—',
       empresa:        p.empresa_nombre||'',
       empresa_correo: p.empresa_correo||'',
-      participantes:  []
+      participantes:  [],
+      instructores:   [],
     };
     grupos[key].participantes.push(p);
+    const instr = p.instructor_nombre || p.usuario_registro || '';
+    if (instr && !grupos[key].instructores.includes(instr)) grupos[key].instructores.push(instr);
   });
   let lista = Object.values(grupos).sort((a,b)=>b.fecha_curso.localeCompare(a.fecha_curso));
   if (q)  lista = lista.filter(g=>g.curso_nombre.toLowerCase().includes(q)||(g.empresa||'').toLowerCase().includes(q));
@@ -3569,8 +3610,12 @@ function renderCursosSesiones(lista) {
         ${apro ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--verde-light);color:var(--verde)">${apro} apro.</span>` : ''}
       </td>
       <td style="text-align:right">
-        <button onclick="abrirSesionParticipantes(${i})"
-                style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver sesión</button>
+        <div style="display:flex;gap:5px;justify-content:flex-end">
+          <button onclick="abrirSesionParticipantes(${i})"
+                  style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver sesión</button>
+          ${canManageInstructor ? `<button onclick="abrirCambiarInstructorSesion(${i})"
+                  style="background:#fff3e0;border:1px solid #fb8c00;color:#e65100;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Instructor</button>` : ''}
+        </div>
       </td>
     </tr>`;
   }).join('');
@@ -3615,11 +3660,80 @@ function renderIndep(data) {
                   style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
           ${puedAprobar ? `<button onclick="abrirApro('per',${p.id})"
                   style="background:var(--verde-light);border:1px solid var(--verde);color:var(--verde);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Aprobar</button>` : ''}
+          ${canManageInstructor ? `<button onclick="abrirCambiarInstructorIndep(${p.id},'${(p.nombre_completo||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${(p.instructor_nombre||p.usuario_registro||'').replace(/'/g,"\\'")}')"
+                  style="background:#fff3e0;border:1px solid #fb8c00;color:#e65100;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Instructor</button>` : ''}
           ${isAdminCal ? `<button onclick="eliminarParticipanteCal(${p.id},'${(p.nombre_completo||'').replace(/'/g,'')}')"
                   style="background:var(--rojo-light);border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">🗑</button>` : ''}
         </div>
       </td>
     </tr>`; }).join('');
+}
+
+/* ── Cambiar instructor ── */
+let _ciIds = [];
+let usuariosInstrData = [];
+let usuariosInstrCargados = false;
+
+async function cargarUsuariosInstructor() {
+  if (usuariosInstrCargados) return;
+  try {
+    const r = await fetch(API + '?action=LISTAR_USUARIOS_INSTRUCTOR');
+    const d = await r.json();
+    if (d.status === 'success') {
+      usuariosInstrData = d.data || [];
+      const sel = document.getElementById('ci-nuevo-instructor');
+      sel.innerHTML = '<option value="">— Seleccionar —</option>' +
+        usuariosInstrData.map(u => `<option value="${escH(u.usuario)}">${escH(u.nombre)}</option>`).join('');
+      usuariosInstrCargados = true;
+    }
+  } catch(e) { console.error('cargarUsuariosInstructor', e); }
+}
+
+async function abrirCambiarInstructorSesion(idx) {
+  const g = _calSesiones[idx];
+  if (!g) return;
+  await cargarUsuariosInstructor();
+  _ciIds = g.participantes.map(p => p.id);
+  document.getElementById('ci-subtitulo').textContent = g.curso_nombre + ' · ' + (g.fecha_curso||'');
+  document.getElementById('ci-instructor-actual').textContent = g.instructores.length ? g.instructores.join(', ') : '—';
+  document.getElementById('ci-n-participantes').textContent = `Afecta a ${_ciIds.length} participante${_ciIds.length!==1?'s':''}`;
+  document.getElementById('ci-nuevo-instructor').value = '';
+  document.getElementById('overlay-cambiar-instructor').style.display = 'flex';
+}
+
+async function abrirCambiarInstructorIndep(id, nombre, instructorActual) {
+  await cargarUsuariosInstructor();
+  _ciIds = [id];
+  document.getElementById('ci-subtitulo').textContent = nombre;
+  document.getElementById('ci-instructor-actual').textContent = instructorActual || '—';
+  document.getElementById('ci-n-participantes').textContent = '1 participante';
+  document.getElementById('ci-nuevo-instructor').value = '';
+  document.getElementById('overlay-cambiar-instructor').style.display = 'flex';
+}
+
+function cerrarCambiarInstructor() {
+  document.getElementById('overlay-cambiar-instructor').style.display = 'none';
+  _ciIds = [];
+}
+
+async function guardarCambiarInstructor() {
+  const instructor = document.getElementById('ci-nuevo-instructor').value;
+  if (!instructor) { alert('Selecciona un instructor.'); return; }
+  try {
+    const r = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'CAMBIAR_INSTRUCTOR_SESION', payload: { ids: _ciIds, instructor } })
+    });
+    const d = await r.json();
+    if (d.status === 'success') {
+      cerrarCambiarInstructor();
+      alert(d.message || 'Instructor actualizado.');
+      cargarPersonal();
+    } else {
+      alert(d.message || 'Error al actualizar.');
+    }
+  } catch(e) { alert('Error de conexión.'); }
 }
 
 function abrirSesionParticipantes(idx) {

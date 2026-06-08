@@ -65,10 +65,13 @@ class Personal {
                        o.nombre AS ocupacion_nombre,
                        p.foto_documentacion_url, p.foto_persona_url,
                        p.empresa_nombre, p.fecha_registro,
+                       p.usuario_registro,
+                       COALESCE(ui.nombre, p.usuario_registro, '') AS instructor_nombre,
                        COALESCE((SELECT cl.correo_contacto FROM clientes cl WHERE cl.nombre_cliente = p.empresa_nombre COLLATE utf8mb4_general_ci AND cl.correo_contacto IS NOT NULL AND cl.correo_contacto <> '' LIMIT 1),'') AS empresa_correo
                 FROM participantes_cursos p
                 LEFT JOIN cursos c ON c.id = p.curso_id
                 LEFT JOIN ocupaciones_especificas o ON o.id = p.ocupacion_id
+                LEFT JOIN usuarios ui ON ui.usuario COLLATE utf8mb4_general_ci = p.usuario_registro
                 WHERE " . implode(' AND ', $where) . "
                 ORDER BY p.fecha_registro DESC";
 
@@ -960,6 +963,35 @@ class Personal {
 
         $this->pdo->prepare("DELETE FROM clientes WHERE id=?")->execute([$id]);
         return ['status' => 'success'];
+    }
+
+    public function listarUsuariosInstructor(): array {
+        $stmt = $this->pdo->query(
+            "SELECT usuario, COALESCE(nombre, usuario) AS nombre, rol
+             FROM usuarios ORDER BY nombre"
+        );
+        return ['status' => 'success', 'data' => $stmt->fetchAll()];
+    }
+
+    public function cambiarInstructorSesion(array $payload): array {
+        $ids = array_values(array_filter(
+            array_map('intval', $payload['ids'] ?? []),
+            fn($v) => $v > 0
+        ));
+        $instructor = trim($payload['instructor'] ?? '');
+        if (empty($ids))  return ['status' => 'error', 'message' => 'No hay participantes seleccionados.'];
+        if (!$instructor) return ['status' => 'error', 'message' => 'Selecciona un instructor.'];
+
+        $chk = $this->pdo->prepare("SELECT usuario FROM usuarios WHERE usuario = ?");
+        $chk->execute([$instructor]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'El instructor seleccionado no existe.'];
+
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $this->pdo->prepare(
+            "UPDATE participantes_cursos SET usuario_registro=? WHERE id IN ({$ph})"
+        )->execute([$instructor, ...$ids]);
+
+        return ['status' => 'success', 'message' => count($ids) . ' participante(s) actualizados.'];
     }
 
     public function eliminarOcupacion(int $id): array {

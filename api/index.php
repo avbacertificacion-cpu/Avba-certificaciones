@@ -270,6 +270,11 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->listarEmpresas());
 
+        case 'LISTAR_USUARIOS_INSTRUCTOR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->listarUsuariosInstructor());
+
         case 'LISTAR_PARTICIPANTES':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -848,6 +853,11 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->eliminarOcupacion((int)($payload['id'] ?? 0)));
+
+        case 'CAMBIAR_INSTRUCTOR_SESION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->cambiarInstructorSesion($payload));
 
         case 'GUARDAR_EMPRESA_DC3':
             $usr = validarToken($pdo, $token);
