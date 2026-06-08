@@ -842,9 +842,13 @@ class Personal {
                 'certificado' => $this->htmlCertificado($p, $qrB64),
                 default       => $this->htmlDiploma($p),
             };
-            $folio       = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
-            $orientation = ($tipo === 'diploma') ? 'landscape' : 'portrait';
-            $url         = $this->htmlAPdf($html, $folio, $tipo, $orientation);
+            $folio = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
+            if ($tipo === 'certificado') {
+                $url = $this->htmlToPdfMpdf($html, $folio, 'CERT');
+            } else {
+                $orientation = ($tipo === 'diploma') ? 'landscape' : 'portrait';
+                $url         = $this->htmlAPdf($html, $folio, $tipo, $orientation);
+            }
         } catch (\Throwable $e) {
             error_log('[AVBA] generarDocumento error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
             return ['status' => 'error', 'message' => 'Error generando documento: ' . $e->getMessage()];
@@ -1918,6 +1922,68 @@ HTML;
         return ['status' => 'success', 'message' => 'Datos guardados correctamente.'];
     }
 
+    private function htmlToPdfMpdf(string $html, string $folio, string $sufijo = 'CERT'): string {
+        if (!class_exists('\\Mpdf\\Mpdf')) {
+            $autoload = __DIR__ . '/../vendor/autoload.php';
+            if (file_exists($autoload)) require_once $autoload;
+        }
+        if (!class_exists('\\Mpdf\\Mpdf')) {
+            throw new \RuntimeException('mPDF no disponible. Verifica vendor/autoload.php.');
+        }
+
+        $rutaDir = UPLOAD_DIR . 'personal/docs/';
+        if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
+
+        $config = [
+            'mode'          => 'utf-8',
+            'format'        => 'A4',
+            'margin_left'   => 0, 'margin_right'  => 0,
+            'margin_top'    => 0, 'margin_bottom' => 0,
+            'margin_header' => 0, 'margin_footer' => 0,
+            'dpi'           => 96,
+            'default_font'  => 'dejavusans',
+            'tempDir'       => sys_get_temp_dir() . '/mpdf',
+        ];
+
+        $mpdf = new \Mpdf\Mpdf($config);
+        $mpdf->SetBasePath(__DIR__ . '/../');
+        $mpdf->SetHTMLFooter('');
+
+        $prevBacktrack = (int) ini_get('pcre.backtrack_limit');
+        ini_set('pcre.backtrack_limit', 10000000);
+
+        $css      = '';
+        $bodyHtml = $html;
+        $p = 0;
+        while (($s = stripos($bodyHtml, '<style', $p)) !== false) {
+            $sEnd = strpos($bodyHtml, '>', $s);
+            if ($sEnd === false) break;
+            $eTag = stripos($bodyHtml, '</style>', $sEnd + 1);
+            if ($eTag === false) break;
+            $css     .= substr($bodyHtml, $sEnd + 1, $eTag - $sEnd - 1) . "\n";
+            $bodyHtml = substr($bodyHtml, 0, $s) . substr($bodyHtml, $eTag + 8);
+            $p = $s;
+        }
+        $bOpen = stripos($bodyHtml, '<body');
+        if ($bOpen !== false) {
+            $bOpen  = strpos($bodyHtml, '>', $bOpen) + 1;
+            $bClose = strripos($bodyHtml, '</body>');
+            if ($bClose !== false) $bodyHtml = substr($bodyHtml, $bOpen, $bClose - $bOpen);
+        }
+
+        if ($css !== '') $mpdf->WriteHTML($css, \Mpdf\HTMLParserMode::HEADER_CSS);
+        $mpdf->WriteHTML($bodyHtml, \Mpdf\HTMLParserMode::HTML_BODY);
+
+        ini_set('pcre.backtrack_limit', $prevBacktrack);
+
+        $mpdf->SetProtection(['print'], '', 'Avba@Cert2024!');
+
+        $nombre  = $sufijo . '_AVBA_' . $folio . '_' . date('Ymd_His') . '.pdf';
+        $destino = $rutaDir . $nombre;
+        $mpdf->Output($destino, 'F');
+        return UPLOAD_URL . 'personal/docs/' . $nombre;
+    }
+
     private function htmlCertificado(array $p, string $qrB64 = ''): string {
         $e = fn($s) => htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8');
 
@@ -1982,7 +2048,7 @@ HTML;
   .qr-box img { width: 100px; height: 100px; border: 1px solid #dde5f0; padding: 2px; }
   .qr-box .qr-label { font-size: 7pt; color: #5a6072; margin-top: 3px; }
   .valid-box { text-align: center; padding: 0 10px; }
-  .valid-badge { border: 2px solid #185FA5; border-radius: 6px; padding: 6px 14px; }
+  .valid-badge { border: 2px solid #185FA5; border-radius: 6px; padding: 6px 14px; display: inline-block; }
   .valid-badge .vb-title { font-size: 8pt; color: #185FA5; font-weight: bold; letter-spacing: 1px; }
   .valid-badge .vb-date  { font-size: 10pt; color: #0C447C; font-weight: bold; margin-top: 2px; }
   .valid-badge .vb-sub   { font-size: 7.5pt; color: #5a6072; margin-top: 1px; }
