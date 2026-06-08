@@ -1812,10 +1812,10 @@ HTML;
         $logoHtml  = $logoB64
             ? "<img src=\"{$logoB64}\" style=\"width:110px;height:52px;display:block;\" alt=\"AVBA\">"
             : '<span style="font-size:11pt;font-weight:bold;color:#C9A84C;">AVBA</span>';
-        // Firma wrapped in cream box so dark signature is visible on dark-blue footer
+        // Firma blanca con fondo transparente — visible directamente sobre el fondo azul marino
         $firmaHtml = $firmaB64
-            ? "<table style=\"margin:0 auto 3px;border-collapse:collapse;\"><tr><td style=\"background:#FFFDF5;padding:4px 10px;\"><img src=\"{$firmaB64}\" style=\"width:110px;height:52px;display:block;\" alt=\"Firma\"></td></tr></table>"
-            : '<div style="height:60px;"></div>';
+            ? "<img src=\"{$firmaB64}\" style=\"width:130px;height:62px;display:block;margin:0 auto 3px;\" alt=\"Firma\">"
+            : '<div style="height:65px;"></div>';
         $selloHtml = $selloB64
             ? "<img src=\"{$selloB64}\" style=\"width:68px;height:60px;display:block;margin:0 auto;\" alt=\"Sello\">"
             : '';
