@@ -809,7 +809,12 @@ class Personal {
     // ══════════════════════════════════════════════════════
 
     public function generarDocumento(int $id, string $tipo, string $usuario): array {
-        $p = $this->obtenerParticipante($id);
+        try {
+            $p = $this->obtenerParticipante($id);
+        } catch (\Throwable $e) {
+            error_log('[AVBA] obtenerParticipante error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            return ['status' => 'error', 'message' => 'Error al cargar datos del participante: ' . $e->getMessage()];
+        }
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
         $tiposValidos = ['dc3', 'diploma', 'certificado'];
