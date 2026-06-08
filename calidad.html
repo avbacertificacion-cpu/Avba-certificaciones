@@ -708,9 +708,10 @@
 
 <!-- sub-nav Catálogos -->
 <div class="sub-nav" id="sub-nav-catalogos" style="display:none">
-  <button class="sub-btn active" id="sub-btn-cat-equipos" onclick="verSubTab('catalogos','equipos')">Tipos de Equipo</button>
-  <button class="sub-btn"        id="sub-btn-cat-cursos"  onclick="verSubTab('catalogos','cursos')">Cursos</button>
-  <button class="sub-btn"        id="sub-btn-cat-ocup"    onclick="verSubTab('catalogos','ocupaciones')">Ocupaciones</button>
+  <button class="sub-btn active" id="sub-btn-cat-equipos"  onclick="verSubTab('catalogos','equipos')">Tipos de Equipo</button>
+  <button class="sub-btn"        id="sub-btn-cat-cursos"   onclick="verSubTab('catalogos','cursos')">Cursos</button>
+  <button class="sub-btn"        id="sub-btn-cat-ocup"     onclick="verSubTab('catalogos','ocupaciones')">Ocupaciones</button>
+  <button class="sub-btn"        id="sub-btn-cat-empresas" onclick="verSubTab('catalogos','empresas')">🏢 Empresas DC-3</button>
 </div>
 
 <div id="sec-maquinaria" class="wrap">
@@ -916,6 +917,49 @@
   </div>
 
 </div><!-- /tab-ocupaciones -->
+
+
+<!-- ══════════════════════════════════════════════════════════
+     TAB: EMPRESAS DC-3
+═══════════════════════════════════════════ -->
+<div id="tab-empresas" class="wrap" style="display:none" data-cat="empresas">
+
+  <div class="top-bar">
+    <h2>Empresas — Datos para constancia DC-3</h2>
+    <button class="btn-crear" onclick="abrirModalEmpresaDC3()">+ Nueva empresa</button>
+  </div>
+
+  <div style="background:var(--azul-light);border:1px solid var(--azul);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;color:var(--azul-dark)">
+    <strong>¿Para qué sirve este catálogo?</strong><br>
+    Registra aquí los datos fiscales de cada empresa cliente: RFC, representante patronal, representante de trabajadores y dirección.
+    Estos datos se llenan automáticamente en la constancia DC-3 al generar los documentos de capacitación.
+  </div>
+
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Catálogo de empresas</span>
+      <span class="tabla-count" id="empresas-count">—</span>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:26%">Razón Social</th>
+            <th style="width:11%;text-align:center">RFC</th>
+            <th style="width:20%">Representante Patrón</th>
+            <th style="width:19%">Rep. Trabajadores</th>
+            <th style="width:15%">Correo</th>
+            <th style="width:9%"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-empresas">
+          <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div><!-- /tab-empresas -->
 
 
 <!-- ══════════════════════════════════════════════════════════
@@ -1383,6 +1427,90 @@
   </div>
 </div>
 
+
+<!-- ══ MODAL EMPRESA DC-3 ══ -->
+<div class="overlay" id="overlay-empresa-dc3" style="display:none" onclick="if(event.target===this)cerrarModalEmpresaDC3()">
+  <div class="modal" style="max-width:580px">
+    <div class="m-header" style="padding:16px 22px 12px;border-bottom:1px solid var(--borde)">
+      <div>
+        <div class="m-title" id="empresa-dc3-titulo">Nueva Empresa</div>
+        <div class="m-sub">Datos para constancia DC-3</div>
+      </div>
+      <button class="m-close" onclick="cerrarModalEmpresaDC3()">✕</button>
+    </div>
+    <div style="padding:18px 22px 20px;max-height:72vh;overflow-y:auto">
+      <input type="hidden" id="emp-dc3-id" value="0">
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>Razón Social / Nombre empresa <span style="color:var(--rojo)">*</span></label>
+          <input type="text" id="emp-dc3-nombre" placeholder="INDUSTRIAS EJEMPLO SA DE CV"
+                 style="text-transform:uppercase" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>RFC</label>
+          <input type="text" id="emp-dc3-rfc" placeholder="INE920101XYZ" maxlength="13"
+                 style="text-transform:uppercase;font-family:monospace">
+        </div>
+        <div class="form-group" style="flex:1.6">
+          <label>Correo de contacto</label>
+          <input type="email" id="emp-dc3-correo" placeholder="contacto@empresa.com">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>Representante del patrón
+            <span style="font-size:11px;color:var(--texto-hint);font-weight:400">&nbsp;— firma DC-3 col. 2</span>
+          </label>
+          <input type="text" id="emp-dc3-rep" placeholder="NOMBRE COMPLETO DEL REPRESENTANTE"
+                 style="text-transform:uppercase">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>Representante de trabajadores
+            <span style="font-size:11px;color:var(--texto-hint);font-weight:400">&nbsp;— solo empresas &gt;50 trabajadores</span>
+          </label>
+          <input type="text" id="emp-dc3-rep-trab" placeholder="NOMBRE COMPLETO (dejar vacío si no aplica)"
+                 style="text-transform:uppercase">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>Dirección fiscal</label>
+          <input type="text" id="emp-dc3-dir" placeholder="CALLE, COLONIA, CP, CIUDAD"
+                 style="text-transform:uppercase">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>Logo de la empresa
+            <span style="font-size:11px;color:var(--texto-hint);font-weight:400">&nbsp;— aparece en encabezado del DC-3</span>
+          </label>
+          <div style="display:flex;gap:10px;align-items:center">
+            <input type="file" id="emp-dc3-logo-file" accept="image/*"
+                   onchange="previewLogoDC3(this)" style="flex:1;font-size:12px">
+            <img id="emp-dc3-logo-preview" src="" alt="Logo"
+                 style="height:40px;max-width:110px;display:none;border:1px solid var(--borde);
+                        border-radius:4px;object-fit:contain;padding:2px;background:#fff">
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;border-top:1px solid var(--borde);padding-top:14px">
+        <button class="btn-cancel2" onclick="cerrarModalEmpresaDC3()">Cancelar</button>
+        <button class="btn-save"    onclick="guardarEmpresaDC3()">Guardar empresa</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ══ MODAL DETALLE PARTICIPANTE (Personal) ══ -->
 <div class="overlay" id="overlay-per-det" style="display:none" onclick="if(event.target===this)cerrarDetPer()">
@@ -2546,7 +2674,7 @@ const TODOS_CONTENIDOS = [
   'sec-maquinaria',
   'sec-acc-inspeccionados', 'tab-accesorios', 'sec-acc-plantilla',
   'sec-personal-cursos',    'sec-personal-indep',    'sec-personal-plantillas',
-  'tab-tipos', 'tab-cursos', 'tab-ocupaciones',
+  'tab-tipos', 'tab-cursos', 'tab-ocupaciones', 'tab-empresas',
   'sec-qr',
   'sec-pnd',
 ];
@@ -2586,7 +2714,7 @@ function verSubTab(sec, sub) {
   const subBtns = {
     accesorios: { inspeccionados:'sub-btn-acc-insp', tipos:'sub-btn-acc-tipos', plantilla:'sub-btn-acc-plantilla' },
     personal:   { cursos:'sub-btn-per-cursos', independiente:'sub-btn-per-indep', plantillas:'sub-btn-per-plantillas' },
-    catalogos:  { equipos:'sub-btn-cat-equipos', cursos:'sub-btn-cat-cursos', ocupaciones:'sub-btn-cat-ocup' },
+    catalogos:  { equipos:'sub-btn-cat-equipos', cursos:'sub-btn-cat-cursos', ocupaciones:'sub-btn-cat-ocup', empresas:'sub-btn-cat-empresas' },
   };
   Object.entries(subBtns[sec] || {}).forEach(([s, btnId]) => {
     document.getElementById(btnId).classList.toggle('active', s === sub);
@@ -2599,7 +2727,7 @@ function verSubTab(sec, sub) {
   const contentMap = {
     accesorios: { inspeccionados:'sec-acc-inspeccionados', tipos:'tab-accesorios', plantilla:'sec-acc-plantilla' },
     personal:   { cursos:'sec-personal-cursos', independiente:'sec-personal-indep', plantillas:'sec-personal-plantillas' },
-    catalogos:  { equipos:'tab-tipos', cursos:'tab-cursos', ocupaciones:'tab-ocupaciones' },
+    catalogos:  { equipos:'tab-tipos', cursos:'tab-cursos', ocupaciones:'tab-ocupaciones', empresas:'tab-empresas' },
   };
   const targetId = contentMap[sec]?.[sub];
   if (targetId) document.getElementById(targetId).style.display = '';
@@ -2612,6 +2740,7 @@ function verSubTab(sec, sub) {
   if (sec === 'catalogos'  && sub === 'equipos'     && !tiposCargados)           { cargarTipos(); cargarPlantillaActual(); }
   if (sec === 'catalogos'  && sub === 'cursos'      && !cursosCargados)          cargarCursos();
   if (sec === 'catalogos'  && sub === 'ocupaciones' && !ocupCargados)            cargarOcupaciones();
+  if (sec === 'catalogos'  && sub === 'empresas'    && !empresasCargadas)        cargarEmpresas();
 }
 
 /* ════════════════════════════════════════
@@ -2840,6 +2969,146 @@ async function eliminarOcupacion(id, nombre) {
     if (data.status === "success") { ocupCargados = false; cargarOcupaciones(); }
     else alert(data.message || "No se pudo eliminar");
   } catch (e) { alert("Error de conexión"); }
+}
+
+// ══════════════════════════════════════════════════
+//  EMPRESAS DC-3
+// ══════════════════════════════════════════════════
+let empresasCargadas = false;
+let empresasData     = [];
+
+async function cargarEmpresas() {
+  const tbody = document.getElementById('tbody-empresas');
+  tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>`;
+  try {
+    const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res = await fetch(API + '?action=LISTAR_EMPRESAS_DC3', { headers: { 'X-Token': s.token || '' } });
+    const data = await res.json();
+    empresasData    = Array.isArray(data) ? data : [];
+    empresasCargadas = true;
+    document.getElementById('empresas-count').textContent = empresasData.length;
+    if (!empresasData.length) {
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--texto-hint)">Sin empresas registradas. Crea la primera con el botón <b>+ Nueva empresa</b>.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = empresasData.map(e => `
+      <tr>
+        <td style="font-weight:600;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.nombre_cliente)}</td>
+        <td style="text-align:center;font-family:monospace;font-size:12px">${escH(e.rfc) || '<span style="color:var(--texto-hint)">—</span>'}</td>
+        <td style="font-size:12px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.representante) || '<span style="color:var(--texto-hint)">—</span>'}</td>
+        <td style="font-size:12px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.representante_trabajadores) || '<span style="color:var(--texto-hint)">—</span>'}</td>
+        <td style="font-size:12px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.correo_contacto) || '<span style="color:var(--texto-hint)">—</span>'}</td>
+        <td style="text-align:center;white-space:nowrap">
+          <button class="btn-icon" title="Editar" onclick="abrirModalEmpresaDC3(${e.id})" style="margin-right:4px">✏️</button>
+          <button class="btn-icon btn-icon-del" title="Eliminar" onclick="eliminarEmpresaDC3(${e.id},'${escH(e.nombre_cliente).replace(/'/g,"\\'")}')">🗑️</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--rojo)">Error al cargar empresas.</td></tr>`;
+  }
+}
+
+function abrirModalEmpresaDC3(id = 0) {
+  window._empDC3Logo = null;
+  ['emp-dc3-nombre','emp-dc3-rfc','emp-dc3-correo','emp-dc3-rep','emp-dc3-rep-trab','emp-dc3-dir'].forEach(f => {
+    document.getElementById(f).value = '';
+  });
+  document.getElementById('emp-dc3-id').value = id;
+  document.getElementById('emp-dc3-logo-file').value = '';
+  document.getElementById('emp-dc3-logo-preview').style.display = 'none';
+
+  if (id) {
+    const e = empresasData.find(x => x.id == id);
+    if (e) {
+      document.getElementById('empresa-dc3-titulo').textContent = 'Editar Empresa';
+      document.getElementById('emp-dc3-nombre').value    = e.nombre_cliente;
+      document.getElementById('emp-dc3-rfc').value       = e.rfc;
+      document.getElementById('emp-dc3-correo').value    = e.correo_contacto;
+      document.getElementById('emp-dc3-rep').value       = e.representante;
+      document.getElementById('emp-dc3-rep-trab').value  = e.representante_trabajadores;
+      document.getElementById('emp-dc3-dir').value       = e.direccion;
+    }
+  } else {
+    document.getElementById('empresa-dc3-titulo').textContent = 'Nueva Empresa';
+  }
+  document.getElementById('overlay-empresa-dc3').style.display = '';
+}
+
+function cerrarModalEmpresaDC3() {
+  document.getElementById('overlay-empresa-dc3').style.display = 'none';
+}
+
+function previewLogoDC3(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    window._empDC3Logo = ev.target.result;
+    const img = document.getElementById('emp-dc3-logo-preview');
+    img.src = ev.target.result;
+    img.style.display = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+async function guardarEmpresaDC3() {
+  const id = parseInt(document.getElementById('emp-dc3-id').value) || 0;
+  const nombre = document.getElementById('emp-dc3-nombre').value.trim().toUpperCase();
+  if (!nombre) { mostrarToast('El nombre de la empresa es obligatorio.', 'error'); return; }
+
+  const payload = {
+    id,
+    nombre_cliente:             nombre,
+    rfc:                        document.getElementById('emp-dc3-rfc').value.trim(),
+    correo_contacto:            document.getElementById('emp-dc3-correo').value.trim(),
+    representante:              document.getElementById('emp-dc3-rep').value.trim(),
+    representante_trabajadores: document.getElementById('emp-dc3-rep-trab').value.trim(),
+    direccion:                  document.getElementById('emp-dc3-dir').value.trim(),
+  };
+  if (window._empDC3Logo) payload.logo = window._empDC3Logo;
+
+  try {
+    const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body:    JSON.stringify({ action: 'GUARDAR_EMPRESA_DC3', payload }),
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast('Empresa guardada correctamente.', 'success');
+      cerrarModalEmpresaDC3();
+      empresasCargadas = false;
+      cargarEmpresas();
+    } else {
+      mostrarToast(data.message || 'Error al guardar empresa.', 'error');
+    }
+  } catch (err) {
+    mostrarToast('Error de conexión.', 'error');
+  }
+}
+
+async function eliminarEmpresaDC3(id, nombre) {
+  if (!confirm(`¿Eliminar la empresa "${nombre}"?\n\nSolo es posible si no tiene registros vinculados (participantes, equipos).`)) return;
+  try {
+    const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body:    JSON.stringify({ action: 'ELIMINAR_EMPRESA_DC3', payload: { id } }),
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast('Empresa eliminada.', 'success');
+      empresasCargadas = false;
+      cargarEmpresas();
+    } else {
+      mostrarToast(data.message || 'No se pudo eliminar.', 'error');
+    }
+  } catch (err) {
+    mostrarToast('Error de conexión.', 'error');
+  }
 }
 
 // ══════════════════════════════════════════════════

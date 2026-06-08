@@ -795,6 +795,106 @@ class Personal {
         return ['status' => 'success', 'id' => $id];
     }
 
+    // ══════════════════════════════════════════════════════
+    //  CATÁLOGO DE EMPRESAS (para DC-3)
+    // ══════════════════════════════════════════════════════
+
+    public function listarEmpresas(): array {
+        $this->ensureMigration013Columns();
+        try {
+            $this->pdo->exec("ALTER TABLE clientes
+                ADD COLUMN IF NOT EXISTS rfc              VARCHAR(20)  DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS representante    VARCHAR(200) DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS direccion        VARCHAR(300) DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS correo_contacto  VARCHAR(200) DEFAULT NULL");
+        } catch (\Throwable $e) {}
+
+        $stmt = $this->pdo->query(
+            "SELECT id, nombre_cliente, primera_parte,
+                    COALESCE(rfc,'') AS rfc,
+                    COALESCE(representante,'') AS representante,
+                    COALESCE(representante_trabajadores,'') AS representante_trabajadores,
+                    COALESCE(direccion,'') AS direccion,
+                    COALESCE(correo_contacto,'') AS correo_contacto,
+                    (logo IS NOT NULL AND logo <> '') AS tiene_logo
+             FROM clientes ORDER BY nombre_cliente"
+        );
+        return $stmt->fetchAll();
+    }
+
+    public function guardarEmpresaDC3(array $payload): array {
+        $this->ensureMigration013Columns();
+        try {
+            $this->pdo->exec("ALTER TABLE clientes
+                ADD COLUMN IF NOT EXISTS rfc              VARCHAR(20)  DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS representante    VARCHAR(200) DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS direccion        VARCHAR(300) DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS correo_contacto  VARCHAR(200) DEFAULT NULL");
+        } catch (\Throwable $e) {}
+
+        $id      = (int)($payload['id'] ?? 0);
+        $nombre  = strtoupper(trim($payload['nombre_cliente'] ?? ''));
+        if (!$nombre) return ['status' => 'error', 'message' => 'El nombre de la empresa es obligatorio.'];
+
+        $rfc     = strtoupper(preg_replace('/[^A-Z0-9&Ñ]/iu', '', $payload['rfc'] ?? '')) ?: null;
+        $rep     = strtoupper(trim($payload['representante'] ?? '')) ?: null;
+        $repTrab = strtoupper(trim($payload['representante_trabajadores'] ?? '')) ?: null;
+        $dir     = strtoupper(trim($payload['direccion'] ?? '')) ?: null;
+        $correo  = strtolower(trim($payload['correo_contacto'] ?? '')) ?: null;
+
+        $logo = null;
+        if (!empty($payload['logo']) && str_starts_with(trim($payload['logo']), 'data:image/')) {
+            $logo = trim($payload['logo']);
+        }
+
+        if ($id) {
+            $sets = 'nombre_cliente=?, rfc=?, representante=?, representante_trabajadores=?, direccion=?, correo_contacto=?';
+            $vals = [$nombre, $rfc, $rep, $repTrab, $dir, $correo];
+            if ($logo !== null) { $sets .= ', logo=?'; $vals[] = $logo; }
+            $vals[] = $id;
+            $this->pdo->prepare("UPDATE clientes SET {$sets} WHERE id=?")->execute($vals);
+        } else {
+            $chk = $this->pdo->prepare("SELECT id FROM clientes WHERE UPPER(TRIM(nombre_cliente)) = UPPER(TRIM(?))");
+            $chk->execute([$nombre]);
+            if ($chk->fetch()) {
+                return ['status' => 'error', 'message' => 'Ya existe una empresa con ese nombre.'];
+            }
+            $maxRow  = $this->pdo->query("SELECT MAX(CAST(primera_parte AS UNSIGNED)) AS max_id FROM clientes")->fetch();
+            $primera = max((int)($maxRow['max_id'] ?? 45154), 45154) + 1;
+
+            $this->pdo->prepare(
+                "INSERT INTO clientes (nombre_cliente, primera_parte, rfc, representante,
+                 representante_trabajadores, direccion, correo_contacto, logo) VALUES (?,?,?,?,?,?,?,?)"
+            )->execute([$nombre, $primera, $rfc, $rep, $repTrab, $dir, $correo, $logo]);
+            $id = (int)$this->pdo->lastInsertId();
+        }
+
+        return ['status' => 'success', 'id' => $id];
+    }
+
+    public function eliminarEmpresaDC3(int $id): array {
+        $chk = $this->pdo->prepare("SELECT nombre_cliente FROM clientes WHERE id=?");
+        $chk->execute([$id]);
+        $row = $chk->fetch();
+        if (!$row) return ['status' => 'error', 'message' => 'Empresa no encontrada.'];
+
+        $nombre = $row['nombre_cliente'];
+        foreach ([
+            "SELECT COUNT(*) FROM equipos WHERE empresa_nombre = ? COLLATE utf8mb4_general_ci",
+            "SELECT COUNT(*) FROM participantes_cursos WHERE empresa_nombre = ? COLLATE utf8mb4_general_ci",
+        ] as $sql) {
+            try {
+                $s = $this->pdo->prepare($sql);
+                $s->execute([$nombre]);
+                if ($s->fetchColumn() > 0)
+                    return ['status' => 'error', 'message' => 'No se puede eliminar: la empresa tiene registros vinculados.'];
+            } catch (\Throwable $e) {}
+        }
+
+        $this->pdo->prepare("DELETE FROM clientes WHERE id=?")->execute([$id]);
+        return ['status' => 'success'];
+    }
+
     public function eliminarOcupacion(int $id): array {
         $stmt = $this->pdo->prepare(
             "SELECT COUNT(*) FROM participantes_cursos WHERE ocupacion_id = ?"
