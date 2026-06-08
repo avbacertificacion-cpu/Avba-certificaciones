@@ -78,6 +78,7 @@ class Personal {
     }
 
     public function obtenerParticipante(int $id): ?array {
+        $this->ensureMigration013Columns();
         $stmt = $this->pdo->prepare(
             "SELECT p.*,
                     c.nombre AS curso_nombre, c.duracion_horas, c.area_tematica,
@@ -626,6 +627,18 @@ class Personal {
         }
 
         return $resultado;
+    }
+
+    private function ensureMigration013Columns(): void {
+        try {
+            $this->pdo->exec("ALTER TABLE usuarios
+                ADD COLUMN IF NOT EXISTS registro_stps VARCHAR(100) NULL");
+        } catch (\Throwable $e) {}
+        try {
+            $this->pdo->exec("ALTER TABLE clientes
+                ADD COLUMN IF NOT EXISTS logo LONGTEXT NULL,
+                ADD COLUMN IF NOT EXISTS representante_trabajadores VARCHAR(300) NULL");
+        } catch (\Throwable $e) {}
     }
 
     private function ensureEstatusColumn(): void {
