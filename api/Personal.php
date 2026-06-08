@@ -848,8 +848,18 @@ class Personal {
         }
 
         if ($id) {
+            // Assign primera_parte if the existing record has none
+            $existing = $this->pdo->prepare("SELECT primera_parte FROM clientes WHERE id=?");
+            $existing->execute([$id]);
+            $exRow = $existing->fetch();
             $sets = 'nombre_cliente=?, rfc=?, representante=?, representante_trabajadores=?, direccion=?, correo_contacto=?';
             $vals = [$nombre, $rfc, $rep, $repTrab, $dir, $correo];
+            if (empty($exRow['primera_parte'])) {
+                $maxRow  = $this->pdo->query("SELECT MAX(CAST(primera_parte AS UNSIGNED)) AS max_id FROM clientes")->fetch();
+                $primera = max((int)($maxRow['max_id'] ?? 45154), 45154) + 1;
+                $sets .= ', primera_parte=?';
+                $vals[] = $primera;
+            }
             if ($logo !== null) { $sets .= ', logo=?'; $vals[] = $logo; }
             $vals[] = $id;
             $this->pdo->prepare("UPDATE clientes SET {$sets} WHERE id=?")->execute($vals);
