@@ -94,7 +94,7 @@ class Personal {
              LEFT JOIN cursos c ON c.id = p.curso_id
              LEFT JOIN ocupaciones_especificas o ON o.id = p.ocupacion_id
              LEFT JOIN usuarios u ON u.usuario = p.usuario_registro
-             LEFT JOIN clientes cl ON UPPER(TRIM(cl.nombre_cliente)) = UPPER(TRIM(p.empresa_nombre))
+             LEFT JOIN clientes cl ON UPPER(TRIM(cl.nombre_cliente COLLATE utf8mb4_general_ci)) = UPPER(TRIM(p.empresa_nombre COLLATE utf8mb4_general_ci))
              WHERE p.id = ?"
         );
         $stmt->execute([$id]);
