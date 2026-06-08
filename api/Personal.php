@@ -1011,11 +1011,11 @@ class Personal {
             };
             $folio = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
             if ($tipo === 'diploma') {
-                $url = $this->htmlToPdfMpdf($html, $folio, 'DIPLOMA', 'A4-L', 5, 5);
+                $url = $this->htmlToPdfMpdf($html, $folio, 'DIPLOMA', 'A4-L');
             } elseif ($tipo === 'certificado') {
                 $url = $this->htmlToPdfMpdf($html, $folio, 'CERT', 'A4');
             } else {
-                $url = $this->htmlToPdfMpdf($html, $folio, 'DC3', 'A4', 10, 12);
+                $url = $this->htmlToPdfMpdf($html, $folio, 'DC3', 'A4');
             }
         } catch (\Throwable $e) {
             error_log('[AVBA] generarDocumento error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
@@ -1357,8 +1357,8 @@ class Personal {
 
         // ── Estilo base Dompdf ─────────────────────────────────────────────
         $css = <<<'CSS'
-@page { size: A4 portrait; }
-* { margin:0; padding:0; box-sizing:border-box; }
+@page { margin: 10mm 12mm; }
+* { margin:0; padding:0; }
 body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8.5pt; color: #000; }
 .doc { width:100%; border-collapse:collapse; border:1.5px solid #000; }
 .doc td, .doc th { border:1px solid #555; padding:0; vertical-align:top; }
@@ -1768,9 +1768,9 @@ HTML;
 <head>
 <meta charset="UTF-8">
 <style>
-@page { size: A4 landscape; }
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: DejaVu Sans, Arial, sans-serif; background: #0B1938; margin: 0; }
+@page { margin: 5mm; }
+* { margin: 0; padding: 0; }
+body { font-family: DejaVu Sans, Arial, sans-serif; margin: 0; }
 </style>
 </head>
 <body>
@@ -2098,7 +2098,7 @@ HTML;
         return ['status' => 'success', 'message' => 'Datos guardados correctamente.'];
     }
 
-    private function htmlToPdfMpdf(string $html, string $folio, string $sufijo = 'CERT', $format = 'A4', float $marginV = 0, float $marginH = 0): string {
+    private function htmlToPdfMpdf(string $html, string $folio, string $sufijo = 'CERT', $format = 'A4'): string {
         if (!class_exists('\\Mpdf\\Mpdf')) {
             $autoload = __DIR__ . '/../vendor/autoload.php';
             if (file_exists($autoload)) require_once $autoload;
@@ -2113,8 +2113,8 @@ HTML;
         $config = [
             'mode'          => 'utf-8',
             'format'        => $format,
-            'margin_left'   => $marginH, 'margin_right'  => $marginH,
-            'margin_top'    => $marginV, 'margin_bottom' => $marginV,
+            'margin_left'   => 0, 'margin_right'  => 0,
+            'margin_top'    => 0, 'margin_bottom' => 0,
             'margin_header' => 0, 'margin_footer' => 0,
             'dpi'           => 96,
             'default_font'  => 'dejavusans',
@@ -2128,10 +2128,20 @@ HTML;
         $prevBacktrack = (int) ini_get('pcre.backtrack_limit');
         ini_set('pcre.backtrack_limit', 10000000);
 
-        // Feed the full HTML document so mPDF applies @page rules (margins, size,
-        // background) correctly. Splitting into HEADER_CSS + HTML_BODY causes @page
-        // directives to be ignored, producing blank/multi-page PDFs.
-        $mpdf->WriteHTML($html);
+        // Use split mode (HEADER_CSS + HTML_BODY) — same pattern as Certificaciones.php.
+        // WriteHTML($fullHtml) with a complete document ignores @page margins in mPDF,
+        // producing hundreds of blank pages. The split mode processes them correctly.
+        $css      = '';
+        $bodyHtml = $html;
+        if (preg_match('/<style[^>]*>(.*?)<\/style>/is', $html, $mStyle)) {
+            $css = $mStyle[1];
+        }
+        if (preg_match('/<body[^>]*>(.*)<\/body>/is', $html, $mBody)) {
+            $bodyHtml = $mBody[1];
+        }
+
+        if ($css !== '') $mpdf->WriteHTML($css, \Mpdf\HTMLParserMode::HEADER_CSS);
+        $mpdf->WriteHTML($bodyHtml, \Mpdf\HTMLParserMode::HTML_BODY);
 
         ini_set('pcre.backtrack_limit', $prevBacktrack);
 
