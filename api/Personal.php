@@ -795,6 +795,17 @@ class Personal {
         return ['status' => 'success', 'id' => $id];
     }
 
+    private function ensureClientesOcupacionesTable(): void {
+        try {
+            $this->pdo->exec("CREATE TABLE IF NOT EXISTS clientes_ocupaciones (
+                cliente_id   INT NOT NULL,
+                ocupacion_id INT NOT NULL,
+                orden        TINYINT NOT NULL DEFAULT 1,
+                PRIMARY KEY (cliente_id, ocupacion_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (\Throwable $e) {}
+    }
+
     // ══════════════════════════════════════════════════════
     //  CATÁLOGO DE EMPRESAS (para DC-3)
     // ══════════════════════════════════════════════════════
@@ -809,6 +820,8 @@ class Personal {
                 ADD COLUMN IF NOT EXISTS correo_contacto  VARCHAR(200) DEFAULT NULL");
         } catch (\Throwable $e) {}
 
+        $this->ensureClientesOcupacionesTable();
+
         $stmt = $this->pdo->query(
             "SELECT id, nombre_cliente, primera_parte,
                     COALESCE(rfc,'') AS rfc,
@@ -819,7 +832,32 @@ class Personal {
                     (logo IS NOT NULL AND logo <> '') AS tiene_logo
              FROM clientes ORDER BY nombre_cliente"
         );
-        return $stmt->fetchAll();
+        $rows = $stmt->fetchAll();
+
+        if (!empty($rows)) {
+            $ids = implode(',', array_map('intval', array_column($rows, 'id')));
+            try {
+                $ocStmt = $this->pdo->query(
+                    "SELECT co.cliente_id, o.id AS ocupacion_id, o.nombre AS ocupacion_nombre
+                     FROM clientes_ocupaciones co
+                     JOIN ocupaciones_especificas o ON o.id = co.ocupacion_id
+                     WHERE co.cliente_id IN ({$ids})
+                     ORDER BY co.cliente_id, co.orden"
+                );
+                $ocMap = [];
+                foreach ($ocStmt->fetchAll() as $oc) {
+                    $ocMap[$oc['cliente_id']][] = [
+                        'id'     => (int)$oc['ocupacion_id'],
+                        'nombre' => $oc['ocupacion_nombre'],
+                    ];
+                }
+            } catch (\Throwable $e) { $ocMap = []; }
+            foreach ($rows as &$row) {
+                $row['ocupaciones'] = $ocMap[$row['id']] ?? [];
+            }
+            unset($row);
+        }
+        return $rows;
     }
 
     public function guardarEmpresaDC3(array $payload): array {
@@ -878,6 +916,25 @@ class Personal {
             )->execute([$nombre, $primera, $rfc, $rep, $repTrab, $dir, $correo, $logo]);
             $id = (int)$this->pdo->lastInsertId();
         }
+
+        // Sync occupations (up to 5)
+        $this->ensureClientesOcupacionesTable();
+        $rawIds  = $payload['ocupacion_ids'] ?? [];
+        $ocupIds = array_slice(
+            array_values(array_filter(
+                array_map('intval', is_array($rawIds) ? $rawIds : []),
+                fn($v) => $v > 0
+            )),
+            0, 5
+        );
+        try {
+            $this->pdo->prepare("DELETE FROM clientes_ocupaciones WHERE cliente_id=?")->execute([$id]);
+            foreach ($ocupIds as $ord => $oid) {
+                $this->pdo->prepare(
+                    "INSERT IGNORE INTO clientes_ocupaciones (cliente_id, ocupacion_id, orden) VALUES (?,?,?)"
+                )->execute([$id, $oid, $ord + 1]);
+            }
+        } catch (\Throwable $e) {}
 
         return ['status' => 'success', 'id' => $id];
     }

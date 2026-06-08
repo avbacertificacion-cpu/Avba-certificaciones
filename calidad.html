@@ -944,16 +944,17 @@
       <table>
         <thead>
           <tr>
-            <th style="width:26%">Razón Social</th>
-            <th style="width:11%;text-align:center">RFC</th>
-            <th style="width:20%">Representante Patrón</th>
-            <th style="width:19%">Rep. Trabajadores</th>
-            <th style="width:15%">Correo</th>
+            <th style="width:19%">Razón Social</th>
+            <th style="width:9%;text-align:center">RFC</th>
+            <th style="width:15%">Representante Patrón</th>
+            <th style="width:12%">Rep. Trabajadores</th>
+            <th style="width:12%">Correo</th>
+            <th style="width:24%">Ocupaciones</th>
             <th style="width:9%"></th>
           </tr>
         </thead>
         <tbody id="tbody-empresas">
-          <tr><td colspan="6" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
+          <tr><td colspan="7" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -1489,6 +1490,17 @@
           <label>Dirección fiscal</label>
           <input type="text" id="emp-dc3-dir" placeholder="CALLE, COLONIA, CP, CIUDAD"
                  style="text-transform:uppercase">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>Ocupaciones específicas
+            <span style="font-size:11px;color:var(--texto-hint);font-weight:400">&nbsp;— hasta 5, se registran en el DC-3 del trabajador</span>
+          </label>
+          <div id="emp-dc3-ocup-wrap" style="margin-top:4px">
+            <div style="color:var(--texto-hint);font-size:12px">Cargando ocupaciones…</div>
+          </div>
         </div>
       </div>
 
@@ -2980,9 +2992,42 @@ async function eliminarOcupacion(id, nombre) {
 let empresasCargadas = false;
 let empresasData     = [];
 
+async function ensureOcupData() {
+  if (ocupData.length) return;
+  try {
+    const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res = await fetch(API + '?action=LISTAR_OCUPACIONES_ADMIN', { headers: { 'X-Token': s.token || '' } });
+    const data = await res.json();
+    if (Array.isArray(data)) ocupData = data;
+  } catch(e) {}
+}
+
+function renderOcupSelects(selected = []) {
+  const wrap = document.getElementById('emp-dc3-ocup-wrap');
+  if (!wrap) return;
+  const active = ocupData.filter(o => o.activo != 0);
+  const opts = ['<option value="">— sin asignar —</option>',
+    ...active.map(o => `<option value="${o.id}">${escH(o.nombre)}</option>`)
+  ].join('');
+  wrap.innerHTML = Array.from({length: 5}, (_, i) => `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
+      <span style="font-size:11px;color:var(--texto-sub);width:74px;flex-shrink:0;text-align:right">Ocup. ${i+1}</span>
+      <select id="emp-dc3-ocup-${i+1}"
+              style="flex:1;padding:7px 10px;border:1.5px solid var(--borde);border-radius:7px;
+                     font-size:12px;color:var(--texto);outline:none;background:#fff">
+        ${opts}
+      </select>
+    </div>
+  `).join('');
+  selected.slice(0, 5).forEach((oc, i) => {
+    const sel = document.getElementById(`emp-dc3-ocup-${i+1}`);
+    if (sel) sel.value = oc.id;
+  });
+}
+
 async function cargarEmpresas() {
   const tbody = document.getElementById('tbody-empresas');
-  tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>`;
   try {
     const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
     const res = await fetch(API + '?action=LISTAR_EMPRESAS_DC3', { headers: { 'X-Token': s.token || '' } });
@@ -2991,32 +3036,41 @@ async function cargarEmpresas() {
     empresasCargadas = true;
     document.getElementById('empresas-count').textContent = empresasData.length;
     if (!empresasData.length) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--texto-hint)">Sin empresas registradas. Crea la primera con el botón <b>+ Nueva empresa</b>.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--texto-hint)">Sin empresas registradas. Crea la primera con el botón <b>+ Nueva empresa</b>.</td></tr>`;
       return;
     }
-    tbody.innerHTML = empresasData.map(e => `
-      <tr>
-        <td style="font-weight:600;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.nombre_cliente)}</td>
-        <td style="text-align:center;font-family:monospace;font-size:12px">${escH(e.rfc) || '<span style="color:var(--texto-hint)">—</span>'}</td>
-        <td style="font-size:12px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.representante) || '<span style="color:var(--texto-hint)">—</span>'}</td>
-        <td style="font-size:12px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.representante_trabajadores) || '<span style="color:var(--texto-hint)">—</span>'}</td>
-        <td style="font-size:12px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.correo_contacto) || '<span style="color:var(--texto-hint)">—</span>'}</td>
-        <td style="text-align:center;white-space:nowrap">
-          <button onclick="abrirModalEmpresaDC3(${e.id})"
-                  style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;
-                         padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;margin-right:4px">Editar</button>
-          <button onclick="eliminarEmpresaDC3(${e.id},'${escH(e.nombre_cliente)}')"
-                  style="background:var(--rojo-light);border:none;color:var(--rojo);border-radius:6px;
-                         padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Eliminar</button>
-        </td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = empresasData.map(e => {
+      const ocTags = (e.ocupaciones || []).length
+        ? (e.ocupaciones).map(o =>
+            `<span style="display:inline-block;background:var(--azul-light);color:var(--azul);
+                          border-radius:4px;padding:1px 6px;margin:1px 2px 1px 0;font-size:10.5px;
+                          white-space:nowrap">${escH(o.nombre)}</span>`
+          ).join('')
+        : '<span style="color:var(--texto-hint)">—</span>';
+      return `
+        <tr>
+          <td style="font-weight:600;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.nombre_cliente)}</td>
+          <td style="text-align:center;font-family:monospace;font-size:12px">${escH(e.rfc) || '<span style="color:var(--texto-hint)">—</span>'}</td>
+          <td style="font-size:12px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.representante) || '<span style="color:var(--texto-hint)">—</span>'}</td>
+          <td style="font-size:12px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.representante_trabajadores) || '<span style="color:var(--texto-hint)">—</span>'}</td>
+          <td style="font-size:12px;max-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.correo_contacto) || '<span style="color:var(--texto-hint)">—</span>'}</td>
+          <td style="font-size:11px;line-height:1.6">${ocTags}</td>
+          <td style="text-align:center;white-space:nowrap">
+            <button onclick="abrirModalEmpresaDC3(${e.id})"
+                    style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;
+                           padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;margin-right:4px">Editar</button>
+            <button onclick="eliminarEmpresaDC3(${e.id},'${escH(e.nombre_cliente)}')"
+                    style="background:var(--rojo-light);border:none;color:var(--rojo);border-radius:6px;
+                           padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Eliminar</button>
+          </td>
+        </tr>`;
+    }).join('');
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:28px;color:var(--rojo)">Error al cargar empresas.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--rojo)">Error al cargar empresas.</td></tr>`;
   }
 }
 
-function abrirModalEmpresaDC3(id = 0) {
+async function abrirModalEmpresaDC3(id = 0) {
   window._empDC3Logo = null;
   ['emp-dc3-nombre','emp-dc3-rfc','emp-dc3-correo','emp-dc3-rep','emp-dc3-rep-trab','emp-dc3-dir'].forEach(f => {
     document.getElementById(f).value = '';
@@ -3024,6 +3078,9 @@ function abrirModalEmpresaDC3(id = 0) {
   document.getElementById('emp-dc3-id').value = id;
   document.getElementById('emp-dc3-logo-file').value = '';
   document.getElementById('emp-dc3-logo-preview').style.display = 'none';
+
+  await ensureOcupData();
+  let selOcups = [];
 
   if (id) {
     const e = empresasData.find(x => x.id == id);
@@ -3035,10 +3092,12 @@ function abrirModalEmpresaDC3(id = 0) {
       document.getElementById('emp-dc3-rep').value       = e.representante;
       document.getElementById('emp-dc3-rep-trab').value  = e.representante_trabajadores;
       document.getElementById('emp-dc3-dir').value       = e.direccion;
+      selOcups = e.ocupaciones || [];
     }
   } else {
     document.getElementById('empresa-dc3-titulo').textContent = 'Nueva Empresa';
   }
+  renderOcupSelects(selOcups);
   document.getElementById('overlay-empresa-dc3').style.display = 'flex';
 }
 
@@ -3064,6 +3123,12 @@ async function guardarEmpresaDC3() {
   const nombre = document.getElementById('emp-dc3-nombre').value.trim().toUpperCase();
   if (!nombre) { mostrarToast('El nombre de la empresa es obligatorio.', 'error'); return; }
 
+  const ocupIds = [];
+  for (let i = 1; i <= 5; i++) {
+    const v = parseInt(document.getElementById(`emp-dc3-ocup-${i}`)?.value || '0');
+    if (v) ocupIds.push(v);
+  }
+
   const payload = {
     id,
     nombre_cliente:             nombre,
@@ -3072,6 +3137,7 @@ async function guardarEmpresaDC3() {
     representante:              document.getElementById('emp-dc3-rep').value.trim(),
     representante_trabajadores: document.getElementById('emp-dc3-rep-trab').value.trim(),
     direccion:                  document.getElementById('emp-dc3-dir').value.trim(),
+    ocupacion_ids:              ocupIds,
   };
   if (window._empDC3Logo) payload.logo = window._empDC3Logo;
 
