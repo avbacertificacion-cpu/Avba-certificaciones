@@ -169,45 +169,27 @@
 
     <div class="fdiv"></div>
 
-    <!-- COURSE FIELDS -->
+    <!-- CURP + FECHA + PROGRAMA -->
     <table width="100%" cellpadding="0" cellspacing="0">
-    <col width="30%"><col width="35%"><col width="35%">
+    <col width="50%"><col width="50%">
     <tr>
-      <td colspan="2" style="padding-right:5mm;vertical-align:top;padding-bottom:6mm;">
-        <div class="flabel">NOMBRE DEL CURSO - Course Name</div>
-        <div class="fval">{curso}</div>
-      </td>
-      <td style="vertical-align:top;padding-bottom:6mm;">
+      <td style="padding-right:5mm;vertical-align:top;padding-bottom:6mm;">
         <div class="flabel">CURP</div>
-        <div class="fval" style="font-size:8pt;">{curp}</div>
-      </td>
-    </tr>
-    <tr>
-      <td style="padding-right:3mm;vertical-align:top;padding-bottom:6mm;">
-        <div class="flabel">ÁREA TEMÁTICA - Area</div>
-        <div class="fval">{area_tematica}</div>
-      </td>
-      <td style="padding-right:3mm;vertical-align:top;padding-bottom:6mm;">
-        <div class="flabel">DURACIÓN - Duration</div>
-        <div class="fval">{duracion_horas} h</div>
+        <div class="fval" style="font-size:8.5pt;">{curp}</div>
       </td>
       <td style="vertical-align:top;padding-bottom:6mm;">
-        <div class="flabel">PUESTO - Position</div>
-        <div class="fval">{puesto}</div>
-      </td>
-    </tr>
-    <tr>
-      <td colspan="2" style="padding-right:5mm;vertical-align:top;padding-bottom:5mm;">
-        <div class="flabel">INSTRUCTOR</div>
-        <div class="fval">{instructor}</div>
-      </td>
-      <td style="vertical-align:top;padding-bottom:5mm;">
         <div class="flabel">FECHA DE CAPACITACIÓN - Training Date</div>
         <div class="fval">{fecha_capacitacion}</div>
       </td>
     </tr>
     <tr>
-      <td colspan="3" style="padding:3mm 0 4mm;">
+      <td colspan="2" style="padding-bottom:4mm;">
+        <div class="flabel">ACREDITA EN - Certifies</div>
+        <div class="fval lg" style="border-color:#2060a8;color:#0d1a2a;">{acreditado_como}</div>
+      </td>
+    </tr>
+    <tr>
+      <td colspan="2" style="padding:2mm 0 4mm;">
         <div style="height:1px;background:#c8d8e8;"></div>
       </td>
     </tr>
@@ -232,7 +214,7 @@
     </tr>
     <tr>
       <td style="padding-bottom:5mm;">
-        <div class="ctext seguras-block">El participante ha completado satisfactoriamente el programa de capacitación con resultado <strong>APROBADO</strong>, acreditándose como: <strong>{acreditado_como}</strong>.</div>
+        <div class="ctext seguras-block">El participante ha completado satisfactoriamente el programa de capacitación descrito con resultado <strong>APROBADO</strong>, cumpliendo los criterios de evaluación establecidos.</div>
       </td>
     </tr>
     <tr>
