@@ -2567,8 +2567,7 @@ function mostrarToast(msg, tipo = "info") {
           'Authorization': 'Bearer ' + t,
           'X-Token': t
         });
-      }
-      return _fetch.call(this, url, opts).then(function(r) {
+        return _fetch.call(this, url, opts).then(function(r) {
         if (r.status === 401) { localStorage.removeItem('avba_session'); setTimeout(function(){ location.href='login.html'; }, 50); }
         return r;
       });
