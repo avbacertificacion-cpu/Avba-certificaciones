@@ -79,6 +79,7 @@ class Personal {
 
     public function obtenerParticipante(int $id): ?array {
         $this->ensureMigration013Columns();
+        $this->ensureTextoCertificadoColumn();
         $stmt = $this->pdo->prepare(
             "SELECT p.*,
                     c.nombre AS curso_nombre, c.duracion_horas, c.area_tematica,
@@ -631,13 +632,22 @@ class Personal {
 
     private function ensureMigration013Columns(): void {
         try {
-            $this->pdo->exec("ALTER TABLE usuarios
-                ADD COLUMN IF NOT EXISTS registro_stps VARCHAR(100) NULL");
+            $cols = $this->pdo->query("SHOW COLUMNS FROM usuarios LIKE 'registro_stps'")->fetchAll();
+            if (empty($cols)) {
+                $this->pdo->exec("ALTER TABLE usuarios ADD COLUMN registro_stps VARCHAR(100) NULL");
+            }
         } catch (\Throwable $e) {}
         try {
-            $this->pdo->exec("ALTER TABLE clientes
-                ADD COLUMN IF NOT EXISTS logo LONGTEXT NULL,
-                ADD COLUMN IF NOT EXISTS representante_trabajadores VARCHAR(300) NULL");
+            $cols = $this->pdo->query("SHOW COLUMNS FROM clientes LIKE 'logo'")->fetchAll();
+            if (empty($cols)) {
+                $this->pdo->exec("ALTER TABLE clientes ADD COLUMN logo LONGTEXT NULL");
+            }
+        } catch (\Throwable $e) {}
+        try {
+            $cols = $this->pdo->query("SHOW COLUMNS FROM clientes LIKE 'representante_trabajadores'")->fetchAll();
+            if (empty($cols)) {
+                $this->pdo->exec("ALTER TABLE clientes ADD COLUMN representante_trabajadores VARCHAR(300) NULL");
+            }
         } catch (\Throwable $e) {}
     }
 
@@ -818,14 +828,19 @@ class Personal {
             if ($data) $qrB64 = 'data:image/png;base64,' . base64_encode($data);
         }
 
-        $html        = match($tipo) {
-            'dc3'         => $this->htmlDC3($p, $qrB64),
-            'certificado' => $this->htmlCertificado($p, $qrB64),
-            default       => $this->htmlDiploma($p),
-        };
-        $folio       = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
-        $orientation = ($tipo === 'diploma') ? 'landscape' : 'portrait';
-        $url         = $this->htmlAPdf($html, $folio, $tipo, $orientation);
+        try {
+            $html = match($tipo) {
+                'dc3'         => $this->htmlDC3($p, $qrB64),
+                'certificado' => $this->htmlCertificado($p, $qrB64),
+                default       => $this->htmlDiploma($p),
+            };
+            $folio       = 'PART-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
+            $orientation = ($tipo === 'diploma') ? 'landscape' : 'portrait';
+            $url         = $this->htmlAPdf($html, $folio, $tipo, $orientation);
+        } catch (\Throwable $e) {
+            error_log('[AVBA] generarDocumento error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+            return ['status' => 'error', 'message' => 'Error generando documento: ' . $e->getMessage()];
+        }
 
         $this->pdo->prepare(
             "INSERT INTO participantes_documentos (participante_id, tipo_doc, url, generado_por)
