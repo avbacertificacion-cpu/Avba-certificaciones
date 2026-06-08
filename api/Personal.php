@@ -1434,6 +1434,7 @@ body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8pt; color: #000;
 .lbl { font-size:6pt; color:#555; padding:2px 5px 0; }
 .val { font-weight:bold; font-size:8pt; padding:1px 5px 3px; }
 .val-inline { padding:2px 5px; }
+.doc table td, .doc table th { border:none; padding:0; }
 .sig-cell { text-align:center; vertical-align:bottom; padding:6px 10px; }
 .sig-name { font-weight:bold; font-size:7.5pt; border-top:1px solid #000;
             padding-top:3px; margin-top:44px; }
@@ -1557,18 +1558,32 @@ CSS;
     </td>
     <td colspan="2" style="padding:3px 8px;vertical-align:middle">
       <div class="lbl" style="margin-bottom:3px">Periodo de ejecución:</div>
-      <table style="border-collapse:collapse">
+      <table style="border-collapse:collapse;width:100%">
         <tr>
-          <td style="font-size:6pt;color:#555;padding-right:4px">De</td>
-          <td>{$hdrFechas}</td>
-          <td style="width:14px;text-align:center;font-size:6pt;color:#555">a</td>
-          <td>{$hdrFechas}</td>
-        </tr>
-        <tr>
-          <td></td>
-          <td>{$dateBoxes($fechaYmd)}</td>
-          <td></td>
-          <td>{$dateBoxes($fechaFinYmd)}</td>
+          <td style="width:50%;text-align:center;vertical-align:bottom">
+            <table style="border-collapse:collapse;margin:0 auto">
+              <tr>
+                <td style="font-size:6pt;color:#555;padding-right:3px;vertical-align:bottom">De</td>
+                <td>{$hdrFechas}</td>
+              </tr>
+              <tr>
+                <td></td>
+                <td>{$dateBoxes($fechaYmd)}</td>
+              </tr>
+            </table>
+          </td>
+          <td style="width:50%;text-align:center;vertical-align:bottom">
+            <table style="border-collapse:collapse;margin:0 auto">
+              <tr>
+                <td style="font-size:6pt;color:#555;padding-right:3px;vertical-align:bottom">a</td>
+                <td>{$hdrFechas}</td>
+              </tr>
+              <tr>
+                <td></td>
+                <td>{$dateBoxes($fechaFinYmd)}</td>
+              </tr>
+            </table>
+          </td>
         </tr>
       </table>
     </td>
