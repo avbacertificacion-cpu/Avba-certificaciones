@@ -518,6 +518,14 @@ class Personal {
                     $cSets[]   = 'representante_trabajadores = ?';
                     $cParams[] = $payload['empresa_rep_trabajadores'] === '' ? null : trim($payload['empresa_rep_trabajadores']);
                 }
+                if (!empty($payload['empresa_logo'])) {
+                    $logoVal = trim($payload['empresa_logo']);
+                    // Accept base64 data URI (image/png, image/jpeg, etc.)
+                    if (str_starts_with($logoVal, 'data:image/')) {
+                        $cSets[]   = 'logo = ?';
+                        $cParams[] = $logoVal;
+                    }
+                }
                 if (!empty($cSets)) {
                     $cParams[] = $cliente['id'];
                     $this->pdo->prepare("UPDATE clientes SET " . implode(', ', $cSets) . " WHERE id = ?")

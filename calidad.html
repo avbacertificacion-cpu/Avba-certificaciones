@@ -3460,13 +3460,27 @@ async function abrirDetPer(id) {
               style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px;text-transform:uppercase"
               oninput="this.value=this.value.toUpperCase()">
           </label>
-          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Representante legal
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Representante legal (Patrón)
             <input id="per-emp-representante" value="${escH(p.empresa_representante||'')}" placeholder="Nombre del representante"
               style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
           </label>
           <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Dirección
             <input id="per-emp-direccion" value="${escH(p.empresa_direccion||'')}" placeholder="Dirección de la empresa"
               style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+          </label>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Rep. de los trabajadores
+            <input id="per-emp-rep-trab" value="${escH(p.empresa_rep_trabajadores||'')}" placeholder="Nombre del representante de trabajadores"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+          </label>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Logo de la empresa
+            <div style="margin-top:4px;display:flex;align-items:center;gap:10px">
+              <input id="per-emp-logo-file" type="file" accept="image/*"
+                onchange="previewEmpresaLogo(this)"
+                style="font-size:11px;flex:1">
+              <img id="per-emp-logo-preview" src="${p.empresa_logo_b64||''}"
+                style="height:36px;max-width:80px;object-fit:contain;border:1px solid var(--borde);border-radius:4px;background:#f5f7fa;${p.empresa_logo_b64?'':'display:none'}">
+            </div>
+            <div style="font-size:10px;color:var(--texto-hint);margin-top:3px">Se mostrará en el DC3 junto al logo de AVBA</div>
           </label>
         </div>
         <button onclick="guardarEmpresaPer(${p.id})"
@@ -3563,6 +3577,7 @@ function seleccionarEmpresaCatalogo(c) {
   set('per-emp-rfc',           c.rfc);
   set('per-emp-representante', c.representante);
   set('per-emp-direccion',     c.direccion);
+  set('per-emp-rep-trab',      c.representante_trabajadores);
   const buscar = document.getElementById('per-emp-buscar');
   if (buscar) buscar.value = c.nombre_cliente;
   const suger = document.getElementById('per-emp-suger');
@@ -3578,13 +3593,34 @@ document.addEventListener('click', e => {
   }
 });
 
+function previewEmpresaLogo(input) {
+  const preview = document.getElementById('per-emp-logo-preview');
+  if (!preview) return;
+  if (input.files && input.files[0]) {
+    const reader = new FileReader();
+    reader.onload = e => { preview.src = e.target.result; preview.style.display = ''; };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
 async function guardarEmpresaPer(id) {
+  const logoFile = document.getElementById('per-emp-logo-file');
+  let logoB64 = null;
+  if (logoFile && logoFile.files && logoFile.files[0]) {
+    logoB64 = await new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = e => resolve(e.target.result);
+      reader.readAsDataURL(logoFile.files[0]);
+    });
+  }
   const payload = {
     id,
-    empresa_nombre:        document.getElementById('per-emp-nombre')?.value        || '',
-    empresa_rfc:           document.getElementById('per-emp-rfc')?.value           || '',
-    empresa_representante: document.getElementById('per-emp-representante')?.value || '',
-    empresa_direccion:     document.getElementById('per-emp-direccion')?.value     || '',
+    empresa_nombre:           document.getElementById('per-emp-nombre')?.value        || '',
+    empresa_rfc:              document.getElementById('per-emp-rfc')?.value           || '',
+    empresa_representante:    document.getElementById('per-emp-representante')?.value || '',
+    empresa_direccion:        document.getElementById('per-emp-direccion')?.value     || '',
+    empresa_rep_trabajadores: document.getElementById('per-emp-rep-trab')?.value      || '',
+    ...(logoB64 ? { empresa_logo: logoB64 } : {}),
   };
   try {
     const res  = await fetch(API, {

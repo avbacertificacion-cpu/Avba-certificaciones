@@ -424,7 +424,8 @@ if ($method === 'GET') {
                 "SELECT nombre_cliente, primera_parte,
                         COALESCE(rfc,'') AS rfc,
                         COALESCE(representante,'') AS representante,
-                        COALESCE(direccion,'') AS direccion
+                        COALESCE(direccion,'') AS direccion,
+                        COALESCE(representante_trabajadores,'') AS representante_trabajadores
                  FROM clientes
                  WHERE nombre_cliente LIKE ? ORDER BY nombre_cliente LIMIT 15"
             );

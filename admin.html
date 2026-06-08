@@ -476,6 +476,14 @@
       </div>
     </div>
 
+    <!-- Registro STPS (solo para INSPECTOR) -->
+    <div class="field" id="campo-stps" style="display:none">
+      <label>Registro STPS</label>
+      <input type="text" id="usr-stps" placeholder="Ej: AABJ-911010-3I8-0005" autocomplete="off"
+             style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()">
+      <div class="hint">Número de registro ante la Secretaría del Trabajo. Se imprime en el DC3.</div>
+    </div>
+
     <!-- Estado (solo en edición) -->
     <div class="field" id="campo-activo" style="display:none">
       <div class="divider"></div>
@@ -670,12 +678,19 @@ function abrirCrear(tipo) {
   document.getElementById("usr-password").value           = "";
   document.getElementById("usr-rol").value                = "";
   document.getElementById("usr-id-cliente").value         = "";
+  document.getElementById("usr-stps").value               = "";
   document.getElementById("usr-activo").checked           = true;
   document.getElementById("pass-req").textContent         = "*";
   document.getElementById("pass-hint").textContent        = "";
   document.getElementById("campo-activo").style.display      = "none";
   document.getElementById("campo-rol").style.display         = esCliente ? "none" : "";
   document.getElementById("campo-id-cliente").style.display  = esCliente ? "" : "none";
+  document.getElementById("campo-stps").style.display        = "none";
+
+  // Show STPS field when role changes to INSPECTOR
+  document.getElementById("usr-rol").onchange = function() {
+    document.getElementById("campo-stps").style.display = this.value === "INSPECTOR" ? "" : "none";
+  };
 
   document.getElementById("overlay-usr").classList.add("open");
   setTimeout(() => document.getElementById("usr-usuario").focus(), 150);
@@ -697,12 +712,19 @@ function abrirEditar(id) {
   document.getElementById("usr-password").value           = "";
   document.getElementById("usr-rol").value                = u.rol;
   document.getElementById("usr-id-cliente").value         = u.id_cliente || "";
+  document.getElementById("usr-stps").value               = u.registro_stps || "";
   document.getElementById("usr-activo").checked           = u.activo == 1;
   document.getElementById("pass-req").textContent         = "";
   document.getElementById("pass-hint").textContent        = "Dejar en blanco para no cambiar la contraseña";
   document.getElementById("campo-activo").style.display      = "block";
   document.getElementById("campo-rol").style.display         = esCliente ? "none" : "";
   document.getElementById("campo-id-cliente").style.display  = esCliente ? "" : "none";
+  document.getElementById("campo-stps").style.display        = u.rol === "INSPECTOR" ? "" : "none";
+
+  // Show STPS field when role changes to INSPECTOR
+  document.getElementById("usr-rol").onchange = function() {
+    document.getElementById("campo-stps").style.display = this.value === "INSPECTOR" ? "" : "none";
+  };
 
   document.getElementById("overlay-usr").classList.add("open");
   setTimeout(() => document.getElementById("usr-nombre").focus(), 150);
@@ -731,16 +753,19 @@ async function guardarUsuario() {
   if (!modoEdicion && !password)        { alert("La contraseña es obligatoria."); return; }
   if (password && password.length < 6)  { alert("La contraseña debe tener al menos 6 caracteres."); return; }
 
+  const registroStps = document.getElementById("usr-stps").value.trim();
   const action  = modoEdicion ? "EDITAR_USUARIO" : "CREAR_USUARIO";
   const payload = modoEdicion
     ? {
         id: parseInt(id), nombre, rol, activo,
         ...(password                  ? { password }               : {}),
-        ...(esCliente                 ? { id_cliente: idCliente }  : {})
+        ...(esCliente                 ? { id_cliente: idCliente }  : {}),
+        ...(rol === 'INSPECTOR'       ? { registro_stps: registroStps } : {})
       }
     : {
         usuario, nombre, password, rol,
-        ...(esCliente                 ? { id_cliente: idCliente }  : {})
+        ...(esCliente                 ? { id_cliente: idCliente }  : {}),
+        ...(rol === 'INSPECTOR'       ? { registro_stps: registroStps } : {})
       };
 
   try {

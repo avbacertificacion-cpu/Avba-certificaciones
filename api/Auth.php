@@ -401,11 +401,12 @@ class Auth {
             return ['status' => 'error', 'message' => "El usuario '{$usuario}' ya existe."];
         }
 
+        $registroStps = trim($payload['registro_stps'] ?? '');
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $this->pdo->prepare(
-            "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo)
-             VALUES (?, ?, ?, ?, ?, 1)"
-        )->execute([$usuario, $hash, $rol, $nombre, $idCliente ?: null]);
+            "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo, registro_stps)
+             VALUES (?, ?, ?, ?, ?, 1, ?)"
+        )->execute([$usuario, $hash, $rol, $nombre, $idCliente ?: null, $registroStps ?: null]);
 
         return ['status' => 'success', 'message' => 'Usuario creado correctamente.'];
     }
@@ -450,6 +451,10 @@ class Auth {
             $sets[] = 'password_hash = ?';
             $params[] = password_hash($payload['password'], PASSWORD_BCRYPT);
         }
+        if (array_key_exists('registro_stps', $payload)) {
+            $sets[] = 'registro_stps = ?';
+            $params[] = trim($payload['registro_stps']) ?: null;
+        }
 
         if (empty($sets)) return ['status' => 'success', 'message' => 'Sin cambios.'];
 
@@ -481,7 +486,8 @@ class Auth {
             "SELECT id, usuario, rol, nombre, id_cliente, activo,
                     DATE_FORMAT(fecha_alta, '%d/%m/%Y %H:%i') AS fecha_alta,
                     DATE_FORMAT(ultimo_acceso, '%d/%m/%Y %H:%i') AS ultimo_acceso,
-                    firma_imagen
+                    firma_imagen,
+                    COALESCE(registro_stps,'') AS registro_stps
              FROM usuarios ORDER BY id"
         );
         $rows = $stmt->fetchAll();
