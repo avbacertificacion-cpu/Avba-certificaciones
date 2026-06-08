@@ -90,6 +90,8 @@ class Personal {
                     o.nombre AS ocupacion_nombre,
                     u.nombre AS instructor_nombre,
                     u.registro_stps AS instructor_stps,
+                    u.firma_imagen AS instructor_firma_imagen,
+                    cl.id AS cliente_id,
                     cl.logo AS empresa_logo_b64,
                     COALESCE(
                         cl.representante COLLATE utf8mb4_general_ci,
@@ -114,6 +116,19 @@ class Personal {
         );
         $stmt2->execute([$id]);
         $row['documentos'] = $stmt2->fetchAll();
+
+        // Ocupaciones específicas de la empresa (para DC-3)
+        $row['ocupaciones_empresa'] = [];
+        if (!empty($row['cliente_id'])) {
+            $this->ensureClientesOcupacionesTable();
+            $stmtOcup = $this->pdo->prepare(
+                "SELECT oe.nombre FROM clientes_ocupaciones co
+                 JOIN ocupaciones_especificas oe ON oe.id = co.ocupacion_id
+                 WHERE co.cliente_id = ? ORDER BY co.orden"
+            );
+            $stmtOcup->execute([$row['cliente_id']]);
+            $row['ocupaciones_empresa'] = array_column($stmtOcup->fetchAll(), 'nombre');
+        }
 
         return $row;
     }
@@ -1299,16 +1314,23 @@ class Personal {
         $nombre    = $up($p['nombre_completo'] ?? '');
         $curp      = strtoupper(trim($p['curp'] ?? ''));
         $puesto    = $up($p['puesto'] ?? '');
-        $ocupacion = trim($p['ocupacion_nombre'] ?? '');
         $empresa   = $up($p['empresa_nombre'] ?? '');
         $rfcRaw    = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $p['empresa_rfc'] ?? ''));
         $patron    = $up($p['empresa_representante'] ?? '');
         $repTrab   = $up($p['empresa_rep_trabajadores'] ?? '');
         $curso     = $up($p['curso_nombre'] ?? '');
         $horasVal  = (float)($p['duracion_horas'] ?? 0);
-        $horas     = $horasVal > 0 ? (string)$horasVal : trim($p['duracion_horas'] ?? '');
+        $horas     = $horasVal > 0 ? (string)(int)$horasVal : trim($p['duracion_horas'] ?? '');
         $area      = trim($p['area_tematica'] ?? '');
-        $fechaYmd  = $p['fecha_curso'] ?? null;   // YYYY-MM-DD
+        $fechaYmd  = $p['fecha_curso'] ?? null;
+
+        // Ocupaciones específicas de la empresa
+        $ocupEmpresa = $p['ocupaciones_empresa'] ?? [];
+        // Fallback: ocupación individual del participante
+        if (empty($ocupEmpresa) && !empty($p['ocupacion_nombre'])) {
+            $ocupEmpresa = [trim($p['ocupacion_nombre'])];
+        }
+        $ocupacionHtml = implode('<br>', array_map(fn($o) => $esc($o), $ocupEmpresa));
 
         // Calcular fecha fin: 8 h/día máximo
         $fechaFinYmd = $fechaYmd;
@@ -1317,15 +1339,14 @@ class Personal {
             $fechaFinYmd = date('Y-m-d', strtotime($fechaYmd . " +{$diasExtra} days"));
         }
 
-        // Agente capacitador: nombre del inspector + registro STPS
+        // Instructor
         $instrNombre = trim($p['instructor_nombre'] ?? '');
         $instrStps   = trim($p['instructor_stps'] ?? '');
-        if ($instrNombre) {
-            $agente = $up($instrNombre);
-            if ($instrStps) $agente .= ' REG. STPS ' . strtoupper($instrStps);
-        } else {
-            $agente = 'AVBA CERTIFICACIONES';
-        }
+        $instrFirmaPath = trim($p['instructor_firma_imagen'] ?? '');
+
+        // Agente: solo nombre; STPS se muestra aparte
+        $agenteNombre = $instrNombre ? $up($instrNombre) : 'AVBA CERTIFICACIONES';
+        $agenteStps   = $instrStps ? strtoupper($instrStps) : '';
 
         // RFC con guiones para mostrar (LLLL-YYMMDD-XXX)
         $rfcFmt = $rfcRaw;
@@ -1335,8 +1356,21 @@ class Personal {
 
         // ── Assets ──────────────────────────────────────────────────────────
         $logoB64  = $this->assetB64('logos/avba.png');
-        $firmaB64 = $this->assetB64('logos/firma_director.png');
         $selloB64 = $this->assetB64('sellos/sello.png');
+
+        // Firma del instructor: usa la propia si existe, sino la del director
+        $instrFirmaB64 = '';
+        if ($instrFirmaPath) {
+            $absPath = dirname(__DIR__) . '/' . ltrim($instrFirmaPath, '/');
+            if (file_exists($absPath)) {
+                $ext  = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
+                $mime = in_array($ext, ['jpg','jpeg']) ? 'image/jpeg' : 'image/png';
+                $instrFirmaB64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($absPath));
+            }
+        }
+        if (!$instrFirmaB64) {
+            $instrFirmaB64 = $this->assetB64('logos/firma_director.png');
+        }
 
         $logoHdr   = $logoB64
             ? "<img src=\"{$logoB64}\" style=\"width:84px;height:39px;display:block;\" alt=\"AVBA\">"
@@ -1349,9 +1383,9 @@ class Personal {
         $logoEmpHtml = $logoEmpB64
             ? "<img src=\"{$logoEmpB64}\" style=\"max-width:90px;max-height:45px;display:block;margin:0 auto;\" alt=\"Empresa\">"
             : '';
-        $firmaHtml = $firmaB64
-            ? "<img src=\"{$firmaB64}\" style=\"height:30px;max-width:100px;display:block;margin:0 auto 2px;\" alt=\"Firma\">"
-            : '<div style="height:30px;"></div>';
+        $firmaHtml = $instrFirmaB64
+            ? "<img src=\"{$instrFirmaB64}\" style=\"height:34px;max-width:110px;display:block;margin:0 auto 2px;\" alt=\"Firma\">"
+            : '<div style="height:34px;"></div>';
         $selloHtml = $selloB64
             ? "<img src=\"{$selloB64}\" style=\"width:50px;height:44px;display:block;margin:0 auto;\" alt=\"Sello\">"
             : '';
@@ -1387,17 +1421,17 @@ class Personal {
                  . '</tr></table>';
         };
 
-        // ── Estilo base Dompdf ─────────────────────────────────────────────
+        // ── Estilo base mPDF ───────────────────────────────────────────────
         $css = <<<'CSS'
 @page { margin: 10mm 12mm; }
 * { margin:0; padding:0; }
 body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 8.5pt; color: #000; }
-.doc { width:100%; border-collapse:collapse; border:1.5px solid #000; }
-.doc td, .doc th { border:1px solid #555; padding:0; vertical-align:top; }
+.doc { width:100%; border-collapse:collapse; border:1.5px solid #1B2A6B; }
+.doc td, .doc th { border:1px solid #8090b8; padding:0; vertical-align:top; }
 .sec-hdr td { background:#1B2A6B; color:#fff; text-align:center; font-weight:bold;
-               font-size:8pt; letter-spacing:0.5px; padding:3px 4px; border-color:#1B2A6B; }
-.lbl { font-size:7pt; color:#444; padding:3px 5px 1px; }
-.val { font-weight:bold; font-size:8.5pt; padding:2px 5px 4px; }
+               font-size:8pt; letter-spacing:1px; padding:4px 4px; border-color:#1B2A6B; }
+.lbl { font-size:6.5pt; color:#555; padding:3px 5px 1px; }
+.val { font-weight:bold; font-size:8.5pt; padding:2px 5px 5px; }
 .val-inline { padding:3px 5px; }
 .sig-cell { text-align:center; vertical-align:bottom; padding:6px 10px; }
 .sig-name { font-weight:bold; font-size:7.5pt; border-top:1px solid #000;
@@ -1418,6 +1452,9 @@ CSS;
         $curpPad  = str_pad($curp, 18);
         $rfcPad   = str_pad($rfcFmt, 14);
         $horasStr = $esc($horas) . ' HORAS';
+        $agenteStpsHtml = $agenteStps
+            ? '<span style="font-size:7.5pt;font-weight:normal;color:#444;margin-left:8px">Reg. STPS: ' . $esc($agenteStps) . '</span>'
+            : '';
 
         // Header columns: Año Mes Día
         $hdrFechas = '<table style="border-collapse:collapse"><tr>'
@@ -1464,13 +1501,13 @@ CSS;
 
   <!-- CURP + Ocupación -->
   <tr>
-    <td style="width:55%;border-right:1px solid #555;padding:0">
+    <td style="width:55%;border-right:1px solid #8090b8;padding:0">
       <div class="lbl">Clave Unica de Registro de Poblacion</div>
       <div class="val-inline">{$boxRow($curpPad)}</div>
     </td>
     <td style="padding:0">
       <div class="lbl">Ocupacion especifica (Catalogo Nacional de Ocupaciones) <sup>1/</sup></div>
-      <div class="val">{$esc($ocupacion)}</div>
+      <div class="val">{$ocupacionHtml}</div>
     </td>
   </tr>
 
@@ -1516,34 +1553,24 @@ CSS;
 
   <!-- Duración + Período -->
   <tr>
-    <td style="width:22%;border-right:1px solid #555;padding:0">
+    <td style="width:20%;border-right:1px solid #8090b8;padding:4px 6px;vertical-align:middle">
       <div class="lbl">Duración en horas</div>
-      <div class="val">{$horasStr}</div>
+      <div style="font-size:14pt;font-weight:bold;color:#1B2A6B;padding:2px 0 0">{$horasStr}</div>
     </td>
-    <td colspan="2" style="padding:4px 6px">
-      <table style="border-collapse:collapse;width:100%">
+    <td colspan="2" style="padding:5px 10px;vertical-align:middle">
+      <div class="lbl" style="margin-bottom:4px">Periodo de ejecución:</div>
+      <table style="border-collapse:collapse">
         <tr>
-          <td style="font-size:7.5pt;white-space:nowrap;padding-right:6px;vertical-align:top">
-            Periodo de<br>ejecución:
-          </td>
-          <td>
-            <table style="border-collapse:collapse">
-              <tr>
-                <td style="font-size:7pt;padding-right:4px">De</td>
-                <td>{$hdrFechas}</td>
-                <td style="width:12px"></td>
-                <td style="font-size:7pt;padding-right:4px">a</td>
-                <td>{$hdrFechas}</td>
-              </tr>
-              <tr>
-                <td></td>
-                <td>{$dateBoxes($fechaYmd)}</td>
-                <td></td>
-                <td></td>
-                <td>{$dateBoxes($fechaFinYmd)}</td>
-              </tr>
-            </table>
-          </td>
+          <td style="font-size:6.5pt;color:#555;padding-right:4px;padding-bottom:1px">De</td>
+          <td>{$hdrFechas}</td>
+          <td style="width:16px;text-align:center;font-size:6.5pt;color:#555;padding-bottom:1px">a</td>
+          <td>{$hdrFechas}</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>{$dateBoxes($fechaYmd)}</td>
+          <td></td>
+          <td>{$dateBoxes($fechaFinYmd)}</td>
         </tr>
       </table>
     </td>
@@ -1561,7 +1588,7 @@ CSS;
   <tr>
     <td colspan="3" style="padding:0">
       <div class="lbl">Nombre del agente capacitador o STPS <sup>3/</sup></div>
-      <div class="val">{$esc($agente)}</div>
+      <div class="val">{$esc($agenteNombre)}{$agenteStpsHtml}</div>
     </td>
   </tr>
 </table>
@@ -1575,34 +1602,34 @@ CSS;
     </td>
   </tr>
   <tr>
-    <!-- Col 1: AVBA — firma + sello (izquierda) -->
-    <td style="width:33%;border-right:1px solid #555;text-align:center;padding:6px 8px;vertical-align:bottom">
+    <!-- Col 1: Instructor — firma + sello (izquierda) -->
+    <td style="width:33%;border-right:1px solid #8090b8;text-align:center;padding:6px 8px;vertical-align:bottom">
       <table style="border-collapse:collapse;margin:0 auto 3px"><tr>
         <td style="padding:0 5px;vertical-align:bottom">{$firmaHtml}</td>
         <td style="padding:0 5px;vertical-align:bottom">{$selloHtml}</td>
       </tr></table>
-      <div style="border-top:1px solid #000;padding-top:3px">
-        <div style="font-size:7.5pt;font-weight:bold">Ing. Jose Marcos Gonzalez Calderon</div>
-        <div style="font-size:7pt">Nombre y firma</div>
-        <div style="font-size:7pt;color:#555;margin-top:2px">Instructor o tutor</div>
+      <div style="border-top:1.5px solid #1B2A6B;padding-top:3px">
+        <div style="font-size:7.5pt;font-weight:bold">{$esc($instrNombre ?: 'Ing. Jose Marcos Gonzalez Calderon')}</div>
+        <div style="font-size:7pt;color:#555">Nombre y firma</div>
+        <div style="font-size:7pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Instructor o tutor</div>
       </div>
     </td>
-    <!-- Col 2: Patron — nombre del representante de la empresa (sin imagen) -->
-    <td style="width:34%;border-right:1px solid #555;text-align:center;padding:6px 8px;vertical-align:bottom">
+    <!-- Col 2: Patron — nombre del representante de la empresa -->
+    <td style="width:34%;border-right:1px solid #8090b8;text-align:center;padding:6px 8px;vertical-align:bottom">
       <div style="height:47px"></div>
-      <div style="border-top:1px solid #000;padding-top:3px">
+      <div style="border-top:1.5px solid #1B2A6B;padding-top:3px">
         <div style="font-size:7.5pt;font-weight:bold">{$esc($patron)}</div>
-        <div style="font-size:7pt">Nombre y firma</div>
-        <div style="font-size:7pt;color:#555;margin-top:2px">Patron o representante legal <sup>4/</sup></div>
+        <div style="font-size:7pt;color:#555">Nombre y firma</div>
+        <div style="font-size:7pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Patron o representante legal <sup>4/</sup></div>
       </div>
     </td>
     <!-- Col 3: Representante de trabajadores -->
     <td style="width:33%;text-align:center;padding:6px 8px;vertical-align:bottom">
       <div style="height:47px"></div>
-      <div style="border-top:1px solid #000;padding-top:3px">
+      <div style="border-top:1.5px solid #1B2A6B;padding-top:3px">
         <div style="font-size:7.5pt;font-weight:bold">{$esc($repTrab)}</div>
-        <div style="font-size:7pt">Nombre y firma</div>
-        <div style="font-size:7pt;color:#555;margin-top:2px">Representante de los trabajadores <sup>5/</sup></div>
+        <div style="font-size:7pt;color:#555">Nombre y firma</div>
+        <div style="font-size:7pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Representante de los trabajadores <sup>5/</sup></div>
       </div>
     </td>
   </tr>
