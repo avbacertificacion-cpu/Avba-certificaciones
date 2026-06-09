@@ -1857,6 +1857,10 @@ HTML;
         return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fotoPath));
     }
 
+    private function htmlCredencialBody(array $p, string $qrB64 = ''): string {
+        $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+        $up  = fn($s) => mb_strtoupper(trim((string)$s), 'UTF-8');
+
         // ── Datos ─────────────────────────────────────────────────────────
         $nombre    = $esc($up($p['nombre_completo'] ?? ''));
         $empresa   = $esc($up($p['empresa_nombre']  ?? ''));
@@ -1881,6 +1885,15 @@ HTML;
             $certSub  = '';
         }
         $cursoCompleto = $esc($cursoRaw);
+
+        // Pre-computar bloque del subtítulo (no se puede usar ternario dentro de heredoc)
+        $certSubHtml = $certSub
+            ? "<table style=\"width:100%;border-collapse:collapse;margin:1.5mm 0 3mm;\" cellpadding=\"0\" cellspacing=\"0\"><tr>
+                <td style=\"border-bottom:1.2px solid #00c8e8;width:4mm;height:4mm;\"></td>
+                <td style=\"font-size:4.5pt;font-weight:bold;color:#00c8e8;white-space:nowrap;padding:0 1.5mm;\">{$certSub}</td>
+                <td style=\"border-bottom:1.2px solid #00c8e8;height:4mm;\"></td>
+              </tr></table>"
+            : "<div style=\"margin-bottom:3mm;\"></div>";
 
         // ── Assets ────────────────────────────────────────────────────────
         $logoB64  = $this->assetB64('logos/avba.png');
@@ -2007,12 +2020,7 @@ HTML;
           <div style="font-size:16pt;font-weight:bold;color:#ffffff;line-height:1;letter-spacing:1px;">{$certMain}</div>
 
           <!-- Subtítulo cian entre guiones -->
-          {$certSub ? "
-          <table style=\"width:100%;border-collapse:collapse;margin:1.5mm 0 3mm;\" cellpadding=\"0\" cellspacing=\"0\"><tr>
-            <td style=\"border-bottom:1.2px solid {$cy};width:4mm;height:4mm;\"></td>
-            <td style=\"font-size:4.5pt;font-weight:bold;color:{$cy};white-space:nowrap;padding:0 1.5mm;\">{$certSub}</td>
-            <td style=\"border-bottom:1.2px solid {$cy};height:4mm;\"></td>
-          </tr></table>" : "<div style=\"margin-bottom:3mm;\"></div>"}
+          {$certSubHtml}
 
           <!-- Campos de datos -->
           <table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0">
