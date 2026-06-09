@@ -758,10 +758,13 @@ if ($method === 'POST') {
         case 'ENVIAR_DOC_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $correosEnviar = is_array($payload['correos'] ?? null)
+                ? $payload['correos']
+                : [(string)($payload['correo'] ?? '')];
             respuesta($personal->enviarDocumento(
-                (int)   ($payload['id']     ?? 0),
-                (string)($payload['tipo']   ?? ''),
-                (string)($payload['correo'] ?? ''),
+                (int)   ($payload['id']   ?? 0),
+                (string)($payload['tipo'] ?? ''),
+                $correosEnviar,
                 $usr['usuario']
             ));
 
@@ -826,10 +829,13 @@ if ($method === 'POST') {
         case 'EMITIR_DOC_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $correosEmitir = is_array($payload['correos'] ?? null)
+                ? $payload['correos']
+                : [(string)($payload['correo'] ?? '')];
             respuesta($personal->emitirDocumentoPersonal(
-                (int)   ($payload['id']                  ?? 0),
-                (string)($payload['tipo']                ?? ''),
-                (string)($payload['correo']              ?? ''),
+                (int)   ($payload['id']  ?? 0),
+                (string)($payload['tipo'] ?? ''),
+                $correosEmitir,
                 $usr['usuario'],
                 !empty($payload['enviar_credenciales'])
             ));

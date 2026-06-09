@@ -628,7 +628,7 @@ class Personal {
     }
 
     // ── Emitir documento y marcar como EMITIDO ─────────────
-    public function emitirDocumentoPersonal(int $id, string $tipo, string $correoDestino, string $usuario, bool $enviarCredenciales = false): array {
+    public function emitirDocumentoPersonal(int $id, string $tipo, string|array $correoDestino, string $usuario, bool $enviarCredenciales = false): array {
         $this->ensureEstatusColumn();
         $resultado = $this->generarDocumento($id, $tipo, $usuario);
         if ($resultado['status'] !== 'success') return $resultado;
@@ -637,15 +637,19 @@ class Personal {
         $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO' WHERE id = ?")
             ->execute([$id]);
 
-        // Enviar correo con o sin credenciales
-        $p      = $this->obtenerParticipante($id);
-        $correo = trim($correoDestino) ?: trim($p['correo'] ?? '');
-        if ($correo && filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+        // Normalise destination list
+        $p     = $this->obtenerParticipante($id);
+        $lista = is_array($correoDestino) ? $correoDestino : [$correoDestino];
+        $lista = array_values(array_unique(array_filter(array_map('trim', $lista))));
+        if (!$lista) $lista = [trim($p['correo'] ?? '')];
+        $lista = array_filter($lista, fn($e) => filter_var($e, FILTER_VALIDATE_EMAIL));
+
+        if ($lista) {
             $credenciales = [];
             if ($enviarCredenciales && $p) {
-                $credenciales = $this->gestionarCredencialesParticipante($p, $correo);
+                $credenciales = $this->gestionarCredencialesParticipante($p, $lista[0]);
             }
-            $this->enviarDocumento($id, $tipo, $correo, $usuario, $credenciales);
+            $this->enviarDocumento($id, $tipo, $lista, $usuario, $credenciales);
         }
 
         return $resultado;
@@ -1173,12 +1177,16 @@ class Personal {
         return ['usuario' => $usuario, 'password' => $password, 'es_nuevo' => true];
     }
 
-    public function enviarDocumento(int $id, string $tipo, string $correoDestino, string $usuario, array $credenciales = []): array {
+    public function enviarDocumento(int $id, string $tipo, string|array $correoDestino, string $usuario, array $credenciales = []): array {
         $p = $this->obtenerParticipante($id);
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
-        $correo = trim($correoDestino) ?: trim($p['correo'] ?? '');
-        if (!$correo || !filter_var($correo, FILTER_VALIDATE_EMAIL))
+        // Normalise to array, falling back to participant's own email
+        $lista = is_array($correoDestino) ? $correoDestino : [$correoDestino];
+        $lista = array_values(array_unique(array_filter(array_map('trim', $lista))));
+        if (!$lista) $lista = [trim($p['correo'] ?? '')];
+        $lista = array_filter($lista, fn($e) => filter_var($e, FILTER_VALIDATE_EMAIL));
+        if (!$lista)
             return ['status' => 'error', 'message' => 'Correo de destino inválido o no registrado.'];
 
         // Buscar último documento generado de ese tipo
@@ -1208,14 +1216,15 @@ class Personal {
         try {
             $mail = new PHPMailer(true);
             configurarMailer($mail, $this->pdo);
-            $mail->addAddress($correo);
+            foreach ($lista as $e) $mail->addAddress($e);
             $mail->Subject    = "{$tipoLabel} de Capacitación — AVBA Inspections";
             $mail->isHTML(true);
             $mail->Body       = $this->plantillaCorreoPersonal($nombre, $tipoLabel, $p['curso_nombre'] ?? '', $credenciales);
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             $mail->send();
 
-            return ['status' => 'success', 'message' => "Documento enviado a {$correo}."];
+            $enviados = implode(', ', $lista);
+            return ['status' => 'success', 'message' => "Documento enviado a {$enviados}."];
         } catch (\Exception $e) {
             return ['status' => 'error', 'message' => 'Error al enviar correo: ' . $e->getMessage()];
         }
