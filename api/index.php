@@ -878,6 +878,11 @@ if ($method === 'POST') {
                 $usr['usuario']
             ));
 
+        case 'GENERAR_CREDENCIALES_LOTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->generarCredencialesLote($payload, $usr['usuario']));
+
         case 'CREAR_TIPO_ACCESORIO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

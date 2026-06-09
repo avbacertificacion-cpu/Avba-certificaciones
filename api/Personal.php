@@ -1034,7 +1034,7 @@ class Personal {
         }
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
-        $tiposValidos = ['dc3', 'diploma', 'certificado'];
+        $tiposValidos = ['dc3', 'diploma', 'certificado', 'credencial'];
         if (!in_array($tipo, $tiposValidos, true))
             return ['status' => 'error', 'message' => 'Tipo de documento no valido.'];
 
@@ -1076,6 +1076,38 @@ class Personal {
             "INSERT INTO participantes_documentos (participante_id, tipo_doc, url, generado_por)
              VALUES (?, ?, ?, ?)"
         )->execute([$id, strtoupper($tipo), $url, $usuario]);
+
+        return ['status' => 'success', 'url' => $url];
+    }
+
+    public function generarCredencialesLote(array $payload, string $usuario): array {
+        $ids = array_filter(array_map('intval', $payload['ids'] ?? []), fn($v) => $v > 0);
+        if (!$ids) return ['status' => 'error', 'message' => 'Sin participantes.'];
+
+        $htmlParts = [];
+        foreach ($ids as $id) {
+            $p = $this->obtenerParticipante($id);
+            if (!$p) continue;
+            if (!in_array($p['estatus'] ?? '', ['APROBADO_CALIDAD', 'EMITIDO'], true)) continue;
+
+            $qrB64 = '';
+            if (!empty($p['qr_codigo']) && defined('SITE_URL')) {
+                $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(SITE_URL . '/validar.html?qr=' . $p['qr_codigo']) . '&size=120&margin=1';
+                $data  = @file_get_contents($qrUrl, false, stream_context_create(['http' => ['timeout' => 4]]));
+                if ($data) $qrB64 = 'data:image/png;base64,' . base64_encode($data);
+            }
+            $htmlParts[] = $this->htmlCredencial($p, $qrB64);
+        }
+
+        if (!$htmlParts) return ['status' => 'error', 'message' => 'Sin participantes aprobados en la selección.'];
+
+        $html  = implode("\n<pagebreak />\n", $htmlParts);
+        $folio = 'LOTE-' . date('YmdHis');
+        try {
+            $url = $this->htmlToPdfMpdf($html, $folio, 'CRED', [86, 133]);
+        } catch (\Throwable $e) {
+            return ['status' => 'error', 'message' => 'Error generando PDF: ' . $e->getMessage()];
+        }
 
         return ['status' => 'success', 'url' => $url];
     }

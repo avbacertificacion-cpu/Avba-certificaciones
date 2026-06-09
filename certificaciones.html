@@ -2245,6 +2245,8 @@ function renderCursosCert(grupos) {
                 onclick="abrirEnviarSesionPer(${i},'diploma')">Diploma</button>
         <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                 onclick="abrirEnviarSesionPer(${i},'certificado')">Cert</button>
+        ${apro ? `<button class="btn-ver" style="font-size:11px;background:#e8f0ff;border-color:#1a5fd6;color:#0d3a8f"
+                onclick="prevCredencialesLote(${i})">🪪 Credenciales</button>` : ''}
       </div>
     </td>
   </tr>`;
@@ -2290,6 +2292,8 @@ function abrirCursoCert(idx) {
                 onclick="prevDocPersonal(${p.id},'diploma')">👁 Diploma</button>
         <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                 onclick="prevDocPersonal(${p.id},'certificado')">👁 Cert</button>
+        <button class="btn-ver" style="font-size:11px;background:#e8f0ff;border-color:#1a5fd6;color:#0d3a8f"
+                onclick="prevDocPersonal(${p.id},'credencial')">🪪 Credencial</button>
         ${!emitido ? `
         <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                 onclick="emitirDocPersonal(${p.id},'dc3',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir DC-3</button>
@@ -2446,6 +2450,8 @@ function renderIndepCert(data) {
                   onclick="prevDocPersonal(${p.id},'diploma')">👁 Diploma</button>
           <button class="btn-ver" style="font-size:10px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                   onclick="prevDocPersonal(${p.id},'certificado')">👁 Cert</button>
+          <button class="btn-ver" style="font-size:10px;background:#e8f0ff;border-color:#1a5fd6;color:#0d3a8f"
+                  onclick="prevDocPersonal(${p.id},'credencial')">🪪 Credencial</button>
           ${!emitido ? `
           <button class="btn-ver" style="font-size:10px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                   onclick="emitirDocPersonal(${p.id},'dc3',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir DC-3</button>
@@ -2474,6 +2480,30 @@ async function prevDocPersonal(participanteId, tipo) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Token': tok },
       body: JSON.stringify({ action: 'GENERAR_DOC_PERSONAL', payload: { id: participanteId, tipo } })
+    });
+    const data = await res.json();
+    if (data.status === 'success' && data.url) {
+      window.open(data.url, '_blank');
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
+    }
+  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+}
+
+async function prevCredencialesLote(idx) {
+  const g = window._cursosCertGrupos?.[idx];
+  if (!g) return;
+  const aprobados = g.participantes
+    .filter(p => p.estatus === 'APROBADO_CALIDAD' || p.estatus === 'EMITIDO')
+    .map(p => p.id);
+  if (!aprobados.length) { mostrarToast('No hay participantes aprobados en esta sesión.', 'err'); return; }
+  mostrarToast(`Generando credenciales (${aprobados.length} participante${aprobados.length !== 1 ? 's' : ''})…`, 'info');
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'GENERAR_CREDENCIALES_LOTE', payload: { ids: aprobados } })
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {
