@@ -1919,140 +1919,146 @@ HTML;
         $cy   = '#00c8e8';
         $lb   = '#5fa0cc';
         $md   = '#0a1f3e';
-        $gold = '#c9a84c';
-        $shd  = '#0d3d8a';  // shield blue
+        $shd  = '#0d3d8a';
 
         // ── Fragmentos ────────────────────────────────────────────────────
+        // Logo en header (centrado, tamaño medio)
         $logoHtml = $logoB64
-            ? "<img src=\"{$logoB64}\" style=\"width:56px;height:26px;display:block;margin:0 auto;\" alt=\"AVBA\">"
-            : '<div style="font-size:9pt;font-weight:bold;color:#00c8e8;text-align:center;">AVBA</div>';
+            ? "<img src=\"{$logoB64}\" style=\"width:50px;height:23px;display:block;margin:0 auto;\" alt=\"AVBA\">"
+            : '<div style="font-size:8pt;font-weight:bold;color:#00c8e8;text-align:center;">AVBA</div>';
 
+        // Logo pequeño para el bloque de sellos
         $logoSmall = $logoB64
-            ? "<img src=\"{$logoB64}\" style=\"width:36px;height:17px;display:block;margin:0 auto;\" alt=\"AVBA\">"
+            ? "<img src=\"{$logoB64}\" style=\"width:32px;height:15px;display:block;margin:1mm auto 0;\" alt=\"AVBA\">"
             : '';
 
         $firmaHtml = $firmaB64
-            ? "<img src=\"{$firmaB64}\" style=\"width:65px;height:30px;display:block;margin:0 auto;\" alt=\"Firma\">"
-            : '<div style="height:30px;"></div>';
+            ? "<img src=\"{$firmaB64}\" style=\"width:60px;height:28px;display:block;margin:0 auto;\" alt=\"Firma\">"
+            : '<div style="height:28px;"></div>';
 
+        // Foto: 27mm × 38mm — suficientemente grande para llenar la columna izquierda
         $fotoHtml = $fotoB64
-            ? "<img src=\"{$fotoB64}\" style=\"width:26mm;height:33mm;display:block;\" alt=\"Foto\">"
-            : "<div style=\"width:26mm;height:33mm;background:{$md};\"></div>";
+            ? "<img src=\"{$fotoB64}\" style=\"width:27mm;height:38mm;display:block;\" alt=\"Foto\">"
+            : "<div style=\"width:27mm;height:38mm;background:{$md};\"></div>";
 
         $qrHtml = $qrB64
-            ? "<img src=\"{$qrB64}\" style=\"width:52mm;height:52mm;display:block;margin:0 auto;\" alt=\"QR\">"
-            : "<div style=\"width:52mm;height:52mm;background:{$md};margin:0 auto;\"></div>";
+            ? "<img src=\"{$qrB64}\" style=\"width:50mm;height:50mm;display:block;margin:0 auto;\" alt=\"QR\">"
+            : "<div style=\"width:50mm;height:50mm;background:{$md};margin:0 auto;\"></div>";
 
-        // Fila de campo con ícono circular
+        // Fila de campo: ícono circular + label + valor + separador (cada fila ~15mm)
         $iconField = function(string $icon, string $label, string $value)
-                     use ($cy, $lb, $bg, $md): string {
+                     use ($cy, $lb, $bg): string {
             return "
             <tr>
-              <td style=\"width:8mm;padding-bottom:2.5mm;vertical-align:top;padding-top:0.5mm;\">
-                <div style=\"width:6mm;height:6mm;border-radius:3mm;background:{$cy};text-align:center;padding-top:0.8mm;\">
-                  <span style=\"font-size:4.5pt;color:{$bg};font-weight:bold;\">{$icon}</span>
+              <td style=\"width:9mm;vertical-align:top;padding-top:1mm;padding-bottom:5mm;\">
+                <div style=\"width:7mm;height:7mm;border-radius:4mm;background:{$cy};text-align:center;padding-top:1.2mm;\">
+                  <span style=\"font-size:5pt;color:{$bg};font-weight:bold;\">{$icon}</span>
                 </div>
               </td>
-              <td style=\"padding-bottom:2.5mm;padding-left:1mm;vertical-align:top;\">
-                <div style=\"font-size:3.5pt;color:{$lb};margin-bottom:0.5mm;\">{$label}</div>
-                <div style=\"font-size:5.5pt;font-weight:bold;color:#ffffff;border-bottom:0.6px solid {$cy};padding-bottom:0.6mm;\">{$value}&nbsp;</div>
+              <td style=\"vertical-align:top;padding-bottom:5mm;padding-left:1.5mm;\">
+                <div style=\"font-size:3.5pt;color:{$lb};margin-bottom:1mm;\">{$label}</div>
+                <div style=\"font-size:5.5pt;font-weight:bold;color:#ffffff;border-bottom:0.7px solid {$cy};padding-bottom:1mm;\">{$value}&nbsp;</div>
               </td>
             </tr>";
         };
 
         // ════════════════════════════════════════════════════════
-        // ANVERSO
+        // ANVERSO  — filas suman exactamente 133mm
+        // Header 30 + stripe 1 + body 79 + stripe 1 + footer 22 = 133mm
         // ════════════════════════════════════════════════════════
         $anverso = <<<HTML
-<table style="width:100%;height:133mm;border-collapse:collapse;background:{$bg};" cellpadding="0" cellspacing="0">
+<table style="width:100%;border-collapse:collapse;background:{$bg};" cellpadding="0" cellspacing="0">
 
-  <!-- HEADER: logo centrado + empresa + tagline (25mm) -->
-  <tr style="height:25mm;">
-    <td style="background:{$dk};text-align:center;padding:2mm 2mm 1.5mm;vertical-align:top;">
-      <!-- Ranura de cordón -->
-      <div style="width:10mm;height:3mm;border:1px solid {$lb};background:{$bg};border-radius:1.5mm;margin:0 auto 2mm;"></div>
+  <!-- HEADER 30mm: ranura + logo + AVBA + INSPECTIONS + tagline -->
+  <tr style="height:30mm;">
+    <td style="background:{$dk};text-align:center;vertical-align:top;padding:2mm 2mm 0;">
+      <div style="width:9mm;height:3mm;border:1px solid {$lb};border-radius:1.5mm;background:{$bg};margin:0 auto 2mm;"></div>
       {$logoHtml}
-      <div style="font-size:10pt;font-weight:bold;color:#ffffff;letter-spacing:3px;line-height:1;margin-top:1mm;">AVBA</div>
-      <div style="font-size:5pt;letter-spacing:2.5px;color:{$cy};margin-top:0.3mm;">INSPECTIONS</div>
-      <div style="font-size:3.5pt;color:{$lb};letter-spacing:1px;margin-top:1mm;">SEGURIDAD &bull; CONFIANZA &bull; CALIDAD</div>
+      <div style="font-size:8pt;font-weight:bold;color:#ffffff;letter-spacing:2px;margin-top:1.5mm;line-height:1;">AVBA</div>
+      <div style="font-size:4.5pt;letter-spacing:2px;color:{$cy};margin-top:0.8mm;">INSPECTIONS</div>
+      <div style="font-size:3.5pt;color:{$lb};letter-spacing:0.8px;margin-top:1.5mm;">SEGURIDAD &bull; CONFIANZA &bull; CALIDAD</div>
     </td>
   </tr>
 
-  <!-- Franja cian -->
-  <tr style="height:1.5mm;"><td style="background:{$cy};"></td></tr>
-
-  <!-- BODY (83.5mm): dos columnas -->
-  <tr style="height:83.5mm;">
-    <td style="padding:2.5mm 2.5mm 1.5mm;vertical-align:top;">
-      <table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tr>
-
-        <!-- Columna izquierda: foto + escudo + sellos -->
-        <td style="width:30mm;padding-right:2mm;vertical-align:top;">
-
-          <!-- Foto con borde cian -->
-          <div style="width:26mm;height:33mm;border:2px solid {$cy};background:{$md};overflow:hidden;">
-            {$fotoHtml}
-          </div>
-
-          <!-- Escudo -->
-          <div style="text-align:center;margin-top:2mm;">
-            <div style="display:inline-block;width:11mm;height:11mm;background:{$shd};border:1.5px solid {$cy};border-radius:1mm 1mm 5.5mm 5.5mm;text-align:center;padding-top:2mm;">
-              <span style="font-size:10pt;color:{$cy};font-weight:bold;">&#10003;</span>
-            </div>
-          </div>
-
-          <!-- Sellos -->
-          <div style="margin-top:2mm;border:0.8px solid {$brd};background:{$dk};padding:1.5mm 1mm;text-align:center;">
-            <div style="font-size:3pt;color:{$lb};letter-spacing:0.5px;">CERTIFICADO POR</div>
-            <div style="margin:1mm 0 0.5mm;">{$logoSmall}</div>
-            <div style="font-size:4pt;font-weight:bold;color:{$cy};letter-spacing:0.5px;">INSPECTIONS</div>
-            <div style="width:80%;height:0.6px;background:{$brd};margin:1.5mm auto;"></div>
-            <div style="font-size:3pt;color:{$lb};letter-spacing:0.5px;">CERTIFICADOS ANTE</div>
-            <div style="font-size:7pt;font-weight:bold;color:{$cy};margin-top:0.5mm;letter-spacing:1px;">EMA<span style="font-size:8pt;">&#10003;</span></div>
-          </div>
-
-        </td>
-
-        <!-- Columna derecha: título + campos -->
-        <td style="vertical-align:top;padding-top:1mm;">
-
-          <!-- Primera palabra muy grande -->
-          <div style="font-size:16pt;font-weight:bold;color:#ffffff;line-height:1;letter-spacing:1px;">{$certMain}</div>
-
-          <!-- Subtítulo cian entre guiones -->
-          {$certSubHtml}
-
-          <!-- Campos de datos -->
-          <table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0">
-            {$iconField('&#9786;', 'NOMBRE COMPLETO', $nombre)}
-            {$iconField('&#9776;', 'FECHA DE CERTIFICACI&Oacute;N', $fechaCert)}
-            {$iconField('&#9711;', 'VIGENCIA', $vigencia)}
-            {$iconField('&#9632;', 'EMPRESA A LA QUE PERTENECE', $empresa)}
-          </table>
-
-        </td>
-      </tr></table>
-    </td>
-  </tr>
-
-  <!-- Franja cian inferior -->
+  <!-- Franja cian 1mm -->
   <tr style="height:1mm;"><td style="background:{$cy};"></td></tr>
 
-  <!-- FOOTER: firma + nombre (23mm) -->
-  <tr style="height:23mm;">
-    <td style="background:{$dk};padding:1.5mm 3mm;vertical-align:top;">
-      <table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tr>
-        <td style="vertical-align:bottom;padding-bottom:1mm;">
-          <div style="font-size:3pt;color:{$lb};margin-bottom:0.5mm;">FOLIO</div>
-          <div style="font-size:3.5pt;color:{$cy};font-weight:bold;">{$folio}</div>
-        </td>
-        <td style="text-align:center;vertical-align:bottom;">
-          {$firmaHtml}
-          <div style="width:80%;height:0.7px;background:{$cy};margin:0.5mm auto 1mm;"></div>
-          <div style="font-size:3.5pt;font-weight:bold;color:#fff;">ING. JOSE MARCOS GONZALEZ CALDERON</div>
-          <div style="font-size:3pt;color:{$cy};margin-top:0.5mm;">CEO | AVBA INSPECTIONS</div>
-        </td>
-      </tr></table>
+  <!-- BODY 79mm: dos columnas -->
+  <tr style="height:79mm;">
+    <td style="padding:2mm 2mm 2mm 2mm;vertical-align:top;">
+      <table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0">
+        <tr>
+
+          <!-- Columna izquierda 29mm: foto + escudo + sellos -->
+          <td style="width:29mm;padding-right:2mm;vertical-align:top;">
+
+            <!-- Foto 27×38mm con borde cian -->
+            <div style="width:27mm;height:38mm;border:1.5px solid {$cy};background:{$md};overflow:hidden;">
+              {$fotoHtml}
+            </div>
+
+            <!-- Escudo 13mm (margin 2mm + div 11mm) -->
+            <div style="text-align:center;margin-top:2mm;">
+              <div style="display:inline-block;width:11mm;height:11mm;background:{$shd};border:1.5px solid {$cy};border-radius:1mm 1mm 5.5mm 5.5mm;text-align:center;padding-top:2mm;">
+                <span style="font-size:9pt;color:{$cy};font-weight:bold;">&#10003;</span>
+              </div>
+            </div>
+
+            <!-- Bloque sellos 22mm (margin 2mm + content 20mm) -->
+            <div style="margin-top:2mm;border:0.8px solid {$brd};background:{$dk};padding:1.5mm 1mm 1.5mm;text-align:center;">
+              <div style="font-size:3pt;color:{$lb};letter-spacing:0.5px;">CERTIFICADO POR</div>
+              {$logoSmall}
+              <div style="font-size:3.5pt;font-weight:bold;color:{$cy};letter-spacing:0.5px;margin-top:0.5mm;">INSPECTIONS</div>
+              <div style="width:85%;height:0.5px;background:{$brd};margin:1.5mm auto;"></div>
+              <div style="font-size:3pt;color:{$lb};letter-spacing:0.5px;">CERTIFICADOS ANTE</div>
+              <div style="font-size:6.5pt;font-weight:bold;color:{$cy};letter-spacing:1px;margin-top:0.8mm;">EMA&#10003;</div>
+            </div>
+
+          </td>
+
+          <!-- Columna derecha: título + campos -->
+          <td style="vertical-align:top;padding-top:1mm;">
+
+            <!-- Primera palabra del curso: muy grande -->
+            <div style="font-size:15pt;font-weight:bold;color:#ffffff;line-height:1;letter-spacing:0.5px;">{$certMain}</div>
+
+            <!-- Resto del nombre: cian entre guiones (pre-computado) -->
+            {$certSubHtml}
+
+            <!-- 4 campos con íconos circulares -->
+            <table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0">
+              {$iconField('&#9786;', 'NOMBRE COMPLETO', $nombre)}
+              {$iconField('&#9776;', 'FECHA DE CERTIFICACI&Oacute;N', $fechaCert)}
+              {$iconField('&#9675;', 'VIGENCIA', $vigencia)}
+              {$iconField('&#9632;', 'EMPRESA A LA QUE PERTENECE', $empresa)}
+            </table>
+
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+
+  <!-- Franja cian 1mm -->
+  <tr style="height:1mm;"><td style="background:{$cy};"></td></tr>
+
+  <!-- FOOTER 22mm: folio + firma + nombre -->
+  <tr style="height:22mm;">
+    <td style="background:{$dk};padding:1.5mm 3mm 1.5mm;vertical-align:bottom;">
+      <table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="width:30%;vertical-align:bottom;padding-bottom:1mm;">
+            <div style="font-size:3pt;color:{$lb};margin-bottom:0.5mm;">FOLIO</div>
+            <div style="font-size:3.5pt;font-weight:bold;color:{$cy};">{$folio}</div>
+          </td>
+          <td style="text-align:center;vertical-align:bottom;">
+            {$firmaHtml}
+            <div style="width:80%;height:0.7px;background:{$cy};margin:0.8mm auto 1mm;"></div>
+            <div style="font-size:3.5pt;font-weight:bold;color:#ffffff;">ING. JOSE MARCOS GONZALEZ CALDERON</div>
+            <div style="font-size:3pt;color:{$cy};margin-top:0.8mm;">CEO | AVBA INSPECTIONS</div>
+          </td>
+        </tr>
+      </table>
     </td>
   </tr>
 
@@ -2060,55 +2066,56 @@ HTML;
 HTML;
 
         // ════════════════════════════════════════════════════════
-        // REVERSO
+        // REVERSO — filas suman exactamente 133mm
+        // Header 30 + stripe 1 + qr 74 + stripe 1 + titular 15 + footer 12 = 133mm
         // ════════════════════════════════════════════════════════
         $reverso = <<<HTML
-<table style="width:100%;height:133mm;border-collapse:collapse;background:{$bg};" cellpadding="0" cellspacing="0">
+<table style="width:100%;border-collapse:collapse;background:{$bg};" cellpadding="0" cellspacing="0">
 
-  <!-- Header igual que anverso (25mm) -->
-  <tr style="height:25mm;">
-    <td style="background:{$dk};text-align:center;padding:2mm 2mm 1.5mm;vertical-align:top;">
-      <div style="width:10mm;height:3mm;border:1px solid {$lb};background:{$bg};border-radius:1.5mm;margin:0 auto 2mm;"></div>
+  <!-- HEADER 30mm (igual que anverso) -->
+  <tr style="height:30mm;">
+    <td style="background:{$dk};text-align:center;vertical-align:top;padding:2mm 2mm 0;">
+      <div style="width:9mm;height:3mm;border:1px solid {$lb};border-radius:1.5mm;background:{$bg};margin:0 auto 2mm;"></div>
       {$logoHtml}
-      <div style="font-size:10pt;font-weight:bold;color:#ffffff;letter-spacing:3px;line-height:1;margin-top:1mm;">AVBA</div>
-      <div style="font-size:5pt;letter-spacing:2.5px;color:{$cy};margin-top:0.3mm;">INSPECTIONS</div>
-      <div style="font-size:3.5pt;color:{$lb};letter-spacing:1px;margin-top:1mm;">SEGURIDAD &bull; CONFIANZA &bull; CALIDAD</div>
+      <div style="font-size:8pt;font-weight:bold;color:#ffffff;letter-spacing:2px;margin-top:1.5mm;line-height:1;">AVBA</div>
+      <div style="font-size:4.5pt;letter-spacing:2px;color:{$cy};margin-top:0.8mm;">INSPECTIONS</div>
+      <div style="font-size:3.5pt;color:{$lb};letter-spacing:0.8px;margin-top:1.5mm;">SEGURIDAD &bull; CONFIANZA &bull; CALIDAD</div>
     </td>
   </tr>
 
-  <tr style="height:1.5mm;"><td style="background:{$cy};"></td></tr>
-
-  <!-- QR central (76mm) -->
-  <tr style="height:76mm;">
-    <td style="text-align:center;padding:4mm 3mm 2mm;vertical-align:middle;">
-      <div style="border:1.5px solid {$cy};display:inline-block;padding:2.5mm;background:{$dk};">
-        {$qrHtml}
-      </div>
-      <div style="font-size:5.5pt;font-weight:bold;color:{$cy};letter-spacing:1px;margin-top:2.5mm;">ESCANEAR PARA VERIFICAR</div>
-      <div style="font-size:3.5pt;color:{$lb};margin-top:0.8mm;">AUTENTICIDAD DEL CERTIFICADO</div>
-    </td>
-  </tr>
-
+  <!-- Franja cian 1mm -->
   <tr style="height:1mm;"><td style="background:{$cy};"></td></tr>
 
-  <!-- Datos titular (17mm) -->
-  <tr style="height:17mm;">
-    <td style="padding:2mm 4mm;text-align:center;vertical-align:middle;">
-      <div style="font-size:4pt;color:{$lb};letter-spacing:0.5px;">TITULAR</div>
-      <div style="font-size:7pt;font-weight:bold;color:#fff;margin-top:0.5mm;">{$nombre}</div>
-      <div style="font-size:4pt;color:{$cy};margin-top:0.8mm;">{$cursoCompleto}</div>
-      <div style="font-size:3.5pt;color:{$lb};margin-top:1mm;">FOLIO: {$folio} &nbsp;·&nbsp; VIGENTE HASTA: {$vigencia}</div>
+  <!-- QR 74mm -->
+  <tr style="height:74mm;">
+    <td style="text-align:center;padding:5mm 3mm 3mm;vertical-align:middle;">
+      <div style="border:1.5px solid {$cy};display:inline-block;padding:2mm;background:{$dk};">
+        {$qrHtml}
+      </div>
+      <div style="font-size:5pt;font-weight:bold;color:{$cy};letter-spacing:1px;margin-top:3mm;">ESCANEAR PARA VERIFICAR</div>
+      <div style="font-size:3.5pt;color:{$lb};margin-top:1mm;">AUTENTICIDAD DEL CERTIFICADO</div>
     </td>
   </tr>
 
-  <!-- Footer (13mm) -->
-  <tr style="height:13mm;">
-    <td style="background:{$dk};border-top:1px solid {$brd};padding:2mm 3mm;vertical-align:middle;text-align:center;">
+  <!-- Franja cian 1mm -->
+  <tr style="height:1mm;"><td style="background:{$cy};"></td></tr>
+
+  <!-- Titular 15mm -->
+  <tr style="height:15mm;">
+    <td style="text-align:center;padding:2mm 4mm;vertical-align:middle;">
+      <div style="font-size:4pt;color:{$lb};letter-spacing:0.5px;">TITULAR</div>
+      <div style="font-size:7pt;font-weight:bold;color:#ffffff;margin-top:1mm;">{$nombre}</div>
+      <div style="font-size:3.5pt;color:{$cy};margin-top:1mm;">{$cursoCompleto}</div>
+      <div style="font-size:3pt;color:{$lb};margin-top:1mm;">FOLIO: {$folio} &nbsp;·&nbsp; VIGENTE HASTA: {$vigencia}</div>
+    </td>
+  </tr>
+
+  <!-- Footer 12mm -->
+  <tr style="height:12mm;">
+    <td style="background:{$dk};border-top:1px solid {$brd};text-align:center;padding:3mm 3mm;vertical-align:middle;">
       <div style="font-size:3.5pt;color:{$lb};">avba.com.mx &nbsp;&bull;&nbsp; Plataforma digital de certificación AVBA Inspections</div>
     </td>
   </tr>
-
-  <tr style="height:0.5mm;"><td style="background:{$cy};"></td></tr>
 
 </table>
 HTML;
