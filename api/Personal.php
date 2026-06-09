@@ -1831,11 +1831,33 @@ HTML;
         return $this->wrapCredencialHtml($this->htmlCredencialBody($p, $qrB64));
     }
 
-    private function htmlCredencialBody(array $p, string $qrB64 = ''): string {
-        $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
-        $up  = fn($s) => mb_strtoupper(trim((string)$s), 'UTF-8');
+    private function fotoBase64WithExif(string $fotoPath): string {
+        if (!file_exists($fotoPath)) return '';
+        $ext = strtolower(pathinfo($fotoPath, PATHINFO_EXTENSION));
+        if (in_array($ext, ['jpg','jpeg']) && function_exists('exif_read_data') && function_exists('imagecreatefromjpeg')) {
+            $exif = @exif_read_data($fotoPath);
+            $orientation = $exif['Orientation'] ?? 1;
+            if ($orientation > 1) {
+                $img = @imagecreatefromjpeg($fotoPath);
+                if ($img) {
+                    switch ($orientation) {
+                        case 3: $img = imagerotate($img, 180, 0); break;
+                        case 6: $img = imagerotate($img, -90, 0); break;
+                        case 8: $img = imagerotate($img, 90, 0); break;
+                    }
+                    ob_start();
+                    imagejpeg($img, null, 92);
+                    $data = ob_get_clean();
+                    imagedestroy($img);
+                    return 'data:image/jpeg;base64,' . base64_encode($data);
+                }
+            }
+        }
+        $mime = ($ext === 'png') ? 'image/png' : 'image/jpeg';
+        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fotoPath));
+    }
 
-        // ── Datos ──────────────────────────────────────────────────────────
+        // ── Datos ─────────────────────────────────────────────────────────
         $nombre    = $esc($up($p['nombre_completo'] ?? ''));
         $empresa   = $esc($up($p['empresa_nombre']  ?? ''));
         $folio     = $esc($p['control']
@@ -1849,156 +1871,178 @@ HTML;
             $vigencia  = date('d/m/Y', strtotime('+3 years', $ts));
         }
 
-        // Título de certificación — primera palabra = título grande, resto = subtítulo
-        $capVal   = (!($p['capacidad_na'] ?? false)) ? trim($p['capacidad'] ?? '') : '';
-        $tbase    = trim($p['texto_certificado'] ?? '');
-        $rawTitle = $capVal ?: ($tbase
-            ? strtoupper(str_ireplace('{capacidad}', $capVal, $tbase))
-            : strtoupper(trim($p['curso_nombre'] ?? '')));
-
-        if (preg_match('/^(\S+)\s+(.+)$/u', $rawTitle, $m)) {
-            $certMain = $esc($m[1]);
-            $certSub  = $esc($m[2]);
+        // Título: primera palabra = grande, resto = subtítulo cian
+        $cursoRaw = $up(trim($p['curso_nombre'] ?? ''));
+        if (preg_match('/^(\S+)\s+(.+)$/u', $cursoRaw, $m)) {
+            $certMain = $esc($m[1]);   // "OPERADOR"
+            $certSub  = $esc($m[2]);   // "DE GRUA VIAJERA HASTA 75 TON"
         } else {
-            $certMain = $esc($rawTitle);
+            $certMain = $esc($cursoRaw);
             $certSub  = '';
         }
+        $cursoCompleto = $esc($cursoRaw);
 
-        // ── Assets ─────────────────────────────────────────────────────────
+        // ── Assets ────────────────────────────────────────────────────────
         $logoB64  = $this->assetB64('logos/avba.png');
         $firmaB64 = $this->assetB64('logos/firma_director.png');
 
-        // Foto del participante (convierte URL de upload a ruta local)
+        // Foto con corrección EXIF de rotación
         $fotoB64 = '';
         if (!empty($p['foto_persona_url'])) {
             $uploadUrl = defined('UPLOAD_URL') ? rtrim(UPLOAD_URL, '/') : '';
             $uploadDir = defined('UPLOAD_DIR') ? rtrim(UPLOAD_DIR, '/') : '';
-            if ($uploadUrl && $uploadDir) {
-                $rel      = ltrim(str_replace($uploadUrl, '', $p['foto_persona_url']), '/');
-                $fotoPath = $uploadDir . '/' . $rel;
-            } else {
-                $fotoPath = dirname(__DIR__) . '/' . ltrim($p['foto_persona_url'], '/');
-            }
+            $fotoPath  = ($uploadUrl && $uploadDir)
+                ? $uploadDir . '/' . ltrim(str_replace($uploadUrl, '', $p['foto_persona_url']), '/')
+                : dirname(__DIR__) . '/' . ltrim($p['foto_persona_url'], '/');
             if (file_exists($fotoPath)) {
-                $ext     = strtolower(pathinfo($fotoPath, PATHINFO_EXTENSION));
-                $mime    = ($ext === 'png') ? 'image/png' : 'image/jpeg';
-                $fotoB64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fotoPath));
+                $fotoB64 = $this->fotoBase64WithExif($fotoPath);
             }
         }
 
         // ── Colores ────────────────────────────────────────────────────────
-        $bg  = '#040f22';   // fondo principal
-        $dk  = '#071830';   // header/footer
-        $brd = '#1a5fd6';   // borde azul
-        $cy  = '#00bfff';   // cian
-        $lb  = '#7ab8f5';   // azul claro texto
-        $md  = '#0a2040';   // azul medio relleno
+        $bg   = '#051226';
+        $dk   = '#03091a';
+        $brd  = '#1659c8';
+        $cy   = '#00c8e8';
+        $lb   = '#5fa0cc';
+        $md   = '#0a1f3e';
+        $gold = '#c9a84c';
+        $shd  = '#0d3d8a';  // shield blue
 
-        // ── Imágenes ───────────────────────────────────────────────────────
+        // ── Fragmentos ────────────────────────────────────────────────────
         $logoHtml = $logoB64
-            ? "<img src=\"{$logoB64}\" style=\"width:52px;height:24px;display:block;margin:0 auto;\" alt=\"AVBA\">"
-            : '<span style="font-size:7pt;font-weight:bold;color:#00bfff;letter-spacing:2px;">AVBA</span>';
+            ? "<img src=\"{$logoB64}\" style=\"width:56px;height:26px;display:block;margin:0 auto;\" alt=\"AVBA\">"
+            : '<div style="font-size:9pt;font-weight:bold;color:#00c8e8;text-align:center;">AVBA</div>';
+
+        $logoSmall = $logoB64
+            ? "<img src=\"{$logoB64}\" style=\"width:36px;height:17px;display:block;margin:0 auto;\" alt=\"AVBA\">"
+            : '';
 
         $firmaHtml = $firmaB64
-            ? "<img src=\"{$firmaB64}\" style=\"width:68px;height:32px;display:block;margin:0 auto 1px;\" alt=\"Firma\">"
-            : '<div style="height:32px;"></div>';
+            ? "<img src=\"{$firmaB64}\" style=\"width:65px;height:30px;display:block;margin:0 auto;\" alt=\"Firma\">"
+            : '<div style="height:30px;"></div>';
 
         $fotoHtml = $fotoB64
-            ? "<img src=\"{$fotoB64}\" style=\"width:27mm;height:34mm;display:block;\" alt=\"Foto\">"
-            : "<div style=\"width:27mm;height:34mm;background:{$md};text-align:center;\">
-                 <div style=\"padding-top:8mm;\">
-                   <div style=\"width:12mm;height:12mm;border-radius:50%;background:#1a4a8b;margin:0 auto 2mm;\"></div>
-                   <div style=\"width:18mm;height:9mm;background:#1a4a8b;margin:0 auto;\"></div>
-                 </div>
-               </div>";
+            ? "<img src=\"{$fotoB64}\" style=\"width:26mm;height:33mm;display:block;\" alt=\"Foto\">"
+            : "<div style=\"width:26mm;height:33mm;background:{$md};\"></div>";
 
         $qrHtml = $qrB64
-            ? "<img src=\"{$qrB64}\" style=\"width:48mm;height:48mm;display:block;margin:0 auto;\" alt=\"QR\">"
-            : "<div style=\"width:48mm;height:48mm;background:{$md};margin:0 auto;text-align:center;padding-top:18mm;\">
-                 <span style=\"font-size:6pt;color:{$lb};\">Sin QR</span>
-               </div>";
+            ? "<img src=\"{$qrB64}\" style=\"width:52mm;height:52mm;display:block;margin:0 auto;\" alt=\"QR\">"
+            : "<div style=\"width:52mm;height:52mm;background:{$md};margin:0 auto;\"></div>";
 
-        // ── Fila de campo con ícono circular ──────────────────────────────
-        $field = function(string $icon, string $label, string $value)
-                 use ($cy, $lb, $md): string {
-            return "<tr>
-              <td style=\"width:6.5mm;vertical-align:middle;padding-bottom:1.8mm;\">
-                <div style=\"width:5mm;height:5mm;border-radius:50%;background:{$cy};text-align:center;padding-top:0.3mm;\">
-                  <span style=\"font-size:5pt;color:#000;font-weight:bold;\">{$icon}</span>
+        // Fila de campo con ícono circular
+        $iconField = function(string $icon, string $label, string $value)
+                     use ($cy, $lb, $bg, $md): string {
+            return "
+            <tr>
+              <td style=\"width:8mm;padding-bottom:2.5mm;vertical-align:top;padding-top:0.5mm;\">
+                <div style=\"width:6mm;height:6mm;border-radius:3mm;background:{$cy};text-align:center;padding-top:0.8mm;\">
+                  <span style=\"font-size:4.5pt;color:{$bg};font-weight:bold;\">{$icon}</span>
                 </div>
               </td>
-              <td style=\"vertical-align:bottom;padding-bottom:1.8mm;padding-left:1mm;\">
-                <div style=\"font-size:4pt;color:{$lb};\">{$label}</div>
-                <div style=\"font-size:5.5pt;font-weight:bold;color:#fff;border-bottom:0.5px solid {$cy};padding-bottom:0.3mm;\">{$value}&nbsp;</div>
+              <td style=\"padding-bottom:2.5mm;padding-left:1mm;vertical-align:top;\">
+                <div style=\"font-size:3.5pt;color:{$lb};margin-bottom:0.5mm;\">{$label}</div>
+                <div style=\"font-size:5.5pt;font-weight:bold;color:#ffffff;border-bottom:0.6px solid {$cy};padding-bottom:0.6mm;\">{$value}&nbsp;</div>
               </td>
             </tr>";
         };
 
-        // ── ANVERSO ──────────────────────────────────────────────────────────
+        // ════════════════════════════════════════════════════════
+        // ANVERSO
+        // ════════════════════════════════════════════════════════
         $anverso = <<<HTML
-<table style="width:100%;height:133mm;border-collapse:collapse;background:{$bg};border:2px solid {$brd};" cellpadding="0" cellspacing="0">
+<table style="width:100%;height:133mm;border-collapse:collapse;background:{$bg};" cellpadding="0" cellspacing="0">
 
-  <tr style="height:14mm;">
-    <td style="background:{$dk};padding:1.5mm 2mm 1mm;text-align:center;border-bottom:1px solid {$brd};vertical-align:middle;">
+  <!-- HEADER: logo centrado + empresa + tagline (25mm) -->
+  <tr style="height:25mm;">
+    <td style="background:{$dk};text-align:center;padding:2mm 2mm 1.5mm;vertical-align:top;">
+      <!-- Ranura de cordón -->
+      <div style="width:10mm;height:3mm;border:1px solid {$lb};background:{$bg};border-radius:1.5mm;margin:0 auto 2mm;"></div>
       {$logoHtml}
-      <div style="font-size:6pt;font-weight:bold;color:{$cy};letter-spacing:2.5px;margin-top:0.5mm;">AVBA &nbsp; INSPECTIONS</div>
-      <div style="font-size:3.5pt;color:{$lb};letter-spacing:1px;margin-top:0.3mm;">SEGURIDAD &bull; CONFIANZA &bull; CALIDAD</div>
+      <div style="font-size:10pt;font-weight:bold;color:#ffffff;letter-spacing:3px;line-height:1;margin-top:1mm;">AVBA</div>
+      <div style="font-size:5pt;letter-spacing:2.5px;color:{$cy};margin-top:0.3mm;">INSPECTIONS</div>
+      <div style="font-size:3.5pt;color:{$lb};letter-spacing:1px;margin-top:1mm;">SEGURIDAD &bull; CONFIANZA &bull; CALIDAD</div>
     </td>
   </tr>
 
-  <tr style="height:107mm;">
-    <td style="padding:2.5mm 2.5mm;vertical-align:top;">
+  <!-- Franja cian -->
+  <tr style="height:1.5mm;"><td style="background:{$cy};"></td></tr>
+
+  <!-- BODY (83.5mm): dos columnas -->
+  <tr style="height:83.5mm;">
+    <td style="padding:2.5mm 2.5mm 1.5mm;vertical-align:top;">
       <table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tr>
 
-        <td style="width:31mm;padding-right:2mm;vertical-align:top;">
-          <div style="border:1.5px solid {$cy};overflow:hidden;width:27mm;height:34mm;background:{$md};">
+        <!-- Columna izquierda: foto + escudo + sellos -->
+        <td style="width:30mm;padding-right:2mm;vertical-align:top;">
+
+          <!-- Foto con borde cian -->
+          <div style="width:26mm;height:33mm;border:2px solid {$cy};background:{$md};overflow:hidden;">
             {$fotoHtml}
           </div>
-          <div style="text-align:center;margin:2mm 0 1.5mm;">
-            <div style="display:inline-block;width:9mm;height:9mm;border:1.5px solid {$cy};border-radius:1mm 1mm 4mm 4mm;background:#0d3a8f;text-align:center;padding-top:1mm;">
-              <span style="font-size:9pt;color:#fff;font-weight:bold;">&#10003;</span>
+
+          <!-- Escudo -->
+          <div style="text-align:center;margin-top:2mm;">
+            <div style="display:inline-block;width:11mm;height:11mm;background:{$shd};border:1.5px solid {$cy};border-radius:1mm 1mm 5.5mm 5.5mm;text-align:center;padding-top:2mm;">
+              <span style="font-size:10pt;color:{$cy};font-weight:bold;">&#10003;</span>
             </div>
           </div>
-          <div style="border:0.5px solid {$brd};padding:1mm 1.5mm;background:{$dk};">
-            <div style="font-size:3pt;color:{$lb};text-align:center;letter-spacing:0.5px;">CERTIFICADO POR</div>
-            <div style="margin:0.5mm 0;">{$logoHtml}</div>
-            <div style="font-size:3pt;color:{$lb};text-align:center;margin-top:0.8mm;letter-spacing:0.5px;">CERTIFICADOS ANTE</div>
-            <div style="font-size:7pt;font-weight:bold;color:{$cy};text-align:center;margin-top:0.3mm;letter-spacing:1px;">EMA &#10003;</div>
+
+          <!-- Sellos -->
+          <div style="margin-top:2mm;border:0.8px solid {$brd};background:{$dk};padding:1.5mm 1mm;text-align:center;">
+            <div style="font-size:3pt;color:{$lb};letter-spacing:0.5px;">CERTIFICADO POR</div>
+            <div style="margin:1mm 0 0.5mm;">{$logoSmall}</div>
+            <div style="font-size:4pt;font-weight:bold;color:{$cy};letter-spacing:0.5px;">INSPECTIONS</div>
+            <div style="width:80%;height:0.6px;background:{$brd};margin:1.5mm auto;"></div>
+            <div style="font-size:3pt;color:{$lb};letter-spacing:0.5px;">CERTIFICADOS ANTE</div>
+            <div style="font-size:7pt;font-weight:bold;color:{$cy};margin-top:0.5mm;letter-spacing:1px;">EMA<span style="font-size:8pt;">&#10003;</span></div>
           </div>
+
         </td>
 
-        <td style="vertical-align:top;">
-          <div style="font-size:13pt;font-weight:bold;color:#fff;line-height:1;">{$certMain}</div>
-          <table style="width:100%;border-collapse:collapse;margin:1.5mm 0 3mm;" cellpadding="0" cellspacing="0"><tr>
-            <td style="border-bottom:1.5px solid {$cy};width:3mm;height:3mm;"></td>
-            <td style="font-size:4.5pt;font-weight:bold;color:{$cy};white-space:nowrap;padding:0 1.5mm;">{$certSub}</td>
-            <td style="border-bottom:1.5px solid {$cy};height:3mm;"></td>
-          </tr></table>
+        <!-- Columna derecha: título + campos -->
+        <td style="vertical-align:top;padding-top:1mm;">
+
+          <!-- Primera palabra muy grande -->
+          <div style="font-size:16pt;font-weight:bold;color:#ffffff;line-height:1;letter-spacing:1px;">{$certMain}</div>
+
+          <!-- Subtítulo cian entre guiones -->
+          {$certSub ? "
+          <table style=\"width:100%;border-collapse:collapse;margin:1.5mm 0 3mm;\" cellpadding=\"0\" cellspacing=\"0\"><tr>
+            <td style=\"border-bottom:1.2px solid {$cy};width:4mm;height:4mm;\"></td>
+            <td style=\"font-size:4.5pt;font-weight:bold;color:{$cy};white-space:nowrap;padding:0 1.5mm;\">{$certSub}</td>
+            <td style=\"border-bottom:1.2px solid {$cy};height:4mm;\"></td>
+          </tr></table>" : "<div style=\"margin-bottom:3mm;\"></div>"}
+
+          <!-- Campos de datos -->
           <table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0">
-            {$field('N', 'NOMBRE COMPLETO', $nombre)}
-            {$field('F', 'FECHA DE CERTIFIC.', $fechaCert)}
-            {$field('V', 'VIGENCIA', $vigencia)}
-            {$field('E', 'EMPRESA', $empresa)}
+            {$iconField('&#9786;', 'NOMBRE COMPLETO', $nombre)}
+            {$iconField('&#9776;', 'FECHA DE CERTIFICACI&Oacute;N', $fechaCert)}
+            {$iconField('&#9711;', 'VIGENCIA', $vigencia)}
+            {$iconField('&#9632;', 'EMPRESA A LA QUE PERTENECE', $empresa)}
           </table>
-        </td>
 
+        </td>
       </tr></table>
     </td>
   </tr>
 
-  <tr style="height:12mm;">
-    <td style="background:{$dk};padding:1.5mm 2.5mm;border-top:1px solid {$brd};vertical-align:middle;">
+  <!-- Franja cian inferior -->
+  <tr style="height:1mm;"><td style="background:{$cy};"></td></tr>
+
+  <!-- FOOTER: firma + nombre (23mm) -->
+  <tr style="height:23mm;">
+    <td style="background:{$dk};padding:1.5mm 3mm;vertical-align:top;">
       <table style="width:100%;border-collapse:collapse;" cellpadding="0" cellspacing="0"><tr>
-        <td style="width:38%;vertical-align:middle;">
-          <div style="font-size:3pt;color:{$lb};">FOLIO</div>
+        <td style="vertical-align:bottom;padding-bottom:1mm;">
+          <div style="font-size:3pt;color:{$lb};margin-bottom:0.5mm;">FOLIO</div>
           <div style="font-size:3.5pt;color:{$cy};font-weight:bold;">{$folio}</div>
         </td>
-        <td style="width:62%;text-align:center;vertical-align:middle;">
+        <td style="text-align:center;vertical-align:bottom;">
           {$firmaHtml}
-          <div style="border-top:0.5px solid {$cy};padding-top:0.5mm;">
-            <div style="font-size:3.5pt;font-weight:bold;color:{$cy};">ING. JOSE MARCOS GONZALEZ CALDERON</div>
-            <div style="font-size:3pt;color:{$lb};">CEO &nbsp;|&nbsp; AVBA Inspections</div>
-          </div>
+          <div style="width:80%;height:0.7px;background:{$cy};margin:0.5mm auto 1mm;"></div>
+          <div style="font-size:3.5pt;font-weight:bold;color:#fff;">ING. JOSE MARCOS GONZALEZ CALDERON</div>
+          <div style="font-size:3pt;color:{$cy};margin-top:0.5mm;">CEO | AVBA INSPECTIONS</div>
         </td>
       </tr></table>
     </td>
@@ -2007,44 +2051,56 @@ HTML;
 </table>
 HTML;
 
-        // ── REVERSO ──────────────────────────────────────────────────────────
+        // ════════════════════════════════════════════════════════
+        // REVERSO
+        // ════════════════════════════════════════════════════════
         $reverso = <<<HTML
-<table style="width:100%;height:133mm;border-collapse:collapse;background:{$bg};border:2px solid {$brd};" cellpadding="0" cellspacing="0">
+<table style="width:100%;height:133mm;border-collapse:collapse;background:{$bg};" cellpadding="0" cellspacing="0">
 
-  <tr style="height:14mm;">
-    <td style="background:{$dk};padding:2mm;text-align:center;border-bottom:1px solid {$brd};vertical-align:middle;">
+  <!-- Header igual que anverso (25mm) -->
+  <tr style="height:25mm;">
+    <td style="background:{$dk};text-align:center;padding:2mm 2mm 1.5mm;vertical-align:top;">
+      <div style="width:10mm;height:3mm;border:1px solid {$lb};background:{$bg};border-radius:1.5mm;margin:0 auto 2mm;"></div>
       {$logoHtml}
-      <div style="font-size:6pt;font-weight:bold;color:{$cy};letter-spacing:2.5px;margin-top:0.5mm;">AVBA &nbsp; INSPECTIONS</div>
-      <div style="font-size:3.5pt;color:{$lb};letter-spacing:1px;margin-top:0.3mm;">SEGURIDAD &bull; CONFIANZA &bull; CALIDAD</div>
+      <div style="font-size:10pt;font-weight:bold;color:#ffffff;letter-spacing:3px;line-height:1;margin-top:1mm;">AVBA</div>
+      <div style="font-size:5pt;letter-spacing:2.5px;color:{$cy};margin-top:0.3mm;">INSPECTIONS</div>
+      <div style="font-size:3.5pt;color:{$lb};letter-spacing:1px;margin-top:1mm;">SEGURIDAD &bull; CONFIANZA &bull; CALIDAD</div>
     </td>
   </tr>
 
-  <tr style="height:97mm;">
-    <td style="text-align:center;padding:3mm 4mm;vertical-align:middle;">
-      <div style="border:1.5px solid {$cy};display:inline-block;padding:2mm;background:{$dk};">
+  <tr style="height:1.5mm;"><td style="background:{$cy};"></td></tr>
+
+  <!-- QR central (76mm) -->
+  <tr style="height:76mm;">
+    <td style="text-align:center;padding:4mm 3mm 2mm;vertical-align:middle;">
+      <div style="border:1.5px solid {$cy};display:inline-block;padding:2.5mm;background:{$dk};">
         {$qrHtml}
       </div>
-      <div style="font-size:5pt;font-weight:bold;color:{$cy};letter-spacing:0.5px;margin-top:2mm;">ESCANEAR PARA VERIFICAR</div>
-      <div style="font-size:3.5pt;color:{$lb};margin-top:0.5mm;">AUTENTICIDAD DEL CERTIFICADO</div>
+      <div style="font-size:5.5pt;font-weight:bold;color:{$cy};letter-spacing:1px;margin-top:2.5mm;">ESCANEAR PARA VERIFICAR</div>
+      <div style="font-size:3.5pt;color:{$lb};margin-top:0.8mm;">AUTENTICIDAD DEL CERTIFICADO</div>
     </td>
   </tr>
 
-  <tr style="height:14mm;">
-    <td style="padding:0 5mm 1.5mm;text-align:center;vertical-align:top;">
-      <div style="border-top:0.5px solid {$brd};padding-top:1.5mm;">
-        <div style="font-size:4pt;color:{$lb};letter-spacing:0.5px;">TITULAR</div>
-        <div style="font-size:6.5pt;font-weight:bold;color:#fff;margin-top:0.5mm;">{$nombre}</div>
-        <div style="font-size:3.5pt;color:{$lb};margin-top:0.5mm;">{$certMain} {$certSub}</div>
-        <div style="font-size:3pt;color:{$lb};margin-top:1mm;">FOLIO: {$folio} &nbsp;·&nbsp; VIGENTE HASTA: {$vigencia}</div>
-      </div>
+  <tr style="height:1mm;"><td style="background:{$cy};"></td></tr>
+
+  <!-- Datos titular (17mm) -->
+  <tr style="height:17mm;">
+    <td style="padding:2mm 4mm;text-align:center;vertical-align:middle;">
+      <div style="font-size:4pt;color:{$lb};letter-spacing:0.5px;">TITULAR</div>
+      <div style="font-size:7pt;font-weight:bold;color:#fff;margin-top:0.5mm;">{$nombre}</div>
+      <div style="font-size:4pt;color:{$cy};margin-top:0.8mm;">{$cursoCompleto}</div>
+      <div style="font-size:3.5pt;color:{$lb};margin-top:1mm;">FOLIO: {$folio} &nbsp;·&nbsp; VIGENTE HASTA: {$vigencia}</div>
     </td>
   </tr>
 
-  <tr style="height:8mm;">
-    <td style="background:{$dk};padding:1.5mm 3mm;border-top:1px solid {$brd};text-align:center;vertical-align:middle;">
+  <!-- Footer (13mm) -->
+  <tr style="height:13mm;">
+    <td style="background:{$dk};border-top:1px solid {$brd};padding:2mm 3mm;vertical-align:middle;text-align:center;">
       <div style="font-size:3.5pt;color:{$lb};">avba.com.mx &nbsp;&bull;&nbsp; Plataforma digital de certificación AVBA Inspections</div>
     </td>
   </tr>
+
+  <tr style="height:0.5mm;"><td style="background:{$cy};"></td></tr>
 
 </table>
 HTML;
