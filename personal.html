@@ -68,6 +68,7 @@ tbody tr:hover td{background:#f8faff;cursor:pointer;}
 .btn-cert{background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark);}
 .btn-dip{background:var(--verde-light);border-color:#5a8f1e;color:var(--verde);}
 .btn-dc3{background:var(--ambar-light);border-color:var(--ambar);color:var(--ambar);}
+.btn-cred{background:#e8f0ff;border-color:#1a5fd6;color:#0d3a8f;}
 /* Util */
 .spin{width:18px;height:18px;border:2px solid var(--borde);border-top-color:var(--azul);border-radius:50%;animation:giro .7s linear infinite;display:inline-block;vertical-align:middle;}
 @keyframes giro{to{transform:rotate(360deg)}}
@@ -286,19 +287,24 @@ function campo(label, val) {
 }
 
 function renderDetalle(d) {
-  const tipoLabel = { DC3: '📋 DC-3', DIPLOMA: '🎓 Diploma', CERTIFICADO: '📜 Certificado' };
+  const tipoLabel = { DC3: '📋 DC-3', DIPLOMA: '🎓 Diploma', CERTIFICADO: '📜 Certificado', CREDENCIAL: '🪪 Credencial PVC' };
   let docs = '';
   if (Array.isArray(d.documentos) && d.documentos.length) {
     // Latest doc per type — always regenerate on click so user sees latest design
     const latest = {};
     d.documentos.forEach(doc => { latest[doc.tipo_doc] = doc; });
-    const colorCls = { DC3: 'btn-dc3', DIPLOMA: 'btn-dip', CERTIFICADO: 'btn-cert' };
+    const colorCls = { DC3: 'btn-dc3', DIPLOMA: 'btn-dip', CERTIFICADO: 'btn-cert', CREDENCIAL: 'btn-cred' };
     docs = `<div class="sec-title">Documentos generados</div><div class="docs-row">
       ${Object.values(latest).map(doc =>
         `<button class="btn-doc ${colorCls[doc.tipo_doc]||'btn-cert'}" onclick="prevDocPersonal(${d.id},'${doc.tipo_doc.toLowerCase()}')">${tipoLabel[doc.tipo_doc] || doc.tipo_doc} <span style="font-size:10px;opacity:.7">${esc(doc.fecha)}</span></button>`
       ).join('')}
     </div>`;
   }
+  // Botón siempre disponible para generar credencial PVC
+  const credBtn = `<div class="sec-title" style="margin-top:10px;">Credencial PVC</div>
+    <div class="docs-row">
+      <button class="btn-doc btn-cred" onclick="prevDocPersonal(${d.id},'credencial')">🪪 Generar Credencial PVC</button>
+    </div>`;
 
   document.getElementById('detalleBody').innerHTML = `
     <div class="sec-title">Datos del participante</div>
@@ -330,7 +336,8 @@ function renderDetalle(d) {
       ${campo('Registrado', d.fecha_alta || d.fecha_registro)}
       ${campo('QR asignado', d.qr_codigo || '')}
     </div>
-    ${docs}`;
+    ${docs}
+    ${credBtn}`;
 }
 
 function cerrarDetalle() { document.getElementById('overlayDetalle').classList.remove('open'); }
