@@ -368,7 +368,11 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
                 <h3>Registro de Inspecciones</h3>
                 <p><?= $inspecciones_mes ?> este mes</p>
             </div>
-        </div>
+            <div class="menu-item" onclick="window.location.href='admin-credenciales.php'">
+                <div class="menu-item-icon">📋</div>
+                <h3>Generar Credenciales</h3>
+                <p>PDF para imprimir</p>
+            </div>
     </div>
 </div>
 
