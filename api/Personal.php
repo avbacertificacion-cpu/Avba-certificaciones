@@ -1117,6 +1117,41 @@ class Personal {
         return ['status' => 'success', 'url' => $url];
     }
 
+    // ── Generar credencial física individual (anverso + reverso) ─────────
+    public function generarCredencial(int $id, string $usuario): array {
+        $p = $this->obtenerParticipante($id);
+        if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        if (empty($p['qr_codigo'])) {
+            return ['status' => 'error', 'message' => 'El participante no tiene código QR. Apruébalo en Calidad primero.'];
+        }
+
+        $qrB64 = '';
+        if (defined('SITE_URL')) {
+            $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(
+                rtrim(SITE_URL, '/') . '/validar.html?qr=' . $p['qr_codigo']
+            ) . '&size=200&margin=1';
+            $data = @file_get_contents($qrUrl, false, stream_context_create(['http' => ['timeout' => 6]]));
+            if ($data) $qrB64 = 'data:image/png;base64,' . base64_encode($data);
+        }
+
+        try {
+            $html  = $this->htmlCredencial($p, $qrB64);
+            $folio = 'CRED-' . str_pad((string)$id, 5, '0', STR_PAD_LEFT);
+            $url   = $this->htmlToPdfMpdf($html, $folio, 'CRED', [86, 133]);
+        } catch (\Throwable $e) {
+            return ['status' => 'error', 'message' => 'Error generando credencial: ' . $e->getMessage()];
+        }
+
+        try {
+            $this->pdo->exec("ALTER TABLE participantes_cursos ADD COLUMN IF NOT EXISTS credencial_url VARCHAR(500) NULL");
+        } catch (\Throwable $ignored) {}
+        $this->pdo->prepare("UPDATE participantes_cursos SET credencial_url = ? WHERE id = ?")
+                  ->execute([$url, $id]);
+
+        return ['status' => 'success', 'url' => $url];
+    }
+
     // ── Gestionar credenciales portal para participante ──────
     private function gestionarCredencialesParticipante(array $p, string $correo): array {
         // Determinar id_cliente: empresa_nombre tiene prioridad, luego primera parte del control
@@ -2478,4 +2513,5 @@ HTML;
         $html = file_get_contents($path);
         return str_replace(array_keys($map), array_values($map), $html);
     }
+
 }
