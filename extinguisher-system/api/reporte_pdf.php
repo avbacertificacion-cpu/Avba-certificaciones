@@ -37,8 +37,8 @@ if ($rol === ROLE_CLIENTE) {
 $stmt = $pdo->prepare("
     SELECT e.*
     FROM extintores e
-    WHERE e.empresa_id = ? AND e.estado != 'inactivo'
-    ORDER BY COALESCE(e.seccion,'ZZZ') ASC, e.codigo_manual ASC
+    WHERE e.empresa_id = ? AND e.estado = 'activo'
+    ORDER BY COALESCE(e.seccion, '') ASC, e.codigo_manual ASC
 ");
 $stmt->execute([$reporte['empresa_id']]);
 $extintores = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -78,33 +78,51 @@ $ubicacion = strtoupper(trim($reporte['observaciones'] ?? ''));
 // ─── Dividir extintores en páginas (~30 filas por página) ────────────────────
 // Construir filas con secciones intercaladas
 $filas = [];
-$seccion_actual = '__NINGUNA__';
+$seccion_actual = null;
 $num = 1;
 
 foreach ($extintores as $ext) {
-    $seccion = strtoupper(trim($ext['seccion'] ?? ''));
-    if ($seccion !== $seccion_actual && $seccion !== '') {
+    $seccion = trim($ext['seccion'] ?? '') ?: 'SIN SECCIÓN';
+    $seccion = strtoupper($seccion);
+
+    // Agregar fila de sección si cambió
+    if ($seccion !== $seccion_actual) {
         $filas[] = ['tipo' => 'seccion', 'texto' => $seccion];
         $seccion_actual = $seccion;
     }
+
+    // Asignar número consecutivo al extintor
     $ext['numero'] = $num++;
     $filas[] = ['tipo' => 'extintor', 'ext' => $ext];
 }
 
-// Dividir en páginas de máximo 32 filas (secciones cuentan como 1)
+// Dividir en páginas de máximo 30 extintores por página
 $paginas = [];
 $pagina_actual = [];
-$filas_en_pagina = 0;
+$extintores_en_pagina = 0;
+$seccion_actual_pag = null;
 
 foreach ($filas as $fila) {
-    if ($filas_en_pagina >= 32) {
+    // Si es una nueva sección y ya hay extintores, reinicia la página
+    if ($fila['tipo'] === 'seccion' && $extintores_en_pagina >= 25) {
         $paginas[] = $pagina_actual;
         $pagina_actual = [];
-        $filas_en_pagina = 0;
+        $extintores_en_pagina = 0;
     }
+
+    // Si es un extintor, contar
+    if ($fila['tipo'] === 'extintor') {
+        if ($extintores_en_pagina >= 30) {
+            $paginas[] = $pagina_actual;
+            $pagina_actual = [];
+            $extintores_en_pagina = 0;
+        }
+        $extintores_en_pagina++;
+    }
+
     $pagina_actual[] = $fila;
-    $filas_en_pagina++;
 }
+
 if (!empty($pagina_actual)) {
     $paginas[] = $pagina_actual;
 }
