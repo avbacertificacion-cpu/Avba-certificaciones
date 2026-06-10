@@ -57,8 +57,57 @@ ALTER TABLE reportes_mensuales
 ADD CONSTRAINT fk_reportes_inspector
 FOREIGN KEY (inspector_id) REFERENCES usuarios(id);
 
--- ─── 5. Verificar resultado final ────────────────────────────────────────────
+-- ─── 5. Tabla tipos_extintores: tipos configurables ─────────────────────────
+
+-- 5a. Crear tabla de tipos
+CREATE TABLE IF NOT EXISTS tipos_extintores (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    nombre      VARCHAR(50) NOT NULL UNIQUE,
+    descripcion VARCHAR(255),
+    estado      ENUM('activo','inactivo') DEFAULT 'activo',
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 5b. Migrar datos existentes (ejecutar solo si extintores.tipo es ENUM)
+INSERT IGNORE INTO tipos_extintores (nombre, descripcion) VALUES
+    ('PQS', 'Polvo Químico Seco'),
+    ('CO2', 'Dióxido de Carbono'),
+    ('agua', 'Agua'),
+    ('espuma', 'Espuma'),
+    ('halotron', 'Halotron'),
+    ('otro', 'Otro tipo');
+
+-- 5c. Cambiar extintores.tipo de ENUM a INT
+-- (Este paso requiere manejo especial - crear columna temporal, migrar, renombrar)
+-- PASO 1: Crear columna temporal
+ALTER TABLE extintores
+ADD COLUMN tipo_id INT AFTER tipo;
+
+-- PASO 2: Copiar datos usando el mapeo de tipos
+UPDATE extintores e
+SET tipo_id = (SELECT id FROM tipos_extintores WHERE nombre = e.tipo)
+WHERE tipo_id IS NULL;
+
+-- PASO 3: Hacer tipo_id NOT NULL y agregar FK
+ALTER TABLE extintores
+MODIFY COLUMN tipo_id INT NOT NULL;
+
+ALTER TABLE extintores
+ADD CONSTRAINT fk_extintor_tipo
+FOREIGN KEY (tipo_id) REFERENCES tipos_extintores(id);
+
+-- PASO 4: Eliminar columna ENUM tipo
+ALTER TABLE extintores
+DROP COLUMN tipo;
+
+-- PASO 5: Renombrar tipo_id a tipo
+ALTER TABLE extintores
+CHANGE COLUMN tipo_id tipo INT NOT NULL;
+
+-- ─── 6. Verificar resultado final ────────────────────────────────────────────
 
 DESC inspecciones;
 DESC reportes_mensuales;
 DESC empresas;
+DESC tipos_extintores;
+DESC extintores;

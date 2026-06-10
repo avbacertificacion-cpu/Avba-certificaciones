@@ -21,6 +21,14 @@ $insertados = 0;
 $errores_insert = [];
 
 try {
+    // Obtener mapeo de tipos
+    $stmt = $pdo->prepare("SELECT id, nombre FROM tipos_extintores WHERE estado = 'activo'");
+    $stmt->execute();
+    $tipos_map = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $t) {
+        $tipos_map[$t['nombre']] = $t['id'];
+    }
+
     $pdo->beginTransaction();
 
     foreach ($d['datos'] as $extintor) {
@@ -28,6 +36,13 @@ try {
         $codigo_qr = hash('sha256', $extintor['codigo_manual'] . $extintor['empresa_id'] . time() . rand());
 
         try {
+            // Buscar tipo_id por nombre
+            $tipo_nombre = trim($extintor['tipo']);
+            if (!isset($tipos_map[$tipo_nombre])) {
+                throw new Exception("Tipo '{$tipo_nombre}' no válido");
+            }
+            $tipo_id = $tipos_map[$tipo_nombre];
+
             $stmt = $pdo->prepare("
                 INSERT INTO extintores
                     (codigo_qr, codigo_manual, empresa_id, ubicacion, tipo, capacidad,
@@ -40,7 +55,7 @@ try {
                 $extintor['codigo_manual'],
                 intval($extintor['empresa_id']),
                 $extintor['ubicacion'],
-                $extintor['tipo'],
+                $tipo_id,
                 $extintor['capacidad'],
                 $extintor['seccion'],
                 $extintor['fecha_recarga'] ?: null,

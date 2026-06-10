@@ -29,6 +29,15 @@ CREATE TABLE empresas (
     created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- ─── TIPOS DE EXTINTORES ──────────────────────────────────────────────────────
+CREATE TABLE tipos_extintores (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    nombre      VARCHAR(50) NOT NULL UNIQUE,
+    descripcion VARCHAR(255),
+    estado      ENUM('activo','inactivo') DEFAULT 'activo',
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- ─── EXTINTORES ──────────────────────────────────────────────────────────────
 CREATE TABLE extintores (
     id              INT PRIMARY KEY AUTO_INCREMENT,
@@ -36,7 +45,7 @@ CREATE TABLE extintores (
     codigo_manual   VARCHAR(30) NOT NULL,          -- ej: EXT-001 (único por empresa)
     empresa_id      INT NOT NULL,
     ubicacion       VARCHAR(255) NOT NULL,
-    tipo            ENUM('PQS','CO2','agua','espuma','halotron','otro') NOT NULL,
+    tipo            INT NOT NULL,                   -- FK a tipos_extintores
     capacidad       VARCHAR(30),                   -- ej: 6 kg, 2.5 kg
     seccion         VARCHAR(150),                  -- ej: EDIFICIO DE VIGILANCIA
     fecha_recarga   DATE,
@@ -47,6 +56,7 @@ CREATE TABLE extintores (
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (empresa_id) REFERENCES empresas(id),
+    FOREIGN KEY (tipo) REFERENCES tipos_extintores(id),
     FOREIGN KEY (creado_por) REFERENCES usuarios(id),
     UNIQUE KEY uk_extintor_empresa_codigo (empresa_id, codigo_manual)
 );
@@ -137,6 +147,15 @@ CREATE INDEX idx_usuario_rol         ON usuarios(rol);
 CREATE INDEX idx_usuario_empresa     ON usuarios(empresa_id);
 
 -- ─── DATOS INICIALES ─────────────────────────────────────────────────────────
+-- Tipos de extintores por defecto
+INSERT INTO tipos_extintores (nombre, descripcion) VALUES
+    ('PQS', 'Polvo Químico Seco'),
+    ('CO2', 'Dióxido de Carbono'),
+    ('agua', 'Agua'),
+    ('espuma', 'Espuma'),
+    ('halotron', 'Halotron'),
+    ('otro', 'Otro tipo');
+
 -- Admin por defecto (password: Admin1234!)
 INSERT INTO empresas (nombre, rfc, email, contacto) VALUES
     ('Empresa Demo', 'EMP123456789', 'demo@empresa.com', 'Contacto Demo');

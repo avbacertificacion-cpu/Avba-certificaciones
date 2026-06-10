@@ -30,7 +30,7 @@ Se descargará un archivo `plantilla-extintores.csv` con estas columnas:
 |---------|-----------|---------|-------|
 | `codigo_manual` | ✅ SÍ | EXT-001 | Único por empresa |
 | `ubicacion` | ✅ SÍ | Almacén General | Ubicación específica |
-| `tipo` | ✅ SÍ | PQS | PQS, CO2, agua, espuma, halotron, otro |
+| `tipo` | ✅ SÍ | PQS | Tipo configurado en el sistema (ver Admin → Tipos de Extintores) |
 | `capacidad` | ❌ No | 6 kg | Formato libre (ej: "6 kg", "2.5 kg") |
 | `seccion` | ❌ No | EDIFICIO A | Agrupa en reportes |
 | `empresa_id` | ✅ SÍ | 1 | ID de la empresa en el sistema |
@@ -153,7 +153,7 @@ EXT-003,Pasillo Principal,agua,1
 | Problema | Causa | Solución |
 |----------|-------|----------|
 | "Falta columna requerida" | El CSV no tiene todas las columnas | Usa la plantilla descargada |
-| "Tipo no válido" | Escribiste "polvo" en lugar de "PQS" | Usa: PQS, CO2, agua, espuma, halotron, otro |
+| "Tipo no válido" | El tipo no existe en el sistema | Verifica en Admin → Tipos de Extintores |
 | "Empresa ID inválido" | El ID no existe o está vacío | Verifica en Admin → Empresas |
 | "Código vacío" | Fila con código en blanco | Completa todos los códigos |
 | "Solo se aceptan CSV" | Intentaste subir Excel directo | Guarda como CSV primero |

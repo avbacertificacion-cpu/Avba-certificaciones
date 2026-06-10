@@ -184,6 +184,18 @@ $nombre = $_SESSION['nombre'];
 <script>
 let datosPreview = [];
 let datosValidos = [];
+let tiposValidos = [];
+
+// Cargar tipos al iniciar
+async function cargarTipos() {
+    const r = await fetch('../api/extintores.php?action=get_tipos');
+    const d = await r.json();
+    if (d.success) {
+        tiposValidos = d.data.map(t => t.nombre);
+    }
+}
+
+cargarTipos();
 
 const dropZone = document.getElementById('dropZone');
 dropZone.addEventListener('click', () => document.getElementById('fileInput').click());
@@ -263,7 +275,7 @@ function procesarArchivo(file) {
 
             if (!fila.codigo_manual) fila.errores.push('Código vacío');
             if (!fila.ubicacion) fila.errores.push('Ubicación vacía');
-            if (!['PQS','CO2','agua','espuma','halotron','otro'].includes(fila.tipo))
+            if (!tiposValidos.includes(fila.tipo))
                 fila.errores.push('Tipo inválido');
             if (!fila.empresa_id || isNaN(fila.empresa_id))
                 fila.errores.push('Empresa ID inválido');

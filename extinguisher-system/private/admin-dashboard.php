@@ -75,9 +75,10 @@ for ($i = 5; $i >= 0; $i--) {
 
 // ─── EXTINTORES POR TIPO ────────────────────────────────────────────────────
 $stmt = $pdo->query("
-    SELECT tipo, COUNT(*) as cantidad FROM extintores
-    WHERE estado != 'inactivo'
-    GROUP BY tipo
+    SELECT te.nombre as tipo, COUNT(*) as cantidad FROM extintores e
+    JOIN tipos_extintores te ON te.id = e.tipo
+    WHERE e.estado != 'inactivo'
+    GROUP BY e.tipo
     ORDER BY cantidad DESC
 ");
 $extintores_por_tipo = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -346,6 +347,11 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
                 <div class="menu-item-icon">🏢</div>
                 <h3>Gestionar Empresas</h3>
                 <p><?= $total_empresas ?> empresas</p>
+            </div>
+            <div class="menu-item" onclick="window.location.href='admin-tipos.php'">
+                <div class="menu-item-icon">🧪</div>
+                <h3>Tipos de Extintores</h3>
+                <p>Configurar tipos</p>
             </div>
             <div class="menu-item" onclick="window.location.href='admin-reportes.php'">
                 <div class="menu-item-icon">📊</div>

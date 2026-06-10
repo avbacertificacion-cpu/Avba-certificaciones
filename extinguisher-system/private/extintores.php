@@ -133,14 +133,7 @@ $es_admin = $rol === ROLE_ADMIN;
         <div class="form-row">
             <div class="form-group">
                 <label>Tipo *</label>
-                <select id="ext-tipo">
-                    <option value="PQS">PQS – Polvo Químico Seco</option>
-                    <option value="CO2">CO2</option>
-                    <option value="agua">Agua</option>
-                    <option value="espuma">Espuma</option>
-                    <option value="halotron">Halotron</option>
-                    <option value="otro">Otro</option>
-                </select>
+                <select id="ext-tipo"></select>
             </div>
             <div class="form-group">
                 <label>Capacidad</label>
@@ -198,10 +191,23 @@ $es_admin = $rol === ROLE_ADMIN;
 <script>
 let extintores = [];
 let empresas   = [];
+let tipos      = [];
 
 // ── Cargar datos iniciales ───────────────────────────────────────────────────
 async function init() {
-    await Promise.all([cargarEmpresas(), cargarExtintores()]);
+    await Promise.all([cargarEmpresas(), cargarTipos(), cargarExtintores()]);
+}
+
+async function cargarTipos() {
+    try {
+        const r = await fetch('../api/extintores.php?action=get_tipos');
+        const d = await r.json();
+        if (d.success) {
+            tipos = d.data;
+            const sel = document.getElementById('ext-tipo');
+            sel.innerHTML = tipos.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
+        }
+    } catch(e) { console.error('Error cargar tipos:', e); }
 }
 
 async function cargarEmpresas() {
@@ -254,7 +260,7 @@ function renderTabla(data) {
                 <td><strong>${e.codigo_manual}</strong></td>
                 <td>${e.empresa_nombre}</td>
                 <td>${e.ubicacion}</td>
-                <td><span class="tipo-tag">${e.tipo}</span></td>
+                <td><span class="tipo-tag">${e.tipo_nombre}</span></td>
                 <td>${e.capacidad || '—'}</td>
                 <td>${e.fecha_recarga || '—'}</td>
                 <td>${e.fecha_ph || '—'}</td>
@@ -316,7 +322,7 @@ function editarExtintor(id) {
 function limpiarModal() {
     ['ext-id','ext-codigo','ext-seccion','ext-ubicacion','ext-capacidad','ext-recarga','ext-ph','ext-obs']
         .forEach(id => document.getElementById(id).value = '');
-    document.getElementById('ext-tipo').value   = 'PQS';
+    document.getElementById('ext-tipo').value   = tipos.length > 0 ? tipos[0].id : '';
     document.getElementById('ext-estado').value = 'activo';
     document.getElementById('modal-alert').innerHTML = '';
 }

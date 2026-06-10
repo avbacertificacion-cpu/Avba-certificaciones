@@ -20,12 +20,13 @@ if ($rol === ROLE_CLIENTE && !in_array($action, ['listar'])) {
 }
 
 switch ($action) {
-    case 'listar':    listar();    break;
-    case 'obtener':   obtener();   break;
-    case 'buscar_qr': buscarQR();  break;
-    case 'crear':     crear();     break;
-    case 'editar':    editar();    break;
-    case 'eliminar':  eliminar();  break;
+    case 'listar':      listar();       break;
+    case 'obtener':     obtener();      break;
+    case 'buscar_qr':   buscarQR();     break;
+    case 'crear':       crear();        break;
+    case 'editar':      editar();       break;
+    case 'eliminar':    eliminar();     break;
+    case 'get_tipos':   obtenerTipos(); break;
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Acción no válida']);
@@ -47,12 +48,14 @@ function listar() {
 
     $stmt = $pdo->prepare("
         SELECT e.*,
+               te.nombre AS tipo_nombre,
                emp.nombre AS empresa_nombre,
                u.nombre   AS creado_por_nombre,
                (SELECT fecha FROM inspecciones
                 WHERE extintor_id = e.id
                 ORDER BY fecha DESC, hora DESC LIMIT 1) AS ultima_inspeccion
         FROM extintores e
+        JOIN tipos_extintores te ON te.id = e.tipo
         JOIN empresas  emp ON emp.id = e.empresa_id
         JOIN usuarios  u   ON u.id  = e.creado_por
         $where
@@ -71,8 +74,9 @@ function obtener() {
     if (!$id) { http_response_code(400); echo json_encode(['error' => 'ID requerido']); return; }
 
     $stmt = $pdo->prepare("
-        SELECT e.*, emp.nombre AS empresa_nombre
+        SELECT e.*, te.nombre AS tipo_nombre, emp.nombre AS empresa_nombre
         FROM extintores e
+        JOIN tipos_extintores te ON te.id = e.tipo
         JOIN empresas emp ON emp.id = e.empresa_id
         WHERE e.id = ?
     ");
@@ -114,8 +118,9 @@ function buscarQR() {
     }
 
     $stmt = $pdo->prepare("
-        SELECT e.*, emp.nombre AS empresa_nombre
+        SELECT e.*, te.nombre AS tipo_nombre, emp.nombre AS empresa_nombre
         FROM extintores e
+        JOIN tipos_extintores te ON te.id = e.tipo
         JOIN empresas emp ON emp.id = e.empresa_id
         $where
         LIMIT 1
@@ -161,6 +166,15 @@ function crear() {
         }
     }
 
+    // Validar que el tipo existe
+    $stmt = $pdo->prepare("SELECT id FROM tipos_extintores WHERE id = ? AND estado = 'activo'");
+    $stmt->execute([$d['tipo']]);
+    if (!$stmt->fetch()) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Tipo de extintor no válido']);
+        return;
+    }
+
     // Generar código QR único
     $codigo_qr = bin2hex(random_bytes(16));
 
@@ -183,7 +197,7 @@ function crear() {
             $d['empresa_id'],
             $d['seccion']       ?? null,
             $d['ubicacion'],
-            $d['tipo'],
+            intval($d['tipo']),
             $d['capacidad']     ?? null,
             $d['fecha_recarga'] ?? null,
             $d['fecha_ph']      ?? null,
@@ -247,6 +261,17 @@ function editar() {
         }
     }
 
+    // Validar tipo si se proporciona
+    if (!empty($d['tipo'])) {
+        $stmt = $pdo->prepare("SELECT id FROM tipos_extintores WHERE id = ? AND estado = 'activo'");
+        $stmt->execute([$d['tipo']]);
+        if (!$stmt->fetch()) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Tipo de extintor no válido']);
+            return;
+        }
+    }
+
     $stmt = $pdo->prepare("
         UPDATE extintores SET
             codigo_manual = ?,
@@ -266,7 +291,7 @@ function editar() {
         $d['empresa_id']    ?? null,
         $d['seccion']       ?? null,
         $d['ubicacion']     ?? '',
-        $d['tipo']          ?? '',
+        !empty($d['tipo']) ? intval($d['tipo']) : null,
         $d['capacidad']     ?? null,
         $d['fecha_recarga'] ?? null,
         $d['fecha_ph']      ?? null,
@@ -296,6 +321,21 @@ function eliminar() {
 
     audit($uid, "Eliminar extintor", 'extintores', $id);
     echo json_encode(['success' => true]);
+}
+
+// ─── OBTENER TIPOS DE EXTINTORES ──────────────────────────────────────────────
+function obtenerTipos() {
+    global $pdo;
+
+    $stmt = $pdo->prepare("
+        SELECT id, nombre, descripcion
+        FROM tipos_extintores
+        WHERE estado = 'activo'
+        ORDER BY nombre ASC
+    ");
+    $stmt->execute();
+
+    echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 
 // ─── HELPER AUDITORÍA ────────────────────────────────────────────────────────
