@@ -3990,7 +3990,7 @@ async function abrirDetPer(id) {
           </div>
         </div>` : ''}
       ${p.documentos?.length?`<div style="margin-bottom:10px"><span style="font-size:11px;color:var(--texto-sub);display:block;margin-bottom:6px">Documentos</span>${p.documentos.map(d=>`<div style="font-size:12px;padding:4px 0">${escH(d.tipo_doc)} — ${escH(d.fecha)} <a href="${escH(d.url)}" target="_blank" style="color:var(--azul)">Descargar</a></div>`).join('')}</div>`:''}
-      ${(p.estatus==='APROBADO_CALIDAD'||p.estatus==='EMITIDO')&&p.qr_codigo?`
+      ${(p.estatus==='APROBADO_CALIDAD'||p.estatus==='EMITIDO')&&p.qr_codigo&&_sesRol==='CERTIFICACIONES'?`
         <div style="border-top:1px solid var(--borde);padding-top:10px;margin-top:4px">
           <span style="font-size:11px;color:var(--texto-sub);display:block;margin-bottom:8px">Credencial de identificación</span>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
