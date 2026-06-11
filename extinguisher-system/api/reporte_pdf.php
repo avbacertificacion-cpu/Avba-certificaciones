@@ -38,7 +38,7 @@ $stmt = $pdo->prepare("
     SELECT e.*
     FROM extintores e
     WHERE e.empresa_id = ? AND e.estado = 'activo'
-    ORDER BY COALESCE(e.seccion, '') ASC, CAST(RIGHT(e.codigo_manual, 3) AS UNSIGNED) ASC
+    ORDER BY COALESCE(e.seccion, '') ASC, CAST(SUBSTR(e.codigo_manual, 5) AS SIGNED) ASC
 ");
 $stmt->execute([$reporte['empresa_id']]);
 $extintores = $stmt->fetchAll(PDO::FETCH_ASSOC);
