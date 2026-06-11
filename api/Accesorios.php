@@ -685,28 +685,8 @@ class Accesorios {
         ];
     }
 
-    // ── Generar certificado FPDI (una página por accesorio) ──
+    // ── Generar certificado con mPDF (una página, HTML template) ──
     public function generarCertAcc(int $sesionId, string $usuario): array {
-        $this->ensurePlantillaAccTable();
-        $row = $this->pdo->query("SELECT plantilla_pdf, pdf_campos FROM acc_plantilla_informe WHERE id = 1")->fetch();
-        $rutaTpl = $row['plantilla_pdf']
-            ? __DIR__ . '/../uploads/plantillas/' . $row['plantilla_pdf']
-            : null;
-
-        if (!$rutaTpl || !file_exists($rutaTpl))
-            return ['status' => 'error', 'message' => 'No hay plantilla PDF configurada para el certificado.'];
-
-        $campos = json_decode($row['pdf_campos'] ?? '[]', true) ?: [];
-        if (!$campos)
-            return ['status' => 'error', 'message' => 'La plantilla no tiene campos configurados. Configúralos en Calidad.'];
-
-        if (!class_exists('setasign\Fpdi\Fpdi')) {
-            $loader = __DIR__ . '/../lib/fpdi_loader.php';
-            if (file_exists($loader)) require_once $loader;
-        }
-        if (!class_exists('setasign\Fpdi\Fpdi'))
-            return ['status' => 'error', 'message' => 'Librería FPDI no disponible en el servidor.'];
-
         $det = $this->detalleSesion($sesionId);
         if ($det['status'] !== 'success') return $det;
         $sesion = $det['data'];
@@ -715,100 +695,113 @@ class Accesorios {
         if (!$accs)
             return ['status' => 'error', 'message' => 'Esta sesión no tiene accesorios registrados.'];
 
+        $qrCodigo = $sesion['qr_codigo'] ?? '';
+        if (!$qrCodigo)
+            return ['status' => 'error', 'message' => 'La sesión no tiene código QR. Apruébala en Calidad primero.'];
+
+        // QR base64
+        $qrB64 = '';
+        $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(
+            rtrim(SITE_URL, '/') . '/validar.html?qr=' . $qrCodigo
+        ) . '&size=300&margin=1';
+        $qrData = @file_get_contents($qrUrl, false, stream_context_create(['http' => ['timeout' => 8]]));
+        if ($qrData) $qrB64 = 'data:image/png;base64,' . base64_encode($qrData);
+
+        // Agrupar accesorios por tipo y contar → "03 Grilletes, 02 Eslingas, 01 Cancamos"
+        $countsByType = [];
+        foreach ($accs as $a) {
+            $tipo = mb_convert_case(trim($a['tipo_nombre'] ?? ''), MB_CASE_TITLE, 'UTF-8') ?: 'Accesorio';
+            $countsByType[$tipo] = ($countsByType[$tipo] ?? 0) + 1;
+        }
+        arsort($countsByType);
+        $itemsList = [];
+        foreach ($countsByType as $tipo => $cnt) {
+            $itemsList[] = str_pad((string)$cnt, 2, '0', STR_PAD_LEFT) . ' ' . $tipo;
+        }
+        $resumenItems = implode(', ', $itemsList);
+
         $folio = $sesion['control']
             ? 'AB.' . $sesion['control'] . '-' . date('Y') . 'MX'
             : 'ACC-' . str_pad((string)$sesionId, 5, '0', STR_PAD_LEFT);
 
-        // Detect page size from template
-        $fpiDim = new \setasign\Fpdi\Fpdi();
-        $fpiDim->setSourceFile($rutaTpl);
-        $tplIdx = $fpiDim->importPage(1);
-        $sz     = $fpiDim->getTemplateSize($tplIdx);
-        $orient = ($sz['width'] > $sz['height']) ? 'L' : 'P';
-        unset($fpiDim);
-
-        $pdf = new \setasign\Fpdi\Fpdi($orient, 'mm', [$sz['width'], $sz['height']]);
-        $pdf->SetAutoPageBreak(false);
-        $pdf->SetMargins(0, 0, 0);
-        $pdf->setSourceFile($rutaTpl);
-
-        foreach ($accs as $i => $a) {
-            $tpl = $pdf->importPage(1);
-            $tSz = $pdf->getTemplateSize($tpl);
-            $pdf->AddPage(($tSz['width'] > $tSz['height']) ? 'L' : 'P', [$tSz['width'], $tSz['height']]);
-            $pdf->useTemplate($tpl);
-
-            $valores = [
-                'id_accesorio'     => $a['id_accesorio'] ?? '',
-                'tipo'             => $a['tipo_nombre']  ?? '',
-                'marca'            => $a['marca']        ?? '',
-                'modelo'           => $a['modelo']       ?? '',
-                'serie'            => $a['serie']        ?? '',
-                'capacidad'        => $a['capacidad']    ?? '',
-                'medidas'          => $a['medidas']      ?? '',
-                'estado'           => $a['estado']       ?? '',
-                'cliente'          => $sesion['cliente'] ?? '',
-                'fecha_inspeccion' => $sesion['fecha']   ?? '',
-                'inspector'        => $sesion['usuario'] ?? '',
-                'folio'            => $folio . '-' . str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT),
-                'total_accesorios' => count($accs) . ' ACCESORIOS INSPECCIONADOS',
-                'lugar_inspeccion' => $sesion['direccion'] ?? '',
-            ];
-
-            // Firma del inspector
-            $firmaRuta = '';
-            $inspectorUsuario = $sesion['usuario'] ?? '';
-            if ($inspectorUsuario) {
-                try {
-                    $st = $this->pdo->prepare("SELECT firma_imagen FROM usuarios WHERE usuario = ? LIMIT 1");
-                    $st->execute([$inspectorUsuario]);
-                    $row = $st->fetch();
-                    if (!empty($row['firma_imagen'])) $firmaRuta = __DIR__ . '/../' . $row['firma_imagen'];
-                } catch (\Exception $e) {}
-            }
-
-            $qrCodigo = $sesion['qr_codigo'] ?? '';
-
-            foreach ($campos as $c) {
-                $x     = (float)($c['x']     ?? 0);
-                $y     = (float)($c['y']     ?? 0);
-                $ancho = (float)($c['ancho'] ?? 0);
-                if ($c['campo'] === 'firma_inspector') {
-                    if ($firmaRuta && file_exists($firmaRuta)) {
-                        $alto = (float)($c['alto'] ?? ($ancho ?: 20));
-                        $pdf->Image($firmaRuta, $x, $y, $ancho ?: 40, $alto);
-                    }
-                    continue;
-                }
-                if ($c['campo'] === 'qr_imagen') {
-                    if ($qrCodigo) {
-                        $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(rtrim(SITE_URL, '/') . '/validar.html?qr=' . urlencode($qrCodigo)) . '&size=300';
-                        $qrTmp = sys_get_temp_dir() . '/avba_qr_acc_' . uniqid() . '.png';
-                        $qrData = @file_get_contents($qrUrl);
-                        if ($qrData) {
-                            file_put_contents($qrTmp, $qrData);
-                            $alto = (float)($c['alto'] ?? ($ancho ?: 25));
-                            $pdf->Image($qrTmp, $x, $y, $ancho ?: 25, $alto);
-                            @unlink($qrTmp);
-                        }
-                    }
-                    continue;
-                }
-                $val   = $valores[$c['campo']] ?? '';
-                $color = str_pad(ltrim($c['color'] ?? '000000', '#'), 6, '0', STR_PAD_LEFT);
-                [$r, $g, $b] = sscanf($color, '%02x%02x%02x');
-                $pdf->SetTextColor($r ?? 0, $g ?? 0, $b ?? 0);
-                $pdf->SetFont($c['fuente'] ?? 'Helvetica', ($c['negrita'] ?? false) ? 'B' : '', $c['tamano'] ?? 11);
-                pdfCell($pdf, $x, $y, $ancho, (int)($c['tamano'] ?? 11), fpdfStr((string)$val));
-            }
+        // Vigencia = 1 año desde la fecha de inspección
+        $vigencia = '';
+        $fechaStr = $sesion['fecha'] ?? '';
+        if ($fechaStr) {
+            $fv = \DateTime::createFromFormat('d/m/Y', $fechaStr);
+            if ($fv) { $fv->modify('+1 year'); $vigencia = $fv->format('d/m/Y'); }
         }
 
-        $dir = __DIR__ . '/../uploads/reportes/';
-        if (!is_dir($dir)) mkdir($dir, 0755, true);
-        $nombre = $folio . '_CERT_' . date('Ymd_His') . '.pdf';
-        file_put_contents($dir . $nombre, protegerPdf($pdf->Output('S')));
+        $noAcreditacion = defined('NO_ACREDITACION') ? NO_ACREDITACION : 'UVNMX 057';
+        $e = fn($s) => htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8');
 
-        return ['status' => 'success', 'url' => 'uploads/reportes/' . $nombre, 'folio' => $folio];
+        $map = [
+            '{folio}'             => $e($folio),
+            '{cliente}'           => $e(mb_strtoupper(trim($sesion['cliente']   ?? ''), 'UTF-8')),
+            '{domicilio}'         => $e(trim($sesion['direccion'] ?? '')),
+            '{tipo_maquinaria}'   => 'ACCESORIOS DE IZAJE',
+            '{capacidad}'         => $e(count($accs) . ' UNIDADES'),
+            '{marca}'             => 'VARIOS',
+            '{modelo}'            => 'VARIOS',
+            '{no_serie}'          => '',
+            '{no_identificacion}' => $e($folio),
+            '{fecha_inspeccion}'  => $e($fechaStr),
+            '{vigencia}'          => $e($vigencia),
+            '{no_acreditacion}'   => $e($noAcreditacion),
+            '{qr_imagen}'         => $qrB64 ?: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+            '{resumen_items}'     => $e($resumenItems),
+        ];
+
+        $templatePath = __DIR__ . '/../certificado_accesorios_preview.html';
+        if (!file_exists($templatePath))
+            return ['status' => 'error', 'message' => 'Plantilla HTML de certificado no encontrada.'];
+
+        $html = str_replace(array_keys($map), array_values($map), file_get_contents($templatePath));
+
+        try {
+            $url = $this->htmlToPdfMpdf($html, $folio, 'CERT_ACC');
+        } catch (\Throwable $ex) {
+            return ['status' => 'error', 'message' => 'Error generando certificado: ' . $ex->getMessage()];
+        }
+
+        return ['status' => 'success', 'url' => $url, 'folio' => $folio];
+    }
+
+    private function htmlToPdfMpdf(string $html, string $folio, string $sufijo = 'CERT'): string {
+        if (!class_exists('\\Mpdf\\Mpdf')) {
+            $autoload = __DIR__ . '/../vendor/autoload.php';
+            if (file_exists($autoload)) require_once $autoload;
+        }
+        if (!class_exists('\\Mpdf\\Mpdf'))
+            throw new \RuntimeException('mPDF no disponible. Verifica vendor/autoload.php.');
+
+        $rutaDir = UPLOAD_DIR . 'reportes/';
+        if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
+
+        $mpdf = new \Mpdf\Mpdf([
+            'mode'          => 'utf-8',
+            'format'        => 'A4',
+            'margin_left'   => 0, 'margin_right'  => 0,
+            'margin_top'    => 0, 'margin_bottom' => 0,
+            'margin_header' => 0, 'margin_footer' => 0,
+            'dpi'           => 96,
+            'default_font'  => 'dejavusans',
+            'tempDir'       => sys_get_temp_dir() . '/mpdf',
+        ]);
+        $mpdf->SetBasePath(__DIR__ . '/../');
+        $mpdf->SetHTMLFooter('');
+
+        $prevBacktrack = (int) ini_get('pcre.backtrack_limit');
+        ini_set('pcre.backtrack_limit', 10000000);
+        $mpdf->WriteHTML($html);
+        ini_set('pcre.backtrack_limit', $prevBacktrack);
+
+        $mpdf->SetProtection(['print'], '', 'Avba@Cert2024!');
+
+        $nombre  = $sufijo . '_AVBA_' . $folio . '_' . date('Ymd_His') . '.pdf';
+        $destino = $rutaDir . $nombre;
+        $mpdf->Output($destino, 'F');
+        return 'uploads/reportes/' . $nombre;
     }
 
     // ── Emitir certificado FPDI → genera PDF + EMITIDO ──────
