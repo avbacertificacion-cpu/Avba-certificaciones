@@ -738,7 +738,7 @@ class Accesorios {
         $map = [
             '{folio}'             => $e($folio),
             '{cliente}'           => $e(mb_strtoupper(trim($sesion['cliente']   ?? ''), 'UTF-8')),
-            '{domicilio}'         => $e(trim($sesion['direccion'] ?? '')),
+            '{domicilio}'         => '',
             '{tipo_maquinaria}'   => 'ACCESORIOS DE IZAJE',
             '{capacidad}'         => $e(count($accs) . ' UNIDADES'),
             '{marca}'             => 'VARIOS',
