@@ -953,7 +953,16 @@ class Accesorios {
         $cliente = $esc($s['cliente']);
         $dir     = $esc($s['direccion'] ?? '');
         $fecha   = $esc($s['fecha']);
-        $usuario = $esc($s['usuario']);
+
+        // Buscar nombre completo del inspector en la tabla de usuarios
+        $nombreInspector = $s['usuario'] ?? '';
+        try {
+            $st = $this->pdo->prepare("SELECT nombre FROM usuarios WHERE usuario = ? LIMIT 1");
+            $st->execute([$s['usuario'] ?? '']);
+            $row = $st->fetch();
+            if (!empty($row['nombre'])) $nombreInspector = $row['nombre'];
+        } catch (\Throwable $ignored) {}
+        $usuario = $esc($nombreInspector);
         $accs    = $s['accesorios'] ?? [];
 
         // ── Resumen de estados (solo CUMPLE / NO CUMPLE) ──
@@ -1148,13 +1157,9 @@ class Accesorios {
 <!-- ── FIRMAS ── -->
 <table class="firma-table">
   <tr>
-    <td class="firma-cell">
+    <td class="firma-cell" style="width:50%">
       <div class="firma-line">Inspector responsable</div>
       <div class="firma-sub">{$usuario}</div>
-    </td>
-    <td class="firma-cell">
-      <div class="firma-line">Recibió / Vo. Bo.</div>
-      <div class="firma-sub">Representante del cliente</div>
     </td>
   </tr>
 </table>
