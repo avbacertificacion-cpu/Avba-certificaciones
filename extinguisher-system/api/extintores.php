@@ -59,7 +59,7 @@ function listar() {
         JOIN empresas  emp ON emp.id = e.empresa_id
         JOIN usuarios  u   ON u.id  = e.creado_por
         $where
-        ORDER BY e.codigo_manual ASC
+        ORDER BY CAST(SUBSTR(e.codigo_manual, 5) AS SIGNED) ASC
     ");
     $stmt->execute($params);
 
