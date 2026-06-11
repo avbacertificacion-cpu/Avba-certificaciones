@@ -736,20 +736,13 @@ class Accesorios {
         $e = fn($s) => htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8');
 
         $map = [
-            '{folio}'             => $e($folio),
-            '{cliente}'           => $e(mb_strtoupper(trim($sesion['cliente']   ?? ''), 'UTF-8')),
-            '{domicilio}'         => '',
-            '{tipo_maquinaria}'   => 'ACCESORIOS DE IZAJE',
-            '{capacidad}'         => $e(count($accs) . ' UNIDADES'),
-            '{marca}'             => 'VARIOS',
-            '{modelo}'            => 'VARIOS',
-            '{no_serie}'          => '',
-            '{no_identificacion}' => $e($folio),
-            '{fecha_inspeccion}'  => $e($fechaStr),
-            '{vigencia}'          => $e($vigencia),
-            '{no_acreditacion}'   => $e($noAcreditacion),
-            '{qr_imagen}'         => $qrB64 ?: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
-            '{resumen_items}'     => $e($resumenItems),
+            '{folio}'            => $e($folio),
+            '{cliente}'          => $e(mb_strtoupper(trim($sesion['cliente'] ?? ''), 'UTF-8')),
+            '{resumen_items}'    => $e($resumenItems),
+            '{fecha_inspeccion}' => $e($fechaStr),
+            '{vigencia}'         => $e($vigencia),
+            '{no_acreditacion}'  => $e($noAcreditacion),
+            '{qr_imagen}'        => $qrB64 ?: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
         ];
 
         $templatePath = __DIR__ . '/../certificado_accesorios_preview.html';
