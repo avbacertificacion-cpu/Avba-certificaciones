@@ -768,7 +768,7 @@ class Accesorios {
         $mpdf->WriteHTML($html);
         ini_set('pcre.backtrack_limit', $prevBacktrack);
 
-        $mpdf->SetProtection(['print', 'print-hi'], '', 'Avba@Cert2024!');
+        $mpdf->SetProtection(['print'], '', 'Avba@Cert2024!');
 
         $nombre  = $sufijo . '_AVBA_' . $folio . '_' . date('Ymd_His') . '.pdf';
         $destino = $rutaDir . $nombre;
