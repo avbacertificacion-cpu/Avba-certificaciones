@@ -1040,13 +1040,11 @@ class Accesorios {
               <td style="padding:6px 8px;border:1px solid #dfe5ef;font-size:9pt">' . $esc($a['tipo_nombre'] ?? '') . '</td>
               <td style="padding:6px 8px;border:1px solid #dfe5ef;font-size:9pt">' . $esc($a['marca'] ?? '') . '</td>
               <td style="padding:6px 8px;border:1px solid #dfe5ef;font-size:9pt">' . $esc($a['modelo'] ?? '') . '</td>
-              <td style="padding:6px 8px;border:1px solid #dfe5ef;font-size:9pt;font-family:monospace">' . $esc($a['serie'] ?? '') . '</td>
+              <td style="padding:6px 8px;border:1px solid #dfe5ef;font-size:9pt">' . $esc($a['serie'] ?? '') . '</td>
               <td style="padding:6px 8px;border:1px solid #dfe5ef;text-align:center;font-size:9pt">' . $esc($a['capacidad'] ?? '') . '</td>
               <td style="padding:6px 8px;border:1px solid #dfe5ef;text-align:center;font-size:9pt">' . $esc($a['medidas'] ?? '') . '</td>
-              <td style="padding:4px 6px;border:1px solid #dfe5ef;text-align:center">
-                <span style="display:inline-block;padding:3px 8px;border-radius:10px;
-                             background:' . $estBg . ';color:' . $estColor . ';
-                             border:1px solid ' . $estBd . ';font-size:8pt;font-weight:bold;white-space:nowrap">
+              <td style="padding:4px 6px;border:1px solid #dfe5ef;text-align:center;background:' . $estBg . '">
+                <span style="color:' . $estColor . ';font-size:8pt;font-weight:bold">
                   ' . $esc($a['estado'] ?? '') . '
                 </span>
               </td>
@@ -1087,16 +1085,10 @@ class Accesorios {
                   font-size: 8.5pt; font-weight: bold; text-align: center;
                   border: 1px solid #0C447C; }
   .acc-table th.left { text-align: left; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 8px;
-           font-size: 8pt; font-weight: bold; border: 1px solid; margin-right: 8px; }
   .firma-table { width: 100%; border-collapse: collapse; margin-top: 40px; }
   .firma-cell { text-align: center; padding: 0 24px; vertical-align: bottom; width: 50%; }
   .firma-line { border-top: 1.5px solid #1a1a2e; padding-top: 6px; margin-top: 52px; font-size: 8.5pt; color: #5a6072; }
   .firma-sub { font-size: 7.5pt; color: #9299a8; margin-top: 2px; }
-  .footer-strip { margin-top: 24px; padding-top: 8px; border-top: 1px solid #dfe5ef;
-                  display: table; width: 100%; }
-  .footer-l { display: table-cell; font-size: 7.5pt; color: #9299a8; vertical-align: middle; }
-  .footer-r { display: table-cell; font-size: 7.5pt; color: #9299a8; text-align: right; vertical-align: middle; }
 </style>
 </head>
 <body>
@@ -1110,7 +1102,7 @@ class Accesorios {
       <div style="font-size:9pt;color:#5a6072;font-style:italic">Evaluación de la condición, seguridad y confiabilidad de accesorios de izaje</div>
     </td>
     <td style="width:170px;vertical-align:top;text-align:right">
-      <div style="background:#185FA5;color:#fff;padding:5px 10px;border-radius:5px;font-size:8pt;font-weight:bold;white-space:nowrap;display:inline-block">{$esc($folio)}</div>
+      <div style="background:#185FA5;color:#fff;padding:5px 10px;border-radius:5px;font-size:8pt;font-weight:bold;white-space:nowrap">{$esc($folio)}</div>
       <div style="font-size:7.5pt;color:#9299a8;margin-top:4px">{$esc(date('d/m/Y'))}</div>
     </td>
   </tr>
@@ -1200,13 +1192,17 @@ class Accesorios {
 </table>
 
 <!-- ── LEYENDA ── -->
-<div style="margin-top:14px;font-size:8pt;color:#5a6072">
-  <strong>Leyenda: </strong>
-  <span class="badge" style="background:#EAF3DE;color:#3B6D11;border-color:#3B6D11">CUMPLE</span>
-  El accesorio se encuentra en condiciones seguras de operación. &nbsp;
-  <span class="badge" style="background:#FCEBEB;color:#A32D2D;border-color:#A32D2D">NO CUMPLE</span>
-  Fuera de servicio o con deficiencias que impiden su uso.
-</div>
+<table style="width:100%;border-collapse:collapse;margin-top:14px">
+  <tr>
+    <td style="font-size:8pt;color:#5a6072;vertical-align:middle">
+      <strong>Leyenda: </strong>
+      <span style="padding:2px 8px;border-radius:8px;background:#EAF3DE;color:#3B6D11;border:1px solid #3B6D11;font-size:8pt;font-weight:bold">CUMPLE</span>
+      &nbsp;El accesorio se encuentra en condiciones seguras de operación.&nbsp;&nbsp;
+      <span style="padding:2px 8px;border-radius:8px;background:#FCEBEB;color:#A32D2D;border:1px solid #A32D2D;font-size:8pt;font-weight:bold">NO CUMPLE</span>
+      &nbsp;Fuera de servicio o con deficiencias que impiden su uso.
+    </td>
+  </tr>
+</table>
 
 <!-- ── FIRMAS ── -->
 <table class="firma-table">
@@ -1219,10 +1215,12 @@ class Accesorios {
 </table>
 
 <!-- ── PIE DE PÁGINA ── -->
-<div class="footer-strip">
-  <div class="footer-l">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. &nbsp;·&nbsp; Generado el {$esc(date('d/m/Y H:i'))}</div>
-  <div class="footer-r">Folio: {$esc($folio)}</div>
-</div>
+<table style="width:100%;border-collapse:collapse;margin-top:24px;border-top:1px solid #dfe5ef;padding-top:8px">
+  <tr>
+    <td style="font-size:7.5pt;color:#9299a8;vertical-align:middle;padding-top:8px">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. &nbsp;·&nbsp; Generado el {$esc(date('d/m/Y H:i'))}</td>
+    <td style="font-size:7.5pt;color:#9299a8;text-align:right;vertical-align:middle;padding-top:8px">Folio: {$esc($folio)}</td>
+  </tr>
+</table>
 
 </body>
 </html>
