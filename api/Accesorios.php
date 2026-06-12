@@ -376,7 +376,7 @@ class Accesorios {
 
         $resultado['message'] = 'Informe emitido correctamente.';
         // Save URL so portal can show the link
-        $informeUrl = rtrim(UPLOAD_URL, '/') . '/' . ltrim($resultado['url'], '/');
+        $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
         $this->pdo->prepare("UPDATE accesorios_sesiones SET informe_url = ? WHERE id = ?")->execute([$informeUrl, $sesionId]);
         return $resultado;
     }
@@ -803,7 +803,7 @@ class Accesorios {
             ->execute([$sesionId]);
         $resultado['message'] = 'Certificado emitido correctamente.';
         // Save URL so portal can show the link
-        $certUrl = rtrim(UPLOAD_URL, '/') . '/' . ltrim($resultado['url'], '/');
+        $certUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
         $this->pdo->prepare("UPDATE accesorios_sesiones SET cert_url = ? WHERE id = ?")->execute([$certUrl, $sesionId]);
         return $resultado;
     }
@@ -836,7 +836,7 @@ class Accesorios {
             $mail->send();
 
             // Marcar como EMITIDO y guardar URL para el portal del cliente
-            $certUrl = rtrim(UPLOAD_URL, '/') . '/' . ltrim($resultado['url'], '/');
+            $certUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
             $this->pdo->prepare(
                 "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', cert_url = ? WHERE id = ?"
             )->execute([$certUrl, $sesionId]);
@@ -915,7 +915,7 @@ class Accesorios {
             $mail->send();
 
             // Marcar como EMITIDO y guardar URL para el portal del cliente
-            $informeUrl = rtrim(UPLOAD_URL, '/') . '/' . ltrim($resultado['url'], '/');
+            $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
             $this->pdo->prepare(
                 "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', informe_url = ? WHERE id = ?"
             )->execute([$informeUrl, $sesionId]);
@@ -954,7 +954,7 @@ class Accesorios {
             $mail->send();
 
             // Marcar como EMITIDO y guardar URL para el portal del cliente
-            $informeUrl = rtrim(UPLOAD_URL, '/') . '/' . ltrim($resultado['url'], '/');
+            $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
             $this->pdo->prepare(
                 "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', informe_url = ? WHERE id = ?"
             )->execute([$informeUrl, $sesionId]);
