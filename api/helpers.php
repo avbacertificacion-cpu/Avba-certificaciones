@@ -374,12 +374,43 @@ function plantillaCorreoHtml(PDO $pdo, string $cuerpo): string {
 
 /**
  * Protege un PDF aplicando cifrado RC4 128-bit (solo lectura e impresión).
- * Re-importa todas las páginas con FPDI y devuelve los bytes cifrados.
+ * Re-importa todas las páginas con FpdiProtected y devuelve los bytes cifrados.
  *
  * @param  string $pdfBytes  Bytes del PDF original (sin protección)
- * @return string            Bytes del PDF protegido
+ * @return string            Bytes del PDF protegido (o los originales si falla)
  */
 function protegerPdf(string $pdfBytes): string
 {
-    return $pdfBytes;
+    if (!$pdfBytes) return $pdfBytes;
+
+    $loader = __DIR__ . '/../lib/FpdiProtected.php';
+    if (!class_exists('FpdiProtected', false) && file_exists($loader)) {
+        require_once $loader;
+    }
+    if (!class_exists('FpdiProtected', false)) {
+        return $pdfBytes;
+    }
+
+    $tmpIn = tempnam(sys_get_temp_dir(), 'avba_prot_');
+    file_put_contents($tmpIn, $pdfBytes);
+
+    try {
+        $pdf = new FpdiProtected();
+        $pageCount = $pdf->setSourceFile($tmpIn);
+
+        for ($i = 1; $i <= $pageCount; $i++) {
+            $tpl = $pdf->importPage($i);
+            $sz  = $pdf->getTemplateSize($tpl);
+            $pdf->AddPage(($sz['width'] > $sz['height']) ? 'L' : 'P', [$sz['width'], $sz['height']]);
+            $pdf->useTemplate($tpl, 0, 0, $sz['width'], $sz['height']);
+        }
+
+        $pdf->SetProtection(['print', 'print-hi'], '', 'Avba@Cert2024!');
+        $result = $pdf->Output('', 'S');
+        @unlink($tmpIn);
+        return $result;
+    } catch (\Throwable $e) {
+        @unlink($tmpIn);
+        return $pdfBytes;
+    }
 }
