@@ -631,29 +631,30 @@ class Auth {
             $stmt = $this->pdo->prepare(
                 "SELECT s.id, s.cliente, s.control,
                         DATE_FORMAT(s.fecha, '%d/%m/%Y') AS fecha,
-                        s.qr_codigo, s.cert_url, s.informe_url,
+                        s.qr_codigo, s.cert_url, s.informe_url, s.informe_cumple_url,
                         COUNT(a.id)             AS total,
                         SUM(a.estado='CUMPLE')  AS cumple,
                         SUM(a.estado!='CUMPLE') AS no_cumple
                  FROM accesorios_sesiones s
                  LEFT JOIN accesorios_izaje a ON a.sesion_id = s.id
                  WHERE s.control LIKE ? AND s.estatus = 'EMITIDO'
-                 GROUP BY s.id, s.qr_codigo, s.cert_url, s.informe_url
+                 GROUP BY s.id, s.qr_codigo, s.cert_url, s.informe_url, s.informe_cumple_url
                  ORDER BY s.fecha DESC"
             );
             $stmt->execute([$like]);
             foreach ($stmt->fetchAll() as $r) {
                 if (!$nombreCliente) $nombreCliente = $r['cliente'];
                 $accesorios[] = [
-                    'id'          => (int)$r['id'],
-                    'folio'       => $r['control'],
-                    'fecha'       => $r['fecha'],
-                    'total'       => (int)$r['total'],
-                    'cumple'      => (int)$r['cumple'],
-                    'no_cumple'   => (int)$r['no_cumple'],
-                    'qr_url'      => $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '',
-                    'cert_url'    => $r['cert_url'] ?? '',
-                    'informe_url' => $r['informe_url'] ?? '',
+                    'id'                 => (int)$r['id'],
+                    'folio'              => $r['control'],
+                    'fecha'              => $r['fecha'],
+                    'total'              => (int)$r['total'],
+                    'cumple'             => (int)$r['cumple'],
+                    'no_cumple'          => (int)$r['no_cumple'],
+                    'qr_url'             => $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '',
+                    'cert_url'           => $r['cert_url'] ?? '',
+                    'informe_url'        => $r['informe_url'] ?? '',
+                    'informe_cumple_url' => $r['informe_cumple_url'] ?? '',
                 ];
             }
         } catch (\PDOException $e) { /* tabla o columna aún no existe */ }

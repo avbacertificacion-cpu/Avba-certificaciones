@@ -282,7 +282,7 @@ function renderMaquinaria(data) {
 }
 
 // ── Render Accesorios ──────────────────────────────────────────────────────
-// PHP retorna: id, folio, fecha, total, cumple, no_cumple, qr_url, cert_url, informe_url
+// PHP retorna: id, folio, fecha, total, cumple, no_cumple, qr_url, cert_url, informe_url, informe_cumple_url
 function renderAccesorios(data) {
   const cont = document.getElementById('acc-cont');
   if (!data || !data.length) {
@@ -293,9 +293,10 @@ function renderAccesorios(data) {
   let html = '<div class="acc-grid">';
   data.forEach(ses => {
     const folio = ses.folio ? 'AB.' + ses.folio + '-' + new Date().getFullYear() + 'MX' : '—';
-    const certBtn    = ses.cert_url    ? `<a class="btn-doc btn-cert" href="${ses.cert_url}" target="_blank">📄 Certificado</a>`   : `<span class="btn-doc btn-cert dis">📄 Certificado</span>`;
-    const repBtn     = ses.informe_url ? `<a class="btn-doc btn-rep"  href="${ses.informe_url}" target="_blank">📊 Reporte</a>`    : `<span class="btn-doc btn-rep dis">📊 Reporte</span>`;
-    const qrBtn      = ses.qr_url      ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(ses.qr_url)}')">🔗 QR</button>` : `<span class="btn-doc btn-qr dis">🔗 QR</span>`;
+    const certBtn    = ses.cert_url           ? `<a class="btn-doc btn-cert" href="${ses.cert_url}"           target="_blank">📄 Certificado</a>`         : `<span class="btn-doc btn-cert dis">📄 Certificado</span>`;
+    const repBtn     = ses.informe_url        ? `<a class="btn-doc btn-rep"  href="${ses.informe_url}"        target="_blank">📊 Reporte</a>`              : `<span class="btn-doc btn-rep dis">📊 Reporte</span>`;
+    const cumpleBtn  = ses.informe_cumple_url ? `<a class="btn-doc btn-rep"  href="${ses.informe_cumple_url}" target="_blank">✔ Reporte CUMPLE</a>`        : '';
+    const qrBtn      = ses.qr_url             ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(ses.qr_url)}')">🔗 QR</button>`   : `<span class="btn-doc btn-qr dis">🔗 QR</span>`;
     html += `<div class="acc-card">
       <div class="acc-folio">${folio}</div>
       <div class="acc-fecha">${ses.fecha || '—'}</div>
@@ -305,7 +306,7 @@ function renderAccesorios(data) {
         ${ses.no_cumple ? `<span class="badge b-nocumple">✖ ${ses.no_cumple} NO CUMPLE</span>` : ''}
         ${!ses.cumple && !ses.no_cumple ? '<span class="badge">Sin resultados</span>' : ''}
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">${certBtn}${repBtn}${qrBtn}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${certBtn}${repBtn}${cumpleBtn}${qrBtn}</div>
     </div>`;
   });
   html += '</div>';

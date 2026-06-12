@@ -600,8 +600,9 @@ class Accesorios {
             'estatus'    => "ALTER TABLE accesorios_sesiones ADD COLUMN estatus    VARCHAR(30)  NOT NULL DEFAULT 'PENDIENTE'",
             'qr_codigo'  => "ALTER TABLE accesorios_sesiones ADD COLUMN qr_codigo  VARCHAR(20)  NULL",
             'direccion'  => "ALTER TABLE accesorios_sesiones ADD COLUMN direccion  VARCHAR(500) NULL",
-            'cert_url'   => "ALTER TABLE accesorios_sesiones ADD COLUMN cert_url    VARCHAR(500) NULL",
-            'informe_url' => "ALTER TABLE accesorios_sesiones ADD COLUMN informe_url VARCHAR(500) NULL",
+            'cert_url'          => "ALTER TABLE accesorios_sesiones ADD COLUMN cert_url          VARCHAR(500) NULL",
+            'informe_url'       => "ALTER TABLE accesorios_sesiones ADD COLUMN informe_url       VARCHAR(500) NULL",
+            'informe_cumple_url'=> "ALTER TABLE accesorios_sesiones ADD COLUMN informe_cumple_url VARCHAR(500) NULL",
         ];
         foreach ($needed as $col => $ddl) {
             $exists = (int) $this->pdo->query(
@@ -650,37 +651,17 @@ class Accesorios {
         if ($det['status'] !== 'success') return $det;
         $sesion = $det['data'];
 
-        if (!class_exists('Dompdf\Dompdf')) {
-            return ['status' => 'error', 'message' => 'Motor PDF no disponible en el servidor.'];
-        }
-
         $folio = $sesion['control']
             ? 'AB.' . $sesion['control'] . '-' . date('Y') . 'MX'
             : 'ACC-' . str_pad((string)$sesionId, 5, '0', STR_PAD_LEFT);
-        $html  = $this->htmlInforme($sesion, $folio);
+        $html = $this->htmlInforme($sesion, $folio);
 
-        $opts = new \Dompdf\Options();
-        $opts->setIsRemoteEnabled(true);
-        $opts->setIsHtml5ParserEnabled(true);
-        $opts->setDefaultMediaType('print');
-
-        $pdf = new \Dompdf\Dompdf($opts);
-        $pdf->loadHtml($html, 'UTF-8');
-        $pdf->setPaper('A4', 'portrait');
-        $pdf->render();
-
-        $dir = __DIR__ . '/../uploads/reportes/';
-        if (!is_dir($dir)) mkdir($dir, 0755, true);
-
-        $nombre  = $folio . '_' . date('Ymd_His') . '.pdf';
-        $rutaAbs = $dir . $nombre;
-        file_put_contents($rutaAbs, protegerPdf($pdf->output()));
-
-        return [
-            'status' => 'success',
-            'url'    => 'uploads/reportes/' . $nombre,
-            'folio'  => $folio,
-        ];
+        try {
+            $url = $this->htmlToPdfMpdf($html, $folio, 'INFORME_ACC');
+        } catch (\Throwable $e) {
+            return ['status' => 'error', 'message' => 'Error generando PDF: ' . $e->getMessage()];
+        }
+        return ['status' => 'success', 'url' => $url, 'folio' => $folio];
     }
 
     // ── Generar certificado con mPDF (una página, HTML template) ──
@@ -787,7 +768,7 @@ class Accesorios {
         $mpdf->WriteHTML($html);
         ini_set('pcre.backtrack_limit', $prevBacktrack);
 
-        $mpdf->SetProtection(['print'], '', 'Avba@Cert2024!');
+        $mpdf->SetProtection(['print', 'print-hi'], '', 'Avba@Cert2024!');
 
         $nombre  = $sufijo . '_AVBA_' . $folio . '_' . date('Ymd_His') . '.pdf';
         $destino = $rutaDir . $nombre;
@@ -870,21 +851,12 @@ class Accesorios {
 
         $html = $this->htmlInforme($sesion, $folio);
 
-        $opts = new \Dompdf\Options();
-        $opts->setIsRemoteEnabled(true);
-        $opts->setIsHtml5ParserEnabled(true);
-
-        $pdf = new \Dompdf\Dompdf($opts);
-        $pdf->loadHtml($html, 'UTF-8');
-        $pdf->setPaper('A4', 'portrait');
-        $pdf->render();
-
-        $dir = __DIR__ . '/../uploads/reportes/';
-        if (!is_dir($dir)) mkdir($dir, 0755, true);
-        $nombre = $folio . '_' . date('Ymd_His') . '.pdf';
-        file_put_contents($dir . $nombre, protegerPdf($pdf->output()));
-
-        return ['status' => 'success', 'url' => 'uploads/reportes/' . $nombre, 'folio' => $folio];
+        try {
+            $url = $this->htmlToPdfMpdf($html, $folio, 'CUMPLE_ACC');
+        } catch (\Throwable $e) {
+            return ['status' => 'error', 'message' => 'Error generando PDF: ' . $e->getMessage()];
+        }
+        return ['status' => 'success', 'url' => $url, 'folio' => $folio];
     }
 
     // ── Enviar informe completo por correo ───────────────
@@ -953,10 +925,10 @@ class Accesorios {
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             $mail->send();
 
-            // Marcar como EMITIDO y guardar URL para el portal del cliente
+            // Marcar como EMITIDO y guardar URL del informe CUMPLE (columna separada)
             $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
             $this->pdo->prepare(
-                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', informe_url = ? WHERE id = ?"
+                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', informe_cumple_url = ? WHERE id = ?"
             )->execute([$informeUrl, $sesionId]);
 
             return ['status' => 'success', 'message' => "Informe enviado a {$correo}."];
