@@ -20,6 +20,7 @@ require_once __DIR__ . '/Admin.php';
 require_once __DIR__ . '/Personal.php';
 require_once __DIR__ . '/Accesorios.php';
 require_once __DIR__ . '/Pnd.php';
+require_once __DIR__ . '/ClienteEquipos.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -57,8 +58,9 @@ $cert     = new Certificaciones($pdo);
 $qr       = new ValidarQR($pdo);
 $admin    = new Admin($pdo);
 $personal = new Personal($pdo);
-$accesorios = new Accesorios($pdo);
-$pnd        = new Pnd($pdo);
+$accesorios     = new Accesorios($pdo);
+$pnd            = new Pnd($pdo);
+$cliEquipos     = new ClienteEquipos($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -457,6 +459,22 @@ if ($method === 'GET') {
             $participantes = $auth->getParticipantesEnSesion($sesion['id']);
             respuesta(['status' => 'success', 'participantes' => $participantes, 'sesion_nombre' => $sesion['sesion_nombre']]);
         }
+
+        // ── Portal cliente: equipos ───────────────────────
+        case 'GET_MIS_EQUIPOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliEquipos->listar($usr['id_cliente'] ?? ''));
+
+        case 'GET_DASHBOARD_EQUIPOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliEquipos->dashboard($usr['id_cliente'] ?? ''));
+
+        case 'GET_DETALLE_EQUIPO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliEquipos->detalle((int)($_GET['id'] ?? 0), $usr['id_cliente'] ?? ''));
 
         default:
             respuesta(['status' => 'error', 'message' => 'Acción no reconocida.'], 400);
@@ -1087,6 +1105,47 @@ if ($method === 'POST') {
             $texto = strtoupper($ocrData['ParsedResults'][0]['ParsedText'] ?? '');
             respuesta(['status' => 'success', 'texto' => $texto]);
         }
+
+        // ── Portal cliente: gestión de equipos ───────────────
+        case 'GUARDAR_EQUIPO_CLI':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliEquipos->guardar($payload, $usr['id_cliente'] ?? ''));
+
+        case 'ELIMINAR_EQUIPO_CLI':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliEquipos->eliminar((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
+
+        case 'SUBIR_DOC_EQUIPO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliEquipos->subirDoc($_POST, $_FILES, $usr['id_cliente'] ?? ''));
+
+        case 'ELIMINAR_DOC_EQUIPO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliEquipos->eliminarDoc((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
+
+        case 'REGISTRAR_HOROMETRO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliEquipos->registrarHora($payload, $usr['id_cliente'] ?? ''));
+
+        case 'ELIMINAR_HOROMETRO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliEquipos->eliminarHora((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
+
+        case 'GUARDAR_CERT_EQUIPO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliEquipos->guardarCert($_POST, $_FILES, $usr['id_cliente'] ?? ''));
+
+        case 'ELIMINAR_CERT_EQUIPO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliEquipos->eliminarCert((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
 
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);
