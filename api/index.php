@@ -1004,6 +1004,15 @@ if ($method === 'POST') {
                 $usr['usuario']
             ));
 
+        case 'ENVIAR_TODO_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->enviarTodoAcc(
+                (int)   ($payload['sesion_id'] ?? 0),
+                (string)($payload['correo']    ?? ''),
+                $usr['usuario']
+            ));
+
         case 'PREVISUALIZAR_INFORME_ACC':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

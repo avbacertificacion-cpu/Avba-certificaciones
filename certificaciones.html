@@ -1898,6 +1898,11 @@ async function abrirAccCert(sesionId) {
           </div>
 
         </div>
+
+        <div style="margin-top:10px;text-align:right">
+          <button style="${btnBase}background:#1a3a6b;border-color:#1a3a6b;color:#fff;padding:7px 16px;font-size:12px"
+                  onclick="enviarTodoAcc(${sesionId})">📨 Enviar los 3 documentos</button>
+        </div>
       </div>`;
 
     let html = docSection;
@@ -2161,6 +2166,28 @@ async function enviarInformeCumple(sesionId) {
     });
     const data = await res.json();
     mostrarToast(data.message || (data.status === 'success' ? 'Enviado' : 'Error'), data.status === 'success' ? 'ok' : 'err');
+  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+}
+
+async function enviarTodoAcc(sesionId) {
+  const correo = prompt('Correo de destino para los 3 documentos (Certificado + Informe + Aprobados):');
+  if (!correo) return;
+  mostrarToast('Generando y enviando documentos…', 'info');
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'ENVIAR_TODO_ACC', payload: { sesion_id: sesionId, correo } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast(data.message || 'Documentos enviados', 'ok');
+      accCertCargados = false;
+      cargarAccCert();
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudieron enviar'), 'err');
+    }
   } catch(e) { mostrarToast('Error de conexión', 'err'); }
 }
 

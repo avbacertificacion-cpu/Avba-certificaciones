@@ -937,6 +937,69 @@ class Accesorios {
         }
     }
 
+    // ── Enviar los 3 documentos en un solo correo ──────────
+    public function enviarTodoAcc(int $sesionId, string $correo, string $usuario): array {
+        if (!$correo || !filter_var($correo, FILTER_VALIDATE_EMAIL))
+            return ['status' => 'error', 'message' => 'Correo de destino inválido.'];
+
+        if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
+            return ['status' => 'error', 'message' => 'Servicio de correo no disponible en este servidor.'];
+
+        // Generar los 3 documentos
+        $resCert   = $this->generarCertAcc($sesionId, $usuario);
+        if ($resCert['status'] !== 'success') return $resCert;
+
+        $resInforme = $this->generarInforme($sesionId, $usuario);
+        if ($resInforme['status'] !== 'success') return $resInforme;
+
+        $resCumple  = $this->generarInformeCumple($sesionId, $usuario);
+        $tieneCumple = $resCumple['status'] === 'success';
+
+        $det     = $this->detalleSesion($sesionId);
+        $cliente = $det['data']['cliente'] ?? 'Cliente';
+
+        try {
+            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            configurarMailer($mail, $this->pdo);
+            $mail->addAddress($correo);
+            $mail->Subject = 'Documentos de Inspección de Accesorios de Izaje — AVBA Inspections';
+            $mail->isHTML(true);
+            $mail->Body = plantillaCorreoHtml($this->pdo,
+                "<p style=\"font-size:14px;color:#5a6072;line-height:1.7\">Estimado/a,<br><br>Adjunto encontrará los documentos de inspección de accesorios de izaje para <strong>" . htmlspecialchars($cliente) . "</strong>:</p>"
+                . "<ul style=\"font-size:13px;color:#5a6072;line-height:1.9;margin:0 0 8px 18px\">"
+                . "<li><strong>Certificado de Inspección</strong></li>"
+                . "<li><strong>Informe de Integridad Operativa</strong></li>"
+                . ($tieneCumple ? "<li><strong>Informe de Accesorios Aprobados (CUMPLE)</strong></li>" : "")
+                . "</ul>"
+            );
+            $mail->addAttachment(__DIR__ . '/../' . $resCert['url'],    basename($resCert['url']));
+            $mail->addAttachment(__DIR__ . '/../' . $resInforme['url'], basename($resInforme['url']));
+            if ($tieneCumple) {
+                $mail->addAttachment(__DIR__ . '/../' . $resCumple['url'], basename($resCumple['url']));
+            }
+            $mail->send();
+
+            // Actualizar BD con URLs y marcar EMITIDO
+            $certUrl    = rtrim(SITE_URL, '/') . '/' . ltrim($resCert['url'],    '/');
+            $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resInforme['url'], '/');
+            $this->pdo->prepare(
+                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', cert_url = ?, informe_url = ? WHERE id = ?"
+            )->execute([$certUrl, $informeUrl, $sesionId]);
+
+            if ($tieneCumple) {
+                $cumpleUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resCumple['url'], '/');
+                $this->pdo->prepare(
+                    "UPDATE accesorios_sesiones SET informe_cumple_url = ? WHERE id = ?"
+                )->execute([$cumpleUrl, $sesionId]);
+            }
+
+            $docs = $tieneCumple ? 3 : 2;
+            return ['status' => 'success', 'message' => "{$docs} documentos enviados a {$correo}."];
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => 'Error al enviar: ' . $e->getMessage()];
+        }
+    }
+
     // ── HTML del Informe de Integridad Operativa ───────────
     private function htmlInforme(array $s, string $folio): string {
         $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
