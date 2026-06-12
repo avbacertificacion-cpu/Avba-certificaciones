@@ -2604,11 +2604,14 @@ function abrirApro(context, id) {
     return;
   }
 
-  // Pre-llenar QR si el registro ya tiene uno asignado (retornado)
+  // Pre-llenar QR si el registro ya tiene uno asignado (retornado de certificaciones)
   let qrExistente = "";
   if (aproContext === 'equipo' && filaActual) {
     const d = datosGlobal.find(x => x.fila === filaActual);
     qrExistente = d?.qr_codigo || "";
+  } else if (aproContext === 'acc') {
+    const s = accSesionesData.find(x => x.id === id);
+    qrExistente = s?.qr_codigo || "";
   }
   document.getElementById("qr-input").value = qrExistente;
   document.getElementById("qr-input").style.borderColor = "";

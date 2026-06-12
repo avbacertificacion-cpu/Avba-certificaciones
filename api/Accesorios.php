@@ -315,19 +315,22 @@ class Accesorios {
     // ── Aprobar sesión → APROBADO_CALIDAD ────────────────
     public function aprobarSesion(int $id, string $usuario, string $qr): array {
         $this->ensureAccSesionesColumns();
-        $chk = $this->pdo->prepare("SELECT id, cliente, control FROM accesorios_sesiones WHERE id = ?");
+        $chk = $this->pdo->prepare("SELECT id, cliente, control, qr_codigo FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
         $sesion = $chk->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
 
         if (!$qr) return ['status' => 'error', 'message' => 'El código QR es requerido.'];
 
-        // Validar QR existe y no está usado
+        // Validar QR existe
         $stmtQR = $this->pdo->prepare("SELECT id, usado FROM qr_codigos WHERE identificador = ?");
         $stmtQR->execute([$qr]);
         $qrRow = $stmtQR->fetch();
-        if (!$qrRow)        return ['status' => 'error', 'message' => 'Código QR no válido.'];
-        if ($qrRow['usado']) return ['status' => 'error', 'message' => 'Código QR ya está en uso.'];
+        if (!$qrRow) return ['status' => 'error', 'message' => 'Código QR no válido.'];
+
+        // Permitir reusar el QR que ya estaba asignado a esta sesión (retorno de certificaciones)
+        $mismoQr = ($sesion['qr_codigo'] === $qr);
+        if ($qrRow['usado'] && !$mismoQr) return ['status' => 'error', 'message' => 'Código QR ya está en uso.'];
 
         // Generar control si la sesión no lo tiene (registros previos a migration_009)
         if (empty($sesion['control'])) {
@@ -339,9 +342,11 @@ class Accesorios {
         $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'APROBADO_CALIDAD', qr_codigo = ? WHERE id = ?")
             ->execute([$qr, $id]);
 
-        // Marcar QR como usado
-        $this->pdo->prepare("UPDATE qr_codigos SET usado = 1 WHERE id = ?")
-            ->execute([$qrRow['id']]);
+        // Marcar QR como usado (solo si no lo estaba ya por ser el mismo QR previo)
+        if (!$qrRow['usado']) {
+            $this->pdo->prepare("UPDATE qr_codigos SET usado = 1 WHERE id = ?")
+                ->execute([$qrRow['id']]);
+        }
 
         return ['status' => 'success', 'message' => 'Sesión aprobada y enviada a Certificaciones.'];
     }
@@ -349,21 +354,14 @@ class Accesorios {
     // ── Devolver sesión → DEVUELTO ─────────────────────
     public function devolverSesion(int $id, string $usuario): array {
         $this->ensureEstatusColumn('accesorios_sesiones');
-        $chk = $this->pdo->prepare("SELECT id, qr_codigo FROM accesorios_sesiones WHERE id = ?");
+        $chk = $this->pdo->prepare("SELECT id FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
         $row = $chk->fetch();
         if (!$row) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
 
-        // Liberar QR para que pueda ser reasignado en calidad
-        $qrAnterior = $row['qr_codigo'] ?? '';
-        if ($qrAnterior) {
-            $this->pdo->prepare(
-                "UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?"
-            )->execute([$qrAnterior]);
-        }
-
+        // Conservar qr_codigo para que calidad lo vea pre-cargado al re-aprobar
         $this->pdo->prepare(
-            "UPDATE accesorios_sesiones SET estatus = 'DEVUELTO', qr_codigo = NULL WHERE id = ?"
+            "UPDATE accesorios_sesiones SET estatus = 'DEVUELTO' WHERE id = ?"
         )->execute([$id]);
         return ['status' => 'success', 'message' => 'Sesión devuelta a Calidad.'];
     }
