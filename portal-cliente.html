@@ -98,69 +98,161 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 .empty-t{font-size:14px;font-weight:600;color:var(--texto-sub);margin-bottom:6px;}
 .empty-s{font-size:13px;}
 .loading{text-align:center;padding:40px;color:var(--texto-hint);}
-/* ── Equipment section ──────────────────────────────────── */
-.eq-sec-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
-.eq-sec-title{font-size:15px;font-weight:700;color:var(--texto);}
+/* ══════════════════════════════════════════════════════════
+   MIS EQUIPOS — Professional Fleet Management UI
+   ══════════════════════════════════════════════════════════ */
+
+/* KPI bar */
+.eq-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+@media(max-width:640px){.eq-kpi-row{grid-template-columns:repeat(2,1fr);}}
+.eq-kpi{background:var(--blanco);border-radius:14px;padding:14px 16px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 12px rgba(0,0,0,.04);display:flex;align-items:center;gap:12px;}
+.eq-kpi-ic{width:44px;height:44px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;}
+.eq-kpi-n{font-size:22px;font-weight:800;line-height:1;}
+.eq-kpi-l{font-size:11px;color:var(--texto-sub);margin-top:2px;}
+
+/* Alert banners */
+.eq-alert{border-radius:12px;padding:13px 18px;margin-bottom:16px;display:flex;align-items:center;gap:12px;}
+.eq-alert-warn{background:linear-gradient(135deg,#7c2d12,#b45309);}
+.eq-alert-ok{background:linear-gradient(135deg,#14532d,#166534);}
+.eq-alert-ico{font-size:20px;}
+.eq-alert-body{flex:1;}
+.eq-alert-txt{font-size:13px;font-weight:700;color:#fff;}
+.eq-alert-sub{font-size:11px;color:rgba(255,255,255,.7);margin-top:2px;}
+
+/* Section header */
+.eq-sec-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+.eq-sec-title{font-size:16px;font-weight:800;color:var(--texto);}
+.eq-add-btn{display:flex;align-items:center;gap:6px;padding:9px 18px;border-radius:9px;border:none;background:var(--azul);color:#fff;font-size:13px;font-weight:700;cursor:pointer;}
+.eq-add-btn:hover{background:var(--azul-dark);}
+
+/* Equipment grid */
+.eq-grid-new{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
+@media(max-width:660px){.eq-grid-new{grid-template-columns:1fr;}}
+.eq-cn{background:var(--blanco);border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.07);border:1px solid rgba(0,0,0,.04);transition:transform .15s,box-shadow .15s;}
+.eq-cn:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,0,0,.13);}
+
+/* Card header gradient */
+.eq-ch{padding:16px 18px 14px;display:flex;align-items:flex-start;gap:12px;}
+.eq-ch-ico{width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.eq-ch-info{flex:1;min-width:0;}
+.eq-ch-name{font-size:15px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.eq-ch-type{font-size:10px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.6px;margin-top:2px;}
+
+/* Status badges (on dark header) */
+.eq-sbadge{display:inline-flex;align-items:center;gap:3px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;margin-top:6px;}
+.esb-activo{background:rgba(134,239,172,.2);color:#86efac;border:1px solid rgba(134,239,172,.3);}
+.esb-mantenimiento{background:rgba(252,211,77,.2);color:#fde68a;border:1px solid rgba(252,211,77,.3);}
+.esb-inspeccion{background:rgba(147,197,253,.2);color:#93c5fd;border:1px solid rgba(147,197,253,.3);}
+.esb-fuera{background:rgba(252,165,165,.2);color:#fca5a5;border:1px solid rgba(252,165,165,.3);}
+
+/* Card body */
+.eq-cb{padding:12px 18px;}
+.eq-chips{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px;}
+.eq-chip{background:var(--gris-bg);border-radius:6px;padding:3px 9px;font-size:11px;color:var(--texto-sub);font-weight:600;}
+.eq-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--borde);border:1px solid var(--borde);border-radius:10px;overflow:hidden;margin-bottom:10px;}
+.eq-met{background:var(--blanco);padding:9px 6px;text-align:center;}
+.eq-met-n{font-size:18px;font-weight:800;color:var(--texto);}
+.eq-met-l{font-size:9px;color:var(--texto-hint);text-transform:uppercase;letter-spacing:.4px;margin-top:1px;}
+.eq-next{border-radius:8px;padding:7px 12px;font-size:11px;font-weight:600;display:flex;align-items:center;gap:7px;}
+.eq-nok{background:#ecfdf5;color:#065f46;}.eq-nwarn{background:#fffbeb;color:#92400e;}.eq-nexp{background:#fef2f2;color:#991b1b;}.eq-nnone{background:var(--gris-bg);color:var(--texto-hint);}
+.eq-cf{padding:10px 18px;background:var(--gris-bg);border-top:1px solid var(--borde);display:flex;gap:6px;}
+
+/* Type gradient colors */
+.et-grua-torre{background:linear-gradient(135deg,#0f3460 0%,#1d4ed8 100%);}
+.et-grua-movil{background:linear-gradient(135deg,#0c4a6e 0%,#0284c7 100%);}
+.et-grua-viajera{background:linear-gradient(135deg,#064e3b 0%,#059669 100%);}
+.et-camion{background:linear-gradient(135deg,#1c1917 0%,#44403c 100%);}
+.et-montacargas{background:linear-gradient(135deg,#7c2d12 0%,#ea580c 100%);}
+.et-retroexc{background:linear-gradient(135deg,#451a03 0%,#b45309 100%);}
+.et-otro{background:linear-gradient(135deg,#1f2937 0%,#4b5563 100%);}
+
+/* Buttons */
 .btn-prim{padding:8px 16px;border-radius:8px;border:none;background:var(--azul);color:#fff;font-size:12px;font-weight:600;cursor:pointer;}
 .btn-prim:hover{background:var(--azul-dark);}
 .btn-sec{padding:6px 12px;border-radius:7px;border:1.5px solid var(--borde);background:var(--blanco);color:var(--texto-sub);font-size:12px;font-weight:600;cursor:pointer;}
 .btn-sec:hover{background:var(--gris-bg);}
 .btn-del{padding:5px 10px;border-radius:6px;border:1.5px solid var(--rojo);background:var(--rojo-light);color:var(--rojo);font-size:11px;font-weight:600;cursor:pointer;}
-/* Charts row */
+
+/* Detail breadcrumb */
+.eq-bc{display:flex;align-items:center;gap:10px;margin-bottom:16px;}
+.eq-bc-btn{display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:8px;border:1.5px solid var(--azul);background:var(--azul-light);color:var(--azul-dark);font-size:12px;font-weight:700;cursor:pointer;}
+.eq-bc-name{font-size:16px;font-weight:800;color:var(--texto);}
+
+/* Detail banner */
+.eq-det-banner{border-radius:16px;padding:20px 22px;margin-bottom:16px;display:flex;align-items:center;gap:16px;}
+.eq-det-bico{width:56px;height:56px;border-radius:14px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:28px;flex-shrink:0;}
+.eq-det-bname{font-size:20px;font-weight:800;color:#fff;line-height:1.2;}
+.eq-det-bsub{font-size:12px;color:rgba(255,255,255,.65);margin-top:4px;}
+.eq-det-bstatus{margin-top:6px;}
+
+/* Detail specs grid */
+.eq-det-specs{background:var(--blanco);border-radius:14px;border:1px solid rgba(0,0,0,.05);padding:16px 20px;margin-bottom:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:14px;}
+.eq-ds-l{font-size:10px;color:var(--texto-hint);text-transform:uppercase;letter-spacing:.5px;font-weight:700;margin-bottom:3px;}
+.eq-ds-v{font-size:14px;font-weight:700;color:var(--texto);}
+
+/* Underline sub-tabs */
+.eq-sub-tabs-u{display:flex;border-bottom:2px solid var(--borde);margin-bottom:14px;overflow-x:auto;}
+.eq-sbu{padding:10px 18px;border:none;background:transparent;font-size:13px;font-weight:600;color:var(--texto-sub);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;}
+.eq-sbu.active{color:var(--azul);border-bottom-color:var(--azul);}
+.eq-sbu:hover:not(.active){color:var(--texto);}
+.eq-sub-act-bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.eq-sub-t{font-size:14px;font-weight:700;color:var(--texto);}
+
+/* Document cards */
+.doc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;}
+.doc-card{background:var(--blanco);border-radius:12px;border:1px solid rgba(0,0,0,.06);padding:14px 16px;display:flex;gap:12px;transition:box-shadow .1s;}
+.doc-card:hover{box-shadow:0 4px 14px rgba(0,0,0,.07);}
+.doc-ico{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.di-bit{background:#e0f2fe;}.di-seg{background:#dcfce7;}.di-tab{background:#fef9c3;}.di-man{background:#f3e8ff;}.di-ot{background:#f3f4f6;}
+.doc-name{font-size:13px;font-weight:700;color:var(--texto);}
+.doc-meta{font-size:11px;color:var(--texto-sub);margin-top:2px;line-height:1.4;}
+.doc-vbadge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-top:5px;}
+.dv-ok{background:#dcfce7;color:#166534;}.dv-warn{background:#fef3c7;color:#92400e;}.dv-exp{background:#fee2e2;color:#991b1b;}
+.doc-acts{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;}
+
+/* Cert cards */
+.cert-card{background:var(--blanco);border-radius:12px;border:1px solid rgba(0,0,0,.06);border-left:4px solid var(--azul);padding:14px 16px;margin-bottom:10px;}
+.cert-card.cv{border-left-color:var(--verde);}.cert-card.cw{border-left-color:var(--ambar);}.cert-card.ce{border-left-color:var(--rojo);}
+.cert-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.cert-title{font-size:14px;font-weight:700;color:var(--texto);}
+.cert-folio{font-family:monospace;font-size:11px;color:var(--texto-hint);margin-top:2px;}
+.cert-dates{display:flex;gap:18px;margin:10px 0;flex-wrap:wrap;}
+.cert-dt{font-size:11px;color:var(--texto-sub);}.cert-dt strong{display:block;font-size:13px;font-weight:700;color:var(--texto);}
+.cert-bar-track{height:5px;background:var(--borde);border-radius:3px;overflow:hidden;margin-top:10px;}
+.cert-bar-fill{height:100%;border-radius:3px;}
+.cert-acts{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+
+/* Horómetro */
+.horo-hero{background:linear-gradient(135deg,#185FA5,#0C447C);border-radius:14px;padding:18px 20px;margin-bottom:14px;display:flex;align-items:center;gap:20px;}
+.horo-big-n{font-size:40px;font-weight:800;color:#fff;line-height:1;}
+.horo-big-l{font-size:12px;color:rgba(255,255,255,.65);margin-top:4px;}
+.horo-entry{background:var(--blanco);border-radius:10px;border:1px solid rgba(0,0,0,.06);padding:12px 16px;display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+.horo-dot{width:10px;height:10px;border-radius:50%;background:var(--azul);flex-shrink:0;}
+.horo-hrs{font-size:17px;font-weight:800;color:var(--azul);}
+.horo-meta{font-size:11px;color:var(--texto-sub);}
+
+/* Modal overlay */
+.eq-overlay{position:fixed;inset:0;background:rgba(10,20,40,.55);z-index:300;display:none;align-items:center;justify-content:center;padding:16px;}
+.eq-overlay.open{display:flex;}
+.eq-modal{background:var(--blanco);border-radius:18px;padding:24px 22px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.25);}
+.eq-modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
+.eq-modal-title{font-size:16px;font-weight:800;color:var(--texto);}
+.eq-modal-close{width:28px;height:28px;border-radius:8px;border:none;background:var(--gris-bg);color:var(--texto-sub);font-size:14px;cursor:pointer;}
+.eq-msec{font-size:10px;font-weight:800;color:var(--texto-hint);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 8px;padding-bottom:6px;border-bottom:1px solid var(--borde);}
+.frow{margin-bottom:12px;}
+.flabel{display:block;font-size:11px;font-weight:600;color:var(--texto-sub);margin-bottom:4px;}
+.finput{width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--borde);font-size:13px;color:var(--texto);background:var(--blanco);}
+.finput:focus{outline:none;border-color:var(--azul);}
+.fgrid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.fact{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}
+
+/* Charts */
 .eq-charts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
 @media(max-width:600px){.eq-charts{grid-template-columns:1fr;}}
 .eq-chart-card{background:var(--blanco);border-radius:14px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 12px rgba(0,0,0,.05);padding:16px 18px;}
 .eq-chart-title{font-size:12px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;}
 .eq-chart-inner{position:relative;height:180px;}
-/* Summary stat mini-cards */
-.eq-sum-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px;}
-@media(max-width:500px){.eq-sum-row{grid-template-columns:repeat(2,1fr);}}
-.eq-sum-card{background:var(--blanco);border-radius:12px;padding:12px 14px;border:1px solid rgba(0,0,0,.05);text-align:center;}
-.eq-sum-n{font-size:22px;font-weight:700;}
-.eq-sum-l{font-size:11px;color:var(--texto-sub);margin-top:2px;}
-/* Equipment grid */
-.eq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px;}
-.eq-card{background:var(--blanco);border-radius:14px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 12px rgba(0,0,0,.05);overflow:hidden;}
-.eq-card-top{padding:14px 16px 12px;border-bottom:1px solid var(--borde);}
-.eq-card-name{font-size:14px;font-weight:700;color:var(--texto);margin-bottom:2px;}
-.eq-card-sub{font-size:11px;color:var(--texto-sub);}
-.eq-card-stats{padding:10px 16px;display:flex;gap:14px;}
-.eq-stat-m{text-align:center;flex:1;}
-.eq-stat-m .sn{font-size:17px;font-weight:700;}
-.eq-stat-m .sl{font-size:10px;color:var(--texto-hint);margin-top:1px;}
-.eq-card-foot{padding:8px 16px;background:var(--gris-bg);border-top:1px solid var(--borde);display:flex;gap:6px;}
-/* Breadcrumb + detail */
-.eq-bc{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
-.eq-bc-btn{padding:5px 12px;border-radius:7px;border:1.5px solid var(--azul);background:var(--azul-light);color:var(--azul-dark);font-size:12px;font-weight:600;cursor:pointer;}
-.eq-bc-name{font-size:15px;font-weight:700;color:var(--texto);}
-.eq-det-info{background:var(--blanco);border-radius:14px;border:1px solid rgba(0,0,0,.05);padding:16px 18px;margin-bottom:14px;}
-.eq-det-row{display:flex;flex-wrap:wrap;gap:16px;}
-.eq-det-fld{font-size:12px;color:var(--texto-sub);}.eq-det-fld span{display:block;font-weight:700;color:var(--texto);font-size:13px;}
-/* Sub-tabs */
-.eq-sub-tabs{display:flex;gap:4px;background:var(--blanco);border-radius:10px;padding:5px;border:1px solid rgba(0,0,0,.05);margin-bottom:14px;overflow-x:auto;}
-.eq-sub-btn{padding:7px 14px;border-radius:7px;border:none;background:transparent;font-size:12px;font-weight:600;color:var(--texto-sub);cursor:pointer;white-space:nowrap;}
-.eq-sub-btn.active{background:var(--azul);color:#fff;}
-.eq-sub-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
-.eq-sub-title{font-size:13px;font-weight:700;color:var(--texto);}
-/* Items list */
-.eq-item-list{display:flex;flex-direction:column;gap:10px;}
-.eq-item{background:var(--blanco);border-radius:10px;border:1px solid rgba(0,0,0,.05);padding:12px 14px;display:flex;align-items:flex-start;gap:10px;}
-.eq-item-ico{font-size:22px;line-height:1;}
-.eq-item-body{flex:1;min-width:0;}
-.eq-item-title{font-size:13px;font-weight:600;color:var(--texto);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.eq-item-sub{font-size:11px;color:var(--texto-sub);margin-top:2px;}
-.eq-item-acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
-/* Modal overlay */
-.eq-overlay{position:fixed;inset:0;background:rgba(10,20,40,.55);z-index:300;display:none;align-items:center;justify-content:center;padding:16px;}
-.eq-overlay.open{display:flex;}
-.eq-modal{background:var(--blanco);border-radius:16px;padding:22px 20px;width:100%;max-width:460px;max-height:92vh;overflow-y:auto;box-shadow:0 24px 60px rgba(0,0,0,.25);}
-.eq-modal-title{font-size:14px;font-weight:700;color:var(--texto);margin-bottom:16px;}
-.frow{margin-bottom:12px;}
-.flabel{display:block;font-size:11px;font-weight:600;color:var(--texto-sub);margin-bottom:4px;}
-.finput{width:100%;padding:8px 11px;border-radius:7px;border:1.5px solid var(--borde);font-size:13px;color:var(--texto);}
-.finput:focus{outline:none;border-color:var(--azul);}
-.fgrid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.fact{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+
 /* Toast */
 .toast-eq{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 22px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;white-space:nowrap;}
 .toast-eq.show{opacity:1;}
@@ -218,12 +310,25 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 
     <!-- Dashboard -->
     <div id="eq-dashboard">
-      <div class="eq-sum-row" id="eq-sum-row">
-        <div class="eq-sum-card"><div class="eq-sum-n" id="eq-s-total" style="color:var(--azul)">—</div><div class="eq-sum-l">Equipos</div></div>
-        <div class="eq-sum-card"><div class="eq-sum-n" id="eq-s-vig"   style="color:var(--verde)">—</div><div class="eq-sum-l">Certs. vigentes</div></div>
-        <div class="eq-sum-card"><div class="eq-sum-n" id="eq-s-vcr"   style="color:var(--ambar)">—</div><div class="eq-sum-l">Por vencer</div></div>
-        <div class="eq-sum-card"><div class="eq-sum-n" id="eq-s-vcd"   style="color:var(--rojo)">—</div><div class="eq-sum-l">Vencidas</div></div>
+      <div class="eq-kpi-row">
+        <div class="eq-kpi">
+          <div class="eq-kpi-ic" style="background:#dbeafe;color:#1d4ed8">🏗</div>
+          <div><div class="eq-kpi-n" id="eq-s-total">—</div><div class="eq-kpi-l">Equipos</div></div>
+        </div>
+        <div class="eq-kpi">
+          <div class="eq-kpi-ic" style="background:#dcfce7;color:#15803d">✔</div>
+          <div><div class="eq-kpi-n" id="eq-s-vig" style="color:var(--verde)">—</div><div class="eq-kpi-l">Certs. vigentes</div></div>
+        </div>
+        <div class="eq-kpi">
+          <div class="eq-kpi-ic" style="background:#fef3c7;color:#92400e">⏰</div>
+          <div><div class="eq-kpi-n" id="eq-s-vcr" style="color:var(--ambar)">—</div><div class="eq-kpi-l">Por vencer</div></div>
+        </div>
+        <div class="eq-kpi">
+          <div class="eq-kpi-ic" style="background:#fee2e2;color:#991b1b">⚠</div>
+          <div><div class="eq-kpi-n" id="eq-s-vcd" style="color:var(--rojo)">—</div><div class="eq-kpi-l">Vencidas</div></div>
+        </div>
       </div>
+      <div id="eq-alertas"></div>
       <div class="eq-charts">
         <div class="eq-chart-card">
           <div class="eq-chart-title">Estado de certificaciones</div>
@@ -238,8 +343,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 
     <!-- Lista de equipos -->
     <div id="eq-lista-view">
-      <div class="eq-sec-hdr">
-        <div class="eq-sec-title">Mis Equipos</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+        <div style="font-size:16px;font-weight:800;color:var(--texto)">Mis Equipos</div>
         <button class="btn-prim" onclick="abrirModalEq(null)">+ Nuevo equipo</button>
       </div>
       <div id="eq-cont"><div class="loading"><span class="spin"></span></div></div>
@@ -249,13 +354,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
     <div id="eq-det-view" style="display:none">
       <div class="eq-bc">
         <button class="eq-bc-btn" onclick="volverListaEq()">← Mis equipos</button>
-        <span class="eq-bc-name" id="eq-det-nombre">—</span>
       </div>
-      <div class="eq-det-info" id="eq-det-info"></div>
-      <div class="eq-sub-tabs">
-        <button class="eq-sub-btn active" onclick="verEqSub('docs',this)">📄 Documentos</button>
-        <button class="eq-sub-btn"        onclick="verEqSub('horas',this)">⏱ Horómetro</button>
-        <button class="eq-sub-btn"        onclick="verEqSub('certs',this)">🏆 Certificaciones</button>
+      <div id="eq-det-info"></div>
+      <div class="eq-sub-tabs-u">
+        <button class="eq-sbu active" onclick="verEqSub('docs',this)">📄 Documentos</button>
+        <button class="eq-sbu"        onclick="verEqSub('horas',this)">⏱ Horómetro</button>
+        <button class="eq-sbu"        onclick="verEqSub('certs',this)">🏆 Certificaciones</button>
       </div>
       <div id="eq-sub-docs"></div>
       <div id="eq-sub-horas"  style="display:none"></div>
@@ -271,13 +375,37 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 <!-- Modal: Equipo -->
 <div class="eq-overlay" id="modal-eq">
   <div class="eq-modal">
-    <div class="eq-modal-title" id="modal-eq-title">Nuevo equipo</div>
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title" id="modal-eq-title">Nuevo equipo</div>
+      <button class="eq-modal-close" onclick="cerrarModalEq()">✕</button>
+    </div>
     <input type="hidden" id="eq-id">
+    <p class="eq-msec">Identificación</p>
     <div class="frow"><label class="flabel">Nombre / Descripción *</label><input class="finput" id="eq-nombre" placeholder="Ej: Grúa viajera 5t"></div>
     <div class="fgrid2">
-      <div class="frow"><label class="flabel">Tipo</label><input class="finput" id="eq-tipo" placeholder="Grúa, Montacargas…"></div>
-      <div class="frow"><label class="flabel">Año</label><input class="finput" id="eq-anio" type="number" min="1950" max="2100" placeholder="2020"></div>
+      <div class="frow"><label class="flabel">Tipo de equipo</label>
+        <select class="finput" id="eq-tipo">
+          <option value="">Seleccionar…</option>
+          <option value="Grúa Torre">Grúa Torre</option>
+          <option value="Grúa Móvil">Grúa Móvil</option>
+          <option value="Grúa Viajera">Grúa Viajera</option>
+          <option value="Grúa Puente">Grúa Puente</option>
+          <option value="Montacargas">Montacargas</option>
+          <option value="Camión">Camión</option>
+          <option value="Retroexcavadora">Retroexcavadora</option>
+          <option value="Otro">Otro</option>
+        </select>
+      </div>
+      <div class="frow"><label class="flabel">Estado</label>
+        <select class="finput" id="eq-estado">
+          <option value="Activo">Activo</option>
+          <option value="Mantenimiento">Mantenimiento</option>
+          <option value="Inspección">Inspección</option>
+          <option value="Fuera de servicio">Fuera de servicio</option>
+        </select>
+      </div>
     </div>
+    <p class="eq-msec">Datos técnicos</p>
     <div class="fgrid2">
       <div class="frow"><label class="flabel">Marca</label><input class="finput" id="eq-marca" placeholder="Ej: Demag"></div>
       <div class="frow"><label class="flabel">Modelo</label><input class="finput" id="eq-modelo" placeholder="Ej: KBK-II"></div>
@@ -286,6 +414,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
       <div class="frow"><label class="flabel">No. Serie</label><input class="finput" id="eq-serie" placeholder="Ej: SN-12345"></div>
       <div class="frow"><label class="flabel">Capacidad</label><input class="finput" id="eq-capacidad" placeholder="Ej: 5 ton"></div>
     </div>
+    <div class="frow"><label class="flabel">Año</label><input class="finput" id="eq-anio" type="number" min="1950" max="2100" placeholder="2020"></div>
     <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="eq-notas" rows="2" placeholder="Observaciones…"></textarea></div>
     <div class="fact">
       <button class="btn-sec" onclick="cerrarModalEq()">Cancelar</button>
@@ -297,7 +426,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 <!-- Modal: Documento -->
 <div class="eq-overlay" id="modal-doc">
   <div class="eq-modal">
-    <div class="eq-modal-title">Subir documento</div>
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Subir documento</div>
+      <button class="eq-modal-close" onclick="cerrarModalDoc()">✕</button>
+    </div>
     <input type="hidden" id="doc-equipo-id">
     <div class="frow"><label class="flabel">Nombre del documento *</label><input class="finput" id="doc-nombre" placeholder="Ej: Seguro de responsabilidad civil 2025"></div>
     <div class="fgrid2">
@@ -324,7 +456,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 <!-- Modal: Horómetro -->
 <div class="eq-overlay" id="modal-hora">
   <div class="eq-modal">
-    <div class="eq-modal-title">Registrar lectura de horómetro</div>
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Registrar lectura de horómetro</div>
+      <button class="eq-modal-close" onclick="cerrarModalHora()">✕</button>
+    </div>
     <input type="hidden" id="hora-equipo-id">
     <div class="fgrid2">
       <div class="frow"><label class="flabel">Horas actuales *</label><input class="finput" id="hora-horas" type="number" min="0" step="0.1" placeholder="1250.5"></div>
@@ -341,7 +476,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 <!-- Modal: Certificación -->
 <div class="eq-overlay" id="modal-cert-eq">
   <div class="eq-modal">
-    <div class="eq-modal-title" id="modal-cert-title">Agregar certificación</div>
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title" id="modal-cert-title">Agregar certificación</div>
+      <button class="eq-modal-close" onclick="cerrarModalCert()">✕</button>
+    </div>
     <input type="hidden" id="ceq-id">
     <input type="hidden" id="ceq-equipo-id">
     <div class="frow"><label class="flabel">Tipo de certificación *</label><input class="finput" id="ceq-tipo" placeholder="Ej: Certificado de operador, Inspección anual…"></div>
@@ -602,9 +740,59 @@ function renderPND(data) {
 // ════════════════════════════════════════════════════════════════════════════
 
 let _eqCargado = false;
-let _eqDetActual = null;  // equipo detail currently open
+let _eqDetActual = null;
 let _chartCerts = null;
 let _chartHoras = null;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function eqTipoInfo(tipo) {
+  const t = (tipo || '').toLowerCase();
+  if (t.includes('torre'))                               return {cls:'et-grua-torre',   ico:'🏗',  label:'Grúa Torre'};
+  if (t.includes('móvil') || t.includes('movil'))       return {cls:'et-grua-movil',   ico:'🚛',  label:'Grúa Móvil'};
+  if (t.includes('viajera'))                             return {cls:'et-grua-viajera', ico:'⚙',  label:'Grúa Viajera'};
+  if (t.includes('puente') || t.includes('grúa') || t.includes('grua')) return {cls:'et-grua-movil', ico:'🔧', label: tipo || 'Grúa'};
+  if (t.includes('montacargas'))                         return {cls:'et-montacargas',  ico:'🔱', label:'Montacargas'};
+  if (t.includes('camión') || t.includes('camion'))      return {cls:'et-camion',       ico:'🚚', label:'Camión'};
+  if (t.includes('retroexc'))                            return {cls:'et-retroexc',     ico:'🚧', label:'Retroexcavadora'};
+  return {cls:'et-otro', ico:'🔩', label: tipo || 'Equipo'};
+}
+
+function estadoBadge(estado) {
+  const map = {
+    'Activo':           {cls:'esb-activo',        ico:'●'},
+    'Mantenimiento':    {cls:'esb-mantenimiento', ico:'🔧'},
+    'Inspección':       {cls:'esb-inspeccion',    ico:'🔍'},
+    'Fuera de servicio':{cls:'esb-fuera',         ico:'⛔'},
+  };
+  const s = map[estado] || {cls:'esb-activo', ico:'●'};
+  return `<span class="eq-sbadge ${s.cls}">${s.ico} ${estado || 'Activo'}</span>`;
+}
+
+function renderAlertas(data) {
+  const certs = data.certs || {};
+  const cont = document.getElementById('eq-alertas');
+  if (!cont) return;
+  let html = '';
+  if (certs.vencidas > 0) {
+    html += `<div class="eq-alert eq-alert-warn">
+      <div class="eq-alert-ico">⚠</div>
+      <div class="eq-alert-body">
+        <div class="eq-alert-txt">${certs.vencidas} certificación${certs.vencidas!==1?'es':''} vencida${certs.vencidas!==1?'s':''}</div>
+        <div class="eq-alert-sub">Revisa y renueva las certificaciones vencidas de tus equipos.</div>
+      </div>
+    </div>`;
+  }
+  if (certs.por_vencer > 0) {
+    html += `<div class="eq-alert eq-alert-ok">
+      <div class="eq-alert-ico">⏰</div>
+      <div class="eq-alert-body">
+        <div class="eq-alert-txt">${certs.por_vencer} certificación${certs.por_vencer!==1?'es':''} próxima${certs.por_vencer!==1?'s':''} a vencer</div>
+        <div class="eq-alert-sub">Programa con tiempo la renovación de estas certificaciones.</div>
+      </div>
+    </div>`;
+  }
+  cont.innerHTML = html;
+}
 
 // ── Toast ──────────────────────────────────────────────────────────────────
 function toastEq(msg, dur) {
@@ -620,11 +808,11 @@ function verEqSub(tab, btn) {
     const el = document.getElementById('eq-sub-' + t);
     if (el) el.style.display = t === tab ? '' : 'none';
   });
-  document.querySelectorAll('.eq-sub-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.eq-sbu').forEach(b => b.classList.remove('active'));
   btn.classList.add('active');
 }
 
-// ── Cargar datos (lazy, solo al activar el tab) ────────────────────────────
+// ── Cargar datos (lazy) ────────────────────────────────────────────────────
 async function cargarEquiposCli() {
   if (_eqCargado) return;
   _eqCargado = true;
@@ -641,6 +829,7 @@ async function cargarDashboardEq() {
     document.getElementById('eq-s-vig').textContent   = d.certs.vigentes;
     document.getElementById('eq-s-vcr').textContent   = d.certs.por_vencer;
     document.getElementById('eq-s-vcd').textContent   = d.certs.vencidas;
+    renderAlertas(d);
     renderChartCerts(d.certs);
     renderChartHoras(d.horas_equipos || []);
   } catch(_) {}
@@ -710,25 +899,50 @@ const TIPO_DOC_ICONS  = { bitacora:'📒', seguro:'🛡', tabla_carga:'📊', ma
 function renderListaEq(equipos) {
   const cont = document.getElementById('eq-cont');
   if (!equipos.length) {
-    cont.innerHTML = '<div class="empty"><div class="empty-t">Sin equipos registrados</div><div class="empty-s">Agrega tus equipos para llevar su control.</div></div>';
+    cont.innerHTML = '<div class="empty"><div class="empty-t">Sin equipos registrados</div><div class="empty-s">Agrega tu primer equipo para comenzar a llevar su control.</div></div>';
     return;
   }
-  let html = '<div class="eq-grid">';
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px">';
   equipos.forEach(eq => {
-    const certColor = eq.certs_vencidas > 0 ? 'var(--rojo)' : eq.certs_vigentes > 0 ? 'var(--verde)' : 'var(--texto-hint)';
-    html += `<div class="eq-card">
-      <div class="eq-card-top">
-        <div class="eq-card-name">${escQ(eq.nombre)}</div>
-        <div class="eq-card-sub">${eq.tipo ? escQ(eq.tipo) : ''}${eq.marca ? ' · ' + escQ(eq.marca) : ''}${eq.modelo ? ' · ' + escQ(eq.modelo) : ''}</div>
+    const ti       = eqTipoInfo(eq.tipo);
+    const certBad  = eq.certs_vencidas > 0;
+    const certWarn = eq.certs_por_vencer > 0;
+    const certOk   = eq.certs_vigentes > 0 && !certBad;
+    const nextCls  = certBad ? 'eq-nexp' : certWarn ? 'eq-nwarn' : certOk ? 'eq-nok' : 'eq-nnone';
+    const nextTxt  = certBad
+      ? `⚠ ${eq.certs_vencidas} cert${eq.certs_vencidas!==1?'s':''} vencida${eq.certs_vencidas!==1?'s':''}`
+      : certWarn
+        ? `⏰ ${eq.certs_por_vencer} cert${eq.certs_por_vencer!==1?'s':''} por vencer`
+        : certOk
+          ? `✔ ${eq.certs_vigentes} cert${eq.certs_vigentes!==1?'s':''} vigente${eq.certs_vigentes!==1?'s':''}`
+          : 'Sin certificaciones';
+    const certColor = certBad ? 'var(--rojo)' : certWarn ? 'var(--ambar)' : 'var(--verde)';
+    html += `<div class="eq-cn">
+      <div class="eq-ch ${ti.cls}">
+        <div class="eq-ch-ico">${ti.ico}</div>
+        <div style="flex:1;min-width:0">
+          <div class="eq-ch-name">${escQ(eq.nombre)}</div>
+          <div class="eq-ch-type">${eq.tipo ? escQ(eq.tipo) : ti.label}${eq.anio ? ' · ' + eq.anio : ''}</div>
+        </div>
+        <div style="flex-shrink:0">${estadoBadge(eq.estado)}</div>
       </div>
-      <div class="eq-card-stats">
-        <div class="eq-stat-m"><div class="sn" style="color:var(--azul)">${eq.total_docs}</div><div class="sl">Docs</div></div>
-        <div class="eq-stat-m"><div class="sn" style="color:${certColor}">${eq.total_certs}</div><div class="sl">Certs</div></div>
-        <div class="eq-stat-m"><div class="sn" style="color:var(--ambar)">${eq.horas_actuales > 0 ? eq.horas_actuales.toLocaleString('es-MX') : '—'}</div><div class="sl">Hrs</div></div>
+      <div class="eq-cb">
+        <div class="eq-chips">
+          ${eq.marca     ? `<span class="eq-chip">${escQ(eq.marca)}</span>` : ''}
+          ${eq.modelo    ? `<span class="eq-chip">${escQ(eq.modelo)}</span>` : ''}
+          ${eq.capacidad ? `<span class="eq-chip">⚖ ${escQ(eq.capacidad)}</span>` : ''}
+          ${eq.serie     ? `<span class="eq-chip">S/N ${escQ(eq.serie)}</span>` : ''}
+        </div>
+        <div class="eq-metrics">
+          <div class="eq-met"><div class="eq-met-n" style="color:var(--azul)">${eq.total_docs}</div><div class="eq-met-l">Docs</div></div>
+          <div class="eq-met"><div class="eq-met-n" style="color:${certColor}">${eq.total_certs}</div><div class="eq-met-l">Certs</div></div>
+          <div class="eq-met"><div class="eq-met-n" style="color:var(--ambar)">${eq.horas_actuales > 0 ? eq.horas_actuales.toLocaleString('es-MX') : '—'}</div><div class="eq-met-l">Hrs</div></div>
+        </div>
+        <div class="eq-next ${nextCls}">${nextTxt}</div>
       </div>
-      <div class="eq-card-foot">
-        <button class="btn-prim" style="flex:1;font-size:11px;padding:6px" onclick="verDetalleEq(${eq.id})">👁 Ver</button>
-        <button class="btn-sec" style="font-size:11px;padding:6px" onclick="abrirModalEq(${JSON.stringify(eq).replace(/"/g,'&quot;')})">✏ Editar</button>
+      <div style="display:flex;gap:6px;padding:10px 14px 14px">
+        <button class="btn-prim" style="flex:1;font-size:12px;padding:8px 10px" onclick="verDetalleEq(${eq.id})">Ver detalle →</button>
+        <button class="btn-sec" style="font-size:12px;padding:8px 10px" onclick="abrirModalEq(${JSON.stringify(eq).replace(/"/g,'&quot;')})">✏</button>
         <button class="btn-del" onclick="eliminarEquipo(${eq.id},'${escQ(eq.nombre)}')">🗑</button>
       </div>
     </div>`;
@@ -742,21 +956,18 @@ async function verDetalleEq(id) {
   document.getElementById('eq-lista-view').style.display = 'none';
   document.getElementById('eq-dashboard').style.display  = 'none';
   document.getElementById('eq-det-view').style.display   = '';
-  document.getElementById('eq-det-nombre').textContent   = '…';
-  ['docs','horas','certs'].forEach(t => document.getElementById('eq-sub-' + t).innerHTML = '<div class="loading"><span class="spin"></span></div>');
-
+  document.getElementById('eq-det-info').innerHTML       = '<div class="loading"><span class="spin"></span></div>';
+  ['docs','horas','certs'].forEach(t => { document.getElementById('eq-sub-' + t).innerHTML = '<div class="loading"><span class="spin"></span></div>'; });
   try {
     const r = await fetch(API + '?action=GET_DETALLE_EQUIPO&id=' + id);
     const d = await r.json();
     if (d.status !== 'success') { toastEq(d.message); volverListaEq(); return; }
     _eqDetActual = d;
-    document.getElementById('eq-det-nombre').textContent = d.equipo.nombre;
     renderDetInfo(d.equipo);
     renderSubDocs(d.documentos, d.equipo.id);
     renderSubHoras(d.horometro, d.equipo.id);
     renderSubCerts(d.certificaciones, d.equipo.id);
-    // reset to first sub-tab
-    document.querySelectorAll('.eq-sub-btn').forEach((b,i) => b.classList.toggle('active', i===0));
+    document.querySelectorAll('.eq-sbu').forEach((b,i) => b.classList.toggle('active', i===0));
     ['docs','horas','certs'].forEach((t,i) => document.getElementById('eq-sub-'+t).style.display = i===0?'':'none');
   } catch(e) {
     toastEq('Error al cargar detalle.'); volverListaEq();
@@ -771,50 +982,64 @@ function volverListaEq() {
 }
 
 function renderDetInfo(eq) {
-  const flds = [
-    eq.tipo     ? ['Tipo', eq.tipo]       : null,
-    eq.marca    ? ['Marca', eq.marca]     : null,
-    eq.modelo   ? ['Modelo', eq.modelo]   : null,
-    eq.serie    ? ['No. Serie', eq.serie] : null,
-    eq.capacidad? ['Capacidad', eq.capacidad] : null,
-    eq.anio     ? ['Año', eq.anio]        : null,
+  const ti = eqTipoInfo(eq.tipo);
+  const specs = [
+    eq.tipo      ? ['Tipo',      eq.tipo]         : null,
+    eq.marca     ? ['Marca',     eq.marca]         : null,
+    eq.modelo    ? ['Modelo',    eq.modelo]        : null,
+    eq.serie     ? ['No. Serie', eq.serie]         : null,
+    eq.capacidad ? ['Capacidad', eq.capacidad]     : null,
+    eq.anio      ? ['Año',       String(eq.anio)]  : null,
+    eq.estado    ? ['Estado',    eq.estado]        : null,
   ].filter(Boolean);
-
   const det = document.getElementById('eq-det-info');
-  det.innerHTML = '<div class="eq-det-row">' +
-    flds.map(([k,v]) => `<div class="eq-det-fld"><span>${escQ(String(v))}</span>${escQ(k)}</div>`).join('') +
-    (eq.notas ? `<div class="eq-det-fld" style="flex:1 1 100%;font-style:italic;color:var(--texto-sub)">${escQ(eq.notas)}</div>` : '') +
-    '</div>';
+  det.innerHTML = `
+    <div class="eq-det-banner ${ti.cls}">
+      <div class="eq-det-bico">${ti.ico}</div>
+      <div>
+        <div class="eq-det-bname">${escQ(eq.nombre)}</div>
+        <div class="eq-det-bsub">${estadoBadge(eq.estado)}</div>
+      </div>
+    </div>
+    <div class="eq-det-specs">
+      ${specs.map(([k,v]) => `<div><div class="eq-ds-l">${k}</div><div class="eq-ds-v">${escQ(v)}</div></div>`).join('')}
+    </div>
+    ${eq.notas ? `<div style="margin:0 0 16px;padding:10px 14px;background:var(--gris-bg);border-radius:10px;font-size:12px;color:var(--texto-sub);font-style:italic">${escQ(eq.notas)}</div>` : '<div style="margin-bottom:6px"></div>'}
+  `;
 }
 
 // ── Documentos ─────────────────────────────────────────────────────────────
 function renderSubDocs(docs, equipoId) {
+  const DOC_IC = {bitacora:'di-bit', seguro:'di-seg', tabla_carga:'di-tab', manual:'di-man', otro:'di-ot'};
   const cont = document.getElementById('eq-sub-docs');
-  let html = `<div class="eq-sub-header">
-    <div class="eq-sub-title">Documentos (${docs.length})</div>
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--texto)">Documentos <span style="color:var(--texto-hint)">(${docs.length})</span></div>
     <button class="btn-prim" onclick="abrirModalDoc(${equipoId})">+ Subir</button>
   </div>`;
   if (!docs.length) {
     html += '<div class="empty"><div class="empty-t">Sin documentos</div><div class="empty-s">Sube bitácoras, seguros, tablas de carga y más.</div></div>';
   } else {
-    html += '<div class="eq-item-list">';
+    html += '<div class="doc-grid">';
     docs.forEach(d => {
-      const ico = TIPO_DOC_ICONS[d.tipo_doc] || '📎';
-      const lbl = TIPO_DOC_LABELS[d.tipo_doc] || d.tipo_doc;
-      const vigBadge = d.vigencia
-        ? (d.vencido
-            ? `<span class="badge b-vencido" style="font-size:10px">⚠ Vencido</span>`
-            : (d.dias_vig <= 30
-                ? `<span class="badge b-vence" style="font-size:10px">Vence en ${d.dias_vig}d</span>`
-                : `<span class="badge b-vigente" style="font-size:10px">Vigente al ${d.vigencia}</span>`))
-        : '';
-      const archLink = d.archivo_url ? `<a href="${d.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver</a>` : '';
-      html += `<div class="eq-item">
-        <div class="eq-item-ico">${ico}</div>
-        <div class="eq-item-body">
-          <div class="eq-item-title">${escQ(d.nombre)}</div>
-          <div class="eq-item-sub">${lbl}${d.fecha_subida ? ' · ' + d.fecha_subida : ''}${d.notas ? ' · ' + escQ(d.notas) : ''} ${vigBadge}</div>
-          <div class="eq-item-acts">${archLink}<button class="btn-del" onclick="eliminarDoc(${d.id})">🗑 Eliminar</button></div>
+      const icoCls = DOC_IC[d.tipo_doc] || 'di-ot';
+      const ico    = TIPO_DOC_ICONS[d.tipo_doc] || '📎';
+      const lbl    = TIPO_DOC_LABELS[d.tipo_doc] || d.tipo_doc;
+      let vigHtml  = '';
+      if (d.vigencia) {
+        if (d.vencido)              vigHtml = `<span class="doc-vbadge dv-exp">⚠ Vencido</span>`;
+        else if (d.dias_vig <= 30)  vigHtml = `<span class="doc-vbadge dv-warn">Vence en ${d.dias_vig}d</span>`;
+        else                        vigHtml = `<span class="doc-vbadge dv-ok">Vigente</span>`;
+      }
+      html += `<div class="doc-card">
+        <div class="doc-ico ${icoCls}">${ico}</div>
+        <div style="flex:1;min-width:0">
+          <div class="doc-name">${escQ(d.nombre)}</div>
+          <div class="doc-meta">${lbl}${d.fecha_subida ? ' · ' + d.fecha_subida : ''}${d.notas ? '<br>'+escQ(d.notas) : ''}</div>
+          ${vigHtml}
+          <div class="doc-acts">
+            ${d.archivo_url ? `<a href="${d.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver</a>` : ''}
+            <button class="btn-del" onclick="eliminarDoc(${d.id})" style="padding:3px 8px;font-size:10px">🗑</button>
+          </div>
         </div>
       </div>`;
     });
@@ -826,28 +1051,34 @@ function renderSubDocs(docs, equipoId) {
 // ── Horómetro ──────────────────────────────────────────────────────────────
 function renderSubHoras(horas, equipoId) {
   const cont = document.getElementById('eq-sub-horas');
-  const maxH  = horas.length ? Math.max(...horas.map(h => h.horas)) : 0;
-  let html = `<div class="eq-sub-header">
-    <div class="eq-sub-title">Horómetro — Máx: <strong>${maxH.toLocaleString('es-MX')} hrs</strong></div>
+  const maxH = horas.length ? Math.max(...horas.map(h => h.horas)) : 0;
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--texto)">Horómetro</div>
     <button class="btn-prim" onclick="abrirModalHora(${equipoId})">+ Registrar</button>
   </div>`;
   if (!horas.length) {
     html += '<div class="empty"><div class="empty-t">Sin registros</div><div class="empty-s">Registra las horas de trabajo del equipo.</div></div>';
   } else {
-    html += '<div class="eq-item-list">';
+    html += `<div class="horo-hero">
+      <div>
+        <div class="horo-big-n">${maxH.toLocaleString('es-MX')}</div>
+        <div class="horo-big-l">Horas registradas (máx.)</div>
+      </div>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:24px;font-weight:800;color:rgba(255,255,255,.75)">${horas.length}</div>
+        <div style="font-size:11px;color:rgba(255,255,255,.5)">registros</div>
+      </div>
+    </div>`;
     horas.forEach(h => {
-      const pct = maxH > 0 ? Math.round((h.horas / maxH) * 100) : 0;
-      html += `<div class="eq-item">
-        <div class="eq-item-ico">⏱</div>
-        <div class="eq-item-body">
-          <div class="eq-item-title">${h.horas.toLocaleString('es-MX')} hrs</div>
-          <div class="eq-item-sub">${h.fecha}${h.notas ? ' · ' + escQ(h.notas) : ''}</div>
-          <div style="margin-top:6px;height:4px;background:var(--borde);border-radius:2px;overflow:hidden"><div style="width:${pct}%;height:100%;background:var(--azul);border-radius:2px"></div></div>
-          <div class="eq-item-acts"><button class="btn-del" onclick="eliminarHora(${h.id})">🗑 Eliminar</button></div>
+      html += `<div class="horo-entry">
+        <div class="horo-dot"></div>
+        <div style="flex:1">
+          <div class="horo-hrs">${h.horas.toLocaleString('es-MX')} hrs</div>
+          <div class="horo-meta">${h.fecha}${h.notas ? ' — ' + escQ(h.notas) : ''}</div>
         </div>
+        <button class="btn-del" onclick="eliminarHora(${h.id})" style="padding:4px 8px;font-size:11px">🗑</button>
       </div>`;
     });
-    html += '</div>';
   }
   cont.innerHTML = html;
 }
@@ -855,42 +1086,45 @@ function renderSubHoras(horas, equipoId) {
 // ── Certificaciones ─────────────────────────────────────────────────────────
 function renderSubCerts(certs, equipoId) {
   const cont = document.getElementById('eq-sub-certs');
-  let html = `<div class="eq-sub-header">
-    <div class="eq-sub-title">Certificaciones (${certs.length})</div>
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--texto)">Certificaciones <span style="color:var(--texto-hint)">(${certs.length})</span></div>
     <button class="btn-prim" onclick="abrirModalCert(${equipoId}, null)">+ Agregar</button>
   </div>`;
   if (!certs.length) {
     html += '<div class="empty"><div class="empty-t">Sin certificaciones</div><div class="empty-s">Registra las certificaciones vigentes del equipo.</div></div>';
   } else {
-    html += '<div class="eq-item-list">';
     certs.forEach(c => {
-      const vencida = c.vencida;
-      const badge = c.fecha_vigencia
-        ? (vencida
-            ? '<span class="badge b-vencido">⚠ Vencida</span>'
-            : (c.dias_vig <= 30
-                ? `<span class="badge b-vence">Por vencer (${c.dias_vig}d)</span>`
-                : `<span class="badge b-vigente">Vigente</span>`))
-        : '<span class="badge">Sin fecha</span>';
-      const archLink = c.archivo_url ? `<a href="${c.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver cert</a>` : '';
-      html += `<div class="eq-item">
-        <div class="eq-item-ico">🏆</div>
-        <div class="eq-item-body">
-          <div class="eq-item-title" style="display:flex;align-items:center;gap:6px">${escQ(c.tipo_cert)} ${badge}</div>
-          <div class="eq-item-sub">
-            ${c.folio ? 'Folio: ' + escQ(c.folio) + ' · ' : ''}
-            ${c.fecha_emision ? 'Emisión: ' + c.fecha_emision + ' · ' : ''}
-            ${c.fecha_vigencia ? 'Vence: ' + c.fecha_vigencia : ''}
+      const cls      = c.vencida ? 'ce' : (c.dias_vig !== null && c.dias_vig !== undefined && c.dias_vig <= 30) ? 'cw' : 'cv';
+      const barColor = c.vencida ? '#ef4444' : (c.dias_vig !== null && c.dias_vig !== undefined && c.dias_vig <= 30) ? '#f59e0b' : '#22c55e';
+      const pct      = c.vencida ? 0 : (c.dias_vig !== null && c.dias_vig !== undefined ? Math.max(4, Math.min(100, Math.round((c.dias_vig / 365) * 100))) : 100);
+      const vigLabel = c.fecha_vigencia
+        ? (c.vencida
+            ? '⚠ Vencida'
+            : (c.dias_vig !== null && c.dias_vig !== undefined && c.dias_vig <= 30
+                ? `⏰ Vence en ${c.dias_vig} días`
+                : `✔ Vigente — ${c.dias_vig} días`))
+        : 'Sin fecha';
+      html += `<div class="cert-card ${cls}">
+        <div class="cert-head">
+          <div>
+            <div class="cert-title">${escQ(c.tipo_cert)}</div>
+            ${c.folio ? `<div class="cert-folio">Folio: ${escQ(c.folio)}</div>` : ''}
           </div>
-          <div class="eq-item-acts">
-            ${archLink}
-            <button class="btn-sec" style="font-size:10px" onclick="abrirModalCert(${equipoId}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">✏ Editar</button>
-            <button class="btn-del" onclick="eliminarCert(${c.id})">🗑 Eliminar</button>
-          </div>
+          <div style="font-size:11px;font-weight:700;color:${barColor};white-space:nowrap;text-align:right">${vigLabel}</div>
+        </div>
+        ${c.fecha_emision || c.fecha_vigencia ? `<div class="cert-dates">
+          ${c.fecha_emision  ? `<div class="cert-dt"><strong>${c.fecha_emision}</strong>Emisión</div>`    : ''}
+          ${c.fecha_vigencia ? `<div class="cert-dt"><strong>${c.fecha_vigencia}</strong>Vencimiento</div>` : ''}
+        </div>` : ''}
+        ${c.fecha_vigencia ? `<div class="cert-bar-track"><div class="cert-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>` : ''}
+        ${c.notas ? `<div style="font-size:11px;color:var(--texto-sub);margin-top:8px;font-style:italic">${escQ(c.notas)}</div>` : ''}
+        <div class="cert-acts">
+          ${c.archivo_url ? `<a href="${c.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Certificado</a>` : ''}
+          <button class="btn-sec" style="font-size:10px" onclick="abrirModalCert(${equipoId}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">✏ Editar</button>
+          <button class="btn-del" onclick="eliminarCert(${c.id})" style="font-size:10px">🗑</button>
         </div>
       </div>`;
     });
-    html += '</div>';
   }
   cont.innerHTML = html;
 }
@@ -901,15 +1135,16 @@ function renderSubCerts(certs, equipoId) {
 
 function abrirModalEq(eq) {
   document.getElementById('modal-eq-title').textContent = eq ? 'Editar equipo' : 'Nuevo equipo';
-  document.getElementById('eq-id').value       = eq ? eq.id    : '';
-  document.getElementById('eq-nombre').value   = eq ? (eq.nombre   || '') : '';
-  document.getElementById('eq-tipo').value     = eq ? (eq.tipo     || '') : '';
-  document.getElementById('eq-marca').value    = eq ? (eq.marca    || '') : '';
-  document.getElementById('eq-modelo').value   = eq ? (eq.modelo   || '') : '';
-  document.getElementById('eq-serie').value    = eq ? (eq.serie    || '') : '';
-  document.getElementById('eq-capacidad').value= eq ? (eq.capacidad|| '') : '';
-  document.getElementById('eq-anio').value     = eq ? (eq.anio     || '') : '';
-  document.getElementById('eq-notas').value    = eq ? (eq.notas    || '') : '';
+  document.getElementById('eq-id').value        = eq ? eq.id             : '';
+  document.getElementById('eq-nombre').value    = eq ? (eq.nombre    || '') : '';
+  document.getElementById('eq-tipo').value      = eq ? (eq.tipo      || '') : '';
+  document.getElementById('eq-estado').value    = eq ? (eq.estado    || 'Activo') : 'Activo';
+  document.getElementById('eq-marca').value     = eq ? (eq.marca     || '') : '';
+  document.getElementById('eq-modelo').value    = eq ? (eq.modelo    || '') : '';
+  document.getElementById('eq-serie').value     = eq ? (eq.serie     || '') : '';
+  document.getElementById('eq-capacidad').value = eq ? (eq.capacidad || '') : '';
+  document.getElementById('eq-anio').value      = eq ? (eq.anio      || '') : '';
+  document.getElementById('eq-notas').value     = eq ? (eq.notas     || '') : '';
   document.getElementById('modal-eq').classList.add('open');
 }
 function cerrarModalEq() { document.getElementById('modal-eq').classList.remove('open'); }
@@ -921,7 +1156,8 @@ async function guardarEquipo() {
   const data = {
     id:       id ? +id : 0,
     nombre,
-    tipo:     document.getElementById('eq-tipo').value.trim(),
+    tipo:     document.getElementById('eq-tipo').value,
+    estado:   document.getElementById('eq-estado').value,
     marca:    document.getElementById('eq-marca').value.trim(),
     modelo:   document.getElementById('eq-modelo').value.trim(),
     serie:    document.getElementById('eq-serie').value.trim(),
