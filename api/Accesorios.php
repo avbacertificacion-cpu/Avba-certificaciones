@@ -836,6 +836,13 @@ class Accesorios {
             );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             $mail->send();
+
+            // Marcar como EMITIDO y guardar URL para el portal del cliente
+            $certUrl = rtrim(UPLOAD_URL, '/') . '/' . ltrim($resultado['url'], '/');
+            $this->pdo->prepare(
+                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', cert_url = ? WHERE id = ?"
+            )->execute([$certUrl, $sesionId]);
+
             return ['status' => 'success', 'message' => "Certificado enviado a {$correo}."];
         } catch (\Exception $e) {
             return ['status' => 'error', 'message' => 'Error al enviar: ' . $e->getMessage()];
@@ -908,6 +915,13 @@ class Accesorios {
             );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             $mail->send();
+
+            // Marcar como EMITIDO y guardar URL para el portal del cliente
+            $informeUrl = rtrim(UPLOAD_URL, '/') . '/' . ltrim($resultado['url'], '/');
+            $this->pdo->prepare(
+                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', informe_url = ? WHERE id = ?"
+            )->execute([$informeUrl, $sesionId]);
+
             return ['status' => 'success', 'message' => "Informe enviado a {$correo}."];
         } catch (\Exception $e) {
             return ['status' => 'error', 'message' => 'Error al enviar: ' . $e->getMessage()];
@@ -940,6 +954,13 @@ class Accesorios {
             );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             $mail->send();
+
+            // Marcar como EMITIDO y guardar URL para el portal del cliente
+            $informeUrl = rtrim(UPLOAD_URL, '/') . '/' . ltrim($resultado['url'], '/');
+            $this->pdo->prepare(
+                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', informe_url = ? WHERE id = ?"
+            )->execute([$informeUrl, $sesionId]);
+
             return ['status' => 'success', 'message' => "Informe enviado a {$correo}."];
         } catch (\Exception $e) {
             return ['status' => 'error', 'message' => 'Error al enviar: ' . $e->getMessage()];
