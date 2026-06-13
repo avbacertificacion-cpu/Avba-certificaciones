@@ -2043,6 +2043,33 @@ HTML;
         return 'data:image/png;base64,' . base64_encode($png);
     }
 
+    private function tintFirmaB64(string $base64, int $r = 10, int $g = 26, int $b = 50): string {
+        if (!function_exists('imagecreatetruecolor')) return $base64;
+        if (!preg_match('/^data:(image\/\w+);base64,(.+)$/s', $base64, $m)) return $base64;
+        $src = imagecreatefromstring(base64_decode($m[2]));
+        if (!$src) return $base64;
+        imagepalettetotruecolor($src);
+        imagesavealpha($src, true);
+        $w = imagesx($src); $h = imagesy($src);
+        $dst = imagecreatetruecolor($w, $h);
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        $trans = imagecolorallocatealpha($dst, 0, 0, 0, 127);
+        imagefill($dst, 0, 0, $trans);
+        for ($px = 0; $px < $w; $px++) {
+            for ($py = 0; $py < $h; $py++) {
+                $c = imagecolorat($src, $px, $py);
+                $a = ($c >> 24) & 0x7F;
+                if ($a < 120) {
+                    imagesetpixel($dst, $px, $py, imagecolorallocatealpha($dst, $r, $g, $b, $a));
+                }
+            }
+        }
+        ob_start(); imagepng($dst); $png = ob_get_clean();
+        imagedestroy($src); imagedestroy($dst);
+        return 'data:image/png;base64,' . base64_encode($png);
+    }
+
     private function processPhotoBg(string $fotoPath): string {
         $script = dirname(__DIR__) . '/tools/remove_bg.py';
         if (!file_exists($script) || !file_exists($fotoPath)) return '';
@@ -2098,8 +2125,7 @@ HTML;
             $vigencia  = date('d/m/Y', strtotime('+3 years', $ts));
         }
 
-        // Nombre e info del director — igual que en DC3/certificados
-        $dirNombre = $esc($up(trim($p['instructor_nombre'] ?? '') ?: 'Ing. Jose Marcos Gonzalez Calderon'));
+        $dirNombre = 'ING. JOSE MARCOS GONZALEZ CALDERON';
         $dirTitulo = 'DIRECTOR GENERAL &middot; AVBA INSPECTIONS';
 
         // ── Assets (fondos a resolución original para calidad de impresión) ──
@@ -2107,15 +2133,9 @@ HTML;
         $reversoB64 = $this->assetB64('credencial_reverso.png');
         $logoB64    = $this->assetB64('logos/avba.png');
 
-        // Firma: igual que DC3 — instructor primero, fallback director
-        $instrFirmaPath = trim($p['instructor_firma_imagen'] ?? '');
-        $firmaB64 = '';
-        if ($instrFirmaPath && file_exists($instrFirmaPath)) {
-            $firmaB64 = $this->assetB64OrPath($instrFirmaPath);
-        }
-        if (!$firmaB64) {
-            $firmaB64 = $this->assetB64('logos/firma_director.png');
-        }
+        // Firma: director general siempre — tintada a azul oscuro (firma_director.png es tinta blanca)
+        $firmaB64 = $this->assetB64('logos/firma_director.png');
+        $firmaTintadaB64 = $firmaB64 ? $this->tintFirmaB64($firmaB64, 10, 26, 50) : '';
 
         // ── Foto: remoción de fondo, recorte proporcional (6:7), esquinas redondeadas ──
         $fotoB64 = '';
@@ -2128,8 +2148,8 @@ HTML;
             if (file_exists($fotoPath)) {
                 $bgRemoved = $this->processPhotoBg($fotoPath);
                 $raw       = $bgRemoved ?: $this->fotoBase64WithExif($fotoPath);
-                // Recortar proporcionalmente a 6:7 (30mm × 35mm) y redimensionar a 2× display
-                $fotoB64 = $this->cropAndResizeB64($raw, 30, 35, 226, 264, (bool)$bgRemoved);
+                // Recortar al marco exacto del anverso: 29.7×31.5mm → 224×238px (2×)
+                $fotoB64 = $this->cropAndResizeB64($raw, 29.7, 31.5, 224, 238, (bool)$bgRemoved);
             }
         }
 
@@ -2146,13 +2166,13 @@ HTML;
             ? "<img src=\"{$logoB64}\" style=\"width:9mm;height:auto;display:block;\">"
             : '';
 
-        $firmaHtml = $firmaB64
-            ? "<img src=\"{$firmaB64}\" style=\"width:26mm;height:11mm;display:block;margin:0 auto;\">"
+        $firmaHtml = ($firmaTintadaB64 ?: $firmaB64)
+            ? "<img src=\"" . ($firmaTintadaB64 ?: $firmaB64) . "\" style=\"width:28mm;height:12mm;display:block;margin:0 auto;\">"
             : '';
 
         // Foto con esquinas redondeadas horneadas en la imagen via GD
         $fotoHtml = $fotoB64
-            ? "<img src=\"{$this->addRoundedCorners($fotoB64, 20)}\" style=\"width:30mm;height:35mm;display:block;\">"
+            ? "<img src=\"{$this->addRoundedCorners($fotoB64, 18)}\" style=\"width:29.7mm;height:31.5mm;display:block;\">"
             : '';
 
         // QR con esquinas redondeadas
@@ -2162,19 +2182,19 @@ HTML;
 
         $anverso = <<<HTML
 <div style="position:absolute;left:0mm;top:0mm;width:86mm;height:133mm;">{$bgAnverso}</div>
-<div style="position:absolute;left:5mm;top:55mm;width:30mm;height:35mm;">{$fotoHtml}</div>
-<div style="position:absolute;left:28mm;top:86mm;width:8mm;">{$escudoHtml}</div>
-<div style="position:absolute;left:47mm;top:59mm;width:37mm;color:#ffffff;font-size:7.5pt;font-weight:bold;line-height:1.2;word-wrap:break-word;letter-spacing:0.4px;">{$nombre}</div>
-<div style="position:absolute;left:47mm;top:69mm;width:37mm;color:#c8e0f8;font-size:5.5pt;line-height:1.35;word-wrap:break-word;">{$cursoCompleto}</div>
-<div style="position:absolute;left:47mm;top:82mm;width:37mm;color:#c8e0f8;font-size:6.5pt;font-weight:bold;letter-spacing:0.4px;">{$fechaCert}</div>
-<div style="position:absolute;left:47mm;top:91mm;width:37mm;color:#96bce0;font-size:5.5pt;line-height:1.3;word-wrap:break-word;">{$empresa}</div>
-<div style="position:absolute;left:44mm;top:105mm;width:40mm;text-align:center;">
+<div style="position:absolute;left:6mm;top:55.9mm;width:29.7mm;height:31.5mm;">{$fotoHtml}</div>
+<div style="position:absolute;left:9mm;top:83.5mm;width:8mm;">{$escudoHtml}</div>
+<div style="position:absolute;left:47mm;top:52mm;width:37mm;text-align:right;color:#a8ccf0;font-size:5pt;font-weight:bold;letter-spacing:0.5px;">{$folio}</div>
+<div style="position:absolute;left:47mm;top:57.5mm;width:37mm;color:#ffffff;font-size:9pt;font-weight:bold;line-height:1.2;word-wrap:break-word;letter-spacing:0.3px;">{$nombre}</div>
+<div style="position:absolute;left:47mm;top:67mm;width:37mm;color:#c8e0f8;font-size:6pt;line-height:1.35;word-wrap:break-word;">{$cursoCompleto}</div>
+<div style="position:absolute;left:47mm;top:79mm;width:37mm;color:#c8e0f8;font-size:7pt;font-weight:bold;letter-spacing:0.4px;">{$fechaCert}</div>
+<div style="position:absolute;left:47mm;top:90mm;width:37mm;color:#96bce0;font-size:6pt;line-height:1.3;word-wrap:break-word;">{$empresa}</div>
+<div style="position:absolute;left:43mm;top:103mm;width:41mm;text-align:center;">
   {$firmaHtml}
-  <div style="font-size:5pt;font-weight:bold;color:#0c2340;margin-top:0.8mm;letter-spacing:0.3px;">{$dirNombre}</div>
-  <div style="font-size:3.8pt;color:#1a4060;margin-top:0.3mm;letter-spacing:0.2px;">{$dirTitulo}</div>
+  <div style="font-size:5.5pt;font-weight:bold;color:#0a1a32;margin-top:0.5mm;letter-spacing:0.2px;">{$dirNombre}</div>
+  <div style="font-size:4pt;color:#1a3050;margin-top:0.3mm;letter-spacing:0.2px;">{$dirTitulo}</div>
 </div>
-<div style="position:absolute;left:44mm;top:128mm;width:40mm;text-align:right;color:#ffffff;font-size:4pt;font-weight:bold;letter-spacing:0.3px;">{$folio}</div>
-<div style="position:absolute;left:44mm;top:131mm;width:40mm;text-align:right;color:#aaccee;font-size:3.5pt;letter-spacing:0.2px;">VIG: {$vigencia}</div>
+<div style="position:absolute;left:43mm;top:129mm;width:41mm;text-align:right;color:#aaccee;font-size:3.8pt;letter-spacing:0.2px;">VIG: {$vigencia}</div>
 HTML;
 
         $reverso = <<<HTML
