@@ -2149,8 +2149,8 @@ HTML;
             if (file_exists($fotoPath)) {
                 $bgRemoved = $this->processPhotoBg($fotoPath);
                 $raw       = $bgRemoved ?: $this->fotoBase64WithExif($fotoPath);
-                // Recortar al marco exacto del anverso: 29.7×31.5mm → 224×238px (2×)
-                $fotoB64 = $this->cropAndResizeB64($raw, 29.7, 31.5, 224, 238, (bool)$bgRemoved);
+                // Recortar proporcionalmente al marco: 29.7×35mm → 224×264px (2×)
+                $fotoB64 = $this->cropAndResizeB64($raw, 29.7, 35, 224, 264, (bool)$bgRemoved);
             }
         }
 
@@ -2173,7 +2173,7 @@ HTML;
 
         // Foto con esquinas redondeadas horneadas en la imagen via GD
         $fotoHtml = $fotoB64
-            ? "<img src=\"{$this->addRoundedCorners($fotoB64, 18)}\" style=\"width:29.7mm;height:31.5mm;display:block;\">"
+            ? "<img src=\"{$this->addRoundedCorners($fotoB64, 18)}\" style=\"width:29.7mm;height:35mm;display:block;\">"
             : '';
 
         // QR con esquinas redondeadas
@@ -2183,7 +2183,7 @@ HTML;
 
         $anverso = <<<HTML
 <div style="position:absolute;left:0mm;top:0mm;width:86mm;height:133mm;">{$bgAnverso}</div>
-<div style="position:absolute;left:6mm;top:55.9mm;width:29.7mm;height:31.5mm;">{$fotoHtml}</div>
+<div style="position:absolute;left:6mm;top:55.9mm;width:29.7mm;height:35mm;overflow:hidden;">{$fotoHtml}</div>
 <div style="position:absolute;left:9mm;top:83.5mm;width:8mm;">{$escudoHtml}</div>
 <div style="position:absolute;left:6mm;top:52mm;width:38mm;color:#a8ccf0;font-size:5.5pt;font-weight:bold;letter-spacing:0.4px;">{$folio}</div>
 <div style="position:absolute;left:47mm;top:57.5mm;width:37mm;color:#ffffff;font-size:9pt;font-weight:bold;line-height:1.2;word-wrap:break-word;letter-spacing:0.3px;">{$nombre}</div>
