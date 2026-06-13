@@ -1902,6 +1902,7 @@ HTML;
     }
 
     private function processPhotoBg(string $fotoPath): string {
+        if (!function_exists('shell_exec') || !function_exists('escapeshellarg')) return '';
         $script = dirname(__DIR__) . '/tools/remove_bg.py';
         if (!file_exists($script) || !file_exists($fotoPath)) return '';
         $cacheKey = md5($fotoPath . '|' . filemtime($fotoPath));
