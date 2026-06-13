@@ -1367,6 +1367,63 @@ class Personal {
         return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
     }
 
+    private function assetB64OrPath(string $path): string {
+        if (!file_exists($path)) return '';
+        $ext  = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $mime = match($ext) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'gif'         => 'image/gif',
+            default       => 'image/png',
+        };
+        return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($path));
+    }
+
+    /**
+     * Crop image to target ratio then resize to target px dimensions.
+     * Crops from top-center so face stays visible in portrait photos.
+     */
+    private function cropAndResizeB64(string $base64, float $wMm, float $hMm, int $dstW, int $dstH, bool $keepPng = false): string {
+        if (!function_exists('imagecreatetruecolor')) return $base64;
+        if (!preg_match('/^data:(image\/\w+);base64,(.+)$/s', $base64, $m)) return $base64;
+        $src = imagecreatefromstring(base64_decode($m[2]));
+        if (!$src) return $base64;
+
+        $sw = imagesx($src); $sh = imagesy($src);
+        $targetRatio = $wMm / $hMm;   // e.g. 30/35 = 0.857
+        $srcRatio    = $sw / $sh;
+
+        if ($srcRatio > $targetRatio) {
+            // Image too wide — crop sides
+            $cropH = $sh;
+            $cropW = (int)round($sh * $targetRatio);
+            $cropX = (int)round(($sw - $cropW) / 2);
+            $cropY = 0;
+        } else {
+            // Image too tall — crop bottom (keep top = face)
+            $cropW = $sw;
+            $cropH = (int)round($sw / $targetRatio);
+            $cropX = 0;
+            $cropY = 0;
+        }
+
+        $dst = imagecreatetruecolor($dstW, $dstH);
+        if ($keepPng) {
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+            imagefill($dst, 0, 0, imagecolorallocatealpha($dst, 0, 0, 0, 127));
+        }
+        imagecopyresampled($dst, $src, 0, 0, $cropX, $cropY, $dstW, $dstH, $cropW, $cropH);
+        imagedestroy($src);
+
+        ob_start();
+        if ($keepPng) { imagepng($dst, null, 6); }
+        else          { imagejpeg($dst, null, 85); }
+        $data = ob_get_clean();
+        imagedestroy($dst);
+
+        return 'data:' . ($keepPng ? 'image/png' : 'image/jpeg') . ';base64,' . base64_encode($data);
+    }
+
     private function htmlAPdf(string $html, string $folio, string $tipo, string $orientation = 'portrait'): string {
         $opts = new Options();
         $opts->set('isRemoteEnabled', false);
@@ -2020,10 +2077,17 @@ HTML;
         $up  = fn($s) => mb_strtoupper(trim((string)$s), 'UTF-8');
 
         // ── Datos ─────────────────────────────────────────────────────────
-        $nombre        = $esc($up($p['nombre_completo'] ?? ''));
-        $empresa       = $esc($up($p['empresa_nombre']  ?? ''));
-        $cursoCompleto = $esc($up($p['curso_nombre']     ?? ''));
-        $folio         = $esc($p['control']
+        $nombre = $esc($up($p['nombre_completo'] ?? ''));
+        $empresa = $esc($up($p['empresa_nombre'] ?? ''));
+
+        // Texto del curso igual que en los diplomas: texto_certificado con {capacidad}
+        $capVal    = ($p['capacidad_na'] ?? false) ? 'N/A' : trim($p['capacidad'] ?? '');
+        $tbase     = trim($p['texto_certificado'] ?? '');
+        $cursoCompleto = $esc($up($tbase
+            ? str_ireplace('{capacidad}', $capVal, $tbase)
+            : ($p['curso_nombre'] ?? '')));
+
+        $folio = $esc($p['control']
             ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'
             : 'PART-' . str_pad((string)($p['id'] ?? 0), 5, '0', STR_PAD_LEFT));
 
@@ -2034,14 +2098,26 @@ HTML;
             $vigencia  = date('d/m/Y', strtotime('+3 years', $ts));
         }
 
-        // ── Assets (redimensionados al tamaño de display para reducir HTML) ─
-        // Credencial: 86x133mm a 96dpi = 325x503px — no necesitamos más resolución
-        $anversoB64 = $this->resizeImageB64($this->assetB64('credencial_anverso.png'), 325, 503, true);
-        $reversoB64 = $this->resizeImageB64($this->assetB64('credencial_reverso.png'), 325, 503, true);
-        $logoB64    = $this->assetB64('logos/avba.png');    // pequeño, no redimensionar
-        $firmaB64   = $this->assetB64('logos/firma_director.png');
+        // Nombre e info del director — igual que en DC3/certificados
+        $dirNombre = $esc($up(trim($p['instructor_nombre'] ?? '') ?: 'Ing. Jose Marcos Gonzalez Calderon'));
+        $dirTitulo = 'DIRECTOR GENERAL &middot; AVBA INSPECTIONS';
 
-        // Foto con corrección EXIF y remoción de fondo (si rembg disponible)
+        // ── Assets (fondos a resolución original para calidad de impresión) ──
+        $anversoB64 = $this->assetB64('credencial_anverso.png');
+        $reversoB64 = $this->assetB64('credencial_reverso.png');
+        $logoB64    = $this->assetB64('logos/avba.png');
+
+        // Firma: igual que DC3 — instructor primero, fallback director
+        $instrFirmaPath = trim($p['instructor_firma_imagen'] ?? '');
+        $firmaB64 = '';
+        if ($instrFirmaPath && file_exists($instrFirmaPath)) {
+            $firmaB64 = $this->assetB64OrPath($instrFirmaPath);
+        }
+        if (!$firmaB64) {
+            $firmaB64 = $this->assetB64('logos/firma_director.png');
+        }
+
+        // ── Foto: remoción de fondo, recorte proporcional (6:7), esquinas redondeadas ──
         $fotoB64 = '';
         if (!empty($p['foto_persona_url'])) {
             $uploadUrl = defined('UPLOAD_URL') ? rtrim(UPLOAD_URL, '/') : '';
@@ -2052,12 +2128,12 @@ HTML;
             if (file_exists($fotoPath)) {
                 $bgRemoved = $this->processPhotoBg($fotoPath);
                 $raw       = $bgRemoved ?: $this->fotoBase64WithExif($fotoPath);
-                // Foto box es 30x35mm a 96dpi ≈ 113x132px — 2x para buena calidad = 226x264px
-                $fotoB64   = $this->resizeImageB64($raw, 226, 264, (bool)$bgRemoved);
+                // Recortar proporcionalmente a 6:7 (30mm × 35mm) y redimensionar a 2× display
+                $fotoB64 = $this->cropAndResizeB64($raw, 30, 35, 226, 264, (bool)$bgRemoved);
             }
         }
 
-        // ── Pre-computar fragmentos HTML (no se puede usar ternario dentro de heredoc) ──
+        // ── Fragmentos HTML ────────────────────────────────────────────────
         $bgAnverso = $anversoB64
             ? "<img src=\"{$anversoB64}\" style=\"width:86mm;height:133mm;display:block;\">"
             : "<div style=\"width:86mm;height:133mm;background:#051226;\"></div>";
@@ -2066,48 +2142,39 @@ HTML;
             ? "<img src=\"{$reversoB64}\" style=\"width:86mm;height:133mm;display:block;\">"
             : "<div style=\"width:86mm;height:133mm;background:#051226;\"></div>";
 
-        // Foto: width:100% only — altura proporcional, overflow:hidden recorta el exceso.
-        // Así una foto retrato (3:4 o más alta) se muestra desde arriba sin distorsión.
-        $fotoHtml = $fotoB64
-            ? "<img src=\"{$fotoB64}\" style=\"width:100%;display:block;\">"
-            : '';
-
-        // Escudo AVBA: logo pequeño en esquina inferior-derecha del recuadro de foto
         $escudoHtml = $logoB64
             ? "<img src=\"{$logoB64}\" style=\"width:9mm;height:auto;display:block;\">"
             : '';
 
         $firmaHtml = $firmaB64
-            ? "<img src=\"{$firmaB64}\" style=\"width:26mm;height:12mm;display:block;margin:0 auto;\">"
+            ? "<img src=\"{$firmaB64}\" style=\"width:26mm;height:11mm;display:block;margin:0 auto;\">"
             : '';
 
-        // QR con esquinas redondeadas aplicadas en la imagen (mPDF ignora border-radius en position:absolute)
-        $qrRounded = $qrB64 ? $this->addRoundedCorners($qrB64, 18) : '';
-        $qrHtml = $qrRounded
-            ? "<img src=\"{$qrRounded}\" style=\"width:27mm;height:25mm;display:block;\">"
+        // Foto con esquinas redondeadas horneadas en la imagen via GD
+        $fotoHtml = $fotoB64
+            ? "<img src=\"{$this->addRoundedCorners($fotoB64, 20)}\" style=\"width:30mm;height:35mm;display:block;\">"
             : '';
 
-        // Foto con esquinas redondeadas aplicadas en la imagen
-        $fotoRounded = $fotoB64 ? $this->addRoundedCorners($fotoB64, 22) : '';
-        $fotoHtml = $fotoRounded
-            ? "<img src=\"{$fotoRounded}\" style=\"width:100%;display:block;\">"
+        // QR con esquinas redondeadas
+        $qrHtml = $qrB64
+            ? "<img src=\"{$this->addRoundedCorners($qrB64, 18)}\" style=\"width:27mm;height:25mm;display:block;\">"
             : '';
 
         $anverso = <<<HTML
 <div style="position:absolute;left:0mm;top:0mm;width:86mm;height:133mm;">{$bgAnverso}</div>
-<div style="position:absolute;left:5mm;top:55mm;width:30mm;height:35mm;overflow:hidden;">{$fotoHtml}</div>
-<div style="position:absolute;left:27mm;top:87mm;width:9mm;opacity:0.9;">{$escudoHtml}</div>
-<div style="position:absolute;left:47mm;top:59mm;width:37mm;color:#ffffff;font-size:7.5pt;font-weight:bold;line-height:1.2;word-wrap:break-word;letter-spacing:0.3px;">{$nombre}</div>
-<div style="position:absolute;left:47mm;top:69mm;width:37mm;color:#c8e0f8;font-size:5.8pt;line-height:1.3;word-wrap:break-word;">{$cursoCompleto}</div>
-<div style="position:absolute;left:47mm;top:82mm;width:37mm;color:#c8e0f8;font-size:6.5pt;font-weight:bold;letter-spacing:0.3px;">{$fechaCert}</div>
+<div style="position:absolute;left:5mm;top:55mm;width:30mm;height:35mm;">{$fotoHtml}</div>
+<div style="position:absolute;left:28mm;top:86mm;width:8mm;">{$escudoHtml}</div>
+<div style="position:absolute;left:47mm;top:59mm;width:37mm;color:#ffffff;font-size:7.5pt;font-weight:bold;line-height:1.2;word-wrap:break-word;letter-spacing:0.4px;">{$nombre}</div>
+<div style="position:absolute;left:47mm;top:69mm;width:37mm;color:#c8e0f8;font-size:5.5pt;line-height:1.35;word-wrap:break-word;">{$cursoCompleto}</div>
+<div style="position:absolute;left:47mm;top:82mm;width:37mm;color:#c8e0f8;font-size:6.5pt;font-weight:bold;letter-spacing:0.4px;">{$fechaCert}</div>
 <div style="position:absolute;left:47mm;top:91mm;width:37mm;color:#96bce0;font-size:5.5pt;line-height:1.3;word-wrap:break-word;">{$empresa}</div>
-<div style="position:absolute;left:44mm;top:106mm;width:40mm;text-align:center;">
+<div style="position:absolute;left:44mm;top:105mm;width:40mm;text-align:center;">
   {$firmaHtml}
-  <div style="font-size:5pt;font-weight:bold;color:#0c2340;letter-spacing:0.3px;margin-top:0.5mm;">JOSE MARCOS GONZALEZ</div>
-  <div style="font-size:4pt;color:#1a4060;letter-spacing:0.2px;margin-top:0.3mm;">DIRECTOR GENERAL - AVBA INSPECTIONS</div>
+  <div style="font-size:5pt;font-weight:bold;color:#0c2340;margin-top:0.8mm;letter-spacing:0.3px;">{$dirNombre}</div>
+  <div style="font-size:3.8pt;color:#1a4060;margin-top:0.3mm;letter-spacing:0.2px;">{$dirTitulo}</div>
 </div>
-<div style="position:absolute;left:5mm;top:122mm;width:38mm;color:#ffffff;font-size:4pt;font-weight:bold;letter-spacing:0.2px;">FOLIO: {$folio}</div>
-<div style="position:absolute;left:5mm;top:125.5mm;width:38mm;color:#aaccee;font-size:3.5pt;letter-spacing:0.1px;">VIG: {$vigencia}</div>
+<div style="position:absolute;left:44mm;top:128mm;width:40mm;text-align:right;color:#ffffff;font-size:4pt;font-weight:bold;letter-spacing:0.3px;">{$folio}</div>
+<div style="position:absolute;left:44mm;top:131mm;width:40mm;text-align:right;color:#aaccee;font-size:3.5pt;letter-spacing:0.2px;">VIG: {$vigencia}</div>
 HTML;
 
         $reverso = <<<HTML
