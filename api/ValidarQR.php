@@ -136,10 +136,12 @@ class ValidarQR {
     // ── Personal / Capacitación ────────────────────────────
     private function buscarPersonal(string $q, bool $esFolio): ?array {
         try {
+            $cols = "p.nombre_completo, p.curp, p.empresa_nombre, p.fecha_curso, p.estatus,
+                     p.capacidad, p.capacidad_na,
+                     c.nombre AS curso_nombre, COALESCE(c.texto_certificado,'') AS texto_certificado";
             if ($esFolio) {
                 $stmt = $this->pdo->prepare(
-                    "SELECT p.nombre_completo, p.curp, p.empresa_nombre, p.fecha_curso,
-                            c.nombre AS curso_nombre, p.estatus
+                    "SELECT {$cols}
                      FROM participantes_cursos p
                      LEFT JOIN cursos c ON c.id = p.curso_id
                      WHERE p.control = ? AND p.estatus IN ('APROBADO_CALIDAD','EMITIDO') LIMIT 1"
@@ -147,8 +149,7 @@ class ValidarQR {
                 $stmt->execute([$q]);
             } else {
                 $stmt = $this->pdo->prepare(
-                    "SELECT p.nombre_completo, p.curp, p.empresa_nombre, p.fecha_curso,
-                            c.nombre AS curso_nombre, p.estatus
+                    "SELECT {$cols}
                      FROM participantes_cursos p
                      LEFT JOIN cursos c ON c.id = p.curso_id
                      WHERE p.qr_codigo = ? AND p.estatus IN ('APROBADO_CALIDAD','EMITIDO') LIMIT 1"
@@ -157,6 +158,12 @@ class ValidarQR {
             }
             $row = $stmt->fetch();
             if (!$row) return null;
+
+            $capVal = $row['capacidad_na'] ? 'N/A' : trim($row['capacidad'] ?? '');
+            $tbase  = trim($row['texto_certificado'] ?? '');
+            $curso  = $tbase
+                ? mb_strtoupper(str_ireplace('{capacidad}', $capVal, $tbase), 'UTF-8')
+                : mb_strtoupper(trim($row['curso_nombre'] ?? ''), 'UTF-8');
 
             $v = calcularVigencia($row['fecha_curso']);
             return [
@@ -169,7 +176,7 @@ class ValidarQR {
                     'titulo'      => 'Constancia de Capacitación',
                     'nombre'      => $row['nombre_completo'],
                     'curp'        => $row['curp'],
-                    'curso'       => $row['curso_nombre'] ?? '—',
+                    'curso'       => $curso ?: '—',
                     'fecha'       => $row['fecha_curso']
                         ? (new DateTime($row['fecha_curso']))->format('d/m/Y') : '',
                     'vencimiento' => $v['vencimiento'],
