@@ -433,6 +433,172 @@ addCert($pdo,$id,'Certificación de Accesorios de Izaje — Lote B','AB.2025-ACC
 addCert($pdo,$id,'Recertificación de Polipastos','AB.2024-POL-003','2024-09-01',dateAdd($today,'+18 days'),'⚠️ Por vencer pronto');
 echo "✅ Accesorios de Izaje\n";
 
+// ══════════════════════════════════════════════════════════════════════════
+// 3. PERSONAL DEMO
+// ══════════════════════════════════════════════════════════════════════════
+
+// Ensure tables
+$pdo->exec("
+    CREATE TABLE IF NOT EXISTS cliente_personal (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      id_cliente VARCHAR(20) NOT NULL,
+      nombre VARCHAR(200) NOT NULL,
+      puesto VARCHAR(100),
+      departamento VARCHAR(100),
+      numero_empleado VARCHAR(50),
+      fecha_ingreso DATE,
+      telefono VARCHAR(30),
+      notas TEXT,
+      estado VARCHAR(30) NOT NULL DEFAULT 'Activo',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+$pdo->exec("
+    CREATE TABLE IF NOT EXISTS cliente_personal_cert (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      personal_id INT NOT NULL,
+      tipo_cert VARCHAR(150) NOT NULL,
+      folio VARCHAR(100),
+      entidad VARCHAR(150),
+      fecha_emision DATE,
+      fecha_vigencia DATE,
+      archivo_url VARCHAR(500),
+      notas TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+$pdo->exec("
+    CREATE TABLE IF NOT EXISTS cliente_personal_docs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      personal_id INT NOT NULL,
+      tipo_doc VARCHAR(50) NOT NULL DEFAULT 'otro',
+      nombre VARCHAR(200) NOT NULL,
+      archivo_url VARCHAR(500),
+      vigencia DATE,
+      notas TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+echo "✅ Tablas de personal verificadas\n";
+
+// Limpiar personal previo
+$pdo->exec("
+    DELETE cpd FROM cliente_personal_docs cpd
+    JOIN cliente_personal cp ON cp.id = cpd.personal_id
+    WHERE cp.id_cliente = '$demoIdCli'
+");
+$pdo->exec("
+    DELETE cpc FROM cliente_personal_cert cpc
+    JOIN cliente_personal cp ON cp.id = cpc.personal_id
+    WHERE cp.id_cliente = '$demoIdCli'
+");
+$pdo->exec("DELETE FROM cliente_personal WHERE id_cliente = '$demoIdCli'");
+echo "✅ Personal previo eliminado\n\n";
+
+// ── Helpers Personal ─────────────────────────────────────────────────────
+function addPers(PDO $pdo, string $idCli, string $nombre, string $puesto, string $dpto, string $numEmp, string $ingreso, string $tel, string $notas, string $estado = 'Activo'): int {
+    $pdo->prepare("
+        INSERT INTO cliente_personal (id_cliente,nombre,puesto,departamento,numero_empleado,fecha_ingreso,telefono,notas,estado)
+        VALUES (?,?,?,?,?,?,?,?,?)
+    ")->execute([$idCli, $nombre, $puesto, $dpto, $numEmp, $ingreso, $tel, $notas, $estado]);
+    return (int)$pdo->lastInsertId();
+}
+function addPCert(PDO $pdo, int $pid, string $tipo, string $folio, string $entidad, string $emision, string $vigencia, string $notas = ''): void {
+    $pdo->prepare("INSERT INTO cliente_personal_cert (personal_id,tipo_cert,folio,entidad,fecha_emision,fecha_vigencia,notas) VALUES (?,?,?,?,?,?,?)")
+        ->execute([$pid, $tipo, $folio, $entidad, $emision ?: null, $vigencia ?: null, $notas]);
+}
+function addPDoc(PDO $pdo, int $pid, string $tipo, string $nombre, ?string $vigencia, string $notas = ''): void {
+    $pdo->prepare("INSERT INTO cliente_personal_docs (personal_id,tipo_doc,nombre,vigencia,notas) VALUES (?,?,?,?,?)")
+        ->execute([$pid, $tipo, $nombre, $vigencia ?: null, $notas]);
+}
+
+echo "=== CREANDO PERSONAL ===\n";
+
+// 1. Operador de Grúa Torre — certificaciones vigentes
+$id = addPers($pdo,$demoIdCli,'Carlos Ramírez Fuentes','Operador de Grúa Torre','Operaciones','EMP-001','2019-03-15','55 1234 5001','Operador Sr. con 7 años de exp.');
+addPCert($pdo,$id,'Operador de Grúa Torre — NOM-006-STPS','AB.2025-OGT-001','AVBA Certificaciones','2025-01-10',dateAdd($today,'+7 months'),'Grúa Torre >100t');
+addPCert($pdo,$id,'Manejo Seguro de Cargas','AB.2024-MSC-022','AVBA Certificaciones','2024-06-20',dateAdd($today,'+2 months'),'');
+addPCert($pdo,$id,'Seguridad en Alturas','STPS-2024-SA-089','STPS','2024-09-01',dateAdd($today,'+3 months'),'Nivel III');
+addPDoc($pdo,$id,'licencia','Licencia Federal de Grúas Cat. G',dateAdd($today,'+14 months'),'Tipo G — Vigente');
+addPDoc($pdo,$id,'antidoping','Antidoping negativo — 2025',dateAdd($today,'+6 months'),'Lab. Médico Central');
+addPDoc($pdo,$id,'medico','Examen médico ocupacional',dateAdd($today,'+4 months'),'Apto para trabajos en altura');
+echo "✅ Carlos Ramírez (Operador Grúa Torre)\n";
+
+// 2. Operador de Grúa Móvil — cert por vencer
+$id = addPers($pdo,$demoIdCli,'Miguel Ángel Torres López','Operador de Grúa Móvil','Operaciones','EMP-002','2020-07-01','55 1234 5002','Operador de grúa all-terrain');
+addPCert($pdo,$id,'Operador de Grúa Móvil — NOM-006-STPS','AB.2025-OGM-004','AVBA Certificaciones','2025-02-15',dateAdd($today,'+25 days'),'⚠️ Renovar pronto');
+addPCert($pdo,$id,'Señalero de Grúa','AB.2025-SG-009','AVBA Certificaciones','2025-01-20',dateAdd($today,'+6 months'),'');
+addPCert($pdo,$id,'Primeros Auxilios','IMSS-2024-PA-112','IMSS','2024-05-10',dateAdd($today,'+5 months'),'');
+addPDoc($pdo,$id,'licencia','Licencia Federal Cat. G',dateAdd($today,'+8 months'),'');
+addPDoc($pdo,$id,'antidoping','Antidoping 2025',dateAdd($today,'+4 months'),'');
+echo "✅ Miguel Torres (Operador Grúa Móvil)\n";
+
+// 3. Rigger / Aparejador — certs por vencer próximas
+$id = addPers($pdo,$demoIdCli,'José Luis Hernández Cruz','Rigger / Aparejador','Operaciones','EMP-003','2018-11-05','55 1234 5003','');
+addPCert($pdo,$id,'Rigger Nivel II — ASME B30.9','AB.2024-RIG-018','AVBA Certificaciones','2024-12-01',dateAdd($today,'+18 days'),'Renovar antes del vencimiento');
+addPCert($pdo,$id,'Inspección de Accesorios de Izaje','AB.2025-IAI-033','AVBA Certificaciones','2025-03-01',dateAdd($today,'+9 months'),'');
+addPDoc($pdo,$id,'antidoping','Antidoping 2025',dateAdd($today,'+3 months'),'');
+addPDoc($pdo,$id,'medico','Examen médico pre-empleo',null,'Sin vigencia definida');
+echo "✅ José Hernández (Rigger)\n";
+
+// 4. Inspector de Seguridad — todo vigente
+$id = addPers($pdo,$demoIdCli,'Fernanda Gómez Villanueva','Inspector HSE','Seguridad','EMP-004','2021-04-12','55 1234 5004','Coordinadora HSE en obra');
+addPCert($pdo,$id,'Coordinador de Seguridad IMSS','IMSS-2025-CSO-077','IMSS','2025-01-05',dateAdd($today,'+11 months'),'');
+addPCert($pdo,$id,'NOM-031-STPS: Construcción','STPS-2024-031-112','STPS','2024-08-20',dateAdd($today,'+8 months'),'');
+addPCert($pdo,$id,'Auditor Interno ISO 45001','DNV-2024-AI-003','DNV GL','2024-10-10',dateAdd($today,'+10 months'),'');
+addPDoc($pdo,$id,'licencia','Cédula profesional Ing. Industrial',null,'Sin vigencia');
+addPDoc($pdo,$id,'medico','Examen médico anual',dateAdd($today,'+6 months'),'Apta');
+addPDoc($pdo,$id,'constancia','Constancia STPS NOM-035',dateAdd($today,'+12 months'),'');
+echo "✅ Fernanda Gómez (Inspector HSE)\n";
+
+// 5. Técnico de Mantenimiento
+$id = addPers($pdo,$demoIdCli,'Roberto Díaz Morales','Técnico Mecánico','Mantenimiento','EMP-005','2022-01-18','55 1234 5005','Especialista en grúas y montacargas');
+addPCert($pdo,$id,'Mantenimiento de Grúas Industriales','AVBA-2025-MTG-011','AVBA Certificaciones','2025-02-01',dateAdd($today,'+8 months'),'');
+addPCert($pdo,$id,'Electricidad Industrial Básica','INA-2024-EIB-234','INEA','2024-07-15',dateAdd($today,'+7 months'),'');
+addPDoc($pdo,$id,'antidoping','Antidoping anual',dateAdd($today,'+3 months'),'');
+addPDoc($pdo,$id,'constancia','Constancia capacitación mantenimiento preventivo',dateAdd($today,'+12 months'),'');
+echo "✅ Roberto Díaz (Técnico Mantenimiento)\n";
+
+// 6. Supervisor de Operaciones
+$id = addPers($pdo,$demoIdCli,'Laura Sánchez Pedraza','Supervisora de Operaciones','Operaciones','EMP-006','2017-06-08','55 1234 5006','9 años de experiencia en izaje');
+addPCert($pdo,$id,'Planificación de Izajes Complejos','AB.2025-PIC-002','AVBA Certificaciones','2025-01-25',dateAdd($today,'+9 months'),'Izajes críticos >100t');
+addPCert($pdo,$id,'Supervisor de Obra STPS','STPS-2024-SUP-033','STPS','2024-11-01',dateAdd($today,'+11 months'),'');
+addPCert($pdo,$id,'Manejo de Materiales Peligrosos','PEMEX-2024-MMP-007','PEMEX Capacitación','2024-08-10',dateAdd($today,'+2 months'),'Clase C y D');
+addPDoc($pdo,$id,'licencia','Licencia de conducir Tipo C',dateAdd($today,'+20 months'),'');
+addPDoc($pdo,$id,'medico','Examen médico anual',dateAdd($today,'+2 months'),'⚠️ Por renovar');
+echo "✅ Laura Sánchez (Supervisora Operaciones)\n";
+
+// 7. Operador de Montacargas — cert VENCIDA
+$id = addPers($pdo,$demoIdCli,'Ernesto Vega Castillo','Operador de Montacargas','Operaciones','EMP-007','2023-03-20','55 1234 5007','');
+addPCert($pdo,$id,'Operador de Montacargas — NOM-006','AB.2023-OMC-007','AVBA Certificaciones','2023-09-15',dateAdd($today,'-2 months'),'⚠️ VENCIDA — requiere renovación urgente');
+addPCert($pdo,$id,'Primeros Auxilios Básico','IMSS-2024-PAB-045','IMSS','2024-03-10',dateAdd($today,'+4 months'),'');
+addPDoc($pdo,$id,'antidoping','Antidoping 2024',dateAdd($today,'+2 months'),'');
+echo "✅ Ernesto Vega (Operador Montacargas — cert vencida)\n";
+
+// 8. Ingeniero de Proyectos
+$id = addPers($pdo,$demoIdCli,'Alejandro Moreno Ruiz','Ingeniero de Proyectos','Ingeniería','EMP-008','2020-09-01','55 1234 5008','Diseño de maniobras de izaje');
+addPCert($pdo,$id,'Diseño de Maniobras de Izaje','AB.2025-DMI-003','AVBA Certificaciones','2025-02-20',dateAdd($today,'+14 months'),'');
+addPCert($pdo,$id,'AutoCAD Avanzado',null,'Autodesk','2024-04-01',null,'Sin vigencia');
+addPCert($pdo,$id,'Cálculo Estructural AISC','AISC-2024-CE-018','AISC','2024-06-15',dateAdd($today,'+6 months'),'');
+addPDoc($pdo,$id,'licencia','Cédula profesional Ing. Civil',null,'Sin vigencia');
+addPDoc($pdo,$id,'constancia','Certificación BIM Nivel 2',null,'Sin vigencia');
+echo "✅ Alejandro Moreno (Ingeniero Proyectos)\n";
+
+// 9. Chofer de Camión Grúa
+$id = addPers($pdo,$demoIdCli,'Héctor Ramírez Soto','Operador de Camión Grúa','Operaciones','EMP-009','2021-11-10','55 1234 5009','');
+addPCert($pdo,$id,'Operador Camión Grúa Articulado','AB.2024-CGA-015','AVBA Certificaciones','2024-10-20',dateAdd($today,'+4 months'),'');
+addPCert($pdo,$id,'Manejo Defensivo Avanzado','ALD-2024-MDA-003','Aldetrans','2024-05-01',dateAdd($today,'+5 months'),'');
+addPDoc($pdo,$id,'licencia','Licencia federal tipo E',dateAdd($today,'+18 months'),'Vigente');
+addPDoc($pdo,$id,'antidoping','Antidoping semestral',dateAdd($today,'+2 months'),'');
+addPDoc($pdo,$id,'medico','Examen médico SCTS',dateAdd($today,'+9 months'),'Apto');
+echo "✅ Héctor Ramírez (Chofer Camión Grúa)\n";
+
+// 10. Coordinador HSE — BAJA
+$id = addPers($pdo,$demoIdCli,'Patricia Flores Mendoza','Coordinadora HSE','Seguridad','EMP-010','2016-02-14','55 1234 5010','Baja por renuncia — 15/05/2025','Baja');
+addPCert($pdo,$id,'Coordinador HSE Nivel Senior','AB.2024-HSE-001','AVBA Certificaciones','2024-01-10',dateAdd($today,'+1 month'),'Empleada de baja');
+addPDoc($pdo,$id,'constancia','Carta de recomendación',null,'');
+echo "✅ Patricia Flores (HSE — Baja)\n";
+
 echo "\n=== RESUMEN FINAL ===\n";
 echo "Usuario: $demoUsuario\n";
 echo "Contraseña: Demo2025!\n";
@@ -441,9 +607,13 @@ $totalEq = $pdo->query("SELECT COUNT(*) FROM cliente_equipos WHERE id_cliente='$
 $totalDocs = $pdo->query("SELECT COUNT(*) FROM cliente_equipos_docs d JOIN cliente_equipos e ON e.id=d.equipo_id WHERE e.id_cliente='$demoIdCli'")->fetchColumn();
 $totalCerts = $pdo->query("SELECT COUNT(*) FROM cliente_equipos_cert c JOIN cliente_equipos e ON e.id=c.equipo_id WHERE e.id_cliente='$demoIdCli'")->fetchColumn();
 $totalHoras = $pdo->query("SELECT COUNT(*) FROM cliente_equipos_horometro h JOIN cliente_equipos e ON e.id=h.equipo_id WHERE e.id_cliente='$demoIdCli'")->fetchColumn();
+$totalPer  = $pdo->query("SELECT COUNT(*) FROM cliente_personal WHERE id_cliente='$demoIdCli'")->fetchColumn();
+$totalPC   = $pdo->query("SELECT COUNT(*) FROM cliente_personal_cert pc JOIN cliente_personal p ON p.id=pc.personal_id WHERE p.id_cliente='$demoIdCli'")->fetchColumn();
 echo "Equipos: $totalEq\n";
-echo "Documentos: $totalDocs\n";
-echo "Certificaciones: $totalCerts\n";
+echo "Documentos (equipos): $totalDocs\n";
+echo "Certificaciones (equipos): $totalCerts\n";
 echo "Registros horómetro: $totalHoras\n";
+echo "Personal: $totalPer\n";
+echo "Certificaciones (personal): $totalPC\n";
 echo "\n✅ Seeder completado exitosamente.\n";
 echo "⚠️  ELIMINA setup_demo.php del servidor después de ejecutarlo.\n";

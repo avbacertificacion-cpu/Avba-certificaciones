@@ -256,6 +256,85 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 /* Toast */
 .toast-eq{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 22px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;white-space:nowrap;}
 .toast-eq.show{opacity:1;}
+
+/* ══ Scrollable tabs ══════════════════════════════════════════ */
+.tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
+.tab-btn{white-space:nowrap;}
+
+/* ══ Fleet Health Score Widget ════════════════════════════════ */
+.eq-dash-top{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:start;margin-bottom:16px;}
+@media(max-width:720px){.eq-dash-top{grid-template-columns:1fr;}}
+.fhs-card{background:var(--blanco);border-radius:16px;border:1px solid rgba(0,0,0,.05);box-shadow:0 4px 20px rgba(0,0,0,.06);padding:18px 20px;display:flex;align-items:center;gap:14px;min-width:250px;}
+.fhs-gauge-wrap{position:relative;flex-shrink:0;width:108px;height:108px;}
+.fhs-overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;}
+.fhs-score-n{font-size:26px;font-weight:900;line-height:1;}
+.fhs-score-l{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--texto-hint);margin-top:1px;}
+.fhs-title{font-size:12px;font-weight:800;color:var(--texto);margin-bottom:8px;}
+.fhs-legend-row{display:flex;align-items:center;gap:6px;font-size:11px;margin-bottom:4px;color:var(--texto-sub);}
+.fhs-leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.fhs-leg-n{font-weight:700;color:var(--texto);margin-left:auto;padding-left:8px;}
+.eq-dash-top .eq-kpi-row{grid-template-columns:repeat(2,1fr)!important;}
+
+/* ══ Alert variants ════════════════════════════════════════════ */
+.eq-alert-caution{background:linear-gradient(135deg,#78350f,#b45309);}
+.eq-alert-info{background:linear-gradient(135deg,#1e3a5f,#1d4ed8);}
+
+/* ══ Status distribution bar ══════════════════════════════════ */
+.eq-stacked-card{background:var(--blanco);border-radius:14px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 12px rgba(0,0,0,.04);padding:14px 18px;margin-bottom:18px;}
+.eq-stacked-ttl{font-size:11px;font-weight:800;color:var(--texto-hint);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;}
+.eq-stacked-bar{display:flex;height:18px;border-radius:6px;overflow:hidden;margin-bottom:10px;gap:2px;}
+.eq-st-seg{display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:rgba(255,255,255,.95);overflow:hidden;white-space:nowrap;min-width:0;transition:flex .6s ease;}
+.eq-st-seg:first-child{border-radius:6px 0 0 6px;}.eq-st-seg:last-child{border-radius:0 6px 6px 0;}
+.eq-stacked-leg{display:flex;gap:16px;flex-wrap:wrap;}
+.eq-stl-item{display:flex;align-items:center;gap:5px;font-size:11px;}
+.eq-stl-dot{width:8px;height:8px;border-radius:50%;}
+.eq-stl-n{font-weight:700;color:var(--texto);}
+.eq-stl-lbl{color:var(--texto-sub);}
+
+/* ══ 3-column charts ══════════════════════════════════════════ */
+.eq-charts-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px;}
+@media(max-width:960px){.eq-charts-3{grid-template-columns:1fr 1fr;}}
+@media(max-width:600px){.eq-charts-3{grid-template-columns:1fr;}}
+
+/* ══ Upcoming expirations ══════════════════════════════════════ */
+.eq-upcoming-card{background:var(--blanco);border-radius:14px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 12px rgba(0,0,0,.04);padding:16px 18px;margin-bottom:18px;}
+.eq-upc-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.eq-upc-ttl{font-size:13px;font-weight:800;color:var(--texto);}
+.eq-upc-badge{font-size:11px;padding:3px 10px;border-radius:20px;font-weight:700;}
+.upc-red{background:#fee2e2;color:#991b1b;}.upc-amber{background:#fef3c7;color:#92400e;}.upc-green{background:#dcfce7;color:#166534;}
+.eq-upc-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;margin-bottom:4px;transition:background .1s;}
+.eq-upc-item:hover{background:var(--gris-bg);}
+.eq-upc-days{min-width:50px;padding:5px 4px;border-radius:7px;text-align:center;font-size:11px;font-weight:800;flex-shrink:0;line-height:1.2;}
+.ud-crit{background:#fee2e2;color:#991b1b;}.ud-warn{background:#fef3c7;color:#92400e;}.ud-soon{background:#dbeafe;color:#1e40af;}.ud-ok{background:#dcfce7;color:#166534;}
+.eq-upc-info{flex:1;min-width:0;}
+.eq-upc-name{font-size:12px;font-weight:700;color:var(--texto);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.eq-upc-eq{font-size:10px;color:var(--texto-hint);margin-top:2px;}
+.eq-upc-tag{font-size:9px;color:var(--texto-sub);background:var(--gris-bg);padding:2px 6px;border-radius:4px;flex-shrink:0;}
+
+/* ══ Filter bar ══════════════════════════════════════════════ */
+.eq-filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px;padding:12px 14px;background:var(--blanco);border-radius:12px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 8px rgba(0,0,0,.03);}
+.eq-filter-input{flex:1;min-width:170px;padding:8px 12px;border-radius:8px;border:1.5px solid var(--borde);font-size:13px;color:var(--texto);background:var(--gris-bg);}
+.eq-filter-input:focus{outline:none;border-color:var(--azul);background:var(--blanco);}
+.eq-filter-sel{padding:8px 10px;border-radius:8px;border:1.5px solid var(--borde);font-size:12px;color:var(--texto);background:var(--gris-bg);cursor:pointer;}
+.eq-filter-sel:focus{outline:none;border-color:var(--azul);}
+.eq-filter-count{font-size:11px;color:var(--texto-hint);white-space:nowrap;}
+
+/* ══ Personal dept/role gradients ════════════════════════════ */
+.pd-operaciones{background:linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%);}
+.pd-mantenimiento{background:linear-gradient(135deg,#7c2d12 0%,#ea580c 100%);}
+.pd-administracion{background:linear-gradient(135deg,#4c1d95 0%,#7c3aed 100%);}
+.pd-seguridad{background:linear-gradient(135deg,#7f1d1d 0%,#dc2626 100%);}
+.pd-ingenieria{background:linear-gradient(135deg,#064e3b 0%,#059669 100%);}
+.pd-rrhh{background:linear-gradient(135deg,#831843 0%,#db2777 100%);}
+.pd-otro{background:linear-gradient(135deg,#1f2937 0%,#4b5563 100%);}
+
+/* ══ Personal status badges (on dark) ════════════════════════ */
+.psb-activo{background:rgba(134,239,172,.2);color:#86efac;border:1px solid rgba(134,239,172,.3);}
+.psb-baja{background:rgba(252,165,165,.2);color:#fca5a5;border:1px solid rgba(252,165,165,.3);}
+.psb-licencia{background:rgba(252,211,77,.2);color:#fde68a;border:1px solid rgba(252,211,77,.3);}
+
+/* ══ Print ═══════════════════════════════════════════════════ */
+@media print{.header,.tabs,.stats,.eq-filters,.btn-prim,.btn-sec,.btn-del,.eq-bc-btn,.eq-upcoming-card,.fhs-card,.eq-stacked-card,.eq-charts-3,.toast-eq{display:none!important}.wrap{padding:0;max-width:100%;margin:0}.eq-cn{break-inside:avoid;margin-bottom:12px}}
 </style>
 </head>
 <body>
@@ -286,6 +365,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
     <button class="tab-btn" onclick="verTab('per',this)">👷 Personal</button>
     <button class="tab-btn" onclick="verTab('pnd',this)">🔬 PND</button>
     <button class="tab-btn" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos</button>
+    <button class="tab-btn" onclick="verTab('personal-cli',this);cargarPersonalCli()">👥 Mi Personal</button>
   </div>
 
   <div id="tab-maq" class="tab-panel active">
@@ -310,42 +390,92 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 
     <!-- Dashboard -->
     <div id="eq-dashboard">
-      <div class="eq-kpi-row">
-        <div class="eq-kpi">
-          <div class="eq-kpi-ic" style="background:#dbeafe;color:#1d4ed8">🏗</div>
-          <div><div class="eq-kpi-n" id="eq-s-total">—</div><div class="eq-kpi-l">Equipos</div></div>
+      <div class="eq-dash-top">
+        <!-- Fleet Health Score -->
+        <div class="fhs-card" id="eq-fhs-card" style="display:none">
+          <div class="fhs-gauge-wrap">
+            <svg viewBox="0 0 108 108" width="108" height="108">
+              <circle cx="54" cy="54" r="43" fill="none" stroke="#e5e7eb" stroke-width="9"/>
+              <circle id="eq-fhs-ring" cx="54" cy="54" r="43" fill="none" stroke="#22c55e" stroke-width="9"
+                stroke-dasharray="270" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 54 54)"
+                style="transition:stroke-dashoffset 1.3s ease,stroke 1.3s ease"/>
+            </svg>
+            <div class="fhs-overlay">
+              <div class="fhs-score-n" id="eq-fhs-n" style="color:#22c55e">—</div>
+              <div class="fhs-score-l">SALUD</div>
+            </div>
+          </div>
+          <div>
+            <div class="fhs-title">Salud de Flota</div>
+            <div id="eq-fhs-legend"></div>
+          </div>
         </div>
-        <div class="eq-kpi">
-          <div class="eq-kpi-ic" style="background:#dcfce7;color:#15803d">✔</div>
-          <div><div class="eq-kpi-n" id="eq-s-vig" style="color:var(--verde)">—</div><div class="eq-kpi-l">Certs. vigentes</div></div>
-        </div>
-        <div class="eq-kpi">
-          <div class="eq-kpi-ic" style="background:#fef3c7;color:#92400e">⏰</div>
-          <div><div class="eq-kpi-n" id="eq-s-vcr" style="color:var(--ambar)">—</div><div class="eq-kpi-l">Por vencer</div></div>
-        </div>
-        <div class="eq-kpi">
-          <div class="eq-kpi-ic" style="background:#fee2e2;color:#991b1b">⚠</div>
-          <div><div class="eq-kpi-n" id="eq-s-vcd" style="color:var(--rojo)">—</div><div class="eq-kpi-l">Vencidas</div></div>
+        <!-- KPIs -->
+        <div class="eq-kpi-row">
+          <div class="eq-kpi">
+            <div class="eq-kpi-ic" style="background:#dbeafe;color:#1d4ed8">🏗</div>
+            <div><div class="eq-kpi-n" id="eq-s-total">—</div><div class="eq-kpi-l">Equipos</div></div>
+          </div>
+          <div class="eq-kpi">
+            <div class="eq-kpi-ic" style="background:#dcfce7;color:#15803d">✔</div>
+            <div><div class="eq-kpi-n" id="eq-s-vig" style="color:var(--verde)">—</div><div class="eq-kpi-l">Certs. vigentes</div></div>
+          </div>
+          <div class="eq-kpi">
+            <div class="eq-kpi-ic" style="background:#fef3c7;color:#92400e">⏰</div>
+            <div><div class="eq-kpi-n" id="eq-s-vcr" style="color:var(--ambar)">—</div><div class="eq-kpi-l">Por vencer</div></div>
+          </div>
+          <div class="eq-kpi">
+            <div class="eq-kpi-ic" style="background:#fee2e2;color:#991b1b">⚠</div>
+            <div><div class="eq-kpi-n" id="eq-s-vcd" style="color:var(--rojo)">—</div><div class="eq-kpi-l">Vencidas</div></div>
+          </div>
         </div>
       </div>
       <div id="eq-alertas"></div>
-      <div class="eq-charts">
+      <div id="eq-status-dist"></div>
+      <div class="eq-charts-3">
         <div class="eq-chart-card">
-          <div class="eq-chart-title">Estado de certificaciones</div>
+          <div class="eq-chart-title">Estado de Certificaciones</div>
           <div class="eq-chart-inner"><canvas id="chart-certs"></canvas></div>
         </div>
         <div class="eq-chart-card">
-          <div class="eq-chart-title">Horómetro por equipo (hrs actuales)</div>
+          <div class="eq-chart-title">Tipos de Equipo</div>
+          <div class="eq-chart-inner"><canvas id="chart-tipos"></canvas></div>
+        </div>
+        <div class="eq-chart-card">
+          <div class="eq-chart-title">Horómetro (hrs máx.)</div>
           <div class="eq-chart-inner"><canvas id="chart-horas"></canvas></div>
         </div>
       </div>
+      <div id="eq-upcoming"></div>
     </div>
 
     <!-- Lista de equipos -->
     <div id="eq-lista-view">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-        <div style="font-size:16px;font-weight:800;color:var(--texto)">Mis Equipos</div>
-        <button class="btn-prim" onclick="abrirModalEq(null)">+ Nuevo equipo</button>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:16px;font-weight:800;color:var(--texto)">Mis Equipos</div>
+          <div style="font-size:11px;color:var(--texto-hint);margin-top:2px" id="eq-list-count"></div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-sec" onclick="window.print()" style="font-size:12px">🖨 Imprimir</button>
+          <button class="btn-prim" onclick="abrirModalEq(null)">+ Nuevo equipo</button>
+        </div>
+      </div>
+      <div class="eq-filters">
+        <input class="eq-filter-input" id="eq-search" placeholder="🔍 Buscar nombre, marca, modelo, serie..." oninput="aplicarFiltrosEq()">
+        <select class="eq-filter-sel" id="eq-filter-tipo" onchange="aplicarFiltrosEq()">
+          <option value="">Todos los tipos</option>
+          <option>Grúa Torre</option><option>Grúa Móvil</option><option>Grúa Viajera</option>
+          <option>Grúa Puente</option><option>Montacargas</option><option>Camión</option>
+          <option>Camioneta</option><option>Retroexcavadora</option>
+          <option>PTEM</option><option>MEWP</option><option>Accesorio de Izaje</option><option>Otro</option>
+        </select>
+        <select class="eq-filter-sel" id="eq-filter-estado" onchange="aplicarFiltrosEq()">
+          <option value="">Todos los estados</option>
+          <option>Activo</option><option>Mantenimiento</option>
+          <option>Inspección</option><option>Fuera de servicio</option>
+        </select>
+        <span class="eq-filter-count" id="eq-filter-count"></span>
       </div>
       <div id="eq-cont"><div class="loading"><span class="spin"></span></div></div>
     </div>
@@ -364,6 +494,111 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
       <div id="eq-sub-docs"></div>
       <div id="eq-sub-horas"  style="display:none"></div>
       <div id="eq-sub-certs"  style="display:none"></div>
+    </div>
+
+  </div>
+
+  <!-- ── Mi Personal ─────────────────────────────────────── -->
+  <div id="tab-personal-cli" class="tab-panel">
+
+    <!-- Dashboard Personal -->
+    <div id="per-cli-dashboard">
+      <div class="eq-dash-top">
+        <!-- Salud de Plantilla -->
+        <div class="fhs-card" id="per-fhs-card" style="display:none">
+          <div class="fhs-gauge-wrap">
+            <svg viewBox="0 0 108 108" width="108" height="108">
+              <circle cx="54" cy="54" r="43" fill="none" stroke="#e5e7eb" stroke-width="9"/>
+              <circle id="per-fhs-ring" cx="54" cy="54" r="43" fill="none" stroke="#7c3aed" stroke-width="9"
+                stroke-dasharray="270" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 54 54)"
+                style="transition:stroke-dashoffset 1.3s ease,stroke 1.3s ease"/>
+            </svg>
+            <div class="fhs-overlay">
+              <div class="fhs-score-n" id="per-fhs-n" style="color:#7c3aed">—</div>
+              <div class="fhs-score-l">SALUD</div>
+            </div>
+          </div>
+          <div>
+            <div class="fhs-title">Salud de Plantilla</div>
+            <div id="per-fhs-legend"></div>
+          </div>
+        </div>
+        <!-- KPIs Personal -->
+        <div class="eq-kpi-row">
+          <div class="eq-kpi">
+            <div class="eq-kpi-ic" style="background:#f3e8ff;color:#7c3aed">👥</div>
+            <div><div class="eq-kpi-n" id="per-s-total">—</div><div class="eq-kpi-l">Total personal</div></div>
+          </div>
+          <div class="eq-kpi">
+            <div class="eq-kpi-ic" style="background:#dcfce7;color:#15803d">✔</div>
+            <div><div class="eq-kpi-n" id="per-s-vig" style="color:var(--verde)">—</div><div class="eq-kpi-l">Certs. vigentes</div></div>
+          </div>
+          <div class="eq-kpi">
+            <div class="eq-kpi-ic" style="background:#fef3c7;color:#92400e">⏰</div>
+            <div><div class="eq-kpi-n" id="per-s-vcr" style="color:var(--ambar)">—</div><div class="eq-kpi-l">Por vencer</div></div>
+          </div>
+          <div class="eq-kpi">
+            <div class="eq-kpi-ic" style="background:#fee2e2;color:#991b1b">⚠</div>
+            <div><div class="eq-kpi-n" id="per-s-vcd" style="color:var(--rojo)">—</div><div class="eq-kpi-l">Vencidas</div></div>
+          </div>
+        </div>
+      </div>
+      <div id="per-alertas"></div>
+      <div id="per-dept-dist"></div>
+      <div class="eq-charts-3">
+        <div class="eq-chart-card">
+          <div class="eq-chart-title">Estado de Certificaciones</div>
+          <div class="eq-chart-inner"><canvas id="chart-certs-per"></canvas></div>
+        </div>
+        <div class="eq-chart-card">
+          <div class="eq-chart-title">Por Departamento</div>
+          <div class="eq-chart-inner"><canvas id="chart-depts"></canvas></div>
+        </div>
+        <div class="eq-chart-card">
+          <div class="eq-chart-title">Por Puesto</div>
+          <div class="eq-chart-inner"><canvas id="chart-puestos"></canvas></div>
+        </div>
+      </div>
+      <div id="per-upcoming"></div>
+    </div>
+
+    <!-- Lista Personal -->
+    <div id="per-cli-lista-view">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div>
+          <div style="font-size:16px;font-weight:800;color:var(--texto)">Mi Personal</div>
+          <div style="font-size:11px;color:var(--texto-hint);margin-top:2px" id="per-list-count"></div>
+        </div>
+        <button class="btn-prim" onclick="abrirModalPers(null)">+ Nuevo empleado</button>
+      </div>
+      <div class="eq-filters">
+        <input class="eq-filter-input" id="per-search" placeholder="🔍 Buscar nombre, puesto, N° empleado..." oninput="aplicarFiltrosPer()">
+        <select class="eq-filter-sel" id="per-filter-dpto" onchange="aplicarFiltrosPer()">
+          <option value="">Todos los departamentos</option>
+          <option>Operaciones</option><option>Mantenimiento</option><option>Administración</option>
+          <option>Seguridad</option><option>Ingeniería</option><option>RRHH</option><option>Otro</option>
+        </select>
+        <select class="eq-filter-sel" id="per-filter-estado" onchange="aplicarFiltrosPer()">
+          <option value="">Todos los estados</option>
+          <option>Activo</option><option>Baja</option><option>Licencia</option>
+        </select>
+        <span class="eq-filter-count" id="per-filter-count"></span>
+      </div>
+      <div id="per-cli-cont"><div class="loading"><span class="spin"></span></div></div>
+    </div>
+
+    <!-- Detalle Empleado -->
+    <div id="per-cli-det-view" style="display:none">
+      <div class="eq-bc">
+        <button class="eq-bc-btn" onclick="volverListaPer()">← Mi Personal</button>
+      </div>
+      <div id="per-cli-det-info"></div>
+      <div class="eq-sub-tabs-u">
+        <button class="eq-sbu active" onclick="verPerSub('certs',this)">🏆 Certificaciones</button>
+        <button class="eq-sbu"        onclick="verPerSub('docs',this)">📄 Documentos</button>
+      </div>
+      <div id="per-sub-certs"></div>
+      <div id="per-sub-docs" style="display:none"></div>
     </div>
 
   </div>
@@ -493,6 +728,106 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
     <div class="fact">
       <button class="btn-sec" onclick="cerrarModalCert()">Cancelar</button>
       <button class="btn-prim" onclick="guardarCertEq()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Empleado -->
+<div class="eq-overlay" id="modal-pers">
+  <div class="eq-modal">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title" id="modal-pers-title">Nuevo empleado</div>
+      <button class="eq-modal-close" onclick="cerrarModalPers()">✕</button>
+    </div>
+    <input type="hidden" id="pers-id">
+    <p class="eq-msec">Identificación</p>
+    <div class="frow"><label class="flabel">Nombre completo *</label><input class="finput" id="pers-nombre" placeholder="Ej: Juan González Martínez"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">No. Empleado</label><input class="finput" id="pers-numempl" placeholder="EMP-001"></div>
+      <div class="frow"><label class="flabel">Estado</label>
+        <select class="finput" id="pers-estado">
+          <option value="Activo">Activo</option>
+          <option value="Baja">Baja</option>
+          <option value="Licencia">Licencia</option>
+        </select>
+      </div>
+    </div>
+    <p class="eq-msec">Posición</p>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Puesto</label><input class="finput" id="pers-puesto" placeholder="Ej: Operador de Grúa"></div>
+      <div class="frow"><label class="flabel">Departamento</label>
+        <select class="finput" id="pers-dpto">
+          <option value="">Seleccionar…</option>
+          <option>Operaciones</option><option>Mantenimiento</option><option>Administración</option>
+          <option>Seguridad</option><option>Ingeniería</option><option>RRHH</option><option>Otro</option>
+        </select>
+      </div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Fecha de ingreso</label><input class="finput" id="pers-ingreso" type="date"></div>
+      <div class="frow"><label class="flabel">Teléfono</label><input class="finput" id="pers-tel" placeholder="55 1234 5678"></div>
+    </div>
+    <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="pers-notas" rows="2" placeholder="Observaciones…"></textarea></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalPers()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarPers()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Documento Personal -->
+<div class="eq-overlay" id="modal-doc-pers">
+  <div class="eq-modal">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Subir documento</div>
+      <button class="eq-modal-close" onclick="cerrarModalDocPers()">✕</button>
+    </div>
+    <input type="hidden" id="doc-pers-id">
+    <div class="frow"><label class="flabel">Nombre del documento *</label><input class="finput" id="doc-pers-nombre" placeholder="Ej: Licencia de conducir categoría E"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Tipo</label>
+        <select class="finput" id="doc-pers-tipo">
+          <option value="licencia">Licencia</option>
+          <option value="antidoping">Antidoping</option>
+          <option value="medico">Examen médico</option>
+          <option value="constancia">Constancia</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+      <div class="frow"><label class="flabel">Vigencia (opcional)</label><input class="finput" id="doc-pers-vigencia" type="date"></div>
+    </div>
+    <div class="frow"><label class="flabel">Archivo (PDF, imagen, DOCX)</label><input class="finput" id="doc-pers-archivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.docx"></div>
+    <div class="frow"><label class="flabel">Notas</label><input class="finput" id="doc-pers-notas" placeholder="Opcional"></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalDocPers()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarDocPers()">Subir</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Certificación Personal -->
+<div class="eq-overlay" id="modal-cert-pers">
+  <div class="eq-modal">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title" id="modal-cert-pers-title">Agregar certificación</div>
+      <button class="eq-modal-close" onclick="cerrarModalCertPers()">✕</button>
+    </div>
+    <input type="hidden" id="certp-id">
+    <input type="hidden" id="certp-pers-id">
+    <div class="frow"><label class="flabel">Tipo de certificación *</label><input class="finput" id="certp-tipo" placeholder="Ej: Operador de Grúa, Manejo de Materiales Peligrosos…"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Folio / Número</label><input class="finput" id="certp-folio" placeholder="AB.00042-2025MX"></div>
+      <div class="frow"><label class="flabel">Entidad emisora</label><input class="finput" id="certp-entidad" placeholder="AVBA, STPS, IMSS…"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Fecha de emisión</label><input class="finput" id="certp-emision" type="date"></div>
+      <div class="frow"><label class="flabel">Fecha de vencimiento</label><input class="finput" id="certp-vigencia" type="date"></div>
+    </div>
+    <div class="frow"><label class="flabel">Archivo (PDF / imagen)</label><input class="finput" id="certp-archivo" type="file" accept=".pdf,.jpg,.jpeg,.png"></div>
+    <div class="frow"><label class="flabel">Notas</label><input class="finput" id="certp-notas" placeholder="Opcional"></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalCertPers()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarCertPers()">Guardar</button>
     </div>
   </div>
 </div>
@@ -741,8 +1076,17 @@ function renderPND(data) {
 
 let _eqCargado = false;
 let _eqDetActual = null;
+let _eqAll = [];
 let _chartCerts = null;
 let _chartHoras = null;
+let _chartTipos = null;
+// Personal
+let _perCargado = false;
+let _perDetActual = null;
+let _perAll = [];
+let _chartCertsP = null;
+let _chartDepts = null;
+let _chartPuestos = null;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function eqTipoInfo(tipo) {
@@ -768,9 +1112,11 @@ function estadoBadge(estado) {
   return `<span class="eq-sbadge ${s.cls}">${s.ico} ${estado || 'Activo'}</span>`;
 }
 
-function renderAlertas(data) {
+function renderAlertas(data, contId) {
+  contId = contId || 'eq-alertas';
   const certs = data.certs || {};
-  const cont = document.getElementById('eq-alertas');
+  const docsV = (data.docs_por_vencer || []).length;
+  const cont = document.getElementById(contId);
   if (!cont) return;
   let html = '';
   if (certs.vencidas > 0) {
@@ -778,19 +1124,29 @@ function renderAlertas(data) {
       <div class="eq-alert-ico">⚠</div>
       <div class="eq-alert-body">
         <div class="eq-alert-txt">${certs.vencidas} certificación${certs.vencidas!==1?'es':''} vencida${certs.vencidas!==1?'s':''}</div>
-        <div class="eq-alert-sub">Revisa y renueva las certificaciones vencidas de tus equipos.</div>
+        <div class="eq-alert-sub">Revisa y renueva las certificaciones vencidas lo antes posible para cumplir la normativa.</div>
       </div>
     </div>`;
   }
   if (certs.por_vencer > 0) {
-    html += `<div class="eq-alert eq-alert-ok">
+    html += `<div class="eq-alert eq-alert-caution" style="border-radius:12px;padding:13px 18px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
       <div class="eq-alert-ico">⏰</div>
       <div class="eq-alert-body">
-        <div class="eq-alert-txt">${certs.por_vencer} certificación${certs.por_vencer!==1?'es':''} próxima${certs.por_vencer!==1?'s':''} a vencer</div>
-        <div class="eq-alert-sub">Programa con tiempo la renovación de estas certificaciones.</div>
+        <div class="eq-alert-txt">${certs.por_vencer} certificación${certs.por_vencer!==1?'es':''} por vencer en los próximos 30 días</div>
+        <div class="eq-alert-sub">Programa la renovación con anticipación para evitar interrupciones.</div>
       </div>
     </div>`;
   }
+  if (docsV > 0) {
+    html += `<div class="eq-alert eq-alert-info" style="border-radius:12px;padding:13px 18px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
+      <div class="eq-alert-ico">📄</div>
+      <div class="eq-alert-body">
+        <div class="eq-alert-txt">${docsV} documento${docsV!==1?'s':''} por vencer en los próximos 30 días</div>
+        <div class="eq-alert-sub">Renueva seguros, licencias y otros documentos antes de su vencimiento.</div>
+      </div>
+    </div>`;
+  }
+  if (html) cont.style.marginBottom = '16px'; else cont.style.marginBottom = '';
   cont.innerHTML = html;
 }
 
@@ -829,10 +1185,103 @@ async function cargarDashboardEq() {
     document.getElementById('eq-s-vig').textContent   = d.certs.vigentes;
     document.getElementById('eq-s-vcr').textContent   = d.certs.por_vencer;
     document.getElementById('eq-s-vcd').textContent   = d.certs.vencidas;
-    renderAlertas(d);
+    renderAlertas(d, 'eq-alertas');
+    renderFleetHealth(d, 'eq-fhs-card', 'eq-fhs-ring', 'eq-fhs-n', 'eq-fhs-legend', false);
+    renderStatusDist(d.equipos_por_estado || [], 'eq-status-dist', 'Estado de Flota');
     renderChartCerts(d.certs);
+    renderChartTipos(d.equipos_por_tipo || []);
     renderChartHoras(d.horas_equipos || []);
+    renderProximasVencer(d, 'eq-upcoming', 'equipo');
   } catch(_) {}
+}
+
+// ── Fleet Health Score gauge ───────────────────────────────────────────────
+function renderFleetHealth(d, cardId, ringId, scoreId, legendId, isPurple) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  const certs = d.certs || {};
+  const total = (certs.vigentes||0)+(certs.por_vencer||0)+(certs.vencidas||0)+(certs.sin_fecha||0);
+  let score = total > 0
+    ? Math.round(((certs.vigentes||0)*100 + (certs.por_vencer||0)*60 + (certs.sin_fecha||0)*40) / total)
+    : (d.total_equipos > 0 || d.total_personal > 0) ? 85 : 0;
+  score = Math.max(0, Math.min(100, score));
+  const color = isPurple
+    ? (score >= 80 ? '#7c3aed' : score >= 60 ? '#9333ea' : '#ef4444')
+    : (score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444');
+  const r = 43, circ = 2 * Math.PI * r;
+  const offset = (circ * (1 - score / 100)).toFixed(1);
+  const ring = document.getElementById(ringId);
+  if (ring) { ring.style.stroke = color; ring.setAttribute('stroke-dasharray', circ.toFixed(1)); ring.setAttribute('stroke-dashoffset', offset); }
+  const sn = document.getElementById(scoreId);
+  if (sn) { sn.textContent = score + '%'; sn.style.color = color; }
+  const leg = document.getElementById(legendId);
+  if (leg) leg.innerHTML = `
+    <div class="fhs-legend-row"><div class="fhs-leg-dot" style="background:#22c55e"></div>Vigentes<div class="fhs-leg-n">${certs.vigentes||0}</div></div>
+    <div class="fhs-legend-row"><div class="fhs-leg-dot" style="background:#f59e0b"></div>Por vencer<div class="fhs-leg-n" style="color:#f59e0b">${certs.por_vencer||0}</div></div>
+    <div class="fhs-legend-row"><div class="fhs-leg-dot" style="background:#ef4444"></div>Vencidas<div class="fhs-leg-n" style="color:#ef4444">${certs.vencidas||0}</div></div>
+    <div class="fhs-legend-row"><div class="fhs-leg-dot" style="background:#9ca3af"></div>Sin fecha<div class="fhs-leg-n">${certs.sin_fecha||0}</div></div>`;
+  card.style.display = '';
+}
+
+// ── Status/Dept distribution bar ──────────────────────────────────────────
+function renderStatusDist(items, contId, label) {
+  const cont = document.getElementById(contId);
+  if (!cont || !items.length) { if (cont) cont.innerHTML = ''; return; }
+  const total = items.reduce((a, b) => a + b.total, 0);
+  const EQ_COLORS  = { 'Activo':'#22c55e','Mantenimiento':'#f59e0b','Inspección':'#60a5fa','Fuera de servicio':'#ef4444' };
+  const DEP_COLORS = ['#6366f1','#f59e0b','#ec4899','#10b981','#ef4444','#14b8a6','#8b5cf6','#f97316'];
+  const segs = items.map((e, i) => {
+    const key = e.estado || e.departamento || '';
+    const color = EQ_COLORS[key] || DEP_COLORS[i % DEP_COLORS.length];
+    const lbl = e.total / total > 0.12 ? key.split(' ')[0] : '';
+    return `<div class="eq-st-seg" style="flex:${e.total};background:${color}" title="${key}: ${e.total}">${lbl}</div>`;
+  }).join('');
+  const legend = items.map((e, i) => {
+    const key = e.estado || e.departamento || '';
+    const color = EQ_COLORS[key] || DEP_COLORS[i % DEP_COLORS.length];
+    return `<div class="eq-stl-item"><div class="eq-stl-dot" style="background:${color}"></div><span class="eq-stl-n">${e.total}</span><span class="eq-stl-lbl">${key}</span></div>`;
+  }).join('');
+  cont.innerHTML = `<div class="eq-stacked-card">
+    <div class="eq-stacked-ttl">${label} — ${total} total</div>
+    <div class="eq-stacked-bar">${segs}</div>
+    <div class="eq-stacked-leg">${legend}</div>
+  </div>`;
+}
+
+// ── Upcoming expirations timeline ─────────────────────────────────────────
+function renderProximasVencer(d, contId, nameKey) {
+  const cont = document.getElementById(contId);
+  if (!cont) return;
+  const proxCerts = d.proximas_certs || [];
+  const proxDocs  = d.docs_por_vencer || [];
+  const all = [
+    ...proxCerts.map(c => ({ tipo:'cert', nombre: c.tipo_cert, who: c[nameKey] || c.equipo || c.personal, dias: c.dias_vig, fecha: c.fecha_vigencia })),
+    ...proxDocs.map(c => ({ tipo:'doc',  nombre: c.nombre, who: c[nameKey] || c.equipo || c.personal, dias: c.dias_vig, fecha: c.vigencia, dt: c.tipo_doc })),
+  ].sort((a, b) => a.dias - b.dias);
+  if (!all.length) { cont.innerHTML = ''; return; }
+  const items = all.slice(0, 15).map(item => {
+    const cls = item.dias <= 7 ? 'ud-crit' : item.dias <= 30 ? 'ud-warn' : item.dias <= 60 ? 'ud-soon' : 'ud-ok';
+    const dl  = item.dias === 0 ? 'Hoy' : item.dias === 1 ? '1 día' : `${item.dias}d`;
+    const ico = item.tipo === 'cert' ? '🏆' : (TIPO_DOC_ICONS[item.dt] || '📎');
+    return `<div class="eq-upc-item">
+      <div class="eq-upc-days ${cls}">${dl}</div>
+      <div class="eq-upc-info">
+        <div class="eq-upc-name">${ico} ${escQ(item.nombre)}</div>
+        <div class="eq-upc-eq">${escQ(item.who)} · Vence ${item.fecha}</div>
+      </div>
+      <div class="eq-upc-tag">${item.tipo === 'cert' ? 'Cert.' : 'Doc.'}</div>
+    </div>`;
+  }).join('');
+  const crit = all.filter(i => i.dias <= 30).length;
+  const bc = crit > 0 ? 'upc-amber' : 'upc-green';
+  cont.innerHTML = `<div class="eq-upcoming-card">
+    <div class="eq-upc-hdr">
+      <div class="eq-upc-ttl">⏳ Próximos Vencimientos — 90 días</div>
+      <span class="eq-upc-badge ${bc}">${all.length} próximo${all.length!==1?'s':''}</span>
+    </div>
+    ${items}
+    ${all.length > 15 ? `<div style="text-align:center;padding:8px 0 4px;font-size:11px;color:var(--texto-hint)">y ${all.length-15} más...</div>` : ''}
+  </div>`;
 }
 
 function renderChartCerts(certs) {
@@ -863,7 +1312,7 @@ function renderChartHoras(horas) {
   _chartHoras = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: horas.map(h => h.nombre.length > 18 ? h.nombre.slice(0,16)+'…' : h.nombre),
+      labels: horas.map(h => h.nombre.length > 16 ? h.nombre.slice(0,14)+'…' : h.nombre),
       datasets: [{
         label: 'Horas',
         data: horas.map(h => h.horas),
@@ -880,6 +1329,40 @@ function renderChartHoras(horas) {
   });
 }
 
+function renderChartTipos(tipos) {
+  const ctx = document.getElementById('chart-tipos');
+  if (!ctx) return;
+  if (!tipos || !tipos.length) { ctx.parentElement.innerHTML = '<p style="text-align:center;color:var(--texto-hint);padding:40px 0;font-size:12px">Sin equipos</p>'; return; }
+  if (_chartTipos) _chartTipos.destroy();
+  const PAL = ['#1d4ed8','#0284c7','#059669','#ea580c','#b45309','#dc2626','#7c3aed','#0f766e','#854d0e'];
+  _chartTipos = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: tipos.map(t => t.tipo),
+      datasets: [{ data: tipos.map(t => t.total), backgroundColor: PAL.slice(0, tipos.length), borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { font: { size: 10 }, padding: 8, boxWidth: 10 } } } }
+  });
+}
+
+function renderChartGenerico(canvasId, items, labelKey, colorBase, chartRef) {
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return null;
+  if (!items || !items.length) { ctx.parentElement.innerHTML = '<p style="text-align:center;color:var(--texto-hint);padding:40px 0;font-size:12px">Sin datos</p>'; return null; }
+  if (chartRef) chartRef.destroy();
+  const PAL = ['#7c3aed','#db2777','#059669','#ea580c','#0284c7','#b45309','#dc2626','#0f766e'];
+  return new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: items.map(i => i[labelKey]),
+      datasets: [{ data: items.map(i => i.total), backgroundColor: PAL.slice(0, items.length), borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { font: { size: 10 }, padding: 6, boxWidth: 10 } } } }
+  });
+}
+
 async function cargarListaEq() {
   const cont = document.getElementById('eq-cont');
   cont.innerHTML = '<div class="loading"><span class="spin"></span></div>';
@@ -887,10 +1370,33 @@ async function cargarListaEq() {
     const r = await fetch(API + '?action=GET_MIS_EQUIPOS');
     const d = await r.json();
     if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo);text-align:center;padding:20px">${d.message}</p>`; return; }
-    renderListaEq(d.equipos || []);
+    _eqAll = d.equipos || [];
+    aplicarFiltrosEq();
   } catch(e) {
     cont.innerHTML = '<p style="color:var(--rojo);text-align:center;padding:20px">Error al cargar equipos.</p>';
   }
+}
+
+function aplicarFiltrosEq() {
+  const search = (document.getElementById('eq-search')?.value || '').toLowerCase().trim();
+  const tipo   = document.getElementById('eq-filter-tipo')?.value  || '';
+  const estado = document.getElementById('eq-filter-estado')?.value || '';
+  let f = _eqAll;
+  if (search) f = f.filter(e => ((e.nombre||'')+(e.marca||'')+(e.modelo||'')+(e.serie||'')).toLowerCase().includes(search));
+  if (tipo)   f = f.filter(e => (e.tipo||'').toLowerCase().includes(tipo.toLowerCase()));
+  if (estado) f = f.filter(e => (e.estado||'') === estado);
+  const cnt = document.getElementById('eq-filter-count');
+  if (cnt) cnt.textContent = f.length !== _eqAll.length ? `${f.length} de ${_eqAll.length}` : '';
+  const lc = document.getElementById('eq-list-count');
+  if (lc) lc.textContent = `${_eqAll.length} equipo${_eqAll.length!==1?'s':''}`;
+  renderListaEq(f);
+}
+
+function limpiarFiltrosEq() {
+  const s = document.getElementById('eq-search'); if (s) s.value = '';
+  const t = document.getElementById('eq-filter-tipo'); if (t) t.value = '';
+  const e = document.getElementById('eq-filter-estado'); if (e) e.value = '';
+  aplicarFiltrosEq();
 }
 
 const TIPO_DOC_LABELS = { bitacora:'Bitácora', seguro:'Seguro', tabla_carga:'Tabla de carga', manual:'Manual', otro:'Otro' };
@@ -1351,8 +1857,478 @@ async function recargarDetalleEq() {
   } catch(_) {}
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+//  MI PERSONAL — gestión de plantilla del cliente
+// ════════════════════════════════════════════════════════════════════════════
+
+// ── Helpers Personal ──────────────────────────────────────────────────────
+function perDeptInfo(dpto) {
+  const d = (dpto || '').toLowerCase();
+  if (d.includes('oper'))  return {cls:'pd-operaciones',   ico:'⚙', label:'Operaciones'};
+  if (d.includes('mant'))  return {cls:'pd-mantenimiento', ico:'🔧', label:'Mantenimiento'};
+  if (d.includes('admin')) return {cls:'pd-administracion',ico:'📋', label:'Administración'};
+  if (d.includes('seg'))   return {cls:'pd-seguridad',     ico:'🛡', label:'Seguridad'};
+  if (d.includes('ing'))   return {cls:'pd-ingenieria',    ico:'📐', label:'Ingeniería'};
+  if (d.includes('rrhh') || d.includes('recurso')) return {cls:'pd-rrhh', ico:'👥', label:'RRHH'};
+  return {cls:'pd-otro', ico:'👤', label: dpto || 'Personal'};
+}
+
+function perEstadoBadge(estado) {
+  const map = {
+    'Activo':   {cls:'psb-activo',   ico:'●'},
+    'Baja':     {cls:'psb-baja',     ico:'✕'},
+    'Licencia': {cls:'psb-licencia', ico:'⏸'},
+  };
+  const s = map[estado] || {cls:'psb-activo', ico:'●'};
+  return `<span class="eq-sbadge ${s.cls}">${s.ico} ${estado || 'Activo'}</span>`;
+}
+
+function toastPer(msg, dur) {
+  const el = document.getElementById('eq-toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), dur || 3000);
+}
+
+// ── Sub-tab switching (personal detail) ───────────────────────────────────
+function verPerSub(tab, btn) {
+  ['certs','docs'].forEach(t => {
+    const el = document.getElementById('per-sub-' + t);
+    if (el) el.style.display = t === tab ? '' : 'none';
+  });
+  document.querySelectorAll('#per-cli-det-view .eq-sbu').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── Cargar datos ──────────────────────────────────────────────────────────
+async function cargarPersonalCli() {
+  if (_perCargado) return;
+  _perCargado = true;
+  cargarDashboardPer();
+  cargarListaPer();
+}
+
+async function cargarDashboardPer() {
+  try {
+    const r = await fetch(API + '?action=GET_DASHBOARD_PERSONAL');
+    const d = await r.json();
+    if (d.status !== 'success') return;
+    document.getElementById('per-s-total').textContent = d.total_personal;
+    document.getElementById('per-s-vig').textContent   = d.certs.vigentes;
+    document.getElementById('per-s-vcr').textContent   = d.certs.por_vencer;
+    document.getElementById('per-s-vcd').textContent   = d.certs.vencidas;
+    renderAlertas(d, 'per-alertas');
+    renderFleetHealth(d, 'per-fhs-card', 'per-fhs-ring', 'per-fhs-n', 'per-fhs-legend', true);
+    renderStatusDist(d.por_departamento || [], 'per-dept-dist', 'Por Departamento');
+    _chartCertsP = renderChartGenerico('chart-certs-per', [
+      {departamento:'Vigentes', total: d.certs.vigentes},
+      {departamento:'Por vencer', total: d.certs.por_vencer},
+      {departamento:'Vencidas', total: d.certs.vencidas},
+      {departamento:'Sin fecha', total: d.certs.sin_fecha},
+    ].filter(x => x.total > 0), 'departamento', '', _chartCertsP);
+    _chartDepts   = renderChartGenerico('chart-depts',   d.por_departamento || [], 'departamento', '', _chartDepts);
+    _chartPuestos = renderChartGenerico('chart-puestos', d.por_puesto       || [], 'puesto',       '', _chartPuestos);
+    renderProximasVencer(d, 'per-upcoming', 'personal');
+  } catch(_) {}
+}
+
+async function cargarListaPer() {
+  const cont = document.getElementById('per-cli-cont');
+  cont.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  try {
+    const r = await fetch(API + '?action=GET_MI_PERSONAL');
+    const d = await r.json();
+    if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo);text-align:center;padding:20px">${d.message}</p>`; return; }
+    _perAll = d.personal || [];
+    aplicarFiltrosPer();
+  } catch(e) {
+    cont.innerHTML = '<p style="color:var(--rojo);text-align:center;padding:20px">Error al cargar personal.</p>';
+  }
+}
+
+function aplicarFiltrosPer() {
+  const search = (document.getElementById('per-search')?.value || '').toLowerCase().trim();
+  const dpto   = document.getElementById('per-filter-dpto')?.value  || '';
+  const estado = document.getElementById('per-filter-estado')?.value || '';
+  let f = _perAll;
+  if (search) f = f.filter(p => ((p.nombre||'')+(p.puesto||'')+(p.numero_empleado||'')).toLowerCase().includes(search));
+  if (dpto)   f = f.filter(p => (p.departamento||'') === dpto);
+  if (estado) f = f.filter(p => (p.estado||'')       === estado);
+  const cnt = document.getElementById('per-filter-count');
+  if (cnt) cnt.textContent = f.length !== _perAll.length ? `${f.length} de ${_perAll.length}` : '';
+  const lc = document.getElementById('per-list-count');
+  if (lc) lc.textContent = `${_perAll.length} empleado${_perAll.length!==1?'s':''}`;
+  renderListaPer(f);
+}
+
+const TIPO_DOC_ICONS_PER = { licencia:'🪪', antidoping:'🧪', medico:'🏥', constancia:'📜', otro:'📎' };
+const TIPO_DOC_LABELS_PER = { licencia:'Licencia', antidoping:'Antidoping', medico:'Examen médico', constancia:'Constancia', otro:'Otro' };
+
+function renderListaPer(personas) {
+  const cont = document.getElementById('per-cli-cont');
+  if (!personas.length) {
+    cont.innerHTML = '<div class="empty"><div class="empty-t">Sin empleados registrados</div><div class="empty-s">Agrega tu plantilla para gestionar sus certificaciones y documentos.</div></div>';
+    return;
+  }
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px">';
+  personas.forEach(p => {
+    const ti       = perDeptInfo(p.departamento);
+    const certBad  = p.certs_vencidas > 0;
+    const certWarn = p.certs_por_vencer > 0;
+    const certOk   = p.certs_vigentes > 0 && !certBad;
+    const nextCls  = certBad ? 'eq-nexp' : certWarn ? 'eq-nwarn' : certOk ? 'eq-nok' : 'eq-nnone';
+    const nextTxt  = certBad
+      ? `⚠ ${p.certs_vencidas} cert${p.certs_vencidas!==1?'s':''} vencida${p.certs_vencidas!==1?'s':''}`
+      : certWarn
+        ? `⏰ ${p.certs_por_vencer} cert${p.certs_por_vencer!==1?'s':''} por vencer`
+        : certOk
+          ? `✔ ${p.certs_vigentes} cert${p.certs_vigentes!==1?'s':''} vigente${p.certs_vigentes!==1?'s':''}`
+          : 'Sin certificaciones';
+    const certColor = certBad ? 'var(--rojo)' : certWarn ? 'var(--ambar)' : 'var(--verde)';
+    html += `<div class="eq-cn">
+      <div class="eq-ch ${ti.cls}">
+        <div class="eq-ch-ico">${ti.ico}</div>
+        <div style="flex:1;min-width:0">
+          <div class="eq-ch-name">${escQ(p.nombre)}</div>
+          <div class="eq-ch-type">${p.puesto ? escQ(p.puesto) : ti.label}${p.departamento ? ' · ' + escQ(p.departamento) : ''}</div>
+        </div>
+        <div style="flex-shrink:0">${perEstadoBadge(p.estado)}</div>
+      </div>
+      <div class="eq-cb">
+        <div class="eq-chips">
+          ${p.numero_empleado ? `<span class="eq-chip">🆔 ${escQ(p.numero_empleado)}</span>` : ''}
+          ${p.departamento    ? `<span class="eq-chip">${escQ(p.departamento)}</span>` : ''}
+          ${p.fecha_ingreso   ? `<span class="eq-chip">📅 ${escQ(p.fecha_ingreso)}</span>` : ''}
+        </div>
+        <div class="eq-metrics">
+          <div class="eq-met"><div class="eq-met-n" style="color:var(--azul)">${p.total_docs}</div><div class="eq-met-l">Docs</div></div>
+          <div class="eq-met"><div class="eq-met-n" style="color:${certColor}">${p.total_certs}</div><div class="eq-met-l">Certs</div></div>
+          <div class="eq-met"><div class="eq-met-n" style="color:var(--ambar)">${p.certs_vigentes > 0 ? p.certs_vigentes : '—'}</div><div class="eq-met-l">Vigentes</div></div>
+        </div>
+        <div class="eq-next ${nextCls}">${nextTxt}</div>
+      </div>
+      <div style="display:flex;gap:6px;padding:10px 14px 14px">
+        <button class="btn-prim" style="flex:1;font-size:12px;padding:8px 10px" onclick="verDetallePerso(${p.id})">Ver detalle →</button>
+        <button class="btn-sec" style="font-size:12px;padding:8px 10px" onclick="abrirModalPers(${JSON.stringify(p).replace(/"/g,'&quot;')})">✏</button>
+        <button class="btn-del" onclick="eliminarPers(${p.id},'${escQ(p.nombre)}')">🗑</button>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+  cont.innerHTML = html;
+}
+
+// ── Ver detalle de empleado ────────────────────────────────────────────────
+async function verDetallePerso(id) {
+  document.getElementById('per-cli-lista-view').style.display = 'none';
+  document.getElementById('per-cli-dashboard').style.display  = 'none';
+  document.getElementById('per-cli-det-view').style.display   = '';
+  document.getElementById('per-cli-det-info').innerHTML       = '<div class="loading"><span class="spin"></span></div>';
+  ['certs','docs'].forEach(t => { const el = document.getElementById('per-sub-' + t); if (el) el.innerHTML = '<div class="loading"><span class="spin"></span></div>'; });
+  try {
+    const r = await fetch(API + '?action=GET_DETALLE_PERSONAL&id=' + id);
+    const d = await r.json();
+    if (d.status !== 'success') { toastPer(d.message); volverListaPer(); return; }
+    _perDetActual = d;
+    renderDetInfoPer(d.personal);
+    renderSubCertsPer(d.certificaciones, d.personal.id);
+    renderSubDocsPer(d.documentos, d.personal.id);
+    document.querySelectorAll('#per-cli-det-view .eq-sbu').forEach((b,i) => b.classList.toggle('active', i===0));
+    ['certs','docs'].forEach((t,i) => { const el = document.getElementById('per-sub-'+t); if (el) el.style.display = i===0?'':'none'; });
+  } catch(e) {
+    toastPer('Error al cargar detalle.'); volverListaPer();
+  }
+}
+
+function volverListaPer() {
+  _perDetActual = null;
+  document.getElementById('per-cli-det-view').style.display   = 'none';
+  document.getElementById('per-cli-lista-view').style.display = '';
+  document.getElementById('per-cli-dashboard').style.display  = '';
+}
+
+function renderDetInfoPer(per) {
+  const ti = perDeptInfo(per.departamento);
+  const specs = [
+    per.puesto          ? ['Puesto',       per.puesto]          : null,
+    per.departamento    ? ['Departamento', per.departamento]    : null,
+    per.numero_empleado ? ['N° Empleado',  per.numero_empleado] : null,
+    per.fecha_ingreso   ? ['Ingreso',      per.fecha_ingreso]   : null,
+    per.telefono        ? ['Teléfono',     per.telefono]        : null,
+    per.estado          ? ['Estado',       per.estado]          : null,
+  ].filter(Boolean);
+  document.getElementById('per-cli-det-info').innerHTML = `
+    <div class="eq-det-banner ${ti.cls}">
+      <div class="eq-det-bico">${ti.ico}</div>
+      <div>
+        <div class="eq-det-bname">${escQ(per.nombre)}</div>
+        <div class="eq-det-bsub">${perEstadoBadge(per.estado)}</div>
+      </div>
+    </div>
+    <div class="eq-det-specs">
+      ${specs.map(([k,v]) => `<div><div class="eq-ds-l">${k}</div><div class="eq-ds-v">${escQ(v)}</div></div>`).join('')}
+    </div>
+    ${per.notas ? `<div style="margin:0 0 16px;padding:10px 14px;background:var(--gris-bg);border-radius:10px;font-size:12px;color:var(--texto-sub);font-style:italic">${escQ(per.notas)}</div>` : '<div style="margin-bottom:6px"></div>'}
+  `;
+}
+
+function renderSubCertsPer(certs, perId) {
+  const cont = document.getElementById('per-sub-certs');
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--texto)">Certificaciones <span style="color:var(--texto-hint)">(${certs.length})</span></div>
+    <button class="btn-prim" onclick="abrirModalCertPers(${perId}, null)">+ Agregar</button>
+  </div>`;
+  if (!certs.length) {
+    html += '<div class="empty"><div class="empty-t">Sin certificaciones</div><div class="empty-s">Registra cursos, habilitaciones y certificaciones del empleado.</div></div>';
+  } else {
+    certs.forEach(c => {
+      const cls      = c.vencida ? 'ce' : (c.dias_vig !== null && c.dias_vig <= 30) ? 'cw' : 'cv';
+      const barColor = c.vencida ? '#ef4444' : (c.dias_vig !== null && c.dias_vig <= 30) ? '#f59e0b' : '#22c55e';
+      const pct      = c.vencida ? 0 : (c.dias_vig !== null ? Math.max(4, Math.min(100, Math.round((c.dias_vig / 365) * 100))) : 100);
+      const vigLabel = c.fecha_vigencia
+        ? (c.vencida ? '⚠ Vencida' : (c.dias_vig !== null && c.dias_vig <= 30 ? `⏰ Vence en ${c.dias_vig} días` : `✔ Vigente — ${c.dias_vig} días`))
+        : 'Sin fecha';
+      html += `<div class="cert-card ${cls}">
+        <div class="cert-head">
+          <div>
+            <div class="cert-title">${escQ(c.tipo_cert)}</div>
+            ${c.folio ? `<div class="cert-folio">Folio: ${escQ(c.folio)}</div>` : ''}
+            ${c.entidad ? `<div class="cert-folio">Entidad: ${escQ(c.entidad)}</div>` : ''}
+          </div>
+          <div style="font-size:11px;font-weight:700;color:${barColor};white-space:nowrap;text-align:right">${vigLabel}</div>
+        </div>
+        ${c.fecha_emision || c.fecha_vigencia ? `<div class="cert-dates">
+          ${c.fecha_emision  ? `<div class="cert-dt"><strong>${c.fecha_emision}</strong>Emisión</div>`    : ''}
+          ${c.fecha_vigencia ? `<div class="cert-dt"><strong>${c.fecha_vigencia}</strong>Vencimiento</div>` : ''}
+        </div>` : ''}
+        ${c.fecha_vigencia ? `<div class="cert-bar-track"><div class="cert-bar-fill" style="width:${pct}%;background:${barColor}"></div></div>` : ''}
+        ${c.notas ? `<div style="font-size:11px;color:var(--texto-sub);margin-top:8px;font-style:italic">${escQ(c.notas)}</div>` : ''}
+        <div class="cert-acts">
+          ${c.archivo_url ? `<a href="${c.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver</a>` : ''}
+          <button class="btn-sec" style="font-size:10px" onclick="abrirModalCertPers(${perId}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">✏ Editar</button>
+          <button class="btn-del" onclick="eliminarCertPers(${c.id})" style="font-size:10px">🗑</button>
+        </div>
+      </div>`;
+    });
+  }
+  cont.innerHTML = html;
+}
+
+function renderSubDocsPer(docs, perId) {
+  const cont = document.getElementById('per-sub-docs');
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--texto)">Documentos <span style="color:var(--texto-hint)">(${docs.length})</span></div>
+    <button class="btn-prim" onclick="abrirModalDocPers(${perId})">+ Subir</button>
+  </div>`;
+  if (!docs.length) {
+    html += '<div class="empty"><div class="empty-t">Sin documentos</div><div class="empty-s">Sube licencias, antidopings, exámenes médicos y más.</div></div>';
+  } else {
+    html += '<div class="doc-grid">';
+    docs.forEach(d => {
+      const ico    = TIPO_DOC_ICONS_PER[d.tipo_doc]  || '📎';
+      const lbl    = TIPO_DOC_LABELS_PER[d.tipo_doc] || d.tipo_doc;
+      const icoCls = { licencia:'di-seg', antidoping:'di-tab', medico:'di-bit', constancia:'di-man', otro:'di-ot' }[d.tipo_doc] || 'di-ot';
+      let vigHtml  = '';
+      if (d.vigencia) {
+        if (d.vencido)           vigHtml = `<span class="doc-vbadge dv-exp">⚠ Vencido</span>`;
+        else if (d.dias_vig <= 30) vigHtml = `<span class="doc-vbadge dv-warn">Vence en ${d.dias_vig}d</span>`;
+        else                     vigHtml = `<span class="doc-vbadge dv-ok">Vigente</span>`;
+      }
+      html += `<div class="doc-card">
+        <div class="doc-ico ${icoCls}">${ico}</div>
+        <div style="flex:1;min-width:0">
+          <div class="doc-name">${escQ(d.nombre)}</div>
+          <div class="doc-meta">${lbl}${d.fecha_subida ? ' · ' + d.fecha_subida : ''}${d.notas ? '<br>'+escQ(d.notas) : ''}</div>
+          ${vigHtml}
+          <div class="doc-acts">
+            ${d.archivo_url ? `<a href="${d.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver</a>` : ''}
+            <button class="btn-del" onclick="eliminarDocPers(${d.id})" style="padding:3px 8px;font-size:10px">🗑</button>
+          </div>
+        </div>
+      </div>`;
+    });
+    html += '</div>';
+  }
+  cont.innerHTML = html;
+}
+
+// ── Recargar detalle sin salir ─────────────────────────────────────────────
+async function recargarDetallePerso() {
+  if (!_perDetActual) return;
+  const id = _perDetActual.personal.id;
+  try {
+    const r = await fetch(API + '?action=GET_DETALLE_PERSONAL&id=' + id);
+    const d = await r.json();
+    if (d.status !== 'success') return;
+    _perDetActual = d;
+    renderSubCertsPer(d.certificaciones, id);
+    renderSubDocsPer(d.documentos, id);
+    cargarListaPer();
+  } catch(_) {}
+}
+
+// ── Modales Personal ──────────────────────────────────────────────────────
+function abrirModalPers(per) {
+  document.getElementById('modal-pers-title').textContent = per ? 'Editar empleado' : 'Nuevo empleado';
+  document.getElementById('pers-id').value        = per ? per.id             : '';
+  document.getElementById('pers-nombre').value    = per ? (per.nombre    || '') : '';
+  document.getElementById('pers-numempl').value   = per ? (per.numero_empleado || '') : '';
+  document.getElementById('pers-estado').value    = per ? (per.estado    || 'Activo') : 'Activo';
+  document.getElementById('pers-puesto').value    = per ? (per.puesto    || '') : '';
+  document.getElementById('pers-dpto').value      = per ? (per.departamento || '') : '';
+  document.getElementById('pers-tel').value       = per ? (per.telefono  || '') : '';
+  document.getElementById('pers-notas').value     = per ? (per.notas     || '') : '';
+  // fecha_ingreso: "dd/mm/yyyy" → "yyyy-mm-dd"
+  const toInput = s => { if (!s) return ''; const [d,m,y] = s.split('/'); return (y&&m&&d) ? `${y}-${m}-${d}` : ''; };
+  document.getElementById('pers-ingreso').value   = per ? toInput(per.fecha_ingreso) : '';
+  document.getElementById('modal-pers').classList.add('open');
+}
+function cerrarModalPers() { document.getElementById('modal-pers').classList.remove('open'); }
+
+async function guardarPers() {
+  const id     = document.getElementById('pers-id').value;
+  const nombre = document.getElementById('pers-nombre').value.trim();
+  if (!nombre) { toastPer('El nombre es requerido.'); return; }
+  const data = {
+    id:              id ? +id : 0,
+    nombre,
+    estado:          document.getElementById('pers-estado').value,
+    puesto:          document.getElementById('pers-puesto').value.trim(),
+    departamento:    document.getElementById('pers-dpto').value,
+    numero_empleado: document.getElementById('pers-numempl').value.trim(),
+    fecha_ingreso:   document.getElementById('pers-ingreso').value,
+    telefono:        document.getElementById('pers-tel').value.trim(),
+    notas:           document.getElementById('pers-notas').value.trim(),
+  };
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'GUARDAR_PERSONAL_CLI', payload:data}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastPer(d.message || 'Error al guardar.'); return; }
+    cerrarModalPers();
+    toastPer('Empleado guardado.');
+    _perCargado = false;
+    cargarPersonalCli();
+  } catch(_) { toastPer('Error de red.'); }
+}
+
+async function eliminarPers(id, nombre) {
+  if (!confirm(`¿Eliminar al empleado "${nombre}"? Se eliminará también su información.`)) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'ELIMINAR_PERSONAL_CLI', payload:{id}}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastPer(d.message || 'Error.'); return; }
+    toastPer('Empleado eliminado.');
+    _perCargado = false;
+    cargarPersonalCli();
+  } catch(_) { toastPer('Error de red.'); }
+}
+
+// ── Documento Personal ────────────────────────────────────────────────────
+function abrirModalDocPers(persId) {
+  document.getElementById('doc-pers-id').value      = persId;
+  document.getElementById('doc-pers-nombre').value  = '';
+  document.getElementById('doc-pers-tipo').value    = 'licencia';
+  document.getElementById('doc-pers-vigencia').value= '';
+  document.getElementById('doc-pers-archivo').value = '';
+  document.getElementById('doc-pers-notas').value   = '';
+  document.getElementById('modal-doc-pers').classList.add('open');
+}
+function cerrarModalDocPers() { document.getElementById('modal-doc-pers').classList.remove('open'); }
+
+async function guardarDocPers() {
+  const persId = document.getElementById('doc-pers-id').value;
+  const nombre = document.getElementById('doc-pers-nombre').value.trim();
+  if (!nombre) { toastPer('El nombre del documento es requerido.'); return; }
+  const fd = new FormData();
+  fd.append('action',      'SUBIR_DOC_PERSONAL');
+  fd.append('personal_id', persId);
+  fd.append('nombre',      nombre);
+  fd.append('tipo_doc',    document.getElementById('doc-pers-tipo').value);
+  fd.append('vigencia',    document.getElementById('doc-pers-vigencia').value);
+  fd.append('notas',       document.getElementById('doc-pers-notas').value.trim());
+  const file = document.getElementById('doc-pers-archivo').files[0];
+  if (file) fd.append('archivo', file);
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await _origFetch(API, { method:'POST', headers:{'X-Token': s.token || ''}, body: fd });
+    const d = await r.json();
+    if (d.status !== 'success') { toastPer(d.message || 'Error.'); return; }
+    cerrarModalDocPers();
+    toastPer('Documento guardado.');
+    recargarDetallePerso();
+  } catch(_) { toastPer('Error de red.'); }
+}
+
+async function eliminarDocPers(id) {
+  if (!confirm('¿Eliminar este documento?')) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'ELIMINAR_DOC_PERSONAL', payload:{id}}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastPer(d.message || 'Error.'); return; }
+    toastPer('Documento eliminado.');
+    recargarDetallePerso();
+  } catch(_) { toastPer('Error de red.'); }
+}
+
+// ── Certificación Personal ────────────────────────────────────────────────
+function abrirModalCertPers(persId, cert) {
+  document.getElementById('modal-cert-pers-title').textContent = cert ? 'Editar certificación' : 'Agregar certificación';
+  document.getElementById('certp-id').value       = cert ? cert.id       : '';
+  document.getElementById('certp-pers-id').value  = persId;
+  document.getElementById('certp-tipo').value     = cert ? (cert.tipo_cert || '') : '';
+  document.getElementById('certp-folio').value    = cert ? (cert.folio    || '') : '';
+  document.getElementById('certp-entidad').value  = cert ? (cert.entidad  || '') : '';
+  document.getElementById('certp-notas').value    = cert ? (cert.notas    || '') : '';
+  const toIn = s => { if (!s) return ''; const [d,m,y] = s.split('/'); return (y&&m&&d) ? `${y}-${m}-${d}` : ''; };
+  document.getElementById('certp-emision').value  = cert ? toIn(cert.fecha_emision)  : '';
+  document.getElementById('certp-vigencia').value = cert ? toIn(cert.fecha_vigencia) : '';
+  document.getElementById('certp-archivo').value  = '';
+  document.getElementById('modal-cert-pers').classList.add('open');
+}
+function cerrarModalCertPers() { document.getElementById('modal-cert-pers').classList.remove('open'); }
+
+async function guardarCertPers() {
+  const persId = document.getElementById('certp-pers-id').value;
+  const tipo   = document.getElementById('certp-tipo').value.trim();
+  if (!tipo) { toastPer('El tipo de certificación es requerido.'); return; }
+  const fd = new FormData();
+  fd.append('action',        'GUARDAR_CERT_PERSONAL');
+  fd.append('id',            document.getElementById('certp-id').value);
+  fd.append('personal_id',   persId);
+  fd.append('tipo_cert',     tipo);
+  fd.append('folio',         document.getElementById('certp-folio').value.trim());
+  fd.append('entidad',       document.getElementById('certp-entidad').value.trim());
+  fd.append('fecha_emision', document.getElementById('certp-emision').value);
+  fd.append('fecha_vigencia',document.getElementById('certp-vigencia').value);
+  fd.append('notas',         document.getElementById('certp-notas').value.trim());
+  const file = document.getElementById('certp-archivo').files[0];
+  if (file) fd.append('archivo', file);
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await _origFetch(API, { method:'POST', headers:{'X-Token': s.token || ''}, body: fd });
+    const d = await r.json();
+    if (d.status !== 'success') { toastPer(d.message || 'Error.'); return; }
+    cerrarModalCertPers();
+    toastPer('Certificación guardada.');
+    recargarDetallePerso();
+    cargarDashboardPer();
+  } catch(_) { toastPer('Error de red.'); }
+}
+
+async function eliminarCertPers(id) {
+  if (!confirm('¿Eliminar esta certificación?')) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'ELIMINAR_CERT_PERSONAL', payload:{id}}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastPer(d.message || 'Error.'); return; }
+    toastPer('Certificación eliminada.');
+    recargarDetallePerso();
+    cargarDashboardPer();
+  } catch(_) { toastPer('Error de red.'); }
+}
+
 // ── Close modals on overlay click ──────────────────────────────────────────
-['modal-eq','modal-doc','modal-hora','modal-cert-eq'].forEach(id => {
+['modal-eq','modal-doc','modal-hora','modal-cert-eq','modal-pers','modal-doc-pers','modal-cert-pers'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });

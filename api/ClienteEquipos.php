@@ -500,6 +500,48 @@ class ClienteEquipos {
         ");
         $hStmt->execute($ids);
 
+        // Equipment by type
+        $tipoStmt = $this->pdo->prepare(
+            "SELECT COALESCE(NULLIF(TRIM(tipo),''),'Sin tipo') AS tipo, COUNT(*) AS total
+             FROM cliente_equipos WHERE id_cliente=? GROUP BY tipo ORDER BY total DESC"
+        );
+        $tipoStmt->execute([$idCliente]);
+
+        // Equipment by estado
+        $estadoStmt = $this->pdo->prepare(
+            "SELECT COALESCE(NULLIF(TRIM(estado),''),'Activo') AS estado, COUNT(*) AS total
+             FROM cliente_equipos WHERE id_cliente=? GROUP BY estado ORDER BY total DESC"
+        );
+        $estadoStmt->execute([$idCliente]);
+
+        // Próximas certificaciones venciendo en 90 días
+        $proxStmt = $this->pdo->prepare("
+            SELECT e.nombre AS equipo, c.tipo_cert,
+                   DATE_FORMAT(c.fecha_vigencia,'%d/%m/%Y') AS fecha_vigencia,
+                   DATEDIFF(c.fecha_vigencia, CURDATE()) AS dias_vig
+            FROM cliente_equipos_cert c
+            JOIN cliente_equipos e ON e.id = c.equipo_id
+            WHERE c.equipo_id IN ($in)
+              AND c.fecha_vigencia >= CURDATE()
+              AND c.fecha_vigencia <= DATE_ADD(CURDATE(), INTERVAL 90 DAY)
+            ORDER BY c.fecha_vigencia ASC
+        ");
+        $proxStmt->execute($ids);
+
+        // Documentos por vencer en 30 días
+        $docsVStmt = $this->pdo->prepare("
+            SELECT e.nombre AS equipo, d.nombre, d.tipo_doc,
+                   DATE_FORMAT(d.vigencia,'%d/%m/%Y') AS vigencia,
+                   DATEDIFF(d.vigencia, CURDATE()) AS dias_vig
+            FROM cliente_equipos_docs d
+            JOIN cliente_equipos e ON e.id = d.equipo_id
+            WHERE d.equipo_id IN ($in)
+              AND d.vigencia >= CURDATE()
+              AND d.vigencia <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
+            ORDER BY d.vigencia ASC
+        ");
+        $docsVStmt->execute($ids);
+
         return [
             'status'        => 'success',
             'total_equipos' => $total,
@@ -510,14 +552,35 @@ class ClienteEquipos {
                 'sin_fecha'  => (int)($cs['sin_fecha']  ?? 0),
             ],
             'docs_por_tipo' => array_map(fn($d) => [
-                'tipo'    => $d['tipo_doc'],
-                'total'   => (int)$d['total'],
+                'tipo'     => $d['tipo_doc'],
+                'total'    => (int)$d['total'],
                 'vencidos' => (int)$d['vencidos'],
             ], $dStmt->fetchAll()),
-            'horas_equipos' => array_map(fn($h) => [
+            'horas_equipos'     => array_map(fn($h) => [
                 'nombre' => $h['nombre'],
                 'horas'  => (float)$h['horas'],
             ], $hStmt->fetchAll()),
+            'equipos_por_tipo'  => array_map(fn($r) => [
+                'tipo'  => $r['tipo'],
+                'total' => (int)$r['total'],
+            ], $tipoStmt->fetchAll()),
+            'equipos_por_estado' => array_map(fn($r) => [
+                'estado' => $r['estado'],
+                'total'  => (int)$r['total'],
+            ], $estadoStmt->fetchAll()),
+            'proximas_certs'    => array_map(fn($r) => [
+                'equipo'         => $r['equipo'],
+                'tipo_cert'      => $r['tipo_cert'],
+                'fecha_vigencia' => $r['fecha_vigencia'],
+                'dias_vig'       => (int)$r['dias_vig'],
+            ], $proxStmt->fetchAll()),
+            'docs_por_vencer'   => array_map(fn($r) => [
+                'equipo'   => $r['equipo'],
+                'nombre'   => $r['nombre'],
+                'tipo_doc' => $r['tipo_doc'],
+                'vigencia' => $r['vigencia'],
+                'dias_vig' => (int)$r['dias_vig'],
+            ], $docsVStmt->fetchAll()),
         ];
     }
 }

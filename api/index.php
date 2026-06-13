@@ -21,6 +21,7 @@ require_once __DIR__ . '/Personal.php';
 require_once __DIR__ . '/Accesorios.php';
 require_once __DIR__ . '/Pnd.php';
 require_once __DIR__ . '/ClienteEquipos.php';
+require_once __DIR__ . '/ClientePersonal.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -61,6 +62,7 @@ $personal = new Personal($pdo);
 $accesorios     = new Accesorios($pdo);
 $pnd            = new Pnd($pdo);
 $cliEquipos     = new ClienteEquipos($pdo);
+$cliPersonal    = new ClientePersonal($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -461,6 +463,21 @@ if ($method === 'GET') {
         }
 
         // ── Portal cliente: equipos ───────────────────────
+        case 'GET_MI_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliPersonal->listar($usr['id_cliente'] ?? ''));
+
+        case 'GET_DASHBOARD_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliPersonal->dashboard($usr['id_cliente'] ?? ''));
+
+        case 'GET_DETALLE_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliPersonal->detalle((int)($_GET['id'] ?? 0), $usr['id_cliente'] ?? ''));
+
         case 'GET_MIS_EQUIPOS':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -1146,6 +1163,37 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cliEquipos->eliminarCert((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
+
+        // ── Personal del cliente ─────────────────────────────────
+        case 'GUARDAR_PERSONAL_CLI':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliPersonal->guardar($payload, $usr['id_cliente'] ?? ''));
+
+        case 'ELIMINAR_PERSONAL_CLI':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliPersonal->eliminar((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
+
+        case 'SUBIR_DOC_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliPersonal->subirDoc($_POST, $_FILES, $usr['id_cliente'] ?? ''));
+
+        case 'ELIMINAR_DOC_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliPersonal->eliminarDoc((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
+
+        case 'GUARDAR_CERT_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliPersonal->guardarCert($_POST, $_FILES, $usr['id_cliente'] ?? ''));
+
+        case 'ELIMINAR_CERT_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliPersonal->eliminarCert((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
 
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);
