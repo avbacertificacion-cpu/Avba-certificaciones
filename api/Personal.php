@@ -2118,11 +2118,12 @@ HTML;
             ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'
             : 'PART-' . str_pad((string)($p['id'] ?? 0), 5, '0', STR_PAD_LEFT));
 
-        $fechaCert = $vigencia = '';
+        $fechaCert = $vigencia = $fechaVig = '';
         if (!empty($p['fecha_curso'])) {
             $ts        = strtotime($p['fecha_curso']);
             $fechaCert = date('d/m/Y', $ts);
             $vigencia  = date('d/m/Y', strtotime('+3 years', $ts));
+            $fechaVig  = $fechaCert . ' - ' . $vigencia;
         }
 
         $dirNombre = 'ING. JOSE MARCOS GONZALEZ CALDERON';
@@ -2184,17 +2185,16 @@ HTML;
 <div style="position:absolute;left:0mm;top:0mm;width:86mm;height:133mm;">{$bgAnverso}</div>
 <div style="position:absolute;left:6mm;top:55.9mm;width:29.7mm;height:31.5mm;">{$fotoHtml}</div>
 <div style="position:absolute;left:9mm;top:83.5mm;width:8mm;">{$escudoHtml}</div>
-<div style="position:absolute;left:47mm;top:52mm;width:37mm;text-align:right;color:#a8ccf0;font-size:5pt;font-weight:bold;letter-spacing:0.5px;">{$folio}</div>
+<div style="position:absolute;left:6mm;top:52mm;width:38mm;color:#a8ccf0;font-size:5.5pt;font-weight:bold;letter-spacing:0.4px;">{$folio}</div>
 <div style="position:absolute;left:47mm;top:57.5mm;width:37mm;color:#ffffff;font-size:9pt;font-weight:bold;line-height:1.2;word-wrap:break-word;letter-spacing:0.3px;">{$nombre}</div>
 <div style="position:absolute;left:47mm;top:67mm;width:37mm;color:#c8e0f8;font-size:6pt;line-height:1.35;word-wrap:break-word;">{$cursoCompleto}</div>
-<div style="position:absolute;left:47mm;top:79mm;width:37mm;color:#c8e0f8;font-size:7pt;font-weight:bold;letter-spacing:0.4px;">{$fechaCert}</div>
+<div style="position:absolute;left:47mm;top:79mm;width:37mm;color:#c8e0f8;font-size:6.5pt;font-weight:bold;letter-spacing:0.3px;">{$fechaVig}</div>
 <div style="position:absolute;left:47mm;top:90mm;width:37mm;color:#96bce0;font-size:6pt;line-height:1.3;word-wrap:break-word;">{$empresa}</div>
 <div style="position:absolute;left:43mm;top:103mm;width:41mm;text-align:center;">
   {$firmaHtml}
   <div style="font-size:5.5pt;font-weight:bold;color:#0a1a32;margin-top:0.5mm;letter-spacing:0.2px;">{$dirNombre}</div>
   <div style="font-size:4pt;color:#1a3050;margin-top:0.3mm;letter-spacing:0.2px;">{$dirTitulo}</div>
 </div>
-<div style="position:absolute;left:43mm;top:129mm;width:41mm;text-align:right;color:#aaccee;font-size:3.8pt;letter-spacing:0.2px;">VIG: {$vigencia}</div>
 HTML;
 
         $reverso = <<<HTML
