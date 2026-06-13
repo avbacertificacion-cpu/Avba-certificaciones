@@ -1902,6 +1902,44 @@ HTML;
     }
 
     /**
+     * Resize a base64 image to max dimensions (maintains aspect ratio).
+     * PNG backgrounds at 1054x1492 become ~6MB base64; at display size (325x503) they're ~0.5MB.
+     */
+    private function resizeImageB64(string $base64, int $maxW, int $maxH, bool $keepPng = false): string {
+        if (!function_exists('imagecreatetruecolor')) return $base64;
+        if (!preg_match('/^data:(image\/\w+);base64,(.+)$/s', $base64, $m)) return $base64;
+        $raw = base64_decode($m[2]);
+        $src = imagecreatefromstring($raw);
+        if (!$src) return $base64;
+
+        $sw = imagesx($src); $sh = imagesy($src);
+        if ($sw <= $maxW && $sh <= $maxH) { imagedestroy($src); return $base64; }
+
+        $scale = min($maxW / $sw, $maxH / $sh);
+        $dw = (int)round($sw * $scale);
+        $dh = (int)round($sh * $scale);
+
+        $dst = imagecreatetruecolor($dw, $dh);
+        if ($keepPng) {
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+            $t = imagecolorallocatealpha($dst, 0, 0, 0, 127);
+            imagefill($dst, 0, 0, $t);
+        }
+        imagecopyresampled($dst, $src, 0, 0, 0, 0, $dw, $dh, $sw, $sh);
+        imagedestroy($src);
+
+        ob_start();
+        if ($keepPng) { imagepng($dst, null, 6); }
+        else          { imagejpeg($dst, null, 82); }
+        $data = ob_get_clean();
+        imagedestroy($dst);
+
+        $mime = $keepPng ? 'image/png' : 'image/jpeg';
+        return 'data:' . $mime . ';base64,' . base64_encode($data);
+    }
+
+    /**
      * Apply rounded corners to a base64 image using PHP GD.
      * mPDF ignores border-radius on position:absolute elements, so we bake it into the image.
      */
@@ -1996,13 +2034,14 @@ HTML;
             $vigencia  = date('d/m/Y', strtotime('+3 years', $ts));
         }
 
-        // ── Assets ────────────────────────────────────────────────────────
-        $anversoB64 = $this->assetB64('credencial_anverso.png');
-        $reversoB64 = $this->assetB64('credencial_reverso.png');
-        $logoB64    = $this->assetB64('logos/avba.png');
+        // ── Assets (redimensionados al tamaño de display para reducir HTML) ─
+        // Credencial: 86x133mm a 96dpi = 325x503px — no necesitamos más resolución
+        $anversoB64 = $this->resizeImageB64($this->assetB64('credencial_anverso.png'), 325, 503, true);
+        $reversoB64 = $this->resizeImageB64($this->assetB64('credencial_reverso.png'), 325, 503, true);
+        $logoB64    = $this->assetB64('logos/avba.png');    // pequeño, no redimensionar
         $firmaB64   = $this->assetB64('logos/firma_director.png');
 
-        // Foto con corrección EXIF de rotación y remoción de fondo (si rembg disponible)
+        // Foto con corrección EXIF y remoción de fondo (si rembg disponible)
         $fotoB64 = '';
         if (!empty($p['foto_persona_url'])) {
             $uploadUrl = defined('UPLOAD_URL') ? rtrim(UPLOAD_URL, '/') : '';
@@ -2012,7 +2051,9 @@ HTML;
                 : dirname(__DIR__) . '/' . ltrim($p['foto_persona_url'], '/');
             if (file_exists($fotoPath)) {
                 $bgRemoved = $this->processPhotoBg($fotoPath);
-                $fotoB64   = $bgRemoved ?: $this->fotoBase64WithExif($fotoPath);
+                $raw       = $bgRemoved ?: $this->fotoBase64WithExif($fotoPath);
+                // Foto box es 30x35mm a 96dpi ≈ 113x132px — 2x para buena calidad = 226x264px
+                $fotoB64   = $this->resizeImageB64($raw, 226, 264, (bool)$bgRemoved);
             }
         }
 
@@ -2488,7 +2529,7 @@ HTML;
         $mpdf->SetHTMLFooter('');
 
         $prevBacktrack = (int) ini_get('pcre.backtrack_limit');
-        ini_set('pcre.backtrack_limit', 10000000);
+        ini_set('pcre.backtrack_limit', 200000000);
 
         // Use split mode (HEADER_CSS + HTML_BODY) — same pattern as Certificaciones.php.
         // WriteHTML($fullHtml) with a complete document ignores @page margins in mPDF,
