@@ -9,12 +9,17 @@
 
 if (PHP_SAPI !== 'cli') {
     if (($_GET['secret'] ?? '') !== 'avba_setup_2025') {
-        http_response_code(403); die('Acceso denegado.');
+        http_response_code(403);
+        die('Acceso denegado. Agrega ?secret=avba_setup_2025 a la URL, o ejecuta desde CLI: php setup_demo.php');
     }
     header('Content-Type: text/plain; charset=utf-8');
 }
 
-require_once __DIR__ . '/config/config.example.php';
+$cfgFile = __DIR__ . '/config/config.php';
+if (!file_exists($cfgFile)) {
+    die("❌ No se encontró config/config.php.\n   Copia config/config.example.php → config/config.php y rellena tus credenciales.\n");
+}
+require_once $cfgFile;
 
 // ── Conexión ──────────────────────────────────────────────────────────────────
 $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
