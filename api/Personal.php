@@ -1948,74 +1948,82 @@ HTML;
             ? "<img src=\"{$reversoB64}\" style=\"width:86mm;height:133mm;display:block;\">"
             : "<div style=\"width:86mm;height:133mm;background:#051226;\"></div>";
 
+        // Foto: width:100% only — altura proporcional, overflow:hidden recorta el exceso.
+        // Así una foto retrato (3:4 o más alta) se muestra desde arriba sin distorsión.
         $fotoHtml = $fotoB64
-            ? "<img src=\"{$fotoB64}\" style=\"width:29mm;height:43mm;display:block;\">"
+            ? "<img src=\"{$fotoB64}\" style=\"width:100%;display:block;\">"
             : '';
 
-        // Escudo AVBA: logo pequeño semitransparente sobre esquina inferior-derecha de la foto
+        // Escudo AVBA: logo pequeño en esquina inferior-derecha del recuadro de foto
         $escudoHtml = $logoB64
-            ? "<img src=\"{$logoB64}\" style=\"width:11mm;height:auto;display:block;\">"
+            ? "<img src=\"{$logoB64}\" style=\"width:9mm;height:auto;display:block;\">"
             : '';
 
         $firmaHtml = $firmaB64
-            ? "<img src=\"{$firmaB64}\" style=\"width:24mm;height:11mm;display:block;margin:0 auto;\">"
+            ? "<img src=\"{$firmaB64}\" style=\"width:26mm;height:12mm;display:block;margin:0 auto;\">"
             : '';
 
+        // QR: tamaño medido en el placeholder del PNG de fondo (27×25 mm)
         $qrHtml = $qrB64
-            ? "<img src=\"{$qrB64}\" style=\"width:44mm;height:44mm;display:block;\">"
+            ? "<img src=\"{$qrB64}\" style=\"width:27mm;height:25mm;display:block;\">"
             : '';
 
         // ════════════════════════════════════════════════════════
-        // ANVERSO  — imagen de fondo + datos superpuestos (position:absolute)
-        // Imagen: 1054×1492 px → 86×133 mm  (escala 0.0816 mm/px × 0.0892 mm/px)
-        // Posiciones estimadas:
-        //   Foto:   left=3mm  top=30mm  w=29mm  h=43mm
-        //   Escudo: left=24mm top=67mm  (esquina inf-der de foto, cubriendo ~4mm)
-        //   Datos:  columna derecha a partir de left=47mm
-        //     Fila 1 (nombre):  top=35mm
-        //     Fila 2 (curso):   top=50mm
-        //     Fila 3 (fecha):   top=64mm
-        //     Fila 4 (empresa): top=78mm
-        //   Firma:  left=46mm  top=109mm
-        //   Folio:  left=4mm   top=119mm
+        // ANVERSO — imagen de fondo 1054×1492 px → 86×133 mm
+        // Posiciones medidas pixel a pixel en el PNG:
+        //   Foto:    left=4mm  top=55mm  w=31mm  h=35mm
+        //   Escudo:  left=27mm top=87mm  w=9mm
+        //   Íconos datos (3 íconos) + texto a la derecha (left=47mm, w=37mm):
+        //     Campo 1 (nombre):  ícono centro ≈62mm  → texto top=58mm
+        //     Campo 2 (cert.):   ícono centro ≈73mm  → texto top=69mm
+        //     Campo 3 (fecha):   ícono centro ≈83mm  → texto top=79mm
+        //     Campo 4 (empresa): bajo recuadro foto  → texto top=92mm
+        //   Firma:   left=44mm  top=107mm  w=40mm
+        //   Folio:   left=5mm   top=121mm
         // ════════════════════════════════════════════════════════
         $anverso = <<<HTML
 <!-- ── Fondo anverso ── -->
 <div style="position:absolute;left:0mm;top:0mm;width:86mm;height:133mm;">{$bgAnverso}</div>
 
-<!-- ── Foto del participante ── -->
-<div style="position:absolute;left:3mm;top:30mm;width:29mm;height:43mm;overflow:hidden;">{$fotoHtml}</div>
+<!-- ── Foto del participante (recuadro medido en PNG: 31×35mm desde top=55mm) ── -->
+<div style="position:absolute;left:4mm;top:55mm;width:31mm;height:35mm;overflow:hidden;">{$fotoHtml}</div>
 
-<!-- ── Escudo AVBA: cubre esquina inferior-derecha de la foto (discreta) ── -->
-<div style="position:absolute;left:24mm;top:67mm;width:11mm;opacity:0.85;">{$escudoHtml}</div>
+<!-- ── Escudo AVBA: esquina inferior-derecha del recuadro de foto ── -->
+<div style="position:absolute;left:27mm;top:87mm;width:9mm;opacity:0.9;">{$escudoHtml}</div>
 
-<!-- ── Datos sobre las líneas del diseño ── -->
-<div style="position:absolute;left:47mm;top:33mm;width:36mm;color:#fff;font-size:5.5pt;font-weight:bold;overflow:hidden;white-space:nowrap;">{$nombre}</div>
-<div style="position:absolute;left:47mm;top:48mm;width:36mm;color:#fff;font-size:5pt;overflow:hidden;white-space:nowrap;">{$cursoCompleto}</div>
-<div style="position:absolute;left:47mm;top:62mm;width:36mm;color:#fff;font-size:5pt;overflow:hidden;white-space:nowrap;">{$fechaCert}</div>
-<div style="position:absolute;left:47mm;top:76mm;width:36mm;color:#fff;font-size:5pt;overflow:hidden;white-space:nowrap;">{$empresa}</div>
+<!-- ── Campo 1: NOMBRE (ícono persona, centro ≈62mm) ── -->
+<div style="position:absolute;left:47mm;top:58mm;width:37mm;color:#ffffff;font-size:7.5pt;font-weight:bold;line-height:1.25;word-wrap:break-word;">{$nombre}</div>
+
+<!-- ── Campo 2: CERTIFICACIÓN (ícono calendario, centro ≈73mm) ── -->
+<div style="position:absolute;left:47mm;top:69mm;width:37mm;color:#ddeeff;font-size:5.5pt;line-height:1.3;word-wrap:break-word;">{$cursoCompleto}</div>
+
+<!-- ── Campo 3: FECHA (ícono reloj/teal, centro ≈83mm) ── -->
+<div style="position:absolute;left:47mm;top:79mm;width:37mm;color:#ddeeff;font-size:6pt;font-weight:bold;">{$fechaCert}</div>
+
+<!-- ── Campo 4: EMPRESA (bajo recuadro de foto, sección inferior) ── -->
+<div style="position:absolute;left:47mm;top:92mm;width:37mm;color:#b8d4ef;font-size:5.5pt;line-height:1.3;word-wrap:break-word;">{$empresa}</div>
 
 <!-- ── Firma + nombre del director ── -->
-<div style="position:absolute;left:46mm;top:107mm;width:34mm;text-align:center;">
+<div style="position:absolute;left:44mm;top:107mm;width:40mm;text-align:center;">
   {$firmaHtml}
-  <div style="font-size:3.5pt;font-weight:bold;color:#fff;letter-spacing:0.2px;margin-top:0.5mm;">JOSÉ MARCOS GONZÁLEZ</div>
-  <div style="font-size:3pt;color:#80b0cc;margin-top:0.5mm;">DIRECTOR GENERAL | AVBA</div>
+  <div style="font-size:4pt;font-weight:bold;color:#ffffff;letter-spacing:0.3px;margin-top:1mm;">JOSÉ MARCOS GONZÁLEZ</div>
+  <div style="font-size:3.5pt;color:#88b8d8;letter-spacing:0.2px;margin-top:0.5mm;">DIRECTOR GENERAL · AVBA INSPECTIONS</div>
 </div>
 
 <!-- ── Folio y vigencia ── -->
-<div style="position:absolute;left:4mm;top:119mm;width:38mm;color:#80b0cc;font-size:3pt;">FOLIO: {$folio} &nbsp;·&nbsp; VIG: {$vigencia}</div>
+<div style="position:absolute;left:5mm;top:121mm;width:38mm;color:#88b8d8;font-size:3.5pt;letter-spacing:0.2px;">FOLIO: {$folio} · VIG: {$vigencia}</div>
 HTML;
 
         // ════════════════════════════════════════════════════════
-        // REVERSO — imagen de fondo + QR superpuesto (position:absolute)
-        // QR: centrado en x=(86-44)/2=21mm, top≈40mm, 44×44mm
+        // REVERSO — imagen de fondo + QR superpuesto
+        // QR placeholder medido en PNG: left=29mm, top=63mm, w=27mm, h=25mm
         // ════════════════════════════════════════════════════════
         $reverso = <<<HTML
 <!-- ── Fondo reverso ── -->
 <div style="position:absolute;left:0mm;top:0mm;width:86mm;height:133mm;">{$bgReverso}</div>
 
 <!-- ── Código QR sobre el placeholder del diseño ── -->
-<div style="position:absolute;left:21mm;top:40mm;width:44mm;height:44mm;">{$qrHtml}</div>
+<div style="position:absolute;left:29mm;top:63mm;width:27mm;height:25mm;">{$qrHtml}</div>
 HTML;
 
         return $anverso . "\n<pagebreak />\n" . $reverso;
