@@ -1901,6 +1901,23 @@ HTML;
         return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fotoPath));
     }
 
+    private function processPhotoBg(string $fotoPath): string {
+        $script = dirname(__DIR__) . '/tools/remove_bg.py';
+        if (!file_exists($script) || !file_exists($fotoPath)) return '';
+        $cacheKey = md5($fotoPath . '|' . filemtime($fotoPath));
+        $outPath  = sys_get_temp_dir() . '/cred_photo_' . $cacheKey . '.png';
+        if (!file_exists($outPath)) {
+            $cmd = 'python3 ' . escapeshellarg($script) . ' '
+                 . escapeshellarg($fotoPath) . ' '
+                 . escapeshellarg($outPath) . ' navy 2>&1';
+            $out = shell_exec($cmd);
+            if (!$out || !str_contains($out, 'OK:') || !file_exists($outPath)) {
+                return '';
+            }
+        }
+        return 'data:image/png;base64,' . base64_encode(file_get_contents($outPath));
+    }
+
     private function htmlCredencialBody(array $p, string $qrB64 = ''): string {
         $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
         $up  = fn($s) => mb_strtoupper(trim((string)$s), 'UTF-8');
@@ -1926,7 +1943,7 @@ HTML;
         $logoB64    = $this->assetB64('logos/avba.png');
         $firmaB64   = $this->assetB64('logos/firma_director.png');
 
-        // Foto con corrección EXIF de rotación
+        // Foto con corrección EXIF de rotación y remoción de fondo (si rembg disponible)
         $fotoB64 = '';
         if (!empty($p['foto_persona_url'])) {
             $uploadUrl = defined('UPLOAD_URL') ? rtrim(UPLOAD_URL, '/') : '';
@@ -1935,7 +1952,8 @@ HTML;
                 ? $uploadDir . '/' . ltrim(str_replace($uploadUrl, '', $p['foto_persona_url']), '/')
                 : dirname(__DIR__) . '/' . ltrim($p['foto_persona_url'], '/');
             if (file_exists($fotoPath)) {
-                $fotoB64 = $this->fotoBase64WithExif($fotoPath);
+                $bgRemoved = $this->processPhotoBg($fotoPath);
+                $fotoB64   = $bgRemoved ?: $this->fotoBase64WithExif($fotoPath);
             }
         }
 
@@ -1965,65 +1983,28 @@ HTML;
 
         // QR: tamaño medido en el placeholder del PNG de fondo (27×25 mm)
         $qrHtml = $qrB64
-            ? "<img src=\"{$qrB64}\" style=\"width:27mm;height:25mm;display:block;\">"
+            ? "<img src=\"{$qrB64}\" style=\"width:27mm;height:25mm;display:block;border-radius:3mm;\">"
             : '';
 
-        // ════════════════════════════════════════════════════════
-        // ANVERSO — imagen de fondo 1054×1492 px → 86×133 mm
-        // Posiciones medidas pixel a pixel en el PNG:
-        //   Foto:    left=4mm  top=55mm  w=31mm  h=35mm
-        //   Escudo:  left=27mm top=87mm  w=9mm
-        //   Íconos datos (3 íconos) + texto a la derecha (left=47mm, w=37mm):
-        //     Campo 1 (nombre):  ícono centro ≈62mm  → texto top=58mm
-        //     Campo 2 (cert.):   ícono centro ≈73mm  → texto top=69mm
-        //     Campo 3 (fecha):   ícono centro ≈83mm  → texto top=79mm
-        //     Campo 4 (empresa): bajo recuadro foto  → texto top=92mm
-        //   Firma:   left=44mm  top=107mm  w=40mm
-        //   Folio:   left=5mm   top=121mm
-        // ════════════════════════════════════════════════════════
         $anverso = <<<HTML
-<!-- ── Fondo anverso ── -->
 <div style="position:absolute;left:0mm;top:0mm;width:86mm;height:133mm;">{$bgAnverso}</div>
-
-<!-- ── Foto del participante (recuadro medido en PNG: 31×35mm desde top=55mm) ── -->
-<div style="position:absolute;left:4mm;top:55mm;width:31mm;height:35mm;overflow:hidden;">{$fotoHtml}</div>
-
-<!-- ── Escudo AVBA: esquina inferior-derecha del recuadro de foto ── -->
+<div style="position:absolute;left:5mm;top:55mm;width:30mm;height:35mm;overflow:hidden;border-radius:3mm;">{$fotoHtml}</div>
 <div style="position:absolute;left:27mm;top:87mm;width:9mm;opacity:0.9;">{$escudoHtml}</div>
-
-<!-- ── Campo 1: NOMBRE (ícono persona, centro ≈62mm) ── -->
-<div style="position:absolute;left:47mm;top:58mm;width:37mm;color:#ffffff;font-size:7.5pt;font-weight:bold;line-height:1.25;word-wrap:break-word;">{$nombre}</div>
-
-<!-- ── Campo 2: CERTIFICACIÓN (ícono calendario, centro ≈73mm) ── -->
-<div style="position:absolute;left:47mm;top:69mm;width:37mm;color:#ddeeff;font-size:5.5pt;line-height:1.3;word-wrap:break-word;">{$cursoCompleto}</div>
-
-<!-- ── Campo 3: FECHA (ícono reloj/teal, centro ≈83mm) ── -->
-<div style="position:absolute;left:47mm;top:79mm;width:37mm;color:#ddeeff;font-size:6pt;font-weight:bold;">{$fechaCert}</div>
-
-<!-- ── Campo 4: EMPRESA (bajo recuadro de foto, sección inferior) ── -->
-<div style="position:absolute;left:47mm;top:92mm;width:37mm;color:#b8d4ef;font-size:5.5pt;line-height:1.3;word-wrap:break-word;">{$empresa}</div>
-
-<!-- ── Firma + nombre del director ── -->
+<div style="position:absolute;left:47mm;top:59mm;width:37mm;color:#ffffff;font-size:7.5pt;font-weight:bold;line-height:1.2;word-wrap:break-word;letter-spacing:0.3px;">{$nombre}</div>
+<div style="position:absolute;left:47mm;top:69mm;width:37mm;color:#c8e0f8;font-size:5.8pt;line-height:1.3;word-wrap:break-word;">{$cursoCompleto}</div>
+<div style="position:absolute;left:47mm;top:80mm;width:37mm;color:#c8e0f8;font-size:6.5pt;font-weight:bold;letter-spacing:0.3px;">{$fechaCert}</div>
+<div style="position:absolute;left:47mm;top:91mm;width:37mm;color:#96bce0;font-size:5.5pt;line-height:1.3;word-wrap:break-word;">{$empresa}</div>
 <div style="position:absolute;left:44mm;top:107mm;width:40mm;text-align:center;">
   {$firmaHtml}
-  <div style="font-size:4pt;font-weight:bold;color:#ffffff;letter-spacing:0.3px;margin-top:1mm;">JOSÉ MARCOS GONZÁLEZ</div>
-  <div style="font-size:3.5pt;color:#88b8d8;letter-spacing:0.2px;margin-top:0.5mm;">DIRECTOR GENERAL · AVBA INSPECTIONS</div>
+  <div style="font-size:4pt;font-weight:bold;color:#ffffff;letter-spacing:0.4px;margin-top:1mm;">JOSE MARCOS GONZALEZ</div>
+  <div style="font-size:3.5pt;color:#88b8d8;letter-spacing:0.3px;margin-top:0.5mm;">DIRECTOR GENERAL - AVBA INSPECTIONS</div>
 </div>
-
-<!-- ── Folio y vigencia ── -->
-<div style="position:absolute;left:5mm;top:121mm;width:38mm;color:#88b8d8;font-size:3.5pt;letter-spacing:0.2px;">FOLIO: {$folio} · VIG: {$vigencia}</div>
+<div style="position:absolute;left:5mm;top:121mm;width:38mm;color:#88b8d8;font-size:3.8pt;letter-spacing:0.2px;">FOLIO: {$folio} - VIG: {$vigencia}</div>
 HTML;
 
-        // ════════════════════════════════════════════════════════
-        // REVERSO — imagen de fondo + QR superpuesto
-        // QR placeholder medido en PNG: left=29mm, top=63mm, w=27mm, h=25mm
-        // ════════════════════════════════════════════════════════
         $reverso = <<<HTML
-<!-- ── Fondo reverso ── -->
 <div style="position:absolute;left:0mm;top:0mm;width:86mm;height:133mm;">{$bgReverso}</div>
-
-<!-- ── Código QR sobre el placeholder del diseño ── -->
-<div style="position:absolute;left:29mm;top:63mm;width:27mm;height:25mm;">{$qrHtml}</div>
+<div style="position:absolute;left:29mm;top:63mm;width:27mm;height:25mm;border-radius:3mm;overflow:hidden;">{$qrHtml}</div>
 HTML;
 
         return $anverso . "\n<pagebreak />\n" . $reverso;
