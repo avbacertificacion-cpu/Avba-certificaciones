@@ -691,6 +691,7 @@ class Admin {
             '', 'dictamen_preview.html', 'dictamen_montacargas.html',
             'dictamen_izaje.html', 'dictamen_ptem.html',
             'dictamen_grua_torre.html', 'dictamen_telehandler.html',
+            'dictamen_mewp.html',
         ];
         if (!in_array($html, $allowed, true)) {
             return ['status' => 'error', 'message' => 'Plantilla HTML no válida.'];

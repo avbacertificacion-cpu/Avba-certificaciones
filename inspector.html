@@ -2673,6 +2673,16 @@ const PC_TEMPLATES = {
       { id:'angulo',    label:'Ángulo de Pluma',    unit:'°'  },
       { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
     ]
+  },
+  'dictamen_mewp.html': {
+    label: 'Plataforma de Elevación Móvil (MEWP)',
+    rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
+    cols: [
+      { id:'peso',      label:'Peso de Prueba',      unit:'kg' },
+      { id:'radio',     label:'Radio de Operación',  unit:'m'  },
+      { id:'altura',    label:'Altura de Trabajo',   unit:'m'  },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
   }
 };
 
