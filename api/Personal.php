@@ -2122,7 +2122,7 @@ HTML;
         if (!empty($p['fecha_curso'])) {
             $ts        = strtotime($p['fecha_curso']);
             $fechaCert = date('d/m/Y', $ts);
-            $vigencia  = date('d/m/Y', strtotime('+3 years', $ts));
+            $vigencia  = date('d/m/Y', strtotime('+1 year', $ts));
             $fechaVig  = $fechaCert . ' - ' . $vigencia;
         }
 
