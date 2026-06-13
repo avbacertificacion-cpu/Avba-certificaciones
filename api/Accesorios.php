@@ -95,6 +95,7 @@ class Accesorios {
 
     // ── Guardar un accesorio (multipart) ───────────────────
     public function guardarAccesorio(array $post, array $files, string $usuario): array {
+        $this->ensureAccIzajeQrColumn();
         $sesionId = (int)($post['sesion_id'] ?? 0);
         if (!$sesionId) return ['status' => 'error', 'message' => 'sesion_id requerido.'];
 
@@ -106,6 +107,12 @@ class Accesorios {
         $estado = in_array($post['estado'] ?? '', ['CUMPLE','NO CUMPLE'])
             ? $post['estado'] : 'CUMPLE';
 
+        $qrCodigo = trim($post['qr_codigo'] ?? '');
+        if ($qrCodigo !== '' && !preg_match('/^\d{10}$/', $qrCodigo))
+            return ['status' => 'error', 'message' => 'El código QR debe ser exactamente 10 dígitos.'];
+        if ($qrCodigo !== '' && !$this->qrDisponible($qrCodigo))
+            return ['status' => 'error', 'message' => 'Ese QR ya está en uso.'];
+
         // Count existing accessories in session for orden
         $cntStmt = $this->pdo->prepare("SELECT COUNT(*) FROM accesorios_izaje WHERE sesion_id = ?");
         $cntStmt->execute([$sesionId]);
@@ -113,8 +120,8 @@ class Accesorios {
 
         $this->pdo->prepare(
             "INSERT INTO accesorios_izaje
-             (sesion_id, id_accesorio, tipo_id, marca, modelo, serie, capacidad, medidas, estado, orden)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             (sesion_id, id_accesorio, tipo_id, marca, modelo, serie, capacidad, medidas, estado, orden, qr_codigo)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )->execute([
             $sesionId,
             strtoupper(trim($post['id_accesorio'] ?? '')),
@@ -126,6 +133,7 @@ class Accesorios {
             strtoupper(trim($post['medidas']  ?? '')),
             $estado,
             $orden,
+            $qrCodigo ?: null,
         ]);
 
         $accesorioId = (int)$this->pdo->lastInsertId();
@@ -186,6 +194,7 @@ class Accesorios {
             'message'     => 'Accesorio guardado.',
             'id'          => $accesorioId,
             'tipo_nombre' => $tipoNombre,
+            'qr_codigo'   => $qrCodigo ?: null,
         ];
     }
 
@@ -250,7 +259,7 @@ class Accesorios {
         $stmt = $this->pdo->prepare(
             "SELECT a.id, a.id_accesorio, t.nombre AS tipo_nombre,
                     a.marca, a.modelo, a.serie, a.capacidad, a.medidas,
-                    a.estado, a.orden,
+                    a.estado, a.orden, a.qr_codigo,
                     COUNT(f.id) AS total_fotos
              FROM accesorios_izaje a
              LEFT JOIN accesorios_tipos t ON t.id = a.tipo_id
@@ -284,6 +293,7 @@ class Accesorios {
 
     // ── Editar accesorio inspeccionado ────────────────────
     public function editarAccesorio(array $payload): array {
+        $this->ensureAccIzajeQrColumn();
         $id        = (int)($payload['id']           ?? 0);
         $tipoId    = (int)($payload['tipo_id']       ?? 0) ?: null;
         $idAcc     = strtoupper(trim($payload['id_accesorio']   ?? ''));
@@ -293,21 +303,29 @@ class Accesorios {
         $capacidad = strtoupper(trim($payload['capacidad']      ?? ''));
         $medidas   = strtoupper(trim($payload['medidas']        ?? ''));
         $estado    = trim($payload['estado']         ?? '');
+        $qrCodigo  = trim($payload['qr_codigo']      ?? '');
 
         if ($id <= 0) return ['status' => 'error', 'message' => 'id requerido.'];
 
         if ($estado && !in_array($estado, ['CUMPLE','NO CUMPLE'], true))
             return ['status' => 'error', 'message' => 'Estado no válido. Use CUMPLE o NO CUMPLE.'];
 
-        $chk = $this->pdo->prepare("SELECT id FROM accesorios_izaje WHERE id = ?");
+        if ($qrCodigo !== '' && !preg_match('/^\d{10}$/', $qrCodigo))
+            return ['status' => 'error', 'message' => 'El código QR debe ser exactamente 10 dígitos.'];
+
+        $chk = $this->pdo->prepare("SELECT id, qr_codigo FROM accesorios_izaje WHERE id = ?");
         $chk->execute([$id]);
-        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Accesorio no encontrado.'];
+        $row = $chk->fetch();
+        if (!$row) return ['status' => 'error', 'message' => 'Accesorio no encontrado.'];
+
+        if ($qrCodigo !== '' && $row['qr_codigo'] !== $qrCodigo && !$this->qrDisponible($qrCodigo, $id))
+            return ['status' => 'error', 'message' => 'El código QR ya está en uso en otro registro.'];
 
         $this->pdo->prepare(
             "UPDATE accesorios_izaje
-             SET tipo_id=?, id_accesorio=?, marca=?, modelo=?, serie=?, capacidad=?, medidas=?, estado=?
+             SET tipo_id=?, id_accesorio=?, marca=?, modelo=?, serie=?, capacidad=?, medidas=?, estado=?, qr_codigo=?
              WHERE id=?"
-        )->execute([$tipoId, $idAcc, $marca, $modelo, $serie, $capacidad, $medidas, $estado, $id]);
+        )->execute([$tipoId, $idAcc, $marca, $modelo, $serie, $capacidad, $medidas, $estado, $qrCodigo ?: null, $id]);
 
         return ['status' => 'success', 'message' => 'Accesorio actualizado.'];
     }
@@ -593,6 +611,83 @@ class Accesorios {
             $comp = fpdiMsgCompresion($e);
             return ['status' => 'error', 'message' => $comp ?? ('Error generando vista previa: ' . $e->getMessage())];
         }
+    }
+
+    private function ensureAccIzajeQrColumn(): void {
+        try {
+            $this->pdo->exec("ALTER TABLE accesorios_izaje ADD COLUMN IF NOT EXISTS qr_codigo VARCHAR(20) NULL");
+        } catch (\Throwable $e) {}
+    }
+
+    private function qrDisponible(string $qr, int $excludeAccId = 0): bool {
+        // qr_codigos pool: if marked used by someone else
+        $r = $this->pdo->prepare("SELECT id FROM qr_codigos WHERE identificador = ? AND usado = 1");
+        $r->execute([$qr]);
+        if ($r->fetch()) return false;
+
+        // equipos
+        $r = $this->pdo->prepare("SELECT id FROM equipos WHERE qr_codigo = ? LIMIT 1");
+        $r->execute([$qr]);
+        if ($r->fetch()) return false;
+
+        // participantes_cursos
+        $r = $this->pdo->prepare("SELECT id FROM participantes_cursos WHERE qr_codigo = ? LIMIT 1");
+        $r->execute([$qr]);
+        if ($r->fetch()) return false;
+
+        // accesorios_sesiones
+        $r = $this->pdo->prepare("SELECT id FROM accesorios_sesiones WHERE qr_codigo = ? LIMIT 1");
+        $r->execute([$qr]);
+        if ($r->fetch()) return false;
+
+        // accesorios_izaje (excluding self)
+        $sql    = "SELECT id FROM accesorios_izaje WHERE qr_codigo = ?";
+        $params = [$qr];
+        if ($excludeAccId > 0) { $sql .= " AND id != ?"; $params[] = $excludeAccId; }
+        $r = $this->pdo->prepare($sql);
+        $r->execute($params);
+        if ($r->fetch()) return false;
+
+        return true;
+    }
+
+    public function getSiguienteQrAcc(): array {
+        $this->ensureAccIzajeQrColumn();
+        $max = 0;
+        $queries = [
+            "SELECT MAX(CAST(identificador AS UNSIGNED)) FROM qr_codigos",
+            "SELECT MAX(CAST(qr_codigo AS UNSIGNED)) FROM equipos WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''",
+            "SELECT MAX(CAST(qr_codigo AS UNSIGNED)) FROM participantes_cursos WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''",
+            "SELECT MAX(CAST(qr_codigo AS UNSIGNED)) FROM accesorios_sesiones WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''",
+            "SELECT MAX(CAST(qr_codigo AS UNSIGNED)) FROM accesorios_izaje WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''",
+        ];
+        foreach ($queries as $sql) {
+            try {
+                $val = (int)$this->pdo->query($sql)->fetchColumn();
+                if ($val > $max) $max = $val;
+            } catch (\Throwable $e) {}
+        }
+        $siguiente = str_pad((string)($max + 1), 10, '0', STR_PAD_LEFT);
+        return ['status' => 'success', 'qr' => $siguiente];
+    }
+
+    public function asignarQrAccesorio(int $id, string $qr): array {
+        $this->ensureAccIzajeQrColumn();
+        if (!preg_match('/^\d{10}$/', $qr))
+            return ['status' => 'error', 'message' => 'El código QR debe ser exactamente 10 dígitos.'];
+
+        $chk = $this->pdo->prepare("SELECT id, qr_codigo FROM accesorios_izaje WHERE id = ?");
+        $chk->execute([$id]);
+        $row = $chk->fetch();
+        if (!$row) return ['status' => 'error', 'message' => 'Accesorio no encontrado.'];
+
+        if ($row['qr_codigo'] !== $qr && !$this->qrDisponible($qr, $id))
+            return ['status' => 'error', 'message' => 'El código QR ya está en uso en otro registro.'];
+
+        $this->pdo->prepare("UPDATE accesorios_izaje SET qr_codigo = ? WHERE id = ?")
+            ->execute([$qr, $id]);
+
+        return ['status' => 'success', 'message' => 'QR asignado correctamente.', 'qr' => $qr];
     }
 
     private function ensureAccSesionesColumns(): void {

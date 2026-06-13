@@ -834,9 +834,14 @@ function mostrarResultado(data) {
     if (modulo === 'accesorio') {
       return [
         filaHTML("Tipo de accesorio", d.tipo||"—"),
+        d.id_accesorio ? filaHTML("ID Accesorio",   d.id_accesorio) : "",
         (d.marca||d.modelo) ? filaHTML("Marca / Modelo", [d.marca,d.modelo].filter(Boolean).join(' ')) : "",
         d.serie     ? filaHTML("No. de serie",  d.serie)    : "",
         d.capacidad ? filaHTML("Capacidad",     d.capacidad): "",
+        d.medidas   ? filaHTML("Medidas",       d.medidas)  : "",
+        d.estado    ? filaHTML("Estado",        d.estado)   : "",
+        d.cliente   ? filaHTML("Cliente",       d.cliente)  : "",
+        d.total     ? filaHTML("Total accesorios", d.total) : "",
         filaHTML("Inspeccionado el", d.fecha||"—"),
         d.vencimiento ? filaHTML("Válido hasta", d.vencimiento) : "",
       ].join('');

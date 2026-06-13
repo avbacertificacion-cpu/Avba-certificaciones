@@ -1420,6 +1420,17 @@
           <option value="NO CUMPLE">No cumple</option>
         </select>
       </div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Código QR <span style="font-size:10px;font-weight:400">(10 dígitos)</span></label>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input id="edit-acc-qr" type="text" maxlength="10" inputmode="numeric" placeholder="0000000000"
+                 style="flex:1;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px;letter-spacing:2px">
+          <button type="button" onclick="editAccSugerirQR()"
+                  style="padding:8px 10px;background:#e8f5e9;color:#2e7d32;border:1.5px solid #a5d6a7;border-radius:var(--radio);cursor:pointer;font-size:12px" title="Siguiente QR disponible">
+            →
+          </button>
+        </div>
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn-nc-cancel" onclick="cerrarEditAcc()">Cancelar</button>
@@ -3495,6 +3506,7 @@ function abrirEditAcc(a) {
   document.getElementById('edit-acc-capacidad').value = a.capacidad || '';
   document.getElementById('edit-acc-medidas').value = a.medidas  || '';
   document.getElementById('edit-acc-estado').value  = a.estado   || 'APTO';
+  document.getElementById('edit-acc-qr').value      = a.qr_codigo || '';
 
   document.getElementById('overlay-edit-acc').classList.add('open');
 }
@@ -3525,6 +3537,7 @@ async function guardarEditAcc() {
           capacidad:    document.getElementById('edit-acc-capacidad').value.trim(),
           medidas:      document.getElementById('edit-acc-medidas').value.trim(),
           estado:       document.getElementById('edit-acc-estado').value,
+          qr_codigo:    document.getElementById('edit-acc-qr').value.replace(/\D/g,'') || '',
         }
       })
     });
@@ -3542,6 +3555,15 @@ async function guardarEditAcc() {
     btn.disabled = false;
     btn.textContent = 'Guardar cambios';
   }
+}
+
+async function editAccSugerirQR() {
+  try {
+    const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res = await fetch(API + '?action=GET_NEXT_QR_ACC', { headers: { 'X-Token': s.token || '' } });
+    const d   = await res.json();
+    if (d.status === 'success') document.getElementById('edit-acc-qr').value = d.qr;
+  } catch(e) {}
 }
 
 /* ════════════════════════════════════════

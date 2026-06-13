@@ -2452,6 +2452,20 @@
         </div>
 
         <div class="field">
+          <label>Código QR <span style="font-size:11px;color:var(--texto-hint)">(10 dígitos)</span></label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="text" id="iza-qr" placeholder="Escanear o ingresar manualmente"
+                   maxlength="10" inputmode="numeric" pattern="\d{10}" style="flex:1;letter-spacing:2px">
+            <button type="button" onclick="izaEscanearQR()" title="Escanear con cámara"
+                    style="padding:9px 13px;background:var(--primario);color:#fff;border:none;border-radius:var(--radio);cursor:pointer;font-size:15px;line-height:1">📷</button>
+            <button type="button" onclick="izaSugerirQR()" title="Siguiente QR disponible"
+                    style="padding:9px 11px;background:#e8f5e9;color:#2e7d32;border:1.5px solid #a5d6a7;border-radius:var(--radio);cursor:pointer;font-size:13px">→</button>
+          </div>
+          <div id="iza-qr-scanner" style="display:none;margin-top:8px;border-radius:8px;overflow:hidden"></div>
+          <div id="iza-qr-error" style="color:#c0392b;font-size:11px;margin-top:3px"></div>
+        </div>
+
+        <div class="field">
           <label>Evidencia fotográfica <span style="font-size:11px;color:var(--texto-hint)">(máx. 6)</span></label>
           <div class="iza-fotos-grid" id="iza-fotos-grid"></div>
           <input type="file" id="iza-fotos-input" accept="image/*" multiple style="display:none" onchange="izaProcesarFotos(this)">
@@ -5089,6 +5103,15 @@ async function izaGuardar() {
   }
   fTipo.classList.remove('has-error');
 
+  const qrVal = (document.getElementById('iza-qr')?.value || '').replace(/\D/g,'');
+  const qrErr = document.getElementById('iza-qr-error');
+  if (qrVal && qrVal.length !== 10) {
+    if (qrErr) qrErr.textContent = 'El QR debe tener exactamente 10 dígitos.';
+    document.getElementById('iza-qr').focus();
+    return;
+  }
+  if (qrErr) qrErr.textContent = '';
+
   const btn = document.getElementById('iza-btn-guardar');
   btn.disabled    = true;
   btn.textContent = 'Guardando…';
@@ -5107,6 +5130,7 @@ async function izaGuardar() {
     fd.append('capacidad',   document.getElementById('iza-capacidad').value.trim());
     fd.append('medidas',     document.getElementById('iza-medidas').value.trim());
     fd.append('estado',      izaEstadoVal);
+    if (qrVal) fd.append('qr_codigo', qrVal);
     izaFotos.forEach(f => fd.append('fotos[]', f, f.name));
 
     const res  = await fetch(WEB_APP_URL, { method: 'POST', body: fd });
@@ -5121,6 +5145,7 @@ async function izaGuardar() {
         marca:       document.getElementById('iza-marca').value.trim(),
         serie:       document.getElementById('iza-serie').value.trim(),
         estado:      izaEstadoVal,
+        qr_codigo:   data.qr_codigo || qrVal || '',
       });
       izaRenderLista();
       izaMostrar('lista');
@@ -5165,9 +5190,52 @@ function izaAgregarOtro() {
   izaMostrar('form');
 }
 
+// ── QR helpers ────────────────────────────────────────
+async function izaSugerirQR() {
+  try {
+    const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res = await fetch(WEB_APP_URL + '?action=GET_NEXT_QR_ACC', {
+      headers: { 'X-Token': s.token || '' }
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      document.getElementById('iza-qr').value = data.qr;
+    }
+  } catch (e) { console.error('izaSugerirQR:', e); }
+}
+
+let izaQrScanner = null;
+async function izaEscanearQR() {
+  const container = document.getElementById('iza-qr-scanner');
+  if (izaQrScanner) {
+    izaQrScanner.clear().then(() => { izaQrScanner = null; container.style.display = 'none'; });
+    return;
+  }
+  if (typeof Html5Qrcode === 'undefined') {
+    mostrarToast('Escáner no disponible. Ingresa el código manualmente.', 'err');
+    return;
+  }
+  container.style.display = 'block';
+  izaQrScanner = new Html5Qrcode('iza-qr-scanner');
+  izaQrScanner.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 200, height: 200 } },
+    (text) => {
+      const digits = text.replace(/\D/g, '').slice(0, 10);
+      document.getElementById('iza-qr').value = digits;
+      izaQrScanner.stop().then(() => { izaQrScanner = null; container.style.display = 'none'; });
+    },
+    () => {}
+  ).catch(err => {
+    mostrarToast('No se pudo acceder a la cámara.', 'err');
+    container.style.display = 'none';
+    izaQrScanner = null;
+  });
+}
+
 // ── Limpiar formulario de accesorio ──────────────────
 function izaLimpiarForm() {
-  ['iza-id','iza-marca','iza-modelo','iza-serie','iza-capacidad','iza-medidas'].forEach(id => {
+  ['iza-id','iza-marca','iza-modelo','iza-serie','iza-capacidad','iza-medidas','iza-qr'].forEach(id => {
     document.getElementById(id).value = '';
   });
   document.getElementById('iza-tipo').value = '';

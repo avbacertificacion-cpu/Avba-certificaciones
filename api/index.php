@@ -201,6 +201,11 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cal->listarQrInfo($_GET['filtro'] ?? 'todos'));
 
+        case 'GET_NEXT_QR_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->getSiguienteQrAcc());
+
         // Panel de Certificaciones
         case 'getDataCertificaciones':
         case 'GET_DATA_CERTIFICACIONES':
@@ -961,6 +966,11 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->editarAccesorio($payload));
+
+        case 'ASIGNAR_QR_ACCESORIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->asignarQrAccesorio((int)($payload['id'] ?? 0), trim($payload['qr'] ?? '')));
 
         case 'APROBAR_SESION_ACC':
             $usr = validarToken($pdo, $token);

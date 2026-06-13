@@ -76,6 +76,47 @@ class ValidarQR {
     // ── Accesorios de Izaje ────────────────────────────────
     private function buscarAccesorio(string $q, bool $esFolio): ?array {
         try {
+            // Para códigos de 10 dígitos: buscar primero por QR individual del accesorio
+            if (!$esFolio) {
+                $stmt = $this->pdo->prepare(
+                    "SELECT i.id, i.id_accesorio, COALESCE(t.nombre,'') AS tipo_nombre,
+                            i.marca, i.modelo, i.serie, i.capacidad, i.medidas, i.estado,
+                            s.cliente, s.fecha, s.estatus
+                     FROM accesorios_izaje i
+                     JOIN accesorios_sesiones s ON s.id = i.sesion_id
+                     LEFT JOIN accesorios_tipos t ON t.id = i.tipo_id
+                     WHERE i.qr_codigo = ? AND s.estatus IN ('APROBADO_CALIDAD','EMITIDO') LIMIT 1"
+                );
+                $stmt->execute([$q]);
+                $acc = $stmt->fetch();
+                if ($acc) {
+                    $v = calcularVigencia($acc['fecha']);
+                    return [
+                        'status'  => 'ok',
+                        'existe'  => true,
+                        'modulo'  => 'accesorio',
+                        'vigente' => $v['vigente'],
+                        'dias'    => $v['dias'],
+                        'datos'   => [
+                            'titulo'       => 'Accesorio de Izaje',
+                            'tipo'         => $acc['tipo_nombre'] ?: 'Accesorio de Izaje',
+                            'id_accesorio' => $acc['id_accesorio'],
+                            'marca'        => $acc['marca'],
+                            'modelo'       => $acc['modelo'],
+                            'serie'        => $acc['serie'],
+                            'capacidad'    => $acc['capacidad'],
+                            'medidas'      => $acc['medidas'],
+                            'estado'       => $acc['estado'],
+                            'cliente'      => $acc['cliente'],
+                            'fecha'        => $acc['fecha']
+                                ? (new DateTime($acc['fecha']))->format('d/m/Y') : '',
+                            'vencimiento'  => $v['vencimiento'],
+                        ],
+                    ];
+                }
+            }
+
+            // Fallback: buscar por QR o folio de sesión
             if ($esFolio) {
                 $stmt = $this->pdo->prepare(
                     "SELECT s.id, s.cliente, s.fecha, s.estatus
@@ -94,19 +135,18 @@ class ValidarQR {
             $sesion = $stmt->fetch();
             if (!$sesion) return null;
 
-            // Obtener primer accesorio de la sesión para mostrar detalles
             $acc = $this->pdo->prepare(
-                "SELECT i.tipo_nombre, i.marca, i.modelo, i.serie, i.capacidad
+                "SELECT COALESCE(t.nombre,'') AS tipo_nombre, i.marca, i.modelo, i.serie, i.capacidad
                  FROM accesorios_izaje i
+                 LEFT JOIN accesorios_tipos t ON t.id = i.tipo_id
                  WHERE i.sesion_id = ? ORDER BY i.id LIMIT 1"
             );
             $acc->execute([$sesion['id']]);
             $accRow = $acc->fetch();
 
-            // Contar accesorios de la sesión
             $cntStmt = $this->pdo->prepare("SELECT COUNT(*) FROM accesorios_izaje WHERE sesion_id = ?");
             $cntStmt->execute([$sesion['id']]);
-            $total = (int) $cntStmt->fetchColumn();
+            $total = (int)$cntStmt->fetchColumn();
 
             $v = calcularVigencia($sesion['fecha']);
             return [
@@ -116,16 +156,17 @@ class ValidarQR {
                 'vigente' => $v['vigente'],
                 'dias'    => $v['dias'],
                 'datos'   => [
-                    'titulo'     => 'Certificado de Accesorio de Izaje',
-                    'tipo'       => $accRow['tipo_nombre'] ?? 'Accesorio de Izaje',
-                    'marca'      => $accRow['marca']       ?? '',
-                    'modelo'     => $accRow['modelo']      ?? '',
-                    'serie'      => $accRow['serie']       ?? '',
-                    'capacidad'  => $accRow['capacidad']   ?? '',
-                    'cliente'    => $sesion['cliente']     ?? '',
-                    'fecha'      => $sesion['fecha']
+                    'titulo'      => 'Certificado de Accesorios de Izaje',
+                    'tipo'        => $accRow['tipo_nombre'] ?? 'Accesorio de Izaje',
+                    'marca'       => $accRow['marca']       ?? '',
+                    'modelo'      => $accRow['modelo']      ?? '',
+                    'serie'       => $accRow['serie']       ?? '',
+                    'capacidad'   => $accRow['capacidad']   ?? '',
+                    'cliente'     => $sesion['cliente']     ?? '',
+                    'total'       => $total,
+                    'fecha'       => $sesion['fecha']
                         ? (new DateTime($sesion['fecha']))->format('d/m/Y') : '',
-                    'vencimiento'=> $v['vencimiento'],
+                    'vencimiento' => $v['vencimiento'],
                 ],
             ];
         } catch (\Throwable $e) {
