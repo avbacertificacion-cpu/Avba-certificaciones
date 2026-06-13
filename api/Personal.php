@@ -1902,19 +1902,30 @@ HTML;
     }
 
     private function processPhotoBg(string $fotoPath): string {
-        if (!function_exists('shell_exec') || !function_exists('escapeshellarg')) return '';
         $script = dirname(__DIR__) . '/tools/remove_bg.py';
         if (!file_exists($script) || !file_exists($fotoPath)) return '';
         $cacheKey = md5($fotoPath . '|' . filemtime($fotoPath));
         $outPath  = sys_get_temp_dir() . '/cred_photo_' . $cacheKey . '.png';
         if (!file_exists($outPath)) {
-            $cmd = 'python3 ' . escapeshellarg($script) . ' '
-                 . escapeshellarg($fotoPath) . ' '
-                 . escapeshellarg($outPath) . ' navy 2>&1';
-            $out = shell_exec($cmd);
-            if (!$out || !str_contains($out, 'OK:') || !file_exists($outPath)) {
-                return '';
+            $py  = escapeshellarg('python3');
+            $scr = escapeshellarg($script);
+            $inp = escapeshellarg($fotoPath);
+            $out = escapeshellarg($outPath);
+            $cmd = "$py $scr $inp $out navy";
+            $result = '';
+            if (function_exists('exec')) {
+                exec("$cmd 2>&1", $lines);
+                $result = implode("\n", $lines);
+            } elseif (function_exists('shell_exec')) {
+                $result = (string)shell_exec("$cmd 2>&1");
+            } elseif (function_exists('proc_open')) {
+                $proc = proc_open($cmd, [1 => ['pipe','w'], 2 => ['pipe','w']], $pipes);
+                if (is_resource($proc)) {
+                    $result = stream_get_contents($pipes[1]) . stream_get_contents($pipes[2]);
+                    proc_close($proc);
+                }
             }
+            if (!str_contains($result, 'OK:') || !file_exists($outPath)) return '';
         }
         return 'data:image/png;base64,' . base64_encode(file_get_contents($outPath));
     }
@@ -1993,7 +2004,7 @@ HTML;
 <div style="position:absolute;left:27mm;top:87mm;width:9mm;opacity:0.9;">{$escudoHtml}</div>
 <div style="position:absolute;left:47mm;top:59mm;width:37mm;color:#ffffff;font-size:7.5pt;font-weight:bold;line-height:1.2;word-wrap:break-word;letter-spacing:0.3px;">{$nombre}</div>
 <div style="position:absolute;left:47mm;top:69mm;width:37mm;color:#c8e0f8;font-size:5.8pt;line-height:1.3;word-wrap:break-word;">{$cursoCompleto}</div>
-<div style="position:absolute;left:47mm;top:80mm;width:37mm;color:#c8e0f8;font-size:6.5pt;font-weight:bold;letter-spacing:0.3px;">{$fechaCert}</div>
+<div style="position:absolute;left:47mm;top:82mm;width:37mm;color:#c8e0f8;font-size:6.5pt;font-weight:bold;letter-spacing:0.3px;">{$fechaCert}</div>
 <div style="position:absolute;left:47mm;top:91mm;width:37mm;color:#96bce0;font-size:5.5pt;line-height:1.3;word-wrap:break-word;">{$empresa}</div>
 <div style="position:absolute;left:44mm;top:107mm;width:40mm;text-align:center;">
   {$firmaHtml}
