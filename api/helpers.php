@@ -405,7 +405,8 @@ function protegerPdf(string $pdfBytes): string
             $pdf->useTemplate($tpl, 0, 0, $sz['width'], $sz['height']);
         }
 
-        $pdf->SetProtection(['print', 'print-hi'], '', 'Avba@Cert2024!');
+        // Solo proteger contra modificaciones; permitir apertura y copia libre
+        $pdf->SetProtection(['print', 'print-hi', 'copy', 'modify', 'annot-forms', 'fill-forms', 'extract', 'assemble'], '', 'Avba@Cert2024!');
         $result = $pdf->Output('', 'S');
         @unlink($tmpIn);
         return $result;

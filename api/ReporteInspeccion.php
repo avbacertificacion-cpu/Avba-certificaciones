@@ -119,7 +119,7 @@ class ReporteInspeccion {
             $rutaPDF  = $carpeta . $archivo;
             $urlPDF   = rtrim(UPLOAD_URL, '/') . '/reportes/' . $archivo;
 
-            $bytes = protegerPdf($dompdf->output());
+            $bytes = $dompdf->output();
             if (!$bytes) return ['status' => 'error', 'message' => 'DOMPDF no generó contenido.'];
             if (file_put_contents($rutaPDF, $bytes) === false) {
                 return ['status' => 'error', 'message' => "No se pudo escribir el archivo: {$rutaPDF}"];
