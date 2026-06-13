@@ -1901,6 +1901,53 @@ HTML;
         return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($fotoPath));
     }
 
+    /**
+     * Apply rounded corners to a base64 image using PHP GD.
+     * mPDF ignores border-radius on position:absolute elements, so we bake it into the image.
+     */
+    private function addRoundedCorners(string $base64, int $radiusPx = 22): string {
+        if (!function_exists('imagecreatetruecolor')) return $base64;
+        if (!preg_match('/^data:(image\/\w+);base64,(.+)$/s', $base64, $m)) return $base64;
+        $raw = base64_decode($m[2]);
+        $src = imagecreatefromstring($raw);
+        if (!$src) return $base64;
+
+        $w = imagesx($src);
+        $h = imagesy($src);
+        $r = min($radiusPx, (int)(min($w, $h) * 0.15)); // cap at 15% of smallest side
+
+        $dst = imagecreatetruecolor($w, $h);
+        imagealphablending($dst, false);
+        imagesavealpha($dst, true);
+        $trans = imagecolorallocatealpha($dst, 0, 0, 0, 127);
+        imagefill($dst, 0, 0, $trans);
+        // Copy source onto transparent canvas (blend ON so non-alpha sources work)
+        imagealphablending($dst, true);
+        imagecopy($dst, $src, 0, 0, 0, 0, $w, $h);
+        // Must turn blending OFF before writing transparent pixels or they blend in
+        imagealphablending($dst, false);
+
+        // Cut the four corners: mark pixels outside the arc as transparent
+        for ($x = 0; $x < $r; $x++) {
+            for ($y = 0; $y < $r; $y++) {
+                if (($r-$x-1)*($r-$x-1) + ($r-$y-1)*($r-$y-1) > $r*$r) {
+                    imagesetpixel($dst, $x,       $y,       $trans); // top-left
+                    imagesetpixel($dst, $w-1-$x,  $y,       $trans); // top-right
+                    imagesetpixel($dst, $x,       $h-1-$y,  $trans); // bottom-left
+                    imagesetpixel($dst, $w-1-$x,  $h-1-$y,  $trans); // bottom-right
+                }
+            }
+        }
+
+        imagesavealpha($dst, true);
+        ob_start();
+        imagepng($dst);
+        $png = ob_get_clean();
+        imagedestroy($src);
+        imagedestroy($dst);
+        return 'data:image/png;base64,' . base64_encode($png);
+    }
+
     private function processPhotoBg(string $fotoPath): string {
         $script = dirname(__DIR__) . '/tools/remove_bg.py';
         if (!file_exists($script) || !file_exists($fotoPath)) return '';
@@ -1993,30 +2040,38 @@ HTML;
             ? "<img src=\"{$firmaB64}\" style=\"width:26mm;height:12mm;display:block;margin:0 auto;\">"
             : '';
 
-        // QR: tamaño medido en el placeholder del PNG de fondo (27×25 mm)
-        $qrHtml = $qrB64
-            ? "<img src=\"{$qrB64}\" style=\"width:27mm;height:25mm;display:block;border-radius:3mm;\">"
+        // QR con esquinas redondeadas aplicadas en la imagen (mPDF ignora border-radius en position:absolute)
+        $qrRounded = $qrB64 ? $this->addRoundedCorners($qrB64, 18) : '';
+        $qrHtml = $qrRounded
+            ? "<img src=\"{$qrRounded}\" style=\"width:27mm;height:25mm;display:block;\">"
+            : '';
+
+        // Foto con esquinas redondeadas aplicadas en la imagen
+        $fotoRounded = $fotoB64 ? $this->addRoundedCorners($fotoB64, 22) : '';
+        $fotoHtml = $fotoRounded
+            ? "<img src=\"{$fotoRounded}\" style=\"width:100%;display:block;\">"
             : '';
 
         $anverso = <<<HTML
 <div style="position:absolute;left:0mm;top:0mm;width:86mm;height:133mm;">{$bgAnverso}</div>
-<div style="position:absolute;left:5mm;top:55mm;width:30mm;height:35mm;overflow:hidden;border-radius:3mm;">{$fotoHtml}</div>
+<div style="position:absolute;left:5mm;top:55mm;width:30mm;height:35mm;overflow:hidden;">{$fotoHtml}</div>
 <div style="position:absolute;left:27mm;top:87mm;width:9mm;opacity:0.9;">{$escudoHtml}</div>
 <div style="position:absolute;left:47mm;top:59mm;width:37mm;color:#ffffff;font-size:7.5pt;font-weight:bold;line-height:1.2;word-wrap:break-word;letter-spacing:0.3px;">{$nombre}</div>
 <div style="position:absolute;left:47mm;top:69mm;width:37mm;color:#c8e0f8;font-size:5.8pt;line-height:1.3;word-wrap:break-word;">{$cursoCompleto}</div>
 <div style="position:absolute;left:47mm;top:82mm;width:37mm;color:#c8e0f8;font-size:6.5pt;font-weight:bold;letter-spacing:0.3px;">{$fechaCert}</div>
 <div style="position:absolute;left:47mm;top:91mm;width:37mm;color:#96bce0;font-size:5.5pt;line-height:1.3;word-wrap:break-word;">{$empresa}</div>
-<div style="position:absolute;left:44mm;top:107mm;width:40mm;text-align:center;">
+<div style="position:absolute;left:44mm;top:106mm;width:40mm;text-align:center;">
   {$firmaHtml}
-  <div style="font-size:4pt;font-weight:bold;color:#ffffff;letter-spacing:0.4px;margin-top:1mm;">JOSE MARCOS GONZALEZ</div>
-  <div style="font-size:3.5pt;color:#88b8d8;letter-spacing:0.3px;margin-top:0.5mm;">DIRECTOR GENERAL - AVBA INSPECTIONS</div>
+  <div style="font-size:5pt;font-weight:bold;color:#0c2340;letter-spacing:0.3px;margin-top:0.5mm;">JOSE MARCOS GONZALEZ</div>
+  <div style="font-size:4pt;color:#1a4060;letter-spacing:0.2px;margin-top:0.3mm;">DIRECTOR GENERAL - AVBA INSPECTIONS</div>
 </div>
-<div style="position:absolute;left:5mm;top:121mm;width:38mm;color:#88b8d8;font-size:3.8pt;letter-spacing:0.2px;">FOLIO: {$folio} - VIG: {$vigencia}</div>
+<div style="position:absolute;left:5mm;top:122mm;width:38mm;color:#ffffff;font-size:4pt;font-weight:bold;letter-spacing:0.2px;">FOLIO: {$folio}</div>
+<div style="position:absolute;left:5mm;top:125.5mm;width:38mm;color:#aaccee;font-size:3.5pt;letter-spacing:0.1px;">VIG: {$vigencia}</div>
 HTML;
 
         $reverso = <<<HTML
 <div style="position:absolute;left:0mm;top:0mm;width:86mm;height:133mm;">{$bgReverso}</div>
-<div style="position:absolute;left:29mm;top:63mm;width:27mm;height:25mm;border-radius:3mm;overflow:hidden;">{$qrHtml}</div>
+<div style="position:absolute;left:29mm;top:63mm;width:27mm;height:25mm;">{$qrHtml}</div>
 HTML;
 
         return $anverso . "\n<pagebreak />\n" . $reverso;
