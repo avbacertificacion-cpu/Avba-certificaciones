@@ -40,12 +40,16 @@ $stmt = $pdo->prepare("
     WHERE e.empresa_id = ? AND e.estado = 'activo'
     ORDER BY COALESCE(e.seccion, '') ASC,
              CAST(
-               CASE
-                 WHEN SUBSTRING(UPPER(e.codigo_manual), 1, 4) = 'EXT-' THEN SUBSTRING(UPPER(e.codigo_manual), 5)
-                 WHEN SUBSTRING(UPPER(e.codigo_manual), 1, 4) = 'EXT ' THEN SUBSTRING(UPPER(e.codigo_manual), 5)
-                 ELSE e.codigo_manual
-               END
-             AS UNSIGNED) ASC
+               REPLACE(
+                 REPLACE(
+                   REPLACE(
+                     REPLACE(
+                       REPLACE(UPPER(e.codigo_manual), 'EXT-', ''),
+                       'EXT ', ''),
+                     'EXT', ''),
+                   '-', ''),
+                 ' ', '')
+               AS UNSIGNED) ASC
 ");
 $stmt->execute([$reporte['empresa_id']]);
 $extintores = $stmt->fetchAll(PDO::FETCH_ASSOC);
