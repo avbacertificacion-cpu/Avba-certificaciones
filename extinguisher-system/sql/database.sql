@@ -136,6 +136,17 @@ CREATE TABLE auditoria (
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
 );
 
+-- ─── API LOGS (Rate limiting y auditoría de acceso público) ──────────────────
+CREATE TABLE api_logs (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    endpoint    VARCHAR(100),
+    ip          VARCHAR(45),
+    status_code INT,
+    details     TEXT,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ip_endpoint (ip, endpoint, created_at)
+);
+
 -- ─── ÍNDICES ─────────────────────────────────────────────────────────────────
 CREATE INDEX idx_extintor_empresa    ON extintores(empresa_id);
 CREATE INDEX idx_extintor_codigo_qr  ON extintores(codigo_qr);

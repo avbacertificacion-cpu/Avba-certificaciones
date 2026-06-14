@@ -111,3 +111,18 @@ DESC reportes_mensuales;
 DESC empresas;
 DESC tipos_extintores;
 DESC extintores;
+
+-- ─── 7. Crear tabla api_logs para rate limiting ─────────────────────────────
+
+CREATE TABLE IF NOT EXISTS api_logs (
+    id          INT PRIMARY KEY AUTO_INCREMENT,
+    endpoint    VARCHAR(100),
+    ip          VARCHAR(45),
+    status_code INT,
+    details     TEXT,
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_ip_endpoint (ip, endpoint, created_at)
+);
+
+-- Verificación
+DESC api_logs;

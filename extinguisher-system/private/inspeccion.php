@@ -44,6 +44,7 @@ if ($empresa_inspeccion) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Inspección de Extintor</title>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Segoe UI',sans-serif;background:#f4f6fb}
@@ -135,6 +136,17 @@ if ($empresa_inspeccion) {
             .modal-content{max-width:90%;padding:24px}
             .modal-header{font-size:20px}
         }
+
+        /* Scanner QR Modal */
+        .scanner-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:2000;align-items:center;justify-content:center}
+        .scanner-modal.show{display:flex}
+        .scanner-modal-content{background:#fff;border-radius:12px;padding:20px;max-width:500px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+        .scanner-modal-header{font-size:20px;font-weight:700;color:#333;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
+        .scanner-modal-close{background:none;border:none;font-size:28px;cursor:pointer;color:#999}
+        .scanner-modal-close:hover{color:#333}
+        #scanner{width:100%;border-radius:8px;overflow:hidden;margin-bottom:16px}
+        .scanner-modal-buttons{display:flex;gap:12px}
+        .scanner-modal-buttons button{flex:1;padding:12px;border:none;border-radius:8px;font-weight:700;cursor:pointer}
     </style>
 </head>
 <body>
@@ -191,6 +203,7 @@ if ($empresa_inspeccion) {
             <p style="color:#888;font-size:13px;margin-bottom:20px">
                 Escanea el código QR o ingresa el código manual (ej: EXT-001)
             </p>
+            <button class="btn btn-success" onclick="abrirScannerQR()" style="width:100%;margin-bottom:16px">📱 Escanear Código QR</button>
             <div class="input-group">
                 <input type="text" id="codigo-input" placeholder="EXT-001 o código QR"
                        value="<?= $qr_param ?>" onkeydown="if(event.key==='Enter') buscarExtintor()">
@@ -203,6 +216,20 @@ if ($empresa_inspeccion) {
 
         <!-- Contenido dinámico -->
         <div id="contenido"></div>
+    </div>
+
+    <!-- Scanner QR Modal -->
+    <div class="scanner-modal" id="scannerModal">
+        <div class="scanner-modal-content">
+            <div class="scanner-modal-header">
+                <span>📱 Escanear Código QR</span>
+                <button class="scanner-modal-close" onclick="cerrarScannerQR()">✕</button>
+            </div>
+            <div id="scanner"></div>
+            <div class="scanner-modal-buttons">
+                <button class="btn btn-danger" onclick="cerrarScannerQR()">Cancelar</button>
+            </div>
+        </div>
     </div>
 <?php endif; ?>
 
@@ -483,6 +510,38 @@ function showAlert(msg, tipo) {
     const b = document.getElementById('alert-box');
     b.innerHTML = `<div class="alert alert-${tipo}">${msg}</div>`;
     setTimeout(() => b.innerHTML = '', 5000);
+}
+
+// ── Scanner QR ────────────────────────────────────────────────────────────────
+let qrScanner = null;
+
+function abrirScannerQR() {
+    document.getElementById('scannerModal').classList.add('show');
+
+    if (!qrScanner) {
+        qrScanner = new Html5Qrcode('scanner');
+        qrScanner.start(
+            { facingMode: 'environment' },
+            { fps: 10, qrbox: 250 },
+            (decodedText) => {
+                console.log('QR detectado:', decodedText);
+                document.getElementById('codigo-input').value = decodedText;
+                cerrarScannerQR();
+                buscarExtintor();
+            },
+            (error) => {}
+        ).catch((err) => {
+            showAlert('No se pudo acceder a la cámara. Verifica los permisos.', 'error');
+            cerrarScannerQR();
+        });
+    }
+}
+
+function cerrarScannerQR() {
+    document.getElementById('scannerModal').classList.remove('show');
+    if (qrScanner) {
+        qrScanner.stop().catch(() => {});
+    }
 }
 </script>
 </body>
