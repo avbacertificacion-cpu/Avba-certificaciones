@@ -1041,6 +1041,34 @@
   <div class="filtros-card" style="gap:8px">
     <input id="acc-f-cliente" placeholder="Buscar cliente..." oninput="filtrarSesionesAcc()">
     <input id="acc-f-fecha"   placeholder="Fecha (dd/mm/aaaa)" oninput="filtrarSesionesAcc()">
+    <input id="acc-f-buscar-acc" placeholder="🔍 Buscar accesorio (tipo, marca, serie, estado…)" style="flex:2;min-width:220px" oninput="debounceBuscarAccCal(this.value)">
+  </div>
+
+  <!-- Panel de resultados de búsqueda por accesorio -->
+  <div id="acc-buscar-panel" class="tabla-card" style="display:none;margin-bottom:12px">
+    <div class="tabla-header">
+      <span class="tabla-title">Resultados de búsqueda</span>
+      <span class="tabla-count" id="acc-buscar-count">—</span>
+      <button class="btn-limpiar" style="margin-left:auto" onclick="limpiarBuscarAccCal()">✕ Limpiar</button>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>ID / Marca / Modelo</th>
+            <th>Serie</th>
+            <th style="width:90px">Capacidad</th>
+            <th style="width:80px;text-align:center">Estado</th>
+            <th>Cliente</th>
+            <th style="width:115px">No. Control</th>
+            <th style="width:90px">Fecha</th>
+            <th style="width:80px"></th>
+          </tr>
+        </thead>
+        <tbody id="acc-buscar-tbody"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="tabla-card">
@@ -3370,6 +3398,62 @@ function filtrarSesionesAcc() {
     (!q  || r.cliente.toLowerCase().includes(q)) &&
     (!qf || (r.fecha||'').toLowerCase().includes(qf))
   ));
+}
+
+let _accBuscarTimer = null;
+function debounceBuscarAccCal(val) {
+  clearTimeout(_accBuscarTimer);
+  const panel = document.getElementById('acc-buscar-panel');
+  if (!val.trim()) { panel.style.display = 'none'; return; }
+  _accBuscarTimer = setTimeout(() => buscarAccCal(val.trim()), 350);
+}
+
+async function buscarAccCal(q) {
+  const panel = document.getElementById('acc-buscar-panel');
+  const tbody = document.getElementById('acc-buscar-tbody');
+  panel.style.display = '';
+  tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:20px"><span class="spin"></span> Buscando…</td></tr>`;
+  try {
+    const res  = await fetch(`${API}?action=BUSCAR_ACCESORIOS&q=${encodeURIComponent(q)}`);
+    const json = await res.json();
+    renderBuscarAccCal(Array.isArray(json.data) ? json.data : []);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--rojo)">Error de búsqueda</td></tr>`;
+  }
+}
+
+function renderBuscarAccCal(data) {
+  const tbody = document.getElementById('acc-buscar-tbody');
+  document.getElementById('acc-buscar-count').textContent = data.length + ' accesorio' + (data.length!==1?'s':'');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--texto-hint)">Sin coincidencias.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(a => {
+    const folio  = a.control ? 'AB.'+a.control+'-'+new Date().getFullYear()+'MX' : '—';
+    const estado = a.estado === 'CUMPLE'
+      ? `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--verde-light);color:var(--verde)">CUMPLE</span>`
+      : a.estado === 'NO CUMPLE'
+        ? `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--rojo-light);color:var(--rojo)">NO CUMPLE</span>`
+        : `<span style="font-size:10px;color:var(--texto-hint)">${escH(a.estado||'—')}</span>`;
+    const id = [a.id_accesorio, a.marca, a.modelo].filter(Boolean).join(' / ');
+    return `<tr style="cursor:pointer" onclick="abrirDetAccSesion(${a.sesion_id})" title="Ver sesión">
+      <td style="font-weight:600">${escH(a.tipo_nombre||'—')}</td>
+      <td style="font-size:12px">${escH(id)}</td>
+      <td style="font-size:11px;font-family:monospace">${escH(a.serie||'—')}</td>
+      <td style="font-size:12px">${escH(a.capacidad||'—')}</td>
+      <td style="text-align:center">${estado}</td>
+      <td style="font-size:12px">${escH(a.cliente||'—')}</td>
+      <td style="font-size:11px;font-family:monospace;color:var(--azul-dark)">${escH(folio)}</td>
+      <td style="font-size:11px;color:var(--texto-sub)">${a.fecha||'—'}</td>
+      <td><button class="btn-ver" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();abrirDetAccSesion(${a.sesion_id})">Ver</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function limpiarBuscarAccCal() {
+  document.getElementById('acc-f-buscar-acc').value = '';
+  document.getElementById('acc-buscar-panel').style.display = 'none';
 }
 
 function estatusAccBadge(e) {

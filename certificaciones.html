@@ -551,6 +551,34 @@
     <input id="ac-fFecha"   placeholder="Fecha..." style="max-width:200px">
     <button class="btn-filtrar" onclick="filtrarAccCert()">Filtrar</button>
     <button class="btn-limpiar" onclick="limpiarAccCert()">Limpiar</button>
+    <input id="ac-fAcc" placeholder="🔍 Buscar accesorio (tipo, marca, serie, estado…)" style="flex:2;min-width:220px" oninput="debounceBuscarAccCert(this.value)">
+  </div>
+
+  <!-- Panel de resultados de búsqueda por accesorio individual -->
+  <div id="acc-cert-buscar-panel" class="tabla-card" style="display:none;margin-bottom:12px">
+    <div class="tabla-header">
+      <span class="tabla-title">Resultados de búsqueda</span>
+      <span class="tabla-count" id="acc-cert-buscar-count">—</span>
+      <button class="btn-limpiar" style="margin-left:auto" onclick="limpiarBuscarAccCert()">✕ Limpiar</button>
+    </div>
+    <div class="tabla-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Tipo</th>
+            <th>ID / Marca / Modelo</th>
+            <th>Serie</th>
+            <th style="width:90px">Capacidad</th>
+            <th style="width:80px;text-align:center">Estado</th>
+            <th>Cliente</th>
+            <th style="width:130px">No. Control</th>
+            <th style="width:90px">Fecha</th>
+            <th style="width:80px"></th>
+          </tr>
+        </thead>
+        <tbody id="acc-cert-buscar-tbody"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="tabla-card">
@@ -1799,6 +1827,62 @@ function limpiarAccCert() {
   document.getElementById('ac-fCliente').value = '';
   document.getElementById('ac-fFecha').value   = '';
   renderAccCert(accCertData);
+}
+
+let _accCertBuscarTimer = null;
+function debounceBuscarAccCert(val) {
+  clearTimeout(_accCertBuscarTimer);
+  const panel = document.getElementById('acc-cert-buscar-panel');
+  if (!val.trim()) { panel.style.display = 'none'; return; }
+  _accCertBuscarTimer = setTimeout(() => buscarAccCert(val.trim()), 350);
+}
+
+async function buscarAccCert(q) {
+  const panel = document.getElementById('acc-cert-buscar-panel');
+  const tbody = document.getElementById('acc-cert-buscar-tbody');
+  panel.style.display = '';
+  tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:20px"><span class="spin"></span> Buscando…</td></tr>`;
+  try {
+    const res  = await fetch(`${API}?action=BUSCAR_ACCESORIOS&q=${encodeURIComponent(q)}&estatus=APROBADO_CALIDAD`);
+    const json = await res.json();
+    renderBuscarAccCert(Array.isArray(json.data) ? json.data : []);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--rojo)">Error de búsqueda</td></tr>`;
+  }
+}
+
+function renderBuscarAccCert(data) {
+  const tbody = document.getElementById('acc-cert-buscar-tbody');
+  document.getElementById('acc-cert-buscar-count').textContent = data.length + ' accesorio' + (data.length!==1?'s':'');
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:24px;color:var(--texto-hint)">Sin coincidencias.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(a => {
+    const folio  = a.control ? 'AB.'+a.control+'-'+new Date().getFullYear()+'MX' : '—';
+    const estado = a.estado === 'CUMPLE'
+      ? `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:#e8f5e9;color:#388e3c">CUMPLE</span>`
+      : a.estado === 'NO CUMPLE'
+        ? `<span style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:#ffebee;color:#c62828">NO CUMPLE</span>`
+        : `<span style="font-size:10px;color:#9e9e9e">${escH(a.estado||'—')}</span>`;
+    const id = [a.id_accesorio, a.marca, a.modelo].filter(Boolean).join(' / ');
+    return `<tr style="cursor:pointer" onclick="abrirAccCert(${a.sesion_id})" title="Ver certificado y documentos">
+      <td style="font-weight:600">${escH(a.tipo_nombre||'—')}</td>
+      <td style="font-size:12px">${escH(id)}</td>
+      <td style="font-size:11px;font-family:monospace">${escH(a.serie||'—')}</td>
+      <td style="font-size:12px">${escH(a.capacidad||'—')}</td>
+      <td style="text-align:center">${estado}</td>
+      <td style="font-size:12px">${escH(a.cliente||'—')}</td>
+      <td style="font-size:11px;font-family:monospace;color:#1565c0">${escH(folio)}</td>
+      <td style="font-size:11px;color:#78909c">${a.fecha||'—'}</td>
+      <td><button class="btn-ver" style="font-size:10px;padding:3px 8px" onclick="event.stopPropagation();abrirAccCert(${a.sesion_id})">Ver</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function limpiarBuscarAccCert() {
+  document.getElementById('ac-fAcc').value = '';
+  document.getElementById('acc-cert-buscar-panel').style.display = 'none';
 }
 
 function estatusCertBadge(e) {

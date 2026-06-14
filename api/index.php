@@ -408,6 +408,18 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->obtenerCamposPdfPersonal($_GET['tipo'] ?? ''));
 
+        case 'BUSCAR_ACCESORIOS': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $idClienteBusq = '';
+            if ($usr['rol'] === 'CLIENTE') {
+                $idClienteBusq = trim($usr['id_cliente'] ?? '');
+                if ($idClienteBusq && ctype_digit($idClienteBusq))
+                    $idClienteBusq = str_pad($idClienteBusq, 5, '0', STR_PAD_LEFT);
+            }
+            respuesta($accesorios->buscarAccesorios($_GET['q'] ?? '', $_GET['estatus'] ?? '', $idClienteBusq));
+        }
+
         case 'LISTAR_SESIONES_ACCESORIOS':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

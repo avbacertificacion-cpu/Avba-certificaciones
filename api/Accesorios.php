@@ -220,6 +220,46 @@ class Accesorios {
         return ['status' => 'success', 'data' => $stmt->fetchAll()];
     }
 
+    // ── Buscar accesorios individuales por cualquier atributo ──
+    public function buscarAccesorios(string $q, string $filtroEstatus = '', string $idCliente = ''): array {
+        $q = trim($q);
+        if (strlen($q) < 2) return ['status' => 'success', 'data' => []];
+
+        $like   = '%' . $q . '%';
+        $params = [$like, $like, $like, $like, $like, $like, $like, $like, $like, $like];
+        $where  = "(a.id_accesorio LIKE ? OR a.marca LIKE ? OR a.modelo LIKE ?
+                    OR a.serie LIKE ? OR a.capacidad LIKE ? OR a.medidas LIKE ?
+                    OR a.estado LIKE ? OR a.qr_codigo LIKE ?
+                    OR COALESCE(t.nombre,'') LIKE ? OR s.cliente LIKE ?)";
+
+        if ($filtroEstatus === 'APROBADO_CALIDAD') {
+            $where .= " AND s.estatus IN ('APROBADO_CALIDAD','EMITIDO')";
+        } elseif ($filtroEstatus) {
+            $where .= " AND s.estatus = " . $this->pdo->quote($filtroEstatus);
+        }
+
+        if ($idCliente) {
+            $where   .= " AND s.control LIKE ?";
+            $params[] = $idCliente . '-%';
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT a.id, a.id_accesorio, COALESCE(t.nombre,'') AS tipo_nombre,
+                    a.marca, a.modelo, a.serie, a.capacidad, a.medidas, a.estado, a.qr_codigo,
+                    s.id AS sesion_id, s.cliente, s.control, s.estatus,
+                    DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha,
+                    s.cert_url, s.informe_url, s.informe_cumple_url, s.qr_codigo AS sesion_qr
+             FROM accesorios_izaje a
+             JOIN accesorios_sesiones s ON s.id = a.sesion_id
+             LEFT JOIN accesorios_tipos t ON t.id = a.tipo_id
+             WHERE {$where}
+             ORDER BY s.fecha DESC, a.orden
+             LIMIT 100"
+        );
+        $stmt->execute($params);
+        return ['status' => 'success', 'data' => $stmt->fetchAll()];
+    }
+
     // ── Listar sesiones con resumen de accesorios ──────────
     public function listarSesiones(string $soloEstatus = ''): array {
         $this->ensureEstatusColumn('accesorios_sesiones');
