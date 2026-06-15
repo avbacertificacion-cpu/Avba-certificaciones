@@ -2107,6 +2107,20 @@ HTML;
         $nombre = $esc($up($p['nombre_completo'] ?? ''));
         $empresa = $esc($up($p['empresa_nombre'] ?? ''));
 
+        // Font-size adaptativo para el nombre según longitud (la zona tiene 37mm ≈ 11 chars a 9pt por línea)
+        $nombreLen   = mb_strlen(strip_tags($nombre), 'UTF-8');
+        $nombreFSize = match(true) {
+            $nombreLen <= 22 => '9pt',
+            $nombreLen <= 28 => '7.5pt',
+            $nombreLen <= 34 => '6.5pt',
+            default          => '5.8pt',
+        };
+        $nombreTop = match(true) {
+            $nombreLen <= 22 => '57.5mm',
+            $nombreLen <= 28 => '57mm',
+            default          => '56.5mm',
+        };
+
         // Texto del curso igual que en los diplomas: texto_certificado con {capacidad}
         $capVal    = ($p['capacidad_na'] ?? false) ? 'N/A' : trim($p['capacidad'] ?? '');
         $tbase     = trim($p['texto_certificado'] ?? '');
@@ -2186,7 +2200,7 @@ HTML;
 <div style="position:absolute;left:6mm;top:55.9mm;width:29.7mm;height:35mm;overflow:hidden;">{$fotoHtml}</div>
 <div style="position:absolute;left:9mm;top:83.5mm;width:8mm;">{$escudoHtml}</div>
 <div style="position:absolute;left:6mm;top:52mm;width:38mm;color:#a8ccf0;font-size:5.5pt;font-weight:bold;letter-spacing:0.4px;">{$folio}</div>
-<div style="position:absolute;left:47mm;top:57.5mm;width:37mm;color:#ffffff;font-size:9pt;font-weight:bold;line-height:1.2;word-wrap:break-word;letter-spacing:0.3px;">{$nombre}</div>
+<div style="position:absolute;left:47mm;top:{$nombreTop};width:37mm;color:#ffffff;font-size:{$nombreFSize};font-weight:bold;line-height:1.25;word-wrap:break-word;word-break:break-word;overflow-wrap:break-word;letter-spacing:0.2px;">{$nombre}</div>
 <div style="position:absolute;left:47mm;top:67mm;width:37mm;color:#c8e0f8;font-size:6pt;line-height:1.35;word-wrap:break-word;">{$cursoCompleto}</div>
 <div style="position:absolute;left:47mm;top:79mm;width:37mm;color:#c8e0f8;font-size:6.5pt;font-weight:bold;letter-spacing:0.3px;">{$fechaVig}</div>
 <div style="position:absolute;left:47mm;top:90mm;width:37mm;color:#96bce0;font-size:6pt;line-height:1.3;word-wrap:break-word;">{$empresa}</div>
