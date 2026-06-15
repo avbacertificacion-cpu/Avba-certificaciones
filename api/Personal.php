@@ -1749,32 +1749,29 @@ CSS;
   </tr>
   <tr>
     <!-- Col 1: Instructor — firma + sello -->
-    <td style="width:33%;border-right:1px solid #8090b8;text-align:center;padding:8px 8px 10px;vertical-align:bottom">
+    <td style="width:33%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:8px 8px 10px;vertical-align:bottom">
       <table style="border-collapse:collapse;margin:0 auto 4px"><tr>
         <td style="padding:0 6px;vertical-align:bottom">{$firmaHtml}</td>
         <td style="padding:0 6px;vertical-align:bottom">{$selloHtml}</td>
       </tr></table>
-      <div style="border-top:2px solid #1B2A6B;padding-top:4px">
+      <div style="padding-top:4px">
         <div style="font-size:8pt;font-weight:bold">{$esc($instrNombre ?: 'Ing. Jose Marcos Gonzalez Calderon')}</div>
-        <div style="font-size:7.5pt;color:#555;margin-top:1px">Nombre y firma</div>
         <div style="font-size:7.5pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Instructor o tutor</div>
       </div>
     </td>
     <!-- Col 2: Patron -->
-    <td style="width:34%;border-right:1px solid #8090b8;text-align:center;padding:8px 8px 10px;vertical-align:bottom">
+    <td style="width:34%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:8px 8px 10px;vertical-align:bottom">
       <div style="height:58px"></div>
-      <div style="border-top:2px solid #1B2A6B;padding-top:4px">
+      <div style="padding-top:4px">
         <div style="font-size:8pt;font-weight:bold">{$esc($patron)}</div>
-        <div style="font-size:7.5pt;color:#555;margin-top:1px">Nombre y firma</div>
         <div style="font-size:7.5pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Patron o representante legal <sup>4/</sup></div>
       </div>
     </td>
     <!-- Col 3: Representante de trabajadores -->
-    <td style="width:33%;text-align:center;padding:8px 8px 10px;vertical-align:bottom">
+    <td style="width:33%;border-top:none;text-align:center;padding:8px 8px 10px;vertical-align:bottom">
       <div style="height:58px"></div>
-      <div style="border-top:2px solid #1B2A6B;padding-top:4px">
+      <div style="padding-top:4px">
         <div style="font-size:8pt;font-weight:bold">{$esc($repTrab)}</div>
-        <div style="font-size:7.5pt;color:#555;margin-top:1px">Nombre y firma</div>
         <div style="font-size:7.5pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Representante de los trabajadores <sup>5/</sup></div>
       </div>
     </td>
