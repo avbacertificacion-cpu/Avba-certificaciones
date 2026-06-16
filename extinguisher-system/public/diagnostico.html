@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico de QR - AVBA</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: #4fc3f7; margin-bottom: 20px; }
+        .section { background: #252526; border: 1px solid #3e3e42; border-radius: 4px; padding: 16px; margin-bottom: 16px; }
+        .section h2 { color: #50fa7b; font-size: 14px; margin-bottom: 10px; }
+        .test { background: #1e1e1e; padding: 10px; margin: 8px 0; border-left: 3px solid #888; }
+        .test.pass { border-color: #50fa7b; }
+        .test.fail { border-color: #ff5555; }
+        .test.pending { border-color: #f1fa8c; }
+        .test-name { font-weight: bold; margin-bottom: 4px; }
+        .test-result { font-size: 12px; color: #888; }
+        .code { background: #1a1a1a; padding: 8px; border-radius: 2px; font-size: 12px; margin-top: 8px; overflow-x: auto; }
+        input { padding: 8px; width: 100%; background: #3c3c3c; color: #d4d4d4; border: 1px solid #555; }
+        button { padding: 8px 16px; background: #667eea; color: white; border: none; cursor: pointer; margin: 8px 0; }
+        button:hover { background: #5568d3; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧯 Diagnóstico del Sistema QR</h1>
+
+        <div class="section">
+            <h2>🔍 Tests de Configuración</h2>
+            <div class="test pending">
+                <div class="test-name">✓ Página de diagnóstico accesible</div>
+                <div class="test-result">Si ves esta página, el servidor SÍ está sirviendo archivos HTML públicos</div>
+            </div>
+            <div class="test" id="test-api-ping">
+                <div class="test-name">Testing API ping...</div>
+                <div class="test-result" id="test-api-ping-result">Cargando...</div>
+            </div>
+            <div class="test" id="test-validar-publico">
+                <div class="test-name">Testing API de validación pública...</div>
+                <div class="test-result" id="test-validar-publico-result">Cargando...</div>
+            </div>
+            <div class="test" id="test-qr-param">
+                <div class="test-name">Testing redirección con ?qr=...</div>
+                <div class="test-result" id="test-qr-param-result">Cargando...</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🧪 Test Manual con Código QR</h2>
+            <div class="test">
+                <div class="test-name">Ingresa un código QR para probar</div>
+                <input type="text" id="qr-test" placeholder="Ej: 43526180127 o URL completa" value="43526180127">
+                <button onclick="testQRCode()">Probar Código QR</button>
+                <div class="code" id="manual-test-result"></div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📋 URLs de Prueba Rápida</h2>
+            <div class="test">
+                <div class="test-name">Haz clic en cualquiera de estos links para probar</div>
+                <p>
+                    <a href="?qr=43526180127" target="_blank">Test 1: ?qr=43526180127</a><br>
+                    <a href="../api/ping.php" target="_blank">Test API Ping</a><br>
+                    <a href="../api/validar-publico.php?codigo=43526180127" target="_blank">Test API Validar</a>
+                </p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📊 Información del Navegador</h2>
+            <div class="test">
+                <div class="code" id="browser-info"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Test API Ping
+        fetch('.//../api/ping.php')
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('test-api-ping').className = 'test pass';
+                document.getElementById('test-api-ping-result').textContent = '✓ API respondiendo: ' + JSON.stringify(data);
+            })
+            .catch(e => {
+                document.getElementById('test-api-ping').className = 'test fail';
+                document.getElementById('test-api-ping-result').textContent = '✗ Error: ' + e.message;
+            });
+
+        // Test API Validar Público
+        fetch('./../api/validar-publico.php?codigo=43526180127')
+            .then(r => r.text())
+            .then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    document.getElementById('test-validar-publico').className = data.found ? 'test pass' : 'test pending';
+                    document.getElementById('test-validar-publico-result').textContent =
+                        '✓ API respondiendo JSON: found=' + data.found;
+                } catch (e) {
+                    document.getElementById('test-validar-publico').className = 'test fail';
+                    document.getElementById('test-validar-publico-result').textContent =
+                        '✗ API retornó HTML en lugar de JSON: ' + text.substring(0, 100);
+                }
+            })
+            .catch(e => {
+                document.getElementById('test-validar-publico').className = 'test fail';
+                document.getElementById('test-validar-publico-result').textContent = '✗ Error: ' + e.message;
+            });
+
+        // Test QR parameter
+        const params = new URLSearchParams(window.location.search);
+        const qrParam = params.get('qr');
+        if (qrParam) {
+            document.getElementById('test-qr-param').className = 'test pass';
+            document.getElementById('test-qr-param-result').textContent =
+                '✓ Parámetro ?qr= recibido correctamente: ' + qrParam;
+        }
+
+        // Browser info
+        document.getElementById('browser-info').innerHTML = `
+Location: ${window.location.href}
+Origin: ${window.location.origin}
+Pathname: ${window.location.pathname}
+Search: ${window.location.search}
+User Agent: ${navigator.userAgent}
+        `.trim();
+
+        function testQRCode() {
+            const value = document.getElementById('qr-test').value.trim();
+            const result = document.getElementById('manual-test-result');
+
+            fetch('./../api/validar-publico.php?codigo=' + encodeURIComponent(value))
+                .then(r => r.text())
+                .then(text => {
+                    try {
+                        const data = JSON.parse(text);
+                        result.innerHTML = `<strong>✓ JSON válido:</strong>\n${JSON.stringify(data, null, 2)}`;
+                    } catch (e) {
+                        result.innerHTML = `<strong>✗ Error al parsear JSON:</strong>\n${e.message}\n\n<strong>Respuesta recibida:</strong>\n${text.substring(0, 500)}`;
+                    }
+                })
+                .catch(e => {
+                    result.innerHTML = `<strong>✗ Error en fetch:</strong>\n${e.message}`;
+                });
+        }
+    </script>
+</body>
+</html>

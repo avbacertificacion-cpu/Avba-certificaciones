@@ -7,25 +7,22 @@ DirectoryIndex index.php index.html
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
 
+    # ESPECIAL: Raíz con ?qr= → PUBLIC VALIDADOR (ANTES de directorio check)
+    RewriteCond %{QUERY_STRING} ^qr=
+    RewriteRule ^$ public/validar-extintor.html [L,QSA]
+
     # CRÍTICO: No reescribir si es un directorio real que existe
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
 
     # CRÍTICO: Nunca reescribir .php, .js, .css, .jpg, .png, etc. en /public/
-    RewriteRule ^public/.*\.(php|js|css|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$ - [L]
+    RewriteRule ^public/.*\.(php|html|js|css|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$ - [L]
 
     # Nunca reescribir archivos o directorios bajo /api/
     RewriteRule ^api(/|$) - [L]
 
     # Nunca reescribir directorios bajo /config/ o /private/
     RewriteRule ^(config|private)(/|$) - [L]
-
-    # Especial: Si es /validar-extintor.html en /public/, servir directamente
-    RewriteRule ^public/validar-extintor\.html$ - [L]
-
-    # Para raíz con ?qr=, reescribir a público validador (solo si tiene ?qr=)
-    RewriteCond %{QUERY_STRING} ^qr=
-    RewriteRule ^$ public/validar-extintor.html [L,QSA]
 
     # Catch-all: Todo lo demás (rutas no existentes) va a index.php
     RewriteCond %{REQUEST_FILENAME} !-f
