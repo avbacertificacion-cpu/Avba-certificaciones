@@ -9,3 +9,8 @@ DirectoryIndex index.php index.html
 
 # Ocultar errores PHP al usuario
 php_flag display_errors Off
+
+# Permitir acceso a cámara para el scanner QR
+<IfModule mod_headers.c>
+    Header set Permissions-Policy "camera=(self)"
+</IfModule>

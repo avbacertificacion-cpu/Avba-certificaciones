@@ -1,1 +1,6 @@
 DirectoryIndex login.html
+
+# Permitir acceso a cámara para el scanner QR
+<IfModule mod_headers.c>
+    Header set Permissions-Policy "camera=(self)"
+</IfModule>
