@@ -453,23 +453,50 @@
             // Usar URL absoluta para asegurar que llega al API correcto
             const apiURL = window.location.origin + '/extintores/api/validar-publico.php?codigo=' + encodeURIComponent(codigo);
 
+            console.log('API URL:', apiURL);
+            console.log('Fetching from:', apiURL);
+
             fetch(apiURL)
                 .then(response => {
+                    console.log('Response status:', response.status);
+                    console.log('Response headers:', response.headers);
+                    console.log('Response URL:', response.url);
+
+                    if (response.status === 401) {
+                        throw new Error('No autorizado - Error 401');
+                    }
+                    if (response.status === 403) {
+                        throw new Error('Acceso denegado - Error 403');
+                    }
                     if (response.status === 429) {
                         throw new Error('Demasiadas solicitudes. Intenta más tarde.');
                     }
-                    return response.json();
-                })
-                .then(data => {
-                    loadingDiv.style.display = 'none';
+                    if (!response.ok) {
+                        throw new Error(`Error HTTP: ${response.status}`);
+                    }
 
-                    if (data.found) {
-                        mostrarResultado(data.data);
-                    } else {
-                        mostrarNoEncontrado();
+                    return response.text();
+                })
+                .then(text => {
+                    console.log('Response text:', text.substring(0, 200));
+                    try {
+                        const data = JSON.parse(text);
+                        loadingDiv.style.display = 'none';
+
+                        if (data.found) {
+                            mostrarResultado(data.data);
+                        } else {
+                            mostrarNoEncontrado();
+                        }
+                    } catch (e) {
+                        console.error('JSON parse error:', e);
+                        console.error('Received text:', text.substring(0, 500));
+                        loadingDiv.style.display = 'none';
+                        mostrarError('Error al procesar respuesta del servidor');
                     }
                 })
                 .catch(error => {
+                    console.error('Fetch error:', error);
                     loadingDiv.style.display = 'none';
                     mostrarError(error.message || 'Error al buscar el extintor');
                 });
