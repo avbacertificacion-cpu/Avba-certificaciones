@@ -370,6 +370,14 @@
             if (e.key === 'Enter') buscar();
         });
 
+        // Auto-search si hay parámetro ?qr= en la URL
+        const params = new URLSearchParams(window.location.search);
+        const qrParam = params.get('qr');
+        if (qrParam) {
+            codigoInput.value = qrParam;
+            buscar();
+        }
+
         function toggleScanner() {
             if (scannerActive) {
                 detenerScanner();
