@@ -3,10 +3,12 @@
 function checkRateLimit($ip, $endpoint, $maxRequests = 10, $timeWindow = 60) {
     global $pdo;
 
-    $now = time();
-    $timeThreshold = $now - $timeWindow;
+    if (!$pdo) return true;  // Si no hay conexión, permitir
 
     try {
+        $now = time();
+        $timeThreshold = $now - $timeWindow;
+
         $stmt = $pdo->prepare("
             SELECT COUNT(*) as count
             FROM api_logs
@@ -28,12 +30,15 @@ function checkRateLimit($ip, $endpoint, $maxRequests = 10, $timeWindow = 60) {
 
         return true;
     } catch (Exception $e) {
-        return true;
+        error_log("Rate limit check error: " . $e->getMessage());
+        return true;  // Permitir si hay error
     }
 }
 
 function logApiAccess($ip, $endpoint, $statusCode, $details = null) {
     global $pdo;
+
+    if (!$pdo) return;
 
     try {
         $stmt = $pdo->prepare("
@@ -42,6 +47,7 @@ function logApiAccess($ip, $endpoint, $statusCode, $details = null) {
         ");
         $stmt->execute([$endpoint, $ip, $statusCode, $details]);
     } catch (Exception $e) {
+        error_log("API access log error: " . $e->getMessage());
     }
 }
 
