@@ -397,7 +397,25 @@
                 { fps: 10, qrbox: 250 },
                 (decodedText) => {
                     console.log('QR detectado:', decodedText);
-                    codigoInput.value = decodedText;
+
+                    // Extraer código QR de diferentes formatos
+                    let codigo = decodedText.trim();
+
+                    // Si es una URL con parámetro qr=, extraer los 11 dígitos
+                    const urlMatch = codigo.match(/[?&]qr=(\d{11})/);
+                    if (urlMatch) {
+                        codigo = urlMatch[1];
+                    }
+                    // Si es solo 11 dígitos, usar directamente
+                    else if (!/^\d{11}$/.test(codigo)) {
+                        // Intentar extraer solo los dígitos
+                        const digitMatch = codigo.match(/(\d{11})/);
+                        if (digitMatch) {
+                            codigo = digitMatch[1];
+                        }
+                    }
+
+                    codigoInput.value = codigo;
                     detenerScanner();
                     buscar();
                 },
