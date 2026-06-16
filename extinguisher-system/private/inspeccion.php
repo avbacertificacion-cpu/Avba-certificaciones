@@ -561,7 +561,21 @@ function abrirScannerQR() {
             { fps: 10, qrbox: 250 },
             (decodedText) => {
                 console.log('QR detectado:', decodedText);
-                document.getElementById('codigo-input').value = decodedText;
+
+                // Extraer código: primero intenta extraer de URL ?qr=11dígitos
+                let codigo = decodedText.trim();
+                const urlMatch = codigo.match(/[?&]qr=(\d{11})/);
+                if (urlMatch) {
+                    codigo = urlMatch[1];
+                } else if (!/^\d{11}$/.test(codigo)) {
+                    // Si no es 11 dígitos, intenta extraerlos
+                    const digitMatch = codigo.match(/(\d{11})/);
+                    if (digitMatch) {
+                        codigo = digitMatch[1];
+                    }
+                }
+
+                document.getElementById('codigo-input').value = codigo;
                 cerrarScannerQR();
                 buscarExtintor();
             },
