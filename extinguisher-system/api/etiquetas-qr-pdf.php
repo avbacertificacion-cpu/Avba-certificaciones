@@ -10,8 +10,13 @@ $cantidad = max(1, min(500, intval($_GET['cantidad']   ?? 10)));
 $primer   = str_pad($primer ?: '1', 11, '0', STR_PAD_LEFT);
 $primerNum = (int)$primer;
 
-// Generar URL base para QR (desde config)
-$baseURL = rtrim(APP_URL, '/') . '/extintores/public/validar-extintor.html';
+// Construir URL pública para QR codes
+// Detectar si es local o producción y construir URL correcta
+$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
+           (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
+$protocol = $isHttps ? 'https' : 'http';
+$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+$baseURL = $protocol . '://' . $host . '/extintores/public/validar-extintor.html';
 
 // Generar array de códigos QR
 $codigos = [];
