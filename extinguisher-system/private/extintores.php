@@ -518,12 +518,23 @@ async function iniciarScannerAsignarAdmin() {
             { facingMode: 'environment' },
             { fps: 10, qrbox: 250 },
             (decodedText) => {
-                const match = decodedText.match(/qr=(\d{11})/);
-                const qr = match ? match[1] : decodedText;
-                if (/^\d{11}$/.test(qr)) {
+                // Extraer QR: primero intenta extraer de URL con formato ?qr=11dígitos
+                let qr = null;
+                const urlMatch = decodedText.match(/[?&]qr=(\d{11})/);
+                if (urlMatch) {
+                    qr = urlMatch[1];
+                } else if (/^\d{11}$/.test(decodedText)) {
+                    // Si es solo 11 dígitos, usar directamente
+                    qr = decodedText;
+                }
+
+                if (qr && /^\d{11}$/.test(qr)) {
                     document.getElementById('input-qr-admin').value = qr;
                     detenerScannerAsignarAdmin();
                     alertDiv.innerHTML = '<div class="alert alert-success">✓ QR detectado. Presiona "Guardar QR"</div>';
+                } else if (!qr) {
+                    // No encontró el formato esperado, mostrar error
+                    alertDiv.innerHTML = '<div class="alert alert-error">QR no válido. Intenta de nuevo.</div>';
                 }
             },
             (error) => { console.log('Error en scanner:', error); }

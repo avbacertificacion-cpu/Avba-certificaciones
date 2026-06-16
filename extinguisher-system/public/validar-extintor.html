@@ -373,8 +373,8 @@
         // Auto-search si hay parámetro ?qr= en la URL
         const params = new URLSearchParams(window.location.search);
         const qrParam = params.get('qr');
-        if (qrParam) {
-            codigoInput.value = qrParam;
+        if (qrParam && qrParam.length <= 50) {  // Validar longitud
+            codigoInput.value = qrParam.trim();
             buscar();
         }
 

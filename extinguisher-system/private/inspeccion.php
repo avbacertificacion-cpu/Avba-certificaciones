@@ -627,12 +627,23 @@ async function iniciarScannerAsignar() {
             { facingMode: 'environment' },
             { fps: 10, qrbox: 250 },
             (decodedText) => {
-                const match = decodedText.match(/qr=(\d{11})/);
-                const qr = match ? match[1] : decodedText;
-                if (/^\d{11}$/.test(qr)) {
+                // Extraer QR: primero intenta extraer de URL con formato ?qr=11dígitos
+                let qr = null;
+                const urlMatch = decodedText.match(/[?&]qr=(\d{11})/);
+                if (urlMatch) {
+                    qr = urlMatch[1];
+                } else if (/^\d{11}$/.test(decodedText)) {
+                    // Si es solo 11 dígitos, usar directamente
+                    qr = decodedText;
+                }
+
+                if (qr && /^\d{11}$/.test(qr)) {
                     document.getElementById('input-qr-asignar').value = qr;
                     detenerScannerAsignar();
                     alertDiv.innerHTML = '<div style="background:#d1fae5;color:#065f46;padding:12px;border-radius:6px">✓ QR detectado. Presiona "Asignar QR"</div>';
+                } else if (!qr) {
+                    // No encontró el formato esperado, mostrar error
+                    alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">QR no válido. Intenta de nuevo.</div>';
                 }
             },
             (error) => { console.log('Error en scanner:', error); }

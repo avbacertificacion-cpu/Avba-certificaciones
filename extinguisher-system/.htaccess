@@ -4,8 +4,9 @@ DirectoryIndex index.php index.html
     RewriteEngine On
 
     # Ruta especial para validación de códigos QR desde URL raíz
+    # QSA = Query String Append (preserva ?qr= parameter)
     RewriteCond %{QUERY_STRING} qr=
-    RewriteRule ^$ public/validar-extintor.html [L]
+    RewriteRule ^$ public/validar-extintor.html [L,QSA]
 
     # Rutas normales
     RewriteCond %{REQUEST_FILENAME} !-f

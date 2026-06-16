@@ -25,6 +25,14 @@ if (!$codigo) {
     exit;
 }
 
+// Validación de longitud: máximo 50 caracteres (EXT-999 = 7 chars, QR = 11 digits)
+if (strlen($codigo) > 50) {
+    http_response_code(400);
+    logApiAccess($ip, $endpoint, 400);
+    echo json_encode(['error' => 'Código inválido']);
+    exit;
+}
+
 $codigo = htmlspecialchars($codigo, ENT_QUOTES, 'UTF-8');
 
 try {

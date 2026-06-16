@@ -10,6 +10,9 @@ $cantidad = max(1, min(500, intval($_GET['cantidad']   ?? 10)));
 $primer   = str_pad($primer ?: '1', 11, '0', STR_PAD_LEFT);
 $primerNum = (int)$primer;
 
+// Generar URL base para QR (desde config)
+$baseURL = rtrim(APP_URL, '/') . '/extintores/public/validar-extintor.html';
+
 // Generar array de códigos QR
 $codigos = [];
 for ($i = 0; $i < $cantidad; $i++) {
@@ -191,12 +194,13 @@ foreach ($paginas as $pag):
 <script>
 // Generar QR codes una vez que el DOM esté listo
 const codigos = <?= json_encode($codigos) ?>;
+const baseURL = <?= json_encode($baseURL) ?>;
 
 codigos.forEach(function(codigo) {
     const container = document.getElementById('qr-' + codigo);
     if (!container) return;
 
-    const validacionURL = 'https://gestion.avba.com.mx/extintores/public/validar-extintor.html?qr=' + codigo;
+    const validacionURL = baseURL + '?qr=' + encodeURIComponent(codigo);
 
     new QRCode(container, {
         text: validacionURL,
