@@ -93,8 +93,8 @@ try {
             </div>
             <div class="form-group">
                 <label>Cantidad de etiquetas</label>
-                <input type="number" id="cantidad" value="10" min="1" max="500" placeholder="10">
-                <small>Máximo 500 por vez. 6 etiquetas por hoja.</small>
+                <input type="number" id="cantidad" value="160" min="1" max="5000" placeholder="160">
+                <small>Máximo 5000. Se distribuirán automáticamente en el PDF.</small>
             </div>
         </div>
 

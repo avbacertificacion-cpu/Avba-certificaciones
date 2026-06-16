@@ -66,18 +66,18 @@ if (file_exists($plantillaPath)) {
             box-shadow: 0 2px 8px rgba(0,0,0,.2);
         }
 
-        /* ─── Grid de etiquetas: 3 columnas × N filas ─── */
+        /* ─── Grid de etiquetas: 3 columnas × 3 filas ─── */
         .etiquetas-grid {
             display: grid;
-            grid-template-columns: repeat(3, 6cm);
-            gap: 0.5cm;
+            grid-template-columns: repeat(3, 5.5cm);
+            gap: 0.3cm;
             justify-content: center;
         }
 
-        /* ─── Etiqueta individual: 6cm × 10cm ─── */
+        /* ─── Etiqueta individual: 5.5cm × 8cm ─── */
         .etiqueta {
-            width: 6cm;
-            height: 10cm;
+            width: 5.5cm;
+            height: 8cm;
             position: relative;
             overflow: hidden;
             page-break-inside: avoid;
@@ -158,8 +158,8 @@ if (file_exists($plantillaPath)) {
 </div>
 
 <?php
-// Dividir en páginas de 6 etiquetas (3 columnas × 2 filas)
-$porPagina = 6;
+// Dividir en páginas de 9 etiquetas (3 columnas × 3 filas)
+$porPagina = 9;
 $paginas   = array_chunk($codigos, $porPagina);
 foreach ($paginas as $pag):
 ?>
@@ -196,8 +196,10 @@ codigos.forEach(function(codigo) {
     const container = document.getElementById('qr-' + codigo);
     if (!container) return;
 
+    const validacionURL = 'https://gestion.avba.com.mx/extintores/public/validar-extintor.html?qr=' + codigo;
+
     new QRCode(container, {
-        text: codigo,
+        text: validacionURL,
         width: 200,
         height: 200,
         colorDark: '#000000',
