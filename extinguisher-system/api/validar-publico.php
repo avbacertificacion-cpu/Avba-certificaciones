@@ -1,14 +1,35 @@
 <?php
+// Configuración para asegurar JSON válido siempre
+error_reporting(E_ALL);
+ini_set('display_errors', 0);  // No mostrar errores como HTML
+ini_set('log_errors', 1);
+
 // Prevenir cualquier output antes de JSON
 ob_start();
 
 try {
-    require_once '../config/config.php';
-    require_once '../config/rate-limiter.php';
+    // Incluir archivos de configuración
+    $configFile = dirname(__FILE__) . '/../config/config.php';
+    $ratelimitFile = dirname(__FILE__) . '/../config/rate-limiter.php';
+
+    if (!file_exists($configFile)) {
+        throw new Exception("Config file not found: $configFile");
+    }
+    if (!file_exists($ratelimitFile)) {
+        throw new Exception("Rate limiter file not found: $ratelimitFile");
+    }
+
+    require_once $configFile;
+    require_once $ratelimitFile;
 
     header('Content-Type: application/json; charset=utf-8');
     header('Access-Control-Allow-Origin: *');
     header('Access-Control-Allow-Methods: GET');
+
+    // Verificar que la conexión a BD existe
+    if (!isset($pdo) || !$pdo) {
+        throw new Exception("Database connection not available");
+    }
 
     $ip = getClientIP();
     $endpoint = '/api/validar-publico.php';

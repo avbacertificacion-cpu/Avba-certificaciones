@@ -1,9 +1,28 @@
 <?php
 
+// Table existence check (cache the result)
+$api_logs_exists = null;
+
+function tableExists($tableName) {
+    global $pdo, $api_logs_exists;
+
+    if ($api_logs_exists !== null) return $api_logs_exists;
+
+    try {
+        $result = $pdo->query("SELECT 1 FROM $tableName LIMIT 1");
+        $api_logs_exists = true;
+    } catch (Exception $e) {
+        $api_logs_exists = false;
+    }
+    return $api_logs_exists;
+}
+
 function checkRateLimit($ip, $endpoint, $maxRequests = 10, $timeWindow = 60) {
     global $pdo;
 
-    if (!$pdo) return true;  // Si no hay conexión, permitir
+    if (!$pdo || !tableExists('api_logs')) {
+        return true;  // Si no hay tabla, permitir sin limitar
+    }
 
     try {
         $now = time();
@@ -38,7 +57,9 @@ function checkRateLimit($ip, $endpoint, $maxRequests = 10, $timeWindow = 60) {
 function logApiAccess($ip, $endpoint, $statusCode, $details = null) {
     global $pdo;
 
-    if (!$pdo) return;
+    if (!$pdo || !tableExists('api_logs')) {
+        return;  // Si no hay tabla, no loguear
+    }
 
     try {
         $stmt = $pdo->prepare("
