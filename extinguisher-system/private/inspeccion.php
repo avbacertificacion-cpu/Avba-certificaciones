@@ -144,7 +144,7 @@ if ($empresa_inspeccion) {
         .scanner-modal-header{font-size:20px;font-weight:700;color:#333;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
         .scanner-modal-close{background:none;border:none;font-size:28px;cursor:pointer;color:#999}
         .scanner-modal-close:hover{color:#333}
-        #scanner{width:100%;border-radius:8px;overflow:hidden;margin-bottom:16px}
+        #scanner{width:100%;height:400px;border-radius:8px;overflow:hidden;margin-bottom:16px}
         .scanner-modal-buttons{display:flex;gap:12px}
         .scanner-modal-buttons button{flex:1;padding:12px;border:none;border-radius:8px;font-weight:700;cursor:pointer}
     </style>
