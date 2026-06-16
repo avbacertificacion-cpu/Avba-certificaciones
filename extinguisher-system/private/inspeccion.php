@@ -531,7 +531,18 @@ function abrirScannerQR() {
             },
             (error) => {}
         ).catch((err) => {
-            showAlert('No se pudo acceder a la cámara. Verifica los permisos.', 'error');
+            console.error('Error al acceder a cámara:', err);
+            const mensajeError = `No se pudo acceder a la cámara: ${err.message || err}
+
+Posibles causas:
+• La página no está en HTTPS
+• El navegador bloqueó los permisos de cámara
+• No hay cámara disponible
+• Cambios en navegador/SO
+
+Solución: Ingresa el código manualmente en el campo.`;
+
+            showAlert(mensajeError, 'error');
             cerrarScannerQR();
         });
     }
