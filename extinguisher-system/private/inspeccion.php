@@ -234,18 +234,26 @@ if ($empresa_inspeccion) {
 
     <!-- Modal Asignar QR -->
     <div class="scanner-modal" id="modalAsignarQR">
-        <div class="scanner-modal-content" style="max-width:400px">
+        <div class="scanner-modal-content" style="max-width:500px">
             <div class="scanner-modal-header">
                 <span>📝 Asignar Código QR</span>
                 <button class="scanner-modal-close" onclick="cerrarModalAsignarQR()">✕</button>
             </div>
             <div id="asignar-qr-alert"></div>
             <div style="padding:20px">
+                <div style="margin-bottom:16px">
+                    <button class="btn" style="background:#48bb78;color:#fff;width:100%;margin-bottom:12px;padding:12px"
+                            onclick="iniciarScannerAsignar()">
+                        📱 Escanear QR Impreso
+                    </button>
+                </div>
+                <div id="scanner-asignar" style="display:none;width:100%;height:300px;border-radius:8px;overflow:hidden;margin-bottom:16px"></div>
+                <div style="text-align:center;margin:16px 0;color:#999">O</div>
                 <div class="form-group">
-                    <label>Código QR (11 dígitos)</label>
+                    <label>Ingresa Manual (11 dígitos)</label>
                     <input type="text" id="input-qr-asignar" placeholder="00000000001" maxlength="11"
                            pattern="[0-9]{11}" style="padding:12px;border:2px solid #ddd;border-radius:8px;font-size:16px;width:100%">
-                    <small style="color:#888;margin-top:8px;display:block">Ingresa los 11 dígitos del QR impreso</small>
+                    <small style="color:#888;margin-top:8px;display:block">Los 11 dígitos del código QR</small>
                 </div>
             </div>
             <div class="scanner-modal-buttons">
@@ -585,18 +593,65 @@ function cerrarScannerQR() {
 
 // ── Asignar QR ────────────────────────────────────────────────────────────────
 let extintor_asignar_id = null;
+let scannerAsignar = null;
 
 function abrirModalAsignarQR(extintor_id) {
     extintor_asignar_id = extintor_id;
     document.getElementById('input-qr-asignar').value = '';
     document.getElementById('asignar-qr-alert').innerHTML = '';
+    document.getElementById('scanner-asignar').style.display = 'none';
     document.getElementById('modalAsignarQR').classList.add('show');
     setTimeout(() => document.getElementById('input-qr-asignar').focus(), 100);
 }
 
 function cerrarModalAsignarQR() {
     document.getElementById('modalAsignarQR').classList.remove('show');
+    detenerScannerAsignar();
     extintor_asignar_id = null;
+}
+
+async function iniciarScannerAsignar() {
+    const scanDiv = document.getElementById('scanner-asignar');
+    const alertDiv = document.getElementById('asignar-qr-alert');
+
+    if (scanDiv.style.display === 'block') {
+        detenerScannerAsignar();
+        return;
+    }
+
+    scanDiv.style.display = 'block';
+
+    try {
+        scannerAsignar = new Html5Qrcode('scanner-asignar');
+        await scannerAsignar.start(
+            { facingMode: 'environment' },
+            { fps: 10, qrbox: 250 },
+            (decodedText) => {
+                const match = decodedText.match(/qr=(\d{11})/);
+                const qr = match ? match[1] : decodedText;
+                if (/^\d{11}$/.test(qr)) {
+                    document.getElementById('input-qr-asignar').value = qr;
+                    detenerScannerAsignar();
+                    alertDiv.innerHTML = '<div style="background:#d1fae5;color:#065f46;padding:12px;border-radius:6px">✓ QR detectado. Presiona "Asignar QR"</div>';
+                }
+            },
+            (error) => { console.log('Error en scanner:', error); }
+        ).catch(() => {
+            alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">No se pudo acceder a la cámara</div>';
+            detenerScannerAsignar();
+        });
+    } catch (err) {
+        alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">Error al iniciar cámara</div>';
+        detenerScannerAsignar();
+    }
+}
+
+function detenerScannerAsignar() {
+    if (scannerAsignar) {
+        scannerAsignar.stop().catch(() => {});
+        scannerAsignar = null;
+    }
+    document.getElementById('scanner-asignar').style.display = 'none';
 }
 
 async function guardarAsignacionQR() {
@@ -604,7 +659,7 @@ async function guardarAsignacionQR() {
     const alertDiv = document.getElementById('asignar-qr-alert');
 
     if (!qr) {
-        alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">Ingresa el código QR</div>';
+        alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">Ingresa o escanea el código QR</div>';
         return;
     }
 

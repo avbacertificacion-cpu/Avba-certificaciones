@@ -188,14 +188,24 @@ $es_admin = $rol === ROLE_ADMIN;
 
 <!-- Modal Asignar/Modificar QR -->
 <div class="modal-overlay" id="modalAsignarQRAdmin">
-    <div class="modal" style="max-width:400px">
+    <div class="modal" style="max-width:500px">
         <h2 id="modalAsignarQRTitulo">Asignar QR</h2>
         <div id="asignar-qr-alert-admin"></div>
-        <div class="form-group">
-            <label>Código QR (11 dígitos)</label>
-            <input type="text" id="input-qr-admin" placeholder="00000000001" maxlength="11" pattern="[0-9]{11}"
-                   style="padding:12px;border:2px solid #ddd;border-radius:8px;font-size:16px">
-            <small style="color:#888;margin-top:8px;display:block">Ingresa los 11 dígitos del QR impreso</small>
+        <div style="padding:20px">
+            <div style="margin-bottom:16px">
+                <button class="btn btn-success" style="width:100%;margin-bottom:12px;padding:12px"
+                        onclick="iniciarScannerAsignarAdmin()">
+                    📱 Escanear QR Impreso
+                </button>
+            </div>
+            <div id="scanner-asignar-admin" style="display:none;width:100%;height:300px;border-radius:8px;overflow:hidden;margin-bottom:16px"></div>
+            <div style="text-align:center;margin:16px 0;color:#999">O</div>
+            <div class="form-group">
+                <label>Ingresa Manual (11 dígitos)</label>
+                <input type="text" id="input-qr-admin" placeholder="00000000001" maxlength="11" pattern="[0-9]{11}"
+                       style="padding:12px;border:2px solid #ddd;border-radius:8px;font-size:16px;width:100%">
+                <small style="color:#888;margin-top:8px;display:block">Los 11 dígitos del código QR</small>
+            </div>
         </div>
         <div class="modal-actions">
             <button class="btn btn-warning" onclick="cerrarModalAsignarQRAdmin()">Cancelar</button>
@@ -204,8 +214,9 @@ $es_admin = $rol === ROLE_ADMIN;
     </div>
 </div>
 
-<!-- QR Generator library (CDN) -->
+<!-- QR Generator & Scanner libraries (CDN) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 let extintores = [];
 let empresas   = [];
@@ -467,6 +478,7 @@ function imprimirQR() {
 // ── Asignar/Modificar QR ─────────────────────────────────────────────────────
 let extintor_qr_id = null;
 let es_modificar_qr = false;
+let scannerAsignarAdmin = null;
 
 function asignarOModificarQR(id, tieneQR) {
     extintor_qr_id = id;
@@ -478,13 +490,59 @@ function asignarOModificarQR(id, tieneQR) {
     document.getElementById('modalAsignarQRTitulo').textContent = titulo;
     document.getElementById('input-qr-admin').value = ext.codigo_qr || '';
     document.getElementById('asignar-qr-alert-admin').innerHTML = '';
+    document.getElementById('scanner-asignar-admin').style.display = 'none';
     document.getElementById('modalAsignarQRAdmin').classList.add('open');
     setTimeout(() => document.getElementById('input-qr-admin').focus(), 100);
 }
 
 function cerrarModalAsignarQRAdmin() {
     document.getElementById('modalAsignarQRAdmin').classList.remove('open');
+    detenerScannerAsignarAdmin();
     extintor_qr_id = null;
+}
+
+async function iniciarScannerAsignarAdmin() {
+    const scanDiv = document.getElementById('scanner-asignar-admin');
+    const alertDiv = document.getElementById('asignar-qr-alert-admin');
+
+    if (scanDiv.style.display === 'block') {
+        detenerScannerAsignarAdmin();
+        return;
+    }
+
+    scanDiv.style.display = 'block';
+
+    try {
+        scannerAsignarAdmin = new Html5Qrcode('scanner-asignar-admin');
+        await scannerAsignarAdmin.start(
+            { facingMode: 'environment' },
+            { fps: 10, qrbox: 250 },
+            (decodedText) => {
+                const match = decodedText.match(/qr=(\d{11})/);
+                const qr = match ? match[1] : decodedText;
+                if (/^\d{11}$/.test(qr)) {
+                    document.getElementById('input-qr-admin').value = qr;
+                    detenerScannerAsignarAdmin();
+                    alertDiv.innerHTML = '<div class="alert alert-success">✓ QR detectado. Presiona "Guardar QR"</div>';
+                }
+            },
+            (error) => { console.log('Error en scanner:', error); }
+        ).catch(() => {
+            alertDiv.innerHTML = '<div class="alert alert-error">No se pudo acceder a la cámara</div>';
+            detenerScannerAsignarAdmin();
+        });
+    } catch (err) {
+        alertDiv.innerHTML = '<div class="alert alert-error">Error al iniciar cámara</div>';
+        detenerScannerAsignarAdmin();
+    }
+}
+
+function detenerScannerAsignarAdmin() {
+    if (scannerAsignarAdmin) {
+        scannerAsignarAdmin.stop().catch(() => {});
+        scannerAsignarAdmin = null;
+    }
+    document.getElementById('scanner-asignar-admin').style.display = 'none';
 }
 
 async function guardarAsignacionQRAdmin() {
@@ -492,7 +550,7 @@ async function guardarAsignacionQRAdmin() {
     const alertDiv = document.getElementById('asignar-qr-alert-admin');
 
     if (!qr) {
-        alertDiv.innerHTML = '<div class="alert alert-error">Ingresa el código QR</div>';
+        alertDiv.innerHTML = '<div class="alert alert-error">Ingresa o escanea el código QR</div>';
         return;
     }
 
