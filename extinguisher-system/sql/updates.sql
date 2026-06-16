@@ -15,7 +15,13 @@ ADD COLUMN IF NOT EXISTS rv  ENUM('OK','NC','NA','PO') DEFAULT NULL AFTER gb;
 
 -- ─── 2. Tabla empresas: UNIQUE en nombre ─────────────────────────────────────
 -- (Solo ejecutar si aún no existe el constraint)
+-- Si ves error "#1061 - Nombre duplicado de clave", el constraint ya existe (es normal, puedes ignorar)
 
+-- Para MariaDB: eliminar y recrear si existe
+-- DROP INDEX IF EXISTS uk_empresa_nombre ON empresas;
+-- ALTER TABLE empresas ADD CONSTRAINT uk_empresa_nombre UNIQUE (nombre);
+
+-- O simplemente ignorar si ya existe
 ALTER TABLE empresas
 ADD CONSTRAINT uk_empresa_nombre UNIQUE (nombre);
 
