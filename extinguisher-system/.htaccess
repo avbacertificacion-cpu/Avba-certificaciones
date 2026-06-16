@@ -3,21 +3,18 @@ DirectoryIndex index.php index.html
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # IMPORTANTE: No reescribir archivos y directorios reales
+    # CRÍTICO: No reescribir archivos y directorios que existen
     RewriteCond %{REQUEST_FILENAME} -f [OR]
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
 
-    # No reescribir /api/* - servir directamente
-    RewriteCond %{REQUEST_URI} ^/extintores/api/ [NC]
-    RewriteRule ^ - [L]
+    # CRÍTICO: No reescribir /api/* - DEBEN SERVIRSE DIRECTAMENTE
+    RewriteRule ^api/ - [L]
 
-    # No reescribir /public/* - servir directamente
-    RewriteCond %{REQUEST_URI} ^/extintores/public/ [NC]
-    RewriteRule ^ - [L]
+    # CRÍTICO: No reescribir /public/* - DEBEN SERVIRSE DIRECTAMENTE
+    RewriteRule ^public/ - [L]
 
     # Ruta especial para validación de códigos QR desde URL raíz
-    # Reescribir /?qr=... a /public/validar-extintor.html?qr=...
     RewriteCond %{QUERY_STRING} qr=
     RewriteRule ^$ /extintores/public/validar-extintor.html [L,QSA]
 
