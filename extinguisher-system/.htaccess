@@ -2,6 +2,12 @@ DirectoryIndex index.php index.html
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
+
+    # Ruta especial para validación de códigos QR desde URL raíz
+    RewriteCond %{QUERY_STRING} qr=
+    RewriteRule ^$ public/validar-extintor.html [L]
+
+    # Rutas normales
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [L]
