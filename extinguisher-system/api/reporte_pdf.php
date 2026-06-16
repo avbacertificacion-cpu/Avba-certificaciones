@@ -34,22 +34,20 @@ if ($rol === ROLE_CLIENTE) {
 }
 
 // ─── Extintores agrupados por sección ────────────────────────────────────────
+// Ordenar secciones por el número de extintor más bajo que contienen,
+// luego por número dentro de cada sección.
 $stmt = $pdo->prepare("
-    SELECT e.*
+    SELECT e.*,
+           MIN(CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+               UPPER(e.codigo_manual),
+               'EXT-',''), 'EXT ',''), 'EXT',''), '-',''), ' ','') AS UNSIGNED))
+               OVER (PARTITION BY COALESCE(e.seccion, '')) AS seccion_orden
     FROM extintores e
     WHERE e.empresa_id = ? AND e.estado = 'activo'
-    ORDER BY COALESCE(e.seccion, '') ASC,
-             CAST(
-               REPLACE(
-                 REPLACE(
-                   REPLACE(
-                     REPLACE(
-                       REPLACE(UPPER(e.codigo_manual), 'EXT-', ''),
-                       'EXT ', ''),
-                     'EXT', ''),
-                   '-', ''),
-                 ' ', '')
-               AS UNSIGNED) ASC
+    ORDER BY seccion_orden ASC,
+             CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+               UPPER(e.codigo_manual),
+               'EXT-',''), 'EXT ',''), 'EXT',''), '-',''), ' ','') AS UNSIGNED) ASC
 ");
 $stmt->execute([$reporte['empresa_id']]);
 $extintores = $stmt->fetchAll(PDO::FETCH_ASSOC);
