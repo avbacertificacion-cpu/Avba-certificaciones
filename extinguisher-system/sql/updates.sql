@@ -35,8 +35,7 @@ DROP INDEX IF EXISTS codigo_manual;
 -- UNIQUE KEY uk_extintor_empresa_codigo (empresa_id, codigo_manual)
 -- Si no existe, ejecutar:
 ALTER TABLE extintores
-ADD CONSTRAINT IF NOT EXISTS uk_extintor_empresa_codigo
-UNIQUE KEY (empresa_id, codigo_manual);
+ADD UNIQUE KEY IF NOT EXISTS uk_extintor_empresa_codigo (empresa_id, codigo_manual);
 
 -- ─── 4. Tabla reportes_mensuales: inspector_id ───────────────────────────────
 
