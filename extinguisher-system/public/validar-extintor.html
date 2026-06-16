@@ -450,7 +450,10 @@
             resultDiv.classList.remove('show');
             errorDiv.classList.remove('show');
 
-            fetch(`../api/validar-publico.php?codigo=${encodeURIComponent(codigo)}`)
+            // Usar URL absoluta para asegurar que llega al API correcto
+            const apiURL = window.location.origin + '/extintores/api/validar-publico.php?codigo=' + encodeURIComponent(codigo);
+
+            fetch(apiURL)
                 .then(response => {
                     if (response.status === 429) {
                         throw new Error('Demasiadas solicitudes. Intenta más tarde.');

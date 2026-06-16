@@ -3,17 +3,26 @@ DirectoryIndex index.php index.html
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # Ruta especial para validación de códigos QR desde URL raíz
-    # QSA = Query String Append (preserva ?qr= parameter)
-    RewriteCond %{QUERY_STRING} qr=
-    RewriteRule ^$ public/validar-extintor.html [L,QSA]
+    # IMPORTANTE: No reescribir archivos y directorios reales
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
 
-    # Rutas normales - PERO EXCLUIR /api, /public, y archivos reales
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteCond %{REQUEST_URI} !^/api/ [NC]
-    RewriteCond %{REQUEST_URI} !^/public/ [NC]
-    RewriteRule ^ index.php [L]
+    # No reescribir /api/* - servir directamente
+    RewriteCond %{REQUEST_URI} ^/extintores/api/ [NC]
+    RewriteRule ^ - [L]
+
+    # No reescribir /public/* - servir directamente
+    RewriteCond %{REQUEST_URI} ^/extintores/public/ [NC]
+    RewriteRule ^ - [L]
+
+    # Ruta especial para validación de códigos QR desde URL raíz
+    # Reescribir /?qr=... a /public/validar-extintor.html?qr=...
+    RewriteCond %{QUERY_STRING} qr=
+    RewriteRule ^$ /extintores/public/validar-extintor.html [L,QSA]
+
+    # Todas las demás rutas van a index.php (routing interno)
+    RewriteRule ^ /extintores/index.php [L]
 </IfModule>
 
 # Ocultar errores PHP al usuario
