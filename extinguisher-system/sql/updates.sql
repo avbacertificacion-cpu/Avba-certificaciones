@@ -59,6 +59,9 @@ MODIFY COLUMN inspector_id INT NOT NULL;
 
 -- 4e. Agregar FOREIGN KEY
 ALTER TABLE reportes_mensuales
+DROP FOREIGN KEY IF EXISTS fk_reportes_inspector;
+
+ALTER TABLE reportes_mensuales
 ADD CONSTRAINT fk_reportes_inspector
 FOREIGN KEY (inspector_id) REFERENCES usuarios(id);
 
