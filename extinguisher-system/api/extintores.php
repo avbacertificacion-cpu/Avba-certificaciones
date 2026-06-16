@@ -20,13 +20,16 @@ if ($rol === ROLE_CLIENTE && !in_array($action, ['listar'])) {
 }
 
 switch ($action) {
-    case 'listar':      listar();       break;
-    case 'obtener':     obtener();      break;
-    case 'buscar_qr':   buscarQR();     break;
-    case 'crear':       crear();        break;
-    case 'editar':      editar();       break;
-    case 'eliminar':    eliminar();     break;
-    case 'get_tipos':   obtenerTipos(); break;
+    case 'listar':                listar();                 break;
+    case 'obtener':               obtener();                break;
+    case 'buscar_qr':             buscarQR();               break;
+    case 'crear':                 crear();                  break;
+    case 'editar':                editar();                 break;
+    case 'eliminar':              eliminar();               break;
+    case 'get_tipos':             obtenerTipos();           break;
+    case 'obtener_qr_disponible': obtenerQRDisponible();    break;
+    case 'asignar_qr':            asignarQR();              break;
+    case 'modificar_qr':          modificarQR();            break;
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Acción no válida']);
@@ -175,8 +178,23 @@ function crear() {
         return;
     }
 
-    // Generar código QR único
-    $codigo_qr = bin2hex(random_bytes(16));
+    // QR es opcional — si se provee debe ser 11 dígitos únicos
+    $codigo_qr = null;
+    if (!empty($d['codigo_qr'])) {
+        $codigo_qr = trim($d['codigo_qr']);
+        if (!preg_match('/^\d{11}$/', $codigo_qr)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'El código QR debe ser exactamente 11 dígitos numéricos']);
+            return;
+        }
+        $stmt = $pdo->prepare("SELECT id FROM extintores WHERE codigo_qr = ?");
+        $stmt->execute([$codigo_qr]);
+        if ($stmt->fetch()) {
+            http_response_code(409);
+            echo json_encode(['error' => 'Este código QR ya está asignado a otro extintor']);
+            return;
+        }
+    }
 
     // Generar código manual correlativo por empresa
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM extintores WHERE empresa_id = ?");
@@ -185,6 +203,7 @@ function crear() {
     $codigo_manual = $d['codigo_manual'] ?? ('EXT-' . str_pad($num, 3, '0', STR_PAD_LEFT));
 
     try {
+        $pdo->beginTransaction();
         $stmt = $pdo->prepare("
             INSERT INTO extintores
                 (codigo_qr, codigo_manual, empresa_id, seccion, ubicacion, tipo, capacidad,
@@ -207,7 +226,15 @@ function crear() {
         ]);
 
         $id = $pdo->lastInsertId();
+
+        // Si se asignó QR, registrar en auditoría de QR y actualizar secuencia
+        if ($codigo_qr) {
+            registrarAsignacionQR($id, null, $codigo_qr, $uid, $rol);
+            actualizarSecuenciaQR($codigo_qr, $uid);
+        }
+
         audit($uid, "Crear extintor $codigo_manual", 'extintores', $id);
+        $pdo->commit();
 
         echo json_encode([
             'success'       => true,
@@ -216,6 +243,7 @@ function crear() {
             'codigo_manual' => $codigo_manual,
         ]);
     } catch (PDOException $e) {
+        $pdo->rollBack();
         if ($e->getCode() == 23000) {
             http_response_code(409);
             echo json_encode(['error' => 'El código manual ya existe']);
@@ -336,6 +364,177 @@ function obtenerTipos() {
     $stmt->execute();
 
     echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+}
+
+// ─── OBTENER PRÓXIMO QR DISPONIBLE ───────────────────────────────────────────
+function obtenerQRDisponible() {
+    global $pdo, $rol;
+
+    if (!in_array($rol, [ROLE_ADMIN, ROLE_INSPECTOR])) {
+        http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
+    }
+
+    try {
+        $stmt = $pdo->prepare("SELECT proximo_qr FROM qr_secuencias WHERE id = 1");
+        $stmt->execute();
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$row) {
+            http_response_code(500);
+            echo json_encode(['error' => 'Tabla qr_secuencias no inicializada']);
+            return;
+        }
+
+        $proximo = (int)$row['proximo_qr'];
+        $qr = str_pad($proximo, 11, '0', STR_PAD_LEFT);
+
+        $stmt = $pdo->prepare("SELECT COUNT(*) FROM extintores WHERE codigo_qr IS NOT NULL");
+        $stmt->execute();
+        $asignados = (int)$stmt->fetchColumn();
+
+        echo json_encode([
+            'success'        => true,
+            'proximo_qr'     => $qr,
+            'total_asignados'=> $asignados,
+            'disponibles'    => 99999999999 - $proximo + 1,
+        ]);
+    } catch (Exception $e) {
+        http_response_code(500);
+        echo json_encode(['error' => 'Error al obtener QR']);
+    }
+}
+
+// ─── ASIGNAR QR (primera vez, inspector o admin) ──────────────────────────────
+function asignarQR() {
+    global $pdo, $rol, $uid;
+
+    if (!in_array($rol, [ROLE_ADMIN, ROLE_INSPECTOR])) {
+        http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
+    }
+
+    $d           = json_decode(file_get_contents('php://input'), true);
+    $extintor_id = intval($d['extintor_id'] ?? 0);
+    $codigo_qr   = trim($d['codigo_qr'] ?? '');
+
+    if (!$extintor_id) { http_response_code(400); echo json_encode(['error' => 'extintor_id requerido']); return; }
+
+    if (!preg_match('/^\d{11}$/', $codigo_qr)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'El código QR debe ser exactamente 11 dígitos numéricos']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("SELECT id, codigo_qr, empresa_id FROM extintores WHERE id = ?");
+    $stmt->execute([$extintor_id]);
+    $ext = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$ext) { http_response_code(404); echo json_encode(['error' => 'Extintor no encontrado']); return; }
+
+    // Inspector: solo puede asignar si aún no tiene QR
+    if ($rol === ROLE_INSPECTOR && $ext['codigo_qr'] !== null) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Este extintor ya tiene QR asignado. Solo Admin puede modificarlo']);
+        return;
+    }
+
+    // Verificar unicidad
+    $stmt = $pdo->prepare("SELECT id FROM extintores WHERE codigo_qr = ? AND id != ?");
+    $stmt->execute([$codigo_qr, $extintor_id]);
+    if ($stmt->fetch()) {
+        http_response_code(409);
+        echo json_encode(['error' => 'Este código QR ya está asignado a otro extintor']);
+        return;
+    }
+
+    try {
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare("UPDATE extintores SET codigo_qr = ? WHERE id = ?");
+        $stmt->execute([$codigo_qr, $extintor_id]);
+        registrarAsignacionQR($extintor_id, $ext['codigo_qr'], $codigo_qr, $uid, $rol);
+        actualizarSecuenciaQR($codigo_qr, $uid);
+        audit($uid, "Asignar QR $codigo_qr a extintor #$extintor_id", 'extintores', $extintor_id);
+        $pdo->commit();
+        echo json_encode(['success' => true, 'codigo_qr' => $codigo_qr]);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => 'Error al asignar QR']);
+    }
+}
+
+// ─── MODIFICAR QR (solo admin) ────────────────────────────────────────────────
+function modificarQR() {
+    global $pdo, $rol, $uid;
+
+    if ($rol !== ROLE_ADMIN) {
+        http_response_code(403); echo json_encode(['error' => 'Solo Admin puede modificar QR']); return;
+    }
+
+    $d              = json_decode(file_get_contents('php://input'), true);
+    $extintor_id    = intval($d['extintor_id'] ?? 0);
+    $codigo_qr_nuevo = trim($d['codigo_qr_nuevo'] ?? '');
+
+    if (!$extintor_id) { http_response_code(400); echo json_encode(['error' => 'extintor_id requerido']); return; }
+
+    if (!preg_match('/^\d{11}$/', $codigo_qr_nuevo)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'El código QR debe ser exactamente 11 dígitos numéricos']);
+        return;
+    }
+
+    $stmt = $pdo->prepare("SELECT id, codigo_qr FROM extintores WHERE id = ?");
+    $stmt->execute([$extintor_id]);
+    $ext = $stmt->fetch(PDO::FETCH_ASSOC);
+    if (!$ext) { http_response_code(404); echo json_encode(['error' => 'Extintor no encontrado']); return; }
+
+    $stmt = $pdo->prepare("SELECT id FROM extintores WHERE codigo_qr = ? AND id != ?");
+    $stmt->execute([$codigo_qr_nuevo, $extintor_id]);
+    if ($stmt->fetch()) {
+        http_response_code(409);
+        echo json_encode(['error' => 'El nuevo QR ya está asignado a otro extintor']);
+        return;
+    }
+
+    try {
+        $pdo->beginTransaction();
+        $stmt = $pdo->prepare("UPDATE extintores SET codigo_qr = ? WHERE id = ?");
+        $stmt->execute([$codigo_qr_nuevo, $extintor_id]);
+        registrarAsignacionQR($extintor_id, $ext['codigo_qr'], $codigo_qr_nuevo, $uid, $rol);
+        actualizarSecuenciaQR($codigo_qr_nuevo, $uid);
+        audit($uid, "Modificar QR {$ext['codigo_qr']} → $codigo_qr_nuevo", 'extintores', $extintor_id);
+        $pdo->commit();
+        echo json_encode(['success' => true, 'codigo_qr_anterior' => $ext['codigo_qr'], 'codigo_qr_nuevo' => $codigo_qr_nuevo]);
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => 'Error al modificar QR']);
+    }
+}
+
+// ─── HELPER: Registrar asignación en qr_asignaciones ─────────────────────────
+function registrarAsignacionQR($extintor_id, $anterior, $nuevo, $uid, $rol) {
+    global $pdo;
+    try {
+        $stmt = $pdo->prepare("
+            INSERT INTO qr_asignaciones (extintor_id, qr_anterior, qr_nuevo, asignado_por, rol_asignador)
+            VALUES (?, ?, ?, ?, ?)
+        ");
+        $stmt->execute([$extintor_id, $anterior, $nuevo, $uid, $rol]);
+    } catch (Exception $e) {}
+}
+
+// ─── HELPER: Actualizar secuencia QR ─────────────────────────────────────────
+function actualizarSecuenciaQR($codigo_qr, $uid) {
+    global $pdo;
+    try {
+        $num = (int)$codigo_qr;
+        $stmt = $pdo->prepare("
+            UPDATE qr_secuencias
+            SET proximo_qr = GREATEST(proximo_qr, ? + 1), actualizado_por = ?
+            WHERE id = 1
+        ");
+        $stmt->execute([$num, $uid]);
+    } catch (Exception $e) {}
 }
 
 // ─── HELPER AUDITORÍA ────────────────────────────────────────────────────────
