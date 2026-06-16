@@ -3,23 +3,34 @@ DirectoryIndex index.php index.html
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
-    # CRÍTICO: No reescribir archivos y directorios que existen
-    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    # CRÍTICO: No reescribir si es un archivo real que existe
+    RewriteCond %{REQUEST_FILENAME} -f
+    RewriteRule ^ - [L]
+
+    # CRÍTICO: No reescribir si es un directorio real que existe
     RewriteCond %{REQUEST_FILENAME} -d
     RewriteRule ^ - [L]
 
-    # CRÍTICO: No reescribir /api/* - DEBEN SERVIRSE DIRECTAMENTE
-    RewriteRule ^api/ - [L]
+    # CRÍTICO: Nunca reescribir .php, .js, .css, .jpg, .png, etc. en /public/
+    RewriteRule ^public/.*\.(php|js|css|jpg|jpeg|png|gif|ico|svg|woff|woff2|ttf|eot)$ - [L]
 
-    # CRÍTICO: No reescribir /public/* - DEBEN SERVIRSE DIRECTAMENTE
-    RewriteRule ^public/ - [L]
+    # Nunca reescribir archivos o directorios bajo /api/
+    RewriteRule ^api(/|$) - [L]
 
-    # Ruta especial para validación de códigos QR desde URL raíz
-    RewriteCond %{QUERY_STRING} qr=
-    RewriteRule ^$ /extintores/public/validar-extintor.html [L,QSA]
+    # Nunca reescribir directorios bajo /config/ o /private/
+    RewriteRule ^(config|private)(/|$) - [L]
 
-    # Todas las demás rutas van a index.php (routing interno)
-    RewriteRule ^ /extintores/index.php [L]
+    # Especial: Si es /validar-extintor.html en /public/, servir directamente
+    RewriteRule ^public/validar-extintor\.html$ - [L]
+
+    # Para raíz con ?qr=, reescribir a público validador (solo si tiene ?qr=)
+    RewriteCond %{QUERY_STRING} ^qr=
+    RewriteRule ^$ public/validar-extintor.html [L,QSA]
+
+    # Catch-all: Todo lo demás (rutas no existentes) va a index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L]
 </IfModule>
 
 # Ocultar errores PHP al usuario
