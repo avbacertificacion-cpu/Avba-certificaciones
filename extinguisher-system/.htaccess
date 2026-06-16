@@ -8,9 +8,11 @@ DirectoryIndex index.php index.html
     RewriteCond %{QUERY_STRING} qr=
     RewriteRule ^$ public/validar-extintor.html [L,QSA]
 
-    # Rutas normales
+    # Rutas normales - PERO EXCLUIR /api, /public, y archivos reales
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_URI} !^/api/ [NC]
+    RewriteCond %{REQUEST_URI} !^/public/ [NC]
     RewriteRule ^ index.php [L]
 </IfModule>
 
