@@ -186,6 +186,24 @@ $es_admin = $rol === ROLE_ADMIN;
     </div>
 </div>
 
+<!-- Modal Asignar/Modificar QR -->
+<div class="modal-overlay" id="modalAsignarQRAdmin">
+    <div class="modal" style="max-width:400px">
+        <h2 id="modalAsignarQRTitulo">Asignar QR</h2>
+        <div id="asignar-qr-alert-admin"></div>
+        <div class="form-group">
+            <label>Código QR (11 dígitos)</label>
+            <input type="text" id="input-qr-admin" placeholder="00000000001" maxlength="11" pattern="[0-9]{11}"
+                   style="padding:12px;border:2px solid #ddd;border-radius:8px;font-size:16px">
+            <small style="color:#888;margin-top:8px;display:block">Ingresa los 11 dígitos del QR impreso</small>
+        </div>
+        <div class="modal-actions">
+            <button class="btn btn-warning" onclick="cerrarModalAsignarQRAdmin()">Cancelar</button>
+            <button class="btn btn-success" onclick="guardarAsignacionQRAdmin()">Guardar QR</button>
+        </div>
+    </div>
+</div>
+
 <!-- QR Generator library (CDN) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script>
@@ -267,7 +285,10 @@ function renderTabla(data) {
                 <td>${e.ultima_inspeccion ? e.ultima_inspeccion.substring(0,10) : '<span style="color:#e74c3c">Sin inspección</span>'}</td>
                 <td><span class="badge badge-${e.estado}">${estadoLabel(e.estado)}</span></td>
                 <td style="white-space:nowrap">
-                    <button class="btn btn-sm btn-primary" onclick="verQR(${e.id})">QR</button>
+                    <button class="btn btn-sm btn-primary" onclick="asignarOModificarQR(${e.id}, ${e.codigo_qr ? 'true' : 'false'})">
+                        ${e.codigo_qr ? '🔧 Modificar QR' : '📝 Asignar QR'}
+                    </button>
+                    ${e.codigo_qr ? `<button class="btn btn-sm btn-info" onclick="verQR(${e.id})">👁️ Ver</button>` : ''}
                     <button class="btn btn-sm btn-warning" onclick="editarExtintor(${e.id})">✏️</button>
                     ${esAdmin ? `<button class="btn btn-sm btn-danger" onclick="eliminarExtintor(${e.id})">🗑️</button>` : ''}
                 </td>
@@ -441,6 +462,76 @@ function imprimirQR() {
         </body></html>
     `);
     win.document.close();
+}
+
+// ── Asignar/Modificar QR ─────────────────────────────────────────────────────
+let extintor_qr_id = null;
+let es_modificar_qr = false;
+
+function asignarOModificarQR(id, tieneQR) {
+    extintor_qr_id = id;
+    es_modificar_qr = tieneQR;
+    const ext = extintores.find(e => e.id === id);
+    if (!ext) return;
+
+    const titulo = tieneQR ? 'Modificar Código QR' : 'Asignar Código QR';
+    document.getElementById('modalAsignarQRTitulo').textContent = titulo;
+    document.getElementById('input-qr-admin').value = ext.codigo_qr || '';
+    document.getElementById('asignar-qr-alert-admin').innerHTML = '';
+    document.getElementById('modalAsignarQRAdmin').classList.add('open');
+    setTimeout(() => document.getElementById('input-qr-admin').focus(), 100);
+}
+
+function cerrarModalAsignarQRAdmin() {
+    document.getElementById('modalAsignarQRAdmin').classList.remove('open');
+    extintor_qr_id = null;
+}
+
+async function guardarAsignacionQRAdmin() {
+    const qr = document.getElementById('input-qr-admin').value.trim();
+    const alertDiv = document.getElementById('asignar-qr-alert-admin');
+
+    if (!qr) {
+        alertDiv.innerHTML = '<div class="alert alert-error">Ingresa el código QR</div>';
+        return;
+    }
+
+    if (!/^\d{11}$/.test(qr)) {
+        alertDiv.innerHTML = '<div class="alert alert-error">El QR debe ser exactamente 11 dígitos</div>';
+        return;
+    }
+
+    try {
+        const action = es_modificar_qr ? 'modificar_qr' : 'asignar_qr';
+        const payload = es_modificar_qr
+            ? { extintor_id: extintor_qr_id, codigo_qr_nuevo: qr }
+            : { extintor_id: extintor_qr_id, codigo_qr: qr };
+
+        const res = await fetch(`../api/extintores.php?action=${action}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            alertDiv.innerHTML = `<div class="alert alert-error">${data.error || 'Error al procesar QR'}</div>`;
+            return;
+        }
+
+        // Actualizar datos
+        const ext = extintores.find(e => e.id === extintor_qr_id);
+        if (ext) {
+            ext.codigo_qr = es_modificar_qr ? data.codigo_qr_nuevo : qr;
+        }
+        cerrarModalAsignarQRAdmin();
+        cargarExtintores();
+        showAlert(`✓ QR ${es_modificar_qr ? 'modificado' : 'asignado'} correctamente`, 'success');
+    } catch (err) {
+        alertDiv.innerHTML = '<div class="alert alert-error">Error al procesar solicitud</div>';
+        console.error('Error:', err);
+    }
 }
 
 // ── Alertas ───────────────────────────────────────────────────────────────────

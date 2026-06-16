@@ -231,6 +231,29 @@ if ($empresa_inspeccion) {
             </div>
         </div>
     </div>
+
+    <!-- Modal Asignar QR -->
+    <div class="scanner-modal" id="modalAsignarQR">
+        <div class="scanner-modal-content" style="max-width:400px">
+            <div class="scanner-modal-header">
+                <span>📝 Asignar Código QR</span>
+                <button class="scanner-modal-close" onclick="cerrarModalAsignarQR()">✕</button>
+            </div>
+            <div id="asignar-qr-alert"></div>
+            <div style="padding:20px">
+                <div class="form-group">
+                    <label>Código QR (11 dígitos)</label>
+                    <input type="text" id="input-qr-asignar" placeholder="00000000001" maxlength="11"
+                           pattern="[0-9]{11}" style="padding:12px;border:2px solid #ddd;border-radius:8px;font-size:16px;width:100%">
+                    <small style="color:#888;margin-top:8px;display:block">Ingresa los 11 dígitos del QR impreso</small>
+                </div>
+            </div>
+            <div class="scanner-modal-buttons">
+                <button class="btn btn-warning" onclick="cerrarModalAsignarQR()">Cancelar</button>
+                <button class="btn btn-success" onclick="guardarAsignacionQR()">Asignar QR</button>
+            </div>
+        </div>
+    </div>
 <?php endif; ?>
 
 <script>
@@ -331,7 +354,12 @@ function mostrarExtintor(ext) {
                     <div class="label">Estado</div>
                     <div class="value">${ext.estado}</div>
                 </div>
+                <div class="info-item">
+                    <div class="label">Código QR</div>
+                    <div class="value">${ext.codigo_qr ? `<strong>${ext.codigo_qr}</strong>` : '<span style="color:#e74c3c">No asignado</span>'}</div>
+                </div>
             </div>
+            ${!ext.codigo_qr ? `<div style="margin-top:16px"><button class="btn btn-success" onclick="abrirModalAsignarQR(${ext.id})">📝 Asignar QR</button></div>` : ''}
         </div>
 
         ${formularioInspeccion(ext)}
@@ -552,6 +580,64 @@ function cerrarScannerQR() {
     document.getElementById('scannerModal').classList.remove('show');
     if (qrScanner) {
         qrScanner.stop().catch(() => {});
+    }
+}
+
+// ── Asignar QR ────────────────────────────────────────────────────────────────
+let extintor_asignar_id = null;
+
+function abrirModalAsignarQR(extintor_id) {
+    extintor_asignar_id = extintor_id;
+    document.getElementById('input-qr-asignar').value = '';
+    document.getElementById('asignar-qr-alert').innerHTML = '';
+    document.getElementById('modalAsignarQR').classList.add('show');
+    setTimeout(() => document.getElementById('input-qr-asignar').focus(), 100);
+}
+
+function cerrarModalAsignarQR() {
+    document.getElementById('modalAsignarQR').classList.remove('show');
+    extintor_asignar_id = null;
+}
+
+async function guardarAsignacionQR() {
+    const qr = document.getElementById('input-qr-asignar').value.trim();
+    const alertDiv = document.getElementById('asignar-qr-alert');
+
+    if (!qr) {
+        alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">Ingresa el código QR</div>';
+        return;
+    }
+
+    if (!/^\d{11}$/.test(qr)) {
+        alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">El QR debe ser exactamente 11 dígitos</div>';
+        return;
+    }
+
+    try {
+        const res = await fetch('../api/extintores.php?action=asignar_qr', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                extintor_id: extintor_asignar_id,
+                codigo_qr: qr
+            })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+            alertDiv.innerHTML = `<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">${data.error || 'Error al asignar QR'}</div>`;
+            return;
+        }
+
+        // Éxito: actualizar datos y cerrar modal
+        extActual.codigo_qr = qr;
+        mostrarExtintor(extActual);
+        cerrarModalAsignarQR();
+        showAlert('✓ QR asignado correctamente', 'success');
+    } catch (err) {
+        alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">Error al asignar QR</div>';
+        console.error('Error:', err);
     }
 }
 </script>
