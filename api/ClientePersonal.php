@@ -507,4 +507,51 @@ class ClientePersonal {
             ], $docsVStmt->fetchAll()),
         ];
     }
+
+    public function getPrefsNotif(string $idCliente): array {
+        $idCliente = $this->norm($idCliente);
+        $s = $this->pdo->prepare("SELECT notif_email, notif_whatsapp, notif_browser, dias_anticip FROM cliente_notif_prefs WHERE id_cliente=? LIMIT 1");
+        $s->execute([$idCliente]);
+        $row = $s->fetch() ?: ['notif_email'=>'','notif_whatsapp'=>'','notif_browser'=>0,'dias_anticip'=>30];
+        return ['status'=>'success','data'=>$row];
+    }
+
+    public function guardarPrefsNotif(array $payload, string $idCliente): array {
+        $idCliente = $this->norm($idCliente);
+        $email     = trim($payload['notif_email']    ?? '');
+        $wa        = trim($payload['notif_whatsapp'] ?? '');
+        $browser   = (int)(bool)($payload['notif_browser'] ?? 0);
+        $dias      = max(1, min(90, (int)($payload['dias_anticip'] ?? 30)));
+        $s = $this->pdo->prepare("SELECT id FROM cliente_notif_prefs WHERE id_cliente=?");
+        $s->execute([$idCliente]);
+        if ($s->fetch()) {
+            $this->pdo->prepare("UPDATE cliente_notif_prefs SET notif_email=?,notif_whatsapp=?,notif_browser=?,dias_anticip=? WHERE id_cliente=?")->execute([$email,$wa,$browser,$dias,$idCliente]);
+        } else {
+            $this->pdo->prepare("INSERT INTO cliente_notif_prefs (id_cliente,notif_email,notif_whatsapp,notif_browser,dias_anticip) VALUES (?,?,?,?,?)")->execute([$idCliente,$email,$wa,$browser,$dias]);
+        }
+        return ['status'=>'success'];
+    }
+
+    public function getAlertasVencimiento(string $idCliente): array {
+        $idCliente = $this->norm($idCliente);
+        // Get dias_anticip from prefs (default 30)
+        $sp = $this->pdo->prepare("SELECT dias_anticip FROM cliente_notif_prefs WHERE id_cliente=? LIMIT 1");
+        $sp->execute([$idCliente]);
+        $dias = (int)(($sp->fetch()['dias_anticip'] ?? 30));
+
+        $stmt = $this->pdo->prepare("
+            SELECT d.id, d.nombre, d.tipo_doc, d.vigencia,
+                   DATEDIFF(d.vigencia, CURDATE()) AS dias_restantes,
+                   p.nombre AS empleado, p.id AS personal_id
+            FROM cliente_personal_docs d
+            JOIN cliente_personal p ON p.id = d.personal_id
+            WHERE p.id_cliente = ?
+              AND d.vigencia IS NOT NULL
+              AND d.vigencia <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+            ORDER BY d.vigencia ASC
+            LIMIT 50
+        ");
+        $stmt->execute([$idCliente, $dias]);
+        return ['status'=>'success','data'=>$stmt->fetchAll(),'dias_anticip'=>$dias];
+    }
 }

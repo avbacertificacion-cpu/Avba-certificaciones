@@ -495,6 +495,18 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cliPersonal->detalle((int)($_GET['id'] ?? 0), $usr['id_cliente'] ?? ''));
 
+        case 'GET_PREFS_NOTIF':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status'=>'error','message'=>'No autorizado.'],401);
+            $idc = $usr['id_cliente'] ?? '';
+            respuesta($cliPersonal->getPrefsNotif($idc));
+
+        case 'GET_ALERTAS_VENCIMIENTO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status'=>'error','message'=>'No autorizado.'],401);
+            $idc = $usr['id_cliente'] ?? '';
+            respuesta($cliPersonal->getAlertasVencimiento($idc));
+
         case 'GET_MIS_EQUIPOS':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -1196,6 +1208,12 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cliPersonal->eliminar((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
+
+        case 'GUARDAR_PREFS_NOTIF':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status'=>'error','message'=>'No autorizado.'],401);
+            $idc = $usr['id_cliente'] ?? '';
+            respuesta($cliPersonal->guardarPrefsNotif($payload, $idc));
 
         case 'SUBIR_DOC_PERSONAL':
             $usr = validarToken($pdo, $token);
