@@ -60,6 +60,17 @@ class ClientePersonal {
                   KEY idx_per (personal_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS cliente_notif_prefs (
+                  id               INT AUTO_INCREMENT PRIMARY KEY,
+                  id_cliente       VARCHAR(20) NOT NULL,
+                  notif_email      VARCHAR(200) NULL,
+                  notif_whatsapp   VARCHAR(30)  NULL,
+                  notif_browser    TINYINT(1)   NOT NULL DEFAULT 0,
+                  dias_anticip     INT          NOT NULL DEFAULT 30,
+                  KEY idx_cli (id_cliente)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
         } catch (\PDOException $e) {
             error_log('[ClientePersonal] migrate: ' . $e->getMessage());
         }

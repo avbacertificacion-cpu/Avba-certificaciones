@@ -365,7 +365,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
     <button class="tab-btn" onclick="verTab('per',this)">👷 Personal</button>
     <button class="tab-btn" onclick="verTab('pnd',this)">🔬 PND</button>
     <button class="tab-btn" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos</button>
-    <button class="tab-btn" onclick="verTab('personal-cli',this);cargarPersonalCli()">👥 Mi Personal</button>
+    <button class="tab-btn" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal</button>
   </div>
 
   <div id="tab-maq" class="tab-panel active">
@@ -575,7 +575,10 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
           <div style="font-size:16px;font-weight:800;color:var(--texto)">Mi Personal</div>
           <div style="font-size:11px;color:var(--texto-hint);margin-top:2px" id="per-list-count"></div>
         </div>
-        <button class="btn-prim" onclick="abrirModalPers(null)">+ Nuevo empleado</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn-sec" onclick="abrirModalNotifPrefs()" style="font-size:12px;padding:8px 12px">⚙ Notificaciones</button>
+          <button class="btn-prim" onclick="abrirModalPers(null)">+ Nuevo empleado</button>
+        </div>
       </div>
       <div class="eq-filters">
         <input class="eq-filter-input" id="per-search" placeholder="🔍 Buscar nombre, puesto, N° empleado..." oninput="aplicarFiltrosPer()">
@@ -797,16 +800,51 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
           <option value="antidoping">Antidoping</option>
           <option value="medico">Examen médico</option>
           <option value="constancia">Constancia</option>
+          <option value="seguro">Seguro</option>
+          <option value="dc3">DC-3</option>
+          <option value="ine">INE</option>
+          <option value="nss">NSS</option>
           <option value="otro">Otro</option>
         </select>
       </div>
-      <div class="frow"><label class="flabel">Vigencia (opcional)</label><input class="finput" id="doc-pers-vigencia" type="date"></div>
+      <div class="frow" style="flex-direction:column;gap:6px">
+        <label class="flabel">Vigencia</label>
+        <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" id="doc-pers-tiene-vig" onchange="toggleVigenciaPer(this.checked)">
+          ¿Tiene vigencia?
+        </label>
+        <input class="finput" id="doc-pers-vigencia" type="date" style="display:none">
+      </div>
     </div>
     <div class="frow"><label class="flabel">Archivo (PDF, imagen, DOCX)</label><input class="finput" id="doc-pers-archivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.docx"></div>
     <div class="frow"><label class="flabel">Notas</label><input class="finput" id="doc-pers-notas" placeholder="Opcional"></div>
     <div class="fact">
       <button class="btn-sec" onclick="cerrarModalDocPers()">Cancelar</button>
       <button class="btn-prim" onclick="guardarDocPers()">Subir</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Preferencias de Notificación -->
+<div class="eq-overlay" id="modal-notif-prefs">
+  <div class="eq-modal">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Configurar Notificaciones</div>
+      <button class="eq-modal-close" onclick="cerrarModalNotifPrefs()">✕</button>
+    </div>
+    <div class="frow"><label class="flabel">Email para notificaciones</label><input class="finput" id="notif-email" type="email" placeholder="tucorreo@empresa.com"></div>
+    <div class="frow"><label class="flabel">Número de WhatsApp (con código de país)</label><input class="finput" id="notif-whatsapp" type="text" placeholder="+52 55 1234 5678"></div>
+    <div class="frow" style="flex-direction:row;align-items:center;gap:8px">
+      <input type="checkbox" id="notif-browser" style="width:16px;height:16px;cursor:pointer">
+      <label for="notif-browser" class="flabel" style="margin:0;cursor:pointer">Notificaciones del navegador</label>
+    </div>
+    <div class="frow"><label class="flabel">Días de anticipación para alertas (1–90)</label><input class="finput" id="notif-dias" type="number" min="1" max="90" value="30"></div>
+    <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:10px 12px;font-size:12px;color:#0369a1;margin-bottom:8px">
+      ℹ El email y WhatsApp se almacenan para futuras integraciones con SMTP y la API de WhatsApp Business. Se enviará un recordatorio al número configurado cuando la integración esté activa.
+    </div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalNotifPrefs()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarPrefsNotif()">Guardar</button>
     </div>
   </div>
 </div>
@@ -1978,6 +2016,7 @@ async function cargarPersonalCli() {
   _perCargado = true;
   cargarDashboardPer();
   cargarListaPer();
+  cargarAlertasVencimiento();
 }
 
 async function cargarDashboardPer() {
@@ -2033,8 +2072,8 @@ function aplicarFiltrosPer() {
   renderListaPer(f);
 }
 
-const TIPO_DOC_ICONS_PER = { licencia:'🪪', antidoping:'🧪', medico:'🏥', constancia:'📜', otro:'📎' };
-const TIPO_DOC_LABELS_PER = { licencia:'Licencia', antidoping:'Antidoping', medico:'Examen médico', constancia:'Constancia', otro:'Otro' };
+const TIPO_DOC_ICONS_PER = { licencia:'🪪', antidoping:'🧪', medico:'🏥', constancia:'📜', seguro:'🛡', dc3:'📋', ine:'🪪', nss:'🏥', otro:'📎' };
+const TIPO_DOC_LABELS_PER = { licencia:'Licencia', antidoping:'Antidoping', medico:'Examen médico', constancia:'Constancia', seguro:'Seguro', dc3:'DC-3', ine:'INE', nss:'NSS', otro:'Otro' };
 
 function renderListaPer(personas) {
   const cont = document.getElementById('per-cli-cont');
@@ -2296,11 +2335,21 @@ async function eliminarPers(id, nombre) {
 }
 
 // ── Documento Personal ────────────────────────────────────────────────────
+function toggleVigenciaPer(checked) {
+  const inp = document.getElementById('doc-pers-vigencia');
+  inp.style.display = checked ? '' : 'none';
+  if (!checked) inp.value = '';
+}
+
 function abrirModalDocPers(persId) {
   document.getElementById('doc-pers-id').value      = persId;
   document.getElementById('doc-pers-nombre').value  = '';
   document.getElementById('doc-pers-tipo').value    = 'licencia';
-  document.getElementById('doc-pers-vigencia').value= '';
+  const cbVig = document.getElementById('doc-pers-tiene-vig');
+  cbVig.checked = false;
+  const vigInput = document.getElementById('doc-pers-vigencia');
+  vigInput.value = '';
+  vigInput.style.display = 'none';
   document.getElementById('doc-pers-archivo').value = '';
   document.getElementById('doc-pers-notas').value   = '';
   document.getElementById('modal-doc-pers').classList.add('open');
@@ -2311,12 +2360,13 @@ async function guardarDocPers() {
   const persId = document.getElementById('doc-pers-id').value;
   const nombre = document.getElementById('doc-pers-nombre').value.trim();
   if (!nombre) { toastPer('El nombre del documento es requerido.'); return; }
+  const tieneVig = document.getElementById('doc-pers-tiene-vig').checked;
   const fd = new FormData();
   fd.append('action',      'SUBIR_DOC_PERSONAL');
   fd.append('personal_id', persId);
   fd.append('nombre',      nombre);
   fd.append('tipo_doc',    document.getElementById('doc-pers-tipo').value);
-  fd.append('vigencia',    document.getElementById('doc-pers-vigencia').value);
+  if (tieneVig) fd.append('vigencia', document.getElementById('doc-pers-vigencia').value);
   fd.append('notas',       document.getElementById('doc-pers-notas').value.trim());
   const file = document.getElementById('doc-pers-archivo').files[0];
   if (file) fd.append('archivo', file);
@@ -2399,8 +2449,109 @@ async function eliminarCertPers(id) {
   } catch(_) { toastPer('Error de red.'); }
 }
 
+// ── Alertas de vencimiento ────────────────────────────────────────────────
+async function cargarAlertasVencimiento() {
+  try {
+    const r = await fetch(API + '?action=GET_ALERTAS_VENCIMIENTO');
+    const d = await r.json();
+    if (d.status !== 'success') return;
+    const alertas = d.data || [];
+    renderAlertasDocsPer(alertas, d.dias_anticip);
+    // Browser notifications
+    if (alertas.length && Notification && Notification.permission === 'granted') {
+      const venc = alertas.filter(a => +a.dias_restantes < 0).length;
+      const prox = alertas.filter(a => +a.dias_restantes >= 0).length;
+      if (venc > 0) {
+        new Notification('⚠ AVBA — Documentos vencidos', {
+          body: `${venc} documento${venc!==1?'s':''} vencido${venc!==1?'s':''}. Revisa Mi Personal.`,
+          icon: 'logos/avba.png'
+        });
+      } else if (prox > 0) {
+        new Notification('⏰ AVBA — Documentos por vencer', {
+          body: `${prox} documento${prox!==1?'s':''} vence${prox===1?'':'n'} pronto. Revisa Mi Personal.`,
+          icon: 'logos/avba.png'
+        });
+      }
+    }
+  } catch(_) {}
+}
+
+function renderAlertasDocsPer(alertas, diasAnticip) {
+  const cont = document.getElementById('per-alertas');
+  if (!cont) return;
+  if (!alertas || !alertas.length) { cont.innerHTML = ''; return; }
+  const vencidos = alertas.filter(a => +a.dias_restantes < 0);
+  const proximos = alertas.filter(a => +a.dias_restantes >= 0);
+  let html = `<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:10px;padding:14px 18px;margin-bottom:14px;display:flex;align-items:flex-start;gap:12px">
+    <div style="font-size:22px;line-height:1">⏰</div>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:700;font-size:14px;color:#92400e;margin-bottom:4px">
+        Alertas de documentos — próximos ${diasAnticip} días
+      </div>`;
+  if (vencidos.length) {
+    html += `<div style="color:#991b1b;font-size:13px;margin-bottom:3px">⚠ ${vencidos.length} documento${vencidos.length!==1?'s':''} vencido${vencidos.length!==1?'s':''}: `;
+    html += vencidos.slice(0,5).map(a => `<strong>${escQ(a.empleado)}</strong> — ${escQ(a.nombre)}`).join(', ');
+    if (vencidos.length > 5) html += ` y ${vencidos.length-5} más`;
+    html += '</div>';
+  }
+  if (proximos.length) {
+    html += `<div style="color:#92400e;font-size:13px;margin-bottom:3px">⏳ ${proximos.length} documento${proximos.length!==1?'s':''} por vencer: `;
+    html += proximos.slice(0,5).map(a => `<strong>${escQ(a.empleado)}</strong> — ${escQ(a.nombre)} (${+a.dias_restantes === 0 ? 'hoy' : `${a.dias_restantes} día${+a.dias_restantes!==1?'s':''}`})`).join(', ');
+    if (proximos.length > 5) html += ` y ${proximos.length-5} más`;
+    html += '</div>';
+  }
+  html += `<div style="margin-top:6px"><a href="#" onclick="event.preventDefault();verTab('personal-cli',document.querySelector('[onclick*=personal-cli]'));document.getElementById('per-cli-lista-view').scrollIntoView({behavior:'smooth'})" style="font-size:12px;color:#0369a1;text-decoration:underline">Ir a Mi Personal →</a></div>`;
+  html += '</div></div>';
+  cont.innerHTML = html;
+}
+
+// ── Preferencias de Notificación ──────────────────────────────────────────
+async function abrirModalNotifPrefs() {
+  await cargarPrefsNotif();
+  document.getElementById('modal-notif-prefs').classList.add('open');
+}
+function cerrarModalNotifPrefs() { document.getElementById('modal-notif-prefs').classList.remove('open'); }
+
+async function cargarPrefsNotif() {
+  try {
+    const r = await fetch(API + '?action=GET_PREFS_NOTIF');
+    const d = await r.json();
+    if (d.status !== 'success') return;
+    const p = d.data || {};
+    document.getElementById('notif-email').value     = p.notif_email     || '';
+    document.getElementById('notif-whatsapp').value  = p.notif_whatsapp  || '';
+    document.getElementById('notif-browser').checked = !!(+p.notif_browser);
+    document.getElementById('notif-dias').value      = p.dias_anticip    || 30;
+  } catch(_) {}
+}
+
+async function guardarPrefsNotif() {
+  const browserChecked = document.getElementById('notif-browser').checked;
+  // Request browser notification permission if checked
+  if (browserChecked && Notification && Notification.permission === 'default') {
+    await Notification.requestPermission();
+  }
+  const payload = {
+    action: 'GUARDAR_PREFS_NOTIF',
+    payload: {
+      notif_email:    document.getElementById('notif-email').value.trim(),
+      notif_whatsapp: document.getElementById('notif-whatsapp').value.trim(),
+      notif_browser:  browserChecked ? 1 : 0,
+      dias_anticip:   parseInt(document.getElementById('notif-dias').value) || 30,
+    }
+  };
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastPer(d.message || 'Error al guardar.'); return; }
+    cerrarModalNotifPrefs();
+    toastPer('Preferencias guardadas.');
+    cargarAlertasVencimiento();
+  } catch(_) { toastPer('Error de red.'); }
+}
+
 // ── Close modals on overlay click ──────────────────────────────────────────
-['modal-eq','modal-doc','modal-hora','modal-cert-eq','modal-pers','modal-doc-pers','modal-cert-pers'].forEach(id => {
+['modal-eq','modal-doc','modal-hora','modal-cert-eq','modal-pers','modal-doc-pers','modal-cert-pers','modal-notif-prefs'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });
