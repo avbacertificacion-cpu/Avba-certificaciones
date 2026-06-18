@@ -1225,6 +1225,12 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cliPersonal->eliminarDoc((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
 
+        case 'EDITAR_DOC_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $idc = $usr['id_cliente'] ?? '';
+            respuesta($cliPersonal->editarDoc($payload ?? $_POST, $_FILES, $idc));
+
         case 'GUARDAR_CERT_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

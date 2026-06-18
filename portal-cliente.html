@@ -816,11 +816,63 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
         <input class="finput" id="doc-pers-vigencia" type="date" style="display:none">
       </div>
     </div>
-    <div class="frow"><label class="flabel">Archivo (PDF, imagen, DOCX)</label><input class="finput" id="doc-pers-archivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.docx"></div>
+    <div class="frow">
+      <label class="flabel">Archivo (PDF, imagen, DOCX)</label>
+      <div id="doc-pers-dropzone" style="border:2px dashed var(--borde);border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:var(--gris-bg);transition:border-color .2s,background .2s"
+           onclick="document.getElementById('doc-pers-archivo').click()"
+           ondragover="event.preventDefault();this.style.borderColor='var(--azul)';this.style.background='var(--azul-light)'"
+           ondragleave="this.style.borderColor='var(--borde)';this.style.background='var(--gris-bg)'"
+           ondrop="dropDocPers(event)">
+        <div id="doc-pers-dropzone-text" style="font-size:13px;color:var(--texto-sub)">
+          <span style="font-size:22px">📂</span><br>
+          Arrastra un archivo aquí o <span style="color:var(--azul);font-weight:600">haz clic</span> para seleccionar
+        </div>
+      </div>
+      <input type="file" id="doc-pers-archivo" accept=".pdf,.jpg,.jpeg,.png,.docx" style="display:none" onchange="previewDocPers(this)">
+    </div>
     <div class="frow"><label class="flabel">Notas</label><input class="finput" id="doc-pers-notas" placeholder="Opcional"></div>
     <div class="fact">
       <button class="btn-sec" onclick="cerrarModalDocPers()">Cancelar</button>
       <button class="btn-prim" onclick="guardarDocPers()">Subir</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Editar Documento Personal -->
+<div class="eq-overlay" id="modal-edit-doc-pers">
+  <div class="eq-modal">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Editar documento</div>
+      <button class="eq-modal-close" onclick="cerrarModalEditDocPers()">✕</button>
+    </div>
+    <input type="hidden" id="edit-doc-pers-id">
+    <div class="frow"><label class="flabel">Nombre *</label><input class="finput" id="edit-doc-pers-nombre" placeholder="Nombre del documento"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Tipo</label>
+        <select class="finput" id="edit-doc-pers-tipo">
+          <option value="licencia">Licencia</option>
+          <option value="antidoping">Antidoping</option>
+          <option value="medico">Examen médico</option>
+          <option value="constancia">Constancia</option>
+          <option value="seguro">Seguro</option>
+          <option value="dc3">DC-3</option>
+          <option value="ine">INE</option>
+          <option value="nss">NSS</option>
+          <option value="otro">Otro</option>
+        </select>
+      </div>
+      <div class="frow">
+        <label class="flabel" style="display:flex;align-items:center;gap:8px">
+          <input type="checkbox" id="edit-doc-pers-tiene-vig" onchange="toggleEditVigPer()"> Tiene vigencia
+        </label>
+        <input class="finput" id="edit-doc-pers-vigencia" type="date" style="display:none;margin-top:4px">
+      </div>
+    </div>
+    <div class="frow"><label class="flabel">Reemplazar archivo (opcional)</label><input class="finput" id="edit-doc-pers-archivo" type="file" accept=".pdf,.jpg,.jpeg,.png,.docx"></div>
+    <div class="frow"><label class="flabel">Notas</label><input class="finput" id="edit-doc-pers-notas" placeholder="Opcional"></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalEditDocPers()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarEditDocPers()">Guardar cambios</button>
     </div>
   </div>
 </div>
@@ -2037,7 +2089,32 @@ async function cargarDashboardPer() {
       {departamento:'Vencidas', total: d.certs.vencidas},
       {departamento:'Sin fecha', total: d.certs.sin_fecha},
     ].filter(x => x.total > 0), 'departamento', '', _chartCertsP);
-    _chartDepts   = renderChartGenerico('chart-depts',   d.por_departamento || [], 'departamento', '', _chartDepts);
+    // Horizontal bar chart for departments
+    (function() {
+      const ctx = document.getElementById('chart-depts');
+      if (!ctx) return;
+      const items = d.por_departamento || [];
+      if (!items.length) { ctx.parentElement.innerHTML = '<p style="text-align:center;color:var(--texto-hint);padding:40px 0;font-size:12px">Sin datos</p>'; return; }
+      if (_chartDepts) _chartDepts.destroy();
+      const PAL = ['#7c3aed','#db2777','#059669','#ea580c','#0284c7','#b45309','#dc2626','#0f766e'];
+      _chartDepts = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: items.map(i => i.departamento),
+          datasets: [{ data: items.map(i => i.total), backgroundColor: PAL.slice(0, items.length), borderWidth: 0, borderRadius: 4 }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { font: { size: 10 }, stepSize: 1 }, grid: { display: false } },
+            y: { ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+    })();
     _chartPuestos = renderChartGenerico('chart-puestos', d.por_puesto       || [], 'puesto',       '', _chartPuestos);
     renderProximasVencer(d, 'per-upcoming', 'personal');
   } catch(_) {}
@@ -2227,15 +2304,52 @@ function renderSubCertsPer(certs, perId) {
 
 function renderSubDocsPer(docs, perId) {
   const cont = document.getElementById('per-sub-docs');
-  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <div style="font-size:13px;font-weight:700;color:var(--texto)">Documentos <span style="color:var(--texto-hint)">(${docs.length})</span></div>
-    <button class="btn-prim" onclick="abrirModalDocPers(${perId})">+ Subir</button>
+  // Store original data for filtering
+  cont._allDocs = docs;
+  cont._perId   = perId;
+  _renderDocsPer(docs, perId, cont);
+}
+
+function _renderDocsPer(docs, perId, cont) {
+  const filterTipo = cont._filterTipo || '';
+  const filterVig  = cont._filterVig  || '';
+  let filtered = docs;
+  if (filterTipo) filtered = filtered.filter(d => d.tipo_doc === filterTipo);
+  if (filterVig === 'vigente')   filtered = filtered.filter(d => d.vigencia && !d.vencido && d.dias_vig > 30);
+  if (filterVig === 'pronto')    filtered = filtered.filter(d => d.vigencia && !d.vencido && d.dias_vig <= 30);
+  if (filterVig === 'vencido')   filtered = filtered.filter(d => d.vencido);
+  if (filterVig === 'sin_fecha') filtered = filtered.filter(d => !d.vigencia);
+
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+    <div style="font-size:13px;font-weight:700;color:var(--texto)">Documentos <span style="color:var(--texto-hint)">(${filtered.length}/${docs.length})</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <select style="font-size:11px;padding:4px 8px;border:1px solid var(--borde);border-radius:6px;background:var(--blanco);color:var(--texto)" onchange="filtrarDocsPer(this,'tipo')">
+        <option value="">Todos los tipos</option>
+        <option value="licencia"${filterTipo==='licencia'?' selected':''}>Licencia</option>
+        <option value="seguro"${filterTipo==='seguro'?' selected':''}>Seguro</option>
+        <option value="dc3"${filterTipo==='dc3'?' selected':''}>DC-3</option>
+        <option value="ine"${filterTipo==='ine'?' selected':''}>INE</option>
+        <option value="nss"${filterTipo==='nss'?' selected':''}>NSS</option>
+        <option value="antidoping"${filterTipo==='antidoping'?' selected':''}>Antidoping</option>
+        <option value="medico"${filterTipo==='medico'?' selected':''}>Examen médico</option>
+        <option value="constancia"${filterTipo==='constancia'?' selected':''}>Constancia</option>
+        <option value="otro"${filterTipo==='otro'?' selected':''}>Otro</option>
+      </select>
+      <select style="font-size:11px;padding:4px 8px;border:1px solid var(--borde);border-radius:6px;background:var(--blanco);color:var(--texto)" onchange="filtrarDocsPer(this,'vig')">
+        <option value="">Cualquier vigencia</option>
+        <option value="vigente"${filterVig==='vigente'?' selected':''}>Vigente</option>
+        <option value="pronto"${filterVig==='pronto'?' selected':''}>Por vencer</option>
+        <option value="vencido"${filterVig==='vencido'?' selected':''}>Vencido</option>
+        <option value="sin_fecha"${filterVig==='sin_fecha'?' selected':''}>Sin fecha</option>
+      </select>
+      <button class="btn-prim" onclick="abrirModalDocPers(${perId})">+ Subir</button>
+    </div>
   </div>`;
-  if (!docs.length) {
+  if (!filtered.length) {
     html += '<div class="empty"><div class="empty-t">Sin documentos</div><div class="empty-s">Sube licencias, antidopings, exámenes médicos y más.</div></div>';
   } else {
     html += '<div class="doc-grid">';
-    docs.forEach(d => {
+    filtered.forEach(d => {
       const ico    = TIPO_DOC_ICONS_PER[d.tipo_doc]  || '📎';
       const lbl    = TIPO_DOC_LABELS_PER[d.tipo_doc] || d.tipo_doc;
       const icoCls = { licencia:'di-seg', antidoping:'di-tab', medico:'di-bit', constancia:'di-man', otro:'di-ot' }[d.tipo_doc] || 'di-ot';
@@ -2253,6 +2367,7 @@ function renderSubDocsPer(docs, perId) {
           ${vigHtml}
           <div class="doc-acts">
             ${d.archivo_url ? `<a href="${d.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver</a>` : ''}
+            <button class="btn-sm" style="font-size:10px;border-color:var(--azul);color:var(--azul);background:var(--azul-light)" onclick="abrirModalEditDocPers(${JSON.stringify(d).replace(/"/g,'&quot;')})">✏ Editar</button>
             <button class="btn-del" onclick="eliminarDocPers(${d.id})" style="padding:3px 8px;font-size:10px">🗑</button>
           </div>
         </div>
@@ -2261,6 +2376,13 @@ function renderSubDocsPer(docs, perId) {
     html += '</div>';
   }
   cont.innerHTML = html;
+}
+
+function filtrarDocsPer(sel, campo) {
+  const cont = document.getElementById('per-sub-docs');
+  if (campo === 'tipo') cont._filterTipo = sel.value;
+  if (campo === 'vig')  cont._filterVig  = sel.value;
+  _renderDocsPer(cont._allDocs || [], cont._perId || 0, cont);
 }
 
 // ── Recargar detalle sin salir ─────────────────────────────────────────────
@@ -2351,6 +2473,8 @@ function abrirModalDocPers(persId) {
   vigInput.value = '';
   vigInput.style.display = 'none';
   document.getElementById('doc-pers-archivo').value = '';
+  const dz = document.getElementById('doc-pers-dropzone-text');
+  if (dz) dz.innerHTML = '<span style="font-size:22px">📂</span><br>Arrastra un archivo aquí o <span style="color:var(--azul);font-weight:600">haz clic</span> para seleccionar';
   document.getElementById('doc-pers-notas').value   = '';
   document.getElementById('modal-doc-pers').classList.add('open');
 }
@@ -2388,6 +2512,86 @@ async function eliminarDocPers(id) {
     const d = await r.json();
     if (d.status !== 'success') { toastPer(d.message || 'Error.'); return; }
     toastPer('Documento eliminado.');
+    recargarDetallePerso();
+  } catch(_) { toastPer('Error de red.'); }
+}
+
+// ── Drag-and-drop helpers for upload modal ────────────────────────────────
+function dropDocPers(e) {
+  e.preventDefault();
+  const dzone = document.getElementById('doc-pers-dropzone');
+  dzone.style.borderColor = 'var(--borde)';
+  dzone.style.background  = 'var(--gris-bg)';
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  document.getElementById('doc-pers-archivo').files = dt.files;
+  previewDocPers(document.getElementById('doc-pers-archivo'));
+}
+
+function previewDocPers(input) {
+  const file = input.files[0];
+  const dzText = document.getElementById('doc-pers-dropzone-text');
+  if (!file) {
+    dzText.innerHTML = '<span style="font-size:22px">📂</span><br>Arrastra un archivo aquí o <span style="color:var(--azul);font-weight:600">haz clic</span> para seleccionar';
+    return;
+  }
+  const ext = file.name.split('.').pop().toLowerCase();
+  const ico = ext === 'pdf' ? '📄' : ['jpg','jpeg','png'].includes(ext) ? '🖼' : '📎';
+  dzText.innerHTML = `${ico} <strong>${escH(file.name)}</strong><br><span style="font-size:11px;color:var(--texto-hint)">${(file.size/1024).toFixed(1)} KB</span> · <span style="color:var(--azul);font-size:11px">Cambiar</span>`;
+}
+
+// ── Editar Documento Personal ─────────────────────────────────────────────
+function toggleEditVigPer() {
+  const cb = document.getElementById('edit-doc-pers-tiene-vig');
+  document.getElementById('edit-doc-pers-vigencia').style.display = cb.checked ? '' : 'none';
+}
+
+function abrirModalEditDocPers(doc) {
+  document.getElementById('edit-doc-pers-id').value     = doc.id;
+  document.getElementById('edit-doc-pers-nombre').value = doc.nombre || '';
+  document.getElementById('edit-doc-pers-tipo').value   = doc.tipo_doc || 'otro';
+  document.getElementById('edit-doc-pers-notas').value  = doc.notas || '';
+  document.getElementById('edit-doc-pers-archivo').value = '';
+  const tieneVig = !!(doc.vigencia);
+  document.getElementById('edit-doc-pers-tiene-vig').checked = tieneVig;
+  document.getElementById('edit-doc-pers-vigencia').style.display = tieneVig ? '' : 'none';
+  if (tieneVig && doc.vigencia) {
+    // vigencia comes as dd/mm/yyyy — convert to yyyy-mm-dd for date input
+    const parts = doc.vigencia.split('/');
+    document.getElementById('edit-doc-pers-vigencia').value = parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : doc.vigencia;
+  } else {
+    document.getElementById('edit-doc-pers-vigencia').value = '';
+  }
+  document.getElementById('modal-edit-doc-pers').classList.add('open');
+}
+
+function cerrarModalEditDocPers() {
+  document.getElementById('modal-edit-doc-pers').classList.remove('open');
+}
+
+async function guardarEditDocPers() {
+  const id     = document.getElementById('edit-doc-pers-id').value;
+  const nombre = document.getElementById('edit-doc-pers-nombre').value.trim();
+  if (!nombre) { toastPer('El nombre es requerido.'); return; }
+  const tieneVig = document.getElementById('edit-doc-pers-tiene-vig').checked;
+  const fd = new FormData();
+  fd.append('action',   'EDITAR_DOC_PERSONAL');
+  fd.append('id',       id);
+  fd.append('nombre',   nombre);
+  fd.append('tipo_doc', document.getElementById('edit-doc-pers-tipo').value);
+  fd.append('vigencia', tieneVig ? document.getElementById('edit-doc-pers-vigencia').value : '');
+  fd.append('notas',    document.getElementById('edit-doc-pers-notas').value.trim());
+  const file = document.getElementById('edit-doc-pers-archivo').files[0];
+  if (file) fd.append('archivo', file);
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await _origFetch(API, { method:'POST', headers:{'X-Token': s.token||''}, body: fd });
+    const d = await r.json();
+    if (d.status !== 'success') { toastPer(d.message || 'Error.'); return; }
+    cerrarModalEditDocPers();
+    toastPer('Documento actualizado.');
     recargarDetallePerso();
   } catch(_) { toastPer('Error de red.'); }
 }
@@ -2489,15 +2693,27 @@ function renderAlertasDocsPer(alertas, diasAnticip) {
         Alertas de documentos — próximos ${diasAnticip} días
       </div>`;
   if (vencidos.length) {
-    html += `<div style="color:#991b1b;font-size:13px;margin-bottom:3px">⚠ ${vencidos.length} documento${vencidos.length!==1?'s':''} vencido${vencidos.length!==1?'s':''}: `;
-    html += vencidos.slice(0,5).map(a => `<strong>${escQ(a.empleado)}</strong> — ${escQ(a.nombre)}`).join(', ');
-    if (vencidos.length > 5) html += ` y ${vencidos.length-5} más`;
+    html += `<div style="color:#991b1b;font-size:13px;margin-bottom:3px">⚠ ${vencidos.length} documento${vencidos.length!==1?'s':''} vencido${vencidos.length!==1?'s':''}`;
+    if (vencidos.length <= 5) {
+      html += `:<ul style="margin:4px 0 0 16px;padding:0;list-style:disc">`;
+      html += vencidos.map(a => `<li><strong>${escQ(a.empleado)}</strong> — ${escQ(a.nombre)}</li>`).join('');
+      html += '</ul>';
+    } else {
+      html += `: ` + vencidos.slice(0,5).map(a => `<strong>${escQ(a.empleado)}</strong> — ${escQ(a.nombre)}`).join(', ');
+      html += ` y ${vencidos.length-5} más`;
+    }
     html += '</div>';
   }
   if (proximos.length) {
-    html += `<div style="color:#92400e;font-size:13px;margin-bottom:3px">⏳ ${proximos.length} documento${proximos.length!==1?'s':''} por vencer: `;
-    html += proximos.slice(0,5).map(a => `<strong>${escQ(a.empleado)}</strong> — ${escQ(a.nombre)} (${+a.dias_restantes === 0 ? 'hoy' : `${a.dias_restantes} día${+a.dias_restantes!==1?'s':''}`})`).join(', ');
-    if (proximos.length > 5) html += ` y ${proximos.length-5} más`;
+    html += `<div style="color:#92400e;font-size:13px;margin-bottom:3px">⏳ ${proximos.length} documento${proximos.length!==1?'s':''} por vencer`;
+    if (proximos.length <= 5) {
+      html += `:<ul style="margin:4px 0 0 16px;padding:0;list-style:disc">`;
+      html += proximos.map(a => `<li><strong>${escQ(a.empleado)}</strong> — ${escQ(a.nombre)} (${+a.dias_restantes === 0 ? 'hoy' : `${a.dias_restantes} día${+a.dias_restantes!==1?'s':''}`})</li>`).join('');
+      html += '</ul>';
+    } else {
+      html += `: ` + proximos.slice(0,5).map(a => `<strong>${escQ(a.empleado)}</strong> — ${escQ(a.nombre)} (${+a.dias_restantes === 0 ? 'hoy' : `${a.dias_restantes} día${+a.dias_restantes!==1?'s':''}`})`).join(', ');
+      html += ` y ${proximos.length-5} más`;
+    }
     html += '</div>';
   }
   html += `<div style="margin-top:6px"><a href="#" onclick="event.preventDefault();verTab('personal-cli',document.querySelector('[onclick*=personal-cli]'));document.getElementById('per-cli-lista-view').scrollIntoView({behavior:'smooth'})" style="font-size:12px;color:#0369a1;text-decoration:underline">Ir a Mi Personal →</a></div>`;
@@ -2551,7 +2767,7 @@ async function guardarPrefsNotif() {
 }
 
 // ── Close modals on overlay click ──────────────────────────────────────────
-['modal-eq','modal-doc','modal-hora','modal-cert-eq','modal-pers','modal-doc-pers','modal-cert-pers','modal-notif-prefs'].forEach(id => {
+['modal-eq','modal-doc','modal-hora','modal-cert-eq','modal-pers','modal-doc-pers','modal-edit-doc-pers','modal-cert-pers','modal-notif-prefs'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });

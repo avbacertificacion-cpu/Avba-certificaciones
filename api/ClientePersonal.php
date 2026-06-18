@@ -314,6 +314,58 @@ class ClientePersonal {
         return ['status' => 'success'];
     }
 
+    public function editarDoc(array $post, array $files, string $idCliente): array {
+        $idCliente = $this->norm($idCliente);
+        $id        = (int)($post['id']       ?? 0);
+        $nombre    = trim($post['nombre']    ?? '');
+        $tipoDoc   = trim($post['tipo_doc']  ?? 'otro');
+        $vigencia  = trim($post['vigencia']  ?? '');
+        $notas     = trim($post['notas']     ?? '');
+
+        if (!$id || !$nombre) return ['status' => 'error', 'message' => 'id y nombre requeridos.'];
+
+        // Verify ownership
+        $s = $this->pdo->prepare("
+            SELECT d.id, d.archivo_url FROM cliente_personal_docs d
+            JOIN cliente_personal p ON p.id = d.personal_id
+            WHERE d.id=? AND p.id_cliente=?
+        ");
+        $s->execute([$id, $idCliente]);
+        $doc = $s->fetch();
+        if (!$doc) return ['status' => 'error', 'message' => 'Documento no encontrado.'];
+
+        $archivoUrl = $doc['archivo_url'];
+        if (!empty($files['archivo']['tmp_name'])) {
+            $ext = strtolower(pathinfo($files['archivo']['name'] ?? '', PATHINFO_EXTENSION));
+            if (!in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'docx', 'xlsx'])) {
+                return ['status' => 'error', 'message' => "Tipo de archivo no permitido (.$ext)."];
+            }
+            // Get personal_id for path
+            $sp = $this->pdo->prepare("SELECT personal_id FROM cliente_personal_docs WHERE id=?");
+            $sp->execute([$id]);
+            $personalId = (int)$sp->fetchColumn();
+            $dir = rtrim(UPLOAD_DIR, '/') . "/personal_cliente/docs/$personalId/";
+            if (!is_dir($dir)) mkdir($dir, 0755, true);
+            $fn = date('YmdHis') . '_' . preg_replace('/[^a-z0-9_\-]/i', '_', pathinfo($files['archivo']['name'], PATHINFO_FILENAME)) . ".$ext";
+            if (!move_uploaded_file($files['archivo']['tmp_name'], $dir . $fn)) {
+                return ['status' => 'error', 'message' => 'Error al guardar el archivo.'];
+            }
+            // Delete old file
+            if ($archivoUrl) {
+                $old = rtrim(UPLOAD_DIR, '/') . '/' . ltrim($archivoUrl, '/');
+                if (file_exists($old)) @unlink($old);
+            }
+            $archivoUrl = "uploads/personal_cliente/docs/$personalId/$fn";
+        }
+
+        $vigDb = $vigencia ? date('Y-m-d', strtotime(str_replace('/', '-', $vigencia))) : null;
+        $this->pdo->prepare(
+            "UPDATE cliente_personal_docs SET nombre=?, tipo_doc=?, vigencia=?, notas=?, archivo_url=? WHERE id=?"
+        )->execute([$nombre, $tipoDoc, $vigDb, $notas, $archivoUrl, $id]);
+
+        return ['status' => 'success'];
+    }
+
     // ════════════════════════════════════════════════════════
     //  CERTIFICACIONES
     // ════════════════════════════════════════════════════════
