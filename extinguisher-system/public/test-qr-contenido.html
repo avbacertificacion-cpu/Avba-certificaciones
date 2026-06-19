@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test QR - Ver Contenido Exacto</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #4fc3f7; margin-bottom: 20px; }
+        .section { background: #252526; border: 1px solid #3e3e42; border-radius: 4px; padding: 16px; margin-bottom: 16px; }
+        .section h2 { color: #50fa7b; font-size: 14px; margin-bottom: 10px; }
+        .code { background: #1a1a1a; padding: 12px; border-radius: 2px; font-size: 11px; max-height: 400px; overflow: auto; white-space: pre-wrap; word-wrap: break-word; border: 1px solid #3e3e42; }
+        button { padding: 8px 16px; background: #667eea; color: white; border: none; cursor: pointer; margin: 8px 0; border-radius: 4px; }
+        button:hover { background: #5568d3; }
+        .info { color: #888; font-size: 12px; margin-top: 8px; }
+        .status { padding: 10px; border-radius: 4px; margin: 10px 0; }
+        .status.loading { background: #2a2a2a; color: #f1fa8c; }
+        .status.success { background: #1a2a1a; color: #50fa7b; }
+        .status.error { background: #2a1a1a; color: #ff5555; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Ver Contenido Exacto del QR</h1>
+
+        <div class="section">
+            <h2>Test 1: /?qr=43526180127</h2>
+            <p class="info">Simula escanear un QR desde la raíz</p>
+            <button onclick="testURL('/?qr=43526180127', 'test1')">Probar</button>
+            <div class="status loading" id="test1-status">Haz clic en el botón para probar...</div>
+            <div class="code" id="test1-result"></div>
+        </div>
+
+        <div class="section">
+            <h2>Test 2: /public/validar-extintor.html?qr=43526180127</h2>
+            <p class="info">Directamente a la página de validación</p>
+            <button onclick="testURL('/public/validar-extintor.html?qr=43526180127', 'test2')">Probar</button>
+            <div class="status loading" id="test2-status">Haz clic en el botón para probar...</div>
+            <div class="code" id="test2-result"></div>
+        </div>
+
+        <div class="section">
+            <h2>Test 3: /api/validar-publico.php?codigo=43526180127</h2>
+            <p class="info">Endpoint de API</p>
+            <button onclick="testURL('/api/validar-publico.php?codigo=43526180127', 'test3')">Probar</button>
+            <div class="status loading" id="test3-status">Haz clic en el botón para probar...</div>
+            <div class="code" id="test3-result"></div>
+        </div>
+    </div>
+
+    <script>
+        function testURL(path, testId) {
+            const fullURL = window.location.origin + '/extintores' + path;
+            const statusEl = document.getElementById(testId + '-status');
+            const resultEl = document.getElementById(testId + '-result');
+
+            statusEl.className = 'status loading';
+            statusEl.textContent = 'Cargando: ' + fullURL;
+            resultEl.textContent = '';
+
+            fetch(fullURL, { redirect: 'manual' })
+                .then(response => {
+                    let status = `Status: ${response.status} ${response.statusText}\n`;
+                    status += `Content-Type: ${response.headers.get('content-type')}\n`;
+                    status += `URL Respuesta: ${response.url}\n\n`;
+
+                    if (response.status >= 300 && response.status < 400) {
+                        const location = response.headers.get('location');
+                        statusEl.className = 'status error';
+                        statusEl.textContent = '⚠️ REDIRECT DETECTADO a: ' + location;
+                        resultEl.textContent = status + 'Location (redirect to): ' + location;
+                        return;
+                    }
+
+                    return response.text().then(text => {
+                        statusEl.className = 'status success';
+                        statusEl.textContent = '✓ Respuesta recibida (' + text.length + ' bytes)';
+
+                        // Mostrar primeros 2000 caracteres
+                        const preview = text.substring(0, 2000);
+                        resultEl.textContent = status + preview;
+
+                        if (text.length > 2000) {
+                            resultEl.textContent += '\n\n... (mostrando primeros 2000 caracteres de ' + text.length + ' totales)';
+                        }
+
+                        // Análisis
+                        if (text.includes('login') || text.includes('Login') || text.includes('password')) {
+                            statusEl.textContent += ' ⚠️ CONTIENE "login" - PROBLEMA DETECTADO';
+                            statusEl.className = 'status error';
+                        } else if (text.includes('Validar Extintor') || text.includes('validar-extintor')) {
+                            statusEl.textContent += ' ✓ CONTIENE "Validar Extintor" - CORRECTO';
+                        }
+                    });
+                })
+                .catch(error => {
+                    statusEl.className = 'status error';
+                    statusEl.textContent = '✗ Error: ' + error.message;
+                    resultEl.textContent = error.toString();
+                });
+        }
+    </script>
+</body>
+</html>
