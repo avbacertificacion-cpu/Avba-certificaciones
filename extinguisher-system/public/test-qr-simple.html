@@ -13,73 +13,69 @@
         .section h2 { color: #667eea; margin-bottom: 15px; font-size: 18px; }
         .section p { color: #666; margin-bottom: 10px; line-height: 1.6; }
         .links { display: flex; flex-direction: column; gap: 10px; }
-        a { display: inline-block; padding: 12px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 6px; text-align: center; transition: background 0.3s; }
+        a { display: inline-block; padding: 12px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 6px; text-align: center; transition: background 0.3s; font-weight: bold; }
         a:hover { background: #5568d3; }
         .note { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-top: 15px; border-radius: 4px; }
         .warning { background: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin-top: 15px; border-radius: 4px; color: #721c24; }
+        .success { background: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin-top: 15px; border-radius: 4px; color: #155724; }
         code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+        .url-box { background: #f9f9f9; padding: 10px; border-left: 3px solid #667eea; margin: 10px 0; word-break: break-all; font-family: monospace; font-size: 12px; }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🔍 Test QR - Abre en Nuevas Pestañas</h1>
-        <p style="color: #666; margin-bottom: 20px;">Estos links abrirán directamente en tu navegador sin limitaciones de CORS.</p>
+        <p style="color: #666; margin-bottom: 20px;">Estos links abrirán directamente desde <strong>gestion.avba.com.mx/extintores</strong></p>
 
         <div class="section">
             <h2>Test 1: ¿Qué sucede al escanear el QR?</h2>
-            <p>Esta es la URL que genera el QR impreso. Si funciona correctamente, debería cargar la página de validación.</p>
-            <p><strong>URL:</strong> <code>/?qr=43526180127</code></p>
+            <p>Esta es la URL que genera el QR impreso. Si funciona correctamente, debería cargar la página de validación SIN pedir login.</p>
+            <div class="url-box">https://gestion.avba.com.mx/extintores/?qr=43526180127</div>
             <div class="links">
-                <a href="/?qr=43526180127" target="_blank">🔗 Abrir Test 1 en nueva pestaña</a>
+                <a href="https://gestion.avba.com.mx/extintores/?qr=43526180127" target="_blank">🔗 Abrir Test 1 en nueva pestaña</a>
             </div>
             <div class="warning">
-                <strong>⚠️ ESPERADO:</strong><br>
-                Si funciona: Ve la página "🧯 Validar Extintor" con formulario<br>
-                Si FALLA: Ve página de login
+                <strong>⚠️ ESPERADO SI FUNCIONA:</strong><br>
+                Ve la página "🧯 Validar Extintor" con formulario de búsqueda<br>
+                <br>
+                <strong>❌ SI FALLA:</strong><br>
+                Ve página de login pidiendo usuario y contraseña
             </div>
         </div>
 
         <div class="section">
             <h2>Test 2: Página de validación directamente</h2>
-            <p>Acceso directo a la página (sin QR en URL).</p>
-            <p><strong>URL:</strong> <code>/public/validar-extintor.html</code></p>
+            <p>Acceso directo a la página (sin QR en URL). Debe cargarse siempre.</p>
+            <div class="url-box">https://gestion.avba.com.mx/extintores/public/validar-extintor.html</div>
             <div class="links">
-                <a href="/public/validar-extintor.html" target="_blank">🔗 Abrir Test 2 en nueva pestaña</a>
+                <a href="https://gestion.avba.com.mx/extintores/public/validar-extintor.html" target="_blank">🔗 Abrir Test 2 en nueva pestaña</a>
             </div>
-            <div class="note">
-                <strong>✓ ESPERADO:</strong> Siempre debe cargar la página de validación
+            <div class="success">
+                <strong>✓ ESPERADO:</strong> Siempre debe cargar la página de validación (no login)
             </div>
         </div>
 
         <div class="section">
             <h2>Test 3: API de validación</h2>
-            <p>Endpoint API que busca un extintor por código.</p>
-            <p><strong>URL:</strong> <code>/api/validar-publico.php?codigo=43526180127</code></p>
+            <p>Endpoint API que busca un extintor por código. Debe retornar JSON.</p>
+            <div class="url-box">https://gestion.avba.com.mx/extintores/api/validar-publico.php?codigo=43526180127</div>
             <div class="links">
-                <a href="/api/validar-publico.php?codigo=43526180127" target="_blank">🔗 Abrir Test 3 en nueva pestaña</a>
+                <a href="https://gestion.avba.com.mx/extintores/api/validar-publico.php?codigo=43526180127" target="_blank">🔗 Abrir Test 3 en nueva pestaña</a>
             </div>
-            <div class="note">
-                <strong>✓ ESPERADO:</strong> JSON con datos del extintor o <code>{"found": false}</code>
+            <div class="success">
+                <strong>✓ ESPERADO:</strong> JSON con datos del extintor<br>
+                Ej: <code>{"found": true, "data": {...}}</code> o <code>{"found": false}</code>
             </div>
         </div>
 
         <div class="section">
-            <h2>📋 Cómo Interpretar los Resultados</h2>
+            <h2>🎯 EL VERDADERO TEST - El Más Importante</h2>
+            <p style="font-size: 16px; font-weight: bold; color: #dc3545;">Abre el <strong>Test 1</strong> y toma una captura de lo que ves.</p>
+            <p style="margin-top: 10px;">Luego dime:</p>
             <ul style="margin-left: 20px; color: #666; line-height: 1.8;">
-                <li><strong>Test 1 muestra página de login:</strong> El .htaccess NO está funcionando</li>
-                <li><strong>Test 1 muestra "Validar Extintor":</strong> ¡Funciona! 🎉</li>
-                <li><strong>Test 2 muestra error 404:</strong> Problema con permisos de archivo</li>
-                <li><strong>Test 3 muestra JSON:</strong> API funciona correctamente</li>
-            </ul>
-        </div>
-
-        <div class="section">
-            <h2>🎯 CRÍTICO - El Verdadero Test</h2>
-            <p>Lo más importante es <strong>Test 1</strong>. Cuando abras esa pestaña, toma una captura de lo que ves y comparte conmigo:</p>
-            <ul style="margin-left: 20px; color: #666; line-height: 1.8;">
-                <li>¿Ves la página de validación (con campos de búsqueda)?</li>
+                <li>¿Ves la página de validación (con titulo "🧯 Validar Extintor")?</li>
                 <li>¿O ves la página de login?</li>
-                <li>¿O algo diferente?</li>
+                <li>¿Qué URL muestra en la barra del navegador?</li>
             </ul>
         </div>
     </div>
