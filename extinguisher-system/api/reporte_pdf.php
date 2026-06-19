@@ -163,9 +163,10 @@ function fmtFecha(?string $fecha): string {
     return $ts ? date('m-y', $ts) : '';
 }
 
-// ─── Logo en base64 si existe ─────────────────────────────────────────────────
+// ─── Logo AVBA en base64 ──────────────────────────────────────────────────────
 $logo_html = '';
 $logo_paths = [
+    '../public/assets/img/logo-avba.jpg',
     '../public/assets/logos/avba_logo.png',
     '../assets/img/logo.png',
     '../assets/img/logo.jpg',
@@ -176,7 +177,7 @@ foreach ($logo_paths as $lp) {
         $ext_img = pathinfo($lp, PATHINFO_EXTENSION);
         $mime = ($ext_img === 'png') ? 'image/png' : 'image/jpeg';
         $b64  = base64_encode(file_get_contents($lp));
-        $logo_html = "<img src=\"data:{$mime};base64,{$b64}\" style=\"width:100px;height:auto\">";
+        $logo_html = "<img src=\"data:{$mime};base64,{$b64}\" style=\"width:120px;height:auto;\" alt=\"AVBA Logo\">";
         break;
     }
 }
