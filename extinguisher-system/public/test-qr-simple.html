@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test QR - Simple</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: #f5f5f5; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { color: #333; margin-bottom: 20px; }
+        .section { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,.1); }
+        .section h2 { color: #667eea; margin-bottom: 15px; font-size: 18px; }
+        .section p { color: #666; margin-bottom: 10px; line-height: 1.6; }
+        .links { display: flex; flex-direction: column; gap: 10px; }
+        a { display: inline-block; padding: 12px 20px; background: #667eea; color: white; text-decoration: none; border-radius: 6px; text-align: center; transition: background 0.3s; }
+        a:hover { background: #5568d3; }
+        .note { background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin-top: 15px; border-radius: 4px; }
+        .warning { background: #f8d7da; border-left: 4px solid #dc3545; padding: 15px; margin-top: 15px; border-radius: 4px; color: #721c24; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Test QR - Abre en Nuevas Pestañas</h1>
+        <p style="color: #666; margin-bottom: 20px;">Estos links abrirán directamente en tu navegador sin limitaciones de CORS.</p>
+
+        <div class="section">
+            <h2>Test 1: ¿Qué sucede al escanear el QR?</h2>
+            <p>Esta es la URL que genera el QR impreso. Si funciona correctamente, debería cargar la página de validación.</p>
+            <p><strong>URL:</strong> <code>/?qr=43526180127</code></p>
+            <div class="links">
+                <a href="/?qr=43526180127" target="_blank">🔗 Abrir Test 1 en nueva pestaña</a>
+            </div>
+            <div class="warning">
+                <strong>⚠️ ESPERADO:</strong><br>
+                Si funciona: Ve la página "🧯 Validar Extintor" con formulario<br>
+                Si FALLA: Ve página de login
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Test 2: Página de validación directamente</h2>
+            <p>Acceso directo a la página (sin QR en URL).</p>
+            <p><strong>URL:</strong> <code>/public/validar-extintor.html</code></p>
+            <div class="links">
+                <a href="/public/validar-extintor.html" target="_blank">🔗 Abrir Test 2 en nueva pestaña</a>
+            </div>
+            <div class="note">
+                <strong>✓ ESPERADO:</strong> Siempre debe cargar la página de validación
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Test 3: API de validación</h2>
+            <p>Endpoint API que busca un extintor por código.</p>
+            <p><strong>URL:</strong> <code>/api/validar-publico.php?codigo=43526180127</code></p>
+            <div class="links">
+                <a href="/api/validar-publico.php?codigo=43526180127" target="_blank">🔗 Abrir Test 3 en nueva pestaña</a>
+            </div>
+            <div class="note">
+                <strong>✓ ESPERADO:</strong> JSON con datos del extintor o <code>{"found": false}</code>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>📋 Cómo Interpretar los Resultados</h2>
+            <ul style="margin-left: 20px; color: #666; line-height: 1.8;">
+                <li><strong>Test 1 muestra página de login:</strong> El .htaccess NO está funcionando</li>
+                <li><strong>Test 1 muestra "Validar Extintor":</strong> ¡Funciona! 🎉</li>
+                <li><strong>Test 2 muestra error 404:</strong> Problema con permisos de archivo</li>
+                <li><strong>Test 3 muestra JSON:</strong> API funciona correctamente</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>🎯 CRÍTICO - El Verdadero Test</h2>
+            <p>Lo más importante es <strong>Test 1</strong>. Cuando abras esa pestaña, toma una captura de lo que ves y comparte conmigo:</p>
+            <ul style="margin-left: 20px; color: #666; line-height: 1.8;">
+                <li>¿Ves la página de validación (con campos de búsqueda)?</li>
+                <li>¿O ves la página de login?</li>
+                <li>¿O algo diferente?</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
