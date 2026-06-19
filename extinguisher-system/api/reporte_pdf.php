@@ -74,6 +74,29 @@ foreach ($extintores as &$ext) {
 }
 unset($ext);
 
+// ─── Si es el mes actual, usar estado ACTUAL del extintor; si es mes pasado, usar histórico
+$fecha_actual = new DateTime('now', new DateTimeZone('America/Mexico_City'));
+$mes_actual = (int)$fecha_actual->format('m');
+$anio_actual = (int)$fecha_actual->format('Y');
+
+$es_mes_actual = ($mes === $mes_actual && $anio === $anio_actual);
+
+if ($es_mes_actual) {
+    // Para el mes actual: usar estado ACTUAL del extintor de la BD
+    foreach ($extintores as &$ext) {
+        if ($ext['inspeccion']) {
+            // Mapear estado actual del extintor a una marca en la inspección
+            if ($ext['estado'] === 'en_prestamo') {
+                $ext['inspeccion']['po'] = 'PO';
+            } else if ($ext['estado'] !== 'activo') {
+                // Si tiene otro estado, crear un marcador
+                $ext['inspeccion']['_estado_actual'] = $ext['estado'];
+            }
+        }
+    }
+    unset($ext);
+}
+
 // Usar el inspector asignado al reporte
 $inspector_header = strtoupper($reporte['inspector_nombre']);
 
