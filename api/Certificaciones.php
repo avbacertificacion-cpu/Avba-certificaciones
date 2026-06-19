@@ -936,8 +936,23 @@ class Certificaciones {
             $html = $this->inyectarPruebaCargaDictamen($html, $pc, $d);
         }
 
-        // Ajuste para mPDF
-        $override = '<style>body{background:#fff!important;}.page{box-shadow:none!important;margin:0!important;}</style>';
+        // Ajuste para mPDF:
+        // 1. Eliminar @import de Google Fonts (mPDF intenta la petición HTTP y falla, dejando PDF en blanco)
+        $html = preg_replace('/@import\s+url\([^)]*\)\s*;?/i', '', $html);
+
+        // 2. Corregir propiedades CSS no soportadas: overflow:hidden recorta a altura 0,
+        //    min-height se maneja diferente, box-shadow/text-shadow no existen en mPDF
+        $override = '<style>
+body { background:#fff!important; }
+.page {
+    box-shadow:none!important;
+    margin:0!important;
+    overflow:visible!important;
+    min-height:0!important;
+    width:100%!important;
+}
+* { text-shadow:none!important; }
+</style>';
         return str_replace('</head>', $override . '</head>', $html);
     }
 
