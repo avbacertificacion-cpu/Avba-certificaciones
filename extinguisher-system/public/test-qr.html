@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prueba QR Completa</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { color: #4fc3f7; margin-bottom: 20px; }
+        .section { background: #252526; border: 1px solid #3e3e42; border-radius: 4px; padding: 16px; margin-bottom: 16px; }
+        .section h2 { color: #50fa7b; font-size: 14px; margin-bottom: 10px; }
+        .test { background: #1e1e1e; padding: 10px; margin: 8px 0; border-left: 3px solid #888; }
+        .test.pass { border-color: #50fa7b; background: #1a2a1a; }
+        .test.fail { border-color: #ff5555; background: #2a1a1a; }
+        .test.pending { border-color: #f1fa8c; background: #2a2a1a; }
+        .code { background: #1a1a1a; padding: 12px; border-radius: 2px; font-size: 12px; margin-top: 8px; overflow-x: auto; word-break: break-all; }
+        button { padding: 8px 16px; background: #667eea; color: white; border: none; cursor: pointer; margin: 8px 0; border-radius: 4px; }
+        button:hover { background: #5568d3; }
+        a { color: #4fc3f7; text-decoration: none; }
+        a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico Completo de QR</h1>
+        <p>Esta página verifica si el sistema de validación de QR funciona correctamente.</p>
+
+        <div class="section">
+            <h2>📍 Información de la Página Actual</h2>
+            <div class="code" id="page-info"></div>
+        </div>
+
+        <div class="section">
+            <h2>🧪 Tests de Endpoints</h2>
+
+            <div class="test pending" id="test-api-test">
+                <strong>1. API Test Endpoint</strong>
+                <div class="code" id="test-api-test-result">Cargando...</div>
+            </div>
+
+            <div class="test pending" id="test-ping">
+                <strong>2. API Ping</strong>
+                <div class="code" id="test-ping-result">Cargando...</div>
+            </div>
+
+            <div class="test pending" id="test-validar-publico">
+                <strong>3. API Validar Público (sin código)</strong>
+                <div class="code" id="test-validar-publico-result">Cargando...</div>
+            </div>
+
+            <div class="test pending" id="test-validar-publico-codigo">
+                <strong>4. API Validar Público (con código)</strong>
+                <div class="code" id="test-validar-publico-codigo-result">Cargando...</div>
+            </div>
+
+            <div class="test pending" id="test-validar-extintor-html">
+                <strong>5. Página Validar Extintor (HTML)</strong>
+                <div class="code" id="test-validar-extintor-html-result">Cargando...</div>
+            </div>
+
+            <div class="test pending" id="test-qr-parameter">
+                <strong>6. Página con parámetro ?qr= (simula escaneo)</strong>
+                <div class="code" id="test-qr-parameter-result">Cargando...</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>🔗 URLs de Prueba Rápida</h2>
+            <p>Abre estos links en pestañas nuevas para verificar manualmente:</p>
+            <ul style="margin-top: 10px;">
+                <li><a href="../api/test.php" target="_blank">API Test</a> - Debería retornar JSON</li>
+                <li><a href="../api/ping.php" target="_blank">API Ping</a> - Debería retornar JSON</li>
+                <li><a href="../api/validar-publico.php?codigo=43526180127" target="_blank">API Validar (con código)</a> - Debería retornar JSON</li>
+                <li><a href="validar-extintor.html" target="_blank">Validar Extintor (HTML puro)</a> - Debería cargar la página</li>
+                <li><a href="validar-extintor.html?qr=43526180127" target="_blank">Validar Extintor (con ?qr=)</a> - Debería cargar con búsqueda automática</li>
+                <li><a href="../?qr=43526180127" target="_blank">Raíz con ?qr= (simula QR scan)</a> - CRÍTICO: Debe ir a validación, NO login</li>
+            </ul>
+        </div>
+
+        <div class="section">
+            <h2>📊 Resumen</h2>
+            <p>Si TODOS los tests pasan (✓), entonces el QR debería funcionar.</p>
+            <p>Si alguno falla (✗), ese es el cuello de botella identificado arriba.</p>
+        </div>
+    </div>
+
+    <script>
+        const apiBase = window.location.origin + '/extintores/api';
+        const baseHtml = window.location.origin + '/extintores/public';
+
+        // Mostrar info de página
+        document.getElementById('page-info').innerHTML = `
+Origin: ${window.location.origin}
+Pathname: ${window.location.pathname}
+Current URL: ${window.location.href}
+Hostname: ${window.location.hostname}
+        `.trim();
+
+        // Test 1: API Test
+        fetch(apiBase + '/test.php')
+            .then(r => r.text())
+            .then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    setTestPass('test-api-test', 'API Test respondiendo correctamente\n' + JSON.stringify(data, null, 2));
+                } catch (e) {
+                    setTestFail('test-api-test', 'Respuesta NO es JSON:\n' + text.substring(0, 200));
+                }
+            })
+            .catch(e => setTestFail('test-api-test', 'Error: ' + e.message));
+
+        // Test 2: API Ping
+        fetch(apiBase + '/ping.php')
+            .then(r => r.text())
+            .then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    setTestPass('test-ping', 'API Ping respondiendo\n' + JSON.stringify(data, null, 2));
+                } catch (e) {
+                    setTestFail('test-ping', 'Respuesta NO es JSON:\n' + text.substring(0, 200));
+                }
+            })
+            .catch(e => setTestFail('test-ping', 'Error: ' + e.message));
+
+        // Test 3: API Validar Público (sin código)
+        fetch(apiBase + '/validar-publico.php')
+            .then(r => r.text())
+            .then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    setTestPass('test-validar-publico', 'API respondió:\n' + JSON.stringify(data, null, 2));
+                } catch (e) {
+                    setTestFail('test-validar-publico', 'NO es JSON:\n' + text.substring(0, 200));
+                }
+            })
+            .catch(e => setTestFail('test-validar-publico', 'Error: ' + e.message));
+
+        // Test 4: API Validar Público (con código)
+        fetch(apiBase + '/validar-publico.php?codigo=43526180127')
+            .then(r => r.text())
+            .then(text => {
+                try {
+                    const data = JSON.parse(text);
+                    setTestPass('test-validar-publico-codigo', 'API respondió:\n' + JSON.stringify(data, null, 2));
+                } catch (e) {
+                    setTestFail('test-validar-publico-codigo', 'NO es JSON:\n' + text.substring(0, 200));
+                }
+            })
+            .catch(e => setTestFail('test-validar-publico-codigo', 'Error: ' + e.message));
+
+        // Test 5: Página validar-extintor.html
+        fetch(baseHtml + '/validar-extintor.html')
+            .then(r => r.text())
+            .then(text => {
+                if (text.includes('<!DOCTYPE') && text.includes('Validar Extintor')) {
+                    setTestPass('test-validar-extintor-html', 'Página HTML cargando correctamente\n(' + text.length + ' bytes)');
+                } else if (text.includes('<!DOCTYPE')) {
+                    setTestFail('test-validar-extintor-html', 'Se cargó otra página HTML:\n' + text.substring(0, 200));
+                } else {
+                    setTestFail('test-validar-extintor-html', 'Respuesta inesperada:\n' + text.substring(0, 200));
+                }
+            })
+            .catch(e => setTestFail('test-validar-extintor-html', 'Error: ' + e.message));
+
+        // Test 6: Página con parámetro ?qr=
+        fetch(window.location.origin + '/extintores/?qr=43526180127', { redirect: 'manual' })
+            .then(r => {
+                if (r.status >= 300 && r.status < 400) {
+                    setTestFail('test-qr-parameter', '⚠️ REDIRECT detectado:\nStatus: ' + r.status + '\nLocation: ' + r.headers.get('location'));
+                } else {
+                    return r.text().then(text => {
+                        if (text.includes('Validar Extintor') || text.includes('validar-extintor')) {
+                            setTestPass('test-qr-parameter', '✓ Reescrita correctamente a validar-extintor.html');
+                        } else if (text.includes('login') || text.includes('Login')) {
+                            setTestFail('test-qr-parameter', '✗ PROBLEMA: Se está sirviendo la página de LOGIN\n' + text.substring(0, 200));
+                        } else {
+                            setTestFail('test-qr-parameter', 'Contenido inesperado:\n' + text.substring(0, 200));
+                        }
+                    });
+                }
+            })
+            .catch(e => setTestFail('test-qr-parameter', 'Error: ' + e.message));
+
+        function setTestPass(testId, message) {
+            const el = document.getElementById(testId);
+            el.className = 'test pass';
+            el.querySelector('.code').textContent = message;
+        }
+
+        function setTestFail(testId, message) {
+            const el = document.getElementById(testId);
+            el.className = 'test fail';
+            el.querySelector('.code').textContent = message;
+        }
+    </script>
+</body>
+</html>
