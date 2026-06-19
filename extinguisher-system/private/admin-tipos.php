@@ -54,16 +54,16 @@ $nombre = $_SESSION['nombre'];
         .alert-success{background:#d4edda;color:#155724;border:1px solid #c3e6cb}
         .alert-error{background:#f8d7da;color:#721c24;border:1px solid #f5c6cb}
 
-        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;justify-content:center;align-items:center}
+        .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;justify-content:center;align-items:center;padding:16px}
         .modal-overlay.open{display:flex}
-        .modal{background:#fff;border-radius:12px;padding:32px;width:100%;max-width:500px;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+        .modal{background:#fff;border-radius:12px;padding:32px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,.2)}
         .modal h2{margin-bottom:24px}
         .form-group{margin-bottom:16px}
         .form-group label{display:block;font-size:13px;font-weight:700;color:#444;margin-bottom:6px}
         .form-group input,.form-group textarea{width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit}
         .form-group textarea{resize:vertical;min-height:80px}
         .form-group small{display:block;color:#999;margin-top:4px}
-        .modal-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:20px;padding-top:18px;border-top:1px solid #eee}
+        .modal-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:20px;padding-top:18px;border-top:1px solid #eee;flex-shrink:0}
 
         @media(max-width:768px){
             .navbar h1{font-size:18px}

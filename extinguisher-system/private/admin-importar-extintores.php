@@ -71,12 +71,12 @@ $nombre = $_SESSION['nombre'];
 
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;justify-content:center;align-items:center;padding:16px}
         .modal-overlay.open{display:flex}
-        .modal{background:#fff;border-radius:16px;width:100%;max-width:500px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+        .modal{background:#fff;border-radius:16px;width:100%;max-width:500px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3)}
 
-        .modal-header{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:24px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center}
+        .modal-header{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:24px;border-radius:16px 16px 0 0;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
         .modal-header h2{font-size:18px}
-        .modal-body{padding:24px}
-        .modal-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:20px;padding-top:20px;border-top:1px solid #eee}
+        .modal-body{padding:24px;overflow-y:auto;flex:1}
+        .modal-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:20px;padding-top:20px;border-top:1px solid #eee;flex-shrink:0}
 
         @media(max-width:768px){
             .stats{grid-template-columns:repeat(2,1fr)}
