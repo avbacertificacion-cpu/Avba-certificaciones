@@ -20,9 +20,9 @@ DirectoryIndex index.php index.html
     # PASO 4: NUNCA reescribir directorios completos
     RewriteRule ^(public|api|config|private)/ - [L]
 
-    # PASO 5: Manejo especial para QR en raiz (/?qr=...)
+    # PASO 5: Manejo especial para QR (/?qr=... o /extintores?qr=...)
     RewriteCond %{QUERY_STRING} ^qr=
-    RewriteRule ^$ public/validar-extintor.html [L,QSA]
+    RewriteRule ^(extintores)?/?$ public/validar-extintor.html [L,QSA]
 
     # PASO 6: Routing interno - todo lo demas va a index.php
     RewriteCond %{REQUEST_FILENAME} !-f
