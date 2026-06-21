@@ -1077,6 +1077,21 @@ body { background:#fff!important; }
             }
         }
 
+        // 5. Inyectar datos del diagrama de plataforma (tokens {pc_plat_svg}, {pc_plat_*}, {pc_obs_*})
+        if (strpos($html, '{pc_plat_svg}') !== false) {
+            $platRow = $pc['con'] ?? $pc['sin'] ?? reset($pc);
+            if (is_array($platRow)) {
+                $pRadio  = (float) ($platRow['radio']  ?? 0);
+                $pAltura = (float) ($platRow['altura'] ?? 0);
+
+                $html = str_replace('{pc_plat_svg}',    $this->buildPlatformSvg($pRadio, $pAltura), $html);
+                $html = str_replace('{pc_plat_radio}',  number_format($pRadio,  1), $html);
+                $html = str_replace('{pc_plat_altura}', number_format($pAltura, 1), $html);
+                $html = str_replace('{pc_obs_radio}',   number_format($pRadio,  1), $html);
+                $html = str_replace('{pc_obs_altura}',  number_format($pAltura, 1), $html);
+            }
+        }
+
         return $html;
     }
 
@@ -1150,6 +1165,72 @@ body { background:#fff!important; }
   <text text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#7a5500"><textPath href="#boom-path2" startOffset="45%">Pluma {$pF} m</textPath></text>
   <rect x="{$lbAngX}" y="{$lbAngY}" width="44" height="14" rx="3" fill="#fef3c7" transform="translate(-22,-10)"/>
   <text x="{$lbAngX}" y="{$lbAngY}" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="8.5" font-weight="800" fill="#92400e">&#945; = {$aF}&#176;</text>
+</svg>
+SVG;
+    }
+
+    /** Genera el SVG de diagrama de plataforma (MEWP/PTEM) — vista lateral de tijera/brazo con altura y radio. */
+    private function buildPlatformSvg(float $radio, float $altura): string {
+        $rF = $radio  > 0 ? number_format($radio,  1) . ' m' : '—';
+        $hF = $altura > 0 ? number_format($altura, 1) . ' m' : '—';
+
+        // Layout constants – viewBox 0 0 180 140
+        $gndY    = 118;
+        $baseTop = $gndY - 9;
+        $maxScH  = $baseTop - 26;
+        $scale   = $altura > 0 ? min($maxScH / $altura, 13.0) : 8.0;
+        $scale   = max($scale, 3.5);
+        $platTop = (int) round($baseTop - $altura * $scale);
+        $platBot = $platTop + 7;
+
+        $midX  = 72;  $halfW = 26;
+        $lx    = $midX - $halfW;
+        $rx    = $midX + $halfW;
+
+        $sciY     = (int) round(($baseTop + $platBot) / 2);
+        $railTop  = $platTop - 15;          // guard rail top bar y
+        $hArrX    = $rx + 24;               // height arrow x
+        $hLblY    = (int) round(($gndY + $platTop) / 2);
+        $rLblY    = $gndY + 14;             // radius label y
+
+        // Arrow head for height (pointing up): triangle tip at $platTop, base 8px below
+        $ahTip = $platTop;
+        $ahBL  = $platTop + 6;
+        $ahLX  = $hArrX - 4;
+        $ahRX  = $hArrX + 4;
+
+        // Arrow head for radius (pointing right): tip at $rx+4
+        $arTipX = $rx + 4;
+        $arBaseX = $rx - 4;
+        $arTY   = $rLblY - 3;
+        $arBY   = $rLblY + 3;
+
+        return <<<SVG
+<svg viewBox="0 0 180 140" xmlns="http://www.w3.org/2000/svg" style="width:163px;height:127px;display:block">
+  <line x1="2" y1="{$gndY}" x2="178" y2="{$gndY}" stroke="#cdd8e3" stroke-width="2.5"/>
+  <rect x="2" y="{$gndY}" width="176" height="10" fill="#e8edf3"/>
+  <ellipse cx="{$lx}" cy="{$gndY}" rx="9" ry="5" fill="#2d3748"/>
+  <ellipse cx="{$lx}" cy="{$gndY}" rx="5" ry="3" fill="#4a5568"/>
+  <ellipse cx="{$rx}" cy="{$gndY}" rx="9" ry="5" fill="#2d3748"/>
+  <ellipse cx="{$rx}" cy="{$gndY}" rx="5" ry="3" fill="#4a5568"/>
+  <rect x="{$lx}" y="{$baseTop}" width="52" height="9" rx="2" fill="#134074"/>
+  <line x1="{$lx}" y1="{$baseTop}" x2="{$rx}" y2="{$platBot}" stroke="#1e5fa8" stroke-width="3" stroke-linecap="round"/>
+  <line x1="{$rx}" y1="{$baseTop}" x2="{$lx}" y2="{$platBot}" stroke="#1e5fa8" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="{$midX}" cy="{$sciY}" r="4.5" fill="#C49A28"/>
+  <circle cx="{$midX}" cy="{$sciY}" r="2" fill="#fff"/>
+  <rect x="{$lx}" y="{$platTop}" width="52" height="7" rx="1" fill="#0B2545"/>
+  <rect x="{$lx}" y="{$railTop}" width="3" height="15" rx="1" fill="#2d3748"/>
+  <rect x="{$rx}" y="{$railTop}" width="3" height="15" rx="1" fill="#2d3748"/>
+  <rect x="{$midX}" y="{$railTop}" width="3" height="15" rx="1" fill="#2d3748" opacity=".7"/>
+  <line x1="{$lx}" y1="{$railTop}" x2="{$rx}" y2="{$railTop}" stroke="#2d3748" stroke-width="2.5"/>
+  <line x1="{$hArrX}" y1="{$gndY}" x2="{$hArrX}" y2="{$ahBL}" stroke="#1a7a4a" stroke-width="1.8" stroke-dasharray="5,3"/>
+  <polygon points="{$hArrX},{$ahTip} {$ahLX},{$ahBL} {$ahRX},{$ahBL}" fill="#1a7a4a"/>
+  <rect x="{$hArrX}" y="{$hLblY}" width="40" height="14" rx="3" fill="#dcfce7" transform="translate(4,-7)"/>
+  <text x="{$hArrX}" y="{$hLblY}" dy="5" dx="6" font-family="Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1a7a4a">h = {$hF}</text>
+  <line x1="{$midX}" y1="{$rLblY}" x2="{$arBaseX}" y2="{$rLblY}" stroke="#1e5fa8" stroke-width="1.8" stroke-dasharray="5,3"/>
+  <polygon points="{$arTipX},{$rLblY} {$arBaseX},{$arTY} {$arBaseX},{$arBY}" fill="#1e5fa8"/>
+  <rect x="{$midX}" y="{$rLblY}" width="44" height="14" rx="3" fill="#dbeafe" transform="translate(-22,-7)"/>
+  <text x="{$midX}" y="{$rLblY}" dy="5" dx="-20" font-family="Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1e5fa8">r = {$rF}</text>
 </svg>
 SVG;
     }

@@ -223,7 +223,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   <div class="sec-title">Alcance de la Inspección <span style="font-size:7pt;font-weight:400;opacity:.6;margin-left:6px">· Inspection Scope</span></div>
   <div class="sec-body"><table class="scope-grid" width="100%">
 <tr>
-<td><svg style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px;" viewBox="0 0 18 18"><circle cx="9" cy="9" r="9" fill="#0B2545"/><text x="9" y="13" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#fff">1</text></svg>Inspección visual de estructura y pluma/tijera</td>
+<td><svg style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px;" viewBox="0 0 18 18"><circle cx="9" cy="9" r="9" fill="#0B2545"/><text x="9" y="13" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#fff">1</text></svg>Inspección visual de estructura y mecanismo de elevación</td>
 <td><svg style="width:18px;height:18px;display:inline-block;vertical-align:middle;margin-right:4px;" viewBox="0 0 18 18"><circle cx="9" cy="9" r="9" fill="#0B2545"/><text x="9" y="13" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#fff">2</text></svg>Sistema hidráulico y electrohidráulico</td>
 </tr>
 <tr>
@@ -332,7 +332,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <circle cx="36" cy="9" r="2.5" fill="#94a3b8" stroke="none" opacity=".3"/>
     </svg>
     <span style="display:block;font-size:7pt;">Fotografía 03</span>
-  </div><div class="foto-caption">Estructura principal y pluma</div></td>
+  </div><div class="foto-caption">Estructura principal y mecanismo de elevación</div></td>
 </tr>
 <tr>
 <td class="foto-card"><div class="foto-placeholder" style="padding:4px;">
@@ -420,49 +420,41 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       </tr></table>
       <table class="pc-table">
         <thead><tr class="pc-thead-row">
-          <th style="width:16%;text-align:left;padding-left:12px">Prueba<br><span class="pc-thead-sub">Test</span></th>
-          <th style="width:12%">Peso de Prueba<br><span class="pc-thead-sub">Test Load</span></th>
-          <th style="width:14%">Radio de Operación<br><span class="pc-thead-sub">Operation Radius</span></th>
-          <th style="width:14%">Longitud de Pluma<br><span class="pc-thead-sub">Boom Length</span></th>
-          <th style="width:14%">Ángulo de Trabajo<br><span class="pc-thead-sub">Working Angle (calc.)</span></th>
-          <th style="width:14%">Altura de Izaje<br><span class="pc-thead-sub">Hoisting Height (calc.)</span></th>
-          <th style="width:14%">Resultado<br><span class="pc-thead-sub">Result</span></th>
+          <th style="width:22%;text-align:left;padding-left:12px">Prueba<br><span class="pc-thead-sub">Test</span></th>
+          <th style="width:20%">Peso de Prueba<br><span class="pc-thead-sub">Test Load</span></th>
+          <th style="width:20%">Radio de Trabajo<br><span class="pc-thead-sub">Working Radius</span></th>
+          <th style="width:20%">Altura de Trabajo<br><span class="pc-thead-sub">Working Height</span></th>
+          <th style="width:18%">Resultado<br><span class="pc-thead-sub">Result</span></th>
         </tr></thead>
         <tbody>
           <tr class="pc-row-sin">
             <td class="pc-td-desc"><span class="pc-test-badge pc-badge-sin"><svg style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;" viewBox="0 0 12 12"><rect width="12" height="12" rx="1" fill="#f0f4f8" stroke="#cdd8e3" stroke-width="1.2"/></svg> Sin Carga</span></td>
             <td class="pc-td" style="color:#94a3b8;font-style:italic;font-size:7.5pt">—</td>
-            <td class="pc-td" style="color:#64748b;font-style:italic;font-size:7.5pt">— (pluma vertical)</td>
-            <td class="pc-td"><div style="font-weight:700;color:#0B2545">10.8 m</div><span class="pc-input-hint">↑ ingresado</span></td>
-            <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">90°</span></div><span class="pc-input-hint">pluma vertical</span></td>
-            <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">10.8</span><span class="pc-calc-unit">m</span></div><span class="pc-input-hint">= longitud pluma</span></td>
+            <td class="pc-td" style="color:#94a3b8;font-style:italic;font-size:7.5pt">—</td>
+            <td class="pc-td" style="color:#94a3b8;font-style:italic;font-size:7.5pt">—</td>
             <td class="pc-td"><span class="pc-ok-badge">✔ CUMPLE</span></td>
           </tr>
           <tr class="pc-row-con">
             <td class="pc-td-desc"><span class="pc-test-badge pc-badge-con"><svg style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;" viewBox="0 0 12 12"><rect width="12" height="12" rx="1" fill="#fff8e1" stroke="#f0c040" stroke-width="1.5"/></svg> Con Carga</span></td>
-            <td class="pc-td"><div style="font-weight:800;color:#1e5fa8;font-size:9pt">42.5<span style="font-size:7pt;font-weight:600;color:#64748b;margin-left:2px">TON</span></div><span class="pc-input-hint">↑ ingresado</span></td>
-            <td class="pc-td"><div style="font-weight:700;color:#1e5fa8">6.0 m</div><span class="pc-input-hint">↑ ingresado</span></td>
-            <td class="pc-td"><div style="font-weight:700;color:#1e5fa8">10.8 m</div><span class="pc-input-hint">↑ ingresado</span></td>
-            <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">56.3°</span></div><span class="pc-input-hint">arccos(r/L)</span></td>
-            <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">8.98</span><span class="pc-calc-unit">m</span></div><span class="pc-input-hint">√(L²−r²)</span></td>
+            <td class="pc-td"><div style="font-weight:800;color:#1e5fa8;font-size:9pt">500<span style="font-size:7pt;font-weight:600;color:#64748b;margin-left:2px">kg</span></div><span class="pc-input-hint">↑ ingresado</span></td>
+            <td class="pc-td"><div style="font-weight:700;color:#1e5fa8">2.5 m</div><span class="pc-input-hint">↑ ingresado</span></td>
+            <td class="pc-td"><div style="font-weight:700;color:#1e5fa8">8.0 m</div><span class="pc-input-hint">↑ ingresado</span></td>
             <td class="pc-td"><span class="pc-ok-badge">✔ CUMPLE</span></td>
           </tr>
         </tbody>
       </table>
       <table class="pc-diagram-row" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;background:linear-gradient(135deg,#f4f8ff,#e8f0fb);" cellpadding="0" cellspacing="0">
         <tr>
-          <td rowspan="2" style="width:175px;padding:6px;border-right:1px solid #cdd8e3;vertical-align:middle;text-align:center;">{pc_crane_svg}</td>
-          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;border-right:1px solid #cdd8e3;"><div class="pc-diag-lbl">Radio de Operación <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">{pc_diag_radio}<span class="unit">m</span></div></td>
-          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;border-right:none;"><div class="pc-diag-lbl">Longitud de Pluma <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">{pc_diag_pluma}<span class="unit">m</span></div></td>
+          <td rowspan="2" style="width:175px;padding:6px;border-right:1px solid #cdd8e3;vertical-align:middle;text-align:center;">{pc_plat_svg}</td>
+          <td class="pc-diag-cell" style="border-bottom:1px solid #cdd8e3;border-right:none;"><div class="pc-diag-lbl">Radio de Trabajo <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">{pc_plat_radio}<span class="unit">m</span></div></td>
         </tr>
         <tr>
-          <td class="pc-diag-cell" style="border-right:1px solid #cdd8e3;border-bottom:none;"><div class="pc-diag-lbl">Ángulo de Trabajo <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:#C49A28">{pc_diag_angulo}<span class="unit">°</span></div><div class="pc-diag-badge">✔ arccos(r / L)</div></td>
-          <td class="pc-diag-cell" style="border-right:none;border-bottom:none;"><div class="pc-diag-lbl">Altura de Izaje <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:#1a7a4a">{pc_diag_altura}<span class="unit">m</span></div><div class="pc-diag-badge">✔ √(L² − r²)</div></td>
+          <td class="pc-diag-cell" style="border-right:none;border-bottom:none;"><div class="pc-diag-lbl">Altura de Trabajo <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val" style="color:#1a7a4a">{pc_plat_altura}<span class="unit">m</span></div></td>
         </tr>
       </table>
       <div class="pc-obs-row">
         <div class="pc-obs-label">Observaciones</div>
-        <div class="pc-obs-content">El equipo <strong>{marca} {modelo}</strong> No. Serie <strong>{no_serie}</strong> respondió correctamente en ambas pruebas realizadas. Durante la prueba sin carga se verificó el funcionamiento de todos los sistemas (hidráulico, eléctrico y mecánico) sin detectar anomalías. En la prueba con carga a radio de operación de <strong>{pc_obs_radio} m</strong> y longitud de pluma de <strong>{pc_obs_pluma} m</strong>, se obtuvo un ángulo de trabajo de <strong>{pc_obs_angulo}°</strong> y una altura de izaje efectiva de <strong>{pc_obs_altura} m</strong>. <strong>Sin observaciones de riesgo. El equipo se considera apto para operar bajo las condiciones inspeccionadas.</strong></div>
+        <div class="pc-obs-content">El equipo <strong>{marca} {modelo}</strong> No. Serie <strong>{no_serie}</strong> respondió correctamente en ambas pruebas realizadas. Durante la prueba sin carga se verificó el funcionamiento de todos los sistemas (hidráulico, eléctrico y mecánico) sin detectar anomalías. En la prueba con carga a una altura de trabajo de <strong>{pc_obs_altura} m</strong> y radio de trabajo de <strong>{pc_obs_radio} m</strong>, la plataforma mantuvo estabilidad y soportó la carga satisfactoriamente. <strong>Sin observaciones de riesgo. El equipo se considera apto para operar bajo las condiciones inspeccionadas.</strong></div>
       </div>
       <table class="pc-result-strip" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;background:#0B2545;padding:0;" cellpadding="0" cellspacing="0"><tr>
         <td style="padding:8px 14px;vertical-align:middle;"><div class="pc-result-left"><span class="pc-result-lbl">Resultado General de la Prueba de Carga</span><span class="pc-result-val">✔ PRUEBA APROBADA</span></div></td>
@@ -497,7 +489,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     <div class="rec"><div class="rec-head"><table width="100%" cellpadding="0" cellspacing="0"><tr><td width="30" style="vertical-align:middle;"><svg style="width:22px;height:22px;display:block;" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#0B2545"/><text x="11" y="15" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" font-weight="700" fill="#fff">1</text></svg></td><td class="rec-head-title" style="vertical-align:middle;">Recomendaciones Operativas</td></tr></table></div><div class="rec-body"><ul>
       <li>La grúa no deberá trabajar en un rango mayor al 85% de su capacidad nominal, conforme a la tabla del fabricante.</li>
       <li>El levantamiento de cada carga debe basarse estrictamente en la tabla de capacidades del fabricante.</li>
-      <li>La extensión de la pluma durante las maniobras deberá realizarse conforme a las recomendaciones del fabricante.</li>
+      <li>La operación de la plataforma deberá realizarse conforme a las recomendaciones del fabricante y dentro de los límites de carga nominal.</li>
       <li>La inspección y pruebas de equipos deben ser debidamente planeadas y programadas.</li>
     </ul></div></div>
     <div class="rec"><div class="rec-head"><table width="100%" cellpadding="0" cellspacing="0"><tr><td width="30" style="vertical-align:middle;"><svg style="width:22px;height:22px;display:block;" viewBox="0 0 22 22"><circle cx="11" cy="11" r="11" fill="#0B2545"/><text x="11" y="15" text-anchor="middle" font-family="Arial,sans-serif" font-size="9" font-weight="700" fill="#fff">2</text></svg></td><td class="rec-head-title" style="vertical-align:middle;">Recomendaciones de Mantenimiento</td></tr></table></div><div class="rec-body"><ul>
