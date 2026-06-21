@@ -86,7 +86,7 @@ try {
     }
 
     $stmt = $pdo->prepare("
-        SELECT i.id, i.fecha, i.hora, i.estado, i.observaciones,
+        SELECT i.id, i.fecha, i.hora, i.observaciones,
                u.nombre AS inspector_nombre
         FROM inspecciones i
         JOIN usuarios u ON u.id = i.inspector_id
