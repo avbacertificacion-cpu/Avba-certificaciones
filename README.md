@@ -12,7 +12,7 @@ Sistema web para la gestión integral de inspecciones mensuales de extintores co
 - **Flujo de aprobación** para reportes
 - **Panel de control** por rol
 - **Auditoría** de todas las acciones
-- **Generación de PDF** (implementar)
+- **Generación de PDF** con etiquetas QR automáticas
 
 ## 🚀 Requisitos
 
