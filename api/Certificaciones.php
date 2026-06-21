@@ -937,6 +937,18 @@ class Certificaciones {
         }
 
         // Ajuste para mPDF:
+        // 0. Reparar tabla .hdr sin cerrar: algunas plantillas dejan el <td class="hdr-logos">
+        //    y la tabla .hdr abiertos antes de .gold-bar (los navegadores lo toleran, pero
+        //    mPDF no flushea la tabla y genera el PDF en blanco). Solo se aplica si las
+        //    etiquetas <table> están desbalanceadas, de modo que es idempotente.
+        if (substr_count($html, '<table') !== substr_count($html, '</table>')) {
+            $html = preg_replace(
+                '#(<td class="hdr-logos"[\s\S]*?</table>)(\s*)(<div class="gold-bar">)#',
+                '$1</td></tr></table>$2$3',
+                $html
+            );
+        }
+
         // 1. Eliminar @import de Google Fonts (mPDF intenta la petición HTTP y falla, dejando PDF en blanco)
         $html = preg_replace('/@import\s+url\([^)]*\)\s*;?/i', '', $html);
 
