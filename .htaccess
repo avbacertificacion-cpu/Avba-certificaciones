@@ -3,6 +3,14 @@ DirectoryIndex index.php index.html
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
+    # PASO 0: MANEJO DE QR - DEBE IR PRIMERO
+    # Cuando hay ?qr= en la raiz del proyecto (/ o /extintores), servir la
+    # pagina publica de validacion SIN pasar por index.php (que redirige a login).
+    # Esto debe ir ANTES de las verificaciones -f/-d porque la raiz es un
+    # directorio real y de lo contrario PASO 2 cortaria el flujo.
+    RewriteCond %{QUERY_STRING} ^qr=
+    RewriteRule ^(extintores/?)?$ public/validar-extintor.html [L,QSA]
+
     # PASO 1: NUNCA reescribir archivos reales que existen
     RewriteCond %{REQUEST_FILENAME} -f
     RewriteRule ^ - [L]
@@ -20,16 +28,7 @@ DirectoryIndex index.php index.html
     # PASO 4: NUNCA reescribir directorios completos
     RewriteRule ^(public|api|config|private)/ - [L]
 
-    # PASO 5: Manejo especial para QR (/?qr=... o /extintores?qr=...)
-    RewriteCond %{QUERY_STRING} ^qr=
-    RewriteCond %{REQUEST_FILENAME} !-f
-    RewriteCond %{REQUEST_FILENAME} !-d
-    RewriteRule ^(extintores)?/?$ public/validar-extintor.html [L,QSA]
-
-    # PASO 5B: Si ya fue reescrito a validar-extintor.html, no reescribir más
-    RewriteRule ^public/validar-extintor\.html$ - [L]
-
-    # PASO 6: Routing interno - todo lo demas va a index.php
+    # PASO 5: Routing interno - todo lo demas va a index.php
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^ index.php [L]
