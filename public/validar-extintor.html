@@ -462,20 +462,30 @@
                     console.log('Response headers:', response.headers);
                     console.log('Response URL:', response.url);
 
-                    if (response.status === 401) {
-                        throw new Error('No autorizado - Error 401');
-                    }
-                    if (response.status === 403) {
-                        throw new Error('Acceso denegado - Error 403');
-                    }
-                    if (response.status === 429) {
-                        throw new Error('Demasiadas solicitudes. Intenta más tarde.');
-                    }
-                    if (!response.ok) {
-                        throw new Error(`Error HTTP: ${response.status}`);
-                    }
-
-                    return response.text();
+                    // Leer el cuerpo SIEMPRE para poder mostrar el mensaje real
+                    return response.text().then(text => {
+                        if (response.status === 401) {
+                            throw new Error('No autorizado - Error 401');
+                        }
+                        if (response.status === 403) {
+                            throw new Error('Acceso denegado - Error 403');
+                        }
+                        if (response.status === 429) {
+                            throw new Error('Demasiadas solicitudes. Intenta más tarde.');
+                        }
+                        if (!response.ok) {
+                            // Intentar extraer el mensaje de error del API
+                            let detalle = '';
+                            try {
+                                const j = JSON.parse(text);
+                                detalle = j.error ? (': ' + j.error) : '';
+                            } catch (e) {
+                                detalle = text ? (': ' + text.substring(0, 200)) : '';
+                            }
+                            throw new Error(`Error HTTP ${response.status}${detalle}`);
+                        }
+                        return text;
+                    });
                 })
                 .then(text => {
                     console.log('Response text:', text.substring(0, 200));
