@@ -22,7 +22,12 @@ DirectoryIndex index.php index.html
 
     # PASO 5: Manejo especial para QR (/?qr=... o /extintores?qr=...)
     RewriteCond %{QUERY_STRING} ^qr=
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(extintores)?/?$ public/validar-extintor.html [L,QSA]
+
+    # PASO 5B: Si ya fue reescrito a validar-extintor.html, no reescribir más
+    RewriteRule ^public/validar-extintor\.html$ - [L]
 
     # PASO 6: Routing interno - todo lo demas va a index.php
     RewriteCond %{REQUEST_FILENAME} !-f
