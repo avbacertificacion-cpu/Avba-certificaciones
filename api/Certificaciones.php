@@ -856,6 +856,11 @@ class Certificaciones {
             return $this->htmlDictamen($d, $qrB64, $items);
         }
 
+        // El HTML con fotos e imágenes base64 supera el límite de retroceso por defecto (1M).
+        // Se sube antes de cualquier preg_replace para que ninguna transformación devuelva null.
+        $prevBacktrack = (int) ini_get('pcre.backtrack_limit');
+        ini_set('pcre.backtrack_limit', 10000000);
+
         $e = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
 
         $vigencia = '';
@@ -965,7 +970,10 @@ body { background:#fff!important; }
 }
 * { text-shadow:none!important; }
 </style>';
-        return str_replace('</head>', $override . '</head>', $html);
+        $result = str_replace('</head>', $override . '</head>', $html);
+
+        ini_set('pcre.backtrack_limit', $prevBacktrack);
+        return $result;
     }
 
     /**
@@ -1199,12 +1207,23 @@ SVG;
                       . 'style="border-collapse:collapse;border:1px solid #cdd8e3;">'
                       . $filas . '</table>';
 
-        // Reemplazar desde <div class="foto-section-title"> hasta el cierre de foto-grid-ganchos
-        $html = preg_replace(
-            '/<div\s+class="foto-section-title"[^>]*>.*?<table\s[^>]*class="foto-grid-ganchos"[^>]*>.*?<\/table>/s',
-            $nuevaSeccion,
-            $html
-        );
+        // Reemplazar el bloque de fotos usando strpos (sin regex sobre HTML gigante con base64)
+        // Busca desde <div class="foto-section-title"> hasta el </table> de foto-grid-ganchos
+        $marcaInicio = '<div class="foto-section-title"';
+        $marcaCierre = 'class="foto-grid-ganchos"';
+        $posInicio   = strpos($html, $marcaInicio);
+        if ($posInicio !== false) {
+            $posCierre = strpos($html, $marcaCierre, $posInicio);
+            if ($posCierre !== false) {
+                // Avanzar hasta el </table> después del marcador
+                $posTablaFin = strpos($html, '</table>', $posCierre);
+                if ($posTablaFin !== false) {
+                    $html = substr($html, 0, $posInicio)
+                          . $nuevaSeccion
+                          . substr($html, $posTablaFin + 8); // 8 = strlen('</table>')
+                }
+            }
+        }
 
         // Actualizar el contador de evidencias en el título de sección
         $html = str_replace(
