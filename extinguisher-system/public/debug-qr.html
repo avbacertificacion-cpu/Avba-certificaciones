@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análisis QR - Debug Completo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: monospace; background: #1e1e1e; color: #d4d4d4; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 { color: #4fc3f7; margin-bottom: 20px; }
+        .flow { background: #252526; border: 1px solid #3e3e42; border-radius: 4px; padding: 20px; margin: 20px 0; }
+        .step { background: #1a1a1a; padding: 15px; margin: 10px 0; border-left: 3px solid #667eea; }
+        .step.ok { border-left-color: #50fa7b; }
+        .step.fail { border-left-color: #ff5555; }
+        .step.unknown { border-left-color: #f1fa8c; }
+        .code { background: #0a0a0a; padding: 10px; margin-top: 10px; border-radius: 2px; font-size: 12px; overflow-x: auto; }
+        .problem { background: #2a1a1a; border: 2px solid #ff5555; padding: 15px; border-radius: 4px; margin: 20px 0; }
+        .solution { background: #1a2a1a; border: 2px solid #50fa7b; padding: 15px; border-radius: 4px; margin: 20px 0; }
+        a { color: #4fc3f7; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Análisis Completo del Sistema de QR</h1>
+
+        <div class="flow">
+            <h2>📊 Flujo de Escaneo de QR</h2>
+
+            <div class="step ok">
+                <strong>1. QR genera URL</strong>
+                <div class="code">https://gestion.avba.com.mx/extintores/public/validar-extintor.html?qr=43526180127</div>
+                <p style="margin-top: 10px;">✓ CORRECTO: El QR se genera con la URL completa</p>
+            </div>
+
+            <div class="step unknown">
+                <strong>2. Servidor recibe solicitud</strong>
+                <div class="code">GET /extintores/public/validar-extintor.html?qr=43526180127</div>
+                <p style="margin-top: 10px;">? DESCONOCIDO: ¿Qué hace el servidor aquí?</p>
+            </div>
+
+            <div class="step unknown">
+                <strong>3. .htaccess evalúa reglas</strong>
+                <div class="code">
+REQUEST_FILENAME = /home/...extinguisher-system/public/validar-extintor.html
+REQUEST_URI = /extintores/public/validar-extintor.html
+QUERY_STRING = qr=43526180127
+
+Regla 1: ¿Es archivo real (-f)?
+   → Si YES: NO REESCRIBIR (-L)
+   → Si NO: Continuar
+
+Regla 3: ¿Coincide ^public/validar-extintor\.html$?
+   → Si YES: NO REESCRIBIR (-L)
+   → Si NO: Continuar
+
+Regla 6: ¿No es archivo y no es directorio?
+   → Si YES: Reescribir a index.php ❌
+                </div>
+                <p style="margin-top: 10px;">? DESCONOCIDO: ¿Cuál regla se aplica?</p>
+            </div>
+
+            <div class="step unknown">
+                <strong>4. Resultado final</strong>
+                <div class="code">
+ESPERADO: Se carga validar-extintor.html (página pública)
+ACTUAL: Se redirige a login
+
+? PROBLEMA: El .htaccess está reescribiendo a index.php cuando NO debería
+                </div>
+            </div>
+        </div>
+
+        <div class="problem">
+            <h2>❌ Posibles Causas del Problema</h2>
+            <ol style="margin-left: 20px; line-height: 1.8;">
+                <li><strong>mod_rewrite no está habilitado</strong> en el servidor
+                    <div class="code">Apache no procesa las reglas RewriteRule</div>
+                </li>
+                <li><strong>REQUEST_FILENAME no detecta el archivo</strong>
+                    <div class="code">-f check falla aunque el archivo existe</div>
+                </li>
+                <li><strong>.htaccess en directorio padre</strong> está interfiriendo
+                    <div class="code">Tiene RegRewriteEngine Off u otras reglas</div>
+                </li>
+                <li><strong>DocumentRoot mal configurado</strong>
+                    <div class="code">REQUEST_FILENAME != ruta real del archivo</div>
+                </li>
+                <li><strong>Alias o RedirectMatch</strong> en virtualhost
+                    <div class="code">Redirect 302 /extintores /public/login.html</div>
+                </li>
+                <li><strong>Session/autenticación forzada</strong>
+                    <div class="code">PHP está redirigiendo incluso si es archivo estático</div>
+                </li>
+            </ol>
+        </div>
+
+        <div class="solution">
+            <h2>✅ Diagnóstico Necesario</h2>
+            <p>Para resolver esto, necesito que verifiques en tu servidor:</p>
+            <ol style="margin-left: 20px; line-height: 1.8; margin-top: 15px;">
+                <li><strong>Abre:</strong> <a href="https://gestion.avba.com.mx/extintores/public/validar-extintor.html" target="_blank">https://gestion.avba.com.mx/extintores/public/validar-extintor.html</a>
+                    <p style="margin-top: 5px; font-size: 12px;">¿Se carga la página de validación o redirige a login?</p>
+                </li>
+                <li><strong>Abre:</strong> <a href="https://gestion.avba.com.mx/extintores/public/validar-extintor.html?qr=43526180127" target="_blank">https://gestion.avba.com.mx/extintores/public/validar-extintor.html?qr=43526180127</a>
+                    <p style="margin-top: 5px; font-size: 12px;">¿Se carga con el parámetro QR?</p>
+                </li>
+                <li><strong>Comprueba logs:</strong> Ver logs de Apache
+                    <div class="code" style="margin-top: 5px;">tail -f /var/log/apache2/error.log</div>
+                </li>
+                <li><strong>Verifica .htaccess:</strong> ¿Está en el servidor?
+                    <a href="https://gestion.avba.com.mx/extintores/.htaccess" target="_blank">intenta descargar .htaccess</a>
+                </li>
+            </ol>
+        </div>
+
+        <div class="solution">
+            <h2>🚨 Solución Más Robusta (Plan B)</h2>
+            <p>Si el .htaccess no funciona, puedo implementar una alternativa:</p>
+            <ol style="margin-left: 20px; line-height: 1.8; margin-top: 15px;">
+                <li><strong>Crear endpoint PHP público</strong> en la raíz que NO redirige a login</li>
+                <li><strong>Cambiar QR para apuntar a ese endpoint</strong> en lugar de validar-extintor.html</li>
+                <li><strong>El endpoint PHP</strong> carga validar-extintor.html dinámicamente</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>
