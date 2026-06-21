@@ -1161,7 +1161,7 @@ if ($method === 'POST') {
         case 'GUARDAR_EQUIPO_CLI':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cliEquipos->guardar($payload, $usr['id_cliente'] ?? ''));
+            respuesta($cliEquipos->guardar($_POST, $_FILES, $usr['id_cliente'] ?? ''));
 
         case 'ELIMINAR_EQUIPO_CLI':
             $usr = validarToken($pdo, $token);

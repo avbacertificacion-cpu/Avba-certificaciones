@@ -134,9 +134,16 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 /* Card header gradient */
 .eq-ch{padding:16px 18px 14px;display:flex;align-items:flex-start;gap:12px;}
 .eq-ch-ico{width:46px;height:46px;border-radius:12px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;}
+.eq-ch-img{width:46px;height:46px;border-radius:12px;object-fit:cover;flex-shrink:0;border:2px solid rgba(255,255,255,.35);}
 .eq-ch-info{flex:1;min-width:0;}
 .eq-ch-name{font-size:15px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .eq-ch-type{font-size:10px;color:rgba(255,255,255,.6);text-transform:uppercase;letter-spacing:.6px;margin-top:2px;}
+.eq-det-bimg{width:72px;height:72px;border-radius:16px;object-fit:cover;flex-shrink:0;border:3px solid rgba(255,255,255,.4);}
+.eq-foto-drop{border:2px dashed var(--azul);border-radius:12px;padding:14px;text-align:center;cursor:pointer;background:var(--gris-bg);transition:background .2s;margin-bottom:4px;position:relative;}
+.eq-foto-drop:hover,.eq-foto-drop.drag{background:#e8f0fe;}
+.eq-foto-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.eq-foto-prev{width:100%;max-height:140px;object-fit:contain;border-radius:8px;margin-top:8px;display:none;}
+.eq-foto-hint{font-size:11px;color:var(--texto-sub);}
 
 /* Status badges (on dark header) */
 .eq-sbadge{display:inline-flex;align-items:center;gap:3px;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:700;margin-top:6px;}
@@ -624,6 +631,20 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
       <button class="eq-modal-close" onclick="cerrarModalEq()">✕</button>
     </div>
     <input type="hidden" id="eq-id">
+    <input type="hidden" id="eq-foto-actual">
+    <p class="eq-msec">Fotografía del equipo</p>
+    <div class="eq-foto-drop" id="eq-foto-drop"
+         ondragover="event.preventDefault();this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')"
+         ondrop="dropFotoEq(event)">
+      <input type="file" id="eq-foto-input" accept="image/jpeg,image/png,image/webp" onchange="previewFotoEq(this)">
+      <div id="eq-foto-hint-txt" class="eq-foto-hint">📷 Arrastra una foto o haz clic para seleccionar<br><span style="font-size:10px">JPG, PNG o WebP · máx 5 MB</span></div>
+      <img id="eq-foto-preview" class="eq-foto-prev" src="" alt="Vista previa">
+    </div>
+    <div id="eq-foto-actions" style="display:none;margin-bottom:8px;font-size:11px;">
+      <span id="eq-foto-nombre" style="color:var(--texto-sub)"></span>
+      <button type="button" style="margin-left:8px;background:none;border:none;color:var(--rojo);cursor:pointer;font-size:11px" onclick="quitarFotoEq()">✕ Quitar</button>
+    </div>
     <p class="eq-msec">Identificación</p>
     <div class="frow"><label class="flabel">Nombre / Descripción *</label><input class="finput" id="eq-nombre" placeholder="Ej: Grúa viajera 5t"></div>
     <div class="fgrid2">
@@ -1587,7 +1608,9 @@ function renderListaEq(equipos) {
     const certColor = certBad ? 'var(--rojo)' : certWarn ? 'var(--ambar)' : 'var(--verde)';
     html += `<div class="eq-cn">
       <div class="eq-ch ${ti.cls}">
-        <div class="eq-ch-ico">${ti.ico}</div>
+        ${eq.foto_url
+          ? `<img class="eq-ch-img" src="${escH(eq.foto_url)}" alt="" loading="lazy">`
+          : `<div class="eq-ch-ico">${ti.ico}</div>`}
         <div style="flex:1;min-width:0">
           <div class="eq-ch-name">${escQ(eq.nombre)}</div>
           <div class="eq-ch-type">${eq.tipo ? escQ(eq.tipo) : ti.label}${eq.anio ? ' · ' + eq.anio : ''}</div>
@@ -1663,7 +1686,9 @@ function renderDetInfo(eq) {
   const det = document.getElementById('eq-det-info');
   det.innerHTML = `
     <div class="eq-det-banner ${ti.cls}">
-      <div class="eq-det-bico">${ti.ico}</div>
+      ${eq.foto_url
+        ? `<img class="eq-det-bimg" src="${escH(eq.foto_url)}" alt="" loading="lazy">`
+        : `<div class="eq-det-bico">${ti.ico}</div>`}
       <div>
         <div class="eq-det-bname">${escQ(eq.nombre)}</div>
         <div class="eq-det-bsub">${estadoBadge(eq.estado)}</div>
@@ -1801,6 +1826,46 @@ function renderSubCerts(certs, equipoId) {
 //  MODALES
 // ════════════════════════════════════════════════════════════════════════════
 
+function previewFotoEq(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toastEq('La foto no debe superar 5 MB.'); input.value=''; return; }
+  const prev = document.getElementById('eq-foto-preview');
+  const hint = document.getElementById('eq-foto-hint-txt');
+  const acts = document.getElementById('eq-foto-actions');
+  const nom  = document.getElementById('eq-foto-nombre');
+  const reader = new FileReader();
+  reader.onload = e => {
+    prev.src = e.target.result;
+    prev.style.display = '';
+    hint.style.display = 'none';
+    acts.style.display = '';
+    nom.textContent    = file.name;
+  };
+  reader.readAsDataURL(file);
+}
+
+function dropFotoEq(e) {
+  e.preventDefault();
+  document.getElementById('eq-foto-drop').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.type.startsWith('image/')) { toastEq('Solo se permiten imágenes.'); return; }
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  const inp = document.getElementById('eq-foto-input');
+  inp.files = dt.files;
+  previewFotoEq(inp);
+}
+
+function quitarFotoEq() {
+  document.getElementById('eq-foto-input').value = '';
+  document.getElementById('eq-foto-actual').value = '';
+  document.getElementById('eq-foto-preview').style.display = 'none';
+  document.getElementById('eq-foto-preview').src = '';
+  document.getElementById('eq-foto-hint-txt').style.display = '';
+  document.getElementById('eq-foto-actions').style.display = 'none';
+}
+
 function abrirModalEq(eq) {
   document.getElementById('modal-eq-title').textContent = eq ? 'Editar equipo' : 'Nuevo equipo';
   document.getElementById('eq-id').value        = eq ? eq.id             : '';
@@ -1813,6 +1878,23 @@ function abrirModalEq(eq) {
   document.getElementById('eq-capacidad').value = eq ? (eq.capacidad || '') : '';
   document.getElementById('eq-anio').value      = eq ? (eq.anio      || '') : '';
   document.getElementById('eq-notas').value     = eq ? (eq.notas     || '') : '';
+  // Foto
+  const prev = document.getElementById('eq-foto-preview');
+  const hint = document.getElementById('eq-foto-hint-txt');
+  const acts = document.getElementById('eq-foto-actions');
+  document.getElementById('eq-foto-input').value = '';
+  if (eq && eq.foto_url) {
+    document.getElementById('eq-foto-actual').value = eq.foto_url;
+    prev.src = eq.foto_url; prev.style.display = '';
+    hint.style.display = 'none';
+    acts.style.display = '';
+    document.getElementById('eq-foto-nombre').textContent = 'Foto actual';
+  } else {
+    document.getElementById('eq-foto-actual').value = '';
+    prev.src = ''; prev.style.display = 'none';
+    hint.style.display = '';
+    acts.style.display = 'none';
+  }
   document.getElementById('modal-eq').classList.add('open');
 }
 function cerrarModalEq() { document.getElementById('modal-eq').classList.remove('open'); }
@@ -1821,20 +1903,24 @@ async function guardarEquipo() {
   const id     = document.getElementById('eq-id').value;
   const nombre = document.getElementById('eq-nombre').value.trim();
   if (!nombre) { toastEq('El nombre es requerido.'); return; }
-  const data = {
-    id:       id ? +id : 0,
-    nombre,
-    tipo:     document.getElementById('eq-tipo').value,
-    estado:   document.getElementById('eq-estado').value,
-    marca:    document.getElementById('eq-marca').value.trim(),
-    modelo:   document.getElementById('eq-modelo').value.trim(),
-    serie:    document.getElementById('eq-serie').value.trim(),
-    capacidad:document.getElementById('eq-capacidad').value.trim(),
-    anio:     document.getElementById('eq-anio').value.trim(),
-    notas:    document.getElementById('eq-notas').value.trim(),
-  };
+  const fd = new FormData();
+  fd.append('action',    'GUARDAR_EQUIPO_CLI');
+  fd.append('id',        id ? id : '0');
+  fd.append('nombre',    nombre);
+  fd.append('tipo',      document.getElementById('eq-tipo').value);
+  fd.append('estado',    document.getElementById('eq-estado').value);
+  fd.append('marca',     document.getElementById('eq-marca').value.trim());
+  fd.append('modelo',    document.getElementById('eq-modelo').value.trim());
+  fd.append('serie',     document.getElementById('eq-serie').value.trim());
+  fd.append('capacidad', document.getElementById('eq-capacidad').value.trim());
+  fd.append('anio',      document.getElementById('eq-anio').value.trim());
+  fd.append('notas',     document.getElementById('eq-notas').value.trim());
+  fd.append('foto_actual', document.getElementById('eq-foto-actual').value);
+  const fotoFile = document.getElementById('eq-foto-input').files[0];
+  if (fotoFile) fd.append('foto', fotoFile);
   try {
-    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'GUARDAR_EQUIPO_CLI', payload:data}) });
+    const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const r = await _origFetch(API, { method:'POST', headers:{'X-Token': s.token || ''}, body: fd });
     const d = await r.json();
     if (d.status !== 'success') { toastEq(d.message || 'Error al guardar.'); return; }
     cerrarModalEq();

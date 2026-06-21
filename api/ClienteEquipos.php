@@ -72,6 +72,7 @@ class ClienteEquipos {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
             try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS estado VARCHAR(50) NULL DEFAULT 'Activo'"); } catch (\PDOException $e) {}
+            try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS foto_url VARCHAR(500) NULL"); } catch (\PDOException $e) {}
         } catch (\PDOException $e) {
             error_log('[ClienteEquipos] migrate: ' . $e->getMessage());
         }
@@ -98,7 +99,7 @@ class ClienteEquipos {
 
         $stmt = $this->pdo->prepare("
             SELECT e.id, e.nombre, e.tipo, e.marca, e.modelo, e.serie,
-                   e.capacidad, e.anio, e.notas, e.estado,
+                   e.capacidad, e.anio, e.notas, e.estado, e.foto_url,
                    DATE_FORMAT(e.created_at,'%d/%m/%Y') AS fecha_registro,
                    COUNT(DISTINCT d.id)  AS total_docs,
                    COALESCE(hm.horas, 0) AS horas_actuales,
@@ -131,6 +132,7 @@ class ClienteEquipos {
             'anio'           => $r['anio'] ? (int)$r['anio'] : null,
             'notas'          => $r['notas'] ?? '',
             'estado'         => $r['estado'] ?? 'Activo',
+            'foto_url'       => $r['foto_url'] ? (rtrim(SITE_URL, '/') . '/' . ltrim($r['foto_url'], '/')) : '',
             'fecha_registro' => $r['fecha_registro'],
             'total_docs'     => (int)$r['total_docs'],
             'horas_actuales' => (float)$r['horas_actuales'],
@@ -141,7 +143,7 @@ class ClienteEquipos {
         ], $stmt->fetchAll())];
     }
 
-    public function guardar(array $data, string $idCliente): array {
+    public function guardar(array $data, array $files, string $idCliente): array {
         $idCliente = $this->norm($idCliente);
         $nombre    = trim($data['nombre']    ?? '');
         if (!$nombre) return ['status' => 'error', 'message' => 'El nombre del equipo es requerido.'];
@@ -156,17 +158,73 @@ class ClienteEquipos {
         $estado    = trim($data['estado']    ?? 'Activo');
         $id        = (int)($data['id']       ?? 0);
 
+        // Manejo de foto
+        $fotoUrl = null;
+        $fotoNueva = false;
+        if (!empty($files['foto']['tmp_name'])) {
+            $ext = strtolower(pathinfo($files['foto']['name'] ?? '', PATHINFO_EXTENSION));
+            if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'])) {
+                return ['status' => 'error', 'message' => "Solo se permiten imágenes JPG, PNG o WebP."];
+            }
+            if ($files['foto']['size'] > 5 * 1024 * 1024) {
+                return ['status' => 'error', 'message' => 'La foto no debe superar 5 MB.'];
+            }
+            $fotoNueva = true;
+        }
+
         if ($id) {
             if (!$this->ownEquipo($id, $idCliente)) return ['status' => 'error', 'message' => 'Equipo no encontrado.'];
-            $this->pdo->prepare(
-                "UPDATE cliente_equipos SET nombre=?,tipo=?,marca=?,modelo=?,serie=?,capacidad=?,anio=?,notas=?,estado=? WHERE id=?"
-            )->execute([$nombre, $tipo, $marca, $modelo, $serie, $capacidad, $anio, $notas, $estado, $id]);
+
+            // Obtener foto actual para posible reemplazo/eliminación
+            $sq = $this->pdo->prepare("SELECT foto_url FROM cliente_equipos WHERE id=?");
+            $sq->execute([$id]);
+            $fotoActual = $sq->fetchColumn() ?: '';
+
+            if ($fotoNueva) {
+                // Borrar foto anterior
+                if ($fotoActual) {
+                    $f = rtrim(UPLOAD_DIR, '/') . '/' . ltrim($fotoActual, '/');
+                    if (file_exists($f)) @unlink($f);
+                }
+                $dir = rtrim(UPLOAD_DIR, '/') . "/equipos_cliente/fotos/$id/";
+                if (!is_dir($dir)) mkdir($dir, 0755, true);
+                $ext = strtolower(pathinfo($files['foto']['name'], PATHINFO_EXTENSION));
+                $fn  = 'foto_' . date('YmdHis') . ".$ext";
+                move_uploaded_file($files['foto']['tmp_name'], $dir . $fn);
+                $fotoUrl = "uploads/equipos_cliente/fotos/$id/$fn";
+                $this->pdo->prepare(
+                    "UPDATE cliente_equipos SET nombre=?,tipo=?,marca=?,modelo=?,serie=?,capacidad=?,anio=?,notas=?,estado=?,foto_url=? WHERE id=?"
+                )->execute([$nombre, $tipo, $marca, $modelo, $serie, $capacidad, $anio, $notas, $estado, $fotoUrl, $id]);
+            } elseif (isset($data['foto_actual']) && $data['foto_actual'] === '') {
+                // Usuario quitó la foto
+                if ($fotoActual) {
+                    $f = rtrim(UPLOAD_DIR, '/') . '/' . ltrim($fotoActual, '/');
+                    if (file_exists($f)) @unlink($f);
+                }
+                $this->pdo->prepare(
+                    "UPDATE cliente_equipos SET nombre=?,tipo=?,marca=?,modelo=?,serie=?,capacidad=?,anio=?,notas=?,estado=?,foto_url=NULL WHERE id=?"
+                )->execute([$nombre, $tipo, $marca, $modelo, $serie, $capacidad, $anio, $notas, $estado, $id]);
+            } else {
+                $this->pdo->prepare(
+                    "UPDATE cliente_equipos SET nombre=?,tipo=?,marca=?,modelo=?,serie=?,capacidad=?,anio=?,notas=?,estado=? WHERE id=?"
+                )->execute([$nombre, $tipo, $marca, $modelo, $serie, $capacidad, $anio, $notas, $estado, $id]);
+            }
         } else {
             $this->pdo->prepare(
                 "INSERT INTO cliente_equipos (id_cliente,nombre,tipo,marca,modelo,serie,capacidad,anio,notas,estado)
                  VALUES (?,?,?,?,?,?,?,?,?,?)"
             )->execute([$idCliente, $nombre, $tipo, $marca, $modelo, $serie, $capacidad, $anio, $notas, $estado]);
             $id = (int)$this->pdo->lastInsertId();
+
+            if ($fotoNueva) {
+                $dir = rtrim(UPLOAD_DIR, '/') . "/equipos_cliente/fotos/$id/";
+                if (!is_dir($dir)) mkdir($dir, 0755, true);
+                $ext = strtolower(pathinfo($files['foto']['name'], PATHINFO_EXTENSION));
+                $fn  = 'foto_' . date('YmdHis') . ".$ext";
+                move_uploaded_file($files['foto']['tmp_name'], $dir . $fn);
+                $fotoUrl = "uploads/equipos_cliente/fotos/$id/$fn";
+                $this->pdo->prepare("UPDATE cliente_equipos SET foto_url=? WHERE id=?")->execute([$fotoUrl, $id]);
+            }
         }
         return ['status' => 'success', 'id' => $id];
     }
@@ -174,6 +232,15 @@ class ClienteEquipos {
     public function eliminar(int $id, string $idCliente): array {
         $idCliente = $this->norm($idCliente);
         if (!$this->ownEquipo($id, $idCliente)) return ['status' => 'error', 'message' => 'Equipo no encontrado.'];
+
+        // Borrar foto del equipo
+        $sf = $this->pdo->prepare("SELECT foto_url FROM cliente_equipos WHERE id=?");
+        $sf->execute([$id]);
+        $fotoUrl = $sf->fetchColumn();
+        if ($fotoUrl) {
+            $f = rtrim(UPLOAD_DIR, '/') . '/' . ltrim($fotoUrl, '/');
+            if (file_exists($f)) @unlink($f);
+        }
 
         foreach (['cliente_equipos_docs', 'cliente_equipos_cert'] as $tabla) {
             $s = $this->pdo->prepare("SELECT archivo_url FROM $tabla WHERE equipo_id=?");
@@ -244,6 +311,7 @@ class ClienteEquipos {
                 'anio'     => $eq['anio'] ? (int)$eq['anio'] : null,
                 'notas'    => $eq['notas'] ?? '',
                 'estado'   => $eq['estado'] ?? 'Activo',
+                'foto_url' => $eq['foto_url'] ? (rtrim(SITE_URL, '/') . '/' . ltrim($eq['foto_url'], '/')) : '',
             ],
             'documentos'      => array_map(fn($r) => [
                 'id'          => (int)$r['id'],
