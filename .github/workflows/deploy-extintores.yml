@@ -12,16 +12,18 @@ jobs:
       - name: Checkout del repo
         uses: actions/checkout@v4
 
-      - name: Deploy via FTP - SOLO la carpeta extinguisher-system
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+      - name: Quitar la config interna antes de subir
+        run: rm -rf extinguisher-system/config
+
+      - name: Subir SOLO la carpeta extinguisher-system por SSH (SCP)
+        uses: appleboy/scp-action@v0.1.7
         with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./extinguisher-system/
-          server-dir: ./extintores/
-          exclude: |
-            **/.git*
-            **/.git*/**
-            config/**
-            **/config/**
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "extinguisher-system/*"
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/extintores"
+          strip_components: 1
+          overwrite: true
+          
