@@ -1376,33 +1376,13 @@ SVG;
         $mpdf->use_kwt          = false;
         $mpdf->useSubstitutions = true;
 
-        // Raise pcre.backtrack_limit — base64 images make HTML larger than default 1M limit
+        // Elevar pcre.backtrack_limit: el HTML incluye imágenes base64 que superan el límite por defecto (1M)
         $prevBacktrack = (int) ini_get('pcre.backtrack_limit');
         ini_set('pcre.backtrack_limit', 10000000);
 
-        // Extract CSS with string ops (not regex) to avoid the very problem we're fixing
-        $css      = '';
-        $bodyHtml = $html;
-        $p = 0;
-        while (($s = stripos($bodyHtml, '<style', $p)) !== false) {
-            $sEnd = strpos($bodyHtml, '>', $s);
-            if ($sEnd === false) break;
-            $eTag = stripos($bodyHtml, '</style>', $sEnd + 1);
-            if ($eTag === false) break;
-            $css     .= substr($bodyHtml, $sEnd + 1, $eTag - $sEnd - 1) . "\n";
-            $bodyHtml = substr($bodyHtml, 0, $s) . substr($bodyHtml, $eTag + 8);
-            $p = $s;
-        }
-        // Extract inner body content
-        $bOpen = stripos($bodyHtml, '<body');
-        if ($bOpen !== false) {
-            $bOpen = strpos($bodyHtml, '>', $bOpen) + 1;
-            $bClose = strripos($bodyHtml, '</body>');
-            if ($bClose !== false) $bodyHtml = substr($bodyHtml, $bOpen, $bClose - $bOpen);
-        }
-
-        if ($css !== '') $mpdf->WriteHTML($css, \Mpdf\HTMLParserMode::HEADER_CSS);
-        $mpdf->WriteHTML($bodyHtml, \Mpdf\HTMLParserMode::HTML_BODY);
+        // Escribir el HTML completo de una sola llamada — mismo método que generar_dictamen_web.php
+        // (dividir CSS+body por separado dejaba bodyHtml vacío en plantillas complejas)
+        $mpdf->WriteHTML($html);
 
         ini_set('pcre.backtrack_limit', $prevBacktrack);
 
