@@ -2,6 +2,8 @@
 
 Sistema web para la gestión integral de inspecciones mensuales de extintores con roles diferenciados (Administrador, Inspector y Cliente).
 
+**Rama de despliegue:** `claude/extintores-deploy` - Estructura optimizada para producción
+
 ## 📋 Características
 
 - **Autenticación segura** con sistema de roles
