@@ -4128,29 +4128,38 @@ function cerrarDetPer() {
   document.getElementById('overlay-per-det').style.display = 'none';
 }
 
-/* ── Abrir PDF: notificación flotante con link directo ── */
+/* ── Abrir PDF en modal iframe (mismo origen, funciona en incógnito) ── */
 function _pdfAbrir(url, label) {
   const abs = (url.startsWith('http://') || url.startsWith('https://'))
     ? url : new URL(url, window.location.href).href;
-  document.getElementById('_pdf_notif')?.remove();
-  const n = document.createElement('div');
-  n.id = '_pdf_notif';
-  n.style.cssText = 'position:fixed;bottom:76px;right:20px;z-index:9999;background:#0f2d52;' +
-    'color:#fff;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,.45);display:flex;' +
-    'align-items:center;gap:12px;padding:13px 17px;font-size:13.5px;max-width:360px;' +
-    'border:1px solid rgba(255,255,255,.1)';
-  n.innerHTML =
-    '<svg viewBox="0 0 20 20" fill="#4ade80" width="18" height="18" style="flex-shrink:0">' +
-    '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 ' +
-    '0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/></svg>' +
-    '<span>' + (label ? '<strong>' + label + '</strong> listo' : 'PDF listo') + '</span>' +
-    '<a href="' + abs + '" target="_blank" rel="noopener" style="display:inline-block;' +
-    'background:#1a6dc7;color:#fff;text-decoration:none;padding:6px 14px;border-radius:7px;' +
-    'font-weight:700;font-size:13px;white-space:nowrap">Abrir PDF →</a>' +
-    '<button onclick="document.getElementById(\'_pdf_notif\')?.remove()" style="background:none;' +
-    'border:none;color:rgba(255,255,255,.5);cursor:pointer;font-size:20px;padding:0;line-height:1">×</button>';
-  document.body.appendChild(n);
-  setTimeout(() => n.remove(), 45000);
+  document.getElementById('_pdf_modal_overlay')?.remove();
+
+  const esc = label ? label.replace(/</g,'&lt;').replace(/>/g,'&gt;') : 'PDF';
+  const overlay = document.createElement('div');
+  overlay.id = '_pdf_modal_overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;' +
+    'flex-direction:column;background:rgba(10,20,40,.82)';
+  overlay.innerHTML =
+    '<div style="background:#0f2d52;padding:10px 16px;display:flex;align-items:center;' +
+    'gap:14px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.12)">' +
+    '<svg viewBox="0 0 20 20" fill="#4ade80" width="16" height="16" style="flex-shrink:0">' +
+    '<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112.707 3.293l3.414 3.414A2 2 ' +
+    '0 0117 8.172V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/></svg>' +
+    '<span style="color:#fff;font-weight:600;flex:1;font-size:14px">' + esc + '</span>' +
+    '<a href="' + abs + '" download style="color:#90c8ff;font-size:13px;text-decoration:none;' +
+    'padding:4px 10px;border:1px solid rgba(144,200,255,.4);border-radius:5px">↓ Descargar</a>' +
+    '<button onclick="document.getElementById(\'_pdf_modal_overlay\')?.remove()" ' +
+    'style="background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;' +
+    'font-size:26px;line-height:1;padding:0 4px" title="Cerrar">×</button>' +
+    '</div>' +
+    '<iframe src="' + abs + '#toolbar=1" style="flex:1;border:none;background:#525659" ' +
+    'allow="fullscreen" loading="lazy"></iframe>';
+
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+
+  const onKey = e => { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', onKey); } };
+  document.addEventListener('keydown', onKey);
 }
 
 async function generarCredencial(id) {
