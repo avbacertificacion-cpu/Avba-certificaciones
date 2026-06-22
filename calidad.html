@@ -4133,8 +4133,15 @@ function _pdfWinAbrir() { return window.open('', '_blank') || null; }
 function _pdfWinNavegar(win, url) {
   const absUrl = (url.startsWith('http://') || url.startsWith('https://'))
     ? url : new URL(url, window.location.href).href;
-  if (win) win.location.href = absUrl;
-  else window.open(absUrl, '_blank');
+  if (win && !win.closed) {
+    try {
+      win.document.open();
+      win.document.write('<!doctype html><html><head><script>location.replace(' + JSON.stringify(absUrl) + ');<\/script></head><body></body></html>');
+      win.document.close();
+    } catch(e) { win.location.href = absUrl; }
+  } else {
+    window.open(absUrl, '_blank');
+  }
 }
 
 async function generarCredencial(id) {
