@@ -936,6 +936,8 @@ class Certificaciones {
             $pruebaCargaHtml = $this->buildPruebaCargaHtml(json_decode($d['prueba_carga'], true));
         }
 
+        $horquillas = !empty($d['horquillas']) ? (json_decode($d['horquillas'], true) ?? []) : [];
+
         $map = [
             '{folio}'             => $folio,
             '{cliente}'           => $e($d['cliente']    ?? ''),
@@ -957,6 +959,10 @@ class Certificaciones {
             '{firma_responsable_img}' => $firmaResponsableImg,
             '{nombre_responsable}'   => $e($nombreResponsable),
             '{cargo_responsable}'    => $e($cargoResponsable),
+            '{horquilla_marca}'      => $e($horquillas['marca']           ?? ''),
+            '{horquilla_serie}'      => $e($horquillas['serie']           ?? ''),
+            '{horquilla_capacidad}'  => $e($horquillas['capacidad']       ?? ''),
+            '{horquilla_cg}'         => $e($horquillas['centro_gravedad'] ?? ''),
             '{{normas_acreditadas}}' => $normasAcredHtml,
             '{{normas_referencia}}'  => $normasRefHtml,
         ];

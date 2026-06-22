@@ -73,6 +73,13 @@ class Inspecciones {
                 );
             } catch (\Throwable $e) {}
 
+            // Auto-add horquillas column
+            try {
+                $this->pdo->exec(
+                    "ALTER TABLE equipos ADD COLUMN IF NOT EXISTS horquillas JSON NULL"
+                );
+            } catch (\Throwable $e) {}
+
             $pruebaCargaJson = null;
             if (!empty($payload['prueba_carga'])) {
                 $pc = $payload['prueba_carga'];
@@ -90,12 +97,24 @@ class Inspecciones {
                 $pruebaCargaJson = json_encode($pc, JSON_UNESCAPED_UNICODE);
             }
 
+            $horquillasJson = null;
+            if (!empty($payload['horquillas'])) {
+                $h = $payload['horquillas'];
+                $horquillasJson = json_encode([
+                    'marca'          => strtoupper(trim($h['marca']          ?? '')),
+                    'serie'          => strtoupper(trim($h['serie']          ?? '')),
+                    'capacidad'      => strtoupper(trim($h['capacidad']      ?? '')),
+                    'centro_gravedad' => strtoupper(trim($h['centro_gravedad'] ?? '')),
+                ], JSON_UNESCAPED_UNICODE);
+            }
+
             $stmt = $this->pdo->prepare(
                 "INSERT INTO equipos
                  (marca_temporal, cliente, coords_inspeccion, maquinaria, marca, modelo, serie,
                   id_equipo, fecha_inspeccion, correo, control, evidencia_url, direccion,
-                  capacidad, estado, envio_direccion, coordenadas_envio, inspector, prueba_carga)
-                 VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?, ?)"
+                  capacidad, estado, envio_direccion, coordenadas_envio, inspector, prueba_carga,
+                  horquillas)
+                 VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?, ?, ?)"
             );
             $u = fn($v) => $v !== null && $v !== '' ? strtoupper(trim($v)) : null;
 
@@ -128,6 +147,7 @@ class Inspecciones {
                 $coordsEnv ?: null,
                 $usuarioActual,
                 $pruebaCargaJson,
+                $horquillasJson,
             ]);
 
             $equipoId = (int) $this->pdo->lastInsertId();

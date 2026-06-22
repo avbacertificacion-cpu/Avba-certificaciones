@@ -2119,7 +2119,7 @@
         </div>
         <div class="field" id="f-maquinaria">
           <label>Tipo de maquinaria <span class="req">*</span></label>
-          <select id="maquinaria" onchange="actualizarChecklist()">
+          <select id="maquinaria" onchange="actualizarChecklist(); toggleHorquillasSection();">
             <option value="">Cargando...</option>
           </select>
           <div class="errmsg">Selecciona un tipo de maquinaria</div>
@@ -2153,6 +2153,33 @@
         <label>Capacidad del equipo</label>
         <input type="text" id="capacidad" placeholder="Ej: 3 toneladas, 500 kg, 10 m³">
         <div class="hint">Capacidad nominal o de carga del equipo</div>
+      </div>
+
+      <!-- Horquillas — solo visible cuando el equipo es montacargas -->
+      <div id="seccion-horquillas" style="display:none">
+        <div class="band-sub" style="margin:14px 0 8px;padding:6px 10px;background:#f0f4ff;border-left:3px solid #1e5fa8;border-radius:4px;font-size:12px;font-weight:600;color:#1e5fa8;">
+          Datos de Horquillas
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Marca de horquillas</label>
+            <input type="text" id="horquilla_marca" placeholder="Ej: Cascade">
+          </div>
+          <div class="field">
+            <label>No. de serie de horquillas</label>
+            <input type="text" id="horquilla_serie" placeholder="Ej: HQ-00456">
+          </div>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>Capacidad de horquillas</label>
+            <input type="text" id="horquilla_capacidad" placeholder="Ej: 3 TON">
+          </div>
+          <div class="field">
+            <label>Centro de gravedad</label>
+            <input type="text" id="horquilla_cg" placeholder="Ej: 500 mm">
+          </div>
+        </div>
       </div>
 
       <div class="field">
@@ -3627,6 +3654,14 @@ function pcGuardar() {
   pruebaCargaData = result;
 }
 
+function toggleHorquillasSection() {
+  const sel     = document.getElementById('maquinaria');
+  const opt     = sel.options[sel.selectedIndex];
+  const dictHtml = opt ? (opt.dataset.dictHtml || '') : '';
+  const sec = document.getElementById('seccion-horquillas');
+  if (sec) sec.style.display = dictHtml === 'dictamen_montacargas.html' ? 'block' : 'none';
+}
+
 function getPruebaCargaData() {
   return Object.keys(pruebaCargaData).length ? pruebaCargaData : null;
 }
@@ -4025,6 +4060,12 @@ async function enviarFormulario() {
         },
         checklist: { ...respuestasCheck },
         prueba_carga: getPruebaCargaData(),
+        horquillas: {
+          marca:      document.getElementById('horquilla_marca')?.value?.trim()    || '',
+          serie:      document.getElementById('horquilla_serie')?.value?.trim()    || '',
+          capacidad:  document.getElementById('horquilla_capacidad')?.value?.trim() || '',
+          centro_gravedad: document.getElementById('horquilla_cg')?.value?.trim() || ''
+        },
         fotos: fotosData
       }
     };
