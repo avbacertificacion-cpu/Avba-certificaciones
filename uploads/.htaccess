@@ -15,6 +15,13 @@ Options -Indexes -ExecCGI
     </FilesMatch>
 </IfModule>
 
+# Quitar CSP de PDFs para que Chrome pueda renderizarlos dentro de iframes
+<IfModule mod_headers.c>
+    <FilesMatch "\.pdf$">
+        Header always unset Content-Security-Policy
+    </FilesMatch>
+</IfModule>
+
 # Solo permitir imágenes, PDF y documentos Office
 <IfModule mod_rewrite.c>
     RewriteEngine On
