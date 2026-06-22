@@ -889,6 +889,13 @@ class Certificaciones {
                 $numeroInspector = (string)$usr['id'];
                 $nombreInspector = $usr['nombre'] ?? '';
                 $firmaUrl = $usr['firma_imagen'] ?? '';
+                // Fallback: si el inspector no tiene firma_imagen en DB, intentar por nombre normalizado
+                if (!$firmaUrl) {
+                    $normNombre = $this->normalizarTexto($nombreInspector ?: $d['inspector']);
+                    if (strpos($normNombre, 'jose marcos') !== false || strpos($normNombre, 'marcos gonzalez') !== false) {
+                        $firmaUrl = 'uploads/firmas/firma_jose_marcos.jpg';
+                    }
+                }
                 if ($firmaUrl) {
                     $localPath = __DIR__ . '/../' . ltrim($firmaUrl, '/');
                     if (file_exists($localPath)) {
@@ -899,6 +906,28 @@ class Certificaciones {
                     }
                 }
             }
+        }
+
+        // Obtener datos del responsable (Aprobado Por)
+        $firmaResponsableImg = '';
+        $nombreResponsable   = 'ING. YOSELIN MARTINEZ JUAREZ';
+        $cargoResponsable    = 'Director Técnico Sustituto';
+        $stmtR = $this->pdo->prepare("SELECT nombre, firma_imagen FROM usuarios WHERE nombre LIKE ? LIMIT 1");
+        $stmtR->execute(['%Yoselin%']);
+        $resp = $stmtR->fetch();
+        if ($resp) {
+            $nombreResponsable = strtoupper($resp['nombre']);
+            $firmaUrlR = $resp['firma_imagen'] ?? '';
+            if (!$firmaUrlR) $firmaUrlR = 'uploads/firmas/firma_yoselin.jpg';
+        } else {
+            $firmaUrlR = 'uploads/firmas/firma_yoselin.jpg';
+        }
+        $localPathR = __DIR__ . '/../' . ltrim($firmaUrlR, '/');
+        if (file_exists($localPathR)) {
+            $extR  = strtolower(pathinfo($localPathR, PATHINFO_EXTENSION));
+            $mimeR = $extR === 'png' ? 'image/png' : 'image/jpeg';
+            $b64R  = base64_encode(file_get_contents($localPathR));
+            $firmaResponsableImg = "<img src='data:{$mimeR};base64,{$b64R}' style='max-width:120px;max-height:50px;object-fit:contain;'>";
         }
 
         // Construir HTML de prueba de carga si existen datos
@@ -924,7 +953,10 @@ class Certificaciones {
             '{prueba_carga}'      => $pruebaCargaHtml,
             '{numero_inspector}'   => $e($numeroInspector),
             '{nombre_inspector}'   => $e($nombreInspector),
-            '{firma_inspector_img}' => $firmaInspectorImg,
+            '{firma_inspector_img}'  => $firmaInspectorImg,
+            '{firma_responsable_img}' => $firmaResponsableImg,
+            '{nombre_responsable}'   => $e($nombreResponsable),
+            '{cargo_responsable}'    => $e($cargoResponsable),
             '{{normas_acreditadas}}' => $normasAcredHtml,
             '{{normas_referencia}}'  => $normasRefHtml,
         ];
@@ -1083,8 +1115,13 @@ body { background:#fff!important; }
             if (is_array($platRow)) {
                 $pRadio  = (float) ($platRow['radio']  ?? 0);
                 $pAltura = (float) ($platRow['altura'] ?? 0);
+                $tipo    = strtolower($platRow['tipo_plataforma'] ?? 'tijera');
+                $isBoom  = strpos($tipo, 'articulad') !== false || strpos($tipo, 'boom') !== false;
+                $svgHtml = $isBoom
+                    ? $this->buildBoomSvg($pRadio, $pAltura)
+                    : $this->buildPlatformSvg($pRadio, $pAltura);
 
-                $html = str_replace('{pc_plat_svg}',    $this->buildPlatformSvg($pRadio, $pAltura), $html);
+                $html = str_replace('{pc_plat_svg}',    $svgHtml, $html);
                 $html = str_replace('{pc_plat_radio}',  number_format($pRadio,  1), $html);
                 $html = str_replace('{pc_plat_altura}', number_format($pAltura, 1), $html);
                 $html = str_replace('{pc_obs_radio}',   number_format($pRadio,  1), $html);
@@ -1233,6 +1270,105 @@ SVG;
   <text x="{$midX}" y="{$rLblY}" dy="5" dx="-20" font-family="Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1e5fa8">r = {$rF}</text>
 </svg>
 SVG;
+    }
+
+    /** Genera el SVG de diagrama de plataforma articulada (boom/articulado) — vista lateral. */
+    private function buildBoomSvg(float $radio, float $altura): string {
+        $rF = $radio  > 0 ? number_format($radio,  1) . ' m' : '—';
+        $hF = $altura > 0 ? number_format($altura, 1) . ' m' : '—';
+
+        // viewBox 0 0 180 140
+        $gndY   = 118;
+        $baseW  = 38; $baseH = 10;
+        $baseX  = 14; $baseY = $gndY - $baseH;
+
+        // Pivot point (turntable center)
+        $pivX = $baseX + $baseW / 2;
+        $pivY = $baseY;
+
+        // Scale: available horizontal = 180 - 20 = 160; available vertical = pivY - 20
+        $availW = 160 - $pivX;
+        $availH = $pivY - 22;
+        $scale  = ($radio > 0 && $altura > 0)
+            ? min($availW / $radio, $availH / $altura)
+            : 2.8;
+        $scale  = max(1.2, min($scale, 5.5));
+
+        $tipX = round($pivX + $radio  * $scale);
+        $tipY = round($pivY - $altura * $scale);
+
+        // Clamp tip to stay within viewBox
+        if ($tipX > 174) { $s = 174 / ($pivX + $radio * $scale); $tipX = 174; $tipY = round($pivY - $altura * $scale * $s); }
+        if ($tipY < 18)  { $s = ($pivY - 18) / ($altura * $scale); $tipY = 18; $tipX = round($pivX + $radio * $scale * $s); }
+
+        // Boom arm: lower boom from pivot up to mid, then upper boom to tip
+        $midX = round($pivX + ($tipX - $pivX) * 0.55);
+        $midY = round($pivY - ($pivY - $tipY) * 0.40);
+
+        // Basket (platform) at tip
+        $bskW = 14; $bskH = 10;
+        $bskX = $tipX - $bskW / 2;
+        $bskY = $tipY - $bskH;
+
+        // Vertical dashed line for height — directly below basket tip
+        $vArX  = (int) min($tipX, 170);
+
+        // Horizontal dashed arrow for radio (below ground)
+        $rLblY   = $gndY + 14;
+        $midLblX = round(($pivX + $tipX) / 2);
+
+        // Wheels
+        $wR = 5;
+        $w1X = $baseX + 8; $w2X = $baseX + $baseW - 8;
+
+        // Cabin/turntable box
+        $cabW = 12; $cabH = 8;
+        $cabX = $pivX - $cabW / 2; $cabY = $pivY - $cabH;
+
+        return <<<SVG
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 140" width="180" height="140">
+  <!-- Ground line -->
+  <line x1="0" y1="{$gndY}" x2="180" y2="{$gndY}" stroke="#6b7280" stroke-width="1.5"/>
+  <!-- Base chassis -->
+  <rect x="{$baseX}" y="{$baseY}" width="{$baseW}" height="{$baseH}" rx="2" fill="#374151" stroke="#111827" stroke-width="0.8"/>
+  <!-- Wheels -->
+  <circle cx="{$w1X}" cy="{$gndY}" r="{$wR}" fill="#1f2937" stroke="#374151" stroke-width="0.8"/>
+  <circle cx="{$w2X}" cy="{$gndY}" r="{$wR}" fill="#1f2937" stroke="#374151" stroke-width="0.8"/>
+  <!-- Cabin / turntable -->
+  <rect x="{$cabX}" y="{$cabY}" width="{$cabW}" height="{$cabH}" rx="2" fill="#4b5563" stroke="#111827" stroke-width="0.7"/>
+  <!-- Lower boom arm -->
+  <line x1="{$pivX}" y1="{$pivY}" x2="{$midX}" y2="{$midY}" stroke="#1e5fa8" stroke-width="4" stroke-linecap="round"/>
+  <!-- Upper boom arm -->
+  <line x1="{$midX}" y1="{$midY}" x2="{$tipX}" y2="{$tipY}" stroke="#1e5fa8" stroke-width="3" stroke-linecap="round"/>
+  <!-- Pivot circle -->
+  <circle cx="{$pivX}" cy="{$pivY}" r="4" fill="#fbbf24" stroke="#92400e" stroke-width="1"/>
+  <!-- Basket platform -->
+  <rect x="{$bskX}" y="{$bskY}" width="{$bskW}" height="{$bskH}" rx="2" fill="#dbeafe" stroke="#1e5fa8" stroke-width="1.2"/>
+  <!-- Worker icon in basket -->
+  <circle cx="{$tipX}" cy="{$bskY}" r="3.5" fill="#fbbf24" stroke="#92400e" stroke-width="0.8"/>
+  <!-- Vertical dashed line for height -->
+  <line x1="{$vArX}" y1="{$tipY}" x2="{$vArX}" y2="{$gndY}" stroke="#374151" stroke-width="1" stroke-dasharray="4,3"/>
+  <!-- Height label -->
+  <rect x="{$vArX}" y="{$tipY}" width="36" height="14" rx="3" fill="#f0fdf4" stroke="#16a34a" stroke-width="0.8" transform="translate(-18,2)"/>
+  <text x="{$vArX}" y="{$tipY}" dy="12" text-anchor="middle" font-family="Arial,sans-serif" font-size="8" font-weight="700" fill="#166534">h = {$hF}</text>
+  <!-- Horizontal dashed line for radius -->
+  <line x1="{$pivX}" y1="{$rLblY}" x2="{$tipX}" y2="{$rLblY}" stroke="#1e5fa8" stroke-width="1" stroke-dasharray="4,3"/>
+  <!-- Radius label -->
+  <rect x="{$midLblX}" y="{$rLblY}" width="40" height="14" rx="3" fill="#dbeafe" stroke="#1e5fa8" stroke-width="0.8" transform="translate(-20,-7)"/>
+  <text x="{$midLblX}" y="{$rLblY}" dy="5" dx="-18" font-family="Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1e5fa8">r = {$rF}</text>
+  <!-- Type label -->
+  <text x="90" y="134" text-anchor="middle" font-family="Arial,sans-serif" font-size="7" fill="#6b7280">Plataforma Articulada / Boom</text>
+</svg>
+SVG;
+    }
+
+    /** Normaliza texto: minúsculas, sin acentos ni ñ, sin espacios extremos. */
+    private function normalizarTexto(string $s): string {
+        $s = mb_strtolower(trim($s), 'UTF-8');
+        return strtr($s, [
+            'á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n',
+            'Á'=>'a','É'=>'e','Í'=>'i','Ó'=>'o','Ú'=>'u','Ü'=>'u','Ñ'=>'n',
+        ]);
     }
 
     /** Reemplaza cada div.foto-placeholder en el HTML del dictamen con la imagen real en base64. */

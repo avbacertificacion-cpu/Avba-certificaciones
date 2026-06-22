@@ -2670,6 +2670,7 @@ const PC_TEMPLATES = {
     label: 'PTEM',
     rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
     cols: [
+      { id:'tipo_plataforma', label:'Tipo de Plataforma', type:'select', options:['Tijera / Scissor','Articulado / Boom'] },
       { id:'peso',      label:'Peso de Prueba',    unit:'kg' },
       { id:'radio',     label:'Radio de Trabajo',  unit:'m'  },
       { id:'altura',    label:'Altura de Trabajo', unit:'m'  },
@@ -2691,6 +2692,7 @@ const PC_TEMPLATES = {
     label: 'Plataforma de Elevación Móvil (MEWP)',
     rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
     cols: [
+      { id:'tipo_plataforma', label:'Tipo de Plataforma', type:'select', options:['Tijera / Scissor','Articulado / Boom'] },
       { id:'peso',      label:'Peso de Prueba',      unit:'kg' },
       { id:'radio',     label:'Radio de Operación',  unit:'m'  },
       { id:'altura',    label:'Altura de Trabajo',   unit:'m'  },
