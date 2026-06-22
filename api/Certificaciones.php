@@ -53,13 +53,13 @@ class Certificaciones {
     }
 
     // ── Imprimir / previsualizar documento ────────────────
-    public function imprimirPDF(int $id, string $tipo): array {
+    public function imprimirPDF(int $id, string $tipo, bool $sinSellos = false): array {
         $datos = $this->obtenerDatosEquipo($id);
         if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
         try {
             $tipoPDF = ($tipo === 'dict') ? 'dictamen' : 'certificado';
-            $rutaPdf = $this->resolverPdf($tipoPDF, $datos);
+            $rutaPdf = $this->resolverPdf($tipoPDF, $datos, $sinSellos);
             $urlPdf  = UPLOAD_URL . 'certificados/' . basename($rutaPdf);
 
             return ['status' => 'success', 'url' => $urlPdf, 'docx' => false];
@@ -766,26 +766,31 @@ class Certificaciones {
      * Genera el PDF final a partir de los datos del equipo.
      * No requiere plantilla Word — usa una plantilla HTML/CSS mantenida en código.
      */
-    private function resolverPdf(string $tipo, array $datos): string {
+    private function resolverPdf(string $tipo, array $datos, bool $sinSellos = false): string {
         // Asegurar que mPDF esté disponible
         if (!class_exists('\\Mpdf\\Mpdf') && file_exists(__DIR__ . '/../vendor/autoload.php')) {
             require_once __DIR__ . '/../vendor/autoload.php';
         }
 
-        // QR como base64; si falla se continúa sin él
-        try {
-            $qrB64 = $this->descargarQrB64($datos['qr_codigo'] ?? '');
-        } catch (\Exception $qrEx) {
+        // QR como base64; sin sellos = sin QR
+        if ($sinSellos) {
             $qrB64 = '';
+        } else {
+            try {
+                $qrB64 = $this->descargarQrB64($datos['qr_codigo'] ?? '');
+            } catch (\Exception $qrEx) {
+                $qrB64 = '';
+            }
         }
 
         if ($tipo === 'dictamen') {
             $items         = $this->obtenerChecklistEquipo((int)($datos['id'] ?? 0), $datos['maquinaria'] ?? '');
             $plantillaHtml = $this->obtenerPlantillaDictHtml($datos['maquinaria'] ?? '');
+            $sufijo        = $sinSellos ? 'PRINT_DICT' : 'DICT';
 
             if ($plantillaHtml) {
-                $html = $this->renderDictamenHtmlTemplate($plantillaHtml, $datos, $qrB64, $items);
-                return $this->htmlToPdfMpdf($html, $datos['control'] ?? (string)($datos['id'] ?? 'doc'), 'DICT');
+                $html = $this->renderDictamenHtmlTemplate($plantillaHtml, $datos, $qrB64, $items, $sinSellos);
+                return $this->htmlToPdfMpdf($html, $datos['control'] ?? (string)($datos['id'] ?? 'doc'), $sufijo);
             }
 
             // Fallback: dictamen programático
@@ -794,8 +799,9 @@ class Certificaciones {
         }
 
         // Certificado: usar plantilla HTML + mPDF
-        $html = $this->renderCertTemplate($datos, $qrB64);
-        return $this->htmlToPdfMpdf($html, $datos['control'] ?? (string)($datos['id'] ?? 'doc'), 'CERT');
+        $sufijo = $sinSellos ? 'PRINT_CERT' : 'CERT';
+        $html   = $this->renderCertTemplate($datos, $qrB64, $sinSellos);
+        return $this->htmlToPdfMpdf($html, $datos['control'] ?? (string)($datos['id'] ?? 'doc'), $sufijo);
     }
 
     /** Lee el archivo de plantilla HTML para dictamen configurado en maquinaria_tipos. */
@@ -850,7 +856,7 @@ class Certificaciones {
      *   {qr_imagen} {checklist_rows} {prueba_carga} {numero_inspector}
      *   {{normas_acreditadas}} {{normas_referencia}}
      */
-    private function renderDictamenHtmlTemplate(string $archivo, array $d, string $qrB64, array $items): string {
+    private function renderDictamenHtmlTemplate(string $archivo, array $d, string $qrB64, array $items, bool $sinSellos = false): string {
         $templatePath = __DIR__ . '/../' . $archivo;
         if (!file_exists($templatePath)) {
             return $this->htmlDictamen($d, $qrB64, $items);
@@ -955,8 +961,8 @@ class Certificaciones {
             '{prueba_carga}'      => $pruebaCargaHtml,
             '{numero_inspector}'   => $e($numeroInspector),
             '{nombre_inspector}'   => $e($nombreInspector),
-            '{firma_inspector_img}'  => $firmaInspectorImg,
-            '{firma_responsable_img}' => $firmaResponsableImg,
+            '{firma_inspector_img}'  => $sinSellos ? '' : $firmaInspectorImg,
+            '{firma_responsable_img}' => $sinSellos ? '' : $firmaResponsableImg,
             '{nombre_responsable}'   => $e($nombreResponsable),
             '{cargo_responsable}'    => $e($cargoResponsable),
             '{horquilla_marca}'      => $e($horquillas['marca']           ?? ''),
@@ -1520,7 +1526,7 @@ SVG;
      *   2. $_SESSION['plantilla_tipo'] — selección guardada por Calidad
      *   3. 'equipos' — fallback por defecto
      */
-    private function renderCertTemplate(array $d, string $qrB64): string {
+    private function renderCertTemplate(array $d, string $qrB64, bool $sinSellos = false): string {
         $registros    = require __DIR__ . '/../config/plantillas.php';
         $tipoPlantilla = $d['plantilla_tipo']
             ?? ($_SESSION['plantilla_tipo'] ?? null)
@@ -1585,7 +1591,13 @@ SVG;
         }
 
         $html = file_get_contents($templatePath);
-        return str_replace(array_keys($map), array_values($map), $html);
+        $html = str_replace(array_keys($map), array_values($map), $html);
+
+        if ($sinSellos) {
+            $html = str_replace('</head>', '<style>.sig-right{visibility:hidden!important;}.scan-txt{display:none!important;}</style></head>', $html);
+        }
+
+        return $html;
     }
 
     /**

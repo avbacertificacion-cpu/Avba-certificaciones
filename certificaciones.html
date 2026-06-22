@@ -1494,6 +1494,18 @@ function renderAcciones(d) {
       fn: "verDocPDF('DICT')"
     },
     {
+      label: "Imprimir certificado",
+      clase: "btn-accion btn-print-cert",
+      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="10" height="7" rx="1"/><path d="M5 6V3h6v3M5 10h6M5 12h4"/><path d="M3 9h10"/></svg>`,
+      fn: "imprimirDocPDF('CERT')"
+    },
+    {
+      label: "Imprimir dictamen",
+      clase: "btn-accion btn-print-dict",
+      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="6" width="10" height="7" rx="1"/><path d="M5 6V3h6v3M5 10h3M5 12h6"/><path d="M3 9h10"/></svg>`,
+      fn: "imprimirDocPDF('DICT')"
+    },
+    {
       label: "Enviar certificado",
       clase: "btn-accion btn-enviar-cert",
       icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12v8H2V4zm0 0l6 5 6-5"/></svg>`,
@@ -1626,6 +1638,36 @@ async function verDocPDF(tipo) {
     if (_pw) _pw.close();
     mostrarToast("Error de conexión", "err");
     console.error("verDocPDF:", e);
+  }
+}
+
+async function imprimirDocPDF(tipo) {
+  const _pw = _pdfWinAbrir();
+  const d = registroActual;
+  if (!d) { if (_pw) _pw.close(); return; }
+  const action = tipo === "CERT" ? "IMPRIMIR_CERT_SIN_SELLOS" : "IMPRIMIR_DICT_SIN_SELLOS";
+  const label  = tipo === "CERT" ? "certificado" : "dictamen";
+  const id = d.id ?? d.fila;
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    mostrarToast("Preparando impresión del " + label + "...", "info");
+    const res  = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Token": s.token || "" },
+      body: JSON.stringify({ action, token: s.token || "", payload: { id } })
+    });
+    const data = await res.json();
+    if (data.status === "success" && data.url) {
+      _pdfWinNavegar(_pw, data.url);
+      if (_pw) _pw.onload = () => { try { _pw.print(); } catch(e) {} };
+    } else {
+      if (_pw) _pw.close();
+      mostrarToast("Error: " + (data.message || "No se pudo generar el PDF"), "err");
+    }
+  } catch (e) {
+    if (_pw) _pw.close();
+    mostrarToast("Error de conexión", "err");
+    console.error("imprimirDocPDF:", e);
   }
 }
 
