@@ -1576,6 +1576,14 @@ async function eliminarParticipanteCert(id, nombre) {
 /* ═══════════════════════════════
    ACCIONES — LÓGICA
 ═══════════════════════════════ */
+
+/* ── Helpers para evitar bloqueo de popups en modo incógnito ── */
+function _pdfWinAbrir() { return window.open('', '_blank') || null; }
+function _pdfWinNavegar(win, url) {
+  if (win) win.location.href = url;
+  else window.open(url, '_blank');
+}
+
 /* Formatea folio para visualización */
 function formatoFolio(control) {
   if (!control) return "—";
@@ -1583,8 +1591,9 @@ function formatoFolio(control) {
 }
 
 async function verDocPDF(tipo) {
+  const _pw = _pdfWinAbrir();
   const d = registroActual;
-  if (!d) return;
+  if (!d) { if (_pw) _pw.close(); return; }
   const action = tipo === "CERT" ? "GENERAR_PDF_WORD_CERT" : "GENERAR_PDF_WORD_DICT";
   const label  = tipo === "CERT" ? "certificado" : "dictamen";
   const id = d.id ?? d.fila;
@@ -1598,12 +1607,14 @@ async function verDocPDF(tipo) {
     });
     const data = await res.json();
     if (data.status === "success" && data.url) {
-      window.open(data.url, "_blank");
+      _pdfWinNavegar(_pw, data.url);
       mostrarToast("PDF generado correctamente", "ok");
     } else {
+      if (_pw) _pw.close();
       mostrarToast("Error: " + (data.message || "No se pudo generar el PDF"), "err");
     }
   } catch (e) {
+    if (_pw) _pw.close();
     mostrarToast("Error de conexión", "err");
     console.error("verDocPDF:", e);
   }
@@ -2023,6 +2034,7 @@ function cerrarAccCert() {
 }
 
 async function prevInformeAcc(sesionId) {
+  const _pw = _pdfWinAbrir();
   mostrarToast('Generando vista previa…', 'info');
   const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
   try {
@@ -2033,15 +2045,17 @@ async function prevInformeAcc(sesionId) {
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {
-      window.open(data.url, '_blank');
+      _pdfWinNavegar(_pw, data.url);
     } else {
+      if (_pw) _pw.close();
       mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
     }
-  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+  } catch(e) { if (_pw) _pw.close(); mostrarToast('Error de conexión', 'err'); }
 }
 
 async function emitirInformeAcc(sesionId, btn) {
   if (!confirm('¿Emitir el informe? Se generará el PDF y se marcará como Emitido.')) return;
+  const _pw = _pdfWinAbrir();
   const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
   const orig = btn.textContent;
   btn.disabled = true; btn.textContent = '…';
@@ -2054,22 +2068,16 @@ async function emitirInformeAcc(sesionId, btn) {
     const data = await res.json();
     if (data.status === 'success' && data.url) {
       mostrarToast('Informe emitido correctamente', 'ok');
-      // Abrir PDF
-      window.open(data.url, '_blank');
-      // Ofrecer imprimir
-      setTimeout(() => {
-        if (confirm('¿Imprimir el informe ahora?')) {
-          const w = window.open(data.url, '_blank');
-          if (w) { w.onload = () => w.print(); }
-        }
-      }, 500);
+      _pdfWinNavegar(_pw, data.url);
       accCertCargados = false;
       cargarAccCert();
     } else {
+      if (_pw) _pw.close();
       mostrarToast('Error: ' + (data.message || 'No se pudo emitir'), 'err');
       btn.disabled = false; btn.textContent = orig;
     }
   } catch(e) {
+    if (_pw) _pw.close();
     mostrarToast('Error de conexión', 'err');
     btn.disabled = false; btn.textContent = orig;
   }
@@ -2097,6 +2105,7 @@ async function devolverAcc(sesionId) {
 
 /* ── Informe completo: imprimir y enviar ───────── */
 async function imprimirInformeAcc(sesionId, btn) {
+  const _pw = _pdfWinAbrir();
   const orig = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   mostrarToast('Generando PDF…', 'info');
@@ -2111,12 +2120,13 @@ async function imprimirInformeAcc(sesionId, btn) {
     if (data.status === 'success' && data.url) {
       mostrarToast('Informe emitido', 'ok');
       accCertCargados = false; cargarAccCert();
-      const w = window.open(data.url, '_blank');
-      if (w) { w.onload = () => w.print(); }
+      _pdfWinNavegar(_pw, data.url);
+      if (_pw) _pw.onload = () => _pw.print();
     } else {
+      if (_pw) _pw.close();
       mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
     }
-  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+  } catch(e) { if (_pw) _pw.close(); mostrarToast('Error de conexión', 'err'); }
   if (btn) { btn.disabled = false; btn.textContent = orig; }
 }
 
@@ -2138,6 +2148,7 @@ async function enviarInformeAcc(sesionId) {
 
 /* ── Certificado FPDI ──────────────────────────── */
 async function prevCertAcc(sesionId) {
+  const _pw = _pdfWinAbrir();
   mostrarToast('Generando certificado…', 'info');
   const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
   try {
@@ -2148,14 +2159,16 @@ async function prevCertAcc(sesionId) {
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {
-      window.open(data.url, '_blank');
+      _pdfWinNavegar(_pw, data.url);
     } else {
+      if (_pw) _pw.close();
       mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
     }
-  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+  } catch(e) { if (_pw) _pw.close(); mostrarToast('Error de conexión', 'err'); }
 }
 
 async function imprimirCertAcc(sesionId, btn) {
+  const _pw = _pdfWinAbrir();
   const orig = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   mostrarToast('Generando certificado…', 'info');
@@ -2170,12 +2183,13 @@ async function imprimirCertAcc(sesionId, btn) {
     if (data.status === 'success' && data.url) {
       mostrarToast('Certificado emitido', 'ok');
       accCertCargados = false; cargarAccCert();
-      const w = window.open(data.url, '_blank');
-      if (w) { w.onload = () => w.print(); }
+      _pdfWinNavegar(_pw, data.url);
+      if (_pw) _pw.onload = () => _pw.print();
     } else {
+      if (_pw) _pw.close();
       mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
     }
-  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+  } catch(e) { if (_pw) _pw.close(); mostrarToast('Error de conexión', 'err'); }
   if (btn) { btn.disabled = false; btn.textContent = orig; }
 }
 
@@ -2197,6 +2211,7 @@ async function enviarCertAcc(sesionId) {
 
 /* ── Informe Solo Aprobados (CUMPLE) ───────────── */
 async function prevInformeCumple(sesionId) {
+  const _pw = _pdfWinAbrir();
   mostrarToast('Generando informe de aprobados…', 'info');
   const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
   try {
@@ -2207,14 +2222,16 @@ async function prevInformeCumple(sesionId) {
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {
-      window.open(data.url, '_blank');
+      _pdfWinNavegar(_pw, data.url);
     } else {
+      if (_pw) _pw.close();
       mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
     }
-  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+  } catch(e) { if (_pw) _pw.close(); mostrarToast('Error de conexión', 'err'); }
 }
 
 async function imprimirInformeCumple(sesionId, btn) {
+  const _pw = _pdfWinAbrir();
   const orig = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = '…'; }
   mostrarToast('Generando informe de aprobados…', 'info');
@@ -2228,12 +2245,13 @@ async function imprimirInformeCumple(sesionId, btn) {
     const data = await res.json();
     if (data.status === 'success' && data.url) {
       mostrarToast('PDF generado', 'ok');
-      const w = window.open(data.url, '_blank');
-      if (w) { w.onload = () => w.print(); }
+      _pdfWinNavegar(_pw, data.url);
+      if (_pw) _pw.onload = () => _pw.print();
     } else {
+      if (_pw) _pw.close();
       mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
     }
-  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+  } catch(e) { if (_pw) _pw.close(); mostrarToast('Error de conexión', 'err'); }
   if (btn) { btn.disabled = false; btn.textContent = orig; }
 }
 
@@ -2588,6 +2606,7 @@ function renderIndepCert(data) {
    EMISIÓN DOCUMENTOS PERSONAL
 ═══════════════════════════════ */
 async function prevDocPersonal(participanteId, tipo) {
+  const _pw = _pdfWinAbrir();
   mostrarToast('Generando vista previa…', 'info');
   const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
   try {
@@ -2598,20 +2617,22 @@ async function prevDocPersonal(participanteId, tipo) {
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {
-      window.open(data.url, '_blank');
+      _pdfWinNavegar(_pw, data.url);
     } else {
+      if (_pw) _pw.close();
       mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
     }
-  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+  } catch(e) { if (_pw) _pw.close(); mostrarToast('Error de conexión', 'err'); }
 }
 
 async function prevCredencialesLote(idx) {
+  const _pw = _pdfWinAbrir();
   const g = window._cursosCertGrupos?.[idx];
-  if (!g) return;
+  if (!g) { if (_pw) _pw.close(); return; }
   const aprobados = g.participantes
     .filter(p => p.estatus === 'APROBADO_CALIDAD' || p.estatus === 'EMITIDO')
     .map(p => p.id);
-  if (!aprobados.length) { mostrarToast('No hay participantes aprobados en esta sesión.', 'err'); return; }
+  if (!aprobados.length) { if (_pw) _pw.close(); mostrarToast('No hay participantes aprobados en esta sesión.', 'err'); return; }
   mostrarToast(`Generando credenciales (${aprobados.length} participante${aprobados.length !== 1 ? 's' : ''})…`, 'info');
   const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
   try {
@@ -2622,11 +2643,12 @@ async function prevCredencialesLote(idx) {
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {
-      window.open(data.url, '_blank');
+      _pdfWinNavegar(_pw, data.url);
     } else {
+      if (_pw) _pw.close();
       mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
     }
-  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+  } catch(e) { if (_pw) _pw.close(); mostrarToast('Error de conexión', 'err'); }
 }
 
 let _emitPerBtn = null;
