@@ -1029,7 +1029,7 @@ class Personal {
     //  GENERACIÓN DE DOCUMENTOS
     // ══════════════════════════════════════════════════════
 
-    public function generarDocumento(int $id, string $tipo, string $usuario): array {
+    public function generarDocumento(int $id, string $tipo, string $usuario, bool $sinSellos = false): array {
         try {
             $p = $this->obtenerParticipante($id);
         } catch (\Throwable $e) {
@@ -1057,7 +1057,7 @@ class Personal {
         try {
             $html = match($tipo) {
                 'dc3'         => $this->htmlDC3($p, $qrB64),
-                'certificado' => $this->htmlCertificado($p, $qrB64),
+                'certificado' => $this->htmlCertificado($p, $qrB64, $sinSellos),
                 'credencial'  => $this->htmlCredencial($p, $qrB64),
                 default       => $this->htmlDiploma($p, $qrB64),
             };
@@ -2654,10 +2654,10 @@ HTML;
         return UPLOAD_URL . 'personal/docs/' . $nombre;
     }
 
-    private function htmlCertificado(array $p, string $qrB64 = ''): string {
+    private function htmlCertificado(array $p, string $qrB64 = '', bool $sinSellos = false): string {
         $templatePath = __DIR__ . '/../certificado_personal_preview.html';
         if (file_exists($templatePath)) {
-            return $this->renderPersonalCertTemplate($templatePath, $p, $qrB64);
+            return $this->renderPersonalCertTemplate($templatePath, $p, $qrB64, $sinSellos);
         }
         // Fallback inline HTML (should never be needed if template file is present)
         $e = fn($s) => htmlspecialchars($this->sinAcentos((string)($s ?? '')), ENT_QUOTES, 'UTF-8');
@@ -2670,7 +2670,7 @@ HTML;
         return "<!DOCTYPE html><html><body><h2>Certificado: {$folio}</h2><p>{$nombre}</p><p>{$empresa}</p><p>{$curso}</p></body></html>";
     }
 
-    private function renderPersonalCertTemplate(string $path, array $p, string $qrB64): string {
+    private function renderPersonalCertTemplate(string $path, array $p, string $qrB64, bool $sinSellos = false): string {
         $e = fn($s) => htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8');
 
         $folio = $e($p['control']
@@ -2706,7 +2706,11 @@ HTML;
         ];
 
         $html = file_get_contents($path);
-        return str_replace(array_keys($map), array_values($map), $html);
+        $html = str_replace(array_keys($map), array_values($map), $html);
+        if ($sinSellos) {
+            $html = str_replace('</head>', '<style>.avba-sello{display:none!important;}</style></head>', $html);
+        }
+        return $html;
     }
 
 }

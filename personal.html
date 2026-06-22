@@ -295,9 +295,13 @@ function renderDetalle(d) {
     d.documentos.forEach(doc => { latest[doc.tipo_doc] = doc; });
     const colorCls = { DC3: 'btn-dc3', DIPLOMA: 'btn-dip', CERTIFICADO: 'btn-cert', CREDENCIAL: 'btn-cred' };
     docs = `<div class="sec-title">Documentos generados</div><div class="docs-row">
-      ${Object.values(latest).map(doc =>
-        `<button class="btn-doc ${colorCls[doc.tipo_doc]||'btn-cert'}" onclick="prevDocPersonal(${d.id},'${doc.tipo_doc.toLowerCase()}')">${tipoLabel[doc.tipo_doc] || doc.tipo_doc} <span style="font-size:10px;opacity:.7">${esc(doc.fecha)}</span></button>`
-      ).join('')}
+      ${Object.values(latest).map(doc => {
+        const tipo = doc.tipo_doc.toLowerCase();
+        const sinSelloBtn = tipo === 'certificado'
+          ? `<button class="btn-doc btn-cert" style="opacity:.75" onclick="prevDocPersonal(${d.id},'${tipo}',true)" title="Sin sello AVBA">🖨 Sin sello</button>`
+          : '';
+        return `<button class="btn-doc ${colorCls[doc.tipo_doc]||'btn-cert'}" onclick="prevDocPersonal(${d.id},'${tipo}')">${tipoLabel[doc.tipo_doc] || doc.tipo_doc} <span style="font-size:10px;opacity:.7">${esc(doc.fecha)}</span></button>${sinSelloBtn}`;
+      }).join('')}
     </div>`;
   }
   // Botón siempre disponible para generar credencial PVC
@@ -342,17 +346,131 @@ function renderDetalle(d) {
 
 function cerrarDetalle() { document.getElementById('overlayDetalle').classList.remove('open'); }
 
+// ── PDF modal viewer ───────────────────────────────────────────────────────
+function _ensurePdfJs() {
+  return new Promise(function(resolve, reject) {
+    if (window.pdfjsLib) { resolve(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.crossOrigin = 'anonymous';
+    s.onload = function() {
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      resolve();
+    };
+    s.onerror = function() { reject(new Error('No se pudo cargar PDF.js')); };
+    document.head.appendChild(s);
+  });
+}
+
+async function _pdfAbrir(url, label) {
+  if (!url) { alert('URL del PDF no disponible'); return; }
+  let abs = (url.startsWith('http://') || url.startsWith('https://'))
+    ? url : new URL(url, window.location.href).href;
+  if (window.location.protocol === 'https:' && abs.startsWith('http://'))
+    abs = 'https://' + abs.slice(7);
+  document.getElementById('_pdf_modal_overlay')?.remove();
+
+  const lbl    = label ? label.replace(/</g,'&lt;').replace(/>/g,'&gt;') : 'PDF';
+  const absEsc = abs.replace(/"/g, '%22');
+
+  const overlay = document.createElement('div');
+  overlay.id = '_pdf_modal_overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;' +
+    'flex-direction:column;background:rgba(10,20,40,.92)';
+  overlay.innerHTML =
+    '<div style="background:#0f2d52;padding:10px 16px;display:flex;align-items:center;' +
+    'gap:14px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,.12)">' +
+    '<svg viewBox="0 0 20 20" fill="#4ade80" width="16" height="16" style="flex-shrink:0">' +
+    '<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112.707 3.293l3.414 3.414A2 2 ' +
+    '0 0117 8.172V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/></svg>' +
+    '<span style="color:#fff;font-weight:600;flex:1;font-size:14px;overflow:hidden;' +
+    'text-overflow:ellipsis;white-space:nowrap">' + lbl + '</span>' +
+    '<a href="' + absEsc + '" target="_blank" rel="noopener" style="color:#90c8ff;font-size:13px;' +
+    'text-decoration:none;padding:4px 10px;border:1px solid rgba(144,200,255,.4);' +
+    'border-radius:5px;flex-shrink:0;white-space:nowrap">↓ Abrir PDF</a>' +
+    '<button id="_pdf_close_btn" style="background:none;border:none;color:rgba(255,255,255,.7);' +
+    'cursor:pointer;font-size:26px;line-height:1;padding:0 4px;flex-shrink:0" title="Cerrar">×</button>' +
+    '</div>' +
+    '<div id="_pdf_pages" style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;' +
+    'background:#525659;display:flex;flex-direction:column;align-items:center;' +
+    'padding:12px 8px;gap:8px;-webkit-overflow-scrolling:touch">' +
+    '<div style="color:#b0c4de;font-size:13px;display:flex;align-items:center;gap:10px;margin-top:40px">' +
+    '<div style="width:32px;height:32px;border:3px solid rgba(255,255,255,.15);' +
+    'border-top-color:#90c8ff;border-radius:50%;animation:_pdfSpin .7s linear infinite"></div>' +
+    'Cargando PDF...</div>' +
+    '</div>' +
+    '<style>@keyframes _pdfSpin{to{transform:rotate(360deg)}}</style>';
+
+  const closeModal = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+  };
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  document.body.appendChild(overlay);
+  document.getElementById('_pdf_close_btn').addEventListener('click', closeModal);
+  const onKey = e => { if (e.key === 'Escape') closeModal(); };
+  document.addEventListener('keydown', onKey);
+
+  const pagesDiv = document.getElementById('_pdf_pages');
+  const _showErr = (msg) => {
+    if (!document.getElementById('_pdf_modal_overlay') || !pagesDiv) return;
+    pagesDiv.innerHTML =
+      '<div style="color:#ffaaaa;font-size:13px;padding:32px 16px;text-align:center;word-break:break-all">' +
+      msg + '<br><br>' +
+      '<a href="' + absEsc + '" target="_blank" rel="noopener" ' +
+      'style="color:#90c8ff;text-decoration:underline;font-size:14px">↗ Abrir PDF en nueva pestaña</a></div>';
+  };
+
+  try {
+    let pdfBuffer;
+    try {
+      const resp = await fetch(abs, { credentials: 'same-origin' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
+      pdfBuffer = await resp.arrayBuffer();
+    } catch(fetchErr) {
+      throw new Error('No se pudo descargar el PDF: ' + fetchErr.message);
+    }
+    await _ensurePdfJs();
+    if (!document.getElementById('_pdf_modal_overlay')) return;
+    const pdf = await pdfjsLib.getDocument({ data: pdfBuffer }).promise;
+    if (!document.getElementById('_pdf_modal_overlay')) return;
+    pagesDiv.innerHTML = '';
+    const availW = pagesDiv.clientWidth - 24;
+    for (let i = 1; i <= pdf.numPages; i++) {
+      if (!document.getElementById('_pdf_modal_overlay')) break;
+      const page = await pdf.getPage(i);
+      const vp0  = page.getViewport({ scale: 1 });
+      const scale = Math.min(2.5, Math.max(0.5, (availW > 0 ? availW : 600) / vp0.width));
+      const vp   = page.getViewport({ scale });
+      const cv   = document.createElement('canvas');
+      cv.width   = Math.floor(vp.width);
+      cv.height  = Math.floor(vp.height);
+      cv.style.cssText = 'display:block;max-width:100%;box-shadow:0 2px 8px rgba(0,0,0,.5)';
+      pagesDiv.appendChild(cv);
+      await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+    }
+  } catch(err) {
+    _showErr((err && err.message) || 'Error desconocido');
+  }
+}
+
 // ── Regenerar documento ────────────────────────────────────────────────────
-async function prevDocPersonal(participanteId, tipo) {
+async function prevDocPersonal(participanteId, tipo, sinSellos = false) {
+  const action = (sinSellos && tipo === 'certificado')
+    ? 'GENERAR_DOC_PERSONAL_SIN_SELLOS'
+    : 'GENERAR_DOC_PERSONAL';
   try {
     const res  = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'GENERAR_DOC_PERSONAL', payload: { id: participanteId, tipo } })
+      body: JSON.stringify({ action, payload: { id: participanteId, tipo } })
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {
-      window.open(data.url, '_blank');
+      const labels = { dc3: 'DC-3', diploma: 'Diploma', certificado: 'Certificado', credencial: 'Credencial PVC' };
+      const label  = (labels[tipo] || tipo) + (sinSellos ? ' (sin sello)' : '');
+      _pdfAbrir(data.url, label);
     } else {
       alert('Error: ' + (data.message || 'No se pudo generar el documento'));
     }

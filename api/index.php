@@ -950,12 +950,14 @@ if ($method === 'POST') {
             respuesta($personal->eliminarEmpresaDC3((int)($payload['id'] ?? 0)));
 
         case 'GENERAR_DOC_PERSONAL':
+        case 'GENERAR_DOC_PERSONAL_SIN_SELLOS':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->generarDocumento(
                 (int)($payload['id']   ?? 0),
                 trim($payload['tipo']  ?? ''),
-                $usr['usuario']
+                $usr['usuario'],
+                $action === 'GENERAR_DOC_PERSONAL_SIN_SELLOS'
             ));
 
         case 'GENERAR_CREDENCIALES_LOTE':

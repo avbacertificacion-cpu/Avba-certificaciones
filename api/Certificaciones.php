@@ -772,15 +772,11 @@ class Certificaciones {
             require_once __DIR__ . '/../vendor/autoload.php';
         }
 
-        // QR como base64; sin sellos = sin QR
-        if ($sinSellos) {
+        // QR como base64; si falla se continúa sin él
+        try {
+            $qrB64 = $this->descargarQrB64($datos['qr_codigo'] ?? '');
+        } catch (\Exception $qrEx) {
             $qrB64 = '';
-        } else {
-            try {
-                $qrB64 = $this->descargarQrB64($datos['qr_codigo'] ?? '');
-            } catch (\Exception $qrEx) {
-                $qrB64 = '';
-            }
         }
 
         if ($tipo === 'dictamen') {
@@ -1594,7 +1590,7 @@ SVG;
         $html = str_replace(array_keys($map), array_values($map), $html);
 
         if ($sinSellos) {
-            $html = str_replace('</head>', '<style>.sig-right{visibility:hidden!important;}.scan-txt{display:none!important;}</style></head>', $html);
+            $html = str_replace('</head>', '<style>.avba-sello{display:none!important;}</style></head>', $html);
         }
 
         return $html;
