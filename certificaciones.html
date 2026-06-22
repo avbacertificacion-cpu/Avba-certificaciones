@@ -2703,6 +2703,7 @@ function cerrarEmitPer() {
 }
 
 async function ejecutarEmitirPer(participanteId, tipo) {
+  const _pw = _pdfWinAbrir();
   const inputVal = document.getElementById('emit-per-correo-input')?.value.trim();
   if (inputVal) _emitPerAddChip(inputVal);
   cerrarEmitPer();
@@ -2722,7 +2723,7 @@ async function ejecutarEmitirPer(participanteId, tipo) {
     const data = await res.json();
     if (data.status === 'success' && data.url) {
       mostrarToast(`${tipo.toUpperCase()} emitido`, 'ok');
-      window.open(data.url, '_blank');
+      _pdfWinNavegar(_pw, data.url);
       perCertCargados = false;
       cerrarPcDet();
       if (document.getElementById('sub-btn-per-indep')?.classList.contains('active')) {
@@ -2731,10 +2732,12 @@ async function ejecutarEmitirPer(participanteId, tipo) {
         cargarPerCursosCert();
       }
     } else {
+      if (_pw) _pw.close();
       mostrarToast('Error: ' + (data.message || 'No se pudo emitir'), 'err');
       if (btn) { btn.disabled = false; btn.textContent = orig; }
     }
   } catch(e) {
+    if (_pw) _pw.close();
     mostrarToast('Error de conexión', 'err');
     if (btn) { btn.disabled = false; btn.textContent = orig; }
   }
