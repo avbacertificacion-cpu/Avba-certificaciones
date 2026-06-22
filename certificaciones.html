@@ -1589,7 +1589,7 @@ async function eliminarParticipanteCert(id, nombre) {
    ACCIONES — LÓGICA
 ═══════════════════════════════ */
 
-/* ── Abrir PDF en modal iframe ── */
+/* ── Abrir PDF en modal con <embed> (evita restricción chrome-extension en frame-src) ── */
 function _pdfAbrir(url, label) {
   const abs = (url.startsWith('http://') || url.startsWith('https://'))
     ? url : new URL(url, window.location.href).href;
@@ -1615,8 +1615,9 @@ function _pdfAbrir(url, label) {
     '<button id="_pdf_close_btn" style="background:none;border:none;color:rgba(255,255,255,.7);' +
     'cursor:pointer;font-size:26px;line-height:1;padding:0 4px" title="Cerrar">×</button>' +
     '</div>' +
-    '<iframe src="' + abs + '#toolbar=1" style="flex:1;border:none;background:#525659" ' +
-    'allow="fullscreen" loading="lazy"></iframe>';
+    '<div style="flex:1;min-height:0;position:relative;overflow:hidden;background:#525659">' +
+    '<embed src="' + abs + '" type="application/pdf" ' +
+    'style="position:absolute;inset:0;width:100%;height:100%;border:none;display:block"></div>';
 
   const closeModal = () => {
     overlay.remove();
