@@ -1061,7 +1061,10 @@ body { background:#fff!important; }
                 $tbodyHtml .= "<td class=\"pc-td-desc\"><span class=\"pc-test-badge\">{$badge} " . $e($tipoFila) . "</span></td>\n";
                 $rowRadio = (float)($datos['radio'] ?? 0);
                 $rowPluma = (float)($datos['pluma'] ?? 0);
+                // tipo_plataforma es metadata para el diagrama SVG, no una columna de medición
+                $camposExcluir = ['tipo_plataforma'];
                 foreach ($datos as $campo => $valor) {
+                    if (in_array($campo, $camposExcluir, true)) continue;
                     if ($campo === 'angulo' && $rowRadio > 0 && $rowPluma >= $rowRadio) {
                         $valor = number_format(rad2deg(acos($rowRadio / $rowPluma)), 1);
                     } elseif ($campo === 'altura' && $rowPluma > 0) {
