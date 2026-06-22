@@ -4147,8 +4147,11 @@ function _ensurePdfJs() {
 
 async function _pdfAbrir(url, label) {
   if (!url) { mostrarToast('URL del PDF no disponible', 'err'); return; }
-  const abs = (url.startsWith('http://') || url.startsWith('https://'))
+  let abs = (url.startsWith('http://') || url.startsWith('https://'))
     ? url : new URL(url, window.location.href).href;
+  // Mixed content: si la página es HTTPS y la URL del recurso es HTTP, forzar HTTPS
+  if (window.location.protocol === 'https:' && abs.startsWith('http://'))
+    abs = 'https://' + abs.slice(7);
   console.log('[PDF] URL:', abs);
   document.getElementById('_pdf_modal_overlay')?.remove();
 

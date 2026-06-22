@@ -254,11 +254,31 @@ function pdfCell($pdf, float $x, float $y, float $ancho, int $tamano, string $te
 }
 
 /**
+ * Convierte URLs http:// a protocol-relative // para evitar mixed-content
+ * cuando el frontend se sirve sobre HTTPS pero UPLOAD_URL usa HTTP.
+ */
+function normalizarUrlsRespuesta(array $data): array {
+    foreach ($data as $k => $v) {
+        if (is_string($v) && str_starts_with($v, 'http://')) {
+            $key = (string)$k;
+            if ($key === 'url' || str_ends_with($key, '_url') || str_ends_with($key, 'Url')
+                || str_ends_with($key, '_pdf') || str_ends_with($key, '_imagen')
+                || str_ends_with($key, '_img') || str_ends_with($key, 'Path')) {
+                $data[$k] = '//' . substr($v, 7);
+            }
+        } elseif (is_array($v)) {
+            $data[$k] = normalizarUrlsRespuesta($v);
+        }
+    }
+    return $data;
+}
+
+/**
  * Devuelve una respuesta JSON y termina la ejecución.
  */
 function respuesta(array $data, int $httpCode = 200): void {
     http_response_code($httpCode);
-    echo json_encode(fixEncoding($data), JSON_UNESCAPED_UNICODE);
+    echo json_encode(fixEncoding(normalizarUrlsRespuesta($data)), JSON_UNESCAPED_UNICODE);
     exit;
 }
 
