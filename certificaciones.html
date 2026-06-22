@@ -1589,32 +1589,10 @@ async function eliminarParticipanteCert(id, nombre) {
    ACCIONES — LÓGICA
 ═══════════════════════════════ */
 
-/* ── Abrir PDF en modal iframe usando blob URL (evita bloqueo de CSP del servidor) ── */
-async function _pdfAbrir(url, label) {
+/* ── Abrir PDF en modal iframe ── */
+function _pdfAbrir(url, label) {
   const abs = (url.startsWith('http://') || url.startsWith('https://'))
     ? url : new URL(url, window.location.href).href;
-  document.getElementById('_pdf_modal_overlay')?.remove();
-
-  const spinner = document.createElement('div');
-  spinner.id = '_pdf_modal_overlay';
-  spinner.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;' +
-    'justify-content:center;flex-direction:column;gap:14px;background:rgba(10,20,40,.82)';
-  spinner.innerHTML = '<div style="width:38px;height:38px;border:3px solid rgba(255,255,255,.15);' +
-    'border-top-color:#90c8ff;border-radius:50%;animation:_pdfSpin .7s linear infinite"></div>' +
-    '<span style="color:#90c8ff;font-size:13px">Cargando PDF...</span>' +
-    '<style>@keyframes _pdfSpin{to{transform:rotate(360deg)}}</style>';
-  document.body.appendChild(spinner);
-
-  let blobUrl;
-  try {
-    const res = await fetch(abs);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    blobUrl = URL.createObjectURL(await res.blob());
-  } catch(e) {
-    document.getElementById('_pdf_modal_overlay')?.remove();
-    mostrarToast('No se pudo cargar el PDF: ' + e.message, 'err');
-    return;
-  }
   document.getElementById('_pdf_modal_overlay')?.remove();
 
   const esc   = label ? label.replace(/</g,'&lt;').replace(/>/g,'&gt;') : 'PDF';
@@ -1631,28 +1609,22 @@ async function _pdfAbrir(url, label) {
     '<path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112.707 3.293l3.414 3.414A2 2 ' +
     '0 0117 8.172V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/></svg>' +
     '<span style="color:#fff;font-weight:600;flex:1;font-size:14px">' + esc + '</span>' +
-    '<button id="_pdf_dl_btn" style="color:#90c8ff;font-size:13px;cursor:pointer;background:none;' +
-    'padding:4px 10px;border:1px solid rgba(144,200,255,.4);border-radius:5px">↓ Descargar</button>' +
+    '<a href="' + abs + '" download="' + fname + '" style="color:#90c8ff;font-size:13px;' +
+    'text-decoration:none;padding:4px 10px;border:1px solid rgba(144,200,255,.4);' +
+    'border-radius:5px">↓ Descargar</a>' +
     '<button id="_pdf_close_btn" style="background:none;border:none;color:rgba(255,255,255,.7);' +
     'cursor:pointer;font-size:26px;line-height:1;padding:0 4px" title="Cerrar">×</button>' +
     '</div>' +
-    '<iframe src="' + blobUrl + '#toolbar=1" style="flex:1;border:none;background:#525659" ' +
+    '<iframe src="' + abs + '#toolbar=1" style="flex:1;border:none;background:#525659" ' +
     'allow="fullscreen" loading="lazy"></iframe>';
 
   const closeModal = () => {
     overlay.remove();
-    URL.revokeObjectURL(blobUrl);
     document.removeEventListener('keydown', onKey);
   };
   overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
   document.body.appendChild(overlay);
-
   document.getElementById('_pdf_close_btn').addEventListener('click', closeModal);
-  document.getElementById('_pdf_dl_btn').addEventListener('click', () => {
-    const a = document.createElement('a');
-    a.href = blobUrl; a.download = fname;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  });
 
   const onKey = e => { if (e.key === 'Escape') closeModal(); };
   document.addEventListener('keydown', onKey);

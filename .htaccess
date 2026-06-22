@@ -22,7 +22,12 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
     # Política de permisos: deshabilitar acceso a cámara/micrófono desde el servidor
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
     # Content Security Policy básica
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https://quickchart.io https://*.openstreetmap.org https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com; connect-src 'self'; frame-src 'self'; object-src 'none'"
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https://quickchart.io https://*.openstreetmap.org https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com; connect-src 'self'; frame-src 'self' blob:; object-src 'self'"
+    # Los PDFs no necesitan CSP (no son documentos ejecutables) y Chrome bloquea su visor
+    # interno si object-src 'none' está presente en la respuesta del PDF
+    <FilesMatch "\.pdf$">
+        Header always unset Content-Security-Policy
+    </FilesMatch>
     # Eliminar header de versión del servidor
     Header unset X-Powered-By
     Header always unset X-Powered-By
