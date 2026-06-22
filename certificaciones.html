@@ -1607,12 +1607,15 @@ function _ensurePdfJs() {
 }
 
 async function _pdfAbrir(url, label) {
+  if (!url) { mostrarToast('URL del PDF no disponible', 'err'); return; }
   const abs = (url.startsWith('http://') || url.startsWith('https://'))
     ? url : new URL(url, window.location.href).href;
+  console.log('[PDF] URL:', abs);
   document.getElementById('_pdf_modal_overlay')?.remove();
 
   const esc   = label ? label.replace(/</g,'&lt;').replace(/>/g,'&gt;') : 'PDF';
   const fname = abs.split('/').pop().split('?')[0] || 'documento.pdf';
+  const absEsc = abs.replace(/"/g, '%22');
 
   const overlay = document.createElement('div');
   overlay.id = '_pdf_modal_overlay';
@@ -1626,9 +1629,9 @@ async function _pdfAbrir(url, label) {
     '0 0117 8.172V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4z"/></svg>' +
     '<span style="color:#fff;font-weight:600;flex:1;font-size:14px;overflow:hidden;' +
     'text-overflow:ellipsis;white-space:nowrap">' + esc + '</span>' +
-    '<a href="' + abs + '" download="' + fname + '" style="color:#90c8ff;font-size:13px;' +
+    '<a href="' + absEsc + '" target="_blank" rel="noopener" style="color:#90c8ff;font-size:13px;' +
     'text-decoration:none;padding:4px 10px;border:1px solid rgba(144,200,255,.4);' +
-    'border-radius:5px;flex-shrink:0;white-space:nowrap">↓ Descargar</a>' +
+    'border-radius:5px;flex-shrink:0;white-space:nowrap">↓ Abrir PDF</a>' +
     '<button id="_pdf_close_btn" style="background:none;border:none;color:rgba(255,255,255,.7);' +
     'cursor:pointer;font-size:26px;line-height:1;padding:0 4px;flex-shrink:0" title="Cerrar">×</button>' +
     '</div>' +
@@ -1653,10 +1656,31 @@ async function _pdfAbrir(url, label) {
   document.addEventListener('keydown', onKey);
 
   const pagesDiv = document.getElementById('_pdf_pages');
+  const _showErr = (msg) => {
+    if (!document.getElementById('_pdf_modal_overlay') || !pagesDiv) return;
+    pagesDiv.innerHTML =
+      '<div style="color:#ffaaaa;font-size:13px;padding:32px 16px;text-align:center;word-break:break-all">' +
+      msg + '<br><br>' +
+      '<div style="font-size:11px;color:#888;margin-bottom:16px">URL: ' + absEsc + '</div>' +
+      '<a href="' + absEsc + '" target="_blank" rel="noopener" ' +
+      'style="color:#90c8ff;text-decoration:underline;font-size:14px">↗ Abrir PDF en nueva pestaña</a></div>';
+  };
+
   try {
+    // Fetch first — error message incluye la URL para diagnóstico
+    let pdfBuffer;
+    try {
+      const resp = await fetch(abs, { credentials: 'same-origin' });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
+      pdfBuffer = await resp.arrayBuffer();
+    } catch(fetchErr) {
+      throw new Error('No se pudo descargar el PDF: ' + fetchErr.message);
+    }
+
     await _ensurePdfJs();
     if (!document.getElementById('_pdf_modal_overlay')) return;
-    const pdf = await pdfjsLib.getDocument(abs).promise;
+
+    const pdf = await pdfjsLib.getDocument({ data: pdfBuffer }).promise;
     if (!document.getElementById('_pdf_modal_overlay')) return;
     pagesDiv.innerHTML = '';
     const availW = pagesDiv.clientWidth - 24;
@@ -1674,14 +1698,7 @@ async function _pdfAbrir(url, label) {
       await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
     }
   } catch(err) {
-    if (document.getElementById('_pdf_modal_overlay') && pagesDiv) {
-      pagesDiv.innerHTML =
-        '<div style="color:#ffaaaa;font-size:14px;padding:40px 16px;text-align:center">' +
-        'No se pudo mostrar el PDF.<br>' +
-        '<small style="color:#aaa;word-break:break-all">' + ((err && err.message) || '') + '</small><br><br>' +
-        '<a href="' + abs + '" download="' + fname + '" ' +
-        'style="color:#90c8ff;text-decoration:underline;font-size:15px">↓ Descargar PDF</a></div>';
-    }
+    _showErr((err && err.message) || 'Error desconocido');
   }
 }
 
