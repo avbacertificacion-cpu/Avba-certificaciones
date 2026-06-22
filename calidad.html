@@ -4128,24 +4128,32 @@ function cerrarDetPer() {
   document.getElementById('overlay-per-det').style.display = 'none';
 }
 
-/* ── Helpers para evitar bloqueo de popups en modo incógnito ── */
-function _pdfWinAbrir() { return window.open('', '_blank') || null; }
-function _pdfWinNavegar(win, url) {
-  const absUrl = (url.startsWith('http://') || url.startsWith('https://'))
+/* ── Abrir PDF: notificación flotante con link directo ── */
+function _pdfAbrir(url, label) {
+  const abs = (url.startsWith('http://') || url.startsWith('https://'))
     ? url : new URL(url, window.location.href).href;
-  if (win && !win.closed) {
-    try {
-      win.document.open();
-      win.document.write('<!doctype html><html><head><script>location.replace(' + JSON.stringify(absUrl) + ');<\/script></head><body></body></html>');
-      win.document.close();
-    } catch(e) { win.location.href = absUrl; }
-  } else {
-    window.open(absUrl, '_blank');
-  }
+  document.getElementById('_pdf_notif')?.remove();
+  const n = document.createElement('div');
+  n.id = '_pdf_notif';
+  n.style.cssText = 'position:fixed;bottom:76px;right:20px;z-index:9999;background:#0f2d52;' +
+    'color:#fff;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,.45);display:flex;' +
+    'align-items:center;gap:12px;padding:13px 17px;font-size:13.5px;max-width:360px;' +
+    'border:1px solid rgba(255,255,255,.1)';
+  n.innerHTML =
+    '<svg viewBox="0 0 20 20" fill="#4ade80" width="18" height="18" style="flex-shrink:0">' +
+    '<path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 ' +
+    '0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/></svg>' +
+    '<span>' + (label ? '<strong>' + label + '</strong> listo' : 'PDF listo') + '</span>' +
+    '<a href="' + abs + '" target="_blank" rel="noopener" style="display:inline-block;' +
+    'background:#1a6dc7;color:#fff;text-decoration:none;padding:6px 14px;border-radius:7px;' +
+    'font-weight:700;font-size:13px;white-space:nowrap">Abrir PDF →</a>' +
+    '<button onclick="document.getElementById(\'_pdf_notif\')?.remove()" style="background:none;' +
+    'border:none;color:rgba(255,255,255,.5);cursor:pointer;font-size:20px;padding:0;line-height:1">×</button>';
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 45000);
 }
 
 async function generarCredencial(id) {
-  const _pw = _pdfWinAbrir();
   const btn = document.getElementById('btn-gen-cred-' + id);
   if (btn) { btn.disabled = true; btn.textContent = 'Generando...'; }
   try {
@@ -4156,14 +4164,12 @@ async function generarCredencial(id) {
     });
     const data = await res.json();
     if (data.status === 'success' && data.url) {
-      _pdfWinNavegar(_pw, data.url);
-      abrirDetPer(id);  // refrescar para mostrar el enlace "Ver última credencial"
+      _pdfAbrir(data.url, 'Credencial');
+      abrirDetPer(id);
     } else {
-      if (_pw) _pw.close();
       alert('Error: ' + (data.message || 'No se pudo generar la credencial.'));
     }
   } catch (e) {
-    if (_pw) _pw.close();
     alert('Error de conexión: ' + e.message);
   } finally {
     if (btn) { btn.disabled = false; btn.innerHTML = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:13px;height:13px"><rect x="1" y="3" width="14" height="10" rx="1.5"/><circle cx="5" cy="8" r="2"/><path d="M9 6h4M9 8h3M9 10h4"/></svg> Generar credencial PDF'; }
@@ -4988,7 +4994,6 @@ async function previsualizarPdf() {
     alert("Agrega al menos un campo antes de previsualizar.");
     return;
   }
-  const _pw = _pdfWinAbrir();
   const btn = document.getElementById("btn-preview-pdf");
   btn.disabled = true;
   btn.textContent = "Generando…";
@@ -5008,13 +5013,11 @@ async function previsualizarPdf() {
     });
     const data = await res.json();
     if (data.status === "success" && data.url) {
-      _pdfWinNavegar(_pw, data.url + "?t=" + Date.now());
+      _pdfAbrir(data.url + "?t=" + Date.now(), "Vista previa");
     } else {
-      if (_pw) _pw.close();
       alert("Error: " + (data.message || "No se pudo generar la vista previa."));
     }
   } catch (e) {
-    if (_pw) _pw.close();
     alert("Error de conexión al generar vista previa.");
   } finally {
     btn.disabled = false;
@@ -5757,7 +5760,6 @@ async function previsualizarPdfPersonal() {
     alert("Agrega al menos un campo antes de previsualizar.");
     return;
   }
-  const _pw = _pdfWinAbrir();
   const btn = document.getElementById("btn-preview-pdf-per");
   btn.disabled = true;
   btn.textContent = "Generando…";
@@ -5773,13 +5775,11 @@ async function previsualizarPdfPersonal() {
     });
     const data = await res.json();
     if (data.status === "success" && data.url) {
-      _pdfWinNavegar(_pw, data.url + "?t=" + Date.now());
+      _pdfAbrir(data.url + "?t=" + Date.now(), "Vista previa");
     } else {
-      if (_pw) _pw.close();
       alert("Error: " + (data.message || "No se pudo generar la vista previa."));
     }
   } catch (e) {
-    if (_pw) _pw.close();
     alert("Error de conexión al generar vista previa.");
   } finally {
     btn.disabled = false;
@@ -6186,7 +6186,6 @@ async function guardarPND() {
 }
 
 async function generarReportePND() {
-  const _pw = _pdfWinAbrir();
   const btn = document.getElementById("pnd-btn-reporte");
   btn.disabled = true;
   btn.textContent = "Generando…";
@@ -6201,14 +6200,11 @@ async function generarReportePND() {
       const d = datosGlobalPND.find(x => x.id === pndFilaActual);
       if (d) d.reporte_url = data.url;
       mostrarToast("Reporte generado correctamente", "ok");
-      if (data.url) _pdfWinNavegar(_pw, data.url + "?t=" + Date.now());
-      else if (_pw) _pw.close();
+      if (data.url) _pdfAbrir(data.url + "?t=" + Date.now(), "Reporte PND");
     } else {
-      if (_pw) _pw.close();
       mostrarToast("Error: " + (data.message || "No se pudo generar el reporte"), "err");
     }
   } catch (e) {
-    if (_pw) _pw.close();
     mostrarToast("Error de conexión.", "err");
     console.error("generarReportePND:", e);
   } finally {
