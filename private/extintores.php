@@ -225,6 +225,7 @@ let tipos      = [];
 // ── Cargar datos iniciales ───────────────────────────────────────────────────
 async function init() {
     await Promise.all([cargarEmpresas(), cargarTipos(), cargarExtintores()]);
+    restaurarFiltros();
 }
 
 async function cargarTipos() {
@@ -314,10 +315,29 @@ function estadoLabel(s) {
 }
 
 // ── Filtrar ───────────────────────────────────────────────────────────────────
+function guardarFiltros() {
+    sessionStorage.setItem('extintores_filtros', JSON.stringify({
+        busqueda: document.getElementById('busqueda').value,
+        estado: document.getElementById('filtroEstado').value,
+        empresa: document.getElementById('filtroEmpresa')?.value || ''
+    }));
+}
+
+function restaurarFiltros() {
+    const filtros = JSON.parse(sessionStorage.getItem('extintores_filtros') || '{}');
+    if (filtros.busqueda !== undefined) document.getElementById('busqueda').value = filtros.busqueda;
+    if (filtros.estado !== undefined) document.getElementById('filtroEstado').value = filtros.estado;
+    if (filtros.empresa !== undefined && document.getElementById('filtroEmpresa')) {
+        document.getElementById('filtroEmpresa').value = filtros.empresa;
+    }
+    filtrar();
+}
+
 function filtrar() {
     const q = document.getElementById('busqueda').value.toLowerCase();
     const e = document.getElementById('filtroEstado').value;
     const empr = document.getElementById('filtroEmpresa')?.value || '';
+    guardarFiltros();
     renderTabla(extintores.filter(x =>
         (!q || x.codigo_manual.toLowerCase().includes(q) || x.ubicacion.toLowerCase().includes(q)) &&
         (!e || x.estado === e) &&
