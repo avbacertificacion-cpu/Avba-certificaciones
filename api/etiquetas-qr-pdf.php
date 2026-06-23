@@ -98,13 +98,13 @@ if (file_exists($plantillaPath)) {
             object-fit: fill;
         }
 
-        /* ─── QR code overlay ─── */
+        /* ─── QR code overlay: dentro de la caja con borde verde ─── */
         .qr-area {
             position: absolute;
-            top: 29%;
-            right: 3%;
+            top: 45%;
+            left: 57%;
             width: 35%;
-            height: 29%;
+            height: 33%;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -112,23 +112,23 @@ if (file_exists($plantillaPath)) {
 
         .qr-area canvas,
         .qr-area img {
-            width: 100% !important;
-            height: 100% !important;
+            width: 1.8cm !important;
+            height: 1.8cm !important;
         }
 
-        /* ─── Código numérico ─── */
+        /* ─── Código numérico: espacio blanco bajo la franja verde ─── */
         .codigo-area {
             position: absolute;
-            bottom: 9%;
+            bottom: 11%;
             left: 0; right: 0;
             text-align: center;
         }
 
         .codigo-texto {
             font-family: 'Courier New', monospace;
-            font-size: 10pt;
+            font-size: 11pt;
             font-weight: bold;
-            color: #fff;
+            color: #0b2545;
             letter-spacing: 1px;
         }
 
