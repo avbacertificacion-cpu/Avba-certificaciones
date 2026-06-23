@@ -225,7 +225,6 @@ let tipos      = [];
 // ── Cargar datos iniciales ───────────────────────────────────────────────────
 async function init() {
     await Promise.all([cargarEmpresas(), cargarTipos(), cargarExtintores()]);
-    restaurarFiltros();
 }
 
 async function cargarTipos() {
@@ -265,6 +264,7 @@ async function cargarExtintores() {
     if (d.success) {
         extintores = d.data;
         renderTabla(extintores);
+        restaurarFiltros();
     }
 }
 
