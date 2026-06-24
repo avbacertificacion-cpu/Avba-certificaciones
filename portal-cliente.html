@@ -342,6 +342,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 
 /* ══ Print ═══════════════════════════════════════════════════ */
 @media print{.header,.tabs,.stats,.eq-filters,.btn-prim,.btn-sec,.btn-del,.eq-bc-btn,.eq-upcoming-card,.fhs-card,.eq-stacked-card,.eq-charts-3,.toast-eq{display:none!important}.wrap{padding:0;max-width:100%;margin:0}.eq-cn{break-inside:avoid;margin-bottom:12px}}
+body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abrirModalPers(null)"]{display:none!important}
 /* ══ Tab notification badge ══════════════════════════════════ */
 .tab-btn{position:relative;}
 .tab-notif{position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none;}
@@ -1007,7 +1008,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
     </div>
     <input type="hidden" id="sub-id">
     <div class="frow"><label class="flabel">Nombre / Referencia *</label><input class="finput" id="sub-nombre" placeholder="Ej: Juan Pérez · Almacén"></div>
-    <div class="frow"><label class="flabel">Usuario (correo) *</label><input class="finput" id="sub-usuario" placeholder="usuario@empresa.com" autocomplete="off"></div>
+    <div class="frow"><label class="flabel">Usuario *</label><input class="finput" id="sub-usuario" placeholder="Ej: empleado01, juan.perez o correo@empresa.com" autocomplete="off"></div>
     <div class="frow"><label class="flabel" id="sub-pass-lbl">Contraseña *</label><input class="finput" id="sub-password" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
     <div class="frow"><label class="flabel">Permiso</label>
       <select class="finput" id="sub-permiso">
@@ -1099,7 +1100,8 @@ if (!_sesion.token || (_sesion.ts && (Date.now() - _sesion.ts) > 28800000)) { lo
 if (!['CLIENTE', 'ADMIN'].includes(_sesion.rol)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
 
 // ── Visibilidad de pestañas según tipo de cuenta ──────────────────────────
-const _esSub = !!_sesion.es_subusuario;
+const _esSub       = !!_sesion.es_subusuario;
+const _puedeEditar = !_esSub || _sesion.permiso_sub !== 'lectura';
 function _configurarTabsPorRol() {
   if (_esSub) {
     // Sub-usuario: solo ve los módulos asignables (Maquinaria, Mis Equipos, Mi Personal)
@@ -1750,8 +1752,8 @@ function renderListaEq(equipos) {
       </div>
       <div style="display:flex;gap:6px;padding:10px 14px 14px">
         <button class="btn-prim" style="flex:1;font-size:12px;padding:8px 10px" onclick="verDetalleEq(${eq.id})">Ver detalle →</button>
-        <button class="btn-sec" style="font-size:12px;padding:8px 10px" onclick="abrirModalEq(${JSON.stringify(eq).replace(/"/g,'&quot;')})">✏</button>
-        <button class="btn-del" onclick="eliminarEquipo(${eq.id},'${escQ(eq.nombre)}')">🗑</button>
+        ${_puedeEditar ? `<button class="btn-sec" style="font-size:12px;padding:8px 10px" onclick="abrirModalEq(${JSON.stringify(eq).replace(/"/g,'&quot;')})">✏</button>
+        <button class="btn-del" onclick="eliminarEquipo(${eq.id},'${escQ(eq.nombre)}')">🗑</button>` : ''}
       </div>
     </div>`;
   });
@@ -1824,7 +1826,7 @@ function renderSubDocs(docs, equipoId) {
   const cont = document.getElementById('eq-sub-docs');
   let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <div style="font-size:13px;font-weight:700;color:var(--texto)">Documentos <span style="color:var(--texto-hint)">(${docs.length})</span></div>
-    <button class="btn-prim" onclick="abrirModalDoc(${equipoId})">+ Subir</button>
+    ${_puedeEditar ? `<button class="btn-prim" onclick="abrirModalDoc(${equipoId})">+ Subir</button>` : ''}
   </div>`;
   if (!docs.length) {
     html += '<div class="empty"><div class="empty-t">Sin documentos</div><div class="empty-s">Sube bitácoras, seguros, tablas de carga y más.</div></div>';
@@ -1848,7 +1850,7 @@ function renderSubDocs(docs, equipoId) {
           ${vigHtml}
           <div class="doc-acts">
             ${d.archivo_url ? `<a href="${d.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver</a>` : ''}
-            <button class="btn-del" onclick="eliminarDoc(${d.id})" style="padding:3px 8px;font-size:10px">🗑</button>
+            ${_puedeEditar ? `<button class="btn-del" onclick="eliminarDoc(${d.id})" style="padding:3px 8px;font-size:10px">🗑</button>` : ''}
           </div>
         </div>
       </div>`;
@@ -1864,7 +1866,7 @@ function renderSubHoras(horas, equipoId) {
   const maxH = horas.length ? Math.max(...horas.map(h => h.horas)) : 0;
   let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <div style="font-size:13px;font-weight:700;color:var(--texto)">Horómetro</div>
-    <button class="btn-prim" onclick="abrirModalHora(${equipoId})">+ Registrar</button>
+    ${_puedeEditar ? `<button class="btn-prim" onclick="abrirModalHora(${equipoId})">+ Registrar</button>` : ''}
   </div>`;
   if (!horas.length) {
     html += '<div class="empty"><div class="empty-t">Sin registros</div><div class="empty-s">Registra las horas de trabajo del equipo.</div></div>';
@@ -1886,7 +1888,7 @@ function renderSubHoras(horas, equipoId) {
           <div class="horo-hrs">${h.horas.toLocaleString('es-MX')} hrs</div>
           <div class="horo-meta">${h.fecha}${h.notas ? ' — ' + escQ(h.notas) : ''}</div>
         </div>
-        <button class="btn-del" onclick="eliminarHora(${h.id})" style="padding:4px 8px;font-size:11px">🗑</button>
+        ${_puedeEditar ? `<button class="btn-del" onclick="eliminarHora(${h.id})" style="padding:4px 8px;font-size:11px">🗑</button>` : ''}
       </div>`;
     });
   }
@@ -1898,7 +1900,7 @@ function renderSubCerts(certs, equipoId) {
   const cont = document.getElementById('eq-sub-certs');
   let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <div style="font-size:13px;font-weight:700;color:var(--texto)">Certificaciones <span style="color:var(--texto-hint)">(${certs.length})</span></div>
-    <button class="btn-prim" onclick="abrirModalCert(${equipoId}, null)">+ Agregar</button>
+    ${_puedeEditar ? `<button class="btn-prim" onclick="abrirModalCert(${equipoId}, null)">+ Agregar</button>` : ''}
   </div>`;
   if (!certs.length) {
     html += '<div class="empty"><div class="empty-t">Sin certificaciones</div><div class="empty-s">Registra las certificaciones vigentes del equipo.</div></div>';
@@ -1930,8 +1932,8 @@ function renderSubCerts(certs, equipoId) {
         ${c.notas ? `<div style="font-size:11px;color:var(--texto-sub);margin-top:8px;font-style:italic">${escQ(c.notas)}</div>` : ''}
         <div class="cert-acts">
           ${c.archivo_url ? `<a href="${c.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Certificado</a>` : ''}
-          <button class="btn-sec" style="font-size:10px" onclick="abrirModalCert(${equipoId}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">✏ Editar</button>
-          <button class="btn-del" onclick="eliminarCert(${c.id})" style="font-size:10px">🗑</button>
+          ${_puedeEditar ? `<button class="btn-sec" style="font-size:10px" onclick="abrirModalCert(${equipoId}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">✏ Editar</button>
+          <button class="btn-del" onclick="eliminarCert(${c.id})" style="font-size:10px">🗑</button>` : ''}
         </div>
       </div>`;
     });
@@ -2404,8 +2406,8 @@ function renderListaPer(personas) {
       </div>
       <div style="display:flex;gap:6px;padding:10px 14px 14px">
         <button class="btn-prim" style="flex:1;font-size:12px;padding:8px 10px" onclick="verDetallePerso(${p.id})">Ver detalle →</button>
-        <button class="btn-sec" style="font-size:12px;padding:8px 10px" onclick="abrirModalPers(${JSON.stringify(p).replace(/"/g,'&quot;')})">✏</button>
-        <button class="btn-del" onclick="eliminarPers(${p.id},'${escQ(p.nombre)}')">🗑</button>
+        ${_puedeEditar ? `<button class="btn-sec" style="font-size:12px;padding:8px 10px" onclick="abrirModalPers(${JSON.stringify(p).replace(/"/g,'&quot;')})">✏</button>
+        <button class="btn-del" onclick="eliminarPers(${p.id},'${escQ(p.nombre)}')">🗑</button>` : ''}
       </div>
     </div>`;
   });
@@ -2471,7 +2473,7 @@ function renderSubCertsPer(certs, perId) {
   const cont = document.getElementById('per-sub-certs');
   let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <div style="font-size:13px;font-weight:700;color:var(--texto)">Certificaciones <span style="color:var(--texto-hint)">(${certs.length})</span></div>
-    <button class="btn-prim" onclick="abrirModalCertPers(${perId}, null)">+ Agregar</button>
+    ${_puedeEditar ? `<button class="btn-prim" onclick="abrirModalCertPers(${perId}, null)">+ Agregar</button>` : ''}
   </div>`;
   if (!certs.length) {
     html += '<div class="empty"><div class="empty-t">Sin certificaciones</div><div class="empty-s">Registra cursos, habilitaciones y certificaciones del empleado.</div></div>';
@@ -2500,8 +2502,8 @@ function renderSubCertsPer(certs, perId) {
         ${c.notas ? `<div style="font-size:11px;color:var(--texto-sub);margin-top:8px;font-style:italic">${escQ(c.notas)}</div>` : ''}
         <div class="cert-acts">
           ${c.archivo_url ? `<a href="${c.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver</a>` : ''}
-          <button class="btn-sec" style="font-size:10px" onclick="abrirModalCertPers(${perId}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">✏ Editar</button>
-          <button class="btn-del" onclick="eliminarCertPers(${c.id})" style="font-size:10px">🗑</button>
+          ${_puedeEditar ? `<button class="btn-sec" style="font-size:10px" onclick="abrirModalCertPers(${perId}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">✏ Editar</button>
+          <button class="btn-del" onclick="eliminarCertPers(${c.id})" style="font-size:10px">🗑</button>` : ''}
         </div>
       </div>`;
     });
@@ -2549,7 +2551,7 @@ function _renderDocsPer(docs, perId, cont) {
         <option value="vencido"${filterVig==='vencido'?' selected':''}>Vencido</option>
         <option value="sin_fecha"${filterVig==='sin_fecha'?' selected':''}>Sin fecha</option>
       </select>
-      <button class="btn-prim" onclick="abrirModalDocPers(${perId})">+ Subir</button>
+      ${_puedeEditar ? `<button class="btn-prim" onclick="abrirModalDocPers(${perId})">+ Subir</button>` : ''}
     </div>
   </div>`;
   if (!filtered.length) {
@@ -2574,8 +2576,8 @@ function _renderDocsPer(docs, perId, cont) {
           ${vigHtml}
           <div class="doc-acts">
             ${d.archivo_url ? `<a href="${d.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver</a>` : ''}
-            <button class="btn-sm" style="font-size:10px;border-color:var(--azul);color:var(--azul);background:var(--azul-light)" onclick="abrirModalEditDocPers(${JSON.stringify(d).replace(/"/g,'&quot;')})">✏ Editar</button>
-            <button class="btn-del" onclick="eliminarDocPers(${d.id})" style="padding:3px 8px;font-size:10px">🗑</button>
+            ${_puedeEditar ? `<button class="btn-sm" style="font-size:10px;border-color:var(--azul);color:var(--azul);background:var(--azul-light)" onclick="abrirModalEditDocPers(${JSON.stringify(d).replace(/"/g,'&quot;')})">✏ Editar</button>
+            <button class="btn-del" onclick="eliminarDocPers(${d.id})" style="padding:3px 8px;font-size:10px">🗑</button>` : ''}
           </div>
         </div>
       </div>`;

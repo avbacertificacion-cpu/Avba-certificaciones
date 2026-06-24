@@ -112,8 +112,8 @@ class ClienteSubusuarios {
         if (strlen($password) < 6) {
             return ['status' => 'error', 'message' => 'La contraseña debe tener al menos 6 caracteres.'];
         }
-        if (!filter_var($usuario, FILTER_VALIDATE_EMAIL) && !preg_match('/^[a-z0-9._-]{3,}$/', $usuario)) {
-            return ['status' => 'error', 'message' => 'Usuario inválido (usa un correo o un identificador simple).'];
+        if (!filter_var($usuario, FILTER_VALIDATE_EMAIL) && !preg_match('/^[a-z0-9._@\-]{3,60}$/', $usuario)) {
+            return ['status' => 'error', 'message' => 'El usuario debe tener al menos 3 caracteres (letras, números, puntos, guiones o @).'];
         }
 
         $dup = $this->pdo->prepare("SELECT id FROM usuarios WHERE usuario = ?");
