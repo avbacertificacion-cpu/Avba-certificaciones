@@ -2695,9 +2695,9 @@ const PC_TEMPLATES = {
   },
   'dictamen_ptem.html': {
     label: 'PTEM',
+    platformSelect: true,
     rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
     cols: [
-      { id:'tipo_plataforma', label:'Tipo de Plataforma', type:'select', options:['Tijera / Scissor','Articulado / Boom'] },
       { id:'peso',      label:'Peso de Prueba',    unit:'kg' },
       { id:'radio',     label:'Radio de Trabajo',  unit:'m'  },
       { id:'altura',    label:'Altura de Trabajo', unit:'m'  },
@@ -2717,12 +2717,12 @@ const PC_TEMPLATES = {
   },
   'dictamen_mewp.html': {
     label: 'Plataforma de Elevación Móvil (MEWP)',
+    platformSelect: true,
     rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
     cols: [
-      { id:'tipo_plataforma', label:'Tipo de Plataforma', type:'select', options:['Tijera / Scissor','Articulado / Boom'] },
-      { id:'peso',      label:'Peso de Prueba',      unit:'kg' },
-      { id:'radio',     label:'Radio de Operación',  unit:'m'  },
-      { id:'altura',    label:'Altura de Trabajo',   unit:'m'  },
+      { id:'peso',      label:'Peso de Prueba',     unit:'kg' },
+      { id:'radio',     label:'Radio de Trabajo',   unit:'m'  },
+      { id:'altura',    label:'Altura de Trabajo',  unit:'m'  },
       { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
     ]
   }
@@ -3551,6 +3551,18 @@ function renderPruebaCarga() {
   }
 
   let html = `<div style="font-size:12px;color:var(--texto-sub);margin-bottom:12px">Plantilla: <strong>${tpl.label}</strong></div>`;
+  if (tpl.platformSelect) {
+    const tp = (pruebaCargaData && pruebaCargaData.tipo_plataforma) || '';
+    html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+      <label style="font-size:12px;font-weight:600;color:var(--texto-sub)">Tipo de Plataforma</label>
+      <select id="pc-tipo-plataforma" onchange="pcGuardar()" style="padding:7px 10px;border:1.5px solid var(--borde);border-radius:6px;font-size:13px;background:#fff;min-width:200px">
+        <option value="">— Selecciona —</option>
+        <option value="Tijera / Scissor"${tp==='Tijera / Scissor'?' selected':''}>Tijera / Scissor</option>
+        <option value="Articulado / Boom"${tp==='Articulado / Boom'?' selected':''}>Articulado / Boom</option>
+      </select>
+      <span style="font-size:11px;color:var(--texto-hint)">define el diagrama de la prueba de carga</span>
+    </div>`;
+  }
   html += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">`;
   html += `<thead><tr>`;
   html += `<th style="padding:7px 10px;background:var(--azul-dark);color:#fff;text-align:left;border-right:1px solid rgba(255,255,255,.15);font-size:11px">Prueba</th>`;
@@ -3622,6 +3634,10 @@ function pcGuardar() {
   if (!tpl) { pruebaCargaData = {}; return; }
 
   const result = { plantilla: dictHtml };
+  if (tpl.platformSelect) {
+    const tpEl = document.getElementById('pc-tipo-plataforma');
+    if (tpEl) result.tipo_plataforma = tpEl.value;
+  }
   tpl.rows.forEach(row => {
     // Leer radio y pluma para calcular campos derivados
     const radio = parseFloat(document.getElementById(`pc_${row.key}_radio`)?.value || 0) || 0;

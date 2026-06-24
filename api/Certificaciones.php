@@ -1017,6 +1017,45 @@ body { background:#fff!important; }
     }
 
     /**
+     * Extrae las columnas de datos del <thead class="pc-thead-row"> de la plantilla
+     * y las traduce al id de campo del JSON (peso, radio, altura, resultado, …).
+     * Se omite la primera columna ("Prueba"). Devuelve [] si no encuentra la tabla.
+     */
+    private function columnasPcTabla(string $html): array {
+        if (!preg_match('/<thead>\s*<tr class="pc-thead-row">(.*?)<\/tr>\s*<\/thead>/s', $html, $m)) {
+            return [];
+        }
+        if (!preg_match_all('/<th\b[^>]*>(.*?)<\/th>/s', $m[1], $ths) || empty($ths[1])) {
+            return [];
+        }
+        $campos = [];
+        foreach (array_slice($ths[1], 1) as $thHtml) {   // omitir la columna "Prueba"
+            // Quitar el subtítulo (<span class="pc-thead-sub">…</span>) y etiquetas
+            $txt = preg_replace('/<span class="pc-thead-sub">.*?<\/span>/s', '', $thHtml);
+            $txt = $this->normalizarTexto(strip_tags($txt));
+            $campos[] = $this->pcCampoDeEncabezado($txt);
+        }
+        return $campos;
+    }
+
+    /** Mapea el texto (normalizado) de un encabezado de columna a su id de campo del JSON. */
+    private function pcCampoDeEncabezado(string $t): string {
+        if (strpos($t, 'resultado') !== false || strpos($t, 'result') !== false) return 'resultado';
+        if (strpos($t, 'carga de prueba') !== false)                              return 'prueba';
+        if (strpos($t, 'cml') !== false)                                          return 'cml';
+        if (strpos($t, 'deforma') !== false)                                      return 'deformacion';
+        if (strpos($t, 'duracion') !== false)                                     return 'duracion';
+        if (strpos($t, 'inclin') !== false)                                       return 'inclin';
+        if (strpos($t, 'extensi') !== false)                                      return 'extension';
+        if (strpos($t, 'peso') !== false)                                         return 'peso';
+        if (strpos($t, 'pluma') !== false || strpos($t, 'longitud') !== false)    return 'pluma';
+        if (strpos($t, 'angulo') !== false)                                       return 'angulo';
+        if (strpos($t, 'radio') !== false)                                        return 'radio';
+        if (strpos($t, 'altura') !== false)                                       return 'altura';
+        return '';
+    }
+
+    /**
      * Inyecta los datos del JSON prueba_carga en el header y tbody de pc-table,
      * y corrige el texto hardcodeado "Equipo Inspeccionado: ...".
      */
@@ -1049,37 +1088,63 @@ body { background:#fff!important; }
             );
         }
 
-        // 3. Reemplazar el <tbody> de la pc-table con los datos reales del JSON
-        if (!empty($pc)) {
+        // 3. Reemplazar el <tbody> de la pc-table con los datos reales del JSON.
+        //    Se generan EXACTAMENTE las columnas que define el <thead> de la plantilla
+        //    (mapeando cada encabezado a su campo del JSON). Así nunca se desbordan
+        //    celdas fuera del margen aunque el JSON traiga campos extra (p. ej.
+        //    tipo_plataforma) o en distinto orden.
+        $filas = array_filter(
+            $pc,
+            fn($v, $k) => is_array($v) && $k !== 'plantilla',
+            ARRAY_FILTER_USE_BOTH
+        );
+        if (!empty($filas)) {
+            // 3a. Extraer las columnas de datos del <thead> (se omite la 1ª, "Prueba").
+            $colsCampos = $this->columnasPcTabla($html);
+
+            $rowLabels = [
+                'sin' => 'Sin Carga', 'con' => 'Con Carga',
+                'trabajo' => 'Carga de Trabajo', 'sobrecarga' => 'Prueba de Sobrecarga',
+            ];
             $tbodyHtml = "<tbody>\n";
             $rowIndex  = 0;
-            foreach ($pc as $tipoFila => $datos) {
-                if (!is_array($datos)) continue;
+            foreach ($filas as $tipoFila => $datos) {
                 $rowCls = $rowIndex === 0 ? 'pc-row-sin' : 'pc-row-con';
-                $badge  = $rowIndex === 0
+                $chk = $rowIndex === 0
                     ? '<svg style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;" viewBox="0 0 12 12"><rect width="12" height="12" rx="1" fill="#f0f4f8" stroke="#cdd8e3" stroke-width="1.2"/></svg>'
                     : '<svg style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;" viewBox="0 0 12 12"><rect width="12" height="12" rx="1" fill="#fff8e1" stroke="#f0c040" stroke-width="1.5"/></svg>';
-                $tbodyHtml .= "<tr class=\"{$rowCls}\">\n";
-                $tbodyHtml .= "<td class=\"pc-td-desc\"><span class=\"pc-test-badge\">{$badge} " . $e($tipoFila) . "</span></td>\n";
+                $label = $rowLabels[$tipoFila] ?? ucfirst((string)$tipoFila);
+
                 $rowRadio = (float)($datos['radio'] ?? 0);
                 $rowPluma = (float)($datos['pluma'] ?? 0);
-                // tipo_plataforma es metadata para el diagrama SVG, no una columna de medición
-                $camposExcluir = ['tipo_plataforma'];
-                foreach ($datos as $campo => $valor) {
-                    if (in_array($campo, $camposExcluir, true)) continue;
-                    if ($campo === 'angulo' && $rowRadio > 0 && $rowPluma >= $rowRadio) {
+
+                $tbodyHtml .= "<tr class=\"{$rowCls}\">\n";
+                $tbodyHtml .= "<td class=\"pc-td-desc\"><span class=\"pc-test-badge\">{$chk} " . $e($label) . "</span></td>\n";
+
+                // Una celda por columna del thead — sin celdas de más.
+                $campos = !empty($colsCampos) ? $colsCampos : ['peso', 'radio', 'altura', 'resultado'];
+                foreach ($campos as $campo) {
+                    $valor = trim((string)($datos[$campo] ?? ''));
+                    // Campos calculados a partir de radio/pluma cuando el inspector no los capturó
+                    if ($campo === 'angulo' && $valor === '' && $rowRadio > 0 && $rowPluma >= $rowRadio) {
                         $valor = number_format(rad2deg(acos($rowRadio / $rowPluma)), 1);
-                    } elseif ($campo === 'altura' && $rowPluma > 0) {
+                    } elseif ($campo === 'altura' && $valor === '' && $rowPluma > 0) {
                         $valor = number_format(sqrt(max(0, $rowPluma * $rowPluma - $rowRadio * $rowRadio)), 2);
                     }
                     if ($campo === 'resultado') {
-                        $ok = strtoupper(trim($valor)) === 'CONFORME' || strtoupper(trim($valor)) === 'OK';
-                        $badge = $ok
-                            ? '<span class="pc-ok-badge">✔ ' . $e($valor) . '</span>'
-                            : '<span style="color:#c62828;font-weight:700">✘ ' . $e($valor) . '</span>';
-                        $tbodyHtml .= "<td class=\"pc-td\">{$badge}</td>\n";
+                        if ($valor === '') {
+                            $tbodyHtml .= "<td class=\"pc-td\"><span style=\"color:#94a3b8;font-weight:700\">NA</span></td>\n";
+                        } else {
+                            $ok = in_array(strtoupper($valor), ['CONFORME', 'OK', 'CUMPLE'], true);
+                            $badge = $ok
+                                ? '<span class="pc-ok-badge">✔ ' . $e($valor) . '</span>'
+                                : '<span style="color:#c62828;font-weight:700">✘ ' . $e($valor) . '</span>';
+                            $tbodyHtml .= "<td class=\"pc-td\">{$badge}</td>\n";
+                        }
                     } else {
-                        $val = $valor !== '' ? $e($valor) : '<span style="color:#94a3b8;font-style:italic">—</span>';
+                        $val = $valor !== ''
+                            ? $e($valor)
+                            : '<span style="color:#94a3b8;font-style:italic">NA</span>';
                         $tbodyHtml .= "<td class=\"pc-td\">{$val}</td>\n";
                     }
                 }
@@ -1122,22 +1187,43 @@ body { background:#fff!important; }
 
         // 5. Inyectar datos del diagrama de plataforma (tokens {pc_plat_svg}, {pc_plat_*}, {pc_obs_*})
         if (strpos($html, '{pc_plat_svg}') !== false) {
-            $platRow = $pc['con'] ?? $pc['sin'] ?? reset($pc);
-            if (is_array($platRow)) {
-                $pRadio  = (float) ($platRow['radio']  ?? 0);
-                $pAltura = (float) ($platRow['altura'] ?? 0);
-                $tipo    = strtolower($platRow['tipo_plataforma'] ?? 'tijera');
-                $isBoom  = strpos($tipo, 'articulad') !== false || strpos($tipo, 'boom') !== false;
-                $svgHtml = $isBoom
-                    ? $this->buildBoomSvg($pRadio, $pAltura)
-                    : $this->buildPlatformSvg($pRadio, $pAltura);
+            // Fila de medición: preferir "con carga"; tomar el valor de la otra fila si falta.
+            $rowCon = is_array($pc['con'] ?? null) ? $pc['con'] : [];
+            $rowSin = is_array($pc['sin'] ?? null) ? $pc['sin'] : [];
+            $valOf  = function (string $campo) use ($rowCon, $rowSin): float {
+                $v = trim((string)($rowCon[$campo] ?? ''));
+                if ($v === '') $v = trim((string)($rowSin[$campo] ?? ''));
+                return (float)$v;
+            };
+            $pRadio  = $valOf('radio');
+            $pAltura = $valOf('altura');
 
-                $html = str_replace('{pc_plat_svg}',    $svgHtml, $html);
-                $html = str_replace('{pc_plat_radio}',  number_format($pRadio,  1), $html);
-                $html = str_replace('{pc_plat_altura}', number_format($pAltura, 1), $html);
-                $html = str_replace('{pc_obs_radio}',   number_format($pRadio,  1), $html);
-                $html = str_replace('{pc_obs_altura}',  number_format($pAltura, 1), $html);
-            }
+            // tipo_plataforma: primero a nivel raíz (selector único), luego por fila.
+            $tipoRaw = $pc['tipo_plataforma']
+                ?? ($rowCon['tipo_plataforma'] ?? ($rowSin['tipo_plataforma'] ?? 'tijera'));
+            $tipo    = strtolower((string)$tipoRaw);
+            $isBoom  = strpos($tipo, 'articulad') !== false || strpos($tipo, 'boom') !== false;
+            $svgHtml = $isBoom
+                ? $this->buildBoomSvg($pRadio, $pAltura)
+                : $this->buildPlatformSvg($pRadio, $pAltura);
+
+            $html = str_replace('{pc_plat_svg}', $svgHtml, $html);
+
+            // Celdas del diagrama: con valor -> "7.6" + unidad "m"; sin valor -> "NA" (se elide la unidad)
+            $html = ($pRadio > 0)
+                ? str_replace('{pc_plat_radio}',  number_format($pRadio, 1),  $html)
+                : str_replace('{pc_plat_radio}<span class="unit">m</span>', '<span style="color:#94a3b8">NA</span>', $html);
+            $html = ($pAltura > 0)
+                ? str_replace('{pc_plat_altura}', number_format($pAltura, 1), $html)
+                : str_replace('{pc_plat_altura}<span class="unit">m</span>', '<span style="color:#94a3b8">NA</span>', $html);
+
+            // Texto de observaciones: con valor -> "7.6 m"; sin valor -> "NA" (se elide la unidad)
+            $html = ($pRadio > 0)
+                ? str_replace('{pc_obs_radio}',  number_format($pRadio, 1),  $html)
+                : str_replace('{pc_obs_radio} m',  'NA', $html);
+            $html = ($pAltura > 0)
+                ? str_replace('{pc_obs_altura}', number_format($pAltura, 1), $html)
+                : str_replace('{pc_obs_altura} m', 'NA', $html);
         }
 
         return $html;
@@ -1219,8 +1305,8 @@ SVG;
 
     /** Genera el SVG de diagrama de plataforma (MEWP/PTEM) — vista lateral de tijera/brazo con altura y radio. */
     private function buildPlatformSvg(float $radio, float $altura): string {
-        $rF = $radio  > 0 ? number_format($radio,  1) . ' m' : '—';
-        $hF = $altura > 0 ? number_format($altura, 1) . ' m' : '—';
+        $rF = $radio  > 0 ? number_format($radio,  1) . ' m' : 'NA';
+        $hF = $altura > 0 ? number_format($altura, 1) . ' m' : 'NA';
 
         // Layout constants – viewBox 0 0 180 140
         $gndY    = 118;
@@ -1279,14 +1365,15 @@ SVG;
   <polygon points="{$arTipX},{$rLblY} {$arBaseX},{$arTY} {$arBaseX},{$arBY}" fill="#1e5fa8"/>
   <rect x="{$midX}" y="{$rLblY}" width="44" height="14" rx="3" fill="#dbeafe" transform="translate(-22,-7)"/>
   <text x="{$midX}" y="{$rLblY}" dy="5" dx="-20" font-family="Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1e5fa8">r = {$rF}</text>
+  <text x="90" y="137" text-anchor="middle" font-family="Arial,sans-serif" font-size="7" fill="#6b7280">Plataforma de Tijera / Scissor</text>
 </svg>
 SVG;
     }
 
     /** Genera el SVG de diagrama de plataforma articulada (boom/articulado) — vista lateral. */
     private function buildBoomSvg(float $radio, float $altura): string {
-        $rF = $radio  > 0 ? number_format($radio,  1) . ' m' : '—';
-        $hF = $altura > 0 ? number_format($altura, 1) . ' m' : '—';
+        $rF = $radio  > 0 ? number_format($radio,  1) . ' m' : 'NA';
+        $hF = $altura > 0 ? number_format($altura, 1) . ' m' : 'NA';
 
         // viewBox 0 0 180 140
         $gndY   = 118;
@@ -1337,7 +1424,7 @@ SVG;
         $cabX = $pivX - $cabW / 2; $cabY = $pivY - $cabH;
 
         return <<<SVG
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 140" width="180" height="140">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 140" style="width:163px;height:127px;display:block">
   <!-- Ground line -->
   <line x1="0" y1="{$gndY}" x2="180" y2="{$gndY}" stroke="#6b7280" stroke-width="1.5"/>
   <!-- Base chassis -->
