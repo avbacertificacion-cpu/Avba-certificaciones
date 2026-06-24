@@ -342,6 +342,9 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 
 /* ══ Print ═══════════════════════════════════════════════════ */
 @media print{.header,.tabs,.stats,.eq-filters,.btn-prim,.btn-sec,.btn-del,.eq-bc-btn,.eq-upcoming-card,.fhs-card,.eq-stacked-card,.eq-charts-3,.toast-eq{display:none!important}.wrap{padding:0;max-width:100%;margin:0}.eq-cn{break-inside:avoid;margin-bottom:12px}}
+/* ══ Tab notification badge ══════════════════════════════════ */
+.tab-btn{position:relative;}
+.tab-notif{position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none;}
 /* ══ Sub-usuarios ══════════════════════════════════════════ */
 .sub-card{border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin-bottom:10px;background:#fff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
 .sub-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px}
@@ -383,8 +386,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
     <button class="tab-btn" id="tabbtn-acc" onclick="verTab('acc',this)">🔗 Accesorios de Izaje</button>
     <button class="tab-btn" id="tabbtn-per" onclick="verTab('per',this)">👷 Personal</button>
     <button class="tab-btn" id="tabbtn-pnd" onclick="verTab('pnd',this)">🔬 PND</button>
-    <button class="tab-btn" id="tabbtn-equipos" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos</button>
-    <button class="tab-btn" id="tabbtn-personal-cli" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal</button>
+    <button class="tab-btn" id="tabbtn-equipos" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos<span class="tab-notif" id="tab-notif-eq" style="display:none"></span></button>
+    <button class="tab-btn" id="tabbtn-personal-cli" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal<span class="tab-notif" id="tab-notif-per" style="display:none"></span></button>
     <button class="tab-btn" id="tabbtn-subusuarios" style="display:none" onclick="verTab('subusuarios',this);cargarSubusuarios()">🔐 Sub-usuarios</button>
   </div>
 
@@ -550,25 +553,46 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
           </div>
         </div>
         <!-- KPIs Personal -->
-        <div class="eq-kpi-row">
-          <div class="eq-kpi">
-            <div class="eq-kpi-ic" style="background:#f3e8ff;color:#7c3aed">👥</div>
-            <div><div class="eq-kpi-n" id="per-s-total">—</div><div class="eq-kpi-l">Total personal</div></div>
+        <div>
+          <div class="eq-kpi-row">
+            <div class="eq-kpi">
+              <div class="eq-kpi-ic" style="background:#f3e8ff;color:#7c3aed">👥</div>
+              <div><div class="eq-kpi-n" id="per-s-total">—</div><div class="eq-kpi-l">Total personal</div></div>
+            </div>
+            <div class="eq-kpi">
+              <div class="eq-kpi-ic" style="background:#dcfce7;color:#15803d">✔</div>
+              <div><div class="eq-kpi-n" id="per-s-activos" style="color:var(--verde)">—</div><div class="eq-kpi-l">Activos</div></div>
+            </div>
+            <div class="eq-kpi">
+              <div class="eq-kpi-ic" style="background:#fef3c7;color:#92400e">⏰</div>
+              <div><div class="eq-kpi-n" id="per-s-vcr" style="color:var(--ambar)">—</div><div class="eq-kpi-l">Certs. por vencer</div></div>
+            </div>
+            <div class="eq-kpi">
+              <div class="eq-kpi-ic" style="background:#fee2e2;color:#991b1b">⚠</div>
+              <div><div class="eq-kpi-n" id="per-s-vcd" style="color:var(--rojo)">—</div><div class="eq-kpi-l">Certs. vencidas</div></div>
+            </div>
           </div>
-          <div class="eq-kpi">
-            <div class="eq-kpi-ic" style="background:#dcfce7;color:#15803d">✔</div>
-            <div><div class="eq-kpi-n" id="per-s-vig" style="color:var(--verde)">—</div><div class="eq-kpi-l">Certs. vigentes</div></div>
-          </div>
-          <div class="eq-kpi">
-            <div class="eq-kpi-ic" style="background:#fef3c7;color:#92400e">⏰</div>
-            <div><div class="eq-kpi-n" id="per-s-vcr" style="color:var(--ambar)">—</div><div class="eq-kpi-l">Por vencer</div></div>
-          </div>
-          <div class="eq-kpi">
-            <div class="eq-kpi-ic" style="background:#fee2e2;color:#991b1b">⚠</div>
-            <div><div class="eq-kpi-n" id="per-s-vcd" style="color:var(--rojo)">—</div><div class="eq-kpi-l">Vencidas</div></div>
+          <div class="eq-kpi-row" style="margin-top:8px">
+            <div class="eq-kpi">
+              <div class="eq-kpi-ic" style="background:#dbeafe;color:#1d4ed8">📤</div>
+              <div><div class="eq-kpi-n" id="per-s-bajas" style="color:var(--texto-sub)">—</div><div class="eq-kpi-l">Bajas</div></div>
+            </div>
+            <div class="eq-kpi">
+              <div class="eq-kpi-ic" style="background:#dcfce7;color:#15803d">🏆</div>
+              <div><div class="eq-kpi-n" id="per-s-vig" style="color:var(--verde)">—</div><div class="eq-kpi-l">Certs. vigentes</div></div>
+            </div>
+            <div class="eq-kpi">
+              <div class="eq-kpi-ic" style="background:#f3e8ff;color:#7c3aed">📄</div>
+              <div><div class="eq-kpi-n" id="per-s-docs-vcr" style="color:#7c3aed">—</div><div class="eq-kpi-l">Docs. por vencer</div></div>
+            </div>
+            <div class="eq-kpi">
+              <div class="eq-kpi-ic" style="background:#e0f2fe;color:#0369a1">📋</div>
+              <div><div class="eq-kpi-n" id="per-s-sin-fecha" style="color:var(--texto-sub)">—</div><div class="eq-kpi-l">Sin fecha cert.</div></div>
+            </div>
           </div>
         </div>
       </div>
+      <div id="per-alertas-certs"></div>
       <div id="per-alertas"></div>
       <div id="per-dept-dist"></div>
       <div class="eq-charts-3">
@@ -2255,11 +2279,15 @@ async function cargarDashboardPer() {
     const r = await fetch(API + '?action=GET_DASHBOARD_PERSONAL');
     const d = await r.json();
     if (d.status !== 'success') return;
-    document.getElementById('per-s-total').textContent = d.total_personal;
-    document.getElementById('per-s-vig').textContent   = d.certs.vigentes;
-    document.getElementById('per-s-vcr').textContent   = d.certs.por_vencer;
-    document.getElementById('per-s-vcd').textContent   = d.certs.vencidas;
-    renderAlertas(d, 'per-alertas');
+    document.getElementById('per-s-total').textContent    = d.total_personal;
+    document.getElementById('per-s-activos').textContent  = d.activos    ?? '—';
+    document.getElementById('per-s-bajas').textContent    = d.bajas      ?? '—';
+    document.getElementById('per-s-vig').textContent      = d.certs.vigentes;
+    document.getElementById('per-s-vcr').textContent      = d.certs.por_vencer;
+    document.getElementById('per-s-vcd').textContent      = d.certs.vencidas;
+    document.getElementById('per-s-sin-fecha').textContent= d.certs.sin_fecha ?? '—';
+    document.getElementById('per-s-docs-vcr').textContent = (d.docs_por_vencer || []).length || '—';
+    renderAlertas(d, 'per-alertas-certs');
     renderFleetHealth(d, 'per-fhs-card', 'per-fhs-ring', 'per-fhs-n', 'per-fhs-legend', true);
     renderStatusDist(d.por_departamento || [], 'per-dept-dist', 'Por Departamento');
     _chartCertsP = renderChartGenerico('chart-certs-per', [
@@ -2860,6 +2888,12 @@ async function cargarAlertasVencimiento() {
 }
 
 function renderAlertasDocsPer(alertas, diasAnticip) {
+  const badge = document.getElementById('tab-notif-per');
+  if (badge) {
+    const total = alertas ? alertas.length : 0;
+    if (total > 0) { badge.textContent = total > 99 ? '99+' : total; badge.style.display = ''; }
+    else { badge.style.display = 'none'; }
+  }
   const cont = document.getElementById('per-alertas');
   if (!cont) return;
   if (!alertas || !alertas.length) { cont.innerHTML = ''; return; }
@@ -2974,6 +3008,17 @@ async function cargarDatos() {
 }
 
 cargarDatos();
+cargarAlertasVencimiento(); // proactive personal doc badge on page load
+(async function cargarBadgeEq() {  // proactive equipment cert badge on page load
+  try {
+    const r = await fetch(API + '?action=GET_DASHBOARD_EQUIPOS');
+    const d = await r.json();
+    if (d.status !== 'success') return;
+    const cnt = (d.certs?.vencidas || 0) + (d.certs?.por_vencer || 0);
+    const badge = document.getElementById('tab-notif-eq');
+    if (badge && cnt > 0) { badge.textContent = cnt > 99 ? '99+' : cnt; badge.style.display = ''; }
+  } catch(_) {}
+})();
 
 // ═══════════════════════════════════════════════════════════════════════════
 //  SUB-USUARIOS (solo cuenta principal)
