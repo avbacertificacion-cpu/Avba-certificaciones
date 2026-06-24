@@ -286,12 +286,14 @@ async function login() {
 
     // Guardar sesión
     localStorage.setItem("avba_session", JSON.stringify({
-      usuario:    data.usuario,
-      nombre:     data.nombre,
-      rol:        data.rol,
-      id_cliente: data.id_cliente,
-      token:      data.token,
-      ts:         Date.now()
+      usuario:       data.usuario,
+      nombre:        data.nombre,
+      rol:           data.rol,
+      id_cliente:    data.id_cliente,
+      token:         data.token,
+      es_subusuario: data.es_subusuario || false,
+      permiso_sub:   data.permiso_sub || null,
+      ts:            Date.now()
     }));
 
     // Redirigir según rol

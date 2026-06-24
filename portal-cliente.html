@@ -342,6 +342,18 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 
 /* ══ Print ═══════════════════════════════════════════════════ */
 @media print{.header,.tabs,.stats,.eq-filters,.btn-prim,.btn-sec,.btn-del,.eq-bc-btn,.eq-upcoming-card,.fhs-card,.eq-stacked-card,.eq-charts-3,.toast-eq{display:none!important}.wrap{padding:0;max-width:100%;margin:0}.eq-cn{break-inside:avoid;margin-bottom:12px}}
+/* ══ Sub-usuarios ══════════════════════════════════════════ */
+.sub-card{border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px;margin-bottom:10px;background:#fff;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+.sub-badge{display:inline-block;font-size:11px;font-weight:600;padding:2px 9px;border-radius:20px}
+.sub-b-gestion{background:#e0f2fe;color:#0369a1}
+.sub-b-lectura{background:#f3f4f6;color:#6b7280}
+.sub-b-off{background:#fee2e2;color:#b91c1c}
+.asig-tab{flex:1;background:none;border:none;padding:8px 4px;font-size:12px;font-weight:600;color:#889;cursor:pointer;border-bottom:2px solid transparent}
+.asig-tab-on{color:#0369a1;border-bottom-color:#0369a1}
+.asig-item{display:flex;align-items:center;gap:9px;padding:8px 6px;border-bottom:1px solid #f1f5f9;font-size:13px;cursor:pointer}
+.asig-item:last-child{border-bottom:none}
+.asig-item input{width:auto;flex-shrink:0}
+.asig-item .asig-sub{font-size:11px;color:#9aa}
 </style>
 </head>
 <body>
@@ -367,12 +379,13 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
   </div>
 
   <div class="tabs">
-    <button class="tab-btn active" onclick="verTab('maq',this)">🔧 Maquinaria</button>
-    <button class="tab-btn" onclick="verTab('acc',this)">🔗 Accesorios de Izaje</button>
-    <button class="tab-btn" onclick="verTab('per',this)">👷 Personal</button>
-    <button class="tab-btn" onclick="verTab('pnd',this)">🔬 PND</button>
-    <button class="tab-btn" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos</button>
-    <button class="tab-btn" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal</button>
+    <button class="tab-btn active" id="tabbtn-maq" onclick="verTab('maq',this)">🔧 Maquinaria</button>
+    <button class="tab-btn" id="tabbtn-acc" onclick="verTab('acc',this)">🔗 Accesorios de Izaje</button>
+    <button class="tab-btn" id="tabbtn-per" onclick="verTab('per',this)">👷 Personal</button>
+    <button class="tab-btn" id="tabbtn-pnd" onclick="verTab('pnd',this)">🔬 PND</button>
+    <button class="tab-btn" id="tabbtn-equipos" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos</button>
+    <button class="tab-btn" id="tabbtn-personal-cli" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal</button>
+    <button class="tab-btn" id="tabbtn-subusuarios" style="display:none" onclick="verTab('subusuarios',this);cargarSubusuarios()">🔐 Sub-usuarios</button>
   </div>
 
   <div id="tab-maq" class="tab-panel active">
@@ -617,6 +630,18 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
       <div id="per-sub-docs" style="display:none"></div>
     </div>
 
+  </div>
+
+  <!-- ══ SUB-USUARIOS ══ -->
+  <div id="tab-subusuarios" class="tab-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div>
+        <h2 style="margin:0;font-size:18px;color:#0d2244">🔐 Sub-usuarios</h2>
+        <p style="margin:4px 0 0;font-size:13px;color:#667">Crea accesos para tu equipo y define qué equipos, personal y certificaciones puede ver cada uno.</p>
+      </div>
+      <button class="btn-prim" onclick="nuevoSub()">+ Nuevo sub-usuario</button>
+    </div>
+    <div id="sub-lista"><div class="loading"><span class="spin"></span></div></div>
   </div>
 </div>
 
@@ -949,6 +974,58 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
   </div>
 </div>
 
+<!-- Modal: Crear / Editar sub-usuario -->
+<div class="eq-overlay" id="modal-sub">
+  <div class="eq-modal">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title" id="modal-sub-title">Nuevo sub-usuario</div>
+      <button class="eq-modal-close" onclick="cerrarModalSub()">✕</button>
+    </div>
+    <input type="hidden" id="sub-id">
+    <div class="frow"><label class="flabel">Nombre / Referencia *</label><input class="finput" id="sub-nombre" placeholder="Ej: Juan Pérez · Almacén"></div>
+    <div class="frow"><label class="flabel">Usuario (correo) *</label><input class="finput" id="sub-usuario" placeholder="usuario@empresa.com" autocomplete="off"></div>
+    <div class="frow"><label class="flabel" id="sub-pass-lbl">Contraseña *</label><input class="finput" id="sub-password" type="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password"></div>
+    <div class="frow"><label class="flabel">Permiso</label>
+      <select class="finput" id="sub-permiso">
+        <option value="gestion">Ver y gestionar (editar y subir documentos)</option>
+        <option value="lectura">Solo ver (lectura)</option>
+      </select>
+    </div>
+    <div class="frow" id="sub-activo-row" style="display:none">
+      <label class="flabel"><input type="checkbox" id="sub-activo" checked style="width:auto;margin-right:6px">Cuenta activa</label>
+    </div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalSub()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarSub()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Asignar recursos a sub-usuario -->
+<div class="eq-overlay" id="modal-asig">
+  <div class="eq-modal" style="max-width:560px">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Asignar acceso — <span id="asig-nombre"></span></div>
+      <button class="eq-modal-close" onclick="cerrarModalAsig()">✕</button>
+    </div>
+    <input type="hidden" id="asig-sub-id">
+    <div style="display:flex;gap:6px;border-bottom:1px solid #e5e7eb;margin-bottom:10px">
+      <button class="asig-tab asig-tab-on" id="asig-tab-equipo"        onclick="asigVer('equipo',this)">⚙ Equipos</button>
+      <button class="asig-tab" id="asig-tab-personal"      onclick="asigVer('personal',this)">👥 Personal</button>
+      <button class="asig-tab" id="asig-tab-certificacion" onclick="asigVer('certificacion',this)">📜 Certificaciones</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <label style="font-size:12px;color:#667;cursor:pointer"><input type="checkbox" id="asig-todos" onchange="asigToggleTodos(this)" style="width:auto;margin-right:6px">Seleccionar todos</label>
+      <span style="font-size:12px;color:#889" id="asig-count">0 seleccionados</span>
+    </div>
+    <div id="asig-lista" style="max-height:46vh;overflow-y:auto;border:1px solid #eef;border-radius:8px;padding:6px"></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalAsig()">Cerrar</button>
+      <button class="btn-prim" onclick="guardarAsignacion()">Guardar asignación</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="qr-overlay">
   <div class="modal-qr">
     <div class="qr-folio" id="qr-folio">—</div>
@@ -996,6 +1073,22 @@ const _sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
 if (!_sesion.token || (_sesion.ts && (Date.now() - _sesion.ts) > 28800000)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
 // Solo CLIENTE y ADMIN pueden acceder a esta vista
 if (!['CLIENTE', 'ADMIN'].includes(_sesion.rol)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
+
+// ── Visibilidad de pestañas según tipo de cuenta ──────────────────────────
+const _esSub = !!_sesion.es_subusuario;
+function _configurarTabsPorRol() {
+  if (_esSub) {
+    // Sub-usuario: solo ve los módulos asignables (Maquinaria, Mis Equipos, Mi Personal)
+    ['acc','per','pnd','subusuarios'].forEach(t => {
+      const b = document.getElementById('tabbtn-' + t); if (b) b.style.display = 'none';
+    });
+    if (_sesion.permiso_sub === 'lectura') document.body.classList.add('solo-lectura');
+  } else if (_sesion.rol === 'CLIENTE') {
+    // Cuenta principal del cliente: muestra la gestión de sub-usuarios
+    const b = document.getElementById('tabbtn-subusuarios'); if (b) b.style.display = '';
+  }
+}
+_configurarTabsPorRol();
 
 // ── Tab switching ──────────────────────────────────────────────────────────
 function verTab(id, btn) {
@@ -2881,6 +2974,200 @@ async function cargarDatos() {
 }
 
 cargarDatos();
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SUB-USUARIOS (solo cuenta principal)
+// ═══════════════════════════════════════════════════════════════════════════
+let _asigCat = { equipo: [], personal: [], certificacion: [] };
+let _asigSel = { equipo: new Set(), personal: new Set(), certificacion: new Set() };
+let _asigTipo = 'equipo';
+
+// JSON seguro para incrustar dentro de un atributo onclick con comillas simples
+function jAttr(o) { return JSON.stringify(o).replace(/&/g,'&amp;').replace(/'/g,'&#39;'); }
+
+async function cargarSubusuarios() {
+  const cont = document.getElementById('sub-lista');
+  cont.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  try {
+    const res = await fetch(`${API}?action=LISTAR_SUBUSUARIOS`);
+    const d = await res.json();
+    if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo);padding:16px">${escH(d.message||'Error')}</p>`; return; }
+    renderSubusuarios(d.subusuarios || []);
+  } catch(_) { cont.innerHTML = '<p style="color:var(--rojo);padding:16px">Error de red.</p>'; }
+}
+
+function renderSubusuarios(lista) {
+  const cont = document.getElementById('sub-lista');
+  if (!lista.length) {
+    cont.innerHTML = '<div class="empty"><div class="empty-t">Sin sub-usuarios</div><div class="empty-s">Crea uno para dar acceso limitado a tu información.</div></div>';
+    return;
+  }
+  cont.innerHTML = lista.map(s => {
+    const permBadge = s.activo
+      ? (s.permiso === 'lectura'
+          ? '<span class="sub-badge sub-b-lectura">Solo ver</span>'
+          : '<span class="sub-badge sub-b-gestion">Ver y gestionar</span>')
+      : '<span class="sub-badge sub-b-off">Inactivo</span>';
+    return `<div class="sub-card">
+      <div style="min-width:0">
+        <div style="font-weight:600;font-size:14px;color:#0d2244">${escH(s.nombre)} ${permBadge}</div>
+        <div style="font-size:12px;color:#778;margin-top:3px">${escH(s.usuario)}</div>
+        <div style="font-size:11px;color:#9aa;margin-top:4px">
+          ⚙ ${s.n_equipos} equipos · 👥 ${s.n_personal} personal · 📜 ${s.n_cert} certificaciones
+          ${s.ultimo_acceso && s.ultimo_acceso !== '—' ? ' · último acceso ' + escH(s.ultimo_acceso) : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn-sec" onclick='abrirAsignar(${s.id}, ${jAttr(s.nombre)})'>Asignar acceso</button>
+        <button class="btn-sec" onclick='editarSub(${jAttr(s)})'>Editar</button>
+        <button class="btn-sec" style="color:var(--rojo,#b91c1c)" onclick='eliminarSub(${s.id}, ${jAttr(s.nombre)})'>Eliminar</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function nuevoSub() {
+  document.getElementById('modal-sub-title').textContent = 'Nuevo sub-usuario';
+  document.getElementById('sub-id').value = '';
+  document.getElementById('sub-nombre').value = '';
+  document.getElementById('sub-usuario').value = '';
+  document.getElementById('sub-usuario').disabled = false;
+  document.getElementById('sub-password').value = '';
+  document.getElementById('sub-pass-lbl').textContent = 'Contraseña *';
+  document.getElementById('sub-permiso').value = 'gestion';
+  document.getElementById('sub-activo-row').style.display = 'none';
+  document.getElementById('modal-sub').classList.add('open');
+}
+
+function editarSub(s) {
+  document.getElementById('modal-sub-title').textContent = 'Editar sub-usuario';
+  document.getElementById('sub-id').value = s.id;
+  document.getElementById('sub-nombre').value = s.nombre || '';
+  document.getElementById('sub-usuario').value = s.usuario || '';
+  document.getElementById('sub-usuario').disabled = true; // el usuario no se cambia
+  document.getElementById('sub-password').value = '';
+  document.getElementById('sub-pass-lbl').textContent = 'Nueva contraseña (dejar vacío para no cambiar)';
+  document.getElementById('sub-permiso').value = s.permiso || 'gestion';
+  document.getElementById('sub-activo-row').style.display = '';
+  document.getElementById('sub-activo').checked = !!s.activo;
+  document.getElementById('modal-sub').classList.add('open');
+}
+
+function cerrarModalSub() { document.getElementById('modal-sub').classList.remove('open'); }
+
+async function guardarSub() {
+  const id      = document.getElementById('sub-id').value;
+  const nombre  = document.getElementById('sub-nombre').value.trim();
+  const usuario = document.getElementById('sub-usuario').value.trim();
+  const password= document.getElementById('sub-password').value;
+  const permiso = document.getElementById('sub-permiso').value;
+  if (!nombre)  { toastEq('El nombre es requerido.'); return; }
+  if (!id && (!usuario || !password)) { toastEq('Usuario y contraseña son obligatorios.'); return; }
+
+  const action  = id ? 'EDITAR_SUBUSUARIO' : 'CREAR_SUBUSUARIO';
+  const payload = id
+    ? { id: +id, nombre, permiso, password, activo: document.getElementById('sub-activo').checked ? 1 : 0 }
+    : { nombre, usuario, password, permiso };
+  try {
+    const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action, payload }) });
+    const d = await res.json();
+    if (d.status !== 'success') { toastEq(d.message || 'Error al guardar.'); return; }
+    cerrarModalSub();
+    toastEq(id ? 'Sub-usuario actualizado.' : 'Sub-usuario creado.');
+    cargarSubusuarios();
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+async function eliminarSub(id, nombre) {
+  if (!confirm(`¿Eliminar al sub-usuario "${nombre}"? Perderá el acceso de inmediato.`)) return;
+  try {
+    const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'ELIMINAR_SUBUSUARIO', payload:{ id } }) });
+    const d = await res.json();
+    if (d.status !== 'success') { toastEq(d.message || 'Error.'); return; }
+    toastEq('Sub-usuario eliminado.');
+    cargarSubusuarios();
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+// ── Asignación de recursos ────────────────────────────────────────────────
+async function abrirAsignar(id, nombre) {
+  document.getElementById('asig-sub-id').value = id;
+  document.getElementById('asig-nombre').textContent = nombre;
+  document.getElementById('asig-lista').innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  document.getElementById('modal-asig').classList.add('open');
+  try {
+    const [rc, ra] = await Promise.all([
+      fetch(`${API}?action=GET_RECURSOS_ASIGNABLES`).then(r => r.json()),
+      fetch(`${API}?action=GET_ACCESOS_SUBUSUARIO&id=${id}`).then(r => r.json())
+    ]);
+    if (rc.status !== 'success' || ra.status !== 'success') { document.getElementById('asig-lista').innerHTML = '<p style="color:var(--rojo);padding:12px">No se pudo cargar.</p>'; return; }
+    _asigCat = { equipo: rc.equipo || [], personal: rc.personal || [], certificacion: rc.certificacion || [] };
+    _asigSel = {
+      equipo:        new Set((ra.accesos.equipo        || []).map(Number)),
+      personal:      new Set((ra.accesos.personal      || []).map(Number)),
+      certificacion: new Set((ra.accesos.certificacion || []).map(Number)),
+    };
+    asigVer('equipo', document.getElementById('asig-tab-equipo'));
+  } catch(_) { document.getElementById('asig-lista').innerHTML = '<p style="color:var(--rojo);padding:12px">Error de red.</p>'; }
+}
+
+function cerrarModalAsig() { document.getElementById('modal-asig').classList.remove('open'); }
+
+function asigVer(tipo, btn) {
+  _asigTipo = tipo;
+  document.querySelectorAll('.asig-tab').forEach(b => b.classList.remove('asig-tab-on'));
+  if (btn) btn.classList.add('asig-tab-on');
+  renderAsigLista();
+}
+
+function renderAsigLista() {
+  const cont = document.getElementById('asig-lista');
+  const items = _asigCat[_asigTipo] || [];
+  const sel = _asigSel[_asigTipo];
+  if (!items.length) {
+    cont.innerHTML = '<p style="color:#9aa;padding:16px;text-align:center;font-size:13px">No hay recursos de este tipo registrados.</p>';
+  } else {
+    cont.innerHTML = items.map(it => `
+      <label class="asig-item">
+        <input type="checkbox" value="${it.id}" ${sel.has(it.id) ? 'checked' : ''} onchange="asigToggle(${it.id}, this.checked)">
+        <span style="flex:1;min-width:0">${escH(it.label)}${it.sub ? ` <span class="asig-sub">${escH(it.sub)}</span>` : ''}</span>
+      </label>`).join('');
+  }
+  asigUpdateCount();
+}
+
+function asigToggle(id, on) {
+  if (on) _asigSel[_asigTipo].add(id); else _asigSel[_asigTipo].delete(id);
+  asigUpdateCount();
+}
+
+function asigToggleTodos(chk) {
+  const items = _asigCat[_asigTipo] || [];
+  _asigSel[_asigTipo] = chk.checked ? new Set(items.map(i => i.id)) : new Set();
+  renderAsigLista();
+}
+
+function asigUpdateCount() {
+  const n = _asigSel[_asigTipo].size;
+  const tot = (_asigCat[_asigTipo] || []).length;
+  document.getElementById('asig-count').textContent = `${n} seleccionado${n !== 1 ? 's' : ''}`;
+  document.getElementById('asig-todos').checked = tot > 0 && n === tot;
+}
+
+async function guardarAsignacion() {
+  const subId = +document.getElementById('asig-sub-id').value;
+  // Guardar los 3 tipos para persistir el estado completo
+  try {
+    for (const tipo of ['equipo','personal','certificacion']) {
+      const ids = [..._asigSel[tipo]];
+      await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'ASIGNAR_RECURSOS_SUBUSUARIO', payload:{ usuario_id: subId, tipo, ids } }) });
+    }
+    cerrarModalAsig();
+    toastEq('Asignación guardada.');
+    cargarSubusuarios();
+  } catch(_) { toastEq('Error al guardar la asignación.'); }
+}
 </script>
 </body>
 </html>

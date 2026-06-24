@@ -22,6 +22,7 @@ require_once __DIR__ . '/Accesorios.php';
 require_once __DIR__ . '/Pnd.php';
 require_once __DIR__ . '/ClienteEquipos.php';
 require_once __DIR__ . '/ClientePersonal.php';
+require_once __DIR__ . '/ClienteSubusuarios.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -63,6 +64,7 @@ $accesorios     = new Accesorios($pdo);
 $pnd            = new Pnd($pdo);
 $cliEquipos     = new ClienteEquipos($pdo);
 $cliPersonal    = new ClientePersonal($pdo);
+$cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuarios.usuario_padre_id
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -104,6 +106,62 @@ if ($method === 'GET') {
 } else {
     $action  = $body['action']  ?? '';
     $payload = $body['payload'] ?? $body;
+}
+
+// ══════════════════════════════════════════════════════════
+//  Helpers de alcance para sub-usuarios del cliente
+// ══════════════════════════════════════════════════════════
+/**
+ * Calcula el alcance de un usuario validado.
+ * Cuenta principal → ids = null (sin restricción).
+ * Sub-usuario      → ids = arrays de recursos asignados por tipo.
+ */
+function alcanceSub(array $usr, ClienteSubusuarios $cliSub): array {
+    if (empty($usr['usuario_padre_id'])) {
+        return ['es_sub' => false, 'lectura' => false,
+                'equipo' => null, 'personal' => null, 'certificacion' => null];
+    }
+    $acc = $cliSub->accesosDe((int)$usr['id']);
+    return [
+        'es_sub'        => true,
+        'lectura'       => (($usr['permiso_sub'] ?? 'gestion') === 'lectura'),
+        'equipo'        => $acc['equipo'],
+        'personal'      => $acc['personal'],
+        'certificacion' => $acc['certificacion'],
+    ];
+}
+
+/** Aborta con 403 si el usuario es un sub-usuario de solo lectura. */
+function bloquearSiLectura(array $alc): void {
+    if ($alc['es_sub'] && $alc['lectura']) {
+        respuesta(['status' => 'error',
+            'message' => 'Tu cuenta es de solo lectura; no puedes modificar la información.'], 403);
+    }
+}
+
+/** Aborta con 403 si un sub-usuario intenta escribir sobre un recurso no asignado. */
+function autorizarRecurso(array $alc, string $tipo, int $recursoId): void {
+    if (!$alc['es_sub']) return;
+    if ($recursoId === 0) return; // creación de un recurso nuevo se valida aparte
+    $ids = $alc[$tipo] ?? [];
+    if (!in_array($recursoId, array_map('intval', (array)$ids), true)) {
+        respuesta(['status' => 'error', 'message' => 'No autorizado para este recurso.'], 403);
+    }
+}
+
+/** Sub-usuarios no pueden crear ni eliminar equipos/empleados de nivel superior. */
+function soloPrincipalPuedeCrearBorrar(array $alc): void {
+    if ($alc['es_sub']) {
+        respuesta(['status' => 'error',
+            'message' => 'Solo la cuenta principal puede crear o eliminar equipos y empleados.'], 403);
+    }
+}
+
+/** Resuelve el id del equipo/empleado padre de un sub-recurso (doc/cert/horómetro). */
+function parentDeRecurso(PDO $pdo, string $tabla, string $col, int $id): int {
+    $s = $pdo->prepare("SELECT $col FROM $tabla WHERE id = ?");
+    $s->execute([$id]);
+    return (int)($s->fetchColumn() ?: 0);
 }
 
 // ══════════════════════════════════════════════════════════
@@ -483,17 +541,20 @@ if ($method === 'GET') {
         case 'GET_MI_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cliPersonal->listar($usr['id_cliente'] ?? ''));
+            $alc = alcanceSub($usr, $cliSub);
+            respuesta($cliPersonal->listar($usr['id_cliente'] ?? '', $alc['personal']));
 
         case 'GET_DASHBOARD_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cliPersonal->dashboard($usr['id_cliente'] ?? ''));
+            $alc = alcanceSub($usr, $cliSub);
+            respuesta($cliPersonal->dashboard($usr['id_cliente'] ?? '', $alc['personal']));
 
         case 'GET_DETALLE_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cliPersonal->detalle((int)($_GET['id'] ?? 0), $usr['id_cliente'] ?? ''));
+            $alc = alcanceSub($usr, $cliSub);
+            respuesta($cliPersonal->detalle((int)($_GET['id'] ?? 0), $usr['id_cliente'] ?? '', $alc['personal']));
 
         case 'GET_PREFS_NOTIF':
             $usr = validarToken($pdo, $token);
@@ -510,17 +571,39 @@ if ($method === 'GET') {
         case 'GET_MIS_EQUIPOS':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cliEquipos->listar($usr['id_cliente'] ?? ''));
+            $alc = alcanceSub($usr, $cliSub);
+            respuesta($cliEquipos->listar($usr['id_cliente'] ?? '', $alc['equipo']));
 
         case 'GET_DASHBOARD_EQUIPOS':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cliEquipos->dashboard($usr['id_cliente'] ?? ''));
+            $alc = alcanceSub($usr, $cliSub);
+            respuesta($cliEquipos->dashboard($usr['id_cliente'] ?? '', $alc['equipo']));
 
         case 'GET_DETALLE_EQUIPO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cliEquipos->detalle((int)($_GET['id'] ?? 0), $usr['id_cliente'] ?? ''));
+            $alc = alcanceSub($usr, $cliSub);
+            respuesta($cliEquipos->detalle((int)($_GET['id'] ?? 0), $usr['id_cliente'] ?? '', $alc['equipo']));
+
+        // ── Sub-usuarios del cliente (solo cuenta principal) ──
+        case 'LISTAR_SUBUSUARIOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliSub->listar((int)$usr['id']));
+
+        case 'GET_RECURSOS_ASIGNABLES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliSub->recursosAsignables($usr['id_cliente'] ?? ''));
+
+        case 'GET_ACCESOS_SUBUSUARIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliSub->obtenerAccesos((int)($_GET['id'] ?? 0), $usr));
 
         default:
             respuesta(['status' => 'error', 'message' => 'Acción no reconocida.'], 400);
@@ -606,8 +689,12 @@ if ($method === 'POST') {
         case 'OBTENER_DATOS_CLIENTE':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            $idCliente = $payload['id_cliente'] ?? ($usr['id_cliente'] ?? '');
-            respuesta($auth->obtenerDatosCliente($idCliente));
+            $alc = alcanceSub($usr, $cliSub);
+            // Sub-usuario: forzar su propio id_cliente y filtrar certificaciones asignadas
+            $idCliente = $alc['es_sub']
+                ? ($usr['id_cliente'] ?? '')
+                : ($payload['id_cliente'] ?? ($usr['id_cliente'] ?? ''));
+            respuesta($auth->obtenerDatosCliente($idCliente, $alc['certificacion']));
 
         // ── Inspector ────────────────────────────────────
         case 'NUEVA_INSPECCION':
@@ -1173,85 +1260,154 @@ if ($method === 'POST') {
         case 'GUARDAR_EQUIPO_CLI':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            if ((int)($_POST['id'] ?? 0) === 0) soloPrincipalPuedeCrearBorrar($alc); // crear nuevo
+            else autorizarRecurso($alc, 'equipo', (int)$_POST['id']);
             respuesta($cliEquipos->guardar($_POST, $_FILES, $usr['id_cliente'] ?? ''));
 
         case 'ELIMINAR_EQUIPO_CLI':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            soloPrincipalPuedeCrearBorrar(alcanceSub($usr, $cliSub));
             respuesta($cliEquipos->eliminar((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
 
         case 'SUBIR_DOC_EQUIPO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'equipo', (int)($_POST['equipo_id'] ?? 0));
             respuesta($cliEquipos->subirDoc($_POST, $_FILES, $usr['id_cliente'] ?? ''));
 
         case 'ELIMINAR_DOC_EQUIPO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'equipo', parentDeRecurso($pdo, 'cliente_equipos_docs', 'equipo_id', (int)($payload['id'] ?? 0)));
             respuesta($cliEquipos->eliminarDoc((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
 
         case 'REGISTRAR_HOROMETRO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'equipo', (int)($payload['equipo_id'] ?? 0));
             respuesta($cliEquipos->registrarHora($payload, $usr['id_cliente'] ?? ''));
 
         case 'ELIMINAR_HOROMETRO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'equipo', parentDeRecurso($pdo, 'cliente_equipos_horometro', 'equipo_id', (int)($payload['id'] ?? 0)));
             respuesta($cliEquipos->eliminarHora((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
 
         case 'GUARDAR_CERT_EQUIPO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'equipo', (int)($_POST['equipo_id'] ?? 0));
             respuesta($cliEquipos->guardarCert($_POST, $_FILES, $usr['id_cliente'] ?? ''));
 
         case 'ELIMINAR_CERT_EQUIPO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'equipo', parentDeRecurso($pdo, 'cliente_equipos_cert', 'equipo_id', (int)($payload['id'] ?? 0)));
             respuesta($cliEquipos->eliminarCert((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
 
         // ── Personal del cliente ─────────────────────────────────
         case 'GUARDAR_PERSONAL_CLI':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            if ((int)($payload['id'] ?? 0) === 0) soloPrincipalPuedeCrearBorrar($alc);
+            else autorizarRecurso($alc, 'personal', (int)$payload['id']);
             respuesta($cliPersonal->guardar($payload, $usr['id_cliente'] ?? ''));
 
         case 'ELIMINAR_PERSONAL_CLI':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            soloPrincipalPuedeCrearBorrar(alcanceSub($usr, $cliSub));
             respuesta($cliPersonal->eliminar((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
 
         case 'GUARDAR_PREFS_NOTIF':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status'=>'error','message'=>'No autorizado.'],401);
+            bloquearSiLectura(alcanceSub($usr, $cliSub));
             $idc = $usr['id_cliente'] ?? '';
             respuesta($cliPersonal->guardarPrefsNotif($payload, $idc));
 
         case 'SUBIR_DOC_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'personal', (int)($_POST['personal_id'] ?? 0));
             respuesta($cliPersonal->subirDoc($_POST, $_FILES, $usr['id_cliente'] ?? ''));
 
         case 'ELIMINAR_DOC_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'personal', parentDeRecurso($pdo, 'cliente_personal_docs', 'personal_id', (int)($payload['id'] ?? 0)));
             respuesta($cliPersonal->eliminarDoc((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
 
         case 'EDITAR_DOC_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'personal', parentDeRecurso($pdo, 'cliente_personal_docs', 'personal_id', (int)(($payload['id'] ?? $_POST['id']) ?? 0)));
             $idc = $usr['id_cliente'] ?? '';
             respuesta($cliPersonal->editarDoc($payload ?? $_POST, $_FILES, $idc));
 
         case 'GUARDAR_CERT_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'personal', (int)($_POST['personal_id'] ?? 0));
             respuesta($cliPersonal->guardarCert($_POST, $_FILES, $usr['id_cliente'] ?? ''));
 
         case 'ELIMINAR_CERT_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'personal', parentDeRecurso($pdo, 'cliente_personal_cert', 'personal_id', (int)($payload['id'] ?? 0)));
             respuesta($cliPersonal->eliminarCert((int)($payload['id'] ?? 0), $usr['id_cliente'] ?? ''));
+
+        // ── Sub-usuarios del cliente (solo cuenta principal) ──
+        case 'CREAR_SUBUSUARIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliSub->crear($payload, $usr));
+
+        case 'EDITAR_SUBUSUARIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliSub->actualizar($payload, $usr));
+
+        case 'ELIMINAR_SUBUSUARIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliSub->eliminar((int)($payload['id'] ?? 0), $usr));
+
+        case 'ASIGNAR_RECURSOS_SUBUSUARIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliSub->asignar($payload, $usr));
 
         default:
             respuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);

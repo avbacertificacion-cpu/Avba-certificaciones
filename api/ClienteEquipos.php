@@ -89,14 +89,28 @@ class ClienteEquipos {
         return (bool)$s->fetch();
     }
 
+    /**
+     * Fragmento SQL para restringir a los ids asignados a un sub-usuario.
+     * $soloIds === null → sin restricción (cuenta principal).
+     * $soloIds === []   → sin acceso a ningún equipo.
+     * @return array{0:string,1:array} [fragmentoSQL, params]
+     */
+    private function restro(?array $soloIds, string $colId): array {
+        if ($soloIds === null) return ['', []];
+        if (!$soloIds)         return [" AND 1=0", []];
+        $in = implode(',', array_fill(0, count($soloIds), '?'));
+        return [" AND $colId IN ($in)", array_map('intval', $soloIds)];
+    }
+
     // ════════════════════════════════════════════════════════
     //  EQUIPOS
     // ════════════════════════════════════════════════════════
 
-    public function listar(string $idCliente): array {
+    public function listar(string $idCliente, ?array $soloIds = null): array {
         $idCliente = $this->norm($idCliente);
         if (!$idCliente) return ['status' => 'error', 'message' => 'id_cliente requerido.'];
 
+        [$frag, $fragParams] = $this->restro($soloIds, 'e.id');
         $stmt = $this->pdo->prepare("
             SELECT e.id, e.nombre, e.tipo, e.marca, e.modelo, e.serie,
                    e.capacidad, e.anio, e.notas, e.estado, e.foto_url,
@@ -114,12 +128,12 @@ class ClienteEquipos {
                 FROM cliente_equipos_horometro GROUP BY equipo_id
             ) hm ON hm.equipo_id = e.id
             LEFT JOIN cliente_equipos_cert c ON c.equipo_id = e.id
-            WHERE e.id_cliente = ?
+            WHERE e.id_cliente = ?$frag
             GROUP BY e.id, e.nombre, e.tipo, e.marca, e.modelo, e.serie,
                      e.capacidad, e.anio, e.notas, e.estado, e.created_at, hm.horas
             ORDER BY e.nombre
         ");
-        $stmt->execute([$idCliente]);
+        $stmt->execute(array_merge([$idCliente], $fragParams));
 
         return ['status' => 'success', 'equipos' => array_map(fn($r) => [
             'id'             => (int)$r['id'],
@@ -263,8 +277,11 @@ class ClienteEquipos {
     //  DETALLE COMPLETO
     // ════════════════════════════════════════════════════════
 
-    public function detalle(int $id, string $idCliente): array {
+    public function detalle(int $id, string $idCliente, ?array $soloIds = null): array {
         $idCliente = $this->norm($idCliente);
+        if ($soloIds !== null && !in_array($id, array_map('intval', $soloIds), true)) {
+            return ['status' => 'error', 'message' => 'No autorizado para ver este equipo.'];
+        }
         $s = $this->pdo->prepare("SELECT * FROM cliente_equipos WHERE id=? AND id_cliente=?");
         $s->execute([$id, $idCliente]);
         $eq = $s->fetch();
@@ -523,12 +540,13 @@ class ClienteEquipos {
     //  DASHBOARD / ESTADÍSTICAS
     // ════════════════════════════════════════════════════════
 
-    public function dashboard(string $idCliente): array {
+    public function dashboard(string $idCliente, ?array $soloIds = null): array {
         $idCliente = $this->norm($idCliente);
         if (!$idCliente) return ['status' => 'error', 'message' => 'id_cliente requerido.'];
 
-        $s = $this->pdo->prepare("SELECT id, nombre FROM cliente_equipos WHERE id_cliente=?");
-        $s->execute([$idCliente]);
+        [$frag, $fragParams] = $this->restro($soloIds, 'id');
+        $s = $this->pdo->prepare("SELECT id, nombre FROM cliente_equipos WHERE id_cliente=?$frag");
+        $s->execute(array_merge([$idCliente], $fragParams));
         $equipos = $s->fetchAll();
         $total   = count($equipos);
 
@@ -568,19 +586,19 @@ class ClienteEquipos {
         ");
         $hStmt->execute($ids);
 
-        // Equipment by type
+        // Equipment by type (restringido al conjunto ya filtrado)
         $tipoStmt = $this->pdo->prepare(
             "SELECT COALESCE(NULLIF(TRIM(tipo),''),'Sin tipo') AS tipo, COUNT(*) AS total
-             FROM cliente_equipos WHERE id_cliente=? GROUP BY tipo ORDER BY total DESC"
+             FROM cliente_equipos WHERE id IN ($in) GROUP BY tipo ORDER BY total DESC"
         );
-        $tipoStmt->execute([$idCliente]);
+        $tipoStmt->execute($ids);
 
-        // Equipment by estado
+        // Equipment by estado (restringido al conjunto ya filtrado)
         $estadoStmt = $this->pdo->prepare(
             "SELECT COALESCE(NULLIF(TRIM(estado),''),'Activo') AS estado, COUNT(*) AS total
-             FROM cliente_equipos WHERE id_cliente=? GROUP BY estado ORDER BY total DESC"
+             FROM cliente_equipos WHERE id IN ($in) GROUP BY estado ORDER BY total DESC"
         );
-        $estadoStmt->execute([$idCliente]);
+        $estadoStmt->execute($ids);
 
         // Próximas certificaciones venciendo en 90 días
         $proxStmt = $this->pdo->prepare("

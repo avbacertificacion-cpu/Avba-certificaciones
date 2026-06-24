@@ -298,12 +298,23 @@ class Auth {
             return ['status' => 'error', 'message' => 'Demasiados intentos fallidos. Espera ' . LOGIN_BLOQUEO_MIN . ' minutos e intenta de nuevo.'];
         }
 
-        $stmt = $this->pdo->prepare(
-            "SELECT id, usuario, password_hash, rol, nombre, id_cliente, activo
-             FROM usuarios WHERE usuario = ?"
-        );
-        $stmt->execute([$usuario]);
-        $row = $stmt->fetch();
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT id, usuario, password_hash, rol, nombre, id_cliente, activo,
+                        usuario_padre_id, permiso_sub
+                 FROM usuarios WHERE usuario = ?"
+            );
+            $stmt->execute([$usuario]);
+            $row = $stmt->fetch();
+        } catch (\PDOException $e) {
+            // Compatibilidad: columnas de sub-usuario aún no migradas
+            $stmt = $this->pdo->prepare(
+                "SELECT id, usuario, password_hash, rol, nombre, id_cliente, activo
+                 FROM usuarios WHERE usuario = ?"
+            );
+            $stmt->execute([$usuario]);
+            $row = $stmt->fetch();
+        }
 
         // Siempre verificar para evitar timing attacks
         $hashVerificar = $row['password_hash'] ?? '$2y$10$invalidhashpadding000000000000000000000000000000000000000';
@@ -336,13 +347,16 @@ class Auth {
             "UPDATE usuarios SET session_token = ?, token_expires = ?, ultimo_acceso = NOW() WHERE id = ?"
         )->execute([$token, $expires, $row['id']]);
 
+        $esSub = !empty($row['usuario_padre_id']);
         return [
-            'status'     => 'success',
-            'rol'        => $row['rol'],
-            'nombre'     => $row['nombre'],
-            'usuario'    => $usuario,
-            'id_cliente' => $row['id_cliente'] ?? '',
-            'token'      => $token,
+            'status'        => 'success',
+            'rol'           => $row['rol'],
+            'nombre'        => $row['nombre'],
+            'usuario'       => $usuario,
+            'id_cliente'    => $row['id_cliente'] ?? '',
+            'token'         => $token,
+            'es_subusuario' => $esSub,
+            'permiso_sub'   => $esSub ? ($row['permiso_sub'] ?? 'gestion') : null,
         ];
     }
 
@@ -574,7 +588,13 @@ class Auth {
     }
 
     // ── PORTAL CLIENTE ─────────────────────────────────────
-    public function obtenerDatosCliente(string $idCliente): array {
+    /**
+     * @param ?array $certIds  null = cuenta principal (sin restricción).
+     *                         Array de equipos.id = sub-usuario; solo verá esas
+     *                         certificaciones y NO los demás módulos (accesorios,
+     *                         personal de cursos, PND), que no son asignables.
+     */
+    public function obtenerDatosCliente(string $idCliente, ?array $certIds = null): array {
         $idCliente = trim($idCliente);
         if (!$idCliente) return ['status' => 'error', 'message' => 'id_cliente requerido.'];
 
@@ -600,7 +620,10 @@ class Auth {
         $equipos = [];
         $nombreCliente = '';
 
+        $certIdsInt = $certIds === null ? null : array_map('intval', $certIds);
         foreach ($rows as $r) {
+            // Sub-usuario: solo certificaciones asignadas
+            if ($certIdsInt !== null && !in_array((int)$r['id'], $certIdsInt, true)) continue;
             if (!$nombreCliente) $nombreCliente = $r['cliente'];
             $fechaParaVigencia = null;
             if ($r['fecha']) {
@@ -609,6 +632,7 @@ class Auth {
             }
             $vigencia = calcularVigencia($fechaParaVigencia);
             $equipos[] = [
+                'id'          => (int)$r['id'],
                 'folio'       => $r['control'],
                 'maquinaria'  => $r['maquinaria'],
                 'marca'       => $r['marca'],
@@ -719,6 +743,13 @@ class Auth {
                 ];
             }
         } catch (\PDOException $e) { /* tabla aún no existe */ }
+
+        // Sub-usuario: los módulos no asignables se ocultan por completo
+        if ($certIds !== null) {
+            $accesorios = [];
+            $personal   = [];
+            $pnd        = [];
+        }
 
         return [
             'status'         => 'success',

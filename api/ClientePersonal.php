@@ -87,14 +87,27 @@ class ClientePersonal {
         return (bool)$s->fetch();
     }
 
+    /**
+     * Fragmento SQL para restringir a los ids asignados a un sub-usuario.
+     * $soloIds === null → sin restricción; [] → sin acceso.
+     * @return array{0:string,1:array} [fragmentoSQL, params]
+     */
+    private function restro(?array $soloIds, string $colId): array {
+        if ($soloIds === null) return ['', []];
+        if (!$soloIds)         return [" AND 1=0", []];
+        $in = implode(',', array_fill(0, count($soloIds), '?'));
+        return [" AND $colId IN ($in)", array_map('intval', $soloIds)];
+    }
+
     // ════════════════════════════════════════════════════════
     //  PERSONAL
     // ════════════════════════════════════════════════════════
 
-    public function listar(string $idCliente): array {
+    public function listar(string $idCliente, ?array $soloIds = null): array {
         $idCliente = $this->norm($idCliente);
         if (!$idCliente) return ['status' => 'error', 'message' => 'id_cliente requerido.'];
 
+        [$frag, $fragParams] = $this->restro($soloIds, 'p.id');
         $stmt = $this->pdo->prepare("
             SELECT p.id, p.nombre, p.puesto, p.departamento, p.numero_empleado,
                    DATE_FORMAT(p.fecha_ingreso,'%d/%m/%Y') AS fecha_ingreso,
@@ -108,12 +121,12 @@ class ClientePersonal {
             FROM cliente_personal p
             LEFT JOIN cliente_personal_docs d ON d.personal_id = p.id
             LEFT JOIN cliente_personal_cert c ON c.personal_id = p.id
-            WHERE p.id_cliente = ?
+            WHERE p.id_cliente = ?$frag
             GROUP BY p.id, p.nombre, p.puesto, p.departamento, p.numero_empleado,
                      p.fecha_ingreso, p.telefono, p.notas, p.estado, p.created_at
             ORDER BY p.nombre
         ");
-        $stmt->execute([$idCliente]);
+        $stmt->execute(array_merge([$idCliente], $fragParams));
 
         return ['status' => 'success', 'personal' => array_map(fn($r) => [
             'id'              => (int)$r['id'],
@@ -189,8 +202,11 @@ class ClientePersonal {
     //  DETALLE COMPLETO
     // ════════════════════════════════════════════════════════
 
-    public function detalle(int $id, string $idCliente): array {
+    public function detalle(int $id, string $idCliente, ?array $soloIds = null): array {
         $idCliente = $this->norm($idCliente);
+        if ($soloIds !== null && !in_array($id, array_map('intval', $soloIds), true)) {
+            return ['status' => 'error', 'message' => 'No autorizado para ver este empleado.'];
+        }
         $s = $this->pdo->prepare("SELECT * FROM cliente_personal WHERE id=? AND id_cliente=?");
         $s->execute([$id, $idCliente]);
         $per = $s->fetch();
@@ -453,12 +469,13 @@ class ClientePersonal {
     //  DASHBOARD
     // ════════════════════════════════════════════════════════
 
-    public function dashboard(string $idCliente): array {
+    public function dashboard(string $idCliente, ?array $soloIds = null): array {
         $idCliente = $this->norm($idCliente);
         if (!$idCliente) return ['status' => 'error', 'message' => 'id_cliente requerido.'];
 
-        $s = $this->pdo->prepare("SELECT id FROM cliente_personal WHERE id_cliente=?");
-        $s->execute([$idCliente]);
+        [$frag, $fragParams] = $this->restro($soloIds, 'id');
+        $s = $this->pdo->prepare("SELECT id FROM cliente_personal WHERE id_cliente=?$frag");
+        $s->execute(array_merge([$idCliente], $fragParams));
         $ids   = array_column($s->fetchAll(), 'id');
         $total = count($ids);
 
@@ -483,9 +500,9 @@ class ClientePersonal {
 
         $stStmt = $this->pdo->prepare(
             "SELECT COALESCE(NULLIF(TRIM(estado),''),'Activo') AS estado, COUNT(*) AS total
-             FROM cliente_personal WHERE id_cliente=? GROUP BY estado"
+             FROM cliente_personal WHERE id IN ($in) GROUP BY estado"
         );
-        $stStmt->execute([$idCliente]);
+        $stStmt->execute($ids);
         $estados = $stStmt->fetchAll();
         $activos = 0; $bajas = 0;
         foreach ($estados as $e) {
@@ -495,15 +512,15 @@ class ClientePersonal {
 
         $dptStmt = $this->pdo->prepare(
             "SELECT COALESCE(NULLIF(TRIM(departamento),''),'Sin departamento') AS departamento, COUNT(*) AS total
-             FROM cliente_personal WHERE id_cliente=? GROUP BY departamento ORDER BY total DESC LIMIT 8"
+             FROM cliente_personal WHERE id IN ($in) GROUP BY departamento ORDER BY total DESC LIMIT 8"
         );
-        $dptStmt->execute([$idCliente]);
+        $dptStmt->execute($ids);
 
         $ptoStmt = $this->pdo->prepare(
             "SELECT COALESCE(NULLIF(TRIM(puesto),''),'Sin puesto') AS puesto, COUNT(*) AS total
-             FROM cliente_personal WHERE id_cliente=? GROUP BY puesto ORDER BY total DESC LIMIT 8"
+             FROM cliente_personal WHERE id IN ($in) GROUP BY puesto ORDER BY total DESC LIMIT 8"
         );
-        $ptoStmt->execute([$idCliente]);
+        $ptoStmt->execute($ids);
 
         $proxStmt = $this->pdo->prepare("
             SELECT p.nombre AS personal, c.tipo_cert,

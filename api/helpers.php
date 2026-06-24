@@ -162,12 +162,22 @@ function calcularVigencia(?string $fechaCert): array {
 function validarToken(PDO $pdo, ?string $token): ?array {
     if (!$token) return null;
 
-    $stmt = $pdo->prepare(
-        "SELECT id, usuario, rol, nombre, id_cliente
-         FROM usuarios
-         WHERE session_token = ? AND activo = 1 AND token_expires > NOW()"
-    );
-    $stmt->execute([$token]);
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT id, usuario, rol, nombre, id_cliente, usuario_padre_id, permiso_sub
+             FROM usuarios
+             WHERE session_token = ? AND activo = 1 AND token_expires > NOW()"
+        );
+        $stmt->execute([$token]);
+    } catch (\PDOException $e) {
+        // Compatibilidad: columnas de sub-usuario aún no migradas
+        $stmt = $pdo->prepare(
+            "SELECT id, usuario, rol, nombre, id_cliente
+             FROM usuarios
+             WHERE session_token = ? AND activo = 1 AND token_expires > NOW()"
+        );
+        $stmt->execute([$token]);
+    }
     return $stmt->fetch() ?: null;
 }
 
