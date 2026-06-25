@@ -18,6 +18,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 .hdr-user-s{font-size:11px;color:rgba(255,255,255,.6);text-align:right;}
 .btn-logout{padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;font-size:12px;font-weight:600;cursor:pointer;}
 .btn-logout:hover{background:rgba(255,255,255,.2);}
+.hdr-empresa-sel{padding:5px 28px 5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:600;cursor:pointer;outline:none;max-width:200px;appearance:auto;}
 .wrap{max-width:1000px;margin:0 auto;padding:20px 16px 60px;}
 /* Stats */
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;}
@@ -369,7 +370,8 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
     <div><div class="hdr-t">AVBA Inspections</div><div class="hdr-s">Portal de certificados</div></div>
   </div>
   <div class="hdr-r">
-    <div><div class="hdr-user-t" id="hdr-nombre">—</div><div class="hdr-user-s">Cliente</div></div>
+    <select id="hdr-empresa-sel" class="hdr-empresa-sel" style="display:none" onchange="cambiarEmpresa(this.value)" title="Cambiar empresa"></select>
+    <div><div class="hdr-user-t" id="hdr-nombre">—</div><div class="hdr-user-s" id="hdr-sub">Cliente</div></div>
     <button class="btn-logout" onclick="cerrarSesion()">Salir</button>
   </div>
 </div>
@@ -1065,25 +1067,70 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
 <script>
 // ── Fetch interceptor (usa mismo avba_session que los demás módulos) ────────
 const _origFetch = window.fetch.bind(window);
+
+// ── Multi-empresa: cliente con acceso a más de una empresa ─────────────────
+const _idsCliente = (_sesion.id_cliente || '').split(',').map(s => s.trim()).filter(Boolean);
+let _clienteActivo = sessionStorage.getItem('avba_cliente_sel') || _idsCliente[0] || '';
+if (_clienteActivo && !_idsCliente.includes(_clienteActivo)) _clienteActivo = _idsCliente[0] || '';
+sessionStorage.setItem('avba_cliente_sel', _clienteActivo);
+
+async function _initEmpresaSel() {
+  if (_idsCliente.length <= 1) return;
+  const sel = document.getElementById('hdr-empresa-sel');
+  try {
+    const r = await _origFetch('api/index.php?action=GET_MIS_EMPRESAS', {
+      headers: { 'X-Token': _sesion.token || '' }
+    });
+    const d = await r.json();
+    if (d.status === 'success' && d.empresas.length) {
+      sel.innerHTML = d.empresas.map(e =>
+        `<option value="${e.primera_parte}"${e.primera_parte === _clienteActivo ? ' selected' : ''}>${e.nombre_cliente}</option>`
+      ).join('');
+      sel.style.display = '';
+      const sub = document.getElementById('hdr-sub');
+      if (sub) sub.textContent = d.empresas.length + ' empresas';
+      return;
+    }
+  } catch {}
+  // Fallback: mostrar IDs
+  sel.innerHTML = _idsCliente.map(id =>
+    `<option value="${id}"${id === _clienteActivo ? ' selected' : ''}>${id}</option>`
+  ).join('');
+  sel.style.display = '';
+}
+_initEmpresaSel();
+
+function cambiarEmpresa(id) {
+  if (!_idsCliente.includes(id)) return;
+  _clienteActivo = id;
+  sessionStorage.setItem('avba_cliente_sel', id);
+  cargarDatos();
+  cargarAlertasVencimiento();
+}
 window.fetch = function(url, opts = {}) {
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   const t = s.token || '';
-  if (t && typeof url === 'string' && url.includes('api/index.php')) {
+  const isApi = typeof url === 'string' && url.includes('api/index.php');
+  if (isApi) {
     if (!opts.method || opts.method.toUpperCase() === 'GET') {
-      opts.headers = Object.assign({}, opts.headers || {}, {
-        'Authorization': 'Bearer ' + t,
-        'X-Token': t
-      });
+      // Inject token header
+      opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t, 'X-Token': t });
+      // Inject id_cliente_sel for multi-client users
+      if (_clienteActivo && _idsCliente.length > 1) {
+        url = url + (url.includes('?') ? '&' : '?') + 'id_cliente_sel=' + encodeURIComponent(_clienteActivo);
+      }
     } else {
       if (!(opts.body instanceof FormData)) {
         try {
           const b = JSON.parse(opts.body || '{}');
-          if (!b.token) { b.token = t; opts.body = JSON.stringify(b); }
+          if (!b.token) b.token = t;
+          if (_clienteActivo && _idsCliente.length > 1) b.id_cliente_sel = _clienteActivo;
+          opts.body = JSON.stringify(b);
         } catch(_) {}
       }
     }
   }
-  if (typeof url === 'string' && url.includes('api/index.php')) {
+  if (isApi) {
     return _origFetch(url, opts).then(function(r) {
       if (r.status === 401) { localStorage.removeItem('avba_session'); setTimeout(function(){ location.href='login.html'; }, 50); }
       return r;

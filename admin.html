@@ -213,6 +213,37 @@
     .activo-toggle { display: flex; align-items: center; gap: 8px; padding-top: 6px; }
     .activo-toggle input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; }
     .divider { height: 1px; background: var(--borde); margin: 16px 0 14px; }
+
+    /* ── Selector multi-empresa ── */
+    .cp-wrap { border: 1.5px solid var(--borde); border-radius: 8px; overflow: hidden; }
+    .cp-search input {
+      width: 100%; padding: 8px 12px;
+      border: none; border-bottom: 1px solid var(--borde);
+      font-size: 13px; color: var(--texto); background: var(--blanco); outline: none;
+    }
+    .cp-search input:focus { border-bottom-color: var(--azul); }
+    .cp-list { max-height: 150px; overflow-y: auto; }
+    .cp-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 12px; cursor: pointer; font-size: 12.5px; color: var(--texto);
+      border-bottom: 1px solid #f5f6fa;
+    }
+    .cp-item:last-child { border-bottom: none; }
+    .cp-item:hover { background: var(--azul-light); }
+    .cp-item input[type=checkbox] { width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
+    .cp-item .cp-id { margin-left: auto; font-size: 10.5px; color: var(--texto-hint); font-family: monospace; }
+    .cp-empty { padding: 18px; text-align: center; color: var(--texto-hint); font-size: 12px; }
+    .cp-pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+    .cp-pill {
+      display: inline-flex; align-items: center; gap: 3px;
+      background: var(--azul-light); color: var(--azul-dark);
+      border: 1px solid #c3d9f3; border-radius: 20px;
+      padding: 3px 6px 3px 10px; font-size: 11.5px; font-weight: 600;
+    }
+    .cp-pill button {
+      background: none; border: none; cursor: pointer; color: var(--azul);
+      font-size: 15px; line-height: 1; padding: 0;
+    }
   </style>
 </head>
 <body>
@@ -466,14 +497,17 @@
       </select>
     </div>
 
-    <!-- ID Cliente (solo para cuentas cliente) -->
+    <!-- Empresas cliente (multi-select) -->
     <div class="field" id="campo-id-cliente" style="display:none">
-      <label>ID Cliente <span style="color:var(--rojo)">*</span></label>
-      <input type="text" id="usr-id-cliente" placeholder="Ej: 10001" autocomplete="off">
-      <div class="hint">
-        Prefijo numérico de los folios del cliente.<br>
-        Ejemplo: si los folios son <strong>10001-0042</strong>, el ID es <strong>10001</strong>.
+      <label>Empresa(s) cliente <span style="color:var(--rojo)">*</span></label>
+      <div class="cp-wrap">
+        <div class="cp-search">
+          <input type="text" id="cp-buscar" placeholder="Buscar empresa..." oninput="filtrarCp()" autocomplete="off">
+        </div>
+        <div class="cp-list" id="cp-list"><div class="cp-empty">Cargando...</div></div>
       </div>
+      <div class="cp-pills" id="cp-pills"></div>
+      <div class="hint">Puedes seleccionar una o varias empresas. La cuenta accede a todas las seleccionadas.</div>
     </div>
 
     <!-- Registro STPS (solo para INSPECTOR) -->
@@ -548,12 +582,84 @@ function logout() {
 }
 
 /* ── Estado ── */
-let usuariosGlobal = [];
-let modoEdicion    = false;
+let usuariosGlobal  = [];
+let modoEdicion     = false;
+let _clientesLista  = [];        // [{primera_parte, nombre_cliente}]
+let _cpSelected     = new Set(); // IDs de empresas seleccionadas en el modal
+let _cpBusq         = '';
+
+/* ── Cargar lista de clientes (se llama una vez) ── */
+async function cargarListaClientes() {
+  if (_clientesLista.length) return;
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    const r = await fetch(API + "?action=LISTAR_CLIENTES_ADMIN&token=" + encodeURIComponent(s.token || ""));
+    const d = await r.json();
+    if (d.status === 'success') _clientesLista = d.data || [];
+  } catch {}
+}
+
+/* ── Multi-select helpers ── */
+function getCpValue()    { return Array.from(_cpSelected).join(','); }
+function setCpValue(str) { _cpSelected = new Set((str||'').split(',').map(s=>s.trim()).filter(Boolean)); }
+
+function filtrarCp() {
+  _cpBusq = document.getElementById('cp-buscar').value.toLowerCase().trim();
+  renderCpList();
+}
+
+function renderCpList() {
+  const list  = document.getElementById('cp-list');
+  const items = _clientesLista.filter(c =>
+    !_cpBusq ||
+    c.nombre_cliente.toLowerCase().includes(_cpBusq) ||
+    c.primera_parte.includes(_cpBusq)
+  );
+  if (!items.length) { list.innerHTML = '<div class="cp-empty">Sin resultados</div>'; return; }
+  list.innerHTML = items.map(c => {
+    const chk = _cpSelected.has(c.primera_parte) ? 'checked' : '';
+    return `<label class="cp-item">
+      <input type="checkbox" value="${esc(c.primera_parte)}" ${chk}
+             onchange="toggleCp('${esc(c.primera_parte)}',this.checked)">
+      <span>${esc(c.nombre_cliente)}</span>
+      <span class="cp-id">${esc(c.primera_parte)}</span>
+    </label>`;
+  }).join('');
+}
+
+function toggleCp(id, checked) {
+  if (checked) _cpSelected.add(id); else _cpSelected.delete(id);
+  renderCpPills();
+}
+
+function renderCpPills() {
+  const pills = document.getElementById('cp-pills');
+  if (!_cpSelected.size) { pills.innerHTML = ''; return; }
+  pills.innerHTML = Array.from(_cpSelected).map(id => {
+    const c  = _clientesLista.find(x => x.primera_parte === id);
+    const nm = c ? c.nombre_cliente : id;
+    return `<span class="cp-pill">${esc(nm)}<button type="button" onclick="quitarCp('${esc(id)}')" title="Quitar">×</button></span>`;
+  }).join('');
+}
+
+function quitarCp(id) {
+  _cpSelected.delete(id);
+  renderCpList();
+  renderCpPills();
+}
+
+async function initCpModal() {
+  document.getElementById('cp-buscar').value = '';
+  _cpBusq = '';
+  await cargarListaClientes();
+  renderCpList();
+  renderCpPills();
+}
 
 /* ── Cargar usuarios ── */
 async function cargar() {
   const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  await cargarListaClientes();
   try {
     const res  = await fetch(API + "?action=LISTAR_USUARIOS&token=" + encodeURIComponent(s.token || ""));
     const data = await res.json();
@@ -648,20 +754,25 @@ function renderClientes(data) {
     tbody.innerHTML = `<tr class="loading-row"><td colspan="6">Sin cuentas de cliente. Usa "+ Nueva cuenta cliente".</td></tr>`;
     return;
   }
-  tbody.innerHTML = data.map(u => `
-    <tr>
+  tbody.innerHTML = data.map(u => {
+    const ids   = (u.id_cliente || '').split(',').map(s => s.trim()).filter(Boolean);
+    const label = ids.length
+      ? ids.map(id => {
+          const c = _clientesLista.find(x => x.primera_parte === id);
+          return c
+            ? `<span title="${esc(id)}" style="display:inline-block;background:var(--azul-light);color:var(--azul-dark);border:1px solid #c3d9f3;border-radius:4px;padding:1px 6px;font-size:11px;font-weight:600;margin:1px 2px">${esc(c.nombre_cliente)}</span>`
+            : `<code style="font-size:11px">${esc(id)}</code>`;
+        }).join('')
+      : '—';
+    return `<tr>
       <td><strong>${esc(u.usuario)}</strong></td>
       <td>${esc(u.nombre || '—')}</td>
-      <td>
-        <span style="font-family:monospace;font-size:12px;background:var(--gris-bg);
-                     padding:2px 8px;border-radius:5px;border:1px solid var(--borde)">
-          ${esc(u.id_cliente || '—')}
-        </span>
-      </td>
+      <td>${label}</td>
       <td>${estadoBadge(u.activo)}</td>
       <td style="color:var(--texto-hint);font-size:11.5px">${esc(u.ultimo_acceso || '—')}</td>
       <td>${accionesTd(u)}</td>
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 }
 
 /* ── Abrir modal crear ── */
@@ -677,7 +788,8 @@ function abrirCrear(tipo) {
   document.getElementById("usr-nombre").value             = "";
   document.getElementById("usr-password").value           = "";
   document.getElementById("usr-rol").value                = "";
-  document.getElementById("usr-id-cliente").value         = "";
+  setCpValue("");
+  initCpModal();
   document.getElementById("usr-stps").value               = "";
   document.getElementById("usr-activo").checked           = true;
   document.getElementById("pass-req").textContent         = "*";
@@ -711,7 +823,8 @@ function abrirEditar(id) {
   document.getElementById("usr-nombre").value             = u.nombre || "";
   document.getElementById("usr-password").value           = "";
   document.getElementById("usr-rol").value                = u.rol;
-  document.getElementById("usr-id-cliente").value         = u.id_cliente || "";
+  setCpValue(u.id_cliente || "");
+  initCpModal();
   document.getElementById("usr-stps").value               = u.registro_stps || "";
   document.getElementById("usr-activo").checked           = u.activo == 1;
   document.getElementById("pass-req").textContent         = "";
@@ -742,13 +855,13 @@ async function guardarUsuario() {
   const tipo      = document.getElementById("usr-tipo").value;
   const esCliente = tipo === 'cliente';
   const rol       = esCliente ? "CLIENTE" : document.getElementById("usr-rol").value;
-  const idCliente = document.getElementById("usr-id-cliente").value.trim();
+  const idCliente = esCliente ? getCpValue() : "";
   const activo    = document.getElementById("usr-activo").checked ? 1 : 0;
   const id        = document.getElementById("usr-id").value;
 
   if (!nombre)                          { alert("El nombre es obligatorio."); return; }
   if (!rol)                             { alert("Selecciona un rol."); return; }
-  if (esCliente && !idCliente)          { alert("El ID Cliente es obligatorio."); return; }
+  if (esCliente && !idCliente)          { alert("Selecciona al menos una empresa cliente."); return; }
   if (!modoEdicion && !usuario)         { alert("El nombre de usuario es obligatorio."); return; }
   if (!modoEdicion && !password)        { alert("La contraseña es obligatoria."); return; }
   if (password && password.length < 6)  { alert("La contraseña debe tener al menos 6 caracteres."); return; }
