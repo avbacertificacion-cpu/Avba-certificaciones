@@ -35,10 +35,13 @@ try {
 echo "=== AVBA Demo Seeder ===\n\n";
 
 // ── 1. Crear usuario demo ─────────────────────────────────────────────────────
-$demoUsuario = 'demo@constructorademo.mx';
-$demoPass    = password_hash('Demo2025!', PASSWORD_DEFAULT);
+$demoUsuario = 'Demo';
+$demoPass    = password_hash('Demo2026', PASSWORD_DEFAULT);
 $demoNombre  = 'CONSTRUCTORA DEMO S.A. DE C.V.';
 $demoIdCli   = '00001';
+
+// Migrar usuario anterior si aún existe con el nombre viejo
+$pdo->prepare("UPDATE usuarios SET usuario=? WHERE usuario='demo@constructorademo.mx'")->execute([$demoUsuario]);
 
 $existing = $pdo->prepare("SELECT id FROM usuarios WHERE usuario = ?");
 $existing->execute([$demoUsuario]);
@@ -53,7 +56,7 @@ if ($existingRow) {
     $pdo->prepare("INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo) VALUES (?,?,?,?,?,1)")
         ->execute([$demoUsuario, $demoPass, 'CLIENTE', $demoNombre, $demoIdCli]);
     $userId = $pdo->lastInsertId();
-    echo "✅ Usuario creado: $demoUsuario / Demo2025! (id=$userId)\n";
+    echo "✅ Usuario creado: $demoUsuario / Demo2026 (id=$userId)\n";
 }
 
 // ── 2. Asegurar tablas cliente_equipos ────────────────────────────────────────
@@ -606,7 +609,7 @@ echo "✅ Patricia Flores (HSE — Baja)\n";
 
 echo "\n=== RESUMEN FINAL ===\n";
 echo "Usuario: $demoUsuario\n";
-echo "Contraseña: Demo2025!\n";
+echo "Contraseña: Demo2026\n";
 echo "id_cliente: $demoIdCli\n";
 $totalEq = $pdo->query("SELECT COUNT(*) FROM cliente_equipos WHERE id_cliente='$demoIdCli'")->fetchColumn();
 $totalDocs = $pdo->query("SELECT COUNT(*) FROM cliente_equipos_docs d JOIN cliente_equipos e ON e.id=d.equipo_id WHERE e.id_cliente='$demoIdCli'")->fetchColumn();
