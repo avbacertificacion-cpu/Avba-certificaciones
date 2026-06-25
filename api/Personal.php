@@ -2708,6 +2708,7 @@ HTML;
         $html = file_get_contents($path);
         $html = str_replace(array_keys($map), array_values($map), $html);
         if ($sinSellos) {
+            $html = preg_replace('/<img[^>]*class=["\'][^"\']*avba-sello[^"\']*["\'][^>]*\/?>/i', '', $html);
             $html = str_replace('</head>', '<style>.avba-sello{display:none!important;}</style></head>', $html);
         }
         return $html;
