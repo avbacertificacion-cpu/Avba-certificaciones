@@ -1,0 +1,43 @@
+{
+  "appId": "mx.com.avba.certificaciones",
+  "appName": "AVBA Certificaciones",
+  "webDir": "www",
+  "server": {
+    "url": "https://gestion.avba.com.mx/login.html",
+    "androidScheme": "https",
+    "iosScheme": "https",
+    "cleartext": false,
+    "allowNavigation": [
+      "gestion.avba.com.mx",
+      "*.avba.com.mx",
+      "quickchart.io"
+    ]
+  },
+  "android": {
+    "allowMixedContent": false
+  },
+  "ios": {
+    "contentInset": "always",
+    "limitsNavigationsToAppBoundDomains": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "launchAutoHide": true,
+      "backgroundColor": "#0b3d91",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": true,
+      "splashImmersive": true
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#0b3d91",
+      "overlaysWebView": false
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_avba",
+      "iconColor": "#0b3d91"
+    }
+  }
+}

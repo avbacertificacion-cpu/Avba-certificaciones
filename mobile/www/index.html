@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0b3d91">
+  <title>AVBA Certificaciones</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      background:linear-gradient(160deg,#0b3d91,#062a66);
+      color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      text-align:center;padding:32px;min-height:100dvh;
+    }
+    .logo{width:120px;height:120px;border-radius:28px;background:#fff;display:flex;
+      align-items:center;justify-content:center;margin-bottom:24px;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+    .logo img{width:88px;height:88px;object-fit:contain}
+    h1{font-size:20px;font-weight:700;letter-spacing:.3px;margin-bottom:6px}
+    p{font-size:13px;opacity:.8;max-width:280px;line-height:1.5}
+    .spin{margin-top:28px;width:34px;height:34px;border:3px solid rgba(255,255,255,.25);
+      border-top-color:#fff;border-radius:50%;animation:r .8s linear infinite}
+    @keyframes r{to{transform:rotate(360deg)}}
+    .retry{display:none;margin-top:24px;padding:12px 28px;border:none;border-radius:10px;
+      background:#fff;color:#0b3d91;font-weight:700;font-size:14px;cursor:pointer}
+    .err{display:none;margin-top:18px;font-size:12px;color:#ffd9d9}
+  </style>
+</head>
+<body>
+  <div class="logo"><img src="icon-512.png" alt="AVBA"></div>
+  <h1>AVBA Certificaciones</h1>
+  <p id="msg">Conectando con el servidor…</p>
+  <div class="spin" id="spin"></div>
+  <div class="err" id="err">No hay conexión a internet. Verifica tu red e intenta de nuevo.</div>
+  <button class="retry" id="retry" onclick="cargar()">Reintentar</button>
+
+  <script>
+    // Esta pantalla solo se muestra como respaldo (offline). Con conexión,
+    // Capacitor carga directamente https://gestion.avba.com.mx/login.html
+    var DESTINO = 'https://gestion.avba.com.mx/login.html';
+
+    function cargar() {
+      document.getElementById('spin').style.display = '';
+      document.getElementById('retry').style.display = 'none';
+      document.getElementById('err').style.display = 'none';
+      document.getElementById('msg').textContent = 'Conectando con el servidor…';
+      // Comprobar conectividad antes de navegar
+      fetch(DESTINO, { method: 'HEAD', cache: 'no-store', mode: 'no-cors' })
+        .then(function () { location.href = DESTINO; })
+        .catch(mostrarError);
+      // Failsafe: si en 6s no navegó, mostrar reintento
+      setTimeout(function () {
+        if (document.getElementById('spin').style.display !== 'none') mostrarError();
+      }, 6000);
+    }
+    function mostrarError() {
+      document.getElementById('spin').style.display = 'none';
+      document.getElementById('err').style.display = '';
+      document.getElementById('retry').style.display = '';
+      document.getElementById('msg').textContent = 'Sin conexión';
+    }
+    window.addEventListener('load', cargar);
+  </script>
+</body>
+</html>

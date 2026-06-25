@@ -1,0 +1,17 @@
+# Dependencias
+node_modules/
+package-lock.json
+
+# Proyectos nativos generados por Capacitor (se regeneran con `cap add`)
+android/
+ios/
+
+# Builds
+*.apk
+*.aab
+*.ipa
+dist/
+.DS_Store
+
+# Capacitor
+.capacitor/
