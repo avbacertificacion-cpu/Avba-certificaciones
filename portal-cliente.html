@@ -1068,45 +1068,10 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
 // ── Fetch interceptor (usa mismo avba_session que los demás módulos) ────────
 const _origFetch = window.fetch.bind(window);
 
-// ── Multi-empresa: cliente con acceso a más de una empresa ─────────────────
-const _idsCliente = (_sesion.id_cliente || '').split(',').map(s => s.trim()).filter(Boolean);
-let _clienteActivo = sessionStorage.getItem('avba_cliente_sel') || _idsCliente[0] || '';
-if (_clienteActivo && !_idsCliente.includes(_clienteActivo)) _clienteActivo = _idsCliente[0] || '';
-sessionStorage.setItem('avba_cliente_sel', _clienteActivo);
-
-async function _initEmpresaSel() {
-  if (_idsCliente.length <= 1) return;
-  const sel = document.getElementById('hdr-empresa-sel');
-  try {
-    const r = await _origFetch('api/index.php?action=GET_MIS_EMPRESAS', {
-      headers: { 'X-Token': _sesion.token || '' }
-    });
-    const d = await r.json();
-    if (d.status === 'success' && d.empresas.length) {
-      sel.innerHTML = d.empresas.map(e =>
-        `<option value="${e.primera_parte}"${e.primera_parte === _clienteActivo ? ' selected' : ''}>${e.nombre_cliente}</option>`
-      ).join('');
-      sel.style.display = '';
-      const sub = document.getElementById('hdr-sub');
-      if (sub) sub.textContent = d.empresas.length + ' empresas';
-      return;
-    }
-  } catch {}
-  // Fallback: mostrar IDs
-  sel.innerHTML = _idsCliente.map(id =>
-    `<option value="${id}"${id === _clienteActivo ? ' selected' : ''}>${id}</option>`
-  ).join('');
-  sel.style.display = '';
-}
-_initEmpresaSel();
-
-function cambiarEmpresa(id) {
-  if (!_idsCliente.includes(id)) return;
-  _clienteActivo = id;
-  sessionStorage.setItem('avba_cliente_sel', id);
-  cargarDatos();
-  cargarAlertasVencimiento();
-}
+// Multi-empresa: estado declarado aquí, inicializado tras leer _sesion (más abajo).
+// El interceptor los referencia como closure, por lo que ya están listos al usarse.
+let _idsCliente   = [];
+let _clienteActivo = '';
 window.fetch = function(url, opts = {}) {
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   const t = s.token || '';
@@ -1163,6 +1128,46 @@ function _configurarTabsPorRol() {
   }
 }
 _configurarTabsPorRol();
+
+// ── Multi-empresa: cliente con acceso a más de una empresa ─────────────────
+_idsCliente   = (_sesion.id_cliente || '').split(',').map(s => s.trim()).filter(Boolean);
+_clienteActivo = sessionStorage.getItem('avba_cliente_sel') || _idsCliente[0] || '';
+if (_clienteActivo && !_idsCliente.includes(_clienteActivo)) _clienteActivo = _idsCliente[0] || '';
+sessionStorage.setItem('avba_cliente_sel', _clienteActivo);
+
+async function _initEmpresaSel() {
+  if (_idsCliente.length <= 1) return;
+  const sel = document.getElementById('hdr-empresa-sel');
+  try {
+    const r = await _origFetch('api/index.php?action=GET_MIS_EMPRESAS', {
+      headers: { 'X-Token': _sesion.token || '' }
+    });
+    const d = await r.json();
+    if (d.status === 'success' && d.empresas.length) {
+      sel.innerHTML = d.empresas.map(e =>
+        `<option value="${e.primera_parte}"${e.primera_parte === _clienteActivo ? ' selected' : ''}>${e.nombre_cliente}</option>`
+      ).join('');
+      sel.style.display = '';
+      const sub = document.getElementById('hdr-sub');
+      if (sub) sub.textContent = d.empresas.length + ' empresas';
+      return;
+    }
+  } catch {}
+  // Fallback: mostrar IDs
+  sel.innerHTML = _idsCliente.map(id =>
+    `<option value="${id}"${id === _clienteActivo ? ' selected' : ''}>${id}</option>`
+  ).join('');
+  sel.style.display = '';
+}
+_initEmpresaSel();
+
+function cambiarEmpresa(id) {
+  if (!_idsCliente.includes(id)) return;
+  _clienteActivo = id;
+  sessionStorage.setItem('avba_cliente_sel', id);
+  cargarDatos();
+  cargarAlertasVencimiento();
+}
 
 // ── Tab switching ──────────────────────────────────────────────────────────
 function verTab(id, btn) {
