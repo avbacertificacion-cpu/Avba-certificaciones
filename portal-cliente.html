@@ -1060,6 +1060,7 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
   </div>
 </div>
 
+<script src="js/native-bridge.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <script>
 // ── Fetch interceptor (usa mismo avba_session que los demás módulos) ────────
@@ -2870,21 +2871,19 @@ async function cargarAlertasVencimiento() {
     if (d.status !== 'success') return;
     const alertas = d.data || [];
     renderAlertasDocsPer(alertas, d.dias_anticip);
-    // Browser notifications
-    if (alertas.length && Notification && Notification.permission === 'granted') {
-      const venc = alertas.filter(a => +a.dias_restantes < 0).length;
-      const prox = alertas.filter(a => +a.dias_restantes >= 0).length;
-      if (venc > 0) {
-        new Notification('⚠ AVBA — Documentos vencidos', {
-          body: `${venc} documento${venc!==1?'s':''} vencido${venc!==1?'s':''}. Revisa Mi Personal.`,
-          icon: 'logos/avba.png'
-        });
-      } else if (prox > 0) {
-        new Notification('⏰ AVBA — Documentos por vencer', {
-          body: `${prox} documento${prox!==1?'s':''} vence${prox===1?'':'n'} pronto. Revisa Mi Personal.`,
-          icon: 'logos/avba.png'
-        });
-      }
+    // Notificaciones nativas (app móvil) o del navegador (web)
+    if (alertas.length && typeof AVBANative !== 'undefined') {
+      const items = alertas.map((a, i) => ({
+        id: 900000 + i,
+        titulo: +a.dias_restantes < 0
+          ? `⚠ Documento vencido — ${a.empleado}`
+          : `⏰ ${a.nombre} vence${+a.dias_restantes === 0 ? ' hoy' : ` en ${a.dias_restantes} día${+a.dias_restantes !== 1 ? 's' : ''}`}`,
+        cuerpo: +a.dias_restantes < 0
+          ? `${a.nombre} de ${a.empleado} está vencido.`
+          : `${a.empleado} — ${a.nombre}`,
+        dias: +a.dias_restantes
+      }));
+      AVBANative.notificarVencimientos(items);
     }
   } catch(_) {}
 }

@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Inspector AVBA</title>
   <link rel="manifest" href="manifest.json">
+  <script src="js/native-bridge.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
@@ -4840,6 +4841,24 @@ async function curOpenCamera(target) {
     izaje:  'Evidencia fotográfica del accesorio',
   };
   document.getElementById('cam-label').textContent = labelMap[target] || 'Capturar foto';
+
+  // Dentro de la app nativa usar la cámara nativa (Capacitor) — mucho mejor en iOS/Android
+  if (typeof AVBANative !== 'undefined' && AVBANative.esNativo) {
+    try {
+      const dataUrl = await AVBANative.tomarFoto({ quality: 82, source: 'CAMERA' });
+      if (!dataUrl) return; // usuario canceló
+      const blob   = await (await fetch(dataUrl)).blob();
+      const nombre = `foto_${camTarget}_${Date.now()}.jpg`;
+      const file   = new File([blob], nombre, { type: 'image/jpeg' });
+      const fakeEvt = { target: { files: [file] } };
+      if (camTarget === 'doc')       { ocr_previewDoc(fakeEvt); }
+      else if (camTarget === 'izaje'){ izaCapturarFotoCallback(file); }
+      else                           { curPreviewPersona(fakeEvt); }
+    } catch (e) {
+      mostrarToast('No se pudo abrir la cámara nativa.', 'err');
+    }
+    return;
+  }
 
   if (!navigator.mediaDevices?.getUserMedia) {
     mostrarToast('Tu navegador no soporta acceso a la cámara. Usa la opción Galería.', 'err');

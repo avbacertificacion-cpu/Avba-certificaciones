@@ -112,8 +112,8 @@ La app abrirá una pantalla de carga azul y luego el login del portal.
 3. En <https://appstoreconnect.apple.com> crea la app, sube el build desde Xcode,
    completa ficha + capturas + política de privacidad y envía a revisión (1–3 días).
 
-> **Política de privacidad:** ambas tiendas la exigen. Necesitas una URL pública
-> (por ejemplo `https://gestion.avba.com.mx/privacidad.html`). Puedo generártela.
+> **Política de privacidad:** ya generada en `privacidad.html`.
+> URL pública: `https://gestion.avba.com.mx/privacidad.html` — usa esa URL en ambas tiendas.
 
 ---
 
