@@ -487,15 +487,22 @@ class ClientePersonal {
 
         $in = implode(',', array_fill(0, $total, '?'));
 
+        // Salud de plantilla: combina vigencias de CERTIFICACIONES y DOCUMENTOS.
+        // - Las certs sin fecha cuentan como "sin_fecha" (deberían tener vigencia).
+        // - Los docs sin vigencia se ignoran (son adjuntos, no relevantes a la salud).
         $cStmt = $this->pdo->prepare("
             SELECT
-                SUM(fecha_vigencia IS NULL)                                                    AS sin_fecha,
-                SUM(fecha_vigencia >= CURDATE() AND DATEDIFF(fecha_vigencia,CURDATE()) > 30)   AS vigentes,
-                SUM(fecha_vigencia >= CURDATE() AND DATEDIFF(fecha_vigencia,CURDATE()) <= 30)  AS por_vencer,
-                SUM(fecha_vigencia < CURDATE())                                                AS vencidas
-            FROM cliente_personal_cert WHERE personal_id IN ($in)
+                SUM(v IS NULL)                                          AS sin_fecha,
+                SUM(v >= CURDATE() AND DATEDIFF(v,CURDATE()) > 30)      AS vigentes,
+                SUM(v >= CURDATE() AND DATEDIFF(v,CURDATE()) <= 30)     AS por_vencer,
+                SUM(v < CURDATE())                                     AS vencidas
+            FROM (
+                SELECT fecha_vigencia AS v FROM cliente_personal_cert WHERE personal_id IN ($in)
+                UNION ALL
+                SELECT vigencia       AS v FROM cliente_personal_docs WHERE personal_id IN ($in) AND vigencia IS NOT NULL
+            ) t
         ");
-        $cStmt->execute($ids);
+        $cStmt->execute(array_merge($ids, $ids));
         $cs = $cStmt->fetch();
 
         $stStmt = $this->pdo->prepare(
