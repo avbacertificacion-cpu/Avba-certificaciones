@@ -1581,9 +1581,9 @@ body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9.5pt; color: #11
 .sec-hdr td { background:#1B2A6B; color:#fff; text-align:center; font-weight:bold;
                font-size:9pt; letter-spacing:1.5px; padding:6px; border-color:#1B2A6B; }
 .lbl { font-size:7pt; color:#555; padding:6px 14px 2px; }
-.val { font-weight:bold; font-size:10pt; padding:4px 14px 9px; }
+.val { font-weight:bold; font-size:10pt; padding:3px 14px 7px; }
 .val-inline { padding:6px 14px; }
-.instruct { font-size:7.5pt; line-height:1.85; padding:12px 16px; }
+.instruct { font-size:7.5pt; line-height:1.6; padding:9px 16px; }
 .sig-line { border-top:1px solid #333; margin:0 6px 4px; }
 .sig-name { font-size:8pt; font-weight:bold; line-height:1.2; word-wrap:break-word;
             overflow-wrap:break-word; word-break:break-word; }
@@ -1622,7 +1622,7 @@ CSS;
   <tr>
     <td style="width:15%;padding:6px;border-right:1px solid #8090b8;vertical-align:middle;text-align:center">
       {$logoHdr}
-      <div style="font-size:5pt;color:#1B2A6B;margin-top:3px;font-weight:bold;line-height:1.25">AVBA<br>CERTIFICACIONES</div>
+      <div style="font-size:5pt;color:#1B2A6B;margin-top:3px;font-weight:bold;line-height:1.3;white-space:nowrap">AVBA CERTIFICACIONES</div>
     </td>
     <td style="text-align:center;padding:16px 8px;border-right:1px solid #8090b8;vertical-align:middle">
       <div style="font-size:14pt;font-weight:bold;color:#1B2A6B;letter-spacing:1px">FORMATO DC-3</div>
@@ -1744,7 +1744,7 @@ CSS;
   </tr>
   <tr>
     <!-- Col 1: Instructor — firma + sello -->
-    <td style="width:33%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:16px 10px 20px;vertical-align:bottom">
+    <td style="width:33%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:10px 10px 13px;vertical-align:bottom">
       <table style="border-collapse:collapse;margin:0 auto 4px"><tr>
         <td style="padding:0 6px;vertical-align:bottom">{$firmaHtml}</td>
         <td style="padding:0 6px;vertical-align:bottom">{$selloHtml}</td>
@@ -1754,15 +1754,15 @@ CSS;
       <div class="sig-role">Instructor o tutor</div>
     </td>
     <!-- Col 2: Patron -->
-    <td style="width:34%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:16px 10px 20px;vertical-align:bottom">
-      <div style="height:74px"></div>
+    <td style="width:34%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:10px 10px 13px;vertical-align:bottom">
+      <div style="height:60px"></div>
       <div class="sig-line"></div>
       <div class="sig-name" style="font-size:{$sigSize($patron)}">{$esc($patron)}</div>
       <div class="sig-role">Patron o representante legal <sup>4/</sup></div>
     </td>
     <!-- Col 3: Representante de trabajadores -->
-    <td style="width:33%;border-top:none;text-align:center;padding:16px 10px 20px;vertical-align:bottom">
-      <div style="height:74px"></div>
+    <td style="width:33%;border-top:none;text-align:center;padding:10px 10px 13px;vertical-align:bottom">
+      <div style="height:60px"></div>
       <div class="sig-line"></div>
       <div class="sig-name" style="font-size:{$sigSize($repTrab)}">{$esc($repTrab)}</div>
       <div class="sig-role">Representante de los trabajadores <sup>5/</sup></div>
@@ -1783,6 +1783,16 @@ CSS;
       <sup>4/</sup> Para empresas con menos de 51 trabajadores. Para empresas con mas de 50 trabajadores firmaria el representante del patron ante la Comision mixta de capacitacion, adiestramiento y productividad.<br>
       <sup>5/</sup> Solo para empresas con mas de 50 trabajadores.<br>
       * Dato no obligatorio.
+    </td>
+  </tr>
+</table>
+
+<!-- PIE: razón social y contacto -->
+<table class="doc" style="margin-top:0;border-top:none">
+  <tr>
+    <td style="padding:11px 14px;text-align:center;background:#1B2A6B;border-color:#1B2A6B">
+      <div style="font-size:8.5pt;font-weight:bold;color:#fff;letter-spacing:.5px">AVBA INSPECTIONS, CERTIFICATIONS AND MAINTENANCE S.A.S. DE C.V.</div>
+      <div style="font-size:7.5pt;color:#cdd6ef;margin-top:4px">www.avba.com.mx &nbsp;&nbsp;·&nbsp;&nbsp; contacto@avba.com.mx</div>
     </td>
   </tr>
 </table>
