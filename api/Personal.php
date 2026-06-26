@@ -1792,7 +1792,7 @@ CSS;
   <tr>
     <td style="padding:11px 14px;text-align:center;background:#1B2A6B;border-color:#1B2A6B">
       <div style="font-size:8.5pt;font-weight:bold;color:#fff;letter-spacing:.5px">AVBA INSPECTIONS, CERTIFICATIONS AND MAINTENANCE S.A.S. DE C.V.</div>
-      <div style="font-size:7.5pt;color:#cdd6ef;margin-top:4px">www.avba.com.mx &nbsp;&nbsp;·&nbsp;&nbsp; contacto@avba.com.mx</div>
+      <div style="font-size:7.5pt;color:#cdd6ef;margin-top:4px">www.avba.com.mx &nbsp;&nbsp;·&nbsp;&nbsp; certificaciones@avba.com.mx</div>
     </td>
   </tr>
 </table>
