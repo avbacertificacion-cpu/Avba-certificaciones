@@ -425,7 +425,7 @@ async function guardarExtintor() {
 
 // ── Eliminar ──────────────────────────────────────────────────────────────────
 async function eliminarExtintor(id) {
-    if (!confirm('¿Eliminar este extintor? Se marcará como inactivo.')) return;
+    if (!confirm('¿Eliminar este extintor de forma permanente? Se borrará junto con su historial de inspecciones. Esta acción no se puede deshacer.')) return;
     const r = await fetch(`../api/extintores.php?action=eliminar&id=${id}`);
     const d = await r.json();
     if (d.success) { showAlert('Extintor eliminado', 'success'); cargarExtintores(); }

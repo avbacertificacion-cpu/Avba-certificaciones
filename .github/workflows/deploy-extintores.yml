@@ -3,7 +3,7 @@ name: Deploy Extintores a Hostinger
 on:
   push:
     branches:
-      - claude/extinguisher-management-system-Y3Om9
+      - claude/extintores-deploy
 
 jobs:
   deploy:
@@ -12,16 +12,17 @@ jobs:
       - name: Checkout del repo
         uses: actions/checkout@v4
 
-      - name: Deploy via FTP - SOLO la carpeta extinguisher-system
+      - name: Deploy via FTP - raiz del repo a /extintores/
         uses: SamKirkland/FTP-Deploy-Action@v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          local-dir: ./extinguisher-system/
+          local-dir: ./
           server-dir: ./extintores/
           exclude: |
             **/.git*
             **/.git*/**
+            **/.github/**
             config/**
             **/config/**
