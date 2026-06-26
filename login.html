@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AVBA — Acceso al Sistema</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0b3d91">
+  <link rel="apple-touch-icon" href="icon-192.png">
   <style>
     :root {
       --azul:      #185FA5;
@@ -333,6 +336,13 @@ window.onload = function() {
     document.getElementById("usuario").focus();
   }
 };
+
+// Registrar service worker (PWA instalable)
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function() {
+    navigator.serviceWorker.register("service-worker.js").catch(function(){});
+  });
+}
 </script>
 </body>
 </html>
