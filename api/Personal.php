@@ -1529,7 +1529,7 @@ class Personal {
             : '';
 
         // ── Generadores de cajas de caracteres ─────────────────────────────
-        $cellStyle = 'width:15px;height:26px;border:1.5px solid #333;text-align:center;'
+        $cellStyle = 'width:15px;height:23px;border:1.5px solid #333;text-align:center;'
                    . 'font-size:9pt;font-weight:bold;padding:0;vertical-align:middle';
 
         $boxes = function(string $str, int $pad = 0) use ($cellStyle, $esc): string {
@@ -1579,11 +1579,11 @@ body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9.5pt; color: #11
 .doc td, .doc th { border:1px solid #8090b8; padding:0; vertical-align:top; }
 .doc table td, .doc table th { border:none; padding:0; }
 .sec-hdr td { background:#1B2A6B; color:#fff; text-align:center; font-weight:bold;
-               font-size:9pt; letter-spacing:1.5px; padding:8px 6px; border-color:#1B2A6B; }
-.lbl { font-size:7pt; color:#555; padding:8px 9px 2px; }
-.val { font-weight:bold; font-size:10.5pt; padding:5px 9px 11px; }
-.val-inline { padding:8px 9px; }
-.instruct { font-size:8pt; line-height:2.05; padding:14px 12px; }
+               font-size:9pt; letter-spacing:1.5px; padding:6px; border-color:#1B2A6B; }
+.lbl { font-size:7pt; color:#555; padding:5px 9px 1px; }
+.val { font-weight:bold; font-size:10pt; padding:3px 9px 7px; }
+.val-inline { padding:5px 9px; }
+.instruct { font-size:7.5pt; line-height:1.7; padding:10px 12px; }
 .sig-line { border-top:1px solid #333; margin:0 6px 4px; }
 .sig-name { font-size:8pt; font-weight:bold; line-height:1.2; word-wrap:break-word;
             overflow-wrap:break-word; word-break:break-word; }
@@ -1701,15 +1701,15 @@ CSS;
 
   <!-- Duración + Período -->
   <tr>
-    <td style="width:24%;border-right:1px solid #8090b8;padding:14px 10px;vertical-align:middle;text-align:center">
-      <div class="lbl" style="text-align:center;padding:0 0 4px">Duración en horas</div>
-      <div style="font-size:17pt;font-weight:bold;color:#1B2A6B;line-height:1.1">{$esc($horas)}</div>
-      <div style="font-size:8pt;font-weight:bold;color:#555;letter-spacing:1px">HORAS</div>
+    <td style="width:26%;border-right:1px solid #8090b8;padding:8px 10px;vertical-align:middle;text-align:center">
+      <div class="lbl" style="text-align:center;padding:0 0 3px">Duración en horas</div>
+      <div style="font-size:15pt;font-weight:bold;color:#1B2A6B;line-height:1.05">{$esc($horas)}</div>
+      <div style="font-size:7.5pt;font-weight:bold;color:#555;letter-spacing:1px">HORAS</div>
     </td>
-    <td colspan="2" style="padding:12px 14px;vertical-align:middle">
-      <div class="lbl" style="padding:0 0 8px;text-align:center">Periodo de ejecución</div>
+    <td colspan="2" style="padding:8px 14px;vertical-align:middle">
+      <div class="lbl" style="padding:0 0 6px;text-align:center">Periodo de ejecución</div>
       <table style="border-collapse:collapse;margin:0 auto">
-        <tr><td style="padding:0 0 9px">{$dateField('De', $fechaYmd)}</td></tr>
+        <tr><td style="padding:0 0 6px">{$dateField('De', $fechaYmd)}</td></tr>
         <tr><td style="padding:0">{$dateField('a', $fechaFinYmd)}</td></tr>
       </table>
     </td>
@@ -1735,14 +1735,14 @@ CSS;
 <!-- FIRMAS -->
 <table class="doc" style="margin-top:0;border-top:none">
   <tr>
-    <td colspan="3" style="padding:11px 12px;font-size:8pt;text-align:center;background:#f0f3fa;line-height:1.6">
+    <td colspan="3" style="padding:8px 12px;font-size:8pt;text-align:center;background:#f0f3fa;line-height:1.5">
       Los datos se asientan en esta constancia bajo protesta de decir verdad, apercibidos de la responsabilidad en que incurre todo
       <b>aquel que no se conduce con verdad.</b>
     </td>
   </tr>
   <tr>
     <!-- Col 1: Instructor — firma + sello -->
-    <td style="width:33%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:16px 8px 22px;vertical-align:bottom">
+    <td style="width:33%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:10px 8px 14px;vertical-align:bottom">
       <table style="border-collapse:collapse;margin:0 auto 4px"><tr>
         <td style="padding:0 6px;vertical-align:bottom">{$firmaHtml}</td>
         <td style="padding:0 6px;vertical-align:bottom">{$selloHtml}</td>
@@ -1752,15 +1752,15 @@ CSS;
       <div class="sig-role">Instructor o tutor</div>
     </td>
     <!-- Col 2: Patron -->
-    <td style="width:34%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:16px 8px 22px;vertical-align:bottom">
-      <div style="height:80px"></div>
+    <td style="width:34%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:10px 8px 14px;vertical-align:bottom">
+      <div style="height:62px"></div>
       <div class="sig-line"></div>
       <div class="sig-name" style="font-size:{$sigSize($patron)}">{$esc($patron)}</div>
       <div class="sig-role">Patron o representante legal <sup>4/</sup></div>
     </td>
     <!-- Col 3: Representante de trabajadores -->
-    <td style="width:33%;border-top:none;text-align:center;padding:16px 8px 22px;vertical-align:bottom">
-      <div style="height:80px"></div>
+    <td style="width:33%;border-top:none;text-align:center;padding:10px 8px 14px;vertical-align:bottom">
+      <div style="height:62px"></div>
       <div class="sig-line"></div>
       <div class="sig-name" style="font-size:{$sigSize($repTrab)}">{$esc($repTrab)}</div>
       <div class="sig-role">Representante de los trabajadores <sup>5/</sup></div>
