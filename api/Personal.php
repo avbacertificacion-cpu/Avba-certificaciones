@@ -1620,9 +1620,9 @@ CSS;
 <!-- TÍTULO -->
 <table class="doc" style="margin-bottom:0">
   <tr>
-    <td style="width:14%;padding:6px 8px;border-right:1px solid #8090b8;vertical-align:middle;text-align:center">
+    <td style="width:15%;padding:6px;border-right:1px solid #8090b8;vertical-align:middle;text-align:center">
       {$logoHdr}
-      <div style="font-size:6pt;color:#1B2A6B;margin-top:3px;font-weight:bold;letter-spacing:0.5px">AVBA CERTIFICACIONES</div>
+      <div style="font-size:5pt;color:#1B2A6B;margin-top:3px;font-weight:bold;line-height:1.25">AVBA<br>CERTIFICACIONES</div>
     </td>
     <td style="text-align:center;padding:16px 8px;border-right:1px solid #8090b8;vertical-align:middle">
       <div style="font-size:14pt;font-weight:bold;color:#1B2A6B;letter-spacing:1px">FORMATO DC-3</div>
@@ -1707,10 +1707,12 @@ CSS;
       <div style="font-size:7.5pt;font-weight:bold;color:#555;letter-spacing:1px">HORAS</div>
     </td>
     <td colspan="2" style="padding:8px 14px;vertical-align:middle">
-      <div class="lbl" style="padding:0 0 6px;text-align:center">Periodo de ejecución</div>
+      <div class="lbl" style="padding:0 0 7px;text-align:center">Periodo de ejecución</div>
       <table style="border-collapse:collapse;margin:0 auto">
-        <tr><td style="padding:0 0 6px">{$dateField('De', $fechaYmd)}</td></tr>
-        <tr><td style="padding:0">{$dateField('a', $fechaFinYmd)}</td></tr>
+        <tr>
+          <td style="padding:0 20px;vertical-align:middle">{$dateField('De', $fechaYmd)}</td>
+          <td style="padding:0 20px;vertical-align:middle;border-left:1px solid #cdd5e6">{$dateField('a', $fechaFinYmd)}</td>
+        </tr>
       </table>
     </td>
   </tr>
