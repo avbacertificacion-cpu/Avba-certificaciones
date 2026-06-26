@@ -1511,10 +1511,10 @@ class Personal {
         }
 
         $logoHdr   = $logoB64
-            ? "<img src=\"{$logoB64}\" style=\"width:84px;height:39px;display:block;\" alt=\"AVBA\">"
+            ? "<img src=\"{$logoB64}\" style=\"width:104px;height:48px;display:block;margin:0 auto;\" alt=\"AVBA\">"
             : '<div style="font-size:8pt;font-weight:bold;color:#1B2A6B;text-align:center">AVBA<br>CERT.</div>';
         $qrHdr     = $qrB64
-            ? "<img src=\"{$qrB64}\" style=\"width:52px;height:52px;\" alt=\"QR\">"
+            ? "<img src=\"{$qrB64}\" style=\"width:68px;height:68px;\" alt=\"QR\">"
             : '<div style="font-size:6pt;color:#aaa;text-align:center">QR</div>';
 
         $logoEmpB64  = $p['empresa_logo_b64'] ?? '';
@@ -1580,10 +1580,10 @@ body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9.5pt; color: #11
 .doc table td, .doc table th { border:none; padding:0; }
 .sec-hdr td { background:#1B2A6B; color:#fff; text-align:center; font-weight:bold;
                font-size:9pt; letter-spacing:1.5px; padding:6px; border-color:#1B2A6B; }
-.lbl { font-size:7pt; color:#555; padding:5px 9px 1px; }
-.val { font-weight:bold; font-size:10pt; padding:3px 9px 7px; }
-.val-inline { padding:5px 9px; }
-.instruct { font-size:7.5pt; line-height:1.7; padding:10px 12px; }
+.lbl { font-size:7pt; color:#555; padding:6px 14px 2px; }
+.val { font-weight:bold; font-size:10pt; padding:4px 14px 9px; }
+.val-inline { padding:6px 14px; }
+.instruct { font-size:7.5pt; line-height:1.85; padding:12px 16px; }
 .sig-line { border-top:1px solid #333; margin:0 6px 4px; }
 .sig-name { font-size:8pt; font-weight:bold; line-height:1.2; word-wrap:break-word;
             overflow-wrap:break-word; word-break:break-word; }
@@ -1744,7 +1744,7 @@ CSS;
   </tr>
   <tr>
     <!-- Col 1: Instructor — firma + sello -->
-    <td style="width:33%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:10px 8px 14px;vertical-align:bottom">
+    <td style="width:33%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:16px 10px 20px;vertical-align:bottom">
       <table style="border-collapse:collapse;margin:0 auto 4px"><tr>
         <td style="padding:0 6px;vertical-align:bottom">{$firmaHtml}</td>
         <td style="padding:0 6px;vertical-align:bottom">{$selloHtml}</td>
@@ -1754,15 +1754,15 @@ CSS;
       <div class="sig-role">Instructor o tutor</div>
     </td>
     <!-- Col 2: Patron -->
-    <td style="width:34%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:10px 8px 14px;vertical-align:bottom">
-      <div style="height:62px"></div>
+    <td style="width:34%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:16px 10px 20px;vertical-align:bottom">
+      <div style="height:74px"></div>
       <div class="sig-line"></div>
       <div class="sig-name" style="font-size:{$sigSize($patron)}">{$esc($patron)}</div>
       <div class="sig-role">Patron o representante legal <sup>4/</sup></div>
     </td>
     <!-- Col 3: Representante de trabajadores -->
-    <td style="width:33%;border-top:none;text-align:center;padding:10px 8px 14px;vertical-align:bottom">
-      <div style="height:62px"></div>
+    <td style="width:33%;border-top:none;text-align:center;padding:16px 10px 20px;vertical-align:bottom">
+      <div style="height:74px"></div>
       <div class="sig-line"></div>
       <div class="sig-name" style="font-size:{$sigSize($repTrab)}">{$esc($repTrab)}</div>
       <div class="sig-role">Representante de los trabajadores <sup>5/</sup></div>
