@@ -1069,7 +1069,7 @@ class Personal {
             } elseif ($tipo === 'credencial') {
                 $url = $this->htmlToPdfMpdf($html, $folio, 'CRED', [86, 133]);
             } else {
-                $url = $this->htmlToPdfMpdf($html, $folio, 'DC3', 'A4');
+                $url = $this->htmlToPdfMpdf($html, $folio, 'DC3', 'Letter');
             }
         } catch (\Throwable $e) {
             error_log('[AVBA] generarDocumento error: ' . $e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
@@ -1529,7 +1529,7 @@ class Personal {
             : '';
 
         // ── Generadores de cajas de caracteres ─────────────────────────────
-        $cellStyle = 'width:15px;height:22px;border:1.5px solid #333;text-align:center;'
+        $cellStyle = 'width:15px;height:26px;border:1.5px solid #333;text-align:center;'
                    . 'font-size:9pt;font-weight:bold;padding:0;vertical-align:middle';
 
         $boxes = function(string $str, int $pad = 0) use ($cellStyle, $esc): string {
@@ -1568,11 +1568,11 @@ body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9.5pt; color: #11
 .doc td, .doc th { border:1px solid #8090b8; padding:0; vertical-align:top; }
 .doc table td, .doc table th { border:none; padding:0; }
 .sec-hdr td { background:#1B2A6B; color:#fff; text-align:center; font-weight:bold;
-               font-size:9pt; letter-spacing:1.5px; padding:5px 6px; border-color:#1B2A6B; }
-.lbl { font-size:7pt; color:#555; padding:4px 7px 1px; }
-.val { font-weight:bold; font-size:10.5pt; padding:2px 7px 6px; }
-.val-inline { padding:4px 7px; }
-.instruct { font-size:7.5pt; line-height:1.65; padding:8px 10px; }
+               font-size:9pt; letter-spacing:1.5px; padding:8px 6px; border-color:#1B2A6B; }
+.lbl { font-size:7pt; color:#555; padding:8px 9px 2px; }
+.val { font-weight:bold; font-size:10.5pt; padding:5px 9px 11px; }
+.val-inline { padding:8px 9px; }
+.instruct { font-size:8pt; line-height:2.05; padding:14px 12px; }
 .page2 { page-break-before: always; }
 .rev-hdr { text-align:center; font-weight:bold; font-size:8pt; color:#1B2A6B;
            border-bottom:1.5px solid #1B2A6B; padding:4px 0 6px; margin-bottom:8px; }
@@ -1608,7 +1608,7 @@ CSS;
       {$logoHdr}
       <div style="font-size:6pt;color:#1B2A6B;margin-top:3px;font-weight:bold;letter-spacing:0.5px">AVBA CERTIFICACIONES</div>
     </td>
-    <td style="text-align:center;padding:10px 8px;border-right:1px solid #8090b8;vertical-align:middle">
+    <td style="text-align:center;padding:16px 8px;border-right:1px solid #8090b8;vertical-align:middle">
       <div style="font-size:14pt;font-weight:bold;color:#1B2A6B;letter-spacing:1px">FORMATO DC-3</div>
       <div style="font-size:9.5pt;font-weight:bold;margin-top:3px">CONSTANCIA DE COMPETENCIAS O DE HABILIDADES LABORALES</div>
     </td>
@@ -1685,11 +1685,11 @@ CSS;
 
   <!-- Duración + Período -->
   <tr>
-    <td style="width:20%;border-right:1px solid #8090b8;padding:6px 8px;vertical-align:middle">
+    <td style="width:20%;border-right:1px solid #8090b8;padding:12px 8px;vertical-align:middle">
       <div class="lbl">Duración en horas</div>
       <div style="font-size:13pt;font-weight:bold;color:#1B2A6B;padding:4px 0 2px">{$horasStr}</div>
     </td>
-    <td colspan="2" style="padding:6px 10px;vertical-align:middle">
+    <td colspan="2" style="padding:12px 10px;vertical-align:middle">
       <div class="lbl" style="margin-bottom:5px">Periodo de ejecución:</div>
       <table style="border-collapse:collapse;width:100%">
         <tr>
@@ -1742,35 +1742,35 @@ CSS;
 <!-- FIRMAS -->
 <table class="doc" style="margin-top:0;border-top:none">
   <tr>
-    <td colspan="3" style="padding:6px 10px;font-size:8pt;text-align:center;background:#f0f3fa;line-height:1.5">
+    <td colspan="3" style="padding:11px 12px;font-size:8pt;text-align:center;background:#f0f3fa;line-height:1.6">
       Los datos se asientan en esta constancia bajo protesta de decir verdad, apercibidos de la responsabilidad en que incurre todo
       <b>aquel que no se conduce con verdad.</b>
     </td>
   </tr>
   <tr>
     <!-- Col 1: Instructor — firma + sello -->
-    <td style="width:33%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:8px 8px 10px;vertical-align:bottom">
+    <td style="width:33%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:16px 8px 22px;vertical-align:bottom">
       <table style="border-collapse:collapse;margin:0 auto 4px"><tr>
         <td style="padding:0 6px;vertical-align:bottom">{$firmaHtml}</td>
         <td style="padding:0 6px;vertical-align:bottom">{$selloHtml}</td>
       </tr></table>
-      <div style="padding-top:4px">
+      <div style="padding-top:6px">
         <div style="font-size:8pt;font-weight:bold">{$esc($instrNombre ?: 'Ing. Jose Marcos Gonzalez Calderon')}</div>
         <div style="font-size:7.5pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Instructor o tutor</div>
       </div>
     </td>
     <!-- Col 2: Patron -->
-    <td style="width:34%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:8px 8px 10px;vertical-align:bottom">
-      <div style="height:58px"></div>
-      <div style="padding-top:4px">
+    <td style="width:34%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:16px 8px 22px;vertical-align:bottom">
+      <div style="height:80px"></div>
+      <div style="padding-top:6px">
         <div style="font-size:8pt;font-weight:bold">{$esc($patron)}</div>
         <div style="font-size:7.5pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Patron o representante legal <sup>4/</sup></div>
       </div>
     </td>
     <!-- Col 3: Representante de trabajadores -->
-    <td style="width:33%;border-top:none;text-align:center;padding:8px 8px 10px;vertical-align:bottom">
-      <div style="height:58px"></div>
-      <div style="padding-top:4px">
+    <td style="width:33%;border-top:none;text-align:center;padding:16px 8px 22px;vertical-align:bottom">
+      <div style="height:80px"></div>
+      <div style="padding-top:6px">
         <div style="font-size:8pt;font-weight:bold">{$esc($repTrab)}</div>
         <div style="font-size:7.5pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Representante de los trabajadores <sup>5/</sup></div>
       </div>
