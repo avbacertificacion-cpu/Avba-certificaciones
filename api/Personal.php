@@ -1546,16 +1546,27 @@ class Personal {
             return '<table style="border-collapse:collapse"><tr>' . $boxes($str, $pad) . '</tr></table>';
         };
 
-        // Cajas para fecha (YYYY-MM-DD → 4+2+2 celdas separadas por espacio)
-        $dateBoxes = function(?string $ymd) use ($boxes): string {
+        // Campo de fecha completo: prefijo (De/a) + etiquetas Año/Mes/Día
+        // perfectamente alineadas sobre los grupos de cajas (4+2+2).
+        $dateField = function(string $pre, ?string $ymd) use ($boxes): string {
             [$y, $mo, $d] = ['    ', '  ', '  '];
             if ($ymd && preg_match('/(\d{4})-(\d{2})-(\d{2})/', $ymd, $mt)) {
                 [$y, $mo, $d] = [$mt[1], $mt[2], $mt[3]];
             }
-            return '<table style="border-collapse:collapse"><tr>'
-                 . $boxes($y) . '<td style="width:5px"></td>'
-                 . $boxes($mo) . '<td style="width:5px"></td>'
-                 . $boxes($d)
+            $hdr = 'font-size:6.5pt;color:#555;text-align:center;padding:0 0 2px;letter-spacing:.5px';
+            $gap = '<td style="width:7px"></td>';
+            return '<table style="border-collapse:collapse;margin:0 auto">'
+                 . '<tr>'
+                 .   '<td rowspan="2" style="font-size:9pt;font-weight:bold;color:#1B2A6B;'
+                 .     'padding-right:8px;vertical-align:middle;text-align:right;width:18px">' . $pre . '</td>'
+                 .   '<td colspan="4" style="' . $hdr . '">Año</td>'
+                 .   '<td></td>'
+                 .   '<td colspan="2" style="' . $hdr . '">Mes</td>'
+                 .   '<td></td>'
+                 .   '<td colspan="2" style="' . $hdr . '">Día</td>'
+                 . '</tr>'
+                 . '<tr>'
+                 .   $boxes($y) . $gap . $boxes($mo) . $gap . $boxes($d)
                  . '</tr></table>';
         };
 
@@ -1587,15 +1598,6 @@ CSS;
         $curpPad  = str_pad($curp, 18);
         $rfcPad   = str_pad($rfcFmt, 14);
         $horasStr = $esc($horas) . ' HORAS';
-
-        // Header columns: Año Mes Día  (widths match 4×15 + 2×15 + 2×15 boxes)
-        $hdrFechas = '<table style="border-collapse:collapse"><tr>'
-            . '<td style="width:60px;text-align:center;font-size:7pt;padding:0 1px">Año</td>'
-            . '<td style="width:5px"></td>'
-            . '<td style="width:30px;text-align:center;font-size:7pt;padding:0 1px">Mes</td>'
-            . '<td style="width:5px"></td>'
-            . '<td style="width:30px;text-align:center;font-size:7pt;padding:0 1px">Día</td>'
-            . '</tr></table>';
 
         $anverso = <<<HTML
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
@@ -1685,39 +1687,16 @@ CSS;
 
   <!-- Duración + Período -->
   <tr>
-    <td style="width:20%;border-right:1px solid #8090b8;padding:12px 8px;vertical-align:middle">
-      <div class="lbl">Duración en horas</div>
-      <div style="font-size:13pt;font-weight:bold;color:#1B2A6B;padding:4px 0 2px">{$horasStr}</div>
+    <td style="width:24%;border-right:1px solid #8090b8;padding:14px 10px;vertical-align:middle;text-align:center">
+      <div class="lbl" style="text-align:center;padding:0 0 4px">Duración en horas</div>
+      <div style="font-size:17pt;font-weight:bold;color:#1B2A6B;line-height:1.1">{$esc($horas)}</div>
+      <div style="font-size:8pt;font-weight:bold;color:#555;letter-spacing:1px">HORAS</div>
     </td>
-    <td colspan="2" style="padding:12px 10px;vertical-align:middle">
-      <div class="lbl" style="margin-bottom:5px">Periodo de ejecución:</div>
-      <table style="border-collapse:collapse;width:100%">
-        <tr>
-          <td style="width:50%;text-align:center;vertical-align:bottom">
-            <table style="border-collapse:collapse;margin:0 auto">
-              <tr>
-                <td style="font-size:7pt;color:#555;padding-right:4px;vertical-align:bottom">De</td>
-                <td>{$hdrFechas}</td>
-              </tr>
-              <tr>
-                <td></td>
-                <td>{$dateBoxes($fechaYmd)}</td>
-              </tr>
-            </table>
-          </td>
-          <td style="width:50%;text-align:center;vertical-align:bottom">
-            <table style="border-collapse:collapse;margin:0 auto">
-              <tr>
-                <td style="font-size:7pt;color:#555;padding-right:4px;vertical-align:bottom">a</td>
-                <td>{$hdrFechas}</td>
-              </tr>
-              <tr>
-                <td></td>
-                <td>{$dateBoxes($fechaFinYmd)}</td>
-              </tr>
-            </table>
-          </td>
-        </tr>
+    <td colspan="2" style="padding:12px 14px;vertical-align:middle">
+      <div class="lbl" style="padding:0 0 8px;text-align:center">Periodo de ejecución</div>
+      <table style="border-collapse:collapse;margin:0 auto">
+        <tr><td style="padding:0 0 9px">{$dateField('De', $fechaYmd)}</td></tr>
+        <tr><td style="padding:0">{$dateField('a', $fechaFinYmd)}</td></tr>
       </table>
     </td>
   </tr>
