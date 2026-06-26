@@ -1584,6 +1584,10 @@ body { font-family: DejaVu Sans, Arial, sans-serif; font-size: 9.5pt; color: #11
 .val { font-weight:bold; font-size:10.5pt; padding:5px 9px 11px; }
 .val-inline { padding:8px 9px; }
 .instruct { font-size:8pt; line-height:2.05; padding:14px 12px; }
+.sig-line { border-top:1px solid #333; margin:0 6px 4px; }
+.sig-name { font-size:8pt; font-weight:bold; line-height:1.2; word-wrap:break-word;
+            overflow-wrap:break-word; word-break:break-word; }
+.sig-role { font-size:7.5pt; color:#1B2A6B; font-weight:bold; margin-top:2px; }
 .page2 { page-break-before: always; }
 .rev-hdr { text-align:center; font-weight:bold; font-size:8pt; color:#1B2A6B;
            border-bottom:1.5px solid #1B2A6B; padding:4px 0 6px; margin-bottom:8px; }
@@ -1598,6 +1602,16 @@ CSS;
         $curpPad  = str_pad($curp, 18);
         $rfcPad   = str_pad($rfcFmt, 14);
         $horasStr = $esc($horas) . ' HORAS';
+
+        // Tamaño de fuente de las firmas según largo del nombre (evita romper el formato)
+        $sigSize = function(string $n): string {
+            $len = mb_strlen(trim($n));
+            if ($len <= 26) return '8pt';
+            if ($len <= 38) return '7.5pt';
+            if ($len <= 50) return '7pt';
+            return '6.5pt';
+        };
+        $instrDisplay = $instrNombre ?: 'Ing. Jose Marcos Gonzalez Calderon';
 
         $anverso = <<<HTML
 <!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
@@ -1733,26 +1747,23 @@ CSS;
         <td style="padding:0 6px;vertical-align:bottom">{$firmaHtml}</td>
         <td style="padding:0 6px;vertical-align:bottom">{$selloHtml}</td>
       </tr></table>
-      <div style="padding-top:6px">
-        <div style="font-size:8pt;font-weight:bold">{$esc($instrNombre ?: 'Ing. Jose Marcos Gonzalez Calderon')}</div>
-        <div style="font-size:7.5pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Instructor o tutor</div>
-      </div>
+      <div class="sig-line"></div>
+      <div class="sig-name" style="font-size:{$sigSize($instrDisplay)}">{$esc($instrDisplay)}</div>
+      <div class="sig-role">Instructor o tutor</div>
     </td>
     <!-- Col 2: Patron -->
     <td style="width:34%;border-right:1px solid #8090b8;border-top:none;text-align:center;padding:16px 8px 22px;vertical-align:bottom">
       <div style="height:80px"></div>
-      <div style="padding-top:6px">
-        <div style="font-size:8pt;font-weight:bold">{$esc($patron)}</div>
-        <div style="font-size:7.5pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Patron o representante legal <sup>4/</sup></div>
-      </div>
+      <div class="sig-line"></div>
+      <div class="sig-name" style="font-size:{$sigSize($patron)}">{$esc($patron)}</div>
+      <div class="sig-role">Patron o representante legal <sup>4/</sup></div>
     </td>
     <!-- Col 3: Representante de trabajadores -->
     <td style="width:33%;border-top:none;text-align:center;padding:16px 8px 22px;vertical-align:bottom">
       <div style="height:80px"></div>
-      <div style="padding-top:6px">
-        <div style="font-size:8pt;font-weight:bold">{$esc($repTrab)}</div>
-        <div style="font-size:7.5pt;color:#1B2A6B;font-weight:bold;margin-top:2px">Representante de los trabajadores <sup>5/</sup></div>
-      </div>
+      <div class="sig-line"></div>
+      <div class="sig-name" style="font-size:{$sigSize($repTrab)}">{$esc($repTrab)}</div>
+      <div class="sig-role">Representante de los trabajadores <sup>5/</sup></div>
     </td>
   </tr>
 </table>
