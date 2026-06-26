@@ -343,9 +343,30 @@ function eliminar() {
     $id = intval($_GET['id'] ?? 0);
     if (!$id) { http_response_code(400); echo json_encode(['error' => 'ID requerido']); return; }
 
-    // Soft-delete
-    $stmt = $pdo->prepare("UPDATE extintores SET estado = 'inactivo' WHERE id = ?");
-    $stmt->execute([$id]);
+    try {
+        $pdo->beginTransaction();
+
+        // Borrar registros dependientes primero (evita errores de clave foránea)
+        foreach (['inspecciones', 'qr_asignaciones'] as $tabla) {
+            try {
+                $stmt = $pdo->prepare("DELETE FROM $tabla WHERE extintor_id = ?");
+                $stmt->execute([$id]);
+            } catch (Exception $e) {
+                // La tabla puede no existir en este entorno; continuar
+            }
+        }
+
+        // Borrar el extintor definitivamente
+        $stmt = $pdo->prepare("DELETE FROM extintores WHERE id = ?");
+        $stmt->execute([$id]);
+
+        $pdo->commit();
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => 'No se pudo eliminar el extintor: ' . $e->getMessage()]);
+        return;
+    }
 
     audit($uid, "Eliminar extintor", 'extintores', $id);
     echo json_encode(['success' => true]);
