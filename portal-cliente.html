@@ -265,7 +265,17 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 .toast-eq{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 22px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;opacity:0;pointer-events:none;transition:opacity .3s;white-space:nowrap;}
 .toast-eq.show{opacity:1;}
 
-/* ══ Scrollable tabs ══════════════════════════════════════════ */
+/* ══ Dos tarjetas de navegación ══════════════════════════════ */
+.tab-cards-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px;}
+.tab-card{background:var(--blanco);border-radius:14px;border:1px solid rgba(0,0,0,.06);box-shadow:0 2px 12px rgba(0,0,0,.05);overflow:hidden;}
+.tab-card-hdr{padding:14px 16px;display:flex;align-items:center;gap:12px;}
+.tab-card-hdr-icon{width:36px;height:36px;border-radius:10px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.tab-card-hdr-t{font-size:13px;font-weight:700;color:#fff;line-height:1.3;}
+.tab-card-hdr-s{font-size:11px;color:rgba(255,255,255,.65);margin-top:2px;}
+.tab-card-body{padding:8px;display:flex;flex-direction:column;gap:2px;}
+.tab-card-body .tab-btn{flex:none;text-align:left;white-space:nowrap;font-size:12.5px;padding:9px 12px;}
+@media(max-width:640px){.tab-cards-grid{grid-template-columns:1fr;}}
+/* ── mantener scrollable la barra legacy si aún existe ─────── */
 .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
 .tab-btn{white-space:nowrap;}
 
@@ -342,7 +352,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 .psb-licencia{background:rgba(252,211,77,.2);color:#fde68a;border:1px solid rgba(252,211,77,.3);}
 
 /* ══ Print ═══════════════════════════════════════════════════ */
-@media print{.header,.tabs,.stats,.eq-filters,.btn-prim,.btn-sec,.btn-del,.eq-bc-btn,.eq-upcoming-card,.fhs-card,.eq-stacked-card,.eq-charts-3,.toast-eq{display:none!important}.wrap{padding:0;max-width:100%;margin:0}.eq-cn{break-inside:avoid;margin-bottom:12px}}
+@media print{.header,.tabs,.tab-cards-grid,.stats,.eq-filters,.btn-prim,.btn-sec,.btn-del,.eq-bc-btn,.eq-upcoming-card,.fhs-card,.eq-stacked-card,.eq-charts-3,.toast-eq{display:none!important}.wrap{padding:0;max-width:100%;margin:0}.eq-cn{break-inside:avoid;margin-bottom:12px}}
 body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abrirModalPers(null)"]{display:none!important}
 /* ══ Tab notification badge ══════════════════════════════════ */
 .tab-btn{position:relative;}
@@ -384,14 +394,41 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
     <div class="stat"><div class="stat-n" id="s-pnd" style="color:#0d9488">—</div><div class="stat-l">Reportes PND</div></div>
   </div>
 
-  <div class="tabs">
-    <button class="tab-btn active" id="tabbtn-maq" onclick="verTab('maq',this)">🔧 Maquinaria</button>
-    <button class="tab-btn" id="tabbtn-acc" onclick="verTab('acc',this)">🔗 Accesorios de Izaje</button>
-    <button class="tab-btn" id="tabbtn-per" onclick="verTab('per',this)">👷 Personal</button>
-    <button class="tab-btn" id="tabbtn-pnd" onclick="verTab('pnd',this)">🔬 PND</button>
-    <button class="tab-btn" id="tabbtn-equipos" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos<span class="tab-notif" id="tab-notif-eq" style="display:none"></span></button>
-    <button class="tab-btn" id="tabbtn-personal-cli" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal<span class="tab-notif" id="tab-notif-per" style="display:none"></span></button>
-    <button class="tab-btn" id="tabbtn-subusuarios" style="display:none" onclick="verTab('subusuarios',this);cargarSubusuarios()">🔐 Sub-usuarios</button>
+  <div class="tab-cards-grid">
+
+    <!-- Tarjeta 1 — Certificaciones emitidas por AVBA -->
+    <div class="tab-card">
+      <div class="tab-card-hdr" style="background:#0C447C">
+        <div class="tab-card-hdr-icon">📋</div>
+        <div>
+          <div class="tab-card-hdr-t">Certificaciones AVBA</div>
+          <div class="tab-card-hdr-s">Documentos emitidos por AVBA</div>
+        </div>
+      </div>
+      <div class="tab-card-body">
+        <button class="tab-btn active" id="tabbtn-maq" onclick="verTab('maq',this)">🔧 Maquinaria</button>
+        <button class="tab-btn" id="tabbtn-acc" onclick="verTab('acc',this)">🔗 Accesorios de Izaje</button>
+        <button class="tab-btn" id="tabbtn-per" onclick="verTab('per',this)">👷 Personal</button>
+        <button class="tab-btn" id="tabbtn-pnd" onclick="verTab('pnd',this)">🔬 PND</button>
+      </div>
+    </div>
+
+    <!-- Tarjeta 2 — Control interno del cliente -->
+    <div class="tab-card">
+      <div class="tab-card-hdr" style="background:#0f766e">
+        <div class="tab-card-hdr-icon">🏢</div>
+        <div>
+          <div class="tab-card-hdr-t">Control de Empresa</div>
+          <div class="tab-card-hdr-s">Gestión interna de equipos y personal</div>
+        </div>
+      </div>
+      <div class="tab-card-body">
+        <button class="tab-btn" id="tabbtn-equipos" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos<span class="tab-notif" id="tab-notif-eq" style="display:none"></span></button>
+        <button class="tab-btn" id="tabbtn-personal-cli" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal<span class="tab-notif" id="tab-notif-per" style="display:none"></span></button>
+        <button class="tab-btn" id="tabbtn-subusuarios" style="display:none" onclick="verTab('subusuarios',this);cargarSubusuarios()">🔐 Sub-usuarios</button>
+      </div>
+    </div>
+
   </div>
 
   <div id="tab-maq" class="tab-panel active">
