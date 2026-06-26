@@ -425,6 +425,7 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
       <div class="tab-card-body">
         <button class="tab-btn" id="tabbtn-equipos" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos<span class="tab-notif" id="tab-notif-eq" style="display:none"></span></button>
         <button class="tab-btn" id="tabbtn-personal-cli" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal<span class="tab-notif" id="tab-notif-per" style="display:none"></span></button>
+        <button class="tab-btn" id="tabbtn-proveedores" onclick="verTab('proveedores',this);cargarProveedores()">🏭 Proveedores</button>
         <button class="tab-btn" id="tabbtn-subusuarios" style="display:none" onclick="verTab('subusuarios',this);cargarSubusuarios()">🔐 Sub-usuarios</button>
       </div>
     </div>
@@ -696,6 +697,23 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
 
   </div>
 
+  <!-- ══ PROVEEDORES ══ -->
+  <div id="tab-proveedores" class="tab-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div>
+        <h2 style="margin:0;font-size:18px;color:#0d2244">🏭 Proveedores</h2>
+        <p style="margin:4px 0 0;font-size:13px;color:#667">Directorio de tus proveedores: datos de contacto, RFC, ubicación y giro.</p>
+      </div>
+      <button class="btn-prim" id="prov-btn-nuevo" onclick="abrirModalProv(null)">+ Nuevo proveedor</button>
+    </div>
+    <div style="margin-bottom:12px">
+      <input id="prov-buscar" type="text" placeholder="🔍 Buscar por nombre, giro, RFC, contacto, ciudad…"
+             style="width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid var(--borde);border-radius:8px;font-size:13px;outline:none"
+             oninput="renderProveedores()">
+    </div>
+    <div id="prov-lista"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+
   <!-- ══ SUB-USUARIOS ══ -->
   <div id="tab-subusuarios" class="tab-panel">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
@@ -890,6 +908,53 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
     <div class="fact">
       <button class="btn-sec" onclick="cerrarModalPers()">Cancelar</button>
       <button class="btn-prim" onclick="guardarPers()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Proveedor -->
+<div class="eq-overlay" id="modal-prov">
+  <div class="eq-modal">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title" id="modal-prov-title">Nuevo proveedor</div>
+      <button class="eq-modal-close" onclick="cerrarModalProv()">✕</button>
+    </div>
+    <input type="hidden" id="prov-id">
+    <p class="eq-msec">Identificación</p>
+    <div class="frow"><label class="flabel">Nombre o razón social *</label><input class="finput" id="prov-nombre" placeholder="Ej: Aceros del Norte S.A. de C.V."></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Giro / Actividad</label><input class="finput" id="prov-giro" placeholder="Ej: Venta de acero estructural"></div>
+      <div class="frow"><label class="flabel">RFC</label><input class="finput" id="prov-rfc" placeholder="XAXX010101000" style="text-transform:uppercase" maxlength="13"></div>
+    </div>
+    <p class="eq-msec">Contacto</p>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Persona de contacto</label><input class="finput" id="prov-contacto" placeholder="Ej: Lic. Ana Pérez"></div>
+      <div class="frow"><label class="flabel">Teléfono</label><input class="finput" id="prov-telefono" placeholder="55 1234 5678"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Correo</label><input class="finput" id="prov-correo" type="email" placeholder="ventas@proveedor.com"></div>
+      <div class="frow"><label class="flabel">Sitio web</label><input class="finput" id="prov-sitio" placeholder="www.proveedor.com"></div>
+    </div>
+    <p class="eq-msec">Ubicación</p>
+    <div class="frow"><label class="flabel">Dirección</label><input class="finput" id="prov-direccion" placeholder="Calle, número, colonia, C.P."></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Ciudad</label><input class="finput" id="prov-ciudad" placeholder="Ej: Monterrey"></div>
+      <div class="frow"><label class="flabel">Estado</label><input class="finput" id="prov-estado-ubic" placeholder="Ej: Nuevo León"></div>
+    </div>
+    <p class="eq-msec">Otros</p>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Estatus</label>
+        <select class="finput" id="prov-estado">
+          <option value="Activo">Activo</option>
+          <option value="Inactivo">Inactivo</option>
+        </select>
+      </div>
+      <div></div>
+    </div>
+    <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="prov-notas" rows="2" placeholder="Condiciones de pago, observaciones…"></textarea></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalProv()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarProv()">Guardar</button>
     </div>
   </div>
 </div>
@@ -1155,7 +1220,7 @@ const _puedeEditar = !_esSub || _sesion.permiso_sub !== 'lectura';
 function _configurarTabsPorRol() {
   if (_esSub) {
     // Sub-usuario: solo ve los módulos asignables (Maquinaria, Mis Equipos, Mi Personal)
-    ['acc','per','pnd','subusuarios'].forEach(t => {
+    ['acc','per','pnd','proveedores','subusuarios'].forEach(t => {
       const b = document.getElementById('tabbtn-' + t); if (b) b.style.display = 'none';
     });
     if (_sesion.permiso_sub === 'lectura') document.body.classList.add('solo-lectura');
@@ -2753,6 +2818,143 @@ async function eliminarPers(id, nombre) {
     _perCargado = false;
     cargarPersonalCli();
   } catch(_) { toastPer('Error de red.'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  PROVEEDORES
+// ═══════════════════════════════════════════════════════════════════════════
+let _provData    = [];
+let _provCargado = false;
+
+async function cargarProveedores() {
+  if (_provCargado) return;
+  const cont = document.getElementById('prov-lista');
+  cont.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  try {
+    const r = await fetch(API + '?action=LISTAR_PROVEEDORES');
+    const d = await r.json();
+    if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo);text-align:center;padding:20px">${d.message || 'Error al cargar.'}</p>`; return; }
+    _provData = d.proveedores || [];
+    _provCargado = true;
+    renderProveedores();
+  } catch(_) {
+    cont.innerHTML = '<p style="color:var(--rojo);text-align:center;padding:20px">Error de red al cargar proveedores.</p>';
+  }
+}
+
+function renderProveedores() {
+  const cont = document.getElementById('prov-lista');
+  const q = (document.getElementById('prov-buscar').value || '').toLowerCase().trim();
+  let lista = _provData;
+  if (q) {
+    lista = _provData.filter(p =>
+      [p.nombre, p.giro, p.rfc, p.contacto, p.ciudad, p.estado_ubic, p.correo]
+        .some(v => (v || '').toLowerCase().includes(q))
+    );
+  }
+  if (!lista.length) {
+    cont.innerHTML = _provData.length
+      ? '<div class="empty"><div class="empty-t">Sin coincidencias</div><div class="empty-s">Prueba con otro término de búsqueda.</div></div>'
+      : '<div class="empty"><div class="empty-t">Sin proveedores registrados</div><div class="empty-s">Agrega tus proveedores con sus datos de contacto, RFC y ubicación.</div></div>';
+    return;
+  }
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px">';
+  lista.forEach(p => {
+    const inactivo = (p.estado || 'Activo') !== 'Activo';
+    const badge = inactivo
+      ? '<span class="badge b-vencido">Inactivo</span>'
+      : '<span class="badge b-vigente">Activo</span>';
+    const ubic = [p.ciudad, p.estado_ubic].filter(Boolean).join(', ');
+    html += `<div class="eq-cn">
+      <div class="eq-ch pd-administracion">
+        <div class="eq-ch-ico">🏭</div>
+        <div style="flex:1;min-width:0">
+          <div class="eq-ch-name">${escQ(p.nombre)}</div>
+          <div class="eq-ch-type">${p.giro ? escQ(p.giro) : 'Proveedor'}</div>
+        </div>
+        <div style="flex-shrink:0">${badge}</div>
+      </div>
+      <div class="eq-cb">
+        <div class="eq-chips">
+          ${p.rfc        ? `<span class="eq-chip">🧾 ${escQ(p.rfc)}</span>` : ''}
+          ${ubic         ? `<span class="eq-chip">📍 ${escQ(ubic)}</span>` : ''}
+        </div>
+        ${p.contacto ? `<div class="info-row"><span class="info-key">Contacto</span><span class="info-val">${escQ(p.contacto)}</span></div>` : ''}
+        ${p.telefono ? `<div class="info-row"><span class="info-key">Teléfono</span><span class="info-val"><a href="tel:${escQ(p.telefono)}" style="color:var(--azul);text-decoration:none">${escQ(p.telefono)}</a></span></div>` : ''}
+        ${p.correo   ? `<div class="info-row"><span class="info-key">Correo</span><span class="info-val"><a href="mailto:${escQ(p.correo)}" style="color:var(--azul);text-decoration:none">${escQ(p.correo)}</a></span></div>` : ''}
+        ${p.sitio_web? `<div class="info-row"><span class="info-key">Sitio</span><span class="info-val"><a href="${/^https?:\/\//.test(p.sitio_web)?escQ(p.sitio_web):'https://'+escQ(p.sitio_web)}" target="_blank" rel="noopener" style="color:var(--azul);text-decoration:none">${escQ(p.sitio_web)}</a></span></div>` : ''}
+        ${p.direccion? `<div class="info-row"><span class="info-key">Dirección</span><span class="info-val" style="max-width:60%">${escQ(p.direccion)}</span></div>` : ''}
+        ${p.notas    ? `<div style="margin-top:8px;font-size:12px;color:var(--texto-sub);background:var(--gris-bg);padding:8px 10px;border-radius:8px">${escQ(p.notas)}</div>` : ''}
+      </div>
+      ${_puedeEditar ? `<div style="display:flex;gap:6px;padding:10px 14px 14px">
+        <button class="btn-sec" style="flex:1;font-size:12px;padding:8px 10px" onclick='abrirModalProv(${JSON.stringify(p).replace(/'/g,"&#39;")})'>✏ Editar</button>
+        <button class="btn-del" onclick="eliminarProv(${p.id},'${escQ(p.nombre)}')">🗑</button>
+      </div>` : ''}
+    </div>`;
+  });
+  html += '</div>';
+  cont.innerHTML = html;
+}
+
+function abrirModalProv(prov) {
+  document.getElementById('modal-prov-title').textContent = prov ? 'Editar proveedor' : 'Nuevo proveedor';
+  document.getElementById('prov-id').value          = prov ? prov.id : '';
+  document.getElementById('prov-nombre').value      = prov ? (prov.nombre      || '') : '';
+  document.getElementById('prov-giro').value        = prov ? (prov.giro        || '') : '';
+  document.getElementById('prov-rfc').value         = prov ? (prov.rfc         || '') : '';
+  document.getElementById('prov-contacto').value    = prov ? (prov.contacto    || '') : '';
+  document.getElementById('prov-telefono').value    = prov ? (prov.telefono    || '') : '';
+  document.getElementById('prov-correo').value      = prov ? (prov.correo      || '') : '';
+  document.getElementById('prov-sitio').value       = prov ? (prov.sitio_web   || '') : '';
+  document.getElementById('prov-direccion').value   = prov ? (prov.direccion   || '') : '';
+  document.getElementById('prov-ciudad').value      = prov ? (prov.ciudad      || '') : '';
+  document.getElementById('prov-estado-ubic').value = prov ? (prov.estado_ubic || '') : '';
+  document.getElementById('prov-estado').value      = prov ? (prov.estado      || 'Activo') : 'Activo';
+  document.getElementById('prov-notas').value       = prov ? (prov.notas       || '') : '';
+  document.getElementById('modal-prov').classList.add('open');
+}
+function cerrarModalProv() { document.getElementById('modal-prov').classList.remove('open'); }
+
+async function guardarProv() {
+  const id     = document.getElementById('prov-id').value;
+  const nombre = document.getElementById('prov-nombre').value.trim();
+  if (!nombre) { toastEq('El nombre o razón social es requerido.'); return; }
+  const data = {
+    id:          id ? +id : 0,
+    nombre,
+    giro:        document.getElementById('prov-giro').value.trim(),
+    rfc:         document.getElementById('prov-rfc').value.trim(),
+    contacto:    document.getElementById('prov-contacto').value.trim(),
+    telefono:    document.getElementById('prov-telefono').value.trim(),
+    correo:      document.getElementById('prov-correo').value.trim(),
+    sitio_web:   document.getElementById('prov-sitio').value.trim(),
+    direccion:   document.getElementById('prov-direccion').value.trim(),
+    ciudad:      document.getElementById('prov-ciudad').value.trim(),
+    estado_ubic: document.getElementById('prov-estado-ubic').value.trim(),
+    estado:      document.getElementById('prov-estado').value,
+    notas:       document.getElementById('prov-notas').value.trim(),
+  };
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'GUARDAR_PROVEEDOR', payload:data}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message || 'Error al guardar.'); return; }
+    cerrarModalProv();
+    toastEq('Proveedor guardado.');
+    _provCargado = false;
+    cargarProveedores();
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+async function eliminarProv(id, nombre) {
+  if (!confirm(`¿Eliminar al proveedor "${nombre}"?`)) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'ELIMINAR_PROVEEDOR', payload:{id}}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message || 'Error.'); return; }
+    toastEq('Proveedor eliminado.');
+    _provCargado = false;
+    cargarProveedores();
+  } catch(_) { toastEq('Error de red.'); }
 }
 
 // ── Documento Personal ────────────────────────────────────────────────────

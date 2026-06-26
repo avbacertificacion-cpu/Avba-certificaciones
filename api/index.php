@@ -22,6 +22,7 @@ require_once __DIR__ . '/Accesorios.php';
 require_once __DIR__ . '/Pnd.php';
 require_once __DIR__ . '/ClienteEquipos.php';
 require_once __DIR__ . '/ClientePersonal.php';
+require_once __DIR__ . '/ClienteProveedores.php';
 require_once __DIR__ . '/ClienteSubusuarios.php';
 
 // ── Headers de seguridad ──────────────────────────────────
@@ -64,6 +65,7 @@ $accesorios     = new Accesorios($pdo);
 $pnd            = new Pnd($pdo);
 $cliEquipos     = new ClienteEquipos($pdo);
 $cliPersonal    = new ClientePersonal($pdo);
+$cliProveedores = new ClienteProveedores($pdo);
 $cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuarios.usuario_padre_id
 
 // ── Extraer token ─────────────────────────────────────────
@@ -577,6 +579,12 @@ if ($method === 'GET') {
             $participantes = $auth->getParticipantesEnSesion($sesion['id']);
             respuesta(['status' => 'success', 'participantes' => $participantes, 'sesion_nombre' => $sesion['sesion_nombre']]);
         }
+
+        // ── Portal cliente: proveedores ───────────────────
+        case 'LISTAR_PROVEEDORES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliProveedores->listar(resolveIdc($usr)));
 
         // ── Portal cliente: equipos ───────────────────────
         case 'GET_MI_PERSONAL':
@@ -1360,6 +1368,19 @@ if ($method === 'POST') {
             bloquearSiLectura($alc);
             autorizarRecurso($alc, 'equipo', parentDeRecurso($pdo, 'cliente_equipos_cert', 'equipo_id', (int)($payload['id'] ?? 0)));
             respuesta($cliEquipos->eliminarCert((int)($payload['id'] ?? 0), resolveIdc($usr)));
+
+        // ── Proveedores del cliente ──────────────────────────────
+        case 'GUARDAR_PROVEEDOR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            bloquearSiLectura(alcanceSub($usr, $cliSub));
+            respuesta($cliProveedores->guardar($payload, resolveIdc($usr)));
+
+        case 'ELIMINAR_PROVEEDOR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            bloquearSiLectura(alcanceSub($usr, $cliSub));
+            respuesta($cliProveedores->eliminar((int)($payload['id'] ?? 0), resolveIdc($usr)));
 
         // ── Personal del cliente ─────────────────────────────────
         case 'GUARDAR_PERSONAL_CLI':
