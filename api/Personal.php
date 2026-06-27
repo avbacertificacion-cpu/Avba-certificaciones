@@ -2321,7 +2321,7 @@ table table td { border: none; }
 
   <!-- ③ CONTENIDO PRINCIPAL -->
   <tr>
-    <td style="text-align:center;padding:6mm 20mm 6mm;background:#FFFDF5;vertical-align:middle;">
+    <td style="text-align:center;padding:6mm 20mm 6mm;background:#FFFDF5;vertical-align:middle;height:138mm;">
 
       <div style="font-family:DejaVu Serif,Georgia,serif;font-size:60pt;font-weight:bold;
                   color:#B8882A;letter-spacing:16px;line-height:1;margin-bottom:6mm;">DIPLOMA</div>
