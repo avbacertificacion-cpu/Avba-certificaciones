@@ -2290,7 +2290,7 @@ table table td { border: none; }
 <body>
 
 <!-- OUTER FRAME -->
-<table style="width:100%;height:197mm;border-collapse:collapse;border:3px double #C9A84C;background:#FFFDF5;">
+<table style="width:100%;height:200mm;border-collapse:collapse;border:3px double #C9A84C;background:#FFFDF5;">
 
   <!-- ① HEADER AZUL -->
   <tr>
@@ -2321,7 +2321,7 @@ table table td { border: none; }
 
   <!-- ③ CONTENIDO PRINCIPAL -->
   <tr>
-    <td style="text-align:center;padding:6mm 20mm 6mm;background:#FFFDF5;vertical-align:top;">
+    <td style="text-align:center;padding:6mm 20mm 6mm;background:#FFFDF5;vertical-align:middle;">
 
       <div style="font-family:DejaVu Serif,Georgia,serif;font-size:60pt;font-weight:bold;
                   color:#B8882A;letter-spacing:16px;line-height:1;margin-bottom:6mm;">DIPLOMA</div>
