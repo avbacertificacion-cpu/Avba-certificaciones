@@ -2290,7 +2290,7 @@ table table td { border: none; }
 <body>
 
 <!-- OUTER FRAME -->
-<table style="width:100%;height:198mm;border-collapse:collapse;border:3px double #C9A84C;background:#FFFDF5;">
+<table style="width:100%;border-collapse:collapse;border:3px double #C9A84C;background:#FFFDF5;">
 
   <!-- ① HEADER AZUL -->
   <tr>
@@ -2319,37 +2319,37 @@ table table td { border: none; }
     </td>
   </tr>
 
-  <!-- ③ CONTENIDO PRINCIPAL (height:100% absorbe el espacio restante) -->
+  <!-- ③ CONTENIDO PRINCIPAL (altura natural por espaciado, sin height fijo) -->
   <tr>
-    <td style="text-align:center;padding:7mm 20mm;background:#FFFDF5;vertical-align:middle;height:100%;">
+    <td style="text-align:center;padding:9mm 20mm;background:#FFFDF5;vertical-align:middle;">
 
       <div style="font-family:DejaVu Serif,Georgia,serif;font-size:60pt;font-weight:bold;
-                  color:#B8882A;letter-spacing:16px;line-height:1;margin-bottom:7mm;">DIPLOMA</div>
+                  color:#B8882A;letter-spacing:16px;line-height:1;margin-bottom:9mm;">DIPLOMA</div>
 
-      <table style="margin:0 auto 7mm;border-collapse:collapse;width:220px;"><tr>
+      <table style="margin:0 auto 9mm;border-collapse:collapse;width:220px;"><tr>
         <td style="border-bottom:1.5px solid #C9A84C;height:1px;"></td>
         <td style="width:14px;text-align:center;font-size:8pt;color:#C9A84C;padding:0 3px;">&#9670;</td>
         <td style="border-bottom:1.5px solid #C9A84C;height:1px;"></td>
       </tr></table>
 
-      <div style="font-size:10pt;color:#999;font-style:italic;margin-bottom:7mm;">Se hace constar que</div>
+      <div style="font-size:10pt;color:#999;font-style:italic;margin-bottom:9mm;">Se hace constar que</div>
 
       <div style="font-family:DejaVu Serif,Georgia,serif;font-size:30pt;font-style:italic;
-                  color:#0D1B4B;line-height:1.2;margin-bottom:6mm;">{$nombre}</div>
+                  color:#0D1B4B;line-height:1.2;margin-bottom:9mm;">{$nombre}</div>
 
-      <div style="width:70%;height:1.5px;background:#C9A84C;margin:0 auto 7mm;"></div>
+      <div style="width:70%;height:1.5px;background:#C9A84C;margin:0 auto 9mm;"></div>
 
-      <div style="font-size:10pt;color:#555;margin-bottom:7mm;">Ha concluido satisfactoriamente el programa de capacitación:</div>
+      <div style="font-size:10pt;color:#555;margin-bottom:9mm;">Ha concluido satisfactoriamente el programa de capacitación:</div>
 
-      <table style="margin:0 auto 7mm;border-collapse:collapse;"><tr>
+      <table style="margin:0 auto 9mm;border-collapse:collapse;"><tr>
         <td style="font-size:14pt;font-weight:bold;color:#0D1B4B;text-transform:uppercase;
                    letter-spacing:1px;padding:3.5mm 35px;
                    border-top:3px solid #C9A84C;border-bottom:3px solid #C9A84C;">{$textoCert}</td>
       </tr></table>
 
-      <div style="font-size:8.5pt;color:#777;margin-bottom:7mm;">{$infoLine}</div>
+      <div style="font-size:8.5pt;color:#777;margin-bottom:9mm;">{$infoLine}</div>
 
-      <div style="font-size:8.5pt;color:#666;line-height:1.85;padding:5mm 20mm;
+      <div style="font-size:8.5pt;color:#666;line-height:1.85;padding:7mm 20mm;
                   border-top:1px solid #E0D5B0;border-bottom:1px solid #E0D5B0;">
         En reconocimiento a su dedicación, esfuerzo y participación activa durante el programa
         de capacitación, y en cumplimiento de los criterios de evaluación establecidos, se expide
