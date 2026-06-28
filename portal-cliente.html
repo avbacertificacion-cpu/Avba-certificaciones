@@ -426,6 +426,7 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
         <button class="tab-btn" id="tabbtn-equipos" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos<span class="tab-notif" id="tab-notif-eq" style="display:none"></span></button>
         <button class="tab-btn" id="tabbtn-personal-cli" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal<span class="tab-notif" id="tab-notif-per" style="display:none"></span></button>
         <button class="tab-btn" id="tabbtn-proveedores" onclick="verTab('proveedores',this);cargarProveedores()">🏭 Proveedores</button>
+        <button class="tab-btn" id="tabbtn-materiales" onclick="verTab('materiales',this);cargarMateriales()">🧰 Materiales</button>
         <button class="tab-btn" id="tabbtn-subusuarios" style="display:none" onclick="verTab('subusuarios',this);cargarSubusuarios()">🔐 Sub-usuarios</button>
       </div>
     </div>
@@ -714,6 +715,23 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
     <div id="prov-lista"><div class="loading"><span class="spin"></span></div></div>
   </div>
 
+  <!-- ══ MATERIALES (catálogo) ══ -->
+  <div id="tab-materiales" class="tab-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div>
+        <h2 style="margin:0;font-size:18px;color:#0d2244">🧰 Catálogo de Materiales</h2>
+        <p style="margin:4px 0 0;font-size:13px;color:#667">Refacciones y suministros para las solicitudes de material del mecánico.</p>
+      </div>
+      <button class="btn-prim" id="mat-btn-nuevo" onclick="abrirModalMat(null)">+ Nuevo material</button>
+    </div>
+    <div style="margin-bottom:12px">
+      <input id="mat-buscar" type="text" placeholder="🔍 Buscar por nombre, núm. parte, categoría…"
+             style="width:100%;box-sizing:border-box;padding:10px 14px;border:1px solid var(--borde);border-radius:8px;font-size:13px;outline:none"
+             oninput="renderMateriales()">
+    </div>
+    <div id="mat-lista"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+
   <!-- ══ SUB-USUARIOS ══ -->
   <div id="tab-subusuarios" class="tab-panel">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
@@ -955,6 +973,36 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
     <div class="fact">
       <button class="btn-sec" onclick="cerrarModalProv()">Cancelar</button>
       <button class="btn-prim" onclick="guardarProv()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Material (catálogo) -->
+<div class="eq-overlay" id="modal-mat">
+  <div class="eq-modal">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title" id="modal-mat-title">Nuevo material</div>
+      <button class="eq-modal-close" onclick="cerrarModalMat()">✕</button>
+    </div>
+    <input type="hidden" id="mat-id">
+    <div class="frow"><label class="flabel">Nombre del material *</label><input class="finput" id="mat-nombre" placeholder="Ej: Aceite hidráulico ISO 68"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Núm. de parte</label><input class="finput" id="mat-numparte" placeholder="Ej: HID-68-19L"></div>
+      <div class="frow"><label class="flabel">Unidad</label><input class="finput" id="mat-unidad" placeholder="Ej: Litro, Pieza, Juego"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Categoría</label><input class="finput" id="mat-categoria" placeholder="Ej: Lubricantes, Filtros, Eléctrico"></div>
+      <div class="frow"><label class="flabel">Estatus</label>
+        <select class="finput" id="mat-activo">
+          <option value="1">Activo</option>
+          <option value="0">Inactivo</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="mat-notas" rows="2" placeholder="Especificaciones, equivalencias…"></textarea></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalMat()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarMat()">Guardar</button>
     </div>
   </div>
 </div>
@@ -1226,7 +1274,7 @@ const _puedeEditar = !_esSub || _sesion.permiso_sub !== 'lectura';
 function _configurarTabsPorRol() {
   if (_esSub) {
     // Sub-usuario: solo ve los módulos asignables (Maquinaria, Mis Equipos, Mi Personal)
-    ['acc','per','pnd','proveedores','subusuarios'].forEach(t => {
+    ['acc','per','pnd','proveedores','materiales','subusuarios'].forEach(t => {
       const b = document.getElementById('tabbtn-' + t); if (b) b.style.display = 'none';
     });
     if (_sesion.permiso_sub === 'lectura') document.body.classList.add('solo-lectura');
@@ -2965,6 +3013,114 @@ async function eliminarProv(id, nombre) {
     toastEq('Proveedor eliminado.');
     _provCargado = false;
     cargarProveedores();
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  MATERIALES (catálogo)
+// ═══════════════════════════════════════════════════════════════════════════
+let _matData    = [];
+let _matCargado = false;
+
+async function cargarMateriales() {
+  if (_matCargado) return;
+  const cont = document.getElementById('mat-lista');
+  cont.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  try {
+    const r = await fetch(API + '?action=LISTAR_MATERIALES');
+    const d = await r.json();
+    if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo);text-align:center;padding:20px">${d.message || 'Error al cargar.'}</p>`; return; }
+    _matData = d.materiales || [];
+    _matCargado = true;
+    renderMateriales();
+  } catch(_) {
+    cont.innerHTML = '<p style="color:var(--rojo);text-align:center;padding:20px">Error de red al cargar materiales.</p>';
+  }
+}
+
+function renderMateriales() {
+  const cont = document.getElementById('mat-lista');
+  const q = (document.getElementById('mat-buscar').value || '').toLowerCase().trim();
+  let lista = _matData;
+  if (q) {
+    lista = _matData.filter(m =>
+      [m.nombre, m.num_parte, m.categoria, m.unidad].some(v => (v || '').toLowerCase().includes(q))
+    );
+  }
+  if (!lista.length) {
+    cont.innerHTML = _matData.length
+      ? '<div class="empty"><div class="empty-t">Sin coincidencias</div><div class="empty-s">Prueba con otro término.</div></div>'
+      : '<div class="empty"><div class="empty-t">Catálogo vacío</div><div class="empty-s">Agrega refacciones y suministros para usarlos en las solicitudes de material.</div></div>';
+    return;
+  }
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px">'
+    + '<thead><tr style="text-align:left;color:#667;border-bottom:2px solid var(--borde)">'
+    + '<th style="padding:8px 10px">Material</th><th style="padding:8px 10px">Núm. parte</th>'
+    + '<th style="padding:8px 10px">Unidad</th><th style="padding:8px 10px">Categoría</th>'
+    + '<th style="padding:8px 10px"></th></tr></thead><tbody>';
+  lista.forEach(m => {
+    const inact = !(+m.activo);
+    html += `<tr style="border-bottom:1px solid #f0f2f7${inact ? ';opacity:.5' : ''}">
+      <td style="padding:8px 10px;font-weight:600;color:#0d2244">${escQ(m.nombre)}${inact ? ' <span class="badge b-vencido" style="font-size:9px">Inactivo</span>' : ''}</td>
+      <td style="padding:8px 10px;font-family:monospace;color:#556">${m.num_parte ? escQ(m.num_parte) : '—'}</td>
+      <td style="padding:8px 10px">${m.unidad ? escQ(m.unidad) : '—'}</td>
+      <td style="padding:8px 10px">${m.categoria ? `<span class="eq-chip">${escQ(m.categoria)}</span>` : '—'}</td>
+      <td style="padding:8px 10px;text-align:right;white-space:nowrap">
+        ${_puedeEditar ? `<button class="btn-sec" style="font-size:12px;padding:6px 9px" onclick='abrirModalMat(${JSON.stringify(m).replace(/'/g,"&#39;")})'>✏</button>
+        <button class="btn-del" style="padding:6px 9px" onclick="eliminarMat(${m.id},'${escQ(m.nombre)}')">🗑</button>` : ''}
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  cont.innerHTML = html;
+}
+
+function abrirModalMat(mat) {
+  document.getElementById('modal-mat-title').textContent = mat ? 'Editar material' : 'Nuevo material';
+  document.getElementById('mat-id').value        = mat ? mat.id : '';
+  document.getElementById('mat-nombre').value    = mat ? (mat.nombre    || '') : '';
+  document.getElementById('mat-numparte').value  = mat ? (mat.num_parte || '') : '';
+  document.getElementById('mat-unidad').value    = mat ? (mat.unidad    || '') : '';
+  document.getElementById('mat-categoria').value = mat ? (mat.categoria || '') : '';
+  document.getElementById('mat-activo').value    = mat ? String(+mat.activo) : '1';
+  document.getElementById('mat-notas').value     = mat ? (mat.notas     || '') : '';
+  document.getElementById('modal-mat').classList.add('open');
+}
+function cerrarModalMat() { document.getElementById('modal-mat').classList.remove('open'); }
+
+async function guardarMat() {
+  const id     = document.getElementById('mat-id').value;
+  const nombre = document.getElementById('mat-nombre').value.trim();
+  if (!nombre) { toastEq('El nombre del material es requerido.'); return; }
+  const data = {
+    id:        id ? +id : 0,
+    nombre,
+    num_parte: document.getElementById('mat-numparte').value.trim(),
+    unidad:    document.getElementById('mat-unidad').value.trim(),
+    categoria: document.getElementById('mat-categoria').value.trim(),
+    activo:    +document.getElementById('mat-activo').value,
+    notas:     document.getElementById('mat-notas').value.trim(),
+  };
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'GUARDAR_MATERIAL', payload:data}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message || 'Error al guardar.'); return; }
+    cerrarModalMat();
+    toastEq('Material guardado.');
+    _matCargado = false;
+    cargarMateriales();
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+async function eliminarMat(id, nombre) {
+  if (!confirm(`¿Eliminar el material "${nombre}"?`)) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'ELIMINAR_MATERIAL', payload:{id}}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message || 'Error.'); return; }
+    toastEq('Material eliminado.');
+    _matCargado = false;
+    cargarMateriales();
   } catch(_) { toastEq('Error de red.'); }
 }
 

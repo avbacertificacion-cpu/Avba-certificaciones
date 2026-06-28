@@ -23,6 +23,7 @@ require_once __DIR__ . '/Pnd.php';
 require_once __DIR__ . '/ClienteEquipos.php';
 require_once __DIR__ . '/ClientePersonal.php';
 require_once __DIR__ . '/ClienteProveedores.php';
+require_once __DIR__ . '/ClienteMateriales.php';
 require_once __DIR__ . '/ClienteSubusuarios.php';
 
 // ── Headers de seguridad ──────────────────────────────────
@@ -66,6 +67,7 @@ $pnd            = new Pnd($pdo);
 $cliEquipos     = new ClienteEquipos($pdo);
 $cliPersonal    = new ClientePersonal($pdo);
 $cliProveedores = new ClienteProveedores($pdo);
+$cliMateriales  = new ClienteMateriales($pdo);
 $cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuarios.usuario_padre_id
 
 // ── Extraer token ─────────────────────────────────────────
@@ -594,6 +596,12 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cliProveedores->listar(resolveIdc($usr)));
+
+        // ── Portal cliente: catálogo de materiales ─────────
+        case 'LISTAR_MATERIALES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliMateriales->listar(resolveIdc($usr)));
 
         // ── Portal cliente: equipos ───────────────────────
         case 'GET_MI_PERSONAL':
@@ -1390,6 +1398,19 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             bloquearSiLectura(alcanceSub($usr, $cliSub));
             respuesta($cliProveedores->eliminar((int)($payload['id'] ?? 0), resolveIdc($usr)));
+
+        // ── Catálogo de materiales del cliente ───────────────────
+        case 'GUARDAR_MATERIAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            bloquearSiLectura(alcanceSub($usr, $cliSub));
+            respuesta($cliMateriales->guardar($payload, resolveIdc($usr)));
+
+        case 'ELIMINAR_MATERIAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            bloquearSiLectura(alcanceSub($usr, $cliSub));
+            respuesta($cliMateriales->eliminar((int)($payload['id'] ?? 0), resolveIdc($usr)));
 
         // ── Personal del cliente ─────────────────────────────────
         case 'GUARDAR_PERSONAL_CLI':
