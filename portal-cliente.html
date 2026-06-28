@@ -1120,6 +1120,12 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
         <option value="lectura">Solo ver (lectura)</option>
       </select>
     </div>
+    <div class="frow">
+      <label class="flabel" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="sub-mantenimiento" style="width:auto;margin:0">
+        <span>🔧 Mecánico — puede crear solicitudes de material y reportes de mantenimiento</span>
+      </label>
+    </div>
     <div class="frow" id="sub-activo-row" style="display:none">
       <label class="flabel"><input type="checkbox" id="sub-activo" checked style="width:auto;margin-right:6px">Cuenta activa</label>
     </div>
@@ -1880,7 +1886,9 @@ function renderListaEq(equipos) {
           ? `✔ ${eq.certs_vigentes} cert${eq.certs_vigentes!==1?'s':''} vigente${eq.certs_vigentes!==1?'s':''}`
           : 'Sin certificaciones';
     const certColor = certBad ? 'var(--rojo)' : certWarn ? 'var(--ambar)' : 'var(--verde)';
-    html += `<div class="eq-cn">
+    const esAvba   = !!eq.certificado_avba;
+    html += `<div class="eq-cn"${esAvba ? ' style="border:2px solid #185FA5;box-shadow:0 2px 14px rgba(24,95,165,.18)"' : ''}>
+      ${esAvba ? '<div style="background:#185FA5;color:#fff;font-size:10.5px;font-weight:700;letter-spacing:.4px;padding:4px 12px;display:flex;align-items:center;gap:5px">🛡 CERTIFICADO POR AVBA' + (eq.control ? ' · ' + escQ(eq.control) : '') + '</div>' : ''}
       <div class="eq-ch ${ti.cls}">
         ${eq.foto_url
           ? `<img class="eq-ch-img" src="${escH(eq.foto_url)}" alt="" loading="lazy">`
@@ -1906,9 +1914,12 @@ function renderListaEq(equipos) {
         <div class="eq-next ${nextCls}">${nextTxt}</div>
       </div>
       <div style="display:flex;gap:6px;padding:10px 14px 14px">
-        <button class="btn-prim" style="flex:1;font-size:12px;padding:8px 10px" onclick="verDetalleEq(${eq.id})">Ver detalle →</button>
+        ${esAvba
+          ? `${eq.certificado_url ? `<a class="btn-prim" style="flex:1;font-size:12px;padding:8px 10px;text-align:center;text-decoration:none" href="${escH(eq.certificado_url)}" target="_blank">📄 Certificado</a>` : ''}
+             ${eq.dictamen_url ? `<a class="btn-sec" style="flex:1;font-size:12px;padding:8px 10px;text-align:center;text-decoration:none" href="${escH(eq.dictamen_url)}" target="_blank">📋 Dictamen</a>` : ''}`
+          : `<button class="btn-prim" style="flex:1;font-size:12px;padding:8px 10px" onclick="verDetalleEq(${eq.id})">Ver detalle →</button>
         ${_puedeEditar ? `<button class="btn-sec" style="font-size:12px;padding:8px 10px" onclick="abrirModalEq(${JSON.stringify(eq).replace(/"/g,'&quot;')})">✏</button>
-        <button class="btn-del" onclick="eliminarEquipo(${eq.id},'${escQ(eq.nombre)}')">🗑</button>` : ''}
+        <button class="btn-del" onclick="eliminarEquipo(${eq.id},'${escQ(eq.nombre)}')">🗑</button>` : ''}`}
       </div>
     </div>`;
   });
@@ -3345,9 +3356,11 @@ function renderSubusuarios(lista) {
           ? '<span class="sub-badge sub-b-lectura">Solo ver</span>'
           : '<span class="sub-badge sub-b-gestion">Ver y gestionar</span>')
       : '<span class="sub-badge sub-b-off">Inactivo</span>';
+    const mantBadge = s.permiso_mantenimiento
+      ? '<span class="sub-badge" style="background:#fef3c7;color:#92400e">🔧 Mecánico</span>' : '';
     return `<div class="sub-card">
       <div style="min-width:0">
-        <div style="font-weight:600;font-size:14px;color:#0d2244">${escH(s.nombre)} ${permBadge}</div>
+        <div style="font-weight:600;font-size:14px;color:#0d2244">${escH(s.nombre)} ${permBadge} ${mantBadge}</div>
         <div style="font-size:12px;color:#778;margin-top:3px">${escH(s.usuario)}</div>
         <div style="font-size:11px;color:#9aa;margin-top:4px">
           ⚙ ${s.n_equipos} equipos · 👥 ${s.n_personal} personal · 📜 ${s.n_cert} certificaciones
@@ -3372,6 +3385,7 @@ function nuevoSub() {
   document.getElementById('sub-password').value = '';
   document.getElementById('sub-pass-lbl').textContent = 'Contraseña *';
   document.getElementById('sub-permiso').value = 'gestion';
+  document.getElementById('sub-mantenimiento').checked = false;
   document.getElementById('sub-activo-row').style.display = 'none';
   document.getElementById('modal-sub').classList.add('open');
 }
@@ -3385,6 +3399,7 @@ function editarSub(s) {
   document.getElementById('sub-password').value = '';
   document.getElementById('sub-pass-lbl').textContent = 'Nueva contraseña (dejar vacío para no cambiar)';
   document.getElementById('sub-permiso').value = s.permiso || 'gestion';
+  document.getElementById('sub-mantenimiento').checked = !!s.permiso_mantenimiento;
   document.getElementById('sub-activo-row').style.display = '';
   document.getElementById('sub-activo').checked = !!s.activo;
   document.getElementById('modal-sub').classList.add('open');
@@ -3398,13 +3413,14 @@ async function guardarSub() {
   const usuario = document.getElementById('sub-usuario').value.trim();
   const password= document.getElementById('sub-password').value;
   const permiso = document.getElementById('sub-permiso').value;
+  const permiso_mantenimiento = document.getElementById('sub-mantenimiento').checked ? 1 : 0;
   if (!nombre)  { toastEq('El nombre es requerido.'); return; }
   if (!id && (!usuario || !password)) { toastEq('Usuario y contraseña son obligatorios.'); return; }
 
   const action  = id ? 'EDITAR_SUBUSUARIO' : 'CREAR_SUBUSUARIO';
   const payload = id
-    ? { id: +id, nombre, permiso, password, activo: document.getElementById('sub-activo').checked ? 1 : 0 }
-    : { nombre, usuario, password, permiso };
+    ? { id: +id, nombre, permiso, permiso_mantenimiento, password, activo: document.getElementById('sub-activo').checked ? 1 : 0 }
+    : { nombre, usuario, password, permiso, permiso_mantenimiento };
   try {
     const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action, payload }) });
     const d = await res.json();

@@ -135,8 +135,10 @@ class ClienteEquipos {
         ");
         $stmt->execute(array_merge([$idCliente], $fragParams));
 
-        return ['status' => 'success', 'equipos' => array_map(fn($r) => [
+        $equipos = array_map(fn($r) => [
             'id'             => (int)$r['id'],
+            'origen'         => 'cliente',
+            'certificado_avba' => false,
             'nombre'         => $r['nombre'],
             'tipo'           => $r['tipo'] ?? '',
             'marca'          => $r['marca'] ?? '',
@@ -154,7 +156,59 @@ class ClienteEquipos {
             'certs_vigentes'   => (int)$r['certs_vigentes'],
             'certs_vencidas'   => (int)$r['certs_vencidas'],
             'certs_por_vencer' => (int)$r['certs_por_vencer'],
-        ], $stmt->fetchAll())];
+        ], $stmt->fetchAll());
+
+        // Equipos certificados por AVBA del cliente: van primero, marcados en azul.
+        // Solo cuando NO hay restricción de sub-usuario (la cuenta principal/los ve completos).
+        $avba = ($soloIds === null) ? $this->listarEquiposAvba($idCliente) : [];
+
+        return ['status' => 'success', 'equipos' => array_merge($avba, $equipos)];
+    }
+
+    /**
+     * Equipos del cliente certificados por AVBA (tabla `equipos`, control = idCliente-folio).
+     * Se muestran en "Mis Equipos" como referencia certificada (origen='avba').
+     */
+    private function listarEquiposAvba(string $idCliente): array {
+        try {
+            $like = $idCliente . '-%';
+            $stmt = $this->pdo->prepare("
+                SELECT id, cliente, maquinaria, marca, modelo, serie, capacidad, id_equipo,
+                       DATE_FORMAT(fecha_inspeccion,'%d/%m/%Y') AS fecha_registro,
+                       control, qr_codigo, certificado_url, dictamen_url
+                FROM equipos
+                WHERE control LIKE ? AND estado = 'ENVIADO'
+                ORDER BY fecha_inspeccion DESC
+            ");
+            $stmt->execute([$like]);
+        } catch (\PDOException $e) {
+            return [];
+        }
+        return array_map(fn($r) => [
+            'id'             => (int)$r['id'],
+            'origen'         => 'avba',
+            'certificado_avba' => true,
+            'control'        => $r['control'] ?? '',
+            'nombre'         => $r['maquinaria'] ?: 'Equipo certificado',
+            'tipo'           => $r['maquinaria'] ?? '',
+            'marca'          => $r['marca'] ?? '',
+            'modelo'         => $r['modelo'] ?? '',
+            'serie'          => $r['serie'] ?? '',
+            'capacidad'      => $r['capacidad'] ?? '',
+            'anio'           => null,
+            'notas'          => '',
+            'estado'         => 'Certificado AVBA',
+            'foto_url'       => '',
+            'fecha_registro' => $r['fecha_registro'],
+            'total_docs'     => 0,
+            'horas_actuales' => 0,
+            'total_certs'    => 1,
+            'certs_vigentes'   => 1,
+            'certs_vencidas'   => 0,
+            'certs_por_vencer' => 0,
+            'certificado_url'  => $r['certificado_url'] ?? '',
+            'dictamen_url'     => $r['dictamen_url'] ?? '',
+        ], $stmt->fetchAll());
     }
 
     public function guardar(array $data, array $files, string $idCliente): array {

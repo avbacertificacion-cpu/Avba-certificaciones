@@ -164,7 +164,7 @@ function validarToken(PDO $pdo, ?string $token): ?array {
 
     try {
         $stmt = $pdo->prepare(
-            "SELECT id, usuario, rol, nombre, id_cliente, usuario_padre_id, permiso_sub
+            "SELECT id, usuario, rol, nombre, id_cliente, usuario_padre_id, permiso_sub, permiso_mantenimiento
              FROM usuarios
              WHERE session_token = ? AND activo = 1 AND token_expires > NOW()"
         );

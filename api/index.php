@@ -120,17 +120,26 @@ if ($method === 'GET') {
  */
 function alcanceSub(array $usr, ClienteSubusuarios $cliSub): array {
     if (empty($usr['usuario_padre_id'])) {
-        return ['es_sub' => false, 'lectura' => false,
+        return ['es_sub' => false, 'lectura' => false, 'mantenimiento' => true,
                 'equipo' => null, 'personal' => null, 'certificacion' => null];
     }
     $acc = $cliSub->accesosDe((int)$usr['id']);
     return [
         'es_sub'        => true,
         'lectura'       => (($usr['permiso_sub'] ?? 'gestion') === 'lectura'),
+        'mantenimiento' => (int)($usr['permiso_mantenimiento'] ?? 0) === 1,
         'equipo'        => $acc['equipo'],
         'personal'      => $acc['personal'],
         'certificacion' => $acc['certificacion'],
     ];
+}
+
+/** Aborta con 403 si el usuario no tiene permiso de mantenimiento. */
+function requiereMantenimiento(array $alc): void {
+    if (!$alc['mantenimiento']) {
+        respuesta(['status' => 'error',
+            'message' => 'No tienes permiso para solicitudes de material ni reportes de mantenimiento.'], 403);
+    }
 }
 
 /** Aborta con 403 si el usuario es un sub-usuario de solo lectura. */
