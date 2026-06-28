@@ -25,6 +25,7 @@ require_once __DIR__ . '/ClientePersonal.php';
 require_once __DIR__ . '/ClienteProveedores.php';
 require_once __DIR__ . '/ClienteMateriales.php';
 require_once __DIR__ . '/ClienteConfig.php';
+require_once __DIR__ . '/ClienteMantenimiento.php';
 require_once __DIR__ . '/ClienteSubusuarios.php';
 
 // ── Headers de seguridad ──────────────────────────────────
@@ -70,6 +71,7 @@ $cliPersonal    = new ClientePersonal($pdo);
 $cliProveedores = new ClienteProveedores($pdo);
 $cliMateriales  = new ClienteMateriales($pdo);
 $cliConfig      = new ClienteConfig($pdo);
+$cliMant        = new ClienteMantenimiento($pdo);
 $cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuarios.usuario_padre_id
 
 // ── Extraer token ─────────────────────────────────────────
@@ -611,6 +613,32 @@ if ($method === 'GET') {
             if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
                 respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cliConfig->obtener(resolveIdc($usr)));
+
+        // ── Solicitudes de material ────────────────────────
+        case 'LISTAR_SOLICITUDES': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            $mec = $alc['es_sub'] ? (int)$usr['id'] : null;
+            respuesta($cliMant->listarSolicitudes(resolveIdc($usr), $mec));
+        }
+        case 'DETALLE_SOLICITUD':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliMant->detalleSolicitud((int)($_GET['id'] ?? 0), resolveIdc($usr)));
+
+        // ── Reportes de mantenimiento ──────────────────────
+        case 'LISTAR_MANTENIMIENTOS': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            $mec = $alc['es_sub'] ? (int)$usr['id'] : null;
+            respuesta($cliMant->listarMantenimientos(resolveIdc($usr), $mec));
+        }
+        case 'DETALLE_MANTENIMIENTO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliMant->detalleMantenimiento((int)($_GET['id'] ?? 0), resolveIdc($usr)));
 
         // ── Portal cliente: equipos ───────────────────────
         case 'GET_MI_PERSONAL':
@@ -1420,6 +1448,48 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             bloquearSiLectura(alcanceSub($usr, $cliSub));
             respuesta($cliMateriales->eliminar((int)($payload['id'] ?? 0), resolveIdc($usr)));
+
+        // ── Solicitudes de material ──────────────────────────────
+        case 'CREAR_SOLICITUD': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            if ($alc['es_sub']) requiereMantenimiento($alc);
+            respuesta($cliMant->crearSolicitud($payload, resolveIdc($usr), $usr));
+        }
+        case 'ASIGNAR_PROVEEDORES_SOL': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'Solo la cuenta principal puede procesar solicitudes.'], 401);
+            respuesta($cliMant->asignarProveedores((int)($payload['id'] ?? 0), (array)($payload['asignaciones'] ?? []), resolveIdc($usr)));
+        }
+        case 'GENERAR_ENVIOS_SOL': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'Solo la cuenta principal puede enviar a proveedores.'], 401);
+            respuesta($cliMant->generarEnvios((int)($payload['id'] ?? 0), resolveIdc($usr)));
+        }
+        case 'ELIMINAR_SOLICITUD': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliMant->eliminarSolicitud((int)($payload['id'] ?? 0), resolveIdc($usr)));
+        }
+
+        // ── Reportes de mantenimiento ────────────────────────────
+        case 'CREAR_MANTENIMIENTO': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            if ($alc['es_sub']) requiereMantenimiento($alc);
+            respuesta($cliMant->crearMantenimiento($_POST, $_FILES, resolveIdc($usr), $usr));
+        }
+        case 'ELIMINAR_MANTENIMIENTO': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliMant->eliminarMantenimiento((int)($payload['id'] ?? 0), resolveIdc($usr)));
+        }
 
         // ── Configuración del cliente (solo cuenta principal) ────
         case 'GUARDAR_CONFIG_CLIENTE':
