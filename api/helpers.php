@@ -4,6 +4,65 @@
  */
 
 /**
+ * Comprime y redimensiona una imagen subida para ahorrar almacenamiento.
+ * Redimensiona el lado mayor a $maxW/$maxH (manteniendo proporción) y la
+ * guarda como JPEG (o PNG si tiene transparencia) con la calidad indicada.
+ * Requiere la extensión GD. Devuelve true si tuvo éxito.
+ *
+ * @param string $src    Ruta del archivo origen (tmp_name)
+ * @param string $dest   Ruta destino (.jpg/.png según contenido)
+ * @param int    $maxW   Ancho máximo
+ * @param int    $maxH   Alto máximo
+ * @param int    $calidad Calidad JPEG (0-100)
+ */
+function comprimirImagen(string $src, string $dest, int $maxW = 1280, int $maxH = 1280, int $calidad = 72): bool {
+    if (!function_exists('imagecreatefromstring') || !function_exists('getimagesize')) return false;
+    $info = @getimagesize($src);
+    if (!$info) return false;
+    [$w, $h] = $info;
+    $type = $info[2] ?? IMAGETYPE_JPEG;
+
+    $data = @file_get_contents($src);
+    if ($data === false) return false;
+    $img = @imagecreatefromstring($data);
+    if (!$img) return false;
+
+    // Escala (solo si excede el máximo)
+    $ratio = min($maxW / max(1, $w), $maxH / max(1, $h), 1);
+    $nw = max(1, (int)round($w * $ratio));
+    $nh = max(1, (int)round($h * $ratio));
+
+    $hasAlpha = in_array($type, [IMAGETYPE_PNG, IMAGETYPE_WEBP], true);
+
+    if ($nw !== $w || $nh !== $h) {
+        $dst = imagecreatetruecolor($nw, $nh);
+        if ($hasAlpha) {
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+            $transparent = imagecolorallocatealpha($dst, 0, 0, 0, 127);
+            imagefilledrectangle($dst, 0, 0, $nw, $nh, $transparent);
+        }
+        imagecopyresampled($dst, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
+        imagedestroy($img);
+        $img = $dst;
+    }
+
+    $ok = false;
+    try {
+        if ($hasAlpha && function_exists('imagepng')) {
+            // Conserva transparencia (logos). PNG comprimido nivel 8.
+            $ok = imagepng($img, $dest, 8);
+        } else {
+            $ok = imagejpeg($img, $dest, max(40, min(95, $calidad)));
+        }
+    } catch (\Throwable $e) {
+        $ok = false;
+    }
+    imagedestroy($img);
+    return (bool)$ok;
+}
+
+/**
  * Valida la CURP: formato + dígito verificador matemático (algoritmo RENAPO).
  * @return array ['valida' => bool, 'error' => string|null]
  */
@@ -366,6 +425,48 @@ function configurarMailer(object $mail, PDO $pdo): void {
     $fromEmail = !empty($cfg['from_email']) ? $cfg['from_email'] : $cfg['username'];
     $fromName  = !empty($cfg['from_name'])  ? $cfg['from_name']  : 'AVBA Certificaciones';
     $mail->setFrom($fromEmail, $fromName);
+}
+
+/**
+ * Configura PHPMailer con el correo de envío PROPIO del cliente (cliente_config).
+ * Si el cliente tiene SMTP completo (host+user+pass), envía desde su servidor.
+ * Si no, cae al SMTP de AVBA pero pone Reply-To al correo del cliente.
+ * @param array $cc  Fila de cliente_config (obtenerRaw)
+ * @return string    Descripción del modo usado (para logs)
+ */
+function configurarMailerCliente(object $mail, PDO $pdo, array $cc): string {
+    $from  = trim($cc['mail_from'] ?? '');
+    $fromN = trim($cc['mail_from_name'] ?? '') ?: ($from ?: 'Cliente AVBA');
+    $host  = trim($cc['mail_host'] ?? '');
+    $user  = trim($cc['mail_user'] ?? '');
+    $pass  = (string)($cc['mail_pass'] ?? '');
+
+    if ($host && $user && $pass !== '') {
+        $mail->isSMTP();
+        $mail->Host     = $host;
+        $mail->SMTPAuth = true;
+        $mail->Username = $user;
+        $mail->Password = $pass;
+        $mail->Port     = (int)($cc['mail_port'] ?? 465) ?: 465;
+        $mail->CharSet  = 'UTF-8';
+        $enc = strtolower($cc['mail_secure'] ?? 'ssl');
+        if (class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+            $mail->SMTPSecure = ($enc === 'tls')
+                ? \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS
+                : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+        } else {
+            $mail->SMTPSecure = ($enc === 'tls') ? 'tls' : 'ssl';
+        }
+        $mail->setFrom($from ?: $user, $fromN);
+        return 'cliente';
+    }
+
+    // Respaldo: SMTP de AVBA, con Reply-To al correo del cliente si lo definió
+    configurarMailer($mail, $pdo);
+    if ($from) {
+        try { $mail->addReplyTo($from, $fromN); } catch (\Throwable $e) {}
+    }
+    return 'avba-fallback';
 }
 
 /**

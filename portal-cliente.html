@@ -427,6 +427,7 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
         <button class="tab-btn" id="tabbtn-personal-cli" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal<span class="tab-notif" id="tab-notif-per" style="display:none"></span></button>
         <button class="tab-btn" id="tabbtn-proveedores" onclick="verTab('proveedores',this);cargarProveedores()">🏭 Proveedores</button>
         <button class="tab-btn" id="tabbtn-materiales" onclick="verTab('materiales',this);cargarMateriales()">🧰 Materiales</button>
+        <button class="tab-btn" id="tabbtn-config" style="display:none" onclick="verTab('config',this);cargarConfig()">⚙ Configuración</button>
         <button class="tab-btn" id="tabbtn-subusuarios" style="display:none" onclick="verTab('subusuarios',this);cargarSubusuarios()">🔐 Sub-usuarios</button>
       </div>
     </div>
@@ -730,6 +731,58 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
              oninput="renderMateriales()">
     </div>
     <div id="mat-lista"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+
+  <!-- ══ CONFIGURACIÓN ══ -->
+  <div id="tab-config" class="tab-panel">
+    <div style="margin-bottom:14px">
+      <h2 style="margin:0;font-size:18px;color:#0d2244">⚙ Configuración</h2>
+      <p style="margin:4px 0 0;font-size:13px;color:#667">Logo, datos fiscales y correo desde el que se envían las solicitudes a proveedores.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px" id="config-grid">
+      <!-- Logo + datos -->
+      <div class="eq-cn" style="padding:16px 18px">
+        <p class="eq-msec" style="margin-top:0">Logo y datos de la empresa</p>
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+          <div id="cfg-logo-prev" style="width:90px;height:64px;border:1px dashed var(--borde);border-radius:8px;display:flex;align-items:center;justify-content:center;background:#fafbff;overflow:hidden;flex-shrink:0;font-size:11px;color:#9aa">Sin logo</div>
+          <div>
+            <label class="btn-sec" style="cursor:pointer;display:inline-block">📤 Subir logo
+              <input type="file" id="cfg-logo-file" accept="image/*" style="display:none" onchange="cfgPrevLogo(this)">
+            </label>
+            <button class="btn-del" id="cfg-logo-del" style="margin-left:6px;display:none" onclick="eliminarLogoCfg()">Quitar</button>
+            <div style="font-size:11px;color:#9aa;margin-top:6px">PNG/JPG · se usa en tus reportes</div>
+          </div>
+        </div>
+        <div class="frow"><label class="flabel">Razón social</label><input class="finput" id="cfg-razon" placeholder="Ej: Constructora del Norte S.A. de C.V."></div>
+        <div class="frow"><label class="flabel">RFC</label><input class="finput" id="cfg-rfc" placeholder="XAXX010101000" style="text-transform:uppercase" maxlength="13"></div>
+      </div>
+
+      <!-- Correo de envío -->
+      <div class="eq-cn" style="padding:16px 18px">
+        <p class="eq-msec" style="margin-top:0">Correo de envío a proveedores</p>
+        <div class="frow"><label class="flabel">Correo (remitente) *</label><input class="finput" id="cfg-mail-from" type="email" placeholder="compras@tuempresa.com"></div>
+        <div class="frow"><label class="flabel">Nombre del remitente</label><input class="finput" id="cfg-mail-name" placeholder="Ej: Compras — Tu Empresa"></div>
+        <p class="eq-msec">Servidor SMTP <span style="font-weight:400;color:#9aa">(para enviar desde tu correo)</span></p>
+        <div class="fgrid2">
+          <div class="frow"><label class="flabel">Host SMTP</label><input class="finput" id="cfg-mail-host" placeholder="smtp.tuempresa.com"></div>
+          <div class="frow"><label class="flabel">Puerto</label><input class="finput" id="cfg-mail-port" type="number" value="465"></div>
+        </div>
+        <div class="fgrid2">
+          <div class="frow"><label class="flabel">Seguridad</label>
+            <select class="finput" id="cfg-mail-secure"><option value="ssl">SSL (465)</option><option value="tls">TLS (587)</option></select>
+          </div>
+          <div class="frow"><label class="flabel">Usuario SMTP</label><input class="finput" id="cfg-mail-user" placeholder="usuario o correo" autocomplete="off"></div>
+        </div>
+        <div class="frow"><label class="flabel">Contraseña SMTP</label><input class="finput" id="cfg-mail-pass" type="password" placeholder="••••••• (dejar vacío para no cambiar)" autocomplete="new-password"></div>
+        <div style="font-size:11px;color:#9aa;margin-bottom:8px">Si no configuras SMTP, el envío sale por el sistema de AVBA con tu correo en "Responder a".</div>
+        <button class="btn-sec" onclick="probarCorreoCfg()">✉ Enviar correo de prueba</button>
+      </div>
+    </div>
+
+    <div class="fact" style="margin-top:16px">
+      <button class="btn-prim" onclick="guardarConfig()">Guardar configuración</button>
+    </div>
   </div>
 
   <!-- ══ SUB-USUARIOS ══ -->
@@ -1274,13 +1327,15 @@ const _puedeEditar = !_esSub || _sesion.permiso_sub !== 'lectura';
 function _configurarTabsPorRol() {
   if (_esSub) {
     // Sub-usuario: solo ve los módulos asignables (Maquinaria, Mis Equipos, Mi Personal)
-    ['acc','per','pnd','proveedores','materiales','subusuarios'].forEach(t => {
+    ['acc','per','pnd','proveedores','materiales','config','subusuarios'].forEach(t => {
       const b = document.getElementById('tabbtn-' + t); if (b) b.style.display = 'none';
     });
     if (_sesion.permiso_sub === 'lectura') document.body.classList.add('solo-lectura');
   } else if (_sesion.rol === 'CLIENTE') {
-    // Cuenta principal del cliente: muestra la gestión de sub-usuarios
-    const b = document.getElementById('tabbtn-subusuarios'); if (b) b.style.display = '';
+    // Cuenta principal del cliente: muestra sub-usuarios y configuración
+    ['subusuarios','config'].forEach(t => {
+      const b = document.getElementById('tabbtn-' + t); if (b) b.style.display = '';
+    });
   }
 }
 _configurarTabsPorRol();
@@ -3121,6 +3176,101 @@ async function eliminarMat(id, nombre) {
     toastEq('Material eliminado.');
     _matCargado = false;
     cargarMateriales();
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CONFIGURACIÓN DEL CLIENTE
+// ═══════════════════════════════════════════════════════════════════════════
+let _cfgCargado = false;
+let _cfgLogoFile = null;
+
+async function cargarConfig() {
+  if (_cfgCargado) return;
+  try {
+    const r = await fetch(API + '?action=GET_CONFIG_CLIENTE');
+    const d = await r.json();
+    if (d.status !== 'success') return;
+    document.getElementById('cfg-razon').value     = d.razon_social || '';
+    document.getElementById('cfg-rfc').value        = d.rfc || '';
+    document.getElementById('cfg-mail-from').value  = d.mail_from || '';
+    document.getElementById('cfg-mail-name').value  = d.mail_from_name || '';
+    document.getElementById('cfg-mail-host').value  = d.mail_host || '';
+    document.getElementById('cfg-mail-port').value  = d.mail_port || 465;
+    document.getElementById('cfg-mail-secure').value= d.mail_secure || 'ssl';
+    document.getElementById('cfg-mail-user').value  = d.mail_user || '';
+    document.getElementById('cfg-mail-pass').placeholder = d.mail_pass_set ? '•••••• (guardada, dejar vacío para no cambiar)' : 'Contraseña SMTP';
+    const prev = document.getElementById('cfg-logo-prev');
+    if (d.logo_url) {
+      prev.innerHTML = `<img src="${escH(d.logo_url)}" style="max-width:100%;max-height:100%;object-fit:contain">`;
+      document.getElementById('cfg-logo-del').style.display = '';
+    } else {
+      prev.textContent = 'Sin logo';
+      document.getElementById('cfg-logo-del').style.display = 'none';
+    }
+    _cfgCargado = true;
+  } catch(_) {}
+}
+
+function cfgPrevLogo(input) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  _cfgLogoFile = f;
+  const prev = document.getElementById('cfg-logo-prev');
+  const rd = new FileReader();
+  rd.onload = e => { prev.innerHTML = `<img src="${e.target.result}" style="max-width:100%;max-height:100%;object-fit:contain">`; };
+  rd.readAsDataURL(f);
+}
+
+async function guardarConfig() {
+  const from = document.getElementById('cfg-mail-from').value.trim();
+  if (from && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(from)) { toastEq('El correo de envío no es válido.'); return; }
+  const fd = new FormData();
+  fd.append('action', 'GUARDAR_CONFIG_CLIENTE');
+  fd.append('razon_social',   document.getElementById('cfg-razon').value.trim());
+  fd.append('rfc',            document.getElementById('cfg-rfc').value.trim());
+  fd.append('mail_from',      from);
+  fd.append('mail_from_name', document.getElementById('cfg-mail-name').value.trim());
+  fd.append('mail_host',      document.getElementById('cfg-mail-host').value.trim());
+  fd.append('mail_port',      document.getElementById('cfg-mail-port').value.trim() || '465');
+  fd.append('mail_secure',    document.getElementById('cfg-mail-secure').value);
+  fd.append('mail_user',      document.getElementById('cfg-mail-user').value.trim());
+  fd.append('mail_pass',      document.getElementById('cfg-mail-pass').value);
+  if (_clienteActivo && _idsCliente.length > 1) fd.append('id_cliente_sel', _clienteActivo);
+  if (_cfgLogoFile) fd.append('logo', _cfgLogoFile);
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await _origFetch(API, { method:'POST', headers:{'X-Token': s.token || ''}, body: fd });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message || 'Error al guardar.'); return; }
+    toastEq('Configuración guardada.');
+    document.getElementById('cfg-mail-pass').value = '';
+    _cfgLogoFile = null;
+    _cfgCargado = false;
+    cargarConfig();
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+async function eliminarLogoCfg() {
+  if (!confirm('¿Quitar el logo?')) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'ELIMINAR_LOGO_CLIENTE'}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message || 'Error.'); return; }
+    toastEq('Logo eliminado.');
+    _cfgCargado = false;
+    cargarConfig();
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+async function probarCorreoCfg() {
+  const destino = prompt('Enviar correo de prueba a:', document.getElementById('cfg-mail-from').value.trim());
+  if (!destino) return;
+  toastEq('Enviando prueba…');
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'PROBAR_CORREO_CLIENTE', payload:{destino}}) });
+    const d = await r.json();
+    toastEq(d.message || (d.status === 'success' ? 'Enviado.' : 'Error.'));
   } catch(_) { toastEq('Error de red.'); }
 }
 

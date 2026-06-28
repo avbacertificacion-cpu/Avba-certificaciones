@@ -24,6 +24,7 @@ require_once __DIR__ . '/ClienteEquipos.php';
 require_once __DIR__ . '/ClientePersonal.php';
 require_once __DIR__ . '/ClienteProveedores.php';
 require_once __DIR__ . '/ClienteMateriales.php';
+require_once __DIR__ . '/ClienteConfig.php';
 require_once __DIR__ . '/ClienteSubusuarios.php';
 
 // ── Headers de seguridad ──────────────────────────────────
@@ -68,6 +69,7 @@ $cliEquipos     = new ClienteEquipos($pdo);
 $cliPersonal    = new ClientePersonal($pdo);
 $cliProveedores = new ClienteProveedores($pdo);
 $cliMateriales  = new ClienteMateriales($pdo);
+$cliConfig      = new ClienteConfig($pdo);
 $cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuarios.usuario_padre_id
 
 // ── Extraer token ─────────────────────────────────────────
@@ -602,6 +604,13 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cliMateriales->listar(resolveIdc($usr)));
+
+        // ── Portal cliente: configuración (logo, correo de envío) ──
+        case 'GET_CONFIG_CLIENTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliConfig->obtener(resolveIdc($usr)));
 
         // ── Portal cliente: equipos ───────────────────────
         case 'GET_MI_PERSONAL':
@@ -1411,6 +1420,43 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             bloquearSiLectura(alcanceSub($usr, $cliSub));
             respuesta($cliMateriales->eliminar((int)($payload['id'] ?? 0), resolveIdc($usr)));
+
+        // ── Configuración del cliente (solo cuenta principal) ────
+        case 'GUARDAR_CONFIG_CLIENTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliConfig->guardar($_POST, $_FILES, resolveIdc($usr)));
+
+        case 'ELIMINAR_LOGO_CLIENTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliConfig->eliminarLogo(resolveIdc($usr)));
+
+        case 'PROBAR_CORREO_CLIENTE': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $cc = $cliConfig->obtenerRaw(resolveIdc($usr));
+            $dest = trim($payload['destino'] ?? ($cc['mail_from'] ?? ''));
+            if (!$dest || !filter_var($dest, FILTER_VALIDATE_EMAIL))
+                respuesta(['status' => 'error', 'message' => 'Indica un correo de destino válido para la prueba.']);
+            if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer'))
+                respuesta(['status' => 'error', 'message' => 'Servicio de correo no disponible.']);
+            try {
+                $mail = new PHPMailer\PHPMailer\PHPMailer(true);
+                $modo = configurarMailerCliente($mail, $pdo, $cc);
+                $mail->addAddress($dest);
+                $mail->isHTML(true);
+                $mail->Subject = 'Prueba de correo — Solicitudes de material';
+                $mail->Body    = '<p>Este es un correo de prueba del sistema de AVBA Inspección. Si lo recibes, tu correo de envío está configurado correctamente.</p>';
+                $mail->send();
+                respuesta(['status' => 'success', 'message' => 'Correo de prueba enviado (modo: ' . $modo . '). Revisa la bandeja de ' . $dest . '.']);
+            } catch (\Throwable $e) {
+                respuesta(['status' => 'error', 'message' => 'No se pudo enviar: ' . $e->getMessage()]);
+            }
+        }
 
         // ── Personal del cliente ─────────────────────────────────
         case 'GUARDAR_PERSONAL_CLI':
