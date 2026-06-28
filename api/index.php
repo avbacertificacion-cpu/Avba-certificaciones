@@ -1369,6 +1369,12 @@ if ($method === 'POST') {
             else autorizarRecurso($alc, 'equipo', (int)$_POST['id']);
             respuesta($cliEquipos->guardar($_POST, $_FILES, resolveIdc($usr)));
 
+        case 'VINCULAR_EQUIPO_AVBA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            bloquearSiLectura(alcanceSub($usr, $cliSub));
+            respuesta($cliEquipos->vincularAvba((int)($payload['avba_equipo_id'] ?? 0), resolveIdc($usr)));
+
         case 'ELIMINAR_EQUIPO_CLI':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

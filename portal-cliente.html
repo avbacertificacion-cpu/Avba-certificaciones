@@ -2016,18 +2016,31 @@ function renderListaEq(equipos) {
         </div>
         <div class="eq-next ${nextCls}">${nextTxt}</div>
       </div>
-      <div style="display:flex;gap:6px;padding:10px 14px 14px">
-        ${esAvba
-          ? `${eq.certificado_url ? `<a class="btn-prim" style="flex:1;font-size:12px;padding:8px 10px;text-align:center;text-decoration:none" href="${escH(eq.certificado_url)}" target="_blank">📄 Certificado</a>` : ''}
-             ${eq.dictamen_url ? `<a class="btn-sec" style="flex:1;font-size:12px;padding:8px 10px;text-align:center;text-decoration:none" href="${escH(eq.dictamen_url)}" target="_blank">📋 Dictamen</a>` : ''}`
+      <div style="display:flex;gap:6px;padding:10px 14px 14px;flex-wrap:wrap">
+        ${esAvba && eq.origen === 'avba'
+          ? `<button class="btn-prim" style="flex:1;min-width:130px;font-size:12px;padding:8px 10px" onclick="abrirEquipoAvba(${eq.id})">＋ Agregar info →</button>
+             ${eq.certificado_url ? `<a class="btn-sec" style="font-size:12px;padding:8px 10px;text-decoration:none" href="${escH(eq.certificado_url)}" target="_blank">📄</a>` : ''}
+             ${eq.dictamen_url ? `<a class="btn-sec" style="font-size:12px;padding:8px 10px;text-decoration:none" href="${escH(eq.dictamen_url)}" target="_blank">📋</a>` : ''}`
           : `<button class="btn-prim" style="flex:1;font-size:12px;padding:8px 10px" onclick="verDetalleEq(${eq.id})">Ver detalle →</button>
-        ${_puedeEditar ? `<button class="btn-sec" style="font-size:12px;padding:8px 10px" onclick="abrirModalEq(${JSON.stringify(eq).replace(/"/g,'&quot;')})">✏</button>
+        ${_puedeEditar && !esAvba ? `<button class="btn-sec" style="font-size:12px;padding:8px 10px" onclick="abrirModalEq(${JSON.stringify(eq).replace(/"/g,'&quot;')})">✏</button>
         <button class="btn-del" onclick="eliminarEquipo(${eq.id},'${escQ(eq.nombre)}')">🗑</button>` : ''}`}
       </div>
     </div>`;
   });
   html += '</div>';
   cont.innerHTML = html;
+}
+
+// ── Abrir equipo certificado AVBA (crea el espejo y abre su detalle) ────────
+async function abrirEquipoAvba(avbaId) {
+  toastEq('Preparando equipo…');
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'VINCULAR_EQUIPO_AVBA', payload:{avba_equipo_id: avbaId}}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message || 'No se pudo abrir.'); return; }
+    _eqCargado = false;            // refrescar lista (el espejo reemplaza la tarjeta AVBA)
+    verDetalleEq(d.id);
+  } catch(_) { toastEq('Error de red.'); }
 }
 
 // ── Ver detalle de un equipo ────────────────────────────────────────────────

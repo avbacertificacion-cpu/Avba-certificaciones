@@ -73,6 +73,7 @@ class ClienteEquipos {
             ");
             try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS estado VARCHAR(50) NULL DEFAULT 'Activo'"); } catch (\PDOException $e) {}
             try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS foto_url VARCHAR(500) NULL"); } catch (\PDOException $e) {}
+            try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS avba_equipo_id INT NULL"); } catch (\PDOException $e) {}
         } catch (\PDOException $e) {
             error_log('[ClienteEquipos] migrate: ' . $e->getMessage());
         }
@@ -113,7 +114,7 @@ class ClienteEquipos {
         [$frag, $fragParams] = $this->restro($soloIds, 'e.id');
         $stmt = $this->pdo->prepare("
             SELECT e.id, e.nombre, e.tipo, e.marca, e.modelo, e.serie,
-                   e.capacidad, e.anio, e.notas, e.estado, e.foto_url,
+                   e.capacidad, e.anio, e.notas, e.estado, e.foto_url, e.avba_equipo_id,
                    DATE_FORMAT(e.created_at,'%d/%m/%Y') AS fecha_registro,
                    COUNT(DISTINCT d.id)  AS total_docs,
                    COALESCE(hm.horas, 0) AS horas_actuales,
@@ -138,7 +139,8 @@ class ClienteEquipos {
         $equipos = array_map(fn($r) => [
             'id'             => (int)$r['id'],
             'origen'         => 'cliente',
-            'certificado_avba' => false,
+            'certificado_avba' => !empty($r['avba_equipo_id']),
+            'avba_equipo_id' => $r['avba_equipo_id'] ? (int)$r['avba_equipo_id'] : null,
             'nombre'         => $r['nombre'],
             'tipo'           => $r['tipo'] ?? '',
             'marca'          => $r['marca'] ?? '',
@@ -158,11 +160,44 @@ class ClienteEquipos {
             'certs_por_vencer' => (int)$r['certs_por_vencer'],
         ], $stmt->fetchAll());
 
-        // Equipos certificados por AVBA del cliente: van primero, marcados en azul.
-        // Solo cuando NO hay restricción de sub-usuario (la cuenta principal/los ve completos).
+        // Equipos certificados por AVBA del cliente que aún NO tienen espejo.
+        // Solo cuando NO hay restricción de sub-usuario.
         $avba = ($soloIds === null) ? $this->listarEquiposAvba($idCliente) : [];
 
-        return ['status' => 'success', 'equipos' => array_merge($avba, $equipos)];
+        $todos = array_merge($avba, $equipos);
+        // Certificados por AVBA primero (espejos + referencias sin espejo)
+        usort($todos, fn($a, $b) => ($b['certificado_avba'] ? 1 : 0) <=> ($a['certificado_avba'] ? 1 : 0));
+
+        return ['status' => 'success', 'equipos' => $todos];
+    }
+
+    /**
+     * Crea (o devuelve) el "espejo" en cliente_equipos de un equipo certificado
+     * por AVBA, para poder adjuntarle documentos/horómetro/certificaciones.
+     */
+    public function vincularAvba(int $avbaEquipoId, string $idCliente): array {
+        $idCliente = $this->norm($idCliente);
+        // Verificar que el equipo AVBA pertenece al cliente
+        $s = $this->pdo->prepare("SELECT id, maquinaria, marca, modelo, serie, capacidad
+                                  FROM equipos WHERE id = ? AND control LIKE ? AND estado = 'ENVIADO' LIMIT 1");
+        $s->execute([$avbaEquipoId, $idCliente . '-%']);
+        $eq = $s->fetch(PDO::FETCH_ASSOC);
+        if (!$eq) return ['status' => 'error', 'message' => 'Equipo certificado no encontrado.'];
+
+        // ¿Ya existe espejo?
+        $ex = $this->pdo->prepare("SELECT id FROM cliente_equipos WHERE id_cliente=? AND avba_equipo_id=? LIMIT 1");
+        $ex->execute([$idCliente, $avbaEquipoId]);
+        $existId = $ex->fetchColumn();
+        if ($existId) return ['status' => 'success', 'id' => (int)$existId, 'nuevo' => false];
+
+        $this->pdo->prepare(
+            "INSERT INTO cliente_equipos (id_cliente,nombre,tipo,marca,modelo,serie,capacidad,estado,avba_equipo_id)
+             VALUES (?,?,?,?,?,?,?, 'Certificado AVBA', ?)"
+        )->execute([
+            $idCliente, $eq['maquinaria'] ?: 'Equipo certificado', $eq['maquinaria'] ?? '',
+            $eq['marca'] ?? '', $eq['modelo'] ?? '', $eq['serie'] ?? '', $eq['capacidad'] ?? '', $avbaEquipoId,
+        ]);
+        return ['status' => 'success', 'id' => (int)$this->pdo->lastInsertId(), 'nuevo' => true];
     }
 
     /**
@@ -172,15 +207,20 @@ class ClienteEquipos {
     private function listarEquiposAvba(string $idCliente): array {
         try {
             $like = $idCliente . '-%';
+            // Excluir los que ya tienen espejo en cliente_equipos (avba_equipo_id)
             $stmt = $this->pdo->prepare("
                 SELECT id, cliente, maquinaria, marca, modelo, serie, capacidad, id_equipo,
                        DATE_FORMAT(fecha_inspeccion,'%d/%m/%Y') AS fecha_registro,
                        control, qr_codigo, certificado_url, dictamen_url
                 FROM equipos
                 WHERE control LIKE ? AND estado = 'ENVIADO'
+                  AND id NOT IN (
+                    SELECT avba_equipo_id FROM cliente_equipos
+                    WHERE id_cliente = ? AND avba_equipo_id IS NOT NULL
+                  )
                 ORDER BY fecha_inspeccion DESC
             ");
-            $stmt->execute([$like]);
+            $stmt->execute([$like, $idCliente]);
         } catch (\PDOException $e) {
             return [];
         }
