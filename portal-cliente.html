@@ -3557,13 +3557,13 @@ function renderSolProc(sol) {
     });
   }
   if (_esPrincipal) {
-    html += `<div class="fact"><button class="btn-sec" onclick="guardarAsignacion()">Guardar asignación</button>
+    html += `<div class="fact"><button class="btn-sec" onclick="guardarAsignacionSol()">Guardar asignación</button>
       <button class="btn-prim" onclick="generarEnvios()">✉ Generar envíos y enviar</button></div>`;
   }
   document.getElementById('solp-body').innerHTML = html;
 }
 
-async function guardarAsignacion() {
+async function guardarAsignacionSol() {
   const asign = {};
   document.querySelectorAll('#solp-body .sp-item').forEach(s => { if (s.value) asign[s.dataset.item] = +s.value; });
   try {
@@ -3575,7 +3575,7 @@ async function guardarAsignacion() {
 }
 
 async function generarEnvios() {
-  await guardarAsignacion();
+  await guardarAsignacionSol();
   toastEq('Generando y enviando…');
   try {
     const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'GENERAR_ENVIOS_SOL', payload:{id:_solProcId}}) });
