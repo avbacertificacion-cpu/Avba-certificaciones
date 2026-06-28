@@ -425,6 +425,8 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
       <div class="tab-card-body">
         <button class="tab-btn" id="tabbtn-equipos" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos<span class="tab-notif" id="tab-notif-eq" style="display:none"></span></button>
         <button class="tab-btn" id="tabbtn-personal-cli" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal<span class="tab-notif" id="tab-notif-per" style="display:none"></span></button>
+        <button class="tab-btn" id="tabbtn-solicitudes" style="display:none" onclick="verTab('solicitudes',this);cargarSolicitudes()">🧾 Solicitudes</button>
+        <button class="tab-btn" id="tabbtn-mantenimiento" style="display:none" onclick="verTab('mantenimiento',this);cargarMantenimientos()">🔧 Mantenimiento</button>
         <button class="tab-btn" id="tabbtn-proveedores" onclick="verTab('proveedores',this);cargarProveedores()">🏭 Proveedores</button>
         <button class="tab-btn" id="tabbtn-materiales" onclick="verTab('materiales',this);cargarMateriales()">🧰 Materiales</button>
         <button class="tab-btn" id="tabbtn-config" style="display:none" onclick="verTab('config',this);cargarConfig()">⚙ Configuración</button>
@@ -785,6 +787,30 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
     </div>
   </div>
 
+  <!-- ══ SOLICITUDES DE MATERIAL ══ -->
+  <div id="tab-solicitudes" class="tab-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div>
+        <h2 style="margin:0;font-size:18px;color:#0d2244">🧾 Solicitudes de Material</h2>
+        <p style="margin:4px 0 0;font-size:13px;color:#667">El mecánico solicita; la cuenta principal asigna proveedores y envía.</p>
+      </div>
+      <button class="btn-prim" onclick="abrirModalSol()">+ Nueva solicitud</button>
+    </div>
+    <div id="sol-lista"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+
+  <!-- ══ MANTENIMIENTO ══ -->
+  <div id="tab-mantenimiento" class="tab-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div>
+        <h2 style="margin:0;font-size:18px;color:#0d2244">🔧 Reportes de Mantenimiento</h2>
+        <p style="margin:4px 0 0;font-size:13px;color:#667">Trabajo realizado, material usado y evidencias (antes/después).</p>
+      </div>
+      <button class="btn-prim" onclick="abrirModalMant()">+ Nuevo reporte</button>
+    </div>
+    <div id="mant-lista"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+
   <!-- ══ SUB-USUARIOS ══ -->
   <div id="tab-subusuarios" class="tab-panel">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
@@ -1060,6 +1086,70 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
   </div>
 </div>
 
+<datalist id="dl-materiales"></datalist>
+
+<!-- Modal: Nueva Solicitud de Material -->
+<div class="eq-overlay" id="modal-sol">
+  <div class="eq-modal" style="max-width:680px">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Nueva solicitud de material</div>
+      <button class="eq-modal-close" onclick="cerrarModalSol()">✕</button>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Equipo *</label><select class="finput" id="sol-equipo"></select></div>
+      <div class="frow"><label class="flabel">Fecha requerida</label><input class="finput" id="sol-fecha" type="date"></div>
+    </div>
+    <p class="eq-msec">Materiales solicitados</p>
+    <div id="sol-items"></div>
+    <button class="btn-sec" style="margin-top:6px" onclick="solAddItem()">+ Agregar ítem</button>
+    <div class="frow" style="margin-top:10px"><label class="flabel">Notas</label><textarea class="finput" id="sol-notas" rows="2" placeholder="Observaciones para compras…"></textarea></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalSol()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarSol()">Crear solicitud</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Procesar Solicitud (asignar proveedores + enviar) -->
+<div class="eq-overlay" id="modal-sol-proc">
+  <div class="eq-modal" style="max-width:720px">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Procesar solicitud — <span id="solp-folio"></span></div>
+      <button class="eq-modal-close" onclick="cerrarModalSolProc()">✕</button>
+    </div>
+    <div id="solp-body"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+</div>
+
+<!-- Modal: Nuevo Reporte de Mantenimiento -->
+<div class="eq-overlay" id="modal-mant">
+  <div class="eq-modal" style="max-width:720px">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Nuevo reporte de mantenimiento</div>
+      <button class="eq-modal-close" onclick="cerrarModalMant()">✕</button>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Equipo *</label><select class="finput" id="mant-equipo" onchange="mantCargarSols()"></select></div>
+      <div class="frow"><label class="flabel">Fecha</label><input class="finput" id="mant-fecha" type="date"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Tipo de mantenimiento</label>
+        <select class="finput" id="mant-tipo"><option value="Preventivo">Preventivo</option><option value="Correctivo">Correctivo</option><option value="Predictivo">Predictivo</option></select>
+      </div>
+      <div class="frow"><label class="flabel">Solicitudes de material usadas</label><select class="finput" id="mant-sols" multiple size="2" style="height:auto"></select></div>
+    </div>
+    <div class="frow"><label class="flabel">Trabajo realizado *</label><textarea class="finput" id="mant-trabajo" rows="3" placeholder="Describe las actividades realizadas…"></textarea></div>
+    <div class="frow"><label class="flabel">Material utilizado</label><textarea class="finput" id="mant-material" rows="2" placeholder="Refacciones y consumibles empleados…"></textarea></div>
+    <div class="frow"><label class="flabel">Observaciones</label><textarea class="finput" id="mant-obs" rows="2" placeholder="Recomendaciones, pendientes…"></textarea></div>
+    <p class="eq-msec">Evidencias fotográficas (hasta 9)</p>
+    <div id="mant-fotos" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px"></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalMant()">Cancelar</button>
+      <button class="btn-prim" id="mant-guardar-btn" onclick="guardarMant2()">Guardar reporte</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Documento Personal -->
 <div class="eq-overlay" id="modal-doc-pers">
   <div class="eq-modal">
@@ -1327,13 +1417,19 @@ const _puedeEditar = !_esSub || _sesion.permiso_sub !== 'lectura';
 function _configurarTabsPorRol() {
   if (_esSub) {
     // Sub-usuario: solo ve los módulos asignables (Maquinaria, Mis Equipos, Mi Personal)
-    ['acc','per','pnd','proveedores','materiales','config','subusuarios'].forEach(t => {
+    ['acc','per','pnd','proveedores','materiales','config','subusuarios','solicitudes','mantenimiento'].forEach(t => {
       const b = document.getElementById('tabbtn-' + t); if (b) b.style.display = 'none';
     });
     if (_sesion.permiso_sub === 'lectura') document.body.classList.add('solo-lectura');
+    // Mecánico (permiso_mantenimiento): habilita solicitudes y mantenimiento
+    if (_sesion.permiso_mantenimiento) {
+      ['solicitudes','mantenimiento'].forEach(t => {
+        const b = document.getElementById('tabbtn-' + t); if (b) b.style.display = '';
+      });
+    }
   } else if (_sesion.rol === 'CLIENTE') {
-    // Cuenta principal del cliente: muestra sub-usuarios y configuración
-    ['subusuarios','config'].forEach(t => {
+    // Cuenta principal del cliente: ve todo (sub-usuarios, configuración, solicitudes, mantenimiento)
+    ['subusuarios','config','solicitudes','mantenimiento'].forEach(t => {
       const b = document.getElementById('tabbtn-' + t); if (b) b.style.display = '';
     });
   }
@@ -3284,6 +3380,330 @@ async function probarCorreoCfg() {
     const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'PROBAR_CORREO_CLIENTE', payload:{destino}}) });
     const d = await r.json();
     toastEq(d.message || (d.status === 'success' ? 'Enviado.' : 'Error.'));
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  EQUIPOS PARA SELECTORES (solicitudes / mantenimiento)
+// ═══════════════════════════════════════════════════════════════════════════
+let _equiposSel = [];
+async function cargarEquiposSelect() {
+  try {
+    const r = await fetch(API + '?action=GET_MIS_EQUIPOS');
+    const d = await r.json();
+    _equiposSel = (d.status === 'success') ? (d.equipos || []) : [];
+  } catch(_) { _equiposSel = []; }
+  return _equiposSel;
+}
+function equiposOptions() {
+  return _equiposSel.map(e => {
+    const tag = e.certificado_avba ? '🛡 ' : '';
+    return `<option value="${e.origen}:${e.id}">${tag}${escH(e.nombre)}${e.serie ? ' · S/N ' + escH(e.serie) : ''}</option>`;
+  }).join('');
+}
+async function cargarMaterialesSelect() {
+  if (!_matData.length) {
+    try { const r = await fetch(API + '?action=LISTAR_MATERIALES'); const d = await r.json(); if (d.status==='success') _matData = d.materiales || []; } catch(_) {}
+  }
+  document.getElementById('dl-materiales').innerHTML = _matData.filter(m=>+m.activo).map(m => `<option value="${escH(m.nombre)}" data-unidad="${escH(m.unidad||'')}" data-parte="${escH(m.num_parte||'')}">`).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SOLICITUDES DE MATERIAL
+// ═══════════════════════════════════════════════════════════════════════════
+let _solCargado = false;
+const _esPrincipal = !_esSub;
+
+async function cargarSolicitudes() {
+  if (_solCargado) return;
+  const cont = document.getElementById('sol-lista');
+  cont.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  try {
+    const r = await fetch(API + '?action=LISTAR_SOLICITUDES');
+    const d = await r.json();
+    if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo);text-align:center;padding:20px">${d.message||'Error.'}</p>`; return; }
+    _solCargado = true;
+    renderSolicitudes(d.solicitudes || []);
+  } catch(_) { cont.innerHTML = '<p style="color:var(--rojo);text-align:center;padding:20px">Error de red.</p>'; }
+}
+
+function solEstadoBadge(e) {
+  const map = { abierta:['#fef3c7','#92400e','Abierta'], parcial:['#dbeafe','#1e40af','Parcial'], enviada:['#dcfce7','#166534','Enviada'] };
+  const [bg,c,t] = map[e] || ['#f3f4f6','#555',e];
+  return `<span class="badge" style="background:${bg};color:${c}">${t}</span>`;
+}
+
+function renderSolicitudes(lista) {
+  const cont = document.getElementById('sol-lista');
+  if (!lista.length) { cont.innerHTML = '<div class="empty"><div class="empty-t">Sin solicitudes</div><div class="empty-s">Crea una solicitud de material para un equipo.</div></div>'; return; }
+  cont.innerHTML = lista.map(s => `<div class="sub-card">
+    <div style="min-width:0">
+      <div style="font-weight:600;font-size:14px;color:#0d2244">${escH(s.folio)} ${solEstadoBadge(s.estado)}</div>
+      <div style="font-size:12.5px;color:#445;margin-top:3px">${escH(s.equipo_nombre||'')}</div>
+      <div style="font-size:11px;color:#9aa;margin-top:4px">👤 ${escH(s.mecanico_nombre||'—')} · 🧰 ${s.n_items} ítems · ✉ ${s.n_envios} envíos${s.fecha_requerida?' · requerido '+escH(s.fecha_requerida):''}</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${_esPrincipal ? `<button class="btn-prim" style="font-size:12px;padding:8px 10px" onclick="procesarSol(${s.id})">Procesar / Enviar</button>
+      <button class="btn-del" onclick="eliminarSol(${s.id},'${escQ(s.folio)}')">🗑</button>` : `<button class="btn-sec" style="font-size:12px;padding:8px 10px" onclick="procesarSol(${s.id})">Ver</button>`}
+    </div>
+  </div>`).join('');
+}
+
+async function abrirModalSol() {
+  await cargarEquiposSelect();
+  await cargarMaterialesSelect();
+  if (!_equiposSel.length) { toastEq('Primero registra o vincula un equipo en Mis Equipos.'); return; }
+  document.getElementById('sol-equipo').innerHTML = equiposOptions();
+  document.getElementById('sol-fecha').value = '';
+  document.getElementById('sol-notas').value = '';
+  document.getElementById('sol-items').innerHTML = '';
+  solAddItem();
+  document.getElementById('modal-sol').classList.add('open');
+}
+function cerrarModalSol() { document.getElementById('modal-sol').classList.remove('open'); }
+
+function solAddItem() {
+  const div = document.createElement('div');
+  div.className = 'sol-item-row';
+  div.style = 'display:grid;grid-template-columns:1fr 70px 80px 90px 28px;gap:6px;margin-bottom:6px;align-items:center';
+  div.innerHTML = `
+    <input class="finput si-desc" list="dl-materiales" placeholder="Material / descripción" oninput="solAutofill(this)">
+    <input class="finput si-cant" type="number" min="0" step="0.01" value="1" placeholder="Cant.">
+    <input class="finput si-unid" placeholder="Unidad">
+    <input class="finput si-parte" placeholder="Núm. parte">
+    <button class="btn-del" style="padding:6px" onclick="this.parentNode.remove()">✕</button>`;
+  document.getElementById('sol-items').appendChild(div);
+}
+function solAutofill(inp) {
+  const opt = [...document.getElementById('dl-materiales').options].find(o => o.value === inp.value);
+  if (!opt) return;
+  const row = inp.closest('.sol-item-row');
+  if (opt.dataset.unidad && !row.querySelector('.si-unid').value) row.querySelector('.si-unid').value = opt.dataset.unidad;
+  if (opt.dataset.parte && !row.querySelector('.si-parte').value) row.querySelector('.si-parte').value = opt.dataset.parte;
+}
+
+async function guardarSol() {
+  const eqVal = document.getElementById('sol-equipo').value.split(':');
+  const items = [...document.querySelectorAll('#sol-items .sol-item-row')].map(r => ({
+    descripcion: r.querySelector('.si-desc').value.trim(),
+    cantidad: parseFloat(r.querySelector('.si-cant').value) || 1,
+    unidad: r.querySelector('.si-unid').value.trim(),
+    num_parte: r.querySelector('.si-parte').value.trim(),
+  })).filter(i => i.descripcion);
+  if (!items.length) { toastEq('Agrega al menos un ítem.'); return; }
+  const payload = {
+    equipo_origen: eqVal[0], equipo_ref_id: +eqVal[1],
+    fecha_requerida: document.getElementById('sol-fecha').value,
+    notas: document.getElementById('sol-notas').value.trim(),
+    items,
+  };
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'CREAR_SOLICITUD', payload}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message||'Error.'); return; }
+    cerrarModalSol(); toastEq('Solicitud creada: ' + d.folio);
+    _solCargado = false; cargarSolicitudes();
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+async function eliminarSol(id, folio) {
+  if (!confirm(`¿Eliminar la solicitud ${folio}?`)) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'ELIMINAR_SOLICITUD', payload:{id}}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message||'Error.'); return; }
+    toastEq('Solicitud eliminada.'); _solCargado = false; cargarSolicitudes();
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+let _solProcId = 0, _solProvCache = [];
+async function procesarSol(id) {
+  _solProcId = id;
+  document.getElementById('modal-sol-proc').classList.add('open');
+  const body = document.getElementById('solp-body');
+  body.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  try {
+    if (!_solProvCache.length) { const rp = await fetch(API + '?action=LISTAR_PROVEEDORES'); const dp = await rp.json(); if (dp.status==='success') _solProvCache = dp.proveedores||[]; }
+    const r = await fetch(API + '?action=DETALLE_SOLICITUD&id=' + id);
+    const d = await r.json();
+    if (d.status !== 'success') { body.innerHTML = `<p style="color:var(--rojo)">${d.message}</p>`; return; }
+    renderSolProc(d.solicitud);
+  } catch(_) { body.innerHTML = '<p style="color:var(--rojo)">Error de red.</p>'; }
+}
+function cerrarModalSolProc() { document.getElementById('modal-sol-proc').classList.remove('open'); }
+
+function renderSolProc(sol) {
+  document.getElementById('solp-folio').textContent = sol.folio;
+  const provOpts = _solProvCache.map(p => `<option value="${p.id}">${escH(p.nombre)}</option>`).join('');
+  let html = `<div style="font-size:12.5px;color:#445;margin-bottom:10px">${escH(sol.equipo_nombre||'')} ${solEstadoBadge(sol.estado)}</div>`;
+  html += '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="text-align:left;color:#667;border-bottom:2px solid var(--borde)"><th style="padding:6px">Material</th><th style="padding:6px">Cant.</th><th style="padding:6px">Proveedor</th></tr></thead><tbody>';
+  sol.items.forEach(it => {
+    const enviado = !!it.envio_id;
+    html += `<tr style="border-bottom:1px solid #f0f2f7">
+      <td style="padding:6px">${escH(it.descripcion)}${it.num_parte?` <span style="color:#9aa;font-family:monospace">(${escH(it.num_parte)})</span>`:''}</td>
+      <td style="padding:6px">${(+it.cantidad)} ${escH(it.unidad||'')}</td>
+      <td style="padding:6px">${enviado
+        ? `<span class="badge b-vigente">✓ ${escH(it.proveedor_nombre||'enviado')}</span>`
+        : (_esPrincipal ? `<select class="finput sp-item" data-item="${it.id}" style="padding:6px"><option value="">— elegir —</option>${provOpts}</select>` : escH(it.proveedor_nombre||'—'))}</td>
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  if (sol.envios && sol.envios.length) {
+    html += '<p class="eq-msec">Envíos generados</p>';
+    sol.envios.forEach(e => {
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:6px 0;border-bottom:1px solid #f0f2f7">
+        <span>${escH(e.folio)} · ${escH(e.proveedor_nombre||'')} · ${e.email_enviado_at?'✉ enviado':'generado'}</span>
+        ${e.pdf_url?`<a href="${escH(e.pdf_url)}" target="_blank" class="btn-sec" style="font-size:11px;padding:4px 8px;text-decoration:none">PDF</a>`:''}</div>`;
+    });
+  }
+  if (_esPrincipal) {
+    html += `<div class="fact"><button class="btn-sec" onclick="guardarAsignacion()">Guardar asignación</button>
+      <button class="btn-prim" onclick="generarEnvios()">✉ Generar envíos y enviar</button></div>`;
+  }
+  document.getElementById('solp-body').innerHTML = html;
+}
+
+async function guardarAsignacion() {
+  const asign = {};
+  document.querySelectorAll('#solp-body .sp-item').forEach(s => { if (s.value) asign[s.dataset.item] = +s.value; });
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'ASIGNAR_PROVEEDORES_SOL', payload:{id:_solProcId, asignaciones:asign}}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message||'Error.'); return; }
+    toastEq('Asignación guardada.'); procesarSol(_solProcId);
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+async function generarEnvios() {
+  await guardarAsignacion();
+  toastEq('Generando y enviando…');
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'GENERAR_ENVIOS_SOL', payload:{id:_solProcId}}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message||'Error.'); return; }
+    const env = (d.envios||[]).map(e => `${e.proveedor}: ${e.correo}`).join(' · ');
+    toastEq('Envíos generados. ' + env);
+    _solCargado = false; procesarSol(_solProcId); cargarSolicitudes();
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  REPORTES DE MANTENIMIENTO
+// ═══════════════════════════════════════════════════════════════════════════
+let _mantCargado = false;
+async function cargarMantenimientos() {
+  if (_mantCargado) return;
+  const cont = document.getElementById('mant-lista');
+  cont.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  try {
+    const r = await fetch(API + '?action=LISTAR_MANTENIMIENTOS');
+    const d = await r.json();
+    if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo);text-align:center;padding:20px">${d.message||'Error.'}</p>`; return; }
+    _mantCargado = true; renderMantenimientos(d.mantenimientos || []);
+  } catch(_) { cont.innerHTML = '<p style="color:var(--rojo);text-align:center;padding:20px">Error de red.</p>'; }
+}
+function renderMantenimientos(lista) {
+  const cont = document.getElementById('mant-lista');
+  if (!lista.length) { cont.innerHTML = '<div class="empty"><div class="empty-t">Sin reportes</div><div class="empty-s">Crea un reporte de mantenimiento para un equipo.</div></div>'; return; }
+  cont.innerHTML = lista.map(m => `<div class="sub-card">
+    <div style="min-width:0">
+      <div style="font-weight:600;font-size:14px;color:#0d2244">${escH(m.folio)} <span class="badge" style="background:#e0f2fe;color:#0369a1">${escH(m.tipo_mant||'Mant.')}</span></div>
+      <div style="font-size:12.5px;color:#445;margin-top:3px">${escH(m.equipo_nombre||'')}</div>
+      <div style="font-size:11px;color:#9aa;margin-top:4px">👤 ${escH(m.mecanico_nombre||'—')} · 📅 ${escH(m.fecha||'')} · 📷 ${m.n_fotos} fotos</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      ${m.pdf_url?`<a href="${escH(m.pdf_url)}" target="_blank" class="btn-prim" style="font-size:12px;padding:8px 10px;text-decoration:none">📄 PDF</a>`:''}
+      ${_esPrincipal?`<button class="btn-del" onclick="eliminarMant2(${m.id},'${escQ(m.folio)}')">🗑</button>`:''}
+    </div>
+  </div>`).join('');
+}
+
+let _mantFotoCount = 0;
+async function abrirModalMant() {
+  await cargarEquiposSelect();
+  if (!_equiposSel.length) { toastEq('Primero registra o vincula un equipo en Mis Equipos.'); return; }
+  document.getElementById('mant-equipo').innerHTML = equiposOptions();
+  document.getElementById('mant-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('mant-tipo').value = 'Preventivo';
+  document.getElementById('mant-trabajo').value = '';
+  document.getElementById('mant-material').value = '';
+  document.getElementById('mant-obs').value = '';
+  // fotos
+  _mantFotoCount = 0;
+  const cont = document.getElementById('mant-fotos'); cont.innerHTML = '';
+  for (let i=0;i<9;i++) mantAddFotoSlot(cont, i);
+  mantCargarSols();
+  document.getElementById('modal-mant').classList.add('open');
+}
+function mantAddFotoSlot(cont, i) {
+  const d = document.createElement('div');
+  d.style = 'border:1px dashed var(--borde);border-radius:8px;padding:6px;text-align:center;font-size:11px';
+  d.innerHTML = `
+    <label style="cursor:pointer;display:block">
+      <div class="mf-prev" style="height:70px;display:flex;align-items:center;justify-content:center;color:#9aa;background:#fafbff;border-radius:6px;overflow:hidden">📷 Foto ${i+1}</div>
+      <input type="file" accept="image/*" class="mf-file" data-i="${i}" style="display:none" onchange="mantPrevFoto(this)">
+    </label>
+    <select class="finput mf-etapa" style="padding:3px;font-size:11px;margin-top:4px"><option value="antes">Antes</option><option value="despues">Después</option></select>`;
+  cont.appendChild(d);
+}
+function mantPrevFoto(inp) {
+  const f = inp.files && inp.files[0]; if (!f) return;
+  const prev = inp.closest('div').querySelector('.mf-prev');
+  const rd = new FileReader(); rd.onload = e => { prev.innerHTML = `<img src="${e.target.result}" style="max-width:100%;max-height:100%;object-fit:cover">`; }; rd.readAsDataURL(f);
+}
+async function mantCargarSols() {
+  const sel = document.getElementById('mant-sols');
+  sel.innerHTML = '<option disabled>Cargando…</option>';
+  try {
+    const r = await fetch(API + '?action=LISTAR_SOLICITUDES'); const d = await r.json();
+    const eqVal = document.getElementById('mant-equipo').value;
+    const lista = (d.solicitudes||[]).filter(s => `${s.equipo_origen}:${s.equipo_ref_id}` === eqVal);
+    sel.innerHTML = lista.length ? lista.map(s => `<option value="${s.id}">${escH(s.folio)} (${s.n_items} ítems)</option>`).join('') : '<option disabled>Sin solicitudes para este equipo</option>';
+  } catch(_) { sel.innerHTML = '<option disabled>Error</option>'; }
+}
+function cerrarModalMant() { document.getElementById('modal-mant').classList.remove('open'); }
+
+async function guardarMant2() {
+  const eqVal = document.getElementById('mant-equipo').value.split(':');
+  const trabajo = document.getElementById('mant-trabajo').value.trim();
+  if (!trabajo) { toastEq('Describe el trabajo realizado.'); return; }
+  const fd = new FormData();
+  fd.append('action','CREAR_MANTENIMIENTO');
+  fd.append('equipo_origen', eqVal[0]);
+  fd.append('equipo_ref_id', eqVal[1]);
+  fd.append('fecha', document.getElementById('mant-fecha').value);
+  fd.append('tipo_mant', document.getElementById('mant-tipo').value);
+  fd.append('trabajo', trabajo);
+  fd.append('material_usado', document.getElementById('mant-material').value.trim());
+  fd.append('observaciones', document.getElementById('mant-obs').value.trim());
+  [...document.getElementById('mant-sols').selectedOptions].forEach(o => fd.append('solicitudes[]', o.value));
+  if (_clienteActivo && _idsCliente.length > 1) fd.append('id_cliente_sel', _clienteActivo);
+  document.querySelectorAll('#mant-fotos .mf-file').forEach(inp => {
+    if (inp.files && inp.files[0]) {
+      fd.append('fotos[]', inp.files[0]);
+      fd.append('fotos_etapa[]', inp.closest('div').querySelector('.mf-etapa').value);
+      fd.append('fotos_comentario[]', '');
+    }
+  });
+  const btn = document.getElementById('mant-guardar-btn'); btn.disabled = true; btn.textContent = 'Guardando…';
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await _origFetch(API, { method:'POST', headers:{'X-Token': s.token||''}, body: fd });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message||'Error.'); return; }
+    cerrarModalMant(); toastEq('Reporte creado: ' + d.folio);
+    _mantCargado = false; cargarMantenimientos();
+  } catch(_) { toastEq('Error de red.'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar reporte'; }
+}
+
+async function eliminarMant2(id, folio) {
+  if (!confirm(`¿Eliminar el reporte ${folio}?`)) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'ELIMINAR_MANTENIMIENTO', payload:{id}}) });
+    const d = await r.json();
+    if (d.status !== 'success') { toastEq(d.message||'Error.'); return; }
+    toastEq('Reporte eliminado.'); _mantCargado = false; cargarMantenimientos();
   } catch(_) { toastEq('Error de red.'); }
 }
 
