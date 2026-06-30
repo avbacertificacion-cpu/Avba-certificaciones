@@ -143,11 +143,15 @@ $es_admin = $rol === ROLE_ADMIN;
         <div class="form-row">
             <div class="form-group">
                 <label>Fecha de Recarga</label>
-                <input type="date" id="ext-recarga">
+                <input type="text" id="ext-recarga" placeholder="DD/MM/AAAA" maxlength="10"
+                       inputmode="numeric" oninput="mascaraFecha(this)" autocomplete="off">
+                <small style="color:#888;font-size:11px">Formato: día/mes/año (ej: 05/03/2022)</small>
             </div>
             <div class="form-group">
                 <label>Fecha Prueba Hidrostática</label>
-                <input type="date" id="ext-ph">
+                <input type="text" id="ext-ph" placeholder="DD/MM/AAAA" maxlength="10"
+                       inputmode="numeric" oninput="mascaraFecha(this)" autocomplete="off">
+                <small style="color:#888;font-size:11px">Formato: día/mes/año (ej: 05/03/2022)</small>
             </div>
         </div>
         <div class="form-group">
@@ -292,9 +296,9 @@ function renderTabla(data) {
                 <td>${e.ubicacion}</td>
                 <td><span class="tipo-tag">${e.tipo_nombre}</span></td>
                 <td>${e.capacidad || '—'}</td>
-                <td>${e.fecha_recarga || '—'}</td>
-                <td>${e.fecha_ph || '—'}</td>
-                <td>${e.ultima_inspeccion ? e.ultima_inspeccion.substring(0,10) : '<span style="color:#e74c3c">Sin inspección</span>'}</td>
+                <td>${isoADisplay(e.fecha_recarga) || '—'}</td>
+                <td>${isoADisplay(e.fecha_ph) || '—'}</td>
+                <td>${e.ultima_inspeccion ? isoADisplay(e.ultima_inspeccion) : '<span style="color:#e74c3c">Sin inspección</span>'}</td>
                 <td><span class="badge badge-${e.estado}">${estadoLabel(e.estado)}</span></td>
                 <td style="white-space:nowrap">
                     <button class="btn btn-sm btn-primary" onclick="asignarOModificarQR(${e.id}, ${e.codigo_qr ? 'true' : 'false'})">
@@ -364,8 +368,8 @@ function editarExtintor(id) {
     document.getElementById('ext-ubicacion').value = ext.ubicacion;
     document.getElementById('ext-tipo').value      = ext.tipo;
     document.getElementById('ext-capacidad').value = ext.capacidad || '';
-    document.getElementById('ext-recarga').value   = ext.fecha_recarga || '';
-    document.getElementById('ext-ph').value        = ext.fecha_ph || '';
+    document.getElementById('ext-recarga').value   = isoADisplay(ext.fecha_recarga);
+    document.getElementById('ext-ph').value        = isoADisplay(ext.fecha_ph);
     document.getElementById('ext-estado').value    = ext.estado;
     document.getElementById('ext-obs').value       = ext.observaciones || '';
     document.getElementById('modalExtintor').classList.add('open');
@@ -383,6 +387,34 @@ function cerrarModal() {
     document.getElementById('modalExtintor').classList.remove('open');
 }
 
+// ── Utilidades de fecha (DD/MM/AAAA <-> YYYY-MM-DD) ───────────────────────────
+function mascaraFecha(input) {
+    let v = input.value.replace(/\D/g, '').slice(0, 8);
+    if (v.length >= 5)      v = v.slice(0,2) + '/' + v.slice(2,4) + '/' + v.slice(4);
+    else if (v.length >= 3) v = v.slice(0,2) + '/' + v.slice(2);
+    input.value = v;
+}
+
+// '2022-03-05' -> '05/03/2022'
+function isoADisplay(iso) {
+    if (!iso) return '';
+    const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
+// '05/03/2022' -> '2022-03-05'  (devuelve null si vacío, false si inválido)
+function displayAIso(disp) {
+    disp = (disp || '').trim();
+    if (!disp) return null;
+    const m = disp.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if (!m) return false;
+    const dia = parseInt(m[1]), mes = parseInt(m[2]), anio = parseInt(m[3]);
+    if (mes < 1 || mes > 12 || dia < 1 || dia > 31 || anio < 1900 || anio > 2100) return false;
+    const fecha = new Date(anio, mes - 1, dia);
+    if (fecha.getFullYear() !== anio || fecha.getMonth() !== mes - 1 || fecha.getDate() !== dia) return false;
+    return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
 async function guardarExtintor() {
     const id       = document.getElementById('ext-id').value;
     const empresa  = document.getElementById('ext-empresa').value;
@@ -392,14 +424,23 @@ async function guardarExtintor() {
         modalAlert('Empresa y Ubicación son requeridos', 'error'); return;
     }
 
+    const fechaRecarga = displayAIso(document.getElementById('ext-recarga').value);
+    const fechaPH      = displayAIso(document.getElementById('ext-ph').value);
+    if (fechaRecarga === false) {
+        modalAlert('Fecha de Recarga inválida. Usa el formato DD/MM/AAAA', 'error'); return;
+    }
+    if (fechaPH === false) {
+        modalAlert('Fecha de Prueba Hidrostática inválida. Usa el formato DD/MM/AAAA', 'error'); return;
+    }
+
     const body = {
         empresa_id:     parseInt(empresa),
         seccion:        document.getElementById('ext-seccion').value.trim().toUpperCase() || null,
         ubicacion,
         tipo:           document.getElementById('ext-tipo').value,
         capacidad:      document.getElementById('ext-capacidad').value || null,
-        fecha_recarga:  document.getElementById('ext-recarga').value  || null,
-        fecha_ph:       document.getElementById('ext-ph').value       || null,
+        fecha_recarga:  fechaRecarga,
+        fecha_ph:       fechaPH,
         estado:         document.getElementById('ext-estado').value,
         observaciones:  document.getElementById('ext-obs').value      || null,
         codigo_manual:  document.getElementById('ext-codigo').value   || null,
