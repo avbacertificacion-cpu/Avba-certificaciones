@@ -690,6 +690,7 @@
   <button class="tab-btn"        id="sec-btn-catalogos"  onclick="verSeccion('catalogos')">⚙️ Catálogos</button>
   <button class="tab-btn"        id="sec-btn-qr"         onclick="verSeccion('qr')">🔢 Códigos QR</button>
   <button class="tab-btn"        id="sec-btn-pnd"        onclick="verSeccion('pnd')">🔬 PND</button>
+  <button class="tab-btn"        id="sec-btn-auditorias" onclick="verSeccion('auditorias');cargarAuditorias()">📋 Auditorías</button>
 </div>
 
 <!-- sub-nav Accesorios -->
@@ -2004,6 +2005,50 @@
 </div>
 
 
+<!-- ══ SECCIÓN AUDITORÍAS ══ -->
+<div id="sec-auditorias" class="wrap" style="display:none">
+  <div id="aud-recordatorio" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:16px;color:#92400e;font-size:13px;font-weight:600"></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+    <div>
+      <h2 style="margin:0;font-size:20px;color:var(--azul-dark)">📋 Auditorías trimestrales</h2>
+      <p style="margin:4px 0 0;font-size:13px;color:var(--texto-sub)">Estado de vigencias de equipos y personal certificados, con hallazgos y firma.</p>
+    </div>
+    <button class="btn-save" style="padding:9px 18px" onclick="abrirModalAud()">+ Nueva auditoría</button>
+  </div>
+  <div id="aud-lista"><div style="text-align:center;padding:30px;color:var(--texto-hint)">Cargando…</div></div>
+</div>
+
+<!-- ══ MODAL NUEVA AUDITORÍA ══ -->
+<div class="overlay" id="overlay-aud">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-header"><h3 style="margin:0">Nueva auditoría trimestral</h3>
+      <button class="modal-close" onclick="cerrarModalAud()">✕</button></div>
+    <div class="modal-body">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px">
+        <div><label style="font-size:12px;color:#667;display:block;margin-bottom:4px">Año</label>
+          <input type="number" id="aud-anio" style="padding:8px;border:1px solid var(--borde);border-radius:7px;width:100px" onchange="audPreview()"></div>
+        <div><label style="font-size:12px;color:#667;display:block;margin-bottom:4px">Trimestre</label>
+          <select id="aud-trim" style="padding:8px;border:1px solid var(--borde);border-radius:7px" onchange="audPreview()">
+            <option value="1">T1 · Ene–Mar</option><option value="2">T2 · Abr–Jun</option>
+            <option value="3">T3 · Jul–Sep</option><option value="4">T4 · Oct–Dic</option></select></div>
+        <div style="flex:1;min-width:180px"><label style="font-size:12px;color:#667;display:block;margin-bottom:4px">Resultado</label>
+          <select id="aud-resultado" style="padding:8px;border:1px solid var(--borde);border-radius:7px;width:100%">
+            <option>Satisfactoria</option><option>Satisfactoria con observaciones</option><option>No satisfactoria</option></select></div>
+      </div>
+      <div id="aud-preview" style="background:#f8fafc;border:1px solid var(--borde);border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px">Cargando vigencias…</div>
+      <label style="font-size:13px;font-weight:600;color:var(--azul-dark);display:block;margin-bottom:6px">Hallazgos</label>
+      <div id="aud-hallazgos"></div>
+      <button onclick="audAddHallazgo()" style="padding:7px 14px;border:1.5px solid var(--azul);background:var(--azul-light);color:var(--azul);border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:12px">+ Agregar hallazgo</button>
+      <label style="font-size:13px;font-weight:600;color:var(--azul-dark);display:block;margin-bottom:4px">Observaciones</label>
+      <textarea id="aud-obs" rows="3" style="width:100%;padding:8px;border:1px solid var(--borde);border-radius:7px;box-sizing:border-box" placeholder="Conclusiones del auditor…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-nc-cancel" onclick="cerrarModalAud()">Cancelar</button>
+      <button class="btn-save" id="aud-guardar-btn" onclick="guardarAud()">Generar auditoría</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL DETALLE ══ -->
 <div class="overlay" id="overlay-det">
   <div class="modal" id="modal-det">
@@ -2772,11 +2817,12 @@ const TODOS_CONTENIDOS = [
   'tab-tipos', 'tab-cursos', 'tab-ocupaciones', 'tab-empresas',
   'sec-qr',
   'sec-pnd',
+  'sec-auditorias',
 ];
 
 function verSeccion(sec) {
-  ['maquinaria','accesorios','personal','catalogos','qr','pnd'].forEach(s => {
-    document.getElementById('sec-btn-' + s).classList.toggle('active', s === sec);
+  ['maquinaria','accesorios','personal','catalogos','qr','pnd','auditorias'].forEach(s => {
+    const b = document.getElementById('sec-btn-' + s); if (b) b.classList.toggle('active', s === sec);
   });
   ['accesorios','personal','catalogos'].forEach(s => {
     document.getElementById('sub-nav-' + s).style.display = 'none';
@@ -2802,6 +2848,8 @@ function verSeccion(sec) {
   } else if (sec === 'pnd') {
     document.getElementById('sec-pnd').style.display = '';
     cargarPND();
+  } else if (sec === 'auditorias') {
+    document.getElementById('sec-auditorias').style.display = '';
   }
 }
 
@@ -6366,6 +6414,124 @@ async function confirmarRechazoPND() {
   } catch (e) {
     mostrarToast("Error de conexión.", "err");
   }
+}
+
+/* ═══════════════════ AUDITORÍAS ═══════════════════ */
+const _AUD_API = (typeof API !== 'undefined') ? API : 'api/index.php';
+function _audTok(){ try { return JSON.parse(localStorage.getItem('avba_session')||'{}').token||''; } catch(_){ return ''; } }
+async function _audFetch(url, opts){ opts=opts||{}; opts.headers=Object.assign({'X-Token':_audTok()}, opts.headers||{}); return fetch(url, opts); }
+
+async function cargarAuditorias() {
+  const cont = document.getElementById('aud-lista');
+  cont.innerHTML = '<div style="text-align:center;padding:30px;color:#9299a8">Cargando…</div>';
+  try {
+    const r = await _audFetch(_AUD_API + '?action=LISTAR_AUDITORIAS');
+    const d = await r.json();
+    if (d.status !== 'success') { cont.innerHTML = `<p style="color:#b91c1c;text-align:center;padding:20px">${d.message||'Error.'}</p>`; return; }
+    // Recordatorio del trimestre en curso
+    const rec = document.getElementById('aud-recordatorio');
+    if ((d.pendientes||[]).includes(d.trimestre_actual)) {
+      const lbl = ['','Ene–Mar','Abr–Jun','Jul–Sep','Oct–Dic'][d.trimestre_actual];
+      rec.style.display = ''; rec.textContent = `⏰ Recordatorio: falta generar la auditoría del trimestre en curso (T${d.trimestre_actual} · ${lbl} ${new Date().getFullYear()}).`;
+    } else { rec.style.display = 'none'; }
+    renderAuditorias(d.auditorias||[]);
+  } catch(_) { cont.innerHTML = '<p style="color:#b91c1c;text-align:center;padding:20px">Error de red.</p>'; }
+}
+
+function _audResColor(r){ r=(r||'').toLowerCase(); return r.includes('no satisf')?'#b91c1c':(r.includes('observ')?'#92400e':'#166534'); }
+
+function renderAuditorias(lista) {
+  const cont = document.getElementById('aud-lista');
+  if (!lista.length) { cont.innerHTML = '<div style="text-align:center;padding:40px;color:#9299a8"><div style="font-size:15px;font-weight:600">Sin auditorías</div><div style="font-size:13px;margin-top:4px">Genera la primera auditoría trimestral.</div></div>'; return; }
+  cont.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px">' + lista.map(a => `
+    <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:16px;box-shadow:0 2px 10px rgba(0,0,0,.04)">
+      <div style="display:flex;justify-content:space-between;align-items:start">
+        <div style="font-weight:700;font-size:15px;color:#0d2244">${esc2(a.periodo)} ${a.anio}</div>
+        <span style="font-size:11px;font-weight:700;color:${_audResColor(a.resultado)}">${esc2(a.resultado||'')}</span>
+      </div>
+      <div style="font-size:12px;color:#778;margin-top:6px">👤 ${esc2(a.responsable||'—')} · ${esc2(a.fecha||'')}</div>
+      <div style="display:flex;gap:6px;margin-top:12px">
+        ${a.pdf_url?`<a href="${esc2(a.pdf_url)}" target="_blank" style="flex:1;text-align:center;padding:7px;background:var(--azul-light);color:var(--azul-dark);border-radius:7px;font-size:12px;font-weight:600;text-decoration:none">📄 PDF</a>`:''}
+        <button onclick="eliminarAud(${a.id},'${esc2(a.periodo)} ${a.anio}')" style="padding:7px 10px;background:#fcebeb;color:#b91c1c;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">🗑</button>
+      </div>
+    </div>`).join('') + '</div>';
+}
+function esc2(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function abrirModalAud() {
+  document.getElementById('aud-anio').value = new Date().getFullYear();
+  document.getElementById('aud-trim').value = Math.ceil((new Date().getMonth()+1)/3);
+  document.getElementById('aud-resultado').value = 'Satisfactoria';
+  document.getElementById('aud-obs').value = '';
+  document.getElementById('aud-hallazgos').innerHTML = '';
+  document.getElementById('overlay-aud').classList.add('open');
+  audPreview();
+}
+function cerrarModalAud() { document.getElementById('overlay-aud').classList.remove('open'); }
+
+async function audPreview() {
+  const anio = document.getElementById('aud-anio').value || new Date().getFullYear();
+  const trim = document.getElementById('aud-trim').value || 1;
+  const box = document.getElementById('aud-preview');
+  box.innerHTML = 'Calculando vigencias…';
+  try {
+    const r = await _audFetch(`${_AUD_API}?action=PREVIEW_AUDITORIA&anio=${anio}&trimestre=${trim}`);
+    const d = await r.json();
+    if (d.status !== 'success') { box.textContent = d.message||'Error.'; return; }
+    const v = d.vigencias, eq = v.equipos, pe = v.personal;
+    const row = (t,s)=>`<tr><td style="padding:3px 6px">${t}</td><td style="text-align:center;padding:3px 6px">${s.total}</td><td style="text-align:center;color:#166534;padding:3px 6px">${s.vigentes}</td><td style="text-align:center;color:#92400e;padding:3px 6px">${s.por_vencer}</td><td style="text-align:center;color:#b91c1c;padding:3px 6px">${s.vencidos}</td></tr>`;
+    box.innerHTML = `<table style="width:100%;font-size:12.5px;border-collapse:collapse">
+      <tr style="color:#667;border-bottom:1px solid #e5e7eb"><th style="text-align:left;padding:3px 6px"></th><th style="padding:3px 6px">Total</th><th style="padding:3px 6px">Vigentes</th><th style="padding:3px 6px">Por vencer</th><th style="padding:3px 6px">Vencidos</th></tr>
+      ${row('Equipos',eq)}${row('Personal',pe)}</table>
+      <div style="margin-top:6px;font-size:12px;color:#555">Resultado sugerido: <strong style="color:${_audResColor(d.resultado_sugerido)}">${esc2(d.resultado_sugerido)}</strong></div>`;
+    if (document.getElementById('aud-resultado').dataset.touched !== '1') document.getElementById('aud-resultado').value = d.resultado_sugerido;
+  } catch(_) { box.textContent = 'Error de red.'; }
+}
+document.getElementById('aud-resultado').addEventListener('change', function(){ this.dataset.touched='1'; });
+
+function audAddHallazgo() {
+  const div = document.createElement('div');
+  div.className = 'aud-hall-row';
+  div.style = 'display:grid;grid-template-columns:1fr 2fr 110px 28px;gap:6px;margin-bottom:6px';
+  div.innerHTML = `
+    <input class="ah-cat" placeholder="Categoría" style="padding:7px;border:1px solid var(--borde);border-radius:6px">
+    <input class="ah-desc" placeholder="Descripción del hallazgo" style="padding:7px;border:1px solid var(--borde);border-radius:6px">
+    <select class="ah-sev" style="padding:7px;border:1px solid var(--borde);border-radius:6px"><option>Menor</option><option>Mayor</option><option>Crítica</option></select>
+    <button onclick="this.parentNode.remove()" style="background:#fcebeb;color:#b91c1c;border:none;border-radius:6px;cursor:pointer">✕</button>`;
+  document.getElementById('aud-hallazgos').appendChild(div);
+}
+
+async function guardarAud() {
+  const hallazgos = [...document.querySelectorAll('#aud-hallazgos .aud-hall-row')].map(r => ({
+    categoria: r.querySelector('.ah-cat').value.trim(),
+    descripcion: r.querySelector('.ah-desc').value.trim(),
+    severidad: r.querySelector('.ah-sev').value,
+  })).filter(h => h.descripcion);
+  const payload = {
+    anio: +document.getElementById('aud-anio').value,
+    trimestre: +document.getElementById('aud-trim').value,
+    resultado: document.getElementById('aud-resultado').value,
+    observaciones: document.getElementById('aud-obs').value.trim(),
+    hallazgos,
+  };
+  const btn = document.getElementById('aud-guardar-btn'); btn.disabled = true; btn.textContent = 'Generando…';
+  try {
+    const r = await _audFetch(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'CREAR_AUDITORIA', payload}) });
+    const d = await r.json();
+    if (d.status !== 'success') { mostrarToast(d.message||'Error.', 'err'); return; }
+    cerrarModalAud(); mostrarToast('Auditoría generada.', 'ok'); cargarAuditorias();
+  } catch(_) { mostrarToast('Error de red.', 'err'); }
+  finally { btn.disabled = false; btn.textContent = 'Generar auditoría'; }
+}
+
+async function eliminarAud(id, label) {
+  if (!confirm(`¿Eliminar la auditoría ${label}?`)) return;
+  try {
+    const r = await _audFetch(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'ELIMINAR_AUDITORIA', payload:{id}}) });
+    const d = await r.json();
+    if (d.status !== 'success') { mostrarToast(d.message||'Error.', 'err'); return; }
+    mostrarToast('Auditoría eliminada.', 'ok'); cargarAuditorias();
+  } catch(_) { mostrarToast('Error de red.', 'err'); }
 }
 </script>
 

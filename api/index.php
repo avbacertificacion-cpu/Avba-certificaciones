@@ -17,6 +17,7 @@ require_once __DIR__ . '/Calidad.php';
 require_once __DIR__ . '/Certificaciones.php';
 require_once __DIR__ . '/ValidarQR.php';
 require_once __DIR__ . '/Admin.php';
+require_once __DIR__ . '/Auditorias.php';
 require_once __DIR__ . '/Personal.php';
 require_once __DIR__ . '/Accesorios.php';
 require_once __DIR__ . '/Pnd.php';
@@ -63,6 +64,7 @@ $cal      = new Calidad($pdo);
 $cert     = new Certificaciones($pdo);
 $qr       = new ValidarQR($pdo);
 $admin    = new Admin($pdo);
+$auditorias = new Auditorias($pdo);
 $personal = new Personal($pdo);
 $accesorios     = new Accesorios($pdo);
 $pnd            = new Pnd($pdo);
@@ -340,6 +342,32 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->listarTiposEquipo());
+
+        // ── Auditorías de Calidad (ADMIN + CALIDAD) ──────────────
+        case 'LISTAR_AUDITORIAS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auditorias->listar());
+
+        case 'PREVIEW_AUDITORIA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auditorias->preview((int)($_GET['anio'] ?? date('Y')), (int)($_GET['trimestre'] ?? ceil((int)date('n')/3))));
+
+        case 'DETALLE_AUDITORIA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auditorias->detalle((int)($_GET['id'] ?? 0)));
+
+        case 'CREAR_AUDITORIA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auditorias->crear($payload, $usr));
+
+        case 'ELIMINAR_AUDITORIA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auditorias->eliminar((int)($payload['id'] ?? 0)));
 
         // Inspector: historial propio
         case 'GET_MIS_INSPECCIONES':
