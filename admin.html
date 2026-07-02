@@ -238,14 +238,29 @@
     .toast.ok  { background:var(--verde); }
     .toast.err { background:var(--rojo); }
 
+    .menu-toggle {
+      display: none; align-items: center; justify-content: center;
+      width: 38px; height: 38px; border-radius: 8px;
+      border: 1.5px solid var(--borde); background: var(--blanco);
+      cursor: pointer; color: var(--texto); flex-shrink: 0;
+    }
+    .sidebar-backdrop {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,.4); z-index: 90;
+    }
     @media(max-width:700px) {
       .sidebar { transform: translateX(-100%); }
       .sidebar.open { transform: translateX(0); }
       .main { margin-left: 0; }
+      .menu-toggle { display: inline-flex; }
+      .sidebar-backdrop.open { display: block; }
     }
   </style>
 </head>
 <body>
+
+<!-- Fondo oscuro para cerrar el menú en móvil -->
+<div class="sidebar-backdrop" id="sidebar-backdrop" onclick="cerrarSidebar()"></div>
 
 <!-- SIDEBAR -->
 <div class="sidebar" id="sidebar">
@@ -307,9 +322,14 @@
 <!-- MAIN -->
 <div class="main">
   <div class="topbar">
-    <div>
-      <div class="topbar-t" id="topbar-t">Gestión de usuarios</div>
-      <div class="topbar-s" id="topbar-s">Administra cuentas del sistema</div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Abrir menú">
+        <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M2 4h12M2 8h12M2 12h12"/></svg>
+      </button>
+      <div>
+        <div class="topbar-t" id="topbar-t">Gestión de usuarios</div>
+        <div class="topbar-s" id="topbar-s">Administra cuentas del sistema</div>
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:10px">
       <div style="text-align:right">
@@ -604,8 +624,19 @@ function renderTabla(data) {
     </tr>`).join("");
 }
 
+/* ── MENÚ LATERAL (móvil) ── */
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebar-backdrop').classList.toggle('open');
+}
+function cerrarSidebar() {
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-backdrop').classList.remove('open');
+}
+
 /* ── NAVEGACIÓN ENTRE SECCIONES ── */
 function mostrarSeccion(id, el) {
+  cerrarSidebar();  // cerrar el menú en móvil al elegir sección
   document.querySelectorAll('.seccion').forEach(s => s.style.display = 'none');
   const sec = document.getElementById('sec-' + id);
   if (sec) sec.style.display = '';
