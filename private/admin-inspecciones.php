@@ -50,6 +50,16 @@ $nombre = $_SESSION['nombre'];
         .empty{text-align:center;padding:60px 20px;background:#fff;border-radius:12px;color:#aaa}
         .empty .icon{font-size:64px;margin-bottom:16px}
 
+        .fecha-bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;background:#fff;border-radius:12px;padding:14px 16px;margin-bottom:16px;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+        .fecha-bar strong{font-size:13px;color:#555}
+        .fecha-bar input[type=date]{padding:10px 12px;border:2px solid #e0e0ff;border-radius:8px;font-size:14px}
+        .fecha-bar input[type=date]:focus{outline:none;border-color:#667eea}
+        .btn-fecha{padding:10px 18px;background:#667eea;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;transition:.2s}
+        .btn-fecha:hover{background:#5568d3}
+        #msgFecha{font-size:13px;font-weight:600}
+        .fecha-hint{font-size:11px;color:#999;flex-basis:100%}
+        .chk-insp,#chkAll{width:16px;height:16px;cursor:pointer}
+
         @media(max-width:768px){
             .navbar h1{font-size:18px}
             .page-header h2{font-size:22px}
@@ -80,6 +90,15 @@ $nombre = $_SESSION['nombre'];
         <select id="filtroInspector" onchange="cargar()" title="Filtrar por inspector">
             <option value="">📋 Todos los inspectores</option>
         </select>
+    </div>
+
+    <!-- Ajuste de fechas (ej. inspecciones del 1-2 julio que corresponden a junio) -->
+    <div class="fecha-bar">
+        <strong>📅 Ajustar fecha de las seleccionadas:</strong>
+        <input type="date" id="nuevaFecha" title="Nueva fecha para las inspecciones seleccionadas">
+        <button onclick="aplicarNuevaFecha()" class="btn-fecha">Cambiar fecha</button>
+        <span id="msgFecha"></span>
+        <span class="fecha-hint">Marca las casillas en la tabla y elige la fecha destino. Útil para mover inspecciones al mes correcto en el cierre.</span>
     </div>
 
     <div class="table-wrapper">
@@ -146,12 +165,14 @@ function render(data) {
     c.innerHTML = `
     <table>
         <thead><tr>
+            <th><input type="checkbox" id="chkAll" onclick="toggleAllInsp(this)" title="Seleccionar todas"></th>
             <th>📅 Fecha</th><th>📍 Código</th><th>🏢 Ubicación</th><th>🏭 Empresa</th><th>👤 Inspector</th>
             <th>SÑ</th><th>MG</th><th>PO</th><th>PH</th><th>SG</th>
             <th>PS</th><th>OB</th><th>DÑ</th><th>PI</th><th>Observaciones</th>
         </tr></thead>
         <tbody>
         ${data.map(i => `<tr>
+            <td><input type="checkbox" class="chk-insp" value="${i.id}"></td>
             <td><strong>${sanitize(i.fecha)} ${sanitize(i.hora.substring(0,5))}</strong></td>
             <td>${sanitize(i.codigo_manual)}</td>
             <td>${sanitize(i.ubicacion)}</td>
@@ -173,6 +194,42 @@ function sanitize(str) {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+}
+
+// ── Ajuste de fechas ──────────────────────────────────────────────────────────
+function toggleAllInsp(chk) {
+    document.querySelectorAll('.chk-insp').forEach(c => c.checked = chk.checked);
+}
+
+async function aplicarNuevaFecha() {
+    const nueva = document.getElementById('nuevaFecha').value;
+    const msg   = document.getElementById('msgFecha');
+    const ids   = [...document.querySelectorAll('.chk-insp:checked')].map(c => parseInt(c.value)).filter(Boolean);
+    const setMsg = (t, c) => { msg.textContent = t; msg.style.color = c; };
+
+    if (!nueva)      { setMsg('Selecciona la nueva fecha.', '#c0392b'); return; }
+    if (!ids.length) { setMsg('Marca al menos una inspección en la tabla.', '#c0392b'); return; }
+
+    const [y, m, d] = nueva.split('-');
+    if (!confirm(`¿Cambiar la fecha de ${ids.length} inspección(es) a ${d}/${m}/${y}?`)) return;
+
+    setMsg('Aplicando...', '#555');
+    try {
+        const r = await fetch('../api/inspecciones.php?action=editar_fecha', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ ids, nueva_fecha: nueva })
+        });
+        const res = await r.json();
+        if (res.success) {
+            setMsg(res.message, '#27ae60');
+            cargar();
+        } else {
+            setMsg(res.error || 'Error al cambiar la fecha.', '#c0392b');
+        }
+    } catch (e) {
+        setMsg('Error de conexión.', '#c0392b');
+    }
 }
 
 // Mes actual por defecto

@@ -20,12 +20,90 @@ $uid    = $_SESSION['usuario_id'];
 $action = $_GET['action'] ?? '';
 
 switch ($action) {
-    case 'guardar':  guardar();  break;
-    case 'listar':   listar();   break;
-    case 'obtener':  obtener();  break;
+    case 'guardar':       guardar();       break;
+    case 'listar':        listar();        break;
+    case 'obtener':       obtener();       break;
+    case 'editar_fecha':  editarFecha();   break;
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Acción no válida']);
+}
+
+// ─── EDITAR FECHA DE UNA O VARIAS INSPECCIONES (ADMIN) ───────────────────────
+// Reasigna la fecha de inspecciones seleccionadas (p.ej. inspecciones hechas el
+// 1-2 de julio que corresponden al reporte de junio → 30/06).
+function editarFecha() {
+    global $pdo, $rol, $uid;
+
+    if ($rol !== ROLE_ADMIN) {
+        http_response_code(403);
+        echo json_encode(['error' => 'Solo el administrador puede cambiar fechas de inspección']);
+        return;
+    }
+
+    $d   = json_decode(file_get_contents('php://input'), true) ?: [];
+    $ids = $d['ids'] ?? [];
+    if (!is_array($ids)) $ids = [$ids];
+    $ids = array_values(array_filter(array_map('intval', $ids), fn($x) => $x > 0));
+
+    $nueva = trim($d['nueva_fecha'] ?? '');
+
+    if (empty($ids)) {
+        http_response_code(400);
+        echo json_encode(['error' => 'No se seleccionaron inspecciones']);
+        return;
+    }
+
+    // Validar fecha destino real (AAAA-MM-DD)
+    $dt = DateTime::createFromFormat('Y-m-d', $nueva);
+    if (!$dt || $dt->format('Y-m-d') !== $nueva) {
+        http_response_code(400);
+        echo json_encode(['error' => 'Fecha destino inválida (formato AAAA-MM-DD)']);
+        return;
+    }
+    $mesDest  = (int) $dt->format('n');
+    $anioDest = (int) $dt->format('Y');
+
+    try {
+        $pdo->beginTransaction();
+
+        $sel      = $pdo->prepare("SELECT extintor_id, fecha FROM inspecciones WHERE id = ?");
+        $conflict = $pdo->prepare("
+            SELECT id FROM inspecciones
+            WHERE extintor_id = ? AND MONTH(fecha) = ? AND YEAR(fecha) = ? AND id <> ?
+            LIMIT 1
+        ");
+        $upd = $pdo->prepare("UPDATE inspecciones SET fecha = ? WHERE id = ?");
+
+        $cambiados   = 0;
+        $conflictos  = 0;
+        foreach ($ids as $id) {
+            $sel->execute([$id]);
+            $row = $sel->fetch(PDO::FETCH_ASSOC);
+            if (!$row) continue;
+            if ($row['fecha'] === $nueva) continue;
+
+            // Evitar duplicar inspección del mismo extintor en el mes destino
+            $conflict->execute([$row['extintor_id'], $mesDest, $anioDest, $id]);
+            if ($conflict->fetch()) { $conflictos++; continue; }
+
+            $upd->execute([$nueva, $id]);
+            audit($uid, "Cambiar fecha inspección #$id de {$row['fecha']} a $nueva", 'inspecciones', $id);
+            $cambiados++;
+        }
+
+        $pdo->commit();
+
+        $msg = "Fecha actualizada en $cambiados inspección(es).";
+        if ($conflictos > 0) {
+            $msg .= " $conflictos se omitieron porque ese extintor ya tenía una inspección en el mes destino.";
+        }
+        echo json_encode(['success' => true, 'cambiados' => $cambiados, 'conflictos' => $conflictos, 'message' => $msg]);
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => 'Error al cambiar la fecha: ' . $e->getMessage()]);
+    }
 }
 
 // ─── GUARDAR INSPECCIÓN ──────────────────────────────────────────────────────
