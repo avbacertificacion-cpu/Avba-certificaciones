@@ -113,6 +113,79 @@ class Inspecciones {
         }
     }
 
+    // ── Listar inspecciones (para ajuste de fechas, ADMIN) ─
+    // Filtra opcionalmente por rango de fecha_inspeccion (AAAA-MM-DD).
+    public function listarInspecciones(string $desde = '', string $hasta = ''): array {
+        $where  = [];
+        $params = [];
+        if ($desde !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $desde)) {
+            $where[]  = 'fecha_inspeccion >= ?';
+            $params[] = $desde;
+        }
+        if ($hasta !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $hasta)) {
+            $where[]  = 'fecha_inspeccion <= ?';
+            $params[] = $hasta;
+        }
+
+        $sql = "SELECT id, control, cliente, maquinaria, marca, serie,
+                       fecha_inspeccion AS fecha_iso,
+                       DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
+                       estado
+                FROM equipos";
+        if ($where) $sql .= ' WHERE ' . implode(' AND ', $where);
+        $sql .= ' ORDER BY fecha_inspeccion DESC, id DESC LIMIT 1000';
+
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+        return ['status' => 'success', 'data' => $stmt->fetchAll()];
+    }
+
+    // ── Editar fecha de inspección de una o varias (ADMIN) ─
+    public function editarFechaInspeccion(array $payload, string $usuario): array {
+        $ids = $payload['ids'] ?? [];
+        if (!is_array($ids)) $ids = [$ids];
+        $ids = array_values(array_filter(array_map('intval', $ids), fn($x) => $x > 0));
+
+        $nueva = trim($payload['nueva_fecha'] ?? '');
+
+        if (empty($ids)) {
+            return ['status' => 'error', 'message' => 'No se seleccionaron inspecciones.'];
+        }
+        // Validar fecha destino real (AAAA-MM-DD)
+        $d = DateTime::createFromFormat('Y-m-d', $nueva);
+        if (!$d || $d->format('Y-m-d') !== $nueva) {
+            return ['status' => 'error', 'message' => 'Fecha destino inválida (formato AAAA-MM-DD).'];
+        }
+
+        try {
+            $this->pdo->beginTransaction();
+            $sel = $this->pdo->prepare("SELECT fecha_inspeccion FROM equipos WHERE id = ?");
+            $upd = $this->pdo->prepare("UPDATE equipos SET fecha_inspeccion = ? WHERE id = ?");
+
+            $cambiados = 0;
+            foreach ($ids as $id) {
+                $sel->execute([$id]);
+                $row = $sel->fetch();
+                if (!$row) continue;
+                $anterior = $row['fecha_inspeccion'];
+                if ($anterior === $nueva) continue;
+                $upd->execute([$nueva, $id]);
+                registrarHistorial($this->pdo, $usuario, $id, 'fecha_inspeccion', $anterior, $nueva, 'UPDATE');
+                $cambiados++;
+            }
+            $this->pdo->commit();
+
+            return [
+                'status'    => 'success',
+                'message'   => "Fecha actualizada en {$cambiados} inspección(es).",
+                'cambiados' => $cambiados
+            ];
+        } catch (Exception $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            return ['status' => 'error', 'message' => $e->getMessage()];
+        }
+    }
+
     // ── Guardar fotos en el servidor ───────────────────────
     private function guardarFotos(array $fotos, string $cliente, string $serie): string {
         $fechaHoy   = date('Y-m-d');

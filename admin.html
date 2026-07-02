@@ -262,9 +262,13 @@
   </div>
 
   <div class="sb-section">Administración</div>
-  <a class="sb-item active" onclick="mostrarSeccion('usuarios')" href="#">
+  <a class="sb-item active" onclick="mostrarSeccion('usuarios', this)" href="#">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M5 7a3 3 0 100-6 3 3 0 000 6zM1 14c0-2.8 1.8-5 4-5M12 7a3 3 0 100-6 3 3 0 000 6M11 9c2.2 0 4 2.2 4 5"/></svg>
     Gestión de usuarios
+  </a>
+  <a class="sb-item" onclick="mostrarSeccion('fechas', this)" href="#">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="12" height="11" rx="1.5"/><path d="M2 6h12M5 1.5v3M11 1.5v3M7 10l1.5 1.5L11 9"/></svg>
+    Ajustar fechas
   </a>
 
   <div class="sb-section">Módulos del sistema</div>
@@ -353,32 +357,94 @@
       </a>
     </div>
 
-    <!-- Tabla usuarios -->
-    <div class="section-card">
-      <div class="section-header">
-        <div class="section-title">Usuarios del sistema</div>
-        <button class="btn-nuevo" onclick="abrirModalNuevo()">
-          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg>
-          Nuevo usuario
-        </button>
+    <!-- ══════ SECCIÓN: USUARIOS ══════ -->
+    <div id="sec-usuarios" class="seccion">
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">Usuarios del sistema</div>
+          <button class="btn-nuevo" onclick="abrirModalNuevo()">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3v10M3 8h10"/></svg>
+            Nuevo usuario
+          </button>
+        </div>
+        <div class="tabla-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Nombre</th>
+                <th>Rol</th>
+                <th>ID Cliente</th>
+                <th>Estado</th>
+                <th>Último acceso</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tabla-usuarios">
+              <tr><td colspan="7" style="text-align:center;padding:32px;color:var(--texto-hint)"><span class="spin"></span> Cargando...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-      <div class="tabla-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Usuario</th>
-              <th>Nombre</th>
-              <th>Rol</th>
-              <th>ID Cliente</th>
-              <th>Estado</th>
-              <th>Último acceso</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="tabla-usuarios">
-            <tr><td colspan="7" style="text-align:center;padding:32px;color:var(--texto-hint)"><span class="spin"></span> Cargando...</td></tr>
-          </tbody>
-        </table>
+    </div>
+
+    <!-- ══════ SECCIÓN: AJUSTAR FECHAS DE INSPECCIÓN ══════ -->
+    <div id="sec-fechas" class="seccion" style="display:none">
+      <div class="section-card">
+        <div class="section-header">
+          <div class="section-title">Ajustar fechas de inspección</div>
+        </div>
+
+        <div style="padding:0 18px 14px;font-size:13px;color:var(--texto-sub);line-height:1.5">
+          Filtra las inspecciones por rango de fecha, selecciona las que quieras y asígnales una
+          nueva fecha. Útil cuando una inspección se registró en un día que en realidad pertenece
+          al mes anterior (cierre de mes).
+        </div>
+
+        <!-- Filtro por rango -->
+        <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;padding:0 18px 16px">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--texto-sub);margin-bottom:4px">Desde</label>
+            <input type="date" id="f-desde" style="padding:9px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+          </div>
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--texto-sub);margin-bottom:4px">Hasta</label>
+            <input type="date" id="f-hasta" style="padding:9px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+          </div>
+          <button class="btn-nuevo" onclick="cargarInspecciones()">Buscar</button>
+        </div>
+
+        <!-- Acción: nueva fecha -->
+        <div style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;padding:14px 18px;background:#F7F9FC;border-top:1px solid var(--borde);border-bottom:1px solid var(--borde)">
+          <div>
+            <label style="display:block;font-size:11px;font-weight:700;color:var(--texto-sub);margin-bottom:4px">Nueva fecha para las seleccionadas</label>
+            <input type="date" id="f-nueva" style="padding:9px 10px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+          </div>
+          <button class="btn-nuevo" onclick="aplicarNuevaFecha()">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 8l3 3 7-7"/></svg>
+            Cambiar fecha de seleccionadas
+          </button>
+          <span id="f-msg" style="font-size:13px;font-weight:600"></span>
+        </div>
+
+        <div class="tabla-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:34px"><input type="checkbox" id="f-all" onclick="toggleAllInsp(this)"></th>
+                <th>Folio</th>
+                <th>Cliente</th>
+                <th>Equipo</th>
+                <th>Serie</th>
+                <th>Fecha actual</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody id="tabla-inspecciones">
+              <tr><td colspan="7" style="text-align:center;padding:32px;color:var(--texto-hint)">Usa el filtro y pulsa «Buscar» para listar inspecciones.</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
@@ -536,6 +602,104 @@ function renderTabla(data) {
         </button>
       </td>
     </tr>`).join("");
+}
+
+/* ── NAVEGACIÓN ENTRE SECCIONES ── */
+function mostrarSeccion(id, el) {
+  document.querySelectorAll('.seccion').forEach(s => s.style.display = 'none');
+  const sec = document.getElementById('sec-' + id);
+  if (sec) sec.style.display = '';
+
+  document.querySelectorAll('.sb-item').forEach(a => a.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  const titulos = {
+    usuarios: ['Gestión de usuarios', 'Administra cuentas del sistema'],
+    fechas:   ['Ajustar fechas de inspección', 'Corrige la fecha de inspecciones (cierre de mes)']
+  };
+  const t = titulos[id] || ['', ''];
+  document.getElementById('topbar-t').textContent = t[0];
+  document.getElementById('topbar-s').textContent = t[1];
+
+  if (id === 'fechas' && !inspecciones.length) cargarInspecciones();
+  return false;
+}
+
+/* ── AJUSTE DE FECHAS DE INSPECCIÓN ── */
+let inspecciones = [];
+
+async function cargarInspecciones() {
+  const desde = document.getElementById('f-desde').value;
+  const hasta = document.getElementById('f-hasta').value;
+  const tbody = document.getElementById('tabla-inspecciones');
+  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--texto-hint)"><span class="spin"></span> Cargando...</td></tr>`;
+  try {
+    let url = API + "?action=LISTAR_INSPECCIONES";
+    if (desde) url += "&desde=" + encodeURIComponent(desde);
+    if (hasta) url += "&hasta=" + encodeURIComponent(hasta);
+    const res  = await fetch(url);
+    const data = JSON.parse(await res.text());
+    inspecciones = (data && data.data) ? data.data : [];
+    renderInspecciones(inspecciones);
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--rojo)">Error al cargar inspecciones.</td></tr>`;
+  }
+}
+
+function renderInspecciones(data) {
+  const tbody = document.getElementById('tabla-inspecciones');
+  const all = document.getElementById('f-all');
+  if (all) all.checked = false;
+  if (!data.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--texto-hint)">No hay inspecciones en ese rango.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = data.map(r => `
+    <tr>
+      <td><input type="checkbox" class="f-chk" value="${r.id}"></td>
+      <td style="font-family:monospace;font-size:12px">${r.control || '—'}</td>
+      <td style="font-weight:600">${r.cliente || '—'}</td>
+      <td>${r.maquinaria || '—'}</td>
+      <td style="font-family:monospace;font-size:12px">${r.serie || '—'}</td>
+      <td style="white-space:nowrap">${r.fecha || '—'}</td>
+      <td style="font-size:12px">${r.estado || '—'}</td>
+    </tr>`).join("");
+}
+
+function toggleAllInsp(chk) {
+  document.querySelectorAll('.f-chk').forEach(c => c.checked = chk.checked);
+}
+
+async function aplicarNuevaFecha() {
+  const nueva = document.getElementById('f-nueva').value;
+  const msg   = document.getElementById('f-msg');
+  const ids   = [...document.querySelectorAll('.f-chk:checked')].map(c => parseInt(c.value)).filter(Boolean);
+
+  const setMsg = (txt, color) => { msg.textContent = txt; msg.style.color = color; };
+
+  if (!nueva)      { setMsg('Selecciona la nueva fecha.', 'var(--rojo)'); return; }
+  if (!ids.length) { setMsg('Selecciona al menos una inspección.', 'var(--rojo)'); return; }
+
+  const [y, m, d] = nueva.split('-');
+  if (!confirm(`¿Cambiar la fecha de ${ids.length} inspección(es) a ${d}/${m}/${y}?`)) return;
+
+  setMsg('Aplicando...', 'var(--texto-sub)');
+  try {
+    const res = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body:    JSON.stringify({ action: 'EDITAR_FECHA_INSPECCION', ids, nueva_fecha: nueva })
+    });
+    const data = JSON.parse(await res.text());
+    if (data.status === 'success') {
+      setMsg(data.message, '#2e7d32');
+      cargarInspecciones();
+    } else {
+      setMsg(data.message || 'Error al aplicar.', 'var(--rojo)');
+    }
+  } catch (e) {
+    setMsg('Error de conexión.', 'var(--rojo)');
+  }
 }
 
 /* ── MODAL NUEVO ── */

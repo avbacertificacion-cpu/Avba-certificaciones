@@ -108,6 +108,12 @@ if ($method === 'GET') {
             if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($auth->listarUsuarios());
 
+        // Listado de inspecciones para ajuste de fechas (ADMIN)
+        case 'LISTAR_INSPECCIONES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($insp->listarInspecciones($_GET['desde'] ?? '', $_GET['hasta'] ?? ''));
+
         // Imprimir PDF certificado (preview)
         case 'IMPRIMIR_PDF_CERT':
             $usr = validarToken($pdo, $token);
@@ -162,6 +168,12 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($insp->guardarInspeccion($payload, $usr['usuario']));
+
+        // Ajustar fecha de inspección de una o varias (ADMIN)
+        case 'EDITAR_FECHA_INSPECCION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($insp->editarFechaInspeccion($payload, $usr['usuario']));
 
         // ── Calidad ──────────────────────────────────────
         case 'VALIDAR_CALIDAD':
