@@ -681,6 +681,14 @@
         <div class="success-msg">El reporte fue guardado y el PDF está siendo generado.<br>Recibirás confirmación en el correo registrado.</div>
         <button class="btn-nueva" onclick="location.reload()">Nueva inspección</button>
       </div>
+      <div class="success-box" id="success-box-offline" style="display:none;">
+        <div class="success-icon" style="background:#f0a500">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v10M12 2l-4 4M12 2l4 4M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4"/></svg>
+        </div>
+        <div class="success-title">Guardada sin conexión</div>
+        <div class="success-msg">No hay internet en este momento.<br>La inspección se guardó en el dispositivo y se enviará <b>automáticamente</b> cuando regrese la conexión.<br><br>Puedes cerrar la app; los datos no se perderán.</div>
+        <button class="btn-nueva" onclick="location.reload()">Nueva inspección</button>
+      </div>
     </div>
 
     <div class="nav-btns" id="btns-paso5">
@@ -1127,11 +1135,29 @@ async function enviarFormulario() {
 
     setProgreso(80, "Generando reporte PDF...");
 
-    const response = await fetch(WEB_APP_URL, {
-      method:  "POST",
-      body:    JSON.stringify(payload),
-      headers: { "Content-Type": "text/plain" }
-    });
+    // Sin conexión: guardar localmente y salir (se enviará después)
+    if (!navigator.onLine) {
+      await guardarPendiente(payload);
+      mostrarGuardadoOffline();
+      enviando = false;
+      return;
+    }
+
+    // Intentar el envío; si falla la RED, encolar en vez de perder la inspección
+    let response;
+    try {
+      response = await fetch(WEB_APP_URL, {
+        method:  "POST",
+        body:    JSON.stringify(payload),
+        headers: { "Content-Type": "text/plain" }
+      });
+    } catch (netErr) {
+      console.warn("Sin red al enviar, guardando localmente:", netErr);
+      await guardarPendiente(payload);
+      mostrarGuardadoOffline();
+      enviando = false;
+      return;
+    }
 
     const texto    = await response.text();
     const resultado = JSON.parse(texto);
@@ -1155,6 +1181,125 @@ async function enviarFormulario() {
     alert("Error al enviar: " + err.message + "\n\nRevisa la consola para más detalles.");
   }
 }
+
+/* ════════════════════════════════════════
+   COLA OFFLINE (IndexedDB) + SINCRONIZACIÓN
+════════════════════════════════════════ */
+const DB_NAME  = "avba_inspector_db";
+const DB_STORE = "pendientes";
+
+function abrirDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) {
+        db.createObjectStore(DB_STORE, { keyPath: "id", autoIncrement: true });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+
+async function guardarPendiente(payload) {
+  const db = await abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, "readwrite");
+    tx.objectStore(DB_STORE).add({ payload, creado: Date.now() });
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror    = () => { db.close(); reject(tx.error); };
+  });
+}
+
+async function listarPendientes() {
+  const db = await abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx  = db.transaction(DB_STORE, "readonly");
+    const req = tx.objectStore(DB_STORE).getAll();
+    req.onsuccess = () => { db.close(); resolve(req.result || []); };
+    req.onerror   = () => { db.close(); reject(req.error); };
+  });
+}
+
+async function borrarPendiente(id) {
+  const db = await abrirDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(DB_STORE, "readwrite");
+    tx.objectStore(DB_STORE).delete(id);
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror    = () => { db.close(); reject(tx.error); };
+  });
+}
+
+let sincronizando = false;
+async function sincronizarPendientes() {
+  if (sincronizando || !navigator.onLine) return;
+  sincronizando = true;
+  try {
+    const items = await listarPendientes();
+    for (const item of items) {
+      try {
+        const resp = await fetch(WEB_APP_URL, {
+          method:  "POST",
+          body:    JSON.stringify(item.payload),
+          headers: { "Content-Type": "text/plain" }
+        });
+        const data = JSON.parse(await resp.text());
+        if (data.status === "success") {
+          await borrarPendiente(item.id);
+        } else {
+          break; // error del servidor: reintentar más tarde
+        }
+      } catch (e) {
+        break;   // sin red todavía: detener y reintentar después
+      }
+    }
+  } catch (e) {
+    console.warn("Error al sincronizar pendientes:", e);
+  } finally {
+    sincronizando = false;
+    actualizarBadgePendientes();
+  }
+}
+
+async function actualizarBadgePendientes() {
+  let n = 0;
+  try { n = (await listarPendientes()).length; } catch (e) {}
+  let badge = document.getElementById("badge-pendientes");
+  if (!badge) {
+    badge = document.createElement("div");
+    badge.id = "badge-pendientes";
+    badge.style.cssText = "position:fixed;left:0;right:0;bottom:0;z-index:9999;" +
+      "padding:10px 14px;font-size:13px;font-weight:600;text-align:center;" +
+      "color:#fff;box-shadow:0 -2px 8px rgba(0,0,0,.15);display:none;";
+    document.body.appendChild(badge);
+  }
+  if (n > 0) {
+    badge.style.display    = "block";
+    badge.style.background  = navigator.onLine ? "#2563eb" : "#f0a500";
+    badge.textContent = navigator.onLine
+      ? `⏳ Enviando ${n} inspección(es) pendiente(s)...`
+      : `📴 ${n} inspección(es) guardada(s) sin conexión — se enviarán al reconectar`;
+  } else {
+    badge.style.display = "none";
+  }
+}
+
+function mostrarGuardadoOffline() {
+  setProgreso(100, "Guardado sin conexión");
+  document.getElementById("progress-box").style.display        = "none";
+  document.getElementById("success-box").style.display         = "none";
+  document.getElementById("success-box-offline").style.display = "block";
+  actualizarBadgePendientes();
+}
+
+window.addEventListener("online",  () => { actualizarBadgePendientes(); sincronizarPendientes(); });
+window.addEventListener("offline", () => { actualizarBadgePendientes(); });
+window.addEventListener("load", () => {
+  actualizarBadgePendientes();
+  setTimeout(sincronizarPendientes, 1500);
+});
 
 /* ════════════════════════════════════════
    SERVICE WORKER (PWA)
