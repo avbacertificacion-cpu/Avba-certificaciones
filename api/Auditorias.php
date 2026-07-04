@@ -183,6 +183,102 @@ class Auditorias {
         return ['status' => 'success'];
     }
 
+    // ════════════════════════════════════════════════════════
+    //  INFORME DE INSPECCIONES (Excel — plantilla UI_INFORME_001)
+    // ════════════════════════════════════════════════════════
+
+    /**
+     * Genera el Excel de informe de inspecciones (formato UI_INFORME_001)
+     * lleno con las inspecciones en el rango de fechas indicado.
+     */
+    public function generarInforme(string $desde, string $hasta, string $responsable): array {
+        $desdeDb = $desde ? date('Y-m-d', strtotime(str_replace('/', '-', $desde))) : date('Y-01-01');
+        $hastaDb = $hasta ? date('Y-m-d', strtotime(str_replace('/', '-', $hasta))) : date('Y-m-d');
+
+        try {
+            $s = $this->pdo->prepare("
+                SELECT id_equipo, cliente, direccion, control, estado, inspector,
+                       DATE_FORMAT(fecha_inspeccion,'%d/%m/%Y') AS fecha,
+                       TIME_FORMAT(marca_temporal,'%H:%i') AS hora
+                FROM equipos
+                WHERE fecha_inspeccion BETWEEN ? AND ?
+                  AND estado IN ('CONFORME','NO CONFORME','ENVIADO','APROBADO CALIDAD','RETORNADO','RECHAZADO')
+                ORDER BY fecha_inspeccion ASC, id ASC
+            ");
+            $s->execute([$desdeDb, $hastaDb]);
+            $rows = $s->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            return ['status' => 'error', 'message' => 'Error al leer inspecciones: ' . $e->getMessage()];
+        }
+        if (!$rows) return ['status' => 'error', 'message' => 'No hay inspecciones en el rango seleccionado.'];
+
+        // Mapear cada inspección al orden de columnas de la plantilla (A..J)
+        $data = [];
+        foreach ($rows as $r) {
+            $data[] = [
+                $responsable,                 // A Nombre de la persona responsable de la información
+                (string)($r['id_equipo'] ?? ''), // B Número de solicitud
+                (string)($r['cliente'] ?? ''),   // C Razón social
+                (string)($r['direccion'] ?? ''), // D Domicilio de la inspección
+                (string)($r['fecha'] ?? ''),     // E Fecha de inspección
+                (string)($r['hora'] ?? ''),      // F Hora de inicio
+                (string)($r['control'] ?? ''),   // G Número de dictamen
+                (string)($r['estado'] ?? ''),    // H Resultado de la inspección
+                (string)($r['inspector'] ?? ''), // I Inspector(es)
+                '',                              // J Persona(s) de apoyo (manual)
+            ];
+        }
+
+        $plantilla = dirname(__DIR__) . '/assets/plantillas/UI_INFORME_001.xlsx';
+        if (!is_file($plantilla)) return ['status' => 'error', 'message' => 'Plantilla no encontrada en el servidor.'];
+
+        $dir = rtrim(UPLOAD_DIR, '/') . '/auditorias/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+        $nombre = 'Informe_Inspecciones_' . date('Ymd_His') . '.xlsx';
+        $destAbs = $dir . $nombre;
+
+        if (!$this->llenarPlantillaXlsx($plantilla, $destAbs, $data)) {
+            return ['status' => 'error', 'message' => 'No se pudo generar el archivo Excel.'];
+        }
+        return ['status' => 'success', 'url' => rtrim(SITE_URL, '/') . '/' . UPLOAD_URL . 'auditorias/' . $nombre,
+                'total' => count($data)];
+    }
+
+    /** Inyecta los renglones de datos en la plantilla xlsx (preserva estilos). */
+    private function llenarPlantillaXlsx(string $plantilla, string $dest, array $data): bool {
+        if (!class_exists('ZipArchive')) return false;
+        if (!@copy($plantilla, $dest)) return false;
+
+        $zip = new \ZipArchive();
+        if ($zip->open($dest) !== true) return false;
+        $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+        if ($sheet === false) { $zip->close(); return false; }
+
+        $esc = function($v) {
+            return str_replace(['&','<','>','"',"'"], ['&amp;','&lt;','&gt;','&quot;','&apos;'], (string)$v);
+        };
+        $rowsXml = '';
+        $r = 2;
+        foreach ($data as $fila) {
+            $rowsXml .= '<row r="' . $r . '" spans="1:10">';
+            $col = 'A';
+            foreach ($fila as $val) {
+                $rowsXml .= '<c r="' . $col . $r . '" t="inlineStr"><is><t xml:space="preserve">'
+                          . $esc($val) . '</t></is></c>';
+                $col++;
+            }
+            $rowsXml .= '</row>';
+            $r++;
+        }
+
+        $sheet = str_replace('</sheetData>', $rowsXml . '</sheetData>', $sheet);
+        $sheet = preg_replace('/<dimension ref="[^"]*"\/>/', '<dimension ref="A1:J' . ($r - 1) . '"/>', $sheet);
+
+        $zip->deleteName('xl/worksheets/sheet1.xml');
+        $zip->addFromString('xl/worksheets/sheet1.xml', $sheet);
+        return $zip->close();
+    }
+
     // ── PDF ──────────────────────────────────────────────────
     private function assetB64(string $rel): string {
         $path = dirname(__DIR__) . '/assets/' . ltrim($rel, '/');

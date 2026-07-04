@@ -369,6 +369,13 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($auditorias->eliminar((int)($payload['id'] ?? 0)));
 
+        case 'GENERAR_INFORME_INSPECCIONES': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $resp = trim($payload['responsable'] ?? ($usr['nombre'] ?? 'Calidad'));
+            respuesta($auditorias->generarInforme(trim($payload['desde'] ?? ''), trim($payload['hasta'] ?? ''), $resp));
+        }
+
         // Inspector: historial propio
         case 'GET_MIS_INSPECCIONES':
             $usr = validarToken($pdo, $token);
