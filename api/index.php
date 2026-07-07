@@ -18,6 +18,7 @@ require_once __DIR__ . '/Certificaciones.php';
 require_once __DIR__ . '/ValidarQR.php';
 require_once __DIR__ . '/Admin.php';
 require_once __DIR__ . '/Auditorias.php';
+require_once __DIR__ . '/AvbaAdmin.php';
 require_once __DIR__ . '/Personal.php';
 require_once __DIR__ . '/Accesorios.php';
 require_once __DIR__ . '/Pnd.php';
@@ -65,6 +66,7 @@ $cert     = new Certificaciones($pdo);
 $qr       = new ValidarQR($pdo);
 $admin    = new Admin($pdo);
 $auditorias = new Auditorias($pdo);
+$avbaAdmin  = new AvbaAdmin($pdo);
 $personal = new Personal($pdo);
 $accesorios     = new Accesorios($pdo);
 $pnd            = new Pnd($pdo);
@@ -342,6 +344,37 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($admin->listarTiposEquipo());
+
+        // ── Control Administrativo AVBA (ADMIN + ADMINISTRATIVO) ──
+        case 'LISTAR_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->listarPersonal());
+
+        case 'DETALLE_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->detallePersonal((int)($_GET['id'] ?? 0)));
+
+        case 'GUARDAR_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->guardarPersonal($payload));
+
+        case 'ELIMINAR_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->eliminarPersonal((int)($payload['id'] ?? 0)));
+
+        case 'SUBIR_DOC_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->subirDocPersonal($_POST, $_FILES));
+
+        case 'ELIMINAR_DOC_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->eliminarDocPersonal((int)($payload['id'] ?? 0)));
 
         // ── Auditorías de Calidad (ADMIN + CALIDAD) ──────────────
         case 'LISTAR_AUDITORIAS':

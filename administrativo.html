@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Control Administrativo — AVBA</title>
+<style>
+:root{--azul:#185FA5;--azul-dark:#0C447C;--azul-light:#E6F1FB;--verde:#3B6D11;--verde-light:#EAF3DE;--ambar:#854F0B;--ambar-light:#FAEEDA;--rojo:#A32D2D;--rojo-light:#FCEBEB;--gris-bg:#f4f7fb;--borde:#dfe5ef;--texto:#1a1a2e;--texto-sub:#5a6072;--texto-hint:#9299a8;--blanco:#fff;}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg)}
+.header{background:var(--azul-dark);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:60px;box-shadow:0 2px 12px rgba(12,68,124,.3);position:sticky;top:0;z-index:50}
+.hdr-l{display:flex;align-items:center;gap:10px}
+.hdr-t{font-size:15px;font-weight:600;color:#fff}.hdr-s{font-size:11px;color:rgba(255,255,255,.6)}
+.btn-logout{padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 16px 60px}
+.tabs{display:flex;gap:4px;background:var(--blanco);border-radius:12px;padding:6px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 10px rgba(0,0,0,.04);margin-bottom:18px;overflow-x:auto}
+.tab-btn{flex:1;padding:9px 14px;border-radius:8px;border:none;background:transparent;font-size:13px;font-weight:600;color:var(--texto-sub);cursor:pointer;white-space:nowrap}
+.tab-btn.active{background:var(--azul);color:#fff}
+.tab-btn:disabled{opacity:.5;cursor:not-allowed}
+.tab-panel{display:none}.tab-panel.active{display:block}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--blanco);border-radius:12px;padding:14px 16px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.stat-n{font-size:24px;font-weight:700}.stat-l{font-size:12px;color:var(--texto-sub);margin-top:2px}
+.sec-hdr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.btn-prim{padding:9px 16px;border-radius:9px;border:none;background:var(--azul);color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+.btn-prim:hover{background:var(--azul-dark)}
+.btn-sec{padding:8px 12px;border-radius:8px;border:1.5px solid var(--borde);background:var(--blanco);color:var(--texto-sub);font-size:12px;font-weight:600;cursor:pointer}
+.btn-del{padding:8px 10px;border-radius:8px;border:1.5px solid var(--rojo);background:var(--rojo-light);color:var(--rojo);font-size:12px;font-weight:600;cursor:pointer}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{background:var(--blanco);border-radius:14px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 12px rgba(0,0,0,.05);overflow:hidden}
+.card-top{padding:14px 16px;border-bottom:1px solid var(--borde);display:flex;gap:10px;align-items:flex-start}
+.card-ico{width:40px;height:40px;border-radius:10px;background:var(--azul-light);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.card-nombre{font-size:14px;font-weight:700;color:var(--texto)}
+.card-sub{font-size:12px;color:var(--texto-sub);margin-top:2px}
+.card-body{padding:12px 16px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.chip{font-size:11px;background:var(--gris-bg);border:1px solid var(--borde);border-radius:20px;padding:3px 9px;color:var(--texto-sub)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.b-ok{background:var(--verde-light);color:var(--verde)}.b-warn{background:var(--ambar-light);color:var(--ambar)}.b-bad{background:var(--rojo-light);color:var(--rojo)}.b-off{background:#f0f0f0;color:#888}
+.card-foot{padding:10px 14px 14px;display:flex;gap:6px;flex-wrap:wrap}
+.empty{text-align:center;padding:44px 20px;color:var(--texto-hint)}
+.empty-t{font-size:15px;font-weight:600}.empty-s{font-size:13px;margin-top:4px}
+.loading{text-align:center;padding:34px;color:var(--texto-hint)}
+.spin{width:20px;height:20px;border:2px solid var(--borde);border-top-color:var(--azul);border-radius:50%;display:inline-block;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;opacity:0;pointer-events:none;transition:opacity .2s}
+.overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--blanco);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);padding:22px 22px 18px}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.modal-title{font-size:16px;font-weight:700;color:var(--texto)}
+.modal-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--texto-hint)}
+.frow{margin-bottom:10px}.fgrid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.flabel{font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:4px}
+.finput{width:100%;padding:9px 11px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none;background:var(--blanco)}
+.finput:focus{border-color:var(--azul)}
+.fact{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.msec{font-size:12px;font-weight:700;color:var(--azul-dark);margin:12px 0 6px;border-bottom:1px solid var(--borde);padding-bottom:4px}
+.doc-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px solid var(--borde);border-radius:9px;margin-bottom:8px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="hdr-l">
+    <div><div class="hdr-t">Control Administrativo</div><div class="hdr-s">AVBA · Personal y documentación</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="hdr-s" id="hdr-user"></span>
+    <button class="btn-logout" onclick="cerrarSesion()">Salir</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab-btn active" id="tabbtn-personal" onclick="verTab('personal',this)">👤 Personal AVBA</button>
+    <button class="tab-btn" disabled title="Próxima fase">🚗 Vehículos</button>
+    <button class="tab-btn" disabled title="Próxima fase">📁 Expediente por cliente</button>
+    <button class="tab-btn" disabled title="Próxima fase">⏰ Vencimientos</button>
+  </div>
+
+  <div id="tab-personal" class="tab-panel active">
+    <div class="stats">
+      <div class="stat"><div class="stat-n" id="s-total" style="color:var(--azul)">—</div><div class="stat-l">Empleados</div></div>
+      <div class="stat"><div class="stat-n" id="s-docs" style="color:var(--verde)">—</div><div class="stat-l">Documentos</div></div>
+      <div class="stat"><div class="stat-n" id="s-pv" style="color:var(--ambar)">—</div><div class="stat-l">Por vencer</div></div>
+      <div class="stat"><div class="stat-n" id="s-venc" style="color:var(--rojo)">—</div><div class="stat-l">Vencidos</div></div>
+    </div>
+    <div class="sec-hdr">
+      <div><h2 style="margin:0;font-size:18px;color:var(--azul-dark)">Personal interno de AVBA</h2>
+        <p style="margin:3px 0 0;font-size:13px;color:var(--texto-sub)">Empleados y su documentación con control de vigencias.</p></div>
+      <button class="btn-prim" onclick="abrirModalPer(null)">+ Nuevo empleado</button>
+    </div>
+    <div id="per-lista"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+</div>
+
+<!-- Modal empleado -->
+<div class="overlay" id="modal-per">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="modal-per-title">Nuevo empleado</div><button class="modal-close" onclick="cerrarModalPer()">✕</button></div>
+    <input type="hidden" id="per-id">
+    <div class="frow"><label class="flabel">Nombre completo *</label><input class="finput" id="per-nombre"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Puesto</label><input class="finput" id="per-puesto" placeholder="Ej: Inspector"></div>
+      <div class="frow"><label class="flabel">Tipo</label>
+        <select class="finput" id="per-tipo"><option value="">—</option><option>Inspector</option><option>Chofer</option><option>Administrativo</option><option>Técnico</option><option>Otro</option></select></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">No. de empleado</label><input class="finput" id="per-numemp"></div>
+      <div class="frow"><label class="flabel">Fecha de ingreso</label><input class="finput" id="per-ingreso" type="date"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Teléfono</label><input class="finput" id="per-tel"></div>
+      <div class="frow"><label class="flabel">Correo</label><input class="finput" id="per-correo" type="email"></div>
+    </div>
+    <div class="frow"><label class="flabel">Estatus</label><select class="finput" id="per-estado"><option>Activo</option><option>Baja</option><option>Licencia</option></select></div>
+    <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="per-notas" rows="2"></textarea></div>
+    <div class="fact"><button class="btn-sec" onclick="cerrarModalPer()">Cancelar</button><button class="btn-prim" onclick="guardarPer()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- Modal detalle / documentos -->
+<div class="overlay" id="modal-det">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-hdr"><div class="modal-title" id="det-nombre">Documentos</div><button class="modal-close" onclick="cerrarModalDet()">✕</button></div>
+    <div class="sec-hdr" style="margin-bottom:8px">
+      <div class="msec" style="margin:0;border:none">Documentos y vigencias</div>
+      <button class="btn-sec" onclick="abrirModalDoc(null)">+ Agregar documento</button>
+    </div>
+    <div id="det-docs"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+</div>
+
+<!-- Modal documento -->
+<div class="overlay" id="modal-doc">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="modal-doc-title">Agregar documento</div><button class="modal-close" onclick="cerrarModalDoc()">✕</button></div>
+    <input type="hidden" id="doc-id">
+    <div class="frow"><label class="flabel">Nombre del documento *</label><input class="finput" id="doc-nombre" placeholder="Ej: Licencia de manejo"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Tipo</label>
+        <select class="finput" id="doc-tipo"><option value="ine">INE</option><option value="licencia">Licencia</option><option value="contrato">Contrato</option><option value="imss">IMSS</option><option value="medico">Examen médico</option><option value="capacitacion">Capacitación / DC-3</option><option value="otro">Otro</option></select></div>
+      <div class="frow"><label class="flabel">Vigencia</label><input class="finput" id="doc-vigencia" type="date"></div>
+    </div>
+    <div class="frow"><label class="flabel">Archivo (imagen o PDF)</label><input class="finput" id="doc-archivo" type="file" accept="image/*,application/pdf"></div>
+    <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="doc-notas" rows="2"></textarea></div>
+    <div class="fact"><button class="btn-sec" onclick="cerrarModalDoc()">Cancelar</button><button class="btn-prim" id="doc-guardar-btn" onclick="guardarDoc()">Guardar</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'api/index.php';
+const _origFetch = window.fetch.bind(window);
+const _sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
+if (!_sesion.token) location.href = 'login.html';
+if (!['ADMINISTRATIVO','ADMIN'].includes(_sesion.rol)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
+document.getElementById('hdr-user').textContent = _sesion.nombre || _sesion.usuario || '';
+
+window.fetch = function(url, opts = {}) {
+  const t = _sesion.token || '';
+  const isApi = typeof url === 'string' && url.includes('api/index.php');
+  if (isApi) {
+    if (!opts.method || opts.method.toUpperCase() === 'GET') {
+      opts.headers = Object.assign({}, opts.headers || {}, {'Authorization':'Bearer '+t,'X-Token':t});
+    } else if (!(opts.body instanceof FormData)) {
+      try { const b = JSON.parse(opts.body||'{}'); if(!b.token) b.token=t; opts.body=JSON.stringify(b); } catch(_){}
+    }
+    return _origFetch(url, opts).then(r => { if (r.status===401){localStorage.removeItem('avba_session');setTimeout(()=>location.href='login.html',40);} return r; });
+  }
+  return _origFetch(url, opts);
+};
+
+function cerrarSesion(){ localStorage.removeItem('avba_session'); location.href='login.html'; }
+function esc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+let _toastT;
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove('show'),2600); }
+function verTab(id,btn){ document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.getElementById('tab-'+id).classList.add('active'); btn.classList.add('active'); }
+
+// ── Personal ──
+let _perData = [];
+async function cargarPersonal(){
+  const cont=document.getElementById('per-lista'); cont.innerHTML='<div class="loading"><span class="spin"></span></div>';
+  try{
+    const r=await fetch(API+'?action=LISTAR_AVBA_PERSONAL'); const d=await r.json();
+    if(d.status!=='success'){ cont.innerHTML=`<p style="color:var(--rojo);text-align:center;padding:20px">${esc(d.message||'Error.')}</p>`; return; }
+    _perData=d.personal||[]; renderPersonal(); actualizarStats();
+  }catch(_){ cont.innerHTML='<p style="color:var(--rojo);text-align:center;padding:20px">Error de red.</p>'; }
+}
+function actualizarStats(){
+  let docs=0,pv=0,vn=0;
+  _perData.forEach(p=>{docs+=p.total_docs;pv+=p.por_vencer;vn+=p.vencidos;});
+  document.getElementById('s-total').textContent=_perData.length;
+  document.getElementById('s-docs').textContent=docs;
+  document.getElementById('s-pv').textContent=pv;
+  document.getElementById('s-venc').textContent=vn;
+}
+function vigBadge(p){
+  if(p.vencidos>0) return `<span class="badge b-bad">⚠ ${p.vencidos} vencido${p.vencidos!==1?'s':''}</span>`;
+  if(p.por_vencer>0) return `<span class="badge b-warn">⏰ ${p.por_vencer} por vencer</span>`;
+  if(p.total_docs>0) return `<span class="badge b-ok">✔ Al día</span>`;
+  return `<span class="badge b-off">Sin documentos</span>`;
+}
+function renderPersonal(){
+  const cont=document.getElementById('per-lista');
+  if(!_perData.length){ cont.innerHTML='<div class="empty"><div class="empty-t">Sin empleados</div><div class="empty-s">Agrega el primer empleado interno.</div></div>'; return; }
+  cont.innerHTML='<div class="cards">'+_perData.map(p=>`
+    <div class="card">
+      <div class="card-top">
+        <div class="card-ico">👤</div>
+        <div style="flex:1;min-width:0">
+          <div class="card-nombre">${esc(p.nombre)}</div>
+          <div class="card-sub">${esc(p.puesto||p.tipo||'Empleado')}${p.num_empleado?' · '+esc(p.num_empleado):''}</div>
+        </div>
+        <span class="badge ${p.estado==='Activo'?'b-ok':(p.estado==='Baja'?'b-bad':'b-warn')}">${esc(p.estado)}</span>
+      </div>
+      <div class="card-body">
+        <div class="chips">
+          ${p.telefono?`<span class="chip">📞 ${esc(p.telefono)}</span>`:''}
+          ${p.correo?`<span class="chip">✉ ${esc(p.correo)}</span>`:''}
+          ${p.fecha_ingreso?`<span class="chip">📅 ${esc(p.fecha_ingreso)}</span>`:''}
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:12px;color:var(--texto-sub)">📄 ${p.total_docs} doc${p.total_docs!==1?'s':''}</span>
+          ${vigBadge(p)}
+        </div>
+      </div>
+      <div class="card-foot">
+        <button class="btn-prim" style="flex:1;font-size:12px;padding:8px" onclick="verDetalle(${p.id},'${esc(p.nombre).replace(/'/g,"\\'")}')">📁 Documentos</button>
+        <button class="btn-sec" onclick='abrirModalPer(${JSON.stringify(p).replace(/'/g,"&#39;")})'>✏</button>
+        <button class="btn-del" onclick="eliminarPer(${p.id},'${esc(p.nombre).replace(/'/g,"\\'")}')">🗑</button>
+      </div>
+    </div>`).join('')+'</div>';
+}
+function abrirModalPer(p){
+  document.getElementById('modal-per-title').textContent=p?'Editar empleado':'Nuevo empleado';
+  document.getElementById('per-id').value=p?p.id:'';
+  document.getElementById('per-nombre').value=p?(p.nombre||''):'';
+  document.getElementById('per-puesto').value=p?(p.puesto||''):'';
+  document.getElementById('per-tipo').value=p?(p.tipo||''):'';
+  document.getElementById('per-numemp').value=p?(p.num_empleado||''):'';
+  document.getElementById('per-ingreso').value=p&&p.fecha_ingreso?p.fecha_ingreso.split('/').reverse().join('-'):'';
+  document.getElementById('per-tel').value=p?(p.telefono||''):'';
+  document.getElementById('per-correo').value=p?(p.correo||''):'';
+  document.getElementById('per-estado').value=p?(p.estado||'Activo'):'Activo';
+  document.getElementById('per-notas').value=p?(p.notas||''):'';
+  document.getElementById('modal-per').classList.add('open');
+}
+function cerrarModalPer(){ document.getElementById('modal-per').classList.remove('open'); }
+async function guardarPer(){
+  const nombre=document.getElementById('per-nombre').value.trim();
+  if(!nombre){ toast('El nombre es requerido.'); return; }
+  const data={
+    id:+document.getElementById('per-id').value||0, nombre,
+    puesto:document.getElementById('per-puesto').value.trim(),
+    tipo:document.getElementById('per-tipo').value,
+    num_empleado:document.getElementById('per-numemp').value.trim(),
+    fecha_ingreso:document.getElementById('per-ingreso').value,
+    telefono:document.getElementById('per-tel').value.trim(),
+    correo:document.getElementById('per-correo').value.trim(),
+    estado:document.getElementById('per-estado').value,
+    notas:document.getElementById('per-notas').value.trim(),
+  };
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'GUARDAR_AVBA_PERSONAL',payload:data})});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return; }
+    cerrarModalPer(); toast('Empleado guardado.'); cargarPersonal();
+  }catch(_){ toast('Error de red.'); }
+}
+async function eliminarPer(id,nombre){
+  if(!confirm(`¿Eliminar a "${nombre}" y sus documentos?`)) return;
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'ELIMINAR_AVBA_PERSONAL',payload:{id}})});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return; }
+    toast('Empleado eliminado.'); cargarPersonal();
+  }catch(_){ toast('Error de red.'); }
+}
+
+// ── Documentos ──
+let _detPid=0;
+async function verDetalle(id,nombre){
+  _detPid=id;
+  document.getElementById('det-nombre').textContent='Documentos — '+nombre;
+  document.getElementById('modal-det').classList.add('open');
+  cargarDocs();
+}
+function cerrarModalDet(){ document.getElementById('modal-det').classList.remove('open'); cargarPersonal(); }
+async function cargarDocs(){
+  const cont=document.getElementById('det-docs'); cont.innerHTML='<div class="loading"><span class="spin"></span></div>';
+  try{
+    const r=await fetch(API+'?action=DETALLE_AVBA_PERSONAL&id='+_detPid); const d=await r.json();
+    if(d.status!=='success'){ cont.innerHTML=`<p style="color:var(--rojo)">${esc(d.message)}</p>`; return; }
+    renderDocs(d.docs||[]);
+  }catch(_){ cont.innerHTML='<p style="color:var(--rojo)">Error de red.</p>'; }
+}
+function docBadge(doc){
+  if(!doc.vigencia) return '<span class="badge b-off">Sin vigencia</span>';
+  if(+doc.vencido) return `<span class="badge b-bad">⚠ Vencido</span>`;
+  if(doc.dias!=null && +doc.dias<=30) return `<span class="badge b-warn">⏰ ${doc.dias}d</span>`;
+  return `<span class="badge b-ok">Vigente</span>`;
+}
+function renderDocs(docs){
+  const cont=document.getElementById('det-docs');
+  if(!docs.length){ cont.innerHTML='<div class="empty" style="padding:24px"><div class="empty-s">Sin documentos. Agrega el primero.</div></div>'; return; }
+  cont.innerHTML=docs.map(dc=>`
+    <div class="doc-row">
+      <div style="min-width:0">
+        <div style="font-weight:600;font-size:13px;color:var(--texto)">${esc(dc.nombre)} ${docBadge(dc)}</div>
+        <div style="font-size:11px;color:var(--texto-hint);margin-top:3px">${esc(dc.tipo_doc)}${dc.vigencia?' · vence '+esc(dc.vigencia):''}${dc.notas?' · '+esc(dc.notas):''}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${dc.archivo_url?`<a class="btn-sec" style="text-decoration:none" href="${esc(dc.archivo_url)}" target="_blank">Ver</a>`:''}
+        <button class="btn-del" onclick="eliminarDoc(${dc.id})">🗑</button>
+      </div>
+    </div>`).join('');
+}
+function abrirModalDoc(){
+  document.getElementById('doc-id').value='';
+  document.getElementById('doc-nombre').value='';
+  document.getElementById('doc-tipo').value='ine';
+  document.getElementById('doc-vigencia').value='';
+  document.getElementById('doc-archivo').value='';
+  document.getElementById('doc-notas').value='';
+  document.getElementById('modal-doc').classList.add('open');
+}
+function cerrarModalDoc(){ document.getElementById('modal-doc').classList.remove('open'); }
+async function guardarDoc(){
+  const nombre=document.getElementById('doc-nombre').value.trim();
+  if(!nombre){ toast('El nombre del documento es requerido.'); return; }
+  const fd=new FormData();
+  fd.append('action','SUBIR_DOC_AVBA_PERSONAL');
+  fd.append('personal_id',_detPid);
+  fd.append('nombre',nombre);
+  fd.append('tipo_doc',document.getElementById('doc-tipo').value);
+  fd.append('vigencia',document.getElementById('doc-vigencia').value);
+  fd.append('notas',document.getElementById('doc-notas').value.trim());
+  const f=document.getElementById('doc-archivo').files[0]; if(f) fd.append('archivo',f);
+  const btn=document.getElementById('doc-guardar-btn'); btn.disabled=true; btn.textContent='Subiendo…';
+  try{
+    const r=await _origFetch(API,{method:'POST',headers:{'X-Token':_sesion.token||''},body:fd});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return; }
+    cerrarModalDoc(); toast('Documento guardado.'); cargarDocs();
+  }catch(_){ toast('Error de red.'); }
+  finally{ btn.disabled=false; btn.textContent='Guardar'; }
+}
+async function eliminarDoc(id){
+  if(!confirm('¿Eliminar este documento?')) return;
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'ELIMINAR_DOC_AVBA_PERSONAL',payload:{id}})});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return; }
+    toast('Documento eliminado.'); cargarDocs();
+  }catch(_){ toast('Error de red.'); }
+}
+
+cargarPersonal();
+</script>
+</body>
+</html>

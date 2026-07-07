@@ -12,6 +12,12 @@ class Auth {
         $this->ensureFirmaColumn();
     }
 
+    /** Roles válidos (constante de config + roles nuevos garantizados). */
+    private function rolesValidos(): array {
+        $base = defined('ROLES_VALIDOS') ? ROLES_VALIDOS : ['ADMIN','INSPECTOR','CALIDAD','CERTIFICACIONES','CLIENTE'];
+        return array_values(array_unique(array_merge($base, ['ADMINISTRATIVO'])));
+    }
+
     private function ensureFirmaColumn(): void {
         try {
             $this->pdo->exec("ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS firma_imagen VARCHAR(500) NULL");
@@ -402,7 +408,7 @@ class Auth {
         if (!$usuario || !$password || !$rol || !$nombre) {
             return ['status' => 'error', 'message' => 'Todos los campos son obligatorios.'];
         }
-        if (!in_array($rol, ROLES_VALIDOS, true)) {
+        if (!in_array($rol, $this->rolesValidos(), true)) {
             return ['status' => 'error', 'message' => 'Rol inválido.'];
         }
         if ($rol === 'CLIENTE' && !$idCliente) {
@@ -450,7 +456,7 @@ class Auth {
         }
         if (isset($payload['rol'])) {
             $rol = strtoupper(trim($payload['rol']));
-            if (!in_array($rol, ROLES_VALIDOS, true)) return ['status' => 'error', 'message' => 'Rol inválido.'];
+            if (!in_array($rol, $this->rolesValidos(), true)) return ['status' => 'error', 'message' => 'Rol inválido.'];
             $sets[] = 'rol = ?';
             $params[] = $rol;
         }
