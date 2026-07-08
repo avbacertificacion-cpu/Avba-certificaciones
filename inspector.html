@@ -6,6 +6,7 @@
   <title>Inspector AVBA</title>
   <link rel="manifest" href="manifest.json">
   <script src="js/native-bridge.js"></script>
+  <script src="js/offline-sync.js"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
   <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
   <style>
@@ -619,6 +620,36 @@
       font-size: 13px;
       color: var(--texto-sub);
     }
+
+    /* ── Aviso de guardado offline (cola pendiente / borrador) ── */
+    .offline-banner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+    .offline-banner.show { display: flex; }
+    .offline-banner .ob-ico { font-size: 20px; flex-shrink: 0; }
+    .offline-banner .ob-txt { flex: 1; }
+    .offline-banner .ob-txt b { display: block; margin-bottom: 2px; }
+    .offline-banner button {
+      flex-shrink: 0;
+      padding: 7px 12px;
+      border-radius: 8px;
+      border: none;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .offline-banner.pendiente { background: #FEF3C7; color: #78350F; border: 1px solid #F0C040; }
+    .offline-banner.pendiente button { background: #78350F; color: #fff; }
+    .offline-banner.borrador  { background: #E6F1FB; color: #0C447C; border: 1px solid #A9CCEE; }
+    .offline-banner.borrador button.ob-continuar { background: #185FA5; color: #fff; }
+    .offline-banner.borrador button.ob-descartar { background: transparent; color: #0C447C; border: 1px solid #A9CCEE; margin-left: 6px; }
 
     .menu-grid {
       display: grid;
@@ -1382,6 +1413,16 @@
     <div class="menu-bienvenida-titulo">Bienvenido, <span id="menu-usuario">inspector</span></div>
     <div class="menu-bienvenida-sub">¿Con qué módulo deseas trabajar hoy?</div>
   </div>
+
+  <div class="offline-banner pendiente" id="banner-pendientes">
+    <div class="ob-ico">📶</div>
+    <div class="ob-txt">
+      <b id="banner-pendientes-txt">1 inspección pendiente de envío</b>
+      Se guardó en este dispositivo y se enviará sola en cuanto haya conexión.
+    </div>
+    <button onclick="reintentarPendientesAhora()">Reintentar ahora</button>
+  </div>
+
   <div class="menu-grid">
 
     <!-- Inspección -->
@@ -2096,6 +2137,18 @@
 <div id="pantalla-inspeccion">
 <div class="contenedor">
 
+  <div class="offline-banner borrador" id="banner-borrador">
+    <div class="ob-ico">💾</div>
+    <div class="ob-txt">
+      <b>Tienes una inspección sin terminar</b>
+      <span id="banner-borrador-txt">Se guardó automáticamente. ¿Deseas continuarla?</span>
+    </div>
+    <div>
+      <button class="ob-continuar" onclick="continuarBorrador()">Continuar</button>
+      <button class="ob-descartar" onclick="descartarBorrador()">Descartar</button>
+    </div>
+  </div>
+
   <!-- ══════════ PASO 1: DATOS ══════════ -->
   <div class="paso activo" id="paso1">
     <div class="card">
@@ -2769,8 +2822,10 @@ function abrirModulo(modulo) {
         el.addEventListener('input', () => {
           const f = el.closest('.field');
           if (f) { f.classList.remove('has-error'); el.classList.remove('err'); }
+          guardarBorradorDebounced();
         });
       });
+      revisarBorradorAlAbrir();
     }
     renderStepsBar(pasoActual);
 
@@ -2806,6 +2861,7 @@ function volverMenu() {
   document.getElementById('header-sub').textContent = 'Selecciona un módulo';
   document.getElementById('btn-volver-menu').style.display = 'none';
   document.getElementById('btn-logout').style.display = 'flex';
+  actualizarBadgePendientes();
 }
 
 /* ════════════════════════════════════════
@@ -3422,6 +3478,9 @@ window.onload = function () {
     btnAdmin.onclick = () => location.href = 'admin.html';
     document.getElementById('btn-logout').before(btnAdmin);
   }
+
+  actualizarBadgePendientes();
+  _iniciarReintentoAutomatico();
 };
 
 /* ════════════════════════════════════════
@@ -3477,6 +3536,8 @@ function irA(n) {
   }
   if (n === 5) renderPruebaCarga();
   if (n === 6) renderResumen();
+
+  guardarBorradorDebounced();
 }
 
 /* ════════════════════════════════════════
@@ -3692,6 +3753,7 @@ function pcGuardar() {
     });
   });
   pruebaCargaData = result;
+  guardarBorradorDebounced();
 }
 
 function toggleHorquillasSection() {
@@ -3778,6 +3840,7 @@ function marcar(btn, tag, valor) {
   btn.classList.add("sel");
   respuestasCheck[tag] = valor;
   actualizarCheckStats();
+  guardarBorradorDebounced();
 }
 
 function marcarBloque(seccion, valor) {
@@ -3792,6 +3855,7 @@ function marcarBloque(seccion, valor) {
     respuestasCheck[tag] = valor;
   });
   actualizarCheckStats();
+  guardarBorradorDebounced();
 }
 
 function actualizarCheckStats() {
@@ -3938,8 +4002,9 @@ function agregarEmail() {
   row.className = 'email-row';
   row.innerHTML = `
     <input type="email" class="email-input" placeholder="correo@empresa.com" autocomplete="email">
-    <button type="button" class="btn-rm-email" onclick="this.parentElement.remove()" title="Eliminar">×</button>`;
+    <button type="button" class="btn-rm-email" onclick="this.parentElement.remove(); guardarBorradorDebounced();" title="Eliminar">×</button>`;
   wrap.appendChild(row);
+  row.querySelector('input').addEventListener('input', guardarBorradorDebounced);
   row.querySelector('input').focus();
 }
 
@@ -3996,7 +4061,7 @@ function procesarFotosSeleccionadas() {
       const base64 = canvas.toDataURL("image/jpeg", 0.75).split(",")[1];
       fotosData.push({ base64, mimeType: "image/jpeg", nombre: file.name });
       procesadas++;
-      if (procesadas === aCargar.length) renderFotosGrid();
+      if (procesadas === aCargar.length) { renderFotosGrid(); guardarBorradorDebounced(); }
     };
     img.src = URL.createObjectURL(file);
   });
@@ -4007,6 +4072,7 @@ function eliminarFoto(e, idx) {
   e.stopPropagation();
   fotosData.splice(idx, 1);
   renderFotosGrid();
+  guardarBorradorDebounced();
 }
 
 /* ════════════════════════════════════════
@@ -4051,6 +4117,13 @@ function setProgreso(pct, stage) {
   document.getElementById("prog-stage").textContent = stage;
 }
 
+/** true si el error indica que no hubo forma de contactar al servidor (sin
+ *  conexión / se perdió a medio camino) — a diferencia de un error que el
+ *  servidor sí alcanzó a devolver (datos rechazados, validación, etc.). */
+function esFalloDeRed(err) {
+  return !navigator.onLine || (err instanceof TypeError);
+}
+
 async function enviarFormulario() {
   if (enviando) return;
   enviando = true;
@@ -4064,6 +4137,8 @@ async function enviarFormulario() {
   btnsPaso5.style.display = "none";
   cardProg.style.display  = "block";
   progBox.style.display   = "block";
+
+  let payload = null;
 
   try {
     setProgreso(20, "Obteniendo coordenadas...");
@@ -4079,7 +4154,7 @@ async function enviarFormulario() {
 
     setProgreso(60, "Enviando inspección...");
 
-    const payload = {
+    payload = {
       action: "NUEVA_INSPECCION",
       payload: {
         info: {
@@ -4134,11 +4209,22 @@ async function enviarFormulario() {
         folioEl.textContent = 'No. de control: ' + resultado.control;
         folioEl.style.display = 'block';
       }
+      await AvbaOffline.borrarBorrador('inspeccion');
     } else {
       throw new Error(resultado.message || "Error desconocido del servidor");
     }
 
   } catch (err) {
+    // Sin conexión: la inspección NO se pierde — se guarda en el dispositivo
+    // y se reintenta sola en cuanto vuelva la señal.
+    if (payload && esFalloDeRed(err)) {
+      await AvbaOffline.encolar('inspeccion', WEB_APP_URL, payload);
+      await AvbaOffline.borrarBorrador('inspeccion'); // ya está a salvo en la cola
+      enviando = false;
+      mostrarInspeccionEncolada();
+      actualizarBadgePendientes();
+      return;
+    }
     console.error("enviarFormulario:", err);
     enviando = false;
     cardProg.style.display  = "none";
@@ -4146,6 +4232,239 @@ async function enviarFormulario() {
     mostrarToast("Error al enviar: " + err.message, "err");
   }
 }
+
+/** Muestra la pantalla de éxito en modo "guardado, pendiente de envío". */
+function mostrarInspeccionEncolada() {
+  const cardProg   = document.getElementById("card-progress");
+  const progBox    = document.getElementById("progress-box");
+  const successBox = document.getElementById("success-box");
+  progBox.style.display = "none";
+
+  const icon  = successBox.querySelector(".success-icon");
+  const title = successBox.querySelector(".success-title");
+  const msg   = successBox.querySelector(".success-msg");
+  if (icon)  { icon.style.background = "#FEF3C7"; icon.style.color = "#78350F"; }
+  if (title) title.textContent = "Inspección guardada — sin conexión";
+  if (msg)   msg.innerHTML = "No se detectó conexión a internet. Tu inspección quedó guardada en este dispositivo y se enviará <strong>automáticamente</strong> en cuanto vuelva la señal — no necesitas repetirla.";
+  document.getElementById('success-folio').style.display = 'none';
+  successBox.style.display = "block";
+}
+
+/* ════════════════════════════════════════
+   BORRADOR AUTOMÁTICO (autoguardado)
+════════════════════════════════════════ */
+let _borradorTimer = null;
+function guardarBorradorDebounced() {
+  clearTimeout(_borradorTimer);
+  _borradorTimer = setTimeout(guardarBorradorInspeccion, 600);
+}
+
+async function guardarBorradorInspeccion() {
+  // Solo tiene sentido autoguardar si hay al menos un dato mínimo capturado.
+  const cliente = document.getElementById('cliente')?.value?.trim();
+  const maquinaria = document.getElementById('maquinaria')?.value?.trim();
+  if (!cliente && !maquinaria && !fotosData.length) return;
+
+  const latLngInsp = markers.insp ? markers.insp.getLatLng() : null;
+  const latLngEnv  = markers.env  ? markers.env.getLatLng()  : null;
+
+  const draft = {
+    paso: pasoActual,
+    guardado: Date.now(),
+    info: {
+      cliente:       document.getElementById("cliente")?.value || '',
+      cliente_id:    document.getElementById("cliente-id")?.value || '',
+      maquinaria:    document.getElementById("maquinaria")?.value || '',
+      marca:         document.getElementById("marca")?.value || '',
+      modelo:        document.getElementById("modelo")?.value || '',
+      serie:         document.getElementById("serie")?.value || '',
+      id_cliente:    document.getElementById("id_cliente")?.value || '',
+      capacidad:     document.getElementById("capacidad")?.value || '',
+      emails:        [...document.querySelectorAll('#emails-wrap .email-input')].map(i => i.value),
+      fecha:         document.getElementById("fecha")?.value || '',
+      comentarios:   document.getElementById("comentarios")?.value || '',
+      coords_insp:   latLngInsp ? { lat: latLngInsp.lat, lng: latLngInsp.lng } : null,
+      coords_envio:  latLngEnv  ? { lat: latLngEnv.lat,  lng: latLngEnv.lng }  : null,
+      dir_insp:      dirManual.insp || '',
+      dir_envio:     dirManual.env  || ''
+    },
+    checklist: { ...respuestasCheck },
+    prueba_carga: pruebaCargaData || {},
+    horquillas: {
+      marca:      document.getElementById('horquilla_marca')?.value    || '',
+      serie:      document.getElementById('horquilla_serie')?.value    || '',
+      capacidad:  document.getElementById('horquilla_capacidad')?.value || '',
+      centro_gravedad: document.getElementById('horquilla_cg')?.value  || ''
+    },
+    fotos: fotosData
+  };
+
+  await AvbaOffline.guardarBorrador('inspeccion', draft);
+}
+
+/** Revisa si hay un borrador guardado al entrar al módulo de Inspección. */
+async function revisarBorradorAlAbrir() {
+  const draft = await AvbaOffline.obtenerBorrador('inspeccion');
+  const banner = document.getElementById('banner-borrador');
+  if (!banner) return;
+  if (draft && (draft.info?.cliente || draft.info?.maquinaria || (draft.fotos || []).length)) {
+    const fecha = draft.guardado ? new Date(draft.guardado).toLocaleString('es-MX', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+    document.getElementById('banner-borrador-txt').textContent =
+      `Guardada automáticamente${fecha ? ' el ' + fecha : ''} — equipo: ${draft.info?.cliente || draft.info?.maquinaria || 'sin nombre'}.`;
+    banner.classList.add('show');
+    window._borradorPendiente = draft;
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+async function continuarBorrador() {
+  const draft = window._borradorPendiente;
+  if (!draft) return;
+  document.getElementById('banner-borrador').classList.remove('show');
+  await restaurarBorradorInspeccion(draft);
+}
+
+async function descartarBorrador() {
+  if (!confirm('¿Descartar la inspección sin terminar? Se perderá lo capturado.')) return;
+  await AvbaOffline.borrarBorrador('inspeccion');
+  document.getElementById('banner-borrador').classList.remove('show');
+  window._borradorPendiente = null;
+}
+
+async function restaurarBorradorInspeccion(draft) {
+  const info = draft.info || {};
+  document.getElementById('cliente').value      = info.cliente || '';
+  document.getElementById('cliente-id').value   = info.cliente_id || '';
+  document.getElementById('marca').value        = info.marca || '';
+  document.getElementById('modelo').value       = info.modelo || '';
+  document.getElementById('serie').value        = info.serie || '';
+  document.getElementById('id_cliente').value   = info.id_cliente || '';
+  document.getElementById('capacidad').value    = info.capacidad || '';
+  if (info.fecha) document.getElementById('fecha').value = info.fecha;
+  document.getElementById('comentarios').value  = info.comentarios || '';
+
+  // Correos: asegurar suficientes filas y llenarlas
+  const emails = (info.emails || []).filter(Boolean);
+  const wrap = document.getElementById('emails-wrap');
+  wrap.querySelectorAll('.email-input').forEach((inp, i) => { if (i > 0) inp.closest('div')?.remove() || inp.remove(); });
+  emails.forEach((val, i) => {
+    let inputs = wrap.querySelectorAll('.email-input');
+    if (i >= inputs.length) agregarEmail();
+    inputs = wrap.querySelectorAll('.email-input');
+    if (inputs[i]) inputs[i].value = val;
+  });
+
+  // Maquinaria: cargar catálogo si aún no está listo, luego seleccionar
+  await cargarMaquinaria();
+  if (info.maquinaria) document.getElementById('maquinaria').value = info.maquinaria;
+
+  // Ubicación: pre-cargar coordenadas para cuando se inicialice el mapa
+  if (info.coords_insp)  { pendingMapPos.insp = info.coords_insp; }
+  if (info.coords_envio) { pendingMapPos.env  = info.coords_envio; }
+  dirManual.insp = info.dir_insp  || '';
+  dirManual.env  = info.dir_envio || '';
+  const bInsp = document.getElementById('buscar-insp');
+  const bEnv  = document.getElementById('buscar-envio');
+  if (bInsp && dirManual.insp) bInsp.value = dirManual.insp;
+  if (bEnv  && dirManual.env)  bEnv.value  = dirManual.env;
+
+  // Horquillas
+  const h = draft.horquillas || {};
+  if (document.getElementById('horquilla_marca'))     document.getElementById('horquilla_marca').value = h.marca || '';
+  if (document.getElementById('horquilla_serie'))     document.getElementById('horquilla_serie').value = h.serie || '';
+  if (document.getElementById('horquilla_capacidad')) document.getElementById('horquilla_capacidad').value = h.capacidad || '';
+  if (document.getElementById('horquilla_cg'))        document.getElementById('horquilla_cg').value = h.centro_gravedad || '';
+
+  // Fotos
+  fotosData = Array.isArray(draft.fotos) ? draft.fotos : [];
+  renderFotosGrid();
+
+  // Checklist: renderizar según maquinaria y luego marcar respuestas guardadas
+  respuestasCheck = { ...(draft.checklist || {}) };
+  await actualizarChecklist();
+  document.querySelectorAll('.check-item').forEach(item => {
+    const tag = item.dataset.tag;
+    const val = respuestasCheck[tag];
+    if (!val) return;
+    const btn = item.querySelector(val === 'C' ? '.btn-c' : val === 'NC' ? '.btn-nc' : '.btn-na');
+    if (btn) btn.classList.add('sel');
+  });
+  actualizarCheckStats();
+
+  // Prueba de carga: renderizar formulario y luego rellenar valores guardados
+  pruebaCargaData = draft.prueba_carga || {};
+  renderPruebaCarga();
+  const selMaq = document.getElementById("maquinaria");
+  const optMaq = selMaq?.options[selMaq.selectedIndex];
+  const dictHtml = optMaq ? (optMaq.dataset.dictHtml || '') : '';
+  const tpl = PC_TEMPLATES[dictHtml];
+  if (tpl) {
+    (tpl.headerFields || []).forEach(f => {
+      const el = document.getElementById(`pc-header-${f.id}`);
+      if (el && pruebaCargaData[f.id] != null) el.value = pruebaCargaData[f.id];
+    });
+    tpl.rows.forEach(row => {
+      tpl.cols.forEach(c => {
+        const el = document.getElementById(`pc_${row.key}_${c.id}`);
+        const val = pruebaCargaData[row.key]?.[c.id];
+        if (el && val != null) el.value = val;
+      });
+    });
+    pcGuardar();
+  }
+
+  toggleHorquillasSection();
+  irA(draft.paso || 1);
+  mostrarToast('Inspección restaurada — continúa donde te quedaste.', 'ok');
+}
+
+/* ════════════════════════════════════════
+   COLA DE ENVÍOS PENDIENTES (auto-reintento)
+════════════════════════════════════════ */
+let _reintentoInterval = null;
+
+async function actualizarBadgePendientes() {
+  const n = await AvbaOffline.contarPendientes('inspeccion');
+  const banner = document.getElementById('banner-pendientes');
+  if (!banner) return;
+  if (n > 0) {
+    document.getElementById('banner-pendientes-txt').textContent =
+      n === 1 ? '1 inspección pendiente de envío' : `${n} inspecciones pendientes de envío`;
+    banner.classList.add('show');
+    _iniciarReintentoAutomatico();
+  } else {
+    banner.classList.remove('show');
+    if (_reintentoInterval) { clearInterval(_reintentoInterval); _reintentoInterval = null; }
+  }
+}
+
+function _iniciarReintentoAutomatico() {
+  if (_reintentoInterval) return;
+  // Reintento periódico de respaldo — 'online' no siempre es 100% confiable
+  // (p. ej. wifi conectado pero sin salida a internet real).
+  _reintentoInterval = setInterval(() => { reintentarPendientes(false); }, 45000);
+}
+
+async function reintentarPendientes(mostrarToastSiVacio) {
+  if (!navigator.onLine) return;
+  const antes = await AvbaOffline.contarPendientes('inspeccion');
+  if (antes === 0) { if (mostrarToastSiVacio) mostrarToast('No hay inspecciones pendientes.', 'info'); return; }
+
+  const enviados = await AvbaOffline.procesarPendientes('inspeccion', (item, status) => {
+    if (status === 'error') {
+      console.warn('[AvbaOffline] Pendiente rechazado por el servidor:', item.id);
+    }
+  });
+  await actualizarBadgePendientes();
+  if (enviados > 0) {
+    mostrarToast(enviados === 1 ? 'Inspección pendiente enviada.' : `${enviados} inspecciones pendientes enviadas.`, 'ok');
+  }
+}
+
+function reintentarPendientesAhora() { reintentarPendientes(true); }
+
+window.addEventListener('online', () => reintentarPendientes(false));
 
 /* ════════════════════════════════════════
    SERVICE WORKER (PWA)
