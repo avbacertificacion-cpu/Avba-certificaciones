@@ -1839,22 +1839,27 @@ async function cargarEquiposCli() {
 }
 
 async function cargarDashboardEq() {
+  let d;
   try {
     const r = await fetch(API + '?action=GET_DASHBOARD_EQUIPOS');
-    const d = await r.json();
-    if (d.status !== 'success') return;
-    document.getElementById('eq-s-total').textContent = d.total_equipos;
-    document.getElementById('eq-s-vig').textContent   = d.certs.vigentes;
-    document.getElementById('eq-s-vcr').textContent   = d.certs.por_vencer;
-    document.getElementById('eq-s-vcd').textContent   = d.certs.vencidas;
-    renderAlertas(d, 'eq-alertas');
-    renderFleetHealth(d, 'eq-fhs-card', 'eq-fhs-ring', 'eq-fhs-n', 'eq-fhs-legend', false);
-    renderStatusDist(d.equipos_por_estado || [], 'eq-status-dist', 'Estado de Flota');
-    renderChartCerts(d.certs);
-    renderChartTipos(d.equipos_por_tipo || []);
-    renderChartHoras(d.horas_equipos || []);
-    renderProximasVencer(d, 'eq-upcoming', 'equipo');
-  } catch(_) {}
+    d = await r.json();
+    if (!d || d.status !== 'success') return;
+  } catch(_) { return; }
+
+  const certs = d.certs || {};
+  const _set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  _set('eq-s-total', d.total_equipos ?? 0);
+  _set('eq-s-vig', certs.vigentes ?? 0);
+  _set('eq-s-vcr', certs.por_vencer ?? 0);
+  _set('eq-s-vcd', certs.vencidas ?? 0);
+
+  try { renderAlertas(d, 'eq-alertas'); } catch(_){}
+  try { renderFleetHealth(d, 'eq-fhs-card', 'eq-fhs-ring', 'eq-fhs-n', 'eq-fhs-legend', false); } catch(_){}
+  try { renderStatusDist(d.equipos_por_estado || [], 'eq-status-dist', 'Estado de Flota'); } catch(_){}
+  try { renderChartCerts(certs); } catch(_){ _chartMsg('chart-certs', 'Sin datos'); }
+  try { renderChartTipos(d.equipos_por_tipo || []); } catch(_){ _chartMsg('chart-tipos', 'Sin datos'); }
+  try { renderChartHoras(d.horas_equipos || []); } catch(_){ _chartMsg('chart-horas', 'Sin datos'); }
+  try { renderProximasVencer(d, 'eq-upcoming', 'equipo'); } catch(_){}
 }
 
 // ── Fleet Health Score gauge ───────────────────────────────────────────────
@@ -2008,11 +2013,19 @@ function renderChartTipos(tipos) {
   });
 }
 
+// Muestra un mensaje limpio en lugar de un canvas vacío.
+function _chartMsg(canvasId, msg) {
+  const c = document.getElementById(canvasId);
+  if (c && c.parentElement) c.parentElement.innerHTML =
+    `<p style="text-align:center;color:var(--texto-hint);padding:40px 0;font-size:12px">${msg}</p>`;
+}
 function renderChartGenerico(canvasId, items, labelKey, colorBase, chartRef) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return null;
-  if (!items || !items.length) { ctx.parentElement.innerHTML = '<p style="text-align:center;color:var(--texto-hint);padding:40px 0;font-size:12px">Sin datos</p>'; return null; }
-  if (chartRef) chartRef.destroy();
+  if (typeof Chart === 'undefined') { _chartMsg(canvasId, 'Gráfica no disponible'); return null; }
+  if (!items || !items.length) { _chartMsg(canvasId, 'Sin datos'); return null; }
+  if (chartRef) { try { chartRef.destroy(); } catch(_){} }
+  try {
   const PAL = ['#7c3aed','#db2777','#059669','#ea580c','#0284c7','#b45309','#dc2626','#0f766e'];
   return new Chart(ctx, {
     type: 'doughnut',
@@ -2023,6 +2036,7 @@ function renderChartGenerico(canvasId, items, labelKey, colorBase, chartRef) {
     options: { responsive: true, maintainAspectRatio: false,
       plugins: { legend: { position: 'right', labels: { font: { size: 10 }, padding: 6, boxWidth: 10 } } } }
   });
+  } catch(e) { _chartMsg(canvasId, 'Sin datos'); return null; }
 }
 
 async function cargarListaEq() {
@@ -2655,56 +2669,59 @@ async function cargarPersonalCli() {
 }
 
 async function cargarDashboardPer() {
+  let d;
   try {
     const r = await fetch(API + '?action=GET_DASHBOARD_PERSONAL');
-    const d = await r.json();
-    if (d.status !== 'success') return;
-    document.getElementById('per-s-total').textContent    = d.total_personal;
-    document.getElementById('per-s-activos').textContent  = d.activos    ?? '—';
-    document.getElementById('per-s-bajas').textContent    = d.bajas      ?? '—';
-    document.getElementById('per-s-vig').textContent      = d.certs.vigentes;
-    document.getElementById('per-s-vcr').textContent      = d.certs.por_vencer;
-    document.getElementById('per-s-vcd').textContent      = d.certs.vencidas;
-    document.getElementById('per-s-sin-fecha').textContent= d.certs.sin_fecha ?? '—';
-    document.getElementById('per-s-docs-vcr').textContent = (d.docs_por_vencer || []).length || '—';
-    renderAlertas(d, 'per-alertas-certs');
-    renderFleetHealth(d, 'per-fhs-card', 'per-fhs-ring', 'per-fhs-n', 'per-fhs-legend', true);
-    renderStatusDist(d.por_departamento || [], 'per-dept-dist', 'Por Departamento');
-    _chartCertsP = renderChartGenerico('chart-certs-per', [
-      {departamento:'Vigentes', total: d.certs.vigentes},
-      {departamento:'Por vencer', total: d.certs.por_vencer},
-      {departamento:'Vencidas', total: d.certs.vencidas},
-      {departamento:'Sin fecha', total: d.certs.sin_fecha},
-    ].filter(x => x.total > 0), 'departamento', '', _chartCertsP);
-    // Horizontal bar chart for departments
-    (function() {
-      const ctx = document.getElementById('chart-depts');
-      if (!ctx) return;
-      const items = d.por_departamento || [];
-      if (!items.length) { ctx.parentElement.innerHTML = '<p style="text-align:center;color:var(--texto-hint);padding:40px 0;font-size:12px">Sin datos</p>'; return; }
-      if (_chartDepts) _chartDepts.destroy();
+    d = await r.json();
+    if (!d || d.status !== 'success') return;
+  } catch(_) { return; }
+
+  const certs = d.certs || {};
+  const _set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+  _set('per-s-total', d.total_personal ?? 0);
+  _set('per-s-activos', d.activos ?? '—');
+  _set('per-s-bajas', d.bajas ?? '—');
+  _set('per-s-vig', certs.vigentes ?? 0);
+  _set('per-s-vcr', certs.por_vencer ?? 0);
+  _set('per-s-vcd', certs.vencidas ?? 0);
+  _set('per-s-sin-fecha', certs.sin_fecha ?? '—');
+  _set('per-s-docs-vcr', (d.docs_por_vencer || []).length || '—');
+
+  // Cada bloque aislado: un fallo no deja en blanco a los demás.
+  try { renderAlertas(d, 'per-alertas-certs'); } catch(_){}
+  try { renderFleetHealth(d, 'per-fhs-card', 'per-fhs-ring', 'per-fhs-n', 'per-fhs-legend', true); } catch(_){}
+  try { renderStatusDist(d.por_departamento || [], 'per-dept-dist', 'Por Departamento'); } catch(_){}
+
+  _chartCertsP = renderChartGenerico('chart-certs-per', [
+    {departamento:'Vigentes', total: certs.vigentes||0},
+    {departamento:'Por vencer', total: certs.por_vencer||0},
+    {departamento:'Vencidas', total: certs.vencidas||0},
+    {departamento:'Sin fecha', total: certs.sin_fecha||0},
+  ].filter(x => x.total > 0), 'departamento', '', _chartCertsP);
+
+  // Barras horizontales por departamento
+  (function() {
+    const ctx = document.getElementById('chart-depts');
+    if (!ctx) return;
+    if (typeof Chart === 'undefined') { _chartMsg('chart-depts', 'Gráfica no disponible'); return; }
+    const items = d.por_departamento || [];
+    if (!items.length) { _chartMsg('chart-depts', 'Sin datos'); return; }
+    try {
+      if (_chartDepts) { try { _chartDepts.destroy(); } catch(_){} }
       const PAL = ['#7c3aed','#db2777','#059669','#ea580c','#0284c7','#b45309','#dc2626','#0f766e'];
       _chartDepts = new Chart(ctx, {
         type: 'bar',
-        data: {
-          labels: items.map(i => i.departamento),
-          datasets: [{ data: items.map(i => i.total), backgroundColor: PAL.slice(0, items.length), borderWidth: 0, borderRadius: 4 }]
-        },
-        options: {
-          indexAxis: 'y',
-          responsive: true,
-          maintainAspectRatio: false,
+        data: { labels: items.map(i => i.departamento),
+          datasets: [{ data: items.map(i => i.total), backgroundColor: PAL.slice(0, items.length), borderWidth: 0, borderRadius: 4 }] },
+        options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false,
           plugins: { legend: { display: false } },
-          scales: {
-            x: { ticks: { font: { size: 10 }, stepSize: 1 }, grid: { display: false } },
-            y: { ticks: { font: { size: 10 } } }
-          }
-        }
+          scales: { x: { ticks: { font: { size: 10 }, stepSize: 1 }, grid: { display: false } }, y: { ticks: { font: { size: 10 } } } } }
       });
-    })();
-    _chartPuestos = renderChartGenerico('chart-puestos', d.por_puesto       || [], 'puesto',       '', _chartPuestos);
-    renderProximasVencer(d, 'per-upcoming', 'personal');
-  } catch(_) {}
+    } catch(e) { _chartMsg('chart-depts', 'Sin datos'); }
+  })();
+
+  _chartPuestos = renderChartGenerico('chart-puestos', d.por_puesto || [], 'puesto', '', _chartPuestos);
+  try { renderProximasVencer(d, 'per-upcoming', 'personal'); } catch(_){}
 }
 
 async function cargarListaPer() {
