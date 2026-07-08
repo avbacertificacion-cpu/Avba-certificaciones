@@ -2354,7 +2354,7 @@ function ver(fila) {
     <div class="field"><label>Modelo</label>     <input id="e-modelo"    value="${esc(d.modelo)}"     ${dis}></div>
     <div class="field"><label>No. de serie</label><input id="e-serie"   value="${esc(d.serie)}"      ${dis}></div>
     <div class="field"><label>ID del equipo</label><input id="e-id"     value="${esc(d.id_equipo || '')}" ${dis}></div>
-    <div class="field"><label>Fecha</label>       <input id="e-fecha"   value="${esc(d.fecha)}"      ${dis}></div>
+    <div class="field"><label>Fecha</label>       <input id="e-fecha" type="date" value="${esc(_fechaDdmmToIso(d.fecha))}" ${dis}></div>
     <div class="field"><label>Capacidad</label>   <input id="e-capacidad" value="${esc(d.capacidad || '')}" ${dis}></div>
   </div>`;
 
@@ -2540,6 +2540,12 @@ function esc(v) {
     .replace(/>/g,"&gt;");
 }
 
+/* Convierte dd/mm/aaaa (formato de despliegue) a aaaa-mm-dd (valor de <input type="date">) */
+function _fechaDdmmToIso(v) {
+  const m = (v || "").match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
+}
+
 /* Recalcular ángulo y altura al editar radio o pluma en prueba de carga */
 function pcCalidadRecalc() {
   const rowKeys = new Set();
@@ -2623,7 +2629,12 @@ async function guardar() {
 
     if (data.status === "success") {
       const d = datosGlobal.find(x => x.fila === filaActual);
-      if (d) Object.assign(d, payload);
+      if (d) {
+        Object.assign(d, payload);
+        // payload.fecha viene en aaaa-mm-dd (input type=date); normalizar a dd/mm/aaaa para la vista
+        const mIso = (payload.fecha || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (mIso) d.fecha = `${mIso[3]}/${mIso[2]}/${mIso[1]}`;
+      }
       cerrarDet();
       render(datosGlobal);
       mostrarToast("Cambios guardados correctamente", "ok");

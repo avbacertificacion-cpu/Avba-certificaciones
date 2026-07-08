@@ -726,7 +726,6 @@
         <div class="sec-label">Datos del equipo</div>
         <div class="grid2">
           <div class="field"><label>Cliente</label>    <input id="d-cliente"    disabled></div>
-          <div class="field"><label>Correo</label>     <input id="d-correo"     disabled></div>
           <div class="field"><label>Maquinaria</label> <input id="d-maquinaria" disabled></div>
           <div class="field"><label>Marca</label>      <input id="d-marca"      disabled></div>
           <div class="field"><label>Modelo</label>     <input id="d-modelo"     disabled></div>
@@ -734,6 +733,18 @@
           <div class="field"><label>ID del equipo</label><input id="d-id"         disabled></div>
           <div class="field"><label>Fecha certif.</label><input id="d-fecha"      disabled></div>
           <div class="field"><label>Capacidad</label>    <input id="d-capacidad"  disabled></div>
+        </div>
+        <div class="field" style="margin-top:8px">
+          <label>Correo(s) del cliente <span style="font-weight:400;color:var(--texto-hint)">(Enter o coma para agregar más)</span></label>
+          <div style="display:flex;gap:8px;align-items:flex-start">
+            <div id="d-correo-wrap" style="flex:1;display:flex;flex-wrap:wrap;gap:5px;padding:6px 8px;border:1.5px solid var(--borde);border-radius:8px;background:#fff;min-height:38px;cursor:text;" onclick="document.getElementById('d-correo-input').focus()">
+              <div id="d-correo-chips" style="display:contents"></div>
+              <input type="email" id="d-correo-input" placeholder="correo@ejemplo.com"
+                style="border:none;outline:none;font-size:13px;min-width:160px;flex:1;padding:1px 3px;background:transparent">
+            </div>
+            <button id="d-correo-guardar" onclick="guardarCorreoCliente()"
+              style="padding:9px 14px;border-radius:8px;border:none;background:var(--azul);color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">Guardar</button>
+          </div>
         </div>
         <div class="sec-label">Ubicación de inspección</div>
         <div class="field"><input id="d-direccion" disabled></div>
@@ -1232,7 +1243,7 @@ function ver(fila) {
 
   // Tab INFO
   document.getElementById("d-cliente").value    = d.cliente    || "";
-  document.getElementById("d-correo").value     = d.correo     || "";
+  _detCorreoInit(d.correo || "");
   document.getElementById("d-maquinaria").value = d.maquinaria || "";
   document.getElementById("d-marca").value      = d.marca      || "";
   document.getElementById("d-modelo").value     = d.modelo     || "";
@@ -1341,6 +1352,86 @@ function ver(fila) {
   document.getElementById("overlay-det").classList.add("open");
 
   // Mapa (se inicializa al abrir tab)
+}
+
+/* ═══════════════════════════════
+   CORREO(S) DEL CLIENTE (editable, multi)
+═══════════════════════════════ */
+let _detCorreos = [];
+
+function _detCorreoInit(correoStr) {
+  _detCorreos = (correoStr || "").split(",").map(s => s.trim()).filter(Boolean);
+  document.getElementById("d-correo-chips").innerHTML = "";
+  document.getElementById("d-correo-input").value = "";
+  _detCorreos.forEach(_detCorreoRenderChip);
+  document.getElementById("d-correo-input").onkeydown = (e) => {
+    if (e.key === "Enter" || e.key === "," || e.key === " ") {
+      e.preventDefault();
+      _detCorreoAddChip(e.target.value);
+    } else if (e.key === "Backspace" && !e.target.value && _detCorreos.length) {
+      const last = _detCorreos[_detCorreos.length - 1];
+      document.getElementById("d-correo-chips").lastElementChild?.remove();
+      _detCorreos = _detCorreos.filter(c => c !== last);
+    }
+  };
+  document.getElementById("d-correo-input").onblur = (e) => {
+    if (e.target.value.trim()) _detCorreoAddChip(e.target.value);
+  };
+}
+
+function _detCorreoRenderChip(email) {
+  const chip = document.createElement("div");
+  chip.style.cssText = "display:inline-flex;align-items:center;gap:4px;background:#e8f0fe;color:#1a56db;border-radius:20px;padding:2px 10px 2px 10px;font-size:12px;max-width:100%;";
+  chip.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${email}</span><span onclick="_detCorreoRemoveChip(this,'${email}')" style="cursor:pointer;font-size:14px;line-height:1;color:#1a56db;margin-left:2px">×</span>`;
+  document.getElementById("d-correo-chips").appendChild(chip);
+}
+
+function _detCorreoAddChip(email) {
+  email = email.trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { document.getElementById("d-correo-input").value = ""; return; }
+  if (_detCorreos.includes(email)) { document.getElementById("d-correo-input").value = ""; return; }
+  _detCorreos.push(email);
+  _detCorreoRenderChip(email);
+  document.getElementById("d-correo-input").value = "";
+}
+
+function _detCorreoRemoveChip(span, email) {
+  _detCorreos = _detCorreos.filter(c => c !== email);
+  span.parentElement.remove();
+}
+
+async function guardarCorreoCliente() {
+  if (!registroActual) return;
+  // Si quedó texto sin confirmar en el input, inclúyelo
+  const pendiente = document.getElementById("d-correo-input").value.trim();
+  if (pendiente) _detCorreoAddChip(pendiente);
+
+  const correo = _detCorreos.join(",");
+  const btn = document.getElementById("d-correo-guardar");
+  btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  btn.textContent = "Guardando…";
+  try {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ACTUALIZAR_CALIDAD", payload: { fila: registroActual.fila, correo } })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      registroActual.correo = correo;
+      const d = datosGlobal.find(x => x.fila === registroActual.fila);
+      if (d) d.correo = correo;
+      mostrarToast("Correo(s) actualizado.", "ok");
+    } else {
+      mostrarToast("Error al guardar: " + (data.message || "Error desconocido"), "err");
+    }
+  } catch (e) {
+    mostrarToast("Error de conexión al guardar.", "err");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
 }
 
 /* ═══════════════════════════════

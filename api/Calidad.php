@@ -113,6 +113,23 @@ class Calidad {
             }
         }
 
+        // Fecha de inspección: el frontend envía 'fecha' en dd/mm/aaaa (o aaaa-mm-dd)
+        if (array_key_exists('fecha', $payload) && trim((string)$payload['fecha']) !== '') {
+            $fechaRaw = trim((string)$payload['fecha']);
+            $fechaDb  = null;
+            if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/', $fechaRaw, $m)) {
+                $fechaDb = "{$m[3]}-{$m[2]}-{$m[1]}";
+            } elseif (preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaRaw)) {
+                $fechaDb = $fechaRaw;
+            }
+            if ($fechaDb === null) {
+                return ['status' => 'error', 'message' => 'Formato de fecha inválido. Usa dd/mm/aaaa.'];
+            }
+            $sets[]   = '`fecha_inspeccion` = ?';
+            $params[] = $fechaDb;
+            registrarHistorial($this->pdo, $usuario, $id, 'fecha_inspeccion', $row['fecha_inspeccion'] ?? null, $fechaDb);
+        }
+
         // QR manual
         if (!empty($payload['qr_codigo'])) {
             $sets[]  = '`qr_codigo` = ?';
