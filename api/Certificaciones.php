@@ -1234,10 +1234,21 @@ body { background:#fff!important; }
         //    trabajo si falta). Sin cálculos geométricos: las cargas se aplican en
         //    vertical, sin ángulo de trabajo ni radio de operación.
         if (strpos($html, '{pc_izaje_cml}') !== false) {
-            $cml    = trim((string)($pc['cml'] ?? ''));
-            $prueba = ($cml !== '' && is_numeric($cml)) ? (string)((float)$cml * 2) : '';
             $rowSobre = is_array($pc['sobrecarga'] ?? null) ? $pc['sobrecarga'] : [];
             $rowTrab  = is_array($pc['trabajo']    ?? null) ? $pc['trabajo']    : [];
+
+            // CML: valor único a nivel raíz (formato actual). Compatibilidad con
+            // registros guardados antes de este cambio, cuando CML/Carga de Prueba
+            // se pedían repetidos dentro de cada fila.
+            $cml = trim((string)($pc['cml'] ?? ''));
+            if ($cml === '') {
+                $cml = trim((string)($rowSobre['cml'] ?? '')) ?: trim((string)($rowTrab['cml'] ?? ''));
+            }
+            $prueba = ($cml !== '' && is_numeric($cml)) ? (string)((float)$cml * 2) : '';
+            if ($prueba === '') {
+                // Registros antiguos: usar la carga de prueba tal como se guardó.
+                $prueba = trim((string)($rowSobre['prueba'] ?? '')) ?: trim((string)($rowTrab['prueba'] ?? ''));
+            }
             $duracion    = trim((string)($rowSobre['duracion']    ?? '')) ?: trim((string)($rowTrab['duracion']    ?? ''));
             $deformacion = trim((string)($rowSobre['deformacion'] ?? '')) ?: trim((string)($rowTrab['deformacion'] ?? ''));
 
