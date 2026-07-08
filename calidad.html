@@ -2406,6 +2406,17 @@ function ver(fila) {
     const inpBase  = 'width:100%;min-width:55px;padding:4px 6px;border:1px solid var(--borde);border-radius:5px;font-size:12px;text-align:center;box-sizing:border-box';
 
     body += `<div class="sec-label">Prueba de Carga${def ? ' — ' + def.label : ''}</div>`;
+
+    // Campos "raíz" (no repetidos por fila): tipo_plataforma, CML, carga de prueba, etc.
+    const rootFields = Object.keys(pcData).filter(k => k !== 'plantilla' && (pcData[k] === null || typeof pcData[k] !== 'object'));
+    if (rootFields.length) {
+      body += `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--texto-sub)">`;
+      rootFields.forEach(k => {
+        body += `<div><strong style="color:var(--texto)">${PC_LABELS[k] || k}:</strong> ${esc(pcData[k]) || '—'}</div>`;
+      });
+      body += `</div>`;
+    }
+
     body += `<div style="overflow-x:auto;margin-bottom:8px"><table style="width:100%;border-collapse:collapse;font-size:12px">`;
     body += `<thead><tr>`;
     body += `<th style="${thStyle};text-align:left;padding-left:10px">Prueba</th>`;

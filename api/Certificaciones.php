@@ -1226,6 +1226,26 @@ body { background:#fff!important; }
                 : str_replace('{pc_obs_altura} m', 'NA', $html);
         }
 
+        // 6. Elementos de izaje: CML y Carga de Prueba son propiedades del elemento
+        //    (constantes, capturadas una sola vez — no por fila). Duración y
+        //    deformación se toman de la prueba de sobrecarga (o de trabajo si falta).
+        //    Sin cálculos: las cargas se aplican en vertical, sin ángulo de trabajo
+        //    ni radio de operación — solo se pasan los datos tal como los registra
+        //    el inspector.
+        if (strpos($html, '{pc_izaje_cml}') !== false) {
+            $cml    = trim((string)($pc['cml']    ?? ''));
+            $prueba = trim((string)($pc['prueba'] ?? ''));
+            $rowSobre = is_array($pc['sobrecarga'] ?? null) ? $pc['sobrecarga'] : [];
+            $rowTrab  = is_array($pc['trabajo']    ?? null) ? $pc['trabajo']    : [];
+            $duracion    = trim((string)($rowSobre['duracion']    ?? '')) ?: trim((string)($rowTrab['duracion']    ?? ''));
+            $deformacion = trim((string)($rowSobre['deformacion'] ?? '')) ?: trim((string)($rowTrab['deformacion'] ?? ''));
+
+            $html = str_replace('{pc_izaje_cml}',         $cml    !== '' ? number_format((float)$cml, 2)    : 'NA', $html);
+            $html = str_replace('{pc_izaje_prueba}',      $prueba !== '' ? number_format((float)$prueba, 2) : 'NA', $html);
+            $html = str_replace('{pc_izaje_duracion}',    $duracion    !== '' ? $e($duracion)    : 'NA', $html);
+            $html = str_replace('{pc_izaje_deformacion}', $deformacion !== '' ? $e($deformacion) : 'NA', $html);
+        }
+
         return $html;
     }
 

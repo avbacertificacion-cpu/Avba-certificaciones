@@ -2685,10 +2685,15 @@ const PC_TEMPLATES = {
   },
   'dictamen_izaje.html': {
     label: 'Elemento de Izaje',
+    // CML y Carga de Prueba son propiedades del elemento (constantes): se capturan
+    // UNA sola vez, no por fila. Las cargas se aplican en vertical — sin ángulo de
+    // trabajo ni radio de operación — por eso no hay columnas calculadas aquí.
+    headerFields: [
+      { id:'cml',    label:'CML (Carga de Trabajo)',  unit:'ton' },
+      { id:'prueba', label:'Carga de Prueba (2×CML)',  unit:'ton' },
+    ],
     rows: [{ key:'trabajo', label:'Carga de Trabajo' }, { key:'sobrecarga', label:'Prueba de Sobrecarga' }],
     cols: [
-      { id:'cml',          label:'CML (Carga de Trabajo)',   unit:'ton' },
-      { id:'prueba',       label:'Carga de Prueba (2×CML)',  unit:'ton' },
       { id:'duracion',     label:'Duración',                 unit:'min' },
       { id:'deformacion',  label:'Deformación posterior',    unit:'mm'  },
       { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
@@ -3564,6 +3569,17 @@ function renderPruebaCarga() {
       <span style="font-size:11px;color:var(--texto-hint)">define el diagrama de la prueba de carga</span>
     </div>`;
   }
+  if (tpl.headerFields && tpl.headerFields.length) {
+    html += `<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;padding:10px 12px;background:var(--gris-bg);border-radius:8px">`;
+    tpl.headerFields.forEach(f => {
+      const val = (pruebaCargaData && pruebaCargaData[f.id]) || '';
+      html += `<div style="display:flex;align-items:center;gap:6px">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);white-space:nowrap">${f.label}${f.unit ? ' ('+f.unit+')' : ''}</label>
+        <input type="text" id="pc-header-${f.id}" value="${val}" oninput="pcGuardar()" style="width:95px;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:13px;text-align:center">
+      </div>`;
+    });
+    html += `<span style="font-size:11px;color:var(--texto-hint)">valor único, no se repite por fila</span></div>`;
+  }
   html += `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">`;
   html += `<thead><tr>`;
   html += `<th style="padding:7px 10px;background:var(--azul-dark);color:#fff;text-align:left;border-right:1px solid rgba(255,255,255,.15);font-size:11px">Prueba</th>`;
@@ -3638,6 +3654,12 @@ function pcGuardar() {
   if (tpl.platformSelect) {
     const tpEl = document.getElementById('pc-tipo-plataforma');
     if (tpEl) result.tipo_plataforma = tpEl.value;
+  }
+  if (tpl.headerFields) {
+    tpl.headerFields.forEach(f => {
+      const el = document.getElementById(`pc-header-${f.id}`);
+      result[f.id] = el ? el.value.trim() : '';
+    });
   }
   tpl.rows.forEach(row => {
     // Leer radio y pluma para calcular campos derivados

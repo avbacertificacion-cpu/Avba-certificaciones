@@ -414,55 +414,55 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     <div class="sec-body" style="padding:0">
       <table class="pc-header-strip" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
         <td class="pc-equip-cell"><div class="pc-equip-lbl">Equipo Inspeccionado</div><div class="pc-equip-val">{tipo_maquinaria} · {marca} {modelo}</div></td>
-        <td class="pc-equip-cell" style="width:110px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Capacidad Nominal</div><div class="pc-equip-val">{capacidad}</div></td>
-        <td class="pc-equip-cell" style="width:115px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Peso de Prueba</div><div class="pc-equip-val">42.5 TON</div></td>
-        <td class="pc-equip-cell" style="width:120px;border-right:none;"><div class="pc-equip-lbl">Fecha de Prueba</div><div class="pc-equip-val">{fecha_inspeccion}</div></td>
+        <td class="pc-equip-cell" style="width:100px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Capacidad Nominal</div><div class="pc-equip-val">{capacidad}</div></td>
+        <td class="pc-equip-cell" style="width:110px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">CML (Carga de Trabajo)</div><div class="pc-equip-val">{pc_izaje_cml} TON</div></td>
+        <td class="pc-equip-cell" style="width:120px;border-right:1px solid #cdd8e3;"><div class="pc-equip-lbl">Carga de Prueba (2×CML)</div><div class="pc-equip-val">{pc_izaje_prueba} TON</div></td>
+        <td class="pc-equip-cell" style="width:110px;border-right:none;"><div class="pc-equip-lbl">Fecha de Prueba</div><div class="pc-equip-val">{fecha_inspeccion}</div></td>
       </tr></table>
       <table class="pc-table">
         <thead><tr class="pc-thead-row">
-          <th style="width:16%;text-align:left;padding-left:12px">Prueba<br><span class="pc-thead-sub">Test</span></th>
-          <th style="width:12%">Peso de Prueba<br><span class="pc-thead-sub">Test Load</span></th>
-          <th style="width:14%">Radio de Operación<br><span class="pc-thead-sub">Operation Radius</span></th>
-          <th style="width:14%">Longitud de Pluma<br><span class="pc-thead-sub">Boom Length</span></th>
-          <th style="width:14%">Ángulo de Trabajo<br><span class="pc-thead-sub">Working Angle (calc.)</span></th>
-          <th style="width:14%">Altura de Izaje<br><span class="pc-thead-sub">Hoisting Height (calc.)</span></th>
-          <th style="width:14%">Resultado<br><span class="pc-thead-sub">Result</span></th>
+          <th style="width:28%;text-align:left;padding-left:12px">Prueba<br><span class="pc-thead-sub">Test</span></th>
+          <th style="width:24%">Duración<br><span class="pc-thead-sub">Duration</span></th>
+          <th style="width:24%">Deformación Posterior<br><span class="pc-thead-sub">Post-test Deformation</span></th>
+          <th style="width:24%">Resultado<br><span class="pc-thead-sub">Result</span></th>
         </tr></thead>
         <tbody>
           <tr class="pc-row-sin">
-            <td class="pc-td-desc"><span class="pc-test-badge pc-badge-sin"><svg style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;" viewBox="0 0 12 12"><rect width="12" height="12" rx="1" fill="#f0f4f8" stroke="#cdd8e3" stroke-width="1.2"/></svg> Sin Carga</span></td>
-            <td class="pc-td" style="color:#94a3b8;font-style:italic;font-size:7.5pt">—</td>
-            <td class="pc-td" style="color:#64748b;font-style:italic;font-size:7.5pt">— (pluma vertical)</td>
-            <td class="pc-td"><div style="font-weight:700;color:#0B2545">10.8 m</div><span class="pc-input-hint">↑ ingresado</span></td>
-            <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">90°</span></div><span class="pc-input-hint">pluma vertical</span></td>
-            <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">10.8</span><span class="pc-calc-unit">m</span></div><span class="pc-input-hint">= longitud pluma</span></td>
+            <td class="pc-td-desc"><span class="pc-test-badge pc-badge-sin"><svg style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;" viewBox="0 0 12 12"><rect width="12" height="12" rx="1" fill="#f0f4f8" stroke="#cdd8e3" stroke-width="1.2"/></svg> Carga de Trabajo</span></td>
+            <td class="pc-td"><div style="font-weight:700;color:#0B2545">10 min</div><span class="pc-input-hint">↑ ingresado</span></td>
+            <td class="pc-td"><div style="font-weight:700;color:#0B2545">0.0 mm</div><span class="pc-input-hint">↑ ingresado</span></td>
             <td class="pc-td"><span class="pc-ok-badge">✔ CUMPLE</span></td>
           </tr>
           <tr class="pc-row-con">
-            <td class="pc-td-desc"><span class="pc-test-badge pc-badge-con"><svg style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;" viewBox="0 0 12 12"><rect width="12" height="12" rx="1" fill="#fff8e1" stroke="#f0c040" stroke-width="1.5"/></svg> Con Carga</span></td>
-            <td class="pc-td"><div style="font-weight:800;color:#1e5fa8;font-size:9pt">42.5<span style="font-size:7pt;font-weight:600;color:#64748b;margin-left:2px">TON</span></div><span class="pc-input-hint">↑ ingresado</span></td>
-            <td class="pc-td"><div style="font-weight:700;color:#1e5fa8">6.0 m</div><span class="pc-input-hint">↑ ingresado</span></td>
-            <td class="pc-td"><div style="font-weight:700;color:#1e5fa8">10.8 m</div><span class="pc-input-hint">↑ ingresado</span></td>
-            <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">56.3°</span></div><span class="pc-input-hint">arccos(r/L)</span></td>
-            <td class="pc-td"><div class="pc-calc"><span class="pc-calc-val">8.98</span><span class="pc-calc-unit">m</span></div><span class="pc-input-hint">√(L²−r²)</span></td>
+            <td class="pc-td-desc"><span class="pc-test-badge pc-badge-con"><svg style="width:12px;height:12px;display:inline-block;vertical-align:middle;margin-right:2px;" viewBox="0 0 12 12"><rect width="12" height="12" rx="1" fill="#fff8e1" stroke="#f0c040" stroke-width="1.5"/></svg> Prueba de Sobrecarga</span></td>
+            <td class="pc-td"><div style="font-weight:700;color:#1e5fa8">10 min</div><span class="pc-input-hint">↑ ingresado</span></td>
+            <td class="pc-td"><div style="font-weight:700;color:#1e5fa8">0.0 mm</div><span class="pc-input-hint">↑ ingresado</span></td>
             <td class="pc-td"><span class="pc-ok-badge">✔ CUMPLE</span></td>
           </tr>
         </tbody>
       </table>
       <table class="pc-diagram-row" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;background:linear-gradient(135deg,#f4f8ff,#e8f0fb);" cellpadding="0" cellspacing="0">
         <tr>
-          <td rowspan="2" style="width:175px;padding:6px;border-right:1px solid #cdd8e3;vertical-align:middle;text-align:center;">{pc_crane_svg}</td>
-          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;border-right:1px solid #cdd8e3;"><div class="pc-diag-lbl">Radio de Operación <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">{pc_diag_radio}<span class="unit">m</span></div></td>
-          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;border-right:none;"><div class="pc-diag-lbl">Longitud de Pluma <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">{pc_diag_pluma}<span class="unit">m</span></div></td>
+          <td rowspan="2" style="width:110px;padding:6px;border-right:1px solid #cdd8e3;vertical-align:middle;text-align:center;">
+            <svg width="54" height="72" viewBox="0 0 54 72" fill="none">
+              <rect x="6" y="3" width="42" height="7" rx="2" fill="#0B2545"/>
+              <line x1="27" y1="10" x2="27" y2="44" stroke="#0B2545" stroke-width="2.5"/>
+              <path d="M27 44c-6 0-10 4-10 9s4 8 9 8" stroke="#C49A28" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+              <rect x="8" y="56" width="38" height="13" rx="2" fill="#1e5fa8"/>
+            </svg>
+            <div style="font-size:6pt;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.3px;margin-top:3px">Carga Vertical<br>Sin Ángulo</div>
+          </td>
+          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;border-right:1px solid #cdd8e3;"><div class="pc-diag-lbl">CML <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">{pc_izaje_cml}<span class="unit">ton</span></div></td>
+          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;border-right:none;"><div class="pc-diag-lbl">Carga de Prueba (2×CML) <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">{pc_izaje_prueba}<span class="unit">ton</span></div></td>
         </tr>
         <tr>
-          <td class="pc-diag-cell" style="border-right:1px solid #cdd8e3;border-bottom:none;"><div class="pc-diag-lbl">Ángulo de Trabajo <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:#C49A28">{pc_diag_angulo}<span class="unit">°</span></div><div class="pc-diag-badge">✔ arccos(r / L)</div></td>
-          <td class="pc-diag-cell" style="border-right:none;border-bottom:none;"><div class="pc-diag-lbl">Altura de Izaje <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:#1a7a4a">{pc_diag_altura}<span class="unit">m</span></div><div class="pc-diag-badge">✔ √(L² − r²)</div></td>
+          <td class="pc-diag-cell" style="border-right:1px solid #cdd8e3;border-bottom:none;"><div class="pc-diag-lbl">Duración de Prueba <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">{pc_izaje_duracion}<span class="unit">min</span></div></td>
+          <td class="pc-diag-cell" style="border-right:none;border-bottom:none;"><div class="pc-diag-lbl">Deformación Posterior <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">{pc_izaje_deformacion}<span class="unit">mm</span></div></td>
         </tr>
       </table>
       <div class="pc-obs-row">
         <div class="pc-obs-label">Observaciones</div>
-        <div class="pc-obs-content">El equipo <strong>{marca} {modelo}</strong> No. Serie <strong>{no_serie}</strong> respondió correctamente en ambas pruebas realizadas. Durante la prueba sin carga se verificó el funcionamiento de todos los sistemas (hidráulico, eléctrico y mecánico) sin detectar anomalías. En la prueba con carga a radio de operación de <strong>{pc_obs_radio} m</strong> y longitud de pluma de <strong>{pc_obs_pluma} m</strong>, se obtuvo un ángulo de trabajo de <strong>{pc_obs_angulo}°</strong> y una altura de izaje efectiva de <strong>{pc_obs_altura} m</strong>. <strong>Sin observaciones de riesgo. El equipo se considera apto para operar bajo las condiciones inspeccionadas.</strong></div>
+        <div class="pc-obs-content">El elemento de izaje <strong>{marca} {modelo}</strong> No. Serie <strong>{no_serie}</strong> fue sometido a prueba de carga en posición <strong>vertical</strong>, sin ángulo de trabajo ni radio de operación, conforme a la normativa aplicable. Se verificó una Carga Máxima de Trabajo (CML) de <strong>{pc_izaje_cml} ton</strong> y se realizó la prueba de sobrecarga con <strong>{pc_izaje_prueba} ton</strong> (2× CML) durante <strong>{pc_izaje_duracion} min</strong>, registrando una deformación posterior de <strong>{pc_izaje_deformacion} mm</strong>. <strong>Sin observaciones de riesgo. El elemento se considera apto para operar bajo las condiciones inspeccionadas.</strong></div>
       </div>
       <table class="pc-result-strip" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;background:#0B2545;padding:0;" cellpadding="0" cellspacing="0"><tr>
         <td style="padding:8px 14px;vertical-align:middle;"><div class="pc-result-left"><span class="pc-result-lbl">Resultado General de la Prueba de Carga</span><span class="pc-result-val">✔ PRUEBA APROBADA</span></div></td>
