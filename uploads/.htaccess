@@ -15,10 +15,14 @@ Options -Indexes -ExecCGI
     </FilesMatch>
 </IfModule>
 
-# Quitar CSP de PDFs para que Chrome pueda renderizarlos dentro de iframes
+# Quitar CSP de PDFs para que Chrome pueda renderizarlos dentro de iframes.
+# Los certificados/dictámenes se regeneran con el MISMO nombre de archivo
+# (por folio) cada vez que se edita algo (p. ej. la fecha desde Calidad):
+# sin no-cache, el navegador puede seguir sirviendo la versión anterior.
 <IfModule mod_headers.c>
     <FilesMatch "\.pdf$">
         Header always unset Content-Security-Policy
+        Header set Cache-Control "no-cache, must-revalidate"
     </FilesMatch>
 </IfModule>
 

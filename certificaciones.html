@@ -1704,6 +1704,10 @@ async function _pdfAbrir(url, label) {
   // Mixed content: si la página es HTTPS y la URL del recurso es HTTP, forzar HTTPS
   if (window.location.protocol === 'https:' && abs.startsWith('http://'))
     abs = 'https://' + abs.slice(7);
+  // El PDF se regenera con el mismo nombre de archivo cada vez (por folio), así que el
+  // navegador puede servir una copia cacheada de una versión anterior. Se agrega un
+  // parámetro de cache-busting para forzar siempre la descarga de la versión recién generada.
+  abs += (abs.includes('?') ? '&' : '?') + '_v=' + Date.now();
   console.log('[PDF] URL:', abs);
   document.getElementById('_pdf_modal_overlay')?.remove();
 
@@ -1764,7 +1768,7 @@ async function _pdfAbrir(url, label) {
     // Fetch first — error message incluye la URL para diagnóstico
     let pdfBuffer;
     try {
-      const resp = await fetch(abs, { credentials: 'same-origin' });
+      const resp = await fetch(abs, { credentials: 'same-origin', cache: 'no-store' });
       if (!resp.ok) throw new Error('HTTP ' + resp.status + ' ' + resp.statusText);
       pdfBuffer = await resp.arrayBuffer();
     } catch(fetchErr) {
