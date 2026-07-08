@@ -2685,12 +2685,13 @@ const PC_TEMPLATES = {
   },
   'dictamen_izaje.html': {
     label: 'Elemento de Izaje',
-    // CML y Carga de Prueba son propiedades del elemento (constantes): se capturan
-    // UNA sola vez, no por fila. Las cargas se aplican en vertical — sin ángulo de
-    // trabajo ni radio de operación — por eso no hay columnas calculadas aquí.
+    // CML es la única propiedad que se captura (una sola vez, no por fila).
+    // La Carga de Prueba (2×CML) se deriva automáticamente en el dictamen —
+    // no se le pide al inspector, ya que es siempre el doble del CML.
+    // Las cargas se aplican en vertical — sin ángulo de trabajo ni radio de
+    // operación — por eso no hay columnas calculadas aquí.
     headerFields: [
-      { id:'cml',    label:'CML (Carga de Trabajo)',  unit:'ton' },
-      { id:'prueba', label:'Carga de Prueba (2×CML)',  unit:'ton' },
+      { id:'cml', label:'CML (Carga de Trabajo)', unit:'ton' },
     ],
     rows: [{ key:'trabajo', label:'Carga de Trabajo' }, { key:'sobrecarga', label:'Prueba de Sobrecarga' }],
     cols: [

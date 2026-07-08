@@ -1226,15 +1226,16 @@ body { background:#fff!important; }
                 : str_replace('{pc_obs_altura} m', 'NA', $html);
         }
 
-        // 6. Elementos de izaje: CML y Carga de Prueba son propiedades del elemento
-        //    (constantes, capturadas una sola vez — no por fila). Duración y
-        //    deformación se toman de la prueba de sobrecarga (o de trabajo si falta).
-        //    Sin cálculos: las cargas se aplican en vertical, sin ángulo de trabajo
-        //    ni radio de operación — solo se pasan los datos tal como los registra
-        //    el inspector.
+        // 6. Elementos de izaje: CML es la única propiedad capturada del elemento
+        //    (constante, una sola vez — no por fila). La Carga de Prueba (2×CML)
+        //    NO se le pide al inspector: se deriva directamente duplicando el CML
+        //    (siempre es el doble, por definición de la prueba de sobrecarga).
+        //    Duración y deformación se toman de la prueba de sobrecarga (o de
+        //    trabajo si falta). Sin cálculos geométricos: las cargas se aplican en
+        //    vertical, sin ángulo de trabajo ni radio de operación.
         if (strpos($html, '{pc_izaje_cml}') !== false) {
-            $cml    = trim((string)($pc['cml']    ?? ''));
-            $prueba = trim((string)($pc['prueba'] ?? ''));
+            $cml    = trim((string)($pc['cml'] ?? ''));
+            $prueba = ($cml !== '' && is_numeric($cml)) ? (string)((float)$cml * 2) : '';
             $rowSobre = is_array($pc['sobrecarga'] ?? null) ? $pc['sobrecarga'] : [];
             $rowTrab  = is_array($pc['trabajo']    ?? null) ? $pc['trabajo']    : [];
             $duracion    = trim((string)($rowSobre['duracion']    ?? '')) ?: trim((string)($rowTrab['duracion']    ?? ''));
