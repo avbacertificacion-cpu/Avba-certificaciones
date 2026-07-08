@@ -140,11 +140,11 @@ if ($empresa_inspeccion) {
         /* Scanner QR Modal */
         .scanner-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.8);z-index:2000;align-items:center;justify-content:center}
         .scanner-modal.show{display:flex}
-        .scanner-modal-content{background:#fff;border-radius:12px;padding:20px;max-width:500px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.3)}
+        .scanner-modal-content{background:#fff;border-radius:12px;padding:20px;max-width:500px;width:90%;max-height:92vh;overflow-y:auto;box-shadow:0 8px 32px rgba(0,0,0,.3)}
         .scanner-modal-header{font-size:20px;font-weight:700;color:#333;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
         .scanner-modal-close{background:none;border:none;font-size:28px;cursor:pointer;color:#999}
         .scanner-modal-close:hover{color:#333}
-        #scanner{width:100%;height:400px;border-radius:8px;overflow:hidden;margin-bottom:16px}
+        #scanner{width:100%;height:min(400px,60vh);border-radius:8px;overflow:hidden;margin-bottom:16px}
         .scanner-modal-buttons{display:flex;gap:12px}
         .scanner-modal-buttons button{flex:1;padding:12px;border:none;border-radius:8px;font-weight:700;cursor:pointer}
     </style>
@@ -550,39 +550,49 @@ function showAlert(msg, tipo) {
 
 // ── Scanner QR ────────────────────────────────────────────────────────────────
 let qrScanner = null;
+let _qrReinicioTimer = null;
+let _qrOrientacion = null;
 
-function abrirScannerQR() {
-    document.getElementById('scannerModal').classList.add('show');
+// Recuadro de escaneo adaptable al tamaño real del video.
+// Evita que el recuadro quede más ancho que el video al girar a vertical.
+function qrboxResponsivo(vw, vh) {
+    const lado = Math.max(160, Math.floor(Math.min(vw, vh) * 0.75));
+    return { width: lado, height: lado };
+}
 
-    if (!qrScanner) {
-        qrScanner = new Html5Qrcode('scanner');
-        qrScanner.start(
-            { facingMode: 'environment' },
-            { fps: 10, qrbox: 250 },
-            (decodedText) => {
-                console.log('QR detectado:', decodedText);
+function _orientacionActual() {
+    return window.innerWidth >= window.innerHeight ? 'landscape' : 'portrait';
+}
 
-                // Extraer código: primero intenta extraer de URL ?qr=11dígitos
-                let codigo = decodedText.trim();
-                const urlMatch = codigo.match(/[?&]qr=(\d{11})/);
-                if (urlMatch) {
-                    codigo = urlMatch[1];
-                } else if (!/^\d{11}$/.test(codigo)) {
-                    // Si no es 11 dígitos, intenta extraerlos
-                    const digitMatch = codigo.match(/(\d{11})/);
-                    if (digitMatch) {
-                        codigo = digitMatch[1];
-                    }
-                }
+function _procesarQRInspeccion(decodedText) {
+    console.log('QR detectado:', decodedText);
 
-                document.getElementById('codigo-input').value = codigo;
-                cerrarScannerQR();
-                buscarExtintor();
-            },
-            (error) => {}
-        ).catch((err) => {
-            console.error('Error al acceder a cámara:', err);
-            const mensajeError = `No se pudo acceder a la cámara: ${err.message || err}
+    // Extraer código: primero intenta extraer de URL ?qr=11dígitos
+    let codigo = decodedText.trim();
+    const urlMatch = codigo.match(/[?&]qr=(\d{11})/);
+    if (urlMatch) {
+        codigo = urlMatch[1];
+    } else if (!/^\d{11}$/.test(codigo)) {
+        const digitMatch = codigo.match(/(\d{11})/);
+        if (digitMatch) codigo = digitMatch[1];
+    }
+
+    document.getElementById('codigo-input').value = codigo;
+    cerrarScannerQR();
+    buscarExtintor();
+}
+
+function _iniciarCamaraInspeccion() {
+    qrScanner = new Html5Qrcode('scanner');
+    return qrScanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: qrboxResponsivo },
+        _procesarQRInspeccion,
+        () => {}
+    ).catch((err) => {
+        console.error('Error al acceder a cámara:', err);
+        qrScanner = null;
+        const mensajeError = `No se pudo acceder a la cámara: ${err.message || err}
 
 Posibles causas:
 • La página no está en HTTPS
@@ -591,17 +601,47 @@ Posibles causas:
 • Cambios en navegador/SO
 
 Solución: Ingresa el código manualmente en el campo.`;
+        showAlert(mensajeError, 'error');
+        cerrarScannerQR();
+    });
+}
 
-            showAlert(mensajeError, 'error');
-            cerrarScannerQR();
-        });
-    }
+function abrirScannerQR() {
+    document.getElementById('scannerModal').classList.add('show');
+    _qrOrientacion = _orientacionActual();
+    if (!qrScanner) _iniciarCamaraInspeccion();
+    window.addEventListener('orientationchange', _reiniciarScannerInspeccion);
+    window.addEventListener('resize', _reiniciarScannerInspeccion);
+}
+
+// Al girar el dispositivo, html5-qrcode no recalcula el video → lo reiniciamos
+// (sólo cuando la orientación realmente cambia, para no interrumpir el escaneo).
+function _reiniciarScannerInspeccion() {
+    if (!document.getElementById('scannerModal').classList.contains('show')) return;
+    const o = _orientacionActual();
+    if (o === _qrOrientacion) return;
+    _qrOrientacion = o;
+    clearTimeout(_qrReinicioTimer);
+    _qrReinicioTimer = setTimeout(async () => {
+        if (!document.getElementById('scannerModal').classList.contains('show')) return;
+        if (qrScanner) {
+            try { await qrScanner.stop(); } catch (e) {}
+            try { qrScanner.clear(); } catch (e) {}
+            qrScanner = null;
+        }
+        _iniciarCamaraInspeccion();
+    }, 350);
 }
 
 function cerrarScannerQR() {
     document.getElementById('scannerModal').classList.remove('show');
+    window.removeEventListener('orientationchange', _reiniciarScannerInspeccion);
+    window.removeEventListener('resize', _reiniciarScannerInspeccion);
+    clearTimeout(_qrReinicioTimer);
     if (qrScanner) {
-        qrScanner.stop().catch(() => {});
+        const s = qrScanner;
+        qrScanner = null;   // permite reabrir el escáner después
+        s.stop().then(() => { try { s.clear(); } catch (e) {} }).catch(() => {});
     }
 }
 
@@ -624,9 +664,43 @@ function cerrarModalAsignarQR() {
     extintor_asignar_id = null;
 }
 
+let _asignarReinicioTimer = null;
+let _asignarOrientacion = null;
+
+function _arrancarCamaraAsignar() {
+    const alertDiv = document.getElementById('asignar-qr-alert');
+    scannerAsignar = new Html5Qrcode('scanner-asignar');
+    return scannerAsignar.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: qrboxResponsivo },
+        (decodedText) => {
+            // Extraer QR: primero intenta extraer de URL con formato ?qr=11dígitos
+            let qr = null;
+            const urlMatch = decodedText.match(/[?&]qr=(\d{11})/);
+            if (urlMatch) {
+                qr = urlMatch[1];
+            } else if (/^\d{11}$/.test(decodedText)) {
+                qr = decodedText;
+            }
+
+            if (qr && /^\d{11}$/.test(qr)) {
+                document.getElementById('input-qr-asignar').value = qr;
+                detenerScannerAsignar();
+                alertDiv.innerHTML = '<div style="background:#d1fae5;color:#065f46;padding:12px;border-radius:6px">✓ QR detectado. Presiona "Asignar QR"</div>';
+            } else if (!qr) {
+                alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">QR no válido. Intenta de nuevo.</div>';
+            }
+        },
+        (error) => {}
+    ).catch(() => {
+        scannerAsignar = null;
+        alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">No se pudo acceder a la cámara</div>';
+        detenerScannerAsignar();
+    });
+}
+
 async function iniciarScannerAsignar() {
     const scanDiv = document.getElementById('scanner-asignar');
-    const alertDiv = document.getElementById('asignar-qr-alert');
 
     if (scanDiv.style.display === 'block') {
         detenerScannerAsignar();
@@ -634,47 +708,43 @@ async function iniciarScannerAsignar() {
     }
 
     scanDiv.style.display = 'block';
+    _asignarOrientacion = _orientacionActual();
+    window.addEventListener('orientationchange', _reiniciarScannerAsignar);
+    window.addEventListener('resize', _reiniciarScannerAsignar);
 
     try {
-        scannerAsignar = new Html5Qrcode('scanner-asignar');
-        await scannerAsignar.start(
-            { facingMode: 'environment' },
-            { fps: 10, qrbox: 250 },
-            (decodedText) => {
-                // Extraer QR: primero intenta extraer de URL con formato ?qr=11dígitos
-                let qr = null;
-                const urlMatch = decodedText.match(/[?&]qr=(\d{11})/);
-                if (urlMatch) {
-                    qr = urlMatch[1];
-                } else if (/^\d{11}$/.test(decodedText)) {
-                    // Si es solo 11 dígitos, usar directamente
-                    qr = decodedText;
-                }
-
-                if (qr && /^\d{11}$/.test(qr)) {
-                    document.getElementById('input-qr-asignar').value = qr;
-                    detenerScannerAsignar();
-                    alertDiv.innerHTML = '<div style="background:#d1fae5;color:#065f46;padding:12px;border-radius:6px">✓ QR detectado. Presiona "Asignar QR"</div>';
-                } else if (!qr) {
-                    // No encontró el formato esperado, mostrar error
-                    alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">QR no válido. Intenta de nuevo.</div>';
-                }
-            },
-            (error) => { console.log('Error en scanner:', error); }
-        ).catch(() => {
-            alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">No se pudo acceder a la cámara</div>';
-            detenerScannerAsignar();
-        });
+        await _arrancarCamaraAsignar();
     } catch (err) {
-        alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">Error al iniciar cámara</div>';
+        document.getElementById('asignar-qr-alert').innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">Error al iniciar cámara</div>';
         detenerScannerAsignar();
     }
 }
 
+function _reiniciarScannerAsignar() {
+    if (document.getElementById('scanner-asignar').style.display !== 'block') return;
+    const o = _orientacionActual();
+    if (o === _asignarOrientacion) return;
+    _asignarOrientacion = o;
+    clearTimeout(_asignarReinicioTimer);
+    _asignarReinicioTimer = setTimeout(async () => {
+        if (document.getElementById('scanner-asignar').style.display !== 'block') return;
+        if (scannerAsignar) {
+            try { await scannerAsignar.stop(); } catch (e) {}
+            try { scannerAsignar.clear(); } catch (e) {}
+            scannerAsignar = null;
+        }
+        _arrancarCamaraAsignar();
+    }, 350);
+}
+
 function detenerScannerAsignar() {
+    window.removeEventListener('orientationchange', _reiniciarScannerAsignar);
+    window.removeEventListener('resize', _reiniciarScannerAsignar);
+    clearTimeout(_asignarReinicioTimer);
     if (scannerAsignar) {
-        scannerAsignar.stop().catch(() => {});
+        const s = scannerAsignar;
         scannerAsignar = null;
+        s.stop().then(() => { try { s.clear(); } catch (e) {} }).catch(() => {});
     }
     document.getElementById('scanner-asignar').style.display = 'none';
 }
