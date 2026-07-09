@@ -83,6 +83,19 @@ function crear() {
         http_response_code(400); echo json_encode(['error' => 'Rol inválido']); return;
     }
 
+    // Pre-chequeo: username duplicado (mensaje preciso, incluye si está desactivado)
+    $usernameLimpio = strtolower(trim($d['username']));
+    $chk = $pdo->prepare("SELECT estado FROM usuarios WHERE username = ? LIMIT 1");
+    $chk->execute([$usernameLimpio]);
+    $existente = $chk->fetch(PDO::FETCH_ASSOC);
+    if ($existente) {
+        $extra = (isset($existente['estado']) && $existente['estado'] === 'inactivo')
+            ? ' (ese usuario existe pero está desactivado)' : '';
+        http_response_code(409);
+        echo json_encode(['error' => "El nombre de usuario \"$usernameLimpio\" ya está en uso$extra"]);
+        return;
+    }
+
     try {
         $stmt = $pdo->prepare("
             INSERT INTO usuarios (nombre, username, email, password, rol, empresa_id, estado)
@@ -109,7 +122,16 @@ function crear() {
         echo json_encode(['success' => true, 'id' => $newId]);
     } catch (PDOException $e) {
         if ($e->getCode() == 23000) {
-            http_response_code(409); echo json_encode(['error' => 'El nombre de usuario ya está en uso']);
+            // El username ya se validó arriba, así que el conflicto es de otro dato
+            $msg = 'No se pudo crear el usuario por un conflicto de datos.';
+            $detalle = $e->getMessage();
+            if (stripos($detalle, 'email') !== false) {
+                $msg = 'El correo ya está registrado en otro usuario.';
+            } elseif (stripos($detalle, 'foreign key') !== false || stripos($detalle, 'empresa') !== false) {
+                $msg = 'La empresa seleccionada no es válida. Vuelve a elegirla.';
+            }
+            http_response_code(409);
+            echo json_encode(['error' => $msg]);
         } else {
             http_response_code(500); echo json_encode(['error' => 'Error al crear usuario']);
         }
