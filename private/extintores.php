@@ -301,9 +301,10 @@ function renderTabla(data) {
                 <td>${e.ultima_inspeccion ? isoADisplay(e.ultima_inspeccion) : '<span style="color:#e74c3c">Sin inspección</span>'}</td>
                 <td><span class="badge badge-${e.estado}">${estadoLabel(e.estado)}</span></td>
                 <td style="white-space:nowrap">
+                    ${(!e.codigo_qr || esAdmin) ? `
                     <button class="btn btn-sm btn-primary" onclick="asignarOModificarQR(${e.id}, ${e.codigo_qr ? 'true' : 'false'})">
                         ${e.codigo_qr ? '🔧 Modificar QR' : '📝 Asignar QR'}
-                    </button>
+                    </button>` : ''}
                     ${e.codigo_qr ? `<button class="btn btn-sm btn-info" onclick="verQR(${e.id})">👁️ Ver</button>` : ''}
                     <button class="btn btn-sm btn-warning" onclick="editarExtintor(${e.id})">✏️</button>
                     ${esAdmin ? `<button class="btn btn-sm btn-danger" onclick="eliminarExtintor(${e.id})">🗑️</button>` : ''}
