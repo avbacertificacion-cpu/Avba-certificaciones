@@ -485,16 +485,15 @@ async function guardarUsuario() {
             credentials: 'same-origin'
         });
 
-        if (!r.ok) throw new Error(`Error ${r.status}`);
+        // Leer el cuerpo SIEMPRE para poder mostrar el mensaje real del servidor
+        const d = await r.json().catch(() => ({}));
 
-        const d = await r.json();
-
-        if (d.success) {
+        if (r.ok && d.success) {
             cerrarModal();
             showAlert(`✓ Usuario ${id ? 'actualizado' : 'creado'} correctamente`, 'success');
             await cargarUsuarios();
         } else {
-            modalAlert(d.error || 'Error al guardar usuario', 'error');
+            modalAlert(d.error || `Error al guardar usuario (${r.status})`, 'error');
         }
     } catch(e) {
         modalAlert('Error de conexión: ' + e.message, 'error');
@@ -512,15 +511,13 @@ async function eliminarUsuario(id) {
 
     try {
         const r = await fetch(`../api/usuarios.php?action=eliminar&id=${parseInt(id)}`);
-        if (!r.ok) throw new Error(`Error ${r.status}`);
+        const d = await r.json().catch(() => ({}));
 
-        const d = await r.json();
-
-        if (d.success) {
+        if (r.ok && d.success) {
             showAlert(`✓ Usuario "${usuario.nombre}" desactivado correctamente`, 'success');
             await cargarUsuarios();
         } else {
-            showAlert(d.error || 'Error al desactivar usuario', 'error');
+            showAlert(d.error || `Error al desactivar usuario (${r.status})`, 'error');
         }
     } catch(e) {
         showAlert('Error de conexión: ' + e.message, 'error');
