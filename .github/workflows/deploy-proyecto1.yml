@@ -1,0 +1,29 @@
+name: Deploy Proyecto 1 a Hostinger
+
+on:
+  push:
+    branches:
+      - claude/continue-avba-project-bU5LX
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repo
+        uses: actions/checkout@v4
+
+      - name: Quitar archivos que no se deben subir
+        run: rm -rf .git .github config
+
+      - name: Subir archivos por SSH (SCP) a la raíz del sitio
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "."
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html"
+          strip_components: 0
+          overwrite: true
+          
