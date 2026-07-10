@@ -356,26 +356,6 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($avbaAdmin->detallePersonal((int)($_GET['id'] ?? 0)));
 
-        case 'GUARDAR_AVBA_PERSONAL':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($avbaAdmin->guardarPersonal($payload));
-
-        case 'ELIMINAR_AVBA_PERSONAL':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($avbaAdmin->eliminarPersonal((int)($payload['id'] ?? 0)));
-
-        case 'SUBIR_DOC_AVBA_PERSONAL':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($avbaAdmin->subirDocPersonal($_POST, $_FILES));
-
-        case 'ELIMINAR_DOC_AVBA_PERSONAL':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($avbaAdmin->eliminarDocPersonal((int)($payload['id'] ?? 0)));
-
         // ── Auditorías de Calidad (ADMIN + CALIDAD) ──────────────
         case 'LISTAR_AUDITORIAS':
             $usr = validarToken($pdo, $token);
@@ -797,6 +777,27 @@ if ($method === 'POST') {
         // ── Auth ─────────────────────────────────────────
         case 'LOGIN':
             respuesta($auth->login($payload));
+
+        // ── Control Administrativo AVBA (ADMIN + ADMINISTRATIVO) ──
+        case 'GUARDAR_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->guardarPersonal($payload));
+
+        case 'ELIMINAR_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->eliminarPersonal((int)($payload['id'] ?? 0)));
+
+        case 'SUBIR_DOC_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->subirDocPersonal($_POST, $_FILES));
+
+        case 'ELIMINAR_DOC_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->eliminarDocPersonal((int)($payload['id'] ?? 0)));
 
         // ── Sesión de acceso para participantes ──────────
         case 'CREAR_SESION_ACCESO':
