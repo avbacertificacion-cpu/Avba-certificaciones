@@ -109,8 +109,12 @@ class ClienteConfig {
             if (!is_dir($dir)) mkdir($dir, 0755, true);
             $fn  = 'logo_' . date('YmdHis') . ".$ext";
             $dest = $dir . $fn;
-            // Comprimir/redimensionar con GD si está disponible
-            if (!comprimirImagen($files['logo']['tmp_name'], $dest, 600, 600, 85)) {
+            // Comprimir/redimensionar con GD si está disponible; comprimirImagen()
+            // devuelve el nombre real (con la extensión que de verdad escribió).
+            $real = comprimirImagen($files['logo']['tmp_name'], $dest, 600, 600, 85);
+            if ($real) {
+                $fn = $real;
+            } else {
                 move_uploaded_file($files['logo']['tmp_name'], $dest);
             }
             // Borrar logo anterior

@@ -7,15 +7,23 @@
  * Comprime y redimensiona una imagen subida para ahorrar almacenamiento.
  * Redimensiona el lado mayor a $maxW/$maxH (manteniendo proporción) y la
  * guarda como JPEG (o PNG si tiene transparencia) con la calidad indicada.
- * Requiere la extensión GD. Devuelve true si tuvo éxito.
+ * Requiere la extensión GD.
+ *
+ * La extensión de $dest es solo una sugerencia: si el contenido resulta
+ * tener transparencia se fuerza a .png (y a .jpg en caso contrario) para
+ * que el archivo en disco siempre coincida con sus bytes reales — de lo
+ * contrario un .jpg/.webp puede terminar con bytes PNG adentro, lo que
+ * rompe su MIME type al servirlo o embeberlo en un PDF.
  *
  * @param string $src    Ruta del archivo origen (tmp_name)
- * @param string $dest   Ruta destino (.jpg/.png según contenido)
+ * @param string $dest   Ruta destino sugerida (se ajusta la extensión real)
  * @param int    $maxW   Ancho máximo
  * @param int    $maxH   Alto máximo
  * @param int    $calidad Calidad JPEG (0-100)
+ * @return string|false  Nombre de archivo final (basename, con la extensión
+ *                        real) en éxito, o false si no se pudo procesar.
  */
-function comprimirImagen(string $src, string $dest, int $maxW = 1280, int $maxH = 1280, int $calidad = 72): bool {
+function comprimirImagen(string $src, string $dest, int $maxW = 1280, int $maxH = 1280, int $calidad = 72) {
     if (!function_exists('imagecreatefromstring') || !function_exists('getimagesize')) return false;
     $info = @getimagesize($src);
     if (!$info) return false;
@@ -47,19 +55,23 @@ function comprimirImagen(string $src, string $dest, int $maxW = 1280, int $maxH 
         $img = $dst;
     }
 
+    $sinExt = preg_replace('/\.[a-zA-Z0-9]+$/', '', $dest);
     $ok = false;
+    $destFinal = $dest;
     try {
         if ($hasAlpha && function_exists('imagepng')) {
             // Conserva transparencia (logos). PNG comprimido nivel 8.
-            $ok = imagepng($img, $dest, 8);
+            $destFinal = $sinExt . '.png';
+            $ok = imagepng($img, $destFinal, 8);
         } else {
-            $ok = imagejpeg($img, $dest, max(40, min(95, $calidad)));
+            $destFinal = $sinExt . '.jpg';
+            $ok = imagejpeg($img, $destFinal, max(40, min(95, $calidad)));
         }
     } catch (\Throwable $e) {
         $ok = false;
     }
     imagedestroy($img);
-    return (bool)$ok;
+    return $ok ? basename($destFinal) : false;
 }
 
 /**

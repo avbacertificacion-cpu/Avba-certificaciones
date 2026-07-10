@@ -301,26 +301,36 @@ class ClienteMantenimiento {
             $proveedor = $prov->fetch(PDO::FETCH_ASSOC);
             if (!$proveedor) continue;
 
-            $folioEnvio = $this->siguienteFolio($idCliente, 'SE', 'cliente_sol_envio');
-            $this->pdo->prepare(
-                "INSERT INTO cliente_sol_envio (id_cliente,sol_id,proveedor_id,folio,email_to,estado)
-                 VALUES (?,?,?,?,?, 'generado')"
-            )->execute([$idCliente, $solId, $provId, $folioEnvio, $proveedor['correo'] ?? '']);
-            $envioId = (int)$this->pdo->lastInsertId();
+            // Aislado por proveedor: si falla uno (p. ej. mPDF no disponible),
+            // no debe tumbar a los demás ni dejar ítems marcados como
+            // enviados sin PDF/correo real.
+            $envioId = null;
+            try {
+                $folioEnvio = $this->siguienteFolio($idCliente, 'SE', 'cliente_sol_envio');
+                $this->pdo->prepare(
+                    "INSERT INTO cliente_sol_envio (id_cliente,sol_id,proveedor_id,folio,email_to,estado)
+                     VALUES (?,?,?,?,?, 'generado')"
+                )->execute([$idCliente, $solId, $provId, $folioEnvio, $proveedor['correo'] ?? '']);
+                $envioId = (int)$this->pdo->lastInsertId();
 
-            // PDF
-            $pdfUrl = $this->pdfSolicitudProveedor($sol, $proveedor, $provItems, $folioEnvio, $idCliente);
-            $this->pdo->prepare("UPDATE cliente_sol_envio SET pdf_url=? WHERE id=?")->execute([$pdfUrl, $envioId]);
+                // PDF
+                $pdfUrl = $this->pdfSolicitudProveedor($sol, $proveedor, $provItems, $folioEnvio, $idCliente);
+                $this->pdo->prepare("UPDATE cliente_sol_envio SET pdf_url=? WHERE id=?")->execute([$pdfUrl, $envioId]);
 
-            // Marcar ítems como enviados
-            $ids = array_map(fn($x) => (int)$x['id'], $provItems);
-            $in = implode(',', array_fill(0, count($ids), '?'));
-            $this->pdo->prepare("UPDATE cliente_sol_material_item SET envio_id=? WHERE id IN ($in)")
-                      ->execute(array_merge([$envioId], $ids));
+                // Marcar ítems como enviados
+                $ids = array_map(fn($x) => (int)$x['id'], $provItems);
+                $in = implode(',', array_fill(0, count($ids), '?'));
+                $this->pdo->prepare("UPDATE cliente_sol_material_item SET envio_id=? WHERE id IN ($in)")
+                          ->execute(array_merge([$envioId], $ids));
 
-            // Correo
-            $envRes = $this->enviarEnvio($envioId, $idCliente, $sol, $proveedor, $pdfUrl, $folioEnvio);
-            $resultados[] = ['proveedor' => $proveedor['nombre'], 'folio' => $folioEnvio, 'correo' => $envRes];
+                // Correo
+                $envRes = $this->enviarEnvio($envioId, $idCliente, $sol, $proveedor, $pdfUrl, $folioEnvio);
+                $resultados[] = ['proveedor' => $proveedor['nombre'], 'folio' => $folioEnvio, 'correo' => $envRes];
+            } catch (\Throwable $e) {
+                error_log('[Mantenimiento] generarEnvios proveedor ' . $provId . ': ' . $e->getMessage());
+                if ($envioId) { $this->pdo->prepare("DELETE FROM cliente_sol_envio WHERE id=?")->execute([$envioId]); }
+                $resultados[] = ['proveedor' => $proveedor['nombre'], 'folio' => null, 'correo' => 'error: no se pudo generar el envío'];
+            }
         }
 
         // Estado de la solicitud
@@ -452,7 +462,10 @@ class ClienteMantenimiento {
             if (!in_array($ext, ['jpg','jpeg','png','webp'])) continue;
             $fn = 'foto_' . ($i + 1) . '_' . date('His') . '.jpg';
             $dest = $dir . $fn;
-            if (!comprimirImagen($tmp, $dest, 1280, 1280, 72)) {
+            $real = comprimirImagen($tmp, $dest, 1280, 1280, 72);
+            if ($real) {
+                $fn = $real;
+            } else {
                 $dest = $dir . 'foto_' . ($i + 1) . '_' . date('His') . ".$ext";
                 if (!move_uploaded_file($tmp, $dest)) continue;
                 $fn = basename($dest);
@@ -618,7 +631,9 @@ class ClienteMantenimiento {
                     if ($ft['etapa'] !== $etapa) continue;
                     $abs = rtrim(UPLOAD_DIR, '/') . '/' . ltrim(str_replace(UPLOAD_URL, '', $ft['archivo_url']), '/');
                     if (!is_file($abs)) continue;
-                    $b64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($abs));
+                    $extFt = strtolower(pathinfo($abs, PATHINFO_EXTENSION));
+                    $mimeFt = in_array($extFt, ['jpg','jpeg']) ? 'image/jpeg' : ($extFt === 'webp' ? 'image/webp' : 'image/png');
+                    $b64 = 'data:' . $mimeFt . ';base64,' . base64_encode(file_get_contents($abs));
                     $out .= '<td style="width:33%;padding:4px;text-align:center;vertical-align:top">
                         <img src="' . $b64 . '" style="width:100%;max-height:120px;object-fit:cover;border:1px solid #ccc;border-radius:4px">
                         ' . ($ft['comentario'] ? '<div style="font-size:7.5pt;color:#666;margin-top:2px">' . $esc($ft['comentario']) . '</div>' : '') . '</td>';

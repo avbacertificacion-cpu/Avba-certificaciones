@@ -353,7 +353,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 
 /* ══ Print ═══════════════════════════════════════════════════ */
 @media print{.header,.tabs,.tab-cards-grid,.stats,.eq-filters,.btn-prim,.btn-sec,.btn-del,.eq-bc-btn,.eq-upcoming-card,.fhs-card,.eq-stacked-card,.eq-charts-3,.toast-eq{display:none!important}.wrap{padding:0;max-width:100%;margin:0}.eq-cn{break-inside:avoid;margin-bottom:12px}}
-body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abrirModalPers(null)"]{display:none!important}
+body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abrirModalPers(null)"],body.solo-lectura [onclick="abrirModalSol()"],body.solo-lectura [onclick="abrirModalMant()"]{display:none!important}
 /* ══ Tab notification badge ══════════════════════════════════ */
 .tab-btn{position:relative;}
 .tab-notif{position:absolute;top:2px;right:2px;background:#ef4444;color:#fff;font-size:9px;font-weight:800;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none;}
@@ -3341,6 +3341,8 @@ async function cargarConfig() {
 function cfgPrevLogo(input) {
   const f = input.files && input.files[0];
   if (!f) return;
+  if (f.size > 5 * 1024 * 1024) { toastEq('El logo no debe superar 5 MB.'); input.value=''; return; }
+  if (!/^image\/(jpe?g|png|webp)$/i.test(f.type)) { toastEq('El logo debe ser JPG, PNG o WebP.'); input.value=''; return; }
   _cfgLogoFile = f;
   const prev = document.getElementById('cfg-logo-prev');
   const rd = new FileReader();
@@ -3574,34 +3576,62 @@ function renderSolProc(sol) {
     });
   }
   if (_esPrincipal) {
+    const sinAsignar = sol.items.filter(it => !it.envio_id && !it.proveedor_nombre).length;
     html += `<div class="fact"><button class="btn-sec" onclick="guardarAsignacionSol()">Guardar asignación</button>
-      <button class="btn-prim" onclick="generarEnvios()">✉ Generar envíos y enviar</button></div>`;
+      <button class="btn-prim" id="btn-generar-envios" onclick="generarEnvios()">✉ Generar envíos y enviar</button></div>`;
+    if (sinAsignar) html += `<div style="font-size:11.5px;color:var(--ambar,#92610a);margin-top:6px">⚠ ${sinAsignar} ítem(s) sin proveedor asignado — se omitirán del envío.</div>`;
   }
   document.getElementById('solp-body').innerHTML = html;
 }
 
-async function guardarAsignacionSol() {
+/**
+ * Devuelve true si guardó bien, false si falló (red o el backend la rechazó).
+ * silencioso=true evita el toast/repintado — lo usa generarEnvios(), que ya
+ * hace su propio repintado al terminar todo el flujo (ahorra una consulta).
+ */
+async function guardarAsignacionSol(silencioso) {
   const asign = {};
   document.querySelectorAll('#solp-body .sp-item').forEach(s => { if (s.value) asign[s.dataset.item] = +s.value; });
   try {
     const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'ASIGNAR_PROVEEDORES_SOL', payload:{id:_solProcId, asignaciones:asign}}) });
     const d = await r.json();
-    if (d.status !== 'success') { toastEq(d.message||'Error.'); return; }
-    toastEq('Asignación guardada.'); procesarSol(_solProcId);
-  } catch(_) { toastEq('Error de red.'); }
+    if (d.status !== 'success') { toastEq(d.message||'Error.'); return false; }
+    if (!silencioso) { toastEq('Asignación guardada.'); procesarSol(_solProcId); }
+    return true;
+  } catch(_) { toastEq('Error de red.'); return false; }
 }
 
+// Bandera a nivel módulo (no un simple btn.disabled): guardarAsignacionSol()
+// repinta #solp-body a medio camino, así que un botón deshabilitado no
+// sobrevive ese repintado — la bandera sí.
+let _generandoEnvios = false;
 async function generarEnvios() {
-  await guardarAsignacionSol();
-  toastEq('Generando y enviando…');
+  if (_generandoEnvios) return; // evita doble clic / doble envío de correos
+  const sinProveedor = document.querySelectorAll('#solp-body .sp-item').length
+    - [...document.querySelectorAll('#solp-body .sp-item')].filter(s => s.value).length;
+  if (sinProveedor > 0 && !confirm(`${sinProveedor} ítem(s) quedarán sin proveedor asignado y no se incluirán en el envío. ¿Continuar?`)) return;
+
+  _generandoEnvios = true;
+  const btn = document.getElementById('btn-generar-envios');
+  if (btn) btn.disabled = true;
   try {
+    const ok = await guardarAsignacionSol(true);
+    if (!ok) return;
+    toastEq('Generando y enviando…');
     const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'GENERAR_ENVIOS_SOL', payload:{id:_solProcId}}) });
     const d = await r.json();
     if (d.status !== 'success') { toastEq(d.message||'Error.'); return; }
     const env = (d.envios||[]).map(e => `${e.proveedor}: ${e.correo}`).join(' · ');
     toastEq('Envíos generados. ' + env);
-    _solCargado = false; procesarSol(_solProcId); cargarSolicitudes();
-  } catch(_) { toastEq('Error de red.'); }
+    _solCargado = false; cargarSolicitudes();
+    procesarSol(_solProcId);
+  } catch(_) {
+    toastEq('Error de red.');
+  } finally {
+    _generandoEnvios = false;
+    const btnFresco = document.getElementById('btn-generar-envios');
+    if (btnFresco) btnFresco.disabled = false;
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -3635,7 +3665,6 @@ function renderMantenimientos(lista) {
   </div>`).join('');
 }
 
-let _mantFotoCount = 0;
 async function abrirModalMant() {
   await cargarEquiposSelect();
   if (!_equiposSel.length) { toastEq('Primero registra o vincula un equipo en Mis Equipos.'); return; }
@@ -3646,7 +3675,6 @@ async function abrirModalMant() {
   document.getElementById('mant-material').value = '';
   document.getElementById('mant-obs').value = '';
   // fotos
-  _mantFotoCount = 0;
   const cont = document.getElementById('mant-fotos'); cont.innerHTML = '';
   for (let i=0;i<9;i++) mantAddFotoSlot(cont, i);
   mantCargarSols();
@@ -3665,6 +3693,8 @@ function mantAddFotoSlot(cont, i) {
 }
 function mantPrevFoto(inp) {
   const f = inp.files && inp.files[0]; if (!f) return;
+  if (f.size > 5 * 1024 * 1024) { toastEq('Cada foto no debe superar 5 MB.'); inp.value=''; return; }
+  if (!/^image\/(jpe?g|png|webp)$/i.test(f.type)) { toastEq('Formato no soportado — usa JPG, PNG o WebP.'); inp.value=''; return; }
   const prev = inp.closest('div').querySelector('.mf-prev');
   const rd = new FileReader(); rd.onload = e => { prev.innerHTML = `<img src="${e.target.result}" style="max-width:100%;max-height:100%;object-fit:cover">`; }; rd.readAsDataURL(f);
 }
@@ -3699,7 +3729,6 @@ async function guardarMant2() {
     if (inp.files && inp.files[0]) {
       fd.append('fotos[]', inp.files[0]);
       fd.append('fotos_etapa[]', inp.closest('div').querySelector('.mf-etapa').value);
-      fd.append('fotos_comentario[]', '');
     }
   });
   const btn = document.getElementById('mant-guardar-btn'); btn.disabled = true; btn.textContent = 'Guardando…';

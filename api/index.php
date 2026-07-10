@@ -1536,6 +1536,7 @@ if ($method === 'POST') {
             $alc = alcanceSub($usr, $cliSub);
             if ($alc['es_sub']) {
                 requiereMantenimiento($alc);
+                bloquearSiLectura($alc);
                 autorizarRecurso($alc, 'equipo', (int)($payload['equipo_ref_id'] ?? 0));
             }
             respuesta($cliMant->crearSolicitud($payload, resolveIdc($usr), $usr));
@@ -1566,6 +1567,7 @@ if ($method === 'POST') {
             $alc = alcanceSub($usr, $cliSub);
             if ($alc['es_sub']) {
                 requiereMantenimiento($alc);
+                bloquearSiLectura($alc);
                 autorizarRecurso($alc, 'equipo', (int)($_POST['equipo_ref_id'] ?? 0));
             }
             respuesta($cliMant->crearMantenimiento($_POST, $_FILES, resolveIdc($usr), $usr));

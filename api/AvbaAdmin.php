@@ -162,7 +162,10 @@ class AvbaAdmin {
                 if (!move_uploaded_file($files['archivo']['tmp_name'], $dir.$fn)) return ['status'=>'error','message'=>'No se pudo guardar.'];
             } else {
                 $fn = 'doc_' . date('YmdHis') . '.jpg';
-                if (!comprimirImagen($files['archivo']['tmp_name'], $dir.$fn, 1600, 1600, 75)) {
+                $real = comprimirImagen($files['archivo']['tmp_name'], $dir.$fn, 1600, 1600, 75);
+                if ($real) {
+                    $fn = $real;
+                } else {
                     $fn = 'doc_' . date('YmdHis') . ".$ext";
                     if (!move_uploaded_file($files['archivo']['tmp_name'], $dir.$fn)) return ['status'=>'error','message'=>'No se pudo guardar.'];
                 }
