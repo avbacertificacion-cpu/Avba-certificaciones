@@ -1,9 +1,14 @@
 <?php
 /**
  * AVBA Certificaciones — Demo Data Seeder
- * Crea usuario demo "CONSTRUCTORA DEMO S.A. DE C.V." con parque completo de equipos.
+ * Crea usuario demo "CONSTRUCTORA DEMO S.A. DE C.V." con parque completo de
+ * equipos, personal, proveedores, catálogo de materiales, solicitudes de
+ * material (en distintos estados) y reportes de mantenimiento con fotos y
+ * PDF reales — para que el portal de cliente se vea completamente activo.
  *
  * USO: php setup_demo.php   (o abrir desde navegador con ?secret=avba_setup_2025)
+ * Es seguro volver a ejecutarlo: limpia los datos demo previos antes de
+ * recrearlos (usuarios/equipos/proveedores/etc. de otros clientes no se tocan).
  * ELIMINAR este archivo del servidor después de ejecutar.
  */
 
@@ -154,6 +159,7 @@ $y = date('Y');
 // ────────────────────────────────────────────────────────────────────────────
 // EQUIPOS DEMO
 // ────────────────────────────────────────────────────────────────────────────
+$eqIds = []; // slug => id, para referenciar los equipos desde mantenimiento/solicitudes
 
 // 1 — Grúa Torre Liebherr 160 EC-B ─────────────────────────────────────────
 $id = insertEquipo($pdo, $demoIdCli, [
@@ -180,6 +186,7 @@ addCert($pdo,$id,'Certificado de Inspección Anual','AB.2024-GT-001',dateAdd($to
 addCert($pdo,$id,'Certificado del Operador — Grúas Torre','AVBA-OP-2024-112',dateAdd($today,'-6 months'),dateAdd($today,'+6 months'),'Operador: Juan Carlos Méndez');
 addCert($pdo,$id,'Verificación de Estructura Metálica','EST-2024-087',dateAdd($today,'-3 months'),dateAdd($today,'+9 months'),'Sin fisuras detectadas');
 addCert($pdo,$id,'Permiso de Operación Municipal','PERM-MUN-2025-003',dateAdd($today,'-1 months'),dateAdd($today,'+20 days'),'⚠️ Por renovar — próximo a vencer');
+$eqIds['grua_torre'] = $id;
 echo "✅ Grúa Torre Liebherr\n";
 
 // 2 — Grúa Móvil Grove GMK5150L ────────────────────────────────────────────
@@ -208,6 +215,7 @@ addCert($pdo,$id,'Certificado de Inspección Anual — Grúa Móvil','AB.2025-GM
 addCert($pdo,$id,'Certificado del Operador','AVBA-OP-2024-089','2024-08-20',dateAdd($today,'+15 days'),'⚠️ Vence muy pronto — operador: Roberto Silva');
 addCert($pdo,$id,'Revisión Técnica Vehicular','RTV-2025-GM-001','2025-03-01',dateAdd($today,'+8 months'),'Grúa en óptimas condiciones');
 addCert($pdo,$id,'Permiso de Circulación Especial','PERM-SCT-2025-117','2025-02-01',dateAdd($today,'+25 days'),'Para transporte en carretera federal');
+$eqIds['grua_movil'] = $id;
 echo "✅ Grúa Móvil Grove GMK5150L\n";
 
 // 3 — Grúa Viajera Demag KBK-II ────────────────────────────────────────────
@@ -230,6 +238,7 @@ addHora($pdo,$id,4200.0,'2024-11-30');
 addHora($pdo,$id,4350.0,'2025-01-31','Antes de entrar a mantenimiento');
 addCert($pdo,$id,'Certificado de Inspección Anual','AB.2024-GV-003','2024-06-15',dateAdd($today,'-45 days'),'❌ VENCIDA — requiere nueva inspección');
 addCert($pdo,$id,'Certificado del Operador (Polipasto)','AVBA-OP-2024-055','2024-05-01',dateAdd($today,'+7 months'));
+$eqIds['grua_viajera'] = $id;
 echo "✅ Grúa Viajera Demag KBK-II\n";
 
 // 4 — PTEM Genie Z-62/40 ───────────────────────────────────────────────────
@@ -255,6 +264,7 @@ addHora($pdo,$id,1105.0,$today,'Lectura actual');
 addCert($pdo,$id,'Certificado de Inspección PTEM','AB.2025-PT-001','2025-01-15',dateAdd($today,'+10 months'),'Conforme NOM-009-STPS');
 addCert($pdo,$id,'Certificado del Operador en Altura','AVBA-OP-2025-021','2025-02-01',dateAdd($today,'+11 months'),'Operador: Luis Alberto García');
 addCert($pdo,$id,'Verificación de Arneses y EPP','EPP-2025-PTEM-007','2025-04-01',dateAdd($today,'+10 months'),'10 arneses revisados y aprobados');
+$eqIds['ptem_genie'] = $id;
 echo "✅ PTEM Genie Z-62/40\n";
 
 // 5 — PTEM JLG 600AJ ────────────────────────────────────────────────────────
@@ -277,6 +287,7 @@ addHora($pdo,$id,680.0,'2025-04-30');
 addHora($pdo,$id,780.5,$today,'Pre-inspección');
 addCert($pdo,$id,'Certificado de Inspección PTEM','AB.2024-PT-008','2024-06-20',dateAdd($today,'-30 days'),'❌ VENCIDA — inspección en proceso');
 addCert($pdo,$id,'Certificado del Operador','AVBA-OP-2025-033','2025-03-01',dateAdd($today,'+9 months'));
+$eqIds['ptem_jlg'] = $id;
 echo "✅ PTEM JLG 600AJ\n";
 
 // 6 — Montacargas Toyota 8FBE20 ────────────────────────────────────────────
@@ -303,6 +314,7 @@ addHora($pdo,$id,7050.5,$today);
 addCert($pdo,$id,'Certificado de Inspección Anual — Montacargas','AB.2025-MF-002','2025-02-10',dateAdd($today,'+8 months'),'Conforme NOM-006-STPS');
 addCert($pdo,$id,'Certificado del Operador de Montacargas','AVBA-OP-2024-101','2024-11-01',dateAdd($today,'+5 months'));
 addCert($pdo,$id,'Revisión de Mástil y Horquillas','MAST-2025-001','2025-01-15',dateAdd($today,'+7 months'),'Sin deformaciones ni grietas');
+$eqIds['montacargas'] = $id;
 echo "✅ Montacargas Toyota 8FBE20\n";
 
 // 7 — Camión Grúa Terex AC 100 ─────────────────────────────────────────────
@@ -328,6 +340,7 @@ addHora($pdo,$id,15350.0,$today,'Turno regular');
 addCert($pdo,$id,'Certificado de Inspección Anual — Grúa Móvil','AB.2024-GM-012','2024-05-20',dateAdd($today,'-60 days'),'❌ VENCIDA — requiere inspección urgente');
 addCert($pdo,$id,'Certificado del Operador','AVBA-OP-2024-044','2024-04-01',dateAdd($today,'+8 months'),'Operador: Pedro Ramírez López');
 addCert($pdo,$id,'Revisión Técnica Vehicular','RTV-2024-003','2024-07-01',dateAdd($today,'+22 days'),'⚠️ Por vencer');
+$eqIds['camion_grua'] = $id;
 echo "✅ Camión Grúa Terex AC 100\n";
 
 // 8 — Camión Kenworth T680 ──────────────────────────────────────────────────
@@ -352,6 +365,7 @@ addHora($pdo,$id,135000.0,'2025-03-31','Km acumulados');
 addHora($pdo,$id,148500.0,$today,'Lectura odómetro actual');
 addCert($pdo,$id,'Verificación Vehicular','VERIF-2025-KW-001','2025-01-20',dateAdd($today,'+11 months'));
 addCert($pdo,$id,'Licencia de Operador Clase E','LIC-FED-2024-0234','2024-09-01',dateAdd($today,'+15 months'),'Operador: Marco Antonio Torres');
+$eqIds['camion_kw'] = $id;
 echo "✅ Camión Kenworth T680\n";
 
 // 9 — Retroexcavadora Caterpillar 323 ──────────────────────────────────────
@@ -376,6 +390,7 @@ addHora($pdo,$id,4320.5,'2025-05-31');
 addHora($pdo,$id,4680.0,$today);
 addCert($pdo,$id,'Certificado de Operador de Maquinaria Pesada','AVBA-OP-2025-044','2025-03-01',dateAdd($today,'+9 months'),'Operador: Alejandro Fuentes');
 addCert($pdo,$id,'Revisión de Estructura y Sistemas Hidráulicos','HID-2025-CAT-001','2025-01-10',dateAdd($today,'+7 months'),'Sin fugas, presiones correctas');
+$eqIds['retro'] = $id;
 echo "✅ Retroexcavadora CAT 323\n";
 
 // 10 — Grúa Puente 10t ─────────────────────────────────────────────────────
@@ -398,6 +413,7 @@ addHora($pdo,$id,2100.0,'2024-06-30');
 addHora($pdo,$id,2250.0,'2024-12-31');
 addCert($pdo,$id,'Certificado de Inspección Anual — Grúa Puente','AB.2024-GP-001','2024-03-10',dateAdd($today,'-90 days'),'❌ VENCIDA — equipo fuera de servicio');
 addCert($pdo,$id,'Verificación de Estructura Metálica','EST-2023-GP-001','2023-10-01',dateAdd($today,'-180 days'),'❌ VENCIDA — pendiente reparación');
+$eqIds['grua_puente'] = $id;
 echo "✅ Grúa Puente Abus 10t\n";
 
 // 11 — Camioneta F-350 ─────────────────────────────────────────────────────
@@ -418,6 +434,7 @@ addDoc($pdo,$id,'bitacora','Bitácora de combustible y servicios',dateAdd($today
 addHora($pdo,$id,42000.0,'2025-03-31','Km acumulados');
 addHora($pdo,$id,48500.0,$today,'Km actuales');
 addCert($pdo,$id,'Verificación Vehicular (tenencia)',dateAdd($today,'+3 months'),'VV-F350-2025',null,dateAdd($today,'+14 months'));
+$eqIds['f350'] = $id;
 echo "✅ Camioneta Ford F-350\n";
 
 // 12 — Conjunto de Accesorios de Izaje ─────────────────────────────────────
@@ -439,6 +456,7 @@ addDoc($pdo,$id,'manual','Procedimiento de inspección y uso',null,'Basado en AS
 addCert($pdo,$id,'Certificación de Accesorios de Izaje — Lote A','AB.2025-ACC-001','2025-02-15',dateAdd($today,'+8 months'),'Eslingas 1t-10t — conforme');
 addCert($pdo,$id,'Certificación de Accesorios de Izaje — Lote B','AB.2025-ACC-002','2025-02-15',dateAdd($today,'+8 months'),'Grilletes y ganchos — conforme');
 addCert($pdo,$id,'Recertificación de Polipastos','AB.2024-POL-003','2024-09-01',dateAdd($today,'+18 days'),'⚠️ Por vencer pronto');
+$eqIds['accesorios'] = $id;
 echo "✅ Accesorios de Izaje\n";
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -607,6 +625,384 @@ addPCert($pdo,$id,'Coordinador HSE Nivel Senior','AB.2024-HSE-001','AVBA Certifi
 addPDoc($pdo,$id,'constancia','Carta de recomendación',null,'');
 echo "✅ Patricia Flores (HSE — Baja)\n";
 
+// ══════════════════════════════════════════════════════════════════════════
+// 4. PROVEEDORES, MATERIALES, CONFIGURACIÓN Y MANTENIMIENTO
+// ══════════════════════════════════════════════════════════════════════════
+require_once __DIR__ . '/api/helpers.php';
+require_once __DIR__ . '/api/ClienteProveedores.php';
+require_once __DIR__ . '/api/ClienteMateriales.php';
+require_once __DIR__ . '/api/ClienteConfig.php';
+require_once __DIR__ . '/api/ClienteMantenimiento.php';
+
+$cliProv = new ClienteProveedores($pdo);
+$cliMat  = new ClienteMateriales($pdo);
+$cliCfg  = new ClienteConfig($pdo);
+$cliMant = new ClienteMantenimiento($pdo);
+
+// Limpiar datos previos del demo en estas tablas para poder re-ejecutar el
+// seeder sin duplicar (mismo criterio que el resto del script).
+$pdo->prepare("DELETE FROM cliente_proveedores WHERE id_cliente=?")->execute([$demoIdCli]);
+$pdo->prepare("DELETE FROM cliente_materiales WHERE id_cliente=?")->execute([$demoIdCli]);
+foreach ($pdo->query("SELECT id FROM cliente_sol_material WHERE id_cliente='$demoIdCli'")->fetchAll() as $s) {
+    $pdo->prepare("DELETE FROM cliente_sol_material_item WHERE sol_id=?")->execute([$s['id']]);
+    $pdo->prepare("DELETE FROM cliente_sol_envio WHERE sol_id=?")->execute([$s['id']]);
+}
+$pdo->prepare("DELETE FROM cliente_sol_material WHERE id_cliente=?")->execute([$demoIdCli]);
+foreach ($pdo->query("SELECT id FROM cliente_mantenimiento WHERE id_cliente='$demoIdCli'")->fetchAll() as $m) {
+    $pdo->prepare("DELETE FROM cliente_mantenimiento_foto WHERE mant_id=?")->execute([$m['id']]);
+    $pdo->prepare("DELETE FROM cliente_mantenimiento_sol WHERE mant_id=?")->execute([$m['id']]);
+}
+$pdo->prepare("DELETE FROM cliente_mantenimiento WHERE id_cliente=?")->execute([$demoIdCli]);
+echo "🗑  Proveedores/materiales/solicitudes/mantenimiento previos del demo eliminados\n";
+
+// ── Generador de fotos de muestra (GD) ──────────────────────────────────────
+// No hay fotografías reales que subir en un seeder, así que se generan
+// imágenes sencillas con GD (silueta de equipo + etiqueta ANTES/DESPUÉS) para
+// que la galería y los PDF de evidencia no queden vacíos ni rotos.
+function generarFotoDemo(string $path, string $equipo, string $etapa, string $detalle): bool {
+    if (!function_exists('imagecreatetruecolor')) return false;
+    $w = 900; $h = 620;
+    $img = imagecreatetruecolor($w, $h);
+    $despues = ($etapa === 'despues');
+    for ($y = 0; $y < $h; $y++) {
+        $t = $y / $h;
+        if ($despues) { $r = 28 + (int)(35*$t); $g = 68 + (int)(55*$t); $b = 40 + (int)(28*$t); }
+        else          { $r = 72 + (int)(48*$t); $g = 56 + (int)(34*$t); $b = 40 + (int)(20*$t); }
+        imageline($img, 0, $y, $w, $y, imagecolorallocate($img, $r, $g, $b));
+    }
+    $metal  = imagecolorallocate($img, 55, 58, 66);
+    $metalD = imagecolorallocate($img, 28, 30, 36);
+    imagefilledrectangle($img, 180, 260, 720, 430, $metal);
+    imagefilledrectangle($img, 260, 195, 640, 265, $metal);
+    imagefilledellipse($img, 260, 430, 110, 110, $metalD);
+    imagefilledellipse($img, 640, 430, 110, 110, $metalD);
+    imagefilledellipse($img, 260, 430, 46, 46, imagecolorallocate($img, 92, 94, 100));
+    imagefilledellipse($img, 640, 430, 46, 46, imagecolorallocate($img, 92, 94, 100));
+    $franja = $despues ? imagecolorallocate($img, 32, 130, 60) : imagecolorallocate($img, 176, 120, 20);
+    imagefilledrectangle($img, 0, $h-56, $w, $h, $franja);
+    $white = imagecolorallocate($img, 255, 255, 255);
+    imagestring($img, 5, 24, 20, mb_strtoupper($equipo), $white);
+    imagestring($img, 4, 24, 44, $detalle, imagecolorallocate($img, 225, 225, 225));
+    imagestring($img, 5, 24, $h-42, 'EVIDENCIA — ' . ($despues ? 'DESPUÉS' : 'ANTES'), $white);
+    imagestring($img, 3, $w-280, $h-30, 'AVBA Demo · foto de muestra', $white);
+    $ok = imagejpeg($img, $path, 82);
+    imagedestroy($img);
+    return $ok;
+}
+
+/** Arma un arreglo $_FILES-compatible con fotos generadas y fija $_POST['fotos_etapa']
+ *  (guardarFotos() lo lee directo de $_POST, no como parámetro). */
+function fotosDemoParaMant(array $items): array {
+    $tmpDir = sys_get_temp_dir();
+    $name = []; $tmp = []; $err = []; $size = [];
+    foreach ($items as $it) {
+        $path = $tmpDir . '/avba_demo_foto_' . uniqid('', true) . '.jpg';
+        generarFotoDemo($path, $it['equipo'], $it['etapa'], $it['detalle']);
+        $name[] = 'foto.jpg'; $tmp[] = $path; $err[] = 0; $size[] = @filesize($path) ?: 0;
+    }
+    $_POST['fotos_etapa'] = array_column($items, 'etapa');
+    return ['tmp' => $tmp, 'files' => ['fotos' => ['name'=>$name,'tmp_name'=>$tmp,'error'=>$err,'size'=>$size]]];
+}
+function limpiarTmp(array $rutas): void { foreach ($rutas as $t) { @unlink($t); } }
+
+function obtenerItemIds(PDO $pdo, int $solId): array {
+    $s = $pdo->prepare("SELECT id FROM cliente_sol_material_item WHERE sol_id=? ORDER BY id");
+    $s->execute([$solId]);
+    return array_map('intval', $s->fetchAll(PDO::FETCH_COLUMN));
+}
+
+// ── PROVEEDORES ──────────────────────────────────────────────────────────
+echo "\n=== CREANDO PROVEEDORES ===\n";
+$provIds = [];
+$proveedoresDemo = [
+    ['slug'=>'hidraulica',  'nombre'=>'Hidráulica y Mangueras de México S.A. de C.V.', 'giro'=>'Mangueras, sellos y sistemas hidráulicos', 'rfc'=>'HMM950214A21', 'contacto'=>'Ing. Patricia Solano', 'telefono'=>'81 8123 4501', 'correo'=>'ventas@hidraulicamx-demo.com', 'sitio_web'=>'hidraulicamx-demo.com', 'direccion'=>'Av. Industrias del Poniente 1245', 'ciudad'=>'Monterrey', 'estado_ubic'=>'Nuevo León', 'notas'=>'Entrega en 24-48h, buen precio en mangueras a la medida.'],
+    ['slug'=>'refaccionaria','nombre'=>'Refaccionaria Industrial del Norte',            'giro'=>'Refacciones y partes industriales',       'rfc'=>'RIN870630B45', 'contacto'=>'Sr. Arturo Beltrán',   'telefono'=>'81 8234 7789', 'correo'=>'compras@rin-demo.mx',       'sitio_web'=>'rin-demo.mx',        'direccion'=>'Blvd. Díaz Ordaz 890',              'ciudad'=>'San Nicolás de los Garza','estado_ubic'=>'Nuevo León', 'notas'=>'Proveedor principal de refacciones generales.'],
+    ['slug'=>'llantas',     'nombre'=>'Llantera Industrial Monterrey',                  'giro'=>'Llantas y rines para equipo pesado',      'rfc'=>'LIM101122C88', 'contacto'=>'Sr. Daniel Ochoa',     'telefono'=>'81 8345 1290', 'correo'=>'daniel.ochoa@llantasmty-demo.com', 'sitio_web'=>'llantasmty-demo.com','direccion'=>'Carretera a Laredo Km 12',          'ciudad'=>'Apodaca',            'estado_ubic'=>'Nuevo León', 'notas'=>'Maneja llantas OTR y de camión de línea.'],
+    ['slug'=>'lubricantes', 'nombre'=>'Lubricantes y Aceites del Bajío S.A. de C.V.',   'giro'=>'Aceites, grasas y lubricantes industriales','rfc'=>'LAB050912D67','contacto'=>'Lic. Mónica Reyes',   'telefono'=>'477 712 4456', 'correo'=>'monica.reyes@lubribajio-demo.com', 'sitio_web'=>'lubribajio-demo.com','direccion'=>'Parque Industrial El Bajío, Nave 7','ciudad'=>'León',              'estado_ubic'=>'Guanajuato', 'notas'=>'Distribuidor autorizado, entrega foránea 3-5 días.'],
+    ['slug'=>'electrico',   'nombre'=>'Eléctrico Industrial Torres',                    'giro'=>'Componentes eléctricos y control',        'rfc'=>'EIT160305E12', 'contacto'=>'Ing. Sergio Torres',   'telefono'=>'81 8456 9012', 'correo'=>'sergio@electricotorres-demo.mx', 'sitio_web'=>'electricotorres-demo.mx','direccion'=>'Calle Morones Prieto 456','ciudad'=>'Monterrey',      'estado_ubic'=>'Nuevo León', 'notas'=>'Baterías, contactores y tableros de control.'],
+    ['slug'=>'rodamientos', 'nombre'=>'Rodamientos y Transmisiones S.A. de C.V.',       'giro'=>'Rodamientos, bandas y cadenas',           'rfc'=>'RTS991103F34', 'contacto'=>'Sr. Iván Camacho',     'telefono'=>'81 8567 3345', 'correo'=>'ivan.camacho@rodatrans-demo.com', 'sitio_web'=>'rodatrans-demo.com','direccion'=>'Av. Fundidora 2100',                'ciudad'=>'Monterrey',          'estado_ubic'=>'Nuevo León', 'notas'=>'Stock amplio de rodamientos para grúas y montacargas.'],
+];
+foreach ($proveedoresDemo as $p) {
+    $r = $cliProv->guardar($p, $demoIdCli);
+    $provIds[$p['slug']] = $r['id'] ?? 0;
+}
+echo "✅ " . count($provIds) . " proveedores registrados\n";
+
+// ── MATERIALES (catálogo) ───────────────────────────────────────────────
+echo "\n=== CREANDO CATÁLOGO DE MATERIALES ===\n";
+$materialesDemo = [
+    ['nombre'=>'Manguera hidráulica 1/2" SAE 100R2', 'num_parte'=>'MH-100R2-12',  'unidad'=>'m',   'categoria'=>'Hidráulica'],
+    ['nombre'=>'Sello kit cilindro hidráulico principal', 'num_parte'=>'SK-CIL-450', 'unidad'=>'kit', 'categoria'=>'Hidráulica'],
+    ['nombre'=>'Aceite hidráulico ISO 68',            'num_parte'=>'AH-ISO68-208', 'unidad'=>'L',   'categoria'=>'Lubricantes'],
+    ['nombre'=>'Aceite de motor diésel 15W40',        'num_parte'=>'AM-15W40-208', 'unidad'=>'L',   'categoria'=>'Lubricantes'],
+    ['nombre'=>'Grasa multiusos EP-2',                'num_parte'=>'GR-EP2-16',    'unidad'=>'kg',  'categoria'=>'Lubricantes'],
+    ['nombre'=>'Filtro de aceite hidráulico',         'num_parte'=>'FLT-HID-220',  'unidad'=>'pza', 'categoria'=>'Filtros'],
+    ['nombre'=>'Filtro de aire motor',                'num_parte'=>'FLT-AIR-330',  'unidad'=>'pza', 'categoria'=>'Filtros'],
+    ['nombre'=>'Filtro de combustible diésel',        'num_parte'=>'FLT-COMB-118', 'unidad'=>'pza', 'categoria'=>'Filtros'],
+    ['nombre'=>'Llanta OTR 12.00-24',                 'num_parte'=>'LL-OTR-1200',  'unidad'=>'pza', 'categoria'=>'Llantas y rodamiento'],
+    ['nombre'=>'Rodamiento cónico mástil montacargas', 'num_parte'=>'ROD-MAST-77', 'unidad'=>'pza', 'categoria'=>'Llantas y rodamiento'],
+    ['nombre'=>'Rodamiento de carrilería grúa puente', 'num_parte'=>'ROD-CARR-45', 'unidad'=>'pza', 'categoria'=>'Llantas y rodamiento'],
+    ['nombre'=>'Cable de acero 6x19 IPS 1/2"',        'num_parte'=>'CAB-6X19-12',  'unidad'=>'m',   'categoria'=>'Izaje'],
+    ['nombre'=>'Batería industrial 12V 150Ah',        'num_parte'=>'BAT-12V-150',  'unidad'=>'pza', 'categoria'=>'Eléctrico'],
+    ['nombre'=>'Contactor de control 40A',            'num_parte'=>'CTR-40A',      'unidad'=>'pza', 'categoria'=>'Eléctrico'],
+    ['nombre'=>'Banda de transmisión industrial',     'num_parte'=>'BND-TR-210',   'unidad'=>'pza', 'categoria'=>'Transmisión'],
+    ['nombre'=>'Balatas de freno (juego)',            'num_parte'=>'BAL-FRE-090',  'unidad'=>'juego','categoria'=>'Frenos'],
+    ['nombre'=>'Guantes de trabajo reforzados',       'num_parte'=>'EPP-GT-010',   'unidad'=>'par', 'categoria'=>'Consumibles'],
+    ['nombre'=>'Trapo industrial absorbente',         'num_parte'=>'CONS-TRAP-01', 'unidad'=>'kg',  'categoria'=>'Consumibles'],
+];
+foreach ($materialesDemo as $m) { $cliMat->guardar($m, $demoIdCli); }
+echo "✅ " . count($materialesDemo) . " materiales en catálogo\n";
+
+// ── CONFIGURACIÓN DEL CLIENTE ────────────────────────────────────────────
+$cliCfg->guardar([
+    'razon_social' => $demoNombre,
+    'rfc'          => 'CDE180523LK9',
+], [], $demoIdCli);
+echo "✅ Configuración del cliente (razón social/RFC)\n";
+
+// ── SOLICITUDES DE MATERIAL ──────────────────────────────────────────────
+echo "\n=== CREANDO SOLICITUDES DE MATERIAL ===\n";
+$usrRoberto = ['id' => 0, 'nombre' => 'Roberto Díaz Morales'];
+$usrJose    = ['id' => 0, 'nombre' => 'José Luis Hernández Cruz'];
+$solIds = [];
+
+// 1 — Grúa Torre: mangueras + filtro — se asigna y se envía (queda "enviada")
+$r = $cliMant->crearSolicitud([
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['grua_torre'],
+    'fecha_requerida' => dateAdd($today, '+5 days'),
+    'notas' => 'Urge para mantenimiento preventivo programado del viernes.',
+    'items' => [
+        ['descripcion' => 'Manguera hidráulica 1/2" SAE 100R2', 'cantidad' => 6, 'unidad' => 'm', 'num_parte' => 'MH-100R2-12'],
+        ['descripcion' => 'Filtro de aceite hidráulico',        'cantidad' => 2, 'unidad' => 'pza','num_parte' => 'FLT-HID-220'],
+    ],
+], $demoIdCli, $usrRoberto);
+$solIds['grua_torre'] = $r['id'] ?? 0;
+echo "✅ Solicitud SM — Grúa Torre (folio {$r['folio']})\n";
+
+// 2 — Montacargas: rodamiento + llanta — queda "parcial" (un ítem sin asignar)
+$r = $cliMant->crearSolicitud([
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['montacargas'],
+    'fecha_requerida' => dateAdd($today, '+10 days'),
+    'notas' => 'Ruido detectado en mástil durante inspección diaria.',
+    'items' => [
+        ['descripcion' => 'Rodamiento cónico mástil montacargas', 'cantidad' => 2, 'unidad' => 'pza', 'num_parte' => 'ROD-MAST-77'],
+        ['descripcion' => 'Llanta sólida delantera (par)',        'cantidad' => 1, 'unidad' => 'juego'],
+    ],
+], $demoIdCli, $usrRoberto);
+$solIds['montacargas'] = $r['id'] ?? 0;
+echo "✅ Solicitud SM — Montacargas (folio {$r['folio']})\n";
+
+// 3 — Retroexcavadora: aceite + filtros — abierta (sin procesar aún)
+$r = $cliMant->crearSolicitud([
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['retro'],
+    'fecha_requerida' => dateAdd($today, '+7 days'),
+    'notas' => 'Para servicio de las 4,500 horas.',
+    'items' => [
+        ['descripcion' => 'Aceite hidráulico ISO 68',    'cantidad' => 60, 'unidad' => 'L',  'num_parte' => 'AH-ISO68-208'],
+        ['descripcion' => 'Filtro de aceite hidráulico', 'cantidad' => 3,  'unidad' => 'pza', 'num_parte' => 'FLT-HID-220'],
+        ['descripcion' => 'Filtro de aire motor',        'cantidad' => 2,  'unidad' => 'pza', 'num_parte' => 'FLT-AIR-330'],
+    ],
+], $demoIdCli, $usrRoberto);
+$solIds['retro'] = $r['id'] ?? 0;
+echo "✅ Solicitud SM — Retroexcavadora (folio {$r['folio']})\n";
+
+// 4 — Camión Grúa Terex: llantas + balatas — abierta
+$r = $cliMant->crearSolicitud([
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['camion_grua'],
+    'fecha_requerida' => dateAdd($today, '+15 days'),
+    'notas' => 'Programar antes de la inspección anual pendiente.',
+    'items' => [
+        ['descripcion' => 'Llanta OTR 12.00-24',        'cantidad' => 4, 'unidad' => 'pza',  'num_parte' => 'LL-OTR-1200'],
+        ['descripcion' => 'Balatas de freno (juego)',   'cantidad' => 1, 'unidad' => 'juego', 'num_parte' => 'BAL-FRE-090'],
+    ],
+], $demoIdCli, $usrJose);
+$solIds['camion_grua'] = $r['id'] ?? 0;
+echo "✅ Solicitud SM — Camión Grúa Terex (folio {$r['folio']})\n";
+
+// 5 — PTEM JLG: batería — se asigna y se envía (queda "enviada")
+$r = $cliMant->crearSolicitud([
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['ptem_jlg'],
+    'fecha_requerida' => dateAdd($today, '+3 days'),
+    'notas' => 'Batería no retiene carga, equipo detenido en inspección técnica.',
+    'items' => [
+        ['descripcion' => 'Batería industrial 12V 150Ah', 'cantidad' => 4, 'unidad' => 'pza', 'num_parte' => 'BAT-12V-150'],
+        ['descripcion' => 'Contactor de control 40A',      'cantidad' => 1, 'unidad' => 'pza', 'num_parte' => 'CTR-40A'],
+    ],
+], $demoIdCli, $usrRoberto);
+$solIds['ptem_jlg'] = $r['id'] ?? 0;
+echo "✅ Solicitud SM — PTEM JLG 600AJ (folio {$r['folio']})\n";
+
+// 6 — Grúa Puente: rodamientos + cable — queda "parcial"
+$r = $cliMant->crearSolicitud([
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['grua_puente'],
+    'fecha_requerida' => dateAdd($today, '+8 days'),
+    'notas' => 'Parte de la corrección estructural en curso (equipo fuera de servicio).',
+    'items' => [
+        ['descripcion' => 'Rodamiento de carrilería grúa puente', 'cantidad' => 4, 'unidad' => 'pza', 'num_parte' => 'ROD-CARR-45'],
+        ['descripcion' => 'Cable de acero 6x19 IPS 1/2"',         'cantidad' => 20, 'unidad' => 'm',  'num_parte' => 'CAB-6X19-12'],
+    ],
+], $demoIdCli, $usrJose);
+$solIds['grua_puente'] = $r['id'] ?? 0;
+echo "✅ Solicitud SM — Grúa Puente (folio {$r['folio']})\n";
+
+// Asignar proveedores y generar envíos para dejar estados realistas
+// (enviada / parcial / abierta, tal como se vería en un cliente activo)
+function asignarYEnviar(ClienteMantenimiento $cliMant, PDO $pdo, int $solId, string $idCli, array $asign, bool $generarEnvio) {
+    if (!$solId) return;
+    $ids = obtenerItemIds($pdo, $solId);
+    $asignaciones = [];
+    foreach ($asign as $idx => $provId) { if (isset($ids[$idx])) $asignaciones[$ids[$idx]] = $provId; }
+    if ($asignaciones) $cliMant->asignarProveedores($solId, $asignaciones, $idCli);
+    if ($generarEnvio) $cliMant->generarEnvios($solId, $idCli);
+}
+asignarYEnviar($cliMant, $pdo, $solIds['grua_torre'],   $demoIdCli, [0 => $provIds['hidraulica'],   1 => $provIds['hidraulica']],   true);  // enviada
+asignarYEnviar($cliMant, $pdo, $solIds['montacargas'],  $demoIdCli, [0 => $provIds['rodamientos']],                                  true);  // parcial (ítem 1 sin asignar)
+asignarYEnviar($cliMant, $pdo, $solIds['ptem_jlg'],     $demoIdCli, [0 => $provIds['electrico'], 1 => $provIds['electrico']],        true);  // enviada
+asignarYEnviar($cliMant, $pdo, $solIds['grua_puente'],  $demoIdCli, [0 => $provIds['rodamientos']],                                  true);  // parcial (ítem 1 sin asignar)
+// retro y camion_grua se quedan "abierta" a propósito, para mostrar ese estado también.
+echo "✅ Asignaciones y envíos a proveedores generados (con PDF real si mPDF está disponible)\n";
+
+// ── REPORTES DE MANTENIMIENTO (énfasis del demo) ────────────────────────
+echo "\n=== CREANDO REPORTES DE MANTENIMIENTO ===\n";
+
+function crearMantDemo(ClienteMantenimiento $cliMant, string $idCli, array $usr, array $data, array $fotos): array {
+    $f = fotosDemoParaMant($fotos);
+    $r = $cliMant->crearMantenimiento($data, $f['files'], $idCli, $usr);
+    limpiarTmp($f['tmp']);
+    return $r;
+}
+
+// 1 — Grúa Torre: preventivo, ligado a la solicitud de mangueras
+$r = crearMantDemo($cliMant, $demoIdCli, $usrRoberto, [
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['grua_torre'],
+    'fecha' => dateAdd($today, '-2 days'), 'tipo_mant' => 'Preventivo',
+    'trabajo' => "Mantenimiento preventivo programado de 2000h. Cambio de mangueras hidráulicas del sistema de pluma (desgaste por abrasión detectado en inspección previa), reemplazo de filtro de aceite hidráulico y purga completa del circuito. Se revisaron conexiones, torque de pernos de anclaje y sistema de frenos de giro.",
+    'material_usado' => "6 m de manguera hidráulica 1/2\" SAE 100R2, 2 filtros de aceite hidráulico, 40 L de aceite ISO 68 de repuesto para purga.",
+    'observaciones' => "Equipo operando de forma normal después del servicio. Sin fugas detectadas tras prueba de presión. Se recomienda dar seguimiento a la póliza de seguro que vence en los próximos meses.",
+    'solicitudes' => [$solIds['grua_torre']],
+], [
+    ['equipo'=>'Grúa Torre Liebherr', 'etapa'=>'antes',   'detalle'=>'Manguera con desgaste visible'],
+    ['equipo'=>'Grúa Torre Liebherr', 'etapa'=>'antes',   'detalle'=>'Filtro de aceite hidráulico saturado'],
+    ['equipo'=>'Grúa Torre Liebherr', 'etapa'=>'despues', 'detalle'=>'Mangueras y filtro reemplazados'],
+]);
+echo "✅ Reporte — Grúa Torre (folio {$r['folio']})\n";
+
+// 2 — Montacargas: correctivo, ligado a solicitud de rodamientos
+$r = crearMantDemo($cliMant, $demoIdCli, $usrRoberto, [
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['montacargas'],
+    'fecha' => dateAdd($today, '-6 days'), 'tipo_mant' => 'Correctivo',
+    'trabajo' => "Se atendió reporte de ruido anormal en el mástil durante elevación de carga. Al desarmar se encontró rodamiento cónico superior con desgaste avanzado y falta de lubricación. Se sustituyeron ambos rodamientos del mástil, se relubricó el conjunto completo y se ajustaron cadenas de elevación.",
+    'material_usado' => "2 rodamientos cónicos de mástil, grasa multiusos EP-2 (1.5 kg).",
+    'observaciones' => "Ruido eliminado por completo. Se realizaron 15 ciclos de prueba con carga nominal sin anomalías. Equipo reincorporado a operación en almacén principal.",
+    'solicitudes' => [$solIds['montacargas']],
+], [
+    ['equipo'=>'Montacargas Toyota', 'etapa'=>'antes',   'detalle'=>'Rodamiento con desgaste avanzado'],
+    ['equipo'=>'Montacargas Toyota', 'etapa'=>'antes',   'detalle'=>'Mástil desarmado para inspección'],
+    ['equipo'=>'Montacargas Toyota', 'etapa'=>'despues', 'detalle'=>'Rodamientos nuevos instalados'],
+    ['equipo'=>'Montacargas Toyota', 'etapa'=>'despues', 'detalle'=>'Prueba de carga sin anomalías'],
+]);
+echo "✅ Reporte — Montacargas (folio {$r['folio']})\n";
+
+// 3 — Grúa Viajera Demag: correctivo (coincide con "Mantenimiento" en Mis Equipos)
+$r = crearMantDemo($cliMant, $demoIdCli, $usrJose, [
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['grua_viajera'],
+    'fecha' => dateAdd($today, '-1 days'), 'tipo_mant' => 'Correctivo',
+    'trabajo' => "Cambio de rodamientos del carro viajero conforme a orden de mantenimiento MP-2025-034. Se retiró polipasto, se sustituyeron rodamientos de las ruedas del carro y se realizó lubricación general de la vía KBK-II.",
+    'material_usado' => "Rodamientos de carro viajero, grasa multiusos EP-2.",
+    'observaciones' => "Trabajo en proceso de cierre — pendiente prueba final de desplazamiento a lo largo de toda la vía antes de reincorporar el equipo a producción.",
+    'solicitudes' => [],
+], [
+    ['equipo'=>'Grúa Viajera Demag', 'etapa'=>'antes',   'detalle'=>'Carro viajero desmontado'],
+    ['equipo'=>'Grúa Viajera Demag', 'etapa'=>'despues', 'detalle'=>'Rodamientos nuevos y vía lubricada'],
+]);
+echo "✅ Reporte — Grúa Viajera Demag (folio {$r['folio']})\n";
+
+// 4 — PTEM Genie: preventivo de rutina
+$r = crearMantDemo($cliMant, $demoIdCli, $usrRoberto, [
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['ptem_genie'],
+    'fecha' => dateAdd($today, '-10 days'), 'tipo_mant' => 'Preventivo',
+    'trabajo' => "Servicio programado de 250 horas. Revisión de niveles de aceite hidráulico, inspección visual de mangueras y cilindros, prueba de funciones de emergencia (descenso manual, paro de emergencia) y verificación de sensores de nivel/inclinación.",
+    'material_usado' => "Sin refacciones — solo insumos de taller (trapo, desengrasante).",
+    'observaciones' => "Equipo en óptimas condiciones. Checklist pre-operación firmado sin observaciones. Próximo servicio programado en 250h adicionales.",
+    'solicitudes' => [],
+], [
+    ['equipo'=>'PTEM Genie Z-62/40', 'etapa'=>'antes',   'detalle'=>'Inspección de mangueras y cilindros'],
+    ['equipo'=>'PTEM Genie Z-62/40', 'etapa'=>'despues', 'detalle'=>'Servicio completado, checklist OK'],
+]);
+echo "✅ Reporte — PTEM Genie (folio {$r['folio']})\n";
+
+// 5 — Retroexcavadora: preventivo, ligado a la solicitud de aceite/filtros
+$r = crearMantDemo($cliMant, $demoIdCli, $usrRoberto, [
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['retro'],
+    'fecha' => dateAdd($today, '-3 days'), 'tipo_mant' => 'Preventivo',
+    'trabajo' => "Servicio de las 4,500 horas: cambio de aceite de motor y sistema hidráulico, sustitución de filtros de aceite, aire y combustible, engrasado general de pines y bujes del brazo/cucharón.",
+    'material_usado' => "60 L de aceite hidráulico ISO 68, 3 filtros de aceite hidráulico, 2 filtros de aire, grasa multiusos.",
+    'observaciones' => "Servicio completado sin contratiempos. Se detectó ligero desgaste en buje del cucharón — se dará seguimiento en próximo servicio, aún dentro de tolerancia.",
+    'solicitudes' => [$solIds['retro']],
+], [
+    ['equipo'=>'Retroexcavadora CAT 323', 'etapa'=>'antes',   'detalle'=>'Cambio de aceite y filtros'],
+    ['equipo'=>'Retroexcavadora CAT 323', 'etapa'=>'despues', 'detalle'=>'Servicio de 4500h completado'],
+]);
+echo "✅ Reporte — Retroexcavadora CAT 323 (folio {$r['folio']})\n";
+
+// 6 — Camión Kenworth: preventivo mayor
+$r = crearMantDemo($cliMant, $demoIdCli, $usrJose, [
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['camion_kw'],
+    'fecha' => dateAdd($today, '-14 days'), 'tipo_mant' => 'Preventivo',
+    'trabajo' => "Servicio mayor de 15,000 km. Cambio de aceite y filtros de motor, revisión y ajuste de frenos, inspección de suspensión neumática y rotación de llantas.",
+    'material_usado' => "Aceite de motor diésel 15W40, filtros de aceite/aire/combustible, balatas de freno (juego delantero).",
+    'observaciones' => "Vehículo en buen estado general. Se recomienda dar seguimiento a la verificación de emisiones próxima a vencer.",
+    'solicitudes' => [],
+], [
+    ['equipo'=>'Camión Kenworth T680', 'etapa'=>'antes',   'detalle'=>'Revisión de frenos y suspensión'],
+    ['equipo'=>'Camión Kenworth T680', 'etapa'=>'despues', 'detalle'=>'Servicio mayor completado'],
+]);
+echo "✅ Reporte — Camión Kenworth T680 (folio {$r['folio']})\n";
+
+// 7 — Grúa Puente: correctivo mayor (estructura), ligado a solicitud de rodamientos/cable
+$r = crearMantDemo($cliMant, $demoIdCli, $usrJose, [
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['grua_puente'],
+    'fecha' => dateAdd($today, '-4 days'), 'tipo_mant' => 'Correctivo',
+    'trabajo' => "Corrección estructural de la carrilería conforme a dictamen de revisión (deformaciones detectadas). Se realizó enderezado de tramo afectado, sustitución de rodamientos de carrilería y cambio de cable de acero principal por desgaste superficial.",
+    'material_usado' => "4 rodamientos de carrilería, 20 m de cable de acero 6x19 IPS 1/2\".",
+    'observaciones' => "Trabajo en ejecución conforme a cotización aprobada por gerencia. Equipo permanece fuera de servicio hasta concluir la verificación estructural final y obtener nuevo certificado de inspección.",
+    'solicitudes' => [$solIds['grua_puente']],
+], [
+    ['equipo'=>'Grúa Puente Abus 10t', 'etapa'=>'antes',   'detalle'=>'Deformación detectada en carrilería'],
+    ['equipo'=>'Grúa Puente Abus 10t', 'etapa'=>'antes',   'detalle'=>'Cable de acero con desgaste superficial'],
+    ['equipo'=>'Grúa Puente Abus 10t', 'etapa'=>'despues', 'detalle'=>'Carrilería enderezada, rodamientos nuevos'],
+    ['equipo'=>'Grúa Puente Abus 10t', 'etapa'=>'despues', 'detalle'=>'Cable de acero reemplazado'],
+]);
+echo "✅ Reporte — Grúa Puente (folio {$r['folio']})\n";
+
+// 8 — PTEM JLG: correctivo eléctrico, ligado a solicitud de batería
+$r = crearMantDemo($cliMant, $demoIdCli, $usrRoberto, [
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['ptem_jlg'],
+    'fecha' => dateAdd($today, '-1 days'), 'tipo_mant' => 'Correctivo',
+    'trabajo' => "Sustitución del banco de baterías (4 unidades de 12V) por pérdida de capacidad de carga detectada en inspección técnica semestral. Se revisó y calibró el sistema de carga a bordo y se verificó continuidad del arnés eléctrico principal.",
+    'material_usado' => "4 baterías industriales 12V 150Ah, 1 contactor de control 40A.",
+    'observaciones' => "Equipo recupera autonomía completa de operación. Se libera para continuar con la inspección técnica semestral pendiente.",
+    'solicitudes' => [$solIds['ptem_jlg']],
+], [
+    ['equipo'=>'PTEM JLG 600AJ', 'etapa'=>'antes',   'detalle'=>'Banco de baterías con baja capacidad'],
+    ['equipo'=>'PTEM JLG 600AJ', 'etapa'=>'despues', 'detalle'=>'Baterías nuevas instaladas y calibradas'],
+]);
+echo "✅ Reporte — PTEM JLG 600AJ (folio {$r['folio']})\n";
+
+// 9 — Camión Grúa Terex: predictivo
+$r = crearMantDemo($cliMant, $demoIdCli, $usrJose, [
+    'equipo_origen' => 'cliente', 'equipo_ref_id' => $eqIds['camion_grua'],
+    'fecha' => dateAdd($today, '-8 days'), 'tipo_mant' => 'Predictivo',
+    'trabajo' => "Estudio predictivo previo a la inspección anual: termografía del tablero eléctrico y motores, análisis de vibración en tambores de izaje y muestreo de aceite hidráulico para análisis en laboratorio.",
+    'material_usado' => "Sin refacciones — solo insumos de muestreo (frascos sellados, etiquetas).",
+    'observaciones' => "Resultados dentro de parámetros normales, sin puntos calientes ni vibración anómala. Se adjuntará el informe de laboratorio del análisis de aceite en cuanto esté disponible.",
+    'solicitudes' => [],
+], [
+    ['equipo'=>'Camión Grúa Terex AC 100', 'etapa'=>'antes',   'detalle'=>'Termografía de tablero eléctrico'],
+    ['equipo'=>'Camión Grúa Terex AC 100', 'etapa'=>'despues', 'detalle'=>'Muestreo de aceite hidráulico'],
+]);
+echo "✅ Reporte — Camión Grúa Terex (folio {$r['folio']})\n";
+
 echo "\n=== RESUMEN FINAL ===\n";
 echo "Usuario: $demoUsuario\n";
 echo "Contraseña: Demo2026\n";
@@ -617,11 +1013,23 @@ $totalCerts = $pdo->query("SELECT COUNT(*) FROM cliente_equipos_cert c JOIN clie
 $totalHoras = $pdo->query("SELECT COUNT(*) FROM cliente_equipos_horometro h JOIN cliente_equipos e ON e.id=h.equipo_id WHERE e.id_cliente='$demoIdCli'")->fetchColumn();
 $totalPer  = $pdo->query("SELECT COUNT(*) FROM cliente_personal WHERE id_cliente='$demoIdCli'")->fetchColumn();
 $totalPC   = $pdo->query("SELECT COUNT(*) FROM cliente_personal_cert pc JOIN cliente_personal p ON p.id=pc.personal_id WHERE p.id_cliente='$demoIdCli'")->fetchColumn();
+$totalProv = $pdo->query("SELECT COUNT(*) FROM cliente_proveedores WHERE id_cliente='$demoIdCli'")->fetchColumn();
+$totalMat  = $pdo->query("SELECT COUNT(*) FROM cliente_materiales WHERE id_cliente='$demoIdCli'")->fetchColumn();
+$totalSol  = $pdo->query("SELECT COUNT(*) FROM cliente_sol_material WHERE id_cliente='$demoIdCli'")->fetchColumn();
+$totalEnv  = $pdo->query("SELECT COUNT(*) FROM cliente_sol_envio WHERE id_cliente='$demoIdCli'")->fetchColumn();
+$totalMantenim = $pdo->query("SELECT COUNT(*) FROM cliente_mantenimiento WHERE id_cliente='$demoIdCli'")->fetchColumn();
+$totalFotosMant = $pdo->query("SELECT COUNT(*) FROM cliente_mantenimiento_foto f JOIN cliente_mantenimiento m ON m.id=f.mant_id WHERE m.id_cliente='$demoIdCli'")->fetchColumn();
 echo "Equipos: $totalEq\n";
 echo "Documentos (equipos): $totalDocs\n";
 echo "Certificaciones (equipos): $totalCerts\n";
 echo "Registros horómetro: $totalHoras\n";
 echo "Personal: $totalPer\n";
 echo "Certificaciones (personal): $totalPC\n";
+echo "Proveedores: $totalProv\n";
+echo "Materiales en catálogo: $totalMat\n";
+echo "Solicitudes de material: $totalSol\n";
+echo "Envíos a proveedores generados: $totalEnv\n";
+echo "Reportes de mantenimiento: $totalMantenim\n";
+echo "Fotos de evidencia (mantenimiento): $totalFotosMant\n";
 echo "\n✅ Seeder completado exitosamente.\n";
 echo "⚠️  ELIMINA setup_demo.php del servidor después de ejecutarlo.\n";
