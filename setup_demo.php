@@ -760,10 +760,32 @@ $cliCfg->guardar([
 ], [], $demoIdCli);
 echo "✅ Configuración del cliente (razón social/RFC)\n";
 
+// ── SUB-USUARIO MECÁNICO (demo) ──────────────────────────────────────────
+// Para poder demostrar el flujo real de "el mecánico solicita/reporta,
+// la cuenta principal procesa" — no solo la vista de la cuenta principal.
+require_once __DIR__ . '/api/ClienteSubusuarios.php';
+$cliSubU = new ClienteSubusuarios($pdo);
+$pdo->prepare("DELETE FROM usuarios WHERE usuario='mecanico.demo'")->execute();
+$padreDemo = ['id' => (int)$userId, 'id_cliente' => $demoIdCli];
+$rSub = $cliSubU->crear([
+    'usuario'  => 'mecanico.demo',
+    'password' => 'Mecanico2026',
+    'nombre'   => 'Roberto Díaz Morales',
+    'permiso'  => 'gestion',
+    'permiso_mantenimiento' => 1,
+], $padreDemo);
+$mecanicoSubId = (int)($rSub['id'] ?? 0);
+if ($mecanicoSubId) {
+    $cliSubU->asignar(['usuario_id' => $mecanicoSubId, 'tipo' => 'equipo', 'ids' => array_values($eqIds)], $padreDemo);
+    echo "✅ Sub-usuario mecánico: mecanico.demo / Mecanico2026 (acceso a todos los equipos demo)\n";
+} else {
+    echo "⚠️  No se pudo crear el sub-usuario mecánico: " . ($rSub['message'] ?? 'error desconocido') . "\n";
+}
+
 // ── SOLICITUDES DE MATERIAL ──────────────────────────────────────────────
 echo "\n=== CREANDO SOLICITUDES DE MATERIAL ===\n";
-$usrRoberto = ['id' => 0, 'nombre' => 'Roberto Díaz Morales'];
-$usrJose    = ['id' => 0, 'nombre' => 'José Luis Hernández Cruz'];
+$usrRoberto = ['id' => $mecanicoSubId, 'nombre' => 'Roberto Díaz Morales'];
+$usrJose    = ['id' => $mecanicoSubId, 'nombre' => 'José Luis Hernández Cruz'];
 $solIds = [];
 
 // 1 — Grúa Torre: mangueras + filtro — se asigna y se envía (queda "enviada")
@@ -1031,5 +1053,6 @@ echo "Solicitudes de material: $totalSol\n";
 echo "Envíos a proveedores generados: $totalEnv\n";
 echo "Reportes de mantenimiento: $totalMantenim\n";
 echo "Fotos de evidencia (mantenimiento): $totalFotosMant\n";
+echo "Sub-usuario mecánico: " . ($mecanicoSubId ? "mecanico.demo / Mecanico2026 (id=$mecanicoSubId)" : "❌ no se creó, revisa el mensaje de arriba") . "\n";
 echo "\n✅ Seeder completado exitosamente.\n";
 echo "⚠️  ELIMINA setup_demo.php del servidor después de ejecutarlo.\n";
