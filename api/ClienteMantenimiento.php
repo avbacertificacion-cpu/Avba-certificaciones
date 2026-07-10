@@ -224,25 +224,28 @@ class ClienteMantenimiento {
         return ['status' => 'success', 'id' => $solId, 'folio' => $folio];
     }
 
-    public function detalleSolicitud(int $solId, string $idCliente): array {
+    public function detalleSolicitud(int $solId, string $idCliente, ?int $mecanicoId = null): array {
         $idCliente = $this->norm($idCliente);
-        $s = $this->pdo->prepare("SELECT * FROM cliente_sol_material WHERE id=? AND id_cliente=?");
-        $s->execute([$solId, $idCliente]);
+        $sql = "SELECT * FROM cliente_sol_material WHERE id=? AND id_cliente=?";
+        $params = [$solId, $idCliente];
+        if ($mecanicoId !== null) { $sql .= " AND mecanico_id=?"; $params[] = $mecanicoId; }
+        $s = $this->pdo->prepare($sql);
+        $s->execute($params);
         $sol = $s->fetch(PDO::FETCH_ASSOC);
         if (!$sol) return ['status' => 'error', 'message' => 'Solicitud no encontrada.'];
 
         $it = $this->pdo->prepare("SELECT i.*, p.nombre AS proveedor_nombre
                                    FROM cliente_sol_material_item i
-                                   LEFT JOIN cliente_proveedores p ON p.id = i.proveedor_id
+                                   LEFT JOIN cliente_proveedores p ON p.id = i.proveedor_id AND p.id_cliente = ?
                                    WHERE i.sol_id = ?");
-        $it->execute([$solId]);
+        $it->execute([$idCliente, $solId]);
         $sol['items'] = $it->fetchAll(PDO::FETCH_ASSOC);
 
         $en = $this->pdo->prepare("SELECT e.*, p.nombre AS proveedor_nombre
                                    FROM cliente_sol_envio e
-                                   LEFT JOIN cliente_proveedores p ON p.id = e.proveedor_id
+                                   LEFT JOIN cliente_proveedores p ON p.id = e.proveedor_id AND p.id_cliente = ?
                                    WHERE e.sol_id = ? ORDER BY e.id");
-        $en->execute([$solId]);
+        $en->execute([$idCliente, $solId]);
         $envios = $en->fetchAll(PDO::FETCH_ASSOC);
         foreach ($envios as &$ev) {
             $ev['pdf_url'] = $ev['pdf_url'] ? (rtrim(SITE_URL, '/') . '/' . ltrim($ev['pdf_url'], '/')) : '';
@@ -258,9 +261,15 @@ class ClienteMantenimiento {
         $chk->execute([$solId, $idCliente]);
         if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Solicitud no encontrada.'];
 
+        $chkProv = $this->pdo->prepare("SELECT id FROM cliente_proveedores WHERE id=? AND id_cliente=?");
         $upd = $this->pdo->prepare("UPDATE cliente_sol_material_item SET proveedor_id=? WHERE id=? AND sol_id=? AND envio_id IS NULL");
         foreach ($asignaciones as $itemId => $provId) {
-            $upd->execute([$provId ? (int)$provId : null, (int)$itemId, $solId]);
+            $provId = $provId ? (int)$provId : null;
+            if ($provId !== null) {
+                $chkProv->execute([$provId, $idCliente]);
+                if (!$chkProv->fetch()) continue; // proveedor no pertenece a este cliente — se ignora
+            }
+            $upd->execute([$provId, (int)$itemId, $solId]);
         }
         return ['status' => 'success'];
     }
@@ -454,10 +463,13 @@ class ClienteMantenimiento {
         }
     }
 
-    public function detalleMantenimiento(int $mantId, string $idCliente): array {
+    public function detalleMantenimiento(int $mantId, string $idCliente, ?int $mecanicoId = null): array {
         $idCliente = $this->norm($idCliente);
-        $s = $this->pdo->prepare("SELECT * FROM cliente_mantenimiento WHERE id=? AND id_cliente=?");
-        $s->execute([$mantId, $idCliente]);
+        $sql = "SELECT * FROM cliente_mantenimiento WHERE id=? AND id_cliente=?";
+        $params = [$mantId, $idCliente];
+        if ($mecanicoId !== null) { $sql .= " AND mecanico_id=?"; $params[] = $mecanicoId; }
+        $s = $this->pdo->prepare($sql);
+        $s->execute($params);
         $m = $s->fetch(PDO::FETCH_ASSOC);
         if (!$m) return ['status' => 'error', 'message' => 'Reporte no encontrado.'];
         $f = $this->pdo->prepare("SELECT id, etapa, archivo_url, comentario FROM cliente_mantenimiento_foto WHERE mant_id=?");
@@ -515,7 +527,7 @@ class ClienteMantenimiento {
         if ($css !== '') $mpdf->WriteHTML($css, \Mpdf\HTMLParserMode::HEADER_CSS);
         $mpdf->WriteHTML($body, \Mpdf\HTMLParserMode::HTML_BODY);
         $mpdf->Output($dir . $nombre, 'F');
-        return trim($subdir, '/') . '/' . $nombre;
+        return rtrim(UPLOAD_URL, '/') . '/' . trim($subdir, '/') . '/' . $nombre;
     }
 
     /** Encabezado con membrete del cliente (logo + razón social + RFC). */
@@ -604,7 +616,7 @@ class ClienteMantenimiento {
                 $out = '';
                 foreach ($fotos as $ft) {
                     if ($ft['etapa'] !== $etapa) continue;
-                    $abs = rtrim(UPLOAD_DIR, '/') . '/' . ltrim($ft['archivo_url'], '/');
+                    $abs = rtrim(UPLOAD_DIR, '/') . '/' . ltrim(str_replace(UPLOAD_URL, '', $ft['archivo_url']), '/');
                     if (!is_file($abs)) continue;
                     $b64 = 'data:image/jpeg;base64,' . base64_encode(file_get_contents($abs));
                     $out .= '<td style="width:33%;padding:4px;text-align:center;vertical-align:top">

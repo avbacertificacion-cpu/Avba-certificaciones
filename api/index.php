@@ -690,10 +690,13 @@ if ($method === 'GET') {
             $mec = $alc['es_sub'] ? (int)$usr['id'] : null;
             respuesta($cliMant->listarSolicitudes(resolveIdc($usr), $mec));
         }
-        case 'DETALLE_SOLICITUD':
+        case 'DETALLE_SOLICITUD': {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cliMant->detalleSolicitud((int)($_GET['id'] ?? 0), resolveIdc($usr)));
+            $alc = alcanceSub($usr, $cliSub);
+            $mec = $alc['es_sub'] ? (int)$usr['id'] : null;
+            respuesta($cliMant->detalleSolicitud((int)($_GET['id'] ?? 0), resolveIdc($usr), $mec));
+        }
 
         // ── Reportes de mantenimiento ──────────────────────
         case 'LISTAR_MANTENIMIENTOS': {
@@ -703,10 +706,13 @@ if ($method === 'GET') {
             $mec = $alc['es_sub'] ? (int)$usr['id'] : null;
             respuesta($cliMant->listarMantenimientos(resolveIdc($usr), $mec));
         }
-        case 'DETALLE_MANTENIMIENTO':
+        case 'DETALLE_MANTENIMIENTO': {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cliMant->detalleMantenimiento((int)($_GET['id'] ?? 0), resolveIdc($usr)));
+            $alc = alcanceSub($usr, $cliSub);
+            $mec = $alc['es_sub'] ? (int)$usr['id'] : null;
+            respuesta($cliMant->detalleMantenimiento((int)($_GET['id'] ?? 0), resolveIdc($usr), $mec));
+        }
 
         // ── Portal cliente: equipos ───────────────────────
         case 'GET_MI_PERSONAL':
@@ -1528,7 +1534,10 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             $alc = alcanceSub($usr, $cliSub);
-            if ($alc['es_sub']) requiereMantenimiento($alc);
+            if ($alc['es_sub']) {
+                requiereMantenimiento($alc);
+                autorizarRecurso($alc, 'equipo', (int)($payload['equipo_ref_id'] ?? 0));
+            }
             respuesta($cliMant->crearSolicitud($payload, resolveIdc($usr), $usr));
         }
         case 'ASIGNAR_PROVEEDORES_SOL': {
@@ -1555,7 +1564,10 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             $alc = alcanceSub($usr, $cliSub);
-            if ($alc['es_sub']) requiereMantenimiento($alc);
+            if ($alc['es_sub']) {
+                requiereMantenimiento($alc);
+                autorizarRecurso($alc, 'equipo', (int)($_POST['equipo_ref_id'] ?? 0));
+            }
             respuesta($cliMant->crearMantenimiento($_POST, $_FILES, resolveIdc($usr), $usr));
         }
         case 'ELIMINAR_MANTENIMIENTO': {
