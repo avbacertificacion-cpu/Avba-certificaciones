@@ -560,9 +560,9 @@ function addPers(PDO $pdo, string $idCli, string $nombre, string $puesto, string
     ")->execute([$idCli, $nombre, $puesto, $dpto, $numEmp, $ingreso, $tel, $notas, $estado]);
     return (int)$pdo->lastInsertId();
 }
-function addPCert(PDO $pdo, int $pid, string $tipo, string $folio, string $entidad, string $emision, string $vigencia, string $notas = ''): void {
+function addPCert(PDO $pdo, int $pid, string $tipo, ?string $folio, string $entidad, ?string $emision, ?string $vigencia, string $notas = ''): void {
     $pdo->prepare("INSERT INTO cliente_personal_cert (personal_id,tipo_cert,folio,entidad,fecha_emision,fecha_vigencia,notas) VALUES (?,?,?,?,?,?,?)")
-        ->execute([$pid, $tipo, $folio, $entidad, $emision ?: null, $vigencia ?: null, $notas]);
+        ->execute([$pid, $tipo, $folio ?: null, $entidad, $emision ?: null, $vigencia ?: null, $notas]);
 }
 function addPDoc(PDO $pdo, int $pid, string $tipo, string $nombre, ?string $vigencia, string $notas = ''): void {
     $pdo->prepare("INSERT INTO cliente_personal_docs (personal_id,tipo_doc,nombre,vigencia,notas) VALUES (?,?,?,?,?)")
