@@ -25,6 +25,19 @@
 @ini_set('memory_limit', '512M');
 @ignore_user_abort(true);
 
+// Producción normalmente corre con display_errors apagado, así que un error
+// fatal (clase no encontrada, columna inexistente, etc.) simplemente corta
+// la salida sin explicación. Este shutdown handler lo imprime igual,
+// SOLO en este script de diagnóstico/seeder — no toca la config del sitio.
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR], true)) {
+        echo "\n\n❌❌❌ ERROR FATAL — el script se detuvo aquí:\n";
+        echo "Mensaje: {$err['message']}\n";
+        echo "Archivo: {$err['file']}:{$err['line']}\n";
+    }
+});
+
 if (PHP_SAPI !== 'cli') {
     if (($_GET['secret'] ?? '') !== 'avba_setup_2025') {
         http_response_code(403);
