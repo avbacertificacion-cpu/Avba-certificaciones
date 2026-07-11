@@ -12,12 +12,30 @@
  * ELIMINAR este archivo del servidor después de ejecutar.
  */
 
+// Las secciones de proveedores/materiales/solicitudes/mantenimiento generan
+// varios PDF reales (mPDF) e imágenes en una sola corrida — en hosting
+// compartido eso puede superar el límite por defecto de tiempo de ejecución
+// o memoria y cortar el script a medias sin ningún error visible (con
+// display_errors apagado, como debe estar en producción). Se relajan ambos
+// límites para este script en particular; si el hosting no permite
+// sobreescribirlos (algunos los bloquean), estas líneas simplemente no
+// tienen efecto y no rompen nada.
+@set_time_limit(0);
+@ini_set('max_execution_time', '0');
+@ini_set('memory_limit', '512M');
+@ignore_user_abort(true);
+
 if (PHP_SAPI !== 'cli') {
     if (($_GET['secret'] ?? '') !== 'avba_setup_2025') {
         http_response_code(403);
         die('Acceso denegado. Agrega ?secret=avba_setup_2025 a la URL, o ejecuta desde CLI: php setup_demo.php');
     }
     header('Content-Type: text/plain; charset=utf-8');
+    // Enviar cada echo al navegador de inmediato en vez de acumularlo en el
+    // buffer — así, si algo llegara a fallar a medio camino, se alcanza a
+    // ver hasta dónde llegó en vez de recibir una página en blanco.
+    while (ob_get_level() > 0) { ob_end_flush(); }
+    ob_implicit_flush(true);
 }
 
 $cfgFile = __DIR__ . '/config/config.php';
