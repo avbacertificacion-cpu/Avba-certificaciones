@@ -1802,7 +1802,15 @@
         Los participantes escanean el QR o escriben el identificador en el login
       </div>
       <div style="margin:0 auto 10px">
-        <img id="ses-qr-img" src="" alt="QR" style="max-width:160px;border-radius:8px;border:2px solid var(--borde)">
+        <img id="ses-qr-img" src="" alt="QR" style="max-width:160px;border-radius:8px;border:2px solid var(--borde)"
+             onerror="qrManejarError()" onload="qrManejarCarga()">
+        <div id="ses-qr-error" style="display:none;font-size:12px;color:var(--rojo,#A32D2D);margin-top:8px">
+          No se pudo cargar el código QR (puede ser la conexión).
+          <button type="button" onclick="qrReintentar()"
+                  style="display:block;margin:8px auto 0;padding:6px 14px;font-size:12px;font-weight:600;color:var(--azul-dark);background:var(--azul-light);border:1px solid #85B7EB;border-radius:8px;cursor:pointer">
+            ↻ Reintentar
+          </button>
+        </div>
       </div>
     </div>
 
@@ -4498,6 +4506,7 @@ let curSesionCursos      = [];
 let curSesionEmpresas    = [];
 let curSesionParts       = [];     // lista de participantes (cargada del servidor)
 let curSesionEmpPreBuild = [];     // empresas agregadas antes de crear sesión
+let curSesionQrUrl       = '';     // URL de acceso codificada en el QR — se guarda para poder reintentar
 const API = WEB_APP_URL;
 
 // ── Pantallas del módulo Cursos ───────────
@@ -4631,11 +4640,10 @@ async function sesContinuar() {
     document.getElementById('ses-lista-nombre').textContent = nombreSesion;
     document.getElementById('ses-lista-meta').textContent   = 'Sesión activa — ' + new Date(fecha + 'T12:00:00').toLocaleDateString('es-MX', {day:'2-digit',month:'long',year:'numeric'});
     document.getElementById('ses-qr-ident').textContent     = data.identificador;
-    const loginUrl = window.location.origin +
+    curSesionQrUrl = window.location.origin +
       window.location.pathname.replace(/inspector\.html.*$/, 'login.html') +
       '?sesion=' + encodeURIComponent(data.identificador);
-    document.getElementById('ses-qr-img').src =
-      'https://quickchart.io/qr?text=' + encodeURIComponent(loginUrl) + '&size=200';
+    qrReintentar();
 
     sesRenderEmpresasLista();
     sesRefrescarParticipantes();
@@ -4644,6 +4652,32 @@ async function sesContinuar() {
   } catch(e) {
     mostrarToast('Error de conexión.', 'err');
   }
+}
+
+/** (Re)carga la imagen del QR desde quickchart.io con un parámetro anti-caché,
+ *  para reintentos manuales o automáticos tras una falla de red. */
+function qrReintentar() {
+  if (!curSesionQrUrl) return;
+  document.getElementById('ses-qr-error').style.display = 'none';
+  document.getElementById('ses-qr-img').style.display = '';
+  document.getElementById('ses-qr-img').src =
+    'https://quickchart.io/qr?text=' + encodeURIComponent(curSesionQrUrl) + '&size=200&_r=' + Date.now();
+}
+let _qrReintentosAuto = 0;
+function qrManejarError() {
+  // Un par de reintentos automáticos silenciosos (útil en redes inestables)
+  // antes de mostrarle al inspector el botón de reintentar manual.
+  if (_qrReintentosAuto < 2) {
+    _qrReintentosAuto++;
+    setTimeout(qrReintentar, 1500);
+    return;
+  }
+  document.getElementById('ses-qr-img').style.display = 'none';
+  document.getElementById('ses-qr-error').style.display = '';
+}
+function qrManejarCarga() {
+  _qrReintentosAuto = 0;
+  document.getElementById('ses-qr-error').style.display = 'none';
 }
 
 // ── Sesión: agregar empresa (setup) ───────
