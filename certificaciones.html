@@ -1278,7 +1278,7 @@ function ver(fila) {
   // Construir URL del QR: si el backend la entrega la usamos,
   // si no, la construimos directamente desde el código de 10 dígitos (col S)
   const qrUrl = d.qr_url ||
-    (d.qr_codigo ? "https://quickchart.io/qr?text=" + encodeURIComponent(d.qr_codigo) + "&size=300" : "");
+    (d.qr_codigo ? "qr.php?text=" + encodeURIComponent(d.qr_codigo) + "&size=300" : "");
 
   if (qrUrl) {
     // Intentar cargar como imagen directa

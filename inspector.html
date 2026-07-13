@@ -4654,14 +4654,15 @@ async function sesContinuar() {
   }
 }
 
-/** (Re)carga la imagen del QR desde quickchart.io con un parámetro anti-caché,
- *  para reintentos manuales o automáticos tras una falla de red. */
+/** (Re)carga la imagen del QR desde nuestro generador interno (qr.php, sin
+ *  depender de un servicio externo) con un parámetro anti-caché, para
+ *  reintentos manuales o automáticos tras una falla de red. */
 function qrReintentar() {
   if (!curSesionQrUrl) return;
   document.getElementById('ses-qr-error').style.display = 'none';
   document.getElementById('ses-qr-img').style.display = '';
   document.getElementById('ses-qr-img').src =
-    'https://quickchart.io/qr?text=' + encodeURIComponent(curSesionQrUrl) + '&size=200&_r=' + Date.now();
+    'qr.php?text=' + encodeURIComponent(curSesionQrUrl) + '&size=200&_r=' + Date.now();
 }
 let _qrReintentosAuto = 0;
 function qrManejarError() {

@@ -465,9 +465,8 @@ class Certificaciones {
                         $qrCodigo = $valoresResueltos['qr_codigo'] ?? '';
                         if ($qrCodigo) {
                             $alto  = (float)($campo['alto'] ?? $ancho ?: 25);
-                            $qrUrl = urlQR($qrCodigo);
                             $qrTmp = sys_get_temp_dir() . '/avba_qr_' . uniqid() . '.png';
-                            $qrData = @file_get_contents($qrUrl);
+                            $qrData = qrCodigoPngBytes($qrCodigo);
                             if ($qrData) {
                                 file_put_contents($qrTmp, $qrData);
                                 $pdf->Image($qrTmp, $x, $y, $ancho ?: 25, $alto);
@@ -676,23 +675,11 @@ class Certificaciones {
             );
         }
 
-        $qrUrl  = urlQR($qrCodigo);
-        $qrTemp = sys_get_temp_dir() . '/avba_qr_' . md5($qrCodigo) . '.png';
+        $qrTemp    = sys_get_temp_dir() . '/avba_qr_' . md5($qrCodigo) . '.png';
+        $qrContent = qrCodigoPngBytes($qrCodigo);
 
-        // Hasta 3 intentos con 2 s de espera entre ellos
-        $qrContent = false;
-        for ($intento = 1; $intento <= 3; $intento++) {
-            $ctx       = stream_context_create(['http' => ['timeout' => 10]]);
-            $qrContent = @file_get_contents($qrUrl, false, $ctx);
-            if ($qrContent !== false) break;
-            if ($intento < 3) sleep(2);
-        }
-
-        if ($qrContent === false) {
-            throw new \RuntimeException(
-                'No se pudo descargar la imagen del código QR después de 3 intentos. ' .
-                'Verifica la conexión a internet del servidor e intenta de nuevo.'
-            );
+        if ($qrContent === '') {
+            throw new \RuntimeException('No se pudo generar la imagen del código QR.');
         }
 
         file_put_contents($qrTemp, $qrContent);
@@ -1787,8 +1774,8 @@ SVG;
     }
 
     /**
-     * Descarga la imagen QR y la devuelve como cadena base64 para embeber en HTML.
-     * Realiza hasta 3 intentos; lanza excepción si falla.
+     * Genera la imagen QR internamente (sin red) y la devuelve como cadena
+     * base64 para embeber en HTML.
      */
     private function descargarQrB64(string $qrCodigo): string {
         if (!$qrCodigo) {
@@ -1796,21 +1783,11 @@ SVG;
                 'El registro no tiene código QR asignado. Verifica el registro en la base de datos.'
             );
         }
-        $qrUrl   = urlQR($qrCodigo);
-        $content = false;
-        for ($i = 1; $i <= 3; $i++) {
-            $ctx     = stream_context_create(['http' => ['timeout' => 10]]);
-            $content = @file_get_contents($qrUrl, false, $ctx);
-            if ($content !== false) break;
-            if ($i < 3) sleep(2);
+        $b64 = qrDataUri(textoQR($qrCodigo));
+        if ($b64 === '') {
+            throw new \RuntimeException('No se pudo generar el código QR.');
         }
-        if ($content === false) {
-            throw new \RuntimeException(
-                'No se pudo descargar el código QR después de 3 intentos. ' .
-                'Verifica la conexión a internet del servidor e intenta de nuevo.'
-            );
-        }
-        return 'data:image/png;base64,' . base64_encode($content);
+        return $b64;
     }
 
     /** Obtiene los ítems del checklist para el dictamen. */
@@ -2566,9 +2543,8 @@ HTML;
                         $qrCodigo = $valoresResueltos['qr_codigo'] ?? '';
                         if ($qrCodigo) {
                             $alto   = (float)($campo['alto'] ?? $ancho ?: 25);
-                            $qrUrl  = urlQR($qrCodigo);
                             $qrTmp  = sys_get_temp_dir() . '/avba_qr_prev_' . uniqid() . '.png';
-                            $qrData = @file_get_contents($qrUrl);
+                            $qrData = qrCodigoPngBytes($qrCodigo);
                             if ($qrData) {
                                 file_put_contents($qrTmp, $qrData);
                                 $pdf->Image($qrTmp, $x, $y, $ancho ?: 25, $alto);

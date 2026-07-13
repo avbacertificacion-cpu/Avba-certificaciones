@@ -1046,12 +1046,10 @@ class Personal {
             return ['status' => 'error', 'message' => 'Dompdf no disponible. Instala las dependencias del proyecto.'];
         }
 
-        // Pre-descargar QR como base64 para incrustarlo en el PDF
+        // QR generado internamente (sin red) para incrustarlo en el PDF
         $qrB64 = '';
         if (!empty($p['qr_codigo']) && defined('SITE_URL')) {
-            $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(SITE_URL . '/validar.html?qr=' . $p['qr_codigo']) . '&size=120&margin=1';
-            $data  = @file_get_contents($qrUrl, false, stream_context_create(['http' => ['timeout' => 4]]));
-            if ($data) $qrB64 = 'data:image/png;base64,' . base64_encode($data);
+            $qrB64 = qrDataUri(textoQR($p['qr_codigo']), 120, 2);
         }
 
         try {
@@ -1096,9 +1094,7 @@ class Personal {
 
             $qrB64 = '';
             if (!empty($p['qr_codigo']) && defined('SITE_URL')) {
-                $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(SITE_URL . '/validar.html?qr=' . $p['qr_codigo']) . '&size=120&margin=1';
-                $data  = @file_get_contents($qrUrl, false, stream_context_create(['http' => ['timeout' => 4]]));
-                if ($data) $qrB64 = 'data:image/png;base64,' . base64_encode($data);
+                $qrB64 = qrDataUri(textoQR($p['qr_codigo']), 120, 2);
             }
             $bodyParts[] = $this->htmlCredencialBody($p, $qrB64);
         }
@@ -1128,11 +1124,7 @@ class Personal {
 
         $qrB64 = '';
         if (defined('SITE_URL')) {
-            $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(
-                rtrim(SITE_URL, '/') . '/validar.html?qr=' . $p['qr_codigo']
-            ) . '&size=200&margin=1';
-            $data = @file_get_contents($qrUrl, false, stream_context_create(['http' => ['timeout' => 6]]));
-            if ($data) $qrB64 = 'data:image/png;base64,' . base64_encode($data);
+            $qrB64 = qrDataUri(textoQR($p['qr_codigo']), 200, 2);
         }
 
         try {

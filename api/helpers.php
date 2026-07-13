@@ -181,14 +181,60 @@ function generarCodigoQR(PDO $pdo): string {
 }
 
 /**
- * Construye la URL del QR usando quickchart.io.
- * El QR codifica la URL de validación completa para que al escanearlo
- * con cualquier cámara abra directamente la página con el código prellenado.
+ * Genera un código QR en PNG con un generador interno (sin depender de un
+ * servicio externo como quickchart.io) y devuelve los bytes del archivo.
+ * $sizeTotal es el ancho/alto total deseado en px; se calcula el tamaño por
+ * módulo del QR para acercarse a esa medida (mínimo 2 px/módulo, para que
+ * siga siendo legible).
+ */
+function qrPngBytes(string $texto, int $sizeTotal = 300, int $margin = 8): string {
+    if ($texto === '') return '';
+    if (!class_exists('QRCode')) {
+        require_once __DIR__ . '/lib/qrcode.php';
+    }
+    try {
+        $qr = QRCode::getMinimumQRCode($texto, QR_ERROR_CORRECT_LEVEL_M);
+        $moduleCount = $qr->getModuleCount();
+        $px  = max(2, (int)round(($sizeTotal - $margin * 2) / max(1, $moduleCount)));
+        $img = $qr->createImage($px, $margin);
+        ob_start();
+        imagepng($img);
+        $bytes = (string)ob_get_clean();
+        imagedestroy($img);
+        return $bytes;
+    } catch (\Throwable $e) {
+        error_log('[qrPngBytes] ' . $e->getMessage());
+        return '';
+    }
+}
+
+/** Igual que qrPngBytes() pero como data URI, lista para <img src="..."> o para incrustar en un PDF sin descargas por HTTP. */
+function qrDataUri(string $texto, int $sizeTotal = 300, int $margin = 8): string {
+    $bytes = qrPngBytes($texto, $sizeTotal, $margin);
+    return $bytes !== '' ? ('data:image/png;base64,' . base64_encode($bytes)) : '';
+}
+
+/** Texto que codifica el QR de validación de un folio/código de certificado. */
+function textoQR(string $codigo): string {
+    if (!$codigo) return '';
+    return rtrim(SITE_URL, '/') . '/validar.html?qr=' . urlencode($codigo);
+}
+
+/** Bytes PNG del QR de validación de un folio/código — para incrustar directo en PDFs (sin red). */
+function qrCodigoPngBytes(string $codigo, int $sizeTotal = 300, int $margin = 8): string {
+    return qrPngBytes(textoQR($codigo), $sizeTotal, $margin);
+}
+
+/**
+ * Construye la URL del QR usando nuestro generador interno (qr.php), para
+ * usarse en <img src> del lado del navegador. Antes apuntaba a quickchart.io
+ * (servicio externo) — se quitó esa dependencia para no depender de la
+ * disponibilidad ni de la red de un tercero.
  */
 function urlQR(string $codigo): string {
-    if (!$codigo) return '';
-    $validarUrl = rtrim(SITE_URL, '/') . '/validar.html?qr=' . urlencode($codigo);
-    return 'https://quickchart.io/qr?text=' . urlencode($validarUrl) . '&size=300';
+    $texto = textoQR($codigo);
+    if (!$texto) return '';
+    return rtrim(SITE_URL, '/') . '/qr.php?text=' . urlencode($texto) . '&size=300';
 }
 
 /**

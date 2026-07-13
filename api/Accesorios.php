@@ -622,9 +622,8 @@ class Accesorios {
             }
             if ($c['campo'] === 'qr_imagen') {
                 // Usar un QR de muestra apuntando a la URL de validación
-                $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(rtrim(SITE_URL, '/') . '/validar.html?qr=PREVIEW') . '&size=300';
                 $qrTmp = sys_get_temp_dir() . '/avba_qr_prev_acc.png';
-                $qrData = @file_get_contents($qrUrl);
+                $qrData = qrPngBytes(rtrim(SITE_URL, '/') . '/validar.html?qr=PREVIEW');
                 if ($qrData) {
                     file_put_contents($qrTmp, $qrData);
                     $alto = (float)($c['alto'] ?? ($ancho ?: 25));
@@ -814,12 +813,7 @@ class Accesorios {
             return ['status' => 'error', 'message' => 'La sesión no tiene código QR. Apruébala en Calidad primero.'];
 
         // QR base64
-        $qrB64 = '';
-        $qrUrl = 'https://quickchart.io/qr?text=' . urlencode(
-            rtrim(SITE_URL, '/') . '/validar.html?qr=' . $qrCodigo
-        ) . '&size=300&margin=1';
-        $qrData = @file_get_contents($qrUrl, false, stream_context_create(['http' => ['timeout' => 8]]));
-        if ($qrData) $qrB64 = 'data:image/png;base64,' . base64_encode($qrData);
+        $qrB64 = qrDataUri(textoQR($qrCodigo), 300, 4);
 
         // Agrupar accesorios por tipo y contar → "03 Grilletes, 02 Eslingas, 01 Cancamos"
         $countsByType = [];
