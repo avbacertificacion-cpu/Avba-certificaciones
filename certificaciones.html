@@ -979,7 +979,7 @@
       <input id="envTodos-correo" type="email" placeholder="correo@empresa.com" autocomplete="off"
         style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px">
       <div id="envTodos-ac" class="correo-ac" style="display:none"></div>
-      <p style="font-size:11px;color:var(--texto-hint);margin:4px 0 0">Se enviará DC-3, Diploma y Certificado en un solo correo. Si el correo es nuevo, se guardará para la próxima vez.</p>
+      <p style="font-size:11px;color:var(--texto-hint);margin:4px 0 0">Se enviará DC-3, Diploma, Certificado y Credencial en un solo correo. Si el correo es nuevo, se guardará para la próxima vez.</p>
     </div>
 
     <div style="padding:11px 14px;background:#f0f7ff;border-radius:8px;margin-bottom:14px">
@@ -2828,7 +2828,7 @@ let _envTodosPid = 0;
 function abrirEnviarTodosPer(pid, nombre, correo) {
   _envTodosPid = pid;
   document.getElementById('envTodos-s').textContent =
-    (nombre || 'Participante') + ' — DC-3, Diploma y Certificado';
+    (nombre || 'Participante') + ' — DC-3, Diploma, Certificado y Credencial';
   const inp = document.getElementById('envTodos-correo');
   inp.value = correo || '';
   document.getElementById('chk-envTodos-creds').checked = false;

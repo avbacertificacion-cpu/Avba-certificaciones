@@ -678,8 +678,10 @@ class Personal {
         if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
             return ['status' => 'error', 'message' => 'Servicio de correo no disponible en este servidor.'];
 
-        // Generar cada documento y reunir sus rutas
-        $tipos     = ['dc3' => 'Constancia DC-3', 'diploma' => 'Diploma', 'certificado' => 'Certificado'];
+        // Generar cada documento y reunir sus rutas. Se incluye la Credencial
+        // (los documentos que se "ven"); las versiones de impresión son el
+        // mismo PDF, no un adjunto aparte.
+        $tipos     = ['dc3' => 'Constancia DC-3', 'diploma' => 'Diploma', 'certificado' => 'Certificado', 'credencial' => 'Credencial'];
         $adjuntos  = [];
         $faltantes = [];
         foreach ($tipos as $tipo => $label) {
@@ -713,7 +715,7 @@ class Personal {
             foreach ($lista as $e) $mail->addAddress($e);
             $mail->Subject = 'Documentos de Capacitación — AVBA Inspections';
             $mail->isHTML(true);
-            $mail->Body    = $this->plantillaCorreoPersonal($nombre, 'DC-3, Diploma y Certificado', $p['curso_nombre'] ?? '', $credenciales);
+            $mail->Body    = $this->plantillaCorreoPersonal($nombre, 'DC-3, Diploma, Certificado y Credencial', $p['curso_nombre'] ?? '', $credenciales);
             foreach ($adjuntos as $a) $mail->addAttachment($a['ruta'], $a['nombre']);
             $mail->send();
         } catch (\Exception $e) {
