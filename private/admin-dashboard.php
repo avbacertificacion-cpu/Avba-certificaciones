@@ -73,6 +73,37 @@ for ($i = 5; $i >= 0; $i--) {
     $inspecciones_por_mes[] = ['mes' => $mes_nombre, 'cantidad' => $count];
 }
 
+// ─── EXTINTORES A MANTENIMIENTO POR MES (ÚLTIMOS 6 MESES) ───────────────────
+// Un extintor cuenta como "mantenimiento" en un mes si:
+//   (1) cumple 1 año desde su recarga en ese mes (fecha_recarga + 1 año), o
+//   (2) en la inspección de ese mes se marcó SIN PRESIÓN (ps = 'NC').
+// El UNION evita contar dos veces al mismo extintor en el mismo mes.
+$mantenimiento_por_mes = [];
+for ($i = 5; $i >= 0; $i--) {
+    $fecha = strtotime("-$i months");
+    $mes = date('n', $fecha);
+    $anio = date('Y', $fecha);
+    $mes_nombre = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][$mes];
+
+    $stmt = $pdo->prepare("
+        SELECT COUNT(*) FROM (
+            SELECT i.extintor_id AS eid
+            FROM inspecciones i
+            WHERE i.ps = 'NC' AND MONTH(i.fecha) = ? AND YEAR(i.fecha) = ?
+            UNION
+            SELECT e.id AS eid
+            FROM extintores e
+            WHERE e.fecha_recarga IS NOT NULL
+              AND MONTH(DATE_ADD(e.fecha_recarga, INTERVAL 1 YEAR)) = ?
+              AND YEAR(DATE_ADD(e.fecha_recarga, INTERVAL 1 YEAR)) = ?
+        ) AS t
+    ");
+    $stmt->execute([$mes, $anio, $mes, $anio]);
+    $count = $stmt->fetchColumn();
+
+    $mantenimiento_por_mes[] = ['mes' => $mes_nombre, 'cantidad' => (int)$count];
+}
+
 // ─── EXTINTORES POR TIPO ────────────────────────────────────────────────────
 $stmt = $pdo->query("
     SELECT te.nombre as tipo, COUNT(*) as cantidad FROM extintores e
@@ -120,6 +151,8 @@ $json_vigencia = json_encode([
 ]);
 $json_empresas = json_encode(array_column($empresas_top, 'nombre'));
 $json_empresas_inspecciones = json_encode(array_column($empresas_top, 'inspecciones'));
+$json_mant_meses = json_encode(array_column($mantenimiento_por_mes, 'mes'));
+$json_mant_cant  = json_encode(array_column($mantenimiento_por_mes, 'cantidad'));
 
 $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $total_extintores) * 100) : 0;
 ?>
@@ -302,6 +335,15 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
                 <canvas id="barChart"></canvas>
             </div>
         </div>
+
+        <!-- Bar Chart - Mantenimiento por mes -->
+        <div class="chart-card">
+            <h3>🛠️ Extintores a Mantenimiento por Mes</h3>
+            <div class="chart-container">
+                <canvas id="mantChart"></canvas>
+            </div>
+            <small style="color:#888;display:block;margin-top:8px">1 año desde la recarga o marcados sin presión en la inspección.</small>
+        </div>
     </div>
 
     <!-- Tables -->
@@ -475,6 +517,29 @@ new Chart(barCtx, {
         maintainAspectRatio: false,
         plugins: {legend: {display: true}},
         scales: {y: {beginAtZero: true}}
+    }
+});
+
+// Bar Chart - Extintores a mantenimiento por mes
+const mantCtx = document.getElementById('mantChart').getContext('2d');
+new Chart(mantCtx, {
+    type: 'bar',
+    data: {
+        labels: <?= $json_mant_meses ?>,
+        datasets: [{
+            label: 'A mantenimiento',
+            data: <?= $json_mant_cant ?>,
+            backgroundColor: '#f39c12',
+            borderColor: '#d68910',
+            borderWidth: 1,
+            borderRadius: 6
+        }]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {legend: {display: true}},
+        scales: {y: {beginAtZero: true, ticks: {precision: 0}}}
     }
 });
 })();
