@@ -604,3 +604,125 @@ function protegerPdf(string $pdfBytes): string
         return $pdfBytes;
     }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   DIRECTORIO DE CORREOS — autocompletado y registro para consultas futuras
+   Reúne los correos usados en toda la plataforma (participantes de cursos,
+   contactos de clientes, correos de equipos certificados) más un catálogo
+   propio que va creciendo cada vez que se envía algo a un correo nuevo.
+══════════════════════════════════════════════════════════════════════ */
+
+function directorioCorreosMigrar(PDO $pdo): void {
+    static $hecho = false;
+    if ($hecho) return;
+    $hecho = true;
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS directorio_correos (
+              id         INT AUTO_INCREMENT PRIMARY KEY,
+              correo     VARCHAR(200) NOT NULL,
+              nombre     VARCHAR(200) NULL,
+              usos       INT NOT NULL DEFAULT 1,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+              UNIQUE KEY uniq_correo (correo)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    } catch (\Throwable $e) {
+        error_log('[directorioCorreosMigrar] ' . $e->getMessage());
+    }
+}
+
+/** Normaliza un correo: minúsculas, sin espacios. Devuelve '' si no es válido. */
+function normalizarCorreo(string $correo): string {
+    $correo = strtolower(trim($correo));
+    return filter_var($correo, FILTER_VALIDATE_EMAIL) ? $correo : '';
+}
+
+/**
+ * Registra uno o varios correos en el directorio (upsert). Se llama al enviar
+ * documentos, para que un correo nuevo quede disponible en el autocompletado
+ * de la próxima vez. $nombre es opcional (a quién pertenece el correo).
+ */
+function directorioCorreosRegistrar(PDO $pdo, array $correos, ?string $nombre = null): void {
+    directorioCorreosMigrar($pdo);
+    $nombre = $nombre !== null ? trim($nombre) : null;
+    try {
+        $st = $pdo->prepare(
+            "INSERT INTO directorio_correos (correo, nombre, usos) VALUES (?, ?, 1)
+             ON DUPLICATE KEY UPDATE usos = usos + 1, nombre = COALESCE(VALUES(nombre), nombre)"
+        );
+        foreach ($correos as $c) {
+            $c = normalizarCorreo((string)$c);
+            if ($c === '') continue;
+            $st->execute([$c, ($nombre !== null && $nombre !== '') ? $nombre : null]);
+        }
+    } catch (\Throwable $e) {
+        error_log('[directorioCorreosRegistrar] ' . $e->getMessage());
+    }
+}
+
+/**
+ * Busca correos que coincidan con $q en todas las fuentes de la plataforma.
+ * Devuelve [ ['correo'=>..., 'nombre'=>...], ... ] deduplicado, priorizando
+ * el directorio propio (por número de usos) y limitado a $limit resultados.
+ */
+function directorioCorreosBuscar(PDO $pdo, string $q, int $limit = 10): array {
+    directorioCorreosMigrar($pdo);
+    $q     = strtolower(trim($q));
+    $limit = max(1, min(25, $limit));
+    if (strlen($q) < 2) return [];
+    $like  = '%' . str_replace(['%','_'], ['\%','\_'], $q) . '%';
+
+    $out = [];   // correo => nombre (primero que gane)
+    $push = function(?string $correo, ?string $nombre) use (&$out, $q) {
+        $correo = strtolower(trim((string)$correo));
+        if ($correo === '' || !str_contains($correo, $q)) return;
+        if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) return;
+        if (!array_key_exists($correo, $out)) {
+            $out[$correo] = ($nombre !== null && trim($nombre) !== '') ? trim($nombre) : '';
+        } elseif ($out[$correo] === '' && $nombre !== null && trim($nombre) !== '') {
+            $out[$correo] = trim($nombre);
+        }
+    };
+
+    // 1) Directorio propio (prioridad por usos)
+    try {
+        $st = $pdo->prepare("SELECT correo, nombre FROM directorio_correos WHERE correo LIKE ? ORDER BY usos DESC, updated_at DESC LIMIT 50");
+        $st->execute([$like]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $push($r['correo'], $r['nombre']);
+    } catch (\Throwable $e) {}
+
+    // 2) Participantes de cursos
+    try {
+        $st = $pdo->prepare("SELECT DISTINCT correo, nombre_completo FROM participantes_cursos WHERE correo LIKE ? LIMIT 50");
+        $st->execute([$like]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            foreach (explode(',', (string)$r['correo']) as $c) $push($c, $r['nombre_completo'] ?? '');
+        }
+    } catch (\Throwable $e) {}
+
+    // 3) Contactos de clientes
+    try {
+        $st = $pdo->prepare("SELECT DISTINCT correo_contacto, nombre_cliente FROM clientes WHERE correo_contacto LIKE ? LIMIT 50");
+        $st->execute([$like]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            foreach (explode(',', (string)$r['correo_contacto']) as $c) $push($c, $r['nombre_cliente'] ?? '');
+        }
+    } catch (\Throwable $e) {}
+
+    // 4) Correos de equipos certificados
+    try {
+        $st = $pdo->prepare("SELECT DISTINCT correo, cliente FROM equipos WHERE correo LIKE ? LIMIT 50");
+        $st->execute([$like]);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            foreach (explode(',', (string)$r['correo']) as $c) $push($c, $r['cliente'] ?? '');
+        }
+    } catch (\Throwable $e) {}
+
+    $res = [];
+    foreach ($out as $correo => $nombre) {
+        $res[] = ['correo' => $correo, 'nombre' => $nombre];
+        if (count($res) >= $limit) break;
+    }
+    return $res;
+}

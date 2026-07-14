@@ -312,6 +312,9 @@ class Personal {
         if (!$correo || !filter_var($correo, FILTER_VALIDATE_EMAIL))
             return ['status' => 'error', 'message' => 'Correo de envío inválido.'];
 
+        // Registrar el correo en el directorio para autocompletado futuro
+        directorioCorreosRegistrar($this->pdo, [$correo], $empresa ?: null);
+
         // Garantizar columna correo_contacto en clientes
         try { $this->pdo->exec("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS correo_contacto VARCHAR(200) DEFAULT NULL"); } catch (\Throwable $e) {}
 
@@ -653,6 +656,77 @@ class Personal {
         }
 
         return $resultado;
+    }
+
+    /**
+     * Genera (si hace falta) los 3 documentos del participante — DC-3, Diploma
+     * y Certificado — y los envía TODOS en un solo correo con sus adjuntos.
+     * Registra el/los correo(s) en el directorio para autocompletado futuro.
+     */
+    public function enviarTodosDocumentosPersonal(int $id, string|array $correoDestino, string $usuario, bool $enviarCredenciales = false): array {
+        $this->ensureEstatusColumn();
+        $p = $this->obtenerParticipante($id);
+        if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        // Normalizar destinatarios (cae al correo del participante si no se indica)
+        $lista = is_array($correoDestino) ? $correoDestino : [$correoDestino];
+        $lista = array_values(array_unique(array_filter(array_map('trim', $lista))));
+        if (!$lista) $lista = [trim($p['correo'] ?? '')];
+        $lista = array_values(array_filter($lista, fn($e) => filter_var($e, FILTER_VALIDATE_EMAIL)));
+        if (!$lista) return ['status' => 'error', 'message' => 'Indica un correo de destino válido.'];
+
+        if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
+            return ['status' => 'error', 'message' => 'Servicio de correo no disponible en este servidor.'];
+
+        // Generar cada documento y reunir sus rutas
+        $tipos     = ['dc3' => 'Constancia DC-3', 'diploma' => 'Diploma', 'certificado' => 'Certificado'];
+        $adjuntos  = [];
+        $faltantes = [];
+        foreach ($tipos as $tipo => $label) {
+            $gen = $this->generarDocumento($id, $tipo, $usuario);
+            if ($gen['status'] !== 'success' || empty($gen['url'])) { $faltantes[] = $label; continue; }
+            $ruta  = str_replace(UPLOAD_URL, UPLOAD_DIR, $gen['url']);
+            $real  = realpath($ruta);
+            $rup   = realpath(UPLOAD_DIR);
+            if ($real && $rup && strncmp($real, $rup, strlen($rup)) === 0) {
+                $adjuntos[] = ['ruta' => $ruta, 'nombre' => basename($ruta)];
+            } else {
+                $faltantes[] = $label;
+            }
+        }
+        if (!$adjuntos)
+            return ['status' => 'error', 'message' => 'No se pudo generar ningún documento para enviar.'];
+
+        // Marcar como emitido
+        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO' WHERE id = ?")->execute([$id]);
+
+        // Credenciales opcionales (una sola vez, al primer destinatario)
+        $credenciales = [];
+        if ($enviarCredenciales) {
+            $credenciales = $this->gestionarCredencialesParticipante($p, $lista[0]);
+        }
+
+        $nombre = $p['nombre_completo'] ?? 'Participante';
+        try {
+            $mail = new PHPMailer(true);
+            configurarMailer($mail, $this->pdo);
+            foreach ($lista as $e) $mail->addAddress($e);
+            $mail->Subject = 'Documentos de Capacitación — AVBA Inspections';
+            $mail->isHTML(true);
+            $mail->Body    = $this->plantillaCorreoPersonal($nombre, 'DC-3, Diploma y Certificado', $p['curso_nombre'] ?? '', $credenciales);
+            foreach ($adjuntos as $a) $mail->addAttachment($a['ruta'], $a['nombre']);
+            $mail->send();
+        } catch (\Exception $e) {
+            return ['status' => 'error', 'message' => 'Error al enviar correo: ' . $e->getMessage()];
+        }
+
+        // Registrar los correos en el directorio para consultas futuras
+        directorioCorreosRegistrar($this->pdo, $lista, $nombre);
+
+        $enviados = implode(', ', $lista);
+        $msg = count($adjuntos) . ' documento(s) enviados a ' . $enviados . '.';
+        if ($faltantes) $msg .= ' No se pudo incluir: ' . implode(', ', $faltantes) . '.';
+        return ['status' => 'success', 'message' => $msg];
     }
 
     private function ensureMigration013Columns(): void {

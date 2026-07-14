@@ -356,6 +356,15 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($avbaAdmin->detallePersonal((int)($_GET['id'] ?? 0)));
 
+        // ── Directorio de correos (autocompletado) ───────────────
+        case 'BUSCAR_CORREOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta([
+                'status'  => 'success',
+                'correos' => directorioCorreosBuscar($pdo, (string)($_GET['q'] ?? ''), (int)($_GET['limit'] ?? 10)),
+            ]);
+
         // ── Auditorías de Calidad (ADMIN + CALIDAD) ──────────────
         case 'LISTAR_AUDITORIAS':
             $usr = validarToken($pdo, $token);
@@ -1175,6 +1184,19 @@ if ($method === 'POST') {
                 (int)   ($payload['id']  ?? 0),
                 (string)($payload['tipo'] ?? ''),
                 $correosEmitir,
+                $usr['usuario'],
+                !empty($payload['enviar_credenciales'])
+            ));
+
+        case 'ENVIAR_TODOS_DOCS_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $correosTodos = is_array($payload['correos'] ?? null)
+                ? $payload['correos']
+                : [(string)($payload['correo'] ?? '')];
+            respuesta($personal->enviarTodosDocumentosPersonal(
+                (int)($payload['id'] ?? 0),
+                $correosTodos,
                 $usr['usuario'],
                 !empty($payload['enviar_credenciales'])
             ));

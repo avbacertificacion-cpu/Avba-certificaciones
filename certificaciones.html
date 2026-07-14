@@ -189,6 +189,20 @@
     .spin { width:18px;height:18px;border:2px solid var(--borde);border-top-color:var(--azul);border-radius:50%;animation:giro .7s linear infinite;display:inline-block;vertical-align:middle;margin-right:8px; }
     @keyframes giro { to { transform:rotate(360deg); } }
 
+    /* Autocompletado de correos */
+    .correo-ac {
+      position:absolute; left:0; right:0; z-index:50;
+      background:#fff; border:1.5px solid var(--borde); border-top:none;
+      border-radius:0 0 8px 8px; box-shadow:0 8px 24px rgba(0,0,0,.12);
+      max-height:210px; overflow-y:auto;
+    }
+    .correo-ac-item { padding:8px 10px; cursor:pointer; font-size:13px; border-bottom:1px solid #f0f2f7; }
+    .correo-ac-item:last-child { border-bottom:none; }
+    .correo-ac-item:hover, .correo-ac-item.sel { background:var(--azul-light); }
+    .correo-ac-item .cae { color:var(--texto); font-weight:600; }
+    .correo-ac-item .can { color:var(--texto-hint); font-size:11px; display:block; margin-top:1px; }
+    .correo-ac-empty { padding:9px 10px; font-size:12px; color:var(--texto-hint); }
+
     /* ── OVERLAY ── */
     .overlay {
       position: fixed; inset: 0;
@@ -922,12 +936,13 @@
       </div>
     </div>
 
-    <div style="margin-bottom:12px">
+    <div style="margin-bottom:12px;position:relative">
       <label style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:4px">
         Correo de envío <span style="color:var(--rojo)">*</span>
       </label>
-      <input id="envSes-correo" type="email" placeholder="correo@empresa.com"
+      <input id="envSes-correo" type="email" placeholder="correo@empresa.com" autocomplete="off"
         style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px">
+      <div id="envSes-ac" class="correo-ac" style="display:none"></div>
     </div>
 
     <div style="padding:11px 14px;background:#f0f7ff;border-radius:8px;margin-bottom:14px">
@@ -941,6 +956,42 @@
     <div class="confirm-btns">
       <button class="btn-confirm-cancel" onclick="cerrarEnviarSesionPer()">Cancelar</button>
       <button class="btn-confirm-ok" id="envSes-ok" style="background:var(--verde)">Enviar documentos</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL ENVIAR TODOS LOS DOCUMENTOS DE UN PARTICIPANTE ══ -->
+<div class="overlay" id="overlay-enviar-todos-per" onclick="if(event.target===this)cerrarEnviarTodosPer()">
+  <div class="modal-sm" style="max-width:430px">
+    <div class="confirm-icon" style="background:#EAF3DE">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#3B6D11" stroke-width="2" style="width:26px;height:26px">
+        <path d="M22 2L11 13"/><path d="M22 2L15 22l-4-9-9-4 20-7z"/>
+      </svg>
+    </div>
+    <div class="confirm-t">Enviar todos los documentos</div>
+    <div class="confirm-s" id="envTodos-s"></div>
+
+    <div style="margin:14px 0 10px;position:relative">
+      <label style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:4px">
+        Correo de envío <span style="color:var(--rojo)">*</span>
+      </label>
+      <input id="envTodos-correo" type="email" placeholder="correo@empresa.com" autocomplete="off"
+        style="width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px">
+      <div id="envTodos-ac" class="correo-ac" style="display:none"></div>
+      <p style="font-size:11px;color:var(--texto-hint);margin:4px 0 0">Se enviará DC-3, Diploma y Certificado en un solo correo. Si el correo es nuevo, se guardará para la próxima vez.</p>
+    </div>
+
+    <div style="padding:11px 14px;background:#f0f7ff;border-radius:8px;margin-bottom:14px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:#0C447C">
+        <input type="checkbox" id="chk-envTodos-creds" style="width:16px;height:16px;cursor:pointer">
+        <span>Incluir usuario y contraseña de acceso al portal</span>
+      </label>
+    </div>
+
+    <div class="confirm-btns">
+      <button class="btn-confirm-cancel" onclick="cerrarEnviarTodosPer()">Cancelar</button>
+      <button class="btn-confirm-ok" id="envTodos-ok" style="background:var(--verde)">✉ Enviar documentos</button>
     </div>
   </div>
 </div>
@@ -2680,6 +2731,8 @@ function abrirCursoCert(idx) {
                 onclick="emitirDocPersonal(${p.id},'diploma',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir Diploma</button>
         <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                 onclick="emitirDocPersonal(${p.id},'certificado',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir Cert</button>` : ''}
+        <button class="btn-ver" style="font-size:11px;background:var(--verde);border-color:var(--verde);color:#fff"
+                onclick="abrirEnviarTodosPer(${p.id},'${(p.nombre_completo||'').replace(/'/g,'')}','${(p.correo||'').replace(/'/g,'')}')">✉ Enviar todo</button>
         <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
                 onclick="devolverParticipante(${p.id})">↩ Devolver</button>
         ${isAdminCert ? `<button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
@@ -2713,6 +2766,7 @@ function abrirEnviarSesionPer(idx, tipo) {
   document.getElementById('envSes-correo').value = g.empresa_correo || '';
   document.getElementById('chk-envSes-creds').checked = false;
   document.getElementById('envSes-ok').onclick = () => ejecutarEnviarSesionPer(g);
+  attachCorreoAutocomplete(document.getElementById('envSes-correo'), document.getElementById('envSes-ac'));
   document.getElementById('overlay-enviar-ses-per').classList.add('open');
 }
 
@@ -2764,6 +2818,117 @@ async function ejecutarEnviarSesionPer(g) {
     mostrarToast('Error de conexión.', 'err');
     console.error('ejecutarEnviarSesionPer:', e);
   }
+}
+
+/* ═══════════════════════════════
+   ENVIAR TODOS LOS DOCS DE UN PARTICIPANTE (+ autocompletado de correos)
+═══════════════════════════════ */
+let _envTodosPid = 0;
+
+function abrirEnviarTodosPer(pid, nombre, correo) {
+  _envTodosPid = pid;
+  document.getElementById('envTodos-s').textContent =
+    (nombre || 'Participante') + ' — DC-3, Diploma y Certificado';
+  const inp = document.getElementById('envTodos-correo');
+  inp.value = correo || '';
+  document.getElementById('chk-envTodos-creds').checked = false;
+  document.getElementById('envTodos-ok').onclick = ejecutarEnviarTodosPer;
+  attachCorreoAutocomplete(inp, document.getElementById('envTodos-ac'));
+  document.getElementById('overlay-enviar-todos-per').classList.add('open');
+  setTimeout(() => inp.focus(), 150);
+}
+
+function cerrarEnviarTodosPer() {
+  document.getElementById('overlay-enviar-todos-per').classList.remove('open');
+  const ac = document.getElementById('envTodos-ac');
+  if (ac) { ac.style.display = 'none'; ac.innerHTML = ''; }
+}
+
+async function ejecutarEnviarTodosPer() {
+  const correo = document.getElementById('envTodos-correo').value.trim();
+  if (!correo || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(correo)) {
+    document.getElementById('envTodos-correo').focus();
+    mostrarToast('Ingresa un correo de envío válido.', 'err');
+    return;
+  }
+  const creds = document.getElementById('chk-envTodos-creds').checked;
+  const pid   = _envTodosPid;
+  cerrarEnviarTodosPer();
+  mostrarToast('Generando documentos y enviando correo…', 'info');
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res  = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({
+        action:  'ENVIAR_TODOS_DOCS_PERSONAL',
+        payload: { id: pid, correo, enviar_credenciales: creds }
+      })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast(data.message || 'Documentos enviados.', 'ok');
+      perCertCargados = false;
+      cargarPerCursosCert();
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo enviar'), 'err');
+    }
+  } catch(e) {
+    mostrarToast('Error de conexión.', 'err');
+    console.error('ejecutarEnviarTodosPer:', e);
+  }
+}
+
+/**
+ * Conecta un input de correo con un dropdown de sugerencias que consulta
+ * BUSCAR_CORREOS (correos registrados en toda la plataforma) mientras se
+ * escribe. Reutilizable en cualquier input + contenedor de sugerencias.
+ */
+function attachCorreoAutocomplete(inp, box) {
+  if (!inp || !box) return;
+  if (inp._acAttached) return;   // no re-enganchar
+  inp._acAttached = true;
+  let timer = null, items = [], sel = -1;
+
+  const cerrar = () => { box.style.display = 'none'; box.innerHTML = ''; sel = -1; };
+  const elegir = (correo) => { inp.value = correo; cerrar(); inp.focus(); };
+
+  const render = () => {
+    if (!items.length) { box.innerHTML = '<div class="correo-ac-empty">Sin coincidencias — se guardará como nuevo al enviar.</div>'; box.style.display = 'block'; return; }
+    box.innerHTML = items.map((it, i) =>
+      '<div class="correo-ac-item' + (i === sel ? ' sel' : '') + '" data-correo="' + it.correo.replace(/"/g,'&quot;') + '">' +
+      '<span class="cae">' + escH(it.correo) + '</span>' +
+      (it.nombre ? '<span class="can">' + escH(it.nombre) + '</span>' : '') +
+      '</div>'
+    ).join('');
+    box.style.display = 'block';
+    [...box.querySelectorAll('.correo-ac-item')].forEach(el => {
+      el.addEventListener('mousedown', (e) => { e.preventDefault(); elegir(el.dataset.correo); });
+    });
+  };
+
+  const buscar = async () => {
+    const q = inp.value.trim();
+    if (q.length < 2) { cerrar(); return; }
+    const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+    try {
+      const res  = await fetch(API + '?action=BUSCAR_CORREOS&q=' + encodeURIComponent(q), { headers: { 'X-Token': tok } });
+      const data = await res.json();
+      items = (data && data.status === 'success' && Array.isArray(data.correos)) ? data.correos : [];
+      sel = -1;
+      render();
+    } catch(_) { cerrar(); }
+  };
+
+  inp.oninput = () => { clearTimeout(timer); timer = setTimeout(buscar, 220); };
+  inp.onkeydown = (e) => {
+    if (box.style.display !== 'block' || !items.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(sel + 1, items.length - 1); render(); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(sel - 1, 0); render(); }
+    else if (e.key === 'Enter' && sel >= 0) { e.preventDefault(); elegir(items[sel].correo); }
+    else if (e.key === 'Escape') { cerrar(); }
+  };
+  inp.onblur = () => { setTimeout(cerrar, 150); };
 }
 
 /* ═══════════════════════════════
