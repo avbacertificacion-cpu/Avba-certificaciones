@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Panel de Calidad — AVBA</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="js/pdfjs/pdf.min.js"></script>
   <style>
     :root {
       --azul:       #185FA5;
@@ -4213,16 +4213,14 @@ function cerrarDetPer() {
   document.getElementById('overlay-per-det').style.display = 'none';
 }
 
-/* ── PDF.js: carga una vez desde CDN, funciona en desktop y móvil ── */
+/* ── PDF.js: alojado localmente (no depende de un CDN externo) ── */
 function _ensurePdfJs() {
   return new Promise(function(resolve, reject) {
     if (window.pdfjsLib) { resolve(); return; }
     var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    s.crossOrigin = 'anonymous';
+    s.src = 'js/pdfjs/pdf.min.js';
     s.onload = function() {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdfjs/pdf.worker.min.js';
       resolve();
     };
     s.onerror = function() { reject(new Error('No se pudo cargar PDF.js')); };
@@ -6672,8 +6670,7 @@ async function eliminarAud(id, label) {
 /* ══════════════════════════════════════════════════════════════════════
    PICKER DE COORDENADAS PDF — PDF.js
 ══════════════════════════════════════════════════════════════════════ */
-pdfjsLib.GlobalWorkerOptions.workerSrc =
-  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdfjs/pdf.worker.min.js';
 
 const PK_COLORS = ['#e74c3c','#3498db','#27ae60','#f39c12','#9b59b6','#1abc9c','#e67e22','#16a085','#8e44ad','#2c3e50'];
 

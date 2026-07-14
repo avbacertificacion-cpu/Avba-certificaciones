@@ -351,11 +351,9 @@ function _ensurePdfJs() {
   return new Promise(function(resolve, reject) {
     if (window.pdfjsLib) { resolve(); return; }
     var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-    s.crossOrigin = 'anonymous';
+    s.src = 'js/pdfjs/pdf.min.js';
     s.onload = function() {
-      pdfjsLib.GlobalWorkerOptions.workerSrc =
-        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'js/pdfjs/pdf.worker.min.js';
       resolve();
     };
     s.onerror = function() { reject(new Error('No se pudo cargar PDF.js')); };
