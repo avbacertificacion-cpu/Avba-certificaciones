@@ -108,11 +108,41 @@ $num_reporte = $reporte['numero_reporte'];
 // ─── Ubicación (usamos observaciones como campo ubicación) ───────────────────
 $ubicacion = strtoupper(trim($reporte['observaciones'] ?? ''));
 
+// ─── Número de cada extintor: últimos 3 dígitos numéricos del código ─────────
+// Ej: EXT-00001 → 1, EXT-1302 → 302, ICA-D243 → 243
+$numeroExtintor = function ($codigo) {
+    $digitos = preg_replace('/\D/', '', (string) $codigo);   // solo dígitos
+    if ($digitos === '') return 0;
+    return (int) substr($digitos, -3);                        // últimos 3
+};
+
+foreach ($extintores as &$e) {
+    $e['numero_ext'] = $numeroExtintor($e['codigo_manual']);
+}
+unset($e);
+
+// Número mínimo por sección (para ordenar las secciones de menor a mayor)
+$min_seccion = [];
+foreach ($extintores as $e) {
+    $sec = strtoupper(trim($e['seccion'] ?? '') ?: 'SIN SECCIÓN');
+    if (!isset($min_seccion[$sec]) || $e['numero_ext'] < $min_seccion[$sec]) {
+        $min_seccion[$sec] = $e['numero_ext'];
+    }
+}
+
+// Ordenar: secciones por su número mínimo, y dentro de cada sección de menor a mayor
+usort($extintores, function ($a, $b) use ($min_seccion) {
+    $sa = strtoupper(trim($a['seccion'] ?? '') ?: 'SIN SECCIÓN');
+    $sb = strtoupper(trim($b['seccion'] ?? '') ?: 'SIN SECCIÓN');
+    if ($min_seccion[$sa] !== $min_seccion[$sb]) return $min_seccion[$sa] <=> $min_seccion[$sb];
+    if ($sa !== $sb) return strcmp($sa, $sb);
+    return $a['numero_ext'] <=> $b['numero_ext'];
+});
+
 // ─── Dividir extintores en páginas (~30 filas por página) ────────────────────
 // Construir filas con secciones intercaladas
 $filas = [];
 $seccion_actual = null;
-$num = 1;
 
 foreach ($extintores as $ext) {
     $seccion = trim($ext['seccion'] ?? '') ?: 'SIN SECCIÓN';
@@ -124,8 +154,8 @@ foreach ($extintores as $ext) {
         $seccion_actual = $seccion;
     }
 
-    // Asignar número consecutivo al extintor
-    $ext['numero'] = $num++;
+    // La columna "No" es el número del extintor (últimos 3 dígitos de su código)
+    $ext['numero'] = $ext['numero_ext'];
     $filas[] = ['tipo' => 'extintor', 'ext' => $ext];
 }
 
