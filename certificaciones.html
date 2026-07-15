@@ -1102,7 +1102,7 @@ async function cargar() {
   document.getElementById("tabla").innerHTML =
     `<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--texto-hint)"><span class="spin"></span>Cargando...</td></tr>`;
   try {
-    const res   = await fetch(API + "?action=getDataCertificaciones");
+    const res   = await fetch(API + "?action=getDataCertificaciones", { cache: 'no-store' });
     const texto = await res.text();
     if (!texto || texto.trim().startsWith("<")) throw new Error("Respuesta inválida del servidor");
     datosGlobal = JSON.parse(texto);

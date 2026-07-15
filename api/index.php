@@ -36,6 +36,15 @@ header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: strict-origin-when-cross-origin');
 
+// ── Anti-caché ────────────────────────────────────────────
+// Las respuestas de la API son datos vivos: nunca deben cachearse. Sin esto,
+// el navegador (sobre todo Safari/iOS) puede devolver una respuesta GET vieja
+// al recargar — p. ej. un registro recién aprobado en Calidad no aparecía en
+// Certificaciones porque la lista se servía desde caché.
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 // Eliminar header que expone versión de PHP
 header_remove('X-Powered-By');
 
