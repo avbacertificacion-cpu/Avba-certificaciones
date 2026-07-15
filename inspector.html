@@ -7,8 +7,8 @@
   <link rel="manifest" href="manifest.json">
   <script src="js/native-bridge.js"></script>
   <script src="js/offline-sync.js"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <link rel="stylesheet" href="js/leaflet/leaflet.css" />
+  <script src="js/leaflet/leaflet.js"></script>
   <style>
     :root {
       --azul:       #185FA5;
@@ -3890,18 +3890,16 @@ function actualizarCheckStats() {
 ════════════════════════════════════════ */
 
 // Leaflet cargado desde CDN no puede resolver las rutas relativas de sus iconos.
-// Se sobreescriben explícitamente con las URLs del mismo CDN.
-// Protegido con un guard: si el CDN de Leaflet no llegó a cargar (red lenta o
-// inestable, bloqueo, caída del CDN), esto NO debe tumbar el resto de la app
-// — antes, un error aquí abortaba la ejecución de TODO el script que venía
-// después (Cursos, envío sin conexión, etc.), dejando esas pantallas en
-// blanco sin ningún aviso. Sin Leaflet, solo el mapa deja de funcionar.
+// Se sobreescriben explícitamente con las rutas locales de los iconos.
+// Leaflet está alojado localmente (js/leaflet/), así que ya no depende de un
+// CDN externo — el mapa se muestra aunque la conexión sea inestable. El guard
+// se conserva por si acaso.
 if (typeof L !== 'undefined') {
   delete L.Icon.Default.prototype._getIconUrl;
   L.Icon.Default.mergeOptions({
-    iconUrl:       'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-    shadowUrl:     'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+    iconUrl:       'js/leaflet/images/marker-icon.png',
+    iconRetinaUrl: 'js/leaflet/images/marker-icon-2x.png',
+    shadowUrl:     'js/leaflet/images/marker-shadow.png',
   });
 }
 
