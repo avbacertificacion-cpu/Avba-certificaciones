@@ -2200,17 +2200,19 @@ const _sesRol = (JSON.parse(localStorage.getItem('avba_session') || '{}')).rol |
 const isAdminCal          = _sesRol === 'ADMIN';
 const canManageInstructor = _sesRol === 'ADMIN' || _sesRol === 'CALIDAD';
 
-/* ─── Definición de plantillas de prueba de carga ─── */
+/* ─── Definición de plantillas de prueba de carga ───
+   cols  = columnas por fila (mismo orden/campos que captura el inspector)
+   calc  = campos que se calculan solos (solo lectura; p. ej. ángulo/altura de grúa)
+   headerFields = campos de captura única (no por fila), p. ej. CML en izaje */
 const PC_DEF = {
-  'dictamen_preview.html':     { label: 'Grúa Móvil',       rows: [{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}] },
-  'dictamen_grua_torre.html':  { label: 'Grúa Torre',        rows: [{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}] },
-  'dictamen_montacargas.html': { label: 'Montacargas',       rows: [{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}] },
-  'dictamen_izaje.html':       { label: 'Elemento de Izaje', rows: [{k:'trabajo',l:'Carga de Trabajo'},{k:'sobrecarga',l:'Sobrecarga'}] },
-  'dictamen_ptem.html':        { label: 'PTEM',              rows: [{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}] },
-  'dictamen_telehandler.html': { label: 'Telehandler',       rows: [{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}] },
+  'dictamen_preview.html':     { label:'Grúa Móvil',        rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','pluma','angulo','altura','resultado'], calc:['angulo','altura'] },
+  'dictamen_grua_torre.html':  { label:'Grúa Torre',        rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','pluma','altura','resultado'], calc:['altura'] },
+  'dictamen_montacargas.html': { label:'Montacargas',       rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','altura','duracion','inclin','resultado'], calc:[] },
+  'dictamen_izaje.html':       { label:'Elemento de Izaje', rows:[{k:'trabajo',l:'Carga de Trabajo'},{k:'sobrecarga',l:'Prueba de Sobrecarga'}], cols:['duracion','deformacion','resultado'], calc:[], headerFields:['cml'] },
+  'dictamen_ptem.html':        { label:'PTEM',              rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','altura','resultado'], calc:[] },
+  'dictamen_telehandler.html': { label:'Telehandler',       rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','extension','altura','angulo','resultado'], calc:[] },
+  'dictamen_mewp.html':        { label:'MEWP',              rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','altura','resultado'], calc:[] },
 };
-const PC_EDITABLE    = ['peso','radio','pluma'];
-const PC_CALCULATED  = ['angulo','altura'];
 const PC_LABELS = {
   peso:'Peso (TON)', radio:'Radio (m)', pluma:'Long. Pluma (m)',
   angulo:'Ángulo (°)', altura:'Altura (m)', resultado:'Resultado',
@@ -2398,21 +2400,31 @@ function ver(fila) {
   if (pcData && pcData.plantilla) {
     const def    = PC_DEF[pcData.plantilla];
     const filas  = def ? def.rows
-      : Object.keys(pcData).filter(k => k !== 'plantilla').map(k => ({k, l: k}));
-    const sample   = pcData[filas[0]?.k] || {};
-    const fieldKeys = Object.keys(sample);
+      : Object.keys(pcData).filter(k => k !== 'plantilla' && typeof pcData[k] === 'object').map(k => ({k, l: k}));
+    // Columnas: preferir las de la plantilla (así se pueden capturar aunque
+    // vengan vacías); si no hay plantilla conocida, derivarlas de los datos.
+    const sample    = pcData[filas[0]?.k] || {};
+    const fieldKeys = (def && def.cols && def.cols.length) ? def.cols : Object.keys(sample);
+    const calcSet   = new Set(def ? (def.calc || []) : ['angulo','altura']);
+    const headerFields = (def && def.headerFields) ? def.headerFields
+      : Object.keys(pcData).filter(k => k !== 'plantilla' && (pcData[k] === null || typeof pcData[k] !== 'object'));
     const thStyle  = 'padding:7px 8px;background:var(--azul-dark);color:#fff;text-align:center;font-size:11px;white-space:nowrap';
     const tdBase   = 'padding:5px 6px;border:1px solid var(--borde)';
     const inpBase  = 'width:100%;min-width:55px;padding:4px 6px;border:1px solid var(--borde);border-radius:5px;font-size:12px;text-align:center;box-sizing:border-box';
 
     body += `<div class="sec-label">Prueba de Carga${def ? ' — ' + def.label : ''}</div>`;
 
-    // Campos "raíz" (no repetidos por fila): tipo_plataforma, CML, carga de prueba, etc.
-    const rootFields = Object.keys(pcData).filter(k => k !== 'plantilla' && (pcData[k] === null || typeof pcData[k] !== 'object'));
-    if (rootFields.length) {
-      body += `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--texto-sub)">`;
-      rootFields.forEach(k => {
-        body += `<div><strong style="color:var(--texto)">${PC_LABELS[k] || k}:</strong> ${esc(pcData[k]) || '—'}</div>`;
+    // Campos de captura única (no por fila): CML, tipo de plataforma, etc. — editables
+    if (headerFields.length) {
+      body += `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">`;
+      headerFields.forEach(k => {
+        const val = pcData[k] ?? '';
+        if (editable) {
+          body += `<div style="font-size:12px"><label style="display:block;color:var(--texto-sub);margin-bottom:2px">${PC_LABELS[k] || k}</label>
+            <input type="text" id="pc-hdr_${k}" value="${esc(val)}" style="${inpBase};min-width:110px" oninput="pcCalidadRecalc()"></div>`;
+        } else {
+          body += `<div style="font-size:12px"><strong style="color:var(--texto)">${PC_LABELS[k] || k}:</strong> ${esc(val) || '—'}</div>`;
+        }
       });
       body += `</div>`;
     }
@@ -2432,12 +2444,21 @@ function ver(fila) {
       body += `<td style="padding:8px 10px;font-weight:600;font-size:12px;border:1px solid var(--borde);white-space:nowrap">${row.l}</td>`;
       fieldKeys.forEach(fk => {
         const val = rowData[fk] ?? '';
-        if (editable && PC_EDITABLE.includes(fk)) {
-          body += `<td style="${tdBase}"><input type="text" id="pc_${row.k}_${fk}" value="${esc(val)}" style="${inpBase}" oninput="pcCalidadRecalc()"></td>`;
-        } else if (PC_CALCULATED.includes(fk)) {
-          body += `<td style="${tdBase}"><input type="text" id="pc_${row.k}_${fk}" value="${esc(val)}" style="${inpBase};background:#f5f5f5" readonly></td>`;
-        } else {
+        if (!editable) {
           body += `<td style="${tdBase};text-align:center">${esc(val) || '—'}</td>`;
+        } else if (calcSet.has(fk)) {
+          // Campo calculado (ángulo/altura de grúa): solo lectura, se recalcula solo
+          body += `<td style="${tdBase}"><input type="text" id="pc_${row.k}_${fk}" value="${esc(val)}" style="${inpBase};background:#f5f5f5" readonly></td>`;
+        } else if (fk === 'resultado') {
+          const v = String(val).toUpperCase();
+          body += `<td style="${tdBase}"><select id="pc_${row.k}_${fk}" style="${inpBase}">
+            <option value=""${v===''?' selected':''}>—</option>
+            <option value="CONFORME"${v==='CONFORME'?' selected':''}>CONFORME</option>
+            <option value="NO CONFORME"${v==='NO CONFORME'?' selected':''}>NO CONFORME</option>
+          </select></td>`;
+        } else {
+          const recalc = (fk === 'radio' || fk === 'pluma') ? ' oninput="pcCalidadRecalc()"' : '';
+          body += `<td style="${tdBase}"><input type="text" id="pc_${row.k}_${fk}" value="${esc(val)}" style="${inpBase}"${recalc}></td>`;
         }
       });
       body += `</tr>`;
@@ -2569,10 +2590,12 @@ function pcCalidadRecalc() {
     const pluma = parseFloat(document.getElementById(`pc_${rk}_pluma`)?.value || 0) || 0;
     const elAng = document.getElementById(`pc_${rk}_angulo`);
     const elAlt = document.getElementById(`pc_${rk}_altura`);
-    if (elAng && radio > 0 && pluma >= radio) {
+    // Solo autocompletar los campos calculados (solo lectura); en plantillas
+    // donde ángulo/altura se capturan a mano, no se deben sobrescribir.
+    if (elAng && elAng.readOnly && radio > 0 && pluma >= radio) {
       elAng.value = (Math.acos(radio / pluma) * 180 / Math.PI).toFixed(1);
     }
-    if (elAlt && pluma > 0) {
+    if (elAlt && elAlt.readOnly && pluma > 0) {
       elAlt.value = Math.sqrt(Math.max(0, pluma * pluma - radio * radio)).toFixed(2);
     }
   });
@@ -2619,15 +2642,22 @@ async function guardar() {
     const pcPlantillaEl = document.getElementById('pc-plantilla');
     if (pcPlantillaEl) {
       const updates = { plantilla: pcPlantillaEl.value };
+      // Campos por fila (id = pc_<fila>_<campo>)
       document.querySelectorAll('[id^="pc_"]').forEach(el => {
         const parts = el.id.split('_');
         if (parts.length >= 3) {
           const rk = parts[1];
           const fk = parts.slice(2).join('_');
           if (!updates[rk]) updates[rk] = {};
-          updates[rk][fk] = el.value.trim();
+          updates[rk][fk] = (el.value || '').trim();
         }
       });
+      // Campos de captura única (id = pc-hdr_<campo>): CML, etc.
+      const headerUpdates = {};
+      document.querySelectorAll('[id^="pc-hdr_"]').forEach(el => {
+        headerUpdates[el.id.slice('pc-hdr_'.length)] = (el.value || '').trim();
+      });
+      if (Object.keys(headerUpdates).length) updates.__header = headerUpdates;
       payload.prueba_carga_updates = updates;
     }
 

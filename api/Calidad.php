@@ -137,7 +137,11 @@ class Calidad {
             registrarHistorial($this->pdo, $usuario, $id, 'qr_codigo', $row['qr_codigo'] ?? null, $payload['qr_codigo']);
         }
 
-        // Prueba de carga (solo editable: peso, radio, pluma; recalcula angulo/altura)
+        // Prueba de carga: se guardan TODOS los campos que capture cada
+        // plantilla (no solo grúa). Ángulo/altura se recalculan solos cuando
+        // hay radio y pluma. Los campos de captura única (CML, etc.) llegan en
+        // '__header'. Los campos calculados que reporta el cliente se ignoran
+        // (se recalculan aquí) para no confiar en valores manipulables.
         if (!empty($payload['prueba_carga_updates']) && is_array($payload['prueba_carga_updates'])) {
             $updates = $payload['prueba_carga_updates'];
             if (!empty($updates['plantilla'])) {
@@ -146,22 +150,39 @@ class Calidad {
                     : [];
                 $pc['plantilla'] = $updates['plantilla'];
 
-                foreach ($updates as $rowKey => $fields) {
-                    if ($rowKey === 'plantilla' || !is_array($fields)) continue;
-                    if (!isset($pc[$rowKey])) $pc[$rowKey] = [];
+                // Campos de captura única (no por fila): CML, tipo de plataforma, etc.
+                if (!empty($updates['__header']) && is_array($updates['__header'])) {
+                    foreach ($updates['__header'] as $hk => $hv) {
+                        if ($hk === '' ) continue;
+                        $pc[$hk] = is_scalar($hv) ? (string)$hv : $hv;
+                    }
+                }
 
-                    foreach (['peso', 'radio', 'pluma'] as $f) {
-                        if (array_key_exists($f, $fields)) {
-                            $pc[$rowKey][$f] = $fields[$f];
-                        }
+                foreach ($updates as $rowKey => $fields) {
+                    if ($rowKey === 'plantilla' || $rowKey === '__header' || !is_array($fields)) continue;
+                    if (!isset($pc[$rowKey]) || !is_array($pc[$rowKey])) $pc[$rowKey] = [];
+
+                    // Guardar todos los campos enviados
+                    foreach ($fields as $f => $v) {
+                        if ($f === 'angulo' || $f === 'altura') continue; // se recalculan abajo
+                        $pc[$rowKey][$f] = is_scalar($v) ? (string)$v : $v;
                     }
 
-                    // Recalcular campos derivados
+                    // Recalcular ángulo/altura de grúa cuando aplican (radio y pluma)
                     $radio = (float)($pc[$rowKey]['radio'] ?? 0);
                     $pluma = (float)($pc[$rowKey]['pluma'] ?? 0);
                     if ($radio > 0 && $pluma > 0 && $radio <= $pluma) {
                         $pc[$rowKey]['angulo'] = (string)round(acos($radio / $pluma) * 180 / M_PI, 1);
                         $pc[$rowKey]['altura'] = (string)round(sqrt($pluma * $pluma - $radio * $radio), 2);
+                    } else {
+                        // Sin geometría de grúa (no hay radio+pluma): ángulo/altura
+                        // se capturan a mano (telehandler, montacargas, ptem…) —
+                        // respetar lo que envió el cliente.
+                        foreach (['angulo', 'altura'] as $f) {
+                            if (array_key_exists($f, $fields)) {
+                                $pc[$rowKey][$f] = is_scalar($fields[$f]) ? (string)$fields[$f] : $fields[$f];
+                            }
+                        }
                     }
                 }
 
