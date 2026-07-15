@@ -313,18 +313,14 @@ class Certificaciones {
         $datos = $this->obtenerDatosEquipo($id);
         if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
-        // Liberar QR asociado para que pueda ser reasignado en calidad
-        $qrAnterior = $datos['qr_codigo'] ?? '';
-        if ($qrAnterior) {
-            $this->pdo->prepare(
-                "UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?"
-            )->execute([$qrAnterior]);
-        }
-
+        // Se CONSERVA el QR asignado (no se libera ni se borra del equipo): al
+        // volver a Calidad y presionar "Aprobar registro", ese mismo QR aparece
+        // precargado, con opción de mantenerlo o cambiarlo. El QR sigue
+        // reservado para este equipo (qr_codigos.usado = 1, equipo_id = id).
         $this->pdo->prepare(
             "UPDATE equipos
              SET estado = 'RETORNADO', certificado_url = NULL, dictamen_url = NULL,
-                 fecha_enviado = NULL, qr_codigo = NULL
+                 fecha_enviado = NULL
              WHERE id = ?"
         )->execute([$id]);
 
