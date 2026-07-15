@@ -3923,7 +3923,11 @@ function crearMapa(id, tipo, lat, lng) {
   }
 
   maps[tipo] = L.map(id, { zoomControl: true }).setView([lat, lng], 16);
-  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  // Host único de OpenStreetMap (CDN Fastly). El antiguo esquema de
+  // subdominios {s}.tile.openstreetmap.org (a/b/c) quedó deprecado y en
+  // algunas redes/DNS no cargaba — este es el recomendado actual.
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
     attribution: "© OpenStreetMap"
   }).addTo(maps[tipo]);
 
@@ -3947,7 +3951,10 @@ function crearMapa(id, tipo, lat, lng) {
     } catch {}
   });
 
-  setTimeout(() => maps[tipo].invalidateSize(), 250);
+  // Recalcular el tamaño varias veces: si el mapa se creó mientras el paso
+  // apenas se estaba mostrando, el contenedor podía medir 0 y no cargar los
+  // tiles del área visible. Reintentar asegura que se pinten al verse.
+  [100, 350, 800, 1500].forEach(ms => setTimeout(() => { try { maps[tipo].invalidateSize(); } catch(e){} }, ms));
 
   // Activar buscador de dirección (el guard interno evita doble-binding)
   const buscarId = tipo === 'insp' ? 'buscar-insp' : 'buscar-envio';
@@ -5414,11 +5421,12 @@ function izaInitMapa() {
 
 function izaCrearMapa(lat, lng) {
   izaMap = L.map('iza-mapa', { zoomControl: true }).setView([lat, lng], 16);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
     attribution: '© OpenStreetMap'
   }).addTo(izaMap);
   izaMarker = L.marker([lat, lng], { draggable: true }).addTo(izaMap);
-  setTimeout(() => izaMap.invalidateSize(), 250);
+  [100, 350, 800, 1500].forEach(ms => setTimeout(() => { try { izaMap.invalidateSize(); } catch(e){} }, ms));
 }
 
 // ── Paso 1: Continuar → crear sesión en BD ────────────
