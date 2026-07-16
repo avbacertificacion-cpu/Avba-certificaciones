@@ -2669,16 +2669,14 @@ async function guardar() {
     const data = await res.json();
 
     if (data.status === "success") {
-      const d = datosGlobal.find(x => x.fila === filaActual);
-      if (d) {
-        Object.assign(d, payload);
-        // payload.fecha viene en aaaa-mm-dd (input type=date); normalizar a dd/mm/aaaa para la vista
-        const mIso = (payload.fecha || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (mIso) d.fecha = `${mIso[3]}/${mIso[2]}/${mIso[1]}`;
-      }
       cerrarDet();
-      render(datosGlobal);
       mostrarToast("Cambios guardados correctamente", "ok");
+      // Re-cargar desde el servidor para que la copia en memoria refleje lo
+      // realmente guardado (incluida la prueba de carga). Antes se hacía
+      // Object.assign(d, payload), pero payload lleva 'prueba_carga_updates',
+      // no 'prueba_carga', así que al reabrir el registro se veían los datos
+      // viejos de la prueba de carga aunque sí se habían guardado.
+      await cargar();
     } else {
       mostrarToast("Error al guardar: " + (data.message || "Error desconocido"), "err");
     }
