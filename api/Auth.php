@@ -10,6 +10,29 @@ class Auth {
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
         $this->ensureFirmaColumn();
+        $this->ensureRolAdministrativo();
+    }
+
+    /**
+     * La columna usuarios.rol es un ENUM que originalmente no incluía
+     * 'ADMINISTRATIVO'. Sin este valor, MySQL rechaza el INSERT/UPDATE al
+     * crear un usuario con ese rol (aunque el backend ya lo acepte), lo que
+     * el panel mostraba como "rol no reconocido". Se amplía el ENUM una sola
+     * vez (solo si falta el valor).
+     */
+    private function ensureRolAdministrativo(): void {
+        try {
+            $col = $this->pdo->query("SHOW COLUMNS FROM usuarios LIKE 'rol'")->fetch(PDO::FETCH_ASSOC);
+            $tipo = $col['Type'] ?? '';
+            if ($tipo && stripos($tipo, 'ADMINISTRATIVO') === false) {
+                $this->pdo->exec(
+                    "ALTER TABLE usuarios MODIFY `rol`
+                     ENUM('ADMIN','INSPECTOR','CALIDAD','CERTIFICACIONES','CLIENTE','ADMINISTRATIVO') NOT NULL"
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log('[Auth] ensureRolAdministrativo: ' . $e->getMessage());
+        }
     }
 
     /** Roles válidos (constante de config + roles nuevos garantizados). */
