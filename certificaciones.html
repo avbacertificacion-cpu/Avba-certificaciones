@@ -375,6 +375,7 @@
     .btn-enviar-cert    { background: var(--azul-light);   border-color: var(--azul);    color: var(--azul-dark); }
     .btn-enviar-dict    { background: var(--ambar-light);  border-color: #D4922A;        color: var(--ambar); }
     .btn-enviar-todo    { background: var(--azul);         border-color: var(--azul);    color: white; }
+    .btn-publicar       { background: #E6F1FB;             border-color: #0C447C;        color: #0C447C; }
     .btn-rechazar       { background: var(--rojo-light);   border-color: #F09595;        color: var(--rojo); }
     .btn-word-cert      { background: #EBF5EB;             border-color: #4CAF50;        color: #2E7D32; }
     .btn-word-dict      { background: #EBF5EB;             border-color: #4CAF50;        color: #2E7D32; }
@@ -384,6 +385,7 @@
     .btn-enviar-cert:hover   { background: #B5D4F4; }
     .btn-enviar-dict:hover   { background: #F2D9A8; }
     .btn-enviar-todo:hover   { background: var(--azul-dark); }
+    .btn-publicar:hover      { background: #CFE3F7; }
     .btn-rechazar:hover      { background: #F7C1C1; }
     .btn-word-cert:hover     { background: #D4EDDA; }
     .btn-word-dict:hover     { background: #D4EDDA; }
@@ -1679,6 +1681,12 @@ function renderAcciones(d) {
       fn: "confirmarAccion('ENVIAR_TODO')"
     },
     {
+      label: "Habilitar en portal del cliente (sin correo)",
+      clase: "btn-accion btn-publicar",
+      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 11V2M5 5l3-3 3 3"/><path d="M2 9v4a1 1 0 001 1h10a1 1 0 001-1V9"/></svg>`,
+      fn: "confirmarAccion('PUBLICAR')"
+    },
+    {
       label: "Rechazar a calidad",
       clase: "btn-accion btn-rechazar",
       icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M8 2l-6 6 6 6"/></svg>`,
@@ -1968,6 +1976,13 @@ function confirmarAccion(accion) {
       titulo: "Rechazar a calidad",
       sub: `El registro volverá a estado <strong>PENDIENTE</strong> para que calidad lo revise nuevamente.`,
       btnColor: "#A32D2D", btnLabel: "Confirmar rechazo"
+    },
+    PUBLICAR: {
+      color: "#0C447C", bg: "#E6F1FB",
+      icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#0C447C" stroke-width="2"><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 14v4a2 2 0 002 2h12a2 2 0 002-2v-4"/></svg>`,
+      titulo: "Habilitar en portal del cliente",
+      sub: `Se generarán el certificado y el dictamen y quedarán <strong>disponibles en el portal del cliente</strong>, <strong>sin enviar correo</strong>. El cliente los verá en "Mis Equipos".`,
+      btnColor: "#0C447C", btnLabel: "Habilitar en portal"
     }
   };
 
@@ -1996,6 +2011,7 @@ async function ejecutarAccion(accion) {
     ENVIAR_CERT: { action: "GENERAR_CERT_ENVIAR",  msg: "Generando y enviando certificado..." },
     ENVIAR_DICT: { action: "GENERAR_DICT_ENVIAR",  msg: "Generando y enviando dictamen..." },
     ENVIAR_TODO: { action: "GENERAR_TODO_ENVIAR",   msg: "Generando y enviando certificado + dictamen..." },
+    PUBLICAR:    { action: "PUBLICAR_PORTAL_CLIENTE", msg: "Habilitando documentos en el portal del cliente...", extra: { tipo: "todo" } },
     RECHAZAR:    { action: "RECHAZAR_CERTIFICACION", msg: "Rechazando registro..." }
   };
 
@@ -2008,14 +2024,16 @@ async function ejecutarAccion(accion) {
     const res  = await fetch(API, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Token": _s.token || "" },
-      body:   JSON.stringify({ action: cfg.action, token: _s.token || "", payload: { fila: d.fila, enviar_credenciales: enviarCreds } })
+      body:   JSON.stringify({ action: cfg.action, token: _s.token || "", payload: { fila: d.fila, enviar_credenciales: enviarCreds, ...(cfg.extra || {}) } })
     });
     const texto = await res.text();
     const data  = JSON.parse(texto);
 
     if (data.status === "success") {
       mostrarToast(
-        accion === "RECHAZAR" ? "Registro enviado a calidad" : "Enviado correctamente",
+        accion === "RECHAZAR" ? "Registro enviado a calidad"
+        : accion === "PUBLICAR" ? (data.message || "Documentos habilitados en el portal del cliente")
+        : "Enviado correctamente",
         "ok"
       );
       cerrarDet();

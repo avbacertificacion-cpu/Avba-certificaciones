@@ -305,6 +305,63 @@ class Certificaciones {
         }
     }
 
+    /**
+     * Habilita los documentos en el PORTAL DEL CLIENTE sin enviar correo.
+     * Genera el certificado y/o el dictamen, guarda sus URLs y marca el
+     * registro como ENVIADO (que es la condición para que el equipo y sus
+     * documentos aparezcan en "Mis Equipos" del portal). No manda email.
+     * $tipo: 'cert' | 'dict' | 'todo' (por defecto 'todo').
+     */
+    public function publicarPortalCliente(array $payload, string $usuario): array {
+        $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
+        if (!$id) return ['status' => 'error', 'message' => 'ID de equipo requerido.'];
+
+        $datos = $this->obtenerDatosEquipo($id);
+        if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+
+        $tipo = in_array(($payload['tipo'] ?? 'todo'), ['cert','dict','todo'], true) ? $payload['tipo'] : 'todo';
+
+        $sets   = [];
+        $params = [];
+        $hechos = [];
+
+        if ($tipo === 'cert' || $tipo === 'todo') {
+            try {
+                $ruta = $this->resolverPdfEnvio('certificado', $id, $datos);
+                $sets[]   = 'certificado_url = ?';
+                $params[] = UPLOAD_URL . 'certificados/' . basename($ruta);
+                $hechos[] = 'certificado';
+            } catch (\Throwable $e) {
+                if ($tipo === 'cert') return ['status' => 'error', 'message' => 'No se pudo generar el certificado: ' . $e->getMessage()];
+                error_log('[publicarPortalCliente] cert: ' . $e->getMessage());
+            }
+        }
+        if ($tipo === 'dict' || $tipo === 'todo') {
+            try {
+                $ruta = $this->resolverPdfEnvio('dictamen', $id, $datos);
+                $sets[]   = 'dictamen_url = ?';
+                $params[] = UPLOAD_URL . 'certificados/' . basename($ruta);
+                $hechos[] = 'dictamen';
+            } catch (\Throwable $e) {
+                if ($tipo === 'dict') return ['status' => 'error', 'message' => 'No se pudo generar el dictamen: ' . $e->getMessage()];
+                error_log('[publicarPortalCliente] dict: ' . $e->getMessage());
+            }
+        }
+
+        if (!$sets) return ['status' => 'error', 'message' => 'No se pudo generar ningún documento para publicar.'];
+
+        $sets[] = "estado = 'ENVIADO'";
+        $sets[] = 'fecha_enviado = NOW()';
+        $params[] = $id;
+        $this->pdo->prepare("UPDATE equipos SET " . implode(', ', $sets) . " WHERE id = ?")->execute($params);
+
+        if (($datos['estado'] ?? '') !== 'ENVIADO') {
+            registrarHistorial($this->pdo, $usuario, $id, 'estado', $datos['estado'] ?? null, 'ENVIADO');
+        }
+
+        return ['status' => 'success', 'message' => 'Documentos habilitados en el portal del cliente (' . implode(' + ', $hechos) . ').'];
+    }
+
     // ── Rechazar a calidad ─────────────────────────────────
     public function rechazarACertificacion(array $payload, string $usuario): array {
         $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
