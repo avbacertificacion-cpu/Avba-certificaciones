@@ -29,6 +29,7 @@
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html, body { overflow-x: hidden; max-width: 100%; }
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
       background: var(--gris-bg);
@@ -46,6 +47,15 @@
       position: sticky;
       top: 0;
       z-index: 50;
+    }
+    /* Evitar que el encabezado desborde a lo ancho en móvil (antes la página
+       se corría a la izquierda al cerrar un modal). */
+    .header-text { min-width: 0; }
+    .header-text .t, .header-text .s { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    @media (max-width: 640px) {
+      .header { padding: 12px 14px; gap: 10px; }
+      .header-text .s { display: none; }
+      #hdr-user-cal { display: none; }
     }
     .logo {
       width: 36px; height: 36px; border-radius: 50%;
