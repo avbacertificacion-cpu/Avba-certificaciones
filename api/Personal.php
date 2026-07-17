@@ -616,6 +616,16 @@ class Personal {
                 $params[] = $val === '' ? null : $val;
             }
         }
+        // Cambio de curso: validar que exista en el catálogo
+        if (array_key_exists('curso_id', $payload)) {
+            $cursoId = (int)($payload['curso_id'] ?? 0);
+            if ($cursoId <= 0) return ['status' => 'error', 'message' => 'Selecciona un curso válido.'];
+            $chkC = $this->pdo->prepare("SELECT id FROM cursos WHERE id = ?");
+            $chkC->execute([$cursoId]);
+            if (!$chkC->fetch()) return ['status' => 'error', 'message' => 'El curso seleccionado no existe.'];
+            $sets[]   = "`curso_id` = ?";
+            $params[] = $cursoId;
+        }
         // capacidad_na es booleano, manejo separado
         if (array_key_exists('capacidad_na', $payload)) {
             $sets[]   = "`capacidad_na` = ?";

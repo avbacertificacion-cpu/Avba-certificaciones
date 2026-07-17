@@ -4037,10 +4037,21 @@ async function aprobarSeleccionadosPer() {
   }
 }
 
+async function asegurarCursosCargados() {
+  if (cursosCargados && cursosData.length) return;
+  try {
+    const res  = await fetch(API + "?action=LISTAR_CURSOS");
+    const data = await res.json();
+    cursosData     = Array.isArray(data) ? data : [];
+    cursosCargados = true;
+  } catch (e) { /* se maneja al construir el selector */ }
+}
+
 async function abrirDetPer(id) {
   document.getElementById('overlay-per-det').style.display = 'flex';
   document.getElementById('per-det-body').innerHTML = `<div style="text-align:center;padding:32px;color:var(--texto-hint)">Cargando...</div>`;
   try {
+    await asegurarCursosCargados();
     const res  = await fetch(API + `?action=OBTENER_PARTICIPANTE&id=${id}`);
     const p    = await res.json();
     if (!p || p.status === 'error') throw new Error(p?.message);
@@ -4089,6 +4100,28 @@ async function abrirDetPer(id) {
             <input id="per-info-correo" type="email" value="${escH(p.correo||'')}"
               placeholder="correo@ejemplo.com"
               style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+          </label>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub);grid-column:1 / -1">Curso
+            <select id="per-info-curso"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px;background:white">
+              ${(() => {
+                const actual = String(p.curso_id || '');
+                const opciones = (cursosData || []).slice()
+                  .sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || '')));
+                let html = '';
+                let existe = false;
+                opciones.forEach(c => {
+                  const sel = String(c.id) === actual;
+                  if (sel) existe = true;
+                  html += `<option value="${c.id}" ${sel ? 'selected' : ''}>${escH(c.nombre || '—')}</option>`;
+                });
+                if (actual && !existe) {
+                  html = `<option value="${escH(actual)}" selected>${escH(p.curso_nombre || 'Curso actual')}</option>` + html;
+                }
+                if (!actual) html = `<option value="" selected disabled>Selecciona un curso…</option>` + html;
+                return html;
+              })()}
+            </select>
           </label>
           <div><span style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:3px">Ocupación</span>
             <span style="font-size:12px">${escH(p.ocupacion_nombre||'—')}</span>
@@ -4625,15 +4658,22 @@ async function guardarInfoPer(id) {
   const capacidad_na = capNaEl ? capNaEl.checked : false;
   const capacidad = capacidad_na ? '' : (document.getElementById('per-info-capacidad')?.value || '').trim();
   const correo    = (document.getElementById('per-info-correo')?.value || '').trim().toLowerCase();
+  const cursoSel  = document.getElementById('per-info-curso');
+  const curso_id  = cursoSel ? parseInt(cursoSel.value, 10) : 0;
   if (curp && curp !== '—') {
     const v = validarCURPCompleta(curp);
     if (!v.valida) { mostrarToast('CURP inválida: ' + v.error, 'err'); return; }
   }
+  if (cursoSel && (!curso_id || curso_id <= 0)) {
+    mostrarToast('Selecciona un curso válido.', 'err'); return;
+  }
+  const payload = { id, nombre_completo: nombre, curp, puesto, telefono, correo, capacidad, capacidad_na };
+  if (curso_id > 0) payload.curso_id = curso_id;
   try {
     const res  = await fetch(API, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ action: 'ACTUALIZAR_INFO_PARTICIPANTE', payload: { id, nombre_completo: nombre, curp, puesto, telefono, correo, capacidad, capacidad_na } })
+      body:    JSON.stringify({ action: 'ACTUALIZAR_INFO_PARTICIPANTE', payload })
     });
     const data = await res.json();
     if (data.status === 'success') {
