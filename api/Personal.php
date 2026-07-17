@@ -61,6 +61,7 @@ class Personal {
         $sql = "SELECT p.id, p.nombre_completo, p.curp, p.puesto,
                        p.telefono, p.correo, p.capacidad, p.capacidad_na,
                        p.control, p.estatus, p.fecha_curso,
+                       p.curso_id,
                        c.nombre AS curso_nombre, c.duracion_horas,
                        o.nombre AS ocupacion_nombre,
                        p.foto_documentacion_url, p.foto_persona_url,
@@ -1097,6 +1098,28 @@ class Personal {
         )->execute([$instructor, ...$ids]);
 
         return ['status' => 'success', 'message' => count($ids) . ' participante(s) actualizados.'];
+    }
+
+    // ── Cambiar el curso de todos los participantes de una sesión ──
+    public function cambiarCursoSesion(array $payload): array {
+        $ids = array_values(array_filter(
+            array_map('intval', $payload['ids'] ?? []),
+            fn($v) => $v > 0
+        ));
+        $cursoId = (int)($payload['curso_id'] ?? 0);
+        if (empty($ids))    return ['status' => 'error', 'message' => 'No hay participantes en la sesión.'];
+        if ($cursoId <= 0)  return ['status' => 'error', 'message' => 'Selecciona un curso válido.'];
+
+        $chk = $this->pdo->prepare("SELECT id FROM cursos WHERE id = ?");
+        $chk->execute([$cursoId]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'El curso seleccionado no existe.'];
+
+        $ph = implode(',', array_fill(0, count($ids), '?'));
+        $this->pdo->prepare(
+            "UPDATE participantes_cursos SET curso_id=? WHERE id IN ({$ph})"
+        )->execute([$cursoId, ...$ids]);
+
+        return ['status' => 'success', 'message' => 'Curso actualizado en ' . count($ids) . ' participante(s).'];
     }
 
     public function eliminarOcupacion(int $id): array {

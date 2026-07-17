@@ -1614,6 +1614,42 @@
   </div>
 </div>
 
+<!-- ══ MODAL CAMBIAR CURSO DE SESIÓN ══ -->
+<div class="overlay" id="overlay-cambiar-curso" style="display:none" onclick="if(event.target===this)cerrarCambiarCurso()">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:#43a047">C</div>
+        <div>
+          <div class="m-title">Cambiar curso de la sesión</div>
+          <div class="m-sub" id="cc-subtitulo">—</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarCambiarCurso()">×</button>
+    </div>
+    <div style="padding:18px 22px 20px">
+      <div style="margin-bottom:14px;padding:10px 12px;background:var(--fondo);border-radius:8px;font-size:12px;line-height:1.6">
+        <span style="color:var(--texto-sub)">Curso actual: </span>
+        <strong id="cc-curso-actual">—</strong><br>
+        <span id="cc-n-participantes" style="color:var(--texto-hint);font-size:11px"></span>
+      </div>
+      <div class="form-group">
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">
+          Nuevo curso <span style="color:var(--rojo)">*</span>
+        </label>
+        <select id="cc-nuevo-curso"
+                style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none;background:white">
+          <option value="">— Seleccionar —</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;border-top:1px solid var(--borde);padding-top:14px">
+        <button class="btn-cancel2" onclick="cerrarCambiarCurso()">Cancelar</button>
+        <button class="btn-save"    onclick="guardarCambiarCurso()">Guardar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL DETALLE PARTICIPANTE (Personal) ══ -->
 <div class="overlay" id="overlay-per-det" style="display:none" onclick="if(event.target===this)cerrarDetPer()">
   <div class="modal" style="max-width:560px">
@@ -3845,6 +3881,8 @@ function renderCursosSesiones(lista) {
         <div style="display:flex;gap:5px;justify-content:flex-end">
           <button onclick="abrirSesionParticipantes(${i})"
                   style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver sesión</button>
+          ${canManageInstructor ? `<button onclick="abrirCambiarCursoSesion(${i})"
+                  style="background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Curso</button>` : ''}
           ${canManageInstructor ? `<button onclick="abrirCambiarInstructorSesion(${i})"
                   style="background:#fff3e0;border:1px solid #fb8c00;color:#e65100;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Instructor</button>` : ''}
         </div>
@@ -3961,6 +3999,52 @@ async function guardarCambiarInstructor() {
     if (d.status === 'success') {
       cerrarCambiarInstructor();
       alert(d.message || 'Instructor actualizado.');
+      cargarPersonal();
+    } else {
+      alert(d.message || 'Error al actualizar.');
+    }
+  } catch(e) { alert('Error de conexión.'); }
+}
+
+/* ── Cambiar curso de una sesión completa ── */
+let _ccIds = [];
+
+async function abrirCambiarCursoSesion(idx) {
+  const g = _calSesiones[idx];
+  if (!g) return;
+  await asegurarCursosCargados();
+  _ccIds = g.participantes.map(p => p.id);
+  document.getElementById('cc-subtitulo').textContent = g.curso_nombre + ' · ' + (g.fecha_curso||'') + (g.empresa ? ' · ' + g.empresa : '');
+  document.getElementById('cc-curso-actual').textContent = g.curso_nombre || '—';
+  document.getElementById('cc-n-participantes').textContent = `Afecta a ${_ccIds.length} participante${_ccIds.length!==1?'s':''}`;
+  const sel = document.getElementById('cc-nuevo-curso');
+  const actualId = String((g.participantes[0] && g.participantes[0].curso_id) || '');
+  const opciones = (cursosData || []).slice().sort((a, b) => String(a.nombre||'').localeCompare(String(b.nombre||'')));
+  sel.innerHTML = '<option value="">— Seleccionar —</option>' +
+    opciones.map(c => `<option value="${c.id}" ${String(c.id)===actualId?'selected':''}>${escH(c.nombre||'—')}</option>`).join('');
+  document.getElementById('overlay-cambiar-curso').style.display = 'flex';
+}
+
+function cerrarCambiarCurso() {
+  document.getElementById('overlay-cambiar-curso').style.display = 'none';
+  _ccIds = [];
+}
+
+async function guardarCambiarCurso() {
+  const curso_id = parseInt(document.getElementById('cc-nuevo-curso').value, 10);
+  if (!curso_id || curso_id <= 0) { alert('Selecciona un curso válido.'); return; }
+  if (!_ccIds.length) { alert('No hay participantes en la sesión.'); return; }
+  try {
+    const r = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'CAMBIAR_CURSO_SESION', payload: { ids: _ccIds, curso_id } })
+    });
+    const d = await r.json();
+    if (d.status === 'success') {
+      cerrarCambiarCurso();
+      alert(d.message || 'Curso actualizado.');
+      perCargados = false;
       cargarPersonal();
     } else {
       alert(d.message || 'Error al actualizar.');
