@@ -1533,7 +1533,7 @@ function initMapa() {
 
   setTimeout(() => {
     mapInstance = L.map("mapa-envio").setView([lat, lng], 15);
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    L.tileLayer("tile.php?z={z}&x={x}&y={y}", {
       maxZoom: 19,
       attribution: "© OpenStreetMap"
     }).addTo(mapInstance);
@@ -1546,7 +1546,7 @@ function initMapa() {
       const pos = markerMapa.getLatLng();
       document.getElementById("d-coordenadas").value = pos.lat + "," + pos.lng;
       try {
-        const res  = await fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + pos.lat + "&lon=" + pos.lng);
+        const res  = await fetch("geocode.php?lat=" + pos.lat + "&lon=" + pos.lng);
         const data = await res.json();
         if (data && data.display_name) {
           document.getElementById("d-envio").value = data.display_name;
@@ -1560,7 +1560,7 @@ function initMapa() {
       markerMapa.setLatLng(e.latlng);
       document.getElementById("d-coordenadas").value = e.latlng.lat + "," + e.latlng.lng;
       try {
-        const res  = await fetch("https://nominatim.openstreetmap.org/reverse?format=json&lat=" + e.latlng.lat + "&lon=" + e.latlng.lng);
+        const res  = await fetch("geocode.php?lat=" + e.latlng.lat + "&lon=" + e.latlng.lng);
         const data = await res.json();
         if (data && data.display_name) {
           document.getElementById("d-envio").value = data.display_name;

@@ -3924,10 +3924,10 @@ function crearMapa(id, tipo, lat, lng) {
   }
 
   maps[tipo] = L.map(id, { zoomControl: true }).setView([lat, lng], 16);
-  // Host único de OpenStreetMap (CDN Fastly). El antiguo esquema de
-  // subdominios {s}.tile.openstreetmap.org (a/b/c) quedó deprecado y en
-  // algunas redes/DNS no cargaba — este es el recomendado actual.
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  // Teselas servidas por nuestro propio proxy (tile.php). En algunas redes
+  // móviles el navegador no alcanza tile.openstreetmap.org y el mapa quedaba
+  // en gris; el servidor sí tiene salida estable y las cachea.
+  L.tileLayer("tile.php?z={z}&x={x}&y={y}", {
     maxZoom: 19,
     attribution: "© OpenStreetMap"
   }).addTo(maps[tipo]);
@@ -3939,7 +3939,7 @@ function crearMapa(id, tipo, lat, lng) {
     pendingMapPos[tipo] = { lat: p.lat, lng: p.lng };
     try {
       const res  = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${p.lat}&lon=${p.lng}`,
+        `geocode.php?lat=${p.lat}&lon=${p.lng}`,
         { headers: { 'Accept': 'application/json' } }
       );
       const data = await res.json();
@@ -3981,7 +3981,7 @@ function initBuscarDir(inputId, sugerId, tipo) {
     timer = setTimeout(async () => {
       try {
         const res  = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=6&accept-language=es`,
+          `geocode.php?q=${encodeURIComponent(q)}`,
           { headers: { 'Accept': 'application/json' } }
         );
         const data = await res.json();
@@ -5422,7 +5422,7 @@ function izaInitMapa() {
 
 function izaCrearMapa(lat, lng) {
   izaMap = L.map('iza-mapa', { zoomControl: true }).setView([lat, lng], 16);
-  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  L.tileLayer('tile.php?z={z}&x={x}&y={y}', {
     maxZoom: 19,
     attribution: '© OpenStreetMap'
   }).addTo(izaMap);
@@ -5449,7 +5449,7 @@ async function izaContinuar() {
   let direccion = '';
   if (coords) {
     try {
-      const gr = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${pos.lat}&lon=${pos.lng}`);
+      const gr = await fetch(`geocode.php?lat=${pos.lat}&lon=${pos.lng}`);
       const gd = await gr.json();
       direccion = gd.display_name || '';
     } catch (_) {}
