@@ -244,19 +244,25 @@ class Personal {
         $p = $chk->fetch();
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
-        // Auto-asignar el siguiente QR disponible
         if (!$qr) {
+            // Auto-asignar el siguiente QR disponible del banco
             $qrRow = $this->pdo->query(
                 "SELECT id, identificador FROM qr_codigos WHERE usado = 0 ORDER BY CAST(identificador AS UNSIGNED) LIMIT 1"
             )->fetch();
-            if (!$qrRow) return ['status' => 'error', 'message' => 'Sin QR disponibles. Genera un lote en Códigos QR.'];
+            if (!$qrRow) return ['status' => 'error', 'message' => 'Sin QR disponibles. Genera un lote en Códigos QR o captura el código manualmente.'];
             $qr = $qrRow['identificador'];
         } else {
-            $stmtQR = $this->pdo->prepare("SELECT id, usado FROM qr_codigos WHERE identificador = ?");
+            // Código capturado manualmente: puede no existir en el banco de
+            // códigos pre-generados. Sólo se impide reutilizar uno ya asignado
+            // a OTRO registro (se permite reusar el mismo del participante).
+            $curr = $this->pdo->prepare("SELECT qr_codigo FROM participantes_cursos WHERE id = ?");
+            $curr->execute([$id]);
+            $mismoQr = (trim((string)$curr->fetchColumn()) === $qr);
+            $stmtQR = $this->pdo->prepare("SELECT usado FROM qr_codigos WHERE identificador = ?");
             $stmtQR->execute([$qr]);
             $qrRow = $stmtQR->fetch();
-            if (!$qrRow)         return ['status' => 'error', 'message' => 'Código QR no válido.'];
-            if ($qrRow['usado']) return ['status' => 'error', 'message' => 'Código QR ya está en uso.'];
+            if ($qrRow && $qrRow['usado'] && !$mismoQr)
+                return ['status' => 'error', 'message' => 'Ese código QR ya está en uso por otro registro.'];
         }
 
         // Generar control si el participante no lo tiene (registros previos a migration_009)
@@ -270,9 +276,8 @@ class Personal {
         $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'APROBADO_CALIDAD', qr_codigo = ? WHERE id = ?")
             ->execute([$qr, $id]);
 
-        // Marcar QR como usado
-        $this->pdo->prepare("UPDATE qr_codigos SET usado = 1 WHERE id = ?")
-            ->execute([$qrRow['id']]);
+        // Registrar el código como usado (lo inserta en el banco si no existía)
+        qrRegistrarUsado($this->pdo, $qr);
 
         return [
             'status'  => 'success',

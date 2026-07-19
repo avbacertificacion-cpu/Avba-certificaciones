@@ -53,18 +53,18 @@ class Calidad {
         $row = $this->obtenerEquipo($id);
         if (!$row) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
-        // Validar que el QR existe
+        // El código lo captura Calidad libremente: NO tiene que existir en el
+        // banco de códigos pre-generados. Sólo se impide reutilizar uno que ya
+        // esté asignado a OTRO registro.
         $stmtQR = $this->pdo->prepare(
             "SELECT id, usado, equipo_id FROM qr_codigos WHERE identificador = ?"
         );
         $stmtQR->execute([$qr]);
         $qrRow = $stmtQR->fetch();
 
-        if (!$qrRow) return ['status' => 'error', 'message' => 'Código QR no válido.'];
-
-        $qrYaEsDeEsteEquipo = $qrRow['usado'] && (int)$qrRow['equipo_id'] === $id;
-        if ($qrRow['usado'] && !$qrYaEsDeEsteEquipo)
-            return ['status' => 'error', 'message' => 'Código QR ya está en uso por otro registro.'];
+        $qrYaEsDeEsteEquipo = $qrRow && $qrRow['usado'] && (int)$qrRow['equipo_id'] === $id;
+        if ($qrRow && $qrRow['usado'] && !$qrYaEsDeEsteEquipo)
+            return ['status' => 'error', 'message' => 'Ese código QR ya está en uso por otro registro.'];
 
         $estadoAnterior = $row['estado'];
         $nuevoEstado    = 'APROBADO CALIDAD';
@@ -82,10 +82,8 @@ class Calidad {
             "UPDATE equipos SET estado = ?, motivo = NULL, qr_codigo = ? WHERE id = ?"
         )->execute([$nuevoEstado, $qr, $id]);
 
-        // Marcar QR como usado
-        $this->pdo->prepare(
-            "UPDATE qr_codigos SET usado = 1, equipo_id = ? WHERE id = ?"
-        )->execute([$id, $qrRow['id']]);
+        // Registrar el código como usado (lo inserta en el banco si no existía)
+        qrRegistrarUsado($this->pdo, $qr, $id);
 
         registrarHistorial($this->pdo, $usuario, $id, 'estado', $estadoAnterior, $nuevoEstado);
         registrarHistorial($this->pdo, $usuario, $id, 'qr_codigo', $row['qr_codigo'] ?? null, $qr);

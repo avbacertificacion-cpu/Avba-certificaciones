@@ -238,6 +238,28 @@ function urlQR(string $codigo): string {
 }
 
 /**
+ * Registra en el banco (qr_codigos) un código QR capturado manualmente por
+ * Calidad y lo marca como usado. Si el código no existía en el banco, lo
+ * inserta; de esta forma el código captado queda registrado (y no se vuelve a
+ * asignar a otro registro) SIN exigir que haya sido pre-generado.
+ *
+ * @param int|null $equipoId  ID del equipo que lo usa (para el catálogo de equipos).
+ */
+function qrRegistrarUsado(PDO $pdo, string $qr, ?int $equipoId = null): void {
+    $qr = trim($qr);
+    if ($qr === '') return;
+    try {
+        $pdo->prepare(
+            "INSERT INTO qr_codigos (identificador, usado, equipo_id)
+             VALUES (?, 1, ?)
+             ON DUPLICATE KEY UPDATE usado = 1, equipo_id = VALUES(equipo_id)"
+        )->execute([$qr, $equipoId]);
+    } catch (\Throwable $e) {
+        error_log('[qrRegistrarUsado] ' . $e->getMessage());
+    }
+}
+
+/**
  * Formatea una fecha a dd/MM/yyyy.
  */
 function formatFecha(?string $fecha): string {

@@ -380,15 +380,15 @@ class Accesorios {
 
         if (!$qr) return ['status' => 'error', 'message' => 'El código QR es requerido.'];
 
-        // Validar QR existe
+        // El código lo captura Calidad libremente: puede no existir en el banco
+        // de códigos pre-generados. Sólo se impide reutilizar uno ya asignado a
+        // OTRO registro (se permite reusar el mismo de esta sesión al retornar).
         $stmtQR = $this->pdo->prepare("SELECT id, usado FROM qr_codigos WHERE identificador = ?");
         $stmtQR->execute([$qr]);
         $qrRow = $stmtQR->fetch();
-        if (!$qrRow) return ['status' => 'error', 'message' => 'Código QR no válido.'];
 
-        // Permitir reusar el QR que ya estaba asignado a esta sesión (retorno de certificaciones)
         $mismoQr = ($sesion['qr_codigo'] === $qr);
-        if ($qrRow['usado'] && !$mismoQr) return ['status' => 'error', 'message' => 'Código QR ya está en uso.'];
+        if ($qrRow && $qrRow['usado'] && !$mismoQr) return ['status' => 'error', 'message' => 'Ese código QR ya está en uso por otro registro.'];
 
         // Generar control si la sesión no lo tiene (registros previos a migration_009)
         if (empty($sesion['control'])) {
@@ -400,11 +400,8 @@ class Accesorios {
         $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'APROBADO_CALIDAD', qr_codigo = ? WHERE id = ?")
             ->execute([$qr, $id]);
 
-        // Marcar QR como usado (solo si no lo estaba ya por ser el mismo QR previo)
-        if (!$qrRow['usado']) {
-            $this->pdo->prepare("UPDATE qr_codigos SET usado = 1 WHERE id = ?")
-                ->execute([$qrRow['id']]);
-        }
+        // Registrar el código como usado (lo inserta en el banco si no existía)
+        qrRegistrarUsado($this->pdo, $qr);
 
         return ['status' => 'success', 'message' => 'Sesión aprobada y enviada a Certificaciones.'];
     }
