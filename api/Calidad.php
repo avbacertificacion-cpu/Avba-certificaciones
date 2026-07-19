@@ -260,31 +260,53 @@ class Calidad {
     public function generarQrLote(array $payload): array {
         $this->ensureQrTable();
 
+        // Tope de seguridad por lote (evita intentar generar millones de golpe)
+        $MAX_LOTE = 100000;
+
         $hasta = trim($payload['hasta'] ?? '');
         if (!preg_match('/^\d{10}$/', $hasta)) {
-            return ['status' => 'error', 'message' => 'El número debe tener exactamente 10 dígitos.'];
+            return ['status' => 'error', 'message' => 'El número final debe tener exactamente 10 dígitos.'];
         }
 
         $ultimoRaw = $this->pdo->query(
             "SELECT MAX(CAST(identificador AS UNSIGNED)) FROM qr_codigos"
         )->fetchColumn();
-        $ultimo = $ultimoRaw ? (int) $ultimoRaw : 0;
+        $ultimo   = $ultimoRaw ? (int) $ultimoRaw : 0;
         $hastaInt = (int) $hasta;
 
-        if ($hastaInt <= $ultimo) {
-            return ['status' => 'error', 'message' => "El número debe ser mayor que el último registrado ({$ultimo})."];
+        // Número inicial: por defecto continúa la serie desde el último
+        // registrado; opcionalmente se puede iniciar una serie nueva (por
+        // ejemplo con otro prefijo, "5xxxxxxxxx") indicando un "desde".
+        $desdeRaw = trim($payload['desde'] ?? '');
+        if ($desdeRaw !== '') {
+            if (!preg_match('/^\d{10}$/', $desdeRaw)) {
+                return ['status' => 'error', 'message' => 'El número inicial debe tener exactamente 10 dígitos.'];
+            }
+            $desde = (int) $desdeRaw;
+        } else {
+            $desde = $ultimo + 1;
         }
 
-        $desde = $ultimo + 1;
-        $cantidad = $hastaInt - $ultimo;
+        if ($hastaInt < $desde) {
+            return ['status' => 'error', 'message' => "El número final ({$hastaInt}) debe ser mayor o igual que el inicial ({$desde})."];
+        }
+
+        $cantidad = $hastaInt - $desde + 1;
+        if ($cantidad > $MAX_LOTE) {
+            return ['status' => 'error', 'message' =>
+                'El rango solicitado genera ' . number_format($cantidad) . ' códigos, y el máximo por lote es ' .
+                number_format($MAX_LOTE) . '. Usa el campo "Iniciar en" para arrancar una serie nueva (p. ej. 5000000000) y define un rango más pequeño.'];
+        }
 
         $stmt = $this->pdo->prepare(
             "INSERT IGNORE INTO qr_codigos (identificador, usado) VALUES (?, 0)"
         );
         $this->pdo->beginTransaction();
         try {
+            $insertados = 0;
             for ($n = $desde; $n <= $hastaInt; $n++) {
                 $stmt->execute([str_pad((string) $n, 10, '0', STR_PAD_LEFT)]);
+                $insertados += $stmt->rowCount();
             }
             $this->pdo->commit();
         } catch (\Throwable $e) {
@@ -292,7 +314,11 @@ class Calidad {
             return ['status' => 'error', 'message' => 'Error al insertar códigos: ' . $e->getMessage()];
         }
 
-        return ['status' => 'success', 'message' => "{$cantidad} códigos generados correctamente.", 'cantidad' => $cantidad];
+        $omitidos = $cantidad - $insertados;
+        $msg = number_format($insertados) . ' código' . ($insertados !== 1 ? 's' : '') . ' generado' . ($insertados !== 1 ? 's' : '') . ' correctamente.';
+        if ($omitidos > 0) $msg .= ' (' . number_format($omitidos) . ' ya existían y se omitieron.)';
+
+        return ['status' => 'success', 'message' => $msg, 'cantidad' => $insertados];
     }
 
     private function ensureQrTable(): void {
