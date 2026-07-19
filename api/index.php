@@ -29,6 +29,7 @@ require_once __DIR__ . '/ClienteMateriales.php';
 require_once __DIR__ . '/ClienteConfig.php';
 require_once __DIR__ . '/ClienteMantenimiento.php';
 require_once __DIR__ . '/ClienteSubusuarios.php';
+require_once __DIR__ . '/PagosServicios.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -86,6 +87,7 @@ $cliMateriales  = new ClienteMateriales($pdo);
 $cliConfig      = new ClienteConfig($pdo);
 $cliMant        = new ClienteMantenimiento($pdo);
 $cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuarios.usuario_padre_id
+$pagosServicios = new PagosServicios($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -364,6 +366,12 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($avbaAdmin->detallePersonal((int)($_GET['id'] ?? 0)));
+
+        // ── Vencimientos / pagos de servicios (ADMIN + ADMINISTRATIVO) ──
+        case 'LISTAR_PAGOS_SERVICIOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pagosServicios->listar());
 
         // ── Directorio de correos (autocompletado) ───────────────
         case 'BUSCAR_CORREOS':
@@ -791,6 +799,22 @@ if ($method === 'GET') {
 if ($method === 'POST') {
 
     switch ($action) {
+
+        // ── Vencimientos / pagos de servicios (ADMIN + ADMINISTRATIVO) ──
+        case 'GUARDAR_PAGO_SERVICIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pagosServicios->guardar($payload));
+
+        case 'MARCAR_PAGADO_SERVICIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pagosServicios->marcarPagado((int)($payload['id'] ?? 0)));
+
+        case 'ELIMINAR_PAGO_SERVICIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pagosServicios->eliminar((int)($payload['id'] ?? 0)));
 
         // ── Auth ─────────────────────────────────────────
         case 'LOGIN':

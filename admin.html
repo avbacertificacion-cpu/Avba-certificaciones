@@ -314,6 +314,7 @@
   <!-- TABS -->
   <div class="tabs-admin">
     <button class="tab-a active" id="tab-btn-usuarios" onclick="verTabAdmin('usuarios',this)">👥 Usuarios</button>
+    <button class="tab-a"        id="tab-btn-pagos"    onclick="verTabAdmin('pagos',this)">📅 Vencimientos</button>
     <button class="tab-a"        id="tab-btn-smtp"     onclick="verTabAdmin('smtp',this)">📧 Correo SMTP</button>
   </div>
 
@@ -378,6 +379,64 @@
     </div>
 
   </div><!-- /tab-sec-usuarios -->
+
+  <!-- SECCIÓN: VENCIMIENTOS / PAGOS DE SERVICIOS -->
+  <div class="tab-sec" id="tab-sec-pagos">
+
+    <!-- Resumen -->
+    <div class="stats" style="margin-bottom:16px">
+      <div class="stat">
+        <div class="stat-n" id="pg-total"      style="color:var(--azul)">—</div>
+        <div class="stat-l">Servicios</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n" id="pg-vencidos"   style="color:var(--rojo)">—</div>
+        <div class="stat-l">Vencidos</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n" id="pg-porvencer"  style="color:var(--ambar)">—</div>
+        <div class="stat-l">Por vencer</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n" id="pg-aldia"      style="color:var(--verde)">—</div>
+        <div class="stat-l">Al día</div>
+      </div>
+      <div class="stat">
+        <div class="stat-n" id="pg-monto"      style="color:var(--violeta);font-size:20px">—</div>
+        <div class="stat-l">Costo mensual aprox.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-hdr">
+        <div>
+          <div class="panel-title">Vencimientos y pagos de servicios</div>
+          <div class="panel-sub">Teléfonos, internet, luz, renta y demás pagos recurrentes</div>
+        </div>
+        <button class="btn-primary" onclick="abrirPago()">+ Nuevo servicio</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Concepto</th>
+              <th>Categoría</th>
+              <th>Proveedor</th>
+              <th>Monto</th>
+              <th>Periodicidad</th>
+              <th>Próximo vencimiento</th>
+              <th>Estado</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-pagos">
+            <tr class="loading-row"><td colspan="8"><div class="spin"></div>Cargando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /tab-sec-pagos -->
 
   <!-- SECCIÓN: SMTP -->
   <div class="tab-sec" id="tab-sec-smtp">
@@ -535,6 +594,86 @@
     <div class="modal-btns">
       <button class="btn-cancel"  onclick="cerrarModal()">Cancelar</button>
       <button class="btn-confirm" onclick="guardarUsuario()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══ MODAL CREAR/EDITAR SERVICIO (VENCIMIENTOS) ══ -->
+<div class="overlay" id="overlay-pago">
+  <div class="modal">
+    <div class="modal-title" id="modal-pago-title">Nuevo servicio</div>
+
+    <input type="hidden" id="pg-id">
+
+    <div class="field">
+      <label>Concepto <span style="color:var(--rojo)">*</span></label>
+      <input type="text" id="pg-concepto" placeholder="Ej: Teléfono Juan Pérez, Internet oficina" autocomplete="off">
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="field" style="margin:0">
+        <label>Categoría</label>
+        <select id="pg-categoria" style="width:100%;padding:10px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);background:var(--blanco)">
+          <option value="telefono">📱 Teléfono</option>
+          <option value="internet">🌐 Internet</option>
+          <option value="luz">💡 Luz</option>
+          <option value="agua">🚰 Agua</option>
+          <option value="gas">🔥 Gas</option>
+          <option value="renta">🏢 Renta</option>
+          <option value="software">💻 Software</option>
+          <option value="seguro">🛡️ Seguro</option>
+          <option value="nomina">👤 Nómina</option>
+          <option value="otro">📦 Otro</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0">
+        <label>Periodicidad</label>
+        <select id="pg-periodicidad" style="width:100%;padding:10px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);background:var(--blanco)">
+          <option value="mensual">Mensual</option>
+          <option value="bimestral">Bimestral</option>
+          <option value="trimestral">Trimestral</option>
+          <option value="semestral">Semestral</option>
+          <option value="anual">Anual</option>
+          <option value="unico">Pago único</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+      <div class="field" style="margin:0">
+        <label>Proveedor</label>
+        <input type="text" id="pg-proveedor" placeholder="Ej: Telcel, Izzi, CFE" autocomplete="off">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Referencia / cuenta</label>
+        <input type="text" id="pg-referencia" placeholder="No. de servicio o cuenta" autocomplete="off">
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+      <div class="field" style="margin:0">
+        <label>Monto ($)</label>
+        <input type="number" id="pg-monto" placeholder="0.00" step="0.01" min="0">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Próximo vencimiento <span style="color:var(--rojo)">*</span></label>
+        <input type="date" id="pg-fecha">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Avisar (días antes)</label>
+        <input type="number" id="pg-recordatorio" placeholder="5" step="1" min="0" max="60" value="5">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Notas</label>
+      <input type="text" id="pg-notas" placeholder="Observaciones opcionales" autocomplete="off">
+    </div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel"  onclick="cerrarPago()">Cancelar</button>
+      <button class="btn-confirm" onclick="guardarPago()">Guardar</button>
     </div>
   </div>
 </div>
@@ -984,6 +1123,9 @@ function esc(v) {
 document.getElementById("overlay-usr").addEventListener("click", function(e) {
   if (e.target === this) cerrarModal();
 });
+document.getElementById("overlay-pago").addEventListener("click", function(e) {
+  if (e.target === this) cerrarPago();
+});
 
 cargar();
 
@@ -993,7 +1135,164 @@ function verTabAdmin(id, btn) {
   document.querySelectorAll('.tab-a').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-sec-' + id).classList.add('active');
   btn.classList.add('active');
-  if (id === 'smtp') cargarSmtp();
+  if (id === 'smtp')  cargarSmtp();
+  if (id === 'pagos') cargarPagos();
+}
+
+/* ═══════════════════════════════════════
+   VENCIMIENTOS / PAGOS DE SERVICIOS
+═══════════════════════════════════════ */
+let pagosGlobal = [];
+
+const PG_CAT_LABEL = {
+  telefono:'📱 Teléfono', internet:'🌐 Internet', luz:'💡 Luz', agua:'🚰 Agua',
+  gas:'🔥 Gas', renta:'🏢 Renta', software:'💻 Software', seguro:'🛡️ Seguro',
+  nomina:'👤 Nómina', otro:'📦 Otro'
+};
+const PG_PER_LABEL = {
+  mensual:'Mensual', bimestral:'Bimestral', trimestral:'Trimestral',
+  semestral:'Semestral', anual:'Anual', unico:'Pago único'
+};
+
+function pgEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function pgMoneda(n){ if(n==null||n==='')return '—'; return '$'+Number(n).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function pgFecha(f){ if(!f)return '—'; const p=String(f).split('-'); return p.length===3? p[2]+'/'+p[1]+'/'+p[0] : f; }
+
+async function cargarPagos() {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const tbody = document.getElementById("tbody-pagos");
+  tbody.innerHTML = `<tr class="loading-row"><td colspan="8"><div class="spin"></div>Cargando...</td></tr>`;
+  try {
+    const r = await fetch(API + "?action=LISTAR_PAGOS_SERVICIOS&token=" + encodeURIComponent(s.token || ""));
+    const d = await r.json();
+    if (d.status !== "success") { tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--rojo)">${pgEsc(d.message||'Error')}</td></tr>`; return; }
+    pagosGlobal = d.data || [];
+    renderPagos();
+    const res = d.resumen || {};
+    document.getElementById("pg-total").textContent     = res.total ?? 0;
+    document.getElementById("pg-vencidos").textContent  = res.vencidos ?? 0;
+    document.getElementById("pg-porvencer").textContent = res.por_vencer ?? 0;
+    document.getElementById("pg-aldia").textContent     = res.al_dia ?? 0;
+    document.getElementById("pg-monto").textContent     = pgMoneda(res.monto_mes ?? 0);
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--rojo)">Error de red.</td></tr>`;
+  }
+}
+
+function pgBadge(estado, dias) {
+  const d = parseInt(dias);
+  if (estado === 'pagado')     return `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:#e3f2fd;color:#1565c0">Pagado</span>`;
+  if (estado === 'vencido')    return `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:var(--rojo-light,#fdecea);color:var(--rojo)">Vencido${d<0?' ('+Math.abs(d)+'d)':''}</span>`;
+  if (estado === 'por_vencer') return `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:#fff3cd;color:#856404">${d===0?'Vence hoy':'En '+d+' día'+(d!==1?'s':'')}</span>`;
+  return `<span style="font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;background:#e8f5e9;color:#1b5e20">Al día</span>`;
+}
+
+function renderPagos() {
+  const tbody = document.getElementById("tbody-pagos");
+  if (!pagosGlobal.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:32px;color:var(--texto-hint)">No hay servicios registrados. Agrega el primero con "+ Nuevo servicio".</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = pagosGlobal.map(p => {
+    const rowBg = p.estado_venc === 'vencido' ? 'background:rgba(244,67,54,.05)'
+                : p.estado_venc === 'por_vencer' ? 'background:rgba(255,193,7,.06)' : '';
+    return `
+    <tr style="${rowBg}">
+      <td style="font-weight:600;color:var(--texto)">${pgEsc(p.concepto)}${p.referencia?`<div style="font-size:11px;color:var(--texto-hint);font-weight:400">${pgEsc(p.referencia)}</div>`:''}</td>
+      <td style="font-size:12px">${pgEsc(PG_CAT_LABEL[p.categoria]||p.categoria)}</td>
+      <td style="font-size:12px;color:var(--texto-sub)">${pgEsc(p.proveedor||'—')}</td>
+      <td style="font-size:12px;font-weight:600">${pgMoneda(p.monto)}</td>
+      <td style="font-size:12px">${pgEsc(PG_PER_LABEL[p.periodicidad]||p.periodicidad)}</td>
+      <td style="font-size:12px;font-weight:600">${pgFecha(p.fecha_vencimiento)}</td>
+      <td>${pgBadge(p.estado_venc, p.dias_restantes)}</td>
+      <td style="text-align:right">
+        <div class="td-actions" style="justify-content:flex-end">
+          ${p.estado_venc!=='pagado' ? `<button onclick="marcarPagado(${p.id})" title="Registrar pago" style="background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Pagar</button>` : ''}
+          <button onclick="abrirPago(${p.id})" style="background:var(--azul-light,#e8f1fb);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Editar</button>
+          <button onclick="eliminarPago(${p.id},'${pgEsc(p.concepto).replace(/'/g,'')}')" style="background:var(--rojo-light,#fdecea);border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;cursor:pointer">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function abrirPago(id) {
+  const p = id ? pagosGlobal.find(x => x.id == id) : null;
+  document.getElementById("modal-pago-title").textContent = p ? "Editar servicio" : "Nuevo servicio";
+  document.getElementById("pg-id").value          = p ? p.id : "";
+  document.getElementById("pg-concepto").value    = p ? (p.concepto||"") : "";
+  document.getElementById("pg-categoria").value   = p ? (p.categoria||"otro") : "telefono";
+  document.getElementById("pg-periodicidad").value= p ? (p.periodicidad||"mensual") : "mensual";
+  document.getElementById("pg-proveedor").value   = p ? (p.proveedor||"") : "";
+  document.getElementById("pg-referencia").value  = p ? (p.referencia||"") : "";
+  document.getElementById("pg-monto").value       = p && p.monto!=null ? p.monto : "";
+  document.getElementById("pg-fecha").value       = p ? (p.fecha_vencimiento||"") : "";
+  document.getElementById("pg-recordatorio").value= p ? (p.recordatorio_dias ?? 5) : 5;
+  document.getElementById("pg-notas").value       = p ? (p.notas||"") : "";
+  document.getElementById("overlay-pago").classList.add("open");
+  setTimeout(() => document.getElementById("pg-concepto").focus(), 150);
+}
+
+function cerrarPago() {
+  document.getElementById("overlay-pago").classList.remove("open");
+}
+
+async function guardarPago() {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const payload = {
+    id:                parseInt(document.getElementById("pg-id").value) || 0,
+    concepto:          document.getElementById("pg-concepto").value.trim(),
+    categoria:         document.getElementById("pg-categoria").value,
+    periodicidad:      document.getElementById("pg-periodicidad").value,
+    proveedor:         document.getElementById("pg-proveedor").value.trim(),
+    referencia:        document.getElementById("pg-referencia").value.trim(),
+    monto:             document.getElementById("pg-monto").value,
+    fecha_vencimiento: document.getElementById("pg-fecha").value,
+    recordatorio_dias: parseInt(document.getElementById("pg-recordatorio").value) || 5,
+    notas:             document.getElementById("pg-notas").value.trim(),
+  };
+  if (!payload.concepto)          { alert("El concepto es obligatorio."); return; }
+  if (!payload.fecha_vencimiento) { alert("Indica la fecha de vencimiento."); return; }
+  try {
+    const r = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "GUARDAR_PAGO_SERVICIO", token: s.token || "", payload })
+    });
+    const d = await r.json();
+    if (d.status === "success") { cerrarPago(); cargarPagos(); }
+    else alert(d.message || "No se pudo guardar.");
+  } catch(e) { alert("Error de red."); }
+}
+
+async function marcarPagado(id) {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  if (!confirm("¿Registrar este servicio como pagado? La fecha de vencimiento avanzará al siguiente periodo.")) return;
+  try {
+    const r = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "MARCAR_PAGADO_SERVICIO", token: s.token || "", payload: { id } })
+    });
+    const d = await r.json();
+    if (d.status === "success") cargarPagos();
+    else alert(d.message || "No se pudo registrar el pago.");
+  } catch(e) { alert("Error de red."); }
+}
+
+async function eliminarPago(id, nombre) {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  if (!confirm(`¿Eliminar el servicio "${nombre}"?`)) return;
+  try {
+    const r = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ELIMINAR_PAGO_SERVICIO", token: s.token || "", payload: { id } })
+    });
+    const d = await r.json();
+    if (d.status === "success") cargarPagos();
+    else alert(d.message || "No se pudo eliminar.");
+  } catch(e) { alert("Error de red."); }
 }
 
 /* ── SMTP ── */
