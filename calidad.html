@@ -6281,9 +6281,6 @@ async function generarLoteQR() {
     alert(`El rango genera ${cantidad.toLocaleString()} códigos y el máximo por lote es 100,000.\n\nUsa "Iniciar en" para arrancar una serie nueva (p. ej. 5000000000) y un rango más pequeño.`);
     return;
   }
-  if (cantidad > 10000) {
-    if (!confirm(`Se generarán ${cantidad.toLocaleString()} códigos. ¿Continuar?`)) return;
-  }
 
   try {
     const res  = await fetch(API, {
@@ -6294,7 +6291,7 @@ async function generarLoteQR() {
     if (data.status === 'success') {
       input.value = '';
       if (dInput) dInput.value = '';
-      if (data.message) alert(data.message);
+      if (typeof mostrarToast === 'function' && data.message) mostrarToast(data.message, 'ok');
       cargarInfoQR();
     } else {
       alert('Error: ' + (data.message || 'No se pudo generar el lote'));
