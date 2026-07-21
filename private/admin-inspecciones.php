@@ -101,6 +101,7 @@ $nombre = $_SESSION['nombre'];
     <div class="fecha-bar">
         <strong>🏭 Marcar planta como inspeccionada:</strong>
         <select id="plantaEmpresa"><option value="">Selecciona planta…</option></select>
+        <select id="plantaInspector"><option value="">Inspector…</option></select>
         <input type="date" id="plantaFecha" title="Fecha del mes a marcar como inspeccionado">
         <button onclick="marcarPlantaInspeccionada()" class="btn-planta">Marcar como inspeccionada</button>
         <span id="msgPlanta"></span>
@@ -260,25 +261,40 @@ async function cargarEmpresasPlanta() {
     } catch (e) { console.error('Error cargar empresas:', e); }
 }
 
+async function cargarInspectoresPlanta() {
+    try {
+        const r = await fetch('../api/usuarios.php?action=listar_inspectores');
+        const d = await r.json();
+        if (d.success) {
+            const sel = document.getElementById('plantaInspector');
+            sel.innerHTML = '<option value="">Inspector…</option>' +
+                d.data.map(i => `<option value="${i.id}">${sanitize(i.nombre)}</option>`).join('');
+        }
+    } catch (e) { console.error('Error cargar inspectores:', e); }
+}
+
 async function marcarPlantaInspeccionada() {
-    const empresa_id = document.getElementById('plantaEmpresa').value;
-    const fecha      = document.getElementById('plantaFecha').value;
-    const msg        = document.getElementById('msgPlanta');
-    const nombre     = document.getElementById('plantaEmpresa').selectedOptions[0]?.textContent || '';
+    const empresa_id   = document.getElementById('plantaEmpresa').value;
+    const inspector_id = document.getElementById('plantaInspector').value;
+    const fecha        = document.getElementById('plantaFecha').value;
+    const msg          = document.getElementById('msgPlanta');
+    const nombre       = document.getElementById('plantaEmpresa').selectedOptions[0]?.textContent || '';
+    const inspNombre   = document.getElementById('plantaInspector').selectedOptions[0]?.textContent || '';
     const setMsg = (t, c) => { msg.textContent = t; msg.style.color = c; };
 
-    if (!empresa_id) { setMsg('Selecciona una planta.', '#c0392b'); return; }
-    if (!fecha)      { setMsg('Selecciona la fecha del mes a marcar.', '#c0392b'); return; }
+    if (!empresa_id)   { setMsg('Selecciona una planta.', '#c0392b'); return; }
+    if (!inspector_id) { setMsg('Selecciona el inspector.', '#c0392b'); return; }
+    if (!fecha)        { setMsg('Selecciona la fecha del mes a marcar.', '#c0392b'); return; }
 
     const [y, m, d] = fecha.split('-');
-    if (!confirm(`¿Marcar TODOS los extintores de "${nombre}" como inspeccionados el ${d}/${m}/${y}, copiando el estatus del mes anterior?`)) return;
+    if (!confirm(`¿Marcar TODOS los extintores de "${nombre}" como inspeccionados el ${d}/${m}/${y} por ${inspNombre}, copiando el estatus del mes anterior?`)) return;
 
     setMsg('Procesando...', '#555');
     try {
         const r = await fetch('../api/inspecciones.php?action=inspeccionar_planta', {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
-            body:    JSON.stringify({ empresa_id: parseInt(empresa_id), fecha })
+            body:    JSON.stringify({ empresa_id: parseInt(empresa_id), inspector_id: parseInt(inspector_id), fecha })
         });
         const res = await r.json();
         if (res.success) {
@@ -301,6 +317,7 @@ document.getElementById('plantaFecha').value =
     `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
 
 cargarEmpresasPlanta();
+cargarInspectoresPlanta();
 cargar();
 </script>
 </body>

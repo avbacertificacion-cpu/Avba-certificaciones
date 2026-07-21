@@ -42,8 +42,9 @@ function inspeccionarPlanta() {
     }
 
     $d = json_decode(file_get_contents('php://input'), true) ?: [];
-    $empresa_id = intval($d['empresa_id'] ?? 0);
-    $fecha      = trim($d['fecha'] ?? '');
+    $empresa_id   = intval($d['empresa_id'] ?? 0);
+    $fecha        = trim($d['fecha'] ?? '');
+    $inspector_id = intval($d['inspector_id'] ?? 0);
 
     if (!$empresa_id) {
         http_response_code(400); echo json_encode(['error' => 'Selecciona una planta (empresa)']); return;
@@ -52,6 +53,17 @@ function inspeccionarPlanta() {
     $dt = DateTime::createFromFormat('Y-m-d', $fecha);
     if (!$dt || $dt->format('Y-m-d') !== $fecha) {
         http_response_code(400); echo json_encode(['error' => 'Fecha inválida (formato AAAA-MM-DD)']); return;
+    }
+
+    // Inspector a asignar: el elegido (validado) o, si no se eligió, quien ejecuta
+    if ($inspector_id) {
+        $chkI = $pdo->prepare("SELECT id FROM usuarios WHERE id=? AND estado='activo'");
+        $chkI->execute([$inspector_id]);
+        if (!$chkI->fetch()) {
+            http_response_code(400); echo json_encode(['error' => 'Inspector seleccionado inválido']); return;
+        }
+    } else {
+        $inspector_id = $uid;
     }
     $mes  = (int) $dt->format('n');
     $anio = (int) $dt->format('Y');
@@ -92,7 +104,7 @@ function inspeccionarPlanta() {
             if (!$p) { $sin_historial++; continue; }
 
             $ins->execute([
-                $eid, $uid, $fecha, $hora,
+                $eid, $inspector_id, $fecha, $hora,
                 $p['ser'], $p['mg'], $p['po'], $p['ph'], $p['sg'], $p['ps'],
                 $p['ob'], $p['dan'], $p['pin'], $p['fn'], $p['gb'], $p['rv'],
                 $p['observaciones']
