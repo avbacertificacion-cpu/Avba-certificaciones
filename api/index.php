@@ -30,6 +30,7 @@ require_once __DIR__ . '/ClienteConfig.php';
 require_once __DIR__ . '/ClienteMantenimiento.php';
 require_once __DIR__ . '/ClienteSubusuarios.php';
 require_once __DIR__ . '/PagosServicios.php';
+require_once __DIR__ . '/Anuncios.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -88,6 +89,7 @@ $cliConfig      = new ClienteConfig($pdo);
 $cliMant        = new ClienteMantenimiento($pdo);
 $cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuarios.usuario_padre_id
 $pagosServicios = new PagosServicios($pdo);
+$anuncios       = new Anuncios($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -372,6 +374,15 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($pagosServicios->listar());
+
+        // ── Publicidad en validación ─────────────────────────────
+        case 'LISTAR_ANUNCIOS_PUBLICO':   // público, sin token (para validar.html)
+            respuesta($anuncios->listarPublico());
+
+        case 'LISTAR_ANUNCIOS':           // admin
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($anuncios->listarAdmin());
 
         // ── Directorio de correos (autocompletado) ───────────────
         case 'BUSCAR_CORREOS':
@@ -900,6 +911,22 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($auth->subirFirma((int)($_POST['usuario_id'] ?? 0), $_FILES['firma'] ?? []));
+
+        // ── Publicidad en validación (ADMIN) ─────────────────────
+        case 'SUBIR_ANUNCIO':   // multipart
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($anuncios->subir($_FILES['imagen'] ?? [], (string)($_POST['titulo'] ?? ''), (string)($_POST['enlace'] ?? '')));
+
+        case 'ACTUALIZAR_ANUNCIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($anuncios->actualizar($payload));
+
+        case 'ELIMINAR_ANUNCIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($anuncios->eliminar((int)($payload['id'] ?? 0)));
 
         case 'ELIMINAR_FIRMA':
             $usr = validarToken($pdo, $token);

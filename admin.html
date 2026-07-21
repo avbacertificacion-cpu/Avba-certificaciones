@@ -315,6 +315,7 @@
   <div class="tabs-admin">
     <button class="tab-a active" id="tab-btn-usuarios" onclick="verTabAdmin('usuarios',this)">👥 Usuarios</button>
     <button class="tab-a"        id="tab-btn-pagos"    onclick="verTabAdmin('pagos',this)">📅 Vencimientos</button>
+    <button class="tab-a"        id="tab-btn-ads"      onclick="verTabAdmin('ads',this)">📢 Publicidad</button>
     <button class="tab-a"        id="tab-btn-smtp"     onclick="verTabAdmin('smtp',this)">📧 Correo SMTP</button>
   </div>
 
@@ -437,6 +438,40 @@
     </div>
 
   </div><!-- /tab-sec-pagos -->
+
+  <!-- SECCIÓN: PUBLICIDAD -->
+  <div class="tab-sec" id="tab-sec-ads">
+    <div class="panel">
+      <div class="panel-hdr">
+        <div>
+          <div class="panel-title">Publicidad en la página de validación</div>
+          <div class="panel-sub">Los banners activos se muestran, rotando, en cada verificación de certificado</div>
+        </div>
+      </div>
+      <div style="padding:18px 20px;border-bottom:1px solid var(--borde)">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
+          <div class="field" style="margin:0">
+            <label>Título (opcional)</label>
+            <input type="text" id="ad-titulo" placeholder="Ej: Pruebas No Destructivas" autocomplete="off">
+          </div>
+          <div class="field" style="margin:0">
+            <label>Enlace al hacer clic (opcional)</label>
+            <input type="text" id="ad-enlace" placeholder="https://avba.com.mx o wa.me/52..." autocomplete="off">
+          </div>
+        </div>
+        <div class="field" style="margin:0 0 12px">
+          <label>Imagen del banner <span style="color:var(--rojo)">*</span></label>
+          <input type="file" id="ad-file" accept="image/*">
+          <div class="hint">PNG, JPG, GIF o WEBP · máx. 8 MB · se recomienda formato horizontal (ej. 1520×1013).</div>
+        </div>
+        <button class="btn-primary" id="ad-btn-subir" onclick="subirAnuncio()">+ Subir banner</button>
+        <span id="ad-msg" style="font-size:13px;color:var(--texto-hint);margin-left:10px"></span>
+      </div>
+      <div id="ads-lista" style="padding:16px 20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px">
+        <div style="color:var(--texto-hint)">Cargando...</div>
+      </div>
+    </div>
+  </div><!-- /tab-sec-ads -->
 
   <!-- SECCIÓN: SMTP -->
   <div class="tab-sec" id="tab-sec-smtp">
@@ -1137,6 +1172,115 @@ function verTabAdmin(id, btn) {
   btn.classList.add('active');
   if (id === 'smtp')  cargarSmtp();
   if (id === 'pagos') cargarPagos();
+  if (id === 'ads')   cargarAnuncios();
+}
+
+/* ═══════════════════════════════════════
+   PUBLICIDAD (banners en validación)
+═══════════════════════════════════════ */
+let anunciosGlobal = [];
+
+async function cargarAnuncios() {
+  const s    = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const cont = document.getElementById("ads-lista");
+  cont.innerHTML = `<div style="color:var(--texto-hint)">Cargando...</div>`;
+  try {
+    const r = await fetch(API + "?action=LISTAR_ANUNCIOS&token=" + encodeURIComponent(s.token || ""));
+    const d = await r.json();
+    if (d.status !== "success") { cont.innerHTML = `<div style="color:var(--rojo)">${esc(d.message||'Error')}</div>`; return; }
+    anunciosGlobal = d.data || [];
+    renderAnuncios();
+  } catch(e) {
+    cont.innerHTML = `<div style="color:var(--rojo)">Error de red.</div>`;
+  }
+}
+
+function renderAnuncios() {
+  const cont = document.getElementById("ads-lista");
+  if (!anunciosGlobal.length) {
+    cont.innerHTML = `<div style="color:var(--texto-hint);grid-column:1/-1">Aún no hay banners. Sube el primero arriba.</div>`;
+    return;
+  }
+  cont.innerHTML = anunciosGlobal.map(a => `
+    <div style="border:1px solid var(--borde);border-radius:12px;overflow:hidden;background:var(--blanco);${a.activo?'':'opacity:.55'}">
+      <div style="position:relative;background:#0b1a33">
+        <img src="${esc(a.imagen)}" alt="${esc(a.titulo||'Banner')}" style="width:100%;display:block;max-height:180px;object-fit:cover">
+        <span style="position:absolute;top:8px;left:8px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:${a.activo?'#e8f5e9':'#f0f0f0'};color:${a.activo?'#1b5e20':'#888'}">${a.activo?'Activo':'Inactivo'}</span>
+      </div>
+      <div style="padding:10px 12px">
+        <div style="font-size:13px;font-weight:600;color:var(--texto);margin-bottom:2px">${esc(a.titulo||'Sin título')}</div>
+        ${a.enlace?`<div style="font-size:11px;color:var(--azul);word-break:break-all;margin-bottom:8px">${esc(a.enlace)}</div>`:'<div style="font-size:11px;color:var(--texto-hint);margin-bottom:8px">Sin enlace</div>'}
+        <div style="display:flex;gap:6px">
+          <button onclick="toggleAnuncio(${a.id},${a.activo?0:1})" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--borde);background:var(--blanco);color:var(--texto-sub);font-size:11px;font-weight:600;cursor:pointer">${a.activo?'Desactivar':'Activar'}</button>
+          <button onclick="eliminarAnuncio(${a.id})" style="padding:6px 10px;border-radius:6px;border:1px solid var(--rojo);background:var(--rojo-light,#fdecea);color:var(--rojo);font-size:11px;font-weight:600;cursor:pointer">🗑</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function subirAnuncio() {
+  const s    = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const file = document.getElementById("ad-file").files[0];
+  const msg  = document.getElementById("ad-msg");
+  const btn  = document.getElementById("ad-btn-subir");
+  if (!file) { msg.style.color = "var(--rojo)"; msg.textContent = "Selecciona una imagen."; return; }
+
+  const form = new FormData();
+  form.append("action", "SUBIR_ANUNCIO");
+  form.append("token", s.token || "");
+  form.append("imagen", file);
+  form.append("titulo", document.getElementById("ad-titulo").value.trim());
+  form.append("enlace", document.getElementById("ad-enlace").value.trim());
+
+  btn.disabled = true;
+  msg.style.color = "var(--texto-hint)";
+  msg.textContent = "Subiendo...";
+  try {
+    const r = await fetch(API, { method: "POST", body: form });
+    const d = await r.json();
+    if (d.status === "success") {
+      msg.style.color = "var(--verde)"; msg.textContent = "Banner agregado.";
+      document.getElementById("ad-file").value = "";
+      document.getElementById("ad-titulo").value = "";
+      document.getElementById("ad-enlace").value = "";
+      cargarAnuncios();
+    } else {
+      msg.style.color = "var(--rojo)"; msg.textContent = d.message || "No se pudo subir.";
+    }
+  } catch(e) {
+    msg.style.color = "var(--rojo)"; msg.textContent = "Error de red.";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function toggleAnuncio(id, activo) {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    const r = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ACTUALIZAR_ANUNCIO", token: s.token || "", payload: { id, activo } })
+    });
+    const d = await r.json();
+    if (d.status === "success") cargarAnuncios();
+    else alert(d.message || "No se pudo actualizar.");
+  } catch(e) { alert("Error de red."); }
+}
+
+async function eliminarAnuncio(id) {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  if (!confirm("¿Eliminar este banner? No se podrá recuperar.")) return;
+  try {
+    const r = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ELIMINAR_ANUNCIO", token: s.token || "", payload: { id } })
+    });
+    const d = await r.json();
+    if (d.status === "success") cargarAnuncios();
+    else alert(d.message || "No se pudo eliminar.");
+  } catch(e) { alert("Error de red."); }
 }
 
 /* ═══════════════════════════════════════

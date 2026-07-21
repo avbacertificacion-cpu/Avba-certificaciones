@@ -264,6 +264,27 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
+    /* ── PUBLICIDAD ── */
+    .ad-banner {
+      position: relative;
+      margin-top: 18px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: #0b1a33;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      animation: adFade .5s ease;
+    }
+    @keyframes adFade { from { opacity: 0; } to { opacity: 1; } }
+    .ad-banner img { width: 100%; display: block; }
+    .ad-tag {
+      position: absolute; top: 8px; right: 8px;
+      font-size: 9px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 20px;
+      background: rgba(0,0,0,0.45); color: rgba(255,255,255,0.7);
+      backdrop-filter: blur(2px);
+    }
+
     /* ── RESULTADO ── */
     .resultado {
       margin-top: 18px;
@@ -486,6 +507,14 @@
 
   <!-- RESULTADO -->
   <div id="resultado"></div>
+
+  <!-- PUBLICIDAD (banners rotativos) -->
+  <div id="ad-banner" class="ad-banner" style="display:none">
+    <a id="ad-link" href="#" target="_blank" rel="noopener nofollow" style="display:block">
+      <img id="ad-img" src="" alt="Publicidad AVBA">
+    </a>
+    <div class="ad-tag">Publicidad</div>
+  </div>
 </div>
 
 <!-- FOOTER -->
@@ -522,6 +551,7 @@ window.onload = function() {
   nuevoCaptcha();
   renderDots();
   verificarBloqueo();
+  cargarAnuncios();
 
   beepOk  = new Audio("https://www.soundjay.com/buttons/sounds/button-3.mp3");
   beepErr = new Audio("https://www.soundjay.com/buttons/sounds/button-10.mp3");
@@ -755,6 +785,7 @@ function mostrarResultado(data) {
   const div = document.getElementById("resultado");
 
   document.body.className = "";
+  siguienteAd(); // rota la publicidad en cada validación
 
   // Sonido + vibración
   try {
@@ -906,6 +937,54 @@ function mostrarResultado(data) {
 
 function filaHTML(key, val) {
   return `<div class="res-row"><span class="res-key">${key}</span><span class="res-val">${val}</span></div>`;
+}
+
+/* ═══════════════════════════════════════
+   PUBLICIDAD (banners rotativos)
+═══════════════════════════════════════ */
+let adsData  = [];
+let adIdx    = 0;
+let adTimer  = null;
+
+async function cargarAnuncios() {
+  try {
+    const r = await fetch(`${API}?action=LISTAR_ANUNCIOS_PUBLICO`);
+    const d = await r.json();
+    adsData = (d && d.anuncios) ? d.anuncios.filter(a => a.imagen) : [];
+    if (!adsData.length) return;
+    // Empezar en un anuncio al azar para variar entre visitas
+    adIdx = Math.floor(Math.random() * adsData.length);
+    mostrarAd();
+    if (adsData.length > 1) {
+      adTimer = setInterval(() => { adIdx = (adIdx + 1) % adsData.length; mostrarAd(); }, 7000);
+    }
+  } catch(e) { /* silencioso: la publicidad no debe interferir con la validación */ }
+}
+
+function mostrarAd() {
+  if (!adsData.length) return;
+  const a   = adsData[adIdx];
+  const box = document.getElementById("ad-banner");
+  const img = document.getElementById("ad-img");
+  const lnk = document.getElementById("ad-link");
+  if (!box || !img) return;
+  img.src = a.imagen;
+  img.alt = a.titulo || "Publicidad AVBA";
+  if (a.enlace) {
+    lnk.href = a.enlace;
+    lnk.style.pointerEvents = "";
+    lnk.style.cursor = "pointer";
+  } else {
+    lnk.removeAttribute("href");
+    lnk.style.pointerEvents = "none";
+    lnk.style.cursor = "default";
+  }
+  box.style.display = "";
+}
+
+/** Avanza al siguiente anuncio (se llama en cada validación). */
+function siguienteAd() {
+  if (adsData.length > 1) { adIdx = (adIdx + 1) % adsData.length; mostrarAd(); }
 }
 
 function resetBg() {
