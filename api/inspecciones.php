@@ -20,13 +20,105 @@ $uid    = $_SESSION['usuario_id'];
 $action = $_GET['action'] ?? '';
 
 switch ($action) {
-    case 'guardar':       guardar();       break;
-    case 'listar':        listar();        break;
-    case 'obtener':       obtener();       break;
-    case 'editar_fecha':  editarFecha();   break;
+    case 'guardar':             guardar();             break;
+    case 'listar':              listar();              break;
+    case 'obtener':             obtener();             break;
+    case 'editar_fecha':        editarFecha();         break;
+    case 'inspeccionar_planta': inspeccionarPlanta();  break;
     default:
         http_response_code(400);
         echo json_encode(['error' => 'Acción no válida']);
+}
+
+// ─── MARCAR TODA UNA PLANTA COMO INSPECCIONADA ───────────────────────────────
+// Crea una inspección del mes destino para cada extintor de la empresa,
+// copiando el estatus de su última inspección previa (el "mes anterior").
+// No sobrescribe extintores que ya tengan inspección en el mes destino.
+function inspeccionarPlanta() {
+    global $pdo, $rol, $uid;
+
+    if (!in_array($rol, [ROLE_ADMIN, ROLE_INSPECTOR])) {
+        http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
+    }
+
+    $d = json_decode(file_get_contents('php://input'), true) ?: [];
+    $empresa_id = intval($d['empresa_id'] ?? 0);
+    $fecha      = trim($d['fecha'] ?? '');
+
+    if (!$empresa_id) {
+        http_response_code(400); echo json_encode(['error' => 'Selecciona una planta (empresa)']); return;
+    }
+
+    $dt = DateTime::createFromFormat('Y-m-d', $fecha);
+    if (!$dt || $dt->format('Y-m-d') !== $fecha) {
+        http_response_code(400); echo json_encode(['error' => 'Fecha inválida (formato AAAA-MM-DD)']); return;
+    }
+    $mes  = (int) $dt->format('n');
+    $anio = (int) $dt->format('Y');
+    $hora = date('H:i:s');
+
+    try {
+        $pdo->beginTransaction();
+
+        $extStmt = $pdo->prepare("SELECT id FROM extintores WHERE empresa_id = ?");
+        $extStmt->execute([$empresa_id]);
+        $ids = $extStmt->fetchAll(PDO::FETCH_COLUMN);
+
+        // ¿Ya tiene inspección en el mes destino?
+        $yaMes = $pdo->prepare("SELECT id FROM inspecciones WHERE extintor_id=? AND MONTH(fecha)=? AND YEAR(fecha)=? LIMIT 1");
+        // Última inspección ANTES del mes destino (estatus del mes anterior)
+        $prev = $pdo->prepare("
+            SELECT ser,mg,po,ph,sg,ps,ob,dan,pin,fn,gb,rv,observaciones
+            FROM inspecciones
+            WHERE extintor_id = ?
+              AND (YEAR(fecha) < ? OR (YEAR(fecha) = ? AND MONTH(fecha) < ?))
+            ORDER BY fecha DESC, hora DESC
+            LIMIT 1
+        ");
+        $ins = $pdo->prepare("
+            INSERT INTO inspecciones
+                (extintor_id, inspector_id, fecha, hora,
+                 ser, mg, po, ph, sg, ps, ob, dan, pin, fn, gb, rv, observaciones)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ");
+
+        $creados = 0; $ya_tenian = 0; $sin_historial = 0;
+        foreach ($ids as $eid) {
+            $yaMes->execute([$eid, $mes, $anio]);
+            if ($yaMes->fetch()) { $ya_tenian++; continue; }
+
+            $prev->execute([$eid, $anio, $anio, $mes]);
+            $p = $prev->fetch(PDO::FETCH_ASSOC);
+            if (!$p) { $sin_historial++; continue; }
+
+            $ins->execute([
+                $eid, $uid, $fecha, $hora,
+                $p['ser'], $p['mg'], $p['po'], $p['ph'], $p['sg'], $p['ps'],
+                $p['ob'], $p['dan'], $p['pin'], $p['fn'], $p['gb'], $p['rv'],
+                $p['observaciones']
+            ]);
+            $creados++;
+        }
+
+        $pdo->commit();
+
+        $msg = "$creados extintor(es) marcados como inspeccionados este mes.";
+        if ($ya_tenian > 0)     $msg .= " $ya_tenian ya tenían inspección este mes (se respetaron).";
+        if ($sin_historial > 0) $msg .= " $sin_historial sin inspección previa (no se pudo copiar el estatus).";
+
+        audit($uid, "Marcar planta #$empresa_id inspeccionada ($fecha): $creados creados", 'inspecciones', $empresa_id);
+        echo json_encode([
+            'success'       => true,
+            'creados'       => $creados,
+            'ya_tenian'     => $ya_tenian,
+            'sin_historial' => $sin_historial,
+            'message'       => $msg
+        ]);
+    } catch (Exception $e) {
+        if ($pdo->inTransaction()) $pdo->rollBack();
+        http_response_code(500);
+        echo json_encode(['error' => 'Error al marcar la planta: ' . $e->getMessage()]);
+    }
 }
 
 // ─── EDITAR FECHA DE UNA O VARIAS INSPECCIONES (ADMIN) ───────────────────────

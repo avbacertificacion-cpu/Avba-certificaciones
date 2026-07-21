@@ -56,6 +56,11 @@ $nombre = $_SESSION['nombre'];
         .fecha-bar input[type=date]:focus{outline:none;border-color:#667eea}
         .btn-fecha{padding:10px 18px;background:#667eea;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;transition:.2s}
         .btn-fecha:hover{background:#5568d3}
+        .btn-planta{padding:10px 18px;background:#27ae60;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px;transition:.2s}
+        .btn-planta:hover{background:#219150}
+        .fecha-bar select{padding:10px 12px;border:2px solid #e0e0ff;border-radius:8px;font-size:14px;background:#fff}
+        .fecha-bar select:focus{outline:none;border-color:#667eea}
+        #msgPlanta{font-size:13px;font-weight:600}
         #msgFecha{font-size:13px;font-weight:600}
         .fecha-hint{font-size:11px;color:#999;flex-basis:100%}
         .chk-insp,#chkAll{width:16px;height:16px;cursor:pointer}
@@ -90,6 +95,16 @@ $nombre = $_SESSION['nombre'];
         <select id="filtroInspector" onchange="cargar()" title="Filtrar por inspector">
             <option value="">📋 Todos los inspectores</option>
         </select>
+    </div>
+
+    <!-- Marcar una planta completa como inspeccionada este mes -->
+    <div class="fecha-bar">
+        <strong>🏭 Marcar planta como inspeccionada:</strong>
+        <select id="plantaEmpresa"><option value="">Selecciona planta…</option></select>
+        <input type="date" id="plantaFecha" title="Fecha del mes a marcar como inspeccionado">
+        <button onclick="marcarPlantaInspeccionada()" class="btn-planta">Marcar como inspeccionada</button>
+        <span id="msgPlanta"></span>
+        <span class="fecha-hint">Copia el estatus de la última inspección previa de cada extintor a la fecha elegida. No sobrescribe extintores que ya tengan inspección ese mes.</span>
     </div>
 
     <!-- Ajuste de fechas (ej. inspecciones del 1-2 julio que corresponden a junio) -->
@@ -232,11 +247,60 @@ async function aplicarNuevaFecha() {
     }
 }
 
+// ── Marcar planta como inspeccionada ──────────────────────────────────────────
+async function cargarEmpresasPlanta() {
+    try {
+        const r = await fetch('../api/usuarios.php?action=listar_empresas');
+        const d = await r.json();
+        if (d.success) {
+            const sel = document.getElementById('plantaEmpresa');
+            sel.innerHTML = '<option value="">Selecciona planta…</option>' +
+                d.data.map(e => `<option value="${e.id}">${sanitize(e.nombre)}</option>`).join('');
+        }
+    } catch (e) { console.error('Error cargar empresas:', e); }
+}
+
+async function marcarPlantaInspeccionada() {
+    const empresa_id = document.getElementById('plantaEmpresa').value;
+    const fecha      = document.getElementById('plantaFecha').value;
+    const msg        = document.getElementById('msgPlanta');
+    const nombre     = document.getElementById('plantaEmpresa').selectedOptions[0]?.textContent || '';
+    const setMsg = (t, c) => { msg.textContent = t; msg.style.color = c; };
+
+    if (!empresa_id) { setMsg('Selecciona una planta.', '#c0392b'); return; }
+    if (!fecha)      { setMsg('Selecciona la fecha del mes a marcar.', '#c0392b'); return; }
+
+    const [y, m, d] = fecha.split('-');
+    if (!confirm(`¿Marcar TODOS los extintores de "${nombre}" como inspeccionados el ${d}/${m}/${y}, copiando el estatus del mes anterior?`)) return;
+
+    setMsg('Procesando...', '#555');
+    try {
+        const r = await fetch('../api/inspecciones.php?action=inspeccionar_planta', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ empresa_id: parseInt(empresa_id), fecha })
+        });
+        const res = await r.json();
+        if (res.success) {
+            setMsg(res.message, '#27ae60');
+            cargar();
+        } else {
+            setMsg(res.error || 'Error al marcar la planta.', '#c0392b');
+        }
+    } catch (e) {
+        setMsg('Error de conexión.', '#c0392b');
+    }
+}
+
 // Mes actual por defecto
 const hoy = new Date();
 document.getElementById('filtroMes').value =
     `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`;
+// Fecha por defecto para "marcar planta": hoy
+document.getElementById('plantaFecha').value =
+    `${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}-${String(hoy.getDate()).padStart(2,'0')}`;
 
+cargarEmpresasPlanta();
 cargar();
 </script>
 </body>
