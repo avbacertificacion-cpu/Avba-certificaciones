@@ -133,9 +133,8 @@
   <h2>7. Servicios de terceros</h2>
   <p>La app utiliza los siguientes servicios de terceros con funciones limitadas y sin acceso a datos personales:</p>
   <ul>
-    <li><strong>QuickChart.io</strong> — generación de códigos QR a partir del número de folio (no contiene datos personales).</li>
-    <li><strong>Leaflet (OpenStreetMap)</strong> — mapas para visualizar coordenadas de inspección. No se envían datos de usuario a estos servicios.</li>
-    <li><strong>CDN de librerías</strong> (jsDelivr, Cloudflare CDN) — carga de Chart.js y Leaflet desde CDN públicos sin transmisión de datos personales.</li>
+    <li><strong>Librerías propias</strong> — los códigos QR, las gráficas (Chart.js), los mapas (Leaflet) y el visor de PDF se generan y sirven desde nuestro propio servidor, sin depender de servicios externos.</li>
+    <li><strong>Mapas (OpenStreetMap)</strong> — las teselas y la búsqueda de direcciones se obtienen a través de nuestro propio servidor; el dispositivo del usuario no se comunica directamente con servicios externos.</li>
   </ul>
   <p>No integramos Google Analytics, Facebook SDK, ni ningún SDK de rastreo publicitario.</p>
 
