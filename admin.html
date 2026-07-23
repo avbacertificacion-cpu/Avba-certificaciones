@@ -713,6 +713,34 @@
   </div>
 </div>
 
+<!-- ══ MODAL DOCUMENTOS DE SERVICIO ══ -->
+<div class="overlay" id="overlay-docs">
+  <div class="modal">
+    <div class="modal-title">Documentos <span id="docs-serv-nombre" style="font-weight:400;color:var(--texto-sub)"></span></div>
+    <input type="hidden" id="docs-serv-id">
+
+    <div style="border:1px dashed var(--borde);border-radius:10px;padding:14px;margin-bottom:14px">
+      <div class="field" style="margin:0 0 10px">
+        <label>Nombre / descripción (opcional)</label>
+        <input type="text" id="doc-nombre" placeholder="Ej: Contrato, Factura julio, Recibo" autocomplete="off">
+      </div>
+      <div class="field" style="margin:0 0 10px">
+        <label>Archivo <span style="color:var(--rojo)">*</span></label>
+        <input type="file" id="doc-file" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp,.docx">
+        <div class="hint">PDF, imagen o DOCX · máx. 15 MB.</div>
+      </div>
+      <button class="btn-primary" id="doc-btn-subir" onclick="subirDocServicio()">+ Agregar documento</button>
+      <span id="doc-msg" style="font-size:12px;color:var(--texto-hint);margin-left:8px"></span>
+    </div>
+
+    <div id="docs-lista" style="max-height:320px;overflow-y:auto"></div>
+
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="cerrarDocs()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 
 <script>
 const API = "api/index.php";
@@ -1161,6 +1189,9 @@ document.getElementById("overlay-usr").addEventListener("click", function(e) {
 document.getElementById("overlay-pago").addEventListener("click", function(e) {
   if (e.target === this) cerrarPago();
 });
+document.getElementById("overlay-docs").addEventListener("click", function(e) {
+  if (e.target === this) cerrarDocs();
+});
 
 cargar();
 
@@ -1352,6 +1383,7 @@ function renderPagos() {
       <td style="text-align:right">
         <div class="td-actions" style="justify-content:flex-end">
           ${p.estado_venc!=='pagado' ? `<button onclick="marcarPagado(${p.id})" title="Registrar pago" style="background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Pagar</button>` : ''}
+          <button onclick="abrirDocsServicio(${p.id},'${pgEsc(p.concepto).replace(/'/g,'')}')" title="Documentos" style="background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">📎 Docs</button>
           <button onclick="abrirPago(${p.id})" style="background:var(--azul-light,#e8f1fb);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Editar</button>
           <button onclick="eliminarPago(${p.id},'${pgEsc(p.concepto).replace(/'/g,'')}')" style="background:var(--rojo-light,#fdecea);border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;cursor:pointer">🗑</button>
         </div>
@@ -1435,6 +1467,108 @@ async function eliminarPago(id, nombre) {
     });
     const d = await r.json();
     if (d.status === "success") cargarPagos();
+    else alert(d.message || "No se pudo eliminar.");
+  } catch(e) { alert("Error de red."); }
+}
+
+/* ── Documentos por servicio ── */
+function docIcono(url) {
+  const u = (url||'').toLowerCase();
+  if (u.endsWith('.pdf')) return '📄';
+  if (/\.(png|jpe?g|gif|webp)$/.test(u)) return '🖼️';
+  if (u.endsWith('.docx')) return '📝';
+  return '📎';
+}
+
+function abrirDocsServicio(id, nombre) {
+  document.getElementById("docs-serv-id").value = id;
+  document.getElementById("docs-serv-nombre").textContent = nombre ? '· ' + nombre : '';
+  document.getElementById("doc-nombre").value = "";
+  document.getElementById("doc-file").value = "";
+  document.getElementById("doc-msg").textContent = "";
+  document.getElementById("overlay-docs").classList.add("open");
+  cargarDocsServicio();
+}
+
+function cerrarDocs() {
+  document.getElementById("overlay-docs").classList.remove("open");
+}
+
+async function cargarDocsServicio() {
+  const s  = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const id = document.getElementById("docs-serv-id").value;
+  const cont = document.getElementById("docs-lista");
+  cont.innerHTML = `<div style="color:var(--texto-hint);font-size:13px;padding:8px 0">Cargando...</div>`;
+  try {
+    const r = await fetch(API + "?action=LISTAR_DOCS_SERVICIO&servicio_id=" + encodeURIComponent(id) + "&token=" + encodeURIComponent(s.token || ""));
+    const d = await r.json();
+    const docs = d.data || [];
+    if (!docs.length) {
+      cont.innerHTML = `<div style="color:var(--texto-hint);font-size:13px;padding:8px 0">Sin documentos. Agrega el primero arriba.</div>`;
+      return;
+    }
+    cont.innerHTML = docs.map(doc => `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--borde)">
+        <span style="font-size:18px">${docIcono(doc.url)}</span>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;color:var(--texto);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(doc.nombre)}</div>
+          <div style="font-size:11px;color:var(--texto-hint)">${esc(doc.fecha||'')}</div>
+        </div>
+        <a href="${esc(doc.url)}" target="_blank" rel="noopener" style="padding:5px 10px;border-radius:6px;background:var(--azul-light,#e8f1fb);color:var(--azul);font-size:11px;font-weight:600;text-decoration:none">Ver</a>
+        <button onclick="eliminarDocServicio(${doc.id})" style="padding:5px 8px;border-radius:6px;border:1px solid var(--rojo);background:var(--rojo-light,#fdecea);color:var(--rojo);font-size:11px;font-weight:600;cursor:pointer">🗑</button>
+      </div>`).join('');
+  } catch(e) {
+    cont.innerHTML = `<div style="color:var(--rojo);font-size:13px;padding:8px 0">Error de red.</div>`;
+  }
+}
+
+async function subirDocServicio() {
+  const s    = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  const id   = document.getElementById("docs-serv-id").value;
+  const file = document.getElementById("doc-file").files[0];
+  const msg  = document.getElementById("doc-msg");
+  const btn  = document.getElementById("doc-btn-subir");
+  if (!file) { msg.style.color = "var(--rojo)"; msg.textContent = "Selecciona un archivo."; return; }
+
+  const form = new FormData();
+  form.append("action", "SUBIR_DOC_SERVICIO");
+  form.append("token", s.token || "");
+  form.append("servicio_id", id);
+  form.append("archivo", file);
+  form.append("nombre", document.getElementById("doc-nombre").value.trim());
+
+  btn.disabled = true;
+  msg.style.color = "var(--texto-hint)";
+  msg.textContent = "Subiendo...";
+  try {
+    const r = await fetch(API, { method: "POST", body: form });
+    const d = await r.json();
+    if (d.status === "success") {
+      msg.style.color = "var(--verde)"; msg.textContent = "Documento agregado.";
+      document.getElementById("doc-nombre").value = "";
+      document.getElementById("doc-file").value = "";
+      cargarDocsServicio();
+    } else {
+      msg.style.color = "var(--rojo)"; msg.textContent = d.message || "No se pudo subir.";
+    }
+  } catch(e) {
+    msg.style.color = "var(--rojo)"; msg.textContent = "Error de red.";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function eliminarDocServicio(id) {
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  if (!confirm("¿Eliminar este documento?")) return;
+  try {
+    const r = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ELIMINAR_DOC_SERVICIO", token: s.token || "", payload: { id } })
+    });
+    const d = await r.json();
+    if (d.status === "success") cargarDocsServicio();
     else alert(d.message || "No se pudo eliminar.");
   } catch(e) { alert("Error de red."); }
 }

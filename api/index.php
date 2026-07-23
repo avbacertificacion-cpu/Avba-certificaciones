@@ -375,6 +375,11 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($pagosServicios->listar());
 
+        case 'LISTAR_DOCS_SERVICIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pagosServicios->listarDocs((int)($_GET['servicio_id'] ?? 0)));
+
         // ── Publicidad en validación ─────────────────────────────
         case 'LISTAR_ANUNCIOS_PUBLICO':   // público, sin token (para validar.html)
             respuesta($anuncios->listarPublico());
@@ -826,6 +831,16 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($pagosServicios->eliminar((int)($payload['id'] ?? 0)));
+
+        case 'SUBIR_DOC_SERVICIO':   // multipart
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pagosServicios->subirDoc((int)($_POST['servicio_id'] ?? 0), $_FILES['archivo'] ?? [], (string)($_POST['nombre'] ?? '')));
+
+        case 'ELIMINAR_DOC_SERVICIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pagosServicios->eliminarDoc((int)($payload['id'] ?? 0)));
 
         // ── Auth ─────────────────────────────────────────
         case 'LOGIN':

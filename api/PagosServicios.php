@@ -57,6 +57,26 @@ class PagosServicios {
         } catch (\PDOException $e) {
             error_log('[PagosServicios] migrate: ' . $e->getMessage());
         }
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS servicios_pagos_docs (
+                  id          INT AUTO_INCREMENT PRIMARY KEY,
+                  servicio_id INT NOT NULL,
+                  nombre      VARCHAR(200) NOT NULL,
+                  archivo_url VARCHAR(300) NOT NULL,
+                  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  INDEX idx_servicio (servicio_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\PDOException $e) {
+            error_log('[PagosServicios] migrate docs: ' . $e->getMessage());
+        }
+    }
+
+    private function urlAbs(string $rel): string {
+        if ($rel === '') return '';
+        if (preg_match('#^https?://#i', $rel)) return $rel;
+        return rtrim(SITE_URL, '/') . '/' . ltrim($rel, '/');
     }
 
     private function normCategoria(string $c): string {
@@ -198,5 +218,66 @@ class PagosServicios {
         if ($id <= 0) return ['status' => 'error', 'message' => 'ID inválido.'];
         $this->pdo->prepare("UPDATE servicios_pagos SET activo=0 WHERE id=?")->execute([$id]);
         return ['status' => 'success', 'message' => 'Servicio eliminado.'];
+    }
+
+    // ── Documentos por servicio ───────────────────────────────
+    public function listarDocs(int $servicioId): array {
+        if ($servicioId <= 0) return ['status' => 'error', 'message' => 'ID inválido.'];
+        $stmt = $this->pdo->prepare(
+            "SELECT id, nombre, archivo_url, DATE_FORMAT(created_at,'%d/%m/%Y') AS fecha
+             FROM servicios_pagos_docs WHERE servicio_id = ? ORDER BY id DESC"
+        );
+        $stmt->execute([$servicioId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$r) { $r['url'] = $this->urlAbs($r['archivo_url']); $r['id'] = (int)$r['id']; }
+        unset($r);
+        return ['status' => 'success', 'data' => $rows];
+    }
+
+    public function subirDoc(int $servicioId, array $file, string $nombre): array {
+        if ($servicioId <= 0) return ['status' => 'error', 'message' => 'Servicio inválido.'];
+        $chk = $this->pdo->prepare("SELECT id FROM servicios_pagos WHERE id = ?");
+        $chk->execute([$servicioId]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Servicio no encontrado.'];
+
+        if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+            return ['status' => 'error', 'message' => 'Selecciona un archivo válido.'];
+        }
+        $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if (!in_array($ext, ['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'docx'], true)) {
+            return ['status' => 'error', 'message' => 'Formato no permitido. Usa PDF, imagen o DOCX.'];
+        }
+        if (($file['size'] ?? 0) > 15 * 1024 * 1024) {
+            return ['status' => 'error', 'message' => 'El archivo no debe superar 15 MB.'];
+        }
+
+        $dir = __DIR__ . '/../uploads/servicios/';
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        $fname   = 'serv_' . $servicioId . '_' . date('YmdHis') . '_' . bin2hex(random_bytes(3)) . '.' . $ext;
+        $destino = $dir . $fname;
+        if (!move_uploaded_file($file['tmp_name'], $destino)) {
+            return ['status' => 'error', 'message' => 'No se pudo guardar el documento.'];
+        }
+
+        $label = trim($nombre) ?: ($file['name'] ?? $fname);
+        $rel   = 'uploads/servicios/' . $fname;
+        $this->pdo->prepare(
+            "INSERT INTO servicios_pagos_docs (servicio_id, nombre, archivo_url) VALUES (?,?,?)"
+        )->execute([$servicioId, mb_substr($label, 0, 200), $rel]);
+
+        return ['status' => 'success', 'message' => 'Documento agregado.', 'id' => (int)$this->pdo->lastInsertId()];
+    }
+
+    public function eliminarDoc(int $docId): array {
+        if ($docId <= 0) return ['status' => 'error', 'message' => 'ID inválido.'];
+        $stmt = $this->pdo->prepare("SELECT archivo_url FROM servicios_pagos_docs WHERE id = ?");
+        $stmt->execute([$docId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$row) return ['status' => 'error', 'message' => 'Documento no encontrado.'];
+
+        $this->pdo->prepare("DELETE FROM servicios_pagos_docs WHERE id = ?")->execute([$docId]);
+        $abs = __DIR__ . '/../' . $row['archivo_url'];
+        if (is_file($abs)) @unlink($abs);
+        return ['status' => 'success', 'message' => 'Documento eliminado.'];
     }
 }
