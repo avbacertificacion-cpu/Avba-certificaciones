@@ -135,18 +135,30 @@ class ValidarQR {
             $sesion = $stmt->fetch();
             if (!$sesion) return null;
 
+            // Traer TODOS los accesorios de la sesión (no sólo el primero)
             $acc = $this->pdo->prepare(
-                "SELECT COALESCE(t.nombre,'') AS tipo_nombre, i.marca, i.modelo, i.serie, i.capacidad
+                "SELECT COALESCE(t.nombre,'') AS tipo_nombre, i.id_accesorio,
+                        i.marca, i.modelo, i.serie, i.capacidad, i.medidas, i.estado
                  FROM accesorios_izaje i
                  LEFT JOIN accesorios_tipos t ON t.id = i.tipo_id
-                 WHERE i.sesion_id = ? ORDER BY i.id LIMIT 1"
+                 WHERE i.sesion_id = ? ORDER BY i.id"
             );
             $acc->execute([$sesion['id']]);
-            $accRow = $acc->fetch();
+            $rows = $acc->fetchAll(PDO::FETCH_ASSOC);
 
-            $cntStmt = $this->pdo->prepare("SELECT COUNT(*) FROM accesorios_izaje WHERE sesion_id = ?");
-            $cntStmt->execute([$sesion['id']]);
-            $total = (int)$cntStmt->fetchColumn();
+            $items = array_map(fn($r) => [
+                'tipo'         => $r['tipo_nombre'] ?: 'Accesorio de Izaje',
+                'id_accesorio' => $r['id_accesorio'] ?? '',
+                'marca'        => $r['marca']        ?? '',
+                'modelo'       => $r['modelo']       ?? '',
+                'serie'        => $r['serie']        ?? '',
+                'capacidad'    => $r['capacidad']    ?? '',
+                'medidas'      => $r['medidas']      ?? '',
+                'estado'       => $r['estado']       ?? '',
+            ], $rows);
+
+            $total   = count($items);
+            $primero = $items[0] ?? [];
 
             $v = calcularVigencia($sesion['fecha']);
             return [
@@ -157,13 +169,14 @@ class ValidarQR {
                 'dias'    => $v['dias'],
                 'datos'   => [
                     'titulo'      => 'Certificado de Accesorios de Izaje',
-                    'tipo'        => $accRow['tipo_nombre'] ?? 'Accesorio de Izaje',
-                    'marca'       => $accRow['marca']       ?? '',
-                    'modelo'      => $accRow['modelo']      ?? '',
-                    'serie'       => $accRow['serie']       ?? '',
-                    'capacidad'   => $accRow['capacidad']   ?? '',
-                    'cliente'     => $sesion['cliente']     ?? '',
+                    'tipo'        => $primero['tipo']      ?? 'Accesorio de Izaje',
+                    'marca'       => $primero['marca']     ?? '',
+                    'modelo'      => $primero['modelo']    ?? '',
+                    'serie'       => $primero['serie']     ?? '',
+                    'capacidad'   => $primero['capacidad'] ?? '',
+                    'cliente'     => $sesion['cliente']    ?? '',
                     'total'       => $total,
+                    'items'       => $items,
                     'fecha'       => $sesion['fecha']
                         ? (new DateTime($sesion['fecha']))->format('d/m/Y') : '',
                     'vencimiento' => $v['vencimiento'],

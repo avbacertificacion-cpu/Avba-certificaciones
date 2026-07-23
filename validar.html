@@ -285,6 +285,18 @@
       backdrop-filter: blur(2px);
     }
 
+    /* ── LISTA DE ACCESORIOS ── */
+    .acc-lista { margin-top: 8px; }
+    .acc-item {
+      border-top: 1px dashed rgba(255,255,255,0.14);
+      padding-top: 8px; margin-top: 8px;
+    }
+    .acc-item:first-child { border-top: none; margin-top: 4px; }
+    .acc-item-hdr {
+      font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+      color: rgba(255,255,255,0.55); margin-bottom: 3px;
+    }
+
     /* ── RESULTADO ── */
     .resultado {
       margin-top: 18px;
@@ -863,6 +875,29 @@ function mostrarResultado(data) {
       ].join('');
     }
     if (modulo === 'accesorio') {
+      const items = Array.isArray(d.items) ? d.items : [];
+      // Si hay lista de accesorios, mostrarlos TODOS
+      if (items.length) {
+        const comun = [
+          d.cliente ? filaHTML("Cliente", d.cliente) : "",
+          filaHTML("Total accesorios", d.total || items.length),
+          filaHTML("Inspeccionado el", d.fecha||"—"),
+          d.vencimiento ? filaHTML("Válido hasta", d.vencimiento) : "",
+        ].join('');
+        const lista = items.map((it, i) => `
+          <div class="acc-item">
+            <div class="acc-item-hdr">Accesorio ${i+1} de ${items.length}</div>
+            ${filaHTML("Tipo", it.tipo||"—")}
+            ${it.id_accesorio ? filaHTML("ID Accesorio", it.id_accesorio) : ""}
+            ${(it.marca||it.modelo) ? filaHTML("Marca / Modelo", [it.marca,it.modelo].filter(Boolean).join(' ')) : ""}
+            ${it.serie ? filaHTML("No. de serie", it.serie) : ""}
+            ${it.capacidad ? filaHTML("Capacidad", it.capacidad) : ""}
+            ${it.medidas ? filaHTML("Medidas", it.medidas) : ""}
+            ${it.estado ? filaHTML("Estado", it.estado) : ""}
+          </div>`).join('');
+        return comun + `<div class="acc-lista">${lista}</div>`;
+      }
+      // Fallback: un solo accesorio (escaneo del QR individual)
       return [
         filaHTML("Tipo de accesorio", d.tipo||"—"),
         d.id_accesorio ? filaHTML("ID Accesorio",   d.id_accesorio) : "",
