@@ -976,6 +976,11 @@ if ($method === 'POST') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cal->actualizarCalidad($payload, $usr['usuario']));
 
+        case 'CAMBIAR_INSPECTOR_EQUIPO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->cambiarInspectorEquipo($payload, $usr['usuario']));
+
         case 'RECHAZAR_CALIDAD':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

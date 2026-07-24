@@ -23,7 +23,7 @@ class Calidad {
                     disponibilidad, estado, motivo, qr_codigo,
                     certificado_url AS link, dictamen_url AS dictamen,
                     envio_direccion AS envio, coordenadas_envio,
-                    reporte_url, prueba_carga
+                    reporte_url, prueba_carga, inspector
              FROM equipos
              WHERE estado IN ('PENDIENTE', 'CONFORME', 'NO CONFORME', 'RECHAZADO', 'RETORNADO')
              ORDER BY marca_temporal DESC"
@@ -89,6 +89,29 @@ class Calidad {
         registrarHistorial($this->pdo, $usuario, $id, 'qr_codigo', $row['qr_codigo'] ?? null, $qr);
 
         return ['status' => 'success', 'message' => 'Inspección aprobada y QR asignado correctamente.'];
+    }
+
+    // ── Cambiar el inspector que firma la inspección ───────
+    public function cambiarInspectorEquipo(array $payload, string $usuario): array {
+        $id        = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
+        $inspector = trim((string)($payload['inspector'] ?? ''));
+        if (!$id) return ['status' => 'error', 'message' => 'ID de equipo requerido.'];
+        if ($inspector === '') return ['status' => 'error', 'message' => 'Selecciona un inspector.'];
+
+        $row = $this->obtenerEquipo($id);
+        if (!$row) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+
+        // Validar que el inspector exista y tenga rol INSPECTOR
+        $chk = $this->pdo->prepare("SELECT nombre FROM usuarios WHERE usuario = ? AND rol = 'INSPECTOR' LIMIT 1");
+        $chk->execute([$inspector]);
+        $insp = $chk->fetch();
+        if (!$insp) return ['status' => 'error', 'message' => 'El inspector seleccionado no es válido.'];
+
+        $anterior = $row['inspector'] ?? '';
+        $this->pdo->prepare("UPDATE equipos SET inspector = ? WHERE id = ?")->execute([$inspector, $id]);
+        registrarHistorial($this->pdo, $usuario, $id, 'inspector', $anterior, $inspector);
+
+        return ['status' => 'success', 'message' => 'Inspector que firma actualizado: ' . ($insp['nombre'] ?? $inspector) . '.'];
     }
 
     // ── Actualizar datos en calidad ────────────────────────

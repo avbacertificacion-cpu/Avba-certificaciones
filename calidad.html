@@ -2397,6 +2397,22 @@ function ver(fila) {
     <div class="field"><label>Correo</label> <input id="e-correo"  value="${esc(d.correo)}"  ${dis}></div>
   </div>`;
 
+  // Inspector que firma la inspección
+  body += `<div class="sec-label">Inspector que firma</div>
+  <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:5px">
+    <div class="field" style="flex:1;min-width:200px;margin:0">
+      <label>Inspector</label>
+      <select id="e-inspector" style="width:100%;padding:9px 11px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;background:#fff">
+        <option value="">Cargando inspectores…</option>
+      </select>
+    </div>
+    <button onclick="guardarInspectorEquipo()"
+      style="padding:9px 16px;background:var(--azul);color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">
+      Guardar inspector
+    </button>
+  </div>
+  <div style="font-size:11px;color:var(--texto-hint)">Es quien firma el certificado y el dictamen de esta inspección.</div>`;
+
   // Ubicación
   body += `<div class="sec-label">Ubicación</div>
   <div class="field" style="margin-bottom:10px">
@@ -2552,6 +2568,46 @@ function ver(fila) {
   document.getElementById("modal-footer").innerHTML = footer;
 
   document.getElementById("overlay-det").classList.add("open");
+  poblarInspectorSelect(d.inspector);
+}
+
+/* ── Inspector que firma (por reporte) ── */
+async function poblarInspectorSelect(actual) {
+  const sel = document.getElementById('e-inspector');
+  if (!sel) return;
+  try { await cargarUsuariosInstructor(); } catch(e) {}
+  const cur  = (actual || '').toString();
+  const list = usuariosInstrData || [];
+  sel.innerHTML = '<option value="">— Seleccionar inspector —</option>' +
+    list.map(u => `<option value="${escH(u.usuario)}" ${String(u.usuario)===cur?'selected':''}>${escH(u.nombre)}</option>`).join('');
+  // Si el inspector actual no está en la lista (texto libre previo), conservarlo
+  if (cur && !list.some(u => String(u.usuario) === cur)) {
+    sel.insertAdjacentHTML('afterbegin', `<option value="${escH(cur)}" selected>${escH(cur)} (actual)</option>`);
+  }
+}
+
+async function guardarInspectorEquipo() {
+  if (!filaActual) return;
+  const sel = document.getElementById('e-inspector');
+  const inspector = sel ? sel.value : '';
+  if (!inspector) { mostrarToast('Selecciona un inspector.', 'err'); return; }
+  try {
+    const res  = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'CAMBIAR_INSPECTOR_EQUIPO', payload: { fila: filaActual, inspector } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast(data.message || 'Inspector actualizado.', 'ok');
+      const d = datosGlobal.find(x => x.fila === filaActual);
+      if (d) d.inspector = inspector;
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo actualizar'), 'err');
+    }
+  } catch(e) {
+    mostrarToast('Error de conexión.', 'err');
+    console.error('guardarInspectorEquipo:', e);
+  }
 }
 
 async function _apiEliminar(action, id) {
