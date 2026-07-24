@@ -197,13 +197,15 @@ class Auditorias {
 
         try {
             $s = $this->pdo->prepare("
-                SELECT id_equipo, cliente, direccion, control, estado, inspector,
-                       DATE_FORMAT(fecha_inspeccion,'%d/%m/%Y') AS fecha,
-                       TIME_FORMAT(marca_temporal,'%H:%i') AS hora
-                FROM equipos
-                WHERE fecha_inspeccion BETWEEN ? AND ?
-                  AND estado IN ('CONFORME','NO CONFORME','ENVIADO','APROBADO CALIDAD','RETORNADO','RECHAZADO')
-                ORDER BY fecha_inspeccion ASC, id ASC
+                SELECT e.id_equipo, e.cliente, e.direccion, e.control, e.estado,
+                       COALESCE(NULLIF(u.nombre,''), e.inspector) AS inspector,
+                       DATE_FORMAT(e.fecha_inspeccion,'%d/%m/%Y') AS fecha,
+                       TIME_FORMAT(e.marca_temporal,'%H:%i') AS hora
+                FROM equipos e
+                LEFT JOIN usuarios u ON u.usuario COLLATE utf8mb4_general_ci = e.inspector
+                WHERE e.fecha_inspeccion BETWEEN ? AND ?
+                  AND e.estado IN ('CONFORME','NO CONFORME','ENVIADO','APROBADO CALIDAD','RETORNADO','RECHAZADO')
+                ORDER BY e.fecha_inspeccion ASC, e.id ASC
             ");
             $s->execute([$desdeDb, $hastaDb]);
             $rows = $s->fetchAll(PDO::FETCH_ASSOC);
@@ -215,6 +217,16 @@ class Auditorias {
         // Mapear cada inspección al orden de columnas de la plantilla (A..J)
         $data = [];
         foreach ($rows as $r) {
+            // G — Número de dictamen: folio completo AB.<control>-<año>MX
+            $ctrl  = trim((string)($r['control'] ?? ''));
+            $anio  = substr((string)($r['fecha'] ?? ''), -4);
+            if (!preg_match('/^\d{4}$/', $anio)) $anio = date('Y');
+            $folio = $ctrl !== '' ? ('AB.' . $ctrl . '-' . $anio . 'MX') : '';
+
+            // H — Resultado: normalizar a CONFORME / NO CONFORME
+            $estado    = strtoupper(trim((string)($r['estado'] ?? '')));
+            $resultado = in_array($estado, ['NO CONFORME', 'RECHAZADO'], true) ? 'NO CONFORME' : 'CONFORME';
+
             $data[] = [
                 $responsable,                 // A Nombre de la persona responsable de la información
                 (string)($r['id_equipo'] ?? ''), // B Número de solicitud
@@ -222,8 +234,8 @@ class Auditorias {
                 (string)($r['direccion'] ?? ''), // D Domicilio de la inspección
                 (string)($r['fecha'] ?? ''),     // E Fecha de inspección
                 (string)($r['hora'] ?? ''),      // F Hora de inicio
-                (string)($r['control'] ?? ''),   // G Número de dictamen
-                (string)($r['estado'] ?? ''),    // H Resultado de la inspección
+                $folio,                          // G Número de dictamen
+                $resultado,                      // H Resultado de la inspección
                 (string)($r['inspector'] ?? ''), // I Inspector(es)
                 '',                              // J Persona(s) de apoyo (manual)
             ];
