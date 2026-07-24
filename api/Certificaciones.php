@@ -24,6 +24,84 @@ class Certificaciones {
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
+        $this->ensureColumnasManual();
+    }
+
+    /** Columnas para el reemplazo manual del PDF (certificado/dictamen). */
+    private function ensureColumnasManual(): void {
+        foreach (['cert_manual_url', 'dict_manual_url'] as $col) {
+            try {
+                $this->pdo->exec("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS {$col} VARCHAR(500) NULL");
+            } catch (\Throwable $e) { /* columna ya existe o motor sin IF NOT EXISTS */ }
+        }
+    }
+
+    /**
+     * Reemplaza manualmente el PDF del certificado o del dictamen con un
+     * archivo subido por Certificaciones. El archivo pasa a ser el que ve el
+     * cliente y el que se adjunta al enviar. $tipo: 'cert' | 'dict'.
+     */
+    public function subirDocumentoManual(array $payload, array $file): array {
+        $id   = (int)($payload['id'] ?? $payload['fila'] ?? 0);
+        $tipo = ($payload['tipo'] ?? '') === 'dict' ? 'dict' : 'cert';
+        if (!$id) return ['status' => 'error', 'message' => 'ID de equipo requerido.'];
+
+        $datos = $this->obtenerDatosEquipo($id);
+        if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+
+        if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+            return ['status' => 'error', 'message' => 'Selecciona un archivo PDF válido.'];
+        }
+        $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if ($ext !== 'pdf') return ['status' => 'error', 'message' => 'El documento debe ser un PDF.'];
+        if (($file['size'] ?? 0) > 20 * 1024 * 1024) {
+            return ['status' => 'error', 'message' => 'El PDF no debe superar 20 MB.'];
+        }
+
+        $folio  = $datos['control'] ?? (string)$id;
+        $sufijo = $tipo === 'dict' ? 'DICT' : 'CERT';
+        $dir    = UPLOAD_DIR . 'certificados/';
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        // Nombre estable por folio para el archivo manual
+        $nombre  = $sufijo . '_MANUAL_' . preg_replace('/[^A-Za-z0-9._-]/', '', (string)$folio) . '.pdf';
+        $destino = $dir . $nombre;
+        if (!move_uploaded_file($file['tmp_name'], $destino)) {
+            return ['status' => 'error', 'message' => 'No se pudo guardar el PDF.'];
+        }
+
+        $rel     = 'uploads/certificados/' . $nombre;
+        $urlAbs  = UPLOAD_URL . 'certificados/' . $nombre;
+        $colMan  = $tipo === 'dict' ? 'dict_manual_url' : 'cert_manual_url';
+        $colPub  = $tipo === 'dict' ? 'dictamen_url'    : 'certificado_url';
+
+        // Guardar el override y actualizar la URL pública (la que ve el cliente).
+        // Si el registro aún no se ha enviado, sólo se guarda el override.
+        if ($datos['estado'] === 'ENVIADO') {
+            $this->pdo->prepare("UPDATE equipos SET {$colMan} = ?, {$colPub} = ? WHERE id = ?")
+                ->execute([$rel, $urlAbs, $id]);
+        } else {
+            $this->pdo->prepare("UPDATE equipos SET {$colMan} = ? WHERE id = ?")
+                ->execute([$rel, $id]);
+        }
+
+        return [
+            'status'  => 'success',
+            'message' => ($tipo === 'dict' ? 'Dictamen' : 'Certificado') . ' reemplazado correctamente.',
+            'url'     => $urlAbs,
+        ];
+    }
+
+    /** Devuelve la ruta local del PDF manual si existe para ese tipo, o ''. */
+    private function pdfManual(int $id, string $tipo): string {
+        $col = $tipo === 'dict' ? 'dict_manual_url' : 'cert_manual_url';
+        try {
+            $stmt = $this->pdo->prepare("SELECT {$col} AS rel FROM equipos WHERE id = ?");
+            $stmt->execute([$id]);
+            $rel = (string)($stmt->fetchColumn() ?: '');
+        } catch (\Throwable $e) { return ''; }
+        if ($rel === '') return '';
+        $abs = __DIR__ . '/../' . ltrim($rel, '/');
+        return is_file($abs) ? $abs : '';
     }
 
     // ── Panel: datos para certificaciones ─────────────────
@@ -90,6 +168,11 @@ class Certificaciones {
     // Estrategia 3: Microservicio VPS (LibreOffice + qpdf, plantilla Word)
     // Estrategia 4: Fallback PHPWord → mPDF (PHP puro, plantilla Word)
     public function generarPdfDesdeWord(int $id, string $tipo): array {
+        // Si hay un PDF reemplazado manualmente, ese manda
+        $manual = $this->pdfManual($id, $tipo === 'dict' ? 'dict' : 'cert');
+        if ($manual !== '') {
+            return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($manual)];
+        }
         // Intentar primero con plantilla PDF si existe
         $resultado = $this->generarPdfDesdeTemplatePdf($id, $tipo);
         if ($resultado['status'] === 'success') return $resultado;
@@ -377,6 +460,7 @@ class Certificaciones {
         $this->pdo->prepare(
             "UPDATE equipos
              SET estado = 'RETORNADO', certificado_url = NULL, dictamen_url = NULL,
+                 cert_manual_url = NULL, dict_manual_url = NULL,
                  fecha_enviado = NULL
              WHERE id = ?"
         )->execute([$id]);
@@ -1814,6 +1898,11 @@ SVG;
      */
     private function resolverPdfEnvio(string $tipo, int $id, array $datos): string {
         $esDict = in_array($tipo, ['dict', 'dictamen'], true);
+
+        // Si hay un PDF reemplazado manualmente, adjuntar ese en lugar de regenerar
+        $manual = $this->pdfManual($id, $esDict ? 'dict' : 'cert');
+        if ($manual !== '') return $manual;
+
         $tipoTemplate = $esDict ? 'dict'      : 'certificado';
         $tipoHtml     = $esDict ? 'dictamen'  : 'certificado';
         $sufijo       = $esDict ? 'DICT'      : 'CERT';

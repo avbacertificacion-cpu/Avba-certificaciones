@@ -1073,6 +1073,11 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cert->publicarPortalCliente($payload, $usr['usuario']));
 
+        case 'SUBIR_DOC_MANUAL_CERT':   // multipart: reemplazo manual de PDF (cert/dict)
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cert->subirDocumentoManual($_POST, $_FILES['archivo'] ?? []));
+
         case 'RECHAZAR_CERTIFICACION':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

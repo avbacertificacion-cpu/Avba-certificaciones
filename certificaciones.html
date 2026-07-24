@@ -1663,6 +1663,18 @@ function renderAcciones(d) {
       fn: "imprimirDocPDF('DICT')"
     },
     {
+      label: "Reemplazar certificado (PDF)",
+      clase: "btn-accion",
+      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 11V3M5 6l3-3 3 3"/><path d="M2 10v3a1 1 0 001 1h10a1 1 0 001-1v-3"/></svg>`,
+      fn: "subirDocManual('CERT')"
+    },
+    {
+      label: "Reemplazar dictamen (PDF)",
+      clase: "btn-accion",
+      icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 11V3M5 6l3-3 3 3"/><path d="M2 10v3a1 1 0 001 1h10a1 1 0 001-1v-3"/></svg>`,
+      fn: "subirDocManual('DICT')"
+    },
+    {
       label: "Enviar certificado",
       clase: "btn-accion btn-enviar-cert",
       icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12v8H2V4zm0 0l6 5 6-5"/></svg>`,
@@ -1890,6 +1902,56 @@ function _pdfWinNavegar(win, url) {
 function formatoFolio(control) {
   if (!control) return "—";
   return "AB." + control + "-" + new Date().getFullYear() + "MX";
+}
+
+/* ── Reemplazar manualmente el PDF (certificado / dictamen) ── */
+let _manualTipo = null;
+function subirDocManual(tipo) {
+  const d = registroActual;
+  if (!d) return;
+  _manualTipo = tipo;
+  let inp = document.getElementById('manual-file-input');
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'application/pdf,.pdf';
+    inp.id = 'manual-file-input';
+    inp.style.display = 'none';
+    inp.addEventListener('change', _manualFileChange);
+    document.body.appendChild(inp);
+  }
+  inp.value = '';
+  inp.click();
+}
+
+async function _manualFileChange(e) {
+  const file = e.target.files[0];
+  const d = registroActual;
+  if (!file || !d) return;
+  const esDict = _manualTipo === 'DICT';
+  const label  = esDict ? 'dictamen' : 'certificado';
+  if (!/\.pdf$/i.test(file.name)) { mostrarToast('El archivo debe ser un PDF.', 'err'); return; }
+  if (!confirm(`¿Reemplazar el ${label} de este registro con "${file.name}"?\n\nEl cliente verá este archivo en lugar del generado.`)) return;
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const form = new FormData();
+  form.append('action', 'SUBIR_DOC_MANUAL_CERT');
+  form.append('token', s.token || '');
+  form.append('fila', d.fila);
+  form.append('tipo', esDict ? 'dict' : 'cert');
+  form.append('archivo', file);
+  try {
+    mostrarToast('Subiendo ' + label + '...', 'info');
+    const res  = await fetch(API, { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast((esDict ? 'Dictamen' : 'Certificado') + ' reemplazado correctamente.', 'ok');
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo subir el PDF'), 'err');
+    }
+  } catch (err) {
+    mostrarToast('Error de conexión al subir el PDF', 'err');
+    console.error('subirDocManual:', err);
+  }
 }
 
 async function verDocPDF(tipo) {
