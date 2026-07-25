@@ -38,6 +38,21 @@ class Auditorias {
         } catch (\PDOException $e) {
             error_log('[Auditorias] migrate: ' . $e->getMessage());
         }
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS informes_inspecciones (
+                  id          INT AUTO_INCREMENT PRIMARY KEY,
+                  desde       DATE NULL,
+                  hasta       DATE NULL,
+                  total       INT  NOT NULL DEFAULT 0,
+                  responsable VARCHAR(200) NULL,
+                  archivo     VARCHAR(300) NOT NULL,
+                  created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\PDOException $e) {
+            error_log('[Auditorias] migrate informes: ' . $e->getMessage());
+        }
     }
 
     private function trimLabel(int $t): string {
@@ -252,6 +267,16 @@ class Auditorias {
         if (!$this->llenarPlantillaXlsx($plantilla, $destAbs, $data)) {
             return ['status' => 'error', 'message' => 'No se pudo generar el archivo Excel.'];
         }
+        // Registrar el informe en el historial
+        try {
+            $this->pdo->prepare(
+                "INSERT INTO informes_inspecciones (desde, hasta, total, responsable, archivo)
+                 VALUES (?,?,?,?,?)"
+            )->execute([$desdeDb, $hastaDb, count($data), $responsable, 'uploads/auditorias/' . $nombre]);
+        } catch (\PDOException $e) {
+            error_log('[Auditorias] registrar informe: ' . $e->getMessage());
+        }
+
         // Devolver el contenido en base64 para que el navegador lo descargue
         // directamente (Blob), sin depender de que el servidor sirva el .xlsx
         // estático. Se conserva también la URL como respaldo.
@@ -262,6 +287,43 @@ class Auditorias {
             'filename' => $nombre,
             'b64'      => $bytes !== false ? base64_encode($bytes) : '',
             'url'      => rtrim(SITE_URL, '/') . '/' . UPLOAD_URL . 'auditorias/' . $nombre,
+        ];
+    }
+
+    /** Lista el historial de informes de inspecciones generados. */
+    public function listarInformes(): array {
+        try {
+            $rows = $this->pdo->query(
+                "SELECT id, total, archivo,
+                        DATE_FORMAT(desde,'%d/%m/%Y') AS desde,
+                        DATE_FORMAT(hasta,'%d/%m/%Y') AS hasta,
+                        DATE_FORMAT(created_at,'%d/%m/%Y %H:%i') AS generado
+                 FROM informes_inspecciones
+                 ORDER BY id DESC LIMIT 100"
+            )->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            return ['status' => 'success', 'data' => []];
+        }
+        return ['status' => 'success', 'data' => $rows];
+    }
+
+    /** Devuelve un informe guardado en base64 para descargarlo de nuevo. */
+    public function descargarInforme(int $id): array {
+        $stmt = $this->pdo->prepare("SELECT archivo FROM informes_inspecciones WHERE id = ?");
+        $stmt->execute([$id]);
+        $rel = (string)($stmt->fetchColumn() ?: '');
+        if ($rel === '') return ['status' => 'error', 'message' => 'Informe no encontrado.'];
+
+        $abs = dirname(__DIR__) . '/' . ltrim($rel, '/');
+        if (!is_file($abs)) return ['status' => 'error', 'message' => 'El archivo ya no está disponible en el servidor.'];
+
+        $bytes = @file_get_contents($abs);
+        if ($bytes === false) return ['status' => 'error', 'message' => 'No se pudo leer el archivo.'];
+
+        return [
+            'status'   => 'success',
+            'filename' => basename($abs),
+            'b64'      => base64_encode($bytes),
         ];
     }
 

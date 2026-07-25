@@ -2058,6 +2058,7 @@
         <button class="btn-save" id="inf-btn" style="padding:8px 16px" onclick="generarInformeInsp()">Generar Excel</button>
       </div>
     </div>
+    <div id="inf-lista" style="margin-top:12px"></div>
   </div>
 
   <div id="aud-lista"><div style="text-align:center;padding:30px;color:var(--texto-hint)">Cargando…</div></div>
@@ -6623,6 +6624,7 @@ async function cargarAuditorias() {
     } else { rec.style.display = 'none'; }
     renderAuditorias(d.auditorias||[]);
   } catch(_) { cont.innerHTML = '<p style="color:#b91c1c;text-align:center;padding:20px">Error de red.</p>'; }
+  cargarInformesInsp();
 }
 
 function _audResColor(r){ r=(r||'').toLowerCase(); return r.includes('no satisf')?'#b91c1c':(r.includes('observ')?'#92400e':'#166534'); }
@@ -6720,24 +6722,58 @@ async function generarInformeInsp() {
     const d = await r.json();
     if (d.status !== 'success') { mostrarToast(d.message||'Error.', 'err'); return; }
     mostrarToast(`Informe generado (${d.total} inspecciones).`, 'ok');
-    if (d.b64) {
-      // Descargar directo desde el contenido (no depende del servidor estático)
-      const bin = atob(d.b64);
-      const bytes = new Uint8Array(bin.length);
-      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-      const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = d.filename || 'Informe_Inspecciones.xlsx';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    } else if (d.url) {
-      window.open(d.url, '_blank');
-    }
+    if (d.b64) _descargarBlobXlsx(d.b64, d.filename || 'Informe_Inspecciones.xlsx');
+    else if (d.url) window.open(d.url, '_blank');
+    cargarInformesInsp();
   } catch(_) { mostrarToast('Error de red.', 'err'); }
   finally { btn.disabled = false; btn.textContent = 'Generar Excel'; }
+}
+
+/* Descarga un xlsx a partir de su contenido base64 (Blob) */
+function _descargarBlobXlsx(b64, filename) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename || 'Informe.xlsx';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+/* Historial de informes de inspecciones generados */
+async function cargarInformesInsp() {
+  const cont = document.getElementById('inf-lista');
+  if (!cont) return;
+  try {
+    const r = await _audFetch(_AUD_API + '?action=LISTAR_INFORMES_INSPECCIONES');
+    const d = await r.json();
+    const lista = (d && d.data) ? d.data : [];
+    if (!lista.length) { cont.innerHTML = ''; return; }
+    cont.innerHTML =
+      `<div style="font-size:12px;font-weight:700;color:#0d2244;margin:4px 0 6px">Informes generados</div>` +
+      lista.map(x => `
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid #dbe6f5">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:600;color:#1a2a44">Periodo ${x.desde||'—'} – ${x.hasta||'—'} · ${x.total} inspección${x.total==1?'':'es'}</div>
+            <div style="font-size:11px;color:#7a8398">Generado: ${x.generado||''}</div>
+          </div>
+          <button onclick="descargarInformeGuardado(${x.id})"
+            style="padding:5px 12px;background:#1b7a3d;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">Descargar</button>
+        </div>`).join('');
+  } catch(_) { /* silencioso */ }
+}
+
+async function descargarInformeGuardado(id) {
+  try {
+    const r = await _audFetch(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'DESCARGAR_INFORME_INSPECCIONES', payload:{ id } }) });
+    const d = await r.json();
+    if (d.status === 'success' && d.b64) _descargarBlobXlsx(d.b64, d.filename);
+    else mostrarToast(d.message || 'No se pudo descargar.', 'err');
+  } catch(_) { mostrarToast('Error de red.', 'err'); }
 }
 
 async function eliminarAud(id, label) {

@@ -414,6 +414,11 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($auditorias->detalle((int)($_GET['id'] ?? 0)));
 
+        case 'LISTAR_INFORMES_INSPECCIONES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auditorias->listarInformes());
+
         // Inspector: historial propio
         case 'GET_MIS_INSPECCIONES':
             $usr = validarToken($pdo, $token);
@@ -816,6 +821,11 @@ if ($method === 'POST') {
             $resp = trim($payload['responsable'] ?? ($usr['nombre'] ?? 'Calidad'));
             respuesta($auditorias->generarInforme(trim($payload['desde'] ?? ''), trim($payload['hasta'] ?? ''), $resp));
         }
+
+        case 'DESCARGAR_INFORME_INSPECCIONES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auditorias->descargarInforme((int)($payload['id'] ?? 0)));
 
         // ── Vencimientos / pagos de servicios (ADMIN + ADMINISTRATIVO) ──
         case 'GUARDAR_PAGO_SERVICIO':
