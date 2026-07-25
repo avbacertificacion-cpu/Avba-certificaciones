@@ -252,8 +252,17 @@ class Auditorias {
         if (!$this->llenarPlantillaXlsx($plantilla, $destAbs, $data)) {
             return ['status' => 'error', 'message' => 'No se pudo generar el archivo Excel.'];
         }
-        return ['status' => 'success', 'url' => rtrim(SITE_URL, '/') . '/' . UPLOAD_URL . 'auditorias/' . $nombre,
-                'total' => count($data)];
+        // Devolver el contenido en base64 para que el navegador lo descargue
+        // directamente (Blob), sin depender de que el servidor sirva el .xlsx
+        // estático. Se conserva también la URL como respaldo.
+        $bytes = @file_get_contents($destAbs);
+        return [
+            'status'   => 'success',
+            'total'    => count($data),
+            'filename' => $nombre,
+            'b64'      => $bytes !== false ? base64_encode($bytes) : '',
+            'url'      => rtrim(SITE_URL, '/') . '/' . UPLOAD_URL . 'auditorias/' . $nombre,
+        ];
     }
 
     /** Inyecta los renglones de datos en la plantilla xlsx (preserva estilos). */

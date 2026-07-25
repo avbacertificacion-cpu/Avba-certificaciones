@@ -6720,7 +6720,22 @@ async function generarInformeInsp() {
     const d = await r.json();
     if (d.status !== 'success') { mostrarToast(d.message||'Error.', 'err'); return; }
     mostrarToast(`Informe generado (${d.total} inspecciones).`, 'ok');
-    window.open(d.url, '_blank');
+    if (d.b64) {
+      // Descargar directo desde el contenido (no depende del servidor estático)
+      const bin = atob(d.b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = d.filename || 'Informe_Inspecciones.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    } else if (d.url) {
+      window.open(d.url, '_blank');
+    }
   } catch(_) { mostrarToast('Error de red.', 'err'); }
   finally { btn.disabled = false; btn.textContent = 'Generar Excel'; }
 }
