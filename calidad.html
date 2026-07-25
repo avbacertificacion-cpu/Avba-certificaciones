@@ -6722,14 +6722,14 @@ async function generarInformeInsp() {
     const d = await r.json();
     if (d.status !== 'success') { mostrarToast(d.message||'Error.', 'err'); return; }
     mostrarToast(`Informe generado (${d.total} inspecciones).`, 'ok');
-    if (d.b64) _descargarBlobXlsx(d.b64, d.filename || 'Informe_Inspecciones.xlsx');
-    else if (d.url) window.open(d.url, '_blank');
+    if (d.id) descargarInformeGuardado(d.id);
+    else if (d.b64) _descargarBlobXlsx(d.b64, d.filename || 'Informe_Inspecciones.xlsx');
     cargarInformesInsp();
   } catch(_) { mostrarToast('Error de red.', 'err'); }
   finally { btn.disabled = false; btn.textContent = 'Generar Excel'; }
 }
 
-/* Descarga un xlsx a partir de su contenido base64 (Blob) */
+/* Descarga un xlsx a partir de su contenido base64 (Blob) — respaldo */
 function _descargarBlobXlsx(b64, filename) {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
@@ -6767,13 +6767,10 @@ async function cargarInformesInsp() {
   } catch(_) { /* silencioso */ }
 }
 
-async function descargarInformeGuardado(id) {
-  try {
-    const r = await _audFetch(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'DESCARGAR_INFORME_INSPECCIONES', payload:{ id } }) });
-    const d = await r.json();
-    if (d.status === 'success' && d.b64) _descargarBlobXlsx(d.b64, d.filename);
-    else mostrarToast(d.message || 'No se pudo descargar.', 'err');
-  } catch(_) { mostrarToast('Error de red.', 'err'); }
+function descargarInformeGuardado(id) {
+  // Descarga por navegación al endpoint dedicado (fiable en escritorio y móvil)
+  const tok = encodeURIComponent(_audTok() || '');
+  window.location.href = `descargar.php?tipo=informe&id=${id}&token=${tok}`;
 }
 
 async function eliminarAud(id, label) {

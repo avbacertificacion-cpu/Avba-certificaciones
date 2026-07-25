@@ -268,25 +268,26 @@ class Auditorias {
             return ['status' => 'error', 'message' => 'No se pudo generar el archivo Excel.'];
         }
         // Registrar el informe en el historial
+        $informeId = 0;
         try {
             $this->pdo->prepare(
                 "INSERT INTO informes_inspecciones (desde, hasta, total, responsable, archivo)
                  VALUES (?,?,?,?,?)"
             )->execute([$desdeDb, $hastaDb, count($data), $responsable, 'uploads/auditorias/' . $nombre]);
+            $informeId = (int)$this->pdo->lastInsertId();
         } catch (\PDOException $e) {
             error_log('[Auditorias] registrar informe: ' . $e->getMessage());
         }
 
-        // Devolver el contenido en base64 para que el navegador lo descargue
-        // directamente (Blob), sin depender de que el servidor sirva el .xlsx
-        // estático. Se conserva también la URL como respaldo.
+        // Se devuelve el id (para descargar por navegación vía descargar.php,
+        // fiable en móvil) y también el contenido en base64 como respaldo.
         $bytes = @file_get_contents($destAbs);
         return [
             'status'   => 'success',
             'total'    => count($data),
+            'id'       => $informeId,
             'filename' => $nombre,
             'b64'      => $bytes !== false ? base64_encode($bytes) : '',
-            'url'      => rtrim(SITE_URL, '/') . '/' . UPLOAD_URL . 'auditorias/' . $nombre,
         ];
     }
 
