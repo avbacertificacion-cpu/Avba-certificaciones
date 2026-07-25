@@ -440,6 +440,9 @@
       display: flex;
       gap: 0;
       padding: 0 24px;
+      flex-wrap: wrap;              /* que quepan en varias filas si no caben */
+      overflow-x: auto;            /* y como respaldo, scroll horizontal propio */
+      -webkit-overflow-scrolling: touch;
     }
     .tab-btn {
       padding: 13px 20px;
@@ -447,7 +450,12 @@
       font-size: 13px; font-weight: 600; color: var(--texto-sub);
       border-bottom: 2.5px solid transparent;
       margin-bottom: -1px;
+      white-space: nowrap;
       transition: color .15s, border-color .15s;
+    }
+    @media (max-width: 680px) {
+      .tabs-nav { padding: 0 8px; gap: 2px; }
+      .tab-btn { padding: 10px 11px; font-size: 12px; }
     }
     .tab-btn.active { color: var(--azul); border-bottom-color: var(--azul); }
     .tab-btn:hover:not(.active) { color: var(--texto); }
