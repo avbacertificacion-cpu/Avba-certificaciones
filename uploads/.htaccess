@@ -26,10 +26,10 @@ Options -Indexes -ExecCGI
     </FilesMatch>
 </IfModule>
 
-# Solo permitir imágenes, PDF y documentos Office
+# Solo permitir imágenes, PDF y documentos Office (Word/Excel)
 <IfModule mod_rewrite.c>
     RewriteEngine On
     RewriteCond %{REQUEST_FILENAME} -f
-    RewriteRule \.(jpg|jpeg|png|webp|pdf|docx|gif)$ - [L]
+    RewriteRule \.(jpg|jpeg|png|webp|pdf|docx|doc|xlsx|xls|gif)$ - [L]
     RewriteRule .* - [F,L]
 </IfModule>
