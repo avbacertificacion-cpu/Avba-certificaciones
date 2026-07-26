@@ -1,5 +1,6 @@
 <?php
 require_once 'config/config.php';
+require_once 'config/roles-extra.php';
 
 // Verificar sesión
 if (!isset($_SESSION['usuario_id'])) {
@@ -17,6 +18,9 @@ switch ($rol) {
         break;
     case ROLE_INSPECTOR:
         header('Location: private/inspector-dashboard.php');
+        break;
+    case ROLE_GERENTE:
+        header('Location: private/gerente-dashboard.php');
         break;
     case ROLE_CLIENTE:
         header('Location: private/cliente-dashboard.php');

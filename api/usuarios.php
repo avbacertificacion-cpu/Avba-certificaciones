@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/roles-extra.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -79,7 +80,7 @@ function crear() {
         http_response_code(400); echo json_encode(['error' => 'Usuario inválido: solo letras, números y _ (mín. 3 caracteres)']); return;
     }
 
-    if (!in_array($d['rol'], ['administrador','inspector','cliente'])) {
+    if (!in_array($d['rol'], ['administrador','inspector','cliente','gerente'])) {
         http_response_code(400); echo json_encode(['error' => 'Rol inválido']); return;
     }
 

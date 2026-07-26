@@ -152,6 +152,7 @@ $nombre = $_SESSION['nombre'];
         <select id="filtroRol" onchange="filtrar()">
             <option value="">📋 Todos los roles</option>
             <option value="administrador">🔐 Administrador</option>
+            <option value="gerente">📊 Gerente</option>
             <option value="inspector">🔍 Inspector</option>
             <option value="cliente">👤 Cliente</option>
         </select>
@@ -201,6 +202,7 @@ $nombre = $_SESSION['nombre'];
                 <label>Rol *</label>
                 <select id="u-rol" onchange="actualizarVisibilidadEmpresa()" required>
                     <option value="administrador">🔐 Administrador</option>
+                    <option value="gerente">📊 Gerente</option>
                     <option value="inspector">🔍 Inspector</option>
                     <option value="cliente">👤 Cliente</option>
                 </select>
@@ -209,6 +211,14 @@ $nombre = $_SESSION['nombre'];
                 <label>Empresa (solo para Clientes) *</label>
                 <select id="u-empresa"></select>
                 <small>Los inspectores trabajan para AVBA, los clientes para empresas específicas</small>
+            </div>
+        </div>
+
+        <div class="form-row" id="gerente-group" style="display:none">
+            <div class="form-group" style="flex:1">
+                <label>Clientes asignados al gerente</label>
+                <div id="gerente-empresas-list" style="max-height:190px;overflow-y:auto;border:2px solid #e0e0ff;border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px"></div>
+                <small>Marca las plantas/clientes que este gerente podrá ver (solo lectura).</small>
             </div>
         </div>
 
@@ -255,6 +265,15 @@ async function cargarEmpresas() {
             const sel = document.getElementById('u-empresa');
             sel.innerHTML = '<option value="">Sin asignar</option>' +
                 empresas.map(e => `<option value="${sanitize(e.id)}">${sanitize(e.nombre)}</option>`).join('');
+            // Lista de casillas para asignar clientes a un gerente
+            const lista = document.getElementById('gerente-empresas-list');
+            if (lista) {
+                lista.innerHTML = empresas.map(e =>
+                    `<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+                        <input type="checkbox" class="ger-emp" value="${sanitize(e.id)}" style="width:16px;height:16px">
+                        ${sanitize(e.nombre)}
+                    </label>`).join('');
+            }
         }
     } catch(e) {
         showAlert('Error cargando empresas: ' + e.message, 'error');
@@ -313,7 +332,7 @@ function sanitize(str) {
 }
 
 function rolLabel(r) {
-    const labels = {administrador:'🔐 Admin', inspector:'🔍 Inspector', cliente:'👤 Cliente'};
+    const labels = {administrador:'🔐 Admin', gerente:'📊 Gerente', inspector:'🔍 Inspector', cliente:'👤 Cliente'};
     return labels[r] || r;
 }
 
@@ -362,6 +381,13 @@ function editarUsuario(id) {
     document.getElementById('pwd-nota').textContent = 'ⓘ Dejar vacío para no cambiar';
     document.getElementById('pwd-bar').style.width = '0';
     actualizarVisibilidadEmpresa();
+    marcarEmpresasGerente([]);
+    if (u.rol === 'gerente') {
+        fetch(`../api/gerente.php?action=empresas_de_gerente&gerente_id=${u.id}`)
+            .then(r => r.json())
+            .then(d => { if (d.success) marcarEmpresasGerente(d.data); })
+            .catch(() => {});
+    }
     document.getElementById('modalUsuario').classList.add('open');
 }
 
@@ -376,6 +402,7 @@ function limpiarModal() {
     document.getElementById('u-estado').value = 'activo';
     document.getElementById('modal-alert').innerHTML = '';
     document.getElementById('pwd-bar').style.width = '0';
+    marcarEmpresasGerente([]);
 }
 
 function cerrarModal() {
@@ -385,8 +412,13 @@ function cerrarModal() {
 
 function actualizarVisibilidadEmpresa() {
     const rol = document.getElementById('u-rol').value;
-    const grupo = document.getElementById('empresa-group');
-    grupo.style.display = (rol === 'cliente') ? 'block' : 'none';
+    document.getElementById('empresa-group').style.display = (rol === 'cliente') ? 'block' : 'none';
+    document.getElementById('gerente-group').style.display = (rol === 'gerente') ? 'flex' : 'none';
+}
+
+function marcarEmpresasGerente(ids) {
+    const set = new Set((ids || []).map(Number));
+    document.querySelectorAll('.ger-emp').forEach(c => { c.checked = set.has(Number(c.value)); });
 }
 
 function actualizarFuerzaPassword() {
@@ -489,6 +521,18 @@ async function guardarUsuario() {
         const d = await r.json().catch(() => ({}));
 
         if (r.ok && d.success) {
+            // Guardar asignación de clientes si es gerente
+            const gid = id ? parseInt(id) : (d.id ? parseInt(d.id) : 0);
+            if (rol === 'gerente' && gid) {
+                const empIds = [...document.querySelectorAll('.ger-emp:checked')].map(c => parseInt(c.value));
+                try {
+                    await fetch('../api/gerente.php?action=guardar_asignacion', {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/json'},
+                        body: JSON.stringify({ gerente_id: gid, empresas: empIds })
+                    });
+                } catch(e) { /* el usuario se creó; la asignación se puede reintentar editando */ }
+            }
             cerrarModal();
             showAlert(`✓ Usuario ${id ? 'actualizado' : 'creado'} correctamente`, 'success');
             await cargarUsuarios();
