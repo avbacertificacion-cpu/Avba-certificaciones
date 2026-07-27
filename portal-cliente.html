@@ -928,10 +928,11 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
 <div class="eq-overlay" id="modal-hora">
   <div class="eq-modal">
     <div class="eq-modal-hdr">
-      <div class="eq-modal-title">Registrar lectura de horómetro</div>
+      <div class="eq-modal-title" id="hora-modal-title">Registrar lectura de horómetro</div>
       <button class="eq-modal-close" onclick="cerrarModalHora()">✕</button>
     </div>
     <input type="hidden" id="hora-equipo-id">
+    <input type="hidden" id="hora-motor" value="1">
     <div class="fgrid2">
       <div class="frow"><label class="flabel">Horas actuales *</label><input class="finput" id="hora-horas" type="number" min="0" step="0.1" placeholder="1250.5"></div>
       <div class="frow"><label class="flabel">Fecha *</label><input class="finput" id="hora-fecha" type="date"></div>
@@ -2322,11 +2323,33 @@ function renderSubDocs(docs, equipoId) {
 // ── Horómetro ──────────────────────────────────────────────────────────────
 function renderSubHoras(horas, equipoId) {
   const cont = document.getElementById('eq-sub-horas');
-  const maxH = horas.length ? Math.max(...horas.map(h => h.horas)) : 0;
+  const eq   = (_eqDetActual && _eqDetActual.equipo) ? _eqDetActual.equipo : {};
+  const dos  = !!(eq && eq.dos_motores);
   let html = _planMantCard(equipoId, (_eqDetActual && _eqDetActual.plan_mant) ? _eqDetActual.plan_mant : null);
-  html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-    <div style="font-size:13px;font-weight:700;color:var(--texto)">Horómetro</div>
-    ${_puedeEditar ? `<button class="btn-prim" onclick="abrirModalHora(${equipoId})">+ Registrar</button>` : ''}
+
+  // Check: ¿la grúa cuenta con dos motores? (habilita un segundo horómetro)
+  if (_puedeEditar) {
+    html += `<label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--texto);margin-bottom:14px;cursor:pointer;padding:9px 12px;background:var(--gris-bg);border-radius:9px">
+      <input type="checkbox" ${dos?'checked':''} onchange="toggleDosMotores(${equipoId}, this.checked)" style="width:auto;margin:0">
+      🔧 Esta grúa cuenta con <strong>dos motores</strong> (habilita un segundo horómetro)
+    </label>`;
+  }
+
+  if (dos) {
+    html += _horoBloque('Horómetro — Motor 1', horas.filter(h => (h.motor||1) === 1), equipoId, 1, false);
+    html += _horoBloque('Horómetro — Motor 2', horas.filter(h => (h.motor||1) === 2), equipoId, 2, false);
+  } else {
+    html += _horoBloque('Horómetro', horas, equipoId, 1, true);
+  }
+  cont.innerHTML = html;
+}
+
+/* Bloque de horómetro para un motor (o único) */
+function _horoBloque(titulo, horas, equipoId, motor, single) {
+  const maxH = horas.length ? Math.max(...horas.map(h => h.horas)) : 0;
+  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin:${single?'0 0 12px':'18px 0 12px'}">
+    <div style="font-size:13px;font-weight:700;color:var(--texto)">${titulo}</div>
+    ${_puedeEditar ? `<button class="btn-prim" onclick="abrirModalHora(${equipoId}, ${motor})">+ Registrar</button>` : ''}
   </div>`;
   if (!horas.length) {
     html += '<div class="empty"><div class="empty-t">Sin registros</div><div class="empty-s">Registra las horas de trabajo del equipo.</div></div>';
@@ -2352,7 +2375,16 @@ function renderSubHoras(horas, equipoId) {
       </div>`;
     });
   }
-  cont.innerHTML = html;
+  return html;
+}
+
+async function toggleDosMotores(equipoId, valor) {
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'SET_DOS_MOTORES', payload:{ id: equipoId, valor: valor ? 1 : 0 } }) });
+    const d = await r.json();
+    if (d.status === 'success') { if (_eqDetActual && _eqDetActual.equipo) _eqDetActual.equipo.dos_motores = valor ? 1 : 0; recargarDetalleEq(); }
+    else toastEq(d.message || 'No se pudo guardar.');
+  } catch(_) { toastEq('Error de red.'); }
 }
 
 // ── Plan de mantenimiento preventivo (horómetro / fecha) ────────────────────
@@ -2666,11 +2698,16 @@ async function eliminarDoc(id) {
 }
 
 // ── Horómetro ──────────────────────────────────────────────────────────────
-function abrirModalHora(equipoId) {
+function abrirModalHora(equipoId, motor) {
+  motor = (motor === 2) ? 2 : 1;
   document.getElementById('hora-equipo-id').value = equipoId;
+  document.getElementById('hora-motor').value     = motor;
   document.getElementById('hora-horas').value     = '';
   document.getElementById('hora-fecha').value     = new Date().toISOString().slice(0,10);
   document.getElementById('hora-notas').value     = '';
+  const dos = !!(_eqDetActual && _eqDetActual.equipo && _eqDetActual.equipo.dos_motores);
+  const t = document.getElementById('hora-modal-title');
+  if (t) t.textContent = dos ? `Registrar horómetro — Motor ${motor}` : 'Registrar lectura de horómetro';
   document.getElementById('modal-hora').classList.add('open');
 }
 function cerrarModalHora() { document.getElementById('modal-hora').classList.remove('open'); }
@@ -2681,7 +2718,8 @@ async function guardarHora() {
   const fecha    = document.getElementById('hora-fecha').value;
   if (!horas || horas <= 0 || !fecha) { toastEq('Horas y fecha son requeridas.'); return; }
   try {
-    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'REGISTRAR_HOROMETRO', payload:{equipo_id:+equipoId, horas, fecha, notas:document.getElementById('hora-notas').value.trim()}}) });
+    const motor = parseInt(document.getElementById('hora-motor').value, 10) || 1;
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'REGISTRAR_HOROMETRO', payload:{equipo_id:+equipoId, horas, fecha, motor, notas:document.getElementById('hora-notas').value.trim()}}) });
     const d = await r.json();
     if (d.status !== 'success') { toastEq(d.message || 'Error.'); return; }
     cerrarModalHora();

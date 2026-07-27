@@ -74,6 +74,9 @@ class ClienteEquipos {
             try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS estado VARCHAR(50) NULL DEFAULT 'Activo'"); } catch (\PDOException $e) {}
             try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS foto_url VARCHAR(500) NULL"); } catch (\PDOException $e) {}
             try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS avba_equipo_id INT NULL"); } catch (\PDOException $e) {}
+            // Grúas con dos motores: bandera por equipo + motor por lectura de horómetro
+            try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS dos_motores TINYINT NOT NULL DEFAULT 0"); } catch (\PDOException $e) {}
+            try { $this->pdo->exec("ALTER TABLE cliente_equipos_horometro ADD COLUMN IF NOT EXISTS motor TINYINT NOT NULL DEFAULT 1"); } catch (\PDOException $e) {}
             // Plan de mantenimiento preventivo (por horómetro y/o por fecha)
             $this->pdo->exec("
                 CREATE TABLE IF NOT EXISTS cliente_equipos_plan_mant (
@@ -518,7 +521,7 @@ class ClienteEquipos {
         $docs->execute([$id]);
 
         $hor = $this->pdo->prepare("
-            SELECT id, horas, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, notas
+            SELECT id, horas, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, notas, motor
             FROM cliente_equipos_horometro WHERE equipo_id=? ORDER BY fecha DESC, id DESC
         ");
         $hor->execute([$id]);
@@ -547,6 +550,7 @@ class ClienteEquipos {
                 'anio'     => $eq['anio'] ? (int)$eq['anio'] : null,
                 'notas'    => $eq['notas'] ?? '',
                 'estado'   => $eq['estado'] ?? 'Activo',
+                'dos_motores' => (int)($eq['dos_motores'] ?? 0),
                 'foto_url' => $eq['foto_url'] ? (rtrim(SITE_URL, '/') . '/' . ltrim($eq['foto_url'], '/')) : '',
             ],
             'documentos'      => array_map(fn($r) => [
@@ -565,6 +569,7 @@ class ClienteEquipos {
                 'horas' => (float)$r['horas'],
                 'fecha' => $r['fecha'],
                 'notas' => $r['notas'] ?? '',
+                'motor' => (int)($r['motor'] ?? 1),
             ], $hor->fetchAll()),
             'plan_mant'       => $this->computarPlanMant($id),
             'certificaciones' => array_map(fn($r) => [
@@ -648,6 +653,8 @@ class ClienteEquipos {
         $horas     = (float)($data['horas']   ?? 0);
         $fecha     = trim($data['fecha']       ?? '');
         $notas     = trim($data['notas']       ?? '');
+        $motor     = (int)($data['motor'] ?? 1);
+        if ($motor !== 2) $motor = 1;
 
         if (!$equipoId || $horas <= 0 || !$fecha) {
             return ['status' => 'error', 'message' => 'equipo_id, horas y fecha son requeridos.'];
@@ -656,9 +663,17 @@ class ClienteEquipos {
 
         $fechaDb = date('Y-m-d', strtotime(str_replace('/', '-', $fecha)));
         $this->pdo->prepare(
-            "INSERT INTO cliente_equipos_horometro (equipo_id,horas,fecha,notas) VALUES (?,?,?,?)"
-        )->execute([$equipoId, $horas, $fechaDb, $notas]);
+            "INSERT INTO cliente_equipos_horometro (equipo_id,horas,fecha,notas,motor) VALUES (?,?,?,?,?)"
+        )->execute([$equipoId, $horas, $fechaDb, $notas, $motor]);
         return ['status' => 'success'];
+    }
+
+    /** Marca si un equipo (grúa) cuenta con dos motores. */
+    public function setDosMotores(int $id, string $idCliente, bool $valor): array {
+        $idCliente = $this->norm($idCliente);
+        if (!$this->ownEquipo($id, $idCliente)) return ['status' => 'error', 'message' => 'Equipo no encontrado.'];
+        $this->pdo->prepare("UPDATE cliente_equipos SET dos_motores=? WHERE id=?")->execute([$valor ? 1 : 0, $id]);
+        return ['status' => 'success', 'message' => $valor ? 'Segundo motor habilitado.' : 'Segundo motor deshabilitado.'];
     }
 
     public function eliminarHora(int $id, string $idCliente): array {
