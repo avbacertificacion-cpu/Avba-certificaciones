@@ -943,6 +943,30 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
   </div>
 </div>
 
+<!-- Modal: Plan de mantenimiento -->
+<div class="eq-overlay" id="overlay-plan-mant">
+  <div class="eq-modal">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Plan de mantenimiento</div>
+      <button class="eq-modal-close" onclick="cerrarModalPlanMant()">✕</button>
+    </div>
+    <input type="hidden" id="plan-eq-id">
+    <div style="font-size:12px;color:var(--texto-hint);margin-bottom:10px">Programa el servicio por horas de uso y/o por fecha. Se avisará cuando se acerque o pase el <strong>primero</strong> de los dos.</div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Cada cuántas horas</label><input class="finput" id="plan-int-horas" type="number" min="0" step="1" placeholder="Ej: 250"></div>
+      <div class="frow"><label class="flabel">Cada cuántos días</label><input class="finput" id="plan-int-dias" type="number" min="0" step="1" placeholder="Ej: 90"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Horas del último servicio</label><input class="finput" id="plan-base-horas" type="number" min="0" step="0.1" placeholder="Horas actuales si es nuevo"></div>
+      <div class="frow"><label class="flabel">Fecha del último servicio</label><input class="finput" id="plan-base-fecha" type="date"></div>
+    </div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarModalPlanMant()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarPlanMant()">Guardar plan</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Certificación -->
 <div class="eq-overlay" id="modal-cert-eq">
   <div class="eq-modal">
@@ -2257,7 +2281,8 @@ function renderSubDocs(docs, equipoId) {
 function renderSubHoras(horas, equipoId) {
   const cont = document.getElementById('eq-sub-horas');
   const maxH = horas.length ? Math.max(...horas.map(h => h.horas)) : 0;
-  let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+  let html = _planMantCard(equipoId, (_eqDetActual && _eqDetActual.plan_mant) ? _eqDetActual.plan_mant : null);
+  html += `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <div style="font-size:13px;font-weight:700;color:var(--texto)">Horómetro</div>
     ${_puedeEditar ? `<button class="btn-prim" onclick="abrirModalHora(${equipoId})">+ Registrar</button>` : ''}
   </div>`;
@@ -2286,6 +2311,101 @@ function renderSubHoras(horas, equipoId) {
     });
   }
   cont.innerHTML = html;
+}
+
+// ── Plan de mantenimiento preventivo (horómetro / fecha) ────────────────────
+function _planMantCard(equipoId, plan) {
+  if (!plan) {
+    return `<div style="border:1.5px dashed var(--borde);border-radius:12px;padding:14px;margin-bottom:14px;text-align:center">
+      <div style="font-size:13px;font-weight:700;color:var(--texto);margin-bottom:2px">🛠 Plan de mantenimiento</div>
+      <div style="font-size:12px;color:var(--texto-hint);margin-bottom:${_puedeEditar?'10px':'0'}">Programa el servicio por horas de uso y/o por fecha.</div>
+      ${_puedeEditar ? `<button class="btn-prim" onclick="abrirModalPlanMant(${equipoId})">Configurar plan</button>` : ''}
+    </div>`;
+  }
+  const col = plan.estado === 'vencido' ? '#ef4444' : (plan.estado === 'por_vencer' ? '#f59e0b' : '#22c55e');
+  const bg  = plan.estado === 'vencido' ? 'rgba(239,68,68,.12)' : (plan.estado === 'por_vencer' ? 'rgba(245,158,11,.12)' : 'rgba(34,197,94,.10)');
+  const lbl = plan.estado === 'vencido' ? '⚠ Mantenimiento vencido' : (plan.estado === 'por_vencer' ? '⏰ Próximo a vencer' : '✔ Al día');
+  let detalle = '';
+  if (plan.intervalo_horas) {
+    const r = plan.horas_restantes;
+    detalle += `<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px">
+      <span style="color:var(--texto-hint)">Por horas (cada ${plan.intervalo_horas} h)</span>
+      <span style="font-weight:600;color:var(--texto)">Próx: ${Number(plan.proximo_horas).toLocaleString('es-MX')} h · ${r<=0?('vencido por '+Math.abs(r)+' h'):('faltan '+Number(r).toLocaleString('es-MX')+' h')}</span>
+    </div>`;
+  }
+  if (plan.intervalo_dias) {
+    const r = plan.dias_restantes;
+    detalle += `<div style="display:flex;justify-content:space-between;font-size:12px;margin-top:4px">
+      <span style="color:var(--texto-hint)">Por fecha (cada ${plan.intervalo_dias} días)</span>
+      <span style="font-weight:600;color:var(--texto)">Próx: ${plan.proxima_fecha} · ${r<=0?('vencido por '+Math.abs(r)+' días'):('faltan '+r+' días')}</span>
+    </div>`;
+  }
+  return `<div style="border:1px solid ${col};background:${bg};border-radius:12px;padding:13px 15px;margin-bottom:14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <div style="font-size:13px;font-weight:800;color:${col}">${lbl}</div>
+      <div style="font-size:11px;color:var(--texto-hint)">Horas actuales: <strong style="color:var(--texto)">${Number(plan.horas_actuales).toLocaleString('es-MX')} h</strong></div>
+    </div>
+    ${detalle}
+    ${_puedeEditar ? `<div style="display:flex;gap:6px;margin-top:11px;flex-wrap:wrap">
+      <button class="btn-prim" style="font-size:12px;padding:7px 12px" onclick="marcarServicioMant(${equipoId})">✔ Registrar servicio</button>
+      <button class="btn-sec" style="font-size:12px;padding:7px 12px" onclick='abrirModalPlanMant(${equipoId}, ${JSON.stringify(plan)})'>Editar</button>
+      <button class="btn-sec" style="font-size:12px;padding:7px 12px" onclick="eliminarPlanMant(${equipoId})">Quitar</button>
+    </div>` : ''}
+  </div>`;
+}
+
+function abrirModalPlanMant(equipoId, plan) {
+  plan = plan || {};
+  document.getElementById('plan-eq-id').value    = equipoId;
+  document.getElementById('plan-int-horas').value = plan.intervalo_horas || '';
+  document.getElementById('plan-int-dias').value  = plan.intervalo_dias || '';
+  document.getElementById('plan-base-horas').value = (plan.base_horas !== undefined && plan.base_horas !== null) ? plan.base_horas : '';
+  // base_fecha viene como dd/mm/aaaa → convertir a aaaa-mm-dd para el input date
+  let bf = '';
+  if (plan.base_fecha) { const p = String(plan.base_fecha).split('/'); if (p.length===3) bf = `${p[2]}-${p[1]}-${p[0]}`; }
+  document.getElementById('plan-base-fecha').value = bf;
+  document.getElementById('overlay-plan-mant').classList.add('open');
+}
+function cerrarModalPlanMant() { document.getElementById('overlay-plan-mant').classList.remove('open'); }
+
+async function guardarPlanMant() {
+  const id = parseInt(document.getElementById('plan-eq-id').value, 10);
+  const intervalo_horas = document.getElementById('plan-int-horas').value.trim();
+  const intervalo_dias  = document.getElementById('plan-int-dias').value.trim();
+  if (!intervalo_horas && !intervalo_dias) { toastEq('Indica un intervalo por horas y/o por días.'); return; }
+  const payload = {
+    id,
+    intervalo_horas,
+    intervalo_dias,
+    base_horas: document.getElementById('plan-base-horas').value.trim(),
+    base_fecha: document.getElementById('plan-base-fecha').value.trim(),
+  };
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'GUARDAR_PLAN_MANT', payload }) });
+    const d = await r.json();
+    if (d.status === 'success') { cerrarModalPlanMant(); toastEq('Plan de mantenimiento guardado.'); recargarDetalleEq(); }
+    else toastEq(d.message || 'No se pudo guardar.');
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+async function marcarServicioMant(equipoId) {
+  if (!confirm('¿Registrar que se realizó el servicio ahora? El próximo mantenimiento se reprogramará a partir de las horas actuales y la fecha de hoy.')) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'MARCAR_SERVICIO_MANT', payload:{ id: equipoId } }) });
+    const d = await r.json();
+    if (d.status === 'success') { toastEq(d.message||'Servicio registrado.'); recargarDetalleEq(); }
+    else toastEq(d.message || 'No se pudo registrar.');
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+async function eliminarPlanMant(equipoId) {
+  if (!confirm('¿Quitar el plan de mantenimiento de este equipo?')) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'ELIMINAR_PLAN_MANT', payload:{ id: equipoId } }) });
+    const d = await r.json();
+    if (d.status === 'success') { toastEq('Plan quitado.'); recargarDetalleEq(); }
+    else toastEq(d.message || 'No se pudo quitar.');
+  } catch(_) { toastEq('Error de red.'); }
 }
 
 // ── Certificaciones ─────────────────────────────────────────────────────────

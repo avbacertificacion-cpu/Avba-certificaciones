@@ -1616,6 +1616,31 @@ if ($method === 'POST') {
             autorizarRecurso($alc, 'equipo', parentDeRecurso($pdo, 'cliente_equipos_horometro', 'equipo_id', (int)($payload['id'] ?? 0)));
             respuesta($cliEquipos->eliminarHora((int)($payload['id'] ?? 0), resolveIdc($usr)));
 
+        // ── Plan de mantenimiento preventivo (por horómetro / fecha) ──
+        case 'GUARDAR_PLAN_MANT':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'equipo', (int)($payload['id'] ?? 0));
+            respuesta($cliEquipos->guardarPlanMantenimiento((int)($payload['id'] ?? 0), resolveIdc($usr), $payload));
+
+        case 'MARCAR_SERVICIO_MANT':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'equipo', (int)($payload['id'] ?? 0));
+            respuesta($cliEquipos->marcarServicioMant((int)($payload['id'] ?? 0), resolveIdc($usr)));
+
+        case 'ELIMINAR_PLAN_MANT':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'equipo', (int)($payload['id'] ?? 0));
+            respuesta($cliEquipos->eliminarPlanMantenimiento((int)($payload['id'] ?? 0), resolveIdc($usr)));
+
         case 'GUARDAR_CERT_EQUIPO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

@@ -74,6 +74,18 @@ class ClienteEquipos {
             try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS estado VARCHAR(50) NULL DEFAULT 'Activo'"); } catch (\PDOException $e) {}
             try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS foto_url VARCHAR(500) NULL"); } catch (\PDOException $e) {}
             try { $this->pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS avba_equipo_id INT NULL"); } catch (\PDOException $e) {}
+            // Plan de mantenimiento preventivo (por horómetro y/o por fecha)
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS cliente_equipos_plan_mant (
+                  equipo_id       INT PRIMARY KEY,
+                  intervalo_horas INT NULL,
+                  intervalo_dias  INT NULL,
+                  base_horas      DECIMAL(10,1) NULL,
+                  base_fecha      DATE NULL,
+                  activo          TINYINT NOT NULL DEFAULT 1,
+                  updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
         } catch (\PDOException $e) {
             error_log('[ClienteEquipos] migrate: ' . $e->getMessage());
         }
@@ -368,6 +380,119 @@ class ClienteEquipos {
     }
 
     // ════════════════════════════════════════════════════════
+    //  PLAN DE MANTENIMIENTO PREVENTIVO (por horómetro / fecha)
+    // ════════════════════════════════════════════════════════
+
+    /** Horas actuales del equipo = lectura de horómetro más alta. */
+    private function horasActuales(int $equipoId): float {
+        $s = $this->pdo->prepare("SELECT MAX(horas) FROM cliente_equipos_horometro WHERE equipo_id=?");
+        $s->execute([$equipoId]);
+        return (float)($s->fetchColumn() ?: 0);
+    }
+
+    /**
+     * Calcula el estado del plan de mantenimiento de un equipo.
+     * Devuelve null si no hay plan configurado.
+     */
+    private function computarPlanMant(int $equipoId): ?array {
+        $s = $this->pdo->prepare("SELECT * FROM cliente_equipos_plan_mant WHERE equipo_id=? AND activo=1");
+        $s->execute([$equipoId]);
+        $p = $s->fetch(PDO::FETCH_ASSOC);
+        if (!$p) return null;
+
+        $intHoras = $p['intervalo_horas'] !== null ? (int)$p['intervalo_horas'] : null;
+        $intDias  = $p['intervalo_dias']  !== null ? (int)$p['intervalo_dias']  : null;
+        if (!$intHoras && !$intDias) return null;
+
+        $horasAct  = $this->horasActuales($equipoId);
+        $baseHoras = $p['base_horas'] !== null ? (float)$p['base_horas'] : 0.0;
+        $baseFecha = $p['base_fecha'] ?: null;
+
+        $out = [
+            'intervalo_horas' => $intHoras,
+            'intervalo_dias'  => $intDias,
+            'base_horas'      => $baseHoras,
+            'base_fecha'      => $baseFecha ? date('d/m/Y', strtotime($baseFecha)) : '',
+            'horas_actuales'  => $horasAct,
+            'proximo_horas'   => null,
+            'horas_restantes' => null,
+            'proxima_fecha'   => '',
+            'dias_restantes'  => null,
+        ];
+
+        $vencido = false; $porVencer = false;
+
+        if ($intHoras) {
+            $proxH = $baseHoras + $intHoras;
+            $restH = $proxH - $horasAct;
+            $out['proximo_horas']   = round($proxH, 1);
+            $out['horas_restantes'] = round($restH, 1);
+            if ($restH <= 0) $vencido = true;
+            elseif ($restH <= max($intHoras * 0.1, 10)) $porVencer = true;
+        }
+        if ($intDias) {
+            $baseF = $baseFecha ?: date('Y-m-d');
+            $proxF = date('Y-m-d', strtotime($baseF . " +{$intDias} day"));
+            $restD = (int)floor((strtotime($proxF) - strtotime('today')) / 86400);
+            $out['proxima_fecha']  = date('d/m/Y', strtotime($proxF));
+            $out['dias_restantes'] = $restD;
+            if ($restD <= 0) $vencido = true;
+            elseif ($restD <= 7) $porVencer = true;
+        }
+
+        $out['estado'] = $vencido ? 'vencido' : ($porVencer ? 'por_vencer' : 'al_dia');
+        return $out;
+    }
+
+    /** Crea o actualiza el plan de mantenimiento del equipo. */
+    public function guardarPlanMantenimiento(int $id, string $idCliente, array $data): array {
+        $idCliente = $this->norm($idCliente);
+        if (!$this->ownEquipo($id, $idCliente)) return ['status' => 'error', 'message' => 'Equipo no encontrado.'];
+
+        $intHoras = ($data['intervalo_horas'] ?? '') === '' ? null : max(0, (int)$data['intervalo_horas']);
+        $intDias  = ($data['intervalo_dias']  ?? '') === '' ? null : max(0, (int)$data['intervalo_dias']);
+        if (!$intHoras && !$intDias) {
+            return ['status' => 'error', 'message' => 'Indica un intervalo por horas y/o por días.'];
+        }
+
+        // Base: horas/fecha del último servicio; por defecto, horas actuales y hoy
+        $baseHoras = ($data['base_horas'] ?? '') === '' ? $this->horasActuales($id) : (float)$data['base_horas'];
+        $baseFechaRaw = trim((string)($data['base_fecha'] ?? ''));
+        $baseFecha = $baseFechaRaw !== '' ? date('Y-m-d', strtotime(str_replace('/', '-', $baseFechaRaw))) : date('Y-m-d');
+
+        $this->pdo->prepare("
+            INSERT INTO cliente_equipos_plan_mant (equipo_id, intervalo_horas, intervalo_dias, base_horas, base_fecha, activo)
+            VALUES (?,?,?,?,?,1)
+            ON DUPLICATE KEY UPDATE intervalo_horas=VALUES(intervalo_horas), intervalo_dias=VALUES(intervalo_dias),
+                                    base_horas=VALUES(base_horas), base_fecha=VALUES(base_fecha), activo=1
+        ")->execute([$id, $intHoras, $intDias, $baseHoras, $baseFecha]);
+
+        return ['status' => 'success', 'message' => 'Plan de mantenimiento guardado.', 'plan_mant' => $this->computarPlanMant($id)];
+    }
+
+    /** Registra un servicio realizado: reprograma la base a horas actuales / hoy. */
+    public function marcarServicioMant(int $id, string $idCliente): array {
+        $idCliente = $this->norm($idCliente);
+        if (!$this->ownEquipo($id, $idCliente)) return ['status' => 'error', 'message' => 'Equipo no encontrado.'];
+        $chk = $this->pdo->prepare("SELECT equipo_id FROM cliente_equipos_plan_mant WHERE equipo_id=?");
+        $chk->execute([$id]);
+        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Este equipo no tiene un plan de mantenimiento.'];
+
+        $this->pdo->prepare("UPDATE cliente_equipos_plan_mant SET base_horas=?, base_fecha=CURDATE() WHERE equipo_id=?")
+            ->execute([$this->horasActuales($id), $id]);
+
+        return ['status' => 'success', 'message' => 'Servicio registrado. Próximo mantenimiento reprogramado.', 'plan_mant' => $this->computarPlanMant($id)];
+    }
+
+    /** Desactiva el plan de mantenimiento del equipo. */
+    public function eliminarPlanMantenimiento(int $id, string $idCliente): array {
+        $idCliente = $this->norm($idCliente);
+        if (!$this->ownEquipo($id, $idCliente)) return ['status' => 'error', 'message' => 'Equipo no encontrado.'];
+        $this->pdo->prepare("UPDATE cliente_equipos_plan_mant SET activo=0 WHERE equipo_id=?")->execute([$id]);
+        return ['status' => 'success', 'message' => 'Plan de mantenimiento desactivado.'];
+    }
+
+    // ════════════════════════════════════════════════════════
     //  DETALLE COMPLETO
     // ════════════════════════════════════════════════════════
 
@@ -441,6 +566,7 @@ class ClienteEquipos {
                 'fecha' => $r['fecha'],
                 'notas' => $r['notas'] ?? '',
             ], $hor->fetchAll()),
+            'plan_mant'       => $this->computarPlanMant($id),
             'certificaciones' => array_map(fn($r) => [
                 'id'             => (int)$r['id'],
                 'tipo_cert'      => $r['tipo_cert'],
