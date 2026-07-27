@@ -774,6 +774,7 @@ class ClienteEquipos {
             return ['status' => 'success', 'total_equipos' => 0,
                     'certs'         => ['vigentes' => 0, 'por_vencer' => 0, 'vencidas' => 0, 'sin_fecha' => 0],
                     'docs_por_tipo' => [],
+                    'mant_alertas'  => [],
                     'horas_equipos' => []];
         }
 
@@ -848,9 +849,31 @@ class ClienteEquipos {
         ");
         $docsVStmt->execute($ids);
 
+        // Alertas de mantenimiento preventivo (planes por vencer / vencidos)
+        $mantAlertas = [];
+        $planStmt = $this->pdo->prepare("SELECT equipo_id FROM cliente_equipos_plan_mant WHERE activo=1 AND equipo_id IN ($in)");
+        $planStmt->execute($ids);
+        $nombreById = array_column($equipos, 'nombre', 'id');
+        foreach ($planStmt->fetchAll(PDO::FETCH_COLUMN) as $eqId) {
+            $p = $this->computarPlanMant((int)$eqId);
+            if (!$p || $p['estado'] === 'al_dia') continue;
+            $mantAlertas[] = array_merge($p, [
+                'equipo_id' => (int)$eqId,
+                'equipo'    => $nombreById[$eqId] ?? ('Equipo #' . $eqId),
+            ]);
+        }
+        usort($mantAlertas, function ($a, $b) {
+            $rank = fn($x) => $x['estado'] === 'vencido' ? 0 : 1;
+            if ($rank($a) !== $rank($b)) return $rank($a) - $rank($b);
+            $va = min($a['dias_restantes'] ?? 1e9, $a['horas_restantes'] ?? 1e9);
+            $vb = min($b['dias_restantes'] ?? 1e9, $b['horas_restantes'] ?? 1e9);
+            return $va <=> $vb;
+        });
+
         return [
             'status'        => 'success',
             'total_equipos' => $total,
+            'mant_alertas'  => $mantAlertas,
             'certs'         => [
                 'vigentes'   => (int)($cs['vigentes']   ?? 0),
                 'por_vencer' => (int)($cs['por_vencer'] ?? 0),

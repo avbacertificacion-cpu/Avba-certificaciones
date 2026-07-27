@@ -506,6 +506,7 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
         </div>
       </div>
       <div id="eq-alertas"></div>
+      <div id="eq-mant-alertas"></div>
       <div id="eq-status-dist"></div>
       <div class="eq-charts-3">
         <div class="eq-chart-card">
@@ -1879,12 +1880,53 @@ async function cargarDashboardEq() {
   _set('eq-s-vcd', certs.vencidas ?? 0);
 
   try { renderAlertas(d, 'eq-alertas'); } catch(_){}
+  try { renderMantAlertas(d, 'eq-mant-alertas'); } catch(_){}
   try { renderFleetHealth(d, 'eq-fhs-card', 'eq-fhs-ring', 'eq-fhs-n', 'eq-fhs-legend', false); } catch(_){}
   try { renderStatusDist(d.equipos_por_estado || [], 'eq-status-dist', 'Estado de Flota'); } catch(_){}
   try { renderChartCerts(certs); } catch(_){ _chartMsg('chart-certs', 'Sin datos'); }
   try { renderChartTipos(d.equipos_por_tipo || []); } catch(_){ _chartMsg('chart-tipos', 'Sin datos'); }
   try { renderChartHoras(d.horas_equipos || []); } catch(_){ _chartMsg('chart-horas', 'Sin datos'); }
   try { renderProximasVencer(d, 'eq-upcoming', 'equipo'); } catch(_){}
+}
+
+// ── Tablero de alertas de mantenimiento preventivo ─────────────────────────
+function renderMantAlertas(d, contId) {
+  const cont = document.getElementById(contId);
+  if (!cont) return;
+  const alertas = d.mant_alertas || [];
+  if (!alertas.length) { cont.innerHTML = ''; return; }
+  const nVenc = alertas.filter(a => a.estado === 'vencido').length;
+  const items = alertas.slice(0, 20).map(a => {
+    const col = a.estado === 'vencido' ? '#ef4444' : '#f59e0b';
+    const bg  = a.estado === 'vencido' ? 'rgba(239,68,68,.10)' : 'rgba(245,158,11,.10)';
+    const partes = [];
+    if (a.intervalo_horas) {
+      const r = a.horas_restantes;
+      partes.push(r <= 0 ? `vencido por ${Math.abs(r).toLocaleString('es-MX')} h` : `faltan ${Number(r).toLocaleString('es-MX')} h`);
+    }
+    if (a.intervalo_dias) {
+      const r = a.dias_restantes;
+      partes.push(r <= 0 ? `vencido por ${Math.abs(r)} días` : `faltan ${r} días`);
+    }
+    const badge = a.estado === 'vencido' ? 'Vencido' : 'Por vencer';
+    return `<div class="eq-upc-item" style="cursor:pointer" onclick="verDetalleEq(${a.equipo_id})">
+      <div class="eq-upc-days" style="background:${bg};color:${col};min-width:64px">${badge}</div>
+      <div class="eq-upc-info">
+        <div class="eq-upc-name">🛠 ${escQ(a.equipo)}</div>
+        <div class="eq-upc-eq">${escQ(partes.join(' · '))} · ${Number(a.horas_actuales).toLocaleString('es-MX')} h actuales</div>
+      </div>
+      <div class="eq-upc-tag">Mant.</div>
+    </div>`;
+  }).join('');
+  const bc = nVenc > 0 ? 'upc-amber' : 'upc-green';
+  cont.innerHTML = `<div class="eq-upcoming-card" style="border-left:3px solid ${nVenc>0?'#ef4444':'#f59e0b'}">
+    <div class="eq-upc-hdr">
+      <div class="eq-upc-ttl">🛠 Mantenimientos por atender</div>
+      <span class="eq-upc-badge ${bc}">${alertas.length} equipo${alertas.length!==1?'s':''}${nVenc?` · ${nVenc} vencido${nVenc!==1?'s':''}`:''}</span>
+    </div>
+    ${items}
+    ${alertas.length > 20 ? `<div style="text-align:center;padding:8px 0 4px;font-size:11px;color:var(--texto-hint)">y ${alertas.length-20} más...</div>` : ''}
+  </div>`;
 }
 
 // ── Fleet Health Score gauge ───────────────────────────────────────────────
