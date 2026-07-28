@@ -426,6 +426,7 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
       <div class="tab-card-body">
         <button class="tab-btn" id="tabbtn-equipos" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos<span class="tab-notif" id="tab-notif-eq" style="display:none"></span></button>
         <button class="tab-btn" id="tabbtn-personal-cli" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal<span class="tab-notif" id="tab-notif-per" style="display:none"></span></button>
+        <button class="tab-btn" id="tabbtn-rh" onclick="verTab('rh',this);cargarRH()">🕒 RH / Asistencia<span class="tab-notif" id="tab-notif-rh" style="display:none"></span></button>
         <button class="tab-btn" id="tabbtn-solicitudes" style="display:none" onclick="verTab('solicitudes',this);cargarSolicitudes()">🧾 Solicitudes</button>
         <button class="tab-btn" id="tabbtn-mantenimiento" style="display:none" onclick="verTab('mantenimiento',this);cargarMantenimientos()">🔧 Mantenimiento</button>
         <button class="tab-btn" id="tabbtn-proveedores" onclick="verTab('proveedores',this);cargarProveedores()">🏭 Proveedores</button>
@@ -703,6 +704,19 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
 
   </div>
 
+  <!-- ══ RH / ASISTENCIA ══ -->
+  <div id="tab-rh" class="tab-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div>
+        <h2 style="margin:0;font-size:18px;color:#0d2244">🕒 RH · Salud laboral</h2>
+        <p style="margin:4px 0 0;font-size:13px;color:#667">Faltas, retardos, actas e incidencias del personal, con semáforo según tus políticas. <span id="rh-ventana" style="font-weight:600;color:#0d2244"></span></p>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap" id="rh-toolbar"></div>
+    </div>
+    <div id="rh-resumen" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px"></div>
+    <div id="rh-lista"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+
   <!-- ══ PROVEEDORES ══ -->
   <div id="tab-proveedores" class="tab-panel">
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
@@ -941,6 +955,78 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
     <div class="fact">
       <button class="btn-sec" onclick="cerrarModalHora()">Cancelar</button>
       <button class="btn-prim" onclick="guardarHora()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Políticas de RH -->
+<div class="eq-overlay" id="overlay-rh-pol">
+  <div class="eq-modal">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Políticas de RH</div>
+      <button class="eq-modal-close" onclick="cerrarPoliticas()">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--texto-hint);margin-bottom:10px">Define los criterios con que se calcula la salud laboral de cada empleado.</div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Faltas permitidas</label><input class="finput" id="pol-faltas-max" type="number" min="0" step="1" placeholder="1"></div>
+      <div class="frow"><label class="flabel">Ventana de faltas</label>
+        <select class="finput" id="pol-ventana" onchange="_polVentanaChange()">
+          <option value="semana">Semana (lun–hoy)</option>
+          <option value="movil">Móvil (últimos N días)</option>
+          <option value="quincena">Quincena</option>
+          <option value="mes">Mes</option>
+        </select>
+      </div>
+    </div>
+    <div class="frow" id="pol-dias-row" style="display:none"><label class="flabel">Días de la ventana móvil</label><input class="finput" id="pol-ventana-dias" type="number" min="1" max="60" step="1" placeholder="7"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Actas administrativas máx.</label><input class="finput" id="pol-actas-max" type="number" min="1" step="1" placeholder="3"></div>
+      <div class="frow"><label class="flabel">Retardos = 1 falta</label><input class="finput" id="pol-ret-falta" type="number" min="1" step="1" placeholder="3"></div>
+    </div>
+    <div class="frow"><label class="flabel">Tolerancia de retardo (min)</label><input class="finput" id="pol-tolerancia" type="number" min="0" max="120" step="1" placeholder="10"></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarPoliticas()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarPoliticas()">Guardar políticas</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Incidencia -->
+<div class="eq-overlay" id="overlay-rh-inc">
+  <div class="eq-modal" style="max-width:520px">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">Registrar incidencia</div>
+      <button class="eq-modal-close" onclick="cerrarIncidencia()">✕</button>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Empleado *</label><select class="finput" id="inc-empleado" onchange="cargarIncidenciasEmp()"></select></div>
+      <div class="frow"><label class="flabel">Tipo *</label>
+        <select class="finput" id="inc-tipo" onchange="_incTipoChange()">
+          <option value="falta">Falta</option>
+          <option value="retardo">Retardo</option>
+          <option value="acta">Acta administrativa</option>
+          <option value="permiso">Permiso</option>
+          <option value="incapacidad">Incapacidad</option>
+          <option value="vacaciones">Vacaciones</option>
+        </select>
+      </div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Fecha *</label><input class="finput" id="inc-fecha" type="date"></div>
+      <div class="frow" id="inc-justif-row"><label class="flabel">&nbsp;</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;padding-top:6px">
+          <input type="checkbox" id="inc-justif" style="width:auto;margin:0"> Justificada
+        </label>
+      </div>
+    </div>
+    <div class="frow"><label class="flabel">Notas</label><input class="finput" id="inc-notas" placeholder="Motivo / detalle"></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarIncidencia()">Cancelar</button>
+      <button class="btn-prim" onclick="guardarIncidencia()">Registrar</button>
+    </div>
+    <div style="margin-top:14px;border-top:1px solid var(--borde);padding-top:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--texto);margin-bottom:6px">Incidencias del empleado</div>
+      <div id="inc-lista" style="max-height:200px;overflow-y:auto"></div>
     </div>
   </div>
 </div>
@@ -1888,6 +1974,169 @@ async function cargarDashboardEq() {
   try { renderChartTipos(d.equipos_por_tipo || []); } catch(_){ _chartMsg('chart-tipos', 'Sin datos'); }
   try { renderChartHoras(d.horas_equipos || []); } catch(_){ _chartMsg('chart-horas', 'Sin datos'); }
   try { renderProximasVencer(d, 'eq-upcoming', 'equipo'); } catch(_){}
+}
+
+// ══ RH / Asistencia · Salud laboral ════════════════════════════════════════
+let _rhData = null, _rhPol = null;
+
+async function cargarRH() {
+  document.getElementById('rh-toolbar').innerHTML = _puedeEditar
+    ? `<button class="btn-prim" onclick="abrirIncidencia(0)">＋ Incidencia</button>
+       <button class="btn-sec" onclick="abrirPoliticas()">⚙ Políticas</button>`
+    : '';
+  const cont = document.getElementById('rh-lista');
+  cont.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  try {
+    const [rs, rp] = await Promise.all([
+      fetch(API + '?action=RH_SALUD').then(r => r.json()),
+      fetch(API + '?action=RH_POLITICAS').then(r => r.json()),
+    ]);
+    if (!rs || rs.status !== 'success') { cont.innerHTML = `<div class="empty"><div class="empty-t">${escQ((rs&&rs.message)||'Error')}</div></div>`; return; }
+    _rhData = rs; _rhPol = (rp && rp.politicas) ? rp.politicas : null;
+    document.getElementById('rh-ventana').textContent = 'Ventana de faltas: ' + (rs.ventana || '');
+    renderRHResumen(rs.resumen || {});
+    renderRHLista(rs.empleados || []);
+    const enRiesgo = (rs.resumen && rs.resumen.riesgo) || 0;
+    const badge = document.getElementById('tab-notif-rh');
+    if (badge) { if (enRiesgo > 0) { badge.style.display = ''; badge.textContent = enRiesgo; } else badge.style.display = 'none'; }
+  } catch(_) { cont.innerHTML = '<div class="empty"><div class="empty-t">Error de red.</div></div>'; }
+}
+
+function renderRHResumen(r) {
+  const chip = (n, l, c, bg) => `<div style="flex:1;min-width:110px;background:${bg};border:1px solid ${c};border-radius:12px;padding:12px 14px">
+    <div style="font-size:24px;font-weight:800;color:${c}">${n || 0}</div><div style="font-size:12px;color:var(--texto-sub)">${l}</div></div>`;
+  document.getElementById('rh-resumen').innerHTML =
+    chip(r.sana, '🟢 Sanas', '#22c55e', 'rgba(34,197,94,.08)') +
+    chip(r.observacion, '🟡 En observación', '#f59e0b', 'rgba(245,158,11,.08)') +
+    chip(r.riesgo, '🔴 En riesgo', '#ef4444', 'rgba(239,68,68,.08)');
+}
+
+function _rhBadge(estado) {
+  const m = { riesgo:['#ef4444','En riesgo'], observacion:['#f59e0b','En observación'], sana:['#22c55e','Sana'] };
+  const [c, l] = m[estado] || m.sana;
+  return `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${c}22;color:${c}">${l}</span>`;
+}
+
+function renderRHLista(emps) {
+  const cont = document.getElementById('rh-lista');
+  if (!emps.length) {
+    cont.innerHTML = '<div class="empty"><div class="empty-t">Sin personal</div><div class="empty-s">Agrega personal en "Mi Personal" para gestionar su asistencia.</div></div>';
+    return;
+  }
+  cont.innerHTML = emps.map(e => {
+    const sub = [e.puesto, e.departamento].filter(Boolean).join(' · ');
+    const chips = [];
+    if (e.faltas)    chips.push(`<span style="font-size:11px;color:#b91c1c">${e.faltas} falta${e.faltas!=1?'s':''}</span>`);
+    if (e.retardos)  chips.push(`<span style="font-size:11px;color:#92400e">${e.retardos} retardo${e.retardos!=1?'s':''}</span>`);
+    if (e.actas)     chips.push(`<span style="font-size:11px;color:#7c2d12">${e.actas} acta${e.actas!=1?'s':''}</span>`);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:11px 4px;border-bottom:1px solid var(--borde)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:700;color:var(--texto)">${escQ(e.nombre)} ${_rhBadge(e.estado_lab)}</div>
+        <div style="font-size:11px;color:var(--texto-hint)">${escQ(sub||'—')}</div>
+        <div style="font-size:11px;color:var(--texto-sub);margin-top:2px">${e.motivos && e.motivos.length ? escQ(e.motivos.join(' · ')) : 'Sin incidencias'}</div>
+        ${chips.length ? `<div style="display:flex;gap:10px;margin-top:3px">${chips.join('')}</div>` : ''}
+      </div>
+      ${_puedeEditar ? `<button class="btn-prim" style="font-size:11px;padding:6px 11px;white-space:nowrap" onclick="abrirIncidencia(${e.id})">＋ Incidencia</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── Políticas ──
+function abrirPoliticas() {
+  const p = _rhPol || { faltas_max:1, faltas_ventana:'semana', faltas_ventana_dias:7, actas_max:3, retardos_por_falta:3, tolerancia_min:10 };
+  document.getElementById('pol-faltas-max').value   = p.faltas_max;
+  document.getElementById('pol-ventana').value      = p.faltas_ventana;
+  document.getElementById('pol-ventana-dias').value = p.faltas_ventana_dias;
+  document.getElementById('pol-actas-max').value    = p.actas_max;
+  document.getElementById('pol-ret-falta').value    = p.retardos_por_falta;
+  document.getElementById('pol-tolerancia').value   = p.tolerancia_min;
+  _polVentanaChange();
+  document.getElementById('overlay-rh-pol').classList.add('open');
+}
+function cerrarPoliticas() { document.getElementById('overlay-rh-pol').classList.remove('open'); }
+function _polVentanaChange() {
+  document.getElementById('pol-dias-row').style.display = document.getElementById('pol-ventana').value === 'movil' ? '' : 'none';
+}
+async function guardarPoliticas() {
+  const payload = {
+    faltas_max:          document.getElementById('pol-faltas-max').value,
+    faltas_ventana:      document.getElementById('pol-ventana').value,
+    faltas_ventana_dias: document.getElementById('pol-ventana-dias').value,
+    actas_max:           document.getElementById('pol-actas-max').value,
+    retardos_por_falta:  document.getElementById('pol-ret-falta').value,
+    tolerancia_min:      document.getElementById('pol-tolerancia').value,
+  };
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'RH_GUARDAR_POLITICAS', payload }) });
+    const d = await r.json();
+    if (d.status === 'success') { cerrarPoliticas(); toastEq('Políticas guardadas.'); cargarRH(); }
+    else toastEq(d.message || 'No se pudo guardar.');
+  } catch(_) { toastEq('Error de red.'); }
+}
+
+// ── Incidencias ──
+function abrirIncidencia(empId) {
+  const sel = document.getElementById('inc-empleado');
+  const emps = (_rhData && _rhData.empleados) ? _rhData.empleados : [];
+  sel.innerHTML = emps.map(e => `<option value="${e.id}">${escQ(e.nombre)}</option>`).join('');
+  if (empId) sel.value = empId;
+  document.getElementById('inc-tipo').value = 'falta';
+  document.getElementById('inc-fecha').value = new Date().toISOString().slice(0,10);
+  document.getElementById('inc-justif').checked = false;
+  document.getElementById('inc-notas').value = '';
+  _incTipoChange();
+  cargarIncidenciasEmp();
+  document.getElementById('overlay-rh-inc').classList.add('open');
+}
+function cerrarIncidencia() { document.getElementById('overlay-rh-inc').classList.remove('open'); }
+function _incTipoChange() {
+  document.getElementById('inc-justif-row').style.display = document.getElementById('inc-tipo').value === 'falta' ? '' : 'none';
+}
+async function cargarIncidenciasEmp() {
+  const empId = document.getElementById('inc-empleado').value;
+  const cont = document.getElementById('inc-lista');
+  if (!empId) { cont.innerHTML = ''; return; }
+  cont.innerHTML = '<div style="font-size:12px;color:var(--texto-hint);padding:6px 0">Cargando…</div>';
+  try {
+    const r = await fetch(API + '?action=RH_INCIDENCIAS&empleado_id=' + encodeURIComponent(empId));
+    const d = await r.json();
+    const items = (d && d.data) ? d.data : [];
+    if (!items.length) { cont.innerHTML = '<div style="font-size:12px;color:var(--texto-hint);padding:6px 0">Sin incidencias registradas.</div>'; return; }
+    const TL = { falta:'Falta', retardo:'Retardo', acta:'Acta administrativa', permiso:'Permiso', incapacidad:'Incapacidad', vacaciones:'Vacaciones' };
+    cont.innerHTML = items.map(i => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--borde)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;color:var(--texto)">${TL[i.tipo]||i.tipo}${i.tipo==='falta'?(i.justificada?' (justificada)':' (injustificada)'):''}</div>
+        <div style="font-size:11px;color:var(--texto-hint)">${i.fecha}${i.notas?' — '+escQ(i.notas):''}</div>
+      </div>
+      ${_puedeEditar ? `<button onclick="eliminarIncidencia(${i.id})" style="padding:3px 7px;border:1px solid #ef4444;background:#fdecea;color:#ef4444;border-radius:6px;font-size:11px;cursor:pointer">🗑</button>` : ''}
+    </div>`).join('');
+  } catch(_) { cont.innerHTML = '<div style="font-size:12px;color:#ef4444">Error de red.</div>'; }
+}
+async function guardarIncidencia() {
+  const payload = {
+    empleado_id: parseInt(document.getElementById('inc-empleado').value, 10),
+    tipo:        document.getElementById('inc-tipo').value,
+    fecha:       document.getElementById('inc-fecha').value,
+    justificada: document.getElementById('inc-tipo').value === 'falta' && document.getElementById('inc-justif').checked ? 1 : 0,
+    notas:       document.getElementById('inc-notas').value.trim(),
+  };
+  if (!payload.empleado_id) { toastEq('Selecciona un empleado.'); return; }
+  if (!payload.fecha) { toastEq('Indica la fecha.'); return; }
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'RH_GUARDAR_INCIDENCIA', payload }) });
+    const d = await r.json();
+    if (d.status === 'success') { toastEq('Incidencia registrada.'); document.getElementById('inc-notas').value=''; cargarIncidenciasEmp(); cargarRH(); }
+    else toastEq(d.message || 'No se pudo registrar.');
+  } catch(_) { toastEq('Error de red.'); }
+}
+async function eliminarIncidencia(id) {
+  if (!confirm('¿Eliminar esta incidencia?')) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'RH_ELIMINAR_INCIDENCIA', payload:{ id } }) });
+    const d = await r.json();
+    if (d.status === 'success') { cargarIncidenciasEmp(); cargarRH(); }
+    else toastEq(d.message || 'No se pudo eliminar.');
+  } catch(_) { toastEq('Error de red.'); }
 }
 
 // ── Tablero de alertas de mantenimiento preventivo ─────────────────────────

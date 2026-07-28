@@ -29,6 +29,7 @@ require_once __DIR__ . '/ClienteMateriales.php';
 require_once __DIR__ . '/ClienteConfig.php';
 require_once __DIR__ . '/ClienteMantenimiento.php';
 require_once __DIR__ . '/ClienteSubusuarios.php';
+require_once __DIR__ . '/ClienteRH.php';
 require_once __DIR__ . '/PagosServicios.php';
 require_once __DIR__ . '/Anuncios.php';
 
@@ -88,6 +89,7 @@ $cliMateriales  = new ClienteMateriales($pdo);
 $cliConfig      = new ClienteConfig($pdo);
 $cliMant        = new ClienteMantenimiento($pdo);
 $cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuarios.usuario_padre_id
+$cliRH          = new ClienteRH($pdo);
 $pagosServicios = new PagosServicios($pdo);
 $anuncios       = new Anuncios($pdo);
 
@@ -742,6 +744,24 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             $alc = alcanceSub($usr, $cliSub);
             respuesta($cliPersonal->detalle((int)($_GET['id'] ?? 0), resolveIdc($usr), $alc['personal']));
+
+        // ── Portal cliente: RH / Asistencia ───────────────
+        case 'RH_POLITICAS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cliRH->obtenerPoliticas(resolveIdc($usr)));
+
+        case 'RH_SALUD':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            respuesta($cliRH->saludLaboral(resolveIdc($usr), $alc['personal']));
+
+        case 'RH_INCIDENCIAS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            respuesta($cliRH->listarIncidencias(resolveIdc($usr), ['empleado_id' => (int)($_GET['empleado_id'] ?? 0), 'tipo' => $_GET['tipo'] ?? ''], $alc['personal']));
 
         case 'GET_PREFS_NOTIF':
             $usr = validarToken($pdo, $token);
@@ -1793,6 +1813,27 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             soloPrincipalPuedeCrearBorrar(alcanceSub($usr, $cliSub));
             respuesta($cliPersonal->eliminar((int)($payload['id'] ?? 0), resolveIdc($usr)));
+
+        // ── RH / Asistencia del cliente ──────────────────────────
+        case 'RH_GUARDAR_POLITICAS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            bloquearSiLectura(alcanceSub($usr, $cliSub));
+            respuesta($cliRH->guardarPoliticas(resolveIdc($usr), $payload));
+
+        case 'RH_GUARDAR_INCIDENCIA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            bloquearSiLectura($alc);
+            autorizarRecurso($alc, 'personal', (int)($payload['empleado_id'] ?? 0));
+            respuesta($cliRH->guardarIncidencia(resolveIdc($usr), $payload, $usr['nombre'] ?? $usr['usuario']));
+
+        case 'RH_ELIMINAR_INCIDENCIA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            bloquearSiLectura(alcanceSub($usr, $cliSub));
+            respuesta($cliRH->eliminarIncidencia((int)($payload['id'] ?? 0), resolveIdc($usr)));
 
         case 'GUARDAR_PREFS_NOTIF':
             $usr = validarToken($pdo, $token);
