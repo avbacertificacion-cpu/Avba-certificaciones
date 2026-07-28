@@ -2817,6 +2817,15 @@ function abrirCursoCert(idx) {
                 onclick="imprimirDocPersonal(${p.id},'diploma')">🖨 Diploma</button>
         <button class="btn-ver" style="font-size:11px;background:#fff8e1;border-color:#c8a000;color:#7a5900"
                 onclick="imprimirDocPersonal(${p.id},'certificado')">🖨 Cert</button>
+        <span style="font-size:10px;color:var(--texto-hint);align-self:center;margin-left:4px">📎 Sustituir PDF:</span>
+        <button class="btn-ver" style="font-size:11px;background:#f3f0ff;border-color:#7c5cff;color:#4b32c3"
+                onclick="subirDocManualPer(${p.id},'dc3')">DC-3</button>
+        <button class="btn-ver" style="font-size:11px;background:#f3f0ff;border-color:#7c5cff;color:#4b32c3"
+                onclick="subirDocManualPer(${p.id},'diploma')">Diploma</button>
+        <button class="btn-ver" style="font-size:11px;background:#f3f0ff;border-color:#7c5cff;color:#4b32c3"
+                onclick="subirDocManualPer(${p.id},'certificado')">Cert</button>
+        <button class="btn-ver" style="font-size:11px;background:#f3f0ff;border-color:#7c5cff;color:#4b32c3"
+                onclick="subirDocManualPer(${p.id},'credencial')">Credencial</button>
         ${!emitido ? `
         <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                 onclick="emitirDocPersonal(${p.id},'dc3',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir DC-3</button>
@@ -3115,6 +3124,46 @@ function renderIndepCert(data) {
 /* ═══════════════════════════════
    EMISIÓN DOCUMENTOS PERSONAL
 ═══════════════════════════════ */
+/* ── Reemplazar manualmente un documento de personal (DC-3/Diploma/Cert/Credencial) ── */
+let _perManualCtx = null;
+function subirDocManualPer(participanteId, tipo) {
+  _perManualCtx = { id: participanteId, tipo };
+  let inp = document.getElementById('per-manual-file-input');
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'application/pdf,.pdf';
+    inp.id = 'per-manual-file-input';
+    inp.style.display = 'none';
+    inp.addEventListener('change', _perManualFileChange);
+    document.body.appendChild(inp);
+  }
+  inp.value = '';
+  inp.click();
+}
+async function _perManualFileChange(e) {
+  const file = e.target.files[0];
+  if (!file || !_perManualCtx) return;
+  const { id, tipo } = _perManualCtx;
+  const label = { dc3:'DC-3', diploma:'Diploma', certificado:'Certificado', credencial:'Credencial' }[tipo] || tipo;
+  if (!/\.pdf$/i.test(file.name)) { mostrarToast('El archivo debe ser un PDF.', 'err'); return; }
+  if (!confirm(`¿Reemplazar el ${label} de este participante con "${file.name}"?\n\nEse archivo será el que se vea, imprima, emita y vea el cliente.`)) return;
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  const form = new FormData();
+  form.append('action', 'SUBIR_DOC_MANUAL_PERSONAL');
+  form.append('token', tok);
+  form.append('id', id);
+  form.append('tipo', tipo);
+  form.append('archivo', file);
+  try {
+    mostrarToast('Subiendo ' + label + '…', 'info');
+    const res  = await fetch(API, { method: 'POST', body: form });
+    const data = await res.json();
+    if (data.status === 'success') mostrarToast(label + ' reemplazado correctamente.', 'ok');
+    else mostrarToast('Error: ' + (data.message || 'No se pudo subir'), 'err');
+  } catch(err) { mostrarToast('Error de conexión al subir el PDF', 'err'); }
+}
+
 async function prevDocPersonal(participanteId, tipo) {
   mostrarToast('Generando vista previa…', 'info');
   const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';

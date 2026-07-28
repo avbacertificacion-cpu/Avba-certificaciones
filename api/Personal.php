@@ -1156,6 +1156,10 @@ class Personal {
         if (!in_array($tipo, $tiposValidos, true))
             return ['status' => 'error', 'message' => 'Tipo de documento no valido.'];
 
+        // Si hay un PDF reemplazado manualmente para este documento, ese manda
+        $manual = $this->docManualPersonal($id, $tipo);
+        if ($manual !== '') return ['status' => 'success', 'url' => $manual];
+
         if (!class_exists('Dompdf\Dompdf')) {
             return ['status' => 'error', 'message' => 'Dompdf no disponible. Instala las dependencias del proyecto.'];
         }
@@ -1194,6 +1198,82 @@ class Personal {
         )->execute([$id, strtoupper($tipo), $url, $usuario]);
 
         return ['status' => 'success', 'url' => $url];
+    }
+
+    // ── Reemplazo manual de documentos de personal ────────────
+    private function ensureDocManualTablePersonal(): void {
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS participantes_doc_manual (
+                  id              INT AUTO_INCREMENT PRIMARY KEY,
+                  participante_id INT NOT NULL,
+                  tipo            VARCHAR(20) NOT NULL,
+                  archivo_url     VARCHAR(300) NOT NULL,
+                  created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  UNIQUE KEY uniq_part_tipo (participante_id, tipo)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\Throwable $e) { /* ya existe */ }
+    }
+
+    /** Devuelve la URL del PDF manual de un documento del participante, o ''. */
+    private function docManualPersonal(int $id, string $tipo): string {
+        try {
+            $this->ensureDocManualTablePersonal();
+            $s = $this->pdo->prepare("SELECT archivo_url FROM participantes_doc_manual WHERE participante_id=? AND tipo=?");
+            $s->execute([$id, strtolower($tipo)]);
+            $rel = (string)($s->fetchColumn() ?: '');
+        } catch (\Throwable $e) { return ''; }
+        if ($rel === '') return '';
+        $abs = __DIR__ . '/../' . ltrim($rel, '/');
+        return is_file($abs) ? $rel : '';
+    }
+
+    /**
+     * Sustituye manualmente un documento del participante (DC-3, diploma,
+     * certificado o credencial) con un PDF subido. El archivo manual pasa a ser
+     * el que se ve, se imprime, se emite y ve el cliente.
+     */
+    public function subirDocumentoManualPersonal(array $payload, array $file, string $usuario): array {
+        $id   = (int)($payload['id'] ?? 0);
+        $tipo = strtolower(trim((string)($payload['tipo'] ?? '')));
+        $tiposValidos = ['dc3', 'diploma', 'certificado', 'credencial'];
+        if (!$id) return ['status' => 'error', 'message' => 'ID de participante requerido.'];
+        if (!in_array($tipo, $tiposValidos, true)) return ['status' => 'error', 'message' => 'Tipo de documento no válido.'];
+
+        $p = $this->obtenerParticipante($id);
+        if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+            return ['status' => 'error', 'message' => 'Selecciona un archivo PDF válido.'];
+        }
+        $ext = strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION));
+        if ($ext !== 'pdf') return ['status' => 'error', 'message' => 'El documento debe ser un PDF.'];
+        if (($file['size'] ?? 0) > 20 * 1024 * 1024) return ['status' => 'error', 'message' => 'El PDF no debe superar 20 MB.'];
+
+        $dir = UPLOAD_DIR . 'personal/docs/';
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        $nombre  = strtoupper($tipo) . '_MANUAL_PART' . str_pad((string)$id, 5, '0', STR_PAD_LEFT) . '.pdf';
+        $destino = $dir . $nombre;
+        if (!move_uploaded_file($file['tmp_name'], $destino)) {
+            return ['status' => 'error', 'message' => 'No se pudo guardar el PDF.'];
+        }
+
+        $rel = 'uploads/personal/docs/' . $nombre;
+        $this->ensureDocManualTablePersonal();
+        $this->pdo->prepare("
+            INSERT INTO participantes_doc_manual (participante_id, tipo, archivo_url)
+            VALUES (?,?,?)
+            ON DUPLICATE KEY UPDATE archivo_url=VALUES(archivo_url)
+        ")->execute([$id, $tipo, $rel]);
+
+        // Reflejarlo en la lista de documentos del participante
+        $this->pdo->prepare(
+            "INSERT INTO participantes_documentos (participante_id, tipo_doc, url, generado_por)
+             VALUES (?, ?, ?, ?)"
+        )->execute([$id, strtoupper($tipo), $rel, $usuario]);
+
+        return ['status' => 'success', 'message' => ucfirst($tipo) . ' reemplazado correctamente.', 'url' => $rel];
     }
 
     public function generarCredencialesLote(array $payload, string $usuario): array {

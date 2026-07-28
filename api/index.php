@@ -1373,6 +1373,11 @@ if ($method === 'POST') {
                 $action === 'GENERAR_DOC_PERSONAL_SIN_SELLOS'
             ));
 
+        case 'SUBIR_DOC_MANUAL_PERSONAL':   // multipart: reemplazo manual de PDF de personal
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->subirDocumentoManualPersonal($_POST, $_FILES['archivo'] ?? [], $usr['usuario']));
+
         case 'GENERAR_CREDENCIALES_LOTE':
             $usr = validarToken($pdo, $token);
             if (!$usr || $usr['rol'] !== 'CERTIFICACIONES') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
