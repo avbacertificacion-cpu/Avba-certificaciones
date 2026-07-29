@@ -357,9 +357,14 @@ class Personal {
         $errores  = [];
         foreach ($participantes as $p) {
             foreach ($tipos as $t) {
-                $res = $this->generarDocumento((int)$p['id'], $t, $usuario);
-                if ($res['status'] === 'success' && !empty($res['url'])) {
-                    $ruta = realpath(str_replace(UPLOAD_URL, UPLOAD_DIR, $res['url']));
+                // Si se subió un PDF manualmente para este participante, ese se envía.
+                $urlDoc = $this->docManualPersonal((int)$p['id'], $t);
+                if ($urlDoc === '') {
+                    $res = $this->generarDocumento((int)$p['id'], $t, $usuario);
+                    $urlDoc = ($res['status'] === 'success') ? ($res['url'] ?? '') : '';
+                }
+                if ($urlDoc !== '') {
+                    $ruta = realpath(str_replace(UPLOAD_URL, UPLOAD_DIR, $urlDoc));
                     if ($ruta) {
                         $safe  = preg_replace('/[^A-Za-z0-9_\-]/', '_', $p['nombre_completo'] ?? 'doc');
                         $adjuntos[] = ['path' => $ruta, 'name' => strtoupper($t) . '_' . $safe . '.pdf'];
@@ -701,9 +706,14 @@ class Personal {
         $adjuntos  = [];
         $faltantes = [];
         foreach ($tipos as $tipo => $label) {
-            $gen = $this->generarDocumento($id, $tipo, $usuario);
-            if ($gen['status'] !== 'success' || empty($gen['url'])) { $faltantes[] = $label; continue; }
-            $ruta  = str_replace(UPLOAD_URL, UPLOAD_DIR, $gen['url']);
+            // Si se subió un PDF manualmente, ese se envía; si no, se genera.
+            $urlDoc = $this->docManualPersonal($id, $tipo);
+            if ($urlDoc === '') {
+                $gen = $this->generarDocumento($id, $tipo, $usuario);
+                if ($gen['status'] !== 'success' || empty($gen['url'])) { $faltantes[] = $label; continue; }
+                $urlDoc = $gen['url'];
+            }
+            $ruta  = str_replace(UPLOAD_URL, UPLOAD_DIR, $urlDoc);
             $real  = realpath($ruta);
             $rup   = realpath(UPLOAD_DIR);
             if ($real && $rup && strncmp($real, $rup, strlen($rup)) === 0) {
@@ -1410,18 +1420,23 @@ class Personal {
         if (!$lista)
             return ['status' => 'error', 'message' => 'Correo de destino inválido o no registrado.'];
 
-        // Buscar último documento generado de ese tipo
-        $stmt = $this->pdo->prepare(
-            "SELECT url FROM participantes_documentos
-             WHERE participante_id = ? AND tipo_doc = ?
-             ORDER BY fecha_generacion DESC LIMIT 1"
-        );
-        $stmt->execute([$id, strtoupper($tipo)]);
-        $doc = $stmt->fetch();
-        if (!$doc) return ['status' => 'error', 'message' => 'Genera el documento primero antes de enviarlo.'];
+        // Si hay un PDF reemplazado manualmente, ese es el que se envía.
+        // Si no, se toma el último documento generado de ese tipo.
+        $urlDoc = $this->docManualPersonal($id, $tipo);
+        if ($urlDoc === '') {
+            $stmt = $this->pdo->prepare(
+                "SELECT url FROM participantes_documentos
+                 WHERE participante_id = ? AND tipo_doc = ?
+                 ORDER BY fecha_generacion DESC LIMIT 1"
+            );
+            $stmt->execute([$id, strtoupper($tipo)]);
+            $doc = $stmt->fetch();
+            if (!$doc) return ['status' => 'error', 'message' => 'Genera el documento primero antes de enviarlo.'];
+            $urlDoc = $doc['url'];
+        }
 
         // Convertir URL a ruta local y validar path traversal
-        $rutaArchivo = str_replace(UPLOAD_URL, UPLOAD_DIR, $doc['url']);
+        $rutaArchivo = str_replace(UPLOAD_URL, UPLOAD_DIR, $urlDoc);
         $realArchivo = realpath($rutaArchivo);
         $realUpload  = realpath(UPLOAD_DIR);
         if (!$realArchivo || !$realUpload || strncmp($realArchivo, $realUpload, strlen($realUpload)) !== 0) {
