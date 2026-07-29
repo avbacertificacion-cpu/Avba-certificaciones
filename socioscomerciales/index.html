@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Socios Comerciales — AVBA</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { overflow-x:hidden; max-width:100%; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:linear-gradient(135deg,#0b1a33 0%,#123a6b 100%); color:#eaf1fb; padding:20px;
+  }
+  .card {
+    width:100%; max-width:440px; background:rgba(255,255,255,0.06);
+    border:1px solid rgba(255,255,255,0.12); border-radius:18px; padding:34px 28px;
+    box-shadow:0 20px 60px rgba(0,0,0,0.35); text-align:center; backdrop-filter:blur(6px);
+  }
+  .logo { font-size:26px; font-weight:800; letter-spacing:2px; }
+  .logo span { color:#4da3ff; }
+  .sub { font-size:12px; color:rgba(255,255,255,0.55); letter-spacing:3px; text-transform:uppercase; margin-top:2px; }
+  .title { font-size:20px; font-weight:700; margin:24px 0 6px; }
+  .desc { font-size:13px; color:rgba(255,255,255,0.65); line-height:1.6; }
+  .pill {
+    display:inline-flex; align-items:center; gap:7px; margin-top:20px; padding:7px 14px;
+    border-radius:20px; font-size:12px; font-weight:600; background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.14);
+  }
+  .dot { width:9px; height:9px; border-radius:50%; background:#f5a623; }
+  .dot.ok { background:#22c55e; } .dot.err { background:#ef4444; }
+  .foot { margin-top:26px; font-size:11px; color:rgba(255,255,255,0.4); }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">AV<span>BA</span></div>
+    <div class="sub">Socios Comerciales</div>
+    <div class="title">Sistema en preparación</div>
+    <div class="desc">
+      Este es un sistema independiente, separado del portal de certificaciones.
+      Estamos configurándolo; muy pronto estará disponible aquí.
+    </div>
+    <div class="pill"><span class="dot" id="dot"></span><span id="estado">Verificando servicio…</span></div>
+    <div class="foot">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</div>
+  </div>
+
+<script>
+  // Ping a la API propia (confirma que el subsistema está montado y aislado)
+  fetch('api/index.php?action=PING', { cache:'no-store' })
+    .then(r => r.json())
+    .then(d => {
+      const dot = document.getElementById('dot'), est = document.getElementById('estado');
+      if (d && d.status === 'success') {
+        dot.className = 'dot ok';
+        est.textContent = 'Servicio activo · BD: ' + (d.db === 'ok' ? 'conectada' : 'sin conexión');
+      } else {
+        dot.className = 'dot err'; est.textContent = 'Servicio no disponible';
+      }
+    })
+    .catch(() => {
+      document.getElementById('dot').className = 'dot err';
+      document.getElementById('estado').textContent = 'Servicio no disponible';
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# ──────────────────────────────────────────────────────────
+#  Socios Comerciales — sistema independiente
+#  Vive en gestion.avba.com.mx/socioscomerciales, aislado del
+#  sistema principal (AVBA Certificaciones) montado en la raíz.
+# ──────────────────────────────────────────────────────────
+
+# Página de inicio propia (la raíz usa login.html; aquí es index.html)
+DirectoryIndex index.html
+
+# Pasar el header Authorization a PHP (para APIs con token)
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# No listar directorios
+Options -Indexes
+
+# HTML siempre revalidado (evita servir versiones viejas tras un despliegue)
+<IfModule mod_headers.c>
+    <FilesMatch "\.html$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
+</IfModule>
