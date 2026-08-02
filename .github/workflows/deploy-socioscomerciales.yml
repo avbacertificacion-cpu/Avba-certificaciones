@@ -1,7 +1,7 @@
 name: Deploy Socios Comerciales
 on:
   push:
-    branches: [ socioscomerciales ]
+    branches: [ claude/socios-comerciales-portal-wco7s3 ]
     paths:
       - 'socioscomerciales/**'
       - '.github/workflows/deploy-socioscomerciales.yml'
