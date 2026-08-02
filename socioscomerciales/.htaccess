@@ -1,7 +1,7 @@
 DirectoryIndex index.html
 
-# Sesiones PHP aisladas del sistema principal
-php_value session.cookie_path /socioscomerciales
+# Las sesiones PHP aisladas (session.cookie_path=/socioscomerciales) se
+# configuran en .user.ini — este host corre PHP-FPM y no admite php_value aquí.
 
 # Permitir que el header Authorization llegue a PHP (algunos hosts lo bloquean)
 <IfModule mod_rewrite.c>
