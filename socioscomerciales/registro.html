@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crear cuenta — Socios Comerciales AVBA</title>
+<style>
+  :root {
+    --azul:        #185FA5;
+    --azul-oscuro: #0C447C;
+    --azul-claro:  #E6F1FB;
+    --acento:      #4DA3FF;
+    --rojo:        #EF4444;
+    --rojo-claro:  #FDECEC;
+    --texto:       #1A2A44;
+    --texto-sub:   #566079;
+    --gris-fondo:  #F4F7FB;
+    --borde:       #DBE3EE;
+    --blanco:      #FFFFFF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { overflow-x: hidden; max-width: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(160deg, #0B1A33 0%, #123A6B 100%);
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .wrap { width: 100%; max-width: 420px; }
+  .brand { text-align: center; margin-bottom: 26px; }
+  .brand-mark { font-size: 26px; font-weight: 800; letter-spacing: -.5px; color: #fff; }
+  .brand-mark .accent { color: var(--acento); }
+  .brand-sub { font-size: 12.5px; color: rgba(255,255,255,0.65); margin-top: 6px; }
+
+  .card {
+    background: var(--blanco); border-radius: 18px; padding: 26px 26px 24px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+  }
+
+  .tabs {
+    display: flex; background: var(--gris-fondo); border-radius: 12px; padding: 4px; margin-bottom: 22px;
+  }
+  .tab {
+    flex: 1; text-align: center; padding: 10px; border-radius: 9px; font-size: 13.5px; font-weight: 700;
+    color: var(--texto-sub); cursor: pointer; user-select: none; transition: background .15s, color .15s;
+  }
+  .tab.active { background: var(--blanco); color: var(--azul); box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+
+  .card-title { font-size: 18px; font-weight: 700; color: var(--texto); margin-bottom: 4px; }
+  .card-sub { font-size: 13px; color: var(--texto-sub); margin-bottom: 20px; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--texto-sub); margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 11px 13px; border: 1.5px solid var(--borde); border-radius: 10px;
+    font-size: 14px; color: var(--texto); outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  .field input:focus { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(24,95,165,0.12); }
+  .field-hint { font-size: 11.5px; color: var(--texto-sub); margin-top: 5px; }
+
+  .error-box {
+    background: var(--rojo-claro); border: 1px solid #f3b8b8; border-radius: 8px;
+    padding: 10px 13px; font-size: 13px; color: var(--rojo); margin-bottom: 16px; display: none;
+  }
+  .error-box.show { display: block; }
+
+  .btn-submit {
+    width: 100%; padding: 13px; border: none; border-radius: 10px;
+    background: var(--azul); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background .15s, transform .1s; margin-top: 6px;
+  }
+  .btn-submit:hover { background: var(--azul-oscuro); }
+  .btn-submit:active { transform: scale(0.98); }
+  .btn-submit:disabled { background: var(--borde); cursor: not-allowed; }
+
+  .spin {
+    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: #fff; border-radius: 50%; animation: giro .6s linear infinite;
+  }
+  @keyframes giro { to { transform: rotate(360deg); } }
+
+  .card-footer { text-align: center; margin-top: 18px; font-size: 13px; color: var(--texto-sub); }
+  .card-footer a { color: var(--azul); font-weight: 600; }
+
+  .foot-legal { text-align: center; margin-top: 22px; font-size: 11.5px; color: rgba(255,255,255,0.55); }
+  .back-link { display: block; text-align: center; margin-top: 14px; font-size: 13px; color: rgba(255,255,255,0.75); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="brand">
+    <div class="brand-mark">AV<span class="accent">BA</span></div>
+    <div class="brand-sub">Socios Comerciales — Inspections, Certifications and Maintenance</div>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" id="tab-persona" onclick="cambiarTipo('persona')">Candidato</div>
+      <div class="tab" id="tab-empresa" onclick="cambiarTipo('empresa')">Empresa</div>
+    </div>
+
+    <div class="card-title" id="card-title">Crear cuenta de candidato</div>
+    <div class="card-sub" id="card-sub">Regístrate para armar tu perfil profesional</div>
+
+    <div class="error-box" id="error-box"></div>
+
+    <div class="field">
+      <label id="label-nombre">Nombre completo</label>
+      <input type="text" id="nombre" placeholder="Nombre completo" autocomplete="name">
+    </div>
+    <div class="field">
+      <label>Correo electrónico</label>
+      <input type="email" id="correo" placeholder="tucorreo@ejemplo.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="password" placeholder="Mínimo 6 caracteres" autocomplete="new-password"
+        onkeydown="if(event.key==='Enter')registrar()">
+      <div class="field-hint">Usa al menos 6 caracteres.</div>
+    </div>
+
+    <button class="btn-submit" id="btn-registro" onclick="registrar()">Crear cuenta</button>
+
+    <div class="card-footer">¿Ya tienes cuenta? <a href="login.html">Inicia sesión</a></div>
+  </div>
+
+  <a class="back-link" href="index.html">&larr; Volver al inicio</a>
+  <div class="foot-legal">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</div>
+</div>
+
+<script>
+const API = "api/index.php";
+let tipoActual = "persona";
+
+const TEXTOS = {
+  persona: {
+    titulo: "Crear cuenta de candidato",
+    sub:    "Regístrate para armar tu perfil profesional",
+    label:  "Nombre completo",
+    placeholder: "Nombre completo"
+  },
+  empresa: {
+    titulo: "Crear cuenta de empresa",
+    sub:    "Regístrate para publicar tu perfil corporativo",
+    label:  "Nombre de la empresa",
+    placeholder: "Razón social o nombre comercial"
+  }
+};
+
+function cambiarTipo(tipo) {
+  tipoActual = tipo;
+  document.getElementById("tab-persona").classList.toggle("active", tipo === "persona");
+  document.getElementById("tab-empresa").classList.toggle("active", tipo === "empresa");
+  document.getElementById("card-title").textContent = TEXTOS[tipo].titulo;
+  document.getElementById("card-sub").textContent = TEXTOS[tipo].sub;
+  document.getElementById("label-nombre").textContent = TEXTOS[tipo].label;
+  document.getElementById("nombre").placeholder = TEXTOS[tipo].placeholder;
+  ocultarError();
+}
+
+function mostrarError(msg) {
+  const box = document.getElementById("error-box");
+  box.textContent = msg;
+  box.classList.add("show");
+}
+function ocultarError() {
+  document.getElementById("error-box").classList.remove("show");
+}
+
+async function registrar() {
+  ocultarError();
+  const nombre   = document.getElementById("nombre").value.trim();
+  const correo   = document.getElementById("correo").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  if (!nombre || !correo || !password) {
+    mostrarError("Todos los campos son obligatorios.");
+    return;
+  }
+
+  const btn = document.getElementById("btn-registro");
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Creando cuenta...';
+
+  const accion = tipoActual === "empresa" ? "REGISTRO_EMPRESA" : "REGISTRO_PERSONA";
+
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      body: JSON.stringify({ action: accion, payload: { nombre, correo, password } })
+    });
+    const data = await res.json();
+
+    if (data.status !== "success") {
+      mostrarError(data.message || "No se pudo crear la cuenta.");
+      btn.disabled = false;
+      btn.textContent = "Crear cuenta";
+      return;
+    }
+
+    localStorage.setItem("sc_session", JSON.stringify({
+      usuario_id: data.usuario_id,
+      tipo:       data.tipo,
+      correo:     data.correo,
+      nombre:     data.nombre,
+      token:      data.token,
+      ts:         Date.now()
+    }));
+
+    window.location.href = data.tipo === "empresa" ? "perfil-empresa.html" : "perfil-persona.html";
+
+  } catch (e) {
+    mostrarError("Error de conexión. Intenta de nuevo.");
+    btn.disabled = false;
+    btn.textContent = "Crear cuenta";
+    console.error("registro:", e);
+  }
+}
+
+window.onload = function() {
+  const params = new URLSearchParams(window.location.search);
+  const tipo = params.get("tipo");
+  if (tipo === "empresa" || tipo === "persona") cambiarTipo(tipo);
+  document.getElementById("nombre").focus();
+};
+</script>
+</body>
+</html>

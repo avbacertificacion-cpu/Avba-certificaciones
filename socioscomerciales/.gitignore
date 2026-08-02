@@ -1,0 +1,10 @@
+# Configuración local con credenciales reales — NO subir al repo
+config/config.php
+
+# Uploads generados por usuarios
+uploads/cv/*
+uploads/fotos/*
+uploads/logos/*
+!uploads/cv/.gitkeep
+!uploads/fotos/.gitkeep
+!uploads/logos/.gitkeep

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iniciar sesión — Socios Comerciales AVBA</title>
+<style>
+  :root {
+    --azul:        #185FA5;
+    --azul-oscuro: #0C447C;
+    --azul-claro:  #E6F1FB;
+    --acento:      #4DA3FF;
+    --rojo:        #EF4444;
+    --rojo-claro:  #FDECEC;
+    --texto:       #1A2A44;
+    --texto-sub:   #566079;
+    --gris-fondo:  #F4F7FB;
+    --borde:       #DBE3EE;
+    --blanco:      #FFFFFF;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { overflow-x: hidden; max-width: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: linear-gradient(160deg, #0B1A33 0%, #123A6B 100%);
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .wrap { width: 100%; max-width: 400px; }
+  .brand { text-align: center; margin-bottom: 26px; }
+  .brand-mark { font-size: 26px; font-weight: 800; letter-spacing: -.5px; color: #fff; }
+  .brand-mark .accent { color: var(--acento); }
+  .brand-sub { font-size: 12.5px; color: rgba(255,255,255,0.65); margin-top: 6px; }
+
+  .card {
+    background: var(--blanco); border-radius: 18px; padding: 30px 28px 26px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.25);
+  }
+  .card-title { font-size: 18px; font-weight: 700; color: var(--texto); margin-bottom: 4px; }
+  .card-sub { font-size: 13px; color: var(--texto-sub); margin-bottom: 22px; }
+
+  .field { margin-bottom: 16px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--texto-sub); margin-bottom: 6px; }
+  .field input {
+    width: 100%; padding: 11px 13px; border: 1.5px solid var(--borde); border-radius: 10px;
+    font-size: 14px; color: var(--texto); outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  .field input:focus { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(24,95,165,0.12); }
+
+  .error-box {
+    background: var(--rojo-claro); border: 1px solid #f3b8b8; border-radius: 8px;
+    padding: 10px 13px; font-size: 13px; color: var(--rojo); margin-bottom: 16px; display: none;
+  }
+  .error-box.show { display: block; }
+
+  .btn-submit {
+    width: 100%; padding: 13px; border: none; border-radius: 10px;
+    background: var(--azul); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background .15s, transform .1s;
+  }
+  .btn-submit:hover { background: var(--azul-oscuro); }
+  .btn-submit:active { transform: scale(0.98); }
+  .btn-submit:disabled { background: var(--borde); cursor: not-allowed; }
+
+  .spin {
+    width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.35);
+    border-top-color: #fff; border-radius: 50%; animation: giro .6s linear infinite;
+  }
+  @keyframes giro { to { transform: rotate(360deg); } }
+
+  .card-footer { text-align: center; margin-top: 18px; font-size: 13px; color: var(--texto-sub); }
+  .card-footer a { color: var(--azul); font-weight: 600; }
+
+  .foot-legal { text-align: center; margin-top: 22px; font-size: 11.5px; color: rgba(255,255,255,0.55); }
+  .back-link { display: block; text-align: center; margin-top: 14px; font-size: 13px; color: rgba(255,255,255,0.75); }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="brand">
+    <div class="brand-mark">AV<span class="accent">BA</span></div>
+    <div class="brand-sub">Socios Comerciales — Inspections, Certifications and Maintenance</div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Iniciar sesión</div>
+    <div class="card-sub">Accede a tu cuenta de candidato o empresa</div>
+
+    <div class="error-box" id="error-box"></div>
+
+    <div class="field">
+      <label>Correo electrónico</label>
+      <input type="email" id="correo" placeholder="tucorreo@ejemplo.com" autocomplete="email"
+        onkeydown="if(event.key==='Enter')document.getElementById('password').focus()">
+    </div>
+    <div class="field">
+      <label>Contraseña</label>
+      <input type="password" id="password" placeholder="Tu contraseña" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')login()">
+    </div>
+
+    <button class="btn-submit" id="btn-login" onclick="login()">Entrar</button>
+
+    <div class="card-footer">¿No tienes cuenta? <a href="registro.html">Regístrate</a></div>
+  </div>
+
+  <a class="back-link" href="index.html">&larr; Volver al inicio</a>
+  <div class="foot-legal">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</div>
+</div>
+
+<script>
+const API = "api/index.php";
+
+function mostrarError(msg) {
+  const box = document.getElementById("error-box");
+  box.textContent = msg;
+  box.classList.add("show");
+}
+function ocultarError() {
+  document.getElementById("error-box").classList.remove("show");
+}
+
+async function login() {
+  ocultarError();
+  const correo   = document.getElementById("correo").value.trim();
+  const password = document.getElementById("password").value.trim();
+
+  if (!correo || !password) {
+    mostrarError("Ingresa tu correo y contraseña.");
+    return;
+  }
+
+  const btn = document.getElementById("btn-login");
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Verificando...';
+
+  try {
+    const res  = await fetch(API, {
+      method: "POST",
+      body: JSON.stringify({ action: "LOGIN", payload: { correo, password } })
+    });
+    const data = await res.json();
+
+    if (data.status !== "success") {
+      mostrarError(data.message || "Error al iniciar sesión.");
+      btn.disabled = false;
+      btn.textContent = "Entrar";
+      return;
+    }
+
+    localStorage.setItem("sc_session", JSON.stringify({
+      usuario_id: data.usuario_id,
+      tipo:       data.tipo,
+      correo:     data.correo,
+      nombre:     data.nombre,
+      token:      data.token,
+      ts:         Date.now()
+    }));
+
+    window.location.href = data.tipo === "empresa" ? "perfil-empresa.html" : "perfil-persona.html";
+
+  } catch (e) {
+    mostrarError("Error de conexión. Intenta de nuevo.");
+    btn.disabled = false;
+    btn.textContent = "Entrar";
+    console.error("login:", e);
+  }
+}
+
+window.onload = function() {
+  document.getElementById("correo").focus();
+};
+</script>
+</body>
+</html>
