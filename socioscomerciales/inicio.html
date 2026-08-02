@@ -219,6 +219,11 @@ async function cargar() {
     const datos = await scGet('GET_INICIO');
     if (datos.status !== 'success') { scToast(datos.message, 'error'); return; }
 
+    // Estado real desde el servidor: el de localStorage puede estar viejo
+    // (p. ej. si el usuario verificó su correo en otro navegador).
+    scSesion.actualizar({ correo_verificado: datos.correo_verificado });
+    scAvisoVerificacion(datos.correo_verificado);
+
     if (sesion.tipo === 'empresa') pintarEmpresa(datos);
     else pintarPersona(datos);
 

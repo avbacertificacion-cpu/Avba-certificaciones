@@ -359,7 +359,12 @@ class ScVacantes {
             );
             $stmt->execute([$empresaId]);
 
-            return ['status' => 'success', 'metricas' => $metricas, 'recientes' => $stmt->fetchAll()];
+            return [
+                'status'            => 'success',
+                'correo_verificado' => (int) ($usuario['correo_verificado'] ?? 0),
+                'metricas'          => $metricas,
+                'recientes'         => $stmt->fetchAll(),
+            ];
         }
 
         // Candidato
@@ -393,7 +398,12 @@ class ScVacantes {
 
         $metricas['perfil_completo'] = $this->completitudPerfil($personaId);
 
-        return ['status' => 'success', 'metricas' => $metricas, 'sugeridas' => $sugeridas];
+        return [
+            'status'            => 'success',
+            'correo_verificado' => (int) ($usuario['correo_verificado'] ?? 0),
+            'metricas'          => $metricas,
+            'sugeridas'         => $sugeridas,
+        ];
     }
 
     /** Porcentaje de completitud del perfil del candidato (0-100). */
