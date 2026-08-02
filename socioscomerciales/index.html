@@ -3,244 +3,227 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Socios Comerciales AVBA — Bolsa de Trabajo</title>
+<title>Socios Comerciales AVBA — Bolsa de trabajo</title>
+<meta name="description" content="La bolsa de trabajo de la industria de inspección, certificación y mantenimiento. Conectamos candidatos calificados con empresas del sector.">
+<link rel="stylesheet" href="assets/avba.css">
 <style>
-  :root {
-    --azul:        #185FA5;
-    --azul-oscuro: #0C447C;
-    --azul-claro:  #E6F1FB;
-    --acento:      #4DA3FF;
-    --verde:       #22C55E;
-    --ambar:       #F59E0B;
-    --rojo:        #EF4444;
-    --texto:       #1A2A44;
-    --gris-fondo:  #F4F7FB;
-    --borde:       #DBE3EE;
-    --blanco:      #FFFFFF;
+  /* ── Barra superior de la landing ─────────────────────── */
+  .top {
+    position: sticky; top: 0; z-index: 30;
+    background: rgba(11,26,51,.94); backdrop-filter: blur(10px);
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  html, body { overflow-x: hidden; max-width: 100%; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-    background: var(--gris-fondo);
-    color: var(--texto);
-    line-height: 1.5;
-  }
-  a { text-decoration: none; color: inherit; }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  .top .wrap { display: flex; align-items: center; gap: 12px; height: 66px; }
+  .top .brand-mark { color: #fff; }
+  .top-acciones { margin-left: auto; display: flex; gap: 10px; }
 
-  /* ── Navbar ─────────────────────────────────────────── */
-  .navbar {
-    position: sticky; top: 0; z-index: 20;
-    background: rgba(11,26,51,0.92);
-    backdrop-filter: blur(8px);
-  }
-  .navbar .wrap {
-    display: flex; align-items: center; justify-content: space-between;
-    height: 68px;
-  }
-  .brand { display: flex; align-items: center; gap: 10px; }
-  .brand-mark {
-    font-size: 22px; font-weight: 800; letter-spacing: -.5px; color: #fff;
-  }
-  .brand-mark .accent { color: var(--acento); }
-  .brand-tagline {
-    font-size: 11px; color: rgba(255,255,255,0.65);
-    border-left: 1px solid rgba(255,255,255,0.25);
-    padding-left: 10px; margin-left: 2px;
-    display: none;
-  }
-  @media (min-width: 640px) { .brand-tagline { display: block; } }
-  .nav-links { display: flex; align-items: center; gap: 10px; }
-  .btn {
-    display: inline-flex; align-items: center; justify-content: center; gap: 6px;
-    padding: 10px 18px; border-radius: 10px; font-size: 14px; font-weight: 600;
-    cursor: pointer; border: none; transition: background .15s, transform .1s, box-shadow .15s;
-    white-space: nowrap;
-  }
-  .btn:active { transform: scale(0.98); }
-  .btn-ghost { background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,0.35); }
-  .btn-ghost:hover { background: rgba(255,255,255,0.1); }
-  .btn-primary { background: var(--acento); color: #0B1A33; }
-  .btn-primary:hover { background: #6cb4ff; }
-  .btn-white { background: #fff; color: var(--azul-oscuro); }
-  .btn-white:hover { background: var(--azul-claro); }
-  .btn-outline-blue { background: transparent; color: var(--azul); border: 1.5px solid var(--azul); }
-  .btn-outline-blue:hover { background: var(--azul-claro); }
-
-  /* ── Hero ───────────────────────────────────────────── */
+  /* ── Hero ─────────────────────────────────────────────── */
   .hero {
-    background: linear-gradient(160deg, #0B1A33 0%, #123A6B 100%);
-    color: #fff;
-    padding: 72px 0 96px;
+    background: linear-gradient(160deg, var(--hero-1) 0%, var(--hero-2) 100%);
+    color: #fff; padding: 76px 0 108px; position: relative; overflow: hidden;
   }
-  .hero .wrap { display: grid; gap: 40px; }
+  .hero::after {
+    content: ''; position: absolute; right: -140px; top: -110px;
+    width: 460px; height: 460px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(77,163,255,.20), transparent 68%);
+  }
+  .hero .wrap { position: relative; z-index: 1; }
   .hero-eyebrow {
     display: inline-flex; align-items: center; gap: 8px;
-    background: rgba(77,163,255,0.15); border: 1px solid rgba(77,163,255,0.35);
+    background: rgba(77,163,255,.15); border: 1px solid rgba(77,163,255,.34);
     color: var(--acento); font-size: 12px; font-weight: 700;
-    padding: 6px 14px; border-radius: 999px; margin-bottom: 20px; letter-spacing: .3px;
+    padding: 6px 15px; border-radius: 999px; margin-bottom: 22px; letter-spacing: .3px;
   }
   .hero h1 {
-    font-size: clamp(32px, 5vw, 48px); font-weight: 800; letter-spacing: -1px;
-    max-width: 720px; margin-bottom: 18px;
+    font-size: clamp(33px, 5.4vw, 52px); font-weight: 800;
+    letter-spacing: -1.3px; line-height: 1.1; max-width: 760px; margin-bottom: 20px;
   }
   .hero h1 .accent { color: var(--acento); }
-  .hero p {
-    font-size: 17px; color: rgba(255,255,255,0.78); max-width: 560px; margin-bottom: 30px;
-  }
-  .hero-ctas { display: flex; flex-wrap: wrap; gap: 14px; }
-  .hero-ctas .btn { padding: 13px 24px; font-size: 15px; }
+  .hero-lead { font-size: 17.5px; color: rgba(255,255,255,.8); max-width: 570px; margin-bottom: 32px; }
+  .hero-ctas { display: flex; flex-wrap: wrap; gap: 13px; }
 
-  /* ── Cards de rol ──────────────────────────────────────── */
+  /* ── Tarjetas de rol, montadas sobre el hero ──────────── */
   .roles {
-    max-width: 1120px; margin: -56px auto 0; padding: 0 24px;
-    display: grid; gap: 20px; grid-template-columns: 1fr;
-    position: relative; z-index: 5;
+    max-width: 1080px; margin: -62px auto 0; padding: 0 20px;
+    display: grid; gap: 20px; grid-template-columns: 1fr; position: relative; z-index: 5;
   }
   @media (min-width: 760px) { .roles { grid-template-columns: 1fr 1fr; } }
-  .role-card {
-    background: #fff; border: 1px solid var(--borde); border-radius: 18px;
-    padding: 28px; box-shadow: 0 12px 32px rgba(11,26,51,0.12);
+  .role {
+    background: #fff; border: 1px solid var(--borde); border-radius: var(--r-lg);
+    padding: 30px; box-shadow: var(--sombra-md);
+    transition: transform .15s, box-shadow .15s;
   }
-  .role-icon {
-    width: 48px; height: 48px; border-radius: 12px;
+  .role:hover { transform: translateY(-3px); box-shadow: var(--sombra-lg); }
+  .role-icono {
+    width: 50px; height: 50px; border-radius: var(--r);
+    display: flex; align-items: center; justify-content: center; margin-bottom: 18px; color: #fff;
+  }
+  .role-icono svg { width: 25px; height: 25px; }
+  .role.persona .role-icono { background: linear-gradient(140deg, var(--azul), var(--acento)); }
+  .role.empresa .role-icono { background: linear-gradient(140deg, var(--azul-oscuro), var(--azul)); }
+  .role h3 { font-size: 20px; font-weight: 700; margin-bottom: 9px; }
+  .role p { font-size: 14px; color: var(--texto-sub); margin-bottom: 18px; }
+  .role ul { list-style: none; margin-bottom: 22px; }
+  .role li {
+    display: flex; align-items: flex-start; gap: 9px;
+    font-size: 13.5px; color: var(--texto-sub); padding: 5px 0;
+  }
+  .role li svg { width: 16px; height: 16px; color: var(--verde); flex-shrink: 0; margin-top: 2px; }
+
+  /* ── Secciones ────────────────────────────────────────── */
+  .seccion { padding: 84px 0 0; }
+  .seccion-cabecera { text-align: center; max-width: 640px; margin: 0 auto 46px; }
+  .seccion-cabecera .eyebrow {
+    font-size: 12px; font-weight: 700; color: var(--azul);
+    letter-spacing: .7px; text-transform: uppercase; margin-bottom: 11px;
+  }
+  .seccion-cabecera h2 {
+    font-size: clamp(25px, 3.6vw, 34px); font-weight: 800;
+    letter-spacing: -.7px; margin-bottom: 11px;
+  }
+  .seccion-cabecera p { color: var(--texto-sub); font-size: 15.5px; }
+
+  .pasos { display: grid; gap: 20px; grid-template-columns: 1fr; }
+  @media (min-width: 760px) { .pasos { grid-template-columns: repeat(3, 1fr); } }
+  .paso { background: #fff; border: 1px solid var(--borde); border-radius: var(--r-md); padding: 26px; }
+  .paso-num {
+    width: 36px; height: 36px; border-radius: var(--r-sm);
+    background: var(--azul-claro); color: var(--azul);
     display: flex; align-items: center; justify-content: center;
-    margin-bottom: 16px;
+    font-weight: 800; font-size: 15px; margin-bottom: 15px;
   }
-  .role-icon svg { width: 24px; height: 24px; color: #fff; }
-  .role-card.persona .role-icon { background: var(--azul); }
-  .role-card.empresa .role-icon { background: var(--azul-oscuro); }
-  .role-card h3 { font-size: 19px; font-weight: 700; margin-bottom: 8px; }
-  .role-card p { font-size: 14px; color: #566079; margin-bottom: 20px; }
-  .role-card .btn { width: 100%; }
+  .paso h4 { font-size: 15.5px; font-weight: 700; margin-bottom: 7px; }
+  .paso p { font-size: 13.5px; color: var(--texto-sub); }
 
-  /* ── Sección "cómo funciona" ─────────────────────────── */
-  .section { padding: 88px 0 40px; }
-  .section-head { text-align: center; max-width: 620px; margin: 0 auto 44px; }
-  .section-head .eyebrow {
-    font-size: 12px; font-weight: 700; color: var(--azul); letter-spacing: .6px;
-    text-transform: uppercase; margin-bottom: 10px;
+  /* ── Franja de cierre ─────────────────────────────────── */
+  .cierre {
+    margin-top: 84px;
+    background: linear-gradient(160deg, var(--hero-1), var(--hero-2));
+    color: #fff; padding: 62px 0; text-align: center;
   }
-  .section-head h2 { font-size: clamp(24px, 3.4vw, 32px); font-weight: 800; letter-spacing: -.5px; margin-bottom: 10px; }
-  .section-head p { color: #566079; font-size: 15px; }
-
-  .steps { display: grid; gap: 20px; grid-template-columns: 1fr; }
-  @media (min-width: 760px) { .steps { grid-template-columns: repeat(3, 1fr); } }
-  .step-card {
-    background: #fff; border: 1px solid var(--borde); border-radius: 16px; padding: 24px;
-  }
-  .step-num {
-    width: 34px; height: 34px; border-radius: 10px; background: var(--azul-claro); color: var(--azul);
-    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px;
-    margin-bottom: 14px;
-  }
-  .step-card h4 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
-  .step-card p { font-size: 13.5px; color: #566079; }
-
-  /* ── Footer ──────────────────────────────────────────── */
-  footer {
-    background: #0B1A33; color: rgba(255,255,255,0.7);
-    padding: 40px 0 26px; margin-top: 60px;
-  }
-  footer .wrap {
-    display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center;
-  }
-  footer .brand-mark { font-size: 18px; }
-  footer .foot-legal { font-size: 12.5px; color: rgba(255,255,255,0.5); max-width: 480px; }
-  footer .foot-links { display: flex; gap: 18px; font-size: 13px; }
-  footer .foot-links a:hover { color: #fff; }
+  .cierre h2 { font-size: clamp(24px, 3.4vw, 32px); font-weight: 800; letter-spacing: -.6px; margin-bottom: 12px; }
+  .cierre p { color: rgba(255,255,255,.76); font-size: 15.5px; max-width: 480px; margin: 0 auto 26px; }
+  .cierre .hero-ctas { justify-content: center; }
+  .pie { margin-top: 0; }
 </style>
 </head>
 <body>
 
-<nav class="navbar">
+<header class="top">
   <div class="wrap">
-    <div class="brand">
-      <span class="brand-mark">AV<span class="accent">BA</span></span>
-      <span class="brand-tagline">Inspections, Certifications and Maintenance</span>
-    </div>
-    <div class="nav-links">
-      <a class="btn btn-ghost" href="login.html">Iniciar sesión</a>
-      <a class="btn btn-primary" href="registro.html">Crear cuenta</a>
-    </div>
-  </div>
-</nav>
-
-<header class="hero">
-  <div class="wrap">
-    <div>
-      <span class="hero-eyebrow">Socios Comerciales AVBA</span>
-      <h1>La bolsa de trabajo de la industria de <span class="accent">inspección y certificación</span></h1>
-      <p>Conectamos candidatos calificados con empresas del sector. Crea tu perfil profesional o publica tus vacantes — todo con el respaldo de la marca AVBA.</p>
-      <div class="hero-ctas">
-        <a class="btn btn-white" href="registro.html?tipo=persona">Soy Candidato</a>
-        <a class="btn btn-ghost" href="registro.html?tipo=empresa">Soy Empresa</a>
-      </div>
+    <span class="brand-mark">AV<span class="accent">BA</span></span>
+    <span class="brand-tagline">Inspections, Certifications and Maintenance</span>
+    <div class="top-acciones">
+      <a class="btn btn-fantasma btn-sm" href="login.html">Iniciar sesión</a>
+      <a class="btn btn-primary btn-sm" href="registro.html">Crear cuenta</a>
     </div>
   </div>
 </header>
 
-<div class="roles">
-  <div class="role-card persona">
-    <div class="role-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 12a4 4 0 100-8 4 4 0 000 8z"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/>
-      </svg>
+<section class="hero">
+  <div class="wrap">
+    <span class="hero-eyebrow">Socios Comerciales AVBA</span>
+    <h1>La bolsa de trabajo de la industria de <span class="accent">inspección y certificación</span></h1>
+    <p class="hero-lead">
+      Conectamos candidatos calificados con empresas del sector. Crea tu perfil profesional
+      o publica tus vacantes, con el respaldo de la marca AVBA.
+    </p>
+    <div class="hero-ctas">
+      <a class="btn btn-blanco btn-lg" href="registro.html?tipo=persona">Busco trabajo</a>
+      <a class="btn btn-fantasma btn-lg" href="registro.html?tipo=empresa">Busco talento</a>
     </div>
-    <h3>Para candidatos</h3>
-    <p>Crea tu perfil profesional, sube tu CV y foto, agrega tu experiencia y postúlate a vacantes de empresas certificadas.</p>
-    <a class="btn btn-outline-blue" href="registro.html?tipo=persona">Crear perfil de candidato</a>
   </div>
-  <div class="role-card empresa">
-    <div class="role-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/>
-      </svg>
-    </div>
+</section>
+
+<div class="roles">
+  <div class="role persona">
+    <div class="role-icono" id="ic-persona"></div>
+    <h3>Para candidatos</h3>
+    <p>Construye tu perfil profesional y postúlate a vacantes del sector en un par de clics.</p>
+    <ul id="lista-persona"></ul>
+    <a class="btn btn-outline btn-bloque" href="registro.html?tipo=persona">Crear perfil de candidato</a>
+  </div>
+
+  <div class="role empresa">
+    <div class="role-icono" id="ic-empresa"></div>
     <h3>Para empresas</h3>
-    <p>Publica tu perfil corporativo, sube tu logo y próximamente publica vacantes y busca candidatos calificados.</p>
-    <a class="btn btn-outline-blue" href="registro.html?tipo=empresa">Crear perfil de empresa</a>
+    <p>Publica tus vacantes y encuentra perfiles técnicos calificados de la industria.</p>
+    <ul id="lista-empresa"></ul>
+    <a class="btn btn-outline btn-bloque" href="registro.html?tipo=empresa">Crear perfil de empresa</a>
   </div>
 </div>
 
-<section class="section">
+<section class="seccion">
   <div class="wrap">
-    <div class="section-head">
+    <div class="seccion-cabecera">
       <div class="eyebrow">Cómo funciona</div>
-      <h2>Tres pasos para empezar</h2>
-      <p>Un portal simple pensado para la industria de inspección, certificación y mantenimiento.</p>
+      <h2>Empieza en tres pasos</h2>
+      <p>Un portal simple, pensado para la industria de inspección, certificación y mantenimiento.</p>
     </div>
-    <div class="steps">
-      <div class="step-card">
-        <div class="step-num">1</div>
+    <div class="pasos">
+      <div class="paso">
+        <div class="paso-num">1</div>
         <h4>Crea tu cuenta</h4>
-        <p>Regístrate como candidato o como empresa en menos de un minuto.</p>
+        <p>Regístrate como candidato o empresa en menos de un minuto y confirma tu correo.</p>
       </div>
-      <div class="step-card">
-        <div class="step-num">2</div>
+      <div class="paso">
+        <div class="paso-num">2</div>
         <h4>Completa tu perfil</h4>
-        <p>Sube tu CV y foto (candidatos) o tu logo y descripción (empresas).</p>
+        <p>Sube tu CV, foto, experiencia y habilidades. Las empresas suben logo y descripción.</p>
       </div>
-      <div class="step-card">
-        <div class="step-num">3</div>
-        <h4>Conéctate</h4>
-        <p>Próximamente: publica y postúlate a vacantes dentro de la comunidad AVBA.</p>
+      <div class="paso">
+        <div class="paso-num">3</div>
+        <h4>Conecta</h4>
+        <p>Postúlate a vacantes o revisa candidatos y gestiona todo el proceso desde tu panel.</p>
       </div>
     </div>
   </div>
 </section>
 
-<footer>
+<section class="cierre">
   <div class="wrap">
-    <span class="brand-mark">AV<span class="accent">BA</span></span>
-    <div class="foot-links">
-      <a href="login.html">Iniciar sesión</a>
-      <a href="registro.html">Crear cuenta</a>
+    <h2>Tu próxima oportunidad está aquí</h2>
+    <p>Únete a la comunidad de profesionales y empresas de la industria AVBA.</p>
+    <div class="hero-ctas">
+      <a class="btn btn-blanco btn-lg" href="registro.html">Crear mi cuenta gratis</a>
+      <a class="btn btn-fantasma btn-lg" href="vacantes.html">Ver vacantes</a>
     </div>
-    <p class="foot-legal">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. — avba.com.mx</p>
   </div>
-</footer>
+</section>
 
+<footer id="pie"></footer>
+
+<script src="assets/avba.js"></script>
+<script>
+const VENTAJAS_PERSONA = [
+  'Perfil profesional con CV en PDF y foto',
+  'Postúlate a vacantes con un clic',
+  'Sigue el estatus de cada postulación',
+];
+const VENTAJAS_EMPRESA = [
+  'Publica vacantes ilimitadas',
+  'Busca candidatos por habilidad y ubicación',
+  'Gestiona postulaciones desde un panel',
+];
+
+function pintarVentajas(idLista, items) {
+  document.getElementById(idLista).innerHTML = items
+    .map(t => `<li>${scIcono('check')}<span>${scEsc(t)}</span></li>`).join('');
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('ic-persona').innerHTML = scIcono('persona');
+  document.getElementById('ic-empresa').innerHTML = scIcono('edificio');
+  pintarVentajas('lista-persona', VENTAJAS_PERSONA);
+  pintarVentajas('lista-empresa', VENTAJAS_EMPRESA);
+  scPintarPie();
+
+  // Si ya hay sesión, ofrecer entrar directo al portal
+  const s = scSesion.leer();
+  if (s && s.token) {
+    document.querySelector('.top-acciones').innerHTML =
+      `<a class="btn btn-primary btn-sm" href="inicio.html">Ir a mi portal</a>`;
+  }
+});
+</script>
 </body>
 </html>

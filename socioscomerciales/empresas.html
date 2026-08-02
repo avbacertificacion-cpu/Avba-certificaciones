@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Empresas — Socios Comerciales AVBA</title>
+<link rel="stylesheet" href="assets/avba.css">
+</head>
+<body>
+
+<header id="navbar"></header>
+
+<main class="wrap contenido">
+  <div class="pagina-titulo">
+    <div class="pagina-cabecera">
+      <div>
+        <h1>Directorio de empresas</h1>
+        <p>Empresas del sector que publican vacantes en el portal.</p>
+      </div>
+      <span class="badge badge-azul" id="contador"></span>
+    </div>
+  </div>
+
+  <form class="filtros" id="form-filtros">
+    <div class="filtros-fila" style="grid-template-columns:1fr auto">
+      <div class="campo">
+        <label for="f-texto">Buscar empresa</label>
+        <input type="text" id="f-texto" placeholder="Nombre o giro">
+      </div>
+      <button type="submit" class="btn btn-primary">Buscar</button>
+    </div>
+  </form>
+
+  <div id="resultados"></div>
+</main>
+
+<footer id="pie"></footer>
+
+<script src="assets/avba.js"></script>
+<script>
+let sesion = null;
+
+function tarjeta(e) {
+  const n = Number(e.vacantes) || 0;
+  return `
+    <div class="tarjeta-lista">
+      <div class="tarjeta-encabezado">
+        ${scAvatar(e.logo_url, e.nombre, 'lg', true)}
+        <div style="flex:1;min-width:0">
+          <div class="fila" style="gap:8px">
+            <span class="tarjeta-nombre"><a href="ver-empresa.html?id=${e.id}">${scEsc(e.nombre)}</a></span>
+            ${Number(e.correo_verificado) ? scBadgeVerificado(true) : ''}
+          </div>
+          ${e.giro ? `<div class="tarjeta-sub">${scEsc(e.giro)}</div>` : ''}
+          <div class="tarjeta-datos">
+            ${e.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(e.ubicacion)}</span>` : ''}
+            <span>${scIcono('maletin')}${n} vacante${n === 1 ? '' : 's'} abierta${n === 1 ? '' : 's'}</span>
+          </div>
+        </div>
+      </div>
+      <div class="tarjeta-pie">
+        ${n > 0
+          ? '<span class="badge badge-verde">Contratando</span>'
+          : '<span class="texto-tenue" style="font-size:12.5px">Sin vacantes por ahora</span>'}
+        <a class="btn btn-sm btn-primary" href="ver-empresa.html?id=${e.id}">Ver perfil</a>
+      </div>
+    </div>`;
+}
+
+async function buscar() {
+  const cont = document.getElementById('resultados');
+  cont.innerHTML = scCargando('Cargando empresas...');
+
+  try {
+    const datos = await scGet('LISTAR_EMPRESAS', { texto: document.getElementById('f-texto').value.trim() });
+    if (datos.status !== 'success') {
+      cont.innerHTML = scVacio('alerta', 'No se pudo cargar', datos.message, '');
+      return;
+    }
+
+    const lista = datos.empresas || [];
+    document.getElementById('contador').textContent =
+      lista.length + (lista.length === 1 ? ' empresa' : ' empresas');
+
+    cont.innerHTML = lista.length
+      ? `<div class="resultados resultados-2">${lista.map(tarjeta).join('')}</div>`
+      : scVacio('edificio', 'Sin resultados',
+          'No encontramos empresas con ese término.',
+          '<button class="btn btn-outline" onclick="limpiar()">Ver todas</button>');
+
+  } catch (e) {
+    cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+  }
+}
+
+function limpiar() {
+  document.getElementById('f-texto').value = '';
+  buscar();
+}
+
+document.getElementById('form-filtros').addEventListener('submit', (e) => {
+  e.preventDefault();
+  buscar();
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  sesion = scExigirSesion();
+  if (!sesion) return;
+
+  scPintarNavbar('empresas.html');
+  scPintarPie();
+  buscar();
+});
+</script>
+</body>
+</html>

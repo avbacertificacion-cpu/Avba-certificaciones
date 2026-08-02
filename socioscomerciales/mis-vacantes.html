@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mis vacantes — Socios Comerciales AVBA</title>
+<link rel="stylesheet" href="assets/avba.css">
+<style>
+  .vacante-fila {
+    background: var(--blanco); border: 1px solid var(--borde);
+    border-radius: var(--r-md); padding: 18px; margin-bottom: 14px;
+  }
+  .vacante-fila.cerrada { opacity: .72; }
+  .vacante-cabecera { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .vacante-cabecera h3 { font-size: 16px; font-weight: 700; }
+  .vacante-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+  .postulaciones { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--borde); }
+  .modal { max-width: 620px; }
+</style>
+</head>
+<body>
+
+<header id="navbar"></header>
+
+<main class="wrap contenido">
+  <div class="pagina-titulo">
+    <div class="pagina-cabecera">
+      <div>
+        <h1>Mis vacantes</h1>
+        <p>Publica vacantes y revisa a los candidatos que se postulan.</p>
+      </div>
+      <button class="btn btn-primary" id="btn-nueva"></button>
+    </div>
+  </div>
+
+  <div id="aviso-verificacion"></div>
+  <div id="lista"></div>
+</main>
+
+<!-- Modal crear/editar vacante -->
+<div class="modal-fondo" id="modal-vacante">
+  <div class="modal">
+    <div class="modal-cabecera">
+      <h3 id="modal-titulo">Publicar vacante</h3>
+      <button class="modal-cerrar" onclick="scCerrarModal('modal-vacante')">&times;</button>
+    </div>
+    <form id="form-vacante">
+      <div class="modal-cuerpo">
+        <input type="hidden" id="v-id">
+        <div class="rejilla rejilla-2">
+          <div class="campo col-full">
+            <label for="v-titulo">Título del puesto *</label>
+            <input type="text" id="v-titulo" placeholder="Ej. Inspector de equipos de izaje" required>
+          </div>
+          <div class="campo">
+            <label for="v-ubicacion">Ubicación</label>
+            <input type="text" id="v-ubicacion" placeholder="Ciudad, Estado">
+          </div>
+          <div class="campo">
+            <label for="v-modalidad">Modalidad</label>
+            <select id="v-modalidad">
+              <option value="presencial">Presencial</option>
+              <option value="remoto">Remoto</option>
+              <option value="hibrido">Híbrido</option>
+            </select>
+          </div>
+          <div class="campo col-full">
+            <label for="v-salario">Salario o rango</label>
+            <input type="text" id="v-salario" placeholder="Ej. $18,000 - $25,000 mensuales">
+          </div>
+          <div class="campo col-full">
+            <label for="v-descripcion">Descripción</label>
+            <textarea id="v-descripcion" style="min-height:140px"
+              placeholder="Responsabilidades, requisitos, certificaciones necesarias..."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-pie">
+        <button type="button" class="btn btn-gris" onclick="scCerrarModal('modal-vacante')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-guardar-vacante">Publicar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<footer id="pie"></footer>
+
+<script src="assets/avba.js"></script>
+<script>
+let sesion = null;
+let abiertas = {};   // id de vacante → true si su lista de postulaciones está desplegada
+let porId = {};      // id → objeto vacante (evita meter JSON dentro de atributos onclick)
+
+function pintarVacantes(lista) {
+  const cont = document.getElementById('lista');
+  porId = {};
+  lista.forEach(v => { porId[v.id] = v; });
+
+  if (!lista.length) {
+    cont.innerHTML = scVacio('vacia', 'Aún no publicas vacantes',
+      'Publica tu primera vacante para empezar a recibir candidatos del sector.',
+      '<button class="btn btn-primary" onclick="nuevaVacante()">Publicar mi primera vacante</button>');
+    return;
+  }
+
+  cont.innerHTML = lista.map(v => `
+    <div class="vacante-fila ${v.estatus === 'cerrada' ? 'cerrada' : ''}">
+      <div class="vacante-cabecera">
+        <div style="flex:1;min-width:200px">
+          <div class="fila" style="gap:8px">
+            <h3>${scEsc(v.titulo)}</h3>
+            <span class="badge ${v.estatus === 'abierta' ? 'badge-verde' : 'badge-gris'}">
+              ${v.estatus === 'abierta' ? 'Abierta' : 'Cerrada'}
+            </span>
+            ${Number(v.nuevas) > 0 ? `<span class="badge badge-ambar">${v.nuevas} nueva${v.nuevas > 1 ? 's' : ''}</span>` : ''}
+          </div>
+          <div class="tarjeta-datos">
+            ${v.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : ''}
+            <span>${scIcono('maletin')}${scEsc(SC_MODALIDADES[v.modalidad] || v.modalidad)}</span>
+            ${v.salario ? `<span>${scIcono('dinero')}${scEsc(v.salario)}</span>` : ''}
+            <span>${scIcono('personas')}${v.postulaciones} postulación${v.postulaciones == 1 ? '' : 'es'}</span>
+            <span>${scIcono('reloj')}${scEsc(scHace(v.creado))}</span>
+          </div>
+        </div>
+        <div class="vacante-acciones">
+          <button class="btn btn-sm btn-suave" onclick="verPostulaciones(${v.id})">
+            Ver candidatos (${v.postulaciones})
+          </button>
+          <button class="btn btn-sm btn-gris" onclick="editarVacante(${v.id})">Editar</button>
+          <button class="btn btn-sm btn-gris" onclick="cambiarEstatus(${v.id}, '${v.estatus === 'abierta' ? 'cerrada' : 'abierta'}')">
+            ${v.estatus === 'abierta' ? 'Cerrar' : 'Reabrir'}
+          </button>
+          <button class="btn btn-sm btn-peligro" onclick="eliminarVacante(${v.id})">Eliminar</button>
+        </div>
+      </div>
+      <div class="postulaciones oculto" id="post-${v.id}"></div>
+    </div>`).join('');
+
+  // Volver a abrir las listas que el usuario tenía desplegadas
+  Object.keys(abiertas).forEach(id => { if (abiertas[id]) verPostulaciones(Number(id), true); });
+}
+
+/* ── Postulaciones de una vacante ───────────────────────── */
+async function verPostulaciones(vacanteId, forzarAbrir) {
+  const cont = document.getElementById('post-' + vacanteId);
+  if (!cont) return;
+
+  if (!forzarAbrir && !cont.classList.contains('oculto')) {
+    cont.classList.add('oculto');
+    abiertas[vacanteId] = false;
+    return;
+  }
+
+  cont.classList.remove('oculto');
+  abiertas[vacanteId] = true;
+  cont.innerHTML = scCargando('Cargando candidatos...');
+
+  try {
+    const datos = await scGet('POSTULACIONES_VACANTE', { vacante_id: vacanteId });
+    if (datos.status !== 'success') { cont.innerHTML = `<p class="texto-sub">${scEsc(datos.message)}</p>`; return; }
+
+    const lista = datos.postulaciones || [];
+    cont.innerHTML = lista.length
+      ? lista.map(p => tarjetaCandidato(p)).join('')
+      : '<p class="texto-tenue" style="font-size:13.5px;padding:8px 0">Todavía no hay postulaciones para esta vacante.</p>';
+
+  } catch (e) {
+    cont.innerHTML = `<p class="texto-sub">${scEsc(e.message)}</p>`;
+  }
+}
+
+function tarjetaCandidato(p) {
+  const est = SC_ESTATUS_POSTULACION[p.estatus] || { texto: p.estatus, clase: 'badge-gris' };
+  return `
+    <div class="item">
+      ${scAvatar(p.foto_url, p.nombre, 'md')}
+      <div class="item-cuerpo">
+        <div class="fila" style="gap:8px">
+          <span class="item-titulo"><a href="ver-perfil.html?id=${p.persona_id}">${scEsc(p.nombre)}</a></span>
+          ${Number(p.correo_verificado) ? scBadgeVerificado(true) : ''}
+          <span class="badge ${est.clase}">${scEsc(est.texto)}</span>
+        </div>
+        ${p.headline ? `<div class="item-sub">${scEsc(p.headline)}</div>` : ''}
+        <div class="item-meta">
+          ${p.ubicacion ? scEsc(p.ubicacion) + ' · ' : ''}${scEsc(p.correo)} · ${scEsc(scHace(p.fecha))}
+        </div>
+        ${p.mensaje ? `<div class="item-desc">"${scEsc(p.mensaje)}"</div>` : ''}
+        <div class="fila mt-8">
+          <a class="btn btn-sm btn-gris" href="ver-perfil.html?id=${p.persona_id}">Ver perfil</a>
+          ${p.cv_url ? `<a class="btn btn-sm btn-gris" href="${scEsc(p.cv_url)}" target="_blank" rel="noopener">Ver CV</a>` : ''}
+          ${p.estatus !== 'en_revision' && p.estatus !== 'aceptada' && p.estatus !== 'rechazada'
+            ? `<button class="btn btn-sm btn-suave" onclick="cambiarPostulacion(${p.id}, 'en_revision')">En revisión</button>` : ''}
+          ${p.estatus !== 'aceptada'
+            ? `<button class="btn btn-sm btn-verde" onclick="cambiarPostulacion(${p.id}, 'aceptada')">Aceptar</button>` : ''}
+          ${p.estatus !== 'rechazada'
+            ? `<button class="btn btn-sm btn-peligro" onclick="cambiarPostulacion(${p.id}, 'rechazada')">Descartar</button>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+async function cambiarPostulacion(id, estatus) {
+  try {
+    const datos = await scPost('CAMBIAR_ESTATUS_POSTULACION', { id, estatus });
+    scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
+    if (datos.status === 'success') cargar();
+  } catch (e) {
+    scToast(e.message, 'error');
+  }
+}
+
+/* ── Crear / editar vacante ─────────────────────────────── */
+function nuevaVacante() {
+  document.getElementById('form-vacante').reset();
+  document.getElementById('v-id').value = '';
+  document.getElementById('modal-titulo').textContent = 'Publicar vacante';
+  document.getElementById('btn-guardar-vacante').textContent = 'Publicar';
+  scAbrirModal('modal-vacante');
+}
+
+function editarVacante(id) {
+  const v = porId[id];
+  if (!v) return;
+
+  document.getElementById('v-id').value          = v.id;
+  document.getElementById('v-titulo').value      = v.titulo || '';
+  document.getElementById('v-ubicacion').value   = v.ubicacion || '';
+  document.getElementById('v-modalidad').value   = v.modalidad || 'presencial';
+  document.getElementById('v-salario').value     = v.salario || '';
+  document.getElementById('v-descripcion').value = v.descripcion || '';
+  document.getElementById('modal-titulo').textContent = 'Editar vacante';
+  document.getElementById('btn-guardar-vacante').textContent = 'Guardar cambios';
+  scAbrirModal('modal-vacante');
+}
+
+document.getElementById('form-vacante').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const id = document.getElementById('v-id').value;
+  const payload = {
+    titulo:      document.getElementById('v-titulo').value.trim(),
+    ubicacion:   document.getElementById('v-ubicacion').value.trim(),
+    modalidad:   document.getElementById('v-modalidad').value,
+    salario:     document.getElementById('v-salario').value.trim(),
+    descripcion: document.getElementById('v-descripcion').value.trim(),
+  };
+  if (id) payload.id = Number(id);
+
+  const btn = document.getElementById('btn-guardar-vacante');
+  const textoOriginal = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Guardando...';
+
+  try {
+    const datos = await scPost(id ? 'ACTUALIZAR_VACANTE' : 'CREAR_VACANTE', payload);
+    scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
+    if (datos.status === 'success') {
+      scCerrarModal('modal-vacante');
+      cargar();
+    }
+  } catch (err) {
+    scToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
+});
+
+async function cambiarEstatus(id, estatus) {
+  try {
+    const datos = await scPost('ACTUALIZAR_VACANTE', { id, estatus });
+    scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
+    if (datos.status === 'success') cargar();
+  } catch (e) {
+    scToast(e.message, 'error');
+  }
+}
+
+async function eliminarVacante(id) {
+  const v = porId[id];
+  const titulo = v ? v.titulo : 'esta vacante';
+  if (!confirm('¿Eliminar la vacante "' + titulo + '"?\n\nSe borrarán también sus postulaciones. Esta acción no se puede deshacer.')) return;
+  try {
+    const datos = await scPost('ELIMINAR_VACANTE', { id });
+    scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
+    if (datos.status === 'success') { delete abiertas[id]; cargar(); }
+  } catch (e) {
+    scToast(e.message, 'error');
+  }
+}
+
+/* ── Carga ──────────────────────────────────────────────── */
+async function cargar() {
+  try {
+    const datos = await scGet('LISTAR_MIS_VACANTES');
+    if (datos.status !== 'success') { scToast(datos.message, 'error'); return; }
+    pintarVacantes(datos.vacantes || []);
+  } catch (e) {
+    document.getElementById('lista').innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  sesion = scExigirSesion('empresa');
+  if (!sesion) return;
+
+  scPintarNavbar('mis-vacantes.html');
+  scPintarPie();
+  scAvisoVerificacion(sesion.correo_verificado);
+
+  const btn = document.getElementById('btn-nueva');
+  btn.innerHTML = scIcono('mas') + 'Publicar vacante';
+  btn.addEventListener('click', nuevaVacante);
+
+  document.getElementById('lista').innerHTML = scCargando('Cargando tus vacantes...');
+  cargar();
+
+  if (new URLSearchParams(location.search).get('nueva') === '1') nuevaVacante();
+});
+</script>
+</body>
+</html>

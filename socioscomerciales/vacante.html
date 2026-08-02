@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vacante — Socios Comerciales AVBA</title>
+<link rel="stylesheet" href="assets/avba.css">
+<style>
+  .volver-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13.5px; font-weight: 600; color: var(--texto-sub); margin: 22px 0 14px;
+  }
+  .volver-link:hover { color: var(--azul); }
+  .volver-link svg { width: 15px; height: 15px; }
+  .descripcion { font-size: 14.5px; color: var(--texto-sub); line-height: 1.7; white-space: pre-line; }
+  .detalle { display: grid; gap: 20px; grid-template-columns: 1fr; }
+  @media (min-width: 900px) { .detalle { grid-template-columns: 2fr 1fr; align-items: start; } }
+</style>
+</head>
+<body>
+
+<header id="navbar"></header>
+
+<main class="wrap contenido">
+  <a class="volver-link" href="vacantes.html" id="volver"></a>
+  <div id="contenido"></div>
+</main>
+
+<!-- Modal de postulación -->
+<div class="modal-fondo" id="modal-postular">
+  <div class="modal">
+    <div class="modal-cabecera">
+      <h3>Postularme a esta vacante</h3>
+      <button class="modal-cerrar" onclick="scCerrarModal('modal-postular')">&times;</button>
+    </div>
+    <form id="form-postular">
+      <div class="modal-cuerpo">
+        <p class="card-sub" id="modal-texto"></p>
+        <div class="campo">
+          <label for="mensaje">Mensaje para la empresa (opcional)</label>
+          <textarea id="mensaje" placeholder="Cuéntales por qué eres el candidato ideal..."></textarea>
+          <div class="campo-ayuda">La empresa verá tu perfil completo y tu CV.</div>
+        </div>
+        <div class="alerta alerta-aviso oculto" id="aviso-cv"></div>
+      </div>
+      <div class="modal-pie">
+        <button type="button" class="btn btn-gris" onclick="scCerrarModal('modal-postular')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-enviar">Enviar postulación</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<footer id="pie"></footer>
+
+<script src="assets/avba.js"></script>
+<script>
+let sesion  = null;
+let vacante = null;
+const idVacante = Number(new URLSearchParams(location.search).get('id') || 0);
+
+function pintar(v) {
+  vacante = v;
+  document.title = v.titulo + ' — Socios Comerciales AVBA';
+
+  const esCandidato = sesion.tipo === 'persona';
+  const abierta     = v.estatus === 'abierta';
+  const yaPostulado = !!v.mi_postulacion;
+
+  let accion = '';
+  if (!esCandidato) {
+    accion = '<p class="texto-tenue" style="font-size:13px">Solo las cuentas de candidato pueden postularse.</p>';
+  } else if (!abierta) {
+    accion = '<span class="badge badge-gris">Esta vacante está cerrada</span>';
+  } else if (yaPostulado) {
+    const est = SC_ESTATUS_POSTULACION[v.mi_postulacion] || { texto: v.mi_postulacion, clase: 'badge-gris' };
+    accion = `<div class="fila">
+        <span class="badge ${est.clase}">${scIcono('check')}Postulación ${scEsc(est.texto.toLowerCase())}</span>
+        <a class="btn btn-sm btn-gris" href="mis-postulaciones.html">Ver mis postulaciones</a>
+      </div>`;
+  } else {
+    accion = `<button class="btn btn-primary btn-lg btn-bloque" onclick="abrirPostulacion()">
+        ${scIcono('enviar')}Postularme ahora</button>`;
+  }
+
+  document.getElementById('contenido').innerHTML = `
+    <div class="detalle">
+      <div>
+        <div class="card">
+          <div class="tarjeta-encabezado" style="margin-bottom:18px">
+            ${scAvatar(v.logo_url, v.empresa, 'lg', true)}
+            <div style="flex:1;min-width:0">
+              <h1 style="font-size:22px;font-weight:800;letter-spacing:-.4px">${scEsc(v.titulo)}</h1>
+              <div class="tarjeta-sub" style="margin-top:4px">
+                <a href="ver-empresa.html?id=${v.empresa_id}" style="font-weight:600">${scEsc(v.empresa)}</a>
+                ${Number(v.empresa_verificada) ? ' ' + scBadgeVerificado(true) : ''}
+              </div>
+              <div class="tarjeta-datos">
+                ${v.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : ''}
+                <span>${scIcono('maletin')}${scEsc(SC_MODALIDADES[v.modalidad] || v.modalidad)}</span>
+                ${v.salario ? `<span>${scIcono('dinero')}${scEsc(v.salario)}</span>` : ''}
+                <span>${scIcono('reloj')}Publicada ${scEsc(scHace(v.creado))}</span>
+              </div>
+            </div>
+          </div>
+
+          <h3 style="font-size:15px;font-weight:700;margin-bottom:10px">Descripción del puesto</h3>
+          <div class="descripcion">${
+            v.descripcion ? scEsc(v.descripcion) : '<em class="texto-tenue">La empresa no agregó una descripción.</em>'
+          }</div>
+        </div>
+      </div>
+
+      <div>
+        <div class="card">
+          <div class="card-titulo"><h3>Postulación</h3></div>
+          <p class="card-sub">Tu perfil y CV se comparten con la empresa.</p>
+          ${accion}
+        </div>
+
+        <div class="card">
+          <div class="card-titulo"><h3>Sobre la empresa</h3></div>
+          <div class="fila" style="gap:12px;margin-bottom:12px">
+            ${scAvatar(v.logo_url, v.empresa, 'md', true)}
+            <div style="flex:1;min-width:0">
+              <div class="item-titulo">${scEsc(v.empresa)}</div>
+              ${v.giro ? `<div class="item-sub">${scEsc(v.giro)}</div>` : ''}
+            </div>
+          </div>
+          <a class="btn btn-outline btn-bloque btn-sm" href="ver-empresa.html?id=${v.empresa_id}">Ver perfil de la empresa</a>
+        </div>
+      </div>
+    </div>`;
+}
+
+function abrirPostulacion() {
+  document.getElementById('modal-texto').textContent =
+    'Vas a postularte a "' + vacante.titulo + '" en ' + vacante.empresa + '.';
+  scAbrirModal('modal-postular');
+}
+
+document.getElementById('form-postular').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('btn-enviar');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Enviando...';
+
+  try {
+    const datos = await scPost('POSTULAR', {
+      vacante_id: idVacante,
+      mensaje:    document.getElementById('mensaje').value.trim(),
+    });
+    scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
+    if (datos.status === 'success') {
+      scCerrarModal('modal-postular');
+      cargar();
+    }
+  } catch (err) {
+    scToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Enviar postulación';
+  }
+});
+
+async function cargar() {
+  const cont = document.getElementById('contenido');
+  cont.innerHTML = scCargando('Cargando vacante...');
+
+  if (!idVacante) {
+    cont.innerHTML = scVacio('alerta', 'Vacante no indicada',
+      'El enlace no incluye una vacante válida.',
+      '<a class="btn btn-outline" href="vacantes.html">Ver todas las vacantes</a>');
+    return;
+  }
+
+  try {
+    const datos = await scGet('GET_VACANTE', { id: idVacante });
+    if (datos.status !== 'success') {
+      cont.innerHTML = scVacio('alerta', 'No se encontró la vacante', datos.message,
+        '<a class="btn btn-outline" href="vacantes.html">Ver todas las vacantes</a>');
+      return;
+    }
+    pintar(datos.vacante);
+  } catch (e) {
+    cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  sesion = scExigirSesion();
+  if (!sesion) return;
+
+  scPintarNavbar(sesion.tipo === 'empresa' ? 'mis-vacantes.html' : 'vacantes.html');
+  scPintarPie();
+
+  const volver = document.getElementById('volver');
+  volver.innerHTML = scIcono('atras') + 'Volver a vacantes';
+  volver.href = sesion.tipo === 'empresa' ? 'mis-vacantes.html' : 'vacantes.html';
+
+  cargar();
+});
+</script>
+</body>
+</html>

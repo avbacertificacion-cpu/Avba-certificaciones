@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Candidatos — Socios Comerciales AVBA</title>
+<link rel="stylesheet" href="assets/avba.css">
+</head>
+<body>
+
+<header id="navbar"></header>
+
+<main class="wrap contenido">
+  <div class="pagina-titulo">
+    <div class="pagina-cabecera">
+      <div>
+        <h1>Buscar candidatos</h1>
+        <p>Encuentra perfiles técnicos calificados de la industria.</p>
+      </div>
+      <span class="badge badge-azul" id="contador"></span>
+    </div>
+  </div>
+
+  <form class="filtros" id="form-filtros">
+    <div class="filtros-fila">
+      <div class="campo">
+        <label for="f-texto">Buscar</label>
+        <input type="text" id="f-texto" placeholder="Nombre, titular o palabra clave">
+      </div>
+      <div class="campo">
+        <label for="f-habilidad">Habilidad</label>
+        <input type="text" id="f-habilidad" placeholder="Ej. NDT, soldadura">
+      </div>
+      <div class="campo">
+        <label for="f-ubicacion">Ubicación</label>
+        <input type="text" id="f-ubicacion" placeholder="Ciudad o estado">
+      </div>
+      <button type="submit" class="btn btn-primary">Buscar</button>
+    </div>
+    <label class="campo-check mt-16">
+      <input type="checkbox" id="f-con-cv"> Solo candidatos con CV cargado
+    </label>
+  </form>
+
+  <div id="resultados"></div>
+</main>
+
+<footer id="pie"></footer>
+
+<script src="assets/avba.js"></script>
+<script>
+let sesion = null;
+
+function tarjeta(c) {
+  const habilidades = c.habilidades || [];
+  return `
+    <div class="tarjeta-lista">
+      <div class="tarjeta-encabezado">
+        ${scAvatar(c.foto_url, c.nombre, 'lg')}
+        <div style="flex:1;min-width:0">
+          <div class="fila" style="gap:8px">
+            <span class="tarjeta-nombre"><a href="ver-perfil.html?id=${c.id}">${scEsc(c.nombre)}</a></span>
+            ${Number(c.correo_verificado) ? scBadgeVerificado(true) : ''}
+          </div>
+          ${c.headline ? `<div class="tarjeta-sub">${scEsc(c.headline)}</div>` : ''}
+          <div class="tarjeta-datos">
+            ${c.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(c.ubicacion)}</span>` : ''}
+            ${c.cv_url ? `<span>${scIcono('documento')}CV disponible</span>` : ''}
+          </div>
+        </div>
+      </div>
+
+      ${habilidades.length ? `<div class="chips mt-16">
+        ${habilidades.map(h => `<span class="chip">${scEsc(h)}</span>`).join('')}
+      </div>` : ''}
+
+      <div class="tarjeta-pie">
+        <span class="texto-tenue" style="font-size:12.5px">
+          ${habilidades.length ? habilidades.length + ' habilidad' + (habilidades.length > 1 ? 'es' : '') : 'Sin habilidades listadas'}
+        </span>
+        <div class="fila">
+          ${c.cv_url ? `<a class="btn btn-sm btn-gris" href="${scEsc(c.cv_url)}" target="_blank" rel="noopener">CV</a>` : ''}
+          <a class="btn btn-sm btn-primary" href="ver-perfil.html?id=${c.id}">Ver perfil</a>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function buscar() {
+  const cont = document.getElementById('resultados');
+  cont.innerHTML = scCargando('Buscando candidatos...');
+
+  const filtros = {
+    texto:     document.getElementById('f-texto').value.trim(),
+    habilidad: document.getElementById('f-habilidad').value.trim(),
+    ubicacion: document.getElementById('f-ubicacion').value.trim(),
+  };
+  if (document.getElementById('f-con-cv').checked) filtros.con_cv = '1';
+
+  try {
+    const datos = await scGet('BUSCAR_CANDIDATOS', filtros);
+    if (datos.status !== 'success') {
+      cont.innerHTML = scVacio('alerta', 'No se pudo buscar', datos.message, '');
+      return;
+    }
+
+    const lista = datos.candidatos || [];
+    document.getElementById('contador').textContent =
+      lista.length + (lista.length === 1 ? ' candidato' : ' candidatos');
+
+    cont.innerHTML = lista.length
+      ? `<div class="resultados resultados-2">${lista.map(tarjeta).join('')}</div>`
+      : scVacio('personas', 'Sin resultados',
+          'No encontramos candidatos con esos filtros. Prueba con otros términos.',
+          '<button class="btn btn-outline" onclick="limpiar()">Limpiar filtros</button>');
+
+  } catch (e) {
+    cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+  }
+}
+
+function limpiar() {
+  document.getElementById('f-texto').value = '';
+  document.getElementById('f-habilidad').value = '';
+  document.getElementById('f-ubicacion').value = '';
+  document.getElementById('f-con-cv').checked = false;
+  buscar();
+}
+
+document.getElementById('form-filtros').addEventListener('submit', (e) => {
+  e.preventDefault();
+  buscar();
+});
+document.getElementById('f-con-cv').addEventListener('change', buscar);
+
+window.addEventListener('DOMContentLoaded', () => {
+  sesion = scExigirSesion('empresa');
+  if (!sesion) return;
+
+  scPintarNavbar('candidatos.html');
+  scPintarPie();
+  buscar();
+});
+</script>
+</body>
+</html>

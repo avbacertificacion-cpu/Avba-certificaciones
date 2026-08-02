@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verificación de correo — Socios Comerciales AVBA</title>
+<link rel="stylesheet" href="assets/avba.css">
+<style>
+  body {
+    background: linear-gradient(160deg, var(--hero-1) 0%, var(--hero-2) 100%);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 20px;
+  }
+  .caja { width: 100%; max-width: 430px; text-align: center; }
+  .caja-marca { margin-bottom: 24px; }
+  .caja-marca .brand-mark { color: #fff; font-size: 28px; }
+  .caja .card { box-shadow: var(--sombra-lg); border: none; padding: 34px 28px 28px; border-radius: var(--r-lg); }
+  .simbolo {
+    width: 66px; height: 66px; border-radius: 50%; margin: 0 auto 20px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .simbolo svg { width: 32px; height: 32px; }
+  .simbolo.ok    { background: var(--verde-bg); color: var(--verde); }
+  .simbolo.error { background: var(--rojo-bg);  color: var(--rojo); }
+  .caja h1 { font-size: 20px; font-weight: 800; margin-bottom: 9px; }
+  .caja p { font-size: 14px; color: var(--texto-sub); margin-bottom: 24px; }
+  .legal { margin-top: 16px; font-size: 11.5px; color: rgba(255,255,255,.45); }
+</style>
+</head>
+<body>
+
+<div class="caja">
+  <div class="caja-marca">
+    <div class="brand-mark">AV<span class="accent">BA</span></div>
+  </div>
+
+  <div class="card">
+    <div class="simbolo" id="simbolo"></div>
+    <h1 id="titulo">Verificando...</h1>
+    <p id="mensaje">Un momento por favor.</p>
+    <div id="acciones"></div>
+  </div>
+
+  <p class="legal">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</p>
+</div>
+
+<script src="assets/avba.js"></script>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(location.search);
+  const ok  = params.get('ok') === '1';
+  const msg = params.get('msg') || (ok ? 'Tu correo quedó verificado.' : 'No se pudo verificar el correo.');
+
+  document.getElementById('simbolo').className = 'simbolo ' + (ok ? 'ok' : 'error');
+  document.getElementById('simbolo').innerHTML = scIcono(ok ? 'verificado' : 'alerta');
+  document.getElementById('titulo').textContent = ok ? '¡Correo verificado!' : 'No pudimos verificarlo';
+  document.getElementById('mensaje').textContent = msg;
+
+  // Reflejar el nuevo estado en la sesión guardada del navegador
+  const s = scSesion.leer();
+  if (ok && s) scSesion.actualizar({ correo_verificado: 1 });
+
+  const destino = (s && s.token) ? 'inicio.html' : 'login.html';
+  const texto   = (s && s.token) ? 'Ir a mi portal' : 'Iniciar sesión';
+
+  document.getElementById('acciones').innerHTML = ok
+    ? `<a class="btn btn-primary btn-bloque btn-lg" href="${destino}">${texto}</a>`
+    : `<a class="btn btn-primary btn-bloque btn-lg" href="${destino}">${texto}</a>
+       <p class="campo-ayuda mt-8">Desde tu portal puedes pedir un enlace nuevo.</p>`;
+});
+</script>
+</body>
+</html>

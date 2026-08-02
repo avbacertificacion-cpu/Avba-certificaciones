@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vacantes — Socios Comerciales AVBA</title>
+<link rel="stylesheet" href="assets/avba.css">
+</head>
+<body>
+
+<header id="navbar"></header>
+
+<main class="wrap contenido">
+  <div class="pagina-titulo">
+    <div class="pagina-cabecera">
+      <div>
+        <h1>Bolsa de trabajo</h1>
+        <p>Vacantes abiertas en la industria de inspección, certificación y mantenimiento.</p>
+      </div>
+      <span class="badge badge-azul" id="contador"></span>
+    </div>
+  </div>
+
+  <form class="filtros" id="form-filtros">
+    <div class="filtros-fila">
+      <div class="campo">
+        <label for="f-texto">Buscar</label>
+        <input type="text" id="f-texto" placeholder="Puesto, empresa o palabra clave">
+      </div>
+      <div class="campo">
+        <label for="f-ubicacion">Ubicación</label>
+        <input type="text" id="f-ubicacion" placeholder="Ciudad o estado">
+      </div>
+      <div class="campo">
+        <label for="f-modalidad">Modalidad</label>
+        <select id="f-modalidad">
+          <option value="">Todas</option>
+          <option value="presencial">Presencial</option>
+          <option value="remoto">Remoto</option>
+          <option value="hibrido">Híbrido</option>
+        </select>
+      </div>
+      <button type="submit" class="btn btn-primary" id="btn-buscar">Buscar</button>
+    </div>
+  </form>
+
+  <div id="resultados"></div>
+</main>
+
+<footer id="pie"></footer>
+
+<script src="assets/avba.js"></script>
+<script>
+let sesion = null;
+
+function tarjeta(v) {
+  const yaPostulado = v.ya_postulado;
+  return `
+    <div class="tarjeta-lista">
+      <div class="tarjeta-encabezado">
+        ${scAvatar(v.logo_url, v.empresa, 'md', true)}
+        <div style="flex:1;min-width:0">
+          <div class="tarjeta-nombre"><a href="vacante.html?id=${v.id}">${scEsc(v.titulo)}</a></div>
+          <div class="tarjeta-sub">
+            <a href="ver-empresa.html?id=${v.empresa_id}">${scEsc(v.empresa)}</a>
+            ${Number(v.empresa_verificada) ? ' ' + scBadgeVerificado(true) : ''}
+          </div>
+          <div class="tarjeta-datos">
+            ${v.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : ''}
+            <span>${scIcono('maletin')}${scEsc(SC_MODALIDADES[v.modalidad] || v.modalidad)}</span>
+            ${v.salario ? `<span>${scIcono('dinero')}${scEsc(v.salario)}</span>` : ''}
+            <span>${scIcono('reloj')}${scEsc(scHace(v.creado))}</span>
+          </div>
+        </div>
+      </div>
+      <div class="tarjeta-pie">
+        ${yaPostulado
+          ? `<span class="badge badge-verde">${scIcono('check')}Ya te postulaste</span>`
+          : '<span class="texto-tenue" style="font-size:12.5px">Vacante abierta</span>'}
+        <a class="btn btn-sm ${yaPostulado ? 'btn-gris' : 'btn-primary'}" href="vacante.html?id=${v.id}">
+          ${yaPostulado ? 'Ver detalle' : 'Ver y postularme'}
+        </a>
+      </div>
+    </div>`;
+}
+
+async function buscar() {
+  const cont = document.getElementById('resultados');
+  cont.innerHTML = scCargando('Buscando vacantes...');
+
+  const filtros = {
+    texto:     document.getElementById('f-texto').value.trim(),
+    ubicacion: document.getElementById('f-ubicacion').value.trim(),
+    modalidad: document.getElementById('f-modalidad').value,
+  };
+
+  try {
+    const datos = await scGet('BUSCAR_VACANTES', filtros);
+    if (datos.status !== 'success') {
+      cont.innerHTML = scVacio('alerta', 'No se pudo buscar', datos.message, '');
+      return;
+    }
+
+    const lista = datos.vacantes || [];
+    document.getElementById('contador').textContent =
+      lista.length + (lista.length === 1 ? ' vacante' : ' vacantes');
+
+    cont.innerHTML = lista.length
+      ? `<div class="resultados resultados-2">${lista.map(tarjeta).join('')}</div>`
+      : scVacio('vacia', 'Sin resultados',
+          'No encontramos vacantes con esos filtros. Prueba con otros términos.',
+          '<button class="btn btn-outline" onclick="limpiar()">Limpiar filtros</button>');
+
+  } catch (e) {
+    cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+  }
+}
+
+function limpiar() {
+  document.getElementById('f-texto').value = '';
+  document.getElementById('f-ubicacion').value = '';
+  document.getElementById('f-modalidad').value = '';
+  buscar();
+}
+
+document.getElementById('form-filtros').addEventListener('submit', (e) => {
+  e.preventDefault();
+  buscar();
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  sesion = scExigirSesion();
+  if (!sesion) return;
+
+  scPintarNavbar('vacantes.html');
+  scPintarPie();
+  buscar();
+});
+</script>
+</body>
+</html>

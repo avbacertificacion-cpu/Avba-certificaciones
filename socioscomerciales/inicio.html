@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inicio — Socios Comerciales AVBA</title>
+<link rel="stylesheet" href="assets/avba.css">
+<style>
+  .saludo {
+    background: linear-gradient(160deg, var(--hero-1), var(--hero-2));
+    color: #fff; padding: 30px 0 34px; margin-bottom: 22px;
+  }
+  .saludo h1 { font-size: 24px; font-weight: 800; letter-spacing: -.5px; }
+  .saludo p { color: rgba(255,255,255,.75); font-size: 14px; margin-top: 5px; }
+  .saludo .fila { margin-top: 18px; }
+  .panel { display: grid; gap: 20px; grid-template-columns: 1fr; }
+  @media (min-width: 900px) { .panel { grid-template-columns: 2fr 1fr; align-items: start; } }
+</style>
+</head>
+<body>
+
+<header id="navbar"></header>
+
+<section class="saludo">
+  <div class="wrap">
+    <h1 id="titulo-saludo">Hola</h1>
+    <p id="sub-saludo">Bienvenido a Socios Comerciales AVBA</p>
+    <div class="fila" id="acciones-rapidas"></div>
+  </div>
+</section>
+
+<main class="wrap contenido">
+  <div id="aviso-verificacion"></div>
+  <div id="aviso-bienvenida"></div>
+
+  <div id="metricas" class="metricas"></div>
+
+  <div class="panel">
+    <div id="columna-principal"></div>
+    <div id="columna-lateral"></div>
+  </div>
+</main>
+
+<footer id="pie"></footer>
+
+<script src="assets/avba.js"></script>
+<script>
+let sesion = null;
+
+/* ── Tarjeta de vacante reutilizada en el panel ─────────── */
+function tarjetaVacante(v) {
+  return `
+    <div class="item">
+      ${scAvatar(v.logo_url, v.empresa, 'md', true)}
+      <div class="item-cuerpo">
+        <div class="item-titulo"><a href="vacante.html?id=${v.id}">${scEsc(v.titulo)}</a></div>
+        <div class="item-sub">${scEsc(v.empresa)}</div>
+        <div class="tarjeta-datos">
+          ${v.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : ''}
+          <span>${scIcono('maletin')}${scEsc(SC_MODALIDADES[v.modalidad] || v.modalidad)}</span>
+          ${v.salario ? `<span>${scIcono('dinero')}${scEsc(v.salario)}</span>` : ''}
+          <span>${scIcono('reloj')}${scEsc(scHace(v.creado))}</span>
+        </div>
+      </div>
+      <div class="item-acciones">
+        <a class="btn btn-sm btn-suave" href="vacante.html?id=${v.id}">Ver</a>
+      </div>
+    </div>`;
+}
+
+/* ── Panel del candidato ────────────────────────────────── */
+function pintarPersona(datos) {
+  const m = datos.metricas || {};
+
+  document.getElementById('metricas').innerHTML = `
+    <div class="metrica destacada">
+      <div class="metrica-valor">${m.mis_postulaciones || 0}</div>
+      <div class="metrica-etiqueta">Mis postulaciones</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-valor">${m.aceptadas || 0}</div>
+      <div class="metrica-etiqueta">Aceptadas</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-valor">${m.vacantes_abiertas || 0}</div>
+      <div class="metrica-etiqueta">Vacantes abiertas</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-valor">${m.empresas_totales || 0}</div>
+      <div class="metrica-etiqueta">Empresas</div>
+    </div>`;
+
+  const sugeridas = datos.sugeridas || [];
+  document.getElementById('columna-principal').innerHTML = `
+    <div class="card">
+      <div class="card-titulo">
+        <h3>Vacantes para ti</h3>
+        <a class="btn btn-sm btn-gris" href="vacantes.html">Ver todas</a>
+      </div>
+      <p class="card-sub">Publicaciones recientes a las que aún no te postulas.</p>
+      <div>${
+        sugeridas.length
+          ? sugeridas.map(tarjetaVacante).join('')
+          : scVacio('vacia', 'Todavía no hay vacantes nuevas',
+              'Cuando las empresas publiquen vacantes, aparecerán aquí.',
+              '<a class="btn btn-outline" href="vacantes.html">Explorar la bolsa de trabajo</a>')
+      }</div>
+    </div>`;
+
+  const pct = m.perfil_completo || 0;
+  document.getElementById('columna-lateral').innerHTML = `
+    <div class="card">
+      <div class="card-titulo"><h3>Tu perfil</h3></div>
+      <p class="card-sub">Un perfil completo recibe más respuestas.</p>
+      <div class="fila" style="justify-content:space-between;margin-bottom:8px">
+        <span class="texto-sub" style="font-size:13px">Completado</span>
+        <strong style="font-size:15px">${pct}%</strong>
+      </div>
+      <div class="progreso"><span style="width:${pct}%"></span></div>
+      <a class="btn btn-outline btn-bloque mt-16" href="perfil-persona.html">Editar mi perfil</a>
+    </div>
+
+    <div class="card">
+      <div class="card-titulo"><h3>Accesos rápidos</h3></div>
+      <a class="btn btn-gris btn-bloque mt-8" href="vacantes.html">Buscar vacantes</a>
+      <a class="btn btn-gris btn-bloque mt-8" href="mis-postulaciones.html">Mis postulaciones</a>
+      <a class="btn btn-gris btn-bloque mt-8" href="empresas.html">Directorio de empresas</a>
+    </div>`;
+}
+
+/* ── Panel de la empresa ────────────────────────────────── */
+function pintarEmpresa(datos) {
+  const m = datos.metricas || {};
+
+  document.getElementById('metricas').innerHTML = `
+    <div class="metrica destacada">
+      <div class="metrica-valor">${m.vacantes_abiertas || 0}</div>
+      <div class="metrica-etiqueta">Vacantes abiertas</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-valor">${m.postulaciones_nuevas || 0}</div>
+      <div class="metrica-etiqueta">Postulaciones nuevas</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-valor">${m.postulaciones_total || 0}</div>
+      <div class="metrica-etiqueta">Postulaciones totales</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-valor">${m.candidatos_totales || 0}</div>
+      <div class="metrica-etiqueta">Candidatos en el portal</div>
+    </div>`;
+
+  const recientes = datos.recientes || [];
+  document.getElementById('columna-principal').innerHTML = `
+    <div class="card">
+      <div class="card-titulo">
+        <h3>Postulaciones recientes</h3>
+        <a class="btn btn-sm btn-gris" href="mis-vacantes.html">Ver todas</a>
+      </div>
+      <p class="card-sub">Últimos candidatos que se postularon a tus vacantes.</p>
+      <div>${
+        recientes.length
+          ? recientes.map(p => `
+            <div class="item">
+              ${scAvatar(p.foto_url, p.nombre, 'md')}
+              <div class="item-cuerpo">
+                <div class="item-titulo"><a href="ver-perfil.html?id=${p.persona_id}">${scEsc(p.nombre)}</a></div>
+                ${p.headline ? `<div class="item-sub">${scEsc(p.headline)}</div>` : ''}
+                <div class="item-meta">Se postuló a <strong>${scEsc(p.titulo)}</strong> · ${scEsc(scHace(p.fecha))}</div>
+              </div>
+              <div class="item-acciones">
+                <span class="badge ${(SC_ESTATUS_POSTULACION[p.estatus] || {}).clase || 'badge-gris'}">
+                  ${scEsc((SC_ESTATUS_POSTULACION[p.estatus] || {}).texto || p.estatus)}
+                </span>
+              </div>
+            </div>`).join('')
+          : scVacio('personas', 'Aún no hay postulaciones',
+              'Publica una vacante para empezar a recibir candidatos.',
+              '<a class="btn btn-primary" href="mis-vacantes.html">Publicar una vacante</a>')
+      }</div>
+    </div>`;
+
+  document.getElementById('columna-lateral').innerHTML = `
+    <div class="card">
+      <div class="card-titulo"><h3>Accesos rápidos</h3></div>
+      <a class="btn btn-primary btn-bloque mt-8" href="mis-vacantes.html?nueva=1">Publicar vacante</a>
+      <a class="btn btn-gris btn-bloque mt-8" href="candidatos.html">Buscar candidatos</a>
+      <a class="btn btn-gris btn-bloque mt-8" href="mis-vacantes.html">Gestionar vacantes</a>
+      <a class="btn btn-gris btn-bloque mt-8" href="perfil-empresa.html">Editar mi empresa</a>
+    </div>`;
+}
+
+/* ── Aviso de bienvenida tras el registro ───────────────── */
+function avisoBienvenida() {
+  const estado = sessionStorage.getItem('sc_bienvenida');
+  if (!estado) return;
+  sessionStorage.removeItem('sc_bienvenida');
+
+  const cont = document.getElementById('aviso-bienvenida');
+  if (estado === 'correo') {
+    cont.innerHTML = `
+      <div class="alerta alerta-ok">
+        ${scIcono('check')}
+        <div><strong>¡Cuenta creada!</strong> Te enviamos un correo para confirmar tu dirección.
+        Revisa tu bandeja de entrada (y la carpeta de correo no deseado).</div>
+      </div>`;
+  } else {
+    cont.innerHTML = `
+      <div class="alerta alerta-aviso">
+        ${scIcono('alerta')}
+        <div><strong>¡Cuenta creada!</strong> No pudimos enviar el correo de confirmación en este momento;
+        puedes reintentarlo con el botón "Reenviar" de abajo.</div>
+      </div>`;
+  }
+}
+
+async function cargar() {
+  try {
+    const datos = await scGet('GET_INICIO');
+    if (datos.status !== 'success') { scToast(datos.message, 'error'); return; }
+
+    if (sesion.tipo === 'empresa') pintarEmpresa(datos);
+    else pintarPersona(datos);
+
+  } catch (e) {
+    scToast(e.message, 'error');
+    document.getElementById('columna-principal').innerHTML =
+      scVacio('alerta', 'No se pudo cargar tu panel', e.message, '');
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  sesion = scExigirSesion();
+  if (!sesion) return;
+
+  scPintarNavbar('inicio.html');
+  scPintarPie();
+
+  const esEmpresa = sesion.tipo === 'empresa';
+  document.getElementById('titulo-saludo').textContent =
+    'Hola, ' + (sesion.nombre || (esEmpresa ? 'empresa' : 'candidato'));
+  document.getElementById('sub-saludo').textContent = esEmpresa
+    ? 'Gestiona tus vacantes y encuentra al mejor talento del sector.'
+    : 'Encuentra tu próxima oportunidad en la industria.';
+
+  document.getElementById('acciones-rapidas').innerHTML = esEmpresa
+    ? `<a class="btn btn-blanco" href="mis-vacantes.html?nueva=1">${scIcono('mas')}Publicar vacante</a>
+       <a class="btn btn-fantasma" href="candidatos.html">${scIcono('lupa')}Buscar candidatos</a>`
+    : `<a class="btn btn-blanco" href="vacantes.html">${scIcono('lupa')}Buscar vacantes</a>
+       <a class="btn btn-fantasma" href="perfil-persona.html">${scIcono('persona')}Mi perfil</a>`;
+
+  scAvisoVerificacion(sesion.correo_verificado);
+  avisoBienvenida();
+
+  document.getElementById('metricas').innerHTML = '';
+  document.getElementById('columna-principal').innerHTML = scCargando('Cargando tu panel...');
+  cargar();
+});
+</script>
+</body>
+</html>

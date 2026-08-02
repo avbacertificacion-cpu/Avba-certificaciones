@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perfil del candidato — Socios Comerciales AVBA</title>
+<link rel="stylesheet" href="assets/avba.css">
+<style>
+  .volver-link {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13.5px; font-weight: 600; color: var(--texto-sub); margin: 22px 0 14px;
+  }
+  .volver-link:hover { color: var(--azul); }
+  .volver-link svg { width: 15px; height: 15px; }
+  .resumen { font-size: 14.5px; color: var(--texto-sub); line-height: 1.7; white-space: pre-line; }
+</style>
+</head>
+<body>
+
+<header id="navbar"></header>
+
+<main class="wrap contenido">
+  <a class="volver-link" href="candidatos.html" id="volver"></a>
+  <div id="contenido"></div>
+</main>
+
+<footer id="pie"></footer>
+
+<script src="assets/avba.js"></script>
+<script>
+let sesion = null;
+const idPersona = Number(new URLSearchParams(location.search).get('id') || 0);
+
+function pintar(datos) {
+  const p = datos.persona;
+  document.title = p.nombre + ' — Socios Comerciales AVBA';
+
+  const exp = datos.experiencia || [];
+  const edu = datos.educacion   || [];
+  const hab = datos.habilidades || [];
+
+  document.getElementById('contenido').innerHTML = `
+    <div class="perfil-card mb-16">
+      <div class="portada"></div>
+      <div class="perfil-cuerpo">
+        <div class="perfil-avatar-fila">
+          ${scAvatar(p.foto_url, p.nombre, 'xl')}
+          <div class="fila" style="padding-bottom:6px">
+            ${p.cv_url ? `<a class="btn btn-primary btn-sm" href="${scEsc(p.cv_url)}" target="_blank" rel="noopener">
+                ${scIcono('documento')}Descargar CV</a>` : ''}
+            <a class="btn btn-outline btn-sm" href="mailto:${scEsc(p.correo)}">${scIcono('correo')}Contactar</a>
+          </div>
+        </div>
+
+        <div class="fila" style="gap:9px;margin-top:12px">
+          <h1 class="perfil-nombre" style="margin-top:0">${scEsc(p.nombre)}</h1>
+          ${Number(p.correo_verificado) ? scBadgeVerificado(true) : ''}
+        </div>
+        ${p.headline ? `<p class="perfil-headline">${scEsc(p.headline)}</p>` : ''}
+        <div class="perfil-meta">
+          ${p.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(p.ubicacion)}</span>` : ''}
+          <span>${scIcono('correo')}${scEsc(p.correo)}</span>
+        </div>
+      </div>
+    </div>
+
+    ${p.resumen ? `<div class="card">
+      <div class="card-titulo"><h3>Resumen profesional</h3></div>
+      <div class="resumen">${scEsc(p.resumen)}</div>
+    </div>` : ''}
+
+    ${hab.length ? `<div class="card">
+      <div class="card-titulo"><h3>Habilidades</h3></div>
+      <div class="chips">${hab.map(h => `<span class="chip">${scEsc(h.habilidad)}</span>`).join('')}</div>
+    </div>` : ''}
+
+    <div class="card">
+      <div class="card-titulo"><h3>Experiencia</h3></div>
+      ${exp.length ? exp.map(e => `
+        <div class="item">
+          <div class="item-cuerpo">
+            <div class="item-titulo">${scEsc(e.puesto)}</div>
+            <div class="item-sub">${scEsc(e.empresa)}</div>
+            <div class="item-meta">${scEsc(scRangoFechas(e.desde, e.hasta, e.actual))}</div>
+            ${e.descripcion ? `<div class="item-desc">${scEsc(e.descripcion)}</div>` : ''}
+          </div>
+        </div>`).join('')
+        : '<p class="texto-tenue" style="font-size:13.5px">Este candidato aún no registró experiencia.</p>'}
+    </div>
+
+    <div class="card">
+      <div class="card-titulo"><h3>Educación</h3></div>
+      ${edu.length ? edu.map(e => `
+        <div class="item">
+          <div class="item-cuerpo">
+            <div class="item-titulo">${scEsc(e.titulo)}</div>
+            <div class="item-sub">${scEsc(e.institucion)}</div>
+            <div class="item-meta">${scEsc([e.anio_inicio, e.anio_fin].filter(Boolean).join(' — ') || 'Sin fechas')}</div>
+          </div>
+        </div>`).join('')
+        : '<p class="texto-tenue" style="font-size:13.5px">Este candidato aún no registró educación.</p>'}
+    </div>`;
+}
+
+async function cargar() {
+  const cont = document.getElementById('contenido');
+  cont.innerHTML = scCargando('Cargando perfil...');
+
+  if (!idPersona) {
+    cont.innerHTML = scVacio('alerta', 'Perfil no indicado', 'El enlace no incluye un candidato válido.', '');
+    return;
+  }
+
+  try {
+    const datos = await scGet('GET_PERSONA_PUBLICA', { id: idPersona });
+    if (datos.status !== 'success') {
+      cont.innerHTML = scVacio('alerta', 'No se encontró el perfil', datos.message, '');
+      return;
+    }
+    pintar(datos);
+  } catch (e) {
+    cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  sesion = scExigirSesion();
+  if (!sesion) return;
+
+  scPintarNavbar(sesion.tipo === 'empresa' ? 'candidatos.html' : 'perfil-persona.html');
+  scPintarPie();
+
+  const volver = document.getElementById('volver');
+  volver.innerHTML = scIcono('atras') + (sesion.tipo === 'empresa' ? 'Volver a candidatos' : 'Volver');
+  volver.href = sesion.tipo === 'empresa' ? 'candidatos.html' : 'perfil-persona.html';
+
+  cargar();
+});
+</script>
+</body>
+</html>

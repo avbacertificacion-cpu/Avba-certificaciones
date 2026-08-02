@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mis postulaciones — Socios Comerciales AVBA</title>
+<link rel="stylesheet" href="assets/avba.css">
+<style>
+  .tabs-filtro { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+  .tab-filtro {
+    padding: 8px 15px; border-radius: 999px; border: 1.5px solid var(--borde);
+    background: var(--blanco); color: var(--texto-sub);
+    font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s;
+  }
+  .tab-filtro:hover { border-color: var(--azul); color: var(--azul); }
+  .tab-filtro.activo { background: var(--azul); border-color: var(--azul); color: #fff; }
+</style>
+</head>
+<body>
+
+<header id="navbar"></header>
+
+<main class="wrap contenido">
+  <div class="pagina-titulo">
+    <h1>Mis postulaciones</h1>
+    <p>Sigue el estatus de cada vacante a la que te postulaste.</p>
+  </div>
+
+  <div class="tabs-filtro" id="tabs"></div>
+  <div id="lista"></div>
+</main>
+
+<footer id="pie"></footer>
+
+<script src="assets/avba.js"></script>
+<script>
+let sesion = null;
+let todas  = [];
+let filtro = 'todas';
+
+const FILTROS = [
+  { clave: 'todas',       texto: 'Todas' },
+  { clave: 'enviada',     texto: 'Enviadas' },
+  { clave: 'en_revision', texto: 'En revisión' },
+  { clave: 'aceptada',    texto: 'Aceptadas' },
+  { clave: 'rechazada',   texto: 'No avanzaron' },
+];
+
+function pintarTabs() {
+  document.getElementById('tabs').innerHTML = FILTROS.map(f => {
+    const n = f.clave === 'todas' ? todas.length : todas.filter(p => p.estatus === f.clave).length;
+    return `<button class="tab-filtro ${filtro === f.clave ? 'activo' : ''}"
+              onclick="cambiarFiltro('${f.clave}')">${f.texto} (${n})</button>`;
+  }).join('');
+}
+
+function cambiarFiltro(clave) {
+  filtro = clave;
+  pintarTabs();
+  pintarLista();
+}
+
+function pintarLista() {
+  const lista = filtro === 'todas' ? todas : todas.filter(p => p.estatus === filtro);
+  const cont  = document.getElementById('lista');
+
+  if (!todas.length) {
+    cont.innerHTML = scVacio('enviar', 'Aún no te has postulado',
+      'Explora la bolsa de trabajo y postúlate a las vacantes que te interesen.',
+      '<a class="btn btn-primary" href="vacantes.html">Buscar vacantes</a>');
+    return;
+  }
+
+  if (!lista.length) {
+    cont.innerHTML = scVacio('vacia', 'Nada en esta categoría',
+      'No tienes postulaciones con ese estatus.', '');
+    return;
+  }
+
+  cont.innerHTML = `<div class="resultados">${lista.map(p => {
+    const est = SC_ESTATUS_POSTULACION[p.estatus] || { texto: p.estatus, clase: 'badge-gris' };
+    return `
+      <div class="tarjeta-lista">
+        <div class="tarjeta-encabezado">
+          ${scAvatar(p.logo_url, p.empresa, 'md', true)}
+          <div style="flex:1;min-width:0">
+            <div class="tarjeta-nombre"><a href="vacante.html?id=${p.vacante_id}">${scEsc(p.titulo)}</a></div>
+            <div class="tarjeta-sub">
+              <a href="ver-empresa.html?id=${p.empresa_id}">${scEsc(p.empresa)}</a>
+            </div>
+            <div class="tarjeta-datos">
+              ${p.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(p.ubicacion)}</span>` : ''}
+              <span>${scIcono('maletin')}${scEsc(SC_MODALIDADES[p.modalidad] || p.modalidad)}</span>
+              ${p.salario ? `<span>${scIcono('dinero')}${scEsc(p.salario)}</span>` : ''}
+              <span>${scIcono('reloj')}Postulado ${scEsc(scHace(p.fecha))}</span>
+            </div>
+            ${p.mensaje ? `<div class="item-desc">Tu mensaje: "${scEsc(p.mensaje)}"</div>` : ''}
+          </div>
+        </div>
+        <div class="tarjeta-pie">
+          <div class="fila" style="gap:8px">
+            <span class="badge ${est.clase}">${scEsc(est.texto)}</span>
+            ${p.vacante_estatus === 'cerrada' ? '<span class="badge badge-gris">Vacante cerrada</span>' : ''}
+          </div>
+          <a class="btn btn-sm btn-gris" href="vacante.html?id=${p.vacante_id}">Ver vacante</a>
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+}
+
+async function cargar() {
+  try {
+    const datos = await scGet('MIS_POSTULACIONES');
+    if (datos.status !== 'success') { scToast(datos.message, 'error'); return; }
+    todas = datos.postulaciones || [];
+    pintarTabs();
+    pintarLista();
+  } catch (e) {
+    document.getElementById('lista').innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+  }
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  sesion = scExigirSesion('persona');
+  if (!sesion) return;
+
+  scPintarNavbar('mis-postulaciones.html');
+  scPintarPie();
+
+  document.getElementById('lista').innerHTML = scCargando('Cargando tus postulaciones...');
+  cargar();
+});
+</script>
+</body>
+</html>
