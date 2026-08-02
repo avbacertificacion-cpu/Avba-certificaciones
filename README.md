@@ -4,8 +4,8 @@ Sistema web para la gestión integral de inspecciones mensuales de extintores co
 
 **Rama de despliegue:** `claude/extintores-deploy` - Estructura optimizada para producción con QR tracking completo
 
-<!-- deploy-check: 2026-07-10 -->
-_Última verificación de despliegue: 2026-07-10_
+<!-- deploy-check: 2026-08-02 -->
+_Última verificación de despliegue: 2026-08-02_
 
 ## 📋 Características
 
