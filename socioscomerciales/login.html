@@ -12,8 +12,8 @@
     min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 20px;
   }
   .acceso { width: 100%; max-width: 410px; }
-  .acceso-marca { text-align: center; margin-bottom: 26px; }
-  .acceso-marca p { font-size: 12.5px; color: rgba(255,255,255,.65); margin-top: 6px; }
+  .acceso-marca { text-align: center; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--borde); }
+  .acceso-marca p { font-size: 12px; font-weight: 700; color: var(--azul); letter-spacing: .5px; text-transform: uppercase; }
   .acceso .card { box-shadow: var(--sombra-lg); border: none; padding: 30px 28px 26px; border-radius: var(--r-lg); }
   .acceso h1 { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
   .acceso-sub { font-size: 13px; color: var(--texto-sub); margin-bottom: 22px; }
@@ -33,12 +33,12 @@
 <body>
 
 <div class="acceso">
-  <div class="acceso-marca">
-    <img src="assets/avba-logo-blanco.png" alt="AVBA Inspections, Certifications and Maintenance" class="logo logo-acceso">
-    <p>Socios Comerciales — Inspections, Certifications and Maintenance</p>
-  </div>
-
   <div class="card">
+    <div class="acceso-marca">
+      <img src="assets/avba-logo.png" alt="AVBA" class="logo logo-acceso">
+      <p>Socios Comerciales</p>
+    </div>
+
     <h1>Iniciar sesión</h1>
     <p class="acceso-sub">Accede a tu cuenta de candidato o empresa</p>
 

@@ -12,7 +12,8 @@
     min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 20px;
   }
   .caja { width: 100%; max-width: 430px; text-align: center; }
-  .caja-marca { margin-bottom: 24px; }
+  .acceso-marca { text-align: center; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--borde); }
+  .acceso-marca p { font-size: 12px; font-weight: 700; color: var(--azul); letter-spacing: .5px; text-transform: uppercase; }
   .caja .card { box-shadow: var(--sombra-lg); border: none; padding: 34px 28px 28px; border-radius: var(--r-lg); }
   .simbolo {
     width: 66px; height: 66px; border-radius: 50%; margin: 0 auto 20px;
@@ -29,11 +30,12 @@
 <body>
 
 <div class="caja">
-  <div class="caja-marca">
-    <img src="assets/avba-logo-blanco.png" alt="AVBA Inspections, Certifications and Maintenance" class="logo logo-acceso">
-  </div>
-
   <div class="card">
+    <div class="acceso-marca">
+      <img src="assets/avba-logo.png" alt="AVBA" class="logo logo-acceso">
+      <p>Socios Comerciales</p>
+    </div>
+
     <div class="simbolo" id="simbolo"></div>
     <h1 id="titulo">Verificando...</h1>
     <p id="mensaje">Un momento por favor.</p>
