@@ -9,7 +9,7 @@
 require_once __DIR__ . '/config.php';
 
 /** Versión actual del esquema. Subir al añadir migraciones. */
-const SC_SCHEMA_VERSION = 6;
+const SC_SCHEMA_VERSION = 7;
 
 class ScDatabase {
     private static ?PDO $instance = null;
@@ -71,6 +71,7 @@ class ScDatabase {
             if ($version < 4) self::migrarA4($pdo);
             if ($version < 5) self::migrarA5($pdo);
             if ($version < 6) self::migrarA6($pdo);
+            if ($version < 7) self::migrarA7($pdo);
 
             $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
                         ON DUPLICATE KEY UPDATE valor = '" . SC_SCHEMA_VERSION . "'");
@@ -94,6 +95,7 @@ class ScDatabase {
         $columnas = self::columnasDe($pdo, 'sc_usuarios');
 
         if (!$columnas)                                    return SC_SCHEMA_VERSION; // Base vacía
+        if (in_array('bloqueado_motivo', $columnas, true))   return 7;
         if (in_array('terminos_aceptados', $columnas, true)) return 6;
         if (self::columnasDe($pdo, 'sc_sesiones'))          return 5;
         if (self::columnasDe($pdo, 'sc_intentos'))          return 4;
@@ -140,6 +142,9 @@ class ScDatabase {
                 reset_token       VARCHAR(64)  NULL,
                 reset_expira      DATETIME     NULL,
                 activo            TINYINT(1) NOT NULL DEFAULT 1,
+                bloqueado_motivo  VARCHAR(255) NULL,
+                bloqueado_fecha   DATETIME     NULL,
+                bloqueado_por     INT UNSIGNED NULL,
                 creado            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 ultimo_acceso     DATETIME NULL,
                 UNIQUE KEY uq_sc_usuarios_correo (correo),
@@ -190,6 +195,25 @@ class ScDatabase {
                 ip         VARCHAR(45) NULL,
                 KEY idx_sc_cv_accesos_persona (persona_id, fecha),
                 KEY idx_sc_cv_accesos_usuario (usuario_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        // Bitácora de lo que hace administración. Sin claves foráneas a
+        // propósito: cuando se borra una cuenta el registro del borrado tiene
+        // que sobrevivir, así que se guarda una copia del correo y el nombre.
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_admin_log (
+                id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                admin_id    INT UNSIGNED NOT NULL,
+                admin_correo VARCHAR(190) NOT NULL,
+                accion      VARCHAR(30)  NOT NULL,
+                usuario_id  INT UNSIGNED NULL,
+                usuario_correo VARCHAR(190) NULL,
+                detalle     VARCHAR(255) NULL,
+                fecha       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ip          VARCHAR(45) NULL,
+                KEY idx_sc_admin_log_fecha (fecha),
+                KEY idx_sc_admin_log_usuario (usuario_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
@@ -409,6 +433,29 @@ class ScDatabase {
         self::agregarColumna($pdo, 'sc_usuarios', 'terminos_aceptados', "DATETIME NULL");
     }
 
+    /** v6 → v7: bloqueo de cuentas y bitácora de administración. */
+    private static function migrarA7(PDO $pdo): void {
+        self::agregarColumna($pdo, 'sc_usuarios', 'bloqueado_motivo', "VARCHAR(255) NULL");
+        self::agregarColumna($pdo, 'sc_usuarios', 'bloqueado_fecha',  "DATETIME NULL");
+        self::agregarColumna($pdo, 'sc_usuarios', 'bloqueado_por',    "INT UNSIGNED NULL");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_admin_log (
+                id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                admin_id    INT UNSIGNED NOT NULL,
+                admin_correo VARCHAR(190) NOT NULL,
+                accion      VARCHAR(30)  NOT NULL,
+                usuario_id  INT UNSIGNED NULL,
+                usuario_correo VARCHAR(190) NULL,
+                detalle     VARCHAR(255) NULL,
+                fecha       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ip          VARCHAR(45) NULL,
+                KEY idx_sc_admin_log_fecha (fecha),
+                KEY idx_sc_admin_log_usuario (usuario_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    }
+
     /** Añade una columna solo si aún no existe. */
     private static function agregarColumna(PDO $pdo, string $tabla, string $columna, string $definicion): void {
         $columnas = self::columnasDe($pdo, $tabla);
@@ -429,7 +476,7 @@ class ScDatabase {
         }
 
         $tablas = [];
-        foreach (['sc_meta','sc_usuarios','sc_sesiones','sc_intentos','sc_cv_accesos','sc_personas',
+        foreach (['sc_meta','sc_usuarios','sc_sesiones','sc_intentos','sc_admin_log','sc_cv_accesos','sc_personas',
                   'sc_experiencia','sc_educacion','sc_habilidades','sc_empresas','sc_vacantes',
                   'sc_postulaciones'] as $t) {
             $cols = self::columnasDe($pdo, $t);

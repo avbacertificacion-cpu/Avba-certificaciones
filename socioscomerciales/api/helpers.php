@@ -44,6 +44,28 @@ const SC_BCRYPT_COSTE = 11;
  */
 const SC_HASH_RELLENO = '$2y$11$lcAQapTbrPGi2hDAEi/OwO8yxp0FOpGp3aw/u752c3uwLeRDZjERy';
 
+/**
+ * ¿Este correo es de administración?
+ *
+ * La lista vive en config/config.php (SC_ADMINS), NO en la base de datos, y
+ * es a propósito: config.php solo existe en el servidor y no se versiona, así
+ * que ni un INSERT malicioso ni una fuga de la base convierten a nadie en
+ * administrador. Para dar o quitar el permiso se edita ese archivo.
+ *
+ * hash_equals no aporta nada aquí (el correo del usuario ya se conoce), pero
+ * la comparación se hace en minúsculas y sin espacios para que un correo bien
+ * escrito nunca se quede fuera por un detalle de formato.
+ */
+function scEsAdmin(?string $correo): bool {
+    if (!$correo || !defined('SC_ADMINS') || !is_array(SC_ADMINS)) return false;
+
+    $buscado = strtolower(trim($correo));
+    foreach (SC_ADMINS as $admin) {
+        if (strtolower(trim((string) $admin)) === $buscado) return true;
+    }
+    return false;
+}
+
 /** Hash de contraseña con el coste fijado por el portal. */
 function scHashPassword(string $password): string {
     return password_hash($password, PASSWORD_BCRYPT, ['cost' => SC_BCRYPT_COSTE]);
@@ -239,6 +261,7 @@ function scValidarToken(PDO $pdo, ?string $token): ?array {
     }
 
     unset($fila['expira']);
+    $fila['es_admin'] = scEsAdmin($fila['correo']) ? 1 : 0;
     return $fila;
 }
 

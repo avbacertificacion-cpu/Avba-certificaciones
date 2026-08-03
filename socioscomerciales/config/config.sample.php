@@ -19,6 +19,19 @@ define('SC_DB_PASS', '');
 // define('SC_MAIL_FROM',        'no-reply@avba.com.mx');
 // define('SC_MAIL_FROM_NOMBRE', 'AVBA Socios Comerciales');
 
+// ── Administradores del portal ────────────────────────────────────────
+// Correos que ven el panel de administración (admin.html) y pueden
+// bloquear o eliminar cuentas.
+//
+// La lista vive AQUÍ y no en la base de datos a propósito: este archivo
+// solo existe en el servidor y no se versiona, así que ni un INSERT
+// malicioso ni una fuga de la base convierten a nadie en administrador.
+//
+// El administrador se registra primero como una cuenta normal (candidato o
+// empresa) desde el portal, y luego se añade su correo a esta lista. Para
+// quitarle el permiso, basta con borrarlo de aquí.
+// define('SC_ADMINS', ['tu-correo@avba.com.mx']);
+
 // ── RECOMENDADO: clave del diagnóstico ────────────────────────────────
 // api/index.php?action=DIAGNOSTICO informa de la versión de PHP, las
 // extensiones cargadas, la versión de MariaDB y el estado del esquema. Sin

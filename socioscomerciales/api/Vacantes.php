@@ -371,6 +371,9 @@ class ScVacantes {
     public function resumenInicio(array $usuario): array {
         $usuarioId  = (int) $usuario['id'];
         $verificado = (int) ($usuario['correo_verificado'] ?? 0) === 1;
+        // Se devuelve para que una sesión abierta antes de que el correo
+        // entrara en SC_ADMINS descubra el permiso sin volver a entrar.
+        $esAdmin    = (int) ($usuario['es_admin'] ?? 0);
 
         if ($usuario['tipo'] === 'empresa') {
             $empresaId = $this->idEmpresaPorUsuario($usuarioId);
@@ -402,6 +405,7 @@ class ScVacantes {
             return [
                 'status'            => 'success',
                 'correo_verificado' => $verificado ? 1 : 0,
+                'es_admin'          => $esAdmin,
                 'metricas'          => $metricas,
                 // El panel muestra nombre y foto de quienes se postularon: son
                 // datos de otras personas, así que sin el correo confirmado se
@@ -444,6 +448,7 @@ class ScVacantes {
         return [
             'status'            => 'success',
             'correo_verificado' => $verificado ? 1 : 0,
+            'es_admin'          => $esAdmin,
             'metricas'          => $metricas,
             'sugeridas'         => $sugeridas,
         ];

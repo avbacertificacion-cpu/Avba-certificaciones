@@ -17,6 +17,7 @@ require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Personas.php';
 require_once __DIR__ . '/Empresas.php';
 require_once __DIR__ . '/Vacantes.php';
+require_once __DIR__ . '/Admin.php';
 require_once __DIR__ . '/diagnostico.php';
 
 // Nunca mostrar avisos de PHP en la respuesta: romperían el JSON
@@ -116,6 +117,7 @@ $auth     = new ScAuth($pdo);
 $personas = new ScPersonas($pdo);
 $empresas = new ScEmpresas($pdo);
 $vacantes = new ScVacantes($pdo);
+$admin    = new ScAdmin($pdo);
 
 // ── Extraer token (Authorization: Bearer, X-Token, body o query) ──
 $token = null;
@@ -226,6 +228,22 @@ function scSesionVerificada(PDO $pdo, ?string $token, ?string $tipo = null): arr
     return $usr;
 }
 
+/**
+ * Exige sesión de administración.
+ *
+ * No pide el correo verificado a propósito: quién es administrador lo dice
+ * SC_ADMINS en config.php, un archivo que solo toca quien tiene el servidor,
+ * y esa es garantía suficiente. Exigirlo además arriesgaría dejar el portal
+ * sin administración si el correo de verificación nunca llega.
+ */
+function scSesionAdmin(PDO $pdo, ?string $token): array {
+    $usr = scSesion($pdo, $token);
+    if (empty($usr['es_admin'])) {
+        scRespuesta(['status' => 'error', 'message' => 'No tienes permisos de administración.'], 403);
+    }
+    return $usr;
+}
+
 /** Id de la ficha de candidato de un usuario, o 0 si no tiene. */
 function scIdPersona(PDO $pdo, int $usuarioId): int {
     $s = $pdo->prepare("SELECT id FROM sc_personas WHERE usuario_id = ?");
@@ -253,7 +271,8 @@ if ($method === 'GET') {
         case 'DESCARGAR_CV':
             $usr       = scSesion($pdo, $token);
             $idPersona = (int) ($_GET['id'] ?? 0);
-            if (!scEstaVerificado($usr) && scIdPersona($pdo, (int) $usr['id']) !== $idPersona) {
+            if (!scEstaVerificado($usr) && empty($usr['es_admin'])
+                && scIdPersona($pdo, (int) $usr['id']) !== $idPersona) {
                 scRespuesta([
                     'status'  => 'error',
                     'codigo'  => 'CORREO_NO_VERIFICADO',
@@ -337,6 +356,23 @@ if ($method === 'GET') {
         case 'POSTULACIONES_VACANTE':
             $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($vacantes->postulacionesDeVacante((int) $usr['id'], (int) ($_GET['vacante_id'] ?? 0)));
+
+        // ── Administración ───────────────────────────────────
+        case 'ADMIN_RESUMEN':
+            scSesionAdmin($pdo, $token);
+            scRespuesta($admin->resumen());
+
+        case 'ADMIN_LISTAR_USUARIOS':
+            scSesionAdmin($pdo, $token);
+            scRespuesta($admin->listarUsuarios($payload));
+
+        case 'ADMIN_VER_USUARIO':
+            scSesionAdmin($pdo, $token);
+            scRespuesta($admin->verUsuario((int) ($_GET['id'] ?? 0)));
+
+        case 'ADMIN_BITACORA':
+            scSesionAdmin($pdo, $token);
+            scRespuesta($admin->bitacora($payload));
 
         // ── Candidatos ───────────────────────────────────────
         case 'BUSCAR_CANDIDATOS':
@@ -474,6 +510,19 @@ if ($method === 'POST') {
         case 'CAMBIAR_ESTATUS_POSTULACION':
             $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($vacantes->cambiarEstatusPostulacion((int) $usr['id'], $payload));
+
+        // ── Administración ──────────────────────────────────
+        case 'ADMIN_BLOQUEAR':
+            $usr = scSesionAdmin($pdo, $token);
+            scRespuesta($admin->bloquear($usr, (int) ($payload['id'] ?? 0), $payload));
+
+        case 'ADMIN_DESBLOQUEAR':
+            $usr = scSesionAdmin($pdo, $token);
+            scRespuesta($admin->desbloquear($usr, (int) ($payload['id'] ?? 0)));
+
+        case 'ADMIN_ELIMINAR':
+            $usr = scSesionAdmin($pdo, $token);
+            scRespuesta($admin->eliminar($usr, (int) ($payload['id'] ?? 0), $payload));
 
         default:
             scRespuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);

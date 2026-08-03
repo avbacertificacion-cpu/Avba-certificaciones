@@ -481,10 +481,12 @@ input[type=file].oculto-file { display: none; }
 /* ── Zona de riesgo (borrar cuenta) ───────────────────────── */
 .card-peligro { border-color: #F4C7C7; }
 .card-peligro .card-titulo h3 { color: var(--rojo); }
-.btn-peligro {
+/* Variante sólida, solo para acciones irreversibles (borrar una cuenta).
+   .btn-peligro sigue siendo el contorno suave que usa el resto del portal. */
+.btn-peligro-solido {
   background: var(--rojo); color: #fff; border: 1.5px solid var(--rojo);
 }
-.btn-peligro:hover { background: #d43c3c; border-color: #d43c3c; }
+.btn-peligro-solido:hover:not(:disabled) { background: #d43c3c; border-color: #d43c3c; }
 
 /* ── Lista de sesiones abiertas ───────────────────────────── */
 .sesion-fila {

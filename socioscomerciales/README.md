@@ -19,6 +19,7 @@ socioscomerciales/
 ├── verificar.html          Resultado del enlace de verificación de correo
 ├── terminos.html           Términos y Condiciones (público)
 ├── aviso-privacidad.html   Aviso de Privacidad (público)
+├── admin.html              Panel de administración (solo SC_ADMINS)
 ├── recuperar.html          Solicitar y aplicar el restablecimiento de contraseña
 ├── inicio.html             Panel principal (distinto por tipo de cuenta)
 │
@@ -45,6 +46,7 @@ socioscomerciales/
 │   ├── Personas.php        Perfil de candidato y búsqueda
 │   ├── Empresas.php        Perfil de empresa y directorio
 │   ├── Vacantes.php        Vacantes, postulaciones y avisos por correo
+│   ├── Admin.php           Panel: listar, ver, bloquear y eliminar cuentas
 │   ├── helpers.php         Sesiones, límites, subidas, envío de correo
 │   └── diagnostico.php     Estado del servidor y del esquema
 ├── config/
@@ -69,13 +71,14 @@ Copiar `config/config.sample.php` a `config/config.php` y llenar:
 | `SC_MAIL_FROM`| No          | Remitente de los correos        |
 | `SC_URL_BASE` | No          | URL base si la detección falla  |
 | `SC_DIAG_CLAVE`| Para el diagnóstico | Sin ella `?action=DIAGNOSTICO` responde 403 |
+| `SC_ADMINS`   | Para el panel | Array de correos con acceso a `admin.html` |
 
 `config.php` está en `.gitignore`, así que el despliegue nunca lo sobrescribe.
 
 ## Base de datos
 
 Tablas con prefijo `sc_`: `sc_meta`, `sc_usuarios`, `sc_sesiones`, `sc_intentos`,
-`sc_cv_accesos`, `sc_personas`, `sc_experiencia`, `sc_educacion`, `sc_habilidades`,
+`sc_admin_log`, `sc_cv_accesos`, `sc_personas`, `sc_experiencia`, `sc_educacion`, `sc_habilidades`,
 `sc_empresas`, `sc_vacantes`, `sc_postulaciones`.
 
 El esquema se crea y se migra solo. `sc_meta.schema_version` guarda la versión
@@ -186,6 +189,52 @@ existían**; si hace falta, se resuelve mostrando un aviso bloqueante en
 > publicarlos deben pasar por un abogado, sobre todo el domicilio social, el
 > fuero y las direcciones de contacto, que hoy son `contacto@avba.com.mx` y
 > `privacidad@avba.com.mx` y **tienen que existir**.
+
+## Administración
+
+`admin.html` lista todas las cuentas del portal (candidatos y empresas), con
+filtros por tipo y estado, búsqueda por nombre o correo y una ficha completa de
+cada una: perfil, experiencia, educación, habilidades, postulaciones o
+vacantes, sesiones abiertas y quién ha consultado su CV.
+
+### Quién es administrador
+
+Lo decide **`SC_ADMINS` en `config/config.php`**, un array de correos. No hay
+columna en la base de datos, y es a propósito: ese archivo solo existe en el
+servidor y no se versiona, así que ni un `INSERT` malicioso ni una fuga de la
+base convierten a nadie en administrador.
+
+El administrador **se registra primero como una cuenta normal** desde el
+portal (candidato o empresa, lo que prefiera) y después se añade su correo a
+la lista. Al entrar le aparece "Administración" en el menú. Para quitarle el
+permiso basta con borrarlo de la lista.
+
+```php
+define('SC_ADMINS', ['tu-correo@avba.com.mx']);
+```
+
+### Bloquear y eliminar
+
+- **Bloquear** pone `activo = 0` y **cierra todas sus sesiones al instante**
+  — si no, quien ya estuviera dentro seguiría hasta que caducara su token. La
+  cuenta desaparece de los listados porque todas las consultas del portal
+  filtran por `u.activo = 1`. No borra nada y se deshace con un clic.
+- **Eliminar** destruye la cuenta, sus archivos y sus publicaciones. Es
+  irreversible, así que pide tres cosas: escribir el correo de la cuenta a
+  mano, un motivo, y **la contraseña del propio administrador** — un token
+  robado no debe bastar para vaciar el portal.
+
+Ambas acciones quedan en `sc_admin_log` con el correo de quien las hizo, el de
+la cuenta afectada, el motivo y la IP. Esa tabla **no tiene claves foráneas a
+propósito**: cuando se borra una cuenta, el registro del borrado tiene que
+sobrevivir, así que guarda una copia del correo en texto.
+
+### Dos cosas que el panel no deja hacer
+
+Un administrador **no puede bloquearse ni eliminarse a sí mismo**, ni tocar a
+otro administrador. Las dos prohibiciones existen para lo mismo: si pudiera,
+quedaría fuera de su propio panel y habría que arreglarlo a mano en la base de
+datos. Para quitarle el permiso a alguien se edita `SC_ADMINS`.
 
 ### Datos personales (ARCO)
 

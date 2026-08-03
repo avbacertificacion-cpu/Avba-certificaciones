@@ -201,7 +201,11 @@ class ScPersonas {
     public function entregarCV(array $usuario, int $personaId): void {
         $autorizado = false;
 
-        if ($usuario['tipo'] === 'empresa') {
+        // Administración puede abrir cualquier CV para revisar una denuncia o
+        // comprobar un perfil. Queda registrado igual que el de una empresa.
+        if (!empty($usuario['es_admin'])) {
+            $autorizado = true;
+        } elseif ($usuario['tipo'] === 'empresa') {
             $autorizado = true;
 
             // — Restricción opcional: solo candidatos que se postularon —

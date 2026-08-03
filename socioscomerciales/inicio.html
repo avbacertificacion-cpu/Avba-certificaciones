@@ -257,7 +257,12 @@ async function cargar() {
 
     // Estado real desde el servidor: el de localStorage puede estar viejo
     // (p. ej. si el usuario verificó su correo en otro navegador).
-    scSesion.actualizar({ correo_verificado: datos.correo_verificado });
+    scSesion.actualizar({
+      correo_verificado: datos.correo_verificado,
+      es_admin:          datos.es_admin || 0,
+    });
+    // El menú se pintó antes de conocer el permiso: se redibuja si cambió
+    if (Number(datos.es_admin) !== Number(sesion.es_admin || 0)) scPintarNavbar('inicio.html');
     scAvisoVerificacion(datos.correo_verificado);
 
     if (sesion.tipo === 'empresa') pintarEmpresa(datos);

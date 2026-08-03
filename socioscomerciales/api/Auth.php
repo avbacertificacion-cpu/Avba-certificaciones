@@ -149,6 +149,7 @@ class ScAuth {
 
         $sesion = $this->emitirSesion((int) $row['id'], $row['tipo'], $correo);
         $sesion['correo_verificado'] = (int) $row['correo_verificado'];
+        $sesion['es_admin']          = scEsAdmin($correo) ? 1 : 0;
         return $sesion;
     }
 

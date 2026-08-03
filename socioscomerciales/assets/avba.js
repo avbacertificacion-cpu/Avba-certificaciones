@@ -227,7 +227,14 @@ function scPintarNavbar(activo) {
   if (!cont) return;
 
   const s = scSesion.leer();
-  const menu = (s && SC_MENU[s.tipo]) ? SC_MENU[s.tipo] : [];
+  const menu = (s && SC_MENU[s.tipo]) ? SC_MENU[s.tipo].slice() : [];
+
+  // El panel se añade al menú de su tipo de cuenta: administración no es un
+  // tipo aparte, es un permiso encima de una cuenta normal.
+  if (s && Number(s.es_admin) === 1) {
+    menu.push({ href: 'admin.html', texto: 'Administración', icono: 'personas' });
+  }
+
   const actual = activo || location.pathname.split('/').pop();
 
   cont.className = 'navbar';

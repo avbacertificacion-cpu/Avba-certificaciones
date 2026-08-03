@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administración — Socios Comerciales AVBA</title>
+<meta name="description" content="Panel de administración del portal Socios Comerciales AVBA.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="stylesheet" href="assets/avba.css">
+<style>
+  [hidden] { display: none !important; }
+  .sr-solo {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .estado-lista { font-size: 12.5px; color: var(--texto-tenue); margin-bottom: 12px; }
+  a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible {
+    outline: 2px solid var(--azul); outline-offset: 2px; border-radius: var(--r-sm);
+  }
+
+  /* ── Métricas ─────────────────────────────────────────── */
+  .metricas { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); margin-bottom: 20px; }
+  .metrica {
+    background: var(--blanco); border: 1px solid var(--borde); border-radius: var(--r-md);
+    box-shadow: var(--sombra-sm); padding: 15px 16px;
+  }
+  .metrica-valor { font-size: 25px; font-weight: 800; letter-spacing: -.6px; line-height: 1.1; }
+  .metrica-etq { font-size: 12px; color: var(--texto-tenue); margin-top: 4px; font-weight: 600; }
+  .metrica.alerta .metrica-valor { color: var(--rojo); }
+  .metrica.aviso  .metrica-valor { color: var(--ambar); }
+
+  /* ── Barra de filtros ─────────────────────────────────── */
+  .barra {
+    display: flex; flex-wrap: wrap; gap: 11px; align-items: center;
+    justify-content: space-between; margin-bottom: 16px;
+  }
+  .pestanas {
+    display: flex; gap: 4px; background: var(--blanco); border: 1px solid var(--borde);
+    border-radius: 999px; padding: 4px; box-shadow: var(--sombra-sm);
+    overflow-x: auto; scrollbar-width: none; max-width: 100%;
+  }
+  .pestanas::-webkit-scrollbar { display: none; }
+  .pestana {
+    border: none; background: none; cursor: pointer; font-family: inherit;
+    font-size: 13px; font-weight: 600; color: var(--texto-sub);
+    padding: 7px 15px; border-radius: 999px; white-space: nowrap;
+    transition: background .15s, color .15s;
+  }
+  .pestana:hover { background: var(--gris-fondo); color: var(--azul); }
+  .pestana[aria-pressed="true"] { background: var(--azul); color: #fff; }
+
+  .buscador { position: relative; }
+  .buscador svg {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    width: 15px; height: 15px; color: var(--texto-tenue); pointer-events: none;
+  }
+  .buscador input {
+    width: 250px; max-width: 100%; padding: 9px 12px 9px 34px;
+    border: 1.5px solid var(--borde); border-radius: var(--r-sm);
+    font-size: 13.5px; background: var(--blanco); outline: none;
+  }
+  .buscador input:focus { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(24,95,165,.11); }
+
+  /* ── Fila de cuenta ───────────────────────────────────── */
+  .cuenta {
+    display: flex; gap: 13px; align-items: flex-start;
+    background: var(--blanco); border: 1px solid var(--borde);
+    border-radius: var(--r-md); box-shadow: var(--sombra-sm);
+    padding: 15px 16px; margin-bottom: 11px;
+  }
+  .cuenta.bloqueada { background: #FEFAFA; border-color: #F2D2D2; }
+  .cuenta.bloqueada .cuenta-nombre { color: var(--texto-sub); }
+  .cuenta-cuerpo { flex: 1; min-width: 0; }
+  .cuenta-titulo { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .cuenta-nombre { font-size: 15px; font-weight: 700; overflow-wrap: anywhere; }
+  .cuenta-correo { font-size: 13px; color: var(--texto-sub); margin-top: 3px; overflow-wrap: anywhere; }
+  .cuenta-datos {
+    display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px;
+    font-size: 12.5px; color: var(--texto-tenue);
+  }
+  .cuenta-motivo {
+    font-size: 12.5px; color: #B91C1C; background: var(--rojo-bg);
+    border-radius: var(--r-sm); padding: 7px 11px; margin-top: 9px;
+    overflow-wrap: anywhere;
+  }
+  .cuenta-acciones { display: flex; flex-wrap: wrap; gap: 7px; flex-shrink: 0; align-items: flex-start; }
+  @media (max-width: 640px) {
+    .cuenta { flex-wrap: wrap; }
+    .cuenta-acciones { width: 100%; }
+  }
+
+  /* ── Ficha (modal) ────────────────────────────────────── */
+  .modal-ancho { max-width: 720px; }
+  .ficha-seccion { margin-top: 20px; }
+  .ficha-seccion:first-child { margin-top: 0; }
+  .ficha-titulo {
+    font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--texto-tenue); margin-bottom: 9px;
+  }
+  .ficha-datos { display: grid; grid-template-columns: auto 1fr; gap: 7px 14px; font-size: 13.5px; }
+  .ficha-datos dt { color: var(--texto-tenue); font-weight: 600; white-space: nowrap; }
+  .ficha-datos dd { color: var(--texto); overflow-wrap: anywhere; }
+  .ficha-lista { font-size: 13.5px; }
+  .ficha-item {
+    padding: 9px 0; border-bottom: 1px solid var(--borde); line-height: 1.55;
+    overflow-wrap: anywhere;
+  }
+  .ficha-item:last-child { border-bottom: none; }
+  .ficha-item-meta { font-size: 12px; color: var(--texto-tenue); margin-top: 2px; }
+  .ficha-vacia { font-size: 13px; color: var(--texto-tenue); font-style: italic; }
+
+  .aviso-admin {
+    display: flex; gap: 11px; align-items: flex-start;
+    background: var(--azul-claro); border: 1px solid #C9E0F5;
+    border-radius: var(--r); padding: 14px 16px; margin-bottom: 20px;
+  }
+  .aviso-admin svg { width: 18px; height: 18px; color: var(--azul); flex-shrink: 0; margin-top: 2px; }
+  .aviso-admin p { font-size: 13.5px; color: var(--texto-sub); margin: 0; line-height: 1.6; }
+
+  /* ── Bitácora ─────────────────────────────────────────── */
+  .bitacora-fila {
+    display: flex; gap: 11px; align-items: baseline; flex-wrap: wrap;
+    padding: 9px 0; border-bottom: 1px solid var(--borde); font-size: 13px;
+  }
+  .bitacora-fila:last-child { border-bottom: none; }
+  .bitacora-fecha { font-size: 12px; color: var(--texto-tenue); margin-left: auto; white-space: nowrap; }
+
+  .esq { background: #E9EFF7; border-radius: 6px; position: relative; overflow: hidden; }
+  .esq::after {
+    content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent);
+    animation: sc-brillo 1.4s infinite;
+  }
+  @keyframes sc-brillo { 100% { transform: translateX(100%); } }
+  @media (prefers-reduced-motion: reduce) { .esq::after { animation: none; } }
+</style>
+</head>
+<body>
+
+<header id="navbar"></header>
+
+<main class="wrap contenido">
+  <div class="pagina-titulo">
+    <div class="pagina-cabecera">
+      <div>
+        <h1>Administración</h1>
+        <p>Cuentas del portal: consulta, bloqueo y eliminación.</p>
+      </div>
+      <button type="button" class="btn btn-outline btn-sm" id="btn-bitacora">Ver bitácora</button>
+    </div>
+  </div>
+
+  <div class="aviso-admin">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.5"/>
+    </svg>
+    <p>
+      <strong>Bloquear</strong> deja a la cuenta fuera del portal y la oculta de los listados,
+      pero no borra nada y se puede deshacer. <strong>Eliminar</strong> destruye el perfil, los
+      archivos y las publicaciones sin vuelta atrás. Todo queda registrado en la bitácora con tu
+      correo.
+    </p>
+  </div>
+
+  <div class="metricas" id="metricas"></div>
+
+  <div class="barra">
+    <div class="pestanas" id="pestanas" role="group" aria-label="Filtrar cuentas"></div>
+    <div class="buscador">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+      </svg>
+      <label class="sr-solo" for="f-texto">Buscar por nombre o correo</label>
+      <input type="search" id="f-texto" placeholder="Nombre o correo" autocomplete="off">
+    </div>
+  </div>
+
+  <p class="estado-lista" id="contador" role="status" aria-live="polite"></p>
+  <div id="lista"></div>
+</main>
+
+<!-- Ficha completa de una cuenta -->
+<div class="modal-fondo" id="modal-ficha">
+  <div class="modal modal-ancho" role="dialog" aria-modal="true" aria-labelledby="ficha-titulo">
+    <div class="modal-cabecera">
+      <h3 id="ficha-titulo">Detalle de la cuenta</h3>
+      <button type="button" class="modal-cerrar" aria-label="Cerrar" onclick="scCerrarModal('modal-ficha')">&times;</button>
+    </div>
+    <div class="modal-cuerpo" id="ficha-cuerpo"></div>
+    <div class="modal-pie" id="ficha-acciones"></div>
+  </div>
+</div>
+
+<!-- Bitácora -->
+<div class="modal-fondo" id="modal-bitacora">
+  <div class="modal modal-ancho" role="dialog" aria-modal="true" aria-labelledby="bitacora-titulo">
+    <div class="modal-cabecera">
+      <h3 id="bitacora-titulo">Bitácora de administración</h3>
+      <button type="button" class="modal-cerrar" aria-label="Cerrar" onclick="scCerrarModal('modal-bitacora')">&times;</button>
+    </div>
+    <div class="modal-cuerpo" id="bitacora-cuerpo"></div>
+  </div>
+</div>
+
+<footer id="pie"></footer>
+
+<script src="assets/avba.js"></script>
+<script>
+let sesion = null;
+let usuarios = [];
+let porId = {};
+let totalDisponible = 0;
+let filtro = 'todos';
+let texto = '';
+let temporizador = null;
+let peticion = 0;
+
+const FILTROS = [
+  { valor: 'todos',        texto: 'Todas' },
+  { valor: 'persona',      texto: 'Candidatos' },
+  { valor: 'empresa',      texto: 'Empresas' },
+  { valor: 'sin_verificar',texto: 'Sin verificar' },
+  { valor: 'bloqueados',   texto: 'Bloqueadas' },
+];
+
+/* Los filtros de tipo y de estado son parámetros distintos en el API */
+function parametrosFiltro() {
+  if (filtro === 'persona' || filtro === 'empresa') return { tipo: filtro };
+  if (filtro === 'sin_verificar' || filtro === 'bloqueados') return { estado: filtro };
+  return {};
+}
+
+/* ── Métricas ───────────────────────────────────────────── */
+function pintarMetricas(m) {
+  const tarjetas = [
+    { valor: m.candidatos,        etq: 'Candidatos' },
+    { valor: m.empresas,          etq: 'Empresas' },
+    { valor: m.vacantes_abiertas, etq: 'Vacantes abiertas' },
+    { valor: m.postulaciones,     etq: 'Postulaciones' },
+    { valor: m.altas_semana,      etq: 'Altas esta semana' },
+    { valor: m.sin_verificar,     etq: 'Sin verificar', clase: 'aviso' },
+    { valor: m.bloqueados,        etq: 'Bloqueadas',    clase: 'alerta' },
+  ];
+
+  document.getElementById('metricas').innerHTML = tarjetas.map(t => `
+    <div class="metrica ${t.clase || ''}">
+      <div class="metrica-valor">${Number(t.valor) || 0}</div>
+      <div class="metrica-etq">${scEsc(t.etq)}</div>
+    </div>`).join('');
+}
+
+/* ── Pestañas ───────────────────────────────────────────── */
+function pintarPestanas() {
+  document.getElementById('pestanas').innerHTML = FILTROS.map(f => `
+    <button type="button" class="pestana" aria-pressed="${filtro === f.valor}"
+            data-filtro="${f.valor}">${scEsc(f.texto)}</button>`).join('');
+}
+
+document.getElementById('pestanas').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-filtro]');
+  if (!btn) return;
+  filtro = btn.dataset.filtro;
+  pintarPestanas();
+  cargar();
+});
+
+document.getElementById('f-texto').addEventListener('input', (e) => {
+  clearTimeout(temporizador);
+  const v = e.target.value.trim();
+  temporizador = setTimeout(() => { texto = v; cargar(); }, 300);
+});
+
+/* ── Lista ──────────────────────────────────────────────── */
+function fila(u) {
+  const bloqueada = Number(u.activo) === 0;
+  const esPersona = u.tipo === 'persona';
+  const esAdmin   = Number(u.es_admin) === 1;
+
+  const insignias = [
+    `<span class="badge ${esPersona ? 'badge-azul' : 'badge-gris'}">${esPersona ? 'Candidato' : 'Empresa'}</span>`,
+    Number(u.correo_verificado) ? scBadgeVerificado(true) : '<span class="badge badge-ambar">Sin verificar</span>',
+    bloqueada ? '<span class="badge badge-rojo">Bloqueada</span>' : '',
+    esAdmin ? '<span class="badge badge-verde">Administración</span>' : '',
+  ].join('');
+
+  const datos = [
+    `Alta ${scEsc(scHace(u.creado))}`,
+    u.ultimo_acceso ? `Último acceso ${scEsc(scHace(u.ultimo_acceso))}` : 'Nunca ha entrado',
+    esPersona
+      ? `${Number(u.postulaciones) || 0} postulaciones`
+      : `${Number(u.vacantes) || 0} vacantes`,
+    esPersona && u.cv_url ? 'Con CV' : '',
+  ].filter(Boolean).map(d => `<span>${d}</span>`).join('');
+
+  // Sobre otro administrador no se ofrecen acciones: el permiso se quita
+  // editando SC_ADMINS en config.php, no desde aquí.
+  const acciones = esAdmin ? '' : (bloqueada
+    ? `<button type="button" class="btn btn-sm btn-outline" data-accion="desbloquear" data-id="${Number(u.id)}">Reactivar</button>
+       <button type="button" class="btn btn-sm btn-peligro-solido" data-accion="eliminar" data-id="${Number(u.id)}">Eliminar</button>`
+    : `<button type="button" class="btn btn-sm btn-outline" data-accion="bloquear" data-id="${Number(u.id)}">Bloquear</button>`);
+
+  return `
+    <article class="cuenta ${bloqueada ? 'bloqueada' : ''}">
+      ${scAvatar(esPersona ? u.foto_url : u.logo_url, u.nombre, 'md', !esPersona)}
+      <div class="cuenta-cuerpo">
+        <div class="cuenta-titulo">
+          <span class="cuenta-nombre">${scEsc(u.nombre || '(sin nombre)')}</span>
+          ${insignias}
+        </div>
+        <div class="cuenta-correo">${scEsc(u.correo)}</div>
+        <div class="cuenta-datos">${datos}</div>
+        ${bloqueada && u.bloqueado_motivo
+          ? `<p class="cuenta-motivo">Motivo: ${scEsc(u.bloqueado_motivo)}</p>` : ''}
+      </div>
+      <div class="cuenta-acciones">
+        <button type="button" class="btn btn-sm btn-gris" data-accion="ver" data-id="${Number(u.id)}">Ver ficha</button>
+        ${acciones}
+      </div>
+    </article>`;
+}
+
+function pintarLista() {
+  const cont = document.getElementById('lista');
+
+  document.getElementById('contador').textContent = usuarios.length
+    ? `Mostrando ${usuarios.length} de ${totalDisponible} cuentas`
+    : '';
+
+  if (!usuarios.length) {
+    cont.innerHTML = scVacio('personas', 'Sin resultados',
+      texto ? 'Ninguna cuenta coincide con la búsqueda.' : 'No hay cuentas en este filtro.', '');
+    return;
+  }
+
+  cont.innerHTML = usuarios.map(fila).join('')
+                 + scBotonVerMas(usuarios.length, totalDisponible, 'verMas');
+}
+
+function esqueletos(n) {
+  const f = `
+    <article class="cuenta">
+      <div class="esq" style="width:44px;height:44px;border-radius:50%;flex-shrink:0"></div>
+      <div class="cuenta-cuerpo">
+        <div class="esq" style="height:13px;width:42%;margin-bottom:9px"></div>
+        <div class="esq" style="height:11px;width:60%"></div>
+      </div>
+    </article>`;
+  return f.repeat(n);
+}
+
+async function cargar() {
+  const mia = ++peticion;
+  document.getElementById('lista').innerHTML = esqueletos(5);
+
+  try {
+    const datos = await scGet('ADMIN_LISTAR_USUARIOS', { ...parametrosFiltro(), texto, offset: 0 });
+    if (mia !== peticion) return;   // llegó tarde: ya hay una búsqueda más nueva
+
+    if (datos.status !== 'success') {
+      document.getElementById('lista').innerHTML =
+        scVacio('alerta', 'No se pudo cargar', datos.message || 'Intenta de nuevo.', '');
+      return;
+    }
+
+    usuarios = datos.usuarios || [];
+    totalDisponible = Number(datos.total) || usuarios.length;
+    porId = {};
+    usuarios.forEach(u => { porId[u.id] = u; });
+    pintarLista();
+  } catch (e) {
+    if (mia !== peticion) return;
+    document.getElementById('lista').innerHTML = scVacio('alerta', 'Error', e.message, '');
+  }
+}
+
+async function verMas() {
+  if (usuarios.length >= totalDisponible) return;
+  try {
+    const datos = await scGet('ADMIN_LISTAR_USUARIOS', {
+      ...parametrosFiltro(), texto, offset: usuarios.length,
+    });
+    if (datos.status !== 'success') { scToast(datos.message || 'No se pudo cargar más.', 'error'); return; }
+
+    (datos.usuarios || []).forEach(u => { porId[u.id] = u; });
+    usuarios = usuarios.concat(datos.usuarios || []);
+    totalDisponible = Number(datos.total) || usuarios.length;
+    pintarLista();
+  } catch (e) {
+    scToast(e.message, 'error');
+  }
+}
+
+async function cargarResumen() {
+  try {
+    const datos = await scGet('ADMIN_RESUMEN');
+    if (datos.status === 'success') pintarMetricas(datos.metricas || {});
+  } catch (e) { /* las métricas son accesorias: no bloquean la pantalla */ }
+}
+
+/* ── Acciones ───────────────────────────────────────────── */
+document.getElementById('lista').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-accion]');
+  if (!btn) return;
+
+  const id = Number(btn.dataset.id);
+  switch (btn.dataset.accion) {
+    case 'ver':         verFicha(id); break;
+    case 'bloquear':    bloquear(id); break;
+    case 'desbloquear': desbloquear(id); break;
+    case 'eliminar':    eliminar(id); break;
+  }
+});
+
+async function bloquear(id) {
+  const u = porId[id];
+  if (!u) return;
+
+  const motivo = prompt(
+    `Vas a bloquear a "${u.nombre || u.correo}".\n\n` +
+    'No podrá entrar y desaparecerá de los listados. Se puede deshacer.\n\n' +
+    'Motivo (opcional, queda en la bitácora):');
+  if (motivo === null) return;   // canceló
+
+  try {
+    const r = await scPost('ADMIN_BLOQUEAR', { id, motivo });
+    scToast(r.message, r.status === 'success' ? 'ok' : 'error');
+    if (r.status === 'success') { cargar(); cargarResumen(); }
+  } catch (e) { scToast(e.message, 'error'); }
+}
+
+async function desbloquear(id) {
+  const u = porId[id];
+  if (!u || !confirm(`¿Reactivar la cuenta de "${u.nombre || u.correo}"?`)) return;
+
+  try {
+    const r = await scPost('ADMIN_DESBLOQUEAR', { id });
+    scToast(r.message, r.status === 'success' ? 'ok' : 'error');
+    if (r.status === 'success') { cargar(); cargarResumen(); }
+  } catch (e) { scToast(e.message, 'error'); }
+}
+
+async function eliminar(id) {
+  const u = porId[id];
+  if (!u) return;
+
+  // Escribir el correo a mano es la salvaguarda contra el clic equivocado:
+  // el borrado no se puede deshacer.
+  const escrito = prompt(
+    `ELIMINAR DEFINITIVAMENTE la cuenta de "${u.nombre || u.correo}".\n\n` +
+    'Se borran su perfil, sus archivos y sus publicaciones. No se puede deshacer.\n\n' +
+    `Para confirmar, escribe el correo de la cuenta:\n${u.correo}`);
+  if (escrito === null) return;
+
+  if (escrito.trim().toLowerCase() !== String(u.correo).toLowerCase()) {
+    scToast('El correo no coincide. No se eliminó nada.', 'error');
+    return;
+  }
+
+  const motivo = prompt('Motivo de la eliminación (queda en la bitácora):') || '';
+
+  const password = prompt('Por seguridad, escribe TU contraseña para confirmar:');
+  if (!password) return;
+
+  try {
+    const r = await scPost('ADMIN_ELIMINAR', { id, password, motivo });
+    scToast(r.message, r.status === 'success' ? 'ok' : 'error');
+    if (r.status === 'success') {
+      scCerrarModal('modal-ficha');
+      cargar();
+      cargarResumen();
+    }
+  } catch (e) { scToast(e.message, 'error'); }
+}
+
+/* ── Ficha completa ─────────────────────────────────────── */
+function bloqueLista(titulo, filas, vacio) {
+  const cuerpo = filas && filas.length
+    ? `<div class="ficha-lista">${filas.join('')}</div>`
+    : `<p class="ficha-vacia">${scEsc(vacio)}</p>`;
+  return `<div class="ficha-seccion"><div class="ficha-titulo">${scEsc(titulo)}</div>${cuerpo}</div>`;
+}
+
+function pintarFicha(d) {
+  const u = d.usuario;
+  const p = d.perfil || {};
+  const esPersona = u.tipo === 'persona';
+
+  const datos = [
+    ['Tipo',        esPersona ? 'Candidato' : 'Empresa'],
+    ['Correo',      u.correo],
+    ['Verificado',  Number(u.correo_verificado) ? 'Sí' : 'No'],
+    ['Estado',      Number(u.activo) ? 'Activa' : 'Bloqueada'],
+    ['Alta',        scHace(u.creado)],
+    ['Último acceso', u.ultimo_acceso ? scHace(u.ultimo_acceso) : 'Nunca'],
+    ['Términos',    u.terminos_aceptados ? `v${u.terminos_version} · ${scHace(u.terminos_aceptados)}` : 'No registrado'],
+  ];
+  if (Number(u.activo) === 0 && u.bloqueado_motivo) datos.push(['Motivo del bloqueo', u.bloqueado_motivo]);
+  if (p.telefono)  datos.push(['Teléfono', p.telefono]);
+  if (p.ubicacion) datos.push(['Ubicación', p.ubicacion]);
+  if (p.curp)      datos.push(['CURP', p.curp]);
+  if (p.giro)      datos.push(['Giro', p.giro]);
+  if (p.sitio_web) datos.push(['Sitio web', p.sitio_web]);
+
+  let html = `
+    <div class="ficha-seccion">
+      <div class="ficha-titulo">Cuenta</div>
+      <dl class="ficha-datos">
+        ${datos.map(([k, v]) => `<dt>${scEsc(k)}</dt><dd>${scEsc(v)}</dd>`).join('')}
+      </dl>
+    </div>`;
+
+  if (p.headline || p.resumen || p.descripcion) {
+    html += `<div class="ficha-seccion">
+      <div class="ficha-titulo">${esPersona ? 'Perfil profesional' : 'Descripción'}</div>
+      ${p.headline ? `<p style="font-weight:600;margin-bottom:6px">${scEsc(p.headline)}</p>` : ''}
+      <p style="font-size:13.5px;color:var(--texto-sub);line-height:1.7;white-space:pre-line">${scEsc(p.resumen || p.descripcion || '')}</p>
+    </div>`;
+  }
+
+  if (esPersona) {
+    if (p.cv_url) {
+      html += `<div class="ficha-seccion">
+        <div class="ficha-titulo">Currículum</div>
+        <button type="button" class="btn btn-sm btn-gris" onclick="scVerCV(${Number(p.id)})">Abrir CV</button>
+        <p class="ficha-vacia" style="margin-top:7px">Tu consulta queda registrada, igual que la de una empresa.</p>
+      </div>`;
+    }
+
+    html += bloqueLista('Experiencia', (d.experiencia || []).map(e => `
+      <div class="ficha-item">
+        <strong>${scEsc(e.puesto)}</strong> — ${scEsc(e.empresa)}
+        <div class="ficha-item-meta">${scEsc(scRangoFechas(e.desde, e.hasta, e.actual))}</div>
+      </div>`), 'Sin experiencia registrada.');
+
+    html += bloqueLista('Educación', (d.educacion || []).map(e => `
+      <div class="ficha-item">
+        <strong>${scEsc(e.titulo)}</strong> — ${scEsc(e.institucion)}
+        <div class="ficha-item-meta">${scEsc([e.anio_inicio, e.anio_fin].filter(Boolean).join(' – '))}</div>
+      </div>`), 'Sin educación registrada.');
+
+    const hab = (d.habilidades || []).map(h => `<span class="chip">${scEsc(h.habilidad)}</span>`).join('');
+    html += `<div class="ficha-seccion">
+      <div class="ficha-titulo">Habilidades</div>
+      ${hab ? `<div class="chips">${hab}</div>` : '<p class="ficha-vacia">Sin habilidades registradas.</p>'}
+    </div>`;
+
+    html += bloqueLista('Postulaciones', (d.postulaciones || []).map(po => `
+      <div class="ficha-item">
+        ${scEsc(po.vacante)} — ${scEsc(po.empresa)}
+        <div class="ficha-item-meta">${scEsc(scHace(po.fecha))} · ${scEsc((SC_ESTATUS_POSTULACION[po.estatus] || {}).texto || po.estatus)}</div>
+      </div>`), 'No se ha postulado a ninguna vacante.');
+
+    html += bloqueLista('Quién ha consultado su CV', (d.accesos_cv || []).map(a => `
+      <div class="ficha-item">${scEsc(a.quien || 'Cuenta eliminada')}
+        <div class="ficha-item-meta">${scEsc(scHace(a.fecha))}</div>
+      </div>`), 'Nadie ha abierto su CV.');
+
+  } else {
+    html += bloqueLista('Vacantes', (d.vacantes || []).map(v => `
+      <div class="ficha-item">
+        <strong>${scEsc(v.titulo)}</strong>
+        <span class="badge ${v.estatus === 'abierta' ? 'badge-verde' : 'badge-gris'}">${v.estatus === 'abierta' ? 'Abierta' : 'Cerrada'}</span>
+        <div class="ficha-item-meta">
+          ${scEsc(v.ubicacion || 'Sin ubicación')} · ${Number(v.postulaciones) || 0} postulaciones · ${scEsc(scHace(v.creado))}
+        </div>
+      </div>`), 'No ha publicado vacantes.');
+  }
+
+  html += bloqueLista('Sesiones abiertas', (d.sesiones || []).map(s => `
+    <div class="ficha-item">${scEsc(s.agente || 'Dispositivo desconocido')}
+      <div class="ficha-item-meta">${scEsc(s.ip || '')} · último uso ${scEsc(scHace(s.ultimo_uso || s.creado))}</div>
+    </div>`), 'Sin sesiones abiertas.');
+
+  html += bloqueLista('Historial de administración', (d.bitacora || []).map(b => `
+    <div class="ficha-item">${scEsc(b.accion)} por ${scEsc(b.admin_correo)}
+      <div class="ficha-item-meta">${scEsc(scHace(b.fecha))}${b.detalle ? ' · ' + scEsc(b.detalle) : ''}</div>
+    </div>`), 'Sin acciones registradas.');
+
+  document.getElementById('ficha-titulo').textContent = u.nombre || u.correo;
+  document.getElementById('ficha-cuerpo').innerHTML = html;
+
+  const esAdmin   = Number(u.es_admin) === 1;
+  const bloqueada = Number(u.activo) === 0;
+  document.getElementById('ficha-acciones').innerHTML = esAdmin
+    ? '<p class="ficha-vacia">Cuenta de administración: para quitarle el permiso, edita SC_ADMINS en config/config.php.</p>'
+    : `<button type="button" class="btn btn-gris" onclick="scCerrarModal('modal-ficha')">Cerrar</button>
+       ${bloqueada
+          ? `<button type="button" class="btn btn-outline" onclick="desbloquear(${Number(u.id)})">Reactivar</button>
+             <button type="button" class="btn btn-peligro-solido" onclick="eliminar(${Number(u.id)})">Eliminar</button>`
+          : `<button type="button" class="btn btn-outline" onclick="bloquear(${Number(u.id)})">Bloquear</button>`}`;
+}
+
+async function verFicha(id) {
+  document.getElementById('ficha-titulo').textContent = 'Cargando...';
+  document.getElementById('ficha-cuerpo').innerHTML = esqueletos(3);
+  document.getElementById('ficha-acciones').innerHTML = '';
+  scAbrirModal('modal-ficha');
+
+  try {
+    const d = await scGet('ADMIN_VER_USUARIO', { id });
+    if (d.status !== 'success') {
+      document.getElementById('ficha-cuerpo').innerHTML =
+        scVacio('alerta', 'No se pudo cargar', d.message || '', '');
+      return;
+    }
+    pintarFicha(d);
+  } catch (e) {
+    document.getElementById('ficha-cuerpo').innerHTML = scVacio('alerta', 'Error', e.message, '');
+  }
+}
+
+/* ── Bitácora ───────────────────────────────────────────── */
+document.getElementById('btn-bitacora').addEventListener('click', async () => {
+  document.getElementById('bitacora-cuerpo').innerHTML = esqueletos(4);
+  scAbrirModal('modal-bitacora');
+
+  try {
+    const d = await scGet('ADMIN_BITACORA');
+    const filas = (d && d.bitacora) || [];
+    document.getElementById('bitacora-cuerpo').innerHTML = filas.length
+      ? filas.map(b => `
+          <div class="bitacora-fila">
+            <span class="badge ${b.accion === 'eliminar' ? 'badge-rojo' : b.accion === 'bloquear' ? 'badge-ambar' : 'badge-verde'}">${scEsc(b.accion)}</span>
+            <span>${scEsc(b.usuario_correo || '(cuenta sin identificar)')}</span>
+            <span style="color:var(--texto-tenue);font-size:12px">por ${scEsc(b.admin_correo)}${b.detalle ? ' · ' + scEsc(b.detalle) : ''}</span>
+            <span class="bitacora-fecha">${scEsc(scHace(b.fecha))}</span>
+          </div>`).join('')
+      : '<p class="ficha-vacia">Todavía no hay acciones registradas.</p>';
+  } catch (e) {
+    document.getElementById('bitacora-cuerpo').innerHTML = scVacio('alerta', 'Error', e.message, '');
+  }
+});
+
+/* ── Arranque ───────────────────────────────────────────── */
+window.addEventListener('DOMContentLoaded', () => {
+  sesion = scExigirSesion();
+  if (!sesion) return;
+
+  // La copia local puede estar desfasada; el API es quien decide de verdad y
+  // responde 403 si no hay permiso. Esto solo evita mostrar la pantalla vacía.
+  if (Number(sesion.es_admin) !== 1) {
+    location.href = 'inicio.html';
+    return;
+  }
+
+  scPintarNavbar('admin.html');
+  scPintarPie();
+  pintarPestanas();
+  cargarResumen();
+  cargar();
+});
+</script>
+</body>
+</html>

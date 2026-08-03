@@ -125,6 +125,7 @@ document.getElementById('form-login').addEventListener('submit', async (e) => {
       nombre:     datos.nombre,
       token:      datos.token,
       correo_verificado: datos.correo_verificado,
+      es_admin:          datos.es_admin || 0,
     });
 
     location.href = 'inicio.html';
