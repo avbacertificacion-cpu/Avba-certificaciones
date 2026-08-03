@@ -9,7 +9,7 @@
 require_once __DIR__ . '/config.php';
 
 /** Versión actual del esquema. Subir al añadir migraciones. */
-const SC_SCHEMA_VERSION = 2;
+const SC_SCHEMA_VERSION = 3;
 
 class ScDatabase {
     private static ?PDO $instance = null;
@@ -64,6 +64,7 @@ class ScDatabase {
             }
 
             if ($version < 2) self::migrarA2($pdo);
+            if ($version < 3) self::migrarA3($pdo);
 
             $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
                         ON DUPLICATE KEY UPDATE valor = '" . SC_SCHEMA_VERSION . "'");
@@ -79,7 +80,8 @@ class ScDatabase {
     private static function detectarVersionPrevia(PDO $pdo): int {
         $columnas = self::columnasDe($pdo, 'sc_usuarios');
 
-        if (!$columnas)                              return SC_SCHEMA_VERSION; // Recién creada
+        if (!$columnas)                                    return SC_SCHEMA_VERSION; // Recién creada
+        if (in_array('reset_token', $columnas, true))       return 3;
         if (in_array('correo_verificado', $columnas, true)) return 2;
         return 1;
     }
@@ -117,12 +119,15 @@ class ScDatabase {
                 correo_verificado TINYINT(1) NOT NULL DEFAULT 0,
                 verif_token       VARCHAR(64)  NULL,
                 verif_expira      DATETIME     NULL,
+                reset_token       VARCHAR(64)  NULL,
+                reset_expira      DATETIME     NULL,
                 activo            TINYINT(1) NOT NULL DEFAULT 1,
                 creado            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 ultimo_acceso     DATETIME NULL,
                 UNIQUE KEY uq_sc_usuarios_correo (correo),
                 KEY idx_sc_usuarios_token (session_token),
-                KEY idx_sc_usuarios_verif (verif_token)
+                KEY idx_sc_usuarios_verif (verif_token),
+                KEY idx_sc_usuarios_reset (reset_token)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
@@ -251,6 +256,16 @@ class ScDatabase {
         } catch (PDOException $e) { /* ya existe */ }
         try {
             $pdo->exec("CREATE INDEX idx_sc_habilidades_nombre ON sc_habilidades (habilidad)");
+        } catch (PDOException $e) { /* ya existe */ }
+    }
+
+    /** v2 → v3: recuperación de contraseña. */
+    private static function migrarA3(PDO $pdo): void {
+        self::agregarColumna($pdo, 'sc_usuarios', 'reset_token',  "VARCHAR(64) NULL");
+        self::agregarColumna($pdo, 'sc_usuarios', 'reset_expira', "DATETIME NULL");
+
+        try {
+            $pdo->exec("CREATE INDEX idx_sc_usuarios_reset ON sc_usuarios (reset_token)");
         } catch (PDOException $e) { /* ya existe */ }
     }
 

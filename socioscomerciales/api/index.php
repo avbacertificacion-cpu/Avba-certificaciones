@@ -251,6 +251,17 @@ if ($method === 'POST') {
             $usr = scSesion($pdo, $token);
             scRespuesta($auth->reenviarVerificacion((int) $usr['id']));
 
+        // ── Contraseña ───────────────────────────────────
+        case 'SOLICITAR_RESET':
+            scRespuesta($auth->solicitarReset($payload));
+
+        case 'RESTABLECER_PASSWORD':
+            scRespuesta($auth->restablecerPassword($payload));
+
+        case 'CAMBIAR_PASSWORD':
+            $usr = scSesion($pdo, $token);
+            scRespuesta($auth->cambiarPassword((int) $usr['id'], $payload));
+
         // ── Perfil persona ─────────────────────────────────
         case 'ACTUALIZAR_PERFIL_PERSONA':
             $usr = scSesionTipo($pdo, $token, 'persona');
@@ -268,6 +279,10 @@ if ($method === 'POST') {
             $usr = scSesionTipo($pdo, $token, 'persona');
             scRespuesta($personas->agregarExperiencia((int) $usr['id'], $payload));
 
+        case 'ACTUALIZAR_EXPERIENCIA':
+            $usr = scSesionTipo($pdo, $token, 'persona');
+            scRespuesta($personas->actualizarExperiencia((int) $usr['id'], $payload));
+
         case 'ELIMINAR_EXPERIENCIA':
             $usr = scSesionTipo($pdo, $token, 'persona');
             scRespuesta($personas->eliminarExperiencia((int) $usr['id'], (int) ($payload['id'] ?? 0)));
@@ -275,6 +290,10 @@ if ($method === 'POST') {
         case 'AGREGAR_EDUCACION':
             $usr = scSesionTipo($pdo, $token, 'persona');
             scRespuesta($personas->agregarEducacion((int) $usr['id'], $payload));
+
+        case 'ACTUALIZAR_EDUCACION':
+            $usr = scSesionTipo($pdo, $token, 'persona');
+            scRespuesta($personas->actualizarEducacion((int) $usr['id'], $payload));
 
         case 'ELIMINAR_EDUCACION':
             $usr = scSesionTipo($pdo, $token, 'persona');

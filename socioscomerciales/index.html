@@ -11,9 +11,10 @@
   /* ── Barra superior de la landing ─────────────────────── */
   .top {
     position: sticky; top: 0; z-index: 30;
-    background: rgba(11,26,51,.94); backdrop-filter: blur(10px);
+    background: rgba(255,255,255,.96); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--borde);
   }
-  .top .wrap { display: flex; align-items: center; gap: 12px; height: 66px; }
+  .top .wrap { display: flex; align-items: center; gap: 13px; height: 68px; }
   .top-acciones { margin-left: auto; display: flex; gap: 10px; }
 
   /* ── Hero ─────────────────────────────────────────────── */
@@ -110,12 +111,12 @@
 
 <header class="top">
   <div class="wrap">
-    <a href="index.html" class="logo-chip">
+    <a href="index.html">
       <img src="assets/avba-logo.png" alt="AVBA" class="logo logo-nav">
     </a>
     <span class="brand-tagline">Bolsa de trabajo industrial</span>
     <div class="top-acciones">
-      <a class="btn btn-fantasma btn-sm" href="login.html">Iniciar sesión</a>
+      <a class="btn btn-gris btn-sm" href="login.html">Iniciar sesión</a>
       <a class="btn btn-primary btn-sm" href="registro.html">Crear cuenta</a>
     </div>
   </div>

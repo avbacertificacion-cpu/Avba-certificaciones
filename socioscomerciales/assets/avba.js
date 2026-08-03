@@ -179,7 +179,7 @@ function scPintarNavbar(activo) {
   cont.className = 'navbar';
   cont.innerHTML = `
     <div class="wrap">
-      <a href="${s ? 'inicio.html' : 'index.html'}" class="logo-chip">
+      <a href="${s ? 'inicio.html' : 'index.html'}">
         <img src="assets/avba-logo.png" alt="AVBA" class="logo logo-nav">
       </a>
       <span class="brand-tagline">Socios Comerciales</span>
@@ -344,10 +344,12 @@ function scCargando(texto) {
 function scPintarPie() {
   const cont = document.getElementById('pie');
   if (!cont) return;
+  // El pie es oscuro y el logo solo se ve bien sobre blanco, así que aquí
+  // va la marca en texto y el logo queda reservado a las barras claras.
   cont.className = 'pie';
   cont.innerHTML = `
     <div class="wrap">
-      <span class="logo-chip"><img src="assets/avba-logo.png" alt="AVBA" class="logo logo-pie"></span>
+      <span class="pie-marca">Socios Comerciales AVBA</span>
       <p class="pie-legal">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. — avba.com.mx</p>
     </div>`;
 }

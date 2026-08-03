@@ -47,6 +47,20 @@
     </div>
   </div>
 
+  <!-- Completitud del perfil -->
+  <div class="card">
+    <div class="card-titulo"><h3>Fuerza de tu perfil</h3></div>
+    <p class="card-sub">Un perfil completo genera más confianza en los candidatos que ven tus vacantes.</p>
+    <div class="completitud-barra">
+      <div class="fila" style="justify-content:space-between;margin-bottom:7px">
+        <span class="texto-sub" style="font-size:13px">Completado</span>
+        <strong style="font-size:16px" id="pct-texto">0%</strong>
+      </div>
+      <div class="progreso"><span id="pct-barra" style="width:0%"></span></div>
+    </div>
+    <div id="pendientes"></div>
+  </div>
+
   <div class="card">
     <div class="card-titulo"><h3>Datos de la empresa</h3></div>
     <p class="card-sub">Esta información aparece en tu perfil público y junto a tus vacantes.</p>
@@ -76,6 +90,30 @@
       </div>
       <div class="form-acciones">
         <button type="submit" class="btn btn-primary" id="btn-guardar">Guardar cambios</button>
+      </div>
+    </form>
+  </div>
+  <!-- Seguridad -->
+  <div class="card">
+    <div class="card-titulo"><h3>Contraseña</h3></div>
+    <p class="card-sub">Cámbiala cuando quieras. Necesitas escribir la actual para confirmar.</p>
+    <form id="form-password">
+      <div class="rejilla rejilla-2">
+        <div class="campo col-full">
+          <label for="pw-actual">Contraseña actual</label>
+          <input type="password" id="pw-actual" autocomplete="current-password" required>
+        </div>
+        <div class="campo">
+          <label for="pw-nueva">Nueva contraseña</label>
+          <input type="password" id="pw-nueva" autocomplete="new-password" placeholder="Mínimo 6 caracteres" required>
+        </div>
+        <div class="campo">
+          <label for="pw-nueva2">Repite la nueva</label>
+          <input type="password" id="pw-nueva2" autocomplete="new-password" required>
+        </div>
+      </div>
+      <div class="form-acciones">
+        <button type="submit" class="btn btn-outline" id="btn-password">Cambiar contraseña</button>
       </div>
     </form>
   </div>
@@ -113,8 +151,58 @@ function pintar(e) {
   document.getElementById('f-sitio').value       = e.sitio_web || '';
   document.getElementById('f-descripcion').value = e.descripcion || '';
 
+  pintarCompletitud(e);
   scAvisoVerificacion(Number(e.correo_verificado));
   scSesion.actualizar({ nombre: e.nombre, correo_verificado: Number(e.correo_verificado) });
+}
+
+/* Cada pendiente es accionable: lleva directo al campo que falta */
+function pintarCompletitud(e) {
+  const faltantes = [];
+
+  if (!e.logo_url)    faltantes.push({ t: 'Sube tu logo',            a: () => document.getElementById('input-logo').click() });
+  if (!e.giro)        faltantes.push({ t: 'Indica tu giro',          a: () => enfocar('f-giro') });
+  if (!e.ubicacion)   faltantes.push({ t: 'Agrega tu ubicación',     a: () => enfocar('f-ubicacion') });
+  if (!e.sitio_web)   faltantes.push({ t: 'Agrega tu sitio web',     a: () => enfocar('f-sitio') });
+  if (!e.descripcion) faltantes.push({ t: 'Describe tu empresa',     a: () => enfocar('f-descripcion') });
+  if (!Number(e.vacantes_abiertas)) {
+    faltantes.push({ t: 'Publica tu primera vacante', a: () => { location.href = 'mis-vacantes.html?nueva=1'; } });
+  }
+
+  const total = 6;
+  const pct = Math.round((total - faltantes.length) / total * 100);
+
+  document.getElementById('pct-texto').textContent = pct + '%';
+  const barra = document.getElementById('pct-barra');
+  barra.style.width = pct + '%';
+  barra.style.background = pct >= 100 ? 'var(--verde)' : (pct >= 60 ? 'var(--azul)' : 'var(--ambar)');
+
+  const cont = document.getElementById('pendientes');
+  cont.innerHTML = '';
+
+  if (!faltantes.length) {
+    cont.innerHTML = `<div class="listo-msg">${scIcono('check')}¡Tu perfil está completo!</div>`;
+    return;
+  }
+
+  const fila = document.createElement('div');
+  fila.className = 'pendientes';
+  faltantes.forEach(f => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'pendiente';
+    chip.innerHTML = scIcono('mas') + scEsc(f.t);
+    chip.addEventListener('click', f.a);
+    fila.appendChild(chip);
+  });
+  cont.appendChild(fila);
+}
+
+function enfocar(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => el.focus(), 320);
 }
 
 async function cargar() {
@@ -141,6 +229,7 @@ document.getElementById('input-logo').addEventListener('change', async (e) => {
       const url = datos.logo_url + '?v=' + Date.now();
       document.getElementById('logo-caja').innerHTML =
         scAvatar(url, empresa ? empresa.nombre : '', 'xl', true);
+      cargar();   // refresca la barra de completitud
     } else {
       scToast(datos.message || 'No se pudo subir el logo.', 'error');
     }
@@ -172,6 +261,33 @@ document.getElementById('form-datos').addEventListener('submit', async (e) => {
   } finally {
     btn.disabled = false;
     btn.textContent = 'Guardar cambios';
+  }
+});
+
+/* ── Cambio de contraseña ───────────────────────────────── */
+document.getElementById('form-password').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const actual = document.getElementById('pw-actual').value;
+  const nueva  = document.getElementById('pw-nueva').value;
+  const nueva2 = document.getElementById('pw-nueva2').value;
+
+  if (nueva.length < 6)  { scToast('La nueva contraseña debe tener al menos 6 caracteres.', 'error'); return; }
+  if (nueva !== nueva2)  { scToast('Las dos contraseñas nuevas no coinciden.', 'error'); return; }
+
+  const btn = document.getElementById('btn-password');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin spin-azul"></div> Cambiando...';
+
+  try {
+    const datos = await scPost('CAMBIAR_PASSWORD', { actual, nueva });
+    scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
+    if (datos.status === 'success') e.target.reset();
+  } catch (err) {
+    scToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Cambiar contraseña';
   }
 });
 

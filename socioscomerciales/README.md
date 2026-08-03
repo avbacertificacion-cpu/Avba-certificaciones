@@ -17,6 +17,7 @@ socioscomerciales/
 ├── login.html              Acceso
 ├── registro.html           Alta de cuenta (candidato / empresa)
 ├── verificar.html          Resultado del enlace de verificación de correo
+├── recuperar.html          Solicitar y aplicar el restablecimiento de contraseña
 ├── inicio.html             Panel principal (distinto por tipo de cuenta)
 │
 │   — Candidato —
@@ -38,11 +39,12 @@ socioscomerciales/
 │   └── avba.js             Sesión, API, navbar, toasts, iconos
 ├── api/
 │   ├── index.php           Router (switch de acciones, respuestas JSON)
-│   ├── Auth.php            Registro, login, verificación de correo
+│   ├── Auth.php            Registro, login, verificación y contraseñas
 │   ├── Personas.php        Perfil de candidato y búsqueda
 │   ├── Empresas.php        Perfil de empresa y directorio
 │   ├── Vacantes.php        Vacantes, postulaciones y avisos por correo
-│   └── helpers.php         Tokens, subidas, envío de correo
+│   ├── helpers.php         Tokens, subidas, envío de correo
+│   └── diagnostico.php     Estado del servidor y del esquema
 ├── config/
 │   ├── config.php          Credenciales reales (NO versionado)
 │   ├── config.sample.php   Plantilla
@@ -78,6 +80,15 @@ aplicada; si es menor que `SC_SCHEMA_VERSION` (en `config/database.php`), se
 ejecutan las migraciones pendientes en el siguiente request. Para añadir una
 migración: subir la constante y agregar un método `migrarAN()`.
 
+## Contraseñas
+
+- **Olvidé mi contraseña**: `recuperar.html` pide el correo y envía un enlace con
+  token de 2 h. La respuesta es siempre la misma exista o no la cuenta, para no
+  revelar qué correos están registrados.
+- Al restablecerla se **cierran todas las sesiones abiertas** de esa cuenta.
+- **Cambiar contraseña** con la sesión iniciada, desde ambos perfiles, exigiendo
+  la contraseña actual.
+
 ## Verificación de correo
 
 Al registrarse se genera un token (48 h de vigencia) y se envía un correo con
@@ -96,8 +107,10 @@ Las cuentas verificadas llevan una insignia y aparecen primero en las búsquedas
 un servicio. `assets/favicon.png` usa solo el isotipo, que es lo único legible
 a tamaño de pestaña.
 
-No recolorear el logo: el arte tiene bordes suavizados y reteñirlo deja halos.
-Sobre fondos oscuros va dentro de una placa blanca (`.logo-chip`).
+No recolorear el logo ni ponerlo sobre fondo oscuro: el arte tiene bordes
+suavizados, así que reteñirlo deja halos y encajarlo en una placa blanca sobre
+fondo oscuro parece calcomanía. Por eso las barras superiores son **blancas** y
+el pie usa la marca en texto.
 
 ## Notas del host (Hostinger, PHP-FPM, MariaDB 11.8)
 

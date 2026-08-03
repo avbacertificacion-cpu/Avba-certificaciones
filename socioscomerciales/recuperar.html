@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recuperar contraseña — Socios Comerciales AVBA</title>
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="stylesheet" href="assets/avba.css">
+<style>
+  body {
+    background: linear-gradient(160deg, var(--hero-1) 0%, var(--hero-2) 100%);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 20px;
+  }
+  .acceso { width: 100%; max-width: 410px; }
+  .acceso .card { box-shadow: var(--sombra-lg); border: none; padding: 30px 28px 26px; border-radius: var(--r-lg); }
+  .acceso-marca { text-align: center; padding-bottom: 18px; margin-bottom: 20px; border-bottom: 1px solid var(--borde); }
+  .acceso-marca p { font-size: 12px; font-weight: 700; color: var(--azul); letter-spacing: .5px; text-transform: uppercase; }
+  .acceso h1 { font-size: 19px; font-weight: 700; margin-bottom: 4px; }
+  .acceso-sub { font-size: 13px; color: var(--texto-sub); margin-bottom: 22px; }
+  .acceso-pie { text-align: center; margin-top: 18px; font-size: 13px; color: var(--texto-sub); }
+  .acceso-pie a { color: var(--azul); font-weight: 600; }
+  .volver { display: block; text-align: center; margin-top: 18px; font-size: 13px; color: rgba(255,255,255,.72); }
+  .volver:hover { color: #fff; }
+  .legal { text-align: center; margin-top: 14px; font-size: 11.5px; color: rgba(255,255,255,.45); }
+  .fuerza { height: 5px; background: var(--borde); border-radius: 999px; overflow: hidden; margin-top: 7px; }
+  .fuerza span { display: block; height: 100%; width: 0; border-radius: 999px; transition: width .25s, background .25s; }
+</style>
+</head>
+<body>
+
+<div class="acceso">
+  <div class="card">
+    <div class="acceso-marca">
+      <img src="assets/avba-logo.png" alt="AVBA" class="logo logo-acceso">
+      <p>Socios Comerciales</p>
+    </div>
+
+    <h1 id="titulo">Recuperar contraseña</h1>
+    <p class="acceso-sub" id="subtitulo">Te enviaremos un enlace para elegir una nueva.</p>
+
+    <div class="alerta alerta-error oculto" id="error"></div>
+    <div class="alerta alerta-ok oculto" id="exito"></div>
+
+    <!-- Paso 1: pedir el enlace -->
+    <form id="form-solicitar">
+      <div class="campo">
+        <label for="correo">Correo electrónico</label>
+        <input type="email" id="correo" autocomplete="email" placeholder="tucorreo@ejemplo.com" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-bloque btn-lg" id="btn-solicitar">Enviar enlace</button>
+    </form>
+
+    <!-- Paso 2: elegir la nueva contraseña (si se llegó con ?t=token) -->
+    <form id="form-restablecer" class="oculto">
+      <div class="campo">
+        <label for="password">Nueva contraseña</label>
+        <input type="password" id="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres" required>
+        <div class="fuerza"><span id="barra-fuerza"></span></div>
+        <div class="campo-ayuda" id="texto-fuerza">Usa al menos 6 caracteres.</div>
+      </div>
+      <div class="campo">
+        <label for="password2">Repite la contraseña</label>
+        <input type="password" id="password2" autocomplete="new-password" placeholder="Vuelve a escribirla" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-bloque btn-lg" id="btn-restablecer">Guardar contraseña</button>
+    </form>
+
+    <p class="acceso-pie">¿Ya la recordaste? <a href="login.html">Inicia sesión</a></p>
+  </div>
+
+  <a class="volver" href="index.html">&larr; Volver al inicio</a>
+  <p class="legal">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</p>
+</div>
+
+<script src="assets/avba.js"></script>
+<script>
+const $error = document.getElementById('error');
+const $exito = document.getElementById('exito');
+const tokenReset = new URLSearchParams(location.search).get('t');
+
+function mostrarError(msg) {
+  $exito.classList.add('oculto');
+  $error.innerHTML = scIcono('alerta') + '<div>' + scEsc(msg) + '</div>';
+  $error.classList.remove('oculto');
+}
+function mostrarExito(msg) {
+  $error.classList.add('oculto');
+  $exito.innerHTML = scIcono('check') + '<div>' + scEsc(msg) + '</div>';
+  $exito.classList.remove('oculto');
+}
+function limpiar() {
+  $error.classList.add('oculto');
+  $exito.classList.add('oculto');
+}
+
+/* Paso 1: solicitar el enlace */
+document.getElementById('form-solicitar').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  limpiar();
+
+  const correo = document.getElementById('correo').value.trim();
+  if (!correo) { mostrarError('Escribe tu correo electrónico.'); return; }
+
+  const btn = document.getElementById('btn-solicitar');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Enviando...';
+
+  try {
+    const datos = await scPost('SOLICITAR_RESET', { correo });
+    mostrarExito(datos.message);
+    document.getElementById('form-solicitar').reset();
+  } catch (err) {
+    mostrarError(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Enviar enlace';
+  }
+});
+
+/* Indicador de fuerza de la nueva contraseña */
+document.getElementById('password').addEventListener('input', (e) => {
+  const v = e.target.value;
+  let p = 0;
+  if (v.length >= 6)  p++;
+  if (v.length >= 10) p++;
+  if (/[A-Z]/.test(v) && /[a-z]/.test(v)) p++;
+  if (/[0-9]/.test(v)) p++;
+  if (/[^A-Za-z0-9]/.test(v)) p++;
+
+  const niveles = [
+    { w: '0%',   c: 'transparent',  t: 'Usa al menos 6 caracteres.' },
+    { w: '25%',  c: 'var(--rojo)',  t: 'Contraseña débil.' },
+    { w: '50%',  c: 'var(--ambar)', t: 'Contraseña aceptable.' },
+    { w: '75%',  c: '#84cc16',      t: 'Contraseña buena.' },
+    { w: '100%', c: 'var(--verde)', t: 'Contraseña fuerte.' },
+  ];
+  const n = niveles[Math.min(p, 4)];
+  const barra = document.getElementById('barra-fuerza');
+  barra.style.width = n.w;
+  barra.style.background = n.c;
+  document.getElementById('texto-fuerza').textContent = v ? n.t : niveles[0].t;
+});
+
+/* Paso 2: guardar la nueva contraseña */
+document.getElementById('form-restablecer').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  limpiar();
+
+  const password  = document.getElementById('password').value;
+  const password2 = document.getElementById('password2').value;
+
+  if (password.length < 6) { mostrarError('La contraseña debe tener al menos 6 caracteres.'); return; }
+  if (password !== password2) { mostrarError('Las dos contraseñas no coinciden.'); return; }
+
+  const btn = document.getElementById('btn-restablecer');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Guardando...';
+
+  try {
+    const datos = await scPost('RESTABLECER_PASSWORD', { token: tokenReset, password });
+    if (datos.status !== 'success') { mostrarError(datos.message); return; }
+
+    // El servidor cerró las sesiones abiertas: limpiar la local también
+    scSesion.borrar();
+    mostrarExito(datos.message);
+    document.getElementById('form-restablecer').classList.add('oculto');
+    setTimeout(() => { location.href = 'login.html'; }, 2200);
+  } catch (err) {
+    mostrarError(err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Guardar contraseña';
+  }
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (tokenReset) {
+    document.getElementById('titulo').textContent = 'Elige una nueva contraseña';
+    document.getElementById('subtitulo').textContent = 'Escríbela dos veces para confirmar.';
+    document.getElementById('form-solicitar').classList.add('oculto');
+    document.getElementById('form-restablecer').classList.remove('oculto');
+    document.getElementById('password').focus();
+  } else {
+    document.getElementById('correo').focus();
+  }
+});
+</script>
+</body>
+</html>

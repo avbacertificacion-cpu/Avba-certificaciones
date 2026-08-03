@@ -241,6 +241,38 @@ class ScPersonas {
         return ['status' => 'success', 'message' => 'Experiencia agregada.'];
     }
 
+    public function actualizarExperiencia(int $usuarioId, array $payload): array {
+        $personaId = $this->idPersonaPorUsuario($usuarioId);
+        if (!$personaId) return ['status' => 'error', 'message' => 'Perfil no encontrado.'];
+
+        $id = (int) ($payload['id'] ?? 0);
+        if (!$id) return ['status' => 'error', 'message' => 'Experiencia no indicada.'];
+
+        $empresa = trim($payload['empresa'] ?? '');
+        $puesto  = trim($payload['puesto']  ?? '');
+        if (!$empresa || !$puesto) {
+            return ['status' => 'error', 'message' => 'Empresa y puesto son obligatorios.'];
+        }
+
+        $actual = !empty($payload['actual']) && $payload['actual'] !== 'false' ? 1 : 0;
+
+        $stmt = $this->pdo->prepare(
+            "UPDATE sc_experiencia
+             SET empresa = ?, puesto = ?, desde = ?, hasta = ?, actual = ?, descripcion = ?
+             WHERE id = ? AND persona_id = ?"
+        );
+        $stmt->execute([
+            $empresa, $puesto,
+            !empty($payload['desde']) ? $payload['desde'] : null,
+            $actual ? null : (!empty($payload['hasta']) ? $payload['hasta'] : null),
+            $actual,
+            trim($payload['descripcion'] ?? '') ?: null,
+            $id, $personaId,
+        ]);
+
+        return ['status' => 'success', 'message' => 'Experiencia actualizada.'];
+    }
+
     public function eliminarExperiencia(int $usuarioId, int $id): array {
         return $this->eliminarDe('sc_experiencia', $usuarioId, $id, 'Experiencia eliminada.');
     }
@@ -266,6 +298,33 @@ class ScPersonas {
         ]);
 
         return ['status' => 'success', 'message' => 'Educación agregada.'];
+    }
+
+    public function actualizarEducacion(int $usuarioId, array $payload): array {
+        $personaId = $this->idPersonaPorUsuario($usuarioId);
+        if (!$personaId) return ['status' => 'error', 'message' => 'Perfil no encontrado.'];
+
+        $id = (int) ($payload['id'] ?? 0);
+        if (!$id) return ['status' => 'error', 'message' => 'Educación no indicada.'];
+
+        $institucion = trim($payload['institucion'] ?? '');
+        $titulo      = trim($payload['titulo']      ?? '');
+        if (!$institucion || !$titulo) {
+            return ['status' => 'error', 'message' => 'Institución y título son obligatorios.'];
+        }
+
+        $stmt = $this->pdo->prepare(
+            "UPDATE sc_educacion SET institucion = ?, titulo = ?, anio_inicio = ?, anio_fin = ?
+             WHERE id = ? AND persona_id = ?"
+        );
+        $stmt->execute([
+            $institucion, $titulo,
+            !empty($payload['anio_inicio']) ? (int) $payload['anio_inicio'] : null,
+            !empty($payload['anio_fin'])    ? (int) $payload['anio_fin']    : null,
+            $id, $personaId,
+        ]);
+
+        return ['status' => 'success', 'message' => 'Educación actualizada.'];
     }
 
     public function eliminarEducacion(int $usuarioId, int $id): array {

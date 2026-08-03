@@ -17,21 +17,26 @@
   }
   .foto-boton:hover { background: var(--azul-oscuro); }
   .foto-boton svg { width: 15px; height: 15px; }
-  .foto-envoltura.subiendo .foto-boton { pointer-events: none; }
+  .foto-envoltura.subiendo { opacity: .6; pointer-events: none; }
+
   .cv-caja {
     display: flex; align-items: center; gap: 13px;
     padding: 14px; border: 1.5px dashed var(--borde); border-radius: var(--r);
-    background: var(--gris-fondo);
+    background: var(--gris-fondo); flex-wrap: wrap;
   }
+  .cv-caja.cargado { border-style: solid; border-color: #A9E9BF; background: var(--verde-bg); }
   .cv-icono {
     width: 42px; height: 42px; border-radius: var(--r-sm); flex-shrink: 0;
     background: var(--azul-claro); color: var(--azul);
     display: flex; align-items: center; justify-content: center;
   }
+  .cv-caja.cargado .cv-icono { background: #fff; color: var(--verde); }
   .cv-icono svg { width: 20px; height: 20px; }
-  .cv-datos { flex: 1; min-width: 0; }
+  .cv-datos { flex: 1; min-width: 150px; }
   .cv-datos strong { font-size: 13.5px; display: block; }
   .cv-datos span { font-size: 12.5px; color: var(--texto-sub); }
+
+  /* El medidor de completitud vive en avba.css (lo comparte perfil-empresa) */
 </style>
 </head>
 <body>
@@ -48,7 +53,7 @@
       <div class="perfil-avatar-fila">
         <div class="foto-envoltura" id="foto-envoltura">
           <div id="avatar-caja"></div>
-          <button class="foto-boton" id="btn-foto" title="Cambiar foto de perfil"></button>
+          <button class="foto-boton" id="btn-foto" title="Cambiar foto de perfil" aria-label="Cambiar foto de perfil"></button>
           <input type="file" id="input-foto" accept="image/jpeg,image/png,image/webp,image/gif" class="oculto-file">
         </div>
         <div class="fila" style="padding-bottom:6px">
@@ -62,11 +67,25 @@
     </div>
   </div>
 
+  <!-- Completitud del perfil -->
+  <div class="card">
+    <div class="card-titulo"><h3>Fuerza de tu perfil</h3></div>
+    <p class="card-sub">Los perfiles completos reciben muchas más respuestas de las empresas.</p>
+    <div class="completitud-barra">
+      <div class="fila" style="justify-content:space-between;margin-bottom:7px">
+        <span class="texto-sub" style="font-size:13px">Completado</span>
+        <strong style="font-size:16px" id="pct-texto">0%</strong>
+      </div>
+      <div class="progreso"><span id="pct-barra" style="width:0%"></span></div>
+    </div>
+    <div id="pendientes"></div>
+  </div>
+
   <!-- CV -->
   <div class="card">
     <div class="card-titulo"><h3>Currículum</h3></div>
     <p class="card-sub">Súbelo en PDF para que las empresas puedan revisarlo (máx. 8 MB).</p>
-    <div class="cv-caja">
+    <div class="cv-caja" id="cv-caja">
       <div class="cv-icono" id="cv-icono"></div>
       <div class="cv-datos" id="cv-datos">
         <strong>Sin CV cargado</strong>
@@ -88,12 +107,13 @@
     <form id="form-datos">
       <div class="rejilla rejilla-2">
         <div class="campo">
-          <label for="f-nombre">Nombre completo</label>
+          <label for="f-nombre">Nombre completo *</label>
           <input type="text" id="f-nombre" required>
         </div>
         <div class="campo">
           <label for="f-headline">Titular profesional</label>
-          <input type="text" id="f-headline" placeholder="Ej. Técnico en mantenimiento industrial">
+          <input type="text" id="f-headline" maxlength="190" placeholder="Ej. Técnico en mantenimiento industrial">
+          <div class="campo-ayuda">Es lo primero que ven las empresas junto a tu nombre.</div>
         </div>
         <div class="campo">
           <label for="f-ubicacion">Ubicación</label>
@@ -122,7 +142,7 @@
   <div class="card">
     <div class="card-titulo">
       <h3>Experiencia</h3>
-      <button class="btn btn-sm btn-suave" onclick="scAbrirModal('modal-exp')">Agregar</button>
+      <button class="btn btn-sm btn-suave" onclick="nuevaExperiencia()">Agregar</button>
     </div>
     <p class="card-sub">Tu trayectoria laboral.</p>
     <div id="lista-experiencia"></div>
@@ -131,22 +151,47 @@
   <!-- Educación -->
   <div class="card">
     <div class="card-titulo">
-      <h3>Educación</h3>
-      <button class="btn btn-sm btn-suave" onclick="scAbrirModal('modal-edu')">Agregar</button>
+      <h3>Educación y certificaciones</h3>
+      <button class="btn btn-sm btn-suave" onclick="nuevaEducacion()">Agregar</button>
     </div>
-    <p class="card-sub">Estudios, certificaciones e instituciones.</p>
+    <p class="card-sub">Estudios, cursos y certificaciones.</p>
     <div id="lista-educacion"></div>
   </div>
 
   <!-- Habilidades -->
   <div class="card">
     <div class="card-titulo"><h3>Habilidades</h3></div>
-    <p class="card-sub">Palabras clave con las que las empresas te encontrarán.</p>
+    <p class="card-sub">Palabras clave con las que las empresas te encontrarán en las búsquedas.</p>
     <div class="chips mb-16" id="chips-habilidades"></div>
     <form id="form-habilidad" class="fila">
-      <input type="text" id="nueva-habilidad" placeholder="Ej. Soldadura, PLC, AutoCAD, logística"
+      <input type="text" id="nueva-habilidad" maxlength="120"
+             placeholder="Ej. Soldadura, PLC, AutoCAD, logística"
              style="flex:1;min-width:180px;padding:10px 13px;border:1.5px solid var(--borde);border-radius:8px;font-size:14px;outline:none">
       <button type="submit" class="btn btn-primary">Agregar</button>
+    </form>
+  </div>
+  <!-- Seguridad -->
+  <div class="card">
+    <div class="card-titulo"><h3>Contraseña</h3></div>
+    <p class="card-sub">Cámbiala cuando quieras. Necesitas escribir la actual para confirmar.</p>
+    <form id="form-password">
+      <div class="rejilla rejilla-2">
+        <div class="campo col-full">
+          <label for="pw-actual">Contraseña actual</label>
+          <input type="password" id="pw-actual" autocomplete="current-password" required>
+        </div>
+        <div class="campo">
+          <label for="pw-nueva">Nueva contraseña</label>
+          <input type="password" id="pw-nueva" autocomplete="new-password" placeholder="Mínimo 6 caracteres" required>
+        </div>
+        <div class="campo">
+          <label for="pw-nueva2">Repite la nueva</label>
+          <input type="password" id="pw-nueva2" autocomplete="new-password" required>
+        </div>
+      </div>
+      <div class="form-acciones">
+        <button type="submit" class="btn btn-outline" id="btn-password">Cambiar contraseña</button>
+      </div>
     </form>
   </div>
 </main>
@@ -155,11 +200,12 @@
 <div class="modal-fondo" id="modal-exp">
   <div class="modal">
     <div class="modal-cabecera">
-      <h3>Agregar experiencia</h3>
-      <button class="modal-cerrar" onclick="scCerrarModal('modal-exp')">&times;</button>
+      <h3 id="exp-modal-titulo">Agregar experiencia</h3>
+      <button class="modal-cerrar" onclick="scCerrarModal('modal-exp')" aria-label="Cerrar">&times;</button>
     </div>
     <form id="form-exp">
       <div class="modal-cuerpo">
+        <input type="hidden" id="exp-id">
         <div class="rejilla rejilla-2">
           <div class="campo"><label for="exp-empresa">Empresa *</label><input type="text" id="exp-empresa" required></div>
           <div class="campo"><label for="exp-puesto">Puesto *</label><input type="text" id="exp-puesto" required></div>
@@ -186,11 +232,12 @@
 <div class="modal-fondo" id="modal-edu">
   <div class="modal">
     <div class="modal-cabecera">
-      <h3>Agregar educación</h3>
-      <button class="modal-cerrar" onclick="scCerrarModal('modal-edu')">&times;</button>
+      <h3 id="edu-modal-titulo">Agregar educación</h3>
+      <button class="modal-cerrar" onclick="scCerrarModal('modal-edu')" aria-label="Cerrar">&times;</button>
     </div>
     <form id="form-edu">
       <div class="modal-cuerpo">
+        <input type="hidden" id="edu-id">
         <div class="rejilla rejilla-2">
           <div class="campo col-full"><label for="edu-institucion">Institución *</label><input type="text" id="edu-institucion" required></div>
           <div class="campo col-full"><label for="edu-titulo">Título o certificación *</label><input type="text" id="edu-titulo" required></div>
@@ -212,6 +259,8 @@
 <script>
 let sesion = null;
 let perfil = null;
+let expPorId = {};   // id → objeto, para no meter JSON en atributos onclick
+let eduPorId = {};
 
 /* ── Pintado ────────────────────────────────────────────── */
 function pintar(datos) {
@@ -230,7 +279,6 @@ function pintar(datos) {
   if (Number(p.correo_verificado)) meta.push(scBadgeVerificado(true));
   document.getElementById('p-meta').innerHTML = meta.join('');
 
-  // Formulario
   document.getElementById('f-nombre').value    = p.nombre || '';
   document.getElementById('f-headline').value  = p.headline || '';
   document.getElementById('f-ubicacion').value = p.ubicacion || '';
@@ -242,21 +290,75 @@ function pintar(datos) {
   pintarExperiencia(datos.experiencia || []);
   pintarEducacion(datos.educacion || []);
   pintarHabilidades(datos.habilidades || []);
+  pintarCompletitud(datos);
 
   scAvisoVerificacion(Number(p.correo_verificado));
   scSesion.actualizar({ nombre: p.nombre, correo_verificado: Number(p.correo_verificado) });
 }
 
+/* Cada pendiente es accionable: lleva directo al campo que falta */
+function pintarCompletitud(datos) {
+  const p = datos.persona;
+  const faltantes = [];
+
+  if (!p.foto_url)  faltantes.push({ t: 'Sube una foto',       a: () => document.getElementById('input-foto').click() });
+  if (!p.headline)  faltantes.push({ t: 'Agrega tu titular',   a: () => enfocar('f-headline') });
+  if (!p.ubicacion) faltantes.push({ t: 'Indica tu ubicación', a: () => enfocar('f-ubicacion') });
+  if (!p.resumen)   faltantes.push({ t: 'Escribe tu resumen',  a: () => enfocar('f-resumen') });
+  if (!p.telefono)  faltantes.push({ t: 'Agrega tu teléfono',  a: () => enfocar('f-telefono') });
+  if (!p.cv_url)    faltantes.push({ t: 'Sube tu CV',          a: () => document.getElementById('input-cv').click() });
+  if (!(datos.experiencia || []).length) faltantes.push({ t: 'Agrega experiencia', a: nuevaExperiencia });
+  if (!(datos.habilidades || []).length) faltantes.push({ t: 'Agrega habilidades', a: () => enfocar('nueva-habilidad') });
+
+  const total = 8;
+  const pct = Math.round((total - faltantes.length) / total * 100);
+
+  document.getElementById('pct-texto').textContent = pct + '%';
+  const barra = document.getElementById('pct-barra');
+  barra.style.width = pct + '%';
+  barra.style.background = pct >= 100 ? 'var(--verde)' : (pct >= 60 ? 'var(--azul)' : 'var(--ambar)');
+
+  const cont = document.getElementById('pendientes');
+  cont.innerHTML = '';
+
+  if (!faltantes.length) {
+    cont.innerHTML = `<div class="listo-msg">${scIcono('check')}¡Tu perfil está completo!</div>`;
+    return;
+  }
+
+  const fila = document.createElement('div');
+  fila.className = 'pendientes';
+  faltantes.forEach(f => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'pendiente';
+    chip.innerHTML = scIcono('mas') + scEsc(f.t);
+    chip.addEventListener('click', f.a);
+    fila.appendChild(chip);
+  });
+  cont.appendChild(fila);
+}
+
+function enfocar(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  setTimeout(() => el.focus(), 320);
+}
+
 function pintarCV(url) {
+  const caja  = document.getElementById('cv-caja');
   const datos = document.getElementById('cv-datos');
   const ver   = document.getElementById('cv-ver');
 
   if (url) {
-    datos.innerHTML = '<strong>Currículum cargado</strong><span>Listo para que las empresas lo revisen.</span>';
+    caja.classList.add('cargado');
+    datos.innerHTML = '<strong>Currículum cargado</strong><span>Las empresas pueden descargarlo desde tu perfil.</span>';
     ver.href = url;
     ver.classList.remove('oculto');
     document.getElementById('btn-cv').textContent = 'Reemplazar';
   } else {
+    caja.classList.remove('cargado');
     datos.innerHTML = '<strong>Sin CV cargado</strong><span>Aún no has subido tu currículum.</span>';
     ver.classList.add('oculto');
     document.getElementById('btn-cv').textContent = 'Subir PDF';
@@ -264,6 +366,9 @@ function pintarCV(url) {
 }
 
 function pintarExperiencia(lista) {
+  expPorId = {};
+  lista.forEach(e => { expPorId[e.id] = e; });
+
   document.getElementById('lista-experiencia').innerHTML = lista.length
     ? lista.map(e => `
       <div class="item">
@@ -274,13 +379,19 @@ function pintarExperiencia(lista) {
           ${e.descripcion ? `<div class="item-desc">${scEsc(e.descripcion)}</div>` : ''}
         </div>
         <div class="item-acciones">
-          <button class="btn btn-sm btn-peligro" onclick="eliminar('ELIMINAR_EXPERIENCIA', ${e.id})">Eliminar</button>
+          <button class="btn btn-sm btn-gris" onclick="editarExperiencia(${e.id})">Editar</button>
+          <button class="btn btn-sm btn-peligro" onclick="borrarExperiencia(${e.id})">Eliminar</button>
         </div>
       </div>`).join('')
-    : scVacio('maletin', 'Sin experiencia registrada', 'Agrega los puestos que has ocupado para destacar tu trayectoria.', '');
+    : scVacio('maletin', 'Sin experiencia registrada',
+        'Agrega los puestos que has ocupado para destacar tu trayectoria.',
+        '<button class="btn btn-outline" onclick="nuevaExperiencia()">Agregar experiencia</button>');
 }
 
 function pintarEducacion(lista) {
+  eduPorId = {};
+  lista.forEach(e => { eduPorId[e.id] = e; });
+
   document.getElementById('lista-educacion').innerHTML = lista.length
     ? lista.map(e => `
       <div class="item">
@@ -290,16 +401,20 @@ function pintarEducacion(lista) {
           <div class="item-meta">${scEsc([e.anio_inicio, e.anio_fin].filter(Boolean).join(' — ') || 'Sin fechas')}</div>
         </div>
         <div class="item-acciones">
-          <button class="btn btn-sm btn-peligro" onclick="eliminar('ELIMINAR_EDUCACION', ${e.id})">Eliminar</button>
+          <button class="btn btn-sm btn-gris" onclick="editarEducacion(${e.id})">Editar</button>
+          <button class="btn btn-sm btn-peligro" onclick="borrarEducacion(${e.id})">Eliminar</button>
         </div>
       </div>`).join('')
-    : scVacio('documento', 'Sin educación registrada', 'Agrega tus estudios y certificaciones técnicas.', '');
+    : scVacio('documento', 'Sin educación registrada',
+        'Agrega tus estudios, cursos y certificaciones.',
+        '<button class="btn btn-outline" onclick="nuevaEducacion()">Agregar educación</button>');
 }
 
 function pintarHabilidades(lista) {
   document.getElementById('chips-habilidades').innerHTML = lista.length
     ? lista.map(h => `<span class="chip">${scEsc(h.habilidad)}
-        <button type="button" title="Quitar" onclick="eliminar('ELIMINAR_HABILIDAD', ${h.id})">&times;</button></span>`).join('')
+        <button type="button" title="Quitar" aria-label="Quitar habilidad"
+                onclick="enviar('ELIMINAR_HABILIDAD', {id:${h.id}})">&times;</button></span>`).join('')
     : '<p class="texto-tenue" style="font-size:13px">Aún no agregas habilidades.</p>';
 }
 
@@ -315,12 +430,6 @@ async function cargar() {
 }
 
 /* ── Subida de archivos ─────────────────────────────────── */
-/*
-   El fallo anterior venía de aquí: si el servidor respondía con HTML
-   (error 500 o archivo demasiado grande), res.json() reventaba la promesa
-   y no ocurría nada en pantalla. Ahora scSubir() lanza un Error con texto
-   legible y lo mostramos siempre.
-*/
 async function subirArchivo(accion, input, alTerminar) {
   const archivo = input.files[0];
   if (!archivo) return;
@@ -334,6 +443,7 @@ async function subirArchivo(accion, input, alTerminar) {
     if (datos.status === 'success') {
       scToast(datos.message, 'ok');
       alTerminar(datos);
+      cargar();               // refresca la barra de completitud
     } else {
       scToast(datos.message || 'No se pudo subir el archivo.', 'error');
     }
@@ -341,14 +451,14 @@ async function subirArchivo(accion, input, alTerminar) {
     scToast(e.message, 'error');
   } finally {
     envoltura.classList.remove('subiendo');
-    input.value = '';   // permite volver a elegir el mismo archivo
+    input.value = '';         // permite volver a elegir el mismo archivo
   }
 }
 
 document.getElementById('btn-foto').addEventListener('click', () => document.getElementById('input-foto').click());
 document.getElementById('input-foto').addEventListener('change', (e) => {
   subirArchivo('SUBIR_FOTO', e.target, (d) => {
-    // Cache-busting: sin esto el navegador podría seguir mostrando la foto vieja
+    // Cache-busting: sin esto el navegador seguiría mostrando la foto vieja
     const url = d.foto_url + '?v=' + Date.now();
     document.getElementById('avatar-caja').innerHTML = scAvatar(url, perfil ? perfil.nombre : '', 'xl');
   });
@@ -362,13 +472,17 @@ document.getElementById('input-cv').addEventListener('change', (e) => {
 /* ── Guardar datos básicos ──────────────────────────────── */
 document.getElementById('form-datos').addEventListener('submit', async (e) => {
   e.preventDefault();
+
+  const nombre = document.getElementById('f-nombre').value.trim();
+  if (!nombre) { scToast('El nombre no puede quedar vacío.', 'error'); return; }
+
   const btn = document.getElementById('btn-guardar');
   btn.disabled = true;
   btn.innerHTML = '<div class="spin"></div> Guardando...';
 
   try {
     const datos = await scPost('ACTUALIZAR_PERFIL_PERSONA', {
-      nombre:    document.getElementById('f-nombre').value.trim(),
+      nombre,
       headline:  document.getElementById('f-headline').value.trim(),
       ubicacion: document.getElementById('f-ubicacion').value.trim(),
       telefono:  document.getElementById('f-telefono').value.trim(),
@@ -401,34 +515,93 @@ async function enviar(accion, payload, idModal) {
   return false;
 }
 
-async function eliminar(accion, id) {
-  await enviar(accion, { id });
+/* Experiencia: alta y edición comparten el mismo modal */
+function nuevaExperiencia() {
+  document.getElementById('form-exp').reset();
+  document.getElementById('exp-id').value = '';
+  document.getElementById('exp-hasta').disabled = false;
+  document.getElementById('exp-modal-titulo').textContent = 'Agregar experiencia';
+  scAbrirModal('modal-exp');
+}
+
+function editarExperiencia(id) {
+  const e = expPorId[id];
+  if (!e) return;
+  document.getElementById('exp-id').value          = e.id;
+  document.getElementById('exp-empresa').value     = e.empresa || '';
+  document.getElementById('exp-puesto').value      = e.puesto || '';
+  document.getElementById('exp-desde').value       = e.desde || '';
+  document.getElementById('exp-hasta').value       = e.hasta || '';
+  document.getElementById('exp-actual').checked    = Number(e.actual) === 1;
+  document.getElementById('exp-hasta').disabled    = Number(e.actual) === 1;
+  document.getElementById('exp-descripcion').value = e.descripcion || '';
+  document.getElementById('exp-modal-titulo').textContent = 'Editar experiencia';
+  scAbrirModal('modal-exp');
+}
+
+function borrarExperiencia(id) {
+  const e = expPorId[id];
+  const nombre = e ? `${e.puesto} en ${e.empresa}` : 'esta experiencia';
+  if (!confirm(`¿Eliminar "${nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
+  enviar('ELIMINAR_EXPERIENCIA', { id });
 }
 
 document.getElementById('form-exp').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const ok = await enviar('AGREGAR_EXPERIENCIA', {
+  const id = document.getElementById('exp-id').value;
+  const payload = {
     empresa:     document.getElementById('exp-empresa').value.trim(),
     puesto:      document.getElementById('exp-puesto').value.trim(),
     desde:       document.getElementById('exp-desde').value,
     hasta:       document.getElementById('exp-hasta').value,
     actual:      document.getElementById('exp-actual').checked,
     descripcion: document.getElementById('exp-descripcion').value.trim(),
-  }, 'modal-exp');
-  if (ok) e.target.reset();
+  };
+  if (id) payload.id = Number(id);
+  await enviar(id ? 'ACTUALIZAR_EXPERIENCIA' : 'AGREGAR_EXPERIENCIA', payload, 'modal-exp');
 });
+
+/* Educación */
+function nuevaEducacion() {
+  document.getElementById('form-edu').reset();
+  document.getElementById('edu-id').value = '';
+  document.getElementById('edu-modal-titulo').textContent = 'Agregar educación';
+  scAbrirModal('modal-edu');
+}
+
+function editarEducacion(id) {
+  const e = eduPorId[id];
+  if (!e) return;
+  document.getElementById('edu-id').value          = e.id;
+  document.getElementById('edu-institucion').value = e.institucion || '';
+  document.getElementById('edu-titulo').value      = e.titulo || '';
+  document.getElementById('edu-inicio').value      = e.anio_inicio || '';
+  document.getElementById('edu-fin').value         = e.anio_fin || '';
+  document.getElementById('edu-modal-titulo').textContent = 'Editar educación';
+  scAbrirModal('modal-edu');
+}
+
+function borrarEducacion(id) {
+  const e = eduPorId[id];
+  const nombre = e ? e.titulo : 'este registro';
+  if (!confirm(`¿Eliminar "${nombre}"?\n\nEsta acción no se puede deshacer.`)) return;
+  enviar('ELIMINAR_EDUCACION', { id });
+}
 
 document.getElementById('form-edu').addEventListener('submit', async (e) => {
   e.preventDefault();
-  const ok = await enviar('AGREGAR_EDUCACION', {
+  const id = document.getElementById('edu-id').value;
+  const payload = {
     institucion: document.getElementById('edu-institucion').value.trim(),
     titulo:      document.getElementById('edu-titulo').value.trim(),
     anio_inicio: document.getElementById('edu-inicio').value,
     anio_fin:    document.getElementById('edu-fin').value,
-  }, 'modal-edu');
-  if (ok) e.target.reset();
+  };
+  if (id) payload.id = Number(id);
+  await enviar(id ? 'ACTUALIZAR_EDUCACION' : 'AGREGAR_EDUCACION', payload, 'modal-edu');
 });
 
+/* Habilidades */
 document.getElementById('form-habilidad').addEventListener('submit', async (e) => {
   e.preventDefault();
   const input = document.getElementById('nueva-habilidad');
@@ -437,11 +610,38 @@ document.getElementById('form-habilidad').addEventListener('submit', async (e) =
   if (await enviar('AGREGAR_HABILIDAD', { habilidad })) input.value = '';
 });
 
-/* Desactivar "hasta" cuando es el trabajo actual */
+/* "Hasta" no aplica si es el trabajo actual */
 document.getElementById('exp-actual').addEventListener('change', (e) => {
   const hasta = document.getElementById('exp-hasta');
   hasta.disabled = e.target.checked;
   if (e.target.checked) hasta.value = '';
+});
+
+/* ── Cambio de contraseña ───────────────────────────────── */
+document.getElementById('form-password').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const actual = document.getElementById('pw-actual').value;
+  const nueva  = document.getElementById('pw-nueva').value;
+  const nueva2 = document.getElementById('pw-nueva2').value;
+
+  if (nueva.length < 6)  { scToast('La nueva contraseña debe tener al menos 6 caracteres.', 'error'); return; }
+  if (nueva !== nueva2)  { scToast('Las dos contraseñas nuevas no coinciden.', 'error'); return; }
+
+  const btn = document.getElementById('btn-password');
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin spin-azul"></div> Cambiando...';
+
+  try {
+    const datos = await scPost('CAMBIAR_PASSWORD', { actual, nueva });
+    scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
+    if (datos.status === 'success') e.target.reset();
+  } catch (err) {
+    scToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Cambiar contraseña';
+  }
 });
 
 window.addEventListener('DOMContentLoaded', () => {

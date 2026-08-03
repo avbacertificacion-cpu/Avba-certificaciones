@@ -5,6 +5,7 @@
 
 const SC_TOKEN_TTL  = 60 * 60 * 24 * 30; // Sesión: 30 días
 const SC_VERIF_TTL  = 60 * 60 * 48;      // Enlace de verificación: 48 horas
+const SC_RESET_TTL  = 60 * 60 * 2;       // Enlace de restablecer contraseña: 2 horas
 
 // Remitente de los correos del portal (se puede sobrescribir en config.php)
 if (!defined('SC_MAIL_FROM'))        define('SC_MAIL_FROM', 'no-reply@avba.com.mx');

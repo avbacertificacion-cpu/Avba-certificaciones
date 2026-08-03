@@ -161,6 +161,108 @@ class ScAuth {
         return ['status' => 'success', 'message' => 'Te enviamos un nuevo enlace de verificación.'];
     }
 
+    // ── SOLICITAR RESTABLECER CONTRASEÑA ─────────────────────
+    public function solicitarReset(array $payload): array {
+        $correo = strtolower(trim($payload['correo'] ?? ''));
+
+        // Respuesta siempre idéntica: si variara, revelaría qué correos
+        // están registrados en el portal.
+        $generica = [
+            'status'  => 'success',
+            'message' => 'Si el correo está registrado, te enviamos un enlace para restablecer tu contraseña.',
+        ];
+
+        if (!$correo || !scEsCorreoValido($correo)) return $generica;
+
+        $stmt = $this->pdo->prepare("SELECT id, tipo, activo FROM sc_usuarios WHERE correo = ?");
+        $stmt->execute([$correo]);
+        $row = $stmt->fetch();
+
+        if (!$row || !$row['activo']) return $generica;
+
+        $token  = scGenerarToken();
+        $expira = date('Y-m-d H:i:s', time() + SC_RESET_TTL);
+        $this->pdo->prepare("UPDATE sc_usuarios SET reset_token = ?, reset_expira = ? WHERE id = ?")
+            ->execute([$token, $expira, $row['id']]);
+
+        $tabla = $row['tipo'] === 'empresa' ? 'sc_empresas' : 'sc_personas';
+        $s = $this->pdo->prepare("SELECT nombre FROM {$tabla} WHERE usuario_id = ?");
+        $s->execute([$row['id']]);
+        $nombre = $s->fetchColumn() ?: '';
+
+        $url = scUrlBase() . '/recuperar.html?t=' . urlencode($token);
+        $saludo = $nombre ? 'Hola ' . htmlspecialchars($nombre) . ',' : 'Hola,';
+        $cuerpo = "<p>{$saludo}</p>
+            <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en
+            <strong>Socios Comerciales AVBA</strong>. Usa el botón de abajo para elegir una nueva.</p>
+            <p style=\"font-size:12.5px;color:#8792a8\">El enlace expira en 2 horas.
+            Si no fuiste tú, ignora este correo: tu contraseña no cambiará.</p>";
+
+        scEnviarCorreo(
+            $correo,
+            'Restablece tu contraseña — Socios Comerciales AVBA',
+            scPlantillaCorreo('Restablece tu contraseña', $cuerpo, 'Elegir nueva contraseña', $url)
+        );
+
+        return $generica;
+    }
+
+    // ── RESTABLECER CON EL TOKEN DEL CORREO ──────────────────
+    public function restablecerPassword(array $payload): array {
+        $token    = trim($payload['token']    ?? '');
+        $password = (string) ($payload['password'] ?? '');
+
+        if (!$token)                return ['status' => 'error', 'message' => 'Enlace inválido.'];
+        if (strlen($password) < 6)  return ['status' => 'error', 'message' => 'La contraseña debe tener al menos 6 caracteres.'];
+
+        $stmt = $this->pdo->prepare(
+            "SELECT id, reset_expira FROM sc_usuarios WHERE reset_token = ? AND activo = 1"
+        );
+        $stmt->execute([$token]);
+        $row = $stmt->fetch();
+
+        if (!$row) {
+            return ['status' => 'error', 'message' => 'Este enlace ya no es válido. Solicita uno nuevo.'];
+        }
+        if ($row['reset_expira'] && strtotime($row['reset_expira']) < time()) {
+            return ['status' => 'error', 'message' => 'El enlace expiró. Solicita uno nuevo.'];
+        }
+
+        // Cambiar la contraseña cierra las sesiones abiertas: si alguien más
+        // tenía acceso, queda fuera.
+        $this->pdo->prepare(
+            "UPDATE sc_usuarios
+             SET password_hash = ?, reset_token = NULL, reset_expira = NULL,
+                 session_token = NULL, token_expires = NULL
+             WHERE id = ?"
+        )->execute([password_hash($password, PASSWORD_BCRYPT), $row['id']]);
+
+        return ['status' => 'success', 'message' => 'Tu contraseña quedó actualizada. Ya puedes iniciar sesión.'];
+    }
+
+    // ── CAMBIAR CONTRASEÑA (con sesión iniciada) ─────────────
+    public function cambiarPassword(int $usuarioId, array $payload): array {
+        $actual = (string) ($payload['actual'] ?? '');
+        $nueva  = (string) ($payload['nueva']  ?? '');
+
+        if (!$actual)             return ['status' => 'error', 'message' => 'Escribe tu contraseña actual.'];
+        if (strlen($nueva) < 6)   return ['status' => 'error', 'message' => 'La nueva contraseña debe tener al menos 6 caracteres.'];
+        if ($actual === $nueva)   return ['status' => 'error', 'message' => 'La nueva contraseña debe ser distinta de la actual.'];
+
+        $stmt = $this->pdo->prepare("SELECT password_hash FROM sc_usuarios WHERE id = ?");
+        $stmt->execute([$usuarioId]);
+        $hash = $stmt->fetchColumn();
+
+        if (!$hash || !password_verify($actual, $hash)) {
+            return ['status' => 'error', 'message' => 'La contraseña actual no es correcta.'];
+        }
+
+        $this->pdo->prepare("UPDATE sc_usuarios SET password_hash = ? WHERE id = ?")
+            ->execute([password_hash($nueva, PASSWORD_BCRYPT), $usuarioId]);
+
+        return ['status' => 'success', 'message' => 'Contraseña actualizada.'];
+    }
+
     // ── Helpers internos ─────────────────────────────────────
     private function enviarCorreoVerificacion(string $correo, string $nombre, string $token): bool {
         $url = scUrlBase() . '/api/index.php?action=VERIFICAR_CORREO&t=' . urlencode($token);

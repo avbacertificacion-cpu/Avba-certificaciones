@@ -57,55 +57,50 @@ button, input, select, textarea { font-family: inherit; }
    que sirva a toda la industria y no solo a inspección o certificación.
    Recortado del arte de mayor resolución disponible (1346px) y reducido,
    por eso se ve limpio. Proporción ≈ 1.6:1.
-   Sobre fondos oscuros va dentro de una placa blanca (.logo-chip) en vez
-   de recolorearlo: el arte tiene bordes suavizados y reteñirlo deja halos. */
+   Siempre va sobre fondo blanco: el arte tiene bordes suavizados, así que
+   ni se recolorea (deja halos) ni se mete en una placa sobre fondo oscuro
+   (parece calcomanía). Por eso las barras superiores son blancas. */
 .logo { display: block; width: auto; }
-.logo-nav    { height: 30px; }
+.logo-nav    { height: 34px; }
 .logo-acceso { height: 74px; margin: 0 auto 10px; }
 .logo-pie    { height: 30px; }
-@media (max-width: 480px) { .logo-nav { height: 26px; } }
-
-.logo-chip {
-  background: #fff; border-radius: 9px; padding: 6px 11px;
-  display: inline-flex; align-items: center; flex-shrink: 0;
-  box-shadow: 0 1px 3px rgba(0,0,0,.14);
-}
+@media (max-width: 480px) { .logo-nav { height: 29px; } }
 
 .brand-tagline {
-  font-size: 11px; color: rgba(255,255,255,.6);
-  border-left: 1px solid rgba(255,255,255,.25);
-  padding-left: 10px; display: none;
+  font-size: 11.5px; font-weight: 600; color: var(--texto-tenue);
+  border-left: 1px solid var(--borde);
+  padding-left: 11px; display: none;
 }
 @media (min-width: 700px) { .brand-tagline { display: block; } }
 
 /* ── Navbar de la app ──────────────────────────────────── */
 .navbar {
-  background: linear-gradient(160deg, var(--hero-1) 0%, var(--hero-2) 100%);
-  position: sticky; top: 0; z-index: 40;
+  background: var(--blanco); border-bottom: 1px solid var(--borde);
+  position: sticky; top: 0; z-index: 40; box-shadow: 0 1px 3px rgba(11,26,51,.05);
 }
-.navbar .wrap { display: flex; align-items: center; gap: 16px; height: 60px; }
+.navbar .wrap { display: flex; align-items: center; gap: 16px; height: 62px; }
 .nav-menu {
   display: flex; align-items: center; gap: 2px; margin-left: auto;
   overflow-x: auto; scrollbar-width: none;
 }
 .nav-menu::-webkit-scrollbar { display: none; }
 .nav-menu a {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
   padding: 7px 12px; border-radius: var(--r-sm);
-  font-size: 11.5px; font-weight: 600; color: rgba(255,255,255,.72);
+  font-size: 11.5px; font-weight: 600; color: var(--texto-sub);
   white-space: nowrap; transition: background .15s, color .15s;
 }
 .nav-menu a svg { width: 19px; height: 19px; }
-.nav-menu a:hover { background: rgba(255,255,255,.1); color: #fff; }
-.nav-menu a.activo { color: #fff; background: rgba(255,255,255,.14); }
+.nav-menu a:hover { background: var(--gris-fondo); color: var(--azul); }
+.nav-menu a.activo { color: var(--azul); background: var(--azul-claro); }
 .nav-salir {
   background: none; border: none; cursor: pointer;
-  color: rgba(255,255,255,.72); font-size: 11.5px; font-weight: 600;
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  color: var(--texto-sub); font-size: 11.5px; font-weight: 600;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
   padding: 7px 12px; border-radius: var(--r-sm);
 }
 .nav-salir svg { width: 19px; height: 19px; }
-.nav-salir:hover { background: rgba(255,255,255,.1); color: #fff; }
+.nav-salir:hover { background: var(--rojo-bg); color: var(--rojo); }
 
 /* ── Botones ───────────────────────────────────────────── */
 .btn {
@@ -301,9 +296,25 @@ button, input, select, textarea { font-family: inherit; }
 .metrica.destacada { background: linear-gradient(160deg, var(--hero-1), var(--hero-2)); border: none; color: #fff; }
 .metrica.destacada .metrica-etiqueta { color: rgba(255,255,255,.72); }
 
-/* ── Barra de progreso ─────────────────────────────────── */
+/* ── Barra de progreso y completitud de perfil ─────────── */
 .progreso { height: 7px; background: var(--borde); border-radius: 999px; overflow: hidden; }
 .progreso span { display: block; height: 100%; background: var(--verde); border-radius: 999px; transition: width .4s; }
+
+.completitud-barra { min-width: 180px; }
+.pendientes { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.pendiente {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--ambar-bg); color: #B45309; border: 1px solid #F6D9A0;
+  font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+  cursor: pointer; transition: background .15s; font-family: inherit;
+}
+.pendiente:hover { background: #FBE2BC; }
+.pendiente svg { width: 13px; height: 13px; }
+.listo-msg {
+  display: flex; align-items: center; gap: 8px;
+  color: #15803D; font-size: 13.5px; font-weight: 600; margin-top: 14px;
+}
+.listo-msg svg { width: 17px; height: 17px; }
 
 /* ── Encabezado de página ──────────────────────────────── */
 .pagina-titulo { padding: 26px 0 18px; }
@@ -393,7 +404,8 @@ button, input, select, textarea { font-family: inherit; }
   background: var(--hero-1); color: rgba(255,255,255,.65);
   padding: 34px 0 26px; margin-top: 56px;
 }
-.pie .wrap { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.pie .wrap { display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center; }
+.pie-marca { font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -.2px; }
 .pie-legal { font-size: 12px; color: rgba(255,255,255,.48); max-width: 460px; }
 .pie-links { display: flex; gap: 18px; font-size: 13px; flex-wrap: wrap; justify-content: center; }
 .pie-links a:hover { color: #fff; }
