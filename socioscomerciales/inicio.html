@@ -9,13 +9,37 @@
 <style>
   .saludo {
     background: linear-gradient(160deg, var(--hero-1), var(--hero-2));
-    color: #fff; padding: 30px 0 34px; margin-bottom: 22px;
+    color: #fff; padding: 34px 0 38px; margin-bottom: 22px;
+    position: relative; overflow: hidden;
   }
-  .saludo h1 { font-size: 24px; font-weight: 800; letter-spacing: -.5px; }
-  .saludo p { color: rgba(255,255,255,.75); font-size: 14px; margin-top: 5px; }
-  .saludo .fila { margin-top: 18px; }
+  .saludo::after {
+    content: ''; position: absolute; right: -120px; top: -140px;
+    width: 380px; height: 380px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(77,163,255,.22), transparent 68%);
+    pointer-events: none;
+  }
+  .saludo .wrap { position: relative; z-index: 1; }
+  .saludo-eyebrow {
+    display: inline-block; font-size: 11.5px; font-weight: 700; letter-spacing: .6px;
+    text-transform: uppercase; color: var(--acento); margin-bottom: 8px;
+  }
+  .saludo h1 { font-size: clamp(23px, 4vw, 30px); font-weight: 800; letter-spacing: -.7px; }
+  .saludo p { color: rgba(255,255,255,.78); font-size: 14.5px; margin-top: 6px; max-width: 520px; }
+  .saludo .fila { margin-top: 20px; }
+
   .panel { display: grid; gap: 20px; grid-template-columns: 1fr; }
   @media (min-width: 900px) { .panel { grid-template-columns: 2fr 1fr; align-items: start; } }
+
+  /* Métrica con icono, para leerse de un vistazo */
+  .metrica { display: flex; align-items: flex-start; gap: 12px; }
+  .metrica-icono {
+    width: 38px; height: 38px; border-radius: var(--r-sm); flex-shrink: 0;
+    background: var(--azul-claro); color: var(--azul);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .metrica-icono svg { width: 19px; height: 19px; }
+  .metrica.destacada .metrica-icono { background: rgba(255,255,255,.18); color: #fff; }
+  .metrica-cuerpo { min-width: 0; }
 </style>
 </head>
 <body>
@@ -24,6 +48,7 @@
 
 <section class="saludo">
   <div class="wrap">
+    <span class="saludo-eyebrow" id="saludo-eyebrow">Socios Comerciales AVBA</span>
     <h1 id="titulo-saludo">Hola</h1>
     <p id="sub-saludo">Bienvenido a Socios Comerciales AVBA</p>
     <div class="fila" id="acciones-rapidas"></div>
@@ -47,6 +72,30 @@
 <script src="assets/avba.js"></script>
 <script>
 let sesion = null;
+
+/* ── Tarjeta de métrica ─────────────────────────────────── */
+function tarjetaMetrica(m) {
+  return `
+    <div class="metrica${m.destacada ? ' destacada' : ''}">
+      <div class="metrica-icono">${scIcono(m.icono)}</div>
+      <div class="metrica-cuerpo">
+        <div class="metrica-valor">${Number(m.valor) || 0}</div>
+        <div class="metrica-etiqueta">${scEsc(m.etiqueta)}</div>
+      </div>
+    </div>`;
+}
+
+/* Esqueleto de las métricas, para que la fila no aparezca de golpe */
+function esqueletoMetricas() {
+  const t = `<div class="metrica">
+      <div class="esq" style="width:38px;height:38px;border-radius:8px;flex-shrink:0"></div>
+      <div class="metrica-cuerpo" style="flex:1">
+        <div class="esq esq-linea corta" style="height:22px"></div>
+        <div class="esq esq-linea media"></div>
+      </div>
+    </div>`;
+  return t.repeat(4);
+}
 
 /* ── Tarjeta de vacante reutilizada en el panel ─────────── */
 function tarjetaVacante(v) {
@@ -73,23 +122,12 @@ function tarjetaVacante(v) {
 function pintarPersona(datos) {
   const m = datos.metricas || {};
 
-  document.getElementById('metricas').innerHTML = `
-    <div class="metrica destacada">
-      <div class="metrica-valor">${m.mis_postulaciones || 0}</div>
-      <div class="metrica-etiqueta">Mis postulaciones</div>
-    </div>
-    <div class="metrica">
-      <div class="metrica-valor">${m.aceptadas || 0}</div>
-      <div class="metrica-etiqueta">Aceptadas</div>
-    </div>
-    <div class="metrica">
-      <div class="metrica-valor">${m.vacantes_abiertas || 0}</div>
-      <div class="metrica-etiqueta">Vacantes abiertas</div>
-    </div>
-    <div class="metrica">
-      <div class="metrica-valor">${m.empresas_totales || 0}</div>
-      <div class="metrica-etiqueta">Empresas</div>
-    </div>`;
+  document.getElementById('metricas').innerHTML = [
+    { icono: 'enviar',   valor: m.mis_postulaciones, etiqueta: 'Mis postulaciones', destacada: true },
+    { icono: 'check',    valor: m.aceptadas,         etiqueta: 'Aceptadas' },
+    { icono: 'maletin',  valor: m.vacantes_abiertas, etiqueta: 'Vacantes abiertas' },
+    { icono: 'edificio', valor: m.empresas_totales,  etiqueta: 'Empresas' },
+  ].map(tarjetaMetrica).join('');
 
   const sugeridas = datos.sugeridas || [];
   document.getElementById('columna-principal').innerHTML = `
@@ -133,23 +171,12 @@ function pintarPersona(datos) {
 function pintarEmpresa(datos) {
   const m = datos.metricas || {};
 
-  document.getElementById('metricas').innerHTML = `
-    <div class="metrica destacada">
-      <div class="metrica-valor">${m.vacantes_abiertas || 0}</div>
-      <div class="metrica-etiqueta">Vacantes abiertas</div>
-    </div>
-    <div class="metrica">
-      <div class="metrica-valor">${m.postulaciones_nuevas || 0}</div>
-      <div class="metrica-etiqueta">Postulaciones nuevas</div>
-    </div>
-    <div class="metrica">
-      <div class="metrica-valor">${m.postulaciones_total || 0}</div>
-      <div class="metrica-etiqueta">Postulaciones totales</div>
-    </div>
-    <div class="metrica">
-      <div class="metrica-valor">${m.candidatos_totales || 0}</div>
-      <div class="metrica-etiqueta">Candidatos en el portal</div>
-    </div>`;
+  document.getElementById('metricas').innerHTML = [
+    { icono: 'maletin',  valor: m.vacantes_abiertas,     etiqueta: 'Vacantes abiertas', destacada: true },
+    { icono: 'enviar',   valor: m.postulaciones_nuevas,  etiqueta: 'Postulaciones nuevas' },
+    { icono: 'documento',valor: m.postulaciones_total,   etiqueta: 'Postulaciones totales' },
+    { icono: 'personas', valor: m.candidatos_totales,    etiqueta: 'Candidatos en el portal' },
+  ].map(tarjetaMetrica).join('');
 
   const recientes = datos.recientes || [];
   document.getElementById('columna-principal').innerHTML = `
@@ -258,8 +285,9 @@ window.addEventListener('DOMContentLoaded', () => {
   scAvisoVerificacion(sesion.correo_verificado);
   avisoBienvenida();
 
-  document.getElementById('metricas').innerHTML = '';
-  document.getElementById('columna-principal').innerHTML = scCargando('Cargando tu panel...');
+  document.getElementById('metricas').innerHTML = esqueletoMetricas();
+  document.getElementById('columna-principal').innerHTML =
+    '<div class="card">' + scEsqueletoLista(3) + '</div>';
   cargar();
 });
 </script>

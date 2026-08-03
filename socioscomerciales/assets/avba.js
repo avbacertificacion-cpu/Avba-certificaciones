@@ -141,6 +141,9 @@ function scToast(mensaje, tipo) {
     el = document.createElement('div');
     el.id = 'sc-toast';
     el.className = 'toast';
+    // Para que un lector de pantalla anuncie el aviso sin robar el foco
+    el.setAttribute('role', 'status');
+    el.setAttribute('aria-live', 'polite');
     document.body.appendChild(el);
   }
   el.textContent = mensaje;
@@ -338,6 +341,29 @@ function scVacio(icono, titulo, texto, botonHtml) {
 
 function scCargando(texto) {
   return `<div class="cargando"><div class="spin spin-azul"></div>${scEsc(texto || 'Cargando...')}</div>`;
+}
+
+/**
+ * Esqueleto de lista: reserva el espacio del contenido real mientras carga,
+ * para que la pantalla no salte cuando llegan los datos.
+ * @param {number} n     cuántas tarjetas dibujar
+ * @param {boolean} dos  true para rejilla de dos columnas
+ */
+function scEsqueletoLista(n, dos) {
+  const tarjeta = `
+    <div class="esq-tarjeta">
+      <div style="display:flex;gap:13px;align-items:flex-start">
+        <div class="esq esq-circulo" style="width:48px;height:48px;flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <div class="esq esq-linea media" style="height:15px"></div>
+          <div class="esq esq-linea corta"></div>
+          <div class="esq esq-linea larga" style="margin-top:12px"></div>
+        </div>
+      </div>
+    </div>`;
+  return `<div class="resultados${dos ? ' resultados-2' : ''}" aria-busy="true" aria-label="Cargando resultados">
+    ${tarjeta.repeat(n || 4)}
+  </div>`;
 }
 
 /* ── Pie de página ─────────────────────────────────────── */

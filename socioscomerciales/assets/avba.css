@@ -49,6 +49,33 @@ a { text-decoration: none; color: inherit; }
 img { max-width: 100%; }
 button, input, select, textarea { font-family: inherit; }
 
+::selection { background: var(--azul-claro); color: var(--azul-oscuro); }
+
+/* Foco visible solo con teclado: accesible sin ensuciar el clic con ratón */
+:focus-visible {
+  outline: 3px solid var(--acento);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respeta a quien pidió menos movimiento en su sistema */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Enlace para saltar al contenido, útil con lector de pantalla */
+.saltar-contenido {
+  position: absolute; left: -9999px; top: 0; z-index: 100;
+  background: var(--azul); color: #fff; padding: 10px 18px;
+  border-radius: 0 0 var(--r-sm) 0; font-size: 14px; font-weight: 600;
+}
+.saltar-contenido:focus { left: 0; }
+
 .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
 .wrap-sm { max-width: 760px; margin: 0 auto; padding: 0 20px; }
 
@@ -398,6 +425,29 @@ button, input, select, textarea { font-family: inherit; }
 
 .cargando { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 40px; color: var(--texto-sub); font-size: 13.5px; }
 .cargando .spin { width: 20px; height: 20px; }
+
+/* ── Esqueletos de carga ───────────────────────────────── */
+/* Ocupan el sitio del contenido real para que la página no "salte"
+   cuando llegan los datos. */
+.esq {
+  background: linear-gradient(90deg, #E9EEF6 25%, #F4F7FB 50%, #E9EEF6 75%);
+  background-size: 200% 100%;
+  animation: esq-brillo 1.3s ease-in-out infinite;
+  border-radius: var(--r-sm);
+}
+@keyframes esq-brillo {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.esq-linea { height: 12px; margin-bottom: 9px; }
+.esq-linea.corta { width: 40%; }
+.esq-linea.media { width: 65%; }
+.esq-linea.larga { width: 90%; }
+.esq-circulo { border-radius: 50%; }
+.esq-tarjeta {
+  background: var(--blanco); border: 1px solid var(--borde);
+  border-radius: var(--r-md); padding: 18px;
+}
 
 /* ── Pie de página ─────────────────────────────────────── */
 .pie {
