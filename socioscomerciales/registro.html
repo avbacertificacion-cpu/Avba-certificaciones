@@ -24,6 +24,8 @@
   .volver { display: block; text-align: center; margin-top: 18px; font-size: 13px; color: rgba(255,255,255,.72); }
   .volver:hover { color: #fff; }
   .legal { text-align: center; margin-top: 14px; font-size: 11.5px; color: rgba(255,255,255,.45); }
+  .legal a { color: rgba(255,255,255,.72); font-weight: 600; }
+  .legal a:hover { color: #fff; text-decoration: underline; }
 
   .tabs { display: flex; background: var(--gris-fondo); border-radius: var(--r); padding: 4px; margin-bottom: 22px; }
   .tab {
@@ -77,6 +79,17 @@
         <div class="campo-ayuda" id="texto-fuerza">Usa al menos 8 caracteres.</div>
       </div>
 
+      <label class="campo-terminos" id="campo-terminos" for="acepta">
+        <input type="checkbox" id="acepta" required
+               aria-describedby="ayuda-terminos">
+        <span id="ayuda-terminos">
+          He leído y acepto los
+          <a href="terminos.html" target="_blank" rel="noopener">Términos y Condiciones</a>
+          y el
+          <a href="aviso-privacidad.html" target="_blank" rel="noopener">Aviso de Privacidad</a>.
+        </span>
+      </label>
+
       <button type="submit" class="btn btn-primary btn-bloque btn-lg" id="btn-crear">Crear cuenta</button>
     </form>
 
@@ -84,7 +97,10 @@
   </div>
 
   <a class="volver" href="index.html">&larr; Volver al inicio</a>
-  <p class="legal">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</p>
+  <p class="legal">
+    <a href="terminos.html">Términos y Condiciones</a> · <a href="aviso-privacidad.html">Aviso de Privacidad</a><br>
+    AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.
+  </p>
 </div>
 
 <script src="assets/avba.js"></script>
@@ -152,6 +168,10 @@ document.getElementById('password').addEventListener('input', (e) => {
   document.getElementById('texto-fuerza').textContent = v ? n.t : niveles[0].t;
 });
 
+document.getElementById('acepta').addEventListener('change', (e) => {
+  if (e.target.checked) document.getElementById('campo-terminos').classList.remove('sin-marcar');
+});
+
 document.getElementById('form-registro').addEventListener('submit', async (e) => {
   e.preventDefault();
   limpiarError();
@@ -159,10 +179,20 @@ document.getElementById('form-registro').addEventListener('submit', async (e) =>
   const nombre   = document.getElementById('nombre').value.trim();
   const correo   = document.getElementById('correo').value.trim();
   const password = document.getElementById('password').value;
+  const acepta   = document.getElementById('acepta').checked;
 
   if (!nombre)   { mostrarError('Escribe tu ' + TEXTOS[tipoActual].label.toLowerCase() + '.'); return; }
   if (!correo)   { mostrarError('Escribe tu correo electrónico.'); return; }
   if (password.length < 8) { mostrarError('La contraseña debe tener al menos 8 caracteres.'); return; }
+
+  // El formulario lleva novalidate, así que el `required` de la casilla no
+  // corta el envío por sí solo: hay que comprobarlo aquí y señalarla.
+  if (!acepta) {
+    document.getElementById('campo-terminos').classList.add('sin-marcar');
+    mostrarError('Para crear tu cuenta necesitas aceptar los Términos y Condiciones y el Aviso de Privacidad.');
+    document.getElementById('acepta').focus();
+    return;
+  }
 
   const btn = document.getElementById('btn-crear');
   btn.disabled = true;
@@ -171,7 +201,7 @@ document.getElementById('form-registro').addEventListener('submit', async (e) =>
   const accion = tipoActual === 'empresa' ? 'REGISTRO_EMPRESA' : 'REGISTRO_PERSONA';
 
   try {
-    const datos = await scPost(accion, { nombre, correo, password });
+    const datos = await scPost(accion, { nombre, correo, password, acepta_terminos: true });
 
     if (datos.status !== 'success') {
       mostrarError(datos.message || 'No se pudo crear la cuenta.');

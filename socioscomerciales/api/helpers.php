@@ -15,6 +15,16 @@ const SC_RESET_TTL     = 60 * 60 * 2;      // Enlace de restablecer contraseña:
 const SC_PASSWORD_MIN = 8;
 
 /**
+ * Versión vigente de los términos y del aviso de privacidad.
+ *
+ * Se guarda junto con la fecha en cada alta. Si el texto cambia hay que
+ * subir esta constante: así se sabe quién aceptó qué y a quién habría que
+ * volver a preguntarle, en vez de tener un "sí" suelto sin contexto.
+ * Formato de fecha, que es lo que aparece al pie de terminos.html.
+ */
+const SC_TERMINOS_VERSION = '2026-08-03';
+
+/**
  * Coste de bcrypt, fijado a propósito en vez de usar el de por defecto:
  * PHP lo subió de 10 a 12 entre versiones, así que sin fijarlo el mismo
  * código produce hashes de distinta dureza según el servidor — y el hash de

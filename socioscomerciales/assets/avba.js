@@ -242,9 +242,13 @@ function scPintarNavbar(activo) {
           <a href="${m.href}" class="${m.href === actual ? 'activo' : ''}">
             ${scIcono(m.icono)}<span>${m.texto}</span>
           </a>`).join('')}
-        <button class="nav-salir" onclick="scCerrarSesion()">
-          ${scIcono('salir')}<span>Salir</span>
-        </button>
+        ${s
+          ? `<button class="nav-salir" onclick="scCerrarSesion()">
+               ${scIcono('salir')}<span>Salir</span>
+             </button>`
+          : `<a class="nav-salir" href="login.html">
+               ${scIcono('persona')}<span>Entrar</span>
+             </a>`}
       </nav>
     </div>`;
 }
@@ -476,6 +480,15 @@ function scHace(fecha) {
 }
 
 /** Formatea un rango de fechas de experiencia. */
+/** "2026-08-03" → "3 de agosto de 2026". Para las páginas legales. */
+function scFechaLarga(iso) {
+  const d = new Date(String(iso).replace(' ', 'T') + (String(iso).length === 10 ? 'T12:00:00' : ''));
+  if (isNaN(d)) return String(iso);
+  const meses = ['enero','febrero','marzo','abril','mayo','junio',
+                 'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return `${d.getDate()} de ${meses[d.getMonth()]} de ${d.getFullYear()}`;
+}
+
 function scRangoFechas(desde, hasta, actual) {
   const f = (v) => {
     if (!v) return '';
@@ -558,6 +571,11 @@ function scPintarPie() {
   cont.innerHTML = `
     <div class="wrap">
       <span class="pie-marca">Socios Comerciales AVBA</span>
+      <p class="pie-enlaces">
+        <a href="terminos.html">Términos y Condiciones</a>
+        <span aria-hidden="true">·</span>
+        <a href="aviso-privacidad.html">Aviso de Privacidad</a>
+      </p>
       <p class="pie-legal">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. — avba.com.mx</p>
     </div>`;
 }

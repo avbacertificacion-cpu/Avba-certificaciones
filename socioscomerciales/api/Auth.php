@@ -17,6 +17,11 @@ class ScAuth {
         $password = (string) ($payload['password'] ?? '');
         $nombre   = trim($payload['nombre']   ?? '');
 
+        // El checkbox puede llegar como true, "1" o "on" según el cliente;
+        // "false" en texto es lo único que hay que descartar a mano.
+        $acepta = !empty($payload['acepta_terminos'])
+                  && $payload['acepta_terminos'] !== 'false';
+
         $etiqueta = $tipo === 'empresa' ? 'Nombre de la empresa' : 'Nombre completo';
 
         if (!$nombre)   return ['status' => 'error', 'message' => "{$etiqueta} es obligatorio."];
@@ -28,6 +33,16 @@ class ScAuth {
         }
         if (strlen($password) < SC_PASSWORD_MIN) {
             return ['status' => 'error', 'message' => 'La contraseña debe tener al menos ' . SC_PASSWORD_MIN . ' caracteres.'];
+        }
+
+        // Se comprueba en el servidor y no solo con el `required` del
+        // formulario: quien llame al API directamente crearía cuentas sin
+        // aceptar nada, y entonces la constancia que guardamos no valdría.
+        if (!$acepta) {
+            return [
+                'status'  => 'error',
+                'message' => 'Debes aceptar los Términos y Condiciones y el Aviso de Privacidad para crear tu cuenta.',
+            ];
         }
 
         // El alta manda un correo y crea una fila: sin freno sirve para
@@ -54,9 +69,11 @@ class ScAuth {
         $this->pdo->beginTransaction();
         try {
             $this->pdo->prepare(
-                "INSERT INTO sc_usuarios (tipo, correo, password_hash, activo, correo_verificado, verif_token, verif_expira)
-                 VALUES (?, ?, ?, 1, 0, ?, ?)"
-            )->execute([$tipo, $correo, $hash, $verifToken, $verifExpira]);
+                "INSERT INTO sc_usuarios
+                    (tipo, correo, password_hash, activo, correo_verificado,
+                     verif_token, verif_expira, terminos_version, terminos_aceptados)
+                 VALUES (?, ?, ?, 1, 0, ?, ?, ?, NOW())"
+            )->execute([$tipo, $correo, $hash, $verifToken, $verifExpira, SC_TERMINOS_VERSION]);
 
             $usuarioId = (int) $this->pdo->lastInsertId();
 
@@ -377,7 +394,8 @@ class ScAuth {
     /** Devuelve todo lo que el portal guarda de esta cuenta, en JSON. */
     public function exportarDatos(int $usuarioId): array {
         $stmt = $this->pdo->prepare(
-            "SELECT id, tipo, correo, correo_verificado, activo, creado, ultimo_acceso
+            "SELECT id, tipo, correo, correo_verificado, activo, creado, ultimo_acceso,
+                    terminos_version, terminos_aceptados
              FROM sc_usuarios WHERE id = ?"
         );
         $stmt->execute([$usuarioId]);

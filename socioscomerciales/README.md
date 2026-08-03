@@ -17,6 +17,8 @@ socioscomerciales/
 ├── login.html              Acceso
 ├── registro.html           Alta de cuenta (candidato / empresa)
 ├── verificar.html          Resultado del enlace de verificación de correo
+├── terminos.html           Términos y Condiciones (público)
+├── aviso-privacidad.html   Aviso de Privacidad (público)
 ├── recuperar.html          Solicitar y aplicar el restablecimiento de contraseña
 ├── inicio.html             Panel principal (distinto por tipo de cuenta)
 │
@@ -153,6 +155,37 @@ despliegue no echa a nadie fuera.
 El token dura 7 días en vez de 30, pero se renueva solo mientras se use
 (`SC_TOKEN_RENUEVA`): quien entra a diario no vuelve a escribir la contraseña y
 uno robado caduca en una semana.
+
+### Términos y Condiciones
+
+El registro **exige aceptar** los Términos y el Aviso de Privacidad. La casilla
+es obligatoria en el formulario, pero la comprobación de verdad está en
+`ScAuth::registrar()`: quien llame al API directamente crearía cuentas sin
+aceptar nada y la constancia dejaría de valer.
+
+De cada alta se guarda **qué versión** se aceptó y **cuándo**
+(`sc_usuarios.terminos_version` y `terminos_aceptados`, esquema v6). No basta
+un "sí" suelto: si el texto cambia hay que poder saber quién aceptó cuál y a
+quién toca volver a preguntarle. La versión vive en tres sitios y hay que
+subirla en los tres a la vez:
+
+| Archivo | Constante |
+|---------|-----------|
+| `api/helpers.php` | `SC_TERMINOS_VERSION` |
+| `terminos.html` | `VERSION_TERMINOS` |
+| `aviso-privacidad.html` | `VERSION_AVISO` |
+
+Las cuentas creadas antes de la v6 quedan con esas columnas en `NULL`, que es
+lo que ocurrió: nunca se les pidió. **No hay flujo para pedírselo a los que ya
+existían**; si hace falta, se resuelve mostrando un aviso bloqueante en
+`inicio.html` cuando `terminos_version` no coincide con la vigente.
+
+> Los dos documentos son un **borrador de trabajo redactado por Claude**, no
+> una asesoría legal. Describen con exactitud lo que el portal hace de verdad
+> (qué datos toca, quién ve el CV, cómo se borra la cuenta), pero antes de
+> publicarlos deben pasar por un abogado, sobre todo el domicilio social, el
+> fuero y las direcciones de contacto, que hoy son `contacto@avba.com.mx` y
+> `privacidad@avba.com.mx` y **tienen que existir**.
 
 ### Datos personales (ARCO)
 

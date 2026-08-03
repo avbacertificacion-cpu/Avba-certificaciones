@@ -9,7 +9,7 @@
 require_once __DIR__ . '/config.php';
 
 /** Versión actual del esquema. Subir al añadir migraciones. */
-const SC_SCHEMA_VERSION = 5;
+const SC_SCHEMA_VERSION = 6;
 
 class ScDatabase {
     private static ?PDO $instance = null;
@@ -70,6 +70,7 @@ class ScDatabase {
             if ($version < 3) self::migrarA3($pdo);
             if ($version < 4) self::migrarA4($pdo);
             if ($version < 5) self::migrarA5($pdo);
+            if ($version < 6) self::migrarA6($pdo);
 
             $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
                         ON DUPLICATE KEY UPDATE valor = '" . SC_SCHEMA_VERSION . "'");
@@ -93,6 +94,7 @@ class ScDatabase {
         $columnas = self::columnasDe($pdo, 'sc_usuarios');
 
         if (!$columnas)                                    return SC_SCHEMA_VERSION; // Base vacía
+        if (in_array('terminos_aceptados', $columnas, true)) return 6;
         if (self::columnasDe($pdo, 'sc_sesiones'))          return 5;
         if (self::columnasDe($pdo, 'sc_intentos'))          return 4;
         if (in_array('reset_token', $columnas, true))       return 3;
@@ -131,6 +133,8 @@ class ScDatabase {
                 session_token     VARCHAR(64)  NULL,
                 token_expires     DATETIME     NULL,
                 correo_verificado TINYINT(1) NOT NULL DEFAULT 0,
+                terminos_version  VARCHAR(20) NULL,
+                terminos_aceptados DATETIME   NULL,
                 verif_token       VARCHAR(64)  NULL,
                 verif_expira      DATETIME     NULL,
                 reset_token       VARCHAR(64)  NULL,
@@ -390,6 +394,19 @@ class ScDatabase {
             // La columna puede no existir en una instalación nueva
             error_log('migrarA5 rescate de sesiones: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * v5 → v6: constancia de la aceptación de los términos.
+     *
+     * Se guarda la versión aceptada, no solo un "sí": si mañana cambian los
+     * términos hay que poder saber quién aceptó cuáles y a quién toca volver
+     * a preguntarle. Las cuentas anteriores quedan en NULL, que es la verdad
+     * — nunca se les pidió.
+     */
+    private static function migrarA6(PDO $pdo): void {
+        self::agregarColumna($pdo, 'sc_usuarios', 'terminos_version',   "VARCHAR(20) NULL");
+        self::agregarColumna($pdo, 'sc_usuarios', 'terminos_aceptados', "DATETIME NULL");
     }
 
     /** Añade una columna solo si aún no existe. */
