@@ -179,7 +179,9 @@ function scPintarNavbar(activo) {
   cont.className = 'navbar';
   cont.innerHTML = `
     <div class="wrap">
-      <a href="${s ? 'inicio.html' : 'index.html'}" class="brand-mark">AV<span class="accent">BA</span></a>
+      <a href="${s ? 'inicio.html' : 'index.html'}">
+        <img src="assets/avba-logo-blanco.png" alt="AVBA" class="logo logo-nav">
+      </a>
       <span class="brand-tagline">Socios Comerciales</span>
       <nav class="nav-menu">
         ${menu.map(m => `
@@ -345,7 +347,7 @@ function scPintarPie() {
   cont.className = 'pie';
   cont.innerHTML = `
     <div class="wrap">
-      <span class="brand-mark">AV<span class="accent">BA</span></span>
+      <img src="assets/avba-logo-blanco.png" alt="AVBA" class="logo logo-pie">
       <p class="pie-legal">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. — avba.com.mx</p>
     </div>`;
 }

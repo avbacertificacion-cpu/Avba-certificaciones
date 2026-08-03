@@ -227,14 +227,20 @@ function scPlantillaCorreo(string $titulo, string $cuerpoHtml, string $textoBoto
         </td></tr>';
     }
 
+    // Muchos clientes de correo bloquean imágenes remotas: el texto alternativo
+    // deja el nombre de la marca visible aunque el logo no cargue.
+    $logo = scUrlBase() . '/assets/avba-logo-blanco.png';
+
     return '<!DOCTYPE html><html lang="es"><body style="margin:0;padding:0;background:#F4F7FB">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#F4F7FB;padding:32px 12px">
 <tr><td align="center">
   <table width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;
          border-radius:16px;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,Helvetica,Arial,sans-serif">
-    <tr><td style="background:linear-gradient(160deg,#0B1A33 0%,#123A6B 100%);padding:28px 32px">
-      <div style="font-size:24px;font-weight:800;color:#ffffff;letter-spacing:-.5px">AV<span style="color:#4DA3FF">BA</span></div>
-      <div style="font-size:12px;color:rgba(255,255,255,.65);margin-top:4px">Inspections, Certifications and Maintenance</div>
+    <tr><td style="background:linear-gradient(160deg,#0B1A33 0%,#123A6B 100%);background-color:#0B1A33;padding:26px 32px">
+      <img src="' . htmlspecialchars($logo, ENT_QUOTES) . '" alt="AVBA"
+           width="150" style="display:block;border:0;height:auto;max-width:150px;color:#ffffff;
+           font-size:22px;font-weight:800">
+      <div style="font-size:12px;color:rgba(255,255,255,.65);margin-top:8px">Inspections, Certifications and Maintenance</div>
     </td></tr>
     <tr><td style="padding:30px 32px 8px">
       <h1 style="margin:0 0 12px;font-size:20px;color:#1A2A44">' . htmlspecialchars($titulo) . '</h1>
