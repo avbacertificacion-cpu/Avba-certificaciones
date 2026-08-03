@@ -42,7 +42,7 @@ class ScDatabase {
      * Crea las tablas sc_* si no existen y aplica las migraciones pendientes.
      * En cada request solo hace un SELECT diminuto contra sc_meta.
      */
-    private static function instalarEsquema(PDO $pdo): void {
+    public static function instalarEsquema(PDO $pdo): void {
         $version = 0;
 
         try {
@@ -53,27 +53,49 @@ class ScDatabase {
             // sc_meta no existe todavía → instalación desde cero o esquema v1
         }
 
-        self::crearTablas($pdo);
+        // Si algo falla aquí, el mensaje debe llegar al usuario: un error
+        // genérico de servidor no dice nada y deja el portal inservible.
+        try {
+            self::crearTablas($pdo);
 
-        // Si sc_meta no existía pero sc_usuarios sí, veníamos de la v1
-        if ($version === 0) {
-            try {
-                $pdo->query("SELECT correo_verificado FROM sc_usuarios LIMIT 1");
-                $version = 2; // Ya tiene las columnas nuevas
-            } catch (PDOException $e) {
-                try {
-                    $pdo->query("SELECT 1 FROM sc_usuarios LIMIT 1");
-                    $version = 1; // Existe pero sin columnas de verificación
-                } catch (PDOException $e2) {
-                    $version = SC_SCHEMA_VERSION; // Recién creada por crearTablas()
-                }
+            // Si sc_meta no existía pero sc_usuarios sí, veníamos de la v1
+            if ($version === 0) {
+                $version = self::detectarVersionPrevia($pdo);
             }
+
+            if ($version < 2) self::migrarA2($pdo);
+
+            $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
+                        ON DUPLICATE KEY UPDATE valor = '" . SC_SCHEMA_VERSION . "'");
+        } catch (PDOException $e) {
+            error_log('SC esquema: ' . $e->getMessage());
+            throw new RuntimeException(
+                'No se pudo preparar la base de datos: ' . $e->getMessage()
+            );
         }
+    }
 
-        if ($version < 2) self::migrarA2($pdo);
+    /** Deduce la versión de una BD creada antes de que existiera sc_meta. */
+    private static function detectarVersionPrevia(PDO $pdo): int {
+        $columnas = self::columnasDe($pdo, 'sc_usuarios');
 
-        $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
-                    ON DUPLICATE KEY UPDATE valor = VALUES(valor)");
+        if (!$columnas)                              return SC_SCHEMA_VERSION; // Recién creada
+        if (in_array('correo_verificado', $columnas, true)) return 2;
+        return 1;
+    }
+
+    /**
+     * Nombres de columna de una tabla, o [] si la tabla no existe.
+     * Se usa SHOW COLUMNS sin marcadores: algunos servidores MySQL no
+     * admiten parámetros preparados en la cláusula LIKE de SHOW.
+     */
+    private static function columnasDe(PDO $pdo, string $tabla): array {
+        try {
+            $stmt = $pdo->query("SHOW COLUMNS FROM `{$tabla}`");
+            return array_column($stmt->fetchAll(), 'Field');
+        } catch (PDOException $e) {
+            return [];
+        }
     }
 
     private static function crearTablas(PDO $pdo): void {
@@ -234,11 +256,52 @@ class ScDatabase {
 
     /** Añade una columna solo si aún no existe. */
     private static function agregarColumna(PDO $pdo, string $tabla, string $columna, string $definicion): void {
-        $stmt = $pdo->prepare("SHOW COLUMNS FROM `{$tabla}` LIKE ?");
-        $stmt->execute([$columna]);
-        if ($stmt->fetch()) return;
+        $columnas = self::columnasDe($pdo, $tabla);
+        if (!$columnas) return;                              // La tabla no existe
+        if (in_array($columna, $columnas, true)) return;     // Ya está
 
         $pdo->exec("ALTER TABLE `{$tabla}` ADD COLUMN `{$columna}` {$definicion}");
+    }
+
+    /** Estado del esquema, para el diagnóstico. */
+    public static function estadoEsquema(PDO $pdo): array {
+        $version = null;
+        try {
+            $stmt = $pdo->query("SELECT valor FROM sc_meta WHERE clave = 'schema_version'");
+            $version = $stmt->fetchColumn();
+        } catch (PDOException $e) {
+            $version = 'sc_meta no existe';
+        }
+
+        $tablas = [];
+        foreach (['sc_meta','sc_usuarios','sc_personas','sc_experiencia','sc_educacion',
+                  'sc_habilidades','sc_empresas','sc_vacantes','sc_postulaciones'] as $t) {
+            $cols = self::columnasDe($pdo, $t);
+            $tablas[$t] = $cols ? count($cols) . ' columnas' : 'NO EXISTE';
+        }
+
+        return [
+            'schema_version_guardada' => $version,
+            'schema_version_esperada' => SC_SCHEMA_VERSION,
+            'tablas'                  => $tablas,
+            'columnas_sc_usuarios'    => self::columnasDe($pdo, 'sc_usuarios'),
+            'columnas_sc_postulaciones' => self::columnasDe($pdo, 'sc_postulaciones'),
+        ];
+    }
+
+    /** Conecta sin abortar la petición; devuelve [PDO|null, error]. */
+    public static function probarConexion(): array {
+        try {
+            $dsn = "mysql:host=" . SC_DB_HOST . ";dbname=" . SC_DB_NAME . ";charset=utf8mb4";
+            $pdo = new PDO($dsn, SC_DB_USER, SC_DB_PASS, [
+                PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+                PDO::ATTR_EMULATE_PREPARES   => false,
+            ]);
+            return [$pdo, null];
+        } catch (PDOException $e) {
+            return [null, $e->getMessage()];
+        }
     }
 }
 

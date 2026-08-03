@@ -17,6 +17,7 @@ require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Personas.php';
 require_once __DIR__ . '/Empresas.php';
 require_once __DIR__ . '/Vacantes.php';
+require_once __DIR__ . '/diagnostico.php';
 
 // Nunca mostrar avisos de PHP en la respuesta: romperían el JSON
 ini_set('display_errors', '0');
@@ -37,7 +38,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 set_exception_handler(function (Throwable $e) {
     error_log('SC API: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
     if (!headers_sent()) http_response_code(500);
-    echo json_encode(['status' => 'error', 'message' => 'Error interno del servidor.'], JSON_UNESCAPED_UNICODE);
+
+    // Las RuntimeException las lanzamos nosotros con texto pensado para el
+    // usuario (p. ej. fallos de esquema); el resto se reporta en genérico
+    // para no filtrar detalles internos.
+    $mensaje = $e instanceof RuntimeException
+        ? $e->getMessage()
+        : 'Error interno del servidor.';
+
+    echo json_encode([
+        'status'  => 'error',
+        'message' => $mensaje,
+        'ayuda'   => 'Si el problema persiste, abre api/index.php?action=DIAGNOSTICO',
+    ], JSON_UNESCAPED_UNICODE);
 });
 register_shutdown_function(function () {
     $err = error_get_last();
@@ -49,6 +62,13 @@ register_shutdown_function(function () {
         echo json_encode(['status' => 'error', 'message' => 'Error interno del servidor.'], JSON_UNESCAPED_UNICODE);
     }
 });
+
+// El diagnóstico corre ANTES de conectar: así puede reportar también los
+// fallos de conexión y de migración, que abortarían el arranque normal.
+if (($_GET['action'] ?? '') === 'DIAGNOSTICO') {
+    echo json_encode(scDiagnostico(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+    exit;
+}
 
 // ── PDO + módulos ─────────────────────────────────────────
 $pdo      = scDB();
