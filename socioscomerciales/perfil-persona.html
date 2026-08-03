@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mi perfil — Socios Comerciales AVBA</title>
+<meta name="description" content="Tu perfil profesional en Socios Comerciales AVBA.">
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
@@ -170,6 +172,29 @@
       <button type="submit" class="btn btn-primary">Agregar</button>
     </form>
   </div>
+
+  <!-- Sesiones abiertas: no se bloquea sin verificar, es control de seguridad -->
+  <div class="card" data-sin-bloqueo>
+    <div class="card-titulo"><h3>Dispositivos con sesión abierta</h3></div>
+    <p class="card-sub">Si ves un dispositivo que no reconoces, ciérralo y cambia tu contraseña.</p>
+    <div id="lista-sesiones"></div>
+    <div class="form-acciones">
+      <button type="button" class="btn btn-outline" id="btn-cerrar-otras">Cerrar las demás sesiones</button>
+    </div>
+  </div>
+
+  <!-- Datos personales: derechos ARCO -->
+  <div class="card card-peligro" data-sin-bloqueo>
+    <div class="card-titulo"><h3>Mis datos</h3></div>
+    <p class="card-sub">
+      Puedes descargar todo lo que guardamos de ti o eliminar tu cuenta por completo.
+      El borrado es inmediato y no se puede deshacer.
+    </p>
+    <div class="form-acciones">
+      <button type="button" class="btn btn-gris" id="btn-exportar">Descargar mis datos</button>
+      <button type="button" class="btn btn-peligro" id="btn-eliminar">Eliminar mi cuenta</button>
+    </div>
+  </div>
   <!-- Seguridad: se puede usar aunque el correo no esté confirmado -->
   <div class="card" data-sin-bloqueo>
     <div class="card-titulo"><h3>Contraseña</h3></div>
@@ -182,7 +207,7 @@
         </div>
         <div class="campo">
           <label for="pw-nueva">Nueva contraseña</label>
-          <input type="password" id="pw-nueva" autocomplete="new-password" placeholder="Mínimo 6 caracteres" required>
+          <input type="password" id="pw-nueva" autocomplete="new-password" placeholder="Mínimo 8 caracteres" minlength="8" required>
         </div>
         <div class="campo">
           <label for="pw-nueva2">Repite la nueva</label>
@@ -632,7 +657,7 @@ document.getElementById('form-password').addEventListener('submit', async (e) =>
   const nueva  = document.getElementById('pw-nueva').value;
   const nueva2 = document.getElementById('pw-nueva2').value;
 
-  if (nueva.length < 6)  { scToast('La nueva contraseña debe tener al menos 6 caracteres.', 'error'); return; }
+  if (nueva.length < 8)  { scToast('La nueva contraseña debe tener al menos 8 caracteres.', 'error'); return; }
   if (nueva !== nueva2)  { scToast('Las dos contraseñas nuevas no coinciden.', 'error'); return; }
 
   const btn = document.getElementById('btn-password');
@@ -655,11 +680,94 @@ document.getElementById('form-password').addEventListener('submit', async (e) =>
   }
 });
 
+
+/* ── Sesiones abiertas ──────────────────────────────────── */
+async function cargarSesiones() {
+  const cont = document.getElementById('lista-sesiones');
+  try {
+    const datos = await scGet('MIS_SESIONES');
+    const lista = (datos && datos.sesiones) || [];
+    if (!lista.length) { cont.innerHTML = '<p class="campo-ayuda">No hay sesiones registradas.</p>'; return; }
+
+    cont.innerHTML = lista.map(s => `
+      <div class="sesion-fila">
+        ${scIcono('persona')}
+        <div class="sesion-datos">
+          <div class="sesion-nombre">${scEsc(s.agente || 'Dispositivo desconocido')}</div>
+          <div class="sesion-meta">
+            Último uso: ${scEsc(scHace(s.ultimo_uso || s.creado))}
+          </div>
+        </div>
+        ${Number(s.actual) ? '<span class="badge badge-verde">Este dispositivo</span>' : ''}
+      </div>`).join('');
+  } catch (e) {
+    cont.innerHTML = '<p class="campo-ayuda">No se pudieron cargar las sesiones.</p>';
+  }
+}
+
+document.getElementById('btn-cerrar-otras').addEventListener('click', async (ev) => {
+  if (!confirm('¿Cerrar la sesión en todos los demás dispositivos?')) return;
+  const btn = ev.currentTarget;
+  btn.disabled = true;
+  try {
+    const r = await scPost('CERRAR_OTRAS_SESIONES');
+    scToast(r.message, r.status === 'success' ? 'ok' : 'error');
+    cargarSesiones();
+  } catch (e) {
+    scToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ── Mis datos: exportar y eliminar ─────────────────────── */
+document.getElementById('btn-exportar').addEventListener('click', async (ev) => {
+  const btn = ev.currentTarget;
+  btn.disabled = true;
+  try {
+    const r = await scGet('EXPORTAR_DATOS');
+    if (r.status !== 'success') { scToast(r.message || 'No se pudo exportar.', 'error'); return; }
+
+    // Se arma el archivo en el navegador: así el JSON con datos personales
+    // nunca queda en una URL que pueda acabar en el historial o en un log.
+    const blob = new Blob([JSON.stringify(r, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mis-datos-avba.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 20000);
+    scToast('Descarga lista.', 'ok');
+  } catch (e) {
+    scToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('btn-eliminar').addEventListener('click', async () => {
+  if (!confirm('Vas a eliminar tu cuenta y TODOS tus datos.\n\nEsta acción no se puede deshacer. ¿Continuar?')) return;
+
+  const password = prompt('Escribe tu contraseña para confirmar el borrado:');
+  if (!password) return;
+
+  try {
+    const r = await scPost('ELIMINAR_CUENTA', { password });
+    if (r.status !== 'success') { scToast(r.message || 'No se pudo eliminar.', 'error'); return; }
+    alert(r.message);
+    scSesion.borrar();
+    location.href = 'index.html';
+  } catch (e) {
+    scToast(e.message, 'error');
+  }
+});
+
 window.addEventListener('DOMContentLoaded', () => {
   sesion = scExigirSesion('persona');
   if (!sesion) return;
 
   scPintarNavbar('perfil-persona.html');
+  cargarSesiones();
   scPintarPie();
 
   document.getElementById('btn-foto').innerHTML = scIcono('camara');

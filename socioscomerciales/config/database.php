@@ -9,7 +9,7 @@
 require_once __DIR__ . '/config.php';
 
 /** Versión actual del esquema. Subir al añadir migraciones. */
-const SC_SCHEMA_VERSION = 4;
+const SC_SCHEMA_VERSION = 5;
 
 class ScDatabase {
     private static ?PDO $instance = null;
@@ -56,16 +56,20 @@ class ScDatabase {
         // Si algo falla aquí, el mensaje debe llegar al usuario: un error
         // genérico de servidor no dice nada y deja el portal inservible.
         try {
-            self::crearTablas($pdo);
-
-            // Si sc_meta no existía pero sc_usuarios sí, veníamos de la v1
+            // El sondeo va ANTES de crear nada. Si se hiciera después, las
+            // tablas que acaba de crear crearTablas() se tomarían por prueba
+            // de que la base ya estaba al día y las migraciones de columnas
+            // (v2 y v3) se saltarían en una base antigua de verdad.
             if ($version === 0) {
                 $version = self::detectarVersionPrevia($pdo);
             }
 
+            self::crearTablas($pdo);
+
             if ($version < 2) self::migrarA2($pdo);
             if ($version < 3) self::migrarA3($pdo);
             if ($version < 4) self::migrarA4($pdo);
+            if ($version < 5) self::migrarA5($pdo);
 
             $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
                         ON DUPLICATE KEY UPDATE valor = '" . SC_SCHEMA_VERSION . "'");
@@ -81,11 +85,15 @@ class ScDatabase {
         }
     }
 
-    /** Deduce la versión de una BD creada antes de que existiera sc_meta. */
+    /**
+     * Deduce la versión de una BD creada antes de que existiera sc_meta.
+     * Se llama antes de crearTablas(), así que lo que ve es el estado real.
+     */
     private static function detectarVersionPrevia(PDO $pdo): int {
         $columnas = self::columnasDe($pdo, 'sc_usuarios');
 
-        if (!$columnas)                                    return SC_SCHEMA_VERSION; // Recién creada
+        if (!$columnas)                                    return SC_SCHEMA_VERSION; // Base vacía
+        if (self::columnasDe($pdo, 'sc_sesiones'))          return 5;
         if (self::columnasDe($pdo, 'sc_intentos'))          return 4;
         if (in_array('reset_token', $columnas, true))       return 3;
         if (in_array('correo_verificado', $columnas, true)) return 2;
@@ -144,6 +152,40 @@ class ScDatabase {
                 clave VARCHAR(190) NOT NULL,
                 ts    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 KEY idx_sc_intentos (tipo, clave, ts)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        // Una fila por dispositivo con sesión abierta. Las columnas
+        // session_token / token_expires de sc_usuarios quedaron sin uso al
+        // migrar a la v5; se conservan solo para no romper una base antigua.
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_sesiones (
+                id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                usuario_id INT UNSIGNED NOT NULL,
+                token      VARCHAR(64) NOT NULL,
+                creado     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                expira     DATETIME NOT NULL,
+                ultimo_uso DATETIME NULL,
+                ip         VARCHAR(45) NULL,
+                agente     VARCHAR(60) NULL,
+                UNIQUE KEY uq_sc_sesiones_token (token),
+                KEY idx_sc_sesiones_usuario (usuario_id, expira),
+                CONSTRAINT fk_sc_sesiones_usuario FOREIGN KEY (usuario_id)
+                    REFERENCES sc_usuarios(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        // Bitácora de quién abrió el CV de quién: son datos personales y
+        // debe poder responderse a un candidato que lo pregunte.
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_cv_accesos (
+                id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                persona_id INT UNSIGNED NOT NULL,
+                usuario_id INT UNSIGNED NOT NULL,
+                fecha      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ip         VARCHAR(45) NULL,
+                KEY idx_sc_cv_accesos_persona (persona_id, fecha),
+                KEY idx_sc_cv_accesos_usuario (usuario_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
@@ -298,6 +340,58 @@ class ScDatabase {
         ");
     }
 
+    /**
+     * v4 → v5: sesiones por dispositivo y bitácora de accesos a los CV.
+     *
+     * Antes la sesión era una columna suelta en sc_usuarios, así que solo
+     * cabía una: entrar desde el teléfono cerraba la de la computadora. Las
+     * sesiones vivas se copian a la tabla nueva para no echar a nadie fuera
+     * en el momento del despliegue.
+     */
+    private static function migrarA5(PDO $pdo): void {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_sesiones (
+                id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                usuario_id INT UNSIGNED NOT NULL,
+                token      VARCHAR(64) NOT NULL,
+                creado     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                expira     DATETIME NOT NULL,
+                ultimo_uso DATETIME NULL,
+                ip         VARCHAR(45) NULL,
+                agente     VARCHAR(60) NULL,
+                UNIQUE KEY uq_sc_sesiones_token (token),
+                KEY idx_sc_sesiones_usuario (usuario_id, expira),
+                CONSTRAINT fk_sc_sesiones_usuario FOREIGN KEY (usuario_id)
+                    REFERENCES sc_usuarios(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_cv_accesos (
+                id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                persona_id INT UNSIGNED NOT NULL,
+                usuario_id INT UNSIGNED NOT NULL,
+                fecha      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ip         VARCHAR(45) NULL,
+                KEY idx_sc_cv_accesos_persona (persona_id, fecha),
+                KEY idx_sc_cv_accesos_usuario (usuario_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        // Rescatar las sesiones abiertas de la columna antigua
+        try {
+            $pdo->exec(
+                "INSERT IGNORE INTO sc_sesiones (usuario_id, token, expira, ultimo_uso)
+                 SELECT id, session_token, token_expires, ultimo_acceso
+                 FROM sc_usuarios
+                 WHERE session_token IS NOT NULL AND token_expires > NOW()"
+            );
+        } catch (PDOException $e) {
+            // La columna puede no existir en una instalación nueva
+            error_log('migrarA5 rescate de sesiones: ' . $e->getMessage());
+        }
+    }
+
     /** Añade una columna solo si aún no existe. */
     private static function agregarColumna(PDO $pdo, string $tabla, string $columna, string $definicion): void {
         $columnas = self::columnasDe($pdo, $tabla);
@@ -318,8 +412,9 @@ class ScDatabase {
         }
 
         $tablas = [];
-        foreach (['sc_meta','sc_usuarios','sc_intentos','sc_personas','sc_experiencia','sc_educacion',
-                  'sc_habilidades','sc_empresas','sc_vacantes','sc_postulaciones'] as $t) {
+        foreach (['sc_meta','sc_usuarios','sc_sesiones','sc_intentos','sc_cv_accesos','sc_personas',
+                  'sc_experiencia','sc_educacion','sc_habilidades','sc_empresas','sc_vacantes',
+                  'sc_postulaciones'] as $t) {
             $cols = self::columnasDe($pdo, $t);
             $tablas[$t] = $cols ? count($cols) . ' columnas' : 'NO EXISTE';
         }

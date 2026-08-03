@@ -127,7 +127,8 @@ class ScVacantes {
                     (SELECT COUNT(*) FROM sc_postulaciones p WHERE p.vacante_id = v.id AND p.estatus = 'enviada') AS nuevas
              FROM sc_vacantes v
              WHERE v.empresa_id = ?
-             ORDER BY v.creado DESC"
+             ORDER BY v.creado DESC
+             LIMIT 300"
         );
         $stmt->execute([$empresaId]);
 
@@ -148,17 +149,29 @@ class ScVacantes {
 
         if ($texto !== '') {
             $where[] = '(v.titulo LIKE ? OR v.descripcion LIKE ? OR e.nombre LIKE ?)';
-            $like    = '%' . $texto . '%';
+            $like    = '%' . scEscaparLike($texto) . '%';
             array_push($params, $like, $like, $like);
         }
         if ($ubicacion !== '') {
             $where[]  = 'v.ubicacion LIKE ?';
-            $params[] = '%' . $ubicacion . '%';
+            $params[] = '%' . scEscaparLike($ubicacion) . '%';
         }
         if (in_array($modalidad, self::MODALIDADES, true)) {
             $where[]  = 'v.modalidad = ?';
             $params[] = $modalidad;
         }
+
+        $condiciones = implode(' AND ', $where);
+        [$limite, $offset] = scPaginacion($filtros);
+
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM sc_vacantes v
+             JOIN sc_empresas e ON e.id = v.empresa_id
+             JOIN sc_usuarios u ON u.id = e.usuario_id
+             WHERE {$condiciones}"
+        );
+        $stmt->execute($params);
+        $total = (int) $stmt->fetchColumn();
 
         $sql = "SELECT v.id, v.titulo, v.descripcion, v.ubicacion, v.modalidad, v.salario, v.creado,
                        e.id AS empresa_id, e.nombre AS empresa, e.logo_url, e.giro,
@@ -166,9 +179,9 @@ class ScVacantes {
                 FROM sc_vacantes v
                 JOIN sc_empresas e ON e.id = v.empresa_id
                 JOIN sc_usuarios u ON u.id = e.usuario_id
-                WHERE " . implode(' AND ', $where) . "
+                WHERE {$condiciones}
                 ORDER BY v.creado DESC
-                LIMIT 60";
+                LIMIT {$limite} OFFSET {$offset}";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
@@ -186,7 +199,13 @@ class ScVacantes {
             unset($v);
         }
 
-        return ['status' => 'success', 'vacantes' => $vacantes, 'total' => count($vacantes)];
+        return [
+            'status'   => 'success',
+            'vacantes' => $vacantes,
+            'total'    => $total,
+            'offset'   => $offset,
+            'hay_mas'  => ($offset + count($vacantes)) < $total,
+        ];
     }
 
     public function obtener(int $id, ?int $personaId = null): array {
@@ -224,7 +243,15 @@ class ScVacantes {
         $vacanteId = (int) ($payload['vacante_id'] ?? 0);
         if (!$vacanteId) return ['status' => 'error', 'message' => 'Vacante no indicada.'];
 
-        $stmt = $this->pdo->prepare("SELECT estatus FROM sc_vacantes WHERE id = ?");
+        // La empresa debe seguir activa: sin el JOIN se podía uno postular a
+        // la vacante de una cuenta ya dada de baja, y ese aviso no llegaba
+        // a nadie.
+        $stmt = $this->pdo->prepare(
+            "SELECT v.estatus FROM sc_vacantes v
+             JOIN sc_empresas e ON e.id = v.empresa_id
+             JOIN sc_usuarios u ON u.id = e.usuario_id
+             WHERE v.id = ? AND u.activo = 1"
+        );
         $stmt->execute([$vacanteId]);
         $estatus = $stmt->fetchColumn();
 
@@ -237,9 +264,19 @@ class ScVacantes {
             return ['status' => 'error', 'message' => 'Ya te postulaste a esta vacante.'];
         }
 
-        $this->pdo->prepare(
-            "INSERT INTO sc_postulaciones (vacante_id, persona_id, mensaje, estatus) VALUES (?, ?, ?, 'enviada')"
-        )->execute([$vacanteId, $personaId, scTexto($payload['mensaje'] ?? null, 2000)]);
+        // Dos clics seguidos podían colarse entre la comprobación de arriba y
+        // el INSERT; el índice único de la tabla lo corta, pero hay que
+        // traducir ese error a un mensaje entendible en vez de un 500.
+        try {
+            $this->pdo->prepare(
+                "INSERT INTO sc_postulaciones (vacante_id, persona_id, mensaje, estatus) VALUES (?, ?, ?, 'enviada')"
+            )->execute([$vacanteId, $personaId, scTexto($payload['mensaje'] ?? null, 2000)]);
+        } catch (PDOException $e) {
+            if ($e->getCode() === '23000') {
+                return ['status' => 'error', 'message' => 'Ya te postulaste a esta vacante.'];
+            }
+            throw $e;
+        }
 
         $this->avisarEmpresaNuevaPostulacion($vacanteId, $personaId);
 
@@ -259,7 +296,8 @@ class ScVacantes {
              JOIN sc_vacantes v ON v.id = p.vacante_id
              JOIN sc_empresas e ON e.id = v.empresa_id
              WHERE p.persona_id = ?
-             ORDER BY p.fecha DESC"
+             ORDER BY p.fecha DESC
+             LIMIT 300"
         );
         $stmt->execute([$personaId]);
 
@@ -285,7 +323,8 @@ class ScVacantes {
              JOIN sc_personas per ON per.id = p.persona_id
              JOIN sc_usuarios u   ON u.id = per.usuario_id
              WHERE p.vacante_id = ?
-             ORDER BY FIELD(p.estatus,'enviada','en_revision','aceptada','rechazada'), p.fecha DESC"
+             ORDER BY FIELD(p.estatus,'enviada','en_revision','aceptada','rechazada'), p.fecha DESC
+             LIMIT 300"
         );
         $stmt->execute([$vacanteId]);
 

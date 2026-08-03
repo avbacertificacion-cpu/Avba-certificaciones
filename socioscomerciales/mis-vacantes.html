@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Mis vacantes — Socios Comerciales AVBA</title>
+<meta name="description" content="Publica y gestiona las vacantes de tu empresa.">
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
@@ -335,15 +337,6 @@ let textoFiltro   = '';
 let orden         = 'recientes';
 let temporizadorBusqueda = null;
 
-/**
- * scEsc() escapa &, < y > pero no las comillas, así que no basta para
- * atributos. Esta función completa el escape para usar dentro de href,
- * aria-label, title, etc.
- */
-function escAttr(valor) {
-  return scEsc(valor).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
 const ORDEN_ESTATUS = { enviada: 0, en_revision: 1, aceptada: 2, rechazada: 3 };
 const ETIQUETA_DECISION = {
   enviada:     { corto: 'Pendiente',  clase: '' },
@@ -476,7 +469,7 @@ function tarjetaVacante(v) {
           <div class="menu-envoltura">
             <button type="button" class="btn-menu" data-accion="menu" data-id="${Number(v.id)}"
               aria-haspopup="true" aria-expanded="false" aria-controls="menu-${Number(v.id)}"
-              aria-label="Más acciones para ${escAttr(v.titulo)}">&#8942;</button>
+              aria-label="Más acciones para ${scEsc(v.titulo)}">&#8942;</button>
             <div class="menu-lista" id="menu-${Number(v.id)}" role="menu" hidden>
               <button type="button" role="menuitem" data-accion="editar" data-id="${Number(v.id)}">
                 ${scIcono('lapiz')}Editar vacante
@@ -706,7 +699,7 @@ function tarjetaCandidato(p, vacanteId) {
           ${p.cv_url
             ? `<button type="button" class="btn btn-sm btn-gris" data-accion="cv" data-id="${Number(p.persona_id)}">${scIcono('documento')}CV</button>`
             : '<span class="etiqueta-decision">Sin CV</span>'}
-          <div class="decision" role="group" aria-label="Cambiar estatus de ${escAttr(p.nombre)}">${decisiones}</div>
+          <div class="decision" role="group" aria-label="Cambiar estatus de ${scEsc(p.nombre)}">${decisiones}</div>
         </div>
       </div>
     </div>`;

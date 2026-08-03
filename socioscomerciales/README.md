@@ -43,14 +43,14 @@ socioscomerciales/
 │   ├── Personas.php        Perfil de candidato y búsqueda
 │   ├── Empresas.php        Perfil de empresa y directorio
 │   ├── Vacantes.php        Vacantes, postulaciones y avisos por correo
-│   ├── helpers.php         Tokens, subidas, envío de correo
+│   ├── helpers.php         Sesiones, límites, subidas, envío de correo
 │   └── diagnostico.php     Estado del servidor y del esquema
 ├── config/
 │   ├── config.php          Credenciales reales (NO versionado)
 │   ├── config.sample.php   Plantilla
 │   └── database.php        scDB() + esquema y migraciones sc_*
 ├── uploads/                cv/ · fotos/ · logos/ (protegido por .htaccess)
-├── .htaccess               DirectoryIndex, Authorization, no-cache de HTML
+├── .htaccess               DirectoryIndex, Authorization, cabeceras de seguridad
 └── .user.ini               Ajustes de PHP (el host corre PHP-FPM)
 ```
 
@@ -66,15 +66,15 @@ Copiar `config/config.sample.php` a `config/config.php` y llenar:
 | `SC_DB_PASS`  | Sí          | Contraseña                      |
 | `SC_MAIL_FROM`| No          | Remitente de los correos        |
 | `SC_URL_BASE` | No          | URL base si la detección falla  |
-| `SC_DIAG_CLAVE`| No         | Protege `?action=DIAGNOSTICO` con clave |
+| `SC_DIAG_CLAVE`| Para el diagnóstico | Sin ella `?action=DIAGNOSTICO` responde 403 |
 
 `config.php` está en `.gitignore`, así que el despliegue nunca lo sobrescribe.
 
 ## Base de datos
 
-Tablas con prefijo `sc_`: `sc_meta`, `sc_usuarios`, `sc_intentos`, `sc_personas`,
-`sc_experiencia`, `sc_educacion`, `sc_habilidades`, `sc_empresas`,
-`sc_vacantes`, `sc_postulaciones`.
+Tablas con prefijo `sc_`: `sc_meta`, `sc_usuarios`, `sc_sesiones`, `sc_intentos`,
+`sc_cv_accesos`, `sc_personas`, `sc_experiencia`, `sc_educacion`, `sc_habilidades`,
+`sc_empresas`, `sc_vacantes`, `sc_postulaciones`.
 
 El esquema se crea y se migra solo. `sc_meta.schema_version` guarda la versión
 aplicada; si es menor que `SC_SCHEMA_VERSION` (en `config/database.php`), se
@@ -93,9 +93,10 @@ Correcciones aplicadas tras una auditoría del API:
   `SC_HOSTS_PERMITIDOS`; si no coincide se usa una URL fija. Sin esto, un
   `Host: evil.tld` en `SOLICITAR_RESET` mandaba a la víctima un correo legítimo
   cuyo enlace, con token válido, apuntaba al servidor del atacante.
-- **Límite de intentos** (`sc_intentos`): 8 inicios de sesión por correo y 30 por
-  IP cada 15 min; 3 solicitudes de recuperación por correo. Login compara contra
-  un hash de relleno si el usuario no existe, para no delatarlo por tiempo.
+- **Límite de intentos** (`sc_intentos`): 8 inicios de sesión por correo y 150
+  por IP cada 15 min; 3 solicitudes de recuperación por correo; 5 registros por
+  IP y 4 reenvíos de verificación por hora. Login compara contra un hash de
+  relleno si el usuario no existe, para no delatarlo por tiempo.
 - **Cambiar contraseña cierra las demás sesiones** y emite un token nuevo.
 - **`GET_PERSONA_PUBLICA` es solo para empresas**; un candidato únicamente puede
   abrir su propio perfil público.
@@ -109,6 +110,77 @@ Correcciones aplicadas tras una auditoría del API:
 - El token **no se acepta por query string** (acabaría en logs y en `Referer`).
 - Los errores de esquema y de conexión ya no exponen usuario ni nombre de la BD.
 - `sitio_web` se valida como URL http(s) real, en servidor y en cliente.
+
+### Segunda ronda de correcciones
+
+- **El diagnóstico exige clave.** `SC_DIAG_CLAVE` era opcional y no venía en
+  `config.sample.php`, así que en la práctica nadie la ponía: cualquiera podía
+  leer versión de PHP, extensiones, versión de MariaDB y qué tablas existen.
+  Ahora, sin clave definida, el endpoint responde 403.
+- **El relleno de tiempos del login no era un hash bcrypt válido.**
+  `password_verify` lo rechazaba de inmediato (66 ms frente a 263 ms de un
+  hash real), así que el tiempo de respuesta delataba qué correos están
+  registrados — justo lo que decía evitar. Ahora `SC_HASH_RELLENO` es un hash
+  real y el coste se fija en `SC_BCRYPT_COSTE` para que no dependa de la
+  versión de PHP del servidor. Al entrar se rehacen los hashes antiguos.
+- **El registro tiene límite** (5 por IP y 3 por correo cada hora). Cada alta
+  manda un correo: sin freno servía para inundar buzones ajenos y quemar la
+  reputación del dominio. El reenvío de verificación también está limitado.
+  El mensaje "ya existe una cuenta con ese correo" se mantiene porque sin él
+  el registro es inusable; el límite es lo que hace inviable usarlo para
+  averiguar quién está dado de alta.
+- **Cabeceras de seguridad** en `.htaccess`: `X-Frame-Options`,
+  `Content-Security-Policy`, `Referrer-Policy` y `Permissions-Policy`. El API
+  añade `Cache-Control: private, no-store` — sus respuestas llevan correos y
+  perfiles y no deben quedar en ninguna caché.
+- **CORS acotado** a `SC_HOSTS_PERMITIDOS` en vez de `*`.
+- **Contraseña mínima de 8** (`SC_PASSWORD_MIN`), en servidor y en cliente.
+- Los comodines de `LIKE` se escapan (`scEscaparLike`): buscar `_` devolvía el
+  padrón entero y obligaba a recorrer la tabla completa.
+- `entregarCV` compara la ruta con la barra final incluida, para que un futuro
+  `uploads/cv_publico/` no pase la comprobación por empezar igual.
+- Las imágenes se **redibujan con GD** al subirlas: se va el EXIF (las fotos de
+  teléfono llevan la geolocalización exacta) y se limitan a 1600 px.
+
+### Sesiones por dispositivo
+
+Antes la sesión era una sola columna en `sc_usuarios`, así que entrar desde el
+teléfono cerraba la de la computadora sin avisar. Ahora viven en `sc_sesiones`,
+una fila por dispositivo, y ambos perfiles muestran la lista con un botón para
+cerrar las demás. La migración v5 copia las sesiones vivas, así que el
+despliegue no echa a nadie fuera.
+
+El token dura 7 días en vez de 30, pero se renueva solo mientras se use
+(`SC_TOKEN_RENUEVA`): quien entra a diario no vuelve a escribir la contraseña y
+uno robado caduca en una semana.
+
+### Datos personales (ARCO)
+
+El portal guarda CV, teléfono, CURP e historial laboral, así que el titular
+tiene que poder llevárselos y borrarlos. En ambos perfiles hay:
+
+- **Descargar mis datos** (`EXPORTAR_DATOS`) — JSON con la cuenta, el perfil,
+  experiencia, educación, habilidades, postulaciones y **qué empresas
+  consultaron su CV**. El archivo se arma en el navegador para que ese JSON
+  nunca viaje en una URL que acabe en un log.
+- **Eliminar mi cuenta** (`ELIMINAR_CUENTA`) — pide la contraseña, porque un
+  token robado no debe bastar para destruir una cuenta. Las filas hijas se van
+  por `ON DELETE CASCADE` y los archivos se borran del disco.
+
+`sc_cv_accesos` guarda quién abrió el CV de quién; nunca impide la descarga.
+
+### Rendimiento y paginación
+
+- Todos los listados traían un `LIMIT 60` fijo **sin desplazamiento**: a partir
+  del resultado 61 el resto era invisible. Ahora aceptan `offset`, devuelven
+  `total` y `hay_mas`, y las páginas tienen botón **"Ver más resultados"**.
+- `MIS_POSTULACIONES`, `LISTAR_MIS_VACANTES` y `POSTULACIONES_VACANTE` no
+  tenían límite ninguno; ahora traen 300 como tope.
+- La búsqueda de candidatos lanzaba una consulta de habilidades **por cada
+  candidato** (hasta 61 por pantalla); ahora es una sola con `IN`.
+- El límite de login por IP subió a 150/15 min: una oficina entera puede salir
+  por una sola IP pública y 30 dejaba fuera a todos. Entrar bien **borra** los
+  intentos, porque antes ocho ingresos legítimos bloqueaban la cuenta.
 
 ### Acceso a los CV
 
@@ -212,6 +284,14 @@ el pie usa la marca en texto.
 - El workflow filtra por `paths: socioscomerciales/**`, así que nunca sube ni
   borra archivos del sistema principal.
 - `gestDB()` está escrita pero **desactivada** en `config/database.php`.
+
+## Despliegue
+
+El workflow sube por SCP con `overwrite: true`, que **sobrescribe pero nunca
+borra**: un archivo que se quite del repositorio sigue vivo y accesible en el
+servidor. No se le pone `--delete` a propósito, porque arrasaría con
+`config/config.php` y con `uploads/`, que solo existen allí. Si se elimina un
+archivo del portal, hay que borrarlo a mano por FTP o SSH.
 
 ## Pendiente
 

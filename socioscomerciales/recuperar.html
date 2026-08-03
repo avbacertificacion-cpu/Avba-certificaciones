@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Recuperar contraseña — Socios Comerciales AVBA</title>
+<meta name="description" content="Restablece la contraseña de tu cuenta.">
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
@@ -54,9 +56,9 @@
     <form id="form-restablecer" class="oculto">
       <div class="campo">
         <label for="password">Nueva contraseña</label>
-        <input type="password" id="password" autocomplete="new-password" placeholder="Mínimo 6 caracteres" required>
+        <input type="password" id="password" autocomplete="new-password" placeholder="Mínimo 8 caracteres" minlength="8" required>
         <div class="fuerza"><span id="barra-fuerza"></span></div>
-        <div class="campo-ayuda" id="texto-fuerza">Usa al menos 6 caracteres.</div>
+        <div class="campo-ayuda" id="texto-fuerza">Usa al menos 8 caracteres.</div>
       </div>
       <div class="campo">
         <label for="password2">Repite la contraseña</label>
@@ -128,7 +130,7 @@ document.getElementById('password').addEventListener('input', (e) => {
   if (/[^A-Za-z0-9]/.test(v)) p++;
 
   const niveles = [
-    { w: '0%',   c: 'transparent',  t: 'Usa al menos 6 caracteres.' },
+    { w: '0%',   c: 'transparent',  t: 'Usa al menos 8 caracteres.' },
     { w: '25%',  c: 'var(--rojo)',  t: 'Contraseña débil.' },
     { w: '50%',  c: 'var(--ambar)', t: 'Contraseña aceptable.' },
     { w: '75%',  c: '#84cc16',      t: 'Contraseña buena.' },
@@ -149,7 +151,7 @@ document.getElementById('form-restablecer').addEventListener('submit', async (e)
   const password  = document.getElementById('password').value;
   const password2 = document.getElementById('password2').value;
 
-  if (password.length < 6) { mostrarError('La contraseña debe tener al menos 6 caracteres.'); return; }
+  if (password.length < 8) { mostrarError('La contraseña debe tener al menos 8 caracteres.'); return; }
   if (password !== password2) { mostrarError('Las dos contraseñas no coinciden.'); return; }
 
   const btn = document.getElementById('btn-restablecer');

@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Empresas — Socios Comerciales AVBA</title>
+<meta name="description" content="Directorio de empresas industriales que contratan en Socios Comerciales AVBA.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Socios Comerciales AVBA">
+<meta property="og:title" content="Empresas — Socios Comerciales AVBA">
+<meta property="og:description" content="Directorio de empresas industriales que contratan en Socios Comerciales AVBA.">
+<meta property="og:image" content="https://gestion.avba.com.mx/socioscomerciales/assets/avba-logo.png">
+<meta property="og:url" content="https://gestion.avba.com.mx/socioscomerciales/empresas.html">
+<meta name="twitter:card" content="summary">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
@@ -149,6 +157,7 @@ let sesion = null;
 let empresas = [];
 let temporizador = null;
 let peticionActual = 0;
+let totalDisponible = 0;   // total real en el servidor, para el botón "ver más"
 
 function plural(n, singular, pluralTexto) { return n === 1 ? singular : pluralTexto; }
 
@@ -223,7 +232,10 @@ function renderizar() {
   document.getElementById('contador').textContent = contadorTexto(lista.length);
 
   if (lista.length) {
-    cont.innerHTML = `<div class="resultados resultados-2">${lista.map(tarjeta).join('')}</div>`;
+    // El filtro "solo contratando" se aplica en el cliente, así que el botón
+    // solo tiene sentido cuando se están viendo todas.
+    cont.innerHTML = `<div class="resultados resultados-2">${lista.map(tarjeta).join('')}</div>`
+                   + (soloActivas ? '' : scBotonVerMas(empresas.length, totalDisponible, 'verMasEmpresas'));
     return;
   }
 
@@ -275,7 +287,10 @@ async function buscar() {
   document.getElementById('contador').textContent = 'Buscando...';
 
   try {
-    const datos = await scGet('LISTAR_EMPRESAS', { texto: document.getElementById('f-texto').value.trim() });
+    const datos = await scGet('LISTAR_EMPRESAS', {
+      texto:  document.getElementById('f-texto').value.trim(),
+      offset: 0,
+    });
     if (mia !== peticionActual) return;   // llegó tarde: ya hay una búsqueda más nueva
 
     if (datos.status !== 'success') {
@@ -283,13 +298,33 @@ async function buscar() {
       return;
     }
 
-    empresas = datos.empresas || [];
+    empresas        = datos.empresas || [];
+    totalDisponible = Number(datos.total) || empresas.length;
     renderizar();
   } catch (e) {
     if (mia !== peticionActual) return;
     mostrarError('Error de conexión', e.message || 'Revisa tu conexión e intenta de nuevo.');
   } finally {
     if (mia === peticionActual) cont.setAttribute('aria-busy', 'false');
+  }
+}
+
+/** Trae el siguiente bloque de empresas y lo añade al final. */
+async function verMasEmpresas() {
+  if (empresas.length >= totalDisponible) return;
+
+  try {
+    const datos = await scGet('LISTAR_EMPRESAS', {
+      texto:  document.getElementById('f-texto').value.trim(),
+      offset: empresas.length,
+    });
+    if (datos.status !== 'success') { scToast(datos.message || 'No se pudo cargar más.', 'error'); return; }
+
+    empresas        = empresas.concat(datos.empresas || []);
+    totalDisponible = Number(datos.total) || empresas.length;
+    renderizar();
+  } catch (e) {
+    scToast(e.message, 'error');
   }
 }
 

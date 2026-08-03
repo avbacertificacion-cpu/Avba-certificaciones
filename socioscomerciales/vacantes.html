@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vacantes — Socios Comerciales AVBA</title>
+<meta name="description" content="Vacantes abiertas en empresas industriales de toda la República.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Socios Comerciales AVBA">
+<meta property="og:title" content="Vacantes — Socios Comerciales AVBA">
+<meta property="og:description" content="Vacantes abiertas en empresas industriales de toda la República.">
+<meta property="og:image" content="https://gestion.avba.com.mx/socioscomerciales/assets/avba-logo.png">
+<meta property="og:url" content="https://gestion.avba.com.mx/socioscomerciales/vacantes.html">
+<meta name="twitter:card" content="summary">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
@@ -181,6 +189,7 @@ let esCandidato  = true;
 let primeraCarga = true;
 let peticionNum  = 0;
 let temporizador = null;
+let totalDisponible = 0;   // total real en el servidor, para el botón "ver más"
 
 /* ── Utilidades ─────────────────────────────────────────── */
 
@@ -458,7 +467,31 @@ function pintarResultados() {
     return;
   }
 
-  cont.innerHTML = `<div class="resultados resultados-2">${lista.map(v => tarjeta(v, f.texto)).join('')}</div>`;
+  cont.innerHTML = `<div class="resultados resultados-2">${lista.map(v => tarjeta(v, f.texto)).join('')}</div>`
+                 + scBotonVerMas(vacantes.length, totalDisponible, 'verMasVacantes');
+}
+
+/**
+ * Trae el siguiente bloque y lo añade al final.
+ *
+ * El orden se aplica en el cliente sobre lo que ya está cargado, así que
+ * "ver más" pide la continuación por el mismo orden del servidor (fecha) y
+ * luego se reordena el conjunto entero.
+ */
+async function verMasVacantes() {
+  if (vacantes.length >= totalDisponible) return;
+
+  const f = leerFiltros();
+  try {
+    const datos = await scGet('BUSCAR_VACANTES', { ...f, offset: vacantes.length });
+    if (datos.status !== 'success') { scToast(datos.message || 'No se pudo cargar más.', 'error'); return; }
+
+    vacantes        = vacantes.concat(datos.vacantes || []);
+    totalDisponible = Number(datos.total) || vacantes.length;
+    pintarResultados();
+  } catch (e) {
+    scToast(e.message, 'error');
+  }
 }
 
 function decirEstado(n, f, error) {
@@ -506,7 +539,7 @@ async function buscar() {
   const mio = ++peticionNum;
 
   try {
-    const datos = await scGet('BUSCAR_VACANTES', f);
+    const datos = await scGet('BUSCAR_VACANTES', { ...f, offset: 0 });
     if (mio !== peticionNum) return; // llegó tarde: ya hay una búsqueda más nueva
 
     if (datos.status !== 'success') {
@@ -521,6 +554,7 @@ async function buscar() {
     }
 
     vacantes = datos.vacantes || [];
+    totalDisponible = Number(datos.total) || vacantes.length;
     primeraCarga = false;
     ocultarCargando();
     pintarResultados();

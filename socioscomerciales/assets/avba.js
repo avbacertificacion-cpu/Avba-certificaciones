@@ -382,6 +382,27 @@ async function scReenviarVerificacion() {
   }
 }
 
+/* ── Paginación ────────────────────────────────────────── */
+
+/**
+ * Botón "Ver más" para las listas que llegan paginadas del API.
+ *
+ * Antes todos los listados traían un LIMIT 60 fijo y sin desplazamiento:
+ * a partir de la vacante 61 el resto era invisible y no había manera de
+ * llegar a ellas. `onclick` es el nombre de una función global de la página.
+ */
+function scBotonVerMas(mostrados, total, funcionGlobal) {
+  const n = Number(mostrados) || 0;
+  const t = Number(total) || 0;
+  if (n >= t) return '';
+
+  return `
+    <div class="ver-mas">
+      <button type="button" class="btn btn-outline" onclick="${funcionGlobal}()">Ver más resultados</button>
+      <p class="ver-mas-nota">Mostrando ${n} de ${t}</p>
+    </div>`;
+}
+
 /* ── Formato y escape ──────────────────────────────────── */
 
 /**

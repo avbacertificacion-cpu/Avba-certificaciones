@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Candidatos — Socios Comerciales AVBA</title>
+<meta name="description" content="Busca candidatos calificados para tus vacantes industriales.">
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
@@ -207,7 +209,9 @@
 let sesion = null;
 let porId  = {};          // id de candidato → objeto (nada de JSON en atributos)
 let expandidos = {};      // id de candidato → mostrar todas sus habilidades
-let peticionActual = 0;   // evita que una respuesta vieja pise a una nueva
+let peticionActual = 0;
+let candidatos      = [];   // resultados acumulados con "ver más"
+let totalDisponible = 0;   // evita que una respuesta vieja pise a una nueva
 let temporizador = null;
 
 const MAX_CHIPS = 6;
@@ -218,13 +222,6 @@ const CAMPOS = {
   ubicacion: { id: 'f-ubicacion', etiqueta: 'Ubicación' },
 };
 
-/**
- * scEsc() escapa &, < y > pero no las comillas, así que no basta para
- * atributos. Esta función completa el escape para href, title, aria-label…
- */
-function escAttr(valor) {
-  return scEsc(valor).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
 
 function leerFiltros() {
   return {
@@ -247,7 +244,7 @@ function pintarActivos() {
       <span class="chip-filtro">
         <span>${scEsc(CAMPOS[clave].etiqueta)}: ${scEsc(f[clave])}</span>
         <button type="button" data-accion="quitar" data-filtro="${clave}"
-          aria-label="Quitar filtro ${escAttr(CAMPOS[clave].etiqueta + ': ' + f[clave])}">&times;</button>
+          aria-label="Quitar filtro ${scEsc(CAMPOS[clave].etiqueta + ': ' + f[clave])}">&times;</button>
       </span>`);
   });
 
@@ -363,7 +360,7 @@ async function buscar() {
   if (filtros.con_cv) params.con_cv = '1';
 
   try {
-    const datos = await scGet('BUSCAR_CANDIDATOS', params);
+    const datos = await scGet('BUSCAR_CANDIDATOS', { ...params, offset: 0 });
     if (mio !== peticionActual) return; // llegó tarde: ya hay una búsqueda más nueva
 
     if (datos.status !== 'success') {
@@ -374,6 +371,8 @@ async function buscar() {
 
     const lista = datos.candidatos || [];
     const total = Number(datos.total);
+    candidatos      = lista;
+    totalDisponible = isNaN(total) ? lista.length : total;
     porId = {};
     lista.forEach(c => { porId[c.id] = c; });
 
@@ -384,14 +383,47 @@ async function buscar() {
       ? 'Mostrando los primeros ' + lista.length + ' de ' + total + '. Afina los filtros para acercarte al perfil que buscas.'
       : '';
 
-    cont.innerHTML = lista.length
-      ? `<div class="resultados resultados-2">${lista.map(c => tarjeta(c, filtros)).join('')}</div>`
-      : vacioSinResultados(filtros);
+    pintarLista(filtros);
 
   } catch (e) {
     if (mio !== peticionActual) return;
     contador.textContent = '';
     cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+  }
+}
+
+/** Dibuja la lista acumulada más el botón de "ver más". */
+function pintarLista(filtros) {
+  const cont = document.getElementById('resultados');
+  cont.innerHTML = candidatos.length
+    ? `<div class="resultados resultados-2">${candidatos.map(c => tarjeta(c, filtros)).join('')}</div>`
+      + scBotonVerMas(candidatos.length, totalDisponible, 'verMasCandidatos')
+    : vacioSinResultados(filtros);
+}
+
+/** Trae el siguiente bloque de candidatos y lo añade al final. */
+async function verMasCandidatos() {
+  if (candidatos.length >= totalDisponible) return;
+
+  const filtros = leerFiltros();
+  const params  = {
+    texto:     filtros.texto,
+    habilidad: filtros.habilidad,
+    ubicacion: filtros.ubicacion,
+    offset:    candidatos.length,
+  };
+  if (filtros.con_cv) params.con_cv = '1';
+
+  try {
+    const datos = await scGet('BUSCAR_CANDIDATOS', params);
+    if (datos.status !== 'success') { scToast(datos.message || 'No se pudo cargar más.', 'error'); return; }
+
+    (datos.candidatos || []).forEach(c => { porId[c.id] = c; });
+    candidatos      = candidatos.concat(datos.candidatos || []);
+    totalDisponible = Number(datos.total) || candidatos.length;
+    pintarLista(filtros);
+  } catch (e) {
+    scToast(e.message, 'error');
   }
 }
 

@@ -76,27 +76,47 @@ class ScEmpresas {
     }
 
     // ── DIRECTORIO DE EMPRESAS ───────────────────────────────
-    public function listarEmpresas(string $texto = ''): array {
-        $sql    = "SELECT e.id, e.nombre, e.giro, e.ubicacion, e.logo_url, u.correo_verificado,
-                          (SELECT COUNT(*) FROM sc_vacantes v WHERE v.empresa_id = e.id AND v.estatus = 'abierta') AS vacantes
-                   FROM sc_empresas e
-                   JOIN sc_usuarios u ON u.id = e.usuario_id
-                   WHERE u.activo = 1";
+    public function listarEmpresas(string $texto = '', array $filtros = []): array {
+        $where  = ['u.activo = 1'];
         $params = [];
 
         if (trim($texto) !== '') {
-            $sql     .= " AND (e.nombre LIKE ? OR e.giro LIKE ?)";
-            $like     = '%' . trim($texto) . '%';
+            $where[]  = '(e.nombre LIKE ? OR e.giro LIKE ?)';
+            $like     = '%' . scEscaparLike(trim($texto)) . '%';
             $params[] = $like;
             $params[] = $like;
         }
 
-        $sql .= " ORDER BY vacantes DESC, e.nombre ASC LIMIT 60";
+        $condiciones = implode(' AND ', $where);
+        [$limite, $offset] = scPaginacion($filtros);
 
-        $stmt = $this->pdo->prepare($sql);
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM sc_empresas e
+             JOIN sc_usuarios u ON u.id = e.usuario_id
+             WHERE {$condiciones}"
+        );
         $stmt->execute($params);
+        $total = (int) $stmt->fetchColumn();
 
-        return ['status' => 'success', 'empresas' => $stmt->fetchAll()];
+        $stmt = $this->pdo->prepare(
+            "SELECT e.id, e.nombre, e.giro, e.ubicacion, e.logo_url, u.correo_verificado,
+                    (SELECT COUNT(*) FROM sc_vacantes v WHERE v.empresa_id = e.id AND v.estatus = 'abierta') AS vacantes
+             FROM sc_empresas e
+             JOIN sc_usuarios u ON u.id = e.usuario_id
+             WHERE {$condiciones}
+             ORDER BY vacantes DESC, e.nombre ASC
+             LIMIT {$limite} OFFSET {$offset}"
+        );
+        $stmt->execute($params);
+        $empresas = $stmt->fetchAll();
+
+        return [
+            'status'   => 'success',
+            'empresas' => $empresas,
+            'total'    => $total,
+            'offset'   => $offset,
+            'hay_mas'  => ($offset + count($empresas)) < $total,
+        ];
     }
 
     // ── ACTUALIZAR DATOS ─────────────────────────────────────

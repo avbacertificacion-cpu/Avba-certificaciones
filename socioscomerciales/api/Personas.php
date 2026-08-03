@@ -109,44 +109,82 @@ class ScPersonas {
         $where  = ['u.activo = 1'];
         $params = [];
 
+        // scEscaparLike: sin ella, buscar "_" o "%" no busca esos caracteres,
+        // los toma por comodines y devuelve el padrón entero.
         if ($texto !== '') {
             $where[] = '(p.nombre LIKE ? OR p.headline LIKE ? OR p.resumen LIKE ?)';
-            $like    = '%' . $texto . '%';
+            $like    = '%' . scEscaparLike($texto) . '%';
             array_push($params, $like, $like, $like);
         }
         if ($ubicacion !== '') {
             $where[]  = 'p.ubicacion LIKE ?';
-            $params[] = '%' . $ubicacion . '%';
+            $params[] = '%' . scEscaparLike($ubicacion) . '%';
         }
         if ($habilidad !== '') {
             $where[]  = 'EXISTS (SELECT 1 FROM sc_habilidades h WHERE h.persona_id = p.id AND h.habilidad LIKE ?)';
-            $params[] = '%' . $habilidad . '%';
+            $params[] = '%' . scEscaparLike($habilidad) . '%';
         }
         if ($conCV) {
             $where[] = "p.cv_url IS NOT NULL AND p.cv_url <> ''";
         }
 
+        $condiciones = implode(' AND ', $where);
+        [$limite, $offset] = scPaginacion($filtros);
+
+        // Total real antes de paginar: sin él la interfaz no puede decir
+        // "60 de 340" ni saber si tiene sentido ofrecer "ver más".
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM sc_personas p
+             JOIN sc_usuarios u ON u.id = p.usuario_id
+             WHERE {$condiciones}"
+        );
+        $stmt->execute($params);
+        $total = (int) $stmt->fetchColumn();
+
         $sql = "SELECT p.id, p.nombre, p.headline, p.ubicacion, p.foto_url,
                        p.cv_url, u.correo_verificado
                 FROM sc_personas p
                 JOIN sc_usuarios u ON u.id = p.usuario_id
-                WHERE " . implode(' AND ', $where) . "
+                WHERE {$condiciones}
                 ORDER BY u.correo_verificado DESC, p.id DESC
-                LIMIT 60";
+                LIMIT {$limite} OFFSET {$offset}";
 
         $stmt = $this->pdo->prepare($sql);
         $stmt->execute($params);
         $candidatos = $stmt->fetchAll();
 
-        // Adjuntar hasta 6 habilidades por candidato para mostrarlas en la tarjeta
-        foreach ($candidatos as &$c) {
-            $s = $this->pdo->prepare("SELECT habilidad FROM sc_habilidades WHERE persona_id = ? ORDER BY id LIMIT 6");
-            $s->execute([$c['id']]);
-            $c['habilidades'] = $s->fetchAll(PDO::FETCH_COLUMN);
-        }
-        unset($c);
+        // Habilidades en UNA consulta para todos. Antes se lanzaba una por
+        // candidato: hasta 61 consultas para pintar una sola pantalla.
+        if ($candidatos) {
+            $ids    = array_column($candidatos, 'id');
+            $marcas = implode(',', array_fill(0, count($ids), '?'));
 
-        return ['status' => 'success', 'candidatos' => $candidatos, 'total' => count($candidatos)];
+            $s = $this->pdo->prepare(
+                "SELECT persona_id, habilidad FROM sc_habilidades
+                 WHERE persona_id IN ({$marcas}) ORDER BY id"
+            );
+            $s->execute($ids);
+
+            $porPersona = [];
+            foreach ($s->fetchAll() as $h) {
+                $pid = $h['persona_id'];
+                if (!isset($porPersona[$pid])) $porPersona[$pid] = [];
+                if (count($porPersona[$pid]) < 6) $porPersona[$pid][] = $h['habilidad'];
+            }
+
+            foreach ($candidatos as &$c) {
+                $c['habilidades'] = $porPersona[$c['id']] ?? [];
+            }
+            unset($c);
+        }
+
+        return [
+            'status'     => 'success',
+            'candidatos' => $candidatos,
+            'total'      => $total,
+            'offset'     => $offset,
+            'hay_mas'    => ($offset + count($candidatos)) < $total,
+        ];
     }
 
     /**
@@ -205,9 +243,13 @@ class ScPersonas {
 
         $ruta = realpath(__DIR__ . '/../' . $rel);
         $base = realpath(__DIR__ . '/../uploads/cv');
-        if (!$ruta || !$base || strpos($ruta, $base) !== 0 || !is_file($ruta)) {
+        // La barra final importa: sin ella "uploads/cv_publico/x.pdf" también
+        // empezaría por "uploads/cv" y pasaría la comprobación.
+        if (!$ruta || !$base || strpos($ruta, $base . DIRECTORY_SEPARATOR) !== 0 || !is_file($ruta)) {
             scRespuesta(['status' => 'error', 'message' => 'El archivo ya no está disponible.'], 404);
         }
+
+        $this->registrarAccesoCV($personaId, (int) $usuario['id']);
 
         $nombreArchivo = 'CV - ' . preg_replace('/[^\p{L}\p{N} _-]/u', '', $fila['nombre']) . '.pdf';
 
@@ -219,6 +261,23 @@ class ScPersonas {
         header('X-Content-Type-Options: nosniff');
         readfile($ruta);
         exit;
+    }
+
+    /**
+     * Deja constancia de quién abrió el CV de quién.
+     *
+     * Un CV es un dato personal: si un candidato pregunta qué empresas lo
+     * consultaron, hay que poder responderle (y lo ve en EXPORTAR_DATOS).
+     * Nunca debe impedir la descarga, así que los fallos solo se registran.
+     */
+    private function registrarAccesoCV(int $personaId, int $usuarioId): void {
+        try {
+            $this->pdo->prepare(
+                "INSERT INTO sc_cv_accesos (persona_id, usuario_id, ip) VALUES (?, ?, ?)"
+            )->execute([$personaId, $usuarioId, scIpCliente()]);
+        } catch (PDOException $e) {
+            error_log('registrarAccesoCV: ' . $e->getMessage());
+        }
     }
 
     // ── ACTUALIZAR DATOS BÁSICOS ─────────────────────────────

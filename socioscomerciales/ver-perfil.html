@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Perfil del candidato — Socios Comerciales AVBA</title>
+<meta name="description" content="Perfil profesional de un candidato en Socios Comerciales AVBA.">
+<meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
@@ -163,14 +165,6 @@
 let sesion = null;
 const idPersona = Number(new URLSearchParams(location.search).get('id') || 0);
 
-/* scEsc() reproduce textContent -> innerHTML, que escapa & < > pero NO las
-   comillas. Para un valor que va dentro de un atributo hay que escaparlas
-   también, o una ruta como archivo.pdf" onmouseover="... se saldría del href
-   e inyectaría un manejador de eventos. */
-function escAtributo(valor) {
-  return scEsc(valor).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
 /* Los archivos del portal llegan como ruta relativa (uploads/...) y el sitio
    web como URL absoluta. Cualquier otra cosa (javascript:, data:) se descarta
    antes de usarse como href. */
@@ -303,7 +297,7 @@ function bloqueContacto(p, cv, correoHref) {
         ? `<button type="button" class="btn btn-primary btn-bloque" data-accion="cv">
              ${scIcono('documento')}Descargar CV</button>`
         : ''}
-      <a class="btn btn-outline btn-bloque" href="${escAtributo(correoHref)}">${scIcono('enviar')}Enviar correo</a>
+      <a class="btn btn-outline btn-bloque" href="${scEsc(correoHref)}">${scIcono('enviar')}Enviar correo</a>
     </div>
     ${cv ? '' : '<p class="nota-tenue">Este candidato todavía no adjunta su CV al portal.</p>'}
   </div>`;
@@ -334,7 +328,7 @@ function pintar(datos) {
               ? `<button type="button" class="btn btn-primary btn-sm" data-accion="cv">
                    ${scIcono('documento')}Descargar CV</button>`
               : ''}
-            <a class="btn btn-outline btn-sm" href="${escAtributo(correoHref)}">${scIcono('correo')}Contactar</a>
+            <a class="btn btn-outline btn-sm" href="${scEsc(correoHref)}">${scIcono('correo')}Contactar</a>
           </div>
         </div>
 

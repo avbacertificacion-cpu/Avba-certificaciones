@@ -19,6 +19,15 @@ define('SC_DB_PASS', '');
 // define('SC_MAIL_FROM',        'no-reply@avba.com.mx');
 // define('SC_MAIL_FROM_NOMBRE', 'AVBA Socios Comerciales');
 
+// ── RECOMENDADO: clave del diagnóstico ────────────────────────────────
+// api/index.php?action=DIAGNOSTICO informa de la versión de PHP, las
+// extensiones cargadas, la versión de MariaDB y el estado del esquema. Sin
+// esta clave el diagnóstico queda DESACTIVADO (responde 403), porque esa
+// información abierta a internet es un mapa para quien busque por dónde
+// entrar. Pon aquí una cadena larga y consúltalo con:
+//   api/index.php?action=DIAGNOSTICO&clave=LA_QUE_PONGAS
+// define('SC_DIAG_CLAVE', 'cámbiala-por-una-cadena-larga-y-aleatoria');
+
 // ── OPCIONAL: URL base del portal ─────────────────────────────────────
 // Solo hace falta si la detección automática falla (p. ej. detrás de un
 // proxy). Se usa para armar los enlaces de verificación de correo.

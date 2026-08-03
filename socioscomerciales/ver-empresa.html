@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Perfil de la empresa — Socios Comerciales AVBA</title>
+<meta name="description" content="Perfil de la empresa y sus vacantes abiertas.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Socios Comerciales AVBA">
+<meta property="og:title" content="Perfil de la empresa — Socios Comerciales AVBA">
+<meta property="og:description" content="Perfil de la empresa y sus vacantes abiertas.">
+<meta property="og:image" content="https://gestion.avba.com.mx/socioscomerciales/assets/avba-logo.png">
+<meta property="og:url" content="https://gestion.avba.com.mx/socioscomerciales/ver-empresa.html">
+<meta name="twitter:card" content="summary">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
@@ -144,14 +152,6 @@ const idEmpresa = Number(new URLSearchParams(location.search).get('id') || 0);
 
 const CLASE_MODALIDAD = { presencial: 'badge-azul', remoto: 'badge-verde', hibrido: 'badge-ambar' };
 
-/* scEsc() reproduce textContent -> innerHTML, que escapa & < > pero NO las
-   comillas. Para un valor que va dentro de un atributo hay que escaparlas
-   también, o un sitio_web como https://x" onmouseover="... se saldría del
-   href e inyectaría un manejador de eventos. */
-function escAtributo(valor) {
-  return scEsc(valor).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-}
-
 /* El sitio web lo escribe la empresa: solo lo usamos como enlace si es
    una URL http(s) real. Cualquier otro esquema se descarta. */
 function urlSegura(valor) {
@@ -270,7 +270,7 @@ function bloqueDatos(e, sitio, nVacantes) {
         <div>
           <span class="dato-etiqueta">Sitio web</span>
           <span class="dato-valor">
-            <a href="${escAtributo(sitio)}" target="_blank" rel="noopener noreferrer">${scEsc(etiquetaSitio(sitio))}</a>
+            <a href="${scEsc(sitio)}" target="_blank" rel="noopener noreferrer">${scEsc(etiquetaSitio(sitio))}</a>
           </span>
         </div>
       </div>` : ''}
@@ -319,7 +319,7 @@ function pintar(datos) {
                    ${scIcono('maletin')}${n} ${plural(n, 'vacante abierta', 'vacantes abiertas')}</a>`
               : ''}
             ${sitio
-              ? `<a class="btn btn-outline btn-sm" href="${escAtributo(sitio)}" target="_blank" rel="noopener noreferrer">
+              ? `<a class="btn btn-outline btn-sm" href="${scEsc(sitio)}" target="_blank" rel="noopener noreferrer">
                    ${scIcono('enlace')}Sitio web</a>`
               : ''}
           </div>

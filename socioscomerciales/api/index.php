@@ -33,9 +33,26 @@ ini_set('session.cookie_secure', '1');
 
 // ── Headers ───────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
-header('Access-Control-Allow-Origin: *');
+
+// El API solo lo consume el portal. Con "*" cualquier sitio podía llamarlo
+// y leer las respuestas públicas; ahora solo se devuelve la cabecera cuando
+// el origen es uno de los nuestros.
+$origen = $_SERVER['HTTP_ORIGIN'] ?? '';
+foreach (SC_HOSTS_PERMITIDOS as $hostOk) {
+    if ($origen === 'https://' . $hostOk || $origen === 'http://' . $hostOk) {
+        header('Access-Control-Allow-Origin: ' . $origen);
+        header('Vary: Origin');
+        break;
+    }
+}
 header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Token');
+
+// Las respuestas llevan perfiles, correos y CV: que ningún intermediario ni
+// el navegador las guarde en disco.
+header('Cache-Control: private, no-store');
+header('X-Content-Type-Options: nosniff');
+header('Referrer-Policy: strict-origin-when-cross-origin');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
@@ -58,7 +75,7 @@ set_exception_handler(function (Throwable $e) {
     echo json_encode([
         'status'  => 'error',
         'message' => $mensaje,
-        'ayuda'   => 'Si el problema persiste, abre api/index.php?action=DIAGNOSTICO',
+        'ayuda'   => 'Si el problema persiste, revisa el log de errores del servidor.',
     ], JSON_UNESCAPED_UNICODE);
 });
 register_shutdown_function(function () {
@@ -74,13 +91,20 @@ register_shutdown_function(function () {
 
 // El diagnóstico corre ANTES de conectar: así puede reportar también los
 // fallos de conexión y de migración, que abortarían el arranque normal.
-// Si se define SC_DIAG_CLAVE en config.php, queda protegido por clave.
 if (($_GET['action'] ?? '') === 'DIAGNOSTICO') {
-    if (defined('SC_DIAG_CLAVE') && SC_DIAG_CLAVE !== '') {
-        // hash_equals evita distinguir la clave por tiempo de respuesta
-        if (!hash_equals(SC_DIAG_CLAVE, (string) ($_GET['clave'] ?? ''))) {
-            scRespuesta(['status' => 'error', 'message' => 'No autorizado.'], 403);
-        }
+    // La clave es OBLIGATORIA. Antes era opcional y, como no venía en
+    // config.sample.php, en la práctica nadie la ponía: cualquiera podía
+    // leer versión de PHP, extensiones, versión de MariaDB y qué tablas
+    // existen. Eso es material de reconocimiento y no debe estar abierto.
+    if (!defined('SC_DIAG_CLAVE') || SC_DIAG_CLAVE === '') {
+        scRespuesta([
+            'status'  => 'error',
+            'message' => 'El diagnóstico está desactivado. Define SC_DIAG_CLAVE en config/config.php para poder usarlo.',
+        ], 403);
+    }
+    // hash_equals evita distinguir la clave por tiempo de respuesta
+    if (!hash_equals(SC_DIAG_CLAVE, (string) ($_GET['clave'] ?? ''))) {
+        scRespuesta(['status' => 'error', 'message' => 'No autorizado.'], 403);
     }
     echo json_encode(scDiagnostico(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     exit;
@@ -251,6 +275,14 @@ if ($method === 'GET') {
             $usr = scSesion($pdo, $token);
             scRespuesta($vacantes->resumenInicio($usr));
 
+        case 'MIS_SESIONES':
+            $usr = scSesion($pdo, $token);
+            scRespuesta($auth->listarSesiones((int) $usr['id'], $token));
+
+        case 'EXPORTAR_DATOS':
+            $usr = scSesion($pdo, $token);
+            scRespuesta($auth->exportarDatos((int) $usr['id']));
+
         // ── Perfiles públicos ────────────────────────────────
         // El perfil de un candidato incluye su correo y su CV: solo las
         // empresas deben verlo, no cualquier cuenta con sesión.
@@ -274,7 +306,7 @@ if ($method === 'GET') {
 
         case 'LISTAR_EMPRESAS':
             scSesionVerificada($pdo, $token);
-            scRespuesta($empresas->listarEmpresas($_GET['texto'] ?? ''));
+            scRespuesta($empresas->listarEmpresas($_GET['texto'] ?? '', $payload));
 
         // ── Vacantes ─────────────────────────────────────────
         // La bolsa de trabajo sí queda visible sin verificar: una vacante es
@@ -338,7 +370,19 @@ if ($method === 'POST') {
 
         case 'LOGOUT':
             $usr = scSesion($pdo, $token);
-            scRespuesta($auth->logout((int) $usr['id']));
+            scRespuesta($auth->logout((int) $usr['id'], $token));
+
+        // Ver y cerrar los dispositivos con sesión abierta. No exige correo
+        // verificado: es justo lo que necesita quien sospecha de un acceso.
+        case 'CERRAR_OTRAS_SESIONES':
+            $usr = scSesion($pdo, $token);
+            scRespuesta($auth->cerrarOtrasSesiones((int) $usr['id'], $token));
+
+        // Derechos ARCO: llevarse los datos o borrar la cuenta. Tampoco se
+        // bloquean sin verificar — cancelar debe poder hacerlo cualquiera.
+        case 'ELIMINAR_CUENTA':
+            $usr = scSesion($pdo, $token);
+            scRespuesta($auth->eliminarCuenta((int) $usr['id'], $payload));
 
         case 'REENVIAR_VERIFICACION':
             $usr = scSesion($pdo, $token);
