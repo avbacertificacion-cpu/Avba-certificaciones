@@ -51,7 +51,7 @@
         <div class="rejilla rejilla-2">
           <div class="campo col-full">
             <label for="v-titulo">Título del puesto *</label>
-            <input type="text" id="v-titulo" placeholder="Ej. Inspector de equipos de izaje" required>
+            <input type="text" id="v-titulo" placeholder="Ej. Supervisor de producción" required>
           </div>
           <div class="campo">
             <label for="v-ubicacion">Ubicación</label>
@@ -99,7 +99,7 @@ function pintarVacantes(lista) {
 
   if (!lista.length) {
     cont.innerHTML = scVacio('vacia', 'Aún no publicas vacantes',
-      'Publica tu primera vacante para empezar a recibir candidatos del sector.',
+      'Publica tu primera vacante para empezar a recibir candidatos de la industria.',
       '<button class="btn btn-primary" onclick="nuevaVacante()">Publicar mi primera vacante</button>');
     return;
   }

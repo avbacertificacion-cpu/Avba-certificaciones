@@ -1,6 +1,7 @@
 # Socios Comerciales AVBA
 
-Portal tipo LinkedIn / bolsa de trabajo (candidatos ↔ empresas) con marca AVBA.
+Portal tipo LinkedIn / bolsa de trabajo industrial (candidatos ↔ empresas) con
+marca AVBA, abierto a empresas de todos los giros de la industria.
 Sistema **independiente** del de certificaciones que vive en la raíz de este
 repositorio: base de datos propia, sesiones propias y despliegue propio.
 
@@ -87,6 +88,17 @@ La verificación **no bloquea el uso del portal**: si el envío falla, la cuenta
 sigue funcionando y se muestra un aviso con un botón para reenviar el enlace.
 Las cuentas verificadas llevan una insignia y aparecen primero en las búsquedas.
 
+## Logo
+
+`assets/avba-logo.png` es un recorte del arte de mayor resolución disponible
+(1346 px), quedándose con el isotipo y el wordmark **sin la palabra del giro**
+(INSPECTIONS / CERTIFICATIONS), para que sirva a toda la industria y no solo a
+un servicio. `assets/favicon.png` usa solo el isotipo, que es lo único legible
+a tamaño de pestaña.
+
+No recolorear el logo: el arte tiene bordes suavizados y reteñirlo deja halos.
+Sobre fondos oscuros va dentro de una placa blanca (`.logo-chip`).
+
 ## Notas del host (Hostinger, PHP-FPM, MariaDB 11.8)
 
 - **`php_value` en `.htaccess` provoca error 500** en toda la carpeta porque
@@ -104,7 +116,8 @@ Las cuentas verificadas llevan una insignia y aparecen primero en las búsquedas
 ## Aislamiento respecto a certificaciones
 
 - Base de datos distinta (prefijo `sc_`, sin tocar tablas del sistema raíz).
-- Cookie de sesión limitada a `/socioscomerciales` (`.user.ini`).
+- Cookie de sesión limitada a `/socioscomerciales`, fijada con `ini_set()` en
+  `api/index.php` porque el host ignora `.user.ini`.
 - El workflow filtra por `paths: socioscomerciales/**`, así que nunca sube ni
   borra archivos del sistema principal.
 - `gestDB()` está escrita pero **desactivada** en `config/database.php`.
