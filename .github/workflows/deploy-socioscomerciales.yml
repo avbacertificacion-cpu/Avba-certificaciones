@@ -20,3 +20,7 @@ jobs:
           source:   "socioscomerciales"
           target:   "/home/u218429682/domains/gestion.avba.com.mx/public_html"
           overwrite: true
+          # El timeout por defecto (30s) agotaba la conexion de forma
+          # intermitente y tumbaba el deploy sin que nada estuviera mal.
+          timeout: 120s
+          command_timeout: 10m
