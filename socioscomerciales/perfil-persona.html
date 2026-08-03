@@ -635,7 +635,11 @@ document.getElementById('form-password').addEventListener('submit', async (e) =>
   try {
     const datos = await scPost('CAMBIAR_PASSWORD', { actual, nueva });
     scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
-    if (datos.status === 'success') e.target.reset();
+    if (datos.status === 'success') {
+      e.target.reset();
+      // El servidor rotó la sesión: sin guardar el token nuevo quedaríamos fuera
+      if (datos.token) scSesion.actualizar({ token: datos.token });
+    }
   } catch (err) {
     scToast(err.message, 'error');
   } finally {

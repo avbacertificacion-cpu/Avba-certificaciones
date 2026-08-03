@@ -49,8 +49,20 @@ function scDiagnostico(): array {
     [$pdo, $errorConexion] = ScDatabase::probarConexion();
 
     if (!$pdo) {
+        // El mensaje de PDO trae el usuario y el nombre de la base
+        // ("Access denied for user 'u123_sc'@'localhost' to database ...").
+        // Se registra en el log y aquí solo se publica el código SQLSTATE.
+        error_log('SC diagnostico: ' . $errorConexion);
+        $codigo = preg_match('/SQLSTATE\[(\w+)\]/', $errorConexion, $m) ? $m[1] : 'desconocido';
+
         $r['status'] = 'error';
-        $r['base_de_datos'] = ['conexion' => 'FALLÓ', 'error' => $errorConexion];
+        $r['base_de_datos'] = [
+            'conexion' => 'FALLÓ',
+            'sqlstate' => $codigo,
+            'pista'    => $codigo === '28000' || $codigo === 'HY000'
+                ? 'Revisa SC_DB_USER / SC_DB_PASS / SC_DB_NAME en config/config.php'
+                : 'El detalle quedó en el log de errores del servidor',
+        ];
         return $r;
     }
 

@@ -35,7 +35,7 @@ class ScVacantes {
         $empresaId = $this->idEmpresaPorUsuario($usuarioId);
         if (!$empresaId) return ['status' => 'error', 'message' => 'Perfil de empresa no encontrado.'];
 
-        $titulo = trim($payload['titulo'] ?? '');
+        $titulo = scTexto($payload['titulo'] ?? '', 190) ?? '';
         if (!$titulo) return ['status' => 'error', 'message' => 'El título de la vacante es obligatorio.'];
 
         $modalidad = strtolower(trim($payload['modalidad'] ?? 'presencial'));
@@ -47,10 +47,10 @@ class ScVacantes {
         )->execute([
             $empresaId,
             $titulo,
-            trim($payload['descripcion'] ?? '') ?: null,
-            trim($payload['ubicacion']   ?? '') ?: null,
+            scTexto($payload['descripcion'] ?? null, 8000),
+            scTexto($payload['ubicacion']   ?? null, 190),
             $modalidad,
-            trim($payload['salario']     ?? '') ?: null,
+            scTexto($payload['salario']     ?? null, 100),
         ]);
 
         return ['status' => 'success', 'message' => 'Vacante publicada.', 'id' => (int) $this->pdo->lastInsertId()];
@@ -70,10 +70,10 @@ class ScVacantes {
         $sets   = [];
         $params = [];
 
-        foreach (['titulo', 'descripcion', 'ubicacion', 'salario'] as $campo) {
+        foreach (['titulo' => 190, 'descripcion' => 8000, 'ubicacion' => 190, 'salario' => 100] as $campo => $max) {
             if (!isset($payload[$campo])) continue;
             $sets[]   = "{$campo} = ?";
-            $params[] = trim((string) $payload[$campo]) ?: null;
+            $params[] = scTexto((string) $payload[$campo], $max);
         }
         if (isset($payload['modalidad'])) {
             $modalidad = strtolower(trim($payload['modalidad']));
@@ -239,7 +239,7 @@ class ScVacantes {
 
         $this->pdo->prepare(
             "INSERT INTO sc_postulaciones (vacante_id, persona_id, mensaje, estatus) VALUES (?, ?, ?, 'enviada')"
-        )->execute([$vacanteId, $personaId, trim($payload['mensaje'] ?? '') ?: null]);
+        )->execute([$vacanteId, $personaId, scTexto($payload['mensaje'] ?? null, 2000)]);
 
         $this->avisarEmpresaNuevaPostulacion($vacanteId, $personaId);
 

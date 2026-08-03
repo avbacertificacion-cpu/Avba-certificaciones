@@ -137,9 +137,12 @@ function pintar(e) {
   const meta = [];
   if (e.ubicacion) meta.push(`<span>${scIcono('ubicacion')}${scEsc(e.ubicacion)}</span>`);
   meta.push(`<span>${scIcono('correo')}${scEsc(e.correo)}</span>`);
-  if (e.sitio_web) {
-    meta.push(`<span>${scIcono('enlace')}<a href="${scEsc(e.sitio_web)}" target="_blank" rel="noopener"
-      style="color:var(--azul);font-weight:600">${scEsc(e.sitio_web.replace(/^https?:\/\//, ''))}</a></span>`);
+  // scUrlSegura descarta cualquier esquema que no sea http(s), por si quedaron
+  // datos guardados antes de que el API validara este campo.
+  const sitioSeguro = scUrlSegura(e.sitio_web);
+  if (sitioSeguro) {
+    meta.push(`<span>${scIcono('enlace')}<a href="${scEsc(sitioSeguro)}" target="_blank" rel="noopener"
+      style="color:var(--azul);font-weight:600">${scEsc(sitioSeguro.replace(/^https?:\/\//, ''))}</a></span>`);
   }
   meta.push(`<span>${scIcono('maletin')}${e.vacantes_abiertas || 0} vacantes abiertas</span>`);
   if (Number(e.correo_verificado)) meta.push(scBadgeVerificado(true));
@@ -282,7 +285,11 @@ document.getElementById('form-password').addEventListener('submit', async (e) =>
   try {
     const datos = await scPost('CAMBIAR_PASSWORD', { actual, nueva });
     scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
-    if (datos.status === 'success') e.target.reset();
+    if (datos.status === 'success') {
+      e.target.reset();
+      // El servidor rotó la sesión: sin guardar el token nuevo quedaríamos fuera
+      if (datos.token) scSesion.actualizar({ token: datos.token });
+    }
   } catch (err) {
     scToast(err.message, 'error');
   } finally {

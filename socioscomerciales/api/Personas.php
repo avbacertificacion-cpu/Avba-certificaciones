@@ -155,14 +155,19 @@ class ScPersonas {
             return ['status' => 'error', 'message' => 'El nombre no puede quedar vacío.'];
         }
 
-        $campos = ['nombre', 'curp', 'headline', 'ubicacion', 'resumen', 'telefono'];
+        // Largo real de cada columna: pasarse provoca el error 1406 de
+        // MariaDB en modo estricto, que el usuario vería como un 500.
+        $campos = [
+            'nombre' => 190, 'curp' => 18, 'headline' => 190,
+            'ubicacion' => 190, 'resumen' => 5000, 'telefono' => 30,
+        ];
         $sets   = [];
         $params = [];
 
-        foreach ($campos as $campo) {
+        foreach ($campos as $campo => $max) {
             if (!isset($payload[$campo])) continue;
             $sets[]   = "{$campo} = ?";
-            $params[] = trim((string) $payload[$campo]) ?: null;
+            $params[] = scTexto((string) $payload[$campo], $max);
         }
 
         if (empty($sets)) {
@@ -219,8 +224,8 @@ class ScPersonas {
         $personaId = $this->idPersonaPorUsuario($usuarioId);
         if (!$personaId) return ['status' => 'error', 'message' => 'Perfil no encontrado.'];
 
-        $empresa = trim($payload['empresa'] ?? '');
-        $puesto  = trim($payload['puesto']  ?? '');
+        $empresa = scTexto($payload['empresa'] ?? '', 190) ?? '';
+        $puesto  = scTexto($payload['puesto']  ?? '', 190) ?? '';
         if (!$empresa || !$puesto) {
             return ['status' => 'error', 'message' => 'Empresa y puesto son obligatorios.'];
         }
@@ -232,10 +237,10 @@ class ScPersonas {
              VALUES (?, ?, ?, ?, ?, ?, ?)"
         )->execute([
             $personaId, $empresa, $puesto,
-            !empty($payload['desde']) ? $payload['desde'] : null,
-            $actual ? null : (!empty($payload['hasta']) ? $payload['hasta'] : null),
+            scFecha($payload['desde'] ?? null),
+            $actual ? null : scFecha($payload['hasta'] ?? null),
             $actual,
-            trim($payload['descripcion'] ?? '') ?: null,
+            scTexto($payload['descripcion'] ?? null, 5000),
         ]);
 
         return ['status' => 'success', 'message' => 'Experiencia agregada.'];
@@ -248,8 +253,8 @@ class ScPersonas {
         $id = (int) ($payload['id'] ?? 0);
         if (!$id) return ['status' => 'error', 'message' => 'Experiencia no indicada.'];
 
-        $empresa = trim($payload['empresa'] ?? '');
-        $puesto  = trim($payload['puesto']  ?? '');
+        $empresa = scTexto($payload['empresa'] ?? '', 190) ?? '';
+        $puesto  = scTexto($payload['puesto']  ?? '', 190) ?? '';
         if (!$empresa || !$puesto) {
             return ['status' => 'error', 'message' => 'Empresa y puesto son obligatorios.'];
         }
@@ -263,10 +268,10 @@ class ScPersonas {
         );
         $stmt->execute([
             $empresa, $puesto,
-            !empty($payload['desde']) ? $payload['desde'] : null,
-            $actual ? null : (!empty($payload['hasta']) ? $payload['hasta'] : null),
+            scFecha($payload['desde'] ?? null),
+            $actual ? null : scFecha($payload['hasta'] ?? null),
             $actual,
-            trim($payload['descripcion'] ?? '') ?: null,
+            scTexto($payload['descripcion'] ?? null, 5000),
             $id, $personaId,
         ]);
 
@@ -282,8 +287,8 @@ class ScPersonas {
         $personaId = $this->idPersonaPorUsuario($usuarioId);
         if (!$personaId) return ['status' => 'error', 'message' => 'Perfil no encontrado.'];
 
-        $institucion = trim($payload['institucion'] ?? '');
-        $titulo      = trim($payload['titulo']      ?? '');
+        $institucion = scTexto($payload['institucion'] ?? '', 190) ?? '';
+        $titulo      = scTexto($payload['titulo']      ?? '', 190) ?? '';
         if (!$institucion || !$titulo) {
             return ['status' => 'error', 'message' => 'Institución y título son obligatorios.'];
         }
@@ -307,8 +312,8 @@ class ScPersonas {
         $id = (int) ($payload['id'] ?? 0);
         if (!$id) return ['status' => 'error', 'message' => 'Educación no indicada.'];
 
-        $institucion = trim($payload['institucion'] ?? '');
-        $titulo      = trim($payload['titulo']      ?? '');
+        $institucion = scTexto($payload['institucion'] ?? '', 190) ?? '';
+        $titulo      = scTexto($payload['titulo']      ?? '', 190) ?? '';
         if (!$institucion || !$titulo) {
             return ['status' => 'error', 'message' => 'Institución y título son obligatorios.'];
         }

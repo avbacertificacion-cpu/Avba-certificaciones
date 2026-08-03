@@ -74,7 +74,14 @@ register_shutdown_function(function () {
 
 // El diagnóstico corre ANTES de conectar: así puede reportar también los
 // fallos de conexión y de migración, que abortarían el arranque normal.
+// Si se define SC_DIAG_CLAVE en config.php, queda protegido por clave.
 if (($_GET['action'] ?? '') === 'DIAGNOSTICO') {
+    if (defined('SC_DIAG_CLAVE') && SC_DIAG_CLAVE !== '') {
+        // hash_equals evita distinguir la clave por tiempo de respuesta
+        if (!hash_equals(SC_DIAG_CLAVE, (string) ($_GET['clave'] ?? ''))) {
+            scRespuesta(['status' => 'error', 'message' => 'No autorizado.'], 403);
+        }
+    }
     echo json_encode(scDiagnostico(), JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
     exit;
 }
@@ -104,14 +111,25 @@ $esMultipart = $method === 'POST' && stripos($tipoContenido, 'multipart/form-dat
 $action      = '';
 $payload     = [];
 
+// El token NUNCA se acepta por query string: acabaría en los logs de acceso
+// del host, en el historial del navegador y en la cabecera Referer.
 if ($method === 'GET') {
     $action = $_GET['action'] ?? '';
-    if (!$token && isset($_GET['token'])) $token = $_GET['token'];
     $payload = $_GET;
 } elseif ($esMultipart) {
     $action  = $_POST['action'] ?? '';
     $payload = $_POST;
     if (!$token && isset($_POST['token'])) $token = $_POST['token'];
+
+    // El host acepta hasta 1.5 GB por petición, así que sin este corte PHP
+    // recibiría y escribiría en disco el archivo entero antes de que el
+    // código pudiera rechazarlo por tamaño.
+    if ((int) ($_SERVER['CONTENT_LENGTH'] ?? 0) > 12 * 1024 * 1024) {
+        scRespuesta([
+            'status'  => 'error',
+            'message' => 'El archivo es demasiado grande. El máximo son 8 MB para el CV y 6 MB para imágenes.',
+        ], 413);
+    }
 
     // Si el cuerpo superó post_max_size, PHP descarta $_POST y $_FILES enteros
     if (empty($_POST) && empty($_FILES)) {
@@ -124,10 +142,19 @@ if ($method === 'GET') {
 } else {
     $raw  = file_get_contents('php://input');
     $body = $raw ? (json_decode($raw, true) ?? []) : [];
+    if (!is_array($body)) $body = [];
     $action  = $body['action']  ?? '';
     $payload = $body['payload'] ?? $body;
     if (!$token && isset($body['token'])) $token = $body['token'];
 }
+
+// Si llega "payload":"texto" o ?texto[]=a, los trim() posteriores lanzarían
+// TypeError y el usuario vería un 500 en lugar de un error entendible.
+if (!is_array($payload)) $payload = [];
+foreach ($payload as $clave => $valor) {
+    if (!is_scalar($valor) && $valor !== null) unset($payload[$clave]);
+}
+if (!is_string($action)) $action = '';
 
 /** Exige sesión válida; corta con 401 si no la hay. */
 function scSesion(PDO $pdo, ?string $token): array {
@@ -173,9 +200,20 @@ if ($method === 'GET') {
             scRespuesta($vacantes->resumenInicio($usr));
 
         // ── Perfiles públicos ────────────────────────────────
+        // El perfil de un candidato incluye su correo y su CV: solo las
+        // empresas deben verlo, no cualquier cuenta con sesión.
         case 'GET_PERSONA_PUBLICA':
-            scSesion($pdo, $token);
-            scRespuesta($personas->obtenerPerfilPublico((int) ($_GET['id'] ?? 0)));
+            $usr = scSesion($pdo, $token);
+            $idPersona = (int) ($_GET['id'] ?? 0);
+            if ($usr['tipo'] !== 'empresa') {
+                // Un candidato solo puede abrir su propio perfil público
+                $s = $pdo->prepare("SELECT id FROM sc_personas WHERE usuario_id = ?");
+                $s->execute([$usr['id']]);
+                if ((int) $s->fetchColumn() !== $idPersona) {
+                    scRespuesta(['status' => 'error', 'message' => 'No autorizado.'], 403);
+                }
+            }
+            scRespuesta($personas->obtenerPerfilPublico($idPersona));
 
         case 'GET_EMPRESA_PUBLICA':
             scRespuesta($empresas->obtenerPerfilPublico((int) ($_GET['id'] ?? 0)));

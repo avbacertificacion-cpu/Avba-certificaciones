@@ -7,16 +7,220 @@
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
-  .vacante-fila {
+  [hidden] { display: none !important; }
+
+  /* ── Foco visible consistente ───────────────────────────── */
+  a:focus-visible, button:focus-visible, input:focus-visible,
+  select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--azul);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
+  }
+
+  /* ── Barra de control del tablero ───────────────────────── */
+  .tablero-barra {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    justify-content: space-between; margin-bottom: 16px;
+  }
+  .pestanas {
+    display: flex; gap: 4px; background: var(--blanco);
+    border: 1px solid var(--borde); border-radius: 999px; padding: 4px;
+    box-shadow: var(--sombra-sm); overflow-x: auto; scrollbar-width: none;
+    max-width: 100%;
+  }
+  .pestanas::-webkit-scrollbar { display: none; }
+  .pestana {
+    display: inline-flex; align-items: center; gap: 7px;
+    border: none; background: none; cursor: pointer; font-family: inherit;
+    font-size: 13px; font-weight: 600; color: var(--texto-sub);
+    padding: 7px 14px; border-radius: 999px; white-space: nowrap;
+    transition: background .15s, color .15s;
+  }
+  .pestana:hover { background: var(--gris-fondo); color: var(--azul); }
+  .pestana[aria-pressed="true"] { background: var(--azul); color: #fff; }
+  .pestana .cuenta {
+    font-size: 11.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px;
+    background: var(--gris-fondo); color: var(--texto-sub); line-height: 1.6;
+  }
+  .pestana[aria-pressed="true"] .cuenta { background: rgba(255,255,255,.22); color: #fff; }
+
+  .herramientas { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .buscador { position: relative; }
+  .buscador svg {
+    position: absolute; left: 11px; top: 50%; transform: translateY(-50%);
+    width: 15px; height: 15px; color: var(--texto-tenue); pointer-events: none;
+  }
+  .buscador input {
+    width: 210px; max-width: 100%; padding: 9px 12px 9px 34px;
+    border: 1.5px solid var(--borde); border-radius: var(--r-sm);
+    font-size: 13.5px; color: var(--texto); background: var(--blanco);
+    outline: none; transition: border-color .15s, box-shadow .15s;
+  }
+  .buscador input:focus { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(24,95,165,.11); }
+  .orden-select {
+    padding: 9px 12px; border: 1.5px solid var(--borde); border-radius: var(--r-sm);
+    font-size: 13.5px; color: var(--texto-sub); background: var(--blanco);
+    outline: none; cursor: pointer;
+  }
+  .orden-select:focus { border-color: var(--azul); }
+  .solo-lectores {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .estado-lista { font-size: 12.5px; color: var(--texto-tenue); margin-bottom: 12px; }
+
+  /* ── Tarjeta de vacante ─────────────────────────────────── */
+  .vacante {
+    background: var(--blanco); border: 1px solid var(--borde);
+    border-radius: var(--r-md); box-shadow: var(--sombra-sm);
+    margin-bottom: 14px; overflow: hidden;
+    border-left: 4px solid var(--verde);
+    transition: box-shadow .15s, border-color .15s;
+  }
+  .vacante:hover { box-shadow: var(--sombra); }
+  .vacante.cerrada { border-left-color: var(--texto-tenue); background: #FCFDFE; }
+  .vacante.cerrada .vacante-titulo { color: var(--texto-sub); }
+  .vacante-cuerpo { padding: 18px 18px 0; }
+  .vacante-top { display: flex; gap: 12px; align-items: flex-start; }
+  .vacante-info { flex: 1; min-width: 0; }
+  .vacante-titulo {
+    font-size: 16.5px; font-weight: 700; letter-spacing: -.2px;
+    line-height: 1.3; word-break: break-word;
+  }
+  .vacante-insignias { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+  .vacante-desc {
+    font-size: 13px; color: var(--texto-sub); line-height: 1.55; margin-top: 10px;
+    display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2;
+    -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .vacante-pie {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    margin-top: 14px; padding: 12px 18px; border-top: 1px solid var(--borde);
+    background: #FBFCFE;
+  }
+  .btn-desplegar svg.chevron { transition: transform .18s; }
+  .btn-desplegar[aria-expanded="true"] svg.chevron { transform: rotate(180deg); }
+  .pie-nota { font-size: 12.5px; color: var(--texto-tenue); margin-left: auto; }
+
+  /* ── Menú de acciones secundarias ───────────────────────── */
+  .menu-envoltura { position: relative; flex-shrink: 0; }
+  .btn-menu {
+    background: var(--blanco); border: 1.5px solid var(--borde); cursor: pointer;
+    width: 36px; height: 36px; border-radius: var(--r-sm); color: var(--texto-sub);
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 17px; line-height: 1; font-family: inherit; letter-spacing: 1px;
+    transition: background .15s, color .15s;
+  }
+  .btn-menu:hover, .btn-menu[aria-expanded="true"] { background: var(--gris-fondo); color: var(--azul); }
+  .menu-lista {
+    position: absolute; right: 0; top: calc(100% + 6px); z-index: 30;
+    background: var(--blanco); border: 1px solid var(--borde);
+    border-radius: var(--r); box-shadow: var(--sombra-md);
+    min-width: 194px; padding: 6px; text-align: left;
+  }
+  .menu-lista button {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    font-size: 13.5px; font-weight: 600; color: var(--texto-sub);
+    padding: 9px 11px; border-radius: var(--r-sm); text-align: left;
+  }
+  .menu-lista button svg { width: 15px; height: 15px; flex-shrink: 0; }
+  .menu-lista button:hover { background: var(--gris-fondo); color: var(--azul); }
+  .menu-lista button.peligro { color: var(--rojo); }
+  .menu-lista button.peligro:hover { background: var(--rojo-bg); color: var(--rojo); }
+  .menu-separador { height: 1px; background: var(--borde); margin: 5px 6px; }
+
+  /* ── Panel de candidatos ────────────────────────────────── */
+  .panel { border-top: 1px solid var(--borde); background: var(--gris-fondo); padding: 16px 18px; }
+  .panel-cabecera {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    justify-content: space-between; margin-bottom: 12px;
+  }
+  .panel-titulo { font-size: 13px; font-weight: 700; color: var(--texto-sub); }
+  .segmentos { display: flex; flex-wrap: wrap; gap: 6px; }
+  .segmento-btn {
+    border: 1px solid var(--borde); background: var(--blanco); cursor: pointer;
+    font-family: inherit; font-size: 12px; font-weight: 600; color: var(--texto-sub);
+    padding: 5px 11px; border-radius: 999px; white-space: nowrap;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .segmento-btn:hover { border-color: var(--acento); color: var(--azul); }
+  .segmento-btn[aria-pressed="true"] { background: var(--azul-claro); border-color: var(--acento); color: var(--azul-oscuro); }
+
+  .candidato {
+    display: flex; gap: 13px; align-items: flex-start;
+    background: var(--blanco); border: 1px solid var(--borde);
+    border-radius: var(--r); padding: 14px; margin-bottom: 10px;
+  }
+  .candidato:last-child { margin-bottom: 0; }
+  .candidato.nuevo { border-color: #C9E0F5; box-shadow: inset 3px 0 0 var(--acento); }
+  .candidato.descartado { opacity: .68; }
+  .candidato-cuerpo { flex: 1; min-width: 0; }
+  .candidato-nombre { font-size: 14.5px; font-weight: 700; word-break: break-word; }
+  .candidato-nombre a:hover { color: var(--azul); text-decoration: underline; }
+  .candidato-mensaje {
+    font-size: 13px; color: var(--texto-sub); line-height: 1.55; margin-top: 8px;
+    background: var(--gris-fondo); border-left: 3px solid var(--borde);
+    padding: 8px 11px; border-radius: 0 var(--r-sm) var(--r-sm) 0;
+    white-space: pre-line; word-break: break-word;
+  }
+  .candidato-acciones {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin-top: 12px; padding-top: 11px; border-top: 1px dashed var(--borde);
+  }
+  .decision { display: flex; flex-wrap: wrap; gap: 0; border: 1px solid var(--borde); border-radius: 999px; overflow: hidden; }
+  .decision button {
+    border: none; background: var(--blanco); cursor: pointer; font-family: inherit;
+    font-size: 12px; font-weight: 600; color: var(--texto-sub);
+    padding: 6px 12px; white-space: nowrap;
+    border-right: 1px solid var(--borde); transition: background .15s, color .15s;
+  }
+  .decision button:last-child { border-right: none; }
+  .decision button:hover:not(:disabled) { background: var(--gris-fondo); color: var(--azul); }
+  .decision button[aria-pressed="true"] { background: var(--azul); color: #fff; }
+  .decision button[aria-pressed="true"].ok { background: var(--verde); }
+  .decision button[aria-pressed="true"].no { background: var(--rojo); }
+  .decision button:disabled { opacity: .6; cursor: wait; }
+  .etiqueta-decision { font-size: 11.5px; font-weight: 700; color: var(--texto-tenue); }
+
+  /* ── Esqueletos de carga ────────────────────────────────── */
+  .esq {
+    background: linear-gradient(90deg, #EDF1F7 25%, #F7FAFD 50%, #EDF1F7 75%);
+    background-size: 400% 100%; animation: brillo 1.4s ease infinite;
+    border-radius: var(--r-sm);
+  }
+  @keyframes brillo { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+  .esq-linea { height: 12px; margin-bottom: 9px; }
+  .esq-card {
     background: var(--blanco); border: 1px solid var(--borde);
     border-radius: var(--r-md); padding: 18px; margin-bottom: 14px;
   }
-  .vacante-fila.cerrada { opacity: .72; }
-  .vacante-cabecera { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
-  .vacante-cabecera h3 { font-size: 16px; font-weight: 700; }
-  .vacante-acciones { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
-  .postulaciones { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--borde); }
-  .modal { max-width: 620px; }
+  .esq-metrica { height: 82px; border-radius: var(--r); }
+  .esq-circulo { width: 48px; height: 48px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Métrica con acento ─────────────────────────────────── */
+  .metrica-nueva { border-color: #F6D9A0; background: var(--ambar-bg); }
+  .metrica-nueva .metrica-valor { color: #B45309; }
+  .metrica-nueva .metrica-etiqueta { color: #B45309; }
+
+  @media (max-width: 560px) {
+    .tablero-barra { align-items: stretch; }
+    .herramientas { width: 100%; }
+    .buscador { flex: 1; min-width: 0; }
+    .buscador input { width: 100%; }
+    .orden-select { flex: 1; min-width: 0; }
+    .vacante-pie .btn { flex: 1; }
+    .pie-nota { margin-left: 0; width: 100%; }
+    .decision { width: 100%; }
+    .decision button { flex: 1; padding: 7px 6px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important; scroll-behavior: auto !important;
+    }
+  }
 </style>
 </head>
 <body>
@@ -28,22 +232,43 @@
     <div class="pagina-cabecera">
       <div>
         <h1>Mis vacantes</h1>
-        <p>Publica vacantes y revisa a los candidatos que se postulan.</p>
+        <p>Publica vacantes y da seguimiento a los candidatos que se postulan.</p>
       </div>
-      <button class="btn btn-primary" id="btn-nueva"></button>
+      <button class="btn btn-primary" id="btn-nueva" data-accion="nueva"></button>
     </div>
   </div>
 
   <div id="aviso-verificacion"></div>
+
+  <section id="resumen" class="metricas" aria-label="Resumen de tus vacantes"></section>
+
+  <div class="tablero-barra" id="barra" hidden>
+    <div class="pestanas" id="pestanas" role="group" aria-label="Filtrar vacantes por estatus"></div>
+    <div class="herramientas">
+      <div class="buscador">
+        <label class="solo-lectores" for="f-buscar">Buscar entre mis vacantes</label>
+        <input type="search" id="f-buscar" placeholder="Buscar por título o ubicación" autocomplete="off">
+      </div>
+      <label class="solo-lectores" for="f-orden">Ordenar vacantes</label>
+      <select id="f-orden" class="orden-select">
+        <option value="recientes">Más recientes</option>
+        <option value="nuevas">Con candidatos nuevos</option>
+        <option value="postulaciones">Con más postulaciones</option>
+        <option value="titulo">Título (A-Z)</option>
+      </select>
+    </div>
+  </div>
+
+  <p class="estado-lista" id="estado-lista" role="status" aria-live="polite"></p>
   <div id="lista"></div>
 </main>
 
 <!-- Modal crear/editar vacante -->
 <div class="modal-fondo" id="modal-vacante">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
     <div class="modal-cabecera">
       <h3 id="modal-titulo">Publicar vacante</h3>
-      <button class="modal-cerrar" onclick="scCerrarModal('modal-vacante')">&times;</button>
+      <button class="modal-cerrar" type="button" aria-label="Cerrar" onclick="scCerrarModal('modal-vacante')">&times;</button>
     </div>
     <form id="form-vacante">
       <div class="modal-cuerpo">
@@ -73,6 +298,7 @@
             <label for="v-descripcion">Descripción</label>
             <textarea id="v-descripcion" style="min-height:140px"
               placeholder="Responsabilidades, requisitos, certificaciones necesarias..."></textarea>
+            <p class="campo-ayuda">Entre más claro el perfil, mejores candidatos recibes.</p>
           </div>
         </div>
       </div>
@@ -88,125 +314,442 @@
 
 <script src="assets/avba.js"></script>
 <script>
-let sesion = null;
-let abiertas = {};   // id de vacante → true si su lista de postulaciones está desplegada
-let porId = {};      // id → objeto vacante (evita meter JSON dentro de atributos onclick)
+/* ==========================================================
+   Mis vacantes — tablero de la empresa
+   Regla de seguridad: todo dato del API pasa por scEsc() y
+   NUNCA viaja dentro de un atributo onclick. Las acciones se
+   resuelven por delegación leyendo data-accion / data-id.
+   ========================================================== */
 
-function pintarVacantes(lista) {
-  const cont = document.getElementById('lista');
-  porId = {};
-  lista.forEach(v => { porId[v.id] = v; });
+let sesion   = null;
+let vacantes = [];   // lista completa tal cual la devuelve el API
+let porId    = {};   // id de vacante → objeto (evita JSON en atributos)
+let abiertas = {};   // id de vacante → panel de candidatos desplegado
+let cachePost = {};  // id de vacante → array de postulaciones ya cargadas
+let filtroPanel = {};// id de vacante → estatus filtrado dentro del panel
+let menuAbierto = null;
 
-  if (!lista.length) {
-    cont.innerHTML = scVacio('vacia', 'Aún no publicas vacantes',
-      'Publica tu primera vacante para empezar a recibir candidatos de la industria.',
-      '<button class="btn btn-primary" onclick="nuevaVacante()">Publicar mi primera vacante</button>');
-    return;
-  }
+let filtroEstatus = 'todas';
+let textoFiltro   = '';
+let orden         = 'recientes';
+let temporizadorBusqueda = null;
 
-  cont.innerHTML = lista.map(v => `
-    <div class="vacante-fila ${v.estatus === 'cerrada' ? 'cerrada' : ''}">
-      <div class="vacante-cabecera">
-        <div style="flex:1;min-width:200px">
-          <div class="fila" style="gap:8px">
-            <h3>${scEsc(v.titulo)}</h3>
-            <span class="badge ${v.estatus === 'abierta' ? 'badge-verde' : 'badge-gris'}">
-              ${v.estatus === 'abierta' ? 'Abierta' : 'Cerrada'}
-            </span>
-            ${Number(v.nuevas) > 0 ? `<span class="badge badge-ambar">${v.nuevas} nueva${v.nuevas > 1 ? 's' : ''}</span>` : ''}
-          </div>
-          <div class="tarjeta-datos">
-            ${v.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : ''}
-            <span>${scIcono('maletin')}${scEsc(SC_MODALIDADES[v.modalidad] || v.modalidad)}</span>
-            ${v.salario ? `<span>${scIcono('dinero')}${scEsc(v.salario)}</span>` : ''}
-            <span>${scIcono('personas')}${v.postulaciones} postulación${v.postulaciones == 1 ? '' : 'es'}</span>
-            <span>${scIcono('reloj')}${scEsc(scHace(v.creado))}</span>
-          </div>
-        </div>
-        <div class="vacante-acciones">
-          <button class="btn btn-sm btn-suave" onclick="verPostulaciones(${v.id})">
-            Ver candidatos (${v.postulaciones})
-          </button>
-          <button class="btn btn-sm btn-gris" onclick="editarVacante(${v.id})">Editar</button>
-          <button class="btn btn-sm btn-gris" onclick="cambiarEstatus(${v.id}, '${v.estatus === 'abierta' ? 'cerrada' : 'abierta'}')">
-            ${v.estatus === 'abierta' ? 'Cerrar' : 'Reabrir'}
-          </button>
-          <button class="btn btn-sm btn-peligro" onclick="eliminarVacante(${v.id})">Eliminar</button>
-        </div>
-      </div>
-      <div class="postulaciones oculto" id="post-${v.id}"></div>
-    </div>`).join('');
-
-  // Volver a abrir las listas que el usuario tenía desplegadas
-  Object.keys(abiertas).forEach(id => { if (abiertas[id]) verPostulaciones(Number(id), true); });
+/**
+ * scEsc() escapa &, < y > pero no las comillas, así que no basta para
+ * atributos. Esta función completa el escape para usar dentro de href,
+ * aria-label, title, etc.
+ */
+function escAttr(valor) {
+  return scEsc(valor).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-/* ── Postulaciones de una vacante ───────────────────────── */
-async function verPostulaciones(vacanteId, forzarAbrir) {
-  const cont = document.getElementById('post-' + vacanteId);
-  if (!cont) return;
+const ORDEN_ESTATUS = { enviada: 0, en_revision: 1, aceptada: 2, rechazada: 3 };
+const ETIQUETA_DECISION = {
+  enviada:     { corto: 'Pendiente',  clase: '' },
+  en_revision: { corto: 'En revisión', clase: '' },
+  aceptada:    { corto: 'Aceptar',    clase: 'ok' },
+  rechazada:   { corto: 'Descartar',  clase: 'no' },
+};
 
-  if (!forzarAbrir && !cont.classList.contains('oculto')) {
-    cont.classList.add('oculto');
-    abiertas[vacanteId] = false;
+/* ── Esqueletos de carga ────────────────────────────────── */
+function esqueletoResumen() {
+  return Array.from({ length: 4 }, () => '<div class="esq esq-metrica"></div>').join('');
+}
+function esqueletoVacantes(n) {
+  return Array.from({ length: n || 3 }, () => `
+    <div class="esq-card">
+      <div class="esq esq-linea" style="width:52%;height:16px"></div>
+      <div class="esq esq-linea" style="width:34%"></div>
+      <div class="esq esq-linea" style="width:78%"></div>
+      <div class="esq esq-linea" style="width:64%;margin-bottom:0"></div>
+    </div>`).join('');
+}
+function esqueletoCandidatos(n) {
+  return Array.from({ length: n || 2 }, () => `
+    <div class="candidato">
+      <div class="esq esq-circulo"></div>
+      <div class="candidato-cuerpo">
+        <div class="esq esq-linea" style="width:44%;height:14px"></div>
+        <div class="esq esq-linea" style="width:66%"></div>
+        <div class="esq esq-linea" style="width:30%;margin-bottom:0"></div>
+      </div>
+    </div>`).join('');
+}
+
+/* ── Resumen y pestañas ─────────────────────────────────── */
+function contarPorEstatus() {
+  const abiertasN = vacantes.filter(v => v.estatus === 'abierta').length;
+  return {
+    todas: vacantes.length,
+    abierta: abiertasN,
+    cerrada: vacantes.length - abiertasN,
+    nuevas: vacantes.reduce((s, v) => s + (Number(v.nuevas) || 0), 0),
+    postulaciones: vacantes.reduce((s, v) => s + (Number(v.postulaciones) || 0), 0),
+  };
+}
+
+function pintarResumen() {
+  const c = contarPorEstatus();
+  document.getElementById('resumen').innerHTML = `
+    <div class="metrica destacada">
+      <div class="metrica-valor">${c.abierta}</div>
+      <div class="metrica-etiqueta">Vacantes abiertas</div>
+    </div>
+    <div class="metrica${c.nuevas ? ' metrica-nueva' : ''}">
+      <div class="metrica-valor">${c.nuevas}</div>
+      <div class="metrica-etiqueta">Postulaciones sin revisar</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-valor">${c.postulaciones}</div>
+      <div class="metrica-etiqueta">Postulaciones totales</div>
+    </div>
+    <div class="metrica">
+      <div class="metrica-valor">${c.cerrada}</div>
+      <div class="metrica-etiqueta">Vacantes cerradas</div>
+    </div>`;
+}
+
+function pintarPestanas() {
+  const c = contarPorEstatus();
+  const tabs = [
+    { valor: 'todas',   texto: 'Todas',    cuenta: c.todas },
+    { valor: 'abierta', texto: 'Abiertas', cuenta: c.abierta },
+    { valor: 'cerrada', texto: 'Cerradas', cuenta: c.cerrada },
+  ];
+  document.getElementById('pestanas').innerHTML = tabs.map(t => `
+    <button type="button" class="pestana" aria-pressed="${filtroEstatus === t.valor}"
+      data-accion="tab" data-valor="${t.valor}">
+      ${t.texto} <span class="cuenta">${t.cuenta}</span>
+    </button>`).join('');
+}
+
+/* ── Filtro y orden en cliente ──────────────────────────── */
+function listaFiltrada() {
+  const txt = textoFiltro.toLowerCase();
+  let lista = vacantes.filter(v => {
+    if (filtroEstatus !== 'todas' && v.estatus !== filtroEstatus) return false;
+    if (!txt) return true;
+    return ((v.titulo || '') + ' ' + (v.ubicacion || '')).toLowerCase().includes(txt);
+  });
+
+  const tiempo = (v) => {
+    const d = new Date(String(v.creado || '').replace(' ', 'T'));
+    return isNaN(d) ? 0 : d.getTime();
+  };
+
+  lista = lista.slice().sort((a, b) => {
+    if (orden === 'titulo') return String(a.titulo || '').localeCompare(String(b.titulo || ''), 'es');
+    if (orden === 'postulaciones') return (Number(b.postulaciones) || 0) - (Number(a.postulaciones) || 0) || tiempo(b) - tiempo(a);
+    if (orden === 'nuevas') return (Number(b.nuevas) || 0) - (Number(a.nuevas) || 0) || tiempo(b) - tiempo(a);
+    return tiempo(b) - tiempo(a);
+  });
+  return lista;
+}
+
+/* ── Tarjeta de vacante ─────────────────────────────────── */
+function tarjetaVacante(v) {
+  const nuevas   = Number(v.nuevas) || 0;
+  const totalP   = Number(v.postulaciones) || 0;
+  const abierta  = v.estatus === 'abierta';
+  const desplegado = !!abiertas[v.id];
+
+  return `
+    <article class="vacante ${abierta ? '' : 'cerrada'}" data-vacante="${Number(v.id)}">
+      <div class="vacante-cuerpo">
+        <div class="vacante-top">
+          <div class="vacante-info">
+            <h3 class="vacante-titulo">${scEsc(v.titulo)}</h3>
+            <div class="vacante-insignias">
+              <span class="badge ${abierta ? 'badge-verde' : 'badge-gris'}">${abierta ? 'Abierta' : 'Cerrada'}</span>
+              ${nuevas ? `<span class="badge badge-ambar">${nuevas} sin revisar</span>` : ''}
+            </div>
+            <div class="tarjeta-datos">
+              ${v.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : ''}
+              <span>${scIcono('maletin')}${scEsc(SC_MODALIDADES[v.modalidad] || v.modalidad || '')}</span>
+              ${v.salario ? `<span>${scIcono('dinero')}${scEsc(v.salario)}</span>` : ''}
+              <span>${scIcono('reloj')}Publicada ${scEsc(scHace(v.creado))}</span>
+            </div>
+            ${v.descripcion ? `<p class="vacante-desc">${scEsc(v.descripcion)}</p>` : ''}
+          </div>
+
+          <div class="menu-envoltura">
+            <button type="button" class="btn-menu" data-accion="menu" data-id="${Number(v.id)}"
+              aria-haspopup="true" aria-expanded="false" aria-controls="menu-${Number(v.id)}"
+              aria-label="Más acciones para ${escAttr(v.titulo)}">&#8942;</button>
+            <div class="menu-lista" id="menu-${Number(v.id)}" role="menu" hidden>
+              <button type="button" role="menuitem" data-accion="editar" data-id="${Number(v.id)}">
+                ${scIcono('lapiz')}Editar vacante
+              </button>
+              <button type="button" role="menuitem" data-accion="estatus" data-id="${Number(v.id)}"
+                data-valor="${abierta ? 'cerrada' : 'abierta'}">
+                ${scIcono(abierta ? 'check' : 'mas')}${abierta ? 'Cerrar vacante' : 'Reabrir vacante'}
+              </button>
+              <div class="menu-separador"></div>
+              <button type="button" role="menuitem" class="peligro" data-accion="eliminar" data-id="${Number(v.id)}">
+                ${scIcono('bote')}Eliminar vacante
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="vacante-pie">
+        <button type="button" class="btn btn-sm ${nuevas ? 'btn-primary' : 'btn-suave'} btn-desplegar"
+          data-accion="ver" data-id="${Number(v.id)}"
+          aria-expanded="${desplegado}" aria-controls="post-${Number(v.id)}">
+          ${scIcono('personas')}${totalP === 1 ? 'Ver 1 candidato' : 'Ver ' + totalP + ' candidatos'}
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+        <a class="btn btn-sm btn-gris" href="vacante.html?id=${Number(v.id)}">Ver publicación</a>
+        <span class="pie-nota">${totalP ? (nuevas ? nuevas + ' por revisar' : 'Todo revisado') : 'Sin postulaciones aún'}</span>
+      </div>
+
+      <div class="panel" id="post-${Number(v.id)}" aria-live="polite" hidden></div>
+    </article>`;
+}
+
+function pintarVacantes() {
+  const cont = document.getElementById('lista');
+  const barra = document.getElementById('barra');
+  const estado = document.getElementById('estado-lista');
+  barra.hidden = vacantes.length === 0;
+
+  if (!vacantes.length) {
+    estado.textContent = '';
+    cont.innerHTML = scVacio('vacia', 'Aún no publicas vacantes',
+      'Publica tu primera vacante para empezar a recibir candidatos de la industria.',
+      '<button class="btn btn-primary" type="button" data-accion="nueva">Publicar mi primera vacante</button>');
     return;
   }
 
-  cont.classList.remove('oculto');
-  abiertas[vacanteId] = true;
-  cont.innerHTML = scCargando('Cargando candidatos...');
+  const lista = listaFiltrada();
+  if (!lista.length) {
+    estado.textContent = 'Ninguna vacante coincide con el filtro.';
+    cont.innerHTML = scVacio('lupa', 'Sin coincidencias',
+      'Ninguna de tus vacantes coincide con la búsqueda o el filtro seleccionado.',
+      '<button class="btn btn-outline" type="button" data-accion="limpiar">Quitar filtros</button>');
+    return;
+  }
+
+  estado.textContent = `Mostrando ${lista.length} de ${vacantes.length} ${vacantes.length === 1 ? 'vacante' : 'vacantes'}.`;
+  cont.innerHTML = lista.map(tarjetaVacante).join('');
+
+  // Vuelve a mostrar los paneles que el usuario tenía desplegados.
+  lista.forEach(v => {
+    if (!abiertas[v.id]) return;
+    const panel = document.getElementById('post-' + v.id);
+    if (!panel) return;
+    panel.hidden = false;
+    if (cachePost[v.id]) pintarPanel(v.id);
+    else cargarPanel(v.id);
+  });
+}
+
+/**
+ * Actualiza sólo los contadores de una tarjeta ya pintada, para no
+ * redibujar el tablero completo (y no perder el scroll ni el foco).
+ */
+function refrescarTarjeta(vacanteId) {
+  const v = porId[vacanteId];
+  const art = document.querySelector('[data-vacante="' + Number(vacanteId) + '"]');
+  if (!v || !art) return;
+
+  const nuevas = Number(v.nuevas) || 0;
+  const total  = Number(v.postulaciones) || 0;
+
+  const insignias = art.querySelector('.vacante-insignias');
+  if (insignias) {
+    let chip = insignias.querySelector('.badge-ambar');
+    if (nuevas && !chip) {
+      chip = document.createElement('span');
+      chip.className = 'badge badge-ambar';
+      insignias.appendChild(chip);
+    }
+    if (chip) {
+      if (nuevas) chip.textContent = nuevas + ' sin revisar';
+      else chip.remove();
+    }
+  }
+
+  const nota = art.querySelector('.pie-nota');
+  if (nota) nota.textContent = total ? (nuevas ? nuevas + ' por revisar' : 'Todo revisado') : 'Sin postulaciones aún';
+
+  const boton = art.querySelector('.btn-desplegar');
+  if (boton) {
+    boton.classList.toggle('btn-primary', nuevas > 0);
+    boton.classList.toggle('btn-suave', nuevas === 0);
+  }
+}
+
+/* ── Panel de candidatos ────────────────────────────────── */
+function alternarPanel(vacanteId) {
+  const panel = document.getElementById('post-' + vacanteId);
+  const boton = document.querySelector('[data-accion="ver"][data-id="' + vacanteId + '"]');
+  if (!panel) return;
+
+  const abrir = panel.hidden;
+  panel.hidden = !abrir;
+  abiertas[vacanteId] = abrir;
+  if (boton) boton.setAttribute('aria-expanded', String(abrir));
+  if (!abrir) return;
+
+  if (cachePost[vacanteId]) pintarPanel(vacanteId);
+  else cargarPanel(vacanteId);
+}
+
+async function cargarPanel(vacanteId) {
+  const panel = document.getElementById('post-' + vacanteId);
+  if (!panel) return;
+  panel.innerHTML = esqueletoCandidatos(2);
 
   try {
     const datos = await scGet('POSTULACIONES_VACANTE', { vacante_id: vacanteId });
-    if (datos.status !== 'success') { cont.innerHTML = `<p class="texto-sub">${scEsc(datos.message)}</p>`; return; }
-
-    const lista = datos.postulaciones || [];
-    cont.innerHTML = lista.length
-      ? lista.map(p => tarjetaCandidato(p)).join('')
-      : '<p class="texto-tenue" style="font-size:13.5px;padding:8px 0">Todavía no hay postulaciones para esta vacante.</p>';
-
+    if (datos.status !== 'success') {
+      panel.innerHTML = `<p class="texto-sub" style="font-size:13.5px">${scEsc(datos.message)}</p>`;
+      return;
+    }
+    cachePost[vacanteId] = datos.postulaciones || [];
+    pintarPanel(vacanteId);
   } catch (e) {
-    cont.innerHTML = `<p class="texto-sub">${scEsc(e.message)}</p>`;
+    panel.innerHTML = `<p class="texto-sub" style="font-size:13.5px">${scEsc(e.message)}</p>`;
   }
 }
 
-function tarjetaCandidato(p) {
+function pintarPanel(vacanteId) {
+  const panel = document.getElementById('post-' + vacanteId);
+  if (!panel) return;
+
+  const todas = cachePost[vacanteId] || [];
+  const filtro = filtroPanel[vacanteId] || 'todas';
+
+  const cuentas = { todas: todas.length, enviada: 0, en_revision: 0, aceptada: 0, rechazada: 0 };
+  todas.forEach(p => { if (cuentas[p.estatus] !== undefined) cuentas[p.estatus]++; });
+
+  if (!todas.length) {
+    panel.innerHTML = scVacio('personas', 'Todavía no hay postulaciones',
+      'Comparte el enlace de la vacante o busca perfiles tú mismo en la sección de candidatos.',
+      '<a class="btn btn-sm btn-outline" href="candidatos.html">Buscar candidatos</a>');
+    return;
+  }
+
+  const chips = [
+    { valor: 'todas',       texto: 'Todas' },
+    { valor: 'enviada',     texto: 'Sin revisar' },
+    { valor: 'en_revision', texto: 'En revisión' },
+    { valor: 'aceptada',    texto: 'Aceptadas' },
+    { valor: 'rechazada',   texto: 'Descartadas' },
+  ].filter(c => c.valor === 'todas' || cuentas[c.valor] > 0);
+
+  const lista = todas
+    .filter(p => filtro === 'todas' || p.estatus === filtro)
+    .slice()
+    .sort((a, b) => {
+      const oa = ORDEN_ESTATUS[a.estatus] ?? 9, ob = ORDEN_ESTATUS[b.estatus] ?? 9;
+      if (oa !== ob) return oa - ob;
+      return String(b.fecha || '').localeCompare(String(a.fecha || ''));
+    });
+
+  panel.innerHTML = `
+    <div class="panel-cabecera">
+      <span class="panel-titulo">Candidatos (${todas.length})</span>
+      <div class="segmentos" role="group" aria-label="Filtrar candidatos por estatus">
+        ${chips.map(c => `
+          <button type="button" class="segmento-btn" aria-pressed="${filtro === c.valor}"
+            data-accion="filtro-panel" data-vacante="${Number(vacanteId)}" data-valor="${c.valor}">
+            ${c.texto}${c.valor === 'todas' ? '' : ' (' + cuentas[c.valor] + ')'}
+          </button>`).join('')}
+      </div>
+    </div>
+    <div class="panel-lista">
+      ${lista.length
+        ? lista.map(p => tarjetaCandidato(p, vacanteId)).join('')
+        : '<p class="texto-tenue" style="font-size:13px;padding:6px 0">No hay candidatos con ese estatus.</p>'}
+    </div>`;
+}
+
+function tarjetaCandidato(p, vacanteId) {
   const est = SC_ESTATUS_POSTULACION[p.estatus] || { texto: p.estatus, clase: 'badge-gris' };
+  const esNuevo = p.estatus === 'enviada';
+
+  const decisiones = ['enviada', 'en_revision', 'aceptada', 'rechazada'].map(v => {
+    const d = ETIQUETA_DECISION[v];
+    const activo = p.estatus === v;
+    return `<button type="button" class="${d.clase}" aria-pressed="${activo}"
+      data-accion="decidir" data-id="${Number(p.id)}" data-vacante="${Number(vacanteId)}" data-valor="${v}"
+      title="${activo ? 'Estatus actual' : 'Marcar como ' + d.corto}">${d.corto}</button>`;
+  }).join('');
+
   return `
-    <div class="item">
+    <div class="candidato ${esNuevo ? 'nuevo' : ''} ${p.estatus === 'rechazada' ? 'descartado' : ''}" id="cand-${Number(p.id)}">
       ${scAvatar(p.foto_url, p.nombre, 'md')}
-      <div class="item-cuerpo">
+      <div class="candidato-cuerpo">
         <div class="fila" style="gap:8px">
-          <span class="item-titulo"><a href="ver-perfil.html?id=${p.persona_id}">${scEsc(p.nombre)}</a></span>
-          ${Number(p.correo_verificado) ? scBadgeVerificado(true) : ''}
+          <span class="candidato-nombre"><a href="ver-perfil.html?id=${Number(p.persona_id)}">${scEsc(p.nombre)}</a></span>
+          ${esNuevo ? '<span class="badge badge-azul">Nuevo</span>' : ''}
           <span class="badge ${est.clase}">${scEsc(est.texto)}</span>
+          ${Number(p.correo_verificado) ? scBadgeVerificado(true) : ''}
         </div>
         ${p.headline ? `<div class="item-sub">${scEsc(p.headline)}</div>` : ''}
         <div class="item-meta">
-          ${p.ubicacion ? scEsc(p.ubicacion) + ' · ' : ''}${scEsc(p.correo)} · ${scEsc(scHace(p.fecha))}
+          ${p.ubicacion ? scEsc(p.ubicacion) + ' &middot; ' : ''}${scEsc(p.correo)} &middot; Se postuló ${scEsc(scHace(p.fecha))}
         </div>
-        ${p.mensaje ? `<div class="item-desc">"${scEsc(p.mensaje)}"</div>` : ''}
-        <div class="fila mt-8">
-          <a class="btn btn-sm btn-gris" href="ver-perfil.html?id=${p.persona_id}">Ver perfil</a>
-          ${p.cv_url ? `<a class="btn btn-sm btn-gris" href="${scEsc(p.cv_url)}" target="_blank" rel="noopener">Ver CV</a>` : ''}
-          ${p.estatus !== 'en_revision' && p.estatus !== 'aceptada' && p.estatus !== 'rechazada'
-            ? `<button class="btn btn-sm btn-suave" onclick="cambiarPostulacion(${p.id}, 'en_revision')">En revisión</button>` : ''}
-          ${p.estatus !== 'aceptada'
-            ? `<button class="btn btn-sm btn-verde" onclick="cambiarPostulacion(${p.id}, 'aceptada')">Aceptar</button>` : ''}
-          ${p.estatus !== 'rechazada'
-            ? `<button class="btn btn-sm btn-peligro" onclick="cambiarPostulacion(${p.id}, 'rechazada')">Descartar</button>` : ''}
+        ${p.mensaje ? `<div class="candidato-mensaje">${scEsc(p.mensaje)}</div>` : ''}
+
+        <div class="candidato-acciones">
+          <a class="btn btn-sm btn-gris" href="ver-perfil.html?id=${Number(p.persona_id)}">${scIcono('persona')}Perfil</a>
+          ${p.cv_url
+            ? `<a class="btn btn-sm btn-gris" href="${escAttr(p.cv_url)}" target="_blank" rel="noopener">${scIcono('documento')}CV</a>`
+            : '<span class="etiqueta-decision">Sin CV</span>'}
+          <div class="decision" role="group" aria-label="Cambiar estatus de ${escAttr(p.nombre)}">${decisiones}</div>
         </div>
       </div>
     </div>`;
 }
 
-async function cambiarPostulacion(id, estatus) {
+function filtrarPanel(vacanteId, valor) {
+  filtroPanel[vacanteId] = valor;
+  pintarPanel(vacanteId);
+}
+
+/* ── Cambio de estatus de una postulación ───────────────── */
+async function decidir(postulacionId, estatus, vacanteId) {
+  const lista = cachePost[vacanteId] || [];
+  const p = lista.find(x => Number(x.id) === Number(postulacionId));
+  if (!p || p.estatus === estatus) return;
+
+  if (estatus === 'rechazada' &&
+      !confirm('¿Descartar a ' + (p.nombre || 'este candidato') + ' de esta vacante?\n\nPodrás revertirlo después.')) return;
+
+  const anterior = p.estatus;
+  const botones = document.querySelectorAll('[data-accion="decidir"][data-id="' + Number(postulacionId) + '"]');
+  botones.forEach(b => { b.disabled = true; });
+
   try {
-    const datos = await scPost('CAMBIAR_ESTATUS_POSTULACION', { id, estatus });
-    scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
-    if (datos.status === 'success') cargar();
+    const datos = await scPost('CAMBIAR_ESTATUS_POSTULACION', { id: postulacionId, estatus });
+    if (datos.status === 'success') {
+      p.estatus = estatus;
+      // Ajusta el contador de "sin revisar" sin recargar toda la página.
+      const v = porId[vacanteId];
+      if (v) {
+        if (anterior === 'enviada' && estatus !== 'enviada') v.nuevas = Math.max(0, (Number(v.nuevas) || 0) - 1);
+        if (anterior !== 'enviada' && estatus === 'enviada') v.nuevas = (Number(v.nuevas) || 0) + 1;
+      }
+      scToast(datos.message || 'Estatus actualizado.', 'ok');
+      pintarResumen();
+      refrescarTarjeta(vacanteId);
+      pintarPanel(vacanteId);
+      // Devuelve el foco al control que se acaba de usar.
+      const vuelta = document.querySelector(
+        '[data-accion="decidir"][data-id="' + Number(postulacionId) + '"][data-valor="' + estatus + '"]');
+      if (vuelta) vuelta.focus();
+    } else {
+      scToast(datos.message, 'error');
+      botones.forEach(b => { b.disabled = false; });
+    }
   } catch (e) {
     scToast(e.message, 'error');
+    botones.forEach(b => { b.disabled = false; });
   }
 }
 
@@ -217,6 +760,7 @@ function nuevaVacante() {
   document.getElementById('modal-titulo').textContent = 'Publicar vacante';
   document.getElementById('btn-guardar-vacante').textContent = 'Publicar';
   scAbrirModal('modal-vacante');
+  setTimeout(() => document.getElementById('v-titulo').focus(), 60);
 }
 
 function editarVacante(id) {
@@ -232,6 +776,7 @@ function editarVacante(id) {
   document.getElementById('modal-titulo').textContent = 'Editar vacante';
   document.getElementById('btn-guardar-vacante').textContent = 'Guardar cambios';
   scAbrirModal('modal-vacante');
+  setTimeout(() => document.getElementById('v-titulo').focus(), 60);
 }
 
 document.getElementById('form-vacante').addEventListener('submit', async (e) => {
@@ -257,6 +802,7 @@ document.getElementById('form-vacante').addEventListener('submit', async (e) => 
     scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
     if (datos.status === 'success') {
       scCerrarModal('modal-vacante');
+      if (id) delete cachePost[Number(id)];
       cargar();
     }
   } catch (err) {
@@ -267,7 +813,10 @@ document.getElementById('form-vacante').addEventListener('submit', async (e) => 
   }
 });
 
-async function cambiarEstatus(id, estatus) {
+async function cambiarEstatusVacante(id, estatus) {
+  const v = porId[id];
+  if (estatus === 'cerrada' && v &&
+      !confirm('¿Cerrar la vacante "' + v.titulo + '"?\n\nDejará de recibir postulaciones. Puedes reabrirla cuando quieras.')) return;
   try {
     const datos = await scPost('ACTUALIZAR_VACANTE', { id, estatus });
     scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
@@ -284,19 +833,115 @@ async function eliminarVacante(id) {
   try {
     const datos = await scPost('ELIMINAR_VACANTE', { id });
     scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
-    if (datos.status === 'success') { delete abiertas[id]; cargar(); }
+    if (datos.status === 'success') {
+      delete abiertas[id];
+      delete cachePost[id];
+      cargar();
+    }
   } catch (e) {
     scToast(e.message, 'error');
   }
 }
 
+/* ── Menú de acciones ───────────────────────────────────── */
+function cerrarMenus(exceptoId) {
+  document.querySelectorAll('.menu-lista').forEach(m => {
+    if (exceptoId && m.id === 'menu-' + exceptoId) return;
+    m.hidden = true;
+  });
+  document.querySelectorAll('.btn-menu').forEach(b => {
+    if (exceptoId && b.dataset.id === String(exceptoId)) return;
+    b.setAttribute('aria-expanded', 'false');
+  });
+  if (!exceptoId) menuAbierto = null;
+}
+
+function alternarMenu(id, boton) {
+  const menu = document.getElementById('menu-' + id);
+  if (!menu) return;
+  const abrir = menu.hidden;
+  cerrarMenus(id);
+  menu.hidden = !abrir;
+  boton.setAttribute('aria-expanded', String(abrir));
+  menuAbierto = abrir ? id : null;
+  if (abrir) {
+    const primero = menu.querySelector('button');
+    if (primero) primero.focus();
+  }
+}
+
+/* ── Delegación de eventos ──────────────────────────────── */
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-accion]');
+  if (!el) { cerrarMenus(); return; }
+
+  const accion = el.dataset.accion;
+  const id = Number(el.dataset.id || 0);
+  if (accion !== 'menu') cerrarMenus();
+
+  switch (accion) {
+    case 'nueva':        nuevaVacante(); break;
+    case 'ver':          alternarPanel(id); break;
+    case 'menu':         alternarMenu(id, el); break;
+    case 'editar':       editarVacante(id); break;
+    case 'estatus':      cambiarEstatusVacante(id, el.dataset.valor); break;
+    case 'eliminar':     eliminarVacante(id); break;
+    case 'decidir':      decidir(id, el.dataset.valor, Number(el.dataset.vacante)); break;
+    case 'filtro-panel': filtrarPanel(Number(el.dataset.vacante), el.dataset.valor); break;
+    case 'tab':          cambiarPestana(el.dataset.valor); break;
+    case 'limpiar':      limpiarFiltros(); break;
+  }
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || menuAbierto === null) return;
+  const boton = document.querySelector('.btn-menu[data-id="' + menuAbierto + '"]');
+  cerrarMenus();
+  if (boton) boton.focus();
+});
+
+function cambiarPestana(valor) {
+  filtroEstatus = valor;
+  pintarPestanas();
+  pintarVacantes();
+}
+
+function limpiarFiltros() {
+  filtroEstatus = 'todas';
+  textoFiltro = '';
+  document.getElementById('f-buscar').value = '';
+  pintarPestanas();
+  pintarVacantes();
+}
+
+document.getElementById('f-buscar').addEventListener('input', (e) => {
+  clearTimeout(temporizadorBusqueda);
+  const valor = e.target.value.trim();
+  temporizadorBusqueda = setTimeout(() => { textoFiltro = valor; pintarVacantes(); }, 300);
+});
+document.getElementById('f-orden').addEventListener('change', (e) => {
+  orden = e.target.value;
+  pintarVacantes();
+});
+
 /* ── Carga ──────────────────────────────────────────────── */
 async function cargar() {
   try {
     const datos = await scGet('LISTAR_MIS_VACANTES');
-    if (datos.status !== 'success') { scToast(datos.message, 'error'); return; }
-    pintarVacantes(datos.vacantes || []);
+    if (datos.status !== 'success') {
+      document.getElementById('resumen').innerHTML = '';
+      document.getElementById('lista').innerHTML = scVacio('alerta', 'No se pudo cargar', datos.message || 'Intenta de nuevo.', '');
+      return;
+    }
+    vacantes = datos.vacantes || [];
+    porId = {};
+    vacantes.forEach(v => { porId[v.id] = v; });
+
+    pintarResumen();
+    pintarPestanas();
+    pintarVacantes();
   } catch (e) {
+    document.getElementById('resumen').innerHTML = '';
     document.getElementById('lista').innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
   }
 }
@@ -311,9 +956,9 @@ window.addEventListener('DOMContentLoaded', () => {
 
   const btn = document.getElementById('btn-nueva');
   btn.innerHTML = scIcono('mas') + 'Publicar vacante';
-  btn.addEventListener('click', nuevaVacante);
 
-  document.getElementById('lista').innerHTML = scCargando('Cargando tus vacantes...');
+  document.getElementById('resumen').innerHTML = esqueletoResumen();
+  document.getElementById('lista').innerHTML = esqueletoVacantes(3);
   cargar();
 
   if (new URLSearchParams(location.search).get('nueva') === '1') nuevaVacante();

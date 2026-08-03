@@ -7,42 +7,149 @@
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
+  /* ── Foco visible consistente ─────────────────────────── */
+  a:focus-visible, button:focus-visible,
+  input:focus-visible, select:focus-visible, textarea:focus-visible {
+    outline: 3px solid rgba(24, 95, 165, .42);
+    outline-offset: 2px;
+  }
+
   .volver-link {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 13.5px; font-weight: 600; color: var(--texto-sub); margin: 22px 0 14px;
   }
   .volver-link:hover { color: var(--azul); }
   .volver-link svg { width: 15px; height: 15px; }
-  .descripcion { font-size: 14.5px; color: var(--texto-sub); line-height: 1.7; white-space: pre-line; }
+
+  /* ── Rejilla del detalle ──────────────────────────────── */
   .detalle { display: grid; gap: 20px; grid-template-columns: 1fr; }
-  @media (min-width: 900px) { .detalle { grid-template-columns: 2fr 1fr; align-items: start; } }
+  @media (min-width: 900px) {
+    .detalle { grid-template-columns: minmax(0, 1.9fr) minmax(280px, 1fr); align-items: start; }
+    /* Resumen pegajoso: la acción sigue visible mientras se lee la descripción. */
+    .detalle-lado { position: sticky; top: 78px; }
+  }
+
+  /* ── Encabezado de la vacante ─────────────────────────── */
+  .vac-cabecera { display: flex; gap: 15px; align-items: flex-start; }
+  .vac-titulo { font-size: 23px; font-weight: 800; letter-spacing: -.4px; line-height: 1.25; }
+  .vac-empresa { font-size: 14px; color: var(--texto-sub); margin-top: 5px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .vac-empresa a { font-weight: 700; color: var(--texto); }
+  .vac-empresa a:hover { color: var(--azul); }
+  .vac-señales { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+
+  /* ── Descripción ──────────────────────────────────────── */
+  .bloque-titulo {
+    font-size: 12px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--texto-tenue); margin-bottom: 10px;
+  }
+  .separador { height: 1px; background: var(--borde); margin: 20px 0; }
+  .descripcion {
+    font-size: 15px; color: var(--texto-sub); line-height: 1.75;
+    white-space: pre-line; overflow-wrap: anywhere; max-width: 68ch;
+  }
+
+  /* ── Lista de datos del resumen ───────────────────────── */
+  .datos { display: grid; grid-template-columns: auto 1fr; gap: 9px 14px; font-size: 13.5px; }
+  .datos dt { color: var(--texto-tenue); font-weight: 600; white-space: nowrap; }
+  .datos dd { color: var(--texto); font-weight: 600; text-align: right; overflow-wrap: anywhere; }
+
+  /* ── Panel de éxito de la postulación ─────────────────── */
+  .exito { text-align: center; padding: 4px 0 2px; }
+  .exito-icono {
+    width: 52px; height: 52px; border-radius: 50%; margin: 0 auto 12px;
+    background: var(--verde-bg); color: #15803D;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .exito-icono svg { width: 26px; height: 26px; }
+  .exito h4 { font-size: 16px; font-weight: 800; margin-bottom: 5px; }
+  .exito p { font-size: 13px; color: var(--texto-sub); margin-bottom: 14px; line-height: 1.55; }
+
+  /* ── Seguimiento del estatus ──────────────────────────── */
+  .pasos { display: flex; align-items: center; gap: 0; margin: 14px 0 10px; }
+  .paso { flex: 1; text-align: center; position: relative; }
+  .paso-punto {
+    width: 15px; height: 15px; border-radius: 50%; margin: 0 auto 6px;
+    background: var(--borde); border: 2px solid var(--blanco); box-shadow: 0 0 0 1px var(--borde);
+  }
+  .paso-etq { font-size: 10.5px; font-weight: 700; color: var(--texto-tenue); line-height: 1.3; }
+  .paso::before {
+    content: ''; position: absolute; top: 7px; left: -50%; width: 100%;
+    height: 2px; background: var(--borde);
+  }
+  .paso:first-child::before { display: none; }
+  .paso.hecho .paso-punto { background: var(--azul); box-shadow: 0 0 0 1px var(--azul); }
+  .paso.hecho .paso-etq { color: var(--azul-oscuro); }
+  .paso.hecho::before { background: var(--azul); }
+  .paso.ok .paso-punto { background: var(--verde); box-shadow: 0 0 0 1px var(--verde); }
+  .paso.ok .paso-etq { color: #15803D; }
+  .paso.no .paso-punto { background: var(--rojo); box-shadow: 0 0 0 1px var(--rojo); }
+  .paso.no .paso-etq { color: #B91C1C; }
+
+  /* ── Barra de acción en móvil ─────────────────────────── */
+  .barra-movil {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    background: var(--blanco); border-top: 1px solid var(--borde);
+    box-shadow: 0 -6px 20px rgba(11,26,51,.10);
+    padding: 11px 20px calc(11px + env(safe-area-inset-bottom));
+    display: flex; align-items: center; gap: 12px;
+  }
+  .barra-movil-txt { flex: 1; min-width: 0; font-size: 12.5px; color: var(--texto-sub); font-weight: 600; }
+  .barra-movil .btn { flex-shrink: 0; }
+  @media (min-width: 900px) { .barra-movil { display: none !important; } }
+  @media (max-width: 899px) { .con-barra { padding-bottom: 92px; } }
+
+  /* ── Esqueleto de carga ───────────────────────────────── */
+  .esq { background: #E9EFF7; border-radius: 6px; position: relative; overflow: hidden; }
+  .esq::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent);
+    transform: translateX(-100%); animation: sc-brillo 1.4s infinite;
+  }
+  @keyframes sc-brillo { 100% { transform: translateX(100%); } }
+  .esq-linea { height: 11px; }
+
+  /* ── Contador del mensaje ─────────────────────────────── */
+  .contador-msg { font-size: 11.5px; color: var(--texto-tenue); margin-top: 5px; text-align: right; }
+  .contador-msg.largo { color: var(--ambar); font-weight: 700; }
+
+  .acciones-lado { display: grid; gap: 8px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .esq::after { animation: none; }
+    * { scroll-behavior: auto !important; }
+  }
 </style>
 </head>
 <body>
 
 <header id="navbar"></header>
 
-<main class="wrap contenido">
+<main class="wrap contenido" id="principal">
   <a class="volver-link" href="vacantes.html" id="volver"></a>
   <div id="contenido"></div>
 </main>
 
+<div class="barra-movil oculto" id="barra-movil"></div>
+
 <!-- Modal de postulación -->
 <div class="modal-fondo" id="modal-postular">
-  <div class="modal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
     <div class="modal-cabecera">
-      <h3>Postularme a esta vacante</h3>
-      <button class="modal-cerrar" onclick="scCerrarModal('modal-postular')">&times;</button>
+      <h3 id="modal-titulo">Postularme a esta vacante</h3>
+      <button type="button" class="modal-cerrar" aria-label="Cerrar" onclick="scCerrarModal('modal-postular')">&times;</button>
     </div>
     <form id="form-postular">
       <div class="modal-cuerpo">
         <p class="card-sub" id="modal-texto"></p>
-        <div class="campo">
-          <label for="mensaje">Mensaje para la empresa (opcional)</label>
-          <textarea id="mensaje" placeholder="Cuéntales por qué eres el candidato ideal..."></textarea>
-          <div class="campo-ayuda">La empresa verá tu perfil completo y tu CV.</div>
-        </div>
         <div class="alerta alerta-aviso oculto" id="aviso-cv"></div>
+        <div class="campo" style="margin-bottom:0">
+          <label for="mensaje">Mensaje para la empresa (opcional)</label>
+          <textarea id="mensaje" rows="5"
+            placeholder="Cuéntales por qué eres el candidato ideal: años de experiencia, certificaciones y disponibilidad."
+            aria-describedby="ayuda-mensaje contador-msg"></textarea>
+          <div class="campo-ayuda" id="ayuda-mensaje">La empresa verá tu perfil completo y tu CV.</div>
+          <div class="contador-msg" id="contador-msg" aria-live="polite">0 caracteres</div>
+        </div>
       </div>
       <div class="modal-pie">
         <button type="button" class="btn btn-gris" onclick="scCerrarModal('modal-postular')">Cancelar</button>
@@ -58,103 +165,317 @@
 <script>
 let sesion  = null;
 let vacante = null;
+let recienPostulado = false;
 const idVacante = Number(new URLSearchParams(location.search).get('id') || 0);
+
+/* ── Utilidades ─────────────────────────────────────────── */
+
+function esVerdad(v) {
+  return v === true || v === 1 || v === '1' || v === 'true';
+}
+
+/** Solo dejamos pasar http/https; cualquier otra cosa se descarta. */
+function urlSegura(valor) {
+  const s = String(valor == null ? '' : valor).trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s)) return s;
+  if (/^[\w-]+(\.[\w-]+)+(\/.*)?$/.test(s)) return 'https://' + s;
+  return '';
+}
+
+function urlBonita(valor) {
+  return String(valor || '').replace(/^https?:\/\//i, '').replace(/\/$/, '');
+}
+
+const CLASE_MODALIDAD = { remoto: 'badge-verde', hibrido: 'badge-azul', presencial: 'badge-gris' };
+
+/** Pasos del seguimiento según el estatus de la postulación. */
+function pasosHtml(estatus) {
+  const orden = { enviada: 1, en_revision: 2, aceptada: 3, rechazada: 3 };
+  const n = orden[estatus] || 1;
+  const finClase = estatus === 'aceptada' ? 'ok' : estatus === 'rechazada' ? 'no' : '';
+  const finTexto = estatus === 'aceptada' ? 'Aceptada'
+                 : estatus === 'rechazada' ? 'No avanzó' : 'Resultado';
+
+  const pasos = [
+    { etq: 'Enviada',     clase: n >= 1 ? 'hecho' : '' },
+    { etq: 'En revisión', clase: n >= 2 ? 'hecho' : '' },
+    { etq: finTexto,      clase: n >= 3 ? (finClase || 'hecho') : '' },
+  ];
+
+  return `<div class="pasos" role="img" aria-label="Avance de la postulación: ${scEsc(finTexto)}">
+    ${pasos.map(p => `<div class="paso ${p.clase}">
+        <div class="paso-punto"></div><div class="paso-etq">${scEsc(p.etq)}</div>
+      </div>`).join('')}
+  </div>`;
+}
+
+/* ── Esqueleto ──────────────────────────────────────────── */
+
+function esqueleto() {
+  const lineas = (n, w) => {
+    let h = '';
+    for (let i = 0; i < n; i++) h += `<div class="esq esq-linea" style="width:${w[i] || '100%'};margin-top:9px"></div>`;
+    return h;
+  };
+  return `
+    <div class="detalle" aria-hidden="true">
+      <div>
+        <div class="card">
+          <div style="display:flex;gap:15px">
+            <div class="esq" style="width:64px;height:64px;border-radius:var(--r)"></div>
+            <div style="flex:1;min-width:0">
+              <div class="esq esq-linea" style="width:70%;height:20px"></div>
+              ${lineas(2, ['45%', '80%'])}
+            </div>
+          </div>
+          <div class="separador"></div>
+          ${lineas(6, ['100%', '96%', '88%', '100%', '74%', '60%'])}
+        </div>
+      </div>
+      <div>
+        <div class="card">
+          <div class="esq esq-linea" style="width:50%;height:14px"></div>
+          ${lineas(2, ['100%', '90%'])}
+          <div class="esq esq-linea" style="width:100%;height:42px;border-radius:var(--r-sm);margin-top:16px"></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ── Pintado del detalle ────────────────────────────────── */
+
+function bloqueAccion(v) {
+  const esCandidato = sesion.tipo === 'persona';
+  const abierta     = v.estatus === 'abierta';
+  const yaPostulado = !!v.mi_postulacion;
+
+  if (recienPostulado && yaPostulado) {
+    return `<div class="exito" role="status">
+        <div class="exito-icono">${scIcono('check')}</div>
+        <h4>¡Postulación enviada!</h4>
+        <p>La empresa ya recibió tu perfil. Si le interesa tu experiencia, te contactará por correo.</p>
+        <div class="acciones-lado">
+          <a class="btn btn-primary btn-bloque" href="mis-postulaciones.html">Ver mis postulaciones</a>
+          <a class="btn btn-gris btn-bloque btn-sm" href="vacantes.html">Seguir buscando vacantes</a>
+        </div>
+      </div>`;
+  }
+
+  if (!esCandidato) {
+    return `<p class="texto-tenue" style="font-size:13px">Solo las cuentas de candidato pueden postularse a esta vacante.</p>`;
+  }
+
+  if (yaPostulado) {
+    const est = SC_ESTATUS_POSTULACION[v.mi_postulacion] ||
+                { texto: v.mi_postulacion, clase: 'badge-gris' };
+    return `
+      <div class="fila" style="gap:8px">
+        <span class="badge ${est.clase}">${scIcono('check')}${scEsc(est.texto)}</span>
+        ${!abierta ? '<span class="badge badge-gris">Vacante cerrada</span>' : ''}
+      </div>
+      ${pasosHtml(v.mi_postulacion)}
+      <a class="btn btn-gris btn-bloque btn-sm mt-8" href="mis-postulaciones.html">Ver mis postulaciones</a>`;
+  }
+
+  if (!abierta) {
+    return `
+      <span class="badge badge-gris">Esta vacante ya está cerrada</span>
+      <a class="btn btn-outline btn-bloque btn-sm mt-16" href="vacantes.html">Ver vacantes abiertas</a>`;
+  }
+
+  return `
+    <button type="button" class="btn btn-primary btn-lg btn-bloque" onclick="abrirPostulacion()">
+      ${scIcono('enviar')}Postularme ahora
+    </button>
+    <p class="campo-ayuda" style="text-align:center;margin-top:9px">Toma menos de un minuto.</p>`;
+}
+
+function barraMovil(v) {
+  const barra = document.getElementById('barra-movil');
+  const principal = document.getElementById('principal');
+  const puedePostular = sesion.tipo === 'persona' && v.estatus === 'abierta' && !v.mi_postulacion;
+
+  if (!puedePostular) {
+    barra.classList.add('oculto');
+    barra.innerHTML = '';
+    principal.classList.remove('con-barra');
+    return;
+  }
+  barra.innerHTML = `
+    <span class="barra-movil-txt truncar">${scEsc(v.titulo)}</span>
+    <button type="button" class="btn btn-primary" onclick="abrirPostulacion()">
+      ${scIcono('enviar')}Postularme
+    </button>`;
+  barra.classList.remove('oculto');
+  principal.classList.add('con-barra');
+}
 
 function pintar(v) {
   vacante = v;
   document.title = v.titulo + ' — Socios Comerciales AVBA';
 
-  const esCandidato = sesion.tipo === 'persona';
-  const abierta     = v.estatus === 'abierta';
-  const yaPostulado = !!v.mi_postulacion;
+  const modKey   = String(v.modalidad || '').toLowerCase();
+  const modTexto = SC_MODALIDADES[modKey] || v.modalidad || 'Sin especificar';
+  const modClase = CLASE_MODALIDAD[modKey] || 'badge-gris';
+  const sitio    = urlSegura(v.sitio_web);
+  const abierta  = v.estatus === 'abierta';
 
-  let accion = '';
-  if (!esCandidato) {
-    accion = '<p class="texto-tenue" style="font-size:13px">Solo las cuentas de candidato pueden postularse.</p>';
-  } else if (!abierta) {
-    accion = '<span class="badge badge-gris">Esta vacante está cerrada</span>';
-  } else if (yaPostulado) {
-    const est = SC_ESTATUS_POSTULACION[v.mi_postulacion] || { texto: v.mi_postulacion, clase: 'badge-gris' };
-    accion = `<div class="fila">
-        <span class="badge ${est.clase}">${scIcono('check')}Postulación ${scEsc(est.texto.toLowerCase())}</span>
-        <a class="btn btn-sm btn-gris" href="mis-postulaciones.html">Ver mis postulaciones</a>
-      </div>`;
-  } else {
-    accion = `<button class="btn btn-primary btn-lg btn-bloque" onclick="abrirPostulacion()">
-        ${scIcono('enviar')}Postularme ahora</button>`;
-  }
+  const señales = [
+    `<span class="badge ${modClase}">${scIcono('maletin')}${scEsc(modTexto)}</span>`,
+    v.ubicacion ? `<span class="badge badge-gris">${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : '',
+    v.salario ? `<span class="badge badge-verde">${scIcono('dinero')}${scEsc(v.salario)}</span>` : '',
+    !abierta ? '<span class="badge badge-rojo">Cerrada</span>' : '',
+  ].filter(Boolean).join('');
 
   document.getElementById('contenido').innerHTML = `
     <div class="detalle">
       <div>
         <div class="card">
-          <div class="tarjeta-encabezado" style="margin-bottom:18px">
+          <div class="vac-cabecera">
             ${scAvatar(v.logo_url, v.empresa, 'lg', true)}
             <div style="flex:1;min-width:0">
-              <h1 style="font-size:22px;font-weight:800;letter-spacing:-.4px">${scEsc(v.titulo)}</h1>
-              <div class="tarjeta-sub" style="margin-top:4px">
-                <a href="ver-empresa.html?id=${v.empresa_id}" style="font-weight:600">${scEsc(v.empresa)}</a>
-                ${Number(v.empresa_verificada) ? ' ' + scBadgeVerificado(true) : ''}
+              <h1 class="vac-titulo">${scEsc(v.titulo)}</h1>
+              <div class="vac-empresa">
+                <a href="ver-empresa.html?id=${Number(v.empresa_id)}">${scEsc(v.empresa)}</a>
+                ${esVerdad(v.empresa_verificada) ? scBadgeVerificado(true) : ''}
               </div>
               <div class="tarjeta-datos">
-                ${v.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : ''}
-                <span>${scIcono('maletin')}${scEsc(SC_MODALIDADES[v.modalidad] || v.modalidad)}</span>
-                ${v.salario ? `<span>${scIcono('dinero')}${scEsc(v.salario)}</span>` : ''}
                 <span>${scIcono('reloj')}Publicada ${scEsc(scHace(v.creado))}</span>
+                ${v.giro ? `<span>${scIcono('edificio')}${scEsc(v.giro)}</span>` : ''}
               </div>
             </div>
           </div>
 
-          <h3 style="font-size:15px;font-weight:700;margin-bottom:10px">Descripción del puesto</h3>
+          <div class="vac-señales">${señales}</div>
+
+          <div class="separador"></div>
+
+          <h2 class="bloque-titulo">Descripción del puesto</h2>
           <div class="descripcion">${
-            v.descripcion ? scEsc(v.descripcion) : '<em class="texto-tenue">La empresa no agregó una descripción.</em>'
+            v.descripcion
+              ? scEsc(v.descripcion)
+              : '<em class="texto-tenue">La empresa no agregó una descripción. Escríbeles en tu mensaje de postulación para conocer los detalles.</em>'
           }</div>
         </div>
       </div>
 
-      <div>
+      <div class="detalle-lado">
         <div class="card">
           <div class="card-titulo"><h3>Postulación</h3></div>
-          <p class="card-sub">Tu perfil y CV se comparten con la empresa.</p>
-          ${accion}
+          <p class="card-sub">Compartimos tu perfil y tu CV con la empresa.</p>
+          ${bloqueAccion(v)}
+        </div>
+
+        <div class="card">
+          <div class="card-titulo"><h3>Resumen</h3></div>
+          <dl class="datos">
+            <dt>Modalidad</dt><dd>${scEsc(modTexto)}</dd>
+            ${v.ubicacion ? `<dt>Ubicación</dt><dd>${scEsc(v.ubicacion)}</dd>` : ''}
+            <dt>Salario</dt><dd>${v.salario ? scEsc(v.salario) : '<span class="texto-tenue">No especificado</span>'}</dd>
+            <dt>Publicada</dt><dd>${scEsc(scHace(v.creado))}</dd>
+            <dt>Estatus</dt><dd>${abierta ? 'Abierta' : 'Cerrada'}</dd>
+          </dl>
+          <button type="button" class="btn btn-gris btn-bloque btn-sm mt-16" id="btn-copiar">
+            ${scIcono('enlace')}Copiar enlace
+          </button>
         </div>
 
         <div class="card">
           <div class="card-titulo"><h3>Sobre la empresa</h3></div>
-          <div class="fila" style="gap:12px;margin-bottom:12px">
+          <div class="fila" style="gap:12px;margin-bottom:14px">
             ${scAvatar(v.logo_url, v.empresa, 'md', true)}
             <div style="flex:1;min-width:0">
               <div class="item-titulo">${scEsc(v.empresa)}</div>
               ${v.giro ? `<div class="item-sub">${scEsc(v.giro)}</div>` : ''}
             </div>
           </div>
-          <a class="btn btn-outline btn-bloque btn-sm" href="ver-empresa.html?id=${v.empresa_id}">Ver perfil de la empresa</a>
+          <div class="acciones-lado">
+            <a class="btn btn-outline btn-bloque btn-sm" href="ver-empresa.html?id=${Number(v.empresa_id)}">Ver perfil de la empresa</a>
+            ${sitio ? `<a class="btn btn-gris btn-bloque btn-sm" href="${scEsc(sitio)}"
+                          target="_blank" rel="noopener noreferrer nofollow">
+                          ${scIcono('enlace')}${scEsc(urlBonita(sitio))}</a>` : ''}
+          </div>
         </div>
       </div>
     </div>`;
+
+  const copiar = document.getElementById('btn-copiar');
+  if (copiar) copiar.addEventListener('click', copiarEnlace);
+
+  barraMovil(v);
 }
 
+async function copiarEnlace() {
+  const btn = document.getElementById('btn-copiar');
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(location.href);
+    } else {
+      throw new Error('sin portapapeles');
+    }
+    btn.innerHTML = scIcono('check') + 'Enlace copiado';
+    scToast('Enlace copiado', 'ok');
+    setTimeout(() => { btn.innerHTML = scIcono('enlace') + 'Copiar enlace'; }, 2200);
+  } catch (e) {
+    scToast('Copia el enlace desde la barra del navegador.', 'error');
+  }
+}
+
+/* ── Postulación ────────────────────────────────────────── */
+
 function abrirPostulacion() {
+  if (!vacante) return;
   document.getElementById('modal-texto').textContent =
     'Vas a postularte a "' + vacante.titulo + '" en ' + vacante.empresa + '.';
+
+  const aviso = document.getElementById('aviso-cv');
+  if (sesion && !esVerdad(sesion.correo_verificado)) {
+    aviso.innerHTML = scIcono('alerta') +
+      '<div><strong>Tu correo aún no está confirmado.</strong> Puedes postularte igual, pero las empresas confían más en los perfiles verificados.</div>';
+    aviso.classList.remove('oculto');
+  } else {
+    aviso.innerHTML = '';
+    aviso.classList.add('oculto');
+  }
+
   scAbrirModal('modal-postular');
+  const txt = document.getElementById('mensaje');
+  setTimeout(() => txt.focus(), 60);
 }
+
+const cajaMensaje = document.getElementById('mensaje');
+cajaMensaje.addEventListener('input', () => {
+  const n  = cajaMensaje.value.trim().length;
+  const el = document.getElementById('contador-msg');
+  el.textContent = n === 1 ? '1 caracter' : n + ' caracteres';
+  el.classList.toggle('largo', n > 900);
+});
 
 document.getElementById('form-postular').addEventListener('submit', async (e) => {
   e.preventDefault();
   const btn = document.getElementById('btn-enviar');
+  if (btn.disabled) return;
   btn.disabled = true;
   btn.innerHTML = '<div class="spin"></div> Enviando...';
 
   try {
     const datos = await scPost('POSTULAR', {
       vacante_id: idVacante,
-      mensaje:    document.getElementById('mensaje').value.trim(),
+      mensaje:    cajaMensaje.value.trim(),
     });
     scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
     if (datos.status === 'success') {
+      recienPostulado = true;
       scCerrarModal('modal-postular');
-      cargar();
+      cajaMensaje.value = '';
+      document.getElementById('contador-msg').textContent = '0 caracteres';
+      await cargar();
+      const exito = document.querySelector('.exito');
+      if (exito) {
+        const suave = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        exito.scrollIntoView({ block: 'center', behavior: suave ? 'smooth' : 'auto' });
+      }
     }
   } catch (err) {
     scToast(err.message, 'error');
@@ -164,27 +485,38 @@ document.getElementById('form-postular').addEventListener('submit', async (e) =>
   }
 });
 
+/* ── Carga ──────────────────────────────────────────────── */
+
 async function cargar() {
   const cont = document.getElementById('contenido');
-  cont.innerHTML = scCargando('Cargando vacante...');
 
   if (!idVacante) {
     cont.innerHTML = scVacio('alerta', 'Vacante no indicada',
       'El enlace no incluye una vacante válida.',
-      '<a class="btn btn-outline" href="vacantes.html">Ver todas las vacantes</a>');
+      '<a class="btn btn-primary" href="vacantes.html">Ver todas las vacantes</a>');
     return;
   }
 
+  cont.setAttribute('aria-busy', 'true');
+  cont.innerHTML = esqueleto();
+
   try {
     const datos = await scGet('GET_VACANTE', { id: idVacante });
+    cont.setAttribute('aria-busy', 'false');
+
     if (datos.status !== 'success') {
-      cont.innerHTML = scVacio('alerta', 'No se encontró la vacante', datos.message,
-        '<a class="btn btn-outline" href="vacantes.html">Ver todas las vacantes</a>');
+      cont.innerHTML = scVacio('alerta', 'No se encontró la vacante',
+        datos.message || 'Puede que la empresa la haya retirado.',
+        '<a class="btn btn-primary" href="vacantes.html">Ver todas las vacantes</a>');
+      document.getElementById('barra-movil').classList.add('oculto');
       return;
     }
     pintar(datos.vacante);
   } catch (e) {
-    cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+    cont.setAttribute('aria-busy', 'false');
+    cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message,
+      '<button type="button" class="btn btn-outline" onclick="cargar()">Reintentar</button>');
+    document.getElementById('barra-movil').classList.add('oculto');
   }
 }
 
@@ -196,8 +528,9 @@ window.addEventListener('DOMContentLoaded', () => {
   scPintarPie();
 
   const volver = document.getElementById('volver');
-  volver.innerHTML = scIcono('atras') + 'Volver a vacantes';
-  volver.href = sesion.tipo === 'empresa' ? 'mis-vacantes.html' : 'vacantes.html';
+  const esEmpresa = sesion.tipo === 'empresa';
+  volver.innerHTML = scIcono('atras') + (esEmpresa ? 'Volver a mis vacantes' : 'Volver a vacantes');
+  volver.href = esEmpresa ? 'mis-vacantes.html' : 'vacantes.html';
 
   cargar();
 });

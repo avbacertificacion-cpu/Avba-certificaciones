@@ -240,11 +240,28 @@ async function scReenviarVerificacion() {
 
 /* ── Formato y escape ──────────────────────────────────── */
 
-/** Escapa texto para insertarlo con innerHTML sin riesgo de inyección. */
+/**
+ * Escapa texto para insertarlo con innerHTML sin riesgo de inyección.
+ *
+ * textContent → innerHTML escapa < > &, pero NO las comillas. Como este
+ * texto también se inserta dentro de atributos (alt="…", href="…", src="…"),
+ * una comilla en un dato del usuario cerraría el atributo y permitiría
+ * inyectar otro (por ejemplo onload=), logrando XSS almacenado. Por eso se
+ * escapan explícitamente ambas comillas.
+ */
 function scEsc(valor) {
   const div = document.createElement('div');
   div.textContent = valor === null || valor === undefined ? '' : String(valor);
-  return div.innerHTML;
+  return div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/**
+ * Devuelve la URL solo si es http(s); si no, cadena vacía.
+ * Evita que un `sitio_web` como "javascript:..." acabe en un href.
+ */
+function scUrlSegura(url) {
+  const v = String(url || '').trim();
+  return /^https?:\/\//i.test(v) ? v : '';
 }
 
 /** Iniciales para el avatar cuando no hay imagen. */

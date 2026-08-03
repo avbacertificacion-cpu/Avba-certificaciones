@@ -6,6 +6,134 @@
 <title>Candidatos — Socios Comerciales AVBA</title>
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
+<style>
+  [hidden] { display: none !important; }
+
+  /* ── Foco visible consistente ───────────────────────────── */
+  a:focus-visible, button:focus-visible, input:focus-visible,
+  select:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--azul);
+    outline-offset: 2px;
+    border-radius: var(--r-sm);
+  }
+  .solo-lectores {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* ── Filtros ────────────────────────────────────────────── */
+  .campo-icono { position: relative; }
+  .campo-icono > svg {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; color: var(--texto-tenue); pointer-events: none;
+  }
+  .campo-icono input { padding-left: 36px !important; }
+
+  .filtros-pie {
+    display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    justify-content: space-between; margin-top: 14px;
+    padding-top: 13px; border-top: 1px solid var(--borde);
+  }
+  .interruptor {
+    display: inline-flex; align-items: center; gap: 8px; cursor: pointer;
+    font-size: 13.5px; font-weight: 600; color: var(--texto-sub);
+    background: var(--gris-fondo); border: 1px solid var(--borde);
+    padding: 7px 13px; border-radius: 999px; transition: background .15s, border-color .15s, color .15s;
+  }
+  .interruptor:hover { border-color: var(--acento); color: var(--azul); }
+  .interruptor input { width: auto; accent-color: var(--azul); cursor: pointer; }
+  .interruptor:has(input:checked) { background: var(--azul-claro); border-color: var(--acento); color: var(--azul-oscuro); }
+  .filtros-botones { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* ── Chips de filtros activos ───────────────────────────── */
+  .activos {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    margin-bottom: 16px;
+  }
+  .activos-etiqueta { font-size: 12.5px; font-weight: 700; color: var(--texto-tenue); }
+  .chip-filtro {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--blanco); border: 1px solid var(--acento); color: var(--azul-oscuro);
+    font-size: 12.5px; font-weight: 600; padding: 5px 6px 5px 12px; border-radius: 999px;
+    max-width: 100%;
+  }
+  .chip-filtro span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip-filtro button {
+    background: var(--azul-claro); border: none; cursor: pointer; color: var(--azul-oscuro);
+    width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 14px; line-height: 1; font-family: inherit; padding: 0;
+    transition: background .15s, color .15s;
+  }
+  .chip-filtro button:hover { background: var(--azul); color: #fff; }
+  .btn-limpiar-todo {
+    background: none; border: none; cursor: pointer; font-family: inherit;
+    font-size: 12.5px; font-weight: 700; color: var(--texto-sub);
+    text-decoration: underline; padding: 4px 2px;
+  }
+  .btn-limpiar-todo:hover { color: var(--rojo); }
+
+  /* ── Encabezado de resultados ───────────────────────────── */
+  .resultados-cabecera {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline;
+    justify-content: space-between; margin-bottom: 14px;
+  }
+  .resultados-cuenta { font-size: 14px; font-weight: 700; }
+  .resultados-nota { font-size: 12.5px; color: var(--texto-tenue); }
+
+  /* ── Tarjeta de candidato ───────────────────────────────── */
+  .tarjeta-lista { display: flex; flex-direction: column; }
+  .tarjeta-lista .tarjeta-pie { margin-top: auto; }
+  .chip-destacado {
+    background: var(--verde-bg); color: #15803D;
+    box-shadow: inset 0 0 0 1px #A9E9BF;
+  }
+  .chip-mas {
+    background: var(--gris-fondo); color: var(--texto-sub);
+    border: 1px dashed var(--borde); cursor: pointer; font-family: inherit;
+    font-size: 12.5px; font-weight: 600; padding: 6px 12px; border-radius: 999px;
+  }
+  .chip-mas:hover { border-color: var(--acento); color: var(--azul); }
+  .sin-habilidades { font-size: 12.5px; color: var(--texto-tenue); margin-top: 14px; font-style: italic; }
+
+  /* ── Esqueletos de carga ────────────────────────────────── */
+  .esq {
+    background: linear-gradient(90deg, #EDF1F7 25%, #F7FAFD 50%, #EDF1F7 75%);
+    background-size: 400% 100%; animation: brillo 1.4s ease infinite;
+    border-radius: var(--r-sm);
+  }
+  @keyframes brillo { 0% { background-position: 100% 0; } 100% { background-position: -100% 0; } }
+  .esq-linea { height: 12px; margin-bottom: 9px; }
+  .esq-circulo { width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0; }
+  .esq-chip { height: 26px; width: 78px; border-radius: 999px; }
+  .esq-card {
+    background: var(--blanco); border: 1px solid var(--borde);
+    border-radius: var(--r-md); padding: 18px;
+  }
+
+  /* ── Sugerencias del estado vacío ───────────────────────── */
+  .sugerencias { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 14px; }
+  .sugerencia {
+    background: var(--azul-claro); color: var(--azul-oscuro); border: none; cursor: pointer;
+    font-family: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 6px 13px; border-radius: 999px; transition: background .15s;
+  }
+  .sugerencia:hover { background: #d5e8f9; }
+
+  @media (max-width: 560px) {
+    .filtros-pie { align-items: stretch; }
+    .filtros-botones { width: 100%; }
+    .filtros-botones .btn { flex: 1; }
+    .interruptor { justify-content: center; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important; scroll-behavior: auto !important;
+    }
+  }
+</style>
 </head>
 <body>
 
@@ -18,30 +146,49 @@
         <h1>Buscar candidatos</h1>
         <p>Encuentra perfiles calificados de toda la industria.</p>
       </div>
-      <span class="badge badge-azul" id="contador"></span>
+      <a class="btn btn-outline btn-sm" href="mis-vacantes.html">Ver mis vacantes</a>
     </div>
   </div>
 
-  <form class="filtros" id="form-filtros">
+  <form class="filtros" id="form-filtros" role="search" aria-label="Filtros de búsqueda de candidatos">
     <div class="filtros-fila">
       <div class="campo">
         <label for="f-texto">Buscar</label>
-        <input type="text" id="f-texto" placeholder="Nombre, titular o palabra clave">
+        <div class="campo-icono">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>
+          </svg>
+          <input type="search" id="f-texto" autocomplete="off"
+            placeholder="Nombre, titular o palabra clave" aria-describedby="ayuda-busqueda">
+        </div>
       </div>
       <div class="campo">
         <label for="f-habilidad">Habilidad</label>
-        <input type="text" id="f-habilidad" placeholder="Ej. soldadura, PLC, calidad">
+        <input type="text" id="f-habilidad" autocomplete="off" placeholder="Ej. soldadura, PLC, calidad">
       </div>
       <div class="campo">
         <label for="f-ubicacion">Ubicación</label>
-        <input type="text" id="f-ubicacion" placeholder="Ciudad o estado">
+        <input type="text" id="f-ubicacion" autocomplete="off" placeholder="Ciudad o estado">
       </div>
-      <button type="submit" class="btn btn-primary">Buscar</button>
+      <button type="submit" class="btn btn-primary" id="btn-buscar">Buscar</button>
     </div>
-    <label class="campo-check mt-16">
-      <input type="checkbox" id="f-con-cv"> Solo candidatos con CV cargado
-    </label>
+
+    <div class="filtros-pie">
+      <label class="interruptor" for="f-con-cv">
+        <input type="checkbox" id="f-con-cv">
+        Solo con CV cargado
+      </label>
+      <p id="ayuda-busqueda" class="resultados-nota">La búsqueda se actualiza sola mientras escribes.</p>
+    </div>
   </form>
+
+  <div class="activos" id="activos" hidden></div>
+
+  <div class="resultados-cabecera">
+    <span class="resultados-cuenta" id="contador" role="status" aria-live="polite"></span>
+    <span class="resultados-nota" id="nota-resultados"></span>
+  </div>
 
   <div id="resultados"></div>
 </main>
@@ -50,17 +197,117 @@
 
 <script src="assets/avba.js"></script>
 <script>
-let sesion = null;
+/* ==========================================================
+   Buscar candidatos — vista de la empresa
+   Regla de seguridad: todo dato del API pasa por scEsc() y
+   NUNCA viaja dentro de un atributo onclick. Las acciones se
+   resuelven por delegación leyendo data-accion / data-id.
+   ========================================================== */
 
-function tarjeta(c) {
-  const habilidades = c.habilidades || [];
+let sesion = null;
+let porId  = {};          // id de candidato → objeto (nada de JSON en atributos)
+let expandidos = {};      // id de candidato → mostrar todas sus habilidades
+let peticionActual = 0;   // evita que una respuesta vieja pise a una nueva
+let temporizador = null;
+
+const MAX_CHIPS = 6;
+
+const CAMPOS = {
+  texto:     { id: 'f-texto',     etiqueta: 'Búsqueda' },
+  habilidad: { id: 'f-habilidad', etiqueta: 'Habilidad' },
+  ubicacion: { id: 'f-ubicacion', etiqueta: 'Ubicación' },
+};
+
+/**
+ * scEsc() escapa &, < y > pero no las comillas, así que no basta para
+ * atributos. Esta función completa el escape para href, title, aria-label…
+ */
+function escAttr(valor) {
+  return scEsc(valor).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+function leerFiltros() {
+  return {
+    texto:     document.getElementById('f-texto').value.trim(),
+    habilidad: document.getElementById('f-habilidad').value.trim(),
+    ubicacion: document.getElementById('f-ubicacion').value.trim(),
+    con_cv:    document.getElementById('f-con-cv').checked,
+  };
+}
+
+/* ── Chips de filtros activos ───────────────────────────── */
+function pintarActivos() {
+  const f = leerFiltros();
+  const cont = document.getElementById('activos');
+  const chips = [];
+
+  Object.keys(CAMPOS).forEach(clave => {
+    if (!f[clave]) return;
+    chips.push(`
+      <span class="chip-filtro">
+        <span>${scEsc(CAMPOS[clave].etiqueta)}: ${scEsc(f[clave])}</span>
+        <button type="button" data-accion="quitar" data-filtro="${clave}"
+          aria-label="Quitar filtro ${escAttr(CAMPOS[clave].etiqueta + ': ' + f[clave])}">&times;</button>
+      </span>`);
+  });
+
+  if (f.con_cv) {
+    chips.push(`
+      <span class="chip-filtro">
+        <span>Solo con CV</span>
+        <button type="button" data-accion="quitar" data-filtro="con_cv"
+          aria-label="Quitar filtro solo con CV">&times;</button>
+      </span>`);
+  }
+
+  if (!chips.length) { cont.hidden = true; cont.innerHTML = ''; return; }
+
+  cont.hidden = false;
+  cont.innerHTML = `
+    <span class="activos-etiqueta">Filtros activos:</span>
+    ${chips.join('')}
+    <button type="button" class="btn-limpiar-todo" data-accion="limpiar">Limpiar todo</button>`;
+}
+
+/* ── Esqueletos de carga ────────────────────────────────── */
+function esqueletoResultados(n) {
+  const card = `
+    <div class="esq-card">
+      <div style="display:flex;gap:13px;align-items:flex-start">
+        <div class="esq esq-circulo"></div>
+        <div style="flex:1;min-width:0">
+          <div class="esq esq-linea" style="width:58%;height:15px"></div>
+          <div class="esq esq-linea" style="width:80%"></div>
+          <div class="esq esq-linea" style="width:40%;margin-bottom:0"></div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <div class="esq esq-chip"></div><div class="esq esq-chip"></div><div class="esq esq-chip"></div>
+      </div>
+    </div>`;
+  return `<div class="resultados resultados-2">${Array.from({ length: n || 4 }, () => card).join('')}</div>`;
+}
+
+/* ── Tarjeta de candidato ───────────────────────────────── */
+function tarjeta(c, filtros) {
+  const habilidades = Array.isArray(c.habilidades) ? c.habilidades : [];
+  const buscadas = [filtros.habilidad, filtros.texto]
+    .filter(Boolean).map(s => s.toLowerCase());
+  const destacada = (h) => buscadas.some(b => String(h).toLowerCase().includes(b));
+
+  // Las habilidades que coinciden con la búsqueda van primero.
+  const ordenadas = habilidades.slice().sort((a, b) => (destacada(b) ? 1 : 0) - (destacada(a) ? 1 : 0));
+  const abierto = !!expandidos[c.id];
+  const visibles = abierto ? ordenadas : ordenadas.slice(0, MAX_CHIPS);
+  const restantes = ordenadas.length - visibles.length;
+
   return `
-    <div class="tarjeta-lista">
+    <article class="tarjeta-lista">
       <div class="tarjeta-encabezado">
         ${scAvatar(c.foto_url, c.nombre, 'lg')}
         <div style="flex:1;min-width:0">
           <div class="fila" style="gap:8px">
-            <span class="tarjeta-nombre"><a href="ver-perfil.html?id=${c.id}">${scEsc(c.nombre)}</a></span>
+            <span class="tarjeta-nombre"><a href="ver-perfil.html?id=${Number(c.id)}">${scEsc(c.nombre)}</a></span>
             ${Number(c.correo_verificado) ? scBadgeVerificado(true) : ''}
           </div>
           ${c.headline ? `<div class="tarjeta-sub">${scEsc(c.headline)}</div>` : ''}
@@ -71,68 +318,174 @@ function tarjeta(c) {
         </div>
       </div>
 
-      ${habilidades.length ? `<div class="chips mt-16">
-        ${habilidades.map(h => `<span class="chip">${scEsc(h)}</span>`).join('')}
-      </div>` : ''}
+      ${ordenadas.length ? `
+        <div class="chips mt-16">
+          ${visibles.map(h => `<span class="chip ${destacada(h) ? 'chip-destacado' : ''}">${scEsc(h)}</span>`).join('')}
+          ${restantes > 0
+            ? `<button type="button" class="chip-mas" data-accion="mas" data-id="${Number(c.id)}">+${restantes} más</button>`
+            : ''}
+        </div>`
+        : '<p class="sin-habilidades">Este perfil aún no lista habilidades.</p>'}
 
       <div class="tarjeta-pie">
         <span class="texto-tenue" style="font-size:12.5px">
-          ${habilidades.length ? habilidades.length + ' habilidad' + (habilidades.length > 1 ? 'es' : '') : 'Sin habilidades listadas'}
+          ${ordenadas.length ? ordenadas.length + (ordenadas.length === 1 ? ' habilidad' : ' habilidades') : 'Sin habilidades'}
         </span>
         <div class="fila">
-          ${c.cv_url ? `<a class="btn btn-sm btn-gris" href="${scEsc(c.cv_url)}" target="_blank" rel="noopener">CV</a>` : ''}
-          <a class="btn btn-sm btn-primary" href="ver-perfil.html?id=${c.id}">Ver perfil</a>
+          ${c.cv_url
+            ? `<a class="btn btn-sm btn-gris" href="${escAttr(c.cv_url)}" target="_blank" rel="noopener">${scIcono('documento')}CV</a>`
+            : ''}
+          <a class="btn btn-sm btn-primary" href="ver-perfil.html?id=${Number(c.id)}">Ver perfil</a>
         </div>
       </div>
-    </div>`;
+    </article>`;
 }
 
+/* ── Búsqueda ───────────────────────────────────────────── */
 async function buscar() {
-  const cont = document.getElementById('resultados');
-  cont.innerHTML = scCargando('Buscando candidatos...');
+  const cont     = document.getElementById('resultados');
+  const contador = document.getElementById('contador');
+  const nota     = document.getElementById('nota-resultados');
 
-  const filtros = {
-    texto:     document.getElementById('f-texto').value.trim(),
-    habilidad: document.getElementById('f-habilidad').value.trim(),
-    ubicacion: document.getElementById('f-ubicacion').value.trim(),
+  const filtros = leerFiltros();
+  pintarActivos();
+
+  const mio = ++peticionActual;
+  cont.innerHTML = esqueletoResultados(4);
+  contador.textContent = 'Buscando candidatos...';
+  nota.textContent = '';
+
+  const params = {
+    texto: filtros.texto,
+    habilidad: filtros.habilidad,
+    ubicacion: filtros.ubicacion,
   };
-  if (document.getElementById('f-con-cv').checked) filtros.con_cv = '1';
+  if (filtros.con_cv) params.con_cv = '1';
 
   try {
-    const datos = await scGet('BUSCAR_CANDIDATOS', filtros);
+    const datos = await scGet('BUSCAR_CANDIDATOS', params);
+    if (mio !== peticionActual) return; // llegó tarde: ya hay una búsqueda más nueva
+
     if (datos.status !== 'success') {
-      cont.innerHTML = scVacio('alerta', 'No se pudo buscar', datos.message, '');
+      contador.textContent = '';
+      cont.innerHTML = scVacio('alerta', 'No se pudo buscar', datos.message || 'Intenta de nuevo.', '');
       return;
     }
 
     const lista = datos.candidatos || [];
-    document.getElementById('contador').textContent =
-      lista.length + (lista.length === 1 ? ' candidato' : ' candidatos');
+    const total = Number(datos.total);
+    porId = {};
+    lista.forEach(c => { porId[c.id] = c; });
+
+    contador.textContent = lista.length
+      ? lista.length + (lista.length === 1 ? ' candidato encontrado' : ' candidatos encontrados')
+      : 'Sin resultados';
+    nota.textContent = (!isNaN(total) && total > lista.length)
+      ? 'Mostrando los primeros ' + lista.length + ' de ' + total + '. Afina los filtros para acercarte al perfil que buscas.'
+      : '';
 
     cont.innerHTML = lista.length
-      ? `<div class="resultados resultados-2">${lista.map(tarjeta).join('')}</div>`
-      : scVacio('personas', 'Sin resultados',
-          'No encontramos candidatos con esos filtros. Prueba con otros términos.',
-          '<button class="btn btn-outline" onclick="limpiar()">Limpiar filtros</button>');
+      ? `<div class="resultados resultados-2">${lista.map(c => tarjeta(c, filtros)).join('')}</div>`
+      : vacioSinResultados(filtros);
 
   } catch (e) {
+    if (mio !== peticionActual) return;
+    contador.textContent = '';
     cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
   }
 }
 
-function limpiar() {
-  document.getElementById('f-texto').value = '';
-  document.getElementById('f-habilidad').value = '';
-  document.getElementById('f-ubicacion').value = '';
-  document.getElementById('f-con-cv').checked = false;
+function vacioSinResultados(filtros) {
+  const hayFiltros = filtros.texto || filtros.habilidad || filtros.ubicacion || filtros.con_cv;
+  if (!hayFiltros) {
+    return scVacio('personas', 'Todavía no hay candidatos',
+      'En cuanto se registren perfiles en el portal aparecerán aquí. Mientras tanto, publica una vacante para que te encuentren.',
+      '<a class="btn btn-primary" href="mis-vacantes.html?nueva=1">Publicar una vacante</a>');
+  }
+  return `
+    <div class="vacio">
+      ${scIcono('lupa')}
+      <h4>Sin coincidencias</h4>
+      <p>Ningún perfil cumple con todos los filtros. Prueba a quitar alguno o busca por una habilidad más general.</p>
+      <button class="btn btn-outline" type="button" data-accion="limpiar">Limpiar filtros</button>
+      <div class="sugerencias">
+        <button type="button" class="sugerencia" data-accion="sugerir" data-valor="soldadura">soldadura</button>
+        <button type="button" class="sugerencia" data-accion="sugerir" data-valor="mantenimiento">mantenimiento</button>
+        <button type="button" class="sugerencia" data-accion="sugerir" data-valor="calidad">calidad</button>
+        <button type="button" class="sugerencia" data-accion="sugerir" data-valor="seguridad industrial">seguridad industrial</button>
+      </div>
+    </div>`;
+}
+
+/* ── Filtros: limpiar, quitar, sugerir ──────────────────── */
+function quitarFiltro(clave) {
+  if (clave === 'con_cv') document.getElementById('f-con-cv').checked = false;
+  else if (CAMPOS[clave]) document.getElementById(CAMPOS[clave].id).value = '';
   buscar();
 }
 
+function limpiar() {
+  Object.keys(CAMPOS).forEach(k => { document.getElementById(CAMPOS[k].id).value = ''; });
+  document.getElementById('f-con-cv').checked = false;
+  buscar();
+  document.getElementById('f-texto').focus();
+}
+
+function sugerir(valor) {
+  limpiarSinBuscar();
+  document.getElementById('f-habilidad').value = valor;
+  buscar();
+}
+
+function limpiarSinBuscar() {
+  Object.keys(CAMPOS).forEach(k => { document.getElementById(CAMPOS[k].id).value = ''; });
+  document.getElementById('f-con-cv').checked = false;
+}
+
+/* ── Delegación de eventos ──────────────────────────────── */
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-accion]');
+  if (!el) return;
+
+  switch (el.dataset.accion) {
+    case 'quitar':  quitarFiltro(el.dataset.filtro); break;
+    case 'limpiar': limpiar(); break;
+    case 'sugerir': sugerir(el.dataset.valor); break;
+    case 'mas': {
+      const id = Number(el.dataset.id);
+      expandidos[id] = true;
+      const chips = el.parentElement;
+      const c = porId[id];
+      if (!c || !chips) return;
+      const filtros = leerFiltros();
+      const buscadas = [filtros.habilidad, filtros.texto].filter(Boolean).map(s => s.toLowerCase());
+      const destacada = (h) => buscadas.some(b => String(h).toLowerCase().includes(b));
+      const ordenadas = (c.habilidades || []).slice()
+        .sort((a, b) => (destacada(b) ? 1 : 0) - (destacada(a) ? 1 : 0));
+      chips.innerHTML = ordenadas
+        .map(h => `<span class="chip ${destacada(h) ? 'chip-destacado' : ''}">${scEsc(h)}</span>`).join('');
+      break;
+    }
+  }
+});
+
+/* ── Búsqueda con retardo (debounce) ────────────────────── */
+function buscarConRetardo() {
+  clearTimeout(temporizador);
+  temporizador = setTimeout(() => { expandidos = {}; buscar(); }, 350);
+}
+
+['f-texto', 'f-habilidad', 'f-ubicacion'].forEach(id => {
+  document.getElementById(id).addEventListener('input', buscarConRetardo);
+});
+document.getElementById('f-con-cv').addEventListener('change', () => { expandidos = {}; buscar(); });
+
 document.getElementById('form-filtros').addEventListener('submit', (e) => {
   e.preventDefault();
+  clearTimeout(temporizador);
+  expandidos = {};
   buscar();
 });
-document.getElementById('f-con-cv').addEventListener('change', buscar);
 
 window.addEventListener('DOMContentLoaded', () => {
   sesion = scExigirSesion('empresa');

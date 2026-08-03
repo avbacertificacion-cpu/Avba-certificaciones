@@ -66,12 +66,13 @@ Copiar `config/config.sample.php` a `config/config.php` y llenar:
 | `SC_DB_PASS`  | Sí          | Contraseña                      |
 | `SC_MAIL_FROM`| No          | Remitente de los correos        |
 | `SC_URL_BASE` | No          | URL base si la detección falla  |
+| `SC_DIAG_CLAVE`| No         | Protege `?action=DIAGNOSTICO` con clave |
 
 `config.php` está en `.gitignore`, así que el despliegue nunca lo sobrescribe.
 
 ## Base de datos
 
-Tablas con prefijo `sc_`: `sc_meta`, `sc_usuarios`, `sc_personas`,
+Tablas con prefijo `sc_`: `sc_meta`, `sc_usuarios`, `sc_intentos`, `sc_personas`,
 `sc_experiencia`, `sc_educacion`, `sc_habilidades`, `sc_empresas`,
 `sc_vacantes`, `sc_postulaciones`.
 
@@ -79,6 +80,38 @@ El esquema se crea y se migra solo. `sc_meta.schema_version` guarda la versión
 aplicada; si es menor que `SC_SCHEMA_VERSION` (en `config/database.php`), se
 ejecutan las migraciones pendientes en el siguiente request. Para añadir una
 migración: subir la constante y agregar un método `migrarAN()`.
+
+## Seguridad
+
+Correcciones aplicadas tras una auditoría del API:
+
+- **`scEsc()` escapa también las comillas.** Antes solo neutralizaba `< > &`,
+  pero el texto se inserta además dentro de atributos (`alt=`, `href=`), así que
+  un nombre con `"` cerraba el atributo e inyectaba `onload=` → **XSS almacenado**
+  con robo del token de sesión. Nunca quites ese escape.
+- **`scUrlBase()` no confía en la cabecera `Host`.** Se valida contra
+  `SC_HOSTS_PERMITIDOS`; si no coincide se usa una URL fija. Sin esto, un
+  `Host: evil.tld` en `SOLICITAR_RESET` mandaba a la víctima un correo legítimo
+  cuyo enlace, con token válido, apuntaba al servidor del atacante.
+- **Límite de intentos** (`sc_intentos`): 8 inicios de sesión por correo y 30 por
+  IP cada 15 min; 3 solicitudes de recuperación por correo. Login compara contra
+  un hash de relleno si el usuario no existe, para no delatarlo por tiempo.
+- **Cambiar contraseña cierra las demás sesiones** y emite un token nuevo.
+- **`GET_PERSONA_PUBLICA` es solo para empresas**; un candidato únicamente puede
+  abrir su propio perfil público.
+- Textos truncados al largo real de su columna y fechas validadas: un valor
+  demasiado largo provocaba error 1406 de MariaDB y el usuario veía un 500.
+- El token **no se acepta por query string** (acabaría en logs y en `Referer`).
+- Los errores de esquema y de conexión ya no exponen usuario ni nombre de la BD.
+- `sitio_web` se valida como URL http(s) real, en servidor y en cliente.
+
+### Pendiente de decidir (producto, no bug)
+
+Cualquier empresa registrada puede listar candidatos y ver el enlace directo a
+su CV. Los PDF se sirven como archivos estáticos con nombre aleatorio, sin
+comprobar sesión. Es coherente con la función de la plataforma, pero si se
+quiere restringir, hay que servir los CV desde un PHP que valide la sesión y la
+relación de postulación.
 
 ## Contraseñas
 

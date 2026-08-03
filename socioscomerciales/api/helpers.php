@@ -19,23 +19,100 @@ function scGenerarToken(): string {
 }
 
 /**
+ * Dominios de los que nos fiamos para construir enlaces.
+ * La cabecera Host la controla por completo quien hace la petición: si se
+ * usara tal cual, bastaría enviar `Host: evil.tld` junto a SOLICITAR_RESET
+ * para que la víctima recibiera un correo legítimo de AVBA cuyo enlace,
+ * con un token de restablecimiento válido, apunta al servidor del atacante.
+ */
+const SC_HOSTS_PERMITIDOS = ['gestion.avba.com.mx', 'www.gestion.avba.com.mx'];
+
+/** URL usada cuando el Host no es de fiar y no hay SC_URL_BASE en config. */
+const SC_URL_BASE_RESPALDO = 'https://gestion.avba.com.mx/socioscomerciales';
+
+/**
  * URL base pública del portal (sin barra final), p. ej.
  * https://gestion.avba.com.mx/socioscomerciales
+ * Nunca se construye a partir de un Host no reconocido.
  */
 function scUrlBase(): string {
     if (defined('SC_URL_BASE') && SC_URL_BASE) return rtrim(SC_URL_BASE, '/');
+
+    // Quitar el puerto antes de comparar (ej. "host:443")
+    $host = strtolower((string) ($_SERVER['HTTP_HOST'] ?? ''));
+    if (($pos = strpos($host, ':')) !== false) $host = substr($host, 0, $pos);
+
+    if (!in_array($host, SC_HOSTS_PERMITIDOS, true)) {
+        return SC_URL_BASE_RESPALDO;
+    }
 
     $esHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https')
         || (($_SERVER['SERVER_PORT'] ?? '') == 443);
     $esquema = $esHttps ? 'https' : 'http';
-    $host    = $_SERVER['HTTP_HOST'] ?? 'gestion.avba.com.mx';
 
     // /socioscomerciales/api/index.php → /socioscomerciales
     $dirApi = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? '/socioscomerciales/api/index.php'));
     $base   = rtrim(dirname($dirApi), '/');
 
     return "{$esquema}://{$host}{$base}";
+}
+
+/**
+ * Recorta un texto al largo de su columna y quita caracteres de control.
+ * Sin esto, un valor demasiado largo provoca el error 1406 de MariaDB en
+ * modo estricto y el usuario ve un 500 en vez de un mensaje claro.
+ */
+function scTexto(?string $valor, int $max): ?string {
+    if ($valor === null) return null;
+    $v = trim(preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $valor) ?? '');
+    if ($v === '') return null;
+    return mb_substr($v, 0, $max);
+}
+
+/** IP del cliente, para contar intentos. */
+function scIpCliente(): string {
+    return substr((string) ($_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'), 0, 45);
+}
+
+/**
+ * Límite de intentos por ventana de tiempo.
+ * Devuelve true si la acción está permitida y la registra; false si se pasó.
+ * Sin esto, LOGIN admite miles de contraseñas por minuto y SOLICITAR_RESET
+ * permite inundar de correos el buzón de cualquier usuario.
+ */
+function scLimite(PDO $pdo, string $tipo, string $clave, int $max, int $ventanaSeg): bool {
+    try {
+        $desde = date('Y-m-d H:i:s', time() - $ventanaSeg);
+
+        $stmt = $pdo->prepare(
+            "SELECT COUNT(*) FROM sc_intentos WHERE tipo = ? AND clave = ? AND ts > ?"
+        );
+        $stmt->execute([$tipo, $clave, $desde]);
+
+        if ((int) $stmt->fetchColumn() >= $max) return false;
+
+        $pdo->prepare("INSERT INTO sc_intentos (tipo, clave) VALUES (?, ?)")
+            ->execute([$tipo, mb_substr($clave, 0, 190)]);
+
+        // Limpieza ocasional para que la tabla no crezca sin fin
+        if (random_int(1, 50) === 1) {
+            $pdo->prepare("DELETE FROM sc_intentos WHERE ts < ?")
+                ->execute([date('Y-m-d H:i:s', time() - 86400)]);
+        }
+        return true;
+    } catch (PDOException $e) {
+        // Si la tabla aún no existe, no bloqueamos el acceso al portal
+        error_log('scLimite: ' . $e->getMessage());
+        return true;
+    }
+}
+
+/** Valida una fecha ISO (YYYY-MM-DD); devuelve null si no lo es. */
+function scFecha(?string $valor): ?string {
+    if (!$valor) return null;
+    $d = DateTime::createFromFormat('Y-m-d', trim($valor));
+    return ($d && $d->format('Y-m-d') === trim($valor)) ? $d->format('Y-m-d') : null;
 }
 
 /**

@@ -3,228 +3,951 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Socios Comerciales AVBA — Bolsa de trabajo</title>
-<meta name="description" content="La bolsa de trabajo industrial de AVBA. Conectamos talento calificado con empresas de todos los giros de la industria.">
+<title>Socios Comerciales AVBA — Bolsa de trabajo industrial</title>
+<meta name="description" content="La bolsa de trabajo de la industria. Candidatos: arma tu perfil, sube tu CV y postúlate. Empresas: publica vacantes y encuentra talento calificado de cualquier giro.">
+<meta name="theme-color" content="#FFFFFF">
+<meta property="og:title" content="Socios Comerciales AVBA — Bolsa de trabajo industrial">
+<meta property="og:description" content="Conectamos talento calificado con empresas de todos los giros de la industria.">
+<meta property="og:image" content="assets/avba-logo.png">
+<meta property="og:type" content="website">
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
-  /* ── Barra superior de la landing ─────────────────────── */
+  /* ==========================================================
+     Landing pública — estilos propios de esta página.
+     El sistema compartido vive en assets/avba.css; aquí solo
+     va lo que es exclusivo de la portada.
+     ========================================================== */
+
+  /* ── Accesibilidad base ───────────────────────────────── */
+  :focus-visible {
+    outline: 3px solid var(--acento);
+    outline-offset: 3px;
+    border-radius: var(--r-sm);
+  }
+  .hero :focus-visible, .cierre :focus-visible { outline-color: #fff; }
+
+  .saltar {
+    position: absolute; left: 12px; top: -60px; z-index: 100;
+    background: var(--azul); color: #fff; font-size: 13.5px; font-weight: 700;
+    padding: 10px 16px; border-radius: var(--r-sm); transition: top .18s;
+  }
+  .saltar:focus { top: 12px; }
+
+  /* Visible solo para lectores de pantalla: mantiene la jerarquía de
+     encabezados sin ocupar espacio (.oculto sí lo saca del árbol). */
+  .solo-lectores {
+    position: absolute !important; width: 1px; height: 1px;
+    padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+
+  html { scroll-behavior: smooth; }
+  section[id] { scroll-margin-top: 88px; }
+
+  /* ── Barra superior (BLANCA: el logo azul solo se ve bien
+        sobre blanco, nunca oscurecer esta barra) ─────────── */
   .top {
     position: sticky; top: 0; z-index: 30;
-    background: rgba(255,255,255,.96); backdrop-filter: blur(10px);
+    background: rgba(255,255,255,.94);
+    -webkit-backdrop-filter: saturate(180%) blur(12px);
+    backdrop-filter: saturate(180%) blur(12px);
     border-bottom: 1px solid var(--borde);
+    transition: box-shadow .25s, background .25s;
   }
+  .top.fijada { box-shadow: 0 4px 20px rgba(11,26,51,.08); background: rgba(255,255,255,.98); }
   .top .wrap { display: flex; align-items: center; gap: 13px; height: 68px; }
-  .top-acciones { margin-left: auto; display: flex; gap: 10px; }
 
-  /* ── Hero ─────────────────────────────────────────────── */
+  .top-nav { display: none; margin-left: auto; gap: 4px; }
+  @media (min-width: 980px) { .top-nav { display: flex; } }
+  .top-nav a {
+    font-size: 13.5px; font-weight: 600; color: var(--texto-sub);
+    padding: 8px 13px; border-radius: var(--r-sm);
+    transition: color .15s, background .15s;
+  }
+  .top-nav a:hover { color: var(--azul); background: var(--azul-claro); }
+
+  .top-acciones { margin-left: auto; display: flex; gap: 9px; align-items: center; }
+  @media (min-width: 980px) { .top-acciones { margin-left: 14px; } }
+
+  /* ── Hero: profundidad hecha solo con CSS ─────────────── */
   .hero {
-    background: linear-gradient(160deg, var(--hero-1) 0%, var(--hero-2) 100%);
-    color: #fff; padding: 76px 0 108px; position: relative; overflow: hidden;
+    position: relative; isolation: isolate; overflow: hidden;
+    color: #fff;
+    padding: clamp(54px, 7vw, 96px) 0 clamp(104px, 11vw, 150px);
+    background:
+      radial-gradient(900px 540px at 82% 4%,  rgba(77,163,255,.32), transparent 62%),
+      radial-gradient(720px 480px at 2% 86%,  rgba(24,95,165,.46), transparent 66%),
+      radial-gradient(560px 340px at 44% -12%, rgba(150,205,255,.20), transparent 70%),
+      linear-gradient(168deg, var(--hero-1) 0%, #0F2A50 48%, var(--hero-2) 100%);
   }
+  /* Malla técnica, desvanecida hacia los bordes */
+  .hero::before {
+    content: ''; position: absolute; inset: 0; z-index: -1;
+    background-image:
+      linear-gradient(rgba(255,255,255,.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.06) 1px, transparent 1px);
+    background-size: 58px 58px;
+    -webkit-mask-image: radial-gradient(1100px 640px at 62% 0%, #000 0%, transparent 76%);
+    mask-image: radial-gradient(1100px 640px at 62% 0%, #000 0%, transparent 76%);
+  }
+  /* Halo suave que da volumen al bloque */
   .hero::after {
-    content: ''; position: absolute; right: -140px; top: -110px;
-    width: 460px; height: 460px; border-radius: 50%;
-    background: radial-gradient(circle, rgba(77,163,255,.20), transparent 68%);
+    content: ''; position: absolute; z-index: -1;
+    width: 620px; height: 620px; right: -190px; top: -230px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(77,163,255,.30), rgba(77,163,255,0) 68%);
+    filter: blur(6px);
   }
-  .hero .wrap { position: relative; z-index: 1; }
-  .hero-eyebrow {
-    display: inline-flex; align-items: center; gap: 8px;
-    background: rgba(77,163,255,.15); border: 1px solid rgba(77,163,255,.34);
-    color: var(--acento); font-size: 12px; font-weight: 700;
-    padding: 6px 15px; border-radius: 999px; margin-bottom: 22px; letter-spacing: .3px;
+  /* Curva blanca que empalma el hero con el resto de la página */
+  .hero-curva {
+    position: absolute; left: 0; right: 0; bottom: -1px; z-index: 0;
+    width: 100%; height: clamp(38px, 5vw, 72px); display: block;
   }
-  .hero h1 {
-    font-size: clamp(33px, 5.4vw, 52px); font-weight: 800;
-    letter-spacing: -1.3px; line-height: 1.1; max-width: 760px; margin-bottom: 20px;
-  }
-  .hero h1 .accent { color: var(--acento); }
-  .hero-lead { font-size: 17.5px; color: rgba(255,255,255,.8); max-width: 570px; margin-bottom: 32px; }
-  .hero-ctas { display: flex; flex-wrap: wrap; gap: 13px; }
+  .hero-curva path { fill: var(--gris-fondo); }
 
-  /* ── Tarjetas de rol, montadas sobre el hero ──────────── */
+  .hero-grid {
+    position: relative; z-index: 1;
+    display: grid; gap: clamp(38px, 5vw, 54px); align-items: center;
+  }
+  @media (min-width: 960px) { .hero-grid { grid-template-columns: 1.06fr .94fr; } }
+  .hero-texto { min-width: 0; }
+
+  .hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 9px;
+    background: rgba(77,163,255,.14); border: 1px solid rgba(77,163,255,.36);
+    color: #A9D3FF; font-size: 12px; font-weight: 700;
+    padding: 7px 15px 7px 11px; border-radius: 999px;
+    margin-bottom: 24px; letter-spacing: .3px;
+  }
+  .punto {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--verde);
+    box-shadow: 0 0 0 4px rgba(34,197,94,.20); flex-shrink: 0;
+  }
+
+  .hero h1 {
+    font-size: clamp(34px, 6vw, 60px); font-weight: 800;
+    letter-spacing: -1.8px; line-height: 1.04; margin-bottom: 22px;
+    text-wrap: balance;
+  }
+  .grad { color: var(--acento); }
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    .grad {
+      background: linear-gradient(96deg, #8CC8FF 0%, #4DA3FF 46%, #C9E4FF 100%);
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent; -webkit-text-fill-color: transparent;
+    }
+  }
+  .hero-lead {
+    font-size: clamp(15.5px, 1.6vw, 18.5px); color: rgba(255,255,255,.82);
+    max-width: 560px; margin-bottom: 30px; line-height: 1.62;
+  }
+  .hero-ctas { display: flex; flex-wrap: wrap; gap: 12px; }
+  .hero-ctas .btn { box-shadow: 0 10px 26px rgba(4,12,26,.28); }
+
+  .hero-notas {
+    list-style: none; display: flex; flex-wrap: wrap; gap: 8px 20px;
+    margin-top: 26px; font-size: 13px; color: rgba(255,255,255,.72);
+  }
+  .hero-notas li { display: inline-flex; align-items: center; gap: 7px; }
+  .hero-notas svg { width: 15px; height: 15px; color: var(--verde); flex-shrink: 0; }
+
+  /* ── Vista previa abstracta del portal (decorativa) ───── */
+  .vista {
+    min-width: 0;
+    border-radius: var(--r-lg);
+    border: 1px solid rgba(255,255,255,.16);
+    background: linear-gradient(150deg, rgba(255,255,255,.13), rgba(255,255,255,.04));
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    box-shadow: 0 30px 70px rgba(3,10,22,.45);
+    padding: 16px; position: relative;
+    animation: flotar 7s ease-in-out infinite;
+  }
+  @keyframes flotar { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+
+  .vista-barra { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .vista-buscador {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 9px;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.16);
+    border-radius: 999px; padding: 9px 14px;
+  }
+  .vista-buscador svg { width: 15px; height: 15px; color: #A9D3FF; flex-shrink: 0; }
+  .vista-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 14px; }
+  .vista-chip {
+    font-size: 11.5px; font-weight: 700; padding: 5px 11px; border-radius: 999px;
+    background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.14);
+    color: rgba(255,255,255,.82);
+  }
+  .vista-chip.on { background: rgba(77,163,255,.26); border-color: rgba(77,163,255,.5); color: #DDEEFF; }
+
+  .vista-fila {
+    display: flex; align-items: center; gap: 12px;
+    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.10);
+    border-radius: var(--r); padding: 12px; margin-bottom: 9px;
+  }
+  .vista-fila:last-child { margin-bottom: 0; }
+  .vista-cuadro {
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+    background: linear-gradient(140deg, rgba(77,163,255,.55), rgba(24,95,165,.55));
+    display: grid; place-items: center; color: #fff;
+  }
+  .vista-cuadro svg { width: 18px; height: 18px; }
+  .vista-lineas { flex: 1; min-width: 0; display: grid; gap: 7px; }
+  .linea { height: 8px; border-radius: 999px; background: rgba(255,255,255,.22); }
+  .linea.corta { width: 46%; background: rgba(255,255,255,.13); }
+  .linea.media { width: 72%; }
+  .linea.larga { width: 88%; }
+  .vista-punto { width: 9px; height: 9px; border-radius: 50%; background: var(--verde); flex-shrink: 0; }
+  .vista-punto.ambar { background: var(--ambar); }
+  .vista-punto.azul { background: var(--acento); }
+
+  .vista-flotante {
+    position: absolute; left: -14px; bottom: 26px;
+    display: inline-flex; align-items: center; gap: 9px;
+    background: #fff; color: var(--texto);
+    font-size: 12.5px; font-weight: 700;
+    padding: 10px 15px; border-radius: 999px;
+    box-shadow: var(--sombra-lg);
+    animation: flotar 7s ease-in-out infinite reverse;
+  }
+  .vista-flotante svg { width: 15px; height: 15px; color: var(--verde); }
+  @media (max-width: 520px) { .vista-flotante { left: 8px; bottom: -14px; } }
+
+  /* ── Tarjetas de público, montadas sobre el hero ──────── */
   .roles {
-    max-width: 1080px; margin: -62px auto 0; padding: 0 20px;
-    display: grid; gap: 20px; grid-template-columns: 1fr; position: relative; z-index: 5;
+    max-width: 1080px; margin: clamp(-92px, -8vw, -70px) auto 0; padding: 0 20px;
+    display: grid; gap: 20px; grid-template-columns: 1fr;
+    position: relative; z-index: 5;
   }
-  @media (min-width: 760px) { .roles { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 800px) { .roles { grid-template-columns: 1fr 1fr; } }
   .role {
-    background: #fff; border: 1px solid var(--borde); border-radius: var(--r-lg);
-    padding: 30px; box-shadow: var(--sombra-md);
-    transition: transform .15s, box-shadow .15s;
+    background: var(--blanco); border: 1px solid var(--borde); border-radius: var(--r-lg);
+    padding: 30px 28px; box-shadow: var(--sombra-md);
+    position: relative; overflow: hidden;
+    transition: transform .2s, box-shadow .2s, border-color .2s;
   }
-  .role:hover { transform: translateY(-3px); box-shadow: var(--sombra-lg); }
+  .role::before {
+    content: ''; position: absolute; inset: 0 0 auto 0; height: 4px;
+  }
+  .role.persona::before { background: linear-gradient(90deg, var(--azul), var(--acento)); }
+  .role.empresa::before { background: linear-gradient(90deg, var(--azul-oscuro), var(--azul)); }
+  .role:hover { transform: translateY(-4px); box-shadow: var(--sombra-lg); border-color: #c6d5e8; }
+
+  .role-cabecera { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
   .role-icono {
-    width: 50px; height: 50px; border-radius: var(--r);
-    display: flex; align-items: center; justify-content: center; margin-bottom: 18px; color: #fff;
+    width: 50px; height: 50px; border-radius: var(--r); flex-shrink: 0;
+    display: grid; place-items: center; color: #fff;
   }
   .role-icono svg { width: 25px; height: 25px; }
   .role.persona .role-icono { background: linear-gradient(140deg, var(--azul), var(--acento)); }
   .role.empresa .role-icono { background: linear-gradient(140deg, var(--azul-oscuro), var(--azul)); }
-  .role h3 { font-size: 20px; font-weight: 700; margin-bottom: 9px; }
-  .role p { font-size: 14px; color: var(--texto-sub); margin-bottom: 18px; }
-  .role ul { list-style: none; margin-bottom: 22px; }
+  .role h3 { font-size: 20px; font-weight: 800; letter-spacing: -.4px; }
+  .role-etiqueta { font-size: 12px; font-weight: 700; color: var(--texto-tenue); text-transform: uppercase; letter-spacing: .6px; }
+  .role > p { font-size: 14.5px; color: var(--texto-sub); margin-bottom: 18px; line-height: 1.6; }
+  .role ul { list-style: none; margin-bottom: 24px; }
   .role li {
-    display: flex; align-items: flex-start; gap: 9px;
-    font-size: 13.5px; color: var(--texto-sub); padding: 5px 0;
+    display: flex; align-items: flex-start; gap: 10px;
+    font-size: 13.8px; color: var(--texto-sub); padding: 6px 0;
   }
-  .role li svg { width: 16px; height: 16px; color: var(--verde); flex-shrink: 0; margin-top: 2px; }
+  .role li svg { width: 16px; height: 16px; color: var(--verde); flex-shrink: 0; margin-top: 3px; }
 
-  /* ── Secciones ────────────────────────────────────────── */
-  .seccion { padding: 84px 0 0; }
-  .seccion-cabecera { text-align: center; max-width: 640px; margin: 0 auto 46px; }
+  /* ── Bandas y secciones ──────────────────────────────── */
+  .seccion { padding: clamp(58px, 8vw, 92px) 0; }
+  .banda-blanca { background: var(--blanco); border-top: 1px solid var(--borde); border-bottom: 1px solid var(--borde); }
+
+  .seccion-cabecera { text-align: center; max-width: 680px; margin: 0 auto clamp(34px, 4vw, 50px); }
   .seccion-cabecera .eyebrow {
-    font-size: 12px; font-weight: 700; color: var(--azul);
-    letter-spacing: .7px; text-transform: uppercase; margin-bottom: 11px;
+    display: inline-block; font-size: 12px; font-weight: 800; color: var(--azul);
+    letter-spacing: .9px; text-transform: uppercase; margin-bottom: 12px;
+    background: var(--azul-claro); padding: 5px 13px; border-radius: 999px;
   }
   .seccion-cabecera h2 {
-    font-size: clamp(25px, 3.6vw, 34px); font-weight: 800;
-    letter-spacing: -.7px; margin-bottom: 11px;
+    font-size: clamp(26px, 3.9vw, 40px); font-weight: 800;
+    letter-spacing: -1.1px; line-height: 1.14; margin-bottom: 13px; text-wrap: balance;
   }
-  .seccion-cabecera p { color: var(--texto-sub); font-size: 15.5px; }
+  .seccion-cabecera p { color: var(--texto-sub); font-size: clamp(14.5px, 1.5vw, 16.5px); line-height: 1.65; }
 
-  .pasos { display: grid; gap: 20px; grid-template-columns: 1fr; }
-  @media (min-width: 760px) { .pasos { grid-template-columns: repeat(3, 1fr); } }
-  .paso { background: #fff; border: 1px solid var(--borde); border-radius: var(--r-md); padding: 26px; }
-  .paso-num {
-    width: 36px; height: 36px; border-radius: var(--r-sm);
+  /* ── Propuesta de valor en formato cifra ─────────────── */
+  .valores { display: grid; gap: 16px; grid-template-columns: repeat(2, 1fr); }
+  @media (min-width: 860px) { .valores { grid-template-columns: repeat(4, 1fr); } }
+  .valor {
+    text-align: center; padding: 26px 16px;
+    border-radius: var(--r-md); background: var(--gris-fondo); border: 1px solid var(--borde);
+    transition: transform .2s, box-shadow .2s;
+  }
+  .valor:hover { transform: translateY(-3px); box-shadow: var(--sombra); }
+  .valor-num {
+    font-size: clamp(28px, 3.6vw, 38px); font-weight: 800; letter-spacing: -1.2px;
+    line-height: 1.05; color: var(--azul);
+  }
+  @supports (background-clip: text) or (-webkit-background-clip: text) {
+    .valor-num {
+      background: linear-gradient(140deg, var(--azul-oscuro), var(--acento));
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent; -webkit-text-fill-color: transparent;
+    }
+  }
+  .valor-tit { font-size: 14px; font-weight: 700; margin-top: 10px; }
+  .valor-sub { font-size: 12.8px; color: var(--texto-sub); margin-top: 4px; line-height: 1.5; }
+
+  /* ── Cómo funciona: pestañas por público ─────────────── */
+  .tabs-como {
+    display: inline-flex; gap: 5px; padding: 5px;
+    background: var(--blanco); border: 1px solid var(--borde);
+    border-radius: 999px; box-shadow: var(--sombra-sm);
+    max-width: 100%; overflow-x: auto; scrollbar-width: none;
+  }
+  .tabs-como::-webkit-scrollbar { display: none; }
+  .tabs-centro { text-align: center; margin-bottom: clamp(28px, 3.5vw, 40px); }
+  .tab-btn {
+    border: none; background: none; font: inherit; cursor: pointer;
+    font-size: 14px; font-weight: 700; color: var(--texto-sub);
+    padding: 11px 22px; border-radius: 999px; white-space: nowrap;
+    display: inline-flex; align-items: center; gap: 8px;
+    transition: background .2s, color .2s;
+  }
+  .tab-btn svg { width: 17px; height: 17px; }
+  .tab-btn:hover { color: var(--azul); }
+  .tab-btn[aria-selected="true"] {
+    background: linear-gradient(140deg, var(--azul), var(--azul-oscuro));
+    color: #fff; box-shadow: var(--sombra-sm);
+  }
+  .panel[hidden] { display: none; }
+  .panel { animation: aparecer .32s ease both; }
+  @keyframes aparecer { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  .ruta { display: grid; gap: 18px; grid-template-columns: 1fr; }
+  @media (min-width: 640px) { .ruta { grid-template-columns: repeat(2, 1fr); } }
+  @media (min-width: 1000px) { .ruta { grid-template-columns: repeat(4, 1fr); } }
+  .ruta-paso {
+    position: relative; background: var(--blanco);
+    border: 1px solid var(--borde); border-radius: var(--r-md);
+    padding: 24px 20px; box-shadow: var(--sombra-sm);
+    transition: transform .2s, box-shadow .2s;
+  }
+  .ruta-paso:hover { transform: translateY(-3px); box-shadow: var(--sombra-md); }
+  @media (min-width: 1000px) {
+    .ruta-paso:not(:last-child)::after {
+      content: ''; position: absolute; right: -19px; top: 44px;
+      width: 18px; border-top: 2px dashed #c6d5e8;
+    }
+  }
+  .ruta-num {
+    width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center;
+    font-weight: 800; font-size: 15px; color: #fff; margin-bottom: 16px;
+    background: linear-gradient(140deg, var(--azul), var(--azul-oscuro));
+  }
+  .ruta-paso h3 { font-size: 15.5px; font-weight: 700; margin-bottom: 7px; }
+  .ruta-paso p { font-size: 13.5px; color: var(--texto-sub); line-height: 1.6; }
+  .ruta-pie { text-align: center; margin-top: 30px; }
+
+  /* ── Giros industriales ──────────────────────────────── */
+  .giros { display: grid; gap: 13px; grid-template-columns: repeat(2, 1fr); }
+  @media (min-width: 620px) { .giros { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 940px) { .giros { grid-template-columns: repeat(4, 1fr); } }
+  .giro {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--gris-fondo); border: 1px solid var(--borde);
+    border-radius: var(--r); padding: 15px 14px;
+    font-size: 13.8px; font-weight: 600; color: var(--texto);
+    transition: transform .18s, border-color .18s, background .18s, box-shadow .18s;
+  }
+  .giro:hover { transform: translateY(-2px); background: var(--blanco); border-color: var(--acento); box-shadow: var(--sombra); }
+  .giro-ic {
+    width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+    display: grid; place-items: center;
     background: var(--azul-claro); color: var(--azul);
-    display: flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 15px; margin-bottom: 15px;
   }
-  .paso h4 { font-size: 15.5px; font-weight: 700; margin-bottom: 7px; }
-  .paso p { font-size: 13.5px; color: var(--texto-sub); }
+  .giro-ic svg { width: 19px; height: 19px; }
+  .giros-nota {
+    text-align: center; margin-top: 26px;
+    font-size: 14px; color: var(--texto-sub);
+  }
+  .giros-nota strong { color: var(--texto); }
 
-  /* ── Franja de cierre ─────────────────────────────────── */
-  .cierre {
-    margin-top: 84px;
-    background: linear-gradient(160deg, var(--hero-1), var(--hero-2));
-    color: #fff; padding: 62px 0; text-align: center;
+  /* ── Preguntas frecuentes ────────────────────────────── */
+  .faq { display: grid; gap: 12px; }
+  @media (min-width: 920px) { .faq { grid-template-columns: 1fr 1fr; align-items: start; } }
+  .faq-item {
+    background: var(--blanco); border: 1px solid var(--borde);
+    border-radius: var(--r); overflow: hidden;
+    transition: box-shadow .2s, border-color .2s;
   }
-  .cierre h2 { font-size: clamp(24px, 3.4vw, 32px); font-weight: 800; letter-spacing: -.6px; margin-bottom: 12px; }
-  .cierre p { color: rgba(255,255,255,.76); font-size: 15.5px; max-width: 480px; margin: 0 auto 26px; }
+  .faq-item[open] { box-shadow: var(--sombra); border-color: #c6d5e8; }
+  .faq-item summary {
+    list-style: none; cursor: pointer; padding: 17px 18px;
+    display: flex; align-items: center; gap: 14px;
+    font-size: 14.8px; font-weight: 700; line-height: 1.45;
+  }
+  .faq-item summary::-webkit-details-marker { display: none; }
+  .faq-item summary:hover { color: var(--azul); }
+  .faq-sig {
+    margin-left: auto; flex-shrink: 0;
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--azul-claro); color: var(--azul);
+    display: grid; place-items: center;
+    transition: transform .25s, background .2s, color .2s;
+  }
+  .faq-sig svg { width: 14px; height: 14px; }
+  .faq-item[open] .faq-sig { transform: rotate(45deg); background: var(--azul); color: #fff; }
+  .faq-cuerpo { padding: 0 18px 18px; font-size: 14px; color: var(--texto-sub); line-height: 1.68; }
+
+  /* ── Franja de cierre ────────────────────────────────── */
+  .cierre {
+    position: relative; isolation: isolate; overflow: hidden;
+    color: #fff; padding: clamp(58px, 7vw, 88px) 0; text-align: center;
+    background:
+      radial-gradient(700px 380px at 50% -10%, rgba(77,163,255,.30), transparent 65%),
+      linear-gradient(160deg, var(--hero-1), var(--hero-2));
+  }
+  .cierre::before {
+    content: ''; position: absolute; inset: 0; z-index: -1;
+    background-image:
+      linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+    background-size: 58px 58px;
+    -webkit-mask-image: radial-gradient(760px 400px at 50% 50%, #000, transparent 75%);
+    mask-image: radial-gradient(760px 400px at 50% 50%, #000, transparent 75%);
+  }
+  .cierre h2 { font-size: clamp(26px, 3.8vw, 38px); font-weight: 800; letter-spacing: -1.1px; margin-bottom: 14px; text-wrap: balance; }
+  .cierre p { color: rgba(255,255,255,.78); font-size: clamp(14.5px, 1.5vw, 16.5px); max-width: 520px; margin: 0 auto 28px; line-height: 1.65; }
   .cierre .hero-ctas { justify-content: center; }
+  .cierre-nota { margin-top: 22px; font-size: 13px; color: rgba(255,255,255,.6); }
+  .cierre-nota a { color: #A9D3FF; font-weight: 600; text-decoration: underline; }
+
   .pie { margin-top: 0; }
+
+  /* ── Aparición al hacer scroll ───────────────────────── */
+  .js-anim .rv { opacity: 0; transform: translateY(22px); }
+  .js-anim .rv.visible {
+    opacity: 1; transform: none;
+    transition: opacity .65s cubic-bezier(.2,.7,.3,1), transform .65s cubic-bezier(.2,.7,.3,1);
+  }
+  .js-anim .rv.d1.visible { transition-delay: .08s; }
+  .js-anim .rv.d2.visible { transition-delay: .16s; }
+  .js-anim .rv.d3.visible { transition-delay: .24s; }
+
+  /* ── Respeto a quien prefiere menos movimiento ───────── */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after {
+      animation: none !important;
+      transition-duration: .01ms !important;
+      transition-delay: 0s !important;
+      scroll-behavior: auto !important;
+    }
+    .js-anim .rv { opacity: 1; transform: none; }
+  }
 </style>
 </head>
 <body>
 
-<header class="top">
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+
+<header class="top" id="top">
   <div class="wrap">
-    <a href="index.html">
+    <a href="index.html" aria-label="Socios Comerciales AVBA, inicio">
       <img src="assets/avba-logo.png" alt="AVBA" class="logo logo-nav">
     </a>
     <span class="brand-tagline">Bolsa de trabajo industrial</span>
-    <div class="top-acciones">
+
+    <nav class="top-nav" aria-label="Secciones de la página">
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#giros">Giros</a>
+      <a href="#preguntas">Preguntas</a>
+      <a href="vacantes.html">Vacantes</a>
+    </nav>
+
+    <div class="top-acciones" id="top-acciones">
       <a class="btn btn-gris btn-sm" href="login.html">Iniciar sesión</a>
       <a class="btn btn-primary btn-sm" href="registro.html">Crear cuenta</a>
     </div>
   </div>
 </header>
 
-<section class="hero">
-  <div class="wrap">
-    <span class="hero-eyebrow">Socios Comerciales AVBA</span>
-    <h1>La bolsa de trabajo de la <span class="accent">industria</span></h1>
-    <p class="hero-lead">
-      Conectamos talento calificado con empresas de todos los giros de la industria.
-      Crea tu perfil profesional o publica tus vacantes, con el respaldo de la marca AVBA.
-    </p>
-    <div class="hero-ctas">
-      <a class="btn btn-blanco btn-lg" href="registro.html?tipo=persona">Busco trabajo</a>
-      <a class="btn btn-fantasma btn-lg" href="registro.html?tipo=empresa">Busco talento</a>
-    </div>
-  </div>
-</section>
+<main id="contenido">
 
-<div class="roles">
-  <div class="role persona">
-    <div class="role-icono" id="ic-persona"></div>
-    <h3>Para candidatos</h3>
-    <p>Construye tu perfil profesional y postúlate a vacantes industriales en un par de clics.</p>
-    <ul id="lista-persona"></ul>
-    <a class="btn btn-outline btn-bloque" href="registro.html?tipo=persona">Crear perfil de candidato</a>
-  </div>
+  <!-- ══ Hero ══════════════════════════════════════════════ -->
+  <section class="hero">
+    <div class="wrap">
+      <div class="hero-grid">
 
-  <div class="role empresa">
-    <div class="role-icono" id="ic-empresa"></div>
-    <h3>Para empresas</h3>
-    <p>Publica tus vacantes y encuentra perfiles calificados de toda la industria.</p>
-    <ul id="lista-empresa"></ul>
-    <a class="btn btn-outline btn-bloque" href="registro.html?tipo=empresa">Crear perfil de empresa</a>
-  </div>
-</div>
+        <div class="hero-texto">
+          <span class="hero-eyebrow"><span class="punto"></span>Socios Comerciales AVBA</span>
 
-<section class="seccion">
-  <div class="wrap">
-    <div class="seccion-cabecera">
-      <div class="eyebrow">Cómo funciona</div>
-      <h2>Empieza en tres pasos</h2>
-      <p>Un portal simple, pensado para las empresas y los profesionales de la industria.</p>
-    </div>
-    <div class="pasos">
-      <div class="paso">
-        <div class="paso-num">1</div>
-        <h4>Crea tu cuenta</h4>
-        <p>Regístrate como candidato o empresa en menos de un minuto y confirma tu correo.</p>
+          <h1>El talento de la industria<br><span class="grad">y las empresas que lo buscan</span></h1>
+
+          <p class="hero-lead">
+            Una bolsa de trabajo abierta a todos los giros industriales.
+            Arma tu perfil profesional y postúlate en un clic, o publica tus
+            vacantes y encuentra a quien necesitas, con el respaldo de la marca AVBA.
+          </p>
+
+          <div class="hero-ctas">
+            <a class="btn btn-blanco btn-lg" href="registro.html?tipo=persona">Busco trabajo</a>
+            <a class="btn btn-fantasma btn-lg" href="registro.html?tipo=empresa">Busco talento</a>
+          </div>
+
+          <ul class="hero-notas">
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Sin costo para candidatos</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>Registro en un minuto</li>
+            <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>100% en línea</li>
+          </ul>
+        </div>
+
+        <!-- Composición decorativa: representa la interfaz del portal
+             sin mostrar datos reales ni inventados. -->
+        <div class="vista" aria-hidden="true">
+          <div class="vista-barra">
+            <div class="vista-buscador">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <span class="linea larga"></span>
+            </div>
+          </div>
+
+          <div class="vista-chips">
+            <span class="vista-chip on">Presencial</span>
+            <span class="vista-chip">Remoto</span>
+            <span class="vista-chip">Híbrido</span>
+            <span class="vista-chip">Tiempo completo</span>
+          </div>
+
+          <div class="vista-fila">
+            <div class="vista-cuadro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div>
+            <div class="vista-lineas"><span class="linea media"></span><span class="linea corta"></span></div>
+            <span class="vista-punto"></span>
+          </div>
+          <div class="vista-fila">
+            <div class="vista-cuadro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg></div>
+            <div class="vista-lineas"><span class="linea larga"></span><span class="linea corta"></span></div>
+            <span class="vista-punto azul"></span>
+          </div>
+          <div class="vista-fila">
+            <div class="vista-cuadro"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg></div>
+            <div class="vista-lineas"><span class="linea media"></span><span class="linea corta"></span></div>
+            <span class="vista-punto ambar"></span>
+          </div>
+
+          <span class="vista-flotante">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            Postulación enviada
+          </span>
+        </div>
+
       </div>
-      <div class="paso">
-        <div class="paso-num">2</div>
-        <h4>Completa tu perfil</h4>
-        <p>Sube tu CV, foto, experiencia y habilidades. Las empresas suben logo y descripción.</p>
+    </div>
+
+    <svg class="hero-curva" viewBox="0 0 1440 80" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path d="M0 80V40C360 8 1080 8 1440 40v40z"/>
+    </svg>
+  </section>
+
+  <!-- ══ Dos públicos ══════════════════════════════════════ -->
+  <h2 class="solo-lectores">Para quién es el portal</h2>
+  <div class="roles">
+    <div class="role persona rv">
+      <div class="role-cabecera">
+        <div class="role-icono">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+        </div>
+        <div>
+          <div class="role-etiqueta">Candidatos</div>
+          <h3>Encuentra tu próximo empleo</h3>
+        </div>
       </div>
-      <div class="paso">
-        <div class="paso-num">3</div>
-        <h4>Conecta</h4>
-        <p>Postúlate a vacantes o revisa candidatos y gestiona todo el proceso desde tu panel.</p>
+      <p>Construye un perfil profesional completo y postúlate a las vacantes de la industria en un par de clics.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Perfil con CV en PDF, foto, experiencia y habilidades</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Búsqueda de vacantes por puesto, ubicación y modalidad</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Postulación con un clic y seguimiento del estatus</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Directorio de empresas para conocer a quién te postulas</span></li>
+      </ul>
+      <a class="btn btn-primary btn-bloque" href="registro.html?tipo=persona">Crear mi perfil de candidato</a>
+    </div>
+
+    <div class="role empresa rv d1">
+      <div class="role-cabecera">
+        <div class="role-icono">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+        </div>
+        <div>
+          <div class="role-etiqueta">Empresas</div>
+          <h3>Contrata talento calificado</h3>
+        </div>
       </div>
+      <p>Publica tus vacantes, recibe postulaciones ordenadas y busca perfiles por habilidad sin salir del portal.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Publicación de vacantes sin límite y siempre editables</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Buscador de candidatos por habilidad y ubicación</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Panel con el estatus de cada postulación recibida</span></li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg><span>Ficha pública de empresa con logo y descripción</span></li>
+      </ul>
+      <a class="btn btn-outline btn-bloque" href="registro.html?tipo=empresa">Registrar mi empresa</a>
     </div>
   </div>
-</section>
 
-<section class="cierre">
+  <!-- ══ Propuesta de valor ════════════════════════════════ -->
+  <section class="seccion" aria-labelledby="t-valores">
+    <div class="wrap">
+      <div class="seccion-cabecera rv">
+        <span class="eyebrow">Por qué aquí</span>
+        <h2 id="t-valores">Una plataforma seria, sin fricción</h2>
+        <p>Pensada para la realidad de la industria: procesos claros, información completa y nada de trámites de por medio.</p>
+      </div>
+
+      <div class="valores">
+        <div class="valor rv">
+          <div class="valor-num">$0</div>
+          <div class="valor-tit">Para candidatos</div>
+          <p class="valor-sub">Crear tu perfil, subir tu CV y postularte no tiene costo.</p>
+        </div>
+        <div class="valor rv d1">
+          <div class="valor-num">Sin límite</div>
+          <div class="valor-tit">Vacantes por empresa</div>
+          <p class="valor-sub">Publica todas las posiciones que necesites y edítalas cuando quieras.</p>
+        </div>
+        <div class="valor rv d2">
+          <div class="valor-num">100%</div>
+          <div class="valor-tit">En línea</div>
+          <p class="valor-sub">Del registro a la postulación, sin papeleo ni visitas presenciales.</p>
+        </div>
+        <div class="valor rv d3">
+          <div class="valor-num">24/7</div>
+          <div class="valor-tit">Tu panel, siempre</div>
+          <p class="valor-sub">Consulta vacantes, postulaciones y candidatos a cualquier hora.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ Cómo funciona ═════════════════════════════════════ -->
+  <section class="seccion banda-blanca" id="como-funciona" aria-labelledby="t-como">
+    <div class="wrap">
+      <div class="seccion-cabecera rv">
+        <span class="eyebrow">Cómo funciona</span>
+        <h2 id="t-como">Dos caminos, el mismo portal</h2>
+        <p>Elige el que te corresponde y mira lo que toma llegar de cero al primer contacto.</p>
+      </div>
+
+      <div class="tabs-centro rv">
+        <div class="tabs-como" role="tablist" aria-label="Cómo funciona según tu perfil">
+          <button type="button" class="tab-btn" role="tab" id="tab-persona" aria-controls="panel-persona" aria-selected="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
+            Soy candidato
+          </button>
+          <button type="button" class="tab-btn" role="tab" id="tab-empresa" aria-controls="panel-empresa" aria-selected="false" tabindex="-1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>
+            Soy empresa
+          </button>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-persona" role="tabpanel" aria-labelledby="tab-persona" tabindex="0">
+        <div class="ruta">
+          <div class="ruta-paso">
+            <div class="ruta-num">1</div>
+            <h3>Crea tu cuenta</h3>
+            <p>Regístrate con tu correo en menos de un minuto y confírmalo con el enlace que te enviamos.</p>
+          </div>
+          <div class="ruta-paso">
+            <div class="ruta-num">2</div>
+            <h3>Arma tu perfil</h3>
+            <p>Sube tu CV en PDF y tu foto, y agrega experiencia, educación y habilidades.</p>
+          </div>
+          <div class="ruta-paso">
+            <div class="ruta-num">3</div>
+            <h3>Explora vacantes</h3>
+            <p>Filtra la bolsa por puesto, ubicación y modalidad hasta encontrar lo que buscas.</p>
+          </div>
+          <div class="ruta-paso">
+            <div class="ruta-num">4</div>
+            <h3>Postúlate y da seguimiento</h3>
+            <p>Un clic para postularte y el estatus de cada proceso a la vista en tu panel.</p>
+          </div>
+        </div>
+        <div class="ruta-pie">
+          <a class="btn btn-primary btn-lg" href="registro.html?tipo=persona">Empezar como candidato</a>
+        </div>
+      </div>
+
+      <div class="panel" id="panel-empresa" role="tabpanel" aria-labelledby="tab-empresa" tabindex="0" hidden>
+        <div class="ruta">
+          <div class="ruta-paso">
+            <div class="ruta-num">1</div>
+            <h3>Registra tu empresa</h3>
+            <p>Crea la cuenta con el nombre de tu empresa y confirma el correo de contacto.</p>
+          </div>
+          <div class="ruta-paso">
+            <div class="ruta-num">2</div>
+            <h3>Completa tu ficha</h3>
+            <p>Sube tu logo y describe a qué se dedica la empresa para que el talento te conozca.</p>
+          </div>
+          <div class="ruta-paso">
+            <div class="ruta-num">3</div>
+            <h3>Publica tus vacantes</h3>
+            <p>Detalla puesto, ubicación, modalidad y rango de sueldo. Queda visible en la bolsa.</p>
+          </div>
+          <div class="ruta-paso">
+            <div class="ruta-num">4</div>
+            <h3>Revisa y contrata</h3>
+            <p>Recibe postulaciones, busca perfiles por habilidad y mueve el estatus de cada candidato.</p>
+          </div>
+        </div>
+        <div class="ruta-pie">
+          <a class="btn btn-primary btn-lg" href="registro.html?tipo=empresa">Empezar como empresa</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ Giros industriales ════════════════════════════════ -->
+  <section class="seccion" id="giros" aria-labelledby="t-giros">
+    <div class="wrap">
+      <div class="seccion-cabecera rv">
+        <span class="eyebrow">Alcance</span>
+        <h2 id="t-giros">Toda la industria cabe aquí</h2>
+        <p>El portal no está limitado a un solo servicio ni a un solo sector: cualquier empresa industrial puede publicar y cualquier profesional puede postularse.</p>
+      </div>
+
+      <div class="giros">
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18"/><path d="M5 21V11l5 3V11l5 3V11l4 2.4V21"/><path d="M5 11 6 4h3l.7 4.8"/></svg></span>
+          Manufactura
+        </div>
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3.2"/><path d="M12 3v2.4M12 18.6V21M21 12h-2.4M5.4 12H3M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7M18.4 18.4l-1.7-1.7M7.3 7.3 5.6 5.6"/></svg></span>
+          Metalmecánica
+        </div>
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></span>
+          Energía y petróleo
+        </div>
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 19h18"/><path d="M5 19a7 7 0 0 1 14 0"/><path d="M10 12.4V6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v6.4"/></svg></span>
+          Construcción
+        </div>
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 16v-3.2l1.9-4.6A2 2 0 0 1 6.8 7h10.4a2 2 0 0 1 1.9 1.2L21 12.8V16z"/><path d="M3 16h18"/><circle cx="7.5" cy="18" r="1.9"/><circle cx="16.5" cy="18" r="1.9"/></svg></span>
+          Automotriz
+        </div>
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3v7a3 3 0 0 0 6 0V3"/><path d="M9 13v8"/><path d="M18 3c-1.6 1.8-2.2 3.8-2.2 6.2 0 1.9.8 3 2.2 3.4V21"/></svg></span>
+          Alimentos y bebidas
+        </div>
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6h12v10H2z"/><path d="M14 9h4l3 3.2V16h-7z"/><circle cx="6.5" cy="18.4" r="1.7"/><circle cx="17" cy="18.4" r="1.7"/></svg></span>
+          Logística y transporte
+        </div>
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 3h6"/><path d="M10 3v6.4L4.7 18a2 2 0 0 0 1.7 3h11.2a2 2 0 0 0 1.7-3L14 9.4V3"/><path d="M7.4 15h9.2"/></svg></span>
+          Química y farmacéutica
+        </div>
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 20h20L14.5 6.5 11 13 8.5 10z"/></svg></span>
+          Minería y extracción
+        </div>
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4"/></svg></span>
+          Electrónica y automatización
+        </div>
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.8-3.8a6 6 0 0 1-7.9 7.9l-6.9 6.9a2.1 2.1 0 0 1-3-3l6.9-6.9a6 6 0 0 1 7.9-7.9z"/></svg></span>
+          Mantenimiento industrial
+        </div>
+        <div class="giro rv">
+          <span class="giro-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V3.2A1.2 1.2 0 0 1 10.2 2h3.6A1.2 1.2 0 0 1 15 3.2V4"/><path d="m9.2 13 2 2 3.6-3.6"/></svg></span>
+          Calidad e inspección
+        </div>
+      </div>
+
+      <p class="giros-nota rv">
+        ¿Tu giro no aparece? <strong>Igual tiene lugar.</strong>
+        La lista es solo una muestra del alcance del portal.
+      </p>
+    </div>
+  </section>
+
+  <!-- ══ Preguntas frecuentes ══════════════════════════════ -->
+  <section class="seccion banda-blanca" id="preguntas" aria-labelledby="t-faq">
+    <div class="wrap">
+      <div class="seccion-cabecera rv">
+        <span class="eyebrow">Preguntas frecuentes</span>
+        <h2 id="t-faq">Lo que suelen preguntarnos</h2>
+        <p>Si te queda una duda que no está aquí, escríbenos desde tu panel una vez que crees tu cuenta.</p>
+      </div>
+
+      <div class="faq rv">
+        <details class="faq-item">
+          <summary>
+            <span>¿Tiene algún costo para los candidatos?</span>
+            <span class="faq-sig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+          </summary>
+          <div class="faq-cuerpo">
+            No. Crear tu cuenta, armar tu perfil, subir tu CV y postularte a las vacantes publicadas no tiene costo.
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>
+            <span>¿Qué empresas pueden publicar vacantes?</span>
+            <span class="faq-sig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+          </summary>
+          <div class="faq-cuerpo">
+            Cualquier empresa de la industria, sin importar su giro ni su tamaño. Basta con registrar la cuenta de empresa, completar la ficha y publicar la vacante.
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>
+            <span>¿Necesito una certificación AVBA para usar el portal?</span>
+            <span class="faq-sig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+          </summary>
+          <div class="faq-cuerpo">
+            No es requisito. Socios Comerciales es una bolsa de trabajo abierta a toda la industria; la marca AVBA respalda el portal, pero no condiciona quién puede participar.
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>
+            <span>¿Quién puede ver mi perfil y mi CV?</span>
+            <span class="faq-sig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+          </summary>
+          <div class="faq-cuerpo">
+            Las empresas registradas en el portal pueden encontrar tu perfil en el buscador de candidatos y revisarlo cuando te postulas. Tú decides qué información publicas y puedes editarla o quitarla cuando quieras.
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>
+            <span>¿Cuánto tarda publicar una vacante?</span>
+            <span class="faq-sig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+          </summary>
+          <div class="faq-cuerpo">
+            Unos minutos. Describes el puesto, la ubicación, la modalidad y el rango de sueldo, y la vacante queda visible en la bolsa para todos los candidatos.
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>
+            <span>No me llegó el correo de verificación, ¿puedo seguir?</span>
+            <span class="faq-sig"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+          </summary>
+          <div class="faq-cuerpo">
+            Sí. La verificación no bloquea el uso del portal: puedes reenviar el enlace desde tu panel en cualquier momento. Las cuentas verificadas llevan una insignia y aparecen primero en las búsquedas.
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ Cierre ════════════════════════════════════════════ -->
+  <section class="cierre" aria-labelledby="t-cierre">
+    <div class="wrap">
+      <h2 id="t-cierre">Tu próxima oportunidad empieza con una cuenta</h2>
+      <p>Súmate a la comunidad de profesionales y empresas de la industria. Toma un minuto y no cuesta nada.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-blanco btn-lg" href="registro.html?tipo=persona">Crear cuenta de candidato</a>
+        <a class="btn btn-fantasma btn-lg" href="registro.html?tipo=empresa">Crear cuenta de empresa</a>
+      </div>
+      <p class="cierre-nota">
+        ¿Solo quieres echar un vistazo? Explora las <a href="vacantes.html">vacantes publicadas</a>
+        o el <a href="empresas.html">directorio de empresas</a>.
+      </p>
+    </div>
+  </section>
+
+</main>
+
+<footer id="pie" class="pie">
   <div class="wrap">
-    <h2>Tu próxima oportunidad está aquí</h2>
-    <p>Únete a la comunidad de profesionales y empresas de la industria.</p>
-    <div class="hero-ctas">
-      <a class="btn btn-blanco btn-lg" href="registro.html">Crear mi cuenta gratis</a>
-      <a class="btn btn-fantasma btn-lg" href="vacantes.html">Ver vacantes</a>
-    </div>
+    <span class="pie-marca">Socios Comerciales AVBA</span>
+    <p class="pie-legal">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. — avba.com.mx</p>
   </div>
-</section>
-
-<footer id="pie"></footer>
+</footer>
 
 <script src="assets/avba.js"></script>
 <script>
-const VENTAJAS_PERSONA = [
-  'Perfil profesional con CV en PDF y foto',
-  'Postúlate a vacantes con un clic',
-  'Sigue el estatus de cada postulación',
-];
-const VENTAJAS_EMPRESA = [
-  'Publica vacantes ilimitadas',
-  'Busca candidatos por habilidad y ubicación',
-  'Gestiona postulaciones desde un panel',
-];
+/* ── Aparición al hacer scroll ──────────────────────────────
+   La clase js-anim solo se pone si hay JS y el usuario no pidió
+   menos movimiento, así el contenido nunca queda invisible. */
+(function () {
+  var menos = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!menos && 'IntersectionObserver' in window) {
+    document.documentElement.classList.add('js-anim');
+  }
+})();
 
-function pintarVentajas(idLista, items) {
-  document.getElementById(idLista).innerHTML = items
-    .map(t => `<li>${scIcono('check')}<span>${scEsc(t)}</span></li>`).join('');
+/* ── Pestañas accesibles de "cómo funciona" ─────────────── */
+function iniciarPestanas() {
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+  if (!tabs.length) return;
+
+  function activar(indice, mover) {
+    tabs.forEach(function (t, i) {
+      var activo = i === indice;
+      t.setAttribute('aria-selected', activo ? 'true' : 'false');
+      t.tabIndex = activo ? 0 : -1;
+      var panel = document.getElementById(t.getAttribute('aria-controls'));
+      if (panel) panel.hidden = !activo;
+    });
+    if (mover) tabs[indice].focus();
+  }
+
+  tabs.forEach(function (tab, i) {
+    tab.addEventListener('click', function () { activar(i, false); });
+    tab.addEventListener('keydown', function (e) {
+      var salto = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 }[e.key];
+      if (salto) {
+        e.preventDefault();
+        activar((i + salto + tabs.length) % tabs.length, true);
+      } else if (e.key === 'Home') {
+        e.preventDefault(); activar(0, true);
+      } else if (e.key === 'End') {
+        e.preventDefault(); activar(tabs.length - 1, true);
+      }
+    });
+  });
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('ic-persona').innerHTML = scIcono('persona');
-  document.getElementById('ic-empresa').innerHTML = scIcono('edificio');
-  pintarVentajas('lista-persona', VENTAJAS_PERSONA);
-  pintarVentajas('lista-empresa', VENTAJAS_EMPRESA);
+/* ── Revelado progresivo ─────────────────────────────────── */
+function iniciarRevelado() {
+  var elementos = document.querySelectorAll('.rv');
+  if (!document.documentElement.classList.contains('js-anim')) {
+    // Sin observador o con movimiento reducido: todo visible de inmediato.
+    Array.prototype.forEach.call(elementos, function (el) { el.classList.add('visible'); });
+    return;
+  }
+  var obs = new IntersectionObserver(function (entradas) {
+    entradas.forEach(function (entrada) {
+      if (entrada.isIntersecting) {
+        entrada.target.classList.add('visible');
+        obs.unobserve(entrada.target);
+      }
+    });
+  }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
+
+  Array.prototype.forEach.call(elementos, function (el) { obs.observe(el); });
+}
+
+/* ── Sombra de la barra al hacer scroll ──────────────────── */
+function iniciarBarra() {
+  var top = document.getElementById('top');
+  if (!top) return;
+  var marcar = function () { top.classList.toggle('fijada', window.scrollY > 8); };
+  marcar();
+  window.addEventListener('scroll', marcar, { passive: true });
+}
+
+window.addEventListener('DOMContentLoaded', function () {
+  iniciarPestanas();
+  iniciarRevelado();
+  iniciarBarra();
   scPintarPie();
 
-  // Si ya hay sesión, ofrecer entrar directo al portal
-  const s = scSesion.leer();
+  // Si ya hay sesión iniciada, ofrecemos entrar directo al portal.
+  var s = scSesion.leer();
   if (s && s.token) {
-    document.querySelector('.top-acciones').innerHTML =
-      `<a class="btn btn-primary btn-sm" href="inicio.html">Ir a mi portal</a>`;
+    document.getElementById('top-acciones').innerHTML =
+      '<a class="btn btn-primary btn-sm" href="inicio.html">Ir a mi portal</a>';
   }
 });
 </script>

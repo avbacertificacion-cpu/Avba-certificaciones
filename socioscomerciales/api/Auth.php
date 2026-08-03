@@ -77,14 +77,27 @@ class ScAuth {
             return ['status' => 'error', 'message' => 'Correo y contraseña requeridos.'];
         }
 
+        // Sin este freno se pueden probar miles de contraseñas por minuto.
+        // Se limita por correo y por IP: lo primero protege a una cuenta
+        // concreta, lo segundo evita el barrido de muchas cuentas.
+        $mensajeLimite = ['status' => 'error', 'message' => 'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.'];
+        if (!scLimite($this->pdo, 'login', $correo, 8, 900))            return $mensajeLimite;
+        if (!scLimite($this->pdo, 'login_ip', scIpCliente(), 30, 900))  return $mensajeLimite;
+
         $stmt = $this->pdo->prepare(
             "SELECT id, tipo, password_hash, activo, correo_verificado FROM sc_usuarios WHERE correo = ?"
         );
         $stmt->execute([$correo]);
         $row = $stmt->fetch();
 
-        // Mensaje genérico para no revelar qué correos están registrados
-        if (!$row || !password_verify($password, $row['password_hash'])) {
+        // Mensaje genérico para no revelar qué correos están registrados.
+        // Si el usuario no existe se compara igual contra un hash de relleno,
+        // para que el tiempo de respuesta no delate su existencia.
+        if (!$row) {
+            password_verify($password, '$2y$10$usuarioInexistenteRellenoParaIgualarTiempos.aaaaaaaaaaaaaaaaaaaaaa');
+            return ['status' => 'error', 'message' => 'Correo o contraseña incorrectos.'];
+        }
+        if (!password_verify($password, $row['password_hash'])) {
             return ['status' => 'error', 'message' => 'Correo o contraseña incorrectos.'];
         }
         if (!$row['activo']) {
@@ -174,6 +187,12 @@ class ScAuth {
 
         if (!$correo || !scEsCorreoValido($correo)) return $generica;
 
+        // Sin límite, cualquiera puede inundar el buzón de un usuario con
+        // correos de recuperación y, de paso, invalidar una y otra vez el
+        // enlace que la víctima legítima intenta usar.
+        if (!scLimite($this->pdo, 'reset', $correo, 3, 900))           return $generica;
+        if (!scLimite($this->pdo, 'reset_ip', scIpCliente(), 15, 900)) return $generica;
+
         $stmt = $this->pdo->prepare("SELECT id, tipo, activo FROM sc_usuarios WHERE correo = ?");
         $stmt->execute([$correo]);
         $row = $stmt->fetch();
@@ -249,18 +268,33 @@ class ScAuth {
         if (strlen($nueva) < 6)   return ['status' => 'error', 'message' => 'La nueva contraseña debe tener al menos 6 caracteres.'];
         if ($actual === $nueva)   return ['status' => 'error', 'message' => 'La nueva contraseña debe ser distinta de la actual.'];
 
-        $stmt = $this->pdo->prepare("SELECT password_hash FROM sc_usuarios WHERE id = ?");
+        $stmt = $this->pdo->prepare("SELECT password_hash, tipo, correo FROM sc_usuarios WHERE id = ?");
         $stmt->execute([$usuarioId]);
-        $hash = $stmt->fetchColumn();
+        $row = $stmt->fetch();
 
-        if (!$hash || !password_verify($actual, $hash)) {
+        if (!$row || !password_verify($actual, $row['password_hash'])) {
             return ['status' => 'error', 'message' => 'La contraseña actual no es correcta.'];
         }
 
-        $this->pdo->prepare("UPDATE sc_usuarios SET password_hash = ? WHERE id = ?")
-            ->execute([password_hash($nueva, PASSWORD_BCRYPT), $usuarioId]);
+        // Cambiar la contraseña debe expulsar cualquier otra sesión: si alguien
+        // robó el token, esta es justo la acción con la que la víctima espera
+        // recuperar el control. También se anula cualquier enlace de
+        // restablecimiento pendiente.
+        $this->pdo->prepare(
+            "UPDATE sc_usuarios
+             SET password_hash = ?, session_token = NULL, token_expires = NULL,
+                 reset_token = NULL, reset_expira = NULL
+             WHERE id = ?"
+        )->execute([password_hash($nueva, PASSWORD_BCRYPT), $usuarioId]);
 
-        return ['status' => 'success', 'message' => 'Contraseña actualizada.'];
+        // Se emite una sesión nueva para que quien hizo el cambio siga dentro
+        $sesion = $this->emitirSesion($usuarioId, $row['tipo'], $row['correo']);
+
+        return [
+            'status'  => 'success',
+            'message' => 'Contraseña actualizada. Se cerraron las demás sesiones.',
+            'token'   => $sesion['token'],
+        ];
     }
 
     // ── Helpers internos ─────────────────────────────────────

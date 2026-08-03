@@ -6,6 +6,108 @@
 <title>Vacantes — Socios Comerciales AVBA</title>
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
+<style>
+  /* ── Foco visible consistente ─────────────────────────── */
+  a:focus-visible, button:focus-visible,
+  input:focus-visible, select:focus-visible {
+    outline: 3px solid rgba(24, 95, 165, .42);
+    outline-offset: 2px;
+  }
+
+  /* ── Campo de búsqueda con icono ──────────────────────── */
+  .campo-busca { position: relative; }
+  .campo-busca > svg {
+    position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+    width: 16px; height: 16px; color: var(--texto-tenue); pointer-events: none;
+  }
+  .campo-busca input { padding-left: 36px; }
+  .campo-busca input::-webkit-search-cancel-button { cursor: pointer; }
+
+  /* ── Segunda fila de la barra de filtros ──────────────── */
+  .barra-filtros {
+    display: flex; align-items: center; gap: 10px 12px; flex-wrap: wrap;
+    margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--borde);
+  }
+  .chips-filtros { flex: 1; min-width: 0; }
+  .chip-filtro { padding-right: 6px; max-width: 100%; }
+  .chip-filtro .chip-valor { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip-etq { font-weight: 700; opacity: .65; flex-shrink: 0; }
+  .chip-limpiar {
+    background: transparent; border: 1.5px dashed var(--borde); color: var(--texto-sub);
+    font-family: inherit; font-size: 12.5px; font-weight: 600;
+    padding: 5px 12px; border-radius: 999px; cursor: pointer;
+    transition: border-color .15s, color .15s;
+  }
+  .chip-limpiar:hover { border-color: var(--rojo); color: var(--rojo); }
+
+  .orden { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+  .orden label { font-size: 12px; font-weight: 700; color: var(--texto-sub); white-space: nowrap; }
+  .orden select {
+    padding: 7px 11px; border: 1.5px solid var(--borde); border-radius: var(--r-sm);
+    font-size: 13px; font-weight: 600; color: var(--texto); background: var(--blanco);
+    outline: none; cursor: pointer;
+  }
+  .orden select:focus { border-color: var(--azul); }
+
+  /* ── Línea de estado y progreso ───────────────────────── */
+  .linea-estado {
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 14px; min-height: 22px; flex-wrap: wrap;
+  }
+  .estado-busqueda { font-size: 13px; font-weight: 600; color: var(--texto-sub); }
+  .barra-progreso {
+    flex: 1; max-width: 170px; height: 3px; border-radius: 999px;
+    background: var(--borde); overflow: hidden;
+  }
+  .barra-progreso i { display: block; height: 100%; width: 38%; background: var(--azul); border-radius: 999px; animation: sc-corre 1.05s ease-in-out infinite; }
+  @keyframes sc-corre { 0% { transform: translateX(-110%); } 100% { transform: translateX(320%); } }
+
+  #resultados { transition: opacity .15s; }
+  #resultados.atenuado { opacity: .45; pointer-events: none; }
+
+  /* ── Esqueletos de carga ──────────────────────────────── */
+  .esq { background: #E9EFF7; border-radius: 6px; position: relative; overflow: hidden; }
+  .esq::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent);
+    transform: translateX(-100%); animation: sc-brillo 1.4s infinite;
+  }
+  @keyframes sc-brillo { 100% { transform: translateX(100%); } }
+  .esq-avatar { width: 48px; height: 48px; border-radius: var(--r); flex-shrink: 0; }
+  .esq-linea { height: 11px; }
+  .esq-pie { margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--borde); display: flex; justify-content: space-between; gap: 10px; }
+
+  /* ── Tarjeta de vacante ───────────────────────────────── */
+  .tarjeta-vac { position: relative; display: flex; flex-direction: column; }
+  .tarjeta-vac .tarjeta-pie { margin-top: auto; }
+  .tarjeta-vac:focus-within { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(24,95,165,.13); }
+  .tarjeta-vac .enlace-cubre::after {
+    content: ''; position: absolute; inset: 0; border-radius: var(--r-md); z-index: 0;
+  }
+  /* Solo los enlaces reales se ponen por encima de la capa que cubre la tarjeta.
+     Insignias y el botón decorativo se quedan debajo para que el clic funcione en toda la tarjeta. */
+  .tarjeta-vac a:not(.enlace-cubre) { position: relative; z-index: 1; }
+  .tarjeta-vac:hover .btn-primary { background: var(--azul-oscuro); }
+  .tarjeta-vac:hover .btn-gris { background: #e8eef7; }
+  .vac-señales { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .vac-extracto {
+    font-size: 13px; color: var(--texto-sub); line-height: 1.55; margin-top: 11px;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .marca { background: #FDF0B5; color: inherit; border-radius: 3px; padding: 0 2px; font-weight: 700; }
+  .pie-nota { font-size: 12.5px; color: var(--texto-tenue); }
+
+  /* ── Sugerencias del estado vacío ─────────────────────── */
+  .sugerencias { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+
+  /* ── Respeta reducción de movimiento ──────────────────── */
+  @media (prefers-reduced-motion: reduce) {
+    .esq::after, .barra-progreso i { animation: none; }
+    .barra-progreso i { width: 100%; opacity: .6; }
+    #resultados, .tarjeta-lista, .btn { transition: none !important; }
+    .tarjeta-lista:hover { transform: none; }
+  }
+</style>
 </head>
 <body>
 
@@ -18,23 +120,26 @@
         <h1>Bolsa de trabajo</h1>
         <p>Vacantes abiertas en empresas de toda la industria.</p>
       </div>
-      <span class="badge badge-azul" id="contador"></span>
+      <span class="badge badge-azul" id="contador" aria-hidden="true"></span>
     </div>
   </div>
 
-  <form class="filtros" id="form-filtros">
+  <form class="filtros" id="form-filtros" role="search" aria-label="Buscar vacantes">
     <div class="filtros-fila">
-      <div class="campo">
+      <div class="campo campo-busca">
         <label for="f-texto">Buscar</label>
-        <input type="text" id="f-texto" placeholder="Puesto, empresa o palabra clave">
+        <input type="search" id="f-texto" name="texto" autocomplete="off"
+               placeholder="Puesto, empresa o palabra clave"
+               aria-describedby="ayuda-texto">
       </div>
       <div class="campo">
         <label for="f-ubicacion">Ubicación</label>
-        <input type="text" id="f-ubicacion" placeholder="Ciudad o estado">
+        <input type="search" id="f-ubicacion" name="ubicacion" autocomplete="off"
+               placeholder="Ciudad o estado">
       </div>
       <div class="campo">
         <label for="f-modalidad">Modalidad</label>
-        <select id="f-modalidad">
+        <select id="f-modalidad" name="modalidad">
           <option value="">Todas</option>
           <option value="presencial">Presencial</option>
           <option value="remoto">Remoto</option>
@@ -43,98 +148,441 @@
       </div>
       <button type="submit" class="btn btn-primary" id="btn-buscar">Buscar</button>
     </div>
+
+    <p id="ayuda-texto" class="campo-ayuda">Los resultados se actualizan solos mientras escribes.</p>
+
+    <div class="barra-filtros">
+      <div class="chips chips-filtros oculto" id="chips-filtros"></div>
+      <div class="orden">
+        <label for="f-orden">Ordenar por</label>
+        <select id="f-orden">
+          <option value="reciente">Más recientes</option>
+          <option value="relevancia">Más relevantes</option>
+        </select>
+      </div>
+    </div>
   </form>
 
-  <div id="resultados"></div>
+  <div class="linea-estado">
+    <p class="estado-busqueda" id="estado-busqueda" role="status" aria-live="polite"></p>
+    <div class="barra-progreso oculto" id="barra-progreso" aria-hidden="true"><i></i></div>
+  </div>
+
+  <div id="resultados" aria-busy="false"></div>
 </main>
 
 <footer id="pie"></footer>
 
 <script src="assets/avba.js"></script>
 <script>
-let sesion = null;
+let sesion       = null;
+let vacantes     = [];   // último resultado del API
+let esCandidato  = true;
+let primeraCarga = true;
+let peticionNum  = 0;
+let temporizador = null;
 
-function tarjeta(v) {
-  const yaPostulado = v.ya_postulado;
-  return `
-    <div class="tarjeta-lista">
-      <div class="tarjeta-encabezado">
-        ${scAvatar(v.logo_url, v.empresa, 'md', true)}
-        <div style="flex:1;min-width:0">
-          <div class="tarjeta-nombre"><a href="vacante.html?id=${v.id}">${scEsc(v.titulo)}</a></div>
-          <div class="tarjeta-sub">
-            <a href="ver-empresa.html?id=${v.empresa_id}">${scEsc(v.empresa)}</a>
-            ${Number(v.empresa_verificada) ? ' ' + scBadgeVerificado(true) : ''}
-          </div>
-          <div class="tarjeta-datos">
-            ${v.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : ''}
-            <span>${scIcono('maletin')}${scEsc(SC_MODALIDADES[v.modalidad] || v.modalidad)}</span>
-            ${v.salario ? `<span>${scIcono('dinero')}${scEsc(v.salario)}</span>` : ''}
-            <span>${scIcono('reloj')}${scEsc(scHace(v.creado))}</span>
-          </div>
-        </div>
-      </div>
-      <div class="tarjeta-pie">
-        ${yaPostulado
-          ? `<span class="badge badge-verde">${scIcono('check')}Ya te postulaste</span>`
-          : '<span class="texto-tenue" style="font-size:12.5px">Vacante abierta</span>'}
-        <a class="btn btn-sm ${yaPostulado ? 'btn-gris' : 'btn-primary'}" href="vacante.html?id=${v.id}">
-          ${yaPostulado ? 'Ver detalle' : 'Ver y postularme'}
-        </a>
-      </div>
-    </div>`;
+/* ── Utilidades ─────────────────────────────────────────── */
+
+/** MySQL puede devolver 1/"1"/true; normalizamos a booleano. */
+function esVerdad(v) {
+  return v === true || v === 1 || v === '1' || v === 'true';
 }
 
-async function buscar() {
-  const cont = document.getElementById('resultados');
-  cont.innerHTML = scCargando('Buscando vacantes...');
+function fechaMs(valor) {
+  if (!valor) return 0;
+  const d = new Date(String(valor).replace(' ', 'T'));
+  return isNaN(d) ? 0 : d.getTime();
+}
 
-  const filtros = {
+/** Recorta un texto a `max` caracteres cortando en palabra completa. */
+function extracto(texto, max) {
+  const t = String(texto == null ? '' : texto).replace(/\s+/g, ' ').trim();
+  if (t.length <= max) return t;
+  const corte = t.slice(0, max);
+  const esp   = corte.lastIndexOf(' ');
+  return (esp > max * 0.6 ? corte.slice(0, esp) : corte).trim() + '…';
+}
+
+/**
+ * Resalta el término buscado SIN romper el escape:
+ * troceamos el texto crudo y escapamos cada pedazo por separado.
+ */
+function resaltar(texto, termino) {
+  const t = String(texto == null ? '' : texto);
+  const q = String(termino || '').trim();
+  if (q.length < 2) return scEsc(t);
+
+  const bajoT = t.toLowerCase();
+  const bajoQ = q.toLowerCase();
+  let i = bajoT.indexOf(bajoQ);
+  if (i === -1) return scEsc(t);
+
+  let salida = '', pos = 0;
+  while (i !== -1) {
+    salida += scEsc(t.slice(pos, i)) +
+              '<mark class="marca">' + scEsc(t.slice(i, i + q.length)) + '</mark>';
+    pos = i + q.length;
+    i = bajoT.indexOf(bajoQ, pos);
+  }
+  return salida + scEsc(t.slice(pos));
+}
+
+const CLASE_MODALIDAD = { remoto: 'badge-verde', hibrido: 'badge-azul', presencial: 'badge-gris' };
+
+/* ── Filtros ────────────────────────────────────────────── */
+
+function leerFiltros() {
+  return {
     texto:     document.getElementById('f-texto').value.trim(),
     ubicacion: document.getElementById('f-ubicacion').value.trim(),
     modalidad: document.getElementById('f-modalidad').value,
   };
+}
 
-  try {
-    const datos = await scGet('BUSCAR_VACANTES', filtros);
-    if (datos.status !== 'success') {
-      cont.innerHTML = scVacio('alerta', 'No se pudo buscar', datos.message, '');
-      return;
-    }
+function hayFiltros(f) {
+  return !!(f.texto || f.ubicacion || f.modalidad);
+}
 
-    const lista = datos.vacantes || [];
-    document.getElementById('contador').textContent =
-      lista.length + (lista.length === 1 ? ' vacante' : ' vacantes');
+const ETIQUETAS_FILTRO = { texto: 'Búsqueda', ubicacion: 'Ubicación', modalidad: 'Modalidad' };
 
-    cont.innerHTML = lista.length
-      ? `<div class="resultados resultados-2">${lista.map(tarjeta).join('')}</div>`
-      : scVacio('vacia', 'Sin resultados',
-          'No encontramos vacantes con esos filtros. Prueba con otros términos.',
-          '<button class="btn btn-outline" onclick="limpiar()">Limpiar filtros</button>');
+function pintarChips(f) {
+  const cont  = document.getElementById('chips-filtros');
+  const items = [];
+  if (f.texto)     items.push({ k: 'texto',     v: f.texto });
+  if (f.ubicacion) items.push({ k: 'ubicacion', v: f.ubicacion });
+  if (f.modalidad) items.push({ k: 'modalidad', v: SC_MODALIDADES[f.modalidad] || f.modalidad });
 
-  } catch (e) {
-    cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+  if (!items.length) {
+    cont.innerHTML = '';
+    cont.classList.add('oculto');
+    return;
+  }
+  cont.classList.remove('oculto');
+  // data-quitar solo lleva claves fijas ('texto'|'ubicacion'|'modalidad'|'todo').
+  cont.innerHTML = items.map(c => `
+    <span class="chip chip-filtro">
+      <span class="chip-etq">${scEsc(ETIQUETAS_FILTRO[c.k])}:</span>
+      <span class="chip-valor">${scEsc(c.v)}</span>
+      <button type="button" data-quitar="${c.k}"
+              aria-label="Quitar filtro de ${scEsc(ETIQUETAS_FILTRO[c.k].toLowerCase())}">&times;</button>
+    </span>`).join('') +
+    `<button type="button" class="chip-limpiar" data-quitar="todo">Limpiar todo</button>`;
+}
+
+function quitarFiltro(clave) {
+  if (clave === 'todo') {
+    document.getElementById('f-texto').value     = '';
+    document.getElementById('f-ubicacion').value = '';
+    document.getElementById('f-modalidad').value = '';
+  } else if (clave === 'modalidad') {
+    document.getElementById('f-modalidad').value = '';
+  } else if (clave === 'texto' || clave === 'ubicacion') {
+    document.getElementById('f-' + clave).value = '';
+  } else {
+    return;
+  }
+  buscar();
+  document.getElementById('f-texto').focus();
+}
+
+/** Usada por el botón del estado vacío. */
+function limpiar() { quitarFiltro('todo'); }
+
+function sincronizarUrl(f) {
+  if (!window.history || !history.replaceState) return;
+  const p = new URLSearchParams();
+  if (f.texto)     p.set('texto', f.texto);
+  if (f.ubicacion) p.set('ubicacion', f.ubicacion);
+  if (f.modalidad) p.set('modalidad', f.modalidad);
+  const qs = p.toString();
+  history.replaceState(null, '', qs ? '?' + qs : location.pathname);
+}
+
+function leerUrl() {
+  const p = new URLSearchParams(location.search);
+  const mod = (p.get('modalidad') || '').toLowerCase();
+  document.getElementById('f-texto').value     = p.get('texto') || '';
+  document.getElementById('f-ubicacion').value = p.get('ubicacion') || '';
+  if (SC_MODALIDADES[mod]) document.getElementById('f-modalidad').value = mod;
+}
+
+/* ── Orden (en cliente) ─────────────────────────────────── */
+
+function puntuar(v, q) {
+  const titulo  = String(v.titulo || '').toLowerCase();
+  const empresa = String(v.empresa || '').toLowerCase();
+  const desc    = String(v.descripcion || '').toLowerCase();
+  let p = 0;
+
+  if (titulo === q)           p += 100;
+  else if (titulo.indexOf(q) === 0) p += 55;
+  else if (titulo.includes(q))      p += 30;
+  if (empresa.includes(q)) p += 14;
+  if (desc.includes(q))    p += 6;
+
+  q.split(/\s+/).filter(Boolean).forEach(w => {
+    if (titulo.includes(w))  p += 7;
+    if (empresa.includes(w)) p += 3;
+    if (desc.includes(w))    p += 1;
+  });
+  return p;
+}
+
+function ordenar(lista, orden, texto) {
+  const copia = lista.slice();
+  if (orden === 'relevancia' && texto) {
+    const q = texto.toLowerCase();
+    return copia
+      .map((v, i) => ({ v, i, p: puntuar(v, q) }))
+      .sort((a, b) => b.p - a.p || fechaMs(b.v.creado) - fechaMs(a.v.creado) || a.i - b.i)
+      .map(x => x.v);
+  }
+  return copia.sort((a, b) => fechaMs(b.creado) - fechaMs(a.creado));
+}
+
+/** "Relevancia" solo tiene sentido si hay texto que comparar. */
+function ajustarOrden() {
+  const sel  = document.getElementById('f-orden');
+  const opt  = sel.querySelector('option[value="relevancia"]');
+  const hayT = !!document.getElementById('f-texto').value.trim();
+  opt.disabled = !hayT;
+  opt.textContent = hayT ? 'Más relevantes' : 'Más relevantes (escribe algo)';
+  if (!hayT && sel.value === 'relevancia') sel.value = 'reciente';
+}
+
+/* ── Pintado ────────────────────────────────────────────── */
+
+function esqueletos(n) {
+  let uno = `
+    <div class="tarjeta-lista" aria-hidden="true">
+      <div class="tarjeta-encabezado">
+        <div class="esq esq-avatar"></div>
+        <div style="flex:1;min-width:0">
+          <div class="esq esq-linea" style="width:62%;height:14px"></div>
+          <div class="esq esq-linea" style="width:40%;margin-top:9px"></div>
+          <div class="esq esq-linea" style="width:78%;margin-top:14px"></div>
+          <div class="esq esq-linea" style="width:66%;margin-top:7px"></div>
+        </div>
+      </div>
+      <div class="esq-pie">
+        <div class="esq esq-linea" style="width:96px;height:20px;border-radius:999px"></div>
+        <div class="esq esq-linea" style="width:118px;height:30px;border-radius:var(--r-sm)"></div>
+      </div>
+    </div>`;
+  let html = '';
+  for (let i = 0; i < n; i++) html += uno;
+  return `<div class="resultados resultados-2">${html}</div>`;
+}
+
+function tarjeta(v, texto) {
+  const ya       = esVerdad(v.ya_postulado);
+  const nueva    = fechaMs(v.creado) > Date.now() - 3 * 86400000;
+  const modKey   = String(v.modalidad || '').toLowerCase();
+  const modClase = CLASE_MODALIDAD[modKey] || 'badge-gris';
+  const resumen  = extracto(v.descripcion, 190);
+
+  const señales = [
+    `<span class="badge ${modClase}">${scIcono('maletin')}${scEsc(SC_MODALIDADES[modKey] || v.modalidad || 'Sin especificar')}</span>`,
+    esVerdad(v.empresa_verificada) ? scBadgeVerificado(true) : '',
+    ya ? `<span class="badge badge-azul">${scIcono('check')}Ya te postulaste</span>` : '',
+    (!ya && nueva) ? '<span class="badge badge-ambar">Nueva</span>' : '',
+  ].filter(Boolean).join('');
+
+  return `
+    <article class="tarjeta-lista tarjeta-vac">
+      <div class="tarjeta-encabezado">
+        ${scAvatar(v.logo_url, v.empresa, 'md', true)}
+        <div style="flex:1;min-width:0">
+          <h2 class="tarjeta-nombre">
+            <a class="enlace-cubre" href="vacante.html?id=${Number(v.id)}">${resaltar(v.titulo, texto)}</a>
+          </h2>
+          <div class="tarjeta-sub">
+            <a href="ver-empresa.html?id=${Number(v.empresa_id)}">${resaltar(v.empresa, texto)}</a>
+          </div>
+          <div class="tarjeta-datos">
+            ${v.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : ''}
+            ${v.salario ? `<span>${scIcono('dinero')}${scEsc(v.salario)}</span>` : ''}
+            <span>${scIcono('reloj')}${scEsc(scHace(v.creado))}</span>
+          </div>
+          <div class="vac-señales">${señales}</div>
+          ${resumen ? `<p class="vac-extracto">${resaltar(resumen, texto)}</p>` : ''}
+        </div>
+      </div>
+      <div class="tarjeta-pie">
+        <span class="pie-nota">${ya ? 'Sigue tu postulación' : 'Vacante abierta'}</span>
+        <span class="btn btn-sm ${(ya || !esCandidato) ? 'btn-gris' : 'btn-primary'}" aria-hidden="true">
+          ${(ya || !esCandidato) ? 'Ver detalle' : 'Ver y postularme'}
+        </span>
+      </div>
+    </article>`;
+}
+
+function vacioContextual(f) {
+  const botones = [];
+  if (f.modalidad) {
+    botones.push(`<button type="button" class="btn btn-sm btn-outline" data-quitar="modalidad">Quitar modalidad</button>`);
+  }
+  if (f.ubicacion) {
+    botones.push(`<button type="button" class="btn btn-sm btn-outline" data-quitar="ubicacion">Quitar ubicación</button>`);
+  }
+  if (f.texto) {
+    botones.push(`<button type="button" class="btn btn-sm btn-outline" data-quitar="texto">Quitar palabra clave</button>`);
+  }
+  botones.push(`<button type="button" class="btn btn-sm btn-primary" data-quitar="todo">Ver todas las vacantes</button>`);
+
+  return scVacio('vacia', 'Sin resultados con esos filtros',
+    'Prueba con menos filtros o con otra palabra clave: la búsqueda revisa el puesto, la empresa y la descripción.',
+    `<div class="sugerencias">${botones.join('')}</div>`);
+}
+
+function pintarResultados() {
+  const cont  = document.getElementById('resultados');
+  const f     = leerFiltros();
+  const orden = document.getElementById('f-orden').value;
+  const lista = ordenar(vacantes, orden, f.texto);
+
+  document.getElementById('contador').textContent =
+    lista.length + (lista.length === 1 ? ' vacante' : ' vacantes');
+
+  if (!lista.length) {
+    cont.innerHTML = hayFiltros(f)
+      ? vacioContextual(f)
+      : scVacio('vacia', 'Todavía no hay vacantes publicadas',
+          esCandidato
+            ? 'En cuanto las empresas publiquen puestos los verás aquí. Mientras tanto, deja tu perfil listo para postularte en un clic.'
+            : 'En cuanto se publiquen vacantes en el portal las verás aquí.',
+          esCandidato
+            ? '<a class="btn btn-primary" href="perfil-persona.html">Completar mi perfil</a>'
+            : '<a class="btn btn-primary" href="mis-vacantes.html">Publicar una vacante</a>');
+    return;
+  }
+
+  cont.innerHTML = `<div class="resultados resultados-2">${lista.map(v => tarjeta(v, f.texto)).join('')}</div>`;
+}
+
+function decirEstado(n, f, error) {
+  const el = document.getElementById('estado-busqueda');
+  if (error) { el.textContent = 'No se pudieron cargar las vacantes.'; return; }
+
+  const base = n === 0 ? 'Sin resultados'
+             : n === 1 ? '1 vacante encontrada'
+                       : n + ' vacantes encontradas';
+  el.textContent = f.texto ? `${base} para “${f.texto}”` : base;
+}
+
+/* ── Búsqueda ───────────────────────────────────────────── */
+
+function mostrarCargando() {
+  const cont = document.getElementById('resultados');
+  cont.setAttribute('aria-busy', 'true');
+  document.getElementById('barra-progreso').classList.remove('oculto');
+
+  if (primeraCarga || !vacantes.length) {
+    cont.classList.remove('atenuado');
+    cont.innerHTML = esqueletos(4);
+  } else {
+    // Ya hay resultados en pantalla: los atenuamos en vez de vaciarlos,
+    // así la página no "salta" con cada tecla.
+    cont.classList.add('atenuado');
   }
 }
 
-function limpiar() {
-  document.getElementById('f-texto').value = '';
-  document.getElementById('f-ubicacion').value = '';
-  document.getElementById('f-modalidad').value = '';
-  buscar();
+function ocultarCargando() {
+  document.getElementById('resultados').setAttribute('aria-busy', 'false');
+  document.getElementById('resultados').classList.remove('atenuado');
+  document.getElementById('barra-progreso').classList.add('oculto');
 }
+
+async function buscar() {
+  clearTimeout(temporizador);
+  ajustarOrden();
+
+  const f = leerFiltros();
+  pintarChips(f);
+  sincronizarUrl(f);
+  mostrarCargando();
+
+  const mio = ++peticionNum;
+
+  try {
+    const datos = await scGet('BUSCAR_VACANTES', f);
+    if (mio !== peticionNum) return; // llegó tarde: ya hay una búsqueda más nueva
+
+    if (datos.status !== 'success') {
+      ocultarCargando();
+      vacantes = [];
+      decirEstado(0, f, true);
+      document.getElementById('contador').textContent = '';
+      document.getElementById('resultados').innerHTML =
+        scVacio('alerta', 'No se pudo buscar', datos.message || 'Intenta de nuevo en un momento.',
+          '<button type="button" class="btn btn-outline" onclick="buscar()">Reintentar</button>');
+      return;
+    }
+
+    vacantes = datos.vacantes || [];
+    primeraCarga = false;
+    ocultarCargando();
+    pintarResultados();
+    decirEstado(vacantes.length, f, false);
+
+  } catch (e) {
+    if (mio !== peticionNum) return;
+    ocultarCargando();
+    vacantes = [];
+    decirEstado(0, f, true);
+    document.getElementById('contador').textContent = '';
+    document.getElementById('resultados').innerHTML =
+      scVacio('alerta', 'Error al cargar', e.message,
+        '<button type="button" class="btn btn-outline" onclick="buscar()">Reintentar</button>');
+  }
+}
+
+function buscarConEspera() {
+  clearTimeout(temporizador);
+  ajustarOrden();
+  temporizador = setTimeout(buscar, 380);
+}
+
+/* ── Eventos ────────────────────────────────────────────── */
 
 document.getElementById('form-filtros').addEventListener('submit', (e) => {
   e.preventDefault();
   buscar();
 });
 
+// La "x" nativa de los input type=search también dispara 'input',
+// así que con este único escucha basta (y no duplicamos peticiones).
+['f-texto', 'f-ubicacion'].forEach(id => {
+  document.getElementById(id).addEventListener('input', buscarConEspera);
+});
+
+document.getElementById('f-modalidad').addEventListener('change', buscar);
+
+document.getElementById('f-orden').addEventListener('change', () => {
+  pintarResultados();
+  decirEstado(vacantes.length, leerFiltros(), false);
+});
+
+// Delegación: chips activos y botones del estado vacío.
+// Solo viajan claves fijas en data-quitar, nunca datos del API.
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest && e.target.closest('[data-quitar]');
+  if (!btn) return;
+  e.preventDefault();
+  quitarFiltro(btn.getAttribute('data-quitar'));
+});
+
 window.addEventListener('DOMContentLoaded', () => {
   sesion = scExigirSesion();
   if (!sesion) return;
+  esCandidato = sesion.tipo === 'persona';
 
   scPintarNavbar('vacantes.html');
   scPintarPie();
+
+  leerUrl();
+  ajustarOrden();
   buscar();
 });
 </script>

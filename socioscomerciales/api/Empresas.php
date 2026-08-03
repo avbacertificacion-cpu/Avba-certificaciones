@@ -107,20 +107,29 @@ class ScEmpresas {
 
         // Normalizar el sitio web para que el enlace funcione
         if (isset($payload['sitio_web'])) {
-            $sitio = trim($payload['sitio_web']);
-            if ($sitio !== '' && !preg_match('#^https?://#i', $sitio)) {
-                $payload['sitio_web'] = 'https://' . $sitio;
+            $sitio = trim((string) $payload['sitio_web']);
+            if ($sitio !== '') {
+                if (!preg_match('#^https?://#i', $sitio)) $sitio = 'https://' . $sitio;
+                // Sin validar, un valor con comillas o "javascript:" acabaría
+                // en un href del perfil público.
+                if (!filter_var($sitio, FILTER_VALIDATE_URL) || !preg_match('#^https?://#i', $sitio)) {
+                    return ['status' => 'error', 'message' => 'El sitio web no es una dirección válida.'];
+                }
             }
+            $payload['sitio_web'] = $sitio;
         }
 
-        $campos = ['nombre', 'giro', 'descripcion', 'sitio_web', 'ubicacion'];
+        $campos = [
+            'nombre' => 190, 'giro' => 190, 'descripcion' => 5000,
+            'sitio_web' => 255, 'ubicacion' => 190,
+        ];
         $sets   = [];
         $params = [];
 
-        foreach ($campos as $campo) {
+        foreach ($campos as $campo => $max) {
             if (!isset($payload[$campo])) continue;
             $sets[]   = "{$campo} = ?";
-            $params[] = trim((string) $payload[$campo]) ?: null;
+            $params[] = scTexto((string) $payload[$campo], $max);
         }
 
         if (empty($sets)) {

@@ -6,6 +6,97 @@
 <title>Empresas — Socios Comerciales AVBA</title>
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
+<style>
+  /* ── Accesibilidad base ──────────────────────────────── */
+  a:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 3px solid var(--acento); outline-offset: 2px; border-radius: var(--r-sm);
+  }
+  .sr-solo {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* ── Buscador ────────────────────────────────────────── */
+  /* Rejilla propia: la compartida .filtros-fila está pensada para 4 columnas
+     y aquí solo hay campo + botón. */
+  .fila-buscar { display: grid; gap: 12px; grid-template-columns: 1fr; }
+  @media (min-width: 640px) { .fila-buscar { grid-template-columns: 1fr auto; align-items: end; } }
+
+  .buscador-caja { position: relative; display: flex; align-items: center; }
+  .buscador-caja > svg {
+    position: absolute; left: 12px; width: 16px; height: 16px;
+    color: var(--texto-tenue); pointer-events: none;
+  }
+  .buscador-caja input { padding-left: 36px; padding-right: 38px; }
+  .buscador-x {
+    position: absolute; right: 7px; width: 26px; height: 26px;
+    display: flex; align-items: center; justify-content: center;
+    background: none; border: none; cursor: pointer; border-radius: 50%;
+    color: var(--texto-tenue); font-size: 19px; line-height: 1;
+  }
+  .buscador-x:hover { background: var(--gris-fondo); color: var(--texto); }
+
+  .filtros-extra {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+    margin-top: 13px; padding-top: 13px; border-top: 1px solid var(--borde);
+  }
+  .filtros-extra .campo-check { cursor: pointer; font-weight: 600; }
+  .pista-busqueda { font-size: 12.5px; color: var(--texto-tenue); margin-left: auto; }
+
+  /* ── Tarjetas del directorio ─────────────────────────── */
+  .tarjeta-lista { position: relative; display: flex; flex-direction: column; }
+  .tarjeta-encabezado { flex: 1; }
+  .tarjeta-info { flex: 1; min-width: 0; }
+  .tarjeta-nombre { display: block; font-size: 15.5px; font-weight: 700; line-height: 1.3; }
+  .tarjeta-nombre a { color: var(--texto); overflow-wrap: anywhere; }
+  .tarjeta-lista:hover .tarjeta-nombre a { color: var(--azul); }
+  /* El nombre cubre la tarjeta completa: un solo enlace para lectores de
+     pantalla y toda la superficie clicable con el ratón. */
+  .tarjeta-nombre a::after { content: ''; position: absolute; inset: 0; border-radius: var(--r-md); }
+  .tarjeta-titulo-fila { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .tarjeta-sub { overflow-wrap: anywhere; }
+  /* El pie queda bajo el enlace extendido: "Ver perfil" es decorativo y el
+     clic lo recibe siempre el enlace del nombre. */
+  .tarjeta-pie { margin-top: auto; }
+
+  .tarjeta-lista.contratando { border-color: #B8E7CB; }
+  .tarjeta-lista.contratando::before {
+    content: ''; position: absolute; left: 0; top: 16px; bottom: 16px;
+    width: 3px; border-radius: 0 3px 3px 0; background: var(--verde);
+  }
+
+  .sin-vacantes { font-size: 12.5px; color: var(--texto-tenue); }
+
+  /* ── Estados ─────────────────────────────────────────── */
+  .estado {
+    background: var(--blanco); border: 1px solid var(--borde);
+    border-radius: var(--r-md); box-shadow: var(--sombra-sm);
+    text-align: center; padding: 52px 22px;
+  }
+  .estado > svg { width: 44px; height: 44px; color: var(--borde); margin-bottom: 13px; }
+  .estado h2 { font-size: 17px; font-weight: 700; margin-bottom: 7px; }
+  .estado p { font-size: 13.5px; color: var(--texto-sub); max-width: 400px; margin: 0 auto 17px; }
+
+  /* ── Esqueletos de carga ─────────────────────────────── */
+  .sk { background: #E7EEF7; border-radius: var(--r-sm); position: relative; overflow: hidden; }
+  .sk::after {
+    content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent);
+    animation: sk-brillo 1.5s infinite;
+  }
+  .sk-linea { height: 12px; margin-bottom: 9px; }
+  .sk-logo { width: 64px; height: 64px; border-radius: var(--r); flex-shrink: 0; }
+  .sk-pie { height: 30px; width: 100%; margin-top: 14px; }
+  @keyframes sk-brillo { 100% { transform: translateX(100%); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+    .tarjeta-lista:hover { transform: none; }
+  }
+</style>
 </head>
 <body>
 
@@ -18,21 +109,33 @@
         <h1>Directorio de empresas</h1>
         <p>Empresas de la industria que publican vacantes en el portal.</p>
       </div>
-      <span class="badge badge-azul" id="contador"></span>
+      <span class="badge badge-azul" id="contador" role="status" aria-live="polite"></span>
     </div>
   </div>
 
-  <form class="filtros" id="form-filtros">
-    <div class="filtros-fila" style="grid-template-columns:1fr auto">
+  <form class="filtros" id="form-filtros" role="search">
+    <div class="fila-buscar">
       <div class="campo">
         <label for="f-texto">Buscar empresa</label>
-        <input type="text" id="f-texto" placeholder="Nombre o giro">
+        <div class="buscador-caja" id="caja-busqueda">
+          <input type="text" id="f-texto" placeholder="Nombre o giro" autocomplete="off"
+                 aria-describedby="pista-busqueda">
+          <button type="button" class="buscador-x oculto" id="btn-limpiar"
+                  aria-label="Limpiar la búsqueda">&times;</button>
+        </div>
       </div>
       <button type="submit" class="btn btn-primary">Buscar</button>
     </div>
+    <div class="filtros-extra">
+      <label class="campo-check" for="f-contratando">
+        <input type="checkbox" id="f-contratando">
+        Solo empresas contratando
+      </label>
+      <span class="pista-busqueda" id="pista-busqueda">Los resultados se actualizan mientras escribes.</span>
+    </div>
   </form>
 
-  <div id="resultados"></div>
+  <div id="resultados" aria-busy="true"></div>
 </main>
 
 <footer id="pie"></footer>
@@ -41,75 +144,195 @@
 <script>
 let sesion = null;
 
+/* Última respuesta del API: el filtro "solo contratando" se aplica en el
+   cliente para no inventar parámetros que el API no acepta. */
+let empresas = [];
+let temporizador = null;
+let peticionActual = 0;
+
+function plural(n, singular, pluralTexto) { return n === 1 ? singular : pluralTexto; }
+
+function contadorTexto(n) { return n + ' ' + plural(n, 'empresa', 'empresas'); }
+
+/* ── Tarjeta ───────────────────────────────────────────── */
 function tarjeta(e) {
   const n = Number(e.vacantes) || 0;
   return `
-    <div class="tarjeta-lista">
+    <article class="tarjeta-lista${n > 0 ? ' contratando' : ''}">
       <div class="tarjeta-encabezado">
         ${scAvatar(e.logo_url, e.nombre, 'lg', true)}
-        <div style="flex:1;min-width:0">
-          <div class="fila" style="gap:8px">
-            <span class="tarjeta-nombre"><a href="ver-empresa.html?id=${e.id}">${scEsc(e.nombre)}</a></span>
-            ${Number(e.correo_verificado) ? scBadgeVerificado(true) : ''}
+        <div class="tarjeta-info">
+          <div class="tarjeta-titulo-fila">
+            <h2 class="tarjeta-nombre">
+              <a href="ver-empresa.html?id=${Number(e.id)}">${scEsc(e.nombre)}</a>
+            </h2>
+            ${Number(e.correo_verificado) === 1 ? scBadgeVerificado(true) : ''}
           </div>
           ${e.giro ? `<div class="tarjeta-sub">${scEsc(e.giro)}</div>` : ''}
           <div class="tarjeta-datos">
             ${e.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(e.ubicacion)}</span>` : ''}
-            <span>${scIcono('maletin')}${n} vacante${n === 1 ? '' : 's'} abierta${n === 1 ? '' : 's'}</span>
+            <span>${scIcono('maletin')}${n} ${plural(n, 'vacante abierta', 'vacantes abiertas')}</span>
           </div>
         </div>
       </div>
       <div class="tarjeta-pie">
         ${n > 0
-          ? '<span class="badge badge-verde">Contratando</span>'
-          : '<span class="texto-tenue" style="font-size:12.5px">Sin vacantes por ahora</span>'}
-        <a class="btn btn-sm btn-primary" href="ver-empresa.html?id=${e.id}">Ver perfil</a>
+          ? `<span class="badge badge-verde">${scIcono('check')}Contratando</span>`
+          : '<span class="sin-vacantes">Sin vacantes por ahora</span>'}
+        <span class="btn btn-sm btn-primary" aria-hidden="true">Ver perfil</span>
       </div>
+    </article>`;
+}
+
+/* ── Esqueleto de carga ────────────────────────────────── */
+function esqueleto() {
+  const tarjetaSk = `
+    <div class="tarjeta-lista">
+      <div class="tarjeta-encabezado">
+        <div class="sk sk-logo"></div>
+        <div class="tarjeta-info">
+          <div class="sk sk-linea" style="height:15px;width:62%"></div>
+          <div class="sk sk-linea" style="width:44%"></div>
+          <div class="sk sk-linea" style="width:78%;margin-bottom:0"></div>
+        </div>
+      </div>
+      <div class="sk sk-pie"></div>
     </div>`;
+  return `<div class="resultados resultados-2">${tarjetaSk.repeat(6)}</div>`;
+}
+
+/* ── Estados ───────────────────────────────────────────── */
+function estado(icono, titulo, texto, botonHtml) {
+  return `<div class="estado">
+    ${scIcono(icono)}
+    <h2>${scEsc(titulo)}</h2>
+    <p>${scEsc(texto)}</p>
+    ${botonHtml || ''}
+  </div>`;
+}
+
+/* ── Render de la lista ya cargada ─────────────────────── */
+function renderizar() {
+  const cont       = document.getElementById('resultados');
+  const soloActivas = document.getElementById('f-contratando').checked;
+  const texto      = document.getElementById('f-texto').value.trim();
+  const lista      = soloActivas
+    ? empresas.filter(e => (Number(e.vacantes) || 0) > 0)
+    : empresas;
+
+  document.getElementById('contador').textContent = contadorTexto(lista.length);
+
+  if (lista.length) {
+    cont.innerHTML = `<div class="resultados resultados-2">${lista.map(tarjeta).join('')}</div>`;
+    return;
+  }
+
+  if (soloActivas && empresas.length) {
+    cont.innerHTML = estado('vacia', 'Ninguna está contratando ahora',
+      'Ninguna de las empresas encontradas tiene vacantes abiertas en este momento.',
+      '<button type="button" class="btn btn-outline" id="btn-quitar-filtro">Ver todas las empresas</button>');
+    document.getElementById('btn-quitar-filtro').addEventListener('click', () => {
+      document.getElementById('f-contratando').checked = false;
+      renderizar();
+    });
+    return;
+  }
+
+  cont.innerHTML = texto
+    ? estado('lupa', 'Sin resultados',
+        'No encontramos empresas que coincidan con "' + texto + '".',
+        '<button type="button" class="btn btn-outline" id="btn-ver-todas">Ver todas las empresas</button>')
+    : estado('edificio', 'Todavía no hay empresas',
+        'Cuando se registren empresas en el portal aparecerán en este directorio.', '');
+
+  const btn = document.getElementById('btn-ver-todas');
+  if (btn) btn.addEventListener('click', limpiar);
+}
+
+/* Error de carga: siempre con la opción de reintentar. */
+function mostrarError(titulo, texto) {
+  empresas = [];
+  document.getElementById('contador').textContent = '';
+  document.getElementById('resultados').innerHTML = estado('alerta', titulo, texto,
+    '<button type="button" class="btn btn-outline" id="btn-reintentar">Reintentar</button>');
+  document.getElementById('btn-reintentar').addEventListener('click', buscar);
+}
+
+/* ── Búsqueda ──────────────────────────────────────────── */
+function programar() {
+  clearTimeout(temporizador);
+  temporizador = setTimeout(buscar, 350);
 }
 
 async function buscar() {
+  clearTimeout(temporizador);
+
   const cont = document.getElementById('resultados');
-  cont.innerHTML = scCargando('Cargando empresas...');
+  const mia  = ++peticionActual;
+
+  cont.setAttribute('aria-busy', 'true');
+  cont.innerHTML = esqueleto();
+  document.getElementById('contador').textContent = 'Buscando...';
 
   try {
     const datos = await scGet('LISTAR_EMPRESAS', { texto: document.getElementById('f-texto').value.trim() });
+    if (mia !== peticionActual) return;   // llegó tarde: ya hay una búsqueda más nueva
+
     if (datos.status !== 'success') {
-      cont.innerHTML = scVacio('alerta', 'No se pudo cargar', datos.message, '');
+      mostrarError('No se pudo cargar el directorio', datos.message || 'Intenta de nuevo en unos segundos.');
       return;
     }
 
-    const lista = datos.empresas || [];
-    document.getElementById('contador').textContent =
-      lista.length + (lista.length === 1 ? ' empresa' : ' empresas');
-
-    cont.innerHTML = lista.length
-      ? `<div class="resultados resultados-2">${lista.map(tarjeta).join('')}</div>`
-      : scVacio('edificio', 'Sin resultados',
-          'No encontramos empresas con ese término.',
-          '<button class="btn btn-outline" onclick="limpiar()">Ver todas</button>');
-
+    empresas = datos.empresas || [];
+    renderizar();
   } catch (e) {
-    cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+    if (mia !== peticionActual) return;
+    mostrarError('Error de conexión', e.message || 'Revisa tu conexión e intenta de nuevo.');
+  } finally {
+    if (mia === peticionActual) cont.setAttribute('aria-busy', 'false');
   }
 }
 
 function limpiar() {
-  document.getElementById('f-texto').value = '';
+  const campo = document.getElementById('f-texto');
+  campo.value = '';
+  document.getElementById('btn-limpiar').classList.add('oculto');
+  campo.focus();
   buscar();
 }
 
-document.getElementById('form-filtros').addEventListener('submit', (e) => {
-  e.preventDefault();
-  buscar();
-});
-
+/* ── Eventos ───────────────────────────────────────────── */
 window.addEventListener('DOMContentLoaded', () => {
   sesion = scExigirSesion();
   if (!sesion) return;
 
   scPintarNavbar('empresas.html');
   scPintarPie();
+
+  const campo = document.getElementById('f-texto');
+  const btnX  = document.getElementById('btn-limpiar');
+
+  // El icono de lupa se inserta aquí para no repetir el SVG en el HTML.
+  document.getElementById('caja-busqueda').insertAdjacentHTML('afterbegin', scIcono('lupa'));
+
+  campo.addEventListener('input', () => {
+    btnX.classList.toggle('oculto', campo.value === '');
+    programar();
+  });
+
+  btnX.addEventListener('click', limpiar);
+
+  document.getElementById('f-contratando').addEventListener('change', () => {
+    // Si hay una búsqueda en vuelo, el render lo hará ella al terminar.
+    if (document.getElementById('resultados').getAttribute('aria-busy') === 'true') return;
+    renderizar();
+  });
+
+  document.getElementById('form-filtros').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    buscar();
+  });
+
   buscar();
 });
 </script>

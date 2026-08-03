@@ -9,7 +9,7 @@
 require_once __DIR__ . '/config.php';
 
 /** Versión actual del esquema. Subir al añadir migraciones. */
-const SC_SCHEMA_VERSION = 3;
+const SC_SCHEMA_VERSION = 4;
 
 class ScDatabase {
     private static ?PDO $instance = null;
@@ -65,13 +65,18 @@ class ScDatabase {
 
             if ($version < 2) self::migrarA2($pdo);
             if ($version < 3) self::migrarA3($pdo);
+            if ($version < 4) self::migrarA4($pdo);
 
             $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
                         ON DUPLICATE KEY UPDATE valor = '" . SC_SCHEMA_VERSION . "'");
         } catch (PDOException $e) {
+            // El mensaje crudo de MariaDB incluye usuario, host y tabla
+            // ("command denied to user 'u123_sc'@'localhost' for table ...").
+            // Se registra en el log del servidor y al cliente le llega un texto
+            // fijo: el detalle se consulta con api/index.php?action=DIAGNOSTICO.
             error_log('SC esquema: ' . $e->getMessage());
             throw new RuntimeException(
-                'No se pudo preparar la base de datos: ' . $e->getMessage()
+                'La base de datos está en mantenimiento. Inténtalo en unos minutos.'
             );
         }
     }
@@ -81,6 +86,7 @@ class ScDatabase {
         $columnas = self::columnasDe($pdo, 'sc_usuarios');
 
         if (!$columnas)                                    return SC_SCHEMA_VERSION; // Recién creada
+        if (self::columnasDe($pdo, 'sc_intentos'))          return 4;
         if (in_array('reset_token', $columnas, true))       return 3;
         if (in_array('correo_verificado', $columnas, true)) return 2;
         return 1;
@@ -128,6 +134,16 @@ class ScDatabase {
                 KEY idx_sc_usuarios_token (session_token),
                 KEY idx_sc_usuarios_verif (verif_token),
                 KEY idx_sc_usuarios_reset (reset_token)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_intentos (
+                id    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                tipo  VARCHAR(20)  NOT NULL,
+                clave VARCHAR(190) NOT NULL,
+                ts    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_sc_intentos (tipo, clave, ts)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
@@ -269,6 +285,19 @@ class ScDatabase {
         } catch (PDOException $e) { /* ya existe */ }
     }
 
+    /** v3 → v4: registro de intentos, para limitar fuerza bruta y correos. */
+    private static function migrarA4(PDO $pdo): void {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_intentos (
+                id    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                tipo  VARCHAR(20)  NOT NULL,
+                clave VARCHAR(190) NOT NULL,
+                ts    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_sc_intentos (tipo, clave, ts)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    }
+
     /** Añade una columna solo si aún no existe. */
     private static function agregarColumna(PDO $pdo, string $tabla, string $columna, string $definicion): void {
         $columnas = self::columnasDe($pdo, $tabla);
@@ -289,18 +318,18 @@ class ScDatabase {
         }
 
         $tablas = [];
-        foreach (['sc_meta','sc_usuarios','sc_personas','sc_experiencia','sc_educacion',
+        foreach (['sc_meta','sc_usuarios','sc_intentos','sc_personas','sc_experiencia','sc_educacion',
                   'sc_habilidades','sc_empresas','sc_vacantes','sc_postulaciones'] as $t) {
             $cols = self::columnasDe($pdo, $t);
             $tablas[$t] = $cols ? count($cols) . ' columnas' : 'NO EXISTE';
         }
 
+        // Se publica el conteo de columnas, no sus nombres: el esquema
+        // detallado es material de reconocimiento para un atacante.
         return [
             'schema_version_guardada' => $version,
             'schema_version_esperada' => SC_SCHEMA_VERSION,
             'tablas'                  => $tablas,
-            'columnas_sc_usuarios'    => self::columnasDe($pdo, 'sc_usuarios'),
-            'columnas_sc_postulaciones' => self::columnasDe($pdo, 'sc_postulaciones'),
         ];
     }
 

@@ -7,13 +7,122 @@
 <link rel="icon" type="image/png" href="assets/favicon.png">
 <link rel="stylesheet" href="assets/avba.css">
 <style>
+  /* ── Accesibilidad base ──────────────────────────────── */
+  a:focus-visible, button:focus-visible {
+    outline: 3px solid var(--acento); outline-offset: 2px; border-radius: var(--r-sm);
+  }
+  .sr-solo {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+
+  /* ── Volver ──────────────────────────────────────────── */
   .volver-link {
     display: inline-flex; align-items: center; gap: 6px;
     font-size: 13.5px; font-weight: 600; color: var(--texto-sub); margin: 22px 0 14px;
   }
   .volver-link:hover { color: var(--azul); }
   .volver-link svg { width: 15px; height: 15px; }
-  .descripcion { font-size: 14.5px; color: var(--texto-sub); line-height: 1.7; white-space: pre-line; }
+
+  /* ── Encabezado ──────────────────────────────────────── */
+  .portada { position: relative; overflow: hidden; }
+  .portada::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 84% 20%, rgba(77,163,255,.34), transparent 58%),
+      radial-gradient(circle at 8% 94%, rgba(255,255,255,.12), transparent 50%);
+  }
+  .perfil-acciones { display: flex; flex-wrap: wrap; gap: 9px; padding-bottom: 6px; }
+  .perfil-id { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .perfil-id .perfil-nombre { margin-top: 0; }
+
+  /* ── Rejilla de dos columnas ─────────────────────────── */
+  .detalle { display: grid; gap: 18px; grid-template-columns: 1fr; align-items: start; }
+  @media (min-width: 900px) {
+    .detalle { grid-template-columns: minmax(0, 1.85fr) minmax(0, 1fr); }
+    .col-lateral { position: sticky; top: 78px; }
+  }
+  .col-principal, .col-lateral { min-width: 0; }
+
+  .card-titulo h2 { font-size: 16px; font-weight: 700; letter-spacing: -.2px; }
+  .card-cuenta { flex-shrink: 0; }
+
+  .descripcion {
+    font-size: 14.5px; color: var(--texto-sub); line-height: 1.75;
+    white-space: pre-line; overflow-wrap: anywhere; margin-top: 10px;
+  }
+
+  /* ── Vacantes ────────────────────────────────────────── */
+  .vacantes { display: grid; gap: 12px; margin-top: 14px; }
+  .vacante {
+    position: relative; border: 1px solid var(--borde); border-radius: var(--r);
+    padding: 15px 16px; background: var(--blanco);
+    transition: border-color .15s, box-shadow .15s, transform .12s;
+  }
+  .vacante:hover { border-color: #C2D4E9; box-shadow: var(--sombra); transform: translateY(-1px); }
+  .vacante:focus-within { border-color: var(--azul); box-shadow: 0 0 0 3px rgba(24,95,165,.13); }
+  .vacante-titulo { font-size: 14.5px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+  .vacante-titulo a { color: var(--texto); }
+  .vacante:hover .vacante-titulo a { color: var(--azul); }
+  /* El título cubre toda la tarjeta para que sea clicable completa,
+     sin duplicar enlaces para lectores de pantalla. */
+  .vacante-titulo a::after { content: ''; position: absolute; inset: 0; border-radius: var(--r); }
+  .vacante-pie {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+    margin-top: 11px; padding-top: 11px; border-top: 1px solid var(--borde);
+  }
+  .vacante-hace { font-size: 12px; color: var(--texto-tenue); margin-left: auto; }
+
+  /* ── Ficha lateral ───────────────────────────────────── */
+  .datos-lista { display: grid; gap: 13px; margin-top: 12px; }
+  .dato { display: flex; gap: 10px; align-items: flex-start; }
+  .dato > svg { width: 16px; height: 16px; color: var(--texto-tenue); flex-shrink: 0; margin-top: 3px; }
+  .dato-etiqueta {
+    display: block; font-size: 11px; font-weight: 700; letter-spacing: .5px;
+    text-transform: uppercase; color: var(--texto-tenue);
+  }
+  .dato-valor { font-size: 13.5px; color: var(--texto); overflow-wrap: anywhere; }
+  .dato-valor a { color: var(--azul); font-weight: 600; }
+  .dato-valor a:hover { text-decoration: underline; }
+  .lateral-acciones { display: grid; gap: 9px; margin-top: 16px; }
+  .nota-tenue { font-size: 12.5px; color: var(--texto-tenue); margin-top: 10px; line-height: 1.5; }
+
+  /* ── Estados vacíos ──────────────────────────────────── */
+  .seccion-vacia {
+    display: flex; align-items: center; gap: 10px; margin-top: 12px;
+    font-size: 13.5px; color: var(--texto-tenue);
+    background: var(--gris-fondo); border: 1px dashed var(--borde);
+    border-radius: var(--r-sm); padding: 14px 16px;
+  }
+  .seccion-vacia svg { width: 17px; height: 17px; flex-shrink: 0; }
+
+  .estado-pagina {
+    background: var(--blanco); border: 1px solid var(--borde);
+    border-radius: var(--r-md); box-shadow: var(--sombra-sm);
+    text-align: center; padding: 58px 22px;
+  }
+  .estado-pagina > svg { width: 46px; height: 46px; color: var(--borde); margin-bottom: 14px; }
+  .estado-pagina h1 { font-size: 19px; font-weight: 800; letter-spacing: -.3px; margin-bottom: 8px; }
+  .estado-pagina p { font-size: 14px; color: var(--texto-sub); max-width: 430px; margin: 0 auto 18px; }
+
+  /* ── Esqueletos de carga ─────────────────────────────── */
+  .sk { background: #E7EEF7; border-radius: var(--r-sm); position: relative; overflow: hidden; }
+  .sk::after {
+    content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent);
+    animation: sk-brillo 1.5s infinite;
+  }
+  .sk-linea { height: 12px; margin-bottom: 10px; }
+  .sk-avatar { width: 104px; height: 104px; border-radius: var(--r); margin-top: -48px; border: 4px solid var(--blanco); }
+  .sk-boton { height: 34px; width: 130px; border-radius: var(--r-sm); }
+  @keyframes sk-brillo { 100% { transform: translateX(100%); } }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: .001ms !important; animation-iteration-count: 1 !important;
+      transition-duration: .001ms !important;
+    }
+  }
 </style>
 </head>
 <body>
@@ -22,7 +131,8 @@
 
 <main class="wrap contenido">
   <a class="volver-link" href="empresas.html" id="volver"></a>
-  <div id="contenido"></div>
+  <p class="sr-solo" id="aviso-estado" role="status" aria-live="polite"></p>
+  <div id="contenido" aria-busy="true"></div>
 </main>
 
 <footer id="pie"></footer>
@@ -32,79 +142,257 @@
 let sesion = null;
 const idEmpresa = Number(new URLSearchParams(location.search).get('id') || 0);
 
-function pintar(datos) {
-  const e = datos.empresa;
-  const vacantes = datos.vacantes || [];
-  document.title = e.nombre + ' — Socios Comerciales AVBA';
+const CLASE_MODALIDAD = { presencial: 'badge-azul', remoto: 'badge-verde', hibrido: 'badge-ambar' };
 
-  document.getElementById('contenido').innerHTML = `
+/* scEsc() reproduce textContent -> innerHTML, que escapa & < > pero NO las
+   comillas. Para un valor que va dentro de un atributo hay que escaparlas
+   también, o un sitio_web como https://x" onmouseover="... se saldría del
+   href e inyectaría un manejador de eventos. */
+function escAtributo(valor) {
+  return scEsc(valor).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/* El sitio web lo escribe la empresa: solo lo usamos como enlace si es
+   una URL http(s) real. Cualquier otro esquema se descarta. */
+function urlSegura(valor) {
+  const s = String(valor === null || valor === undefined ? '' : valor).trim();
+  return /^https?:\/\//i.test(s) ? s : '';
+}
+
+/* Etiqueta corta y legible del sitio, sin protocolo ni barra final. */
+function etiquetaSitio(url) {
+  return url.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+}
+
+function anunciar(texto) {
+  const el = document.getElementById('aviso-estado');
+  if (el) el.textContent = texto;
+}
+
+function seccionVacia(icono, texto) {
+  return `<p class="seccion-vacia">${scIcono(icono)}<span>${scEsc(texto)}</span></p>`;
+}
+
+function estadoPagina(icono, titulo, texto) {
+  return `<div class="estado-pagina">
+    ${scIcono(icono)}
+    <h1>${scEsc(titulo)}</h1>
+    <p>${scEsc(texto)}</p>
+    <a class="btn btn-outline" id="btn-estado-volver" href="empresas.html">${scIcono('atras')}Volver</a>
+  </div>`;
+}
+
+function plural(n, singular, pluralTexto) { return n === 1 ? singular : pluralTexto; }
+
+/* ── Esqueleto de carga ────────────────────────────────── */
+function esqueleto() {
+  const lineas = (n, anchos) =>
+    Array.from({ length: n }, (_, i) =>
+      `<div class="sk sk-linea" style="width:${anchos[i % anchos.length]}"></div>`).join('');
+
+  return `
     <div class="perfil-card mb-16">
       <div class="portada"></div>
       <div class="perfil-cuerpo">
         <div class="perfil-avatar-fila">
+          <div class="sk sk-avatar"></div>
+          <div class="perfil-acciones"><div class="sk sk-boton"></div></div>
+        </div>
+        <div style="margin-top:16px;max-width:420px">
+          <div class="sk sk-linea" style="height:22px;width:52%"></div>
+          <div class="sk sk-linea" style="width:70%"></div>
+          <div class="sk sk-linea" style="width:40%;margin-bottom:0"></div>
+        </div>
+      </div>
+    </div>
+    <div class="detalle">
+      <div class="col-principal">
+        <div class="card">
+          <div class="sk sk-linea" style="height:16px;width:36%;margin-bottom:16px"></div>
+          ${lineas(4, ['100%', '94%', '98%', '58%'])}
+        </div>
+        <div class="card">
+          <div class="sk sk-linea" style="height:16px;width:32%;margin-bottom:16px"></div>
+          ${lineas(4, ['66%', '90%', '72%', '88%'])}
+        </div>
+      </div>
+      <div class="col-lateral">
+        <div class="card">
+          <div class="sk sk-linea" style="height:16px;width:48%;margin-bottom:16px"></div>
+          ${lineas(3, ['82%', '64%', '74%'])}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ── Bloques de contenido ──────────────────────────────── */
+function bloqueVacantes(vacantes, nombreEmpresa) {
+  if (!vacantes.length) {
+    return seccionVacia('vacia', 'Esta empresa no tiene vacantes abiertas por ahora.') +
+      '<p class="nota-tenue">Vuelve más adelante o revisa otras empresas del directorio.</p>';
+  }
+
+  return `<div class="vacantes">${vacantes.map(v => {
+    const modalidad = SC_MODALIDADES[v.modalidad] || v.modalidad || '';
+    const clase     = CLASE_MODALIDAD[v.modalidad] || 'badge-gris';
+    const hace      = scHace(v.creado);
+    return `<article class="vacante">
+      <h3 class="vacante-titulo">
+        <a href="vacante.html?id=${Number(v.id)}">${scEsc(v.titulo)}</a>
+      </h3>
+      <div class="tarjeta-datos">
+        ${v.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : ''}
+        ${v.salario ? `<span>${scIcono('dinero')}${scEsc(v.salario)}</span>` : ''}
+        <span>${scIcono('edificio')}${scEsc(nombreEmpresa)}</span>
+      </div>
+      <div class="vacante-pie">
+        ${modalidad ? `<span class="badge ${clase}">${scEsc(modalidad)}</span>` : ''}
+        ${hace ? `<span class="vacante-hace">${scIcono('reloj')}${scEsc(hace)}</span>` : ''}
+      </div>
+    </article>`;
+  }).join('')}</div>`;
+}
+
+function bloqueDatos(e, sitio, nVacantes) {
+  return `<div class="card">
+    <div class="card-titulo"><h2>Datos de la empresa</h2></div>
+    <div class="datos-lista">
+      ${e.giro ? `<div class="dato">
+        ${scIcono('maletin')}
+        <div><span class="dato-etiqueta">Giro</span><span class="dato-valor">${scEsc(e.giro)}</span></div>
+      </div>` : ''}
+      ${e.ubicacion ? `<div class="dato">
+        ${scIcono('ubicacion')}
+        <div><span class="dato-etiqueta">Ubicación</span><span class="dato-valor">${scEsc(e.ubicacion)}</span></div>
+      </div>` : ''}
+      ${sitio ? `<div class="dato">
+        ${scIcono('enlace')}
+        <div>
+          <span class="dato-etiqueta">Sitio web</span>
+          <span class="dato-valor">
+            <a href="${escAtributo(sitio)}" target="_blank" rel="noopener noreferrer">${scEsc(etiquetaSitio(sitio))}</a>
+          </span>
+        </div>
+      </div>` : ''}
+      <div class="dato">
+        ${scIcono('vacia')}
+        <div>
+          <span class="dato-etiqueta">Vacantes abiertas</span>
+          <span class="dato-valor">${nVacantes} ${plural(nVacantes, 'vacante', 'vacantes')}</span>
+        </div>
+      </div>
+      <div class="dato">
+        ${scIcono('verificado')}
+        <div>
+          <span class="dato-etiqueta">Cuenta</span>
+          <span class="dato-valor">${Number(e.correo_verificado) === 1
+            ? 'Correo verificado por AVBA'
+            : 'Correo pendiente de verificar'}</span>
+        </div>
+      </div>
+    </div>
+    ${nVacantes > 0 ? `<div class="lateral-acciones">
+      <a class="btn btn-primary btn-bloque" href="#vacantes-abiertas">${scIcono('maletin')}Ver vacantes</a>
+    </div>` : ''}
+  </div>`;
+}
+
+/* ── Pintado principal ─────────────────────────────────── */
+function pintar(datos) {
+  const e        = datos.empresa || {};
+  const vacantes = datos.vacantes || [];
+  const n        = vacantes.length;
+
+  document.title = (e.nombre || 'Perfil de la empresa') + ' — Socios Comerciales AVBA';
+
+  const sitio = urlSegura(e.sitio_web);
+
+  const encabezado = `
+    <article class="perfil-card mb-16">
+      <div class="portada"></div>
+      <div class="perfil-cuerpo">
+        <div class="perfil-avatar-fila">
           ${scAvatar(e.logo_url, e.nombre, 'xl', true)}
-          ${e.sitio_web ? `<div class="fila" style="padding-bottom:6px">
-            <a class="btn btn-outline btn-sm" href="${scEsc(e.sitio_web)}" target="_blank" rel="noopener">
-              ${scIcono('enlace')}Sitio web</a>
-          </div>` : ''}
+          <div class="perfil-acciones">
+            ${n > 0
+              ? `<a class="btn btn-primary btn-sm" href="#vacantes-abiertas">
+                   ${scIcono('maletin')}${n} ${plural(n, 'vacante abierta', 'vacantes abiertas')}</a>`
+              : ''}
+            ${sitio
+              ? `<a class="btn btn-outline btn-sm" href="${escAtributo(sitio)}" target="_blank" rel="noopener noreferrer">
+                   ${scIcono('enlace')}Sitio web</a>`
+              : ''}
+          </div>
         </div>
 
-        <div class="fila" style="gap:9px;margin-top:12px">
-          <h1 class="perfil-nombre" style="margin-top:0">${scEsc(e.nombre)}</h1>
-          ${Number(e.correo_verificado) ? scBadgeVerificado(true) : ''}
+        <div class="perfil-id">
+          <h1 class="perfil-nombre">${scEsc(e.nombre)}</h1>
+          ${Number(e.correo_verificado) === 1 ? scBadgeVerificado(true) : ''}
+          ${n > 0 ? '<span class="badge badge-verde">Contratando</span>' : ''}
         </div>
         ${e.giro ? `<p class="perfil-headline">${scEsc(e.giro)}</p>` : ''}
         <div class="perfil-meta">
           ${e.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(e.ubicacion)}</span>` : ''}
-          <span>${scIcono('maletin')}${vacantes.length} vacante${vacantes.length === 1 ? '' : 's'} abierta${vacantes.length === 1 ? '' : 's'}</span>
+          <span>${scIcono('maletin')}${n} ${plural(n, 'vacante abierta', 'vacantes abiertas')}</span>
         </div>
       </div>
-    </div>
+    </article>`;
 
+  const principal = `
     ${e.descripcion ? `<div class="card">
-      <div class="card-titulo"><h3>Sobre la empresa</h3></div>
-      <div class="descripcion">${scEsc(e.descripcion)}</div>
-    </div>` : ''}
+       <div class="card-titulo"><h2>Sobre la empresa</h2></div>
+       <p class="descripcion">${scEsc(e.descripcion)}</p>
+     </div>` : ''}
 
-    <div class="card">
-      <div class="card-titulo"><h3>Vacantes abiertas</h3></div>
-      ${vacantes.length ? vacantes.map(v => `
-        <div class="item">
-          <div class="item-cuerpo">
-            <div class="item-titulo"><a href="vacante.html?id=${v.id}">${scEsc(v.titulo)}</a></div>
-            <div class="tarjeta-datos">
-              ${v.ubicacion ? `<span>${scIcono('ubicacion')}${scEsc(v.ubicacion)}</span>` : ''}
-              <span>${scIcono('maletin')}${scEsc(SC_MODALIDADES[v.modalidad] || v.modalidad)}</span>
-              ${v.salario ? `<span>${scIcono('dinero')}${scEsc(v.salario)}</span>` : ''}
-              <span>${scIcono('reloj')}${scEsc(scHace(v.creado))}</span>
-            </div>
-          </div>
-          <div class="item-acciones">
-            <a class="btn btn-sm btn-suave" href="vacante.html?id=${v.id}">Ver</a>
-          </div>
-        </div>`).join('')
-        : '<p class="texto-tenue" style="font-size:13.5px">Esta empresa no tiene vacantes abiertas por ahora.</p>'}
+    <div class="card" id="vacantes-abiertas">
+      <div class="card-titulo">
+        <h2>Vacantes abiertas</h2>
+        ${n ? `<span class="badge badge-verde card-cuenta">${n}</span>` : ''}
+      </div>
+      ${bloqueVacantes(vacantes, e.nombre)}
     </div>`;
+
+  document.getElementById('contenido').innerHTML = `
+    ${encabezado}
+    <div class="detalle">
+      <div class="col-principal">${principal}</div>
+      <aside class="col-lateral" aria-label="Datos de la empresa">${bloqueDatos(e, sitio, n)}</aside>
+    </div>`;
+
+  anunciar((e.nombre || 'Empresa') + ' cargada, ' + n + ' ' + plural(n, 'vacante abierta', 'vacantes abiertas') + '.');
 }
 
+/* ── Carga ─────────────────────────────────────────────── */
 async function cargar() {
   const cont = document.getElementById('contenido');
-  cont.innerHTML = scCargando('Cargando empresa...');
+  cont.setAttribute('aria-busy', 'true');
+  cont.innerHTML = esqueleto();
+  anunciar('Cargando empresa...');
 
-  if (!idEmpresa) {
-    cont.innerHTML = scVacio('alerta', 'Empresa no indicada', 'El enlace no incluye una empresa válida.', '');
-    return;
-  }
+  const fallar = (titulo, texto) => {
+    cont.innerHTML = estadoPagina('alerta', titulo, texto);
+    const btn = document.getElementById('btn-estado-volver');
+    if (btn) btn.href = document.getElementById('volver').href;
+    anunciar(titulo);
+  };
 
   try {
+    if (!idEmpresa) {
+      fallar('Empresa no indicada', 'El enlace no incluye una empresa válida. Vuelve al directorio y elige una.');
+      return;
+    }
+
     const datos = await scGet('GET_EMPRESA_PUBLICA', { id: idEmpresa });
-    if (datos.status !== 'success') {
-      cont.innerHTML = scVacio('alerta', 'No se encontró la empresa', datos.message, '');
+    if (datos.status !== 'success' || !datos.empresa) {
+      fallar('No encontramos esta empresa',
+             datos.message || 'La empresa ya no está disponible o el enlace es incorrecto.');
       return;
     }
     pintar(datos);
   } catch (e) {
-    cont.innerHTML = scVacio('alerta', 'Error al cargar', e.message, '');
+    fallar('No pudimos cargar la empresa', e.message || 'Revisa tu conexión e intenta de nuevo.');
+  } finally {
+    cont.setAttribute('aria-busy', 'false');
   }
 }
 
@@ -112,11 +400,11 @@ window.addEventListener('DOMContentLoaded', () => {
   sesion = scExigirSesion();
   if (!sesion) return;
 
-  scPintarNavbar(sesion.tipo === 'empresa' ? 'perfil-empresa.html' : 'empresas.html');
+  const esEmpresa = sesion.tipo === 'empresa';
+  scPintarNavbar(esEmpresa ? 'perfil-empresa.html' : 'empresas.html');
   scPintarPie();
 
   const volver = document.getElementById('volver');
-  const esEmpresa = sesion.tipo === 'empresa';
   volver.innerHTML = scIcono('atras') + (esEmpresa ? 'Volver' : 'Volver a empresas');
   volver.href = esEmpresa ? 'inicio.html' : 'empresas.html';
 
