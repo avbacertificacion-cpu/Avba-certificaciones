@@ -87,10 +87,16 @@ La verificación **no bloquea el uso del portal**: si el envío falla, la cuenta
 sigue funcionando y se muestra un aviso con un botón para reenviar el enlace.
 Las cuentas verificadas llevan una insignia y aparecen primero en las búsquedas.
 
-## Notas del host (Hostinger, PHP-FPM)
+## Notas del host (Hostinger, PHP-FPM, MariaDB 11.8)
 
-- Los ajustes de PHP van en `.user.ini`. **`php_value` en `.htaccess` provoca
-  error 500** en toda la carpeta porque Apache no reconoce la directiva.
+- **`php_value` en `.htaccess` provoca error 500** en toda la carpeta porque
+  Apache no reconoce la directiva bajo PHP-FPM.
+- **`.user.ini` tampoco se aplica en este host**: el diagnóstico devuelve los
+  límites globales (`upload_max_filesize` de 1536M), no los del archivo. Por eso
+  los ajustes que el portal necesita se fijan por código con `ini_set()` en
+  `api/index.php`. El archivo se conserva por si el host habilita `user_ini`.
+- `SHOW COLUMNS ... LIKE ?` con sentencias preparadas **nativas** falla en este
+  MariaDB; por eso las migraciones listan columnas sin marcadores.
 - `uploads/.htaccess` usa lista de bloqueo + `RewriteRule` como lista blanca,
   el mismo patrón que el sistema principal ya usa en producción.
 - El correo sale por la función `mail()` de PHP.

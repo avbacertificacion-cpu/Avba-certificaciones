@@ -22,6 +22,15 @@ require_once __DIR__ . '/diagnostico.php';
 // Nunca mostrar avisos de PHP en la respuesta: romperían el JSON
 ini_set('display_errors', '0');
 
+// Aislar la cookie de sesión de la del sistema de certificaciones.
+// Se fija aquí y no solo en .user.ini porque este host no aplica ese
+// archivo (el diagnóstico muestra los límites globales, no los nuestros).
+// Hoy la autenticación es por token, pero esto deja el aislamiento
+// garantizado si en el futuro se usan sesiones PHP.
+ini_set('session.cookie_path', '/socioscomerciales');
+ini_set('session.cookie_httponly', '1');
+ini_set('session.cookie_secure', '1');
+
 // ── Headers ───────────────────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
