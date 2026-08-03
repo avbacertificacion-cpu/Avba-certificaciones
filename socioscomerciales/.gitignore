@@ -8,3 +8,4 @@ uploads/logos/*
 !uploads/cv/.gitkeep
 !uploads/fotos/.gitkeep
 !uploads/logos/.gitkeep
+!uploads/cv/.htaccess

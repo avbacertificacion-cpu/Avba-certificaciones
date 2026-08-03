@@ -149,6 +149,78 @@ class ScPersonas {
         return ['status' => 'success', 'candidatos' => $candidatos, 'total' => count($candidatos)];
     }
 
+    /**
+     * Entrega el CV de un candidato validando la sesión.
+     * Los PDF ya no se sirven como archivos estáticos: contienen datos
+     * personales (teléfono, domicilio, historial) y su URL, una vez conocida,
+     * funcionaba para siempre y para cualquiera.
+     *
+     * Reglas: el candidato solo puede abrir el suyo; una empresa con sesión
+     * puede abrir el de cualquier candidato, que es justo la función de la
+     * bolsa de trabajo. Para restringirlo aún más a quienes se postularon a
+     * sus vacantes, basta activar la comprobación marcada abajo.
+     */
+    public function entregarCV(array $usuario, int $personaId): void {
+        $autorizado = false;
+
+        if ($usuario['tipo'] === 'empresa') {
+            $autorizado = true;
+
+            // — Restricción opcional: solo candidatos que se postularon —
+            // $s = $this->pdo->prepare(
+            //     "SELECT 1 FROM sc_postulaciones p
+            //      JOIN sc_vacantes v ON v.id = p.vacante_id
+            //      JOIN sc_empresas e ON e.id = v.empresa_id
+            //      WHERE p.persona_id = ? AND e.usuario_id = ? LIMIT 1");
+            // $s->execute([$personaId, $usuario['id']]);
+            // $autorizado = (bool) $s->fetchColumn();
+        } else {
+            $s = $this->pdo->prepare("SELECT id FROM sc_personas WHERE usuario_id = ?");
+            $s->execute([$usuario['id']]);
+            $autorizado = ((int) $s->fetchColumn() === $personaId);
+        }
+
+        if (!$autorizado) {
+            scRespuesta(['status' => 'error', 'message' => 'No autorizado para ver este CV.'], 403);
+        }
+
+        $stmt = $this->pdo->prepare(
+            "SELECT p.cv_url, p.nombre FROM sc_personas p
+             JOIN sc_usuarios u ON u.id = p.usuario_id
+             WHERE p.id = ? AND u.activo = 1"
+        );
+        $stmt->execute([$personaId]);
+        $fila = $stmt->fetch();
+
+        if (!$fila || !$fila['cv_url']) {
+            scRespuesta(['status' => 'error', 'message' => 'Este candidato no tiene CV cargado.'], 404);
+        }
+
+        // La ruta sale de la base, pero se comprueba igual: solo dentro de
+        // uploads/cv/ y sin saltos de directorio.
+        $rel = $fila['cv_url'];
+        if (strpos($rel, 'uploads/cv/') !== 0 || strpos($rel, '..') !== false) {
+            scRespuesta(['status' => 'error', 'message' => 'Archivo no válido.'], 400);
+        }
+
+        $ruta = realpath(__DIR__ . '/../' . $rel);
+        $base = realpath(__DIR__ . '/../uploads/cv');
+        if (!$ruta || !$base || strpos($ruta, $base) !== 0 || !is_file($ruta)) {
+            scRespuesta(['status' => 'error', 'message' => 'El archivo ya no está disponible.'], 404);
+        }
+
+        $nombreArchivo = 'CV - ' . preg_replace('/[^\p{L}\p{N} _-]/u', '', $fila['nombre']) . '.pdf';
+
+        if (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/pdf');
+        header('Content-Length: ' . filesize($ruta));
+        header('Content-Disposition: inline; filename="' . $nombreArchivo . '"');
+        header('Cache-Control: private, no-store');
+        header('X-Content-Type-Options: nosniff');
+        readfile($ruta);
+        exit;
+    }
+
     // ── ACTUALIZAR DATOS BÁSICOS ─────────────────────────────
     public function actualizarPerfil(int $usuarioId, array $payload): array {
         if (isset($payload['nombre']) && trim($payload['nombre']) === '') {

@@ -105,13 +105,24 @@ Correcciones aplicadas tras una auditoría del API:
 - Los errores de esquema y de conexión ya no exponen usuario ni nombre de la BD.
 - `sitio_web` se valida como URL http(s) real, en servidor y en cliente.
 
-### Pendiente de decidir (producto, no bug)
+### Acceso a los CV
 
-Cualquier empresa registrada puede listar candidatos y ver el enlace directo a
-su CV. Los PDF se sirven como archivos estáticos con nombre aleatorio, sin
-comprobar sesión. Es coherente con la función de la plataforma, pero si se
-quiere restringir, hay que servir los CV desde un PHP que valide la sesión y la
-relación de postulación.
+Los PDF **ya no se sirven como archivos estáticos**: `uploads/cv/.htaccess`
+deniega el acceso directo y los entrega `api/index.php?action=DESCARGAR_CV`,
+que valida la sesión antes de escribir el archivo. Un candidato solo puede
+abrir el suyo; una empresa con sesión puede abrir el de cualquier candidato,
+que es la función de la bolsa de trabajo.
+
+Como un `href` no puede llevar la cabecera `Authorization`, el frontend usa
+`scVerCV(personaId)`: descarga el PDF como blob y lo muestra desde memoria, de
+modo que el token nunca viaja en la URL.
+
+Para restringirlo aún más a los candidatos que se postularon a las vacantes de
+esa empresa, basta descomentar la comprobación marcada en
+`ScPersonas::entregarCV()`.
+
+Las fotos y logos siguen siendo públicos: se muestran con `<img>` en los
+listados y no contienen datos personales sensibles.
 
 ## Contraseñas
 

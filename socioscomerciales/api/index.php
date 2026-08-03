@@ -187,6 +187,12 @@ if ($method === 'GET') {
                    . '&msg=' . urlencode($res['message']), true, 302);
             exit;
 
+        // Devuelve el PDF, no JSON: valida sesión y luego escribe el archivo
+        case 'DESCARGAR_CV':
+            $usr = scSesion($pdo, $token);
+            $personas->entregarCV($usr, (int) ($_GET['id'] ?? 0));
+            exit;
+
         case 'GET_PERFIL_PERSONA':
             $usr = scSesionTipo($pdo, $token, 'persona');
             scRespuesta($personas->obtenerPerfil((int) $usr['id']));

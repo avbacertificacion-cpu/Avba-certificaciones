@@ -699,7 +699,7 @@ function tarjetaCandidato(p, vacanteId) {
         <div class="candidato-acciones">
           <a class="btn btn-sm btn-gris" href="ver-perfil.html?id=${Number(p.persona_id)}">${scIcono('persona')}Perfil</a>
           ${p.cv_url
-            ? `<a class="btn btn-sm btn-gris" href="${escAttr(p.cv_url)}" target="_blank" rel="noopener">${scIcono('documento')}CV</a>`
+            ? `<button type="button" class="btn btn-sm btn-gris" data-accion="cv" data-id="${Number(p.persona_id)}">${scIcono('documento')}CV</button>`
             : '<span class="etiqueta-decision">Sin CV</span>'}
           <div class="decision" role="group" aria-label="Cambiar estatus de ${escAttr(p.nombre)}">${decisiones}</div>
         </div>
@@ -880,6 +880,7 @@ document.addEventListener('click', (e) => {
   if (accion !== 'menu') cerrarMenus();
 
   switch (accion) {
+    case 'cv':           scVerCV(id); break;
     case 'nueva':        nuevaVacante(); break;
     case 'ver':          alternarPanel(id); break;
     case 'menu':         alternarMenu(id, el); break;

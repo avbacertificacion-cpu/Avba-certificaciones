@@ -92,7 +92,7 @@
         <span>Aún no has subido tu currículum.</span>
       </div>
       <div class="fila">
-        <a class="btn btn-sm btn-gris oculto" id="cv-ver" href="#" target="_blank" rel="noopener">Ver</a>
+        <button type="button" class="btn btn-sm btn-gris oculto" id="cv-ver">Ver</button>
         <button class="btn btn-sm btn-primary" id="btn-cv">Subir PDF</button>
         <input type="file" id="input-cv" accept="application/pdf" class="oculto-file">
       </div>
@@ -354,7 +354,6 @@ function pintarCV(url) {
   if (url) {
     caja.classList.add('cargado');
     datos.innerHTML = '<strong>Currículum cargado</strong><span>Las empresas pueden descargarlo desde tu perfil.</span>';
-    ver.href = url;
     ver.classList.remove('oculto');
     document.getElementById('btn-cv').textContent = 'Reemplazar';
   } else {
@@ -465,6 +464,10 @@ document.getElementById('input-foto').addEventListener('change', (e) => {
 });
 
 document.getElementById('btn-cv').addEventListener('click', () => document.getElementById('input-cv').click());
+// El CV ya no es un archivo estático: se pide al API con la sesión
+document.getElementById('cv-ver').addEventListener('click', () => {
+  if (perfil) scVerCV(perfil.id);
+});
 document.getElementById('input-cv').addEventListener('change', (e) => {
   subirArchivo('SUBIR_CV', e.target, (d) => pintarCV(d.cv_url));
 });

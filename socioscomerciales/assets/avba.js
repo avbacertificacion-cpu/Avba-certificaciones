@@ -133,6 +133,51 @@ async function scSubir(action, archivo) {
   return scLeerRespuesta(res);
 }
 
+/**
+ * Abre el CV de un candidato en una pestaña nueva.
+ *
+ * El PDF ya no es un archivo estático: se pide al API con la cabecera
+ * Authorization, así que no se puede enlazar con un href normal. Se descarga
+ * como blob y se muestra desde memoria, de modo que el token nunca viaja en
+ * la URL. La pestaña se abre ANTES del fetch porque, si se abriera después,
+ * el navegador lo tomaría por una ventana emergente y la bloquearía.
+ */
+async function scVerCV(personaId) {
+  const s = scSesion.leer();
+  if (!s || !s.token) { location.href = 'login.html'; return; }
+
+  const ventana = window.open('', '_blank');
+  try {
+    const res = await fetch(`${SC_API}?action=DESCARGAR_CV&id=${Number(personaId)}`, {
+      headers: { 'Authorization': 'Bearer ' + s.token },
+    });
+
+    if (!res.ok) {
+      let mensaje = 'No se pudo abrir el CV.';
+      try { mensaje = (await res.json()).message || mensaje; } catch (e) { /* no era JSON */ }
+      if (ventana) ventana.close();
+      scToast(mensaje, 'error');
+      return;
+    }
+
+    const url = URL.createObjectURL(await res.blob());
+    if (ventana) {
+      ventana.location = url;
+    } else {
+      // La pestaña fue bloqueada: se ofrece como descarga
+      const a = document.createElement('a');
+      a.href = url; a.download = 'CV.pdf';
+      document.body.appendChild(a); a.click(); a.remove();
+    }
+    // Liberar la memoria del blob una vez que la pestaña lo cargó
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+  } catch (e) {
+    if (ventana) ventana.close();
+    scToast(e.message || 'No se pudo abrir el CV.', 'error');
+  }
+}
+
 /* ── Toast ─────────────────────────────────────────────── */
 let scToastTimer = null;
 function scToast(mensaje, tipo) {

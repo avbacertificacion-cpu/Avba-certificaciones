@@ -300,8 +300,8 @@ function bloqueContacto(p, cv, correoHref) {
     </div>
     <div class="contacto-acciones">
       ${cv
-        ? `<a class="btn btn-primary btn-bloque" href="${escAtributo(cv)}" target="_blank" rel="noopener">
-             ${scIcono('documento')}Descargar CV</a>`
+        ? `<button type="button" class="btn btn-primary btn-bloque" data-accion="cv">
+             ${scIcono('documento')}Descargar CV</button>`
         : ''}
       <a class="btn btn-outline btn-bloque" href="${escAtributo(correoHref)}">${scIcono('enviar')}Enviar correo</a>
     </div>
@@ -331,8 +331,8 @@ function pintar(datos) {
           ${scAvatar(p.foto_url, p.nombre, 'xl')}
           <div class="perfil-acciones">
             ${cv
-              ? `<a class="btn btn-primary btn-sm" href="${escAtributo(cv)}" target="_blank" rel="noopener">
-                   ${scIcono('documento')}Descargar CV</a>`
+              ? `<button type="button" class="btn btn-primary btn-sm" data-accion="cv">
+                   ${scIcono('documento')}Descargar CV</button>`
               : ''}
             <a class="btn btn-outline btn-sm" href="${escAtributo(correoHref)}">${scIcono('correo')}Contactar</a>
           </div>
@@ -431,6 +431,13 @@ async function cargar() {
     cont.setAttribute('aria-busy', 'false');
   }
 }
+
+/* El CV ya no es un archivo estático: se pide al API con la sesión.
+   Delegación para que sirva en los botones de la cabecera y del lateral. */
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-accion="cv"]');
+  if (b && idPersona) scVerCV(idPersona);
+});
 
 window.addEventListener('DOMContentLoaded', () => {
   sesion = scExigirSesion();

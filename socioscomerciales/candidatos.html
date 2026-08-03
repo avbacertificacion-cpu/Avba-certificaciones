@@ -333,7 +333,7 @@ function tarjeta(c, filtros) {
         </span>
         <div class="fila">
           ${c.cv_url
-            ? `<a class="btn btn-sm btn-gris" href="${escAttr(c.cv_url)}" target="_blank" rel="noopener">${scIcono('documento')}CV</a>`
+            ? `<button type="button" class="btn btn-sm btn-gris" data-accion="cv" data-id="${Number(c.id)}">${scIcono('documento')}CV</button>`
             : ''}
           <a class="btn btn-sm btn-primary" href="ver-perfil.html?id=${Number(c.id)}">Ver perfil</a>
         </div>
@@ -448,6 +448,7 @@ document.addEventListener('click', (e) => {
   if (!el) return;
 
   switch (el.dataset.accion) {
+    case 'cv':      scVerCV(Number(el.dataset.id)); break;
     case 'quitar':  quitarFiltro(el.dataset.filtro); break;
     case 'limpiar': limpiar(); break;
     case 'sugerir': sugerir(el.dataset.valor); break;

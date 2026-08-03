@@ -1,0 +1,10 @@
+# Los CV NO se sirven como archivos estáticos: contienen datos personales y
+# su URL, una vez conocida, funcionaría para siempre y para cualquiera.
+# Se entregan por api/index.php?action=DESCARGAR_CV, que valida la sesión.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order Allow,Deny
+    Deny from all
+</IfModule>
