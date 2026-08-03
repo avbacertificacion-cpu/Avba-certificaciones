@@ -172,6 +172,43 @@ function scSesionTipo(PDO $pdo, ?string $token, string $tipo): array {
     return $usr;
 }
 
+/** True si la cuenta ya confirmó su correo. */
+function scEstaVerificado(array $usr): bool {
+    return (int) ($usr['correo_verificado'] ?? 0) === 1;
+}
+
+/**
+ * Exige sesión CON el correo ya confirmado.
+ *
+ * Se aplica a todo lo que escribe en la base y a todo lo que muestra datos de
+ * otras cuentas. Una cuenta sin verificar queda reducida a: entrar, ver y
+ * completar su propio panel en modo lectura, reenviar el enlace, cambiar su
+ * contraseña y salir. Así una dirección de correo inventada no sirve para
+ * publicar vacantes, postularse ni pasear por los perfiles del portal.
+ *
+ * El `codigo` permite al frontend distinguir este 403 del de tipo de cuenta y
+ * pintar el aviso de "confirma tu correo" en lugar de un error genérico.
+ */
+function scSesionVerificada(PDO $pdo, ?string $token, ?string $tipo = null): array {
+    $usr = $tipo === null ? scSesion($pdo, $token) : scSesionTipo($pdo, $token, $tipo);
+    if (!scEstaVerificado($usr)) {
+        scRespuesta([
+            'status'  => 'error',
+            'codigo'  => 'CORREO_NO_VERIFICADO',
+            'message' => 'Confirma tu correo electrónico para usar esta función. '
+                       . 'Te enviamos un enlace al registrarte; puedes pedir uno nuevo desde tu panel.',
+        ], 403);
+    }
+    return $usr;
+}
+
+/** Id de la ficha de candidato de un usuario, o 0 si no tiene. */
+function scIdPersona(PDO $pdo, int $usuarioId): int {
+    $s = $pdo->prepare("SELECT id FROM sc_personas WHERE usuario_id = ?");
+    $s->execute([$usuarioId]);
+    return (int) $s->fetchColumn();
+}
+
 // ══════════════════════════════════════════════════════════
 //  RUTAS GET
 // ══════════════════════════════════════════════════════════
@@ -187,10 +224,19 @@ if ($method === 'GET') {
                    . '&msg=' . urlencode($res['message']), true, 302);
             exit;
 
-        // Devuelve el PDF, no JSON: valida sesión y luego escribe el archivo
+        // Devuelve el PDF, no JSON: valida sesión y luego escribe el archivo.
+        // Sin el correo confirmado solo se puede abrir el CV propio.
         case 'DESCARGAR_CV':
-            $usr = scSesion($pdo, $token);
-            $personas->entregarCV($usr, (int) ($_GET['id'] ?? 0));
+            $usr       = scSesion($pdo, $token);
+            $idPersona = (int) ($_GET['id'] ?? 0);
+            if (!scEstaVerificado($usr) && scIdPersona($pdo, (int) $usr['id']) !== $idPersona) {
+                scRespuesta([
+                    'status'  => 'error',
+                    'codigo'  => 'CORREO_NO_VERIFICADO',
+                    'message' => 'Confirma tu correo electrónico para consultar el CV de un candidato.',
+                ], 403);
+            }
+            $personas->entregarCV($usr, $idPersona);
             exit;
 
         case 'GET_PERFIL_PERSONA':
@@ -213,39 +259,37 @@ if ($method === 'GET') {
             $idPersona = (int) ($_GET['id'] ?? 0);
             if ($usr['tipo'] !== 'empresa') {
                 // Un candidato solo puede abrir su propio perfil público
-                $s = $pdo->prepare("SELECT id FROM sc_personas WHERE usuario_id = ?");
-                $s->execute([$usr['id']]);
-                if ((int) $s->fetchColumn() !== $idPersona) {
+                if (scIdPersona($pdo, (int) $usr['id']) !== $idPersona) {
                     scRespuesta(['status' => 'error', 'message' => 'No autorizado.'], 403);
                 }
+            } else {
+                // Ver la ficha de otra persona exige el correo confirmado
+                scSesionVerificada($pdo, $token);
             }
             scRespuesta($personas->obtenerPerfilPublico($idPersona));
 
         case 'GET_EMPRESA_PUBLICA':
+            scSesionVerificada($pdo, $token);
             scRespuesta($empresas->obtenerPerfilPublico((int) ($_GET['id'] ?? 0)));
 
         case 'LISTAR_EMPRESAS':
+            scSesionVerificada($pdo, $token);
             scRespuesta($empresas->listarEmpresas($_GET['texto'] ?? ''));
 
         // ── Vacantes ─────────────────────────────────────────
+        // La bolsa de trabajo sí queda visible sin verificar: una vacante es
+        // un anuncio público de la empresa, no la ficha de una persona. Lo que
+        // no se puede sin confirmar el correo es postularse.
         case 'BUSCAR_VACANTES':
             $usr       = scValidarToken($pdo, $token);
-            $personaId = null;
-            if ($usr && $usr['tipo'] === 'persona') {
-                $s = $pdo->prepare("SELECT id FROM sc_personas WHERE usuario_id = ?");
-                $s->execute([$usr['id']]);
-                $personaId = (int) $s->fetchColumn() ?: null;
-            }
+            $personaId = ($usr && $usr['tipo'] === 'persona')
+                ? (scIdPersona($pdo, (int) $usr['id']) ?: null) : null;
             scRespuesta($vacantes->buscar($payload, $personaId));
 
         case 'GET_VACANTE':
             $usr       = scValidarToken($pdo, $token);
-            $personaId = null;
-            if ($usr && $usr['tipo'] === 'persona') {
-                $s = $pdo->prepare("SELECT id FROM sc_personas WHERE usuario_id = ?");
-                $s->execute([$usr['id']]);
-                $personaId = (int) $s->fetchColumn() ?: null;
-            }
+            $personaId = ($usr && $usr['tipo'] === 'persona')
+                ? (scIdPersona($pdo, (int) $usr['id']) ?: null) : null;
             scRespuesta($vacantes->obtener((int) ($_GET['id'] ?? 0), $personaId));
 
         case 'LISTAR_MIS_VACANTES':
@@ -257,13 +301,14 @@ if ($method === 'GET') {
             $usr = scSesionTipo($pdo, $token, 'persona');
             scRespuesta($vacantes->misPostulaciones((int) $usr['id']));
 
+        // Muestra los datos de quienes se postularon: exige correo confirmado
         case 'POSTULACIONES_VACANTE':
-            $usr = scSesionTipo($pdo, $token, 'empresa');
+            $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($vacantes->postulacionesDeVacante((int) $usr['id'], (int) ($_GET['vacante_id'] ?? 0)));
 
         // ── Candidatos ───────────────────────────────────────
         case 'BUSCAR_CANDIDATOS':
-            scSesionTipo($pdo, $token, 'empresa');
+            scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($personas->buscarCandidatos($payload));
 
         default:
@@ -278,6 +323,10 @@ if ($method === 'POST') {
     switch ($action) {
 
         // ── Auth ─────────────────────────────────────────
+        // Estas acciones NO exigen el correo confirmado a propósito: son
+        // justo las que necesita quien todavía no lo confirmó. Si el correo
+        // no llegó, el usuario debe poder entrar, pedir otro enlace, cambiar
+        // su contraseña y salir; bloquearlas dejaría la cuenta inservible.
         case 'REGISTRO_PERSONA':
             scRespuesta($auth->registrar('persona', $payload));
 
@@ -308,78 +357,78 @@ if ($method === 'POST') {
 
         // ── Perfil persona ─────────────────────────────────
         case 'ACTUALIZAR_PERFIL_PERSONA':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($personas->actualizarPerfil((int) $usr['id'], $payload));
 
         case 'SUBIR_CV':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($personas->subirCV((int) $usr['id'], $_FILES['archivo'] ?? []));
 
         case 'SUBIR_FOTO':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($personas->subirFoto((int) $usr['id'], $_FILES['archivo'] ?? []));
 
         case 'AGREGAR_EXPERIENCIA':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($personas->agregarExperiencia((int) $usr['id'], $payload));
 
         case 'ACTUALIZAR_EXPERIENCIA':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($personas->actualizarExperiencia((int) $usr['id'], $payload));
 
         case 'ELIMINAR_EXPERIENCIA':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($personas->eliminarExperiencia((int) $usr['id'], (int) ($payload['id'] ?? 0)));
 
         case 'AGREGAR_EDUCACION':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($personas->agregarEducacion((int) $usr['id'], $payload));
 
         case 'ACTUALIZAR_EDUCACION':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($personas->actualizarEducacion((int) $usr['id'], $payload));
 
         case 'ELIMINAR_EDUCACION':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($personas->eliminarEducacion((int) $usr['id'], (int) ($payload['id'] ?? 0)));
 
         case 'AGREGAR_HABILIDAD':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($personas->agregarHabilidad((int) $usr['id'], $payload));
 
         case 'ELIMINAR_HABILIDAD':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($personas->eliminarHabilidad((int) $usr['id'], (int) ($payload['id'] ?? 0)));
 
         // ── Perfil empresa ──────────────────────────────────
         case 'ACTUALIZAR_PERFIL_EMPRESA':
-            $usr = scSesionTipo($pdo, $token, 'empresa');
+            $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($empresas->actualizarPerfil((int) $usr['id'], $payload));
 
         case 'SUBIR_LOGO':
-            $usr = scSesionTipo($pdo, $token, 'empresa');
+            $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($empresas->subirLogo((int) $usr['id'], $_FILES['archivo'] ?? []));
 
         // ── Vacantes ────────────────────────────────────────
         case 'CREAR_VACANTE':
-            $usr = scSesionTipo($pdo, $token, 'empresa');
+            $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($vacantes->crear((int) $usr['id'], $payload));
 
         case 'ACTUALIZAR_VACANTE':
-            $usr = scSesionTipo($pdo, $token, 'empresa');
+            $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($vacantes->actualizar((int) $usr['id'], $payload));
 
         case 'ELIMINAR_VACANTE':
-            $usr = scSesionTipo($pdo, $token, 'empresa');
+            $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($vacantes->eliminar((int) $usr['id'], (int) ($payload['id'] ?? 0)));
 
         // ── Postulaciones ───────────────────────────────────
         case 'POSTULAR':
-            $usr = scSesionTipo($pdo, $token, 'persona');
+            $usr = scSesionVerificada($pdo, $token, 'persona');
             scRespuesta($vacantes->postular((int) $usr['id'], $payload));
 
         case 'CAMBIAR_ESTATUS_POSTULACION':
-            $usr = scSesionTipo($pdo, $token, 'empresa');
+            $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($vacantes->cambiarEstatusPostulacion((int) $usr['id'], $payload));
 
         default:

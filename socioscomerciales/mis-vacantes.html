@@ -238,11 +238,12 @@
     </div>
   </div>
 
-  <div id="aviso-verificacion"></div>
+  <div id="aviso-verificacion" data-sin-bloqueo></div>
 
   <section id="resumen" class="metricas" aria-label="Resumen de tus vacantes"></section>
 
-  <div class="tablero-barra" id="barra" hidden>
+  <!-- Filtrar lo propio no es una escritura: sigue disponible sin verificar -->
+  <div class="tablero-barra" id="barra" data-sin-bloqueo hidden>
     <div class="pestanas" id="pestanas" role="group" aria-label="Filtrar vacantes por estatus"></div>
     <div class="herramientas">
       <div class="buscador">
@@ -544,6 +545,10 @@ function pintarVacantes() {
     if (cachePost[v.id]) pintarPanel(v.id);
     else cargarPanel(v.id);
   });
+
+  // Las tarjetas se redibujan, así que el bloqueo por correo sin confirmar
+  // debe reaplicarse aquí y no solo al arrancar la página.
+  scSoloLecturaSinVerificar(['main']);
 }
 
 /**

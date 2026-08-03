@@ -284,6 +284,18 @@ function bloqueAccion(v) {
       <a class="btn btn-outline btn-bloque btn-sm mt-16" href="vacantes.html">Ver vacantes abiertas</a>`;
   }
 
+  // Postularse manda tus datos a la empresa: el API lo exige verificado
+  if (!scVerificado()) {
+    return `
+      <button type="button" class="btn btn-primary btn-lg btn-bloque" disabled>
+        ${scIcono('enviar')}Postularme ahora
+      </button>
+      <p class="campo-ayuda" style="text-align:center;margin-top:9px">
+        Confirma tu correo electrónico para postularte.
+        <a href="inicio.html">Reenviar el enlace</a>
+      </p>`;
+  }
+
   return `
     <button type="button" class="btn btn-primary btn-lg btn-bloque" onclick="abrirPostulacion()">
       ${scIcono('enviar')}Postularme ahora
@@ -294,7 +306,8 @@ function bloqueAccion(v) {
 function barraMovil(v) {
   const barra = document.getElementById('barra-movil');
   const principal = document.getElementById('principal');
-  const puedePostular = sesion.tipo === 'persona' && v.estatus === 'abierta' && !v.mi_postulacion;
+  const puedePostular = sesion.tipo === 'persona' && v.estatus === 'abierta'
+                        && !v.mi_postulacion && scVerificado();
 
   if (!puedePostular) {
     barra.classList.add('oculto');
@@ -426,18 +439,21 @@ async function copiarEnlace() {
 
 function abrirPostulacion() {
   if (!vacante) return;
+
+  // Postularse envía tus datos a la empresa: exige el correo confirmado.
+  // El API rechaza POSTULAR sin verificar, así que se avisa antes de abrir
+  // el formulario en lugar de dejar que el envío falle.
+  if (!scVerificado()) {
+    scToast('Confirma tu correo electrónico para poder postularte.', 'error');
+    return;
+  }
+
   document.getElementById('modal-texto').textContent =
     'Vas a postularte a "' + vacante.titulo + '" en ' + vacante.empresa + '.';
 
   const aviso = document.getElementById('aviso-cv');
-  if (sesion && !esVerdad(sesion.correo_verificado)) {
-    aviso.innerHTML = scIcono('alerta') +
-      '<div><strong>Tu correo aún no está confirmado.</strong> Puedes postularte igual, pero las empresas confían más en los perfiles verificados.</div>';
-    aviso.classList.remove('oculto');
-  } else {
-    aviso.innerHTML = '';
-    aviso.classList.add('oculto');
-  }
+  aviso.innerHTML = '';
+  aviso.classList.add('oculto');
 
   scAbrirModal('modal-postular');
   const txt = document.getElementById('mensaje');

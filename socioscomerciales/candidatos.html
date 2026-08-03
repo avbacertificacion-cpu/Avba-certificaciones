@@ -494,6 +494,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
   scPintarNavbar('candidatos.html');
   scPintarPie();
+
+  // La búsqueda devuelve fichas de candidatos: exige correo confirmado
+  if (!scBloquearSinVerificar('resultados', 'La búsqueda de candidatos')) {
+    // Los filtros buscan solos al escribir: hay que apagarlos o pedirían
+    // datos que el API va a negar con 403.
+    scSoloLecturaSinVerificar(['main']);
+    return;
+  }
+
   buscar();
 });
 </script>

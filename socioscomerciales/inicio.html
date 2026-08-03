@@ -56,7 +56,7 @@
 </section>
 
 <main class="wrap contenido">
-  <div id="aviso-verificacion"></div>
+  <div id="aviso-verificacion" data-sin-bloqueo></div>
   <div id="aviso-bienvenida"></div>
 
   <div id="metricas" class="metricas"></div>
@@ -202,9 +202,15 @@ function pintarEmpresa(datos) {
                 </span>
               </div>
             </div>`).join('')
-          : scVacio('personas', 'Aún no hay postulaciones',
-              'Publica una vacante para empezar a recibir candidatos.',
-              '<a class="btn btn-primary" href="mis-vacantes.html">Publicar una vacante</a>')
+          : (!scVerificado()
+              // El API oculta la lista mientras el correo no esté confirmado,
+              // así que aquí se explica el motivo real y no "aún no hay".
+              ? scVacio('correo', 'Confirma tu correo para ver a los candidatos',
+                  'Los datos de quienes se postulan solo se muestran a cuentas verificadas.',
+                  '<button class="btn btn-primary" id="btn-reenviar" onclick="scReenviarVerificacion()">Reenviar enlace</button>')
+              : scVacio('personas', 'Aún no hay postulaciones',
+                  'Publica una vacante para empezar a recibir candidatos.',
+                  '<a class="btn btn-primary" href="mis-vacantes.html">Publicar una vacante</a>'))
       }</div>
     </div>`;
 

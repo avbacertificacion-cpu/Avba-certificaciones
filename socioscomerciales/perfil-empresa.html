@@ -24,7 +24,7 @@
 <header id="navbar"></header>
 
 <main class="wrap contenido" style="padding-top:22px">
-  <div id="aviso-verificacion"></div>
+  <div id="aviso-verificacion" data-sin-bloqueo></div>
 
   <div class="perfil-card mb-16">
     <div class="portada"></div>
@@ -93,8 +93,8 @@
       </div>
     </form>
   </div>
-  <!-- Seguridad -->
-  <div class="card">
+  <!-- Seguridad: se puede usar aunque el correo no esté confirmado -->
+  <div class="card" data-sin-bloqueo>
     <div class="card-titulo"><h3>Contraseña</h3></div>
     <p class="card-sub">Cámbiala cuando quieras. Necesitas escribir la actual para confirmar.</p>
     <form id="form-password">
@@ -157,6 +157,9 @@ function pintar(e) {
   pintarCompletitud(e);
   scAvisoVerificacion(Number(e.correo_verificado));
   scSesion.actualizar({ nombre: e.nombre, correo_verificado: Number(e.correo_verificado) });
+
+  // Sin el correo confirmado la ficha se ve pero no se edita
+  scSoloLecturaSinVerificar(['main']);
 }
 
 /* Cada pendiente es accionable: lleva directo al campo que falta */

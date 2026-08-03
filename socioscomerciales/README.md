@@ -99,6 +99,11 @@ Correcciones aplicadas tras una auditoría del API:
 - **Cambiar contraseña cierra las demás sesiones** y emite un token nuevo.
 - **`GET_PERSONA_PUBLICA` es solo para empresas**; un candidato únicamente puede
   abrir su propio perfil público.
+- **Sin el correo verificado no se escribe nada ni se ven perfiles ajenos**
+  (ver más abajo). Antes bastaba con registrarse con una dirección inventada
+  para publicar vacantes y recorrer el directorio de candidatos.
+- `LISTAR_EMPRESAS` y `GET_EMPRESA_PUBLICA` ya **exigen sesión**: eran las dos
+  únicas acciones que devolvían perfiles a cualquiera sin token.
 - Textos truncados al largo real de su columna y fechas validadas: un valor
   demasiado largo provocaba error 1406 de MariaDB y el usuario veía un 500.
 - El token **no se acepta por query string** (acabaría en logs y en `Referer`).
@@ -139,9 +144,38 @@ Al registrarse se genera un token (48 h de vigencia) y se envía un correo con
 un enlace a `api/index.php?action=VERIFICAR_CORREO&t=…`, que marca la cuenta y
 redirige a `verificar.html`.
 
-La verificación **no bloquea el uso del portal**: si el envío falla, la cuenta
-sigue funcionando y se muestra un aviso con un botón para reenviar el enlace.
 Las cuentas verificadas llevan una insignia y aparecen primero en las búsquedas.
+
+### Qué puede hacer una cuenta sin verificar
+
+Mientras `correo_verificado = 0` la cuenta queda en **solo lectura de lo
+propio**. El API lo aplica con `scSesionVerificada()` en `api/index.php`, que
+responde `403` con `codigo: CORREO_NO_VERIFICADO`.
+
+| Permitido sin verificar | Bloqueado hasta verificar |
+|---|---|
+| `LOGIN`, `LOGOUT`, `REGISTRO_*` | Editar perfil de persona o de empresa |
+| `REENVIAR_VERIFICACION` | Subir CV, foto o logo |
+| `SOLICITAR_RESET`, `RESTABLECER_PASSWORD`, `CAMBIAR_PASSWORD` | Experiencia, educación y habilidades |
+| `GET_PERFIL_PERSONA` / `GET_PERFIL_EMPRESA` (el propio) | Crear, editar o borrar vacantes |
+| `GET_INICIO` (sin la lista de postulantes) | Postularse y mover el estatus de una postulación |
+| `BUSCAR_VACANTES`, `GET_VACANTE` (la bolsa es pública) | `LISTAR_EMPRESAS`, `GET_EMPRESA_PUBLICA`, `GET_PERSONA_PUBLICA`, `BUSCAR_CANDIDATOS`, `POSTULACIONES_VACANTE` |
+| `LISTAR_MIS_VACANTES`, `MIS_POSTULACIONES` (propias) | `DESCARGAR_CV` de otra persona (el propio sí) |
+
+Las excepciones son deliberadas: **entrar, pedir otro enlace y cambiar la
+contraseña nunca se bloquean**, porque si el correo no llega la cuenta quedaría
+inservible. Por lo mismo `GET_INICIO` sigue abierto — es lo que consulta el
+botón "Ya lo confirmé" para saber si el enlace ya se abrió desde otro navegador.
+
+La bolsa de trabajo sí se puede mirar: una vacante es un anuncio de la empresa,
+no la ficha de una persona. Lo que no se puede es postularse.
+
+En el frontend hay tres piezas en `assets/avba.js`, todas **cortesía visual**
+(la regla vive en el API): `scVerificado()` lee el dato de la sesión local,
+`scBloquearSinVerificar()` sustituye una pantalla entera por el aviso, y
+`scSoloLecturaSinVerificar()` desactiva campos y botones salvo los marcados con
+`data-sin-bloqueo` (aviso de verificación, tarjeta de contraseña, filtros de lo
+propio).
 
 ## Logo
 

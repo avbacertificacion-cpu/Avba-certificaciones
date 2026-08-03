@@ -451,6 +451,14 @@ window.addEventListener('DOMContentLoaded', () => {
   volver.innerHTML = scIcono('atras') + (esEmpresa ? 'Volver a candidatos' : 'Volver');
   volver.href = esEmpresa ? 'candidatos.html' : 'perfil-persona.html';
 
+  // Una empresa aquí ve la ficha de un candidato, así que exige correo
+  // confirmado. Un candidato solo puede abrir la suya (el API lo verifica),
+  // y ver su propio perfil sí está permitido sin verificar.
+  if (esEmpresa && !scBloquearSinVerificar('contenido', 'El perfil del candidato')) {
+    document.getElementById('contenido').setAttribute('aria-busy', 'false');
+    return;
+  }
+
   cargar();
 });
 </script>

@@ -309,6 +309,13 @@ window.addEventListener('DOMContentLoaded', () => {
   scPintarNavbar('empresas.html');
   scPintarPie();
 
+  // El directorio muestra perfiles de otras cuentas: exige correo confirmado
+  if (!scBloquearSinVerificar('resultados', 'El directorio de empresas')) {
+    document.getElementById('resultados').setAttribute('aria-busy', 'false');
+    scSoloLecturaSinVerificar(['main']);   // apaga también el buscador
+    return;
+  }
+
   const campo = document.getElementById('f-texto');
   const btnX  = document.getElementById('btn-limpiar');
 

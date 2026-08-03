@@ -408,6 +408,12 @@ window.addEventListener('DOMContentLoaded', () => {
   volver.innerHTML = scIcono('atras') + (esEmpresa ? 'Volver' : 'Volver a empresas');
   volver.href = esEmpresa ? 'inicio.html' : 'empresas.html';
 
+  // Perfil de otra cuenta: exige correo confirmado
+  if (!scBloquearSinVerificar('contenido', 'El perfil de la empresa')) {
+    document.getElementById('contenido').setAttribute('aria-busy', 'false');
+    return;
+  }
+
   cargar();
 });
 </script>

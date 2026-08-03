@@ -90,6 +90,12 @@ async function scLeerRespuesta(res) {
     location.href = 'login.html';
     throw new Error(datos.message || 'Sesión expirada.');
   }
+  // El API rechazó la acción por correo sin confirmar. Puede pasar aunque la
+  // interfaz creyera lo contrario (sesión vieja en localStorage), así que se
+  // corrige la copia local para que el aviso aparezca al recargar.
+  if (datos && datos.codigo === 'CORREO_NO_VERIFICADO') {
+    scSesion.actualizar({ correo_verificado: 0 });
+  }
   return datos;
 }
 
@@ -249,11 +255,27 @@ async function scCerrarSesion() {
   location.href = 'index.html';
 }
 
-/* ── Aviso de correo sin verificar ─────────────────────── */
+/* ── Verificación de correo ────────────────────────────── */
+
+/**
+ * ¿La cuenta ya confirmó su correo?
+ *
+ * Es solo una pista para la interfaz: el permiso de verdad lo decide el API,
+ * que responde 403 con codigo CORREO_NO_VERIFICADO. Nunca uses esto como
+ * única barrera; el valor vive en localStorage y el usuario puede editarlo.
+ */
+function scVerificado(sesion) {
+  const s = sesion || scSesion.leer();
+  return !!(s && Number(s.correo_verificado) === 1);
+}
+
 /** Inserta el aviso en el contenedor con id "aviso-verificacion" si aplica. */
 function scAvisoVerificacion(verificado) {
   const cont = document.getElementById('aviso-verificacion');
   if (!cont) return;
+
+  // Mantener sincronizada la sesión local con lo que dice el servidor
+  scSesion.actualizar({ correo_verificado: verificado ? 1 : 0 });
 
   if (verificado) { cont.innerHTML = ''; return; }
 
@@ -261,13 +283,90 @@ function scAvisoVerificacion(verificado) {
     <div class="alerta alerta-aviso">
       ${scIcono('correo')}
       <div>
-        <strong>Confirma tu correo electrónico.</strong>
-        Te enviamos un enlace al registrarte. Verifícalo para que tu perfil se muestre como confiable.
+        <strong>Confirma tu correo electrónico para activar tu cuenta.</strong>
+        Mientras no lo hagas no puedes editar tu perfil, publicar o postularte,
+        ni ver los perfiles de otras cuentas. Te enviamos un enlace al registrarte.
       </div>
       <div class="alerta-acciones">
-        <button class="btn btn-sm btn-gris" id="btn-reenviar" onclick="scReenviarVerificacion()">Reenviar</button>
+        <button class="btn btn-sm btn-gris" id="btn-reenviar" onclick="scReenviarVerificacion()">Reenviar enlace</button>
+        <button class="btn btn-sm btn-gris" onclick="scRevisarVerificacion(this)">Ya lo confirmé</button>
       </div>
     </div>`;
+}
+
+/**
+ * Bloquea una pantalla completa cuando la cuenta no ha confirmado su correo.
+ *
+ * Devuelve true si puede continuar. Si no, pinta el aviso dentro del
+ * contenedor indicado y el llamador debe cortar (return) sin pedir datos:
+ * el API los negaría de todos modos con 403.
+ */
+function scBloquearSinVerificar(contenedorId, queSeBloquea) {
+  if (scVerificado()) return true;
+
+  const cont = document.getElementById(contenedorId);
+  if (cont) {
+    cont.innerHTML = `
+      <div class="vacio" data-sin-bloqueo>
+        ${scIcono('correo')}
+        <h4>Confirma tu correo para continuar</h4>
+        <p>${scEsc(queSeBloquea || 'Esta sección')} se habilita en cuanto verifiques
+           tu correo electrónico. Abre el enlace que te enviamos al registrarte
+           o pide uno nuevo.</p>
+        <button class="btn btn-azul" id="btn-reenviar" onclick="scReenviarVerificacion()">Reenviar enlace</button>
+        <button class="btn btn-outline" onclick="scRevisarVerificacion(this)">Ya lo confirmé</button>
+      </div>`;
+  }
+  return false;
+}
+
+/**
+ * Deja la pantalla en solo lectura mientras el correo no esté confirmado.
+ *
+ * Desactiva campos y botones dentro de los contenedores indicados, salvo los
+ * marcados con data-sin-bloqueo (reenviar el enlace, cerrar sesión, etc.).
+ * Es únicamente cortesía visual: quien fuerce el clic recibirá igualmente el
+ * 403 del API, que es donde está la regla de verdad.
+ */
+function scSoloLecturaSinVerificar(selectores) {
+  if (scVerificado()) return true;
+
+  (selectores || ['main']).forEach(sel => {
+    document.querySelectorAll(sel).forEach(cont => {
+      cont.querySelectorAll('input, textarea, select, button').forEach(el => {
+        if (el.closest('[data-sin-bloqueo]')) return;
+        el.disabled = true;
+        el.title = 'Confirma tu correo electrónico para poder editar.';
+      });
+    });
+  });
+  return false;
+}
+
+/**
+ * Vuelve a preguntar al servidor si el correo ya quedó confirmado.
+ *
+ * Hace falta porque el enlace del correo se abre a menudo en otro navegador
+ * (o en el teléfono): la copia en localStorage seguiría diciendo que no está
+ * verificado y el usuario quedaría bloqueado sin motivo. GET_INICIO devuelve
+ * el dato al día y no exige verificación, justo para poder salir de aquí.
+ */
+async function scRevisarVerificacion(boton) {
+  const original = boton ? boton.textContent : '';
+  if (boton) { boton.disabled = true; boton.textContent = 'Revisando...'; }
+  try {
+    const r = await scGet('GET_INICIO');
+    if (r && Number(r.correo_verificado) === 1) {
+      scSesion.actualizar({ correo_verificado: 1 });
+      location.reload();
+      return;
+    }
+    scToast('Tu correo sigue sin confirmar. Abre el enlace que te enviamos.', 'error');
+  } catch (e) {
+    scToast(e.message, 'error');
+  } finally {
+    if (boton) { boton.disabled = false; boton.textContent = original; }
+  }
 }
 
 async function scReenviarVerificacion() {

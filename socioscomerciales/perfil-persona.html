@@ -44,7 +44,7 @@
 <header id="navbar"></header>
 
 <main class="wrap contenido" style="padding-top:22px">
-  <div id="aviso-verificacion"></div>
+  <div id="aviso-verificacion" data-sin-bloqueo></div>
 
   <!-- Cabecera del perfil -->
   <div class="perfil-card mb-16">
@@ -92,7 +92,7 @@
         <span>Aún no has subido tu currículum.</span>
       </div>
       <div class="fila">
-        <button type="button" class="btn btn-sm btn-gris oculto" id="cv-ver">Ver</button>
+        <button type="button" class="btn btn-sm btn-gris oculto" id="cv-ver" data-sin-bloqueo>Ver</button>
         <button class="btn btn-sm btn-primary" id="btn-cv">Subir PDF</button>
         <input type="file" id="input-cv" accept="application/pdf" class="oculto-file">
       </div>
@@ -170,8 +170,8 @@
       <button type="submit" class="btn btn-primary">Agregar</button>
     </form>
   </div>
-  <!-- Seguridad -->
-  <div class="card">
+  <!-- Seguridad: se puede usar aunque el correo no esté confirmado -->
+  <div class="card" data-sin-bloqueo>
     <div class="card-titulo"><h3>Contraseña</h3></div>
     <p class="card-sub">Cámbiala cuando quieras. Necesitas escribir la actual para confirmar.</p>
     <form id="form-password">
@@ -294,6 +294,10 @@ function pintar(datos) {
 
   scAvisoVerificacion(Number(p.correo_verificado));
   scSesion.actualizar({ nombre: p.nombre, correo_verificado: Number(p.correo_verificado) });
+
+  // Sin el correo confirmado el perfil se ve pero no se edita: el API
+  // rechazaría cualquier guardado, así que la interfaz lo dice de entrada.
+  scSoloLecturaSinVerificar(['main']);
 }
 
 /* Cada pendiente es accionable: lleva directo al campo que falta */

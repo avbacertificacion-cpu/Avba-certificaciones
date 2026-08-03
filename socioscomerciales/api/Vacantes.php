@@ -330,7 +330,8 @@ class ScVacantes {
     //  Resumen para la pantalla de inicio
     // ══════════════════════════════════════════════════════════
     public function resumenInicio(array $usuario): array {
-        $usuarioId = (int) $usuario['id'];
+        $usuarioId  = (int) $usuario['id'];
+        $verificado = (int) ($usuario['correo_verificado'] ?? 0) === 1;
 
         if ($usuario['tipo'] === 'empresa') {
             $empresaId = $this->idEmpresaPorUsuario($usuarioId);
@@ -361,9 +362,12 @@ class ScVacantes {
 
             return [
                 'status'            => 'success',
-                'correo_verificado' => (int) ($usuario['correo_verificado'] ?? 0),
+                'correo_verificado' => $verificado ? 1 : 0,
                 'metricas'          => $metricas,
-                'recientes'         => $stmt->fetchAll(),
+                // El panel muestra nombre y foto de quienes se postularon: son
+                // datos de otras personas, así que sin el correo confirmado se
+                // devuelven los contadores pero no la lista.
+                'recientes'         => $verificado ? $stmt->fetchAll() : [],
             ];
         }
 
@@ -400,7 +404,7 @@ class ScVacantes {
 
         return [
             'status'            => 'success',
-            'correo_verificado' => (int) ($usuario['correo_verificado'] ?? 0),
+            'correo_verificado' => $verificado ? 1 : 0,
             'metricas'          => $metricas,
             'sugeridas'         => $sugeridas,
         ];
