@@ -132,6 +132,38 @@
   .menu-lista button.peligro:hover { background: var(--rojo-bg); color: var(--rojo); }
   .menu-separador { height: 1px; background: var(--borde); margin: 5px 6px; }
 
+  /* ── Selección múltiple ─────────────────────────────────── */
+  .candidato-check { padding-top: 3px; flex-shrink: 0; }
+  .candidato-check input { width: 17px; height: 17px; accent-color: var(--azul); cursor: pointer; }
+  .candidato.elegido { border-color: var(--acento); background: #FAFCFF; }
+
+  .barra-seleccion {
+    display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    background: var(--azul-claro); border: 1px solid var(--acento);
+    border-radius: var(--r); padding: 11px 14px; margin-bottom: 12px;
+  }
+  .barra-seleccion-texto { font-size: 13.5px; font-weight: 700; color: var(--azul-oscuro); }
+  .barra-seleccion .btn { margin-left: auto; }
+  .barra-seleccion .btn + .btn { margin-left: 0; }
+
+  .selector-todos {
+    display: inline-flex; align-items: center; gap: 7px; cursor: pointer;
+    font-size: 12.5px; font-weight: 600; color: var(--texto-sub);
+  }
+  .selector-todos input { width: 15px; height: 15px; accent-color: var(--azul); cursor: pointer; }
+
+  .previsualizacion {
+    background: var(--gris-fondo); border: 1px solid var(--borde);
+    border-radius: var(--r-sm); padding: 13px 15px; font-size: 13.5px;
+    line-height: 1.65; color: var(--texto-sub); margin-bottom: 14px;
+  }
+  .previsualizacion strong { color: var(--texto); }
+  .lista-destinatarios {
+    max-height: 150px; overflow-y: auto; font-size: 13px; color: var(--texto-sub);
+    border: 1px solid var(--borde); border-radius: var(--r-sm); padding: 10px 12px;
+  }
+  .lista-destinatarios div { padding: 3px 0; overflow-wrap: anywhere; }
+
   /* ── Panel de candidatos ────────────────────────────────── */
   .panel { border-top: 1px solid var(--borde); background: var(--gris-fondo); padding: 16px 18px; }
   .panel-cabecera {
@@ -266,6 +298,42 @@
   <div id="lista"></div>
 </main>
 
+<!-- Modal: avisar a los seleccionados que están en revisión -->
+<div class="modal-fondo" id="modal-aviso">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="aviso-titulo">
+    <div class="modal-cabecera">
+      <h3 id="aviso-titulo">Avisar que sus documentos están en revisión</h3>
+      <button class="modal-cerrar" type="button" aria-label="Cerrar" onclick="scCerrarModal('modal-aviso')">&times;</button>
+    </div>
+    <form id="form-aviso">
+      <div class="modal-cuerpo">
+        <div class="previsualizacion" id="aviso-previa"></div>
+
+        <div class="campo">
+          <label for="aviso-destinatarios">Se enviará a</label>
+          <div class="lista-destinatarios" id="aviso-destinatarios"></div>
+        </div>
+
+        <div class="campo">
+          <label for="aviso-nota">Mensaje adicional (opcional)</label>
+          <textarea id="aviso-nota" rows="3" maxlength="1000"
+            placeholder="Ej. Estamos validando tus certificaciones vigentes. Si te falta algún documento, súbelo a tu perfil."></textarea>
+          <div class="campo-ayuda">Se añade al correo tal cual lo escribas. Máximo 1000 caracteres.</div>
+        </div>
+
+        <label class="campo-check" for="aviso-marcar" style="cursor:pointer">
+          <input type="checkbox" id="aviso-marcar" checked>
+          Marcar también su postulación como <strong>&nbsp;En revisión</strong>
+        </label>
+      </div>
+      <div class="modal-pie">
+        <button type="button" class="btn btn-gris" onclick="scCerrarModal('modal-aviso')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btn-aviso">Enviar avisos</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Modal crear/editar vacante -->
 <div class="modal-fondo" id="modal-vacante">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
@@ -329,6 +397,7 @@ let vacantes = [];   // lista completa tal cual la devuelve el API
 let porId    = {};   // id de vacante → objeto (evita JSON en atributos)
 let abiertas = {};   // id de vacante → panel de candidatos desplegado
 let cachePost = {};  // id de vacante → array de postulaciones ya cargadas
+let elegidos  = {};  // id de vacante → Set con los ids de postulación marcados
 let filtroPanel = {};// id de vacante → estatus filtrado dentro del panel
 let menuAbierto = null;
 
@@ -648,6 +717,12 @@ function pintarPanel(vacanteId) {
       return String(b.fecha || '').localeCompare(String(a.fecha || ''));
     });
 
+  const marcados = elegidos[vacanteId] || new Set();
+  // Solo cuentan los que están a la vista: si el filtro cambia, "todos"
+  // debe referirse a lo que el usuario realmente ve.
+  const visibles = lista.map(p => Number(p.id));
+  const todosVisiblesMarcados = visibles.length > 0 && visibles.every(id => marcados.has(id));
+
   panel.innerHTML = `
     <div class="panel-cabecera">
       <span class="panel-titulo">Candidatos (${todas.length})</span>
@@ -659,11 +734,64 @@ function pintarPanel(vacanteId) {
           </button>`).join('')}
       </div>
     </div>
+
+    ${marcados.size ? `
+      <div class="barra-seleccion">
+        <span class="barra-seleccion-texto">
+          ${marcados.size} ${marcados.size === 1 ? 'candidato seleccionado' : 'candidatos seleccionados'}
+        </span>
+        <button type="button" class="btn btn-sm btn-primary"
+                data-accion="avisar" data-vacante="${Number(vacanteId)}">
+          Avisar que están en revisión
+        </button>
+        <button type="button" class="btn btn-sm btn-gris"
+                data-accion="limpiar-seleccion" data-vacante="${Number(vacanteId)}">
+          Quitar selección
+        </button>
+      </div>` : ''}
+
+    ${lista.length ? `
+      <label class="selector-todos" style="margin-bottom:10px">
+        <input type="checkbox" data-accion="elegir-todos" data-vacante="${Number(vacanteId)}"
+               ${todosVisiblesMarcados ? 'checked' : ''}>
+        Seleccionar los ${lista.length} que se ven
+      </label>` : ''}
+
     <div class="panel-lista">
       ${lista.length
         ? lista.map(p => tarjetaCandidato(p, vacanteId)).join('')
         : '<p class="texto-tenue" style="font-size:13px;padding:6px 0">No hay candidatos con ese estatus.</p>'}
     </div>`;
+}
+
+/* ── Selección múltiple ─────────────────────────────────── */
+
+function alternarElegido(vacanteId, postulacionId) {
+  if (!elegidos[vacanteId]) elegidos[vacanteId] = new Set();
+  const set = elegidos[vacanteId];
+  const id = Number(postulacionId);
+
+  if (set.has(id)) set.delete(id);
+  else set.add(id);
+
+  pintarPanel(vacanteId);
+}
+
+function elegirVisibles(vacanteId, marcar) {
+  const todas = cachePost[vacanteId] || [];
+  const filtro = filtroPanel[vacanteId] || 'todas';
+  const visibles = todas.filter(p => filtro === 'todas' || p.estatus === filtro);
+
+  if (!elegidos[vacanteId]) elegidos[vacanteId] = new Set();
+  const set = elegidos[vacanteId];
+
+  visibles.forEach(p => { marcar ? set.add(Number(p.id)) : set.delete(Number(p.id)); });
+  pintarPanel(vacanteId);
+}
+
+function limpiarSeleccion(vacanteId) {
+  elegidos[vacanteId] = new Set();
+  pintarPanel(vacanteId);
 }
 
 function tarjetaCandidato(p, vacanteId) {
@@ -678,8 +806,15 @@ function tarjetaCandidato(p, vacanteId) {
       title="${activo ? 'Estatus actual' : 'Marcar como ' + d.corto}">${d.corto}</button>`;
   }).join('');
 
+  const marcado = (elegidos[vacanteId] || new Set()).has(Number(p.id));
+
   return `
-    <div class="candidato ${esNuevo ? 'nuevo' : ''} ${p.estatus === 'rechazada' ? 'descartado' : ''}" id="cand-${Number(p.id)}">
+    <div class="candidato ${esNuevo ? 'nuevo' : ''} ${p.estatus === 'rechazada' ? 'descartado' : ''} ${marcado ? 'elegido' : ''}" id="cand-${Number(p.id)}">
+      <div class="candidato-check">
+        <input type="checkbox" data-accion="elegir" data-id="${Number(p.id)}"
+               data-vacante="${Number(vacanteId)}" ${marcado ? 'checked' : ''}
+               aria-label="Seleccionar a ${scEsc(p.nombre)}">
+      </div>
       ${scAvatar(p.foto_url, p.nombre, 'md')}
       <div class="candidato-cuerpo">
         <div class="fila" style="gap:8px">
@@ -868,6 +1003,86 @@ function alternarMenu(id, boton) {
   }
 }
 
+/* ── Aviso de "documentos en revisión" ──────────────────── */
+let avisoVacante = null;
+const MAX_AVISOS = 50;   // igual que SC_MAX_AVISOS en api/helpers.php
+
+function seleccionados(vacanteId) {
+  const set = elegidos[vacanteId] || new Set();
+  return (cachePost[vacanteId] || []).filter(p => set.has(Number(p.id)));
+}
+
+function abrirAviso(vacanteId) {
+  const lista = seleccionados(vacanteId);
+  if (!lista.length) { scToast('No hay candidatos seleccionados.', 'error'); return; }
+
+  // El API no acepta más de SC_MAX_AVISOS de una vez; avisarlo aquí evita que
+  // el usuario mande el lote y se entere después de que se quedó a medias.
+  // Mismo tope que SC_MAX_AVISOS en api/helpers.php
+  if (lista.length > MAX_AVISOS) {
+    scToast(`Selecciona ${MAX_AVISOS} candidatos como máximo por envío.`, 'error');
+    return;
+  }
+
+  avisoVacante = vacanteId;
+  const v = porId[vacanteId];
+
+  document.getElementById('aviso-previa').innerHTML = `
+    Recibirán un correo de <strong>Socios Comerciales AVBA</strong> confirmando que su
+    postulación a <strong>${scEsc(v ? v.titulo : 'la vacante')}</strong> fue recibida y que
+    <strong>sus documentos están siendo revisados</strong>.`;
+
+  document.getElementById('aviso-destinatarios').innerHTML = lista.map(p => `
+    <div>${scEsc(p.nombre)} &middot; <span class="texto-tenue">${scEsc(p.correo)}</span></div>`).join('');
+
+  document.getElementById('aviso-nota').value = '';
+  document.getElementById('aviso-marcar').checked = true;
+  document.getElementById('btn-aviso').textContent =
+    lista.length === 1 ? 'Enviar 1 aviso' : `Enviar ${lista.length} avisos`;
+
+  scAbrirModal('modal-aviso');
+}
+
+document.getElementById('form-aviso').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (avisoVacante === null) return;
+
+  const lista = seleccionados(avisoVacante);
+  if (!lista.length) { scCerrarModal('modal-aviso'); return; }
+
+  const btn = document.getElementById('btn-aviso');
+  const textoBoton = btn.textContent;
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spin"></div> Enviando...';
+
+  try {
+    // Los ids viajan como texto separado por comas: el API descarta del
+    // payload cualquier valor que no sea escalar.
+    const datos = await scPost('AVISAR_REVISION', {
+      ids: lista.map(p => Number(p.id)).join(','),
+      nota: document.getElementById('aviso-nota').value.trim(),
+      marcar_revision: document.getElementById('aviso-marcar').checked,
+    });
+
+    scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
+
+    if (datos.status === 'success') {
+      scCerrarModal('modal-aviso');
+      limpiarSeleccion(avisoVacante);
+      // El estatus pudo cambiar en el servidor: se recarga el panel para no
+      // dejar la pantalla mostrando "sin revisar" a quien ya está en revisión.
+      delete cachePost[avisoVacante];
+      cargarPanel(avisoVacante);
+      cargar();
+    }
+  } catch (err) {
+    scToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoBoton;
+  }
+});
+
 /* ── Delegación de eventos ──────────────────────────────── */
 document.addEventListener('click', (e) => {
   const el = e.target.closest('[data-accion]');
@@ -889,6 +1104,12 @@ document.addEventListener('click', (e) => {
     case 'filtro-panel': filtrarPanel(Number(el.dataset.vacante), el.dataset.valor); break;
     case 'tab':          cambiarPestana(el.dataset.valor); break;
     case 'limpiar':      limpiarFiltros(); break;
+
+    // Selección múltiple de candidatos
+    case 'elegir':       alternarElegido(Number(el.dataset.vacante), id); break;
+    case 'elegir-todos': elegirVisibles(Number(el.dataset.vacante), el.checked); break;
+    case 'limpiar-seleccion': limpiarSeleccion(Number(el.dataset.vacante)); break;
+    case 'avisar':       abrirAviso(Number(el.dataset.vacante)); break;
   }
 });
 

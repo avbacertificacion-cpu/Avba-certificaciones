@@ -25,6 +25,16 @@ const SC_PASSWORD_MIN = 8;
 const SC_TERMINOS_VERSION = '2026-08-03';
 
 /**
+ * Quién firma el aviso de "documentos en revisión" que se manda a los
+ * postulantes. Se deja en una constante porque es texto de cara al candidato
+ * y cambiarlo no debería obligar a tocar la lógica de envío.
+ */
+const SC_REVISOR = 'AVBA Inspections, Certifications and Maintenance';
+
+/** Máximo de postulantes a los que se avisa de una sola vez. */
+const SC_MAX_AVISOS = 50;
+
+/**
  * Coste de bcrypt, fijado a propósito en vez de usar el de por defecto:
  * PHP lo subió de 10 a 12 entre versiones, así que sin fijarlo el mismo
  * código produce hashes de distinta dureza según el servidor — y el hash de
@@ -216,6 +226,27 @@ function scPaginacion(array $filtros, int $porDefecto = 24, int $maxLimite = 60)
     if ($offset > 100000) $offset = 100000;   // tope duro, evita escaneos absurdos
 
     return [$limite, $offset];
+}
+
+/**
+ * Convierte "12,7,12,x,9" en [12, 7, 9].
+ *
+ * Las selecciones múltiples llegan como texto y no como array porque el
+ * router descarta del payload todo lo que no sea escalar (ver index.php): un
+ * ?ids[]=... o un JSON con array haría fallar los trim() posteriores.
+ * Devuelve enteros positivos, sin repetidos y como mucho $max.
+ */
+function scListaIds($valor, int $max = 100): array {
+    if (is_array($valor)) $partes = $valor;
+    else                  $partes = explode(',', (string) $valor);
+
+    $ids = [];
+    foreach ($partes as $parte) {
+        $n = (int) trim((string) $parte);
+        if ($n > 0 && !in_array($n, $ids, true)) $ids[] = $n;
+        if (count($ids) >= $max) break;
+    }
+    return $ids;
 }
 
 /** Valida una fecha ISO (YYYY-MM-DD); devuelve null si no lo es. */

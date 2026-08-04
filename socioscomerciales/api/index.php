@@ -511,6 +511,13 @@ if ($method === 'POST') {
             $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($vacantes->cambiarEstatusPostulacion((int) $usr['id'], $payload));
 
+        // Aviso masivo de "documentos en revisión" a varios postulantes.
+        // Los ids llegan en un texto separado por comas: el saneado de arriba
+        // descarta del payload todo lo que no sea escalar.
+        case 'AVISAR_REVISION':
+            $usr = scSesionVerificada($pdo, $token, 'empresa');
+            scRespuesta($vacantes->avisarRevision((int) $usr['id'], $payload));
+
         // ── Administración ──────────────────────────────────
         case 'ADMIN_BLOQUEAR':
             $usr = scSesionAdmin($pdo, $token);

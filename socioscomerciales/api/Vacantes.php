@@ -365,6 +365,147 @@ class ScVacantes {
         return ['status' => 'success', 'message' => 'Estatus actualizado.'];
     }
 
+    /**
+     * Avisa por correo a varios postulantes de que sus documentos están en
+     * revisión, y opcionalmente los marca como "en revisión".
+     *
+     * Solo alcanza a postulaciones de vacantes de esta empresa: la consulta
+     * ya filtra por empresa_id, así que meter el id de la postulación de otra
+     * empresa simplemente no devuelve fila y se cuenta como omitida.
+     *
+     * Es la única acción del portal que manda muchos correos de golpe, así
+     * que va con tope (SC_MAX_AVISOS) y con límite por hora: un envío masivo
+     * repetido acabaría con el dominio marcado como spam.
+     */
+    public function avisarRevision(int $usuarioId, array $payload): array {
+        $empresaId = $this->idEmpresaPorUsuario($usuarioId);
+        if (!$empresaId) return ['status' => 'error', 'message' => 'Perfil de empresa no encontrado.'];
+
+        // Se leen sin tope para poder avisar si venían de más, en vez de
+        // recortar en silencio y dejar a unos cuantos sin correo.
+        $pedidos = scListaIds($payload['ids'] ?? '', 500);
+        if (!$pedidos) {
+            return ['status' => 'error', 'message' => 'No seleccionaste a ningún candidato.'];
+        }
+        if (count($pedidos) > SC_MAX_AVISOS) {
+            return [
+                'status'  => 'error',
+                'message' => 'Selecciona como máximo ' . SC_MAX_AVISOS . ' candidatos por envío. '
+                           . 'Enviar más de golpe hace que los correos acaben marcados como spam.',
+            ];
+        }
+        $ids = $pedidos;
+
+        if (!scLimite($this->pdo, 'avisos', (string) $usuarioId, 6, 3600)) {
+            return [
+                'status'  => 'error',
+                'message' => 'Has enviado varios avisos masivos en la última hora. Espera un poco antes de mandar más.',
+            ];
+        }
+
+        $marcar = !empty($payload['marcar_revision']) && $payload['marcar_revision'] !== 'false';
+        $nota   = scTexto($payload['nota'] ?? null, 1000);
+
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        $stmt = $this->pdo->prepare(
+            "SELECT po.id, po.estatus, per.nombre, u.correo, v.titulo, e.nombre AS empresa
+             FROM sc_postulaciones po
+             JOIN sc_vacantes v  ON v.id = po.vacante_id
+             JOIN sc_empresas e  ON e.id = v.empresa_id
+             JOIN sc_personas per ON per.id = po.persona_id
+             JOIN sc_usuarios u  ON u.id = per.usuario_id
+             WHERE po.id IN ({$marcas}) AND v.empresa_id = ? AND u.activo = 1"
+        );
+        $stmt->execute(array_merge($ids, [$empresaId]));
+        $postulaciones = $stmt->fetchAll();
+
+        if (!$postulaciones) {
+            return ['status' => 'error', 'message' => 'Ninguna de las postulaciones seleccionadas es de tus vacantes.'];
+        }
+
+        // Enviar correo es lento; sin esto un lote grande podía cortarse a la
+        // mitad y dejar a unos avisados y a otros no, sin saber a quiénes.
+        @set_time_limit(120);
+
+        $enviados = 0;
+        $fallidos = [];
+
+        foreach ($postulaciones as $po) {
+            if ($this->enviarAvisoRevision($po, $nota)) $enviados++;
+            else $fallidos[] = $po['nombre'];
+        }
+
+        // El estatus se cambia después del envío y solo sobre lo que seguía
+        // sin revisar: marcar antes dejaría a alguien "en revisión" sin que le
+        // hubiera llegado nada.
+        $marcados = 0;
+        if ($marcar) {
+            $idsOk  = array_column($postulaciones, 'id');
+            $marcas = implode(',', array_fill(0, count($idsOk), '?'));
+            $upd = $this->pdo->prepare(
+                "UPDATE sc_postulaciones SET estatus = 'en_revision'
+                 WHERE id IN ({$marcas}) AND estatus = 'enviada'"
+            );
+            $upd->execute($idsOk);
+            $marcados = $upd->rowCount();
+        }
+
+        $omitidos = count($ids) - count($postulaciones);
+
+        $partes = [$enviados === 1 ? 'Se avisó a 1 candidato.' : "Se avisó a {$enviados} candidatos."];
+        if ($marcados)         $partes[] = $marcados === 1 ? '1 pasó a "en revisión".' : "{$marcados} pasaron a \"en revisión\".";
+        if ($fallidos)         $partes[] = 'No salió el correo de: ' . implode(', ', array_slice($fallidos, 0, 5)) . '.';
+        if ($omitidos > 0)     $partes[] = "{$omitidos} se omitieron por no corresponder a tus vacantes.";
+
+        return [
+            'status'   => $enviados > 0 ? 'success' : 'error',
+            'message'  => implode(' ', $partes),
+            'enviados' => $enviados,
+            'marcados' => $marcados,
+            'fallidos' => count($fallidos),
+        ];
+    }
+
+    /** Correo de "tus documentos están en revisión" para un postulante. */
+    private function enviarAvisoRevision(array $po, ?string $nota): bool {
+        $cuerpo = '<p>Hola ' . htmlspecialchars($po['nombre']) . ',</p>
+            <p>Te confirmamos que recibimos tu postulación a
+            <strong>' . htmlspecialchars($po['titulo']) . '</strong> y que
+            <strong>tus documentos están siendo revisados por '
+            . htmlspecialchars(SC_REVISOR) . '</strong>.</p>
+            <p>No necesitas hacer nada por ahora. Te escribiremos en cuanto haya
+            una respuesta sobre tu proceso.</p>';
+
+        // La nota la escribe la empresa: se escapa y se respetan los saltos de
+        // línea, para que no pueda meter HTML en un correo que firma AVBA.
+        if ($nota) {
+            $cuerpo .= '<p style="background:#F4F7FB;border-left:3px solid #185FA5;padding:12px 14px;'
+                     . 'border-radius:6px;white-space:pre-line">'
+                     . nl2br(htmlspecialchars($nota)) . '</p>';
+        }
+
+        $cuerpo .= '<p style="font-size:12.5px;color:#8792a8">Postulación enviada a '
+                 . htmlspecialchars($po['empresa']) . ' a través de Socios Comerciales AVBA.</p>';
+
+        $html = scPlantillaCorreo(
+            'Tus documentos están en revisión',
+            $cuerpo,
+            'Ver mis postulaciones',
+            scUrlBase() . '/mis-postulaciones.html'
+        );
+
+        try {
+            return scEnviarCorreo(
+                $po['correo'],
+                'Tus documentos están en revisión — ' . $po['titulo'],
+                $html
+            );
+        } catch (Throwable $e) {
+            error_log('enviarAvisoRevision: ' . $e->getMessage());
+            return false;
+        }
+    }
+
     // ══════════════════════════════════════════════════════════
     //  Resumen para la pantalla de inicio
     // ══════════════════════════════════════════════════════════

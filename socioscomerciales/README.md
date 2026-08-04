@@ -190,6 +190,35 @@ existían**; si hace falta, se resuelve mostrando un aviso bloqueante en
 > fuero y las direcciones de contacto, que hoy son `contacto@avba.com.mx` y
 > `privacidad@avba.com.mx` y **tienen que existir**.
 
+## Aviso masivo a los postulantes
+
+En **`mis-vacantes.html`**, al desplegar los candidatos de una vacante, cada
+uno lleva una casilla. Seleccionando varios aparece una barra con **"Avisar que
+están en revisión"**, que manda a todos un correo confirmando que su
+postulación se recibió y que **sus documentos están siendo revisados por
+`SC_REVISOR`** (en `api/helpers.php`, hoy "AVBA Inspections, Certifications and
+Maintenance"). Se puede añadir un mensaje propio y, de paso, marcar sus
+postulaciones como "En revisión".
+
+Detalles que importan:
+
+- El selector **"seleccionar los que se ven"** respeta el filtro de estatus: si
+  estás en "Sin revisar", marca solo esos.
+- El correo se manda **antes** de cambiar el estatus, y el cambio solo alcanza
+  a los que seguían en "enviada". Al revés, alguien podría quedar marcado como
+  "en revisión" sin que le hubiera llegado nada.
+- La consulta filtra por `empresa_id`, así que un id de la postulación de otra
+  empresa simplemente no devuelve fila y se cuenta como omitido.
+- **Tope de 50 por envío** (`SC_MAX_AVISOS`) y 6 envíos por hora y empresa. Es
+  la única acción del portal que manda muchos correos de golpe; sin freno, el
+  dominio acaba marcado como spam. Si se seleccionan más de 50 se rechaza el
+  lote entero con un mensaje, en vez de recortar en silencio y dejar a unos
+  cuantos sin correo.
+- El mensaje adicional lo escribe la empresa y va en un correo que firma AVBA,
+  así que se escapa con `htmlspecialchars` + `nl2br`: no puede meter HTML.
+- Los ids viajan como **texto separado por comas**, no como array: el router
+  descarta del payload todo lo que no sea escalar (`scListaIds` los reconstruye).
+
 ## Administración
 
 `admin.html` lista todas las cuentas del portal (candidatos y empresas), con
