@@ -34,6 +34,7 @@
   "alternateName": "AVBA",
   "url": "https://www.avba.com.mx/",
   "logo": "https://www.avba.com.mx/assets/avba-logo.png",
+  "email": "Certificaciones@avba.com.mx",
   "areaServed": "MX",
   "description": "Inspección, certificación y mantenimiento de equipos de izaje, capacitación DC-3 y seguridad industrial en toda la República Mexicana.",
   "contactPoint": [
@@ -426,6 +427,32 @@
   .contact-card h3{font-size:16px;font-weight:700;margin-bottom:7px;}
   .contact-card p{font-size:14px;color:var(--texto-sub);margin-bottom:20px;}
 
+  /* Correo general */
+  .correo-bloque{
+    display:flex;align-items:center;gap:20px;
+    max-width:920px;margin:0 auto 24px;padding:24px 28px;
+    background:linear-gradient(135deg,var(--azul-light),var(--superficie) 72%);
+    border:1px solid var(--borde);border-radius:var(--radio);
+    box-shadow:var(--sombra-sm);
+    transition:transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s, border-color .22s;
+  }
+  .correo-bloque:hover{transform:translateY(-4px);box-shadow:var(--sombra);border-color:var(--brand-ink);}
+  .correo-icono{
+    width:56px;height:56px;border-radius:16px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--superficie);color:var(--brand-ink);box-shadow:var(--sombra-sm);
+  }
+  .correo-icono svg{width:27px;height:27px;}
+  .correo-texto{display:flex;flex-direction:column;gap:3px;flex-grow:1;min-width:0;}
+  .correo-texto strong{font-size:18px;font-weight:800;letter-spacing:-.3px;color:var(--texto);word-break:break-word;}
+  .correo-texto > span{font-size:13.5px;color:var(--texto-sub);}
+  .correo-cta{
+    display:inline-flex;align-items:center;gap:8px;flex-shrink:0;
+    font-size:14px;font-weight:700;color:var(--brand-ink);
+  }
+  .correo-cta svg{width:16px;height:16px;transition:transform .22s;}
+  .correo-bloque:hover .correo-cta svg{transform:translateX(4px);}
+
   /* Zonas de atención */
   .zona{
     background:var(--superficie);border:1px solid var(--borde);border-radius:var(--radio);
@@ -483,7 +510,7 @@
   /* ── Footer ───────────────────────────────── */
   .site-footer{background:var(--hero-a);color:#9EB0CA;padding:60px 0 30px;}
   .footer-grid{
-    display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:44px;
+    display:grid;grid-template-columns:1.5fr 1fr 1fr 1.2fr;gap:40px;
     padding-bottom:36px;border-bottom:1px solid rgba(255,255,255,.11);
   }
   .footer-brand img{width:180px;height:auto;margin-bottom:18px;}
@@ -891,6 +918,20 @@
         <p>Cuéntanos qué equipos tienes y en qué estado están sus certificaciones. Te respondemos con un alcance y una propuesta clara, sin rodeos.</p>
       </div>
 
+      <a class="correo-bloque reveal" href="mailto:Certificaciones@avba.com.mx">
+        <span class="correo-icono">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m2.5 7 9.5 6 9.5-6"/></svg>
+        </span>
+        <span class="correo-texto">
+          <strong>Certificaciones@avba.com.mx</strong>
+          <span>Escríbenos con el detalle de tus equipos y te respondemos con un alcance y una propuesta.</span>
+        </span>
+        <span class="correo-cta">
+          Enviar correo
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </span>
+      </a>
+
       <div class="contact-grid">
 
         <div class="zona reveal" style="--c1:var(--brand-ink);--bg:var(--azul-light);">
@@ -1011,6 +1052,16 @@
           <li><a href="https://gestion.avba.com.mx/socioscomerciales/" target="_blank" rel="noopener">Socios comerciales</a></li>
           <li><a href="https://gestion.avba.com.mx/extintores" target="_blank" rel="noopener">Extintores</a></li>
           <li><a href="#contacto">Contacto</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h4>Contacto</h4>
+        <ul>
+          <li><a href="mailto:Certificaciones@avba.com.mx">Certificaciones@avba.com.mx</a></li>
+          <li><a href="tel:+528991373127">Norte · +52 899 137 3127</a></li>
+          <li><a href="tel:+527715181523">Centro · +52 771 518 1523</a></li>
+          <li><a href="tel:+529516086188">Sur · +52 951 608 6188</a></li>
         </ul>
       </div>
     </div>
