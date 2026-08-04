@@ -1,7 +1,7 @@
 <?php
 /**
  * AVBA Certificaciones — Demo Data Seeder
- * Crea usuario demo "CONSTRUCTORA DEMO S.A. DE C.V." con parque completo de
+ * Crea el perfil demo "ArcelorMittal" con parque completo de
  * equipos, personal, proveedores, catálogo de materiales, solicitudes de
  * material (en distintos estados) y reportes de mantenimiento con fotos y
  * PDF reales — para que el portal de cliente se vea completamente activo.
@@ -73,7 +73,7 @@ echo "=== AVBA Demo Seeder ===\n\n";
 // ── 1. Crear usuario demo ─────────────────────────────────────────────────────
 $demoUsuario = 'Demo';
 $demoPass    = password_hash('Demo2026', PASSWORD_DEFAULT);
-$demoNombre  = 'CONSTRUCTORA DEMO S.A. DE C.V.';
+$demoNombre  = 'ArcelorMittal';
 $demoIdCli   = '00001';
 
 // Migrar usuario anterior si aún existe con el nombre viejo
@@ -787,7 +787,7 @@ echo "✅ " . count($materialesDemo) . " materiales en catálogo\n";
 // ── CONFIGURACIÓN DEL CLIENTE ────────────────────────────────────────────
 $cliCfg->guardar([
     'razon_social' => $demoNombre,
-    'rfc'          => 'CDE180523LK9',
+    'rfc'          => 'AMM180523LK9',   // RFC ficticio, solo para el demo
 ], [], $demoIdCli);
 echo "✅ Configuración del cliente (razón social/RFC)\n";
 
