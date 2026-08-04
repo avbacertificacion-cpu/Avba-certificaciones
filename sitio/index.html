@@ -3,21 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>AVBA — Inspección, Certificación y Mantenimiento de Equipos de Izaje | México</title>
-<meta name="description" content="AVBA Inspections, Certifications and Maintenance: inspección y certificación de equipos de izaje, pruebas de carga, mantenimiento, capacitación DC-3 y extintores. Cobertura en toda la República Mexicana.">
+<title>AVBA | Inspección y Certificación de Equipos de Izaje</title>
+<meta name="description" content="Inspección, certificación y mantenimiento de equipos de izaje en todo México. Pruebas de carga, capacitación DC-3 y certificados digitales verificables.">
 <meta name="robots" content="index, follow">
 <link rel="canonical" href="https://www.avba.com.mx/">
 
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="AVBA Inspections, Certifications and Maintenance">
-<meta property="og:title" content="AVBA — Inspección, Certificación y Mantenimiento de Equipos de Izaje">
-<meta property="og:description" content="Inspección y certificación de equipos de izaje, pruebas de carga, mantenimiento, capacitación DC-3 y extintores. Cobertura en toda la República Mexicana.">
+<meta property="og:title" content="AVBA | Inspección y Certificación de Equipos de Izaje">
+<meta property="og:description" content="Inspección, certificación y mantenimiento de equipos de izaje en todo México. Pruebas de carga, capacitación DC-3 y certificados digitales verificables.">
 <meta property="og:url" content="https://www.avba.com.mx/">
 <meta property="og:image" content="https://www.avba.com.mx/assets/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:locale" content="es_MX">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="AVBA — Inspección, Certificación y Mantenimiento de Equipos de Izaje">
-<meta name="twitter:description" content="Inspección y certificación de equipos de izaje, pruebas de carga, mantenimiento, capacitación DC-3 y extintores en toda México.">
+<meta name="twitter:title" content="AVBA | Inspección y Certificación de Equipos de Izaje">
+<meta name="twitter:description" content="Inspección, certificación y mantenimiento de equipos de izaje en todo México. Pruebas de carga, capacitación DC-3 y certificados verificables.">
 <meta name="twitter:image" content="https://www.avba.com.mx/assets/og-image.png">
 
 <link rel="icon" href="assets/favicon.png" type="image/png" sizes="128x128">
@@ -32,9 +34,13 @@
   "alternateName": "AVBA",
   "url": "https://www.avba.com.mx/",
   "logo": "https://www.avba.com.mx/assets/avba-logo.png",
-  "email": "contacto@avba.com.mx",
   "areaServed": "MX",
-  "description": "Inspección, certificación y mantenimiento de equipos de izaje, capacitación DC-3 y seguridad industrial en toda la República Mexicana."
+  "description": "Inspección, certificación y mantenimiento de equipos de izaje, capacitación DC-3 y seguridad industrial en toda la República Mexicana.",
+  "contactPoint": [
+    {"@type":"ContactPoint","name":"Zona Norte","telephone":"+52-899-137-3127","contactType":"sales","areaServed":"MX","availableLanguage":"Spanish"},
+    {"@type":"ContactPoint","name":"Zona Centro","telephone":"+52-771-518-1523","contactType":"sales","areaServed":"MX","availableLanguage":"Spanish"},
+    {"@type":"ContactPoint","name":"Zona Sur","telephone":"+52-951-608-6188","contactType":"sales","areaServed":"MX","availableLanguage":"Spanish"}
+  ]
 }
 </script>
 
@@ -247,6 +253,17 @@
   .hero-brand-card li{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:600;color:#12233D;}
   .hero-brand-card li svg{width:18px;height:18px;color:var(--verde);flex-shrink:0;}
 
+  /* ── Barra de credibilidad ────────────────── */
+  .credibilidad{
+    background:var(--superficie);border-bottom:1px solid var(--borde);
+    padding:22px 0;
+  }
+  .cred-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;}
+  .cred{display:flex;align-items:center;gap:12px;justify-content:center;text-align:left;}
+  .cred svg{width:24px;height:24px;color:var(--brand-ink);flex-shrink:0;}
+  .cred span{font-size:13.5px;color:var(--texto-sub);line-height:1.35;}
+  .cred strong{display:block;font-weight:700;color:var(--texto);}
+
   /* ═══ Secciones ════════════════════════════ */
   .section{padding:96px 0;}
   .section-alt{background:var(--superficie);}
@@ -347,6 +364,8 @@
     display:flex;align-items:center;justify-content:center;
   }
   .about-points .chk svg{width:15px;height:15px;}
+  .about-points strong{font-weight:700;color:var(--texto);}
+  .about-points li > span:last-child{color:var(--texto-sub);}
   .about-visual{
     background:linear-gradient(158deg,var(--azul-light),var(--superficie) 70%);
     border:1px solid var(--borde);border-radius:24px;padding:36px 30px;
@@ -406,11 +425,60 @@
   .c-icon svg{width:26px;height:26px;}
   .contact-card h3{font-size:16px;font-weight:700;margin-bottom:7px;}
   .contact-card p{font-size:14px;color:var(--texto-sub);margin-bottom:20px;}
-  .pendiente{
-    display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;
-    color:var(--texto-sub);background:var(--superficie-2);border:1px dashed var(--borde);
-    padding:9px 16px;border-radius:11px;
+
+  /* Zonas de atención */
+  .zona{
+    background:var(--superficie);border:1px solid var(--borde);border-radius:var(--radio);
+    padding:28px 24px;box-shadow:var(--sombra-sm);text-align:center;
+    transition:transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s, border-color .22s;
   }
+  .zona:hover{transform:translateY(-5px);box-shadow:var(--sombra);border-color:var(--c1);}
+  .z-head{display:flex;align-items:center;justify-content:center;gap:11px;margin-bottom:14px;}
+  .z-pin{
+    width:42px;height:42px;border-radius:13px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--c1);
+  }
+  .z-pin svg{width:22px;height:22px;}
+  .zona h3{font-size:17px;font-weight:700;}
+  .z-tel{
+    display:block;font-size:19px;font-weight:800;letter-spacing:-.4px;
+    color:var(--c1);margin-bottom:20px;
+  }
+  .z-tel:hover{text-decoration:underline;}
+  .z-acciones{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;}
+  .btn-wa{background:#25D366;color:#0A2E17;box-shadow:0 6px 16px rgba(37,211,102,.3);}
+  .btn-wa:hover{background:#1FBE5A;box-shadow:0 10px 24px rgba(37,211,102,.42);}
+
+  .sedes{
+    display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:12px;
+    max-width:920px;margin:34px auto 0;padding-top:26px;border-top:1px solid var(--borde);
+  }
+  .sedes-label{
+    font-size:11.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--texto-sub);
+  }
+  .sedes-lista{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
+  .sedes-lista span{
+    font-size:13.5px;font-weight:600;color:var(--texto);
+    background:var(--superficie-2);border:1px solid var(--borde);
+    padding:7px 15px;border-radius:99px;
+  }
+
+  /* ── Cierre / CTA ─────────────────────────── */
+  .cta-final{
+    color:#fff;padding:84px 0;
+    background:
+      radial-gradient(700px 380px at 78% 0%, rgba(0,144,96,.28) 0%, transparent 62%),
+      radial-gradient(760px 420px at 12% 100%, rgba(0,132,192,.32) 0%, transparent 64%),
+      linear-gradient(150deg,var(--hero-a),var(--hero-b));
+  }
+  .cta-inner{max-width:760px;text-align:center;}
+  .cta-final h2{font-size:clamp(25px,3.2vw,38px);font-weight:800;margin-bottom:16px;}
+  .cta-final h2 .hl{
+    background:linear-gradient(100deg,var(--acento),#7FE3B4);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+  }
+  .cta-final p{color:#C2D5EE;font-size:16.5px;margin-bottom:30px;}
+  .cta-botones{display:flex;flex-wrap:wrap;gap:13px;justify-content:center;}
 
   /* ── Footer ───────────────────────────────── */
   .site-footer{background:var(--hero-a);color:#9EB0CA;padding:60px 0 30px;}
@@ -447,6 +515,9 @@
     .footer-grid{grid-template-columns:1fr 1fr;}
     .footer-brand{grid-column:1 / -1;}
   }
+  @media (max-width:900px){
+    .cred-grid{grid-template-columns:repeat(2,1fr);gap:20px 14px;}
+  }
   @media (max-width:820px){
     nav.main-nav{
       position:fixed;inset:80px 0 0;background:var(--superficie);
@@ -471,7 +542,13 @@
     nav.main-nav{inset:70px 0 0;}
     .hero-ctas{flex-direction:column;align-items:stretch;}
     .hero-ctas .btn{width:100%;}
-    .servicio,.division{padding:26px 22px;}
+    .servicio,.division,.zona{padding:26px 22px;}
+    .cred-grid{grid-template-columns:1fr;gap:14px;}
+    .cred{justify-content:flex-start;}
+    .z-acciones{flex-direction:column;}
+    .z-acciones .btn{width:100%;}
+    .cta-botones{flex-direction:column;}
+    .cta-botones .btn{width:100%;}
     .footer-grid{grid-template-columns:1fr;gap:32px;}
     .footer-bottom{flex-direction:column;}
   }
@@ -520,19 +597,19 @@
     <div class="container hero-grid">
       <div>
         <span class="eyebrow"><span class="dot"></span> Cobertura en toda la República Mexicana</span>
-        <h1>Inspección, certificación y mantenimiento de <span class="hl">equipos de izaje</span>.</h1>
-        <p class="lead">En AVBA mantenemos tu operación segura y en cumplimiento: inspecciones normativas, pruebas de carga, mantenimiento, capacitación DC-3 y seguridad contra incendio, con certificados verificables en línea.</p>
+        <h1>En cada carga hay una decisión. Asegúrate de que sea la <span class="hl">correcta</span>.</h1>
+        <p class="lead">Inspeccionamos, certificamos y damos mantenimiento a equipos de izaje bajo normas ASME, OSHA y DIN. Porque una grúa sin certificar no es un riesgo operativo: es un riesgo humano y legal.</p>
         <div class="hero-ctas">
-          <a href="#servicios" class="btn btn-light">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
-            Ver nuestros servicios
+          <a href="#contacto" class="btn btn-light">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><path d="M12 3 4 6v6c0 5 3.4 8.6 8 10 4.6-1.4 8-5 8-10V6Z"/></svg>
+            Solicitar inspección
           </a>
-          <a href="#divisiones" class="btn btn-ghost-light">Acceder a nuestras divisiones</a>
+          <a href="https://gestion.avba.com.mx/validar.html" target="_blank" rel="noopener" class="btn btn-ghost-light">Validar un certificado</a>
         </div>
         <div class="hero-stats">
-          <div><strong>Cobertura nacional</strong><span>Servicio en todo México</span></div>
-          <div><strong>Certificación digital</strong><span>Validación por QR y folio</span></div>
-          <div><strong>Normatividad vigente</strong><span>Seguridad industrial</span></div>
+          <div><strong>ASME · OSHA · DIN</strong><span>Criterios normativos</span></div>
+          <div><strong>Folio y código QR</strong><span>Certificados verificables</span></div>
+          <div><strong>Norte · Centro · Sur</strong><span>Atención por zonas</span></div>
         </div>
       </div>
 
@@ -548,13 +625,35 @@
     </div>
   </section>
 
+  <!-- ═══ BARRA DE CREDIBILIDAD ══════════════ -->
+  <section class="credibilidad" aria-label="Respaldo de AVBA">
+    <div class="container cred-grid">
+      <div class="cred">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2 20 5.5V11c0 5.5-3.2 9.5-8 11-4.8-1.5-8-5.5-8-11V5.5Z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>Normas <strong>ASME · OSHA · DIN</strong></span>
+      </div>
+      <div class="cred">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.4"/><rect x="14" y="3" width="7" height="7" rx="1.4"/><rect x="3" y="14" width="7" height="7" rx="1.4"/><path d="M14 14h3v3h-3zM19.5 14H21M14 19.5V21M18 21h3v-3"/></svg>
+        <span>Certificados <strong>verificables por QR</strong></span>
+      </div>
+      <div class="cred">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18a15 15 0 0 1 0-18Z"/></svg>
+        <span>Cobertura en <strong>toda la República</strong></span>
+      </div>
+      <div class="cred">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10 12 4.5 2 10l10 5.5Z"/><path d="M6 12v4.5c0 1.4 2.7 2.8 6 2.8s6-1.4 6-2.8V12"/></svg>
+        <span>Capacitación con <strong>constancia DC-3</strong></span>
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ SERVICIOS (prioridad) ══════════════ -->
   <section class="section section-alt" id="servicios">
     <div class="container">
       <div class="section-head reveal">
         <span class="tag">Nuestros servicios</span>
         <h2>Todo lo que tu operación necesita, en un solo aliado</h2>
-        <p>Soluciones integrales de inspección, certificación, mantenimiento y capacitación para la seguridad y el cumplimiento normativo de tus equipos y tu personal.</p>
+        <p>Inspección, prueba de carga, mantenimiento y capacitación con un solo proveedor. Un hallazgo no se queda en el reporte: se cierra.</p>
       </div>
 
       <div class="servicios-grid">
@@ -564,12 +663,12 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h8"/><path d="M11 21V7l9-4v13"/><path d="M11 7 4 10v11"/><path d="M20 16h1.5"/><circle cx="16" cy="16" r="1"/></svg>
           </div>
           <h3>Inspección y certificación de equipos de izaje</h3>
-          <p>Nuestro servicio principal: evaluación normativa completa de grúas, polipastos, aparejos y accesorios de izaje, con emisión de certificado digital verificable por QR o folio.</p>
+          <p>Un equipo sin inspección vigente es una falla esperando su turno. Nosotros la encontramos antes que la carga.</p>
           <ul class="s-list">
-            <li>Grúas viajeras, torre y móviles</li>
-            <li>Polipastos y diferenciales</li>
-            <li>Eslingas, cadenas y accesorios</li>
-            <li>Dictamen técnico y certificado digital</li>
+            <li>Grúas viajeras, de torre y móviles, polipastos, eslingas, cadenas y aparejos</li>
+            <li>Evaluación bajo criterios ASME, OSHA y DIN</li>
+            <li>Certificado digital con folio único y código QR, verificable en cualquier momento</li>
+            <li>Dictamen técnico con hallazgos y recomendaciones</li>
           </ul>
         </article>
 
@@ -578,9 +677,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v5"/><path d="M5 7h14l-1.6 5.4a5.8 5.8 0 0 1-10.8 0Z"/><path d="M12 17v5"/><path d="M8.5 22h7"/></svg>
           </div>
           <h3>Pruebas de carga</h3>
-          <p>Pruebas estáticas y dinámicas que verifican la capacidad real y segura de tus equipos e instalaciones.</p>
+          <p>La capacidad nominal se demuestra, no se supone. Comprobamos que el equipo resiste lo que dice resistir.</p>
           <ul class="s-list">
-            <li>Estáticas</li><li>Dinámicas</li><li>Con reporte técnico</li>
+            <li>Estáticas y dinámicas</li><li>Frenos y límites de recorrido</li><li>Memoria técnica de la prueba</li>
           </ul>
         </article>
 
@@ -589,9 +688,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 1 5.4-5.4Z"/></svg>
           </div>
           <h3>Mantenimiento de equipos</h3>
-          <p>Programas preventivos y correctivos que extienden la vida útil y la confiabilidad de tu maquinaria.</p>
+          <p>El mantenimiento correctivo cuesta producción; el preventivo cuesta una visita programada. Tú decides cuál pagas.</p>
           <ul class="s-list">
-            <li>Preventivo</li><li>Correctivo</li><li>Programado</li>
+            <li>Preventivo y correctivo</li><li>Componentes críticos</li><li>Cierre de hallazgos</li><li>Rutinas programadas</li>
           </ul>
         </article>
 
@@ -600,9 +699,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10 12 4.5 2 10l10 5.5Z"/><path d="M6 12v4.5c0 1.4 2.7 2.8 6 2.8s6-1.4 6-2.8V12"/><path d="M22 10v5"/></svg>
           </div>
           <h3>Capacitación y DC-3</h3>
-          <p>Formación técnica para operadores y personal de seguridad, con constancia DC-3 al finalizar.</p>
+          <p>El equipo puede estar certificado. Si el operador no lo está, el riesgo sigue completo.</p>
           <ul class="s-list">
-            <li>Operadores</li><li>Seguridad</li><li>Constancia DC-3</li>
+            <li>Operadores, señaleros y aparejadores</li><li>Constancia DC-3</li><li>Diplomado en Cálculo de Cargas</li><li>Programas en sitio</li>
           </ul>
         </article>
 
@@ -611,9 +710,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2c1 2-1 3-1 5a3 3 0 0 0 6 0c0-1-.5-2-1-3 2 1 4 4 4 7a8 8 0 1 1-16 0c0-3 2-5 4-6 0 0-.5 2 1 3 1-2-1-4 3-6Z"/></svg>
           </div>
           <h3>Extintores y seguridad industrial</h3>
-          <p>Suministro, recarga y mantenimiento de extintores, además de asesoría en seguridad contra incendio.</p>
+          <p>Un extintor vencido pesa lo mismo que uno cargado. La diferencia se descubre en el peor momento.</p>
           <ul class="s-list">
-            <li>Recarga</li><li>Mantenimiento</li><li>Suministro</li>
+            <li>Recarga y mantenimiento</li><li>Control de vigencias</li><li>Equipo contra incendio</li>
           </ul>
         </article>
 
@@ -627,7 +726,7 @@
       <div class="section-head reveal">
         <span class="tag">Nuestras divisiones</span>
         <h2>Accede a la división que necesitas</h2>
-        <p>Cada división de AVBA cuenta con su propia plataforma digital. Entra directamente para gestionar, validar o colaborar con nosotros.</p>
+        <p>Cada división opera con su propia plataforma digital. Entra directo a la que necesitas.</p>
       </div>
 
       <div class="div-grid">
@@ -640,8 +739,8 @@
             <span class="d-badge">Certificaciones</span>
           </div>
           <h3>Sistema AVBA</h3>
-          <p>Plataforma de gestión de inspecciones, control de calidad y emisión de certificaciones para clientes y personal técnico.</p>
-          <span class="d-go">Ir al sistema
+          <p>Administra tus certificaciones en un solo lugar: equipos, vigencias, hallazgos y documentación lista para cuando te la pidan.</p>
+          <span class="d-go">Entrar al sistema
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
           </span>
         </a>
@@ -654,8 +753,8 @@
             <span class="d-badge">Público</span>
           </div>
           <h3>Validación de certificados</h3>
-          <p>Confirma la autenticidad de cualquier certificado emitido por AVBA usando su folio o código QR. Acceso libre, sin registro.</p>
-          <span class="d-go">Validar ahora
+          <p>Consulta pública por folio o código QR. Confirma en segundos si un certificado AVBA es auténtico y está vigente.</p>
+          <span class="d-go">Validar certificado
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
           </span>
         </a>
@@ -668,8 +767,8 @@
             <span class="d-badge">Alianzas</span>
           </div>
           <h3>Socios comerciales</h3>
-          <p>Directorio de socios comerciales y bolsa de trabajo para quienes quieren sumarse y colaborar con AVBA.</p>
-          <span class="d-go">Ver portal
+          <p>Directorio de socios comerciales y bolsa de trabajo especializada en izaje, mantenimiento industrial y seguridad.</p>
+          <span class="d-go">Ver directorio
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
           </span>
         </a>
@@ -682,7 +781,7 @@
             <span class="d-badge">Seguridad</span>
           </div>
           <h3>Extintores</h3>
-          <p>Sistema de control de extintores: seguimiento de recargas, mantenimiento y vigencia de tu equipo contra incendio.</p>
+          <p>Control digital de recargas y vigencias. Sabes qué extintor vence, cuándo y dónde está, sin buscar papeles.</p>
           <span class="d-go">Ir al sistema
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
           </span>
@@ -699,23 +798,23 @@
         <span class="tag">Sobre AVBA</span>
         <h2>Seguridad y cumplimiento con respaldo técnico real</h2>
         <p>AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. es una empresa mexicana dedicada a la inspección, certificación y mantenimiento de equipos de izaje, así como a la capacitación de personal técnico y operativo.</p>
-        <p>Trabajamos bajo estándares de seguridad industrial para que tus equipos, tu personal y tu operación cumplan con la normatividad vigente, con procesos de certificación trazables y verificables en línea.</p>
+        <p>Trabajamos bajo estándares de seguridad industrial para que tus equipos, tu personal y tu operación cumplan con la normatividad vigente, con procesos de certificación trazables y verificables en línea. La seguridad es nuestro compromiso; tu bienestar, nuestra prioridad.</p>
         <ul class="about-points">
           <li>
             <span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
-            Certificados verificables públicamente por folio o código QR.
+            <span><strong>Norma, no criterio.</strong> Trabajamos alineados a ASME, OSHA y DIN. Lo que dictaminamos se sostiene frente a una auditoría, no frente a una opinión.</span>
           </li>
           <li>
             <span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
-            Equipo técnico especializado en izaje y seguridad industrial.
+            <span><strong>Evidencia verificable.</strong> Cada certificado tiene folio y código QR. Cualquiera puede validarlo en línea: tu cliente, tu auditor o la autoridad.</span>
           </li>
           <li>
             <span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
-            Cuatro divisiones especializadas con plataforma digital propia.
+            <span><strong>Cobertura nacional.</strong> Atención por zonas Norte, Centro y Sur, con sedes en Altamira, Cd. Obregón y Coatzacoalcos.</span>
           </li>
           <li>
             <span class="chk"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
-            Atención y cobertura en toda la República Mexicana.
+            <span><strong>Servicio completo.</strong> Inspección, prueba de carga, mantenimiento y capacitación con un solo proveedor.</span>
           </li>
         </ul>
       </div>
@@ -750,8 +849,8 @@
   <section class="section cobertura" id="cobertura">
     <div class="container">
       <span class="tag">Cobertura</span>
-      <h2>Damos servicio en toda la República Mexicana</h2>
-      <p class="lead">Coordinamos inspecciones, certificaciones, mantenimiento y capacitación donde tu operación lo necesite, sin importar la región del país.</p>
+      <h2>Donde opera tu equipo, llegamos.</h2>
+      <p class="lead">Damos servicio en toda la República Mexicana, organizados por zonas Norte, Centro y Sur, con sedes en Altamira, Tamaulipas; Cd. Obregón, Sonora; y Coatzacoalcos, Veracruz. Coordinamos la visita en sitio para que tu planta no detenga la operación más de lo necesario.</p>
 
       <div class="radar">
         <svg viewBox="0 0 200 120" role="img" aria-label="AVBA da cobertura de servicio en todo México">
@@ -788,43 +887,96 @@
     <div class="container">
       <div class="section-head reveal">
         <span class="tag">Contacto</span>
-        <h2>Hablemos de tu proyecto</h2>
-        <p>Cuéntanos qué equipos necesitas certificar y te preparamos una propuesta a la medida.</p>
+        <h2>Hablemos de tus equipos.</h2>
+        <p>Cuéntanos qué equipos tienes y en qué estado están sus certificaciones. Te respondemos con un alcance y una propuesta clara, sin rodeos.</p>
       </div>
 
       <div class="contact-grid">
-        <div class="contact-card reveal" style="--c1:var(--brand-ink);--bg:var(--azul-light);">
-          <div class="c-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2.5"/><path d="m2.5 7 9.5 6 9.5-6"/></svg>
+
+        <div class="zona reveal" style="--c1:var(--brand-ink);--bg:var(--azul-light);">
+          <div class="z-head">
+            <span class="z-pin">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            </span>
+            <h3>Zona Norte</h3>
           </div>
-          <h3>Correo electrónico</h3>
-          <p>contacto@avba.com.mx</p>
-          <a class="btn btn-primary btn-sm" href="mailto:contacto@avba.com.mx">Enviar correo</a>
+          <a class="z-tel" href="tel:+528991373127">+52 899 137 3127</a>
+          <div class="z-acciones">
+            <a class="btn btn-primary btn-sm" href="tel:+528991373127">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.7a2 2 0 0 1-.4 2.1L8 9.9a16 16 0 0 0 6 6l1.4-1.4a2 2 0 0 1 2.1-.4c.9.3 1.8.5 2.7.6a2 2 0 0 1 1.8 2Z"/></svg>
+              Llamar
+            </a>
+            <a class="btn btn-wa btn-sm" href="https://wa.me/528991373127" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.6L3 20l1-5.4A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8.6 10.4c.3 2.4 2.1 4.2 4.5 4.5"/></svg>
+              WhatsApp
+            </a>
+          </div>
         </div>
 
-        <div class="contact-card reveal" style="--c1:var(--verde);--bg:var(--verde-light);">
-          <div class="c-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.6L3 20l1-5.4A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8.6 10.4c.3 2.4 2.1 4.2 4.5 4.5"/></svg>
+        <div class="zona reveal" style="--c1:var(--cian);--bg:var(--cian-light);">
+          <div class="z-head">
+            <span class="z-pin">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            </span>
+            <h3>Zona Centro</h3>
           </div>
-          <h3>WhatsApp</h3>
-          <p>Atención directa por mensaje</p>
-          <span class="pendiente">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-            Número por confirmar
-          </span>
+          <a class="z-tel" href="tel:+527715181523">+52 771 518 1523</a>
+          <div class="z-acciones">
+            <a class="btn btn-primary btn-sm" href="tel:+527715181523">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.7a2 2 0 0 1-.4 2.1L8 9.9a16 16 0 0 0 6 6l1.4-1.4a2 2 0 0 1 2.1-.4c.9.3 1.8.5 2.7.6a2 2 0 0 1 1.8 2Z"/></svg>
+              Llamar
+            </a>
+            <a class="btn btn-wa btn-sm" href="https://wa.me/527715181523" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.6L3 20l1-5.4A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8.6 10.4c.3 2.4 2.1 4.2 4.5 4.5"/></svg>
+              WhatsApp
+            </a>
+          </div>
         </div>
 
-        <div class="contact-card reveal" style="--c1:var(--cian);--bg:var(--cian-light);">
-          <div class="c-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.7a2 2 0 0 1-.4 2.1L8 9.9a16 16 0 0 0 6 6l1.4-1.4a2 2 0 0 1 2.1-.4c.9.3 1.8.5 2.7.6a2 2 0 0 1 1.8 2Z"/></svg>
+        <div class="zona reveal" style="--c1:var(--verde);--bg:var(--verde-light);">
+          <div class="z-head">
+            <span class="z-pin">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+            </span>
+            <h3>Zona Sur</h3>
           </div>
-          <h3>Teléfono</h3>
-          <p>Llámanos en horario laboral</p>
-          <span class="pendiente">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-            Número por confirmar
-          </span>
+          <a class="z-tel" href="tel:+529516086188">+52 951 608 6188</a>
+          <div class="z-acciones">
+            <a class="btn btn-primary btn-sm" href="tel:+529516086188">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.3 1.8.6 2.7a2 2 0 0 1-.4 2.1L8 9.9a16 16 0 0 0 6 6l1.4-1.4a2 2 0 0 1 2.1-.4c.9.3 1.8.5 2.7.6a2 2 0 0 1 1.8 2Z"/></svg>
+              Llamar
+            </a>
+            <a class="btn btn-wa btn-sm" href="https://wa.me/529516086188" target="_blank" rel="noopener">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.6L3 20l1-5.4A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8.6 10.4c.3 2.4 2.1 4.2 4.5 4.5"/></svg>
+              WhatsApp
+            </a>
+          </div>
         </div>
+
+      </div>
+
+      <div class="sedes reveal">
+        <span class="sedes-label">Sedes</span>
+        <span class="sedes-lista">
+          <span>Altamira, Tamps.</span>
+          <span>Cd. Obregón, Son.</span>
+          <span>Coatzacoalcos, Ver.</span>
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ CIERRE / CTA ═══════════════════════ -->
+  <section class="cta-final">
+    <div class="container cta-inner">
+      <h2>Seguridad es nuestro compromiso, tu bienestar es nuestra <span class="hl">prioridad</span>.</h2>
+      <p>No esperes al incidente, a la auditoría o al paro de planta. Agenda hoy la inspección de tus equipos de izaje y opera con respaldo documental.</p>
+      <div class="cta-botones">
+        <a class="btn btn-light" href="#contacto">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 12l2 2 4-4"/><path d="M12 3 4 6v6c0 5 3.4 8.6 8 10 4.6-1.4 8-5 8-10V6Z"/></svg>
+          Solicitar inspección
+        </a>
+        <a class="btn btn-ghost-light" href="#servicios">Ver servicios</a>
       </div>
     </div>
   </section>

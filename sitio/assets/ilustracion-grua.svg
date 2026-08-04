@@ -1,0 +1,182 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520" role="img" aria-labelledby="grua-titulo" fill="none">
+  <title id="grua-titulo">Grúa móvil telescópica de izaje con pluma extendida, bloque de poleas y gancho</title>
+  <defs>
+    <linearGradient id="grua-grad-pluma" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#F2A81D"/>
+      <stop offset="0.55" stop-color="#FFC85C"/>
+      <stop offset="1" stop-color="#F2A81D"/>
+    </linearGradient>
+    <linearGradient id="grua-grad-cuerpo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0084C0"/>
+      <stop offset="1" stop-color="#003C78"/>
+    </linearGradient>
+    <linearGradient id="grua-grad-cristal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4DA3FF"/>
+      <stop offset="1" stop-color="#0084C0"/>
+    </linearGradient>
+    <radialGradient id="grua-grad-halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#4DA3FF" stop-opacity="0.30"/>
+      <stop offset="0.6" stop-color="#0084C0" stop-opacity="0.10"/>
+      <stop offset="1" stop-color="#0084C0" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- halo -->
+  <ellipse cx="430" cy="196" rx="215" ry="190" fill="url(#grua-grad-halo)"/>
+
+  <!-- sombra de piso -->
+  <ellipse cx="300" cy="452" rx="248" ry="16" fill="#0084C0" opacity="0.18"/>
+
+  <!-- cota de radio de carga -->
+  <g stroke="#4DA3FF" stroke-width="1.6" opacity="0.45" stroke-linecap="round">
+    <path d="M322 366v106" stroke-dasharray="5 7"/>
+    <path d="M549 386v86" stroke-dasharray="5 7"/>
+    <path d="M322 470h227"/>
+    <path d="M322 464v12"/>
+    <path d="M549 464v12"/>
+    <path d="M330 466l-8 4 8 4"/>
+    <path d="M541 466l8 4-8 4"/>
+  </g>
+
+  <!-- estabilizadores -->
+  <g stroke="#FFFFFF" stroke-width="2.2" stroke-linejoin="round">
+    <path d="M118 368 L72 392 L72 406 L118 382 Z" fill="#0084C0"/>
+    <path d="M400 368 L446 392 L446 406 L400 382 Z" fill="#0084C0"/>
+    <path d="M118 368 L72 392 L72 406 L118 382 Z" fill="#003C78" opacity="0.3" stroke="none"/>
+    <rect x="66" y="402" width="16" height="28" rx="3" fill="#003C78"/>
+    <rect x="436" y="402" width="16" height="28" rx="3" fill="#003C78"/>
+    <path d="M54 430 H94 L98 442 H50 Z" fill="#F2A81D"/>
+    <path d="M424 430 H464 L468 442 H420 Z" fill="#F2A81D"/>
+  </g>
+
+  <!-- ruedas traseras (detrás del chasis) -->
+  <g opacity="0.75">
+    <circle cx="176" cy="406" r="26" fill="#003C78" stroke="#4DA3FF" stroke-width="1.6"/>
+    <circle cx="340" cy="406" r="26" fill="#003C78" stroke="#4DA3FF" stroke-width="1.6"/>
+  </g>
+
+  <!-- chasis -->
+  <g stroke="#FFFFFF" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M110 368 H406 L426 350 H130 Z" fill="#0084C0"/>
+    <path d="M110 368 H406 V406 H110 Z" fill="url(#grua-grad-cuerpo)"/>
+  </g>
+  <rect x="110" y="394" width="296" height="7" fill="#F2A81D" opacity="0.9"/>
+  <g stroke="#4DA3FF" stroke-width="1.4" opacity="0.55">
+    <path d="M110 380 H406"/>
+    <path d="M252 368 V394"/>
+    <path d="M282 368 V394"/>
+  </g>
+
+  <!-- ruedas delanteras -->
+  <g>
+    <circle cx="156" cy="412" r="30" fill="#003C78" stroke="#FFFFFF" stroke-width="2.2"/>
+    <circle cx="156" cy="412" r="14" fill="#0084C0"/>
+    <circle cx="156" cy="412" r="5" fill="#4DA3FF"/>
+    <circle cx="220" cy="412" r="30" fill="#003C78" stroke="#FFFFFF" stroke-width="2.2"/>
+    <circle cx="220" cy="412" r="14" fill="#0084C0"/>
+    <circle cx="220" cy="412" r="5" fill="#4DA3FF"/>
+    <circle cx="320" cy="412" r="30" fill="#003C78" stroke="#FFFFFF" stroke-width="2.2"/>
+    <circle cx="320" cy="412" r="14" fill="#0084C0"/>
+    <circle cx="320" cy="412" r="5" fill="#4DA3FF"/>
+    <circle cx="384" cy="412" r="30" fill="#003C78" stroke="#FFFFFF" stroke-width="2.2"/>
+    <circle cx="384" cy="412" r="14" fill="#0084C0"/>
+    <circle cx="384" cy="412" r="5" fill="#4DA3FF"/>
+  </g>
+
+  <!-- cabina del portador -->
+  <g stroke="#FFFFFF" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M114 368 V322 C114 315 118 311 125 310 L157 305 L189 322 V368 Z" fill="url(#grua-grad-cuerpo)"/>
+  </g>
+  <path d="M127 320 L157 315 L180 327 V340 H127 Z" fill="url(#grua-grad-cristal)" opacity="0.92"/>
+  <rect x="114" y="352" width="75" height="8" fill="#F2A81D" opacity="0.9"/>
+  <path d="M118 344 H185" stroke="#4DA3FF" stroke-width="1.4" opacity="0.6"/>
+
+  <!-- base de la superestructura -->
+  <g stroke="#FFFFFF" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M198 340 H344 L358 330 H212 Z" fill="#0084C0"/>
+    <path d="M198 340 H344 V360 H198 Z" fill="#003C78"/>
+  </g>
+
+  <!-- contrapeso -->
+  <g stroke="#FFFFFF" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M200 340 V296 H258 V340 Z" fill="#003C78"/>
+    <path d="M200 296 H258 L270 287 H212 Z" fill="#0084C0"/>
+  </g>
+  <g stroke="#4DA3FF" stroke-width="1.6" opacity="0.6">
+    <path d="M214 303 V333"/>
+    <path d="M229 303 V333"/>
+    <path d="M244 303 V333"/>
+  </g>
+
+  <!-- cabina del operador -->
+  <g stroke="#FFFFFF" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M266 340 V306 L277 294 H311 V340 Z" fill="url(#grua-grad-cuerpo)"/>
+  </g>
+  <path d="M272 310 L280 301 H305 V330 H272 Z" fill="url(#grua-grad-cristal)" opacity="0.92"/>
+  <rect x="266" y="332" width="45" height="6" fill="#F2A81D" opacity="0.85"/>
+
+  <!-- cilindro de elevación -->
+  <g stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round">
+    <path d="M282 344 L352 296" stroke-width="11" stroke="#003C78"/>
+    <path d="M282 344 L352 296" stroke-width="11"/>
+    <path d="M348 299 L392 269" stroke-width="7" stroke="#4DA3FF"/>
+    <path d="M348 299 L392 269" stroke-width="7"/>
+  </g>
+
+  <!-- pluma telescópica -->
+  <g stroke="#FFFFFF" stroke-width="2.6" stroke-linejoin="round">
+    <path d="M307.3 305.7 L537.6 112.8 L552.4 129.2 L336.7 338.3 Z" fill="url(#grua-grad-pluma)"/>
+  </g>
+  <path d="M329.4 330.2 L548.3 124.7 L552.4 129.2 L336.7 338.3 Z" fill="#003C78" opacity="0.28"/>
+  <g stroke="#003C78" stroke-width="2.4" opacity="0.5" stroke-linecap="round">
+    <path d="M385.6 240.1 L410.0 267.3"/>
+    <path d="M450.1 186.1 L470.5 208.7"/>
+  </g>
+  <g stroke="#FFFFFF" stroke-width="1.6" opacity="0.45" stroke-linecap="round">
+    <path d="M383.0 242.7 L407.4 269.9"/>
+    <path d="M447.5 188.7 L467.9 211.3"/>
+    <path d="M318.0 317.5 L541.0 116.5"/>
+  </g>
+
+  <!-- pie de pluma -->
+  <g stroke="#FFFFFF" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M304 300 L344 300 L344 342 L304 342 Z" fill="#003C78" opacity="0.95"/>
+  </g>
+  <circle cx="322" cy="322" r="9" fill="#0084C0" stroke="#FFFFFF" stroke-width="2.2"/>
+  <circle cx="322" cy="322" r="3" fill="#4DA3FF"/>
+
+  <!-- cabeza de pluma -->
+  <circle cx="545" cy="121" r="10" fill="#003C78" stroke="#FFFFFF" stroke-width="2.2"/>
+  <circle cx="545" cy="121" r="4" fill="#4DA3FF"/>
+
+  <!-- cables de izaje -->
+  <g stroke="#FFFFFF" stroke-width="2" opacity="0.9" stroke-linecap="round">
+    <path d="M541 128 L536 294"/>
+    <path d="M551 133 L562 294"/>
+  </g>
+
+  <!-- bloque de poleas -->
+  <g stroke="#FFFFFF" stroke-width="2.4" stroke-linejoin="round">
+    <rect x="529" y="292" width="40" height="34" rx="9" fill="#F2A81D"/>
+  </g>
+  <path d="M529 314 h40 v3 a9 9 0 0 1 -9 9 h-22 a9 9 0 0 1 -9 -9 z" fill="#003C78" opacity="0.25"/>
+  <g stroke="#003C78" stroke-width="2" opacity="0.75">
+    <circle cx="540" cy="309" r="6.5"/>
+    <circle cx="558" cy="309" r="6.5"/>
+  </g>
+  <rect x="542" y="324" width="14" height="18" rx="4" fill="#F2A81D" stroke="#FFFFFF" stroke-width="2.2"/>
+
+  <!-- gancho -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M549 342 V356 C549 382 576 386 576 360 C576 346 560 342 557 356" stroke="#FFFFFF" stroke-width="13"/>
+    <path d="M549 342 V356 C549 382 576 386 576 360 C576 346 560 342 557 356" stroke="#F2A81D" stroke-width="9"/>
+  </g>
+
+  <!-- destellos -->
+  <g stroke="#4DA3FF" stroke-width="2" opacity="0.5" stroke-linecap="round">
+    <path d="M498 76 h18"/>
+    <path d="M507 67 v18"/>
+    <path d="M596 214 h12"/>
+    <path d="M602 208 v12"/>
+  </g>
+</svg>

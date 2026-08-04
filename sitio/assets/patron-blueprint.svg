@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" role="img" aria-labelledby="blueprint-titulo" fill="none">
+  <title id="blueprint-titulo">Patrón decorativo de plano técnico con cuadrícula, cotas y arcos de radio de carga</title>
+  <defs>
+    <pattern id="blueprint-malla-fina" width="12" height="12" patternUnits="userSpaceOnUse">
+      <path d="M12 0 H0 V12" stroke="#4DA3FF" stroke-width="0.5" opacity="0.30"/>
+    </pattern>
+    <pattern id="blueprint-malla-gruesa" width="60" height="60" patternUnits="userSpaceOnUse">
+      <path d="M60 0 H0 V60" stroke="#4DA3FF" stroke-width="1" opacity="0.5"/>
+    </pattern>
+    <linearGradient id="blueprint-grad-borde" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#4DA3FF" stop-opacity="0.15"/>
+    </linearGradient>
+  </defs>
+
+  <!-- cuadrícula tileable -->
+  <rect width="240" height="240" fill="url(#blueprint-malla-fina)"/>
+  <rect width="240" height="240" fill="url(#blueprint-malla-gruesa)"/>
+
+  <!-- arcos de radio de carga -->
+  <g stroke="#FFFFFF" fill="none" stroke-linecap="round">
+    <path d="M100 210 A70 70 0 0 0 30 140" stroke-width="1.2" opacity="0.30"/>
+    <path d="M150 210 A120 120 0 0 0 30 90" stroke-width="1.2" opacity="0.24" stroke-dasharray="6 6"/>
+    <path d="M200 210 A170 170 0 0 0 30 40" stroke-width="1.2" opacity="0.18"/>
+  </g>
+
+  <!-- ángulo de pluma -->
+  <g stroke="#4DA3FF" fill="none" stroke-linecap="round">
+    <path d="M30 210 L188 70" stroke-width="1" opacity="0.35" stroke-dasharray="4 5"/>
+    <path d="M30 210 H206" stroke-width="1" opacity="0.28"/>
+    <path d="M30 210 V44" stroke-width="1" opacity="0.28"/>
+    <path d="M74 210 A44 44 0 0 0 61 179" stroke-width="1" opacity="0.4"/>
+  </g>
+  <circle cx="30" cy="210" r="3.5" fill="none" stroke="#FFFFFF" stroke-width="1.2" opacity="0.45"/>
+
+  <!-- línea de cota horizontal -->
+  <g stroke="#FFFFFF" fill="none" stroke-width="1" opacity="0.34" stroke-linecap="round">
+    <path d="M46 30 V52"/>
+    <path d="M182 30 V52"/>
+    <path d="M46 44 H182"/>
+    <path d="M54 40 L46 44 L54 48"/>
+    <path d="M174 40 L182 44 L174 48"/>
+  </g>
+
+  <!-- línea de cota vertical -->
+  <g stroke="#FFFFFF" fill="none" stroke-width="1" opacity="0.3" stroke-linecap="round">
+    <path d="M204 66 H226"/>
+    <path d="M204 186 H226"/>
+    <path d="M216 66 V186"/>
+    <path d="M212 74 L216 66 L220 74"/>
+    <path d="M212 178 L216 186 L220 178"/>
+  </g>
+
+  <!-- mira de referencia -->
+  <g stroke="url(#blueprint-grad-borde)" fill="none" stroke-width="1.2">
+    <circle cx="168" cy="150" r="14"/>
+    <circle cx="168" cy="150" r="5"/>
+    <path d="M168 128 V140"/>
+    <path d="M168 160 V172"/>
+    <path d="M146 150 H158"/>
+    <path d="M178 150 H190"/>
+  </g>
+
+  <!-- detalle de perfil / viga -->
+  <g stroke="#4DA3FF" fill="none" stroke-width="1" opacity="0.35" stroke-linejoin="round">
+    <path d="M60 96 H108 V108 H60 Z"/>
+    <path d="M60 96 L66 90 H114 L108 96"/>
+    <path d="M108 108 L114 102 V90"/>
+    <path d="M72 96 V108"/>
+    <path d="M96 96 V108"/>
+  </g>
+</svg>
