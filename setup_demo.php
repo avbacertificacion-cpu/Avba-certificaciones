@@ -1056,6 +1056,250 @@ $r = crearMantDemo($cliMant, $demoIdCli, $usrJose, [
 ]);
 echo "✅ Reporte — Camión Grúa Terex (folio {$r['folio']})\n";
 
+// ────────────────────────────────────────────────────────────────────────────
+//  FUNCIONES NUEVAS — plan de mantenimiento, doble motor, RH y vencimientos
+// ────────────────────────────────────────────────────────────────────────────
+// Los módulos crean sus tablas solos la primera vez que se abren, pero el demo
+// puede correr antes de que alguien entre a esas pantallas: se aseguran aquí.
+echo "\n=== FUNCIONES NUEVAS ===\n";
+
+$pdo->exec("
+    CREATE TABLE IF NOT EXISTS cliente_equipos_plan_mant (
+      equipo_id       INT PRIMARY KEY,
+      intervalo_horas INT NULL,
+      intervalo_dias  INT NULL,
+      base_horas      DECIMAL(10,1) NULL,
+      base_fecha      DATE NULL,
+      activo          TINYINT NOT NULL DEFAULT 1,
+      updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+$pdo->exec("
+    CREATE TABLE IF NOT EXISTS cliente_rh_politicas (
+      id_cliente          VARCHAR(20) PRIMARY KEY,
+      faltas_max          INT NOT NULL DEFAULT 1,
+      faltas_ventana      VARCHAR(20) NOT NULL DEFAULT 'semana',
+      faltas_ventana_dias INT NOT NULL DEFAULT 7,
+      actas_max           INT NOT NULL DEFAULT 3,
+      retardos_por_falta  INT NOT NULL DEFAULT 3,
+      tolerancia_min      INT NOT NULL DEFAULT 10,
+      updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+$pdo->exec("
+    CREATE TABLE IF NOT EXISTS cliente_rh_incidencias (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      id_cliente  VARCHAR(20) NOT NULL,
+      empleado_id INT NOT NULL,
+      tipo        VARCHAR(20) NOT NULL,
+      justificada TINYINT NOT NULL DEFAULT 0,
+      fecha       DATE NOT NULL,
+      notas       TEXT NULL,
+      archivo_url VARCHAR(300) NULL,
+      created_by  VARCHAR(120) NULL,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_cli (id_cliente), KEY idx_emp (empleado_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+$pdo->exec("
+    CREATE TABLE IF NOT EXISTS servicios_pagos (
+      id                INT AUTO_INCREMENT PRIMARY KEY,
+      concepto          VARCHAR(150) NOT NULL,
+      categoria         VARCHAR(40)  NOT NULL DEFAULT 'otro',
+      proveedor         VARCHAR(120) NULL,
+      referencia        VARCHAR(120) NULL,
+      monto             DECIMAL(10,2) NULL,
+      periodicidad      VARCHAR(20)  NOT NULL DEFAULT 'mensual',
+      fecha_vencimiento DATE NOT NULL,
+      recordatorio_dias INT NOT NULL DEFAULT 5,
+      ultimo_pago       DATE NULL,
+      estatus           VARCHAR(20)  NOT NULL DEFAULT 'pendiente',
+      notas             TEXT NULL,
+      activo            TINYINT NOT NULL DEFAULT 1,
+      created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+$pdo->exec("
+    CREATE TABLE IF NOT EXISTS anuncios_validacion (
+      id          INT AUTO_INCREMENT PRIMARY KEY,
+      titulo      VARCHAR(150) NULL,
+      imagen_url  VARCHAR(300) NOT NULL,
+      enlace      VARCHAR(500) NULL,
+      activo      TINYINT NOT NULL DEFAULT 1,
+      orden       INT NOT NULL DEFAULT 0,
+      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+");
+try { $pdo->exec("ALTER TABLE cliente_equipos ADD COLUMN IF NOT EXISTS dos_motores TINYINT NOT NULL DEFAULT 0"); } catch (\Throwable $e) {}
+try { $pdo->exec("ALTER TABLE cliente_equipos_horometro ADD COLUMN IF NOT EXISTS motor TINYINT NOT NULL DEFAULT 1"); } catch (\Throwable $e) {}
+
+// Limpiar lo que sembró una corrida anterior (equipos y personal se recrean,
+// así que sus planes/incidencias quedarían huérfanos)
+$pdo->exec("DELETE FROM cliente_equipos_plan_mant WHERE equipo_id NOT IN (SELECT id FROM cliente_equipos)");
+$pdo->prepare("DELETE FROM cliente_rh_incidencias WHERE id_cliente=?")->execute([$demoIdCli]);
+$pdo->exec("DELETE FROM servicios_pagos WHERE notas LIKE '%[demo]%'");
+$pdo->exec("DELETE FROM anuncios_validacion WHERE titulo LIKE '%(demo)%'");
+
+// ── A. Grúa con DOS MOTORES (chasis + superestructura) ──────────────────────
+// El camión grúa lleva motor de traslado y motor de la grúa: cada uno con su
+// propio horómetro. Las lecturas ya sembradas quedan como Motor 1.
+$pdo->prepare("UPDATE cliente_equipos SET dos_motores=1 WHERE id=?")->execute([$eqIds['camion_grua']]);
+$addHoraMotor = function (int $eqId, float $horas, string $fecha, int $motor, string $notas = '') use ($pdo) {
+    $pdo->prepare("INSERT INTO cliente_equipos_horometro (equipo_id,horas,fecha,notas,motor) VALUES(?,?,?,?,?)")
+        ->execute([$eqId, $horas, $fecha, $notas, $motor]);
+};
+$addHoraMotor($eqIds['camion_grua'], 2180, dateAdd($today,'-95 days'), 2, 'Motor de superestructura — lectura trimestral');
+$addHoraMotor($eqIds['camion_grua'], 2265, dateAdd($today,'-62 days'), 2, 'Motor de superestructura');
+$addHoraMotor($eqIds['camion_grua'], 2341, dateAdd($today,'-30 days'), 2, 'Motor de superestructura');
+$addHoraMotor($eqIds['camion_grua'], 2402, dateAdd($today,'-6 days'),  2, 'Motor de superestructura — previo a inspección anual');
+echo "✅ Camión Grúa Terex marcado con dos motores (+4 lecturas de Motor 2)\n";
+
+// ── B. PLANES DE MANTENIMIENTO PREVENTIVO (horómetro + fecha) ───────────────
+// Se calcula la base a partir de las horas ya registradas para que el semáforo
+// del portal quede con casos reales: vencidos, por vencer y al día.
+$planMant = function (int $eqId, int $intHoras, int $intDias, string $estado) use ($pdo, $today) {
+    $st = $pdo->prepare("SELECT COALESCE(MAX(horas),0) FROM cliente_equipos_horometro WHERE equipo_id=?");
+    $st->execute([$eqId]);
+    $horasAct = (float)$st->fetchColumn();
+    switch ($estado) {
+        case 'vencido':                                   // ya se pasó
+            $baseHoras = max(0, $horasAct - $intHoras - 45);
+            $baseFecha = dateAdd($today, '-' . ($intDias + 6) . ' days');
+            break;
+        case 'por_vencer':                                // quedan pocas horas/días
+            $baseHoras = max(0, $horasAct - $intHoras + 8);
+            $baseFecha = dateAdd($today, '-' . max(1, $intDias - 5) . ' days');
+            break;
+        default:                                          // al día
+            $baseHoras = max(0, $horasAct - (int)round($intHoras * 0.25));
+            $baseFecha = dateAdd($today, '-' . (int)round($intDias * 0.25) . ' days');
+    }
+    $pdo->prepare("
+        INSERT INTO cliente_equipos_plan_mant (equipo_id,intervalo_horas,intervalo_dias,base_horas,base_fecha,activo)
+        VALUES (?,?,?,?,?,1)
+        ON DUPLICATE KEY UPDATE intervalo_horas=VALUES(intervalo_horas), intervalo_dias=VALUES(intervalo_dias),
+          base_horas=VALUES(base_horas), base_fecha=VALUES(base_fecha), activo=1
+    ")->execute([$eqId, $intHoras, $intDias, $baseHoras, $baseFecha]);
+};
+$planMant($eqIds['grua_torre'],   500, 180, 'al_dia');
+$planMant($eqIds['grua_movil'],   250,  90, 'por_vencer');
+$planMant($eqIds['montacargas'],  200,  60, 'vencido');
+$planMant($eqIds['camion_grua'],  250,  90, 'por_vencer');
+$planMant($eqIds['retro'],        300, 120, 'al_dia');
+$planMant($eqIds['ptem_jlg'],     150,  90, 'vencido');
+$planMant($eqIds['grua_puente'],  400, 180, 'al_dia');
+$planMant($eqIds['ptem_genie'],   150,  90, 'por_vencer');
+echo "✅ Planes de mantenimiento preventivo en 8 equipos (2 vencidos, 3 por vencer, 3 al día)\n";
+
+// ── C. RH / ASISTENCIA — políticas e incidencias ────────────────────────────
+// Ventana móvil de 15 días para mostrar el parámetro configurable de RH.
+$pdo->prepare("
+    INSERT INTO cliente_rh_politicas
+      (id_cliente, faltas_max, faltas_ventana, faltas_ventana_dias, actas_max, retardos_por_falta, tolerancia_min)
+    VALUES (?,?,?,?,?,?,?)
+    ON DUPLICATE KEY UPDATE faltas_max=VALUES(faltas_max), faltas_ventana=VALUES(faltas_ventana),
+      faltas_ventana_dias=VALUES(faltas_ventana_dias), actas_max=VALUES(actas_max),
+      retardos_por_falta=VALUES(retardos_por_falta), tolerancia_min=VALUES(tolerancia_min)
+")->execute([$demoIdCli, 1, 'movil', 15, 3, 3, 10]);
+
+$perId = function (string $numEmp) use ($pdo, $demoIdCli): int {
+    $s = $pdo->prepare("SELECT id FROM cliente_personal WHERE id_cliente=? AND numero_empleado=?");
+    $s->execute([$demoIdCli, $numEmp]);
+    return (int)($s->fetchColumn() ?: 0);
+};
+$addInc = function (int $empId, string $tipo, string $fecha, int $justif, string $notas) use ($pdo, $demoIdCli) {
+    if (!$empId) return;
+    $pdo->prepare("
+        INSERT INTO cliente_rh_incidencias (id_cliente, empleado_id, tipo, justificada, fecha, notas, created_by)
+        VALUES (?,?,?,?,?,?,?)
+    ")->execute([$demoIdCli, $empId, $tipo, $justif, $fecha, $notas, 'RH Demo']);
+};
+
+// Ernesto Vega (montacargas) — 2 faltas injustificadas + 1 acta → EN RIESGO
+$e = $perId('EMP-007');
+$addInc($e, 'falta',   dateAdd($today,'-9 days'),  0, 'No se presentó ni avisó al supervisor.');
+$addInc($e, 'falta',   dateAdd($today,'-3 days'),  0, 'Inasistencia sin justificar.');
+$addInc($e, 'acta',    dateAdd($today,'-4 days'),  0, 'Acta administrativa por inasistencias reiteradas.');
+$addInc($e, 'retardo', dateAdd($today,'-11 days'), 0, 'Ingreso 25 min después de la hora de entrada.');
+
+// José Hernández (rigger) — 2 actas acumuladas → EN OBSERVACIÓN
+$e = $perId('EMP-003');
+$addInc($e, 'acta',    dateAdd($today,'-40 days'), 0, 'Acta por incumplimiento del procedimiento de amarre.');
+$addInc($e, 'acta',    dateAdd($today,'-12 days'), 0, 'Acta por uso incompleto de EPP en maniobra.');
+$addInc($e, 'retardo', dateAdd($today,'-6 days'),  0, 'Retardo de 15 min.');
+
+// Miguel Torres (grúa móvil) — 3 retardos = 1 falta efectiva → EN OBSERVACIÓN
+$e = $perId('EMP-002');
+$addInc($e, 'retardo', dateAdd($today,'-13 days'), 0, 'Retardo de 12 min.');
+$addInc($e, 'retardo', dateAdd($today,'-8 days'),  0, 'Retardo de 20 min por tráfico.');
+$addInc($e, 'retardo', dateAdd($today,'-2 days'),  0, 'Retardo de 18 min.');
+
+// Roberto Díaz (mecánico) — incapacidad vigente → EN OBSERVACIÓN
+$e = $perId('EMP-005');
+$addInc($e, 'incapacidad', dateAdd($today,'-5 days'), 1, 'Incapacidad IMSS por 3 días — lumbalgia.');
+
+// Carlos Ramírez — falta justificada y vacaciones (no penalizan como injustificadas)
+$e = $perId('EMP-001');
+$addInc($e, 'falta',      dateAdd($today,'-7 days'),  1, 'Falta justificada con comprobante médico.');
+$addInc($e, 'vacaciones', dateAdd($today,'-45 days'), 1, 'Periodo vacacional autorizado (5 días).');
+
+// Fernanda Gómez — permiso autorizado
+$addInc($perId('EMP-004'), 'permiso', dateAdd($today,'-20 days'), 1, 'Permiso de un día por trámite personal.');
+$totalInc = $pdo->query("SELECT COUNT(*) FROM cliente_rh_incidencias WHERE id_cliente='$demoIdCli'")->fetchColumn();
+echo "✅ RH: políticas (ventana móvil 15 días) + $totalInc incidencias — semáforo con casos en riesgo, observación y sanos\n";
+
+// ── D. VENCIMIENTOS Y PAGOS DE SERVICIOS (panel de administración) ──────────
+$addServicio = function (string $concepto, string $cat, string $prov, string $ref, $monto, string $per, string $venc, int $rec, string $notas) use ($pdo) {
+    $pdo->prepare("
+        INSERT INTO servicios_pagos (concepto,categoria,proveedor,referencia,monto,periodicidad,fecha_vencimiento,recordatorio_dias,notas,activo)
+        VALUES (?,?,?,?,?,?,?,?,?,1)
+    ")->execute([$concepto, $cat, $prov, $ref, $monto, $per, $venc, $rec, $notas . ' [demo]']);
+};
+$addServicio('Teléfono — Dirección',        'telefono', 'Telcel',      '5512340001', 649.00,  'mensual',    dateAdd($today,'-4 days'),  5, 'Plan empresarial con datos ilimitados.');
+$addServicio('Teléfono — Inspectores (4)',  'telefono', 'AT&T',        '5512340002', 1996.00, 'mensual',    dateAdd($today,'+3 days'),  5, 'Cuatro líneas para personal de campo.');
+$addServicio('Internet — Oficina central',  'internet', 'Totalplay',   'TP-884512',  1299.00, 'mensual',    dateAdd($today,'+2 days'),  5, 'Enlace dedicado 200 Mbps simétrico.');
+$addServicio('Luz — Oficina y taller',      'luz',      'CFE',         '9204581173', 4820.50, 'bimestral',  dateAdd($today,'+21 days'), 7, 'Medidor del taller de mantenimiento.');
+$addServicio('Agua — Taller',               'agua',     'SACMEX',      'AG-55210',   680.00,  'bimestral',  dateAdd($today,'+34 days'), 7, '');
+$addServicio('Renta — Oficina central',     'renta',    'Inmobiliaria Solano', 'CONT-2024-11', 28500.00, 'mensual', dateAdd($today,'+6 days'), 8, 'Contrato vigente hasta noviembre.');
+$addServicio('Hosting y dominio',           'software', 'Hostinger',   'AVBA-HOST',  3480.00, 'anual',      dateAdd($today,'+95 days'), 15, 'gestion.avba.com.mx y avba.com.mx.');
+$addServicio('Seguro de responsabilidad civil','seguro', 'GNP Seguros', 'POL-778120', 42300.00,'anual',     dateAdd($today,'+140 days'),20, 'Cobertura para maniobras de izaje.');
+$addServicio('Software de facturación',     'software', 'CONTPAQi',    'LIC-2026-08',6900.00, 'anual',      dateAdd($today,'-12 days'), 10, 'Licencia por renovar.');
+echo "✅ Vencimientos: 9 servicios (2 vencidos, 3 por vencer, resto al día)\n";
+
+// ── E. PUBLICIDAD EN LA PÁGINA DE VALIDACIÓN ───────────────────────────────
+// Banner generado con GD (no hay artes reales que subir en un seeder).
+$dirAnun = __DIR__ . '/uploads/anuncios/';
+if (!is_dir($dirAnun)) @mkdir($dirAnun, 0755, true);
+$bannerOk = false;
+if (function_exists('imagecreatetruecolor')) {
+    $w = 1200; $h = 800;
+    $img = imagecreatetruecolor($w, $h);
+    for ($y = 0; $y < $h; $y++) {                       // degradado azul AVBA
+        $t = $y / $h;
+        imageline($img, 0, $y, $w, $y, imagecolorallocate($img,
+            11 + (int)(7*$t), 26 + (int)(32*$t), 51 + (int)(56*$t)));
+    }
+    $blanco = imagecolorallocate($img, 255, 255, 255);
+    $acento = imagecolorallocate($img, 77, 163, 255);
+    imagefilledrectangle($img, 0, 0, 14, $h, $acento);
+    imagestring($img, 5, 60, 250, 'AVBA INSPECTIONS', $acento);
+    imagestring($img, 5, 60, 300, 'PRUEBAS NO DESTRUCTIVAS', $blanco);
+    imagestring($img, 5, 60, 330, 'INSPECCION Y CERTIFICACION DE EQUIPOS', $blanco);
+    imagestring($img, 4, 60, 400, 'Mayor confiabilidad para tus equipos', imagecolorallocate($img,200,215,235));
+    imagestring($img, 4, 60, 470, 'Cobertura en todo Mexico  ·  avba.com.mx', $acento);
+    imagestring($img, 3, 60, $h-60, 'Banner de muestra (demo)', imagecolorallocate($img,120,140,170));
+    $bannerOk = imagepng($img, $dirAnun . 'anuncio_demo.png');
+    imagedestroy($img);
+}
+if ($bannerOk) {
+    $pdo->prepare("INSERT INTO anuncios_validacion (titulo, imagen_url, enlace, activo, orden) VALUES (?,?,?,1,1)")
+        ->execute(['Pruebas No Destructivas (demo)', 'uploads/anuncios/anuncio_demo.png', 'https://avba.com.mx']);
+    echo "✅ Publicidad: banner de muestra activo en la página de validación\n";
+} else {
+    echo "ℹ  Publicidad: no se generó el banner (GD no disponible)\n";
+}
+
 echo "\n=== RESUMEN FINAL ===\n";
 echo "Usuario: $demoUsuario\n";
 echo "Contraseña: Demo2026\n";
@@ -1084,6 +1328,16 @@ echo "Solicitudes de material: $totalSol\n";
 echo "Envíos a proveedores generados: $totalEnv\n";
 echo "Reportes de mantenimiento: $totalMantenim\n";
 echo "Fotos de evidencia (mantenimiento): $totalFotosMant\n";
+$totalPlan = $pdo->query("SELECT COUNT(*) FROM cliente_equipos_plan_mant p JOIN cliente_equipos e ON e.id=p.equipo_id WHERE e.id_cliente='$demoIdCli'")->fetchColumn();
+$totalM2   = $pdo->query("SELECT COUNT(*) FROM cliente_equipos_horometro h JOIN cliente_equipos e ON e.id=h.equipo_id WHERE e.id_cliente='$demoIdCli' AND h.motor=2")->fetchColumn();
+$totalRHi  = $pdo->query("SELECT COUNT(*) FROM cliente_rh_incidencias WHERE id_cliente='$demoIdCli'")->fetchColumn();
+$totalServ = $pdo->query("SELECT COUNT(*) FROM servicios_pagos WHERE notas LIKE '%[demo]%'")->fetchColumn();
+$totalAnun = $pdo->query("SELECT COUNT(*) FROM anuncios_validacion WHERE titulo LIKE '%(demo)%'")->fetchColumn();
+echo "Planes de mantenimiento preventivo: $totalPlan\n";
+echo "Lecturas de horómetro Motor 2 (grúa de 2 motores): $totalM2\n";
+echo "Incidencias de RH: $totalRHi\n";
+echo "Servicios en Vencimientos (admin): $totalServ\n";
+echo "Anuncios en validación: $totalAnun\n";
 echo "Sub-usuario mecánico: " . ($mecanicoSubId ? "mecanico.demo / Mecanico2026 (id=$mecanicoSubId)" : "❌ no se creó, revisa el mensaje de arriba") . "\n";
 echo "\n✅ Seeder completado exitosamente.\n";
 echo "⚠️  ELIMINA setup_demo.php del servidor después de ejecutarlo.\n";
