@@ -175,6 +175,19 @@ function bloquearSiLectura(array $alc): void {
     }
 }
 
+/**
+ * Módulo de RH / Asistencia: la cuenta principal del cliente siempre entra;
+ * un sub-usuario solo si se le otorgó el permiso de RH. Se valida en el
+ * servidor porque ocultar la pestaña en el portal no impide llamar la API.
+ */
+function exigirPermisoRH(array $usr): void {
+    $esSub = !empty($usr['usuario_padre_id']);
+    if ($esSub && empty($usr['permiso_rh'])) {
+        respuesta(['status' => 'error',
+            'message' => 'No tienes permiso para el módulo de RH / Asistencia.'], 403);
+    }
+}
+
 /** Aborta con 403 si un sub-usuario intenta escribir sobre un recurso no asignado. */
 function autorizarRecurso(array $alc, string $tipo, int $recursoId): void {
     if (!$alc['es_sub']) return;
@@ -749,17 +762,20 @@ if ($method === 'GET') {
         case 'RH_POLITICAS':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            exigirPermisoRH($usr);
             respuesta($cliRH->obtenerPoliticas(resolveIdc($usr)));
 
         case 'RH_SALUD':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            exigirPermisoRH($usr);
             $alc = alcanceSub($usr, $cliSub);
             respuesta($cliRH->saludLaboral(resolveIdc($usr), $alc['personal']));
 
         case 'RH_INCIDENCIAS':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            exigirPermisoRH($usr);
             $alc = alcanceSub($usr, $cliSub);
             respuesta($cliRH->listarIncidencias(resolveIdc($usr), ['empleado_id' => (int)($_GET['empleado_id'] ?? 0), 'tipo' => $_GET['tipo'] ?? ''], $alc['personal']));
 
@@ -1823,12 +1839,14 @@ if ($method === 'POST') {
         case 'RH_GUARDAR_POLITICAS':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            exigirPermisoRH($usr);
             bloquearSiLectura(alcanceSub($usr, $cliSub));
             respuesta($cliRH->guardarPoliticas(resolveIdc($usr), $payload));
 
         case 'RH_GUARDAR_INCIDENCIA':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            exigirPermisoRH($usr);
             $alc = alcanceSub($usr, $cliSub);
             bloquearSiLectura($alc);
             autorizarRecurso($alc, 'personal', (int)($payload['empleado_id'] ?? 0));
@@ -1837,6 +1855,7 @@ if ($method === 'POST') {
         case 'RH_ELIMINAR_INCIDENCIA':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            exigirPermisoRH($usr);
             bloquearSiLectura(alcanceSub($usr, $cliSub));
             respuesta($cliRH->eliminarIncidencia((int)($payload['id'] ?? 0), resolveIdc($usr)));
 

@@ -1430,6 +1430,12 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
         <span>🔧 Mecánico — puede crear solicitudes de material y reportes de mantenimiento</span>
       </label>
     </div>
+    <div class="frow">
+      <label class="flabel" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+        <input type="checkbox" id="sub-rh" style="width:auto;margin:0">
+        <span>🕒 RH — puede ver y registrar asistencia, incidencias y salud laboral del personal</span>
+      </label>
+    </div>
     <div class="frow" id="sub-activo-row" style="display:none">
       <label class="flabel"><input type="checkbox" id="sub-activo" checked style="width:auto;margin-right:6px">Cuenta activa</label>
     </div>
@@ -1530,7 +1536,7 @@ const _puedeEditar = !_esSub || _sesion.permiso_sub !== 'lectura';
 function _configurarTabsPorRol() {
   if (_esSub) {
     // Sub-usuario: solo ve los módulos asignables (Maquinaria, Mis Equipos, Mi Personal)
-    ['acc','per','pnd','proveedores','materiales','config','subusuarios','solicitudes','mantenimiento'].forEach(t => {
+    ['acc','per','pnd','proveedores','materiales','config','subusuarios','solicitudes','mantenimiento','rh'].forEach(t => {
       const b = document.getElementById('tabbtn-' + t); if (b) b.style.display = 'none';
     });
     if (_sesion.permiso_sub === 'lectura') document.body.classList.add('solo-lectura');
@@ -1539,6 +1545,10 @@ function _configurarTabsPorRol() {
       ['solicitudes','mantenimiento'].forEach(t => {
         const b = document.getElementById('tabbtn-' + t); if (b) b.style.display = '';
       });
+    }
+    // RH (permiso_rh): habilita el módulo de RH / Asistencia
+    if (_sesion.permiso_rh) {
+      const b = document.getElementById('tabbtn-rh'); if (b) b.style.display = '';
     }
   } else if (_sesion.rol === 'CLIENTE') {
     // Cuenta principal del cliente: ve todo (sub-usuarios, configuración, solicitudes, mantenimiento)
@@ -4593,9 +4603,11 @@ function renderSubusuarios(lista) {
       : '<span class="sub-badge sub-b-off">Inactivo</span>';
     const mantBadge = s.permiso_mantenimiento
       ? '<span class="sub-badge" style="background:#fef3c7;color:#92400e">🔧 Mecánico</span>' : '';
+    const rhBadge = s.permiso_rh
+      ? '<span class="sub-badge" style="background:#e0e7ff;color:#3730a3">🕒 RH</span>' : '';
     return `<div class="sub-card">
       <div style="min-width:0">
-        <div style="font-weight:600;font-size:14px;color:#0d2244">${escH(s.nombre)} ${permBadge} ${mantBadge}</div>
+        <div style="font-weight:600;font-size:14px;color:#0d2244">${escH(s.nombre)} ${permBadge} ${mantBadge} ${rhBadge}</div>
         <div style="font-size:12px;color:#778;margin-top:3px">${escH(s.usuario)}</div>
         <div style="font-size:11px;color:#9aa;margin-top:4px">
           ⚙ ${s.n_equipos} equipos · 👥 ${s.n_personal} personal · 📜 ${s.n_cert} certificaciones
@@ -4621,6 +4633,7 @@ function nuevoSub() {
   document.getElementById('sub-pass-lbl').textContent = 'Contraseña *';
   document.getElementById('sub-permiso').value = 'gestion';
   document.getElementById('sub-mantenimiento').checked = false;
+  document.getElementById('sub-rh').checked = false;
   document.getElementById('sub-activo-row').style.display = 'none';
   document.getElementById('modal-sub').classList.add('open');
 }
@@ -4635,6 +4648,7 @@ function editarSub(s) {
   document.getElementById('sub-pass-lbl').textContent = 'Nueva contraseña (dejar vacío para no cambiar)';
   document.getElementById('sub-permiso').value = s.permiso || 'gestion';
   document.getElementById('sub-mantenimiento').checked = !!s.permiso_mantenimiento;
+  document.getElementById('sub-rh').checked = !!s.permiso_rh;
   document.getElementById('sub-activo-row').style.display = '';
   document.getElementById('sub-activo').checked = !!s.activo;
   document.getElementById('modal-sub').classList.add('open');
@@ -4649,13 +4663,14 @@ async function guardarSub() {
   const password= document.getElementById('sub-password').value;
   const permiso = document.getElementById('sub-permiso').value;
   const permiso_mantenimiento = document.getElementById('sub-mantenimiento').checked ? 1 : 0;
+  const permiso_rh = document.getElementById('sub-rh').checked ? 1 : 0;
   if (!nombre)  { toastEq('El nombre es requerido.'); return; }
   if (!id && (!usuario || !password)) { toastEq('Usuario y contraseña son obligatorios.'); return; }
 
   const action  = id ? 'EDITAR_SUBUSUARIO' : 'CREAR_SUBUSUARIO';
   const payload = id
-    ? { id: +id, nombre, permiso, permiso_mantenimiento, password, activo: document.getElementById('sub-activo').checked ? 1 : 0 }
-    : { nombre, usuario, password, permiso, permiso_mantenimiento };
+    ? { id: +id, nombre, permiso, permiso_mantenimiento, permiso_rh, password, activo: document.getElementById('sub-activo').checked ? 1 : 0 }
+    : { nombre, usuario, password, permiso, permiso_mantenimiento, permiso_rh };
   try {
     const res = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action, payload }) });
     const d = await res.json();

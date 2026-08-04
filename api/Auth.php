@@ -330,7 +330,7 @@ class Auth {
         try {
             $stmt = $this->pdo->prepare(
                 "SELECT id, usuario, password_hash, rol, nombre, id_cliente, activo,
-                        usuario_padre_id, permiso_sub, permiso_mantenimiento
+                        usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh
                  FROM usuarios WHERE usuario = ?"
             );
             $stmt->execute([$usuario]);
@@ -387,6 +387,8 @@ class Auth {
             'es_subusuario' => $esSub,
             'permiso_sub'   => $esSub ? ($row['permiso_sub'] ?? 'gestion') : null,
             'permiso_mantenimiento' => $esSub ? (int)($row['permiso_mantenimiento'] ?? 0) : 1,
+            // Cuenta principal: siempre ve RH. Sub-usuario: solo si se le dio el permiso.
+            'permiso_rh'    => $esSub ? (int)($row['permiso_rh'] ?? 0) : 1,
         ];
     }
 

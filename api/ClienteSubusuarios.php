@@ -30,6 +30,11 @@ class ClienteSubusuarios {
             if (!in_array('permiso_mantenimiento', $cols, true)) {
                 $this->pdo->exec("ALTER TABLE usuarios ADD COLUMN permiso_mantenimiento TINYINT NOT NULL DEFAULT 0");
             }
+            // Permiso de RH: habilita el módulo de RH / Asistencia (faltas,
+            // actas, salud laboral). Independiente del permiso de mantenimiento.
+            if (!in_array('permiso_rh', $cols, true)) {
+                $this->pdo->exec("ALTER TABLE usuarios ADD COLUMN permiso_rh TINYINT NOT NULL DEFAULT 0");
+            }
             $this->pdo->exec("
                 CREATE TABLE IF NOT EXISTS cliente_subusuario_acceso (
                   id          INT AUTO_INCREMENT PRIMARY KEY,
@@ -54,7 +59,7 @@ class ClienteSubusuarios {
     /** Verifica que $subId sea sub-usuario del padre indicado. Devuelve la fila o null. */
     private function subDePadre(int $subId, int $padreId): ?array {
         $s = $this->pdo->prepare(
-            "SELECT id, usuario, nombre, id_cliente, activo, permiso_sub, permiso_mantenimiento, usuario_padre_id
+            "SELECT id, usuario, nombre, id_cliente, activo, permiso_sub, permiso_mantenimiento, permiso_rh, usuario_padre_id
              FROM usuarios WHERE id = ? AND usuario_padre_id = ?"
         );
         $s->execute([$subId, $padreId]);
@@ -79,7 +84,7 @@ class ClienteSubusuarios {
 
     public function listar(int $padreId): array {
         $s = $this->pdo->prepare(
-            "SELECT u.id, u.usuario, u.nombre, u.activo, u.permiso_sub, u.permiso_mantenimiento,
+            "SELECT u.id, u.usuario, u.nombre, u.activo, u.permiso_sub, u.permiso_mantenimiento, u.permiso_rh,
                     DATE_FORMAT(u.ultimo_acceso, '%d/%m/%Y %H:%i') AS ultimo_acceso,
                     (SELECT COUNT(*) FROM cliente_subusuario_acceso a WHERE a.usuario_id = u.id AND a.tipo='equipo')        AS n_equipos,
                     (SELECT COUNT(*) FROM cliente_subusuario_acceso a WHERE a.usuario_id = u.id AND a.tipo='personal')      AS n_personal,
@@ -97,6 +102,7 @@ class ClienteSubusuarios {
             'activo'        => (int)$r['activo'],
             'permiso'       => $r['permiso_sub'],
             'permiso_mantenimiento' => (int)$r['permiso_mantenimiento'],
+            'permiso_rh'    => (int)$r['permiso_rh'],
             'ultimo_acceso' => $r['ultimo_acceso'] ?: '—',
             'n_equipos'     => (int)$r['n_equipos'],
             'n_personal'    => (int)$r['n_personal'],
@@ -110,6 +116,7 @@ class ClienteSubusuarios {
         $nombre   = trim($payload['nombre']   ?? '');
         $permiso  = ($payload['permiso'] ?? 'gestion') === 'lectura' ? 'lectura' : 'gestion';
         $mant     = !empty($payload['permiso_mantenimiento']) ? 1 : 0;
+        $rh       = !empty($payload['permiso_rh']) ? 1 : 0;
 
         if (!$usuario || !$password || !$nombre) {
             return ['status' => 'error', 'message' => 'Usuario, contraseña y nombre son obligatorios.'];
@@ -129,9 +136,9 @@ class ClienteSubusuarios {
 
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $this->pdo->prepare(
-            "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo, usuario_padre_id, permiso_sub, permiso_mantenimiento)
-             VALUES (?, ?, 'CLIENTE', ?, ?, 1, ?, ?, ?)"
-        )->execute([$usuario, $hash, $nombre, $padre['id_cliente'] ?: null, (int)$padre['id'], $permiso, $mant]);
+            "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo, usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh)
+             VALUES (?, ?, 'CLIENTE', ?, ?, 1, ?, ?, ?, ?)"
+        )->execute([$usuario, $hash, $nombre, $padre['id_cliente'] ?: null, (int)$padre['id'], $permiso, $mant, $rh]);
 
         return ['status' => 'success', 'message' => 'Sub-usuario creado.', 'id' => (int)$this->pdo->lastInsertId()];
     }
@@ -146,11 +153,14 @@ class ClienteSubusuarios {
         $mant    = isset($payload['permiso_mantenimiento'])
                    ? (!empty($payload['permiso_mantenimiento']) ? 1 : 0)
                    : (int)$sub['permiso_mantenimiento'];
+        $rh      = isset($payload['permiso_rh'])
+                   ? (!empty($payload['permiso_rh']) ? 1 : 0)
+                   : (int)$sub['permiso_rh'];
         $activo  = isset($payload['activo']) ? (int)(bool)$payload['activo'] : (int)$sub['activo'];
 
         $this->pdo->prepare(
-            "UPDATE usuarios SET nombre = ?, permiso_sub = ?, permiso_mantenimiento = ?, activo = ? WHERE id = ? AND usuario_padre_id = ?"
-        )->execute([$nombre, $permiso, $mant, $activo, $subId, (int)$padre['id']]);
+            "UPDATE usuarios SET nombre = ?, permiso_sub = ?, permiso_mantenimiento = ?, permiso_rh = ?, activo = ? WHERE id = ? AND usuario_padre_id = ?"
+        )->execute([$nombre, $permiso, $mant, $rh, $activo, $subId, (int)$padre['id']]);
 
         $password = trim($payload['password'] ?? '');
         if ($password !== '') {
