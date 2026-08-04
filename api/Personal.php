@@ -118,6 +118,18 @@ class Personal {
         $stmt2->execute([$id]);
         $row['documentos'] = $stmt2->fetchAll();
 
+        // Verificación de identidad con IA (semáforo para Calidad), si ya se corrió
+        $row['verificacion_ia'] = null;
+        try {
+            $stmtV = $this->pdo->prepare(
+                "SELECT resultado, nombre_doc, curp_doc, detalle,
+                        DATE_FORMAT(created_at,'%d/%m/%Y %H:%i') AS fecha
+                 FROM participantes_verificacion WHERE participante_id = ?"
+            );
+            $stmtV->execute([$id]);
+            $row['verificacion_ia'] = $stmtV->fetch() ?: null;
+        } catch (\Throwable $e) { /* la tabla se crea al primer uso del módulo */ }
+
         // Ocupaciones específicas de la empresa (para DC-3)
         $row['ocupaciones_empresa'] = [];
         if (!empty($row['cliente_id'])) {

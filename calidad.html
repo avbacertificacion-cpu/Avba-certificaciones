@@ -4347,9 +4347,19 @@ async function abrirDetPer(id) {
         <div style="margin-bottom:14px">
           <span style="font-size:11px;color:var(--texto-sub);display:block;margin-bottom:6px">Documento de identidad</span>
           <img src="${escH(p.foto_documentacion_url)}" style="max-width:100%;border-radius:8px;border:1px solid var(--borde);display:block;margin-bottom:10px">
-          <div style="font-size:11px;color:var(--texto-hint)">
-            Captura el nombre y la CURP en los campos de arriba tomándolos de este documento.
+          <button id="btn-verif-ia" onclick="verificarIdentidadIA(${p.id})"
+            style="display:inline-flex;align-items:center;gap:7px;padding:8px 16px;
+                   background:var(--azul);color:white;border:none;border-radius:8px;
+                   font-size:13px;font-weight:600;cursor:pointer">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" style="width:14px;height:14px">
+              <path d="M8 1.5l5.5 2.2v4c0 3.2-2.3 5.9-5.5 6.8-3.2-.9-5.5-3.6-5.5-6.8v-4L8 1.5z"/><path d="M5.8 8.1l1.6 1.6 3-3.2"/>
+            </svg>
+            Verificar identidad con IA
+          </button>
+          <div style="font-size:11px;color:var(--texto-hint);margin-top:6px">
+            Compara el nombre y la CURP capturados contra esta identificación.
           </div>
+          <div id="verif-ia-box" style="margin-top:10px">${_verifIAHtml(p.verificacion_ia)}</div>
         </div>` : ''}
       ${p.documentos?.length?`<div style="margin-bottom:10px"><span style="font-size:11px;color:var(--texto-sub);display:block;margin-bottom:6px">Documentos</span>${p.documentos.map(d=>`<div style="font-size:12px;padding:4px 0">${escH(d.tipo_doc)} — ${escH(d.fecha)} <a href="${escH(d.url)}" target="_blank" style="color:var(--azul)">Descargar</a></div>`).join('')}</div>`:''}
       ${(p.estatus==='APROBADO_CALIDAD'||p.estatus==='EMITIDO')&&p.qr_codigo&&_sesRol==='CERTIFICACIONES'?`
@@ -4612,6 +4622,61 @@ async function guardarEmpresaPer(id) {
   } catch (e) {
     mostrarToast('Error de conexión.', 'err');
     console.error('guardarEmpresaPer:', e);
+  }
+}
+
+/* ── Verificación de identidad con IA (semáforo para el revisor) ──
+   Verde = lo capturado coincide con la identificación · Rojo = no coincide ·
+   Amarillo = no se pudo leer el documento. Es una ayuda: la decisión de
+   aprobar o devolver la sigue tomando Calidad. */
+function _verifIAHtml(v) {
+  if (!v || !v.resultado) return '';
+  const cfg = {
+    coincide:    ['#1b7a3d', '#e8f5e9', '#43a047', '✓ Coincide con la identificación'],
+    no_coincide: ['#b91c1c', '#fdecea', '#ef4444', '✗ No coincide con la identificación'],
+    ilegible:    ['#92400e', '#fff8e1', '#f59e0b', '⚠ No se pudo leer el documento'],
+  }[v.resultado] || ['#5a6072', '#f0f0f0', '#bbb', v.resultado];
+  const [color, fondo, borde, etiqueta] = cfg;
+  const leido = [];
+  if (v.nombre_doc) leido.push(`Nombre en el documento: <strong>${escH(v.nombre_doc)}</strong>`);
+  if (v.curp_doc)   leido.push(`CURP en el documento: <strong style="font-family:monospace">${escH(v.curp_doc)}</strong>`);
+  return `<div style="background:${fondo};border:1.5px solid ${borde};border-radius:9px;padding:10px 12px">
+    <div style="font-size:12px;font-weight:700;color:${color}">${etiqueta}</div>
+    ${v.detalle ? `<div style="font-size:11px;color:var(--texto-sub);margin-top:4px">${escH(v.detalle)}</div>` : ''}
+    ${leido.length ? `<div style="font-size:11px;color:var(--texto-sub);margin-top:5px;line-height:1.6">${leido.join('<br>')}</div>` : ''}
+    ${v.fecha ? `<div style="font-size:10px;color:var(--texto-hint);margin-top:5px">Verificado: ${escH(v.fecha)}</div>` : ''}
+  </div>`;
+}
+
+async function verificarIdentidadIA(id) {
+  const btn = document.getElementById('btn-verif-ia');
+  const box = document.getElementById('verif-ia-box');
+  if (!btn || !box) return;
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = 'Verificando…';
+  box.innerHTML = `<div style="font-size:12px;color:var(--texto-hint)">Comparando los datos con la identificación…</div>`;
+  try {
+    const res  = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ action: 'VERIFICAR_IDENTIDAD_IA', payload: { id } })
+    });
+    const d = await res.json();
+    if (d.status === 'success') {
+      box.innerHTML = _verifIAHtml({ ...d, fecha: '' });
+      const msg = { coincide: 'Los datos coinciden.', no_coincide: 'Los datos NO coinciden.', ilegible: 'No se pudo leer el documento.' }[d.resultado];
+      mostrarToast(msg || 'Verificación realizada.', d.resultado === 'coincide' ? 'ok' : 'err');
+    } else {
+      box.innerHTML = `<div style="font-size:12px;color:var(--rojo)">${escH(d.message || 'No se pudo verificar.')}</div>`;
+      mostrarToast(d.message || 'No se pudo verificar.', 'err');
+    }
+  } catch (e) {
+    box.innerHTML = `<div style="font-size:12px;color:var(--rojo)">Error de conexión al verificar.</div>`;
+    mostrarToast('Error de conexión.', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = original;
   }
 }
 

@@ -32,6 +32,7 @@ require_once __DIR__ . '/ClienteSubusuarios.php';
 require_once __DIR__ . '/ClienteRH.php';
 require_once __DIR__ . '/PagosServicios.php';
 require_once __DIR__ . '/Anuncios.php';
+require_once __DIR__ . '/VerificacionIA.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -92,6 +93,7 @@ $cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuario
 $cliRH          = new ClienteRH($pdo);
 $pagosServicios = new PagosServicios($pdo);
 $anuncios       = new Anuncios($pdo);
+$verifIA        = new VerificacionIA($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -1388,6 +1390,11 @@ if ($method === 'POST') {
                 $usr['usuario'],
                 $action === 'GENERAR_DOC_PERSONAL_SIN_SELLOS'
             ));
+
+        case 'VERIFICAR_IDENTIDAD_IA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($verifIA->verificar((int)($payload['id'] ?? 0), $usr['usuario']));
 
         case 'SUBIR_DOC_MANUAL_PERSONAL':   // multipart: reemplazo manual de PDF de personal
             $usr = validarToken($pdo, $token);

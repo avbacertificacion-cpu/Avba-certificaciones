@@ -40,6 +40,13 @@ define('NO_ACREDITACION', 'UVNMX 057');  // Número de registro oficial
 define('CONVERT_SERVICE_URL', 'https://mi-vps.com/convert.php');
 define('CONVERT_SERVICE_KEY', 'clave_secreta_fuerte_aqui');
 
+// ── Verificación de identidad con IA (opcional) ───────────
+// API key de Google Gemini (https://aistudio.google.com/apikey).
+// Permite que Calidad compare los datos capturados por el participante
+// contra su identificación oficial. Si se deja vacía, el botón de
+// verificación queda deshabilitado y todo se revisa a mano.
+define('GEMINI_API_KEY', '');
+
 // ── Entorno ───────────────────────────────────────────────
 define('APP_ENV', 'production');
 

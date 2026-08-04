@@ -131,10 +131,11 @@
 
   <!-- 7 -->
   <h2>7. Servicios de terceros</h2>
-  <p>La app utiliza los siguientes servicios de terceros con funciones limitadas y sin acceso a datos personales:</p>
+  <p>La app utiliza los siguientes servicios de terceros:</p>
   <ul>
-    <li><strong>Librerías propias</strong> — los códigos QR, las gráficas (Chart.js), los mapas (Leaflet) y el visor de PDF se generan y sirven desde nuestro propio servidor, sin depender de servicios externos.</li>
+    <li><strong>Librerías propias</strong> — los códigos QR, las gráficas (Chart.js), los mapas (Leaflet), el lector de códigos QR y el visor de PDF se generan y sirven desde nuestro propio servidor, sin depender de servicios externos y sin acceso a datos personales.</li>
     <li><strong>Mapas (OpenStreetMap)</strong> — las teselas y la búsqueda de direcciones se obtienen a través de nuestro propio servidor; el dispositivo del usuario no se comunica directamente con servicios externos.</li>
+    <li><strong>Verificación de identidad (Google Gemini)</strong> — cuando el personal de Calidad utiliza la función de verificación, se transmite a Google la <em>imagen de la identificación oficial</em> del participante junto con el nombre y la CURP que capturó, con la única finalidad de comparar ambos y detectar discrepancias. Estos datos <strong>sí son datos personales</strong>. La transmisión ocurre solo al ejecutar esa verificación de forma manual; no se realiza de manera automática ni continua, y el resultado que se conserva en nuestros sistemas es únicamente la conclusión de la comparación. Esta función puede deshabilitarse por completo.</li>
   </ul>
   <p>No integramos Google Analytics, Facebook SDK, ni ningún SDK de rastreo publicitario.</p>
 
