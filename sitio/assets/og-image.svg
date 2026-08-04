@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0B1A33"/>
+      <stop offset="100%" stop-color="#123A6B"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <g opacity="0.15" stroke="#ffffff" stroke-width="1">
+    <circle cx="1020" cy="120" r="180"/>
+    <circle cx="1020" cy="120" r="120"/>
+    <circle cx="1020" cy="120" r="60"/>
+  </g>
+  <g transform="translate(96,225)">
+    <rect width="96" height="96" rx="24" fill="#185FA5"/>
+    <path d="M48 16 L80 30 V64 C80 88 66 104 48 112 C30 104 16 88 16 64 V30 Z" fill="none" stroke="#4DA3FF" stroke-width="4" transform="translate(0,-8)"/>
+    <path d="M31 58 L44 70 L67 42" fill="none" stroke="#ffffff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" transform="translate(0,-8)"/>
+  </g>
+  <text x="220" y="270" font-family="Arial, sans-serif" font-size="72" font-weight="800" fill="#ffffff">AV<tspan fill="#4DA3FF">BA</tspan></text>
+  <text x="220" y="312" font-family="Arial, sans-serif" font-size="22" font-weight="700" letter-spacing="1" fill="#93A9CC">INSPECTIONS · CERTIFICATIONS · MAINTENANCE</text>
+  <text x="96" y="400" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#ffffff">Inspección, certificación y mantenimiento</text>
+  <text x="96" y="442" font-family="Arial, sans-serif" font-size="34" font-weight="700" fill="#ffffff">de equipos de izaje en toda México</text>
+</svg>

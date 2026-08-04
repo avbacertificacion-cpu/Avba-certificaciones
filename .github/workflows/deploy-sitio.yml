@@ -1,0 +1,26 @@
+name: Deploy Sitio AVBA
+
+on:
+  push:
+    branches: [ claude/avba-html-migration-umx2gt ]
+    paths:
+      - 'sitio/**'
+      - '.github/workflows/deploy-sitio.yml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Subir sitio por SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "sitio"
+          strip_components: 1
+          overwrite: true
+          target: "/home/u218429682/domains/avba.com.mx/public_html"
