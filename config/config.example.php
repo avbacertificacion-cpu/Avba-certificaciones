@@ -46,6 +46,10 @@ define('CONVERT_SERVICE_KEY', 'clave_secreta_fuerte_aqui');
 // contra su identificación oficial. Si se deja vacía, el botón de
 // verificación queda deshabilitado y todo se revisa a mano.
 define('GEMINI_API_KEY', '');
+// Modelo a usar (opcional). Si se deja vacío o no se define, se usa
+// 'gemini-2.5-flash' (rápido y económico). Para documentos difíciles puede
+// cambiarse a 'gemini-2.5-pro'.
+define('GEMINI_MODEL', '');
 
 // ── Entorno ───────────────────────────────────────────────
 define('APP_ENV', 'production');

@@ -18,9 +18,19 @@
 class VerificacionIA {
     private PDO $pdo;
 
-    /** Modelo de visión: rápido y económico, suficiente para leer una credencial. */
-    private const MODELO = 'gemini-2.5-flash';
+    /**
+     * Modelo de visión por defecto: rápido y económico, suficiente para leer
+     * una credencial. Se puede cambiar sin tocar código definiendo
+     * GEMINI_MODEL en config/config.php (por ejemplo 'gemini-2.5-pro' si se
+     * necesita más precisión en documentos difíciles).
+     */
+    private const MODELO_DEFAULT = 'gemini-2.5-flash';
     private const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/';
+
+    private function modelo(): string {
+        $m = defined('GEMINI_MODEL') ? trim((string)GEMINI_MODEL) : '';
+        return $m !== '' ? $m : self::MODELO_DEFAULT;
+    }
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
@@ -147,7 +157,7 @@ class VerificacionIA {
             ],
         ];
 
-        $url = self::ENDPOINT . self::MODELO . ':generateContent';
+        $url = self::ENDPOINT . $this->modelo() . ':generateContent';
         $ch  = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
