@@ -6,6 +6,9 @@ on:
     paths:
       - 'sitio/**'
       - '.github/workflows/deploy-sitio.yml'
+  # Permite relanzar el despliegue a mano desde la pestaña Actions,
+  # útil cuando el servidor no responde por un problema pasajero.
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -13,7 +16,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Subir sitio por SCP
+      # El servidor de Hostinger a veces tarda en aceptar la conexión y el
+      # intento se agota. Por eso se reintenta hasta tres veces con esperas
+      # crecientes, en lugar de dar el despliegue por fallido al primer fallo.
+      - name: Subir sitio por SCP (intento 1)
+        id: intento1
+        continue-on-error: true
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -23,4 +31,57 @@ jobs:
           source: "sitio"
           strip_components: 1
           overwrite: true
+          timeout: 120s
+          command_timeout: 15m
           target: "/home/u218429682/domains/avba.com.mx/public_html"
+
+      - name: Esperar antes de reintentar
+        if: steps.intento1.outcome == 'failure'
+        run: sleep 30
+
+      - name: Subir sitio por SCP (intento 2)
+        id: intento2
+        if: steps.intento1.outcome == 'failure'
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "sitio"
+          strip_components: 1
+          overwrite: true
+          timeout: 120s
+          command_timeout: 15m
+          target: "/home/u218429682/domains/avba.com.mx/public_html"
+
+      - name: Esperar antes del último intento
+        if: steps.intento1.outcome == 'failure' && steps.intento2.outcome == 'failure'
+        run: sleep 60
+
+      - name: Subir sitio por SCP (intento 3)
+        id: intento3
+        if: steps.intento1.outcome == 'failure' && steps.intento2.outcome == 'failure'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "sitio"
+          strip_components: 1
+          overwrite: true
+          timeout: 120s
+          command_timeout: 15m
+          target: "/home/u218429682/domains/avba.com.mx/public_html"
+
+      - name: Resultado
+        run: |
+          if [ "${{ steps.intento1.outcome }}" = "success" ]; then
+            echo "Sitio desplegado al primer intento."
+          elif [ "${{ steps.intento2.outcome }}" = "success" ]; then
+            echo "Sitio desplegado en el segundo intento (el primero se agotó)."
+          else
+            echo "Sitio desplegado en el tercer intento (los dos anteriores se agotaron)."
+          fi
