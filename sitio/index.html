@@ -448,6 +448,34 @@
   .cred span{font-size:13.5px;color:var(--texto-sub);line-height:1.35;}
   .cred strong{display:block;font-weight:700;color:var(--texto);}
 
+  /* ── Acreditación ─────────────────────────── */
+  .acreditacion{
+    background:linear-gradient(135deg,var(--azul-light),var(--superficie) 68%);
+    border-bottom:1px solid var(--borde);padding:44px 0;
+  }
+  .acred-caja{display:flex;align-items:center;gap:38px;flex-wrap:wrap;justify-content:center;}
+  .acred-sello{
+    flex-shrink:0;background:#fff;border-radius:16px;padding:20px 26px;
+    box-shadow:var(--sombra-sm);border:1px solid var(--borde);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .acred-sello[hidden]{display:none;}
+  .acred-sello img{width:auto;height:auto;max-width:230px;max-height:120px;}
+  .acred-texto{flex:1;min-width:280px;max-width:620px;}
+  .acred-tag{
+    display:inline-block;font-size:12px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
+    color:var(--brand-ink);margin-bottom:10px;
+  }
+  .acred-texto h2{font-size:clamp(21px,2.6vw,29px);font-weight:800;margin-bottom:12px;}
+  .acred-texto p{font-size:15.5px;color:var(--texto-sub);}
+  .acred-folio{
+    display:inline-flex;align-items:center;gap:8px;margin-top:14px;
+    font-size:13.5px;font-weight:700;color:var(--texto);
+    background:var(--superficie);border:1px solid var(--borde);
+    padding:8px 16px;border-radius:99px;
+  }
+  .acred-folio svg{width:16px;height:16px;color:var(--verde);}
+
   /* ═══ Secciones ════════════════════════════ */
   .section{padding:96px 0;}
   .section-alt{background:var(--superficie);}
@@ -919,6 +947,8 @@
     .hero-ctas{flex-direction:column;align-items:stretch;}
     .hero-ctas .btn{width:100%;}
     .servicio,.division,.zona{padding:26px 22px;}
+    .acred-caja{flex-direction:column;text-align:center;gap:24px;}
+    .acreditacion{padding:34px 0;}
     .muro-galeria{columns:1;}
     .post-img{max-height:none;}
     .visor{padding:16px;}
@@ -1028,6 +1058,24 @@
       <div class="cred">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10 12 4.5 2 10l10 5.5Z"/><path d="M6 12v4.5c0 1.4 2.7 2.8 6 2.8s6-1.4 6-2.8V12"/></svg>
         <span>Capacitación con <strong>constancia DC-3</strong></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ ACREDITACIÓN ═══════════════════════ -->
+  <section class="acreditacion" id="acreditacion" aria-label="Acreditación de AVBA">
+    <div class="container acred-caja">
+      <div class="acred-sello">
+        <!-- El logotipo de la EMA se coloca en assets/acreditacion-ema.png.
+             Si aún no está, este bloque se oculta solo y no rompe la página. -->
+        <img src="assets/acreditacion-ema.png" alt="Símbolo de acreditación de la Entidad Mexicana de Acreditación"
+             width="260" height="140" loading="lazy"
+             onerror="this.closest('.acred-sello').hidden = true;">
+      </div>
+      <div class="acred-texto">
+        <span class="acred-tag">Acreditación</span>
+        <h2>Unidad de Inspección acreditada ante la ema</h2>
+        <p>Nuestros dictámenes tienen validez formal ante clientes, auditores y autoridad. Una inspección emitida por una unidad acreditada no es un reporte de servicio: es la evidencia que se te exigirá en una auditoría.</p>
       </div>
     </div>
   </section>

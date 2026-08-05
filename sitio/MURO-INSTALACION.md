@@ -99,3 +99,39 @@ Estas medidas ya están implementadas y probadas:
   lo publico y lo enlazo desde el formulario.
 - **Aviso de publicación nueva.** Hoy hay que entrar al panel a revisar. Se
   puede añadir un correo automático cuando llegue algo pendiente.
+
+---
+
+# Logotipo de acreditación (ema)
+
+La franja de acreditación ya está en el sitio, arriba de los servicios.
+Mientras no exista el archivo del logotipo, el recuadro se oculta solo y el
+texto se muestra igual: no queda ninguna imagen rota.
+
+## Cómo colocar el logotipo
+
+1. Consigue el archivo oficial que te entrega la ema (PNG con fondo
+   transparente, o SVG).
+2. Súbelo por el Administrador de archivos de Hostinger a la carpeta
+   `assets/` del sitio, con este nombre exacto:
+
+   ```
+   assets/acreditacion-ema.png
+   ```
+
+3. Recarga la página. El logotipo aparece automáticamente; no hay que tocar
+   código.
+
+Si tu archivo es SVG o tiene otro nombre, mándamelo y ajusto la referencia.
+
+## Antes de publicarlo, dos datos que faltan
+
+- **El número de acreditación.** La ema pide normalmente que su símbolo se
+  acompañe del número asignado y del alcance acreditado. Ya hay un espacio
+  preparado en el diseño (`.acred-folio`) para colocarlo; solo hace falta el
+  dato.
+- **El alcance acreditado.** Conviene indicar para qué está acreditada la
+  unidad, para que quede claro qué cubre la acreditación.
+
+Conviene revisar las condiciones de uso del símbolo que entrega la propia
+ema, porque suelen fijar reglas de tamaño, proporción y contexto.
