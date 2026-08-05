@@ -9,7 +9,7 @@
 require_once __DIR__ . '/config.php';
 
 /** Versión actual del esquema. Subir al añadir migraciones. */
-const SC_SCHEMA_VERSION = 7;
+const SC_SCHEMA_VERSION = 8;
 
 class ScDatabase {
     private static ?PDO $instance = null;
@@ -72,6 +72,7 @@ class ScDatabase {
             if ($version < 5) self::migrarA5($pdo);
             if ($version < 6) self::migrarA6($pdo);
             if ($version < 7) self::migrarA7($pdo);
+            if ($version < 8) self::migrarA8($pdo);
 
             $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
                         ON DUPLICATE KEY UPDATE valor = '" . SC_SCHEMA_VERSION . "'");
@@ -95,6 +96,7 @@ class ScDatabase {
         $columnas = self::columnasDe($pdo, 'sc_usuarios');
 
         if (!$columnas)                                    return SC_SCHEMA_VERSION; // Base vacía
+        if (self::columnasDe($pdo, 'sc_publicaciones'))      return 8;
         if (in_array('bloqueado_motivo', $columnas, true))   return 7;
         if (in_array('terminos_aceptados', $columnas, true)) return 6;
         if (self::columnasDe($pdo, 'sc_sesiones'))          return 5;
@@ -214,6 +216,39 @@ class ScDatabase {
                 ip          VARCHAR(45) NULL,
                 KEY idx_sc_admin_log_fecha (fecha),
                 KEY idx_sc_admin_log_usuario (usuario_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+
+        // Muro del portal: publicaciones con texto y/o imagen, y sus
+        // comentarios. Ambas cuelgan de sc_usuarios con ON DELETE CASCADE,
+        // así que borrar una cuenta se lleva también lo que publicó.
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_publicaciones (
+                id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                usuario_id INT UNSIGNED NOT NULL,
+                texto      TEXT NULL,
+                imagen_url VARCHAR(255) NULL,
+                creado     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_sc_publicaciones_creado (creado),
+                KEY idx_sc_publicaciones_usuario (usuario_id),
+                CONSTRAINT fk_sc_publicaciones_usuario FOREIGN KEY (usuario_id)
+                    REFERENCES sc_usuarios(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_comentarios (
+                id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                publicacion_id INT UNSIGNED NOT NULL,
+                usuario_id    INT UNSIGNED NOT NULL,
+                texto         TEXT NOT NULL,
+                creado        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_sc_comentarios_pub (publicacion_id, creado),
+                CONSTRAINT fk_sc_comentarios_pub FOREIGN KEY (publicacion_id)
+                    REFERENCES sc_publicaciones(id) ON DELETE CASCADE,
+                CONSTRAINT fk_sc_comentarios_usuario FOREIGN KEY (usuario_id)
+                    REFERENCES sc_usuarios(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
@@ -456,6 +491,41 @@ class ScDatabase {
         ");
     }
 
+    /** v7 → v8: muro de publicaciones y comentarios. */
+    private static function migrarA8(PDO $pdo): void {
+        // Muro del portal: publicaciones con texto y/o imagen, y sus
+        // comentarios. Ambas cuelgan de sc_usuarios con ON DELETE CASCADE,
+        // así que borrar una cuenta se lleva también lo que publicó.
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_publicaciones (
+                id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                usuario_id INT UNSIGNED NOT NULL,
+                texto      TEXT NULL,
+                imagen_url VARCHAR(255) NULL,
+                creado     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_sc_publicaciones_creado (creado),
+                KEY idx_sc_publicaciones_usuario (usuario_id),
+                CONSTRAINT fk_sc_publicaciones_usuario FOREIGN KEY (usuario_id)
+                    REFERENCES sc_usuarios(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_comentarios (
+                id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                publicacion_id INT UNSIGNED NOT NULL,
+                usuario_id    INT UNSIGNED NOT NULL,
+                texto         TEXT NOT NULL,
+                creado        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_sc_comentarios_pub (publicacion_id, creado),
+                CONSTRAINT fk_sc_comentarios_pub FOREIGN KEY (publicacion_id)
+                    REFERENCES sc_publicaciones(id) ON DELETE CASCADE,
+                CONSTRAINT fk_sc_comentarios_usuario FOREIGN KEY (usuario_id)
+                    REFERENCES sc_usuarios(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    }
+
     /** Añade una columna solo si aún no existe. */
     private static function agregarColumna(PDO $pdo, string $tabla, string $columna, string $definicion): void {
         $columnas = self::columnasDe($pdo, $tabla);
@@ -476,7 +546,7 @@ class ScDatabase {
         }
 
         $tablas = [];
-        foreach (['sc_meta','sc_usuarios','sc_sesiones','sc_intentos','sc_admin_log','sc_cv_accesos','sc_personas',
+        foreach (['sc_meta','sc_usuarios','sc_sesiones','sc_intentos','sc_admin_log','sc_cv_accesos','sc_publicaciones','sc_comentarios','sc_personas',
                   'sc_experiencia','sc_educacion','sc_habilidades','sc_empresas','sc_vacantes',
                   'sc_postulaciones'] as $t) {
             $cols = self::columnasDe($pdo, $t);

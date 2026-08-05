@@ -140,6 +140,30 @@ async function scSubir(action, archivo) {
 }
 
 /**
+ * POST multipart con campos de texto y un archivo opcional.
+ *
+ * scSubir() solo manda `archivo`; PUBLICAR necesita además el texto en el
+ * mismo envío, porque la publicación y su imagen son una sola cosa.
+ */
+async function scEnviarFormulario(action, campos, archivo) {
+  const s = scSesion.leer();
+  const fd = new FormData();
+  fd.append('action', action);
+
+  Object.entries(campos || {}).forEach(([k, v]) => {
+    if (v !== null && v !== undefined) fd.append(k, v);
+  });
+  if (archivo) fd.append('archivo', archivo);
+
+  const cabeceras = {};
+  if (s && s.token) cabeceras['Authorization'] = 'Bearer ' + s.token;
+  // Ojo: NO fijar Content-Type; el navegador debe poner el boundary.
+
+  const res = await fetch(SC_API, { method: 'POST', headers: cabeceras, body: fd });
+  return scLeerRespuesta(res);
+}
+
+/**
  * Abre el CV de un candidato en una pestaña nueva.
  *
  * El PDF ya no es un archivo estático: se pide al API con la cabecera
@@ -585,4 +609,400 @@ function scPintarPie() {
       </p>
       <p class="pie-legal">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. — avba.com.mx</p>
     </div>`;
+}
+
+/* ══════════════════════════════════════════════════════════
+   MURO DEL PORTAL (feed)
+
+   Componente completo: se monta con scMontarFeed('id-contenedor') y se
+   encarga del compositor, la lista, los comentarios y los borrados.
+   Vive aquí y no en la página para poder reutilizarlo tal cual.
+
+   El muro NO es público: el API exige sesión con el correo confirmado,
+   porque muestra nombres y fotos de otras cuentas.
+   ══════════════════════════════════════════════════════════ */
+
+const SC_FEED_MAX_TEXTO      = 3000;   // igual que ScFeed::MAX_TEXTO
+const SC_FEED_MAX_COMENTARIO = 1000;
+
+let scFeedEstado = {
+  contenedor: null,
+  publicaciones: [],
+  total: 0,
+  archivo: null,       // File elegido en el compositor
+  previaUrl: null,     // objectURL de la vista previa, hay que liberarlo
+  expandidos: {},      // id de publicación → comentarios completos cargados
+};
+
+/** Enlace al perfil público del autor, según su tipo de cuenta. */
+function scFeedEnlaceAutor(a) {
+  if (a.autor_tipo === 'empresa' && a.autor_empresa_id) {
+    return 'ver-empresa.html?id=' + Number(a.autor_empresa_id);
+  }
+  if (a.autor_tipo === 'persona' && a.autor_persona_id) {
+    return 'ver-perfil.html?id=' + Number(a.autor_persona_id);
+  }
+  return '';
+}
+
+function scFeedCabeceraAutor(a, fecha, acciones) {
+  const enlace = scFeedEnlaceAutor(a);
+  const nombre = scEsc(a.autor_nombre || 'Cuenta sin nombre');
+
+  return `
+    <div class="feed-autor">
+      ${scAvatar(a.autor_foto, a.autor_nombre, 'sm', a.autor_tipo === 'empresa')}
+      <div class="feed-autor-datos">
+        <div class="feed-autor-nombre">
+          ${enlace ? `<a href="${enlace}">${nombre}</a>` : nombre}
+          ${Number(a.autor_verificado) ? scIcono('verificado', 'feed-verificado') : ''}
+        </div>
+        <div class="feed-fecha">${scEsc(scHace(fecha))}</div>
+      </div>
+      ${acciones || ''}
+    </div>`;
+}
+
+/** ¿Puedo borrar esto? El API lo vuelve a comprobar; esto solo pinta. */
+function scFeedPuedoBorrar(autorId, duenoPublicacionId) {
+  const s = scSesion.leer();
+  if (!s) return false;
+  if (Number(s.es_admin) === 1) return true;
+  if (Number(s.usuario_id) === Number(autorId)) return true;
+  return duenoPublicacionId !== undefined
+      && Number(s.usuario_id) === Number(duenoPublicacionId);
+}
+
+function scFeedComentario(c, duenoPublicacionId) {
+  const borrar = scFeedPuedoBorrar(c.autor_id, duenoPublicacionId)
+    ? `<button type="button" class="feed-borrar" title="Eliminar comentario"
+         data-feed="borrar-comentario" data-id="${Number(c.id)}"
+         data-pub="${Number(c.publicacion_id)}" aria-label="Eliminar comentario">&times;</button>`
+    : '';
+
+  const enlace = scFeedEnlaceAutor(c);
+  const nombre = scEsc(c.autor_nombre || 'Cuenta sin nombre');
+
+  return `
+    <div class="feed-comentario">
+      ${scAvatar(c.autor_foto, c.autor_nombre, 'xs', c.autor_tipo === 'empresa')}
+      <div class="feed-comentario-burbuja">
+        <div class="feed-comentario-cabecera">
+          <span class="feed-comentario-autor">${enlace ? `<a href="${enlace}">${nombre}</a>` : nombre}</span>
+          <span class="feed-comentario-fecha">${scEsc(scHace(c.creado))}</span>
+          ${borrar}
+        </div>
+        <div class="feed-comentario-texto">${scEsc(c.texto)}</div>
+      </div>
+    </div>`;
+}
+
+function scFeedPublicacion(pub) {
+  const acciones = scFeedPuedoBorrar(pub.autor_id)
+    ? `<button type="button" class="feed-borrar" title="Eliminar publicación"
+         data-feed="borrar-publicacion" data-id="${Number(pub.id)}"
+         aria-label="Eliminar publicación">&times;</button>`
+    : '';
+
+  const total = Number(pub.n_comentarios) || 0;
+  const expandido = !!scFeedEstado.expandidos[pub.id];
+  const comentarios = expandido ? scFeedEstado.expandidos[pub.id] : (pub.comentarios || []);
+
+  // Solo se ofrece "ver todos" si hay más de los que se muestran de entrada
+  const verTodos = (!expandido && total > comentarios.length)
+    ? `<button type="button" class="feed-ver-mas" data-feed="ver-comentarios" data-id="${Number(pub.id)}">
+         Ver los ${total} comentarios
+       </button>`
+    : '';
+
+  return `
+    <article class="feed-publicacion" id="pub-${Number(pub.id)}">
+      ${scFeedCabeceraAutor(pub, pub.creado, acciones)}
+
+      ${pub.texto ? `<div class="feed-texto">${scEsc(pub.texto)}</div>` : ''}
+      ${pub.imagen_url
+        ? `<div class="feed-imagen">
+             <img src="${scEsc(pub.imagen_url)}" alt="Fotografía de la publicación" loading="lazy">
+           </div>` : ''}
+
+      <div class="feed-pie">
+        <span class="feed-cuenta">${total === 1 ? '1 comentario' : total + ' comentarios'}</span>
+      </div>
+
+      <div class="feed-comentarios">
+        ${verTodos}
+        ${comentarios.map(c => scFeedComentario(c, pub.autor_id)).join('')}
+      </div>
+
+      <form class="feed-responder" data-feed="form-comentario" data-id="${Number(pub.id)}">
+        <input type="text" maxlength="${SC_FEED_MAX_COMENTARIO}" required
+               placeholder="Escribe un comentario..." aria-label="Escribe un comentario">
+        <button type="submit" class="btn btn-sm btn-primary">Comentar</button>
+      </form>
+    </article>`;
+}
+
+function scFeedCompositor() {
+  const s = scSesion.leer();
+  const previa = scFeedEstado.previaUrl
+    ? `<div class="feed-previa">
+         <img src="${scFeedEstado.previaUrl}" alt="Vista previa de la fotografía">
+         <button type="button" class="feed-previa-quitar" data-feed="quitar-imagen"
+                 aria-label="Quitar la fotografía">&times;</button>
+       </div>`
+    : '';
+
+  return `
+    <form class="feed-compositor" id="feed-compositor">
+      <div class="feed-compositor-fila">
+        ${scAvatar(null, s ? s.nombre : '', 'sm', s && s.tipo === 'empresa')}
+        <textarea id="feed-texto" rows="2" maxlength="${SC_FEED_MAX_TEXTO}"
+          placeholder="Comparte una noticia, una obra terminada o una novedad de tu empresa..."
+          aria-label="Texto de la publicación"></textarea>
+      </div>
+      ${previa}
+      <div class="feed-compositor-pie">
+        <button type="button" class="btn btn-sm btn-gris" data-feed="elegir-imagen">
+          ${scIcono('camara')}Añadir foto
+        </button>
+        <input type="file" id="feed-archivo" class="oculto-file"
+               accept="image/jpeg,image/png,image/webp,image/gif">
+        <span class="feed-contador" id="feed-contador"></span>
+        <button type="submit" class="btn btn-sm btn-primary" id="feed-publicar">Publicar</button>
+      </div>
+    </form>`;
+}
+
+function scFeedPintar() {
+  const cont = document.getElementById(scFeedEstado.contenedor);
+  if (!cont) return;
+
+  const lista = scFeedEstado.publicaciones;
+
+  cont.innerHTML = scFeedCompositor() + (lista.length
+    ? `<div class="feed-lista">${lista.map(scFeedPublicacion).join('')}</div>
+       ${scBotonVerMas(lista.length, scFeedEstado.total, 'scFeedVerMas')}`
+    : scVacio('documento', 'Todavía no hay publicaciones',
+        'Sé el primero en compartir algo con la comunidad del portal.', ''));
+
+  scFeedActualizarContador();
+}
+
+function scFeedActualizarContador() {
+  const campo = document.getElementById('feed-texto');
+  const el    = document.getElementById('feed-contador');
+  if (!campo || !el) return;
+
+  const restantes = SC_FEED_MAX_TEXTO - campo.value.length;
+  el.textContent = restantes < 300 ? restantes + ' caracteres restantes' : '';
+  el.classList.toggle('cerca', restantes < 100);
+}
+
+/* ── Carga ──────────────────────────────────────────────── */
+async function scFeedCargar() {
+  const cont = document.getElementById(scFeedEstado.contenedor);
+  if (!cont) return;
+  cont.innerHTML = scCargando('Cargando el muro...');
+
+  try {
+    const datos = await scGet('GET_FEED', { offset: 0 });
+    if (datos.status !== 'success') {
+      cont.innerHTML = scVacio('alerta', 'No se pudo cargar el muro', datos.message || '', '');
+      return;
+    }
+    scFeedEstado.publicaciones = datos.publicaciones || [];
+    scFeedEstado.total = Number(datos.total) || scFeedEstado.publicaciones.length;
+    scFeedPintar();
+  } catch (e) {
+    cont.innerHTML = scVacio('alerta', 'Error', e.message, '');
+  }
+}
+
+async function scFeedVerMas() {
+  if (scFeedEstado.publicaciones.length >= scFeedEstado.total) return;
+  try {
+    const datos = await scGet('GET_FEED', { offset: scFeedEstado.publicaciones.length });
+    if (datos.status !== 'success') { scToast(datos.message || 'No se pudo cargar más.', 'error'); return; }
+
+    scFeedEstado.publicaciones = scFeedEstado.publicaciones.concat(datos.publicaciones || []);
+    scFeedEstado.total = Number(datos.total) || scFeedEstado.publicaciones.length;
+    scFeedPintar();
+  } catch (e) {
+    scToast(e.message, 'error');
+  }
+}
+
+/* ── Acciones ───────────────────────────────────────────── */
+function scFeedLimpiarImagen() {
+  if (scFeedEstado.previaUrl) URL.revokeObjectURL(scFeedEstado.previaUrl);
+  scFeedEstado.previaUrl = null;
+  scFeedEstado.archivo = null;
+}
+
+async function scFeedPublicar() {
+  const campo = document.getElementById('feed-texto');
+  const texto = campo ? campo.value.trim() : '';
+
+  if (!texto && !scFeedEstado.archivo) {
+    scToast('Escribe algo o adjunta una fotografía.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('feed-publicar');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<div class="spin"></div> Publicando...'; }
+
+  try {
+    const datos = await scEnviarFormulario('PUBLICAR', { texto }, scFeedEstado.archivo);
+    if (datos.status !== 'success') { scToast(datos.message || 'No se pudo publicar.', 'error'); return; }
+
+    scFeedLimpiarImagen();
+    scToast(datos.message, 'ok');
+    scFeedCargar();
+  } catch (e) {
+    scToast(e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Publicar'; }
+  }
+}
+
+async function scFeedComentar(publicacionId, texto, form) {
+  if (!texto.trim()) return;
+
+  const btn = form.querySelector('button[type="submit"]');
+  if (btn) btn.disabled = true;
+
+  try {
+    const datos = await scPost('COMENTAR', { publicacion_id: publicacionId, texto });
+    if (datos.status !== 'success') { scToast(datos.message || 'No se pudo comentar.', 'error'); return; }
+
+    // Si estaba expandido se recarga la lista completa para no dejarla a medias
+    if (scFeedEstado.expandidos[publicacionId]) {
+      await scFeedVerComentarios(publicacionId);
+    } else {
+      await scFeedCargar();
+    }
+  } catch (e) {
+    scToast(e.message, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
+async function scFeedVerComentarios(publicacionId) {
+  try {
+    const datos = await scGet('GET_COMENTARIOS', { publicacion_id: publicacionId });
+    if (datos.status !== 'success') { scToast(datos.message || 'No se pudieron cargar.', 'error'); return; }
+
+    scFeedEstado.expandidos[publicacionId] = datos.comentarios || [];
+
+    const pub = scFeedEstado.publicaciones.find(p => Number(p.id) === Number(publicacionId));
+    if (pub) pub.n_comentarios = (datos.comentarios || []).length;
+
+    scFeedPintar();
+  } catch (e) {
+    scToast(e.message, 'error');
+  }
+}
+
+async function scFeedBorrar(accion, id, publicacionId) {
+  const esPublicacion = accion === 'borrar-publicacion';
+  const pregunta = esPublicacion
+    ? '¿Eliminar esta publicación?\n\nSe borra también su fotografía y sus comentarios.'
+    : '¿Eliminar este comentario?';
+  if (!confirm(pregunta)) return;
+
+  try {
+    const datos = await scPost(esPublicacion ? 'ELIMINAR_PUBLICACION' : 'ELIMINAR_COMENTARIO', { id });
+    scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
+    if (datos.status !== 'success') return;
+
+    if (esPublicacion) {
+      delete scFeedEstado.expandidos[id];
+      scFeedCargar();
+    } else if (scFeedEstado.expandidos[publicacionId]) {
+      scFeedVerComentarios(publicacionId);
+    } else {
+      scFeedCargar();
+    }
+  } catch (e) {
+    scToast(e.message, 'error');
+  }
+}
+
+/**
+ * Monta el muro dentro del contenedor indicado.
+ * Los eventos se enganchan una sola vez, por delegación: el contenido se
+ * redibuja entero en cada cambio y unos listeners directos se perderían.
+ */
+function scMontarFeed(contenedorId) {
+  scFeedEstado.contenedor = contenedorId;
+  const cont = document.getElementById(contenedorId);
+  if (!cont) return;
+
+  cont.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-feed]');
+    if (!el) return;
+
+    const id = Number(el.dataset.id || 0);
+    switch (el.dataset.feed) {
+      case 'elegir-imagen':
+        document.getElementById('feed-archivo').click();
+        break;
+      case 'quitar-imagen':
+        scFeedLimpiarImagen();
+        scFeedPintar();
+        break;
+      case 'ver-comentarios':
+        scFeedVerComentarios(id);
+        break;
+      case 'borrar-publicacion':
+      case 'borrar-comentario':
+        scFeedBorrar(el.dataset.feed, id, Number(el.dataset.pub || 0));
+        break;
+    }
+  });
+
+  cont.addEventListener('change', (e) => {
+    if (e.target.id !== 'feed-archivo') return;
+
+    const archivo = e.target.files && e.target.files[0];
+    if (!archivo) return;
+
+    if (archivo.size > 6 * 1024 * 1024) {
+      scToast('La fotografía no puede pasar de 6 MB.', 'error');
+      e.target.value = '';
+      return;
+    }
+
+    // El texto ya escrito se conserva: scFeedPintar() lo redibuja vacío, así
+    // que se guarda antes y se repone después.
+    const campo = document.getElementById('feed-texto');
+    const texto = campo ? campo.value : '';
+
+    scFeedLimpiarImagen();
+    scFeedEstado.archivo = archivo;
+    scFeedEstado.previaUrl = URL.createObjectURL(archivo);
+    scFeedPintar();
+
+    const nuevo = document.getElementById('feed-texto');
+    if (nuevo) nuevo.value = texto;
+  });
+
+  cont.addEventListener('input', (e) => {
+    if (e.target.id === 'feed-texto') scFeedActualizarContador();
+  });
+
+  cont.addEventListener('submit', (e) => {
+    e.preventDefault();
+
+    if (e.target.id === 'feed-compositor') { scFeedPublicar(); return; }
+
+    if (e.target.dataset.feed === 'form-comentario') {
+      const campo = e.target.querySelector('input');
+      scFeedComentar(Number(e.target.dataset.id), campo.value, e.target);
+      campo.value = '';
+    }
+  });
+
+  scFeedCargar();
 }

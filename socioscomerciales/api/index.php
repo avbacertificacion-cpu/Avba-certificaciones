@@ -18,6 +18,7 @@ require_once __DIR__ . '/Personas.php';
 require_once __DIR__ . '/Empresas.php';
 require_once __DIR__ . '/Vacantes.php';
 require_once __DIR__ . '/Admin.php';
+require_once __DIR__ . '/Feed.php';
 require_once __DIR__ . '/diagnostico.php';
 
 // Nunca mostrar avisos de PHP en la respuesta: romperían el JSON
@@ -118,6 +119,7 @@ $personas = new ScPersonas($pdo);
 $empresas = new ScEmpresas($pdo);
 $vacantes = new ScVacantes($pdo);
 $admin    = new ScAdmin($pdo);
+$feed     = new ScFeed($pdo);
 
 // ── Extraer token (Authorization: Bearer, X-Token, body o query) ──
 $token = null;
@@ -357,6 +359,17 @@ if ($method === 'GET') {
             $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($vacantes->postulacionesDeVacante((int) $usr['id'], (int) ($_GET['vacante_id'] ?? 0)));
 
+        // ── Muro ─────────────────────────────────────────────
+        // Leerlo exige correo confirmado: muestra nombres y fotos de otras
+        // cuentas, igual que el directorio o la búsqueda de candidatos.
+        case 'GET_FEED':
+            scSesionVerificada($pdo, $token);
+            scRespuesta($feed->listar($payload));
+
+        case 'GET_COMENTARIOS':
+            scSesionVerificada($pdo, $token);
+            scRespuesta($feed->comentarios((int) ($_GET['publicacion_id'] ?? 0)));
+
         // ── Administración ───────────────────────────────────
         case 'ADMIN_RESUMEN':
             scSesionAdmin($pdo, $token);
@@ -517,6 +530,27 @@ if ($method === 'POST') {
         case 'AVISAR_REVISION':
             $usr = scSesionVerificada($pdo, $token, 'empresa');
             scRespuesta($vacantes->avisarRevision((int) $usr['id'], $payload));
+
+        // ── Muro ────────────────────────────────────────────
+        // PUBLICAR llega como multipart porque puede traer una imagen: el
+        // texto viene en $_POST y el archivo en $_FILES.
+        case 'PUBLICAR':
+            $usr = scSesionVerificada($pdo, $token);
+            scRespuesta($feed->publicar((int) $usr['id'], $payload, $_FILES['archivo'] ?? []));
+
+        case 'COMENTAR':
+            $usr = scSesionVerificada($pdo, $token);
+            scRespuesta($feed->comentar((int) $usr['id'], $payload));
+
+        // El borrado NO exige correo confirmado: quien quiera retirar algo
+        // suyo debe poder hacerlo siempre, y administración modera sin más.
+        case 'ELIMINAR_PUBLICACION':
+            $usr = scSesion($pdo, $token);
+            scRespuesta($feed->eliminarPublicacion($usr, (int) ($payload['id'] ?? 0)));
+
+        case 'ELIMINAR_COMENTARIO':
+            $usr = scSesion($pdo, $token);
+            scRespuesta($feed->eliminarComentario($usr, (int) ($payload['id'] ?? 0)));
 
         // ── Administración ──────────────────────────────────
         case 'ADMIN_BLOQUEAR':

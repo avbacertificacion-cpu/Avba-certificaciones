@@ -13,7 +13,7 @@ repositorio: base de datos propia, sesiones propias y despliegue propio.
 
 ```
 socioscomerciales/
-├── index.html              Landing pública
+├── index.html              Landing pública + muro del portal
 ├── login.html              Acceso
 ├── registro.html           Alta de cuenta (candidato / empresa)
 ├── verificar.html          Resultado del enlace de verificación de correo
@@ -47,13 +47,14 @@ socioscomerciales/
 │   ├── Empresas.php        Perfil de empresa y directorio
 │   ├── Vacantes.php        Vacantes, postulaciones y avisos por correo
 │   ├── Admin.php           Panel: listar, ver, bloquear y eliminar cuentas
+│   ├── Feed.php            Muro: publicaciones, fotos y comentarios
 │   ├── helpers.php         Sesiones, límites, subidas, envío de correo
 │   └── diagnostico.php     Estado del servidor y del esquema
 ├── config/
 │   ├── config.php          Credenciales reales (NO versionado)
 │   ├── config.sample.php   Plantilla
 │   └── database.php        scDB() + esquema y migraciones sc_*
-├── uploads/                cv/ · fotos/ · logos/ (protegido por .htaccess)
+├── uploads/                cv/ · fotos/ · logos/ · feed/ (protegido por .htaccess)
 ├── .htaccess               DirectoryIndex, Authorization, cabeceras de seguridad
 └── .user.ini               Ajustes de PHP (el host corre PHP-FPM)
 ```
@@ -78,7 +79,7 @@ Copiar `config/config.sample.php` a `config/config.php` y llenar:
 ## Base de datos
 
 Tablas con prefijo `sc_`: `sc_meta`, `sc_usuarios`, `sc_sesiones`, `sc_intentos`,
-`sc_admin_log`, `sc_cv_accesos`, `sc_personas`, `sc_experiencia`, `sc_educacion`, `sc_habilidades`,
+`sc_admin_log`, `sc_cv_accesos`, `sc_publicaciones`, `sc_comentarios`, `sc_personas`, `sc_experiencia`, `sc_educacion`, `sc_habilidades`,
 `sc_empresas`, `sc_vacantes`, `sc_postulaciones`.
 
 El esquema se crea y se migra solo. `sc_meta.schema_version` guarda la versión
@@ -189,6 +190,56 @@ existían**; si hace falta, se resuelve mostrando un aviso bloqueante en
 > publicarlos deben pasar por un abogado, sobre todo el domicilio social, el
 > fuero y las direcciones de contacto, que hoy son `contacto@avba.com.mx` y
 > `privacidad@avba.com.mx` y **tienen que existir**.
+
+## Muro del portal (feed)
+
+En **`index.html`**, debajo del hero. Publicaciones con texto y/o fotografía,
+con comentarios. El componente entero vive en `assets/avba.js`
+(`scMontarFeed('feed')`), así que se puede montar igual en otra página con una
+línea.
+
+### No es público, y es a propósito
+
+El muro muestra **nombres y fotos de otras cuentas**. El aviso de privacidad
+que publicamos dice que el perfil de un candidato lo ven "las cuentas
+registradas en el portal"; un muro abierto a cualquier visitante contradiría
+eso y expondría a los candidatos a que los indexara un buscador.
+
+Por eso la sección tiene tres estados:
+
+| Quién llega | Qué ve |
+|---|---|
+| Sin cuenta | Invitación a registrarse. **No se pide nada al API.** |
+| Con cuenta sin confirmar | Aviso para verificar el correo |
+| Cuenta verificada | El muro completo |
+
+`GET_FEED` y `GET_COMENTARIOS` exigen `scSesionVerificada`, igual que el
+directorio de empresas o la búsqueda de candidatos.
+
+### Quién puede borrar qué
+
+- Su publicación o su comentario: **su autor**.
+- Cualquier comentario en una publicación propia: **el dueño de la
+  publicación** — si alguien le deja algo ofensivo en su muro no debería tener
+  que esperar a que lo moderen.
+- Todo: **administración** (`SC_ADMINS`).
+
+Borrar NO exige el correo confirmado: quien quiera retirar algo suyo debe
+poder hacerlo siempre.
+
+### Límites y detalles
+
+- **10 publicaciones y 40 comentarios por hora** y cuenta. Un muro sin freno
+  es un tablón de spam en cuestión de horas.
+- Las fotos van a `uploads/feed/`, pasan por `scGuardarArchivo`, así que se
+  **redibujan con GD**: se va el EXIF con la geolocalización y se limitan a
+  1600 px. Máximo 6 MB.
+- Borrar una publicación borra su archivo del disco; los comentarios se van
+  por `ON DELETE CASCADE`. Borrar una cuenta se lleva todo lo que publicó.
+- `PUBLICAR` viaja como **multipart** porque puede traer imagen
+  (`scEnviarFormulario` en `avba.js`); el resto es JSON normal.
+- Las publicaciones de cuentas bloqueadas desaparecen del muro: todas las
+  consultas filtran por `u.activo = 1`.
 
 ## Aviso masivo a los postulantes
 

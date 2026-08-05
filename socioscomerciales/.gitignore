@@ -5,7 +5,9 @@ config/config.php
 uploads/cv/*
 uploads/fotos/*
 uploads/logos/*
+uploads/feed/*
 !uploads/cv/.gitkeep
 !uploads/fotos/.gitkeep
 !uploads/logos/.gitkeep
+!uploads/feed/.gitkeep
 !uploads/cv/.htaccess
