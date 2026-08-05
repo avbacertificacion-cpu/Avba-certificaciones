@@ -81,15 +81,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $limite  = min(60, max(1, (int)($_GET['limite'] ?? 24)));
     $desde   = max(0, (int)($_GET['desde'] ?? 0));
 
-    $sql = 'SELECT id, nombre, puesto, empresa, comentario, archivo, ancho, alto, creado_en
-              FROM muro_publicaciones
-             WHERE estado = "aprobado"
-             ORDER BY creado_en DESC
-             LIMIT :limite OFFSET :desde';
-    $st = $pdo->prepare($sql);
-    $st->bindValue(':limite', $limite, PDO::PARAM_INT);
-    $st->bindValue(':desde',  $desde,  PDO::PARAM_INT);
-    $st->execute();
+    // ?aleatorio=1 devuelve una publicación al azar, para la ventana de bienvenida.
+    // Solo se consideran las que tienen fotografía: sin imagen no vale la pena mostrarla.
+    if (!empty($_GET['aleatorio'])) {
+        $sql = 'SELECT id, nombre, puesto, empresa, comentario, archivo, ancho, alto, creado_en
+                  FROM muro_publicaciones
+                 WHERE estado = "aprobado" AND archivo IS NOT NULL
+                 ORDER BY RAND()
+                 LIMIT :limite';
+        $st = $pdo->prepare($sql);
+        $st->bindValue(':limite', $limite, PDO::PARAM_INT);
+        $st->execute();
+    } else {
+        $sql = 'SELECT id, nombre, puesto, empresa, comentario, archivo, ancho, alto, creado_en
+                  FROM muro_publicaciones
+                 WHERE estado = "aprobado"
+                 ORDER BY creado_en DESC
+                 LIMIT :limite OFFSET :desde';
+        $st = $pdo->prepare($sql);
+        $st->bindValue(':limite', $limite, PDO::PARAM_INT);
+        $st->bindValue(':desde',  $desde,  PDO::PARAM_INT);
+        $st->execute();
+    }
 
     $filas = array_map(static function (array $f): array {
         return [

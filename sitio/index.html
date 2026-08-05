@@ -673,6 +673,49 @@
   .post-nombre{font-size:14px;font-weight:700;color:var(--texto);}
   .post-rol{font-size:12.5px;color:var(--texto-sub);overflow-wrap:anywhere;}
 
+  /* ── Ventana de bienvenida ────────────────── */
+  .saludo{
+    position:fixed;right:26px;bottom:26px;z-index:110;width:330px;max-width:calc(100vw - 36px);
+    background:var(--superficie);border:1px solid var(--borde);border-radius:18px;
+    box-shadow:var(--sombra-lg);overflow:hidden;
+    transform:translateY(18px);opacity:0;
+    transition:opacity .38s ease, transform .38s cubic-bezier(.2,.8,.3,1);
+  }
+  .saludo[hidden]{display:none;}
+  .saludo.visible{opacity:1;transform:none;}
+  .saludo-x{
+    position:absolute;top:10px;right:10px;z-index:2;width:32px;height:32px;border:0;border-radius:50%;
+    background:rgba(3,14,30,.5);color:#fff;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .saludo-x:hover{background:rgba(3,14,30,.72);}
+  .saludo-x svg{width:15px;height:15px;}
+  .saludo-cabecera{padding:16px 18px 12px;}
+  .saludo-tag{
+    display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
+    color:var(--brand-ink);background:var(--azul-light);padding:4px 11px;border-radius:99px;margin-bottom:8px;
+  }
+  .saludo-titulo{font-size:14.5px;font-weight:700;color:var(--texto);}
+  .saludo-img{
+    width:100%;height:auto;max-height:230px;object-fit:cover;object-position:center;
+    display:block;background:var(--azul-light);
+  }
+  .saludo-cuerpo{padding:16px 18px 18px;}
+  .saludo-com{
+    font-size:13.5px;color:var(--texto-sub);margin-bottom:14px;
+    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+  }
+  .saludo-quien{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
+  .saludo-ini{
+    width:34px;height:34px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--azul),var(--marino));color:#fff;font-weight:800;font-size:13px;
+  }
+  .saludo-datos{display:flex;flex-direction:column;min-width:0;}
+  .saludo-nombre{font-size:13.5px;font-weight:700;color:var(--texto);}
+  .saludo-rol{font-size:12px;color:var(--texto-sub);overflow-wrap:anywhere;}
+  .saludo-cta{width:100%;}
+
   /* Visor a pantalla completa */
   .visor{position:fixed;inset:0;z-index:130;display:flex;align-items:center;justify-content:center;padding:24px;}
   .visor[hidden]{display:none;}
@@ -947,6 +990,20 @@
     .hero-ctas{flex-direction:column;align-items:stretch;}
     .hero-ctas .btn{width:100%;}
     .servicio,.division,.zona{padding:26px 22px;}
+    .saludo{
+      right:10px;left:10px;bottom:10px;width:auto;max-width:none;
+      display:flex;align-items:stretch;gap:0;border-radius:14px;
+    }
+    .saludo-cabecera{display:none;}
+    .saludo-img{width:104px;height:auto;min-height:100%;max-height:none;flex-shrink:0;}
+    .saludo-cuerpo{padding:12px 14px;flex:1;min-width:0;}
+    .saludo-com{-webkit-line-clamp:2;font-size:12.5px;margin-bottom:10px;}
+    .saludo-quien{margin-bottom:10px;}
+    .saludo-ini{width:28px;height:28px;font-size:11.5px;}
+    .saludo-nombre{font-size:12.5px;}
+    .saludo-rol{font-size:11px;}
+    .saludo-cta{font-size:12.5px;padding:8px 12px;min-height:38px;}
+    .saludo-x{width:28px;height:28px;top:6px;right:6px;}
     .acred-caja{flex-direction:column;text-align:center;gap:24px;}
     .acreditacion{padding:34px 0;}
     .muro-galeria{columns:1;}
@@ -1342,6 +1399,29 @@
       </div>
     </div>
   </section>
+
+  <!-- Ventana de bienvenida: una publicación al azar del muro -->
+  <aside class="saludo" id="saludo" hidden aria-label="Publicación destacada de nuestros operadores">
+    <button class="saludo-x" type="button" aria-label="Cerrar" data-cerrar-saludo>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="saludo-cabecera">
+      <span class="saludo-tag">Orgullo AVBA</span>
+      <p class="saludo-titulo">Así trabajan nuestros operadores</p>
+    </div>
+    <img class="saludo-img" id="saludo-img" alt="" loading="lazy">
+    <div class="saludo-cuerpo">
+      <p class="saludo-com" id="saludo-com"></p>
+      <div class="saludo-quien">
+        <span class="saludo-ini" id="saludo-ini" aria-hidden="true"></span>
+        <span class="saludo-datos">
+          <span class="saludo-nombre" id="saludo-nombre"></span>
+          <span class="saludo-rol" id="saludo-rol"></span>
+        </span>
+      </div>
+      <a class="btn btn-primary btn-sm saludo-cta" href="#muro" data-cerrar-saludo>Ver más izajes</a>
+    </div>
+  </aside>
 
   <!-- Visor de fotografías -->
   <div class="visor" id="visor" hidden>
@@ -1848,6 +1928,65 @@
         galeria.innerHTML = '';
         if (vacio) vacio.hidden = false;
       });
+  }
+
+  /* ── Ventana de bienvenida con una publicación al azar ── */
+  var saludo = document.getElementById('saludo');
+
+  function saludoYaMostrado(){
+    try {
+      var t = parseInt(localStorage.getItem('avba-saludo') || '0', 10);
+      // Se muestra como máximo una vez cada 24 horas por visitante.
+      return t && (Date.now() - t) < 86400000;
+    } catch (e) { return false; }
+  }
+  function marcarSaludo(){
+    try { localStorage.setItem('avba-saludo', String(Date.now())); } catch (e) {}
+  }
+  function cerrarSaludo(){
+    if (!saludo) return;
+    saludo.classList.remove('visible');
+    setTimeout(function(){ saludo.hidden = true; }, 380);
+    marcarSaludo();
+  }
+
+  function mostrarSaludo(p){
+    if (!saludo || !p) return;
+    var rol = [p.puesto, p.empresa].filter(Boolean).join(' · ');
+    var img = document.getElementById('saludo-img');
+    img.src = p.imagen;
+    img.alt = 'Izaje compartido por ' + p.nombre;
+    document.getElementById('saludo-com').textContent    = p.comentario;
+    document.getElementById('saludo-ini').textContent    = iniciales(p.nombre);
+    document.getElementById('saludo-nombre').textContent = p.nombre;
+    document.getElementById('saludo-rol').textContent    = rol;
+
+    saludo.hidden = false;
+    // Un cuadro sin pintar no anima: se espera al siguiente fotograma.
+    requestAnimationFrame(function(){
+      requestAnimationFrame(function(){ saludo.classList.add('visible'); });
+    });
+    marcarSaludo();
+  }
+
+  if (saludo && !saludoYaMostrado()) {
+    saludo.addEventListener('click', function(ev){
+      if (ev.target.closest('[data-cerrar-saludo]')) cerrarSaludo();
+    });
+    document.addEventListener('keydown', function(ev){
+      if (ev.key === 'Escape' && !saludo.hidden) cerrarSaludo();
+    });
+    // Se deja respirar la portada antes de aparecer.
+    setTimeout(function(){
+      fetch('api/muro.php?aleatorio=1&limite=1')
+        .then(function(r){ return r.ok ? r.json() : Promise.reject(); })
+        .then(function(d){
+          var p = d && d.publicaciones && d.publicaciones[0];
+          // Sin publicaciones aprobadas con foto, no se muestra nada.
+          if (p && p.imagen) mostrarSaludo(p);
+        })
+        .catch(function(){});
+    }, 3500);
   }
 
   /* Ventana del formulario */
