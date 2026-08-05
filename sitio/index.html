@@ -602,19 +602,36 @@
   }
   .muro-nota{font-size:13.5px;color:var(--texto-sub);}
 
-  .muro-galeria{
-    display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:20px;
-  }
+  /* Columnas tipo mosaico: cada fotografía conserva su forma real,
+     ya sea vertical, horizontal o cuadrada, sin recortes. */
+  .muro-galeria{columns:3;column-gap:20px;}
   .muro-cargando{
-    grid-column:1/-1;text-align:center;color:var(--texto-sub);font-size:14.5px;padding:34px 0;
+    text-align:center;color:var(--texto-sub);font-size:14.5px;padding:34px 0;
   }
   .post{
     background:var(--superficie);border:1px solid var(--borde);border-radius:var(--radio);
-    overflow:hidden;box-shadow:var(--sombra-sm);display:flex;flex-direction:column;
+    overflow:hidden;box-shadow:var(--sombra-sm);
+    break-inside:avoid;-webkit-column-break-inside:avoid;
+    margin:0 0 20px;display:flex;flex-direction:column;
     transition:transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s;
   }
   .post:hover{transform:translateY(-4px);box-shadow:var(--sombra);}
-  .post-img{width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--azul-light);display:block;}
+  .post-figura{
+    margin:0;position:relative;cursor:zoom-in;background:var(--azul-light);
+    display:block;line-height:0;
+  }
+  .post-img{
+    width:100%;height:auto;display:block;
+    /* Una foto muy alargada no debe adueñarse de la columna. */
+    max-height:520px;object-fit:contain;
+  }
+  .post-lupa{
+    position:absolute;right:10px;bottom:10px;width:34px;height:34px;border-radius:50%;
+    background:rgba(3,14,30,.62);color:#fff;display:flex;align-items:center;justify-content:center;
+    opacity:0;transition:opacity .2s;pointer-events:none;
+  }
+  .post-lupa svg{width:17px;height:17px;}
+  .post:hover .post-lupa{opacity:1;}
   .post-cuerpo{padding:18px 20px 20px;display:flex;flex-direction:column;gap:10px;flex-grow:1;}
   .post-com{font-size:14.5px;color:var(--texto);overflow-wrap:anywhere;flex-grow:1;}
   .post-pie{display:flex;align-items:center;gap:11px;padding-top:12px;border-top:1px solid var(--borde);}
@@ -627,6 +644,25 @@
   .post-quien{display:flex;flex-direction:column;min-width:0;}
   .post-nombre{font-size:14px;font-weight:700;color:var(--texto);}
   .post-rol{font-size:12.5px;color:var(--texto-sub);overflow-wrap:anywhere;}
+
+  /* Visor a pantalla completa */
+  .visor{position:fixed;inset:0;z-index:130;display:flex;align-items:center;justify-content:center;padding:24px;}
+  .visor[hidden]{display:none;}
+  .visor-fondo{position:absolute;inset:0;background:rgba(3,10,22,.92);}
+  .visor-caja{position:relative;max-width:1100px;width:100%;text-align:center;}
+  .visor img{
+    max-width:100%;max-height:78vh;width:auto;height:auto;
+    margin:0 auto;border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.6);
+  }
+  .visor-pie{margin-top:16px;color:#DCE7F7;font-size:14.5px;}
+  .visor-pie strong{display:block;font-size:15px;color:#fff;margin-bottom:2px;}
+  .visor-x{
+    position:absolute;top:-52px;right:0;width:44px;height:44px;border:0;border-radius:50%;
+    background:rgba(255,255,255,.14);color:#fff;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .visor-x:hover{background:rgba(255,255,255,.26);}
+  .visor-x svg{width:20px;height:20px;}
 
   .muro-vacio{
     text-align:center;padding:56px 24px;color:var(--texto-sub);
@@ -856,6 +892,7 @@
   @media (max-width:900px){
     .cred-grid{grid-template-columns:repeat(2,1fr);gap:20px 14px;}
     .correos-grid{grid-template-columns:1fr;}
+    .muro-galeria{columns:2;}
   }
   @media (max-width:820px){
     nav.main-nav{
@@ -882,6 +919,10 @@
     .hero-ctas{flex-direction:column;align-items:stretch;}
     .hero-ctas .btn{width:100%;}
     .servicio,.division,.zona{padding:26px 22px;}
+    .muro-galeria{columns:1;}
+    .post-img{max-height:none;}
+    .visor{padding:16px;}
+    .visor-x{top:auto;bottom:-52px;right:50%;transform:translateX(50%);}
     .correo-bloque{padding:20px;gap:14px;}
     .correo-texto strong{font-size:14px;}
     .cred-grid{grid-template-columns:1fr;gap:14px;}
@@ -1253,6 +1294,18 @@
       </div>
     </div>
   </section>
+
+  <!-- Visor de fotografías -->
+  <div class="visor" id="visor" hidden>
+    <div class="visor-fondo" data-cerrar-visor></div>
+    <div class="visor-caja" role="dialog" aria-modal="true" aria-label="Fotografía ampliada">
+      <button class="visor-x" type="button" aria-label="Cerrar" data-cerrar-visor>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <img id="visor-img" alt="">
+      <div class="visor-pie" id="visor-pie"></div>
+    </div>
+  </div>
 
   <!-- Formulario del muro -->
   <div class="modal" id="modal-muro" hidden>
@@ -1662,10 +1715,19 @@
     if (vacio) vacio.hidden = true;
     galeria.innerHTML = lista.map(function(p){
       var rol = [p.puesto, p.empresa].filter(Boolean).join(' · ');
-      var img = p.imagen
-        ? '<img class="post-img" src="' + escapar(p.imagen) + '" alt="Izaje compartido por ' + escapar(p.nombre) + '" loading="lazy"'
-          + (p.ancho && p.alto ? ' width="' + p.ancho + '" height="' + p.alto + '"' : '') + '>'
-        : '';
+      var alt = 'Izaje compartido por ' + escapar(p.nombre);
+      var img = '';
+      if (p.imagen) {
+        img = '<figure class="post-figura" data-ver="' + escapar(p.imagen) + '"'
+            +      ' data-nombre="' + escapar(p.nombre) + '" data-rol="' + escapar(rol) + '"'
+            +      ' tabindex="0" role="button" aria-label="Ampliar fotografía de ' + escapar(p.nombre) + '">'
+            +   '<img class="post-img" src="' + escapar(p.imagen) + '" alt="' + alt + '" loading="lazy"'
+            +     (p.ancho && p.alto ? ' width="' + p.ancho + '" height="' + p.alto + '"' : '') + '>'
+            +   '<span class="post-lupa" aria-hidden="true">'
+            +     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M11 8v6M8 11h6"/></svg>'
+            +   '</span>'
+            + '</figure>';
+      }
       return '<article class="post">' + img
         + '<div class="post-cuerpo">'
         +   '<p class="post-com">' + escapar(p.comentario) + '</p>'
@@ -1678,6 +1740,54 @@
         +   '</div>'
         + '</div></article>';
     }).join('');
+  }
+
+  /* Visor: ver la fotografía completa en grande */
+  var visor    = document.getElementById('visor');
+  var visorImg = document.getElementById('visor-img');
+  var visorPie = document.getElementById('visor-pie');
+  var focoPrevio = null;
+
+  function abrirVisor(fig){
+    if (!visor) return;
+    focoPrevio = fig;
+    visorImg.src = fig.getAttribute('data-ver');
+    visorImg.alt = 'Fotografía de ' + fig.getAttribute('data-nombre');
+    var rol = fig.getAttribute('data-rol');
+    visorPie.innerHTML = '<strong>' + escapar(fig.getAttribute('data-nombre')) + '</strong>'
+                       + (rol ? escapar(rol) : '');
+    visor.hidden = false;
+    document.body.style.overflow = 'hidden';
+    var x = visor.querySelector('.visor-x');
+    if (x) x.focus();
+  }
+  function cerrarVisor(){
+    if (!visor) return;
+    visor.hidden = true;
+    visorImg.removeAttribute('src');
+    document.body.style.overflow = '';
+    if (focoPrevio) focoPrevio.focus();
+  }
+
+  if (galeria) {
+    galeria.addEventListener('click', function(ev){
+      var fig = ev.target.closest('.post-figura');
+      if (fig) abrirVisor(fig);
+    });
+    // También con teclado, para quien no usa ratón
+    galeria.addEventListener('keydown', function(ev){
+      if (ev.key !== 'Enter' && ev.key !== ' ') return;
+      var fig = ev.target.closest('.post-figura');
+      if (fig) { ev.preventDefault(); abrirVisor(fig); }
+    });
+  }
+  if (visor) {
+    visor.addEventListener('click', function(ev){
+      if (ev.target.closest('[data-cerrar-visor]')) cerrarVisor();
+    });
+    document.addEventListener('keydown', function(ev){
+      if (ev.key === 'Escape' && !visor.hidden) cerrarVisor();
+    });
   }
 
   if (galeria) {
