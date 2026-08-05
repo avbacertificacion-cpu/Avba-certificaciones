@@ -1730,24 +1730,72 @@
     coment.addEventListener('input', function(){ cuenta.textContent = coment.value.length; });
   }
 
-  /* Vista previa de la foto */
+  /* Vista previa y compresión de la foto */
   var foto = document.getElementById('m-foto');
   var prev = document.getElementById('m-prev');
   var subirTxt = document.getElementById('m-subir-txt');
+  var fotoLista = null;   // Blob ya comprimido que se enviará
+
+  /**
+   * Reduce la fotografía en el propio navegador antes de subirla.
+   * Las fotos de celular pesan varios MB y muchos servidores no las
+   * aceptan; comprimirlas aquí evita ese límite y hace el envío mucho
+   * más rápido con datos móviles.
+   */
+  function comprimir(archivo, ladoMax, calidad){
+    return new Promise(function(resolve, reject){
+      var lector = new FileReader();
+      lector.onerror = function(){ reject(new Error('lectura')); };
+      lector.onload = function(){
+        var img = new Image();
+        img.onerror = function(){ reject(new Error('decodificacion')); };
+        img.onload = function(){
+          var escala = Math.min(1, ladoMax / Math.max(img.width, img.height));
+          var w = Math.round(img.width * escala);
+          var h = Math.round(img.height * escala);
+          var lienzo = document.createElement('canvas');
+          lienzo.width = w; lienzo.height = h;
+          var ctx = lienzo.getContext('2d');
+          ctx.fillStyle = '#fff';
+          ctx.fillRect(0, 0, w, h);
+          ctx.drawImage(img, 0, 0, w, h);
+          lienzo.toBlob(function(blob){
+            blob ? resolve(blob) : reject(new Error('conversion'));
+          }, 'image/jpeg', calidad);
+        };
+        img.src = lector.result;
+      };
+      lector.readAsDataURL(archivo);
+    });
+  }
+
   if (foto) {
     foto.addEventListener('change', function(){
       var f = foto.files && foto.files[0];
       if (!f) return;
-      if (f.size > 8 * 1024 * 1024) {
-        mostrarMsg('La imagen supera los 8 MB. Elige una más ligera.', 'err');
+      fotoLista = null;
+
+      if (!/^image\/(jpeg|png|webp)$/.test(f.type)) {
+        mostrarMsg('Elige una imagen JPG, PNG o WebP.', 'err');
         foto.value = '';
         return;
       }
+
       var url = URL.createObjectURL(f);
       prev.src = url;
       prev.hidden = false;
       if (subirTxt) subirTxt.style.display = 'none';
       prev.onload = function(){ URL.revokeObjectURL(url); };
+
+      comprimir(f, 1600, 0.82)
+        .then(function(blob){
+          // Si comprimir no ayuda (imagen ya pequeña), se envía la original.
+          fotoLista = blob.size < f.size ? blob : f;
+        })
+        .catch(function(){
+          // Sin compresión posible: se intenta con el archivo original.
+          fotoLista = f;
+        });
     });
   }
 
@@ -1778,7 +1826,19 @@
       boton.disabled = true;
       boton.textContent = 'Enviando…';
 
-      fetch('api/muro.php', {method: 'POST', body: new FormData(form)})
+      var datos = new FormData(form);
+      // Se sustituye el archivo original por la versión ya comprimida.
+      if (fotoLista) {
+        datos.set('foto', fotoLista, 'izaje.jpg');
+      } else if (foto && foto.files.length && foto.files[0].size > 2 * 1024 * 1024) {
+        // La compresión aún no terminó y el archivo es grande: mejor esperar
+        // que enviar algo que el servidor rechazará.
+        boton.disabled = false;
+        boton.textContent = 'Enviar publicación';
+        return mostrarMsg('La fotografía se está preparando. Espera un momento e inténtalo de nuevo.', 'err');
+      }
+
+      fetch('api/muro.php', {method: 'POST', body: datos})
         .then(function(r){ return r.json().then(function(d){ return {ok: r.ok, d: d}; }); })
         .then(function(res){
           if (res.ok && res.d.status === 'ok') {
