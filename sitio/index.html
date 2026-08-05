@@ -1933,21 +1933,10 @@
   /* ── Ventana de bienvenida con una publicación al azar ── */
   var saludo = document.getElementById('saludo');
 
-  function saludoYaMostrado(){
-    try {
-      var t = parseInt(localStorage.getItem('avba-saludo') || '0', 10);
-      // Se muestra como máximo una vez cada 24 horas por visitante.
-      return t && (Date.now() - t) < 86400000;
-    } catch (e) { return false; }
-  }
-  function marcarSaludo(){
-    try { localStorage.setItem('avba-saludo', String(Date.now())); } catch (e) {}
-  }
   function cerrarSaludo(){
     if (!saludo) return;
     saludo.classList.remove('visible');
     setTimeout(function(){ saludo.hidden = true; }, 380);
-    marcarSaludo();
   }
 
   function mostrarSaludo(p){
@@ -1966,10 +1955,11 @@
     requestAnimationFrame(function(){
       requestAnimationFrame(function(){ saludo.classList.add('visible'); });
     });
-    marcarSaludo();
   }
 
-  if (saludo && !saludoYaMostrado()) {
+  // Se muestra en cada visita y en cada recarga, con una publicación
+  // distinta cada vez.
+  if (saludo) {
     saludo.addEventListener('click', function(ev){
       if (ev.target.closest('[data-cerrar-saludo]')) cerrarSaludo();
     });
