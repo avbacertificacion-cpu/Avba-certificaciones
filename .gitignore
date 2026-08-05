@@ -1,5 +1,11 @@
 # Configuración local con credenciales reales — NO subir al repo
 config/config.php
+sitio/config/config.php
+
+# Fotografías que suben los visitantes al muro de operadores: viven en el
+# servidor, no en el repositorio (el deploy no las borra al sobrescribir).
+sitio/uploads/muro/*
+!sitio/uploads/muro/.htaccess
 
 # Dependencias de Composer
 vendor/

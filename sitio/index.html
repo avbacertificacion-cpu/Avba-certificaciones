@@ -594,6 +594,103 @@
     padding:9px 18px;border-radius:99px;font-size:13.5px;font-weight:600;color:#E4EEFC;
   }
 
+  /* ── Muro de operadores ───────────────────── */
+  .muro-seccion{background:var(--superficie-2);}
+  .muro-cta{
+    display:flex;align-items:center;justify-content:center;gap:16px;
+    flex-wrap:wrap;margin-bottom:40px;
+  }
+  .muro-nota{font-size:13.5px;color:var(--texto-sub);}
+
+  .muro-galeria{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));gap:20px;
+  }
+  .muro-cargando{
+    grid-column:1/-1;text-align:center;color:var(--texto-sub);font-size:14.5px;padding:34px 0;
+  }
+  .post{
+    background:var(--superficie);border:1px solid var(--borde);border-radius:var(--radio);
+    overflow:hidden;box-shadow:var(--sombra-sm);display:flex;flex-direction:column;
+    transition:transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s;
+  }
+  .post:hover{transform:translateY(-4px);box-shadow:var(--sombra);}
+  .post-img{width:100%;aspect-ratio:4/3;object-fit:cover;background:var(--azul-light);display:block;}
+  .post-cuerpo{padding:18px 20px 20px;display:flex;flex-direction:column;gap:10px;flex-grow:1;}
+  .post-com{font-size:14.5px;color:var(--texto);overflow-wrap:anywhere;flex-grow:1;}
+  .post-pie{display:flex;align-items:center;gap:11px;padding-top:12px;border-top:1px solid var(--borde);}
+  .post-ini{
+    width:38px;height:38px;border-radius:50%;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--azul),var(--marino));
+    color:#fff;font-weight:800;font-size:14px;
+  }
+  .post-quien{display:flex;flex-direction:column;min-width:0;}
+  .post-nombre{font-size:14px;font-weight:700;color:var(--texto);}
+  .post-rol{font-size:12.5px;color:var(--texto-sub);overflow-wrap:anywhere;}
+
+  .muro-vacio{
+    text-align:center;padding:56px 24px;color:var(--texto-sub);
+    background:var(--superficie);border:1px dashed var(--borde);border-radius:var(--radio);
+  }
+  .muro-vacio svg{width:44px;height:44px;margin:0 auto 16px;color:var(--brand-ink);opacity:.55;}
+  .muro-vacio p{font-size:15px;}
+
+  /* ── Ventana del formulario ───────────────── */
+  .modal{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:20px;}
+  .modal[hidden]{display:none;}
+  .modal-fondo{position:absolute;inset:0;background:rgba(3,14,30,.62);backdrop-filter:blur(3px);}
+  .modal-caja{
+    position:relative;background:var(--superficie);border-radius:20px;
+    width:100%;max-width:540px;max-height:90vh;overflow-y:auto;
+    padding:32px 30px;box-shadow:var(--sombra-lg);
+  }
+  .modal-x{
+    position:absolute;top:14px;right:14px;width:40px;height:40px;
+    border:0;background:transparent;color:var(--texto-sub);cursor:pointer;
+    border-radius:10px;display:flex;align-items:center;justify-content:center;
+  }
+  .modal-x:hover{background:var(--azul-light);color:var(--brand-ink);}
+  .modal-x svg{width:19px;height:19px;}
+  .modal-caja h3{font-size:21px;font-weight:800;margin-bottom:6px;}
+  .modal-sub{font-size:14px;color:var(--texto-sub);margin-bottom:22px;}
+
+  .campo{margin-bottom:16px;position:relative;}
+  .campo-fila{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .campo label{display:block;font-size:13px;font-weight:700;color:var(--texto);margin-bottom:6px;}
+  .campo label span{color:var(--rojo);}
+  .campo input[type=text],.campo textarea{
+    width:100%;padding:12px 14px;font-family:inherit;font-size:15px;
+    color:var(--texto);background:var(--superficie);
+    border:1.5px solid var(--borde);border-radius:10px;resize:vertical;
+  }
+  .campo input[type=text]:focus,.campo textarea:focus{border-color:var(--brand-ink);outline:none;}
+  .contador{position:absolute;right:2px;bottom:-17px;font-size:11.5px;color:var(--texto-sub);}
+
+  .subir{position:relative;border:2px dashed var(--borde);border-radius:12px;overflow:hidden;background:var(--superficie-2);}
+  .subir:hover{border-color:var(--brand-ink);}
+  .subir input[type=file]{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;}
+  .subir-txt{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+    padding:26px 16px;text-align:center;color:var(--texto-sub);font-size:14px;pointer-events:none;
+  }
+  .subir-txt svg{width:26px;height:26px;color:var(--brand-ink);}
+  .subir-txt small{font-size:12px;opacity:.8;}
+  .subir-prev{width:100%;max-height:230px;object-fit:contain;background:#0b1220;display:block;}
+
+  .consent{
+    display:flex;gap:11px;align-items:flex-start;margin:20px 0;
+    font-size:13px;color:var(--texto-sub);line-height:1.5;cursor:pointer;
+  }
+  .consent input{width:19px;height:19px;flex-shrink:0;margin-top:1px;accent-color:var(--azul);cursor:pointer;}
+
+  #m-trampa{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;}
+
+  .form-msg{padding:12px 15px;border-radius:10px;font-size:13.5px;margin-bottom:16px;}
+  .form-msg.err{background:var(--rojo-light);color:#8C2318;border:1px solid rgba(225,72,60,.32);}
+  .form-msg.ok{background:var(--verde-light);color:#0B5033;border:1px solid rgba(0,144,96,.3);}
+  #m-enviar{width:100%;}
+  #m-enviar[disabled]{opacity:.6;cursor:progress;}
+
   /* ── Preguntas frecuentes ─────────────────── */
   .faq{max-width:840px;margin:0 auto;display:flex;flex-direction:column;gap:12px;}
   .faq-item{
@@ -815,6 +912,7 @@
       <a href="#divisiones">Divisiones</a>
       <a href="#nosotros">Nosotros</a>
       <a href="#cobertura">Cobertura</a>
+      <a href="#muro">Orgullo AVBA</a>
       <a href="#preguntas">Preguntas</a>
       <a href="#contacto">Contacto</a>
     </nav>
@@ -1127,6 +1225,96 @@
       </div>
     </div>
   </section>
+
+  <!-- ═══ MURO DE OPERADORES ═════════════════ -->
+  <section class="section muro-seccion" id="muro">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="tag">Orgullo AVBA</span>
+        <h2>Siéntete orgulloso de ser operador</h2>
+        <p>Detrás de cada maniobra segura hay alguien que la hizo bien. Comparte tu izaje, presume tu trabajo y forma parte del equipo de AVBA Inspections.</p>
+      </div>
+
+      <div class="muro-cta reveal">
+        <button class="btn btn-primary" id="abrir-muro" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2.5"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 5l1.5-2h5L16 5"/></svg>
+          Compartir mi izaje
+        </button>
+        <span class="muro-nota">Tu publicación la revisa nuestro equipo antes de aparecer.</span>
+      </div>
+
+      <div class="muro-galeria" id="muro-galeria" aria-live="polite">
+        <div class="muro-cargando">Cargando publicaciones…</div>
+      </div>
+
+      <div class="muro-vacio" id="muro-vacio" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="15" rx="2.5"/><circle cx="12" cy="12.5" r="3.5"/><path d="M8 5l1.5-2h5L16 5"/></svg>
+        <p><strong>Este muro apenas comienza.</strong><br>Sé el primero en compartir una maniobra de la que te sientas orgulloso.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Formulario del muro -->
+  <div class="modal" id="modal-muro" hidden>
+    <div class="modal-fondo" data-cerrar-muro></div>
+    <div class="modal-caja" role="dialog" aria-modal="true" aria-labelledby="modal-titulo">
+      <button class="modal-x" type="button" aria-label="Cerrar" data-cerrar-muro>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+
+      <h3 id="modal-titulo">Comparte tu izaje</h3>
+      <p class="modal-sub">Cuéntanos de esa maniobra y súbenos la foto. Publicamos después de revisarla.</p>
+
+      <form id="form-muro" novalidate>
+        <div class="campo">
+          <label for="m-nombre">Tu nombre <span aria-hidden="true">*</span></label>
+          <input type="text" id="m-nombre" name="nombre" maxlength="80" required autocomplete="name">
+        </div>
+
+        <div class="campo-fila">
+          <div class="campo">
+            <label for="m-puesto">Puesto</label>
+            <input type="text" id="m-puesto" name="puesto" maxlength="80" placeholder="Operador de grúa">
+          </div>
+          <div class="campo">
+            <label for="m-empresa">Empresa</label>
+            <input type="text" id="m-empresa" name="empresa" maxlength="120">
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="m-comentario">Tu comentario <span aria-hidden="true">*</span></label>
+          <textarea id="m-comentario" name="comentario" rows="4" maxlength="600" required
+                    placeholder="¿Qué maniobra fue? ¿Qué te enorgullece de tu trabajo?"></textarea>
+          <span class="contador"><span id="m-cuenta">0</span>/600</span>
+        </div>
+
+        <div class="campo">
+          <label for="m-foto">Fotografía del izaje</label>
+          <div class="subir" id="m-subir">
+            <input type="file" id="m-foto" name="foto" accept="image/jpeg,image/png,image/webp">
+            <div class="subir-txt" id="m-subir-txt">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16"/></svg>
+              <span>Toca para elegir una foto<br><small>JPG, PNG o WebP · hasta 8 MB</small></span>
+            </div>
+            <img class="subir-prev" id="m-prev" alt="" hidden>
+          </div>
+        </div>
+
+        <label class="consent">
+          <input type="checkbox" id="m-consent" name="consentimiento" value="1" required>
+          <span>Autorizo a AVBA a publicar esta fotografía y mi comentario en su sitio y redes. Confirmo que aparezco en la imagen o cuento con el permiso de quienes aparecen, y que puedo compartir la maniobra del sitio donde fue tomada.</span>
+        </label>
+
+        <!-- Trampa para bots: invisible para las personas -->
+        <input type="text" name="sitio_web" id="m-trampa" tabindex="-1" autocomplete="off" aria-hidden="true">
+
+        <div class="form-msg" id="m-msg" hidden></div>
+
+        <button class="btn btn-primary" type="submit" id="m-enviar">Enviar publicación</button>
+      </form>
+    </div>
+  </div>
 
   <!-- ═══ PREGUNTAS FRECUENTES ═══════════════ -->
   <section class="section" id="preguntas">
@@ -1450,6 +1638,168 @@
   /* Año del footer */
   var year = document.getElementById('year');
   if (year) year.textContent = new Date().getFullYear();
+
+  /* ── Muro de operadores ─────────────────── */
+  var galeria = document.getElementById('muro-galeria');
+  var vacio   = document.getElementById('muro-vacio');
+
+  function escapar(t){
+    var d = document.createElement('div');
+    d.textContent = t == null ? '' : String(t);
+    return d.innerHTML;
+  }
+  function iniciales(nombre){
+    var p = String(nombre || '?').trim().split(/\s+/);
+    return ((p[0] || '?')[0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
+  }
+
+  function pintar(lista){
+    if (!lista.length) {
+      galeria.innerHTML = '';
+      if (vacio) vacio.hidden = false;
+      return;
+    }
+    if (vacio) vacio.hidden = true;
+    galeria.innerHTML = lista.map(function(p){
+      var rol = [p.puesto, p.empresa].filter(Boolean).join(' · ');
+      var img = p.imagen
+        ? '<img class="post-img" src="' + escapar(p.imagen) + '" alt="Izaje compartido por ' + escapar(p.nombre) + '" loading="lazy"'
+          + (p.ancho && p.alto ? ' width="' + p.ancho + '" height="' + p.alto + '"' : '') + '>'
+        : '';
+      return '<article class="post">' + img
+        + '<div class="post-cuerpo">'
+        +   '<p class="post-com">' + escapar(p.comentario) + '</p>'
+        +   '<div class="post-pie">'
+        +     '<span class="post-ini" aria-hidden="true">' + escapar(iniciales(p.nombre)) + '</span>'
+        +     '<span class="post-quien">'
+        +       '<span class="post-nombre">' + escapar(p.nombre) + '</span>'
+        +       (rol ? '<span class="post-rol">' + escapar(rol) + '</span>' : '')
+        +     '</span>'
+        +   '</div>'
+        + '</div></article>';
+    }).join('');
+  }
+
+  if (galeria) {
+    fetch('api/muro.php?limite=24')
+      .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function(d){ pintar((d && d.publicaciones) || []); })
+      .catch(function(){
+        // Si el backend aún no está configurado, el muro se muestra vacío
+        // en lugar de dejar un mensaje de carga permanente.
+        galeria.innerHTML = '';
+        if (vacio) vacio.hidden = false;
+      });
+  }
+
+  /* Ventana del formulario */
+  var modal   = document.getElementById('modal-muro');
+  var abrir   = document.getElementById('abrir-muro');
+  var form    = document.getElementById('form-muro');
+  var ultimoFoco = null;
+
+  function abrirModal(){
+    if (!modal) return;
+    ultimoFoco = document.activeElement;
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+    var primero = document.getElementById('m-nombre');
+    if (primero) primero.focus();
+  }
+  function cerrarModal(){
+    if (!modal) return;
+    modal.hidden = true;
+    document.body.style.overflow = '';
+    if (ultimoFoco) ultimoFoco.focus();
+  }
+
+  if (abrir) abrir.addEventListener('click', abrirModal);
+  if (modal) {
+    modal.addEventListener('click', function(ev){
+      if (ev.target.closest('[data-cerrar-muro]')) cerrarModal();
+    });
+    document.addEventListener('keydown', function(ev){
+      if (ev.key === 'Escape' && !modal.hidden) cerrarModal();
+    });
+  }
+
+  /* Contador del comentario */
+  var coment = document.getElementById('m-comentario');
+  var cuenta = document.getElementById('m-cuenta');
+  if (coment && cuenta) {
+    coment.addEventListener('input', function(){ cuenta.textContent = coment.value.length; });
+  }
+
+  /* Vista previa de la foto */
+  var foto = document.getElementById('m-foto');
+  var prev = document.getElementById('m-prev');
+  var subirTxt = document.getElementById('m-subir-txt');
+  if (foto) {
+    foto.addEventListener('change', function(){
+      var f = foto.files && foto.files[0];
+      if (!f) return;
+      if (f.size > 8 * 1024 * 1024) {
+        mostrarMsg('La imagen supera los 8 MB. Elige una más ligera.', 'err');
+        foto.value = '';
+        return;
+      }
+      var url = URL.createObjectURL(f);
+      prev.src = url;
+      prev.hidden = false;
+      if (subirTxt) subirTxt.style.display = 'none';
+      prev.onload = function(){ URL.revokeObjectURL(url); };
+    });
+  }
+
+  var msg = document.getElementById('m-msg');
+  function mostrarMsg(texto, tipo){
+    if (!msg) return;
+    msg.textContent = texto;
+    msg.className = 'form-msg ' + tipo;
+    msg.hidden = false;
+  }
+
+  if (form) {
+    form.addEventListener('submit', function(ev){
+      ev.preventDefault();
+      var boton = document.getElementById('m-enviar');
+      var consent = document.getElementById('m-consent');
+
+      if (!document.getElementById('m-nombre').value.trim()) {
+        return mostrarMsg('Escribe tu nombre.', 'err');
+      }
+      if (coment.value.trim().length < 5) {
+        return mostrarMsg('Cuéntanos algo más sobre tu maniobra.', 'err');
+      }
+      if (!consent.checked) {
+        return mostrarMsg('Necesitamos tu autorización para publicar la fotografía y el comentario.', 'err');
+      }
+
+      boton.disabled = true;
+      boton.textContent = 'Enviando…';
+
+      fetch('api/muro.php', {method: 'POST', body: new FormData(form)})
+        .then(function(r){ return r.json().then(function(d){ return {ok: r.ok, d: d}; }); })
+        .then(function(res){
+          if (res.ok && res.d.status === 'ok') {
+            form.reset();
+            if (prev) { prev.hidden = true; prev.removeAttribute('src'); }
+            if (subirTxt) subirTxt.style.display = '';
+            if (cuenta) cuenta.textContent = '0';
+            mostrarMsg(res.d.message || 'Publicación enviada. La revisaremos antes de publicarla.', 'ok');
+          } else {
+            mostrarMsg((res.d && res.d.message) || 'No se pudo enviar. Inténtalo de nuevo.', 'err');
+          }
+        })
+        .catch(function(){
+          mostrarMsg('No se pudo enviar. Revisa tu conexión e inténtalo de nuevo.', 'err');
+        })
+        .finally(function(){
+          boton.disabled = false;
+          boton.textContent = 'Enviar publicación';
+        });
+    });
+  }
 })();
 </script>
 
