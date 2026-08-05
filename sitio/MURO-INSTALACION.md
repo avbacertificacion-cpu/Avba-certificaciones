@@ -28,14 +28,12 @@ lleguen a GitHub.
 Necesitas tres cosas:
 
 - **Datos de la base**: host, nombre, usuario y contraseña.
-- **Contraseña del panel**, guardada como hash. Genérala una sola vez con:
+- **Contraseña del panel**, guardada cifrada. No hace falta terminal: abre
+  **https://www.avba.com.mx/generar-clave.php**, escribe la contraseña que
+  quieras y esa página te da la línea exacta para pegar en `config.php`.
+  La contraseña en claro no queda escrita en ningún archivo.
 
-  ```
-  php -r "echo password_hash('LA_CONTRASENA_QUE_QUIERAS', PASSWORD_DEFAULT), PHP_EOL;"
-  ```
-
-  Pega el resultado en `MURO_ADMIN_HASH`. La contraseña en claro no se
-  guarda en ningún archivo.
+  Cuando ya puedas entrar al panel, borra `generar-clave.php` del servidor.
 
 - **`IP_SALT`**: cualquier cadena larga y aleatoria. Sirve para limitar el
   abuso sin almacenar las direcciones IP de los visitantes.
@@ -50,6 +48,14 @@ ejecute cualquier script dentro de esa carpeta. Si tu plan de Hostinger
 ignora `php_flag`, avísame y lo resolvemos por otra vía.
 
 ---
+
+## Herramientas de apoyo
+
+| Página | Para qué sirve |
+|---|---|
+| `generar-clave.php` | Crea la contraseña del panel. Bórrala cuando termines. |
+| `diagnostico.php` | Revisa que todo esté bien configurado y explica qué falta. |
+| `moderacion.php` | El panel donde se aprueban las publicaciones. |
 
 ## Moderar publicaciones
 
