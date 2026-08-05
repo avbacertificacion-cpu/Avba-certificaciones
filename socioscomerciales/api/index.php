@@ -360,15 +360,17 @@ if ($method === 'GET') {
             scRespuesta($vacantes->postulacionesDeVacante((int) $usr['id'], (int) ($_GET['vacante_id'] ?? 0)));
 
         // ── Muro ─────────────────────────────────────────────
-        // Leerlo exige correo confirmado: muestra nombres y fotos de otras
-        // cuentas, igual que el directorio o la búsqueda de candidatos.
+        // Se lee SIN cuenta: es público. Lo que se ve sin sesión son solo
+        // las publicaciones aprobadas por administración; con sesión se ven
+        // además las propias pendientes o rechazadas.
         case 'GET_FEED':
-            scSesionVerificada($pdo, $token);
-            scRespuesta($feed->listar($payload));
+            scRespuesta($feed->listar($payload, scValidarToken($pdo, $token)));
 
         case 'GET_COMENTARIOS':
-            scSesionVerificada($pdo, $token);
-            scRespuesta($feed->comentarios((int) ($_GET['publicacion_id'] ?? 0)));
+            scRespuesta($feed->comentarios(
+                (int) ($_GET['publicacion_id'] ?? 0),
+                scValidarToken($pdo, $token)
+            ));
 
         // ── Administración ───────────────────────────────────
         case 'ADMIN_RESUMEN':
@@ -386,6 +388,10 @@ if ($method === 'GET') {
         case 'ADMIN_BITACORA':
             scSesionAdmin($pdo, $token);
             scRespuesta($admin->bitacora($payload));
+
+        case 'ADMIN_MURO':
+            scSesionAdmin($pdo, $token);
+            scRespuesta($feed->pendientes($payload));
 
         // ── Candidatos ───────────────────────────────────────
         case 'BUSCAR_CANDIDATOS':
@@ -564,6 +570,10 @@ if ($method === 'POST') {
         case 'ADMIN_ELIMINAR':
             $usr = scSesionAdmin($pdo, $token);
             scRespuesta($admin->eliminar($usr, (int) ($payload['id'] ?? 0), $payload));
+
+        case 'ADMIN_MODERAR':
+            $usr = scSesionAdmin($pdo, $token);
+            scRespuesta($feed->moderar($usr, (int) ($payload['id'] ?? 0), $payload));
 
         default:
             scRespuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);

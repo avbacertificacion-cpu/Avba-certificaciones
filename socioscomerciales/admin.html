@@ -118,6 +118,35 @@
   .aviso-admin svg { width: 18px; height: 18px; color: var(--azul); flex-shrink: 0; margin-top: 2px; }
   .aviso-admin p { font-size: 13.5px; color: var(--texto-sub); margin: 0; line-height: 1.6; }
 
+  /* ── Moderación del muro ──────────────────────────────── */
+  .mod-pub {
+    border: 1px solid var(--borde); border-radius: var(--r);
+    padding: 14px 15px; margin-bottom: 12px;
+  }
+  .mod-pub-autor {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    font-size: 13.5px; margin-bottom: 10px;
+  }
+  .mod-pub-nombre { font-weight: 700; overflow-wrap: anywhere; }
+  .mod-pub-meta { font-size: 12px; color: var(--texto-tenue); margin-left: auto; white-space: nowrap; }
+  .mod-pub-texto {
+    font-size: 13.5px; line-height: 1.65; color: var(--texto-sub);
+    white-space: pre-line; overflow-wrap: anywhere;
+  }
+  .mod-pub-imagen {
+    margin-top: 11px; border-radius: var(--r-sm); overflow: hidden;
+    border: 1px solid var(--borde);
+  }
+  .mod-pub-imagen img { width: 100%; max-height: 300px; object-fit: contain; display: block; background: var(--gris-fondo); }
+  .mod-pub-acciones {
+    display: flex; gap: 8px; flex-wrap: wrap;
+    margin-top: 12px; padding-top: 11px; border-top: 1px solid var(--borde);
+  }
+  .mod-pub-motivo {
+    font-size: 12.5px; color: #B91C1C; background: var(--rojo-bg);
+    border-radius: var(--r-sm); padding: 7px 11px; margin-top: 10px;
+  }
+
   /* ── Bitácora ─────────────────────────────────────────── */
   .bitacora-fila {
     display: flex; gap: 11px; align-items: baseline; flex-wrap: wrap;
@@ -147,7 +176,10 @@
         <h1>Administración</h1>
         <p>Cuentas del portal: consulta, bloqueo y eliminación.</p>
       </div>
-      <button type="button" class="btn btn-outline btn-sm" id="btn-bitacora">Ver bitácora</button>
+      <div class="fila">
+        <button type="button" class="btn btn-primary btn-sm" id="btn-muro">Moderar muro</button>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-bitacora">Ver bitácora</button>
+      </div>
     </div>
   </div>
 
@@ -191,6 +223,20 @@
     </div>
     <div class="modal-cuerpo" id="ficha-cuerpo"></div>
     <div class="modal-pie" id="ficha-acciones"></div>
+  </div>
+</div>
+
+<!-- Moderación del muro -->
+<div class="modal-fondo" id="modal-muro">
+  <div class="modal modal-ancho" role="dialog" aria-modal="true" aria-labelledby="muro-titulo">
+    <div class="modal-cabecera">
+      <h3 id="muro-titulo">Moderación del muro</h3>
+      <button type="button" class="modal-cerrar" aria-label="Cerrar" onclick="scCerrarModal('modal-muro')">&times;</button>
+    </div>
+    <div class="modal-cuerpo">
+      <div class="pestanas" id="muro-pestanas" role="group" aria-label="Filtrar publicaciones"></div>
+      <div id="muro-cuerpo" style="margin-top:16px"></div>
+    </div>
   </div>
 </div>
 
@@ -243,6 +289,7 @@ function pintarMetricas(m) {
     { valor: m.altas_semana,      etq: 'Altas esta semana' },
     { valor: m.sin_verificar,     etq: 'Sin verificar', clase: 'aviso' },
     { valor: m.bloqueados,        etq: 'Bloqueadas',    clase: 'alerta' },
+    { valor: m.muro_pendientes,   etq: 'Muro por revisar', clase: 'aviso' },
   ];
 
   document.getElementById('metricas').innerHTML = tarjetas.map(t => `
@@ -396,7 +443,15 @@ async function verMas() {
 async function cargarResumen() {
   try {
     const datos = await scGet('ADMIN_RESUMEN');
-    if (datos.status === 'success') pintarMetricas(datos.metricas || {});
+    if (datos.status === 'success') {
+      pintarMetricas(datos.metricas || {});
+
+      // El número en el botón es lo que hace que alguien entre a revisar;
+      // enterrado en una métrica más, la cola se queda sin atender.
+      const n = Number((datos.metricas || {}).muro_pendientes) || 0;
+      document.getElementById('btn-muro').textContent =
+        n ? `Moderar muro (${n})` : 'Moderar muro';
+    }
   } catch (e) { /* las métricas son accesorias: no bloquean la pantalla */ }
 }
 
@@ -611,6 +666,119 @@ async function verFicha(id) {
     document.getElementById('ficha-cuerpo').innerHTML = scVacio('alerta', 'Error', e.message, '');
   }
 }
+
+/* ── Moderación del muro ────────────────────────────────── */
+let muroFiltro = 'pendiente';
+
+const MURO_FILTROS = [
+  { valor: 'pendiente', texto: 'Por revisar' },
+  { valor: 'aprobada',  texto: 'Aprobadas' },
+  { valor: 'rechazada', texto: 'Rechazadas' },
+];
+
+function pintarMuroPestanas() {
+  document.getElementById('muro-pestanas').innerHTML = MURO_FILTROS.map(f => `
+    <button type="button" class="pestana" aria-pressed="${muroFiltro === f.valor}"
+            data-muro-filtro="${f.valor}">${scEsc(f.texto)}</button>`).join('');
+}
+
+function tarjetaModeracion(pub) {
+  const acciones = pub.estado === 'pendiente'
+    ? `<button type="button" class="btn btn-sm btn-primary" data-moderar="aprobar" data-id="${Number(pub.id)}">Aprobar</button>
+       <button type="button" class="btn btn-sm btn-peligro" data-moderar="rechazar" data-id="${Number(pub.id)}">Rechazar</button>`
+    : pub.estado === 'aprobada'
+      ? `<button type="button" class="btn btn-sm btn-outline" data-moderar="rechazar" data-id="${Number(pub.id)}">Retirar del muro</button>`
+      : `<button type="button" class="btn btn-sm btn-primary" data-moderar="aprobar" data-id="${Number(pub.id)}">Aprobar ahora</button>`;
+
+  return `
+    <article class="mod-pub">
+      <div class="mod-pub-autor">
+        ${scAvatar(pub.autor_foto, pub.autor_nombre, 'sm', pub.autor_tipo === 'empresa')}
+        <div>
+          <div class="mod-pub-nombre">${scEsc(pub.autor_nombre || '(sin nombre)')}</div>
+          <div class="ficha-item-meta">${scEsc(pub.autor_correo)}</div>
+        </div>
+        <span class="mod-pub-meta">${scEsc(scHace(pub.creado))}</span>
+      </div>
+
+      ${pub.texto ? `<div class="mod-pub-texto">${scEsc(pub.texto)}</div>` : '<p class="ficha-vacia">Sin texto.</p>'}
+      ${pub.imagen_url
+        ? `<div class="mod-pub-imagen"><img src="${scEsc(pub.imagen_url)}" alt="Imagen de la publicación" loading="lazy"></div>`
+        : ''}
+      ${pub.moderado_motivo ? `<p class="mod-pub-motivo">Motivo: ${scEsc(pub.moderado_motivo)}</p>` : ''}
+
+      <div class="mod-pub-acciones">
+        ${acciones}
+        <button type="button" class="btn btn-sm btn-gris" data-moderar="borrar" data-id="${Number(pub.id)}">Eliminar</button>
+      </div>
+    </article>`;
+}
+
+async function cargarMuro() {
+  const cont = document.getElementById('muro-cuerpo');
+  cont.innerHTML = esqueletos(3);
+
+  try {
+    const datos = await scGet('ADMIN_MURO', { estado: muroFiltro });
+    if (datos.status !== 'success') {
+      cont.innerHTML = scVacio('alerta', 'No se pudo cargar', datos.message || '', '');
+      return;
+    }
+
+    const lista = datos.publicaciones || [];
+    cont.innerHTML = lista.length
+      ? lista.map(tarjetaModeracion).join('')
+      : scVacio('check',
+          muroFiltro === 'pendiente' ? 'No hay nada por revisar' : 'Sin publicaciones aquí',
+          muroFiltro === 'pendiente' ? 'Todo lo que se publicó ya pasó por moderación.' : '', '');
+  } catch (e) {
+    cont.innerHTML = scVacio('alerta', 'Error', e.message, '');
+  }
+}
+
+document.getElementById('btn-muro').addEventListener('click', () => {
+  pintarMuroPestanas();
+  scAbrirModal('modal-muro');
+  cargarMuro();
+});
+
+document.getElementById('muro-pestanas').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-muro-filtro]');
+  if (!btn) return;
+  muroFiltro = btn.dataset.muroFiltro;
+  pintarMuroPestanas();
+  cargarMuro();
+});
+
+document.getElementById('muro-cuerpo').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-moderar]');
+  if (!btn) return;
+
+  const id = Number(btn.dataset.id);
+  const accion = btn.dataset.moderar;
+
+  try {
+    let datos;
+
+    if (accion === 'borrar') {
+      if (!confirm('¿Eliminar esta publicación?\n\nSe borra también su imagen y sus comentarios. No se puede deshacer.')) return;
+      datos = await scPost('ELIMINAR_PUBLICACION', { id });
+    } else if (accion === 'rechazar') {
+      // El motivo lo ve el autor en su propia publicación, así que conviene
+      // que diga algo útil y no solo "no".
+      const motivo = prompt('Motivo del rechazo (lo verá el autor):');
+      if (motivo === null) return;
+      datos = await scPost('ADMIN_MODERAR', { id, decision: 'rechazar', motivo });
+    } else {
+      datos = await scPost('ADMIN_MODERAR', { id, decision: 'aprobar' });
+    }
+
+    scToast(datos.message, datos.status === 'success' ? 'ok' : 'error');
+    if (datos.status === 'success') { cargarMuro(); cargarResumen(); }
+  } catch (err) {
+    scToast(err.message, 'error');
+  }
+});
 
 /* ── Bitácora ───────────────────────────────────────────── */
 document.getElementById('btn-bitacora').addEventListener('click', async () => {

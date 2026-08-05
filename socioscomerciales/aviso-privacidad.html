@@ -106,6 +106,11 @@
           <td>Solo si decides capturarla. Es un campo opcional.</td>
         </tr>
         <tr>
+          <td><strong>Publicaciones en el muro</strong><br>El texto y las fotografías que
+              decidas publicar, junto con tu nombre y tu foto de perfil.</td>
+          <td>Solo si publicas. Es opcional.</td>
+        </tr>
+        <tr>
           <td><strong>Técnicos</strong><br>Dirección IP, navegador y sistema operativo de las
               sesiones abiertas; registro de intentos de acceso.</td>
           <td>De forma automática, por seguridad de tu cuenta.</td>
@@ -123,6 +128,7 @@
     <li>Mostrar tu perfil a las empresas registradas, si eres candidato; o tus vacantes a los
       candidatos, si eres empresa.</li>
     <li>Gestionar tus postulaciones y notificarte por correo los cambios de estatus.</li>
+    <li>Publicar en el muro del portal lo que tú decidas publicar ahí.</li>
     <li>Proteger la seguridad de tu cuenta: detectar accesos indebidos, limitar intentos de
       ingreso y dejar constancia de quién consulta tu currículum.</li>
   </ul>
@@ -142,6 +148,8 @@
     <li>Los datos se alojan en el <strong>proveedor de hospedaje</strong> que presta servicio a
       AVBA, que actúa únicamente como encargado y no puede usarlos para fines propios.</li>
   </ul>
+
+  <div class="destacado" id="sello-muro"></div>
   <p>
     <strong>No vendemos, alquilamos ni cedemos tus datos a terceros</strong> con fines comerciales.
     Solo se entregarían a una autoridad cuando exista un requerimiento legal fundado y motivado.
@@ -150,8 +158,9 @@
   <h2 id="conservacion">5. Cuánto tiempo los conservamos</h2>
   <p>
     Mientras tu cuenta siga activa. Cuando la eliminas, tu perfil, tus archivos y tus
-    publicaciones se borran de inmediato. Las empresas que hayan descargado tu currículum antes de
-    la baja son responsables de eliminarlo de sus propios registros.
+    publicaciones del muro se borran de inmediato. Las empresas que hayan descargado tu
+    currículum antes de la baja son responsables de eliminarlo de sus propios registros, y una
+    publicación que ya haya sido vista o copiada por terceros escapa a nuestro control.
   </p>
 
   <h2 id="arco">6. Tus derechos ARCO</h2>
@@ -166,7 +175,8 @@
       todo lo que guardamos de ti, incluida la lista de empresas que consultaron tu currículum.</li>
     <li><strong>Rectificación</strong> — edita los campos de tu perfil cuando quieras.</li>
     <li><strong>Cancelación</strong> — el botón <em>"Eliminar mi cuenta"</em> borra todo de forma
-      inmediata e irreversible.</li>
+      inmediata e irreversible. También puedes borrar una publicación concreta del muro sin dar
+      de baja la cuenta, desde la propia publicación.</li>
     <li><strong>Oposición</strong> — escríbenos si quieres limitar algún tratamiento concreto sin
       dar de baja tu cuenta.</li>
   </ul>
@@ -231,13 +241,22 @@
 /* Misma versión que terminos.html y que SC_TERMINOS_VERSION en
    api/helpers.php: la casilla del registro acepta ambos documentos a la vez,
    así que comparten número. */
-const VERSION_AVISO = '2026-08-03';
+const VERSION_AVISO = '2026-08-05';
 
 document.getElementById('sello-sensibles').innerHTML =
   scIcono('verificado') +
   '<p><strong>No pedimos datos sensibles.</strong> El portal no solicita información de salud, ' +
   'origen étnico, creencias religiosas, afiliación sindical, opiniones políticas ni preferencias ' +
   'sexuales. Te pedimos que tampoco los incluyas en tu currículum ni en tu resumen.</p>';
+
+document.getElementById('sello-muro').innerHTML =
+  scIcono('alerta') +
+  '<p><strong>El muro del portal es público.</strong> Lo que publiques ahí — tu texto, tus ' +
+  'fotografías, tu nombre y tu foto de perfil — puede verlo cualquiera, tenga cuenta o no, y ' +
+  'puede quedar indexado por buscadores. Nada se publica hasta que AVBA lo revisa y lo aprueba, ' +
+  'pero una vez aprobado es contenido abierto: no publiques ahí datos que no quieras que sean ' +
+  'públicos. El resto de tu perfil (currículum, teléfono, CURP) NO es público y sigue las reglas ' +
+  'descritas arriba.</p>';
 
 document.getElementById('fecha-version').textContent =
   'Versión ' + VERSION_AVISO + ' · Última actualización: ' + scFechaLarga(VERSION_AVISO);

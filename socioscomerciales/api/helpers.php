@@ -22,7 +22,7 @@ const SC_PASSWORD_MIN = 8;
  * volver a preguntarle, en vez de tener un "sí" suelto sin contexto.
  * Formato de fecha, que es lo que aparece al pie de terminos.html.
  */
-const SC_TERMINOS_VERSION = '2026-08-03';
+const SC_TERMINOS_VERSION = '2026-08-05';
 
 /**
  * Quién firma el aviso de "documentos en revisión" que se manda a los

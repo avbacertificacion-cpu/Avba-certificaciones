@@ -715,9 +715,21 @@ function scFeedPublicacion(pub) {
        </button>`
     : '';
 
+  // Solo su autor (y administración) reciben lo no aprobado, así que este
+  // aviso nunca lo ve un visitante cualquiera.
+  let aviso = '';
+  if (pub.estado === 'pendiente') {
+    aviso = `<div class="feed-estado pendiente">${scIcono('reloj')}
+      <span>Pendiente de revisión. Solo tú la ves hasta que AVBA la apruebe.</span></div>`;
+  } else if (pub.estado === 'rechazada') {
+    aviso = `<div class="feed-estado rechazada">${scIcono('alerta')}
+      <span>No aprobada${pub.moderado_motivo ? ': ' + scEsc(pub.moderado_motivo) : '.'}</span></div>`;
+  }
+
   return `
-    <article class="feed-publicacion" id="pub-${Number(pub.id)}">
+    <article class="feed-publicacion ${pub.estado && pub.estado !== 'aprobada' ? 'sin-aprobar' : ''}" id="pub-${Number(pub.id)}">
       ${scFeedCabeceraAutor(pub, pub.creado, acciones)}
+      ${aviso}
 
       ${pub.texto ? `<div class="feed-texto">${scEsc(pub.texto)}</div>` : ''}
       ${pub.imagen_url
@@ -725,21 +737,69 @@ function scFeedPublicacion(pub) {
              <img src="${scEsc(pub.imagen_url)}" alt="Fotografía de la publicación" loading="lazy">
            </div>` : ''}
 
-      <div class="feed-pie">
-        <span class="feed-cuenta">${total === 1 ? '1 comentario' : total + ' comentarios'}</span>
-      </div>
+      ${pub.estado && pub.estado !== 'aprobada' ? '' : `
+        <div class="feed-pie">
+          <span class="feed-cuenta">${total === 1 ? '1 comentario' : total + ' comentarios'}</span>
+        </div>
 
-      <div class="feed-comentarios">
-        ${verTodos}
-        ${comentarios.map(c => scFeedComentario(c, pub.autor_id)).join('')}
-      </div>
+        <div class="feed-comentarios">
+          ${verTodos}
+          ${comentarios.map(c => scFeedComentario(c, pub.autor_id)).join('')}
+        </div>
 
-      <form class="feed-responder" data-feed="form-comentario" data-id="${Number(pub.id)}">
-        <input type="text" maxlength="${SC_FEED_MAX_COMENTARIO}" required
-               placeholder="Escribe un comentario..." aria-label="Escribe un comentario">
-        <button type="submit" class="btn btn-sm btn-primary">Comentar</button>
-      </form>
+        ${scVerificado()
+          ? `<form class="feed-responder" data-feed="form-comentario" data-id="${Number(pub.id)}">
+               <input type="text" maxlength="${SC_FEED_MAX_COMENTARIO}" required
+                      placeholder="Escribe un comentario..." aria-label="Escribe un comentario">
+               <button type="submit" class="btn btn-sm btn-primary">Comentar</button>
+             </form>`
+          : `<p class="feed-responder-cerrado">
+               <a href="registro.html">Crea tu cuenta</a> para comentar.
+             </p>`}
+      `}
     </article>`;
+}
+
+/**
+ * Encabezado del muro: el compositor si puedes publicar, y si no la
+ * invitación correspondiente. El muro se lee sin cuenta, pero publicar
+ * exige una con el correo confirmado.
+ */
+function scFeedEncabezado() {
+  const s = scSesion.leer();
+
+  if (!s || !s.token) {
+    return `
+      <div class="feed-invitacion">
+        ${scIcono('personas')}
+        <div>
+          <strong>¿Quieres publicar aquí?</strong>
+          Crea tu cuenta gratis y comparte tus obras, novedades y vacantes con
+          toda la comunidad industrial de AVBA.
+        </div>
+        <div class="feed-invitacion-acciones">
+          <a class="btn btn-sm btn-primary" href="registro.html">Crear cuenta</a>
+          <a class="btn btn-sm btn-outline" href="login.html">Entrar</a>
+        </div>
+      </div>`;
+  }
+
+  if (!scVerificado(s)) {
+    return `
+      <div class="feed-invitacion">
+        ${scIcono('correo')}
+        <div>
+          <strong>Confirma tu correo para publicar.</strong>
+          Puedes leer el muro, pero para publicar y comentar hace falta verificar
+          tu correo electrónico.
+        </div>
+        <div class="feed-invitacion-acciones">
+          <a class="btn btn-sm btn-primary" href="inicio.html">Ir a mi panel</a>
+        </div>
+      </div>`;
+  }
+
+  return scFeedCompositor();
 }
 
 function scFeedCompositor() {
@@ -770,6 +830,10 @@ function scFeedCompositor() {
         <span class="feed-contador" id="feed-contador"></span>
         <button type="submit" class="btn btn-sm btn-primary" id="feed-publicar">Publicar</button>
       </div>
+      <p class="feed-nota-moderacion">
+        ${scIcono('alerta')}
+        El muro es público. Tu publicación aparece cuando AVBA la revisa.
+      </p>
     </form>`;
 }
 
@@ -779,11 +843,14 @@ function scFeedPintar() {
 
   const lista = scFeedEstado.publicaciones;
 
-  cont.innerHTML = scFeedCompositor() + (lista.length
+  cont.innerHTML = scFeedEncabezado() + (lista.length
     ? `<div class="feed-lista">${lista.map(scFeedPublicacion).join('')}</div>
        ${scBotonVerMas(lista.length, scFeedEstado.total, 'scFeedVerMas')}`
     : scVacio('documento', 'Todavía no hay publicaciones',
-        'Sé el primero en compartir algo con la comunidad del portal.', ''));
+        scVerificado()
+          ? 'Sé el primero en compartir algo con la comunidad del portal.'
+          : 'Aquí aparecerán las novedades que comparta la comunidad del portal.',
+        ''));
 
   scFeedActualizarContador();
 }

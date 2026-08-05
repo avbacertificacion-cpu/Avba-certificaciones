@@ -640,3 +640,38 @@ input[type=file].oculto-file { display: none; }
   .feed-responder { flex-wrap: wrap; }
   .feed-responder .btn { width: 100%; }
 }
+
+/* ── Muro: invitación, moderación y estados ──────────────── */
+.feed-invitacion {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  background: var(--azul-claro); border: 1px solid #C9E0F5;
+  border-radius: var(--r-md); padding: 16px 18px; margin-bottom: 16px;
+  font-size: 13.5px; color: var(--texto-sub); line-height: 1.6;
+}
+.feed-invitacion > svg { width: 22px; height: 22px; color: var(--azul); flex-shrink: 0; }
+.feed-invitacion > div:first-of-type { flex: 1; min-width: 190px; }
+.feed-invitacion strong { display: block; color: var(--texto); font-size: 14.5px; margin-bottom: 2px; }
+.feed-invitacion-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.feed-nota-moderacion {
+  display: flex; gap: 7px; align-items: center;
+  font-size: 12px; color: var(--texto-tenue); margin-top: 10px;
+}
+.feed-nota-moderacion svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+.feed-publicacion.sin-aprobar { border-style: dashed; background: #FCFDFE; }
+.feed-estado {
+  display: flex; gap: 8px; align-items: center;
+  font-size: 12.5px; font-weight: 600; line-height: 1.5;
+  border-radius: var(--r-sm); padding: 8px 11px; margin-top: 11px;
+}
+.feed-estado svg { width: 15px; height: 15px; flex-shrink: 0; }
+.feed-estado.pendiente { background: var(--ambar-bg, #FEF6E7); color: #92610B; }
+.feed-estado.rechazada { background: var(--rojo-bg); color: #B91C1C; }
+
+.feed-responder-cerrado {
+  font-size: 13px; color: var(--texto-tenue); margin-top: 12px;
+  padding-top: 11px; border-top: 1px solid var(--borde);
+}
+.feed-responder-cerrado a { color: var(--azul); font-weight: 700; }
+.feed-responder-cerrado a:hover { text-decoration: underline; }

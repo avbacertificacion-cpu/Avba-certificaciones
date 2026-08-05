@@ -4,11 +4,12 @@
  *
  * Publicaciones con texto y/o imagen, y comentarios sobre ellas.
  *
- * El muro **no es público**: leerlo exige sesión con el correo confirmado,
- * igual que el resto de pantallas que muestran datos de otras cuentas. En el
- * aviso de privacidad se dice que el perfil de un candidato lo ven "las
- * cuentas registradas en el portal", y un muro abierto a internet con nombres
- * y fotos contradiría eso.
+ * El muro **es público**: cualquiera puede leerlo sin cuenta. Lo que lo hace
+ * seguro es que nada se ve hasta que administración lo aprueba — sin esa
+ * moderación, un muro abierto publicaría en la portada de AVBA el nombre y la
+ * foto de cualquiera que se registrara, y lo que escribiera.
+ *
+ * Publicar y comentar sí exigen cuenta con el correo confirmado.
  */
 
 class ScFeed {
@@ -51,25 +52,44 @@ class ScFeed {
     // ══════════════════════════════════════════════════════════
     //  LEER EL MURO
     // ══════════════════════════════════════════════════════════
-    public function listar(array $filtros): array {
+    /**
+     * @param array|null $usuario Sesión, o null si quien mira no tiene cuenta.
+     *
+     * Quien no tiene cuenta ve solo lo aprobado. Quien la tiene ve además lo
+     * suyo pendiente o rechazado: si no, publicaría algo y desaparecería sin
+     * explicación, y volvería a intentarlo pensando que falló.
+     */
+    public function listar(array $filtros, ?array $usuario = null): array {
         [$limite, $offset] = scPaginacion($filtros, 10, 30);
 
-        $total = (int) $this->pdo->query(
+        $condicion = "u.activo = 1 AND pub.estado = 'aprobada'";
+        $params    = [];
+
+        if ($usuario) {
+            $condicion = "u.activo = 1 AND (pub.estado = 'aprobada' OR pub.usuario_id = ?)";
+            $params[]  = (int) $usuario['id'];
+        }
+
+        $stmt = $this->pdo->prepare(
             "SELECT COUNT(*) FROM sc_publicaciones pub
              JOIN sc_usuarios u ON u.id = pub.usuario_id
-             WHERE u.activo = 1"
-        )->fetchColumn();
+             WHERE {$condicion}"
+        );
+        $stmt->execute($params);
+        $total = (int) $stmt->fetchColumn();
 
         $join = sprintf(self::AUTOR_JOIN, 'pub.usuario_id');
-        $stmt = $this->pdo->query(
-            "SELECT pub.id, pub.texto, pub.imagen_url, pub.creado," . self::AUTOR_SELECT . ",
+        $stmt = $this->pdo->prepare(
+            "SELECT pub.id, pub.texto, pub.imagen_url, pub.creado,
+                    pub.estado, pub.moderado_motivo," . self::AUTOR_SELECT . ",
                     (SELECT COUNT(*) FROM sc_comentarios c WHERE c.publicacion_id = pub.id) AS n_comentarios
              FROM sc_publicaciones pub
              {$join}
-             WHERE u.activo = 1
+             WHERE {$condicion}
              ORDER BY pub.creado DESC, pub.id DESC
              LIMIT {$limite} OFFSET {$offset}"
         );
+        $stmt->execute($params);
         $publicaciones = $stmt->fetchAll();
 
         // Los dos últimos comentarios de cada publicación, en UNA consulta.
@@ -114,9 +134,15 @@ class ScFeed {
     }
 
     /** Todos los comentarios de una publicación. */
-    public function comentarios(int $publicacionId): array {
+    public function comentarios(int $publicacionId, ?array $usuario = null): array {
         if ($publicacionId <= 0) {
             return ['status' => 'error', 'message' => 'Publicación no indicada.'];
+        }
+
+        // Sin esto se podrían leer los comentarios de una publicación que
+        // todavía no ha pasado por moderación, pidiéndola por su id.
+        if (!$this->publicacionVisible($publicacionId, $usuario)) {
+            return ['status' => 'error', 'message' => 'Esa publicación no está disponible.'];
         }
 
         $join = sprintf(self::AUTOR_JOIN, 'c.usuario_id');
@@ -131,6 +157,26 @@ class ScFeed {
         $stmt->execute([$publicacionId]);
 
         return ['status' => 'success', 'comentarios' => $stmt->fetchAll()];
+    }
+
+    /** ¿Puede este visitante ver esta publicación? */
+    private function publicacionVisible(int $publicacionId, ?array $usuario): bool {
+        $stmt = $this->pdo->prepare(
+            "SELECT pub.estado, pub.usuario_id
+             FROM sc_publicaciones pub
+             JOIN sc_usuarios u ON u.id = pub.usuario_id
+             WHERE pub.id = ? AND u.activo = 1"
+        );
+        $stmt->execute([$publicacionId]);
+        $pub = $stmt->fetch();
+
+        if (!$pub) return false;
+        if ($pub['estado'] === 'aprobada') return true;
+
+        // Su autor y administración ven también lo pendiente
+        return $usuario && (
+            !empty($usuario['es_admin']) || (int) $pub['usuario_id'] === (int) $usuario['id']
+        );
     }
 
     // ══════════════════════════════════════════════════════════
@@ -176,7 +222,7 @@ class ScFeed {
 
         return [
             'status'  => 'success',
-            'message' => 'Publicación creada.',
+            'message' => 'Publicación enviada. Aparecerá en el muro en cuanto AVBA la revise.',
             'id'      => (int) $this->pdo->lastInsertId(),
         ];
     }
@@ -192,15 +238,17 @@ class ScFeed {
             return ['status' => 'error', 'message' => 'Has comentado muchas veces en la última hora. Espera un poco.'];
         }
 
-        // La publicación debe existir y ser de una cuenta activa
+        // Solo se comenta lo que ya pasó por moderación: comentar algo
+        // pendiente dejaría respuestas colgando de una publicación que
+        // quizá nunca llegue a verse.
         $stmt = $this->pdo->prepare(
             "SELECT pub.id FROM sc_publicaciones pub
              JOIN sc_usuarios u ON u.id = pub.usuario_id
-             WHERE pub.id = ? AND u.activo = 1"
+             WHERE pub.id = ? AND u.activo = 1 AND pub.estado = 'aprobada'"
         );
         $stmt->execute([$publicacionId]);
         if (!$stmt->fetchColumn()) {
-            return ['status' => 'error', 'message' => 'Esa publicación ya no está disponible.'];
+            return ['status' => 'error', 'message' => 'Esa publicación no está disponible para comentar.'];
         }
 
         $this->pdo->prepare(
@@ -213,6 +261,115 @@ class ScFeed {
     // ══════════════════════════════════════════════════════════
     //  BORRAR
     // ══════════════════════════════════════════════════════════
+
+    // ══════════════════════════════════════════════════════════
+    //  MODERACIÓN
+    // ══════════════════════════════════════════════════════════
+
+    /** Publicaciones a la espera de revisión, las más antiguas primero. */
+    public function pendientes(array $filtros): array {
+        $estado = strtolower(trim($filtros['estado'] ?? 'pendiente'));
+        if (!in_array($estado, ['pendiente', 'aprobada', 'rechazada'], true)) {
+            $estado = 'pendiente';
+        }
+
+        [$limite, $offset] = scPaginacion($filtros, 20, 60);
+
+        $stmt = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM sc_publicaciones pub
+             JOIN sc_usuarios u ON u.id = pub.usuario_id
+             WHERE pub.estado = ?"
+        );
+        $stmt->execute([$estado]);
+        $total = (int) $stmt->fetchColumn();
+
+        $join = sprintf(self::AUTOR_JOIN, 'pub.usuario_id');
+        $stmt = $this->pdo->prepare(
+            "SELECT pub.id, pub.texto, pub.imagen_url, pub.creado,
+                    pub.estado, pub.moderado_motivo, pub.moderado_fecha," . self::AUTOR_SELECT . ",
+                    u.correo AS autor_correo
+             FROM sc_publicaciones pub
+             {$join}
+             WHERE pub.estado = ?
+             ORDER BY pub.creado " . ($estado === 'pendiente' ? 'ASC' : 'DESC') . ", pub.id ASC
+             LIMIT {$limite} OFFSET {$offset}"
+        );
+        $stmt->execute([$estado]);
+        $publicaciones = $stmt->fetchAll();
+
+        return [
+            'status'        => 'success',
+            'publicaciones' => $publicaciones,
+            'total'         => $total,
+            'offset'        => $offset,
+            'hay_mas'       => ($offset + count($publicaciones)) < $total,
+        ];
+    }
+
+    /** Cuántas esperan revisión, para la insignia del panel. */
+    public function contarPendientes(): int {
+        try {
+            return (int) $this->pdo->query(
+                "SELECT COUNT(*) FROM sc_publicaciones WHERE estado = 'pendiente'"
+            )->fetchColumn();
+        } catch (PDOException $e) {
+            return 0;
+        }
+    }
+
+    /**
+     * Aprueba o rechaza una publicación.
+     *
+     * Rechazar no borra: el autor sigue viendo la suya con el motivo, así
+     * sabe por qué no salió. Para que desaparezca del todo hay que borrarla.
+     */
+    public function moderar(array $admin, int $id, array $payload): array {
+        $decision = strtolower(trim($payload['decision'] ?? ''));
+        if (!in_array($decision, ['aprobar', 'rechazar'], true)) {
+            return ['status' => 'error', 'message' => 'Decisión no válida.'];
+        }
+        if ($id <= 0) return ['status' => 'error', 'message' => 'Publicación no indicada.'];
+
+        $stmt = $this->pdo->prepare(
+            "SELECT pub.id, pub.estado, u.correo
+             FROM sc_publicaciones pub
+             JOIN sc_usuarios u ON u.id = pub.usuario_id
+             WHERE pub.id = ?"
+        );
+        $stmt->execute([$id]);
+        $pub = $stmt->fetch();
+        if (!$pub) return ['status' => 'error', 'message' => 'Esa publicación ya no existe.'];
+
+        $estado = $decision === 'aprobar' ? 'aprobada' : 'rechazada';
+        $motivo = $decision === 'rechazar' ? scTexto($payload['motivo'] ?? null, 255) : null;
+
+        $this->pdo->prepare(
+            "UPDATE sc_publicaciones
+             SET estado = ?, moderado_por = ?, moderado_fecha = NOW(), moderado_motivo = ?
+             WHERE id = ?"
+        )->execute([$estado, (int) $admin['id'], $motivo, $id]);
+
+        try {
+            $this->pdo->prepare(
+                "INSERT INTO sc_admin_log
+                    (admin_id, admin_correo, accion, usuario_id, usuario_correo, detalle, ip)
+                 VALUES (?, ?, ?, NULL, ?, ?, ?)"
+            )->execute([
+                (int) $admin['id'], $admin['correo'], 'muro_' . $decision,
+                $pub['correo'], 'Publicación #' . $id . ($motivo ? ' — ' . $motivo : ''),
+                scIpCliente(),
+            ]);
+        } catch (PDOException $e) {
+            error_log('ScFeed::moderar bitacora: ' . $e->getMessage());
+        }
+
+        return [
+            'status'  => 'success',
+            'message' => $decision === 'aprobar'
+                ? 'Publicación aprobada: ya se ve en el muro.'
+                : 'Publicación rechazada. Su autor verá el motivo.',
+        ];
+    }
 
     /**
      * Borra una publicación. Puede hacerlo su autor o administración.

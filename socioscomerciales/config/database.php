@@ -9,7 +9,7 @@
 require_once __DIR__ . '/config.php';
 
 /** Versión actual del esquema. Subir al añadir migraciones. */
-const SC_SCHEMA_VERSION = 8;
+const SC_SCHEMA_VERSION = 9;
 
 class ScDatabase {
     private static ?PDO $instance = null;
@@ -73,6 +73,7 @@ class ScDatabase {
             if ($version < 6) self::migrarA6($pdo);
             if ($version < 7) self::migrarA7($pdo);
             if ($version < 8) self::migrarA8($pdo);
+            if ($version < 9) self::migrarA9($pdo);
 
             $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
                         ON DUPLICATE KEY UPDATE valor = '" . SC_SCHEMA_VERSION . "'");
@@ -96,6 +97,7 @@ class ScDatabase {
         $columnas = self::columnasDe($pdo, 'sc_usuarios');
 
         if (!$columnas)                                    return SC_SCHEMA_VERSION; // Base vacía
+        if (in_array('estado', self::columnasDe($pdo, 'sc_publicaciones'), true)) return 9;
         if (self::columnasDe($pdo, 'sc_publicaciones'))      return 8;
         if (in_array('bloqueado_motivo', $columnas, true))   return 7;
         if (in_array('terminos_aceptados', $columnas, true)) return 6;
@@ -229,7 +231,12 @@ class ScDatabase {
                 usuario_id INT UNSIGNED NOT NULL,
                 texto      TEXT NULL,
                 imagen_url VARCHAR(255) NULL,
+                estado     ENUM('pendiente','aprobada','rechazada') NOT NULL DEFAULT 'pendiente',
+                moderado_por    INT UNSIGNED NULL,
+                moderado_fecha  DATETIME     NULL,
+                moderado_motivo VARCHAR(255) NULL,
                 creado     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_sc_publicaciones_estado (estado, creado),
                 KEY idx_sc_publicaciones_creado (creado),
                 KEY idx_sc_publicaciones_usuario (usuario_id),
                 CONSTRAINT fk_sc_publicaciones_usuario FOREIGN KEY (usuario_id)
@@ -502,7 +509,12 @@ class ScDatabase {
                 usuario_id INT UNSIGNED NOT NULL,
                 texto      TEXT NULL,
                 imagen_url VARCHAR(255) NULL,
+                estado     ENUM('pendiente','aprobada','rechazada') NOT NULL DEFAULT 'pendiente',
+                moderado_por    INT UNSIGNED NULL,
+                moderado_fecha  DATETIME     NULL,
+                moderado_motivo VARCHAR(255) NULL,
                 creado     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                KEY idx_sc_publicaciones_estado (estado, creado),
                 KEY idx_sc_publicaciones_creado (creado),
                 KEY idx_sc_publicaciones_usuario (usuario_id),
                 CONSTRAINT fk_sc_publicaciones_usuario FOREIGN KEY (usuario_id)
@@ -524,6 +536,31 @@ class ScDatabase {
                     REFERENCES sc_usuarios(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
+    }
+
+    /**
+     * v8 → v9: moderación del muro.
+     *
+     * El muro pasó a ser público, así que nada se ve hasta que
+     * administración lo aprueba. Lo ya publicado se da por aprobado: se
+     * escribió cuando el muro solo lo veían cuentas registradas y dejarlo
+     * en pendiente sería hacerlo desaparecer sin avisar a nadie.
+     */
+    private static function migrarA9(PDO $pdo): void {
+        self::agregarColumna($pdo, 'sc_publicaciones', 'estado',
+            "ENUM('pendiente','aprobada','rechazada') NOT NULL DEFAULT 'pendiente'");
+        self::agregarColumna($pdo, 'sc_publicaciones', 'moderado_por',    "INT UNSIGNED NULL");
+        self::agregarColumna($pdo, 'sc_publicaciones', 'moderado_fecha',  "DATETIME NULL");
+        self::agregarColumna($pdo, 'sc_publicaciones', 'moderado_motivo', "VARCHAR(255) NULL");
+
+        try {
+            $pdo->exec("UPDATE sc_publicaciones SET estado = 'aprobada' WHERE estado = 'pendiente'");
+        } catch (PDOException $e) {
+            error_log('migrarA9: ' . $e->getMessage());
+        }
+        try {
+            $pdo->exec("CREATE INDEX idx_sc_publicaciones_estado ON sc_publicaciones (estado, creado)");
+        } catch (PDOException $e) { /* ya existe */ }
     }
 
     /** Añade una columna solo si aún no existe. */

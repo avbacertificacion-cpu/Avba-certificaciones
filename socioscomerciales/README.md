@@ -198,23 +198,44 @@ con comentarios. El componente entero vive en `assets/avba.js`
 (`scMontarFeed('feed')`), así que se puede montar igual en otra página con una
 línea.
 
-### No es público, y es a propósito
+### Público para leer, con cuenta para publicar, y todo moderado
 
-El muro muestra **nombres y fotos de otras cuentas**. El aviso de privacidad
-que publicamos dice que el perfil de un candidato lo ven "las cuentas
-registradas en el portal"; un muro abierto a cualquier visitante contradiría
-eso y expondría a los candidatos a que los indexara un buscador.
+`GET_FEED` y `GET_COMENTARIOS` **no piden sesión**: el muro lo lee cualquiera.
+Lo que lo hace seguro es que **nada aparece hasta que administración lo
+aprueba**. Sin esa moderación, un muro abierto publicaría en la portada de AVBA
+el nombre, la foto y lo que escribiera cualquiera que se registrara.
 
-Por eso la sección tiene tres estados:
+| Quién llega | Qué ve | Qué puede hacer |
+|---|---|---|
+| Sin cuenta | El muro aprobado | Invitación a registrarse |
+| Con cuenta sin confirmar | El muro aprobado | Aviso para verificar el correo |
+| Cuenta verificada | El muro + lo suyo pendiente | Publicar y comentar |
+| Administración | Todo | Aprobar, rechazar y borrar |
 
-| Quién llega | Qué ve |
-|---|---|
-| Sin cuenta | Invitación a registrarse. **No se pide nada al API.** |
-| Con cuenta sin confirmar | Aviso para verificar el correo |
-| Cuenta verificada | El muro completo |
+Quien publica **sigue viendo lo suyo aunque esté pendiente o rechazado**, con
+el estado y el motivo. Si desapareciera sin más, lo volvería a intentar
+pensando que falló el envío.
 
-`GET_FEED` y `GET_COMENTARIOS` exigen `scSesionVerificada`, igual que el
-directorio de empresas o la búsqueda de candidatos.
+### El circuito de moderación
+
+`sc_publicaciones.estado` es `pendiente` → `aprobada` | `rechazada`.
+
+- En **`admin.html`**, el botón *"Moderar muro (N)"* lleva la cuenta de lo que
+  espera. El número en el botón es lo que hace que alguien entre a revisar;
+  enterrado en una métrica más, la cola se queda sin atender.
+- **Rechazar no borra**: el autor sigue viendo su publicación con el motivo,
+  así sabe por qué no salió. Para que desaparezca hay que borrarla.
+- Una publicación aprobada se puede **retirar del muro** después (pasa a
+  rechazada) sin perder el contenido.
+- Cada decisión queda en `sc_admin_log` con el correo de quien la tomó.
+- **Solo se comenta lo aprobado**: comentar algo pendiente dejaría respuestas
+  colgando de una publicación que quizá nunca llegue a verse. `GET_COMENTARIOS`
+  comprueba la visibilidad de la publicación antes de devolver nada, para que
+  no se puedan leer los comentarios de algo sin aprobar pidiéndolo por su id.
+
+La migración v9 da por **aprobado lo que ya estaba publicado**: se escribió
+cuando el muro solo lo veían cuentas registradas, y dejarlo en pendiente sería
+hacerlo desaparecer sin avisar a nadie.
 
 ### Quién puede borrar qué
 
@@ -229,8 +250,8 @@ poder hacerlo siempre.
 
 ### Límites y detalles
 
-- **10 publicaciones y 40 comentarios por hora** y cuenta. Un muro sin freno
-  es un tablón de spam en cuestión de horas.
+- **10 publicaciones y 40 comentarios por hora** y cuenta. La moderación para
+  lo que llega al muro, pero sin límite la cola de revisión se inunda igual.
 - Las fotos van a `uploads/feed/`, pasan por `scGuardarArchivo`, así que se
   **redibujan con GD**: se va el EXIF con la geolocalización y se limitan a
   1600 px. Máximo 6 MB.

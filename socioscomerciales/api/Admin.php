@@ -42,6 +42,10 @@ class ScAdmin {
              FROM sc_admin_log ORDER BY fecha DESC LIMIT 10"
         );
 
+        // El muro lo lleva ScFeed, pero el contador va aquí para que el panel
+        // avise de un vistazo si hay publicaciones esperando revisión.
+        $metricas['muro_pendientes'] = (new ScFeed($this->pdo))->contarPendientes();
+
         return [
             'status'    => 'success',
             'metricas'  => $metricas,

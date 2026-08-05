@@ -442,20 +442,6 @@
      líneas de 140 caracteres, ilegibles. */
   .wrap-muro { max-width: 720px; }
 
-  .muro-cerrado {
-    background: var(--blanco); border: 1px solid var(--borde);
-    border-radius: var(--r-md); box-shadow: var(--sombra-sm);
-    text-align: center; padding: 44px 24px;
-  }
-  .muro-cerrado > svg {
-    width: 42px; height: 42px; color: var(--borde); margin-bottom: 14px;
-  }
-  .muro-cerrado h3 { font-size: 18px; font-weight: 800; letter-spacing: -.3px; margin-bottom: 8px; }
-  .muro-cerrado p {
-    font-size: 14px; color: var(--texto-sub); line-height: 1.65;
-    max-width: 420px; margin: 0 auto 18px;
-  }
-  .muro-cerrado-acciones { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
 
 </style>
 </head>
@@ -606,21 +592,20 @@
   </div>
 
   <!-- ══ Muro del portal ═══════════════════════════════════ -->
-  <!-- El contenido lo pinta scMontarFeed() solo si hay sesión con el correo
-       confirmado. A quien llega sin cuenta se le muestra la invitación:
-       publicar nombres y fotos de los usuarios a cualquier visitante
-       contradiría el aviso de privacidad, que dice que el perfil solo lo ven
-       las cuentas registradas. -->
+  <!-- Público: lo lee cualquiera, sin cuenta. Lo que lo hace seguro es que
+       nada aparece hasta que administración lo aprueba. Publicar y comentar
+       sí exigen cuenta con el correo confirmado; a quien no la tiene el
+       propio componente le muestra la invitación a registrarse. -->
   <section class="seccion banda-blanca" id="muro" aria-labelledby="t-muro">
     <div class="wrap wrap-muro">
       <div class="seccion-cabecera rv">
         <span class="eyebrow">La comunidad</span>
         <h2 id="t-muro">Qué está pasando en el portal</h2>
-        <p>Noticias, obras terminadas y novedades que comparten candidatos y empresas.</p>
+        <p>Noticias, obras terminadas y novedades que comparten candidatos y empresas.
+           Todo lo que se publica pasa antes por la revisión de AVBA.</p>
       </div>
 
       <div id="feed"></div>
-      <div id="feed-cerrado"></div>
     </div>
   </section>
 
@@ -994,47 +979,10 @@ window.addEventListener('DOMContentLoaded', function () {
       '<a class="btn btn-primary btn-sm" href="inicio.html">Ir a mi portal</a>';
   }
 
-  iniciarMuro(s);
-});
-
-/**
- * El muro tiene tres estados: sin cuenta, con cuenta sin confirmar y
- * listo para usarse. Solo en el tercero se pide nada al API.
- */
-function iniciarMuro(s) {
-  var cerrado = document.getElementById('feed-cerrado');
-
-  if (!s || !s.token) {
-    cerrado.innerHTML =
-      '<div class="muro-cerrado">' +
-        scIcono('personas') +
-        '<h3>Entra para ver el muro</h3>' +
-        '<p>Las publicaciones de la comunidad son solo para cuentas registradas. ' +
-          'Crear una es gratis y toma menos de un minuto.</p>' +
-        '<div class="muro-cerrado-acciones">' +
-          '<a class="btn btn-primary" href="registro.html">Crear mi cuenta</a>' +
-          '<a class="btn btn-outline" href="login.html">Ya tengo cuenta</a>' +
-        '</div>' +
-      '</div>';
-    return;
-  }
-
-  if (!scVerificado(s)) {
-    cerrado.innerHTML =
-      '<div class="muro-cerrado">' +
-        scIcono('correo') +
-        '<h3>Confirma tu correo para ver el muro</h3>' +
-        '<p>Se habilita en cuanto verifiques tu correo electrónico. ' +
-          'Abre el enlace que te enviamos al registrarte o pide uno nuevo desde tu panel.</p>' +
-        '<div class="muro-cerrado-acciones">' +
-          '<a class="btn btn-primary" href="inicio.html">Ir a mi panel</a>' +
-        '</div>' +
-      '</div>';
-    return;
-  }
-
+  // El muro es público: se monta siempre. El propio componente decide si
+  // enseña el compositor o la invitación a registrarse.
   scMontarFeed('feed');
-}
+});
 </script>
 </body>
 </html>
