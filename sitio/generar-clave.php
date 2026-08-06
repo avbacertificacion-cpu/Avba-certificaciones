@@ -24,6 +24,7 @@ header('Cache-Control: no-store, no-cache, must-revalidate');
 $hash = '';
 $aviso = '';
 $fuerza = null;
+$salt = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $clave = (string)($_POST['clave'] ?? '');
@@ -32,6 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $aviso = 'Usa al menos 10 caracteres. Esta contraseña protege lo que se publica en tu sitio.';
     } else {
         $hash = password_hash($clave, PASSWORD_DEFAULT);
+        // Cadena aleatoria para IP_SALT. No hay que recordarla: el sistema
+        // la usa internamente para no guardar las IP de los visitantes.
+        $salt = bin2hex(random_bytes(24));
 
         // Valoración simple, solo informativa.
         $puntos = 0;
@@ -83,7 +87,7 @@ if (is_file($rutaConfig)) {
       border-radius:10px;font-size:14px;margin-bottom:18px;}
   .resultado{background:#0B1220;border-radius:12px;padding:18px;margin:18px 0;position:relative;}
   .resultado code{display:block;color:#8FE3C0;font-family:ui-monospace,Menlo,Consolas,monospace;
-                  font-size:13px;word-break:break-all;line-height:1.65;}
+                  font-size:13px;word-break:break-all;line-height:1.85;white-space:pre-wrap;}
   .copiar{position:absolute;top:12px;right:12px;background:#1d2b45;color:#cfe3ff;border:0;
           border-radius:8px;padding:7px 12px;font-size:12.5px;font-weight:700;cursor:pointer;margin:0;min-height:auto;}
   .copiar:hover{background:#2a3d5e;}
@@ -144,17 +148,23 @@ if (is_file($rutaConfig)) {
 
   <?php if ($hash): ?>
     <div class="caja">
-      <h1>Ya está. Ahora pega esto</h1>
+      <h1>Ya está. Ahora pega estas dos líneas</h1>
       <div class="resultado">
         <button class="copiar" type="button" onclick="copiar(this)">Copiar</button>
-        <code id="linea">define('MURO_ADMIN_HASH', '<?= htmlspecialchars($hash) ?>');</code>
+        <code id="linea">define('MURO_ADMIN_HASH', '<?= htmlspecialchars($hash) ?>');
+define('IP_SALT', '<?= htmlspecialchars($salt) ?>');</code>
       </div>
+
+      <p class="nota" style="margin:-6px 0 16px;">
+        Son <strong>dos líneas</strong>: la contraseña del panel y la cadena que evita
+        guardar las direcciones IP de tus visitantes. La segunda no hay que recordarla.
+      </p>
 
       <ol>
         <li>Entra al <strong>Administrador de archivos</strong> de Hostinger.</li>
         <li>Abre la carpeta del sitio y luego <strong>config</strong> → <strong>config.php</strong>.</li>
-        <li>Busca la línea que empieza con <code>define('MURO_ADMIN_HASH'</code> y
-            <strong>reemplázala completa</strong> por la de arriba.</li>
+        <li>Busca las líneas que empiezan con <code>define('MURO_ADMIN_HASH'</code> y
+            <code>define('IP_SALT'</code>, y <strong>reemplázalas</strong> por las de arriba.</li>
         <li>Guarda el archivo.</li>
         <li>Entra al <a href="moderacion.php">panel de moderación</a> con la contraseña que acabas de elegir.</li>
       </ol>

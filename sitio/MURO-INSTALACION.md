@@ -35,8 +35,20 @@ Necesitas tres cosas:
 
   Cuando ya puedas entrar al panel, borra `generar-clave.php` del servidor.
 
-- **`IP_SALT`**: cualquier cadena larga y aleatoria. Sirve para limitar el
-  abuso sin almacenar las direcciones IP de los visitantes.
+- **`IP_SALT`**: la genera la misma página `generar-clave.php`, junto con la
+  contraseña. No hay que recordarla.
+
+  Para qué sirve: el muro limita a 5 publicaciones por persona al día, y para
+  contarlas hay que distinguir de algún modo a cada visitante. En lugar de
+  guardar su dirección IP —un dato personal— se guarda una huella
+  irreversible de ella. El problema es que las direcciones IPv4 son unos
+  4 mil millones: cualquiera podría calcular la huella de todas y recuperar
+  las originales. `IP_SALT` es una cadena secreta que se mezcla con la IP
+  antes de calcular esa huella, y sin conocerla ese ataque deja de ser
+  viable.
+
+  Si algún día la cambias, lo único que ocurre es que los contadores del
+  límite diario se reinician.
 
 ## 3. Permisos del directorio de fotografías
 
