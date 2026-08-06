@@ -1921,6 +1921,21 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($arneses->eliminarPuntoChecklist((int)($payload['id'] ?? 0)));
 
+        case 'GENERAR_DICTAMEN_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->generarDictamen((int)($payload['id'] ?? 0)));
+
+        case 'GENERAR_CERT_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->generarCertificado((int)($payload['item_id'] ?? 0)));
+
+        case 'EMITIR_SESION_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->emitirSesion((int)($payload['id'] ?? 0)));
+
         // ── RH / Asistencia del cliente ──────────────────────────
         case 'RH_GUARDAR_POLITICAS':
             $usr = validarToken($pdo, $token);

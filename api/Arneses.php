@@ -593,6 +593,259 @@ class Arneses {
         return ['status' => 'success', 'message' => 'Sesión devuelta para corrección.'];
     }
 
+    // ════════════════════════════════════════════════════════
+    //  DOCUMENTOS
+    // ════════════════════════════════════════════════════════
+
+    /** HTML → PDF con mPDF, guardado en uploads/reportes/. */
+    private function htmlToPdf(string $html, string $folio, string $sufijo): string {
+        if (!class_exists('\\Mpdf\\Mpdf')) {
+            $autoload = __DIR__ . '/../vendor/autoload.php';
+            if (file_exists($autoload)) require_once $autoload;
+        }
+        if (!class_exists('\\Mpdf\\Mpdf')) throw new \RuntimeException('mPDF no disponible.');
+
+        $dir = UPLOAD_DIR . 'reportes/';
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+
+        $mpdf = new \Mpdf\Mpdf([
+            'mode' => 'utf-8', 'format' => 'A4',
+            'margin_left' => 12, 'margin_right' => 12, 'margin_top' => 12, 'margin_bottom' => 14,
+            'default_font' => 'dejavusans',
+            'tempDir' => sys_get_temp_dir() . '/mpdf',
+        ]);
+        $mpdf->SetBasePath(__DIR__ . '/../');
+        $prev = (int)ini_get('pcre.backtrack_limit');
+        ini_set('pcre.backtrack_limit', 10000000);
+        $mpdf->WriteHTML($html);
+        ini_set('pcre.backtrack_limit', $prev);
+        $mpdf->SetProtection(['print'], '', 'Avba@Cert2024!');
+
+        $nombre = $sufijo . '_AVBA_' . preg_replace('/[^A-Za-z0-9._-]/', '', $folio) . '_' . date('Ymd_His') . '.pdf';
+        $mpdf->Output($dir . $nombre, 'F');
+        return 'uploads/reportes/' . $nombre;
+    }
+
+    private function esc($v): string {
+        return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+    }
+
+    /** Encabezado común de los documentos. */
+    private function encabezado(string $titulo, string $folio): string {
+        $logo = __DIR__ . '/../assets/logos/avba.png';
+        $img  = is_file($logo)
+            ? '<img src="assets/logos/avba.png" style="height:38px">'
+            : '<span style="font-size:18px;font-weight:bold;color:#0C447C">AVBA</span>';
+        $acred = defined('NO_ACREDITACION') ? NO_ACREDITACION : '';
+        return '
+        <table width="100%" style="border-bottom:2px solid #185FA5;padding-bottom:6px;margin-bottom:10px">
+          <tr>
+            <td width="45%">' . $img . '</td>
+            <td width="55%" style="text-align:right;font-size:8pt;color:#5a6072">
+              AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.<br>
+              ' . ($acred ? 'Unidad de Inspección ' . $this->esc($acred) . '<br>' : '') . '
+              Folio: <strong style="color:#0C447C">' . $this->esc(formatoFolio($folio)) . '</strong>
+            </td>
+          </tr>
+        </table>
+        <div style="text-align:center;font-size:14pt;font-weight:bold;color:#0C447C;margin-bottom:2px">' . $this->esc($titulo) . '</div>
+        <div style="text-align:center;font-size:8pt;color:#5a6072;margin-bottom:12px">
+          Equipo de protección personal contra caídas · NOM-009-STPS-2011
+        </div>';
+    }
+
+    /**
+     * DICTAMEN TÉCNICO del lote: ampara toda la inspección con el listado de
+     * piezas y su resultado.
+     */
+    public function generarDictamen(int $sesionId): array {
+        $det = $this->detalleSesion($sesionId);
+        if ($det['status'] !== 'success') return $det;
+        $ses = $det['sesion']; $items = $det['items'];
+        if (!$items) return ['status' => 'error', 'message' => 'La inspección no tiene piezas.'];
+        if (empty($ses['control'])) return ['status' => 'error', 'message' => 'La inspección aún no tiene folio; debe aprobarse en Calidad.'];
+
+        $aptos  = count(array_filter($items, fn($i) => $i['resultado'] === 'APTO'));
+        $noApt  = count(array_filter($items, fn($i) => $i['resultado'] === 'NO APTO'));
+        $cond   = count($items) - $aptos - $noApt;
+
+        $filas = '';
+        foreach ($items as $n => $i) {
+            $color = $i['resultado'] === 'APTO' ? '#1b7a3d' : ($i['resultado'] === 'NO APTO' ? '#b91c1c' : '#92400e');
+            $filas .= '<tr>
+                <td style="text-align:center">' . ($n + 1) . '</td>
+                <td>' . $this->esc($i['tipo_nombre']) . '</td>
+                <td>' . $this->esc($i['marca']) . ' ' . $this->esc($i['modelo']) . '</td>
+                <td>' . $this->esc($i['serie'] ?: '—') . '</td>
+                <td style="text-align:center">' . $this->esc($i['retiro_fmt'] ?: '—') . '</td>
+                <td style="text-align:center;color:' . $color . ';font-weight:bold">' . $this->esc($i['resultado']) . '</td>
+              </tr>';
+            if (!empty($i['observaciones'])) {
+                $filas .= '<tr><td></td><td colspan="5" style="font-size:7.5pt;color:#5a6072;font-style:italic">'
+                        . $this->esc($i['observaciones']) . '</td></tr>';
+            }
+        }
+
+        $qrImg = !empty($ses['qr_codigo'])
+            ? '<img src="' . qrDataUri(textoQR($ses['qr_codigo']), 240, 3) . '" style="width:80px">' : '';
+
+        $html = '<html><body style="font-family:dejavusans;font-size:9pt;color:#1a1a2e">'
+          . $this->encabezado('DICTAMEN TÉCNICO DE INSPECCIÓN', $ses['control'])
+          . '<table width="100%" style="font-size:9pt;margin-bottom:10px">
+               <tr><td width="18%"><strong>Cliente:</strong></td><td width="52%">' . $this->esc($ses['cliente']) . '</td>
+                   <td width="30%" rowspan="3" style="text-align:right">' . $qrImg . '</td></tr>
+               <tr><td><strong>Fecha:</strong></td><td>' . $this->esc($ses['fecha_fmt']) . '</td></tr>
+               <tr><td><strong>Lugar:</strong></td><td>' . $this->esc($ses['direccion'] ?: '—') . '</td></tr>
+             </table>
+             <table width="100%" cellpadding="5" style="border-collapse:collapse;font-size:8.5pt">
+               <thead><tr style="background:#E6F1FB;color:#0C447C">
+                 <th width="6%">#</th><th width="26%">Tipo de equipo</th><th width="24%">Marca / Modelo</th>
+                 <th width="20%">No. de serie</th><th width="12%">Retiro</th><th width="12%">Resultado</th>
+               </tr></thead>
+               <tbody>' . $filas . '</tbody>
+             </table>
+             <table width="100%" style="margin-top:12px;font-size:9pt">
+               <tr>
+                 <td width="33%" style="text-align:center;background:#e8f5e9;padding:8px"><strong style="color:#1b7a3d;font-size:13pt">' . $aptos . '</strong><br>APTOS</td>
+                 <td width="33%" style="text-align:center;background:#fff8e1;padding:8px"><strong style="color:#92400e;font-size:13pt">' . $cond . '</strong><br>CONDICIONADOS</td>
+                 <td width="34%" style="text-align:center;background:#fdecea;padding:8px"><strong style="color:#b91c1c;font-size:13pt">' . $noApt . '</strong><br>NO APTOS</td>
+               </tr>
+             </table>
+             <div style="margin-top:14px;font-size:8pt;color:#5a6072;line-height:1.5">
+               La presente inspección se realizó conforme a la NOM-009-STPS-2011 y a las
+               recomendaciones del fabricante. El equipo dictaminado como NO APTO debe
+               retirarse de servicio de inmediato. Los equipos amparados conservan su
+               validez siempre que no sufran un evento de caída, alteración o daño, y
+               hasta su fecha de retiro obligatorio.
+             </div>
+             <table width="100%" style="margin-top:38px;font-size:8.5pt">
+               <tr>
+                 <td width="50%" style="text-align:center;border-top:1px solid #999;padding-top:4px">Inspector</td>
+                 <td width="10%"></td>
+                 <td width="40%" style="text-align:center;border-top:1px solid #999;padding-top:4px">Firma del cliente</td>
+               </tr>
+             </table>
+             </body></html>';
+
+        $url = $this->htmlToPdf($html, $ses['control'], 'DICT_ARN');
+        $abs = rtrim(SITE_URL, '/') . '/' . $url;
+        $this->pdo->prepare("UPDATE arneses_sesiones SET dictamen_url = ? WHERE id = ?")->execute([$abs, $sesionId]);
+        return ['status' => 'success', 'url' => $abs];
+    }
+
+    /** CERTIFICADO individual de una pieza (con su QR de validación). */
+    public function generarCertificado(int $itemId): array {
+        $s = $this->pdo->prepare("
+            SELECT i.*, COALESCE(t.nombre,'') AS tipo_nombre,
+                   DATE_FORMAT(i.fecha_fabricacion,'%d/%m/%Y') AS fabricacion_fmt,
+                   DATE_FORMAT(i.fecha_retiro,'%d/%m/%Y')      AS retiro_fmt,
+                   DATE_FORMAT(i.vigencia,'%d/%m/%Y')          AS vigencia_fmt,
+                   se.cliente, se.control, se.estatus, se.direccion,
+                   DATE_FORMAT(se.fecha,'%d/%m/%Y') AS fecha_fmt
+            FROM arneses_items i
+            LEFT JOIN arneses_tipos t ON t.id = i.tipo_id
+            LEFT JOIN arneses_sesiones se ON se.id = i.sesion_id
+            WHERE i.id = ?
+        ");
+        $s->execute([$itemId]);
+        $it = $s->fetch(PDO::FETCH_ASSOC);
+        if (!$it) return ['status' => 'error', 'message' => 'Pieza no encontrada.'];
+        if (empty($it['control'])) return ['status' => 'error', 'message' => 'La inspección aún no tiene folio; debe aprobarse en Calidad.'];
+        if ($it['resultado'] === 'NO APTO') {
+            return ['status' => 'error', 'message' => 'No se emite certificado para equipo NO APTO; debe retirarse de servicio.'];
+        }
+        if (empty($it['qr_codigo'])) return ['status' => 'error', 'message' => 'La pieza no tiene código QR asignado.'];
+
+        $qrImg = '<img src="' . qrDataUri(textoQR($it['qr_codigo']), 300, 3) . '" style="width:105px">';
+        $fila = fn($k, $v) => '<tr><td width="38%" style="color:#5a6072;padding:4px 0">' . $k
+              . '</td><td style="font-weight:bold;padding:4px 0">' . $this->esc($v ?: '—') . '</td></tr>';
+
+        $html = '<html><body style="font-family:dejavusans;font-size:9.5pt;color:#1a1a2e">'
+          . $this->encabezado('CERTIFICADO DE INSPECCIÓN', $it['control'])
+          . '<div style="border:2px solid #185FA5;border-radius:6px;padding:14px;margin-bottom:12px">
+               <table width="100%">
+                 <tr>
+                   <td width="68%">
+                     <table width="100%" style="font-size:9.5pt">'
+                       . $fila('Tipo de equipo',   $it['tipo_nombre'])
+                       . $fila('Marca / Modelo',   trim($it['marca'] . ' ' . $it['modelo']))
+                       . $fila('No. de serie',     $it['serie'])
+                       . $fila('ID / Etiqueta',    $it['id_arnes'])
+                       . $fila('Talla',            $it['talla'])
+                       . $fila('Longitud',         $it['longitud'])
+                       . $fila('Norma aplicable',  $it['norma'] ?: 'NOM-009-STPS-2011')
+                     . '</table>
+                   </td>
+                   <td width="32%" style="text-align:center;vertical-align:top">'
+                     . $qrImg . '<div style="font-size:7pt;color:#5a6072;margin-top:3px">Valida en<br>gestion.avba.com.mx</div>
+                   </td>
+                 </tr>
+               </table>
+             </div>
+             <table width="100%" style="font-size:9.5pt;margin-bottom:10px">'
+               . $fila('Cliente',                 $it['cliente'])
+               . $fila('Fecha de inspección',     $it['fecha_fmt'])
+               . $fila('Fecha de fabricación',    $it['fabricacion_fmt'])
+               . $fila('Retiro obligatorio',      $it['retiro_fmt'])
+             . '</table>
+             <table width="100%" style="margin-bottom:12px">
+               <tr>
+                 <td width="50%" style="text-align:center;background:#e8f5e9;padding:10px">
+                   <div style="font-size:13pt;font-weight:bold;color:#1b7a3d">' . $this->esc($it['resultado']) . '</div>
+                   <div style="font-size:8pt;color:#5a6072">Resultado de la inspección</div>
+                 </td>
+                 <td width="50%" style="text-align:center;background:#E6F1FB;padding:10px">
+                   <div style="font-size:13pt;font-weight:bold;color:#0C447C">' . $this->esc($it['vigencia_fmt'] ?: '—') . '</div>
+                   <div style="font-size:8pt;color:#5a6072">Válido hasta</div>
+                 </td>
+               </tr>
+             </table>'
+             . (!empty($it['observaciones'])
+                ? '<div style="font-size:8.5pt;background:#fff8e1;border-left:3px solid #f59e0b;padding:8px;margin-bottom:10px">
+                     <strong>Observaciones:</strong> ' . $this->esc($it['observaciones']) . '</div>'
+                : '')
+             . '<div style="font-size:7.5pt;color:#5a6072;line-height:1.5">
+                  Inspección realizada conforme a la NOM-009-STPS-2011 y a las recomendaciones del
+                  fabricante. Este certificado pierde validez si el equipo sufre un evento de caída,
+                  alteración o daño, o al llegar su fecha de retiro obligatorio, lo que ocurra primero.
+                </div>
+                <table width="100%" style="margin-top:34px;font-size:8.5pt">
+                  <tr><td style="text-align:center;border-top:1px solid #999;padding-top:4px">Inspector responsable</td></tr>
+                </table>
+             </body></html>';
+
+        $folio = $it['control'] . '-' . str_pad((string)$itemId, 4, '0', STR_PAD_LEFT);
+        $url = $this->htmlToPdf($html, $folio, 'CERT_ARN');
+        $abs = rtrim(SITE_URL, '/') . '/' . $url;
+        $this->pdo->prepare("UPDATE arneses_items SET cert_url = ? WHERE id = ?")->execute([$abs, $itemId]);
+        return ['status' => 'success', 'url' => $abs];
+    }
+
+    /** Emite todo: dictamen del lote + certificado de cada pieza apta. */
+    public function emitirSesion(int $sesionId): array {
+        $det = $this->detalleSesion($sesionId);
+        if ($det['status'] !== 'success') return $det;
+
+        $dict = $this->generarDictamen($sesionId);
+        if ($dict['status'] !== 'success') return $dict;
+
+        $ok = 0; $errores = [];
+        foreach ($det['items'] as $i) {
+            if ($i['resultado'] === 'NO APTO') continue;
+            $r = $this->generarCertificado((int)$i['id']);
+            if ($r['status'] === 'success') $ok++;
+            else $errores[] = ($i['serie'] ?: ('#' . $i['id'])) . ': ' . $r['message'];
+        }
+
+        $this->pdo->prepare("UPDATE arneses_sesiones SET estatus='EMITIDO' WHERE id=?")->execute([$sesionId]);
+        return [
+            'status'   => 'success',
+            'message'  => "Dictamen emitido y $ok certificado(s) generado(s).",
+            'dictamen' => $dict['url'],
+            'errores'  => $errores,
+        ];
+    }
+
     public function eliminarSesion(int $id): array {
         if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
         $items = $this->pdo->prepare("SELECT id FROM arneses_items WHERE sesion_id = ?");
