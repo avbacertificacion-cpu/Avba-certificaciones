@@ -5,6 +5,12 @@ on:
     branches:
       - claude/continue-avba-project-bU5LX
 
+# El SCP a Hostinger falla de forma intermitente con "dial tcp: i/o timeout"
+# (la conexión no se establece, no es un problema del contenido). Por eso el
+# envío se intenta hasta 3 veces con una pausa entre intentos: los dos
+# primeros no marcan el job como fallido, y solo si el tercero también falla
+# se reporta el error. Además se amplía el timeout de conexión a 60s, porque
+# los intentos fallidos se rendían justo al llegar a los 30s por defecto.
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -15,7 +21,9 @@ jobs:
       - name: Quitar archivos que no se deben subir
         run: rm -rf .git .github config
 
-      - name: Subir archivos por SSH (SCP) a la raíz del sitio
+      - name: Subir por SCP (intento 1 de 3)
+        id: scp1
+        continue-on-error: true
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -26,4 +34,55 @@ jobs:
           target: "/home/u218429682/domains/gestion.avba.com.mx/public_html"
           strip_components: 0
           overwrite: true
-          
+          timeout: 60s
+
+      - name: Esperar antes del segundo intento
+        if: steps.scp1.outcome == 'failure'
+        run: sleep 20
+
+      - name: Subir por SCP (intento 2 de 3)
+        id: scp2
+        if: steps.scp1.outcome == 'failure'
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "."
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html"
+          strip_components: 0
+          overwrite: true
+          timeout: 60s
+
+      - name: Esperar antes del tercer intento
+        if: steps.scp1.outcome == 'failure' && steps.scp2.outcome == 'failure'
+        run: sleep 40
+
+      # Último intento: sin continue-on-error, así que si este falla el job
+      # sí se marca como fallido y el error queda visible.
+      - name: Subir por SCP (intento 3 de 3)
+        id: scp3
+        if: steps.scp1.outcome == 'failure' && steps.scp2.outcome == 'failure'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "."
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html"
+          strip_components: 0
+          overwrite: true
+          timeout: 60s
+
+      - name: Resultado del despliegue
+        run: |
+          if [ "${{ steps.scp1.outcome }}" = "success" ]; then
+            echo "✅ Desplegado al primer intento."
+          elif [ "${{ steps.scp2.outcome }}" = "success" ]; then
+            echo "✅ Desplegado en el segundo intento (el primero falló por red)."
+          else
+            echo "✅ Desplegado en el tercer intento (los dos primeros fallaron por red)."
+          fi
