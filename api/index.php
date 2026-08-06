@@ -33,6 +33,7 @@ require_once __DIR__ . '/ClienteRH.php';
 require_once __DIR__ . '/PagosServicios.php';
 require_once __DIR__ . '/Anuncios.php';
 require_once __DIR__ . '/VerificacionIA.php';
+require_once __DIR__ . '/Arneses.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -94,6 +95,7 @@ $cliRH          = new ClienteRH($pdo);
 $pagosServicios = new PagosServicios($pdo);
 $anuncios       = new Anuncios($pdo);
 $verifIA        = new VerificacionIA($pdo);
+$arneses        = new Arneses($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -740,6 +742,37 @@ if ($method === 'GET') {
             $mec = $alc['es_sub'] ? (int)$usr['id'] : null;
             respuesta($cliMant->detalleMantenimiento((int)($_GET['id'] ?? 0), resolveIdc($usr), $mec));
         }
+
+        // ── Arneses y líneas de vida ──────────────────────
+        case 'LISTAR_TIPOS_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->listarTipos(($_GET['todos'] ?? '') !== '1'));
+
+        case 'LISTAR_CHECKLIST_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->listarChecklist((int)($_GET['tipo_id'] ?? 0)));
+
+        case 'GET_MIS_ARNESES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->misSesiones($usr['usuario']));
+
+        case 'LISTAR_SESIONES_ARNESES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->listarSesiones(trim($_GET['estatus'] ?? '')));
+
+        case 'DETALLE_SESION_ARNESES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->detalleSesion((int)($_GET['id'] ?? 0)));
+
+        case 'GET_NEXT_QR_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->siguienteQr());
 
         // ── Portal cliente: equipos ───────────────────────
         case 'GET_MI_PERSONAL':
@@ -1841,6 +1874,52 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             soloPrincipalPuedeCrearBorrar(alcanceSub($usr, $cliSub));
             respuesta($cliPersonal->eliminar((int)($payload['id'] ?? 0), resolveIdc($usr)));
+
+        // ── Arneses y líneas de vida ─────────────────────────────
+        case 'CREAR_SESION_ARNESES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->crearSesion($payload, $usr['usuario']));
+
+        case 'GUARDAR_ITEM_ARNES':   // multipart (lleva fotos)
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->guardarItem($_POST, $_FILES));
+
+        case 'EDITAR_ITEM_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->editarItem($payload));
+
+        case 'APROBAR_SESION_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->aprobarSesion($payload, $usr['usuario']));
+
+        case 'DEVOLVER_SESION_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->devolverSesion($payload, $usr['usuario']));
+
+        case 'ELIMINAR_SESION_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->eliminarSesion((int)($payload['id'] ?? 0)));
+
+        case 'GUARDAR_TIPO_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->guardarTipo($payload));
+
+        case 'GUARDAR_PUNTO_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->guardarPuntoChecklist($payload));
+
+        case 'ELIMINAR_PUNTO_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->eliminarPuntoChecklist((int)($payload['id'] ?? 0)));
 
         // ── RH / Asistencia del cliente ──────────────────────────
         case 'RH_GUARDAR_POLITICAS':
