@@ -1031,6 +1031,28 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
   </div>
 </div>
 
+<!-- Modal: Imprimir expediente (arma un solo PDF con lo seleccionado) -->
+<div class="eq-overlay" id="overlay-imprimir">
+  <div class="eq-modal" style="max-width:520px">
+    <div class="eq-modal-hdr">
+      <div class="eq-modal-title">🖨 Imprimir expediente</div>
+      <button class="eq-modal-close" onclick="cerrarImprimir()">✕</button>
+    </div>
+    <div style="font-size:12px;color:var(--texto-hint);margin-bottom:10px" id="imp-sub">
+      Selecciona los documentos y se combinarán en un solo PDF.
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn-sec" style="font-size:12px;padding:5px 12px" onclick="impMarcarTodos(true)">Seleccionar todo</button>
+      <button class="btn-sec" style="font-size:12px;padding:5px 12px" onclick="impMarcarTodos(false)">Ninguno</button>
+    </div>
+    <div id="imp-lista" style="max-height:340px;overflow-y:auto;border:1px solid var(--borde);border-radius:10px;padding:6px"></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrarImprimir()">Cancelar</button>
+      <button class="btn-prim" id="imp-btn" onclick="generarImpresion()">Generar PDF</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: Plan de mantenimiento -->
 <div class="eq-overlay" id="overlay-plan-mant">
   <div class="eq-modal">
@@ -2535,7 +2557,8 @@ function renderDetInfo(eq) {
     <div class="eq-det-specs">
       ${specs.map(([k,v]) => `<div><div class="eq-ds-l">${k}</div><div class="eq-ds-v">${escQ(v)}</div></div>`).join('')}
     </div>
-    ${eq.notas ? `<div style="margin:0 0 16px;padding:10px 14px;background:var(--gris-bg);border-radius:10px;font-size:12px;color:var(--texto-sub);font-style:italic">${escQ(eq.notas)}</div>` : '<div style="margin-bottom:6px"></div>'}
+    ${eq.notas ? `<div style="margin:0 0 12px;padding:10px 14px;background:var(--gris-bg);border-radius:10px;font-size:12px;color:var(--texto-sub);font-style:italic">${escQ(eq.notas)}</div>` : ''}
+    <button class="btn-sec" style="margin-bottom:14px" onclick="abrirImprimir('equipo', ${eq.id}, '${escQ(eq.nombre).replace(/'/g,"")}')">🖨 Imprimir expediente</button>
   `;
 }
 
@@ -2644,6 +2667,76 @@ async function toggleDosMotores(equipoId, valor) {
     if (d.status === 'success') { if (_eqDetActual && _eqDetActual.equipo) _eqDetActual.equipo.dos_motores = valor ? 1 : 0; recargarDetalleEq(); }
     else toastEq(d.message || 'No se pudo guardar.');
   } catch(_) { toastEq('Error de red.'); }
+}
+
+
+// ── Impresión combinada del expediente ─────────────────────────────────────
+// Arma un solo PDF con los documentos elegidos, para no imprimir uno por uno.
+let _impTipo = null, _impId = null;
+
+async function abrirImprimir(tipo, id, nombre) {
+  _impTipo = tipo; _impId = id;
+  document.getElementById('imp-sub').textContent =
+    `${nombre || ''} — selecciona los documentos y se combinarán en un solo PDF.`;
+  const cont = document.getElementById('imp-lista');
+  cont.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--texto-hint)">Cargando documentos…</div>';
+  document.getElementById('overlay-imprimir').classList.add('open');
+  try {
+    const r = await fetch(`${API}?action=LISTAR_DOCS_IMPRIMIBLES&tipo=${encodeURIComponent(tipo)}&id=${encodeURIComponent(id)}`);
+    const d = await r.json();
+    const docs = (d && d.documentos) ? d.documentos : [];
+    if (!docs.length) {
+      cont.innerHTML = '<div style="padding:12px;font-size:12px;color:var(--texto-hint)">No hay documentos con archivo adjunto para imprimir.</div>';
+      return;
+    }
+    let html = '', grupoActual = '';
+    docs.forEach(doc => {
+      if (doc.grupo !== grupoActual) {
+        grupoActual = doc.grupo;
+        html += `<div style="font-size:11px;font-weight:700;color:var(--texto-hint);text-transform:uppercase;letter-spacing:.05em;padding:8px 6px 4px">${escQ(grupoActual)}</div>`;
+      }
+      const ico = doc.formato === 'pdf' ? '📄' : (doc.formato === 'imagen' ? '🖼️' : '📎');
+      html += `<label style="display:flex;align-items:center;gap:9px;padding:8px 6px;border-radius:8px;cursor:pointer">
+        <input type="checkbox" class="imp-chk" value="${escH(doc.clave)}" checked style="width:auto;margin:0">
+        <span style="font-size:15px">${ico}</span>
+        <span style="flex:1;min-width:0">
+          <span style="display:block;font-size:13px;color:var(--texto)">${escQ(doc.nombre)}</span>
+          ${doc.detalle ? `<span style="display:block;font-size:11px;color:var(--texto-hint)">${escQ(doc.detalle)}</span>` : ''}
+        </span>
+      </label>`;
+    });
+    cont.innerHTML = html;
+  } catch(_) {
+    cont.innerHTML = '<div style="padding:12px;font-size:12px;color:#ef4444">Error de red.</div>';
+  }
+}
+
+function cerrarImprimir() { document.getElementById('overlay-imprimir').classList.remove('open'); }
+function impMarcarTodos(v) { document.querySelectorAll('.imp-chk').forEach(c => c.checked = v); }
+
+async function generarImpresion() {
+  const sel = Array.from(document.querySelectorAll('.imp-chk:checked')).map(c => c.value);
+  if (!sel.length) { toastEq('Selecciona al menos un documento.'); return; }
+  const btn = document.getElementById('imp-btn');
+  btn.disabled = true; btn.textContent = 'Generando…';
+  try {
+    const r = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'IMPRIMIR_EXPEDIENTE', payload: { tipo: _impTipo, id: _impId, documentos: sel } })
+    });
+    const d = await r.json();
+    if (d.status === 'success') {
+      cerrarImprimir();
+      toastEq(`PDF listo (${d.paginas} página${d.paginas!==1?'s':''}).`);
+      if (d.omitidos && d.omitidos.length) {
+        alert('Estos documentos están protegidos y no se pudieron combinar; imprímelos por separado:\n\n• ' + d.omitidos.join('\n• '));
+      }
+      window.open(d.url, '_blank');
+    } else {
+      toastEq(d.message || 'No se pudo generar el PDF.');
+    }
+  } catch(_) { toastEq('Error de red.'); }
+  finally { btn.disabled = false; btn.textContent = 'Generar PDF'; }
 }
 
 // ── Plan de mantenimiento preventivo (horómetro / fecha) ────────────────────
@@ -3320,7 +3413,8 @@ function renderDetInfoPer(per) {
     <div class="eq-det-specs">
       ${specs.map(([k,v]) => `<div><div class="eq-ds-l">${k}</div><div class="eq-ds-v">${escQ(v)}</div></div>`).join('')}
     </div>
-    ${per.notas ? `<div style="margin:0 0 16px;padding:10px 14px;background:var(--gris-bg);border-radius:10px;font-size:12px;color:var(--texto-sub);font-style:italic">${escQ(per.notas)}</div>` : '<div style="margin-bottom:6px"></div>'}
+    ${per.notas ? `<div style="margin:0 0 12px;padding:10px 14px;background:var(--gris-bg);border-radius:10px;font-size:12px;color:var(--texto-sub);font-style:italic">${escQ(per.notas)}</div>` : ''}
+    <button class="btn-sec" style="margin-bottom:14px" onclick="abrirImprimir('personal', ${per.id}, '${escQ(per.nombre).replace(/'/g,"")}')">🖨 Imprimir expediente</button>
   `;
 }
 

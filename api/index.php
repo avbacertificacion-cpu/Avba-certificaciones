@@ -34,6 +34,7 @@ require_once __DIR__ . '/PagosServicios.php';
 require_once __DIR__ . '/Anuncios.php';
 require_once __DIR__ . '/VerificacionIA.php';
 require_once __DIR__ . '/Arneses.php';
+require_once __DIR__ . '/ClienteImpresion.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -96,6 +97,7 @@ $pagosServicios = new PagosServicios($pdo);
 $anuncios       = new Anuncios($pdo);
 $verifIA        = new VerificacionIA($pdo);
 $arneses        = new Arneses($pdo);
+$cliImpresion   = new ClienteImpresion($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -792,6 +794,14 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             $alc = alcanceSub($usr, $cliSub);
             respuesta($cliPersonal->detalle((int)($_GET['id'] ?? 0), resolveIdc($usr), $alc['personal']));
+
+        case 'LISTAR_DOCS_IMPRIMIBLES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            $tipoImp = ($_GET['tipo'] ?? '') === 'personal' ? 'personal' : 'equipo';
+            autorizarRecurso($alc, $tipoImp, (int)($_GET['id'] ?? 0));
+            respuesta($cliImpresion->listarDocumentos($tipoImp, (int)($_GET['id'] ?? 0), resolveIdc($usr)));
 
         // ── Portal cliente: RH / Asistencia ───────────────
         case 'RH_POLITICAS':
@@ -1874,6 +1884,14 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             soloPrincipalPuedeCrearBorrar(alcanceSub($usr, $cliSub));
             respuesta($cliPersonal->eliminar((int)($payload['id'] ?? 0), resolveIdc($usr)));
+
+        case 'IMPRIMIR_EXPEDIENTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $alc = alcanceSub($usr, $cliSub);
+            $tipoImp = ($payload['tipo'] ?? '') === 'personal' ? 'personal' : 'equipo';
+            autorizarRecurso($alc, $tipoImp, (int)($payload['id'] ?? 0));
+            respuesta($cliImpresion->generarCombinado($tipoImp, (int)($payload['id'] ?? 0), (array)($payload['documentos'] ?? []), resolveIdc($usr)));
 
         // ── Arneses y líneas de vida ─────────────────────────────
         case 'CREAR_SESION_ARNESES':
