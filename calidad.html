@@ -704,6 +704,7 @@
 <div class="tabs-nav">
   <button class="tab-btn active" id="sec-btn-maquinaria" onclick="verSeccion('maquinaria')">🔧 Maquinaria</button>
   <button class="tab-btn"        id="sec-btn-accesorios" onclick="verSeccion('accesorios')">🔗 Accesorios</button>
+  <button class="tab-btn"        id="sec-btn-arneses"   onclick="verSeccion('arneses')">🦺 Arneses</button>
   <button class="tab-btn"        id="sec-btn-personal"   onclick="verSeccion('personal')">👤 Personal</button>
   <button class="tab-btn"        id="sec-btn-catalogos"  onclick="verSeccion('catalogos')">⚙️ Catálogos</button>
   <button class="tab-btn"        id="sec-btn-qr"         onclick="verSeccion('qr')">🔢 Códigos QR</button>
@@ -2044,6 +2045,28 @@
 
 
 <!-- ══ SECCIÓN AUDITORÍAS ══ -->
+<div id="sec-arneses" class="wrap" style="display:none">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+    <div>
+      <h2 style="margin:0;font-size:20px;color:var(--azul-dark)">🦺 Arneses y líneas de vida</h2>
+      <p style="margin:4px 0 0;font-size:13px;color:var(--texto-sub)">Equipo de protección contra caídas · NOM-009-STPS-2011</p>
+    </div>
+  </div>
+  <div id="arn-cal-lista"><div style="text-align:center;padding:30px;color:var(--texto-hint)">Cargando…</div></div>
+</div>
+
+<!-- ══ MODAL DETALLE DE INSPECCIÓN DE ARNESES ══ -->
+<div class="overlay" id="overlay-arn">
+  <div class="modal" style="max-width:820px">
+    <div class="modal-header">
+      <h3 style="margin:0" id="arn-det-titulo">Inspección de arneses</h3>
+      <button class="modal-close" onclick="cerrarArnDet()">✕</button>
+    </div>
+    <div class="modal-body" id="arn-det-body" style="max-height:70vh;overflow-y:auto"></div>
+    <div class="modal-btns" id="arn-det-footer"></div>
+  </div>
+</div>
+
 <div id="sec-auditorias" class="wrap" style="display:none">
   <div id="aud-recordatorio" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:16px;color:#92400e;font-size:13px;font-weight:600"></div>
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
@@ -2978,10 +3001,11 @@ const TODOS_CONTENIDOS = [
   'sec-qr',
   'sec-pnd',
   'sec-auditorias',
+  'sec-arneses',
 ];
 
 function verSeccion(sec) {
-  ['maquinaria','accesorios','personal','catalogos','qr','pnd','auditorias'].forEach(s => {
+  ['maquinaria','accesorios','arneses','personal','catalogos','qr','pnd','auditorias'].forEach(s => {
     const b = document.getElementById('sec-btn-' + s); if (b) b.classList.toggle('active', s === sec);
   });
   ['accesorios','personal','catalogos'].forEach(s => {
@@ -3002,6 +3026,9 @@ function verSeccion(sec) {
   } else if (sec === 'catalogos') {
     document.getElementById('sub-nav-catalogos').style.display = '';
     verSubTab('catalogos', 'equipos');
+  } else if (sec === 'arneses') {
+    document.getElementById('sec-arneses').style.display = '';
+    cargarSesionesArn();
   } else if (sec === 'qr') {
     document.getElementById('sec-qr').style.display = '';
     cargarInfoQR();
@@ -6127,6 +6154,161 @@ async function verEvidencia(url) {
    CÓDIGOS QR
 ════════════════════════════════════════ */
 let qrInfoCache = null;
+
+/* ═══ ARNESES Y LÍNEAS DE VIDA (revisión y aprobación) ═══════════════════════
+   Calidad revisa la inspección, corrige lo que haga falta y la aprueba. Cada
+   pieza necesita su QR porque cada una lleva certificado individual. */
+let _arnSesiones = [];
+let _arnDetActual = null;
+
+async function cargarSesionesArn() {
+  const cont = document.getElementById('arn-cal-lista');
+  cont.innerHTML = '<div style="text-align:center;padding:30px;color:var(--texto-hint)">Cargando…</div>';
+  try {
+    const r = await fetch(API + '?action=LISTAR_SESIONES_ARNESES');
+    const d = await r.json();
+    if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo);text-align:center;padding:20px">${escH(d.message||'Error')}</p>`; return; }
+    _arnSesiones = d.sesiones || [];
+    renderSesionesArn();
+  } catch(_) { cont.innerHTML = '<p style="color:var(--rojo);text-align:center;padding:20px">Error de red.</p>'; }
+}
+
+function _arnBadge(est) {
+  const m = {
+    'PENDIENTE':        ['#92400e','#fff8e1','Pendiente'],
+    'APROBADO_CALIDAD': ['#0C447C','#E6F1FB','Aprobado'],
+    'EMITIDO':          ['#1b7a3d','#e8f5e9','Emitido'],
+    'DEVUELTO':         ['#b91c1c','#fdecea','Devuelto'],
+  }[est] || ['#5a6072','#f0f0f0', est || '—'];
+  return `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${m[1]};color:${m[0]}">${m[2]}</span>`;
+}
+
+function renderSesionesArn() {
+  const cont = document.getElementById('arn-cal-lista');
+  if (!_arnSesiones.length) {
+    cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--texto-hint)">Sin inspecciones de arneses registradas.</div>';
+    return;
+  }
+  cont.innerHTML = _arnSesiones.map(s => `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--borde);border-radius:10px;margin-bottom:8px;background:#fff;cursor:pointer"
+         onclick="abrirArnDet(${s.id})">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:14px;font-weight:600;color:var(--texto)">${escH(s.cliente)} ${_arnBadge(s.estatus)}</div>
+        <div style="font-size:12px;color:var(--texto-sub);margin-top:2px">
+          ${escH(s.fecha||'')} · ${s.total} pieza(s) · ${s.aptos} apta(s)${+s.no_aptos ? ` · <span style="color:var(--rojo)">${s.no_aptos} no apta(s)</span>` : ''}
+          ${s.control ? ' · Folio ' + escH(s.control) : ''}
+        </div>
+      </div>
+      <span style="color:var(--azul);font-size:18px">›</span>
+    </div>`).join('');
+}
+
+async function abrirArnDet(id) {
+  const body = document.getElementById('arn-det-body');
+  document.getElementById('overlay-arn').classList.add('open');
+  body.innerHTML = '<div style="text-align:center;padding:30px;color:var(--texto-hint)">Cargando…</div>';
+  document.getElementById('arn-det-footer').innerHTML = '';
+  try {
+    const r = await fetch(API + '?action=DETALLE_SESION_ARNESES&id=' + id);
+    const d = await r.json();
+    if (d.status !== 'success') { body.innerHTML = `<p style="color:var(--rojo)">${escH(d.message||'Error')}</p>`; return; }
+    _arnDetActual = d;
+    renderArnDet(d);
+  } catch(_) { body.innerHTML = '<p style="color:var(--rojo)">Error de red.</p>'; }
+}
+
+function renderArnDet(d) {
+  const ses = d.sesion, items = d.items || [];
+  document.getElementById('arn-det-titulo').textContent = ses.cliente;
+
+  const sinQR = items.filter(i => !i.qr_codigo).length;
+  const color = r => r === 'APTO' ? '#1b7a3d' : (r === 'NO APTO' ? '#b91c1c' : '#92400e');
+
+  document.getElementById('arn-det-body').innerHTML = `
+    <div style="font-size:12px;color:var(--texto-sub);margin-bottom:12px">
+      ${escH(ses.fecha_fmt||'')} · ${escH(ses.direccion||'Sin ubicación')} ${_arnBadge(ses.estatus)}
+      ${ses.control ? ' · Folio <strong>' + escH(ses.control) + '</strong>' : ''}
+    </div>
+    ${sinQR ? `<div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:10px;font-size:12px;color:#92400e;margin-bottom:12px">
+       ⚠ ${sinQR} pieza(s) sin código QR. Cada pieza lleva certificado propio, así que necesita su QR antes de aprobar.
+     </div>` : ''}
+    ${items.map((i, n) => `
+      <div style="border:1px solid var(--borde);border-radius:10px;padding:12px;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <strong style="font-size:13px;color:var(--texto)">${n+1}. ${escH(i.tipo_nombre||'Equipo')}</strong>
+          <span style="font-size:11px;font-weight:700;color:${color(i.resultado)}">${escH(i.resultado)}</span>
+        </div>
+        <div style="font-size:12px;color:var(--texto-sub);margin-top:3px">
+          ${[i.marca, i.modelo, i.serie].filter(Boolean).map(escH).join(' · ') || 'Sin datos'}
+          ${i.retiro_fmt ? ' · Retiro: ' + escH(i.retiro_fmt) : ''}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap">
+          <input type="text" id="arn-qr-${i.id}" value="${escH(i.qr_codigo||'')}" maxlength="10" placeholder="QR de la pieza"
+                 style="width:130px;padding:5px 8px;border:1.5px solid ${i.qr_codigo?'var(--borde)':'#f59e0b'};border-radius:6px;font-size:12px;font-family:monospace">
+          <button onclick="guardarQrArn(${i.id})" style="padding:5px 12px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Guardar QR</button>
+          ${i.fotos && i.fotos.length ? `<span style="font-size:11px;color:var(--texto-hint)">📷 ${i.fotos.length}</span>` : ''}
+        </div>
+        ${i.observaciones ? `<div style="font-size:11px;color:var(--texto-sub);font-style:italic;margin-top:6px">${escH(i.observaciones)}</div>` : ''}
+        ${(i.checklist||[]).length ? `<details style="margin-top:7px">
+            <summary style="font-size:11px;color:var(--azul);cursor:pointer">Ver checklist (${i.checklist.length})</summary>
+            <div style="margin-top:5px">${i.checklist.map(c => `
+              <div style="font-size:11px;padding:2px 0;color:var(--texto-sub)">
+                <strong style="color:${c.valor==='NC'?'var(--rojo)':(c.valor==='C'?'var(--verde)':'#888')}">${escH(c.valor||'—')}</strong>
+                · ${escH(c.descripcion)}
+              </div>`).join('')}</div>
+          </details>` : ''}
+      </div>`).join('') || '<div style="color:var(--texto-hint)">Sin piezas registradas.</div>'}
+  `;
+
+  const puedeAprobar = ['PENDIENTE','DEVUELTO',''].includes(ses.estatus || '');
+  document.getElementById('arn-det-footer').innerHTML = `
+    <button class="btn-cancel" onclick="cerrarArnDet()">Cerrar</button>
+    ${puedeAprobar ? `<button class="btn-confirm" onclick="aprobarArn(${ses.id})">✓ Aprobar → Certificaciones</button>` : ''}
+    ${ses.estatus === 'APROBADO_CALIDAD' ? `<button class="btn-confirm" onclick="emitirArn(${ses.id})">📄 Emitir documentos</button>` : ''}
+  `;
+}
+
+function cerrarArnDet() { document.getElementById('overlay-arn').classList.remove('open'); }
+
+async function guardarQrArn(itemId) {
+  const qr = document.getElementById('arn-qr-' + itemId).value.trim();
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'EDITAR_ITEM_ARNES', payload:{ id:itemId, qr_codigo:qr } }) });
+    const d = await r.json();
+    if (d.status === 'success') { mostrarToast('QR guardado.', 'ok'); abrirArnDet(_arnDetActual.sesion.id); }
+    else mostrarToast(d.message || 'No se pudo guardar.', 'err');
+  } catch(_) { mostrarToast('Error de red.', 'err'); }
+}
+
+async function aprobarArn(id) {
+  const qr = prompt('Código QR de la inspección (ampara el dictamen del lote):');
+  if (qr === null) return;
+  if (!qr.trim()) { mostrarToast('Indica el código QR.', 'err'); return; }
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'APROBAR_SESION_ARNES', payload:{ id, qr: qr.trim() } }) });
+    const d = await r.json();
+    if (d.status === 'success') { mostrarToast(d.message || 'Aprobada.', 'ok'); cerrarArnDet(); cargarSesionesArn(); }
+    else mostrarToast(d.message || 'No se pudo aprobar.', 'err');
+  } catch(_) { mostrarToast('Error de red.', 'err'); }
+}
+
+async function emitirArn(id) {
+  if (!confirm('¿Emitir el dictamen del lote y el certificado de cada pieza apta?')) return;
+  mostrarToast('Generando documentos…', 'info');
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'EMITIR_SESION_ARNES', payload:{ id } }) });
+    const d = await r.json();
+    if (d.status === 'success') {
+      mostrarToast(d.message || 'Documentos emitidos.', 'ok');
+      if (d.dictamen) window.open(d.dictamen, '_blank');
+      if (d.errores && d.errores.length) alert('Algunas piezas no generaron certificado:\n\n' + d.errores.join('\n'));
+      cerrarArnDet(); cargarSesionesArn();
+    } else mostrarToast(d.message || 'No se pudo emitir.', 'err');
+  } catch(_) { mostrarToast('Error de red.', 'err'); }
+}
 
 async function cargarInfoQR() {
   const filtro = document.getElementById('qr-filtro')?.value || 'todos';
