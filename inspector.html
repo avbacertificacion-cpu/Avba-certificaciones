@@ -4937,7 +4937,6 @@ function ocr_previewDoc(event) {
   const preview = document.getElementById('ocr-preview');
   const holder  = document.getElementById('ocr-placeholder');
   const zone    = document.getElementById('ocr-zone');
-  const btn     = document.getElementById('ocr-btn');
 
   const reader = new FileReader();
   reader.onload = e => {
@@ -4945,7 +4944,6 @@ function ocr_previewDoc(event) {
     preview.style.display = 'block';
     holder.style.display  = 'none';
     zone.classList.add('has-img');
-    btn.disabled = false;
   };
   reader.readAsDataURL(file);
 
@@ -4956,97 +4954,6 @@ function ocr_previewDoc(event) {
   document.getElementById('cur-doc-status').style.color = 'var(--verde)';
 }
 
-// ── OCR: procesar imagen con OCR.space ────
-async function ocr_procesar() {
-  if (!curDocFile) return;
-  const btn   = document.getElementById('ocr-btn');
-  const label = document.getElementById('ocr-btn-label');
-  const res   = document.getElementById('ocr-result');
-
-  btn.disabled  = true;
-  label.textContent = 'Procesando…';
-  res.className = 'ocr-result';
-
-  try {
-    const s        = JSON.parse(localStorage.getItem('avba_session') || '{}');
-    const formData = new FormData();
-    formData.append('action', 'OCR_PROXY');
-    formData.append('token',  s.token || '');
-    formData.append('file',   curDocFile);
-
-    const resp = await fetch(WEB_APP_URL, { method: 'POST', body: formData });
-    const data = await resp.json();
-
-    if (data.status !== 'success') {
-      res.className   = 'ocr-result err';
-      res.textContent = 'Error OCR: ' + (data.message || 'No se pudo procesar la imagen.');
-      return;
-    }
-
-    const texto = data.texto || '';
-
-    if (!texto) {
-      res.className = 'ocr-result err';
-      res.textContent = 'No se pudo leer texto en la imagen. Intenta con mejor iluminación o mayor resolución.';
-      return;
-    }
-
-    let campos = [];
-
-    // ── Extraer CURP ─────────────────────────
-    const curpMatch = texto.match(/[A-Z]{4}\d{6}[HM][A-Z]{5}[A-Z0-9]\d/);
-    if (curpMatch) {
-      document.getElementById('cur-curp').value = curpMatch[0];
-      curClearErr('cur-curp');
-      campos.push('CURP');
-    }
-
-    // ── Extraer nombre (doc CURP de RENAPO) ──
-    // Formato: "NOMBRE(S):\n JUAN" o "NOMBRE: JUAN PÉREZ"
-    const nombreMatch = texto.match(/NOMBRE[S\s]*[:()]*\s*\n?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{2,40})/);
-    const ap1Match    = texto.match(/PRIMER\s+APELLIDO[^:]*:\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{1,25})/);
-    const ap2Match    = texto.match(/SEGUNDO\s+APELLIDO[^:]*:\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{1,25})/);
-
-    if (ap1Match || nombreMatch) {
-      const apellido1 = (ap1Match?.[1] || '').trim();
-      const apellido2 = (ap2Match?.[1] || '').trim();
-      const nombres   = (nombreMatch?.[1] || '').trim();
-
-      let nombreCompleto = '';
-      if (apellido1 && nombres) {
-        nombreCompleto = `${apellido1} ${apellido2 ? apellido2 + ' ' : ''}${nombres}`.trim();
-      } else if (nombres) {
-        nombreCompleto = nombres;
-      }
-
-      if (nombreCompleto && nombreCompleto.length > 3) {
-        // Convertir a Title Case
-        nombreCompleto = nombreCompleto.split(' ')
-          .map(p => p.charAt(0) + p.slice(1).toLowerCase())
-          .join(' ');
-        document.getElementById('cur-nombre').value = nombreCompleto;
-        curClearErr('cur-nombre');
-        campos.push('nombre');
-      }
-    }
-
-    if (campos.length) {
-      res.className   = 'ocr-result ok';
-      res.textContent = `✓ Datos extraídos: ${campos.join(', ')}. Verifica que sean correctos.`;
-    } else {
-      res.className   = 'ocr-result err';
-      res.textContent = 'No se encontraron datos reconocibles. Ingresa los datos manualmente.';
-    }
-
-  } catch (e) {
-    res.className   = 'ocr-result err';
-    res.textContent = 'Error de conexión con el servicio OCR. Ingresa los datos manualmente.';
-    console.error('OCR error:', e);
-  } finally {
-    btn.disabled  = false;
-    label.textContent = 'Extraer datos con OCR';
-  }
-}
 
 // ── Preview foto participante ─────────────
 function curPreviewPersona(event) {
@@ -5082,8 +4989,6 @@ function curLimpiarFormParticipante() {
   document.getElementById('ocr-preview').style.display    = 'none';
   document.getElementById('ocr-placeholder').style.display = '';
   document.getElementById('ocr-zone').classList.remove('has-img');
-  document.getElementById('ocr-btn').disabled              = true;
-  document.getElementById('ocr-result').className          = 'ocr-result';
   document.getElementById('ocr-file').value                = '';
   const docStatus = document.getElementById('cur-doc-status');
   if (docStatus) { docStatus.innerHTML = 'Sin foto — usa la sección de arriba o captura aquí'; docStatus.style.cssText = ''; }
