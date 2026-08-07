@@ -339,6 +339,11 @@ $json_pie = json_encode([$inspeccionados_mes, $total_extintores - $inspeccionado
                 <h3>Ver Extintores</h3>
                 <p><?= $total_extintores ?> equipos registrados</p>
             </div>
+            <div class="menu-item" onclick="window.location.href='cliente-desglose.php'">
+                <div class="menu-item-icon">📦</div>
+                <h3>Desglose de Extintores</h3>
+                <p>Total y por tipo/capacidad</p>
+            </div>
         </div>
     </div>
 </div>
