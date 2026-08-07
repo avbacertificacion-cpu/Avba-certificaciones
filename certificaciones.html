@@ -2180,10 +2180,12 @@ async function cargarArnCert() {
   cont.innerHTML = '<div style="text-align:center;padding:26px;color:var(--texto-hint)">Cargando…</div>';
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   try {
-    const r = await fetch(`${API}?action=LISTAR_SESIONES_ARNESES&estatus=APROBADO_CALIDAD&token=${encodeURIComponent(s.token||'')}`);
+    // Igual que maquinaria: se muestran las aprobadas Y las ya emitidas, para
+    // poder reemitir, consultar documentos o devolverlas despues de emitir.
+    const r = await fetch(`${API}?action=LISTAR_SESIONES_ARNESES&token=${encodeURIComponent(s.token||'')}`);
     const d = await r.json();
     if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo);text-align:center;padding:18px">${escH(d.message||'Error')}</p>`; return; }
-    _arncSesiones = d.sesiones || [];
+    _arncSesiones = (d.sesiones || []).filter(x => x.estatus === 'APROBADO_CALIDAD' || x.estatus === 'EMITIDO');
     renderArnCert();
   } catch(_) { cont.innerHTML = '<p style="color:var(--rojo);text-align:center;padding:18px">Error de red.</p>'; }
 }
@@ -2191,38 +2193,51 @@ async function cargarArnCert() {
 function renderArnCert() {
   const cont = document.getElementById('arnc-lista');
   const tot = _arncSesiones.length;
+  const porEmitir = _arncSesiones.filter(x => x.estatus === 'APROBADO_CALIDAD').length;
   const piezas = _arncSesiones.reduce((a,s)=>a+(+s.total||0),0);
   const aptos  = _arncSesiones.reduce((a,s)=>a+(+s.aptos||0),0);
-  document.getElementById('arnc-total').textContent  = tot;
+  document.getElementById('arnc-total').textContent  = porEmitir;
   document.getElementById('arnc-piezas').textContent = piezas;
   document.getElementById('arnc-aptos').textContent  = aptos;
   document.getElementById('arnc-count').textContent  = tot + ' inspección' + (tot!==1?'es':'');
 
   if (!tot) {
-    cont.innerHTML = '<div style="text-align:center;padding:30px;color:var(--texto-hint)">No hay inspecciones aprobadas pendientes de emitir.</div>';
+    cont.innerHTML = '<div style="text-align:center;padding:30px;color:var(--texto-hint)">No hay inspecciones de arneses en Certificaciones.</div>';
     return;
   }
   cont.innerHTML = _arncSesiones.map(s => `
     <div style="border:1px solid var(--borde);border-radius:10px;padding:13px 15px;margin-bottom:10px;background:#fff">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:180px">
-          <div style="font-size:14px;font-weight:600;color:var(--texto)">${escH(s.cliente)}</div>
+          <div style="font-size:14px;font-weight:600;color:var(--texto)">
+            ${escH(s.cliente)}
+            ${s.estatus === 'EMITIDO'
+              ? '<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;background:var(--verde-light);color:var(--verde);margin-left:6px">Emitido</span>'
+              : '<span style="font-size:10px;font-weight:700;padding:2px 9px;border-radius:20px;background:var(--azul-light);color:var(--azul-dark);margin-left:6px">Por emitir</span>'}
+          </div>
           <div style="font-size:12px;color:var(--texto-sub);margin-top:2px">
             ${escH(s.fecha||'')} · ${s.total} equipo(s) · ${s.aptos} apto(s)${+s.no_aptos ? ` · <span style="color:var(--rojo)">${s.no_aptos} no apto(s)</span>` : ''}
             ${s.control ? ' · Folio ' + escH(s.control) : ''}
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn-ver" style="font-size:11px" onclick="emitirArnCert(${s.id})">📄 Emitir documentos</button>
-          ${s.dictamen_url ? `<a class="btn-ver" style="font-size:11px;text-decoration:none" href="${escH(s.dictamen_url)}" target="_blank">Ver dictamen</a>` : ''}
-          <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)" onclick="devolverArnCert(${s.id})">↩ Devolver</button>
+          <button class="btn-ver" style="font-size:11px" onclick="emitirArnCert(${s.id})">
+            ${s.estatus === 'EMITIDO' ? '🔄 Reemitir documentos' : '📄 Emitir documentos'}
+          </button>
+          ${s.dictamen_url ? `<a class="btn-ver" style="font-size:11px;text-decoration:none" href="${escH(s.dictamen_url)}" target="_blank">📄 Ver dictamen</a>` : ''}
+          <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)" onclick="devolverArnCert(${s.id})">↩ Devolver a Calidad</button>
         </div>
       </div>
     </div>`).join('');
 }
 
 async function emitirArnCert(id) {
-  if (!confirm('¿Emitir el dictamen del lote y el certificado de cada pieza apta?')) return;
+  const ses = _arncSesiones.find(x => x.id === id);
+  const yaEmitida = ses && ses.estatus === 'EMITIDO';
+  const msg = yaEmitida
+    ? '¿Volver a generar el dictamen y los certificados? Se crearán documentos nuevos y sustituirán a los anteriores en el portal del cliente.'
+    : '¿Emitir el dictamen del lote y el certificado de cada pieza apta?';
+  if (!confirm(msg)) return;
   mostrarToast('Generando documentos…', 'info');
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   try {
