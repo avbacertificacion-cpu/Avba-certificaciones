@@ -2055,6 +2055,48 @@
   <div id="arn-cal-lista"><div style="text-align:center;padding:30px;color:var(--texto-hint)">Cargando…</div></div>
 </div>
 
+<!-- ══ MODAL: AGREGAR PARTICIPANTE A UNA SESIÓN (Calidad) ══ -->
+<div class="overlay" id="overlay-cal-part">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-header">
+      <h3 style="margin:0" id="calp-titulo">Agregar participante</h3>
+      <button class="modal-close" onclick="calCerrarAgregarPart()">✕</button>
+    </div>
+    <div class="modal-body" style="max-height:66vh;overflow-y:auto">
+      <div style="font-size:12px;color:var(--texto-sub);margin-bottom:10px" id="calp-sub">—</div>
+
+      <!-- Participantes ya registrados -->
+      <div id="calp-existentes" style="display:none">
+        <input type="text" id="calp-buscar" placeholder="🔍 Buscar por nombre o CURP" oninput="calpFiltrar()"
+               style="width:100%;padding:9px 11px;border:1.5px solid var(--borde);border-radius:9px;font-size:13px;margin-bottom:8px">
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <button onclick="calpMarcar(true)" style="flex:1;padding:6px;border:1px solid var(--borde);background:#fff;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer">Seleccionar todos</button>
+          <button onclick="calpMarcar(false)" style="flex:1;padding:6px;border:1px solid var(--borde);background:#fff;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer">Ninguno</button>
+        </div>
+        <div id="calp-lista" style="max-height:300px;overflow-y:auto"></div>
+      </div>
+
+      <!-- Participante nuevo -->
+      <div id="calp-nuevo" style="display:none">
+        <div class="field"><label>Nombre completo <span style="color:var(--rojo)">*</span></label>
+          <input type="text" id="calp-nombre" placeholder="Nombre del participante"></div>
+        <div class="field"><label>CURP</label>
+          <input type="text" id="calp-curp" maxlength="18" placeholder="18 caracteres"
+                 style="font-family:monospace;text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+        <div class="field"><label>Puesto</label><input type="text" id="calp-puesto"></div>
+        <div class="field"><label>Teléfono</label><input type="text" id="calp-telefono"></div>
+        <div style="font-size:11px;color:var(--texto-hint)">
+          El participante quedará como pendiente de aprobación, igual que los capturados por el inspector.
+        </div>
+      </div>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="calCerrarAgregarPart()">Cancelar</button>
+      <button class="btn-confirm" id="calp-btn" onclick="calGuardarParticipantes()">Agregar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL DETALLE DE INSPECCIÓN DE ARNESES ══ -->
 <div class="overlay" id="overlay-arn">
   <div class="modal" style="max-width:820px">
@@ -4128,6 +4170,138 @@ async function guardarCambiarCurso() {
   } catch(e) { alert('Error de conexión.'); }
 }
 
+
+/* ── Calidad: agregar participantes a una sesión ya cerrada ─────────────────
+   Siempre aparece alguien que llegó tarde o que se detecta después de que el
+   inspector cerró la sesión. Calidad puede sumarlo, ya sea copiando a alguien
+   que la empresa ya tiene registrado o capturándolo desde cero. El nuevo
+   registro entra como PENDIENTE, igual que los del inspector, para que pase
+   por la misma revisión. */
+let _calpSesion = null, _calpModo = 'existente', _calpDatos = [];
+
+async function calAbrirAgregarPart(idx, modo) {
+  const g = _calSesiones[idx];
+  if (!g || !g.participantes || !g.participantes.length) {
+    mostrarToast('La sesión no tiene datos para heredar el curso y la empresa.', 'err');
+    return;
+  }
+  _calpSesion = g;
+  _calpModo   = modo;
+
+  const base = g.participantes[0];
+  document.getElementById('calp-titulo').textContent =
+    modo === 'nuevo' ? 'Agregar participante nuevo' : 'Agregar participantes ya registrados';
+  document.getElementById('calp-sub').innerHTML =
+    `<strong>${escH(g.curso_nombre)}</strong> · ${escH(g.fecha_curso||'')}` +
+    (g.empresa ? ` · ${escH(g.empresa)}` : '');
+
+  document.getElementById('calp-existentes').style.display = modo === 'existente' ? '' : 'none';
+  document.getElementById('calp-nuevo').style.display      = modo === 'nuevo' ? '' : 'none';
+  document.getElementById('overlay-cal-part').classList.add('open');
+
+  if (modo === 'nuevo') {
+    ['calp-nombre','calp-curp','calp-puesto','calp-telefono'].forEach(id => document.getElementById(id).value = '');
+    return;
+  }
+
+  const cont = document.getElementById('calp-lista');
+  cont.innerHTML = '<div style="padding:14px;font-size:12px;color:var(--texto-hint)">Cargando…</div>';
+  try {
+    const empresa = g.empresa || base.empresa_nombre || '';
+    const url = `${API}?action=LISTAR_PARTICIPANTES_EMPRESA&empresa=${encodeURIComponent(empresa)}`
+              + `&curso_id=${encodeURIComponent(base.curso_id || '')}&fecha=${encodeURIComponent(g.fecha_curso || '')}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    _calpDatos = (d && d.participantes) ? d.participantes : [];
+  } catch(_) { _calpDatos = []; }
+  calpRender();
+}
+
+function calCerrarAgregarPart() { document.getElementById('overlay-cal-part').classList.remove('open'); }
+
+function calpRender() {
+  const cont = document.getElementById('calp-lista');
+  const f = (document.getElementById('calp-buscar').value || '').toLowerCase().trim();
+  const vis = _calpDatos.filter(p => !f ||
+    (p.nombre_completo||'').toLowerCase().includes(f) || (p.curp||'').toLowerCase().includes(f));
+  if (!_calpDatos.length) {
+    cont.innerHTML = '<div style="padding:18px;text-align:center;font-size:12px;color:var(--texto-hint)">No hay participantes previos de esta empresa disponibles para este curso.</div>';
+    return;
+  }
+  if (!vis.length) {
+    cont.innerHTML = '<div style="padding:18px;text-align:center;font-size:12px;color:var(--texto-hint)">Ninguno coincide con la búsqueda.</div>';
+    return;
+  }
+  cont.innerHTML = vis.map(p => `
+    <label style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--borde);cursor:pointer">
+      <input type="checkbox" class="calp-chk" value="${p.id}" style="width:15px;height:15px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--texto)">${escH(p.nombre_completo)}</div>
+        <div style="font-size:11px;color:var(--texto-sub)">${p.curp ? escH(p.curp)+' · ' : ''}${escH(p.puesto||'Sin puesto')}${p.cursos_tomados ? ' · '+p.cursos_tomados+' curso(s)' : ''}</div>
+      </div>
+      ${p.foto_documentacion_url ? '<span title="Tiene identificación">🪪</span>' : ''}
+    </label>`).join('');
+}
+function calpFiltrar() { calpRender(); }
+function calpMarcar(v) { document.querySelectorAll('.calp-chk').forEach(c => c.checked = v); }
+
+async function calGuardarParticipantes() {
+  if (!_calpSesion) return;
+  const g = _calpSesion, base = g.participantes[0];
+  const btn = document.getElementById('calp-btn');
+
+  // Datos que hereda de la sesión para que el nuevo registro quede igual
+  const comun = {
+    curso_id: base.curso_id, fecha_curso: g.fecha_curso,
+    empresa_nombre: g.empresa || base.empresa_nombre || '',
+    empresa_rfc: base.empresa_rfc || '',
+    empresa_representante: base.empresa_representante || '',
+    empresa_direccion: base.empresa_direccion || '',
+  };
+
+  let aEnviar = [];
+  if (_calpModo === 'nuevo') {
+    const nombre = document.getElementById('calp-nombre').value.trim();
+    if (!nombre) { mostrarToast('El nombre es obligatorio.', 'err'); return; }
+    const curp = document.getElementById('calp-curp').value.trim().toUpperCase();
+    if (curp) {
+      const v = validarCURPCompleta(curp);
+      if (!v.valida) { mostrarToast('CURP inválida: ' + v.error, 'err'); return; }
+    }
+    aEnviar = [{ ...comun, nombre_completo: nombre, curp,
+                 puesto: document.getElementById('calp-puesto').value.trim(),
+                 telefono: document.getElementById('calp-telefono').value.trim() }];
+  } else {
+    const ids = Array.from(document.querySelectorAll('.calp-chk:checked')).map(c => +c.value);
+    if (!ids.length) { mostrarToast('Selecciona al menos un participante.', 'err'); return; }
+    aEnviar = ids.map(id => {
+      const p = _calpDatos.find(x => x.id === id);
+      return p ? { ...comun, nombre_completo: p.nombre_completo, curp: p.curp, puesto: p.puesto,
+                   ocupacion_id: p.ocupacion_id, capacidad: p.capacidad, capacidad_na: p.capacidad_na,
+                   telefono: p.telefono,
+                   foto_documentacion_url: p.foto_documentacion_url,
+                   foto_persona_url: p.foto_persona_url } : null;
+    }).filter(Boolean);
+  }
+
+  btn.disabled = true;
+  let ok = 0; const fallos = [];
+  for (let i = 0; i < aEnviar.length; i++) {
+    btn.textContent = `Agregando ${i+1} de ${aEnviar.length}…`;
+    try {
+      const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'GUARDAR_PARTICIPANTE', payload: aEnviar[i] }) });
+      const d = await r.json();
+      if (d.status === 'success') ok++; else fallos.push(`${aEnviar[i].nombre_completo}: ${d.message||'error'}`);
+    } catch(_) { fallos.push(`${aEnviar[i].nombre_completo}: error de conexión`); }
+  }
+  btn.disabled = false; btn.textContent = 'Agregar';
+  calCerrarAgregarPart();
+  mostrarToast(`${ok} participante(s) agregado(s) a la sesión.`, ok ? 'ok' : 'err');
+  if (fallos.length) alert('No se pudieron agregar:\n\n• ' + fallos.join('\n• '));
+  if (ok) cargarPersonal();
+}
+
 function abrirSesionParticipantes(idx) {
   const g = _calSesiones[idx];
   if (!g) return;
@@ -4148,7 +4322,21 @@ function abrirSesionParticipantes(idx) {
       </button>
     </div>` : '';
 
-  document.getElementById('per-det-body').innerHTML = aproBarHtml +
+  // Calidad puede sumar participantes aunque la sesión ya se haya cerrado:
+  // siempre aparece alguien que llegó tarde o que se detecta despues.
+  const addBar = `
+    <div style="padding:8px 0 12px;border-bottom:1px solid var(--borde);margin-bottom:6px;display:flex;gap:8px;flex-wrap:wrap">
+      <button onclick="calAbrirAgregarPart(${idx}, 'existente')"
+        style="flex:1;min-width:150px;padding:8px 12px;background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">
+        👥 Agregar ya registrados
+      </button>
+      <button onclick="calAbrirAgregarPart(${idx}, 'nuevo')"
+        style="flex:1;min-width:150px;padding:8px 12px;background:var(--azul-light);border:1px solid var(--azul);color:var(--azul-dark);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer">
+        ＋ Agregar nuevo
+      </button>
+    </div>`;
+
+  document.getElementById('per-det-body').innerHTML = addBar + aproBarHtml +
     g.participantes.map(p => {
       const pend = !p.estatus || p.estatus==='PENDIENTE' || p.estatus==='DEVUELTO';
       return `
