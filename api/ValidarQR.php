@@ -28,6 +28,9 @@ class ValidarQR {
         $result = $this->buscarAccesorio($qrBuscado, $esFolio);
         if ($result) return $result;
 
+        $result = $this->buscarArnes($qrBuscado, $esFolio);
+        if ($result) return $result;
+
         $result = $this->buscarPersonal($qrBuscado, $esFolio);
         if ($result) return $result;
 
@@ -179,6 +182,108 @@ class ValidarQR {
                     'items'       => $items,
                     'fecha'       => $sesion['fecha']
                         ? (new DateTime($sesion['fecha']))->format('d/m/Y') : '',
+                    'vencimiento' => $v['vencimiento'],
+                ],
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    // ── Arneses y líneas de vida ───────────────────────────
+    // Se busca primero por el QR de la PIEZA (cada una lleva su certificado)
+    // y, si no, por el folio o el QR de la inspección completa.
+    private function buscarArnes(string $q, bool $esFolio): ?array {
+        try {
+            if (!$esFolio) {
+                $stmt = $this->pdo->prepare(
+                    "SELECT i.id_arnes, i.marca, i.modelo, i.serie, i.talla, i.norma,
+                            i.resultado, i.observaciones,
+                            DATE_FORMAT(i.vigencia,'%d/%m/%Y')          AS vigencia,
+                            DATE_FORMAT(i.fecha_retiro,'%d/%m/%Y')      AS retiro,
+                            DATE_FORMAT(i.fecha_fabricacion,'%d/%m/%Y') AS fabricacion,
+                            COALESCE(t.nombre,'') AS tipo_nombre,
+                            s.cliente, s.fecha, s.estatus
+                     FROM arneses_items i
+                     JOIN arneses_sesiones s ON s.id = i.sesion_id
+                     LEFT JOIN arneses_tipos t ON t.id = i.tipo_id
+                     WHERE i.qr_codigo = ? AND s.estatus IN ('APROBADO_CALIDAD','EMITIDO') LIMIT 1"
+                );
+                $stmt->execute([$q]);
+                $it = $stmt->fetch();
+                if ($it) {
+                    // La vigencia de la pieza manda: un arnes caduca por su
+                    // fecha de retiro aunque la inspeccion sea reciente.
+                    $vig = calcularVigencia($it['fecha']);
+                    $vigente = $vig['vigente'] && $it['resultado'] !== 'NO APTO';
+                    return [
+                        'status'  => 'ok',
+                        'existe'  => true,
+                        'modulo'  => 'arnes',
+                        'vigente' => $vigente,
+                        'dias'    => $vig['dias'],
+                        'datos'   => [
+                            'titulo'       => 'Equipo de Protección contra Caídas',
+                            'tipo'         => $it['tipo_nombre'] ?: 'Arnés / Línea de vida',
+                            'id_arnes'     => $it['id_arnes'] ?? '',
+                            'marca'        => trim(($it['marca'] ?? '') . ' ' . ($it['modelo'] ?? '')),
+                            'serie'        => $it['serie'] ?? '',
+                            'talla'        => $it['talla'] ?? '',
+                            'norma'        => $it['norma'] ?: 'NOM-009-STPS-2011',
+                            'resultado'    => $it['resultado'],
+                            'cliente'      => $it['cliente'],
+                            'fabricacion'  => $it['fabricacion'] ?? '',
+                            'retiro'       => $it['retiro'] ?? '',
+                            'fecha'        => $it['fecha'] ? (new DateTime($it['fecha']))->format('d/m/Y') : '',
+                            'vencimiento'  => $it['vigencia'] ?: $vig['vencimiento'],
+                            'observaciones'=> $it['observaciones'] ?? '',
+                        ],
+                    ];
+                }
+            }
+
+            // Inspección completa (folio o QR de la sesión)
+            $campo = $esFolio ? 'control' : 'qr_codigo';
+            $stmt = $this->pdo->prepare(
+                "SELECT id, cliente, fecha, estatus FROM arneses_sesiones
+                 WHERE {$campo} = ? AND estatus IN ('APROBADO_CALIDAD','EMITIDO') LIMIT 1"
+            );
+            $stmt->execute([$q]);
+            $ses = $stmt->fetch();
+            if (!$ses) return null;
+
+            $st = $this->pdo->prepare(
+                "SELECT i.serie, i.marca, i.modelo, i.resultado,
+                        DATE_FORMAT(i.fecha_retiro,'%d/%m/%Y') AS retiro,
+                        COALESCE(t.nombre,'') AS tipo_nombre
+                 FROM arneses_items i
+                 LEFT JOIN arneses_tipos t ON t.id = i.tipo_id
+                 WHERE i.sesion_id = ? ORDER BY i.orden, i.id"
+            );
+            $st->execute([$ses['id']]);
+            $items = array_map(fn($r) => [
+                'tipo'      => $r['tipo_nombre'] ?: 'Equipo contra caídas',
+                'marca'     => trim(($r['marca'] ?? '') . ' ' . ($r['modelo'] ?? '')),
+                'serie'     => $r['serie'] ?? '',
+                'resultado' => $r['resultado'],
+                'retiro'    => $r['retiro'] ?? '',
+            ], $st->fetchAll());
+
+            $v = calcularVigencia($ses['fecha']);
+            return [
+                'status'  => 'ok',
+                'existe'  => true,
+                'modulo'  => 'arnes',
+                'vigente' => $v['vigente'],
+                'dias'    => $v['dias'],
+                'datos'   => [
+                    'titulo'      => 'Inspección de Equipo contra Caídas',
+                    'tipo'        => $items[0]['tipo'] ?? 'Equipo contra caídas',
+                    'cliente'     => $ses['cliente'],
+                    'total'       => count($items),
+                    'items'       => $items,
+                    'norma'       => 'NOM-009-STPS-2011',
+                    'fecha'       => $ses['fecha'] ? (new DateTime($ses['fecha']))->format('d/m/Y') : '',
                     'vencimiento' => $v['vencimiento'],
                 ],
             ];

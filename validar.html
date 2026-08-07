@@ -874,6 +874,45 @@ function mostrarResultado(data) {
         d.vencimiento ? filaHTML("Válido hasta", d.vencimiento) : "",
       ].join('');
     }
+    if (modulo === 'arnes') {
+      const items = Array.isArray(d.items) ? d.items : [];
+      // Inspección completa: se listan todas las piezas
+      if (items.length) {
+        const comun = [
+          d.cliente ? filaHTML("Cliente", d.cliente) : "",
+          filaHTML("Total de equipos", d.total || items.length),
+          d.norma ? filaHTML("Norma", d.norma) : "",
+          filaHTML("Inspeccionado el", d.fecha||"—"),
+          d.vencimiento ? filaHTML("Válido hasta", d.vencimiento) : "",
+        ].join('');
+        const lista = items.map((it, i) => `
+          <div class="acc-item">
+            <div class="acc-item-hdr">Equipo ${i+1} de ${items.length}</div>
+            ${filaHTML("Tipo", it.tipo||"—")}
+            ${it.marca ? filaHTML("Marca / Modelo", it.marca) : ""}
+            ${it.serie ? filaHTML("No. de serie", it.serie) : ""}
+            ${it.retiro ? filaHTML("Retiro obligatorio", it.retiro) : ""}
+            ${filaHTML("Resultado", it.resultado||"—")}
+          </div>`).join('');
+        return comun + `<div class="acc-lista">${lista}</div>`;
+      }
+      // Pieza individual
+      return [
+        filaHTML("Tipo de equipo", d.tipo||"—"),
+        d.id_arnes ? filaHTML("ID / Etiqueta", d.id_arnes) : "",
+        d.marca    ? filaHTML("Marca / Modelo", d.marca)   : "",
+        d.serie    ? filaHTML("No. de serie",   d.serie)   : "",
+        d.talla    ? filaHTML("Talla",          d.talla)   : "",
+        d.norma    ? filaHTML("Norma",          d.norma)   : "",
+        d.resultado? filaHTML("Resultado",      d.resultado): "",
+        d.cliente  ? filaHTML("Cliente",        d.cliente) : "",
+        d.fabricacion ? filaHTML("Fabricación", d.fabricacion) : "",
+        d.retiro   ? filaHTML("Retiro obligatorio", d.retiro) : "",
+        filaHTML("Inspeccionado el", d.fecha||"—"),
+        d.vencimiento ? filaHTML("Válido hasta", d.vencimiento) : "",
+        d.observaciones ? filaHTML("Observaciones", d.observaciones) : "",
+      ].join('');
+    }
     if (modulo === 'accesorio') {
       const items = Array.isArray(d.items) ? d.items : [];
       // Si hay lista de accesorios, mostrarlos TODOS

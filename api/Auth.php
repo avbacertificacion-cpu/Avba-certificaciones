@@ -715,6 +715,66 @@ class Auth {
             }
         } catch (\PDOException $e) { /* tabla o columna aún no existe */ }
 
+        // ── Arneses y líneas de vida ──────────────────────
+        // Cada pieza lleva su propio certificado, así que se devuelven las
+        // piezas además del dictamen que ampara la inspección completa.
+        $arneses = [];
+        try {
+            $stmt = $this->pdo->prepare(
+                "SELECT s.id, s.cliente, s.control, s.qr_codigo, s.dictamen_url,
+                        DATE_FORMAT(s.fecha, '%d/%m/%Y') AS fecha,
+                        COUNT(i.id)                       AS total,
+                        SUM(i.resultado = 'APTO')         AS aptos,
+                        SUM(i.resultado = 'NO APTO')      AS no_aptos
+                 FROM arneses_sesiones s
+                 LEFT JOIN arneses_items i ON i.sesion_id = s.id
+                 WHERE s.control LIKE ? AND s.estatus = 'EMITIDO'
+                 GROUP BY s.id, s.cliente, s.control, s.qr_codigo, s.dictamen_url, s.fecha
+                 ORDER BY s.fecha DESC"
+            );
+            $stmt->execute([$like]);
+            $sesionesArn = $stmt->fetchAll();
+
+            $stPiezas = $this->pdo->prepare(
+                "SELECT i.id, i.id_arnes, i.marca, i.modelo, i.serie, i.resultado,
+                        i.qr_codigo, i.cert_url,
+                        DATE_FORMAT(i.vigencia,'%d/%m/%Y')     AS vigencia,
+                        DATE_FORMAT(i.fecha_retiro,'%d/%m/%Y') AS retiro,
+                        COALESCE(t.nombre,'') AS tipo_nombre
+                 FROM arneses_items i
+                 LEFT JOIN arneses_tipos t ON t.id = i.tipo_id
+                 WHERE i.sesion_id = ? ORDER BY i.orden, i.id"
+            );
+            foreach ($sesionesArn as $r) {
+                if (!$nombreCliente) $nombreCliente = $r['cliente'];
+                $stPiezas->execute([$r['id']]);
+                $piezas = array_map(fn($p) => [
+                    'id'        => (int)$p['id'],
+                    'tipo'      => $p['tipo_nombre'],
+                    'id_arnes'  => $p['id_arnes'] ?? '',
+                    'marca'     => trim(($p['marca'] ?? '') . ' ' . ($p['modelo'] ?? '')),
+                    'serie'     => $p['serie'] ?? '',
+                    'resultado' => $p['resultado'],
+                    'vigencia'  => $p['vigencia'] ?? '',
+                    'retiro'    => $p['retiro'] ?? '',
+                    'cert_url'  => $p['cert_url'] ?? '',
+                    'qr_url'    => $p['qr_codigo'] ? urlQR($p['qr_codigo']) : '',
+                ], $stPiezas->fetchAll());
+
+                $arneses[] = [
+                    'id'           => (int)$r['id'],
+                    'folio'        => $r['control'],
+                    'fecha'        => $r['fecha'],
+                    'total'        => (int)$r['total'],
+                    'aptos'        => (int)$r['aptos'],
+                    'no_aptos'     => (int)$r['no_aptos'],
+                    'qr_url'       => $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '',
+                    'dictamen_url' => $r['dictamen_url'] ?? '',
+                    'piezas'       => $piezas,
+                ];
+            }
+        } catch (\PDOException $e) { /* el módulo aún no se ha usado */ }
+
         // ── Personal (cursos) ─────────────────────────────
         $personal = [];
         try {
@@ -781,6 +841,7 @@ class Auth {
             $accesorios = [];
             $personal   = [];
             $pnd        = [];
+            $arneses    = [];
         }
 
         return [
@@ -788,6 +849,7 @@ class Auth {
             'nombre_cliente' => $nombreCliente,
             'equipos'        => $equipos,
             'accesorios'     => $accesorios,
+            'arneses'        => $arneses,
             'personal'       => $personal,
             'pnd'            => $pnd,
         ];

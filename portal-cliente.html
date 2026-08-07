@@ -409,6 +409,7 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
       <div class="tab-card-body">
         <button class="tab-btn active" id="tabbtn-maq" onclick="verTab('maq',this)">🔧 Maquinaria</button>
         <button class="tab-btn" id="tabbtn-acc" onclick="verTab('acc',this)">🔗 Accesorios de Izaje</button>
+        <button class="tab-btn" id="tabbtn-arn" onclick="verTab('arn',this)">🦺 Arneses y Líneas de Vida</button>
         <button class="tab-btn" id="tabbtn-per" onclick="verTab('per',this)">👷 Personal</button>
         <button class="tab-btn" id="tabbtn-pnd" onclick="verTab('pnd',this)">🔬 PND</button>
       </div>
@@ -441,6 +442,10 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
   <div id="tab-maq" class="tab-panel active">
     <div class="loading" id="maq-load"><span class="spin"></span><p style="margin-top:10px;font-size:13px">Cargando...</p></div>
     <div id="maq-cont" style="display:none"></div>
+  </div>
+
+  <div id="tab-arn" class="tab-panel">
+    <div id="arn-cont"><div class="loading"><span class="spin"></span></div></div>
   </div>
 
   <div id="tab-acc" class="tab-panel">
@@ -1711,6 +1716,51 @@ function renderMaquinaria(data) {
 
 // ── Render Accesorios ──────────────────────────────────────────────────────
 // PHP retorna: id, folio, fecha, total, cumple, no_cumple, qr_url, cert_url, informe_url, informe_cumple_url
+
+// ── Arneses y líneas de vida ───────────────────────────────────────────────
+// Cada pieza tiene su propio certificado, así que además del dictamen del
+// lote se listan las piezas con su vigencia y su documento individual.
+function renderArneses(data) {
+  const cont = document.getElementById('arn-cont');
+  if (!cont) return;
+  if (!data || !data.length) {
+    cont.innerHTML = '<div class="empty"><div class="empty-t">Sin inspecciones registradas</div><div class="empty-s">Aquí aparecerán tus arneses y líneas de vida inspeccionados.</div></div>';
+    return;
+  }
+  const colorRes = r => r === 'APTO' ? 'var(--verde)' : (r === 'NO APTO' ? '#ef4444' : '#f59e0b');
+  let html = '<div class="acc-grid">';
+  data.forEach(ses => {
+    const folio = ses.folio ? 'AB.' + ses.folio + '-' + new Date().getFullYear() + 'MX' : '—';
+    const dictBtn = ses.dictamen_url
+      ? `<a class="btn-doc btn-rep" href="${escH(ses.dictamen_url)}" target="_blank">📄 Dictamen</a>`
+      : `<span class="btn-doc btn-rep dis">📄 Dictamen</span>`;
+    const qrBtn = ses.qr_url
+      ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(ses.qr_url)}')">🔗 QR</button>`
+      : `<span class="btn-doc btn-qr dis">🔗 QR</span>`;
+    const piezas = (ses.piezas || []).map(pz => `
+      <div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid var(--borde)">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--texto);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escQ(pz.tipo || 'Equipo')}</div>
+          <div style="font-size:11px;color:var(--texto-hint)">${escQ([pz.marca, pz.serie].filter(Boolean).join(' · ') || 'Sin serie')}${pz.retiro ? ' · Retiro ' + escQ(pz.retiro) : ''}</div>
+        </div>
+        <span style="font-size:10px;font-weight:700;color:${colorRes(pz.resultado)}">${escQ(pz.resultado || '')}</span>
+        ${pz.cert_url ? `<a class="btn-doc btn-cert" style="padding:3px 8px;font-size:10px" href="${escH(pz.cert_url)}" target="_blank">📄</a>` : ''}
+      </div>`).join('');
+    html += `<div class="acc-card">
+      <div class="acc-folio">${folio}</div>
+      <div class="acc-fecha">${escQ(ses.fecha || '—')}</div>
+      <div style="font-size:12px;color:var(--texto-sub);margin-bottom:10px">${ses.total || 0} equipo${ses.total!==1?'s':''} inspeccionado${ses.total!==1?'s':''}</div>
+      <div class="acc-badges" style="margin-bottom:10px">
+        ${ses.aptos    ? `<span class="badge b-cumple">✔ ${ses.aptos} APTO${ses.aptos!==1?'S':''}</span>` : ''}
+        ${ses.no_aptos ? `<span class="badge b-nocumple">✖ ${ses.no_aptos} NO APTO${ses.no_aptos!==1?'S':''}</span>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${dictBtn}${qrBtn}</div>
+      ${piezas}
+    </div>`;
+  });
+  cont.innerHTML = html + '</div>';
+}
+
 function renderAccesorios(data) {
   const cont = document.getElementById('acc-cont');
   if (!data || !data.length) {
@@ -4641,6 +4691,7 @@ async function cargarDatos() {
     document.getElementById('hdr-nombre').textContent = _sesion.nombre || json.nombre_cliente || '—';
     renderMaquinaria(json.equipos    || []);
     renderAccesorios(json.accesorios || []);
+    try { renderArneses(json.arneses || []); } catch(_) {}
     renderPersonal(json.personal     || []);
     renderPND(json.pnd               || []);
   } catch(e) {
