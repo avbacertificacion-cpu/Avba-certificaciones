@@ -1923,10 +1923,25 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($arneses->aprobarSesion($payload, $usr['usuario']));
 
-        case 'DEVOLVER_SESION_ARNES':
+        case 'DEVOLVER_SESION_ARNES':   // Calidad → Inspector
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->devolverSesion($payload, $usr['usuario']));
+
+        case 'RETORNAR_SESION_ARNES':   // Certificaciones → Calidad
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->retornarSesion($payload, $usr['usuario']));
+
+        case 'GUARDAR_DATOS_SESION_ARNES':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($arneses->devolverSesion($payload, $usr['usuario']));
+            respuesta($arneses->guardarDatosSesion($payload, $usr['usuario']));
+
+        case 'SUBIR_DOC_MANUAL_ARNES':  // multipart
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->subirDocumentoManual($_POST, $_FILES['archivo'] ?? []));
 
         case 'ELIMINAR_SESION_ARNES':
             $usr = validarToken($pdo, $token);
@@ -1961,7 +1976,7 @@ if ($method === 'POST') {
         case 'EMITIR_SESION_ARNES':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($arneses->emitirSesion((int)($payload['id'] ?? 0)));
+            respuesta($arneses->emitirSesion($payload, $usr['usuario']));
 
         // ── RH / Asistencia del cliente ──────────────────────────
         case 'RH_GUARDAR_POLITICAS':

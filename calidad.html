@@ -6380,7 +6380,8 @@ function _arnBadge(est) {
     'PENDIENTE':        ['#92400e','#fff8e1','Pendiente'],
     'APROBADO_CALIDAD': ['#0C447C','#E6F1FB','Aprobado'],
     'EMITIDO':          ['#1b7a3d','#e8f5e9','Emitido'],
-    'DEVUELTO':         ['#b91c1c','#fdecea','Devuelto'],
+    'DEVUELTO':         ['#b91c1c','#fdecea','Devuelto al inspector'],
+    'RETORNADO':        ['#92400e','#fff3e0','Retornado por Certificaciones'],
   }[est] || ['#5a6072','#f0f0f0', est || '—'];
   return `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;background:${m[1]};color:${m[0]}">${m[2]}</span>`;
 }
@@ -6430,9 +6431,39 @@ function renderArnDet(d) {
   if (sub) sub.textContent = `${ses.fecha_fmt||''} · ${ses.direccion||'Sin ubicación'}`
                            + (ses.control ? ' · Folio ' + ses.control : '');
 
+  const bloqueado = !['PENDIENTE','DEVUELTO','RETORNADO',''].includes(ses.estatus || '');
+
   document.getElementById('arn-det-body').innerHTML = `
     <div style="font-size:12px;color:var(--texto-sub);margin-bottom:12px">
       ${_arnBadge(ses.estatus)}
+    </div>
+    ${ses.motivo ? `<div style="background:#fdecea;border:1px solid var(--rojo);border-radius:8px;padding:10px;font-size:12px;color:#b91c1c;margin-bottom:12px">
+       <strong>Motivo del retorno:</strong> ${escH(ses.motivo)}
+     </div>` : ''}
+    <!-- Datos del expediente: Calidad los corrige antes de aprobar, igual que
+         en grúas (incluye el inspector que firma el dictamen). -->
+    <div style="border:1px solid var(--borde);border-radius:10px;padding:12px;margin-bottom:12px;background:#fafbfc">
+      <div style="font-size:12px;font-weight:700;color:var(--texto);margin-bottom:8px">Datos del expediente</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
+        <label style="font-size:11px;color:var(--texto-sub)">Cliente
+          <input type="text" id="arn-ed-cliente" value="${escH(ses.cliente||'')}" ${bloqueado?'disabled':''}
+                 style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Fecha de inspección
+          <input type="date" id="arn-ed-fecha" value="${escH(ses.fecha||'')}" ${bloqueado?'disabled':''}
+                 style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Correo del cliente (para el envío)
+          <input type="text" id="arn-ed-correo" value="${escH(ses.correo||'')}" placeholder="correo@empresa.com"
+                 style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Inspector que firma
+          <input type="text" id="arn-ed-inspector" value="${escH(ses.inspector_firma||ses.usuario||'')}"
+                 style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+        <label style="font-size:11px;color:var(--texto-sub);grid-column:1/-1">Lugar de la inspección
+          <input type="text" id="arn-ed-direccion" value="${escH(ses.direccion||'')}" ${bloqueado?'disabled':''}
+                 style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+      </div>
+      <button onclick="guardarDatosArn(${ses.id})"
+              style="margin-top:9px;padding:6px 14px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">
+        Guardar datos</button>
     </div>
     ${sinQR ? `<div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:10px;font-size:12px;color:#92400e;margin-bottom:12px">
        ⚠ ${sinQR} pieza(s) sin código QR. Cada pieza lleva certificado propio, así que necesita su QR antes de aprobar.
@@ -6465,12 +6496,43 @@ function renderArnDet(d) {
       </div>`).join('') || '<div style="color:var(--texto-hint)">Sin piezas registradas.</div>'}
   `;
 
-  const puedeAprobar = ['PENDIENTE','DEVUELTO',''].includes(ses.estatus || '');
+  // RETORNADO entra aquí igual que en grúas: Certificaciones lo regresó y
+  // vuelve a ser aprobable conservando su QR.
+  const puedeAprobar = ['PENDIENTE','DEVUELTO','RETORNADO',''].includes(ses.estatus || '');
   document.getElementById('arn-det-footer').innerHTML = `
     <button class="btn-sec" onclick="cerrarArnDet()">Cerrar</button>
+    ${puedeAprobar ? `<button class="btn-sec" style="color:var(--rojo);border-color:var(--rojo)" onclick="devolverArn(${ses.id})">↩ Devolver al inspector</button>` : ''}
     ${puedeAprobar ? `<button class="btn-guardar" onclick="aprobarArn(${ses.id})">✓ Aprobar → Certificaciones</button>` : ''}
-    ${ses.estatus === 'APROBADO_CALIDAD' ? `<button class="btn-sec" onclick="emitirArn(${ses.id})">📄 Emitir documentos</button>` : ''}
+    ${ses.estatus === 'APROBADO_CALIDAD' ? '<span style="font-size:11px;color:var(--texto-hint);align-self:center">En Certificaciones para emisión y envío.</span>' : ''}
   `;
+}
+
+async function guardarDatosArn(id) {
+  const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ''; };
+  const payload = { id, correo: val('arn-ed-correo'), inspector_firma: val('arn-ed-inspector') };
+  ['cliente','fecha','direccion'].forEach(c => {
+    const el = document.getElementById('arn-ed-' + c);
+    if (el && !el.disabled) payload[c] = el.value.trim();
+  });
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'GUARDAR_DATOS_SESION_ARNES', payload }) });
+    const d = await r.json();
+    if (d.status === 'success') { mostrarToast(d.message || 'Datos guardados.', 'ok'); abrirArnDet(id); cargarSesionesArn(); }
+    else mostrarToast(d.message || 'No se pudo guardar.', 'err');
+  } catch(_) { mostrarToast('Error de red.', 'err'); }
+}
+
+async function devolverArn(id) {
+  const motivo = prompt('Motivo de la devolución al inspector:');
+  if (motivo === null) return;
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'DEVOLVER_SESION_ARNES', payload:{ id, motivo } }) });
+    const d = await r.json();
+    if (d.status === 'success') { mostrarToast('Devuelta al inspector.', 'ok'); cerrarArnDet(); cargarSesionesArn(); }
+    else mostrarToast(d.message || 'No se pudo devolver.', 'err');
+  } catch(_) { mostrarToast('Error de red.', 'err'); }
 }
 
 function cerrarArnDet() { document.getElementById('overlay-arn').style.display = 'none'; }
@@ -6499,21 +6561,8 @@ async function aprobarArn(id) {
   } catch(_) { mostrarToast('Error de red.', 'err'); }
 }
 
-async function emitirArn(id) {
-  if (!confirm('¿Emitir el dictamen del lote y el certificado de cada pieza apta?')) return;
-  mostrarToast('Generando documentos…', 'info');
-  try {
-    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'EMITIR_SESION_ARNES', payload:{ id } }) });
-    const d = await r.json();
-    if (d.status === 'success') {
-      mostrarToast(d.message || 'Documentos emitidos.', 'ok');
-      if (d.dictamen) window.open(d.dictamen, '_blank');
-      if (d.errores && d.errores.length) alert('Algunas piezas no generaron certificado:\n\n' + d.errores.join('\n'));
-      cerrarArnDet(); cargarSesionesArn();
-    } else mostrarToast(d.message || 'No se pudo emitir.', 'err');
-  } catch(_) { mostrarToast('Error de red.', 'err'); }
-}
+/* La emisión y el envío corresponden a Certificaciones, igual que en grúas:
+   Calidad aprueba y el expediente pasa al siguiente departamento. */
 
 async function cargarInfoQR() {
   const filtro = document.getElementById('qr-filtro')?.value || 'todos';

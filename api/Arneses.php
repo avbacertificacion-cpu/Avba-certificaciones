@@ -15,8 +15,16 @@
  * Una inspección individual es simplemente una sesión con una sola pieza, así
  * que el mismo modelo cubre el trabajo por lote y el de una pieza suelta.
  *
- * Estados de la sesión: PENDIENTE → APROBADO_CALIDAD → EMITIDO, con DEVUELTO
- * como rama lateral (vuelve a ser aprobable).
+ * El recorrido entre departamentos es el mismo que el de grúas:
+ *
+ *   Inspector captura (PENDIENTE)
+ *     → Calidad revisa: aprueba con folio y QR (APROBADO_CALIDAD)
+ *                       o devuelve al inspector (DEVUELTO)
+ *     → Certificaciones emite documentos y los publica/envía (EMITIDO)
+ *                       o retorna el expediente a Calidad (RETORNADO)
+ *
+ * Igual que en grúas, RETORNADO conserva el QR reservado y vuelve a ser
+ * aprobable, mientras que DEVUELTO regresa la captura al inspector.
  */
 class Arneses {
     private PDO $pdo;
@@ -121,6 +129,18 @@ class Arneses {
             ");
             // Al pasar la norma a seleccion multiple hace falta mas espacio
             try { $this->pdo->exec("ALTER TABLE arneses_items MODIFY norma VARCHAR(400) NULL"); } catch (\Throwable $e) {}
+
+            // Columnas que alinean el flujo con el de grúas (envío por correo,
+            // sustitución manual de documentos e inspector firmante).
+            foreach ([
+                "ALTER TABLE arneses_sesiones ADD COLUMN correo VARCHAR(300) NULL",
+                "ALTER TABLE arneses_sesiones ADD COLUMN inspector_firma VARCHAR(150) NULL",
+                "ALTER TABLE arneses_sesiones ADD COLUMN dictamen_manual_url VARCHAR(500) NULL",
+                "ALTER TABLE arneses_sesiones ADD COLUMN fecha_enviado DATETIME NULL",
+                "ALTER TABLE arneses_items ADD COLUMN cert_manual_url VARCHAR(500) NULL",
+            ] as $sql) {
+                try { $this->pdo->exec($sql); } catch (\Throwable $e) {}
+            }
             $this->seedCatalogo();
         } catch (\PDOException $e) {
             error_log('[Arneses] migrate: ' . $e->getMessage());
@@ -271,12 +291,13 @@ class Arneses {
         $fecha = trim((string)($p['fecha'] ?? '')) ?: date('Y-m-d');
 
         $this->pdo->prepare("
-            INSERT INTO arneses_sesiones (cliente, fecha, coordenadas, direccion, usuario, estatus)
-            VALUES (?,?,?,?,?, 'PENDIENTE')
+            INSERT INTO arneses_sesiones (cliente, fecha, coordenadas, direccion, correo, usuario, estatus)
+            VALUES (?,?,?,?,?,?, 'PENDIENTE')
         ")->execute([
             mb_strtoupper($cliente), date('Y-m-d', strtotime(str_replace('/', '-', $fecha))),
             trim((string)($p['coordenadas'] ?? '')) ?: null,
             trim((string)($p['direccion'] ?? '')) ?: null,
+            trim((string)($p['correo'] ?? '')) ?: null,
             $usuario,
         ]);
         return ['status' => 'success', 'sesion_id' => (int)$this->pdo->lastInsertId()];
@@ -439,6 +460,8 @@ class Arneses {
     public function listarSesiones(string $estatus = ''): array {
         $sql = "SELECT s.id, s.cliente, DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha, s.direccion,
                        s.control, s.estatus, s.usuario, s.qr_codigo, s.dictamen_url,
+                       s.dictamen_manual_url, s.correo, s.inspector_firma, s.motivo,
+                       DATE_FORMAT(s.fecha_enviado,'%d/%m/%Y %H:%i') AS fecha_enviado,
                        (SELECT COUNT(*) FROM arneses_items i WHERE i.sesion_id = s.id) AS total,
                        (SELECT COUNT(*) FROM arneses_items i WHERE i.sesion_id = s.id AND i.resultado = 'APTO') AS aptos,
                        (SELECT COUNT(*) FROM arneses_items i WHERE i.sesion_id = s.id AND i.resultado = 'NO APTO') AS no_aptos
@@ -557,7 +580,9 @@ class Arneses {
         $s->execute([$id]);
         $ses = $s->fetch(PDO::FETCH_ASSOC);
         if (!$ses) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
-        if (!in_array($ses['estatus'], ['PENDIENTE', 'DEVUELTO', ''], true)) {
+        // RETORNADO entra aquí igual que en grúas: Certificaciones lo regresó a
+        // Calidad, conserva su QR y vuelve a ser aprobable sin recapturar.
+        if (!in_array($ses['estatus'], ['PENDIENTE', 'DEVUELTO', 'RETORNADO', ''], true)) {
             return ['status' => 'error', 'message' => 'Esta sesión ya fue aprobada.'];
         }
 
@@ -582,6 +607,7 @@ class Arneses {
         )->execute([$qr, $control, $id]);
 
         if (function_exists('qrRegistrarUsado')) qrRegistrarUsado($this->pdo, $qr, null);
+        $this->historial($usuario, $id, $ses['estatus'], 'APROBADO_CALIDAD');
 
         return ['status' => 'success', 'message' => 'Sesión aprobada y enviada a Certificaciones.', 'control' => $control];
     }
@@ -590,9 +616,96 @@ class Arneses {
         $id     = (int)($p['id'] ?? 0);
         $motivo = trim((string)($p['motivo'] ?? ''));
         if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+        $ant = $this->pdo->prepare("SELECT estatus FROM arneses_sesiones WHERE id = ?");
+        $ant->execute([$id]);
+        $anterior = (string)($ant->fetchColumn() ?: '');
         $this->pdo->prepare("UPDATE arneses_sesiones SET estatus='DEVUELTO', motivo=? WHERE id=?")
             ->execute([$motivo ?: null, $id]);
+        $this->historial($usuario, $id, $anterior, 'DEVUELTO');
         return ['status' => 'success', 'message' => 'Sesión devuelta para corrección.'];
+    }
+
+    /**
+     * Certificaciones regresa el expediente a Calidad. Equivale a
+     * `rechazarACertificacion` en grúas: borra los documentos emitidos para que
+     * no queden visibles en el portal del cliente, pero CONSERVA el QR
+     * reservado, de modo que al re-aprobar aparece precargado.
+     */
+    public function retornarSesion(array $p, string $usuario): array {
+        $id     = (int)($p['id'] ?? 0);
+        $motivo = trim((string)($p['motivo'] ?? ''));
+        if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+
+        $s = $this->pdo->prepare("SELECT estatus FROM arneses_sesiones WHERE id = ?");
+        $s->execute([$id]);
+        $anterior = $s->fetchColumn();
+        if ($anterior === false) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+
+        $this->pdo->prepare(
+            "UPDATE arneses_sesiones
+             SET estatus='RETORNADO', dictamen_url=NULL, dictamen_manual_url=NULL,
+                 fecha_enviado=NULL, motivo=?
+             WHERE id=?"
+        )->execute([$motivo ?: null, $id]);
+        $this->pdo->prepare("UPDATE arneses_items SET cert_url=NULL, cert_manual_url=NULL WHERE sesion_id=?")
+            ->execute([$id]);
+
+        $this->historial($usuario, $id, (string)$anterior, 'RETORNADO');
+        return ['status' => 'success', 'message' => 'Expediente retornado a Calidad.'];
+    }
+
+    /**
+     * Calidad corrige el encabezado de la sesión: cliente, fecha, lugar, correo
+     * de envío e inspector que firma (mismo criterio que en grúas, donde Calidad
+     * puede cambiar el inspector firmante de cada reporte).
+     */
+    public function guardarDatosSesion(array $p, string $usuario): array {
+        $id = (int)($p['id'] ?? 0);
+        if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+
+        $mapa = [
+            'cliente'         => fn($v) => mb_strtoupper(trim((string)$v)) ?: null,
+            'direccion'       => fn($v) => trim((string)$v) ?: null,
+            'correo'          => fn($v) => trim((string)$v) ?: null,
+            'inspector_firma' => fn($v) => trim((string)$v) ?: null,
+            'fecha'           => fn($v) => $this->fecha($v),
+        ];
+
+        $campos = []; $vals = [];
+        foreach ($mapa as $campo => $norm) {
+            if (!array_key_exists($campo, $p)) continue;
+            $campos[] = "$campo = ?";
+            $vals[]   = $norm($p[$campo]);
+        }
+        if (!$campos) return ['status' => 'success', 'message' => 'Sin cambios.'];
+
+        $correo = trim((string)($p['correo'] ?? ''));
+        if ($correo !== '') {
+            foreach (array_filter(array_map('trim', explode(',', $correo))) as $addr) {
+                if (!filter_var($addr, FILTER_VALIDATE_EMAIL)) {
+                    return ['status' => 'error', 'message' => "Correo inválido: $addr"];
+                }
+            }
+        }
+
+        $vals[] = $id;
+        $this->pdo->prepare("UPDATE arneses_sesiones SET " . implode(', ', $campos) . " WHERE id = ?")->execute($vals);
+        $this->historial($usuario, $id, null, 'datos actualizados');
+        return ['status' => 'success', 'message' => 'Datos de la inspección actualizados.'];
+    }
+
+    /**
+     * Anota el cambio en historial_general. `equipo_id` queda en NULL porque esa
+     * columna referencia la tabla `equipos` (grúas) y un id de sesión de arneses
+     * apuntaría a un equipo ajeno; la referencia va en el nombre del campo.
+     */
+    private function historial(string $usuario, int $sesionId, ?string $anterior, ?string $nuevo): void {
+        if (!function_exists('registrarHistorial')) return;
+        try {
+            registrarHistorial($this->pdo, $usuario, null, "arnes#$sesionId.estatus", $anterior ?: null, $nuevo);
+        } catch (\Throwable $e) {
+            error_log('[Arneses] historial: ' . $e->getMessage());
+        }
     }
 
     // ════════════════════════════════════════════════════════
@@ -725,7 +838,8 @@ class Arneses {
              </div>
              <table width="100%" style="margin-top:38px;font-size:8.5pt">
                <tr>
-                 <td width="50%" style="text-align:center;border-top:1px solid #999;padding-top:4px">Inspector</td>
+                 <td width="50%" style="text-align:center;border-top:1px solid #999;padding-top:4px">'
+                   . $this->esc($ses['inspector_firma'] ?: $ses['usuario'] ?: '') . '<br>Inspector</td>
                  <td width="10%"></td>
                  <td width="40%" style="text-align:center;border-top:1px solid #999;padding-top:4px">Firma del cliente</td>
                </tr>
@@ -826,38 +940,256 @@ class Arneses {
         return ['status' => 'success', 'url' => $abs];
     }
 
-    /** Emite todo: dictamen del lote + certificado de cada pieza apta. */
-    public function emitirSesion(int $sesionId): array {
+    /**
+     * Reemplaza manualmente el dictamen de la sesión o el certificado de una
+     * pieza. Igual que en grúas, el archivo subido sustituye al generado tanto
+     * en el portal del cliente como en el correo de envío.
+     * $p['tipo']: 'dict' (usa $p['id'] = sesión) | 'cert' (usa $p['item_id']).
+     */
+    public function subirDocumentoManual(array $p, array $file): array {
+        $tipo = ($p['tipo'] ?? '') === 'cert' ? 'cert' : 'dict';
+
+        if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+            return ['status' => 'error', 'message' => 'Selecciona un archivo PDF válido.'];
+        }
+        if (strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION)) !== 'pdf') {
+            return ['status' => 'error', 'message' => 'El documento debe ser un PDF.'];
+        }
+        if (($file['size'] ?? 0) > 20 * 1024 * 1024) {
+            return ['status' => 'error', 'message' => 'El PDF no debe superar 20 MB.'];
+        }
+
+        if ($tipo === 'cert') {
+            $itemId = (int)($p['item_id'] ?? 0);
+            if (!$itemId) return ['status' => 'error', 'message' => 'Pieza no indicada.'];
+            $s = $this->pdo->prepare(
+                "SELECT i.id, i.serie, se.control FROM arneses_items i
+                 JOIN arneses_sesiones se ON se.id = i.sesion_id WHERE i.id = ?"
+            );
+            $s->execute([$itemId]);
+            $row = $s->fetch(PDO::FETCH_ASSOC);
+            if (!$row) return ['status' => 'error', 'message' => 'Pieza no encontrada.'];
+            $folio = ($row['control'] ?: 'SF') . '-' . str_pad((string)$itemId, 4, '0', STR_PAD_LEFT);
+            $sufijo = 'CERT_ARN';
+        } else {
+            $sesionId = (int)($p['id'] ?? 0);
+            if (!$sesionId) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+            $s = $this->pdo->prepare("SELECT control FROM arneses_sesiones WHERE id = ?");
+            $s->execute([$sesionId]);
+            $control = $s->fetchColumn();
+            if ($control === false) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+            $folio  = $control ?: ('S' . $sesionId);
+            $sufijo = 'DICT_ARN';
+        }
+
+        $dir = UPLOAD_DIR . 'reportes/';
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        $nombre  = $sufijo . '_MANUAL_' . preg_replace('/[^A-Za-z0-9._-]/', '', (string)$folio) . '.pdf';
+        $destino = $dir . $nombre;
+        if (!move_uploaded_file($file['tmp_name'], $destino)) {
+            return ['status' => 'error', 'message' => 'No se pudo guardar el PDF.'];
+        }
+
+        $abs = rtrim(SITE_URL, '/') . '/uploads/reportes/' . $nombre;
+        if ($tipo === 'cert') {
+            $this->pdo->prepare("UPDATE arneses_items SET cert_manual_url = ? WHERE id = ?")
+                ->execute([$abs, $itemId]);
+            $msg = 'Certificado reemplazado correctamente.';
+        } else {
+            $this->pdo->prepare("UPDATE arneses_sesiones SET dictamen_manual_url = ? WHERE id = ?")
+                ->execute([$abs, $sesionId]);
+            $msg = 'Dictamen reemplazado correctamente.';
+        }
+
+        return ['status' => 'success', 'message' => $msg, 'url' => $abs];
+    }
+
+    /** Ruta local de un PDF a partir de su URL absoluta, o '' si no existe. */
+    private function rutaLocal(?string $url): string {
+        $url = trim((string)$url);
+        if ($url === '') return '';
+        $rel = ltrim(str_replace(rtrim(SITE_URL, '/'), '', $url), '/');
+        $abs = __DIR__ . '/../' . $rel;
+        return is_file($abs) ? $abs : '';
+    }
+
+    /**
+     * Emite todo: dictamen del lote + certificado de cada pieza apta, y publica
+     * el expediente en el portal del cliente (estatus EMITIDO). Si
+     * $p['enviar'] viene activo, además manda el correo con los adjuntos,
+     * igual que "Generar y enviar" en grúas.
+     *
+     * Los documentos sustituidos manualmente NO se regeneran: se respetan tal
+     * cual, tanto para el portal como para el correo.
+     */
+    public function emitirSesion(array $p, string $usuario): array {
+        $sesionId = (int)($p['id'] ?? 0);
+        if (!$sesionId) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+
         $det = $this->detalleSesion($sesionId);
         if ($det['status'] !== 'success') return $det;
+        $ses = $det['sesion'];
 
-        $dict = $this->generarDictamen($sesionId);
-        if ($dict['status'] !== 'success') return $dict;
+        $enviar = !empty($p['enviar']);
+        $correo = trim((string)($ses['correo'] ?? ''));
+        if ($enviar && $correo === '') {
+            return ['status' => 'error', 'message' => 'La inspección no tiene correo registrado. Agrégalo en los datos de la sesión.'];
+        }
 
-        $ok = 0; $errores = [];
+        // ── Dictamen del lote (manual si lo hay) ──────────────
+        $dictUrl = trim((string)($ses['dictamen_manual_url'] ?? ''));
+        if ($dictUrl === '') {
+            $dict = $this->generarDictamen($sesionId);
+            if ($dict['status'] !== 'success') return $dict;
+            $dictUrl = $dict['url'];
+        } else {
+            $this->pdo->prepare("UPDATE arneses_sesiones SET dictamen_url = ? WHERE id = ?")
+                ->execute([$dictUrl, $sesionId]);
+        }
+
+        // ── Certificado por pieza (manual si lo hay) ──────────
+        $ok = 0; $errores = []; $adjuntos = [];
         foreach ($det['items'] as $i) {
             if ($i['resultado'] === 'NO APTO') continue;
-            $r = $this->generarCertificado((int)$i['id']);
-            if ($r['status'] === 'success') $ok++;
-            else $errores[] = ($i['serie'] ?: ('#' . $i['id'])) . ': ' . $r['message'];
+            $manual = trim((string)($i['cert_manual_url'] ?? ''));
+            if ($manual !== '') {
+                $this->pdo->prepare("UPDATE arneses_items SET cert_url = ? WHERE id = ?")
+                    ->execute([$manual, (int)$i['id']]);
+                $ok++;
+                $certUrl = $manual;
+            } else {
+                $r = $this->generarCertificado((int)$i['id']);
+                if ($r['status'] !== 'success') {
+                    $errores[] = ($i['serie'] ?: ('#' . $i['id'])) . ': ' . $r['message'];
+                    continue;
+                }
+                $ok++;
+                $certUrl = $r['url'];
+            }
+            if ($enviar) {
+                $ruta = $this->rutaLocal($certUrl);
+                if ($ruta !== '') $adjuntos[$ruta] = basename($ruta);
+            }
         }
 
         $this->pdo->prepare("UPDATE arneses_sesiones SET estatus='EMITIDO' WHERE id=?")->execute([$sesionId]);
+        $this->historial($usuario, $sesionId, $ses['estatus'] ?? null, 'EMITIDO');
+
+        $mensaje = "Dictamen emitido y $ok certificado(s) generado(s). Ya están disponibles en el portal del cliente.";
+
+        if ($enviar) {
+            $rutaDict = $this->rutaLocal($dictUrl);
+            if ($rutaDict !== '') $adjuntos = [$rutaDict => basename($rutaDict)] + $adjuntos;
+            try {
+                $this->enviarCorreo($correo, (string)$ses['cliente'], (string)($ses['control'] ?: $sesionId), $adjuntos);
+                $this->pdo->prepare("UPDATE arneses_sesiones SET fecha_enviado = NOW() WHERE id = ?")
+                    ->execute([$sesionId]);
+                $this->registrarEnvio($ses, implode(', ', $adjuntos), $usuario);
+                $mensaje = "Documentos enviados a $correo y publicados en el portal del cliente.";
+            } catch (\Throwable $e) {
+                // Los documentos ya quedaron publicados; sólo falló el correo.
+                $errores[] = 'No se pudo enviar el correo: ' . $e->getMessage();
+                $mensaje  .= ' El envío por correo falló.';
+            }
+        }
+
         return [
             'status'   => 'success',
-            'message'  => "Dictamen emitido y $ok certificado(s) generado(s).",
-            'dictamen' => $dict['url'],
+            'message'  => $mensaje,
+            'dictamen' => $dictUrl,
             'errores'  => $errores,
         ];
     }
 
+    /** Correo al cliente con el dictamen y los certificados adjuntos. */
+    private function enviarCorreo(string $to, string $cliente, string $folio, array $adjuntos): void {
+        if (!class_exists('\\PHPMailer\\PHPMailer\\PHPMailer')) {
+            $autoload = __DIR__ . '/../vendor/autoload.php';
+            if (file_exists($autoload)) require_once $autoload;
+        }
+        if (!class_exists('\\PHPMailer\\PHPMailer\\PHPMailer')) {
+            throw new \RuntimeException('PHPMailer no disponible.');
+        }
+
+        $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+        configurarMailer($mail, $this->pdo);
+
+        $hay = false;
+        foreach (array_filter(array_map('trim', explode(',', $to))) as $addr) {
+            if (filter_var($addr, FILTER_VALIDATE_EMAIL)) { $mail->addAddress($addr); $hay = true; }
+        }
+        if (!$hay) throw new \RuntimeException('No hay destinatarios válidos.');
+
+        $folioFmt = function_exists('formatoFolio') ? formatoFolio($folio) : $folio;
+        $mail->Subject = "Inspección de equipo contra caídas AVBA — Folio {$folioFmt}";
+        $mail->isHTML(true);
+
+        $n = max(0, count($adjuntos) - 1);
+        $cuerpo = '
+      <p style="font-size:15px;color:#1a1a2e;margin:0 0 12px">Estimado(a) cliente <strong>'
+        . htmlspecialchars($cliente) . '</strong>,</p>
+      <p style="font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px">
+        Adjuntamos el <strong>dictamen técnico de inspección</strong> de su equipo de
+        protección contra caídas, junto con ' . $n . ' certificado(s) individual(es),
+        emitidos conforme a la NOM-009-STPS-2011.
+      </p>
+      <div style="background:#E6F1FB;border-radius:8px;padding:14px 18px;margin-bottom:20px">
+        <p style="font-size:13px;color:#0C447C;margin:0"><strong>Folio:</strong> ' . htmlspecialchars($folioFmt) . '</p>
+        <p style="font-size:12px;color:#1B2A6B;margin:6px 0 0">
+          Cada pieza conserva su vigencia hasta su fecha de retiro, siempre que no
+          sufra un evento de caída, alteración o daño.
+        </p>
+      </div>';
+        $mail->Body = function_exists('plantillaCorreoHtml')
+            ? plantillaCorreoHtml($this->pdo, $cuerpo)
+            : $cuerpo;
+
+        foreach ($adjuntos as $ruta => $nombre) $mail->addAttachment($ruta, $nombre);
+        $mail->send();
+    }
+
+    /** Deja constancia del envío en historico_envios, como en grúas. */
+    private function registrarEnvio(array $ses, string $archivos, string $usuario): void {
+        try {
+            $this->pdo->prepare(
+                "INSERT INTO historico_envios (cliente, control, correo, archivo, usuario, equipo_id)
+                 VALUES (?, ?, ?, ?, ?, NULL)"
+            )->execute([
+                $ses['cliente'] ?? null,
+                $ses['control'] ?? null,
+                $ses['correo']  ?? null,
+                $archivos,
+                $usuario,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[Arneses] registrarEnvio: ' . $e->getMessage());
+        }
+    }
+
     public function eliminarSesion(int $id): array {
         if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
-        $items = $this->pdo->prepare("SELECT id FROM arneses_items WHERE sesion_id = ?");
+
+        // Los QR vuelven al banco para poder reasignarlos (igual que en Calidad
+        // al eliminar un equipo); si no, se perderían al borrar la sesión.
+        $libera = function (?string $qr): void {
+            $qr = trim((string)$qr);
+            if ($qr === '') return;
+            try {
+                $this->pdo->prepare("UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?")
+                    ->execute([$qr]);
+            } catch (\Throwable $e) { error_log('[Arneses] liberar QR: ' . $e->getMessage()); }
+        };
+
+        $s = $this->pdo->prepare("SELECT qr_codigo FROM arneses_sesiones WHERE id = ?");
+        $s->execute([$id]);
+        $libera($s->fetchColumn() ?: null);
+
+        $items = $this->pdo->prepare("SELECT id, qr_codigo FROM arneses_items WHERE sesion_id = ?");
         $items->execute([$id]);
-        foreach ($items->fetchAll(PDO::FETCH_COLUMN) as $itemId) {
-            $this->pdo->prepare("DELETE FROM arneses_item_checklist WHERE item_id = ?")->execute([$itemId]);
-            $this->pdo->prepare("DELETE FROM arneses_fotos WHERE item_id = ?")->execute([$itemId]);
+        foreach ($items->fetchAll(PDO::FETCH_ASSOC) as $it) {
+            $libera($it['qr_codigo']);
+            $this->pdo->prepare("DELETE FROM arneses_item_checklist WHERE item_id = ?")->execute([$it['id']]);
+            $this->pdo->prepare("DELETE FROM arneses_fotos WHERE item_id = ?")->execute([$it['id']]);
         }
         $this->pdo->prepare("DELETE FROM arneses_items WHERE sesion_id = ?")->execute([$id]);
         $this->pdo->prepare("DELETE FROM arneses_sesiones WHERE id = ?")->execute([$id]);

@@ -2221,49 +2221,150 @@ function renderArnCert() {
           </div>
         </div>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
-          <button class="btn-ver" style="font-size:11px" onclick="emitirArnCert(${s.id})">
-            ${s.estatus === 'EMITIDO' ? '🔄 Reemitir documentos' : '📄 Emitir documentos'}
+          <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
+                  onclick="emitirArnCert(${s.id}, true)">📤 ${s.estatus === 'EMITIDO' ? 'Reenviar' : 'Emitir y enviar'}</button>
+          <button class="btn-ver" style="font-size:11px" onclick="emitirArnCert(${s.id}, false)">
+            ${s.estatus === 'EMITIDO' ? '🔄 Reemitir sin correo' : '📄 Solo publicar en portal'}
           </button>
           ${s.dictamen_url ? `<a class="btn-ver" style="font-size:11px;text-decoration:none" href="${escH(s.dictamen_url)}" target="_blank">📄 Ver dictamen</a>` : ''}
-          <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)" onclick="devolverArnCert(${s.id})">↩ Devolver a Calidad</button>
+          <button class="btn-ver" style="font-size:11px" onclick="arncToggleDocs(${s.id})">📎 Sustituir PDF</button>
+          <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)" onclick="retornarArnCert(${s.id})">↩ Retornar a Calidad</button>
         </div>
       </div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px;color:var(--texto-sub)">
+        <span>✉️ ${s.correo ? escH(s.correo) : '<em style="color:var(--rojo)">Sin correo registrado</em>'}</span>
+        <button class="btn-ver" style="font-size:10px;padding:2px 8px" onclick="arncEditarCorreo(${s.id})">Editar</button>
+        ${s.fecha_enviado ? `<span style="color:var(--verde)">· Enviado el ${escH(s.fecha_enviado)}</span>` : ''}
+        ${s.dictamen_manual_url ? '<span style="color:var(--naranja,#92400e)">· Dictamen sustituido manualmente</span>' : ''}
+      </div>
+      <div id="arnc-docs-${s.id}" style="display:none;margin-top:10px;border-top:1px dashed var(--borde);padding-top:10px"></div>
     </div>`).join('');
 }
 
-async function emitirArnCert(id) {
+async function emitirArnCert(id, enviar) {
   const ses = _arncSesiones.find(x => x.id === id);
   const yaEmitida = ses && ses.estatus === 'EMITIDO';
-  const msg = yaEmitida
-    ? '¿Volver a generar el dictamen y los certificados? Se crearán documentos nuevos y sustituirán a los anteriores en el portal del cliente.'
-    : '¿Emitir el dictamen del lote y el certificado de cada pieza apta?';
+  if (enviar && !(ses && ses.correo)) {
+    mostrarToast('La inspección no tiene correo. Usa "Editar" para agregarlo.', 'err');
+    return;
+  }
+  const msg = enviar
+    ? `¿Emitir los documentos y enviarlos por correo a ${ses.correo}?` +
+      (yaEmitida ? '\n\nSe generarán documentos nuevos que sustituirán a los del portal del cliente.' : '')
+    : (yaEmitida
+        ? '¿Volver a generar el dictamen y los certificados? Se crearán documentos nuevos y sustituirán a los anteriores en el portal del cliente. No se enviará correo.'
+        : '¿Emitir el dictamen del lote y el certificado de cada pieza apta, y publicarlos en el portal del cliente? No se enviará correo.');
   if (!confirm(msg)) return;
-  mostrarToast('Generando documentos…', 'info');
+  mostrarToast(enviar ? 'Generando y enviando…' : 'Generando documentos…', 'info');
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   try {
     const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json','X-Token':s.token||''},
-      body: JSON.stringify({ action:'EMITIR_SESION_ARNES', token:s.token||'', payload:{ id } }) });
+      body: JSON.stringify({ action:'EMITIR_SESION_ARNES', token:s.token||'', payload:{ id, enviar: !!enviar } }) });
     const d = await r.json();
     if (d.status === 'success') {
       mostrarToast(d.message || 'Documentos emitidos.', 'ok');
-      if (d.dictamen) window.open(d.dictamen, '_blank');
-      if (d.errores && d.errores.length) alert('Algunas piezas no generaron certificado:\n\n• ' + d.errores.join('\n• '));
+      if (d.dictamen && !enviar) window.open(d.dictamen, '_blank');
+      if (d.errores && d.errores.length) alert('Avisos de la emisión:\n\n• ' + d.errores.join('\n• '));
       cargarArnCert();
     } else mostrarToast(d.message || 'No se pudo emitir.', 'err');
   } catch(_) { mostrarToast('Error de conexión.', 'err'); }
 }
 
-async function devolverArnCert(id) {
-  const motivo = prompt('Motivo de la devolución a Calidad:');
+async function retornarArnCert(id) {
+  const motivo = prompt('Motivo del retorno a Calidad:');
   if (motivo === null) return;
+  if (!confirm('Se retirarán del portal del cliente el dictamen y los certificados de esta inspección. ¿Continuar?')) return;
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   try {
     const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json','X-Token':s.token||''},
-      body: JSON.stringify({ action:'DEVOLVER_SESION_ARNES', token:s.token||'', payload:{ id, motivo } }) });
+      body: JSON.stringify({ action:'RETORNAR_SESION_ARNES', token:s.token||'', payload:{ id, motivo } }) });
     const d = await r.json();
-    if (d.status === 'success') { mostrarToast('Devuelta a Calidad.', 'ok'); cargarArnCert(); }
-    else mostrarToast(d.message || 'No se pudo devolver.', 'err');
+    if (d.status === 'success') { mostrarToast('Expediente retornado a Calidad.', 'ok'); cargarArnCert(); }
+    else mostrarToast(d.message || 'No se pudo retornar.', 'err');
   } catch(_) { mostrarToast('Error de conexión.', 'err'); }
+}
+
+async function arncEditarCorreo(id) {
+  const ses = _arncSesiones.find(x => x.id === id);
+  const correo = prompt('Correo del cliente para el envío (separa varios con coma):', ses ? (ses.correo || '') : '');
+  if (correo === null) return;
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json','X-Token':s.token||''},
+      body: JSON.stringify({ action:'GUARDAR_DATOS_SESION_ARNES', token:s.token||'', payload:{ id, correo } }) });
+    const d = await r.json();
+    if (d.status === 'success') { mostrarToast('Correo actualizado.', 'ok'); cargarArnCert(); }
+    else mostrarToast(d.message || 'No se pudo guardar.', 'err');
+  } catch(_) { mostrarToast('Error de conexión.', 'err'); }
+}
+
+/* Panel de sustitución manual: el dictamen del lote y el certificado de cada
+   pieza. El PDF que se sube reemplaza al generado, tanto en el portal del
+   cliente como en el correo. */
+async function arncToggleDocs(id) {
+  const cont = document.getElementById('arnc-docs-' + id);
+  if (!cont) return;
+  if (cont.style.display !== 'none') { cont.style.display = 'none'; return; }
+  cont.style.display = 'block';
+  cont.innerHTML = '<div style="color:var(--texto-hint);font-size:12px">Cargando piezas…</div>';
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await fetch(`${API}?action=DETALLE_SESION_ARNESES&id=${id}&token=${encodeURIComponent(s.token||'')}`);
+    const d = await r.json();
+    if (d.status !== 'success') { cont.innerHTML = `<div style="color:var(--rojo);font-size:12px">${escH(d.message||'Error')}</div>`; return; }
+
+    const fila = (titulo, sub, manual, onchange) => `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--borde)">
+        <div style="flex:1;min-width:170px">
+          <div style="font-size:12px;font-weight:600;color:var(--texto)">${titulo}</div>
+          <div style="font-size:11px;color:var(--texto-sub)">${sub}</div>
+        </div>
+        ${manual ? `<a href="${escH(manual)}" target="_blank" style="font-size:11px;color:var(--verde)">PDF manual ✓</a>` : ''}
+        <input type="file" accept="application/pdf" style="font-size:11px;max-width:210px" onchange="${onchange}">
+      </div>`;
+
+    let html = `<div style="font-size:12px;font-weight:600;color:var(--texto);margin-bottom:6px">Sustituir documentos manualmente</div>`;
+    html += fila('Dictamen técnico del lote', 'Ampara toda la inspección',
+                 d.sesion.dictamen_manual_url || '',
+                 `arncSubirDoc(this, 'dict', ${id}, 0)`);
+    (d.items || []).filter(i => i.resultado !== 'NO APTO').forEach(i => {
+      html += fila(
+        escH(i.tipo_nombre || 'Pieza') + (i.serie ? ' · ' + escH(i.serie) : ''),
+        'Certificado individual' + (i.id_arnes ? ' · ID ' + escH(i.id_arnes) : ''),
+        i.cert_manual_url || '',
+        `arncSubirDoc(this, 'cert', ${id}, ${i.id})`);
+    });
+    html += `<div style="font-size:11px;color:var(--texto-hint);margin-top:8px">
+      Al emitir, los documentos sustituidos se respetan tal cual; el resto se genera automáticamente.</div>`;
+    cont.innerHTML = html;
+  } catch(_) { cont.innerHTML = '<div style="color:var(--rojo);font-size:12px">Error de red.</div>'; }
+}
+
+async function arncSubirDoc(input, tipo, sesionId, itemId) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  if (f.type !== 'application/pdf' && !/\.pdf$/i.test(f.name)) { mostrarToast('El archivo debe ser PDF.', 'err'); input.value=''; return; }
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const fd = new FormData();
+  fd.append('action', 'SUBIR_DOC_MANUAL_ARNES');
+  fd.append('token', s.token || '');
+  fd.append('tipo', tipo);
+  fd.append('id', sesionId);
+  fd.append('item_id', itemId);
+  fd.append('archivo', f);
+  input.disabled = true;
+  mostrarToast('Subiendo PDF…', 'info');
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'X-Token': s.token||''}, body: fd });
+    const d = await r.json();
+    if (d.status === 'success') {
+      mostrarToast(d.message || 'Documento reemplazado.', 'ok');
+      // La lista se re-renderiza (borra el panel), así que se reabre después.
+      await cargarArnCert();
+      arncToggleDocs(sesionId);
+    } else mostrarToast(d.message || 'No se pudo subir.', 'err');
+  } catch(_) { mostrarToast('Error de conexión.', 'err'); }
+  input.disabled = false; input.value = '';
 }
 
 function verSeccion(sec) {

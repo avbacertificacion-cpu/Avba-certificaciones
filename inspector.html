@@ -2686,6 +2686,11 @@
           <input type="text" id="arn-fecha" readonly>
         </div>
 
+        <div class="field">
+          <label>Correo del cliente</label>
+          <input type="text" id="arn-correo" placeholder="correo@empresa.com (para el envío de documentos)" autocomplete="off">
+        </div>
+
         <div class="mapa-info">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5L10 10"/></svg>
           <span>Arrastra el marcador al lugar exacto de inspección. El GPS se activa automáticamente.</span>
@@ -6162,7 +6167,8 @@ async function arnContinuar() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
       body: JSON.stringify({ action: 'CREAR_SESION_ARNESES', token: s.token || '',
-        payload: { cliente, fecha: new Date().toISOString().slice(0,10), coordenadas: coords, direccion } })
+        payload: { cliente, fecha: new Date().toISOString().slice(0,10), coordenadas: coords, direccion,
+                   correo: (document.getElementById('arn-correo')?.value || '').trim() } })
     });
     const d = await r.json();
     if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo crear la inspección.', 'err'); return; }
