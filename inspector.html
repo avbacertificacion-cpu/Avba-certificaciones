@@ -2729,8 +2729,9 @@
         </div>
 
         <div class="field">
-          <label>Norma aplicable</label>
-          <input type="text" id="arn-norma" placeholder="Ej: NOM-009-STPS-2011 / ANSI Z359.11">
+          <label>Normas aplicables</label>
+          <div id="arn-normas-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-bottom:6px"></div>
+          <input type="text" id="arn-norma-otra" placeholder="Otra norma (opcional)" style="margin-top:4px">
         </div>
 
         <div class="grid2">
@@ -6057,6 +6058,7 @@ async function arnIniciar() {
     { dropdownId: 'drop-arn-cliente' }
   );
   arnInitMapa();
+  arnRenderNormas();
   await arnCargarTipos();
 }
 
@@ -6074,6 +6076,40 @@ function arnCrearMapa(lat, lng) {
   L.tileLayer('tile.php?z={z}&x={x}&y={y}', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(arnMap);
   arnMarker = L.marker([lat, lng], { draggable: true }).addTo(arnMap);
   [100, 350, 800, 1500].forEach(ms => setTimeout(() => { try { arnMap.invalidateSize(); } catch(e){} }, ms));
+}
+
+
+/* Normas que aplican a equipo de protección contra caídas. Selección múltiple
+   porque una pieza suele cumplir varias a la vez (la mexicana y la ANSI o EN
+   con que fue fabricada). Se guardan separadas por coma. */
+const ARN_NORMAS = [
+  'NOM-009-STPS-2011',
+  'ANSI/ASSP Z359.11',
+  'ANSI/ASSP Z359.12',
+  'ANSI/ASSP Z359.13',
+  'ANSI/ASSP Z359.14',
+  'OSHA 1926.502',
+  'EN 361',
+  'EN 354',
+  'EN 355',
+  'EN 360',
+];
+
+function arnRenderNormas() {
+  const cont = document.getElementById('arn-normas-grid');
+  if (!cont) return;
+  cont.innerHTML = ARN_NORMAS.map((n, i) => `
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:3px 0">
+      <input type="checkbox" class="arn-norma-chk" value="${n}" ${n === 'NOM-009-STPS-2011' ? 'checked' : ''} style="width:auto;margin:0">
+      <span>${n}</span>
+    </label>`).join('');
+}
+
+function arnNormasSeleccionadas() {
+  const marcadas = Array.from(document.querySelectorAll('.arn-norma-chk:checked')).map(c => c.value);
+  const otra = (document.getElementById('arn-norma-otra')?.value || '').trim();
+  if (otra) marcadas.push(otra);
+  return marcadas.join(', ');
 }
 
 async function arnCargarTipos() {
@@ -6255,8 +6291,9 @@ function arnAddFotos(files) {
 function arnQuitarFoto(i) { arnFotos.splice(i, 1); arnRenderFotos(); }
 
 function arnLimpiarForm() {
-  ['arn-id','arn-marca','arn-modelo','arn-serie','arn-talla','arn-longitud','arn-norma','arn-qr','arn-observaciones']
+  ['arn-id','arn-marca','arn-modelo','arn-serie','arn-talla','arn-longitud','arn-norma-otra','arn-qr','arn-observaciones']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  arnRenderNormas();   // vuelve a dejar marcada la NOM por omisión
   ['arn-fabricacion','arn-retiro'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   document.getElementById('arn-tipo').value = '';
   document.getElementById('arn-card-checklist').style.display = 'none';
@@ -6291,7 +6328,7 @@ async function arnGuardar() {
   fd.append('serie',     document.getElementById('arn-serie').value.trim());
   fd.append('talla',     document.getElementById('arn-talla').value.trim());
   fd.append('longitud',  document.getElementById('arn-longitud').value.trim());
-  fd.append('norma',     document.getElementById('arn-norma').value.trim());
+  fd.append('norma',     arnNormasSeleccionadas());
   fd.append('fecha_fabricacion', document.getElementById('arn-fabricacion').value);
   fd.append('fecha_retiro',      document.getElementById('arn-retiro').value);
   fd.append('resultado',     arnResultadoVal);

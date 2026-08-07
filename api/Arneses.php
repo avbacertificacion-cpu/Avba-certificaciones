@@ -84,7 +84,7 @@ class Arneses {
                   modelo        VARCHAR(200) NULL,
                   serie         VARCHAR(200) NULL,
                   talla         VARCHAR(50)  NULL,
-                  norma         VARCHAR(120) NULL,
+                  norma         VARCHAR(400) NULL,
                   longitud      VARCHAR(80)  NULL,
                   fecha_fabricacion DATE NULL,
                   fecha_retiro      DATE NULL,
@@ -119,6 +119,8 @@ class Arneses {
                   KEY idx_item (item_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
+            // Al pasar la norma a seleccion multiple hace falta mas espacio
+            try { $this->pdo->exec("ALTER TABLE arneses_items MODIFY norma VARCHAR(400) NULL"); } catch (\Throwable $e) {}
             $this->seedCatalogo();
         } catch (\PDOException $e) {
             error_log('[Arneses] migrate: ' . $e->getMessage());
