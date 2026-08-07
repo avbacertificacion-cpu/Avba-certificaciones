@@ -20,16 +20,16 @@ if ($empresa_id) {
     $empresa = $st->fetch(PDO::FETCH_ASSOC);
 
     if ($empresa) {
-        // Total (sin inactivos)
-        $st = $pdo->prepare("SELECT COUNT(*) FROM extintores WHERE empresa_id=? AND estado!='inactivo'");
+        // Total (todos los extintores, sin importar el estado)
+        $st = $pdo->prepare("SELECT COUNT(*) FROM extintores WHERE empresa_id=?");
         $st->execute([$empresa_id]);
         $total = (int) $st->fetchColumn();
 
-        // Desglose por tipo
+        // Desglose por tipo (todos los extintores, sin importar el estado)
         $st = $pdo->prepare("
             SELECT te.nombre AS tipo, COUNT(*) AS cantidad
             FROM extintores e JOIN tipos_extintores te ON te.id = e.tipo
-            WHERE e.empresa_id=? AND e.estado!='inactivo'
+            WHERE e.empresa_id=?
             GROUP BY e.tipo ORDER BY cantidad DESC, te.nombre ASC");
         $st->execute([$empresa_id]);
         $por_tipo = $st->fetchAll(PDO::FETCH_ASSOC);
