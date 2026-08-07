@@ -211,9 +211,22 @@ class ClienteImpresion {
         }
 
         $dir = rtrim(UPLOAD_DIR, '/') . '/impresiones/';
-        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
+            return ['status' => 'error', 'message' => 'No se pudo crear la carpeta de impresiones en el servidor.'];
+        }
         $nombre = 'EXPEDIENTE_' . strtoupper($tipo) . '_' . $id . '_' . date('Ymd_His') . '.pdf';
-        $pdf->Output($dir . $nombre, 'F');
+        $destino = $dir . $nombre;
+
+        // OJO: FPDI/FPDF recibe (destino, nombre) — al revés que mPDF, que usa
+        // (nombre, destino). Invertirlos deja el archivo sin escribir.
+        $pdf->Output('F', $destino);
+
+        // No devolver una URL si el archivo no quedó escrito: el usuario veria
+        // un 404 al abrirlo y parecería que el sistema funcionó.
+        if (!is_file($destino) || filesize($destino) < 100) {
+            error_log('[ClienteImpresion] no se escribió el PDF en ' . $destino);
+            return ['status' => 'error', 'message' => 'El PDF no se pudo guardar en el servidor. Revisa los permisos de la carpeta uploads/impresiones.'];
+        }
 
         return [
             'status'    => 'success',

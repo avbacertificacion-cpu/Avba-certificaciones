@@ -622,7 +622,10 @@ class Arneses {
         $mpdf->SetProtection(['print'], '', 'Avba@Cert2024!');
 
         $nombre = $sufijo . '_AVBA_' . preg_replace('/[^A-Za-z0-9._-]/', '', $folio) . '_' . date('Ymd_His') . '.pdf';
-        $mpdf->Output($dir . $nombre, 'F');
+        $mpdf->Output($dir . $nombre, 'F');   // mPDF: (nombre, destino)
+        if (!is_file($dir . $nombre)) {
+            throw new \RuntimeException('El PDF no se pudo guardar en el servidor (revisa permisos de uploads/reportes).');
+        }
         return 'uploads/reportes/' . $nombre;
     }
 
