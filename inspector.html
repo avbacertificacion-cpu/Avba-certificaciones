@@ -2736,7 +2736,7 @@
 
         <div class="field">
           <label>Normas aplicables</label>
-          <div id="arn-normas-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-bottom:6px"></div>
+          <div id="arn-normas-grid" style="display:grid;grid-template-columns:1fr;gap:0;margin-bottom:6px;max-height:230px;overflow-y:auto;border:1px solid var(--borde);border-radius:9px;padding:6px 10px"></div>
           <input type="text" id="arn-norma-otra" placeholder="Otra norma (opcional)" style="margin-top:4px">
         </div>
 
@@ -6088,26 +6088,33 @@ function arnCrearMapa(lat, lng) {
 /* Normas que aplican a equipo de protección contra caídas. Selección múltiple
    porque una pieza suele cumplir varias a la vez (la mexicana y la ANSI o EN
    con que fue fabricada). Se guardan separadas por coma. */
+// Clave que se guarda + titulo oficial. Revisiones verificadas en 2026: la
+// NOM-009 sigue en su version 2011, Z359.11 y Z359.14 se actualizaron en 2021
+// (la .14 obligatoria desde agosto de 2023), Z359.12 en 2019, y EN 360 paso a
+// 2023 mientras las demas EN siguen en 2002/2010.
 const ARN_NORMAS = [
-  'NOM-009-STPS-2011',
-  'ANSI/ASSP Z359.11',
-  'ANSI/ASSP Z359.12',
-  'ANSI/ASSP Z359.13',
-  'ANSI/ASSP Z359.14',
-  'OSHA 1926.502',
-  'EN 361',
-  'EN 354',
-  'EN 355',
-  'EN 360',
+  { clave: 'NOM-009-STPS-2011',      titulo: 'Condiciones de seguridad para realizar trabajos en altura' },
+  { clave: 'ANSI/ASSP Z359.11-2021', titulo: 'Safety Requirements for Full Body Harnesses' },
+  { clave: 'ANSI/ASSP Z359.12-2019', titulo: 'Connecting Components for Personal Fall Arrest Systems' },
+  { clave: 'ANSI/ASSP Z359.13-2013', titulo: 'Personal Energy Absorbers and Energy Absorbing Lanyards' },
+  { clave: 'ANSI/ASSP Z359.14-2021', titulo: 'Safety Requirements for Self-Retracting Devices' },
+  { clave: 'OSHA 29 CFR 1926.502',   titulo: 'Fall Protection Systems Criteria and Practices' },
+  { clave: 'EN 361:2002',            titulo: 'Arneses anticaídas' },
+  { clave: 'EN 354:2010',            titulo: 'Elementos de amarre' },
+  { clave: 'EN 355:2002',            titulo: 'Absorbedores de energía' },
+  { clave: 'EN 360:2023',            titulo: 'Anticaídas retráctiles' },
 ];
 
 function arnRenderNormas() {
   const cont = document.getElementById('arn-normas-grid');
   if (!cont) return;
-  cont.innerHTML = ARN_NORMAS.map((n, i) => `
-    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:3px 0">
-      <input type="checkbox" class="arn-norma-chk" value="${n}" ${n === 'NOM-009-STPS-2011' ? 'checked' : ''} style="width:auto;margin:0">
-      <span>${n}</span>
+  cont.innerHTML = ARN_NORMAS.map(n => `
+    <label style="display:flex;align-items:flex-start;gap:7px;font-size:12px;cursor:pointer;padding:5px 0;grid-column:1/-1">
+      <input type="checkbox" class="arn-norma-chk" value="${n.clave}" ${n.clave === 'NOM-009-STPS-2011' ? 'checked' : ''} style="width:auto;margin:2px 0 0">
+      <span style="line-height:1.35">
+        <strong>${n.clave}</strong>
+        <span style="display:block;font-size:11px;color:var(--texto-sub)">${n.titulo}</span>
+      </span>
     </label>`).join('');
 }
 
