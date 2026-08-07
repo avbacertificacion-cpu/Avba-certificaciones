@@ -4878,7 +4878,12 @@ async function sesContinuar() {
 
     curSesionAccesoId    = data.id;
     curSesionAccesoIdent = data.identificador;
-    curSesion            = { nombre_sesion: nombreSesion, fecha, curso_ids: cursoIds };
+    // Se guardan también los cursos resueltos (id + nombre): el alta manual y
+    // el alta de participantes ya registrados necesitan el curso concreto, no
+    // sólo sus ids.
+    curSesion            = { nombre_sesion: nombreSesion, fecha, curso_ids: cursoIds,
+                             cursos: curSesionCursos.filter(c => cursoIds.includes(c.id))
+                                       .map(c => ({ id: c.id, nombre: c.nombre })) };
     curSesionParts       = [];
     curSesionEmpresas    = [...curSesionEmpPreBuild];
 
@@ -5080,6 +5085,9 @@ async function exiAgregar() {
           curso_id: cursoId, fecha_curso: curSesion?.fecha || '',
           empresa_nombre: p.empresa_nombre, empresa_rfc: p.empresa_rfc,
           empresa_representante: p.empresa_representante, empresa_direccion: p.empresa_direccion,
+          // Liga con la sesión abierta: sin esto el participante se guarda pero
+          // no aparece en la lista de la sesión.
+          sesion_acceso_id: curSesionAccesoId || 0,
         }})
       });
       const d = await r.json();
@@ -5229,13 +5237,24 @@ function curPrepararForm(modo) {
     badge.className  = 'cur-modo-badge sesion';
     badge.textContent = '📚 Sesión: ' + curSesion.nombre_sesion;
 
+    const cursosSes = curSesion.cursos || [];
+    const fechaTxt  = new Date(curSesion.fecha + 'T12:00:00')
+                        .toLocaleDateString('es-MX', {day:'2-digit',month:'long',year:'numeric'});
     lockInfo.style.display = 'block';
-    lockInfo.innerHTML = `<strong>${curSesion.curso_nombre}</strong> · ${
-      new Date(curSesion.fecha + 'T12:00:00').toLocaleDateString('es-MX', {day:'2-digit',month:'long',year:'numeric'})
-    }`;
+    lockInfo.innerHTML = `<strong>${cursosSes.map(c => escHtmlInsp(c.nombre)).join(' / ') || 'Sesión'}</strong> · ${fechaTxt}`;
 
-    // Ocultar sección 2 (curso/fecha) — ya están fijos
-    if (secCurso) secCurso.style.display = 'none';
+    // La fecha ya está fija por la sesión. El curso sólo se oculta si la sesión
+    // ampara uno solo; con varios hay que poder elegir a cuál se inscribe.
+    const selCurso = document.getElementById('cur-curso');
+    if (cursosSes.length > 1) {
+      if (secCurso) secCurso.style.display = '';
+      selCurso.innerHTML = '<option value="">— Selecciona el curso —</option>' +
+        cursosSes.map(c => `<option value="${c.id}">${escHtmlInsp(c.nombre)}</option>`).join('');
+      const campoFecha = document.getElementById('cur-fecha')?.closest('.cur-field');
+      if (campoFecha) campoFecha.style.display = 'none';
+    } else {
+      if (secCurso) secCurso.style.display = 'none';
+    }
 
     // Pre-llenar empresa si es misma empresa
     if (curSesion.misma_empresa && curSesion.empresa.nombre) {
@@ -5257,6 +5276,14 @@ function curPrepararForm(modo) {
     badge.textContent = '👤 Independiente';
     lockInfo.style.display = 'none';
     if (secCurso) secCurso.style.display = '';
+    // Restaurar el catálogo completo y la fecha: el modo sesión los restringe.
+    const campoFecha = document.getElementById('cur-fecha')?.closest('.cur-field');
+    if (campoFecha) campoFecha.style.display = '';
+    const selCurso = document.getElementById('cur-curso');
+    if (selCurso && curCursos.length) {
+      selCurso.innerHTML = '<option value="">— Seleccionar curso —</option>' +
+        curCursos.map(c => `<option value="${c.id}">${escHtmlInsp(c.nombre)} (${c.duracion_horas}h)</option>`).join('');
+    }
     btnVolver.style.display = 'none';
     btnEnviar.textContent   = 'Guardar registro';
   }
@@ -5377,8 +5404,13 @@ async function curEnviar() {
 
   const nombre  = document.getElementById('cur-nombre').value.trim();
   const curp    = document.getElementById('cur-curp').value.trim().toUpperCase();
-  const cursoId = esSesion ? curSesion.curso_id : document.getElementById('cur-curso').value;
-  const fecha   = esSesion ? curSesion.fecha     : document.getElementById('cur-fecha').value;
+  // En sesión, el curso sale de la propia sesión: si sólo tiene uno se toma
+  // directo; si tiene varios, el selector queda visible para elegirlo.
+  const cursosSes = (esSesion && curSesion.cursos) ? curSesion.cursos : [];
+  const cursoId = esSesion
+    ? (cursosSes.length === 1 ? cursosSes[0].id : document.getElementById('cur-curso').value)
+    : document.getElementById('cur-curso').value;
+  const fecha   = esSesion ? curSesion.fecha : document.getElementById('cur-fecha').value;
 
   // Validación matemática de CURP (si se proporcionó)
   if (curp) {
@@ -5387,7 +5419,9 @@ async function curEnviar() {
   }
 
   let valido = true;
-  if (!esSesion) {
+  if (esSesion) {
+    if (!cursoId) { curShowErr('cur-curso', 'Selecciona el curso de la sesión'); valido = false; }
+  } else {
     if (!cursoId) { curShowErr('cur-curso', 'Selecciona un curso');               valido = false; }
     if (!fecha)   { curShowErr('cur-fecha', 'La fecha del curso es obligatoria'); valido = false; }
   }
@@ -5421,6 +5455,9 @@ async function curEnviar() {
     fd.append('empresa_rfc',           document.getElementById('cur-rfc').value.trim());
     fd.append('empresa_representante', document.getElementById('cur-representante').value.trim());
     fd.append('empresa_direccion',     document.getElementById('cur-direccion-empresa').value.trim());
+    // En modo sesión, la liga con la sesión abierta es lo que hace que el
+    // participante aparezca en la lista y llegue a Calidad dentro del grupo.
+    if (esSesion && curSesionAccesoId) fd.append('sesion_acceso_id', curSesionAccesoId);
     if (curDocFile)     fd.append('foto_documentacion', curDocFile,     curDocFile.name);
     if (curPersonaFile) fd.append('foto_persona',       curPersonaFile, curPersonaFile.name);
 
@@ -5429,10 +5466,10 @@ async function curEnviar() {
 
     if (data.status === 'success') {
       if (esSesion) {
-        // Modo sesión: agregar a la lista y volver
-        curSesionParts.push({ nombre, curp, id: data.id });
-        sesRenderLista();
+        // Modo sesión: se relee del servidor en vez de empujar a mano, para que
+        // la lista refleje lo que quedó guardado (curso, empresa, orden).
         curMostrar('lista');
+        await sesRefrescarParticipantes();
         mostrarToast('✓ Participante registrado correctamente', 'ok');
       } else {
         // Modo independiente: mostrar pantalla de éxito con folio

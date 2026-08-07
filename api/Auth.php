@@ -295,7 +295,7 @@ class Auth {
         $this->ensureParticipanteTables();
         $stmt = $this->pdo->prepare(
             "SELECT p.id, p.nombre_completo, p.curp, p.foto_documentacion_url,
-                    c.nombre AS curso_nombre
+                    p.empresa_nombre, c.nombre AS curso_nombre
              FROM sesion_acceso_participantes s
              JOIN participantes_cursos p ON p.id = s.participante_id
              LEFT JOIN cursos c ON c.id = p.curso_id

@@ -296,6 +296,21 @@ class Personal {
             $id = (int)$this->pdo->lastInsertId();
         }
 
+        // Vincular a la sesión de acceso si el registro se hizo desde una sesión
+        // abierta del inspector. Sin esta liga el participante existe pero no
+        // aparece en la lista de la sesión, que se arma desde la tabla puente
+        // (es la misma liga que crea el auto-registro por QR).
+        $sesionId = (int)($payload['sesion_acceso_id'] ?? 0);
+        if ($sesionId && $id) {
+            try {
+                $this->pdo->prepare(
+                    "INSERT IGNORE INTO sesion_acceso_participantes (sesion_acceso_id, participante_id) VALUES (?,?)"
+                )->execute([$sesionId, $id]);
+            } catch (\Throwable $e) {
+                error_log('[guardarParticipante] vincular sesión: ' . $e->getMessage());
+            }
+        }
+
         $control = $campos['control'] ?? null;
         if (!$control) {
             $rowCtrl = $this->pdo->prepare("SELECT control FROM participantes_cursos WHERE id = ?");
