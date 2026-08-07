@@ -390,6 +390,11 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
                 <h3>Gestionar Empresas</h3>
                 <p><?= $total_empresas ?> empresas</p>
             </div>
+            <div class="menu-item" onclick="window.location.href='admin-desglose.php'">
+                <div class="menu-item-icon">📦</div>
+                <h3>Desglose por Planta</h3>
+                <p>Extintores por tipo</p>
+            </div>
             <div class="menu-item" onclick="window.location.href='admin-tipos.php'">
                 <div class="menu-item-icon">🧪</div>
                 <h3>Tipos de Extintores</h3>
