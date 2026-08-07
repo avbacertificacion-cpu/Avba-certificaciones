@@ -924,7 +924,7 @@ class Arneses {
      * conclusiones — con el mismo lenguaje visual que los certificados de
      * maquinaria.
      */
-    public function generarDictamen(int $sesionId): array {
+    public function generarDictamen(int $sesionId, bool $persistir = true): array {
         $det = $this->detalleSesion($sesionId);
         if ($det['status'] !== 'success') return $det;
         $ses = $det['sesion']; $items = $det['items'];
@@ -1135,12 +1135,16 @@ class Arneses {
              . ' · ' . $this->esc($ses['cliente']);
         $url = $this->htmlToPdf($html, $ses['control'], 'DICT_ARN', $pie);
         $abs = rtrim(SITE_URL, '/') . '/' . $url;
-        $this->pdo->prepare("UPDATE arneses_sesiones SET dictamen_url = ? WHERE id = ?")->execute([$abs, $sesionId]);
+        // En vista previa no se guarda la URL: el documento aún no es el que
+        // ampara al cliente, sólo sirve para revisarlo antes de emitir.
+        if ($persistir) {
+            $this->pdo->prepare("UPDATE arneses_sesiones SET dictamen_url = ? WHERE id = ?")->execute([$abs, $sesionId]);
+        }
         return ['status' => 'success', 'url' => $abs];
     }
 
     /** CERTIFICADO individual de una pieza (con su QR de validación). */
-    public function generarCertificado(int $itemId): array {
+    public function generarCertificado(int $itemId, bool $persistir = true): array {
         $s = $this->pdo->prepare("
             SELECT i.*, COALESCE(t.nombre,'') AS tipo_nombre,
                    DATE_FORMAT(i.fecha_fabricacion,'%d/%m/%Y') AS fabricacion_fmt,
@@ -1313,7 +1317,9 @@ class Arneses {
         $pie = 'Certificado ' . $this->esc(formatoFolio($folio)) . ' · ' . $this->esc($it['cliente']);
         $url = $this->htmlToPdf($html, $folio, 'CERT_ARN', $pie);
         $abs = rtrim(SITE_URL, '/') . '/' . $url;
-        $this->pdo->prepare("UPDATE arneses_items SET cert_url = ? WHERE id = ?")->execute([$abs, $itemId]);
+        if ($persistir) {
+            $this->pdo->prepare("UPDATE arneses_items SET cert_url = ? WHERE id = ?")->execute([$abs, $itemId]);
+        }
         return ['status' => 'success', 'url' => $abs];
     }
 
@@ -1379,6 +1385,35 @@ class Arneses {
         }
 
         return ['status' => 'success', 'message' => $msg, 'url' => $abs];
+    }
+
+    /**
+     * Genera un documento SÓLO para revisarlo: no cambia el estado de la
+     * inspección, no publica nada en el portal del cliente y no manda correo.
+     * Si el documento ya fue sustituido manualmente, devuelve ese archivo, que
+     * es el que realmente recibirá el cliente.
+     * $p['tipo']: 'dict' (usa $p['id']) | 'cert' (usa $p['item_id']).
+     */
+    public function vistaPrevia(array $p): array {
+        $tipo = ($p['tipo'] ?? '') === 'cert' ? 'cert' : 'dict';
+
+        if ($tipo === 'cert') {
+            $itemId = (int)($p['item_id'] ?? 0);
+            if (!$itemId) return ['status' => 'error', 'message' => 'Pieza no indicada.'];
+            $s = $this->pdo->prepare("SELECT cert_manual_url FROM arneses_items WHERE id = ?");
+            $s->execute([$itemId]);
+            $manual = trim((string)($s->fetchColumn() ?: ''));
+            if ($manual !== '') return ['status' => 'success', 'url' => $manual, 'manual' => true];
+            return $this->generarCertificado($itemId, false) + ['manual' => false];
+        }
+
+        $sesionId = (int)($p['id'] ?? 0);
+        if (!$sesionId) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+        $s = $this->pdo->prepare("SELECT dictamen_manual_url FROM arneses_sesiones WHERE id = ?");
+        $s->execute([$sesionId]);
+        $manual = trim((string)($s->fetchColumn() ?: ''));
+        if ($manual !== '') return ['status' => 'success', 'url' => $manual, 'manual' => true];
+        return $this->generarDictamen($sesionId, false) + ['manual' => false];
     }
 
     /** Ruta local de un PDF a partir de su URL absoluta, o '' si no existe. */

@@ -1938,6 +1938,11 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($arneses->guardarDatosSesion($payload, $usr['usuario']));
 
+        case 'VISTA_PREVIA_ARNES':      // genera el PDF sin emitir ni publicar
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->vistaPrevia($payload));
+
         case 'SUBIR_DOC_MANUAL_ARNES':  // multipart
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

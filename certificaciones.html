@@ -2226,8 +2226,8 @@ function renderArnCert() {
           <button class="btn-ver" style="font-size:11px" onclick="emitirArnCert(${s.id}, false)">
             ${s.estatus === 'EMITIDO' ? '🔄 Reemitir sin correo' : '📄 Solo publicar en portal'}
           </button>
-          ${s.dictamen_url ? `<a class="btn-ver" style="font-size:11px;text-decoration:none" href="${escH(s.dictamen_url)}" target="_blank">📄 Ver dictamen</a>` : ''}
-          <button class="btn-ver" style="font-size:11px" onclick="arncToggleDocs(${s.id})">📎 Sustituir PDF</button>
+          <button class="btn-ver" style="font-size:11px" onclick="arncVistaPrevia('dict', ${s.id}, 0, this)">👁 Ver dictamen</button>
+          <button class="btn-ver" style="font-size:11px" onclick="arncToggleDocs(${s.id})">📄 Documentos</button>
           <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)" onclick="retornarArnCert(${s.id})">↩ Retornar a Calidad</button>
         </div>
       </div>
@@ -2298,9 +2298,29 @@ async function arncEditarCorreo(id) {
   } catch(_) { mostrarToast('Error de conexión.', 'err'); }
 }
 
-/* Panel de sustitución manual: el dictamen del lote y el certificado de cada
-   pieza. El PDF que se sube reemplaza al generado, tanto en el portal del
-   cliente como en el correo. */
+/* Vista previa: genera el PDF para revisarlo sin emitir, sin publicarlo en el
+   portal del cliente y sin mandar correo. Si el documento ya se sustituyó
+   manualmente, abre ese archivo, que es el que recibirá el cliente. */
+async function arncVistaPrevia(tipo, sesionId, itemId, btn) {
+  const txt = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Generando…'; }
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json','X-Token':s.token||''},
+      body: JSON.stringify({ action:'VISTA_PREVIA_ARNES', token:s.token||'',
+                             payload:{ tipo, id: sesionId, item_id: itemId } }) });
+    const d = await r.json();
+    if (d.status === 'success' && d.url) {
+      window.open(d.url, '_blank');
+      if (d.manual) mostrarToast('Mostrando el PDF sustituido manualmente.', 'info');
+    } else mostrarToast(d.message || 'No se pudo generar el documento.', 'err');
+  } catch(_) { mostrarToast('Error de conexión.', 'err'); }
+  if (btn) { btn.disabled = false; btn.textContent = txt; }
+}
+
+/* Panel de documentos: el dictamen del lote y el certificado de cada pieza,
+   con vista previa y sustitución manual. El PDF que se sube reemplaza al
+   generado, tanto en el portal del cliente como en el correo. */
 async function arncToggleDocs(id) {
   const cont = document.getElementById('arnc-docs-' + id);
   if (!cont) return;
@@ -2313,25 +2333,31 @@ async function arncToggleDocs(id) {
     const d = await r.json();
     if (d.status !== 'success') { cont.innerHTML = `<div style="color:var(--rojo);font-size:12px">${escH(d.message||'Error')}</div>`; return; }
 
-    const fila = (titulo, sub, manual, onchange) => `
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--borde)">
+    const fila = (titulo, sub, manual, verArgs, onchange) => `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid var(--borde)">
         <div style="flex:1;min-width:170px">
           <div style="font-size:12px;font-weight:600;color:var(--texto)">${titulo}</div>
-          <div style="font-size:11px;color:var(--texto-sub)">${sub}</div>
+          <div style="font-size:11px;color:var(--texto-sub)">${sub}
+            ${manual ? '<span style="color:var(--verde)"> · PDF sustituido manualmente</span>' : ''}</div>
         </div>
-        ${manual ? `<a href="${escH(manual)}" target="_blank" style="font-size:11px;color:var(--verde)">PDF manual ✓</a>` : ''}
-        <input type="file" accept="application/pdf" style="font-size:11px;max-width:210px" onchange="${onchange}">
+        <button class="btn-ver" style="font-size:11px" onclick="arncVistaPrevia(${verArgs}, this)">👁 Ver PDF</button>
+        <input type="file" accept="application/pdf" style="font-size:11px;max-width:190px" onchange="${onchange}">
       </div>`;
 
-    let html = `<div style="font-size:12px;font-weight:600;color:var(--texto);margin-bottom:6px">Sustituir documentos manualmente</div>`;
+    let html = `<div style="font-size:12px;font-weight:600;color:var(--texto);margin-bottom:2px">Documentos de la inspección</div>
+      <div style="font-size:11px;color:var(--texto-hint);margin-bottom:6px">
+        "Ver PDF" sólo genera el documento para revisarlo: no lo publica ni lo envía.
+        Para reemplazarlo, sube un PDF propio.</div>`;
     html += fila('Dictamen técnico del lote', 'Ampara toda la inspección',
                  d.sesion.dictamen_manual_url || '',
+                 `'dict', ${id}, 0`,
                  `arncSubirDoc(this, 'dict', ${id}, 0)`);
     (d.items || []).filter(i => i.resultado !== 'NO APTO').forEach(i => {
       html += fila(
         escH(i.tipo_nombre || 'Pieza') + (i.serie ? ' · ' + escH(i.serie) : ''),
         'Certificado individual' + (i.id_arnes ? ' · ID ' + escH(i.id_arnes) : ''),
         i.cert_manual_url || '',
+        `'cert', ${id}, ${i.id}`,
         `arncSubirDoc(this, 'cert', ${id}, ${i.id})`);
     });
     html += `<div style="font-size:11px;color:var(--texto-hint);margin-top:8px">
