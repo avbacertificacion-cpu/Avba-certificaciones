@@ -33,15 +33,6 @@ if ($empresa_id) {
             GROUP BY e.tipo ORDER BY cantidad DESC, te.nombre ASC");
         $st->execute([$empresa_id]);
         $por_tipo = $st->fetchAll(PDO::FETCH_ASSOC);
-
-        // Desglose por tipo + capacidad (detalle)
-        $st = $pdo->prepare("
-            SELECT te.nombre AS tipo, COALESCE(NULLIF(TRIM(e.capacidad),''),'Sin especificar') AS capacidad, COUNT(*) AS cantidad
-            FROM extintores e JOIN tipos_extintores te ON te.id = e.tipo
-            WHERE e.empresa_id=? AND e.estado!='inactivo'
-            GROUP BY e.tipo, e.capacidad ORDER BY te.nombre ASC, cantidad DESC");
-        $st->execute([$empresa_id]);
-        $por_tipo_cap = $st->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 
@@ -153,22 +144,6 @@ $json_tipos_cant = json_encode(array_map('intval', array_column($por_tipo, 'cant
                     <tfoot><tr><td>Total</td><td class="n"><?= $total ?></td><td class="n">100%</td></tr></tfoot>
                 </table>
             </div>
-        </div>
-
-        <div class="card" style="margin-top:22px">
-            <h3>Detalle por tipo y capacidad</h3>
-            <table>
-                <thead><tr><th>Tipo</th><th>Capacidad</th><th class="n">Cantidad</th></tr></thead>
-                <tbody>
-                <?php foreach ($por_tipo_cap as $t): ?>
-                    <tr>
-                        <td><?= htmlspecialchars($t['tipo']) ?></td>
-                        <td><?= htmlspecialchars($t['capacidad']) ?></td>
-                        <td class="n"><?= (int)$t['cantidad'] ?></td>
-                    </tr>
-                <?php endforeach; ?>
-                </tbody>
-            </table>
         </div>
     <?php endif; ?>
 </div>
