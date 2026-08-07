@@ -25,18 +25,22 @@ if ($empresa_id) {
         $st->execute([$empresa_id]);
         $total = (int) $st->fetchColumn();
 
-        // Desglose por tipo (todos los extintores, sin importar el estado)
+        // Desglose por tipo + capacidad (todos los extintores, sin importar el estado)
         $st = $pdo->prepare("
-            SELECT te.nombre AS tipo, COUNT(*) AS cantidad
+            SELECT te.nombre AS tipo,
+                   COALESCE(NULLIF(TRIM(e.capacidad),''),'Sin especificar') AS capacidad,
+                   COUNT(*) AS cantidad
             FROM extintores e JOIN tipos_extintores te ON te.id = e.tipo
             WHERE e.empresa_id=?
-            GROUP BY e.tipo ORDER BY cantidad DESC, te.nombre ASC");
+            GROUP BY e.tipo, e.capacidad
+            ORDER BY te.nombre ASC, cantidad DESC");
         $st->execute([$empresa_id]);
         $por_tipo = $st->fetchAll(PDO::FETCH_ASSOC);
     }
 }
 
-$json_tipos      = json_encode(array_column($por_tipo, 'tipo'));
+$labels_chart = array_map(fn($t) => $t['tipo'] . ' ' . $t['capacidad'], $por_tipo);
+$json_tipos      = json_encode($labels_chart);
 $json_tipos_cant = json_encode(array_map('intval', array_column($por_tipo, 'cantidad')));
 ?>
 <!DOCTYPE html>
@@ -125,23 +129,24 @@ $json_tipos_cant = json_encode(array_map('intval', array_column($por_tipo, 'cant
 
         <div class="grid">
             <div class="card">
-                <h3>Distribución por tipo</h3>
+                <h3>Distribución por tipo y capacidad</h3>
                 <div class="chart-box"><canvas id="chTipo"></canvas></div>
             </div>
             <div class="card">
-                <h3>Desglose por tipo</h3>
+                <h3>Desglose por tipo y capacidad</h3>
                 <table>
-                    <thead><tr><th>Tipo</th><th class="n">Cantidad</th><th class="n">%</th></tr></thead>
+                    <thead><tr><th>Tipo</th><th>Capacidad</th><th class="n">Cantidad</th><th class="n">%</th></tr></thead>
                     <tbody>
                     <?php foreach ($por_tipo as $t): $pct = $total>0 ? round($t['cantidad']/$total*100) : 0; ?>
                         <tr>
                             <td><?= htmlspecialchars($t['tipo']) ?></td>
+                            <td><?= htmlspecialchars($t['capacidad']) ?></td>
                             <td class="n"><?= (int)$t['cantidad'] ?></td>
                             <td class="n"><?= $pct ?>%</td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
-                    <tfoot><tr><td>Total</td><td class="n"><?= $total ?></td><td class="n">100%</td></tr></tfoot>
+                    <tfoot><tr><td colspan="2">Total</td><td class="n"><?= $total ?></td><td class="n">100%</td></tr></tfoot>
                 </table>
             </div>
         </div>
