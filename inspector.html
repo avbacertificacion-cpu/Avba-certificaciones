@@ -1157,6 +1157,12 @@
     }
     .iza-estado-btn.cumple.activo   { border-color: var(--verde); background: var(--verde-light); color: var(--verde); }
     .iza-estado-btn.no-cumple.activo{ border-color: var(--rojo);  background: var(--rojo-light);  color: var(--rojo); }
+    /* Resultados de arneses: sin estas reglas el boton pulsado no se distinguia */
+    .arn-res-btn { flex: 1; min-width: 96px; padding: 11px 6px; font-size: 12px; }
+    .arn-res-btn.activo { box-shadow: 0 0 0 3px rgba(0,0,0,.06); }
+    .arn-res-btn.apto.activo         { border-color: var(--verde); background: var(--verde-light); color: var(--verde); }
+    .arn-res-btn.condicionado.activo { border-color: #f59e0b;      background: #fff8e1;            color: #92400e; }
+    .arn-res-btn.no-apto.activo      { border-color: var(--rojo);  background: var(--rojo-light);  color: var(--rojo); }
     .iza-fotos-grid {
       display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px;
     }
@@ -2763,9 +2769,9 @@
       <div class="card">
         <div class="card-title">Resultado</div>
         <div style="display:flex;gap:8px;flex-wrap:wrap" id="arn-resultado-btns">
-          <button type="button" class="iza-estado-btn" data-val="APTO" onclick="arnResultado('APTO')">✓ APTO</button>
-          <button type="button" class="iza-estado-btn" data-val="CONDICIONADO" onclick="arnResultado('CONDICIONADO')">⚠ CONDICIONADO</button>
-          <button type="button" class="iza-estado-btn" data-val="NO APTO" onclick="arnResultado('NO APTO')">✕ NO APTO</button>
+          <button type="button" class="iza-estado-btn arn-res-btn apto" data-val="APTO" onclick="arnResultado('APTO')">✓ APTO</button>
+          <button type="button" class="iza-estado-btn arn-res-btn condicionado" data-val="CONDICIONADO" onclick="arnResultado('CONDICIONADO')">⚠ CONDICIONADO</button>
+          <button type="button" class="iza-estado-btn arn-res-btn no-apto" data-val="NO APTO" onclick="arnResultado('NO APTO')">✕ NO APTO</button>
         </div>
         <div class="field" style="margin-top:12px">
           <label>Observaciones</label>
@@ -6214,7 +6220,7 @@ function arnMarcarTodo(val) { arnChecklist.forEach(p => arnSetChk(p.tag, val)); 
 
 function arnResultado(val) {
   arnResultadoVal = val;
-  document.querySelectorAll('#arn-resultado-btns .iza-estado-btn').forEach(b => {
+  document.querySelectorAll('#arn-resultado-btns .arn-res-btn').forEach(b => {
     b.classList.toggle('activo', b.dataset.val === val);
   });
 }
