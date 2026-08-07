@@ -159,7 +159,8 @@ foreach ($extintores as $ext) {
     $filas[] = ['tipo' => 'extintor', 'ext' => $ext];
 }
 
-// Dividir en páginas de máximo 30 extintores por página
+// Dividir en páginas de máximo 26 extintores por página
+// (cabe con holgura en una hoja carta horizontal, evitando desbordes al imprimir)
 $paginas = [];
 $pagina_actual = [];
 $extintores_en_pagina = 0;
@@ -167,7 +168,7 @@ $seccion_actual_pag = null;
 
 foreach ($filas as $fila) {
     // Si es una nueva sección y ya hay extintores, reinicia la página
-    if ($fila['tipo'] === 'seccion' && $extintores_en_pagina >= 25) {
+    if ($fila['tipo'] === 'seccion' && $extintores_en_pagina >= 22) {
         $paginas[] = $pagina_actual;
         $pagina_actual = [];
         $extintores_en_pagina = 0;
@@ -175,7 +176,7 @@ foreach ($filas as $fila) {
 
     // Si es un extintor, contar
     if ($fila['tipo'] === 'extintor') {
-        if ($extintores_en_pagina >= 30) {
+        if ($extintores_en_pagina >= 26) {
             $paginas[] = $pagina_actual;
             $pagina_actual = [];
             $extintores_en_pagina = 0;
@@ -248,7 +249,8 @@ if (!$logo_html) {
     <meta charset="UTF-8">
     <title><?= htmlspecialchars($num_reporte) ?> – <?= htmlspecialchars($reporte['empresa_nombre']) ?></title>
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
+        * { margin:0; padding:0; box-sizing:border-box;
+            -webkit-print-color-adjust:exact; print-color-adjust:exact; }
         body { font-family: Arial, Helvetica, sans-serif; font-size:8.5pt; color:#000; background:#fff; }
 
         /* ─── Encabezado de página ─── */
@@ -308,9 +310,13 @@ if (!$logo_html) {
 
         @media print {
             .no-print { display:none !important; }
-            body { font-size: 7.5pt; }
-            .page-block { page-break-after: always; }
+            body { font-size: 7.5pt; padding:0 !important; background:#fff !important; }
+            /* Sin margen para no generar páginas casi en blanco entre hojas */
+            .page-block { margin:0 !important; padding:0 !important;
+                          box-shadow:none !important; page-break-after: always; }
             .page-block:last-child { page-break-after: auto; }
+            /* Evitar que una fila se parta a la mitad entre páginas */
+            .main-table tr { page-break-inside: avoid; }
         }
 
         @media screen {
