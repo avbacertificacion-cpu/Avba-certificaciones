@@ -6050,7 +6050,12 @@ async function arnIniciar() {
     String(hoy.getDate()).padStart(2,'0') + '/' + String(hoy.getMonth()+1).padStart(2,'0') + '/' + hoy.getFullYear();
 
   arnMostrar('datos');
-  try { initEmpresaSearch('arn-cliente', 'arn-cliente-id'); } catch(_) {}
+  // Recibe ELEMENTOS, no ids: pasarle textos hacía que no sugiriera empresas.
+  initEmpresaSearch(
+    document.getElementById('arn-cliente'),
+    document.getElementById('arn-cliente-id'),
+    { dropdownId: 'drop-arn-cliente' }
+  );
   arnInitMapa();
   await arnCargarTipos();
 }

@@ -2643,6 +2643,14 @@ function ver(fila) {
 
   document.getElementById("overlay-det").classList.add("open");
   poblarInspectorSelect(d.inspector);
+  // Sugerir empresas ya registradas al corregir el cliente
+  try {
+    const inp = document.getElementById('e-cliente');
+    if (inp && typeof initEmpresaSearch === 'function' && !inp.dataset.autoEmp) {
+      inp.dataset.autoEmp = '1';
+      initEmpresaSearch(inp, document.createElement('input'), { dropdownId: 'drop-e-cliente' });
+    }
+  } catch(_) {}
 }
 
 /* ── Inspector que firma (por reporte) ── */
@@ -6747,6 +6755,13 @@ function verPND(id) {
     </div>`;
 
   document.getElementById("overlay-pnd").style.display = 'flex';
+  try {
+    const inpP = document.getElementById('pnd-e-cliente');
+    if (inpP && typeof initEmpresaSearch === 'function' && !inpP.dataset.autoEmp) {
+      inpP.dataset.autoEmp = '1';
+      initEmpresaSearch(inpP, document.createElement('input'), { dropdownId: 'drop-pnd-cliente' });
+    }
+  } catch(_) {}
 }
 
 function cerrarDetPND() {
