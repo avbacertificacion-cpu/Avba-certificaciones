@@ -745,6 +745,15 @@ if ($method === 'GET') {
             respuesta($cliMant->detalleMantenimiento((int)($_GET['id'] ?? 0), resolveIdc($usr), $mec));
         }
 
+        case 'LISTAR_PARTICIPANTES_EMPRESA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->participantesDeEmpresa(
+                trim($_GET['empresa'] ?? ''),
+                (int)($_GET['curso_id'] ?? 0),
+                trim($_GET['fecha'] ?? '')
+            ));
+
         // ── Arneses y líneas de vida ──────────────────────
         case 'LISTAR_TIPOS_ARNES':
             $usr = validarToken($pdo, $token);

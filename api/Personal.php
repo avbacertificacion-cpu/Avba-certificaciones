@@ -146,6 +146,81 @@ class Personal {
         return $row;
     }
 
+    /**
+     * Participantes ya registrados de una empresa, para reutilizarlos en un
+     * curso nuevo sin volver a capturarlos ni pedirles otra vez sus datos.
+     *
+     * Se agrupa por CURP (o por nombre, si no tiene) y se toma el registro más
+     * reciente de cada persona, que es el que trae los datos y las fotos al
+     * día. Se excluyen los que ya están en el curso/fecha indicados, para no
+     * ofrecer duplicados dentro de la misma sesión.
+     */
+    public function participantesDeEmpresa(string $empresa, int $cursoId = 0, string $fechaCurso = ''): array {
+        $empresa = trim($empresa);
+        if ($empresa === '') return ['status' => 'error', 'message' => 'Indica la empresa.'];
+
+        try {
+            $sql = "SELECT p.nombre_completo, p.curp, p.puesto, p.ocupacion_id,
+                           p.capacidad, p.capacidad_na, p.telefono,
+                           p.foto_documentacion_url, p.foto_persona_url,
+                           p.empresa_nombre, p.empresa_rfc, p.empresa_representante, p.empresa_direccion,
+                           MAX(p.id) AS ultimo_id,
+                           COUNT(*)  AS cursos_tomados,
+                           MAX(DATE_FORMAT(p.fecha_curso,'%d/%m/%Y')) AS ultimo_curso
+                    FROM participantes_cursos p
+                    WHERE TRIM(p.empresa_nombre) = ?
+                    GROUP BY COALESCE(NULLIF(p.curp,''), p.nombre_completo)
+                    ORDER BY p.nombre_completo
+                    LIMIT 500";
+            $st = $this->pdo->prepare($sql);
+            $st->execute([$empresa]);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log('[Personal] participantesDeEmpresa: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudo consultar el personal de la empresa.'];
+        }
+
+        // Quitar los que ya están en esta misma sesión de curso
+        $yaEnSesion = [];
+        if ($cursoId && $fechaCurso !== '') {
+            try {
+                $f = date('Y-m-d', strtotime(str_replace('/', '-', $fechaCurso)));
+                $st2 = $this->pdo->prepare(
+                    "SELECT COALESCE(NULLIF(curp,''), nombre_completo) AS clave
+                     FROM participantes_cursos
+                     WHERE curso_id = ? AND fecha_curso = ? AND TRIM(empresa_nombre) = ?"
+                );
+                $st2->execute([$cursoId, $f, $empresa]);
+                $yaEnSesion = array_flip($st2->fetchAll(PDO::FETCH_COLUMN));
+            } catch (\PDOException $e) { /* sin filtro si algo falla */ }
+        }
+
+        $out = [];
+        foreach ($rows as $r) {
+            $clave = ($r['curp'] ?? '') !== '' ? $r['curp'] : $r['nombre_completo'];
+            if (isset($yaEnSesion[$clave])) continue;
+            $out[] = [
+                'id'              => (int)$r['ultimo_id'],
+                'nombre_completo' => $r['nombre_completo'],
+                'curp'            => $r['curp'] ?? '',
+                'puesto'          => $r['puesto'] ?? '',
+                'ocupacion_id'    => $r['ocupacion_id'] ?? '',
+                'capacidad'       => $r['capacidad'] ?? '',
+                'capacidad_na'    => $r['capacidad_na'] ?? '',
+                'telefono'        => $r['telefono'] ?? '',
+                'foto_documentacion_url' => $r['foto_documentacion_url'] ?? '',
+                'foto_persona_url'       => $r['foto_persona_url'] ?? '',
+                'empresa_nombre'         => $r['empresa_nombre'] ?? '',
+                'empresa_rfc'            => $r['empresa_rfc'] ?? '',
+                'empresa_representante'  => $r['empresa_representante'] ?? '',
+                'empresa_direccion'      => $r['empresa_direccion'] ?? '',
+                'cursos_tomados'  => (int)$r['cursos_tomados'],
+                'ultimo_curso'    => $r['ultimo_curso'] ?? '',
+            ];
+        }
+        return ['status' => 'success', 'participantes' => $out];
+    }
+
     public function guardarParticipante(array $payload, array $files, string $usuario): array {
         $this->ensureParticipanteColumns();
         $id      = (int)($payload['id'] ?? 0);

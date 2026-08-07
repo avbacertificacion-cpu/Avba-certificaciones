@@ -1877,6 +1877,10 @@
       </div>
     </div>
 
+    <button class="ses-agregar-btn" onclick="sesAgregarExistentes()"
+            style="background:var(--verde-light,#e8f5e9);border-color:var(--verde,#3B6D11);color:var(--verde,#3B6D11)">
+      👥 Agregar participantes ya registrados
+    </button>
     <button class="ses-agregar-btn" onclick="sesAgregarParticipanteManual()">
       + Agregar participante manualmente
     </button>
@@ -1884,6 +1888,32 @@
             onclick="sesFinalizarSesion()">
       ✓ Cerrar sesión
     </button>
+  </div>
+</div>
+
+<!-- ══ SELECCIÓN DE PARTICIPANTES YA REGISTRADOS ══ -->
+<div class="cam-overlay" id="ov-existentes" style="display:none;z-index:400;background:rgba(10,20,40,.6);align-items:flex-start;padding:16px">
+  <div style="background:#fff;border-radius:14px;max-width:520px;width:100%;margin:auto;max-height:88vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:14px 16px;border-bottom:1px solid var(--borde);display:flex;align-items:center;gap:10px">
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:var(--texto)">Participantes ya registrados</div>
+        <div style="font-size:11px;color:var(--texto-sub)" id="exi-sub">—</div>
+      </div>
+      <button onclick="cerrarExistentes()" style="border:none;background:none;font-size:20px;color:var(--texto-sub);cursor:pointer">✕</button>
+    </div>
+    <div style="padding:10px 16px;border-bottom:1px solid var(--borde)">
+      <input type="text" id="exi-buscar" placeholder="🔍 Buscar por nombre o CURP" oninput="exiFiltrar()"
+             style="width:100%;padding:9px 11px;border:1.5px solid var(--borde);border-radius:9px;font-size:13px">
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button onclick="exiMarcarTodos(true)" style="flex:1;padding:6px;border:1px solid var(--borde);background:#fff;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer">Seleccionar todos</button>
+        <button onclick="exiMarcarTodos(false)" style="flex:1;padding:6px;border:1px solid var(--borde);background:#fff;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer">Ninguno</button>
+      </div>
+    </div>
+    <div id="exi-lista" style="flex:1;overflow-y:auto;padding:6px 12px"></div>
+    <div style="padding:12px 16px;border-top:1px solid var(--borde);display:flex;gap:8px">
+      <button onclick="cerrarExistentes()" style="flex:1;padding:11px;border:1.5px solid var(--borde);background:#fff;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>
+      <button id="exi-btn-add" onclick="exiAgregar()" style="flex:2;padding:11px;border:none;background:var(--azul);color:#fff;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer">Agregar a la sesión</button>
+    </div>
   </div>
 </div>
 
@@ -4836,7 +4866,7 @@ async function sesContinuar() {
 
     curSesionAccesoId    = data.id;
     curSesionAccesoIdent = data.identificador;
-    curSesion            = { nombre_sesion: nombreSesion, fecha };
+    curSesion            = { nombre_sesion: nombreSesion, fecha, curso_ids: cursoIds };
     curSesionParts       = [];
     curSesionEmpresas    = [...curSesionEmpPreBuild];
 
@@ -4924,6 +4954,133 @@ function sesRenderEmpresasLista() {
 
 function escHtmlInsp(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+
+/* ── Agregar participantes ya registrados de la empresa ─────────────────────
+   Mismo personal suele repetirse entre cursos de una empresa. En vez de
+   volver a capturarlos (y volver a pedirles sus datos y su identificación),
+   se listan los que ya existen y se copian a la sesión con el curso nuevo. */
+let _exiDatos = [];
+
+async function sesAgregarExistentes() {
+  const ov = document.getElementById('ov-existentes');
+  const cont = document.getElementById('exi-lista');
+
+  // Selectores de empresa y curso de esta sesión
+  const empresas = (curSesionEmpresas || []).map(e => e.nombre_empresa).filter(Boolean);
+  if (!empresas.length) { mostrarToast('La sesión no tiene empresas configuradas.', 'err'); return; }
+  const cursos = (curCursos || []).filter(c => (curSesion?.curso_ids || []).map(String).includes(String(c.id)));
+
+  document.getElementById('exi-sub').innerHTML = `
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+      <select id="exi-empresa" onchange="exiCargar()" style="flex:1;min-width:140px;padding:6px 8px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+        ${empresas.map(e => `<option value="${escHtmlInsp(e)}">${escHtmlInsp(e)}</option>`).join('')}
+      </select>
+      <select id="exi-curso" style="flex:1;min-width:140px;padding:6px 8px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+        ${cursos.length
+          ? cursos.map(c => `<option value="${c.id}">${escHtmlInsp(c.nombre)}</option>`).join('')
+          : '<option value="">— Sin cursos —</option>'}
+      </select>
+    </div>`;
+
+  ov.style.display = 'flex';
+  cont.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--texto-sub)">Cargando…</div>';
+  exiCargar();
+}
+
+function cerrarExistentes() { document.getElementById('ov-existentes').style.display = 'none'; }
+
+async function exiCargar() {
+  const cont = document.getElementById('exi-lista');
+  const empresa = document.getElementById('exi-empresa')?.value || '';
+  const cursoId = document.getElementById('exi-curso')?.value || '';
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  cont.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--texto-sub)">Cargando…</div>';
+  try {
+    const url = `${API}?action=LISTAR_PARTICIPANTES_EMPRESA&empresa=${encodeURIComponent(empresa)}`
+              + `&curso_id=${encodeURIComponent(cursoId)}&fecha=${encodeURIComponent(curSesion?.fecha || '')}`
+              + `&token=${encodeURIComponent(s.token || '')}`;
+    const r = await fetch(url);
+    const d = await r.json();
+    _exiDatos = (d && d.participantes) ? d.participantes : [];
+  } catch(_) { _exiDatos = []; }
+  exiRender();
+}
+
+function exiRender() {
+  const cont = document.getElementById('exi-lista');
+  const filtro = (document.getElementById('exi-buscar')?.value || '').toLowerCase().trim();
+  const vis = _exiDatos.filter(p =>
+    !filtro || (p.nombre_completo||'').toLowerCase().includes(filtro) || (p.curp||'').toLowerCase().includes(filtro));
+
+  if (!_exiDatos.length) {
+    cont.innerHTML = '<div style="padding:20px;text-align:center;font-size:12px;color:var(--texto-sub)">No hay participantes previos de esta empresa disponibles para este curso.</div>';
+    return;
+  }
+  if (!vis.length) {
+    cont.innerHTML = '<div style="padding:20px;text-align:center;font-size:12px;color:var(--texto-sub)">Ningún participante coincide con la búsqueda.</div>';
+    return;
+  }
+  cont.innerHTML = vis.map(p => `
+    <label style="display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--borde);cursor:pointer">
+      <input type="checkbox" class="exi-chk" value="${p.id}" style="width:auto;margin:0">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;color:var(--texto)">${escHtmlInsp(p.nombre_completo)}</div>
+        <div style="font-size:11px;color:var(--texto-sub)">
+          ${p.curp ? escHtmlInsp(p.curp) + ' · ' : ''}${escHtmlInsp(p.puesto || 'Sin puesto')}
+          ${p.cursos_tomados ? ' · ' + p.cursos_tomados + ' curso(s)' : ''}
+        </div>
+      </div>
+      ${p.foto_documentacion_url ? '<span title="Tiene identificación" style="font-size:13px">🪪</span>' : ''}
+    </label>`).join('');
+}
+
+function exiFiltrar() { exiRender(); }
+function exiMarcarTodos(v) { document.querySelectorAll('.exi-chk').forEach(c => c.checked = v); }
+
+async function exiAgregar() {
+  const ids = Array.from(document.querySelectorAll('.exi-chk:checked')).map(c => +c.value);
+  if (!ids.length) { mostrarToast('Selecciona al menos un participante.', 'err'); return; }
+  const cursoId = document.getElementById('exi-curso')?.value || '';
+  if (!cursoId) { mostrarToast('Selecciona el curso al que se agregarán.', 'err'); return; }
+
+  const btn = document.getElementById('exi-btn-add');
+  btn.disabled = true;
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  let ok = 0; const fallos = [];
+
+  for (let i = 0; i < ids.length; i++) {
+    const p = _exiDatos.find(x => x.id === ids[i]);
+    if (!p) continue;
+    btn.textContent = `Agregando ${i+1} de ${ids.length}…`;
+    try {
+      const r = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+        body: JSON.stringify({ action: 'GUARDAR_PARTICIPANTE', token: s.token || '', payload: {
+          nombre_completo: p.nombre_completo, curp: p.curp, puesto: p.puesto,
+          ocupacion_id: p.ocupacion_id, capacidad: p.capacidad, capacidad_na: p.capacidad_na,
+          telefono: p.telefono,
+          // Se reaprovechan las fotos ya cargadas: no hay que volver a pedirlas
+          foto_documentacion_url: p.foto_documentacion_url,
+          foto_persona_url: p.foto_persona_url,
+          curso_id: cursoId, fecha_curso: curSesion?.fecha || '',
+          empresa_nombre: p.empresa_nombre, empresa_rfc: p.empresa_rfc,
+          empresa_representante: p.empresa_representante, empresa_direccion: p.empresa_direccion,
+        }})
+      });
+      const d = await r.json();
+      if (d.status === 'success') ok++;
+      else fallos.push(`${p.nombre_completo}: ${d.message || 'error'}`);
+    } catch(_) { fallos.push(`${p.nombre_completo}: error de conexión`); }
+  }
+
+  btn.disabled = false; btn.textContent = 'Agregar a la sesión';
+  cerrarExistentes();
+  mostrarToast(`${ok} participante(s) agregado(s).`, ok ? 'ok' : 'err');
+  if (fallos.length) alert('No se pudieron agregar:\n\n• ' + fallos.join('\n• '));
+  sesRefrescarParticipantes();
 }
 
 // ── Sesión: agregar participante manual ───
