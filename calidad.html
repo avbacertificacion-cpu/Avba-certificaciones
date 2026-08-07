@@ -6549,7 +6549,14 @@ async function guardarQrArn(itemId) {
 }
 
 async function aprobarArn(id) {
-  const qr = prompt('Código QR de la inspección (ampara el dictamen del lote):');
+  // Un expediente retornado por Certificaciones conserva su QR: se precarga
+  // para poder mantenerlo tal cual, igual que en grúas.
+  const previo = (_arnDetActual?.sesion?.qr_codigo || '').trim();
+  const qr = prompt(
+    previo
+      ? 'Código QR de la inspección (ya tiene uno reservado; déjalo igual para conservarlo):'
+      : 'Código QR de la inspección (ampara el dictamen del lote):',
+    previo);
   if (qr === null) return;
   if (!qr.trim()) { mostrarToast('Indica el código QR.', 'err'); return; }
   try {

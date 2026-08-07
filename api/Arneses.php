@@ -405,7 +405,16 @@ class Arneses {
      * que se revisa el banco y todas las tablas que consumen QR. $excluirItem
      * permite reasignar el mismo QR a la pieza que ya lo tenía.
      */
-    private function qrDisponible(string $qr, int $excluirItem = 0): bool {
+    private function qrDisponible(string $qr, int $excluirItem = 0, int $excluirSesion = 0): bool {
+        // Un expediente retornado por Certificaciones conserva su QR reservado.
+        // Al volver a aprobarlo, ese mismo código sigue siendo suyo: no puede
+        // tratarse como ocupado por otro registro.
+        if ($excluirSesion > 0) {
+            $s = $this->pdo->prepare("SELECT qr_codigo FROM arneses_sesiones WHERE id = ?");
+            $s->execute([$excluirSesion]);
+            if (trim((string)$s->fetchColumn()) === $qr) return true;
+        }
+
         $r = $this->pdo->prepare("SELECT id FROM qr_codigos WHERE identificador = ? AND usado = 1");
         $r->execute([$qr]);
         if ($r->fetch()) return false;
@@ -574,12 +583,16 @@ class Arneses {
         $id = (int)($p['id'] ?? 0);
         $qr = trim((string)($p['qr'] ?? ''));
         if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
-        if ($qr === '') return ['status' => 'error', 'message' => 'Indica el código QR de la sesión.'];
 
         $s = $this->pdo->prepare("SELECT * FROM arneses_sesiones WHERE id = ?");
         $s->execute([$id]);
         $ses = $s->fetch(PDO::FETCH_ASSOC);
         if (!$ses) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+
+        // Si no se indica código pero el expediente ya tiene uno reservado
+        // (caso de un retorno de Certificaciones), se conserva el mismo.
+        if ($qr === '') $qr = trim((string)($ses['qr_codigo'] ?? ''));
+        if ($qr === '') return ['status' => 'error', 'message' => 'Indica el código QR de la sesión.'];
         // RETORNADO entra aquí igual que en grúas: Certificaciones lo regresó a
         // Calidad, conserva su QR y vuelve a ser aprobable sin recapturar.
         if (!in_array($ses['estatus'], ['PENDIENTE', 'DEVUELTO', 'RETORNADO', ''], true)) {
@@ -597,7 +610,7 @@ class Arneses {
             return ['status' => 'error', 'message' => "Faltan códigos QR: $sin pieza(s) sin QR asignado. Cada pieza lleva su propio certificado."];
         }
 
-        if (!$this->qrDisponible($qr)) {
+        if (!$this->qrDisponible($qr, 0, $id)) {
             return ['status' => 'error', 'message' => 'Ese código QR ya está asignado a otro registro.'];
         }
 
