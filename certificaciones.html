@@ -500,6 +500,7 @@
 <div class="tabs-nav">
   <button class="tab-btn active" id="sec-btn-maquinaria" onclick="verSeccion('maquinaria')">🔧 Maquinaria</button>
   <button class="tab-btn" id="sec-btn-accesorios" onclick="verSeccion('accesorios')">🔗 Accesorios</button>
+  <button class="tab-btn" id="sec-btn-arneses" onclick="verSeccion('arneses')">🦺 Arneses</button>
   <button class="tab-btn" id="sec-btn-personal" onclick="verSeccion('personal')">👤 Personal</button>
 </div>
 <div class="sub-nav" id="sub-nav-personal" style="display:none">
@@ -566,6 +567,21 @@
 
 
 <!-- ══ SECCIÓN: ACCESORIOS ══ -->
+<div id="sec-arneses" class="wrap" style="display:none">
+  <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+    <div class="stat"><div class="stat-n" id="arnc-total" style="color:var(--azul)">—</div><div class="stat-l">Por emitir</div></div>
+    <div class="stat"><div class="stat-n" id="arnc-piezas" style="color:var(--texto)">—</div><div class="stat-l">Equipos</div></div>
+    <div class="stat"><div class="stat-n" id="arnc-aptos" style="color:var(--verde)">—</div><div class="stat-l">Aptos</div></div>
+  </div>
+  <div class="tabla-card">
+    <div class="tabla-header">
+      <span class="tabla-title">Inspecciones aprobadas por Calidad</span>
+      <span class="tabla-count" id="arnc-count">—</span>
+    </div>
+    <div id="arnc-lista" style="padding:14px"></div>
+  </div>
+</div>
+
 <div id="sec-accesorios" class="wrap" style="display:none">
 
   <div class="stats" id="acc-stats-cert" style="grid-template-columns:repeat(3,1fr)">
@@ -2151,12 +2167,94 @@ function mostrarToast(msg, tipo = "info") {
 /* ═══════════════════════════════
    NAVEGACIÓN POR SECCIONES
 ═══════════════════════════════ */
-const CERT_SECCIONES = ['sec-maquinaria','sec-accesorios','sec-per-cursos','sec-per-indep'];
+const CERT_SECCIONES = ['sec-maquinaria','sec-accesorios','sec-arneses','sec-per-cursos','sec-per-indep'];
+
+
+/* ═══ ARNESES Y LÍNEAS DE VIDA (emisión) ════════════════════════════════════
+   Certificaciones emite el dictamen del lote y el certificado de cada pieza
+   apta de las inspecciones que Calidad ya aprobó. */
+let _arncSesiones = [];
+
+async function cargarArnCert() {
+  const cont = document.getElementById('arnc-lista');
+  cont.innerHTML = '<div style="text-align:center;padding:26px;color:var(--texto-hint)">Cargando…</div>';
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await fetch(`${API}?action=LISTAR_SESIONES_ARNESES&estatus=APROBADO_CALIDAD&token=${encodeURIComponent(s.token||'')}`);
+    const d = await r.json();
+    if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo);text-align:center;padding:18px">${escH(d.message||'Error')}</p>`; return; }
+    _arncSesiones = d.sesiones || [];
+    renderArnCert();
+  } catch(_) { cont.innerHTML = '<p style="color:var(--rojo);text-align:center;padding:18px">Error de red.</p>'; }
+}
+
+function renderArnCert() {
+  const cont = document.getElementById('arnc-lista');
+  const tot = _arncSesiones.length;
+  const piezas = _arncSesiones.reduce((a,s)=>a+(+s.total||0),0);
+  const aptos  = _arncSesiones.reduce((a,s)=>a+(+s.aptos||0),0);
+  document.getElementById('arnc-total').textContent  = tot;
+  document.getElementById('arnc-piezas').textContent = piezas;
+  document.getElementById('arnc-aptos').textContent  = aptos;
+  document.getElementById('arnc-count').textContent  = tot + ' inspección' + (tot!==1?'es':'');
+
+  if (!tot) {
+    cont.innerHTML = '<div style="text-align:center;padding:30px;color:var(--texto-hint)">No hay inspecciones aprobadas pendientes de emitir.</div>';
+    return;
+  }
+  cont.innerHTML = _arncSesiones.map(s => `
+    <div style="border:1px solid var(--borde);border-radius:10px;padding:13px 15px;margin-bottom:10px;background:#fff">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px">
+          <div style="font-size:14px;font-weight:600;color:var(--texto)">${escH(s.cliente)}</div>
+          <div style="font-size:12px;color:var(--texto-sub);margin-top:2px">
+            ${escH(s.fecha||'')} · ${s.total} equipo(s) · ${s.aptos} apto(s)${+s.no_aptos ? ` · <span style="color:var(--rojo)">${s.no_aptos} no apto(s)</span>` : ''}
+            ${s.control ? ' · Folio ' + escH(s.control) : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn-ver" style="font-size:11px" onclick="emitirArnCert(${s.id})">📄 Emitir documentos</button>
+          ${s.dictamen_url ? `<a class="btn-ver" style="font-size:11px;text-decoration:none" href="${escH(s.dictamen_url)}" target="_blank">Ver dictamen</a>` : ''}
+          <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)" onclick="devolverArnCert(${s.id})">↩ Devolver</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+async function emitirArnCert(id) {
+  if (!confirm('¿Emitir el dictamen del lote y el certificado de cada pieza apta?')) return;
+  mostrarToast('Generando documentos…', 'info');
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json','X-Token':s.token||''},
+      body: JSON.stringify({ action:'EMITIR_SESION_ARNES', token:s.token||'', payload:{ id } }) });
+    const d = await r.json();
+    if (d.status === 'success') {
+      mostrarToast(d.message || 'Documentos emitidos.', 'ok');
+      if (d.dictamen) window.open(d.dictamen, '_blank');
+      if (d.errores && d.errores.length) alert('Algunas piezas no generaron certificado:\n\n• ' + d.errores.join('\n• '));
+      cargarArnCert();
+    } else mostrarToast(d.message || 'No se pudo emitir.', 'err');
+  } catch(_) { mostrarToast('Error de conexión.', 'err'); }
+}
+
+async function devolverArnCert(id) {
+  const motivo = prompt('Motivo de la devolución a Calidad:');
+  if (motivo === null) return;
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json','X-Token':s.token||''},
+      body: JSON.stringify({ action:'DEVOLVER_SESION_ARNES', token:s.token||'', payload:{ id, motivo } }) });
+    const d = await r.json();
+    if (d.status === 'success') { mostrarToast('Devuelta a Calidad.', 'ok'); cargarArnCert(); }
+    else mostrarToast(d.message || 'No se pudo devolver.', 'err');
+  } catch(_) { mostrarToast('Error de conexión.', 'err'); }
+}
 
 function verSeccion(sec) {
   CERT_SECCIONES.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
   document.getElementById('sub-nav-personal').style.display = 'none';
-  ['maquinaria','accesorios','personal'].forEach(s => {
+  ['maquinaria','accesorios','arneses','personal'].forEach(s => {
     document.getElementById('sec-btn-' + s)?.classList.remove('active');
   });
   document.getElementById('sec-btn-' + sec)?.classList.add('active');
@@ -2167,6 +2265,9 @@ function verSeccion(sec) {
     document.getElementById('sec-accesorios').style.display = '';
     accCertCargados = false;
     cargarAccCert();
+  } else if (sec === 'arneses') {
+    document.getElementById('sec-arneses').style.display = '';
+    cargarArnCert();
   } else if (sec === 'personal') {
     document.getElementById('sub-nav-personal').style.display = 'flex';
     verSubTabCert('cursos');

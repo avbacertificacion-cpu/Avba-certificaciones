@@ -2098,14 +2098,20 @@
 </div>
 
 <!-- ══ MODAL DETALLE DE INSPECCIÓN DE ARNESES ══ -->
-<div class="overlay" id="overlay-arn">
+<div class="overlay" id="overlay-arn" style="display:none" onclick="if(event.target===this)cerrarArnDet()">
   <div class="modal" style="max-width:820px">
-    <div class="modal-header">
-      <h3 style="margin:0" id="arn-det-titulo">Inspección de arneses</h3>
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:#0C447C">🦺</div>
+        <div>
+          <div class="m-title" id="arn-det-titulo">Inspección de arneses</div>
+          <div class="m-sub"   id="arn-det-sub">—</div>
+        </div>
+      </div>
       <button class="modal-close" onclick="cerrarArnDet()">✕</button>
     </div>
-    <div class="modal-body" id="arn-det-body" style="max-height:70vh;overflow-y:auto"></div>
-    <div class="modal-btns" id="arn-det-footer"></div>
+    <div class="modal-body" id="arn-det-body"></div>
+    <div class="modal-footer" id="arn-det-footer"></div>
   </div>
 </div>
 
@@ -6401,7 +6407,7 @@ function renderSesionesArn() {
 
 async function abrirArnDet(id) {
   const body = document.getElementById('arn-det-body');
-  document.getElementById('overlay-arn').classList.add('open');
+  document.getElementById('overlay-arn').style.display = 'flex';
   body.innerHTML = '<div style="text-align:center;padding:30px;color:var(--texto-hint)">Cargando…</div>';
   document.getElementById('arn-det-footer').innerHTML = '';
   try {
@@ -6420,10 +6426,13 @@ function renderArnDet(d) {
   const sinQR = items.filter(i => !i.qr_codigo).length;
   const color = r => r === 'APTO' ? '#1b7a3d' : (r === 'NO APTO' ? '#b91c1c' : '#92400e');
 
+  const sub = document.getElementById('arn-det-sub');
+  if (sub) sub.textContent = `${ses.fecha_fmt||''} · ${ses.direccion||'Sin ubicación'}`
+                           + (ses.control ? ' · Folio ' + ses.control : '');
+
   document.getElementById('arn-det-body').innerHTML = `
     <div style="font-size:12px;color:var(--texto-sub);margin-bottom:12px">
-      ${escH(ses.fecha_fmt||'')} · ${escH(ses.direccion||'Sin ubicación')} ${_arnBadge(ses.estatus)}
-      ${ses.control ? ' · Folio <strong>' + escH(ses.control) + '</strong>' : ''}
+      ${_arnBadge(ses.estatus)}
     </div>
     ${sinQR ? `<div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:10px;font-size:12px;color:#92400e;margin-bottom:12px">
        ⚠ ${sinQR} pieza(s) sin código QR. Cada pieza lleva certificado propio, así que necesita su QR antes de aprobar.
@@ -6458,13 +6467,13 @@ function renderArnDet(d) {
 
   const puedeAprobar = ['PENDIENTE','DEVUELTO',''].includes(ses.estatus || '');
   document.getElementById('arn-det-footer').innerHTML = `
-    <button class="btn-cancel" onclick="cerrarArnDet()">Cerrar</button>
-    ${puedeAprobar ? `<button class="btn-confirm" onclick="aprobarArn(${ses.id})">✓ Aprobar → Certificaciones</button>` : ''}
-    ${ses.estatus === 'APROBADO_CALIDAD' ? `<button class="btn-confirm" onclick="emitirArn(${ses.id})">📄 Emitir documentos</button>` : ''}
+    <button class="btn-sec" onclick="cerrarArnDet()">Cerrar</button>
+    ${puedeAprobar ? `<button class="btn-guardar" onclick="aprobarArn(${ses.id})">✓ Aprobar → Certificaciones</button>` : ''}
+    ${ses.estatus === 'APROBADO_CALIDAD' ? `<button class="btn-sec" onclick="emitirArn(${ses.id})">📄 Emitir documentos</button>` : ''}
   `;
 }
 
-function cerrarArnDet() { document.getElementById('overlay-arn').classList.remove('open'); }
+function cerrarArnDet() { document.getElementById('overlay-arn').style.display = 'none'; }
 
 async function guardarQrArn(itemId) {
   const qr = document.getElementById('arn-qr-' + itemId).value.trim();
