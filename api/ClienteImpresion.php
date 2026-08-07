@@ -214,7 +214,9 @@ class ClienteImpresion {
         if (!is_dir($dir) && !@mkdir($dir, 0755, true) && !is_dir($dir)) {
             return ['status' => 'error', 'message' => 'No se pudo crear la carpeta de impresiones en el servidor.'];
         }
-        $nombre = 'EXPEDIENTE_' . strtoupper($tipo) . '_' . $id . '_' . date('Ymd_His') . '.pdf';
+        // El id_cliente va en el nombre para que descargar.php pueda comprobar
+        // que quien lo pide es de la misma empresa.
+        $nombre = 'EXPEDIENTE_' . $idCliente . '_' . strtoupper($tipo) . '_' . $id . '_' . date('Ymd_His') . '.pdf';
         $destino = $dir . $nombre;
 
         // OJO: FPDI/FPDF recibe (destino, nombre) — al revés que mPDF, que usa
@@ -228,11 +230,14 @@ class ClienteImpresion {
             return ['status' => 'error', 'message' => 'El PDF no se pudo guardar en el servidor. Revisa los permisos de la carpeta uploads/impresiones.'];
         }
 
+        // Se entrega por descargar.php y no como archivo estático: en este
+        // hosting Apache no sirve los archivos recién creados bajo uploads/
+        // (ya ocurrió con el informe de inspecciones y se resolvió igual).
         return [
-            'status'    => 'success',
-            'url'       => rtrim(SITE_URL, '/') . '/' . UPLOAD_URL . 'impresiones/' . $nombre,
-            'paginas'   => $paginas,
-            'omitidos'  => $omitidos,
+            'status'   => 'success',
+            'archivo'  => $nombre,
+            'paginas'  => $paginas,
+            'omitidos' => $omitidos,
         ];
     }
 

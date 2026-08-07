@@ -2731,7 +2731,11 @@ async function generarImpresion() {
       if (d.omitidos && d.omitidos.length) {
         alert('Estos documentos están protegidos y no se pudieron combinar; imprímelos por separado:\n\n• ' + d.omitidos.join('\n• '));
       }
-      window.open(d.url, '_blank');
+      // Se abre por descargar.php: sirve el PDF desde PHP, porque el servidor
+      // no entrega los archivos recién creados bajo uploads/.
+      const _s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+      window.open('descargar.php?tipo=expediente&f=' + encodeURIComponent(d.archivo) +
+                  '&token=' + encodeURIComponent(_s.token || ''), '_blank');
     } else {
       toastEq(d.message || 'No se pudo generar el PDF.');
     }
