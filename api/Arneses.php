@@ -713,7 +713,7 @@ class Arneses {
     // ════════════════════════════════════════════════════════
 
     /** HTML → PDF con mPDF, guardado en uploads/reportes/. */
-    private function htmlToPdf(string $html, string $folio, string $sufijo): string {
+    private function htmlToPdf(string $html, string $folio, string $sufijo, string $pieDoc = ''): string {
         if (!class_exists('\\Mpdf\\Mpdf')) {
             $autoload = __DIR__ . '/../vendor/autoload.php';
             if (file_exists($autoload)) require_once $autoload;
@@ -725,11 +725,26 @@ class Arneses {
 
         $mpdf = new \Mpdf\Mpdf([
             'mode' => 'utf-8', 'format' => 'A4',
-            'margin_left' => 12, 'margin_right' => 12, 'margin_top' => 12, 'margin_bottom' => 14,
+            'margin_left' => 13, 'margin_right' => 13, 'margin_top' => 12, 'margin_bottom' => 16,
+            'margin_footer' => 7,
             'default_font' => 'dejavusans',
             'tempDir' => sys_get_temp_dir() . '/mpdf',
         ]);
         $mpdf->SetBasePath(__DIR__ . '/../');
+
+        // Pie con folio y paginación en todas las hojas: un documento de varias
+        // páginas necesita que cada hoja se pueda identificar por sí sola.
+        if ($pieDoc !== '') {
+            $mpdf->SetHTMLFooter(
+                '<table width="100%" style="border-top:1px solid #dde5f0;font-size:6.8pt;color:#7a8494;padding-top:3px">
+                   <tr>
+                     <td width="60%">' . $pieDoc . '</td>
+                     <td width="40%" style="text-align:right">Página {PAGENO} de {nbpg}</td>
+                   </tr>
+                 </table>'
+            );
+        }
+
         $prev = (int)ini_get('pcre.backtrack_limit');
         ini_set('pcre.backtrack_limit', 10000000);
         $mpdf->WriteHTML($html);
@@ -748,33 +763,153 @@ class Arneses {
         return htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
     }
 
-    /** Encabezado común de los documentos. */
-    private function encabezado(string $titulo, string $folio): string {
-        $logo = __DIR__ . '/../assets/logos/avba.png';
-        $img  = is_file($logo)
-            ? '<img src="assets/logos/avba.png" style="height:38px">'
-            : '<span style="font-size:18px;font-weight:bold;color:#0C447C">AVBA</span>';
-        $acred = defined('NO_ACREDITACION') ? NO_ACREDITACION : '';
-        return '
-        <table width="100%" style="border-bottom:2px solid #185FA5;padding-bottom:6px;margin-bottom:10px">
-          <tr>
-            <td width="45%">' . $img . '</td>
-            <td width="55%" style="text-align:right;font-size:8pt;color:#5a6072">
-              AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.<br>
-              ' . ($acred ? 'Unidad de Inspección ' . $this->esc($acred) . '<br>' : '') . '
-              Folio: <strong style="color:#0C447C">' . $this->esc(formatoFolio($folio)) . '</strong>
-            </td>
-          </tr>
-        </table>
-        <div style="text-align:center;font-size:14pt;font-weight:bold;color:#0C447C;margin-bottom:2px">' . $this->esc($titulo) . '</div>
-        <div style="text-align:center;font-size:8pt;color:#5a6072;margin-bottom:12px">
-          Equipo de protección personal contra caídas · NOM-009-STPS-2011
-        </div>';
+    /** Ruta relativa de un activo de marca si existe (mPDF resuelve sobre la raíz). */
+    private function activo(string $rel): string {
+        return is_file(__DIR__ . '/../' . $rel) ? $rel : '';
     }
 
     /**
-     * DICTAMEN TÉCNICO del lote: ampara toda la inspección con el listado de
-     * piezas y su resultado.
+     * Hoja de estilos común de los documentos de arneses. Reproduce el lenguaje
+     * visual de los certificados de maquinaria (banda azul, barra de título,
+     * etiquetas de sección) para que el cliente reciba documentos consistentes.
+     * mPDF no soporta flexbox: toda la maquetación va con tablas.
+     */
+    private function estilosDoc(): string {
+        // Sin regla @page: define los márgenes en el constructor de mPDF. Una
+        // @page en la hoja de estilos desplaza el pie de página HTML y lo deja
+        // fuera de la hoja.
+        return '<style>
+  body { font-family: dejavusans; font-size: 9pt; color: #1a1a2e; margin: 0; }
+  h1,h2,h3,p { margin: 0; }
+
+  .hdr        { border-bottom: 3px solid #185FA5; padding: 0 2px 6px; }
+  .hdr-t      { font-size: 13.5pt; font-weight: bold; color: #0C447C; }
+  .hdr-s      { font-size: 7.5pt; color: #5a6072; }
+  .hdr-r      { text-align: right; font-size: 7.5pt; color: #5a6072; line-height: 1.55; }
+  .title-bar  { background: #0C447C; text-align: center; padding: 7px 0; }
+  .title-bar h2 { color: #fff; font-size: 12.5pt; font-weight: bold; letter-spacing: 2.5px; }
+  .title-bar .sub { color: #a8c6e8; font-size: 7.5pt; letter-spacing: .5px; margin-top: 2px; }
+  .folio-bar  { background: #E6F1FB; text-align: center; padding: 5px 0;
+                border-bottom: 2px solid #185FA5; }
+  .folio-bar span { font-size: 10.5pt; color: #0C447C; font-weight: bold; letter-spacing: 1px; }
+
+  .slabel     { background: #185FA5; color: #fff; font-size: 7.5pt; font-weight: bold;
+                letter-spacing: 1.2px; padding: 4px 10px; margin: 11px 0 0; }
+  .dt         { width: 100%; border-collapse: collapse; }
+  .dt td      { padding: 3.5px 9px; border-bottom: 1px solid #dde5f0; font-size: 8.5pt; }
+  .dt .lbl    { width: 22%; font-weight: bold; color: #185FA5; background: #f5f8fd; }
+  .dt .val    { color: #1a1a2e; }
+
+  .grid       { width: 100%; border-collapse: collapse; font-size: 7.8pt; }
+  .grid th    { background: #0C447C; color: #fff; padding: 5px 4px; font-size: 6.8pt; }
+  .grid td    { padding: 3px 4px; border-bottom: 1px solid #dde5f0; }
+  .grid .alt  { background: #f7fafd; }
+  .juntos     { page-break-inside: avoid; }
+
+  .kpi        { width: 100%; border-collapse: separate; border-spacing: 6px 0; margin-top: 8px; }
+  .kpi td     { text-align: center; padding: 9px 4px; border-radius: 5px; }
+  .kpi .n     { font-size: 16pt; font-weight: bold; }
+  .kpi .l     { font-size: 7pt; letter-spacing: .8px; }
+
+  .nota       { font-size: 7.8pt; color: #5a6072; line-height: 1.55; }
+  .legal      { margin-top: 6px; padding: 5px 10px; background: #f5f8fd;
+                border-top: 1px solid #dde5f0; font-size: 7pt; color: #7a8494;
+                text-align: center; line-height: 1.5; }
+  .sign-t     { font-size: 8pt; font-weight: bold; }
+  .sign-s     { font-size: 7pt; color: #5a6072; }
+</style>';
+    }
+
+    /**
+     * Línea de firma. mPDF no dibuja el borde de un div vacío, así que la línea
+     * se traza con la celda de una tabla.
+     */
+    private function lineaFirma(): string {
+        return '<table width="82%" style="margin:0 auto 3px"><tr>
+                  <td style="border-top:1px solid #333;font-size:1pt">&nbsp;</td>
+                </tr></table>';
+    }
+
+    /** Banda superior, barra de título y folio: encabezado común. */
+    private function encabezado(string $titulo, string $folio, string $subtitulo = ''): string {
+        // Membrete en blanco: el logotipo es azul oscuro y sobre la banda azul
+        // quedaba ilegible.
+        $logo  = $this->activo('assets/logos/avba.png');
+        $img   = $logo
+            ? '<img src="' . $logo . '" style="height:34px">'
+            : '<div class="hdr-t">AVBA Inspections</div>';
+        $acred = defined('NO_ACREDITACION') ? (string)NO_ACREDITACION : '';
+        $sub   = $subtitulo ?: 'Equipo de protección personal contra caídas';
+
+        return '
+        <div class="hdr">
+          <table width="100%"><tr>
+            <td width="34%" style="vertical-align:middle">' . $img . '</td>
+            <td width="66%" class="hdr-r">
+              <strong style="color:#0C447C;font-size:8.5pt">AVBA Inspections, Certifications &amp; Maintenance S.A.S. de C.V.</strong><br>'
+              . ($acred ? 'Unidad de Inspección ' . $this->esc($acred) . ' · ' : '')
+              . 'Altamira, Tamaulipas · México<br>gestion.avba.com.mx
+            </td>
+          </tr></table>
+        </div>
+        <div class="title-bar">
+          <h2>' . $this->esc($titulo) . '</h2>
+          <div class="sub">' . $this->esc($sub) . '</div>
+        </div>
+        <div class="folio-bar"><span>Folio: ' . $this->esc(formatoFolio($folio)) . '</span></div>';
+    }
+
+    /** Franja de acreditaciones al pie de los documentos. */
+    private function franjaAcreditaciones(): string {
+        $imgs = '';
+        foreach ([['assets/logos/stps.png', 22], ['assets/logos/iso.png', 22], ['assets/logos/asme.png', 22]] as [$rel, $h]) {
+            $ok = $this->activo($rel);
+            if ($ok) $imgs .= '<td style="text-align:center"><img src="' . $ok . '" style="height:' . $h . 'px"></td>';
+        }
+        if ($imgs === '') return '';
+        return '<table width="100%" style="margin-top:8px"><tr>' . $imgs . '</tr></table>';
+    }
+
+    /**
+     * Consolida las normas capturadas (selección múltiple, separadas por coma o
+     * salto de línea) en una lista sin repeticiones.
+     */
+    private function normasDe(array $items): array {
+        $out = [];
+        foreach ($items as $i) {
+            foreach (preg_split('/[,\n;]+/', (string)($i['norma'] ?? '')) as $n) {
+                $n = trim($n);
+                if ($n !== '' && !in_array($n, $out, true)) $out[] = $n;
+            }
+        }
+        if (!$out) $out[] = 'NOM-009-STPS-2011';
+        return $out;
+    }
+
+    /** Fotos de una pieza como rutas relativas (mPDF no descarga por HTTP). */
+    private function fotosDe(int $itemId): array {
+        $s = $this->pdo->prepare("SELECT url FROM arneses_fotos WHERE item_id = ? ORDER BY orden LIMIT 6");
+        $s->execute([$itemId]);
+        $out = [];
+        foreach ($s->fetchAll(PDO::FETCH_COLUMN) as $u) {
+            $rel = ltrim(str_replace(rtrim(SITE_URL, '/'), '', (string)$u), '/');
+            if (is_file(__DIR__ . '/../' . $rel)) $out[] = $rel;
+        }
+        return $out;
+    }
+
+    /** Color y fondo asociados a un resultado de inspección. */
+    private function colorRes(string $r): array {
+        if ($r === 'APTO')    return ['#1b7a3d', '#e8f5e9'];
+        if ($r === 'NO APTO') return ['#b91c1c', '#fdecea'];
+        return ['#92400e', '#fff8e1'];
+    }
+
+    /**
+     * DICTAMEN TÉCNICO del lote: documento completo que ampara la inspección —
+     * alcance, marco normativo, metodología, relación de equipos, hallazgos y
+     * conclusiones — con el mismo lenguaje visual que los certificados de
+     * maquinaria.
      */
     public function generarDictamen(int $sesionId): array {
         $det = $this->detalleSesion($sesionId);
@@ -783,70 +918,209 @@ class Arneses {
         if (!$items) return ['status' => 'error', 'message' => 'La inspección no tiene piezas.'];
         if (empty($ses['control'])) return ['status' => 'error', 'message' => 'La inspección aún no tiene folio; debe aprobarse en Calidad.'];
 
+        $total  = count($items);
         $aptos  = count(array_filter($items, fn($i) => $i['resultado'] === 'APTO'));
         $noApt  = count(array_filter($items, fn($i) => $i['resultado'] === 'NO APTO'));
-        $cond   = count($items) - $aptos - $noApt;
+        $cond   = $total - $aptos - $noApt;
+        $pct    = $total ? (int)round($aptos * 100 / $total) : 0;
 
+        // Dictamen global: basta una pieza no apta para que el lote quede
+        // condicionado; el resto se sigue amparando individualmente.
+        if ($noApt > 0)      { $veredicto = 'CON EQUIPO FUERA DE SERVICIO'; $vColor = '#b91c1c'; $vFondo = '#fdecea'; }
+        elseif ($cond > 0)   { $veredicto = 'APTO CON CONDICIONES';         $vColor = '#92400e'; $vFondo = '#fff8e1'; }
+        else                 { $veredicto = 'APTO PARA SERVICIO';           $vColor = '#1b7a3d'; $vFondo = '#e8f5e9'; }
+
+        // ── Relación de equipos ──────────────────────────────
         $filas = '';
         foreach ($items as $n => $i) {
-            $color = $i['resultado'] === 'APTO' ? '#1b7a3d' : ($i['resultado'] === 'NO APTO' ? '#b91c1c' : '#92400e');
-            $filas .= '<tr>
+            [$c] = $this->colorRes($i['resultado']);
+            $alt = $n % 2 ? ' class="alt"' : '';
+            $filas .= '<tr' . $alt . '>
                 <td style="text-align:center">' . ($n + 1) . '</td>
                 <td>' . $this->esc($i['tipo_nombre']) . '</td>
-                <td>' . $this->esc($i['marca']) . ' ' . $this->esc($i['modelo']) . '</td>
+                <td>' . $this->esc(trim(($i['marca'] ?? '') . ' ' . ($i['modelo'] ?? '')) ?: '—') . '</td>
                 <td>' . $this->esc($i['serie'] ?: '—') . '</td>
+                <td style="text-align:center">' . $this->esc($i['id_arnes'] ?: '—') . '</td>
+                <td style="text-align:center">' . $this->esc($i['fabricacion_fmt'] ?: '—') . '</td>
                 <td style="text-align:center">' . $this->esc($i['retiro_fmt'] ?: '—') . '</td>
-                <td style="text-align:center;color:' . $color . ';font-weight:bold">' . $this->esc($i['resultado']) . '</td>
+                <td style="text-align:center;color:' . $c . ';font-weight:bold;font-size:7pt;white-space:nowrap">' . $this->esc($i['resultado']) . '</td>
               </tr>';
-            if (!empty($i['observaciones'])) {
-                $filas .= '<tr><td></td><td colspan="5" style="font-size:7.5pt;color:#5a6072;font-style:italic">'
-                        . $this->esc($i['observaciones']) . '</td></tr>';
+        }
+
+        // ── Hallazgos: puntos no conformes y observaciones ───
+        $hallazgos = '';
+        foreach ($items as $n => $i) {
+            $nc = array_values(array_filter($i['checklist'] ?? [], fn($c) => ($c['valor'] ?? '') === 'NC'));
+            if (!$nc && empty($i['observaciones'])) continue;
+            [$c] = $this->colorRes($i['resultado']);
+            $hallazgos .= '<div style="border-left:3px solid ' . $c . ';background:#f9fafb;padding:7px 10px;margin-top:7px">
+                <div style="font-size:8.5pt;font-weight:bold">Equipo ' . ($n + 1) . ' — '
+                . $this->esc($i['tipo_nombre']) . ($i['serie'] ? ' · Serie ' . $this->esc($i['serie']) : '')
+                . ' <span style="color:' . $c . '">(' . $this->esc($i['resultado']) . ')</span></div>';
+            foreach ($nc as $c2) {
+                $hallazgos .= '<div class="nota" style="margin-top:3px">• No conforme: ' . $this->esc($c2['descripcion']) . '</div>';
             }
+            if (!empty($i['observaciones'])) {
+                $hallazgos .= '<div class="nota" style="margin-top:3px;font-style:italic">Observaciones: '
+                            . $this->esc($i['observaciones']) . '</div>';
+            }
+            $hallazgos .= '</div>';
+        }
+        if ($hallazgos === '') {
+            $hallazgos = '<div class="nota" style="margin-top:7px">No se detectaron no conformidades ni observaciones en los equipos inspeccionados.</div>';
+        }
+
+        // ── Marco normativo ──────────────────────────────────
+        $normas = '';
+        foreach ($this->normasDe($items) as $nm) {
+            $normas .= '<tr><td width="4%" style="border:none;padding:2px 0">•</td>
+                        <td style="border:none;padding:2px 0;font-size:8pt">' . $this->esc($nm) . '</td></tr>';
         }
 
         $qrImg = !empty($ses['qr_codigo'])
-            ? '<img src="' . qrDataUri(textoQR($ses['qr_codigo']), 240, 3) . '" style="width:80px">' : '';
+            ? '<img src="' . qrDataUri(textoQR($ses['qr_codigo']), 260, 3) . '" style="width:78px">'
+              . '<div style="font-size:6.5pt;color:#5a6072;margin-top:2px">Valida este dictamen</div>'
+            : '';
+        $inspector = $this->esc($ses['inspector_firma'] ?: $ses['usuario'] ?: '');
+        $sello     = $this->activo('assets/sellos/sello.png');
 
-        $html = '<html><body style="font-family:dejavusans;font-size:9pt;color:#1a1a2e">'
-          . $this->encabezado('DICTAMEN TÉCNICO DE INSPECCIÓN', $ses['control'])
-          . '<table width="100%" style="font-size:9pt;margin-bottom:10px">
-               <tr><td width="18%"><strong>Cliente:</strong></td><td width="52%">' . $this->esc($ses['cliente']) . '</td>
-                   <td width="30%" rowspan="3" style="text-align:right">' . $qrImg . '</td></tr>
-               <tr><td><strong>Fecha:</strong></td><td>' . $this->esc($ses['fecha_fmt']) . '</td></tr>
-               <tr><td><strong>Lugar:</strong></td><td>' . $this->esc($ses['direccion'] ?: '—') . '</td></tr>
+        $html = '<html><head><meta charset="UTF-8">' . $this->estilosDoc() . '</head><body>'
+          . $this->encabezado('DICTAMEN TÉCNICO DE INSPECCIÓN', $ses['control'],
+                              'Equipo de protección personal contra caídas')
+
+          . '<div class="slabel">DATOS DEL CLIENTE Y DE LA INSPECCIÓN</div>
+             <table class="dt">
+               <tr><td class="lbl">CLIENTE</td><td class="val">' . $this->esc($ses['cliente']) . '</td>
+                   <td rowspan="4" width="20%" style="text-align:center;background:#fff">' . $qrImg . '</td></tr>
+               <tr><td class="lbl">LUGAR DE INSPECCIÓN</td><td class="val">' . $this->esc($ses['direccion'] ?: '—') . '</td></tr>
+               <tr><td class="lbl">FECHA DE INSPECCIÓN</td><td class="val">' . $this->esc($ses['fecha_fmt']) . '</td></tr>
+               <tr><td class="lbl">INSPECTOR RESPONSABLE</td><td class="val">' . $inspector . '</td></tr>
              </table>
-             <table width="100%" cellpadding="5" style="border-collapse:collapse;font-size:8.5pt">
-               <thead><tr style="background:#E6F1FB;color:#0C447C">
-                 <th width="6%">#</th><th width="26%">Tipo de equipo</th><th width="24%">Marca / Modelo</th>
-                 <th width="20%">No. de serie</th><th width="12%">Retiro</th><th width="12%">Resultado</th>
+
+             <div class="slabel">RESUMEN DEL DICTAMEN</div>
+             <table class="kpi">
+               <tr>
+                 <td style="background:#eef2f7"><div class="n" style="color:#0C447C">' . $total . '</div><div class="l">EQUIPOS</div></td>
+                 <td style="background:#e8f5e9"><div class="n" style="color:#1b7a3d">' . $aptos . '</div><div class="l">APTOS</div></td>
+                 <td style="background:#fff8e1"><div class="n" style="color:#92400e">' . $cond . '</div><div class="l">CONDICIONADOS</div></td>
+                 <td style="background:#fdecea"><div class="n" style="color:#b91c1c">' . $noApt . '</div><div class="l">NO APTOS</div></td>
+               </tr>
+             </table>
+             <table width="100%" style="margin-top:9px;border-collapse:collapse">
+               <tr>
+                 <td width="26%" style="font-size:7.5pt;color:#5a6072">Índice de conformidad</td>
+                 <td width="58%">
+                   <table width="100%" style="border-collapse:collapse;background:#e6eaf0">
+                     <tr><td width="' . max($pct, 1) . '%" style="background:#1b7a3d;height:9px"></td>
+                         <td width="' . (100 - $pct) . '%"></td></tr>
+                   </table>
+                 </td>
+                 <td width="16%" style="text-align:right;font-size:10pt;font-weight:bold;color:#1b7a3d">' . $pct . '%</td>
+               </tr>
+             </table>
+             <div style="background:' . $vFondo . ';border:2px solid ' . $vColor . ';border-radius:5px;text-align:center;padding:9px;margin-top:10px">
+               <div style="font-size:7pt;color:#5a6072;letter-spacing:1px">DICTAMEN GENERAL DEL LOTE</div>
+               <div style="font-size:14pt;font-weight:bold;color:' . $vColor . '">' . $veredicto . '</div>
+             </div>
+
+             <div class="slabel">OBJETIVO Y ALCANCE</div>
+             <div class="nota" style="padding:7px 2px">
+               Verificar el estado físico y funcional del equipo de protección personal contra
+               caídas relacionado en este dictamen, a fin de determinar si es apto para
+               continuar en servicio. El alcance comprende la inspección visual y funcional
+               de los ' . $total . ' equipo(s) listados, en las condiciones y el lugar
+               indicados. No comprende ensayos destructivos, pruebas de carga dinámica ni
+               equipos no relacionados en este documento.
+             </div>
+
+             <div class="slabel">MARCO NORMATIVO APLICADO</div>
+             <table width="100%" style="margin:5px 0 0"><tbody>' . $normas . '</tbody></table>
+
+             <div class="slabel">METODOLOGÍA Y CRITERIOS DE ACEPTACIÓN</div>
+             <div class="nota" style="padding:7px 2px">
+               Cada equipo se sometió a una lista de verificación específica por tipo, en la que
+               cada punto se califica como <strong>C</strong> (conforme), <strong>NC</strong>
+               (no conforme) o <strong>NA</strong> (no aplica). Los criterios de dictamen son:
+             </div>
+             <table class="grid" style="margin-top:4px">
+               <tr><th width="22%">RESULTADO</th><th>CRITERIO</th></tr>
+               <tr><td style="color:#1b7a3d;font-weight:bold;text-align:center">APTO</td>
+                   <td>Sin puntos no conformes. El equipo puede permanecer en servicio hasta su fecha de retiro.</td></tr>
+               <tr class="alt"><td style="color:#92400e;font-weight:bold;text-align:center">CONDICIONADO</td>
+                   <td>Presenta desviaciones menores que no comprometen la resistencia. Requiere corrección y seguimiento.</td></tr>
+               <tr><td style="color:#b91c1c;font-weight:bold;text-align:center">NO APTO</td>
+                   <td>Presenta daño, deterioro o vencimiento. Debe retirarse de servicio y destruirse para impedir su reutilización.</td></tr>
+             </table>
+
+             <div class="juntos">
+             <div class="slabel">RELACIÓN DE EQUIPOS INSPECCIONADOS</div>
+             <table class="grid" style="margin-top:4px">
+               <thead><tr>
+                 <th width="4%">#</th><th width="20%">TIPO DE EQUIPO</th><th width="17%">MARCA / MODELO</th>
+                 <th width="15%">No. SERIE</th><th width="10%">ID</th><th width="10%">FABRIC.</th>
+                 <th width="10%">RETIRO</th><th width="15%">RESULTADO</th>
                </tr></thead>
                <tbody>' . $filas . '</tbody>
              </table>
-             <table width="100%" style="margin-top:12px;font-size:9pt">
-               <tr>
-                 <td width="33%" style="text-align:center;background:#e8f5e9;padding:8px"><strong style="color:#1b7a3d;font-size:13pt">' . $aptos . '</strong><br>APTOS</td>
-                 <td width="33%" style="text-align:center;background:#fff8e1;padding:8px"><strong style="color:#92400e;font-size:13pt">' . $cond . '</strong><br>CONDICIONADOS</td>
-                 <td width="34%" style="text-align:center;background:#fdecea;padding:8px"><strong style="color:#b91c1c;font-size:13pt">' . $noApt . '</strong><br>NO APTOS</td>
-               </tr>
-             </table>
-             <div style="margin-top:14px;font-size:8pt;color:#5a6072;line-height:1.5">
-               La presente inspección se realizó conforme a la NOM-009-STPS-2011 y a las
-               recomendaciones del fabricante. El equipo dictaminado como NO APTO debe
-               retirarse de servicio de inmediato. Los equipos amparados conservan su
-               validez siempre que no sufran un evento de caída, alteración o daño, y
-               hasta su fecha de retiro obligatorio.
              </div>
-             <table width="100%" style="margin-top:38px;font-size:8.5pt">
+
+             <div class="slabel">HALLAZGOS Y NO CONFORMIDADES</div>'
+             . $hallazgos
+
+             . '<div class="slabel">CONCLUSIONES Y RECOMENDACIONES</div>
+             <div class="nota" style="padding:7px 2px">
+               De los ' . $total . ' equipo(s) inspeccionados, <strong>' . $aptos . '</strong> resultaron
+               aptos para continuar en servicio, <strong>' . $cond . '</strong> quedaron condicionados y
+               <strong>' . $noApt . '</strong> resultaron no aptos.'
+               . ($noApt > 0
+                  ? ' Los equipos dictaminados como NO APTOS deben retirarse de servicio de forma
+                     inmediata y destruirse para impedir su reutilización; no se emite certificado para ellos.'
+                  : '')
+               . ($cond > 0
+                  ? ' Los equipos CONDICIONADOS pueden usarse una vez atendidas las observaciones
+                     señaladas, bajo responsabilidad del usuario.'
+                  : '') . '
+               Se recomienda mantener la inspección previa al uso por parte del usuario en cada
+               jornada, la inspección documentada por persona competente al menos cada doce meses,
+               y el resguardo del equipo en lugar seco, ventilado y libre de químicos, bordes
+               filosos y radiación solar directa. Cada equipo apto cuenta con certificado
+               individual y código QR de validación.
+             </div>
+
+             <div class="juntos">
+             <table width="100%" style="margin-top:26px">
                <tr>
-                 <td width="50%" style="text-align:center;border-top:1px solid #999;padding-top:4px">'
-                   . $this->esc($ses['inspector_firma'] ?: $ses['usuario'] ?: '') . '<br>Inspector</td>
-                 <td width="10%"></td>
-                 <td width="40%" style="text-align:center;border-top:1px solid #999;padding-top:4px">Firma del cliente</td>
+                 <td width="33%" style="text-align:center">'
+                   . ($sello ? '<img src="' . $sello . '" style="height:52px"><br>' : '<div style="height:52px"></div>')
+                   . '' . $this->lineaFirma() . '
+                      <div class="sign-t">' . ($inspector ?: 'Inspector responsable') . '</div>
+                      <div class="sign-s">Inspector · AVBA Inspections</div></td>
+                 <td width="33%" style="text-align:center">
+                      <div style="height:52px"></div>
+                      ' . $this->lineaFirma() . '
+                      <div class="sign-t">Unidad de Inspección</div>
+                      <div class="sign-s">Revisión y aprobación técnica</div></td>
+                 <td width="34%" style="text-align:center">
+                      <div style="height:52px"></div>
+                      ' . $this->lineaFirma() . '
+                      <div class="sign-t">Por el cliente</div>
+                      <div class="sign-s">Nombre, firma y fecha</div></td>
                </tr>
-             </table>
+             </table>'
+             . $this->franjaAcreditaciones()
+             . '<div class="legal">
+                  Este dictamen ampara únicamente los equipos relacionados y las condiciones
+                  observadas al momento de la inspección. Pierde validez si el equipo sufre un
+                  evento de caída, alteración, reparación no autorizada o daño, o al llegar su
+                  fecha de retiro obligatorio, lo que ocurra primero.
+                  Folio <strong>' . $this->esc(formatoFolio($ses['control'])) . '</strong> · '
+                  . date('Y') . ' AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.
+                </div></div>
              </body></html>';
 
-        $url = $this->htmlToPdf($html, $ses['control'], 'DICT_ARN');
+        $pie = 'Dictamen técnico ' . $this->esc(formatoFolio($ses['control']))
+             . ' · ' . $this->esc($ses['cliente']);
+        $url = $this->htmlToPdf($html, $ses['control'], 'DICT_ARN', $pie);
         $abs = rtrim(SITE_URL, '/') . '/' . $url;
         $this->pdo->prepare("UPDATE arneses_sesiones SET dictamen_url = ? WHERE id = ?")->execute([$abs, $sesionId]);
         return ['status' => 'success', 'url' => $abs];
@@ -875,66 +1149,156 @@ class Arneses {
         }
         if (empty($it['qr_codigo'])) return ['status' => 'error', 'message' => 'La pieza no tiene código QR asignado.'];
 
-        $qrImg = '<img src="' . qrDataUri(textoQR($it['qr_codigo']), 300, 3) . '" style="width:105px">';
-        $fila = fn($k, $v) => '<tr><td width="38%" style="color:#5a6072;padding:4px 0">' . $k
-              . '</td><td style="font-weight:bold;padding:4px 0">' . $this->esc($v ?: '—') . '</td></tr>';
+        // Firmante e identificación del expediente
+        $sIns = $this->pdo->prepare("SELECT inspector_firma, usuario FROM arneses_sesiones WHERE id = ?");
+        $sIns->execute([(int)$it['sesion_id']]);
+        $rIns = $sIns->fetch(PDO::FETCH_ASSOC) ?: [];
+        $inspector = $this->esc($rIns['inspector_firma'] ?: ($rIns['usuario'] ?? ''));
 
-        $html = '<html><body style="font-family:dejavusans;font-size:9.5pt;color:#1a1a2e">'
-          . $this->encabezado('CERTIFICADO DE INSPECCIÓN', $it['control'])
-          . '<div style="border:2px solid #185FA5;border-radius:6px;padding:14px;margin-bottom:12px">
-               <table width="100%">
-                 <tr>
-                   <td width="68%">
-                     <table width="100%" style="font-size:9.5pt">'
-                       . $fila('Tipo de equipo',   $it['tipo_nombre'])
-                       . $fila('Marca / Modelo',   trim($it['marca'] . ' ' . $it['modelo']))
-                       . $fila('No. de serie',     $it['serie'])
-                       . $fila('ID / Etiqueta',    $it['id_arnes'])
-                       . $fila('Talla',            $it['talla'])
-                       . $fila('Longitud',         $it['longitud'])
-                       . $fila('Norma aplicable',  $it['norma'] ?: 'NOM-009-STPS-2011')
-                     . '</table>
-                   </td>
-                   <td width="32%" style="text-align:center;vertical-align:top">'
-                     . $qrImg . '<div style="font-size:7pt;color:#5a6072;margin-top:3px">Valida en<br>gestion.avba.com.mx</div>
-                   </td>
-                 </tr>
-               </table>
+        // Puntos de inspección verificados: es lo que sustenta el resultado.
+        $ck = $this->pdo->prepare("
+            SELECT c.tag, c.valor, COALESCE(d.descripcion, c.tag) AS descripcion
+            FROM arneses_item_checklist c
+            LEFT JOIN arneses_checklist d ON d.tipo_id = ? AND d.tag = c.tag
+            WHERE c.item_id = ? ORDER BY d.orden, c.id
+        ");
+        $ck->execute([(int)$it['tipo_id'], $itemId]);
+        $puntos = $ck->fetchAll(PDO::FETCH_ASSOC);
+
+        $filasCk = '';
+        foreach ($puntos as $n => $p) {
+            $v  = $p['valor'] ?: 'NA';
+            $cc = $v === 'C' ? '#1b7a3d' : ($v === 'NC' ? '#b91c1c' : '#7a8494');
+            $tx = $v === 'C' ? 'CONFORME' : ($v === 'NC' ? 'NO CONFORME' : 'NO APLICA');
+            $filasCk .= '<tr' . ($n % 2 ? ' class="alt"' : '') . '>
+                <td width="6%" style="text-align:center">' . ($n + 1) . '</td>
+                <td>' . $this->esc($p['descripcion']) . '</td>
+                <td width="20%" style="text-align:center;color:' . $cc . ';font-weight:bold">' . $tx . '</td>
+              </tr>';
+        }
+        $bloqueCk = $filasCk
+            ? '<div class="slabel">PUNTOS DE INSPECCIÓN VERIFICADOS</div>
+               <table class="grid" style="margin-top:4px">
+                 <thead><tr><th width="6%">#</th><th>PUNTO DE INSPECCIÓN</th><th width="20%">RESULTADO</th></tr></thead>
+                 <tbody>' . $filasCk . '</tbody>
+               </table>'
+            : '';
+
+        // Evidencia fotográfica
+        $fotos = $this->fotosDe($itemId);
+        $bloqueFotos = '';
+        if ($fotos) {
+            $celdas = '';
+            foreach (array_slice($fotos, 0, 3) as $f) {
+                $celdas .= '<td width="33%" style="text-align:center;padding:4px">
+                              <img src="' . $this->esc($f) . '" style="width:150px">
+                            </td>';
+            }
+            $bloqueFotos = '<div class="slabel">EVIDENCIA FOTOGRÁFICA</div>
+                            <table width="100%" style="margin-top:4px"><tr>' . $celdas . '</tr></table>';
+        }
+
+        // Normas aplicables (selección múltiple), en una sola celda del cuadro
+        // de identificación para no gastar una sección entera del certificado.
+        $normas = implode('<br>', array_map(fn($n) => $this->esc($n), $this->normasDe([$it])));
+
+        [$rColor, $rFondo] = $this->colorRes((string)$it['resultado']);
+        $leyenda = $it['resultado'] === 'APTO'
+            ? 'El equipo cumple los criterios de aceptación y es apto para continuar en servicio.'
+            : 'El equipo puede usarse una vez atendidas las observaciones señaladas, bajo responsabilidad del usuario.';
+
+        $qrImg = '<img src="' . qrDataUri(textoQR($it['qr_codigo']), 320, 3) . '" style="width:96px">';
+        $sello = $this->activo('assets/sellos/sello.png');
+        $folio = $it['control'] . '-' . str_pad((string)$itemId, 4, '0', STR_PAD_LEFT);
+
+        $html = '<html><head><meta charset="UTF-8">' . $this->estilosDoc() . '</head><body>'
+          . $this->encabezado('CERTIFICADO DE INSPECCIÓN', $folio,
+                              'Equipo de protección personal contra caídas')
+
+          . '<div class="nota" style="text-align:center;padding:6px 18px 0">
+               AVBA Inspections, como unidad de inspección, hace constar que el equipo descrito a
+               continuación fue inspeccionado en sus componentes y funciones conforme a la
+               normatividad aplicable, y que a la fecha de emisión presenta el resultado indicado.
              </div>
-             <table width="100%" style="font-size:9.5pt;margin-bottom:10px">'
-               . $fila('Cliente',                 $it['cliente'])
-               . $fila('Fecha de inspección',     $it['fecha_fmt'])
-               . $fila('Fecha de fabricación',    $it['fabricacion_fmt'])
-               . $fila('Retiro obligatorio',      $it['retiro_fmt'])
-             . '</table>
-             <table width="100%" style="margin-bottom:12px">
+
+             <div class="slabel">DATOS DEL CLIENTE E IDENTIFICACIÓN DEL EQUIPO</div>
+             <table class="dt">
+               <tr><td class="lbl">CLIENTE / EMPRESA</td><td class="val" colspan="3">' . $this->esc($it['cliente']) . '</td></tr>
+               <tr><td class="lbl">LUGAR DE INSPECCIÓN</td><td class="val" colspan="3">' . $this->esc($it['direccion'] ?: '—') . '</td></tr>
+               <tr><td class="lbl">TIPO DE EQUIPO</td><td class="val">' . $this->esc($it['tipo_nombre'] ?: '—') . '</td>
+                   <td class="lbl">MARCA</td><td class="val">' . $this->esc($it['marca'] ?: '—') . '</td></tr>
+               <tr><td class="lbl">MODELO</td><td class="val">' . $this->esc($it['modelo'] ?: '—') . '</td>
+                   <td class="lbl">No. DE SERIE</td><td class="val">' . $this->esc($it['serie'] ?: '—') . '</td></tr>
+               <tr><td class="lbl">ID / ETIQUETA</td><td class="val">' . $this->esc($it['id_arnes'] ?: '—') . '</td>
+                   <td class="lbl">TALLA</td><td class="val">' . $this->esc($it['talla'] ?: '—') . '</td></tr>
+               <tr><td class="lbl">LONGITUD</td><td class="val">' . $this->esc($it['longitud'] ?: '—') . '</td>
+                   <td class="lbl">FABRICACIÓN</td><td class="val">' . $this->esc($it['fabricacion_fmt'] ?: '—') . '</td></tr>
+               <tr><td class="lbl">FECHA DE INSPECCIÓN</td><td class="val">' . $this->esc($it['fecha_fmt'] ?: '—') . '</td>
+                   <td class="lbl">RETIRO OBLIGATORIO</td><td class="val">' . $this->esc($it['retiro_fmt'] ?: '—') . '</td></tr>
+               <tr><td class="lbl">NORMAS APLICABLES</td>
+                   <td class="val" colspan="3">' . $normas . '</td></tr>
+             </table>
+
+             <div class="slabel">RESULTADO DE LA INSPECCIÓN</div>
+             <table width="100%" style="margin-top:5px;border-collapse:separate;border-spacing:6px 0">
                <tr>
-                 <td width="50%" style="text-align:center;background:#e8f5e9;padding:10px">
-                   <div style="font-size:13pt;font-weight:bold;color:#1b7a3d">' . $this->esc($it['resultado']) . '</div>
-                   <div style="font-size:8pt;color:#5a6072">Resultado de la inspección</div>
+                 <td width="46%" style="background:' . $rFondo . ';border:2px solid ' . $rColor . ';border-radius:5px;text-align:center;padding:5px">
+                   <div style="font-size:13.5pt;font-weight:bold;color:' . $rColor . '">' . $this->esc($it['resultado']) . '</div>
+                   <div style="font-size:7pt;color:#5a6072;letter-spacing:.8px">RESULTADO DE LA INSPECCIÓN</div>
                  </td>
-                 <td width="50%" style="text-align:center;background:#E6F1FB;padding:10px">
-                   <div style="font-size:13pt;font-weight:bold;color:#0C447C">' . $this->esc($it['vigencia_fmt'] ?: '—') . '</div>
-                   <div style="font-size:8pt;color:#5a6072">Válido hasta</div>
+                 <td width="30%" style="background:#E6F1FB;border:2px solid #185FA5;border-radius:5px;text-align:center;padding:5px">
+                   <div style="font-size:11.5pt;font-weight:bold;color:#0C447C">' . $this->esc($it['vigencia_fmt'] ?: '—') . '</div>
+                   <div style="font-size:7pt;color:#5a6072;letter-spacing:.8px">VIGENCIA DEL CERTIFICADO</div>
+                 </td>
+                 <td width="24%" style="text-align:center">' . $qrImg . '
+                   <div style="font-size:6.5pt;color:#5a6072">Escanea para validar<br>gestion.avba.com.mx</div>
                  </td>
                </tr>
-             </table>'
+             </table>
+             <div class="nota" style="padding:5px 2px">' . $leyenda . '</div>'
+
+             . $bloqueCk
              . (!empty($it['observaciones'])
-                ? '<div style="font-size:8.5pt;background:#fff8e1;border-left:3px solid #f59e0b;padding:8px;margin-bottom:10px">
-                     <strong>Observaciones:</strong> ' . $this->esc($it['observaciones']) . '</div>'
+                ? '<div style="font-size:8pt;background:#fff8e1;border-left:3px solid #f59e0b;padding:8px;margin-top:9px">
+                     <strong>Observaciones del inspector:</strong> ' . $this->esc($it['observaciones']) . '</div>'
                 : '')
-             . '<div style="font-size:7.5pt;color:#5a6072;line-height:1.5">
-                  Inspección realizada conforme a la NOM-009-STPS-2011 y a las recomendaciones del
-                  fabricante. Este certificado pierde validez si el equipo sufre un evento de caída,
-                  alteración o daño, o al llegar su fecha de retiro obligatorio, lo que ocurra primero.
-                </div>
-                <table width="100%" style="margin-top:34px;font-size:8.5pt">
-                  <tr><td style="text-align:center;border-top:1px solid #999;padding-top:4px">Inspector responsable</td></tr>
-                </table>
+             . $bloqueFotos
+
+             . '<div class="nota" style="padding:6px 2px 0">
+               <strong style="color:#0C447C">Uso y conservación:</strong> el usuario debe inspeccionar
+               visualmente el equipo antes de cada uso. Consérvese en lugar seco y ventilado, alejado de
+               fuentes de calor, químicos, bordes filosos y radiación solar directa. Retírese de servicio
+               de inmediato ante cualquier evento de caída, daño, alteración o reparación no autorizada,
+               y al llegar la fecha de retiro obligatorio del fabricante.
+             </div>
+
+             <div class="juntos">
+             <table width="100%" style="margin-top:6px">
+               <tr>
+                 <td width="50%" style="text-align:center">'
+                   . ($sello ? '<img src="' . $sello . '" style="height:36px"><br>' : '<div style="height:36px"></div>')
+                   . '' . $this->lineaFirma() . '
+                      <div class="sign-t">' . ($inspector ?: 'Inspector responsable') . '</div>
+                      <div class="sign-s">Inspector · AVBA Inspections</div></td>
+                 <td width="50%" style="text-align:center;vertical-align:bottom">
+                      <div style="height:36px"></div>
+                      ' . $this->lineaFirma() . '
+                      <div class="sign-t">Unidad de Inspección</div>
+                      <div class="sign-s">Revisión y aprobación técnica</div></td>
+               </tr>
+             </table>'
+             // Sin franja de acreditaciones: el membrete ya declara la unidad de
+             // inspección y así el certificado cierra en una sola hoja.
+             . '<div class="legal">
+                  Este certificado ampara únicamente el equipo identificado y las condiciones
+                  observadas al momento de la inspección. Su autenticidad puede verificarse
+                  escaneando el código QR. Folio <strong>' . $this->esc(formatoFolio($folio)) . '</strong> · '
+                  . date('Y') . ' AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.
+                </div></div>
              </body></html>';
 
-        $folio = $it['control'] . '-' . str_pad((string)$itemId, 4, '0', STR_PAD_LEFT);
-        $url = $this->htmlToPdf($html, $folio, 'CERT_ARN');
+        $pie = 'Certificado ' . $this->esc(formatoFolio($folio)) . ' · ' . $this->esc($it['cliente']);
+        $url = $this->htmlToPdf($html, $folio, 'CERT_ARN', $pie);
         $abs = rtrim(SITE_URL, '/') . '/' . $url;
         $this->pdo->prepare("UPDATE arneses_items SET cert_url = ? WHERE id = ?")->execute([$abs, $itemId]);
         return ['status' => 'success', 'url' => $abs];
