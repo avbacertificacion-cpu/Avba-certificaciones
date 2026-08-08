@@ -189,6 +189,68 @@ function controlSinCliente(PDO $pdo): string {
 }
 
 /**
+ * Series de códigos QR por tipo de registro: el primer dígito identifica a qué
+ * corresponde la etiqueta. Los equipos (maquinaria, accesorios de izaje y
+ * equipo contra caídas) usan la serie 4; el personal de cursos, la 7.
+ */
+const QR_PREFIJO_EQUIPO   = '4';
+const QR_PREFIJO_PERSONAL = '7';
+
+/** ¿El código pertenece a la serie indicada? */
+function qrEsDeSerie(string $qr, string $prefijo): bool {
+    $qr = trim($qr);
+    return $qr !== '' && $qr[0] === $prefijo;
+}
+
+/** Nombre legible de una serie, para los mensajes de error. */
+function qrNombreSerie(string $prefijo): string {
+    return $prefijo === QR_PREFIJO_PERSONAL ? 'personal' : 'equipo';
+}
+
+/**
+ * Siguiente código libre de una serie. Primero se reaprovecha el más bajo sin
+ * usar del banco; si la serie está agotada, se continúa a partir del mayor
+ * emitido. Devuelve siempre 10 dígitos empezando por el prefijo.
+ */
+function siguienteQrSerie(PDO $pdo, string $prefijo): string {
+    $like = $prefijo . '%';
+
+    try {
+        $st = $pdo->prepare(
+            "SELECT identificador FROM qr_codigos
+             WHERE usado = 0 AND identificador LIKE ? AND LENGTH(identificador) = 10
+             ORDER BY CAST(identificador AS UNSIGNED) LIMIT 1"
+        );
+        $st->execute([$like]);
+        $libre = $st->fetchColumn();
+        if ($libre) return (string)$libre;
+    } catch (\Throwable $e) { /* el banco aún no existe */ }
+
+    // Serie sin códigos libres: continuar desde el mayor ya emitido en ella.
+    $max = (int)($prefijo . '000000000');
+    $fuentes = [
+        ['qr_codigos',           'identificador'],
+        ['equipos',              'qr_codigo'],
+        ['participantes_cursos', 'qr_codigo'],
+        ['accesorios_sesiones',  'qr_codigo'],
+        ['accesorios_izaje',     'qr_codigo'],
+        ['arneses_sesiones',     'qr_codigo'],
+        ['arneses_items',        'qr_codigo'],
+    ];
+    foreach ($fuentes as [$tabla, $col]) {
+        try {
+            $st = $pdo->prepare(
+                "SELECT MAX(CAST(`$col` AS UNSIGNED)) FROM `$tabla`
+                 WHERE `$col` LIKE ? AND LENGTH(`$col`) = 10"
+            );
+            $st->execute([$like]);
+            $max = max($max, (int)$st->fetchColumn());
+        } catch (\Throwable $e) { /* tabla o columna aún no existe */ }
+    }
+    return str_pad((string)($max + 1), 10, '0', STR_PAD_LEFT);
+}
+
+/**
  * Genera un código QR de 10 dígitos desde el catálogo o uno nuevo.
  */
 function generarCodigoQR(PDO $pdo): string {

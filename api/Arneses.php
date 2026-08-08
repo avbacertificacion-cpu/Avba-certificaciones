@@ -337,6 +337,10 @@ class Arneses {
 
         // El QR es opcional al capturar, pero si viene no puede estar ocupado
         $qrItem = trim((string)($post['qr_codigo'] ?? ''));
+        if ($qrItem !== '' && !qrEsDeSerie($qrItem, QR_PREFIJO_EQUIPO)) {
+            return ['status' => 'error', 'message' =>
+                'Los códigos QR de equipo empiezan con ' . QR_PREFIJO_EQUIPO . '. El código indicado no pertenece a esa serie.'];
+        }
         if ($qrItem !== '' && !$this->qrDisponible($qrItem)) {
             return ['status' => 'error', 'message' => "El código QR $qrItem ya está asignado a otro registro."];
         }
@@ -435,13 +439,22 @@ class Arneses {
         return !$r->fetch();
     }
 
-    /** Siguiente QR libre del banco, para sugerirlo en la captura. */
+    /**
+     * Siguiente QR libre para sugerirlo en la captura. El equipo contra caídas
+     * es equipo, así que va en la serie 4.
+     */
     public function siguienteQr(): array {
-        $r = $this->pdo->query("SELECT identificador FROM qr_codigos WHERE usado = 0 ORDER BY CAST(identificador AS UNSIGNED) LIMIT 50");
+        $r = $this->pdo->prepare(
+            "SELECT identificador FROM qr_codigos
+             WHERE usado = 0 AND identificador LIKE ? AND LENGTH(identificador) = 10
+             ORDER BY CAST(identificador AS UNSIGNED) LIMIT 50"
+        );
+        $r->execute([QR_PREFIJO_EQUIPO . '%']);
         foreach ($r->fetchAll(PDO::FETCH_COLUMN) as $qr) {
             if ($this->qrDisponible((string)$qr)) return ['status' => 'success', 'qr' => $qr];
         }
-        return ['status' => 'error', 'message' => 'No hay códigos QR disponibles en el banco.'];
+        // Serie agotada en el banco: continuar la numeración.
+        return ['status' => 'success', 'qr' => siguienteQrSerie($this->pdo, QR_PREFIJO_EQUIPO)];
     }
 
     private function fecha($v): ?string {
@@ -563,6 +576,10 @@ class Arneses {
         }
         if (array_key_exists('qr_codigo', $p)) {
             $q = trim((string)$p['qr_codigo']);
+            if ($q !== '' && !qrEsDeSerie($q, QR_PREFIJO_EQUIPO)) {
+                return ['status' => 'error', 'message' =>
+                    'Los códigos QR de equipo empiezan con ' . QR_PREFIJO_EQUIPO . '. El código indicado no pertenece a esa serie.'];
+            }
             if ($q !== '' && !$this->qrDisponible($q, $id)) {
                 return ['status' => 'error', 'message' => "El código QR $q ya está asignado a otro registro."];
             }
@@ -610,6 +627,10 @@ class Arneses {
             return ['status' => 'error', 'message' => "Faltan códigos QR: $sin pieza(s) sin QR asignado. Cada pieza lleva su propio certificado."];
         }
 
+        if (!qrEsDeSerie($qr, QR_PREFIJO_EQUIPO)) {
+            return ['status' => 'error', 'message' =>
+                'Los códigos QR de equipo empiezan con ' . QR_PREFIJO_EQUIPO . '. El código indicado no pertenece a esa serie.'];
+        }
         if (!$this->qrDisponible($qr, 0, $id)) {
             return ['status' => 'error', 'message' => 'Ese código QR ya está asignado a otro registro.'];
         }

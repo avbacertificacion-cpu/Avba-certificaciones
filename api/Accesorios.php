@@ -689,28 +689,17 @@ class Accesorios {
 
     public function getSiguienteQrAcc(): array {
         $this->ensureAccIzajeQrColumn();
-        $max = 0;
-        $queries = [
-            "SELECT MAX(CAST(identificador AS UNSIGNED)) FROM qr_codigos",
-            "SELECT MAX(CAST(qr_codigo AS UNSIGNED)) FROM equipos WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''",
-            "SELECT MAX(CAST(qr_codigo AS UNSIGNED)) FROM participantes_cursos WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''",
-            "SELECT MAX(CAST(qr_codigo AS UNSIGNED)) FROM accesorios_sesiones WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''",
-            "SELECT MAX(CAST(qr_codigo AS UNSIGNED)) FROM accesorios_izaje WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''",
-        ];
-        foreach ($queries as $sql) {
-            try {
-                $val = (int)$this->pdo->query($sql)->fetchColumn();
-                if ($val > $max) $max = $val;
-            } catch (\Throwable $e) {}
-        }
-        $siguiente = str_pad((string)($max + 1), 10, '0', STR_PAD_LEFT);
-        return ['status' => 'success', 'qr' => $siguiente];
+        // Los accesorios de izaje son equipo: van en la serie 4.
+        return ['status' => 'success', 'qr' => siguienteQrSerie($this->pdo, QR_PREFIJO_EQUIPO)];
     }
 
     public function asignarQrAccesorio(int $id, string $qr): array {
         $this->ensureAccIzajeQrColumn();
         if (!preg_match('/^\d{10}$/', $qr))
             return ['status' => 'error', 'message' => 'El código QR debe ser exactamente 10 dígitos.'];
+        if (!qrEsDeSerie($qr, QR_PREFIJO_EQUIPO))
+            return ['status' => 'error', 'message' =>
+                'Los códigos QR de equipo empiezan con ' . QR_PREFIJO_EQUIPO . '. El código indicado no pertenece a esa serie.'];
 
         $chk = $this->pdo->prepare("SELECT id, qr_codigo FROM accesorios_izaje WHERE id = ?");
         $chk->execute([$id]);

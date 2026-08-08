@@ -53,6 +53,11 @@ class Calidad {
         $row = $this->obtenerEquipo($id);
         if (!$row) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
+        if (!qrEsDeSerie($qr, QR_PREFIJO_EQUIPO)) {
+            return ['status' => 'error', 'message' =>
+                'Los códigos QR de equipo empiezan con ' . QR_PREFIJO_EQUIPO . '. El código indicado no pertenece a esa serie.'];
+        }
+
         // El código lo captura Calidad libremente: NO tiene que existir en el
         // banco de códigos pre-generados. Sólo se impide reutilizar uno que ya
         // esté asignado a OTRO registro.

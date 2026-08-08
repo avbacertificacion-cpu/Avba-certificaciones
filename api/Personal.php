@@ -380,13 +380,13 @@ class Personal {
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
         if (!$qr) {
-            // Auto-asignar el siguiente QR disponible del banco
-            $qrRow = $this->pdo->query(
-                "SELECT id, identificador FROM qr_codigos WHERE usado = 0 ORDER BY CAST(identificador AS UNSIGNED) LIMIT 1"
-            )->fetch();
-            if (!$qrRow) return ['status' => 'error', 'message' => 'Sin QR disponibles. Genera un lote en Códigos QR o captura el código manualmente.'];
-            $qr = $qrRow['identificador'];
+            // Auto-asignar el siguiente libre de la serie de personal
+            $qr = siguienteQrSerie($this->pdo, QR_PREFIJO_PERSONAL);
         } else {
+            if (!qrEsDeSerie($qr, QR_PREFIJO_PERSONAL)) {
+                return ['status' => 'error', 'message' =>
+                    'Los códigos QR de personal empiezan con ' . QR_PREFIJO_PERSONAL . '. El código indicado no pertenece a esa serie.'];
+            }
             // Código capturado manualmente: puede no existir en el banco de
             // códigos pre-generados. Sólo se impide reutilizar uno ya asignado
             // a OTRO registro (se permite reusar el mismo del participante).
