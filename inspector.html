@@ -206,6 +206,24 @@
       border-color: var(--azul);
       box-shadow: 0 0 0 3px rgba(24,95,165,0.1);
     }
+    /* Las casillas y radios quedan fuera del estilo de campo de texto: la
+       regla de arriba les quita la apariencia nativa y los dejaba en 0x0,
+       invisibles e imposibles de pulsar. */
+    .field input[type="checkbox"],
+    .field input[type="radio"] {
+      -webkit-appearance: auto;
+      appearance: auto;
+      width: 18px;
+      min-width: 18px;
+      height: 18px;
+      padding: 0;
+      margin: 0;
+      border: 0;
+      border-radius: 0;
+      background: none;
+      accent-color: var(--azul);
+      flex-shrink: 0;
+    }
     .field input[readonly] {
       background: var(--gris-bg);
       color: var(--texto-sub);
@@ -2736,7 +2754,6 @@
           <div class="field"><label>Modelo</label><input type="text" id="arn-modelo"></div>
           <div class="field"><label>No. de serie</label><input type="text" id="arn-serie"></div>
           <div class="field"><label>Talla</label><input type="text" id="arn-talla" placeholder="Ej: M, G, Universal"></div>
-          <div class="field"><label>Longitud</label><input type="text" id="arn-longitud" placeholder="Ej: 1.8 m"></div>
         </div>
 
         <div class="field">
@@ -6365,7 +6382,7 @@ function arnAddFotos(files) {
 function arnQuitarFoto(i) { arnFotos.splice(i, 1); arnRenderFotos(); }
 
 function arnLimpiarForm() {
-  ['arn-id','arn-marca','arn-modelo','arn-serie','arn-talla','arn-longitud','arn-norma-otra','arn-qr','arn-observaciones']
+  ['arn-id','arn-marca','arn-modelo','arn-serie','arn-talla','arn-norma-otra','arn-qr','arn-observaciones']
     .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   arnRenderNormas();   // vuelve a dejar marcada la NOM por omisión
   ['arn-fabricacion','arn-retiro'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
@@ -6401,7 +6418,6 @@ async function arnGuardar() {
   fd.append('modelo',    document.getElementById('arn-modelo').value.trim());
   fd.append('serie',     document.getElementById('arn-serie').value.trim());
   fd.append('talla',     document.getElementById('arn-talla').value.trim());
-  fd.append('longitud',  document.getElementById('arn-longitud').value.trim());
   fd.append('norma',     arnNormasSeleccionadas());
   fd.append('fecha_fabricacion', document.getElementById('arn-fabricacion').value);
   fd.append('fecha_retiro',      document.getElementById('arn-retiro').value);
