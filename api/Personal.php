@@ -365,16 +365,41 @@ class Personal {
         return ['status' => 'success', 'id' => $id, 'control' => $control];
     }
 
-    public function eliminarParticipante(int $id): array {
-        $row = $this->pdo->prepare("SELECT qr_codigo FROM participantes_cursos WHERE id = ?");
+    /**
+     * Elimina un participante y libera su QR.
+     *
+     * Calidad puede depurar su propia sesión, pero no borrar un registro ya
+     * EMITIDO: en ese punto el documento salió hacia el cliente y su QR está
+     * publicado, así que borrarlo dejaría una constancia en circulación que ya
+     * no valida. Ese caso queda reservado a un administrador.
+     */
+    public function eliminarParticipante(int $id, string $rol = 'ADMIN'): array {
+        if (!$id) return ['status' => 'error', 'message' => 'Participante no indicado.'];
+
+        $row = $this->pdo->prepare("SELECT qr_codigo, estatus, nombre_completo FROM participantes_cursos WHERE id = ?");
         $row->execute([$id]);
         $p = $row->fetch();
+        if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+        if (($p['estatus'] ?? '') === 'EMITIDO' && $rol !== 'ADMIN') {
+            return ['status' => 'error', 'message' =>
+                'Este participante ya tiene documentos emitidos y entregados. Sólo un administrador puede eliminarlo.'];
+        }
+
         if (!empty($p['qr_codigo'])) {
             $this->pdo->prepare(
                 "UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?"
             )->execute([$p['qr_codigo']]);
         }
+        // Documentos y liga con la sesión de acceso: la cascada de la llave
+        // foránea sólo cubre los documentos, y sólo si la llave existe.
+        foreach (['participantes_documentos', 'sesion_acceso_participantes'] as $tabla) {
+            try {
+                $this->pdo->prepare("DELETE FROM `$tabla` WHERE participante_id = ?")->execute([$id]);
+            } catch (\Throwable $e) { /* tabla aún no existe */ }
+        }
         $this->pdo->prepare("DELETE FROM participantes_cursos WHERE id = ?")->execute([$id]);
+
         return ['status' => 'success', 'message' => 'Participante eliminado correctamente.'];
     }
 

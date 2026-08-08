@@ -4347,9 +4347,12 @@ async function calGuardarParticipantes() {
   if (ok) cargarPersonal();
 }
 
+let _perSesionIdx = null;
+
 function abrirSesionParticipantes(idx) {
   const g = _calSesiones[idx];
   if (!g) return;
+  _perSesionIdx = idx;
 
   document.getElementById('per-det-nombre').textContent = g.curso_nombre;
   document.getElementById('per-det-sub').textContent    = (g.fecha_curso||'') + (g.empresa ? ' · ' + g.empresa : '');
@@ -4396,10 +4399,41 @@ function abrirSesionParticipantes(idx) {
         ${estatusPerBadge(p.estatus)}
         <button onclick="abrirDetPer(${p.id})"
           style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Ver</button>
+        ${(p.estatus === 'EMITIDO' && !isAdminCal) ? '' : `
+        <button onclick="borrarParticipanteSesion(${p.id})"
+          title="Quitar de la sesión"
+          style="background:var(--rojo-light);border:none;color:var(--rojo);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Borrar</button>`}
       </div>`;
     }).join('');
 
   document.getElementById('overlay-per-det').style.display = 'flex';
+}
+
+/* Borrar un participante desde el detalle de la sesión. Se quita en pantalla al
+   instante y el listado de atrás se recarga después, para poder depurar varios
+   seguidos sin esperar a cada recarga. */
+async function borrarParticipanteSesion(id) {
+  const g = _calSesiones[_perSesionIdx];
+  if (!g) return;
+  // El nombre se resuelve aquí: incrustarlo en el onclick rompía el atributo
+  // en cuanto traía comillas o apóstrofos.
+  const nombre = (g.participantes.find(x => +x.id === +id) || {}).nombre_completo || 'este participante';
+  if (!confirm(`¿Eliminar a "${nombre}" de esta sesión?\n\nSe borra el registro y su código QR vuelve a quedar disponible. No se puede deshacer.`)) return;
+  try {
+    const res  = await fetch(API, { method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ action: 'ELIMINAR_PARTICIPANTE', payload: { id } }) });
+    const data = await res.json();
+    if (data.status !== 'success') { mostrarToast(data.message || 'No se pudo eliminar.', 'err'); return; }
+
+    mostrarToast('Participante eliminado.', 'ok');
+    g.participantes = g.participantes.filter(x => +x.id !== +id);
+    if (!g.participantes.length) {
+      document.getElementById('overlay-per-det').style.display = 'none';
+    } else {
+      abrirSesionParticipantes(_perSesionIdx);
+    }
+    perCargados = false; cargarPersonal();
+  } catch(e) { mostrarToast('Error de conexión.', 'err'); }
 }
 
 function toggleTodosPer(chkAll) {

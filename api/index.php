@@ -1326,8 +1326,8 @@ if ($method === 'POST') {
 
         case 'ELIMINAR_PARTICIPANTE':
             $usr = validarToken($pdo, $token);
-            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($personal->eliminarParticipante((int)($payload['id'] ?? 0)));
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->eliminarParticipante((int)($payload['id'] ?? 0), $usr['rol']));
 
         case 'APROBAR_PARTICIPANTE':
             $usr = validarToken($pdo, $token);
