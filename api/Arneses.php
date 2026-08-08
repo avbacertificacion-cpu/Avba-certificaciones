@@ -152,29 +152,64 @@ class Arneses {
      * NOM-009-STPS-2011. Calidad puede editarlos después; este seed solo corre
      * cuando el catálogo está vacío, así que no pisa cambios posteriores.
      */
-    private function seedCatalogo(): void {
-        $hay = (int)$this->pdo->query("SELECT COUNT(*) FROM arneses_tipos")->fetchColumn();
-        if ($hay > 0) return;
+    private function catalogoBase(): array {
+        // Puntos comunes a todo el equipo textil contra caídas.
+        $etiqueta = ['ETIQUETA','Etiquetas legibles — marca, modelo, número de serie, fecha de fabricación y norma'];
+        $vidaUtil = ['VIDAUTIL','Dentro de la vida útil indicada por el fabricante'];
+        $ganchos  = ['GANCHOS', 'Ganchos y mosquetones — seguro automático funcional, sin deformación ni corrosión'];
+        $cintas   = ['CINTAS',  'Cintas y bandas — sin cortes, deshilachado, abrasión, quemaduras ni decoloración'];
+        $costura  = ['COSTURA', 'Costuras — sin hilos rotos, sueltos o deshilachados'];
+        $herraje  = ['HERRAJE', 'Herrajes, hebillas y ajustadores — sin deformación, fisuras, corrosión ni bordes filosos'];
+        $impacto  = ['IMPACTO', 'Indicador de impacto sin activar'];
 
-        $catalogo = [
-            ['Arnés de cuerpo completo', 'arnes', [
-                ['CINTAS',  'Cintas y bandas — sin cortes, deshilachado, abrasión, quemaduras ni decoloración'],
-                ['COSTURA', 'Costuras — sin hilos rotos, sueltos o deshilachados'],
-                ['HERRAJE', 'Herrajes, hebillas y ajustadores — sin deformación, fisuras, corrosión ni bordes filosos'],
+        // La clave identifica al tipo para el alta automática; el nombre sí se
+        // muestra y Calidad puede editarlo sin que se vuelva a dar de alta.
+        return [
+            // ── Arneses (clasificación por aplicación, ANSI/ASSP Z359.11) ──
+            'ARNES_COMPLETO' => ['Arnés de cuerpo completo', 'arnes', [
+                $cintas, $costura, $herraje,
                 ['ARGOLLA', 'Argolla dorsal D — sin deformación ni desgaste, con libre movimiento'],
-                ['ETIQUETA','Etiquetas legibles — marca, modelo, número de serie, fecha de fabricación y norma'],
-                ['IMPACTO', 'Indicador de impacto sin activar'],
-                ['VIDAUTIL','Dentro de la vida útil indicada por el fabricante'],
+                $etiqueta, $impacto, $vidaUtil,
             ]],
-            ['Línea de vida vertical', 'linea', [
+            'ARNES_POSICION' => ['Arnés de posicionamiento (Clase P)', 'arnes', [
+                $cintas, $costura, $herraje,
+                ['ARGLAT',  'Argollas laterales de posicionamiento — sin deformación ni desgaste'],
+                ['CINTURON','Cinturón y almohadilla lumbar — sin daño, con soporte firme'],
+                $etiqueta, $impacto, $vidaUtil,
+            ]],
+            'ARNES_SUSPENSION' => ['Arnés de suspensión y descenso controlado (Clase D)', 'arnes', [
+                $cintas, $costura, $herraje,
+                ['ARGVENT', 'Argolla ventral o frontal — sin deformación, alineada y con libre movimiento'],
+                ['ASIENTO', 'Asiento o bandas de suspensión — sin daño y correctamente ajustables'],
+                $etiqueta, $impacto, $vidaUtil,
+            ]],
+            'ARNES_CONFINADO' => ['Arnés para espacios confinados (Clase E)', 'arnes', [
+                $cintas, $costura, $herraje,
+                ['ARGHOMB', 'Argollas de hombros — sin deformación, alineadas para izaje vertical'],
+                ['SEPARAD', 'Separador o yugo de izaje — completo y compatible con el trípode'],
+                $etiqueta, $impacto, $vidaUtil,
+            ]],
+            'ARNES_ESCALA' => ['Arnés para ascenso en escalas (Clase L)', 'arnes', [
+                $cintas, $costura, $herraje,
+                ['ARGESTE', 'Argolla esternal — sin deformación y compatible con el sistema guiado'],
+                $etiqueta, $impacto, $vidaUtil,
+            ]],
+            'ARNES_RESCATE' => ['Arnés de rescate', 'arnes', [
+                $cintas, $costura, $herraje,
+                ['ARGRESC', 'Puntos de anclaje de rescate — completos, sin deformación ni desgaste'],
+                $etiqueta, $impacto, $vidaUtil,
+            ]],
+
+            // ── Líneas de vida y conectores ────────────────────────────
+            'LV_VERTICAL' => ['Línea de vida vertical', 'linea', [
                 ['CUERPO',  'Cuerda, cinta o cable — sin cortes, deshilachado, torceduras, nudos ni corrosión'],
                 ['ABSORB',  'Absorbedor de energía sin desplegar y con cubierta íntegra'],
-                ['GANCHOS', 'Mosquetones y ganchos — seguro automático funcional, sin deformación ni corrosión'],
+                $ganchos,
                 ['TERMIN',  'Terminales y ojales — guardacabos, prensas y costuras en buen estado'],
-                ['ETIQUETA','Etiquetas legibles y completas'],
+                $etiqueta,
                 ['COMPAT',  'Longitud y compatibilidad adecuadas al sistema y al punto de anclaje'],
             ]],
-            ['Línea de vida horizontal', 'linea', [
+            'LV_HORIZONTAL' => ['Línea de vida horizontal', 'linea', [
                 ['CUERPO',  'Cable o cinta — sin cortes, deshilachado, torceduras ni corrosión'],
                 ['TENSION', 'Tensión y flecha dentro de lo especificado por el fabricante'],
                 ['ANCLAJE', 'Anclajes extremos e intermedios — firmes, sin deformación ni corrosión'],
@@ -182,30 +217,134 @@ class Arneses {
                 ['TERMIN',  'Terminales, prensas y tensores en buen estado'],
                 ['ETIQUETA','Etiquetas y capacidad de usuarios legibles'],
             ]],
-            ['Conector de anclaje / eslinga', 'linea', [
+            'CONECTOR_ESLINGA' => ['Conector de anclaje / eslinga', 'linea', [
                 ['CUERPO',  'Cinta o cuerda — sin cortes, deshilachado, quemaduras ni abrasión'],
                 ['COSTURA', 'Costuras — sin hilos rotos o sueltos'],
                 ['GANCHOS', 'Ganchos y mosquetones — seguro automático funcional, sin deformación'],
                 ['ETIQUETA','Etiquetas legibles — capacidad, norma y fecha de fabricación'],
-                ['VIDAUTIL','Dentro de la vida útil indicada por el fabricante'],
+                $vidaUtil,
             ]],
-            ['Absorbedor de energía', 'linea', [
+            'ABSORBEDOR' => ['Absorbedor de energía', 'linea', [
                 ['ABSORB',  'Sin desplegar, con cubierta y costuras íntegras'],
                 ['GANCHOS', 'Conectores — seguro funcional, sin deformación ni corrosión'],
                 ['ETIQUETA','Etiquetas legibles — norma, capacidad y fecha de fabricación'],
-                ['VIDAUTIL','Dentro de la vida útil indicada por el fabricante'],
+                $vidaUtil,
+            ]],
+            'ESLINGA_ABSORB' => ['Eslinga con absorbedor de energía (Z359.13)', 'linea', [
+                ['CUERPO',  'Cinta, cuerda o cable — sin cortes, deshilachado, quemaduras ni abrasión'],
+                ['COSTURA', 'Costuras — sin hilos rotos, sueltos o deshilachados'],
+                ['ABSORB',  'Absorbedor sin desplegar, con cubierta y testigo íntegros'],
+                $ganchos,
+                ['CAIDALIB','Longitud y caída libre compatibles con el claro disponible'],
+                $etiqueta, $vidaUtil,
+            ]],
+
+            // ── Dispositivos autorretráctiles (ANSI/ASSP Z359.14) ──────
+            'SRL' => ['Dispositivo autorretráctil (SRL)', 'linea', [
+                ['CARCASA', 'Carcasa — sin fisuras, golpes, tornillería completa y apretada'],
+                ['RETRACC', 'Retracción — la línea sale y recoge libremente, sin atascos'],
+                ['BLOQUEO', 'Bloqueo — frena con un tirón seco y sostiene la carga'],
+                ['CUERPO',  'Cable o cinta — sin hilos rotos, deshilachado, torceduras, dobleces ni corrosión'],
+                ['ABSORB',  'Absorbedor de energía sin desplegar y con testigo íntegro'],
+                ['GIRATOR', 'Gancho giratorio con seguro automático e indicador de impacto sin activar'],
+                ['CLASE',   'Clase del dispositivo (1 o 2) acorde al punto de anclaje y a la caída libre'],
+                $etiqueta,
+                ['SERVICIO','Dentro del intervalo de servicio o recertificación del fabricante'],
+            ]],
+            'SRL_P' => ['Autorretráctil personal montado en arnés (SRL-P)', 'linea', [
+                ['CARCASA', 'Carcasa — sin fisuras, golpes, tornillería completa y apretada'],
+                ['RETRACC', 'Retracción — la línea sale y recoge libremente, sin atascos'],
+                ['BLOQUEO', 'Bloqueo — frena con un tirón seco y sostiene la carga'],
+                ['CUERPO',  'Cinta o cable — sin cortes, deshilachado, torceduras ni corrosión'],
+                ['MONTAJE', 'Montaje al arnés — anclaje correcto, compatible y sin holgura'],
+                ['ABSORB',  'Absorbedor de energía sin desplegar y con testigo íntegro'],
+                ['GIRATOR', 'Conectores con seguro automático e indicador de impacto sin activar'],
+                ['CLASE',   'Clase del dispositivo (1 o 2) acorde al punto de anclaje y a la caída libre'],
+                $etiqueta,
+                ['SERVICIO','Dentro del intervalo de servicio o recertificación del fabricante'],
+            ]],
+            'SRL_R' => ['Autorretráctil con rescate integrado (SRL-R)', 'linea', [
+                ['CARCASA', 'Carcasa — sin fisuras, golpes, tornillería completa y apretada'],
+                ['RETRACC', 'Retracción — la línea sale y recoge libremente, sin atascos'],
+                ['BLOQUEO', 'Bloqueo — frena con un tirón seco y sostiene la carga'],
+                ['RESCATE', 'Mecanismo de rescate — cambio de modo, manivela e izaje o descenso funcionales'],
+                ['CUERPO',  'Cable o cinta — sin hilos rotos, deshilachado, torceduras ni corrosión'],
+                ['GIRATOR', 'Gancho giratorio con seguro automático e indicador de impacto sin activar'],
+                ['MONTAJE', 'Montaje al trípode o pescante — firme y compatible'],
+                ['CLASE',   'Clase del dispositivo (1 o 2) acorde al punto de anclaje y a la caída libre'],
+                $etiqueta,
+                ['SERVICIO','Dentro del intervalo de servicio o recertificación del fabricante'],
+            ]],
+
+            // ── Otros componentes del sistema ──────────────────────────
+            'ARRESTADOR' => ['Freno o arrestador de caídas para línea vertical (Z359.15)', 'linea', [
+                ['CUERPO',  'Cuerpo del freno — sin fisuras, deformación ni corrosión'],
+                ['BLOQUEO', 'Bloqueo — muerde la línea con un tirón y sostiene la carga'],
+                ['DESLIZ',  'Deslizamiento libre en ambos sentidos sin atascarse'],
+                ['COMPAT',  'Compatible con el diámetro y el tipo de línea del fabricante'],
+                $ganchos, $etiqueta, $vidaUtil,
+            ]],
+            'ESCALA_SISTEMA' => ['Sistema anticaídas para escalas fijas (Z359.16)', 'linea', [
+                ['RIEL',    'Riel o cable guía — continuo, alineado, sin deformación ni corrosión'],
+                ['ANCLAJE', 'Soportes y anclajes a la estructura — completos, firmes y sin corrosión'],
+                ['CARRO',   'Carro o freno — desliza libre y bloquea con un tirón'],
+                ['TENSION', 'Tensión del cable y topes de extremo conforme al fabricante'],
+                $ganchos, $etiqueta,
+            ]],
+            'ANCLAJE_CONECTOR' => ['Conector de anclaje (Z359.18)', 'linea', [
+                ['CUERPO',  'Cuerpo — sin deformación, fisuras, desgaste ni corrosión'],
+                ['CINTA',   'Cinta o cable — sin cortes, deshilachado, quemaduras ni abrasión'],
+                ['ANCLAJE', 'Instalación sobre la estructura — firme y sin bordes filosos en contacto'],
+                ['CAPACID', 'Capacidad marcada acorde a la carga y al número de usuarios'],
+                $ganchos, $etiqueta, $vidaUtil,
             ]],
         ];
+    }
 
-        $insTipo = $this->pdo->prepare("INSERT INTO arneses_tipos (nombre, familia, activo) VALUES (?,?,1)");
-        $insChk  = $this->pdo->prepare("INSERT INTO arneses_checklist (tipo_id, tag, descripcion, orden) VALUES (?,?,?,?)");
-        foreach ($catalogo as [$nombre, $familia, $puntos]) {
-            $insTipo->execute([$nombre, $familia]);
-            $tipoId = (int)$this->pdo->lastInsertId();
-            $orden = 1;
-            foreach ($puntos as [$tag, $desc]) {
-                $insChk->execute([$tipoId, $tag, $desc, $orden++]);
+    /**
+     * Da de alta los tipos del catálogo que aún no existen, sin tocar los que ya
+     * están ni sus puntos de inspección editados por Calidad.
+     *
+     * El alta se registra por clave en arneses_catalogo_seed: así un tipo que
+     * Calidad borre a propósito no vuelve a aparecer en el siguiente arranque.
+     */
+    private function seedCatalogo(): void {
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS arneses_catalogo_seed (
+                  clave   VARCHAR(40) NOT NULL PRIMARY KEY,
+                  aplicado TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\PDOException $e) { /* motor sin ENGINE, p. ej. en pruebas */
+            try { $this->pdo->exec("CREATE TABLE IF NOT EXISTS arneses_catalogo_seed (clave VARCHAR(40) NOT NULL PRIMARY KEY, aplicado TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"); }
+            catch (\Throwable $e2) { return; }
+        }
+
+        $aplicadas = $this->pdo->query("SELECT clave FROM arneses_catalogo_seed")->fetchAll(PDO::FETCH_COLUMN);
+        $aplicadas = array_flip($aplicadas);
+
+        $existentes = [];
+        foreach ($this->pdo->query("SELECT nombre FROM arneses_tipos")->fetchAll(PDO::FETCH_COLUMN) as $n) {
+            $existentes[mb_strtolower(trim((string)$n))] = true;
+        }
+
+        $insTipo  = $this->pdo->prepare("INSERT INTO arneses_tipos (nombre, familia, activo) VALUES (?,?,1)");
+        $insChk   = $this->pdo->prepare("INSERT INTO arneses_checklist (tipo_id, tag, descripcion, orden) VALUES (?,?,?,?)");
+        $marcar   = $this->pdo->prepare("INSERT INTO arneses_catalogo_seed (clave) VALUES (?)");
+
+        foreach ($this->catalogoBase() as $clave => [$nombre, $familia, $puntos]) {
+            if (isset($aplicadas[$clave])) continue;
+
+            // Instalaciones anteriores ya traen los primeros tipos sin clave:
+            // se marcan como aplicados para no duplicarlos.
+            if (!isset($existentes[mb_strtolower($nombre)])) {
+                $insTipo->execute([$nombre, $familia]);
+                $tipoId = (int)$this->pdo->lastInsertId();
+                $orden  = 1;
+                foreach ($puntos as [$tag, $desc]) $insChk->execute([$tipoId, $tag, $desc, $orden++]);
             }
+            try { $marcar->execute([$clave]); } catch (\Throwable $e) {}
         }
     }
 
