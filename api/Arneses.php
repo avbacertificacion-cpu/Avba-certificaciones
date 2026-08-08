@@ -336,15 +336,21 @@ class Arneses {
         foreach ($this->catalogoBase() as $clave => [$nombre, $familia, $puntos]) {
             if (isset($aplicadas[$clave])) continue;
 
-            // Instalaciones anteriores ya traen los primeros tipos sin clave:
-            // se marcan como aplicados para no duplicarlos.
-            if (!isset($existentes[mb_strtolower($nombre)])) {
-                $insTipo->execute([$nombre, $familia]);
-                $tipoId = (int)$this->pdo->lastInsertId();
-                $orden  = 1;
-                foreach ($puntos as [$tag, $desc]) $insChk->execute([$tipoId, $tag, $desc, $orden++]);
+            // Cada tipo va aislado: si uno falla, los demás se siguen dando de
+            // alta en lugar de quedarse el catálogo a medias.
+            try {
+                // Instalaciones anteriores ya traen los primeros tipos sin
+                // clave: se marcan como aplicados para no duplicarlos.
+                if (!isset($existentes[mb_strtolower($nombre)])) {
+                    $insTipo->execute([$nombre, $familia]);
+                    $tipoId = (int)$this->pdo->lastInsertId();
+                    $orden  = 1;
+                    foreach ($puntos as [$tag, $desc]) $insChk->execute([$tipoId, $tag, $desc, $orden++]);
+                }
+                $marcar->execute([$clave]);
+            } catch (\Throwable $e) {
+                error_log('[Arneses] catálogo ' . $clave . ': ' . $e->getMessage());
             }
-            try { $marcar->execute([$clave]); } catch (\Throwable $e) {}
         }
     }
 
