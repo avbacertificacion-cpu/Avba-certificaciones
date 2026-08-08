@@ -2822,6 +2822,13 @@
         <button class="btn-ant" onclick="arnVerLista()">Ver lista</button>
         <button class="btn-sig" onclick="arnGuardar()">Guardar pieza</button>
       </div>
+      <button class="btn-ant" style="width:100%;margin-top:8px" onclick="arnGuardarYRepetir()"
+              title="Guarda esta pieza y deja todo capturado para la siguiente igual">
+        ⧉ Guardar y capturar otra igual
+      </button>
+      <div style="font-size:11px;color:var(--texto-sub);text-align:center;margin-top:5px">
+        Conserva tipo, marca, modelo, fechas, normas y checklist; sólo se limpian serie, QR y fotos.
+      </div>
     </div>
   </div>
 
@@ -6395,17 +6402,62 @@ function arnLimpiarForm() {
   arnResultado('APTO');
 }
 
-async function arnGuardar() {
+/* Instantánea del formulario, para poder repetir una captura idéntica sin
+   volver a teclear todo. */
+function arnLeerForm() {
+  const v = id => (document.getElementById(id) || {}).value || '';
+  const checklist = {};
+  document.querySelectorAll('.arn-chk-btn[data-sel="1"]').forEach(b => { checklist[b.dataset.tag] = b.dataset.val; });
+  return {
+    tipo_id: v('arn-tipo'), id_arnes: v('arn-id'), marca: v('arn-marca'), modelo: v('arn-modelo'),
+    serie: v('arn-serie'), talla: v('arn-talla'), fabricacion: v('arn-fabricacion'),
+    retiro: v('arn-retiro'), observaciones: v('arn-observaciones'),
+    normas: [...document.querySelectorAll('.arn-norma-chk:checked')].map(c => c.value),
+    normaOtra: v('arn-norma-otra'), resultado: arnResultadoVal, checklist,
+  };
+}
+
+/* Vuelca una instantánea en el formulario. La serie, el QR y las fotos quedan
+   en blanco a propósito: son propias de cada unidad. */
+async function arnEscribirForm(d) {
+  arnLimpiarForm();
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  set('arn-tipo', d.tipo_id);
+  if (d.tipo_id) await arnCargarChecklist();   // lee el tipo del propio selector
+  ['id_arnes','marca','modelo','talla','observaciones'].forEach(k =>
+    set('arn-' + (k === 'id_arnes' ? 'id' : k), d[k]));
+  set('arn-fabricacion', d.fabricacion);
+  set('arn-retiro', d.retiro);
+  set('arn-norma-otra', d.normaOtra);
+  document.querySelectorAll('.arn-norma-chk').forEach(c => { c.checked = (d.normas || []).includes(c.value); });
+  arnResultado(d.resultado || 'APTO');
+  Object.entries(d.checklist || {}).forEach(([tag, val]) => {
+    const b = document.querySelector(`.arn-chk-btn[data-tag="${tag}"][data-val="${val}"]`);
+    if (b) b.click();
+  });
+}
+
+/* Guarda y deja el formulario listo para la siguiente pieza idéntica. */
+async function arnGuardarYRepetir() {
+  const datos = arnLeerForm();
+  const ok = await arnGuardar(true);
+  if (!ok) return;
+  await arnEscribirForm(datos);
+  mostrarToast('Datos conservados. Captura la serie de la siguiente pieza.', 'ok');
+  document.getElementById('arn-serie')?.focus();
+}
+
+async function arnGuardar(repetir = false) {
   const tipoId = document.getElementById('arn-tipo').value;
   const fTipo  = document.getElementById('arn-f-tipo');
-  if (!tipoId) { fTipo.classList.add('has-error'); return; }
+  if (!tipoId) { fTipo.classList.add('has-error'); return false; }
   fTipo.classList.remove('has-error');
 
   // Recoger las respuestas del checklist
   const checklist = {};
   document.querySelectorAll('.arn-chk-btn[data-sel="1"]').forEach(b => { checklist[b.dataset.tag] = b.dataset.val; });
   const faltantes = arnChecklist.filter(p => !checklist[p.tag]).length;
-  if (faltantes > 0 && !confirm(`Quedan ${faltantes} punto(s) sin responder. ¿Guardar de todos modos?`)) return;
+  if (faltantes > 0 && !confirm(`Quedan ${faltantes} punto(s) sin responder. ¿Guardar de todos modos?`)) return false;
 
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   const fd = new FormData();
@@ -6430,21 +6482,28 @@ async function arnGuardar() {
   const btn = document.querySelector('#arn-screen-form .btn-sig');
   btn.disabled = true; btn.textContent = 'Guardando…';
   try {
+    const instantanea = arnLeerForm();
     const r = await fetch(API, { method: 'POST', body: fd });
     const d = await r.json();
-    if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo guardar.', 'err'); return; }
+    if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo guardar.', 'err'); return false; }
     const tipoNombre = (arnTipos.find(t => String(t.id) === String(tipoId)) || {}).nombre || '';
     arnPiezas.push({
+      id: d.item_id,
       tipo: tipoNombre,
       serie: document.getElementById('arn-serie').value.trim(),
       marca: document.getElementById('arn-marca').value.trim(),
       resultado: arnResultadoVal,
+      datos: instantanea,
     });
-    mostrarToast('Pieza registrada.', 'ok');
-    arnLimpiarForm();
+    if (!repetir) {
+      mostrarToast('Pieza registrada.', 'ok');
+      arnLimpiarForm();
+    }
     arnRenderLista();
+    return true;
   } catch(_) {
     mostrarToast('Error de conexión.', 'err');
+    return false;
   } finally {
     btn.disabled = false; btn.textContent = 'Guardar pieza';
   }
@@ -6464,7 +6523,20 @@ function arnRenderLista() {
         <div style="font-size:11px;color:var(--texto-sub)">${[p.marca, p.serie].filter(Boolean).join(' · ') || 'Sin serie'}</div>
       </div>
       <span style="font-size:11px;font-weight:700;color:${color(p.resultado)}">${p.resultado}</span>
+      <button onclick="arnDuplicarPieza(${i})" title="Capturar otra igual a esta"
+              style="padding:4px 9px;background:var(--azul-light);border:none;color:var(--azul-dark);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">⧉</button>
     </div>`).join('');
+}
+
+/* Reabre el formulario con los datos de una pieza ya capturada, para registrar
+   otra idéntica cambiando sólo lo propio de la unidad. */
+async function arnDuplicarPieza(i) {
+  const p = arnPiezas[i];
+  if (!p || !p.datos) { mostrarToast('Esa pieza no se puede duplicar.', 'err'); return; }
+  arnMostrar('form');
+  await arnEscribirForm(p.datos);
+  mostrarToast('Datos copiados. Captura la serie de esta pieza.', 'ok');
+  document.getElementById('arn-serie')?.focus();
 }
 
 function arnVerLista() { arnRenderLista(); arnMostrar('lista'); }

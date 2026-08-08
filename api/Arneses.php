@@ -452,7 +452,16 @@ class Arneses {
      * Guarda una pieza con su checklist y fotos. $post viene de un FormData
      * (multipart) porque puede traer imágenes.
      */
-    public function guardarItem(array $post, array $files): array {
+    /**
+     * Alta de una pieza.
+     *
+     * $permitirCerrada deja añadir piezas a una sesión ya aprobada o emitida:
+     * siempre aparece equipo que llegó después o que se detectó al revisar, y
+     * obligar a devolver todo el expediente para sumar una pieza era peor. Sólo
+     * Calidad y administración pueden hacerlo, y la pieza nueva entra sin
+     * documento hasta que Certificaciones vuelva a emitir.
+     */
+    public function guardarItem(array $post, array $files, bool $permitirCerrada = false): array {
         $sesionId = (int)($post['sesion_id'] ?? 0);
         if (!$sesionId) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
 
@@ -460,7 +469,8 @@ class Arneses {
         $chk->execute([$sesionId]);
         $ses = $chk->fetch(PDO::FETCH_ASSOC);
         if (!$ses) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
-        if (!in_array($ses['estatus'], ['PENDIENTE', 'DEVUELTO'], true)) {
+        $abierta = in_array($ses['estatus'], ['PENDIENTE', 'DEVUELTO'], true);
+        if (!$abierta && !$permitirCerrada) {
             return ['status' => 'error', 'message' => 'La sesión ya fue aprobada; no admite cambios.'];
         }
 
@@ -525,7 +535,90 @@ class Arneses {
 
         $this->guardarFotos($itemId, $sesionId, $files);
 
-        return ['status' => 'success', 'item_id' => $itemId];
+        return [
+            'status'   => 'success',
+            'item_id'  => $itemId,
+            'estatus'  => $ses['estatus'],
+            'reemitir' => !$abierta,   // la sesión ya estaba cerrada
+        ];
+    }
+
+    /**
+     * Duplica una pieza con todo y su lista de verificación. Pensado para lotes
+     * de equipo idéntico, donde lo único que cambia es el número de serie: se
+     * capturan una vez los datos y después sólo se ajusta lo distinto.
+     *
+     * No se copian las fotografías ni el QR: la evidencia y el código son de
+     * cada unidad, no del modelo.
+     */
+    public function duplicarItem(array $p, bool $permitirCerrada = false): array {
+        $itemId = (int)($p['item_id'] ?? 0);
+        $copias = max(1, min(50, (int)($p['copias'] ?? 1)));
+        if (!$itemId) return ['status' => 'error', 'message' => 'Pieza no indicada.'];
+
+        $s = $this->pdo->prepare("SELECT * FROM arneses_items WHERE id = ?");
+        $s->execute([$itemId]);
+        $it = $s->fetch(PDO::FETCH_ASSOC);
+        if (!$it) return ['status' => 'error', 'message' => 'Pieza no encontrada.'];
+
+        $sesionId = (int)$it['sesion_id'];
+        $e = $this->pdo->prepare("SELECT estatus FROM arneses_sesiones WHERE id = ?");
+        $e->execute([$sesionId]);
+        $estatus = (string)$e->fetchColumn();
+        $abierta = in_array($estatus, ['PENDIENTE', 'DEVUELTO'], true);
+        if (!$abierta && !$permitirCerrada) {
+            return ['status' => 'error', 'message' => 'La sesión ya fue aprobada; no admite cambios.'];
+        }
+
+        // Series para las copias: una por copia, en el orden recibido. Las que
+        // no se indiquen quedan vacías para completarlas después.
+        $series = $p['series'] ?? [];
+        if (is_string($series)) $series = array_filter(array_map('trim', preg_split('/[\n,;]+/', $series)));
+        $series = array_values((array)$series);
+
+        $checklist = $this->pdo->prepare("SELECT tag, valor FROM arneses_item_checklist WHERE item_id = ?");
+        $checklist->execute([$itemId]);
+        $puntos = $checklist->fetchAll(PDO::FETCH_ASSOC);
+
+        $orden = (int)$this->pdo->query("SELECT COALESCE(MAX(orden),0) FROM arneses_items WHERE sesion_id = " . $sesionId)->fetchColumn();
+
+        $insItem = $this->pdo->prepare("
+            INSERT INTO arneses_items
+              (sesion_id, tipo_id, id_arnes, marca, modelo, serie, talla, norma, longitud,
+               fecha_fabricacion, fecha_retiro, vigencia, resultado, observaciones, qr_codigo, orden)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,?)
+        ");
+        $insChk = $this->pdo->prepare("INSERT INTO arneses_item_checklist (item_id, tag, valor) VALUES (?,?,?)");
+
+        $creados = [];
+        for ($i = 0; $i < $copias; $i++) {
+            $serie = mb_strtoupper(trim((string)($series[$i] ?? ''))) ?: null;
+            $insItem->execute([
+                $sesionId, $it['tipo_id'], $it['id_arnes'], $it['marca'], $it['modelo'], $serie,
+                $it['talla'], $it['norma'], $it['longitud'],
+                $it['fecha_fabricacion'], $it['fecha_retiro'], $it['vigencia'],
+                $it['resultado'], $it['observaciones'],
+                ++$orden,
+            ]);
+            $nuevoId = (int)$this->pdo->lastInsertId();
+            foreach ($puntos as $pt) {
+                try { $insChk->execute([$nuevoId, $pt['tag'], $pt['valor']]); } catch (\PDOException $ex) {}
+            }
+            $creados[] = $nuevoId;
+        }
+
+        $sinSerie = 0;
+        foreach ($creados as $n => $_) if (trim((string)($series[$n] ?? '')) === '') $sinSerie++;
+
+        $msg = count($creados) . ' copia(s) creada(s). Falta asignarles su código QR';
+        $msg .= $sinSerie ? ", y el número de serie de $sinSerie de ellas." : '.';
+
+        return [
+            'status'   => 'success',
+            'ids'      => $creados,
+            'reemitir' => !$abierta,
+            'message'  => $msg,
+        ];
     }
 
     private function guardarFotos(int $itemId, int $sesionId, array $files): void {

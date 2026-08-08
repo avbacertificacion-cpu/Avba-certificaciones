@@ -6544,9 +6544,13 @@ function renderArnDet(d) {
           ${i.retiro_fmt ? ' · Retiro: ' + escH(i.retiro_fmt) : ''}
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap">
+          <input type="text" id="arn-serie-${i.id}" value="${escH(i.serie||'')}" placeholder="No. de serie"
+                 style="width:150px;padding:5px 8px;border:1.5px solid ${i.serie?'var(--borde)':'#f59e0b'};border-radius:6px;font-size:12px">
           <input type="text" id="arn-qr-${i.id}" value="${escH(i.qr_codigo||'')}" maxlength="10" placeholder="QR de la pieza"
                  style="width:130px;padding:5px 8px;border:1.5px solid ${i.qr_codigo?'var(--borde)':'#f59e0b'};border-radius:6px;font-size:12px;font-family:monospace">
-          <button onclick="guardarQrArn(${i.id})" style="padding:5px 12px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Guardar QR</button>
+          <button onclick="guardarQrArn(${i.id})" style="padding:5px 12px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Guardar</button>
+          <button onclick="duplicarItemArn(${i.id})" title="Crear copias de esta pieza"
+                  style="padding:5px 12px;background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">⧉ Duplicar</button>
           ${i.fotos && i.fotos.length ? `<span style="font-size:11px;color:var(--texto-hint)">📷 ${i.fotos.length}</span>` : ''}
         </div>
         ${i.observaciones ? `<div style="font-size:11px;color:var(--texto-sub);font-style:italic;margin-top:6px">${escH(i.observaciones)}</div>` : ''}
@@ -6603,13 +6607,39 @@ async function devolverArn(id) {
 function cerrarArnDet() { document.getElementById('overlay-arn').style.display = 'none'; }
 
 async function guardarQrArn(itemId) {
-  const qr = document.getElementById('arn-qr-' + itemId).value.trim();
+  const qr    = document.getElementById('arn-qr-' + itemId).value.trim();
+  const serie = (document.getElementById('arn-serie-' + itemId) || {}).value || '';
   try {
     const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'EDITAR_ITEM_ARNES', payload:{ id:itemId, qr_codigo:qr } }) });
+      body: JSON.stringify({ action:'EDITAR_ITEM_ARNES',
+                             payload:{ id:itemId, qr_codigo:qr, serie: serie.trim() } }) });
     const d = await r.json();
-    if (d.status === 'success') { mostrarToast('QR guardado.', 'ok'); abrirArnDet(_arnDetActual.sesion.id); }
+    if (d.status === 'success') { mostrarToast('Pieza actualizada.', 'ok'); abrirArnDet(_arnDetActual.sesion.id); }
     else mostrarToast(d.message || 'No se pudo guardar.', 'err');
+  } catch(_) { mostrarToast('Error de red.', 'err'); }
+}
+
+/* Equipo idéntico en lote: se copia la pieza con toda su lista de verificación
+   y después sólo se completan el número de serie y el QR de cada copia. */
+async function duplicarItemArn(itemId) {
+  const n = parseInt(prompt('¿Cuántas copias de esta pieza? (1 a 50)', '1') || '0', 10);
+  if (!n || n < 1) return;
+  if (n > 50) { mostrarToast('Máximo 50 copias por vez.', 'err'); return; }
+  const series = prompt(
+    `Números de serie de las ${n} copia(s), uno por renglón.\n` +
+    'Puedes dejarlo vacío y capturarlos después en cada copia.', '') || '';
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'DUPLICAR_ITEM_ARNES', payload:{ item_id:itemId, copias:n, series } }) });
+    const d = await r.json();
+    if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo duplicar.', 'err'); return; }
+    mostrarToast(d.message, 'ok');
+    if (d.reemitir) {
+      alert('Las copias se agregaron a una inspección ya cerrada.\n\n' +
+            'Asígnales número de serie y código QR, y pide a Certificaciones que vuelva a emitir ' +
+            'para que salgan sus certificados.');
+    }
+    abrirArnDet(_arnDetActual.sesion.id);
   } catch(_) { mostrarToast('Error de red.', 'err'); }
 }
 

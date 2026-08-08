@@ -1912,7 +1912,13 @@ if ($method === 'POST') {
         case 'GUARDAR_ITEM_ARNES':   // multipart (lleva fotos)
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($arneses->guardarItem($_POST, $_FILES));
+            // Sólo Calidad y administración pueden sumar piezas a una sesión ya cerrada.
+            respuesta($arneses->guardarItem($_POST, $_FILES, in_array($usr['rol'], ['ADMIN','CALIDAD'])));
+
+        case 'DUPLICAR_ITEM_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->duplicarItem($payload, in_array($usr['rol'], ['ADMIN','CALIDAD'])));
 
         case 'EDITAR_ITEM_ARNES':
             $usr = validarToken($pdo, $token);
