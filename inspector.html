@@ -1908,7 +1908,7 @@
       <button onclick="cerrarExistentes()" style="border:none;background:none;font-size:20px;color:var(--texto-sub);cursor:pointer">✕</button>
     </div>
     <div style="padding:10px 16px;border-bottom:1px solid var(--borde)">
-      <input type="text" id="exi-buscar" placeholder="🔍 Buscar por nombre o CURP" oninput="exiFiltrar()"
+      <input type="text" id="exi-buscar" placeholder="🔍 Buscar en toda la base por nombre, CURP o empresa" oninput="exiFiltrar()"
              style="width:100%;padding:9px 11px;border:1.5px solid var(--borde);border-radius:9px;font-size:13px">
       <div style="display:flex;gap:8px;margin-top:8px">
         <button onclick="exiMarcarTodos(true)" style="flex:1;padding:6px;border:1px solid var(--borde);background:#fff;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer">Seleccionar todos</button>
@@ -4984,15 +4984,16 @@ async function sesAgregarExistentes() {
   const ov = document.getElementById('ov-existentes');
   const cont = document.getElementById('exi-lista');
 
-  // Selectores de empresa y curso de esta sesión
+  // La búsqueda es general sobre toda la base; la empresa elegida sólo hace que
+  // su gente salga primero. El curso sí es el destino de la inscripción.
   const empresas = (curSesionEmpresas || []).map(e => e.nombre_empresa).filter(Boolean);
-  if (!empresas.length) { mostrarToast('La sesión no tiene empresas configuradas.', 'err'); return; }
   const cursos = (curCursos || []).filter(c => (curSesion?.curso_ids || []).map(String).includes(String(c.id)));
 
   document.getElementById('exi-sub').innerHTML = `
     <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
       <select id="exi-empresa" onchange="exiCargar()" style="flex:1;min-width:140px;padding:6px 8px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
-        ${empresas.map(e => `<option value="${escHtmlInsp(e)}">${escHtmlInsp(e)}</option>`).join('')}
+        ${empresas.map(e => `<option value="${escHtmlInsp(e)}">${escHtmlInsp(e)} primero</option>`).join('')}
+        <option value="">Todas las empresas</option>
       </select>
       <select id="exi-curso" style="flex:1;min-width:140px;padding:6px 8px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
         ${cursos.length
@@ -5015,8 +5016,10 @@ async function exiCargar() {
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   cont.innerHTML = '<div style="padding:16px;font-size:12px;color:var(--texto-sub)">Cargando…</div>';
   try {
+    const buscar = document.getElementById('exi-buscar')?.value || '';
     const url = `${API}?action=LISTAR_PARTICIPANTES_EMPRESA&empresa=${encodeURIComponent(empresa)}`
               + `&curso_id=${encodeURIComponent(cursoId)}&fecha=${encodeURIComponent(curSesion?.fecha || '')}`
+              + `&buscar=${encodeURIComponent(buscar)}`
               + `&token=${encodeURIComponent(s.token || '')}`;
     const r = await fetch(url);
     const d = await r.json();
@@ -5027,19 +5030,21 @@ async function exiCargar() {
 
 function exiRender() {
   const cont = document.getElementById('exi-lista');
-  const filtro = (document.getElementById('exi-buscar')?.value || '').toLowerCase().trim();
-  const vis = _exiDatos.filter(p =>
-    !filtro || (p.nombre_completo||'').toLowerCase().includes(filtro) || (p.curp||'').toLowerCase().includes(filtro));
+  // El filtrado corre en el servidor sobre toda la base.
+  const vis = _exiDatos;
 
-  if (!_exiDatos.length) {
-    cont.innerHTML = '<div style="padding:20px;text-align:center;font-size:12px;color:var(--texto-sub)">No hay participantes previos de esta empresa disponibles para este curso.</div>';
-    return;
-  }
   if (!vis.length) {
-    cont.innerHTML = '<div style="padding:20px;text-align:center;font-size:12px;color:var(--texto-sub)">Ningún participante coincide con la búsqueda.</div>';
+    const q = (document.getElementById('exi-buscar')?.value || '').trim();
+    cont.innerHTML = '<div style="padding:20px;text-align:center;font-size:12px;color:var(--texto-sub)">'
+      + (q ? 'Ningún participante coincide con la búsqueda.'
+           : 'No hay participantes registrados disponibles para este curso.') + '</div>';
     return;
   }
-  cont.innerHTML = vis.map(p => `
+  const empSel = (document.getElementById('exi-empresa')?.value || '').trim().toUpperCase();
+  cont.innerHTML = vis.map(p => {
+    const emp = (p.empresa_nombre || '').trim();
+    const propia = empSel !== '' && emp.toUpperCase() === empSel;
+    return `
     <label style="display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid var(--borde);cursor:pointer">
       <input type="checkbox" class="exi-chk" value="${p.id}" style="width:auto;margin:0">
       <div style="flex:1;min-width:0">
@@ -5048,12 +5053,21 @@ function exiRender() {
           ${p.curp ? escHtmlInsp(p.curp) + ' · ' : ''}${escHtmlInsp(p.puesto || 'Sin puesto')}
           ${p.cursos_tomados ? ' · ' + p.cursos_tomados + ' curso(s)' : ''}
         </div>
+        <div style="font-size:11px;color:${propia ? 'var(--verde)' : 'var(--texto-hint)'}">
+          ${emp ? escHtmlInsp(emp) : 'Sin empresa'}${propia ? ' · empresa de la sesión' : ''}
+        </div>
       </div>
       ${p.foto_documentacion_url ? '<span title="Tiene identificación" style="font-size:13px">🪪</span>' : ''}
-    </label>`).join('');
+    </label>`; }).join('');
 }
 
-function exiFiltrar() { exiRender(); }
+/* La búsqueda consulta al servidor: la lista viene acotada, así que filtrar
+   sólo en pantalla escondería coincidencias del resto de la base. */
+let _exiTimer = null;
+function exiFiltrar() {
+  clearTimeout(_exiTimer);
+  _exiTimer = setTimeout(() => exiCargar(), 300);
+}
 function exiMarcarTodos(v) { document.querySelectorAll('.exi-chk').forEach(c => c.checked = v); }
 
 async function exiAgregar() {

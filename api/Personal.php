@@ -149,17 +149,21 @@ class Personal {
     }
 
     /**
-     * Participantes ya registrados de una empresa, para reutilizarlos en un
-     * curso nuevo sin volver a capturarlos ni pedirles otra vez sus datos.
+     * Participantes ya registrados, para reutilizarlos en un curso nuevo sin
+     * volver a capturarlos ni pedirles otra vez sus datos.
+     *
+     * La búsqueda es general sobre toda la base: la gente rota entre empresas y
+     * limitar la lista a la del curso dejaba fuera coincidencias válidas. La
+     * empresa del curso sólo ordena —sus integrantes salen primero—, no filtra.
      *
      * Se agrupa por CURP (o por nombre, si no tiene) y se toma el registro más
      * reciente de cada persona, que es el que trae los datos y las fotos al
      * día. Se excluyen los que ya están en el curso/fecha indicados, para no
      * ofrecer duplicados dentro de la misma sesión.
      */
-    public function participantesDeEmpresa(string $empresa, int $cursoId = 0, string $fechaCurso = ''): array {
+    public function participantesDeEmpresa(string $empresa, int $cursoId = 0, string $fechaCurso = '', string $buscar = ''): array {
         $empresa = trim($empresa);
-        if ($empresa === '') return ['status' => 'error', 'message' => 'Indica la empresa.'];
+        $buscar  = trim($buscar);
 
         try {
             // Un renglón por persona: el de su curso más reciente. Se resuelve
@@ -167,6 +171,16 @@ class Personal {
             // se seleccionan columnas sin agregar es un error bajo el modo
             // ONLY_FULL_GROUP_BY de MySQL (activo por omisión desde 5.7), y ahí
             // la lista de personal llegaba vacía.
+            $filtro = '';
+            $params = [];
+            if ($buscar !== '') {
+                $filtro = "AND (p.nombre_completo LIKE ? OR p.curp LIKE ? OR p.empresa_nombre LIKE ?)";
+                $like   = '%' . $buscar . '%';
+                $params = [$like, $like, $like];
+            }
+            // La empresa del curso sólo prioriza el orden.
+            $params[] = $empresa;
+
             $sql = "SELECT p.id AS ultimo_id,
                            p.nombre_completo, p.curp, p.puesto, p.ocupacion_id,
                            p.capacidad, p.capacidad_na, p.telefono,
@@ -174,23 +188,21 @@ class Personal {
                            p.empresa_nombre, p.empresa_rfc, p.empresa_representante, p.empresa_direccion,
                            DATE_FORMAT(p.fecha_curso,'%d/%m/%Y') AS ultimo_curso,
                            (SELECT COUNT(*) FROM participantes_cursos q
-                             WHERE TRIM(q.empresa_nombre) = TRIM(p.empresa_nombre)
-                               AND COALESCE(NULLIF(q.curp,''), q.nombre_completo)
+                             WHERE COALESCE(NULLIF(q.curp,''), q.nombre_completo)
                                  = COALESCE(NULLIF(p.curp,''), p.nombre_completo)) AS cursos_tomados
                     FROM participantes_cursos p
-                    WHERE TRIM(p.empresa_nombre) = ?
-                      AND p.id = (SELECT MAX(r.id) FROM participantes_cursos r
-                                   WHERE TRIM(r.empresa_nombre) = TRIM(p.empresa_nombre)
-                                     AND COALESCE(NULLIF(r.curp,''), r.nombre_completo)
+                    WHERE p.id = (SELECT MAX(r.id) FROM participantes_cursos r
+                                   WHERE COALESCE(NULLIF(r.curp,''), r.nombre_completo)
                                        = COALESCE(NULLIF(p.curp,''), p.nombre_completo))
-                    ORDER BY p.nombre_completo
+                      $filtro
+                    ORDER BY (TRIM(COALESCE(p.empresa_nombre,'')) = ?) DESC, p.nombre_completo
                     LIMIT 500";
             $st = $this->pdo->prepare($sql);
-            $st->execute([$empresa]);
+            $st->execute($params);
             $rows = $st->fetchAll(PDO::FETCH_ASSOC);
         } catch (\PDOException $e) {
             error_log('[Personal] participantesDeEmpresa: ' . $e->getMessage());
-            return ['status' => 'error', 'message' => 'No se pudo consultar el personal de la empresa.'];
+            return ['status' => 'error', 'message' => 'No se pudo consultar el personal registrado.'];
         }
 
         // Quitar los que ya están en esta misma sesión de curso
@@ -201,9 +213,9 @@ class Personal {
                 $st2 = $this->pdo->prepare(
                     "SELECT COALESCE(NULLIF(curp,''), nombre_completo) AS clave
                      FROM participantes_cursos
-                     WHERE curso_id = ? AND fecha_curso = ? AND TRIM(empresa_nombre) = ?"
+                     WHERE curso_id = ? AND fecha_curso = ?"
                 );
-                $st2->execute([$cursoId, $f, $empresa]);
+                $st2->execute([$cursoId, $f]);
                 $yaEnSesion = array_flip($st2->fetchAll(PDO::FETCH_COLUMN));
             } catch (\PDOException $e) { /* sin filtro si algo falla */ }
         }

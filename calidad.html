@@ -2067,7 +2067,7 @@
 
       <!-- Participantes ya registrados -->
       <div id="calp-existentes" style="display:none">
-        <input type="text" id="calp-buscar" placeholder="🔍 Buscar por nombre o CURP" oninput="calpFiltrar()"
+        <input type="text" id="calp-buscar" placeholder="🔍 Buscar en toda la base por nombre, CURP o empresa" oninput="calpFiltrar()"
                style="width:100%;padding:9px 11px;border:1.5px solid var(--borde);border-radius:9px;font-size:13px;margin-bottom:8px">
         <div style="display:flex;gap:8px;margin-bottom:8px">
           <button onclick="calpMarcar(true)" style="flex:1;padding:6px;border:1px solid var(--borde);background:#fff;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer">Seleccionar todos</button>
@@ -4218,12 +4218,23 @@ async function calAbrirAgregarPart(idx, modo) {
     return;
   }
 
+  document.getElementById('calp-buscar').value = '';
+  calpCargar('');
+}
+
+/* La lista es general sobre toda la base de participantes; la empresa del
+   curso sólo hace que sus integrantes salgan primero. */
+async function calpCargar(buscar) {
+  const g = _calpSesion;
+  if (!g) return;
+  const base = g.participantes[0] || {};
   const cont = document.getElementById('calp-lista');
   cont.innerHTML = '<div style="padding:14px;font-size:12px;color:var(--texto-hint)">Cargando…</div>';
   try {
     const empresa = g.empresa || base.empresa_nombre || '';
     const url = `${API}?action=LISTAR_PARTICIPANTES_EMPRESA&empresa=${encodeURIComponent(empresa)}`
-              + `&curso_id=${encodeURIComponent(base.curso_id || '')}&fecha=${encodeURIComponent(g.fecha_curso || '')}`;
+              + `&curso_id=${encodeURIComponent(base.curso_id || '')}&fecha=${encodeURIComponent(g.fecha_curso || '')}`
+              + `&buscar=${encodeURIComponent(buscar || '')}`;
     const r = await fetch(url);
     const d = await r.json();
     _calpDatos = (d && d.participantes) ? d.participantes : [];
@@ -4231,32 +4242,43 @@ async function calAbrirAgregarPart(idx, modo) {
   calpRender();
 }
 
+/* La búsqueda va al servidor: la lista es general sobre toda la base y viene
+   acotada, así que filtrar sólo en pantalla escondería coincidencias. */
+let _calpTimer = null;
+function calpFiltrarServidor() {
+  clearTimeout(_calpTimer);
+  _calpTimer = setTimeout(() => calpCargar(document.getElementById('calp-buscar').value || ''), 300);
+}
+
 function calCerrarAgregarPart() { document.getElementById('overlay-cal-part').classList.remove('open'); }
 
 function calpRender() {
   const cont = document.getElementById('calp-lista');
-  const f = (document.getElementById('calp-buscar').value || '').toLowerCase().trim();
-  const vis = _calpDatos.filter(p => !f ||
-    (p.nombre_completo||'').toLowerCase().includes(f) || (p.curp||'').toLowerCase().includes(f));
-  if (!_calpDatos.length) {
-    cont.innerHTML = '<div style="padding:18px;text-align:center;font-size:12px;color:var(--texto-hint)">No hay participantes previos de esta empresa disponibles para este curso.</div>';
-    return;
-  }
+  // El filtrado lo hace el servidor: aquí se muestra tal cual lo devuelto.
+  const vis = _calpDatos;
   if (!vis.length) {
-    cont.innerHTML = '<div style="padding:18px;text-align:center;font-size:12px;color:var(--texto-hint)">Ninguno coincide con la búsqueda.</div>';
+    const q = (document.getElementById('calp-buscar').value || '').trim();
+    cont.innerHTML = '<div style="padding:18px;text-align:center;font-size:12px;color:var(--texto-hint)">'
+      + (q ? 'Ninguno coincide con la búsqueda.'
+           : 'No hay participantes registrados disponibles para este curso.') + '</div>';
     return;
   }
-  cont.innerHTML = vis.map(p => `
+  const empresaCurso = ((_calpSesion && _calpSesion.empresa) || '').trim().toUpperCase();
+  cont.innerHTML = vis.map(p => {
+    const emp = (p.empresa_nombre || '').trim();
+    const propia = emp.toUpperCase() === empresaCurso && empresaCurso !== '';
+    return `
     <label style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--borde);cursor:pointer">
       <input type="checkbox" class="calp-chk" value="${p.id}" style="width:15px;height:15px">
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--texto)">${escH(p.nombre_completo)}</div>
         <div style="font-size:11px;color:var(--texto-sub)">${p.curp ? escH(p.curp)+' · ' : ''}${escH(p.puesto||'Sin puesto')}${p.cursos_tomados ? ' · '+p.cursos_tomados+' curso(s)' : ''}</div>
+        <div style="font-size:11px;color:${propia ? 'var(--verde)' : 'var(--texto-hint)'}">${emp ? escH(emp) : 'Sin empresa'}${propia ? ' · empresa del curso' : ''}</div>
       </div>
       ${p.foto_documentacion_url ? '<span title="Tiene identificación">🪪</span>' : ''}
-    </label>`).join('');
+    </label>`; }).join('');
 }
-function calpFiltrar() { calpRender(); }
+function calpFiltrar() { calpFiltrarServidor(); }
 function calpMarcar(v) { document.querySelectorAll('.calp-chk').forEach(c => c.checked = v); }
 
 async function calGuardarParticipantes() {

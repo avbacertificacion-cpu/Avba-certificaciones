@@ -751,7 +751,8 @@ if ($method === 'GET') {
             respuesta($personal->participantesDeEmpresa(
                 trim($_GET['empresa'] ?? ''),
                 (int)($_GET['curso_id'] ?? 0),
-                trim($_GET['fecha'] ?? '')
+                trim($_GET['fecha'] ?? ''),
+                trim($_GET['buscar'] ?? '')
             ));
 
         // ── Arneses y líneas de vida ──────────────────────
