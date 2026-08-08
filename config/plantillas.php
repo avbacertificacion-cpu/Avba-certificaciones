@@ -52,6 +52,37 @@ return [
         ],
     ],
 
+    'arneses' => [
+        'titulo'       => 'Certificado de Inspección Técnica',
+        'descripcion'  => 'Arneses y líneas de vida',
+        'detalle'      => 'Equipo de protección personal contra caídas. Incluye fecha de fabricación, retiro obligatorio y normas aplicables; la vigencia se corta en el retiro si cae antes.',
+        'archivo'      => 'certificado_arneses_preview.html',
+        'modulos'      => ['certificaciones', 'arneses'],
+        'campos'       => ['cliente','domicilio','tipo_equipo','talla','marca','modelo','no_serie',
+                           'no_identificacion','fecha_fabricacion','fecha_retiro','normas','fecha_inspeccion'],
+        'color'        => '#0d2244',
+        'icono'        => 'equipo',
+        'muestra' => [
+            '{folio}'             => 'ARN-2026-0001',
+            '{cliente}'           => 'INDUSTRIAS MODELO SA DE CV',
+            '{domicilio}'         => 'BLVD. TOLUCA 450, COL. INDUSTRIAL, CDMX CP 02300',
+            '{tipo_equipo}'       => 'ARNÉS DE CUERPO COMPLETO',
+            '{talla}'             => 'M/L',
+            '{marca}'             => 'MSA',
+            '{modelo}'            => 'V-FORM+',
+            '{no_serie}'          => 'SN-4471902',
+            '{no_identificacion}' => 'ARN-114',
+            '{fecha_fabricacion}' => '12/04/2023',
+            '{fecha_retiro}'      => '12/04/2028',
+            '{normas}'            => 'NOM-009-STPS-2011 · ANSI/ASSP Z359.11-2021',
+            '{resultado_texto}'   => 'SEGURAS para su uso',
+            '{fecha_inspeccion}'  => '',   // filled at runtime
+            '{vigencia}'          => '',   // filled at runtime
+            '{no_acreditacion}'   => 'UVNMX 057',
+            '{qr_imagen}'         => '',   // filled at runtime
+        ],
+    ],
+
     'personal' => [
         'titulo'       => 'Certificado de Personal',
         'descripcion'  => 'Cursos y programas de capacitación',
