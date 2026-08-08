@@ -32,6 +32,9 @@ require_once __DIR__ . '/config/config.php';
 require_once __DIR__ . '/config/database.php';
 require_once __DIR__ . '/api/helpers.php';
 
+// config/database.php sólo define la clase: la conexión se pide aparte.
+$pdo = Database::getConnection();
+
 header('Content-Type: text/html; charset=utf-8');
 
 if (($_GET['secret'] ?? '') !== SECRETO_MANTENIMIENTO) {
