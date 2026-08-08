@@ -160,16 +160,27 @@ class Personal {
         if ($empresa === '') return ['status' => 'error', 'message' => 'Indica la empresa.'];
 
         try {
-            $sql = "SELECT p.nombre_completo, p.curp, p.puesto, p.ocupacion_id,
+            // Un renglón por persona: el de su curso más reciente. Se resuelve
+            // con una subconsulta en lugar de GROUP BY porque agrupar mientras
+            // se seleccionan columnas sin agregar es un error bajo el modo
+            // ONLY_FULL_GROUP_BY de MySQL (activo por omisión desde 5.7), y ahí
+            // la lista de personal llegaba vacía.
+            $sql = "SELECT p.id AS ultimo_id,
+                           p.nombre_completo, p.curp, p.puesto, p.ocupacion_id,
                            p.capacidad, p.capacidad_na, p.telefono,
                            p.foto_documentacion_url, p.foto_persona_url,
                            p.empresa_nombre, p.empresa_rfc, p.empresa_representante, p.empresa_direccion,
-                           MAX(p.id) AS ultimo_id,
-                           COUNT(*)  AS cursos_tomados,
-                           MAX(DATE_FORMAT(p.fecha_curso,'%d/%m/%Y')) AS ultimo_curso
+                           DATE_FORMAT(p.fecha_curso,'%d/%m/%Y') AS ultimo_curso,
+                           (SELECT COUNT(*) FROM participantes_cursos q
+                             WHERE TRIM(q.empresa_nombre) = TRIM(p.empresa_nombre)
+                               AND COALESCE(NULLIF(q.curp,''), q.nombre_completo)
+                                 = COALESCE(NULLIF(p.curp,''), p.nombre_completo)) AS cursos_tomados
                     FROM participantes_cursos p
                     WHERE TRIM(p.empresa_nombre) = ?
-                    GROUP BY COALESCE(NULLIF(p.curp,''), p.nombre_completo)
+                      AND p.id = (SELECT MAX(r.id) FROM participantes_cursos r
+                                   WHERE TRIM(r.empresa_nombre) = TRIM(p.empresa_nombre)
+                                     AND COALESCE(NULLIF(r.curp,''), r.nombre_completo)
+                                       = COALESCE(NULLIF(p.curp,''), p.nombre_completo))
                     ORDER BY p.nombre_completo
                     LIMIT 500";
             $st = $this->pdo->prepare($sql);
@@ -228,13 +239,29 @@ class Personal {
 
         if (!$cursoId)
             return ['status' => 'error', 'message' => 'Selecciona un curso.'];
-        if (!trim($payload['fecha_curso'] ?? ''))
-            return ['status' => 'error', 'message' => 'La fecha del curso es obligatoria.'];
 
-        // Normalizar CURP si se proporcionó
+        // La fecha tiene que quedar en un formato que la columna DATE acepte:
+        // si no se puede interpretar, se avisa en vez de dejar que el INSERT
+        // falle con un error interno.
+        $fechaCurso = $this->parseFecha(trim($payload['fecha_curso'] ?? ''));
+        if (!$fechaCurso)
+            return ['status' => 'error', 'message' => 'La fecha del curso es obligatoria y debe ser válida (dd/mm/aaaa).'];
+
+        if (!trim($payload['nombre_completo'] ?? ''))
+            return ['status' => 'error', 'message' => 'El nombre del participante es obligatorio.'];
+
+        // El curso tiene que existir: es llave foránea.
+        $ck = $this->pdo->prepare("SELECT id FROM cursos WHERE id = ?");
+        $ck->execute([$cursoId]);
+        if (!$ck->fetch())
+            return ['status' => 'error', 'message' => 'El curso indicado ya no existe.'];
+
+        // Normalizar CURP si se proporcionó. Se guarda como cadena vacía, no
+        // como NULL: la columna nació NOT NULL y hay instalaciones donde sigue
+        // siéndolo.
         $curpRaw = strtoupper(trim($payload['curp'] ?? ''));
-        $curp    = $curpRaw ?: null;
-        if ($curp) {
+        $curp    = $curpRaw;
+        if ($curp !== '') {
             $curpCheck = validarCURPCompleta($curp);
             if (!$curpCheck['valida']) return ['status' => 'error', 'message' => $curpCheck['error']];
         }
@@ -272,7 +299,7 @@ class Personal {
             'empresa_direccion'     => $u($payload['empresa_direccion']     ?? ''),
             'empresa_representante' => $u($payload['empresa_representante'] ?? ''),
             'curso_id'              => $cursoId,
-            'fecha_curso'           => $this->parseFecha($payload['fecha_curso'] ?? ''),
+            'fecha_curso'           => $fechaCurso,
             'foto_documentacion_url'=> $fotoDocUrl,
             'foto_persona_url'      => $fotoPersonaUrl,
         ];
@@ -901,6 +928,13 @@ class Personal {
                 ADD COLUMN IF NOT EXISTS capacidad             VARCHAR(100) DEFAULT NULL,
                 ADD COLUMN IF NOT EXISTS capacidad_na          TINYINT(1)   NOT NULL DEFAULT 0,
                 ADD COLUMN IF NOT EXISTS correo                VARCHAR(200) DEFAULT NULL");
+        } catch (\Throwable $e) {}
+
+        // La CURP es opcional en el sistema (hay participantes que no la
+        // traen), pero la columna nació NOT NULL: relajarla evita que el
+        // registro reviente con un error interno.
+        try {
+            $this->pdo->exec("ALTER TABLE participantes_cursos MODIFY curp VARCHAR(18) NULL");
         } catch (\Throwable $e) {}
     }
 
