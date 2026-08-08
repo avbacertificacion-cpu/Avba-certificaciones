@@ -4264,13 +4264,16 @@ async function calGuardarParticipantes() {
   const g = _calpSesion, base = g.participantes[0];
   const btn = document.getElementById('calp-btn');
 
-  // Datos que hereda de la sesión para que el nuevo registro quede igual
+  // Datos que hereda de la sesión para que el nuevo registro quede igual.
+  // Si el primer participante del grupo no trae los datos fiscales, se busca
+  // en el resto: basta con que uno los tenga para heredarlos.
+  const conDato = campo => (g.participantes.find(p => (p[campo] || '').trim()) || {})[campo] || '';
   const comun = {
     curso_id: base.curso_id, fecha_curso: g.fecha_curso,
     empresa_nombre: g.empresa || base.empresa_nombre || '',
-    empresa_rfc: base.empresa_rfc || '',
-    empresa_representante: base.empresa_representante || '',
-    empresa_direccion: base.empresa_direccion || '',
+    empresa_rfc: conDato('empresa_rfc'),
+    empresa_representante: conDato('empresa_representante'),
+    empresa_direccion: conDato('empresa_direccion'),
   };
 
   let aEnviar = [];
@@ -4290,9 +4293,15 @@ async function calGuardarParticipantes() {
     if (!ids.length) { mostrarToast('Selecciona al menos un participante.', 'err'); return; }
     aEnviar = ids.map(id => {
       const p = _calpDatos.find(x => x.id === id);
+      // El propio registro del participante suele traer los datos fiscales
+      // más completos que la sesión: se prefieren los suyos.
       return p ? { ...comun, nombre_completo: p.nombre_completo, curp: p.curp, puesto: p.puesto,
                    ocupacion_id: p.ocupacion_id, capacidad: p.capacidad, capacidad_na: p.capacidad_na,
                    telefono: p.telefono,
+                   empresa_nombre:        p.empresa_nombre        || comun.empresa_nombre,
+                   empresa_rfc:           p.empresa_rfc           || comun.empresa_rfc,
+                   empresa_representante: p.empresa_representante || comun.empresa_representante,
+                   empresa_direccion:     p.empresa_direccion     || comun.empresa_direccion,
                    foto_documentacion_url: p.foto_documentacion_url,
                    foto_persona_url: p.foto_persona_url } : null;
     }).filter(Boolean);

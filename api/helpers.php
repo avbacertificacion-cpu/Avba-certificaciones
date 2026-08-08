@@ -116,6 +116,12 @@ function generarToken(): string {
 }
 
 /**
+ * Prefijo reservado para los folios sin empresa. Los clientes reales arrancan
+ * en 45155, así que 00000 no colisiona con ninguno.
+ */
+const CONTROL_PREFIJO_SIN_EMPRESA = '00000';
+
+/**
  * Formatea el folio para mostrar en documentos.
  * "24568-45698" → "AB.24568-45698-2026MX"
  * La BD guarda el valor sin formato.
@@ -150,7 +156,14 @@ function generarControl(PDO $pdo, string $nombreCliente): string {
         $ins->execute([$nombreCliente, $newId]);
     }
 
-    // Consecutivo global: MAX entre todas las tablas con control
+    return "{$numA}-" . consecutivoControl($pdo);
+}
+
+/**
+ * Segunda mitad del folio: consecutivo global, el máximo entre todas las
+ * tablas que llevan número de control.
+ */
+function consecutivoControl(PDO $pdo): string {
     $maxB = 0;
     foreach (['equipos', 'accesorios_sesiones', 'participantes_cursos', 'pnd_inspecciones'] as $tabla) {
         try {
@@ -161,9 +174,18 @@ function generarControl(PDO $pdo, string $nombreCliente): string {
             $maxB = max($maxB, (int)($r['max_b'] ?? 0));
         } catch (\PDOException $e) { /* tabla o columna aún no existe */ }
     }
-    $numB = str_pad($maxB + 1, 5, '0', STR_PAD_LEFT);
+    return str_pad($maxB + 1, 5, '0', STR_PAD_LEFT);
+}
 
-    return "{$numA}-{$numB}";
+/**
+ * Folio para un registro que no pertenece a ninguna empresa (por ejemplo, una
+ * persona que toma un curso por su cuenta). Usa un prefijo reservado y NO da
+ * de alta un cliente: si no, cada participante independiente acabaría en el
+ * catálogo de empresas y saldría en los autocompletados de "nombre de la
+ * empresa".
+ */
+function controlSinCliente(PDO $pdo): string {
+    return CONTROL_PREFIJO_SIN_EMPRESA . '-' . consecutivoControl($pdo);
 }
 
 /**

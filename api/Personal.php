@@ -65,7 +65,9 @@ class Personal {
                        c.nombre AS curso_nombre, c.duracion_horas,
                        o.nombre AS ocupacion_nombre,
                        p.foto_documentacion_url, p.foto_persona_url,
-                       p.empresa_nombre, p.fecha_registro,
+                       p.empresa_nombre, p.empresa_rfc,
+                       p.empresa_representante, p.empresa_direccion,
+                       p.fecha_registro,
                        p.usuario_registro,
                        COALESCE(ui.nombre, p.usuario_registro, '') AS instructor_nombre,
                        COALESCE((SELECT cl.correo_contacto FROM clientes cl WHERE cl.nombre_cliente = p.empresa_nombre COLLATE utf8mb4_general_ci AND cl.correo_contacto IS NOT NULL AND cl.correo_contacto <> '' LIMIT 1),'') AS empresa_correo
@@ -312,9 +314,13 @@ class Personal {
             $this->pdo->prepare("UPDATE participantes_cursos SET " . implode(', ', $sets) . " WHERE id = ?")
                       ->execute($values);
         } else {
-            // Insertar — asignar número de control
-            $clienteNombre = $campos['empresa_nombre'] ?? $campos['nombre_completo'];
-            $campos['control']          = generarControl($this->pdo, $clienteNombre);
+            // Insertar — asignar número de control. Sin empresa se usa el
+            // prefijo reservado: antes se daba de alta un "cliente" con el
+            // nombre de la persona, que acababa en el catálogo de empresas.
+            $empresa = trim((string)($campos['empresa_nombre'] ?? ''));
+            $campos['control']          = $empresa !== ''
+                ? generarControl($this->pdo, $empresa)
+                : controlSinCliente($this->pdo);
             $campos['usuario_registro'] = $usuario;
             $cols   = implode(', ', array_map(fn($k) => "`{$k}`", array_keys($campos)));
             $marks  = implode(', ', array_fill(0, count($campos), '?'));
@@ -396,8 +402,10 @@ class Personal {
 
         // Generar control si el participante no lo tiene (registros previos a migration_009)
         if (empty($p['control'])) {
-            $clienteNombre = $p['empresa_nombre'] ?: $p['nombre_completo'];
-            $control = generarControl($this->pdo, $clienteNombre);
+            $empresa = trim((string)($p['empresa_nombre'] ?? ''));
+            $control = $empresa !== ''
+                ? generarControl($this->pdo, $empresa)
+                : controlSinCliente($this->pdo);
             $this->pdo->prepare("UPDATE participantes_cursos SET control = ? WHERE id = ?")
                 ->execute([$control, $id]);
         }
