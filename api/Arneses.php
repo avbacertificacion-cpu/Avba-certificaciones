@@ -1352,6 +1352,27 @@ class Arneses {
         return $out;
     }
 
+    /**
+     * Barra del índice de conformidad.
+     *
+     * Se dibuja con una tabla y celdas CON contenido: mPDF no pinta el fondo de
+     * un div vacío ni respeta su altura, y una celda de ancho 0% igual reserva
+     * espacio, por lo que al 100% la barra se quedaba corta. Por eso la celda
+     * del resto sólo se emite cuando falta algo por cubrir.
+     */
+    private function barraConformidad(int $pct): string {
+        $pct  = max(0, min(100, $pct));
+        $alto = 'font-size:1pt;line-height:9px';
+        $html = '<table width="100%" style="border-collapse:collapse;background:#e6eaf0"><tr>';
+        if ($pct > 0) {
+            $html .= '<td width="' . $pct . '%" style="background:#1b7a3d;' . $alto . '">&nbsp;</td>';
+        }
+        if ($pct < 100) {
+            $html .= '<td width="' . (100 - $pct) . '%" style="' . $alto . '">&nbsp;</td>';
+        }
+        return $html . '</tr></table>';
+    }
+
     /** Ruta relativa de un activo de marca si existe (mPDF resuelve sobre la raíz). */
     private function activo(string $rel): string {
         return is_file(__DIR__ . '/../' . $rel) ? $rel : '';
@@ -1601,12 +1622,7 @@ class Arneses {
              <table width="100%" style="margin-top:9px;border-collapse:collapse">
                <tr>
                  <td width="26%" style="font-size:7.5pt;color:#5a6072">Índice de conformidad</td>
-                 <td width="58%">
-                   <table width="100%" style="border-collapse:collapse;background:#e6eaf0">
-                     <tr><td width="' . max($pct, 1) . '%" style="background:#1b7a3d;height:9px"></td>
-                         <td width="' . (100 - $pct) . '%"></td></tr>
-                   </table>
-                 </td>
+                 <td width="58%">' . $this->barraConformidad($pct) . '</td>
                  <td width="16%" style="text-align:right;font-size:10pt;font-weight:bold;color:#1b7a3d">' . $pct . '%</td>
                </tr>
              </table>
