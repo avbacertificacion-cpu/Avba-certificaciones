@@ -93,6 +93,50 @@ if ($pdo && !array_filter($resultados, fn($r) => !$r['ok'])) {
     }
 }
 
+// ── Camino del login para un usuario concreto ─────────────
+// Se consulta el registro tal como lo hace login(), SIN verificar la
+// contraseña y SIN registrar intentos: así no se bloquea la cuenta.
+$revision = null;
+$quien = trim($_GET['usuario'] ?? '');
+if ($pdo && $quien !== '') {
+    try {
+        $sel = $pdo->prepare("SELECT * FROM usuarios WHERE usuario = ?");
+        $sel->execute([mb_strtolower($quien)]);
+        $row = $sel->fetch();
+        if (!$row) {
+            $revision = ['ok' => false, 'nota' => 'No existe un usuario con ese nombre (se busca en minúsculas).'];
+        } else {
+            $hash = (string)($row['password_hash'] ?? '');
+            $revision = [
+                'ok'       => true,
+                'rol'      => $row['rol'] ?? '(sin rol)',
+                'activo'   => $row['activo'] ?? '(sin columna)',
+                'hashLen'  => strlen($hash),
+                'hashTipo' => strlen($hash) === 32 ? 'MD5 heredado' : (str_starts_with($hash, '$2y$') ? 'bcrypt' : 'desconocido'),
+                'columnas' => implode(', ', array_keys($row)),
+                'destino'  => ($row['rol'] ?? '') === 'CALIDAD' ? 'calidad.html' : '—',
+            ];
+        }
+    } catch (\Throwable $ex) {
+        $revision = ['ok' => false, 'nota' => get_class($ex) . ': ' . $ex->getMessage()
+            . ' en ' . basename($ex->getFile()) . ':' . $ex->getLine()];
+    }
+}
+
+// ── Bitácora de errores de PHP ────────────────────────────
+// Aquí queda escrito el error real que el manejador global esconde.
+$bitacora = [];
+$candidatos = array_filter([
+    ini_get('error_log') ?: null,
+    __DIR__ . '/error_log', __DIR__ . '/php_errorlog',
+    __DIR__ . '/../error_log', __DIR__ . '/logs/error_log',
+]);
+foreach ($candidatos as $ruta) {
+    if (!$ruta || !@is_readable($ruta) || !@is_file($ruta)) continue;
+    $lineas = @file($ruta, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+    $bitacora[] = ['ruta' => $ruta, 'lineas' => array_slice($lineas, -40)];
+}
+
 $fallos = array_filter($resultados, fn($r) => !$r['ok']);
 ?>
 <!doctype html>
@@ -150,6 +194,52 @@ $fallos = array_filter($resultados, fn($r) => !$r['ok']);
         </details>
       </div>
     <?php endif; ?>
+  </div>
+<?php endif; ?>
+
+<div class="caja">
+  <strong>Revisar un usuario</strong>
+  <div style="font-size:12px;color:#5a6072;margin:4px 0 8px">
+    Consulta el registro sin verificar la contraseña, así que no gasta intentos ni bloquea la cuenta.
+  </div>
+  <form method="get" style="display:flex;gap:8px;flex-wrap:wrap">
+    <input type="hidden" name="secret" value="<?= $e($_GET['secret'] ?? '') ?>">
+    <input type="text" name="usuario" value="<?= $e($quien) ?>" placeholder="usuario de Calidad"
+           style="padding:7px 10px;border:1.5px solid #dde5f0;border-radius:7px;font-size:13px">
+    <button style="padding:7px 16px;background:#185FA5;color:#fff;border:none;border-radius:7px;font-size:13px;cursor:pointer">Revisar</button>
+  </form>
+  <?php if ($revision): ?>
+    <div class="mono" style="margin-top:10px;font-size:12px">
+      <?php if (!$revision['ok']): ?>
+        <span class="err"><?= $e($revision['nota']) ?></span>
+      <?php else: ?>
+        rol: <strong><?= $e($revision['rol']) ?></strong> ·
+        activo: <strong><?= $e($revision['activo']) ?></strong> ·
+        contraseña: <strong><?= $e($revision['hashTipo']) ?></strong> (<?= (int)$revision['hashLen'] ?> car.)<br>
+        columnas: <?= $e($revision['columnas']) ?>
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
+</div>
+
+<?php if ($bitacora): ?>
+  <div class="caja">
+    <strong>Bitácora de errores del servidor</strong>
+    <div style="font-size:12px;color:#5a6072;margin:4px 0 8px">
+      Aquí queda escrito el error real que el mensaje genérico esconde. Últimas 40 líneas.
+    </div>
+    <?php foreach ($bitacora as $b): ?>
+      <div class="mono" style="font-size:11px;color:#7a8494;margin-top:8px"><?= $e($b['ruta']) ?></div>
+      <pre class="mono" style="white-space:pre-wrap;font-size:11px;background:#f7fafd;padding:8px;border-radius:6px;max-height:320px;overflow:auto"><?= $e(implode("\n", $b['lineas'])) ?></pre>
+    <?php endforeach; ?>
+  </div>
+<?php else: ?>
+  <div class="caja">
+    <strong>Bitácora de errores</strong>
+    <div style="font-size:12px;color:#5a6072;margin-top:4px">
+      No se encontró un archivo de bitácora legible desde aquí. Búscalo en hPanel de Hostinger,
+      en la sección de registros de error del sitio.
+    </div>
   </div>
 <?php endif; ?>
 
