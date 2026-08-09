@@ -72,6 +72,27 @@ if ($pdo) {
     }
 }
 
+// ── Prueba del inicio de sesión ───────────────────────────
+// Se usa un usuario inexistente a propósito: recorre exactamente el mismo
+// camino (tabla de intentos, consulta de usuarios, registro del fallo) sin
+// bloquear ninguna cuenta real por intentos fallidos.
+$login = null;
+if ($pdo && !array_filter($resultados, fn($r) => !$r['ok'])) {
+    $t0 = microtime(true);
+    try {
+        $_SERVER['REMOTE_ADDR'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+        $auth = new Auth($pdo);
+        $r = $auth->login(['usuario' => '__diagnostico_avba__', 'password' => 'clave-invalida-de-prueba']);
+        $login = ['ok' => true, 'ms' => round((microtime(true) - $t0) * 1000),
+                  'respuesta' => $r['message'] ?? ($r['status'] ?? '')];
+    } catch (\Throwable $ex) {
+        $login = ['ok' => false, 'ms' => round((microtime(true) - $t0) * 1000),
+                  'clase' => get_class($ex), 'mensaje' => $ex->getMessage(),
+                  'donde' => basename($ex->getFile()) . ':' . $ex->getLine(),
+                  'traza' => $ex->getTraceAsString()];
+    }
+}
+
 $fallos = array_filter($resultados, fn($r) => !$r['ok']);
 ?>
 <!doctype html>
@@ -107,6 +128,28 @@ $fallos = array_filter($resultados, fn($r) => !$r['ok']);
   <div class="caja bien">
     Todas las clases se construyen sin error. Si el sistema sigue fallando, el problema
     no está en el arranque sino en la acción concreta que se ejecuta.
+  </div>
+<?php endif; ?>
+
+<?php if ($login): ?>
+  <div class="caja <?= $login['ok'] ? 'bien' : 'mal' ?>">
+    <strong>Prueba de inicio de sesión</strong>
+    <?php if ($login['ok']): ?>
+      <div style="margin-top:6px">
+        El camino del login corre sin error (<?= (int)$login['ms'] ?> ms).
+        Respuesta con usuario inexistente: <em class="mono"><?= $e($login['respuesta']) ?></em>.
+        <br>Si aún así no puedes entrar, el problema no es del servidor sino de las
+        credenciales o del navegador: prueba recargando a fondo o borrando la caché del sitio.
+      </div>
+    <?php else: ?>
+      <div style="margin-top:6px" class="mono">
+        <?= $e($login['clase']) ?>: <?= $e($login['mensaje']) ?><br>
+        en <?= $e($login['donde']) ?>
+        <details style="margin-top:8px"><summary style="cursor:pointer">Ver traza</summary>
+          <pre style="white-space:pre-wrap;font-size:11px"><?= $e($login['traza']) ?></pre>
+        </details>
+      </div>
+    <?php endif; ?>
   </div>
 <?php endif; ?>
 
