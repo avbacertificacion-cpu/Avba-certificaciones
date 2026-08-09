@@ -1125,6 +1125,147 @@ class Arneses {
         return ($rel !== '' && is_file(__DIR__ . '/../' . $rel)) ? $rel : '';
     }
 
+    /**
+     * Compone la firma con el sello encima, como si se hubiera estampado después
+     * de firmar: el sello va traslúcido y montado sobre el trazo, no debajo ni
+     * al lado. Se resuelve con GD en una sola imagen porque mPDF no superpone
+     * elementos de forma fiable.
+     *
+     * El resultado se cachea con la huella de ambos archivos, así que sólo se
+     * vuelve a componer si cambia la firma o el sello.
+     *
+     * @return string Ruta relativa a la imagen compuesta, o la firma sola si no
+     *                se pudo componer.
+     */
+    private function firmaSellada(string $firmaRel, string $selloRel): string {
+        if ($firmaRel === '' || $selloRel === '') return $firmaRel;
+        if (!function_exists('imagecreatetruecolor')) return $firmaRel;
+
+        $fAbs = __DIR__ . '/../' . $firmaRel;
+        $sAbs = __DIR__ . '/../' . $selloRel;
+        if (!is_file($fAbs) || !is_file($sAbs)) return $firmaRel;
+
+        $huella = substr(md5(filemtime($fAbs) . filesize($fAbs) . filemtime($sAbs) . filesize($sAbs)), 0, 12);
+        $dir    = UPLOAD_DIR . 'firmas_selladas/';
+        $rel    = 'uploads/firmas_selladas/firma_' . $huella . '.png';
+        if (is_file(__DIR__ . '/../' . $rel)) return $rel;
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return $firmaRel;
+
+        try {
+            $firma = @imagecreatefromstring((string)file_get_contents($fAbs));
+            $sello = @imagecreatefromstring((string)file_get_contents($sAbs));
+            if (!$firma || !$sello) return $firmaRel;
+
+            // Las firmas suelen venir escaneadas o fotografiadas sobre papel, en
+            // JPG y sin transparencia. Sin quitarles el fondo, el sello queda
+            // sobre un recuadro blanco y se nota el montaje.
+            $firma = $this->sinFondoBlanco($firma);
+            $firma = $this->recortarMargenes($firma);
+
+            $fw = imagesx($firma); $fh = imagesy($firma);
+            $sw = imagesx($sello); $sh = imagesy($sello);
+            if ($fw < 2 || $fh < 2) return $firmaRel;
+
+            // El lienzo se dimensiona a partir de la firma, no del sello: si se
+            // parte del sello, en firmas anchas y bajas el lienzo crece de más y
+            // el sello acaba desproporcionado sobre el trazo.
+            // El sello se dimensiona contra la FIRMA, no contra el lienzo: de lo
+            // contrario acaba más grande que el trazo y lo tapa por completo.
+            $selloAlto  = (int)round($fh * 0.80);
+            $selloAncho = (int)round($sw * ($selloAlto / max(1, $sh)));
+            $H = (int)round($fh * 1.10);
+            $W = (int)round(max($fw, $selloAncho) * 1.15);
+
+            $dst = imagecreatetruecolor($W, $H);
+            imagealphablending($dst, false);
+            imagesavealpha($dst, true);
+            imagefilledrectangle($dst, 0, 0, $W, $H, imagecolorallocatealpha($dst, 0, 0, 0, 127));
+            imagealphablending($dst, true);
+
+            // Firma centrada
+            $fx = (int)round(($W - $fw) / 2);
+            $fy = (int)round(($H - $fh) / 2);
+            imagecopy($dst, $firma, $fx, $fy, 0, 0, $fw, $fh);
+
+            // Sello traslúcido, del alto calculado arriba
+            $nsh = $selloAlto;
+            $nsw = $selloAncho;
+            $sel = imagecreatetruecolor($nsw, $nsh);
+            imagealphablending($sel, false);
+            imagesavealpha($sel, true);
+            imagefilledrectangle($sel, 0, 0, $nsw, $nsh, imagecolorallocatealpha($sel, 0, 0, 0, 127));
+            imagecopyresampled($sel, $sello, 0, 0, 0, 0, $nsw, $nsh, $sw, $sh);
+            // Tinta translúcida: deja ver el trazo de la firma por debajo.
+            @imagefilter($sel, IMG_FILTER_COLORIZE, 0, 0, 0, 30);
+
+            // Montado sobre la firma, ligeramente a la derecha y abajo, como
+            // cae un sello puesto a mano.
+            imagealphablending($dst, true);
+            imagecopy($dst, $sel,
+                (int)round(($W - $nsw) / 2 + $W * 0.10),
+                (int)round(($H - $nsh) / 2 + $H * 0.06),
+                0, 0, $nsw, $nsh);
+
+            $ok = imagepng($dst, $dir . basename($rel), 8);
+            imagedestroy($dst); imagedestroy($sel); imagedestroy($firma); imagedestroy($sello);
+            return $ok ? $rel : $firmaRel;
+        } catch (\Throwable $e) {
+            error_log('[Arneses] firmaSellada: ' . $e->getMessage());
+            return $firmaRel;
+        }
+    }
+
+    /**
+     * Vuelve transparente el fondo claro de una imagen, con degradado en los
+     * tonos intermedios para no dejar el trazo dentado.
+     */
+    private function sinFondoBlanco(\GdImage $img, int $umbral = 205): \GdImage {
+        $w = imagesx($img); $h = imagesy($img);
+        $out = imagecreatetruecolor($w, $h);
+        imagealphablending($out, false);
+        imagesavealpha($out, true);
+
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $c = imagecolorat($img, $x, $y);
+                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+                $lum = (int)round(0.299 * $r + 0.587 * $g + 0.114 * $b);
+
+                if ($lum >= 245)        $a = 127;                       // papel
+                elseif ($lum <= $umbral) $a = 0;                        // trazo
+                else $a = (int)round(127 * ($lum - $umbral) / (245 - $umbral));
+
+                imagesetpixel($out, $x, $y, imagecolorallocatealpha($out, $r, $g, $b, $a));
+            }
+        }
+        imagedestroy($img);
+        return $out;
+    }
+
+    /** Recorta el margen transparente sobrante alrededor del trazo. */
+    private function recortarMargenes(\GdImage $img): \GdImage {
+        $w = imagesx($img); $h = imagesy($img);
+        $x1 = $w; $y1 = $h; $x2 = -1; $y2 = -1;
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                if ((imagecolorat($img, $x, $y) >> 24 & 0x7F) < 100) {
+                    if ($x < $x1) $x1 = $x;  if ($x > $x2) $x2 = $x;
+                    if ($y < $y1) $y1 = $y;  if ($y > $y2) $y2 = $y;
+                }
+            }
+        }
+        if ($x2 < 0) return $img;   // toda transparente
+
+        $nw = $x2 - $x1 + 1; $nh = $y2 - $y1 + 1;
+        $out = imagecreatetruecolor($nw, $nh);
+        imagealphablending($out, false);
+        imagesavealpha($out, true);
+        imagefilledrectangle($out, 0, 0, $nw, $nh, imagecolorallocatealpha($out, 0, 0, 0, 127));
+        imagecopy($out, $img, 0, 0, $x1, $y1, $nw, $nh);
+        imagedestroy($img);
+        return $out;
+    }
+
     /** Ruta relativa de un activo de marca si existe (mPDF resuelve sobre la raíz). */
     private function activo(string $rel): string {
         return is_file(__DIR__ . '/../' . $rel) ? $rel : '';
@@ -1346,6 +1487,8 @@ class Arneses {
         $inspector = $this->esc($ses['inspector_firma'] ?: $ses['usuario'] ?: '');
         $sello     = $this->activo('assets/sellos/sello.png');
         $firma     = $this->firmaDe((string)($ses['inspector_usuario'] ?? ''), (string)($ses['inspector_firma'] ?? ''));
+        // Firma y sello en una sola imagen, con el sello montado encima.
+        $rubrica   = $firma ? $this->firmaSellada($firma, $sello) : $sello;
 
         $html = '<html><head><meta charset="UTF-8">' . $this->estilosDoc() . '</head><body>'
           . $this->encabezado('DICTAMEN TÉCNICO DE INSPECCIÓN', $ses['control'],
@@ -1455,9 +1598,9 @@ class Arneses {
                <tr>
                  <td width="30%"></td>
                  <td width="40%" style="text-align:center">'
-                   . ($firma ? '<img src="' . $firma . '" style="height:44px"><br>' : '')
-                   . ($sello ? '<img src="' . $sello . '" style="height:' . ($firma ? '46' : '60') . 'px"><br>'
-                             : ($firma ? '' : '<div style="height:60px"></div>'))
+                   . ($rubrica
+                       ? '<img src="' . $rubrica . '" style="height:66px"><br>'
+                       : '<div style="height:66px"></div>')
                    . '' . $this->lineaFirma() . '
                       <div class="sign-t">' . ($inspector ?: 'Inspector responsable') . '</div>
                       <div class="sign-s">Inspector · AVBA Inspections</div></td>
