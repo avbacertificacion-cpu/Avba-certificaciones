@@ -38,7 +38,7 @@ class Arneses {
      * los archivos de origen no cambian y la caché seguiría entregando las
      * viejas.
      */
-    private const FIRMA_VERSION = 4;
+    private const FIRMA_VERSION = 5;
 
     /** Umbrales de luminancia al limpiar y realzar una firma escaneada. */
     private const LUM_PAPEL = 248;   // de aquí en adelante es hoja
@@ -1139,17 +1139,14 @@ class Arneses {
     }
 
     /**
-     * Deja la firma lista para el documento: le quita el fondo del papel, le
-     * devuelve contraste, recorta el margen sobrante y la aplana sobre blanco.
+     * Deja la firma lista para el documento: quita el fondo del papel, le
+     * devuelve contraste y recorta el margen sobrante.
      *
-     * Se aplana a propósito, sin canal alfa: mPDF guarda un PNG transparente
-     * como imagen negra más una máscara aparte, y si el visor no aplica la
-     * máscara la firma sale como un recuadro negro. Sobre la hoja del documento
-     * el resultado se ve igual y no depende del visor.
-     *
-     * El resultado se cachea con la huella del archivo y la versión del
-     * procesado; esta última es la que invalida las imágenes ya generadas
-     * cuando cambia el tratamiento.
+     * En ningún momento se usa transparencia. El fondo se pinta blanco desde el
+     * principio, en vez de hacerlo transparente y aplanarlo después: mPDF
+     * incrusta un PNG con canal alfa como imagen a color —negra en la zona
+     * transparente— más una máscara aparte, y si el visor no aplica la máscara
+     * la firma sale como un recuadro negro. Sin alfa no hay máscara posible.
      *
      * @return string Ruta relativa a la imagen procesada, o la original si no
      *                se pudo procesar.
@@ -1168,106 +1165,92 @@ class Arneses {
         if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return $firmaRel;
 
         try {
-            $firma = @imagecreatefromstring((string)file_get_contents($fAbs));
-            if (!$firma) return $firmaRel;
+            $src = @imagecreatefromstring((string)file_get_contents($fAbs));
+            if (!$src) return $firmaRel;
 
             // El realce recorre la imagen píxel por píxel: una firma de varios
             // megapíxeles tardaría segundos sin aportar nada, porque en el
             // documento se imprime a unos 58 px de alto.
-            $firma = $this->limitarAncho($firma, 900);
-            $firma = $this->sinFondoBlanco($firma);
-            $firma = $this->recortarMargenes($firma);
+            $src = $this->limitarAncho($src, 900);
+            $w = imagesx($src); $h = imagesy($src);
 
-            $fw = imagesx($firma); $fh = imagesy($firma);
-            if ($fw < 2 || $fh < 2) return $firmaRel;
+            $lum = fn(int $c): int => (int)round(
+                0.299 * (($c >> 16) & 0xFF) + 0.587 * (($c >> 8) & 0xFF) + 0.114 * ($c & 0xFF)
+            );
 
-            $W = (int)round($fw * 1.06);
-            $H = (int)round($fh * 1.12);
+            // Tono más oscuro presente, para estirar desde el trazo real y no
+            // desde un negro teórico que un escaneo claro nunca alcanza.
+            $minLum = 255;
+            for ($y = 0; $y < $h; $y++) {
+                for ($x = 0; $x < $w; $x++) {
+                    $l = $lum(imagecolorat($src, $x, $y));
+                    if ($l < $minLum) $minLum = $l;
+                }
+            }
+            $rango = max(1, self::LUM_TINTA - $minLum);
 
-            $dst = imagecreatetruecolor($W, $H);
-            imagealphablending($dst, false);
-            imagesavealpha($dst, false);
-            imagefilledrectangle($dst, 0, 0, $W, $H, imagecolorallocate($dst, 255, 255, 255));
-            imagealphablending($dst, true);
-            imagecopy($dst, $firma,
-                (int)round(($W - $fw) / 2), (int)round(($H - $fh) / 2), 0, 0, $fw, $fh);
+            // Lienzo opaco desde el inicio: nunca hay canal alfa que guardar.
+            $out = imagecreatetruecolor($w, $h);
+            imagealphablending($out, false);
+            imagesavealpha($out, false);
+            $blanco = imagecolorallocate($out, 255, 255, 255);
+            imagefilledrectangle($out, 0, 0, $w, $h, $blanco);
 
-            $ok = imagepng($dst, $dir . basename($rel), 8);
-            imagedestroy($dst); imagedestroy($firma);
+            $x1 = $w; $y1 = $h; $x2 = -1; $y2 = -1;   // recuadro del trazo
+            for ($y = 0; $y < $h; $y++) {
+                for ($x = 0; $x < $w; $x++) {
+                    $c = imagecolorat($src, $x, $y);
+                    $l = $lum($c);
+                    if ($l >= self::LUM_PAPEL) continue;          // papel: queda blanco
+
+                    $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
+
+                    if ($l >= self::LUM_TINTA) {
+                        // Borde: se mezcla con el blanco según lo claro que sea,
+                        // para que el trazo no salga dentado.
+                        $m = ($l - self::LUM_TINTA) / (self::LUM_PAPEL - self::LUM_TINTA);
+                        $r = (int)round($r + (255 - $r) * $m);
+                        $g = (int)round($g + (255 - $g) * $m);
+                        $b = (int)round($b + (255 - $b) * $m);
+                    } else {
+                        // Trazo: se estira el tono hacia lo oscuro conservando
+                        // el matiz, escalando los tres canales por igual.
+                        $t = min(1.0, max(0.0, ($l - $minLum) / $rango));
+                        $f = ($t * self::LUM_META) / max(1, $l);
+                        $r = min(255, (int)round($r * $f));
+                        $g = min(255, (int)round($g * $f));
+                        $b = min(255, (int)round($b * $f));
+                        if ($x < $x1) $x1 = $x;  if ($x > $x2) $x2 = $x;
+                        if ($y < $y1) $y1 = $y;  if ($y > $y2) $y2 = $y;
+                    }
+                    imagesetpixel($out, $x, $y, imagecolorallocate($out, $r, $g, $b));
+                }
+            }
+            imagedestroy($src);
+
+            // Recorte con un margen mínimo alrededor del trazo
+            if ($x2 > $x1 && $y2 > $y1) {
+                $m  = (int)round(max($x2 - $x1, $y2 - $y1) * 0.04);
+                $rx = max(0, $x1 - $m); $ry = max(0, $y1 - $m);
+                $rw = min($w - $rx, $x2 - $x1 + 1 + $m * 2);
+                $rh = min($h - $ry, $y2 - $y1 + 1 + $m * 2);
+
+                $rec = imagecreatetruecolor($rw, $rh);
+                imagealphablending($rec, false);
+                imagesavealpha($rec, false);
+                imagefilledrectangle($rec, 0, 0, $rw, $rh, imagecolorallocate($rec, 255, 255, 255));
+                imagecopy($rec, $out, 0, 0, $rx, $ry, $rw, $rh);
+                imagedestroy($out);
+                $out = $rec;
+            }
+
+            $ok = imagepng($out, $dir . basename($rel), 8);
+            imagedestroy($out);
             return $ok ? $rel : $firmaRel;
         } catch (\Throwable $e) {
             error_log('[Arneses] firmaProcesada: ' . $e->getMessage());
             return $firmaRel;
         }
-    }
-
-    /**
-     * Quita el fondo claro de una firma escaneada y le devuelve contraste.
-     *
-     * Las firmas llegan fotografiadas o escaneadas sobre papel, con muy poco
-     * contraste: en la del director el trazo más oscuro apenas baja a 67 de
-     * luminancia y buena parte se dispersa hasta 245, casi papel. Sin realzarla,
-     * bajo el sello no se lee. Se hacen dos cosas:
-     *
-     *   1. Transparencia: papel fuera, con degradado en la franja intermedia
-     *      para que el borde del trazo no salga dentado.
-     *   2. Realce: el rango real de tinta se estira hacia los tonos oscuros,
-     *      conservando el matiz de cada píxel (se escalan los tres canales por
-     *      igual), así que se oscurece el trazo sin repintar la firma.
-     */
-    private function sinFondoBlanco(\GdImage $img): \GdImage {
-        $w = imagesx($img); $h = imagesy($img);
-
-        $lum = fn(int $c): int => (int)round(
-            0.299 * (($c >> 16) & 0xFF) + 0.587 * (($c >> 8) & 0xFF) + 0.114 * ($c & 0xFF)
-        );
-
-        // Tono más oscuro presente, para estirar desde el trazo real y no desde
-        // un negro teórico que este escaneo nunca alcanza.
-        $minLum = 255;
-        for ($y = 0; $y < $h; $y++) {
-            for ($x = 0; $x < $w; $x++) {
-                $l = $lum(imagecolorat($img, $x, $y));
-                if ($l < $minLum) $minLum = $l;
-            }
-        }
-        $rango = max(1, self::LUM_TINTA - $minLum);
-
-        $out = imagecreatetruecolor($w, $h);
-        imagealphablending($out, false);
-        imagesavealpha($out, true);
-
-        for ($y = 0; $y < $h; $y++) {
-            for ($x = 0; $x < $w; $x++) {
-                $c = imagecolorat($img, $x, $y);
-                $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
-                $l = $lum($c);
-
-                if ($l >= self::LUM_PAPEL) {
-                    imagesetpixel($out, $x, $y, imagecolorallocatealpha($out, 255, 255, 255, 127));
-                    continue;
-                }
-                if ($l >= self::LUM_TINTA) {   // franja de borde
-                    $a = (int)round(127 * ($l - self::LUM_TINTA) / (self::LUM_PAPEL - self::LUM_TINTA));
-                    imagesetpixel($out, $x, $y, imagecolorallocatealpha($out, $r, $g, $b, $a));
-                    continue;
-                }
-
-                // Trazo: se estira el tono hacia lo oscuro conservando el matiz
-                $t       = min(1.0, max(0.0, ($l - $minLum) / $rango));
-                $destino = $t * self::LUM_META;
-                $f       = $destino / max(1, $l);
-                imagesetpixel($out, $x, $y, imagecolorallocatealpha(
-                    $out,
-                    min(255, (int)round($r * $f)),
-                    min(255, (int)round($g * $f)),
-                    min(255, (int)round($b * $f)),
-                    0
-                ));
-            }
-        }
-        imagedestroy($img);
-        return $out;
     }
 
     /**
@@ -1298,6 +1281,8 @@ class Arneses {
             imagealphablending($dst, false);
             imagesavealpha($dst, false);
             imagefilledrectangle($dst, 0, 0, $w, $h, imagecolorallocate($dst, 255, 255, 255));
+            // Con blending activo, imagecopy mezcla el alfa del origen contra el
+            // blanco: el resultado queda opaco y sin canal alfa que guardar.
             imagealphablending($dst, true);
             imagecopy($dst, $src, 0, 0, 0, 0, $w, $h);
 
@@ -1323,30 +1308,6 @@ class Arneses {
         imagealphablending($out, false);
         imagesavealpha($out, true);
         imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
-        imagedestroy($img);
-        return $out;
-    }
-
-    /** Recorta el margen transparente sobrante alrededor del trazo. */
-    private function recortarMargenes(\GdImage $img): \GdImage {
-        $w = imagesx($img); $h = imagesy($img);
-        $x1 = $w; $y1 = $h; $x2 = -1; $y2 = -1;
-        for ($y = 0; $y < $h; $y++) {
-            for ($x = 0; $x < $w; $x++) {
-                if ((imagecolorat($img, $x, $y) >> 24 & 0x7F) < 110) {
-                    if ($x < $x1) $x1 = $x;  if ($x > $x2) $x2 = $x;
-                    if ($y < $y1) $y1 = $y;  if ($y > $y2) $y2 = $y;
-                }
-            }
-        }
-        if ($x2 < 0) return $img;   // toda transparente
-
-        $nw = $x2 - $x1 + 1; $nh = $y2 - $y1 + 1;
-        $out = imagecreatetruecolor($nw, $nh);
-        imagealphablending($out, false);
-        imagesavealpha($out, true);
-        imagefilledrectangle($out, 0, 0, $nw, $nh, imagecolorallocatealpha($out, 0, 0, 0, 127));
-        imagecopy($out, $img, 0, 0, $x1, $y1, $nw, $nh);
         imagedestroy($img);
         return $out;
     }
