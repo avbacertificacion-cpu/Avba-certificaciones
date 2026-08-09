@@ -142,8 +142,12 @@ class Arneses {
                 try { $this->pdo->exec($sql); } catch (\Throwable $e) {}
             }
             $this->seedCatalogo();
-        } catch (\PDOException $e) {
-            error_log('[Arneses] migrate: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            // Se atrapa Throwable, no sólo PDOException: este constructor corre
+            // en TODAS las peticiones, incluida la de iniciar sesión, así que un
+            // fallo de migración no puede tumbar el sistema entero.
+            error_log('[Arneses] migrate: ' . $e->getMessage()
+                . ' en ' . basename($e->getFile()) . ':' . $e->getLine());
         }
     }
 
@@ -309,6 +313,11 @@ class Arneses {
      * Calidad borre a propósito no vuelve a aparecer en el siguiente arranque.
      */
     private function seedCatalogo(): void {
+        try { $this->seedCatalogoInterno(); }
+        catch (\Throwable $e) { error_log('[Arneses] seedCatalogo: ' . $e->getMessage()); }
+    }
+
+    private function seedCatalogoInterno(): void {
         try {
             $this->pdo->exec("
                 CREATE TABLE IF NOT EXISTS arneses_catalogo_seed (
