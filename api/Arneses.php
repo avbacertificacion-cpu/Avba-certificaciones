@@ -32,6 +32,12 @@ class Arneses {
     /** Resultado de la inspección de una pieza. */
     private const RESULTADOS = ['APTO', 'CONDICIONADO', 'NO APTO'];
 
+    /**
+     * Versión del compositor de firma y sello. Súbela al cambiar cómo se
+     * componen: es lo que invalida las imágenes ya generadas.
+     */
+    private const FIRMA_VERSION = 3;
+
     /** Umbrales de luminancia al limpiar y realzar una firma escaneada. */
     private const LUM_PAPEL = 248;   // de aquí en adelante es hoja
     private const LUM_TINTA = 235;   // por debajo de aquí es trazo pleno
@@ -1150,7 +1156,14 @@ class Arneses {
         $sAbs = __DIR__ . '/../' . $selloRel;
         if (!is_file($fAbs) || !is_file($sAbs)) return $firmaRel;
 
-        $huella = substr(md5(filemtime($fAbs) . filesize($fAbs) . filemtime($sAbs) . filesize($sAbs)), 0, 12);
+        // La huella incluye la versión del compositor, no sólo los archivos de
+        // origen: si depende sólo de la firma y el sello, al corregir cómo se
+        // componen el servidor sigue entregando la imagen vieja para siempre,
+        // porque los archivos de origen no cambiaron.
+        $huella = substr(md5(
+            self::FIRMA_VERSION . '|' .
+            filemtime($fAbs) . filesize($fAbs) . filemtime($sAbs) . filesize($sAbs)
+        ), 0, 12);
         $dir    = UPLOAD_DIR . 'firmas_selladas/';
         $rel    = 'uploads/firmas_selladas/firma_' . $huella . '.png';
         if (is_file(__DIR__ . '/../' . $rel)) return $rel;
@@ -1185,10 +1198,15 @@ class Arneses {
             $H = (int)round($fh * 1.10);
             $W = (int)round(max($fw, $selloAncho) * 1.15);
 
+            // El lienzo va BLANCO y OPACO, no transparente. mPDF guarda un PNG con
+            // canal alfa como imagen negra más una máscara aparte, y si el visor
+            // no aplica la máscara —pasa al abrir el PDF en el navegador— la
+            // firma sale como un recuadro negro. Sobre la hoja blanca del
+            // documento el resultado se ve igual, y sin máscara de por medio.
             $dst = imagecreatetruecolor($W, $H);
             imagealphablending($dst, false);
-            imagesavealpha($dst, true);
-            imagefilledrectangle($dst, 0, 0, $W, $H, imagecolorallocatealpha($dst, 0, 0, 0, 127));
+            imagesavealpha($dst, false);
+            imagefilledrectangle($dst, 0, 0, $W, $H, imagecolorallocate($dst, 255, 255, 255));
             imagealphablending($dst, true);
 
             // Firma centrada
