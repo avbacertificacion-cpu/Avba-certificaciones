@@ -2115,6 +2115,72 @@
   </div>
 </div>
 
+<!-- ══ CAPTURA DE EQUIPO DE ARNESES DESDE CALIDAD ══ -->
+<div class="overlay" id="overlay-arn-nuevo" style="display:none;z-index:520" onclick="if(event.target===this)cerrarArnNuevo()">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:#0C447C">＋</div>
+        <div>
+          <div class="m-title">Agregar equipo a la inspección</div>
+          <div class="m-sub" id="arn-nuevo-sub">—</div>
+        </div>
+      </div>
+      <button class="modal-close" onclick="cerrarArnNuevo()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
+        <label style="font-size:11px;color:var(--texto-sub);grid-column:1/-1">Tipo de equipo *
+          <select id="arn-n-tipo" onchange="arnNuevoChecklist()" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px">
+            <option value="">— Seleccionar —</option>
+          </select></label>
+        <label style="font-size:11px;color:var(--texto-sub)">ID / Etiqueta interna
+          <input type="text" id="arn-n-id" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Marca
+          <input type="text" id="arn-n-marca" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Modelo
+          <input type="text" id="arn-n-modelo" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">No. de serie
+          <input type="text" id="arn-n-serie" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Talla
+          <input type="text" id="arn-n-talla" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Código QR
+          <input type="text" id="arn-n-qr" maxlength="10" placeholder="Empieza con 4"
+                 style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px;font-family:monospace"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Fecha de fabricación
+          <input type="date" id="arn-n-fabricacion" onchange="arnNuevoRetiro()" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Retiro obligatorio
+          <input type="date" id="arn-n-retiro" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+      </div>
+
+      <div style="margin-top:12px">
+        <div style="font-size:11px;color:var(--texto-sub);margin-bottom:5px">Resultado</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap" id="arn-n-resultado"></div>
+      </div>
+
+      <div style="margin-top:12px">
+        <div style="font-size:11px;color:var(--texto-sub);margin-bottom:5px">Normas aplicables</div>
+        <div id="arn-n-normas" style="max-height:170px;overflow-y:auto;border:1px solid var(--borde);border-radius:8px;padding:6px 10px"></div>
+      </div>
+
+      <div style="margin-top:12px" id="arn-n-card-chk">
+        <div style="font-size:11px;color:var(--texto-sub);margin-bottom:5px">Puntos de inspección</div>
+        <div id="arn-n-checklist" style="border:1px solid var(--borde);border-radius:8px;padding:4px 10px"></div>
+      </div>
+
+      <label style="font-size:11px;color:var(--texto-sub);display:block;margin-top:12px">Observaciones
+        <textarea id="arn-n-obs" rows="2" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></textarea></label>
+
+      <label style="font-size:11px;color:var(--texto-sub);display:block;margin-top:10px">Fotografías (opcional)
+        <input type="file" id="arn-n-fotos" accept="image/*" multiple style="width:100%;font-size:12px;margin-top:4px"></label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-sec" onclick="cerrarArnNuevo()">Cancelar</button>
+      <button class="btn-guardar" id="arn-n-btn" onclick="guardarArnNuevo()">Guardar equipo</button>
+    </div>
+  </div>
+</div>
+
 <div id="sec-auditorias" class="wrap" style="display:none">
   <div id="aud-recordatorio" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:16px;color:#92400e;font-size:13px;font-weight:600"></div>
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
@@ -2255,6 +2321,7 @@
 </div>
 
 
+<script src="js/arneses-normas.js"></script>
 <script>
 /* ═══════════════════════════════════════
    CONFIGURACIÓN
@@ -6529,6 +6596,9 @@ function renderArnDet(d) {
       <button onclick="guardarDatosArn(${ses.id})"
               style="margin-top:9px;padding:6px 14px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">
         Guardar datos</button>
+      <button onclick="abrirArnNuevo()"
+              style="margin-top:9px;margin-left:6px;padding:6px 14px;background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">
+        ＋ Agregar equipo</button>
     </div>
     ${sinQR ? `<div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:10px;font-size:12px;color:#92400e;margin-bottom:12px">
        ⚠ ${sinQR} pieza(s) sin código QR. Cada pieza lleva certificado propio, así que necesita su QR antes de aprobar.
@@ -6617,6 +6687,165 @@ async function guardarQrArn(itemId) {
     if (d.status === 'success') { mostrarToast('Pieza actualizada.', 'ok'); abrirArnDet(_arnDetActual.sesion.id); }
     else mostrarToast(d.message || 'No se pudo guardar.', 'err');
   } catch(_) { mostrarToast('Error de red.', 'err'); }
+}
+
+/* ═══ CAPTURA DE EQUIPO DESDE CALIDAD ═══════════════════════════════════════
+   Mismo alcance que la captura del inspector: tipo, datos, normas, checklist,
+   resultado y fotos. Sirve para sumar equipo que apareció después, incluso si
+   la inspección ya se cerró. */
+let _arnNTipos = [], _arnNChecklist = [], _arnNResultado = 'APTO';
+const ARN_N_RESULTADOS = ['APTO','CONDICIONADO','NO APTO'];
+
+async function abrirArnNuevo() {
+  if (!_arnDetActual) return;
+  const ses = _arnDetActual.sesion;
+  document.getElementById('arn-nuevo-sub').textContent =
+    ses.cliente + ' · ' + (ses.fecha_fmt || '') + (ses.control ? ' · Folio ' + ses.control : '');
+
+  ['arn-n-id','arn-n-marca','arn-n-modelo','arn-n-serie','arn-n-talla','arn-n-qr',
+   'arn-n-fabricacion','arn-n-retiro','arn-n-obs'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('arn-n-fotos').value = '';
+  _arnNResultado = 'APTO';
+  arnNRenderResultado();
+  arnNRenderNormas();
+
+  // Catálogo de tipos, una sola vez
+  if (!_arnNTipos.length) {
+    try {
+      const r = await fetch(API + '?action=LISTAR_TIPOS_ARNES');
+      const d = await r.json();
+      _arnNTipos = d.tipos || [];
+    } catch(_) { _arnNTipos = []; }
+  }
+  document.getElementById('arn-n-tipo').innerHTML = '<option value="">— Seleccionar —</option>' +
+    _arnNTipos.map(t => `<option value="${t.id}">${escH(t.nombre)}</option>`).join('');
+  document.getElementById('arn-n-checklist').innerHTML =
+    '<div style="font-size:12px;color:var(--texto-hint);padding:6px 0">Elige el tipo de equipo para ver sus puntos.</div>';
+  _arnNChecklist = [];
+
+  document.getElementById('overlay-arn-nuevo').style.display = 'flex';
+}
+function cerrarArnNuevo() { document.getElementById('overlay-arn-nuevo').style.display = 'none'; }
+
+function arnNRenderResultado() {
+  const color = { 'APTO':'#1b7a3d', 'CONDICIONADO':'#92400e', 'NO APTO':'#b91c1c' };
+  document.getElementById('arn-n-resultado').innerHTML = ARN_N_RESULTADOS.map(r => `
+    <button onclick="_arnNResultado='${r}';arnNRenderResultado()"
+      style="padding:6px 14px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;
+             border:2px solid ${_arnNResultado===r ? color[r] : 'var(--borde)'};
+             background:${_arnNResultado===r ? color[r] : '#fff'};
+             color:${_arnNResultado===r ? '#fff' : 'var(--texto-sub)'}">${r}</button>`).join('');
+}
+
+function arnNRenderNormas() {
+  document.getElementById('arn-n-normas').innerHTML = ARN_NORMAS.map(n => `
+    <label style="display:flex;align-items:flex-start;gap:7px;font-size:12px;cursor:pointer;padding:4px 0">
+      <input type="checkbox" class="arn-n-norma" value="${escH(n.clave)}"
+             ${n.clave === 'NOM-009-STPS-2011' ? 'checked' : ''}
+             style="width:16px;height:16px;margin:2px 0 0;flex-shrink:0">
+      <span><strong>${escH(n.clave)}</strong> — ${escH(n.titulo)}</span>
+    </label>`).join('');
+}
+
+async function arnNuevoChecklist() {
+  const tipoId = document.getElementById('arn-n-tipo').value;
+  const cont = document.getElementById('arn-n-checklist');
+  if (!tipoId) { cont.innerHTML = ''; _arnNChecklist = []; return; }
+  cont.innerHTML = '<div style="font-size:12px;color:var(--texto-hint);padding:6px 0">Cargando puntos…</div>';
+  try {
+    const r = await fetch(API + '?action=LISTAR_CHECKLIST_ARNES&tipo_id=' + encodeURIComponent(tipoId));
+    const d = await r.json();
+    _arnNChecklist = d.checklist || [];
+  } catch(_) { _arnNChecklist = []; }
+  if (!_arnNChecklist.length) {
+    cont.innerHTML = '<div style="font-size:12px;color:var(--texto-hint);padding:6px 0">Este tipo no tiene puntos configurados.</div>';
+    return;
+  }
+  cont.innerHTML = _arnNChecklist.map(p => `
+    <div style="padding:7px 0;border-bottom:1px solid var(--borde)">
+      <div style="font-size:12px;color:var(--texto);margin-bottom:4px">${escH(p.descripcion)}</div>
+      <div style="display:flex;gap:5px">
+        ${['C','NC','NA'].map(v => `
+          <button class="arn-n-chk" data-tag="${escH(p.tag)}" data-val="${v}" data-sel="0"
+                  onclick="arnNChk(this)"
+                  style="padding:4px 12px;border:1.5px solid var(--borde);background:#fff;color:var(--texto-sub);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">${v}</button>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function arnNChk(btn) {
+  const color = { 'C':'#1b7a3d', 'NC':'#b91c1c', 'NA':'#7a8494' };
+  document.querySelectorAll(`.arn-n-chk[data-tag="${btn.dataset.tag}"]`).forEach(b => {
+    b.dataset.sel = '0'; b.style.background = '#fff';
+    b.style.color = 'var(--texto-sub)'; b.style.borderColor = 'var(--borde)';
+  });
+  btn.dataset.sel = '1';
+  btn.style.background = color[btn.dataset.val];
+  btn.style.color = '#fff';
+  btn.style.borderColor = color[btn.dataset.val];
+}
+
+/* Retiro obligatorio a 5 años de la fabricación, ajustable. */
+function arnNuevoRetiro() {
+  const f = document.getElementById('arn-n-fabricacion').value;
+  const r = document.getElementById('arn-n-retiro');
+  if (!f || r.value) return;
+  const d = new Date(f + 'T12:00:00');
+  d.setFullYear(d.getFullYear() + 5);
+  r.value = d.toISOString().slice(0, 10);
+}
+
+async function guardarArnNuevo() {
+  const tipoId = document.getElementById('arn-n-tipo').value;
+  if (!tipoId) { mostrarToast('Selecciona el tipo de equipo.', 'err'); return; }
+
+  const checklist = {};
+  document.querySelectorAll('.arn-n-chk[data-sel="1"]').forEach(b => { checklist[b.dataset.tag] = b.dataset.val; });
+  const faltan = _arnNChecklist.filter(p => !checklist[p.tag]).length;
+  if (faltan && !confirm(`Quedan ${faltan} punto(s) sin responder. ¿Guardar de todos modos?`)) return;
+
+  const normas = [...document.querySelectorAll('.arn-n-norma:checked')].map(c => c.value).join(', ');
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const v = id => (document.getElementById(id) || {}).value || '';
+
+  const fd = new FormData();
+  fd.append('action', 'GUARDAR_ITEM_ARNES');
+  fd.append('token', s.token || '');
+  fd.append('sesion_id', _arnDetActual.sesion.id);
+  fd.append('tipo_id', tipoId);
+  fd.append('id_arnes', v('arn-n-id').trim());
+  fd.append('marca',    v('arn-n-marca').trim());
+  fd.append('modelo',   v('arn-n-modelo').trim());
+  fd.append('serie',    v('arn-n-serie').trim());
+  fd.append('talla',    v('arn-n-talla').trim());
+  fd.append('norma',    normas);
+  fd.append('fecha_fabricacion', v('arn-n-fabricacion'));
+  fd.append('fecha_retiro',      v('arn-n-retiro'));
+  fd.append('resultado',     _arnNResultado);
+  fd.append('observaciones', v('arn-n-obs').trim());
+  fd.append('qr_codigo',     v('arn-n-qr').trim());
+  fd.append('checklist', JSON.stringify(checklist));
+  const fotos = document.getElementById('arn-n-fotos').files || [];
+  [...fotos].slice(0, 6).forEach(f => fd.append('fotos[]', f));
+
+  const btn = document.getElementById('arn-n-btn');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const r = await fetch(API, { method: 'POST', headers: { 'X-Token': s.token || '' }, body: fd });
+    const d = await r.json();
+    if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo guardar.', 'err'); return; }
+    mostrarToast('Equipo agregado a la inspección.', 'ok');
+    if (d.reemitir) {
+      alert('El equipo se agregó a una inspección ya cerrada.\n\n' +
+            'Pide a Certificaciones que vuelva a emitir para que salga su certificado.');
+    }
+    cerrarArnNuevo();
+    abrirArnDet(_arnDetActual.sesion.id);
+    cargarSesionesArn();
+  } catch(_) { mostrarToast('Error de conexión.', 'err'); }
+  finally { btn.disabled = false; btn.textContent = 'Guardar equipo'; }
 }
 
 /* Equipo idéntico en lote: se copia la pieza con toda su lista de verificación

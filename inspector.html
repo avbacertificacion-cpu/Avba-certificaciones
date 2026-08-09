@@ -2883,6 +2883,7 @@
   </div>
 </div>
 
+<script src="js/arneses-normas.js"></script>
 <script>
 /* ════════════════════════════════════════
    CONFIGURACIÓN
@@ -6172,22 +6173,6 @@ function arnCrearMapa(lat, lng) {
 // NOM-009 sigue en su version 2011, Z359.11 y Z359.14 se actualizaron en 2021
 // (la .14 obligatoria desde agosto de 2023), Z359.12 en 2019, y EN 360 paso a
 // 2023 mientras las demas EN siguen en 2002/2010.
-const ARN_NORMAS = [
-  { clave: 'NOM-009-STPS-2011',      titulo: 'Condiciones de seguridad para realizar trabajos en altura' },
-  { clave: 'ANSI/ASSP Z359.11-2021', titulo: 'Safety Requirements for Full Body Harnesses' },
-  { clave: 'ANSI/ASSP Z359.12-2019', titulo: 'Connecting Components for Personal Fall Arrest Systems' },
-  { clave: 'ANSI/ASSP Z359.13-2013', titulo: 'Personal Energy Absorbers and Energy Absorbing Lanyards' },
-  { clave: 'ANSI/ASSP Z359.14-2021', titulo: 'Safety Requirements for Self-Retracting Devices' },
-  { clave: 'ANSI/ASSP Z359.15-2014', titulo: 'Single Anchor Lifelines and Fall Arresters for Personal Fall Arrest and Rescue Systems' },
-  { clave: 'ANSI/ASSP Z359.16-2016', titulo: 'Safety Requirements for Climbing Ladder Fall Arrest Systems' },
-  { clave: 'ANSI/ASSP Z359.18-2017', titulo: 'Safety Requirements for Anchorage Connectors for Active Fall Protection Systems' },
-  { clave: 'ANSI/ASSP Z359.6-2016',  titulo: 'Specifications and Design Requirements for Active Fall Protection Systems' },
-  { clave: 'OSHA 29 CFR 1926.502',   titulo: 'Fall Protection Systems Criteria and Practices' },
-  { clave: 'EN 361:2002',            titulo: 'Arneses anticaídas' },
-  { clave: 'EN 354:2010',            titulo: 'Elementos de amarre' },
-  { clave: 'EN 355:2002',            titulo: 'Absorbedores de energía' },
-  { clave: 'EN 360:2023',            titulo: 'Anticaídas retráctiles' },
-];
 
 function arnRenderNormas() {
   const cont = document.getElementById('arn-normas-grid');
