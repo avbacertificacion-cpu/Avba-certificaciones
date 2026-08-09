@@ -6623,6 +6623,16 @@ function renderArnDet(d) {
                   style="padding:5px 12px;background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">⧉ Duplicar</button>
           ${i.fotos && i.fotos.length ? `<span style="font-size:11px;color:var(--texto-hint)">📷 ${i.fotos.length}</span>` : ''}
         </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
+          <label style="font-size:11px;color:var(--texto-sub)">Fabricación
+            <input type="date" id="arn-fab-${i.id}" value="${escH(i.fecha_fabricacion||'')}"
+                   onchange="arnRecalcRetiro(${i.id})"
+                   style="margin-left:4px;padding:4px 7px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+          <label style="font-size:11px;color:var(--texto-sub)">Retiro
+            <input type="date" id="arn-ret-${i.id}" value="${escH(i.fecha_retiro||'')}"
+                   style="margin-left:4px;padding:4px 7px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+          <span style="font-size:10.5px;color:var(--texto-hint)">Al cambiar la fabricación, el retiro se recalcula a 5 años.</span>
+        </div>
         ${i.observaciones ? `<div style="font-size:11px;color:var(--texto-sub);font-style:italic;margin-top:6px">${escH(i.observaciones)}</div>` : ''}
         ${(i.checklist||[]).length ? `<details style="margin-top:7px">
             <summary style="font-size:11px;color:var(--azul);cursor:pointer">Ver checklist (${i.checklist.length})</summary>
@@ -6676,13 +6686,27 @@ async function devolverArn(id) {
 
 function cerrarArnDet() { document.getElementById('overlay-arn').style.display = 'none'; }
 
+/* Al corregir la fabricación de una copia, el retiro sigue: cinco años de vida
+   útil. Se deja editable por si el fabricante indica otra cosa. */
+function arnRecalcRetiro(itemId) {
+  const fab = document.getElementById('arn-fab-' + itemId);
+  const ret = document.getElementById('arn-ret-' + itemId);
+  if (!fab || !ret || !fab.value) return;
+  const d = new Date(fab.value + 'T12:00:00');
+  d.setFullYear(d.getFullYear() + 5);
+  ret.value = d.toISOString().slice(0, 10);
+}
+
 async function guardarQrArn(itemId) {
-  const qr    = document.getElementById('arn-qr-' + itemId).value.trim();
-  const serie = (document.getElementById('arn-serie-' + itemId) || {}).value || '';
+  const v     = id => (document.getElementById(id) || {}).value || '';
+  const qr    = v('arn-qr-' + itemId).trim();
+  const serie = v('arn-serie-' + itemId).trim();
   try {
     const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ action:'EDITAR_ITEM_ARNES',
-                             payload:{ id:itemId, qr_codigo:qr, serie: serie.trim() } }) });
+                             payload:{ id:itemId, qr_codigo:qr, serie,
+                                       fecha_fabricacion: v('arn-fab-' + itemId),
+                                       fecha_retiro:      v('arn-ret-' + itemId) } }) });
     const d = await r.json();
     if (d.status === 'success') { mostrarToast('Pieza actualizada.', 'ok'); abrirArnDet(_arnDetActual.sesion.id); }
     else mostrarToast(d.message || 'No se pudo guardar.', 'err');

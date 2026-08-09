@@ -818,8 +818,30 @@ class Arneses {
             $r = strtoupper(trim((string)$p['resultado']));
             if (in_array($r, self::RESULTADOS, true)) { $campos[] = "resultado = ?"; $vals[] = $r; }
         }
-        foreach (['fecha_fabricacion','fecha_retiro','vigencia'] as $c) {
-            if (array_key_exists($c, $p)) { $campos[] = "$c = ?"; $vals[] = $this->fecha($p[$c]); }
+        // Fechas. Si cambia la fabricación y no se indica un retiro explícito, se
+        // recalcula igual que al capturar: los cinco años de vida útil del equipo
+        // textil, y la vigencia recortada si el retiro cae antes. Sin esto, una
+        // pieza clonada conservaba el retiro de la original al corregirle la
+        // fecha de fabricación.
+        $fabNueva = array_key_exists('fecha_fabricacion', $p) ? $this->fecha($p['fecha_fabricacion']) : null;
+        $retExpl  = array_key_exists('fecha_retiro', $p) ? $this->fecha($p['fecha_retiro']) : null;
+
+        if (array_key_exists('fecha_fabricacion', $p)) { $campos[] = "fecha_fabricacion = ?"; $vals[] = $fabNueva; }
+
+        $retFinal = $retExpl;
+        if ($retFinal === null && $fabNueva && !array_key_exists('fecha_retiro', $p)) {
+            $retFinal = date('Y-m-d', strtotime($fabNueva . ' +5 years'));
+        }
+        if (array_key_exists('fecha_retiro', $p) || $retFinal !== null) {
+            $campos[] = "fecha_retiro = ?"; $vals[] = $retFinal;
+        }
+
+        if (array_key_exists('vigencia', $p)) {
+            $campos[] = "vigencia = ?"; $vals[] = $this->fecha($p['vigencia']);
+        } elseif ($retFinal !== null) {
+            $vig = date('Y-m-d', strtotime('+1 year'));
+            if (strtotime($retFinal) < strtotime($vig)) $vig = $retFinal;
+            $campos[] = "vigencia = ?"; $vals[] = $vig;
         }
         if (array_key_exists('qr_codigo', $p)) {
             $q = trim((string)$p['qr_codigo']);
