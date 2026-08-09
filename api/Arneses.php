@@ -33,10 +33,12 @@ class Arneses {
     private const RESULTADOS = ['APTO', 'CONDICIONADO', 'NO APTO'];
 
     /**
-     * Versión del compositor de firma y sello. Súbela al cambiar cómo se
-     * componen: es lo que invalida las imágenes ya generadas.
+     * Versión del tratamiento de imágenes de firma y sello. Súbela al cambiar
+     * cómo se procesan: es lo que invalida las que ya están generadas, porque
+     * los archivos de origen no cambian y la caché seguiría entregando las
+     * viejas.
      */
-    private const FIRMA_VERSION = 3;
+    private const FIRMA_VERSION = 4;
 
     /** Umbrales de luminancia al limpiar y realzar una firma escaneada. */
     private const LUM_PAPEL = 248;   // de aquí en adelante es hoja
@@ -1137,107 +1139,64 @@ class Arneses {
     }
 
     /**
-     * Compone la firma con el sello encima, como si se hubiera estampado después
-     * de firmar: el sello va traslúcido y montado sobre el trazo, no debajo ni
-     * al lado. Se resuelve con GD en una sola imagen porque mPDF no superpone
-     * elementos de forma fiable.
+     * Deja la firma lista para el documento: le quita el fondo del papel, le
+     * devuelve contraste, recorta el margen sobrante y la aplana sobre blanco.
      *
-     * El resultado se cachea con la huella de ambos archivos, así que sólo se
-     * vuelve a componer si cambia la firma o el sello.
+     * Se aplana a propósito, sin canal alfa: mPDF guarda un PNG transparente
+     * como imagen negra más una máscara aparte, y si el visor no aplica la
+     * máscara la firma sale como un recuadro negro. Sobre la hoja del documento
+     * el resultado se ve igual y no depende del visor.
      *
-     * @return string Ruta relativa a la imagen compuesta, o la firma sola si no
-     *                se pudo componer.
+     * El resultado se cachea con la huella del archivo y la versión del
+     * procesado; esta última es la que invalida las imágenes ya generadas
+     * cuando cambia el tratamiento.
+     *
+     * @return string Ruta relativa a la imagen procesada, o la original si no
+     *                se pudo procesar.
      */
-    private function firmaSellada(string $firmaRel, string $selloRel): string {
-        if ($firmaRel === '' || $selloRel === '') return $firmaRel;
+    private function firmaProcesada(string $firmaRel): string {
+        if ($firmaRel === '') return '';
         if (!function_exists('imagecreatetruecolor')) return $firmaRel;
 
         $fAbs = __DIR__ . '/../' . $firmaRel;
-        $sAbs = __DIR__ . '/../' . $selloRel;
-        if (!is_file($fAbs) || !is_file($sAbs)) return $firmaRel;
+        if (!is_file($fAbs)) return $firmaRel;
 
-        // La huella incluye la versión del compositor, no sólo los archivos de
-        // origen: si depende sólo de la firma y el sello, al corregir cómo se
-        // componen el servidor sigue entregando la imagen vieja para siempre,
-        // porque los archivos de origen no cambiaron.
-        $huella = substr(md5(
-            self::FIRMA_VERSION . '|' .
-            filemtime($fAbs) . filesize($fAbs) . filemtime($sAbs) . filesize($sAbs)
-        ), 0, 12);
-        $dir    = UPLOAD_DIR . 'firmas_selladas/';
-        $rel    = 'uploads/firmas_selladas/firma_' . $huella . '.png';
+        $huella = substr(md5(self::FIRMA_VERSION . '|' . filemtime($fAbs) . filesize($fAbs)), 0, 12);
+        $dir    = UPLOAD_DIR . 'firmas_procesadas/';
+        $rel    = 'uploads/firmas_procesadas/firma_' . $huella . '.png';
         if (is_file(__DIR__ . '/../' . $rel)) return $rel;
         if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return $firmaRel;
 
         try {
             $firma = @imagecreatefromstring((string)file_get_contents($fAbs));
-            $sello = @imagecreatefromstring((string)file_get_contents($sAbs));
-            if (!$firma || !$sello) return $firmaRel;
+            if (!$firma) return $firmaRel;
 
-            // Las firmas suelen venir escaneadas o fotografiadas sobre papel, en
-            // JPG y sin transparencia. Sin quitarles el fondo, el sello queda
-            // sobre un recuadro blanco y se nota el montaje.
             // El realce recorre la imagen píxel por píxel: una firma de varios
             // megapíxeles tardaría segundos sin aportar nada, porque en el
-            // documento se imprime a unos 66 px de alto.
+            // documento se imprime a unos 58 px de alto.
             $firma = $this->limitarAncho($firma, 900);
             $firma = $this->sinFondoBlanco($firma);
             $firma = $this->recortarMargenes($firma);
 
             $fw = imagesx($firma); $fh = imagesy($firma);
-            $sw = imagesx($sello); $sh = imagesy($sello);
             if ($fw < 2 || $fh < 2) return $firmaRel;
 
-            // El lienzo se dimensiona a partir de la firma, no del sello: si se
-            // parte del sello, en firmas anchas y bajas el lienzo crece de más y
-            // el sello acaba desproporcionado sobre el trazo.
-            // El sello se dimensiona contra la FIRMA, no contra el lienzo: de lo
-            // contrario acaba más grande que el trazo y lo tapa por completo.
-            $selloAlto  = (int)round($fh * 0.80);
-            $selloAncho = (int)round($sw * ($selloAlto / max(1, $sh)));
-            $H = (int)round($fh * 1.10);
-            $W = (int)round(max($fw, $selloAncho) * 1.15);
+            $W = (int)round($fw * 1.06);
+            $H = (int)round($fh * 1.12);
 
-            // El lienzo va BLANCO y OPACO, no transparente. mPDF guarda un PNG con
-            // canal alfa como imagen negra más una máscara aparte, y si el visor
-            // no aplica la máscara —pasa al abrir el PDF en el navegador— la
-            // firma sale como un recuadro negro. Sobre la hoja blanca del
-            // documento el resultado se ve igual, y sin máscara de por medio.
             $dst = imagecreatetruecolor($W, $H);
             imagealphablending($dst, false);
             imagesavealpha($dst, false);
             imagefilledrectangle($dst, 0, 0, $W, $H, imagecolorallocate($dst, 255, 255, 255));
             imagealphablending($dst, true);
-
-            // Firma centrada
-            $fx = (int)round(($W - $fw) / 2);
-            $fy = (int)round(($H - $fh) / 2);
-            imagecopy($dst, $firma, $fx, $fy, 0, 0, $fw, $fh);
-
-            // Sello traslúcido, del alto calculado arriba
-            $nsh = $selloAlto;
-            $nsw = $selloAncho;
-            $sel = imagecreatetruecolor($nsw, $nsh);
-            imagealphablending($sel, false);
-            imagesavealpha($sel, true);
-            imagefilledrectangle($sel, 0, 0, $nsw, $nsh, imagecolorallocatealpha($sel, 0, 0, 0, 127));
-            imagecopyresampled($sel, $sello, 0, 0, 0, 0, $nsw, $nsh, $sw, $sh);
-            // Tinta translúcida: deja ver el trazo de la firma por debajo.
-            @imagefilter($sel, IMG_FILTER_COLORIZE, 0, 0, 0, 30);
-
-            // Montado sobre la firma, ligeramente a la derecha y abajo, como
-            // cae un sello puesto a mano.
-            imagealphablending($dst, true);
-            imagecopy($dst, $sel,
-                (int)round(($W - $nsw) / 2 + $W * 0.10),
-                (int)round(($H - $nsh) / 2 + $H * 0.06),
-                0, 0, $nsw, $nsh);
+            imagecopy($dst, $firma,
+                (int)round(($W - $fw) / 2), (int)round(($H - $fh) / 2), 0, 0, $fw, $fh);
 
             $ok = imagepng($dst, $dir . basename($rel), 8);
-            imagedestroy($dst); imagedestroy($sel); imagedestroy($firma); imagedestroy($sello);
+            imagedestroy($dst); imagedestroy($firma);
             return $ok ? $rel : $firmaRel;
         } catch (\Throwable $e) {
-            error_log('[Arneses] firmaSellada: ' . $e->getMessage());
+            error_log('[Arneses] firmaProcesada: ' . $e->getMessage());
             return $firmaRel;
         }
     }
@@ -1309,6 +1268,46 @@ class Arneses {
         }
         imagedestroy($img);
         return $out;
+    }
+
+    /**
+     * Aplana una imagen con transparencia sobre blanco, sin retocarla.
+     *
+     * mPDF incrusta los PNG transparentes como imagen a color más una máscara
+     * aparte, y en el archivo la zona transparente queda negra: si el visor no
+     * aplica la máscara, sale un recuadro negro. Sobre la hoja del documento el
+     * resultado aplanado se ve igual y no depende del visor.
+     */
+    private function aplanarSobreBlanco(string $rel): string {
+        if ($rel === '' || !function_exists('imagecreatetruecolor')) return $rel;
+        $abs = __DIR__ . '/../' . $rel;
+        if (!is_file($abs)) return $rel;
+
+        $huella  = substr(md5(self::FIRMA_VERSION . '|' . $rel . filemtime($abs) . filesize($abs)), 0, 12);
+        $dir     = UPLOAD_DIR . 'firmas_procesadas/';
+        $destino = 'uploads/firmas_procesadas/plano_' . $huella . '.png';
+        if (is_file(__DIR__ . '/../' . $destino)) return $destino;
+        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return $rel;
+
+        try {
+            $src = @imagecreatefromstring((string)file_get_contents($abs));
+            if (!$src) return $rel;
+            $w = imagesx($src); $h = imagesy($src);
+
+            $dst = imagecreatetruecolor($w, $h);
+            imagealphablending($dst, false);
+            imagesavealpha($dst, false);
+            imagefilledrectangle($dst, 0, 0, $w, $h, imagecolorallocate($dst, 255, 255, 255));
+            imagealphablending($dst, true);
+            imagecopy($dst, $src, 0, 0, 0, 0, $w, $h);
+
+            $ok = imagepng($dst, $dir . basename($destino), 8);
+            imagedestroy($dst); imagedestroy($src);
+            return $ok ? $destino : $rel;
+        } catch (\Throwable $e) {
+            error_log('[Arneses] aplanarSobreBlanco: ' . $e->getMessage());
+            return $rel;
+        }
     }
 
     /** Reduce la imagen si excede el lado máximo, conservando la proporción. */
@@ -1592,10 +1591,9 @@ class Arneses {
               . '<div style="font-size:6.5pt;color:#5a6072;margin-top:2px">Valida este dictamen</div>'
             : '';
         $inspector = $this->esc($ses['inspector_firma'] ?: $ses['usuario'] ?: '');
-        $sello     = $this->activo('assets/sellos/sello.png');
+        $sello     = $this->aplanarSobreBlanco($this->activo('assets/sellos/sello.png'));
         $firma     = $this->firmaDe((string)($ses['inspector_usuario'] ?? ''), (string)($ses['inspector_firma'] ?? ''));
-        // Firma y sello en una sola imagen, con el sello montado encima.
-        $rubrica   = $firma ? $this->firmaSellada($firma, $sello) : $sello;
+        $rubrica   = $firma ? $this->firmaProcesada($firma) : '';
 
         $html = '<html><head><meta charset="UTF-8">' . $this->estilosDoc() . '</head><body>'
           . $this->encabezado('DICTAMEN TÉCNICO DE INSPECCIÓN', $ses['control'],
@@ -1698,15 +1696,16 @@ class Arneses {
              <div class="juntos">
              <table width="100%" style="margin-top:26px">
                <tr>
-                 <td width="30%"></td>
-                 <td width="40%" style="text-align:center">'
+                 <td width="55%" style="text-align:center;vertical-align:bottom">'
                    . ($rubrica
-                       ? '<img src="' . $rubrica . '" style="height:66px"><br>'
-                       : '<div style="height:66px"></div>')
+                       ? '<img src="' . $rubrica . '" style="height:58px"><br>'
+                       : '<div style="height:58px"></div>')
                    . '' . $this->lineaFirma() . '
                       <div class="sign-t">' . ($inspector ?: 'Inspector responsable') . '</div>
                       <div class="sign-s">Inspector · AVBA Inspections</div></td>
-                 <td width="30%"></td>
+                 <td width="45%" style="text-align:center;vertical-align:bottom">'
+                   . ($sello ? '<img src="' . $sello . '" style="height:76px">' : '')
+                   . '<div class="sign-s" style="margin-top:4px">Sello de la unidad de inspección</div></td>
                </tr>
              </table>'
              . $this->franjaAcreditaciones()

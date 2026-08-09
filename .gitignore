@@ -10,7 +10,7 @@ vendor/
 uploads/certificados/*
 uploads/evidencias/*
 uploads/reportes/*
-uploads/firmas_selladas/*
+uploads/firmas_procesadas/*
 uploads/plantillas/*
 uploads/personal/*
 uploads/accesorios/*
