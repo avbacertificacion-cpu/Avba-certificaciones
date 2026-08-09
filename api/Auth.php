@@ -324,7 +324,12 @@ class Auth {
         $blk->execute([$usuario]);
         $intento = $blk->fetch();
         if ($intento && $intento['bloqueado_hasta'] && $intento['bloqueado_hasta'] > date('Y-m-d H:i:s')) {
-            return ['status' => 'error', 'message' => 'Demasiados intentos fallidos. Espera ' . LOGIN_BLOQUEO_MIN . ' minutos e intenta de nuevo.'];
+            // La constante se lee con defined(), igual que en registrarIntento():
+            // si falta en la configuración del servidor, esta línea tumbaba el
+            // inicio de sesión justo de quien ya estaba bloqueado.
+            $restan = max(1, (int)ceil((strtotime($intento['bloqueado_hasta']) - time()) / 60));
+            return ['status' => 'error', 'message' =>
+                "Demasiados intentos fallidos. Espera $restan minuto(s) e intenta de nuevo."];
         }
 
         try {

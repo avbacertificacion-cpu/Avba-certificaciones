@@ -189,6 +189,28 @@ function controlSinCliente(PDO $pdo): string {
 }
 
 /**
+ * Valores por omisión de la configuración opcional.
+ *
+ * config/config.php vive sólo en el servidor y no siempre trae todas las
+ * constantes que el código fue incorporando. Faltando una, PHP 8 lanza un Error
+ * fatal y el sistema responde "Error interno del servidor" sin más pista. Aquí
+ * se les da un valor razonable para que una constante ausente degrade en vez de
+ * tumbar la petición.
+ */
+foreach ([
+    'LOGIN_MAX_INTENTOS' => 5,
+    'LOGIN_BLOQUEO_MIN'  => 15,
+    'TOKEN_TTL'          => 28800,
+    'NO_ACREDITACION'    => '',
+    'CORS_ORIGINS'       => '',
+    'GEMINI_API_KEY'     => '',
+    'GEMINI_MODEL'       => '',
+    'APP_ENV'            => 'production',
+] as $constante => $valor) {
+    if (!defined($constante)) define($constante, $valor);
+}
+
+/**
  * Series de códigos QR por tipo de registro: el primer dígito identifica a qué
  * corresponde la etiqueta. Los equipos (maquinaria, accesorios de izaje y
  * equipo contra caídas) usan la serie 4; el personal de cursos, la 7.

@@ -123,6 +123,30 @@ if ($pdo && $quien !== '') {
     }
 }
 
+// ── Liberar el bloqueo por intentos fallidos ──────────────
+$liberado = null;
+if ($pdo && ($_GET['liberar'] ?? '') !== '' ) {
+    $u = mb_strtolower(trim($_GET['liberar']));
+    try {
+        $st = $pdo->prepare("DELETE FROM login_intentos WHERE usuario = ?");
+        $st->execute([$u]);
+        $liberado = ['ok' => true, 'usuario' => $u, 'filas' => $st->rowCount()];
+    } catch (\Throwable $ex) {
+        $liberado = ['ok' => false, 'usuario' => $u, 'nota' => $ex->getMessage()];
+    }
+}
+
+// ── Cuentas bloqueadas en este momento ────────────────────
+$bloqueadas = [];
+if ($pdo) {
+    try {
+        $st = $pdo->query("SELECT usuario, intentos, bloqueado_hasta FROM login_intentos
+                           WHERE bloqueado_hasta IS NOT NULL AND bloqueado_hasta > NOW()
+                           ORDER BY bloqueado_hasta DESC");
+        $bloqueadas = $st->fetchAll();
+    } catch (\Throwable $ex) { /* la tabla aún no existe */ }
+}
+
 // ── Bitácora de errores de PHP ────────────────────────────
 // Aquí queda escrito el error real que el manejador global esconde.
 $bitacora = [];
@@ -196,6 +220,37 @@ $fallos = array_filter($resultados, fn($r) => !$r['ok']);
     <?php endif; ?>
   </div>
 <?php endif; ?>
+
+<?php if ($liberado): ?>
+  <div class="caja <?= $liberado['ok'] ? 'bien' : 'mal' ?>">
+    <?php if ($liberado['ok']): ?>
+      Bloqueo liberado para <strong><?= $e($liberado['usuario']) ?></strong>
+      (<?= (int)$liberado['filas'] ?> registro(s) de intentos borrados). Ya puede intentar entrar.
+    <?php else: ?>
+      No se pudo liberar <strong><?= $e($liberado['usuario']) ?></strong>: <?= $e($liberado['nota']) ?>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
+<div class="caja <?= $bloqueadas ? 'mal' : '' ?>">
+  <strong>Cuentas bloqueadas por intentos fallidos</strong>
+  <?php if (!$bloqueadas): ?>
+    <div style="font-size:13px;margin-top:6px">Ninguna cuenta está bloqueada en este momento.</div>
+  <?php else: ?>
+    <table style="margin-top:8px">
+      <tr><th>Usuario</th><th>Intentos</th><th>Bloqueado hasta</th><th></th></tr>
+      <?php foreach ($bloqueadas as $b): ?>
+        <tr>
+          <td class="mono"><?= $e($b['usuario']) ?></td>
+          <td><?= (int)$b['intentos'] ?></td>
+          <td class="mono"><?= $e($b['bloqueado_hasta']) ?></td>
+          <td><a href="?secret=<?= $e($_GET['secret'] ?? '') ?>&liberar=<?= urlencode($b['usuario']) ?>"
+                 style="color:#185FA5;font-weight:600">Liberar ahora</a></td>
+        </tr>
+      <?php endforeach; ?>
+    </table>
+  <?php endif; ?>
+</div>
 
 <div class="caja">
   <strong>Revisar un usuario</strong>
