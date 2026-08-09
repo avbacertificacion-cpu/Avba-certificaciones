@@ -32,6 +32,11 @@ class Arneses {
     /** Resultado de la inspección de una pieza. */
     private const RESULTADOS = ['APTO', 'CONDICIONADO', 'NO APTO'];
 
+    /** Umbrales de luminancia al limpiar y realzar una firma escaneada. */
+    private const LUM_PAPEL = 248;   // de aquí en adelante es hoja
+    private const LUM_TINTA = 235;   // por debajo de aquí es trazo pleno
+    private const LUM_META  = 140;   // a cuánto se lleva el tono más claro del trazo
+
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
         $this->migrate();
@@ -1159,6 +1164,10 @@ class Arneses {
             // Las firmas suelen venir escaneadas o fotografiadas sobre papel, en
             // JPG y sin transparencia. Sin quitarles el fondo, el sello queda
             // sobre un recuadro blanco y se nota el montaje.
+            // El realce recorre la imagen píxel por píxel: una firma de varios
+            // megapíxeles tardaría segundos sin aportar nada, porque en el
+            // documento se imprime a unos 66 px de alto.
+            $firma = $this->limitarAncho($firma, 900);
             $firma = $this->sinFondoBlanco($firma);
             $firma = $this->recortarMargenes($firma);
 
@@ -1216,11 +1225,37 @@ class Arneses {
     }
 
     /**
-     * Vuelve transparente el fondo claro de una imagen, con degradado en los
-     * tonos intermedios para no dejar el trazo dentado.
+     * Quita el fondo claro de una firma escaneada y le devuelve contraste.
+     *
+     * Las firmas llegan fotografiadas o escaneadas sobre papel, con muy poco
+     * contraste: en la del director el trazo más oscuro apenas baja a 67 de
+     * luminancia y buena parte se dispersa hasta 245, casi papel. Sin realzarla,
+     * bajo el sello no se lee. Se hacen dos cosas:
+     *
+     *   1. Transparencia: papel fuera, con degradado en la franja intermedia
+     *      para que el borde del trazo no salga dentado.
+     *   2. Realce: el rango real de tinta se estira hacia los tonos oscuros,
+     *      conservando el matiz de cada píxel (se escalan los tres canales por
+     *      igual), así que se oscurece el trazo sin repintar la firma.
      */
-    private function sinFondoBlanco(\GdImage $img, int $umbral = 205): \GdImage {
+    private function sinFondoBlanco(\GdImage $img): \GdImage {
         $w = imagesx($img); $h = imagesy($img);
+
+        $lum = fn(int $c): int => (int)round(
+            0.299 * (($c >> 16) & 0xFF) + 0.587 * (($c >> 8) & 0xFF) + 0.114 * ($c & 0xFF)
+        );
+
+        // Tono más oscuro presente, para estirar desde el trazo real y no desde
+        // un negro teórico que este escaneo nunca alcanza.
+        $minLum = 255;
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $l = $lum(imagecolorat($img, $x, $y));
+                if ($l < $minLum) $minLum = $l;
+            }
+        }
+        $rango = max(1, self::LUM_TINTA - $minLum);
+
         $out = imagecreatetruecolor($w, $h);
         imagealphablending($out, false);
         imagesavealpha($out, true);
@@ -1229,15 +1264,48 @@ class Arneses {
             for ($x = 0; $x < $w; $x++) {
                 $c = imagecolorat($img, $x, $y);
                 $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
-                $lum = (int)round(0.299 * $r + 0.587 * $g + 0.114 * $b);
+                $l = $lum($c);
 
-                if ($lum >= 245)        $a = 127;                       // papel
-                elseif ($lum <= $umbral) $a = 0;                        // trazo
-                else $a = (int)round(127 * ($lum - $umbral) / (245 - $umbral));
+                if ($l >= self::LUM_PAPEL) {
+                    imagesetpixel($out, $x, $y, imagecolorallocatealpha($out, 255, 255, 255, 127));
+                    continue;
+                }
+                if ($l >= self::LUM_TINTA) {   // franja de borde
+                    $a = (int)round(127 * ($l - self::LUM_TINTA) / (self::LUM_PAPEL - self::LUM_TINTA));
+                    imagesetpixel($out, $x, $y, imagecolorallocatealpha($out, $r, $g, $b, $a));
+                    continue;
+                }
 
-                imagesetpixel($out, $x, $y, imagecolorallocatealpha($out, $r, $g, $b, $a));
+                // Trazo: se estira el tono hacia lo oscuro conservando el matiz
+                $t       = min(1.0, max(0.0, ($l - $minLum) / $rango));
+                $destino = $t * self::LUM_META;
+                $f       = $destino / max(1, $l);
+                imagesetpixel($out, $x, $y, imagecolorallocatealpha(
+                    $out,
+                    min(255, (int)round($r * $f)),
+                    min(255, (int)round($g * $f)),
+                    min(255, (int)round($b * $f)),
+                    0
+                ));
             }
         }
+        imagedestroy($img);
+        return $out;
+    }
+
+    /** Reduce la imagen si excede el lado máximo, conservando la proporción. */
+    private function limitarAncho(\GdImage $img, int $maxLado): \GdImage {
+        $w = imagesx($img); $h = imagesy($img);
+        $mayor = max($w, $h);
+        if ($mayor <= $maxLado) return $img;
+
+        $f  = $maxLado / $mayor;
+        $nw = max(1, (int)round($w * $f));
+        $nh = max(1, (int)round($h * $f));
+        $out = imagecreatetruecolor($nw, $nh);
+        imagealphablending($out, false);
+        imagesavealpha($out, true);
+        imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
         imagedestroy($img);
         return $out;
     }
@@ -1248,7 +1316,7 @@ class Arneses {
         $x1 = $w; $y1 = $h; $x2 = -1; $y2 = -1;
         for ($y = 0; $y < $h; $y++) {
             for ($x = 0; $x < $w; $x++) {
-                if ((imagecolorat($img, $x, $y) >> 24 & 0x7F) < 100) {
+                if ((imagecolorat($img, $x, $y) >> 24 & 0x7F) < 110) {
                     if ($x < $x1) $x1 = $x;  if ($x > $x2) $x2 = $x;
                     if ($y < $y1) $y1 = $y;  if ($y > $y2) $y2 = $y;
                 }
