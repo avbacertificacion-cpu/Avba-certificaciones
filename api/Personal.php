@@ -1268,8 +1268,11 @@ class Personal {
     }
 
     public function listarUsuariosInstructor(): array {
+        // Se incluye la firma para que quien elija al inspector sepa si tiene
+        // una registrada: sin ella el documento sale sólo con el nombre.
         $stmt = $this->pdo->query(
-            "SELECT usuario, COALESCE(nombre, usuario) AS nombre, rol
+            "SELECT usuario, COALESCE(nombre, usuario) AS nombre, rol,
+                    COALESCE(firma_imagen,'') AS firma_imagen
              FROM usuarios WHERE rol = 'INSPECTOR' ORDER BY nombre"
         );
         return ['status' => 'success', 'data' => $stmt->fetchAll()];

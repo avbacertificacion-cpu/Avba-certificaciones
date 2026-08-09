@@ -6587,8 +6587,11 @@ function renderArnDet(d) {
           <input type="text" id="arn-ed-correo" value="${escH(ses.correo||'')}" placeholder="correo@empresa.com"
                  style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Inspector que firma
-          <input type="text" id="arn-ed-inspector" value="${escH(ses.inspector_firma||ses.usuario||'')}"
-                 style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+          <select id="arn-ed-inspector"
+                  style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px;background:#fff">
+            <option value="">Cargando inspectores…</option>
+          </select>
+          <span id="arn-ed-firma-aviso" style="font-size:10.5px;color:var(--texto-hint)"></span></label>
         <label style="font-size:11px;color:var(--texto-sub);grid-column:1/-1">Lugar de la inspección
           <input type="text" id="arn-ed-direccion" value="${escH(ses.direccion||'')}" ${bloqueado?'disabled':''}
                  style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
@@ -6647,6 +6650,8 @@ function renderArnDet(d) {
 
   // RETORNADO entra aquí igual que en grúas: Certificaciones lo regresó y
   // vuelve a ser aprobable conservando su QR.
+  arnPoblarInspectores(ses.inspector_usuario || '', ses.inspector_firma || ses.usuario || '');
+
   const puedeAprobar = ['PENDIENTE','DEVUELTO','RETORNADO',''].includes(ses.estatus || '');
   document.getElementById('arn-det-footer').innerHTML = `
     <button class="btn-sec" onclick="cerrarArnDet()">Cerrar</button>
@@ -6656,9 +6661,50 @@ function renderArnDet(d) {
   `;
 }
 
+/* El inspector se elige de los usuarios con rol INSPECTOR: de ahí salen el
+   nombre que se imprime y la firma que se estampa en el dictamen. */
+async function arnPoblarInspectores(usuarioActual, nombreActual) {
+  const sel = document.getElementById('arn-ed-inspector');
+  const avi = document.getElementById('arn-ed-firma-aviso');
+  if (!sel) return;
+  try { await cargarUsuariosInstructor(); } catch(_) {}
+  const lista = usuariosInstrData || [];
+  sel.innerHTML = '<option value="">— Seleccionar inspector —</option>' +
+    lista.map(u => `<option value="${escH(u.usuario)}" data-nombre="${escH(u.nombre)}"
+                            data-firma="${u.firma_imagen ? '1' : ''}"
+                            ${String(u.usuario) === String(usuarioActual) ? 'selected' : ''}>${escH(u.nombre)}</option>`).join('');
+
+  // Expedientes anteriores guardaban sólo el nombre escrito a mano
+  if (!usuarioActual && nombreActual) {
+    const coincide = lista.find(u => u.nombre === nombreActual);
+    if (coincide) sel.value = coincide.usuario;
+    else sel.insertAdjacentHTML('afterbegin',
+      `<option value="" data-nombre="${escH(nombreActual)}" selected>${escH(nombreActual)} (sin cuenta)</option>`);
+  }
+  sel.onchange = () => arnAvisoFirma();
+  arnAvisoFirma();
+
+  function arnAvisoFirma() {
+    if (!avi) return;
+    const op = sel.options[sel.selectedIndex];
+    if (!op || !sel.value) { avi.textContent = ''; return; }
+    avi.textContent = op.dataset.firma
+      ? '✓ Tiene firma registrada; se estampará en el dictamen.'
+      : '⚠ Sin firma registrada: el dictamen saldrá sólo con su nombre.';
+    avi.style.color = op.dataset.firma ? 'var(--verde)' : '#92400e';
+  }
+}
+
 async function guardarDatosArn(id) {
   const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ''; };
-  const payload = { id, correo: val('arn-ed-correo'), inspector_firma: val('arn-ed-inspector') };
+  const sel = document.getElementById('arn-ed-inspector');
+  const op  = sel ? sel.options[sel.selectedIndex] : null;
+  const payload = {
+    id,
+    correo: val('arn-ed-correo'),
+    inspector_usuario: sel ? sel.value : '',
+    inspector_firma:   op ? (op.dataset.nombre || '') : '',
+  };
   ['cliente','fecha','direccion'].forEach(c => {
     const el = document.getElementById('arn-ed-' + c);
     if (el && !el.disabled) payload[c] = el.value.trim();

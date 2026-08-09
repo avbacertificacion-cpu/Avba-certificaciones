@@ -135,6 +135,9 @@ class Arneses {
             foreach ([
                 "ALTER TABLE arneses_sesiones ADD COLUMN correo VARCHAR(300) NULL",
                 "ALTER TABLE arneses_sesiones ADD COLUMN inspector_firma VARCHAR(150) NULL",
+                // El usuario, además del nombre: la firma se resuelve por cuenta,
+                // no emparejando nombres, que cambian y se escriben distinto.
+                "ALTER TABLE arneses_sesiones ADD COLUMN inspector_usuario VARCHAR(100) NULL",
                 "ALTER TABLE arneses_sesiones ADD COLUMN dictamen_manual_url VARCHAR(500) NULL",
                 "ALTER TABLE arneses_sesiones ADD COLUMN fecha_enviado DATETIME NULL",
                 "ALTER TABLE arneses_items ADD COLUMN cert_manual_url VARCHAR(500) NULL",
@@ -729,7 +732,7 @@ class Arneses {
     public function listarSesiones(string $estatus = ''): array {
         $sql = "SELECT s.id, s.cliente, DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha, s.direccion,
                        s.control, s.estatus, s.usuario, s.qr_codigo, s.dictamen_url,
-                       s.dictamen_manual_url, s.correo, s.inspector_firma, s.motivo,
+                       s.dictamen_manual_url, s.correo, s.inspector_firma, s.inspector_usuario, s.motivo,
                        DATE_FORMAT(s.fecha_enviado,'%d/%m/%Y %H:%i') AS fecha_enviado,
                        (SELECT COUNT(*) FROM arneses_items i WHERE i.sesion_id = s.id) AS total,
                        (SELECT COUNT(*) FROM arneses_items i WHERE i.sesion_id = s.id AND i.resultado = 'APTO') AS aptos,
@@ -971,6 +974,7 @@ class Arneses {
             'direccion'       => fn($v) => trim((string)$v) ?: null,
             'correo'          => fn($v) => trim((string)$v) ?: null,
             'inspector_firma' => fn($v) => trim((string)$v) ?: null,
+            'inspector_usuario' => fn($v) => trim((string)$v) ?: null,
             'fecha'           => fn($v) => $this->fecha($v),
         ];
 
@@ -1092,6 +1096,33 @@ class Arneses {
         $html = str_replace(array_keys($mapa), array_values($mapa), $html);
         // Cualquier marcador sobrante de la plantilla se limpia.
         return preg_replace('/\{[a-z_]+\}/', '', $html);
+    }
+
+    /**
+     * Imagen de firma del inspector que ampara el documento. Se busca por cuenta
+     * de usuario; si el expediente es anterior a que se guardara la cuenta, se
+     * intenta por nombre. Devuelve '' si no hay firma registrada, y entonces el
+     * documento sale sólo con la línea y el nombre.
+     */
+    private function firmaDe(string $usuario, string $nombre): string {
+        $rel = '';
+        try {
+            if ($usuario !== '') {
+                $st = $this->pdo->prepare("SELECT firma_imagen FROM usuarios WHERE usuario = ? LIMIT 1");
+                $st->execute([$usuario]);
+                $rel = (string)($st->fetchColumn() ?: '');
+            }
+            if ($rel === '' && $nombre !== '') {
+                $st = $this->pdo->prepare(
+                    "SELECT firma_imagen FROM usuarios WHERE rol = 'INSPECTOR' AND nombre = ? LIMIT 1"
+                );
+                $st->execute([$nombre]);
+                $rel = (string)($st->fetchColumn() ?: '');
+            }
+        } catch (\Throwable $e) { return ''; }
+
+        $rel = ltrim($rel, '/');
+        return ($rel !== '' && is_file(__DIR__ . '/../' . $rel)) ? $rel : '';
     }
 
     /** Ruta relativa de un activo de marca si existe (mPDF resuelve sobre la raíz). */
@@ -1314,6 +1345,7 @@ class Arneses {
             : '';
         $inspector = $this->esc($ses['inspector_firma'] ?: $ses['usuario'] ?: '');
         $sello     = $this->activo('assets/sellos/sello.png');
+        $firma     = $this->firmaDe((string)($ses['inspector_usuario'] ?? ''), (string)($ses['inspector_firma'] ?? ''));
 
         $html = '<html><head><meta charset="UTF-8">' . $this->estilosDoc() . '</head><body>'
           . $this->encabezado('DICTAMEN TÉCNICO DE INSPECCIÓN', $ses['control'],
@@ -1423,7 +1455,9 @@ class Arneses {
                <tr>
                  <td width="30%"></td>
                  <td width="40%" style="text-align:center">'
-                   . ($sello ? '<img src="' . $sello . '" style="height:60px"><br>' : '<div style="height:60px"></div>')
+                   . ($firma ? '<img src="' . $firma . '" style="height:44px"><br>' : '')
+                   . ($sello ? '<img src="' . $sello . '" style="height:' . ($firma ? '46' : '60') . 'px"><br>'
+                             : ($firma ? '' : '<div style="height:60px"></div>'))
                    . '' . $this->lineaFirma() . '
                       <div class="sign-t">' . ($inspector ?: 'Inspector responsable') . '</div>
                       <div class="sign-s">Inspector · AVBA Inspections</div></td>
