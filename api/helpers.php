@@ -228,6 +228,11 @@ function ensurePublicado(PDO $pdo): void {
     if ($hecho) return;
     $hecho = true;
 
+    // El relleno es idempotente: marca como publicado lo que está en el estado
+    // de "ya entregado". Un expediente retenido en Calidad no está en ese
+    // estado, así que repetirlo no lo publica. Por eso no hace falta una tabla
+    // marcadora, cuya creación podría fallar y dejar sin marcar todo lo emitido
+    // antes de este cambio.
     $tablas = [
         ['equipos',              "estado  = 'ENVIADO'"],
         ['accesorios_sesiones',  "estatus = 'EMITIDO'"],
@@ -235,28 +240,13 @@ function ensurePublicado(PDO $pdo): void {
         ['participantes_cursos', "estatus = 'EMITIDO'"],
         ['pnd_inspecciones',     "estado  = 'APROBADO'"],
     ];
-    foreach ($tablas as [$t, $_]) {
+    foreach ($tablas as [$t, $cond]) {
+        // Cada sentencia va aislada: que una tabla falte no puede impedir que
+        // las demás queden marcadas.
         try { $pdo->exec("ALTER TABLE `$t` ADD COLUMN IF NOT EXISTS publicado TINYINT NOT NULL DEFAULT 0"); }
-        catch (\Throwable $e) { /* ya existe o la tabla aún no se usa */ }
-    }
-
-    // El relleno inicial corre una sola vez: después, marcar de nuevo por estado
-    // volvería a publicar lo que Calidad tenga retenido a propósito.
-    try {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS avba_migraciones (
-                      clave    VARCHAR(60) NOT NULL PRIMARY KEY,
-                      aplicada TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        $st = $pdo->prepare("SELECT clave FROM avba_migraciones WHERE clave = ?");
-        $st->execute(['publicado_portal_v1']);
-        if ($st->fetch()) return;
-
-        foreach ($tablas as [$t, $cond]) {
-            try { $pdo->exec("UPDATE `$t` SET publicado = 1 WHERE $cond"); } catch (\Throwable $e) {}
-        }
-        $pdo->prepare("INSERT INTO avba_migraciones (clave) VALUES (?)")->execute(['publicado_portal_v1']);
-    } catch (\Throwable $e) {
-        error_log('[ensurePublicado] ' . $e->getMessage());
+        catch (\Throwable $e) { /* la columna ya existe */ }
+        try { $pdo->exec("UPDATE `$t` SET publicado = 1 WHERE $cond AND publicado = 0"); }
+        catch (\Throwable $e) { error_log("[ensurePublicado] $t: " . $e->getMessage()); }
     }
 }
 
