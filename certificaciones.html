@@ -1715,7 +1715,7 @@ function renderAcciones(d) {
       fn: "confirmarAccion('PUBLICAR')"
     },
     {
-      label: "Rechazar a calidad",
+      label: "Retornar a calidad",
       clase: "btn-accion btn-rechazar",
       icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8h12M8 2l-6 6 6 6"/></svg>`,
       fn: "confirmarAccion('RECHAZAR')"
@@ -2051,9 +2051,9 @@ function confirmarAccion(accion) {
     RECHAZAR: {
       color: "#A32D2D", bg: "#FCEBEB",
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#A32D2D" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>`,
-      titulo: "Rechazar a calidad",
-      sub: `El registro volverá a estado <strong>PENDIENTE</strong> para que calidad lo revise nuevamente.`,
-      btnColor: "#A32D2D", btnLabel: "Confirmar rechazo"
+      titulo: "Retornar a calidad",
+      sub: `El registro volverá a <strong>calidad</strong> para corregirse. El cliente <strong>conserva en su portal</strong> el certificado y el dictamen que ya recibió; se sustituirán cuando vuelvas a emitir.`,
+      btnColor: "#A32D2D", btnLabel: "Confirmar retorno"
     },
     PUBLICAR: {
       color: "#0C447C", bg: "#E6F1FB",
@@ -2090,7 +2090,7 @@ async function ejecutarAccion(accion) {
     ENVIAR_DICT: { action: "GENERAR_DICT_ENVIAR",  msg: "Generando y enviando dictamen..." },
     ENVIAR_TODO: { action: "GENERAR_TODO_ENVIAR",   msg: "Generando y enviando certificado + dictamen..." },
     PUBLICAR:    { action: "PUBLICAR_PORTAL_CLIENTE", msg: "Habilitando documentos en el portal del cliente...", extra: { tipo: "todo" } },
-    RECHAZAR:    { action: "RECHAZAR_CERTIFICACION", msg: "Rechazando registro..." }
+    RECHAZAR:    { action: "RECHAZAR_CERTIFICACION", msg: "Retornando el registro a calidad..." }
   };
 
   const cfg = mapaAcciones[accion];
@@ -2109,7 +2109,7 @@ async function ejecutarAccion(accion) {
 
     if (data.status === "success") {
       mostrarToast(
-        accion === "RECHAZAR" ? "Registro enviado a calidad"
+        accion === "RECHAZAR" ? "Registro retornado a calidad. El cliente conserva sus documentos."
         : accion === "PUBLICAR" ? (data.message || "Documentos habilitados en el portal del cliente")
         : "Enviado correctamente",
         "ok"
@@ -2273,7 +2273,9 @@ async function emitirArnCert(id, enviar) {
 async function retornarArnCert(id) {
   const motivo = prompt('Motivo del retorno a Calidad:');
   if (motivo === null) return;
-  if (!confirm('Se retirarán del portal del cliente el dictamen y los certificados de esta inspección. ¿Continuar?')) return;
+  if (!confirm('La inspección volverá a Calidad para corregirse.\n\n' +
+               'El cliente conserva en su portal el dictamen y los certificados que ya recibió; ' +
+               'se sustituirán cuando vuelvas a emitir.\n\n¿Continuar?')) return;
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   try {
     const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json','X-Token':s.token||''},
