@@ -1917,6 +1917,11 @@ if ($method === 'POST') {
             // Sólo Calidad y administración pueden sumar piezas a una sesión ya cerrada.
             respuesta($arneses->guardarItem($_POST, $_FILES, in_array($usr['rol'], ['ADMIN','CALIDAD'])));
 
+        case 'ELIMINAR_ITEM_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->eliminarItem($payload, true));
+
         case 'DUPLICAR_ITEM_ARNES':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

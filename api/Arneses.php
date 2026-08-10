@@ -569,6 +569,61 @@ class Arneses {
     }
 
     /**
+     * Elimina una pieza de la inspección: su lista de verificación, sus fotos y
+     * el certificado que tuviera. El QR vuelve al banco para poder reasignarlo.
+     *
+     * A diferencia de retornar el expediente, esto SÍ le quita la pieza al
+     * cliente: se borra porque no debía estar, no porque haya que corregirla.
+     * La interfaz avisa de ello cuando la inspección ya está emitida.
+     */
+    public function eliminarItem(array $p, bool $permitirCerrada = false): array {
+        $itemId = (int)($p['item_id'] ?? $p['id'] ?? 0);
+        if (!$itemId) return ['status' => 'error', 'message' => 'Pieza no indicada.'];
+
+        $s = $this->pdo->prepare(
+            "SELECT i.id, i.sesion_id, i.serie, i.qr_codigo, se.estatus
+             FROM arneses_items i JOIN arneses_sesiones se ON se.id = i.sesion_id
+             WHERE i.id = ?"
+        );
+        $s->execute([$itemId]);
+        $it = $s->fetch(PDO::FETCH_ASSOC);
+        if (!$it) return ['status' => 'error', 'message' => 'Pieza no encontrada.'];
+
+        $abierta = in_array($it['estatus'], ['PENDIENTE', 'DEVUELTO', 'RETORNADO'], true);
+        if (!$abierta && !$permitirCerrada) {
+            return ['status' => 'error', 'message' => 'La inspección ya fue aprobada; no admite cambios.'];
+        }
+
+        // Una inspección sin piezas no puede dictaminarse: mejor eliminarla
+        // entera que dejarla vacía y con folio asignado.
+        $quedan = (int)$this->pdo->query(
+            "SELECT COUNT(*) FROM arneses_items WHERE sesion_id = " . (int)$it['sesion_id']
+        )->fetchColumn();
+        if ($quedan <= 1) {
+            return ['status' => 'error', 'message' =>
+                'Es la única pieza de la inspección. Si no debe existir, elimina la inspección completa.'];
+        }
+
+        // El QR vuelve al banco: si no, se perdería al borrar la pieza.
+        if (!empty($it['qr_codigo'])) {
+            try {
+                $this->pdo->prepare("UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?")
+                    ->execute([$it['qr_codigo']]);
+            } catch (\Throwable $e) { error_log('[Arneses] liberar QR: ' . $e->getMessage()); }
+        }
+
+        $this->pdo->prepare("DELETE FROM arneses_item_checklist WHERE item_id = ?")->execute([$itemId]);
+        $this->pdo->prepare("DELETE FROM arneses_fotos WHERE item_id = ?")->execute([$itemId]);
+        $this->pdo->prepare("DELETE FROM arneses_items WHERE id = ?")->execute([$itemId]);
+
+        return [
+            'status'   => 'success',
+            'reemitir' => !$abierta,
+            'message'  => 'Pieza eliminada' . ($it['serie'] ? ' (' . $it['serie'] . ')' : '') . '.',
+        ];
+    }
+
+    /**
      * Duplica una pieza con todo y su lista de verificación. Pensado para lotes
      * de equipo idéntico, donde lo único que cambia es el número de serie: se
      * capturan una vez los datos y después sólo se ajusta lo distinto.

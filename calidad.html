@@ -6624,6 +6624,8 @@ function renderArnDet(d) {
           <button onclick="guardarQrArn(${i.id})" style="padding:5px 12px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Guardar</button>
           <button onclick="duplicarItemArn(${i.id})" title="Crear copias de esta pieza"
                   style="padding:5px 12px;background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">⧉ Duplicar</button>
+          <button onclick="eliminarItemArn(${i.id})" title="Eliminar esta pieza de la inspección"
+                  style="padding:5px 12px;background:var(--rojo-light);border:none;color:var(--rojo);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">🗑 Eliminar</button>
           ${i.fotos && i.fotos.length ? `<span style="font-size:11px;color:var(--texto-hint)">📷 ${i.fotos.length}</span>` : ''}
         </div>
         <div style="display:flex;gap:8px;align-items:center;margin-top:6px;flex-wrap:wrap">
@@ -6916,6 +6918,34 @@ async function guardarArnNuevo() {
     cargarSesionesArn();
   } catch(_) { mostrarToast('Error de conexión.', 'err'); }
   finally { btn.disabled = false; btn.textContent = 'Guardar equipo'; }
+}
+
+/* Quitar una pieza de la inspección. A diferencia de retornar el expediente,
+   esto sí se la quita al cliente: se borra porque no debía estar. */
+async function eliminarItemArn(itemId) {
+  const ses  = _arnDetActual?.sesion || {};
+  const item = (_arnDetActual?.items || []).find(x => +x.id === +itemId) || {};
+  const quien = [item.tipo_nombre, item.serie].filter(Boolean).join(' · ') || 'esta pieza';
+  const emitida = ses.estatus === 'EMITIDO';
+
+  let aviso = `¿Eliminar ${quien} de la inspección?\n\nSe borran sus puntos de inspección y sus fotos, y su código QR vuelve a quedar disponible.`;
+  if (emitida) aviso += '\n\nLa inspección ya está emitida: la pieza y su certificado dejarán de aparecer en el portal del cliente.';
+  aviso += '\n\nNo se puede deshacer.';
+  if (!confirm(aviso)) return;
+
+  try {
+    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ action:'ELIMINAR_ITEM_ARNES', payload:{ item_id:itemId } }) });
+    const d = await r.json();
+    if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo eliminar.', 'err'); return; }
+    mostrarToast(d.message, 'ok');
+    if (d.reemitir) {
+      alert('La pieza se quitó de una inspección ya emitida.\n\n' +
+            'Pide a Certificaciones que vuelva a emitir para que el dictamen deje de incluirla.');
+    }
+    abrirArnDet(ses.id);
+    cargarSesionesArn();
+  } catch(_) { mostrarToast('Error de red.', 'err'); }
 }
 
 /* Equipo idéntico en lote: se copia la pieza con toda su lista de verificación
