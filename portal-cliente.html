@@ -2703,7 +2703,11 @@ function renderDetInfo(eq) {
       ${specs.map(([k,v]) => `<div><div class="eq-ds-l">${k}</div><div class="eq-ds-v">${escQ(v)}</div></div>`).join('')}
     </div>
     ${eq.notas ? `<div style="margin:0 0 12px;padding:10px 14px;background:var(--gris-bg);border-radius:10px;font-size:12px;color:var(--texto-sub);font-style:italic">${escQ(eq.notas)}</div>` : ''}
-    <button class="btn-sec" style="margin-bottom:14px" onclick="abrirImprimir('equipo', ${eq.id}, '${escQ(eq.nombre).replace(/'/g,"")}')">🖨 Imprimir expediente</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn-sec" onclick="abrirImprimir('equipo', ${eq.id}, '${escQ(eq.nombre).replace(/'/g,"")}')">🖨 Imprimir expediente</button>
+      <button class="btn-sec" style="background:#eef7ee;border-color:#1b7a3d;color:#1b7a3d"
+              onclick="abrirEnvio([{tipo:'expediente_equipo',id:${eq.id}}],'Enviar expediente completo','${escQ(eq.nombre).replace(/'/g,"")} — documentos, certificaciones y lo emitido por AVBA')">✉ Enviar expediente</button>
+    </div>
   `;
 }
 
@@ -3567,7 +3571,11 @@ function renderDetInfoPer(per) {
       ${specs.map(([k,v]) => `<div><div class="eq-ds-l">${k}</div><div class="eq-ds-v">${escQ(v)}</div></div>`).join('')}
     </div>
     ${per.notas ? `<div style="margin:0 0 12px;padding:10px 14px;background:var(--gris-bg);border-radius:10px;font-size:12px;color:var(--texto-sub);font-style:italic">${escQ(per.notas)}</div>` : ''}
-    <button class="btn-sec" style="margin-bottom:14px" onclick="abrirImprimir('personal', ${per.id}, '${escQ(per.nombre).replace(/'/g,"")}')">🖨 Imprimir expediente</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="btn-sec" onclick="abrirImprimir('personal', ${per.id}, '${escQ(per.nombre).replace(/'/g,"")}')">🖨 Imprimir expediente</button>
+      <button class="btn-sec" style="background:#eef7ee;border-color:#1b7a3d;color:#1b7a3d"
+              onclick="abrirEnvio([{tipo:'expediente_personal',id:${per.id}}],'Enviar expediente completo','${escQ(per.nombre).replace(/'/g,"")} — documentos y certificaciones')">✉ Enviar expediente</button>
+    </div>
   `;
 }
 

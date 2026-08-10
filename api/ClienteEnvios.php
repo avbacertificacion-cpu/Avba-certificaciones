@@ -212,12 +212,80 @@ class ClienteEnvios {
                 case 'cert_personal':
                     $out = $this->docPropio('cliente_personal_cert', 'personal_id', 'cliente_personal', $id, $idCliente, 'tipo_cert');
                     break;
+
+                // ── Expediente completo de un equipo o una persona ──
+                case 'expediente_equipo':
+                    $out = $this->expediente('equipo', $id, $idCliente, $like);
+                    break;
+                case 'expediente_personal':
+                    $out = $this->expediente('personal', $id, $idCliente, $like);
+                    break;
             }
         } catch (\PDOException $e) {
             error_log('[ClienteEnvios] resolver ' . $tipo . ': ' . $e->getMessage());
         }
 
         return $out;
+    }
+
+    /**
+     * Expediente completo: todo lo que el cliente tiene cargado de ese equipo o
+     * persona —documentos y certificaciones— y, si el equipo está vinculado a
+     * uno certificado por AVBA, también su certificado y dictamen. Es el mismo
+     * conjunto que arma "Imprimir expediente", pero para enviarlo.
+     */
+    private function expediente(string $tipo, int $id, string $idCliente, string $like): array {
+        $tabla = $tipo === 'personal' ? 'cliente_personal' : 'cliente_equipos';
+
+        // Pertenencia primero: sin esto se podrían pedir expedientes ajenos.
+        $chk = $this->pdo->prepare("SELECT * FROM `$tabla` WHERE id = ? AND id_cliente = ?");
+        $chk->execute([$id, $idCliente]);
+        $dueno = $chk->fetch(PDO::FETCH_ASSOC);
+        if (!$dueno) return [];
+
+        $tDocs = $tipo === 'personal' ? 'cliente_personal_docs' : 'cliente_equipos_docs';
+        $tCert = $tipo === 'personal' ? 'cliente_personal_cert' : 'cliente_equipos_cert';
+        $fk    = $tipo === 'personal' ? 'personal_id' : 'equipo_id';
+
+        $out = [];
+
+        $d = $this->pdo->prepare(
+            "SELECT nombre, archivo_url FROM `$tDocs`
+             WHERE `$fk` = ? AND archivo_url IS NOT NULL AND archivo_url <> ''
+             ORDER BY tipo_doc, nombre"
+        );
+        $d->execute([$id]);
+        foreach ($d->fetchAll(PDO::FETCH_ASSOC) as $n => $r) {
+            $out[$this->unico($out, (string)($r['nombre'] ?: 'Documento ' . ($n + 1)))] = $r['archivo_url'];
+        }
+
+        $c = $this->pdo->prepare(
+            "SELECT tipo_cert, folio, archivo_url FROM `$tCert`
+             WHERE `$fk` = ? AND archivo_url IS NOT NULL AND archivo_url <> ''
+             ORDER BY fecha_vigencia DESC"
+        );
+        $c->execute([$id]);
+        foreach ($c->fetchAll(PDO::FETCH_ASSOC) as $n => $r) {
+            $nombre = trim(($r['tipo_cert'] ?: 'Certificación') . ($r['folio'] ? ' ' . $r['folio'] : ''));
+            $out[$this->unico($out, $nombre)] = $r['archivo_url'];
+        }
+
+        // Lo emitido por AVBA para ese equipo, si está vinculado
+        if ($tipo === 'equipo' && !empty($dueno['avba_equipo_id'])) {
+            foreach ($this->resolver('equipo', (int)$dueno['avba_equipo_id'], $idCliente) as $k => $v) {
+                $out[$this->unico($out, $k)] = $v;
+            }
+        }
+
+        return $out;
+    }
+
+    /** Evita que dos documentos con el mismo nombre se pisen en el correo. */
+    private function unico(array $out, string $nombre): string {
+        if (!isset($out[$nombre])) return $nombre;
+        $i = 2;
+        while (isset($out[$nombre . ' (' . $i . ')'])) $i++;
+        return $nombre . ' (' . $i . ')';
     }
 
     /**
