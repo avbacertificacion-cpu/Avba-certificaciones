@@ -38,7 +38,7 @@ class Arneses {
      * los archivos de origen no cambian y la caché seguiría entregando las
      * viejas.
      */
-    private const FIRMA_VERSION = 6;
+    private const FIRMA_VERSION = 7;
 
     /** Umbrales de luminancia al limpiar y realzar una firma escaneada. */
     private const LUM_PAPEL = 248;   // de aquí en adelante es hoja
@@ -1173,6 +1173,15 @@ class Arneses {
             $src = @imagecreatefromstring((string)file_get_contents($fAbs));
             if (!$src) return $firmaRel;
 
+            // Lo PRIMERO es resolver la transparencia contra blanco.
+            //
+            // Las firmas llegan de dos maneras: escaneadas sobre papel (JPG, sin
+            // transparencia) o recortadas con fondo transparente (PNG). En las
+            // segundas, imagecolorat devuelve negro en el fondo —el color que hay
+            // debajo del alfa—, así que leyendo sólo el RGB el fondo se tomaba por
+            // trazo y la firma salía como un recuadro negro.
+            $src = $this->sobreBlanco($src);
+
             // El realce recorre la imagen píxel por píxel: una firma de varios
             // megapíxeles tardaría segundos sin aportar nada, porque en el
             // documento se imprime a unos 58 px de alto.
@@ -1298,6 +1307,35 @@ class Arneses {
             error_log('[Arneses] aplanarSobreBlanco: ' . $e->getMessage());
             return $rel;
         }
+    }
+
+    /**
+     * Devuelve la imagen compuesta sobre blanco, resolviendo su transparencia.
+     * Un píxel medio transparente se mezcla con el blanco en la proporción que
+     * le corresponde, para que el borde del trazo no quede duro.
+     */
+    private function sobreBlanco(\GdImage $img): \GdImage {
+        $w = imagesx($img); $h = imagesy($img);
+        $out = imagecreatetruecolor($w, $h);
+        imagealphablending($out, false);
+        imagesavealpha($out, false);
+        imagefilledrectangle($out, 0, 0, $w, $h, imagecolorallocate($out, 255, 255, 255));
+
+        for ($y = 0; $y < $h; $y++) {
+            for ($x = 0; $x < $w; $x++) {
+                $c = imagecolorat($img, $x, $y);
+                $a = ($c >> 24) & 0x7F;               // 0 opaco … 127 transparente
+                if ($a >= 127) continue;              // del todo transparente: queda blanco
+
+                $op = (127 - $a) / 127;               // opacidad real del píxel
+                $r  = (int)round((($c >> 16) & 0xFF) * $op + 255 * (1 - $op));
+                $g  = (int)round((($c >> 8)  & 0xFF) * $op + 255 * (1 - $op));
+                $b  = (int)round(( $c        & 0xFF) * $op + 255 * (1 - $op));
+                imagesetpixel($out, $x, $y, imagecolorallocate($out, $r, $g, $b));
+            }
+        }
+        imagedestroy($img);
+        return $out;
     }
 
     /** Reduce la imagen si excede el lado máximo, conservando la proporción. */
