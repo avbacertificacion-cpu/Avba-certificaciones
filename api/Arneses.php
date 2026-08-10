@@ -38,7 +38,7 @@ class Arneses {
      * los archivos de origen no cambian y la caché seguiría entregando las
      * viejas.
      */
-    private const FIRMA_VERSION = 5;
+    private const FIRMA_VERSION = 6;
 
     /** Umbrales de luminancia al limpiar y realzar una firma escaneada. */
     private const LUM_PAPEL = 248;   // de aquí en adelante es hoja
@@ -1158,9 +1158,14 @@ class Arneses {
         $fAbs = __DIR__ . '/../' . $firmaRel;
         if (!is_file($fAbs)) return $firmaRel;
 
+        // Se guarda en JPEG, no en PNG: mPDF analiza los PNG píxel por píxel con
+        // su propio lector, mientras que un JPEG lo incrusta tal cual. El PNG
+        // generado aquí salía correcto —RGB, 8 bits, sin alfa ni entrelazado— y
+        // aun así el visor lo mostraba en negro. JPEG no admite transparencia ni
+        // máscaras, así que ese fallo no puede repetirse.
         $huella = substr(md5(self::FIRMA_VERSION . '|' . filemtime($fAbs) . filesize($fAbs)), 0, 12);
         $dir    = UPLOAD_DIR . 'firmas_procesadas/';
-        $rel    = 'uploads/firmas_procesadas/firma_' . $huella . '.png';
+        $rel    = 'uploads/firmas_procesadas/firma_' . $huella . '.jpg';
         if (is_file(__DIR__ . '/../' . $rel)) return $rel;
         if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return $firmaRel;
 
@@ -1244,7 +1249,7 @@ class Arneses {
                 $out = $rec;
             }
 
-            $ok = imagepng($out, $dir . basename($rel), 8);
+            $ok = imagejpeg($out, $dir . basename($rel), 94);
             imagedestroy($out);
             return $ok ? $rel : $firmaRel;
         } catch (\Throwable $e) {
@@ -1268,7 +1273,7 @@ class Arneses {
 
         $huella  = substr(md5(self::FIRMA_VERSION . '|' . $rel . filemtime($abs) . filesize($abs)), 0, 12);
         $dir     = UPLOAD_DIR . 'firmas_procesadas/';
-        $destino = 'uploads/firmas_procesadas/plano_' . $huella . '.png';
+        $destino = 'uploads/firmas_procesadas/plano_' . $huella . '.jpg';
         if (is_file(__DIR__ . '/../' . $destino)) return $destino;
         if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return $rel;
 
@@ -1286,7 +1291,7 @@ class Arneses {
             imagealphablending($dst, true);
             imagecopy($dst, $src, 0, 0, 0, 0, $w, $h);
 
-            $ok = imagepng($dst, $dir . basename($destino), 8);
+            $ok = imagejpeg($dst, $dir . basename($destino), 94);
             imagedestroy($dst); imagedestroy($src);
             return $ok ? $destino : $rel;
         } catch (\Throwable $e) {

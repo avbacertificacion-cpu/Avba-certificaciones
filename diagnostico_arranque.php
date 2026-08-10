@@ -147,6 +147,46 @@ if ($pdo) {
     } catch (\Throwable $ex) { /* la tabla aún no existe */ }
 }
 
+// ── Firma del inspector, tal como la genera este servidor ──
+// El PDF se veía bien en desarrollo y negro aquí, así que hace falta ver el
+// archivo que produce ESTE servidor, no el de otra máquina.
+$firmaInfo = null;
+if ($pdo && class_exists('Arneses')) {
+    try {
+        $st = $pdo->query("SELECT usuario, nombre, firma_imagen FROM usuarios
+                           WHERE rol = 'INSPECTOR' AND firma_imagen IS NOT NULL AND firma_imagen <> ''
+                           ORDER BY nombre LIMIT 1");
+        $insp = $st->fetch();
+        if ($insp) {
+            $arn = new Arneses($pdo);
+            $r   = new ReflectionMethod('Arneses', 'firmaProcesada');
+            $r->setAccessible(true);
+            $t0  = microtime(true);
+            $gen = (string)$r->invoke($arn, ltrim((string)$insp['firma_imagen'], '/'));
+            $abs = __DIR__ . '/' . $gen;
+
+            $firmaInfo = [
+                'inspector' => $insp['nombre'], 'origen' => $insp['firma_imagen'],
+                'generada'  => $gen, 'existe' => is_file($abs),
+                'ms'        => round((microtime(true) - $t0) * 1000),
+            ];
+            if (is_file($abs)) {
+                $i = @getimagesize($abs);
+                $firmaInfo['tamano']  = filesize($abs);
+                $firmaInfo['medidas'] = $i ? ($i[0] . 'x' . $i[1]) : '?';
+                $firmaInfo['mime']    = $i ? image_type_to_mime_type($i[2]) : '?';
+                $firmaInfo['url']     = $gen . '?v=' . filemtime($abs);
+                $firmaInfo['gd']      = function_exists('gd_info') ? (gd_info()['GD Version'] ?? '?') : 'sin GD';
+            }
+        } else {
+            $firmaInfo = ['nota' => 'Ningún inspector tiene firma cargada.'];
+        }
+    } catch (\Throwable $ex) {
+        $firmaInfo = ['nota' => get_class($ex) . ': ' . $ex->getMessage()
+            . ' en ' . basename($ex->getFile()) . ':' . $ex->getLine()];
+    }
+}
+
 // ── Bitácora de errores de PHP ────────────────────────────
 // Aquí queda escrito el error real que el manejador global esconde.
 $bitacora = [];
@@ -228,6 +268,36 @@ $fallos = array_filter($resultados, fn($r) => !$r['ok']);
       (<?= (int)$liberado['filas'] ?> registro(s) de intentos borrados). Ya puede intentar entrar.
     <?php else: ?>
       No se pudo liberar <strong><?= $e($liberado['usuario']) ?></strong>: <?= $e($liberado['nota']) ?>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
+<?php if ($firmaInfo): ?>
+  <div class="caja">
+    <strong>Firma del inspector, procesada en este servidor</strong>
+    <?php if (isset($firmaInfo['nota'])): ?>
+      <div class="mono err" style="margin-top:6px"><?= $e($firmaInfo['nota']) ?></div>
+    <?php else: ?>
+      <div class="mono" style="margin-top:6px;font-size:12px">
+        inspector: <?= $e($firmaInfo['inspector']) ?><br>
+        origen: <?= $e($firmaInfo['origen']) ?><br>
+        generada: <?= $e($firmaInfo['generada']) ?>
+        <?= $firmaInfo['existe'] ? '<span class="ok">(existe)</span>' : '<span class="err">(NO se generó)</span>' ?><br>
+        <?php if ($firmaInfo['existe']): ?>
+          <?= $e($firmaInfo['medidas']) ?> · <?= $e($firmaInfo['mime']) ?> ·
+          <?= number_format($firmaInfo['tamano'] / 1024, 1) ?> KB ·
+          <?= (int)$firmaInfo['ms'] ?> ms · GD <?= $e($firmaInfo['gd']) ?>
+        <?php endif; ?>
+      </div>
+      <?php if ($firmaInfo['existe']): ?>
+        <div style="margin-top:10px;background:#eef2f7;padding:10px;border-radius:6px;display:inline-block">
+          <img src="<?= $e($firmaInfo['url']) ?>" style="max-height:120px;display:block">
+        </div>
+        <div style="font-size:12px;color:#5a6072;margin-top:6px">
+          Así se ve el archivo que el servidor entrega al documento. Si aquí se ve
+          bien y en el PDF sale negra, el problema está al incrustarla, no al generarla.
+        </div>
+      <?php endif; ?>
     <?php endif; ?>
   </div>
 <?php endif; ?>
