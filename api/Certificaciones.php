@@ -267,6 +267,7 @@ class Certificaciones {
 
     // ── Generar y enviar certificado ───────────────────────
     public function generarCertEnviar(array $payload, string $usuario): array {
+        ensurePublicado($this->pdo);
         $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
         if (!$id) return ['status' => 'error', 'message' => 'ID de equipo requerido.'];
 
@@ -291,7 +292,7 @@ class Certificaciones {
             $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'certificado', [$rutaCert => $nombreCert], $credenciales);
 
             $this->pdo->prepare(
-                "UPDATE equipos SET certificado_url = ?, estado = 'ENVIADO', fecha_enviado = NOW() WHERE id = ?"
+                "UPDATE equipos SET certificado_url = ?, estado = 'ENVIADO', publicado = 1, fecha_enviado = NOW() WHERE id = ?"
             )->execute([$urlCert, $id]);
 
             $this->registrarEnvio($datos, $nombreCert, $usuario);
@@ -305,6 +306,7 @@ class Certificaciones {
 
     // ── Generar y enviar certificado + dictamen ────────────
     public function generarTodoEnviar(array $payload, string $usuario): array {
+        ensurePublicado($this->pdo);
         $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
         if (!$id) return ['status' => 'error', 'message' => 'ID de equipo requerido.'];
 
@@ -337,7 +339,7 @@ class Certificaciones {
 
             $this->pdo->prepare(
                 "UPDATE equipos
-                 SET certificado_url = ?, dictamen_url = ?, estado = 'ENVIADO', fecha_enviado = NOW()
+                 SET certificado_url = ?, dictamen_url = ?, estado = 'ENVIADO', publicado = 1, fecha_enviado = NOW()
                  WHERE id = ?"
             )->execute([$urlCert, $urlDict, $id]);
 
@@ -352,6 +354,7 @@ class Certificaciones {
 
     // ── Generar y enviar solo el dictamen ─────────────────
     public function generarDictEnviar(array $payload, string $usuario): array {
+        ensurePublicado($this->pdo);
         $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
         if (!$id) return ['status' => 'error', 'message' => 'ID de equipo requerido.'];
 
@@ -376,7 +379,7 @@ class Certificaciones {
             $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'dictamen', [$rutaDict => $nombreDict], $credenciales);
 
             $this->pdo->prepare(
-                "UPDATE equipos SET dictamen_url = ?, estado = 'ENVIADO', fecha_enviado = NOW() WHERE id = ?"
+                "UPDATE equipos SET dictamen_url = ?, estado = 'ENVIADO', publicado = 1, fecha_enviado = NOW() WHERE id = ?"
             )->execute([$urlDict, $id]);
 
             $this->registrarEnvio($datos, $nombreDict, $usuario);
@@ -396,6 +399,7 @@ class Certificaciones {
      * $tipo: 'cert' | 'dict' | 'todo' (por defecto 'todo').
      */
     public function publicarPortalCliente(array $payload, string $usuario): array {
+        ensurePublicado($this->pdo);
         $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
         if (!$id) return ['status' => 'error', 'message' => 'ID de equipo requerido.'];
 
@@ -434,6 +438,7 @@ class Certificaciones {
         if (!$sets) return ['status' => 'error', 'message' => 'No se pudo generar ningún documento para publicar.'];
 
         $sets[] = "estado = 'ENVIADO'";
+        $sets[] = "publicado = 1";
         $sets[] = 'fecha_enviado = NOW()';
         $params[] = $id;
         $this->pdo->prepare("UPDATE equipos SET " . implode(', ', $sets) . " WHERE id = ?")->execute($params);
@@ -457,12 +462,11 @@ class Certificaciones {
         // volver a Calidad y presionar "Aprobar registro", ese mismo QR aparece
         // precargado, con opción de mantenerlo o cambiarlo. El QR sigue
         // reservado para este equipo (qr_codigos.usado = 1, equipo_id = id).
+        // Los documentos NO se borran ni se despublica el registro: el cliente
+        // conserva en su portal lo que ya recibió mientras Calidad corrige. Se
+        // sustituirán solos cuando Certificaciones vuelva a emitir.
         $this->pdo->prepare(
-            "UPDATE equipos
-             SET estado = 'RETORNADO', certificado_url = NULL, dictamen_url = NULL,
-                 cert_manual_url = NULL, dict_manual_url = NULL,
-                 fecha_enviado = NULL
-             WHERE id = ?"
+            "UPDATE equipos SET estado = 'RETORNADO' WHERE id = ?"
         )->execute([$id]);
 
         registrarHistorial($this->pdo, $usuario, $id, 'estado', $datos['estado'], 'RETORNADO');

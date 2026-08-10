@@ -405,6 +405,7 @@ class Personal {
 
     // ── Aprobar participante → APROBADO_CALIDAD ────────────
     public function aprobarParticipante(int $id, string $usuario, string $qr = ''): array {
+        ensurePublicado($this->pdo);
         $this->ensureEstatusColumn();
         // Garantizar columna qr_codigo
         try {
@@ -555,7 +556,7 @@ class Personal {
         // Marcar todos como EMITIDO
         $ids = array_map(fn($p) => (int)$p['id'], $participantes);
         $ph  = implode(',', array_fill(0, count($ids), '?'));
-        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO' WHERE id IN ({$ph})")
+        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO', publicado = 1 WHERE id IN ({$ph})")
                   ->execute($ids);
 
         // Guardar correo en la empresa del catálogo
@@ -832,7 +833,7 @@ class Personal {
         if ($resultado['status'] !== 'success') return $resultado;
 
         // Marcar como emitido
-        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO' WHERE id = ?")
+        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO', publicado = 1 WHERE id = ?")
             ->execute([$id]);
 
         // Normalise destination list
@@ -900,7 +901,7 @@ class Personal {
             return ['status' => 'error', 'message' => 'No se pudo generar ningún documento para enviar.'];
 
         // Marcar como emitido
-        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO' WHERE id = ?")->execute([$id]);
+        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO', publicado = 1 WHERE id = ?")->execute([$id]);
 
         // Credenciales opcionales (una sola vez, al primer destinatario)
         $credenciales = [];

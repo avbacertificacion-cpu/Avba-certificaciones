@@ -960,14 +960,12 @@ class Arneses {
         $anterior = $s->fetchColumn();
         if ($anterior === false) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
 
+        // Los documentos NO se borran ni se despublica el expediente: el cliente
+        // conserva en su portal lo que ya recibió mientras Calidad corrige, y se
+        // sustituirán solos cuando Certificaciones vuelva a emitir.
         $this->pdo->prepare(
-            "UPDATE arneses_sesiones
-             SET estatus='RETORNADO', dictamen_url=NULL, dictamen_manual_url=NULL,
-                 fecha_enviado=NULL, motivo=?
-             WHERE id=?"
+            "UPDATE arneses_sesiones SET estatus='RETORNADO', motivo=? WHERE id=?"
         )->execute([$motivo ?: null, $id]);
-        $this->pdo->prepare("UPDATE arneses_items SET cert_url=NULL, cert_manual_url=NULL WHERE sesion_id=?")
-            ->execute([$id]);
 
         $this->historial($usuario, $id, (string)$anterior, 'RETORNADO');
         return ['status' => 'success', 'message' => 'Expediente retornado a Calidad.'];
@@ -1964,7 +1962,8 @@ class Arneses {
             }
         }
 
-        $this->pdo->prepare("UPDATE arneses_sesiones SET estatus='EMITIDO' WHERE id=?")->execute([$sesionId]);
+        ensurePublicado($this->pdo);
+        $this->pdo->prepare("UPDATE arneses_sesiones SET estatus='EMITIDO', publicado=1 WHERE id=?")->execute([$sesionId]);
         $this->historial($usuario, $sesionId, $ses['estatus'] ?? null, 'EMITIDO');
 
         $mensaje = "Dictamen emitido y $ok certificado(s) generado(s). Ya están disponibles en el portal del cliente.";

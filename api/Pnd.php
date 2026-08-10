@@ -289,11 +289,12 @@ class Pnd {
 
     // ── Aprobar inspección ─────────────────────────────────
     public function aprobar(array $payload, string $usuario): array {
+        ensurePublicado($this->pdo);
         $id = (int)($payload['id'] ?? $payload['fila'] ?? 0);
         if (!$id) return ['status' => 'error', 'message' => 'ID de inspección requerido.'];
 
         $this->pdo->prepare(
-            "UPDATE pnd_inspecciones SET estado = 'APROBADO', motivo = NULL WHERE id = ?"
+            "UPDATE pnd_inspecciones SET estado = 'APROBADO', publicado = 1, motivo = NULL WHERE id = ?"
         )->execute([$id]);
 
         return ['status' => 'success', 'message' => 'Inspección PND aprobada correctamente.'];

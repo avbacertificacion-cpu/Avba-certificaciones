@@ -423,10 +423,11 @@ class Accesorios {
 
     // ── Emitir informe → genera PDF + EMITIDO ─────────
     public function emitirInforme(int $sesionId, string $usuario): array {
+        ensurePublicado($this->pdo);
         $resultado = $this->generarInforme($sesionId, $usuario);
         if ($resultado['status'] !== 'success') return $resultado;
 
-        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'EMITIDO' WHERE id = ?")
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1 WHERE id = ?")
             ->execute([$sesionId]);
 
         $resultado['message'] = 'Informe emitido correctamente.';
@@ -895,7 +896,7 @@ class Accesorios {
     public function emitirCertAcc(int $sesionId, string $usuario): array {
         $resultado = $this->generarCertAcc($sesionId, $usuario);
         if ($resultado['status'] !== 'success') return $resultado;
-        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'EMITIDO' WHERE id = ?")
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1 WHERE id = ?")
             ->execute([$sesionId]);
         $resultado['message'] = 'Certificado emitido correctamente.';
         // Save URL so portal can show the link
@@ -934,7 +935,7 @@ class Accesorios {
             // Marcar como EMITIDO y guardar URL para el portal del cliente
             $certUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
             $this->pdo->prepare(
-                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', cert_url = ? WHERE id = ?"
+                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1, cert_url = ? WHERE id = ?"
             )->execute([$certUrl, $sesionId]);
 
             return ['status' => 'success', 'message' => "Certificado enviado a {$correo}."];
@@ -1004,7 +1005,7 @@ class Accesorios {
             // Marcar como EMITIDO y guardar URL para el portal del cliente
             $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
             $this->pdo->prepare(
-                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', informe_url = ? WHERE id = ?"
+                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1, informe_url = ? WHERE id = ?"
             )->execute([$informeUrl, $sesionId]);
 
             return ['status' => 'success', 'message' => "Informe enviado a {$correo}."];
@@ -1043,7 +1044,7 @@ class Accesorios {
             // Marcar como EMITIDO y guardar URL del informe CUMPLE (columna separada)
             $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
             $this->pdo->prepare(
-                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', informe_cumple_url = ? WHERE id = ?"
+                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1, informe_cumple_url = ? WHERE id = ?"
             )->execute([$informeUrl, $sesionId]);
 
             return ['status' => 'success', 'message' => "Informe enviado a {$correo}."];
@@ -1098,7 +1099,7 @@ class Accesorios {
             $certUrl    = rtrim(SITE_URL, '/') . '/' . ltrim($resCert['url'],    '/');
             $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resInforme['url'], '/');
             $this->pdo->prepare(
-                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', cert_url = ?, informe_url = ? WHERE id = ?"
+                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1, cert_url = ?, informe_url = ? WHERE id = ?"
             )->execute([$certUrl, $informeUrl, $sesionId]);
 
             if ($tieneCumple) {

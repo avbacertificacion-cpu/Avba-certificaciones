@@ -640,6 +640,7 @@ class Auth {
             $idCliente = str_pad($idCliente, 5, '0', STR_PAD_LEFT);
         }
 
+        ensurePublicado($this->pdo);
         $like = $idCliente . '-%';
 
         // ── Equipos ──────────────────────────────────────
@@ -648,7 +649,7 @@ class Auth {
                     DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
                     control, estado, qr_codigo, certificado_url, dictamen_url
              FROM equipos
-             WHERE control LIKE ? AND estado = 'ENVIADO'
+             WHERE control LIKE ? AND (publicado = 1 OR estado = 'ENVIADO')
              ORDER BY fecha_inspeccion DESC"
         );
         $stmt->execute([$like]);
@@ -698,7 +699,7 @@ class Auth {
                         SUM(a.estado!='CUMPLE') AS no_cumple
                  FROM accesorios_sesiones s
                  LEFT JOIN accesorios_izaje a ON a.sesion_id = s.id
-                 WHERE s.control LIKE ? AND s.estatus = 'EMITIDO'
+                 WHERE s.control LIKE ? AND (s.publicado = 1 OR s.estatus = 'EMITIDO')
                  GROUP BY s.id, s.qr_codigo, s.cert_url, s.informe_url, s.informe_cumple_url
                  ORDER BY s.fecha DESC"
             );
@@ -733,7 +734,7 @@ class Auth {
                         SUM(i.resultado = 'NO APTO')      AS no_aptos
                  FROM arneses_sesiones s
                  LEFT JOIN arneses_items i ON i.sesion_id = s.id
-                 WHERE s.control LIKE ? AND s.estatus = 'EMITIDO'
+                 WHERE s.control LIKE ? AND (s.publicado = 1 OR s.estatus = 'EMITIDO')
                  GROUP BY s.id, s.cliente, s.control, s.qr_codigo, s.dictamen_url, s.fecha
                  ORDER BY s.fecha DESC"
             );
@@ -793,7 +794,7 @@ class Auth {
                  FROM participantes_cursos p
                  LEFT JOIN cursos c ON c.id = p.curso_id
                  LEFT JOIN participantes_documentos pd ON pd.participante_id = p.id
-                 WHERE p.control LIKE ? AND p.estatus = 'EMITIDO'
+                 WHERE p.control LIKE ? AND (p.publicado = 1 OR p.estatus = 'EMITIDO')
                  GROUP BY p.id, p.nombre_completo, p.control, p.empresa_nombre,
                           p.qr_codigo, p.fecha_curso, c.nombre
                  ORDER BY p.fecha_curso DESC"
@@ -824,7 +825,7 @@ class Auth {
                         DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
                         componente, identificacion, resultado, reporte_url
                  FROM pnd_inspecciones
-                 WHERE control LIKE ? AND estado = 'APROBADO'
+                 WHERE control LIKE ? AND (publicado = 1 OR estado = 'APROBADO')
                  ORDER BY fecha_inspeccion DESC"
             );
             $stmt->execute([$like]);

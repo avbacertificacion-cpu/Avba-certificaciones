@@ -211,6 +211,56 @@ foreach ([
 }
 
 /**
+ * Marca "publicado en el portal del cliente".
+ *
+ * El portal mostraba los registros filtrando por su estado de flujo
+ * (ENVIADO / EMITIDO / APROBADO). Con eso, devolver un expediente a Calidad
+ * para corregirlo se lo quitaba al cliente de inmediato, junto con documentos
+ * que ya tenía y podía necesitar ese mismo día.
+ *
+ * La bandera separa las dos ideas: el ESTADO dice en qué punto del flujo va el
+ * expediente internamente; PUBLICADO dice si el cliente lo ve. Al retornar sólo
+ * cambia el estado; lo publicado se mantiene hasta que Certificaciones vuelve a
+ * emitir y sobrescribe los documentos.
+ */
+function ensurePublicado(PDO $pdo): void {
+    static $hecho = false;
+    if ($hecho) return;
+    $hecho = true;
+
+    $tablas = [
+        ['equipos',              "estado  = 'ENVIADO'"],
+        ['accesorios_sesiones',  "estatus = 'EMITIDO'"],
+        ['arneses_sesiones',     "estatus = 'EMITIDO'"],
+        ['participantes_cursos', "estatus = 'EMITIDO'"],
+        ['pnd_inspecciones',     "estado  = 'APROBADO'"],
+    ];
+    foreach ($tablas as [$t, $_]) {
+        try { $pdo->exec("ALTER TABLE `$t` ADD COLUMN IF NOT EXISTS publicado TINYINT NOT NULL DEFAULT 0"); }
+        catch (\Throwable $e) { /* ya existe o la tabla aún no se usa */ }
+    }
+
+    // El relleno inicial corre una sola vez: después, marcar de nuevo por estado
+    // volvería a publicar lo que Calidad tenga retenido a propósito.
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS avba_migraciones (
+                      clave    VARCHAR(60) NOT NULL PRIMARY KEY,
+                      aplicada TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $st = $pdo->prepare("SELECT clave FROM avba_migraciones WHERE clave = ?");
+        $st->execute(['publicado_portal_v1']);
+        if ($st->fetch()) return;
+
+        foreach ($tablas as [$t, $cond]) {
+            try { $pdo->exec("UPDATE `$t` SET publicado = 1 WHERE $cond"); } catch (\Throwable $e) {}
+        }
+        $pdo->prepare("INSERT INTO avba_migraciones (clave) VALUES (?)")->execute(['publicado_portal_v1']);
+    } catch (\Throwable $e) {
+        error_log('[ensurePublicado] ' . $e->getMessage());
+    }
+}
+
+/**
  * Series de códigos QR por tipo de registro: el primer dígito identifica a qué
  * corresponde la etiqueta. Los equipos (maquinaria, accesorios de izaje y
  * equipo contra caídas) usan la serie 4; el personal de cursos, la 7.
