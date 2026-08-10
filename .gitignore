@@ -7,6 +7,7 @@ vendor/
 # Uploads generados
 uploads/certificados/
 uploads/evidencias/
+uploads/ordenes/
 
 # Archivos de instalación
 install.php

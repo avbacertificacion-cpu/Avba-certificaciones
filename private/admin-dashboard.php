@@ -420,6 +420,11 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
                 <h3>Generar Etiquetas QR</h3>
                 <p>Imprimir etiquetas consecutivas</p>
             </div>
+            <div class="menu-item" onclick="window.location.href='admin-ordenes.php'">
+                <div class="menu-item-icon">🛒</div>
+                <h3>Órdenes de Compra</h3>
+                <p>Ítems, fotos y fechas de instalación</p>
+            </div>
         </div>
     </div>
 </div>
