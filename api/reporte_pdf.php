@@ -38,12 +38,13 @@ if ($rol === ROLE_CLIENTE) {
 // luego por número dentro de cada sección.
 // NOTA: Incluye todos los extintores sin importar el estado
 $stmt = $pdo->prepare("
-    SELECT e.*,
+    SELECT e.*, te.nombre AS tipo_nombre,
            MIN(CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
                UPPER(e.codigo_manual),
                'EXT-',''), 'EXT ',''), 'EXT',''), '-',''), ' ','') AS UNSIGNED))
                OVER (PARTITION BY COALESCE(e.seccion, '')) AS seccion_orden
     FROM extintores e
+    JOIN tipos_extintores te ON te.id = e.tipo
     WHERE e.empresa_id = ?
     ORDER BY seccion_orden ASC,
              CAST(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
@@ -426,7 +427,7 @@ if (!$logo_html) {
             <tr>
                 <td><?= $ext['numero'] ?></td>
                 <td class="td-area"><?= htmlspecialchars($ext['ubicacion']) ?></td>
-                <td><?= htmlspecialchars($ext['tipo']) ?></td>
+                <td><?= htmlspecialchars($ext['tipo_nombre']) ?></td>
                 <td><?= htmlspecialchars($ext['capacidad'] ?? '') ?></td>
                 <td><?= fmtFecha($ext['fecha_ph']) ?></td>
                 <td><?= fmtFecha($ext['fecha_recarga']) ?></td>

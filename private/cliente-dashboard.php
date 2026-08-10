@@ -108,7 +108,7 @@ $json_pie = json_encode([$inspeccionados_mes, $total_extintores - $inspeccionado
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Inspección – Cliente</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="../public/assets/js/chart.umd.min.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;color:#333}
@@ -349,6 +349,15 @@ $json_pie = json_encode([$inspeccionados_mes, $total_extintores - $inspeccionado
 </div>
 
 <script>
+(function(){
+// Si la librería de gráficas no cargó, mostrar aviso en vez de recuadros vacíos
+if (typeof Chart === 'undefined') {
+    document.querySelectorAll('.chart-container').forEach(function(c){
+        c.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#999;font-size:13px;text-align:center;padding:16px">No se pudo cargar la librería de gráficas.<br>Revisa tu conexión y recarga la página.</div>';
+    });
+    return;
+}
+
 // Pie Chart
 const pieCtx = document.getElementById('pieChart').getContext('2d');
 new Chart(pieCtx, {
@@ -395,6 +404,7 @@ new Chart(barCtx, {
         }
     }
 });
+})();
 
 function logout() {
     fetch('../api/auth.php?action=logout', {method:'POST'})

@@ -125,12 +125,6 @@ $empresa_id = $_SESSION['empresa_id'];
         <input type="text" id="busqueda" placeholder="🔍 Buscar por código o ubicación...">
         <select id="filtroTipo">
             <option value="">Todos los tipos</option>
-            <option value="PQS">PQS</option>
-            <option value="CO2">CO2</option>
-            <option value="agua">Agua</option>
-            <option value="espuma">Espuma</option>
-            <option value="halotron">Halotron</option>
-            <option value="otro">Otro</option>
         </select>
         <select id="filtroEstado">
             <option value="">Todos los estados</option>
@@ -167,8 +161,16 @@ async function cargar() {
     }
 
     extintores = d.data || [];
+    poblarFiltroTipo();
     calcularKPIs();
     renderizar();
+}
+
+function poblarFiltroTipo() {
+    const tipos = [...new Set(extintores.map(e => e.tipo_nombre).filter(Boolean))].sort();
+    const sel = document.getElementById('filtroTipo');
+    sel.innerHTML = '<option value="">Todos los tipos</option>' +
+        tipos.map(t => `<option value="${t}">${t}</option>`).join('');
 }
 
 function calcularKPIs() {
@@ -248,7 +250,7 @@ function renderizar() {
         const coincideBusqueda = !busqueda ||
             e.codigo_manual.toLowerCase().includes(busqueda) ||
             e.ubicacion.toLowerCase().includes(busqueda);
-        const coincideTipo = !filtroTipo || e.tipo === filtroTipo;
+        const coincideTipo = !filtroTipo || e.tipo_nombre === filtroTipo;
         const coincideEstado = !filtroEstado || e.estado === filtroEstado;
         return coincideBusqueda && coincideTipo && coincideEstado;
     });
@@ -279,7 +281,7 @@ function renderizar() {
                 <div class="card-header">
                     <div>
                         <div class="card-codigo">${e.codigo_manual}</div>
-                        <div class="card-tipo-badge">${e.tipo}</div>
+                        <div class="card-tipo-badge">${e.tipo_nombre}</div>
                     </div>
                     <span class="estado-badge estado-${e.estado}">${e.estado.toUpperCase()}</span>
                 </div>
@@ -337,7 +339,7 @@ function abrirDetalle(id) {
                 </div>
                 <div class="modal-item">
                     <label>Tipo</label>
-                    <value>${ext.tipo}</value>
+                    <value>${ext.tipo_nombre}</value>
                 </div>
             </div>
             <div class="modal-row full">
