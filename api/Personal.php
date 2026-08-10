@@ -1193,9 +1193,28 @@ class Personal {
 
         if ($id) {
             // Assign primera_parte if the existing record has none
-            $existing = $this->pdo->prepare("SELECT primera_parte FROM clientes WHERE id=?");
+            $existing = $this->pdo->prepare("SELECT nombre_cliente, primera_parte FROM clientes WHERE id=?");
             $existing->execute([$id]);
             $exRow = $existing->fetch();
+
+            // Cambiar el nombre desde aquí sólo renombraría el catálogo y
+            // dejaría el nombre viejo copiado en los registros ya existentes.
+            // Si hay registros vinculados se exige usar el renombrado, que
+            // propaga el cambio a todos los módulos.
+            if ($exRow && strtoupper(trim((string)$exRow['nombre_cliente'])) !== $nombre) {
+                $anterior = strtoupper(trim((string)$exRow['nombre_cliente']));
+                foreach ($this->refsEmpresaExistentes() as [$tabla, $col, $etiqueta]) {
+                    try {
+                        $s = $this->pdo->prepare("SELECT COUNT(*) FROM `$tabla` WHERE UPPER(TRIM(`$col`)) = ?");
+                        $s->execute([$anterior]);
+                        if ($s->fetchColumn() > 0) {
+                            return ['status' => 'error', 'requiere_renombrado' => true, 'message' =>
+                                'La empresa ya tiene registros a su nombre. Usa el botón "Renombrar" para cambiarlo y actualizar todos los registros existentes.'];
+                        }
+                    } catch (\Throwable $e) {}
+                }
+            }
+
             $sets = 'nombre_cliente=?, rfc=?, representante=?, representante_trabajadores=?, direccion=?, correo_contacto=?';
             $vals = [$nombre, $rfc, $rep, $repTrab, $dir, $correo];
             if (empty($exRow['primera_parte'])) {
@@ -1251,21 +1270,180 @@ class Personal {
         $row = $chk->fetch();
         if (!$row) return ['status' => 'error', 'message' => 'Empresa no encontrada.'];
 
-        $nombre = $row['nombre_cliente'];
-        foreach ([
-            "SELECT COUNT(*) FROM equipos WHERE empresa_nombre = ? COLLATE utf8mb4_general_ci",
-            "SELECT COUNT(*) FROM participantes_cursos WHERE empresa_nombre = ? COLLATE utf8mb4_general_ci",
-        ] as $sql) {
+        $nombre = strtoupper(trim((string)$row['nombre_cliente']));
+        foreach ($this->refsEmpresaExistentes() as [$tabla, $col, $etiqueta]) {
             try {
-                $s = $this->pdo->prepare($sql);
+                $s = $this->pdo->prepare("SELECT COUNT(*) FROM `$tabla` WHERE UPPER(TRIM(`$col`)) = ?");
                 $s->execute([$nombre]);
                 if ($s->fetchColumn() > 0)
-                    return ['status' => 'error', 'message' => 'No se puede eliminar: la empresa tiene registros vinculados.'];
+                    return ['status' => 'error', 'message' => "No se puede eliminar: la empresa tiene registros vinculados en $etiqueta."];
             } catch (\Throwable $e) {}
         }
 
         $this->pdo->prepare("DELETE FROM clientes WHERE id=?")->execute([$id]);
         return ['status' => 'success'];
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  RENOMBRAR EMPRESA
+    // ══════════════════════════════════════════════════════════
+    //  El vínculo real entre una empresa y sus registros es el número de
+    //  control (`primera_parte`-consecutivo) y el `id_cliente` del usuario del
+    //  portal; el nombre está sólo COPIADO en cada módulo para mostrarlo e
+    //  imprimirlo. Por eso se puede reescribir el texto en todas las tablas sin
+    //  tocar folios, QR, accesos ni la propiedad de los documentos.
+    //
+    //  Tabla, columna con la copia del nombre y etiqueta para el usuario.
+    private const EMPRESA_REFS = [
+        ['equipos',              'cliente',        'Maquinaria y equipos'],
+        ['arneses_sesiones',     'cliente',        'Arneses y líneas de vida'],
+        ['accesorios_sesiones',  'cliente',        'Accesorios de izaje'],
+        ['pnd_inspecciones',     'cliente',        'Pruebas no destructivas'],
+        ['participantes_cursos', 'empresa_nombre', 'Participantes de cursos'],
+        ['sesion_empresas',      'nombre_empresa', 'Sesiones de captura'],
+        ['historico_envios',     'cliente',        'Histórico de envíos'],
+    ];
+
+    /** Descarta de EMPRESA_REFS lo que no exista en esta base de datos. */
+    private function refsEmpresaExistentes(): array {
+        $out = [];
+        foreach (self::EMPRESA_REFS as $ref) {
+            try {
+                // Falla si la tabla o la columna no existen; no lee ninguna fila.
+                $this->pdo->query("SELECT `{$ref[1]}` FROM `{$ref[0]}` LIMIT 0");
+                $out[] = $ref;
+            } catch (\Throwable $e) {
+                // Módulo no instalado en esta base: se ignora.
+            }
+        }
+        return $out;
+    }
+
+    /**
+     * Cambia el nombre de una empresa y propaga el cambio a todos los registros
+     * que ya lo tenían copiado.
+     *
+     * Con `aplicar` falso sólo devuelve el alcance (cuántos registros de cada
+     * módulo cambiarían) para poder confirmarlo antes de escribir nada.
+     */
+    public function renombrarEmpresa(array $payload): array {
+        $id      = (int)($payload['id'] ?? 0);
+        $nuevo   = strtoupper(trim((string)($payload['nombre_nuevo'] ?? '')));
+        $aplicar = !empty($payload['aplicar']);
+
+        if (!$id)             return ['status' => 'error', 'message' => 'Empresa no válida.'];
+        if ($nuevo === '')    return ['status' => 'error', 'message' => 'El nuevo nombre es obligatorio.'];
+        if (mb_strlen($nuevo) > 150)
+            return ['status' => 'error', 'message' => 'El nombre no puede exceder 150 caracteres.'];
+
+        $st = $this->pdo->prepare("SELECT id, nombre_cliente, primera_parte FROM clientes WHERE id = ?");
+        $st->execute([$id]);
+        $emp = $st->fetch();
+        if (!$emp) return ['status' => 'error', 'message' => 'Empresa no encontrada.'];
+
+        $actual  = (string)$emp['nombre_cliente'];
+        $anterior = strtoupper(trim($actual));
+        if ($anterior === $nuevo)
+            return ['status' => 'error', 'message' => 'El nombre nuevo es igual al actual.'];
+
+        // Si el nombre ya pertenece a otra empresa esto sería una fusión, no un
+        // renombrado: cada empresa tiene su propia serie de folios y su propio
+        // acceso al portal, así que se rechaza.
+        $dup = $this->pdo->prepare(
+            "SELECT id FROM clientes WHERE UPPER(TRIM(nombre_cliente)) = ? AND id <> ? LIMIT 1"
+        );
+        $dup->execute([$nuevo, $id]);
+        if ($dup->fetch())
+            return ['status' => 'error', 'message' =>
+                'Ya existe otra empresa registrada con ese nombre. Renombrar no fusiona empresas: cada una conserva su propia serie de folios y su propio acceso al portal.'];
+
+        $refs = $this->refsEmpresaExistentes();
+
+        // Alcance
+        $detalle = [];
+        $total   = 0;
+        foreach ($refs as [$tabla, $col, $etiqueta]) {
+            try {
+                $q = $this->pdo->prepare("SELECT COUNT(*) FROM `$tabla` WHERE UPPER(TRIM(`$col`)) = ?");
+                $q->execute([$anterior]);
+                $n = (int)$q->fetchColumn();
+            } catch (\Throwable $e) { continue; }
+            if ($n > 0) {
+                $detalle[] = ['modulo' => $etiqueta, 'registros' => $n];
+                $total    += $n;
+            }
+        }
+
+        // Cuenta del portal: su nombre visible también es el de la empresa.
+        $idsCliente = [];
+        if (($emp['primera_parte'] ?? '') !== '') {
+            $pp = (string)$emp['primera_parte'];
+            $idsCliente = array_values(array_unique([$pp, str_pad($pp, 5, '0', STR_PAD_LEFT)]));
+        }
+        $usuariosPortal = 0;
+        if ($idsCliente) {
+            try {
+                $ph = implode(',', array_fill(0, count($idsCliente), '?'));
+                $q  = $this->pdo->prepare(
+                    "SELECT COUNT(*) FROM usuarios
+                     WHERE rol = 'CLIENTE' AND id_cliente IN ($ph) AND UPPER(TRIM(nombre)) = ?"
+                );
+                $q->execute([...$idsCliente, $anterior]);
+                $usuariosPortal = (int)$q->fetchColumn();
+            } catch (\Throwable $e) {}
+        }
+
+        if (!$aplicar) {
+            return [
+                'status'          => 'success',
+                'modo'            => 'preview',
+                'nombre_actual'   => $actual,
+                'nombre_nuevo'    => $nuevo,
+                'detalle'         => $detalle,
+                'total'           => $total,
+                'usuarios_portal' => $usuariosPortal,
+            ];
+        }
+
+        $aplicados = [];
+        $cambiados = 0;
+        $this->pdo->beginTransaction();
+        try {
+            foreach ($refs as [$tabla, $col, $etiqueta]) {
+                $u = $this->pdo->prepare("UPDATE `$tabla` SET `$col` = ? WHERE UPPER(TRIM(`$col`)) = ?");
+                $u->execute([$nuevo, $anterior]);
+                $n = $u->rowCount();
+                if ($n > 0) {
+                    $aplicados[] = ['modulo' => $etiqueta, 'registros' => $n];
+                    $cambiados  += $n;
+                }
+            }
+            $this->pdo->prepare("UPDATE clientes SET nombre_cliente = ? WHERE id = ?")
+                      ->execute([$nuevo, $id]);
+            if ($idsCliente) {
+                $ph = implode(',', array_fill(0, count($idsCliente), '?'));
+                $this->pdo->prepare(
+                    "UPDATE usuarios SET nombre = ?
+                     WHERE rol = 'CLIENTE' AND id_cliente IN ($ph) AND UPPER(TRIM(nombre)) = ?"
+                )->execute([$nuevo, ...$idsCliente, $anterior]);
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            error_log('[renombrarEmpresa] ' . $e->getMessage());
+            return ['status' => 'error', 'message' =>
+                'No se pudo completar el renombrado; no se modificó ningún registro.'];
+        }
+
+        return [
+            'status'        => 'success',
+            'modo'          => 'aplicado',
+            'nombre_actual' => $actual,
+            'nombre_nuevo'  => $nuevo,
+            'detalle'       => $aplicados,
+            'total'         => $cambiados,
+            'message'       => "Empresa renombrada. Se actualizaron $cambiados registro(s).",
+        ];
     }
 
     public function listarUsuariosInstructor(): array {

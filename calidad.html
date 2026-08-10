@@ -3497,7 +3497,10 @@ async function cargarEmpresas() {
             <button onclick="abrirModalEmpresaDC3(${e.id})"
                     style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;
                            padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;margin-right:4px">Editar</button>
-            <button onclick="eliminarEmpresaDC3(${e.id},'${escH(e.nombre_cliente)}')"
+            <button onclick="renombrarEmpresaDC3(${e.id})" title="Cambiar el nombre y actualizarlo en todos los registros existentes"
+                    style="background:var(--amarillo-light,#fff4e0);border:none;color:var(--naranja,#b06b00);border-radius:6px;
+                           padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer;margin-right:4px">Renombrar</button>
+            <button onclick="eliminarEmpresaDC3(${e.id})"
                     style="background:var(--rojo-light);border:none;color:var(--rojo);border-radius:6px;
                            padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Eliminar</button>
           </td>
@@ -3600,7 +3603,62 @@ async function guardarEmpresaDC3() {
   }
 }
 
-async function eliminarEmpresaDC3(id, nombre) {
+// Renombrar propaga el nuevo nombre a todos los módulos. El vínculo real de un
+// registro con su empresa es el número de control, no el texto, así que folios,
+// QR y accesos del portal no se ven afectados.
+async function renombrarEmpresaDC3(id) {
+  const emp = empresasData.find(x => x.id == id);
+  if (!emp) return;
+  const actual = (emp.nombre_cliente || '').trim();
+
+  const nuevo = (prompt(
+    `Nuevo nombre para:\n\n${actual}\n\n` +
+    `Se actualizará también en todos los registros que ya existen.`, actual
+  ) || '').trim().toUpperCase();
+  if (!nuevo || nuevo === actual.toUpperCase()) return;
+
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const llamar = async (aplicar) => {
+    const res = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body:    JSON.stringify({ action: 'RENOMBRAR_EMPRESA', payload: { id, nombre_nuevo: nuevo, aplicar } }),
+    });
+    return res.json();
+  };
+
+  try {
+    const prev = await llamar(false);
+    if (prev.status !== 'success') { mostrarToast(prev.message || 'No se pudo renombrar.', 'error'); return; }
+
+    const lineas = (prev.detalle || []).length
+      ? prev.detalle.map(d => `   • ${d.modulo}: ${d.registros}`).join('\n')
+      : '   • Sin registros vinculados todavía';
+
+    let msg = `${prev.nombre_actual}\n        ↓\n${prev.nombre_nuevo}\n\n`
+            + `Registros que se actualizarán (${prev.total}):\n${lineas}\n`;
+    if (prev.usuarios_portal) msg += `\nTambién se actualizará el nombre visible de la cuenta del portal.\n`;
+    msg += `\nNO cambian: números de control, códigos QR ni el acceso del cliente.\n`
+        +  `Los PDF ya emitidos conservan el nombre con el que se generaron; si\n`
+        +  `deben salir con el nombre nuevo hay que volver a emitirlos.\n\n¿Aplicar el cambio?`;
+    if (!confirm(msg)) return;
+
+    const res = await llamar(true);
+    if (res.status === 'success') {
+      mostrarToast(res.message || 'Empresa renombrada.', 'success');
+      empresasCargadas = false;
+      cargarEmpresas();
+    } else {
+      mostrarToast(res.message || 'No se pudo renombrar.', 'error');
+    }
+  } catch (err) {
+    mostrarToast('Error de conexión.', 'error');
+  }
+}
+
+async function eliminarEmpresaDC3(id) {
+  const emp = empresasData.find(x => x.id == id);
+  const nombre = emp ? emp.nombre_cliente : '';
   if (!confirm(`¿Eliminar la empresa "${nombre}"?\n\nSolo es posible si no tiene registros vinculados (participantes, equipos).`)) return;
   try {
     const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');

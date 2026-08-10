@@ -1435,6 +1435,11 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->eliminarEmpresaDC3((int)($payload['id'] ?? 0)));
 
+        case 'RENOMBRAR_EMPRESA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->renombrarEmpresa($payload));
+
         case 'GENERAR_DOC_PERSONAL':
         case 'GENERAR_DOC_PERSONAL_SIN_SELLOS':
             $usr = validarToken($pdo, $token);
