@@ -1507,6 +1507,39 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
   </div>
 </div>
 
+<!-- ══ ENVIAR DOCUMENTOS POR CORREO ══ -->
+<div class="overlay" id="env-overlay">
+  <div class="modal-qr" style="max-width:460px;text-align:left">
+    <div class="qr-folio" id="env-titulo" style="text-align:left">Enviar documentos</div>
+    <div class="qr-sub" id="env-sub" style="text-align:left;margin-bottom:12px">—</div>
+
+    <label style="font-size:12px;color:var(--texto-sub);display:block;margin-bottom:4px">
+      Correo de destino <span style="color:#ef4444">*</span>
+    </label>
+    <input type="text" id="env-correo" placeholder="correo@empresa.com"
+           style="width:100%;padding:10px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:14px;margin-bottom:4px">
+    <div style="font-size:11px;color:var(--texto-hint);margin-bottom:12px">
+      Puedes escribir varios separados por coma (hasta 5).
+    </div>
+
+    <label style="font-size:12px;color:var(--texto-sub);display:block;margin-bottom:4px">
+      Mensaje (opcional)
+    </label>
+    <textarea id="env-mensaje" rows="3" placeholder="Se incluirá en el cuerpo del correo"
+              style="width:100%;padding:10px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;margin-bottom:14px"></textarea>
+
+    <div style="font-size:11px;color:var(--texto-hint);margin-bottom:14px">
+      El envío sale desde el correo institucional de AVBA.
+    </div>
+
+    <div style="display:flex;gap:8px">
+      <button class="btn-cerrar" style="flex:1" onclick="cerrarEnvio()">Cancelar</button>
+      <button class="btn-cerrar" id="env-btn" style="flex:1;background:var(--azul);color:#fff"
+              onclick="confirmarEnvio()">Enviar</button>
+    </div>
+  </div>
+</div>
+
 <script src="js/native-bridge.js"></script>
 <script src="js/chart/chart.umd.min.js"></script>
 <script>
@@ -1644,6 +1677,52 @@ function cerrarQR() { document.getElementById('qr-overlay').classList.remove('op
 function escQ(s) { return (s||'').replace(/'/g, "\\'").replace(/"/g, '&quot;'); }
 function escH(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+/* ── Envío de documentos por correo ─────────────────────────────────────────
+   El navegador nunca manda rutas de archivo: sólo el tipo de elemento y su id.
+   El servidor resuelve qué documentos son y comprueba que sean de esta empresa
+   antes de adjuntarlos. */
+let _envDocs = [];
+
+function abrirEnvio(docs, titulo, detalle) {
+  _envDocs = Array.isArray(docs) ? docs : [docs];
+  document.getElementById('env-titulo').textContent = titulo || 'Enviar documentos';
+  document.getElementById('env-sub').textContent    = detalle || '';
+  document.getElementById('env-correo').value  = '';
+  document.getElementById('env-mensaje').value = '';
+  document.getElementById('env-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('env-correo').focus(), 80);
+}
+function cerrarEnvio() { document.getElementById('env-overlay').classList.remove('open'); }
+
+async function confirmarEnvio() {
+  const correo = document.getElementById('env-correo').value.trim();
+  if (!correo) { alert('Escribe el correo de destino.'); return; }
+  if (!_envDocs.length) { alert('No hay documentos que enviar.'); return; }
+
+  const btn = document.getElementById('env-btn');
+  btn.disabled = true; btn.textContent = 'Enviando…';
+  try {
+    const r = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'ENVIAR_DOCS_CLIENTE', payload: {
+        correo, docs: _envDocs,
+        mensaje: document.getElementById('env-mensaje').value.trim(),
+      }})
+    });
+    const d = await r.json();
+    if (d.status === 'success') { cerrarEnvio(); alert(d.message || 'Documentos enviados.'); }
+    else alert(d.message || 'No se pudo enviar.');
+  } catch(_) { alert('Error de conexión.'); }
+  btn.disabled = false; btn.textContent = 'Enviar';
+}
+
+/** Botón compacto de envío, para reutilizar en cada tarjeta. */
+function btnEnviar(tipo, id, titulo, detalle) {
+  return `<button class="btn-doc" style="background:#eef7ee;color:#1b7a3d"
+            onclick="abrirEnvio([{tipo:'${tipo}',id:${id}}],'${escQ(titulo)}','${escQ(detalle||'')}')"
+            title="Enviar por correo">✉ Enviar</button>`;
+}
+
 // ── Logout ─────────────────────────────────────────────────────────────────
 function cerrarSesion() { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
 
@@ -1706,7 +1785,11 @@ function renderMaquinaria(data) {
         <div class="info-row"><span class="info-key">Fecha inspección</span><span class="info-val">${eq.fecha || '—'}</span></div>
         ${vigenciaBar(eq.dias, eq.vencimiento, eq.vigente)}
       </div>
-      <div class="card-footer">${certBtn}${dictBtn}${qrBtn}</div>
+      <div class="card-footer">${certBtn}${dictBtn}${qrBtn}${
+        (eq.link_cert || eq.link_dict)
+          ? btnEnviar('equipo', eq.id, 'Enviar documentos del equipo',
+                      `${eq.maquinaria || 'Equipo'}${eq.serie ? ' · S/N ' + eq.serie : ''} — certificado y dictamen`)
+          : ''}</div>
     </div>`;
   });
   html += '</div>';
@@ -1745,6 +1828,9 @@ function renderArneses(data) {
         </div>
         <span style="font-size:10px;font-weight:700;color:${colorRes(pz.resultado)}">${escQ(pz.resultado || '')}</span>
         ${pz.cert_url ? `<a class="btn-doc btn-cert" style="padding:3px 8px;font-size:10px" href="${escH(pz.cert_url)}" target="_blank">📄</a>` : ''}
+        ${pz.cert_url ? `<button class="btn-doc" style="padding:3px 8px;font-size:10px;background:#eef7ee;color:#1b7a3d"
+            onclick="abrirEnvio([{tipo:'arnes_pieza',id:${pz.id}}],'Enviar certificado','${escQ((pz.tipo||'Equipo') + (pz.serie ? ' · S/N ' + pz.serie : ''))}')"
+            title="Enviar por correo">✉</button>` : ''}
       </div>`).join('');
     html += `<div class="acc-card">
       <div class="acc-folio">${folio}</div>
@@ -1754,7 +1840,9 @@ function renderArneses(data) {
         ${ses.aptos    ? `<span class="badge b-cumple">✔ ${ses.aptos} APTO${ses.aptos!==1?'S':''}</span>` : ''}
         ${ses.no_aptos ? `<span class="badge b-nocumple">✖ ${ses.no_aptos} NO APTO${ses.no_aptos!==1?'S':''}</span>` : ''}
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${dictBtn}${qrBtn}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${dictBtn}${qrBtn}${
+        btnEnviar('arnes', ses.id, 'Enviar la inspección completa',
+                  `${folio} — dictamen y los certificados de las ${ses.total || 0} piezas`)}</div>
       ${piezas}
     </div>`;
   });
@@ -1784,7 +1872,9 @@ function renderAccesorios(data) {
         ${ses.no_cumple ? `<span class="badge b-nocumple">✖ ${ses.no_cumple} NO CUMPLE</span>` : ''}
         ${!ses.cumple && !ses.no_cumple ? '<span class="badge">Sin resultados</span>' : ''}
       </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">${certBtn}${repBtn}${cumpleBtn}${qrBtn}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${certBtn}${repBtn}${cumpleBtn}${qrBtn}${
+        btnEnviar('accesorio', ses.id, 'Enviar la sesión de accesorios',
+                  `${folio} — certificado y reportes`)}</div>
     </div>`;
   });
   html += '</div>';
@@ -1886,7 +1976,11 @@ function renderPersonal(data) {
         <div class="info-row"><span class="info-key">Curso</span><span class="info-val">${p.curso || '—'}</span></div>
         <div class="info-row"><span class="info-key">Fecha</span><span class="info-val">${p.fecha_curso || '—'}</span></div>
       </div>
-      <div class="card-footer">${certBtn}${dipBtn}${dc3Btn}${qrBtn}</div>
+      <div class="card-footer">${certBtn}${dipBtn}${dc3Btn}${qrBtn}${
+        (p.url_certificado || p.url_diploma || p.url_dc3)
+          ? btnEnviar('personal', p.id, 'Enviar constancias',
+                      `${p.nombre || ''} — ${p.curso || 'curso'}`)
+          : ''}</div>
     </div>`;
   });
   html += '</div>';
@@ -1920,7 +2014,8 @@ function renderPND(data) {
       <div class="acc-fecha">${r.fecha || '—'}</div>
       <div style="font-size:12px;color:var(--texto-sub);margin-bottom:10px">${r.componente || '—'}</div>
       ${r.identificacion ? `<div style="font-size:11px;color:var(--texto-hint);margin-bottom:10px">ID: ${r.identificacion}</div>` : ''}
-      <div style="display:flex;gap:6px;flex-wrap:wrap">${repBtn}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${repBtn}${
+        r.reporte_url ? btnEnviar('pnd', r.id, 'Enviar reporte PND', `${folio} — ${r.componente || ''}`) : ''}</div>
     </div>`;
   });
   html += '</div>';
@@ -2642,6 +2737,8 @@ function renderSubDocs(docs, equipoId) {
           ${vigHtml}
           <div class="doc-acts">
             ${d.archivo_url ? `<a href="${d.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver</a>` : ''}
+            ${d.archivo_url ? `<button class="btn-sm" style="font-size:10px;background:#eef7ee;color:#1b7a3d"
+              onclick="abrirEnvio([{tipo:'doc_equipo',id:${d.id}}],'Enviar documento','${escQ(d.nombre)}')">✉ Enviar</button>` : ''}
             ${_puedeEditar ? `<button class="btn-del" onclick="eliminarDoc(${d.id})" style="padding:3px 8px;font-size:10px">🗑</button>` : ''}
           </div>
         </div>
@@ -2925,6 +3022,8 @@ function renderSubCerts(certs, equipoId) {
         ${c.notas ? `<div style="font-size:11px;color:var(--texto-sub);margin-top:8px;font-style:italic">${escQ(c.notas)}</div>` : ''}
         <div class="cert-acts">
           ${c.archivo_url ? `<a href="${c.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Certificado</a>` : ''}
+          ${c.archivo_url ? `<button class="btn-sm" style="font-size:10px;background:#eef7ee;color:#1b7a3d"
+            onclick="abrirEnvio([{tipo:'cert_equipo',id:${c.id}}],'Enviar certificado','${escQ(c.tipo_cert || '')}')">✉ Enviar</button>` : ''}
           ${_puedeEditar ? `<button class="btn-sec" style="font-size:10px" onclick="abrirModalCert(${equipoId}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">✏ Editar</button>
           <button class="btn-del" onclick="eliminarCert(${c.id})" style="font-size:10px">🗑</button>` : ''}
         </div>
@@ -3505,6 +3604,8 @@ function renderSubCertsPer(certs, perId) {
         ${c.notas ? `<div style="font-size:11px;color:var(--texto-sub);margin-top:8px;font-style:italic">${escQ(c.notas)}</div>` : ''}
         <div class="cert-acts">
           ${c.archivo_url ? `<a href="${c.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver</a>` : ''}
+          ${c.archivo_url ? `<button class="btn-sm" style="font-size:10px;background:#eef7ee;color:#1b7a3d"
+            onclick="abrirEnvio([{tipo:'cert_personal',id:${c.id}}],'Enviar certificado','${escQ(c.tipo_cert || '')}')">✉ Enviar</button>` : ''}
           ${_puedeEditar ? `<button class="btn-sec" style="font-size:10px" onclick="abrirModalCertPers(${perId}, ${JSON.stringify(c).replace(/"/g,'&quot;')})">✏ Editar</button>
           <button class="btn-del" onclick="eliminarCertPers(${c.id})" style="font-size:10px">🗑</button>` : ''}
         </div>
@@ -3579,6 +3680,8 @@ function _renderDocsPer(docs, perId, cont) {
           ${vigHtml}
           <div class="doc-acts">
             ${d.archivo_url ? `<a href="${d.archivo_url}" target="_blank" class="btn-sm btn-sm-cert" style="font-size:10px">📥 Ver</a>` : ''}
+            ${d.archivo_url ? `<button class="btn-sm" style="font-size:10px;background:#eef7ee;color:#1b7a3d"
+              onclick="abrirEnvio([{tipo:'doc_personal',id:${d.id}}],'Enviar documento','${escQ(d.nombre)}')">✉ Enviar</button>` : ''}
             ${_puedeEditar ? `<button class="btn-sm" style="font-size:10px;border-color:var(--azul);color:var(--azul);background:var(--azul-light)" onclick="abrirModalEditDocPers(${JSON.stringify(d).replace(/"/g,'&quot;')})">✏ Editar</button>
             <button class="btn-del" onclick="eliminarDocPers(${d.id})" style="padding:3px 8px;font-size:10px">🗑</button>` : ''}
           </div>

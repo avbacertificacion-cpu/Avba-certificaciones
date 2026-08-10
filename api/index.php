@@ -35,6 +35,7 @@ require_once __DIR__ . '/Anuncios.php';
 require_once __DIR__ . '/VerificacionIA.php';
 require_once __DIR__ . '/Arneses.php';
 require_once __DIR__ . '/ClienteImpresion.php';
+require_once __DIR__ . '/ClienteEnvios.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -98,6 +99,7 @@ $anuncios       = new Anuncios($pdo);
 $verifIA        = new VerificacionIA($pdo);
 $arneses        = new Arneses($pdo);
 $cliImpresion   = new ClienteImpresion($pdo);
+$cliEnvios      = new ClienteEnvios($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -1949,6 +1951,12 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($arneses->vistaPrevia($payload));
+
+        case 'ENVIAR_DOCS_CLIENTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            // Un sub-usuario de solo lectura sí puede enviar: no modifica nada.
+            respuesta($cliEnvios->enviar($payload, $usr));
 
         case 'SUBIR_DOC_MANUAL_ARNES':  // multipart
             $usr = validarToken($pdo, $token);
