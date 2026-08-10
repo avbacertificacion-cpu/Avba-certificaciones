@@ -122,21 +122,38 @@ function crear() {
 
         echo json_encode(['success' => true, 'id' => $newId]);
     } catch (PDOException $e) {
-        if ($e->getCode() == 23000) {
-            // El username ya se validó arriba, así que el conflicto es de otro dato
-            $msg = 'No se pudo crear el usuario por un conflicto de datos.';
-            $detalle = $e->getMessage();
-            if (stripos($detalle, 'email') !== false) {
-                $msg = 'El correo ya está registrado en otro usuario.';
-            } elseif (stripos($detalle, 'foreign key') !== false || stripos($detalle, 'empresa') !== false) {
-                $msg = 'La empresa seleccionada no es válida. Vuelve a elegirla.';
-            }
-            http_response_code(409);
-            echo json_encode(['error' => $msg]);
-        } else {
-            http_response_code(500); echo json_encode(['error' => 'Error al crear usuario']);
-        }
+        [$code, $msg] = mapearErrorUsuario($e);
+        http_response_code($code);
+        echo json_encode(['error' => $msg]);
     }
+}
+
+// ─── Traducir errores de MySQL a mensajes claros para el admin ───────────────
+// Usa el código nativo de MySQL (errorInfo[1]), no coincidencias de texto frágiles:
+// 1048 = columna no puede ser NULL, 1062 = valor duplicado, 1452 = FK inválida.
+function mapearErrorUsuario(PDOException $e) {
+    $native  = $e->errorInfo[1] ?? null;
+    $detalle = $e->errorInfo[2] ?? $e->getMessage();
+
+    if ($native == 1048) {
+        if (stripos($detalle, "'email'") !== false) {
+            return [500, "La columna 'email' de la base de datos no permite dejarse vacía. Pide al administrador del sistema que la corrija en /private/reparar-rol.php."];
+        }
+        return [500, "Falta un dato requerido por la base de datos: " . $detalle];
+    }
+    if ($native == 1062) {
+        if (stripos($detalle, 'username') !== false) {
+            return [409, 'El nombre de usuario ya está en uso.'];
+        }
+        if (stripos($detalle, 'email') !== false) {
+            return [409, 'El correo ya está registrado en otro usuario.'];
+        }
+        return [409, 'Ese valor ya está en uso por otro registro.'];
+    }
+    if ($native == 1452) {
+        return [400, 'La empresa seleccionada no es válida. Vuelve a elegirla.'];
+    }
+    return [500, 'Error al guardar el usuario: ' . $detalle];
 }
 
 // ─── EDITAR USUARIO ──────────────────────────────────────────────────────────
@@ -157,27 +174,33 @@ function editar() {
         $empresa_id = $d['empresa_id'];
     }
 
-    $stmt = $pdo->prepare("
-        UPDATE usuarios SET nombre=?, username=?, email=?, rol=?, empresa_id=?, estado=? WHERE id=?
-    ");
-    $stmt->execute([
-        $d['nombre'],
-        strtolower(trim($d['username'] ?? '')),
-        !empty($d['email']) ? strtolower(trim($d['email'])) : null,
-        $d['rol'],
-        $empresa_id,
-        $d['estado'] ?? 'activo',
-        $id,
-    ]);
+    try {
+        $stmt = $pdo->prepare("
+            UPDATE usuarios SET nombre=?, username=?, email=?, rol=?, empresa_id=?, estado=? WHERE id=?
+        ");
+        $stmt->execute([
+            $d['nombre'],
+            strtolower(trim($d['username'] ?? '')),
+            !empty($d['email']) ? strtolower(trim($d['email'])) : null,
+            $d['rol'],
+            $empresa_id,
+            $d['estado'] ?? 'activo',
+            $id,
+        ]);
 
-    // Cambiar contraseña si se proporcionó
-    if (!empty($d['password'])) {
-        $stmt = $pdo->prepare("UPDATE usuarios SET password=? WHERE id=?");
-        $stmt->execute([password_hash($d['password'], PASSWORD_BCRYPT), $id]);
+        // Cambiar contraseña si se proporcionó
+        if (!empty($d['password'])) {
+            $stmt = $pdo->prepare("UPDATE usuarios SET password=? WHERE id=?");
+            $stmt->execute([password_hash($d['password'], PASSWORD_BCRYPT), $id]);
+        }
+
+        audit($uid, "Editar usuario", 'usuarios', $id);
+        echo json_encode(['success' => true]);
+    } catch (PDOException $e) {
+        [$code, $msg] = mapearErrorUsuario($e);
+        http_response_code($code);
+        echo json_encode(['error' => $msg]);
     }
-
-    audit($uid, "Editar usuario", 'usuarios', $id);
-    echo json_encode(['success' => true]);
 }
 
 // ─── ELIMINAR (soft-delete) ──────────────────────────────────────────────────

@@ -1,9 +1,11 @@
 <?php
 /**
- * Herramienta de reparación (solo ADMIN):
+ * Herramienta de reparación de base de datos (solo ADMIN):
  *  1) Convierte la columna usuarios.rol de ENUM a VARCHAR (para aceptar 'gerente'
  *     y roles futuros). Es idempotente: si ya es VARCHAR, no hace daño.
  *  2) Permite corregir el rol de cualquier usuario (p.ej. el que quedó vacío).
+ *  3) Permite que la columna usuarios.email quede vacía (NULL), ya que el
+ *     formulario de usuarios la marca como opcional. Es idempotente.
  *
  * Úsala una vez y listo. No requiere phpMyAdmin.
  */
@@ -27,10 +29,23 @@ try {
         $mensajes[] = ['ok', "Columna 'rol' convertida de <b>$tipoActual</b> a VARCHAR(30). Ahora acepta 'gerente'."];
     }
 } catch (Exception $e) {
-    $mensajes[] = ['err', "No se pudo ajustar la columna: " . htmlspecialchars($e->getMessage())];
+    $mensajes[] = ['err', "No se pudo ajustar la columna 'rol': " . htmlspecialchars($e->getMessage())];
 }
 
-// ── 2) Corregir el rol de un usuario (POST) ──────────────────────────────────
+// ── 2) Asegurar que la columna email permita NULL (es opcional en el formulario) ──
+try {
+    $col = $pdo->query("SHOW COLUMNS FROM usuarios LIKE 'email'")->fetch(PDO::FETCH_ASSOC);
+    if ($col && strtoupper($col['Null']) === 'NO') {
+        $pdo->exec("ALTER TABLE usuarios MODIFY COLUMN email VARCHAR(150) NULL DEFAULT NULL");
+        $mensajes[] = ['ok', "Columna 'email' corregida: ahora acepta valores vacíos. Antes rechazaba usuarios sin correo con un error confuso de 'correo duplicado'."];
+    } elseif ($col) {
+        $mensajes[] = ['ok', "La columna 'email' ya acepta valores vacíos. No se necesitó cambio."];
+    }
+} catch (Exception $e) {
+    $mensajes[] = ['err', "No se pudo ajustar la columna 'email': " . htmlspecialchars($e->getMessage())];
+}
+
+// ── 3) Corregir el rol de un usuario (POST) ──────────────────────────────────
 $rolesValidos = ['administrador','gerente','inspector','cliente'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $uid_fix = intval($_POST['usuario_id'] ?? 0);
@@ -56,7 +71,7 @@ $usuarios = $pdo->query("SELECT id, nombre, username, rol, estado FROM usuarios 
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reparar roles</title>
+<title>Reparar base de datos</title>
 <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Segoe UI',sans-serif;background:#f0f4ff;color:#1a2138;padding:24px}
@@ -81,8 +96,8 @@ $usuarios = $pdo->query("SELECT id, nombre, username, rol, estado FROM usuarios 
 <body>
 <div class="wrap">
     <a class="back" href="admin-dashboard.php">← Panel Admin</a>
-    <h1 style="margin-top:10px">🛠️ Reparar roles de usuario</h1>
-    <div class="sub">Corrige la columna de rol y asigna el rol correcto a cualquier usuario, sin phpMyAdmin.</div>
+    <h1 style="margin-top:10px">🛠️ Reparar base de datos de usuarios</h1>
+    <div class="sub">Corrige las columnas de rol y correo, y asigna el rol correcto a cualquier usuario, sin phpMyAdmin.</div>
 
     <?php foreach ($mensajes as $m): ?>
         <div class="msg <?= $m[0] ?>"><?= $m[1] ?></div>
