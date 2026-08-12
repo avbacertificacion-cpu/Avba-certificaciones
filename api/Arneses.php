@@ -26,24 +26,13 @@
  * Igual que en grúas, RETORNADO conserva el QR reservado y vuelve a ser
  * aprobable, mientras que DEVUELTO regresa la captura al inspector.
  */
+require_once __DIR__ . '/FirmaInspector.php';
+
 class Arneses {
     private PDO $pdo;
 
     /** Resultado de la inspección de una pieza. */
     private const RESULTADOS = ['APTO', 'CONDICIONADO', 'NO APTO'];
-
-    /**
-     * Versión del tratamiento de imágenes de firma y sello. Súbela al cambiar
-     * cómo se procesan: es lo que invalida las que ya están generadas, porque
-     * los archivos de origen no cambian y la caché seguiría entregando las
-     * viejas.
-     */
-    private const FIRMA_VERSION = 7;
-
-    /** Umbrales de luminancia al limpiar y realzar una firma escaneada. */
-    private const LUM_PAPEL = 248;   // de aquí en adelante es hoja
-    private const LUM_TINTA = 235;   // por debajo de aquí es trazo pleno
-    private const LUM_META  = 140;   // a cuánto se lleva el tono más claro del trazo
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
@@ -1170,242 +1159,19 @@ class Arneses {
      * intenta por nombre. Devuelve '' si no hay firma registrada, y entonces el
      * documento sale sólo con la línea y el nombre.
      */
+    /* El tratamiento de la firma vive en FirmaInspector: lo comparten arneses y
+       accesorios, y tenerlo en un solo sitio evita que el arreglo del recuadro
+       negro se aplique en un módulo y se olvide en el otro. */
     private function firmaDe(string $usuario, string $nombre): string {
-        $rel = '';
-        try {
-            if ($usuario !== '') {
-                $st = $this->pdo->prepare("SELECT firma_imagen FROM usuarios WHERE usuario = ? LIMIT 1");
-                $st->execute([$usuario]);
-                $rel = (string)($st->fetchColumn() ?: '');
-            }
-            if ($rel === '' && $nombre !== '') {
-                $st = $this->pdo->prepare(
-                    "SELECT firma_imagen FROM usuarios WHERE rol = 'INSPECTOR' AND nombre = ? LIMIT 1"
-                );
-                $st->execute([$nombre]);
-                $rel = (string)($st->fetchColumn() ?: '');
-            }
-        } catch (\Throwable $e) { return ''; }
-
-        $rel = ltrim($rel, '/');
-        return ($rel !== '' && is_file(__DIR__ . '/../' . $rel)) ? $rel : '';
+        return FirmaInspector::rutaDe($this->pdo, $usuario, $nombre);
     }
 
-    /**
-     * Deja la firma lista para el documento: quita el fondo del papel, le
-     * devuelve contraste y recorta el margen sobrante.
-     *
-     * En ningún momento se usa transparencia. El fondo se pinta blanco desde el
-     * principio, en vez de hacerlo transparente y aplanarlo después: mPDF
-     * incrusta un PNG con canal alfa como imagen a color —negra en la zona
-     * transparente— más una máscara aparte, y si el visor no aplica la máscara
-     * la firma sale como un recuadro negro. Sin alfa no hay máscara posible.
-     *
-     * @return string Ruta relativa a la imagen procesada, o la original si no
-     *                se pudo procesar.
-     */
     private function firmaProcesada(string $firmaRel): string {
-        if ($firmaRel === '') return '';
-        if (!function_exists('imagecreatetruecolor')) return $firmaRel;
-
-        $fAbs = __DIR__ . '/../' . $firmaRel;
-        if (!is_file($fAbs)) return $firmaRel;
-
-        // Se guarda en JPEG, no en PNG: mPDF analiza los PNG píxel por píxel con
-        // su propio lector, mientras que un JPEG lo incrusta tal cual. El PNG
-        // generado aquí salía correcto —RGB, 8 bits, sin alfa ni entrelazado— y
-        // aun así el visor lo mostraba en negro. JPEG no admite transparencia ni
-        // máscaras, así que ese fallo no puede repetirse.
-        $huella = substr(md5(self::FIRMA_VERSION . '|' . filemtime($fAbs) . filesize($fAbs)), 0, 12);
-        $dir    = UPLOAD_DIR . 'firmas_procesadas/';
-        $rel    = 'uploads/firmas_procesadas/firma_' . $huella . '.jpg';
-        if (is_file(__DIR__ . '/../' . $rel)) return $rel;
-        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return $firmaRel;
-
-        try {
-            $src = @imagecreatefromstring((string)file_get_contents($fAbs));
-            if (!$src) return $firmaRel;
-
-            // Lo PRIMERO es resolver la transparencia contra blanco.
-            //
-            // Las firmas llegan de dos maneras: escaneadas sobre papel (JPG, sin
-            // transparencia) o recortadas con fondo transparente (PNG). En las
-            // segundas, imagecolorat devuelve negro en el fondo —el color que hay
-            // debajo del alfa—, así que leyendo sólo el RGB el fondo se tomaba por
-            // trazo y la firma salía como un recuadro negro.
-            $src = $this->sobreBlanco($src);
-
-            // El realce recorre la imagen píxel por píxel: una firma de varios
-            // megapíxeles tardaría segundos sin aportar nada, porque en el
-            // documento se imprime a unos 58 px de alto.
-            $src = $this->limitarAncho($src, 900);
-            $w = imagesx($src); $h = imagesy($src);
-
-            $lum = fn(int $c): int => (int)round(
-                0.299 * (($c >> 16) & 0xFF) + 0.587 * (($c >> 8) & 0xFF) + 0.114 * ($c & 0xFF)
-            );
-
-            // Tono más oscuro presente, para estirar desde el trazo real y no
-            // desde un negro teórico que un escaneo claro nunca alcanza.
-            $minLum = 255;
-            for ($y = 0; $y < $h; $y++) {
-                for ($x = 0; $x < $w; $x++) {
-                    $l = $lum(imagecolorat($src, $x, $y));
-                    if ($l < $minLum) $minLum = $l;
-                }
-            }
-            $rango = max(1, self::LUM_TINTA - $minLum);
-
-            // Lienzo opaco desde el inicio: nunca hay canal alfa que guardar.
-            $out = imagecreatetruecolor($w, $h);
-            imagealphablending($out, false);
-            imagesavealpha($out, false);
-            $blanco = imagecolorallocate($out, 255, 255, 255);
-            imagefilledrectangle($out, 0, 0, $w, $h, $blanco);
-
-            $x1 = $w; $y1 = $h; $x2 = -1; $y2 = -1;   // recuadro del trazo
-            for ($y = 0; $y < $h; $y++) {
-                for ($x = 0; $x < $w; $x++) {
-                    $c = imagecolorat($src, $x, $y);
-                    $l = $lum($c);
-                    if ($l >= self::LUM_PAPEL) continue;          // papel: queda blanco
-
-                    $r = ($c >> 16) & 0xFF; $g = ($c >> 8) & 0xFF; $b = $c & 0xFF;
-
-                    if ($l >= self::LUM_TINTA) {
-                        // Borde: se mezcla con el blanco según lo claro que sea,
-                        // para que el trazo no salga dentado.
-                        $m = ($l - self::LUM_TINTA) / (self::LUM_PAPEL - self::LUM_TINTA);
-                        $r = (int)round($r + (255 - $r) * $m);
-                        $g = (int)round($g + (255 - $g) * $m);
-                        $b = (int)round($b + (255 - $b) * $m);
-                    } else {
-                        // Trazo: se estira el tono hacia lo oscuro conservando
-                        // el matiz, escalando los tres canales por igual.
-                        $t = min(1.0, max(0.0, ($l - $minLum) / $rango));
-                        $f = ($t * self::LUM_META) / max(1, $l);
-                        $r = min(255, (int)round($r * $f));
-                        $g = min(255, (int)round($g * $f));
-                        $b = min(255, (int)round($b * $f));
-                        if ($x < $x1) $x1 = $x;  if ($x > $x2) $x2 = $x;
-                        if ($y < $y1) $y1 = $y;  if ($y > $y2) $y2 = $y;
-                    }
-                    imagesetpixel($out, $x, $y, imagecolorallocate($out, $r, $g, $b));
-                }
-            }
-            imagedestroy($src);
-
-            // Recorte con un margen mínimo alrededor del trazo
-            if ($x2 > $x1 && $y2 > $y1) {
-                $m  = (int)round(max($x2 - $x1, $y2 - $y1) * 0.04);
-                $rx = max(0, $x1 - $m); $ry = max(0, $y1 - $m);
-                $rw = min($w - $rx, $x2 - $x1 + 1 + $m * 2);
-                $rh = min($h - $ry, $y2 - $y1 + 1 + $m * 2);
-
-                $rec = imagecreatetruecolor($rw, $rh);
-                imagealphablending($rec, false);
-                imagesavealpha($rec, false);
-                imagefilledrectangle($rec, 0, 0, $rw, $rh, imagecolorallocate($rec, 255, 255, 255));
-                imagecopy($rec, $out, 0, 0, $rx, $ry, $rw, $rh);
-                imagedestroy($out);
-                $out = $rec;
-            }
-
-            $ok = imagejpeg($out, $dir . basename($rel), 94);
-            imagedestroy($out);
-            return $ok ? $rel : $firmaRel;
-        } catch (\Throwable $e) {
-            error_log('[Arneses] firmaProcesada: ' . $e->getMessage());
-            return $firmaRel;
-        }
+        return FirmaInspector::procesada($firmaRel);
     }
 
-    /**
-     * Aplana una imagen con transparencia sobre blanco, sin retocarla.
-     *
-     * mPDF incrusta los PNG transparentes como imagen a color más una máscara
-     * aparte, y en el archivo la zona transparente queda negra: si el visor no
-     * aplica la máscara, sale un recuadro negro. Sobre la hoja del documento el
-     * resultado aplanado se ve igual y no depende del visor.
-     */
     private function aplanarSobreBlanco(string $rel): string {
-        if ($rel === '' || !function_exists('imagecreatetruecolor')) return $rel;
-        $abs = __DIR__ . '/../' . $rel;
-        if (!is_file($abs)) return $rel;
-
-        $huella  = substr(md5(self::FIRMA_VERSION . '|' . $rel . filemtime($abs) . filesize($abs)), 0, 12);
-        $dir     = UPLOAD_DIR . 'firmas_procesadas/';
-        $destino = 'uploads/firmas_procesadas/plano_' . $huella . '.jpg';
-        if (is_file(__DIR__ . '/../' . $destino)) return $destino;
-        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return $rel;
-
-        try {
-            $src = @imagecreatefromstring((string)file_get_contents($abs));
-            if (!$src) return $rel;
-            $w = imagesx($src); $h = imagesy($src);
-
-            $dst = imagecreatetruecolor($w, $h);
-            imagealphablending($dst, false);
-            imagesavealpha($dst, false);
-            imagefilledrectangle($dst, 0, 0, $w, $h, imagecolorallocate($dst, 255, 255, 255));
-            // Con blending activo, imagecopy mezcla el alfa del origen contra el
-            // blanco: el resultado queda opaco y sin canal alfa que guardar.
-            imagealphablending($dst, true);
-            imagecopy($dst, $src, 0, 0, 0, 0, $w, $h);
-
-            $ok = imagejpeg($dst, $dir . basename($destino), 94);
-            imagedestroy($dst); imagedestroy($src);
-            return $ok ? $destino : $rel;
-        } catch (\Throwable $e) {
-            error_log('[Arneses] aplanarSobreBlanco: ' . $e->getMessage());
-            return $rel;
-        }
-    }
-
-    /**
-     * Devuelve la imagen compuesta sobre blanco, resolviendo su transparencia.
-     * Un píxel medio transparente se mezcla con el blanco en la proporción que
-     * le corresponde, para que el borde del trazo no quede duro.
-     */
-    private function sobreBlanco(\GdImage $img): \GdImage {
-        $w = imagesx($img); $h = imagesy($img);
-        $out = imagecreatetruecolor($w, $h);
-        imagealphablending($out, false);
-        imagesavealpha($out, false);
-        imagefilledrectangle($out, 0, 0, $w, $h, imagecolorallocate($out, 255, 255, 255));
-
-        for ($y = 0; $y < $h; $y++) {
-            for ($x = 0; $x < $w; $x++) {
-                $c = imagecolorat($img, $x, $y);
-                $a = ($c >> 24) & 0x7F;               // 0 opaco … 127 transparente
-                if ($a >= 127) continue;              // del todo transparente: queda blanco
-
-                $op = (127 - $a) / 127;               // opacidad real del píxel
-                $r  = (int)round((($c >> 16) & 0xFF) * $op + 255 * (1 - $op));
-                $g  = (int)round((($c >> 8)  & 0xFF) * $op + 255 * (1 - $op));
-                $b  = (int)round(( $c        & 0xFF) * $op + 255 * (1 - $op));
-                imagesetpixel($out, $x, $y, imagecolorallocate($out, $r, $g, $b));
-            }
-        }
-        imagedestroy($img);
-        return $out;
-    }
-
-    /** Reduce la imagen si excede el lado máximo, conservando la proporción. */
-    private function limitarAncho(\GdImage $img, int $maxLado): \GdImage {
-        $w = imagesx($img); $h = imagesy($img);
-        $mayor = max($w, $h);
-        if ($mayor <= $maxLado) return $img;
-
-        $f  = $maxLado / $mayor;
-        $nw = max(1, (int)round($w * $f));
-        $nh = max(1, (int)round($h * $f));
-        $out = imagecreatetruecolor($nw, $nh);
-        imagealphablending($out, false);
-        imagesavealpha($out, true);
-        imagecopyresampled($out, $img, 0, 0, 0, 0, $nw, $nh, $w, $h);
-        imagedestroy($img);
-        return $out;
+        return FirmaInspector::aplanada($rel);
     }
 
     /**

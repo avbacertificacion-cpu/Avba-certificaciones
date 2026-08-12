@@ -1381,7 +1381,7 @@
 
 <!-- ══ MODAL DETALLE SESIÓN ACCESORIOS ══ -->
 <div class="overlay" id="overlay-acc-sesion" style="display:none" onclick="if(event.target===this)cerrarDetAccSesion()">
-  <div class="modal" style="max-width:660px">
+  <div class="modal" style="max-width:820px">
     <div class="modal-hdr">
       <div class="modal-hdr-l">
         <div class="m-avatar" style="background:var(--verde)">A</div>
@@ -1393,6 +1393,59 @@
       <button class="btn-close" onclick="cerrarDetAccSesion()">×</button>
     </div>
     <div style="padding:16px 22px 20px;max-height:72vh;overflow-y:auto" id="acc-ses-body">
+    </div>
+  </div>
+</div>
+
+<!-- ══ CAPTURA DE ACCESORIO DESDE CALIDAD ══
+     Mismo criterio que en arneses: Calidad puede dar de alta un accesorio en
+     una sesión ya enviada, como si fuera el inspector. -->
+<div class="overlay" id="overlay-acc-nuevo" style="display:none;z-index:520" onclick="if(event.target===this)cerrarAccNuevo()">
+  <div class="modal" style="max-width:720px">
+    <div class="modal-hdr">
+      <div class="modal-hdr-l">
+        <div class="m-avatar" style="background:var(--verde)">＋</div>
+        <div>
+          <div class="m-title">Agregar accesorio a la sesión</div>
+          <div class="m-sub" id="acc-nuevo-sub">—</div>
+        </div>
+      </div>
+      <button class="btn-close" onclick="cerrarAccNuevo()">×</button>
+    </div>
+    <div style="padding:16px 22px 8px;max-height:66vh;overflow-y:auto">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
+        <label style="font-size:11px;color:var(--texto-sub);grid-column:1/-1">Tipo de accesorio *
+          <select id="acc-n-tipo" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px">
+            <option value="">— Seleccionar —</option>
+          </select></label>
+        <label style="font-size:11px;color:var(--texto-sub)">ID / Etiqueta interna
+          <input type="text" id="acc-n-id" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Marca
+          <input type="text" id="acc-n-marca" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Modelo
+          <input type="text" id="acc-n-modelo" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">No. de serie
+          <input type="text" id="acc-n-serie" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Capacidad
+          <input type="text" id="acc-n-capacidad" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Medidas
+          <input type="text" id="acc-n-medidas" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Código QR
+          <input type="text" id="acc-n-qr" maxlength="10" placeholder="Empieza con 4"
+                 style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px;font-family:monospace"></label>
+        <label style="font-size:11px;color:var(--texto-sub)">Resultado
+          <select id="acc-n-estado" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px">
+            <option value="CUMPLE">CUMPLE</option>
+            <option value="NO CUMPLE">NO CUMPLE</option>
+          </select></label>
+      </div>
+
+      <label style="font-size:11px;color:var(--texto-sub);display:block;margin-top:10px">Fotografías (opcional, máx. 6)
+        <input type="file" id="acc-n-fotos" accept="image/*" multiple style="width:100%;font-size:12px;margin-top:4px"></label>
+    </div>
+    <div style="padding:10px 22px 18px;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn-sec" onclick="cerrarAccNuevo()">Cancelar</button>
+      <button class="btn-guardar" id="acc-n-btn" onclick="guardarAccNuevo()">Guardar accesorio</button>
     </div>
   </div>
 </div>
@@ -3876,6 +3929,8 @@ function estatusAccBadge(e) {
   if (e === 'APROBADO_CALIDAD') return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--verde-light);color:var(--verde)">Aprobado</span>`;
   if (e === 'EMITIDO')          return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--azul-light);color:var(--azul-dark)">Emitido</span>`;
   if (e === 'DEVUELTO')         return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--rojo-light);color:var(--rojo)">Devuelto</span>`;
+  // Certificaciones lo regresó para ajustes; el cliente conserva sus documentos
+  if (e === 'RETORNADO')        return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#fff4e0;color:#b06b00">Retornado</span>`;
   return `<span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:#f0f0f0;color:#888">Pendiente</span>`;
 }
 
@@ -3888,7 +3943,7 @@ function renderSesionesAcc(data) {
   }
   tbody.innerHTML = data.map(r => {
     const folio = r.control ? 'AB.'+r.control+'-'+new Date().getFullYear()+'MX' : '—';
-    const puedAprobar = !r.estatus || r.estatus === 'PENDIENTE' || r.estatus === 'DEVUELTO';
+    const puedAprobar = ['','PENDIENTE','DEVUELTO','RETORNADO'].includes(r.estatus || '');
     return `
     <tr>
       <td style="font-weight:600">${escH(r.cliente)}</td>
@@ -3931,43 +3986,314 @@ async function abrirDetAccSesion(id) {
     document.getElementById('acc-ses-sub').textContent =
       (s.fecha||'') + (s.usuario ? ' · '+s.usuario : '') + (folioAcc ? ' · ' + folioAcc : '');
     accSesionActual = s;
-    const puedAprobar = !s.estatus || s.estatus === 'PENDIENTE' || s.estatus === 'DEVUELTO';
-    const accsHtml = (s.accesorios||[]).map((a,i) => `
-      <div id="acc-row-${a.id}" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--borde)">
-        <div style="width:28px;height:28px;border-radius:50%;background:var(--azul-light);color:var(--azul);
-                    font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:13px;font-weight:600;color:var(--texto)">${escH(a.tipo_nombre||'—')}</div>
-          <div style="font-size:11px;color:var(--texto-sub);margin-top:2px">
-            ${[a.id_accesorio,a.marca,a.modelo,a.serie].filter(Boolean).map(escH).join(' · ')||'—'}
-            ${a.capacidad?' · '+escH(a.capacidad):''}${a.medidas?' · '+escH(a.medidas):''}
-          </div>
-          ${+a.total_fotos>0?`<div style="font-size:10px;color:var(--azul);margin-top:2px">📷 ${a.total_fotos} foto${a.total_fotos!=1?'s':''}</div>`:''}
+    // RETORNADO entra aquí igual que en arneses y grúas: Certificaciones lo
+    // regresó a Calidad, conserva su QR y vuelve a ser aprobable.
+    const puedAprobar = ['','PENDIENTE','DEVUELTO','RETORNADO'].includes(s.estatus || '');
+    const bloqueado   = !puedAprobar;
+    const sinQR = (s.accesorios||[]).filter(a => !a.qr_codigo).length;
+
+    const cab = `
+      ${s.motivo ? `<div style="background:#fdecea;border:1px solid var(--rojo);border-radius:8px;padding:10px;font-size:12px;color:#b91c1c;margin-bottom:12px">
+         <strong>Motivo del retorno:</strong> ${escH(s.motivo)}
+       </div>` : ''}
+      <!-- Datos del expediente: Calidad los corrige antes de aprobar, igual que
+           en arneses y grúas (incluye el inspector que firma el informe). -->
+      <div style="border:1px solid var(--borde);border-radius:10px;padding:12px;margin-bottom:12px;background:#fafbfc">
+        <div style="font-size:12px;font-weight:700;color:var(--texto);margin-bottom:8px">Datos del expediente</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px">
+          <label style="font-size:11px;color:var(--texto-sub)">Cliente
+            <input type="text" id="acc-ed-cliente" value="${escH(s.cliente||'')}" ${bloqueado?'disabled':''}
+                   style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+          <label style="font-size:11px;color:var(--texto-sub)">Fecha de inspección
+            <input type="date" id="acc-ed-fecha" value="${escH(s.fecha_iso||'')}" ${bloqueado?'disabled':''}
+                   style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+          <label style="font-size:11px;color:var(--texto-sub)">Correo del cliente (para el envío)
+            <input type="text" id="acc-ed-correo" value="${escH(s.correo||'')}" placeholder="correo@empresa.com"
+                   style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+          <label style="font-size:11px;color:var(--texto-sub)">Inspector que firma
+            <select id="acc-ed-inspector"
+                    style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px;background:#fff">
+              <option value="">Cargando inspectores…</option>
+            </select>
+            <span id="acc-ed-firma-aviso" style="font-size:10.5px;color:var(--texto-hint)"></span></label>
+          <label style="font-size:11px;color:var(--texto-sub);grid-column:1/-1">Lugar de la inspección
+            <input type="text" id="acc-ed-direccion" value="${escH(s.direccion||'')}" ${bloqueado?'disabled':''}
+                   style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
         </div>
-        <span id="acc-badge-${a.id}" style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0;${estadoBadgeStyle(a.estado)}">
-          ${escH(a.estado||'—')}
-        </span>
-        <button onclick="abrirEditAcc(${JSON.stringify(a).replace(/"/g,'&quot;')})"
-                style="padding:4px 10px;border-radius:6px;border:1.5px solid var(--ambar);
-                       color:var(--ambar);font-size:11px;font-weight:600;
-                       background:var(--ambar-light);cursor:pointer;flex-shrink:0">
-          ✏ Editar
-        </button>
+        <button onclick="guardarDatosAcc(${s.id})"
+                style="margin-top:9px;padding:6px 14px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">
+          Guardar datos</button>
+        <button onclick="abrirAccNuevo()"
+                style="margin-top:9px;margin-left:6px;padding:6px 14px;background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">
+          ＋ Agregar accesorio</button>
+      </div>
+      ${sinQR ? `<div style="background:#fff8e1;border:1px solid #f59e0b;border-radius:8px;padding:10px;font-size:12px;color:#92400e;margin-bottom:12px">
+         ⚠ ${sinQR} accesorio(s) sin código QR.
+       </div>` : ''}`;
+
+    const accsHtml = (s.accesorios||[]).map((a,i) => `
+      <div id="acc-row-${a.id}" style="border:1px solid var(--borde);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:26px;height:26px;border-radius:50%;background:var(--azul-light);color:var(--azul);
+                      font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${i+1}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:600;color:var(--texto)">${escH(a.tipo_nombre||'—')}</div>
+            <div style="font-size:11px;color:var(--texto-sub);margin-top:2px">
+              ${[a.id_accesorio,a.marca,a.modelo].filter(Boolean).map(escH).join(' · ')||'—'}
+              ${a.capacidad?' · '+escH(a.capacidad):''}${a.medidas?' · '+escH(a.medidas):''}
+            </div>
+            ${+a.total_fotos>0?`<div style="font-size:10px;color:var(--azul);margin-top:2px">📷 ${a.total_fotos} foto${a.total_fotos!=1?'s':''}</div>`:''}
+          </div>
+          <span id="acc-badge-${a.id}" style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0;${estadoBadgeStyle(a.estado)}">
+            ${escH(a.estado||'—')}
+          </span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap">
+          <input type="text" id="acc-serie-${a.id}" value="${escH(a.serie||'')}" placeholder="No. de serie"
+                 style="width:150px;padding:5px 8px;border:1.5px solid ${a.serie?'var(--borde)':'#f59e0b'};border-radius:6px;font-size:12px">
+          <input type="text" id="acc-qr-${a.id}" value="${escH(a.qr_codigo||'')}" maxlength="10" placeholder="QR del accesorio"
+                 style="width:140px;padding:5px 8px;border:1.5px solid ${a.qr_codigo?'var(--borde)':'#f59e0b'};border-radius:6px;font-size:12px;font-family:monospace">
+          <button onclick="guardarSerieQrAcc(${a.id})"
+                  style="padding:5px 12px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Guardar</button>
+          <button onclick="abrirEditAccPorId(${a.id})"
+                  style="padding:5px 12px;border-radius:6px;border:1.5px solid var(--ambar);color:var(--ambar);
+                         font-size:11px;font-weight:600;background:var(--ambar-light);cursor:pointer">✏ Editar</button>
+          <button onclick="duplicarAccesorio(${a.id})" title="Crear copias de este accesorio"
+                  style="padding:5px 12px;background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">⧉ Duplicar</button>
+          <button onclick="eliminarAccesorioCal(${a.id})" title="Eliminar este accesorio de la sesión"
+                  style="padding:5px 12px;background:var(--rojo-light);border:none;color:var(--rojo);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">🗑 Eliminar</button>
+        </div>
       </div>`).join('') || `<div style="text-align:center;padding:32px;color:var(--texto-hint)">Sin accesorios</div>`;
 
     const aprobarBtnHtml = puedAprobar ? `
-      <div style="padding:14px 0 4px;text-align:right">
+      <div style="padding:14px 0 4px;text-align:right;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+        <button onclick="devolverAccCal(${s.id})"
+                style="padding:8px 16px;border-radius:8px;border:1.5px solid var(--rojo);background:var(--rojo-light);
+                       color:var(--rojo);font-size:12px;font-weight:600;cursor:pointer">
+          ↩ Devolver al inspector
+        </button>
         <button onclick="abrirApro('acc',${s.id})"
                 style="padding:8px 20px;border-radius:8px;border:none;background:var(--verde);
                        color:white;font-size:13px;font-weight:600;cursor:pointer">
           ✓ Aprobar sesión → Certificaciones
         </button>
       </div>` : `
-      <div style="padding:12px 0 4px;text-align:right">${estatusAccBadge(s.estatus)}</div>`;
+      <div style="padding:12px 0 4px;text-align:right">${estatusAccBadge(s.estatus)}
+        <div style="font-size:11px;color:var(--texto-hint);margin-top:4px">En Certificaciones para emisión y envío.</div>
+      </div>`;
 
-    document.getElementById('acc-ses-body').innerHTML = accsHtml + aprobarBtnHtml;
+    document.getElementById('acc-ses-body').innerHTML = cab + accsHtml + aprobarBtnHtml;
+    accPoblarInspectores(s.inspector_usuario || '', s.inspector_firma || s.usuario || '');
   } catch (e) {
     document.getElementById('acc-ses-body').innerHTML = `<div style="text-align:center;padding:32px;color:var(--rojo)">Error al cargar.</div>`;
+  }
+}
+
+/* El inspector se elige de los usuarios con rol INSPECTOR: de ahí salen el
+   nombre que se imprime y la firma que se estampa en el informe. */
+async function accPoblarInspectores(usuarioActual, nombreActual) {
+  const sel = document.getElementById('acc-ed-inspector');
+  const avi = document.getElementById('acc-ed-firma-aviso');
+  if (!sel) return;
+  try { await cargarUsuariosInstructor(); } catch(_) {}
+  const lista = usuariosInstrData || [];
+  sel.innerHTML = '<option value="">— Seleccionar inspector —</option>' +
+    lista.map(u => `<option value="${escH(u.usuario)}" data-nombre="${escH(u.nombre)}"
+                            data-firma="${u.firma_imagen ? '1' : ''}"
+                            ${String(u.usuario) === String(usuarioActual) ? 'selected' : ''}>${escH(u.nombre)}</option>`).join('');
+
+  // Expedientes anteriores guardaban sólo el nombre escrito a mano
+  if (!usuarioActual && nombreActual) {
+    const coincide = lista.find(u => u.nombre === nombreActual || u.usuario === nombreActual);
+    if (coincide) sel.value = coincide.usuario;
+    else sel.insertAdjacentHTML('afterbegin',
+      `<option value="" data-nombre="${escH(nombreActual)}" selected>${escH(nombreActual)} (sin cuenta)</option>`);
+  }
+  sel.onchange = accAvisoFirma;
+  accAvisoFirma();
+
+  function accAvisoFirma() {
+    if (!avi) return;
+    const op = sel.options[sel.selectedIndex];
+    if (!op || !sel.value) { avi.textContent = ''; return; }
+    avi.textContent = op.dataset.firma
+      ? '✓ Tiene firma registrada; se estampará en el informe.'
+      : '⚠ Sin firma registrada: el informe saldrá sólo con su nombre.';
+    avi.style.color = op.dataset.firma ? 'var(--verde)' : '#92400e';
+  }
+}
+
+async function guardarDatosAcc(id) {
+  const val = i => { const el = document.getElementById(i); return el ? el.value.trim() : ''; };
+  const sel = document.getElementById('acc-ed-inspector');
+  const op  = sel ? sel.options[sel.selectedIndex] : null;
+  const payload = {
+    id,
+    correo: val('acc-ed-correo'),
+    inspector_usuario: sel ? sel.value : '',
+    inspector_firma:   op ? (op.dataset.nombre || '') : '',
+  };
+  ['cliente','fecha','direccion'].forEach(c => {
+    const el = document.getElementById('acc-ed-' + c);
+    if (el && !el.disabled) payload[c] = el.value.trim();
+  });
+  const r = await accPost('GUARDAR_DATOS_SESION_ACC', payload);
+  if (r && r.status === 'success') {
+    mostrarToast(r.message || 'Datos guardados.', 'ok');
+    abrirDetAccSesion(id);
+    accSesionesCargadas = false; cargarSesionesAcc();
+  } else if (r) mostrarToast(r.message || 'No se pudo guardar.', 'err');
+}
+
+/* Serie y QR juntos: es lo que más se corrige en un lote de accesorios
+   idénticos, donde sólo cambia el número de serie. */
+async function guardarSerieQrAcc(accId) {
+  const serie = (document.getElementById('acc-serie-' + accId) || {}).value || '';
+  const qr    = ((document.getElementById('acc-qr-' + accId) || {}).value || '').replace(/\D/g,'');
+  if (qr && qr.length !== 10) { mostrarToast('El QR debe tener 10 dígitos.', 'err'); return; }
+  const a = (accSesionActual && (accSesionActual.accesorios||[]).find(x => x.id == accId)) || {};
+  const r = await accPost('EDITAR_ACCESORIO', {
+    id: accId, tipo_id: a.tipo_id || 0,
+    id_accesorio: a.id_accesorio || '', marca: a.marca || '', modelo: a.modelo || '',
+    serie: serie.trim(), capacidad: a.capacidad || '', medidas: a.medidas || '',
+    estado: a.estado || 'CUMPLE', qr_codigo: qr,
+  });
+  if (r && r.status === 'success') {
+    mostrarToast('Accesorio actualizado.', 'ok');
+    abrirDetAccSesion(accSesionActual.id);
+  } else if (r) mostrarToast(r.message || 'No se pudo guardar.', 'err');
+}
+
+function abrirEditAccPorId(accId) {
+  const a = (accSesionActual && (accSesionActual.accesorios||[]).find(x => x.id == accId));
+  if (a) abrirEditAcc(a);
+}
+
+/* Duplicar: para lotes de equipo idéntico donde sólo cambia la serie. Se
+   capturan los datos una vez y después se ajusta lo distinto. */
+async function duplicarAccesorio(accId) {
+  const n = parseInt(prompt('¿Cuántas copias de este accesorio?', '1') || '0', 10);
+  if (!n || n < 1) return;
+  if (n > 50) { mostrarToast('Máximo 50 copias por vez.', 'err'); return; }
+  const series = prompt(
+    'Números de serie de las copias, uno por línea (opcional).\n' +
+    'Puedes dejarlo vacío y capturarlos después.', '') || '';
+  const r = await accPost('DUPLICAR_ACCESORIO', { id: accId, copias: n, series });
+  if (r && r.status === 'success') {
+    mostrarToast(r.message || 'Copias creadas.', 'ok');
+    if (r.reemitir) alert('La sesión ya estaba cerrada: pide a Certificaciones que vuelva a emitir para que las copias aparezcan en los documentos.');
+    abrirDetAccSesion(accSesionActual.id);
+    accSesionesCargadas = false; cargarSesionesAcc();
+  } else if (r) mostrarToast(r.message || 'No se pudo duplicar.', 'err');
+}
+
+async function eliminarAccesorioCal(accId) {
+  const a = (accSesionActual && (accSesionActual.accesorios||[]).find(x => x.id == accId)) || {};
+  const ident = a.serie || a.id_accesorio || a.tipo_nombre || 'este accesorio';
+  const emitida = accSesionActual && accSesionActual.estatus === 'EMITIDO';
+  let msg = `¿Eliminar ${ident} de la sesión?\n\nSe borran también sus fotografías y su código QR vuelve al banco.`;
+  if (emitida) msg += '\n\nLa sesión ya está emitida: el accesorio dejará de aparecer en los documentos cuando Certificaciones los vuelva a emitir.';
+  if (!confirm(msg)) return;
+  const r = await accPost('ELIMINAR_ACCESORIO', { id: accId });
+  if (r && r.status === 'success') {
+    mostrarToast(r.message || 'Accesorio eliminado.', 'ok');
+    if (r.reemitir) alert('Pide a Certificaciones que vuelva a emitir los documentos para que reflejen el cambio.');
+    abrirDetAccSesion(accSesionActual.id);
+    accSesionesCargadas = false; cargarSesionesAcc();
+  } else if (r) mostrarToast(r.message || 'No se pudo eliminar.', 'err');
+}
+
+async function devolverAccCal(id) {
+  const motivo = prompt('Motivo de la devolución al inspector:');
+  if (motivo === null) return;
+  const r = await accPost('DEVOLVER_SESION_ACC', { id, motivo });
+  if (r && r.status === 'success') {
+    mostrarToast('Sesión devuelta al inspector.', 'ok');
+    cerrarDetAccSesion();
+    accSesionesCargadas = false; cargarSesionesAcc();
+  } else if (r) mostrarToast(r.message || 'No se pudo devolver.', 'err');
+}
+
+/* ── Alta de accesorio desde Calidad ── */
+async function abrirAccNuevo() {
+  if (!accSesionActual) return;
+  document.getElementById('acc-nuevo-sub').textContent =
+    (accSesionActual.cliente || '') + (accSesionActual.control ? ' · Folio ' + accSesionActual.control : '');
+  ['id','marca','modelo','serie','capacidad','medidas','qr'].forEach(f => {
+    const el = document.getElementById('acc-n-' + f); if (el) el.value = '';
+  });
+  const fotos = document.getElementById('acc-n-fotos'); if (fotos) fotos.value = '';
+  document.getElementById('acc-n-estado').value = 'CUMPLE';
+
+  if (!accTiposData.length) { try { await cargarAccTipos(); } catch(_) {} }
+  document.getElementById('acc-n-tipo').innerHTML =
+    '<option value="">— Seleccionar —</option>' +
+    accTiposData.filter(t => t.activo != 0).map(t => `<option value="${t.id}">${escH(t.nombre)}</option>`).join('');
+
+  document.getElementById('overlay-acc-nuevo').style.display = 'flex';
+}
+
+function cerrarAccNuevo() { document.getElementById('overlay-acc-nuevo').style.display = 'none'; }
+
+async function guardarAccNuevo() {
+  if (!accSesionActual) return;
+  const v = id => (document.getElementById(id) || {}).value || '';
+  const tipo = v('acc-n-tipo');
+  if (!tipo) { mostrarToast('Selecciona el tipo de accesorio.', 'err'); return; }
+  const qr = v('acc-n-qr').replace(/\D/g,'');
+  if (qr && qr.length !== 10) { mostrarToast('El QR debe tener 10 dígitos.', 'err'); return; }
+
+  const btn = document.getElementById('acc-n-btn');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+
+  const s  = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const fd = new FormData();
+  fd.append('action', 'GUARDAR_ACCESORIO');
+  fd.append('token', s.token || '');
+  fd.append('sesion_id',    accSesionActual.id);
+  fd.append('tipo_id',      tipo);
+  fd.append('id_accesorio', v('acc-n-id').trim());
+  fd.append('marca',        v('acc-n-marca').trim());
+  fd.append('modelo',       v('acc-n-modelo').trim());
+  fd.append('serie',        v('acc-n-serie').trim());
+  fd.append('capacidad',    v('acc-n-capacidad').trim());
+  fd.append('medidas',      v('acc-n-medidas').trim());
+  fd.append('estado',       v('acc-n-estado'));
+  if (qr) fd.append('qr_codigo', qr);
+  const fotos = document.getElementById('acc-n-fotos');
+  if (fotos && fotos.files) {
+    Array.from(fotos.files).slice(0, 6).forEach(f => fd.append('fotos[]', f));
+  }
+
+  try {
+    const res  = await fetch(API, { method: 'POST', headers: { 'X-Token': s.token || '' }, body: fd });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast('Accesorio agregado.', 'ok');
+      if (data.reemitir) alert('La sesión ya estaba cerrada: pide a Certificaciones que vuelva a emitir para que el accesorio aparezca en los documentos.');
+      cerrarAccNuevo();
+      abrirDetAccSesion(accSesionActual.id);
+      accSesionesCargadas = false; cargarSesionesAcc();
+    } else {
+      mostrarToast(data.message || 'No se pudo guardar.', 'err');
+    }
+  } catch (e) { mostrarToast('Error de conexión.', 'err'); }
+  btn.disabled = false; btn.textContent = 'Guardar accesorio';
+}
+
+/* POST JSON al API con el token de la sesión; devuelve null si falla la red. */
+async function accPost(action, payload) {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res = await fetch(API, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+      body:    JSON.stringify({ action, token: s.token || '', payload }),
+    });
+    return await res.json();
+  } catch (e) {
+    mostrarToast('Error de conexión.', 'err');
+    return null;
   }
 }
 

@@ -1497,12 +1497,47 @@ if ($method === 'POST') {
         case 'GUARDAR_ACCESORIO':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($accesorios->guardarAccesorio($_POST, $_FILES, $usr['usuario']));
+            // Calidad y Admin pueden agregar accesorios a una sesión ya cerrada,
+            // igual que en arneses; el inspector sólo mientras siga abierta.
+            respuesta($accesorios->guardarAccesorio(
+                $_POST, $_FILES, $usr['usuario'],
+                in_array($usr['rol'], ['ADMIN','CALIDAD'], true)
+            ));
 
         case 'EDITAR_ACCESORIO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->editarAccesorio($payload));
+
+        case 'DUPLICAR_ACCESORIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->duplicarAccesorio($payload, in_array($usr['rol'], ['ADMIN','CALIDAD'], true)));
+
+        case 'ELIMINAR_ACCESORIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->eliminarAccesorio($payload, true));
+
+        case 'GUARDAR_DATOS_SESION_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->guardarDatosSesion($payload, $usr['usuario']));
+
+        case 'RETORNAR_SESION_ACC':   // Certificaciones → Calidad
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->retornarSesion($payload, $usr['usuario']));
+
+        case 'VISTA_PREVIA_ACC':      // genera el PDF sin emitir ni publicar
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->vistaPreviaAcc($payload));
+
+        case 'SUBIR_DOC_MANUAL_ACC':  // multipart
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->subirDocumentoManualAcc($_POST, $_FILES['archivo'] ?? []));
 
         case 'ASIGNAR_QR_ACCESORIO':
             $usr = validarToken($pdo, $token);
@@ -1514,10 +1549,12 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->aprobarSesion((int)($payload['id'] ?? 0), $usr['usuario'], trim($payload['qr'] ?? '')));
 
-        case 'DEVOLVER_SESION_ACC':
+        case 'DEVOLVER_SESION_ACC':   // Calidad → Inspector
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($accesorios->devolverSesion((int)($payload['id'] ?? 0), $usr['usuario']));
+            respuesta($accesorios->devolverSesion(
+                (int)($payload['id'] ?? 0), $usr['usuario'], (string)($payload['motivo'] ?? '')
+            ));
 
         case 'EMITIR_INFORME_ACC':
             $usr = validarToken($pdo, $token);

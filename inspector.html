@@ -2636,6 +2636,12 @@
           <button class="btn-ant" id="iza-btn-volver-lista" onclick="izaMostrar('lista')" style="display:none">← Lista</button>
           <button class="btn-sig" id="iza-btn-guardar"      onclick="izaGuardar()" style="flex:1">Guardar →</button>
         </div>
+        <!-- Lotes de accesorios idénticos: se guarda y el formulario queda
+             cargado con los mismos datos para capturar sólo la serie siguiente. -->
+        <button class="btn-ant" style="width:100%;margin-top:8px" onclick="izaGuardarYRepetir()"
+                title="Guarda este accesorio y conserva los datos para capturar otro igual">
+          ⧉ Guardar y capturar otro igual
+        </button>
       </div>
     </div>
   </div>
@@ -5907,15 +5913,70 @@ function izaCapturarFotoCallback(file) {
   izaRenderFotos();
 }
 
+/* Datos del formulario que se repiten en un lote de accesorios idénticos. La
+   serie, el QR y las fotografías NO se copian: son de cada unidad. */
+function izaLeerForm() {
+  const v = id => (document.getElementById(id) || {}).value || '';
+  return {
+    tipo:      v('iza-tipo'),
+    id_acc:    v('iza-id'),
+    marca:     v('iza-marca'),
+    modelo:    v('iza-modelo'),
+    capacidad: v('iza-capacidad'),
+    medidas:   v('iza-medidas'),
+    estado:    izaEstadoVal,
+  };
+}
+
+function izaEscribirForm(d) {
+  if (!d) return;
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  set('iza-tipo',      d.tipo);
+  set('iza-id',        d.id_acc);
+  set('iza-marca',     d.marca);
+  set('iza-modelo',    d.modelo);
+  set('iza-capacidad', d.capacidad);
+  set('iza-medidas',   d.medidas);
+  set('iza-serie', '');
+  set('iza-qr',    '');
+  izaEstado(d.estado || 'CUMPLE');
+  izaFotos = [];
+  izaRenderFotos();
+}
+
+/* Guarda y deja el formulario listo para el siguiente accesorio idéntico. */
+async function izaGuardarYRepetir() {
+  const datos = izaLeerForm();
+  const ok = await izaGuardar(true);
+  if (!ok) return;
+  izaEscribirForm(datos);
+  izaMostrar('form');
+  document.getElementById('iza-btn-volver-lista').style.display = 'block';
+  mostrarToast('Datos conservados. Captura la serie del siguiente.', 'ok');
+  document.getElementById('iza-serie')?.focus();
+}
+
+/* Reabre el formulario con los datos de un accesorio ya capturado, para
+   registrar otro idéntico cambiando sólo lo propio de la unidad. */
+function izaDuplicar(i) {
+  const a = izaAccesorios[i];
+  if (!a || !a.datos) { mostrarToast('Ese accesorio no se puede duplicar.', 'err'); return; }
+  izaEscribirForm(a.datos);
+  izaMostrar('form');
+  document.getElementById('iza-btn-volver-lista').style.display = 'block';
+  mostrarToast('Datos copiados. Captura la serie de este accesorio.', 'ok');
+  document.getElementById('iza-serie')?.focus();
+}
+
 // ── Guardar accesorio ─────────────────────────────────
-async function izaGuardar() {
+async function izaGuardar(repetir = false) {
   const tipoId = document.getElementById('iza-tipo').value;
   const fTipo  = document.getElementById('iza-f-tipo');
 
   if (!tipoId) {
     fTipo.classList.add('has-error');
     document.getElementById('iza-tipo').focus();
-    return;
+    return false;
   }
   fTipo.classList.remove('has-error');
 
@@ -5924,11 +5985,13 @@ async function izaGuardar() {
   if (qrVal && qrVal.length !== 10) {
     if (qrErr) qrErr.textContent = 'El QR debe tener exactamente 10 dígitos.';
     document.getElementById('iza-qr').focus();
-    return;
+    return false;
   }
   if (qrErr) qrErr.textContent = '';
 
-  const btn = document.getElementById('iza-btn-guardar');
+  const btn   = document.getElementById('iza-btn-guardar');
+  const base  = izaLeerForm();          // datos repetibles, para duplicar después
+  let   guardado = false;
   btn.disabled    = true;
   btn.textContent = 'Guardando…';
 
@@ -5962,10 +6025,14 @@ async function izaGuardar() {
         serie:       document.getElementById('iza-serie').value.trim(),
         estado:      izaEstadoVal,
         qr_codigo:   data.qr_codigo || qrVal || '',
+        datos:       base,
       });
       izaRenderLista();
-      izaMostrar('lista');
-      mostrarToast('Accesorio guardado correctamente', 'ok');
+      guardado = true;
+      if (!repetir) {
+        izaMostrar('lista');
+        mostrarToast('Accesorio guardado correctamente', 'ok');
+      }
     } else {
       mostrarToast('Error: ' + (data.message || 'No se pudo guardar el accesorio.'), 'err');
     }
@@ -5976,6 +6043,7 @@ async function izaGuardar() {
     btn.disabled    = false;
     btn.textContent = 'Guardar →';
   }
+  return guardado;
 }
 
 // ── Render lista ──────────────────────────────────────
@@ -5991,6 +6059,8 @@ function izaRenderLista() {
       <span class="iza-list-badge ${a.estado === 'CUMPLE' ? 'cumple' : 'no-cumple'}">
         ${a.estado === 'CUMPLE' ? '✓ Cumple' : '✗ No cumple'}
       </span>
+      <button onclick="izaDuplicar(${i})" title="Capturar otro igual a este"
+              style="padding:4px 9px;background:var(--azul-light);border:none;color:var(--azul-dark);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0;margin-left:6px">⧉</button>
     </div>`).join('');
 
   const n = izaAccesorios.length;

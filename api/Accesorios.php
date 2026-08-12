@@ -6,9 +6,13 @@
 if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
 }
+require_once __DIR__ . '/FirmaInspector.php';
 
 class Accesorios {
     private PDO $pdo;
+
+    /** Estatus en los que la sesión todavía admite cambios del inspector. */
+    private const ABIERTOS = ['PENDIENTE', 'DEVUELTO', 'RETORNADO', ''];
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
@@ -94,14 +98,26 @@ class Accesorios {
     }
 
     // ── Guardar un accesorio (multipart) ───────────────────
-    public function guardarAccesorio(array $post, array $files, string $usuario): array {
+    /**
+     * @param bool $permitirCerrada Calidad puede agregar accesorios a una sesión
+     *        ya enviada o emitida (mismo permiso que en arneses); el inspector
+     *        sólo mientras el expediente siga abierto.
+     */
+    public function guardarAccesorio(array $post, array $files, string $usuario, bool $permitirCerrada = false): array {
         $this->ensureAccIzajeQrColumn();
+        $this->ensureAccSesionesColumns();
         $sesionId = (int)($post['sesion_id'] ?? 0);
         if (!$sesionId) return ['status' => 'error', 'message' => 'sesion_id requerido.'];
 
-        $chk = $this->pdo->prepare("SELECT id FROM accesorios_sesiones WHERE id = ?");
+        $chk = $this->pdo->prepare("SELECT id, estatus FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$sesionId]);
-        if (!$chk->fetch()) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+        $ses = $chk->fetch();
+        if (!$ses) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+
+        $abierta = in_array((string)$ses['estatus'], self::ABIERTOS, true);
+        if (!$abierta && !$permitirCerrada) {
+            return ['status' => 'error', 'message' => 'La sesión ya fue aprobada; no admite nuevos accesorios.'];
+        }
 
         $tipoId = ($post['tipo_id'] ?? '') !== '' ? (int)$post['tipo_id'] : null;
         $estado = in_array($post['estado'] ?? '', ['CUMPLE','NO CUMPLE'])
@@ -195,6 +211,9 @@ class Accesorios {
             'id'          => $accesorioId,
             'tipo_nombre' => $tipoNombre,
             'qr_codigo'   => $qrCodigo ?: null,
+            // Si se agregó a una sesión ya cerrada, los documentos vigentes
+            // quedaron incompletos: hay que volver a emitirlos.
+            'reemitir'    => !$abierta,
         ];
     }
 
@@ -291,7 +310,16 @@ class Accesorios {
     // ── Detalle de una sesión con sus accesorios ───────────
     public function detalleSesion(int $id): array {
         $this->ensureAccSesionesColumns();
-        $chk = $this->pdo->prepare("SELECT id, cliente, control, estatus, DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha, coordenadas, direccion, usuario, qr_codigo, informe_url FROM accesorios_sesiones WHERE id = ?");
+        $chk = $this->pdo->prepare(
+            "SELECT id, cliente, control, estatus,
+                    DATE_FORMAT(fecha,'%d/%m/%Y') AS fecha,
+                    DATE_FORMAT(fecha,'%Y-%m-%d')  AS fecha_iso,
+                    coordenadas, direccion, usuario, qr_codigo,
+                    correo, motivo, inspector_firma, inspector_usuario,
+                    informe_url, cert_url, informe_cumple_url,
+                    cert_manual_url, informe_manual_url
+             FROM accesorios_sesiones WHERE id = ?"
+        );
         $chk->execute([$id]);
         $sesion = $chk->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
@@ -373,10 +401,18 @@ class Accesorios {
     // ── Aprobar sesión → APROBADO_CALIDAD ────────────────
     public function aprobarSesion(int $id, string $usuario, string $qr): array {
         $this->ensureAccSesionesColumns();
-        $chk = $this->pdo->prepare("SELECT id, cliente, control, qr_codigo FROM accesorios_sesiones WHERE id = ?");
+        $chk = $this->pdo->prepare("SELECT id, cliente, control, qr_codigo, estatus FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
         $sesion = $chk->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+
+        // RETORNADO entra aquí igual que en arneses y grúas: Certificaciones lo
+        // regresó a Calidad, conserva su QR y vuelve a ser aprobable sin
+        // recapturarlo. Si no se indica código, se reutiliza el reservado.
+        if ($qr === '') $qr = trim((string)($sesion['qr_codigo'] ?? ''));
+        if (!in_array((string)$sesion['estatus'], self::ABIERTOS, true)) {
+            return ['status' => 'error', 'message' => 'Esta sesión ya fue aprobada.'];
+        }
 
         if (!$qr) return ['status' => 'error', 'message' => 'El código QR es requerido.'];
 
@@ -397,44 +433,393 @@ class Accesorios {
                 ->execute([$control, $id]);
         }
 
-        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'APROBADO_CALIDAD', qr_codigo = ? WHERE id = ?")
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'APROBADO_CALIDAD', qr_codigo = ?, motivo = NULL WHERE id = ?")
             ->execute([$qr, $id]);
 
         // Registrar el código como usado (lo inserta en el banco si no existía)
         qrRegistrarUsado($this->pdo, $qr);
+        $this->historial($usuario, $id, (string)$sesion['estatus'], 'APROBADO_CALIDAD');
 
         return ['status' => 'success', 'message' => 'Sesión aprobada y enviada a Certificaciones.'];
     }
 
-    // ── Devolver sesión → DEVUELTO ─────────────────────
-    public function devolverSesion(int $id, string $usuario): array {
-        $this->ensureEstatusColumn('accesorios_sesiones');
-        $chk = $this->pdo->prepare("SELECT id FROM accesorios_sesiones WHERE id = ?");
+    // ── Devolver sesión al inspector → DEVUELTO ─────────
+    public function devolverSesion(int $id, string $usuario, string $motivo = ''): array {
+        $this->ensureAccSesionesColumns();
+        $chk = $this->pdo->prepare("SELECT id, estatus FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
         $row = $chk->fetch();
         if (!$row) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
 
         // Conservar qr_codigo para que calidad lo vea pre-cargado al re-aprobar
         $this->pdo->prepare(
-            "UPDATE accesorios_sesiones SET estatus = 'DEVUELTO' WHERE id = ?"
-        )->execute([$id]);
-        return ['status' => 'success', 'message' => 'Sesión devuelta a Calidad.'];
+            "UPDATE accesorios_sesiones SET estatus = 'DEVUELTO', motivo = ? WHERE id = ?"
+        )->execute([trim($motivo) ?: null, $id]);
+        $this->historial($usuario, $id, (string)$row['estatus'], 'DEVUELTO');
+        return ['status' => 'success', 'message' => 'Sesión devuelta al inspector.'];
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  FLUJO ENTRE DEPARTAMENTOS  (mismo proceso que arneses)
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Certificaciones regresa el expediente a Calidad para ajustes.
+     *
+     * Los documentos NO se borran ni se despublica el expediente: el cliente
+     * conserva en su portal lo que ya recibió mientras Calidad corrige, y se
+     * sustituirán solos cuando Certificaciones vuelva a emitir. El QR reservado
+     * también se conserva, de modo que al re-aprobar aparece precargado.
+     */
+    public function retornarSesion(array $p, string $usuario): array {
+        $this->ensureAccSesionesColumns();
+        $id     = (int)($p['id'] ?? 0);
+        $motivo = trim((string)($p['motivo'] ?? ''));
+        if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+
+        $s = $this->pdo->prepare("SELECT estatus FROM accesorios_sesiones WHERE id = ?");
+        $s->execute([$id]);
+        $anterior = $s->fetchColumn();
+        if ($anterior === false) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'RETORNADO', motivo = ? WHERE id = ?")
+            ->execute([$motivo ?: null, $id]);
+
+        $this->historial($usuario, $id, (string)$anterior, 'RETORNADO');
+        return ['status' => 'success', 'message' => 'Expediente retornado a Calidad.'];
+    }
+
+    /**
+     * Calidad corrige el encabezado de la sesión: cliente, fecha, lugar, correo
+     * de envío e inspector que firma (mismo criterio que en arneses y grúas).
+     */
+    public function guardarDatosSesion(array $p, string $usuario): array {
+        $this->ensureAccSesionesColumns();
+        $id = (int)($p['id'] ?? 0);
+        if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+
+        $mapa = [
+            'cliente'           => fn($v) => mb_strtoupper(trim((string)$v)) ?: null,
+            'direccion'         => fn($v) => mb_strtoupper(trim((string)$v)) ?: null,
+            'coordenadas'       => fn($v) => trim((string)$v) ?: null,
+            'correo'            => fn($v) => trim((string)$v) ?: null,
+            'inspector_firma'   => fn($v) => trim((string)$v) ?: null,
+            'inspector_usuario' => fn($v) => trim((string)$v) ?: null,
+            'fecha'             => fn($v) => $this->fechaIso($v),
+        ];
+
+        $campos = []; $vals = [];
+        foreach ($mapa as $campo => $norm) {
+            if (!array_key_exists($campo, $p)) continue;
+            $campos[] = "$campo = ?";
+            $vals[]   = $norm($p[$campo]);
+        }
+        if (!$campos) return ['status' => 'success', 'message' => 'Sin cambios.'];
+
+        $correo = trim((string)($p['correo'] ?? ''));
+        if ($correo !== '') {
+            foreach (array_filter(array_map('trim', explode(',', $correo))) as $addr) {
+                if (!filter_var($addr, FILTER_VALIDATE_EMAIL)) {
+                    return ['status' => 'error', 'message' => "Correo inválido: $addr"];
+                }
+            }
+        }
+
+        $vals[] = $id;
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET " . implode(', ', $campos) . " WHERE id = ?")
+            ->execute($vals);
+        $this->historial($usuario, $id, null, 'datos actualizados');
+        return ['status' => 'success', 'message' => 'Datos de la inspección actualizados.'];
+    }
+
+    /**
+     * Duplica un accesorio con todos sus datos. Pensado para lotes de equipo
+     * idéntico, donde lo único que cambia es el número de serie: se capturan
+     * una vez los datos y después sólo se ajusta lo distinto.
+     *
+     * No se copian las fotografías ni el QR: la evidencia y el código son de
+     * cada unidad, no del modelo.
+     */
+    public function duplicarAccesorio(array $p, bool $permitirCerrada = false): array {
+        $this->ensureAccIzajeQrColumn();
+        $accId  = (int)($p['id'] ?? $p['accesorio_id'] ?? 0);
+        $copias = max(1, min(50, (int)($p['copias'] ?? 1)));
+        if (!$accId) return ['status' => 'error', 'message' => 'Accesorio no indicado.'];
+
+        $s = $this->pdo->prepare("SELECT * FROM accesorios_izaje WHERE id = ?");
+        $s->execute([$accId]);
+        $it = $s->fetch();
+        if (!$it) return ['status' => 'error', 'message' => 'Accesorio no encontrado.'];
+
+        $sesionId = (int)$it['sesion_id'];
+        $e = $this->pdo->prepare("SELECT estatus FROM accesorios_sesiones WHERE id = ?");
+        $e->execute([$sesionId]);
+        $estatus = (string)$e->fetchColumn();
+        $abierta = in_array($estatus, self::ABIERTOS, true);
+        if (!$abierta && !$permitirCerrada) {
+            return ['status' => 'error', 'message' => 'La sesión ya fue aprobada; no admite cambios.'];
+        }
+
+        // Series para las copias: una por copia, en el orden recibido. Las que
+        // no se indiquen quedan vacías para completarlas después.
+        $series = $p['series'] ?? [];
+        if (is_string($series)) $series = array_filter(array_map('trim', preg_split('/[\n,;]+/', $series)));
+        $series = array_values((array)$series);
+
+        $orden = (int)$this->pdo->query(
+            "SELECT COALESCE(MAX(orden),0) FROM accesorios_izaje WHERE sesion_id = " . $sesionId
+        )->fetchColumn();
+
+        $ins = $this->pdo->prepare(
+            "INSERT INTO accesorios_izaje
+               (sesion_id, id_accesorio, tipo_id, marca, modelo, serie, capacidad, medidas, estado, orden, qr_codigo)
+             VALUES (?,?,?,?,?,?,?,?,?,?,NULL)"
+        );
+
+        $creados = [];
+        for ($i = 0; $i < $copias; $i++) {
+            $serie = mb_strtoupper(trim((string)($series[$i] ?? ''))) ?: null;
+            $ins->execute([
+                $sesionId, $it['id_accesorio'], $it['tipo_id'], $it['marca'], $it['modelo'],
+                $serie, $it['capacidad'], $it['medidas'], $it['estado'], ++$orden,
+            ]);
+            $creados[] = (int)$this->pdo->lastInsertId();
+        }
+
+        $sinSerie = 0;
+        foreach ($creados as $n => $_) if (trim((string)($series[$n] ?? '')) === '') $sinSerie++;
+
+        $msg = count($creados) . ' copia(s) creada(s). Falta asignarles su código QR';
+        $msg .= $sinSerie ? ", y el número de serie de $sinSerie de ellas." : '.';
+
+        return ['status' => 'success', 'ids' => $creados, 'reemitir' => !$abierta, 'message' => $msg];
+    }
+
+    /**
+     * Elimina un accesorio de la sesión, con su evidencia fotográfica, y
+     * devuelve su QR al banco para que pueda reutilizarse.
+     */
+    public function eliminarAccesorio(array $p, bool $permitirCerrada = false): array {
+        $this->ensureAccIzajeQrColumn();
+        $accId = (int)($p['id'] ?? $p['accesorio_id'] ?? 0);
+        if (!$accId) return ['status' => 'error', 'message' => 'Accesorio no indicado.'];
+
+        $s = $this->pdo->prepare(
+            "SELECT a.id, a.sesion_id, a.serie, a.id_accesorio, a.qr_codigo, se.estatus
+             FROM accesorios_izaje a JOIN accesorios_sesiones se ON se.id = a.sesion_id
+             WHERE a.id = ?"
+        );
+        $s->execute([$accId]);
+        $it = $s->fetch();
+        if (!$it) return ['status' => 'error', 'message' => 'Accesorio no encontrado.'];
+
+        $abierta = in_array((string)$it['estatus'], self::ABIERTOS, true);
+        if (!$abierta && !$permitirCerrada) {
+            return ['status' => 'error', 'message' => 'La sesión ya fue aprobada; no admite cambios.'];
+        }
+
+        // Una sesión sin accesorios no puede dictaminarse: mejor eliminarla
+        // entera que dejarla vacía y con folio asignado.
+        $quedan = (int)$this->pdo->query(
+            "SELECT COUNT(*) FROM accesorios_izaje WHERE sesion_id = " . (int)$it['sesion_id']
+        )->fetchColumn();
+        if ($quedan <= 1) {
+            return ['status' => 'error', 'message' =>
+                'Es el único accesorio de la sesión. Si no debe existir, elimina la sesión completa.'];
+        }
+
+        // El QR vuelve al banco: si no, se perdería al borrar el registro.
+        if (!empty($it['qr_codigo'])) {
+            try {
+                $this->pdo->prepare("UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?")
+                    ->execute([$it['qr_codigo']]);
+            } catch (\Throwable $e) { error_log('[Accesorios] liberar QR: ' . $e->getMessage()); }
+        }
+
+        // Borrar los archivos de evidencia, no sólo su registro
+        try {
+            $f = $this->pdo->prepare("SELECT url FROM accesorios_fotos WHERE accesorio_id = ?");
+            $f->execute([$accId]);
+            foreach ($f->fetchAll(PDO::FETCH_COLUMN) as $url) {
+                $abs = __DIR__ . '/../' . ltrim((string)$url, '/');
+                if (is_file($abs)) @unlink($abs);
+            }
+        } catch (\Throwable $e) {}
+
+        $this->pdo->prepare("DELETE FROM accesorios_fotos WHERE accesorio_id = ?")->execute([$accId]);
+        $this->pdo->prepare("DELETE FROM accesorios_izaje WHERE id = ?")->execute([$accId]);
+
+        $ident = trim((string)($it['serie'] ?: $it['id_accesorio']));
+        return [
+            'status'   => 'success',
+            'reemitir' => !$abierta,
+            'message'  => 'Accesorio eliminado' . ($ident ? " ($ident)" : '') . '.',
+        ];
+    }
+
+    /**
+     * Genera el documento para revisarlo SIN emitir ni publicar nada. Si hay un
+     * PDF sustituido a mano se devuelve ese, que es el que verá el cliente.
+     */
+    public function vistaPreviaAcc(array $p): array {
+        $this->ensureAccSesionesColumns();
+        $sesionId = (int)($p['id'] ?? $p['sesion_id'] ?? 0);
+        if (!$sesionId) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+
+        $tipo = in_array($p['tipo'] ?? '', ['cert', 'informe', 'cumple'], true) ? $p['tipo'] : 'informe';
+        $col  = $tipo === 'cert' ? 'cert_manual_url' : ($tipo === 'informe' ? 'informe_manual_url' : '');
+
+        if ($col !== '') {
+            $s = $this->pdo->prepare("SELECT `$col` FROM accesorios_sesiones WHERE id = ?");
+            $s->execute([$sesionId]);
+            $manual = trim((string)($s->fetchColumn() ?: ''));
+            if ($manual !== '') return ['status' => 'success', 'url' => $manual, 'manual' => true];
+        }
+
+        $r = match ($tipo) {
+            'cert'   => $this->generarCertAcc($sesionId, 'preview'),
+            'cumple' => $this->generarInformeCumple($sesionId, 'preview'),
+            default  => $this->generarInforme($sesionId, 'preview'),
+        };
+        return $r + ['manual' => false];
+    }
+
+    /** Ruta en disco de un PDF a partir de su URL pública, o '' si no existe. */
+    private function rutaLocalAcc(?string $url): string {
+        $url = trim((string)$url);
+        if ($url === '') return '';
+        $rel = ltrim(str_replace(rtrim(SITE_URL, '/'), '', $url), '/');
+        $abs = __DIR__ . '/../' . $rel;
+        return is_file($abs) ? $abs : '';
+    }
+
+    /**
+     * Documento que realmente vale para el cliente: el sustituido a mano si lo
+     * hay, o el recién generado. Devuelve `url_pub` (para el portal) y `abs`
+     * (para adjuntarlo al correo), de modo que quien lo use no tenga que saber
+     * si el archivo se generó o se subió.
+     *
+     * $tipo: 'cert' | 'informe' | 'cumple' (el CUMPLE no admite sustitución
+     * manual: es un extracto del informe, no un documento firmado aparte).
+     */
+    private function docEfectivo(int $sesionId, string $tipo, string $usuario): array {
+        $col = $tipo === 'cert' ? 'cert_manual_url' : ($tipo === 'informe' ? 'informe_manual_url' : '');
+        if ($col !== '') {
+            try {
+                $s = $this->pdo->prepare("SELECT `$col` FROM accesorios_sesiones WHERE id = ?");
+                $s->execute([$sesionId]);
+                $manual = trim((string)($s->fetchColumn() ?: ''));
+                $abs    = $this->rutaLocalAcc($manual);
+                if ($abs !== '') {
+                    return ['status' => 'success', 'url_pub' => $manual, 'abs' => $abs, 'manual' => true];
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        $r = match ($tipo) {
+            'cert'   => $this->generarCertAcc($sesionId, $usuario),
+            'cumple' => $this->generarInformeCumple($sesionId, $usuario),
+            default  => $this->generarInforme($sesionId, $usuario),
+        };
+        if (($r['status'] ?? '') !== 'success') return $r;
+
+        $rel            = ltrim((string)$r['url'], '/');
+        $r['abs']       = __DIR__ . '/../' . $rel;
+        $r['url_pub']   = rtrim(SITE_URL, '/') . '/' . $rel;
+        $r['manual']    = false;
+        return $r;
+    }
+
+    /**
+     * Reemplaza manualmente el certificado o el informe de la sesión. Igual que
+     * en arneses y grúas, el archivo subido sustituye al generado tanto en el
+     * portal del cliente como en el correo de envío.
+     * $p['tipo']: 'cert' | 'informe'.
+     */
+    public function subirDocumentoManualAcc(array $p, array $file): array {
+        $this->ensureAccSesionesColumns();
+        $tipo     = ($p['tipo'] ?? '') === 'cert' ? 'cert' : 'informe';
+        $sesionId = (int)($p['id'] ?? $p['sesion_id'] ?? 0);
+        if (!$sesionId) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+
+        if (empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name'])) {
+            return ['status' => 'error', 'message' => 'Selecciona un archivo PDF válido.'];
+        }
+        if (strtolower(pathinfo($file['name'] ?? '', PATHINFO_EXTENSION)) !== 'pdf') {
+            return ['status' => 'error', 'message' => 'El documento debe ser un PDF.'];
+        }
+        if (($file['size'] ?? 0) > 20 * 1024 * 1024) {
+            return ['status' => 'error', 'message' => 'El PDF no debe superar 20 MB.'];
+        }
+
+        $s = $this->pdo->prepare("SELECT control FROM accesorios_sesiones WHERE id = ?");
+        $s->execute([$sesionId]);
+        $control = $s->fetchColumn();
+        if ($control === false) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+        $folio = $control ?: ('S' . $sesionId);
+
+        $dir = UPLOAD_DIR . 'reportes/';
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        $sufijo  = $tipo === 'cert' ? 'CERT_ACC' : 'INFORME_ACC';
+        $nombre  = $sufijo . '_MANUAL_' . preg_replace('/[^A-Za-z0-9._-]/', '', (string)$folio) . '.pdf';
+        if (!move_uploaded_file($file['tmp_name'], $dir . $nombre)) {
+            return ['status' => 'error', 'message' => 'No se pudo guardar el PDF.'];
+        }
+
+        $abs = rtrim(SITE_URL, '/') . '/uploads/reportes/' . $nombre;
+        $col = $tipo === 'cert' ? 'cert_manual_url' : 'informe_manual_url';
+        $this->pdo->prepare("UPDATE accesorios_sesiones SET `$col` = ? WHERE id = ?")->execute([$abs, $sesionId]);
+
+        return [
+            'status'  => 'success',
+            'url'     => $abs,
+            'message' => ($tipo === 'cert' ? 'Certificado' : 'Informe') . ' reemplazado correctamente.',
+        ];
+    }
+
+    /**
+     * Anota el cambio en historial_general. `equipo_id` queda en NULL porque esa
+     * columna referencia la tabla `equipos` (grúas) y un id de sesión de
+     * accesorios apuntaría a un equipo ajeno; la referencia va en el campo.
+     */
+    private function historial(string $usuario, int $sesionId, ?string $anterior, ?string $nuevo): void {
+        if (!function_exists('registrarHistorial')) return;
+        try {
+            registrarHistorial($this->pdo, $usuario, null, "accesorio#$sesionId.estatus", $anterior ?: null, $nuevo);
+        } catch (\Throwable $e) {
+            error_log('[Accesorios] historial: ' . $e->getMessage());
+        }
+    }
+
+    /** Normaliza una fecha (Y-m-d o d/m/Y) a Y-m-d, o null si no es válida. */
+    private function fechaIso($v): ?string {
+        $v = trim((string)$v);
+        if ($v === '') return null;
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $v)) return $v;
+        if (preg_match('#^(\d{1,2})/(\d{1,2})/(\d{4})$#', $v, $m)) {
+            return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+        }
+        $t = strtotime($v);
+        return $t ? date('Y-m-d', $t) : null;
     }
 
     // ── Emitir informe → genera PDF + EMITIDO ─────────
     public function emitirInforme(int $sesionId, string $usuario): array {
         ensurePublicado($this->pdo);
-        $resultado = $this->generarInforme($sesionId, $usuario);
-        if ($resultado['status'] !== 'success') return $resultado;
+        $doc = $this->docEfectivo($sesionId, 'informe', $usuario);
+        if (($doc['status'] ?? '') !== 'success') return $doc;
 
-        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1 WHERE id = ?")
-            ->execute([$sesionId]);
+        $this->pdo->prepare(
+            "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1, informe_url = ?, motivo = NULL WHERE id = ?"
+        )->execute([$doc['url_pub'], $sesionId]);
+        $this->historial($usuario, $sesionId, null, 'EMITIDO');
 
-        $resultado['message'] = 'Informe emitido correctamente.';
-        // Save URL so portal can show the link
-        $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
-        $this->pdo->prepare("UPDATE accesorios_sesiones SET informe_url = ? WHERE id = ?")->execute([$informeUrl, $sesionId]);
-        return $resultado;
+        return [
+            'status'  => 'success',
+            'url'     => $doc['url_pub'],
+            'manual'  => $doc['manual'],
+            'message' => 'Informe emitido correctamente.',
+        ];
     }
 
     // ── Obtener config de plantilla de fondo ──────────────
@@ -724,16 +1109,33 @@ class Accesorios {
             'cert_url'          => "ALTER TABLE accesorios_sesiones ADD COLUMN cert_url          VARCHAR(500) NULL",
             'informe_url'       => "ALTER TABLE accesorios_sesiones ADD COLUMN informe_url       VARCHAR(500) NULL",
             'informe_cumple_url'=> "ALTER TABLE accesorios_sesiones ADD COLUMN informe_cumple_url VARCHAR(500) NULL",
+            // Columnas que alinean el flujo con el de arneses y grúas: envío por
+            // correo, motivo de devolución/retorno, inspector firmante y
+            // sustitución manual de documentos.
+            'correo'            => "ALTER TABLE accesorios_sesiones ADD COLUMN correo            VARCHAR(300) NULL",
+            'motivo'            => "ALTER TABLE accesorios_sesiones ADD COLUMN motivo            TEXT NULL",
+            'inspector_firma'   => "ALTER TABLE accesorios_sesiones ADD COLUMN inspector_firma   VARCHAR(150) NULL",
+            // El usuario, además del nombre: la firma se resuelve por cuenta, no
+            // emparejando nombres, que cambian y se escriben distinto.
+            'inspector_usuario' => "ALTER TABLE accesorios_sesiones ADD COLUMN inspector_usuario VARCHAR(100) NULL",
+            'cert_manual_url'   => "ALTER TABLE accesorios_sesiones ADD COLUMN cert_manual_url   VARCHAR(500) NULL",
+            'informe_manual_url'=> "ALTER TABLE accesorios_sesiones ADD COLUMN informe_manual_url VARCHAR(500) NULL",
+            'fecha_enviado'     => "ALTER TABLE accesorios_sesiones ADD COLUMN fecha_enviado     DATETIME NULL",
         ];
+        // Se atrapa Throwable, no sólo PDOException: esta clase se construye en
+        // TODAS las peticiones, incluida la de iniciar sesión, así que un fallo
+        // de migración no puede tumbar el sistema entero.
         foreach ($needed as $col => $ddl) {
-            $exists = (int) $this->pdo->query(
-                "SELECT COUNT(*) FROM information_schema.COLUMNS
-                 WHERE TABLE_SCHEMA = DATABASE()
-                   AND TABLE_NAME   = 'accesorios_sesiones'
-                   AND COLUMN_NAME  = '{$col}'"
-            )->fetchColumn();
-            if (!$exists) {
-                try { $this->pdo->exec($ddl); } catch (\PDOException $e) {}
+            try {
+                $exists = (int) $this->pdo->query(
+                    "SELECT COUNT(*) FROM information_schema.COLUMNS
+                     WHERE TABLE_SCHEMA = DATABASE()
+                       AND TABLE_NAME   = 'accesorios_sesiones'
+                       AND COLUMN_NAME  = '{$col}'"
+                )->fetchColumn();
+                if (!$exists) $this->pdo->exec($ddl);
+            } catch (\Throwable $e) {
+                error_log("[Accesorios] columna {$col}: " . $e->getMessage());
             }
         }
     }
@@ -894,15 +1296,21 @@ class Accesorios {
 
     // ── Emitir certificado FPDI → genera PDF + EMITIDO ──────
     public function emitirCertAcc(int $sesionId, string $usuario): array {
-        $resultado = $this->generarCertAcc($sesionId, $usuario);
-        if ($resultado['status'] !== 'success') return $resultado;
-        $this->pdo->prepare("UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1 WHERE id = ?")
-            ->execute([$sesionId]);
-        $resultado['message'] = 'Certificado emitido correctamente.';
-        // Save URL so portal can show the link
-        $certUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
-        $this->pdo->prepare("UPDATE accesorios_sesiones SET cert_url = ? WHERE id = ?")->execute([$certUrl, $sesionId]);
-        return $resultado;
+        ensurePublicado($this->pdo);
+        $doc = $this->docEfectivo($sesionId, 'cert', $usuario);
+        if (($doc['status'] ?? '') !== 'success') return $doc;
+
+        $this->pdo->prepare(
+            "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1, cert_url = ?, motivo = NULL WHERE id = ?"
+        )->execute([$doc['url_pub'], $sesionId]);
+        $this->historial($usuario, $sesionId, null, 'EMITIDO');
+
+        return [
+            'status'  => 'success',
+            'url'     => $doc['url_pub'],
+            'manual'  => $doc['manual'],
+            'message' => 'Certificado emitido correctamente.',
+        ];
     }
 
     // ── Enviar certificado FPDI por correo ────────────────
@@ -910,15 +1318,15 @@ class Accesorios {
         if (!$correo || !filter_var($correo, FILTER_VALIDATE_EMAIL))
             return ['status' => 'error', 'message' => 'Correo de destino inválido.'];
 
-        $resultado = $this->generarCertAcc($sesionId, $usuario);
-        if ($resultado['status'] !== 'success') return $resultado;
+        $doc = $this->docEfectivo($sesionId, 'cert', $usuario);
+        if (($doc['status'] ?? '') !== 'success') return $doc;
 
         if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
             return ['status' => 'error', 'message' => 'Servicio de correo no disponible en este servidor.'];
 
         $det     = $this->detalleSesion($sesionId);
         $cliente = $det['data']['cliente'] ?? 'Cliente';
-        $rutaArchivo = __DIR__ . '/../' . $resultado['url'];
+        $rutaArchivo = $doc['abs'];
 
         try {
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
@@ -933,7 +1341,7 @@ class Accesorios {
             $mail->send();
 
             // Marcar como EMITIDO y guardar URL para el portal del cliente
-            $certUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
+            $certUrl = $doc['url_pub'];
             $this->pdo->prepare(
                 "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1, cert_url = ? WHERE id = ?"
             )->execute([$certUrl, $sesionId]);
@@ -980,15 +1388,15 @@ class Accesorios {
         if (!$correo || !filter_var($correo, FILTER_VALIDATE_EMAIL))
             return ['status' => 'error', 'message' => 'Correo de destino inválido.'];
 
-        $resultado = $this->generarInforme($sesionId, $usuario);
-        if ($resultado['status'] !== 'success') return $resultado;
+        $doc = $this->docEfectivo($sesionId, 'informe', $usuario);
+        if (($doc['status'] ?? '') !== 'success') return $doc;
 
         if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
             return ['status' => 'error', 'message' => 'Servicio de correo no disponible en este servidor.'];
 
         $det     = $this->detalleSesion($sesionId);
         $cliente = $det['data']['cliente'] ?? 'Cliente';
-        $rutaArchivo = __DIR__ . '/../' . $resultado['url'];
+        $rutaArchivo = $doc['abs'];
 
         try {
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
@@ -1003,7 +1411,7 @@ class Accesorios {
             $mail->send();
 
             // Marcar como EMITIDO y guardar URL para el portal del cliente
-            $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
+            $informeUrl = $doc['url_pub'];
             $this->pdo->prepare(
                 "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1, informe_url = ? WHERE id = ?"
             )->execute([$informeUrl, $sesionId]);
@@ -1019,15 +1427,15 @@ class Accesorios {
         if (!$correo || !filter_var($correo, FILTER_VALIDATE_EMAIL))
             return ['status' => 'error', 'message' => 'Correo de destino inválido.'];
 
-        $resultado = $this->generarInformeCumple($sesionId, $usuario);
-        if ($resultado['status'] !== 'success') return $resultado;
+        $doc = $this->docEfectivo($sesionId, 'cumple', $usuario);
+        if (($doc['status'] ?? '') !== 'success') return $doc;
 
         if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
             return ['status' => 'error', 'message' => 'Servicio de correo no disponible en este servidor.'];
 
         $det     = $this->detalleSesion($sesionId);
         $cliente = $det['data']['cliente'] ?? 'Cliente';
-        $rutaArchivo = __DIR__ . '/../' . $resultado['url'];
+        $rutaArchivo = $doc['abs'];
 
         try {
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
@@ -1042,7 +1450,7 @@ class Accesorios {
             $mail->send();
 
             // Marcar como EMITIDO y guardar URL del informe CUMPLE (columna separada)
-            $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resultado['url'], '/');
+            $informeUrl = $doc['url_pub'];
             $this->pdo->prepare(
                 "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1, informe_cumple_url = ? WHERE id = ?"
             )->execute([$informeUrl, $sesionId]);
@@ -1061,15 +1469,15 @@ class Accesorios {
         if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
             return ['status' => 'error', 'message' => 'Servicio de correo no disponible en este servidor.'];
 
-        // Generar los 3 documentos
-        $resCert   = $this->generarCertAcc($sesionId, $usuario);
-        if ($resCert['status'] !== 'success') return $resCert;
+        // Los 3 documentos, respetando los sustituidos a mano
+        $resCert   = $this->docEfectivo($sesionId, 'cert', $usuario);
+        if (($resCert['status'] ?? '') !== 'success') return $resCert;
 
-        $resInforme = $this->generarInforme($sesionId, $usuario);
-        if ($resInforme['status'] !== 'success') return $resInforme;
+        $resInforme = $this->docEfectivo($sesionId, 'informe', $usuario);
+        if (($resInforme['status'] ?? '') !== 'success') return $resInforme;
 
-        $resCumple  = $this->generarInformeCumple($sesionId, $usuario);
-        $tieneCumple = $resCumple['status'] === 'success';
+        $resCumple   = $this->docEfectivo($sesionId, 'cumple', $usuario);
+        $tieneCumple = ($resCumple['status'] ?? '') === 'success';
 
         $det     = $this->detalleSesion($sesionId);
         $cliente = $det['data']['cliente'] ?? 'Cliente';
@@ -1088,25 +1496,26 @@ class Accesorios {
                 . ($tieneCumple ? "<li><strong>Informe de Accesorios Aprobados (CUMPLE)</strong></li>" : "")
                 . "</ul>"
             );
-            $mail->addAttachment(__DIR__ . '/../' . $resCert['url'],    basename($resCert['url']));
-            $mail->addAttachment(__DIR__ . '/../' . $resInforme['url'], basename($resInforme['url']));
+            $mail->addAttachment($resCert['abs'],    basename($resCert['abs']));
+            $mail->addAttachment($resInforme['abs'], basename($resInforme['abs']));
             if ($tieneCumple) {
-                $mail->addAttachment(__DIR__ . '/../' . $resCumple['url'], basename($resCumple['url']));
+                $mail->addAttachment($resCumple['abs'], basename($resCumple['abs']));
             }
             $mail->send();
 
             // Actualizar BD con URLs y marcar EMITIDO
-            $certUrl    = rtrim(SITE_URL, '/') . '/' . ltrim($resCert['url'],    '/');
-            $informeUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resInforme['url'], '/');
             $this->pdo->prepare(
-                "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1, cert_url = ?, informe_url = ? WHERE id = ?"
-            )->execute([$certUrl, $informeUrl, $sesionId]);
+                "UPDATE accesorios_sesiones
+                 SET estatus = 'EMITIDO', publicado = 1, cert_url = ?, informe_url = ?,
+                     motivo = NULL, fecha_enviado = NOW()
+                 WHERE id = ?"
+            )->execute([$resCert['url_pub'], $resInforme['url_pub'], $sesionId]);
+            $this->historial($usuario, $sesionId, null, 'EMITIDO');
 
             if ($tieneCumple) {
-                $cumpleUrl = rtrim(SITE_URL, '/') . '/' . ltrim($resCumple['url'], '/');
                 $this->pdo->prepare(
                     "UPDATE accesorios_sesiones SET informe_cumple_url = ? WHERE id = ?"
-                )->execute([$cumpleUrl, $sesionId]);
+                )->execute([$resCumple['url_pub'], $sesionId]);
             }
 
             $docs = $tieneCumple ? 3 : 2;
@@ -1124,24 +1533,24 @@ class Accesorios {
         $dir     = $esc($s['direccion'] ?? '');
         $fecha   = $esc($s['fecha'] ?? '');
 
-        // Inspector: nombre completo + firma
-        $nombreInspector = $s['usuario'] ?? '';
-        $firmaB64        = '';
+        // Inspector que firma: Calidad puede designarlo (inspector_usuario); si
+        // no lo hizo, firma quien capturó la inspección.
+        $cuenta          = trim((string)($s['inspector_usuario'] ?? '')) ?: (string)($s['usuario'] ?? '');
+        $nombreInspector = trim((string)($s['inspector_firma'] ?? ''));
         try {
-            $st = $this->pdo->prepare("SELECT nombre, firma_imagen FROM usuarios WHERE usuario = ? LIMIT 1");
-            $st->execute([$s['usuario'] ?? '']);
-            $row = $st->fetch();
-            if (!empty($row['nombre'])) $nombreInspector = $row['nombre'];
-            if (!empty($row['firma_imagen'])) {
-                $firmaPath = __DIR__ . '/../' . ltrim($row['firma_imagen'], '/');
-                if (file_exists($firmaPath)) {
-                    $ext      = strtolower(pathinfo($firmaPath, PATHINFO_EXTENSION));
-                    $mime     = $ext === 'png' ? 'image/png' : 'image/jpeg';
-                    $firmaB64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($firmaPath));
-                }
+            if ($nombreInspector === '' && $cuenta !== '') {
+                $st = $this->pdo->prepare("SELECT nombre FROM usuarios WHERE usuario = ? LIMIT 1");
+                $st->execute([$cuenta]);
+                $nombreInspector = (string)($st->fetchColumn() ?: '');
             }
         } catch (\Throwable $ignored) {}
-        $usuario = $esc($nombreInspector);
+        if ($nombreInspector === '') $nombreInspector = $cuenta;
+
+        // La firma pasa por FirmaInspector: resuelve la transparencia contra
+        // blanco antes de incrustarla. Sin ese paso, una firma recortada en PNG
+        // se incrusta como imagen negra + máscara y sale como recuadro negro.
+        $firmaB64 = FirmaInspector::dataUri($this->pdo, $cuenta, $nombreInspector);
+        $usuario  = $esc($nombreInspector);
 
         $accs     = $s['accesorios'] ?? [];
         $total    = count($accs);

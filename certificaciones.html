@@ -2538,7 +2538,8 @@ function limpiarBuscarAccCert() {
 }
 
 function estatusCertBadge(e) {
-  if (e === 'EMITIDO') return `<span class="badge b-env" style="font-size:10px">Emitido</span>`;
+  if (e === 'EMITIDO')   return `<span class="badge b-env" style="font-size:10px">Emitido</span>`;
+  if (e === 'RETORNADO') return `<span class="badge b-vencido" style="font-size:10px">Retornado a Calidad</span>`;
   return `<span class="badge b-apro" style="font-size:10px">Aprobado</span>`;
 }
 
@@ -2563,7 +2564,7 @@ function renderAccCert(data) {
         <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
           <button class="btn-ver" style="font-size:11px" onclick="abrirAccCert(${r.id})">📋 Ver / Documentos</button>
           <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
-                  onclick="devolverAcc(${r.id})">↩ Devolver</button>
+                  onclick="retornarAcc(${r.id})">↩ Retornar a Calidad</button>
           ${isAdminCert ? `<button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
                   onclick="eliminarSesionAccCert(${r.id},'${(r.cliente||'').replace(/'/g,'')}')">🗑</button>` : ''}
         </div>
@@ -2573,6 +2574,9 @@ function renderAccCert(data) {
 }
 
 let currentAccSesionId = null;
+/* Correo de la sesión abierta: se guarda aquí en vez de incrustarlo en un
+   atributo onclick, donde una comilla en el valor rompería el HTML. */
+let currentAccCorreo   = '';
 
 async function abrirAccCert(sesionId) {
   currentAccSesionId = sesionId;
@@ -2585,6 +2589,7 @@ async function abrirAccCert(sesionId) {
     const raw  = await res.json();
     if (raw.status !== 'success') throw new Error(raw.message || 'Error del servidor');
     const data = raw.data;
+    currentAccCorreo = data.correo || '';
     document.getElementById('acc-det-cliente').textContent = data.cliente || '—';
     const folio = data.control ? 'AB.'+data.control+'-'+new Date().getFullYear()+'MX' : '';
     document.getElementById('acc-det-fecha').textContent   =
@@ -2598,41 +2603,57 @@ async function abrirAccCert(sesionId) {
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
 
           <div style="background:var(--blanco);border:1px solid var(--borde);border-radius:7px;padding:10px">
-            <div style="font-size:11px;font-weight:600;color:var(--texto);margin-bottom:7px">📋 Informe Completo</div>
+            <div style="font-size:11px;font-weight:600;color:var(--texto);margin-bottom:7px">📋 Informe Completo
+              ${data.informe_manual_url ? '<span style="color:var(--verde);font-weight:500"> · PDF propio</span>' : ''}</div>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
               <button style="${btnBase}background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
-                      onclick="prevInformeAcc(${sesionId})">👁 Ver</button>
+                      onclick="accVistaPrevia('informe',${sesionId},this)">👁 Ver</button>
               <button style="${btnBase}background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                       onclick="imprimirInformeAcc(${sesionId},this)">🖨 Imprimir</button>
               <button style="${btnBase}background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                       onclick="enviarInformeAcc(${sesionId})">✉ Enviar</button>
             </div>
+            <input type="file" accept="application/pdf" title="Sustituir por un PDF propio"
+                   style="font-size:10.5px;margin-top:6px;max-width:100%"
+                   onchange="accSubirDoc(this,'informe',${sesionId})">
           </div>
 
           <div style="background:var(--blanco);border:1px solid var(--borde);border-radius:7px;padding:10px">
-            <div style="font-size:11px;font-weight:600;color:var(--texto);margin-bottom:7px">🏆 Certificado (PDF)</div>
+            <div style="font-size:11px;font-weight:600;color:var(--texto);margin-bottom:7px">🏆 Certificado (PDF)
+              ${data.cert_manual_url ? '<span style="color:var(--verde);font-weight:500"> · PDF propio</span>' : ''}</div>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
               <button style="${btnBase}background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
-                      onclick="prevCertAcc(${sesionId})">👁 Ver</button>
+                      onclick="accVistaPrevia('cert',${sesionId},this)">👁 Ver</button>
               <button style="${btnBase}background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                       onclick="imprimirCertAcc(${sesionId},this)">🖨 Imprimir</button>
               <button style="${btnBase}background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                       onclick="enviarCertAcc(${sesionId})">✉ Enviar</button>
             </div>
+            <input type="file" accept="application/pdf" title="Sustituir por un PDF propio"
+                   style="font-size:10.5px;margin-top:6px;max-width:100%"
+                   onchange="accSubirDoc(this,'cert',${sesionId})">
           </div>
 
           <div style="background:var(--blanco);border:1px solid var(--borde);border-radius:7px;padding:10px">
             <div style="font-size:11px;font-weight:600;color:var(--texto);margin-bottom:7px">✅ Solo Aprobados</div>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
               <button style="${btnBase}background:var(--ambar-light);border-color:var(--ambar);color:var(--ambar)"
-                      onclick="prevInformeCumple(${sesionId})">👁 Ver</button>
+                      onclick="accVistaPrevia('cumple',${sesionId},this)">👁 Ver</button>
               <button style="${btnBase}background:var(--ambar-light);border-color:var(--ambar);color:var(--ambar)"
                       onclick="imprimirInformeCumple(${sesionId},this)">🖨 Imprimir</button>
               <button style="${btnBase}background:var(--ambar-light);border-color:var(--ambar);color:var(--ambar)"
                       onclick="enviarInformeCumple(${sesionId})">✉ Enviar</button>
             </div>
+            <div style="font-size:10.5px;color:var(--texto-hint);margin-top:6px">Extracto del informe: no admite PDF propio.</div>
           </div>
 
+        </div>
+
+        <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--texto-sub)">
+          <span>✉ Correo del cliente: <strong>${data.correo ? escH(data.correo) : 'sin registrar'}</strong></span>
+          <button style="${btnBase}background:var(--gris-bg);border-color:var(--borde);color:var(--texto)"
+                  onclick="accEditarCorreo(${sesionId})">Editar</button>
+          <span style="color:var(--texto-hint)">"Ver" sólo genera el documento para revisarlo: no lo publica ni lo envía.</span>
         </div>
 
         <div style="margin-top:10px;text-align:right">
@@ -2719,23 +2740,102 @@ async function emitirInformeAcc(sesionId, btn) {
   }
 }
 
-async function devolverAcc(sesionId) {
-  if (!confirm('¿Devolver esta sesión a Calidad para revisión?')) return;
+/* Retorna el expediente a Calidad para ajustes. Igual que en arneses y grúas,
+   el cliente NO pierde lo que ya tiene en su portal: los documentos vigentes se
+   quedan y sólo se sustituyen cuando Certificaciones vuelve a emitir. */
+async function retornarAcc(sesionId) {
+  const motivo = prompt('Motivo del retorno a Calidad:');
+  if (motivo === null) return;
+  if (!confirm('La sesión volverá a Calidad para corregirse.\n\n' +
+               'El cliente conserva en su portal el certificado y los informes que ya recibió; ' +
+               'se sustituirán cuando vuelvas a emitir.\n\n¿Continuar?')) return;
   const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
   try {
     const res  = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Token': tok },
-      body: JSON.stringify({ action: 'DEVOLVER_SESION_ACC', payload: { id: sesionId } })
+      body: JSON.stringify({ action: 'RETORNAR_SESION_ACC', payload: { id: sesionId, motivo } })
     });
     const data = await res.json();
     if (data.status === 'success') {
-      mostrarToast('Sesión devuelta a Calidad', 'ok');
+      mostrarToast('Expediente retornado a Calidad', 'ok');
       accCertCargados = false;
       cargarAccCert();
     } else {
-      mostrarToast('Error: ' + (data.message || 'No se pudo devolver'), 'err');
+      mostrarToast('Error: ' + (data.message || 'No se pudo retornar'), 'err');
     }
+  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+}
+
+/* Vista previa: genera el PDF para revisarlo sin emitir, sin publicarlo en el
+   portal y sin mandar correo. Si el documento se sustituyó a mano, abre ese
+   archivo, que es el que recibirá el cliente. */
+async function accVistaPrevia(tipo, sesionId, btn) {
+  const txt = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'VISTA_PREVIA_ACC', payload: { tipo, id: sesionId } })
+    });
+    const data = await res.json();
+    if (data.status === 'success' && data.url) {
+      _pdfAbrir(data.url, tipo === 'cert' ? 'Certificado' : (tipo === 'cumple' ? 'Solo aprobados' : 'Informe completo'));
+      if (data.manual) mostrarToast('Mostrando el PDF sustituido manualmente.', 'info');
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
+    }
+  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+  if (btn) { btn.disabled = false; btn.textContent = txt; }
+}
+
+/* Sustitución manual: el PDF que se sube reemplaza al generado, tanto en el
+   portal del cliente como en el correo de envío. */
+async function accSubirDoc(input, tipo, sesionId) {
+  const f = input.files && input.files[0];
+  if (!f) return;
+  if (f.type !== 'application/pdf' && !/\.pdf$/i.test(f.name)) {
+    mostrarToast('El archivo debe ser PDF.', 'err'); input.value = ''; return;
+  }
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  const fd  = new FormData();
+  fd.append('action', 'SUBIR_DOC_MANUAL_ACC');
+  fd.append('token', tok);
+  fd.append('tipo', tipo);
+  fd.append('id', sesionId);
+  fd.append('archivo', f);
+  input.disabled = true;
+  mostrarToast('Subiendo PDF…', 'info');
+  try {
+    const res  = await fetch(API, { method: 'POST', headers: { 'X-Token': tok }, body: fd });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast(data.message || 'Documento reemplazado.', 'ok');
+      abrirAccCert(sesionId);
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo subir'), 'err');
+    }
+  } catch(e) { mostrarToast('Error de conexión', 'err'); }
+  input.disabled = false; input.value = '';
+}
+
+/* Correo del cliente guardado en la sesión: evita volver a teclearlo en cada
+   envío y es el que usa "Enviar los 3 documentos". */
+async function accEditarCorreo(sesionId) {
+  const correo = prompt('Correo del cliente para el envío (separa varios con coma):', currentAccCorreo || '');
+  if (correo === null) return;
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'GUARDAR_DATOS_SESION_ACC', payload: { id: sesionId, correo } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') { mostrarToast('Correo actualizado.', 'ok'); abrirAccCert(sesionId); }
+    else mostrarToast('Error: ' + (data.message || 'No se pudo guardar'), 'err');
   } catch(e) { mostrarToast('Error de conexión', 'err'); }
 }
 
