@@ -4075,9 +4075,13 @@ async function abrirDetAccSesion(id) {
               <option value="">Cargando inspectores…</option>
             </select>
             <span id="acc-ed-firma-aviso" style="font-size:10.5px;color:var(--texto-hint)"></span></label>
+          <!-- El lugar se puede corregir siempre: es texto que sólo alimenta los
+               documentos, no identifica el expediente como el folio o el cliente. -->
           <label style="font-size:11px;color:var(--texto-sub);grid-column:1/-1">Lugar de la inspección
-            <input type="text" id="acc-ed-direccion" value="${escH(s.direccion||'')}" ${bloqueado?'disabled':''}
-                   style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+            <input type="text" id="acc-ed-direccion" value="${escH(s.direccion||'')}"
+                   placeholder="Planta, patio o domicilio donde se realizó"
+                   style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px">
+            ${bloqueado ? '<span style="font-size:10.5px;color:var(--texto-hint)">Se corrige cuando quieras; aparecerá en los documentos la próxima vez que Certificaciones los emita.</span>' : ''}</label>
         </div>
         <button onclick="guardarDatosAcc(${s.id})"
                 style="margin-top:9px;padding:6px 14px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">
@@ -7049,9 +7053,13 @@ function renderArnDet(d) {
             <option value="">Cargando inspectores…</option>
           </select>
           <span id="arn-ed-firma-aviso" style="font-size:10.5px;color:var(--texto-hint)"></span></label>
+        <!-- El lugar se puede corregir siempre: es texto que sólo alimenta los
+             documentos, no identifica el expediente como el folio o el cliente. -->
         <label style="font-size:11px;color:var(--texto-sub);grid-column:1/-1">Lugar de la inspección
-          <input type="text" id="arn-ed-direccion" value="${escH(ses.direccion||'')}" ${bloqueado?'disabled':''}
-                 style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>
+          <input type="text" id="arn-ed-direccion" value="${escH(ses.direccion||'')}"
+                 placeholder="Planta, patio o domicilio donde se realizó"
+                 style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px">
+          ${bloqueado ? '<span style="font-size:10.5px;color:var(--texto-hint)">Se corrige cuando quieras; aparecerá en los documentos la próxima vez que Certificaciones los emita.</span>' : ''}</label>
       </div>
       <button onclick="guardarDatosArn(${ses.id})"
               style="margin-top:9px;padding:6px 14px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">
