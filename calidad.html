@@ -2178,7 +2178,7 @@
       <div class="modal-hdr-l">
         <div class="m-avatar" style="background:#0C447C">＋</div>
         <div>
-          <div class="m-title">Agregar equipo a la inspección</div>
+          <div class="m-title" id="arn-nuevo-titulo">Agregar equipo a la inspección</div>
           <div class="m-sub" id="arn-nuevo-sub">—</div>
         </div>
       </div>
@@ -2227,7 +2227,7 @@
       <label style="font-size:11px;color:var(--texto-sub);display:block;margin-top:12px">Observaciones
         <textarea id="arn-n-obs" rows="2" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></textarea></label>
 
-      <label style="font-size:11px;color:var(--texto-sub);display:block;margin-top:10px">Fotografías (opcional)
+      <label id="arn-n-card-fotos" style="font-size:11px;color:var(--texto-sub);display:block;margin-top:10px">Fotografías (opcional)
         <input type="file" id="arn-n-fotos" accept="image/*" multiple style="width:100%;font-size:12px;margin-top:4px"></label>
     </div>
     <div class="modal-footer">
@@ -7087,6 +7087,9 @@ function renderArnDet(d) {
           <input type="text" id="arn-qr-${i.id}" value="${escH(i.qr_codigo||'')}" maxlength="10" placeholder="QR de la pieza"
                  style="width:130px;padding:5px 8px;border:1.5px solid ${i.qr_codigo?'var(--borde)':'#f59e0b'};border-radius:6px;font-size:12px;font-family:monospace">
           <button onclick="guardarQrArn(${i.id})" style="padding:5px 12px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Guardar</button>
+          <button onclick="abrirArnEditar(${i.id})" title="Corregir tipo, marca, modelo, talla, normas y puntos de inspección"
+                  style="padding:5px 12px;border-radius:6px;border:1.5px solid var(--ambar);color:var(--ambar);
+                         font-size:11px;font-weight:600;background:var(--ambar-light);cursor:pointer">✏ Editar</button>
           <button onclick="duplicarItemArn(${i.id})" title="Crear copias de esta pieza"
                   style="padding:5px 12px;background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">⧉ Duplicar</button>
           <button onclick="eliminarItemArn(${i.id})" title="Eliminar esta pieza de la inspección"
@@ -7242,11 +7245,19 @@ async function guardarQrArn(itemId) {
    resultado y fotos. Sirve para sumar equipo que apareció después, incluso si
    la inspección ya se cerró. */
 let _arnNTipos = [], _arnNChecklist = [], _arnNResultado = 'APTO';
+/* El mismo formulario sirve para alta y para corrección: 0 = alta,
+   id de la pieza = edición. Así los campos son idénticos en los dos
+   casos y no hay dos formularios que se desincronicen. */
+let _arnEditandoId = 0;
 const ARN_N_RESULTADOS = ['APTO','CONDICIONADO','NO APTO'];
 
 async function abrirArnNuevo() {
   if (!_arnDetActual) return;
+  _arnEditandoId = 0;
   const ses = _arnDetActual.sesion;
+  document.getElementById('arn-nuevo-titulo').textContent = 'Agregar equipo a la inspección';
+  document.getElementById('arn-n-btn').textContent = 'Guardar equipo';
+  document.getElementById('arn-n-card-fotos').style.display = '';
   document.getElementById('arn-nuevo-sub').textContent =
     ses.cliente + ' · ' + (ses.fecha_fmt || '') + (ses.control ? ' · Folio ' + ses.control : '');
 
@@ -7275,7 +7286,65 @@ async function abrirArnNuevo() {
 
   document.getElementById('overlay-arn-nuevo').style.display = 'flex';
 }
-function cerrarArnNuevo() { document.getElementById('overlay-arn-nuevo').style.display = 'none'; }
+function cerrarArnNuevo() {
+  document.getElementById('overlay-arn-nuevo').style.display = 'none';
+  _arnEditandoId = 0;
+}
+
+/**
+ * Corrige una pieza ya capturada: tipo, marca, modelo, talla, normas,
+ * resultado, fechas, QR, observaciones y puntos de inspección.
+ *
+ * Usa el mismo formulario que el alta para que los campos sean exactamente los
+ * mismos; lo único que no se toca aquí son las fotografías, que son evidencia
+ * de campo y no se sustituyen desde Calidad.
+ */
+async function abrirArnEditar(itemId) {
+  if (!_arnDetActual) return;
+  const it = (_arnDetActual.items || []).find(x => +x.id === +itemId);
+  if (!it) { mostrarToast('No se encontró la pieza.', 'err'); return; }
+
+  _arnEditandoId = +itemId;
+  const ses = _arnDetActual.sesion;
+  document.getElementById('arn-nuevo-titulo').textContent = 'Corregir equipo de la inspección';
+  document.getElementById('arn-n-btn').textContent = 'Guardar cambios';
+  document.getElementById('arn-nuevo-sub').textContent =
+    (it.tipo_nombre || 'Equipo') + (it.serie ? ' · ' + it.serie : '') +
+    (ses.control ? ' · Folio ' + ses.control : '');
+  // Las fotos son evidencia del inspector: no se reemplazan al corregir datos.
+  document.getElementById('arn-n-card-fotos').style.display = 'none';
+  document.getElementById('arn-n-fotos').value = '';
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  set('arn-n-id',          it.id_arnes);
+  set('arn-n-marca',       it.marca);
+  set('arn-n-modelo',      it.modelo);
+  set('arn-n-serie',       it.serie);
+  set('arn-n-talla',       it.talla);
+  set('arn-n-qr',          it.qr_codigo);
+  set('arn-n-fabricacion', it.fecha_fabricacion);
+  set('arn-n-retiro',      it.fecha_retiro);
+  set('arn-n-obs',         it.observaciones);
+
+  _arnNResultado = it.resultado || 'APTO';
+  arnNRenderResultado();
+  arnNRenderNormas(it.norma || '');
+
+  if (!_arnNTipos.length) {
+    try {
+      const r = await fetch(API + '?action=LISTAR_TIPOS_ARNES');
+      const d = await r.json();
+      _arnNTipos = d.tipos || [];
+    } catch(_) { _arnNTipos = []; }
+  }
+  document.getElementById('arn-n-tipo').innerHTML = '<option value="">— Seleccionar —</option>' +
+    _arnNTipos.map(t => `<option value="${t.id}" ${+t.id === +it.tipo_id ? 'selected' : ''}>${escH(t.nombre)}</option>`).join('');
+
+  const respuestas = {};
+  (it.checklist || []).forEach(c => { if (c.valor) respuestas[c.tag] = c.valor; });
+  document.getElementById('overlay-arn-nuevo').style.display = 'flex';
+  await arnNuevoChecklist(respuestas);
+}
 
 function arnNRenderResultado() {
   const color = { 'APTO':'#1b7a3d', 'CONDICIONADO':'#92400e', 'NO APTO':'#b91c1c' };
@@ -7287,19 +7356,42 @@ function arnNRenderResultado() {
              color:${_arnNResultado===r ? '#fff' : 'var(--texto-sub)'}">${r}</button>`).join('');
 }
 
-function arnNRenderNormas() {
-  document.getElementById('arn-n-normas').innerHTML = ARN_NORMAS.map(n => `
+/* Sin `marcadas` se preselecciona la norma base (alta); al corregir se pasan
+   las que ya traía la pieza.
+   Las normas registradas que no estén en el catálogo se listan igualmente y
+   marcadas: si sólo se dibujara el catálogo, al guardar se perderían sin
+   avisar (capturas viejas o normas escritas a mano). */
+function arnNRenderNormas(marcadas) {
+  const sel = marcadas === undefined
+    ? ['NOM-009-STPS-2011']
+    : String(marcadas || '').split(/[,;]+/).map(x => x.trim()).filter(Boolean);
+
+  const claves = ARN_NORMAS.map(n => n.clave);
+  const extras = sel.filter(c => !claves.includes(c))
+                    .map(c => ({ clave: c, titulo: 'Registrada en esta pieza (fuera del catálogo)' }));
+
+  document.getElementById('arn-n-normas').innerHTML = [...ARN_NORMAS, ...extras].map(n => `
     <label style="display:flex;align-items:flex-start;gap:7px;font-size:12px;cursor:pointer;padding:4px 0">
       <input type="checkbox" class="arn-n-norma" value="${escH(n.clave)}"
-             ${n.clave === 'NOM-009-STPS-2011' ? 'checked' : ''}
+             ${sel.includes(n.clave) ? 'checked' : ''}
              style="width:16px;height:16px;margin:2px 0 0;flex-shrink:0">
       <span><strong>${escH(n.clave)}</strong> — ${escH(n.titulo)}</span>
     </label>`).join('');
 }
 
-async function arnNuevoChecklist() {
+/* `respuestas` es {TAG: 'C'|'NC'|'NA'} y sólo se usa al corregir una pieza
+   existente, para dejar marcado lo que el inspector ya había respondido. */
+async function arnNuevoChecklist(respuestas) {
   const tipoId = document.getElementById('arn-n-tipo').value;
   const cont = document.getElementById('arn-n-checklist');
+
+  // Al cambiar el tipo se recargan sus puntos. Lo ya respondido se conserva
+  // para los puntos que el tipo nuevo también tenga; el resto se pierde porque
+  // esos puntos dejan de existir para ese equipo.
+  if (respuestas === undefined) {
+    respuestas = {};
+    document.querySelectorAll('.arn-n-chk[data-sel="1"]').forEach(b => { respuestas[b.dataset.tag] = b.dataset.val; });
+  }
   if (!tipoId) { cont.innerHTML = ''; _arnNChecklist = []; return; }
   cont.innerHTML = '<div style="font-size:12px;color:var(--texto-hint);padding:6px 0">Cargando puntos…</div>';
   try {
@@ -7321,6 +7413,13 @@ async function arnNuevoChecklist() {
                   style="padding:4px 12px;border:1.5px solid var(--borde);background:#fff;color:var(--texto-sub);border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">${v}</button>`).join('')}
       </div>
     </div>`).join('');
+
+  if (respuestas) {
+    Object.entries(respuestas).forEach(([tag, val]) => {
+      const b = document.querySelector(`.arn-n-chk[data-tag="${tag}"][data-val="${val}"]`);
+      if (b) arnNChk(b);
+    });
+  }
 }
 
 function arnNChk(btn) {
@@ -7357,6 +7456,44 @@ async function guardarArnNuevo() {
   const normas = [...document.querySelectorAll('.arn-n-norma:checked')].map(c => c.value).join(', ');
   const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
   const v = id => (document.getElementById(id) || {}).value || '';
+
+  // Corrección de una pieza existente: va por JSON, sin fotos.
+  if (_arnEditandoId) {
+    const btnE = document.getElementById('arn-n-btn');
+    btnE.disabled = true; btnE.textContent = 'Guardando…';
+    try {
+      const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json','X-Token':s.token||''},
+        body: JSON.stringify({ action:'EDITAR_ITEM_ARNES', token: s.token || '', payload: {
+          id:        _arnEditandoId,
+          tipo_id:   tipoId,
+          id_arnes:  v('arn-n-id').trim(),
+          marca:     v('arn-n-marca').trim(),
+          modelo:    v('arn-n-modelo').trim(),
+          serie:     v('arn-n-serie').trim(),
+          talla:     v('arn-n-talla').trim(),
+          norma:     normas,
+          fecha_fabricacion: v('arn-n-fabricacion'),
+          fecha_retiro:      v('arn-n-retiro'),
+          resultado:     _arnNResultado,
+          observaciones: v('arn-n-obs').trim(),
+          qr_codigo:     v('arn-n-qr').trim(),
+          checklist:     JSON.stringify(checklist),
+        }}) });
+      const d = await r.json();
+      if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo guardar.', 'err'); return; }
+      mostrarToast('Equipo actualizado.', 'ok');
+      if ((_arnDetActual.sesion.estatus || '') === 'EMITIDO') {
+        alert('La inspección ya está emitida.\n\n' +
+              'Pide a Certificaciones que vuelva a emitir para que el dictamen y el certificado salgan con los datos corregidos.');
+      }
+      const sesId = _arnDetActual.sesion.id;
+      cerrarArnNuevo();
+      abrirArnDet(sesId);
+      cargarSesionesArn();
+    } catch(_) { mostrarToast('Error de conexión.', 'err'); }
+    finally { btnE.disabled = false; btnE.textContent = 'Guardar cambios'; }
+    return;
+  }
 
   const fd = new FormData();
   fd.append('action', 'GUARDAR_ITEM_ARNES');

@@ -938,10 +938,32 @@ class Arneses {
             }
             $campos[] = "qr_codigo = ?"; $vals[] = $q ?: null;
         }
-        if (!$campos) return ['status' => 'success', 'message' => 'Sin cambios.'];
+        if ($campos) {
+            $vals[] = $id;
+            $this->pdo->prepare("UPDATE arneses_items SET " . implode(', ', $campos) . " WHERE id = ?")->execute($vals);
+        }
 
-        $vals[] = $id;
-        $this->pdo->prepare("UPDATE arneses_items SET " . implode(', ', $campos) . " WHERE id = ?")->execute($vals);
+        // Checklist: llega como JSON {"TAG":"C"|"NC"|"NA"}, igual que al
+        // capturar. Se reemplaza completo porque al cambiar el tipo de equipo
+        // los puntos anteriores ya no corresponden a los del tipo nuevo.
+        if (array_key_exists('checklist', $p)) {
+            $raw     = $p['checklist'];
+            $valores = is_string($raw) ? json_decode($raw, true) : (is_array($raw) ? $raw : []);
+            if (is_array($valores)) {
+                $this->pdo->prepare("DELETE FROM arneses_item_checklist WHERE item_id = ?")->execute([$id]);
+                $ins = $this->pdo->prepare("INSERT INTO arneses_item_checklist (item_id, tag, valor) VALUES (?,?,?)");
+                foreach ($valores as $tag => $val) {
+                    $val = strtoupper((string)$val);
+                    if (!in_array($val, ['C', 'NC', 'NA'], true)) continue;
+                    $tagLimpio = strtoupper(preg_replace('/[^A-Za-z0-9_]/', '', (string)$tag));
+                    if ($tagLimpio === '') continue;
+                    try { $ins->execute([$id, $tagLimpio, $val]); } catch (\PDOException $e) { /* duplicado */ }
+                }
+            }
+            $campos[] = 'checklist';
+        }
+
+        if (!$campos) return ['status' => 'success', 'message' => 'Sin cambios.'];
         return ['status' => 'success', 'message' => 'Pieza actualizada.'];
     }
 
