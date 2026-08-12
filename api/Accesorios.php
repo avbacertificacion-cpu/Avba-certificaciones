@@ -599,13 +599,13 @@ class Accesorios {
      * Elimina un accesorio de la sesión, con su evidencia fotográfica, y
      * devuelve su QR al banco para que pueda reutilizarse.
      */
-    public function eliminarAccesorio(array $p, bool $permitirCerrada = false): array {
+    public function eliminarAccesorio(array $p, bool $permitirCerrada = false, string $usuario = ''): array {
         $this->ensureAccIzajeQrColumn();
         $accId = (int)($p['id'] ?? $p['accesorio_id'] ?? 0);
         if (!$accId) return ['status' => 'error', 'message' => 'Accesorio no indicado.'];
 
         $s = $this->pdo->prepare(
-            "SELECT a.id, a.sesion_id, a.serie, a.id_accesorio, a.qr_codigo, se.estatus
+            "SELECT a.id, a.sesion_id, a.serie, a.id_accesorio, a.qr_codigo, se.estatus, se.control
              FROM accesorios_izaje a JOIN accesorios_sesiones se ON se.id = a.sesion_id
              WHERE a.id = ?"
         );
@@ -618,14 +618,19 @@ class Accesorios {
             return ['status' => 'error', 'message' => 'La sesión ya fue aprobada; no admite cambios.'];
         }
 
-        // Una sesión sin accesorios no puede dictaminarse: mejor eliminarla
-        // entera que dejarla vacía y con folio asignado.
+        // Una sesión sin accesorios no puede dictaminarse: en vez de dejarla
+        // vacía y con folio asignado, se avisa para que se elimine entera. El
+        // aviso lleva `ultima` para que la interfaz ofrezca hacerlo de una vez.
         $quedan = (int)$this->pdo->query(
             "SELECT COUNT(*) FROM accesorios_izaje WHERE sesion_id = " . (int)$it['sesion_id']
         )->fetchColumn();
         if ($quedan <= 1) {
-            return ['status' => 'error', 'message' =>
-                'Es el único accesorio de la sesión. Si no debe existir, elimina la sesión completa.'];
+            return [
+                'status'    => 'error',
+                'ultima'    => true,
+                'sesion_id' => (int)$it['sesion_id'],
+                'message'   => 'Es el único accesorio de la sesión: al quitarlo no quedaría nada que dictaminar. Elimina la sesión completa.',
+            ];
         }
 
         // El QR vuelve al banco: si no, se perdería al borrar el registro.
@@ -648,6 +653,15 @@ class Accesorios {
 
         $this->pdo->prepare("DELETE FROM accesorios_fotos WHERE accesorio_id = ?")->execute([$accId]);
         $this->pdo->prepare("DELETE FROM accesorios_izaje WHERE id = ?")->execute([$accId]);
+
+        if (function_exists('registrarEliminacion')) {
+            registrarEliminacion(
+                $this->pdo, $usuario ?: 'sistema', 'accesorio#' . (int)$it['sesion_id'] . '.item',
+                'Accesorio ' . ($it['serie'] ?: $it['id_accesorio'] ?: "#$accId") . ' de la sesión '
+                    . ($it['control'] ?: 's/folio') . ' — estatus ' . ($it['estatus'] ?: 'PENDIENTE'),
+                (string)($p['motivo'] ?? '')
+            );
+        }
 
         $ident = trim((string)($it['serie'] ?: $it['id_accesorio']));
         return [
@@ -1792,22 +1806,75 @@ HTML;
     }
 
     // ── Eliminar sesión de accesorios y liberar QR ─────────
-    public function eliminarSesionAcc(int $id): array {
-        $row = $this->pdo->prepare("SELECT qr_codigo FROM accesorios_sesiones WHERE id = ?");
+    /**
+     * Elimina la sesión completa con sus accesorios, fotos y códigos.
+     *
+     * Calidad puede eliminar aunque ya esté emitida y publicada —para eso
+     * está: quitar duplicados y capturas equivocadas—, pero entonces se exige
+     * un motivo y la baja queda anotada, porque el expediente desaparece
+     * también del portal del cliente.
+     */
+    public function eliminarSesionAcc(int $id, string $usuario = '', string $motivo = ''): array {
+        $row = $this->pdo->prepare("SELECT cliente, control, estatus, qr_codigo FROM accesorios_sesiones WHERE id = ?");
         $row->execute([$id]);
         $sesion = $row->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
 
+        $publicado = in_array((string)$sesion['estatus'], ['EMITIDO', 'RETORNADO'], true);
+        $motivo    = trim($motivo);
+        if ($publicado && $motivo === '') {
+            return ['status' => 'error', 'requiere_motivo' => true, 'message' =>
+                'Esta sesión ya fue emitida al cliente. Indica el motivo de la baja para poder eliminarla.'];
+        }
+
+        $libera = function (?string $qr): void {
+            $qr = trim((string)$qr);
+            if ($qr === '') return;
+            try {
+                $this->pdo->prepare("UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?")
+                    ->execute([$qr]);
+            } catch (\Throwable $e) { error_log('[Accesorios] liberar QR: ' . $e->getMessage()); }
+        };
+
         try {
-            if (!empty($sesion['qr_codigo'])) {
-                $this->pdo->prepare(
-                    "UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?"
-                )->execute([$sesion['qr_codigo']]);
+            $libera($sesion['qr_codigo']);
+
+            // Cada accesorio puede llevar su propio QR y su evidencia: los QR
+            // vuelven al banco y las fotos se borran del disco.
+            $accs = $this->pdo->prepare("SELECT id, qr_codigo FROM accesorios_izaje WHERE sesion_id = ?");
+            $accs->execute([$id]);
+            $filas = $accs->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($filas as $a) {
+                $libera($a['qr_codigo']);
+                try {
+                    $f = $this->pdo->prepare("SELECT url FROM accesorios_fotos WHERE accesorio_id = ?");
+                    $f->execute([$a['id']]);
+                    foreach ($f->fetchAll(PDO::FETCH_COLUMN) as $url) {
+                        $abs = __DIR__ . '/../' . ltrim((string)$url, '/');
+                        if (is_file($abs)) @unlink($abs);
+                    }
+                } catch (\Throwable $e) {}
+                $this->pdo->prepare("DELETE FROM accesorios_fotos WHERE accesorio_id = ?")->execute([$a['id']]);
             }
+
             // Eliminar accesorios relacionados primero (FK sin CASCADE)
             $this->pdo->prepare("DELETE FROM accesorios_izaje WHERE sesion_id = ?")->execute([$id]);
             $this->pdo->prepare("DELETE FROM accesorios_sesiones WHERE id = ?")->execute([$id]);
-            return ['status' => 'success', 'message' => 'Sesión eliminada correctamente.'];
+
+            if (function_exists('registrarEliminacion')) {
+                registrarEliminacion(
+                    $this->pdo, $usuario ?: 'sistema', "accesorio#$id",
+                    'Sesión de accesorios ' . ($sesion['control'] ?: 's/folio') . ' — ' . $sesion['cliente']
+                        . ' — ' . count($filas) . ' accesorio(s) — estatus ' . ($sesion['estatus'] ?: 'PENDIENTE'),
+                    $motivo
+                );
+            }
+
+            return [
+                'status'    => 'success',
+                'publicado' => $publicado,
+                'message'   => 'Sesión eliminada.' . ($publicado ? ' Ya no aparece en el portal del cliente.' : ''),
+            ];
         } catch (\Throwable $e) {
             return ['status' => 'error', 'message' => $e->getMessage()];
         }

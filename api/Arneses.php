@@ -565,12 +565,12 @@ class Arneses {
      * cliente: se borra porque no debía estar, no porque haya que corregirla.
      * La interfaz avisa de ello cuando la inspección ya está emitida.
      */
-    public function eliminarItem(array $p, bool $permitirCerrada = false): array {
+    public function eliminarItem(array $p, bool $permitirCerrada = false, string $usuario = ''): array {
         $itemId = (int)($p['item_id'] ?? $p['id'] ?? 0);
         if (!$itemId) return ['status' => 'error', 'message' => 'Pieza no indicada.'];
 
         $s = $this->pdo->prepare(
-            "SELECT i.id, i.sesion_id, i.serie, i.qr_codigo, se.estatus
+            "SELECT i.id, i.sesion_id, i.serie, i.id_arnes, i.qr_codigo, se.estatus, se.control
              FROM arneses_items i JOIN arneses_sesiones se ON se.id = i.sesion_id
              WHERE i.id = ?"
         );
@@ -583,14 +583,19 @@ class Arneses {
             return ['status' => 'error', 'message' => 'La inspección ya fue aprobada; no admite cambios.'];
         }
 
-        // Una inspección sin piezas no puede dictaminarse: mejor eliminarla
-        // entera que dejarla vacía y con folio asignado.
+        // Una inspección sin piezas no puede dictaminarse: en vez de dejarla
+        // vacía y con folio asignado, se avisa para que se elimine entera. El
+        // aviso lleva `ultima` para que la interfaz ofrezca hacerlo de una vez.
         $quedan = (int)$this->pdo->query(
             "SELECT COUNT(*) FROM arneses_items WHERE sesion_id = " . (int)$it['sesion_id']
         )->fetchColumn();
         if ($quedan <= 1) {
-            return ['status' => 'error', 'message' =>
-                'Es la única pieza de la inspección. Si no debe existir, elimina la inspección completa.'];
+            return [
+                'status'    => 'error',
+                'ultima'    => true,
+                'sesion_id' => (int)$it['sesion_id'],
+                'message'   => 'Es la única pieza de la inspección: al quitarla no quedaría nada que dictaminar. Elimina la inspección completa.',
+            ];
         }
 
         // El QR vuelve al banco: si no, se perdería al borrar la pieza.
@@ -601,9 +606,28 @@ class Arneses {
             } catch (\Throwable $e) { error_log('[Arneses] liberar QR: ' . $e->getMessage()); }
         }
 
+        // La evidencia se borra también del disco, no sólo su registro.
+        try {
+            $f = $this->pdo->prepare("SELECT url FROM arneses_fotos WHERE item_id = ?");
+            $f->execute([$itemId]);
+            foreach ($f->fetchAll(PDO::FETCH_COLUMN) as $url) {
+                $abs = __DIR__ . '/../' . ltrim((string)$url, '/');
+                if (is_file($abs)) @unlink($abs);
+            }
+        } catch (\Throwable $e) {}
+
         $this->pdo->prepare("DELETE FROM arneses_item_checklist WHERE item_id = ?")->execute([$itemId]);
         $this->pdo->prepare("DELETE FROM arneses_fotos WHERE item_id = ?")->execute([$itemId]);
         $this->pdo->prepare("DELETE FROM arneses_items WHERE id = ?")->execute([$itemId]);
+
+        if (function_exists('registrarEliminacion')) {
+            registrarEliminacion(
+                $this->pdo, $usuario ?: 'sistema', 'arnes#' . (int)$it['sesion_id'] . '.pieza',
+                'Pieza ' . ($it['serie'] ?: $it['id_arnes'] ?: "#$itemId") . ' de la inspección '
+                    . ($it['control'] ?: 's/folio') . ' — estatus ' . ($it['estatus'] ?: 'PENDIENTE'),
+                (string)($p['motivo'] ?? '')
+            );
+        }
 
         return [
             'status'   => 'success',
@@ -1878,8 +1902,28 @@ class Arneses {
         }
     }
 
-    public function eliminarSesion(int $id): array {
+    /**
+     * Elimina la inspección completa: piezas, listas de verificación y fotos.
+     *
+     * Calidad puede eliminar aunque el expediente ya esté emitido y publicado
+     * —para eso está: quitar duplicados y capturas equivocadas—, pero entonces
+     * se exige un motivo y la baja queda anotada en el historial, porque el
+     * registro desaparece también del portal del cliente.
+     */
+    public function eliminarSesion(int $id, string $usuario = '', string $motivo = ''): array {
         if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+
+        $s = $this->pdo->prepare("SELECT cliente, control, estatus, qr_codigo FROM arneses_sesiones WHERE id = ?");
+        $s->execute([$id]);
+        $ses = $s->fetch(PDO::FETCH_ASSOC);
+        if (!$ses) return ['status' => 'error', 'message' => 'Inspección no encontrada.'];
+
+        $publicado = in_array((string)$ses['estatus'], ['EMITIDO', 'RETORNADO'], true);
+        $motivo    = trim($motivo);
+        if ($publicado && $motivo === '') {
+            return ['status' => 'error', 'requiere_motivo' => true, 'message' =>
+                'Esta inspección ya fue emitida al cliente. Indica el motivo de la baja para poder eliminarla.'];
+        }
 
         // Los QR vuelven al banco para poder reasignarlos (igual que en Calidad
         // al eliminar un equipo); si no, se perderían al borrar la sesión.
@@ -1892,19 +1936,42 @@ class Arneses {
             } catch (\Throwable $e) { error_log('[Arneses] liberar QR: ' . $e->getMessage()); }
         };
 
-        $s = $this->pdo->prepare("SELECT qr_codigo FROM arneses_sesiones WHERE id = ?");
-        $s->execute([$id]);
-        $libera($s->fetchColumn() ?: null);
+        $libera($ses['qr_codigo']);
 
         $items = $this->pdo->prepare("SELECT id, qr_codigo FROM arneses_items WHERE sesion_id = ?");
         $items->execute([$id]);
-        foreach ($items->fetchAll(PDO::FETCH_ASSOC) as $it) {
+        $filas = $items->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($filas as $it) {
             $libera($it['qr_codigo']);
+            // Las fotos se borran del disco: si no, la evidencia de un
+            // expediente dado de baja se queda ocupando espacio para siempre.
+            try {
+                $f = $this->pdo->prepare("SELECT url FROM arneses_fotos WHERE item_id = ?");
+                $f->execute([$it['id']]);
+                foreach ($f->fetchAll(PDO::FETCH_COLUMN) as $url) {
+                    $abs = __DIR__ . '/../' . ltrim((string)$url, '/');
+                    if (is_file($abs)) @unlink($abs);
+                }
+            } catch (\Throwable $e) {}
             $this->pdo->prepare("DELETE FROM arneses_item_checklist WHERE item_id = ?")->execute([$it['id']]);
             $this->pdo->prepare("DELETE FROM arneses_fotos WHERE item_id = ?")->execute([$it['id']]);
         }
         $this->pdo->prepare("DELETE FROM arneses_items WHERE sesion_id = ?")->execute([$id]);
         $this->pdo->prepare("DELETE FROM arneses_sesiones WHERE id = ?")->execute([$id]);
-        return ['status' => 'success', 'message' => 'Sesión eliminada.'];
+
+        if (function_exists('registrarEliminacion')) {
+            registrarEliminacion(
+                $this->pdo, $usuario ?: 'sistema', "arnes#$id",
+                'Inspección de arneses ' . ($ses['control'] ?: 's/folio') . ' — ' . $ses['cliente']
+                    . ' — ' . count($filas) . ' pieza(s) — estatus ' . ($ses['estatus'] ?: 'PENDIENTE'),
+                $motivo
+            );
+        }
+
+        return [
+            'status'    => 'success',
+            'publicado' => $publicado,
+            'message'   => 'Inspección eliminada.' . ($publicado ? ' Ya no aparece en el portal del cliente.' : ''),
+        ];
     }
 }

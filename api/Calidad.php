@@ -359,11 +359,28 @@ class Calidad {
     }
 
     // ── Eliminar equipo y liberar QR ───────────────────────
-    public function eliminarEquipo(int $id): array {
-        $row = $this->pdo->prepare("SELECT qr_codigo FROM equipos WHERE id = ?");
+    /**
+     * Elimina un equipo inspeccionado (grúa, maquinaria).
+     *
+     * Calidad puede eliminar aunque el registro ya esté enviado y publicado
+     * —para eso está: quitar duplicados y capturas equivocadas—, pero entonces
+     * se exige un motivo y la baja queda anotada en el historial, porque el
+     * registro desaparece también del portal del cliente.
+     */
+    public function eliminarEquipo(int $id, string $usuario = '', string $motivo = ''): array {
+        $row = $this->pdo->prepare(
+            "SELECT cliente, control, maquinaria, serie, estado, qr_codigo FROM equipos WHERE id = ?"
+        );
         $row->execute([$id]);
         $equipo = $row->fetch();
         if (!$equipo) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+
+        $publicado = in_array((string)$equipo['estado'], ['ENVIADO', 'RETORNADO'], true);
+        $motivo    = trim($motivo);
+        if ($publicado && $motivo === '') {
+            return ['status' => 'error', 'requiere_motivo' => true, 'message' =>
+                'Este equipo ya tiene documentos entregados al cliente. Indica el motivo de la baja para poder eliminarlo.'];
+        }
 
         try {
             if (!empty($equipo['qr_codigo'])) {
@@ -374,7 +391,22 @@ class Calidad {
             // inspeccion_checklist tiene ON DELETE CASCADE → se borra automáticamente
             // historial_general tiene ON DELETE SET NULL → no bloquea el DELETE
             $this->pdo->prepare("DELETE FROM equipos WHERE id = ?")->execute([$id]);
-            return ['status' => 'success', 'message' => 'Registro eliminado correctamente.'];
+
+            if (function_exists('registrarEliminacion')) {
+                registrarEliminacion(
+                    $this->pdo, $usuario ?: 'sistema', "equipo#$id",
+                    'Equipo ' . ($equipo['control'] ?: 's/folio') . ' — ' . $equipo['cliente']
+                        . ' — ' . trim(($equipo['maquinaria'] ?? '') . ' ' . ($equipo['serie'] ?? ''))
+                        . ' — estado ' . ($equipo['estado'] ?: 'PENDIENTE'),
+                    $motivo
+                );
+            }
+
+            return [
+                'status'    => 'success',
+                'publicado' => $publicado,
+                'message'   => 'Registro eliminado.' . ($publicado ? ' Ya no aparece en el portal del cliente.' : ''),
+            ];
         } catch (\Throwable $e) {
             return ['status' => 'error', 'message' => $e->getMessage()];
         }

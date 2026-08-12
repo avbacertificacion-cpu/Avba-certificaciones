@@ -373,17 +373,29 @@ class Personal {
      * publicado, así que borrarlo dejaría una constancia en circulación que ya
      * no valida. Ese caso queda reservado a un administrador.
      */
-    public function eliminarParticipante(int $id, string $rol = 'ADMIN'): array {
+    /**
+     * Da de baja un participante.
+     *
+     * Calidad puede eliminar aunque ya tenga documentos emitidos —para eso
+     * está: quitar duplicados y capturas equivocadas—, pero entonces se exige
+     * un motivo y la baja queda anotada en el historial, porque la constancia
+     * desaparece también del portal del cliente.
+     */
+    public function eliminarParticipante(int $id, string $rol = 'ADMIN', string $usuario = '', string $motivo = ''): array {
         if (!$id) return ['status' => 'error', 'message' => 'Participante no indicado.'];
 
-        $row = $this->pdo->prepare("SELECT qr_codigo, estatus, nombre_completo FROM participantes_cursos WHERE id = ?");
+        $row = $this->pdo->prepare(
+            "SELECT qr_codigo, estatus, nombre_completo, control, empresa_nombre FROM participantes_cursos WHERE id = ?"
+        );
         $row->execute([$id]);
         $p = $row->fetch();
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
-        if (($p['estatus'] ?? '') === 'EMITIDO' && $rol !== 'ADMIN') {
-            return ['status' => 'error', 'message' =>
-                'Este participante ya tiene documentos emitidos y entregados. Sólo un administrador puede eliminarlo.'];
+        $publicado = in_array((string)($p['estatus'] ?? ''), ['EMITIDO', 'RETORNADO'], true);
+        $motivo    = trim($motivo);
+        if ($publicado && $motivo === '') {
+            return ['status' => 'error', 'requiere_motivo' => true, 'message' =>
+                'Este participante ya tiene documentos emitidos y entregados. Indica el motivo de la baja para poder eliminarlo.'];
         }
 
         if (!empty($p['qr_codigo'])) {
@@ -400,7 +412,21 @@ class Personal {
         }
         $this->pdo->prepare("DELETE FROM participantes_cursos WHERE id = ?")->execute([$id]);
 
-        return ['status' => 'success', 'message' => 'Participante eliminado correctamente.'];
+        if (function_exists('registrarEliminacion')) {
+            registrarEliminacion(
+                $this->pdo, $usuario ?: $rol, "participante#$id",
+                'Participante ' . $p['nombre_completo'] . ' — ' . ($p['empresa_nombre'] ?: 'sin empresa')
+                    . ' — folio ' . ($p['control'] ?: 's/folio')
+                    . ' — estatus ' . ($p['estatus'] ?: 'PENDIENTE'),
+                $motivo
+            );
+        }
+
+        return [
+            'status'    => 'success',
+            'publicado' => $publicado,
+            'message'   => 'Participante eliminado.' . ($publicado ? ' Ya no aparece en el portal del cliente.' : ''),
+        ];
     }
 
     // ── Aprobar participante → APROBADO_CALIDAD ────────────

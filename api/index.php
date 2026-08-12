@@ -1121,6 +1121,11 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($pnd->rechazar($payload, $usr['usuario']));
 
+        case 'ELIMINAR_PND':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($pnd->eliminar($payload, $usr['usuario']));
+
         // ── Certificaciones ───────────────────────────────
         case 'IMPRIMIR_PDF_CERT':
             $usr = validarToken($pdo, $token);
@@ -1316,20 +1321,29 @@ if ($method === 'POST') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->guardarParticipante($payload, $_FILES, $usr['usuario']));
 
+        // Calidad da de baja duplicados y capturas equivocadas en todos los
+        // módulos. Si el registro ya está publicado en el portal del cliente la
+        // clase exige un motivo y anota la baja en el historial.
         case 'ELIMINAR_EQUIPO':
             $usr = validarToken($pdo, $token);
-            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cal->eliminarEquipo((int)($payload['id'] ?? 0)));
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->eliminarEquipo(
+                (int)($payload['id'] ?? 0), $usr['usuario'], (string)($payload['motivo'] ?? '')
+            ));
 
         case 'ELIMINAR_SESION_ACC':
             $usr = validarToken($pdo, $token);
-            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($accesorios->eliminarSesionAcc((int)($payload['id'] ?? 0)));
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->eliminarSesionAcc(
+                (int)($payload['id'] ?? 0), $usr['usuario'], (string)($payload['motivo'] ?? '')
+            ));
 
         case 'ELIMINAR_PARTICIPANTE':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($personal->eliminarParticipante((int)($payload['id'] ?? 0), $usr['rol']));
+            respuesta($personal->eliminarParticipante(
+                (int)($payload['id'] ?? 0), $usr['rol'], $usr['usuario'], (string)($payload['motivo'] ?? '')
+            ));
 
         case 'APROBAR_PARTICIPANTE':
             $usr = validarToken($pdo, $token);
@@ -1517,7 +1531,7 @@ if ($method === 'POST') {
         case 'ELIMINAR_ACCESORIO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($accesorios->eliminarAccesorio($payload, true));
+            respuesta($accesorios->eliminarAccesorio($payload, true, $usr['usuario']));
 
         case 'GUARDAR_DATOS_SESION_ACC':
             $usr = validarToken($pdo, $token);
@@ -1962,7 +1976,7 @@ if ($method === 'POST') {
         case 'ELIMINAR_ITEM_ARNES':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($arneses->eliminarItem($payload, true));
+            respuesta($arneses->eliminarItem($payload, true, $usr['usuario']));
 
         case 'DUPLICAR_ITEM_ARNES':
             $usr = validarToken($pdo, $token);
@@ -2012,8 +2026,10 @@ if ($method === 'POST') {
 
         case 'ELIMINAR_SESION_ARNES':
             $usr = validarToken($pdo, $token);
-            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($arneses->eliminarSesion((int)($payload['id'] ?? 0)));
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->eliminarSesion(
+                (int)($payload['id'] ?? 0), $usr['usuario'], (string)($payload['motivo'] ?? '')
+            ));
 
         case 'GUARDAR_TIPO_ARNES':
             $usr = validarToken($pdo, $token);

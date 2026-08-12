@@ -478,6 +478,35 @@ function registrarHistorial(PDO $pdo, string $usuario, ?int $equipoId, string $c
 }
 
 /**
+ * Anota la baja de un registro de inspección.
+ *
+ * Cuando se elimina un expediente el registro desaparece de la base y, si ya
+ * estaba emitido, también del portal del cliente: esta anotación es lo único
+ * que queda de él. Guarda qué era y por qué se dio de baja, porque la unidad
+ * de inspección tiene que poder justificar la baja de un folio emitido.
+ *
+ * Nunca lanza: no se puede impedir una eliminación legítima porque falle la
+ * bitácora, pero sí queda constancia en el log del servidor.
+ *
+ * @param string $referencia  Identificador corto del expediente (cabe en 50).
+ * @param string $descripcion Qué se eliminó, en texto legible.
+ * @param string $motivo      Razón capturada por quien elimina.
+ */
+function registrarEliminacion(PDO $pdo, string $usuario, string $referencia, string $descripcion, string $motivo = ''): void {
+    try {
+        registrarHistorial(
+            $pdo, $usuario, null,
+            mb_substr($referencia, 0, 50),
+            mb_substr($descripcion, 0, 2000),
+            $motivo !== '' ? mb_substr($motivo, 0, 2000) : null,
+            'DELETE'
+        );
+    } catch (\Throwable $e) {
+        error_log("[registrarEliminacion] $referencia: " . $e->getMessage());
+    }
+}
+
+/**
  * Corrige UTF-8 doblemente codificado que ocurre cuando datos se insertaron
  * con una conexión latin1 hacia columnas utf8/utf8mb4.
  * Ejemplo: "JuÃ¡rez" → "Juárez"

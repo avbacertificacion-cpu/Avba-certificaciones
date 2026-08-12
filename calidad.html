@@ -1361,6 +1361,9 @@
       <button class="btn-sec"      onclick="generarReportePND()" id="pnd-btn-reporte">Generar reporte</button>
       <button class="btn-sec"      onclick="aprobarPND()"  id="pnd-btn-aprobar">Aprobar</button>
       <button class="btn-rechazar" onclick="abrirRechazoPND()">Rechazar</button>
+      <button class="btn-sec" id="pnd-btn-eliminar" style="color:var(--rojo);border-color:var(--rojo)"
+              title="Dar de baja la inspección (duplicado o captura equivocada)"
+              onclick="eliminarPndActual()">🗑 Eliminar</button>
     </div>
   </div>
 </div>
@@ -2428,6 +2431,9 @@ let filaActual    = null;
 let guardando     = false;
 const _sesRol = (JSON.parse(localStorage.getItem('avba_session') || '{}')).rol || '';
 const isAdminCal          = _sesRol === 'ADMIN';
+/* Calidad da de baja duplicados y capturas equivocadas en todos los módulos.
+   Si el expediente ya se entregó al cliente, el servidor pide el motivo. */
+const puedeEliminarCal    = ['ADMIN','CALIDAD'].includes(_sesRol);
 const canManageInstructor = _sesRol === 'ADMIN' || _sesRol === 'CALIDAD';
 
 /* ─── Definición de plantillas de prueba de carga ───
@@ -2751,7 +2757,7 @@ function ver(fila) {
 
   // ── Footer según estado ──
   let footer = "";
-  const btnEliminar = isAdminCal
+  const btnEliminar = puedeEliminarCal
     ? `<button style="background:var(--rojo-light);border:1px solid var(--rojo);color:var(--rojo);border-radius:8px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer"
          onclick="eliminarEquipo(${d.fila},'${esc(d.cliente)}')">🗑 Eliminar</button>`
     : '';
@@ -2818,38 +2824,91 @@ async function guardarInspectorEquipo() {
   }
 }
 
-async function _apiEliminar(action, id) {
-  const res  = await fetch(API, { method: 'POST', headers: {'Content-Type':'application/json'},
-                                   body: JSON.stringify({ action, payload: { id } }) });
+async function _apiEliminar(action, id, motivo) {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  const payload = motivo ? { id, motivo } : { id };
+  const res  = await fetch(API, { method: 'POST', headers: {'Content-Type':'application/json','X-Token':s.token||''},
+                                   body: JSON.stringify({ action, token: s.token || '', payload }) });
   if (!res.ok) throw new Error('HTTP ' + res.status);
-  const data = await res.json();
-  if (data.status !== 'success') throw new Error(data.message || 'Error al eliminar.');
-  return data;
+  return res.json();
+}
+
+/**
+ * Baja de un registro desde Calidad, igual en todos los módulos.
+ *
+ * Se puede eliminar en cualquier estado: para eso está, para quitar duplicados
+ * y capturas equivocadas. Si el expediente ya se entregó al cliente el servidor
+ * responde `requiere_motivo` y aquí se pide la razón, que queda anotada en el
+ * historial junto con quién dio la baja.
+ *
+ * @param recargar Función que refresca la vista tras eliminar.
+ */
+async function bajaRegistro(action, id, descripcion, recargar) {
+  if (!confirm(`¿Eliminar permanentemente ${descripcion}?\n\n` +
+               `No se puede deshacer. El código QR queda libre para reasignarse.`)) return;
+  try {
+    let data = await _apiEliminar(action, id);
+
+    if (data.requiere_motivo) {
+      const motivo = prompt(
+        'Este registro ya se entregó al cliente y desaparecerá de su portal.\n\n' +
+        'Motivo de la baja (queda registrado en el historial):', '');
+      if (motivo === null) return;
+      if (!motivo.trim()) { mostrarToast('Sin motivo no se puede dar de baja.', 'err'); return; }
+      data = await _apiEliminar(action, id, motivo.trim());
+    }
+
+    if (data.status !== 'success') { mostrarToast(data.message || 'No se pudo eliminar.', 'err'); return data; }
+    mostrarToast(data.message || 'Registro eliminado.', 'ok');
+    if (typeof recargar === 'function') recargar();
+    return data;
+  } catch (e) {
+    mostrarToast('Error: ' + e.message, 'err');
+  }
 }
 
 async function eliminarEquipo(id, desc) {
-  if (!confirm(`¿Eliminar permanentemente el registro "${desc}"?\nEl QR asociado quedará disponible.`)) return;
-  try {
-    await _apiEliminar('ELIMINAR_EQUIPO', id);
-    cerrarDet();
-    cargar();
-  } catch(e) { alert('Error: ' + e.message); }
+  await bajaRegistro('ELIMINAR_EQUIPO', id, `el registro de "${desc}"`, () => { cerrarDet(); cargar(); });
+}
+
+/* El cliente se lee de la sesión abierta y no del atributo onclick: un
+   apóstrofo en el nombre de la empresa rompería el HTML. */
+function eliminarSesionAccActual() {
+  if (!accSesionActual) return;
+  eliminarSesionAccCal(accSesionActual.id, accSesionActual.cliente || 'sin cliente');
 }
 
 async function eliminarSesionAccCal(id, desc) {
-  if (!confirm(`¿Eliminar permanentemente la sesión "${desc}"?\nEl QR asociado quedará disponible.`)) return;
-  try {
-    await _apiEliminar('ELIMINAR_SESION_ACC', id);
-    cargarSesionesAcc();
-  } catch(e) { alert('Error: ' + e.message); }
+  await bajaRegistro('ELIMINAR_SESION_ACC', id, `la sesión de accesorios de "${desc}"`, () => {
+    cerrarDetAccSesion(); accSesionesCargadas = false; cargarSesionesAcc();
+  });
 }
 
 async function eliminarParticipanteCal(id, nombre) {
-  if (!confirm(`¿Eliminar permanentemente al participante "${nombre}"?\nEl QR asociado quedará disponible.`)) return;
-  try {
-    await _apiEliminar('ELIMINAR_PARTICIPANTE', id);
+  await bajaRegistro('ELIMINAR_PARTICIPANTE', id, `al participante "${nombre}"`, () => {
     perCargados = false; cargarPersonal();
-  } catch(e) { alert('Error: ' + e.message); }
+  });
+}
+
+async function eliminarSesionArnCal(id, desc) {
+  await bajaRegistro('ELIMINAR_SESION_ARNES', id, `la inspección de arneses de "${desc}"`, () => {
+    cerrarArnDet(); cargarSesionesArn();
+  });
+}
+
+/* El cliente se lee del registro abierto: incrustarlo en el onclick rompería
+   el atributo en cuanto trajera un apóstrofo. */
+function eliminarPndActual() {
+  if (!pndFilaActual) return;
+  const d = (datosGlobalPND || []).find(x => +x.id === +pndFilaActual) || {};
+  eliminarPndCal(pndFilaActual, d.cliente || 'sin cliente');
+}
+
+async function eliminarPndCal(id, desc) {
+  await bajaRegistro('ELIMINAR_PND', id, `la inspección PND de "${desc}"`, () => {
+    cerrarDetPND();
+    cargarPND();
+  });
 }
 
 function cerrarDet() {
@@ -3965,7 +4024,7 @@ function renderSesionesAcc(data) {
                   style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Ver</button>
           ${puedAprobar ? `<button onclick="abrirApro('acc',${r.id})"
                   style="background:var(--verde-light);border:1px solid var(--verde);color:var(--verde);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Aprobar</button>` : ''}
-          ${isAdminCal ? `<button onclick="eliminarSesionAccCal(${r.id},'${(r.cliente||'').replace(/'/g,'')}')"
+          ${puedeEliminarCal ? `<button onclick="eliminarSesionAccCal(${r.id},'${(r.cliente||'').replace(/'/g,'')}')"
                   style="background:var(--rojo-light);border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">🗑</button>` : ''}
         </div>
       </td>
@@ -4082,7 +4141,17 @@ async function abrirDetAccSesion(id) {
         <div style="font-size:11px;color:var(--texto-hint);margin-top:4px">En Certificaciones para emisión y envío.</div>
       </div>`;
 
-    document.getElementById('acc-ses-body').innerHTML = cab + accsHtml + aprobarBtnHtml;
+    const bajaBtnHtml = puedeEliminarCal ? `
+      <div style="padding:6px 0 0;text-align:right">
+        <button onclick="eliminarSesionAccActual()"
+                title="Dar de baja la sesión completa (duplicado o captura equivocada)"
+                style="padding:6px 14px;border-radius:8px;border:1.5px solid var(--rojo);background:var(--rojo-light);
+                       color:var(--rojo);font-size:12px;font-weight:600;cursor:pointer">
+          🗑 Eliminar sesión completa
+        </button>
+      </div>` : '';
+
+    document.getElementById('acc-ses-body').innerHTML = cab + accsHtml + aprobarBtnHtml + bajaBtnHtml;
     accPoblarInspectores(s.inspector_usuario || '', s.inspector_firma || s.usuario || '');
   } catch (e) {
     document.getElementById('acc-ses-body').innerHTML = `<div style="text-align:center;padding:32px;color:var(--rojo)">Error al cargar.</div>`;
@@ -4195,6 +4264,14 @@ async function eliminarAccesorioCal(accId) {
   if (emitida) msg += '\n\nLa sesión ya está emitida: el accesorio dejará de aparecer en los documentos cuando Certificaciones los vuelva a emitir.';
   if (!confirm(msg)) return;
   const r = await accPost('ELIMINAR_ACCESORIO', { id: accId });
+  // Era el único accesorio: se ofrece dar de baja la sesión completa en vez de
+  // dejar el expediente vacío con folio asignado.
+  if (r && r.ultima) {
+    if (confirm(r.message + '\n\n¿Eliminar la sesión completa ahora?')) {
+      eliminarSesionAccCal(r.sesion_id || accSesionActual.id, accSesionActual.cliente || 'sin cliente');
+    }
+    return;
+  }
   if (r && r.status === 'success') {
     mostrarToast(r.message || 'Accesorio eliminado.', 'ok');
     if (r.reemitir) alert('Pide a Certificaciones que vuelva a emitir los documentos para que reflejen el cambio.');
@@ -4515,7 +4592,7 @@ function renderIndep(data) {
                   style="background:var(--verde-light);border:1px solid var(--verde);color:var(--verde);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Aprobar</button>` : ''}
           ${canManageInstructor ? `<button onclick="abrirCambiarInstructorIndep(${p.id},'${(p.nombre_completo||'').replace(/'/g,"\\'").replace(/"/g,'&quot;')}','${(p.instructor_nombre||p.usuario_registro||'').replace(/'/g,"\\'")}')"
                   style="background:#fff3e0;border:1px solid #fb8c00;color:#e65100;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Instructor</button>` : ''}
-          ${isAdminCal ? `<button onclick="eliminarParticipanteCal(${p.id},'${(p.nombre_completo||'').replace(/'/g,'')}')"
+          ${puedeEliminarCal ? `<button onclick="eliminarParticipanteCal(${p.id},'${(p.nombre_completo||'').replace(/'/g,'')}')"
                   style="background:var(--rojo-light);border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">🗑</button>` : ''}
         </div>
       </td>
@@ -4850,7 +4927,7 @@ function abrirSesionParticipantes(idx) {
         ${estatusPerBadge(p.estatus)}
         <button onclick="abrirDetPer(${p.id})"
           style="background:var(--azul-light);border:none;color:var(--azul);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Ver</button>
-        ${(p.estatus === 'EMITIDO' && !isAdminCal) ? '' : `
+        ${!puedeEliminarCal ? '' : `
         <button onclick="borrarParticipanteSesion(${p.id})"
           title="Quitar de la sesión"
           style="background:var(--rojo-light);border:none;color:var(--rojo);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">Borrar</button>`}
@@ -4869,14 +4946,10 @@ async function borrarParticipanteSesion(id) {
   // El nombre se resuelve aquí: incrustarlo en el onclick rompía el atributo
   // en cuanto traía comillas o apóstrofos.
   const nombre = (g.participantes.find(x => +x.id === +id) || {}).nombre_completo || 'este participante';
-  if (!confirm(`¿Eliminar a "${nombre}" de esta sesión?\n\nSe borra el registro y su código QR vuelve a quedar disponible. No se puede deshacer.`)) return;
   try {
-    const res  = await fetch(API, { method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ action: 'ELIMINAR_PARTICIPANTE', payload: { id } }) });
-    const data = await res.json();
-    if (data.status !== 'success') { mostrarToast(data.message || 'No se pudo eliminar.', 'err'); return; }
+    const data = await bajaRegistro('ELIMINAR_PARTICIPANTE', id, `a "${nombre}" de esta sesión`, null);
+    if (!data || data.status !== 'success') return;
 
-    mostrarToast('Participante eliminado.', 'ok');
     g.participantes = g.participantes.filter(x => +x.id !== +id);
     if (!g.participantes.length) {
       document.getElementById('overlay-per-det').style.display = 'none';
@@ -7041,10 +7114,21 @@ function renderArnDet(d) {
   const puedeAprobar = ['PENDIENTE','DEVUELTO','RETORNADO',''].includes(ses.estatus || '');
   document.getElementById('arn-det-footer').innerHTML = `
     <button class="btn-sec" onclick="cerrarArnDet()">Cerrar</button>
+    ${puedeEliminarCal ? `<button class="btn-sec" style="color:var(--rojo);border-color:var(--rojo)"
+        title="Dar de baja la inspección completa (duplicado o captura equivocada)"
+        onclick="eliminarSesionArnActual()">🗑 Eliminar inspección</button>` : ''}
     ${puedeAprobar ? `<button class="btn-sec" style="color:var(--rojo);border-color:var(--rojo)" onclick="devolverArn(${ses.id})">↩ Devolver al inspector</button>` : ''}
     ${puedeAprobar ? `<button class="btn-guardar" onclick="aprobarArn(${ses.id})">✓ Aprobar → Certificaciones</button>` : ''}
     ${ses.estatus === 'APROBADO_CALIDAD' ? '<span style="font-size:11px;color:var(--texto-hint);align-self:center">En Certificaciones para emisión y envío.</span>' : ''}
   `;
+}
+
+/* El cliente se lee del expediente abierto y no del atributo onclick: un
+   apóstrofo en el nombre de la empresa rompería el HTML. */
+function eliminarSesionArnActual() {
+  const ses = _arnDetActual && _arnDetActual.sesion;
+  if (!ses) return;
+  eliminarSesionArnCal(ses.id, ses.cliente || 'sin cliente');
 }
 
 /* El inspector se elige de los usuarios con rol INSPECTOR: de ahí salen el
@@ -7321,6 +7405,14 @@ async function eliminarItemArn(itemId) {
     const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ action:'ELIMINAR_ITEM_ARNES', payload:{ item_id:itemId } }) });
     const d = await r.json();
+    // Era la única pieza: en vez de dejar el expediente vacío con folio, se
+    // ofrece dar de baja la inspección completa desde aquí mismo.
+    if (d.ultima) {
+      if (confirm(d.message + '\n\n¿Eliminar la inspección completa ahora?')) {
+        eliminarSesionArnCal(d.sesion_id || ses.id, ses.cliente || 'sin cliente');
+      }
+      return;
+    }
     if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo eliminar.', 'err'); return; }
     mostrarToast(d.message, 'ok');
     if (d.reemitir) {

@@ -313,6 +313,62 @@ class Pnd {
         return ['status' => 'success', 'message' => 'Inspección PND rechazada.'];
     }
 
+    /**
+     * Elimina una inspección PND.
+     *
+     * Calidad puede eliminar aunque ya esté aprobada y publicada —para eso
+     * está: quitar duplicados y capturas equivocadas—, pero entonces se exige
+     * un motivo y la baja queda anotada en el historial, porque el registro
+     * desaparece también del portal del cliente.
+     */
+    public function eliminar(array $payload, string $usuario = ''): array {
+        $id     = (int)($payload['id'] ?? $payload['fila'] ?? 0);
+        $motivo = trim((string)($payload['motivo'] ?? ''));
+        if (!$id) return ['status' => 'error', 'message' => 'ID de inspección requerido.'];
+
+        $s = $this->pdo->prepare(
+            "SELECT control, cliente, componente, estado FROM pnd_inspecciones WHERE id = ?"
+        );
+        $s->execute([$id]);
+        $row = $s->fetch();
+        if (!$row) return ['status' => 'error', 'message' => 'Inspección no encontrada.'];
+
+        $publicado = in_array((string)$row['estado'], ['APROBADO', 'RETORNADO'], true);
+        if ($publicado && $motivo === '') {
+            return ['status' => 'error', 'requiere_motivo' => true, 'message' =>
+                'Esta inspección ya fue aprobada y entregada. Indica el motivo de la baja para poder eliminarla.'];
+        }
+
+        // La evidencia vive en una carpeta por folio: se borra completa para no
+        // dejar fotografías de un expediente que ya no existe.
+        try {
+            $control = preg_replace('/[^a-zA-Z0-9_\-]/', '_', (string)$row['control']);
+            $dir     = rtrim(UPLOAD_DIR, '/') . '/pnd/' . $control . '/';
+            if ($control !== '' && is_dir($dir)) {
+                foreach ((array)glob($dir . '*') as $f) { if (is_file($f)) @unlink($f); }
+                @rmdir($dir);
+            }
+        } catch (\Throwable $e) { error_log('[Pnd] limpiar evidencia: ' . $e->getMessage()); }
+
+        $this->pdo->prepare("DELETE FROM pnd_inspecciones WHERE id = ?")->execute([$id]);
+
+        if (function_exists('registrarEliminacion')) {
+            registrarEliminacion(
+                $this->pdo, $usuario ?: 'sistema', "pnd#$id",
+                'Inspección PND ' . ($row['control'] ?: 's/folio') . ' — ' . $row['cliente']
+                    . ' — ' . mb_substr((string)$row['componente'], 0, 120)
+                    . ' — estado ' . ($row['estado'] ?: 'PENDIENTE'),
+                $motivo
+            );
+        }
+
+        return [
+            'status'    => 'success',
+            'publicado' => $publicado,
+            'message'   => 'Inspección eliminada.' . ($publicado ? ' Ya no aparece en el portal del cliente.' : ''),
+        ];
+    }
+
     // ── Guardar fotos en disco ─────────────────────────────
     private function guardarFotos(array $fotos, string $control): string {
         $dirName = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $control);
