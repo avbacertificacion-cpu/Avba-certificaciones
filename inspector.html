@@ -2600,6 +2600,16 @@
           <input type="text" id="iza-medidas" placeholder="Ej: 3 m × 25 mm">
         </div>
 
+        <!-- Juegos y aparejos: el registro es el conjunto (su capacidad y su
+             dictamen) y aquí se anota de qué piezas se compone. Se deja vacío
+             en los accesorios sueltos. -->
+        <div class="field">
+          <label>Componentes del juego</label>
+          <textarea id="iza-componentes" rows="3"
+                    placeholder="Sólo si es un juego o aparejo. Una pieza por renglón:&#10;2 poleas Ø 8&quot;&#10;3 grilletes Crosby G-209 3/4&quot;"></textarea>
+          <div class="hint">Déjalo vacío si es un accesorio suelto.</div>
+        </div>
+
         <div class="field">
           <label>Estado <span class="req">*</span></label>
           <div class="iza-estado-row">
@@ -5924,6 +5934,7 @@ function izaLeerForm() {
     modelo:    v('iza-modelo'),
     capacidad: v('iza-capacidad'),
     medidas:   v('iza-medidas'),
+    componentes: v('iza-componentes'),
     estado:    izaEstadoVal,
   };
 }
@@ -5935,8 +5946,9 @@ function izaEscribirForm(d) {
   set('iza-id',        d.id_acc);
   set('iza-marca',     d.marca);
   set('iza-modelo',    d.modelo);
-  set('iza-capacidad', d.capacidad);
-  set('iza-medidas',   d.medidas);
+  set('iza-capacidad',   d.capacidad);
+  set('iza-medidas',     d.medidas);
+  set('iza-componentes', d.componentes);
   set('iza-serie', '');
   set('iza-qr',    '');
   izaEstado(d.estado || 'CUMPLE');
@@ -6008,6 +6020,7 @@ async function izaGuardar(repetir = false) {
     fd.append('serie',       document.getElementById('iza-serie').value.trim());
     fd.append('capacidad',   document.getElementById('iza-capacidad').value.trim());
     fd.append('medidas',     document.getElementById('iza-medidas').value.trim());
+    fd.append('componentes', document.getElementById('iza-componentes').value.trim());
     fd.append('estado',      izaEstadoVal);
     if (qrVal) fd.append('qr_codigo', qrVal);
     izaFotos.forEach(f => fd.append('fotos[]', f, f.name));
@@ -6121,7 +6134,7 @@ async function izaEscanearQR() {
 
 // ── Limpiar formulario de accesorio ──────────────────
 function izaLimpiarForm() {
-  ['iza-id','iza-marca','iza-modelo','iza-serie','iza-capacidad','iza-medidas','iza-qr'].forEach(id => {
+  ['iza-id','iza-marca','iza-modelo','iza-serie','iza-capacidad','iza-medidas','iza-qr','iza-componentes'].forEach(id => {
     document.getElementById(id).value = '';
   });
   document.getElementById('iza-tipo').value = '';

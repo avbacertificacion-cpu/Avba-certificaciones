@@ -136,8 +136,8 @@ class Accesorios {
 
         $this->pdo->prepare(
             "INSERT INTO accesorios_izaje
-             (sesion_id, id_accesorio, tipo_id, marca, modelo, serie, capacidad, medidas, estado, orden, qr_codigo)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+             (sesion_id, id_accesorio, tipo_id, marca, modelo, serie, capacidad, medidas, estado, orden, qr_codigo, componentes)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )->execute([
             $sesionId,
             strtoupper(trim($post['id_accesorio'] ?? '')),
@@ -150,6 +150,7 @@ class Accesorios {
             $estado,
             $orden,
             $qrCodigo ?: null,
+            $this->normalizarComponentes($post['componentes'] ?? ''),
         ]);
 
         $accesorioId = (int)$this->pdo->lastInsertId();
@@ -325,9 +326,9 @@ class Accesorios {
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
 
         $stmt = $this->pdo->prepare(
-            "SELECT a.id, a.id_accesorio, t.nombre AS tipo_nombre,
+            "SELECT a.id, a.id_accesorio, a.tipo_id, t.nombre AS tipo_nombre,
                     a.marca, a.modelo, a.serie, a.capacidad, a.medidas,
-                    a.estado, a.orden, a.qr_codigo,
+                    a.estado, a.orden, a.qr_codigo, a.componentes,
                     COUNT(f.id) AS total_fotos
              FROM accesorios_izaje a
              LEFT JOIN accesorios_tipos t ON t.id = a.tipo_id
@@ -372,6 +373,7 @@ class Accesorios {
         $medidas   = strtoupper(trim($payload['medidas']        ?? ''));
         $estado    = trim($payload['estado']         ?? '');
         $qrCodigo  = trim($payload['qr_codigo']      ?? '');
+        $comps     = $this->normalizarComponentes($payload['componentes'] ?? '');
 
         if ($id <= 0) return ['status' => 'error', 'message' => 'id requerido.'];
 
@@ -391,9 +393,9 @@ class Accesorios {
 
         $this->pdo->prepare(
             "UPDATE accesorios_izaje
-             SET tipo_id=?, id_accesorio=?, marca=?, modelo=?, serie=?, capacidad=?, medidas=?, estado=?, qr_codigo=?
+             SET tipo_id=?, id_accesorio=?, marca=?, modelo=?, serie=?, capacidad=?, medidas=?, estado=?, qr_codigo=?, componentes=?
              WHERE id=?"
-        )->execute([$tipoId, $idAcc, $marca, $modelo, $serie, $capacidad, $medidas, $estado, $qrCodigo ?: null, $id]);
+        )->execute([$tipoId, $idAcc, $marca, $modelo, $serie, $capacidad, $medidas, $estado, $qrCodigo ?: null, $comps, $id]);
 
         return ['status' => 'success', 'message' => 'Accesorio actualizado.'];
     }
@@ -572,8 +574,8 @@ class Accesorios {
 
         $ins = $this->pdo->prepare(
             "INSERT INTO accesorios_izaje
-               (sesion_id, id_accesorio, tipo_id, marca, modelo, serie, capacidad, medidas, estado, orden, qr_codigo)
-             VALUES (?,?,?,?,?,?,?,?,?,?,NULL)"
+               (sesion_id, id_accesorio, tipo_id, marca, modelo, serie, capacidad, medidas, estado, orden, qr_codigo, componentes)
+             VALUES (?,?,?,?,?,?,?,?,?,?,NULL,?)"
         );
 
         $creados = [];
@@ -582,6 +584,7 @@ class Accesorios {
             $ins->execute([
                 $sesionId, $it['id_accesorio'], $it['tipo_id'], $it['marca'], $it['modelo'],
                 $serie, $it['capacidad'], $it['medidas'], $it['estado'], ++$orden,
+                $it['componentes'] ?? null,
             ]);
             $creados[] = (int)$this->pdo->lastInsertId();
         }
@@ -1049,10 +1052,39 @@ class Accesorios {
         }
     }
 
+    /**
+     * Deja la lista de componentes de un juego en una pieza por renglón.
+     *
+     * Se acepta lo que el inspector teclee —saltos de línea, comas o punto y
+     * coma— porque en campo se captura rápido y sin formato; el informe la
+     * imprime tal cual queda aquí. Cada renglón se guarda en mayúsculas, como
+     * el resto de los datos del accesorio.
+     */
+    private function normalizarComponentes($raw): ?string {
+        $texto = trim((string)$raw);
+        if ($texto === '') return null;
+        $partes = preg_split('/[\r\n;]+|,(?![^(]*\))/u', $texto);
+        $limpias = [];
+        foreach ($partes as $p) {
+            $p = mb_strtoupper(trim($p));
+            if ($p !== '') $limpias[] = $p;
+        }
+        if (!$limpias) return null;
+        // 20 renglones bastan para cualquier aparejo y evitan que un pegado
+        // accidental llene el documento.
+        return mb_substr(implode("\n", array_slice($limpias, 0, 20)), 0, 2000);
+    }
+
     private function ensureAccIzajeQrColumn(): void {
-        try {
-            $this->pdo->exec("ALTER TABLE accesorios_izaje ADD COLUMN IF NOT EXISTS qr_codigo VARCHAR(20) NULL");
-        } catch (\Throwable $e) {}
+        foreach ([
+            "ALTER TABLE accesorios_izaje ADD COLUMN IF NOT EXISTS qr_codigo VARCHAR(20) NULL",
+            // Un juego (motón con sus grilletes, aparejo, etc.) se registra como
+            // un accesorio más: lleva su propia capacidad y su propio resultado,
+            // y aquí se anota de qué piezas se compone.
+            "ALTER TABLE accesorios_izaje ADD COLUMN IF NOT EXISTS componentes TEXT NULL",
+        ] as $sql) {
+            try { $this->pdo->exec($sql); } catch (\Throwable $e) {}
+        }
     }
 
     private function qrDisponible(string $qr, int $excludeAccId = 0): bool {
@@ -1596,6 +1628,25 @@ class Accesorios {
               <td style="padding:5px 6px;border:1px solid #c8d4e8;font-size:8.5pt;color:#1a1a2e;text-align:center">' . $esc($a['medidas'] ?? '') . '</td>
               <td style="padding:5px 6px;border:1px solid #c8d4e8;text-align:center;background:' . $estBg . ';font-size:8pt;font-weight:bold;color:' . $estColor . '">' . $esc($estLabel) . '</td>
             </tr>';
+
+            // Juegos y aparejos: el renglón de arriba es el conjunto (su
+            // capacidad y su dictamen) y debajo se detalla de qué se compone.
+            // Sólo aparece en los accesorios que lo tengan capturado, así que
+            // el resto del informe se ve exactamente igual que siempre.
+            $comps = array_filter(array_map('trim', explode("\n", (string)($a['componentes'] ?? ''))));
+            if ($comps) {
+                $lista = '';
+                foreach ($comps as $c) {
+                    $lista .= '<div style="padding:1px 0">• ' . $esc($c) . '</div>';
+                }
+                $filas .= '<tr style="background:' . $bg . '">
+                  <td style="border:1px solid #c8d4e8;border-top:none"></td>
+                  <td colspan="7" style="padding:3px 8px 6px;border:1px solid #c8d4e8;border-top:none;font-size:7.5pt;color:#5a6072">
+                    <span style="font-weight:bold;color:#0C447C">Componentes del juego:</span>
+                    <div style="margin-top:2px">' . $lista . '</div>
+                  </td>
+                </tr>';
+            }
         }
         if (!$filas) {
             $filas = '<tr><td colspan="8" style="padding:18px;text-align:center;color:#9299a8;font-size:9pt;border:1px solid #c8d4e8">Sin accesorios registrados en esta sesión.</td></tr>';
