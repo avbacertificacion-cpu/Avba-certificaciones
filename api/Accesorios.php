@@ -14,8 +14,61 @@ class Accesorios {
     /** Estatus en los que la sesión todavía admite cambios del inspector. */
     private const ABIERTOS = ['PENDIENTE', 'DEVUELTO', 'RETORNADO', ''];
 
+    /**
+     * Conjuntos que se inspeccionan y se dictaminan como una sola pieza, con su
+     * capacidad —la del componente más débil— y su propio resultado. El detalle
+     * de las piezas que los integran va en el campo "Componentes del juego".
+     *
+     * Se dan de alta una sola vez cada uno; después Calidad los renombra,
+     * desactiva o elimina y no vuelven a aparecer.
+     */
+    private const TIPOS_BASE = [
+        'juego_poleas'      => 'JUEGO DE POLEAS CON GRILLETE',
+        'eslinga_cable_gri' => 'ESLINGA DE CABLE DE ACERO CON TERMINACIÓN EN GRILLETE',
+    ];
+
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
+        $this->seedTipos();
+    }
+
+    /**
+     * Alta única de los tipos base. La marca de aplicado se guarda aparte para
+     * no reponer lo que Calidad haya decidido quitar: sin ella, un tipo borrado
+     * reaparecería en la siguiente petición.
+     */
+    private function seedTipos(): void {
+        try {
+            $this->pdo->exec(
+                "CREATE TABLE IF NOT EXISTS accesorios_tipos_seed (
+                   clave    VARCHAR(40) NOT NULL PRIMARY KEY,
+                   aplicado TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            );
+        } catch (\Throwable $e) {
+            // Sin la marca no se puede sembrar sin arriesgar reponer lo borrado.
+            error_log('[Accesorios] seedTipos (marca): ' . $e->getMessage());
+            return;
+        }
+
+        foreach (self::TIPOS_BASE as $clave => $nombre) {
+            try {
+                $st = $this->pdo->prepare("SELECT 1 FROM accesorios_tipos_seed WHERE clave = ?");
+                $st->execute([$clave]);
+                if ($st->fetch()) continue;
+
+                // Puede existir ya con ese nombre si alguien lo capturó a mano.
+                $dup = $this->pdo->prepare("SELECT id FROM accesorios_tipos WHERE UPPER(TRIM(nombre)) = ?");
+                $dup->execute([$nombre]);
+                if (!$dup->fetch()) {
+                    $this->pdo->prepare("INSERT INTO accesorios_tipos (nombre) VALUES (?)")->execute([$nombre]);
+                }
+                $this->pdo->prepare("INSERT INTO accesorios_tipos_seed (clave) VALUES (?)")->execute([$clave]);
+            } catch (\Throwable $e) {
+                // Cada tipo va aislado: que uno falle no impide sembrar el resto.
+                error_log("[Accesorios] seedTipos ($clave): " . $e->getMessage());
+            }
+        }
     }
 
     // ── Catálogo de tipos (público autenticado) ────────────
