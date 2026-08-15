@@ -647,6 +647,11 @@ if ($method === 'GET') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->detalleSesion((int)($_GET['id'] ?? 0)));
 
+        case 'SUGERENCIAS_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->sugerenciasAcc((int)($_GET['tipo_id'] ?? 0)));
+
         case 'OBTENER_PLANTILLA_ACC':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -782,6 +787,11 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($arneses->detalleSesion((int)($_GET['id'] ?? 0)));
+
+        case 'SUGERENCIAS_ARNES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($arneses->sugerencias((int)($_GET['tipo_id'] ?? 0)));
 
         case 'GET_NEXT_QR_ARNES':
             $usr = validarToken($pdo, $token);

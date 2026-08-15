@@ -71,6 +71,53 @@ class Accesorios {
         }
     }
 
+    /**
+     * Valores ya capturados en marca, modelo, capacidad y medidas, para
+     * ofrecerlos como sugerencia al escribir.
+     *
+     * Van ordenados por uso: lo que más se ha capturado sale primero, que es lo
+     * que casi siempre se busca. Si se indica el tipo de accesorio, sus valores
+     * encabezan la lista —la medida de una eslinga no se parece a la de un
+     * grillete— y detrás va el resto, por si el equipo se capturó antes bajo
+     * otro tipo.
+     */
+    public function sugerenciasAcc(int $tipoId = 0): array {
+        $this->ensureAccIzajeQrColumn();
+        $campos = ['marca', 'modelo', 'capacidad', 'medidas'];
+        $out    = [];
+
+        foreach ($campos as $campo) {
+            $lista = [];
+            // Primero los del tipo indicado, después todos: al unir se quitan
+            // los repetidos conservando ese orden.
+            $consultas = [];
+            if ($tipoId > 0) $consultas[] = [$tipoId];
+            $consultas[] = [0];
+
+            foreach ($consultas as [$filtro]) {
+                $sql = "SELECT `$campo` AS v, COUNT(*) AS n
+                        FROM accesorios_izaje
+                        WHERE `$campo` IS NOT NULL AND TRIM(`$campo`) <> ''";
+                $params = [];
+                if ($filtro > 0) { $sql .= " AND tipo_id = ?"; $params[] = $filtro; }
+                $sql .= " GROUP BY `$campo` ORDER BY n DESC, v ASC LIMIT 200";
+                try {
+                    $st = $this->pdo->prepare($sql);
+                    $st->execute($params);
+                    foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $v) {
+                        $v = trim((string)$v);
+                        if ($v !== '' && !in_array($v, $lista, true)) $lista[] = $v;
+                    }
+                } catch (\Throwable $e) {
+                    error_log("[Accesorios] sugerencias $campo: " . $e->getMessage());
+                }
+            }
+            $out[$campo] = array_slice($lista, 0, 200);
+        }
+
+        return ['status' => 'success', 'data' => $out];
+    }
+
     // ── Catálogo de tipos (público autenticado) ────────────
     public function listarTipos(): array {
         $rows = $this->pdo->query(

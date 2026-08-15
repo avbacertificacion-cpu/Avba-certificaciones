@@ -1400,6 +1400,16 @@
   </div>
 </div>
 
+<!-- Sugerencias de lo ya capturado. Van fuera de los modales porque las
+     comparten el alta y la corrección, y un <datalist> se referencia por id. -->
+<datalist id="dl-acc-marca"></datalist>
+<datalist id="dl-acc-modelo"></datalist>
+<datalist id="dl-acc-capacidad"></datalist>
+<datalist id="dl-acc-medidas"></datalist>
+<datalist id="dl-arn-marca"></datalist>
+<datalist id="dl-arn-modelo"></datalist>
+<datalist id="dl-arn-talla"></datalist>
+
 <!-- ══ CAPTURA DE ACCESORIO DESDE CALIDAD ══
      Mismo criterio que en arneses: Calidad puede dar de alta un accesorio en
      una sesión ya enviada, como si fuera el inspector. -->
@@ -1424,15 +1434,15 @@
         <label style="font-size:11px;color:var(--texto-sub)">ID / Etiqueta interna
           <input type="text" id="acc-n-id" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Marca
-          <input type="text" id="acc-n-marca" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+          <input type="text" id="acc-n-marca" list="dl-acc-marca" autocomplete="off" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Modelo
-          <input type="text" id="acc-n-modelo" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+          <input type="text" id="acc-n-modelo" list="dl-acc-modelo" autocomplete="off" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">No. de serie
           <input type="text" id="acc-n-serie" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Capacidad
-          <input type="text" id="acc-n-capacidad" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+          <input type="text" id="acc-n-capacidad" list="dl-acc-capacidad" autocomplete="off" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Medidas
-          <input type="text" id="acc-n-medidas" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+          <input type="text" id="acc-n-medidas" list="dl-acc-medidas" autocomplete="off" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Código QR
           <input type="text" id="acc-n-qr" maxlength="10" placeholder="9 o 10 dígitos"
                  style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px;font-family:monospace"></label>
@@ -1485,12 +1495,12 @@
       </div>
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Marca</label>
-        <input id="edit-acc-marca" type="text" placeholder="Certex"
+        <input id="edit-acc-marca" type="text" list="dl-acc-marca" autocomplete="off" placeholder="Certex"
                style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
       </div>
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Modelo</label>
-        <input id="edit-acc-modelo" type="text" placeholder="EW-60"
+        <input id="edit-acc-modelo" type="text" list="dl-acc-modelo" autocomplete="off" placeholder="EW-60"
                style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
       </div>
       <div>
@@ -1500,12 +1510,12 @@
       </div>
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Capacidad</label>
-        <input id="edit-acc-capacidad" type="text" placeholder="3 Ton"
+        <input id="edit-acc-capacidad" type="text" list="dl-acc-capacidad" autocomplete="off" placeholder="3 Ton"
                style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
       </div>
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Medidas</label>
-        <input id="edit-acc-medidas" type="text" placeholder="60mm × 4m"
+        <input id="edit-acc-medidas" type="text" list="dl-acc-medidas" autocomplete="off" placeholder="60mm × 4m"
                style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
       </div>
       <div>
@@ -2200,19 +2210,19 @@
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px">
         <label style="font-size:11px;color:var(--texto-sub);grid-column:1/-1">Tipo de equipo *
-          <select id="arn-n-tipo" onchange="arnNuevoChecklist()" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px">
+          <select id="arn-n-tipo" onchange="arnNuevoChecklist(); arnCargarSugerencias(this.value)" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px">
             <option value="">— Seleccionar —</option>
           </select></label>
         <label style="font-size:11px;color:var(--texto-sub)">ID / Etiqueta interna
           <input type="text" id="arn-n-id" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Marca
-          <input type="text" id="arn-n-marca" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+          <input type="text" id="arn-n-marca" list="dl-arn-marca" autocomplete="off" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Modelo
-          <input type="text" id="arn-n-modelo" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+          <input type="text" id="arn-n-modelo" list="dl-arn-modelo" autocomplete="off" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">No. de serie
           <input type="text" id="arn-n-serie" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Talla
-          <input type="text" id="arn-n-talla" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+          <input type="text" id="arn-n-talla" list="dl-arn-talla" autocomplete="off" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Código QR
           <input type="text" id="arn-n-qr" maxlength="10" placeholder="Empieza con 4"
                  style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px;font-family:monospace"></label>
@@ -4327,6 +4337,8 @@ async function abrirAccNuevo() {
     '<option value="">— Seleccionar —</option>' +
     accTiposData.filter(t => t.activo != 0).map(t => `<option value="${t.id}">${escH(t.nombre)}</option>`).join('');
 
+  accCargarSugerencias(0);
+  document.getElementById('acc-n-tipo').onchange = function () { accCargarSugerencias(this.value); };
   document.getElementById('overlay-acc-nuevo').style.display = 'flex';
 }
 
@@ -4377,6 +4389,40 @@ async function guardarAccNuevo() {
     }
   } catch (e) { mostrarToast('Error de conexión.', 'err'); }
   btn.disabled = false; btn.textContent = 'Guardar accesorio';
+}
+
+/**
+ * Rellena las listas de sugerencias con lo ya capturado antes.
+ *
+ * Se usa <datalist>: el navegador filtra conforme se escribe y deja teclear un
+ * valor nuevo. Al cambiar el tipo se recargan, porque las medidas de una
+ * eslinga no se parecen a las de un grillete.
+ */
+async function accCargarSugerencias(tipoId) {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await fetch(`${API}?action=SUGERENCIAS_ACC&tipo_id=${encodeURIComponent(tipoId||0)}&token=${encodeURIComponent(s.token||'')}`);
+    const d = await r.json();
+    if (d.status !== 'success') return;
+    ['marca','modelo','capacidad','medidas'].forEach(c => pintarDatalist('dl-acc-' + c, d.data[c]));
+  } catch(_) { /* sin sugerencias se sigue capturando a mano */ }
+}
+
+async function arnCargarSugerencias(tipoId) {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const r = await fetch(`${API}?action=SUGERENCIAS_ARNES&tipo_id=${encodeURIComponent(tipoId||0)}&token=${encodeURIComponent(s.token||'')}`);
+    const d = await r.json();
+    if (d.status !== 'success') return;
+    ['marca','modelo','talla'].forEach(c => pintarDatalist('dl-arn-' + c, d.data[c]));
+  } catch(_) {}
+}
+
+function pintarDatalist(id, valores) {
+  const dl = document.getElementById(id);
+  if (!dl) return;
+  dl.innerHTML = (valores || []).map(v =>
+    `<option value="${String(v).replace(/"/g, '&quot;')}"></option>`).join('');
 }
 
 /* POST JSON al API con el token de la sesión; devuelve null si falla la red. */
@@ -4433,6 +4479,8 @@ function abrirEditAcc(a) {
   document.getElementById('edit-acc-estado').value  = a.estado   || 'APTO';
   document.getElementById('edit-acc-qr').value      = a.qr_codigo || '';
 
+  accCargarSugerencias(a.tipo_id || 0);
+  sel.onchange = function () { accCargarSugerencias(this.value); };
   document.getElementById('overlay-edit-acc').classList.add('open');
 }
 
@@ -7306,6 +7354,7 @@ async function abrirArnNuevo() {
     '<div style="font-size:12px;color:var(--texto-hint);padding:6px 0">Elige el tipo de equipo para ver sus puntos.</div>';
   _arnNChecklist = [];
 
+  arnCargarSugerencias(0);
   document.getElementById('overlay-arn-nuevo').style.display = 'flex';
 }
 function cerrarArnNuevo() {
@@ -7364,6 +7413,7 @@ async function abrirArnEditar(itemId) {
 
   const respuestas = {};
   (it.checklist || []).forEach(c => { if (c.valor) respuestas[c.tag] = c.valor; });
+  arnCargarSugerencias(it.tipo_id || 0);
   document.getElementById('overlay-arn-nuevo').style.display = 'flex';
   await arnNuevoChecklist(respuestas);
 }

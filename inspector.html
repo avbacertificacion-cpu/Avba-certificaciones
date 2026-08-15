@@ -2566,7 +2566,7 @@
           </div>
           <div class="field" id="iza-f-tipo">
             <label>Tipo <span class="req">*</span></label>
-            <select id="iza-tipo">
+            <select id="iza-tipo" onchange="izaCargarSugerencias()">
               <option value="">— Seleccionar —</option>
             </select>
             <div class="errmsg">Selecciona el tipo de accesorio</div>
@@ -2576,11 +2576,13 @@
         <div class="row2">
           <div class="field">
             <label>Marca</label>
-            <input type="text" id="iza-marca" placeholder="Ej: Crosby">
+            <input type="text" id="iza-marca" list="dl-iza-marca" autocomplete="off" placeholder="Ej: Crosby">
+            <datalist id="dl-iza-marca"></datalist>
           </div>
           <div class="field">
             <label>Modelo</label>
-            <input type="text" id="iza-modelo" placeholder="Ej: G-209">
+            <input type="text" id="iza-modelo" list="dl-iza-modelo" autocomplete="off" placeholder="Ej: G-209">
+            <datalist id="dl-iza-modelo"></datalist>
           </div>
         </div>
 
@@ -2591,13 +2593,15 @@
           </div>
           <div class="field">
             <label>Capacidad</label>
-            <input type="text" id="iza-capacidad" placeholder="Ej: 2 ton">
+            <input type="text" id="iza-capacidad" list="dl-iza-capacidad" autocomplete="off" placeholder="Ej: 2 ton">
+            <datalist id="dl-iza-capacidad"></datalist>
           </div>
         </div>
 
         <div class="field">
           <label>Medidas</label>
-          <input type="text" id="iza-medidas" placeholder="Ej: 3 m × 25 mm">
+          <input type="text" id="iza-medidas" list="dl-iza-medidas" autocomplete="off" placeholder="Ej: 3 m × 25 mm">
+          <datalist id="dl-iza-medidas"></datalist>
         </div>
 
         <!-- Juegos y aparejos: el registro es el conjunto (su capacidad y su
@@ -2758,7 +2762,7 @@
 
         <div class="field" id="arn-f-tipo">
           <label>Tipo de equipo <span class="req">*</span></label>
-          <select id="arn-tipo" onchange="arnCargarChecklist()">
+          <select id="arn-tipo" onchange="arnCargarChecklist(); arnCargarSugerencias()">
             <option value="">— Seleccionar —</option>
           </select>
           <div class="errmsg">Selecciona el tipo de equipo</div>
@@ -2766,10 +2770,10 @@
 
         <div class="grid2">
           <div class="field"><label>ID / Etiqueta interna</label><input type="text" id="arn-id" placeholder="Ej: ARN-014"></div>
-          <div class="field"><label>Marca</label><input type="text" id="arn-marca" placeholder="Ej: 3M, MSA"></div>
-          <div class="field"><label>Modelo</label><input type="text" id="arn-modelo"></div>
+          <div class="field"><label>Marca</label><input type="text" id="arn-marca" list="dl-arn-marca" autocomplete="off" placeholder="Ej: 3M, MSA"><datalist id="dl-arn-marca"></datalist></div>
+          <div class="field"><label>Modelo</label><input type="text" id="arn-modelo" list="dl-arn-modelo" autocomplete="off"><datalist id="dl-arn-modelo"></datalist></div>
           <div class="field"><label>No. de serie</label><input type="text" id="arn-serie"></div>
-          <div class="field"><label>Talla</label><input type="text" id="arn-talla" placeholder="Ej: M, G, Universal"></div>
+          <div class="field"><label>Talla</label><input type="text" id="arn-talla" list="dl-arn-talla" autocomplete="off" placeholder="Ej: M, G, Universal"><datalist id="dl-arn-talla"></datalist></div>
         </div>
 
         <div class="field">
@@ -5749,6 +5753,7 @@ async function izaIniciar() {
   const sel = document.getElementById('iza-tipo');
   sel.innerHTML = '<option value="">— Seleccionar —</option>' +
     izaTipos.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
+  izaCargarSugerencias();
 
   // Reset estado global
   izaSesionId   = null;
@@ -5921,6 +5926,43 @@ function izaCapturarFotoCallback(file) {
   if (izaFotos.length >= 6) { mostrarToast('Ya alcanzaste el máximo de 6 fotos por accesorio.', 'err'); return; }
   izaFotos.push(file);
   izaRenderFotos();
+}
+
+/**
+ * Rellena las listas de sugerencias con lo ya capturado antes.
+ *
+ * Se usa <datalist>: el navegador filtra conforme se escribe y sigue
+ * permitiendo teclear un valor nuevo, que es justo lo que se necesita en campo
+ * —sugerir sin obligar—. Al cambiar el tipo se recargan, porque las medidas de
+ * una eslinga no se parecen a las de un grillete.
+ */
+async function izaCargarSugerencias() {
+  const tipo = (document.getElementById('iza-tipo') || {}).value || '';
+  try {
+    const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const r = await fetch(`${WEB_APP_URL}?action=SUGERENCIAS_ACC&tipo_id=${encodeURIComponent(tipo)}&token=${encodeURIComponent(s.token||'')}`);
+    const d = await r.json();
+    if (d.status !== 'success') return;
+    ['marca','modelo','capacidad','medidas'].forEach(c => pintarDatalist('dl-iza-' + c, d.data[c]));
+  } catch(_) { /* sin sugerencias se sigue capturando a mano */ }
+}
+
+async function arnCargarSugerencias() {
+  const tipo = (document.getElementById('arn-tipo') || {}).value || '';
+  try {
+    const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const r = await fetch(`${WEB_APP_URL}?action=SUGERENCIAS_ARNES&tipo_id=${encodeURIComponent(tipo)}&token=${encodeURIComponent(s.token||'')}`);
+    const d = await r.json();
+    if (d.status !== 'success') return;
+    ['marca','modelo','talla'].forEach(c => pintarDatalist('dl-arn-' + c, d.data[c]));
+  } catch(_) {}
+}
+
+function pintarDatalist(id, valores) {
+  const dl = document.getElementById(id);
+  if (!dl) return;
+  dl.innerHTML = (valores || []).map(v =>
+    `<option value="${String(v).replace(/"/g, '&quot;')}"></option>`).join('');
 }
 
 /* Datos del formulario que se repiten en un lote de accesorios idénticos. La
@@ -6287,6 +6329,7 @@ async function arnCargarTipos() {
   const sel = document.getElementById('arn-tipo');
   sel.innerHTML = '<option value="">— Seleccionar —</option>' +
     arnTipos.map(t => `<option value="${t.id}">${t.nombre}</option>`).join('');
+  arnCargarSugerencias();
 }
 
 async function arnContinuar() {

@@ -372,6 +372,39 @@ class Arneses {
     //  CATÁLOGO DE TIPOS Y CHECKLIST (Calidad)
     // ════════════════════════════════════════════════════════
 
+    /**
+     * Valores ya capturados en marca, modelo y talla, para ofrecerlos como
+     * sugerencia al escribir. Mismo criterio que en accesorios: ordenados por
+     * uso, y con los del tipo indicado al frente.
+     */
+    public function sugerencias(int $tipoId = 0): array {
+        $out = [];
+        foreach (['marca', 'modelo', 'talla'] as $campo) {
+            $lista = [];
+            $filtros = $tipoId > 0 ? [$tipoId, 0] : [0];
+            foreach ($filtros as $filtro) {
+                $sql = "SELECT `$campo` AS v, COUNT(*) AS n
+                        FROM arneses_items
+                        WHERE `$campo` IS NOT NULL AND TRIM(`$campo`) <> ''";
+                $params = [];
+                if ($filtro > 0) { $sql .= " AND tipo_id = ?"; $params[] = $filtro; }
+                $sql .= " GROUP BY `$campo` ORDER BY n DESC, v ASC LIMIT 200";
+                try {
+                    $st = $this->pdo->prepare($sql);
+                    $st->execute($params);
+                    foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $v) {
+                        $v = trim((string)$v);
+                        if ($v !== '' && !in_array($v, $lista, true)) $lista[] = $v;
+                    }
+                } catch (\Throwable $e) {
+                    error_log("[Arneses] sugerencias $campo: " . $e->getMessage());
+                }
+            }
+            $out[$campo] = array_slice($lista, 0, 200);
+        }
+        return ['status' => 'success', 'data' => $out];
+    }
+
     public function listarTipos(bool $soloActivos = true): array {
         $sql = "SELECT id, nombre, familia, activo FROM arneses_tipos"
              . ($soloActivos ? " WHERE activo = 1" : "")
