@@ -124,8 +124,8 @@ class Accesorios {
             ? $post['estado'] : 'CUMPLE';
 
         $qrCodigo = trim($post['qr_codigo'] ?? '');
-        if ($qrCodigo !== '' && !preg_match('/^\d{10}$/', $qrCodigo))
-            return ['status' => 'error', 'message' => 'El código QR debe ser exactamente 10 dígitos.'];
+        if ($qrCodigo !== '' && !qrFormatoValido($qrCodigo))
+            return ['status' => 'error', 'message' => qrMensajeFormato()];
         if ($qrCodigo !== '' && !$this->qrDisponible($qrCodigo))
             return ['status' => 'error', 'message' => 'Ese QR ya está en uso.'];
 
@@ -380,8 +380,8 @@ class Accesorios {
         if ($estado && !in_array($estado, ['CUMPLE','NO CUMPLE'], true))
             return ['status' => 'error', 'message' => 'Estado no válido. Use CUMPLE o NO CUMPLE.'];
 
-        if ($qrCodigo !== '' && !preg_match('/^\d{10}$/', $qrCodigo))
-            return ['status' => 'error', 'message' => 'El código QR debe ser exactamente 10 dígitos.'];
+        if ($qrCodigo !== '' && !qrFormatoValido($qrCodigo))
+            return ['status' => 'error', 'message' => qrMensajeFormato()];
 
         $chk = $this->pdo->prepare("SELECT id, qr_codigo FROM accesorios_izaje WHERE id = ?");
         $chk->execute([$id]);
@@ -1108,6 +1108,17 @@ class Accesorios {
         $r->execute([$qr]);
         if ($r->fetch()) return false;
 
+        // arneses: faltaban aquí, así que un código ya pegado en un arnés podía
+        // reasignarse a un accesorio y la validación pública devolvería dos
+        // registros para el mismo número.
+        foreach (['arneses_sesiones', 'arneses_items'] as $tabla) {
+            try {
+                $r = $this->pdo->prepare("SELECT id FROM `$tabla` WHERE qr_codigo = ? LIMIT 1");
+                $r->execute([$qr]);
+                if ($r->fetch()) return false;
+            } catch (\Throwable $e) { /* el módulo aún no está instalado */ }
+        }
+
         // accesorios_izaje (excluding self)
         $sql    = "SELECT id FROM accesorios_izaje WHERE qr_codigo = ?";
         $params = [$qr];
@@ -1121,17 +1132,27 @@ class Accesorios {
 
     public function getSiguienteQrAcc(): array {
         $this->ensureAccIzajeQrColumn();
-        // Los accesorios de izaje son equipo: van en la serie 4.
-        return ['status' => 'success', 'qr' => siguienteQrSerie($this->pdo, QR_PREFIJO_EQUIPO)];
+        // Se entrega la placa libre más baja del banco, sin inventar números:
+        // las placas de accesorios vienen impresas y hay lotes de 9 y de 10
+        // dígitos conviviendo.
+        $qr = siguienteQrAccesorio($this->pdo);
+        if ($qr === '') {
+            return ['status' => 'error', 'message' =>
+                'No hay placas libres en el banco de códigos. Carga el lote nuevo desde Calidad → Códigos QR, o captura el código a mano.'];
+        }
+        return ['status' => 'success', 'qr' => $qr];
     }
 
     public function asignarQrAccesorio(int $id, string $qr): array {
         $this->ensureAccIzajeQrColumn();
-        if (!preg_match('/^\d{10}$/', $qr))
-            return ['status' => 'error', 'message' => 'El código QR debe ser exactamente 10 dígitos.'];
-        if (!qrEsDeSerie($qr, QR_PREFIJO_EQUIPO))
+        if (!qrFormatoValido($qr))
+            return ['status' => 'error', 'message' => qrMensajeFormato()];
+        // Los accesorios no tienen serie propia definida y conviven placas de 9
+        // y de 10 dígitos, así que sólo se rechaza lo que sí está definido: un
+        // código de la serie de personal no puede acabar en un accesorio.
+        if (qrEsDeSerie($qr, QR_PREFIJO_PERSONAL))
             return ['status' => 'error', 'message' =>
-                'Los códigos QR de equipo empiezan con ' . QR_PREFIJO_EQUIPO . '. El código indicado no pertenece a esa serie.'];
+                'Ese código pertenece a la serie de personal (empieza con ' . QR_PREFIJO_PERSONAL . '); no puede asignarse a un accesorio.'];
 
         $chk = $this->pdo->prepare("SELECT id, qr_codigo FROM accesorios_izaje WHERE id = ?");
         $chk->execute([$id]);

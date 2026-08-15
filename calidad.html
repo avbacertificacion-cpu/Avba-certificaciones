@@ -1434,7 +1434,7 @@
         <label style="font-size:11px;color:var(--texto-sub)">Medidas
           <input type="text" id="acc-n-medidas" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Código QR
-          <input type="text" id="acc-n-qr" maxlength="10" placeholder="Empieza con 4"
+          <input type="text" id="acc-n-qr" maxlength="10" placeholder="9 o 10 dígitos"
                  style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px;font-family:monospace"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Resultado
           <select id="acc-n-estado" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px">
@@ -1522,9 +1522,9 @@
         <div style="font-size:10.5px;color:var(--texto-hint);margin-top:2px">Se imprime bajo el renglón del accesorio en el informe. Déjalo vacío si es un accesorio suelto.</div>
       </div>
       <div style="grid-column:1/-1">
-        <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Código QR <span style="font-size:10px;font-weight:400">(10 dígitos)</span></label>
+        <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Código QR <span style="font-size:10px;font-weight:400">(9 o 10 dígitos, como en la placa)</span></label>
         <div style="display:flex;gap:6px;margin-top:4px">
-          <input id="edit-acc-qr" type="text" maxlength="10" inputmode="numeric" placeholder="0000000000"
+          <input id="edit-acc-qr" type="text" maxlength="10" inputmode="numeric" placeholder="635261114"
                  style="flex:1;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px;letter-spacing:2px">
           <button type="button" onclick="editAccSugerirQR()"
                   style="padding:8px 10px;background:#e8f5e9;color:#2e7d32;border:1.5px solid #a5d6a7;border-radius:var(--radio);cursor:pointer;font-size:12px" title="Siguiente QR disponible">
@@ -4130,7 +4130,7 @@ async function abrirDetAccSesion(id) {
         <div style="display:flex;gap:8px;align-items:center;margin-top:7px;flex-wrap:wrap">
           <input type="text" id="acc-serie-${a.id}" value="${escH(a.serie||'')}" placeholder="No. de serie"
                  style="width:150px;padding:5px 8px;border:1.5px solid ${a.serie?'var(--borde)':'#f59e0b'};border-radius:6px;font-size:12px">
-          <input type="text" id="acc-qr-${a.id}" value="${escH(a.qr_codigo||'')}" maxlength="10" placeholder="QR del accesorio"
+          <input type="text" id="acc-qr-${a.id}" value="${escH(a.qr_codigo||'')}" maxlength="10" placeholder="QR (9 o 10 dígitos)"
                  style="width:140px;padding:5px 8px;border:1.5px solid ${a.qr_codigo?'var(--borde)':'#f59e0b'};border-radius:6px;font-size:12px;font-family:monospace">
           <button onclick="guardarSerieQrAcc(${a.id})"
                   style="padding:5px 12px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Guardar</button>
@@ -4239,7 +4239,7 @@ async function guardarDatosAcc(id) {
 async function guardarSerieQrAcc(accId) {
   const serie = (document.getElementById('acc-serie-' + accId) || {}).value || '';
   const qr    = ((document.getElementById('acc-qr-' + accId) || {}).value || '').replace(/\D/g,'');
-  if (qr && qr.length !== 10) { mostrarToast('El QR debe tener 10 dígitos.', 'err'); return; }
+  if (qr && (qr.length < 9 || qr.length > 10)) { mostrarToast('El código debe tener 9 o 10 dígitos, como viene impreso en la placa.', 'err'); return; }
   const a = (accSesionActual && (accSesionActual.accesorios||[]).find(x => x.id == accId)) || {};
   const r = await accPost('EDITAR_ACCESORIO', {
     id: accId, tipo_id: a.tipo_id || 0,
@@ -4338,7 +4338,7 @@ async function guardarAccNuevo() {
   const tipo = v('acc-n-tipo');
   if (!tipo) { mostrarToast('Selecciona el tipo de accesorio.', 'err'); return; }
   const qr = v('acc-n-qr').replace(/\D/g,'');
-  if (qr && qr.length !== 10) { mostrarToast('El QR debe tener 10 dígitos.', 'err'); return; }
+  if (qr && (qr.length < 9 || qr.length > 10)) { mostrarToast('El código debe tener 9 o 10 dígitos, como viene impreso en la placa.', 'err'); return; }
 
   const btn = document.getElementById('acc-n-btn');
   btn.disabled = true; btn.textContent = 'Guardando…';
@@ -4483,13 +4483,16 @@ async function guardarEditAcc() {
   }
 }
 
+/* Sugiere la placa libre más baja del banco. Si el banco está vacío el servidor
+   lo dice: las placas vienen impresas, así que el sistema no inventa números. */
 async function editAccSugerirQR() {
   try {
     const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
     const res = await fetch(API + '?action=GET_NEXT_QR_ACC', { headers: { 'X-Token': s.token || '' } });
     const d   = await res.json();
     if (d.status === 'success') document.getElementById('edit-acc-qr').value = d.qr;
-  } catch(e) {}
+    else mostrarToast(d.message || 'No hay placas libres en el banco.', 'err');
+  } catch(e) { mostrarToast('Error de conexión.', 'err'); }
 }
 
 /* ════════════════════════════════════════

@@ -258,6 +258,28 @@ function ensurePublicado(PDO $pdo): void {
 const QR_PREFIJO_EQUIPO   = '4';
 const QR_PREFIJO_PERSONAL = '7';
 
+/**
+ * Longitud admitida de un código impreso en placa.
+ *
+ * Las placas de maquinaria y personal traen 10 dígitos; el lote nuevo de
+ * accesorios trae 9. Se acepta lo que venga impreso y NUNCA se rellena ni se
+ * recorta: quien valida teclea lo que ve en la placa, así que el código
+ * guardado tiene que ser el mismo carácter por carácter. No hay riesgo de
+ * choque entre lotes porque distinta longitud es distinto código.
+ */
+const QR_LONGITUD_MIN = 9;
+const QR_LONGITUD_MAX = 10;
+
+/** ¿Tiene forma de código de placa (sólo dígitos, 9 o 10)? */
+function qrFormatoValido(string $qr): bool {
+    return (bool)preg_match('/^\d{' . QR_LONGITUD_MIN . ',' . QR_LONGITUD_MAX . '}$/', trim($qr));
+}
+
+/** Mensaje único para cuando el formato no cuadra. */
+function qrMensajeFormato(): string {
+    return 'El código QR debe tener ' . QR_LONGITUD_MIN . ' o ' . QR_LONGITUD_MAX . ' dígitos, tal como viene impreso en la placa.';
+}
+
 /** ¿El código pertenece a la serie indicada? */
 function qrEsDeSerie(string $qr, string $prefijo): bool {
     $qr = trim($qr);
@@ -310,6 +332,39 @@ function siguienteQrSerie(PDO $pdo, string $prefijo): string {
         } catch (\Throwable $e) { /* tabla o columna aún no existe */ }
     }
     return str_pad((string)($max + 1), 10, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Siguiente código libre para un accesorio de izaje.
+ *
+ * Los accesorios no tienen serie propia definida todavía y sus placas conviven
+ * en dos longitudes, así que en vez de calcular un número se entrega el más
+ * bajo sin usar del banco: son las placas que realmente están en la mano. Sólo
+ * se descartan los de la serie de personal, que sí está definida y no debe
+ * acabar pegada en un accesorio.
+ *
+ * Devuelve '' si el banco no tiene códigos libres; entonces se capturan a mano
+ * o se carga el lote nuevo desde Calidad.
+ */
+function siguienteQrAccesorio(PDO $pdo): string {
+    try {
+        $st = $pdo->prepare(
+            "SELECT identificador FROM qr_codigos
+             WHERE usado = 0
+               AND identificador NOT LIKE ?
+               AND LENGTH(identificador) BETWEEN ? AND ?
+             ORDER BY LENGTH(identificador), CAST(identificador AS UNSIGNED) LIMIT 1"
+        );
+        // Los límites van como enteros: LENGTH() devuelve número y un
+        // parámetro de texto no compara igual en todos los motores.
+        $st->bindValue(1, QR_PREFIJO_PERSONAL . '%');
+        $st->bindValue(2, QR_LONGITUD_MIN, PDO::PARAM_INT);
+        $st->bindValue(3, QR_LONGITUD_MAX, PDO::PARAM_INT);
+        $st->execute();
+        return (string)($st->fetchColumn() ?: '');
+    } catch (\Throwable $e) {
+        return '';
+    }
 }
 
 /**

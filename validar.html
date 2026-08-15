@@ -718,8 +718,9 @@ function extraerCodigo(valor) {
   const matchUrl = v.match(/[?&](?:id|qr|code)=([^&]+)/i);
   if (matchUrl) return decodeURIComponent(matchUrl[1]);
 
-  // 10 dígitos directos (código de col S)
-  if (/^\d{10}$/.test(v)) return v;
+  // Código de la placa tecleado directo. Se aceptan 9 y 10 dígitos: las placas
+  // de maquinaria y personal traen 10 y el lote de accesorios trae 9.
+  if (/^\d{9,10}$/.test(v)) return v;
 
   // Folio con guión (col K directamente): "XXXXX-YYYYY"
   if (/^\d{5}-\d{5}$/.test(v)) return v;
@@ -743,10 +744,10 @@ async function validar() {
   const codigo = extraerCodigo(inputRaw);
 
   // Validar que sea un formato reconocido
-  const esCodigoQR    = /^\d{10}$/.test(codigo);
+  const esCodigoQR    = /^\d{9,10}$/.test(codigo);
   const esFolio       = /^\d{5}-\d{5}$/.test(codigo);
   if (!esCodigoQR && !esFolio) {
-    mostrarError("Formato no reconocido. Usa el código de 10 dígitos o el número de certificado (Ej: AB.12345-67890-2026MX).");
+    mostrarError("Formato no reconocido. Usa el código de la placa (9 o 10 dígitos) o el número de certificado (Ej: AB.12345-67890-2026MX).");
     document.getElementById("qr-input").classList.add("err");
     return;
   }

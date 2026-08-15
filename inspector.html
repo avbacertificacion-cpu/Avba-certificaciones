@@ -2622,7 +2622,7 @@
           <label>Código QR <span style="font-size:11px;color:var(--texto-hint)">(10 dígitos)</span></label>
           <div style="display:flex;gap:8px;align-items:center">
             <input type="text" id="iza-qr" placeholder="Escanear o ingresar manualmente"
-                   maxlength="10" inputmode="numeric" pattern="\d{10}" style="flex:1;letter-spacing:2px">
+                   maxlength="10" inputmode="numeric" pattern="\d{9,10}" style="flex:1;letter-spacing:2px">
             <button type="button" onclick="izaEscanearQR()" title="Escanear con cámara"
                     style="padding:9px 13px;background:var(--primario);color:#fff;border:none;border-radius:var(--radio);cursor:pointer;font-size:15px;line-height:1">📷</button>
             <button type="button" onclick="izaSugerirQR()" title="Siguiente QR disponible"
@@ -5994,8 +5994,8 @@ async function izaGuardar(repetir = false) {
 
   const qrVal = (document.getElementById('iza-qr')?.value || '').replace(/\D/g,'');
   const qrErr = document.getElementById('iza-qr-error');
-  if (qrVal && qrVal.length !== 10) {
-    if (qrErr) qrErr.textContent = 'El QR debe tener exactamente 10 dígitos.';
+  if (qrVal && (qrVal.length < 9 || qrVal.length > 10)) {
+    if (qrErr) qrErr.textContent = 'El código debe tener 9 o 10 dígitos, tal como viene impreso en la placa.';
     document.getElementById('iza-qr').focus();
     return false;
   }

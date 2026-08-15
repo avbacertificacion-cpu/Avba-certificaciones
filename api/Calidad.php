@@ -290,27 +290,44 @@ class Calidad {
         $MAX_LOTE = 100000;
 
         $hasta = trim($payload['hasta'] ?? '');
-        if (!preg_match('/^\d{10}$/', $hasta)) {
-            return ['status' => 'error', 'message' => 'El número final debe tener exactamente 10 dígitos.'];
+        if (!qrFormatoValido($hasta)) {
+            return ['status' => 'error', 'message' => qrMensajeFormato()];
         }
+        // Las placas conviven en dos longitudes (10 dígitos maquinaria y
+        // personal, 9 el lote nuevo de accesorios). Un lote se genera dentro de
+        // UNA longitud: mezclarlas produciría códigos que no existen impresos.
+        $digitos = strlen($hasta);
 
-        $ultimoRaw = $this->pdo->query(
-            "SELECT MAX(CAST(identificador AS UNSIGNED)) FROM qr_codigos"
-        )->fetchColumn();
-        $ultimo   = $ultimoRaw ? (int) $ultimoRaw : 0;
-        $hastaInt = (int) $hasta;
-
-        // Número inicial: por defecto continúa la serie desde el último
-        // registrado; opcionalmente se puede iniciar una serie nueva (por
-        // ejemplo con otro prefijo, "5xxxxxxxxx") indicando un "desde".
         $desdeRaw = trim($payload['desde'] ?? '');
         if ($desdeRaw !== '') {
-            if (!preg_match('/^\d{10}$/', $desdeRaw)) {
-                return ['status' => 'error', 'message' => 'El número inicial debe tener exactamente 10 dígitos.'];
+            if (!qrFormatoValido($desdeRaw)) {
+                return ['status' => 'error', 'message' => qrMensajeFormato()];
+            }
+            if (strlen($desdeRaw) !== $digitos) {
+                return ['status' => 'error', 'message' =>
+                    "El inicial tiene " . strlen($desdeRaw) . " dígitos y el final $digitos. Un lote no puede mezclar longitudes: son series de placas distintas."];
             }
             $desde = (int) $desdeRaw;
         } else {
-            $desde = $ultimo + 1;
+            // Por defecto continúa desde el último de ESA misma longitud. Sin
+            // esta condición, un lote de 9 dígitos arrancaría a partir del
+            // mayor de 10 (4 000 000 000 > 635 261 114) y nunca cuadraría.
+            $st = $this->pdo->prepare(
+                "SELECT MAX(CAST(identificador AS UNSIGNED)) FROM qr_codigos WHERE LENGTH(identificador) = ?"
+            );
+            // Se enlaza como entero a propósito: LENGTH() devuelve número y un
+            // parámetro de texto no compara igual en todos los motores.
+            $st->bindValue(1, $digitos, PDO::PARAM_INT);
+            $st->execute();
+            $ultimoRaw = $st->fetchColumn();
+            $desde = ($ultimoRaw ? (int) $ultimoRaw : 0) + 1;
+        }
+        $hastaInt = (int) $hasta;
+
+        // El rango no puede cambiar de longitud a mitad de camino.
+        if (strlen((string)$desde) !== $digitos) {
+            return ['status' => 'error', 'message' =>
+                "El rango se sale de los $digitos dígitos. Indica el número inicial con \"Iniciar en\"."];
         }
 
         if ($hastaInt < $desde) {
@@ -331,7 +348,9 @@ class Calidad {
         try {
             $insertados = 0;
             for ($n = $desde; $n <= $hastaInt; $n++) {
-                $stmt->execute([str_pad((string) $n, 10, '0', STR_PAD_LEFT)]);
+                // Se rellena a la longitud del lote, no a 10: un código de 9
+                // dígitos con un cero delante no sería el que está impreso.
+                $stmt->execute([str_pad((string) $n, $digitos, '0', STR_PAD_LEFT)]);
                 $insertados += $stmt->rowCount();
             }
             $this->pdo->commit();
@@ -348,14 +367,20 @@ class Calidad {
     }
 
     private function ensureQrTable(): void {
-        $this->pdo->exec("
-            CREATE TABLE IF NOT EXISTS qr_codigos (
-                id            INT AUTO_INCREMENT PRIMARY KEY,
-                identificador VARCHAR(20) NOT NULL UNIQUE,
-                usado         TINYINT(1)  DEFAULT 0,
-                equipo_id     INT         DEFAULT NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-        ");
+        // Si la tabla ya existe —el caso normal— un fallo aquí no debe impedir
+        // cargar el lote: se deja constancia en el log y se sigue.
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS qr_codigos (
+                    id            INT AUTO_INCREMENT PRIMARY KEY,
+                    identificador VARCHAR(20) NOT NULL UNIQUE,
+                    usado         TINYINT(1)  DEFAULT 0,
+                    equipo_id     INT         DEFAULT NULL
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\Throwable $e) {
+            error_log('[Calidad] ensureQrTable: ' . $e->getMessage());
+        }
     }
 
     // ── Eliminar equipo y liberar QR ───────────────────────
