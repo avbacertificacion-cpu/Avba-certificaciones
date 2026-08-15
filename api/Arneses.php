@@ -532,6 +532,7 @@ class Arneses {
             $orden + 1,
         ]);
         $itemId = (int)$this->pdo->lastInsertId();
+        $this->ocuparQr($qrItem);
 
         // Checklist: llega como JSON {"TAG":"C"|"NC"|"NA"}
         $chkRaw = $post['checklist'] ?? '';
@@ -712,6 +713,24 @@ class Arneses {
             'reemitir' => !$abierta,
             'message'  => $msg,
         ];
+    }
+
+    /**
+     * Marca la placa como ocupada en el banco y libera la anterior si se
+     * sustituyó. El código NO tiene que existir de antemano: se captura libre y
+     * aquí se da de alta. Sin esto el banco no se entera de las placas puestas
+     * en una pieza y volvería a proponerlas como disponibles.
+     */
+    private function ocuparQr(string $nuevo, ?string $anterior = null): void {
+        $nuevo    = trim($nuevo);
+        $anterior = trim((string)$anterior);
+        if ($anterior !== '' && $anterior !== $nuevo) {
+            try {
+                $this->pdo->prepare("UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?")
+                    ->execute([$anterior]);
+            } catch (\Throwable $e) { error_log('[Arneses] liberar QR: ' . $e->getMessage()); }
+        }
+        if ($nuevo !== '' && function_exists('qrRegistrarUsado')) qrRegistrarUsado($this->pdo, $nuevo);
     }
 
     private function guardarFotos(int $itemId, int $sesionId, array $files): void {
@@ -937,6 +956,9 @@ class Arneses {
                 return ['status' => 'error', 'message' => "El código QR $q ya está asignado a otro registro."];
             }
             $campos[] = "qr_codigo = ?"; $vals[] = $q ?: null;
+            $qrPrevio = $this->pdo->prepare("SELECT qr_codigo FROM arneses_items WHERE id = ?");
+            $qrPrevio->execute([$id]);
+            $this->ocuparQr($q, (string)($qrPrevio->fetchColumn() ?: ''));
         }
         if ($campos) {
             $vals[] = $id;

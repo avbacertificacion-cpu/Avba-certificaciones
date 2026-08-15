@@ -154,6 +154,7 @@ class Accesorios {
         ]);
 
         $accesorioId = (int)$this->pdo->lastInsertId();
+        $this->ocuparQr((string)$qrCodigo);
 
         // Handle photos (max 6, multipart files['fotos'])
         $fotosArr = $files['fotos'] ?? [];
@@ -396,6 +397,7 @@ class Accesorios {
              SET tipo_id=?, id_accesorio=?, marca=?, modelo=?, serie=?, capacidad=?, medidas=?, estado=?, qr_codigo=?, componentes=?
              WHERE id=?"
         )->execute([$tipoId, $idAcc, $marca, $modelo, $serie, $capacidad, $medidas, $estado, $qrCodigo ?: null, $comps, $id]);
+        $this->ocuparQr($qrCodigo, $row['qr_codigo'] ?? '');
 
         return ['status' => 'success', 'message' => 'Accesorio actualizado.'];
     }
@@ -1075,6 +1077,27 @@ class Accesorios {
         return mb_substr(implode("\n", array_slice($limpias, 0, 20)), 0, 2000);
     }
 
+    /**
+     * Deja constancia en el banco de que la placa quedó ocupada, y libera la
+     * anterior si se sustituyó.
+     *
+     * El código NO tiene que existir de antemano: Calidad lo captura libre y
+     * aquí se da de alta como usado. Sin este paso el banco no se entera de las
+     * placas asignadas a un accesorio y el botón de "siguiente disponible"
+     * volvería a proponer una que ya está pegada en un equipo.
+     */
+    private function ocuparQr(string $nuevo, ?string $anterior = null): void {
+        $nuevo    = trim($nuevo);
+        $anterior = trim((string)$anterior);
+        if ($anterior !== '' && $anterior !== $nuevo) {
+            try {
+                $this->pdo->prepare("UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?")
+                    ->execute([$anterior]);
+            } catch (\Throwable $e) { error_log('[Accesorios] liberar QR: ' . $e->getMessage()); }
+        }
+        if ($nuevo !== '' && function_exists('qrRegistrarUsado')) qrRegistrarUsado($this->pdo, $nuevo);
+    }
+
     private function ensureAccIzajeQrColumn(): void {
         foreach ([
             "ALTER TABLE accesorios_izaje ADD COLUMN IF NOT EXISTS qr_codigo VARCHAR(20) NULL",
@@ -1164,6 +1187,7 @@ class Accesorios {
 
         $this->pdo->prepare("UPDATE accesorios_izaje SET qr_codigo = ? WHERE id = ?")
             ->execute([$qr, $id]);
+        $this->ocuparQr($qr, $row['qr_codigo'] ?? '');
 
         return ['status' => 'success', 'message' => 'QR asignado correctamente.', 'qr' => $qr];
     }
