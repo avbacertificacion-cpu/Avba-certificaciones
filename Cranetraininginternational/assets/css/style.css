@@ -190,6 +190,10 @@ section { padding: clamp(2.5rem, 5vw, 5rem) 0; }
   gap: 1rem;
 }
 
+/* Only meant to show inside the collapsed mobile menu; hidden by default
+   so it doesn't also render as a second full-width button on desktop. */
+.nav-cta-mobile { display: none; }
+
 .btn {
   display: inline-block;
   font-family: var(--font-display);
@@ -302,6 +306,7 @@ section { padding: clamp(2.5rem, 5vw, 5rem) 0; }
   display: grid;
   gap: 1.5rem;
 }
+.grid > * { min-width: 0; }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
@@ -450,8 +455,10 @@ tbody tr:last-child td { border-bottom: none; }
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 1.2rem;
+  min-width: 0;
 }
-.form-field { display: flex; flex-direction: column; gap: 0.35rem; }
+.form-grid > * { min-width: 0; }
+.form-field { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
 .form-field.full { grid-column: 1 / -1; }
 label { font-weight: 600; font-size: 0.92rem; color: var(--navy); }
 label .req { color: var(--danger); }
@@ -463,6 +470,12 @@ input, select, textarea {
   border-radius: var(--radius);
   background: var(--white);
   color: var(--ink);
+  /* <select> in particular sizes itself to its widest <option> text by
+     default, which is wide enough here to force the whole form to
+     overflow horizontally on narrow viewports unless constrained. */
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 input:focus, select:focus, textarea:focus {
   border-color: var(--navy);
