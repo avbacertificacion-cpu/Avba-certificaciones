@@ -120,12 +120,12 @@
             showStatus("ok", "Thank you. Your request has been sent — we will follow up shortly.");
           } else {
             var msg = (result.data && result.data.message) ||
-              "We could not send your request right now. Please email us directly at [PLACEHOLDER: CTI contact email] and we will respond as soon as possible.";
+              "We could not send your request right now. Please email us directly at info@cranetraininginternational.com and we will respond as soon as possible.";
             showStatus("err", msg);
           }
         })
         .catch(function () {
-          showStatus("err", "We could not send your request right now. Please email us directly at [PLACEHOLDER: CTI contact email] and we will respond as soon as possible.");
+          showStatus("err", "We could not send your request right now. Please email us directly at info@cranetraininginternational.com and we will respond as soon as possible.");
         })
         .finally(function () {
           submitBtn.disabled = false;
