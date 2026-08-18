@@ -1,0 +1,33 @@
+# .htaccess propio de Cranetraininginternational/
+#
+# El .htaccess de la raíz de public_html (sistema de certificaciones AVBA)
+# define reglas que se HEREDAN en esta subcarpeta y rompen el sitio si no
+# se anulan aquí:
+#
+#   1) DirectoryIndex login.html  -> sin corregirlo, entrar a esta carpeta
+#      manda al login del sistema de certificaciones (o da 403 si no hay
+#      login.html aquí). Lo restablecemos a index.html.
+#
+#   2) Content-Security-Policy con default-src 'self' -> bloquea sin aviso
+#      visible (solo en consola) cualquier recurso externo. Este sitio
+#      resuelve la CSP sirviendo TODO desde la propia carpeta (SVG propios,
+#      CSS/JS propios, sin CDN) y solo permite Google Fonts, que es lo único
+#      externo que usamos (fonts.googleapis.com para el CSS de las
+#      tipografías, fonts.gstatic.com para los archivos de fuente). Se
+#      declara una CSP propia explícita en vez de depender de la de la raíz.
+#
+# Options -Indexes y las reglas de caché/GZIP de la raíz SÍ se heredan y se
+# dejan tal cual: no hace falta anularlas.
+
+DirectoryIndex index.html
+
+<IfModule mod_headers.c>
+    Header always set Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data:; script-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /Cranetraininginternational/
+</IfModule>
+
+ErrorDocument 404 /Cranetraininginternational/404.html

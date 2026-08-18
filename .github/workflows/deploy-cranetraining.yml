@@ -1,0 +1,91 @@
+name: Deploy Crane Training International
+
+on:
+  push:
+    branches:
+      - claude/cranetraining-web-m770n6
+    paths:
+      - 'Cranetraininginternational/**'
+      - '.github/workflows/deploy-cranetraining.yml'
+  # Permite relanzar el despliegue a mano desde la pestaña Actions,
+  # útil cuando el servidor no responde por un problema pasajero.
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # El SCP de Hostinger falla de forma intermitente con
+      # "dial tcp: i/o timeout". Se reintenta hasta tres veces con esperas
+      # crecientes en lugar de dar el despliegue por fallido al primer fallo.
+      #
+      # IMPORTANTE: solo se sube el contenido de Cranetraininginternational/
+      # (strip_components: 1 quita ese primer segmento de la ruta) y el
+      # target apunta a su propia subcarpeta dentro de public_html. Nunca a
+      # public_html a secas: ahí vive el sistema de certificaciones en
+      # producción y un despliegue mal apuntado lo sobrescribiría.
+      - name: Subir sitio por SCP (intento 1)
+        id: intento1
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "Cranetraininginternational/*"
+          strip_components: 1
+          overwrite: true
+          timeout: 60s
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/Cranetraininginternational"
+
+      - name: Esperar antes de reintentar
+        if: steps.intento1.outcome == 'failure'
+        run: sleep 20
+
+      - name: Subir sitio por SCP (intento 2)
+        id: intento2
+        if: steps.intento1.outcome == 'failure'
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "Cranetraininginternational/*"
+          strip_components: 1
+          overwrite: true
+          timeout: 60s
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/Cranetraininginternational"
+
+      - name: Esperar antes del último intento
+        if: steps.intento1.outcome == 'failure' && steps.intento2.outcome == 'failure'
+        run: sleep 40
+
+      - name: Subir sitio por SCP (intento 3)
+        id: intento3
+        if: steps.intento1.outcome == 'failure' && steps.intento2.outcome == 'failure'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "Cranetraininginternational/*"
+          strip_components: 1
+          overwrite: true
+          timeout: 60s
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/Cranetraininginternational"
+
+      - name: Resultado
+        run: |
+          if [ "${{ steps.intento1.outcome }}" = "success" ]; then
+            echo "Sitio desplegado al primer intento."
+          elif [ "${{ steps.intento2.outcome }}" = "success" ]; then
+            echo "Sitio desplegado en el segundo intento (el primero se agotó)."
+          else
+            echo "Sitio desplegado en el tercer intento (los dos anteriores se agotaron)."
+          fi

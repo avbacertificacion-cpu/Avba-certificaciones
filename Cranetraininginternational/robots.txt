@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /Cranetraininginternational/
+Disallow: /Cranetraininginternational/api/
+Disallow: /Cranetraininginternational/config/
+
+Sitemap: https://gestion.avba.com.mx/Cranetraininginternational/sitemap.xml

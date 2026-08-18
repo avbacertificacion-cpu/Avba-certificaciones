@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400" role="img" aria-hidden="true">
+  <rect width="640" height="400" fill="#eef1f4"/>
+  <rect x="0.5" y="0.5" width="639" height="399" fill="none" stroke="#d7dde3" stroke-width="1"/>
+  <g stroke="#9fb0c3" stroke-width="6" stroke-linecap="round" fill="none">
+    <path d="M80,330 L80,120 L360,120"/>
+    <path d="M360,120 L360,150"/>
+    <path d="M300,120 L300,90 L80,120"/>
+    <line x1="360" y1="150" x2="360" y2="230"/>
+  </g>
+  <circle cx="360" cy="238" r="8" fill="#9fb0c3"/>
+  <text x="320" y="370" font-family="Arial, sans-serif" font-size="18" fill="#5A6472" text-anchor="middle">Photo placeholder — CTI Houston training site</text>
+</svg>

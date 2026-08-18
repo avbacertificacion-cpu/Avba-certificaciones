@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 66" role="img" aria-labelledby="ctiMarkOndarkTitle">
+  <title id="ctiMarkOndarkTitle">Crane Training International mark</title>
+  <circle cx="32" cy="26" r="16" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+  <ellipse cx="32" cy="26" rx="16" ry="4.5" fill="none" stroke="#FFFFFF" stroke-width="2"/>
+  <path d="M32,10 C24,10 24,42 32,42" fill="none" stroke="#F0A202" stroke-width="3.4" stroke-linecap="round"/>
+  <rect x="25" y="41" width="14" height="7" rx="1.5" fill="#F0A202"/>
+  <path d="M32,48 C32,56 20,54 20,59 C20,63 28,63 28,58" fill="none" stroke="#F0A202" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

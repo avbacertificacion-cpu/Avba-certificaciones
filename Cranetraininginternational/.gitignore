@@ -1,0 +1,8 @@
+# Real SMTP credentials — lives only on the server. Copy
+# config/mail-config.sample.php to config/mail-config.php on the server
+# and fill in real values. See README.md.
+config/mail-config.php
+
+# Runtime rate-limit bookkeeping for the contact form.
+storage/*.json
+!storage/.gitkeep
