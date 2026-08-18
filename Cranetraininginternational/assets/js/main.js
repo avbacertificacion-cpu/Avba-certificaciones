@@ -17,6 +17,37 @@
     });
   }
 
+  /* Scroll-reveal: progressive enhancement only. If IntersectionObserver
+     isn't available or the visitor prefers reduced motion, elements are
+     left alone and simply render normally (no .reveal class is added). */
+  var prefersReducedMotion = window.matchMedia &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!prefersReducedMotion && "IntersectionObserver" in window) {
+    var revealTargets = document.querySelectorAll(
+      ".card, .program-card, .stat, .two-col > div, .grid > *"
+    );
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("in-view");
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: "0px 0px -40px 0px" });
+    revealTargets.forEach(function (el) {
+      el.classList.add("reveal");
+      io.observe(el);
+    });
+
+    /* Safety net: a fast/instant jump (scrollbar drag, End key, a browser
+       or OS quirk around smooth-scroll) should never leave content stuck
+       invisible. Anything not revealed within a few seconds is force-shown. */
+    setTimeout(function () {
+      revealTargets.forEach(function (el) { el.classList.add("in-view"); });
+      io.disconnect();
+    }, 4000);
+  }
+
   /* Programs catalog filter (programs.html) */
   var filterBar = document.querySelector("[data-filter-bar]");
   if (filterBar) {

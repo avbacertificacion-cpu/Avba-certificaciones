@@ -120,6 +120,7 @@ section { padding: clamp(2.5rem, 5vw, 5rem) 0; }
   top: 0;
   z-index: 100;
   box-shadow: var(--shadow);
+  border-bottom: 3px solid var(--amber);
 }
 
 .nav-bar {
@@ -208,7 +209,8 @@ section { padding: clamp(2.5rem, 5vw, 5rem) 0; }
   font-size: 0.95rem;
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
-.btn:hover { transform: translateY(-1px); }
+.btn:hover { transform: translateY(-2px); box-shadow: 0 8px 18px rgba(11, 37, 69, 0.22); }
+.btn:active { transform: translateY(0); box-shadow: none; }
 
 .btn-amber {
   background: var(--amber);
@@ -221,7 +223,7 @@ section { padding: clamp(2.5rem, 5vw, 5rem) 0; }
   border-color: var(--white);
   color: var(--white);
 }
-.btn-outline:hover { background: var(--white); color: var(--navy); }
+.btn-outline:hover { background: var(--white); color: var(--navy); box-shadow: 0 8px 18px rgba(0, 0, 0, 0.25); }
 
 .btn-navy {
   background: var(--navy);
@@ -239,7 +241,25 @@ section { padding: clamp(2.5rem, 5vw, 5rem) 0; }
   position: relative;
   overflow: hidden;
 }
+.hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+.hero::after {
+  content: "";
+  display: block;
+  height: 6px;
+  background-image: repeating-linear-gradient(
+    135deg, var(--amber) 0 16px, var(--navy-900) 16px 32px
+  );
+}
 .hero .container {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 2.5rem;
@@ -272,7 +292,26 @@ section { padding: clamp(2.5rem, 5vw, 5rem) 0; }
 .page-hero {
   background: linear-gradient(135deg, var(--navy) 0%, var(--navy-900) 100%);
   color: var(--white);
-  padding: clamp(2.5rem, 5vw, 4rem) 0;
+  padding: clamp(2.5rem, 5vw, 4rem) 0 0;
+  position: relative;
+  overflow: hidden;
+}
+.page-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+.page-hero .container { position: relative; z-index: 1; padding-bottom: clamp(2.5rem, 5vw, 4rem); }
+.page-hero::after {
+  content: "";
+  display: block;
+  height: 6px;
+  background-image: repeating-linear-gradient(
+    135deg, var(--amber) 0 16px, var(--navy-900) 16px 32px
+  );
 }
 .page-hero h1 { color: var(--white); margin-bottom: 0.4rem; }
 .page-hero .lead { color: #dbe4f0; max-width: 68ch; font-size: 1.1rem; margin: 0; }
@@ -320,7 +359,9 @@ section { padding: clamp(2.5rem, 5vw, 5rem) 0; }
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
+.card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); border-color: var(--amber); }
 
 .program-card {
   background: var(--white);
@@ -332,7 +373,9 @@ section { padding: clamp(2.5rem, 5vw, 5rem) 0; }
   display: flex;
   flex-direction: column;
   height: 100%;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
+.program-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-lg); }
 .program-card .code {
   font-family: var(--font-display);
   color: var(--amber-600);
@@ -445,7 +488,17 @@ tbody tr:last-child td { border-bottom: none; }
   background: linear-gradient(135deg, var(--navy) 0%, var(--navy-900) 100%);
   color: var(--white);
   text-align: center;
-  padding: clamp(2.5rem, 5vw, 3.5rem) 0;
+  padding: clamp(2.5rem, 5vw, 3.5rem) 0 0;
+  position: relative;
+}
+.cta-band .container { padding-bottom: clamp(2.5rem, 5vw, 3.5rem); }
+.cta-band::after {
+  content: "";
+  display: block;
+  height: 6px;
+  background-image: repeating-linear-gradient(
+    135deg, var(--amber) 0 16px, var(--navy-900) 16px 32px
+  );
 }
 .cta-band h2 { color: var(--white); }
 .cta-band p { color: #dbe4f0; max-width: 56ch; margin: 0 auto 1.5rem; }
@@ -635,4 +688,44 @@ textarea { resize: vertical; min-height: 120px; }
   .footer-grid { grid-template-columns: 1fr; }
   .footer-bottom { flex-direction: column; }
   h1 { font-size: 2rem; }
+}
+
+/* ------------------------- Scroll-reveal (progressive) --------------------- */
+/* main.js tags eligible elements with .reveal on load, then adds .in-view
+   via IntersectionObserver as they scroll into place. If JS never runs,
+   nothing gets the .reveal class and content just displays normally. */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.55s ease, transform 0.55s ease;
+}
+.reveal.in-view { opacity: 1; transform: translateY(0); }
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal { opacity: 1; transform: none; transition: none; }
+  .card:hover, .program-card:hover, .btn:hover { transform: none; }
+}
+
+/* ------------------------------ Small polish -------------------------------- */
+.section-label {
+  position: relative;
+  padding-left: 1.1rem;
+}
+.section-label::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.3em;
+  width: 0.7rem;
+  height: 0.7rem;
+  background: var(--amber);
+  transform: rotate(45deg);
+}
+
+.stat { transition: transform 0.2s ease; }
+.stat:hover { transform: translateY(-3px); }
+
+a:focus-visible, button:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible {
+  outline-offset: 3px;
 }
