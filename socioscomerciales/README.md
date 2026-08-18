@@ -48,6 +48,8 @@ socioscomerciales/
 │   ├── Vacantes.php        Vacantes, postulaciones y avisos por correo
 │   ├── Admin.php           Panel: listar, ver, bloquear y eliminar cuentas
 │   ├── Feed.php            Muro: publicaciones, fotos y comentarios
+│   ├── Correos.php         Envíos masivos y correo automático
+│   ├── cron.php            Tarea programada (correo de la semana)
 │   ├── helpers.php         Sesiones, límites, subidas, envío de correo
 │   └── diagnostico.php     Estado del servidor y del esquema
 ├── config/
@@ -73,13 +75,15 @@ Copiar `config/config.sample.php` a `config/config.php` y llenar:
 | `SC_URL_BASE` | No          | URL base si la detección falla  |
 | `SC_DIAG_CLAVE`| Para el diagnóstico | Sin ella `?action=DIAGNOSTICO` responde 403 |
 | `SC_ADMINS`   | Para el panel | Array de correos con acceso a `admin.html` |
+| `SC_MAIL_HOST` · `SC_MAIL_USER` · `SC_MAIL_PASS` · `SC_MAIL_PORT` | Muy recomendable | SMTP, copiados del sistema de certificaciones |
+| `SC_CRON_CLAVE`| Para el cron | Protege `api/cron.php` |
 
 `config.php` está en `.gitignore`, así que el despliegue nunca lo sobrescribe.
 
 ## Base de datos
 
 Tablas con prefijo `sc_`: `sc_meta`, `sc_usuarios`, `sc_sesiones`, `sc_intentos`,
-`sc_admin_log`, `sc_cv_accesos`, `sc_publicaciones`, `sc_comentarios`, `sc_personas`, `sc_experiencia`, `sc_educacion`, `sc_habilidades`,
+`sc_admin_log`, `sc_envios`, `sc_cv_accesos`, `sc_publicaciones`, `sc_comentarios`, `sc_personas`, `sc_experiencia`, `sc_educacion`, `sc_habilidades`,
 `sc_empresas`, `sc_vacantes`, `sc_postulaciones`.
 
 El esquema se crea y se migra solo. `sc_meta.schema_version` guarda la versión
@@ -190,6 +194,95 @@ existían**; si hace falta, se resuelve mostrando un aviso bloqueante en
 > publicarlos deben pasar por un abogado, sobre todo el domicilio social, el
 > fuero y las direcciones de contacto, que hoy son `contacto@avba.com.mx` y
 > `privacidad@avba.com.mx` y **tienen que existir**.
+
+## Correo saliente
+
+El portal manda por **SMTP autenticado con PHPMailer**, el mismo camino que ya
+usa el sistema de certificaciones. Las credenciales se **copian** a
+`config/config.php` con el prefijo `SC_`:
+
+| Sistema de certificaciones | Socios Comerciales |
+|---|---|
+| `MAIL_HOST` | `SC_MAIL_HOST` |
+| `MAIL_USER` | `SC_MAIL_USER` |
+| `MAIL_PASS` | `SC_MAIL_PASS` |
+| `MAIL_PORT` | `SC_MAIL_PORT` |
+| `MAIL_FROM` | `SC_MAIL_FROM` |
+| `MAIL_FROM_NAME` | `SC_MAIL_FROM_NOMBRE` |
+
+Se copian en vez de leer el `config.php` de la raíz porque cargar aquel archivo
+traería también las credenciales de su base de datos, y eso rompería el
+aislamiento entre los dos sistemas. **PHPMailer sí se reutiliza**: se busca en
+`vendor/` de este portal y, si no está, en el `vendor/` de la raíz, que es
+donde Composer lo dejó. Es una lectura de una dependencia, no una modificación.
+
+Sin SMTP configurado el portal sigue funcionando con `mail()`, pero esos
+correos acaban en spam con frecuencia: un SMTP autenticado sale con el SPF y el
+DKIM del dominio. Si el SMTP falla en un envío concreto se reintenta con
+`mail()` antes de darlo por perdido. `?action=DIAGNOSTICO` informa de cuál de
+los dos caminos está activo.
+
+La conexión SMTP se **reutiliza entre correos** (`SMTPKeepAlive`): abrirla y
+cerrarla en cada uno multiplica el tiempo de un envío masivo y algunos
+servidores lo toman por abuso.
+
+## Correos desde administración
+
+### Envío masivo
+
+Botón **"Enviar correo"** en `admin.html`. Se escribe una vez y sale
+personalizado: `{nombre}` se sustituye por el nombre de cada persona, tanto en
+el cuerpo como en el asunto. Trae precargado el texto del primer filtro.
+
+Antes de mandar se ve **a cuántos alcanza**, una **vista previa** con un nombre
+de ejemplo, y hay botón para **mandarse una prueba a uno mismo**. Sin eso, la
+única forma de comprobar el formato sería mandárselo a cientos de personas.
+
+Se puede filtrar por tipo de cuenta y por correo confirmado. La casilla de
+verificados viene marcada: escribir a direcciones sin confirmar genera rebotes,
+y los rebotes perjudican la reputación del dominio. La pantalla dice cuántos
+quedan fuera por esa causa.
+
+**El envío va por lotes de 25.** Con cientos de destinatarios, una sola
+petición agotaría el tiempo de ejecución a la mitad, dejando a unos avisados y
+a otros no y sin saber por dónde se quedó. Cada campaña se guarda en
+`sc_envios` con su avance; el navegador va pidiendo lotes y muestra el
+progreso. **Si se interrumpe, se retoma desde la bitácora** y nadie recibe el
+correo dos veces: el avance va por `id` de usuario, no por `OFFSET`, así que un
+alta a mitad del envío no desplaza la lista.
+
+Límite de dos campañas por hora y administrador.
+
+### Correo automático a la semana del registro
+
+Botón **"Correo automático"**. Se activa, se redacta con `{nombre}` y sale solo
+**siete días después de cada alta**. La pantalla muestra a cuántos les toca ya,
+cuántos siguen dentro de la semana y a cuántos se les envió.
+
+Quién ya lo recibió se marca en `sc_usuarios.auto_semana_enviado`. La cuenta se
+**reserva antes de enviar**, con un `UPDATE` condicional: si otra pasada ya la
+tomó, `rowCount()` es 0 y se salta. Sin eso, dos peticiones simultáneas
+mandarían el correo por duplicado. El precio es que un fallo de SMTP deja esa
+cuenta sin correo en vez de reintentarlo — es la opción menos mala, porque
+reintentar en bucle es lo que acaba mandando el mismo correo diez veces.
+
+La migración v11 marca como **ya enviadas** todas las cuentas que existían. Si
+se dejaran en blanco, al activar el automático saldría de golpe un correo a
+todo el padrón antiguo diciendo que "acaba de pasar el primer filtro".
+
+**Dos disparadores**, y con cualquiera de los dos basta:
+
+1. **Cron del hosting** (recomendado). En el panel de Hostinger, una vez al día:
+   ```
+   curl -s "https://gestion.avba.com.mx/socioscomerciales/api/cron.php?clave=LA_CLAVE"
+   ```
+   Requiere `SC_CRON_CLAVE` en `config.php`. Una URL abierta que dispara correos
+   es un botón de spam para quien la descubra.
+
+2. **El propio tráfico del portal**, como red de seguridad si el cron no está
+   puesto: una de cada cuarenta peticiones vacía un poco la cola. Corre en
+   `register_shutdown_function` tras `fastcgi_finish_request()`, así que la
+   respuesta ya salió y el usuario no espera por ello.
 
 ## Muro del portal (feed)
 

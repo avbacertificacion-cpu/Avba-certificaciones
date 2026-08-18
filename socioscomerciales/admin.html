@@ -147,6 +147,33 @@
     border-radius: var(--r-sm); padding: 7px 11px; margin-top: 10px;
   }
 
+  /* ── Correo masivo ────────────────────────────────────── */
+  .destinatarios-caja {
+    background: var(--azul-claro); border: 1px solid #C9E0F5;
+    border-radius: var(--r-sm); padding: 12px 14px; margin-bottom: 14px;
+    font-size: 13.5px; color: var(--texto-sub); line-height: 1.6;
+  }
+  .destinatarios-caja strong { color: var(--azul-oscuro); }
+  .destinatarios-caja .aviso { color: #92610B; display: block; margin-top: 5px; font-size: 12.5px; }
+
+  .previa-correo {
+    border: 1px solid var(--borde); border-radius: var(--r-sm);
+    padding: 14px 16px; background: var(--gris-fondo);
+    font-size: 13.5px; line-height: 1.7; color: var(--texto-sub);
+    white-space: pre-line; overflow-wrap: anywhere;
+  }
+  .previa-correo .previa-etq {
+    display: block; font-size: 11px; font-weight: 800; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--texto-tenue); margin-bottom: 7px;
+  }
+  .previa-correo .previa-asunto { font-weight: 700; color: var(--texto); display: block; margin-bottom: 8px; }
+
+  .progreso-texto { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+  code {
+    background: var(--gris-fondo); border: 1px solid var(--borde);
+    border-radius: 4px; padding: 1px 5px; font-size: 12.5px;
+  }
+
   /* ── Bitácora ─────────────────────────────────────────── */
   .bitacora-fila {
     display: flex; gap: 11px; align-items: baseline; flex-wrap: wrap;
@@ -178,6 +205,8 @@
       </div>
       <div class="fila">
         <button type="button" class="btn btn-primary btn-sm" id="btn-muro">Moderar muro</button>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-correo">Enviar correo</button>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-auto">Correo automático</button>
         <button type="button" class="btn btn-outline btn-sm" id="btn-bitacora">Ver bitácora</button>
       </div>
     </div>
@@ -237,6 +266,113 @@
       <div class="pestanas" id="muro-pestanas" role="group" aria-label="Filtrar publicaciones"></div>
       <div id="muro-cuerpo" style="margin-top:16px"></div>
     </div>
+  </div>
+</div>
+
+<!-- Correo masivo -->
+<div class="modal-fondo" id="modal-correo">
+  <div class="modal modal-ancho" role="dialog" aria-modal="true" aria-labelledby="correo-titulo">
+    <div class="modal-cabecera">
+      <h3 id="correo-titulo">Enviar correo a las cuentas registradas</h3>
+      <button type="button" class="modal-cerrar" aria-label="Cerrar" onclick="cerrarCorreo()">&times;</button>
+    </div>
+
+    <form id="form-correo">
+      <div class="modal-cuerpo">
+        <div class="rejilla rejilla-2">
+          <div class="campo">
+            <label for="c-destinatarios">Enviar a</label>
+            <select id="c-destinatarios">
+              <option value="todos">Todas las cuentas</option>
+              <option value="persona" selected>Solo candidatos</option>
+              <option value="empresa">Solo empresas</option>
+            </select>
+          </div>
+          <div class="campo">
+            <label for="c-asunto">Asunto</label>
+            <input type="text" id="c-asunto" maxlength="190" required>
+          </div>
+        </div>
+
+        <label class="campo-check" for="c-verificados" style="margin-bottom:14px;cursor:pointer">
+          <input type="checkbox" id="c-verificados" checked>
+          Solo a quienes confirmaron su correo
+        </label>
+
+        <div class="campo">
+          <label for="c-cuerpo">Mensaje</label>
+          <textarea id="c-cuerpo" rows="8" maxlength="5000" required></textarea>
+          <div class="campo-ayuda">
+            Escribe <code>{nombre}</code> donde quieras que aparezca el nombre de cada
+            persona. Funciona también en el asunto.
+          </div>
+        </div>
+
+        <div class="destinatarios-caja" id="c-destinatarios-info"></div>
+        <div class="previa-correo" id="c-previa"></div>
+      </div>
+
+      <div class="modal-pie" id="c-acciones">
+        <button type="button" class="btn btn-gris" onclick="cerrarCorreo()">Cancelar</button>
+        <button type="button" class="btn btn-outline" id="c-prueba">Enviarme una prueba</button>
+        <button type="submit" class="btn btn-primary" id="c-enviar">Enviar a todos</button>
+      </div>
+    </form>
+
+    <!-- Progreso, sustituye al formulario mientras se envía -->
+    <div class="modal-cuerpo" id="c-progreso" hidden>
+      <p class="progreso-texto" id="c-progreso-texto"></p>
+      <div class="progreso"><span id="c-progreso-barra" style="width:0%"></span></div>
+      <p class="campo-ayuda" style="margin-top:12px">
+        No cierres esta ventana. Si se interrumpe, el envío se retoma desde donde iba.
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- Correo automático a la semana del registro -->
+<div class="modal-fondo" id="modal-auto">
+  <div class="modal modal-ancho" role="dialog" aria-modal="true" aria-labelledby="auto-titulo">
+    <div class="modal-cabecera">
+      <h3 id="auto-titulo">Correo automático a la semana</h3>
+      <button type="button" class="modal-cerrar" aria-label="Cerrar" onclick="scCerrarModal('modal-auto')">&times;</button>
+    </div>
+
+    <form id="form-auto">
+      <div class="modal-cuerpo">
+        <div class="aviso-admin">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>
+          </svg>
+          <p id="auto-resumen">Cargando…</p>
+        </div>
+
+        <label class="campo-check" for="a-activo" style="margin-bottom:16px;cursor:pointer">
+          <input type="checkbox" id="a-activo">
+          <strong>Activar el envío automático</strong>
+        </label>
+
+        <div class="campo">
+          <label for="a-asunto">Asunto</label>
+          <input type="text" id="a-asunto" maxlength="190" required>
+        </div>
+
+        <div class="campo">
+          <label for="a-cuerpo">Mensaje</label>
+          <textarea id="a-cuerpo" rows="8" maxlength="5000" required></textarea>
+          <div class="campo-ayuda">
+            <code>{nombre}</code> se sustituye por el nombre de cada persona.
+          </div>
+        </div>
+
+        <div class="previa-correo" id="a-previa"></div>
+      </div>
+      <div class="modal-pie">
+        <button type="button" class="btn btn-gris" onclick="scCerrarModal('modal-auto')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="a-guardar">Guardar</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -780,15 +916,321 @@ document.getElementById('muro-cuerpo').addEventListener('click', async (e) => {
   }
 });
 
+/* ── Correo masivo ──────────────────────────────────────── */
+
+// El texto que pidió AVBA, ya listo para usarse tal cual.
+const CORREO_ASUNTO_POR_DEFECTO = 'Tu información ha sido procesada';
+const CORREO_CUERPO_POR_DEFECTO =
+  'Estimado {nombre}:\n\n' +
+  'Te informamos que tu información ha sido procesada y has pasado el primer filtro ' +
+  'de nuestro proceso de selección.\n\n' +
+  'Nos pondremos en contacto contigo para darte los siguientes pasos. Mientras tanto, ' +
+  'te recomendamos mantener tu perfil actualizado en el portal.\n\n' +
+  'Gracias por tu interés.';
+
+let envioEnCurso = null;   // id de la campaña mientras se manda
+let temporizadorPrevia = null;
+
+function leerCorreo() {
+  return {
+    destinatarios:    document.getElementById('c-destinatarios').value,
+    solo_verificados: document.getElementById('c-verificados').checked ? '1' : '0',
+    asunto:           document.getElementById('c-asunto').value.trim(),
+    cuerpo:           document.getElementById('c-cuerpo').value.trim(),
+  };
+}
+
+/* La vista previa usa un nombre de ejemplo para que se vea cómo queda el
+   {nombre} sustituido, que es justo lo que hay que revisar antes de enviar. */
+function pintarPrevia() {
+  const d = leerCorreo();
+  const ejemplo = 'María Fernanda Ruiz';
+  const cont = document.getElementById('c-previa');
+
+  if (!d.asunto && !d.cuerpo) { cont.innerHTML = ''; return; }
+
+  const sust = t => String(t || '').split('{nombre}').join(ejemplo);
+
+  cont.innerHTML =
+    `<span class="previa-etq">Así lo recibirá ${scEsc(ejemplo)}</span>` +
+    `<span class="previa-asunto">${scEsc(sust(d.asunto)) || '(sin asunto)'}</span>` +
+    scEsc(sust(d.cuerpo));
+}
+
+async function cargarDestinatarios() {
+  const cont = document.getElementById('c-destinatarios-info');
+  const d = leerCorreo();
+
+  try {
+    const r = await scGet('ADMIN_DESTINATARIOS', {
+      destinatarios: d.destinatarios,
+      solo_verificados: d.solo_verificados,
+    });
+    if (r.status !== 'success') { cont.textContent = r.message || ''; return; }
+
+    const n = Number(r.total) || 0;
+    const ejemplos = (r.ejemplos || []).map(e => e.nombre).filter(Boolean).slice(0, 3);
+
+    cont.innerHTML =
+      `<strong>${n} ${n === 1 ? 'cuenta recibirá' : 'cuentas recibirán'} este correo.</strong>` +
+      (ejemplos.length ? ` Por ejemplo: ${scEsc(ejemplos.join(', '))}…` : '') +
+      (Number(r.sin_verificar) > 0
+        ? `<span class="aviso">Quedan fuera ${Number(r.sin_verificar)} cuentas sin correo confirmado. ` +
+          'Incluirlas suele generar rebotes, y los rebotes perjudican la reputación del dominio.</span>'
+        : '');
+
+    document.getElementById('c-enviar').disabled = n === 0;
+  } catch (e) {
+    cont.textContent = e.message;
+  }
+}
+
+function refrescarCorreo() {
+  clearTimeout(temporizadorPrevia);
+  temporizadorPrevia = setTimeout(() => { pintarPrevia(); cargarDestinatarios(); }, 250);
+}
+
+['c-destinatarios', 'c-verificados', 'c-asunto', 'c-cuerpo'].forEach(id => {
+  const el = document.getElementById(id);
+  el.addEventListener('input', refrescarCorreo);
+  el.addEventListener('change', refrescarCorreo);
+});
+
+document.getElementById('btn-correo').addEventListener('click', () => {
+  // Si no hay nada escrito se rellena con la plantilla; si el usuario ya
+  // había redactado algo y solo cerró la ventana, se respeta.
+  const asunto = document.getElementById('c-asunto');
+  const cuerpo = document.getElementById('c-cuerpo');
+  if (!asunto.value.trim()) asunto.value = CORREO_ASUNTO_POR_DEFECTO;
+  if (!cuerpo.value.trim()) cuerpo.value = CORREO_CUERPO_POR_DEFECTO;
+
+  scAbrirModal('modal-correo');
+  pintarPrevia();
+  cargarDestinatarios();
+});
+
+function cerrarCorreo() {
+  if (envioEnCurso) {
+    if (!confirm('Hay un envío en curso.\n\nSi cierras, se detiene donde va y podrás retomarlo después desde la bitácora. ¿Cerrar?')) return;
+    envioEnCurso = null;
+  }
+  document.getElementById('c-progreso').hidden = true;
+  document.getElementById('form-correo').hidden = false;
+  scCerrarModal('modal-correo');
+}
+
+document.getElementById('c-prueba').addEventListener('click', async (ev) => {
+  const btn = ev.currentTarget;
+  btn.disabled = true;
+  try {
+    const r = await scPost('ADMIN_CORREO_PRUEBA', leerCorreo());
+    scToast(r.message, r.status === 'success' ? 'ok' : 'error');
+  } catch (e) {
+    scToast(e.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('form-correo').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const info = document.getElementById('c-destinatarios-info').textContent;
+  if (!confirm('Vas a enviar este correo a todas las cuentas del filtro.\n\n' + info +
+               '\n\nNo se puede deshacer. ¿Continuar?')) return;
+
+  const btn = document.getElementById('c-enviar');
+  btn.disabled = true;
+
+  try {
+    const r = await scPost('ADMIN_CORREO_CREAR', leerCorreo());
+    if (r.status !== 'success') { scToast(r.message || 'No se pudo preparar el envío.', 'error'); return; }
+
+    envioEnCurso = r.id;
+    document.getElementById('form-correo').hidden = true;
+    document.getElementById('c-progreso').hidden = false;
+    await correrLotes(r.id, r.total);
+  } catch (err) {
+    scToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/**
+ * Pide lotes hasta terminar. El bucle vive en el cliente porque el servidor
+ * no puede tener una petición abierta durante minutos: cada lote es una
+ * petición corta y el avance queda guardado en la base.
+ */
+async function correrLotes(id, total) {
+  const texto = document.getElementById('c-progreso-texto');
+  const barra = document.getElementById('c-progreso-barra');
+
+  while (envioEnCurso === id) {
+    let r;
+    try {
+      r = await scPost('ADMIN_CORREO_LOTE', { id });
+    } catch (e) {
+      texto.textContent = 'Se interrumpió: ' + e.message + ' Puedes retomarlo desde la bitácora.';
+      envioEnCurso = null;
+      return;
+    }
+
+    if (r.status !== 'success') {
+      texto.textContent = r.message || 'No se pudo continuar.';
+      envioEnCurso = null;
+      return;
+    }
+
+    const hechos = Number(r.enviados) + Number(r.fallidos || 0);
+    const t = Number(r.total) || total || 1;
+    barra.style.width = Math.min(100, Math.round(hechos / t * 100)) + '%';
+    texto.textContent = r.message;
+
+    if (r.terminado) {
+      envioEnCurso = null;
+      scToast(r.message, 'ok');
+      cargarResumen();
+      setTimeout(() => {
+        document.getElementById('c-progreso').hidden = true;
+        document.getElementById('form-correo').hidden = false;
+        scCerrarModal('modal-correo');
+      }, 2500);
+      return;
+    }
+  }
+}
+
+/* ── Correo automático a la semana ──────────────────────── */
+
+function pintarPreviaAuto() {
+  const ejemplo = 'María Fernanda Ruiz';
+  const sust = t => String(t || '').split('{nombre}').join(ejemplo);
+
+  document.getElementById('a-previa').innerHTML =
+    `<span class="previa-etq">Así lo recibirá ${scEsc(ejemplo)}</span>` +
+    `<span class="previa-asunto">${scEsc(sust(document.getElementById('a-asunto').value)) || '(sin asunto)'}</span>` +
+    scEsc(sust(document.getElementById('a-cuerpo').value));
+}
+
+['a-asunto', 'a-cuerpo'].forEach(id =>
+  document.getElementById(id).addEventListener('input', pintarPreviaAuto));
+
+document.getElementById('btn-auto').addEventListener('click', async () => {
+  scAbrirModal('modal-auto');
+  document.getElementById('auto-resumen').textContent = 'Cargando…';
+
+  try {
+    const r = await scGet('ADMIN_AUTO');
+    if (r.status !== 'success') {
+      document.getElementById('auto-resumen').textContent = r.message || 'No se pudo cargar.';
+      return;
+    }
+
+    document.getElementById('a-activo').checked = !!r.activo;
+    document.getElementById('a-asunto').value = r.asunto || '';
+    document.getElementById('a-cuerpo').value = r.cuerpo || '';
+    pintarPreviaAuto();
+
+    // Los tres números que hacen falta para entender qué va a pasar: a quién
+    // le toca ya, quién sigue en espera y a cuántos se les mandó.
+    document.getElementById('auto-resumen').innerHTML =
+      `El correo sale <strong>${Number(r.dias)} días después</strong> de cada registro. ` +
+      `Ahora mismo le toca a <strong>${Number(r.listos)}</strong> ` +
+      `${Number(r.listos) === 1 ? 'cuenta' : 'cuentas'}, ` +
+      `<strong>${Number(r.esperando)}</strong> siguen dentro de la semana y ya se envió a ` +
+      `<strong>${Number(r.ya_enviados)}</strong>.` +
+      (r.activo ? '' : ' <strong>Está desactivado</strong>, así que por ahora no sale ninguno.');
+  } catch (e) {
+    document.getElementById('auto-resumen').textContent = e.message;
+  }
+});
+
+document.getElementById('form-auto').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const activo = document.getElementById('a-activo').checked;
+  if (activo && !confirm('Al activarlo, quienes lleven más de una semana registrados recibirán este correo en las próximas horas.\n\n¿Continuar?')) return;
+
+  const btn = document.getElementById('a-guardar');
+  btn.disabled = true;
+
+  try {
+    const r = await scPost('ADMIN_AUTO_GUARDAR', {
+      activo,
+      asunto: document.getElementById('a-asunto').value.trim(),
+      cuerpo: document.getElementById('a-cuerpo').value.trim(),
+    });
+    scToast(r.message, r.status === 'success' ? 'ok' : 'error');
+    if (r.status === 'success') scCerrarModal('modal-auto');
+  } catch (err) {
+    scToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 /* ── Bitácora ───────────────────────────────────────────── */
+/**
+ * Envíos masivos anteriores. Los que quedaron a medias llevan botón para
+ * retomarlos: sin eso, un envío interrumpido no habría manera de terminarlo.
+ */
+async function bloqueEnvios() {
+  try {
+    const d = await scGet('ADMIN_ENVIOS');
+    const lista = (d && d.envios) || [];
+    if (!lista.length) return '';
+
+    return `
+      <div class="ficha-seccion">
+        <div class="ficha-titulo">Envíos de correo</div>
+        ${lista.map(e => {
+          const enCurso = e.estado === 'en_curso';
+          const hechos  = Number(e.enviados) + Number(e.fallidos);
+          return `
+            <div class="ficha-item">
+              <strong>${scEsc(e.asunto)}</strong>
+              ${enCurso ? '<span class="badge badge-ambar">A medias</span>' : ''}
+              <div class="ficha-item-meta">
+                ${hechos} de ${Number(e.total)} · ${Number(e.fallidos)} fallidos ·
+                ${scEsc(e.admin_correo)} · ${scEsc(scHace(e.creado))}
+              </div>
+              ${enCurso
+                ? `<button type="button" class="btn btn-sm btn-outline" style="margin-top:7px"
+                     data-retomar="${Number(e.id)}" data-total="${Number(e.total)}">Retomar envío</button>`
+                : ''}
+            </div>`;
+        }).join('')}
+      </div>`;
+  } catch (e) {
+    return '';
+  }
+}
+
+document.getElementById('bitacora-cuerpo').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-retomar]');
+  if (!btn) return;
+
+  const id = Number(btn.dataset.retomar);
+  if (!confirm('Se reanudará el envío desde donde se quedó.\n\nNadie recibirá el correo dos veces. ¿Continuar?')) return;
+
+  scCerrarModal('modal-bitacora');
+  envioEnCurso = id;
+  document.getElementById('form-correo').hidden = true;
+  document.getElementById('c-progreso').hidden = false;
+  scAbrirModal('modal-correo');
+  await correrLotes(id, Number(btn.dataset.total));
+});
+
 document.getElementById('btn-bitacora').addEventListener('click', async () => {
   document.getElementById('bitacora-cuerpo').innerHTML = esqueletos(4);
   scAbrirModal('modal-bitacora');
 
   try {
+    const envios = await bloqueEnvios();
     const d = await scGet('ADMIN_BITACORA');
     const filas = (d && d.bitacora) || [];
-    document.getElementById('bitacora-cuerpo').innerHTML = filas.length
+    document.getElementById('bitacora-cuerpo').innerHTML = envios + (filas.length
       ? filas.map(b => `
           <div class="bitacora-fila">
             <span class="badge ${b.accion === 'eliminar' ? 'badge-rojo' : b.accion === 'bloquear' ? 'badge-ambar' : 'badge-verde'}">${scEsc(b.accion)}</span>
@@ -796,7 +1238,7 @@ document.getElementById('btn-bitacora').addEventListener('click', async () => {
             <span style="color:var(--texto-tenue);font-size:12px">por ${scEsc(b.admin_correo)}${b.detalle ? ' · ' + scEsc(b.detalle) : ''}</span>
             <span class="bitacora-fecha">${scEsc(scHace(b.fecha))}</span>
           </div>`).join('')
-      : '<p class="ficha-vacia">Todavía no hay acciones registradas.</p>';
+      : '<p class="ficha-vacia">Todavía no hay acciones registradas.</p>');
   } catch (e) {
     document.getElementById('bitacora-cuerpo').innerHTML = scVacio('alerta', 'Error', e.message, '');
   }

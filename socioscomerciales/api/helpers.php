@@ -519,10 +519,56 @@ function scBorrarArchivo(?string $urlRelativa): void {
 }
 
 /**
+ * ¿Está configurado el envío por SMTP?
+ *
+ * El sistema de certificaciones manda sus correos con PHPMailer por SMTP
+ * autenticado, no con mail(). Un correo autenticado con SPF/DKIM del dominio
+ * llega a la bandeja de entrada; uno de mail() acaba en spam con frecuencia.
+ * Aquí se usa el mismo servidor, con las credenciales copiadas a SC_MAIL_*.
+ */
+function scSmtpConfigurado(): bool {
+    return defined('SC_MAIL_HOST') && SC_MAIL_HOST !== ''
+        && defined('SC_MAIL_USER') && SC_MAIL_USER !== ''
+        && defined('SC_MAIL_PASS') && SC_MAIL_PASS !== '';
+}
+
+/**
+ * Carga PHPMailer si está disponible.
+ *
+ * La librería la instala Composer en la raíz del hosting para el sistema de
+ * certificaciones (`public_html/vendor/`). Se reutiliza en vez de duplicarla:
+ * es solo lectura de una dependencia, no se toca nada de ese sistema. Si
+ * alguien instala Composer dentro de socioscomerciales, esa copia tiene
+ * preferencia.
+ */
+function scCargarPhpMailer(): bool {
+    if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) return true;
+
+    foreach ([__DIR__ . '/../vendor/autoload.php',
+              __DIR__ . '/../../vendor/autoload.php'] as $ruta) {
+        if (is_file($ruta)) {
+            require_once $ruta;
+            if (class_exists('PHPMailer\\PHPMailer\\PHPMailer')) return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Envía un correo del portal. Devuelve true si el servidor lo aceptó.
  * Nunca lanza excepción: si el correo falla, el registro debe continuar.
+ *
+ * Usa SMTP si está configurado; si no, cae a mail() para no dejar el portal
+ * sin correos mientras se termina de configurar.
  */
 function scEnviarCorreo(string $para, string $asunto, string $html): bool {
+    if (scSmtpConfigurado() && scCargarPhpMailer()) {
+        if (scEnviarPorSmtp($para, $asunto, $html)) return true;
+        // Si el SMTP falla se intenta con mail() antes de darlo por perdido:
+        // más vale que llegue por el camino malo que que no llegue.
+        error_log('scEnviarCorreo: SMTP falló, se intenta con mail()');
+    }
+
     $remitente = SC_MAIL_FROM;
     $nombre    = SC_MAIL_FROM_NOMBRE;
 
@@ -540,6 +586,52 @@ function scEnviarCorreo(string $para, string $asunto, string $html): bool {
         return @mail($para, $asuntoCodificado, $html, implode("\r\n", $cabeceras), '-f' . $remitente);
     } catch (Throwable $e) {
         error_log('scEnviarCorreo: ' . $e->getMessage());
+        return false;
+    }
+}
+
+/**
+ * Envío por SMTP con PHPMailer.
+ *
+ * La conexión se reutiliza entre llamadas (SMTPKeepAlive): en un envío masivo,
+ * abrir y cerrar la sesión SMTP en cada correo multiplica por varias veces el
+ * tiempo total y algunos servidores lo toman por abuso.
+ */
+function scEnviarPorSmtp(string $para, string $asunto, string $html): bool {
+    static $mail = null;
+
+    try {
+        if ($mail === null) {
+            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host       = SC_MAIL_HOST;
+            $mail->SMTPAuth   = true;
+            $mail->Username   = SC_MAIL_USER;
+            $mail->Password   = SC_MAIL_PASS;
+            $mail->Port       = defined('SC_MAIL_PORT') ? (int) SC_MAIL_PORT : 465;
+            $mail->CharSet    = 'UTF-8';
+            $mail->SMTPKeepAlive = true;
+
+            // El puerto 465 es SMTPS (TLS desde el saludo); el 587 es STARTTLS.
+            $mail->SMTPSecure = $mail->Port === 587
+                ? \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS
+                : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+
+            $mail->setFrom(SC_MAIL_FROM, SC_MAIL_FROM_NOMBRE);
+            $mail->isHTML(true);
+        }
+
+        $mail->clearAllRecipients();
+        $mail->addAddress($para);
+        $mail->Subject = $asunto;
+        $mail->Body    = $html;
+
+        return $mail->send();
+    } catch (Throwable $e) {
+        error_log('scEnviarPorSmtp: ' . $e->getMessage());
+        // Una conexión rota no se arregla sola: se descarta para que el
+        // siguiente intento abra una nueva.
+        $mail = null;
         return false;
     }
 }

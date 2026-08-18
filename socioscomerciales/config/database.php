@@ -9,7 +9,7 @@
 require_once __DIR__ . '/config.php';
 
 /** Versión actual del esquema. Subir al añadir migraciones. */
-const SC_SCHEMA_VERSION = 9;
+const SC_SCHEMA_VERSION = 11;
 
 class ScDatabase {
     private static ?PDO $instance = null;
@@ -74,6 +74,8 @@ class ScDatabase {
             if ($version < 7) self::migrarA7($pdo);
             if ($version < 8) self::migrarA8($pdo);
             if ($version < 9) self::migrarA9($pdo);
+            if ($version < 10) self::migrarA10($pdo);
+            if ($version < 11) self::migrarA11($pdo);
 
             $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
                         ON DUPLICATE KEY UPDATE valor = '" . SC_SCHEMA_VERSION . "'");
@@ -97,6 +99,8 @@ class ScDatabase {
         $columnas = self::columnasDe($pdo, 'sc_usuarios');
 
         if (!$columnas)                                    return SC_SCHEMA_VERSION; // Base vacía
+        if (in_array('auto_semana_enviado', $columnas, true)) return 11;
+        if (self::columnasDe($pdo, 'sc_envios'))             return 10;
         if (in_array('estado', self::columnasDe($pdo, 'sc_publicaciones'), true)) return 9;
         if (self::columnasDe($pdo, 'sc_publicaciones'))      return 8;
         if (in_array('bloqueado_motivo', $columnas, true))   return 7;
@@ -151,10 +155,12 @@ class ScDatabase {
                 bloqueado_por     INT UNSIGNED NULL,
                 creado            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 ultimo_acceso     DATETIME NULL,
+                auto_semana_enviado DATETIME NULL,
                 UNIQUE KEY uq_sc_usuarios_correo (correo),
                 KEY idx_sc_usuarios_token (session_token),
                 KEY idx_sc_usuarios_verif (verif_token),
-                KEY idx_sc_usuarios_reset (reset_token)
+                KEY idx_sc_usuarios_reset (reset_token),
+                KEY idx_sc_usuarios_auto (auto_semana_enviado, creado)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
@@ -256,6 +262,30 @@ class ScDatabase {
                     REFERENCES sc_publicaciones(id) ON DELETE CASCADE,
                 CONSTRAINT fk_sc_comentarios_usuario FOREIGN KEY (usuario_id)
                     REFERENCES sc_usuarios(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+
+        // Campañas de correo masivo. Se guarda el avance (ultimo_id) porque el
+        // envío va por lotes: si el navegador se cierra a la mitad hay que
+        // poder retomar sin volver a escribir a quien ya recibió.
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_envios (
+                id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                admin_id      INT UNSIGNED NOT NULL,
+                admin_correo  VARCHAR(190) NOT NULL,
+                asunto        VARCHAR(190) NOT NULL,
+                cuerpo        TEXT NOT NULL,
+                destinatarios VARCHAR(20) NOT NULL DEFAULT 'todos',
+                solo_verificados TINYINT(1) NOT NULL DEFAULT 1,
+                total         INT UNSIGNED NOT NULL DEFAULT 0,
+                enviados      INT UNSIGNED NOT NULL DEFAULT 0,
+                fallidos      INT UNSIGNED NOT NULL DEFAULT 0,
+                ultimo_id     INT UNSIGNED NOT NULL DEFAULT 0,
+                estado        ENUM('en_curso','terminado','cancelado') NOT NULL DEFAULT 'en_curso',
+                creado        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                terminado     DATETIME NULL,
+                KEY idx_sc_envios_creado (creado)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
@@ -563,6 +593,53 @@ class ScDatabase {
         } catch (PDOException $e) { /* ya existe */ }
     }
 
+    /** v9 → v10: campañas de correo masivo. */
+    private static function migrarA10(PDO $pdo): void {
+        // Campañas de correo masivo. Se guarda el avance (ultimo_id) porque el
+        // envío va por lotes: si el navegador se cierra a la mitad hay que
+        // poder retomar sin volver a escribir a quien ya recibió.
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_envios (
+                id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                admin_id      INT UNSIGNED NOT NULL,
+                admin_correo  VARCHAR(190) NOT NULL,
+                asunto        VARCHAR(190) NOT NULL,
+                cuerpo        TEXT NOT NULL,
+                destinatarios VARCHAR(20) NOT NULL DEFAULT 'todos',
+                solo_verificados TINYINT(1) NOT NULL DEFAULT 1,
+                total         INT UNSIGNED NOT NULL DEFAULT 0,
+                enviados      INT UNSIGNED NOT NULL DEFAULT 0,
+                fallidos      INT UNSIGNED NOT NULL DEFAULT 0,
+                ultimo_id     INT UNSIGNED NOT NULL DEFAULT 0,
+                estado        ENUM('en_curso','terminado','cancelado') NOT NULL DEFAULT 'en_curso',
+                creado        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                terminado     DATETIME NULL,
+                KEY idx_sc_envios_creado (creado)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+    }
+
+    /**
+     * v10 → v11: marca del correo automático de la semana.
+     *
+     * Las cuentas que ya existían se dan por avisadas. Si se dejaran en NULL,
+     * al activar el automático saldría de golpe un correo a todo el padrón
+     * antiguo diciendo que "acaba de pasar el primer filtro".
+     */
+    private static function migrarA11(PDO $pdo): void {
+        self::agregarColumna($pdo, 'sc_usuarios', 'auto_semana_enviado', "DATETIME NULL");
+
+        try {
+            $pdo->exec("UPDATE sc_usuarios SET auto_semana_enviado = NOW()
+                        WHERE auto_semana_enviado IS NULL");
+        } catch (PDOException $e) {
+            error_log('migrarA11: ' . $e->getMessage());
+        }
+        try {
+            $pdo->exec("CREATE INDEX idx_sc_usuarios_auto ON sc_usuarios (auto_semana_enviado, creado)");
+        } catch (PDOException $e) { /* ya existe */ }
+    }
+
     /** Añade una columna solo si aún no existe. */
     private static function agregarColumna(PDO $pdo, string $tabla, string $columna, string $definicion): void {
         $columnas = self::columnasDe($pdo, $tabla);
@@ -583,7 +660,7 @@ class ScDatabase {
         }
 
         $tablas = [];
-        foreach (['sc_meta','sc_usuarios','sc_sesiones','sc_intentos','sc_admin_log','sc_cv_accesos','sc_publicaciones','sc_comentarios','sc_personas',
+        foreach (['sc_meta','sc_usuarios','sc_sesiones','sc_intentos','sc_admin_log','sc_envios','sc_cv_accesos','sc_publicaciones','sc_comentarios','sc_personas',
                   'sc_experiencia','sc_educacion','sc_habilidades','sc_empresas','sc_vacantes',
                   'sc_postulaciones'] as $t) {
             $cols = self::columnasDe($pdo, $t);

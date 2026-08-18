@@ -19,6 +19,7 @@ require_once __DIR__ . '/Empresas.php';
 require_once __DIR__ . '/Vacantes.php';
 require_once __DIR__ . '/Admin.php';
 require_once __DIR__ . '/Feed.php';
+require_once __DIR__ . '/Correos.php';
 require_once __DIR__ . '/diagnostico.php';
 
 // Nunca mostrar avisos de PHP en la respuesta: romperían el JSON
@@ -120,6 +121,11 @@ $empresas = new ScEmpresas($pdo);
 $vacantes = new ScVacantes($pdo);
 $admin    = new ScAdmin($pdo);
 $feed     = new ScFeed($pdo);
+$correos  = new ScCorreos($pdo);
+
+// Los correos automáticos que ya toquen salen al terminar la petición, no
+// durante: ver scTareasDeFondo() al final del archivo.
+register_shutdown_function('scTareasDeFondo');
 
 // ── Extraer token (Authorization: Bearer, X-Token, body o query) ──
 $token = null;
@@ -393,6 +399,19 @@ if ($method === 'GET') {
             scSesionAdmin($pdo, $token);
             scRespuesta($feed->pendientes($payload));
 
+        // ── Correo masivo ────────────────────────────────────
+        case 'ADMIN_DESTINATARIOS':
+            scSesionAdmin($pdo, $token);
+            scRespuesta($correos->destinatarios($payload));
+
+        case 'ADMIN_ENVIOS':
+            scSesionAdmin($pdo, $token);
+            scRespuesta($correos->historial());
+
+        case 'ADMIN_AUTO':
+            scSesionAdmin($pdo, $token);
+            scRespuesta($correos->autoConfig());
+
         // ── Candidatos ───────────────────────────────────────
         case 'BUSCAR_CANDIDATOS':
             scSesionVerificada($pdo, $token, 'empresa');
@@ -575,6 +594,26 @@ if ($method === 'POST') {
             $usr = scSesionAdmin($pdo, $token);
             scRespuesta($feed->moderar($usr, (int) ($payload['id'] ?? 0), $payload));
 
+        // ── Correo masivo ────────────────────────────────────
+        // El envío va por lotes: CREAR registra la campaña y LOTE manda el
+        // siguiente bloque. Mandar cientos de correos en una sola petición
+        // agotaría el tiempo de ejecución a la mitad.
+        case 'ADMIN_CORREO_PRUEBA':
+            $usr = scSesionAdmin($pdo, $token);
+            scRespuesta($correos->prueba($usr, $payload));
+
+        case 'ADMIN_CORREO_CREAR':
+            $usr = scSesionAdmin($pdo, $token);
+            scRespuesta($correos->crear($usr, $payload));
+
+        case 'ADMIN_CORREO_LOTE':
+            $usr = scSesionAdmin($pdo, $token);
+            scRespuesta($correos->lote($usr, (int) ($payload['id'] ?? 0)));
+
+        case 'ADMIN_AUTO_GUARDAR':
+            $usr = scSesionAdmin($pdo, $token);
+            scRespuesta($correos->autoGuardar($usr, $payload));
+
         default:
             scRespuesta(['status' => 'error', 'message' => "Acción POST desconocida: {$action}"], 400);
     }
@@ -582,3 +621,28 @@ if ($method === 'POST') {
 
 // Método no soportado
 scRespuesta(['status' => 'error', 'message' => 'Método no soportado.'], 405);
+
+
+/**
+ * Respaldo del correo automático de la semana.
+ *
+ * scRespuesta() termina con exit, así que esto solo corre por la función de
+ * cierre: se registra al final del arranque y PHP la ejecuta al terminar.
+ *
+ * Lo normal es que lo dispare el cron del hosting (api/cron.php). Esto es la
+ * red de seguridad para cuando el cron no está configurado: aprovecha una de
+ * cada cuarenta peticiones para vaciar un poco la cola. Con fastcgi_finish_
+ * request() la respuesta ya salió, así que el usuario no espera por ello.
+ */
+function scTareasDeFondo(): void {
+    if (random_int(1, 40) !== 1) return;
+
+    // Devuelve la respuesta al navegador antes de ponerse a mandar correos
+    if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
+
+    try {
+        (new ScCorreos(scDB()))->procesarAutomaticos(5);
+    } catch (Throwable $e) {
+        error_log('scTareasDeFondo: ' . $e->getMessage());
+    }
+}

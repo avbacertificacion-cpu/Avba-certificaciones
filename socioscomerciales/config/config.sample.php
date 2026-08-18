@@ -13,11 +13,37 @@ define('SC_DB_NAME', '');
 define('SC_DB_USER', '');
 define('SC_DB_PASS', '');
 
-// ── OPCIONAL: correos del portal ──────────────────────────────────────
-// Si no se definen, se usan estos valores por defecto. Conviene usar una
-// cuenta real del dominio para que los correos no caigan en spam.
+// ── Correo saliente (SMTP) ────────────────────────────────────────────
+// COPIA AQUÍ los mismos valores que ya usa el sistema de certificaciones.
+// Están en el config.php de la RAÍZ del hosting, con estos nombres:
+//
+//     MAIL_HOST       →  SC_MAIL_HOST
+//     MAIL_USER       →  SC_MAIL_USER
+//     MAIL_PASS       →  SC_MAIL_PASS
+//     MAIL_PORT       →  SC_MAIL_PORT
+//     MAIL_FROM       →  SC_MAIL_FROM
+//     MAIL_FROM_NAME  →  SC_MAIL_FROM_NOMBRE
+//
+// Se copian en vez de leer aquel archivo para no acoplar los dos sistemas:
+// cargarlo traería también las credenciales de su base de datos.
+//
+// Sin estos valores el portal usa la función mail() de PHP, que funciona
+// pero acaba en spam con frecuencia: un correo SMTP autenticado sale con
+// el SPF y el DKIM del dominio, y ese sí llega a la bandeja de entrada.
+//
+// define('SC_MAIL_HOST',        'smtp.hostinger.com');
+// define('SC_MAIL_USER',        'no-reply@avba.com.mx');
+// define('SC_MAIL_PASS',        'la-contraseña-del-buzón');
+// define('SC_MAIL_PORT',        465);   // 465 = SSL, 587 = STARTTLS
 // define('SC_MAIL_FROM',        'no-reply@avba.com.mx');
 // define('SC_MAIL_FROM_NOMBRE', 'AVBA Socios Comerciales');
+
+// ── Correo automático a la semana del registro ────────────────────────
+// Clave para que el cron del hosting pueda dispararlo:
+//     https://gestion.avba.com.mx/socioscomerciales/api/cron.php?clave=...
+// Si no se define, el portal igual manda esos correos aprovechando el
+// tráfico normal, pero con cron salen a su hora aunque nadie entre.
+// define('SC_CRON_CLAVE', 'cámbiala-por-una-cadena-larga-y-aleatoria');
 
 // ── Administradores del portal ────────────────────────────────────────
 // Correos que ven el panel de administración (admin.html) y pueden

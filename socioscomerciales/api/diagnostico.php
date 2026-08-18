@@ -27,6 +27,17 @@ function scDiagnostico(): array {
         'correo' => [
             'funcion_mail_disponible' => function_exists('mail'),
             'remitente'               => defined('SC_MAIL_FROM') ? SC_MAIL_FROM : '(sin definir)',
+            // Sin SMTP los correos salen por mail() y suelen acabar en spam
+            'smtp_configurado'        => scSmtpConfigurado(),
+            'smtp_host'               => defined('SC_MAIL_HOST') ? SC_MAIL_HOST : '(sin definir)',
+            'smtp_puerto'             => defined('SC_MAIL_PORT') ? SC_MAIL_PORT : '(por defecto 465)',
+            'phpmailer_encontrado'    => scCargarPhpMailer(),
+            'metodo_de_envio'         => (scSmtpConfigurado() && scCargarPhpMailer())
+                                          ? 'SMTP autenticado' : 'mail() de PHP',
+        ],
+        'automaticos' => [
+            'cron_clave_definida' => defined('SC_CRON_CLAVE') && SC_CRON_CLAVE !== '',
+            'url_cron'            => scUrlBase() . '/api/cron.php?clave=...',
         ],
         'url_base' => scUrlBase(),
     ];
