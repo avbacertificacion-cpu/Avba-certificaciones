@@ -1098,6 +1098,10 @@ class Certificaciones {
         ];
 
         $html = file_get_contents($templatePath);
+        // Las horquillas son opcionales: un telehandler puede traer canastilla,
+        // pluma o cucharón en su lugar. Si el inspector no las habilitó, el
+        // apartado se recorta entero en vez de salir en blanco.
+        $html = $this->recortarBloqueHorquillas($html, $d);
         $html = str_replace(array_keys($map), array_values($map), $html);
 
         // Inyectar fotos reales sobre los divs foto-placeholder

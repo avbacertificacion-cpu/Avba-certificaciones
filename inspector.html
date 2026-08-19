@@ -2285,11 +2285,24 @@
         <div class="hint">Capacidad nominal o de carga del equipo</div>
       </div>
 
-      <!-- Horquillas — solo visible cuando el equipo es montacargas -->
+      <!-- Horquillas — montacargas y telehandler. Se habilitan con la casilla:
+           un telehandler puede traer canastilla, pluma o cucharón en lugar de
+           horquillas, y entonces el apartado no debe salir en el dictamen. -->
       <div id="seccion-horquillas" style="display:none">
         <div class="band-sub" style="margin:14px 0 8px;padding:6px 10px;background:#f0f4ff;border-left:3px solid #1e5fa8;border-radius:4px;font-size:12px;font-weight:600;color:#1e5fa8;">
           Datos de Horquillas
         </div>
+        <label id="horquillas-toggle-label"
+               style="display:flex;align-items:center;gap:9px;margin:0 0 10px;padding:9px 12px;
+                      border:1.5px solid var(--borde,#d6dce6);border-radius:8px;cursor:pointer;
+                      font-size:13px;color:var(--texto,#1a1a2e);background:#fff">
+          <input type="checkbox" id="horquilla_aplica" onchange="horquillasCambio()"
+                 style="width:18px;height:18px;flex-shrink:0;cursor:pointer">
+          <span>El equipo lleva horquillas
+            <span style="display:block;font-size:11px;color:var(--texto-hint,#8b93a5);font-weight:400">
+              Desactívalo si trae canastilla, pluma, cucharón u otro aditamento.</span></span>
+        </label>
+        <div id="horquillas-campos">
         <div class="row2">
           <div class="field">
             <label>Marca de horquillas</label>
@@ -2309,6 +2322,7 @@
             <label>Centro de gravedad</label>
             <input type="text" id="horquilla_cg" placeholder="Ej: 500 mm">
           </div>
+        </div>
         </div>
       </div>
 
@@ -4050,12 +4064,77 @@ function pcGuardar() {
   guardarBorradorDebounced();
 }
 
+/* Plantillas cuyo dictamen tiene apartado de horquillas. En montacargas es lo
+   normal y viene marcado; en telehandler no, porque igual trae canastilla,
+   pluma o cucharón: ahí el inspector decide. */
+const HORQUILLAS_PLANTILLAS = {
+  'dictamen_montacargas.html': true,   // marcado por omisión
+  'dictamen_telehandler.html': false,  // el inspector lo habilita
+};
+
 function toggleHorquillasSection() {
-  const sel     = document.getElementById('maquinaria');
-  const opt     = sel.options[sel.selectedIndex];
+  const sel      = document.getElementById('maquinaria');
+  const opt      = sel.options[sel.selectedIndex];
   const dictHtml = opt ? (opt.dataset.dictHtml || '') : '';
-  const sec = document.getElementById('seccion-horquillas');
-  if (sec) sec.style.display = dictHtml === 'dictamen_montacargas.html' ? 'block' : 'none';
+  const sec      = document.getElementById('seccion-horquillas');
+  const chk      = document.getElementById('horquilla_aplica');
+  if (!sec) return;
+
+  const aplica = Object.prototype.hasOwnProperty.call(HORQUILLAS_PLANTILLAS, dictHtml);
+  sec.style.display = aplica ? 'block' : 'none';
+
+  if (!aplica) {
+    // Al cambiar a un equipo sin horquillas se limpian: si no, los datos de
+    // un montacargas anterior viajarían pegados a una grúa.
+    if (chk) chk.checked = false;
+    limpiarHorquillas();
+  } else if (chk && !chk.dataset.tocado) {
+    chk.checked = HORQUILLAS_PLANTILLAS[dictHtml];
+  }
+  toggleHorquillasCampos();
+}
+
+/* Habilita o deshabilita los campos según la casilla. Deshabilitados quedan a
+   la vista pero no se envían, para que se note que existen y están apagados. */
+/* Sólo cuando lo cambia el inspector: a partir de ahí su decisión manda sobre
+   el valor por omisión del tipo de equipo. */
+function horquillasCambio() {
+  const chk = document.getElementById('horquilla_aplica');
+  if (chk) chk.dataset.tocado = '1';
+  toggleHorquillasCampos();
+}
+
+function toggleHorquillasCampos() {
+  const chk = document.getElementById('horquilla_aplica');
+  const box = document.getElementById('horquillas-campos');
+  if (!chk || !box) return;
+  const on = chk.checked;
+  box.style.opacity       = on ? '1' : '.45';
+  box.style.pointerEvents = on ? 'auto' : 'none';
+  ['horquilla_marca','horquilla_serie','horquilla_capacidad','horquilla_cg']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.disabled = !on; });
+  if (!on) limpiarHorquillas();
+  if (typeof guardarBorradorDebounced === 'function') guardarBorradorDebounced();
+}
+
+function limpiarHorquillas() {
+  ['horquilla_marca','horquilla_serie','horquilla_capacidad','horquilla_cg']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+}
+
+/* Datos de horquillas para enviar. Devuelve null cuando no aplican, de modo que
+   el dictamen y el certificado recorten el apartado en vez de imprimirlo vacío. */
+function getHorquillasData() {
+  const chk = document.getElementById('horquilla_aplica');
+  if (!chk || !chk.checked) return null;
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  const d = {
+    marca:           v('horquilla_marca'),
+    serie:           v('horquilla_serie'),
+    capacidad:       v('horquilla_capacidad'),
+    centro_gravedad: v('horquilla_cg'),
+  };
+  return Object.values(d).some(x => x !== '') ? d : null;
 }
 
 function getPruebaCargaData() {
@@ -4481,12 +4560,7 @@ async function enviarFormulario() {
         },
         checklist: { ...respuestasCheck },
         prueba_carga: getPruebaCargaData(),
-        horquillas: {
-          marca:      document.getElementById('horquilla_marca')?.value?.trim()    || '',
-          serie:      document.getElementById('horquilla_serie')?.value?.trim()    || '',
-          capacidad:  document.getElementById('horquilla_capacidad')?.value?.trim() || '',
-          centro_gravedad: document.getElementById('horquilla_cg')?.value?.trim() || ''
-        },
+        horquillas: getHorquillasData(),
         fotos: fotosData
       }
     };
@@ -4596,12 +4670,8 @@ async function guardarBorradorInspeccion() {
     },
     checklist: { ...respuestasCheck },
     prueba_carga: pruebaCargaData || {},
-    horquillas: {
-      marca:      document.getElementById('horquilla_marca')?.value    || '',
-      serie:      document.getElementById('horquilla_serie')?.value    || '',
-      capacidad:  document.getElementById('horquilla_capacidad')?.value || '',
-      centro_gravedad: document.getElementById('horquilla_cg')?.value  || ''
-    },
+    horquillas: getHorquillasData(),
+    horquillas_aplica: !!document.getElementById('horquilla_aplica')?.checked,
     fotos: fotosData
   };
 
@@ -4676,11 +4746,20 @@ async function restaurarBorradorInspeccion(draft) {
   if (bEnv  && dirManual.env)  bEnv.value  = dirManual.env;
 
   // Horquillas
-  const h = draft.horquillas || {};
+  const h   = draft.horquillas || {};
+  const chk = document.getElementById('horquilla_aplica');
+  if (chk) {
+    // Borradores viejos no traían la marca: se deduce de si había datos.
+    chk.checked = draft.horquillas_aplica !== undefined
+      ? !!draft.horquillas_aplica
+      : Object.values(h).some(x => (x || '').trim() !== '');
+    chk.dataset.tocado = '1';
+  }
   if (document.getElementById('horquilla_marca'))     document.getElementById('horquilla_marca').value = h.marca || '';
   if (document.getElementById('horquilla_serie'))     document.getElementById('horquilla_serie').value = h.serie || '';
   if (document.getElementById('horquilla_capacidad')) document.getElementById('horquilla_capacidad').value = h.capacidad || '';
   if (document.getElementById('horquilla_cg'))        document.getElementById('horquilla_cg').value = h.centro_gravedad || '';
+  toggleHorquillasSection();
 
   // Fotos
   fotosData = Array.isArray(draft.fotos) ? draft.fotos : [];
