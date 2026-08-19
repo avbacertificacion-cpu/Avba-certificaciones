@@ -207,6 +207,28 @@
         <div class="fval">{fecha_inspeccion}</div>
       </td>
     </tr>
+    <!--BLOQUE_HORQUILLAS-->
+    <!-- Row 3b: HORQUILLAS — sólo se imprime en equipos que las llevan -->
+    <tr>
+      <td colspan="3" style="padding-bottom:2mm;">
+        <div class="flabel" style="letter-spacing:.6px">HORQUILLAS - Forks</div>
+      </td>
+    </tr>
+    <tr>
+      <td style="padding-right:3mm;vertical-align:top;padding-bottom:5mm;">
+        <div class="flabel">CAPACIDAD - Capacity</div>
+        <div class="fval">{horquilla_capacidad}</div>
+      </td>
+      <td style="padding-right:3mm;vertical-align:top;padding-bottom:5mm;">
+        <div class="flabel">CENTRO DE GRAVEDAD - Load Center</div>
+        <div class="fval">{horquilla_cg}</div>
+      </td>
+      <td style="vertical-align:top;padding-bottom:5mm;">
+        <div class="flabel">NO. SERIE - Serial Number</div>
+        <div class="fval">{horquilla_serie}</div>
+      </td>
+    </tr>
+    <!--/BLOQUE_HORQUILLAS-->
     <!-- Separator row — reliable mPDF spacing before text section -->
     <tr>
       <td colspan="3" style="padding:3mm 0 4mm;">
@@ -235,6 +257,24 @@
     <tr>
       <td style="padding-bottom:5mm;">
         <div class="ctext seguras-block">El equipo se encuentra en condiciones <strong>SEGURAS para su operación</strong>, de conformidad con los criterios técnicos evaluados. La vigencia del presente certificado es hasta el <strong>{vigencia}</strong>.</div>
+      </td>
+    </tr>
+    <!-- Normas bajo las que se realizó la inspección. La acreditada es la del
+         alcance de la unidad; la de referencia complementa el criterio técnico. -->
+    <tr>
+      <td style="padding-top:3mm;padding-bottom:3mm;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+          <td style="width:50%;padding-right:4mm;vertical-align:top;">
+            <div class="flabel">NORMAS ACREDITADAS - Accredited Standards</div>
+            <div class="fval" style="font-size:8.5pt;line-height:1.5">{{normas_acreditadas}}</div>
+          </td>
+          <td style="width:50%;vertical-align:top;">
+            <div class="flabel">NORMAS DE REFERENCIA - Reference Standards</div>
+            <div class="fval" style="font-size:8.5pt;line-height:1.5">{{normas_referencia}}</div>
+          </td>
+        </tr>
+        </table>
       </td>
     </tr>
     <tr>

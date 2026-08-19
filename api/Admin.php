@@ -8,8 +8,80 @@
 class Admin {
     private PDO $pdo;
 
+    /**
+     * Tipos de maquinaria que deben existir con su plantilla de dictamen ya
+     * asignada. Se dan de alta una sola vez cada uno; después Calidad los
+     * renombra, les cambia la plantilla o los elimina y no vuelven a aparecer.
+     *
+     * Las plantillas ya existían en el repositorio; lo que faltaba era que el
+     * tipo estuviera dado de alta y apuntando a la suya.
+     */
+    private const TIPOS_BASE = [
+        'montacargas' => ['MONTACARGAS',  'dictamen_montacargas.html'],
+        'grua_torre'  => ['GRÚA TORRE',   'dictamen_grua_torre.html'],
+    ];
+
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
+        $this->seedTiposMaquinaria();
+    }
+
+    /**
+     * Alta única de los tipos base. La marca de aplicado va en su propia tabla
+     * para no reponer lo que Calidad haya decidido quitar.
+     *
+     * Se atrapa Throwable en todo: esta clase se construye en TODAS las
+     * peticiones, incluida la de iniciar sesión, así que un fallo aquí no puede
+     * tumbar el sistema.
+     */
+    private function seedTiposMaquinaria(): void {
+        try {
+            $this->pdo->exec(
+                "CREATE TABLE IF NOT EXISTS maquinaria_tipos_seed (
+                   clave    VARCHAR(40) NOT NULL PRIMARY KEY,
+                   aplicado TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            );
+            $this->pdo->exec(
+                "ALTER TABLE maquinaria_tipos
+                 ADD COLUMN IF NOT EXISTS plantilla_dict_html VARCHAR(100) NULL"
+            );
+        } catch (\Throwable $e) {
+            error_log('[Admin] seedTiposMaquinaria (marca): ' . $e->getMessage());
+            return;
+        }
+
+        foreach (self::TIPOS_BASE as $clave => [$nombre, $plantilla]) {
+            try {
+                $st = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
+                $st->execute([$clave]);
+                if ($st->fetch()) continue;
+
+                // Puede existir ya, capturado a mano y quizá con acento distinto.
+                $dup = $this->pdo->prepare(
+                    "SELECT id, plantilla_dict_html FROM maquinaria_tipos
+                     WHERE UPPER(TRIM(nombre)) = ? LIMIT 1"
+                );
+                $dup->execute([$nombre]);
+                $fila = $dup->fetch();
+
+                if ($fila) {
+                    // No se duplica: sólo se le asigna la plantilla si le falta.
+                    if (empty($fila['plantilla_dict_html'])) {
+                        $this->pdo->prepare(
+                            "UPDATE maquinaria_tipos SET plantilla_dict_html = ? WHERE id = ?"
+                        )->execute([$plantilla, $fila['id']]);
+                    }
+                } else {
+                    $this->pdo->prepare(
+                        "INSERT INTO maquinaria_tipos (nombre, plantilla_dict_html) VALUES (?, ?)"
+                    )->execute([$nombre, $plantilla]);
+                }
+                $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")->execute([$clave]);
+            } catch (\Throwable $e) {
+                error_log("[Admin] seedTiposMaquinaria ($clave): " . $e->getMessage());
+            }
+        }
     }
 
     // ── Listar tipos de equipo con sus secciones ───────────────

@@ -1739,6 +1739,32 @@ SVG;
         return $rows;
     }
 
+    /**
+     * Quita del certificado el bloque de horquillas cuando el equipo no las
+     * tiene capturadas.
+     *
+     * La plantilla es la misma para toda la maquinaria, así que el bloque va
+     * delimitado por comentarios y se recorta entero: dejarlo con los campos
+     * vacíos pondría un apartado "HORQUILLAS" en blanco en el certificado de
+     * una grúa, que no las lleva.
+     */
+    private function recortarBloqueHorquillas(string $html, array $d): string {
+        $horq = !empty($d['horquillas']) ? (json_decode($d['horquillas'], true) ?? []) : [];
+        $hay  = false;
+        foreach (['capacidad', 'centro_gravedad', 'serie', 'marca'] as $c) {
+            if (trim((string)($horq[$c] ?? '')) !== '') { $hay = true; break; }
+        }
+        if ($hay) {
+            // Se conserva el bloque, pero sin las marcas: no tienen por qué
+            // viajar dentro del documento que recibe el cliente.
+            return str_replace(['<!--BLOQUE_HORQUILLAS-->', '<!--/BLOQUE_HORQUILLAS-->'], '', $html);
+        }
+
+        return preg_replace(
+            '/<!--BLOQUE_HORQUILLAS-->.*?<!--\/BLOQUE_HORQUILLAS-->/s', '', $html
+        ) ?? $html;
+    }
+
     /** Devuelve [html_normas_acreditadas, html_normas_referencia] para el tipo de maquinaria. */
     private function obtenerNormasHtml(string $maquinaria): array {
         if (!$maquinaria) return ['—', '—'];
@@ -1831,9 +1857,25 @@ SVG;
                 '{fecha_inspeccion}'  => $e($d['fecha_fmt']  ?? ''),
                 '{vigencia}'          => $e($vigencia),
             ];
+
+            // Normas del alcance: el certificado debe decir bajo qué se
+            // inspeccionó, igual que ya lo hace el dictamen.
+            [$normasAcred, $normasRef] = $this->obtenerNormasHtml($d['maquinaria'] ?? '');
+            $map['{{normas_acreditadas}}'] = $normasAcred;
+            $map['{{normas_referencia}}']  = $normasRef;
+
+            // Horquillas: sólo las llevan montacargas y telehandlers, así que
+            // sus campos se suman aquí y el bloque se recorta más abajo cuando
+            // el equipo no tiene ninguno capturado.
+            $horq = !empty($d['horquillas']) ? (json_decode($d['horquillas'], true) ?? []) : [];
+            $map['{horquilla_marca}']     = $e($horq['marca']           ?? '');
+            $map['{horquilla_serie}']     = $e($horq['serie']           ?? '');
+            $map['{horquilla_capacidad}'] = $e($horq['capacidad']       ?? '');
+            $map['{horquilla_cg}']        = $e($horq['centro_gravedad'] ?? '');
         }
 
         $html = file_get_contents($templatePath);
+        $html = $this->recortarBloqueHorquillas($html, $d);
         $html = str_replace(array_keys($map), array_values($map), $html);
 
         if ($sinSellos) {
