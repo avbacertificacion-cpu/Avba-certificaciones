@@ -1038,27 +1038,11 @@ class Certificaciones {
             }
         }
 
-        // Obtener datos del responsable (Aprobado Por)
-        $firmaResponsableImg = '';
-        $nombreResponsable   = 'ING. YOSELIN MARTINEZ JUAREZ';
-        $cargoResponsable    = 'Director Técnico Sustituto';
-        $stmtR = $this->pdo->prepare("SELECT nombre, firma_imagen FROM usuarios WHERE nombre LIKE ? LIMIT 1");
-        $stmtR->execute(['%Yoselin%']);
-        $resp = $stmtR->fetch();
-        if ($resp) {
-            $nombreResponsable = strtoupper($resp['nombre']);
-            $firmaUrlR = $resp['firma_imagen'] ?? '';
-            if (!$firmaUrlR) $firmaUrlR = 'uploads/firmas/firma_yoselin.jpg';
-        } else {
-            $firmaUrlR = 'uploads/firmas/firma_yoselin.jpg';
-        }
-        $localPathR = __DIR__ . '/../' . ltrim($firmaUrlR, '/');
-        if (file_exists($localPathR)) {
-            $extR  = strtolower(pathinfo($localPathR, PATHINFO_EXTENSION));
-            $mimeR = $extR === 'png' ? 'image/png' : 'image/jpeg';
-            $b64R  = base64_encode(file_get_contents($localPathR));
-            $firmaResponsableImg = "<img src='data:{$mimeR};base64,{$b64R}' style='max-width:120px;max-height:50px;object-fit:contain;'>";
-        }
+        // Quién revisa y autoriza (Aprobado Por): nunca el mismo que inspeccionó.
+        $resp = $this->resolverResponsable($nombreInspector, (string)($d['inspector'] ?? ''));
+        $nombreResponsable   = $resp['nombre'];
+        $cargoResponsable    = $resp['cargo'];
+        $firmaResponsableImg = $resp['firma_img'];
 
         // Construir HTML de prueba de carga si existen datos
         $pruebaCargaHtml = '';
@@ -1625,6 +1609,136 @@ SVG;
     }
 
     /** Normaliza texto: minúsculas, sin acentos ni ñ, sin espacios extremos. */
+    /**
+     * Firmantes de la revisión del dictamen.
+     *
+     * "Sustituto" es respecto del titular: José Marcos es el Director Técnico y
+     * Yoselin lo sustituye. El cargo se deja aquí y no en la base porque
+     * `usuarios` no tiene columna de puesto; si cambia, se corrige en un lugar.
+     */
+    private const FIRMANTE_TITULAR = [
+        'clave'  => 'jose marcos',
+        'nombre' => 'ING. JOSÉ MARCOS GONZÁLEZ CALDERÓN',
+        'cargo'  => 'Director Técnico',
+        'firma'  => 'uploads/firmas/firma_jose_marcos.jpg',
+    ];
+    private const FIRMANTE_SUSTITUTO = [
+        'clave'  => 'yoselin',
+        'nombre' => 'ING. YOSELIN MARTÍNEZ JUÁREZ',
+        'cargo'  => 'Director Técnico Sustituto',
+        'firma'  => 'uploads/firmas/firma_yoselin.jpg',
+    ];
+
+    /** ¿El texto corresponde a José Marcos González Calderón? */
+    private function esFirmanteTitular(string $texto): bool {
+        $n = $this->normalizarTexto($texto);
+        return str_contains($n, 'jose marcos') || str_contains($n, 'marcos gonzalez');
+    }
+
+    /**
+     * Quién revisa y autoriza el dictamen.
+     *
+     * Nadie revisa su propio trabajo: si el dictamen lo firma José Marcos como
+     * inspector, lo autoriza Yoselin; para cualquier otro inspector lo autoriza
+     * José Marcos. Se compara contra el nombre y contra la cuenta, porque el
+     * inspector puede venir por cualquiera de los dos.
+     *
+     * @return array{nombre:string,cargo:string,firma_img:string}
+     */
+    private function resolverResponsable(string $inspectorNombre, string $inspectorUsuario): array {
+        // El inspector puede llegar como nombre o como cuenta. Si sólo viene la
+        // cuenta se resuelve su nombre, porque una cuenta como "jmarcos" no se
+        // parece al nombre y la regla se decidiría mal.
+        if (!$this->esFirmanteTitular($inspectorNombre) && $inspectorUsuario !== '') {
+            $inspectorNombre = $this->nombreDeCuenta($inspectorUsuario) ?: $inspectorNombre;
+        }
+        $esTitular = $this->esFirmanteTitular($inspectorNombre)
+                  || $this->cuentaEsTitular($inspectorUsuario);
+        $f = $esTitular ? self::FIRMANTE_SUSTITUTO : self::FIRMANTE_TITULAR;
+
+        // La base manda sobre la constante: si ahí está el nombre completo o una
+        // firma cargada desde el perfil, es la buena.
+        $nombre   = $f['nombre'];
+        $firmaRel = $f['firma'];
+        foreach ($this->usuariosPorNombre($f['clave']) as $row) {
+            if (!empty($row['nombre']))       $nombre   = mb_strtoupper($row['nombre'], 'UTF-8');
+            if (!empty($row['firma_imagen'])) $firmaRel = ltrim((string)$row['firma_imagen'], '/');
+            break;
+        }
+
+        return [
+            'nombre'    => $nombre,
+            'cargo'     => $f['cargo'],
+            'firma_img' => $this->firmaImgTag($firmaRel),
+        ];
+    }
+
+    /**
+     * ¿La cuenta es la de José Marcos? Se compara contra la cuenta que tenga
+     * registrada, no contra el texto: "jmarcos" no se parece a su nombre.
+     */
+    private function cuentaEsTitular(string $usuario): bool {
+        if (trim($usuario) === '') return false;
+        $u = $this->normalizarTexto($usuario);
+        foreach ($this->usuariosPorNombre(self::FIRMANTE_TITULAR['clave']) as $row) {
+            if ($this->normalizarTexto((string)($row['usuario'] ?? '')) === $u) return true;
+        }
+        // Último recurso, para cuando el titular no está dado de alta: una
+        // cuenta que lo nombra se toma como suya. Ante la duda conviene que
+        // autorice el sustituto; el error contrario —que revisara su propio
+        // trabajo— es el que sí invalida el dictamen.
+        return str_contains($u, 'marcos');
+    }
+
+    /** Nombre completo de una cuenta, o '' si no existe. */
+    private function nombreDeCuenta(string $usuario): string {
+        try {
+            $st = $this->pdo->prepare("SELECT usuario, nombre FROM usuarios");
+            $st->execute();
+            $buscado = $this->normalizarTexto($usuario);
+            foreach ($st->fetchAll() as $r) {
+                if ($this->normalizarTexto((string)($r['usuario'] ?? '')) === $buscado) {
+                    return (string)($r['nombre'] ?? '');
+                }
+            }
+            return '';
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+    /**
+     * Usuarios cuyo nombre contiene la clave, comparando sin acentos.
+     *
+     * El filtrado se hace en PHP y no con LIKE: "José" no empata con "jose" a
+     * menos que la colación de la base sea insensible a acentos, y eso cambia
+     * entre servidores. Con normalizarTexto el resultado es el mismo siempre.
+     */
+    private function usuariosPorNombre(string $clave): array {
+        try {
+            $rows = $this->pdo->query("SELECT usuario, nombre, firma_imagen FROM usuarios ORDER BY id")->fetchAll();
+        } catch (\Throwable $e) {
+            error_log('[Certificaciones] usuariosPorNombre: ' . $e->getMessage());
+            return [];
+        }
+        $clave = $this->normalizarTexto($clave);
+        return array_values(array_filter(
+            $rows,
+            fn($r) => str_contains($this->normalizarTexto((string)($r['nombre'] ?? '')), $clave)
+        ));
+    }
+
+    /** <img> en base64 de una firma, o cadena vacía si el archivo no está. */
+    private function firmaImgTag(string $rel): string {
+        if ($rel === '') return '';
+        $abs = __DIR__ . '/../' . ltrim($rel, '/');
+        if (!is_file($abs)) return '';
+        $ext  = strtolower(pathinfo($abs, PATHINFO_EXTENSION));
+        $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';
+        $b64  = base64_encode((string)file_get_contents($abs));
+        return "<img src='data:{$mime};base64,{$b64}' style='max-width:120px;max-height:50px;object-fit:contain;'>";
+    }
+
     private function normalizarTexto(string $s): string {
         $s = mb_strtolower(trim($s), 'UTF-8');
         return strtr($s, [
