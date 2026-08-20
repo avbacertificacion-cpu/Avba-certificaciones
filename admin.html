@@ -316,6 +316,7 @@
     <button class="tab-a active" id="tab-btn-usuarios" onclick="verTabAdmin('usuarios',this)">👥 Usuarios</button>
     <button class="tab-a"        id="tab-btn-pagos"    onclick="verTabAdmin('pagos',this)">📅 Vencimientos</button>
     <button class="tab-a"        id="tab-btn-ads"      onclick="verTabAdmin('ads',this)">📢 Publicidad</button>
+    <button class="tab-a"        id="tab-btn-conta"    onclick="verTabAdmin('conta',this)">💰 Contabilidad</button>
     <button class="tab-a"        id="tab-btn-smtp"     onclick="verTabAdmin('smtp',this)">📧 Correo SMTP</button>
   </div>
 
@@ -474,6 +475,56 @@
   </div><!-- /tab-sec-ads -->
 
   <!-- SECCIÓN: SMTP -->
+  <!-- SECCIÓN: CONTABILIDAD -->
+  <div class="tab-sec" id="tab-sec-conta">
+
+    <!-- Periodo de trabajo -->
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;
+                background:var(--gris-bg,#f5f7fa);border:1px solid var(--borde,#e0e6ef);border-radius:10px;padding:10px 14px">
+      <label style="font-size:12px;font-weight:700;color:var(--texto-sub,#5a6472)">Periodo</label>
+      <select id="cta-periodo" onchange="ctaCambiarPeriodo()"
+              style="padding:7px 10px;border:1.5px solid var(--borde,#d6dce6);border-radius:7px;font-size:13px;background:#fff;min-width:220px"></select>
+      <span id="cta-periodo-info" style="font-size:12px;color:var(--texto-hint,#8b93a5)"></span>
+      <div style="flex:1"></div>
+      <button class="btn-sec" onclick="ctaAbrirPeriodo(0)" style="font-size:12px">+ Nuevo periodo</button>
+      <button class="btn-sec" onclick="ctaAbrirPeriodo(ctaPeriodoId)" style="font-size:12px">✎ Editar</button>
+    </div>
+
+    <!-- Sub-pestañas -->
+    <div class="tabs-admin" style="margin-bottom:14px">
+      <button class="tab-a active" id="cta-btn-balance"   onclick="ctaVer('balance',this)">📊 Balance</button>
+      <button class="tab-a"        id="cta-btn-ingreso"   onclick="ctaVer('ingreso',this)">▲ Ingresos</button>
+      <button class="tab-a"        id="cta-btn-gasto"     onclick="ctaVer('gasto',this)">▼ Gastos</button>
+      <button class="tab-a"        id="cta-btn-entrega"   onclick="ctaVer('entrega',this)">💵 Dinero entregado</button>
+      <button class="tab-a"        id="cta-btn-reembolso" onclick="ctaVer('reembolso',this)">↩ Reembolsos</button>
+      <button class="tab-a"        id="cta-btn-saldos"    onclick="ctaVer('saldos',this)">👤 Saldos</button>
+      <button class="tab-a"        id="cta-btn-config"    onclick="ctaVer('config',this)">⚙ Configuración</button>
+    </div>
+
+    <div id="cta-cuerpo"><div class="loading-row" style="padding:30px;text-align:center"><span class="spin"></span> Cargando…</div></div>
+  </div><!-- /tab-sec-conta -->
+
+  <!-- ══ MODAL: MOVIMIENTO DE CONTABILIDAD ══ -->
+  <div class="overlay" id="overlay-cta-mov" style="display:none" onclick="if(event.target===this)ctaCerrarMov()">
+    <div class="modal" style="max-width:620px">
+      <div class="modal-hdr">
+        <div class="modal-hdr-l">
+          <div class="m-avatar" id="cta-mov-icono" style="background:var(--azul,#0B2545)">$</div>
+          <div>
+            <div class="m-title" id="cta-mov-titulo">Movimiento</div>
+            <div class="m-sub"   id="cta-mov-sub">—</div>
+          </div>
+        </div>
+        <button class="btn-close" onclick="ctaCerrarMov()">×</button>
+      </div>
+      <div style="padding:16px 22px;max-height:66vh;overflow-y:auto" id="cta-mov-campos"></div>
+      <div style="padding:10px 22px 18px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn-sec" onclick="ctaCerrarMov()">Cancelar</button>
+        <button class="btn-save" id="cta-mov-btn" onclick="ctaGuardarMov()" style="padding:9px 22px">Guardar</button>
+      </div>
+    </div>
+  </div>
+
   <div class="tab-sec" id="tab-sec-smtp">
     <div class="panel">
       <div class="panel-hdr">
@@ -1195,6 +1246,481 @@ document.getElementById("overlay-docs").addEventListener("click", function(e) {
 
 cargar();
 
+
+/* ═══════════════════════════════════════
+   CONTABILIDAD
+   Traslada el control que se llevaba en Excel. Las cifras nunca se guardan
+   calculadas: el balance, los saldos y el estado de reembolso salen del
+   servidor a partir de los movimientos, así que no pueden quedar desfasados.
+═══════════════════════════════════════ */
+let ctaPeriodoId = 0, ctaVista = 'balance', ctaCat = {}, ctaPeriodos = [], ctaMov = { tipo:'', id:0 };
+
+const CTA_MONEDA = new Intl.NumberFormat('es-MX', { style:'currency', currency:'MXN' });
+const ctaFmt  = n => CTA_MONEDA.format(Number(n) || 0);
+const ctaEsc  = v => String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const ctaFecha = f => { if (!f) return '—'; const [a,m,d] = String(f).slice(0,10).split('-'); return `${d}/${m}/${a}`; };
+
+async function ctaApi(accion, params = {}, metodo = 'GET', payload = null) {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    if (metodo === 'GET') {
+      const q = new URLSearchParams({ action: accion, token: s.token || '', ...params });
+      const r = await fetch(`${API}?${q}`);
+      return await r.json();
+    }
+    const r = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type':'application/json', 'X-Token': s.token || '' },
+      body: JSON.stringify({ action: accion, token: s.token || '', payload }),
+    });
+    return await r.json();
+  } catch (e) { return { status:'error', message:'Error de conexión.' }; }
+}
+
+async function ctaIniciar() {
+  const d = await ctaApi('CONTA_PERIODOS');
+  ctaPeriodos = d.data || [];
+  const sel = document.getElementById('cta-periodo');
+  sel.innerHTML = ctaPeriodos.map(p =>
+    `<option value="${p.id}">${ctaEsc(p.nombre)}${+p.cerrado ? ' (cerrado)' : ''}</option>`).join('');
+  if (!ctaPeriodoId || !ctaPeriodos.some(p => +p.id === +ctaPeriodoId)) {
+    ctaPeriodoId = ctaPeriodos.length ? +ctaPeriodos[0].id : 0;
+  }
+  sel.value = ctaPeriodoId;
+  ctaCat = (await ctaApi('CONTA_CATALOGO')).data || {};
+  ctaCambiarPeriodo();
+}
+
+function ctaCambiarPeriodo() {
+  ctaPeriodoId = +document.getElementById('cta-periodo').value || 0;
+  const p = ctaPeriodos.find(x => +x.id === ctaPeriodoId);
+  document.getElementById('cta-periodo-info').textContent = p
+    ? [p.fecha_ini ? ctaFecha(p.fecha_ini) : null, p.fecha_fin ? ctaFecha(p.fecha_fin) : null].filter(Boolean).join(' — ')
+      + (+p.cerrado ? ' · cerrado, no admite capturas' : '')
+    : '';
+  ctaRender();
+}
+
+function ctaVer(vista, btn) {
+  ctaVista = vista;
+  document.querySelectorAll('#tab-sec-conta .tab-a').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  ctaRender();
+}
+
+async function ctaRender() {
+  const cont = document.getElementById('cta-cuerpo');
+  if (!ctaPeriodoId) { cont.innerHTML = '<div style="padding:30px;text-align:center;color:var(--texto-hint)">Crea un periodo para empezar.</div>'; return; }
+  cont.innerHTML = '<div style="padding:30px;text-align:center;color:var(--texto-hint)"><span class="spin"></span> Cargando…</div>';
+  if (ctaVista === 'balance')   return ctaRenderBalance(cont);
+  if (ctaVista === 'reembolso') return ctaRenderReembolsos(cont);
+  if (ctaVista === 'saldos')    return ctaRenderSaldos(cont);
+  if (ctaVista === 'config')    return ctaRenderConfig(cont);
+  return ctaRenderMovimientos(cont, ctaVista);
+}
+
+/* ── Balance ── */
+async function ctaRenderBalance(cont) {
+  const b = await ctaApi('CONTA_BALANCE', { periodo_id: ctaPeriodoId });
+  if (b.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo)">${ctaEsc(b.message)}</p>`; return; }
+
+  const tarjeta = (etq, val, color) => `
+    <div class="stat"><div class="stat-n" style="color:${color};font-size:20px">${val}</div><div class="stat-l">${etq}</div></div>`;
+
+  // El contenido va en su propio contenedor con desplazamiento: una tabla de
+  // varias columnas de moneda se sale de la tarjeta en pantallas angostas.
+  const tabla = (titulo, filas, cols) => `
+    <div style="background:#fff;border:1px solid var(--borde,#e0e6ef);border-radius:10px;padding:14px;flex:1;min-width:280px;overflow:hidden">
+      <div style="font-size:12px;font-weight:700;color:var(--azul-dark,#0B2545);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">${titulo}</div>
+      ${filas.length ? `<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;white-space:nowrap">
+        ${filas.map(f => `<tr>${cols(f)}</tr>`).join('')}
+      </table></div>` : '<div style="font-size:12px;color:var(--texto-hint)">Sin datos.</div>'}
+    </div>`;
+
+  cont.innerHTML = `
+    <div class="stats" style="margin-bottom:16px">
+      ${tarjeta('Ingresos',  ctaFmt(b.ingresos), 'var(--verde,#1a7a4a)')}
+      ${tarjeta('Gastos',    ctaFmt(b.gastos),   'var(--rojo,#c62828)')}
+      ${tarjeta('Utilidad',  ctaFmt(b.utilidad), b.utilidad >= 0 ? 'var(--azul,#0B2545)' : 'var(--rojo,#c62828)')}
+      ${tarjeta('Margen',    b.margen === null ? '—' : (b.margen*100).toFixed(1) + '%', 'var(--azul,#0B2545)')}
+      ${tarjeta('Por reembolsar', ctaFmt(b.por_reembolsar), 'var(--ambar,#b06b00)')}
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap">
+      ${tabla('Ingresos por categoría', b.por_categoria, f => `
+        <td style="padding:4px 0;border-bottom:1px solid #eef2f7">${ctaEsc(f.etiqueta)}</td>
+        <td style="padding:4px 0;border-bottom:1px solid #eef2f7;text-align:center;color:var(--texto-hint)">${f.n}</td>
+        <td style="padding:4px 0;border-bottom:1px solid #eef2f7;text-align:right;font-weight:600">${ctaFmt(f.total)}</td>`)}
+      ${tabla('Gastos por quien pagó', b.por_pagador, f => `
+        <td style="padding:4px 0;border-bottom:1px solid #eef2f7">${ctaEsc(f.etiqueta)}</td>
+        <td style="padding:4px 0;border-bottom:1px solid #eef2f7;text-align:center;color:var(--texto-hint)">${f.n}</td>
+        <td style="padding:4px 0;border-bottom:1px solid #eef2f7;text-align:right;font-weight:600">${ctaFmt(f.total)}</td>`)}
+      ${tabla('Mes a mes', b.por_mes, f => `
+        <td style="padding:4px 0;border-bottom:1px solid #eef2f7">${ctaEsc(f.mes)}</td>
+        <td style="padding:4px 0;border-bottom:1px solid #eef2f7;text-align:right;color:var(--verde,#1a7a4a)">${ctaFmt(f.ingresos)}</td>
+        <td style="padding:4px 0;border-bottom:1px solid #eef2f7;text-align:right;color:var(--rojo,#c62828)">${ctaFmt(f.gastos)}</td>
+        <td style="padding:4px 0;border-bottom:1px solid #eef2f7;text-align:right;font-weight:700">${ctaFmt(f.utilidad)}</td>`)}
+    </div>
+    <p style="font-size:11.5px;color:var(--texto-hint);margin-top:12px">
+      Las cifras se calculan de los movimientos capturados: no hay nada que actualizar a mano.
+      El dinero entregado al personal (${ctaFmt(b.entregado)}) no es un gasto — es un anticipo, y se
+      convierte en gasto cuando la persona lo comprueba.</p>`;
+}
+
+
+/* ── Listados de movimientos (ingresos, gastos, entregas) ── */
+const CTA_DEF = {
+  ingreso: { titulo:'Ingresos', icono:'▲', color:'var(--verde,#1a7a4a)',
+    cols:[['fecha','Fecha',90],['concepto','Concepto',null],['categoria','Categoría',130],
+          ['cliente','Cliente',180],['responsable','Responsable',120],['forma_pago','Forma de pago',130]],
+    campos:[['fecha','Fecha','date',true],['concepto','Concepto / descripción','text',true],
+            ['categoria','Categoría','cat:categoria',false],['cliente','Nombre del cliente','text',false],
+            ['responsable','Responsable','text',false],['forma_pago','Forma de pago','cat:forma_pago',false],
+            ['notas','Notas adicionales','textarea',false],['monto','Monto','money',true]] },
+  gasto: { titulo:'Gastos', icono:'▼', color:'var(--rojo,#c62828)',
+    cols:[['fecha','Fecha',90],['concepto','Concepto',null],['pagador','Quién lo pagó',140],
+          ['forma_pago','Forma de pago',130],['comprobante','Comprobante',150]],
+    campos:[['fecha','Fecha','date',true],['concepto','Concepto / descripción','text',true],
+            ['pagador','Nombre de quien lo pagó','cat:personal',false],
+            ['forma_pago','Forma de pago','cat:forma_pago',false],
+            ['comprobante','Comprobante de pago','cat:comprobante',false],
+            ['notas','Notas','textarea',false],['monto','Total','money',true]] },
+  entrega: { titulo:'Dinero entregado', icono:'💵', color:'var(--azul,#0B2545)',
+    cols:[['fecha','Fecha',90],['persona','Persona',180],['forma','Forma de entrega',150],['notas','Motivo / notas',null]],
+    campos:[['fecha','Fecha','date',true],['persona','Persona','cat:personal',true],
+            ['forma','Forma de entrega','cat:entrega',false],['notas','Notas / motivo','textarea',false],
+            ['monto','Monto','money',true]] },
+};
+
+async function ctaRenderMovimientos(cont, tipo) {
+  const def = CTA_DEF[tipo];
+  const q   = (document.getElementById('cta-busca')?.value || '').trim();
+  const d   = await ctaApi('CONTA_MOVIMIENTOS', { tipo, periodo_id: ctaPeriodoId, q });
+  if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo)">${ctaEsc(d.message)}</p>`; return; }
+  const filas = d.data || [];
+  const cerrado = ctaPeriodoCerrado();
+
+  cont.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <input id="cta-busca" value="${ctaEsc(q)}" placeholder="Buscar en ${def.titulo.toLowerCase()}…"
+             oninput="ctaBuscarDebounce()" style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--borde,#d6dce6);border-radius:8px;font-size:13px">
+      <span style="font-size:12px;color:var(--texto-hint)">${filas.length} registro(s)</span>
+      <span style="font-size:15px;font-weight:700;color:${def.color}">${ctaFmt(d.total)}</span>
+      <button class="btn-save" onclick="ctaAbrirMov('${tipo}',0)" ${cerrado ? 'disabled title="El periodo está cerrado"' : ''}
+              style="padding:8px 16px;font-size:13px">+ Nuevo</button>
+    </div>
+    <div class="tabla-wrap" style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:var(--azul-dark,#0B2545);color:#fff">
+          ${def.cols.map(([,t,w]) => `<th style="padding:7px 9px;text-align:left;font-size:11.5px;${w?`width:${w}px`:''}">${t}</th>`).join('')}
+          <th style="padding:7px 9px;text-align:right;font-size:11.5px;width:120px">Monto</th>
+          <th style="width:90px"></th>
+        </tr></thead>
+        <tbody>
+          ${filas.length ? filas.map((f,i) => `
+            <tr style="background:${i%2 ? '#f7f9fc' : '#fff'}">
+              ${def.cols.map(([c]) => `<td style="padding:6px 9px;border-bottom:1px solid #eef2f7">${
+                c === 'fecha' ? ctaFecha(f[c]) : ctaEsc(f[c] || '—')}</td>`).join('')}
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:600">${ctaFmt(f.monto)}</td>
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7;text-align:right;white-space:nowrap">
+                <button onclick="ctaAbrirMov('${tipo}',${f.id})" ${cerrado?'disabled':''}
+                        style="background:var(--azul-light,#e8eef8);border:none;color:var(--azul,#0B2545);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer">✎</button>
+                <button onclick="ctaEliminarMov('${tipo}',${f.id})" ${cerrado?'disabled':''}
+                        style="background:var(--rojo-light,#fdecea);border:none;color:var(--rojo,#c62828);border-radius:6px;padding:4px 9px;font-size:11px;font-weight:600;cursor:pointer;margin-left:3px">🗑</button>
+              </td>
+            </tr>`).join('')
+          : `<tr><td colspan="${def.cols.length+2}" style="padding:28px;text-align:center;color:var(--texto-hint)">Sin movimientos${q?' que coincidan':''}.</td></tr>`}
+        </tbody>
+      </table>
+    </div>`;
+  const inp = document.getElementById('cta-busca');
+  if (q) { inp.focus(); inp.setSelectionRange(q.length, q.length); }
+}
+
+let _ctaBuscaTimer = null;
+function ctaBuscarDebounce() { clearTimeout(_ctaBuscaTimer); _ctaBuscaTimer = setTimeout(ctaRender, 300); }
+
+function ctaPeriodoCerrado() {
+  const p = ctaPeriodos.find(x => +x.id === ctaPeriodoId);
+  return !!(p && +p.cerrado);
+}
+
+/* ── Alta y edición ── */
+function ctaAbrirMov(tipo, id) {
+  if (ctaPeriodoCerrado()) { alert('El periodo está cerrado. Ábrelo desde "Editar" para poder capturar.'); return; }
+  const def = CTA_DEF[tipo];
+  ctaMov = { tipo, id };
+  document.getElementById('cta-mov-icono').textContent = def.icono;
+  document.getElementById('cta-mov-icono').style.background = def.color;
+  document.getElementById('cta-mov-titulo').textContent = (id ? 'Editar ' : 'Nuevo ') + def.titulo.toLowerCase().replace(/s$/,'');
+  const p = ctaPeriodos.find(x => +x.id === ctaPeriodoId);
+  document.getElementById('cta-mov-sub').textContent = p ? p.nombre : '';
+
+  ctaApi('CONTA_MOVIMIENTOS', { tipo, periodo_id: ctaPeriodoId }).then(d => {
+    const dato = id ? (d.data || []).find(x => +x.id === +id) || {} : {};
+    document.getElementById('cta-mov-campos').innerHTML = def.campos.map(([c, etq, tipoCampo, req]) => {
+      const v = dato[c] ?? '';
+      if (tipoCampo.startsWith('cat:')) {
+        const lista = ctaCat[tipoCampo.slice(4)] || [];
+        // El valor guardado se conserva aunque ya no esté en el catálogo:
+        // desactivar una etiqueta no debe borrarla de los movimientos viejos.
+        const fuera = v && !lista.some(o => o.valor === v);
+        return `<label style="display:block;margin-bottom:11px;font-size:11.5px;font-weight:600;color:var(--texto-sub,#5a6472)">${etq}${req?' *':''}
+          <select id="cta-f-${c}" style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde,#d6dce6);border-radius:7px;font-size:13px;background:#fff">
+            <option value="">— Sin especificar —</option>
+            ${fuera ? `<option value="${ctaEsc(v)}" selected>${ctaEsc(v)} (fuera del catálogo)</option>` : ''}
+            ${lista.map(o => `<option value="${ctaEsc(o.valor)}" ${o.valor===v?'selected':''}>${ctaEsc(o.valor)}</option>`).join('')}
+          </select></label>`;
+      }
+      if (tipoCampo === 'textarea') {
+        return `<label style="display:block;margin-bottom:11px;font-size:11.5px;font-weight:600;color:var(--texto-sub,#5a6472)">${etq}
+          <textarea id="cta-f-${c}" rows="2" style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde,#d6dce6);border-radius:7px;font-size:13px">${ctaEsc(v)}</textarea></label>`;
+      }
+      const t = tipoCampo === 'date' ? 'date' : 'text';
+      const extra = tipoCampo === 'money' ? 'inputmode="decimal" placeholder="0.00"' : '';
+      return `<label style="display:block;margin-bottom:11px;font-size:11.5px;font-weight:600;color:var(--texto-sub,#5a6472)">${etq}${req?' *':''}
+        <input id="cta-f-${c}" type="${t}" ${extra} value="${ctaEsc(tipoCampo==='date' ? String(v).slice(0,10) : v)}"
+               style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde,#d6dce6);border-radius:7px;font-size:13px"></label>`;
+    }).join('');
+    if (!id) { const f = document.getElementById('cta-f-fecha'); if (f && !f.value) f.value = new Date().toISOString().slice(0,10); }
+    document.getElementById('overlay-cta-mov').style.display = 'flex';
+  });
+}
+
+function ctaCerrarMov() { document.getElementById('overlay-cta-mov').style.display = 'none'; }
+
+async function ctaGuardarMov() {
+  const def = CTA_DEF[ctaMov.tipo];
+  const payload = { tipo: ctaMov.tipo, id: ctaMov.id, periodo_id: ctaPeriodoId };
+  def.campos.forEach(([c]) => { payload[c] = (document.getElementById('cta-f-' + c) || {}).value || ''; });
+
+  const btn = document.getElementById('cta-mov-btn');
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  const r = await ctaApi('CONTA_GUARDAR_MOVIMIENTO', {}, 'POST', payload);
+  btn.disabled = false; btn.textContent = 'Guardar';
+  if (r.status !== 'success') { alert(r.message || 'No se pudo guardar.'); return; }
+  ctaCerrarMov(); ctaRender();
+}
+
+async function ctaEliminarMov(tipo, id) {
+  if (!confirm('¿Eliminar este movimiento?\n\nLos totales, saldos y reembolsos se recalculan solos.')) return;
+  const r = await ctaApi('CONTA_ELIMINAR_MOVIMIENTO', {}, 'POST', { tipo, id });
+  if (r.status !== 'success') { alert(r.message || 'No se pudo eliminar.'); return; }
+  ctaRender();
+}
+
+
+/* ── Reembolsos ── */
+async function ctaRenderReembolsos(cont) {
+  const d = await ctaApi('CONTA_REEMBOLSOS', { periodo_id: ctaPeriodoId });
+  if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo)">${ctaEsc(d.message)}</p>`; return; }
+  const filas = d.data || [], t = d.totales;
+
+  cont.innerHTML = `
+    <div class="stats" style="margin-bottom:14px">
+      <div class="stat"><div class="stat-n" style="font-size:20px">${ctaFmt(t.pagado)}</div><div class="stat-l">Pagado por el personal</div></div>
+      <div class="stat"><div class="stat-n" style="font-size:20px;color:var(--ambar,#b06b00)">${ctaFmt(t.pendiente)}</div><div class="stat-l">Pendiente de reembolso</div></div>
+      <div class="stat"><div class="stat-n" style="font-size:20px;color:var(--verde,#1a7a4a)">${ctaFmt(t.reembolsado)}</div><div class="stat-l">Ya reembolsado</div></div>
+    </div>
+    <div style="background:#eef4ff;border:1px solid #c3d9f3;border-radius:8px;padding:10px 14px;font-size:12px;color:#0d2244;margin-bottom:14px">
+      Esta lista se arma sola con los gastos que pagó de su bolsa alguien del personal. Un gasto queda
+      <strong>reembolsado</strong> cuando el dinero entregado a esa persona alcanza a cubrirlo, contando
+      sus gastos en el orden en que ocurrieron. Para saldar a alguien, registra la entrega en
+      <strong>Dinero entregado</strong>.
+    </div>
+    <div class="tabla-wrap" style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:var(--azul-dark,#0B2545);color:#fff">
+          <th style="padding:7px 9px;text-align:left;font-size:11.5px;width:90px">Fecha</th>
+          <th style="padding:7px 9px;text-align:left;font-size:11.5px">Concepto</th>
+          <th style="padding:7px 9px;text-align:left;font-size:11.5px;width:140px">Persona</th>
+          <th style="padding:7px 9px;text-align:left;font-size:11.5px;width:140px">Comprobante</th>
+          <th style="padding:7px 9px;text-align:right;font-size:11.5px;width:110px">Monto</th>
+          <th style="padding:7px 9px;text-align:center;font-size:11.5px;width:130px">Estado</th>
+        </tr></thead>
+        <tbody>
+          ${filas.length ? filas.map((f,i) => {
+            const pend = f.estado === 'Pendiente';
+            return `<tr style="background:${i%2 ? '#f7f9fc' : '#fff'}">
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7">${ctaFecha(f.fecha)}</td>
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7">${ctaEsc(f.concepto)}</td>
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7">${ctaEsc(f.persona)}</td>
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7">${ctaEsc(f.comprobante || '—')}</td>
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:600">${ctaFmt(f.monto)}</td>
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7;text-align:center">
+                <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;
+                  background:${pend?'#fff4e0':'#e6f7ef'};color:${pend?'#b06b00':'#1a7a4a'}">${f.estado}</span>
+              </td>
+            </tr>`;
+          }).join('')
+          : '<tr><td colspan="6" style="padding:28px;text-align:center;color:var(--texto-hint)">Nadie del personal ha pagado nada de su bolsa en este periodo.</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+    ${d.por_persona.length ? `
+    <div style="margin-top:16px;background:#fff;border:1px solid var(--borde,#e0e6ef);border-radius:10px;padding:14px;max-width:620px">
+      <div style="font-size:12px;font-weight:700;color:var(--azul-dark,#0B2545);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Detalle por persona</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <tr style="color:var(--texto-sub);font-size:11.5px">
+          <th style="text-align:left;padding:3px 0">Persona</th><th style="text-align:right">Pagado</th>
+          <th style="text-align:right">Pendiente</th><th style="text-align:right">Reembolsado</th></tr>
+        ${d.por_persona.map(p => `<tr>
+          <td style="padding:4px 0;border-bottom:1px solid #eef2f7">${ctaEsc(p.persona)}</td>
+          <td style="padding:4px 0;border-bottom:1px solid #eef2f7;text-align:right">${ctaFmt(p.pagado)}</td>
+          <td style="padding:4px 0;border-bottom:1px solid #eef2f7;text-align:right;color:var(--ambar,#b06b00);font-weight:600">${ctaFmt(p.pendiente)}</td>
+          <td style="padding:4px 0;border-bottom:1px solid #eef2f7;text-align:right;color:var(--verde,#1a7a4a)">${ctaFmt(p.reembolsado)}</td>
+        </tr>`).join('')}
+      </table>
+    </div>` : ''}`;
+}
+
+/* ── Saldos por persona ── */
+async function ctaRenderSaldos(cont) {
+  const d = await ctaApi('CONTA_SALDOS', { periodo_id: ctaPeriodoId });
+  if (d.status !== 'success') { cont.innerHTML = `<p style="color:var(--rojo)">${ctaEsc(d.message)}</p>`; return; }
+  const filas = d.data || [], t = d.totales;
+  const celda = (v, color) => `<td style="padding:6px 9px;border-bottom:1px solid #eef2f7;text-align:right;${color?`color:${color};font-weight:600`:''}">${v > 0 ? ctaFmt(v) : '—'}</td>`;
+
+  cont.innerHTML = `
+    <div style="background:#eef4ff;border:1px solid #c3d9f3;border-radius:8px;padding:10px 14px;font-size:12px;color:#0d2244;margin-bottom:14px">
+      Compara lo que se le entregó a cada persona contra lo que comprobó. Si le sobra, debe regresarlo;
+      si puso de su bolsa, hay que reembolsarle.
+    </div>
+    <div class="tabla-wrap" style="overflow-x:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <thead><tr style="background:var(--azul-dark,#0B2545);color:#fff">
+          <th style="padding:7px 9px;text-align:left;font-size:11.5px">Persona</th>
+          <th style="padding:7px 9px;text-align:right;font-size:11.5px">Entregado</th>
+          <th style="padding:7px 9px;text-align:right;font-size:11.5px">Gastado</th>
+          <th style="padding:7px 9px;text-align:right;font-size:11.5px">Saldo neto</th>
+          <th style="padding:7px 9px;text-align:right;font-size:11.5px">Debe regresar</th>
+          <th style="padding:7px 9px;text-align:right;font-size:11.5px">Se le debe</th>
+          <th style="padding:7px 9px;text-align:right;font-size:11.5px">Pendiente</th>
+          <th style="padding:7px 9px;text-align:right;font-size:11.5px">Reembolsado</th>
+        </tr></thead>
+        <tbody>
+          ${filas.length ? filas.map((f,i) => `
+            <tr style="background:${i%2 ? '#f7f9fc' : '#fff'}">
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7">${ctaEsc(f.persona)}${
+                f.en_catalogo ? '' : ' <span style="font-size:10px;color:var(--texto-hint)" title="Tiene movimientos pero ya no está en el catálogo de personal">(fuera del catálogo)</span>'}</td>
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7;text-align:right">${ctaFmt(f.entregado)}</td>
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7;text-align:right">${ctaFmt(f.gastado)}</td>
+              <td style="padding:6px 9px;border-bottom:1px solid #eef2f7;text-align:right;font-weight:700;color:${f.neto < 0 ? 'var(--rojo,#c62828)' : 'var(--verde,#1a7a4a)'}">${ctaFmt(f.neto)}</td>
+              ${celda(f.regresar, 'var(--verde,#1a7a4a)')}
+              ${celda(f.reembolsar, 'var(--rojo,#c62828)')}
+              ${celda(f.pendiente, 'var(--ambar,#b06b00)')}
+              ${celda(f.reembolsado, null)}
+            </tr>`).join('')
+          : '<tr><td colspan="8" style="padding:28px;text-align:center;color:var(--texto-hint)">Sin movimientos de personal en este periodo.</td></tr>'}
+        </tbody>
+        ${filas.length ? `<tfoot><tr style="background:#eef2f7;font-weight:700">
+          <td style="padding:7px 9px">TOTAL</td>
+          <td style="padding:7px 9px;text-align:right">${ctaFmt(t.entregado)}</td>
+          <td style="padding:7px 9px;text-align:right">${ctaFmt(t.gastado)}</td>
+          <td style="padding:7px 9px;text-align:right">${ctaFmt(t.neto)}</td>
+          <td style="padding:7px 9px;text-align:right">${ctaFmt(t.regresar)}</td>
+          <td style="padding:7px 9px;text-align:right">${ctaFmt(t.reembolsar)}</td>
+          <td style="padding:7px 9px;text-align:right">${ctaFmt(t.pendiente)}</td>
+          <td style="padding:7px 9px;text-align:right">${ctaFmt(t.reembolsado)}</td>
+        </tr></tfoot>` : ''}
+      </table>
+    </div>`;
+}
+
+
+/* ── Configuración: catálogos y periodos ── */
+async function ctaRenderConfig(cont) {
+  const d = await ctaApi('CONTA_CATALOGO', { todos: 1 });
+  ctaCat = (await ctaApi('CONTA_CATALOGO')).data || {};
+  const tipos = d.tipos || {}, datos = d.data || {};
+
+  cont.innerHTML = `
+    <div style="background:#eef4ff;border:1px solid #c3d9f3;border-radius:8px;padding:10px 14px;font-size:12px;color:#0d2244;margin-bottom:14px">
+      Lo que aquí se define alimenta los desplegables de captura. Renombrar un valor corrige también los
+      movimientos que ya lo usaban. Un valor que ya se usó no se borra: se desactiva, deja de ofrecerse y
+      los registros anteriores lo conservan.
+    </div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+      ${Object.entries(tipos).map(([tipo, etq]) => `
+        <div style="background:#fff;border:1px solid var(--borde,#e0e6ef);border-radius:10px;padding:14px;flex:1;min-width:250px">
+          <div style="font-size:12px;font-weight:700;color:var(--azul-dark,#0B2545);text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">${ctaEsc(etq)}</div>
+          ${(datos[tipo] || []).map(v => `
+            <div style="display:flex;align-items:center;gap:6px;padding:4px 0;border-bottom:1px solid #eef2f7">
+              <span style="flex:1;font-size:13px;${+v.activo ? '' : 'color:var(--texto-hint);text-decoration:line-through'}">${ctaEsc(v.valor)}</span>
+              ${+v.activo ? '' : '<span style="font-size:10px;color:var(--texto-hint)">inactivo</span>'}
+              <button onclick="ctaEditarCat(${v.id},'${tipo}',${JSON.stringify(v.valor).replace(/"/g,'&quot;')},${+v.activo})"
+                      style="background:var(--azul-light,#e8eef8);border:none;color:var(--azul,#0B2545);border-radius:5px;padding:3px 7px;font-size:11px;cursor:pointer">✎</button>
+              <button onclick="ctaBorrarCat(${v.id})"
+                      style="background:var(--rojo-light,#fdecea);border:none;color:var(--rojo,#c62828);border-radius:5px;padding:3px 7px;font-size:11px;cursor:pointer">🗑</button>
+            </div>`).join('') || '<div style="font-size:12px;color:var(--texto-hint)">Vacío.</div>'}
+          <button onclick="ctaEditarCat(0,'${tipo}','',1)" class="btn-sec"
+                  style="margin-top:9px;font-size:11.5px;padding:5px 11px">+ Agregar</button>
+        </div>`).join('')}
+    </div>
+
+    <div style="margin-top:18px;background:#fff;border:1px solid var(--borde,#e0e6ef);border-radius:10px;padding:14px;max-width:720px">
+      <div style="font-size:12px;font-weight:700;color:var(--azul-dark,#0B2545);text-transform:uppercase;letter-spacing:.04em;margin-bottom:9px">Periodos</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px">
+        <tr style="color:var(--texto-sub);font-size:11.5px">
+          <th style="text-align:left;padding:3px 0">Nombre</th><th style="text-align:left">Desde</th>
+          <th style="text-align:left">Hasta</th><th style="text-align:center">Estado</th><th></th></tr>
+        ${ctaPeriodos.map(p => `<tr>
+          <td style="padding:5px 0;border-bottom:1px solid #eef2f7">${ctaEsc(p.nombre)}</td>
+          <td style="padding:5px 0;border-bottom:1px solid #eef2f7">${ctaFecha(p.fecha_ini)}</td>
+          <td style="padding:5px 0;border-bottom:1px solid #eef2f7">${ctaFecha(p.fecha_fin)}</td>
+          <td style="padding:5px 0;border-bottom:1px solid #eef2f7;text-align:center">
+            <span style="font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;background:${+p.cerrado?'#eef2f7':'#e6f7ef'};color:${+p.cerrado?'#5a6472':'#1a7a4a'}">${+p.cerrado?'Cerrado':'Abierto'}</span></td>
+          <td style="padding:5px 0;border-bottom:1px solid #eef2f7;text-align:right;white-space:nowrap">
+            <button onclick="ctaAbrirPeriodo(${p.id})" style="background:var(--azul-light,#e8eef8);border:none;color:var(--azul,#0B2545);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer">✎</button>
+            <button onclick="ctaBorrarPeriodo(${p.id})" style="background:var(--rojo-light,#fdecea);border:none;color:var(--rojo,#c62828);border-radius:5px;padding:3px 8px;font-size:11px;cursor:pointer;margin-left:3px">🗑</button>
+          </td></tr>`).join('')}
+      </table>
+      <button onclick="ctaAbrirPeriodo(0)" class="btn-sec" style="margin-top:9px;font-size:11.5px;padding:5px 11px">+ Nuevo periodo</button>
+    </div>`;
+}
+
+async function ctaEditarCat(id, tipo, valor, activo) {
+  const nuevo = prompt(id ? 'Nuevo nombre:' : 'Valor a agregar:', valor || '');
+  if (nuevo === null) return;
+  if (!nuevo.trim()) { alert('El valor no puede quedar vacío.'); return; }
+  const payload = { id, tipo, valor: nuevo.trim(), activo };
+  if (id && !activo && confirm('Este valor está desactivado. ¿Volver a activarlo?')) payload.activo = 1;
+  const r = await ctaApi('CONTA_GUARDAR_CATALOGO', {}, 'POST', payload);
+  if (r.status !== 'success') { alert(r.message || 'No se pudo guardar.'); return; }
+  ctaRender();
+}
+
+async function ctaBorrarCat(id) {
+  if (!confirm('¿Quitar este valor del catálogo?\n\nSi ya se usó en algún movimiento sólo se desactivará, para no alterar lo capturado.')) return;
+  const r = await ctaApi('CONTA_ELIMINAR_CATALOGO', {}, 'POST', { id });
+  if (r.status !== 'success') { alert(r.message || 'No se pudo eliminar.'); return; }
+  if (r.desactivado) alert(r.message);
+  ctaRender();
+}
+
+async function ctaAbrirPeriodo(id) {
+  const p = ctaPeriodos.find(x => +x.id === +id) || {};
+  const nombre = prompt('Nombre del periodo:', p.nombre || `Ejercicio ${new Date().getFullYear()}`);
+  if (nombre === null) return;
+  const ini = prompt('Fecha inicial (aaaa-mm-dd), o vacío:', (p.fecha_ini || '').slice(0,10));
+  if (ini === null) return;
+  const fin = prompt('Fecha final (aaaa-mm-dd), o vacío:', (p.fecha_fin || '').slice(0,10));
+  if (fin === null) return;
+  const cerrado = id ? confirm('¿Dejar el periodo CERRADO?\n\nAceptar = cerrado (no admite capturas).\nCancelar = abierto.') : false;
+
+  const r = await ctaApi('CONTA_GUARDAR_PERIODO', {}, 'POST',
+    { id: +id || 0, nombre, fecha_ini: ini, fecha_fin: fin, cerrado: cerrado ? 1 : 0 });
+  if (r.status !== 'success') { alert(r.message || 'No se pudo guardar.'); return; }
+  if (!id) ctaPeriodoId = +r.id;
+  ctaIniciar();
+}
+
+async function ctaBorrarPeriodo(id) {
+  if (!confirm('¿Eliminar este periodo?')) return;
+  const r = await ctaApi('CONTA_ELIMINAR_PERIODO', {}, 'POST', { id });
+  if (r.status !== 'success') { alert(r.message || 'No se pudo eliminar.'); return; }
+  if (+id === ctaPeriodoId) ctaPeriodoId = 0;
+  ctaIniciar();
+}
+
 /* ── Tab admin switching ── */
 function verTabAdmin(id, btn) {
   document.querySelectorAll('.tab-sec').forEach(s => s.classList.remove('active'));
@@ -1204,6 +1730,7 @@ function verTabAdmin(id, btn) {
   if (id === 'smtp')  cargarSmtp();
   if (id === 'pagos') cargarPagos();
   if (id === 'ads')   cargarAnuncios();
+  if (id === 'conta') ctaIniciar();
 }
 
 /* ═══════════════════════════════════════

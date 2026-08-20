@@ -36,6 +36,7 @@ require_once __DIR__ . '/VerificacionIA.php';
 require_once __DIR__ . '/Arneses.php';
 require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
+require_once __DIR__ . '/Contabilidad.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -96,6 +97,7 @@ $cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuario
 $cliRH          = new ClienteRH($pdo);
 $pagosServicios = new PagosServicios($pdo);
 $anuncios       = new Anuncios($pdo);
+$conta       = new Contabilidad($pdo);
 $verifIA        = new VerificacionIA($pdo);
 $arneses        = new Arneses($pdo);
 $cliImpresion   = new ClienteImpresion($pdo);
@@ -646,6 +648,39 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->detalleSesion((int)($_GET['id'] ?? 0)));
+
+        // ── Contabilidad (sólo ADMIN: son cifras del negocio) ──
+        case 'CONTA_PERIODOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->periodos());
+
+        case 'CONTA_CATALOGO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->catalogo(empty($_GET['todos'])));
+
+        case 'CONTA_MOVIMIENTOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->listarMovimientos(
+                (string)($_GET['tipo'] ?? ''), (int)($_GET['periodo_id'] ?? 0), (string)($_GET['q'] ?? '')
+            ));
+
+        case 'CONTA_REEMBOLSOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->reembolsos((int)($_GET['periodo_id'] ?? 0)));
+
+        case 'CONTA_SALDOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->saldos((int)($_GET['periodo_id'] ?? 0)));
+
+        case 'CONTA_BALANCE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->balance((int)($_GET['periodo_id'] ?? 0)));
 
         case 'SUGERENCIAS_ACC':
             $usr = validarToken($pdo, $token);
@@ -1665,6 +1700,37 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->generarInforme((int)($payload['sesion_id'] ?? 0), $usr['usuario']));
+
+        // ── Contabilidad ──────────────────────────────────
+        case 'CONTA_GUARDAR_PERIODO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->guardarPeriodo($payload));
+
+        case 'CONTA_ELIMINAR_PERIODO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->eliminarPeriodo((int)($payload['id'] ?? 0)));
+
+        case 'CONTA_GUARDAR_CATALOGO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->guardarCatalogo($payload));
+
+        case 'CONTA_ELIMINAR_CATALOGO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->eliminarCatalogo((int)($payload['id'] ?? 0)));
+
+        case 'CONTA_GUARDAR_MOVIMIENTO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->guardarMovimiento((string)($payload['tipo'] ?? ''), $payload));
+
+        case 'CONTA_ELIMINAR_MOVIMIENTO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($conta->eliminarMovimiento((string)($payload['tipo'] ?? ''), (int)($payload['id'] ?? 0)));
 
         case 'SAVE_SMTP_CONFIG':
             $usr = validarToken($pdo, $token);
