@@ -14,6 +14,15 @@ define('SC_DB_USER', '');
 define('SC_DB_PASS', '');
 
 // ── Correo saliente (SMTP) ────────────────────────────────────────────
+//
+// YA NO HACE FALTA TOCAR ESTO: el correo saliente se configura desde el
+// propio panel de administración, en el botón «Correo saliente», que
+// además trae un botón para probar la conexión antes de guardar. Lo que
+// se guarde ahí manda sobre lo que diga este archivo.
+//
+// Estas constantes siguen funcionando como respaldo, y son útiles si se
+// prefiere dejar las credenciales fuera de la base de datos.
+//
 // COPIA AQUÍ los mismos valores que ya usa el sistema de certificaciones.
 // Están en el config.php de la RAÍZ del hosting, con estos nombres:
 //
@@ -51,6 +60,15 @@ define('SC_DB_PASS', '');
 // WhatsApp mucho más que el correo, así que suele ser el botón que más
 // respuestas genera. Formato internacional, sin espacios ni signos.
 // define('SC_WHATSAPP', '5215512345678');
+
+// ── Llave con la que se cifra la contraseña del buzón ─────────────────
+// La contraseña que se escribe en el panel se guarda cifrada. La llave
+// sale de aquí si se define; si no, el portal crea una sola vez el archivo
+// config/.clave-correo. No hace falta tocarlo.
+//
+// Si se cambia, las contraseñas ya guardadas dejan de poder leerse y hay
+// que volver a escribirlas en el panel.
+// define('SC_CLAVE_CIFRADO', 'cámbiala-por-una-cadena-larga-y-aleatoria');
 
 // ── Firma de los enlaces de los correos ───────────────────────────────
 // Los botones de "sí sigo interesado", "puedo empezar en 15 días", etc. van

@@ -156,6 +156,16 @@
   .destinatarios-caja strong { color: var(--azul-oscuro); }
   .destinatarios-caja .aviso { color: #92610B; display: block; margin-top: 5px; font-size: 12.5px; }
 
+  /* ── Correo saliente ──────────────────────────────────── */
+  .fila-campos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .fila-campos { grid-template-columns: 1fr; } }
+  .smtp-resultado {
+    border-radius: var(--r-sm); padding: 11px 14px; font-size: 13.5px;
+    line-height: 1.55; margin-top: 4px; overflow-wrap: anywhere;
+  }
+  .smtp-resultado.ok  { background: var(--verde-bg); color: #14663A; }
+  .smtp-resultado.mal { background: var(--rojo-bg);  color: #A5241B; }
+
   /* ── Selector de secciones del correo ─────────────────── */
   .bloques-caja {
     border: 1px solid var(--borde); border-radius: var(--r-sm);
@@ -261,6 +271,7 @@
         <button type="button" class="btn btn-primary btn-sm" id="btn-muro">Moderar muro</button>
         <button type="button" class="btn btn-outline btn-sm" id="btn-correo">Enviar correo</button>
         <button type="button" class="btn btn-outline btn-sm" id="btn-auto">Correo automático</button>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-smtp">Correo saliente</button>
         <button type="button" class="btn btn-outline btn-sm" id="btn-respuestas">Respuestas</button>
         <button type="button" class="btn btn-outline btn-sm" id="btn-agenda">Agenda</button>
         <button type="button" class="btn btn-outline btn-sm" id="btn-bitacora">Ver bitácora</button>
@@ -454,6 +465,86 @@
       <div class="modal-pie">
         <button type="button" class="btn btn-gris" onclick="scCerrarModal('modal-auto')">Cancelar</button>
         <button type="submit" class="btn btn-primary" id="a-guardar">Guardar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Correo saliente (SMTP) -->
+<div class="modal-fondo" id="modal-smtp">
+  <div class="modal modal-ancho" role="dialog" aria-modal="true" aria-labelledby="smtp-titulo">
+    <div class="modal-cabecera">
+      <h3 id="smtp-titulo">Correo saliente</h3>
+      <button type="button" class="modal-cerrar" aria-label="Cerrar" onclick="scCerrarModal('modal-smtp')">&times;</button>
+    </div>
+
+    <form id="form-smtp">
+      <div class="modal-cuerpo">
+        <div class="aviso-admin" id="smtp-estado-caja">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 6L2 7"/>
+          </svg>
+          <p id="smtp-estado">Cargando…</p>
+        </div>
+
+        <div class="campo">
+          <label for="s-host">Servidor de salida</label>
+          <input type="text" id="s-host" maxlength="190" placeholder="smtp.hostinger.com"
+                 autocomplete="off" spellcheck="false" required>
+          <div class="campo-ayuda">Los mismos datos que ya usa el sistema de gestión.</div>
+        </div>
+
+        <div class="fila-campos">
+          <div class="campo">
+            <label for="s-puerto">Puerto</label>
+            <input type="number" id="s-puerto" min="1" max="65535" value="465" required>
+          </div>
+          <div class="campo">
+            <label for="s-seguridad">Cifrado</label>
+            <select id="s-seguridad">
+              <option value="auto">Automático (según el puerto)</option>
+              <option value="ssl">SSL / TLS directo (465)</option>
+              <option value="tls">STARTTLS (587)</option>
+              <option value="ninguna">Sin cifrado</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="s-usuario">Usuario del buzón</label>
+          <input type="text" id="s-usuario" maxlength="190" placeholder="no-reply@avba.com.mx"
+                 autocomplete="off" spellcheck="false" required>
+        </div>
+
+        <div class="campo">
+          <label for="s-password">Contraseña</label>
+          <input type="password" id="s-password" maxlength="190" autocomplete="new-password">
+          <div class="campo-ayuda" id="s-password-ayuda">
+            Se guarda cifrada. Déjala en blanco para no cambiar la que ya está.
+          </div>
+        </div>
+
+        <div class="fila-campos">
+          <div class="campo">
+            <label for="s-remitente">Aparece como (correo)</label>
+            <input type="text" id="s-remitente" maxlength="190" placeholder="no-reply@avba.com.mx"
+                   autocomplete="off" spellcheck="false">
+          </div>
+          <div class="campo">
+            <label for="s-remitente-nombre">Aparece como (nombre)</label>
+            <input type="text" id="s-remitente-nombre" maxlength="120" placeholder="AVBA Socios Comerciales">
+          </div>
+        </div>
+
+        <div id="s-resultado"></div>
+      </div>
+
+      <div class="modal-pie">
+        <button type="button" class="btn btn-gris" onclick="scCerrarModal('modal-smtp')">Cancelar</button>
+        <button type="button" class="btn btn-outline" id="s-olvidar" hidden>Borrar y usar config.php</button>
+        <button type="button" class="btn btn-outline" id="s-probar">Probar conexión</button>
+        <button type="submit" class="btn btn-primary" id="s-guardar">Guardar</button>
       </div>
     </form>
   </div>
@@ -1395,6 +1486,142 @@ document.getElementById('form-auto').addEventListener('submit', async (e) => {
     scToast(err.message, 'error');
   } finally {
     btn.disabled = false;
+  }
+});
+
+/* ── Correo saliente (SMTP) ─────────────────────────────── */
+
+function leerSmtp() {
+  return {
+    host:             document.getElementById('s-host').value.trim(),
+    puerto:           document.getElementById('s-puerto').value,
+    seguridad:        document.getElementById('s-seguridad').value,
+    usuario:          document.getElementById('s-usuario').value.trim(),
+    password:         document.getElementById('s-password').value,
+    remitente:        document.getElementById('s-remitente').value.trim(),
+    remitente_nombre: document.getElementById('s-remitente-nombre').value.trim(),
+  };
+}
+
+function resultadoSmtp(texto, bien) {
+  document.getElementById('s-resultado').innerHTML =
+    texto ? `<div class="smtp-resultado ${bien ? 'ok' : 'mal'}">${scEsc(texto)}</div>` : '';
+}
+
+/** El texto de arriba: de dónde salen los ajustes que están funcionando. */
+function estadoSmtp(d) {
+  const caja = document.getElementById('smtp-estado');
+
+  if (!d.phpmailer) {
+    caja.innerHTML = 'No se encontró <strong>PHPMailer</strong> en el servidor, así que no se puede '
+      + 'usar SMTP. Los correos salen con la función <code>mail()</code> de PHP, que funciona pero '
+      + 'acaba en spam con frecuencia.';
+    return;
+  }
+  if (!d.configurado) {
+    caja.innerHTML = '<strong>Todavía no hay SMTP configurado.</strong> Mientras tanto los correos '
+      + 'salen con <code>mail()</code>, que suele acabar en spam. Llena los datos del buzón de '
+      + 'gestión y pulsa «Probar conexión».';
+    return;
+  }
+  caja.innerHTML = d.guardado_en_panel
+    ? 'Configurado <strong>desde este panel</strong>. Los correos salen por '
+      + `<strong>${scEsc(d.host)}:${Number(d.puerto)}</strong> como <strong>${scEsc(d.remitente)}</strong>.`
+    : 'Configurado en <code>config.php</code>. Los correos salen por '
+      + `<strong>${scEsc(d.host)}:${Number(d.puerto)}</strong>. `
+      + 'Si guardas aquí, lo de este panel manda sobre el archivo.';
+}
+
+async function cargarSmtp() {
+  resultadoSmtp('');
+  document.getElementById('smtp-estado').textContent = 'Cargando…';
+
+  try {
+    const d = await scGet('ADMIN_SMTP');
+    if (d.status !== 'success') {
+      document.getElementById('smtp-estado').textContent = d.message || 'No se pudo cargar.';
+      return;
+    }
+
+    document.getElementById('s-host').value = d.host || '';
+    document.getElementById('s-puerto').value = d.puerto || 465;
+    document.getElementById('s-seguridad').value = d.seguridad || 'auto';
+    document.getElementById('s-usuario').value = d.usuario || '';
+    document.getElementById('s-remitente').value = d.remitente || '';
+    document.getElementById('s-remitente-nombre').value = d.remitente_nombre || '';
+    document.getElementById('s-password').value = '';
+
+    // La contraseña guardada nunca vuelve al navegador; solo se dice si existe.
+    document.getElementById('s-password-ayuda').innerHTML = d.hay_password
+      ? 'Ya hay una contraseña guardada (cifrada). Déjala en blanco para no cambiarla.'
+      : 'Se guarda cifrada en la base, con la llave en un archivo del servidor.';
+
+    document.getElementById('s-olvidar').hidden = !d.guardado_en_panel;
+    estadoSmtp(d);
+  } catch (e) {
+    document.getElementById('smtp-estado').textContent = e.message;
+  }
+}
+
+document.getElementById('btn-smtp').addEventListener('click', () => {
+  scAbrirModal('modal-smtp');
+  cargarSmtp();
+});
+
+// Al cambiar el puerto se ajusta el cifrado, que es lo que casi siempre toca
+document.getElementById('s-puerto').addEventListener('change', () => {
+  const sel = document.getElementById('s-seguridad');
+  if (sel.value !== 'auto') return;
+  const p = Number(document.getElementById('s-puerto').value);
+  if (p === 465 || p === 587) sel.value = p === 465 ? 'ssl' : 'tls';
+});
+
+document.getElementById('s-probar').addEventListener('click', async () => {
+  const btn = document.getElementById('s-probar');
+  btn.disabled = true;
+  btn.textContent = 'Probando…';
+  resultadoSmtp('');
+
+  try {
+    const r = await scPost('ADMIN_SMTP_PROBAR', leerSmtp());
+    resultadoSmtp(r.message, r.status === 'success');
+  } catch (err) {
+    resultadoSmtp(err.message, false);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Probar conexión';
+  }
+});
+
+document.getElementById('form-smtp').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('s-guardar');
+  btn.disabled = true;
+
+  try {
+    const r = await scPost('ADMIN_SMTP_GUARDAR', leerSmtp());
+    scToast(r.message, r.status === 'success' ? 'ok' : 'error');
+    if (r.status === 'success') {
+      document.getElementById('s-password').value = '';
+      cargarSmtp();
+    }
+  } catch (err) {
+    scToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('s-olvidar').addEventListener('click', async () => {
+  if (!confirm('Se borran los ajustes guardados aquí y se vuelve a los de config.php.\n\n'
+             + 'Si config.php no los tiene, los correos pasarán a salir con mail(). ¿Continuar?')) return;
+
+  try {
+    const r = await scPost('ADMIN_SMTP_OLVIDAR', {});
+    scToast(r.message, r.status === 'success' ? 'ok' : 'error');
+    if (r.status === 'success') cargarSmtp();
+  } catch (err) {
+    scToast(err.message, 'error');
   }
 });
 

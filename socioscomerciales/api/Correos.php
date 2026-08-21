@@ -164,6 +164,247 @@ class ScCorreos {
         return $limpio;
     }
 
+    // ══════════════════════════════════════════════════════════
+    //  CORREO SALIENTE (SMTP) DESDE EL PANEL
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Ajustes actuales del correo saliente, para pintar el formulario.
+     *
+     * La contraseña NO viaja de vuelta al navegador: solo se dice si hay
+     * una guardada. Devolverla convertiría cualquier fallo del panel en
+     * una fuga de la contraseña del buzón.
+     */
+    public function smtpConfig(): array {
+        $a = scAjustesCorreo(true);
+
+        return [
+            'status'            => 'success',
+            'host'              => $a['host'],
+            'usuario'           => $a['usuario'],
+            'puerto'            => (int) $a['puerto'],
+            'seguridad'         => $a['seguridad'],
+            'remitente'         => $a['remitente'],
+            'remitente_nombre'  => $a['remitente_nombre'],
+            'hay_password'      => $a['password'] !== '',
+            'configurado'       => scSmtpConfigurado(),
+            'origen'            => $a['origen'],
+            'phpmailer'         => scCargarPhpMailer(),
+            'guardado_en_panel' => $this->hayAjustesGuardados(),
+        ];
+    }
+
+    private function hayAjustesGuardados(): bool {
+        try {
+            return (int) $this->pdo->query(
+                "SELECT COUNT(*) FROM sc_meta WHERE clave LIKE 'smtp\\_%'"
+            )->fetchColumn() > 0;
+        } catch (PDOException $e) {
+            return false;
+        }
+    }
+
+    /** Comprueba y normaliza lo que llega del formulario. */
+    private function validarSmtp(array $payload): array {
+        $host = scTexto($payload['host'] ?? null, 190);
+        if (!$host) return ['error' => 'Escribe el servidor de salida (por ejemplo smtp.hostinger.com).'];
+
+        // Un host con protocolo o barra es un error de copiar y pegar muy
+        // común, y PHPMailer falla luego con un mensaje que no lo explica.
+        $host = preg_replace('#^[a-z]+://#i', '', $host);
+        $host = trim(explode('/', $host)[0]);
+        if ($host === '' || !preg_match('/^[A-Za-z0-9._\-]+$/', $host)) {
+            return ['error' => 'El servidor de salida no tiene un formato válido.'];
+        }
+
+        $usuario = scTexto($payload['usuario'] ?? null, 190);
+        if (!$usuario) return ['error' => 'Escribe el usuario del buzón.'];
+
+        $puerto = (int) ($payload['puerto'] ?? 465);
+        if ($puerto < 1 || $puerto > 65535) return ['error' => 'El puerto no es válido.'];
+
+        $seguridad = (string) ($payload['seguridad'] ?? 'auto');
+        if (!in_array($seguridad, ['auto', 'ssl', 'tls', 'ninguna'], true)) $seguridad = 'auto';
+
+        $remitente = scTexto($payload['remitente'] ?? null, 190) ?: $usuario;
+        if (!scEsCorreoValido($remitente)) {
+            return ['error' => 'La dirección del remitente no es un correo válido.'];
+        }
+
+        $nombre = scTexto($payload['remitente_nombre'] ?? null, 120) ?: 'AVBA Socios Comerciales';
+
+        // Si se deja en blanco, se conserva la que ya estaba: el formulario
+        // nunca recibe la contraseña guardada, así que un campo vacío
+        // significa «no la cambies», no «bórrala».
+        $password = (string) ($payload['password'] ?? '');
+        if ($password === '') {
+            $password = scAjustesCorreo()['password'];
+            if ($password === '') return ['error' => 'Escribe la contraseña del buzón.'];
+        }
+
+        return [
+            'host'             => $host,
+            'usuario'          => $usuario,
+            'password'         => $password,
+            'puerto'           => $puerto,
+            'seguridad'        => $seguridad,
+            'remitente'        => $remitente,
+            'remitente_nombre' => $nombre,
+        ];
+    }
+
+    /**
+     * Prueba la conexión sin mandar nada.
+     *
+     * Se conecta y autentica, y ya. Es lo que hace falta para saber si las
+     * credenciales sirven, y el mensaje de error del servidor («535
+     * Authentication failed», «Connection refused») dice mucho más que un
+     * «no se pudo enviar» genérico.
+     */
+    public function probarSmtp(array $admin, array $payload): array {
+        $datos = $this->validarSmtp($payload);
+        if (isset($datos['error'])) return ['status' => 'error', 'message' => $datos['error']];
+
+        if (!scCargarPhpMailer()) {
+            return [
+                'status'  => 'error',
+                'message' => 'No se encontró PHPMailer en el servidor, así que no se puede usar SMTP. '
+                           . 'El portal seguirá mandando correos con la función mail() de PHP.',
+            ];
+        }
+
+        // Lo que va diciendo el servidor. Se recoge por el canal de
+        // depuración porque PHPMailer descarta la respuesta cruda antes de
+        // que se le pueda preguntar: cuando falla la autenticación, lo único
+        // que queda es un «Could not authenticate» que no distingue entre
+        // contraseña mal escrita, cuenta bloqueada o buzón que exige
+        // contraseña de aplicación. El «535 5.7.8 ...» del servidor sí.
+        $dialogo = [];
+
+        try {
+            $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+            $mail->isSMTP();
+            $mail->Host       = $datos['host'];
+            $mail->Port       = $datos['puerto'];
+            $mail->SMTPAuth   = true;
+            $mail->Username   = $datos['usuario'];
+            $mail->Password   = $datos['password'];
+            $mail->SMTPSecure = scCifradoSmtp($datos['seguridad'], $datos['puerto']);
+            $mail->Timeout    = 12;   // que el panel no se quede colgado
+
+            // Con Debugoutput como función, PHPMailer no imprime nada: si lo
+            // hiciera, se colaría en el JSON de la respuesta.
+            $mail->SMTPDebug  = \PHPMailer\PHPMailer\SMTP::DEBUG_SERVER;
+            $mail->Debugoutput = function ($linea) use (&$dialogo) { $dialogo[] = $linea; };
+
+            $conectado = $mail->smtpConnect();
+            if ($conectado) $mail->smtpClose();
+
+            if (!$conectado) {
+                return ['status' => 'error',
+                        'message' => 'No se pudo conectar. ' . $this->detalleSmtp($mail->ErrorInfo, $dialogo)];
+            }
+
+            return [
+                'status'  => 'success',
+                'message' => 'Conexión correcta con ' . $datos['host'] . ':' . $datos['puerto'] . '.',
+            ];
+
+        } catch (Throwable $e) {
+            return [
+                'status'  => 'error',
+                'message' => 'No se pudo conectar. ' . $this->detalleSmtp($e->getMessage(), $dialogo),
+            ];
+        }
+    }
+
+    /**
+     * Explicación del fallo, con la última queja literal del servidor.
+     *
+     * Del diálogo se rescata la última línea que empiece por un código de
+     * error SMTP (4xx o 5xx). Eso es lo que dice qué pasó de verdad.
+     */
+    private function detalleSmtp(string $resumen, array $dialogo): string {
+        $partes = [];
+
+        $resumen = trim($resumen);
+        if ($resumen !== '') $partes[] = rtrim($resumen, ' .') . '.';
+
+        $queja = '';
+        foreach ($dialogo as $linea) {
+            // Las líneas del servidor llegan como "SERVER -> CLIENT: 535 ..."
+            $limpia = trim(preg_replace('/^.*?(?:SERVER -> CLIENT:|<-)\s*/s', '', (string) $linea));
+            if (preg_match('/^[45]\d\d(?:[ -]|$)/', $limpia)) $queja = $limpia;
+        }
+
+        if ($queja !== '') {
+            $queja = mb_substr(preg_replace('/\s+/', ' ', $queja), 0, 180);
+            if (stripos($resumen, $queja) === false) {
+                $partes[] = 'El servidor respondió: «' . $queja . '».';
+            }
+        }
+
+        return $partes ? implode(' ', $partes) : 'El servidor no respondió.';
+    }
+
+    /** Guarda los ajustes. La contraseña va cifrada. */
+    public function guardarSmtp(array $admin, array $payload): array {
+        $datos = $this->validarSmtp($payload);
+        if (isset($datos['error'])) return ['status' => 'error', 'message' => $datos['error']];
+
+        try {
+            foreach ($datos as $campo => $valor) {
+                $this->guardarMeta('smtp_' . $campo,
+                    $campo === 'password' ? scCifrar((string) $valor) : (string) $valor);
+            }
+        } catch (Throwable $e) {
+            error_log('ScCorreos::guardarSmtp: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudieron guardar los ajustes del correo.'];
+        }
+
+        // Los ajustes viejos siguen en memoria hasta que se recargan
+        scAjustesCorreo(true);
+
+        $this->anotar($admin, 'Correo saliente configurado: ' . $datos['usuario'] . '@' . $datos['host']);
+
+        return [
+            'status'  => 'success',
+            'message' => 'Ajustes guardados. Manda una prueba para confirmar que llegan.',
+        ];
+    }
+
+    /** Vuelve a lo que diga config.php, borrando lo guardado en el panel. */
+    public function olvidarSmtp(array $admin): array {
+        try {
+            $this->pdo->exec("DELETE FROM sc_meta WHERE clave LIKE 'smtp\\_%'");
+        } catch (PDOException $e) {
+            return ['status' => 'error', 'message' => 'No se pudieron borrar los ajustes.'];
+        }
+
+        scAjustesCorreo(true);
+        $this->anotar($admin, 'Ajustes de correo del panel borrados');
+
+        return [
+            'status'  => 'success',
+            'message' => scSmtpConfigurado()
+                ? 'Borrados. Vuelve a usarse la configuración de config.php.'
+                : 'Borrados. Ya no hay SMTP configurado: los correos saldrán con mail().',
+        ];
+    }
+
+    /** Apunte en la bitácora. Nunca debe tumbar la operación. */
+    private function anotar(array $admin, string $detalle): void {
+        try {
+            $this->pdo->prepare(
+                "INSERT INTO sc_admin_log
+                    (admin_id, admin_correo, accion, usuario_id, usuario_correo, detalle, ip)
+                 VALUES (?, ?, 'correo_smtp', NULL, NULL, ?, ?)"
+            )->execute([(int) $admin['id'], $admin['correo'], mb_substr($detalle, 0, 255), scIpCliente()]);
+        } catch (PDOException $e) {
+            error_log('ScCorreos::anotar: ' . $e->getMessage());
+        }
+    }
+
     /**
      * Manda una sola copia a quien está redactando, para que vea cómo llega
      * antes de escribirle a todo el padrón. Sin esto, la única forma de

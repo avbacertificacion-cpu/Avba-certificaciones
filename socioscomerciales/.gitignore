@@ -1,6 +1,10 @@
 # Configuración local con credenciales reales — NO subir al repo
 config/config.php
 
+# Llave con la que se cifra la contraseña del buzón. Solo en el servidor:
+# si se pierde, hay que volver a escribir la contraseña en el panel.
+config/.clave-correo
+
 # Uploads generados por usuarios
 uploads/cv/*
 uploads/fotos/*

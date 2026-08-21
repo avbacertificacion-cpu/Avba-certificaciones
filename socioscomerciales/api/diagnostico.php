@@ -24,17 +24,27 @@ function scDiagnostico(): array {
             'fileinfo'  => extension_loaded('fileinfo'),
             'gd'        => extension_loaded('gd'),
         ],
-        'correo' => [
-            'funcion_mail_disponible' => function_exists('mail'),
-            'remitente'               => defined('SC_MAIL_FROM') ? SC_MAIL_FROM : '(sin definir)',
-            // Sin SMTP los correos salen por mail() y suelen acabar en spam
-            'smtp_configurado'        => scSmtpConfigurado(),
-            'smtp_host'               => defined('SC_MAIL_HOST') ? SC_MAIL_HOST : '(sin definir)',
-            'smtp_puerto'             => defined('SC_MAIL_PORT') ? SC_MAIL_PORT : '(por defecto 465)',
-            'phpmailer_encontrado'    => scCargarPhpMailer(),
-            'metodo_de_envio'         => (scSmtpConfigurado() && scCargarPhpMailer())
-                                          ? 'SMTP autenticado' : 'mail() de PHP',
-        ],
+        // Se informa de los ajustes que están funcionando de verdad, que
+        // pueden venir del panel o de config.php. Mirar solo las constantes
+        // haría que el diagnóstico dijera "sin definir" con el correo
+        // perfectamente configurado desde la administración.
+        'correo' => (function () {
+            $a = scAjustesCorreo();
+            return [
+                'funcion_mail_disponible' => function_exists('mail'),
+                'remitente'               => $a['remitente'],
+                // Sin SMTP los correos salen por mail() y suelen acabar en spam
+                'smtp_configurado'        => scSmtpConfigurado(),
+                'smtp_host'               => $a['host'] !== '' ? $a['host'] : '(sin definir)',
+                'smtp_puerto'             => $a['puerto'],
+                'smtp_usuario'            => $a['usuario'] !== '' ? $a['usuario'] : '(sin definir)',
+                'smtp_cifrado'            => $a['seguridad'],
+                'ajustes_desde'           => $a['origen'] === 'panel' ? 'el panel de administración' : 'config.php',
+                'phpmailer_encontrado'    => scCargarPhpMailer(),
+                'metodo_de_envio'         => (scSmtpConfigurado() && scCargarPhpMailer())
+                                              ? 'SMTP autenticado' : 'mail() de PHP',
+            ];
+        })(),
         'automaticos' => [
             'cron_clave_definida' => defined('SC_CRON_CLAVE') && SC_CRON_CLAVE !== '',
             'url_cron'            => scUrlBase() . '/api/cron.php?clave=...',

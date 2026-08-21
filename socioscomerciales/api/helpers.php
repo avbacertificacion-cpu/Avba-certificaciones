@@ -645,18 +645,152 @@ function scBorrarArchivo(?string $urlRelativa): void {
     if (is_file($ruta)) @unlink($ruta);
 }
 
+// ══════════════════════════════════════════════════════════════
+//  CIFRADO DE LA CONTRASEÑA DEL BUZÓN
+//
+//  La contraseña del SMTP no se puede guardar como un hash: el servidor
+//  tiene que poder leerla para autenticarse. Lo que sí se puede es que un
+//  volcado de la base —una inyección, una copia de seguridad que se
+//  escapa— no la entregue en claro. Por eso el texto cifrado vive en la
+//  base y la llave vive en un archivo, fuera de ella.
+//
+//  Contra alguien que ya tiene acceso al servidor esto no protege, y no
+//  pretende hacerlo: quien puede leer el archivo puede descifrarla.
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * Llave de cifrado. De SC_CLAVE_CIFRADO si está definida; si no, de un
+ * archivo que se crea solo la primera vez.
+ *
+ * El archivo va en config/, que no se versiona y que el despliegue no pisa
+ * porque no existe en el repositorio. Si se pierde, las contraseñas
+ * guardadas dejan de poder leerse y hay que volver a escribirlas — que es
+ * exactamente lo que debe pasar.
+ */
+function scClaveCifrado(): string {
+    static $clave = null;
+    if ($clave !== null) return $clave;
+
+    if (defined('SC_CLAVE_CIFRADO') && SC_CLAVE_CIFRADO !== '') {
+        return $clave = hash('sha256', SC_CLAVE_CIFRADO, true);
+    }
+
+    $ruta = __DIR__ . '/../config/.clave-correo';
+
+    if (is_file($ruta)) {
+        $guardada = trim((string) @file_get_contents($ruta));
+        if ($guardada !== '') return $clave = hash('sha256', $guardada, true);
+    }
+
+    $nueva = bin2hex(random_bytes(32));
+    if (@file_put_contents($ruta, $nueva, LOCK_EX) === false) {
+        throw new RuntimeException('No se pudo crear la llave de cifrado en config/.');
+    }
+    @chmod($ruta, 0600);
+
+    return $clave = hash('sha256', $nueva, true);
+}
+
+/** Cifra un texto. Devuelve base64 de iv + etiqueta + criptograma. */
+function scCifrar(string $texto): string {
+    if ($texto === '') return '';
+
+    $iv  = random_bytes(12);                  // GCM usa 96 bits
+    $tag = '';
+    $cripto = openssl_encrypt($texto, 'aes-256-gcm', scClaveCifrado(),
+                              OPENSSL_RAW_DATA, $iv, $tag);
+
+    if ($cripto === false) throw new RuntimeException('No se pudo cifrar la contraseña.');
+
+    return base64_encode($iv . $tag . $cripto);
+}
+
+/** Descifra lo que produjo scCifrar. Cadena vacía si no se puede. */
+function scDescifrar(string $blob): string {
+    if ($blob === '') return '';
+
+    $crudo = base64_decode($blob, true);
+    if ($crudo === false || strlen($crudo) < 29) return '';
+
+    $iv     = substr($crudo, 0, 12);
+    $tag    = substr($crudo, 12, 16);
+    $cripto = substr($crudo, 28);
+
+    // GCM comprueba la etiqueta: si la llave cambió o alguien tocó el
+    // texto cifrado, esto devuelve false en vez de basura.
+    $texto = openssl_decrypt($cripto, 'aes-256-gcm', scClaveCifrado(),
+                             OPENSSL_RAW_DATA, $iv, $tag);
+
+    return $texto === false ? '' : $texto;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  AJUSTES DEL CORREO SALIENTE
+// ══════════════════════════════════════════════════════════════
+
+/** Valores del correo saliente que se pueden guardar desde el panel. */
+const SC_CLAVES_SMTP = ['host', 'usuario', 'password', 'puerto', 'seguridad', 'remitente', 'remitente_nombre'];
+
+/**
+ * Ajustes del correo saliente, ya resueltos.
+ *
+ * Manda lo que se haya guardado desde el panel; lo que falte se completa
+ * con las constantes de config.php. Se hace en este orden para que quien
+ * ya tenía el config lleno siga funcionando sin tocar nada, y para que
+ * cambiar algo desde el panel no obligue a entrar por FTP.
+ */
+function scAjustesCorreo(bool $recargar = false): array {
+    static $cache = null;
+    if ($cache !== null && !$recargar) return $cache;
+
+    // Punto de partida: config.php
+    $ajustes = [
+        'host'             => defined('SC_MAIL_HOST') ? (string) SC_MAIL_HOST : '',
+        'usuario'          => defined('SC_MAIL_USER') ? (string) SC_MAIL_USER : '',
+        'password'         => defined('SC_MAIL_PASS') ? (string) SC_MAIL_PASS : '',
+        'puerto'           => defined('SC_MAIL_PORT') ? (int) SC_MAIL_PORT : 465,
+        'seguridad'        => 'auto',
+        'remitente'        => SC_MAIL_FROM,
+        'remitente_nombre' => SC_MAIL_FROM_NOMBRE,
+        'origen'           => 'config',
+    ];
+
+    // Encima, lo guardado desde el panel
+    try {
+        if (function_exists('scDB')) {
+            $stmt = scDB()->query("SELECT clave, valor FROM sc_meta WHERE clave LIKE 'smtp\\_%'");
+            foreach ($stmt->fetchAll() as $fila) {
+                $campo = substr($fila['clave'], 5);
+                if (!in_array($campo, SC_CLAVES_SMTP, true)) continue;
+
+                $valor = $campo === 'password' ? scDescifrar($fila['valor']) : $fila['valor'];
+                if ($valor === '') continue;
+
+                $ajustes[$campo] = $campo === 'puerto' ? (int) $valor : $valor;
+                $ajustes['origen'] = 'panel';
+            }
+        }
+    } catch (Throwable $e) {
+        // Si la base no responde, se sigue con lo de config.php: mejor
+        // mandar el correo con la configuración vieja que no mandarlo.
+        error_log('scAjustesCorreo: ' . $e->getMessage());
+    }
+
+    return $cache = $ajustes;
+}
+
 /**
  * ¿Está configurado el envío por SMTP?
  *
  * El sistema de certificaciones manda sus correos con PHPMailer por SMTP
  * autenticado, no con mail(). Un correo autenticado con SPF/DKIM del dominio
  * llega a la bandeja de entrada; uno de mail() acaba en spam con frecuencia.
- * Aquí se usa el mismo servidor, con las credenciales copiadas a SC_MAIL_*.
+ * Aquí se usa el mismo servidor: las credenciales se escriben en el panel de
+ * administración, o se copian a las constantes SC_MAIL_* de config.php.
  */
 function scSmtpConfigurado(): bool {
-    return defined('SC_MAIL_HOST') && SC_MAIL_HOST !== ''
-        && defined('SC_MAIL_USER') && SC_MAIL_USER !== ''
-        && defined('SC_MAIL_PASS') && SC_MAIL_PASS !== '';
+    $a = scAjustesCorreo();
+    return $a['host'] !== '' && $a['usuario'] !== '' && $a['password'] !== '';
 }
 
 /**
@@ -696,8 +830,9 @@ function scEnviarCorreo(string $para, string $asunto, string $html): bool {
         error_log('scEnviarCorreo: SMTP falló, se intenta con mail()');
     }
 
-    $remitente = SC_MAIL_FROM;
-    $nombre    = SC_MAIL_FROM_NOMBRE;
+    $ajustes   = scAjustesCorreo();
+    $remitente = $ajustes['remitente'];
+    $nombre    = $ajustes['remitente_nombre'];
 
     $cabeceras = [
         'MIME-Version: 1.0',
@@ -718,6 +853,25 @@ function scEnviarCorreo(string $para, string $asunto, string $html): bool {
 }
 
 /**
+ * Cómo se cifra la conexión.
+ *
+ * En «auto» se deduce del puerto, que es lo que acierta casi siempre: 465
+ * es SMTPS (TLS desde el saludo) y 587 es STARTTLS. Se deja elegir a mano
+ * porque algunos servidores usan puertos raros y entonces adivinar falla.
+ */
+function scCifradoSmtp(string $seguridad, int $puerto): string {
+    $ssl   = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
+    $tls   = \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
+
+    switch ($seguridad) {
+        case 'ssl':     return $ssl;
+        case 'tls':     return $tls;
+        case 'ninguna': return '';
+        default:        return $puerto === 465 ? $ssl : $tls;
+    }
+}
+
+/**
  * Envío por SMTP con PHPMailer.
  *
  * La conexión se reutiliza entre llamadas (SMTPKeepAlive): en un envío masivo,
@@ -725,26 +879,30 @@ function scEnviarCorreo(string $para, string $asunto, string $html): bool {
  * tiempo total y algunos servidores lo toman por abuso.
  */
 function scEnviarPorSmtp(string $para, string $asunto, string $html): bool {
-    static $mail = null;
+    static $mail  = null;
+    static $huella = '';
+
+    $ajustes = scAjustesCorreo();
+
+    // Si los ajustes cambiaron desde el panel, la conexión guardada ya no
+    // vale: seguiría autenticada contra el servidor viejo.
+    $actual = md5(serialize($ajustes));
+    if ($actual !== $huella) { $mail = null; $huella = $actual; }
 
     try {
         if ($mail === null) {
             $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
             $mail->isSMTP();
-            $mail->Host       = SC_MAIL_HOST;
+            $mail->Host       = $ajustes['host'];
             $mail->SMTPAuth   = true;
-            $mail->Username   = SC_MAIL_USER;
-            $mail->Password   = SC_MAIL_PASS;
-            $mail->Port       = defined('SC_MAIL_PORT') ? (int) SC_MAIL_PORT : 465;
+            $mail->Username   = $ajustes['usuario'];
+            $mail->Password   = $ajustes['password'];
+            $mail->Port       = (int) $ajustes['puerto'];
             $mail->CharSet    = 'UTF-8';
             $mail->SMTPKeepAlive = true;
+            $mail->SMTPSecure = scCifradoSmtp($ajustes['seguridad'], (int) $ajustes['puerto']);
 
-            // El puerto 465 es SMTPS (TLS desde el saludo); el 587 es STARTTLS.
-            $mail->SMTPSecure = $mail->Port === 587
-                ? \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS
-                : \PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS;
-
-            $mail->setFrom(SC_MAIL_FROM, SC_MAIL_FROM_NOMBRE);
+            $mail->setFrom($ajustes['remitente'], $ajustes['remitente_nombre']);
             $mail->isHTML(true);
         }
 

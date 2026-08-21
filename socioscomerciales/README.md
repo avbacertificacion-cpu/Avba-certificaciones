@@ -246,6 +246,40 @@ La conexión SMTP se **reutiliza entre correos** (`SMTPKeepAlive`): abrirla y
 cerrarla en cada uno multiplica el tiempo de un envío masivo y algunos
 servidores lo toman por abuso.
 
+### Configurarlo desde el panel
+
+Botón **"Correo saliente"**. Servidor, puerto, cifrado, usuario, contraseña y
+cómo aparece el remitente, con un botón de **"Probar conexión"** que se conecta
+y autentica sin mandar nada.
+
+Ese botón es la mitad del valor de la pantalla: cuando algo falla, enseña la
+respuesta literal del servidor —`535 5.7.8 Authentication credentials
+invalid`— en vez de un "no se pudo enviar". PHPMailer resume cualquier fallo de
+autenticación en un `Could not authenticate` que no distingue entre contraseña
+mal escrita, cuenta bloqueada o buzón que exige contraseña de aplicación, y
+además descarta la respuesta cruda antes de que se le pueda preguntar; por eso
+el diálogo se recoge por el canal de depuración (`Debugoutput` como función,
+para que no se cuele en el JSON de la respuesta).
+
+**La contraseña se guarda cifrada** con AES-256-GCM. El texto cifrado vive en
+`sc_meta`; la llave vive en `config/.clave-correo`, fuera de la base y fuera
+del repositorio. Así un volcado de la base —una inyección, una copia de
+seguridad que se escapa— no entrega la contraseña del buzón. Contra alguien que
+ya tiene acceso al servidor esto no protege y no pretende hacerlo: quien puede
+leer el archivo puede descifrarla. Como el envío necesita la contraseña en
+claro para autenticarse, un hash no es una opción.
+
+La contraseña **nunca vuelve al navegador**: el panel solo recibe si hay una
+guardada. Dejar el campo en blanco al guardar significa "no la cambies".
+
+**Precedencia**: lo guardado en el panel manda sobre las constantes `SC_MAIL_*`
+de `config.php`. Así quien ya tenía el archivo lleno sigue funcionando sin tocar
+nada, y cambiar algo no obliga a entrar por FTP. El botón **"Borrar y usar
+config.php"** deshace lo del panel.
+
+Cambiar los ajustes descarta la conexión SMTP guardada en memoria
+(`SMTPKeepAlive`), que si no seguiría autenticada contra el servidor viejo.
+
 ## Correos desde administración
 
 ### Envío masivo

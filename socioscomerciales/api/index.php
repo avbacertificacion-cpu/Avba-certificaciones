@@ -433,6 +433,10 @@ if ($method === 'GET') {
             scSesionAdmin($pdo, $token);
             scRespuesta($admin->agenda());
 
+        case 'ADMIN_SMTP':
+            scSesionAdmin($pdo, $token);
+            scRespuesta($correos->smtpConfig());
+
         // ── Candidatos ───────────────────────────────────────
         case 'BUSCAR_CANDIDATOS':
             scSesionVerificada($pdo, $token, 'empresa');
@@ -642,6 +646,18 @@ if ($method === 'POST') {
         case 'ADMIN_AGENDA_BORRAR':
             $a = scSesionAdmin($pdo, $token);
             scRespuesta($admin->borrarFranja($a, (int) ($payload['id'] ?? 0), $payload));
+
+        case 'ADMIN_SMTP_PROBAR':
+            $a = scSesionAdmin($pdo, $token);
+            scRespuesta($correos->probarSmtp($a, $payload));
+
+        case 'ADMIN_SMTP_GUARDAR':
+            $a = scSesionAdmin($pdo, $token);
+            scRespuesta($correos->guardarSmtp($a, $payload));
+
+        case 'ADMIN_SMTP_OLVIDAR':
+            $a = scSesionAdmin($pdo, $token);
+            scRespuesta($correos->olvidarSmtp($a));
 
         case 'ADMIN_AUTO_GUARDAR':
             $usr = scSesionAdmin($pdo, $token);
