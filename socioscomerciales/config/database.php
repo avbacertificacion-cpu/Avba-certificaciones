@@ -9,7 +9,7 @@
 require_once __DIR__ . '/config.php';
 
 /** Versión actual del esquema. Subir al añadir migraciones. */
-const SC_SCHEMA_VERSION = 11;
+const SC_SCHEMA_VERSION = 12;
 
 class ScDatabase {
     private static ?PDO $instance = null;
@@ -76,6 +76,7 @@ class ScDatabase {
             if ($version < 9) self::migrarA9($pdo);
             if ($version < 10) self::migrarA10($pdo);
             if ($version < 11) self::migrarA11($pdo);
+            if ($version < 12) self::migrarA12($pdo);
 
             $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
                         ON DUPLICATE KEY UPDATE valor = '" . SC_SCHEMA_VERSION . "'");
@@ -130,7 +131,7 @@ class ScDatabase {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS sc_meta (
                 clave VARCHAR(50) NOT NULL PRIMARY KEY,
-                valor VARCHAR(255) NOT NULL
+                valor TEXT NOT NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
@@ -638,6 +639,21 @@ class ScDatabase {
         try {
             $pdo->exec("CREATE INDEX idx_sc_usuarios_auto ON sc_usuarios (auto_semana_enviado, creado)");
         } catch (PDOException $e) { /* ya existe */ }
+    }
+
+    /**
+     * sc_meta.valor nació como VARCHAR(255) para guardar cosas diminutas
+     * (schema_version). Ahora también guarda la plantilla del correo
+     * automático, que admite hasta 5000 caracteres: con 255 el panel de
+     * administración devolvía un error 500 al pulsar «Guardar» — la
+     * plantilla por defecto ya pasa de 255 por sí sola.
+     */
+    private static function migrarA12(PDO $pdo): void {
+        try {
+            $pdo->exec("ALTER TABLE sc_meta MODIFY valor TEXT NOT NULL");
+        } catch (PDOException $e) {
+            error_log('migrarA12: ' . $e->getMessage());
+        }
     }
 
     /** Añade una columna solo si aún no existe. */

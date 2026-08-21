@@ -626,6 +626,11 @@ function scEnviarPorSmtp(string $para, string $asunto, string $html): bool {
         $mail->Subject = $asunto;
         $mail->Body    = $html;
 
+        // Versión en texto plano. No es un adorno: un correo que solo lleva
+        // HTML puntúa peor en los filtros antispam, y es lo único que ven los
+        // clientes con las imágenes y el HTML desactivados.
+        $mail->AltBody = $mail->html2text($html, false);
+
         return $mail->send();
     } catch (Throwable $e) {
         error_log('scEnviarPorSmtp: ' . $e->getMessage());
