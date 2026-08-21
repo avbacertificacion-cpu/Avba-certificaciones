@@ -54,6 +54,133 @@ const SC_BCRYPT_COSTE = 11;
  */
 const SC_HASH_RELLENO = '$2y$11$lcAQapTbrPGi2hDAEi/OwO8yxp0FOpGp3aw/u752c3uwLeRDZjERy';
 
+/** Cuántos días vale un enlace de los que van dentro de un correo. */
+const SC_FIRMA_TTL_DIAS = 60;
+
+/**
+ * Secreto con el que se firman los enlaces de los correos.
+ *
+ * Si config.php define SC_FIRMA_CLAVE, manda esa. Si no, se genera una vez y
+ * se guarda en sc_meta. Se hace así para que la función salga andando sin
+ * obligar a tocar el config del servidor: un secreto que hay que configurar a
+ * mano es un secreto que acaba sin configurar, y entonces no habría firma.
+ *
+ * Cambiar el secreto invalida los enlaces ya enviados. Es justo lo que se
+ * quiere si alguna vez se filtra.
+ */
+function scSecretoFirma(PDO $pdo): string {
+    static $secreto = null;
+    if ($secreto !== null) return $secreto;
+
+    if (defined('SC_FIRMA_CLAVE') && SC_FIRMA_CLAVE !== '') {
+        return $secreto = SC_FIRMA_CLAVE;
+    }
+
+    try {
+        $stmt = $pdo->query("SELECT valor FROM sc_meta WHERE clave = 'firma_secreto'");
+        $guardado = $stmt->fetchColumn();
+        if (is_string($guardado) && $guardado !== '') return $secreto = $guardado;
+
+        $nuevo = bin2hex(random_bytes(32));
+        // INSERT IGNORE, no INSERT: si dos peticiones simultáneas llegan aquí
+        // a la vez, la segunda no debe pisar el secreto de la primera — los
+        // enlaces que esta ya hubiera firmado dejarían de valer.
+        $pdo->prepare("INSERT IGNORE INTO sc_meta (clave, valor) VALUES ('firma_secreto', ?)")
+            ->execute([$nuevo]);
+
+        $stmt = $pdo->query("SELECT valor FROM sc_meta WHERE clave = 'firma_secreto'");
+        return $secreto = (string) ($stmt->fetchColumn() ?: $nuevo);
+    } catch (PDOException $e) {
+        error_log('scSecretoFirma: ' . $e->getMessage());
+        // Sin secreto estable no se puede firmar nada. Vale más romper el
+        // enlace que emitir uno que cualquiera pueda falsificar.
+        throw new RuntimeException('No se pudo preparar la firma de los enlaces.');
+    }
+}
+
+/** base64 apto para URL: sin +, sin / y sin relleno. */
+function scBase64Url(string $bin): string {
+    return rtrim(strtr(base64_encode($bin), '+/', '-_'), '=');
+}
+
+function scBase64UrlDecode(string $texto): string {
+    return (string) base64_decode(strtr($texto, '-_', '+/'), true);
+}
+
+/**
+ * Arma el token de un enlace de correo.
+ *
+ * Lleva a quién va dirigido, qué se le pregunta, qué respuesta representa y
+ * hasta cuándo vale, todo firmado. Así una persona puede contestar desde el
+ * correo sin escribir la contraseña, y aun así nadie puede contestar por
+ * ella ni cambiar el número de usuario del enlace que le llegó.
+ */
+function scFirmarEnlace(PDO $pdo, int $usuarioId, string $tipo, string $valor, ?int $ttlDias = null): string {
+    $carga = scBase64Url(json_encode([
+        'u' => $usuarioId,
+        't' => $tipo,
+        'v' => $valor,
+        'x' => time() + (($ttlDias ?? SC_FIRMA_TTL_DIAS) * 86400),
+    ], JSON_UNESCAPED_UNICODE));
+
+    $firma = scBase64Url(hash_hmac('sha256', $carga, scSecretoFirma($pdo), true));
+
+    return $carga . '.' . $firma;
+}
+
+/**
+ * Comprueba un token y devuelve su contenido, o null si no es de fiar.
+ * Devuelve ['caducado' => true] cuando la firma es buena pero pasó la fecha,
+ * para poder decírselo a la persona en vez de soltarle un error genérico.
+ */
+function scVerificarEnlace(PDO $pdo, ?string $token): ?array {
+    if (!is_string($token) || $token === '') return null;
+
+    $partes = explode('.', $token);
+    if (count($partes) !== 2) return null;
+
+    [$carga, $firma] = $partes;
+
+    $esperada = scBase64Url(hash_hmac('sha256', $carga, scSecretoFirma($pdo), true));
+    if (!hash_equals($esperada, $firma)) return null;
+
+    $datos = json_decode(scBase64UrlDecode($carga), true);
+    if (!is_array($datos) || !isset($datos['u'], $datos['t'], $datos['v'], $datos['x'])) return null;
+
+    if ((int) $datos['x'] < time()) {
+        return ['caducado' => true, 'usuario_id' => (int) $datos['u']];
+    }
+
+    return [
+        'caducado'   => false,
+        'usuario_id' => (int) $datos['u'],
+        'tipo'       => (string) $datos['t'],
+        'valor'      => (string) $datos['v'],
+    ];
+}
+
+/** URL completa de un enlace de respuesta, lista para meter en el correo. */
+function scUrlRespuesta(PDO $pdo, int $usuarioId, string $tipo, string $valor): string {
+    return scUrlBase() . '/r.php?t=' . scFirmarEnlace($pdo, $usuarioId, $tipo, $valor);
+}
+
+/**
+ * Folio de seguimiento de una cuenta.
+ *
+ * Es el número de usuario con formato, no un dato nuevo: así no hay una
+ * secuencia más que mantener y el folio se puede calcular en cualquier sitio
+ * sin consultar nada.
+ */
+function scFolio(int $usuarioId): string {
+    return 'SC-' . str_pad((string) $usuarioId, 6, '0', STR_PAD_LEFT);
+}
+
+/** Al revés: del folio al número de usuario. 0 si el folio no tiene forma. */
+function scFolioAId(string $folio): int {
+    if (!preg_match('/^\s*(?:SC-)?0*(\d{1,9})\s*$/i', $folio, $m)) return 0;
+    return (int) $m[1];
+}
+
 /**
  * ¿Este correo es de administración?
  *
@@ -641,10 +768,168 @@ function scEnviarPorSmtp(string $para, string $asunto, string $html): bool {
     }
 }
 
+// ══════════════════════════════════════════════════════════════
+//  BLOQUES DE CORREO
+//
+//  Todo va en tablas con estilos en línea. No es descuido: Outlook sigue
+//  maquetando con el motor de Word, que ignora flexbox, grid y casi
+//  cualquier hoja de estilo, así que lo que aquí parece anticuado es lo
+//  único que se ve igual en todas partes.
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * Fecha en castellano, sin depender de la configuración regional.
+ *
+ * strftime está obsoleto desde PHP 8.1 e IntlDateFormatter necesita la
+ * extensión intl, que en hosting compartido no siempre está. Con dos
+ * arreglos se acaba el problema.
+ */
+function scFechaLargaEs(string $fecha): string {
+    $dias  = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+    $meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+              'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+    $t = strtotime($fecha);
+    if ($t === false) return $fecha;
+
+    return $dias[(int) date('w', $t)] . ' ' . (int) date('j', $t) . ' de '
+         . $meses[(int) date('n', $t) - 1] . ' a las ' . date('H:i', $t);
+}
+
+/** Versión corta, para botones donde no cabe la larga. */
+function scFechaCortaEs(string $fecha): string {
+    $dias = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+    $t = strtotime($fecha);
+    if ($t === false) return $fecha;
+
+    return $dias[(int) date('w', $t)] . ' ' . (int) date('j', $t) . ' · ' . date('H:i', $t);
+}
+
+/** Una sección del correo con su rótulo y un separador arriba. */
+function scCorreoSeccion(string $rotulo, string $titulo, string $contenido, string $pie = ''): string {
+    return '
+    <tr><td style="padding:6px 32px 0">
+      <div style="border-top:1px solid #DBE3EE;padding-top:22px">
+        <div style="font-size:11px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#8792A8;padding-bottom:6px">'
+          . htmlspecialchars($rotulo) . '</div>'
+        . ($titulo !== '' ? '<div style="font-size:16.5px;font-weight:700;color:#1A2A44;padding-bottom:14px">'
+            . htmlspecialchars($titulo) . '</div>' : '')
+        . $contenido
+        . ($pie !== '' ? '<div style="font-size:12.5px;color:#8792A8;padding-top:10px">' . htmlspecialchars($pie) . '</div>' : '')
+      . '</div>
+    </td></tr>';
+}
+
+/**
+ * Botones de respuesta, uno por renglón.
+ * Cada uno es un enlace normal: se contesta desde el propio correo.
+ */
+function scCorreoBotones(array $opciones): string {
+    $filas = '';
+    foreach ($opciones as $o) {
+        $filas .= '
+        <tr><td style="padding-bottom:8px">
+          <a href="' . htmlspecialchars($o['url'], ENT_QUOTES) . '"
+             style="display:block;border:1.5px solid #DBE3EE;border-radius:8px;padding:12px 16px;
+                    font-size:14.5px;font-weight:600;color:#1A2A44;text-decoration:none;background:#ffffff">'
+            . htmlspecialchars($o['texto']) . '</a>
+        </td></tr>';
+    }
+    return '<table width="100%" cellpadding="0" cellspacing="0">' . $filas . '</table>';
+}
+
+/** Opciones en línea, para cuando se pueden marcar varias. */
+function scCorreoChips(array $opciones): string {
+    $chips = '';
+    foreach ($opciones as $o) {
+        $chips .= '<a href="' . htmlspecialchars($o['url'], ENT_QUOTES) . '"
+             style="display:inline-block;border:1.5px solid #DBE3EE;border-radius:18px;
+                    padding:7px 13px;margin:0 5px 7px 0;font-size:13px;font-weight:600;
+                    color:#1A2A44;text-decoration:none;background:#ffffff">'
+            . htmlspecialchars($o['texto']) . '</a> ';
+    }
+    return '<div>' . $chips . '</div>';
+}
+
+/** Barra de avance del perfil y lo que falta. */
+function scCorreoAvance(int $porcentaje, array $faltantes, string $urlPerfil): string {
+    $porcentaje = max(0, min(100, $porcentaje));
+
+    // La barra son dos tablas anidadas porque un div con width en % dentro de
+    // otro div no sobrevive a Outlook.
+    $barra = '
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#F4F7FB;border-radius:6px;height:10px">
+      <tr><td>
+        <table width="' . $porcentaje . '%" cellpadding="0" cellspacing="0" style="background:#185FA5;border-radius:6px;height:10px">
+          <tr><td style="font-size:0;line-height:10px">&nbsp;</td></tr>
+        </table>
+      </td></tr>
+    </table>
+    <div style="font-size:12.5px;font-weight:700;color:#185FA5;padding-top:7px">' . $porcentaje . ' % completo</div>';
+
+    $lista = '';
+    foreach (array_slice($faltantes, 0, 3) as $f) {
+        $lista .= '<div style="font-size:13.5px;color:#566079;padding:3px 0 3px 14px">• '
+                . htmlspecialchars($f['texto']) . '</div>';
+    }
+
+    return $barra
+         . '<div style="padding-top:10px">' . $lista . '</div>'
+         . '<div style="padding-top:12px">'
+         . '<a href="' . htmlspecialchars($urlPerfil, ENT_QUOTES) . '"
+              style="display:inline-block;background:#185FA5;color:#ffffff;text-decoration:none;
+                     font-weight:700;font-size:14px;padding:10px 20px;border-radius:8px">Completar mi perfil</a>'
+         . '</div>';
+}
+
+/** Tarjetas de vacantes abiertas. */
+function scCorreoVacantes(array $vacantes, string $urlBase): string {
+    $modos = ['presencial' => 'Presencial', 'remoto' => 'Remoto', 'hibrido' => 'Híbrido'];
+    $filas = '';
+
+    foreach ($vacantes as $v) {
+        $meta = array_filter([
+            $v['empresa'] ?? '',
+            $v['ubicacion'] ?? '',
+            $modos[$v['modalidad'] ?? ''] ?? '',
+            $v['salario'] ?? '',
+        ]);
+
+        $filas .= '
+        <tr><td style="padding-bottom:9px">
+          <a href="' . htmlspecialchars($urlBase . '/vacantes.html?id=' . (int) $v['id'], ENT_QUOTES) . '"
+             style="display:block;border:1px solid #DBE3EE;border-radius:10px;padding:13px 15px;text-decoration:none;background:#ffffff">
+            <div style="font-size:14.5px;font-weight:700;color:#185FA5;padding-bottom:3px">'
+              . htmlspecialchars($v['titulo']) . '</div>
+            <div style="font-size:12.5px;color:#566079">' . htmlspecialchars(implode(' · ', $meta)) . '</div>
+          </a>
+        </td></tr>';
+    }
+
+    return '<table width="100%" cellpadding="0" cellspacing="0">' . $filas . '</table>';
+}
+
+/** Botón verde de WhatsApp con el mensaje ya escrito. */
+function scCorreoWhatsApp(string $numero, string $nombre, string $folio): string {
+    $numero = preg_replace('/\D+/', '', $numero);
+    if ($numero === '') return '';
+
+    $texto = "Hola, soy {$nombre} (folio {$folio}) y escribo por mi registro en Socios Comerciales AVBA.";
+    $url   = 'https://wa.me/' . $numero . '?text=' . rawurlencode($texto);
+
+    return '<a href="' . htmlspecialchars($url, ENT_QUOTES) . '"
+        style="display:inline-block;background:#25D366;color:#ffffff;text-decoration:none;
+               font-weight:700;font-size:14.5px;padding:12px 22px;border-radius:8px">
+        Escribirnos por WhatsApp</a>';
+}
+
 /**
  * Plantilla HTML de correo con la identidad AVBA.
+ *
+ * $bloquesHtml son las secciones extra (preguntas, avance, vacantes...) que
+ * van después del mensaje y del botón principal.
  */
-function scPlantillaCorreo(string $titulo, string $cuerpoHtml, string $textoBoton = '', string $urlBoton = ''): string {
+function scPlantillaCorreo(string $titulo, string $cuerpoHtml, string $textoBoton = '', string $urlBoton = '', string $bloquesHtml = ''): string {
     $boton = '';
     if ($textoBoton && $urlBoton) {
         $boton = '
@@ -675,7 +960,9 @@ function scPlantillaCorreo(string $titulo, string $cuerpoHtml, string $textoBoto
       <h1 style="margin:0 0 12px;font-size:20px;color:#1A2A44">' . htmlspecialchars($titulo) . '</h1>
       <div style="font-size:14px;line-height:1.6;color:#566079">' . $cuerpoHtml . '</div>
     </td></tr>'
-    . $boton .
+    . $boton
+    . $bloquesHtml
+    . ($bloquesHtml !== '' ? '<tr><td style="height:26px;font-size:0">&nbsp;</td></tr>' : '') .
     '<tr><td style="padding:20px 32px;background:#F4F7FB;font-size:11.5px;color:#8792a8">
       AVBA Inspections, Certifications and Maintenance S.A.S. de C.V. — avba.com.mx<br>
       Si no solicitaste este correo, puedes ignorarlo.

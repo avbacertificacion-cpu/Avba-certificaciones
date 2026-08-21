@@ -19,6 +19,7 @@ require_once __DIR__ . '/Empresas.php';
 require_once __DIR__ . '/Vacantes.php';
 require_once __DIR__ . '/Admin.php';
 require_once __DIR__ . '/Feed.php';
+require_once __DIR__ . '/Interaccion.php';
 require_once __DIR__ . '/Correos.php';
 require_once __DIR__ . '/diagnostico.php';
 
@@ -122,6 +123,7 @@ $vacantes = new ScVacantes($pdo);
 $admin    = new ScAdmin($pdo);
 $feed     = new ScFeed($pdo);
 $correos  = new ScCorreos($pdo);
+$inter    = new ScInteraccion($pdo);
 
 // Los correos automáticos que ya toquen salen al terminar la petición, no
 // durante: ver scTareasDeFondo() al final del archivo.
@@ -378,6 +380,16 @@ if ($method === 'GET') {
                 scValidarToken($pdo, $token)
             ));
 
+        // Consulta pública por folio. No devuelve nombre ni correo: el
+        // folio llega por correo, pero cualquiera puede probar números
+        // seguidos, así que solo se enseña la etapa y el propio avance.
+        case 'ESTADO_FOLIO':
+            if (!scLimite($pdo, 'folio', scIpCliente(), 30, 3600)) {
+                scRespuesta(['status' => 'error',
+                    'message' => 'Demasiadas consultas. Inténtalo en un rato.'], 429);
+            }
+            scRespuesta($inter->estadoPorFolio((string) ($_GET['folio'] ?? '')));
+
         // ── Administración ───────────────────────────────────
         case 'ADMIN_RESUMEN':
             scSesionAdmin($pdo, $token);
@@ -411,6 +423,15 @@ if ($method === 'GET') {
         case 'ADMIN_AUTO':
             scSesionAdmin($pdo, $token);
             scRespuesta($correos->autoConfig());
+
+        // ── Respuestas, estatus y agenda ─────────────────────
+        case 'ADMIN_RESPUESTAS':
+            scSesionAdmin($pdo, $token);
+            scRespuesta(['status' => 'success', 'preguntas' => $inter->resumen()]);
+
+        case 'ADMIN_AGENDA':
+            scSesionAdmin($pdo, $token);
+            scRespuesta($admin->agenda());
 
         // ── Candidatos ───────────────────────────────────────
         case 'BUSCAR_CANDIDATOS':
@@ -609,6 +630,18 @@ if ($method === 'POST') {
         case 'ADMIN_CORREO_LOTE':
             $usr = scSesionAdmin($pdo, $token);
             scRespuesta($correos->lote($usr, (int) ($payload['id'] ?? 0)));
+
+        case 'ADMIN_ESTATUS':
+            $a = scSesionAdmin($pdo, $token);
+            scRespuesta($admin->cambiarEstatus($a, (int) ($payload['id'] ?? 0), $payload));
+
+        case 'ADMIN_AGENDA_CREAR':
+            $a = scSesionAdmin($pdo, $token);
+            scRespuesta($admin->crearFranja($a, $payload));
+
+        case 'ADMIN_AGENDA_BORRAR':
+            $a = scSesionAdmin($pdo, $token);
+            scRespuesta($admin->borrarFranja($a, (int) ($payload['id'] ?? 0), $payload));
 
         case 'ADMIN_AUTO_GUARDAR':
             $usr = scSesionAdmin($pdo, $token);

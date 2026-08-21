@@ -66,14 +66,28 @@ class ScAuth {
         $verifToken  = scGenerarToken();
         $verifExpira = date('Y-m-d H:i:s', time() + SC_VERIF_TTL);
 
+        // Quién lo invitó, si llegó por el enlace de recomendación de otro.
+        // Se comprueba contra la base en vez de guardarlo tal cual: el folio
+        // viaja en una URL y cualquiera puede escribir el número que quiera.
+        $referido = null;
+        $refFolio = trim((string) ($payload['ref'] ?? ''));
+        if ($refFolio !== '') {
+            $refId = scFolioAId($refFolio);
+            if ($refId > 0) {
+                $s = $this->pdo->prepare("SELECT id FROM sc_usuarios WHERE id = ? AND activo = 1");
+                $s->execute([$refId]);
+                $referido = $s->fetchColumn() ?: null;
+            }
+        }
+
         $this->pdo->beginTransaction();
         try {
             $this->pdo->prepare(
                 "INSERT INTO sc_usuarios
                     (tipo, correo, password_hash, activo, correo_verificado,
-                     verif_token, verif_expira, terminos_version, terminos_aceptados)
-                 VALUES (?, ?, ?, 1, 0, ?, ?, ?, NOW())"
-            )->execute([$tipo, $correo, $hash, $verifToken, $verifExpira, SC_TERMINOS_VERSION]);
+                     verif_token, verif_expira, terminos_version, terminos_aceptados, referido_por)
+                 VALUES (?, ?, ?, 1, 0, ?, ?, ?, NOW(), ?)"
+            )->execute([$tipo, $correo, $hash, $verifToken, $verifExpira, SC_TERMINOS_VERSION, $referido]);
 
             $usuarioId = (int) $this->pdo->lastInsertId();
 

@@ -12,6 +12,8 @@
  * mismo y no tocar a otro administrador.
  */
 
+require_once __DIR__ . '/Interaccion.php';
+
 class ScAdmin {
     private PDO $pdo;
 
@@ -31,7 +33,12 @@ class ScAdmin {
                (SELECT COUNT(*) FROM sc_usuarios WHERE correo_verificado = 0 AND activo = 1) AS sin_verificar,
                (SELECT COUNT(*) FROM sc_vacantes WHERE estatus = 'abierta') AS vacantes_abiertas,
                (SELECT COUNT(*) FROM sc_postulaciones)                   AS postulaciones,
-               (SELECT COUNT(*) FROM sc_usuarios WHERE creado > DATE_SUB(NOW(), INTERVAL 7 DAY)) AS altas_semana"
+               (SELECT COUNT(*) FROM sc_usuarios WHERE creado > DATE_SUB(NOW(), INTERVAL 7 DAY)) AS altas_semana,
+               (SELECT COUNT(DISTINCT usuario_id) FROM sc_respuestas)   AS han_contestado,
+               (SELECT COUNT(*) FROM sc_respuestas WHERE tipo = 'interes' AND valor = 'si')  AS siguen_interesados,
+               (SELECT COUNT(*) FROM sc_respuestas WHERE tipo = 'interes' AND valor = 'no')  AS ya_no_interesados,
+               (SELECT COUNT(*) FROM sc_franjas WHERE usuario_id IS NULL AND inicio > NOW()) AS franjas_libres,
+               (SELECT COUNT(*) FROM sc_franjas WHERE usuario_id IS NOT NULL AND inicio > NOW()) AS entrevistas"
         );
         $metricas = $stmt->fetch() ?: [];
 
@@ -136,6 +143,8 @@ class ScAdmin {
             "SELECT u.id, u.tipo, u.correo, u.correo_verificado, u.activo, u.creado,
                     u.ultimo_acceso, u.bloqueado_motivo, u.bloqueado_fecha,
                     u.terminos_version, u.terminos_aceptados,
+                    u.estatus, u.estatus_fecha, u.estatus_nota, u.auto_semana_enviado,
+                    u.referido_por,
                     COALESCE(p.nombre, e.nombre) AS nombre
              FROM sc_usuarios u
              LEFT JOIN sc_personas p ON p.usuario_id = u.id
@@ -148,7 +157,22 @@ class ScAdmin {
         if (!$usuario) return ['status' => 'error', 'message' => 'La cuenta no existe.'];
 
         $usuario['es_admin'] = scEsAdmin($usuario['correo']) ? 1 : 0;
-        $detalle = ['status' => 'success', 'usuario' => $usuario];
+        $usuario['folio']    = scFolio($usuarioId);
+        if ($usuario['referido_por']) {
+            $usuario['referido_folio'] = scFolio((int) $usuario['referido_por']);
+        }
+
+        $inter   = new ScInteraccion($this->pdo);
+        $detalle = [
+            'status'    => 'success',
+            'usuario'   => $usuario,
+            // Lo que contestó desde los correos y cuánto lleva de perfil: es
+            // lo que hace falta para decidir si esta cuenta pasa de etapa.
+            'respuestas'=> $inter->respuestasDe($usuarioId),
+            'avance'    => $inter->avancePerfil($usuarioId),
+            'entrevista'=> $inter->franjaDe($usuarioId),
+            'etapas'    => ScInteraccion::ESTATUS,
+        ];
 
         if ($usuario['tipo'] === 'persona') {
             $stmt = $this->pdo->prepare("SELECT * FROM sc_personas WHERE usuario_id = ?");
@@ -391,6 +415,142 @@ class ScAdmin {
         }
 
         return $objetivo;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  ETAPA DEL PROCESO
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Mueve una cuenta de etapa.
+     *
+     * Es lo que ve la persona en la página pública de seguimiento, así que
+     * cambiarlo no es un apunte interno: es contarle algo. Por eso queda en
+     * la bitácora con quién lo movió y a qué.
+     */
+    public function cambiarEstatus(array $admin, int $usuarioId, array $payload): array {
+        $etapa = trim((string) ($payload['estatus'] ?? ''));
+        if (!isset(ScInteraccion::ESTATUS[$etapa])) {
+            return ['status' => 'error', 'message' => 'Esa etapa no existe.'];
+        }
+
+        if ($usuarioId <= 0) return ['status' => 'error', 'message' => 'Cuenta no indicada.'];
+
+        $stmt = $this->pdo->prepare("SELECT id, correo, estatus FROM sc_usuarios WHERE id = ?");
+        $stmt->execute([$usuarioId]);
+        $objetivo = $stmt->fetch();
+        if (!$objetivo) return ['status' => 'error', 'message' => 'La cuenta no existe.'];
+
+        $nota = scTexto($payload['nota'] ?? null, 255);
+
+        $this->pdo->prepare(
+            "UPDATE sc_usuarios SET estatus = ?, estatus_fecha = NOW(), estatus_nota = ? WHERE id = ?"
+        )->execute([$etapa, $nota, $usuarioId]);
+
+        $this->registrar($admin, 'estatus', $usuarioId, $objetivo['correo'],
+            mb_substr($objetivo['estatus'] . ' → ' . $etapa . ($nota ? " ({$nota})" : ''), 0, 255));
+
+        return [
+            'status'  => 'success',
+            'estatus' => $etapa,
+            'message' => 'Etapa actualizada a «' . ScInteraccion::ESTATUS[$etapa]['titulo'] . '».',
+        ];
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  AGENDA DE ENTREVISTAS
+    // ══════════════════════════════════════════════════════════
+
+    /** Franjas de aquí en adelante, con quién tomó cada una. */
+    public function agenda(): array {
+        $stmt = $this->pdo->query(
+            "SELECT f.id, f.inicio, f.minutos, f.modo, f.nota, f.usuario_id, f.tomada,
+                    u.correo, COALESCE(p.nombre, e.nombre) AS nombre
+             FROM sc_franjas f
+             LEFT JOIN sc_usuarios u ON u.id = f.usuario_id
+             LEFT JOIN sc_personas p ON p.usuario_id = u.id
+             LEFT JOIN sc_empresas e ON e.usuario_id = u.id
+             WHERE f.inicio > DATE_SUB(NOW(), INTERVAL 1 DAY)
+             ORDER BY f.inicio ASC LIMIT 100"
+        );
+        $franjas = $stmt->fetchAll();
+
+        foreach ($franjas as &$f) {
+            $f['id']     = (int) $f['id'];
+            $f['libre']  = $f['usuario_id'] === null;
+            $f['cuando'] = scFechaLargaEs($f['inicio']);
+            if ($f['usuario_id'] !== null) $f['folio'] = scFolio((int) $f['usuario_id']);
+        }
+        unset($f);
+
+        return [
+            'status'  => 'success',
+            'franjas' => $franjas,
+            'libres'  => count(array_filter($franjas, fn($f) => $f['libre'])),
+            'modos'   => ['llamada' => 'Llamada', 'videollamada' => 'Videollamada', 'presencial' => 'Presencial'],
+        ];
+    }
+
+    /** Abre una franja nueva. */
+    public function crearFranja(array $admin, array $payload): array {
+        $inicio = trim((string) ($payload['inicio'] ?? ''));
+        $marca  = strtotime($inicio);
+
+        if ($marca === false || $marca <= 0) {
+            return ['status' => 'error', 'message' => 'Indica la fecha y la hora.'];
+        }
+        if ($marca < time()) {
+            return ['status' => 'error', 'message' => 'Esa fecha ya pasó.'];
+        }
+        if ($marca > time() + (365 * 86400)) {
+            return ['status' => 'error', 'message' => 'Esa fecha está demasiado lejos.'];
+        }
+
+        $minutos = (int) ($payload['minutos'] ?? 30);
+        if ($minutos < 10 || $minutos > 240) $minutos = 30;
+
+        $modo = (string) ($payload['modo'] ?? 'llamada');
+        if (!in_array($modo, ['llamada', 'videollamada', 'presencial'], true)) $modo = 'llamada';
+
+        try {
+            $this->pdo->prepare(
+                "INSERT INTO sc_franjas (inicio, minutos, modo, nota, creado_por) VALUES (?, ?, ?, ?, ?)"
+            )->execute([
+                date('Y-m-d H:i:00', $marca), $minutos, $modo,
+                scTexto($payload['nota'] ?? null, 190), (int) $admin['id'],
+            ]);
+        } catch (PDOException $e) {
+            // uq_sc_franjas_inicio: dos franjas a la misma hora serían dos
+            // llamadas encimadas, no dos huecos.
+            return ['status' => 'error', 'message' => 'Ya hay una franja a esa hora.'];
+        }
+
+        return ['status' => 'success', 'message' => 'Franja abierta para el ' . scFechaLargaEs(date('Y-m-d H:i:00', $marca)) . '.'];
+    }
+
+    /** Quita una franja. Si estaba tomada, hay que confirmarlo. */
+    public function borrarFranja(array $admin, int $franjaId, array $payload): array {
+        $stmt = $this->pdo->prepare("SELECT * FROM sc_franjas WHERE id = ?");
+        $stmt->execute([$franjaId]);
+        $franja = $stmt->fetch();
+
+        if (!$franja) return ['status' => 'error', 'message' => 'Esa franja ya no existe.'];
+
+        if ($franja['usuario_id'] !== null && empty($payload['confirmar'])) {
+            return [
+                'status'   => 'error',
+                'codigo'   => 'FRANJA_TOMADA',
+                'message'  => 'Esa entrevista ya está apartada por ' . scFolio((int) $franja['usuario_id'])
+                            . '. Si la borras, esa persona se queda sin cita y no se le avisa solo.',
+            ];
+        }
+
+        $this->pdo->prepare("DELETE FROM sc_franjas WHERE id = ?")->execute([$franjaId]);
+
+        $this->registrar($admin, 'agenda', $franja['usuario_id'] ? (int) $franja['usuario_id'] : null, null,
+            'Franja borrada: ' . $franja['inicio']);
+
+        return ['status' => 'success', 'message' => 'Franja eliminada.'];
     }
 
     /** Deja constancia de la acción. Nunca debe tumbar la operación. */

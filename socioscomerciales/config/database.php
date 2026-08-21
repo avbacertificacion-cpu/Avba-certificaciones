@@ -9,7 +9,7 @@
 require_once __DIR__ . '/config.php';
 
 /** Versión actual del esquema. Subir al añadir migraciones. */
-const SC_SCHEMA_VERSION = 12;
+const SC_SCHEMA_VERSION = 13;
 
 class ScDatabase {
     private static ?PDO $instance = null;
@@ -77,6 +77,7 @@ class ScDatabase {
             if ($version < 10) self::migrarA10($pdo);
             if ($version < 11) self::migrarA11($pdo);
             if ($version < 12) self::migrarA12($pdo);
+            if ($version < 13) self::migrarA13($pdo);
 
             $pdo->exec("INSERT INTO sc_meta (clave, valor) VALUES ('schema_version', '" . SC_SCHEMA_VERSION . "')
                         ON DUPLICATE KEY UPDATE valor = '" . SC_SCHEMA_VERSION . "'");
@@ -100,6 +101,7 @@ class ScDatabase {
         $columnas = self::columnasDe($pdo, 'sc_usuarios');
 
         if (!$columnas)                                    return SC_SCHEMA_VERSION; // Base vacía
+        if (in_array('estatus_fecha', $columnas, true))       return 13;
         if (in_array('auto_semana_enviado', $columnas, true)) return 11;
         if (self::columnasDe($pdo, 'sc_envios'))             return 10;
         if (in_array('estado', self::columnasDe($pdo, 'sc_publicaciones'), true)) return 9;
@@ -157,11 +159,17 @@ class ScDatabase {
                 creado            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 ultimo_acceso     DATETIME NULL,
                 auto_semana_enviado DATETIME NULL,
+                estatus           ENUM('nuevo','en_revision','primer_filtro','entrevista','aprobado','no_procede')
+                                  NOT NULL DEFAULT 'nuevo',
+                estatus_fecha     DATETIME NULL,
+                estatus_nota      VARCHAR(255) NULL,
+                referido_por      INT UNSIGNED NULL,
                 UNIQUE KEY uq_sc_usuarios_correo (correo),
                 KEY idx_sc_usuarios_token (session_token),
                 KEY idx_sc_usuarios_verif (verif_token),
                 KEY idx_sc_usuarios_reset (reset_token),
-                KEY idx_sc_usuarios_auto (auto_semana_enviado, creado)
+                KEY idx_sc_usuarios_auto (auto_semana_enviado, creado),
+                KEY idx_sc_usuarios_estatus (estatus)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
 
@@ -283,6 +291,8 @@ class ScDatabase {
                 enviados      INT UNSIGNED NOT NULL DEFAULT 0,
                 fallidos      INT UNSIGNED NOT NULL DEFAULT 0,
                 ultimo_id     INT UNSIGNED NOT NULL DEFAULT 0,
+                bloques       VARCHAR(190) NOT NULL DEFAULT '',
+                preguntas     VARCHAR(190) NOT NULL DEFAULT '',
                 estado        ENUM('en_curso','terminado','cancelado') NOT NULL DEFAULT 'en_curso',
                 creado        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 terminado     DATETIME NULL,
@@ -399,6 +409,46 @@ class ScDatabase {
                     REFERENCES sc_vacantes(id) ON DELETE CASCADE,
                 CONSTRAINT fk_sc_postulaciones_persona FOREIGN KEY (persona_id)
                     REFERENCES sc_personas(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        // Respuestas que la gente da pulsando un enlace del correo, sin
+        // necesidad de entrar al portal. Un mismo `tipo` puede admitir una
+        // sola respuesta (disponibilidad) o varias (certificaciones); de eso
+        // se encarga ScInteraccion, no la tabla.
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_respuestas (
+                id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                usuario_id INT UNSIGNED NOT NULL,
+                tipo       VARCHAR(30)  NOT NULL,
+                valor      VARCHAR(120) NOT NULL,
+                origen     VARCHAR(20)  NOT NULL DEFAULT 'correo',
+                creado     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ip         VARCHAR(45) NULL,
+                UNIQUE KEY uq_sc_respuestas (usuario_id, tipo, valor),
+                KEY idx_sc_respuestas_tipo (tipo, valor),
+                CONSTRAINT fk_sc_respuestas_usuario FOREIGN KEY (usuario_id)
+                    REFERENCES sc_usuarios(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+        ");
+
+        // Franjas de entrevista que abre el administrador. usuario_id NULL
+        // significa libre; en cuanto alguien la toma, deja de estarlo.
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS sc_franjas (
+                id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                inicio     DATETIME NOT NULL,
+                minutos    SMALLINT UNSIGNED NOT NULL DEFAULT 30,
+                modo       ENUM('llamada','videollamada','presencial') NOT NULL DEFAULT 'llamada',
+                nota       VARCHAR(190) NULL,
+                usuario_id INT UNSIGNED NULL,
+                tomada     DATETIME NULL,
+                creado     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                creado_por INT UNSIGNED NULL,
+                UNIQUE KEY uq_sc_franjas_inicio (inicio),
+                KEY idx_sc_franjas_libres (usuario_id, inicio),
+                CONSTRAINT fk_sc_franjas_usuario FOREIGN KEY (usuario_id)
+                    REFERENCES sc_usuarios(id) ON DELETE SET NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
         ");
     }
@@ -612,6 +662,8 @@ class ScDatabase {
                 enviados      INT UNSIGNED NOT NULL DEFAULT 0,
                 fallidos      INT UNSIGNED NOT NULL DEFAULT 0,
                 ultimo_id     INT UNSIGNED NOT NULL DEFAULT 0,
+                bloques       VARCHAR(190) NOT NULL DEFAULT '',
+                preguntas     VARCHAR(190) NOT NULL DEFAULT '',
                 estado        ENUM('en_curso','terminado','cancelado') NOT NULL DEFAULT 'en_curso',
                 creado        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 terminado     DATETIME NULL,
@@ -654,6 +706,42 @@ class ScDatabase {
         } catch (PDOException $e) {
             error_log('migrarA12: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * v13 — el correo del primer filtro pasa de informar a pedir cosas.
+     *
+     * Además de las tablas nuevas (sc_respuestas y sc_franjas, que crea
+     * crearTablas), cada cuenta necesita un estatus visible desde la página
+     * pública de seguimiento y saber quién la invitó.
+     */
+    private static function migrarA13(PDO $pdo): void {
+        self::agregarColumna($pdo, 'sc_usuarios', 'estatus',
+            "ENUM('nuevo','en_revision','primer_filtro','entrevista','aprobado','no_procede') NOT NULL DEFAULT 'nuevo'");
+        self::agregarColumna($pdo, 'sc_usuarios', 'estatus_fecha', "DATETIME NULL");
+        self::agregarColumna($pdo, 'sc_usuarios', 'estatus_nota',  "VARCHAR(255) NULL");
+        self::agregarColumna($pdo, 'sc_usuarios', 'referido_por',  "INT UNSIGNED NULL");
+
+        // Qué secciones llevaba cada campaña. Se guarda con la campaña y no
+        // solo en la configuración general porque el envío va por lotes: si
+        // alguien cambia los ajustes a mitad de camino, la segunda mitad del
+        // padrón recibiría un correo distinto al de la primera.
+        self::agregarColumna($pdo, 'sc_envios', 'bloques',   "VARCHAR(190) NOT NULL DEFAULT ''");
+        self::agregarColumna($pdo, 'sc_envios', 'preguntas', "VARCHAR(190) NOT NULL DEFAULT ''");
+
+        // A quien ya recibió el correo del primer filtro se le pone ese
+        // estatus: la página de seguimiento tiene que contarle lo mismo que
+        // le dijo el correo, no empezar de cero.
+        try {
+            $pdo->exec("UPDATE sc_usuarios SET estatus = 'primer_filtro', estatus_fecha = auto_semana_enviado
+                        WHERE auto_semana_enviado IS NOT NULL AND estatus = 'nuevo'");
+        } catch (PDOException $e) {
+            error_log('migrarA13: ' . $e->getMessage());
+        }
+
+        try {
+            $pdo->exec("CREATE INDEX idx_sc_usuarios_estatus ON sc_usuarios (estatus)");
+        } catch (PDOException $e) { /* ya existe */ }
     }
 
     /** Añade una columna solo si aún no existe. */

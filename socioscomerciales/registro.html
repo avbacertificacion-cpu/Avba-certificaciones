@@ -39,6 +39,10 @@
 
   .fuerza { height: 5px; background: var(--borde); border-radius: 999px; overflow: hidden; margin-top: 7px; }
   .fuerza span { display: block; height: 100%; width: 0; border-radius: 999px; transition: width .25s, background .25s; }
+  .nota-referido {
+    background: var(--verde-bg); color: #14663A; font-size: 13px; font-weight: 600;
+    padding: 10px 14px; border-radius: var(--r-sm); margin-bottom: 16px; text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -201,7 +205,14 @@ document.getElementById('form-registro').addEventListener('submit', async (e) =>
   const accion = tipoActual === 'empresa' ? 'REGISTRO_EMPRESA' : 'REGISTRO_PERSONA';
 
   try {
-    const datos = await scPost(accion, { nombre, correo, password, acepta_terminos: true });
+    // Si llegó por el enlace de recomendación de alguien, se pasa su folio.
+    // El servidor lo comprueba contra la base; aquí solo se reenvía.
+    const ref = new URLSearchParams(location.search).get('ref');
+
+    const datos = await scPost(accion, {
+      nombre, correo, password, acepta_terminos: true,
+      ...(ref ? { ref } : {})
+    });
 
     if (datos.status !== 'success') {
       mostrarError(datos.message || 'No se pudo crear la cuenta.');
@@ -237,7 +248,20 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('tab-' + tipo).addEventListener('click', () => cambiarTipo(tipo));
   });
 
-  const tipo = new URLSearchParams(location.search).get('tipo');
+  const params = new URLSearchParams(location.search);
+
+  // Quien llega recomendado por alguien del padrón ve que se le esperaba:
+  // un enlace de invitación que aterriza en un formulario idéntico al de
+  // cualquiera desperdicia justo lo que lo hace distinto.
+  if (params.get('ref')) {
+    const nota = document.createElement('p');
+    nota.className = 'nota-referido';
+    nota.textContent = 'Te invitó alguien que ya está en el padrón de AVBA. Bienvenido.';
+    const forma = document.getElementById('forma-registro') || document.querySelector('form');
+    if (forma) forma.parentNode.insertBefore(nota, forma);
+  }
+
+  const tipo = params.get('tipo');
   cambiarTipo(tipo === 'empresa' ? 'empresa' : 'persona');
   document.getElementById('nombre').focus();
 });

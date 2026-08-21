@@ -13,6 +13,8 @@
  * navegador se cierra, se retoma exactamente donde iba.
  */
 
+require_once __DIR__ . '/Interaccion.php';
+
 class ScCorreos {
     private PDO $pdo;
 
@@ -136,7 +138,30 @@ class ScCorreos {
             'destinatarios'    => $tipo,
             'solo_verificados' => ($payload['solo_verificados'] ?? '1') !== '0'
                                   && ($payload['solo_verificados'] ?? true) !== false,
+            'bloques'          => self::limpiarLista($payload['bloques'] ?? '', array_keys(self::BLOQUES)),
+            'preguntas'        => self::limpiarLista($payload['preguntas'] ?? '', array_keys(ScInteraccion::PREGUNTAS)),
         ];
+    }
+
+    /**
+     * Deja solo las claves conocidas de una lista separada por comas.
+     *
+     * Estas claves acaban decidiendo qué se le enseña a la gente, así que se
+     * comparan contra el catálogo en vez de confiar en lo que llegue: un
+     * valor inventado no debe llegar nunca a la base ni al correo.
+     */
+    private static function limpiarLista($valor, array $permitidos): array {
+        if (is_string($valor)) $valor = explode(',', $valor);
+        if (!is_array($valor)) return [];
+
+        $limpio = [];
+        foreach ($valor as $v) {
+            $v = trim((string) $v);
+            if ($v !== '' && in_array($v, $permitidos, true) && !in_array($v, $limpio, true)) {
+                $limpio[] = $v;
+            }
+        }
+        return $limpio;
     }
 
     /**
@@ -153,7 +178,10 @@ class ScCorreos {
         $ok = $this->enviarUno(
             $admin['correo'],
             $this->asuntoFinal($datos['asunto'], $nombre),
-            $this->cuerpoHtml($datos['cuerpo'], $nombre)
+            $this->cuerpoHtml($datos['cuerpo'], $nombre),
+            // La prueba se arma con los datos del propio administrador: así
+            // ve los bloques con contenido de verdad y no con un ejemplo.
+            $this->bloquesPara((int) $admin['id'], $datos['bloques'], $datos['preguntas'])
         );
 
         return $ok
@@ -190,11 +218,12 @@ class ScCorreos {
 
         $this->pdo->prepare(
             "INSERT INTO sc_envios
-                (admin_id, admin_correo, asunto, cuerpo, destinatarios, solo_verificados, total)
-             VALUES (?, ?, ?, ?, ?, ?, ?)"
+                (admin_id, admin_correo, asunto, cuerpo, destinatarios, solo_verificados, total, bloques, preguntas)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )->execute([
             (int) $admin['id'], $admin['correo'], $datos['asunto'], $datos['cuerpo'],
             $datos['destinatarios'], $datos['solo_verificados'] ? 1 : 0, $total,
+            implode(',', $datos['bloques']), implode(',', $datos['preguntas']),
         ]);
 
         $id = (int) $this->pdo->lastInsertId();
@@ -281,13 +310,17 @@ class ScCorreos {
         $fallidos = 0;
         $ultimoId = (int) $envio['ultimo_id'];
 
+        $bloques   = array_filter(explode(',', (string) ($envio['bloques'] ?? '')));
+        $preguntas = array_filter(explode(',', (string) ($envio['preguntas'] ?? '')));
+
         foreach ($cuentas as $c) {
             $nombre = $this->nombreParaSaludo($c['nombre'] ?? null, $c['correo']);
 
             $ok = $this->enviarUno(
                 $c['correo'],
                 $this->asuntoFinal($envio['asunto'], $nombre),
-                $this->cuerpoHtml($envio['cuerpo'], $nombre)
+                $this->cuerpoHtml($envio['cuerpo'], $nombre),
+                $this->bloquesPara((int) $c['id'], $bloques, $preguntas)
             );
 
             $ok ? $enviados++ : $fallidos++;
@@ -379,6 +412,13 @@ class ScCorreos {
         }
     }
 
+    /** Una lista guardada en sc_meta; si nunca se guardó, la de por defecto. */
+    private function listaMeta(string $clave, array $porDefecto): array {
+        $guardado = $this->meta($clave, null);
+        if ($guardado === null) return $porDefecto;          // nunca configurado
+        return array_values(array_filter(explode(',', $guardado)));  // '' = todo apagado
+    }
+
     private function guardarMeta(string $clave, string $valor): void {
         $this->pdo->prepare(
             "INSERT INTO sc_meta (clave, valor) VALUES (?, ?)
@@ -406,6 +446,11 @@ class ScCorreos {
             'activo'    => $this->meta('auto_semana_activo', '0') === '1',
             'asunto'    => $this->meta('auto_semana_asunto', self::AUTO_ASUNTO_DEFECTO),
             'cuerpo'    => $this->meta('auto_semana_cuerpo', self::AUTO_CUERPO_DEFECTO),
+            'bloques'   => $this->listaMeta('auto_semana_bloques', self::BLOQUES_POR_DEFECTO),
+            'preguntas' => $this->listaMeta('auto_semana_preguntas', self::PREGUNTAS_POR_DEFECTO),
+            'catalogo_bloques'   => self::BLOQUES,
+            'catalogo_preguntas' => array_map(fn($p) => $p['titulo'], ScInteraccion::PREGUNTAS),
+            'whatsapp'  => defined('SC_WHATSAPP') && SC_WHATSAPP !== '',
             'dias'      => self::DIAS_AUTOMATICO,
             'listos'    => (int) ($conteos['listos'] ?? 0),
             'esperando' => (int) ($conteos['esperando'] ?? 0),
@@ -422,6 +467,8 @@ class ScCorreos {
         $this->guardarMeta('auto_semana_asunto', $datos['asunto']);
         $this->guardarMeta('auto_semana_cuerpo', $datos['cuerpo']);
         $this->guardarMeta('auto_semana_activo', $activo ? '1' : '0');
+        $this->guardarMeta('auto_semana_bloques', implode(',', $datos['bloques']));
+        $this->guardarMeta('auto_semana_preguntas', implode(',', $datos['preguntas']));
 
         try {
             $this->pdo->prepare(
@@ -463,8 +510,10 @@ class ScCorreos {
             return ['status' => 'success', 'enviados' => 0, 'motivo' => 'desactivado'];
         }
 
-        $asunto = $this->meta('auto_semana_asunto', self::AUTO_ASUNTO_DEFECTO);
-        $cuerpo = $this->meta('auto_semana_cuerpo', self::AUTO_CUERPO_DEFECTO);
+        $asunto    = $this->meta('auto_semana_asunto', self::AUTO_ASUNTO_DEFECTO);
+        $cuerpo    = $this->meta('auto_semana_cuerpo', self::AUTO_CUERPO_DEFECTO);
+        $bloques   = $this->listaMeta('auto_semana_bloques', self::BLOQUES_POR_DEFECTO);
+        $preguntas = $this->listaMeta('auto_semana_preguntas', self::PREGUNTAS_POR_DEFECTO);
 
         $max = max(1, min($max, 100));
 
@@ -484,9 +533,21 @@ class ScCorreos {
 
         if (!$cuentas) return ['status' => 'success', 'enviados' => 0];
 
+        // Reservar y mover de etapa van en el mismo UPDATE: el correo le dice
+        // a la persona que pasó el primer filtro, así que la página de
+        // seguimiento tiene que decirle lo mismo. Solo se mueve si sigue en
+        // 'nuevo' o 'en_revision'; a quien ya está en entrevista o aprobado
+        // no se le hace retroceder.
         $reservar = $this->pdo->prepare(
-            "UPDATE sc_usuarios SET auto_semana_enviado = NOW()
-             WHERE id = ? AND auto_semana_enviado IS NULL"
+            // estatus_fecha va ANTES que estatus: MySQL evalúa las
+            // asignaciones de izquierda a derecha usando el valor ya
+            // actualizado, así que si se pusiera después leería el estatus
+            // nuevo y la condición nunca se cumpliría.
+            "UPDATE sc_usuarios
+                SET auto_semana_enviado = NOW(),
+                    estatus_fecha = IF(estatus IN ('nuevo','en_revision'), NOW(), estatus_fecha),
+                    estatus = IF(estatus IN ('nuevo','en_revision'), 'primer_filtro', estatus)
+              WHERE id = ? AND auto_semana_enviado IS NULL"
         );
 
         $enviados = 0;
@@ -501,7 +562,8 @@ class ScCorreos {
             $ok = $this->enviarUno(
                 $c['correo'],
                 $this->asuntoFinal($asunto, $nombre),
-                $this->cuerpoHtml($cuerpo, $nombre)
+                $this->cuerpoHtml($cuerpo, $nombre),
+                $this->bloquesPara((int) $c['id'], $bloques, $preguntas)
             );
 
             $ok ? $enviados++ : $fallidos++;
@@ -545,17 +607,164 @@ class ScCorreos {
         return $stmt->fetchColumn() ?: null;
     }
 
-    private function enviarUno(string $para, string $asunto, string $cuerpoHtml): bool {
+    /**
+     * Manda un correo ya armado.
+     *
+     * El título grande del correo es el asunto, no un rótulo fijo: repetir
+     * "Socios Comerciales AVBA" debajo del rótulo de la cabecera gastaba el
+     * renglón más visible del mensaje en decir algo que ya estaba dicho.
+     */
+    private function enviarUno(string $para, string $asunto, string $cuerpoHtml, string $bloques = ''): bool {
         try {
             return scEnviarCorreo(
                 $para,
                 $asunto,
-                scPlantillaCorreo('Socios Comerciales AVBA', $cuerpoHtml,
-                    'Entrar al portal', scUrlBase() . '/inicio.html')
+                scPlantillaCorreo($asunto, $cuerpoHtml,
+                    'Entrar al portal', scUrlBase() . '/inicio.html', $bloques)
             );
         } catch (Throwable $e) {
             error_log('ScCorreos::enviarUno: ' . $e->getMessage());
             return false;
         }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  BLOQUES QUE PIDEN ALGO
+    // ══════════════════════════════════════════════════════════
+
+    /** Bloques disponibles, con el nombre que ve el administrador. */
+    public const BLOQUES = [
+        'pregunta'  => 'Una pregunta con botones de respuesta',
+        'avance'    => 'Qué le falta a su perfil',
+        'vacantes'  => 'Vacantes abiertas que le encajan',
+        'agenda'    => 'Horarios de entrevista para apartar',
+        'whatsapp'  => 'Botón de WhatsApp',
+        'folio'     => 'Su folio y el enlace de seguimiento',
+        'referido'  => 'Invitar a un colega',
+    ];
+
+    /** Qué preguntas entran en el sorteo del bloque «pregunta». */
+    public const PREGUNTAS_POR_DEFECTO = ['interes', 'disponibilidad', 'certificacion'];
+    public const BLOQUES_POR_DEFECTO   = ['pregunta', 'avance', 'whatsapp'];
+
+    /**
+     * Arma las secciones extra de un correo para una persona concreta.
+     *
+     * Del bloque «pregunta» sale UNA sola: la primera de la lista que esa
+     * persona no haya contestado. Un correo con cuatro preguntas es un
+     * formulario disfrazado y no lo contesta nadie; con una sola, quien
+     * pulsa aterriza en r.php y allí sigue la conversación.
+     */
+    public function bloquesPara(int $usuarioId, array $bloques, array $preguntas): string {
+        if (!$bloques) return '';
+
+        $inter = new ScInteraccion($this->pdo);
+        $html  = '';
+
+        try {
+            if (in_array('pregunta', $bloques, true)) {
+                $html .= $this->bloquePregunta($inter, $usuarioId, $preguntas);
+            }
+            if (in_array('avance', $bloques, true)) {
+                $avance = $inter->avancePerfil($usuarioId);
+                if (!$avance['completo']) {
+                    $html .= scCorreoSeccion('Tu perfil', 'Te falta poco para completarlo',
+                        scCorreoAvance($avance['porcentaje'], $avance['faltantes'], scUrlBase() . '/inicio.html'));
+                }
+            }
+            if (in_array('vacantes', $bloques, true)) {
+                $vacantes = $inter->vacantesPara($usuarioId, 3);
+                if ($vacantes) {
+                    $html .= scCorreoSeccion('Vacantes abiertas',
+                        count($vacantes) === 1 ? 'Una vacante para tu perfil' : 'Vacantes para tu perfil',
+                        scCorreoVacantes($vacantes, scUrlBase()));
+                }
+            }
+            if (in_array('agenda', $bloques, true)) {
+                $html .= $this->bloqueAgenda($inter, $usuarioId);
+            }
+            if (in_array('folio', $bloques, true)) {
+                $html .= scCorreoSeccion('Seguimiento', 'Tu folio es ' . scFolio($usuarioId),
+                    scCorreoBotones([[
+                        'texto' => 'Ver el estado de mi solicitud',
+                        'url'   => scUrlBase() . '/estado.html?folio=' . scFolio($usuarioId),
+                    ]]),
+                    'Guarda este folio: con él puedes consultar tu avance cuando quieras.');
+            }
+            if (in_array('referido', $bloques, true)) {
+                $html .= scCorreoSeccion('Recomienda a alguien', '¿Conoces a alguien del oficio?',
+                    scCorreoBotones([[
+                        'texto' => 'Pasarle la invitación',
+                        'url'   => scUrlBase() . '/registro.html?ref=' . scFolio($usuarioId),
+                    ]]),
+                    'Buscamos técnicos e inspectores con certificaciones vigentes.');
+            }
+            if (in_array('whatsapp', $bloques, true) && defined('SC_WHATSAPP') && SC_WHATSAPP !== '') {
+                $nombre = $this->nombreParaSaludo($this->nombreDe($usuarioId), '');
+                $boton  = scCorreoWhatsApp(SC_WHATSAPP, $nombre, scFolio($usuarioId));
+                if ($boton !== '') {
+                    $html .= scCorreoSeccion('¿Prefieres WhatsApp?', 'Escríbenos por ahí', $boton,
+                        'Contestamos en horario de oficina.');
+                }
+            }
+        } catch (Throwable $e) {
+            // Un bloque roto no puede impedir que salga el correo: el mensaje
+            // principal es lo que hay que entregar sí o sí.
+            error_log('ScCorreos::bloquesPara: ' . $e->getMessage());
+        }
+
+        return $html;
+    }
+
+    private function bloquePregunta(ScInteraccion $inter, int $usuarioId, array $preguntas): string {
+        $contestadas = $inter->respuestasDe($usuarioId);
+
+        foreach ($preguntas as $tipo) {
+            if (isset($contestadas[$tipo])) continue;
+            $pregunta = ScInteraccion::PREGUNTAS[$tipo] ?? null;
+            if (!$pregunta) continue;
+
+            $opciones = [];
+            foreach ($pregunta['opciones'] as $valor => $etiqueta) {
+                $opciones[] = [
+                    'texto' => $etiqueta,
+                    'url'   => scUrlRespuesta($this->pdo, $usuarioId, $tipo, $valor),
+                ];
+            }
+
+            return scCorreoSeccion(
+                'Una pregunta rápida',
+                $pregunta['titulo'],
+                empty($pregunta['multiple']) ? scCorreoBotones($opciones) : scCorreoChips($opciones),
+                empty($pregunta['multiple'])
+                    ? 'Un clic y listo, no hace falta entrar al portal.'
+                    : 'Marca las que tengas, una por una.'
+            );
+        }
+
+        return '';
+    }
+
+    private function bloqueAgenda(ScInteraccion $inter, int $usuarioId): string {
+        $suya = $inter->franjaDe($usuarioId);
+        if ($suya) {
+            return scCorreoSeccion('Tu entrevista', scFechaLargaEs($suya['inicio']),
+                '<div style="font-size:13.5px;color:#566079">' . (int) $suya['minutos'] . ' minutos</div>',
+                'Si necesitas cambiarla, escríbenos.');
+        }
+
+        $libres = $inter->franjasLibres(4);
+        if (!$libres) return '';
+
+        $opciones = [];
+        foreach ($libres as $f) {
+            $opciones[] = [
+                'texto' => scFechaLargaEs($f['inicio']),
+                'url'   => scUrlRespuesta($this->pdo, $usuarioId, 'franja', (string) $f['id']),
+            ];
+        }
+
+        return scCorreoSeccion('Entrevista', 'Escoge cuándo te llamamos',
+            scCorreoBotones($opciones), 'Se aparta al instante con un clic.');
     }
 }

@@ -156,6 +156,60 @@
   .destinatarios-caja strong { color: var(--azul-oscuro); }
   .destinatarios-caja .aviso { color: #92610B; display: block; margin-top: 5px; font-size: 12.5px; }
 
+  /* ── Selector de secciones del correo ─────────────────── */
+  .bloques-caja {
+    border: 1px solid var(--borde); border-radius: var(--r-sm);
+    padding: 14px 16px; margin-bottom: 14px; background: var(--blanco);
+  }
+  .bloques-titulo { font-size: 13.5px; font-weight: 700; color: var(--texto); margin-bottom: 3px; }
+  .bloques-ayuda  { font-size: 12.5px; color: var(--texto-sub); margin-bottom: 10px; line-height: 1.5; }
+  .bloques-lista  { display: flex; flex-wrap: wrap; gap: 7px; }
+  .bloque-op {
+    display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+    border: 1.5px solid var(--borde); border-radius: 20px; padding: 6px 12px;
+    font-size: 12.5px; font-weight: 600; color: var(--texto-sub); user-select: none;
+  }
+  .bloque-op:hover { border-color: var(--azul); }
+  .bloque-op input { margin: 0; cursor: pointer; }
+  .bloque-op:has(input:checked) { border-color: var(--azul); background: var(--azul-claro); color: var(--azul-oscuro); }
+  .bloque-op.apagado { opacity: .5; }
+
+  /* ── Respuestas ───────────────────────────────────────── */
+  .resp-grupo { margin-bottom: 22px; }
+  .resp-grupo h4 { font-size: 14.5px; font-weight: 700; margin-bottom: 3px; }
+  .resp-grupo .resp-total { font-size: 12px; color: var(--texto-tenue); margin-bottom: 10px; }
+  .resp-fila { display: grid; grid-template-columns: 1fr 46px; gap: 10px; align-items: center; margin-bottom: 7px; }
+  .resp-etq { font-size: 13px; color: var(--texto-sub); }
+  .resp-barra { height: 7px; background: var(--gris-fondo); border-radius: 4px; overflow: hidden; margin-top: 4px; }
+  .resp-barra span { display: block; height: 100%; background: var(--azul); border-radius: 4px; }
+  .resp-num { font-size: 13px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
+  .resp-num.cero { color: var(--texto-tenue); font-weight: 500; }
+
+  /* ── Agenda ───────────────────────────────────────────── */
+  .agenda-forma {
+    display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px;
+    align-items: end; margin-bottom: 18px;
+  }
+  .agenda-forma .campo { margin-bottom: 0; }
+  @media (max-width: 620px) { .agenda-forma { grid-template-columns: 1fr; } }
+  .franja {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px;
+    border: 1px solid var(--borde); border-radius: var(--r-sm);
+    padding: 11px 14px; margin-bottom: 8px;
+  }
+  .franja.tomada { border-color: var(--verde); background: var(--verde-bg); }
+  .franja-cuando { font-size: 13.5px; font-weight: 700; }
+  .franja-quien  { font-size: 12.5px; color: var(--texto-sub); margin-top: 2px; }
+
+  /* ── Etapa del proceso en la ficha ────────────────────── */
+  .etapa-caja { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .etapa-caja select { flex: 1; min-width: 170px; }
+  .respuestas-ficha { display: flex; flex-wrap: wrap; gap: 6px; }
+  .respuesta-chip {
+    background: var(--azul-claro); color: var(--azul-oscuro); border-radius: 14px;
+    padding: 4px 11px; font-size: 12.5px; font-weight: 600;
+  }
+
   .previa-correo {
     border: 1px solid var(--borde); border-radius: var(--r-sm);
     padding: 14px 16px; background: var(--gris-fondo);
@@ -207,6 +261,8 @@
         <button type="button" class="btn btn-primary btn-sm" id="btn-muro">Moderar muro</button>
         <button type="button" class="btn btn-outline btn-sm" id="btn-correo">Enviar correo</button>
         <button type="button" class="btn btn-outline btn-sm" id="btn-auto">Correo automático</button>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-respuestas">Respuestas</button>
+        <button type="button" class="btn btn-outline btn-sm" id="btn-agenda">Agenda</button>
         <button type="button" class="btn btn-outline btn-sm" id="btn-bitacora">Ver bitácora</button>
       </div>
     </div>
@@ -308,6 +364,18 @@
           </div>
         </div>
 
+        <div class="bloques-caja">
+          <p class="bloques-titulo">¿Qué más lleva el correo?</p>
+          <p class="bloques-ayuda">Cada sección añade botones al final del mensaje. Con dos o tres basta.</p>
+          <div id="c-bloques" class="bloques-lista"></div>
+
+          <div id="c-preguntas-caja" hidden>
+            <p class="bloques-titulo" style="margin-top:14px">¿Qué se le pregunta?</p>
+            <p class="bloques-ayuda">Se manda una sola: la primera que esa persona no haya contestado.</p>
+            <div id="c-preguntas" class="bloques-lista"></div>
+          </div>
+        </div>
+
         <div class="destinatarios-caja" id="c-destinatarios-info"></div>
         <div class="previa-correo" id="c-previa"></div>
       </div>
@@ -366,6 +434,21 @@
           </div>
         </div>
 
+        <div class="bloques-caja">
+          <p class="bloques-titulo">¿Qué más lleva el correo?</p>
+          <p class="bloques-ayuda">Cada sección añade botones al final del mensaje. Con dos o tres
+            basta: un correo con todas es una pared y no lo lee nadie.</p>
+          <div id="a-bloques" class="bloques-lista"></div>
+
+          <div id="a-preguntas-caja" hidden>
+            <p class="bloques-titulo" style="margin-top:14px">¿Qué se le pregunta?</p>
+            <p class="bloques-ayuda">Se manda <strong>una sola</strong>: la primera de esta lista que
+              esa persona no haya contestado todavía. Al pulsar, aterriza en una página donde puede
+              seguir contestando las demás.</p>
+            <div id="a-preguntas" class="bloques-lista"></div>
+          </div>
+        </div>
+
         <div class="previa-correo" id="a-previa"></div>
       </div>
       <div class="modal-pie">
@@ -373,6 +456,69 @@
         <button type="submit" class="btn btn-primary" id="a-guardar">Guardar</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Respuestas recogidas desde los correos -->
+<div class="modal-fondo" id="modal-respuestas">
+  <div class="modal modal-ancho" role="dialog" aria-modal="true" aria-labelledby="resp-titulo">
+    <div class="modal-cabecera">
+      <h3 id="resp-titulo">Lo que ha contestado la gente</h3>
+      <button type="button" class="modal-cerrar" aria-label="Cerrar" onclick="scCerrarModal('modal-respuestas')">&times;</button>
+    </div>
+    <div class="modal-cuerpo" id="resp-cuerpo"></div>
+    <div class="modal-pie">
+      <button type="button" class="btn btn-gris" onclick="scCerrarModal('modal-respuestas')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Agenda de entrevistas -->
+<div class="modal-fondo" id="modal-agenda">
+  <div class="modal modal-ancho" role="dialog" aria-modal="true" aria-labelledby="ag-titulo">
+    <div class="modal-cabecera">
+      <h3 id="ag-titulo">Agenda de entrevistas</h3>
+      <button type="button" class="modal-cerrar" aria-label="Cerrar" onclick="scCerrarModal('modal-agenda')">&times;</button>
+    </div>
+    <div class="modal-cuerpo">
+      <div class="aviso-admin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+        </svg>
+        <p id="ag-resumen">Cargando…</p>
+      </div>
+
+      <form id="form-agenda" class="agenda-forma">
+        <div class="campo">
+          <label for="ag-inicio">Fecha y hora</label>
+          <input type="datetime-local" id="ag-inicio" required>
+        </div>
+        <div class="campo">
+          <label for="ag-minutos">Duración</label>
+          <select id="ag-minutos">
+            <option value="20">20 min</option>
+            <option value="30" selected>30 min</option>
+            <option value="45">45 min</option>
+            <option value="60">1 hora</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="ag-modo">Modo</label>
+          <select id="ag-modo">
+            <option value="llamada">Llamada</option>
+            <option value="videollamada">Videollamada</option>
+            <option value="presencial">Presencial</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary" id="ag-crear">Abrir franja</button>
+      </form>
+
+      <div id="ag-lista"></div>
+    </div>
+    <div class="modal-pie">
+      <button type="button" class="btn btn-gris" onclick="scCerrarModal('modal-agenda')">Cerrar</button>
+    </div>
   </div>
 </div>
 
@@ -426,6 +572,9 @@ function pintarMetricas(m) {
     { valor: m.sin_verificar,     etq: 'Sin verificar', clase: 'aviso' },
     { valor: m.bloqueados,        etq: 'Bloqueadas',    clase: 'alerta' },
     { valor: m.muro_pendientes,   etq: 'Muro por revisar', clase: 'aviso' },
+    { valor: m.han_contestado,    etq: 'Han contestado' },
+    { valor: m.siguen_interesados,etq: 'Siguen interesados' },
+    { valor: m.entrevistas,       etq: 'Entrevistas apartadas' },
   ];
 
   document.getElementById('metricas').innerHTML = tarjetas.map(t => `
@@ -674,12 +823,24 @@ function bloqueLista(titulo, filas, vacio) {
   return `<div class="ficha-seccion"><div class="ficha-titulo">${scEsc(titulo)}</div>${cuerpo}</div>`;
 }
 
+/* Títulos de las preguntas, para etiquetar las respuestas en la ficha.
+   Los sirve ADMIN_AUTO en catalogo_preguntas; aquí se guarda una copia por
+   si la ficha se abre antes que ninguna ventana de correo. */
+const TITULOS_PREGUNTA = {
+  interes:        '¿Sigue interesado?',
+  disponibilidad: '¿Cuándo puede empezar?',
+  sueldo:         'Sueldo que busca',
+  movilidad:      '¿Puede salir de su ciudad?',
+  certificacion:  'Certificaciones vigentes'
+};
+
 function pintarFicha(d) {
   const u = d.usuario;
   const p = d.perfil || {};
   const esPersona = u.tipo === 'persona';
 
   const datos = [
+    ['Folio',       u.folio || ''],
     ['Tipo',        esPersona ? 'Candidato' : 'Empresa'],
     ['Correo',      u.correo],
     ['Verificado',  Number(u.correo_verificado) ? 'Sí' : 'No'],
@@ -694,6 +855,8 @@ function pintarFicha(d) {
   if (p.curp)      datos.push(['CURP', p.curp]);
   if (p.giro)      datos.push(['Giro', p.giro]);
   if (p.sitio_web) datos.push(['Sitio web', p.sitio_web]);
+  if (u.referido_folio) datos.push(['Lo invitó', u.referido_folio]);
+  if (u.auto_semana_enviado) datos.push(['Correo del primer filtro', scHace(u.auto_semana_enviado)]);
 
   let html = `
     <div class="ficha-seccion">
@@ -702,6 +865,58 @@ function pintarFicha(d) {
         ${datos.map(([k, v]) => `<dt>${scEsc(k)}</dt><dd>${scEsc(v)}</dd>`).join('')}
       </dl>
     </div>`;
+
+  // ── Etapa del proceso ──────────────────────────────────
+  // Es lo que ve esa persona en la página pública de seguimiento, así que
+  // el desplegable dice explícitamente que cambiarlo se lo está contando.
+  const etapas = d.etapas || {};
+  html += `<div class="ficha-seccion">
+    <div class="ficha-titulo">Etapa del proceso</div>
+    <div class="etapa-caja">
+      <select id="ficha-etapa" aria-label="Etapa del proceso">
+        ${Object.entries(etapas).map(([clave, e]) =>
+          `<option value="${scEsc(clave)}" ${u.estatus === clave ? 'selected' : ''}>${scEsc(e.titulo)}</option>`
+        ).join('')}
+      </select>
+      <button type="button" class="btn btn-sm btn-primary"
+        onclick="cambiarEtapa(${Number(u.id)}, document.getElementById('ficha-etapa').value)">Cambiar</button>
+    </div>
+    <p class="ficha-vacia" style="margin-top:7px">
+      Esto es lo que ve al consultar su folio en estado.html.
+      ${u.estatus_fecha ? 'Última vez: ' + scEsc(scHace(u.estatus_fecha)) + '.' : ''}
+    </p>
+  </div>`;
+
+  // ── Avance del perfil ──────────────────────────────────
+  const av = d.avance || {};
+  html += `<div class="ficha-seccion">
+    <div class="ficha-titulo">Perfil completo al ${Number(av.porcentaje || 0)} %</div>
+    ${(av.faltantes && av.faltantes.length)
+      ? `<p class="ficha-vacia">Le falta: ${scEsc(av.faltantes.map(f => f.texto).join(', '))}.</p>`
+      : '<p class="ficha-vacia">No le falta nada.</p>'}
+  </div>`;
+
+  // ── Lo que ha contestado desde los correos ─────────────
+  const resp = d.respuestas || {};
+  const claves = Object.keys(resp);
+  html += `<div class="ficha-seccion">
+    <div class="ficha-titulo">Respuestas desde los correos</div>
+    ${claves.length
+      ? claves.map(tipo => `
+          <p style="font-size:12.5px;color:var(--texto-tenue);margin:8px 0 5px">${scEsc(TITULOS_PREGUNTA[tipo] || tipo)}</p>
+          <div class="respuestas-ficha">
+            ${resp[tipo].map(r => `<span class="respuesta-chip">${scEsc(r.etiqueta)}</span>`).join('')}
+          </div>`).join('')
+      : '<p class="ficha-vacia">Todavía no ha contestado ninguno de los botones de los correos.</p>'}
+  </div>`;
+
+  if (d.entrevista) {
+    html += `<div class="ficha-seccion">
+      <div class="ficha-titulo">Entrevista apartada</div>
+      <p style="font-size:13.5px;font-weight:600">${scEsc(d.entrevista.inicio)}</p>
+      <p class="ficha-vacia">${Number(d.entrevista.minutos)} minutos · ${scEsc(d.entrevista.modo)}</p>
+    </div>`;
+  }
 
   if (p.headline || p.resumen || p.descripcion) {
     html += `<div class="ficha-seccion">
@@ -937,6 +1152,8 @@ function leerCorreo() {
     solo_verificados: document.getElementById('c-verificados').checked ? '1' : '0',
     asunto:           document.getElementById('c-asunto').value.trim(),
     cuerpo:           document.getElementById('c-cuerpo').value.trim(),
+    bloques:          leerMarcados('c-bloques').join(','),
+    preguntas:        leerMarcados('c-preguntas').join(','),
   };
 }
 
@@ -1007,6 +1224,12 @@ document.getElementById('btn-correo').addEventListener('click', () => {
   scAbrirModal('modal-correo');
   pintarPrevia();
   cargarDestinatarios();
+
+  // La campaña arranca sin secciones extra: un envío a todo el padrón con
+  // preguntas dentro es una decisión, no algo que deba pasar por descuido.
+  catalogo()
+    .then(cat => pintarBloques('c-bloques', 'c-preguntas', 'c-preguntas-caja', cat, [], cat.preguntas || []))
+    .catch(err => scToast(err.message, 'error'));
 });
 
 function cerrarCorreo() {
@@ -1130,6 +1353,9 @@ document.getElementById('btn-auto').addEventListener('click', async () => {
     document.getElementById('a-activo').checked = !!r.activo;
     document.getElementById('a-asunto').value = r.asunto || '';
     document.getElementById('a-cuerpo').value = r.cuerpo || '';
+
+    CATALOGO = r;
+    pintarBloques('a-bloques', 'a-preguntas', 'a-preguntas-caja', r, r.bloques || [], r.preguntas || []);
     pintarPreviaAuto();
 
     // Los tres números que hacen falta para entender qué va a pasar: a quién
@@ -1160,6 +1386,8 @@ document.getElementById('form-auto').addEventListener('submit', async (e) => {
       activo,
       asunto: document.getElementById('a-asunto').value.trim(),
       cuerpo: document.getElementById('a-cuerpo').value.trim(),
+      bloques:   leerMarcados('a-bloques').join(','),
+      preguntas: leerMarcados('a-preguntas').join(','),
     });
     scToast(r.message, r.status === 'success' ? 'ok' : 'error');
     if (r.status === 'success') scCerrarModal('modal-auto');
@@ -1169,6 +1397,194 @@ document.getElementById('form-auto').addEventListener('submit', async (e) => {
     btn.disabled = false;
   }
 });
+
+/* ── Secciones que piden algo dentro del correo ─────────── */
+
+/**
+ * Catálogo de secciones y preguntas. Lo sirve ADMIN_AUTO; se guarda al
+ * vuelo porque las dos ventanas de correo lo necesitan y no tiene sentido
+ * pedirlo dos veces.
+ */
+let CATALOGO = null;
+
+async function catalogo() {
+  if (CATALOGO) return CATALOGO;
+  const r = await scGet('ADMIN_AUTO');
+  if (r.status !== 'success') throw new Error(r.message || 'No se pudo cargar el catálogo.');
+  CATALOGO = r;
+  return r;
+}
+
+/** Pinta las casillas de secciones y devuelve el manejador de cambios. */
+function pintarBloques(idBloques, idPreguntas, idCajaPreguntas, cat, activos, preguntas) {
+  const caja = document.getElementById(idBloques);
+
+  caja.innerHTML = Object.entries(cat.catalogo_bloques).map(([clave, texto]) => {
+    // El botón de WhatsApp no se puede ofrecer si no hay número configurado:
+    // marcarlo no haría nada y solo confundiría.
+    const sinWhatsApp = clave === 'whatsapp' && !cat.whatsapp;
+    return `<label class="bloque-op ${sinWhatsApp ? 'apagado' : ''}"
+              title="${sinWhatsApp ? 'Define SC_WHATSAPP en config.php para poder usarlo' : ''}">
+        <input type="checkbox" value="${scEsc(clave)}"
+          ${activos.includes(clave) && !sinWhatsApp ? 'checked' : ''}
+          ${sinWhatsApp ? 'disabled' : ''}>
+        ${scEsc(texto)}</label>`;
+  }).join('');
+
+  document.getElementById(idPreguntas).innerHTML =
+    Object.entries(cat.catalogo_preguntas).map(([clave, titulo]) =>
+      `<label class="bloque-op"><input type="checkbox" value="${scEsc(clave)}"
+         ${preguntas.includes(clave) ? 'checked' : ''}> ${scEsc(titulo)}</label>`
+    ).join('');
+
+  // La lista de preguntas solo tiene sentido si la sección está marcada
+  const sincronizar = () => {
+    const marcado = [...caja.querySelectorAll('input:checked')].some(i => i.value === 'pregunta');
+    document.getElementById(idCajaPreguntas).hidden = !marcado;
+  };
+  caja.addEventListener('change', sincronizar);
+  sincronizar();
+}
+
+function leerMarcados(id) {
+  return [...document.getElementById(id).querySelectorAll('input:checked')].map(i => i.value);
+}
+
+/* ── Respuestas recogidas ───────────────────────────────── */
+
+document.getElementById('btn-respuestas').addEventListener('click', async () => {
+  scAbrirModal('modal-respuestas');
+  const caja = document.getElementById('resp-cuerpo');
+  caja.innerHTML = '<p class="vacio">Cargando…</p>';
+
+  try {
+    const d = await scGet('ADMIN_RESPUESTAS');
+    if (d.status !== 'success') { caja.innerHTML = `<p class="vacio">${scEsc(d.message)}</p>`; return; }
+
+    const algo = d.preguntas.some(p => p.total > 0);
+    if (!algo) {
+      caja.innerHTML = '<p class="vacio">Todavía nadie ha contestado. Las respuestas llegan cuando '
+                     + 'la gente pulsa los botones de los correos.</p>';
+      return;
+    }
+
+    caja.innerHTML = d.preguntas.map(p => {
+      // El porcentaje se calcula sobre el total de esa pregunta, no sobre el
+      // padrón: lo que interesa es el reparto entre quienes contestaron.
+      const mayor = Math.max(1, ...p.opciones.map(o => o.total));
+      const filas = p.opciones.map(o => `
+        <div class="resp-fila">
+          <div>
+            <div class="resp-etq">${scEsc(o.etiqueta)}</div>
+            <div class="resp-barra"><span style="width:${Math.round(o.total / mayor * 100)}%"></span></div>
+          </div>
+          <div class="resp-num ${o.total ? '' : 'cero'}">${Number(o.total)}</div>
+        </div>`).join('');
+
+      return `<div class="resp-grupo">
+          <h4>${scEsc(p.titulo)}</h4>
+          <p class="resp-total">${Number(p.total)} ${p.total === 1 ? 'respuesta' : 'respuestas'}${p.multiple ? ' · se pueden marcar varias' : ''}</p>
+          ${filas}
+        </div>`;
+    }).join('');
+  } catch (e) {
+    caja.innerHTML = `<p class="vacio">${scEsc(e.message)}</p>`;
+  }
+});
+
+/* ── Agenda de entrevistas ──────────────────────────────── */
+
+async function cargarAgenda() {
+  const lista = document.getElementById('ag-lista');
+  lista.innerHTML = '<p class="vacio">Cargando…</p>';
+
+  try {
+    const d = await scGet('ADMIN_AGENDA');
+    if (d.status !== 'success') { lista.innerHTML = `<p class="vacio">${scEsc(d.message)}</p>`; return; }
+
+    document.getElementById('ag-resumen').innerHTML =
+      `<strong>${Number(d.libres)}</strong> ${d.libres === 1 ? 'franja libre' : 'franjas libres'} por delante. `
+      + 'Las libres salen en los correos como botones; quien pulsa la aparta al instante.';
+
+    if (!d.franjas.length) {
+      lista.innerHTML = '<p class="vacio">No hay franjas abiertas. Crea alguna arriba para que '
+                      + 'los correos puedan ofrecer horarios.</p>';
+      return;
+    }
+
+    lista.innerHTML = d.franjas.map(f => `
+      <div class="franja ${f.libre ? '' : 'tomada'}">
+        <div>
+          <div class="franja-cuando">${scEsc(f.cuando)}</div>
+          <div class="franja-quien">${Number(f.minutos)} min · ${scEsc(d.modos[f.modo] || f.modo)}
+            ${f.libre ? '· libre' : '· apartada por ' + scEsc(f.nombre || f.correo || f.folio)}</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline" data-franja="${Number(f.id)}"
+          data-tomada="${f.libre ? '0' : '1'}">Quitar</button>
+      </div>`).join('');
+  } catch (e) {
+    lista.innerHTML = `<p class="vacio">${scEsc(e.message)}</p>`;
+  }
+}
+
+document.getElementById('btn-agenda').addEventListener('click', () => {
+  scAbrirModal('modal-agenda');
+  cargarAgenda();
+});
+
+document.getElementById('form-agenda').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('ag-crear');
+  btn.disabled = true;
+
+  try {
+    const r = await scPost('ADMIN_AGENDA_CREAR', {
+      inicio:  document.getElementById('ag-inicio').value,
+      minutos: document.getElementById('ag-minutos').value,
+      modo:    document.getElementById('ag-modo').value,
+    });
+    scToast(r.message, r.status === 'success' ? 'ok' : 'error');
+    if (r.status === 'success') {
+      document.getElementById('ag-inicio').value = '';
+      cargarAgenda();
+    }
+  } catch (err) {
+    scToast(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('ag-lista').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-franja]');
+  if (!btn) return;
+
+  const tomada = btn.dataset.tomada === '1';
+  if (tomada && !confirm('Esa entrevista ya está apartada. Si la quitas, esa persona se queda '
+                       + 'sin cita y no se le avisa solo.\n\n¿Quitarla igualmente?')) return;
+
+  btn.disabled = true;
+  try {
+    const r = await scPost('ADMIN_AGENDA_BORRAR', { id: Number(btn.dataset.franja), confirmar: tomada });
+    scToast(r.message, r.status === 'success' ? 'ok' : 'error');
+    cargarAgenda();
+  } catch (err) {
+    scToast(err.message, 'error');
+    btn.disabled = false;
+  }
+});
+
+/* ── Etapa del proceso ──────────────────────────────────── */
+
+async function cambiarEtapa(id, etapa) {
+  try {
+    const r = await scPost('ADMIN_ESTATUS', { id, estatus: etapa });
+    scToast(r.message, r.status === 'success' ? 'ok' : 'error');
+    if (r.status === 'success') { cargar(); cargarResumen(); }
+  } catch (err) {
+    scToast(err.message, 'error');
+  }
+}
 
 /* ── Bitácora ───────────────────────────────────────────── */
 /**

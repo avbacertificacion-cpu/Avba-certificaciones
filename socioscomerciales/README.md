@@ -80,6 +80,13 @@ Copiar `config/config.sample.php` a `config/config.php` y llenar:
 
 `config.php` está en `.gitignore`, así que el despliegue nunca lo sobrescribe.
 
+### Opcional, para las secciones nuevas del correo
+
+| Constante | Para qué |
+|---|---|
+| `SC_WHATSAPP` | Número en formato internacional. Sin él, el botón de WhatsApp no se puede activar (el panel lo muestra en gris). |
+| `SC_FIRMA_CLAVE` | Firma de los enlaces de los correos. Si falta, se genera sola y se guarda en la base. Definirla sirve para poder invalidar de golpe todos los enlaces ya enviados. |
+
 ## Base de datos
 
 Tablas con prefijo `sc_`: `sc_meta`, `sc_usuarios`, `sc_sesiones`, `sc_intentos`,
@@ -90,6 +97,19 @@ El esquema se crea y se migra solo. `sc_meta.schema_version` guarda la versión
 aplicada; si es menor que `SC_SCHEMA_VERSION` (en `config/database.php`), se
 ejecutan las migraciones pendientes en el siguiente request. Para añadir una
 migración: subir la constante y agregar un método `migrarAN()`.
+
+### Tablas de la v13
+
+- **`sc_respuestas`** — lo que contesta la gente desde los correos.
+  `UNIQUE(usuario_id, tipo, valor)`, así que volver a pulsar el mismo botón no
+  duplica. Las preguntas de una sola respuesta borran la anterior antes de
+  insertar; las de varias (certificaciones) se acumulan.
+- **`sc_franjas`** — horarios de entrevista. `usuario_id NULL` = libre.
+- **`sc_usuarios`** gana `estatus`, `estatus_fecha`, `estatus_nota` y
+  `referido_por`; **`sc_envios`** gana `bloques` y `preguntas` — se guardan con
+  la campaña y no solo en la configuración general, porque el envío va por
+  lotes: si alguien cambia los ajustes a mitad, la segunda mitad del padrón
+  recibiría un correo distinto al de la primera.
 
 ## Seguridad
 
@@ -283,6 +303,105 @@ todo el padrón antiguo diciendo que "acaba de pasar el primer filtro".
    puesto: una de cada cuarenta peticiones vacía un poco la cola. Corre en
    `register_shutdown_function` tras `fastcgi_finish_request()`, así que la
    respuesta ya salió y el usuario no espera por ello.
+
+## Que el correo pida algo (opciones A–I)
+
+El correo del primer filtro informaba y ofrecía un botón genérico. Ahora puede
+pedir cosas, y todo se contesta **con un clic desde el propio correo**, sin
+escribir la contraseña.
+
+### El motor: enlaces firmados
+
+Cada botón lleva un token con `{usuario, pregunta, respuesta, caducidad}`
+firmado con HMAC-SHA256 (`scFirmarEnlace` / `scVerificarEnlace` en
+`api/helpers.php`). Aterriza en **`r.php`**, que valida la firma, guarda la
+respuesta y enseña una página de agradecimiento.
+
+Firmarlo es lo que permite quitar el inicio de sesión sin abrir un agujero:
+cambiar el número de usuario en la URL invalida la firma, así que nadie puede
+contestar por otra persona. El secreto sale de `SC_FIRMA_CLAVE` si está
+definida; si no, se genera solo y se guarda en `sc_meta.firma_secreto` — un
+secreto que hay que configurar a mano es un secreto que acaba sin configurar.
+Cambiarlo invalida de golpe todos los enlaces ya enviados, que es justo lo que
+se quiere si alguna vez se filtra. Los enlaces caducan a los 60 días.
+
+### Las secciones que puede llevar
+
+Se eligen con casillas en **"Correo automático"** y en **"Enviar correo"**. Por
+defecto vienen tres; con dos o tres basta, porque un correo con las siete es una
+pared que no lee nadie.
+
+| Sección | Qué hace |
+|---|---|
+| `pregunta` | Una pregunta con botones de respuesta |
+| `avance` | Barra de avance del perfil y qué le falta |
+| `vacantes` | Hasta tres vacantes abiertas que le encajan |
+| `agenda` | Horarios de entrevista libres, para apartar |
+| `whatsapp` | Botón de WhatsApp con nombre y folio ya escritos |
+| `folio` | Su folio y el enlace de seguimiento |
+| `referido` | Enlace para invitar a un colega |
+
+Del bloque `pregunta` sale **una sola**: la primera de la lista configurada que
+esa persona no haya contestado. Al pulsar, `r.php` le ofrece la siguiente. El
+correo abre la conversación; la página la continúa. Un correo con cuatro
+preguntas es un formulario disfrazado y no lo contesta nadie.
+
+Las preguntas y sus opciones viven en `ScInteraccion::PREGUNTAS`, no en la base:
+son textos de cara al candidato, y lo que se guarda es una clave corta y
+estable, así que reescribir una etiqueta no invalida lo ya recogido. El catálogo
+de certificaciones es del sector: CWI, API 510/570/653, END nivel II, IRATA,
+alturas, espacios confinados, NOM-020, NOM-029 e izaje.
+
+Las claves que llegan del panel se comparan contra el catálogo antes de tocar
+nada (`ScCorreos::limpiarLista`): deciden qué se le enseña a la gente, así que
+un valor inventado no debe llegar ni a la base ni al correo.
+
+### Folio y página de seguimiento
+
+Cada cuenta tiene folio `SC-000123`, que **es su número de usuario con
+formato**, no una secuencia aparte. `estado.html` lo consulta sin sesión y
+muestra la etapa y el avance del perfil.
+
+A propósito **no devuelve nombre ni correo**: el folio llega por correo, pero
+cualquiera puede probar números seguidos, así que lo único que se enseña es en
+qué punto va. Además, 30 consultas por hora e IP.
+
+Las etapas (`sc_usuarios.estatus`) las mueve administración desde la ficha, y el
+correo del primer filtro mueve solo a `primer_filtro` a quien siguiera en
+`nuevo` o `en_revision` — a quien ya iba por entrevista no se le hace
+retroceder. Todo cambio queda en la bitácora: no es un apunte interno, es algo
+que esa persona va a leer.
+
+### Agenda de entrevistas
+
+Administración abre franjas en **"Agenda"**; las libres salen como botones en
+los correos. La reserva va con un `UPDATE ... WHERE usuario_id IS NULL`: si dos
+personas pulsan el mismo horario a la vez, solo una ve `rowCount() === 1` y la
+otra recibe un aviso claro con las alternativas, en vez de quedarse las dos
+convencidas de tener la cita. Una cita por persona: elegir otra libera la
+anterior. Borrar una franja ya apartada exige confirmación, porque esa persona
+se queda sin cita y no se le avisa solo.
+
+### Referidos
+
+El bloque `referido` manda a `registro.html?ref=SC-000123`. El folio se
+comprueba contra la base antes de guardarlo en `sc_usuarios.referido_por`: viaja
+en una URL y cualquiera puede escribir el número que quiera. Quien llega
+invitado ve un aviso de que se le esperaba.
+
+### Dónde se ve todo
+
+- **"Respuestas"** en el panel: el reparto de cada pregunta.
+- **Ficha de cada cuenta**: folio, etapa, avance del perfil, lo que contestó y su
+  entrevista.
+- **Resumen**: cuántos han contestado, cuántos siguen interesados y cuántas
+  entrevistas hay apartadas.
+
+### Antes de activar C o D
+
+Preguntar sueldo esperado o certificaciones es recabar **datos personales
+nuevos**. Hay que revisar que el aviso de privacidad los cubra — y ese texto
+sigue pendiente de que lo lea un abogado.
 
 ## Muro del portal (feed)
 

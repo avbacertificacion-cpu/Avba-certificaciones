@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Estado de mi solicitud — Socios Comerciales AVBA</title>
+<meta name="description" content="Consulta en qué punto va tu registro en Socios Comerciales AVBA con tu folio.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/png" href="assets/favicon.png">
+<link rel="stylesheet" href="assets/avba.css">
+<style>
+  body {
+    background: linear-gradient(160deg, var(--hero-1) 0%, var(--hero-2) 100%);
+    min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    padding: 32px 20px;
+  }
+  .caja { width: 100%; max-width: 480px; }
+  .tarjeta {
+    background: var(--blanco); border-radius: var(--r-lg);
+    box-shadow: var(--sombra-lg); padding: 32px 28px 28px;
+  }
+  .marca { text-align: center; padding-bottom: 18px; margin-bottom: 22px; border-bottom: 1px solid var(--borde); }
+  .marca img { height: 40px; width: auto; display: block; margin: 0 auto 8px; }
+  .marca p { font-size: 11.5px; font-weight: 700; color: var(--azul); letter-spacing: .6px; text-transform: uppercase; }
+
+  h1 { font-size: 19px; font-weight: 800; margin-bottom: 6px; }
+  .sub { font-size: 13.5px; color: var(--texto-sub); margin-bottom: 18px; }
+
+  .buscador { display: flex; gap: 8px; }
+  .buscador input {
+    flex: 1; padding: 12px 14px; border: 1.5px solid var(--borde);
+    border-radius: var(--r-sm); font-size: 15px; color: var(--texto);
+    letter-spacing: .5px;
+  }
+  .buscador input:focus { outline: none; border-color: var(--azul); }
+  .buscador button {
+    background: var(--azul); color: #fff; border: none; font-weight: 700;
+    font-size: 14.5px; padding: 12px 20px; border-radius: var(--r-sm); cursor: pointer;
+  }
+  .buscador button:hover { background: var(--azul-oscuro); }
+  .buscador button[disabled] { opacity: .6; cursor: default; }
+
+  .aviso { margin-top: 14px; font-size: 13.5px; padding: 11px 14px; border-radius: var(--r-sm); }
+  .aviso.mal { background: var(--rojo-bg); color: #A5241B; }
+
+  .resultado { margin-top: 24px; padding-top: 22px; border-top: 1px solid var(--borde); }
+  .rotulo { font-size: 11px; font-weight: 700; letter-spacing: .8px; text-transform: uppercase;
+            color: var(--texto-tenue); margin-bottom: 6px; }
+  .folio { font-size: 22px; font-weight: 800; letter-spacing: 1px; color: var(--azul); margin-bottom: 20px; }
+
+  /* Línea de etapas: la barra vertical dice de un vistazo por dónde va */
+  .etapas { list-style: none; margin: 0 0 22px; padding: 0; }
+  .etapa { display: grid; grid-template-columns: 22px 1fr; gap: 12px; padding-bottom: 14px; position: relative; }
+  .etapa:last-child { padding-bottom: 0; }
+  .punto {
+    width: 14px; height: 14px; border-radius: 50%; margin-top: 4px;
+    background: var(--gris-fondo); border: 2px solid var(--borde); z-index: 1;
+  }
+  .etapa:not(:last-child)::before {
+    content: ''; position: absolute; left: 6px; top: 20px; bottom: 0;
+    width: 2px; background: var(--borde);
+  }
+  .etapa.hecha .punto { background: var(--verde); border-color: var(--verde); }
+  .etapa.hecha:not(:last-child)::before { background: var(--verde); }
+  .etapa.actual .punto { background: var(--azul); border-color: var(--azul);
+                         box-shadow: 0 0 0 4px var(--azul-claro); }
+  .etapa h2 { font-size: 14.5px; font-weight: 700; color: var(--texto-tenue); }
+  .etapa.hecha h2, .etapa.actual h2 { color: var(--texto); }
+  .etapa.actual h2 { color: var(--azul-oscuro); }
+  .etapa p { font-size: 13px; color: var(--texto-sub); margin-top: 3px; }
+  .etapa .cuando { font-size: 12px; color: var(--texto-tenue); margin-top: 3px; }
+
+  .barra { height: 9px; background: var(--gris-fondo); border-radius: 6px; overflow: hidden; }
+  .barra span { display: block; height: 100%; background: var(--azul); border-radius: 6px; transition: width .5s; }
+  .pct { font-size: 12.5px; font-weight: 700; color: var(--azul); margin-top: 7px; }
+  .faltan { margin: 9px 0 0 18px; font-size: 13px; color: var(--texto-sub); }
+  .faltan li { margin-bottom: 3px; }
+
+  .btn { display: inline-block; background: var(--azul); color: #fff; font-weight: 700;
+         font-size: 14.5px; padding: 11px 20px; border-radius: var(--r-sm); margin-top: 16px; }
+  .btn:hover { background: var(--azul-oscuro); }
+
+  .legal { margin-top: 16px; font-size: 11.5px; color: rgba(255,255,255,.5); text-align: center; }
+  .legal a { color: rgba(255,255,255,.75); font-weight: 600; }
+  .legal a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<div class="caja">
+  <div class="tarjeta">
+    <div class="marca">
+      <img src="assets/avba-logo.png" alt="AVBA">
+      <p>Socios Comerciales</p>
+    </div>
+
+    <h1>Estado de tu solicitud</h1>
+    <p class="sub">Escribe el folio que viene en nuestros correos. Es algo como <strong>SC-000123</strong>.</p>
+
+    <form class="buscador" id="forma" autocomplete="off">
+      <input type="text" id="folio" name="folio" placeholder="SC-000123"
+             maxlength="14" aria-label="Folio de seguimiento" required>
+      <button type="submit" id="boton">Consultar</button>
+    </form>
+
+    <div id="aviso"></div>
+    <div id="resultado"></div>
+  </div>
+
+  <p class="legal">
+    <a href="index.html">Ir al portal</a> ·
+    <a href="terminos.html">Términos y Condiciones</a> ·
+    <a href="aviso-privacidad.html">Aviso de Privacidad</a><br>
+    AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.
+  </p>
+</div>
+
+<script src="assets/avba.js"></script>
+<script>
+// El orden en que avanza una solicitud. 'no_procede' queda fuera a propósito:
+// no es un paso más de la fila, es una salida, y pintarlo al final de la línea
+// haría parecer que todo el mundo acaba ahí.
+const ORDEN = ['nuevo', 'en_revision', 'primer_filtro', 'entrevista', 'aprobado'];
+
+const $ = (id) => document.getElementById(id);
+
+function mostrarAviso(texto) {
+  $('aviso').innerHTML = texto ? '<div class="aviso mal">' + scEsc(texto) + '</div>' : '';
+  if (texto) $('resultado').innerHTML = '';
+}
+
+function pintar(d) {
+  mostrarAviso('');
+
+  const posicion = ORDEN.indexOf(d.etapa);
+  let etapas = '';
+
+  if (posicion === -1) {
+    // Salida del proceso: una sola tarjeta, sin línea de tiempo.
+    etapas = '<li class="etapa actual"><span class="punto"></span><div>'
+           + '<h2>' + scEsc(d.titulo) + '</h2><p>' + scEsc(d.texto) + '</p>'
+           + (d.desde ? '<p class="cuando">' + scFechaLarga(d.desde) + '</p>' : '')
+           + '</div></li>';
+  } else {
+    ORDEN.forEach((clave, i) => {
+      const clase = i < posicion ? 'hecha' : (i === posicion ? 'actual' : '');
+      etapas += '<li class="etapa ' + clase + '"><span class="punto"></span><div>'
+             + '<h2>' + scEsc(TITULOS[clave]) + '</h2>'
+             + (i === posicion ? '<p>' + scEsc(d.texto) + '</p>' : '')
+             + (i === posicion && d.desde ? '<p class="cuando">Desde el ' + scFechaLarga(d.desde) + '</p>' : '')
+             + '</div></li>';
+    });
+  }
+
+  let perfil = '<p class="rotulo">Tu perfil</p>'
+             + '<div class="barra"><span style="width:' + (d.avance || 0) + '%"></span></div>'
+             + '<p class="pct">' + (d.avance || 0) + ' % completo</p>';
+
+  if (d.faltantes && d.faltantes.length) {
+    perfil += '<ul class="faltan">'
+            + d.faltantes.map(f => '<li>' + scEsc(f) + '</li>').join('')
+            + '</ul><a class="btn" href="inicio.html">Completar mi perfil</a>';
+  } else {
+    perfil += '<p class="sub" style="margin-top:8px">No te falta nada. Gracias por mantenerlo al día.</p>';
+  }
+
+  $('resultado').innerHTML =
+      '<div class="resultado">'
+    + '<p class="rotulo">Folio</p><div class="folio">' + scEsc(d.folio) + '</div>'
+    + '<ul class="etapas">' + etapas + '</ul>'
+    + perfil
+    + '</div>';
+}
+
+// Títulos de cada etapa. Se dejan aquí para poder pintar la línea completa,
+// incluidos los pasos que esta persona todavía no ha alcanzado.
+const TITULOS = {
+  nuevo:         'Registro recibido',
+  en_revision:   'En revisión',
+  primer_filtro: 'Pasaste el primer filtro',
+  entrevista:    'En entrevista',
+  aprobado:      'Aprobado'
+};
+
+async function consultar(folio) {
+  $('boton').disabled = true;
+  $('boton').textContent = 'Consultando…';
+
+  try {
+    const r = await fetch('api/index.php?action=ESTADO_FOLIO&folio=' + encodeURIComponent(folio));
+    const d = await r.json();
+    if (d.status === 'success') pintar(d);
+    else mostrarAviso(d.message || 'No encontramos ese folio.');
+  } catch (e) {
+    mostrarAviso('No pudimos conectar. Revisa tu conexión e inténtalo de nuevo.');
+  } finally {
+    $('boton').disabled = false;
+    $('boton').textContent = 'Consultar';
+  }
+}
+
+$('forma').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const folio = $('folio').value.trim();
+  if (folio) consultar(folio);
+});
+
+// Si el folio viene en la URL (así llega desde el correo), se consulta solo.
+window.addEventListener('DOMContentLoaded', () => {
+  const folio = new URLSearchParams(location.search).get('folio');
+  if (folio) {
+    $('folio').value = folio;
+    consultar(folio);
+  } else {
+    $('folio').focus();
+  }
+});
+</script>
+
+</body>
+</html>

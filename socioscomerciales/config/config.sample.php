@@ -45,6 +45,21 @@ define('SC_DB_PASS', '');
 // tráfico normal, pero con cron salen a su hora aunque nadie entre.
 // define('SC_CRON_CLAVE', 'cámbiala-por-una-cadena-larga-y-aleatoria');
 
+// ── WhatsApp de contacto ──────────────────────────────────────────────
+// Si se define, los correos pueden llevar un botón que abre WhatsApp con el
+// mensaje ya escrito (nombre y folio incluidos). En México se contesta
+// WhatsApp mucho más que el correo, así que suele ser el botón que más
+// respuestas genera. Formato internacional, sin espacios ni signos.
+// define('SC_WHATSAPP', '5215512345678');
+
+// ── Firma de los enlaces de los correos ───────────────────────────────
+// Los botones de "sí sigo interesado", "puedo empezar en 15 días", etc. van
+// firmados para que nadie pueda contestar por otra persona cambiando un
+// número en la URL. Si no se define, el portal genera un secreto solo y lo
+// guarda en la base, que es suficiente. Definirlo aquí sirve para poder
+// invalidar de golpe todos los enlaces ya enviados: basta con cambiarlo.
+// define('SC_FIRMA_CLAVE', 'cámbiala-por-una-cadena-larga-y-aleatoria');
+
 // ── Administradores del portal ────────────────────────────────────────
 // Correos que ven el panel de administración (admin.html) y pueden
 // bloquear o eliminar cuentas.
