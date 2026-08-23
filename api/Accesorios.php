@@ -230,8 +230,10 @@ class Accesorios {
         if ($qrCodigo !== '' && !$this->qrDisponible($qrCodigo))
             return ['status' => 'error', 'message' => 'Ese QR ya está en uso.'];
 
-        // Count existing accessories in session for orden
-        $cntStmt = $this->pdo->prepare("SELECT COUNT(*) FROM accesorios_izaje WHERE sesion_id = ?");
+        // El orden sigue al último, no al total: si Calidad borró un renglón
+        // intermedio, contar daría un número ya ocupado y dos accesorios
+        // acabarían compartiendo posición en el informe.
+        $cntStmt = $this->pdo->prepare("SELECT COALESCE(MAX(orden),0) FROM accesorios_izaje WHERE sesion_id = ?");
         $cntStmt->execute([$sesionId]);
         $orden = (int)$cntStmt->fetchColumn() + 1;
 
@@ -645,10 +647,11 @@ class Accesorios {
      * No se copian las fotografías ni el QR: la evidencia y el código son de
      * cada unidad, no del modelo.
      */
-    public function duplicarAccesorio(array $p, bool $permitirCerrada = false): array {
+    public function duplicarAccesorio(
+        array $p, bool $permitirCerrada = false, string $usuario = '', bool $soloPropia = false
+    ): array {
         $this->ensureAccIzajeQrColumn();
-        $accId  = (int)($p['id'] ?? $p['accesorio_id'] ?? 0);
-        $copias = max(1, min(50, (int)($p['copias'] ?? 1)));
+        $accId = (int)($p['id'] ?? $p['accesorio_id'] ?? 0);
         if (!$accId) return ['status' => 'error', 'message' => 'Accesorio no indicado.'];
 
         $s = $this->pdo->prepare("SELECT * FROM accesorios_izaje WHERE id = ?");
@@ -657,19 +660,47 @@ class Accesorios {
         if (!$it) return ['status' => 'error', 'message' => 'Accesorio no encontrado.'];
 
         $sesionId = (int)$it['sesion_id'];
-        $e = $this->pdo->prepare("SELECT estatus FROM accesorios_sesiones WHERE id = ?");
+        $e = $this->pdo->prepare("SELECT estatus, usuario FROM accesorios_sesiones WHERE id = ?");
         $e->execute([$sesionId]);
-        $estatus = (string)$e->fetchColumn();
+        $ses = $e->fetch() ?: ['estatus' => '', 'usuario' => ''];
+        $estatus = (string)$ses['estatus'];
         $abierta = in_array($estatus, self::ABIERTOS, true);
         if (!$abierta && !$permitirCerrada) {
             return ['status' => 'error', 'message' => 'La sesión ya fue aprobada; no admite cambios.'];
         }
+        // El inspector clona dentro de su propia sesión; la de otro compañero
+        // no le corresponde tocarla.
+        if ($soloPropia && trim((string)$ses['usuario']) !== trim($usuario)) {
+            return ['status' => 'error', 'message' => 'Esa sesión es de otro inspector.'];
+        }
 
-        // Series para las copias: una por copia, en el orden recibido. Las que
-        // no se indiquen quedan vacías para completarlas después.
-        $series = $p['series'] ?? [];
-        if (is_string($series)) $series = array_filter(array_map('trim', preg_split('/[\n,;]+/', $series)));
-        $series = array_values((array)$series);
+        // Series, códigos internos y placas para las copias: uno por copia, en
+        // el orden recibido. Lo que no se indique queda vacío para completarlo
+        // después.
+        $lista = function ($v): array {
+            if (is_string($v)) $v = preg_split('/[\n,;]+/', $v);
+            return array_values(array_map(fn($x) => trim((string)$x), (array)$v));
+        };
+        $series = $lista($p['series'] ?? []);
+        $qrs    = $lista($p['qrs']    ?? []);
+        $ids    = $lista($p['ids']    ?? []);
+
+        $copias = (int)($p['copias'] ?? 0);
+        $copias = max(1, min(50, max($copias, count($qrs), count($series), count($ids))));
+
+        // Las placas se revisan todas antes de crear nada: más vale no dejar la
+        // sesión a medio clonar por un código repetido en el renglón 7.
+        $vistos = [];
+        foreach (array_slice($qrs, 0, $copias) as $n => $qr) {
+            if ($qr === '') continue;
+            if (!qrFormatoValido($qr))
+                return ['status' => 'error', 'message' => 'Copia ' . ($n + 1) . ': ' . qrMensajeFormato()];
+            if (isset($vistos[$qr]))
+                return ['status' => 'error', 'message' => "El código $qr está repetido entre las copias."];
+            if (!$this->qrDisponible($qr))
+                return ['status' => 'error', 'message' => "El código $qr ya está en uso."];
+            $vistos[$qr] = true;
+        }
 
         $orden = (int)$this->pdo->query(
             "SELECT COALESCE(MAX(orden),0) FROM accesorios_izaje WHERE sesion_id = " . $sesionId
@@ -678,27 +709,83 @@ class Accesorios {
         $ins = $this->pdo->prepare(
             "INSERT INTO accesorios_izaje
                (sesion_id, id_accesorio, tipo_id, marca, modelo, serie, capacidad, medidas, estado, orden, qr_codigo, componentes)
-             VALUES (?,?,?,?,?,?,?,?,?,?,NULL,?)"
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
         );
 
+        $copiarFotos = !empty($p['copiar_fotos']);
         $creados = [];
-        for ($i = 0; $i < $copias; $i++) {
-            $serie = mb_strtoupper(trim((string)($series[$i] ?? ''))) ?: null;
-            $ins->execute([
-                $sesionId, $it['id_accesorio'], $it['tipo_id'], $it['marca'], $it['modelo'],
-                $serie, $it['capacidad'], $it['medidas'], $it['estado'], ++$orden,
-                $it['componentes'] ?? null,
-            ]);
-            $creados[] = (int)$this->pdo->lastInsertId();
+        $this->pdo->beginTransaction();
+        try {
+            for ($i = 0; $i < $copias; $i++) {
+                $serie = mb_strtoupper($series[$i] ?? '') ?: null;
+                $idAcc = mb_strtoupper($ids[$i] ?? '') ?: (string)$it['id_accesorio'];
+                $qr    = $qrs[$i] ?? '';
+                $ins->execute([
+                    $sesionId, $idAcc, $it['tipo_id'], $it['marca'], $it['modelo'],
+                    $serie, $it['capacidad'], $it['medidas'], $it['estado'], ++$orden,
+                    $qr !== '' ? $qr : null, $it['componentes'] ?? null,
+                ]);
+                $nuevoId = (int)$this->pdo->lastInsertId();
+                $creados[] = ['id' => $nuevoId, 'qr' => $qr, 'serie' => $serie ?? '', 'id_accesorio' => $idAcc];
+                if ($qr !== '') $this->ocuparQr($qr);
+                if ($copiarFotos) $this->clonarFotos($accId, $nuevoId, $sesionId);
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $ex) {
+            $this->pdo->rollBack();
+            error_log('[Accesorios] duplicar: ' . $ex->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudieron crear las copias.'];
         }
 
-        $sinSerie = 0;
-        foreach ($creados as $n => $_) if (trim((string)($series[$n] ?? '')) === '') $sinSerie++;
+        $sinQr = 0; $sinSerie = 0;
+        foreach ($creados as $c) {
+            if ($c['qr']    === '') $sinQr++;
+            if ($c['serie'] === '') $sinSerie++;
+        }
+        $falta = [];
+        if ($sinQr)    $falta[] = "el código QR de $sinQr";
+        if ($sinSerie) $falta[] = "el número de serie de $sinSerie";
+        $msg = count($creados) . ' copia(s) creada(s)';
+        $msg .= $falta ? '. Falta ' . implode(' y ', $falta) . '.' : '.';
 
-        $msg = count($creados) . ' copia(s) creada(s). Falta asignarles su código QR';
-        $msg .= $sinSerie ? ", y el número de serie de $sinSerie de ellas." : '.';
+        return [
+            'status'   => 'success',
+            'ids'      => array_column($creados, 'id'),
+            'copias'   => $creados,
+            'reemitir' => !$abierta,
+            'message'  => $msg,
+        ];
+    }
 
-        return ['status' => 'success', 'ids' => $creados, 'reemitir' => !$abierta, 'message' => $msg];
+    /**
+     * Lleva la evidencia del accesorio original a la copia. Se usa cuando el
+     * inspector clona un lote de piezas idénticas que fotografió juntas: sin
+     * esto las copias saldrían sin foto en el informe y ya no puede subirlas
+     * desde el celular una vez guardadas.
+     */
+    private function clonarFotos(int $origenId, int $destinoId, int $sesionId): void {
+        try {
+            $q = $this->pdo->prepare("SELECT url, orden FROM accesorios_fotos WHERE accesorio_id = ? ORDER BY orden");
+            $q->execute([$origenId]);
+            $fotos = $q->fetchAll();
+            if (!$fotos) return;
+
+            $base = dirname(__DIR__) . '/';
+            $dir  = $base . "uploads/accesorios/$sesionId/";
+            if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return;
+
+            $ins = $this->pdo->prepare("INSERT INTO accesorios_fotos (accesorio_id, url, orden) VALUES (?,?,?)");
+            foreach ($fotos as $n => $f) {
+                $src = $base . ltrim((string)$f['url'], '/');
+                if (!is_file($src)) continue;
+                $ext   = strtolower(pathinfo($src, PATHINFO_EXTENSION)) ?: 'jpg';
+                $fname = "acc_{$destinoId}_" . ($n + 1) . ".$ext";
+                if (!@copy($src, $dir . $fname)) continue;
+                $ins->execute([$destinoId, "uploads/accesorios/$sesionId/$fname", $n + 1]);
+            }
+        } catch (\Throwable $ex) {
+            error_log('[Accesorios] clonar fotos: ' . $ex->getMessage());
+        }
     }
 
     /**
@@ -1265,6 +1352,30 @@ class Accesorios {
                 'No hay placas libres en el banco de códigos. Carga el lote nuevo desde Calidad → Códigos QR, o captura el código a mano.'];
         }
         return ['status' => 'success', 'qr' => $qr];
+    }
+
+    /**
+     * Varias placas libres de golpe, para clonar un lote de piezas iguales.
+     * Si el banco no alcanza se entregan las que haya y se dice cuántas
+     * faltan: es preferible a devolver error y dejar al inspector sin nada.
+     */
+    public function getSiguientesQrAcc(int $n): array {
+        $this->ensureAccIzajeQrColumn();
+        $n    = max(1, min(50, $n));
+        $qrs  = siguientesQrAccesorio($this->pdo, $n);
+        if (!$qrs) {
+            return ['status' => 'error', 'message' =>
+                'No hay placas libres en el banco de códigos. Carga el lote nuevo desde Calidad → Códigos QR, o captura los códigos a mano.'];
+        }
+        $faltan = $n - count($qrs);
+        return [
+            'status'  => 'success',
+            'qrs'     => $qrs,
+            'faltan'  => $faltan,
+            'message' => $faltan > 0
+                ? "El banco sólo tiene " . count($qrs) . " placa(s) libre(s); faltan $faltan por capturar a mano."
+                : '',
+        ];
     }
 
     public function asignarQrAccesorio(int $id, string $qr): array {

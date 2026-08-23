@@ -347,13 +347,24 @@ function siguienteQrSerie(PDO $pdo, string $prefijo): string {
  * o se carga el lote nuevo desde Calidad.
  */
 function siguienteQrAccesorio(PDO $pdo): string {
+    $lote = siguientesQrAccesorio($pdo, 1);
+    return $lote[0] ?? '';
+}
+
+/**
+ * Los mismos códigos, pero varios de golpe: al clonar un accesorio se asignan
+ * tantas placas como copias. Devuelve menos de $n (o vacío) si el banco no
+ * alcanza; nunca inventa números.
+ */
+function siguientesQrAccesorio(PDO $pdo, int $n = 1): array {
+    $n = max(1, min(50, $n));
     try {
         $st = $pdo->prepare(
             "SELECT identificador FROM qr_codigos
              WHERE usado = 0
                AND identificador NOT LIKE ?
                AND LENGTH(identificador) BETWEEN ? AND ?
-             ORDER BY LENGTH(identificador), CAST(identificador AS UNSIGNED) LIMIT 1"
+             ORDER BY LENGTH(identificador), CAST(identificador AS UNSIGNED) LIMIT $n"
         );
         // Los límites van como enteros: LENGTH() devuelve número y un
         // parámetro de texto no compara igual en todos los motores.
@@ -361,9 +372,9 @@ function siguienteQrAccesorio(PDO $pdo): string {
         $st->bindValue(2, QR_LONGITUD_MIN, PDO::PARAM_INT);
         $st->bindValue(3, QR_LONGITUD_MAX, PDO::PARAM_INT);
         $st->execute();
-        return (string)($st->fetchColumn() ?: '');
+        return array_map('strval', $st->fetchAll(PDO::FETCH_COLUMN) ?: []);
     } catch (\Throwable $e) {
-        return '';
+        return [];
     }
 }
 

@@ -1694,6 +1694,63 @@
   </div>
 </div>
 
+<!-- ══════════ CLONAR ACCESORIO ══════════
+     Un cliente entrega diez grilletes iguales: mismo tipo, marca, modelo,
+     capacidad y medidas. Sólo cambia la placa que les pegamos. Aquí se
+     capturan de una vez en lugar de repetir el formulario diez veces. -->
+<div id="modal-iza-clonar" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.45);overflow-y:auto">
+  <div style="max-width:560px;margin:16px auto;background:var(--blanco);border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
+    <div style="background:var(--azul);padding:14px 18px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:14px;font-weight:700;color:#fff">Clonar accesorio</div>
+        <div style="font-size:11px;color:rgba(255,255,255,0.85)" id="iza-clon-sub"></div>
+      </div>
+      <button onclick="izaClonarCerrar()"
+              style="background:rgba(255,255,255,0.2);border:none;border-radius:8px;color:#fff;font-size:12px;padding:6px 12px;cursor:pointer;font-weight:600">Cerrar ✕</button>
+    </div>
+
+    <div style="padding:16px 18px 22px;max-height:78vh;overflow-y:auto">
+      <div id="iza-clon-resumen"
+           style="background:#f4f7fb;border:1px solid #dbe6f3;border-radius:10px;padding:10px 12px;font-size:12px;color:#28324a;line-height:1.6;margin-bottom:14px"></div>
+
+      <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-bottom:12px">
+        <div class="field" style="margin:0;flex:0 0 110px">
+          <label>¿Cuántas?</label>
+          <input type="number" id="iza-clon-n" min="1" max="50" value="3"
+                 inputmode="numeric" oninput="izaClonarFilas()" onchange="izaClonarCantidad()">
+        </div>
+        <button type="button" onclick="izaClonarAutollenar()" id="iza-clon-auto"
+                style="flex:1;min-width:170px;padding:10px 12px;background:#e8f5e9;color:#2e7d32;border:1.5px solid #a5d6a7;border-radius:var(--radio);font-size:12px;font-weight:600;cursor:pointer">
+          → Asignar las siguientes placas libres</button>
+      </div>
+
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--texto-sub);margin-bottom:6px;cursor:pointer">
+        <input type="checkbox" id="iza-clon-fotos" checked style="width:16px;height:16px">
+        Usar las mismas fotos que el original
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--texto-sub);margin-bottom:14px;cursor:pointer">
+        <input type="checkbox" id="iza-clon-ids" onchange="izaClonarFilas(true)" style="width:16px;height:16px">
+        El ID del accesorio también cambia
+      </label>
+
+      <div id="iza-clon-filas"></div>
+      <div id="iza-clon-error" style="color:#c0392b;font-size:12px;margin-top:8px"></div>
+
+      <div style="display:flex;gap:8px;margin-top:16px">
+        <button type="button" onclick="izaClonarCerrar()"
+                style="flex:0 0 auto;padding:12px 16px;background:#fff;border:1.5px solid var(--borde);color:var(--texto-sub);border-radius:var(--radio);font-size:13px;cursor:pointer">Cancelar</button>
+        <button type="button" onclick="izaClonarGuardar()" id="iza-clon-btn"
+                style="flex:1;padding:12px;background:var(--azul);color:#fff;border:none;border-radius:var(--radio);font-size:14px;font-weight:600;cursor:pointer">
+          Crear copias</button>
+      </div>
+
+      <button type="button" onclick="izaClonarEnFormulario()"
+              style="width:100%;margin-top:10px;padding:10px;background:none;border:none;color:var(--azul);font-size:12px;text-decoration:underline;cursor:pointer">
+        Prefiero capturarlo con el formulario (para cambiar más datos o las fotos)</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══════════ MODAL DETALLE CURSO/PARTICIPANTE ══════════ -->
 <div id="modal-cur" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,0.45);overflow-y:auto">
   <div style="max-width:700px;margin:24px auto;background:var(--blanco);border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.2)">
@@ -2642,7 +2699,7 @@
             <input type="text" id="iza-qr" placeholder="Escanear o ingresar manualmente"
                    maxlength="10" inputmode="numeric" pattern="\d{9,10}" style="flex:1;letter-spacing:2px">
             <button type="button" onclick="izaEscanearQR()" title="Escanear con cámara"
-                    style="padding:9px 13px;background:var(--primario);color:#fff;border:none;border-radius:var(--radio);cursor:pointer;font-size:15px;line-height:1">📷</button>
+                    style="padding:9px 13px;background:var(--azul);color:#fff;border:none;border-radius:var(--radio);cursor:pointer;font-size:15px;line-height:1">📷</button>
             <button type="button" onclick="izaSugerirQR()" title="Siguiente QR disponible"
                     style="padding:9px 11px;background:#e8f5e9;color:#2e7d32;border:1.5px solid #a5d6a7;border-radius:var(--radio);cursor:pointer;font-size:13px">→</button>
           </div>
@@ -6101,6 +6158,210 @@ function izaDuplicar(i) {
   document.getElementById('iza-serie')?.focus();
 }
 
+/* ═══════════════════════════════════════════════════════════
+   CLONAR EN LOTE
+   Los grilletes, ganchos y cáncamos llegan por juegos idénticos: mismo
+   tipo, marca, modelo, capacidad y medidas. Lo único propio de cada
+   pieza es la placa que le pegamos, así que se capturan de corrido.
+   ═══════════════════════════════════════════════════════════ */
+let izaClonIdx = -1;
+
+function izaClonar(i) {
+  const a = izaAccesorios[i];
+  if (!a || !a.id) { mostrarToast('Ese accesorio todavía no se puede clonar.', 'err'); return; }
+  izaClonIdx = i;
+
+  const d = a.datos || {};
+  const linea = (et, v) => v ? `<div><b>${et}:</b> ${escHtmlIza(v)}</div>` : '';
+  document.getElementById('iza-clon-sub').textContent = a.tipo_nombre || 'Accesorio';
+  document.getElementById('iza-clon-resumen').innerHTML =
+    linea('Tipo', a.tipo_nombre) + linea('Marca', d.marca) + linea('Modelo', d.modelo) +
+    linea('Capacidad', d.capacidad) + linea('Medidas', d.medidas) +
+    linea('ID', d.id_acc) + linea('Estado', d.estado || a.estado) +
+    `<div style="margin-top:6px;color:var(--texto-hint)">Las copias heredan todo esto. Sólo captura lo que cambia en cada pieza.</div>`;
+
+  document.getElementById('iza-clon-n').value      = 3;
+  document.getElementById('iza-clon-fotos').checked = true;
+  document.getElementById('iza-clon-ids').checked   = false;
+  document.getElementById('iza-clon-error').textContent = '';
+  document.getElementById('iza-clon-filas').innerHTML = '';
+  izaClonarFilas(true);
+  document.getElementById('modal-iza-clonar').style.display = 'block';
+}
+
+function izaClonarCerrar() {
+  document.getElementById('modal-iza-clonar').style.display = 'none';
+  izaClonIdx = -1;
+}
+
+/* Pasa al formulario de siempre, por si la copia cambia en algo más que
+   la placa (otra serie, otras fotos, un defecto distinto). */
+function izaClonarEnFormulario() {
+  const i = izaClonIdx;
+  izaClonarCerrar();
+  if (i >= 0) izaDuplicar(i);
+}
+
+function escHtmlIza(v) {
+  return String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function izaClonarFilaHtml(k, conId, p = {}) {
+  return `
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:7px">
+      <div style="flex:0 0 22px;font-size:12px;font-weight:700;color:var(--texto-hint);text-align:right">${k + 1}</div>
+      <input type="text" class="iza-clon-qr" placeholder="Código QR" value="${escHtmlIza(p.qr)}"
+             maxlength="10" inputmode="numeric" style="flex:1.4;min-width:0;letter-spacing:1px;margin:0">
+      <input type="text" class="iza-clon-serie" placeholder="Serie (opcional)" value="${escHtmlIza(p.serie)}"
+             style="flex:1;min-width:0;margin:0">
+      ${conId ? `<input type="text" class="iza-clon-id" placeholder="ID" value="${escHtmlIza(p.id)}"
+             style="flex:.8;min-width:0;margin:0">` : ''}
+    </div>`;
+}
+
+/* Ajusta los renglones a la cantidad pedida agregando o quitando sólo los que
+   sobran o faltan. Rehacerlos todos en cada tecla borraba el cursor del campo
+   donde el inspector estaba escribiendo, y en el celular eso se traduce en
+   placas capturadas a medias. */
+function izaClonarFilas(rehacer = false) {
+  const cont  = document.getElementById('iza-clon-filas');
+  const conId = document.getElementById('iza-clon-ids').checked;
+  const n     = izaClonarCuantas();
+
+  // La columna de ID cambia la forma del renglón: ahí sí hay que rehacerlos,
+  // conservando lo capturado.
+  if (rehacer || cont.dataset.conid !== String(conId)) {
+    const previos = izaClonarLeer();
+    cont.dataset.conid = String(conId);
+    cont.innerHTML = Array.from({ length: n }, (_, k) => izaClonarFilaHtml(k, conId, previos[k] || {})).join('');
+    return;
+  }
+
+  let filas = cont.children.length;
+  while (filas < n) { cont.insertAdjacentHTML('beforeend', izaClonarFilaHtml(filas, conId)); filas++; }
+  while (filas > n) { cont.lastElementChild.remove(); filas--; }
+}
+
+function izaClonarCuantas() {
+  let n = parseInt(document.getElementById('iza-clon-n').value, 10);
+  if (!(n >= 1)) n = 1;
+  return Math.min(50, n);
+}
+
+/* El número se corrige al salir del campo, nunca mientras se teclea: si se
+   reescribe en pleno tecleo, el "1" de "12" se vuelve un valor definitivo. */
+function izaClonarCantidad() {
+  document.getElementById('iza-clon-n').value = izaClonarCuantas();
+  izaClonarFilas();
+}
+
+function izaClonarLeer() {
+  const qrs    = [...document.querySelectorAll('.iza-clon-qr')];
+  const series = [...document.querySelectorAll('.iza-clon-serie')];
+  const ids    = [...document.querySelectorAll('.iza-clon-id')];
+  return qrs.map((q, k) => ({
+    qr:    (q.value || '').replace(/\D/g, ''),
+    serie: (series[k]?.value || '').trim(),
+    id:    (ids[k]?.value || '').trim(),
+  }));
+}
+
+/* Trae del banco tantas placas libres como copias haya y las reparte en los
+   renglones vacíos, sin pisar las que ya se escanearon a mano. */
+async function izaClonarAutollenar() {
+  const btn = document.getElementById('iza-clon-auto');
+  const filas = izaClonarLeer();
+  const faltan = filas.filter(f => !f.qr).length;
+  if (!faltan) { mostrarToast('Todas las copias ya tienen código.', 'ok'); return; }
+
+  btn.disabled = true;
+  const txt = btn.textContent;
+  btn.textContent = 'Buscando placas…';
+  try {
+    const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res = await fetch(`${WEB_APP_URL}?action=GET_NEXT_QRS_ACC&n=${faltan}`, { headers: { 'X-Token': s.token || '' } });
+    const d   = await res.json();
+    if (d.status !== 'success') { mostrarToast(d.message || 'No hay placas libres.', 'err'); return; }
+
+    // Las que ya trae otra copia en pantalla no se vuelven a repartir.
+    const usados = new Set(filas.map(f => f.qr).filter(Boolean));
+    const libres = (d.qrs || []).filter(q => !usados.has(q));
+    const campos = [...document.querySelectorAll('.iza-clon-qr')];
+    campos.forEach(c => { if (!c.value.trim() && libres.length) c.value = libres.shift(); });
+    if (d.faltan > 0) mostrarToast(d.message, 'err');
+  } catch (e) {
+    mostrarToast('Error de conexión.', 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = txt;
+  }
+}
+
+async function izaClonarGuardar() {
+  const a = izaAccesorios[izaClonIdx];
+  if (!a) return;
+  const filas = izaClonarLeer();
+  const err   = document.getElementById('iza-clon-error');
+  err.textContent = '';
+
+  // Se avisa aquí de lo que el servidor rechazaría, para no perder el viaje.
+  const malos = filas.filter(f => f.qr && (f.qr.length < 9 || f.qr.length > 10));
+  if (malos.length) { err.textContent = 'Los códigos deben tener 9 o 10 dígitos, tal como vienen impresos en la placa.'; return; }
+  const conQr = filas.map(f => f.qr).filter(Boolean);
+  if (new Set(conQr).size !== conQr.length) { err.textContent = 'Hay un código repetido entre las copias.'; return; }
+
+  const sinQr = filas.length - conQr.length;
+  if (sinQr && !confirm(
+      `${sinQr} de ${filas.length} copia(s) quedarían sin código QR.\n\n` +
+      `Sin placa no se les puede emitir certificado individual; Calidad tendría que asignarlo después.\n\n¿Continuar así?`)) return;
+
+  const btn = document.getElementById('iza-clon-btn');
+  btn.disabled = true;
+  btn.textContent = 'Creando…';
+  try {
+    const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res = await fetch(WEB_APP_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (s.token || '') },
+      body: JSON.stringify({
+        action:  'DUPLICAR_ACCESORIO',
+        token:   s.token || '',
+        payload: {
+          id:            a.id,
+          copias:        filas.length,
+          qrs:           filas.map(f => f.qr),
+          series:        filas.map(f => f.serie),
+          ids:           filas.map(f => f.id),
+          copiar_fotos:  document.getElementById('iza-clon-fotos').checked ? 1 : 0,
+        },
+      }),
+    });
+    const d = await res.json();
+    if (d.status !== 'success') { err.textContent = d.message || 'No se pudieron crear las copias.'; return; }
+
+    (d.copias || []).forEach(c => {
+      izaAccesorios.push({
+        id:          c.id,
+        tipo_nombre: a.tipo_nombre,
+        marca:       a.marca,
+        serie:       c.serie || '',
+        estado:      a.estado,
+        qr_codigo:   c.qr || '',
+        datos:       a.datos ? { ...a.datos, id_acc: c.id_accesorio } : null,
+      });
+    });
+    izaRenderLista();
+    izaClonarCerrar();
+    izaMostrar('lista');
+    mostrarToast(d.message, 'ok');
+  } catch (e) {
+    err.textContent = 'Error de conexión. Intenta de nuevo.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Crear copias';
+  }
+}
+
 // ── Guardar accesorio ─────────────────────────────────
 async function izaGuardar(repetir = false) {
   const tipoId = document.getElementById('iza-tipo').value;
@@ -6193,8 +6454,8 @@ function izaRenderLista() {
       <span class="iza-list-badge ${a.estado === 'CUMPLE' ? 'cumple' : 'no-cumple'}">
         ${a.estado === 'CUMPLE' ? '✓ Cumple' : '✗ No cumple'}
       </span>
-      <button onclick="izaDuplicar(${i})" title="Capturar otro igual a este"
-              style="padding:4px 9px;background:var(--azul-light);border:none;color:var(--azul-dark);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0;margin-left:6px">⧉</button>
+      <button onclick="izaClonar(${i})" title="Clonar: varios iguales cambiando sólo el código"
+              style="padding:4px 9px;background:var(--azul-light);border:none;color:var(--azul-dark);border-radius:6px;font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0;margin-left:6px">⧉ Clonar</button>
     </div>`).join('');
 
   const n = izaAccesorios.length;

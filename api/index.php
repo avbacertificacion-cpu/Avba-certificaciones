@@ -344,6 +344,11 @@ if ($method === 'GET') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->getSiguienteQrAcc());
 
+        case 'GET_NEXT_QRS_ACC':   // varias placas de golpe, para clonar un lote
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->getSiguientesQrAcc((int)($_GET['n'] ?? 1)));
+
         // Panel de Certificaciones
         case 'getDataCertificaciones':
         case 'GET_DATA_CERTIFICACIONES':
@@ -1573,10 +1578,15 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->editarAccesorio($payload));
 
-        case 'DUPLICAR_ACCESORIO':
+        case 'DUPLICAR_ACCESORIO': {
             $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($accesorios->duplicarAccesorio($payload, in_array($usr['rol'], ['ADMIN','CALIDAD'], true)));
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','INSPECTOR'], true))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            // Calidad y Admin clonan en cualquier sesión, incluso ya cerrada;
+            // el inspector sólo dentro de la suya y mientras siga abierta.
+            $priv = in_array($usr['rol'], ['ADMIN','CALIDAD'], true);
+            respuesta($accesorios->duplicarAccesorio($payload, $priv, $usr['usuario'], !$priv));
+        }
 
         case 'ELIMINAR_ACCESORIO':
             $usr = validarToken($pdo, $token);
