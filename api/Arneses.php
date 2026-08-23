@@ -27,6 +27,7 @@
  * aprobable, mientras que DEVUELTO regresa la captura al inspector.
  */
 require_once __DIR__ . '/FirmaInspector.php';
+require_once __DIR__ . '/FusionSesiones.php';
 
 class Arneses {
     private PDO $pdo;
@@ -1987,6 +1988,29 @@ class Arneses {
      * se exige un motivo y la baja queda anotada en el historial, porque el
      * registro desaparece también del portal del cliente.
      */
+    /**
+     * Junta varias inspecciones del mismo cliente en una sola.
+     *
+     * El cliente que mandó revisar su equipo espera un expediente, no tres
+     * porque el inspector volvió otro día. La lógica vive en FusionSesiones,
+     * compartida con accesorios.
+     */
+    public function fusionarSesiones(array $p, string $usuario): array {
+        $f = new FusionSesiones($this->pdo, [
+            'tabla_sesion' => 'arneses_sesiones',
+            'tabla_item'   => 'arneses_items',
+            'col_sesion'   => 'sesion_id',
+            'etiqueta'     => 'inspección de arneses',
+            'ref'          => 'arnes',
+        ]);
+        return $f->fusionar(
+            (int)($p['destino_id'] ?? 0),
+            (array)($p['origenes'] ?? []),
+            $usuario,
+            (string)($p['motivo'] ?? '')
+        );
+    }
+
     public function eliminarSesion(int $id, string $usuario = '', string $motivo = ''): array {
         if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
 

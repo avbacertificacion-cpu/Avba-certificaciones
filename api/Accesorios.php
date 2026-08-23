@@ -7,6 +7,7 @@ if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
     require_once __DIR__ . '/../vendor/autoload.php';
 }
 require_once __DIR__ . '/FirmaInspector.php';
+require_once __DIR__ . '/FusionSesiones.php';
 
 class Accesorios {
     private PDO $pdo;
@@ -2010,6 +2011,26 @@ HTML;
      * un motivo y la baja queda anotada, porque el expediente desaparece
      * también del portal del cliente.
      */
+    /**
+     * Junta varias sesiones de accesorios del mismo cliente en una sola.
+     * Mismo criterio y misma implementación que en arneses.
+     */
+    public function fusionarSesiones(array $p, string $usuario): array {
+        $f = new FusionSesiones($this->pdo, [
+            'tabla_sesion' => 'accesorios_sesiones',
+            'tabla_item'   => 'accesorios_izaje',
+            'col_sesion'   => 'sesion_id',
+            'etiqueta'     => 'sesión de accesorios',
+            'ref'          => 'accesorio',
+        ]);
+        return $f->fusionar(
+            (int)($p['destino_id'] ?? 0),
+            (array)($p['origenes'] ?? []),
+            $usuario,
+            (string)($p['motivo'] ?? '')
+        );
+    }
+
     public function eliminarSesionAcc(int $id, string $usuario = '', string $motivo = ''): array {
         $row = $this->pdo->prepare("SELECT cliente, control, estatus, qr_codigo FROM accesorios_sesiones WHERE id = ?");
         $row->execute([$id]);

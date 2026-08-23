@@ -1100,6 +1100,7 @@
       <table>
         <thead>
           <tr>
+            <th style="width:26px"></th>
             <th>Cliente</th>
             <th style="width:110px">Fecha</th>
             <th style="width:130px">No. Control</th>
@@ -1112,7 +1113,7 @@
           </tr>
         </thead>
         <tbody id="tbody-acc-sesiones">
-          <tr><td colspan="8" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
+          <tr><td colspan="10" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>
         </tbody>
       </table>
     </div>
@@ -3923,7 +3924,7 @@ let accSesionesData     = [];
 
 async function cargarSesionesAcc() {
   const tbody = document.getElementById('tbody-acc-sesiones');
-  tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--texto-hint)">Cargando...</td></tr>`;
   try {
     const res  = await fetch(API + '?action=LISTAR_SESIONES_ACCESORIOS');
     const data = await res.json();
@@ -3938,7 +3939,7 @@ async function cargarSesionesAcc() {
     document.getElementById('acc-s-nocumple').textContent = nocumple;
     filtrarSesionesAcc();
   } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:28px;color:var(--rojo)">Error de conexión</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:28px;color:var(--rojo)">Error de conexión</td></tr>`;
   }
 }
 
@@ -4020,7 +4021,8 @@ function renderSesionesAcc(data) {
   const tbody = document.getElementById('tbody-acc-sesiones');
   document.getElementById('acc-count').textContent = data.length + ' sesión' + (data.length!==1?'es':'');
   if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin registros</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin registros</td></tr>`;
+    document.getElementById('fus-barra-acc')?.remove();
     return;
   }
   tbody.innerHTML = data.map(r => {
@@ -4028,6 +4030,9 @@ function renderSesionesAcc(data) {
     const puedAprobar = ['','PENDIENTE','DEVUELTO','RETORNADO'].includes(r.estatus || '');
     return `
     <tr>
+      <td style="width:26px"><input type="checkbox" class="fus-acc" value="${r.id}" data-cliente="${escH(r.cliente||'')}"
+             onchange="fusionActualizar('acc')" title="Seleccionar para fusionar"
+             style="width:16px;height:16px;cursor:pointer"></td>
       <td style="font-weight:600">${escH(r.cliente)}</td>
       <td>${r.fecha||'—'}</td>
       <td style="font-size:11px;font-family:monospace;color:var(--azul-dark)">${escH(folio)}</td>
@@ -4443,6 +4448,135 @@ async function accPost(action, payload) {
 
 function cerrarDetAccSesion() {
   document.getElementById('overlay-acc-sesion').style.display = 'none';
+}
+
+
+/* ═══════════════════════════════════════
+   FUSIÓN DE SESIONES
+   Un cliente puede acabar con varias inspecciones abiertas porque el inspector
+   volvió otro día o fue otra persona. Para el cliente es una sola visita, así
+   que Calidad las junta en un solo expediente.
+═══════════════════════════════════════ */
+const FUSION = {
+  arn: { clase:'fus-arn', accion:'FUSIONAR_SESIONES_ARNES', que:'inspección', recargar:() => cargarSesionesArn() },
+  acc: { clase:'fus-acc', accion:'FUSIONAR_SESIONES_ACC',   que:'sesión',
+         recargar:() => { accSesionesCargadas = false; cargarSesionesAcc(); } },
+};
+
+/* Barra que aparece sobre el listado en cuanto hay algo seleccionado. */
+function fusionBarra(mod) {
+  return `<div id="fus-barra-${mod}" style="display:none;align-items:center;gap:10px;flex-wrap:wrap;
+              background:#eef4ff;border:1px solid #c3d9f3;border-radius:10px;padding:10px 14px;margin-bottom:10px">
+    <span id="fus-txt-${mod}" style="font-size:13px;color:#0d2244;flex:1;min-width:200px"></span>
+    <button onclick="fusionEjecutar('${mod}')" id="fus-btn-${mod}"
+            style="padding:7px 15px;background:var(--azul);color:#fff;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer">
+      ⇉ Fusionar en una sola</button>
+    <button onclick="fusionLimpiar('${mod}')"
+            style="padding:7px 13px;background:#fff;border:1px solid var(--borde);color:var(--texto-sub);border-radius:7px;font-size:12px;cursor:pointer">
+      Quitar selección</button>
+  </div>`;
+}
+
+function fusionSeleccion(mod) {
+  return [...document.querySelectorAll('.' + FUSION[mod].clase + ':checked')];
+}
+
+/* Compara nombres de cliente igual que el servidor: sin acentos, sin dobles
+   espacios y sin distinguir mayúsculas. */
+function fusionNorm(s) {
+  return String(s || '').trim().replace(/\s+/g, ' ').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function fusionActualizar(mod) {
+  const sel = fusionSeleccion(mod);
+  let barra = document.getElementById('fus-barra-' + mod);
+  if (!barra && mod === 'acc') {
+    // La tabla de accesorios no se re-dibuja completa, así que la barra se
+    // inserta una vez sobre ella.
+    const tabla = document.getElementById('tbody-acc-sesiones')?.closest('.tabla-card, table')?.parentElement;
+    if (tabla) { tabla.insertAdjacentHTML('beforebegin', fusionBarra('acc')); barra = document.getElementById('fus-barra-acc'); }
+  }
+  if (!barra) return;
+
+  if (sel.length < 2) { barra.style.display = 'none'; return; }
+
+  const clientes = [...new Set(sel.map(c => fusionNorm(c.dataset.cliente)))];
+  const mismo = clientes.length === 1;
+  barra.style.display = 'flex';
+  barra.style.background = mismo ? '#eef4ff' : '#fff4e0';
+  barra.style.borderColor = mismo ? '#c3d9f3' : '#f0a202';
+  document.getElementById('fus-txt-' + mod).innerHTML = mismo
+    ? `<strong>${sel.length}</strong> seleccionadas de <strong>${escH(sel[0].dataset.cliente)}</strong>. Se juntarán en un solo expediente.`
+    : `⚠ Las seleccionadas son de <strong>${clientes.length} clientes distintos</strong>. Sólo se pueden fusionar inspecciones del mismo cliente.`;
+  document.getElementById('fus-btn-' + mod).disabled = !mismo;
+  document.getElementById('fus-btn-' + mod).style.opacity = mismo ? '1' : '.5';
+  document.getElementById('fus-btn-' + mod).style.cursor  = mismo ? 'pointer' : 'not-allowed';
+}
+
+function fusionLimpiar(mod) {
+  document.querySelectorAll('.' + FUSION[mod].clase).forEach(c => { c.checked = false; });
+  fusionActualizar(mod);
+}
+
+async function fusionEjecutar(mod) {
+  const cfg = FUSION[mod];
+  const sel = fusionSeleccion(mod);
+  if (sel.length < 2) return;
+
+  // Se conserva el folio de la más antigua: es la que abrió el trabajo. Se
+  // deja elegir porque a veces el folio bueno es el de otra.
+  const ids  = sel.map(c => +c.value);
+  const info = ids.map(id => {
+    const fila = mod === 'arn'
+      ? (_arnSesiones || []).find(x => +x.id === id)
+      : (accSesionesData || []).find(x => +x.id === id);
+    return { id, folio: fila?.control || ('#' + id), fecha: fila?.fecha || 'sin fecha' };
+  });
+
+  const lista = info.map((x, i) => `  ${i + 1}. Folio ${x.folio} — ${x.fecha}`).join('\n');
+  const elec = prompt(
+    `¿Cuál conserva el folio, la fecha y el código QR?\n\n${lista}\n\n` +
+    `Escribe el número (1-${info.length}). Las demás ceden sus piezas y desaparecen.`, '1');
+  if (elec === null) return;
+  const idx = parseInt(elec, 10) - 1;
+  if (!(idx >= 0 && idx < info.length)) { mostrarToast('Número no válido.', 'err'); return; }
+
+  const destino  = info[idx];
+  const origenes = info.filter((_, i) => i !== idx);
+  if (!confirm(
+      `Se juntarán ${origenes.length} ${cfg.que}(es) en el folio ${destino.folio}.\n\n` +
+      origenes.map(o => `  · ${o.folio} (${o.fecha})`).join('\n') +
+      `\n\nSus piezas pasan al folio ${destino.folio} y esos folios dejan de existir.\n` +
+      `Los códigos QR de las piezas no cambian.\n\n¿Continuar?`)) return;
+
+  const enviar = async motivo => {
+    const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const r = await fetch(API, {
+      method:'POST', headers:{ 'Content-Type':'application/json', 'X-Token': s.token || '' },
+      body: JSON.stringify({ action: cfg.accion, token: s.token || '',
+        payload: { destino_id: destino.id, origenes: origenes.map(o => o.id), motivo } }),
+    });
+    return r.json();
+  };
+
+  try {
+    let d = await enviar('');
+    if (d.requiere_motivo) {
+      const motivo = prompt(d.message + '\n\nMotivo de la fusión (queda en el historial):', '');
+      if (motivo === null) return;
+      if (!motivo.trim()) { mostrarToast('Sin motivo no se puede fusionar.', 'err'); return; }
+      d = await enviar(motivo.trim());
+    }
+    if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo fusionar.', 'err'); return; }
+    mostrarToast(d.message, 'ok');
+    if (d.reemitir) {
+      alert('La fusión tocó un expediente ya emitido.\n\n' +
+            'Pide a Certificaciones que vuelva a emitir para que los documentos incluyan todo.');
+    }
+    fusionLimpiar(mod);
+    cfg.recargar();
+  } catch (e) { mostrarToast('Error de conexión.', 'err'); }
 }
 
 /* ── Helpers de estado ── */
@@ -7055,18 +7189,21 @@ function renderSesionesArn() {
     cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--texto-hint)">Sin inspecciones de arneses registradas.</div>';
     return;
   }
-  cont.innerHTML = _arnSesiones.map(s => `
-    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--borde);border-radius:10px;margin-bottom:8px;background:#fff;cursor:pointer"
-         onclick="abrirArnDet(${s.id})">
-      <div style="flex:1;min-width:0">
+  cont.innerHTML = fusionBarra('arn') + _arnSesiones.map(s => `
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--borde);border-radius:10px;margin-bottom:8px;background:#fff">
+      <input type="checkbox" class="fus-arn" value="${s.id}" data-cliente="${escH(s.cliente||'')}"
+             onchange="fusionActualizar('arn')" onclick="event.stopPropagation()"
+             title="Seleccionar para fusionar" style="width:17px;height:17px;flex-shrink:0;cursor:pointer">
+      <div style="flex:1;min-width:0;cursor:pointer" onclick="abrirArnDet(${s.id})">
         <div style="font-size:14px;font-weight:600;color:var(--texto)">${escH(s.cliente)} ${_arnBadge(s.estatus)}</div>
         <div style="font-size:12px;color:var(--texto-sub);margin-top:2px">
           ${escH(s.fecha||'')} · ${s.total} pieza(s) · ${s.aptos} apta(s)${+s.no_aptos ? ` · <span style="color:var(--rojo)">${s.no_aptos} no apta(s)</span>` : ''}
           ${s.control ? ' · Folio ' + escH(s.control) : ''}
         </div>
       </div>
-      <span style="color:var(--azul);font-size:18px">›</span>
+      <span style="color:var(--azul);font-size:18px;cursor:pointer" onclick="abrirArnDet(${s.id})">›</span>
     </div>`).join('');
+  fusionActualizar('arn');
 }
 
 async function abrirArnDet(id) {
