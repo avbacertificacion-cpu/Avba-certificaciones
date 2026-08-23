@@ -4544,18 +4544,33 @@ async function fusionEjecutar(mod) {
 
   const destino  = info[idx];
   const origenes = info.filter((_, i) => i !== idx);
+
+  // Las sesiones que se juntan son de días distintos, así que el expediente
+  // resultante necesita una sola fecha y ésa la decide Calidad. Se propone la
+  // del folio que se conserva, que suele ser la de la primera visita.
+  const fecha = prompt(
+    `Fecha del expediente ya fusionado.\n\n` +
+    `Se juntan: ${info.map(x => x.fecha).join(', ')}.\n\n` +
+    `Escríbela como dd/mm/aaaa.`, destino.fecha || '');
+  if (fecha === null) return;
+  if (!/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(fecha.trim())) {
+    mostrarToast('La fecha debe ir como dd/mm/aaaa.', 'err');
+    return;
+  }
+
   if (!confirm(
-      `Se juntarán ${origenes.length} ${cfg.que}(es) en el folio ${destino.folio}.\n\n` +
+      `Se juntarán ${origenes.length} ${cfg.que}(es) en el folio ${destino.folio}, con fecha ${fecha.trim()}.\n\n` +
       origenes.map(o => `  · ${o.folio} (${o.fecha})`).join('\n') +
-      `\n\nSus piezas pasan al folio ${destino.folio} y esos folios dejan de existir.\n` +
-      `Los códigos QR de las piezas no cambian.\n\n¿Continuar?`)) return;
+      `\n\nSus piezas pasan al folio ${destino.folio} con sus datos, sus fotos y su código QR intactos;\n` +
+      `esos folios dejan de existir.\n\n` +
+      `El código QR del expediente lo ajusta el sistema.\n\n¿Continuar?`)) return;
 
   const enviar = async motivo => {
     const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
     const r = await fetch(API, {
       method:'POST', headers:{ 'Content-Type':'application/json', 'X-Token': s.token || '' },
       body: JSON.stringify({ action: cfg.accion, token: s.token || '',
-        payload: { destino_id: destino.id, origenes: origenes.map(o => o.id), motivo } }),
+        payload: { destino_id: destino.id, origenes: origenes.map(o => o.id), motivo, fecha: fecha.trim() } }),
     });
     return r.json();
   };

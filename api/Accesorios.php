@@ -2133,12 +2133,16 @@ HTML;
             'col_sesion'   => 'sesion_id',
             'etiqueta'     => 'sesión de accesorios',
             'ref'          => 'accesorio',
+            'tabla_foto'   => 'accesorios_fotos',
+            'col_foto_item'=> 'accesorio_id',
+            'dir_fotos'    => 'uploads/accesorios/',
         ]);
         return $f->fusionar(
             (int)($p['destino_id'] ?? 0),
             (array)($p['origenes'] ?? []),
             $usuario,
-            (string)($p['motivo'] ?? '')
+            (string)($p['motivo'] ?? ''),
+            ['fecha' => (string)($p['fecha'] ?? '')]
         );
     }
 
