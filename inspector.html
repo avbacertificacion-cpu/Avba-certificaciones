@@ -2633,11 +2633,11 @@
         <div class="row2">
           <div class="field">
             <label>ID del accesorio</label>
-            <input type="text" id="iza-id" placeholder="Ej: ACC-001">
+            <input type="text" id="iza-id" placeholder="Ej: ACC-001" oninput="izaEspejo(this)">
           </div>
           <div class="field" id="iza-f-tipo">
             <label>Tipo <span class="req">*</span></label>
-            <select id="iza-tipo" onchange="izaCargarSugerencias()">
+            <select id="iza-tipo" onchange="izaCargarSugerencias(); izaEspejoAlCambiarTipo()">
               <option value="">— Seleccionar —</option>
             </select>
             <div class="errmsg">Selecciona el tipo de accesorio</div>
@@ -2660,7 +2660,7 @@
         <div class="row2">
           <div class="field">
             <label>Serie</label>
-            <input type="text" id="iza-serie" placeholder="Ej: SN-0042">
+            <input type="text" id="iza-serie" placeholder="Ej: SN-0042" oninput="izaEspejo(this)">
           </div>
           <div class="field">
             <label>Capacidad</label>
@@ -2696,7 +2696,7 @@
         <div class="field">
           <label>Código QR <span style="font-size:11px;color:var(--texto-hint)">(9 o 10 dígitos, como en la placa)</span></label>
           <div style="display:flex;gap:8px;align-items:center">
-            <input type="text" id="iza-qr" placeholder="Escanear o ingresar manualmente"
+            <input type="text" id="iza-qr" placeholder="Escanear o ingresar manualmente" oninput="izaEspejo(this)"
                    maxlength="10" inputmode="numeric" pattern="\d{9,10}" style="flex:1;letter-spacing:2px">
             <button type="button" onclick="izaEscanearQR()" title="Escanear con cámara"
                     style="padding:9px 13px;background:var(--azul);color:#fff;border:none;border-radius:var(--radio);cursor:pointer;font-size:15px;line-height:1">📷</button>
@@ -2704,6 +2704,7 @@
                     style="padding:9px 11px;background:#e8f5e9;color:#2e7d32;border:1.5px solid #a5d6a7;border-radius:var(--radio);cursor:pointer;font-size:13px">→</button>
           </div>
           <div id="iza-qr-scanner" style="display:none;margin-top:8px;border-radius:8px;overflow:hidden"></div>
+          <div id="iza-espejo-aviso" style="display:none;font-size:11.5px;line-height:1.5;border-radius:8px;padding:8px 10px;margin-top:6px"></div>
           <div id="iza-qr-error" style="color:#c0392b;font-size:11px;margin-top:3px"></div>
         </div>
 
@@ -6072,6 +6073,78 @@ function izaCapturarFotoCallback(file) {
  * —sugerir sin obligar—. Al cambiar el tipo se recargan, porque las medidas de
  * una eslinga no se parecen a las de un grillete.
  */
+/* ═══════════════════════════════════════════════════════════
+   UN SOLO CÓDIGO — grilletes
+   Un grillete no trae número de serie de fábrica: lo identifica la placa que
+   le pegamos, y ese número es a la vez su etiqueta interna y su QR. Se captura
+   una vez y los tres campos quedan iguales.
+   ═══════════════════════════════════════════════════════════ */
+const IZA_ESPEJO = ['iza-id', 'iza-serie', 'iza-qr'];
+
+/* Lo decide el catálogo, no el nombre: el juego de poleas y la eslinga con
+   terminación en grillete llevan la palabra pero sí tienen serie propia. */
+function izaTipoCodigoUnico(tipoId) {
+  const t = izaTipos.find(x => x.id == tipoId);
+  return !!t && +t.codigo_unico === 1;
+}
+
+function izaEspejoActivo() {
+  return izaTipoCodigoUnico((document.getElementById('iza-tipo') || {}).value);
+}
+
+function izaEspejo(origen) {
+  if (!izaEspejoActivo()) return;
+  IZA_ESPEJO.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el !== origen) el.value = origen.value;
+  });
+  izaEspejoAviso();
+}
+
+/* Copia el valor a los tres partiendo del QR: lo usan el escáner y el botón de
+   siguiente placa, que llenan el campo sin que nadie teclee. */
+function izaEspejoDesdeQr() {
+  const qr = document.getElementById('iza-qr');
+  if (qr) izaEspejo(qr);
+}
+
+function izaEspejoAviso() {
+  const avi = document.getElementById('iza-espejo-aviso');
+  if (!avi) return;
+  if (!izaEspejoActivo()) { avi.style.display = 'none'; return; }
+
+  const v = (document.getElementById('iza-qr').value || '').trim();
+  const sirve = /^\d{9,10}$/.test(v);
+  const mal   = v !== '' && !sirve;
+  avi.style.display = '';
+  avi.style.background = mal ? '#fff4e0' : '#e8f1fb';
+  avi.style.color      = mal ? '#8a5200' : '#0C447C';
+  avi.innerHTML = v === ''
+    ? 'Este tipo lleva <b>un solo código</b>: el que captures aquí queda también como ID y como serie.'
+    : sirve
+      ? '✓ El mismo código en el ID, la serie y el QR.'
+      : '⚠ Se guardará como ID y serie, pero no como código QR: la placa lleva 9 o 10 dígitos.';
+}
+
+/* Al cambiar el tipo se ajusta el modo sin pisar lo capturado: sólo se unifica
+   si los tres venían iguales o si sólo uno traía valor. */
+function izaEspejoAlCambiarTipo() {
+  if (!izaEspejoActivo()) { izaEspejoAviso(); return; }
+  const vals = IZA_ESPEJO.map(id => (document.getElementById(id).value || '').trim());
+  const conValor = vals.filter(Boolean);
+  if (conValor.length && new Set(conValor.map(v => v.toUpperCase())).size <= 1) {
+    IZA_ESPEJO.forEach(id => { document.getElementById(id).value = conValor[0]; });
+  }
+  izaEspejoAviso();
+}
+
+/* El QR sólo admite dígitos. Si el código no los tiene, se manda vacío y el
+   código sobrevive en el ID y la serie. */
+function izaEspejoQrParaGuardar() {
+  const v = (document.getElementById('iza-qr').value || '').trim();
+  return /^\d{9,10}$/.test(v) ? v : '';
+}
+
 async function izaCargarSugerencias() {
   const tipo = (document.getElementById('iza-tipo') || {}).value || '';
   try {
@@ -6129,7 +6202,11 @@ function izaEscribirForm(d) {
   set('iza-componentes', d.componentes);
   set('iza-serie', '');
   set('iza-qr',    '');
+  // En los tipos de un solo código el ID es el código de la pieza, no un dato
+  // del modelo: heredarlo dejaría a la siguiente con el de la anterior.
+  if (izaEspejoActivo()) set('iza-id', '');
   izaEstado(d.estado || 'CUMPLE');
+  izaEspejoAviso();
   izaFotos = [];
   izaRenderFotos();
 }
@@ -6165,6 +6242,7 @@ function izaDuplicar(i) {
    pieza es la placa que le pegamos, así que se capturan de corrido.
    ═══════════════════════════════════════════════════════════ */
 let izaClonIdx = -1;
+let izaClonUnico = false;   // el tipo del original lleva un solo código
 
 function izaClonar(i) {
   const a = izaAccesorios[i];
@@ -6172,17 +6250,22 @@ function izaClonar(i) {
   izaClonIdx = i;
 
   const d = a.datos || {};
+  izaClonUnico = izaTipoCodigoUnico(d.tipo);
   const linea = (et, v) => v ? `<div><b>${et}:</b> ${escHtmlIza(v)}</div>` : '';
   document.getElementById('iza-clon-sub').textContent = a.tipo_nombre || 'Accesorio';
   document.getElementById('iza-clon-resumen').innerHTML =
     linea('Tipo', a.tipo_nombre) + linea('Marca', d.marca) + linea('Modelo', d.modelo) +
     linea('Capacidad', d.capacidad) + linea('Medidas', d.medidas) +
-    linea('ID', d.id_acc) + linea('Estado', d.estado || a.estado) +
-    `<div style="margin-top:6px;color:var(--texto-hint)">Las copias heredan todo esto. Sólo captura lo que cambia en cada pieza.</div>`;
+    (izaClonUnico ? '' : linea('ID', d.id_acc)) + linea('Estado', d.estado || a.estado) +
+    (izaClonUnico
+      ? `<div style="margin-top:6px;color:var(--azul-dark)"><b>Un solo código por pieza:</b> el que captures queda también como ID y como serie.</div>`
+      : `<div style="margin-top:6px;color:var(--texto-hint)">Las copias heredan todo esto. Sólo captura lo que cambia en cada pieza.</div>`);
 
   document.getElementById('iza-clon-n').value      = 3;
   document.getElementById('iza-clon-fotos').checked = true;
   document.getElementById('iza-clon-ids').checked   = false;
+  // Con un solo código no hay ID aparte que cambiar.
+  document.getElementById('iza-clon-ids').closest('label').style.display = izaClonUnico ? 'none' : 'flex';
   document.getElementById('iza-clon-error').textContent = '';
   document.getElementById('iza-clon-filas').innerHTML = '';
   izaClonarFilas(true);
@@ -6207,6 +6290,16 @@ function escHtmlIza(v) {
 }
 
 function izaClonarFilaHtml(k, conId, p = {}) {
+  // En los tipos de un solo código —los grilletes— la serie y el ID son ese
+  // mismo código, así que se captura una vez y el servidor lo reparte.
+  if (izaClonUnico) {
+    return `
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:7px">
+      <div style="flex:0 0 22px;font-size:12px;font-weight:700;color:var(--texto-hint);text-align:right">${k + 1}</div>
+      <input type="text" class="iza-clon-qr" placeholder="Código de la pieza" value="${escHtmlIza(p.qr)}"
+             maxlength="10" inputmode="numeric" style="flex:1;min-width:0;letter-spacing:1px;margin:0">
+    </div>`;
+  }
   return `
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:7px">
       <div style="flex:0 0 22px;font-size:12px;font-weight:700;color:var(--texto-hint);text-align:right">${k + 1}</div>
@@ -6259,8 +6352,10 @@ function izaClonarLeer() {
   const qrs    = [...document.querySelectorAll('.iza-clon-qr')];
   const series = [...document.querySelectorAll('.iza-clon-serie')];
   const ids    = [...document.querySelectorAll('.iza-clon-id')];
+  // Sólo se quitan las letras cuando el campo es de veras un QR. En los tipos
+  // de un solo código puede llevarlas, y limpiarlas convertía "G-9" en "9".
   return qrs.map((q, k) => ({
-    qr:    (q.value || '').replace(/\D/g, ''),
+    qr:    izaClonUnico ? (q.value || '').trim() : (q.value || '').replace(/\D/g, ''),
     serie: (series[k]?.value || '').trim(),
     id:    (ids[k]?.value || '').trim(),
   }));
@@ -6305,15 +6400,29 @@ async function izaClonarGuardar() {
   err.textContent = '';
 
   // Se avisa aquí de lo que el servidor rechazaría, para no perder el viaje.
-  const malos = filas.filter(f => f.qr && (f.qr.length < 9 || f.qr.length > 10));
-  if (malos.length) { err.textContent = 'Los códigos deben tener 9 o 10 dígitos, tal como vienen impresos en la placa.'; return; }
-  const conQr = filas.map(f => f.qr).filter(Boolean);
-  if (new Set(conQr).size !== conQr.length) { err.textContent = 'Hay un código repetido entre las copias.'; return; }
+  const esPlaca = v => /^\d{9,10}$/.test(v);
+  if (!izaClonUnico) {
+    const malos = filas.filter(f => f.qr && !esPlaca(f.qr));
+    if (malos.length) { err.textContent = 'Los códigos deben tener 9 o 10 dígitos, tal como vienen impresos en la placa.'; return; }
+  }
+  const codigos = filas.map(f => f.qr).filter(Boolean);
+  if (new Set(codigos).size !== codigos.length) { err.textContent = 'Hay un código repetido entre las copias.'; return; }
 
-  const sinQr = filas.length - conQr.length;
-  if (sinQr && !confirm(
-      `${sinQr} de ${filas.length} copia(s) quedarían sin código QR.\n\n` +
+  // Con un solo código, lo que no tenga forma de placa se manda como ID y
+  // serie: en el QR sólo caben 9 o 10 dígitos y el servidor lo rechazaría.
+  const qrs    = filas.map(f => (izaClonUnico && !esPlaca(f.qr)) ? '' : f.qr);
+  const series = izaClonUnico ? filas.map(f => (esPlaca(f.qr) ? '' : f.qr)) : filas.map(f => f.serie);
+  const ids    = izaClonUnico ? series.slice() : filas.map(f => f.id);
+
+  const sinCodigo = filas.length - codigos.length;
+  if (sinCodigo && !confirm(
+      `${sinCodigo} de ${filas.length} copia(s) quedarían sin código.\n\n` +
       `Sin placa no se les puede emitir certificado individual; Calidad tendría que asignarlo después.\n\n¿Continuar así?`)) return;
+
+  const sinPlaca = izaClonUnico ? filas.filter(f => f.qr && !esPlaca(f.qr)).length : 0;
+  if (sinPlaca && !confirm(
+      `${sinPlaca} código(s) no tienen forma de placa (9 o 10 dígitos).\n\n` +
+      `Se guardarán como ID y serie, pero esas copias quedarán sin código QR.\n\n¿Continuar?`)) return;
 
   const btn = document.getElementById('iza-clon-btn');
   btn.disabled = true;
@@ -6329,9 +6438,7 @@ async function izaClonarGuardar() {
         payload: {
           id:            a.id,
           copias:        filas.length,
-          qrs:           filas.map(f => f.qr),
-          series:        filas.map(f => f.serie),
-          ids:           filas.map(f => f.id),
+          qrs, series, ids,
           copiar_fotos:  document.getElementById('iza-clon-fotos').checked ? 1 : 0,
         },
       }),
@@ -6374,9 +6481,14 @@ async function izaGuardar(repetir = false) {
   }
   fTipo.classList.remove('has-error');
 
-  const qrVal = (document.getElementById('iza-qr')?.value || '').replace(/\D/g,'');
+  // En los tipos de un solo código el valor puede no ser una placa: entonces
+  // se guarda como ID y serie, y el aviso ya lo explicó.
+  const espejo = izaEspejoActivo();
+  const qrVal = espejo
+    ? izaEspejoQrParaGuardar()
+    : (document.getElementById('iza-qr')?.value || '').replace(/\D/g,'');
   const qrErr = document.getElementById('iza-qr-error');
-  if (qrVal && (qrVal.length < 9 || qrVal.length > 10)) {
+  if (!espejo && qrVal && (qrVal.length < 9 || qrVal.length > 10)) {
     if (qrErr) qrErr.textContent = 'El código debe tener 9 o 10 dígitos, tal como viene impreso en la placa.';
     document.getElementById('iza-qr').focus();
     return false;
@@ -6396,6 +6508,8 @@ async function izaGuardar(repetir = false) {
     fd.append('token',       s.token || '');
     fd.append('sesion_id',   izaSesionId);
     fd.append('id_accesorio',document.getElementById('iza-id').value.trim());
+    // El servidor unifica igual, pero mandarlo ya unificado deja el registro
+    // idéntico a lo que el inspector vio en pantalla.
     fd.append('tipo_id',     tipoId);
     fd.append('marca',       document.getElementById('iza-marca').value.trim());
     fd.append('modelo',      document.getElementById('iza-modelo').value.trim());
@@ -6481,6 +6595,7 @@ async function izaSugerirQR() {
     const data = await res.json();
     if (data.status === 'success') {
       document.getElementById('iza-qr').value = data.qr;
+      izaEspejoDesdeQr();
     }
   } catch (e) { console.error('izaSugerirQR:', e); }
 }
@@ -6504,6 +6619,7 @@ async function izaEscanearQR() {
     (text) => {
       const digits = text.replace(/\D/g, '').slice(0, 10);
       document.getElementById('iza-qr').value = digits;
+      izaEspejoDesdeQr();
       izaQrScanner.stop().then(() => { izaQrScanner = null; container.style.display = 'none'; });
     },
     () => {}

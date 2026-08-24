@@ -32,11 +32,14 @@ class Accesorios {
     ];
 
     /**
-     * Tipos que arrancan con la casilla de código único puesta. Se comparan por
-     * nombre completo, no por "contiene grillete": el juego de poleas y la
-     * eslinga con terminación en grillete sí tienen serie propia.
+     * Tipos que arrancan con la casilla de código único puesta: todos los
+     * grilletes, sea cual sea la variante —recto, lira, de ancla, con perno—.
+     *
+     * Se busca por el principio del nombre y no por "contiene grillete": el
+     * juego de poleas y la eslinga con terminación en grillete lo llevan al
+     * final y ésos sí tienen serie propia.
      */
-    private const TIPOS_CODIGO_UNICO = ['GRILLETE', 'GRILLETES'];
+    private const PREFIJO_CODIGO_UNICO = 'GRILLETE';
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
@@ -84,15 +87,16 @@ class Accesorios {
         // Los grilletes ya capturados se marcan una sola vez. Con su propia
         // marca, para que quitar la casilla a mano no se deshaga sola.
         try {
+            // v2 porque la primera versión sólo marcaba el tipo llamado
+            // "GRILLETE" a secas y hacen falta todas sus variantes.
             $st = $this->pdo->prepare("SELECT 1 FROM accesorios_tipos_seed WHERE clave = ?");
-            $st->execute(['codigo_unico_grillete']);
+            $st->execute(['codigo_unico_grillete_v2']);
             if (!$st->fetch() && $this->ensureTipoCodigoUnico()) {
-                $ph = implode(',', array_fill(0, count(self::TIPOS_CODIGO_UNICO), '?'));
                 $this->pdo->prepare(
-                    "UPDATE accesorios_tipos SET codigo_unico = 1 WHERE UPPER(TRIM(nombre)) IN ($ph)"
-                )->execute(self::TIPOS_CODIGO_UNICO);
+                    "UPDATE accesorios_tipos SET codigo_unico = 1 WHERE UPPER(TRIM(nombre)) LIKE ?"
+                )->execute([self::PREFIJO_CODIGO_UNICO . '%']);
                 $this->pdo->prepare("INSERT INTO accesorios_tipos_seed (clave) VALUES (?)")
-                    ->execute(['codigo_unico_grillete']);
+                    ->execute(['codigo_unico_grillete_v2']);
             }
         } catch (\Throwable $e) {
             error_log('[Accesorios] seedTipos (codigo_unico): ' . $e->getMessage());
@@ -173,9 +177,15 @@ class Accesorios {
         $dup->execute([$nombre]);
         if ($dup->fetch()) return ['status' => 'error', 'message' => 'Ya existe un tipo con ese nombre.'];
 
+        // Si no se dice nada, un tipo nuevo que empiece por "grillete" nace con
+        // la casilla puesta: son todos piezas sin serie de fábrica.
+        $unico = array_key_exists('codigo_unico', $payload)
+            ? (!empty($payload['codigo_unico']) ? 1 : 0)
+            : (str_starts_with(mb_strtoupper(trim($nombre)), self::PREFIJO_CODIGO_UNICO) ? 1 : 0);
+
         if ($this->ensureTipoCodigoUnico()) {
             $this->pdo->prepare("INSERT INTO accesorios_tipos (nombre, codigo_unico) VALUES (?,?)")
-                ->execute([$nombre, !empty($payload['codigo_unico']) ? 1 : 0]);
+                ->execute([$nombre, $unico]);
         } else {
             $this->pdo->prepare("INSERT INTO accesorios_tipos (nombre) VALUES (?)")->execute([$nombre]);
         }
