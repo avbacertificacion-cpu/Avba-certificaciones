@@ -10,6 +10,9 @@ require_once __DIR__ . '/FirmaInspector.php';
 require_once __DIR__ . '/FusionSesiones.php';
 
 class Accesorios {
+    /** null mientras no se ha comprobado si el catálogo tiene la columna. */
+    private ?bool $codigoUnicoDisponible = null;
+
     private PDO $pdo;
 
     /** Estatus en los que la sesión todavía admite cambios del inspector. */
@@ -27,6 +30,13 @@ class Accesorios {
         'juego_poleas'      => 'JUEGO DE POLEAS CON GRILLETE',
         'eslinga_cable_gri' => 'ESLINGA DE CABLE DE ACERO CON TERMINACIÓN EN GRILLETE',
     ];
+
+    /**
+     * Tipos que arrancan con la casilla de código único puesta. Se comparan por
+     * nombre completo, no por "contiene grillete": el juego de poleas y la
+     * eslinga con terminación en grillete sí tienen serie propia.
+     */
+    private const TIPOS_CODIGO_UNICO = ['GRILLETE', 'GRILLETES'];
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
@@ -69,6 +79,23 @@ class Accesorios {
                 // Cada tipo va aislado: que uno falle no impide sembrar el resto.
                 error_log("[Accesorios] seedTipos ($clave): " . $e->getMessage());
             }
+        }
+
+        // Los grilletes ya capturados se marcan una sola vez. Con su propia
+        // marca, para que quitar la casilla a mano no se deshaga sola.
+        try {
+            $st = $this->pdo->prepare("SELECT 1 FROM accesorios_tipos_seed WHERE clave = ?");
+            $st->execute(['codigo_unico_grillete']);
+            if (!$st->fetch() && $this->ensureTipoCodigoUnico()) {
+                $ph = implode(',', array_fill(0, count(self::TIPOS_CODIGO_UNICO), '?'));
+                $this->pdo->prepare(
+                    "UPDATE accesorios_tipos SET codigo_unico = 1 WHERE UPPER(TRIM(nombre)) IN ($ph)"
+                )->execute(self::TIPOS_CODIGO_UNICO);
+                $this->pdo->prepare("INSERT INTO accesorios_tipos_seed (clave) VALUES (?)")
+                    ->execute(['codigo_unico_grillete']);
+            }
+        } catch (\Throwable $e) {
+            error_log('[Accesorios] seedTipos (codigo_unico): ' . $e->getMessage());
         }
     }
 
@@ -121,16 +148,18 @@ class Accesorios {
 
     // ── Catálogo de tipos (público autenticado) ────────────
     public function listarTipos(): array {
+        $col  = $this->ensureTipoCodigoUnico() ? 'codigo_unico' : '0 AS codigo_unico';
         $rows = $this->pdo->query(
-            "SELECT id, nombre FROM accesorios_tipos WHERE activo = 1 ORDER BY nombre"
+            "SELECT id, nombre, $col FROM accesorios_tipos WHERE activo = 1 ORDER BY nombre"
         )->fetchAll();
         return ['status' => 'success', 'data' => $rows];
     }
 
     // ── Catálogo de tipos (admin — incluye inactivos) ──────
     public function listarTiposAdmin(): array {
+        $col  = $this->ensureTipoCodigoUnico() ? 'codigo_unico' : '0 AS codigo_unico';
         $rows = $this->pdo->query(
-            "SELECT id, nombre, activo, fecha_creacion FROM accesorios_tipos ORDER BY nombre"
+            "SELECT id, nombre, activo, $col, fecha_creacion FROM accesorios_tipos ORDER BY nombre"
         )->fetchAll();
         return ['status' => 'success', 'data' => $rows];
     }
@@ -144,7 +173,12 @@ class Accesorios {
         $dup->execute([$nombre]);
         if ($dup->fetch()) return ['status' => 'error', 'message' => 'Ya existe un tipo con ese nombre.'];
 
-        $this->pdo->prepare("INSERT INTO accesorios_tipos (nombre) VALUES (?)")->execute([$nombre]);
+        if ($this->ensureTipoCodigoUnico()) {
+            $this->pdo->prepare("INSERT INTO accesorios_tipos (nombre, codigo_unico) VALUES (?,?)")
+                ->execute([$nombre, !empty($payload['codigo_unico']) ? 1 : 0]);
+        } else {
+            $this->pdo->prepare("INSERT INTO accesorios_tipos (nombre) VALUES (?)")->execute([$nombre]);
+        }
         return ['status' => 'success', 'message' => 'Tipo creado.', 'id' => (int)$this->pdo->lastInsertId()];
     }
 
@@ -159,8 +193,13 @@ class Accesorios {
         if ($dup->fetch()) return ['status' => 'error', 'message' => 'Ya existe otro tipo con ese nombre.'];
 
         $activo = isset($payload['activo']) ? (int)$payload['activo'] : 1;
-        $this->pdo->prepare("UPDATE accesorios_tipos SET nombre = ?, activo = ? WHERE id = ?")
-            ->execute([$nombre, $activo, $id]);
+        if ($this->ensureTipoCodigoUnico()) {
+            $this->pdo->prepare("UPDATE accesorios_tipos SET nombre = ?, activo = ?, codigo_unico = ? WHERE id = ?")
+                ->execute([$nombre, $activo, !empty($payload['codigo_unico']) ? 1 : 0, $id]);
+        } else {
+            $this->pdo->prepare("UPDATE accesorios_tipos SET nombre = ?, activo = ? WHERE id = ?")
+                ->execute([$nombre, $activo, $id]);
+        }
 
         return ['status' => 'success', 'message' => 'Tipo actualizado.'];
     }
@@ -225,6 +264,16 @@ class Accesorios {
             ? $post['estado'] : 'CUMPLE';
 
         $qrCodigo = trim($post['qr_codigo'] ?? '');
+        $idAcc    = strtoupper(trim($post['id_accesorio'] ?? ''));
+        $serie    = strtoupper(trim($post['serie']        ?? ''));
+
+        // Grilletes y demás tipos de código único: etiqueta, serie y QR son el
+        // mismo dato, se capture por donde se capture.
+        $qrFueraDeFormato = false;
+        if ($this->tipoCodigoUnico($tipoId)) {
+            [$idAcc, $serie, $qrCodigo, $qrFueraDeFormato] = $this->unificarCodigos($idAcc, $serie, $qrCodigo);
+        }
+
         if ($qrCodigo !== '' && !qrFormatoValido($qrCodigo))
             return ['status' => 'error', 'message' => qrMensajeFormato()];
         if ($qrCodigo !== '' && !$this->qrDisponible($qrCodigo))
@@ -243,11 +292,11 @@ class Accesorios {
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         )->execute([
             $sesionId,
-            strtoupper(trim($post['id_accesorio'] ?? '')),
+            $idAcc,
             $tipoId,
             strtoupper(trim($post['marca']    ?? '')),
             strtoupper(trim($post['modelo']   ?? '')),
-            strtoupper(trim($post['serie']    ?? '')),
+            $serie,
             strtoupper(trim($post['capacidad']?? '')),
             strtoupper(trim($post['medidas']  ?? '')),
             $estado,
@@ -312,7 +361,9 @@ class Accesorios {
 
         return [
             'status'      => 'success',
-            'message'     => 'Accesorio guardado.',
+            'message'     => $qrFueraDeFormato
+                ? 'Accesorio guardado. El código quedó como etiqueta y serie, pero no como QR: la placa lleva 9 o 10 dígitos.'
+                : 'Accesorio guardado.',
             'id'          => $accesorioId,
             'tipo_nombre' => $tipoNombre,
             'qr_codigo'   => $qrCodigo ?: null,
@@ -484,6 +535,14 @@ class Accesorios {
         if ($estado && !in_array($estado, ['CUMPLE','NO CUMPLE'], true))
             return ['status' => 'error', 'message' => 'Estado no válido. Use CUMPLE o NO CUMPLE.'];
 
+        // En los tipos de código único —los grilletes— los tres campos son el
+        // mismo dato: se unifican aquí también, no sólo en pantalla, para que
+        // no lleguen distintos por otra vía.
+        $qrFueraDeFormato = false;
+        if ($this->tipoCodigoUnico($tipoId)) {
+            [$idAcc, $serie, $qrCodigo, $qrFueraDeFormato] = $this->unificarCodigos($idAcc, $serie, $qrCodigo);
+        }
+
         if ($qrCodigo !== '' && !qrFormatoValido($qrCodigo))
             return ['status' => 'error', 'message' => qrMensajeFormato()];
 
@@ -502,7 +561,9 @@ class Accesorios {
         )->execute([$tipoId, $idAcc, $marca, $modelo, $serie, $capacidad, $medidas, $estado, $qrCodigo ?: null, $comps, $id]);
         $this->ocuparQr($qrCodigo, $row['qr_codigo'] ?? '');
 
-        return ['status' => 'success', 'message' => 'Accesorio actualizado.'];
+        return ['status' => 'success', 'message' => $qrFueraDeFormato
+            ? 'Accesorio actualizado. El código quedó como etiqueta y serie, pero no como QR: la placa lleva 9 o 10 dígitos.'
+            : 'Accesorio actualizado.'];
     }
 
     // ── Aprobar sesión → APROBADO_CALIDAD ────────────────
@@ -713,6 +774,9 @@ class Accesorios {
         );
 
         $copiarFotos = !empty($p['copiar_fotos']);
+        // Un lote de grilletes es justo el caso: cada copia sólo cambia en su
+        // código, y ese código va en los tres campos.
+        $unico   = $this->tipoCodigoUnico($it['tipo_id'] ? (int)$it['tipo_id'] : null);
         $creados = [];
         $this->pdo->beginTransaction();
         try {
@@ -720,6 +784,15 @@ class Accesorios {
                 $serie = mb_strtoupper($series[$i] ?? '') ?: null;
                 $idAcc = mb_strtoupper($ids[$i] ?? '') ?: (string)$it['id_accesorio'];
                 $qr    = $qrs[$i] ?? '';
+                if ($unico) {
+                    // Aquí la etiqueta heredada no cuenta: si contara, todas las
+                    // copias sin código propio se llamarían igual que el original.
+                    [$idAcc, $serie, $qr, ] = $this->unificarCodigos(
+                        mb_strtoupper($ids[$i] ?? ''), mb_strtoupper($series[$i] ?? ''), $qr
+                    );
+                    $serie = $serie ?: null;
+                    $idAcc = $idAcc ?: (string)$it['id_accesorio'];
+                }
                 $ins->execute([
                     $sesionId, $idAcc, $it['tipo_id'], $it['marca'], $it['modelo'],
                     $serie, $it['capacidad'], $it['medidas'], $it['estado'], ++$orden,
@@ -1284,6 +1357,77 @@ class Accesorios {
             } catch (\Throwable $e) { error_log('[Accesorios] liberar QR: ' . $e->getMessage()); }
         }
         if ($nuevo !== '' && function_exists('qrRegistrarUsado')) qrRegistrarUsado($this->pdo, $nuevo);
+    }
+
+    /**
+     * Tipos en los que la etiqueta interna, el número de serie y el código QR
+     * son el mismo dato.
+     *
+     * Un grillete no trae número de serie de fábrica: lo que lo identifica es la
+     * placa que le pegamos, y ese número es a la vez su etiqueta interna y su
+     * QR. Capturarlo tres veces sólo abre la puerta a que los tres queden
+     * distintos y el certificado no cuadre con la pieza.
+     *
+     * Es una casilla del catálogo y no una lista de nombres a propósito: hay
+     * tipos que llevan "grillete" en el nombre —el juego de poleas, la eslinga
+     * con terminación en grillete— y ésos sí tienen serie propia.
+     */
+    private function ensureTipoCodigoUnico(): bool {
+        // Una vez por instancia: se consulta desde varios sitios y no hace falta
+        // lanzar el ALTER en cada uno. Va en el objeto y no en una estática
+        // porque la respuesta depende de la conexión.
+        if ($this->codigoUnicoDisponible !== null) return $this->codigoUnicoDisponible;
+
+        try {
+            $this->pdo->exec(
+                "ALTER TABLE accesorios_tipos ADD COLUMN IF NOT EXISTS codigo_unico TINYINT(1) NOT NULL DEFAULT 0"
+            );
+        } catch (\Throwable $e) { /* ya existe, o el motor no admite IF NOT EXISTS */ }
+
+        // Se comprueba en lugar de darlo por hecho: si la columna no se pudo
+        // crear —permisos, un motor que no admite IF NOT EXISTS— el resto del
+        // módulo tiene que seguir funcionando sin ella, no reventar el catálogo
+        // de tipos entero.
+        try {
+            $this->pdo->query("SELECT codigo_unico FROM accesorios_tipos LIMIT 0");
+            $this->codigoUnicoDisponible = true;
+        } catch (\Throwable $e) {
+            error_log('[Accesorios] codigo_unico no disponible: ' . $e->getMessage());
+            $this->codigoUnicoDisponible = false;
+        }
+        return $this->codigoUnicoDisponible;
+    }
+
+    /** ¿Este tipo comparte etiqueta, serie y QR? */
+    private function tipoCodigoUnico(?int $tipoId): bool {
+        if (!$tipoId || !$this->ensureTipoCodigoUnico()) return false;
+        try {
+            $st = $this->pdo->prepare("SELECT codigo_unico FROM accesorios_tipos WHERE id = ?");
+            $st->execute([$tipoId]);
+            return (int)$st->fetchColumn() === 1;
+        } catch (\Throwable $e) { return false; }
+    }
+
+    /**
+     * Deja etiqueta, serie y QR con el mismo valor cuando el tipo así lo pide.
+     *
+     * Manda el QR si viene, porque es el número impreso en la placa; si no, la
+     * serie, y en último término la etiqueta. Un valor que no tenga forma de
+     * placa se copia igual en etiqueta y serie, pero no en el QR: ahí sólo
+     * caben 9 o 10 dígitos y meter otra cosa rompería la validación pública.
+     *
+     * @return array{0:string,1:string,2:string,3:bool} etiqueta, serie, qr, ¿el QR quedó fuera?
+     */
+    private function unificarCodigos(string $idAcc, string $serie, string $qr): array {
+        $valor = $qr !== '' ? $qr : ($serie !== '' ? $serie : $idAcc);
+        if ($valor === '') return ['', '', '', false];
+        $sirveDeQr = qrFormatoValido($valor);
+        return [
+            mb_strtoupper($valor),
+            mb_strtoupper($valor),
+            $sirveDeQr ? $valor : '',
+            !$sirveDeQr,
+        ];
     }
 
     private function ensureAccIzajeQrColumn(): void {

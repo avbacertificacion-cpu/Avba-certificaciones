@@ -1433,20 +1433,22 @@
             <option value="">— Seleccionar —</option>
           </select></label>
         <label style="font-size:11px;color:var(--texto-sub)">ID / Etiqueta interna
-          <input type="text" id="acc-n-id" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+          <input type="text" id="acc-n-id" oninput="accEspejo(this,'nuevo')" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Marca
           <input type="text" id="acc-n-marca" list="dl-acc-marca" autocomplete="off" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Modelo
           <input type="text" id="acc-n-modelo" list="dl-acc-modelo" autocomplete="off" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">No. de serie
-          <input type="text" id="acc-n-serie" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
+          <input type="text" id="acc-n-serie" oninput="accEspejo(this,'nuevo')" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Capacidad
           <input type="text" id="acc-n-capacidad" list="dl-acc-capacidad" autocomplete="off" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Medidas
           <input type="text" id="acc-n-medidas" list="dl-acc-medidas" autocomplete="off" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px"></label>
         <label style="font-size:11px;color:var(--texto-sub)">Código QR
-          <input type="text" id="acc-n-qr" maxlength="10" placeholder="9 o 10 dígitos"
+          <input type="text" id="acc-n-qr" maxlength="10" placeholder="9 o 10 dígitos" oninput="accEspejo(this,'nuevo')"
                  style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px;font-family:monospace"></label>
+        <div id="acc-n-espejo-aviso" style="grid-column:1/-1;display:none;font-size:11px;color:var(--azul-dark);
+             background:var(--azul-light);border-radius:8px;padding:7px 10px;line-height:1.5"></div>
         <label style="font-size:11px;color:var(--texto-sub)">Resultado
           <select id="acc-n-estado" style="width:100%;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:13px">
             <option value="CUMPLE">CUMPLE</option>
@@ -1491,7 +1493,7 @@
       </div>
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">ID Accesorio</label>
-        <input id="edit-acc-id-acc" type="text" placeholder="A-001"
+        <input id="edit-acc-id-acc" type="text" placeholder="A-001" oninput="accEspejo(this,'edit')"
                style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
       </div>
       <div>
@@ -1506,7 +1508,7 @@
       </div>
       <div>
         <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">No. Serie</label>
-        <input id="edit-acc-serie" type="text" placeholder="CB2024-0112"
+        <input id="edit-acc-serie" type="text" placeholder="CB2024-0112" oninput="accEspejo(this,'edit')"
                style="width:100%;margin-top:4px;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px">
       </div>
       <div>
@@ -1535,13 +1537,15 @@
       <div style="grid-column:1/-1">
         <label style="font-size:11px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.04em">Código QR <span style="font-size:10px;font-weight:400">(9 o 10 dígitos, como en la placa)</span></label>
         <div style="display:flex;gap:6px;margin-top:4px">
-          <input id="edit-acc-qr" type="text" maxlength="10" inputmode="numeric" placeholder="635261114"
+          <input id="edit-acc-qr" type="text" maxlength="10" inputmode="numeric" placeholder="635261114" oninput="accEspejo(this,'edit')"
                  style="flex:1;padding:8px 10px;border:1.5px solid var(--borde);border-radius:var(--radio);font-size:13px;letter-spacing:2px">
           <button type="button" onclick="editAccSugerirQR()"
                   style="padding:8px 10px;background:#e8f5e9;color:#2e7d32;border:1.5px solid #a5d6a7;border-radius:var(--radio);cursor:pointer;font-size:12px" title="Siguiente QR disponible">
             →
           </button>
         </div>
+        <div id="edit-acc-espejo-aviso" style="display:none;font-size:11px;color:var(--azul-dark);background:var(--azul-light);
+             border-radius:8px;padding:7px 10px;margin-top:6px;line-height:1.5"></div>
       </div>
     </div>
     <div class="modal-footer">
@@ -1852,12 +1856,24 @@
                style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none"
                onkeydown="if(event.key==='Enter')guardarAccTipo()">
       </div>
-      <div class="form-group" style="margin-bottom:20px">
+      <div class="form-group" style="margin-bottom:14px">
         <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:5px">Estado</label>
         <select id="acc-tipo-activo" style="width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none;background:white">
           <option value="1">Activo</option>
           <option value="0">Inactivo</option>
         </select>
+      </div>
+      <div class="form-group" style="margin-bottom:20px">
+        <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
+          <input type="checkbox" id="acc-tipo-codigo-unico" style="width:16px;height:16px;margin-top:2px;flex-shrink:0">
+          <span style="font-size:12.5px;color:var(--texto)">
+            <b>Etiqueta, serie y QR son el mismo código</b>
+            <span style="display:block;font-size:11px;color:var(--texto-hint);margin-top:2px;font-weight:400">
+              Para piezas sin serie de fábrica, como los grilletes: lo que las identifica es la placa
+              que les pegamos. Al capturar cualquiera de los tres, los otros dos se llenan solos.
+            </span>
+          </span>
+        </label>
       </div>
     </div>
     <div class="modal-footer" style="justify-content:flex-end;gap:8px">
@@ -3844,7 +3860,10 @@ function renderAccTipos() {
 
   tbody.innerHTML = accTiposData.map(t => `
     <tr>
-      <td style="font-weight:500">${t.nombre}</td>
+      <td style="font-weight:500">${t.nombre}
+        ${+t.codigo_unico === 1 ? `<span title="La etiqueta, la serie y el QR son el mismo código"
+            style="margin-left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--azul-light);color:var(--azul-dark)">1 código</span>` : ''}
+      </td>
       <td style="text-align:center">
         <span style="font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;
               background:${t.activo == 1 ? 'var(--verde-light)' : '#f0f0f0'};
@@ -3865,6 +3884,7 @@ function abrirModalAccTipo(id) {
   document.getElementById('acc-tipo-id').value    = id || '';
   document.getElementById('acc-tipo-nombre').value = '';
   document.getElementById('acc-tipo-activo').value = '1';
+  document.getElementById('acc-tipo-codigo-unico').checked = false;
   document.getElementById('acc-tipo-modal-titulo').textContent = id ? 'Editar tipo de accesorio' : 'Nuevo tipo de accesorio';
 
   if (id) {
@@ -3872,6 +3892,7 @@ function abrirModalAccTipo(id) {
     if (t) {
       document.getElementById('acc-tipo-nombre').value = t.nombre;
       document.getElementById('acc-tipo-activo').value = String(t.activo);
+      document.getElementById('acc-tipo-codigo-unico').checked = +t.codigo_unico === 1;
     }
   }
 
@@ -3890,8 +3911,11 @@ async function guardarAccTipo() {
 
   if (!nombre) { alert('El nombre es obligatorio.'); return; }
 
+  const unico   = document.getElementById('acc-tipo-codigo-unico').checked ? 1 : 0;
   const action  = id ? 'EDITAR_TIPO_ACCESORIO' : 'CREAR_TIPO_ACCESORIO';
-  const payload = id ? { id: parseInt(id), nombre, activo: parseInt(activo) } : { nombre };
+  const payload = id
+    ? { id: parseInt(id), nombre, activo: parseInt(activo), codigo_unico: unico }
+    : { nombre, codigo_unico: unico };
 
   try {
     const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
@@ -4343,7 +4367,8 @@ async function abrirAccNuevo() {
     accTiposData.filter(t => t.activo != 0).map(t => `<option value="${t.id}">${escH(t.nombre)}</option>`).join('');
 
   accCargarSugerencias(0);
-  document.getElementById('acc-n-tipo').onchange = function () { accCargarSugerencias(this.value); };
+  document.getElementById('acc-n-tipo').onchange = function () { accCargarSugerencias(this.value); accEspejoAlCambiarTipo('nuevo'); };
+  accEspejoAviso('nuevo');
   document.getElementById('overlay-acc-nuevo').style.display = 'flex';
 }
 
@@ -4354,8 +4379,11 @@ async function guardarAccNuevo() {
   const v = id => (document.getElementById(id) || {}).value || '';
   const tipo = v('acc-n-tipo');
   if (!tipo) { mostrarToast('Selecciona el tipo de accesorio.', 'err'); return; }
-  const qr = v('acc-n-qr').replace(/\D/g,'');
-  if (qr && (qr.length < 9 || qr.length > 10)) { mostrarToast('El código debe tener 9 o 10 dígitos, como viene impreso en la placa.', 'err'); return; }
+  // En los tipos de un solo código el valor puede no ser una placa: entonces
+  // se guarda sólo como etiqueta y serie, y el aviso ya lo explicó.
+  const espejo = accEspejoActivo('nuevo');
+  const qr = espejo ? accEspejoQrParaGuardar('nuevo') : v('acc-n-qr').replace(/\D/g,'');
+  if (!espejo && qr && (qr.length < 9 || qr.length > 10)) { mostrarToast('El código debe tener 9 o 10 dígitos, como viene impreso en la placa.', 'err'); return; }
 
   const btn = document.getElementById('acc-n-btn');
   btn.disabled = true; btn.textContent = 'Guardando…';
@@ -4629,13 +4657,98 @@ function abrirEditAcc(a) {
   document.getElementById('edit-acc-qr').value      = a.qr_codigo || '';
 
   accCargarSugerencias(a.tipo_id || 0);
-  sel.onchange = function () { accCargarSugerencias(this.value); };
+  sel.onchange = function () { accCargarSugerencias(this.value); accEspejoAlCambiarTipo('edit'); };
+  accEspejoAviso('edit');
   document.getElementById('overlay-edit-acc').classList.add('open');
 }
 
 function cerrarEditAcc() {
   document.getElementById('overlay-edit-acc').classList.remove('open');
 }
+
+/* ═══════════════════════════════════════════════════════════
+   UN SOLO CÓDIGO
+   Un grillete no trae número de serie de fábrica: lo identifica la placa que
+   le pegamos, y ese número es a la vez su etiqueta interna y su QR.
+   Capturarlo tres veces sólo abre la puerta a que los tres queden distintos y
+   el certificado no cuadre con la pieza.
+   ═══════════════════════════════════════════════════════════ */
+/* Los dos formularios de Calidad que capturan accesorios. */
+const ACC_ESPEJO_FORMS = {
+  edit:  { id:'edit-acc-id-acc', serie:'edit-acc-serie', qr:'edit-acc-qr',
+           tipo:'edit-acc-tipo', aviso:'edit-acc-espejo-aviso' },
+  nuevo: { id:'acc-n-id',        serie:'acc-n-serie',    qr:'acc-n-qr',
+           tipo:'acc-n-tipo',    aviso:'acc-n-espejo-aviso' },
+};
+
+/* Lo decide el catálogo, no el nombre: hay tipos que llevan "grillete" en el
+   nombre —el juego de poleas, la eslinga con terminación en grillete— y ésos
+   sí tienen serie propia. */
+function accTipoCodigoUnico(tipoId) {
+  const t = accTiposData.find(x => x.id == tipoId);
+  return !!t && +t.codigo_unico === 1;
+}
+
+function accEspejoActivo(form) {
+  const f = ACC_ESPEJO_FORMS[form];
+  return !!f && accTipoCodigoUnico(document.getElementById(f.tipo)?.value);
+}
+
+/* Copia lo escrito a los otros dos campos. */
+function accEspejo(origen, form) {
+  if (!accEspejoActivo(form)) return;
+  const f = ACC_ESPEJO_FORMS[form];
+  const valor = origen.value;
+  [f.id, f.serie, f.qr].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el !== origen) el.value = valor;
+  });
+  accEspejoAviso(form);
+}
+
+/* Explica el modo y avisa cuando el código no tiene forma de placa: en el QR
+   sólo caben 9 o 10 dígitos, así que ahí no puede guardarse. */
+function accEspejoAviso(form) {
+  const f   = ACC_ESPEJO_FORMS[form];
+  const avi = f && document.getElementById(f.aviso);
+  if (!avi) return;
+  if (!accEspejoActivo(form)) { avi.style.display = 'none'; return; }
+
+  const v = (document.getElementById(f.qr).value || '').trim();
+  const sirve = /^\d{9,10}$/.test(v);
+  avi.style.display = '';
+  avi.innerHTML = v === ''
+    ? 'Este tipo lleva <b>un solo código</b>: al capturar la etiqueta, la serie o el QR, los otros dos se llenan solos.'
+    : sirve
+      ? '✓ El mismo código en la etiqueta, la serie y el QR.'
+      : '⚠ <b>' + escH(v) + '</b> se guardará como etiqueta y serie, pero no como código QR: la placa lleva 9 o 10 dígitos.';
+  avi.style.background = (v !== '' && !sirve) ? '#fff4e0' : 'var(--azul-light)';
+  avi.style.color      = (v !== '' && !sirve) ? '#8a5200' : 'var(--azul-dark)';
+}
+
+/* Al cambiar el tipo se ajusta el modo, sin pisar lo ya capturado: sólo se
+   unifica si los tres campos venían iguales o si sólo uno traía valor. */
+function accEspejoAlCambiarTipo(form) {
+  if (!accEspejoActivo(form)) { accEspejoAviso(form); return; }
+  const f = ACC_ESPEJO_FORMS[form];
+  const campos = [f.id, f.serie, f.qr];
+  const vals = campos.map(id => (document.getElementById(id).value || '').trim());
+  const conValor = vals.filter(Boolean);
+  const iguales  = new Set(conValor.map(v => v.toUpperCase())).size <= 1;
+  if (conValor.length && iguales) {
+    const v = conValor[0];
+    campos.forEach(id => { document.getElementById(id).value = v; });
+  }
+  accEspejoAviso(form);
+}
+
+/* El QR sólo admite dígitos. Si el código no los tiene, se guarda vacío y el
+   código sobrevive en la etiqueta y la serie. */
+function accEspejoQrParaGuardar(form) {
+  const v = (document.getElementById(ACC_ESPEJO_FORMS[form].qr).value || '').trim();
+  return /^\d{9,10}$/.test(v) ? v : '';
+}
+
 
 async function guardarEditAcc() {
   const btn = document.getElementById('btn-guardar-edit-acc');
@@ -4660,7 +4773,11 @@ async function guardarEditAcc() {
           medidas:      document.getElementById('edit-acc-medidas').value.trim(),
           componentes:  document.getElementById('edit-acc-componentes').value.trim(),
           estado:       document.getElementById('edit-acc-estado').value,
-          qr_codigo:    document.getElementById('edit-acc-qr').value.replace(/\D/g,'') || '',
+          // En los tipos de un solo código el QR puede no tener forma de placa;
+          // ahí va vacío y el código se conserva en etiqueta y serie.
+          qr_codigo:    accEspejoActivo('edit')
+                          ? accEspejoQrParaGuardar('edit')
+                          : (document.getElementById('edit-acc-qr').value.replace(/\D/g,'') || ''),
         }
       })
     });
