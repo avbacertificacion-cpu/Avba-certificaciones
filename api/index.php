@@ -37,6 +37,7 @@ require_once __DIR__ . '/Arneses.php';
 require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
 require_once __DIR__ . '/Contabilidad.php';
+require_once __DIR__ . '/MaterialControl.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -98,6 +99,7 @@ $cliRH          = new ClienteRH($pdo);
 $pagosServicios = new PagosServicios($pdo);
 $anuncios       = new Anuncios($pdo);
 $conta       = new Contabilidad($pdo);
+$material    = new MaterialControl($pdo);
 $verifIA        = new VerificacionIA($pdo);
 $arneses        = new Arneses($pdo);
 $cliImpresion   = new ClienteImpresion($pdo);
@@ -398,6 +400,17 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($avbaAdmin->detallePersonal((int)($_GET['id'] ?? 0)));
+
+        // ── Control de material en planta (ADMIN + ADMINISTRATIVO) ──
+        case 'LISTAR_MATERIAL_VALES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($material->listar((string)($_GET['estado'] ?? ''), (string)($_GET['q'] ?? '')));
+
+        case 'DETALLE_MATERIAL_VALE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($material->detalle((int)($_GET['id'] ?? 0)));
 
         // ── Vencimientos / pagos de servicios (ADMIN + ADMINISTRATIVO) ──
         case 'LISTAR_PAGOS_SERVICIOS':
@@ -999,6 +1012,37 @@ if ($method === 'POST') {
         // ── Auth ─────────────────────────────────────────
         case 'LOGIN':
             respuesta($auth->login($payload));
+
+        // ── Control de material en planta (ADMIN + ADMINISTRATIVO) ──
+        case 'GUARDAR_MATERIAL_VALE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($material->guardar($payload, $usr['usuario']));
+
+        case 'RETIRAR_MATERIAL_VALE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($material->retirar($payload));
+
+        case 'REABRIR_MATERIAL_VALE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($material->reabrir((int)($payload['id'] ?? 0)));
+
+        case 'ELIMINAR_MATERIAL_VALE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($material->eliminar((int)($payload['id'] ?? 0), $usr['usuario'], (string)($payload['motivo'] ?? '')));
+
+        case 'SUBIR_DOC_MATERIAL':   // multipart
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($material->subirDoc($_POST, $_FILES));
+
+        case 'ELIMINAR_DOC_MATERIAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($material->eliminarDoc((int)($payload['id'] ?? 0)));
 
         // ── Control Administrativo AVBA (ADMIN + ADMINISTRATIVO) ──
         case 'GUARDAR_AVBA_PERSONAL':

@@ -77,6 +77,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg)}
 <div class="wrap">
   <div class="tabs">
     <button class="tab-btn active" id="tabbtn-personal" onclick="verTab('personal',this)">👤 Personal AVBA</button>
+    <button class="tab-btn" id="tabbtn-material" onclick="verTab('material',this)">📦 Control de material</button>
     <button class="tab-btn" disabled title="Próxima fase">🚗 Vehículos</button>
     <button class="tab-btn" disabled title="Próxima fase">📁 Expediente por cliente</button>
     <button class="tab-btn" disabled title="Próxima fase">⏰ Vencimientos</button>
@@ -95,6 +96,34 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg)}
       <button class="btn-prim" onclick="abrirModalPer(null)">+ Nuevo empleado</button>
     </div>
     <div id="per-lista"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+
+  <!-- ══════════ CONTROL DE MATERIAL ══════════
+       Al entrar a una planta con material propio, la puerta emite un vale.
+       Ese papel es lo único que acredita que el material es nuestro: sin él
+       no sale. Aquí se guarda, junto con el vale de salida cuando regresa. -->
+  <div id="tab-material" class="tab-panel">
+    <div class="stats">
+      <div class="stat"><div class="stat-n" id="m-dentro" style="color:var(--ambar)">—</div><div class="stat-l">En planta</div></div>
+      <div class="stat"><div class="stat-n" id="m-plantas" style="color:var(--azul)">—</div><div class="stat-l">Plantas</div></div>
+      <div class="stat"><div class="stat-n" id="m-sinresp" style="color:var(--rojo)">—</div><div class="stat-l">Sin vale escaneado</div></div>
+      <div class="stat"><div class="stat-n" id="m-retirados" style="color:var(--verde)">—</div><div class="stat-l">Retirados</div></div>
+    </div>
+    <div class="sec-hdr">
+      <div><h2 style="margin:0;font-size:18px;color:var(--azul-dark)">Material ingresado a planta</h2>
+        <p style="margin:3px 0 0;font-size:13px;color:var(--texto-sub)">Vales de entrada y salida que acreditan que el material es nuestro.</p></div>
+      <button class="btn-prim" onclick="abrirModalVale(null)">+ Nuevo ingreso</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <input class="finput" id="m-buscar" placeholder="Buscar por planta, folio, responsable o material…"
+             style="flex:1;min-width:200px" oninput="filtrarVales()">
+      <select class="finput" id="m-filtro" style="width:auto;min-width:150px" onchange="filtrarVales()">
+        <option value="DENTRO">En planta</option>
+        <option value="RETIRADO">Retirados</option>
+        <option value="">Todos</option>
+      </select>
+    </div>
+    <div id="mat-lista"><div class="loading"><span class="spin"></span></div></div>
   </div>
 </div>
 
@@ -149,6 +178,75 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg)}
     <div class="frow"><label class="flabel">Archivo (imagen o PDF)</label><input class="finput" id="doc-archivo" type="file" accept="image/*,application/pdf"></div>
     <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="doc-notas" rows="2"></textarea></div>
     <div class="fact"><button class="btn-sec" onclick="cerrarModalDoc()">Cancelar</button><button class="btn-prim" id="doc-guardar-btn" onclick="guardarDoc()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- Modal ingreso de material -->
+<div class="overlay" id="modal-vale">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-hdr"><div class="modal-title" id="modal-vale-title">Nuevo ingreso de material</div><button class="modal-close" onclick="cerrarModalVale()">✕</button></div>
+    <input type="hidden" id="v-id">
+    <div class="frow"><label class="flabel">Planta o cliente *</label><input class="finput" id="v-planta" placeholder="Ej: Grúas Villarreal — Planta Altamira"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Área o ubicación</label><input class="finput" id="v-ubicacion" placeholder="Ej: Almacén 3"></div>
+      <div class="frow"><label class="flabel">Folio del vale</label><input class="finput" id="v-folio" placeholder="El que da la puerta"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Fecha de ingreso</label><input class="finput" id="v-ingreso" type="date"></div>
+      <div class="frow"><label class="flabel">Quién lo ingresó</label><input class="finput" id="v-responsable"></div>
+    </div>
+    <div class="frow"><label class="flabel">Material ingresado</label>
+      <textarea class="finput" id="v-material" rows="4" placeholder="Una pieza por renglón:&#10;1 dinamómetro 10 ton serie D-1042&#10;2 eslingas sintéticas 3 m&#10;1 maletín de herramienta"></textarea>
+      <div style="font-size:11px;color:var(--texto-hint);margin-top:3px">Es la lista que se coteja en la puerta al salir.</div>
+    </div>
+    <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="v-notas" rows="2"></textarea></div>
+    <div class="fact"><button class="btn-sec" onclick="cerrarModalVale()">Cancelar</button><button class="btn-prim" onclick="guardarVale()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- Modal expediente del vale -->
+<div class="overlay" id="modal-mdet">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-hdr"><div class="modal-title" id="mdet-titulo">Expediente</div><button class="modal-close" onclick="cerrarModalMdet()">✕</button></div>
+    <div id="mdet-resumen" style="background:#f4f7fb;border:1px solid var(--borde);border-radius:10px;padding:11px 13px;font-size:12.5px;line-height:1.65;margin-bottom:12px"></div>
+    <div class="sec-hdr" style="margin-bottom:8px">
+      <div class="msec" style="margin:0;border:none">Documentación</div>
+      <button class="btn-sec" onclick="abrirModalMdoc()">+ Subir documento</button>
+    </div>
+    <div id="mdet-docs"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+</div>
+
+<!-- Modal subir documento del vale -->
+<div class="overlay" id="modal-mdoc">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title">Subir documento</div><button class="modal-close" onclick="cerrarModalMdoc()">✕</button></div>
+    <div class="frow"><label class="flabel">Tipo *</label>
+      <select class="finput" id="md-tipo">
+        <option value="vale_entrada">Vale de entrada</option>
+        <option value="vale_salida">Vale de salida</option>
+        <option value="remision">Remisión</option>
+        <option value="foto">Foto del material</option>
+        <option value="identificacion">Identificación / gafete</option>
+        <option value="otro">Otro</option>
+      </select></div>
+    <div class="frow"><label class="flabel">Nombre</label><input class="finput" id="md-nombre" placeholder="Se pone solo si lo dejas vacío"></div>
+    <div class="frow"><label class="flabel">Archivo (foto o PDF) *</label><input class="finput" id="md-archivo" type="file" accept="image/*,application/pdf" capture="environment"></div>
+    <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="md-notas" rows="2"></textarea></div>
+    <div class="fact"><button class="btn-sec" onclick="cerrarModalMdoc()">Cancelar</button><button class="btn-prim" id="md-btn" onclick="guardarMdoc()">Subir</button></div>
+  </div>
+</div>
+
+<!-- Modal retiro -->
+<div class="overlay" id="modal-retiro">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title">Retirar material de la planta</div><button class="modal-close" onclick="cerrarModalRetiro()">✕</button></div>
+    <div id="retiro-sub" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:12px"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Fecha de salida</label><input class="finput" id="r-fecha" type="date"></div>
+      <div class="frow"><label class="flabel">Folio del vale de salida</label><input class="finput" id="r-folio"></div>
+    </div>
+    <div class="fact"><button class="btn-sec" onclick="cerrarModalRetiro()">Cancelar</button><button class="btn-prim" onclick="confirmarRetiro()">Marcar retirado</button></div>
   </div>
 </div>
 
@@ -361,7 +459,272 @@ async function eliminarDoc(id){
   }catch(_){ toast('Error de red.'); }
 }
 
+// ══════════ CONTROL DE MATERIAL ══════════
+// El vale que da la puerta es lo único que acredita que el material es
+// nuestro. Lo que importa del listado es qué sigue dentro y desde cuándo.
+let _valesData = [];
+let _mdetId = 0;
+
+async function cargarVales(){
+  const cont=document.getElementById('mat-lista'); cont.innerHTML='<div class="loading"><span class="spin"></span></div>';
+  try{
+    const r=await fetch(API+'?action=LISTAR_MATERIAL_VALES'); const d=await r.json();
+    if(d.status!=='success'){ cont.innerHTML=`<p style="color:var(--rojo);text-align:center;padding:20px">${esc(d.message||'Error.')}</p>`; return; }
+    _valesData=d.vales||[];
+    const rs=d.resumen||{};
+    document.getElementById('m-dentro').textContent    = rs.dentro ?? 0;
+    document.getElementById('m-plantas').textContent   = rs.plantas ?? 0;
+    document.getElementById('m-sinresp').textContent   = rs.sin_respaldo ?? 0;
+    document.getElementById('m-retirados').textContent = rs.retirados ?? 0;
+    filtrarVales();
+  }catch(_){ cont.innerHTML='<p style="color:var(--rojo);text-align:center;padding:20px">Error de red.</p>'; }
+}
+
+function filtrarVales(){
+  const q=(document.getElementById('m-buscar').value||'').trim().toLowerCase();
+  const est=document.getElementById('m-filtro').value;
+  renderVales(_valesData.filter(v=>
+    (!est || v.estado===est) &&
+    (!q || [v.planta,v.folio,v.responsable,v.material,v.ubicacion].join(' ').toLowerCase().includes(q))
+  ));
+}
+
+/* El tiempo dentro es el dato que se olvida: a partir de un mes se marca. */
+function diasBadge(v){
+  if(v.estado!=='DENTRO') return `<span class="badge b-ok">✔ Retirado${v.fecha_salida?' '+esc(v.fecha_salida):''}</span>`;
+  const d=v.dias_dentro;
+  if(d==null) return '<span class="badge b-warn">En planta</span>';
+  const txt=d===0?'Ingresó hoy':(d===1?'1 día en planta':`${d} días en planta`);
+  return `<span class="badge ${d>30?'b-bad':'b-warn'}">${d>30?'⚠ ':'⏳ '}${txt}</span>`;
+}
+
+function renderVales(lista){
+  const cont=document.getElementById('mat-lista');
+  if(!lista.length){
+    cont.innerHTML='<div class="empty"><div class="empty-t">Sin registros</div><div class="empty-s">Registra el material que dejaste en una planta y sube su vale.</div></div>';
+    return;
+  }
+  cont.innerHTML='<div class="cards">'+lista.map(v=>`
+    <div class="card">
+      <div class="card-top">
+        <div class="card-ico">📦</div>
+        <div style="flex:1;min-width:0">
+          <div class="card-nombre">${esc(v.planta)}</div>
+          <div class="card-sub">${v.folio?'Vale '+esc(v.folio):'Sin folio'}${v.ubicacion?' · '+esc(v.ubicacion):''}</div>
+        </div>
+        ${diasBadge(v)}
+      </div>
+      <div class="card-body">
+        <div class="chips">
+          ${v.fecha_ingreso?`<span class="chip">📅 Ingresó ${esc(v.fecha_ingreso)}</span>`:''}
+          ${v.responsable?`<span class="chip">👤 ${esc(v.responsable)}</span>`:''}
+          ${v.piezas?`<span class="chip">🧰 ${v.piezas} pieza${v.piezas!==1?'s':''}</span>`:''}
+        </div>
+        ${v.material?`<div style="font-size:12px;color:var(--texto-sub);white-space:pre-line;margin-bottom:8px">${esc(v.material)}</div>`:''}
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <span style="font-size:12px;color:var(--texto-sub)">📄 ${v.total_docs} doc${v.total_docs!==1?'s':''}</span>
+          ${v.sin_respaldo
+            ? '<span class="badge b-bad">⚠ Falta el vale escaneado</span>'
+            : (v.estado==='RETIRADO' && !v.docs_salida ? '<span class="badge b-warn">Falta el vale de salida</span>' : '')}
+        </div>
+      </div>
+      <div class="card-foot">
+        <button class="btn-prim" style="flex:1;font-size:12px;padding:8px" onclick="verExpediente(${v.id})">📁 Documentos</button>
+        ${v.estado==='DENTRO'
+          ? `<button class="btn-sec" title="Marcar retirado" onclick="abrirModalRetiro(${v.id})">📤</button>`
+          : `<button class="btn-sec" title="Volver a marcar en planta" onclick="reabrirVale(${v.id})">↩</button>`}
+        <button class="btn-sec" onclick='abrirModalVale(${JSON.stringify(v).replace(/'/g,"&#39;")})'>✏</button>
+        <button class="btn-del" onclick="eliminarVale(${v.id})">🗑</button>
+      </div>
+    </div>`).join('')+'</div>';
+}
+
+// ── Alta y edición ──
+function abrirModalVale(v){
+  document.getElementById('modal-vale-title').textContent = v?'Editar ingreso':'Nuevo ingreso de material';
+  document.getElementById('v-id').value          = v?v.id:'';
+  document.getElementById('v-planta').value      = v?(v.planta||''):'';
+  document.getElementById('v-ubicacion').value   = v?(v.ubicacion||''):'';
+  document.getElementById('v-folio').value       = v?(v.folio||''):'';
+  document.getElementById('v-ingreso').value     = v?(v.fecha_ingreso_iso||''):new Date().toISOString().slice(0,10);
+  document.getElementById('v-responsable').value = v?(v.responsable||''):(_sesion.nombre||_sesion.usuario||'');
+  document.getElementById('v-material').value    = v?(v.material||''):'';
+  document.getElementById('v-notas').value       = v?(v.notas||''):'';
+  document.getElementById('modal-vale').classList.add('open');
+}
+function cerrarModalVale(){ document.getElementById('modal-vale').classList.remove('open'); }
+
+async function guardarVale(){
+  const planta=document.getElementById('v-planta').value.trim();
+  if(!planta){ toast('Indica la planta o el cliente.'); return; }
+  const id=+document.getElementById('v-id').value||0;
+  const previo=_valesData.find(x=>x.id===id);
+  const data={
+    id, planta,
+    ubicacion:document.getElementById('v-ubicacion').value.trim(),
+    folio:document.getElementById('v-folio').value.trim(),
+    fecha_ingreso:document.getElementById('v-ingreso').value,
+    responsable:document.getElementById('v-responsable').value.trim(),
+    material:document.getElementById('v-material').value,
+    notas:document.getElementById('v-notas').value.trim(),
+    // Editar no debe reabrir un vale ya cerrado ni perder su salida.
+    estado:previo?previo.estado:'DENTRO',
+    fecha_salida:previo?(previo.fecha_salida_iso||''):'',
+    folio_salida:previo?(previo.folio_salida||''):'',
+  };
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'GUARDAR_MATERIAL_VALE',payload:data})});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return; }
+    cerrarModalVale(); cargarVales();
+    // Un vale sin el papel escaneado no sirve para sacar nada: se ofrece subirlo.
+    if(!id){ _mdetId=d.id; toast('Registro guardado. Sube el vale.'); abrirModalMdoc('vale_entrada'); }
+    else toast('Registro guardado.');
+  }catch(_){ toast('Error de red.'); }
+}
+
+async function eliminarVale(id){
+  const v=_valesData.find(x=>x.id===id);
+  if(!confirm(`¿Eliminar el registro de ${v?v.planta:'este material'} y toda su documentación?\n\nEsto no se puede deshacer.`)) return;
+  const motivo=prompt('Motivo (queda en el historial):','');
+  if(motivo===null) return;
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'ELIMINAR_MATERIAL_VALE',payload:{id,motivo}})});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return; }
+    toast('Registro eliminado.'); cargarVales();
+  }catch(_){ toast('Error de red.'); }
+}
+
+// ── Retiro ──
+let _retiroId=0;
+function abrirModalRetiro(id){
+  _retiroId=id;
+  const v=_valesData.find(x=>x.id===id);
+  document.getElementById('retiro-sub').textContent =
+    v ? `${v.planta}${v.folio?' · vale '+v.folio:''}${v.piezas?' · '+v.piezas+' pieza(s)':''}` : '';
+  document.getElementById('r-fecha').value=new Date().toISOString().slice(0,10);
+  document.getElementById('r-folio').value='';
+  document.getElementById('modal-retiro').classList.add('open');
+}
+function cerrarModalRetiro(){ document.getElementById('modal-retiro').classList.remove('open'); }
+async function confirmarRetiro(){
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'RETIRAR_MATERIAL_VALE',payload:{
+      id:_retiroId,
+      fecha_salida:document.getElementById('r-fecha').value,
+      folio_salida:document.getElementById('r-folio').value.trim(),
+    }})});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return; }
+    cerrarModalRetiro(); toast(d.message||'Material retirado.'); cargarVales();
+    if(d.falta_vale_salida){ _mdetId=_retiroId; abrirModalMdoc('vale_salida'); }
+  }catch(_){ toast('Error de red.'); }
+}
+async function reabrirVale(id){
+  if(!confirm('¿Volver a marcar este material como que sigue en la planta?')) return;
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'REABRIR_MATERIAL_VALE',payload:{id}})});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return; }
+    toast(d.message||'Listo.'); cargarVales();
+  }catch(_){ toast('Error de red.'); }
+}
+
+// ── Expediente ──
+const MD_ETIQUETAS={vale_entrada:'Vale de entrada',vale_salida:'Vale de salida',remision:'Remisión',foto:'Foto del material',identificacion:'Identificación',otro:'Documento'};
+
+async function verExpediente(id){
+  _mdetId=id;
+  document.getElementById('modal-mdet').classList.add('open');
+  document.getElementById('mdet-docs').innerHTML='<div class="loading"><span class="spin"></span></div>';
+  cargarExpediente();
+}
+function cerrarModalMdet(){ document.getElementById('modal-mdet').classList.remove('open'); cargarVales(); }
+
+async function cargarExpediente(){
+  const cont=document.getElementById('mdet-docs');
+  try{
+    const r=await fetch(API+'?action=DETALLE_MATERIAL_VALE&id='+_mdetId); const d=await r.json();
+    if(d.status!=='success'){ cont.innerHTML=`<p style="color:var(--rojo)">${esc(d.message||'Error.')}</p>`; return; }
+    const v=d.vale||{};
+    document.getElementById('mdet-titulo').textContent='Expediente — '+(v.planta||'');
+    const li=(et,val)=>val?`<div><b>${et}:</b> ${esc(val)}</div>`:'';
+    document.getElementById('mdet-resumen').innerHTML =
+      li('Planta',v.planta)+li('Área',v.ubicacion)+li('Folio del vale',v.folio)+
+      li('Ingresó',v.fecha_ingreso)+li('Responsable',v.responsable)+
+      (v.estado==='RETIRADO'
+        ? li('Retirado',v.fecha_salida)+li('Folio de salida',v.folio_salida)
+        : '<div style="color:#8a5200;margin-top:4px"><b>Sigue en la planta.</b></div>')+
+      (v.material?`<div style="margin-top:6px"><b>Material:</b><div style="white-space:pre-line;color:var(--texto-sub)">${esc(v.material)}</div></div>`:'')+
+      (v.notas?`<div style="margin-top:6px;color:var(--texto-sub)">${esc(v.notas)}</div>`:'');
+    renderMdocs(d.docs||[]);
+  }catch(_){ cont.innerHTML='<p style="color:var(--rojo)">Error de red.</p>'; }
+}
+
+function renderMdocs(docs){
+  const cont=document.getElementById('mdet-docs');
+  if(!docs.length){
+    cont.innerHTML='<div class="empty" style="padding:24px"><div class="empty-s">Sin documentos. Sube el vale que te dio la planta.</div></div>';
+    return;
+  }
+  cont.innerHTML=docs.map(dc=>`
+    <div class="doc-row">
+      <div style="min-width:0">
+        <div style="font-weight:600;font-size:13px;color:var(--texto)">${esc(dc.nombre)}</div>
+        <div style="font-size:11px;color:var(--texto-hint);margin-top:3px">${esc(MD_ETIQUETAS[dc.tipo_doc]||dc.tipo_doc)}${dc.fecha_subida?' · subido '+esc(dc.fecha_subida):''}${dc.notas?' · '+esc(dc.notas):''}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${dc.archivo_url?`<a class="btn-sec" style="text-decoration:none" href="${esc(dc.archivo_url)}" target="_blank">Ver</a>`:''}
+        <button class="btn-del" onclick="eliminarMdoc(${dc.id})">🗑</button>
+      </div>
+    </div>`).join('');
+}
+
+function abrirModalMdoc(tipo){
+  document.getElementById('md-tipo').value = tipo || 'vale_entrada';
+  document.getElementById('md-nombre').value='';
+  document.getElementById('md-archivo').value='';
+  document.getElementById('md-notas').value='';
+  document.getElementById('modal-mdoc').classList.add('open');
+}
+function cerrarModalMdoc(){ document.getElementById('modal-mdoc').classList.remove('open'); }
+
+async function guardarMdoc(){
+  const f=document.getElementById('md-archivo').files[0];
+  if(!f){ toast('Elige el archivo del documento.'); return; }
+  const fd=new FormData();
+  fd.append('action','SUBIR_DOC_MATERIAL');
+  fd.append('vale_id',_mdetId);
+  fd.append('tipo_doc',document.getElementById('md-tipo').value);
+  fd.append('nombre',document.getElementById('md-nombre').value.trim());
+  fd.append('notas',document.getElementById('md-notas').value.trim());
+  fd.append('archivo',f);
+  const btn=document.getElementById('md-btn'); btn.disabled=true; btn.textContent='Subiendo…';
+  try{
+    const r=await _origFetch(API,{method:'POST',headers:{'X-Token':_sesion.token||''},body:fd});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return; }
+    cerrarModalMdoc(); toast('Documento subido.');
+    // Si se llegó aquí desde el alta, el expediente todavía no estaba abierto.
+    if(document.getElementById('modal-mdet').classList.contains('open')) cargarExpediente();
+    else cargarVales();
+  }catch(_){ toast('Error de red.'); }
+  finally{ btn.disabled=false; btn.textContent='Subir'; }
+}
+
+async function eliminarMdoc(id){
+  if(!confirm('¿Eliminar este documento del expediente?')) return;
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'ELIMINAR_DOC_MATERIAL',payload:{id}})});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return; }
+    toast('Documento eliminado.'); cargarExpediente();
+  }catch(_){ toast('Error de red.'); }
+}
+
 cargarPersonal();
+cargarVales();
 </script>
 </body>
 </html>
