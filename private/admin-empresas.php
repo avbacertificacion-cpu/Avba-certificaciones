@@ -1,9 +1,13 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/empresa-config.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
     header('Location: ../public/login.html'); exit;
 }
 $nombre = $_SESSION['nombre'];
+
+// Crea la columna de preferencia la primera vez que un admin entra aquí
+asegurarColumnaAlertas($pdo);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -147,6 +151,18 @@ $nombre = $_SESSION['nombre'];
             <small>Dirección fiscal completa</small>
         </div>
 
+        <div class="form-group" style="background:#f7f9fc;border:1.5px solid #e0e0ff;border-radius:8px;padding:14px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0">
+                <input type="checkbox" id="e-alertas" checked style="width:18px;height:18px;cursor:pointer">
+                <span>Mostrar alertas y vencimientos en el panel del cliente</span>
+            </label>
+            <small style="margin-top:8px;display:block">
+                Si lo desactivas, el cliente de esta empresa no verá la sección
+                «Alertas y Vencimientos» ni la tabla «Próximos Vencimientos».
+                Útil cuando las fechas de prueba hidrostática aún no están depuradas.
+            </small>
+        </div>
+
         <div class="modal-actions">
             <button class="btn btn-warning" onclick="cerrarModal()">Cancelar</button>
             <button class="btn btn-primary" onclick="guardarEmpresa()">Guardar empresa</button>
@@ -186,6 +202,7 @@ function render(data) {
                 ${e.telefono ? `<p><strong>Teléfono</strong> ${sanitize(e.telefono)}</p>` : ''}
                 ${e.contacto ? `<p><strong>Contacto</strong> ${sanitize(e.contacto)}</p>` : ''}
                 ${e.domicilio ? `<p><strong>Domicilio</strong> ${sanitize(e.domicilio)}</p>` : ''}
+                ${Number(e.mostrar_alertas) === 0 ? `<p style="margin-top:8px"><span style="display:inline-block;background:#fef3c7;color:#92400e;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700">🔕 Alertas ocultas al cliente</span></p>` : ''}
             </div>
             <div class="empresa-actions">
                 <button class="btn btn-sm btn-warning" onclick="editarEmpresa(${parseInt(e.id)})" title="Editar empresa">✏️ Editar</button>
@@ -224,6 +241,8 @@ function editarEmpresa(id) {
     document.getElementById('e-telefono').value = e.telefono || '';
     document.getElementById('e-contacto').value = e.contacto || '';
     document.getElementById('e-domicilio').value = e.domicilio || '';
+    // Sin dato guardado se asume activado (comportamiento por defecto)
+    document.getElementById('e-alertas').checked = (e.mostrar_alertas === undefined) || Number(e.mostrar_alertas) === 1;
     document.getElementById('modalEmpresa').classList.add('open');
 }
 
@@ -235,6 +254,7 @@ function limpiarModal() {
     document.getElementById('e-telefono').value = '';
     document.getElementById('e-contacto').value = '';
     document.getElementById('e-domicilio').value = '';
+    document.getElementById('e-alertas').checked = true;
     document.getElementById('modal-alert').innerHTML = '';
 }
 
@@ -275,6 +295,7 @@ async function guardarEmpresa() {
             telefono: document.getElementById('e-telefono').value.trim() || null,
             contacto: document.getElementById('e-contacto').value.trim() || null,
             domicilio: document.getElementById('e-domicilio').value.trim() || null,
+            mostrar_alertas: document.getElementById('e-alertas').checked ? 1 : 0,
         };
         if (id) body.id = parseInt(id);
 

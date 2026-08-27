@@ -1,6 +1,7 @@
 <?php
 require_once '../config/config.php';
 require_once '../config/roles-extra.php';
+require_once '../config/empresa-config.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -45,7 +46,14 @@ function listar() {
 // ─── LISTAR EMPRESAS ─────────────────────────────────────────────────────────
 function listarEmpresas() {
     global $pdo;
-    $stmt = $pdo->query("SELECT id, nombre FROM empresas WHERE estado='activo' ORDER BY nombre");
+    // Se devuelven todos los datos de contacto: la pantalla de empresas los usa
+    // para precargar el formulario de edición (si no vinieran, al guardar se
+    // sobrescribirían con valores vacíos).
+    $colAlertas = empresaTieneColumnaAlertas($pdo) ? 'mostrar_alertas' : '1 AS mostrar_alertas';
+    $stmt = $pdo->query("
+        SELECT id, nombre, rfc, domicilio, telefono, email, contacto, $colAlertas
+        FROM empresas WHERE estado='activo' ORDER BY nombre
+    ");
     echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
 }
 
@@ -236,34 +244,43 @@ function crearEmpresa() {
 
     $id = $d['id'] ?? null;
 
+    // Preferencia de alertas del panel del cliente (por defecto: mostrarlas)
+    asegurarColumnaAlertas($pdo);
+    $tieneAlertas   = empresaTieneColumnaAlertas($pdo);
+    $mostrarAlertas = array_key_exists('mostrar_alertas', $d) ? (int) !empty($d['mostrar_alertas']) : 1;
+
     if ($id) {
         // Editar empresa existente
-        $stmt = $pdo->prepare("
-            UPDATE empresas
-            SET nombre=?, rfc=?, domicilio=?, telefono=?, email=?, contacto=?
-            WHERE id=?
-        ");
-        $stmt->execute([
+        $sql = "UPDATE empresas SET nombre=?, rfc=?, domicilio=?, telefono=?, email=?, contacto="
+             . ($tieneAlertas ? "?, mostrar_alertas=? WHERE id=?" : "? WHERE id=?");
+        $params = [
             $d['nombre'],
             $d['rfc']       ?? null,
             $d['domicilio'] ?? null,
             $d['telefono']  ?? null,
             $d['email']     ?? null,
             $d['contacto']  ?? null,
-            $id
-        ]);
+        ];
+        if ($tieneAlertas) $params[] = $mostrarAlertas;
+        $params[] = $id;
+
+        $pdo->prepare($sql)->execute($params);
         audit($uid, "Editar empresa {$d['nombre']}", 'empresas', $id);
     } else {
         // Crear empresa nueva
-        $stmt = $pdo->prepare("INSERT INTO empresas (nombre,rfc,domicilio,telefono,email,contacto) VALUES (?,?,?,?,?,?)");
-        $stmt->execute([
+        $cols   = "nombre,rfc,domicilio,telefono,email,contacto" . ($tieneAlertas ? ",mostrar_alertas" : "");
+        $vals   = "?,?,?,?,?,?" . ($tieneAlertas ? ",?" : "");
+        $params = [
             $d['nombre'],
             $d['rfc']       ?? null,
             $d['domicilio'] ?? null,
             $d['telefono']  ?? null,
             $d['email']     ?? null,
             $d['contacto']  ?? null,
-        ]);
+        ];
+        if ($tieneAlertas) $params[] = $mostrarAlertas;
+
+        $pdo->prepare("INSERT INTO empresas ($cols) VALUES ($vals)")->execute($params);
         $id = $pdo->lastInsertId();
         audit($uid, "Crear empresa {$d['nombre']}", 'empresas', $id);
     }

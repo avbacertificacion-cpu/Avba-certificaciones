@@ -1,10 +1,14 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/empresa-config.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_CLIENTE) {
     header('Location: ../public/login.html'); exit;
 }
 $nombre     = $_SESSION['nombre'];
 $empresa_id = $_SESSION['empresa_id'];
+
+// El admin puede ocultar la sección de alertas/vencimientos para esta empresa
+$mostrar_alertas = empresaMuestraAlertas($pdo, $empresa_id);
 
 // ─── MÉTRICAS PRINCIPALES ───────────────────────────────────────────────────
 // Total extintores de la empresa
@@ -227,11 +231,13 @@ $json_pie = json_encode([$inspeccionados_mes, $total_extintores - $inspeccionado
             <div class="kpi-subtext">Completado este mes</div>
         </div>
 
+        <?php if ($mostrar_alertas): ?>
         <div class="kpi-card <?= $ya_vencidos > 0 ? 'danger' : 'success' ?>">
             <div class="kpi-label">⚠️ Vencimientos</div>
             <div class="kpi-value <?= $ya_vencidos > 0 ? 'danger' : 'success' ?>"><?= $ya_vencidos + $proximos_vencer ?></div>
             <div class="kpi-subtext"><?= $ya_vencidos ?> vencidos, <?= $proximos_vencer ?> próximos</div>
         </div>
+        <?php endif; ?>
     </div>
 
     <!-- Charts -->
@@ -257,7 +263,7 @@ $json_pie = json_encode([$inspeccionados_mes, $total_extintores - $inspeccionado
     </div>
 
     <!-- Alerts Section -->
-    <?php if ($ya_vencidos > 0 || $proximos_vencer > 0 || $sin_inspeccion > 0): ?>
+    <?php if ($mostrar_alertas && ($ya_vencidos > 0 || $proximos_vencer > 0 || $sin_inspeccion > 0)): ?>
     <div class="alerts-section">
         <div class="alerts-title">🚨 Alertas y Vencimientos</div>
 
@@ -294,7 +300,7 @@ $json_pie = json_encode([$inspeccionados_mes, $total_extintores - $inspeccionado
     <?php endif; ?>
 
     <!-- Próximos Vencimientos (Tabla) -->
-    <?php if (!empty($vencimientos_proximos)): ?>
+    <?php if ($mostrar_alertas && !empty($vencimientos_proximos)): ?>
     <div class="chart-card" style="margin-bottom:32px">
         <h3>📅 Próximos Vencimientos (Vigencia PH)</h3>
         <div style="overflow-x:auto">
