@@ -1,10 +1,14 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/empresa-config.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_CLIENTE) {
     header('Location: ../public/login.html'); exit;
 }
 $nombre = $_SESSION['nombre'];
 $empresa_id = $_SESSION['empresa_id'];
+
+// El admin puede ocultar toda la información de vencimientos para esta empresa
+$mostrar_alertas = empresaMuestraAlertas($pdo, $empresa_id);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -150,6 +154,8 @@ $empresa_id = $_SESSION['empresa_id'];
 <script>
 let extintores = [];
 let kpis = {};
+// Configurado por el admin: si está en false se oculta toda la info de vencimientos
+const MOSTRAR_ALERTAS = <?= $mostrar_alertas ? 'true' : 'false' ?>;
 
 async function cargar() {
     const r = await fetch(`../api/extintores.php?action=listar&empresa_id=<?= $empresa_id ?>`);
@@ -222,6 +228,7 @@ function renderKPIs() {
             <div class="kpi-label">Inspeccionados</div>
             <div class="kpi-value">${kpis.inspeccionados}</div>
         </div>
+        ${MOSTRAR_ALERTAS ? `
         <div class="kpi-card warning">
             <div class="kpi-icon">⏰</div>
             <div class="kpi-label">Próx. Vencimiento</div>
@@ -231,7 +238,7 @@ function renderKPIs() {
             <div class="kpi-icon">⚠️</div>
             <div class="kpi-label">Vencidos</div>
             <div class="kpi-value">${kpis.vencidos}</div>
-        </div>
+        </div>` : ''}
         <div class="kpi-card">
             <div class="kpi-icon">🔍</div>
             <div class="kpi-label">Sin Inspección</div>
@@ -265,14 +272,18 @@ function renderizar() {
         const ultimaInsp = e.ultima_inspeccion ? new Date(e.ultima_inspeccion + ' 00:00:00') : null;
         const proxVenc = ultimaInsp ? new Date(ultimaInsp.getTime() + 30 * 24 * 60 * 60 * 1000) : null;
 
-        let inspBadge = '<span class="inspeccion-badge insp-none">Sin inspección</span>';
-        if (ultimaInsp) {
-            if (proxVenc < hoy) {
-                inspBadge = '<span class="inspeccion-badge insp-danger">Vencido</span>';
-            } else if (proxVenc < new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000)) {
-                inspBadge = '<span class="inspeccion-badge insp-warning">Próx. vencimiento</span>';
-            } else {
-                inspBadge = '<span class="inspeccion-badge insp-ok">Vigente</span>';
+        // La etiqueta de vigencia sólo se muestra si el admin habilitó las alertas
+        let inspBadge = '';
+        if (MOSTRAR_ALERTAS) {
+            inspBadge = '<span class="inspeccion-badge insp-none">Sin inspección</span>';
+            if (ultimaInsp) {
+                if (proxVenc < hoy) {
+                    inspBadge = '<span class="inspeccion-badge insp-danger">Vencido</span>';
+                } else if (proxVenc < new Date(hoy.getTime() + 7 * 24 * 60 * 60 * 1000)) {
+                    inspBadge = '<span class="inspeccion-badge insp-warning">Próx. vencimiento</span>';
+                } else {
+                    inspBadge = '<span class="inspeccion-badge insp-ok">Vigente</span>';
+                }
             }
         }
 
@@ -368,22 +379,28 @@ function abrirDetalle(id) {
                     <label>Fecha Recarga</label>
                     <value>${ext.fecha_recarga || '—'}</value>
                 </div>
+                ${MOSTRAR_ALERTAS ? `
                 <div class="modal-item">
                     <label>Prueba Hidrostática</label>
                     <value>${ext.fecha_ph || '—'}</value>
-                </div>
+                </div>` : ''}
             </div>
         </div>
 
         <div class="modal-section">
             <div class="modal-section-title">Inspección</div>
+            ${MOSTRAR_ALERTAS ? `
             <div class="modal-row full">
                 <div class="modal-item">
                     <label>Estado de Inspección</label>
                     <value><span class="inspeccion-badge insp-${colorInsp}">${estadoInsp}</span></value>
                 </div>
-            </div>
-            ${ultimaInsp ? `<div class="modal-row"><div class="modal-item"><label>Última Inspección</label><value>${ext.ultima_inspeccion}</value></div><div class="modal-item"><label>Próx. Vencimiento</label><value>${proxVenc.toISOString().split('T')[0]}</value></div></div>` : '<p style="color:#999;font-size:13px">Este extintor aún no ha sido inspeccionado.</p>'}
+            </div>` : ''}
+            ${ultimaInsp
+                ? (MOSTRAR_ALERTAS
+                    ? `<div class="modal-row"><div class="modal-item"><label>Última Inspección</label><value>${ext.ultima_inspeccion}</value></div><div class="modal-item"><label>Próx. Vencimiento</label><value>${proxVenc.toISOString().split('T')[0]}</value></div></div>`
+                    : `<div class="modal-row full"><div class="modal-item"><label>Última Inspección</label><value>${ext.ultima_inspeccion}</value></div></div>`)
+                : '<p style="color:#999;font-size:13px">Este extintor aún no ha sido inspeccionado.</p>'}
         </div>
 
         ${ext.observaciones ? `<div class="modal-section"><div class="modal-section-title">Observaciones</div><div class="modal-row full"><div class="modal-item"><value>${ext.observaciones}</value></div></div></div>` : ''}
