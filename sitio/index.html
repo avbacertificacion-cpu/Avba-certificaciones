@@ -459,6 +459,74 @@
   .cred span{font-size:13.5px;color:var(--texto-sub);line-height:1.35;}
   .cred strong{display:block;font-weight:700;color:var(--texto);}
 
+  /* ── Tira de izajes ───────────────────────── */
+  .tira{background:var(--superficie);padding:26px 0 28px;border-bottom:1px solid var(--borde);}
+  .tira[hidden]{display:none;}
+  .tira-cabecera{
+    display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
+    flex-wrap:wrap;margin-bottom:18px;
+  }
+  .tira-tag{
+    display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
+    color:var(--brand-ink);background:var(--azul-light);padding:5px 13px;border-radius:99px;margin-bottom:9px;
+  }
+  .tira-cabecera h2{font-size:clamp(18px,2vw,22px);font-weight:800;}
+  .tira-link{
+    display:inline-flex;align-items:center;gap:8px;flex-shrink:0;
+    font-size:14px;font-weight:700;color:var(--brand-ink);padding:8px 0;min-height:40px;
+  }
+  .tira-link svg{width:16px;height:16px;transition:transform .22s;}
+  .tira-link:hover svg{transform:translateX(4px);}
+
+  /* El marco recorta la pista y difumina los extremos, para que las
+     fotografías entren y salgan sin un corte brusco. */
+  .tira-marco{
+    position:relative;overflow:hidden;
+    -webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
+    mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
+  }
+  .tira-pista{
+    display:flex;gap:16px;width:max-content;
+    animation:desfile 46s linear infinite;
+  }
+  .tira-marco:hover .tira-pista,
+  .tira-marco:focus-within .tira-pista{animation-play-state:paused;}
+  @keyframes desfile{
+    from{transform:translateX(0);}
+    /* La mitad, porque la secuencia va duplicada: el salto es invisible. */
+    to{transform:translateX(-50%);}
+  }
+  .tira-item{
+    position:relative;flex-shrink:0;width:216px;height:142px;
+    border-radius:14px;overflow:hidden;cursor:zoom-in;
+    background:var(--azul-light);border:1px solid var(--borde);
+    transition:transform .25s cubic-bezier(.2,.8,.3,1), box-shadow .25s;
+  }
+  .tira-item:hover{transform:translateY(-4px);box-shadow:var(--sombra);}
+  .tira-item img{width:100%;height:100%;object-fit:cover;display:block;}
+  .tira-pie{
+    position:absolute;left:0;right:0;bottom:0;padding:22px 12px 9px;
+    background:linear-gradient(transparent,rgba(3,14,30,.82));
+    color:#fff;font-size:12px;font-weight:700;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  @media (prefers-reduced-motion: reduce){
+    .tira-pista{animation:none;}
+    .tira-marco{overflow-x:auto;}
+  }
+  /* Sin puntero fino (móvil y tabletas) no hay forma de pausar el desfile,
+     así que la tira se desliza con el dedo: más predecible al tocar. */
+  @media (hover: none){
+    .tira-pista{animation:none;width:auto;}
+    .tira-marco{
+      overflow-x:auto;scroll-snap-type:x mandatory;
+      -webkit-overflow-scrolling:touch;scrollbar-width:none;
+    }
+    .tira-marco::-webkit-scrollbar{display:none;}
+    .tira-item{scroll-snap-align:start;}
+    .tira-item.duplicada{display:none;}
+  }
+
   /* ── Acreditación ─────────────────────────── */
   .acreditacion{
     background:linear-gradient(135deg,var(--azul-light),var(--superficie) 68%);
@@ -1001,6 +1069,9 @@
     .hero-ctas{flex-direction:column;align-items:stretch;}
     .hero-ctas .btn{width:100%;}
     .servicio,.division,.zona{padding:26px 22px;}
+    .tira{padding:30px 0 34px;}
+    .tira-item{width:190px;height:132px;}
+    .tira-cabecera{margin-bottom:16px;}
     .saludo{
       right:10px;left:10px;bottom:10px;width:auto;max-width:none;
       display:flex;align-items:stretch;gap:0;border-radius:14px;
@@ -1127,6 +1198,23 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 10 12 4.5 2 10l10 5.5Z"/><path d="M6 12v4.5c0 1.4 2.7 2.8 6 2.8s6-1.4 6-2.8V12"/></svg>
         <span>Capacitación <strong>acreditada, con DC-3</strong></span>
       </div>
+    </div>
+  </section>
+
+  <!-- ═══ TIRA DE IZAJES (segundo módulo) ════ -->
+  <section class="tira" id="tira" hidden aria-label="Izajes compartidos por nuestros operadores">
+    <div class="container tira-cabecera">
+      <div>
+        <span class="tira-tag">Orgullo AVBA</span>
+        <h2>Maniobras de nuestros operadores</h2>
+      </div>
+      <a class="tira-link" href="#muro">
+        Ver todas
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+    <div class="tira-marco">
+      <div class="tira-pista" id="tira-pista"></div>
     </div>
   </section>
 
@@ -1835,6 +1923,8 @@
   /* ── Muro de operadores ─────────────────── */
   var galeria = document.getElementById('muro-galeria');
   var vacio   = document.getElementById('muro-vacio');
+  var tira    = document.getElementById('tira');
+  var pista   = document.getElementById('tira-pista');
 
   function escapar(t){
     var d = document.createElement('div');
@@ -1909,18 +1999,19 @@
     if (focoPrevio) focoPrevio.focus();
   }
 
-  if (galeria) {
-    galeria.addEventListener('click', function(ev){
-      var fig = ev.target.closest('.post-figura');
+[galeria, pista].forEach(function(zona){
+    if (!zona) return;
+    zona.addEventListener('click', function(ev){
+      var fig = ev.target.closest('.post-figura, .tira-item');
       if (fig) abrirVisor(fig);
     });
     // También con teclado, para quien no usa ratón
-    galeria.addEventListener('keydown', function(ev){
+    zona.addEventListener('keydown', function(ev){
       if (ev.key !== 'Enter' && ev.key !== ' ') return;
-      var fig = ev.target.closest('.post-figura');
+      var fig = ev.target.closest('.post-figura, .tira-item');
       if (fig) { ev.preventDefault(); abrirVisor(fig); }
     });
-  }
+  });
   if (visor) {
     visor.addEventListener('click', function(ev){
       if (ev.target.closest('[data-cerrar-visor]')) cerrarVisor();
@@ -1930,10 +2021,43 @@
     });
   }
 
+  /* Tira de izajes: misma consulta, para no pedir los datos dos veces */
+  function pintarTira(lista){
+    if (!tira || !pista) return;
+    var conFoto = lista.filter(function(p){ return p.imagen; });
+    // Con menos de tres fotografías el desfile no se sostiene: mejor no mostrarlo.
+    if (conFoto.length < 3) return;
+
+    function tarjeta(p, duplicada){
+      var rol = [p.puesto, p.empresa].filter(Boolean).join(' · ');
+      return '<figure class="tira-item' + (duplicada ? ' duplicada' : '') + '" data-ver="' + escapar(p.imagen) + '"'
+           +   ' data-nombre="' + escapar(p.nombre) + '" data-rol="' + escapar(rol) + '"'
+           +   (duplicada ? ' aria-hidden="true"' : ' tabindex="0" role="button" aria-label="Ampliar fotografía de ' + escapar(p.nombre) + '"')
+           + '>'
+           +   '<img src="' + escapar(p.imagen) + '" alt="' + (duplicada ? '' : 'Izaje compartido por ' + escapar(p.nombre)) + '" loading="lazy">'
+           +   '<figcaption class="tira-pie">' + escapar(p.nombre) + '</figcaption>'
+           + '</figure>';
+    }
+
+    // La secuencia va dos veces seguidas para que el bucle no tenga corte.
+    var html = conFoto.map(function(p){ return tarjeta(p, false); }).join('')
+             + conFoto.map(function(p){ return tarjeta(p, true);  }).join('');
+    pista.innerHTML = html;
+    tira.hidden = false;
+
+    // Más fotografías, recorrido más largo: se ajusta el ritmo para que
+    // la velocidad aparente sea siempre la misma.
+    pista.style.animationDuration = Math.max(24, conFoto.length * 7) + 's';
+  }
+
   if (galeria) {
     fetch('api/muro.php?limite=24')
       .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
-      .then(function(d){ pintar((d && d.publicaciones) || []); })
+      .then(function(d){
+        var lista = (d && d.publicaciones) || [];
+        pintar(lista);
+        pintarTira(lista);
+      })
       .catch(function(){
         // Si el backend aún no está configurado, el muro se muestra vacío
         // en lugar de dejar un mensaje de carga permanente.
