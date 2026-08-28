@@ -515,7 +515,7 @@ function validarToken(PDO $pdo, ?string $token): ?array {
 
     try {
         $stmt = $pdo->prepare(
-            "SELECT id, usuario, rol, nombre, id_cliente, usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh
+            "SELECT id, usuario, rol, nombre, id_cliente, modulo, usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh
              FROM usuarios
              WHERE session_token = ? AND activo = 1 AND token_expires > NOW()"
         );
@@ -529,7 +529,12 @@ function validarToken(PDO $pdo, ?string $token): ?array {
         );
         $stmt->execute([$token]);
     }
-    return $stmt->fetch() ?: null;
+    $usr = $stmt->fetch() ?: null;
+    // Una cuenta sin columna de módulo es del sistema de siempre. Nunca se
+    // asume lo contrario: el valor por omisión no debe abrir el expediente
+    // aparte, sólo cerrarlo.
+    if ($usr && !isset($usr['modulo'])) $usr['modulo'] = 'principal';
+    return $usr;
 }
 
 /**

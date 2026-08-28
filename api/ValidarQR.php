@@ -34,7 +34,27 @@ class ValidarQR {
         $result = $this->buscarPersonal($qrBuscado, $esFolio);
         if ($result) return $result;
 
+        // Expediente de servicios directos: al escanear una placa no importa de
+        // qué expediente salió el certificado, sólo si es válido y está vigente.
+        $result = $this->buscarServicioDirecto($qrBuscado, $esFolio);
+        if ($result) return $result;
+
         return ['status' => 'ok', 'existe' => false];
+    }
+
+    /** Certificados del expediente aparte. */
+    private function buscarServicioDirecto(string $q, bool $esFolio): ?array {
+        if (!class_exists('ServiciosDirectos')) {
+            $f = __DIR__ . '/ServiciosDirectos.php';
+            if (!is_file($f)) return null;
+            require_once $f;
+        }
+        try {
+            return (new ServiciosDirectos($this->pdo))->buscarPorQr($q, $esFolio);
+        } catch (\Throwable $e) {
+            error_log('[ValidarQR] servicios directos: ' . $e->getMessage());
+            return null;
+        }
     }
 
     // ── Maquinaria / Equipo ────────────────────────────────

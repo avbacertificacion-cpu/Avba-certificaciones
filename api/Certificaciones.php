@@ -894,7 +894,25 @@ class Certificaciones {
      * Genera el PDF final a partir de los datos del equipo.
      * No requiere plantilla Word — usa una plantilla HTML/CSS mantenida en código.
      */
-    private function resolverPdf(string $tipo, array $datos, bool $sinSellos = false): string {
+    /**
+     * Genera el documento a partir de un arreglo de datos, sin pasar por la
+     * tabla de equipos.
+     *
+     * El expediente de servicios directos lleva sus propias tablas, pero el
+     * certificado que emite es el mismo de siempre: mismas plantillas, mismas
+     * normas, mismo sello. En vez de copiar el renderizador entero se le
+     * entrega aquí la fila ya armada, con las mismas claves que usa la
+     * plantilla.
+     *
+     * @param array $datos  fila con las claves de equipos (control, cliente, …)
+     * @param array $items  renglones del checklist, para el dictamen
+     * @return string       ruta absoluta al PDF
+     */
+    public function pdfDesdeDatos(array $datos, string $tipo = 'certificado', array $items = []): string {
+        return $this->resolverPdf($tipo, $datos, false, $items);
+    }
+
+    private function resolverPdf(string $tipo, array $datos, bool $sinSellos = false, ?array $itemsPre = null): string {
         // Asegurar que mPDF esté disponible
         if (!class_exists('\\Mpdf\\Mpdf') && file_exists(__DIR__ . '/../vendor/autoload.php')) {
             require_once __DIR__ . '/../vendor/autoload.php';
@@ -908,7 +926,11 @@ class Certificaciones {
         }
 
         if ($tipo === 'dictamen') {
-            $items         = $this->obtenerChecklistEquipo((int)($datos['id'] ?? 0), $datos['maquinaria'] ?? '');
+            // Con los renglones ya dados no se consulta la tabla de equipos:
+            // los datos pueden venir de otro expediente.
+            $items         = $itemsPre !== null
+                ? $itemsPre
+                : $this->obtenerChecklistEquipo((int)($datos['id'] ?? 0), $datos['maquinaria'] ?? '');
             $plantillaHtml = $this->obtenerPlantillaDictHtml($datos['maquinaria'] ?? '');
             $sufijo        = $sinSellos ? 'PRINT_DICT' : 'DICT';
 

@@ -38,6 +38,7 @@ require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
 require_once __DIR__ . '/Contabilidad.php';
 require_once __DIR__ . '/MaterialControl.php';
+require_once __DIR__ . '/ServiciosDirectos.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -100,6 +101,7 @@ $pagosServicios = new PagosServicios($pdo);
 $anuncios       = new Anuncios($pdo);
 $conta       = new Contabilidad($pdo);
 $material    = new MaterialControl($pdo);
+$sd          = new ServiciosDirectos($pdo);
 $verifIA        = new VerificacionIA($pdo);
 $arneses        = new Arneses($pdo);
 $cliImpresion   = new ClienteImpresion($pdo);
@@ -146,6 +148,58 @@ if ($method === 'GET') {
     $action  = $body['action']  ?? '';
     $payload = $body['payload'] ?? $body;
 }
+
+// ══════════════════════════════════════════════════════════
+//  SEPARACIÓN DE MÓDULOS
+//
+//  El expediente de servicios directos lleva su propio control de calidad y
+//  su propia gente. Quien entra a uno no entra al otro, en los dos sentidos:
+//  una cuenta del sistema de siempre no toca el expediente aparte, y una
+//  cuenta del expediente aparte no toca nada del sistema de siempre.
+//
+//  Se resuelve aquí, en un solo sitio, y no repartido por cada caso del
+//  switch: con cuarenta rutas y creciendo, basta olvidar una para que la
+//  separación deje de existir sin que nadie se entere.
+// ══════════════════════════════════════════════════════════
+
+/** Acciones del expediente aparte. Todo lo demás es del sistema de siempre. */
+const ACCIONES_DIRECTO = [
+    'LISTAR_SD_SERVICIOS', 'DETALLE_SD_SERVICIO', 'SD_SIGUIENTE_QR', 'SD_RESUMEN',
+    'GUARDAR_SD_SERVICIO', 'ELIMINAR_SD_SERVICIO', 'SD_AVANZAR', 'SD_REGRESAR',
+    'SUBIR_FOTO_SD', 'ELIMINAR_FOTO_SD', 'EMITIR_SD_SERVICIO',
+];
+
+/** Acciones que no pertenecen a ningún módulo: acceso, salida y lo público. */
+const ACCIONES_COMUNES = [
+    'LOGIN', 'LOGOUT', 'VALIDAR_QR', 'validarQR', 'LISTAR_ANUNCIOS_PUBLICO',
+];
+
+/**
+ * Corta la petición si la cuenta no pertenece al módulo de la acción.
+ *
+ * Va antes del switch, así que un caso nuevo queda protegido por omisión: si
+ * no se declara en ACCIONES_DIRECTO, es del sistema de siempre y una cuenta
+ * del expediente aparte no lo alcanza.
+ */
+function exigirModulo(PDO $pdo, ?string $token, string $accion): void {
+    if ($accion === '' || in_array($accion, ACCIONES_COMUNES, true)) return;
+
+    $esDirecto = in_array($accion, ACCIONES_DIRECTO, true);
+    $usr = validarToken($pdo, $token);
+    // Sin sesión válida no se decide nada aquí: cada caso pide su token y
+    // responde 401 como siempre.
+    if (!$usr) return;
+
+    $modulo = ($usr['modulo'] ?? 'principal') === 'directo' ? 'directo' : 'principal';
+    if ($esDirecto && $modulo !== 'directo') {
+        respuesta(['status' => 'error', 'message' => 'Esta cuenta no pertenece a ese módulo.'], 403);
+    }
+    if (!$esDirecto && $modulo === 'directo') {
+        respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo tiene acceso a su propio módulo.'], 403);
+    }
+}
+
+exigirModulo($pdo, $token, $action);
 
 // ══════════════════════════════════════════════════════════
 //  Helpers de alcance para sub-usuarios del cliente
@@ -400,6 +454,22 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($avbaAdmin->detallePersonal((int)($_GET['id'] ?? 0)));
+
+        // ── Servicios directos (expediente aparte, sólo su propia gente) ──
+        case 'LISTAR_SD_SERVICIOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($sd->listar((string)($_GET['estado'] ?? ''), (string)($_GET['q'] ?? '')));
+
+        case 'DETALLE_SD_SERVICIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($sd->detalle((int)($_GET['id'] ?? 0)));
+
+        case 'SD_SIGUIENTE_QR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($sd->siguienteQr());
 
         // ── Control de material en planta (ADMIN + ADMINISTRATIVO) ──
         case 'LISTAR_MATERIAL_VALES':
@@ -1012,6 +1082,44 @@ if ($method === 'POST') {
         // ── Auth ─────────────────────────────────────────
         case 'LOGIN':
             respuesta($auth->login($payload));
+
+        // ── Servicios directos (expediente aparte, sólo su propia gente) ──
+        // El acceso ya lo filtró exigirModulo(): aquí sólo llegan cuentas del
+        // módulo, así que basta con exigir sesión válida.
+        case 'GUARDAR_SD_SERVICIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($sd->guardar($payload, $usr['usuario']));
+
+        case 'ELIMINAR_SD_SERVICIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($sd->eliminar((int)($payload['id'] ?? 0), $usr['usuario'], (string)($payload['motivo'] ?? '')));
+
+        case 'SD_AVANZAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($sd->avanzar((int)($payload['id'] ?? 0), $usr['usuario'], (string)($payload['nota'] ?? '')));
+
+        case 'SD_REGRESAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($sd->regresar((int)($payload['id'] ?? 0), $usr['usuario'], (string)($payload['motivo'] ?? '')));
+
+        case 'EMITIR_SD_SERVICIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($sd->emitir((int)($payload['id'] ?? 0), $usr['usuario']));
+
+        case 'SUBIR_FOTO_SD':   // multipart
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($sd->subirFoto($_POST, $_FILES));
+
+        case 'ELIMINAR_FOTO_SD':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($sd->eliminarFoto((int)($payload['id'] ?? 0)));
 
         // ── Control de material en planta (ADMIN + ADMINISTRATIVO) ──
         case 'GUARDAR_MATERIAL_VALE':
