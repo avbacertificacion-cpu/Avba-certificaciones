@@ -38,7 +38,6 @@ require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
 require_once __DIR__ . '/Contabilidad.php';
 require_once __DIR__ . '/MaterialControl.php';
-require_once __DIR__ . '/ServiciosDirectos.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -75,37 +74,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
-
-// ── PDO + módulos ─────────────────────────────────────────
-$pdo   = Database::getConnection();
-$auth     = new Auth($pdo);
-$insp     = new Inspecciones($pdo);
-$cal      = new Calidad($pdo);
-$cert     = new Certificaciones($pdo);
-$qr       = new ValidarQR($pdo);
-$admin    = new Admin($pdo);
-$auditorias = new Auditorias($pdo);
-$avbaAdmin  = new AvbaAdmin($pdo);
-$personal = new Personal($pdo);
-$accesorios     = new Accesorios($pdo);
-$pnd            = new Pnd($pdo);
-$cliEquipos     = new ClienteEquipos($pdo);
-$cliPersonal    = new ClientePersonal($pdo);
-$cliProveedores = new ClienteProveedores($pdo);
-$cliMateriales  = new ClienteMateriales($pdo);
-$cliConfig      = new ClienteConfig($pdo);
-$cliMant        = new ClienteMantenimiento($pdo);
-$cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuarios.usuario_padre_id
-$cliRH          = new ClienteRH($pdo);
-$pagosServicios = new PagosServicios($pdo);
-$anuncios       = new Anuncios($pdo);
-$conta       = new Contabilidad($pdo);
-$material    = new MaterialControl($pdo);
-$sd          = new ServiciosDirectos($pdo);
-$verifIA        = new VerificacionIA($pdo);
-$arneses        = new Arneses($pdo);
-$cliImpresion   = new ClienteImpresion($pdo);
-$cliEnvios      = new ClienteEnvios($pdo);
 
 // ── Extraer token ─────────────────────────────────────────
 $token = null;
@@ -149,57 +117,62 @@ if ($method === 'GET') {
     $payload = $body['payload'] ?? $body;
 }
 
+
 // ══════════════════════════════════════════════════════════
-//  SEPARACIÓN DE MÓDULOS
+//  DIVISIÓN: qué base atiende esta petición
 //
-//  El expediente de servicios directos lleva su propio control de calidad y
-//  su propia gente. Quien entra a uno no entra al otro, en los dos sentidos:
-//  una cuenta del sistema de siempre no toca el expediente aparte, y una
-//  cuenta del expediente aparte no toca nada del sistema de siempre.
+//  Cada división lleva su propio expediente en su propia base, con el mismo
+//  esquema y sus propias cuentas. Una persona existe en una y sólo en una, así
+//  que basta con encontrar dónde vale su token: a partir de ahí todo el sistema
+//  trabaja contra esa base sin enterarse de que existe la otra.
 //
-//  Se resuelve aquí, en un solo sitio, y no repartido por cada caso del
-//  switch: con cuarenta rutas y creciendo, basta olvidar una para que la
-//  separación deje de existir sin que nadie se entere.
+//  Se resuelve aquí, antes de construir nada, porque cada clase recibe su
+//  conexión en el constructor.
 // ══════════════════════════════════════════════════════════
-
-/** Acciones del expediente aparte. Todo lo demás es del sistema de siempre. */
-const ACCIONES_DIRECTO = [
-    'LISTAR_SD_SERVICIOS', 'DETALLE_SD_SERVICIO', 'SD_SIGUIENTE_QR', 'SD_RESUMEN',
-    'GUARDAR_SD_SERVICIO', 'ELIMINAR_SD_SERVICIO', 'SD_AVANZAR', 'SD_REGRESAR',
-    'SUBIR_FOTO_SD', 'ELIMINAR_FOTO_SD', 'EMITIR_SD_SERVICIO',
-];
-
-/** Acciones que no pertenecen a ningún módulo: acceso, salida y lo público. */
-const ACCIONES_COMUNES = [
-    'LOGIN', 'LOGOUT', 'VALIDAR_QR', 'validarQR', 'LISTAR_ANUNCIOS_PUBLICO',
-];
-
-/**
- * Corta la petición si la cuenta no pertenece al módulo de la acción.
- *
- * Va antes del switch, así que un caso nuevo queda protegido por omisión: si
- * no se declara en ACCIONES_DIRECTO, es del sistema de siempre y una cuenta
- * del expediente aparte no lo alcanza.
- */
-function exigirModulo(PDO $pdo, ?string $token, string $accion): void {
-    if ($accion === '' || in_array($accion, ACCIONES_COMUNES, true)) return;
-
-    $esDirecto = in_array($accion, ACCIONES_DIRECTO, true);
-    $usr = validarToken($pdo, $token);
-    // Sin sesión válida no se decide nada aquí: cada caso pide su token y
-    // responde 401 como siempre.
-    if (!$usr) return;
-
-    $modulo = ($usr['modulo'] ?? 'principal') === 'directo' ? 'directo' : 'principal';
-    if ($esDirecto && $modulo !== 'directo') {
-        respuesta(['status' => 'error', 'message' => 'Esta cuenta no pertenece a ese módulo.'], 403);
-    }
-    if (!$esDirecto && $modulo === 'directo') {
-        respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo tiene acceso a su propio módulo.'], 403);
-    }
+$conexiones = [];
+foreach (Database::bases() as $division => $nombreBase) {
+    $c = Database::deDivision($division);
+    if ($c) $conexiones[$division] = $c;
 }
 
-exigirModulo($pdo, $token, $action);
+$sesion   = resolverSesion($conexiones, $token);
+$division = $sesion['division'] ?? 'principal';
+$pdo      = $sesion['pdo'] ?? Database::getConnection();
+
+// ── Módulos ───────────────────────────────────────────────
+$auth     = new Auth($pdo);
+$insp     = new Inspecciones($pdo);
+$cal      = new Calidad($pdo);
+$cert     = new Certificaciones($pdo);
+$qr       = new ValidarQR($pdo);
+$admin    = new Admin($pdo);
+$auditorias = new Auditorias($pdo);
+$avbaAdmin  = new AvbaAdmin($pdo);
+$personal = new Personal($pdo);
+$accesorios     = new Accesorios($pdo);
+$pnd            = new Pnd($pdo);
+$cliEquipos     = new ClienteEquipos($pdo);
+$cliPersonal    = new ClientePersonal($pdo);
+$cliProveedores = new ClienteProveedores($pdo);
+$cliMateriales  = new ClienteMateriales($pdo);
+$cliConfig      = new ClienteConfig($pdo);
+$cliMant        = new ClienteMantenimiento($pdo);
+$cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuarios.usuario_padre_id
+$cliRH          = new ClienteRH($pdo);
+$pagosServicios = new PagosServicios($pdo);
+$anuncios       = new Anuncios($pdo);
+$conta       = new Contabilidad($pdo);
+$material    = new MaterialControl($pdo);
+$verifIA        = new VerificacionIA($pdo);
+$arneses        = new Arneses($pdo);
+$cliImpresion   = new ClienteImpresion($pdo);
+$cliEnvios      = new ClienteEnvios($pdo);
+
+
+// La validación pública no tiene sesión y debe encontrar el certificado sin
+// importar qué división lo emitió: quien escanea una placa no sabe —ni tiene
+// por qué saber— cómo está organizada la unidad por dentro.
+$qr->conexionesDeDivision($conexiones);
 
 // ══════════════════════════════════════════════════════════
 //  Helpers de alcance para sub-usuarios del cliente
@@ -454,22 +427,6 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($avbaAdmin->detallePersonal((int)($_GET['id'] ?? 0)));
-
-        // ── Servicios directos (expediente aparte, sólo su propia gente) ──
-        case 'LISTAR_SD_SERVICIOS':
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($sd->listar((string)($_GET['estado'] ?? ''), (string)($_GET['q'] ?? '')));
-
-        case 'DETALLE_SD_SERVICIO':
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($sd->detalle((int)($_GET['id'] ?? 0)));
-
-        case 'SD_SIGUIENTE_QR':
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($sd->siguienteQr());
 
         // ── Control de material en planta (ADMIN + ADMINISTRATIVO) ──
         case 'LISTAR_MATERIAL_VALES':
@@ -1080,46 +1037,22 @@ if ($method === 'POST') {
             respuesta($pagosServicios->eliminarDoc((int)($payload['id'] ?? 0)));
 
         // ── Auth ─────────────────────────────────────────
-        case 'LOGIN':
-            respuesta($auth->login($payload));
-
-        // ── Servicios directos (expediente aparte, sólo su propia gente) ──
-        // El acceso ya lo filtró exigirModulo(): aquí sólo llegan cuentas del
-        // módulo, así que basta con exigir sesión válida.
-        case 'GUARDAR_SD_SERVICIO':
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($sd->guardar($payload, $usr['usuario']));
-
-        case 'ELIMINAR_SD_SERVICIO':
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($sd->eliminar((int)($payload['id'] ?? 0), $usr['usuario'], (string)($payload['motivo'] ?? '')));
-
-        case 'SD_AVANZAR':
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($sd->avanzar((int)($payload['id'] ?? 0), $usr['usuario'], (string)($payload['nota'] ?? '')));
-
-        case 'SD_REGRESAR':
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($sd->regresar((int)($payload['id'] ?? 0), $usr['usuario'], (string)($payload['motivo'] ?? '')));
-
-        case 'EMITIR_SD_SERVICIO':
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($sd->emitir((int)($payload['id'] ?? 0), $usr['usuario']));
-
-        case 'SUBIR_FOTO_SD':   // multipart
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($sd->subirFoto($_POST, $_FILES));
-
-        case 'ELIMINAR_FOTO_SD':
-            $usr = validarToken($pdo, $token);
-            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($sd->eliminarFoto((int)($payload['id'] ?? 0)));
+        case 'LOGIN': {
+            // Todavía no hay token, así que no se sabe de qué división es la
+            // cuenta: se prueba en cada base hasta encontrarla. Se responde el
+            // primer acierto, y si en ninguna, el error de la principal para no
+            // revelar cuántas divisiones hay.
+            $fallo = null;
+            foreach ($conexiones as $div => $c) {
+                $r = (new Auth($c))->login($payload);
+                if (($r['status'] ?? '') === 'success') {
+                    $r['division'] = $div;
+                    respuesta($r);
+                }
+                if ($fallo === null) $fallo = $r;
+            }
+            respuesta($fallo ?? ['status' => 'error', 'message' => 'Credenciales inválidas.']);
+        }
 
         // ── Control de material en planta (ADMIN + ADMINISTRATIVO) ──
         case 'GUARDAR_MATERIAL_VALE':

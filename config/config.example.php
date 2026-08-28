@@ -18,6 +18,29 @@ define('DB_NAME', 'u123456_avba');
 define('DB_USER', 'u123456_avba');
 define('DB_PASS', 'ContraseñaSegura123!');
 
+/*
+ * ── Divisiones ────────────────────────────────────────────
+ * Cada división lleva su propio expediente en su propia base, con el mismo
+ * esquema y sus propias cuentas. La aplicación es la misma: elige la base
+ * según en cuál vive la cuenta que entró.
+ *
+ * Para dar de alta una división:
+ *   1. Crear la base en el panel del hosting, con el mismo usuario de MySQL.
+ *   2. Importar en ella el esquema (las tablas se crean solas al primer uso,
+ *      pero conviene partir de un respaldo de la principal SIN sus datos).
+ *   3. Declararla aquí y crear ahí su primera cuenta ADMIN.
+ *
+ * Deja el arreglo vacío mientras haya una sola división.
+ *
+ * El banco de placas QR es independiente en cada base: cárgale a cada división
+ * SU PROPIO lote de placas. Cargar el mismo lote en las dos haría que un mismo
+ * número existiera dos veces, y al escanearlo aparecería sólo el primero que
+ * se encuentre.
+ */
+define('DB_DIVISIONES', [
+    // 'secundaria' => 'u123456_avba_div2',
+]);
+
 // ── Seguridad ─────────────────────────────────────────────
 define('TOKEN_TTL', 28800);           // 8 horas en segundos
 define('LOGIN_MAX_INTENTOS', 5);      // bloquear tras N fallos

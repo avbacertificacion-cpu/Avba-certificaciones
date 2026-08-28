@@ -515,7 +515,7 @@ function validarToken(PDO $pdo, ?string $token): ?array {
 
     try {
         $stmt = $pdo->prepare(
-            "SELECT id, usuario, rol, nombre, id_cliente, modulo, usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh
+            "SELECT id, usuario, rol, nombre, id_cliente, usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh
              FROM usuarios
              WHERE session_token = ? AND activo = 1 AND token_expires > NOW()"
         );
@@ -529,12 +529,34 @@ function validarToken(PDO $pdo, ?string $token): ?array {
         );
         $stmt->execute([$token]);
     }
-    $usr = $stmt->fetch() ?: null;
-    // Una cuenta sin columna de módulo es del sistema de siempre. Nunca se
-    // asume lo contrario: el valor por omisión no debe abrir el expediente
-    // aparte, sólo cerrarlo.
-    if ($usr && !isset($usr['modulo'])) $usr['modulo'] = 'principal';
-    return $usr;
+    return $stmt->fetch() ?: null;
+}
+
+/**
+ * Encuentra en qué división vive una sesión.
+ *
+ * Cada división tiene su propia base con el mismo esquema y sus propias
+ * cuentas, así que una persona existe en una y sólo en una. El token no dice
+ * de cuál es —viene del navegador— de modo que se busca en orden: la principal
+ * primero, que es donde está casi todo el mundo.
+ *
+ * Devuelve ['division','pdo','usuario'] o null si el token no vale en ninguna.
+ */
+function resolverSesion(array $conexiones, ?string $token): ?array {
+    if (!$token) return null;
+    foreach ($conexiones as $division => $pdo) {
+        try {
+            $usr = validarToken($pdo, $token);
+        } catch (\Throwable $e) {
+            error_log("[resolverSesion] división '$division': " . $e->getMessage());
+            continue;
+        }
+        if ($usr) {
+            $usr['division'] = $division;
+            return ['division' => $division, 'pdo' => $pdo, 'usuario' => $usr];
+        }
+    }
+    return null;
 }
 
 /**

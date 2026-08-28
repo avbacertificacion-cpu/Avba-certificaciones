@@ -11,7 +11,6 @@ class Auth {
         $this->pdo = $pdo;
         $this->ensureFirmaColumn();
         $this->ensureRolAdministrativo();
-        $this->ensureModuloColumn();
     }
 
     /**
@@ -25,10 +24,10 @@ class Auth {
         try {
             $col = $this->pdo->query("SHOW COLUMNS FROM usuarios LIKE 'rol'")->fetch(PDO::FETCH_ASSOC);
             $tipo = $col['Type'] ?? '';
-            if ($tipo && (stripos($tipo, 'ADMINISTRATIVO') === false || stripos($tipo, 'DIRECTO') === false)) {
+            if ($tipo && stripos($tipo, 'ADMINISTRATIVO') === false) {
                 $this->pdo->exec(
                     "ALTER TABLE usuarios MODIFY `rol`
-                     ENUM('ADMIN','INSPECTOR','CALIDAD','CERTIFICACIONES','CLIENTE','ADMINISTRATIVO','DIRECTO') NOT NULL"
+                     ENUM('ADMIN','INSPECTOR','CALIDAD','CERTIFICACIONES','CLIENTE','ADMINISTRATIVO') NOT NULL"
                 );
             }
         } catch (\Throwable $e) {
@@ -39,26 +38,7 @@ class Auth {
     /** Roles válidos (constante de config + roles nuevos garantizados). */
     private function rolesValidos(): array {
         $base = defined('ROLES_VALIDOS') ? ROLES_VALIDOS : ['ADMIN','INSPECTOR','CALIDAD','CERTIFICACIONES','CLIENTE'];
-        return array_values(array_unique(array_merge($base, ['ADMINISTRATIVO', 'DIRECTO'])));
-    }
-
-    /**
-     * Cada cuenta pertenece a un módulo y sólo a uno.
-     *
-     * 'principal' es el sistema de siempre. 'directo' es el expediente aparte,
-     * con su propio control de calidad y su propia gente: quien entra a uno no
-     * entra al otro. La separación se aplica en el enrutador (moduloDeAccion en
-     * api/index.php), no aquí, para que sea un único punto y no una condición
-     * repartida por veinte archivos.
-     */
-    private function ensureModuloColumn(): void {
-        try {
-            $this->pdo->exec(
-                "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS modulo VARCHAR(20) NOT NULL DEFAULT 'principal'"
-            );
-        } catch (\Throwable $e) {
-            error_log('[Auth] ensureModuloColumn: ' . $e->getMessage());
-        }
+        return array_values(array_unique(array_merge($base, ['ADMINISTRATIVO'])));
     }
 
     private function ensureFirmaColumn(): void {
@@ -354,7 +334,7 @@ class Auth {
 
         try {
             $stmt = $this->pdo->prepare(
-                "SELECT id, usuario, password_hash, rol, nombre, id_cliente, activo, modulo,
+                "SELECT id, usuario, password_hash, rol, nombre, id_cliente, activo,
                         usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh
                  FROM usuarios WHERE usuario = ?"
             );
@@ -405,8 +385,6 @@ class Auth {
         return [
             'status'        => 'success',
             'rol'           => $row['rol'],
-            // Sin columna todavía, la cuenta es del sistema de siempre.
-            'modulo'        => $row['modulo'] ?? 'principal',
             'nombre'        => $row['nombre'],
             'usuario'       => $usuario,
             'id_cliente'    => $row['id_cliente'] ?? '',
@@ -449,17 +427,6 @@ class Auth {
         ")->execute([$usuario, $maxIntentos, $bloqueoMin]);
     }
 
-    /**
-     * A qué expediente pertenece un rol.
-     *
-     * Se deriva del rol y no se pide aparte: dos campos que pueden contradecirse
-     * acaban contradiciéndose, y aquí la contradicción sería dar acceso al
-     * expediente equivocado.
-     */
-    private function moduloDeRol(string $rol): string {
-        return strtoupper(trim($rol)) === 'DIRECTO' ? 'directo' : 'principal';
-    }
-
     // ── CREAR USUARIO ──────────────────────────────────────
     public function crearUsuario(array $payload): array {
         $usuario    = strtolower(trim($payload['usuario']    ?? ''));
@@ -488,10 +455,9 @@ class Auth {
         $registroStps = trim($payload['registro_stps'] ?? '');
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $this->pdo->prepare(
-            "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo, registro_stps, modulo)
-             VALUES (?, ?, ?, ?, ?, 1, ?, ?)"
-        )->execute([$usuario, $hash, $rol, $nombre, $idCliente ?: null, $registroStps ?: null,
-                    $this->moduloDeRol($rol)]);
+            "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo, registro_stps)
+             VALUES (?, ?, ?, ?, ?, 1, ?)"
+        )->execute([$usuario, $hash, $rol, $nombre, $idCliente ?: null, $registroStps ?: null]);
 
         return ['status' => 'success', 'message' => 'Usuario creado correctamente.'];
     }
@@ -523,10 +489,6 @@ class Auth {
             if (!in_array($rol, $this->rolesValidos(), true)) return ['status' => 'error', 'message' => 'Rol inválido.'];
             $sets[] = 'rol = ?';
             $params[] = $rol;
-            // El módulo viaja con el rol: si se cambia uno sin el otro, la
-            // cuenta quedaría con acceso a un expediente que no le toca.
-            $sets[] = 'modulo = ?';
-            $params[] = $this->moduloDeRol($rol);
         }
         if (isset($payload['id_cliente'])) {
             $sets[] = 'id_cliente = ?';

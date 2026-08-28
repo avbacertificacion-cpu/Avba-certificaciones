@@ -233,8 +233,7 @@ const DESTINOS = {
   CERTIFICACIONES: "certificaciones.html",
   ADMINISTRATIVO:  "administrativo.html",
   CLIENTE:         "portal-cliente.html",
-  PARTICIPANTE:    "participante.html",
-  DIRECTO:         "directo.html"
+  PARTICIPANTE:    "participante.html"
 };
 
 function focusPass() { document.getElementById("password").focus(); }
@@ -295,9 +294,9 @@ async function login() {
       usuario:       data.usuario,
       nombre:        data.nombre,
       rol:           data.rol,
-      // A qué expediente pertenece la cuenta. Cada página lo comprueba antes
-      // de dibujar nada; el servidor lo vuelve a comprobar en cada petición.
-      modulo:        data.modulo || 'principal',
+      // De qué división es la cuenta. Sólo informativo: el servidor lo resuelve
+      // solo en cada petición, según en qué base valió el token.
+      division:      data.division || 'principal',
       id_cliente:    data.id_cliente,
       token:         data.token,
       es_subusuario: data.es_subusuario || false,

@@ -6,6 +6,9 @@
 class ValidarQR {
     private PDO $pdo;
 
+    /** Bases de otras divisiones que también se consultan al validar. */
+    private array $otrasDivisiones = [];
+
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
     }
@@ -34,27 +37,43 @@ class ValidarQR {
         $result = $this->buscarPersonal($qrBuscado, $esFolio);
         if ($result) return $result;
 
-        // Expediente de servicios directos: al escanear una placa no importa de
-        // qué expediente salió el certificado, sólo si es válido y está vigente.
-        $result = $this->buscarServicioDirecto($qrBuscado, $esFolio);
+        // Las demás divisiones: quien escanea una placa no sabe —ni tiene por
+        // qué saber— cómo está organizada la unidad por dentro. El certificado
+        // se valida igual, lo haya emitido quien lo haya emitido.
+        $result = $this->buscarEnOtrasDivisiones($qrBuscado);
         if ($result) return $result;
 
         return ['status' => 'ok', 'existe' => false];
     }
 
-    /** Certificados del expediente aparte. */
-    private function buscarServicioDirecto(string $q, bool $esFolio): ?array {
-        if (!class_exists('ServiciosDirectos')) {
-            $f = __DIR__ . '/ServiciosDirectos.php';
-            if (!is_file($f)) return null;
-            require_once $f;
+    /**
+     * Conexiones de las otras divisiones, para la validación pública.
+     *
+     * Se inyectan desde el enrutador en vez de abrirlas aquí: esta clase no
+     * tiene por qué saber cómo está configurada la unidad.
+     */
+    public function conexionesDeDivision(array $conexiones): void {
+        $this->otrasDivisiones = [];
+        foreach ($conexiones as $division => $c) {
+            if ($c !== $this->pdo) $this->otrasDivisiones[$division] = $c;
         }
-        try {
-            return (new ServiciosDirectos($this->pdo))->buscarPorQr($q, $esFolio);
-        } catch (\Throwable $e) {
-            error_log('[ValidarQR] servicios directos: ' . $e->getMessage());
-            return null;
+    }
+
+    /** Busca el mismo código en las bases de las otras divisiones. */
+    private function buscarEnOtrasDivisiones(string $q): ?array {
+        foreach ($this->otrasDivisiones as $division => $c) {
+            try {
+                $otro = new self($c);
+                // Sin conexiones cruzadas: si no, dos divisiones se llamarían
+                // la una a la otra sin fin.
+                $r = $otro->validarQR($q);
+            } catch (\Throwable $e) {
+                error_log("[ValidarQR] división '$division': " . $e->getMessage());
+                continue;
+            }
+            if (!empty($r['existe'])) return $r;
         }
+        return null;
     }
 
     // ── Maquinaria / Equipo ────────────────────────────────
