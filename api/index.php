@@ -11,6 +11,7 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/database.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/Divisiones.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Inspecciones.php';
 require_once __DIR__ . '/Calidad.php';
@@ -129,11 +130,7 @@ if ($method === 'GET') {
 //  Se resuelve aquí, antes de construir nada, porque cada clase recibe su
 //  conexión en el constructor.
 // ══════════════════════════════════════════════════════════
-$conexiones = [];
-foreach (Database::bases() as $division => $nombreBase) {
-    $c = Database::deDivision($division);
-    if ($c) $conexiones[$division] = $c;
-}
+$conexiones = Divisiones::conexiones();
 
 $sesion   = resolverSesion($conexiones, $token);
 $division = $sesion['division'] ?? 'principal';
