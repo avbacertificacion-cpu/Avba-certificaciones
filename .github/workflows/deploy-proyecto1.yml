@@ -11,6 +11,11 @@ on:
 # primeros no marcan el job como fallido, y solo si el tercero también falla
 # se reporta el error. Además se amplía el timeout de conexión a 60s, porque
 # los intentos fallidos se rendían justo al llegar a los 30s por defecto.
+#
+# Las pausas son de 1 y 3 minutos porque cuando el servidor deja de aceptar
+# conexiones lo hace durante un rato: con esperas de 20 y 40 segundos los tres
+# intentos caían dentro del mismo mal momento y el despliegue se perdía entero.
+# Ya pasó una vez, y dejó el sistema con media versión subida.
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -38,7 +43,7 @@ jobs:
 
       - name: Esperar antes del segundo intento
         if: steps.scp1.outcome == 'failure'
-        run: sleep 20
+        run: sleep 60
 
       - name: Subir por SCP (intento 2 de 3)
         id: scp2
@@ -58,7 +63,7 @@ jobs:
 
       - name: Esperar antes del tercer intento
         if: steps.scp1.outcome == 'failure' && steps.scp2.outcome == 'failure'
-        run: sleep 40
+        run: sleep 180
 
       # Último intento: sin continue-on-error, así que si este falla el job
       # sí se marca como fallido y el error queda visible.

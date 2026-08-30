@@ -8,8 +8,8 @@
  */
 
 // ── Bootstrap ─────────────────────────────────────────────
-require_once __DIR__ . '/../config/config.php';
-require_once __DIR__ . '/../config/database.php';
+
+
 require_once __DIR__ . '/helpers.php';
 // Con guarda a propósito: el envío al servidor es por SCP y falla a ratos a
 // medio camino. Si este archivo no llegó, el sistema debe seguir en pie con
