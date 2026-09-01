@@ -105,6 +105,23 @@ function asegurarTablasCotizaciones($pdo) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (Exception $e) { /* las acciones reportarán el error */ }
+
+    // Porcentaje de utilidad con el que se calcula el precio de venta.
+    // Va aparte para que las bases de datos ya creadas también lo reciban.
+    agregarColumna($pdo, 'cotizaciones', 'utilidad_pct',  "DECIMAL(8,2) NOT NULL DEFAULT 0");
+    agregarColumna($pdo, 'cotizaciones', 'utilidad_base', "VARCHAR(10) NOT NULL DEFAULT 'costo'");
+    // Producto del catálogo del que salió la partida, para reabrirla ya elegido
+    agregarColumna($pdo, 'cotizacion_items', 'catalogo_id', "INT DEFAULT NULL");
+}
+
+/** Agrega una columna solo si falta. */
+function agregarColumna($pdo, string $tabla, string $columna, string $definicion): void {
+    try {
+        $stmt = $pdo->prepare("SHOW COLUMNS FROM `$tabla` LIKE ?");
+        $stmt->execute([$columna]);
+        if ($stmt->fetch()) return;
+        $pdo->exec("ALTER TABLE `$tabla` ADD COLUMN `$columna` $definicion");
+    } catch (Exception $e) { /* si otra petición la creó primero, no pasa nada */ }
 }
 
 // ═══════════════════════ PROVEEDORES ═══════════════════════
@@ -315,13 +332,19 @@ function guardarCotizacion() {
     $estadosValidos = ['borrador','enviada','aceptada','rechazada'];
     $estado = in_array($d['estado'] ?? '', $estadosValidos, true) ? $d['estado'] : 'borrador';
 
+    // Porcentaje con el que se calculó el precio de venta: al reabrir la
+    // cotización debe seguir vigente el mismo criterio.
+    $util_pct  = max(0, min(100000, round((float)($d['utilidad_pct'] ?? 0), 2)));
+    $util_base = ($d['utilidad_base'] ?? 'costo') === 'venta' ? 'venta' : 'costo';
+
     try {
         $pdo->beginTransaction();
 
         if ($id) {
             $pdo->prepare("
                 UPDATE cotizaciones
-                SET empresa_id=?, cliente_nombre=?, contacto=?, fecha=?, vigencia_dias=?, estado=?, notas=?
+                SET empresa_id=?, cliente_nombre=?, contacto=?, fecha=?, vigencia_dias=?, estado=?, notas=?,
+                    utilidad_pct=?, utilidad_base=?
                 WHERE id=?
             ")->execute([
                 $empresa_id, $cliente,
@@ -330,13 +353,15 @@ function guardarCotizacion() {
                 max(0, intval($d['vigencia_dias'] ?? 15)),
                 $estado,
                 trim($d['notas'] ?? '') ?: null,
+                $util_pct, $util_base,
                 $id,
             ]);
         } else {
             $folio = siguienteFolio($pdo);
             $pdo->prepare("
-                INSERT INTO cotizaciones (folio, empresa_id, cliente_nombre, contacto, fecha, vigencia_dias, estado, notas, creado_por)
-                VALUES (?,?,?,?,?,?,?,?,?)
+                INSERT INTO cotizaciones
+                    (folio, empresa_id, cliente_nombre, contacto, fecha, vigencia_dias, estado, notas, utilidad_pct, utilidad_base, creado_por)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?)
             ")->execute([
                 $folio, $empresa_id, $cliente,
                 trim($d['contacto'] ?? '') ?: null,
@@ -344,6 +369,7 @@ function guardarCotizacion() {
                 max(0, intval($d['vigencia_dias'] ?? 15)),
                 $estado,
                 trim($d['notas'] ?? '') ?: null,
+                $util_pct, $util_base,
                 $uid,
             ]);
             $id = $pdo->lastInsertId();
@@ -353,8 +379,8 @@ function guardarCotizacion() {
         $pdo->prepare("DELETE FROM cotizacion_items WHERE cotizacion_id = ?")->execute([$id]);
         $ins = $pdo->prepare("
             INSERT INTO cotizacion_items
-                (cotizacion_id, descripcion, cantidad, unidad, proveedor_id, costo_unitario, precio_unitario, orden)
-            VALUES (?,?,?,?,?,?,?,?)
+                (cotizacion_id, descripcion, cantidad, unidad, proveedor_id, catalogo_id, costo_unitario, precio_unitario, orden)
+            VALUES (?,?,?,?,?,?,?,?,?)
         ");
         $orden = 0;
         foreach ($items as $it) {
@@ -366,6 +392,7 @@ function guardarCotizacion() {
                 max(0, round((float)($it['cantidad'] ?? 1), 2)),
                 trim($it['unidad'] ?? '') ?: null,
                 intval($it['proveedor_id'] ?? 0) ?: null,
+                intval($it['catalogo_id'] ?? 0) ?: null,
                 max(0, round((float)($it['costo_unitario'] ?? 0), 2)),
                 max(0, round((float)($it['precio_unitario'] ?? 0), 2)),
                 $orden++,

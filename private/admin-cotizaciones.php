@@ -74,6 +74,16 @@ $nombre = $_SESSION['nombre'];
     .items .ro{font-size:13px;text-align:right;white-space:nowrap}
     .items .del{background:#fee2e2;color:#b91c1c;border:none;border-radius:6px;padding:6px 9px;cursor:pointer;font-weight:700}
 
+    .pct-bar{background:#f1f5fb;border:2px solid #dbe3f7;border-radius:12px;padding:14px 16px;margin-bottom:16px}
+    .pct-bar label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px}
+    .pct-campos{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .pct-campos input{width:100px;padding:9px;border:2px solid #e0e0ff;border-radius:8px;font-size:15px;font-weight:700;text-align:right;background:#fff}
+    .pct-campos input:focus,.pct-campos select:focus{outline:none;border-color:#667eea}
+    .pct-campos select{padding:9px;border:2px solid #e0e0ff;border-radius:8px;font-size:13px;background:#fff}
+    .pct-nota{font-size:12px;color:#64748b;margin-top:8px}
+    .items input.manual{border-color:#f39c12;background:#fffbeb}
+    .items .rest{background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px;color:#f39c12}
+
     .tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;background:#f8faff;
          border:2px solid #e0e7ff;border-radius:12px;padding:14px;margin-top:6px}
     .tot div span{display:block;font-size:11px;color:#64748b;font-weight:700;text-transform:uppercase}
@@ -161,17 +171,34 @@ $nombre = $_SESSION['nombre'];
             </div>
         </div>
 
+        <div class="pct-bar">
+            <div>
+                <label>% de utilidad de esta cotización</label>
+                <div class="pct-campos">
+                    <input type="number" id="k-pct" step="0.1" min="0" value="40" oninput="aplicarPorcentaje()">
+                    <span>%</span>
+                    <select id="k-base" onchange="aplicarPorcentaje()">
+                        <option value="costo">sobre el costo (markup)</option>
+                        <option value="venta">sobre la venta (margen)</option>
+                    </select>
+                    <button class="btn btn-primary btn-sm" onclick="aplicarPorcentaje(true)">↻ Recalcular todas</button>
+                </div>
+            </div>
+            <div class="pct-nota" id="pct-nota"></div>
+        </div>
+
         <div class="fg">
             <label>Partidas</label>
             <div style="overflow-x:auto">
             <table class="items">
                 <thead><tr>
-                    <th style="min-width:200px">Descripción</th>
-                    <th style="width:70px">Cant.</th>
-                    <th style="width:85px">Unidad</th>
                     <th style="min-width:150px">Proveedor (a quién se lo pedí)</th>
+                    <th style="min-width:170px">Producto del proveedor</th>
+                    <th style="min-width:190px">Descripción para el cliente</th>
+                    <th style="width:70px">Cant.</th>
+                    <th style="width:80px">Unidad</th>
                     <th style="width:105px">Costo unit.</th>
-                    <th style="width:105px">Precio venta</th>
+                    <th style="width:120px">Precio venta</th>
                     <th style="width:95px">Utilidad</th>
                     <th style="width:60px">%</th>
                     <th style="width:40px"></th>
@@ -181,9 +208,7 @@ $nombre = $_SESSION['nombre'];
             </div>
             <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
                 <button class="btn btn-ghost btn-sm" onclick="agregarFila()">＋ Agregar partida</button>
-                <select id="k-catalogo" onchange="desdeCatalogo()" style="padding:7px;border:2px solid #e0e0ff;border-radius:8px;font-size:13px">
-                    <option value="">Traer del catálogo de precios…</option>
-                </select>
+                <span class="hint" style="margin:0">Elige el proveedor y su lista de productos aparecerá en la siguiente columna con su costo.</span>
             </div>
         </div>
 
@@ -223,6 +248,12 @@ function aviso(t, ok) {
     m.textContent = t; m.style.color = ok ? '#27ae60' : '#c0392b';
     setTimeout(() => { m.textContent = ''; }, 4000);
 }
+/** El último porcentaje usado se recuerda, que casi siempre es el mismo. */
+function pctPorDefecto() {
+    const v = parseFloat(localStorage.getItem('avba_cot_pct'));
+    return (isFinite(v) && v > 0) ? v : 40;
+}
+
 function fechaCorta(f) {
     if (!f) return '—';
     const p = String(f).substring(0,10).split('-');
@@ -246,10 +277,6 @@ async function cargar() {
     document.getElementById('k-empresa').innerHTML =
         '<option value="">— Otro / prospecto —</option>' +
         empresas.map(e => `<option value="${e.id}">${esc(e.nombre)}</option>`).join('');
-    document.getElementById('k-catalogo').innerHTML =
-        '<option value="">Traer del catálogo de precios…</option>' +
-        catalogo.map(c => `<option value="${c.id}">${esc(c.descripcion)} — ${money(c.costo)}${c.proveedor_nombre ? ' (' + esc(c.proveedor_nombre) + ')' : ''}</option>`).join('');
-
     adjuntos = await contarDocs('cotizacion');
 
     pintarKpis(rr.success ? rr.data : null);
@@ -328,11 +355,13 @@ function nueva() {
     document.getElementById('k-vigencia').value = 15;
     document.getElementById('k-estado').value = 'borrador';
     document.getElementById('k-notas').value = '';
+    document.getElementById('k-pct').value = pctPorDefecto();
+    document.getElementById('k-base').value = 'costo';
     document.getElementById('items').innerHTML = '';
     document.getElementById('btnImprimir').style.display = 'none';
     document.getElementById('btnDocs').style.display = 'none';
     agregarFila();
-    recalcular();
+    aplicarPorcentaje();
     document.getElementById('modalCot').classList.add('open');
 }
 
@@ -352,13 +381,15 @@ async function editar(id) {
     document.getElementById('k-vigencia').value = c.vigencia_dias;
     document.getElementById('k-estado').value = c.estado;
     document.getElementById('k-notas').value = c.notas || '';
+    document.getElementById('k-pct').value  = Number(c.utilidad_pct) > 0 ? Number(c.utilidad_pct) : pctPorDefecto();
+    document.getElementById('k-base').value = c.utilidad_base === 'venta' ? 'venta' : 'costo';
     document.getElementById('btnImprimir').style.display = '';
     document.getElementById('btnDocs').style.display = '';
 
     document.getElementById('items').innerHTML = '';
     (c.items || []).forEach(it => agregarFila(it));
     if (!(c.items || []).length) agregarFila();
-    recalcular();
+    aplicarPorcentaje();   // pinta la nota; los precios guardados quedan intactos
     document.getElementById('modalCot').classList.add('open');
 }
 
@@ -376,32 +407,135 @@ function agregarFila(it) {
     const opts = '<option value="">—</option>' +
         proveedores.map(p => `<option value="${p.id}"${String(p.id) === String(it.proveedor_id || '') ? ' selected' : ''}>${esc(p.nombre)}</option>`).join('');
     tr.innerHTML = `
+        <td><select class="i-prov" onchange="cambioProveedor(this)">${opts}</select></td>
+        <td><select class="i-cat" onchange="desdeCatalogo(this)"></select></td>
         <td><input type="text" class="i-desc" value="${esc(it.descripcion || '')}" placeholder="Ej: Recarga extintor PQS 9 kg"></td>
         <td><input type="number" class="i-cant n" step="0.01" min="0" value="${it.cantidad != null ? it.cantidad : 1}" oninput="recalcular()"></td>
         <td><input type="text" class="i-unidad" value="${esc(it.unidad || '')}" placeholder="pza"></td>
-        <td><select class="i-prov">${opts}</select></td>
-        <td><input type="number" class="i-costo n" step="0.01" min="0" value="${it.costo_unitario != null ? it.costo_unitario : 0}" oninput="recalcular()"></td>
-        <td><input type="number" class="i-precio n" step="0.01" min="0" value="${it.precio_unitario != null ? it.precio_unitario : 0}" oninput="recalcular()"></td>
+        <td><input type="number" class="i-costo n" step="0.01" min="0" value="${it.costo_unitario != null ? it.costo_unitario : 0}" oninput="cambioCosto(this)"></td>
+        <td style="white-space:nowrap">
+            <input type="number" class="i-precio n" step="0.01" min="0" value="${it.precio_unitario != null ? it.precio_unitario : 0}"
+                   style="width:calc(100% - 22px)" oninput="precioManual(this)">
+            <button type="button" class="rest" title="Volver a calcularlo con el porcentaje" onclick="restaurarPrecio(this)">↻</button>
+        </td>
         <td class="ro i-util">$0.00</td>
         <td class="ro i-pct">0%</td>
         <td><button type="button" class="del" onclick="this.closest('tr').remove();recalcular()">✕</button></td>`;
     document.getElementById('items').appendChild(tr);
+
+    // Una partida que ya traía precio guardado se respeta tal cual
+    marcarManual(tr, it.precio_unitario != null && Number(it.precio_unitario) > 0);
+
+    llenarProductos(tr);
+    // Si la partida vino del catálogo, se deja seleccionado su producto
+    if (it.catalogo_id) tr.querySelector('.i-cat').value = it.catalogo_id;
+    aplicarPorcentajeFila(tr);   // una partida nueva ya nace con su precio calculado
     recalcular();
 }
 
-function desdeCatalogo() {
-    const sel = document.getElementById('k-catalogo');
-    const c = catalogo.find(x => String(x.id) === sel.value);
-    sel.value = '';
+// ── Productos del proveedor elegido ─────────────────────────────────────────
+/** Llena la lista de productos con los del proveedor seleccionado en esa fila. */
+function llenarProductos(tr) {
+    const prov = tr.querySelector('.i-prov').value;
+    const sel  = tr.querySelector('.i-cat');
+    const previo = sel.value;
+    const items = catalogo.filter(c => prov ? String(c.proveedor_id) === prov : true);
+
+    if (!prov) {
+        sel.innerHTML = '<option value="">— Elige primero el proveedor —</option>';
+        return;
+    }
+    if (!items.length) {
+        sel.innerHTML = '<option value="">— Sin productos en el catálogo —</option>';
+        return;
+    }
+    sel.innerHTML = '<option value="">— Elegir producto —</option>' +
+        items.map(c => `<option value="${c.id}">${esc(c.descripcion)} · ${money(c.costo)}</option>`).join('');
+    // Si el producto que ya tenía sigue siendo de este proveedor, se conserva
+    if (previo && items.some(c => String(c.id) === previo)) sel.value = previo;
+}
+
+function cambioProveedor(sel) {
+    llenarProductos(sel.closest('tr'));
+}
+
+/** Al elegir un producto se traen su descripción, unidad y costo del proveedor. */
+function desdeCatalogo(sel) {
+    const tr = sel.closest('tr');
+    const c  = catalogo.find(x => String(x.id) === sel.value);
     if (!c) return;
-    agregarFila({
-        descripcion: c.descripcion,
-        cantidad: 1,
-        unidad: c.unidad || '',
-        proveedor_id: c.proveedor_id,
-        costo_unitario: c.costo,
-        precio_unitario: 0,
+    tr.querySelector('.i-desc').value   = c.descripcion || '';
+    tr.querySelector('.i-unidad').value = c.unidad || '';
+    tr.querySelector('.i-costo').value  = Number(c.costo) || 0;
+    // El precio vuelve a salir del porcentaje, aunque antes se hubiera escrito a mano
+    marcarManual(tr, false);
+    aplicarPorcentajeFila(tr);
+    recalcular();
+}
+
+// ── Precio de venta a partir del porcentaje ─────────────────────────────────
+/** Marca (o desmarca) una fila cuyo precio se escribió a mano. */
+function marcarManual(tr, manual) {
+    const inp = tr.querySelector('.i-precio');
+    tr.dataset.manual = manual ? '1' : '';
+    inp.classList.toggle('manual', !!manual);
+    inp.title = manual ? 'Precio escrito a mano: el porcentaje no lo cambia' : '';
+    tr.querySelector('.rest').style.visibility = manual ? 'visible' : 'hidden';
+}
+
+function precioManual(inp) { marcarManual(inp.closest('tr'), true); recalcular(); }
+function restaurarPrecio(btn) { marcarManual(btn.closest('tr'), false); aplicarPorcentajeFila(btn.closest('tr')); recalcular(); }
+function cambioCosto(inp) { aplicarPorcentajeFila(inp.closest('tr')); recalcular(); }
+
+/** Calcula el precio de venta de una sola partida, si no se escribió a mano. */
+function aplicarPorcentajeFila(tr) {
+    if (tr.dataset.manual === '1') return;
+    const pct   = parseFloat(document.getElementById('k-pct').value) || 0;
+    const base  = document.getElementById('k-base').value;
+    const costo = parseFloat(tr.querySelector('.i-costo').value) || 0;
+    tr.querySelector('.i-precio').value = precioDesdeCosto(costo, pct, base).toFixed(2);
+}
+
+/**
+ * Calcula el precio de venta de un costo según el porcentaje de la cotización.
+ *  - sobre el costo:  precio = costo × (1 + %)
+ *  - sobre la venta:  precio = costo ÷ (1 − %)   ← el % queda como margen real
+ */
+function precioDesdeCosto(costo, pct, base) {
+    costo = Number(costo) || 0;
+    pct   = Number(pct) || 0;
+    if (costo <= 0) return 0;
+    if (base === 'venta') {
+        if (pct >= 100) return 0; // un margen del 100% sobre venta no tiene solución
+        return costo / (1 - pct / 100);
+    }
+    return costo * (1 + pct / 100);
+}
+
+/**
+ * Aplica el porcentaje a todas las partidas.
+ * @param {boolean} forzar  true = también reescribe los precios puestos a mano.
+ */
+function aplicarPorcentaje(forzar) {
+    const pct  = parseFloat(document.getElementById('k-pct').value) || 0;
+    const base = document.getElementById('k-base').value;
+
+    document.querySelectorAll('#items tr').forEach(tr => {
+        if (forzar) marcarManual(tr, false);
+        if (tr.dataset.manual === '1') return;
+        const costo = parseFloat(tr.querySelector('.i-costo').value) || 0;
+        tr.querySelector('.i-precio').value = precioDesdeCosto(costo, pct, base).toFixed(2);
     });
+
+    const nota = document.getElementById('pct-nota');
+    if (base === 'venta') {
+        nota.textContent = pct >= 100
+            ? '⚠️ Un margen sobre la venta del 100% o más no se puede calcular. Usa un valor menor.'
+            : `Cada partida se vende a costo ÷ ${(1 - pct / 100).toFixed(2)}, de modo que el margen real sea del ${pct}%.`;
+    } else {
+        nota.textContent = `Cada partida se vende a costo × ${(1 + pct / 100).toFixed(2)}. Puedes escribir un precio a mano y el porcentaje lo respetará (se marca en ámbar).`;
+    }
+    recalcular();
 }
 
 function leerItems() {
@@ -410,6 +544,7 @@ function leerItems() {
         cantidad:        parseFloat(tr.querySelector('.i-cant').value) || 0,
         unidad:          tr.querySelector('.i-unidad').value.trim(),
         proveedor_id:    parseInt(tr.querySelector('.i-prov').value) || 0,
+        catalogo_id:     parseInt(tr.querySelector('.i-cat').value) || 0,
         costo_unitario:  parseFloat(tr.querySelector('.i-costo').value) || 0,
         precio_unitario: parseFloat(tr.querySelector('.i-precio').value) || 0,
     }));
@@ -448,6 +583,8 @@ async function guardarCot() {
         fecha:          document.getElementById('k-fecha').value,
         vigencia_dias:  parseInt(document.getElementById('k-vigencia').value) || 0,
         estado:         document.getElementById('k-estado').value,
+        utilidad_pct:   parseFloat(document.getElementById('k-pct').value) || 0,
+        utilidad_base:  document.getElementById('k-base').value,
         notas:          document.getElementById('k-notas').value.trim(),
         items:          items,
     };
@@ -458,7 +595,10 @@ async function guardarCot() {
         method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
     });
     const d = await r.json().catch(() => ({}));
-    if (r.ok && d.success) { cerrar('modalCot'); aviso('✓ Cotización guardada', true); cargar(); }
+    if (r.ok && d.success) {
+        try { localStorage.setItem('avba_cot_pct', String(body.utilidad_pct)); } catch (e) {}
+        cerrar('modalCot'); aviso('✓ Cotización guardada', true); cargar();
+    }
     else aviso(d.error || 'Error al guardar', false);
 }
 
