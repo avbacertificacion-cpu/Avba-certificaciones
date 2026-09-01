@@ -8,6 +8,10 @@ vendor/
 uploads/certificados/
 uploads/evidencias/
 uploads/ordenes/
+# Los documentos adjuntos sí guardan su .htaccess y su index.html (blindan la carpeta)
+uploads/documentos/*
+!uploads/documentos/.htaccess
+!uploads/documentos/index.html
 
 # Archivos de instalación
 install.php

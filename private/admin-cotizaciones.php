@@ -199,17 +199,20 @@ $nombre = $_SESSION['nombre'];
 
         <div class="modal-actions">
             <button class="btn btn-warning" onclick="cerrar('modalCot')">Cancelar</button>
+            <button class="btn btn-ghost" id="btnDocs" onclick="docsActual()" style="display:none">📎 Documentos</button>
             <button class="btn btn-ghost" id="btnImprimir" onclick="imprimirActual()" style="display:none">🖨️ Imprimir para el cliente</button>
             <button class="btn btn-primary" onclick="guardarCot()">Guardar cotización</button>
         </div>
     </div>
 </div>
 
+<?php include __DIR__ . '/documentos-widget.php'; ?>
+
 <div id="areaImpresion"></div>
 
 <script>
 const API = '../api/cotizaciones.php';
-let cotizaciones = [], proveedores = [], catalogo = [], empresas = [];
+let cotizaciones = [], proveedores = [], catalogo = [], empresas = [], adjuntos = {};
 
 const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
 const money = n => '$' + Number(n || 0).toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2});
@@ -247,9 +250,19 @@ async function cargar() {
         '<option value="">Traer del catálogo de precios…</option>' +
         catalogo.map(c => `<option value="${c.id}">${esc(c.descripcion)} — ${money(c.costo)}${c.proveedor_nombre ? ' (' + esc(c.proveedor_nombre) + ')' : ''}</option>`).join('');
 
+    adjuntos = await contarDocs('cotizacion');
+
     pintarKpis(rr.success ? rr.data : null);
     render();
 }
+
+/** Abre el panel de documentos de una cotización. */
+function docsDe(id) {
+    const c = cotizaciones.find(x => x.id === id);
+    abrirDocs('cotizacion', id, c ? `${c.folio} — ${c.cliente_nombre}` : '');
+}
+// Al cerrar el panel se refrescan los contadores de adjuntos del listado
+window.alCerrarDocs = async function () { adjuntos = await contarDocs('cotizacion'); render(); };
 
 function pintarKpis(r) {
     const c = document.getElementById('kpis');
@@ -280,7 +293,7 @@ function render() {
         <thead><tr>
             <th>Folio</th><th>Fecha</th><th>Cliente</th><th class="n">Partidas</th>
             <th class="n">Costo</th><th class="n">Venta</th><th class="n">Utilidad</th>
-            <th class="n">Margen</th><th class="n">Markup</th><th>Estado</th><th></th>
+            <th class="n">Margen</th><th class="n">Markup</th><th>Estado</th><th>Docs.</th><th></th>
         </tr></thead>
         <tbody>${data.map(c => `<tr>
             <td style="font-weight:700">${esc(c.folio)}</td>
@@ -293,6 +306,7 @@ function render() {
             <td class="n">${c.margen_pct}%</td>
             <td class="n">${c.markup_pct}%</td>
             <td><span class="badge b-${esc(c.estado)}">${esc(c.estado)}</span></td>
+            <td><button class="btn btn-ghost btn-sm" onclick="docsDe(${c.id})" title="Evidencias, facturas y documentación">📎 ${adjuntos[c.id] || 0}</button></td>
             <td style="white-space:nowrap;text-align:right">
                 <button class="btn btn-warning btn-sm" onclick="editar(${c.id})" title="Editar">✏️</button>
                 <button class="btn btn-ghost btn-sm" onclick="imprimir(${c.id})" title="Imprimir para el cliente">🖨️</button>
@@ -316,6 +330,7 @@ function nueva() {
     document.getElementById('k-notas').value = '';
     document.getElementById('items').innerHTML = '';
     document.getElementById('btnImprimir').style.display = 'none';
+    document.getElementById('btnDocs').style.display = 'none';
     agregarFila();
     recalcular();
     document.getElementById('modalCot').classList.add('open');
@@ -338,6 +353,7 @@ async function editar(id) {
     document.getElementById('k-estado').value = c.estado;
     document.getElementById('k-notas').value = c.notas || '';
     document.getElementById('btnImprimir').style.display = '';
+    document.getElementById('btnDocs').style.display = '';
 
     document.getElementById('items').innerHTML = '';
     (c.items || []).forEach(it => agregarFila(it));
@@ -462,6 +478,7 @@ async function imprimir(id) {
     pintarImpresion(d.data);
 }
 function imprimirActual() { if (cotActual) imprimir(cotActual.id); }
+function docsActual() { if (cotActual) docsDe(cotActual.id); }
 
 function pintarImpresion(c) {
     const filas = (c.items || []).map((it, i) => {

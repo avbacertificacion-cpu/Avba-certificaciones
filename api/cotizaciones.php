@@ -8,6 +8,7 @@
  * Las tablas se crean solas la primera vez (no requiere migración manual).
  */
 require_once '../config/config.php';
+require_once '../config/documentos-lib.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -390,6 +391,7 @@ function eliminarCotizacion() {
         $pdo->prepare("DELETE FROM cotizacion_items WHERE cotizacion_id = ?")->execute([$id]);
         $pdo->prepare("DELETE FROM cotizaciones WHERE id = ?")->execute([$id]);
         $pdo->commit();
+        borrarDocumentosDe($pdo, 'cotizacion', $id);
         audit($uid, "Eliminar cotización", 'cotizaciones', $id);
         echo json_encode(['success' => true]);
     } catch (Exception $e) {

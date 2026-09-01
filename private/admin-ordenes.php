@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/documentos-lib.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
     header('Location: ../public/login.html'); exit;
 }
@@ -83,6 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $of = $old->fetchColumn();
             if ($of && is_file($UPLOAD_DIR . $of)) @unlink($UPLOAD_DIR . $of);
             $pdo->prepare("DELETE FROM ordenes_compra WHERE id=?")->execute([$id]);
+            borrarDocumentosDe($pdo, 'orden_compra', $id);
         }
     }
 
@@ -235,6 +237,9 @@ $json_estado = json_encode([$instaladas, $pendientes]);
                     </div>
                 </div>
                 <div class="oc-actions">
+                    <button class="btn btn-sm" style="background:#eef2fb;color:#475569"
+                            onclick="abrirDocs('orden_compra', <?= (int)$o['id'] ?>, <?= htmlspecialchars(json_encode('Orden #' . $o['id']), ENT_QUOTES) ?>)"
+                            title="Evidencias, facturas y documentación">📎 Documentos</button>
                     <button class="btn btn-warning btn-sm" onclick='editar(<?= json_encode([
                         "id"=>(int)$o["id"], "descripcion"=>$o["descripcion"],
                         "fecha_tentativa"=>$o["fecha_tentativa"], "fecha_instalacion"=>$o["fecha_instalacion"],
@@ -351,5 +356,6 @@ document.getElementById('modal').addEventListener('click', e => { if (e.target.i
 })();
 <?php endif; ?>
 </script>
+<?php include __DIR__ . '/documentos-widget.php'; ?>
 </body>
 </html>
