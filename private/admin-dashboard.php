@@ -425,6 +425,16 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
                 <h3>Órdenes de Compra</h3>
                 <p>Ítems, fotos y fechas de instalación</p>
             </div>
+            <div class="menu-item" onclick="window.location.href='admin-cotizaciones.php'">
+                <div class="menu-item-icon">💰</div>
+                <h3>Cotizaciones</h3>
+                <p>Precios de venta y utilidad</p>
+            </div>
+            <div class="menu-item" onclick="window.location.href='admin-proveedores.php'">
+                <div class="menu-item-icon">🏭</div>
+                <h3>Proveedores y Precios</h3>
+                <p>A quién le compras y a qué costo</p>
+            </div>
         </div>
     </div>
 </div>
