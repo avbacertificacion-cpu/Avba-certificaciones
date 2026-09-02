@@ -117,6 +117,9 @@ function asegurarTablasCotizaciones($pdo) {
     // que venían en 'borrador' o 'enviada' quedan como pendientes.
     try {
         $pdo->exec("UPDATE cotizaciones SET estado='pendiente' WHERE estado IN ('borrador','enviada')");
+        // El porcentaje pasó a ser siempre sobre el costo. Los precios guardados
+        // no cambian; sólo la base con la que se vuelve a leer el porcentaje.
+        $pdo->exec("UPDATE cotizaciones SET utilidad_base='costo' WHERE utilidad_base <> 'costo'");
     } catch (Exception $e) { /* si falla, las cotizaciones viejas conservan su estado */ }
 }
 
@@ -283,10 +286,12 @@ function conUtilidad(array $r): array {
     $r['total_costo'] = round($costo, 2);
     $r['total_venta'] = round($venta, 2);
     $r['utilidad']    = round($util, 2);
-    // Margen: utilidad sobre el precio de venta
-    $r['margen_pct']  = $venta > 0 ? round($util / $venta * 100, 1) : 0;
-    // Markup: cuánto se le carga encima al costo del proveedor
+    // El porcentaje de ganancia del sistema es siempre sobre el costo:
+    // lo que cuesta 10 con 50% se vende en 15.
     $r['markup_pct']  = $costo > 0 ? round($util / $costo * 100, 1) : 0;
+    // Se conserva el margen sobre venta por si hace falta en algún cálculo,
+    // pero no se muestra: dos porcentajes distintos para lo mismo confundían.
+    $r['margen_pct']  = $venta > 0 ? round($util / $venta * 100, 1) : 0;
     return $r;
 }
 
@@ -345,7 +350,7 @@ function guardarCotizacion() {
     // Porcentaje con el que se calculó el precio de venta: al reabrir la
     // cotización debe seguir vigente el mismo criterio.
     $util_pct  = max(0, min(100000, round((float)($d['utilidad_pct'] ?? 0), 2)));
-    $util_base = ($d['utilidad_base'] ?? 'costo') === 'venta' ? 'venta' : 'costo';
+    $util_base = 'costo'; // el porcentaje del sistema siempre es sobre el costo
 
     try {
         $pdo->beginTransaction();
@@ -460,8 +465,8 @@ function resumen() {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $r = ['total' => 0, 'aceptadas' => 0, 'venta_aceptada' => 0, 'utilidad_aceptada' => 0,
-          'venta_pendiente' => 0, 'venta_pagada' => 0, 'margen_promedio' => 0];
-    $margenes = [];
+          'venta_pendiente' => 0, 'venta_pagada' => 0, 'ganancia_promedio' => 0];
+    $ganancias = [];
     foreach ($rows as $row) {
         $row = conUtilidad($row);
         $r['total']++;
@@ -474,13 +479,13 @@ function resumen() {
         } elseif ($row['estado'] === 'pendiente') {
             $r['venta_pendiente'] += $row['total_venta'];
         }
-        if ($row['total_venta'] > 0) $margenes[] = $row['margen_pct'];
+        if ($row['total_costo'] > 0) $ganancias[] = $row['markup_pct'];
     }
     $r['venta_aceptada']    = round($r['venta_aceptada'], 2);
     $r['utilidad_aceptada'] = round($r['utilidad_aceptada'], 2);
     $r['venta_pendiente']   = round($r['venta_pendiente'], 2);
     $r['venta_pagada']      = round($r['venta_pagada'], 2);
-    $r['margen_promedio']   = $margenes ? round(array_sum($margenes) / count($margenes), 1) : 0;
+    $r['ganancia_promedio'] = $ganancias ? round(array_sum($ganancias) / count($ganancias), 1) : 0;
 
     echo json_encode(['success' => true, 'data' => $r]);
 }

@@ -179,14 +179,10 @@ $nombre = $_SESSION['nombre'];
 
         <div class="pct-bar">
             <div>
-                <label>% de utilidad de esta cotización</label>
+                <label>% de ganancia de esta cotización</label>
                 <div class="pct-campos">
                     <input type="number" id="k-pct" step="0.1" min="0" value="40" oninput="aplicarPorcentaje()">
-                    <span>%</span>
-                    <select id="k-base" onchange="aplicarPorcentaje()">
-                        <option value="costo">sobre el costo (markup)</option>
-                        <option value="venta">sobre la venta (margen)</option>
-                    </select>
+                    <span>% sobre el costo</span>
                     <button class="btn btn-primary btn-sm" onclick="aplicarPorcentaje(true)">↻ Recalcular todas</button>
                 </div>
             </div>
@@ -223,8 +219,7 @@ $nombre = $_SESSION['nombre'];
             <div><span>Costo total</span><b id="t-costo">$0.00</b></div>
             <div><span>Precio de venta</span><b id="t-venta">$0.00</b></div>
             <div><span>Utilidad</span><b id="t-util" style="color:#047857">$0.00</b></div>
-            <div><span>Margen (sobre venta)</span><b id="t-margen">0%</b></div>
-            <div><span>Markup (sobre costo)</span><b id="t-markup">0%</b></div>
+            <div><span>% de ganancia (sobre costo)</span><b id="t-ganancia">0%</b></div>
         </div>
 
         <div class="fg" style="margin-top:14px"><label>Notas / condiciones</label><textarea id="k-notas" rows="2" placeholder="Tiempo de entrega, forma de pago…"></textarea></div>
@@ -308,7 +303,7 @@ function pintarKpis(r) {
         <div class="kpi pur"><div class="v">${money(r.utilidad_aceptada)}</div><div class="l">Utilidad de lo ganado</div></div>
         <div class="kpi ok"><div class="v">${money(r.venta_pagada || 0)}</div><div class="l">Ya cobrado</div></div>
         <div class="kpi warn"><div class="v">${money(r.venta_pendiente)}</div><div class="l">Pendientes de respuesta</div></div>
-        <div class="kpi"><div class="v">${r.margen_promedio}%</div><div class="l">Margen promedio</div></div>`;
+        <div class="kpi"><div class="v">${r.ganancia_promedio}%</div><div class="l">% de ganancia promedio</div></div>`;
 }
 
 // ── Listado ─────────────────────────────────────────────────────────────────
@@ -328,7 +323,7 @@ function render() {
         <thead><tr>
             <th>Folio</th><th>Fecha</th><th>Cliente</th><th class="n">Partidas</th>
             <th class="n">Costo</th><th class="n">Venta</th><th class="n">Utilidad</th>
-            <th class="n">Margen</th><th class="n">Markup</th><th>Estado</th><th>Docs.</th><th></th>
+            <th class="n">% ganancia</th><th>Estado</th><th>Docs.</th><th></th>
         </tr></thead>
         <tbody>${data.map(c => `<tr>
             <td style="font-weight:700">${esc(c.folio)}</td>
@@ -338,7 +333,6 @@ function render() {
             <td class="n">${money(c.total_costo)}</td>
             <td class="n" style="font-weight:700">${money(c.total_venta)}</td>
             <td class="n util ${Number(c.utilidad) < 0 ? 'neg' : ''}">${money(c.utilidad)}</td>
-            <td class="n">${c.margen_pct}%</td>
             <td class="n">${c.markup_pct}%</td>
             <td><span class="badge b-${esc(c.estado)}">${esc(c.estado)}</span></td>
             <td><button class="btn btn-ghost btn-sm" onclick="docsDe(${c.id})" title="Evidencias, facturas y documentación">📎 ${adjuntos[c.id] || 0}</button></td>
@@ -364,7 +358,6 @@ function nueva() {
     document.getElementById('k-estado').value = 'pendiente';
     document.getElementById('k-notas').value = '';
     document.getElementById('k-pct').value = pctPorDefecto();
-    document.getElementById('k-base').value = 'costo';
     document.getElementById('items').innerHTML = '';
     document.getElementById('btnImprimir').style.display = 'none';
     document.getElementById('btnDocs').style.display = 'none';
@@ -390,7 +383,6 @@ async function editar(id) {
     document.getElementById('k-estado').value = c.estado;
     document.getElementById('k-notas').value = c.notas || '';
     document.getElementById('k-pct').value  = Number(c.utilidad_pct) > 0 ? Number(c.utilidad_pct) : pctPorDefecto();
-    document.getElementById('k-base').value = c.utilidad_base === 'venta' ? 'venta' : 'costo';
     document.getElementById('btnImprimir').style.display = '';
     document.getElementById('btnDocs').style.display = '';
 
@@ -498,11 +490,10 @@ function precioManual(inp) { marcarManual(inp.closest('tr'), true); recalcular()
 /** Al escribir el % de una partida, su precio de venta se recalcula con ese porcentaje. */
 function pctManual(inp) {
     const tr = inp.closest('tr');
-    const base  = document.getElementById('k-base').value;
     const costo = parseFloat(tr.querySelector('.i-costo').value) || 0;
     const pct   = parseFloat(inp.value) || 0;
     marcarManual(tr, true);
-    tr.querySelector('.i-precio').value = precioDesdeCosto(costo, pct, base).toFixed(2);
+    tr.querySelector('.i-precio').value = precioDesdeCosto(costo, pct).toFixed(2);
     recalcular();
 }
 function restaurarPrecio(btn) { marcarManual(btn.closest('tr'), false); aplicarPorcentajeFila(btn.closest('tr')); recalcular(); }
@@ -512,37 +503,25 @@ function cambioCosto(inp) { aplicarPorcentajeFila(inp.closest('tr')); recalcular
 function aplicarPorcentajeFila(tr) {
     if (tr.dataset.manual === '1') return;
     const pct   = parseFloat(document.getElementById('k-pct').value) || 0;
-    const base  = document.getElementById('k-base').value;
     const costo = parseFloat(tr.querySelector('.i-costo').value) || 0;
-    tr.querySelector('.i-precio').value = precioDesdeCosto(costo, pct, base).toFixed(2);
+    tr.querySelector('.i-precio').value = precioDesdeCosto(costo, pct).toFixed(2);
 }
 
 /**
- * Porcentaje de utilidad de una partida, expresado en la misma base que el de
- * la cotización, para que la columna y el encabezado hablen el mismo idioma.
+ * El porcentaje de ganancia siempre se calcula sobre el costo: lo que cuesta
+ * 10 con 50% se vende en 15.
  */
-function porcentajeDeFila(costo, precio, base) {
-    costo = Number(costo) || 0;
+function porcentajeDeFila(costo, precio) {
+    costo  = Number(costo) || 0;
     precio = Number(precio) || 0;
-    const util = precio - costo;
-    if (base === 'venta') return precio > 0 ? util / precio * 100 : 0;
-    return costo > 0 ? util / costo * 100 : 0;
+    return costo > 0 ? (precio - costo) / costo * 100 : 0;
 }
 
-/**
- * Calcula el precio de venta de un costo según el porcentaje de la cotización.
- *  - sobre el costo:  precio = costo × (1 + %)
- *  - sobre la venta:  precio = costo ÷ (1 − %)   ← el % queda como margen real
- */
-function precioDesdeCosto(costo, pct, base) {
+/** Precio de venta a partir del costo: precio = costo × (1 + %). */
+function precioDesdeCosto(costo, pct) {
     costo = Number(costo) || 0;
     pct   = Number(pct) || 0;
-    if (costo <= 0) return 0;
-    if (base === 'venta') {
-        if (pct >= 100) return 0; // un margen del 100% sobre venta no tiene solución
-        return costo / (1 - pct / 100);
-    }
-    return costo * (1 + pct / 100);
+    return costo > 0 ? costo * (1 + pct / 100) : 0;
 }
 
 /**
@@ -550,24 +529,18 @@ function precioDesdeCosto(costo, pct, base) {
  * @param {boolean} forzar  true = también reescribe los precios puestos a mano.
  */
 function aplicarPorcentaje(forzar) {
-    const pct  = parseFloat(document.getElementById('k-pct').value) || 0;
-    const base = document.getElementById('k-base').value;
+    const pct = parseFloat(document.getElementById('k-pct').value) || 0;
 
     document.querySelectorAll('#items tr').forEach(tr => {
         if (forzar) marcarManual(tr, false);
         if (tr.dataset.manual === '1') return;
         const costo = parseFloat(tr.querySelector('.i-costo').value) || 0;
-        tr.querySelector('.i-precio').value = precioDesdeCosto(costo, pct, base).toFixed(2);
+        tr.querySelector('.i-precio').value = precioDesdeCosto(costo, pct).toFixed(2);
     });
 
-    const nota = document.getElementById('pct-nota');
-    if (base === 'venta') {
-        nota.textContent = pct >= 100
-            ? '⚠️ Un margen sobre la venta del 100% o más no se puede calcular. Usa un valor menor.'
-            : `Cada partida se vende a costo ÷ ${(1 - pct / 100).toFixed(2)}, de modo que el margen real sea del ${pct}%. Puedes darle su propio % a cualquier partida en su renglón.`;
-    } else {
-        nota.textContent = `Cada partida se vende a costo × ${(1 + pct / 100).toFixed(2)}. Puedes cambiar el % o el precio de una partida en su renglón: queda con el suyo (en ámbar) y este porcentaje ya no la toca.`;
-    }
+    document.getElementById('pct-nota').textContent =
+        `Cada partida se vende a costo × ${(1 + pct / 100).toFixed(2)}: lo que cuesta $10 se cotiza en $${(10 * (1 + pct / 100)).toFixed(2)}. ` +
+        `Puedes darle su propio % (o su propio precio) a cualquier partida en su renglón; queda en ámbar y este porcentaje ya no la toca.`;
     recalcular();
 }
 
@@ -585,7 +558,6 @@ function leerItems() {
 
 function recalcular() {
     let costo = 0, venta = 0;
-    const base = document.getElementById('k-base').value;
     document.querySelectorAll('#items tr').forEach(tr => {
         const cant = parseFloat(tr.querySelector('.i-cant').value) || 0;
         const cu   = parseFloat(tr.querySelector('.i-costo').value) || 0;
@@ -598,7 +570,7 @@ function recalcular() {
         eUtil.style.color = u < 0 ? '#c0392b' : '#047857';
         // No se reescribe mientras se teclea en esa misma casilla
         if (ePct !== document.activeElement) {
-            ePct.value = porcentajeDeFila(cu, pu, base).toFixed(1);
+            ePct.value = porcentajeDeFila(cu, pu).toFixed(1);
         }
     });
     const util = venta - costo;
@@ -607,8 +579,7 @@ function recalcular() {
     const tu = document.getElementById('t-util');
     tu.textContent = money(util);
     tu.style.color = util < 0 ? '#c0392b' : '#047857';
-    document.getElementById('t-margen').textContent = (venta > 0 ? (util / venta * 100).toFixed(1) : '0.0') + '%';
-    document.getElementById('t-markup').textContent = (costo > 0 ? (util / costo * 100).toFixed(1) : '0.0') + '%';
+    document.getElementById('t-ganancia').textContent = (costo > 0 ? (util / costo * 100).toFixed(1) : '0.0') + '%';
 }
 
 async function guardarCot() {
@@ -622,7 +593,7 @@ async function guardarCot() {
         vigencia_dias:  parseInt(document.getElementById('k-vigencia').value) || 0,
         estado:         document.getElementById('k-estado').value,
         utilidad_pct:   parseFloat(document.getElementById('k-pct').value) || 0,
-        utilidad_base:  document.getElementById('k-base').value,
+        utilidad_base:  'costo',
         notas:          document.getElementById('k-notas').value.trim(),
         items:          items,
     };
