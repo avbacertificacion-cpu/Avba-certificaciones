@@ -32,14 +32,33 @@ class Accesorios {
     ];
 
     /**
-     * Tipos que arrancan con la casilla de código único puesta: todos los
-     * grilletes, sea cual sea la variante —recto, lira, de ancla, con perno—.
+     * Familias que arrancan con la casilla de código único puesta: piezas sin
+     * número de serie de fábrica, donde lo que las identifica es la placa que
+     * les pegamos, y ese número es a la vez su etiqueta interna y su QR.
      *
-     * Se busca por el principio del nombre y no por "contiene grillete": el
-     * juego de poleas y la eslinga con terminación en grillete lo llevan al
+     * Se compara por el principio del nombre y no por "contiene": el juego de
+     * poleas y la eslinga con terminación en grillete llevan la palabra al
      * final y ésos sí tienen serie propia.
+     *
+     * Agregar una familia aquí basta: la siembra la aplica una sola vez y sin
+     * tocar las anteriores, de modo que lo que Calidad haya desmarcado a mano
+     * se respeta.
      */
-    private const PREFIJO_CODIGO_UNICO = 'GRILLETE';
+    private const PREFIJOS_CODIGO_UNICO = ['GRILLETE', 'SOPORTE DE IZAJE'];
+
+    /** Marca de siembra de cada familia, para aplicarla una sola vez. */
+    private static function claveSiembra(string $prefijo): string {
+        return 'codigo_unico_' . strtolower(str_replace(' ', '_', $prefijo));
+    }
+
+    /** ¿El nombre pertenece a alguna familia de código único? */
+    private static function esFamiliaCodigoUnico(string $nombre): bool {
+        $nombre = mb_strtoupper(trim($nombre));
+        foreach (self::PREFIJOS_CODIGO_UNICO as $p) {
+            if (str_starts_with($nombre, $p)) return true;
+        }
+        return false;
+    }
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
@@ -87,16 +106,21 @@ class Accesorios {
         // Los grilletes ya capturados se marcan una sola vez. Con su propia
         // marca, para que quitar la casilla a mano no se deshaga sola.
         try {
-            // v2 porque la primera versión sólo marcaba el tipo llamado
-            // "GRILLETE" a secas y hacen falta todas sus variantes.
-            $st = $this->pdo->prepare("SELECT 1 FROM accesorios_tipos_seed WHERE clave = ?");
-            $st->execute(['codigo_unico_grillete_v2']);
-            if (!$st->fetch() && $this->ensureTipoCodigoUnico()) {
-                $this->pdo->prepare(
+            // Cada familia lleva su propia marca, así que agregar una nueva no
+            // vuelve a tocar las que ya se sembraron: si a un grillete le
+            // quitaron la casilla a mano, se queda sin ella.
+            $ya  = $this->pdo->prepare("SELECT 1 FROM accesorios_tipos_seed WHERE clave = ?");
+            $upd = null;
+            foreach (self::PREFIJOS_CODIGO_UNICO as $prefijo) {
+                $clave = self::claveSiembra($prefijo);
+                $ya->execute([$clave]);
+                if ($ya->fetch() || !$this->ensureTipoCodigoUnico()) continue;
+
+                $upd = $upd ?: $this->pdo->prepare(
                     "UPDATE accesorios_tipos SET codigo_unico = 1 WHERE UPPER(TRIM(nombre)) LIKE ?"
-                )->execute([self::PREFIJO_CODIGO_UNICO . '%']);
-                $this->pdo->prepare("INSERT INTO accesorios_tipos_seed (clave) VALUES (?)")
-                    ->execute(['codigo_unico_grillete_v2']);
+                );
+                $upd->execute([$prefijo . '%']);
+                $this->pdo->prepare("INSERT INTO accesorios_tipos_seed (clave) VALUES (?)")->execute([$clave]);
             }
         } catch (\Throwable $e) {
             error_log('[Accesorios] seedTipos (codigo_unico): ' . $e->getMessage());
@@ -177,11 +201,11 @@ class Accesorios {
         $dup->execute([$nombre]);
         if ($dup->fetch()) return ['status' => 'error', 'message' => 'Ya existe un tipo con ese nombre.'];
 
-        // Si no se dice nada, un tipo nuevo que empiece por "grillete" nace con
-        // la casilla puesta: son todos piezas sin serie de fábrica.
+        // Si no se dice nada, un tipo nuevo de una familia de código único nace
+        // con la casilla puesta: son todos piezas sin serie de fábrica.
         $unico = array_key_exists('codigo_unico', $payload)
             ? (!empty($payload['codigo_unico']) ? 1 : 0)
-            : (str_starts_with(mb_strtoupper(trim($nombre)), self::PREFIJO_CODIGO_UNICO) ? 1 : 0);
+            : (self::esFamiliaCodigoUnico($nombre) ? 1 : 0);
 
         if ($this->ensureTipoCodigoUnico()) {
             $this->pdo->prepare("INSERT INTO accesorios_tipos (nombre, codigo_unico) VALUES (?,?)")
