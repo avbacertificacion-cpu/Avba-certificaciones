@@ -1,9 +1,28 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/emisor.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
     header('Location: ../public/login.html'); exit;
 }
 $nombre = $_SESSION['nombre'];
+
+/** Opciones "<clave> - <descripción>" para los selects de catálogos del SAT. */
+function opcionesCatalogo(array $catalogo, string $seleccionada = ''): string {
+    $html = '';
+    foreach ($catalogo as $clave => $desc) {
+        $html .= '<option value="' . htmlspecialchars($clave) . '"'
+               . ($clave === $seleccionada ? ' selected' : '') . '>'
+               . htmlspecialchars($clave . ' - ' . $desc) . '</option>';
+    }
+    return $html;
+}
+
+// Valores por defecto: los que trae el formato de la empresa
+$optRegimen = opcionesCatalogo(catRegimenFiscal());
+$optUso     = opcionesCatalogo(catUsoCfdi(), 'G01');
+$optMetodo  = opcionesCatalogo(catMetodoPago(), 'PPD');
+$optForma   = opcionesCatalogo(catFormaPago(), '99');
+$optUnidad  = opcionesCatalogo(catClaveUnidad());
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -98,23 +117,20 @@ $nombre = $_SESSION['nombre'];
     .empty{text-align:center;padding:50px 20px;color:#94a3b8}.empty .ic{font-size:52px;margin-bottom:10px}
     .msg{font-size:13px;font-weight:600;margin-bottom:12px}
     .hint{font-size:11px;color:#94a3b8;margin-top:4px}
+    .fiscal{border:2px solid #e0e0ff;border-radius:10px;padding:12px 14px;margin-bottom:14px;background:#fafbff}
+    .fiscal summary{cursor:pointer;font-weight:700;font-size:13px;color:#475569}
+    .fiscal summary .hint-sum{font-weight:400;color:#94a3b8;font-size:12px;margin-left:6px}
+    .fiscal[open] summary{margin-bottom:12px}
+    .chk{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;color:#475569;cursor:pointer}
+    .chk input{width:auto}
+    .col-sat{display:none}
+    .ver-sat .col-sat{display:table-cell}
+    /* Con tantas columnas, la tabla se desborda y se recorre en horizontal:
+       si se dejara encoger, las cifras del negocio quedan ilegibles. */
+    .items{min-width:1040px}
+    .items.ver-sat{min-width:1400px}
     @media(max-width:800px){ .grid4,.grid2{grid-template-columns:1fr} }
 
-    /* Vista para imprimir/enviar al cliente: nunca muestra costos ni utilidad */
-    #areaImpresion{display:none}
-    @media print{
-        body>*{display:none !important}
-        body{background:#fff !important}
-        #areaImpresion{display:block !important;position:static}
-        #areaImpresion th{background:#eef2fb !important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-        #areaImpresion tr{page-break-inside:avoid}
-        @page{size:letter portrait;margin:14mm}
-    }
-    #areaImpresion{font-size:13px;color:#111}
-    #areaImpresion h1{font-size:22px;margin-bottom:2px}
-    #areaImpresion table{width:100%;border-collapse:collapse;margin-top:14px}
-    #areaImpresion th{background:#eef2fb;border:1px solid #cbd5e1;padding:7px;font-size:11px}
-    #areaImpresion td{border:1px solid #cbd5e1;padding:7px}
 </style>
 </head>
 <body>
@@ -177,6 +193,43 @@ $nombre = $_SESSION['nombre'];
             </div>
         </div>
 
+        <details class="fiscal" id="boxFiscal">
+            <summary>Datos fiscales del presupuesto <span class="hint-sum">RFC, uso de CFDI, forma de pago y claves del SAT</span></summary>
+
+            <div class="grid4">
+                <div class="fg"><label>RFC del cliente</label><input type="text" id="k-rfc" maxlength="13" placeholder="XAXX010101000"></div>
+                <div class="fg"><label>Régimen fiscal del cliente</label>
+                    <select id="k-regimen"><option value="">— Sin especificar —</option><?= $optRegimen ?></select>
+                </div>
+                <div class="fg"><label>C.P. del cliente</label><input type="text" id="k-cp" maxlength="10" placeholder="89600"></div>
+                <div class="fg"><label>Uso del CFDI</label>
+                    <select id="k-uso"><?= $optUso ?></select>
+                </div>
+            </div>
+
+            <div class="grid4">
+                <div class="fg"><label>Método de pago</label><select id="k-metodo"><?= $optMetodo ?></select></div>
+                <div class="fg"><label>Forma de pago</label><select id="k-forma"><?= $optForma ?></select></div>
+                <div class="fg"><label>Moneda</label>
+                    <select id="k-moneda"><option value="MXN">MXN — Peso mexicano</option><option value="USD">USD — Dólar</option><option value="EUR">EUR — Euro</option></select>
+                </div>
+                <div class="fg"><label>Tipo de cambio</label><input type="number" id="k-tc" step="0.000001" min="0.000001" value="1"></div>
+            </div>
+
+            <div class="grid4">
+                <div class="fg"><label>Condiciones de pago</label><input type="text" id="k-condiciones" placeholder="Ej: 50% anticipo, 50% contra entrega"></div>
+                <div class="fg"><label>Clave prod/serv del SAT</label><input type="text" id="k-prodserv" maxlength="20" placeholder="90101802">
+                    <div class="hint">Se usa en todas las partidas que no traigan la suya.</div>
+                </div>
+                <div class="fg"><label>Clave de unidad del SAT</label>
+                    <select id="k-unidad"><option value="">— Sin especificar —</option><?= $optUnidad ?></select>
+                </div>
+                <div class="fg" style="display:flex;align-items:flex-end">
+                    <label class="chk"><input type="checkbox" id="k-verClaves" onchange="alternarClaves()"> Capturar claves por partida</label>
+                </div>
+            </div>
+        </details>
+
         <div class="pct-bar">
             <div>
                 <label>% de ganancia de esta cotización</label>
@@ -199,6 +252,10 @@ $nombre = $_SESSION['nombre'];
                     <th style="min-width:165px">Descripción para el cliente</th>
                     <th style="width:78px">Cant.</th>
                     <th style="width:76px">Unidad</th>
+                    <th class="col-sat" style="width:92px">Código</th>
+                    <th class="col-sat" style="width:96px">Clave<br>prod/serv</th>
+                    <th class="col-sat" style="width:86px">Clave<br>unidad</th>
+                    <th class="col-sat" style="width:74px">IVA</th>
                     <th class="col-dinero" style="width:112px">Costo unit.<br><span class="th-nota">lo que compré</span></th>
                     <th class="col-dinero" style="width:88px">% util.<br><span class="th-nota">ganancia</span></th>
                     <th class="col-dinero" style="width:145px">Precio venta<br><span class="th-nota">unitario al cliente</span></th>
@@ -217,9 +274,11 @@ $nombre = $_SESSION['nombre'];
 
         <div class="tot">
             <div><span>Costo total</span><b id="t-costo">$0.00</b></div>
-            <div><span>Precio de venta</span><b id="t-venta">$0.00</b></div>
+            <div><span>Subtotal (sin IVA)</span><b id="t-venta">$0.00</b></div>
             <div><span>Utilidad</span><b id="t-util" style="color:#047857">$0.00</b></div>
             <div><span>% de ganancia (sobre costo)</span><b id="t-ganancia">0%</b></div>
+            <div><span>IVA trasladado</span><b id="t-iva">$0.00</b></div>
+            <div><span>Total con IVA</span><b id="t-total">$0.00</b></div>
         </div>
 
         <div class="fg" style="margin-top:14px"><label>Notas / condiciones</label><textarea id="k-notas" rows="2" placeholder="Tiempo de entrega, forma de pago…"></textarea></div>
@@ -235,7 +294,6 @@ $nombre = $_SESSION['nombre'];
 
 <?php include __DIR__ . '/documentos-widget.php'; ?>
 
-<div id="areaImpresion"></div>
 
 <script>
 const API = '../api/cotizaciones.php';
@@ -254,6 +312,20 @@ function aviso(t, ok) {
 function pctPorDefecto() {
     const v = parseFloat(localStorage.getItem('avba_cot_pct'));
     return (isFinite(v) && v > 0) ? v : 40;
+}
+
+/** Opciones de IVA de una partida (16% general, 8% fronterizo, 0%). */
+function opcionesIva(tasa) {
+    const t = (tasa === undefined || tasa === null || tasa === '') ? 16 : Number(tasa);
+    return [16, 8, 0].map(v =>
+        `<option value="${v}"${v === t ? ' selected' : ''}>${v}%</option>`).join('');
+}
+
+/** Muestra u oculta las columnas de claves del SAT en las partidas. */
+function alternarClaves() {
+    const ver = document.getElementById('k-verClaves').checked;
+    document.querySelector('.items').classList.toggle('ver-sat', ver);
+    try { localStorage.setItem('avba_cot_sat', ver ? '1' : ''); } catch (e) {}
 }
 
 function fechaCorta(f) {
@@ -357,6 +429,7 @@ function nueva() {
     document.getElementById('k-vigencia').value = 15;
     document.getElementById('k-estado').value = 'pendiente';
     document.getElementById('k-notas').value = '';
+    ponerFiscales({});
     document.getElementById('k-pct').value = pctPorDefecto();
     document.getElementById('items').innerHTML = '';
     document.getElementById('btnImprimir').style.display = 'none';
@@ -382,6 +455,7 @@ async function editar(id) {
     document.getElementById('k-vigencia').value = c.vigencia_dias;
     document.getElementById('k-estado').value = c.estado;
     document.getElementById('k-notas').value = c.notas || '';
+    ponerFiscales(c);
     document.getElementById('k-pct').value  = Number(c.utilidad_pct) > 0 ? Number(c.utilidad_pct) : pctPorDefecto();
     document.getElementById('btnImprimir').style.display = '';
     document.getElementById('btnDocs').style.display = '';
@@ -393,12 +467,39 @@ async function editar(id) {
     document.getElementById('modalCot').classList.add('open');
 }
 
+/**
+ * Vuelca los datos fiscales de una cotización al formulario. Los que no trae
+ * (cotización nueva) caen en los valores con los que se emite normalmente.
+ */
+function ponerFiscales(c) {
+    document.getElementById('k-rfc').value         = c.cliente_rfc || '';
+    document.getElementById('k-regimen').value     = c.cliente_regimen || '';
+    document.getElementById('k-cp').value          = c.cliente_cp || '';
+    document.getElementById('k-uso').value         = c.uso_cfdi || 'G01';
+    document.getElementById('k-metodo').value      = c.metodo_pago || 'PPD';
+    document.getElementById('k-forma').value       = c.forma_pago || '99';
+    document.getElementById('k-moneda').value      = c.moneda || 'MXN';
+    document.getElementById('k-tc').value          = c.tipo_cambio ? Number(c.tipo_cambio) : 1;
+    document.getElementById('k-condiciones').value = c.condiciones_pago || '';
+    document.getElementById('k-prodserv').value    = c.clave_prodserv || '';
+    document.getElementById('k-unidad').value      = c.clave_unidad || '';
+}
+
 function empresaElegida() {
     const sel = document.getElementById('k-empresa');
-    if (sel.value) {
-        const e = empresas.find(x => String(x.id) === sel.value);
-        if (e) document.getElementById('k-cliente').value = e.nombre;
-    }
+    if (!sel.value) return;
+    const e = empresas.find(x => String(x.id) === sel.value);
+    if (!e) return;
+    document.getElementById('k-cliente').value = e.nombre;
+    // Los datos fiscales del cliente sólo se rellenan si están vacíos: si el
+    // admin ya escribió algo a mano para esta cotización, no se le pisa.
+    const copiar = (id, valor) => {
+        const campo = document.getElementById(id);
+        if (valor && !campo.value) campo.value = valor;
+    };
+    copiar('k-rfc', e.rfc);
+    copiar('k-regimen', e.regimen_fiscal);
+    copiar('k-cp', e.cp);
 }
 
 function agregarFila(it) {
@@ -412,6 +513,10 @@ function agregarFila(it) {
         <td><input type="text" class="i-desc" value="${esc(it.descripcion || '')}" placeholder="Ej: Recarga extintor PQS 9 kg"></td>
         <td><input type="number" class="i-cant n" step="0.01" min="0" value="${it.cantidad != null ? it.cantidad : 1}" oninput="recalcular()"></td>
         <td><input type="text" class="i-unidad" value="${esc(it.unidad || '')}" placeholder="pza"></td>
+        <td class="col-sat"><input type="text" class="i-codigo" value="${esc(it.codigo || '')}" placeholder="—"></td>
+        <td class="col-sat"><input type="text" class="i-prodserv" value="${esc(it.clave_prodserv || '')}" placeholder="general"></td>
+        <td class="col-sat"><input type="text" class="i-claveunidad" value="${esc(it.clave_unidad || '')}" placeholder="general"></td>
+        <td class="col-sat"><select class="i-iva" onchange="recalcular()">${opcionesIva(it.iva_tasa)}</select></td>
         <td class="col-dinero"><input type="number" class="i-costo n" step="0.01" min="0" value="${it.costo_unitario != null ? it.costo_unitario : 0}" oninput="cambioCosto(this)"></td>
         <td class="col-dinero"><input type="number" class="i-pct n" step="0.1" title="Porcentaje de utilidad de esta partida" oninput="pctManual(this)"></td>
         <td class="col-dinero" style="white-space:nowrap">
@@ -553,17 +658,23 @@ function leerItems() {
         catalogo_id:     parseInt(tr.querySelector('.i-cat').value) || 0,
         costo_unitario:  parseFloat(tr.querySelector('.i-costo').value) || 0,
         precio_unitario: parseFloat(tr.querySelector('.i-precio').value) || 0,
+        codigo:          tr.querySelector('.i-codigo').value.trim(),
+        clave_prodserv:  tr.querySelector('.i-prodserv').value.trim(),
+        clave_unidad:    tr.querySelector('.i-claveunidad').value.trim(),
+        iva_tasa:        parseFloat(tr.querySelector('.i-iva').value) || 0,
     }));
 }
 
 function recalcular() {
-    let costo = 0, venta = 0;
+    let costo = 0, venta = 0, iva = 0;
     document.querySelectorAll('#items tr').forEach(tr => {
         const cant = parseFloat(tr.querySelector('.i-cant').value) || 0;
         const cu   = parseFloat(tr.querySelector('.i-costo').value) || 0;
         const pu   = parseFloat(tr.querySelector('.i-precio').value) || 0;
         const sc = cant * cu, sv = cant * pu, u = sv - sc;
         costo += sc; venta += sv;
+        // El IVA no es ingreso: se suma aparte y nunca entra en la utilidad
+        iva += sv * ((parseFloat(tr.querySelector('.i-iva').value) || 0) / 100);
         const eUtil = tr.querySelector('.i-util'), ePct = tr.querySelector('.i-pct');
         tr.querySelector('.i-importe').textContent = money(sv);
         eUtil.textContent = money(u);
@@ -580,6 +691,8 @@ function recalcular() {
     tu.textContent = money(util);
     tu.style.color = util < 0 ? '#c0392b' : '#047857';
     document.getElementById('t-ganancia').textContent = (costo > 0 ? (util / costo * 100).toFixed(1) : '0.0') + '%';
+    document.getElementById('t-iva').textContent   = money(iva);
+    document.getElementById('t-total').textContent = money(venta + iva);
 }
 
 async function guardarCot() {
@@ -595,6 +708,17 @@ async function guardarCot() {
         utilidad_pct:   parseFloat(document.getElementById('k-pct').value) || 0,
         utilidad_base:  'costo',
         notas:          document.getElementById('k-notas').value.trim(),
+        cliente_rfc:      document.getElementById('k-rfc').value.trim(),
+        cliente_regimen:  document.getElementById('k-regimen').value,
+        cliente_cp:       document.getElementById('k-cp').value.trim(),
+        uso_cfdi:         document.getElementById('k-uso').value,
+        metodo_pago:      document.getElementById('k-metodo').value,
+        forma_pago:       document.getElementById('k-forma').value,
+        moneda:           document.getElementById('k-moneda').value,
+        tipo_cambio:      parseFloat(document.getElementById('k-tc').value) || 1,
+        condiciones_pago: document.getElementById('k-condiciones').value.trim(),
+        clave_prodserv:   document.getElementById('k-prodserv').value.trim(),
+        clave_unidad:     document.getElementById('k-unidad').value,
         items:          items,
     };
     if (!body.cliente_nombre) { alert('Indica quién solicita la cotización.'); return; }
@@ -620,46 +744,20 @@ async function borrar(id) {
 }
 
 // ── Impresión para el cliente (sin costos ni utilidad) ──────────────────────
-async function imprimir(id) {
-    const r = await fetch(`${API}?action=obtener_cotizacion&id=${id}`);
-    const d = await r.json().catch(() => ({}));
-    if (!r.ok || !d.success) { aviso(d.error || 'No se pudo abrir la cotización', false); return; }
-    pintarImpresion(d.data);
+/** Abre el presupuesto con el formato fiscal, listo para imprimir o guardar en PDF. */
+function imprimir(id) {
+    window.open(`../api/cotizacion_pdf.php?id=${id}`, '_blank');
 }
 function imprimirActual() { if (cotActual) imprimir(cotActual.id); }
 function docsActual() { if (cotActual) docsDe(cotActual.id); }
 
-function pintarImpresion(c) {
-    const filas = (c.items || []).map((it, i) => {
-        const imp = (parseFloat(it.cantidad) || 0) * (parseFloat(it.precio_unitario) || 0);
-        return `<tr>
-            <td style="text-align:center">${i + 1}</td>
-            <td>${esc(it.descripcion)}</td>
-            <td style="text-align:center">${Number(it.cantidad)}</td>
-            <td style="text-align:center">${esc(it.unidad || '')}</td>
-            <td style="text-align:right">${money(it.precio_unitario)}</td>
-            <td style="text-align:right">${money(imp)}</td>
-        </tr>`;
-    }).join('');
-
-    document.getElementById('areaImpresion').innerHTML = `
-        <h1>Cotización ${esc(c.folio)}</h1>
-        <div style="color:#555;margin-bottom:12px">AVBA Inspections · Fecha: ${fechaCorta(c.fecha)} · Vigencia: ${c.vigencia_dias} días</div>
-        <div><b>Cliente:</b> ${esc(c.cliente_nombre)}</div>
-        ${c.contacto ? `<div><b>Atención:</b> ${esc(c.contacto)}</div>` : ''}
-        <table>
-            <thead><tr><th style="width:35px">#</th><th>Descripción</th><th style="width:60px">Cant.</th>
-            <th style="width:70px">Unidad</th><th style="width:100px">P. unitario</th><th style="width:110px">Importe</th></tr></thead>
-            <tbody>${filas}</tbody>
-            <tfoot><tr>
-                <td colspan="5" style="text-align:right;font-weight:700">Total</td>
-                <td style="text-align:right;font-weight:700">${money(c.total_venta)}</td>
-            </tr></tfoot>
-        </table>
-        ${c.notas ? `<p style="margin-top:14px"><b>Notas:</b> ${esc(c.notas)}</p>` : ''}
-        <p style="margin-top:18px;font-size:11px;color:#666">Precios en pesos mexicanos. Esta cotización no incluye IVA salvo que se indique lo contrario.</p>`;
-    window.print();
-}
+// La preferencia de mostrar las claves del SAT se recuerda entre sesiones
+try {
+    if (localStorage.getItem('avba_cot_sat')) {
+        document.getElementById('k-verClaves').checked = true;
+        alternarClaves();
+    }
+} catch (e) {}
 
 document.querySelectorAll('.modal-ov').forEach(m =>
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));

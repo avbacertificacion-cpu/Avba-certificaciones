@@ -1,6 +1,7 @@
 <?php
 require_once '../config/config.php';
 require_once '../config/empresa-config.php';
+require_once '../config/emisor.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
     header('Location: ../public/login.html'); exit;
 }
@@ -9,6 +10,7 @@ $nombre = $_SESSION['nombre'];
 // Crea la columna de preferencia la primera vez que un admin entra aquí
 asegurarColumnaAlertas($pdo);
 asegurarColumnaFotos($pdo);
+asegurarColumnasFiscales($pdo);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -71,7 +73,7 @@ asegurarColumnaFotos($pdo);
         .modal h2{margin-bottom:24px}
         .form-group{margin-bottom:16px}
         .form-group label{display:block;font-size:13px;font-weight:700;color:#444;margin-bottom:6px}
-        .form-group input,.form-group textarea{width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit}
+        .form-group input,.form-group textarea,.form-group select{width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;font-family:inherit}
         .form-group textarea{resize:vertical;min-height:80px}
         .modal-actions{display:flex;gap:12px;justify-content:flex-end;margin-top:20px;padding-top:18px;border-top:1px solid #eee;flex-shrink:0}
         .alert{padding:12px;border-radius:6px;margin-bottom:14px;font-size:13px}
@@ -126,6 +128,23 @@ asegurarColumnaFotos($pdo);
             <label>RFC</label>
             <input type="text" id="e-rfc" placeholder="XXXXXXXXXXXXXXX" maxlength="13">
             <small>Registro Federal de Contribuyentes (13 caracteres)</small>
+        </div>
+
+        <div class="form-group">
+            <label>Régimen fiscal</label>
+            <select id="e-regimen">
+                <option value="">— Sin especificar —</option>
+                <?php foreach (catRegimenFiscal() as $clave => $desc): ?>
+                    <option value="<?= $clave ?>"><?= $clave ?> - <?= htmlspecialchars($desc) ?></option>
+                <?php endforeach; ?>
+            </select>
+            <small>Aparece en el presupuesto que se le envía al cliente</small>
+        </div>
+
+        <div class="form-group">
+            <label>Código postal fiscal</label>
+            <input type="text" id="e-cp" placeholder="89600" maxlength="10">
+            <small>Domicilio fiscal registrado ante el SAT</small>
         </div>
 
         <div class="form-group">
@@ -250,6 +269,8 @@ function editarEmpresa(id) {
     document.getElementById('e-id').value = e.id;
     document.getElementById('e-nombre').value = e.nombre;
     document.getElementById('e-rfc').value = e.rfc || '';
+    document.getElementById('e-regimen').value = e.regimen_fiscal || '';
+    document.getElementById('e-cp').value = e.cp || '';
     document.getElementById('e-email').value = e.email || '';
     document.getElementById('e-telefono').value = e.telefono || '';
     document.getElementById('e-contacto').value = e.contacto || '';
@@ -264,6 +285,8 @@ function limpiarModal() {
     document.getElementById('e-id').value = '';
     document.getElementById('e-nombre').value = '';
     document.getElementById('e-rfc').value = '';
+    document.getElementById('e-regimen').value = '';
+    document.getElementById('e-cp').value = '';
     document.getElementById('e-email').value = '';
     document.getElementById('e-telefono').value = '';
     document.getElementById('e-contacto').value = '';
@@ -312,6 +335,8 @@ async function guardarEmpresa() {
             domicilio: document.getElementById('e-domicilio').value.trim() || null,
             mostrar_alertas: document.getElementById('e-alertas').checked ? 1 : 0,
             requiere_fotos:  document.getElementById('e-fotos').checked ? 1 : 0,
+            regimen_fiscal:  document.getElementById('e-regimen').value || null,
+            cp:              document.getElementById('e-cp').value.trim() || null,
         };
         if (id) body.id = parseInt(id);
 

@@ -9,6 +9,7 @@
  */
 require_once '../config/config.php';
 require_once '../config/documentos-lib.php';
+require_once '../config/emisor.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -113,6 +114,28 @@ function asegurarTablasCotizaciones($pdo) {
     // Producto del catálogo del que salió la partida, para reabrirla ya elegido
     agregarColumna($pdo, 'cotizacion_items', 'catalogo_id', "INT DEFAULT NULL");
 
+    // Datos fiscales que se imprimen en el presupuesto. Se guardan en la propia
+    // cotización (no se leen de la empresa al imprimir) para que el documento
+    // conserve los datos con los que se emitió, aunque el cliente cambie después.
+    agregarColumna($pdo, 'cotizaciones', 'cliente_rfc',      "VARCHAR(20)  DEFAULT NULL");
+    agregarColumna($pdo, 'cotizaciones', 'cliente_regimen',  "VARCHAR(10)  DEFAULT NULL");
+    agregarColumna($pdo, 'cotizaciones', 'cliente_cp',       "VARCHAR(10)  DEFAULT NULL");
+    agregarColumna($pdo, 'cotizaciones', 'uso_cfdi',         "VARCHAR(10)  NOT NULL DEFAULT 'G01'");
+    agregarColumna($pdo, 'cotizaciones', 'metodo_pago',      "VARCHAR(10)  NOT NULL DEFAULT 'PPD'");
+    agregarColumna($pdo, 'cotizaciones', 'forma_pago',       "VARCHAR(10)  NOT NULL DEFAULT '99'");
+    agregarColumna($pdo, 'cotizaciones', 'moneda',           "VARCHAR(5)   NOT NULL DEFAULT 'MXN'");
+    agregarColumna($pdo, 'cotizaciones', 'tipo_cambio',      "DECIMAL(12,6) NOT NULL DEFAULT 1");
+    agregarColumna($pdo, 'cotizaciones', 'condiciones_pago', "VARCHAR(150) DEFAULT NULL");
+    // Claves del SAT que casi siempre se repiten en todas las partidas: se
+    // capturan una vez por cotización y cada partida puede sobrescribirlas.
+    agregarColumna($pdo, 'cotizaciones', 'clave_prodserv',   "VARCHAR(20)  DEFAULT NULL");
+    agregarColumna($pdo, 'cotizaciones', 'clave_unidad',     "VARCHAR(10)  DEFAULT NULL");
+
+    agregarColumna($pdo, 'cotizacion_items', 'codigo',         "VARCHAR(60) DEFAULT NULL");
+    agregarColumna($pdo, 'cotizacion_items', 'clave_prodserv', "VARCHAR(20) DEFAULT NULL");
+    agregarColumna($pdo, 'cotizacion_items', 'clave_unidad',   "VARCHAR(10) DEFAULT NULL");
+    agregarColumna($pdo, 'cotizacion_items', 'iva_tasa',       "DECIMAL(5,2) NOT NULL DEFAULT 16");
+
     // Los estados pasaron a ser pendiente → aceptada → pagada. Las cotizaciones
     // que venían en 'borrador' o 'enviada' quedan como pendientes.
     try {
@@ -126,6 +149,18 @@ function asegurarTablasCotizaciones($pdo) {
 /** Estados válidos de una cotización, en el orden en que avanzan. */
 function estadosValidos(): array {
     return ['pendiente', 'aceptada', 'pagada', 'rechazada'];
+}
+
+/** Devuelve la clave sólo si está en el catálogo del SAT; si no, null. */
+function claveValida($clave, array $catalogo): ?string {
+    $clave = strtoupper(trim((string) $clave));
+    return isset($catalogo[$clave]) ? $clave : null;
+}
+
+/** Tasas de IVA que se pueden cotizar: 16% general, 8% franja fronteriza, 0%. */
+function tasaIvaValida($tasa): float {
+    $tasa = round((float) $tasa, 2);
+    return in_array($tasa, [16.0, 8.0, 0.0], true) ? $tasa : 16.0;
 }
 
 /** Agrega una columna solo si falta. */
@@ -352,41 +387,51 @@ function guardarCotizacion() {
     $util_pct  = max(0, min(100000, round((float)($d['utilidad_pct'] ?? 0), 2)));
     $util_base = 'costo'; // el porcentaje del sistema siempre es sobre el costo
 
+    // Datos fiscales del presupuesto. Se validan contra los catálogos para que
+    // en el documento no acabe impresa una clave que el SAT no reconoce.
+    $fis = [
+        'cliente_rfc'      => strtoupper(trim($d['cliente_rfc'] ?? '')) ?: null,
+        'cliente_regimen'  => claveValida($d['cliente_regimen'] ?? '', catRegimenFiscal()),
+        'cliente_cp'       => trim($d['cliente_cp'] ?? '') ?: null,
+        'uso_cfdi'         => claveValida($d['uso_cfdi'] ?? '', catUsoCfdi())      ?? 'G01',
+        'metodo_pago'      => claveValida($d['metodo_pago'] ?? '', catMetodoPago())?? 'PPD',
+        'forma_pago'       => claveValida($d['forma_pago'] ?? '', catFormaPago())  ?? '99',
+        'moneda'           => in_array(strtoupper(trim($d['moneda'] ?? '')), ['MXN','USD','EUR'], true)
+                                ? strtoupper(trim($d['moneda'])) : 'MXN',
+        'tipo_cambio'      => max(0.000001, round((float)($d['tipo_cambio'] ?? 1), 6)),
+        'condiciones_pago' => trim($d['condiciones_pago'] ?? '') ?: null,
+        'clave_prodserv'   => trim($d['clave_prodserv'] ?? '') ?: null,
+        'clave_unidad'     => trim($d['clave_unidad'] ?? '') ?: null,
+    ];
+
+    // Campos comunes al alta y a la edición. Las columnas se arman a partir de
+    // este arreglo, así que basta añadir aquí un campo para que se guarde: no
+    // hay dos listas que se puedan desincronizar.
+    $campos = array_merge([
+        'empresa_id'     => $empresa_id,
+        'cliente_nombre' => $cliente,
+        'contacto'       => trim($d['contacto'] ?? '') ?: null,
+        'fecha'          => $fecha,
+        'vigencia_dias'  => max(0, intval($d['vigencia_dias'] ?? 15)),
+        'estado'         => $estado,
+        'notas'          => trim($d['notas'] ?? '') ?: null,
+        'utilidad_pct'   => $util_pct,
+        'utilidad_base'  => $util_base,
+    ], $fis);
+
     try {
         $pdo->beginTransaction();
 
         if ($id) {
-            $pdo->prepare("
-                UPDATE cotizaciones
-                SET empresa_id=?, cliente_nombre=?, contacto=?, fecha=?, vigencia_dias=?, estado=?, notas=?,
-                    utilidad_pct=?, utilidad_base=?
-                WHERE id=?
-            ")->execute([
-                $empresa_id, $cliente,
-                trim($d['contacto'] ?? '') ?: null,
-                $fecha,
-                max(0, intval($d['vigencia_dias'] ?? 15)),
-                $estado,
-                trim($d['notas'] ?? '') ?: null,
-                $util_pct, $util_base,
-                $id,
-            ]);
+            $sets = implode(', ', array_map(fn($c) => "`$c`=?", array_keys($campos)));
+            $pdo->prepare("UPDATE cotizaciones SET $sets WHERE id=?")
+                ->execute(array_merge(array_values($campos), [$id]));
         } else {
-            $folio = siguienteFolio($pdo);
-            $pdo->prepare("
-                INSERT INTO cotizaciones
-                    (folio, empresa_id, cliente_nombre, contacto, fecha, vigencia_dias, estado, notas, utilidad_pct, utilidad_base, creado_por)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)
-            ")->execute([
-                $folio, $empresa_id, $cliente,
-                trim($d['contacto'] ?? '') ?: null,
-                $fecha,
-                max(0, intval($d['vigencia_dias'] ?? 15)),
-                $estado,
-                trim($d['notas'] ?? '') ?: null,
-                $util_pct, $util_base,
-                $uid,
-            ]);
+            $campos = ['folio' => siguienteFolio($pdo)] + $campos + ['creado_por' => $uid];
+            $cols = implode(',', array_map(fn($c) => "`$c`", array_keys($campos)));
+            $vals = implode(',', array_fill(0, count($campos), '?'));
+            $pdo->prepare("INSERT INTO cotizaciones ($cols) VALUES ($vals)")
+                ->execute(array_values($campos));
             $id = $pdo->lastInsertId();
         }
 
@@ -394,8 +439,9 @@ function guardarCotizacion() {
         $pdo->prepare("DELETE FROM cotizacion_items WHERE cotizacion_id = ?")->execute([$id]);
         $ins = $pdo->prepare("
             INSERT INTO cotizacion_items
-                (cotizacion_id, descripcion, cantidad, unidad, proveedor_id, catalogo_id, costo_unitario, precio_unitario, orden)
-            VALUES (?,?,?,?,?,?,?,?,?)
+                (cotizacion_id, descripcion, cantidad, unidad, proveedor_id, catalogo_id,
+                 costo_unitario, precio_unitario, codigo, clave_prodserv, clave_unidad, iva_tasa, orden)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
         ");
         $orden = 0;
         foreach ($items as $it) {
@@ -410,6 +456,11 @@ function guardarCotizacion() {
                 intval($it['catalogo_id'] ?? 0) ?: null,
                 max(0, round((float)($it['costo_unitario'] ?? 0), 2)),
                 max(0, round((float)($it['precio_unitario'] ?? 0), 2)),
+                trim($it['codigo'] ?? '') ?: null,
+                // Vacías a propósito: al imprimir heredan la clave de la cotización
+                trim($it['clave_prodserv'] ?? '') ?: null,
+                trim($it['clave_unidad'] ?? '') ?: null,
+                tasaIvaValida($it['iva_tasa'] ?? 16),
                 $orden++,
             ]);
         }

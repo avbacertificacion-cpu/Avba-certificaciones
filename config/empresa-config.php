@@ -76,3 +76,23 @@ function asegurarColumnaFotos(PDO $pdo): void {
 function empresaRequiereFotos(PDO $pdo, $empresa_id): bool {
     return empresaPreferencia($pdo, $empresa_id, 'requiere_fotos', false);
 }
+
+// ─── Datos fiscales del cliente (para el presupuesto) ────────────────────────
+/**
+ * Régimen fiscal y código postal del cliente. Sirven para precargar el
+ * presupuesto: el documento guarda su propia copia, pero volver a teclearlos
+ * en cada cotización del mismo cliente no tiene sentido.
+ */
+function asegurarColumnasFiscales(PDO $pdo): void {
+    asegurarColumnaEmpresa($pdo, 'regimen_fiscal', "VARCHAR(10) DEFAULT NULL");
+    asegurarColumnaEmpresa($pdo, 'cp',             "VARCHAR(10) DEFAULT NULL");
+}
+
+/** Columnas fiscales que existen hoy en `empresas`, para armar el SELECT. */
+function columnasFiscalesEmpresa(PDO $pdo): array {
+    $cols = [];
+    foreach (['regimen_fiscal', 'cp'] as $c) {
+        if (empresaTieneColumna($pdo, $c)) $cols[] = $c;
+    }
+    return $cols;
+}
