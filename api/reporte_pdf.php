@@ -104,6 +104,22 @@ $inspector_header = strtoupper($reporte['inspector_nombre']);
 // Total de extintores incluidos en el reporte, para el encabezado
 $total_extintores = count($extintores);
 
+// Desglose por tipo, para acompañar al total en el mismo renglón.
+// Se ordena del más numeroso al menos, y a igual cantidad por nombre.
+$desglose_tipos = [];
+foreach ($extintores as $e) {
+    $t = trim($e['tipo_nombre'] ?? '') ?: 'Sin tipo';
+    $desglose_tipos[$t] = ($desglose_tipos[$t] ?? 0) + 1;
+}
+uksort($desglose_tipos, function ($a, $b) use ($desglose_tipos) {
+    return [$desglose_tipos[$b], $a] <=> [$desglose_tipos[$a], $b];
+});
+$desglose_texto = [];
+foreach ($desglose_tipos as $nombre => $cantidad) {
+    $desglose_texto[] = $nombre . ': ' . $cantidad;
+}
+$desglose_texto = implode(' · ', $desglose_texto);
+
 $meses_es = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
              'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 $mes_texto = strtoupper(substr($meses_es[$mes], 0, 3)) . '-' . substr($anio, 2, 2);
@@ -270,6 +286,7 @@ if (!$logo_html) {
         .info-table { border-collapse:collapse; font-size:8.5pt; }
         .info-table td { padding:1px 6px 1px 0; vertical-align:top; }
         .info-table td:first-child { font-weight:bold; white-space:nowrap; }
+        .info-table .desglose { font-size:7.5pt; color:#333; }
 
         .leyenda { border:1px solid #666; border-collapse:collapse; font-size:8pt; }
         .leyenda td { padding:2px 8px; border:1px solid #666; white-space:nowrap; }
@@ -381,7 +398,11 @@ if (!$logo_html) {
                 </tr>
                 <tr>
                     <td>Total de extintores:</td>
-                    <td><strong><?= $total_extintores ?></strong></td>
+                    <td>
+                        <strong><?= $total_extintores ?></strong><?php if ($desglose_texto): ?>
+                        <span class="desglose">&nbsp;&nbsp;|&nbsp;&nbsp;<?= htmlspecialchars($desglose_texto) ?></span>
+                        <?php endif; ?>
+                    </td>
                 </tr>
             </table>
 
