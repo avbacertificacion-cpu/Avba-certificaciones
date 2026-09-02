@@ -1115,16 +1115,19 @@ class Certificaciones {
         $html = str_replace(array_keys($map), array_values($map), $html);
 
         // Inyectar fotos reales sobre los divs foto-placeholder
-        $html = $this->inyectarFotosDictamen($html, $d['evidencia_url'] ?? '');
+        // La prueba de carga se resuelve antes que las fotos: si la sección no va,
+        // la evidencia dispone del hueco que deja.
+        $pcDatos = !empty($d['prueba_carga']) ? (json_decode($d['prueba_carga'], true) ?? []) : [];
+        $hayPc   = $this->pruebasCargaCapturadas($pcDatos) >= 2;
+        $html = $this->inyectarFotosDictamen($html, $d['evidencia_url'] ?? '', $hayPc);
 
         // Prueba de carga: primero se decide si la sección va o no, y sólo
         // entonces se rellena. Al revés se rellenaría un bloque que se va a
         // cortar, y —peor— sin datos quedaban a la vista los marcadores {…} de
         // la plantilla, porque la inyección ni siquiera llegaba a ejecutarse.
-        $pc   = !empty($d['prueba_carga']) ? (json_decode($d['prueba_carga'], true) ?? []) : [];
-        $html = $this->recortarBloquePruebaCarga($html, $pc);
-        if ($this->pruebasCargaCapturadas($pc) >= 2) {
-            $html = $this->inyectarPruebaCargaDictamen($html, $pc, $d);
+        $html = $this->recortarBloquePruebaCarga($html, $pcDatos);
+        if ($hayPc) {
+            $html = $this->inyectarPruebaCargaDictamen($html, $pcDatos, $d);
         }
 
         // Ajuste para mPDF:
@@ -1778,7 +1781,13 @@ SVG;
     }
 
     /** Reemplaza cada div.foto-placeholder en el HTML del dictamen con la imagen real en base64. */
-    private function inyectarFotosDictamen(string $html, string $evidenciaUrl): string {
+    /**
+     * @param bool $conPruebaCarga  false cuando la sección de prueba de carga
+     *   no se va a imprimir. Entonces la página se queda a un tercio, así que
+     *   la evidencia ocupa el hueco: caben más fotos y más grandes. El dictamen
+     *   no se rellena con adorno, se rellena con lo que sí se inspeccionó.
+     */
+    private function inyectarFotosDictamen(string $html, string $evidenciaUrl, bool $conPruebaCarga = true): string {
         if (!$evidenciaUrl) return $html;
 
         // Resolver ruta local
@@ -1794,7 +1803,9 @@ SVG;
         if (empty($archivos)) return $html;
 
         sort($archivos);
-        $archivos = array_slice($archivos, 0, 9);
+        $tope   = $conPruebaCarga ? 9   : 12;
+        $altura = $conPruebaCarga ? 120 : 155;
+        $archivos = array_slice($archivos, 0, $tope);
 
         // Convertir todas las fotos a base64
         $fotos = [];
@@ -1815,7 +1826,7 @@ SVG;
             foreach ($fila as $f) {
                 $filas .= '<td class="foto-card" style="padding:4px;text-align:center;vertical-align:middle;">'
                         . "<img src=\"data:{$f['mime']};base64,{$f['b64']}\" "
-                        . 'style="max-width:100%;max-height:120px;object-fit:contain;display:block;margin:0 auto;">'
+                        . 'style="max-width:100%;max-height:' . $altura . 'px;object-fit:contain;display:block;margin:0 auto;">'
                         . '</td>';
             }
             // Rellenar celdas vacías en la última fila
