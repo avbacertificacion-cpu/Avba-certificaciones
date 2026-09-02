@@ -132,6 +132,33 @@ function tiposPorSabor(array $tipos, string $sabor): array {
     return $tipos; // industrial y eólico usan la mezcla completa
 }
 
+/**
+ * ¿La columna email acepta vacíos? En bases antiguas está como NOT NULL, y el
+ * gerente se crea sin correo. Si no los acepta, se le pone uno de relleno en
+ * vez de fallar (el admin puede cambiarlo después desde Gestionar Usuarios).
+ */
+function emailAceptaVacio(PDO $pdo): bool {
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM usuarios LIKE 'email'")->fetch(PDO::FETCH_ASSOC);
+        return !$col || strtoupper($col['Null']) === 'YES';
+    } catch (Exception $e) { return true; }
+}
+
+/**
+ * ¿La columna rol acepta el valor 'gerente'? En bases antiguas es un ENUM que
+ * sólo contempla los tres roles originales. Eso no se puede sortear desde aquí:
+ * lo arregla private/reparar-rol.php, que ya existe justo para eso.
+ */
+function rolAceptaGerente(PDO $pdo): bool {
+    try {
+        $col = $pdo->query("SHOW COLUMNS FROM usuarios LIKE 'rol'")->fetch(PDO::FETCH_ASSOC);
+        if (!$col) return true;
+        $tipo = strtolower($col['Type']);
+        if (strncmp($tipo, 'enum', 4) !== 0) return true; // varchar: acepta cualquier rol
+        return strpos($tipo, "'gerente'") !== false;
+    } catch (Exception $e) { return true; }
+}
+
 /** Fecha de recarga: 85% reciente (extintor al corriente), 15% vencida hace 12-18 meses (dispara "a mantenimiento"). */
 function fechaRecarga(): string {
     $diasAtras = (mt_rand(1, 100) <= 15) ? mt_rand(370, 540) : mt_rand(0, 330);
@@ -177,6 +204,11 @@ foreach (centros() as $c) {
 }
 $gerenteYaExiste = (bool) $pdo->query("SELECT id FROM usuarios WHERE username = '" . GERENTE_USERNAME . "'")->fetchColumn();
 
+// Compatibilidad con el esquema real de la tabla de usuarios. Se revisa aquí
+// para avisar en la previsualización, antes de sembrar nada.
+$rolListo      = rolAceptaGerente($pdo);
+$emailGerente  = emailAceptaVacio($pdo) ? null : GERENTE_USERNAME . '@avba.com.mx';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembrar') {
     $inspectorId = intval($_POST['inspector_id'] ?? 0);
     $inspectorValido = in_array($inspectorId, array_column($inspectores, 'id'));
@@ -185,6 +217,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
         $errorGeneral = 'No hay ningún inspector activo en el sistema. Crea uno primero en Gestionar Usuarios.';
     } elseif (!$inspectorValido) {
         $errorGeneral = 'Elige a qué inspector se le atribuye el historial sembrado.';
+    } elseif (!$rolListo) {
+        // Se detiene antes de sembrar: si no, se perderían miles de filas al fallar el último paso.
+        $errorGeneral = 'La columna "rol" de tu base todavía no acepta el valor "gerente". Abre una vez private/reparar-rol.php (lo arregla solo) y regresa aquí.';
     } else {
         // La tabla de asignaciones se crea (si falta) ANTES de abrir la transacción:
         // un CREATE TABLE en MySQL hace commit implícito y rompería la transacción
@@ -200,6 +235,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
 
         try {
             $pdo->beginTransaction();
+
+            // El usuario gerente se crea primero: si algo falla aquí, falla de
+            // inmediato y no después de insertar miles de extintores.
+            $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE username = ?");
+            $stmt->execute([GERENTE_USERNAME]);
+            $gerenteId = $stmt->fetchColumn();
+            $gerenteNuevo = !$gerenteId;
+
+            if (!$gerenteId) {
+                $pdo->prepare("
+                    INSERT INTO usuarios (nombre, username, email, password, rol, empresa_id, estado)
+                    VALUES (?,?,?,?,'gerente',NULL,'activo')
+                ")->execute([
+                    'Gerente Corporativo AVBA', GERENTE_USERNAME, $emailGerente,
+                    password_hash(GERENTE_PASSWORD, PASSWORD_BCRYPT),
+                ]);
+                $gerenteId = $pdo->lastInsertId();
+            }
 
             $tipos = asegurarTipos($pdo);
             $resultados = [];
@@ -308,23 +361,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                 ];
             }
 
-            // Usuario gerente, asignado a las 14 plantas
-            $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE username = ?");
-            $stmt->execute([GERENTE_USERNAME]);
-            $gerenteId = $stmt->fetchColumn();
-            $gerenteNuevo = !$gerenteId;
-
-            if (!$gerenteId) {
-                $pdo->prepare("
-                    INSERT INTO usuarios (nombre, username, email, password, rol, empresa_id, estado)
-                    VALUES (?,?,NULL,?,'gerente',NULL,'activo')
-                ")->execute([
-                    'Gerente Corporativo AVBA', GERENTE_USERNAME,
-                    password_hash(GERENTE_PASSWORD, PASSWORD_BCRYPT),
-                ]);
-                $gerenteId = $pdo->lastInsertId();
-            }
-
+            // Asignación del gerente a las 14 plantas
             $pdo->prepare("DELETE FROM gerente_empresas WHERE gerente_id = ?")->execute([$gerenteId]);
             $insGe = $pdo->prepare("INSERT INTO gerente_empresas (gerente_id, empresa_id) VALUES (?,?)");
             foreach ($empresaIds as $eid) $insGe->execute([$gerenteId, $eid]);
@@ -454,6 +491,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
             <?php if (!$inspectores): ?>
                 <div class="alerta warn">No hay ningún inspector activo todavía. Crea uno en <a href="admin-usuarios.php">Gestionar Usuarios</a> antes de sembrar el historial de inspecciones.</div>
             <?php endif; ?>
+            <?php if (!$rolListo): ?>
+                <div class="alerta warn">La columna <b>rol</b> de tu base todavía no acepta el valor «gerente», así que no se podría crear el usuario. Abre una vez <a href="reparar-rol.php">reparar-rol.php</a> (lo corrige solo) y regresa aquí.</div>
+            <?php endif; ?>
+            <?php if ($emailGerente): ?>
+                <div class="alerta ok">Tu columna <b>email</b> no acepta valores vacíos, así que el gerente se creará con el correo de relleno <b><?= htmlspecialchars($emailGerente) ?></b>. Puedes cambiarlo después en Gestionar Usuarios.</div>
+            <?php endif; ?>
             <?php if ($gerenteYaExiste): ?>
                 <div class="alerta ok">El usuario gerente (<?= htmlspecialchars(GERENTE_USERNAME) ?>) ya existe — se le reasignarán las 14 plantas sin tocar su contraseña.</div>
             <?php endif; ?>
@@ -468,7 +511,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <button type="submit" class="btn btn-primary" <?= $inspectores ? '' : 'disabled' ?>>Confirmar y sembrar</button>
+                <button type="submit" class="btn btn-primary" <?= ($inspectores && $rolListo) ? '' : 'disabled' ?>>Confirmar y sembrar</button>
             </form>
         </div>
     <?php endif; ?>
