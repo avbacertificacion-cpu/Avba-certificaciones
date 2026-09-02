@@ -1066,10 +1066,14 @@ class Certificaciones {
         $cargoResponsable    = $resp['cargo'];
         $firmaResponsableImg = $resp['firma_img'];
 
-        // Construir HTML de prueba de carga si existen datos
+        // La tabla del token {prueba_carga} sigue la misma regla que la sección:
+        // sin las dos pruebas capturadas no se imprime nada.
         $pruebaCargaHtml = '';
         if (!empty($d['prueba_carga'])) {
-            $pruebaCargaHtml = $this->buildPruebaCargaHtml(json_decode($d['prueba_carga'], true));
+            $pcTok = json_decode($d['prueba_carga'], true) ?? [];
+            if ($this->pruebasCargaCapturadas($pcTok) >= 2) {
+                $pruebaCargaHtml = $this->buildPruebaCargaHtml($pcTok);
+            }
         }
 
         $horquillas = !empty($d['horquillas']) ? (json_decode($d['horquillas'], true) ?? []) : [];
@@ -1113,9 +1117,13 @@ class Certificaciones {
         // Inyectar fotos reales sobre los divs foto-placeholder
         $html = $this->inyectarFotosDictamen($html, $d['evidencia_url'] ?? '');
 
-        // Inyectar datos de prueba de carga en la tabla pc-table
-        if (!empty($d['prueba_carga'])) {
-            $pc = json_decode($d['prueba_carga'], true) ?? [];
+        // Prueba de carga: primero se decide si la sección va o no, y sólo
+        // entonces se rellena. Al revés se rellenaría un bloque que se va a
+        // cortar, y —peor— sin datos quedaban a la vista los marcadores {…} de
+        // la plantilla, porque la inyección ni siquiera llegaba a ejecutarse.
+        $pc   = !empty($d['prueba_carga']) ? (json_decode($d['prueba_carga'], true) ?? []) : [];
+        $html = $this->recortarBloquePruebaCarga($html, $pc);
+        if ($this->pruebasCargaCapturadas($pc) >= 2) {
             $html = $this->inyectarPruebaCargaDictamen($html, $pc, $d);
         }
 
@@ -1888,6 +1896,119 @@ SVG;
      * vacíos pondría un apartado "HORQUILLAS" en blanco en el certificado de
      * una grúa, que no las lleva.
      */
+    /**
+     * Quita la sección de prueba de carga del dictamen cuando no hay dos
+     * pruebas capturadas.
+     *
+     * El formulario del inspector guarda siempre la estructura completa —una
+     * fila por prueba con todas sus columnas— aunque no se escriba nada, así
+     * que "no hubo prueba de carga" no se nota por la ausencia del dato sino
+     * porque las filas vienen vacías. Sin este recorte el dictamen imprimía una
+     * tabla de NA, un croquis con ceros y un texto afirmando que el equipo
+     * "respondió correctamente en ambas pruebas realizadas".
+     *
+     * Se exigen las dos: una prueba a medias no sostiene el dictamen, y media
+     * tabla oficial es peor que ninguna.
+     *
+     * Las normas acreditadas y de referencia viven dentro de la franja de
+     * resultado de esta misma sección, y tienen que salir siempre. Por eso la
+     * plantilla lleva una franja de respaldo que sólo aparece cuando la sección
+     * se va.
+     */
+    /** Marcas que sólo sirven para localizar; nunca viajan en el documento. */
+    private const MARCAS_PC_SUELTAS = [
+        '<!--PC_TITULO_PAG-->', '<!--/PC_TITULO_PAG-->',
+        '<!--PC_METODOLOGIA-->', '<!--/PC_METODOLOGIA-->',
+        '<!--METODOLOGIA-->', '<!--/METODOLOGIA-->',
+    ];
+
+    private function recortarBloquePruebaCarga(string $html, array $pc): string {
+        $marcas   = ['<!--BLOQUE_PRUEBA_CARGA-->', '<!--/BLOQUE_PRUEBA_CARGA-->'];
+        $respaldo = ['<!--BLOQUE_NORMAS_SIN_PC-->', '<!--/BLOQUE_NORMAS_SIN_PC-->'];
+
+        if ($this->pruebasCargaCapturadas($pc) >= 2) {
+            // Se conserva la sección y se va el respaldo. Las marcas no tienen
+            // por qué viajar dentro del documento que recibe el cliente.
+            $html = preg_replace('/<!--BLOQUE_NORMAS_SIN_PC-->.*?<!--\/BLOQUE_NORMAS_SIN_PC-->/s', '', $html) ?? $html;
+            return str_replace(array_merge($marcas, $respaldo, self::MARCAS_PC_SUELTAS), '', $html);
+        }
+
+        $html = preg_replace('/<!--BLOQUE_PRUEBA_CARGA-->.*?<!--\/BLOQUE_PRUEBA_CARGA-->/s', '', $html) ?? $html;
+        $html = $this->quitarRastrosPruebaCarga($html);
+        return str_replace(array_merge($marcas, $respaldo, self::MARCAS_PC_SUELTAS), '', $html);
+    }
+
+    /**
+     * Lo demás que el dictamen dice sobre la prueba de carga cuando no la hubo.
+     *
+     * Quitar la sección y dejar el resto sería peor que no quitar nada: el
+     * encabezado de la página seguiría anunciando "Load Test", y la lista de
+     * metodología seguiría afirmando que se hizo una prueba de carga al equipo
+     * —una actividad que no se realizó, declarada en un documento acreditado—.
+     */
+    private function quitarRastrosPruebaCarga(string $html): string {
+        // El encabezado de la página deja de anunciar la prueba.
+        $html = preg_replace('/<!--PC_TITULO_PAG-->.*?<!--\/PC_TITULO_PAG-->/s', '', $html) ?? $html;
+
+        // La lista de metodología pierde ese punto y se reacomoda: si se dejara
+        // el hueco, la numeración saltaría y parecería un defecto de impresión.
+        if (!preg_match('/<!--METODOLOGIA-->(.*?)<!--\/METODOLOGIA-->/s', $html, $m)) return $html;
+
+        $tabla = $m[1];
+        preg_match_all('/<td>.*?<\/td>/s', $tabla, $celdas);
+        // Se descarta el punto de la prueba y también las celdas de relleno: la
+        // rejilla es de dos columnas y con un punto menos el relleno sobra o
+        // cambia de sitio, así que se vuelve a poner al final si hace falta.
+        $puntos = array_values(array_filter(
+            $celdas[0] ?? [],
+            fn($td) => !str_contains($td, 'Prueba de carga al equipo')
+                    && trim(strip_tags($td)) !== ''
+        ));
+        if (!$puntos) return $html;
+
+        // Renumerar las viñetas y volver a armar la rejilla de dos columnas.
+        if (count($puntos) % 2 !== 0) $puntos[] = '<td></td>';
+        $filas = '';
+        foreach (array_chunk($puntos, 2) as $par) {
+            $filas .= "<tr>\n";
+            foreach ($par as $td) $filas .= $td . "\n";
+            $filas .= "</tr>\n";
+        }
+        // La numeración va por orden de aparición, no por posición en la fila.
+        $i = 0;
+        $filas = preg_replace_callback(
+            '/(<text\b[^>]*>)\d+(<\/text>)/',
+            function ($x) use (&$i) { $i++; return $x[1] . $i . $x[2]; },
+            $filas
+        ) ?? $filas;
+
+        $abre  = strpos($tabla, '>', strpos($tabla, '<table')) + 1;
+        $nueva = substr($tabla, 0, $abre) . "\n" . $filas . '</table>';
+
+        return str_replace($m[0], '<!--METODOLOGIA-->' . $nueva . '<!--/METODOLOGIA-->', $html);
+    }
+
+    /**
+     * Cuántas pruebas trae capturadas el registro.
+     *
+     * Cuenta una fila como hecha si tiene algún valor propio del inspector. Se
+     * excluyen las claves que no son medición —la plantilla y el tipo de
+     * plataforma, que el formulario rellena solo— porque si contaran, un
+     * registro sin tocar parecería lleno.
+     */
+    private function pruebasCargaCapturadas(array $pc): int {
+        $hechas = 0;
+        foreach ($pc as $clave => $fila) {
+            if (!is_array($fila) || $clave === 'plantilla') continue;
+            foreach ($fila as $campo => $valor) {
+                if (in_array($campo, ['tipo_plataforma', 'plantilla'], true)) continue;
+                if (is_array($valor)) continue;
+                if (trim((string)$valor) !== '') { $hechas++; break; }
+            }
+        }
+        return $hechas;
+    }
+
     private function recortarBloqueHorquillas(string $html, array $d): string {
         $horq = !empty($d['horquillas']) ? (json_decode($d['horquillas'], true) ?? []) : [];
         $hay  = false;

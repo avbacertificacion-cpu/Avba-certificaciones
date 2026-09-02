@@ -291,7 +291,7 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
   <td class="hdr-title">
       <div class="hdr-title-es" style="font-size:13pt">Reporte Fotográfico</div>
       <div class="hdr-sep"></div>
-      <div class="hdr-title-en">Photographic Report &amp; Load Test · Prueba de Carga</div>
+      <div class="hdr-title-en">Photographic Report<!--PC_TITULO_PAG--> &amp; Load Test · Prueba de Carga<!--/PC_TITULO_PAG--></div>
     </td>
   <td class="hdr-cert" width="64mm"><span class="hdr-cert-lbl">No. Certificado</span><span class="hdr-cert-val">{folio}</span></td>
 </tr>
@@ -410,7 +410,8 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
 </table>
     </div>
 
-    <div class="sec-title">Prueba de Carga <span style="font-size:7pt;font-weight:400;opacity:.6;margin-left:6px">· Load Test</span></div>
+    <!--BLOQUE_PRUEBA_CARGA-->
+<div class="sec-title">Prueba de Carga <span style="font-size:7pt;font-weight:400;opacity:.6;margin-left:6px">· Load Test</span></div>
     <div class="sec-body" style="padding:0">
       <table class="pc-header-strip" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
         <td class="pc-equip-cell"><div class="pc-equip-lbl">Equipo Inspeccionado</div><div class="pc-equip-val">{tipo_maquinaria} · {marca} {modelo}</div></td>
@@ -461,6 +462,14 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
         <td style="padding:8px 14px;text-align:right;vertical-align:middle;"><div class="pc-norma"><span style="display:block;opacity:.7;font-size:6pt;letter-spacing:.3px;text-transform:uppercase;margin-bottom:2px">Normas Acreditadas</span>{{normas_acreditadas}}<br><span style="display:block;opacity:.7;font-size:6pt;letter-spacing:.3px;text-transform:uppercase;margin:3px 0 2px">Normas de Referencia</span>{{normas_referencia}}</div></td>
       </tr></table>
     </div>
+<!--/BLOQUE_PRUEBA_CARGA-->
+<!--BLOQUE_NORMAS_SIN_PC-->
+    <div class="sec-body" style="padding:0">
+      <table class="pc-result-strip" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;background:#0B2545;padding:0;" cellpadding="0" cellspacing="0"><tr>
+        <td style="padding:8px 14px;text-align:left;vertical-align:middle;background:#0B2545;color:#fff;"><div class="pc-norma" style="text-align:left;color:rgba(255,255,255,.75)"><span style="display:block;opacity:.7;font-size:6pt;letter-spacing:.3px;text-transform:uppercase;margin-bottom:2px">Normas Acreditadas</span><br>{{normas_acreditadas}}<br><span style="display:block;opacity:.7;font-size:6pt;letter-spacing:.3px;text-transform:uppercase;margin:3px 0 2px">Normas de Referencia</span><br>{{normas_referencia}}</div></td>
+      </tr></table>
+    </div>
+<!--/BLOQUE_NORMAS_SIN_PC-->
   </div>
   <table class="page-foot" style="margin-top:6px;width:100%;" cellpadding="0" cellspacing="0"><tr>
     <td><span class="f-lbl">Folio</span></td>
