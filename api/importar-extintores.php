@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/mayusculas.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
@@ -8,7 +9,7 @@ if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
     exit;
 }
 
-$d = json_decode(file_get_contents('php://input'), true);
+$d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
 
 if (empty($d['datos']) || !is_array($d['datos'])) {
     http_response_code(400);

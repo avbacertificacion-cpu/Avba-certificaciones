@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/mayusculas.php';
 require_once '../config/roles-extra.php';
 require_once '../config/empresa-config.php';
 header('Content-Type: application/json');
@@ -80,7 +81,7 @@ function crear() {
         http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
     }
 
-    $d = json_decode(file_get_contents('php://input'), true);
+    $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
 
     foreach (['nombre','username','password','rol'] as $c) {
         if (empty($d[$c])) {
@@ -176,7 +177,7 @@ function editar() {
         http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
     }
 
-    $d  = json_decode(file_get_contents('php://input'), true);
+    $d  = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     $id = intval($d['id'] ?? 0);
     if (!$id) { http_response_code(400); echo json_encode(['error' => 'ID requerido']); return; }
 
@@ -241,7 +242,7 @@ function crearEmpresa() {
         http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
     }
 
-    $d = json_decode(file_get_contents('php://input'), true);
+    $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     if (empty($d['nombre'])) {
         http_response_code(400); echo json_encode(['error' => 'Nombre requerido']); return;
     }

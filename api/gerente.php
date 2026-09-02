@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/mayusculas.php';
 require_once '../config/roles-extra.php';
 header('Content-Type: application/json');
 
@@ -128,7 +129,7 @@ function guardarAsignacion() {
         http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
     }
 
-    $d = json_decode(file_get_contents('php://input'), true) ?: [];
+    $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true)) ?: [];
     $gerente_id = intval($d['gerente_id'] ?? 0);
     $empresas   = $d['empresas'] ?? [];
     if (!is_array($empresas)) $empresas = [];

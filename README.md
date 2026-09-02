@@ -269,6 +269,33 @@ Los nombres de la lista son centros de trabajo reales, así que la herramienta
 nunca borra "todo lo que coincida": cada planta se marca a mano, por si alguna
 llegara a ser un cliente de verdad.
 
+## 🔠 Texto en MAYÚSCULAS
+
+Los documentos que emite la empresa se capturan en mayúsculas, así que el texto
+se convierte **al guardarlo**, no al imprimirlo: la base queda pareja y cualquier
+pantalla nueva lo hereda sin acordarse de convertir nada
+(`config/mayusculas.php`).
+
+No se convierte todo, porque hay campos donde hacerlo rompe el sistema:
+
+| Campo | Por qué no se toca |
+|---|---|
+| `password` | Es un hash bcrypt: en mayúsculas deja de validar y nadie puede entrar. |
+| `estado`, `rol`, `modulo`, `utilidad_base` | El código los compara en minúsculas (`WHERE estado = 'activo'`). |
+| `archivo`, `nombre_original`, `mime` | Nombres de archivo; el servidor Linux distingue mayúsculas y las fotos dejarían de abrir. |
+| `username`, `email`, `codigo_qr` | Identifican: se buscan tal cual se dieron de alta. |
+| Claves del SAT y casillas del checklist | Ya vienen en su forma oficial (`E48`, `G01`, `OK`, `NC`). |
+
+Los acentos se conservan: en español las mayúsculas se acentúan, así que
+"Área de Proceso" queda "ÁREA DE PROCESO".
+
+### Convertir lo que ya estaba guardado
+
+Lo capturado antes de este cambio conserva su forma original. Se empareja desde
+`private/admin-mayusculas.php`: muestra cuántos registros cambiarían por tabla y
+columna, y convierte dentro de una transacción. Se puede volver a ejecutar sin
+problema —lo que ya está en mayúsculas no vuelve a escribirse—.
+
 ## 📝 Licencia
 
 Todos los derechos reservados © 2026

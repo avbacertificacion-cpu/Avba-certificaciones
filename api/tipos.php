@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/mayusculas.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
@@ -67,7 +68,7 @@ function obtener() {
 function crear() {
     global $pdo;
 
-    $d = json_decode(file_get_contents('php://input'), true);
+    $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
 
     if (empty($d['nombre'])) {
         http_response_code(400);
@@ -106,7 +107,7 @@ function crear() {
 function editar() {
     global $pdo;
 
-    $d = json_decode(file_get_contents('php://input'), true);
+    $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
 
     $id = intval($d['id'] ?? 0);
     if (!$id) {
@@ -152,7 +153,7 @@ function editar() {
 function cambiarEstado() {
     global $pdo;
 
-    $d = json_decode(file_get_contents('php://input'), true);
+    $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
 
     $id = intval($d['id'] ?? 0);
     $estado = $d['estado'] ?? '';

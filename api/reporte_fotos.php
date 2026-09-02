@@ -10,6 +10,7 @@
  * y se guardan con un nombre imposible de adivinar.
  */
 require_once '../config/config.php';
+require_once '../config/mayusculas.php';
 
 header('Content-Type: application/json');
 
@@ -115,7 +116,7 @@ function subir() {
         return;
     }
 
-    $desc = trim($_POST['descripcion'] ?? '');
+    $desc = aMayusculas(trim($_POST['descripcion'] ?? ''));
     if (mb_strlen($desc) > 255) $desc = mb_substr($desc, 0, 255);
 
     try {

@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/mayusculas.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -158,7 +159,7 @@ function crear() {
         http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
     }
 
-    $d = json_decode(file_get_contents('php://input'), true);
+    $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
 
     $campos_req = ['empresa_id', 'ubicacion', 'tipo'];
     foreach ($campos_req as $c) {
@@ -262,7 +263,7 @@ function editar() {
         http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
     }
 
-    $d  = json_decode(file_get_contents('php://input'), true);
+    $d  = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     $id = intval($d['id'] ?? 0);
     if (!$id) { http_response_code(400); echo json_encode(['error' => 'ID requerido']); return; }
 
@@ -433,7 +434,7 @@ function asignarQR() {
         http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
     }
 
-    $d           = json_decode(file_get_contents('php://input'), true);
+    $d           = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     $extintor_id = intval($d['extintor_id'] ?? 0);
     $codigo_qr   = trim($d['codigo_qr'] ?? '');
 
@@ -514,7 +515,7 @@ function modificarQR() {
         http_response_code(403); echo json_encode(['error' => 'Solo Admin puede modificar QR']); return;
     }
 
-    $d              = json_decode(file_get_contents('php://input'), true);
+    $d              = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     $extintor_id    = intval($d['extintor_id'] ?? 0);
     $codigo_qr_nuevo = trim($d['codigo_qr_nuevo'] ?? '');
 

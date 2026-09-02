@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/mayusculas.php';
 
 header('Content-Type: application/json');
 
@@ -42,7 +43,7 @@ switch ($action) {
 function crearPlantilla() {
     global $pdo;
 
-    $data = json_decode(file_get_contents('php://input'), true);
+    $data = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     $nombre = $data['nombre'] ?? '';
     $descripcion = $data['descripcion'] ?? '';
     $empresa_id = $data['empresa_id'] ?? null;
@@ -164,7 +165,7 @@ function obtenerPlantilla() {
 function editarPlantilla() {
     global $pdo;
 
-    $data = json_decode(file_get_contents('php://input'), true);
+    $data = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     $id = $data['id'] ?? '';
     $nombre = $data['nombre'] ?? '';
     $descripcion = $data['descripcion'] ?? '';
@@ -215,7 +216,7 @@ function eliminarPlantilla() {
 function agregarArea() {
     global $pdo;
 
-    $data = json_decode(file_get_contents('php://input'), true);
+    $data = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     $plantilla_id = $data['plantilla_id'] ?? '';
     $nombre = $data['nombre'] ?? '';
     $descripcion = $data['descripcion'] ?? '';
@@ -257,7 +258,7 @@ function agregarArea() {
 function agregarCampo() {
     global $pdo;
 
-    $data = json_decode(file_get_contents('php://input'), true);
+    $data = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     $area_id = $data['area_id'] ?? '';
     $nombre_campo = $data['nombre_campo'] ?? '';
     $tipo = $data['tipo'] ?? '';

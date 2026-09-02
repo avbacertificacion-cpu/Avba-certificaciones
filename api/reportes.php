@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/mayusculas.php';
 
 header('Content-Type: application/json');
 
@@ -44,7 +45,7 @@ function crearReporte() {
         return;
     }
 
-    $data = json_decode(file_get_contents('php://input'), true);
+    $data = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     $plantilla_id = $data['plantilla_id'] ?? '';
 
     if (empty($plantilla_id)) {
@@ -206,7 +207,7 @@ function obtenerReporte() {
 function guardarDatos() {
     global $pdo;
 
-    $data = json_decode(file_get_contents('php://input'), true);
+    $data = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     $reporte_id = $data['reporte_id'] ?? '';
     $area_id = $data['area_id'] ?? '';
     $campo_id = $data['campo_id'] ?? '';
@@ -263,7 +264,7 @@ function aprobarReporte() {
         return;
     }
 
-    $data = json_decode(file_get_contents('php://input'), true);
+    $data = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true));
     $id = $data['id'] ?? '';
     $estado = $data['estado'] ?? 'aprobado';
 

@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/mayusculas.php';
 require_once '../config/documentos-lib.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
     header('Location: ../public/login.html'); exit;
@@ -49,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $accion = $_POST['accion'] ?? '';
 
     if ($accion === 'crear' || $accion === 'editar') {
-        $descripcion = trim($_POST['descripcion'] ?? '');
+        $descripcion = aMayusculas(trim($_POST['descripcion'] ?? ''));
         $f_tent = fechaValida($_POST['fecha_tentativa'] ?? '');
         $f_inst = fechaValida($_POST['fecha_instalacion'] ?? '');
         $foto   = guardarFoto($_FILES['foto'] ?? [], $UPLOAD_DIR);

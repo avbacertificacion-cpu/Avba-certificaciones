@@ -8,6 +8,7 @@
  * Las tablas se crean solas la primera vez (no requiere migración manual).
  */
 require_once '../config/config.php';
+require_once '../config/mayusculas.php';
 require_once '../config/documentos-lib.php';
 require_once '../config/emisor.php';
 header('Content-Type: application/json');
@@ -189,7 +190,7 @@ function listarProveedores() {
 
 function guardarProveedor() {
     global $pdo, $uid;
-    $d = json_decode(file_get_contents('php://input'), true) ?: [];
+    $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true)) ?: [];
     $nombre = trim($d['nombre'] ?? '');
     if ($nombre === '') { http_response_code(400); echo json_encode(['error' => 'El nombre del proveedor es obligatorio']); return; }
 
@@ -247,7 +248,7 @@ function listarCatalogo() {
 
 function guardarPrecio() {
     global $pdo, $uid;
-    $d = json_decode(file_get_contents('php://input'), true) ?: [];
+    $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true)) ?: [];
     $desc = trim($d['descripcion'] ?? '');
     if ($desc === '') { http_response_code(400); echo json_encode(['error' => 'La descripción es obligatoria']); return; }
 
@@ -366,7 +367,7 @@ function siguienteFolio($pdo): string {
 
 function guardarCotizacion() {
     global $pdo, $uid;
-    $d = json_decode(file_get_contents('php://input'), true) ?: [];
+    $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true)) ?: [];
 
     $id    = intval($d['id'] ?? 0);
     $items = $d['items'] ?? [];
@@ -495,7 +496,7 @@ function eliminarCotizacion() {
 
 function cambiarEstado() {
     global $pdo, $uid;
-    $d  = json_decode(file_get_contents('php://input'), true) ?: [];
+    $d  = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true)) ?: [];
     $id = intval($d['id'] ?? 0);
     $estado = $d['estado'] ?? '';
     if (!$id || !in_array($estado, estadosValidos(), true)) {

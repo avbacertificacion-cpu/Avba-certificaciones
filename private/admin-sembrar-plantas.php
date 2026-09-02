@@ -15,6 +15,7 @@
  */
 require_once '../config/config.php';
 require_once '../config/roles-extra.php';
+require_once '../config/mayusculas.php';
 require_once '../config/modo-demo.php';
 require_once '../config/plantas-demo.php';
 
@@ -104,7 +105,7 @@ function asegurarTipos(PDO $pdo): array {
     if ($tipos) return $tipos;
 
     $ins = $pdo->prepare("INSERT INTO tipos_extintores (nombre, descripcion, estado) VALUES (?,?,'activo')");
-    foreach (TIPOS_ESTANDAR as $t) $ins->execute([$t['nombre'], $t['descripcion']]);
+    foreach (TIPOS_ESTANDAR as $t) $ins->execute([aMayusculas($t['nombre']), aMayusculas($t['descripcion'])]);
     return $pdo->query("SELECT id, nombre FROM tipos_extintores WHERE estado = 'activo'")->fetchAll(PDO::FETCH_ASSOC);
 }
 
@@ -238,7 +239,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                     INSERT INTO usuarios (nombre, username, email, password, rol, empresa_id, estado)
                     VALUES (?,?,?,?,'gerente',NULL,'activo')
                 ")->execute([
-                    'Gerente Corporativo AVBA', GERENTE_USERNAME, $emailGerente,
+                    aMayusculas('Gerente Corporativo AVBA'), GERENTE_USERNAME, $emailGerente,
                     password_hash(GERENTE_PASSWORD, PASSWORD_BCRYPT),
                 ]);
                 $gerenteId = $pdo->lastInsertId();
@@ -255,7 +256,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
 
                 if (!$empresaId) {
                     $pdo->prepare("INSERT INTO empresas (nombre, domicilio, estado) VALUES (?,?,'activo')")
-                        ->execute([$c['nombre'], $c['domicilio']]);
+                        ->execute([aMayusculas($c['nombre']), aMayusculas($c['domicilio'])]);
                     $empresaId = $pdo->lastInsertId();
                 }
                 $empresaIds[] = $empresaId;
@@ -285,10 +286,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                         $filasExt[] = [
                             'EXT-' . str_pad($numero + $n, 3, '0', STR_PAD_LEFT),
                             $empresaId,
-                            $seccion,
-                            $seccion . ' — ' . elegir(DETALLES_UBICACION),
+                            aMayusculas($seccion),
+                            aMayusculas($seccion . ' — ' . elegir(DETALLES_UBICACION)),
                             elegir($tiposDisponibles)['id'],
-                            elegir($capacidades),
+                            aMayusculas(elegir($capacidades)),
                             fechaRecarga(),
                             fechaPH(),
                             (mt_rand(1, 100) <= 5) ? 'en_prestamo' : 'activo',

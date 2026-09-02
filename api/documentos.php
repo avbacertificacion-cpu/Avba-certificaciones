@@ -9,6 +9,7 @@
  * SIEMPRE desde aquí, nunca por enlace directo, para que no queden expuestos.
  */
 require_once '../config/config.php';
+require_once '../config/mayusculas.php';
 
 if (!isset($_SESSION['usuario_id'])) {
     http_response_code(401);
@@ -173,7 +174,7 @@ function subir() {
     }
 
     $tipo = in_array($_POST['tipo'] ?? '', TIPOS, true) ? $_POST['tipo'] : 'otro';
-    $desc = trim($_POST['descripcion'] ?? '');
+    $desc = aMayusculas(trim($_POST['descripcion'] ?? ''));
     if (mb_strlen($desc) > 255) $desc = mb_substr($desc, 0, 255);
 
     if (!is_dir($DIR)) @mkdir($DIR, 0755, true);
