@@ -31,7 +31,8 @@ $total_extintores = (int) $q("SELECT COUNT(*) FROM extintores WHERE empresa_id=?
 $inspeccionados_mes = (int) $q("
     SELECT COUNT(DISTINCT i.extintor_id) FROM inspecciones i
     JOIN extintores e ON e.id=i.extintor_id
-    WHERE e.empresa_id=? AND MONTH(i.fecha)=? AND YEAR(i.fecha)=?", [$empresa_id, $mes_actual, $anio_actual]);
+    WHERE e.empresa_id=? AND e.estado!='inactivo'
+      AND MONTH(i.fecha)=? AND YEAR(i.fecha)=?", [$empresa_id, $mes_actual, $anio_actual]);
 $porcentaje = $total_extintores > 0 ? round(($inspeccionados_mes/$total_extintores)*100) : 0;
 $vencidos = (int) $q("SELECT COUNT(*) FROM extintores WHERE empresa_id=? AND estado!='inactivo' AND fecha_ph IS NOT NULL AND fecha_ph < CURDATE()", [$empresa_id]);
 $proximos = (int) $q("SELECT COUNT(*) FROM extintores WHERE empresa_id=? AND estado!='inactivo' AND fecha_ph IS NOT NULL AND fecha_ph BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 15 DAY)", [$empresa_id]);
@@ -42,7 +43,8 @@ for ($i = 5; $i >= 0; $i--) {
     $f = strtotime("-$i months"); $m = date('n',$f); $a = date('Y',$f);
     $nom = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][$m];
     $cant = (int) $q("SELECT COUNT(DISTINCT i.extintor_id) FROM inspecciones i JOIN extintores e ON e.id=i.extintor_id
-                      WHERE e.empresa_id=? AND MONTH(i.fecha)=? AND YEAR(i.fecha)=?", [$empresa_id, $m, $a]);
+                      WHERE e.empresa_id=? AND e.estado!='inactivo'
+                        AND MONTH(i.fecha)=? AND YEAR(i.fecha)=?", [$empresa_id, $m, $a]);
     $insp_mes[] = ['mes'=>$nom, 'cantidad'=>$cant];
 }
 
@@ -54,10 +56,11 @@ for ($i = 5; $i >= 0; $i--) {
     $st = $pdo->prepare("
         SELECT COUNT(*) FROM (
             SELECT i.extintor_id AS eid FROM inspecciones i JOIN extintores e ON e.id=i.extintor_id
-              WHERE e.empresa_id=? AND i.ps='NC' AND MONTH(i.fecha)=? AND YEAR(i.fecha)=?
+              WHERE e.empresa_id=? AND e.estado!='inactivo' AND i.ps='NC'
+                AND MONTH(i.fecha)=? AND YEAR(i.fecha)=?
             UNION
             SELECT e.id AS eid FROM extintores e
-              WHERE e.empresa_id=? AND e.fecha_recarga IS NOT NULL
+              WHERE e.empresa_id=? AND e.estado!='inactivo' AND e.fecha_recarga IS NOT NULL
                 AND MONTH(DATE_ADD(e.fecha_recarga, INTERVAL 1 YEAR))=? AND YEAR(DATE_ADD(e.fecha_recarga, INTERVAL 1 YEAR))=?
         ) t");
     $st->execute([$empresa_id, $m, $a, $empresa_id, $m, $a]);

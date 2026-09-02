@@ -22,7 +22,8 @@ $anio_actual = date('Y');
 $stmt = $pdo->prepare("
     SELECT COUNT(DISTINCT extintor_id) FROM inspecciones i
     JOIN extintores e ON e.id = i.extintor_id
-    WHERE e.empresa_id = ? AND MONTH(i.fecha) = ? AND YEAR(i.fecha) = ?
+    WHERE e.empresa_id = ? AND e.estado != 'inactivo'
+      AND MONTH(i.fecha) = ? AND YEAR(i.fecha) = ?
 ");
 $stmt->execute([$empresa_id, $mes_actual, $anio_actual]);
 $inspeccionados_mes = $stmt->fetchColumn();
@@ -72,7 +73,8 @@ for ($i = 5; $i >= 0; $i--) {
     $stmt = $pdo->prepare("
         SELECT COUNT(DISTINCT extintor_id) FROM inspecciones i
         JOIN extintores e ON e.id = i.extintor_id
-        WHERE e.empresa_id = ? AND MONTH(i.fecha) = ? AND YEAR(i.fecha) = ?
+        WHERE e.empresa_id = ? AND e.estado != 'inactivo'
+          AND MONTH(i.fecha) = ? AND YEAR(i.fecha) = ?
     ");
     $stmt->execute([$empresa_id, $mes, $anio]);
     $count = $stmt->fetchColumn();

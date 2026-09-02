@@ -60,7 +60,8 @@ function misEmpresas() {
                   WHERE e.empresa_id = emp.id AND e.estado != 'inactivo') AS total_extintores,
                (SELECT COUNT(DISTINCT i.extintor_id) FROM inspecciones i
                   JOIN extintores e ON e.id = i.extintor_id
-                  WHERE e.empresa_id = emp.id AND MONTH(i.fecha) = ? AND YEAR(i.fecha) = ?) AS inspeccionados_mes,
+                  WHERE e.empresa_id = emp.id AND e.estado != 'inactivo'
+                    AND MONTH(i.fecha) = ? AND YEAR(i.fecha) = ?) AS inspeccionados_mes,
                (SELECT COUNT(*) FROM extintores e
                   WHERE e.empresa_id = emp.id AND e.estado != 'inactivo'
                     AND e.fecha_ph IS NOT NULL AND e.fecha_ph < CURDATE()) AS vencidos

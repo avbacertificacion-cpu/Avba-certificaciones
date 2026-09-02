@@ -18,10 +18,17 @@ $total_extintores = $stmt->fetchColumn();
 $stmt = $pdo->query("SELECT COUNT(*) FROM usuarios WHERE estado='activo'");
 $total_usuarios = $stmt->fetchColumn();
 
-// Total de inspecciones este mes
+// Extintores inspeccionados este mes.
+// Se cuentan extintores distintos y sólo los que siguen activos, para que
+// coincida con el total: si no, una segunda inspección del mismo extintor —o
+// la de uno dado de baja— hacía que el porcentaje pasara del 100%.
 $mes_actual = date('n');
 $anio_actual = date('Y');
-$stmt = $pdo->prepare("SELECT COUNT(*) FROM inspecciones WHERE MONTH(fecha)=? AND YEAR(fecha)=?");
+$stmt = $pdo->prepare("
+    SELECT COUNT(DISTINCT i.extintor_id) FROM inspecciones i
+    JOIN extintores e ON e.id = i.extintor_id
+    WHERE e.estado != 'inactivo' AND MONTH(i.fecha)=? AND YEAR(i.fecha)=?
+");
 $stmt->execute([$mes_actual, $anio_actual]);
 $inspecciones_mes = $stmt->fetchColumn();
 
@@ -66,7 +73,11 @@ for ($i = 5; $i >= 0; $i--) {
     $anio = date('Y', $fecha);
     $mes_nombre = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][$mes];
 
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM inspecciones WHERE MONTH(fecha)=? AND YEAR(fecha)=?");
+    $stmt = $pdo->prepare("
+        SELECT COUNT(DISTINCT i.extintor_id) FROM inspecciones i
+        JOIN extintores e ON e.id = i.extintor_id
+        WHERE e.estado != 'inactivo' AND MONTH(i.fecha)=? AND YEAR(i.fecha)=?
+    ");
     $stmt->execute([$mes, $anio]);
     $count = $stmt->fetchColumn();
 
@@ -89,11 +100,13 @@ for ($i = 5; $i >= 0; $i--) {
         SELECT COUNT(*) FROM (
             SELECT i.extintor_id AS eid
             FROM inspecciones i
-            WHERE i.ps = 'NC' AND MONTH(i.fecha) = ? AND YEAR(i.fecha) = ?
+            JOIN extintores e ON e.id = i.extintor_id
+            WHERE e.estado != 'inactivo' AND i.ps = 'NC'
+              AND MONTH(i.fecha) = ? AND YEAR(i.fecha) = ?
             UNION
             SELECT e.id AS eid
             FROM extintores e
-            WHERE e.fecha_recarga IS NOT NULL
+            WHERE e.estado != 'inactivo' AND e.fecha_recarga IS NOT NULL
               AND MONTH(DATE_ADD(e.fecha_recarga, INTERVAL 1 YEAR)) = ?
               AND YEAR(DATE_ADD(e.fecha_recarga, INTERVAL 1 YEAR)) = ?
         ) AS t
