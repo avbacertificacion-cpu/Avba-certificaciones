@@ -55,7 +55,7 @@ $nombre = $_SESSION['nombre'];
 
     .modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
     .modal-ov.open{display:flex}
-    .modal{background:#fff;border-radius:14px;width:100%;max-width:1050px;padding:24px;margin:auto}
+    .modal{background:#fff;border-radius:14px;width:100%;max-width:1180px;padding:24px;margin:auto}
     .modal h3{font-size:19px;margin-bottom:16px;color:#1e293b}
     .fg{margin-bottom:14px}
     .fg label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:5px}
@@ -82,6 +82,12 @@ $nombre = $_SESSION['nombre'];
     .pct-campos select{padding:9px;border:2px solid #e0e0ff;border-radius:8px;font-size:13px;background:#fff}
     .pct-nota{font-size:12px;color:#64748b;margin-top:8px}
     .items input.manual{border-color:#f39c12;background:#fffbeb}
+    /* Las tres cifras del negocio —lo que compré, la ganancia y el precio al
+       cliente— se agrupan para que se lean de un vistazo. */
+    .items th.col-dinero{background:#e8effb}
+    .items td.col-dinero{background:#f8faff}
+    .items td.i-importe{font-weight:700;color:#1e293b}
+    .items .th-nota{display:block;font-weight:400;text-transform:none;font-size:9px;color:#64748b;margin-top:1px}
     .items .rest{background:none;border:none;cursor:pointer;font-size:13px;padding:0 4px;color:#f39c12}
 
     .tot{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;background:#f8faff;
@@ -192,16 +198,17 @@ $nombre = $_SESSION['nombre'];
             <div style="overflow-x:auto">
             <table class="items">
                 <thead><tr>
-                    <th style="min-width:150px">Proveedor (a quién se lo pedí)</th>
-                    <th style="min-width:170px">Producto del proveedor</th>
-                    <th style="min-width:190px">Descripción para el cliente</th>
-                    <th style="width:70px">Cant.</th>
-                    <th style="width:80px">Unidad</th>
-                    <th style="width:105px">Costo unit.</th>
-                    <th style="width:120px">Precio venta</th>
-                    <th style="width:95px">Utilidad</th>
-                    <th style="width:80px">% util.</th>
-                    <th style="width:40px"></th>
+                    <th style="min-width:135px">Proveedor (a quién se lo pedí)</th>
+                    <th style="min-width:150px">Producto del proveedor</th>
+                    <th style="min-width:165px">Descripción para el cliente</th>
+                    <th style="width:78px">Cant.</th>
+                    <th style="width:76px">Unidad</th>
+                    <th class="col-dinero" style="width:112px">Costo unit.<br><span class="th-nota">lo que compré</span></th>
+                    <th class="col-dinero" style="width:88px">% util.<br><span class="th-nota">ganancia</span></th>
+                    <th class="col-dinero" style="width:145px">Precio venta<br><span class="th-nota">unitario al cliente</span></th>
+                    <th class="col-dinero" style="width:112px">Importe<br><span class="th-nota">lo que paga</span></th>
+                    <th style="width:100px">Utilidad</th>
+                    <th style="width:36px"></th>
                 </tr></thead>
                 <tbody id="items"></tbody>
             </table>
@@ -413,14 +420,15 @@ function agregarFila(it) {
         <td><input type="text" class="i-desc" value="${esc(it.descripcion || '')}" placeholder="Ej: Recarga extintor PQS 9 kg"></td>
         <td><input type="number" class="i-cant n" step="0.01" min="0" value="${it.cantidad != null ? it.cantidad : 1}" oninput="recalcular()"></td>
         <td><input type="text" class="i-unidad" value="${esc(it.unidad || '')}" placeholder="pza"></td>
-        <td><input type="number" class="i-costo n" step="0.01" min="0" value="${it.costo_unitario != null ? it.costo_unitario : 0}" oninput="cambioCosto(this)"></td>
-        <td style="white-space:nowrap">
+        <td class="col-dinero"><input type="number" class="i-costo n" step="0.01" min="0" value="${it.costo_unitario != null ? it.costo_unitario : 0}" oninput="cambioCosto(this)"></td>
+        <td class="col-dinero"><input type="number" class="i-pct n" step="0.1" title="Porcentaje de utilidad de esta partida" oninput="pctManual(this)"></td>
+        <td class="col-dinero" style="white-space:nowrap">
             <input type="number" class="i-precio n" step="0.01" min="0" value="${it.precio_unitario != null ? it.precio_unitario : 0}"
-                   style="width:calc(100% - 22px)" oninput="precioManual(this)">
+                   style="width:calc(100% - 24px)" oninput="precioManual(this)">
             <button type="button" class="rest" title="Volver a calcularlo con el porcentaje" onclick="restaurarPrecio(this)">↻</button>
         </td>
+        <td class="col-dinero ro i-importe">$0.00</td>
         <td class="ro i-util">$0.00</td>
-        <td><input type="number" class="i-pct n" step="0.1" title="Porcentaje de utilidad de esta partida" oninput="pctManual(this)"></td>
         <td><button type="button" class="del" onclick="this.closest('tr').remove();recalcular()">✕</button></td>`;
     document.getElementById('items').appendChild(tr);
 
@@ -585,6 +593,7 @@ function recalcular() {
         const sc = cant * cu, sv = cant * pu, u = sv - sc;
         costo += sc; venta += sv;
         const eUtil = tr.querySelector('.i-util'), ePct = tr.querySelector('.i-pct');
+        tr.querySelector('.i-importe').textContent = money(sv);
         eUtil.textContent = money(u);
         eUtil.style.color = u < 0 ? '#c0392b' : '#047857';
         // No se reescribe mientras se teclea en esa misma casilla
