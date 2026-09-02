@@ -286,7 +286,8 @@ $optUnidad  = opcionesCatalogo(catClaveUnidad());
         <div class="modal-actions">
             <button class="btn btn-warning" onclick="cerrar('modalCot')">Cancelar</button>
             <button class="btn btn-ghost" id="btnDocs" onclick="docsActual()" style="display:none">📎 Documentos</button>
-            <button class="btn btn-ghost" id="btnImprimir" onclick="imprimirActual()" style="display:none">🖨️ Imprimir para el cliente</button>
+            <button class="btn btn-ghost" id="btnImprimir" onclick="imprimirActual('cliente')" style="display:none">🖨️ Copia del cliente</button>
+            <button class="btn btn-ghost" id="btnInterna" onclick="imprimirActual('interna')" style="display:none">🔒 Copia interna</button>
             <button class="btn btn-primary" onclick="guardarCot()">Guardar cotización</button>
         </div>
     </div>
@@ -410,7 +411,8 @@ function render() {
             <td><button class="btn btn-ghost btn-sm" onclick="docsDe(${c.id})" title="Evidencias, facturas y documentación">📎 ${adjuntos[c.id] || 0}</button></td>
             <td style="white-space:nowrap;text-align:right">
                 <button class="btn btn-warning btn-sm" onclick="editar(${c.id})" title="Editar">✏️</button>
-                <button class="btn btn-ghost btn-sm" onclick="imprimir(${c.id})" title="Imprimir para el cliente">🖨️</button>
+                <button class="btn btn-ghost btn-sm" onclick="imprimir(${c.id},'cliente')" title="Copia para el cliente (sólo precios de venta)">🖨️</button>
+                <button class="btn btn-ghost btn-sm" onclick="imprimir(${c.id},'interna')" title="Copia interna (con costos y utilidad)">🔒</button>
                 <button class="btn btn-danger btn-sm" onclick="borrar(${c.id})" title="Eliminar">🗑️</button>
             </td></tr>`).join('')}</tbody></table>`;
 }
@@ -433,6 +435,7 @@ function nueva() {
     document.getElementById('k-pct').value = pctPorDefecto();
     document.getElementById('items').innerHTML = '';
     document.getElementById('btnImprimir').style.display = 'none';
+    document.getElementById('btnInterna').style.display = 'none';
     document.getElementById('btnDocs').style.display = 'none';
     agregarFila();
     aplicarPorcentaje();
@@ -458,6 +461,7 @@ async function editar(id) {
     ponerFiscales(c);
     document.getElementById('k-pct').value  = Number(c.utilidad_pct) > 0 ? Number(c.utilidad_pct) : pctPorDefecto();
     document.getElementById('btnImprimir').style.display = '';
+    document.getElementById('btnInterna').style.display = '';
     document.getElementById('btnDocs').style.display = '';
 
     document.getElementById('items').innerHTML = '';
@@ -744,11 +748,15 @@ async function borrar(id) {
 }
 
 // ── Impresión para el cliente (sin costos ni utilidad) ──────────────────────
-/** Abre el presupuesto con el formato fiscal, listo para imprimir o guardar en PDF. */
-function imprimir(id) {
-    window.open(`../api/cotizacion_pdf.php?id=${id}`, '_blank');
+/**
+ * Abre el presupuesto con el formato fiscal, listo para imprimir o guardar en PDF.
+ * @param {string} vista  'cliente' (precios de venta) o 'interna' (con costos y utilidad).
+ */
+function imprimir(id, vista) {
+    const q = vista === 'interna' ? '&vista=interna' : '';
+    window.open(`../api/cotizacion_pdf.php?id=${id}${q}`, '_blank');
 }
-function imprimirActual() { if (cotActual) imprimir(cotActual.id); }
+function imprimirActual(vista) { if (cotActual) imprimir(cotActual.id, vista); }
 function docsActual() { if (cotActual) docsDe(cotActual.id); }
 
 // La preferencia de mostrar las claves del SAT se recuerda entre sesiones
