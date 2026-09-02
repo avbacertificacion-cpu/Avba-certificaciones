@@ -224,6 +224,51 @@ extinguisher-system/
 - **Seguridad**: Password hashing BCRYPT, Prepared statements
 - **Generación PDF**: TCPDF (por implementar)
 
+## 🧪 Sistema de demostración
+
+La demostración y el sistema real son **dos instalaciones separadas**, cada una
+con su propio `config/config.php` y, sobre todo, **con su propia base de datos**.
+Ninguna información pasa de una a la otra: no comparten tablas ni usuarios.
+
+`config/config.php` no viaja en el repositorio (está en `.gitignore`), así que
+cada instalación mantiene sus credenciales y su base sin que un despliegue las
+pise.
+
+### Montar la demostración
+
+1. Crear una **base de datos nueva** en el hosting, aparte de la de producción
+   (por ejemplo `avba_demo`).
+2. Publicar el mismo código en un subdominio o carpeta propia
+   (por ejemplo `demo.midominio.com`).
+3. En el `config/config.php` **de esa instalación** —nunca en el del sistema
+   real— apuntar a la base nueva y agregar:
+
+   ```php
+   define('MODO_DEMO', true);
+   ```
+
+4. Entrar como administrador a `private/admin-sembrar-plantas.php` y sembrar las
+   14 plantas de ejemplo con su historial.
+
+Con `MODO_DEMO` encendido, las pantallas muestran una cinta que identifica la
+instalación como demostración. En el sistema real la constante no existe, así
+que el modo está apagado y **sembrar datos de ejemplo está bloqueado**: es lo
+que evita que las plantas de demostración vuelvan a entrar por descuido y
+falseen los tableros, los porcentajes de inspección y los reportes.
+
+### Quitar datos de demostración del sistema real
+
+Si en el sistema real quedaron plantas de ejemplo de una carga anterior, se
+retiran desde `private/admin-quitar-demo.php`. La pantalla muestra, planta por
+planta, cuántos extintores, inspecciones, reportes y cotizaciones se irían con
+ella; el administrador marca cuáles quitar y escribe una palabra de
+confirmación. El borrado ocurre dentro de una transacción, y los archivos
+subidos se eliminan sólo cuando la transacción cerró bien.
+
+Los nombres de la lista son centros de trabajo reales, así que la herramienta
+nunca borra "todo lo que coincida": cada planta se marca a mano, por si alguna
+llegara a ser un cliente de verdad.
+
 ## 📝 Licencia
 
 Todos los derechos reservados © 2026
