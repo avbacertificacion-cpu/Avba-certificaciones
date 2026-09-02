@@ -101,6 +101,9 @@ if ($es_mes_actual) {
 // Usar el inspector asignado al reporte
 $inspector_header = strtoupper($reporte['inspector_nombre']);
 
+// Total de extintores incluidos en el reporte, para el encabezado
+$total_extintores = count($extintores);
+
 $meses_es = ['','Enero','Febrero','Marzo','Abril','Mayo','Junio',
              'Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 $mes_texto = strtoupper(substr($meses_es[$mes], 0, 3)) . '-' . substr($anio, 2, 2);
@@ -375,6 +378,10 @@ if (!$logo_html) {
                 <tr>
                     <td>Ubicación:</td>
                     <td><?= htmlspecialchars($ubicacion) ?></td>
+                </tr>
+                <tr>
+                    <td>Total de extintores:</td>
+                    <td><strong><?= $total_extintores ?></strong></td>
                 </tr>
             </table>
 
