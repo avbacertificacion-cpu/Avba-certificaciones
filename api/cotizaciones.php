@@ -82,7 +82,7 @@ function asegurarTablasCotizaciones($pdo) {
                 contacto       VARCHAR(150) DEFAULT NULL,
                 fecha          DATE NOT NULL,
                 vigencia_dias  INT NOT NULL DEFAULT 15,
-                estado         VARCHAR(20) NOT NULL DEFAULT 'borrador',
+                estado         VARCHAR(20) NOT NULL DEFAULT 'pendiente',
                 notas          TEXT DEFAULT NULL,
                 creado_por     INT DEFAULT NULL,
                 created_at     DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -112,6 +112,17 @@ function asegurarTablasCotizaciones($pdo) {
     agregarColumna($pdo, 'cotizaciones', 'utilidad_base', "VARCHAR(10) NOT NULL DEFAULT 'costo'");
     // Producto del catálogo del que salió la partida, para reabrirla ya elegido
     agregarColumna($pdo, 'cotizacion_items', 'catalogo_id', "INT DEFAULT NULL");
+
+    // Los estados pasaron a ser pendiente → aceptada → pagada. Las cotizaciones
+    // que venían en 'borrador' o 'enviada' quedan como pendientes.
+    try {
+        $pdo->exec("UPDATE cotizaciones SET estado='pendiente' WHERE estado IN ('borrador','enviada')");
+    } catch (Exception $e) { /* si falla, las cotizaciones viejas conservan su estado */ }
+}
+
+/** Estados válidos de una cotización, en el orden en que avanzan. */
+function estadosValidos(): array {
+    return ['pendiente', 'aceptada', 'pagada', 'rechazada'];
 }
 
 /** Agrega una columna solo si falta. */
@@ -329,8 +340,7 @@ function guardarCotizacion() {
     $dt = DateTime::createFromFormat('Y-m-d', $fecha);
     if (!$dt || $dt->format('Y-m-d') !== $fecha) $fecha = date('Y-m-d');
 
-    $estadosValidos = ['borrador','enviada','aceptada','rechazada'];
-    $estado = in_array($d['estado'] ?? '', $estadosValidos, true) ? $d['estado'] : 'borrador';
+    $estado = in_array($d['estado'] ?? '', estadosValidos(), true) ? $d['estado'] : 'pendiente';
 
     // Porcentaje con el que se calculó el precio de venta: al reabrir la
     // cotización debe seguir vigente el mismo criterio.
@@ -432,7 +442,7 @@ function cambiarEstado() {
     $d  = json_decode(file_get_contents('php://input'), true) ?: [];
     $id = intval($d['id'] ?? 0);
     $estado = $d['estado'] ?? '';
-    if (!$id || !in_array($estado, ['borrador','enviada','aceptada','rechazada'], true)) {
+    if (!$id || !in_array($estado, estadosValidos(), true)) {
         http_response_code(400); echo json_encode(['error' => 'Datos inválidos']); return;
     }
     $pdo->prepare("UPDATE cotizaciones SET estado=? WHERE id=?")->execute([$estado, $id]);
@@ -450,16 +460,18 @@ function resumen() {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $r = ['total' => 0, 'aceptadas' => 0, 'venta_aceptada' => 0, 'utilidad_aceptada' => 0,
-          'venta_pendiente' => 0, 'margen_promedio' => 0];
+          'venta_pendiente' => 0, 'venta_pagada' => 0, 'margen_promedio' => 0];
     $margenes = [];
     foreach ($rows as $row) {
         $row = conUtilidad($row);
         $r['total']++;
-        if ($row['estado'] === 'aceptada') {
+        // Aceptada y pagada son negocio ganado; la pagada además ya se cobró.
+        if (in_array($row['estado'], ['aceptada','pagada'], true)) {
             $r['aceptadas']++;
             $r['venta_aceptada']    += $row['total_venta'];
             $r['utilidad_aceptada'] += $row['utilidad'];
-        } elseif (in_array($row['estado'], ['borrador','enviada'], true)) {
+            if ($row['estado'] === 'pagada') $r['venta_pagada'] += $row['total_venta'];
+        } elseif ($row['estado'] === 'pendiente') {
             $r['venta_pendiente'] += $row['total_venta'];
         }
         if ($row['total_venta'] > 0) $margenes[] = $row['margen_pct'];
@@ -467,6 +479,7 @@ function resumen() {
     $r['venta_aceptada']    = round($r['venta_aceptada'], 2);
     $r['utilidad_aceptada'] = round($r['utilidad_aceptada'], 2);
     $r['venta_pendiente']   = round($r['venta_pendiente'], 2);
+    $r['venta_pagada']      = round($r['venta_pagada'], 2);
     $r['margen_promedio']   = $margenes ? round(array_sum($margenes) / count($margenes), 1) : 0;
 
     echo json_encode(['success' => true, 'data' => $r]);

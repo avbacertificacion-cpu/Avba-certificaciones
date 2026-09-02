@@ -46,9 +46,9 @@ $nombre = $_SESSION['nombre'];
     tbody tr:hover{background:#f8faff}
 
     .badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block}
-    .b-borrador{background:#e2e8f0;color:#475569}
-    .b-enviada{background:#dbeafe;color:#1d4ed8}
-    .b-aceptada{background:#d1fae5;color:#047857}
+    .b-pendiente{background:#fef3c7;color:#92400e}
+    .b-aceptada{background:#dbeafe;color:#1d4ed8}
+    .b-pagada{background:#d1fae5;color:#047857}
     .b-rechazada{background:#fee2e2;color:#b91c1c}
     .util{font-weight:800;color:#047857}
     .util.neg{color:#c0392b}
@@ -127,9 +127,9 @@ $nombre = $_SESSION['nombre'];
         <input type="text" id="busca" placeholder="🔍 Buscar folio o cliente…" oninput="render()">
         <select id="filtroEstado" onchange="render()">
             <option value="">Todos los estados</option>
-            <option value="borrador">Borrador</option>
-            <option value="enviada">Enviada</option>
+            <option value="pendiente">Pendiente</option>
             <option value="aceptada">Aceptada</option>
+            <option value="pagada">Pagada</option>
             <option value="rechazada">Rechazada</option>
         </select>
         <button class="btn btn-primary" onclick="nueva()">＋ Nueva cotización</button>
@@ -163,9 +163,9 @@ $nombre = $_SESSION['nombre'];
             <div class="fg"><label>Vigencia (días)</label><input type="number" id="k-vigencia" min="0" value="15"></div>
             <div class="fg"><label>Estado</label>
                 <select id="k-estado">
-                    <option value="borrador">Borrador</option>
-                    <option value="enviada">Enviada</option>
+                    <option value="pendiente">Pendiente</option>
                     <option value="aceptada">Aceptada</option>
+                    <option value="pagada">Pagada</option>
                     <option value="rechazada">Rechazada</option>
                 </select>
             </div>
@@ -200,7 +200,7 @@ $nombre = $_SESSION['nombre'];
                     <th style="width:105px">Costo unit.</th>
                     <th style="width:120px">Precio venta</th>
                     <th style="width:95px">Utilidad</th>
-                    <th style="width:60px">%</th>
+                    <th style="width:80px">% util.</th>
                     <th style="width:40px"></th>
                 </tr></thead>
                 <tbody id="items"></tbody>
@@ -296,10 +296,11 @@ function pintarKpis(r) {
     if (!r) { c.innerHTML = ''; return; }
     c.innerHTML = `
         <div class="kpi"><div class="v">${r.total}</div><div class="l">Cotizaciones registradas</div></div>
-        <div class="kpi ok"><div class="v">${r.aceptadas}</div><div class="l">Aceptadas</div></div>
-        <div class="kpi ok"><div class="v">${money(r.venta_aceptada)}</div><div class="l">Venta aceptada</div></div>
-        <div class="kpi pur"><div class="v">${money(r.utilidad_aceptada)}</div><div class="l">Utilidad de lo aceptado</div></div>
-        <div class="kpi warn"><div class="v">${money(r.venta_pendiente)}</div><div class="l">En borrador / enviadas</div></div>
+        <div class="kpi ok"><div class="v">${r.aceptadas}</div><div class="l">Aceptadas y pagadas</div></div>
+        <div class="kpi ok"><div class="v">${money(r.venta_aceptada)}</div><div class="l">Venta ganada</div></div>
+        <div class="kpi pur"><div class="v">${money(r.utilidad_aceptada)}</div><div class="l">Utilidad de lo ganado</div></div>
+        <div class="kpi ok"><div class="v">${money(r.venta_pagada || 0)}</div><div class="l">Ya cobrado</div></div>
+        <div class="kpi warn"><div class="v">${money(r.venta_pendiente)}</div><div class="l">Pendientes de respuesta</div></div>
         <div class="kpi"><div class="v">${r.margen_promedio}%</div><div class="l">Margen promedio</div></div>`;
 }
 
@@ -353,7 +354,7 @@ function nueva() {
     document.getElementById('k-contacto').value = '';
     document.getElementById('k-fecha').value = new Date().toISOString().substring(0,10);
     document.getElementById('k-vigencia').value = 15;
-    document.getElementById('k-estado').value = 'borrador';
+    document.getElementById('k-estado').value = 'pendiente';
     document.getElementById('k-notas').value = '';
     document.getElementById('k-pct').value = pctPorDefecto();
     document.getElementById('k-base').value = 'costo';
@@ -419,7 +420,7 @@ function agregarFila(it) {
             <button type="button" class="rest" title="Volver a calcularlo con el porcentaje" onclick="restaurarPrecio(this)">↻</button>
         </td>
         <td class="ro i-util">$0.00</td>
-        <td class="ro i-pct">0%</td>
+        <td><input type="number" class="i-pct n" step="0.1" title="Porcentaje de utilidad de esta partida" oninput="pctManual(this)"></td>
         <td><button type="button" class="del" onclick="this.closest('tr').remove();recalcular()">✕</button></td>`;
     document.getElementById('items').appendChild(tr);
 
@@ -479,11 +480,23 @@ function marcarManual(tr, manual) {
     const inp = tr.querySelector('.i-precio');
     tr.dataset.manual = manual ? '1' : '';
     inp.classList.toggle('manual', !!manual);
-    inp.title = manual ? 'Precio escrito a mano: el porcentaje no lo cambia' : '';
+    tr.querySelector('.i-pct').classList.toggle('manual', !!manual);
+    inp.title = manual ? 'Precio propio de esta partida: el porcentaje general no lo cambia' : '';
     tr.querySelector('.rest').style.visibility = manual ? 'visible' : 'hidden';
 }
 
 function precioManual(inp) { marcarManual(inp.closest('tr'), true); recalcular(); }
+
+/** Al escribir el % de una partida, su precio de venta se recalcula con ese porcentaje. */
+function pctManual(inp) {
+    const tr = inp.closest('tr');
+    const base  = document.getElementById('k-base').value;
+    const costo = parseFloat(tr.querySelector('.i-costo').value) || 0;
+    const pct   = parseFloat(inp.value) || 0;
+    marcarManual(tr, true);
+    tr.querySelector('.i-precio').value = precioDesdeCosto(costo, pct, base).toFixed(2);
+    recalcular();
+}
 function restaurarPrecio(btn) { marcarManual(btn.closest('tr'), false); aplicarPorcentajeFila(btn.closest('tr')); recalcular(); }
 function cambioCosto(inp) { aplicarPorcentajeFila(inp.closest('tr')); recalcular(); }
 
@@ -494,6 +507,18 @@ function aplicarPorcentajeFila(tr) {
     const base  = document.getElementById('k-base').value;
     const costo = parseFloat(tr.querySelector('.i-costo').value) || 0;
     tr.querySelector('.i-precio').value = precioDesdeCosto(costo, pct, base).toFixed(2);
+}
+
+/**
+ * Porcentaje de utilidad de una partida, expresado en la misma base que el de
+ * la cotización, para que la columna y el encabezado hablen el mismo idioma.
+ */
+function porcentajeDeFila(costo, precio, base) {
+    costo = Number(costo) || 0;
+    precio = Number(precio) || 0;
+    const util = precio - costo;
+    if (base === 'venta') return precio > 0 ? util / precio * 100 : 0;
+    return costo > 0 ? util / costo * 100 : 0;
 }
 
 /**
@@ -531,9 +556,9 @@ function aplicarPorcentaje(forzar) {
     if (base === 'venta') {
         nota.textContent = pct >= 100
             ? '⚠️ Un margen sobre la venta del 100% o más no se puede calcular. Usa un valor menor.'
-            : `Cada partida se vende a costo ÷ ${(1 - pct / 100).toFixed(2)}, de modo que el margen real sea del ${pct}%.`;
+            : `Cada partida se vende a costo ÷ ${(1 - pct / 100).toFixed(2)}, de modo que el margen real sea del ${pct}%. Puedes darle su propio % a cualquier partida en su renglón.`;
     } else {
-        nota.textContent = `Cada partida se vende a costo × ${(1 + pct / 100).toFixed(2)}. Puedes escribir un precio a mano y el porcentaje lo respetará (se marca en ámbar).`;
+        nota.textContent = `Cada partida se vende a costo × ${(1 + pct / 100).toFixed(2)}. Puedes cambiar el % o el precio de una partida en su renglón: queda con el suyo (en ámbar) y este porcentaje ya no la toca.`;
     }
     recalcular();
 }
@@ -552,6 +577,7 @@ function leerItems() {
 
 function recalcular() {
     let costo = 0, venta = 0;
+    const base = document.getElementById('k-base').value;
     document.querySelectorAll('#items tr').forEach(tr => {
         const cant = parseFloat(tr.querySelector('.i-cant').value) || 0;
         const cu   = parseFloat(tr.querySelector('.i-costo').value) || 0;
@@ -561,7 +587,10 @@ function recalcular() {
         const eUtil = tr.querySelector('.i-util'), ePct = tr.querySelector('.i-pct');
         eUtil.textContent = money(u);
         eUtil.style.color = u < 0 ? '#c0392b' : '#047857';
-        ePct.textContent  = sv > 0 ? (u / sv * 100).toFixed(1) + '%' : '0%';
+        // No se reescribe mientras se teclea en esa misma casilla
+        if (ePct !== document.activeElement) {
+            ePct.value = porcentajeDeFila(cu, pu, base).toFixed(1);
+        }
     });
     const util = venta - costo;
     document.getElementById('t-costo').textContent  = money(costo);
