@@ -50,8 +50,9 @@ function listarEmpresas() {
     // para precargar el formulario de edición (si no vinieran, al guardar se
     // sobrescribirían con valores vacíos).
     $colAlertas = empresaTieneColumnaAlertas($pdo) ? 'mostrar_alertas' : '1 AS mostrar_alertas';
+    $colFotos   = empresaTieneColumnaFotos($pdo)   ? 'requiere_fotos'  : '0 AS requiere_fotos';
     $stmt = $pdo->query("
-        SELECT id, nombre, rfc, domicilio, telefono, email, contacto, $colAlertas
+        SELECT id, nombre, rfc, domicilio, telefono, email, contacto, $colAlertas, $colFotos
         FROM empresas WHERE estado='activo' ORDER BY nombre
     ");
     echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
@@ -249,10 +250,17 @@ function crearEmpresa() {
     $tieneAlertas   = empresaTieneColumnaAlertas($pdo);
     $mostrarAlertas = array_key_exists('mostrar_alertas', $d) ? (int) !empty($d['mostrar_alertas']) : 1;
 
+    // Módulo opcional de evidencia fotográfica en el reporte (por defecto: apagado)
+    asegurarColumnaFotos($pdo);
+    $tieneFotos    = empresaTieneColumnaFotos($pdo);
+    $requiereFotos = array_key_exists('requiere_fotos', $d) ? (int) !empty($d['requiere_fotos']) : 0;
+
     if ($id) {
         // Editar empresa existente
-        $sql = "UPDATE empresas SET nombre=?, rfc=?, domicilio=?, telefono=?, email=?, contacto="
-             . ($tieneAlertas ? "?, mostrar_alertas=? WHERE id=?" : "? WHERE id=?");
+        $sql = "UPDATE empresas SET nombre=?, rfc=?, domicilio=?, telefono=?, email=?, contacto=?"
+             . ($tieneAlertas ? ", mostrar_alertas=?" : "")
+             . ($tieneFotos   ? ", requiere_fotos=?"  : "")
+             . " WHERE id=?";
         $params = [
             $d['nombre'],
             $d['rfc']       ?? null,
@@ -262,14 +270,16 @@ function crearEmpresa() {
             $d['contacto']  ?? null,
         ];
         if ($tieneAlertas) $params[] = $mostrarAlertas;
+        if ($tieneFotos)   $params[] = $requiereFotos;
         $params[] = $id;
 
         $pdo->prepare($sql)->execute($params);
         audit($uid, "Editar empresa {$d['nombre']}", 'empresas', $id);
     } else {
         // Crear empresa nueva
-        $cols   = "nombre,rfc,domicilio,telefono,email,contacto" . ($tieneAlertas ? ",mostrar_alertas" : "");
-        $vals   = "?,?,?,?,?,?" . ($tieneAlertas ? ",?" : "");
+        $cols   = "nombre,rfc,domicilio,telefono,email,contacto"
+                . ($tieneAlertas ? ",mostrar_alertas" : "") . ($tieneFotos ? ",requiere_fotos" : "");
+        $vals   = "?,?,?,?,?,?" . ($tieneAlertas ? ",?" : "") . ($tieneFotos ? ",?" : "");
         $params = [
             $d['nombre'],
             $d['rfc']       ?? null,
@@ -279,6 +289,7 @@ function crearEmpresa() {
             $d['contacto']  ?? null,
         ];
         if ($tieneAlertas) $params[] = $mostrarAlertas;
+        if ($tieneFotos)   $params[] = $requiereFotos;
 
         $pdo->prepare("INSERT INTO empresas ($cols) VALUES ($vals)")->execute($params);
         $id = $pdo->lastInsertId();

@@ -213,6 +213,20 @@ if (!empty($pagina_actual)) {
 
 $total_paginas = count($paginas);
 
+// ─── Evidencia fotográfica (módulo opcional por planta) ──────────────────────
+// Se leen las fotos que ya tenga el reporte; si hay, ocupan una hoja extra al
+// final. La lectura es defensiva: si la tabla aún no existe, simplemente no hay.
+$fotos = [];
+try {
+    $stmt = $pdo->prepare("SELECT archivo, descripcion FROM reporte_fotos WHERE reporte_id = ? ORDER BY orden, id");
+    $stmt->execute([$reporte_id]);
+    $fotos = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {
+    $fotos = [];
+}
+$hoja_fotos = $fotos ? 1 : 0;
+$total_paginas += $hoja_fotos;
+
 if ($total_paginas === 0) {
     exit('No hay extintores registrados para la empresa "' . htmlspecialchars($reporte['empresa_nombre']) . '". Agrega extintores primero.');
 }
@@ -345,6 +359,15 @@ if (!$logo_html) {
             .page-block { background:#fff; padding:14px; margin:0 auto 20px;
                           max-width:1050px; box-shadow:0 2px 8px rgba(0,0,0,.2); }
         }
+
+        /* ─── Hoja de evidencia fotográfica ─── */
+        .fotos-titulo { font-size:11pt; font-weight:bold; text-transform:uppercase;
+                        text-align:center; margin:6px 0 10px; }
+        .fotos-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; }
+        .foto-celda { border:1px solid #999; padding:4px; text-align:center;
+                      page-break-inside:avoid; }
+        .foto-celda img { width:100%; height:150px; object-fit:contain; display:block; }
+        .foto-pie { font-size:7pt; color:#333; margin-top:3px; }
 
         /* ─── Botones pantalla ─── */
         .btn-bar { max-width:1050px; margin:0 auto 16px; display:flex; gap:10px; }
@@ -483,6 +506,46 @@ if (!$logo_html) {
 
 </div><!-- .page-block -->
 <?php endforeach; ?>
+
+<?php if ($fotos): ?>
+<!-- ── EVIDENCIA FOTOGRÁFICA (hoja final) ─────────────────────────────────── -->
+<div class="page-block">
+    <div class="page-header">
+        <div class="header-top">
+            <?= $logo_html ?>
+            <div class="header-title">
+                <h1>Evidencia Fotográfica</h1>
+                <p>Reporte de Inspección Mensual de Extintores</p>
+            </div>
+            <div class="rev-num"><?= htmlspecialchars($num_reporte) ?></div>
+        </div>
+        <table class="info-table">
+            <tr>
+                <td>Empresa:</td>
+                <td><strong><?= htmlspecialchars(strtoupper($reporte['empresa_nombre'])) ?></strong></td>
+            </tr>
+            <tr>
+                <td>Fecha de inspección:</td>
+                <td style="color:#0070c0;font-weight:bold"><?= $mes_texto ?></td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="fotos-grid">
+        <?php foreach ($fotos as $i => $f): ?>
+        <div class="foto-celda">
+            <img src="../uploads/reportes/<?= htmlspecialchars($f['archivo']) ?>" alt="Evidencia <?= $i + 1 ?>">
+            <div class="foto-pie"><?= htmlspecialchars($f['descripcion'] ?: ('Fotografía ' . ($i + 1))) ?></div>
+        </div>
+        <?php endforeach; ?>
+    </div>
+
+    <div class="firma-wrap">
+        <div class="firma-box">FIRMA ENTERADO</div>
+        <div class="pagina-num">Hoja <?= $total_paginas ?> de <?= $total_paginas ?></div>
+    </div>
+</div><!-- .page-block -->
+<?php endif; ?>
 
 </body>
 </html>

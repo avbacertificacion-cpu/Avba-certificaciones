@@ -8,6 +8,7 @@ vendor/
 uploads/certificados/
 uploads/evidencias/
 uploads/ordenes/
+uploads/reportes/
 # Los documentos adjuntos sí guardan su .htaccess y su index.html (blindan la carpeta)
 uploads/documentos/*
 !uploads/documentos/.htaccess

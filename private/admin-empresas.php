@@ -8,6 +8,7 @@ $nombre = $_SESSION['nombre'];
 
 // Crea la columna de preferencia la primera vez que un admin entra aquí
 asegurarColumnaAlertas($pdo);
+asegurarColumnaFotos($pdo);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -163,6 +164,17 @@ asegurarColumnaAlertas($pdo);
             </small>
         </div>
 
+        <div class="form-group" style="background:#f7f9fc;border:1.5px solid #e0e0ff;border-radius:8px;padding:14px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0">
+                <input type="checkbox" id="e-fotos" style="width:18px;height:18px;cursor:pointer">
+                <span>Solicitar evidencia fotográfica al generar el reporte</span>
+            </label>
+            <small style="margin-top:8px;display:block">
+                Si lo activas, al crear un reporte de esta planta se pedirán hasta
+                9 fotografías, que se incluirán al final del reporte.
+            </small>
+        </div>
+
         <div class="modal-actions">
             <button class="btn btn-warning" onclick="cerrarModal()">Cancelar</button>
             <button class="btn btn-primary" onclick="guardarEmpresa()">Guardar empresa</button>
@@ -203,6 +215,7 @@ function render(data) {
                 ${e.contacto ? `<p><strong>Contacto</strong> ${sanitize(e.contacto)}</p>` : ''}
                 ${e.domicilio ? `<p><strong>Domicilio</strong> ${sanitize(e.domicilio)}</p>` : ''}
                 ${Number(e.mostrar_alertas) === 0 ? `<p style="margin-top:8px"><span style="display:inline-block;background:#fef3c7;color:#92400e;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700">🔕 Alertas ocultas al cliente</span></p>` : ''}
+                ${Number(e.requiere_fotos) === 1 ? `<p style="margin-top:8px"><span style="display:inline-block;background:#dbeafe;color:#1d4ed8;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700">📷 Pide fotos en el reporte</span></p>` : ''}
             </div>
             <div class="empresa-actions">
                 <button class="btn btn-sm btn-warning" onclick="editarEmpresa(${parseInt(e.id)})" title="Editar empresa">✏️ Editar</button>
@@ -243,6 +256,7 @@ function editarEmpresa(id) {
     document.getElementById('e-domicilio').value = e.domicilio || '';
     // Sin dato guardado se asume activado (comportamiento por defecto)
     document.getElementById('e-alertas').checked = (e.mostrar_alertas === undefined) || Number(e.mostrar_alertas) === 1;
+    document.getElementById('e-fotos').checked = Number(e.requiere_fotos) === 1;
     document.getElementById('modalEmpresa').classList.add('open');
 }
 
@@ -255,6 +269,7 @@ function limpiarModal() {
     document.getElementById('e-contacto').value = '';
     document.getElementById('e-domicilio').value = '';
     document.getElementById('e-alertas').checked = true;
+    document.getElementById('e-fotos').checked = false;
     document.getElementById('modal-alert').innerHTML = '';
 }
 
@@ -296,6 +311,7 @@ async function guardarEmpresa() {
             contacto: document.getElementById('e-contacto').value.trim() || null,
             domicilio: document.getElementById('e-domicilio').value.trim() || null,
             mostrar_alertas: document.getElementById('e-alertas').checked ? 1 : 0,
+            requiere_fotos:  document.getElementById('e-fotos').checked ? 1 : 0,
         };
         if (id) body.id = parseInt(id);
 

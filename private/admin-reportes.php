@@ -80,6 +80,24 @@ $nombre = $_SESSION['nombre'];
     <div id="tabla"></div>
 </div>
 
+<!-- Modal de fotografías del reporte -->
+<div class="modal-overlay" id="modalFotos">
+    <div class="modal" style="max-width:640px">
+        <h2 style="margin-bottom:6px">📷 Evidencia fotográfica</h2>
+        <p style="color:#666;font-size:13px;margin-bottom:16px" id="fotos-titulo"></p>
+        <div id="fotos-alert"></div>
+        <div class="form-group">
+            <label>Agregar fotografías <span style="font-weight:400;color:#666">(máximo 9 en total)</span></label>
+            <input type="file" id="f-archivos" accept="image/*" multiple>
+            <button class="btn btn-primary" style="margin-top:10px" onclick="agregarFotos()">⬆️ Subir</button>
+        </div>
+        <div id="fotos-lista"></div>
+        <div class="modal-actions">
+            <button class="btn btn-warning" onclick="cerrarFotos()">Cerrar</button>
+        </div>
+    </div>
+</div>
+
 <!-- Modal crear reporte -->
 <div class="modal-overlay" id="modalReporte">
     <div class="modal">
@@ -116,6 +134,14 @@ $nombre = $_SESSION['nombre'];
             <label>Ubicación</label>
             <input type="text" id="r-obs" placeholder="Ej: EAA, PLANTA NORTE…" style="text-transform:uppercase">
         </div>
+        <div class="form-group" id="bloque-fotos" style="display:none;background:#f7f9fc;border:1.5px solid #e0e0ff;border-radius:8px;padding:14px">
+            <label>📷 Evidencia fotográfica <span style="font-weight:400;color:#666">(máximo 9)</span></label>
+            <input type="file" id="r-fotos" accept="image/*" multiple>
+            <small style="display:block;margin-top:6px;color:#666" id="fotos-nota">
+                Esta planta tiene activado el módulo de evidencia fotográfica.
+                Las fotos se incluirán al final del reporte.
+            </small>
+        </div>
         <div class="modal-actions">
             <button class="btn btn-warning" onclick="cerrarModal()">Cancelar</button>
             <button class="btn btn-primary" onclick="crearReporte()">Crear</button>
@@ -133,16 +159,30 @@ async function init() {
     cargar();
 }
 
+let empresas = [];
+
 async function cargarEmpresas() {
     const r = await fetch('../api/usuarios.php?action=listar_empresas');
     const d = await r.json();
     if (!d.success) return;
+    empresas = d.data;
     const sel1 = document.getElementById('filtroEmpresa');
     const sel2 = document.getElementById('r-empresa');
     d.data.forEach(e => {
         sel1.innerHTML += `<option value="${e.id}">${e.nombre}</option>`;
         sel2.innerHTML += `<option value="${e.id}">${e.nombre}</option>`;
     });
+    sel2.addEventListener('change', revisarModuloFotos);
+    revisarModuloFotos();
+}
+
+/** El bloque de fotos sólo aparece si la planta elegida tiene el módulo activo. */
+function revisarModuloFotos() {
+    const id = document.getElementById('r-empresa').value;
+    const emp = empresas.find(e => String(e.id) === String(id));
+    const pide = emp && Number(emp.requiere_fotos) === 1;
+    document.getElementById('bloque-fotos').style.display = pide ? '' : 'none';
+    if (!pide) document.getElementById('r-fotos').value = '';
 }
 
 async function cargarInspectores() {
@@ -184,6 +224,7 @@ async function cargar() {
                     ? `<button class="btn btn-sm btn-success" onclick="publicar(${rep.id})">✅ Publicar</button>`
                     : `<button class="btn btn-sm btn-warning" onclick="despublicar(${rep.id})">🔒 Ocultar</button>`
                 }
+                ${plantaPideFotos(rep.empresa_id) ? `<button class="btn btn-sm" style="background:#eef2fb;color:#475569" onclick="abrirFotos(${rep.id}, '${String(rep.numero_reporte).replace(/'/g, "\\'")}')">📷 Fotos</button>` : ''}
                 <button class="btn btn-sm btn-primary" onclick="verPDF(${rep.id})">📄 PDF</button>
                 <button class="btn btn-sm btn-danger" onclick="eliminar(${rep.id})">🗑️</button>
             </td>
@@ -226,6 +267,106 @@ function verPDF(id) {
 }
 
 // ── Modal ─────────────────────────────────────────────────────────────────────
+/** Sube las fotos elegidas en el modal al reporte recién creado. Devuelve cuántas entraron. */
+async function subirFotosDelModal(reporteId) {
+    const input = document.getElementById('r-fotos');
+    if (document.getElementById('bloque-fotos').style.display === 'none') return 0;
+    const archivos = Array.from(input.files).slice(0, 9);
+    if (!archivos.length) return 0;
+
+    let ok = 0, fallos = [];
+    for (const f of archivos) {
+        const fd = new FormData();
+        fd.append('foto', f);
+        fd.append('reporte_id', reporteId);
+        try {
+            const r = await fetch('../api/reporte_fotos.php?action=subir', { method: 'POST', body: fd });
+            const d = await r.json();
+            if (r.ok && d.success) ok++; else fallos.push(`${f.name}: ${d.error || 'error'}`);
+        } catch (e) { fallos.push(`${f.name}: no se pudo enviar`); }
+    }
+    input.value = '';
+    // Si alguna falló se avisa, pero el reporte ya quedó creado: se pueden agregar
+    // después con el botón 📷 del listado.
+    if (fallos.length) showAlert('Algunas fotos no se subieron — ' + fallos.join('; '), 'error');
+    return ok;
+}
+
+// ── Gestión de fotos de un reporte ya creado ────────────────────────────────
+let fotosReporteId = null;
+
+function plantaPideFotos(empresaId) {
+    const e = empresas.find(x => String(x.id) === String(empresaId));
+    return e && Number(e.requiere_fotos) === 1;
+}
+
+function abrirFotos(id, numero) {
+    fotosReporteId = id;
+    document.getElementById('fotos-titulo').textContent = 'Reporte ' + numero;
+    document.getElementById('fotos-alert').innerHTML = '';
+    document.getElementById('f-archivos').value = '';
+    document.getElementById('modalFotos').classList.add('open');
+    cargarFotos();
+}
+function cerrarFotos() { document.getElementById('modalFotos').classList.remove('open'); }
+
+async function cargarFotos() {
+    const cont = document.getElementById('fotos-lista');
+    cont.innerHTML = '<p style="color:#888;font-size:13px">Cargando…</p>';
+    const r = await fetch(`../api/reporte_fotos.php?action=listar&reporte_id=${fotosReporteId}`);
+    const d = await r.json();
+    if (!r.ok || !d.success) { cont.innerHTML = '<p style="color:#c0392b;font-size:13px">No se pudo cargar.</p>'; return; }
+
+    if (!d.data.length) {
+        cont.innerHTML = '<p style="color:#888;font-size:13px">Todavía no hay fotografías en este reporte.</p>';
+        return;
+    }
+    cont.innerHTML = `
+        <p style="font-size:12px;color:#666;margin-bottom:8px">${d.data.length} de ${d.maximo} fotografías</p>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        ${d.data.map((f, i) => `
+            <div style="border:1px solid #e8eeff;border-radius:8px;overflow:hidden;background:#fafbff">
+                <img src="../uploads/reportes/${f.archivo}" style="width:100%;height:90px;object-fit:cover;display:block">
+                <div style="display:flex;justify-content:space-between;align-items:center;padding:5px 7px">
+                    <span style="font-size:11px;color:#666">Foto ${i + 1}</span>
+                    <button onclick="borrarFoto(${f.id})" title="Eliminar"
+                        style="background:#fee2e2;color:#b91c1c;border:none;border-radius:5px;padding:3px 7px;cursor:pointer;font-size:11px;font-weight:700">🗑️</button>
+                </div>
+            </div>`).join('')}
+        </div>`;
+}
+
+async function agregarFotos() {
+    const input = document.getElementById('f-archivos');
+    const archivos = Array.from(input.files);
+    if (!archivos.length) return;
+
+    let fallos = [];
+    for (const f of archivos) {
+        const fd = new FormData();
+        fd.append('foto', f);
+        fd.append('reporte_id', fotosReporteId);
+        const r = await fetch('../api/reporte_fotos.php?action=subir', { method: 'POST', body: fd });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok || !d.success) fallos.push(`${f.name}: ${d.error || 'error'}`);
+    }
+    input.value = '';
+    document.getElementById('fotos-alert').innerHTML = fallos.length
+        ? `<div class="alert alert-error">${fallos.join('<br>')}</div>` : '';
+    cargarFotos();
+}
+
+async function borrarFoto(id) {
+    if (!confirm('¿Eliminar esta fotografía del reporte?')) return;
+    const r = await fetch(`../api/reporte_fotos.php?action=eliminar&id=${id}`);
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.success) {
+        document.getElementById('fotos-alert').innerHTML =
+            `<div class="alert alert-error">${d.error || 'No se pudo eliminar'}</div>`;
+    }
+    cargarFotos();
+}
+
 function abrirModal() { document.getElementById('modalReporte').classList.add('open'); }
 function cerrarModal() { document.getElementById('modalReporte').classList.remove('open'); }
 
@@ -245,6 +386,11 @@ async function crearReporte() {
         document.getElementById('modal-alert').innerHTML =
             '<div class="alert alert-error">Selecciona un inspector responsable</div>'; return;
     }
+    const archivos = document.getElementById('r-fotos').files;
+    if (document.getElementById('bloque-fotos').style.display !== 'none' && archivos.length > 9) {
+        document.getElementById('modal-alert').innerHTML =
+            `<div class="alert alert-error">Máximo 9 fotografías (elegiste ${archivos.length})</div>`; return;
+    }
 
     const r = await fetch('../api/reportes_mensuales.php?action=crear', {
         method: 'POST',
@@ -253,8 +399,11 @@ async function crearReporte() {
     });
     const d = await r.json();
     if (d.success) {
+        const subidas = await subirFotosDelModal(d.id);
         cerrarModal();
-        showAlert(`Reporte ${d.numero_reporte} creado. Publícalo cuando esté listo.`, 'success');
+        showAlert(
+            `Reporte ${d.numero_reporte} creado${subidas ? ` con ${subidas} fotografía${subidas === 1 ? '' : 's'}` : ''}. ` +
+            `Publícalo cuando esté listo.`, 'success');
         cargar();
     } else {
         document.getElementById('modal-alert').innerHTML =
