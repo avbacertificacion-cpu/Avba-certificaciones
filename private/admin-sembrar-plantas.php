@@ -9,7 +9,9 @@
  *  - Crea un usuario gerente asignado a las 14 plantas.
  *
  * Es idempotente: se puede volver a abrir y confirmar sin duplicar nada — una
- * empresa que ya existe se reutiliza, y una que ya tiene extintores se salta.
+ * empresa que ya existe se reutiliza, y una planta que ya llegó a su meta de
+ * extintores se deja igual. Si viene de una siembra anterior más chica, se le
+ * agregan los que le faltan continuando la numeración EXT-###.
  */
 require_once '../config/config.php';
 require_once '../config/roles-extra.php';
@@ -19,6 +21,9 @@ if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
 }
 $nombreAdmin = $_SESSION['nombre'];
 $uid = $_SESSION['usuario_id'];
+
+// Son varios miles de filas: en hosting compartido el límite por defecto no alcanza.
+@set_time_limit(0);
 
 const GERENTE_USERNAME = 'gerente.corporativo';
 const GERENTE_PASSWORD = 'Gerente2026!';
@@ -67,14 +72,41 @@ const CAPACIDADES = [
     'eolico'      => [4.5, 9, 12, 25],
 ];
 
-/** Rango de cantidad de extintores según el sabor y tamaño de la planta. */
+/**
+ * Cuántos extintores debe tener cada planta. Todas rebasan los 100; el tamaño
+ * sigue variando según el tipo de centro para que no queden todas iguales.
+ */
 function rangoExtintores(string $sabor, bool $grande): array {
-    if ($sabor === 'corporativo') return [6, 10];
-    if ($sabor === 'eolico')      return [15, 25];
-    return $grande ? [55, 70] : [35, 50];
+    if ($sabor === 'corporativo') return [105, 130];
+    if ($sabor === 'eolico')      return [120, 155];
+    return $grande ? [200, 260] : [140, 190];
 }
 
 function elegir(array $a) { return $a[array_rand($a)]; }
+
+/**
+ * Siguiente número libre de la serie EXT-### de una planta. Si la planta ya
+ * tenía extintores (por ejemplo de una siembra anterior más chica), la
+ * numeración continúa desde el último en vez de repetir códigos.
+ */
+function siguienteNumero(PDO $pdo, int $empresaId): int {
+    $stmt = $pdo->prepare("
+        SELECT MAX(CAST(REPLACE(codigo_manual, 'EXT-', '') AS UNSIGNED))
+        FROM extintores WHERE empresa_id = ? AND codigo_manual LIKE 'EXT-%'
+    ");
+    $stmt->execute([$empresaId]);
+    return ((int) $stmt->fetchColumn()) + 1;
+}
+
+/** Inserta varias filas por sentencia: con miles de extintores, una por una es demasiado lento. */
+function insertarLote(PDO $pdo, string $sql, int $columnas, array $filas): void {
+    if (!$filas) return;
+    $marcadores = '(' . implode(',', array_fill(0, $columnas, '?')) . ')';
+    foreach (array_chunk($filas, 150) as $lote) {
+        $pdo->prepare($sql . ' VALUES ' . implode(',', array_fill(0, count($lote), $marcadores)))
+            ->execute(array_merge(...$lote));
+    }
+}
 
 /** Asegura que existan tipos de extintor activos; si no hay ninguno, crea los 4 estándar. */
 function asegurarTipos(PDO $pdo): array {
@@ -127,13 +159,21 @@ foreach (centros() as $c) {
     $stmt = $pdo->prepare("SELECT id FROM empresas WHERE nombre = ?");
     $stmt->execute([$c['nombre']]);
     $empresaId = $stmt->fetchColumn();
-    $tieneExtintores = false;
+    $existentes = 0;
     if ($empresaId) {
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM extintores WHERE empresa_id = ?");
         $stmt->execute([$empresaId]);
-        $tieneExtintores = $stmt->fetchColumn() > 0;
+        $existentes = (int) $stmt->fetchColumn();
     }
-    $preview[] = $c + ['empresa_id' => $empresaId ?: null, 'tiene_extintores' => $tieneExtintores];
+    [$metaMin, $metaMax] = rangoExtintores($c['sabor'], $c['grande']);
+    $preview[] = $c + [
+        'empresa_id' => $empresaId ?: null,
+        'existentes' => $existentes,
+        // Concatenado a propósito: dentro de comillas, PHP se comería el guion
+        // largo como parte del nombre de la variable y el mínimo desaparecería.
+        'meta'       => $metaMin . '–' . $metaMax,
+        'completa'   => $existentes >= $metaMin,
+    ];
 }
 $gerenteYaExiste = (bool) $pdo->query("SELECT id FROM usuarios WHERE username = '" . GERENTE_USERNAME . "'")->fetchColumn();
 
@@ -179,56 +219,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
 
                 $stmt = $pdo->prepare("SELECT COUNT(*) FROM extintores WHERE empresa_id = ?");
                 $stmt->execute([$empresaId]);
-                $yaTiene = $stmt->fetchColumn() > 0;
+                $existentes = (int) $stmt->fetchColumn();
+
+                [$min, $max] = rangoExtintores($c['sabor'], $c['grande']);
+                // Si la planta ya llegó a la meta se deja igual; si viene de una
+                // siembra anterior más chica, se le agregan los que le faltan.
+                $faltan = ($existentes >= $min) ? 0 : mt_rand($min, $max) - $existentes;
 
                 $creados = 0;
-                if (!$yaTiene) {
+                if ($faltan > 0) {
                     $tiposDisponibles = tiposPorSabor($tipos, $c['sabor']);
                     $secciones        = SECCIONES[$c['sabor']];
                     $capacidades      = CAPACIDADES[$c['sabor']];
-                    [$min, $max]      = rangoExtintores($c['sabor'], $c['grande']);
-                    $cantidad         = mt_rand($min, $max);
+                    $numero           = siguienteNumero($pdo, $empresaId);
 
-                    $insExt = $pdo->prepare("
-                        INSERT INTO extintores
-                            (codigo_qr, codigo_manual, empresa_id, seccion, ubicacion, tipo, capacidad,
-                             fecha_recarga, fecha_ph, estado, observaciones, creado_por)
-                        VALUES (NULL,?,?,?,?,?,?,?,?,?,NULL,?)
-                    ");
-                    $insInsp = $pdo->prepare("
-                        INSERT INTO inspecciones
-                            (extintor_id, inspector_id, fecha, hora, ser, mg, po, ph, sg, ps, ob, dan, pin, fn, gb, rv, observaciones)
-                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL)
-                    ");
-
-                    for ($n = 1; $n <= $cantidad; $n++) {
-                        $codigoManual = 'EXT-' . str_pad($n, 3, '0', STR_PAD_LEFT);
+                    $filasExt = [];
+                    for ($n = 0; $n < $faltan; $n++) {
                         $seccion = elegir($secciones);
                         if ($c['sabor'] === 'eolico' && $seccion === 'Base de Aerogenerador') {
                             $seccion .= ' ' . mt_rand(1, 6);
                         }
-                        $ubicacion = $seccion . ' — ' . elegir(DETALLES_UBICACION);
-                        $tipo = elegir($tiposDisponibles);
-                        $estado = (mt_rand(1, 100) <= 5) ? 'en_prestamo' : 'activo';
+                        $filasExt[] = [
+                            'EXT-' . str_pad($numero + $n, 3, '0', STR_PAD_LEFT),
+                            $empresaId,
+                            $seccion,
+                            $seccion . ' — ' . elegir(DETALLES_UBICACION),
+                            elegir($tiposDisponibles)['id'],
+                            elegir($capacidades),
+                            fechaRecarga(),
+                            fechaPH(),
+                            (mt_rand(1, 100) <= 5) ? 'en_prestamo' : 'activo',
+                            $uid,
+                        ];
+                    }
+                    insertarLote($pdo, "
+                        INSERT INTO extintores
+                            (codigo_manual, empresa_id, seccion, ubicacion, tipo, capacidad,
+                             fecha_recarga, fecha_ph, estado, creado_por)
+                    ", 10, $filasExt);
+                    $creados = count($filasExt);
 
-                        $insExt->execute([
-                            $codigoManual, $empresaId, $seccion, $ubicacion, $tipo['id'], elegir($capacidades),
-                            fechaRecarga(), fechaPH(), $estado, $uid,
-                        ]);
-                        $extintorId = $pdo->lastInsertId();
+                    // Ids de los que se acaban de insertar, para colgarles el historial
+                    $stmt = $pdo->prepare("SELECT id FROM extintores WHERE empresa_id = ? ORDER BY id DESC LIMIT $creados");
+                    $stmt->execute([$empresaId]);
+                    $nuevosIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
-                        // Historial de los últimos 6 meses (incluye el mes actual), un registro por mes.
-                        // Se ancla al mes con el mismo cálculo que ya usa private/gerente-empresa.php,
-                        // y en el mes actual el día nunca rebasa hoy (para no generar fechas futuras).
+                    // Historial de los últimos 6 meses (incluye el mes actual), un registro por mes.
+                    // Se ancla al mes con el mismo cálculo que ya usa private/gerente-empresa.php,
+                    // y en el mes actual el día nunca rebasa hoy (para no generar fechas futuras).
+                    $campos = ['ser', 'mg', 'po', 'ph', 'sg', 'ps', 'ob', 'dan', 'pin', 'fn', 'gb', 'rv'];
+                    $filasInsp = [];
+                    foreach ($nuevosIds as $extintorId) {
                         for ($i = 5; $i >= 0; $i--) {
                             $f = strtotime("-$i months");
                             $m = (int) date('n', $f);
                             $a = (int) date('Y', $f);
                             $diasEnMes = (int) date('t', mktime(0, 0, 0, $m, 1, $a));
                             $diaMax = ($i === 0) ? max(1, (int) date('j')) : $diasEnMes;
-                            $fecha = sprintf('%04d-%02d-%02d', $a, $m, mt_rand(1, $diaMax));
-                            $hora  = sprintf('%02d:%02d:00', mt_rand(8, 16), mt_rand(0, 59));
-                            $campos = ['ser', 'mg', 'po', 'ph', 'sg', 'ps', 'ob', 'dan', 'pin', 'fn', 'gb', 'rv'];
+
                             $vals = [];
                             foreach ($campos as $campo) {
                                 $vals[$campo] = (mt_rand(1, 100) <= 5) ? 'NC' : 'OK';
@@ -236,20 +284,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                             // Fuerza "sin presión" en un subconjunto, para que la gráfica de mantenimiento tenga datos
                             if (mt_rand(1, 100) <= 8) $vals['ps'] = 'NC';
 
-                            $insInsp->execute([
-                                $extintorId, $inspectorId, $fecha, $hora,
-                                $vals['ser'], $vals['mg'], $vals['po'], $vals['ph'], $vals['sg'], $vals['ps'],
-                                $vals['ob'], $vals['dan'], $vals['pin'], $vals['fn'], $vals['gb'], $vals['rv'],
-                            ]);
+                            $filasInsp[] = array_merge([
+                                $extintorId, $inspectorId,
+                                sprintf('%04d-%02d-%02d', $a, $m, mt_rand(1, $diaMax)),
+                                sprintf('%02d:%02d:00', mt_rand(8, 16), mt_rand(0, 59)),
+                            ], array_values($vals));
                         }
-                        $creados++;
                     }
+                    insertarLote($pdo, "
+                        INSERT INTO inspecciones
+                            (extintor_id, inspector_id, fecha, hora, ser, mg, po, ph, sg, ps, ob, dan, pin, fn, gb, rv)
+                    ", 16, $filasInsp);
                 }
 
                 $resultados[] = [
                     'nombre'     => $c['nombre'],
-                    'estado'     => $yaTiene ? 'ya tenía extintores (se dejó igual)' : 'sembrada',
+                    'estado'     => $faltan === 0
+                        ? "ya tenía $existentes (se dejó igual)"
+                        : ($existentes > 0 ? "completada (tenía $existentes)" : 'sembrada'),
                     'creados'    => $creados,
+                    'total'      => $existentes + $creados,
                     'empresa_id' => $empresaId,
                 ];
             }
@@ -309,6 +363,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
     thead{background:#f1f5fb}
     th{padding:10px 9px;text-align:left;font-size:11px;color:#475569;font-weight:700;text-transform:uppercase}
     td{padding:10px 9px;font-size:13px;border-bottom:1px solid #f1f5f9}
+    td.n,th.n{text-align:right}
     .badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block}
     .b-crear{background:#fef3c7;color:#92400e}.b-existe{background:#e2e8f0;color:#475569}
     .b-ok{background:#d1fae5;color:#047857}
@@ -344,13 +399,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
         <div class="card">
             <h3 style="margin-bottom:12px">✓ Resultado</h3>
             <table>
-                <thead><tr><th>Planta</th><th>Estado</th><th>Extintores creados</th></tr></thead>
+                <thead><tr><th>Planta</th><th>Estado</th><th class="n">Nuevos</th><th class="n">Total</th></tr></thead>
                 <tbody>
                 <?php foreach ($resultados as $r): ?>
                     <tr>
                         <td><?= htmlspecialchars($r['nombre']) ?></td>
                         <td><span class="badge <?= $r['creados'] > 0 ? 'b-ok' : 'b-existe' ?>"><?= htmlspecialchars($r['estado']) ?></span></td>
-                        <td><?= $r['creados'] ?></td>
+                        <td class="n"><?= $r['creados'] ?></td>
+                        <td class="n" style="font-weight:700"><?= $r['total'] ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -381,11 +437,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                         <td style="color:#64748b"><?= htmlspecialchars($p['domicilio']) ?></td>
                         <td>
                             <?php if (!$p['empresa_id']): ?>
-                                <span class="badge b-crear">se creará</span>
-                            <?php elseif (!$p['tiene_extintores']): ?>
-                                <span class="badge b-crear">existe, se le agregarán extintores</span>
+                                <span class="badge b-crear">se creará con <?= htmlspecialchars($p['meta']) ?> extintores</span>
+                            <?php elseif (!$p['completa']): ?>
+                                <span class="badge b-crear">tiene <?= $p['existentes'] ?> — se completará a <?= htmlspecialchars($p['meta']) ?></span>
                             <?php else: ?>
-                                <span class="badge b-existe">ya existe con extintores</span>
+                                <span class="badge b-existe">ya tiene <?= $p['existentes'] ?> (sin cambios)</span>
                             <?php endif; ?>
                         </td>
                     </tr>
