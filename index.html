@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
 <meta name="description" content="Portal de AVBA Inspections, Certifications and Maintenance — acceso a nuestros sistemas y sitios.">
+<link rel="icon" href="assets/logos/avba.png">
 <title>AVBA Inspections — Portal</title>
 <style>
 :root{
@@ -35,13 +36,12 @@ body{
   clip-path:polygon(0 100%, 100% 0, 100% 100%, 0 100%);
 }
 .marca{
-  width:74px; height:74px; margin:0 auto 16px; border-radius:20px;
-  background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22);
-  display:flex; align-items:center; justify-content:center;
-  box-shadow:0 12px 34px rgba(0,0,0,.30);
+  display:inline-block; margin:0 auto 14px; padding:16px 30px; border-radius:20px;
+  background:#fff; box-shadow:0 14px 38px rgba(0,0,0,.32);
 }
-.marca svg{width:40px;height:40px;color:#fff}
-.hero h1{font-size:30px;font-weight:800;letter-spacing:-.4px}
+.marca img{display:block;width:220px;max-width:62vw;height:auto}
+/* El logo ya dice el nombre; el texto queda para lectores de pantalla. */
+.solo-lectores{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .hero .lema{font-size:14.5px;color:rgba(255,255,255,.78);margin-top:6px}
 .acred{
   display:inline-flex; align-items:center; gap:7px; margin-top:16px;
@@ -101,6 +101,7 @@ body{
   border-top:1px solid var(--borde);background:var(--blanco);
 }
 .pie strong{color:var(--texto-sub);font-weight:600}
+.pie-logo{display:block;width:96px;height:auto;margin:0 auto 12px;opacity:.9}
 
 @media(max-width:560px){
   .hero{padding:40px 18px 64px}
@@ -112,12 +113,8 @@ body{
 <body>
 
 <div class="hero">
-  <div class="marca">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
-    </svg>
-  </div>
-  <h1>AVBA Inspections</h1>
+  <h1 class="marca"><img src="assets/logos/avba.png" alt="AVBA Inspections"></h1>
+  <span class="solo-lectores">AVBA Inspections</span>
   <div class="lema">Inspections, Certifications and Maintenance</div>
   <div class="acred">
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px">
@@ -137,6 +134,7 @@ body{
 </div>
 
 <div class="pie">
+  <img class="pie-logo" src="assets/logos/avba_certifications.png" alt="AVBA Certifications">
   <strong>AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</strong><br>
   Altamira, Tamaulipas · México
 </div>
