@@ -100,8 +100,14 @@ body{
   text-align:center;padding:22px 18px 30px;font-size:12px;color:var(--texto-hint);
   border-top:1px solid var(--borde);background:var(--blanco);
 }
-.pie strong{color:var(--texto-sub);font-weight:600}
+.pie strong{display:block;color:var(--texto-sub);font-weight:600}
 .pie-logo{display:block;width:78px;height:auto;margin:0 auto 12px;opacity:.9}
+.cobertura{
+  display:inline-flex;align-items:center;gap:7px;margin-top:9px;
+  font-size:12.5px;font-weight:600;color:var(--azul-dark);
+  background:var(--azul-light);border-radius:20px;padding:5px 14px;
+}
+.cobertura svg{width:14px;height:14px;flex-shrink:0}
 
 @media(max-width:560px){
   .hero{padding:40px 18px 64px}
@@ -135,8 +141,14 @@ body{
 
 <div class="pie">
   <img class="pie-logo" src="assets/logos/avba.png" alt="AVBA Certifications">
-  <strong>AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</strong><br>
-  Altamira, Tamaulipas · México
+  <strong>AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</strong>
+  <div class="cobertura">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+      <circle cx="8" cy="8" r="6.5"/><path d="M1.5 8h13"/>
+      <path d="M8 1.5c1.8 1.8 2.8 4.1 2.8 6.5S9.8 12.7 8 14.5C6.2 12.7 5.2 10.4 5.2 8S6.2 3.3 8 1.5z"/>
+    </svg>
+    Cobertura en todo México y en el extranjero
+  </div>
 </div>
 
 <script>
