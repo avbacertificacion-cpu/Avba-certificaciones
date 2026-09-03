@@ -148,9 +148,8 @@ body{
    estado: 'publico' | 'acceso' | 'pronto'
      · publico → cualquiera puede usarla
      · acceso  → pide credenciales
-     · pronto  → todavía no se puede usar; se muestra apagada y sin enlace,
-                 porque mandar a alguien a algo a medio hacer es peor que
-                 decirle que viene en camino.
+     · pronto  → todavía no existe; se muestra apagada y sin enlace, porque
+                 un enlace a una página que no está es peor que no ponerla.
    ═══════════════════════════════════════════════════════════ */
 const PLATAFORMAS = [
   {
@@ -198,7 +197,7 @@ const PLATAFORMAS = [
 const ETIQUETA = {
   publico: ['e-publico', 'Público'],
   acceso:  ['e-acceso',  'Requiere acceso'],
-  pronto:  ['e-pronto',  'En desarrollo'],
+  pronto:  ['e-pronto',  'Próximamente'],
 };
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
