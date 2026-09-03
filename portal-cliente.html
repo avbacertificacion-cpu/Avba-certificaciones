@@ -11,7 +11,8 @@ html,body{overflow-x:hidden;max-width:100%}
 body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 .header{background:var(--azul);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:60px;box-shadow:0 2px 12px rgba(24,95,165,.25);position:sticky;top:0;z-index:50;}
 .hdr-l{display:flex;align-items:center;gap:10px;}
-.hdr-logo{width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;}
+.hdr-logo{width:32px;height:32px;border-radius:8px;background:#fff;display:flex;align-items:center;justify-content:center;}
+.hdr-logo img{width:24px;height:24px;object-fit:contain;display:block;}
 .hdr-t{font-size:15px;font-weight:600;color:#fff;}
 .hdr-s{font-size:11px;color:rgba(255,255,255,.6);}
 .hdr-r{display:flex;align-items:center;gap:10px;}
@@ -376,7 +377,7 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
 <div class="header">
   <div class="hdr-l">
     <div class="hdr-logo">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      <img src="assets/logos/avba_icono.png" alt="AVBA">
     </div>
     <div><div class="hdr-t">AVBA Inspections</div><div class="hdr-s">Portal de certificados</div></div>
   </div>
