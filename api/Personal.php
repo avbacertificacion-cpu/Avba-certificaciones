@@ -2101,7 +2101,7 @@ class Personal {
         }
 
         $logoHdr   = $logoB64
-            ? "<img src=\"{$logoB64}\" style=\"width:104px;height:48px;display:block;margin:0 auto;\" alt=\"AVBA\">"
+            ? "<img src=\"{$logoB64}\" style=\"height:48px;width:auto;display:block;margin:0 auto;\" alt=\"AVBA\">"
             : '<div style="font-size:8pt;font-weight:bold;color:#1B2A6B;text-align:center">AVBA<br>CERT.</div>';
         $qrHdr     = $qrB64
             ? "<img src=\"{$qrB64}\" style=\"width:68px;height:68px;\" alt=\"QR\">"
@@ -2846,7 +2846,7 @@ HTML;
         $selloB64  = $this->assetB64('sellos/sello.png');
 
         $logoHtml  = $logoB64
-            ? "<img src=\"{$logoB64}\" style=\"width:110px;height:52px;display:block;\" alt=\"AVBA\">"
+            ? "<img src=\"{$logoB64}\" style=\"height:52px;width:auto;display:block;\" alt=\"AVBA\">"
             : '<span style="font-size:11pt;font-weight:bold;color:#C9A84C;">AVBA</span>';
         // Firma blanca con fondo transparente — visible directamente sobre el fondo azul marino
         $firmaHtml = $firmaB64
