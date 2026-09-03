@@ -3,7 +3,9 @@
 # ──────────────────────────────────────────────────────────
 
 # ── Página de inicio ──────────────────────────────────────
-DirectoryIndex login.html
+# El portal es la entrada; login.html queda de respaldo por si el portal no
+# se subió todavía, para que la raíz nunca acabe en un listado de archivos.
+DirectoryIndex index.html login.html
 
 # ── Pasar Authorization header a PHP ─────────────────────
 RewriteEngine On

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Portal de AVBA Inspections, Certifications and Maintenance — acceso a nuestros sistemas y sitios.">
+<title>AVBA Inspections — Portal</title>
+<style>
+:root{
+  --azul:#185FA5; --azul-dark:#0C447C; --azul-light:#E6F1FB;
+  --marino:#0B2545; --oro:#C49A28;
+  --texto:#1a1a2e; --texto-sub:#5a6072; --texto-hint:#9299a8;
+  --borde:#dfe5ef; --blanco:#fff; --gris-bg:#f0f4f9;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;max-width:100%}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  background:var(--gris-bg); color:var(--texto);
+  min-height:100vh; display:flex; flex-direction:column;
+}
+
+/* ── Portada ── */
+.hero{
+  background:
+    radial-gradient(1100px 380px at 15% -10%, rgba(24,95,165,.55), transparent 60%),
+    radial-gradient(900px 340px at 90% 0%, rgba(196,154,40,.20), transparent 55%),
+    linear-gradient(160deg,#0B2545 0%,#0C447C 100%);
+  color:#fff; padding:54px 20px 74px; text-align:center; position:relative;
+}
+.hero::after{
+  content:''; position:absolute; left:0; right:0; bottom:-1px; height:44px;
+  background:var(--gris-bg);
+  clip-path:polygon(0 100%, 100% 0, 100% 100%, 0 100%);
+}
+.marca{
+  width:74px; height:74px; margin:0 auto 16px; border-radius:20px;
+  background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22);
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 12px 34px rgba(0,0,0,.30);
+}
+.marca svg{width:40px;height:40px;color:#fff}
+.hero h1{font-size:30px;font-weight:800;letter-spacing:-.4px}
+.hero .lema{font-size:14.5px;color:rgba(255,255,255,.78);margin-top:6px}
+.acred{
+  display:inline-flex; align-items:center; gap:7px; margin-top:16px;
+  background:rgba(196,154,40,.16); border:1px solid rgba(196,154,40,.45);
+  color:#F2D68A; font-size:12px; font-weight:700; letter-spacing:.4px;
+  padding:6px 14px; border-radius:20px;
+}
+
+/* ── Rejilla ── */
+.wrap{max-width:1080px;margin:0 auto;padding:0 18px 40px;width:100%;flex:1}
+.intro{margin:26px 0 20px;text-align:center}
+.intro h2{font-size:19px;color:var(--azul-dark);font-weight:800}
+.intro p{font-size:13.5px;color:var(--texto-sub);margin-top:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px}
+
+.tile{
+  display:flex; flex-direction:column; text-decoration:none; color:inherit;
+  background:var(--blanco); border:1px solid rgba(0,0,0,.06); border-radius:16px;
+  padding:20px 20px 18px; position:relative; overflow:hidden;
+  box-shadow:0 3px 14px rgba(12,68,124,.07);
+  transition:transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+}
+.tile::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:4px;
+  background:var(--azul); opacity:.85; transition:width .18s ease;
+}
+.tile:hover{transform:translateY(-4px);box-shadow:0 14px 34px rgba(12,68,124,.16);border-color:rgba(24,95,165,.28)}
+.tile:hover::before{width:7px;background:var(--oro)}
+.tile:focus-visible{outline:3px solid var(--azul);outline-offset:3px}
+
+.tile-top{display:flex;align-items:flex-start;gap:13px;margin-bottom:10px}
+.tile-ico{
+  width:46px;height:46px;border-radius:13px;flex-shrink:0;
+  background:var(--azul-light); color:var(--azul-dark);
+  display:flex;align-items:center;justify-content:center;
+}
+.tile-ico svg{width:24px;height:24px}
+.tile h3{font-size:16px;font-weight:800;line-height:1.25}
+.tile .url{font-size:11.5px;color:var(--texto-hint);margin-top:3px;overflow-wrap:anywhere}
+.tile p{font-size:13px;color:var(--texto-sub);line-height:1.55;flex:1}
+.tile-pie{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}
+.etq{font-size:10.5px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;padding:4px 10px;border-radius:20px}
+.e-publico{background:#E7F3E8;color:#2C6B33}
+.e-acceso{background:var(--azul-light);color:var(--azul-dark)}
+.e-pronto{background:#F1F1F4;color:#7A7F8C}
+.ir{font-size:13px;font-weight:700;color:var(--azul)}
+.tile:hover .ir{color:var(--oro)}
+
+/* Los que aún no están publicados no deben parecer un enlace roto. */
+.tile.pronto{cursor:default;opacity:.72;box-shadow:none;background:#fbfcfe}
+.tile.pronto::before{background:#c9cfd9}
+.tile.pronto:hover{transform:none;box-shadow:none;border-color:rgba(0,0,0,.06)}
+.tile.pronto:hover::before{width:4px;background:#c9cfd9}
+
+.pie{
+  text-align:center;padding:22px 18px 30px;font-size:12px;color:var(--texto-hint);
+  border-top:1px solid var(--borde);background:var(--blanco);
+}
+.pie strong{color:var(--texto-sub);font-weight:600}
+
+@media(max-width:560px){
+  .hero{padding:40px 18px 64px}
+  .hero h1{font-size:24px}
+  .grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="marca">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>
+    </svg>
+  </div>
+  <h1>AVBA Inspections</h1>
+  <div class="lema">Inspections, Certifications and Maintenance</div>
+  <div class="acred">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px">
+      <path d="M8 1.5l2 1.4 2.4.2.2 2.4 1.4 2-1.4 2-.2 2.4-2.4.2-2 1.4-2-1.4-2.4-.2-.2-2.4-1.4-2 1.4-2 .2-2.4 2.4-.2 2-1.4z"/>
+      <path d="M5.6 8.1l1.6 1.6 3.2-3.4"/>
+    </svg>
+    Unidad de Verificación acreditada · UVNMX 057
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="intro">
+    <h2>Nuestras plataformas</h2>
+    <p>Elige a dónde quieres entrar.</p>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<div class="pie">
+  <strong>AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</strong><br>
+  Altamira, Tamaulipas · México
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   LAS PLATAFORMAS
+   Para agregar, quitar o renombrar una, se edita esta lista y ya.
+   estado: 'publico' | 'acceso' | 'pronto'
+     · publico → cualquiera puede usarla
+     · acceso  → pide credenciales
+     · pronto  → todavía no está publicada; se muestra apagada y sin enlace,
+                 porque un enlace a una página que no existe es peor que no
+                 ponerla.
+   ═══════════════════════════════════════════════════════════ */
+const PLATAFORMAS = [
+  {
+    titulo: 'Sistema de Gestión',
+    url:    'login.html',
+    urlTxt: 'gestion.avba.com.mx',
+    estado: 'acceso',
+    desc:   'Inspecciones, dictámenes y certificados de maquinaria, accesorios de izaje, arneses, personal y PND.',
+    icono:  '<path d="M4 4h16v16H4z"/><path d="M8 9h8M8 13h8M8 17h5"/>',
+  },
+  {
+    titulo: 'Validar certificado',
+    url:    'validar.html',
+    urlTxt: 'gestion.avba.com.mx · validar.html',
+    estado: 'publico',
+    desc:   'Comprueba la autenticidad y la vigencia de cualquier certificado escaneando su código QR o capturando el folio.',
+    icono:  '<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z"/><path d="M14 14h2v2h-2zM18 14h2v2h-2zM14 18h2v2h-2zM18 18h2v2h-2z"/>',
+  },
+  {
+    titulo: 'Crane Training International',
+    url:    'Cranetraininginternational/',
+    urlTxt: 'gestion.avba.com.mx · Crane Training',
+    estado: 'publico',
+    desc:   'Capacitación para operadores y supervisores: grúas, montacargas, plataformas de elevación y telehandlers.',
+    icono:  '<path d="M4 20h16"/><path d="M6 20V6h3l9 4"/><path d="M9 6l7 3M15 9v4"/><circle cx="15" cy="15" r="2"/>',
+  },
+  {
+    titulo: 'Socios Comerciales',
+    url:    'socioscomerciales/',
+    urlTxt: 'gestion.avba.com.mx · socioscomerciales',
+    estado: 'publico',
+    desc:   'Bolsa de trabajo industrial: vacantes y perfiles para los sectores que atendemos.',
+    icono:  '<circle cx="9" cy="8" r="3"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.4"/><path d="M15.5 14.2c2.6.4 4.5 2.6 4.5 5.3"/>',
+  },
+  {
+    titulo: 'Control de Extintores',
+    url:    'extintores/',
+    urlTxt: 'gestion.avba.com.mx · extintores',
+    estado: 'pronto',
+    desc:   'Registro, inspección y control de vigencias del parque de extintores.',
+    icono:  '<path d="M9 8h6v13H9z"/><path d="M12 8V5"/><path d="M12 5h3.5a1.5 1.5 0 010 3H14"/><path d="M9 12h6"/>',
+  },
+];
+
+const ETIQUETA = {
+  publico: ['e-publico', 'Público'],
+  acceso:  ['e-acceso',  'Requiere acceso'],
+  pronto:  ['e-pronto',  'Próximamente'],
+};
+
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+document.getElementById('grid').innerHTML = PLATAFORMAS.map(p => {
+  const [cls, txt] = ETIQUETA[p.estado] || ETIQUETA.acceso;
+  const pronto = p.estado === 'pronto';
+  // Sin href cuando no está publicada: así no se puede pulsar ni el teclado la
+  // enfoca, en vez de llevar a una página que no existe.
+  const abre = pronto ? '<div class="tile pronto">' : `<a class="tile" href="${esc(p.url)}">`;
+  const cierra = pronto ? '</div>' : '</a>';
+  return `${abre}
+    <div class="tile-top">
+      <div class="tile-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${p.icono}</svg></div>
+      <div style="min-width:0">
+        <h3>${esc(p.titulo)}</h3>
+        <div class="url">${esc(p.urlTxt)}</div>
+      </div>
+    </div>
+    <p>${esc(p.desc)}</p>
+    <div class="tile-pie">
+      <span class="etq ${cls}">${txt}</span>
+      ${pronto ? '' : '<span class="ir">Entrar →</span>'}
+    </div>
+  ${cierra}`;
+}).join('');
+</script>
+</body>
+</html>
