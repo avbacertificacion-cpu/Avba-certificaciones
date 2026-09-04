@@ -221,6 +221,40 @@ class Presupuestos {
             ");
         } catch (\Throwable $e) { error_log('[Presupuestos] migrar partidas: ' . $e->getMessage()); }
 
+        /*
+         * Qué inspecciones cubre cada presupuesto.
+         *
+         * Vive de este lado a propósito: `equipos` es la tabla del corazón del
+         * sistema —la que llenan inspectores, calidad y el portal del cliente—
+         * y agregarle una columna de facturación la volvería también una tabla
+         * de dinero. Aquí no se toca ni una línea de Certificaciones.
+         *
+         * La llave única sobre equipo_id es el candado que importa: una misma
+         * inspección no puede quedar colgada de dos presupuestos. Facturar dos
+         * veces el mismo trabajo no se descubre revisando el sistema, se
+         * descubre cuando el cliente reclama.
+         *
+         * El control, la máquina y la fecha se copian congelados, igual que en
+         * las partidas: el presupuesto tiene que seguir diciendo lo mismo
+         * dentro de un año, aunque el registro del equipo se corrija después.
+         */
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS pres_inspecciones (
+                  id               INT AUTO_INCREMENT PRIMARY KEY,
+                  presupuesto_id   INT NOT NULL,
+                  equipo_id        INT NOT NULL,
+                  control          VARCHAR(30)  NULL,
+                  maquinaria       VARCHAR(150) NULL,
+                  detalle          VARCHAR(300) NULL,
+                  fecha_inspeccion DATE NULL,
+                  created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  UNIQUE KEY uk_equipo (equipo_id),
+                  KEY idx_presupuesto (presupuesto_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\Throwable $e) { error_log('[Presupuestos] migrar inspecciones: ' . $e->getMessage()); }
+
         try {
             $this->pdo->exec("
                 CREATE TABLE IF NOT EXISTS pres_propuestas (
@@ -735,6 +769,154 @@ class Presupuestos {
     }
 
     // ══════════════════════════════════════════════════════════
+    //  INSPECCIONES QUE SE PUEDEN COBRAR
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Las inspecciones de un cliente que ya están publicadas en su portal.
+     *
+     * Ése es el criterio de "trabajo entregado", y no lo inventa este módulo:
+     * es el mismo con el que ClienteEquipos arma "Mis Equipos" —estado
+     * 'ENVIADO' y el folio de control con el prefijo del cliente—. Certificaciones
+     * pone las tres marcas juntas al emitir el certificado: estado, publicado y
+     * fecha_enviado. Si algún día cambia esa regla, cambia en un solo lugar y
+     * aquí se sigue cobrando lo mismo que el cliente ve.
+     *
+     * El cruce con el cliente NO es por nombre. El folio de control se arma como
+     * "{primera_parte}-{consecutivo}", así que se navega por la llave:
+     * pres_clientes.cliente_id → clientes.primera_parte → prefijo del control.
+     * Emparejar por nombre en esta base es justo lo que falla en silencio: hay
+     * dos colaciones distintas conviviendo y el resultado sería una lista vacía
+     * sin explicación.
+     */
+    public function inspeccionesDisponibles(int $clientePresId, int $presupuestoId = 0): array {
+        if ($clientePresId <= 0) {
+            return ['status' => 'ok', 'inspecciones' => [],
+                'aviso' => 'Elige primero el cliente del presupuesto.'];
+        }
+        try {
+            $sc = $this->pdo->prepare("SELECT cliente_id, nombre_comercial FROM pres_clientes WHERE id = ?");
+            $sc->execute([$clientePresId]);
+            $cli = $sc->fetch(PDO::FETCH_ASSOC);
+            if (!$cli) return ['status' => 'error', 'message' => 'Cliente no encontrado.'];
+
+            // Un cliente capturado sólo aquí no tiene expediente en
+            // Certificaciones, así que no hay inspecciones que traerle. Decirlo
+            // es mejor que devolver una lista vacía que parece una falla.
+            if (empty($cli['cliente_id'])) {
+                return ['status' => 'ok', 'inspecciones' => [],
+                    'aviso' => 'Este cliente se capturó sólo en presupuestos, no viene del directorio de AVBA, '
+                             . 'así que no tiene inspecciones en Certificaciones.'];
+            }
+
+            $sp = $this->pdo->prepare("SELECT primera_parte FROM clientes WHERE id = ?");
+            $sp->execute([(int)$cli['cliente_id']]);
+            $pp = trim((string)$sp->fetchColumn());
+            if ($pp === '') {
+                return ['status' => 'ok', 'inspecciones' => [],
+                    'aviso' => 'El cliente no tiene número de expediente en el directorio.'];
+            }
+
+            // generarControl() rellena el prefijo a cinco dígitos; el directorio
+            // lo guarda como se capturó. Se buscan las dos formas para que un
+            // expediente viejo y corto no quede fuera.
+            $prefijos = array_values(array_unique([$pp . '-%', str_pad($pp, 5, '0', STR_PAD_LEFT) . '-%']));
+            $marcas   = implode(' OR ', array_fill(0, count($prefijos), 'e.control LIKE ?'));
+
+            // `publicado` la agrega ensurePublicado() sobre la marcha; puede no
+            // estar en una base que todavía no ha pasado por ahí.
+            $hayPublicado = false;
+            try {
+                $hayPublicado = (bool)$this->pdo->query("SHOW COLUMNS FROM equipos LIKE 'publicado'")->fetch();
+            } catch (\Throwable $e) { /* se decide sin ella */ }
+            $filtroPub = $hayPublicado ? ' AND e.publicado = 1' : '';
+
+            /*
+             * Dos grupos entran a la lista:
+             *
+             *   1. Lo publicado en el portal de este cliente, que es lo que se
+             *      puede empezar a cobrar.
+             *   2. Lo que ESTE presupuesto ya trae enganchado, sin importar en
+             *      qué estado esté hoy.
+             *
+             * El segundo grupo no es un adorno. Certificaciones puede regresar a
+             * Calidad una inspección ya enviada (estado 'RETORNADO'); si eso pasa
+             * después de engancharla, sin esta rama desaparecería de la lista y
+             * al guardar el presupuesto su propia inspección se rechazaría por
+             * "ya no disponible", dejándolo imposible de editar.
+             */
+            $st = $this->pdo->prepare("
+                SELECT e.id, e.control, e.maquinaria, e.marca, e.modelo, e.serie, e.id_equipo,
+                       e.capacidad, e.fecha_inspeccion, e.estado, e.certificado_url, e.dictamen_url,
+                       pi.presupuesto_id AS tomada_por_id, pp.folio AS tomada_por_folio
+                  FROM equipos e
+                  LEFT JOIN pres_inspecciones pi ON pi.equipo_id = e.id
+                  LEFT JOIN pres_presupuestos pp ON pp.id = pi.presupuesto_id
+                 WHERE pi.presupuesto_id = ?
+                    OR (e.estado = 'ENVIADO'$filtroPub AND ($marcas))
+                 ORDER BY e.fecha_inspeccion DESC, e.id DESC
+            ");
+            $st->execute([$presupuestoId, ...$prefijos]);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            error_log('[Presupuestos] inspeccionesDisponibles: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudieron leer las inspecciones.'];
+        }
+
+        $out = [];
+        foreach ($rows as $r) {
+            $tomadaPor = (int)($r['tomada_por_id'] ?? 0);
+            $out[] = [
+                'id'               => (int)$r['id'],
+                'control'          => (string)($r['control'] ?? ''),
+                'maquinaria'       => (string)($r['maquinaria'] ?? ''),
+                'detalle'          => $this->detalleEquipo($r),
+                'fecha_inspeccion' => $r['fecha_inspeccion'],
+                'tiene_certificado'=> !empty($r['certificado_url']) || !empty($r['dictamen_url']),
+                // Se enganchó estando publicada y después Calidad la regresó.
+                // Se avisa en vez de esconderla: puede que el presupuesto ya no
+                // deba cobrarla.
+                'regreso_a_calidad'=> (string)($r['estado'] ?? '') !== 'ENVIADO',
+                // Ya está en este presupuesto: se muestra palomeada.
+                'en_este'          => $presupuestoId > 0 && $tomadaPor === $presupuestoId,
+                // Está en otro: se muestra bloqueada y se dice en cuál, para que
+                // se pueda ir a verlo en vez de quedarse adivinando.
+                'ocupada_por'      => ($tomadaPor > 0 && $tomadaPor !== $presupuestoId)
+                                      ? (string)($r['tomada_por_folio'] ?? '') : '',
+            ];
+        }
+        return ['status' => 'ok', 'inspecciones' => $out];
+    }
+
+    /** Cómo se nombra un equipo en el presupuesto y en la propuesta. */
+    private function detalleEquipo(array $e): string {
+        $p = [];
+        foreach (['maquinaria', 'marca', 'modelo'] as $k) {
+            $v = trim((string)($e[$k] ?? ''));
+            if ($v !== '') $p[] = $v;
+        }
+        $txt = implode(' ', $p);
+        $serie = trim((string)($e['serie'] ?? ''));
+        if ($serie !== '') $txt .= ' · s/n ' . $serie;
+        $eco = trim((string)($e['id_equipo'] ?? ''));
+        if ($eco !== '') $txt .= ' · núm. ' . $eco;
+        return mb_substr(trim($txt) ?: 'Equipo sin identificar', 0, 300);
+    }
+
+    /** Las inspecciones ya enganchadas a un presupuesto. */
+    private function inspeccionesDe(int $presupuestoId): array {
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT equipo_id, control, maquinaria, detalle, fecha_inspeccion
+                   FROM pres_inspecciones WHERE presupuesto_id = ?
+                  ORDER BY fecha_inspeccion DESC, id ASC"
+            );
+            $st->execute([$presupuestoId]);
+            return $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) { return []; }
+    }
+
+    // ══════════════════════════════════════════════════════════
     //  NORMALIZADORES
     // ══════════════════════════════════════════════════════════
 
@@ -858,6 +1040,8 @@ class Presupuestos {
         $sp->execute([$id]);
         $p['partidas'] = $sp->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
+        $p['inspecciones'] = $this->inspeccionesDe($id);
+
         $sr = $this->pdo->prepare(
             "SELECT id, pdf_url, modelo, tokens_in, tokens_out, usuario, created_at
              FROM pres_propuestas WHERE presupuesto_id = ? ORDER BY id DESC"
@@ -913,6 +1097,40 @@ class Presupuestos {
 
         $partidas = $this->normalizarPartidas((array)($p['partidas'] ?? []));
         if (!$partidas) return ['status' => 'error', 'message' => 'El presupuesto necesita al menos una partida.'];
+
+        /*
+         * Las inspecciones que este presupuesto cobra.
+         *
+         * Los ids llegan del navegador, así que no se guardan tal cual: se
+         * validan contra la misma lista que la pantalla ofrece. Sin eso,
+         * cualquiera con la consola abierta podría colgarle a su presupuesto
+         * inspecciones de otro cliente, o una que ya se cobró.
+         */
+        $idsInsp   = array_values(array_unique(array_map('intval', (array)($p['inspecciones'] ?? []))));
+        $inspFilas = [];
+        if ($idsInsp) {
+            $disp = $this->inspeccionesDisponibles($clienteId, $id);
+            if (($disp['status'] ?? '') !== 'ok') return $disp;
+            $porId  = array_column($disp['inspecciones'], null, 'id');
+            $ajenas = [];
+            foreach ($idsInsp as $eid) {
+                $row = $porId[$eid] ?? null;
+                if (!$row) {
+                    return ['status' => 'error',
+                        'message' => 'Una de las inspecciones ya no está disponible para este cliente. '
+                                   . 'Vuelve a abrir la lista para ver las vigentes.'];
+                }
+                if ($row['ocupada_por'] !== '') { $ajenas[] = $row['control'] . ' → ' . $row['ocupada_por']; continue; }
+                $inspFilas[] = $row;
+            }
+            // Se nombran una por una con el folio que ya las cobra: así se puede
+            // ir a ver el otro presupuesto en vez de quedarse adivinando.
+            if ($ajenas) {
+                return ['status' => 'error',
+                    'message' => 'Estas inspecciones ya están cobradas en otro presupuesto: '
+                               . implode(', ', $ajenas) . '.'];
+            }
+        }
 
         $descuentoGlobal = $this->dinero($p['descuento'] ?? 0);
         $tot = $this->calcularTotales($partidas, $descuentoGlobal);
@@ -975,6 +1193,22 @@ class Presupuestos {
                     $d['descuento_pct'], $d['tasa_iva'], $d['importe'],
                     $d['clave_prodserv'], $d['clave_unidad'], $i,
                 ]);
+            }
+
+            // Se reemplazan enteras, igual que las partidas: lo que quedó fuera
+            // de la lista se suelta y vuelve a estar disponible para cobrarse en
+            // otro presupuesto.
+            $this->pdo->prepare("DELETE FROM pres_inspecciones WHERE presupuesto_id = ?")->execute([$id]);
+            if ($inspFilas) {
+                $ii = $this->pdo->prepare(
+                    "INSERT INTO pres_inspecciones
+                       (presupuesto_id, equipo_id, control, maquinaria, detalle, fecha_inspeccion)
+                     VALUES (?,?,?,?,?,?)"
+                );
+                foreach ($inspFilas as $f) {
+                    $ii->execute([$id, $f['id'], $f['control'], $f['maquinaria'],
+                                  $f['detalle'], $f['fecha_inspeccion']]);
+                }
             }
             $this->pdo->commit();
         } catch (\Throwable $e) {
@@ -1109,6 +1343,10 @@ class Presupuestos {
         try {
             $this->pdo->prepare("DELETE FROM pres_partidas   WHERE presupuesto_id = ?")->execute([$id]);
             $this->pdo->prepare("DELETE FROM pres_propuestas WHERE presupuesto_id = ?")->execute([$id]);
+            // Las inspecciones que cobraba vuelven a estar libres. Si no se
+            // soltaran, borrar un presupuesto equivocado dejaría ese trabajo sin
+            // poder cobrarse nunca, y sin nada que explicara por qué.
+            $this->pdo->prepare("DELETE FROM pres_inspecciones WHERE presupuesto_id = ?")->execute([$id]);
             $this->pdo->prepare("DELETE FROM pres_presupuestos WHERE id = ?")->execute([$id]);
             $this->pdo->commit();
         } catch (\Throwable $e) {
@@ -1216,6 +1454,30 @@ class Presupuestos {
     }
 
     /** Tabla de importes. La escribe PHP siempre: los números no se delegan. */
+    /**
+     * El anexo que dice, equipo por equipo, qué ampara la oferta.
+     *
+     * Una partida que dice "inspección de montacargas · 2 equipos" no le sirve a
+     * quien recibe el documento: no puede confirmar que sean los suyos, ni
+     * cotejarlo después contra la factura. Con el folio de control y el número
+     * de serie sí, y son los mismos folios que ve en su portal.
+     */
+    private function bloqueInspecciones(array $insp): string {
+        if (!$insp) return '';
+        $h = '<h2 class="p-titulo">Inspecciones que ampara esta oferta</h2>
+<table class="imp">
+  <tr><th width="18%">Folio</th><th width="58%">Equipo</th><th width="24%">Fecha</th></tr>';
+        foreach ($insp as $i) {
+            $f = trim((string)($i['fecha_inspeccion'] ?? ''));
+            $h .= '<tr>'
+                . '<td>' . $this->esc((string)($i['control'] ?? '')) . '</td>'
+                . '<td>' . $this->esc((string)($i['detalle'] ?? '')) . '</td>'
+                . '<td>' . ($f !== '' ? $this->esc(date('d/m/Y', strtotime($f))) : '—') . '</td>'
+                . '</tr>';
+        }
+        return $h . '</table>';
+    }
+
     private function bloqueEconomico(array $pre, array $partidas): string {
         $mon = $this->esc((string)$pre['moneda']);
         $h = '<h2 class="p-titulo">Propuesta económica</h2>
@@ -1324,7 +1586,9 @@ class Presupuestos {
         $pre = $d['presupuesto'];
         if (!$pre['partidas']) return ['status' => 'error', 'message' => 'El presupuesto no tiene partidas.'];
 
-        $cuerpo = $this->bloqueEconomico($pre, $pre['partidas']) . $this->bloqueCondiciones($pre);
+        $cuerpo = $this->bloqueEconomico($pre, $pre['partidas'])
+                . $this->bloqueInspecciones($pre['inspecciones'] ?? [])
+                . $this->bloqueCondiciones($pre);
         try {
             $rel = $this->aPdf($this->documentoHtml('PRESUPUESTO', $cuerpo, $pre), (string)$pre['folio'], 'PRESUPUESTO');
         } catch (\Throwable $e) {

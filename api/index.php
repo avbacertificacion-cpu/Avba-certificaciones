@@ -471,6 +471,14 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($presup->detalle((int)($_GET['id'] ?? 0)));
 
+        case 'PRES_INSPECCIONES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->inspeccionesDisponibles(
+                (int)($_GET['cliente_pres_id'] ?? 0),
+                (int)($_GET['presupuesto_id'] ?? 0)
+            ));
+
         case 'PRES_BUSCAR_SAT':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

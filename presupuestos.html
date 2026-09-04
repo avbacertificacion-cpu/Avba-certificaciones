@@ -230,6 +230,14 @@ textarea.finput{resize:vertical;min-height:80px;font-family:inherit;line-height:
         <input class="finput" id="mp-vigencia" type="number" min="1" max="365" value="15"></div>
     </div>
 
+    <div class="msec">Inspecciones que cubre</div>
+    <div class="frow">
+      <button class="btn-sec" onclick="abrirInspecciones()">Traer inspecciones del portal del cliente</button>
+      <div class="fhint">Sólo las que ya están publicadas en el portal de ese cliente. Una inspección
+        no puede quedar en dos presupuestos: si otro ya la cobra, aquí sale bloqueada con su folio.</div>
+    </div>
+    <div id="mp-insp-lista"></div>
+
     <div class="msec">Partidas</div>
     <div class="frow">
       <select class="finput" id="mp-add" onchange="agregarDelCatalogo(this)">
@@ -335,6 +343,21 @@ textarea.finput{resize:vertical;min-height:80px;font-family:inherit;line-height:
     <div class="fact">
       <button class="btn-sec" onclick="cerrar('m-serv')">Cancelar</button>
       <button class="btn-prim" onclick="guardarServ()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL: INSPECCIONES ══════════ -->
+<div class="overlay" id="m-insp">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">Inspecciones publicadas</div>
+      <button class="modal-close" onclick="cerrar('m-insp')">✕</button>
+    </div>
+    <div id="mi-cuerpo"></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrar('m-insp')">Cancelar</button>
+      <button class="btn-prim" onclick="aplicarInspecciones()">Usar las seleccionadas</button>
     </div>
   </div>
 </div>
@@ -450,6 +473,8 @@ async function get(action, params){
 
 // ══════════ ESTADO EN MEMORIA ══════════
 let _servicios = [], _clientes = [], _config = {}, _regimenes = {}, _usos = {}, _partidas = [];
+// Las inspecciones que este presupuesto cobra, y la lista que ofrece el modal.
+let _inspecciones = [], _inspDisp = [];
 let _fact = { disponible:false, modo:'', formas_pago:{}, metodos_pago:{}, motivos:{} };
 const esAdmin = _sesion.rol === 'ADMIN';
 
@@ -880,6 +905,120 @@ function agregarDelCatalogo(sel){
   });
   renderPartidas();
 }
+// ══════════ INSPECCIONES QUE COBRA EL PRESUPUESTO ══════════
+async function abrirInspecciones(){
+  const cli = document.getElementById('mp-cliente').value;
+  if (!cli) { toast('Elige primero el cliente.'); return; }
+  const cuerpo = document.getElementById('mi-cuerpo');
+  cuerpo.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  abrir('m-insp');
+
+  const d = await get('PRES_INSPECCIONES', {
+    cliente_pres_id: cli,
+    presupuesto_id: document.getElementById('mp-id').value || 0,
+  });
+  if (d.status !== 'ok') { cuerpo.innerHTML = `<p class="empty">${esc(d.message||'Error.')}</p>`; return; }
+
+  _inspDisp = d.inspecciones || [];
+  if (!_inspDisp.length) {
+    cuerpo.innerHTML = `<div class="empty"><div class="empty-t">Nada que cobrar todavía</div>
+      <div class="empty-s">${esc(d.aviso || 'Este cliente no tiene inspecciones publicadas en su portal.')}</div></div>`;
+    return;
+  }
+
+  const yaTengo = new Set(_inspecciones.map(x=>Number(x.equipo_id)));
+  cuerpo.innerHTML = `
+    <div class="fhint" style="margin-bottom:9px">${_inspDisp.length} inspección(es) de este cliente.
+      Se cobran una por equipo.</div>
+    <div class="tbl-wrap"><table class="tabla">
+      <thead><tr><th style="width:6%"></th><th style="width:18%">Folio</th>
+        <th style="width:46%">Equipo</th><th style="width:16%">Fecha</th><th style="width:14%"></th></tr></thead>
+      <tbody>${_inspDisp.map(i => {
+        const bloq = i.ocupada_por !== '';
+        const marcada = yaTengo.has(Number(i.id));
+        return `<tr${bloq ? ' style="opacity:.55"' : ''}>
+          <td><input type="checkbox" class="mi-chk" value="${i.id}"
+                ${marcada ? 'checked' : ''} ${bloq ? 'disabled' : ''}></td>
+          <td style="font-family:monospace;font-size:12px">${esc(i.control)}</td>
+          <td>${esc(i.detalle)}</td>
+          <td>${esc(i.fecha_inspeccion || '—')}</td>
+          <td style="font-size:11.5px">${
+            bloq ? `<span style="color:var(--ambar)">Ya en ${esc(i.ocupada_por)}</span>`
+            : i.regreso_a_calidad ? '<span style="color:var(--ambar)">Regresó a Calidad</span>'
+            : ''}</td>
+        </tr>`; }).join('')}</tbody>
+    </table></div>`;
+}
+
+function aplicarInspecciones(){
+  const marcadas = [...document.querySelectorAll('.mi-chk:checked')].map(c=>Number(c.value));
+  const porId = Object.fromEntries(_inspDisp.map(i=>[Number(i.id), i]));
+  _inspecciones = marcadas.map(id => {
+    const i = porId[id];
+    return {equipo_id:id, control:i.control, maquinaria:i.maquinaria,
+            detalle:i.detalle, fecha_inspeccion:i.fecha_inspeccion};
+  });
+  cerrar('m-insp');
+  renderInspecciones();
+}
+
+function renderInspecciones(){
+  const cont = document.getElementById('mp-insp-lista');
+  if (!_inspecciones.length) {
+    cont.innerHTML = '<div class="fhint">Ninguna enganchada. El presupuesto se puede emitir igual.</div>';
+    return;
+  }
+  // Se agrupan por tipo de máquina porque así es como se cobran: una partida
+  // por línea de servicio, con la cantidad de equipos que le tocan.
+  const grupos = {};
+  _inspecciones.forEach(i => { (grupos[i.maquinaria || 'Equipo'] ||= []).push(i); });
+
+  cont.innerHTML = Object.entries(grupos).map(([maq, lista]) => `
+    <div class="aviso" style="margin:6px 0;background:var(--fondo-sub)">
+      <strong>${esc(maq)}</strong> · ${lista.length} equipo(s)
+      <div style="font-size:11.5px;color:var(--texto-sub);margin-top:4px">
+        ${lista.map(i=>esc(i.control)).join(' · ')}</div>
+    </div>`).join('') +
+    `<button class="btn-sec" onclick="partidasDesdeInspecciones()">Armar partidas con esto</button>
+     <button class="btn-sec" onclick="_inspecciones=[];renderInspecciones()">Quitar todas</button>`;
+}
+
+/**
+ * Convierte lo enganchado en partidas: una por tipo de equipo, con la cantidad
+ * y el detalle de qué se inspeccionó. El precio sale del catálogo si hay una
+ * línea que corresponda; si no, queda en cero para que lo pongan a mano.
+ */
+function partidasDesdeInspecciones(){
+  const grupos = {};
+  _inspecciones.forEach(i => { (grupos[i.maquinaria || 'Equipo'] ||= []).push(i); });
+
+  Object.entries(grupos).forEach(([maq, lista]) => {
+    const norm = s => (s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const m = norm(maq);
+    const serv = _servicios.filter(s=>Number(s.activo))
+      .find(s => norm(s.nombre).includes(m) || m.includes(norm(s.nombre).replace(/^inspeccion y certificacion de /,'')));
+    const detalle = lista.map(i=>`${i.control} — ${i.detalle}`).join('\n');
+
+    _partidas.push({
+      servicio_id: serv ? serv.id : null,
+      clave: serv ? serv.clave : '',
+      descripcion: serv ? serv.nombre : ('Inspección y certificación de ' + maq),
+      alcance: detalle,
+      normas: serv ? (serv.normas||'') : '',
+      unidad: serv ? serv.unidad : 'Equipo',
+      cantidad: lista.length,
+      precio_unitario: serv ? Number(serv.precio) : 0,
+      descuento_pct: 0,
+      tasa_iva: serv ? Number(serv.tasa_iva) : 16,
+      importe: 0,
+      clave_prodserv: serv ? (serv.clave_prodserv||'') : '',
+      clave_unidad: serv ? (serv.clave_unidad||'') : '',
+    });
+  });
+  renderPartidas();
+  toast('Partidas armadas. Revisa los precios antes de guardar.');
+}
+
 function agregarPartida(){
   _partidas.push({servicio_id:null, clave:'', descripcion:'', alcance:'', normas:'',
     unidad:'Servicio', cantidad:1, precio_unitario:0, descuento_pct:0, tasa_iva:16,
@@ -893,6 +1032,7 @@ async function abrirPres(id){
   document.getElementById('mp-title').textContent = id ? 'Presupuesto' : 'Nuevo presupuesto';
   document.getElementById('mp-id').value = id || '';
   _partidas = [];
+  _inspecciones = [];
 
   if (!id) {
     document.getElementById('mp-cliente').value = '';
@@ -902,7 +1042,7 @@ async function abrirPres(id){
     document.getElementById('mp-descuento').value = 0;
     document.getElementById('mp-cli-hint').textContent = '';
     document.getElementById('mp-guardar').disabled = false;
-    renderPartidas(); abrir('m-pres'); return;
+    renderPartidas(); renderInspecciones(); abrir('m-pres'); return;
   }
 
   const d = await get('PRES_DETALLE', {id});
@@ -925,10 +1065,15 @@ async function abrirPres(id){
     descuento_pct: Number(d.descuento_pct), tasa_iva: Number(d.tasa_iva),
     importe: Number(d.importe), clave_prodserv: d.clave_prodserv||'', clave_unidad: d.clave_unidad||'',
   }));
+  _inspecciones = (p.inspecciones||[]).map(i => ({
+    equipo_id: Number(i.equipo_id), control: i.control||'', maquinaria: i.maquinaria||'',
+    detalle: i.detalle||'', fecha_inspeccion: i.fecha_inspeccion||'',
+  }));
   // Un presupuesto facturado sostiene un CFDI: se puede ver, no editar.
   document.getElementById('mp-guardar').disabled = (p.estado === 'FACTURADO');
   clienteElegido();
   renderPartidas();
+  renderInspecciones();
   abrir('m-pres');
 }
 
@@ -947,6 +1092,7 @@ async function guardarPres(){
     condiciones: document.getElementById('mp-condiciones').value,
     notas: document.getElementById('mp-notas').value,
     partidas: _partidas,
+    inspecciones: _inspecciones.map(i=>i.equipo_id),
   });
   btn.disabled = false;
   toast(d.message || 'Guardado.');
