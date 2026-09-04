@@ -176,6 +176,7 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard de Administración</title>
     <script src="../public/assets/js/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;color:#333}

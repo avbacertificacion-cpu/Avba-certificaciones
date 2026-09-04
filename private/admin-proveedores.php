@@ -11,7 +11,8 @@ $nombre = $_SESSION['nombre'];
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Proveedores y Precios</title>
-<style>
+<link rel="stylesheet" href="../public/assets/css/movil.css">
+    <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Segoe UI',system-ui,sans-serif;background:#eef2fb;color:#1a2138}
     .navbar{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:16px 26px;
@@ -55,43 +56,7 @@ $nombre = $_SESSION['nombre'];
     .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
     .empty{text-align:center;padding:50px 20px;color:#94a3b8}.empty .ic{font-size:52px;margin-bottom:10px}
     .msg{font-size:13px;font-weight:600;margin-bottom:12px}
-    /* La tabla nunca debe estirar la página: si no cabe, se recorre dentro
-       de su tarjeta. Sin esto el teléfono aleja el zoom y todo queda diminuto. */
-    .tabla-env{overflow-x:auto}
-
-    @media(max-width:760px){
-        .row2{grid-template-columns:1fr}
-        .container{padding:16px 12px}
-        h2{font-size:20px}
-        .toolbar{flex-direction:column;align-items:stretch}
-        .toolbar input,.toolbar select,.toolbar .btn{width:100%}
-
-        /* Cada renglón se lee como una ficha: el encabezado de la tabla
-           desaparece y cada dato lleva su rótulo al lado. */
-        .tabla-env{overflow-x:visible}
-        .tabla thead{display:none}
-        .tabla,.tabla tbody,.tabla tr,.tabla td{display:block;width:100%}
-        .tabla tr{border:1px solid #e6ecf8;border-radius:12px;padding:10px 13px;margin-bottom:11px;background:#fff}
-        .tabla td{border:none;padding:6px 0;display:flex;justify-content:space-between;
-                  align-items:baseline;gap:14px;text-align:right}
-        .tabla td::before{content:attr(data-et);font-size:11px;font-weight:700;color:#64748b;
-                          text-transform:uppercase;text-align:left;flex-shrink:0}
-        .tabla td.td-titulo{font-weight:700;font-size:15px;padding-bottom:9px;margin-bottom:4px;
-                            border-bottom:1px solid #f1f5f9;display:block;text-align:left}
-        .tabla td.td-titulo::before{display:block;margin-bottom:3px}
-        .tabla td.acciones{justify-content:flex-end;gap:8px;padding-top:10px;margin-top:5px;
-                           border-top:1px solid #f1f5f9}
-        .tabla td.acciones::before{display:none}
-        .tabla td.acciones .btn{flex:1;text-align:center;padding:10px}
-        /* Un emoji suelto en un botón ancho no dice qué hace: en el teléfono
-           se le añade la palabra. */
-        .tabla td.acciones .btn-warning::after{content:' Editar'}
-        .tabla td.acciones .btn-danger::after{content:' Eliminar'}
-
-        /* Los formularios ocupan la pantalla completa: más sitio para escribir */
-        .modal-ov{padding:0;align-items:stretch}
-        .modal{border-radius:0;min-height:100vh;max-width:none;padding:18px 14px}
-    }
+    @media(max-width:760px){ .row2{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -221,8 +186,8 @@ function renderProv() {
             <td data-et="Email">${esc(p.email || '—')}</td>
             <td data-et="Precios" class="n">${p.productos}</td>
             <td class="acciones">
-                <button class="btn btn-warning btn-sm" onclick='editarProv(${JSON.stringify(p)})'>✏️</button>
-                <button class="btn btn-danger btn-sm" onclick="borrarProv(${p.id})">🗑️</button>
+                <button class="btn btn-warning btn-sm" data-lbl="Editar" onclick='editarProv(${JSON.stringify(p)})'>✏️</button>
+                <button class="btn btn-danger btn-sm" data-lbl="Eliminar" onclick="borrarProv(${p.id})">🗑️</button>
             </td></tr>`).join('')}</tbody></table></div>`;
 }
 
@@ -283,8 +248,8 @@ function renderCat() {
             <td data-et="Unidad">${esc(c.unidad || '—')}</td>
             <td data-et="Costo" class="n" style="font-weight:700">${money(c.costo)}</td>
             <td class="acciones">
-                <button class="btn btn-warning btn-sm" onclick='editarPrecio(${JSON.stringify(c)})'>✏️</button>
-                <button class="btn btn-danger btn-sm" onclick="borrarPrecio(${c.id})">🗑️</button>
+                <button class="btn btn-warning btn-sm" data-lbl="Editar" onclick='editarPrecio(${JSON.stringify(c)})'>✏️</button>
+                <button class="btn btn-danger btn-sm" data-lbl="Eliminar" onclick="borrarPrecio(${c.id})">🗑️</button>
             </td></tr>`).join('')}</tbody></table></div>`;
 }
 

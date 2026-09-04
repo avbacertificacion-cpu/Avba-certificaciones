@@ -11,6 +11,7 @@ $nombre = $_SESSION['nombre'];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Reportes Mensuales – Admin</title>
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Segoe UI',sans-serif;background:#f4f6fb}
@@ -208,29 +209,29 @@ async function cargar() {
     }
 
     c.innerHTML = `
-    <table>
+    <div class="tabla-env"><table class="tabla">
         <thead><tr>
             <th>Número</th><th>Empresa</th><th>Período</th>
             <th>Estado</th><th>Acciones</th>
         </tr></thead>
         <tbody>
         ${d.data.map(rep => `<tr>
-            <td><strong>${rep.numero_reporte}</strong></td>
-            <td>${rep.empresa_nombre}</td>
-            <td>${meses[rep.mes]} ${rep.anio}</td>
-            <td><span class="badge b-${rep.estado}">${estadoLabel(rep.estado)}</span></td>
-            <td style="white-space:nowrap">
+            <td data-et="Número" class="td-titulo"><strong>${rep.numero_reporte}</strong></td>
+            <td data-et="Empresa">${rep.empresa_nombre}</td>
+            <td data-et="Período">${meses[rep.mes]} ${rep.anio}</td>
+            <td data-et="Estado"><span class="badge b-${rep.estado}">${estadoLabel(rep.estado)}</span></td>
+            <td class="acciones">
                 ${rep.estado !== 'publicado'
                     ? `<button class="btn btn-sm btn-success" onclick="publicar(${rep.id})">✅ Publicar</button>`
                     : `<button class="btn btn-sm btn-warning" onclick="despublicar(${rep.id})">🔒 Ocultar</button>`
                 }
                 ${plantaPideFotos(rep.empresa_id) ? `<button class="btn btn-sm" style="background:#eef2fb;color:#475569" onclick="abrirFotos(${rep.id}, '${String(rep.numero_reporte).replace(/'/g, "\\'")}')">📷 Fotos</button>` : ''}
                 <button class="btn btn-sm btn-primary" onclick="verPDF(${rep.id})">📄 PDF</button>
-                <button class="btn btn-sm btn-danger" onclick="eliminar(${rep.id})">🗑️</button>
+                <button class="btn btn-sm btn-danger" data-lbl="Eliminar" onclick="eliminar(${rep.id})">🗑️</button>
             </td>
         </tr>`).join('')}
         </tbody>
-    </table>`;
+    </table></div>`;
 }
 
 function estadoLabel(s) {

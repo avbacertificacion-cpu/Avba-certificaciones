@@ -35,7 +35,7 @@ function listar() {
     }
 
     $stmt = $pdo->query("
-        SELECT u.id, u.nombre, u.username, u.email, u.rol, u.estado, u.empresa_id, u.created_at,
+        SELECT u.id, u.nombre, u.username, u.email, u.rol, u.estado, u.empresa_id,
                e.nombre AS empresa_nombre
         FROM usuarios u
         LEFT JOIN empresas e ON e.id = u.empresa_id

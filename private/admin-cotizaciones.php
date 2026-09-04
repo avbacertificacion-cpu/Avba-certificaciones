@@ -30,7 +30,8 @@ $optUnidad  = opcionesCatalogo(catClaveUnidad());
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Cotizaciones</title>
-<style>
+<link rel="stylesheet" href="../public/assets/css/movil.css">
+    <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Segoe UI',system-ui,sans-serif;background:#eef2fb;color:#1a2138}
     .navbar{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:16px 26px;
@@ -127,8 +128,10 @@ $optUnidad  = opcionesCatalogo(catClaveUnidad());
     .ver-sat .col-sat{display:table-cell}
     /* Con tantas columnas, la tabla se desborda y se recorre en horizontal:
        si se dejara encoger, las cifras del negocio quedan ilegibles. */
-    .items{min-width:1074px}
-    .items.ver-sat{min-width:1434px}
+    @media(min-width:761px){
+        .items{min-width:1074px}
+        .items.ver-sat{min-width:1434px}
+    }
     .items td.sel,.items th:first-child{text-align:center}
     .items .i-sel{width:auto;cursor:pointer}
     /* Una partida fuera de la selección se atenúa, pero sigue ahí: la
@@ -146,54 +149,10 @@ $optUnidad  = opcionesCatalogo(catClaveUnidad());
     .tot-cab{font-size:12px;font-weight:700;color:#92400e;background:#fef3c7;border-radius:8px 8px 0 0;
              padding:8px 12px;margin-top:6px;display:none}
     .tot-cab.visible{display:block}
-    /* La tabla del listado nunca debe estirar la página: si no cabe, se recorre
-       dentro de su tarjeta. Sin esto el teléfono aleja el zoom y todo queda diminuto. */
-    .tabla-env{overflow-x:auto}
-
     @media(max-width:800px){ .grid4,.grid2{grid-template-columns:1fr} }
 
     @media(max-width:760px){
-        .container{padding:16px 12px}
-        h2{font-size:20px}
-        .navbar{padding:14px 16px}
-
-        /* Siete indicadores apilados dejaban el listado fuera de la pantalla */
-        .kpis{grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-        .kpi{padding:12px;border-left-width:4px}
-        .kpi .v{font-size:17px}
-        .kpi .l{font-size:10px}
-
-        .toolbar{flex-direction:column;align-items:stretch}
-        .toolbar input,.toolbar select,.toolbar .btn,.toolbar a{width:100%;text-align:center}
-
-        /* Cada cotización se lee como una ficha */
-        .tabla-env{overflow-x:visible}
-        .tabla thead{display:none}
-        .tabla,.tabla tbody,.tabla tr,.tabla td{display:block;width:100%}
-        .tabla tr{border:1px solid #e6ecf8;border-radius:12px;padding:10px 13px;margin-bottom:11px;background:#fff}
-        .tabla tr:hover{background:#fff}
-        .tabla td{border:none;padding:6px 0;display:flex;justify-content:space-between;
-                  align-items:baseline;gap:14px;text-align:right}
-        .tabla td::before{content:attr(data-et);font-size:11px;font-weight:700;color:#64748b;
-                          text-transform:uppercase;text-align:left;flex-shrink:0}
-        .tabla td.td-titulo{font-weight:800;font-size:16px;padding-bottom:9px;margin-bottom:4px;
-                            border-bottom:1px solid #f1f5f9;display:block;text-align:left}
-        .tabla td.td-titulo::before{display:block;margin-bottom:3px}
-        .tabla td.acciones{justify-content:flex-end;flex-wrap:wrap;gap:8px;padding-top:10px;
-                           margin-top:5px;border-top:1px solid #f1f5f9}
-        .tabla td.acciones::before{display:none}
-        /* Dos botones por renglón, con su palabra: un emoji suelto no dice qué hace */
-        .tabla td.acciones .btn{flex:1 1 44%;padding:10px;text-align:center}
-        .tabla td.acciones .b-editar::after{content:' Editar'}
-        .tabla td.acciones .b-cliente::after{content:' Cliente'}
-        .tabla td.acciones .b-interna::after{content:' Interna'}
-        .tabla td.acciones .b-borrar::after{content:' Eliminar'}
-
-        /* El editor ocupa la pantalla completa: es donde más se escribe */
-        .modal-ov{padding:0;align-items:stretch}
-        .modal{border-radius:0;min-height:100vh;max-width:none;padding:16px 13px}
-        .modal-actions{flex-direction:column-reverse}
-        .modal-actions .btn{width:100%}
+        /* Propio de esta pantalla; el resto lo pone movil.css */
         .sel-bar select{width:100%;max-width:none}
         .sel-bar{gap:7px}
         .tot{grid-template-columns:1fr 1fr;gap:10px;padding:12px}
@@ -202,8 +161,6 @@ $optUnidad  = opcionesCatalogo(catClaveUnidad());
         /* Capturar una partida recorriendo una rejilla de 1074px en una
            ventana de 364px es inviable con el pulgar: cada partida pasa a ser
            una ficha con sus campos uno debajo de otro. */
-        .items{min-width:0}
-        .items.ver-sat{min-width:0}
         .items thead{display:none}
         .items,.items tbody,.items tr,.items td{display:block;width:100%}
         .items tr{border:2px solid #e0e7ff;border-radius:12px;padding:10px 12px;margin-bottom:12px;background:#fff}
@@ -218,18 +175,15 @@ $optUnidad  = opcionesCatalogo(catClaveUnidad());
         .items.ver-sat td.col-sat{display:flex}
         .items input,.items select{flex:1;min-width:0}
         .items .ro{flex:1;text-align:right;font-weight:700}
-        /* El renglón de marcado encabeza la ficha */
         .items td.sel{border-bottom:1px solid #f1f5f9;padding-bottom:9px;margin-bottom:4px}
         .items td.sel::before{flex:1}
         .items td.sel .i-sel{flex:0 0 auto;width:20px;height:20px}
-        /* Precio de venta: el botón de recalcular no debe comerse el campo */
         .items td[data-et="Precio de venta"] input{width:auto !important;flex:1}
         .items td.quitar{padding-top:9px;margin-top:4px;border-top:1px solid #f1f5f9}
         .items td.quitar::before{display:none}
         .items td.quitar .del{width:100%;padding:10px}
         .items td.quitar .del::after{content:' Quitar partida'}
     }
-
 </style>
 </head>
 <body>
@@ -523,10 +477,10 @@ function render() {
             <td data-et="Estado"><span class="badge b-${esc(c.estado)}">${esc(c.estado)}</span></td>
             <td data-et="Documentos"><button class="btn btn-ghost btn-sm" onclick="docsDe(${c.id})" title="Evidencias, facturas y documentación">📎 ${adjuntos[c.id] || 0}</button></td>
             <td class="acciones">
-                <button class="btn btn-warning btn-sm b-editar" onclick="editar(${c.id})" title="Editar">✏️</button>
-                <button class="btn btn-ghost btn-sm b-cliente" onclick="imprimir(${c.id},'cliente')" title="Copia para el cliente (sólo precios de venta)">🖨️</button>
-                <button class="btn btn-ghost btn-sm b-interna" onclick="imprimir(${c.id},'interna')" title="Copia interna (con costos y utilidad)">🔒</button>
-                <button class="btn btn-danger btn-sm b-borrar" onclick="borrar(${c.id})" title="Eliminar">🗑️</button>
+                <button class="btn btn-warning btn-sm" data-lbl="Editar" onclick="editar(${c.id})" title="Editar">✏️</button>
+                <button class="btn btn-ghost btn-sm" data-lbl="Cliente" onclick="imprimir(${c.id},'cliente')" title="Copia para el cliente (sólo precios de venta)">🖨️</button>
+                <button class="btn btn-ghost btn-sm" data-lbl="Interna" onclick="imprimir(${c.id},'interna')" title="Copia interna (con costos y utilidad)">🔒</button>
+                <button class="btn btn-danger btn-sm" data-lbl="Eliminar" onclick="borrar(${c.id})" title="Eliminar">🗑️</button>
             </td></tr>`).join('')}</tbody></table></div>`;
 }
 

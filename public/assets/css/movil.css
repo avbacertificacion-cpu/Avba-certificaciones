@@ -1,0 +1,91 @@
+/**
+ * Ajustes para teléfono, compartidos por las pantallas del sistema.
+ *
+ * El problema que resuelve: una tabla puesta directamente en la página hace
+ * que el ancho de la tabla sea el ancho de la página. En un teléfono eso
+ * obliga al navegador a alejar el zoom para que quepa —el listado de
+ * extintores llegaba a verse al 34%— y nada se puede leer.
+ *
+ * Dos piezas:
+ *   1. `.tabla-env` envuelve la tabla y absorbe el desbordamiento.
+ *   2. Por debajo de 760px, `.tabla` deja de ser tabla: cada renglón se
+ *      convierte en una ficha y cada celda muestra el rótulo que lleva en su
+ *      atributo `data-et`.
+ *
+ * Para usarla en una pantalla:
+ *   <link rel="stylesheet" href="../public/assets/css/movil.css">
+ *   ...y al pintar las filas:
+ *   <div class="tabla-env"><table class="tabla">
+ *     <tr><td data-et="Código" class="td-titulo">EXT-001</td>
+ *         <td data-et="Ubicación">…</td>
+ *         <td class="acciones">…botones…</td></tr>
+ *   </table></div>
+ *
+ * `td-titulo` es el dato que encabeza la ficha; `acciones` es la fila de
+ * botones, que va al pie y sin rótulo.
+ */
+
+.tabla-env { overflow-x: auto; }
+
+@media (max-width: 760px) {
+    .container { padding-left: 12px; padding-right: 12px; }
+
+    /* Indicadores de dos en dos: apilados dejaban el contenido fuera de vista */
+    /* minmax(0,1fr) y no 1fr: una pista `1fr` nunca baja de su min-content, así
+       que una cifra larga —"$1,234,567.00"— ensancha la rejilla y con ella la
+       página entera. Con minmax(0,…) la pista sí puede encoger. */
+    .kpis, .kpi-grid, .stats { grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important; gap: 10px; }
+    .kpi, .kpi-card, .stat-card { padding: 12px; }
+    .kpi .v, .kpi-value, .stat-value { font-size: 17px; }
+    .kpi .l, .kpi-label, .stat-label { font-size: 10px; }
+
+    /* Filtros y botones a lo ancho, que es como se tocan bien */
+    .toolbar { flex-direction: column; align-items: stretch; }
+    .toolbar input, .toolbar select, .toolbar .btn, .toolbar button { width: 100%; min-width: 0; }
+
+    /* La tabla pasa a ser una lista de fichas */
+    .tabla-env { overflow-x: visible; }
+    .tabla thead { display: none; }
+    .tabla, .tabla tbody, .tabla tr, .tabla td { display: block; width: 100%; }
+    .tabla { box-shadow: none; background: none; }
+    .tabla tr {
+        border: 1px solid #e6ecf8; border-radius: 12px; padding: 10px 13px;
+        margin-bottom: 11px; background: #fff; box-shadow: 0 2px 8px rgba(30,41,59,.06);
+    }
+    .tabla tr:hover { background: #fff; }
+    .tabla td {
+        border: none; padding: 6px 0; display: flex; justify-content: space-between;
+        align-items: baseline; gap: 14px; text-align: right;
+    }
+    .tabla td::before {
+        content: attr(data-et); font-size: 11px; font-weight: 700; color: #64748b;
+        text-transform: uppercase; text-align: left; flex-shrink: 0;
+    }
+    /* El dato que encabeza la ficha ocupa su propio renglón */
+    .tabla td.td-titulo {
+        display: block; text-align: left; font-weight: 800; font-size: 16px;
+        padding-bottom: 9px; margin-bottom: 4px; border-bottom: 1px solid #f1f5f9;
+    }
+    .tabla td.td-titulo::before { display: block; margin-bottom: 3px; }
+    /* Los botones, al pie de la ficha y sin rótulo */
+    .tabla td.acciones {
+        justify-content: flex-end; flex-wrap: wrap; gap: 8px; text-align: center;
+        padding-top: 10px; margin-top: 5px; border-top: 1px solid #f1f5f9;
+    }
+    .tabla td.acciones::before { display: none; }
+    .tabla td.acciones .btn, .tabla td.acciones button { flex: 1 1 44%; padding: 10px; }
+    /* Un emoji suelto en un botón ancho no dice qué hace. El botón lleva su
+       palabra en data-lbl y aquí se le añade; en escritorio no se muestra,
+       donde el icono basta porque el botón es pequeño y tiene title. */
+    .tabla td.acciones [data-lbl]::after { content: ' ' attr(data-lbl); }
+
+    /* Los gráficos se dimensionan solos y pueden pedir más ancho del que hay
+       mientras se dibujan; acotarlos evita que ensanchen la página. */
+    canvas { max-width: 100% !important; }
+
+    /* Los formularios ocupan la pantalla: es donde más se escribe */
+    .modal-ov, .modal-overlay { padding: 0; align-items: stretch; }
+    .modal { border-radius: 0; min-height: 100vh; max-height: none; max-width: none; padding: 18px 14px; }
+    .modal-actions { flex-direction: column-reverse; }
+    .modal-actions .btn { width: 100%; }
+}

@@ -13,6 +13,7 @@ $es_admin = $rol === ROLE_ADMIN;
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Extintores – Gestión</title>
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Segoe UI',sans-serif;background:#f4f6fb}
@@ -282,7 +283,7 @@ function renderTabla(data) {
     const esAdmin = <?= $es_admin ? 'true' : 'false' ?>;
 
     c.innerHTML = `
-    <table>
+    <div class="tabla-env"><table class="tabla">
         <thead><tr>
             <th>Código</th><th>Empresa</th><th>Ubicación</th><th>Tipo</th>
             <th>Capacidad</th><th>Recarga</th><th>PH</th><th>Última insp.</th>
@@ -291,28 +292,28 @@ function renderTabla(data) {
         <tbody>
         ${data.map(e => `
             <tr>
-                <td><strong>${e.codigo_manual}</strong></td>
-                <td>${e.empresa_nombre}</td>
-                <td>${e.ubicacion}</td>
-                <td><span class="tipo-tag">${e.tipo_nombre}</span></td>
-                <td>${e.capacidad || '—'}</td>
-                <td>${isoADisplay(e.fecha_recarga) || '—'}</td>
-                <td>${isoADisplay(e.fecha_ph) || '—'}</td>
-                <td>${e.ultima_inspeccion ? isoADisplay(e.ultima_inspeccion) : '<span style="color:#e74c3c">Sin inspección</span>'}</td>
-                <td><span class="badge badge-${e.estado}">${estadoLabel(e.estado)}</span></td>
-                <td style="white-space:nowrap">
+                <td data-et="Código" class="td-titulo"><strong>${e.codigo_manual}</strong></td>
+                <td data-et="Empresa">${e.empresa_nombre}</td>
+                <td data-et="Ubicación">${e.ubicacion}</td>
+                <td data-et="Tipo"><span class="tipo-tag">${e.tipo_nombre}</span></td>
+                <td data-et="Capacidad">${e.capacidad || '—'}</td>
+                <td data-et="Recarga">${isoADisplay(e.fecha_recarga) || '—'}</td>
+                <td data-et="Prueba hidrostática">${isoADisplay(e.fecha_ph) || '—'}</td>
+                <td data-et="Última inspección">${e.ultima_inspeccion ? isoADisplay(e.ultima_inspeccion) : '<span style="color:#e74c3c">Sin inspección</span>'}</td>
+                <td data-et="Estado"><span class="badge badge-${e.estado}">${estadoLabel(e.estado)}</span></td>
+                <td class="acciones">
                     ${(!e.codigo_qr || esAdmin) ? `
                     <button class="btn btn-sm btn-primary" onclick="asignarOModificarQR(${e.id}, ${e.codigo_qr ? 'true' : 'false'})">
                         ${e.codigo_qr ? '🔧 Modificar QR' : '📝 Asignar QR'}
                     </button>` : ''}
                     ${e.codigo_qr ? `<button class="btn btn-sm btn-info" onclick="verQR(${e.id})">👁️ Ver</button>` : ''}
-                    <button class="btn btn-sm btn-warning" onclick="editarExtintor(${e.id})">✏️</button>
-                    ${esAdmin ? `<button class="btn btn-sm btn-danger" onclick="eliminarExtintor(${e.id})">🗑️</button>` : ''}
+                    <button class="btn btn-sm btn-warning" data-lbl="Editar" onclick="editarExtintor(${e.id})">✏️</button>
+                    ${esAdmin ? `<button class="btn btn-sm btn-danger" data-lbl="Eliminar" onclick="eliminarExtintor(${e.id})">🗑️</button>` : ''}
                 </td>
             </tr>
         `).join('')}
         </tbody>
-    </table>`;
+    </table></div>`;
 }
 
 function estadoLabel(s) {

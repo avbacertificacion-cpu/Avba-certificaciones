@@ -11,6 +11,7 @@ $nombre = $_SESSION['nombre'];
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tipos de Extintores</title>
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Segoe UI',sans-serif;background:#f0f4ff;color:#333}
@@ -140,21 +141,21 @@ async function cargarTipos() {
         return;
     }
 
-    let html = '<table class="tipos-table"><thead><tr><th>Nombre</th><th>Descripción</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
+    let html = '<div class="tabla-env"><table class="tipos-table tabla"><thead><tr><th>Nombre</th><th>Descripción</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>';
 
     for (const tipo of tipos) {
         html += `<tr>
-            <td><strong>${htmlEscape(tipo.nombre)}</strong></td>
-            <td>${htmlEscape(tipo.descripcion || '')}</td>
-            <td><span class="status-badge status-${tipo.estado}">${tipo.estado === 'activo' ? '✓ Activo' : '✗ Inactivo'}</span></td>
-            <td class="actions">
+            <td data-et="Nombre" class="td-titulo"><strong>${htmlEscape(tipo.nombre)}</strong></td>
+            <td data-et="Descripción">${htmlEscape(tipo.descripcion || '')}</td>
+            <td data-et="Estado"><span class="status-badge status-${tipo.estado}">${tipo.estado === 'activo' ? '✓ Activo' : '✗ Inactivo'}</span></td>
+            <td class="actions acciones">
                 <button class="btn btn-sm btn-primary" onclick="editarTipo(${tipo.id})">Editar</button>
                 <button class="btn btn-sm btn-${tipo.estado === 'activo' ? 'danger' : 'warning'}" onclick="cambiarEstado(${tipo.id}, '${tipo.estado === 'activo' ? 'inactivo' : 'activo'}')">${tipo.estado === 'activo' ? 'Desactivar' : 'Activar'}</button>
             </td>
         </tr>`;
     }
 
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
     document.getElementById('tabla-container').innerHTML = html;
 }
 
