@@ -259,6 +259,89 @@ class Presupuestos {
         }
 
         $this->sembrarConfig();
+        $this->sembrarServicios();
+    }
+
+    /**
+     * Catálogo inicial con las líneas que AVBA de veras vende. Se siembra una
+     * sola vez y sólo si el catálogo está vacío: la pantalla de un módulo nuevo
+     * en blanco no dice qué se espera que uno escriba, y el primer presupuesto
+     * se atora ahí.
+     *
+     * Los precios entran en cero a propósito. Un precio inventado por el
+     * sistema es peor que ningún precio: se cuela al presupuesto, de ahí a la
+     * propuesta y acaba siendo lo que AVBA se comprometió a cobrar. Que lo
+     * ponga quien lo cotiza.
+     *
+     * Las claves del SAT también quedan vacías, y el catálogo las marca en
+     * ámbar. Son las que deciden si el timbrado pasa: se eligen con el buscador
+     * del SAT que ya trae la pantalla, no se adivinan aquí.
+     */
+    private function sembrarServicios(): void {
+        try {
+            $hecho = $this->pdo->query("SELECT valor FROM pres_config WHERE clave = 'servicios_sembrados'")
+                               ->fetchColumn();
+            if ($hecho) return;
+
+            // Si ya hay catálogo, esto no tiene nada que hacer: sólo deja la
+            // marca para no volver a preguntar en cada arranque.
+            $hay = (int)$this->pdo->query("SELECT COUNT(*) FROM pres_servicios")->fetchColumn();
+
+            if ($hay === 0) {
+                $entregaEquipo = "Dictamen de cumplimiento, certificado con folio y código QR verificable, "
+                               . "y reporte fotográfico de la inspección.";
+                $base = [
+                    ['INS-GRUA',  'Inspección y certificación de grúa',
+                     'Inspección de grúa hidráulica sobre camión o neumáticos, con verificación de estructura, sistema hidráulico, cables, ganchos, frenos y dispositivos de seguridad.',
+                     'NOM-004-STPS-1999 · ASME B30.5', 'Equipo'],
+                    ['INS-TORRE', 'Inspección y certificación de grúa torre',
+                     'Inspección de grúa torre: estructura, arriostramientos, mecanismos de giro y elevación, limitadores de carga y dispositivos de seguridad.',
+                     'NOM-004-STPS-1999 · ASME B30.3', 'Equipo'],
+                    ['INS-MEWP',  'Inspección y certificación de plataforma de elevación (MEWP)',
+                     'Inspección de plataforma de elevación de personal: estructura, sistema hidráulico, controles, paros de emergencia y sistemas anticaída.',
+                     'NOM-009-STPS-2011 · ANSI A92', 'Equipo'],
+                    ['INS-MONTA', 'Inspección y certificación de montacargas',
+                     'Inspección de montacargas: mástil, horquillas, cadenas, sistema hidráulico, frenos, dirección y dispositivos de seguridad.',
+                     'NOM-006-STPS-2014 · ASME B56.1', 'Equipo'],
+                    ['INS-TELE',  'Inspección y certificación de manipulador telescópico',
+                     'Inspección de telehandler: pluma telescópica, estabilizadores, sistema hidráulico, aditamentos y limitadores de carga.',
+                     'NOM-006-STPS-2014 · ASME B30.22', 'Equipo'],
+                    ['INS-ACC',   'Inspección y certificación de accesorios de izaje',
+                     'Inspección de eslingas, grilletes, ganchos, estrobos y demás accesorios de izaje, con identificación individual y capacidad verificada.',
+                     'NOM-006-STPS-2014 · ASME B30.9 · ASME B30.26', 'Pieza'],
+                    ['INS-ARN',   'Inspección y certificación de equipo de protección contra caídas',
+                     'Inspección de arneses, líneas de vida, absorbedores y conectores, con revisión de costuras, herrajes y vigencia del fabricante.',
+                     'NOM-009-STPS-2011 · ANSI Z359', 'Pieza'],
+                    ['CAP-PERS',  'Certificación de personal',
+                     'Evaluación y certificación de competencia del operador, con constancia de habilidades laborales DC-3 y credencial con código QR verificable.',
+                     'NOM-004-STPS-1999 · NOM-006-STPS-2014 · NOM-009-STPS-2011', 'Persona'],
+                    ['PND',       'Pruebas no destructivas',
+                     'Aplicación de pruebas no destructivas —líquidos penetrantes, partículas magnéticas o ultrasonido— sobre elementos estructurales y de izaje.',
+                     'ASNT SNT-TC-1A', 'Servicio'],
+                ];
+
+                $ins = $this->pdo->prepare(
+                    "INSERT INTO pres_servicios
+                       (clave, nombre, descripcion, normas, entregables, unidad, precio, orden, activo)
+                     VALUES (?, ?, ?, ?, ?, ?, 0, ?, 1)"
+                );
+                foreach ($base as $i => [$clave, $nombre, $desc, $normas, $unidad]) {
+                    $entrega = $unidad === 'Persona'
+                        ? "Constancia de habilidades laborales DC-3, credencial con código QR verificable y lista de asistencia."
+                        : ($unidad === 'Servicio'
+                            ? "Reporte de resultados con la técnica aplicada, criterios de aceptación e indicaciones encontradas."
+                            : $entregaEquipo);
+                    try {
+                        $ins->execute([$clave, $nombre, $desc, $normas, $entrega, $unidad, ($i + 1) * 10]);
+                    } catch (\Throwable $e) { /* clave repetida: alguien ya la capturó */ }
+                }
+            }
+
+            $this->pdo->prepare("INSERT IGNORE INTO pres_config (clave, valor) VALUES ('servicios_sembrados', ?)")
+                      ->execute([date('Y-m-d H:i:s')]);
+        } catch (\Throwable $e) {
+            error_log('[Presupuestos] sembrarServicios: ' . $e->getMessage());
+        }
     }
 
     /**

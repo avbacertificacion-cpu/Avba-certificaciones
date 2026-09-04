@@ -500,7 +500,9 @@ async function cargarServ(){
         <div class="card-ico">🧾</div>
         <div style="flex:1;min-width:0">
           <div class="card-nombre">${esc(s.nombre)}</div>
-          <div class="card-sub">${esc(s.clave)} · ${money(s.precio)} ${esc(s.moneda)} / ${esc(s.unidad)}</div>
+          <div class="card-sub">${esc(s.clave)} · ${Number(s.precio) > 0
+            ? `${money(s.precio)} ${esc(s.moneda)}`
+            : '<span style="color:var(--ambar)">sin precio</span>'} / ${esc(s.unidad)}</div>
         </div>
         <span class="badge ${Number(s.activo)? 'b-ok':'b-off'}">${Number(s.activo)?'Activo':'Inactivo'}</span>
       </div>
@@ -721,9 +723,16 @@ function llenarSelectorClientes(){
 }
 function llenarSelectorServicios(){
   const sel = document.getElementById('mp-add');
+  const act = _servicios.filter(s=>Number(s.activo));
+  // Un desplegable que se abre y no muestra nada parece descompuesto. Si el
+  // catálogo está vacío, que lo diga y diga a dónde ir.
+  if (!act.length) {
+    sel.innerHTML = '<option value="">Catálogo vacío — date de alta un servicio en la pestaña «Catálogo de servicios»</option>';
+    return;
+  }
   sel.innerHTML = '<option value="">+ Agregar servicio del catálogo…</option>' +
-    _servicios.filter(s=>Number(s.activo))
-      .map(s=>`<option value="${s.id}">${esc(s.nombre)} — ${money(s.precio)}</option>`).join('');
+    act.map(s=>`<option value="${s.id}">${esc(s.nombre)} — ${
+      Number(s.precio) > 0 ? money(s.precio) : 'sin precio'}</option>`).join('');
 }
 function clienteElegido(){
   const c = _clientes.find(x=>String(x.id)===document.getElementById('mp-cliente').value);
