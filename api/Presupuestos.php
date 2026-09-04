@@ -442,7 +442,87 @@ class Presupuestos {
     //  CLIENTES (con sus datos fiscales)
     // ══════════════════════════════════════════════════════════
 
+    /**
+     * Trae al catálogo de presupuestos los clientes que ya existen en el
+     * directorio de AVBA (tabla `clientes`, la que alimentan Certificaciones y
+     * Personal). Sin esto habría que recapturar a mano toda la cartera, y peor:
+     * el mismo cliente acabaría escrito de dos formas distintas, una en cada
+     * módulo, sin manera de saber cuál es la buena.
+     *
+     * El reparto es: el directorio manda sobre la identidad (el nombre), y los
+     * datos fiscales que el SAT exige para timbrar —RFC, régimen, CP, uso de
+     * CFDI— viven aquí, porque aquella tabla no los tiene. Lo que se capture en
+     * presupuestos no se pisa nunca: la sincronización sólo da de alta lo que
+     * falta y corrige el nombre si allá lo cambiaron.
+     */
+    private function sincronizarDirectorio(): void {
+        try {
+            // Las columnas de `clientes` han ido creciendo con los módulos que
+            // la usan (Personal las agrega sobre la marcha). Se pregunta antes
+            // de leer, para no romper en una base que todavía no las tenga.
+            $cols = [];
+            foreach ($this->pdo->query("SHOW COLUMNS FROM clientes")->fetchAll(PDO::FETCH_ASSOC) ?: [] as $c) {
+                $cols[strtolower((string)$c['Field'])] = true;
+            }
+            if (!isset($cols['nombre_cliente'])) return;
+
+            $extra = array_values(array_filter(
+                ['rfc', 'direccion', 'correo_contacto', 'representante'],
+                fn($c) => isset($cols[$c])
+            ));
+            $sel = 'id, nombre_cliente' . ($extra ? ', ' . implode(', ', $extra) : '');
+            $dir = $this->pdo->query("SELECT $sel FROM clientes")->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            if (!$dir) return;
+
+            $ya = [];
+            foreach ($this->pdo->query(
+                "SELECT id, cliente_id FROM pres_clientes WHERE cliente_id IS NOT NULL"
+            )->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
+                $ya[(int)$r['cliente_id']] = (int)$r['id'];
+            }
+
+            $ins = $this->pdo->prepare(
+                "INSERT INTO pres_clientes (cliente_id, nombre_comercial, rfc, direccion, correo, contacto)
+                 VALUES (?, ?, ?, ?, ?, ?)"
+            );
+            // Sólo escribe si de veras cambió: así una carga de la pestaña no
+            // deja una tanda de UPDATE inútiles en la bitácora del servidor.
+            $upd = $this->pdo->prepare(
+                "UPDATE pres_clientes SET nombre_comercial = ? WHERE id = ? AND nombre_comercial <> ?"
+            );
+
+            foreach ($dir as $c) {
+                $cid    = (int)$c['id'];
+                $nombre = trim((string)$c['nombre_cliente']);
+                if ($cid <= 0 || $nombre === '') continue;
+
+                if (isset($ya[$cid])) { $upd->execute([$nombre, $ya[$cid], $nombre]); continue; }
+
+                // El RFC del directorio se capturó para otros fines y puede
+                // venir con formato libre. Si no pasa el patrón del SAT entra
+                // vacío: mejor que lo pidan a que el timbrado lo rechace.
+                $rfc = strtoupper(preg_replace('/\s+/', '', (string)($c['rfc'] ?? '')));
+                if ($rfc !== '' && !preg_match('/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/', $rfc)) $rfc = '';
+
+                $correo = trim((string)($c['correo_contacto'] ?? ''));
+                if ($correo !== '' && !filter_var($correo, FILTER_VALIDATE_EMAIL)) $correo = '';
+
+                $ins->execute([
+                    $cid, mb_substr($nombre, 0, 200), $rfc,
+                    mb_substr(trim((string)($c['direccion'] ?? '')), 0, 300),
+                    mb_substr($correo, 0, 200),
+                    mb_substr(trim((string)($c['representante'] ?? '')), 0, 150),
+                ]);
+            }
+        } catch (\Throwable $e) {
+            // Que el directorio no se deje leer no debe dejar sin catálogo al
+            // módulo: sigue sirviendo con los clientes capturados aquí.
+            error_log('[Presupuestos] sincronizar directorio: ' . $e->getMessage());
+        }
+    }
+
     public function clientes(string $busca = ''): array {
+        $this->sincronizarDirectorio();
         try {
             if (trim($busca) !== '') {
                 $st = $this->pdo->prepare(
@@ -464,7 +544,11 @@ class Presupuestos {
         }
         // Marca lo que le falta a cada cliente para poder facturarle. Descubrirlo
         // al momento de timbrar, con el cliente esperando, es demasiado tarde.
-        foreach ($rows as &$r) $r['falta_fiscal'] = $this->faltaFiscal($r);
+        foreach ($rows as &$r) {
+            $r['falta_fiscal'] = $this->faltaFiscal($r);
+            $r['origen']       = !empty($r['cliente_id']) ? 'directorio' : 'presupuestos';
+        }
+        unset($r);
         return ['status' => 'ok', 'clientes' => $rows];
     }
 
@@ -521,6 +605,15 @@ class Presupuestos {
         ];
 
         if ($id > 0) {
+            // El vínculo con el directorio de AVBA no se toca al editar: el
+            // formulario no lo manda, y borrarlo haría que la sincronización
+            // diera de alta al mismo cliente otra vez, ahora duplicado.
+            if (!array_key_exists('cliente_id', $p)) {
+                $st = $this->pdo->prepare("SELECT cliente_id FROM pres_clientes WHERE id = ?");
+                $st->execute([$id]);
+                $prev = $st->fetchColumn();
+                $campos['cliente_id'] = ($prev === false || $prev === null) ? null : (int)$prev;
+            }
             $sets = implode(', ', array_map(fn($c) => "$c = ?", array_keys($campos)));
             $this->pdo->prepare("UPDATE pres_clientes SET $sets WHERE id = ?")
                       ->execute([...array_values($campos), $id]);
@@ -536,6 +629,18 @@ class Presupuestos {
 
     public function eliminarCliente(int $id): array {
         if ($id <= 0) return ['status' => 'error', 'message' => 'Cliente no válido.'];
+
+        // A los que vienen del directorio de AVBA no tiene caso borrarlos aquí:
+        // la siguiente carga de la pestaña los daría de alta otra vez, y de
+        // paso se perderían sus datos fiscales. Se desactivan.
+        $s = $this->pdo->prepare("SELECT cliente_id FROM pres_clientes WHERE id = ?");
+        $s->execute([$id]);
+        if ((int)$s->fetchColumn() > 0) {
+            return ['status' => 'error',
+                'message' => 'Ese cliente viene del directorio de AVBA y se da de baja desde Personal. '
+                           . 'Aquí puedes desactivarlo para que deje de aparecer en los presupuestos.'];
+        }
+
         $s = $this->pdo->prepare("SELECT COUNT(*) FROM pres_presupuestos WHERE cliente_pres_id = ?");
         $s->execute([$id]);
         if ((int)$s->fetchColumn() > 0) {

@@ -636,11 +636,13 @@ async function cargarCli(){
 
   if (!_clientes.length) {
     cont.innerHTML = `<div class="empty"><div class="empty-t">Sin clientes todavía</div>
-      <div class="empty-s">Agrega uno con su constancia de situación fiscal a la mano.</div></div>`;
+      <div class="empty-s">Aquí aparecen solos los clientes del directorio de AVBA. Si el directorio
+      está vacío, agrega uno con su constancia de situación fiscal a la mano.</div></div>`;
     return;
   }
   cont.innerHTML = '<div class="cards">' + _clientes.map(c => {
     const falta = c.falta_fiscal || [];
+    const delDir = c.origen === 'directorio';
     return `
     <div class="card">
       <div class="card-top">
@@ -655,11 +657,12 @@ async function cargarCli(){
       <div class="card-body">
         ${c.razon_social ? `<div style="font-size:12.5px;color:var(--texto-sub)">${esc(c.razon_social)}</div>` : ''}
         ${c.correo ? `<div style="font-size:12.5px;color:var(--texto-sub);margin-top:3px">${esc(c.correo)}</div>` : ''}
+        ${delDir ? `<div style="font-size:11.5px;color:var(--texto-sub);margin-top:5px">Del directorio de AVBA</div>` : ''}
         ${falta.length ? `<div class="aviso" style="margin-top:9px;margin-bottom:0">Falta: ${esc(falta.join(', '))}.</div>` : ''}
       </div>
       <div class="card-foot">
-        <button class="btn-sec" onclick="abrirCli(${c.id})">Editar</button>
-        <button class="btn-del" onclick="borrarCli(${c.id})">Eliminar</button>
+        <button class="btn-sec" onclick="abrirCli(${c.id})">${falta.length ? 'Completar datos fiscales' : 'Editar'}</button>
+        ${delDir ? '' : `<button class="btn-del" onclick="borrarCli(${c.id})">Eliminar</button>`}
       </div>
     </div>`; }).join('') + '</div>';
 }
