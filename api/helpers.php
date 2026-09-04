@@ -205,6 +205,9 @@ foreach ([
     'CORS_ORIGINS'       => '',
     'GEMINI_API_KEY'     => '',
     'GEMINI_MODEL'       => '',
+    'CLAUDE_API_KEY'     => '',
+    'CLAUDE_MODEL'       => '',
+    'CLAUDE_EFFORT'      => '',
     'APP_ENV'            => 'production',
 ] as $constante => $valor) {
     if (!defined($constante)) define($constante, $valor);

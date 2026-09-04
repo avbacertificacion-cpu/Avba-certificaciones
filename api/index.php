@@ -42,6 +42,8 @@ require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
 require_once __DIR__ . '/Contabilidad.php';
 require_once __DIR__ . '/MaterialControl.php';
+require_once __DIR__ . '/ClaudeIA.php';
+require_once __DIR__ . '/Presupuestos.php';
 
 // ── Headers de seguridad ──────────────────────────────────
 header('Content-Type: application/json; charset=utf-8');
@@ -165,6 +167,7 @@ $pagosServicios = new PagosServicios($pdo);
 $anuncios       = new Anuncios($pdo);
 $conta       = new Contabilidad($pdo);
 $material    = new MaterialControl($pdo);
+$presup      = new Presupuestos($pdo);
 $verifIA        = new VerificacionIA($pdo);
 $arneses        = new Arneses($pdo);
 $cliImpresion   = new ClienteImpresion($pdo);
@@ -440,6 +443,37 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($material->detalle((int)($_GET['id'] ?? 0)));
+
+        // ── Presupuestos: catálogo, clientes y ofertas (ADMIN + ADMINISTRATIVO) ──
+        case 'PRES_CONFIG':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->config());
+
+        case 'PRES_SERVICIOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->servicios(!empty($_GET['activos'])));
+
+        case 'PRES_CLIENTES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->clientes((string)($_GET['q'] ?? '')));
+
+        case 'PRES_LISTAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->listar((string)($_GET['estado'] ?? ''), (string)($_GET['q'] ?? '')));
+
+        case 'PRES_DETALLE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->detalle((int)($_GET['id'] ?? 0)));
+
+        case 'PRES_VER_PROPUESTA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->verPropuesta((int)($_GET['id'] ?? 0)));
 
         // ── Vencimientos / pagos de servicios (ADMIN + ADMINISTRATIVO) ──
         case 'LISTAR_PAGOS_SERVICIOS':
@@ -1057,6 +1091,72 @@ if ($method === 'POST') {
         }
 
         // ── Control de material en planta (ADMIN + ADMINISTRATIVO) ──
+        // ── Presupuestos (ADMIN + ADMINISTRATIVO) ────────────────
+        case 'PRES_GUARDAR_CONFIG':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->guardarConfig($payload));
+
+        case 'PRES_GUARDAR_SERVICIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->guardarServicio($payload));
+
+        case 'PRES_ELIMINAR_SERVICIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->eliminarServicio((int)($payload['id'] ?? 0)));
+
+        case 'PRES_GUARDAR_CLIENTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->guardarCliente($payload));
+
+        case 'PRES_ELIMINAR_CLIENTE':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->eliminarCliente((int)($payload['id'] ?? 0)));
+
+        case 'PRES_GUARDAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->guardar($payload, $usr['nombre'] ?? $usr['usuario'] ?? 'Sistema'));
+
+        case 'PRES_ESTADO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->cambiarEstado((int)($payload['id'] ?? 0), (string)($payload['estado'] ?? '')));
+
+        case 'PRES_ELIMINAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->eliminar((int)($payload['id'] ?? 0), $usr['nombre'] ?? $usr['usuario'] ?? 'Sistema'));
+
+        case 'PRES_PDF':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->pdfPresupuesto((int)($payload['id'] ?? 0)));
+
+        case 'PRES_GENERAR_PROPUESTA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->generarPropuesta((int)($payload['id'] ?? 0), $usr['nombre'] ?? $usr['usuario'] ?? 'Sistema'));
+
+        case 'PRES_ELIMINAR_PROPUESTA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->eliminarPropuesta((int)($payload['id'] ?? 0)));
+
+        case 'PRES_ENVIAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->enviar(
+                (int)($payload['id'] ?? 0),
+                (string)($payload['correo'] ?? ''),
+                $usr['nombre'] ?? $usr['usuario'] ?? 'Sistema',
+                !array_key_exists('incluir_propuesta', $payload) || !empty($payload['incluir_propuesta'])
+            ));
+
         case 'GUARDAR_MATERIAL_VALE':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

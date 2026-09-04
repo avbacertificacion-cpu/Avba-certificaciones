@@ -1,0 +1,1432 @@
+<?php
+/**
+ * AVBA Certificaciones — Servicios, precios, clientes y presupuestos.
+ *
+ * La cadena completa vive aquí:
+ *
+ *   catálogo de servicios ─┐
+ *   datos del cliente     ─┼─→ PRESUPUESTO ─→ PROPUESTA TÉCNICO-ECONÓMICA ─→ FACTURA
+ *   precios y condiciones ─┘      (PDF)            (redactada con IA)          (PAC)
+ *
+ * Dos decisiones que conviene entender antes de tocar nada:
+ *
+ * 1. Los totales NUNCA se toman de lo que manda el navegador. Llegan las
+ *    partidas y aquí se recalcula todo. Un presupuesto es una oferta con
+ *    consecuencias: si el importe se pudiera inyectar desde el cliente, un
+ *    campo oculto mal puesto —o alguien con la consola abierta— cambiaría lo
+ *    que AVBA se compromete a cobrar.
+ *
+ * 2. El diseño de la propuesta es de PHP, no de la IA. El modelo redacta el
+ *    texto; el encabezado, los logotipos, la tabla de importes y el pie salen
+ *    de esta clase. Así dos propuestas hechas con seis meses de diferencia se
+ *    ven idénticas, y ninguna puede inventarse una acreditación que no tenemos.
+ */
+
+class Presupuestos {
+
+    private PDO $pdo;
+
+    /** Estados por los que pasa un presupuesto. */
+    private const ESTADOS = ['BORRADOR', 'ENVIADO', 'ACEPTADO', 'RECHAZADO', 'FACTURADO', 'CANCELADO'];
+
+    /** IVA general vigente. Se puede cambiar por partida (p. ej. 0 en exportación). */
+    private const IVA_DEFAULT = 16.0;
+
+    /**
+     * Regímenes fiscales del SAT. Se guardan aquí para que la captura sea una
+     * lista y no un campo libre: un régimen mal tecleado no se descubre hasta
+     * que el timbrado lo rechaza, con el cliente esperando su factura.
+     */
+    public const REGIMENES = [
+        '601' => 'General de Ley Personas Morales',
+        '603' => 'Personas Morales con Fines no Lucrativos',
+        '605' => 'Sueldos y Salarios e Ingresos Asimilados a Salarios',
+        '606' => 'Arrendamiento',
+        '607' => 'Régimen de Enajenación o Adquisición de Bienes',
+        '608' => 'Demás ingresos',
+        '610' => 'Residentes en el Extranjero sin Establecimiento Permanente en México',
+        '611' => 'Ingresos por Dividendos (socios y accionistas)',
+        '612' => 'Personas Físicas con Actividades Empresariales y Profesionales',
+        '614' => 'Ingresos por intereses',
+        '615' => 'Régimen de los ingresos por obtención de premios',
+        '616' => 'Sin obligaciones fiscales',
+        '620' => 'Sociedades Cooperativas de Producción que optan por diferir sus ingresos',
+        '621' => 'Incorporación Fiscal',
+        '622' => 'Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras',
+        '623' => 'Opcional para Grupos de Sociedades',
+        '624' => 'Coordinados',
+        '625' => 'Régimen de las Actividades Empresariales con ingresos a través de Plataformas Tecnológicas',
+        '626' => 'Régimen Simplificado de Confianza',
+    ];
+
+    /** Usos de CFDI. Para un servicio de inspección lo habitual es G03. */
+    public const USOS_CFDI = [
+        'G01' => 'Adquisición de mercancías',
+        'G02' => 'Devoluciones, descuentos o bonificaciones',
+        'G03' => 'Gastos en general',
+        'I01' => 'Construcciones',
+        'I02' => 'Mobiliario y equipo de oficina por inversiones',
+        'I03' => 'Equipo de transporte',
+        'I04' => 'Equipo de cómputo y accesorios',
+        'I05' => 'Dados, troqueles, moldes, matrices y herramental',
+        'I06' => 'Comunicaciones telefónicas',
+        'I07' => 'Comunicaciones satelitales',
+        'I08' => 'Otra maquinaria y equipo',
+        'S01' => 'Sin efectos fiscales',
+        'CP01' => 'Pagos',
+    ];
+
+    public function __construct(PDO $pdo) {
+        $this->pdo = $pdo;
+        $this->migrar();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  ESQUEMA
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Cada bloque va en su propio try. Si una tabla falla —permisos, una
+     * versión de MariaDB que no traga algo— las demás siguen creándose, y sobre
+     * todo el constructor no lanza: index.php construye TODAS las clases antes
+     * de enrutar, así que una excepción aquí tumbaría hasta el login.
+     */
+    private function migrar(): void {
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS pres_config (
+                  clave      VARCHAR(60) NOT NULL PRIMARY KEY,
+                  valor      MEDIUMTEXT NULL,
+                  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\Throwable $e) { error_log('[Presupuestos] migrar config: ' . $e->getMessage()); }
+
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS pres_servicios (
+                  id             INT AUTO_INCREMENT PRIMARY KEY,
+                  clave          VARCHAR(40)  NOT NULL,
+                  nombre         VARCHAR(200) NOT NULL,
+                  descripcion    TEXT NULL,
+                  alcance        TEXT NULL,
+                  normas         VARCHAR(400) NULL,
+                  entregables    TEXT NULL,
+                  unidad         VARCHAR(30)  NOT NULL DEFAULT 'Servicio',
+                  precio         DECIMAL(12,2) NOT NULL DEFAULT 0,
+                  moneda         VARCHAR(3)   NOT NULL DEFAULT 'MXN',
+                  tasa_iva       DECIMAL(5,2) NOT NULL DEFAULT 16.00,
+                  clave_prodserv VARCHAR(10)  NULL,
+                  clave_unidad   VARCHAR(10)  NULL,
+                  orden          INT NOT NULL DEFAULT 0,
+                  activo         TINYINT NOT NULL DEFAULT 1,
+                  created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                  UNIQUE KEY uk_clave (clave)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\Throwable $e) { error_log('[Presupuestos] migrar servicios: ' . $e->getMessage()); }
+
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS pres_clientes (
+                  id               INT AUTO_INCREMENT PRIMARY KEY,
+                  cliente_id       INT NULL,
+                  nombre_comercial VARCHAR(200) NOT NULL,
+                  razon_social     VARCHAR(250) NULL,
+                  rfc              VARCHAR(13)  NULL,
+                  cp_fiscal        VARCHAR(5)   NULL,
+                  regimen_fiscal   VARCHAR(3)   NULL,
+                  uso_cfdi         VARCHAR(4)   NOT NULL DEFAULT 'G03',
+                  correo           VARCHAR(200) NULL,
+                  telefono         VARCHAR(40)  NULL,
+                  contacto         VARCHAR(150) NULL,
+                  direccion        VARCHAR(300) NULL,
+                  notas            TEXT NULL,
+                  activo           TINYINT NOT NULL DEFAULT 1,
+                  created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                  KEY idx_nombre (nombre_comercial),
+                  KEY idx_rfc (rfc)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\Throwable $e) { error_log('[Presupuestos] migrar clientes: ' . $e->getMessage()); }
+
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS pres_presupuestos (
+                  id             INT AUTO_INCREMENT PRIMARY KEY,
+                  folio          VARCHAR(30) NOT NULL,
+                  cliente_pres_id INT NULL,
+                  cliente_nombre VARCHAR(250) NOT NULL,
+                  cliente_correo VARCHAR(200) NULL,
+                  atencion       VARCHAR(150) NULL,
+                  fecha          DATE NOT NULL,
+                  vigencia_dias  INT NOT NULL DEFAULT 15,
+                  lugar_servicio VARCHAR(250) NULL,
+                  moneda         VARCHAR(3) NOT NULL DEFAULT 'MXN',
+                  tipo_cambio    DECIMAL(10,4) NOT NULL DEFAULT 1.0000,
+                  subtotal       DECIMAL(14,2) NOT NULL DEFAULT 0,
+                  descuento      DECIMAL(14,2) NOT NULL DEFAULT 0,
+                  iva            DECIMAL(14,2) NOT NULL DEFAULT 0,
+                  total          DECIMAL(14,2) NOT NULL DEFAULT 0,
+                  estado         VARCHAR(15) NOT NULL DEFAULT 'BORRADOR',
+                  condiciones    TEXT NULL,
+                  notas          TEXT NULL,
+                  pdf_url        VARCHAR(300) NULL,
+                  enviado_at     DATETIME NULL,
+                  factura_uuid   VARCHAR(50) NULL,
+                  factura_pdf    VARCHAR(300) NULL,
+                  factura_xml    VARCHAR(300) NULL,
+                  usuario        VARCHAR(120) NULL,
+                  created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                  UNIQUE KEY uk_folio (folio),
+                  KEY idx_estado (estado),
+                  KEY idx_fecha (fecha)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\Throwable $e) { error_log('[Presupuestos] migrar presupuestos: ' . $e->getMessage()); }
+
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS pres_partidas (
+                  id              INT AUTO_INCREMENT PRIMARY KEY,
+                  presupuesto_id  INT NOT NULL,
+                  servicio_id     INT NULL,
+                  clave           VARCHAR(40) NULL,
+                  descripcion     VARCHAR(300) NOT NULL,
+                  alcance         TEXT NULL,
+                  normas          VARCHAR(400) NULL,
+                  unidad          VARCHAR(30) NOT NULL DEFAULT 'Servicio',
+                  cantidad        DECIMAL(12,2) NOT NULL DEFAULT 1,
+                  precio_unitario DECIMAL(12,2) NOT NULL DEFAULT 0,
+                  descuento_pct   DECIMAL(5,2) NOT NULL DEFAULT 0,
+                  tasa_iva        DECIMAL(5,2) NOT NULL DEFAULT 16.00,
+                  importe         DECIMAL(14,2) NOT NULL DEFAULT 0,
+                  clave_prodserv  VARCHAR(10) NULL,
+                  clave_unidad    VARCHAR(10) NULL,
+                  orden           INT NOT NULL DEFAULT 0,
+                  KEY idx_presupuesto (presupuesto_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\Throwable $e) { error_log('[Presupuestos] migrar partidas: ' . $e->getMessage()); }
+
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS pres_propuestas (
+                  id             INT AUTO_INCREMENT PRIMARY KEY,
+                  presupuesto_id INT NOT NULL,
+                  html           MEDIUMTEXT NULL,
+                  pdf_url        VARCHAR(300) NULL,
+                  modelo         VARCHAR(60) NULL,
+                  tokens_in      INT NOT NULL DEFAULT 0,
+                  tokens_out     INT NOT NULL DEFAULT 0,
+                  usuario        VARCHAR(120) NULL,
+                  created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  KEY idx_presupuesto (presupuesto_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\Throwable $e) { error_log('[Presupuestos] migrar propuestas: ' . $e->getMessage()); }
+
+        $this->sembrarConfig();
+    }
+
+    /**
+     * Texto base del prompt. Se siembra una sola vez; a partir de ahí lo edita
+     * Administración desde la pantalla, y esa versión editada manda. Sembrar en
+     * cada arranque pisaría lo que el usuario escribió.
+     */
+    private function sembrarConfig(): void {
+        $base = [
+            'perfil_empresa' =>
+                "AVBA Inspections es una unidad de verificación con acreditación UVNMX 057 ante la ema.\n" .
+                "Inspeccionamos y certificamos equipos de izaje, grúas, plataformas de elevación, montacargas, " .
+                "accesorios de izaje y equipo de protección contra caídas.\n" .
+                "Cobertura en todo México y en el extranjero.",
+            'normas' =>
+                "NOM-004-STPS-1999 — Sistemas de protección y dispositivos de seguridad en maquinaria.\n" .
+                "NOM-006-STPS-2014 — Manejo y almacenamiento de materiales.\n" .
+                "NOM-009-STPS-2011 — Trabajos en altura.\n" .
+                "NOM-020-STPS-2011 — Recipientes sujetos a presión.\n" .
+                "ASME B30 — Normas de seguridad para grúas y aparatos de izaje.",
+            'condiciones' =>
+                "Precios en moneda nacional, más IVA.\n" .
+                "Vigencia de la oferta: 15 días naturales.\n" .
+                "Condiciones de pago: a convenir.\n" .
+                "El servicio se programa una vez recibida la orden de compra.",
+            'instrucciones_ia' =>
+                "Redacta en español de México, en tercera persona y en tono técnico-comercial sobrio.\n" .
+                "No prometas resultados de aprobación: el dictamen depende del estado real del equipo.\n" .
+                "No menciones acreditaciones, normas ni alcances que no estén en la información entregada.",
+        ];
+        foreach ($base as $clave => $valor) {
+            try {
+                $this->pdo->prepare("INSERT IGNORE INTO pres_config (clave, valor) VALUES (?, ?)")
+                          ->execute([$clave, $valor]);
+            } catch (\Throwable $e) {
+                error_log('[Presupuestos] sembrarConfig: ' . $e->getMessage());
+            }
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  CONFIGURACIÓN (el "prompt de nosotros")
+    // ══════════════════════════════════════════════════════════
+
+    /** Claves que la pantalla puede leer y escribir. */
+    private const CONFIG_EDITABLE = ['perfil_empresa', 'normas', 'condiciones', 'instrucciones_ia'];
+
+    public function config(): array {
+        // La tabla también guarda el contador de folios. Sale de aquí filtrado:
+        // no es texto que nadie deba editar desde la pantalla.
+        $out = [];
+        try {
+            foreach ($this->pdo->query("SELECT clave, valor FROM pres_config")->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                if (in_array($r['clave'], self::CONFIG_EDITABLE, true)) $out[$r['clave']] = (string)$r['valor'];
+            }
+        } catch (\Throwable $e) { error_log('[Presupuestos] config: ' . $e->getMessage()); }
+        return ['status' => 'ok', 'config' => $out,
+                'regimenes' => self::REGIMENES, 'usos_cfdi' => self::USOS_CFDI];
+    }
+
+    public function guardarConfig(array $p): array {
+        $permitidas = self::CONFIG_EDITABLE;
+        $st = $this->pdo->prepare(
+            "INSERT INTO pres_config (clave, valor) VALUES (?, ?)
+             ON DUPLICATE KEY UPDATE valor = VALUES(valor)"
+        );
+        foreach ($permitidas as $c) {
+            if (array_key_exists($c, $p)) $st->execute([$c, trim((string)$p[$c])]);
+        }
+        return ['status' => 'ok', 'message' => 'Configuración guardada.'];
+    }
+
+    private function cfg(string $clave, string $porDefecto = ''): string {
+        try {
+            $s = $this->pdo->prepare("SELECT valor FROM pres_config WHERE clave = ?");
+            $s->execute([$clave]);
+            $v = $s->fetchColumn();
+            if ($v !== false && trim((string)$v) !== '') return (string)$v;
+        } catch (\Throwable $e) { error_log('[Presupuestos] cfg: ' . $e->getMessage()); }
+        return $porDefecto;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  CATÁLOGO DE SERVICIOS
+    // ══════════════════════════════════════════════════════════
+
+    public function servicios(bool $soloActivos = false): array {
+        $sql = "SELECT * FROM pres_servicios";
+        if ($soloActivos) $sql .= " WHERE activo = 1";
+        $sql .= " ORDER BY orden ASC, nombre ASC";
+        try {
+            $rows = $this->pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            error_log('[Presupuestos] servicios: ' . $e->getMessage());
+            $rows = [];
+        }
+        return ['status' => 'ok', 'servicios' => $rows];
+    }
+
+    public function guardarServicio(array $p): array {
+        $id     = (int)($p['id'] ?? 0);
+        $nombre = trim((string)($p['nombre'] ?? ''));
+        if ($nombre === '') return ['status' => 'error', 'message' => 'El servicio necesita un nombre.'];
+
+        $clave = strtoupper(trim((string)($p['clave'] ?? '')));
+        if ($clave === '') $clave = $this->claveDesde($nombre);
+
+        // La clave identifica al servicio en el presupuesto y en la factura;
+        // repetida, dos partidas distintas acabarían pareciendo la misma.
+        $dup = $this->pdo->prepare("SELECT id FROM pres_servicios WHERE clave = ? AND id <> ?");
+        $dup->execute([$clave, $id]);
+        if ($dup->fetchColumn()) {
+            return ['status' => 'error', 'message' => "Ya existe un servicio con la clave {$clave}."];
+        }
+
+        $campos = [
+            'clave'          => $clave,
+            'nombre'         => $nombre,
+            'descripcion'    => trim((string)($p['descripcion'] ?? '')),
+            'alcance'        => trim((string)($p['alcance'] ?? '')),
+            'normas'         => trim((string)($p['normas'] ?? '')),
+            'entregables'    => trim((string)($p['entregables'] ?? '')),
+            'unidad'         => trim((string)($p['unidad'] ?? '')) ?: 'Servicio',
+            'precio'         => $this->dinero($p['precio'] ?? 0),
+            'moneda'         => $this->moneda($p['moneda'] ?? 'MXN'),
+            'tasa_iva'       => $this->tasa($p['tasa_iva'] ?? self::IVA_DEFAULT),
+            'clave_prodserv' => preg_replace('/\D/', '', (string)($p['clave_prodserv'] ?? '')),
+            'clave_unidad'   => strtoupper(trim((string)($p['clave_unidad'] ?? ''))),
+            'orden'          => (int)($p['orden'] ?? 0),
+            'activo'         => !empty($p['activo']) ? 1 : 0,
+        ];
+
+        if ($id > 0) {
+            $sets = implode(', ', array_map(fn($c) => "$c = ?", array_keys($campos)));
+            $st = $this->pdo->prepare("UPDATE pres_servicios SET $sets WHERE id = ?");
+            $st->execute([...array_values($campos), $id]);
+            return ['status' => 'ok', 'id' => $id, 'message' => 'Servicio actualizado.'];
+        }
+
+        $cols = implode(', ', array_keys($campos));
+        $marc = implode(', ', array_fill(0, count($campos), '?'));
+        $this->pdo->prepare("INSERT INTO pres_servicios ($cols) VALUES ($marc)")
+                  ->execute(array_values($campos));
+        return ['status' => 'ok', 'id' => (int)$this->pdo->lastInsertId(), 'message' => 'Servicio agregado.'];
+    }
+
+    /**
+     * Borra el servicio del catálogo, no de los presupuestos que ya lo usan.
+     * Las partidas guardan su propia copia de descripción y precio: un
+     * presupuesto emitido tiene que seguir diciendo lo mismo dentro de un año,
+     * aunque el catálogo haya cambiado tres veces.
+     */
+    public function eliminarServicio(int $id): array {
+        if ($id <= 0) return ['status' => 'error', 'message' => 'Servicio no válido.'];
+        $this->pdo->prepare("DELETE FROM pres_servicios WHERE id = ?")->execute([$id]);
+        return ['status' => 'ok', 'message' => 'Servicio eliminado del catálogo.'];
+    }
+
+    private function claveDesde(string $nombre): string {
+        $base = strtoupper(preg_replace('/[^A-Za-z0-9]+/', '-', $this->sinAcentos($nombre)));
+        $base = trim(substr($base, 0, 24), '-');
+        if ($base === '') $base = 'SERV';
+        $clave = $base;
+        $n = 1;
+        while (true) {
+            $s = $this->pdo->prepare("SELECT id FROM pres_servicios WHERE clave = ?");
+            $s->execute([$clave]);
+            if (!$s->fetchColumn()) return $clave;
+            $clave = $base . '-' . (++$n);
+        }
+    }
+
+    private function sinAcentos(string $s): string {
+        return strtr($s, [
+            'á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ñ'=>'n','ü'=>'u',
+            'Á'=>'A','É'=>'E','Í'=>'I','Ó'=>'O','Ú'=>'U','Ñ'=>'N','Ü'=>'U',
+        ]);
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  CLIENTES (con sus datos fiscales)
+    // ══════════════════════════════════════════════════════════
+
+    public function clientes(string $busca = ''): array {
+        try {
+            if (trim($busca) !== '') {
+                $st = $this->pdo->prepare(
+                    "SELECT * FROM pres_clientes
+                     WHERE nombre_comercial LIKE ? OR razon_social LIKE ? OR rfc LIKE ?
+                     ORDER BY nombre_comercial ASC"
+                );
+                $like = '%' . trim($busca) . '%';
+                $st->execute([$like, $like, $like]);
+                $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            } else {
+                $rows = $this->pdo->query(
+                    "SELECT * FROM pres_clientes ORDER BY nombre_comercial ASC"
+                )->fetchAll(PDO::FETCH_ASSOC) ?: [];
+            }
+        } catch (\Throwable $e) {
+            error_log('[Presupuestos] clientes: ' . $e->getMessage());
+            $rows = [];
+        }
+        // Marca lo que le falta a cada cliente para poder facturarle. Descubrirlo
+        // al momento de timbrar, con el cliente esperando, es demasiado tarde.
+        foreach ($rows as &$r) $r['falta_fiscal'] = $this->faltaFiscal($r);
+        return ['status' => 'ok', 'clientes' => $rows];
+    }
+
+    /** Devuelve la lista de datos fiscales que impedirían timbrar. */
+    private function faltaFiscal(array $c): array {
+        $falta = [];
+        $rfc = strtoupper(trim((string)($c['rfc'] ?? '')));
+        if ($rfc === '' || !preg_match('/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/', $rfc)) $falta[] = 'RFC';
+        if (trim((string)($c['razon_social'] ?? '')) === '')                      $falta[] = 'razón social';
+        if (!preg_match('/^\d{5}$/', (string)($c['cp_fiscal'] ?? '')))            $falta[] = 'código postal fiscal';
+        if (!isset(self::REGIMENES[(string)($c['regimen_fiscal'] ?? '')]))        $falta[] = 'régimen fiscal';
+        return $falta;
+    }
+
+    public function guardarCliente(array $p): array {
+        $id     = (int)($p['id'] ?? 0);
+        $nombre = trim((string)($p['nombre_comercial'] ?? ''));
+        if ($nombre === '') return ['status' => 'error', 'message' => 'El cliente necesita un nombre.'];
+
+        $rfc = strtoupper(preg_replace('/\s+/', '', (string)($p['rfc'] ?? '')));
+        if ($rfc !== '' && !preg_match('/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/', $rfc)) {
+            return ['status' => 'error', 'message' => 'El RFC no tiene un formato válido.'];
+        }
+        $cp = preg_replace('/\D/', '', (string)($p['cp_fiscal'] ?? ''));
+        if ($cp !== '' && !preg_match('/^\d{5}$/', $cp)) {
+            return ['status' => 'error', 'message' => 'El código postal fiscal debe tener 5 dígitos.'];
+        }
+        $reg = trim((string)($p['regimen_fiscal'] ?? ''));
+        if ($reg !== '' && !isset(self::REGIMENES[$reg])) {
+            return ['status' => 'error', 'message' => 'Régimen fiscal no reconocido.'];
+        }
+        $uso = strtoupper(trim((string)($p['uso_cfdi'] ?? 'G03')));
+        if (!isset(self::USOS_CFDI[$uso])) $uso = 'G03';
+
+        $correo = trim((string)($p['correo'] ?? ''));
+        if ($correo !== '' && !filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+            return ['status' => 'error', 'message' => 'El correo del cliente no es válido.'];
+        }
+
+        $campos = [
+            'cliente_id'       => ($p['cliente_id'] ?? null) ? (int)$p['cliente_id'] : null,
+            'nombre_comercial' => $nombre,
+            'razon_social'     => trim((string)($p['razon_social'] ?? '')),
+            'rfc'              => $rfc,
+            'cp_fiscal'        => $cp,
+            'regimen_fiscal'   => $reg,
+            'uso_cfdi'         => $uso,
+            'correo'           => $correo,
+            'telefono'         => trim((string)($p['telefono'] ?? '')),
+            'contacto'         => trim((string)($p['contacto'] ?? '')),
+            'direccion'        => trim((string)($p['direccion'] ?? '')),
+            'notas'            => trim((string)($p['notas'] ?? '')),
+            'activo'           => array_key_exists('activo', $p) ? (!empty($p['activo']) ? 1 : 0) : 1,
+        ];
+
+        if ($id > 0) {
+            $sets = implode(', ', array_map(fn($c) => "$c = ?", array_keys($campos)));
+            $this->pdo->prepare("UPDATE pres_clientes SET $sets WHERE id = ?")
+                      ->execute([...array_values($campos), $id]);
+            return ['status' => 'ok', 'id' => $id, 'message' => 'Cliente actualizado.'];
+        }
+
+        $cols = implode(', ', array_keys($campos));
+        $marc = implode(', ', array_fill(0, count($campos), '?'));
+        $this->pdo->prepare("INSERT INTO pres_clientes ($cols) VALUES ($marc)")
+                  ->execute(array_values($campos));
+        return ['status' => 'ok', 'id' => (int)$this->pdo->lastInsertId(), 'message' => 'Cliente agregado.'];
+    }
+
+    public function eliminarCliente(int $id): array {
+        if ($id <= 0) return ['status' => 'error', 'message' => 'Cliente no válido.'];
+        $s = $this->pdo->prepare("SELECT COUNT(*) FROM pres_presupuestos WHERE cliente_pres_id = ?");
+        $s->execute([$id]);
+        if ((int)$s->fetchColumn() > 0) {
+            return ['status' => 'error',
+                'message' => 'Ese cliente tiene presupuestos. Desactívalo en lugar de borrarlo.'];
+        }
+        $this->pdo->prepare("DELETE FROM pres_clientes WHERE id = ?")->execute([$id]);
+        return ['status' => 'ok', 'message' => 'Cliente eliminado.'];
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  NORMALIZADORES
+    // ══════════════════════════════════════════════════════════
+
+    private function dinero($v): float {
+        $n = (float)str_replace([',', '$', ' '], '', (string)$v);
+        return round(max(0, $n), 2);
+    }
+
+    private function cantidad($v): float {
+        $n = (float)str_replace([',', ' '], '', (string)$v);
+        return round(max(0, $n), 2);
+    }
+
+    private function moneda($v): string {
+        $m = strtoupper(trim((string)$v));
+        return in_array($m, ['MXN', 'USD', 'EUR'], true) ? $m : 'MXN';
+    }
+
+    private function tasa($v): float {
+        $n = (float)$v;
+        return round(min(100, max(0, $n)), 2);
+    }
+
+    private function porcentaje($v): float {
+        $n = (float)$v;
+        return round(min(100, max(0, $n)), 2);
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  PRESUPUESTOS
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Folio consecutivo por año: PRE-2026-0001.
+     *
+     * El número sale de un contador que sólo avanza, no de contar filas ni de
+     * mirar el mayor existente. La diferencia importa cuando se borra un
+     * presupuesto: con cualquiera de esas dos cuentas, eliminar el último
+     * devolvería su número al siguiente, y dos clientes distintos acabarían
+     * con papeles que dicen el mismo folio. El contador no retrocede.
+     *
+     * Si el contador se perdiera —una base restaurada a medias, por ejemplo—
+     * se recupera del mayor folio que sí exista, para no volver a empezar en 1.
+     * La columna es UNIQUE: si dos capturas simultáneas llegaran al mismo
+     * número, la segunda falla en vez de duplicarlo en silencio.
+     */
+    private function siguienteFolio(): string {
+        $anio  = (int)date('Y');
+        $clave = 'folio_' . $anio;
+        $n = 0;
+        try {
+            $s = $this->pdo->prepare("SELECT valor FROM pres_config WHERE clave = ?");
+            $s->execute([$clave]);
+            $n = (int)($s->fetchColumn() ?: 0);
+
+            $m = $this->pdo->prepare(
+                "SELECT folio FROM pres_presupuestos WHERE folio LIKE ? ORDER BY folio DESC LIMIT 1"
+            );
+            $m->execute(["PRE-{$anio}-%"]);
+            $ult = (string)($m->fetchColumn() ?: '');
+            if ($ult !== '') $n = max($n, (int)substr($ult, -4));
+        } catch (\Throwable $e) {
+            error_log('[Presupuestos] siguienteFolio: ' . $e->getMessage());
+        }
+        $n++;
+        try {
+            $this->pdo->prepare(
+                "INSERT INTO pres_config (clave, valor) VALUES (?, ?)
+                 ON DUPLICATE KEY UPDATE valor = VALUES(valor)"
+            )->execute([$clave, (string)$n]);
+        } catch (\Throwable $e) {
+            error_log('[Presupuestos] siguienteFolio contador: ' . $e->getMessage());
+        }
+        return sprintf('PRE-%d-%04d', $anio, $n);
+    }
+
+    public function listar(string $estado = '', string $busca = ''): array {
+        $sql = "SELECT p.*,
+                       (SELECT COUNT(*) FROM pres_partidas d WHERE d.presupuesto_id = p.id) AS partidas,
+                       (SELECT COUNT(*) FROM pres_propuestas r WHERE r.presupuesto_id = p.id) AS propuestas
+                FROM pres_presupuestos p WHERE 1=1";
+        $args = [];
+        if ($estado !== '' && in_array($estado, self::ESTADOS, true)) {
+            $sql .= " AND p.estado = ?";
+            $args[] = $estado;
+        }
+        if (trim($busca) !== '') {
+            $sql .= " AND (p.folio LIKE ? OR p.cliente_nombre LIKE ?)";
+            $like = '%' . trim($busca) . '%';
+            $args[] = $like; $args[] = $like;
+        }
+        $sql .= " ORDER BY p.fecha DESC, p.id DESC LIMIT 500";
+        try {
+            $st = $this->pdo->prepare($sql);
+            $st->execute($args);
+            $rows = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            error_log('[Presupuestos] listar: ' . $e->getMessage());
+            $rows = [];
+        }
+        $hoy = new DateTimeImmutable('today');
+        foreach ($rows as &$r) {
+            // "Vencido" sólo tiene sentido mientras la oferta sigue en pie.
+            // Un presupuesto ya aceptado o facturado no vence.
+            $vence = (new DateTimeImmutable((string)$r['fecha']))
+                        ->modify('+' . (int)$r['vigencia_dias'] . ' days');
+            $r['vence_el'] = $vence->format('Y-m-d');
+            $r['vencido']  = in_array($r['estado'], ['BORRADOR', 'ENVIADO'], true) && $vence < $hoy;
+        }
+        return ['status' => 'ok', 'presupuestos' => $rows, 'estados' => self::ESTADOS];
+    }
+
+    public function detalle(int $id): array {
+        if ($id <= 0) return ['status' => 'error', 'message' => 'Presupuesto no válido.'];
+        $st = $this->pdo->prepare("SELECT * FROM pres_presupuestos WHERE id = ?");
+        $st->execute([$id]);
+        $p = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$p) return ['status' => 'error', 'message' => 'Presupuesto no encontrado.'];
+
+        $sp = $this->pdo->prepare("SELECT * FROM pres_partidas WHERE presupuesto_id = ? ORDER BY orden ASC, id ASC");
+        $sp->execute([$id]);
+        $p['partidas'] = $sp->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        $sr = $this->pdo->prepare(
+            "SELECT id, pdf_url, modelo, tokens_in, tokens_out, usuario, created_at
+             FROM pres_propuestas WHERE presupuesto_id = ? ORDER BY id DESC"
+        );
+        $sr->execute([$id]);
+        $p['propuestas'] = $sr->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        if (!empty($p['cliente_pres_id'])) {
+            $sc = $this->pdo->prepare("SELECT * FROM pres_clientes WHERE id = ?");
+            $sc->execute([(int)$p['cliente_pres_id']]);
+            $cli = $sc->fetch(PDO::FETCH_ASSOC);
+            if ($cli) {
+                $cli['falta_fiscal'] = $this->faltaFiscal($cli);
+                $p['cliente'] = $cli;
+            }
+        }
+        return ['status' => 'ok', 'presupuesto' => $p];
+    }
+
+    /**
+     * Crea o actualiza un presupuesto con sus partidas.
+     *
+     * Las partidas se reemplazan enteras en lugar de irse comparando una por
+     * una: es una lista corta que se edita de golpe en la pantalla, y calcar el
+     * estado exacto de lo que ve el usuario evita el peor error posible aquí,
+     * que es una partida fantasma cobrando de más.
+     */
+    public function guardar(array $p, string $usuario): array {
+        $id = (int)($p['id'] ?? 0);
+
+        if ($id > 0) {
+            $s = $this->pdo->prepare("SELECT estado FROM pres_presupuestos WHERE id = ?");
+            $s->execute([$id]);
+            $estado = (string)($s->fetchColumn() ?: '');
+            if ($estado === '') return ['status' => 'error', 'message' => 'Presupuesto no encontrado.'];
+            // Un presupuesto ya facturado sostiene un CFDI. Cambiarle los
+            // importes dejaría la factura describiendo algo que ya no existe.
+            if ($estado === 'FACTURADO') {
+                return ['status' => 'error',
+                    'message' => 'Este presupuesto ya está facturado y no puede modificarse.'];
+            }
+        }
+
+        $clienteId = (int)($p['cliente_pres_id'] ?? 0);
+        $cliente   = null;
+        if ($clienteId > 0) {
+            $sc = $this->pdo->prepare("SELECT * FROM pres_clientes WHERE id = ?");
+            $sc->execute([$clienteId]);
+            $cliente = $sc->fetch(PDO::FETCH_ASSOC) ?: null;
+        }
+        $nombre = $cliente['nombre_comercial'] ?? trim((string)($p['cliente_nombre'] ?? ''));
+        if ($nombre === '') return ['status' => 'error', 'message' => 'Falta el cliente.'];
+
+        $partidas = $this->normalizarPartidas((array)($p['partidas'] ?? []));
+        if (!$partidas) return ['status' => 'error', 'message' => 'El presupuesto necesita al menos una partida.'];
+
+        $descuentoGlobal = $this->dinero($p['descuento'] ?? 0);
+        $tot = $this->calcularTotales($partidas, $descuentoGlobal);
+
+        $fecha = trim((string)($p['fecha'] ?? ''));
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha)) $fecha = date('Y-m-d');
+
+        $correo = trim((string)($p['cliente_correo'] ?? ($cliente['correo'] ?? '')));
+        if ($correo !== '' && !filter_var($correo, FILTER_VALIDATE_EMAIL)) {
+            return ['status' => 'error', 'message' => 'El correo del cliente no es válido.'];
+        }
+
+        $campos = [
+            'cliente_pres_id' => $clienteId > 0 ? $clienteId : null,
+            'cliente_nombre'  => $nombre,
+            'cliente_correo'  => $correo,
+            'atencion'        => trim((string)($p['atencion'] ?? ($cliente['contacto'] ?? ''))),
+            'fecha'           => $fecha,
+            'vigencia_dias'   => max(1, min(365, (int)($p['vigencia_dias'] ?? 15))),
+            'lugar_servicio'  => trim((string)($p['lugar_servicio'] ?? '')),
+            'moneda'          => $this->moneda($p['moneda'] ?? 'MXN'),
+            'tipo_cambio'     => max(0.0001, (float)($p['tipo_cambio'] ?? 1)),
+            'subtotal'        => $tot['subtotal'],
+            'descuento'       => $tot['descuento'],
+            'iva'             => $tot['iva'],
+            'total'           => $tot['total'],
+            'condiciones'     => trim((string)($p['condiciones'] ?? '')) ?: $this->cfg('condiciones'),
+            'notas'           => trim((string)($p['notas'] ?? '')),
+        ];
+
+        $this->pdo->beginTransaction();
+        try {
+            if ($id > 0) {
+                $sets = implode(', ', array_map(fn($c) => "$c = ?", array_keys($campos)));
+                $this->pdo->prepare("UPDATE pres_presupuestos SET $sets WHERE id = ?")
+                          ->execute([...array_values($campos), $id]);
+            } else {
+                $campos['folio']   = $this->siguienteFolio();
+                $campos['estado']  = 'BORRADOR';
+                $campos['usuario'] = $usuario;
+                $cols = implode(', ', array_keys($campos));
+                $marc = implode(', ', array_fill(0, count($campos), '?'));
+                $this->pdo->prepare("INSERT INTO pres_presupuestos ($cols) VALUES ($marc)")
+                          ->execute(array_values($campos));
+                $id = (int)$this->pdo->lastInsertId();
+            }
+
+            $this->pdo->prepare("DELETE FROM pres_partidas WHERE presupuesto_id = ?")->execute([$id]);
+            $ins = $this->pdo->prepare(
+                "INSERT INTO pres_partidas
+                   (presupuesto_id, servicio_id, clave, descripcion, alcance, normas, unidad,
+                    cantidad, precio_unitario, descuento_pct, tasa_iva, importe,
+                    clave_prodserv, clave_unidad, orden)
+                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)"
+            );
+            foreach ($partidas as $i => $d) {
+                $ins->execute([
+                    $id, $d['servicio_id'], $d['clave'], $d['descripcion'], $d['alcance'],
+                    $d['normas'], $d['unidad'], $d['cantidad'], $d['precio_unitario'],
+                    $d['descuento_pct'], $d['tasa_iva'], $d['importe'],
+                    $d['clave_prodserv'], $d['clave_unidad'], $i,
+                ]);
+            }
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            error_log('[Presupuestos] guardar: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudo guardar el presupuesto.'];
+        }
+
+        return ['status' => 'ok', 'id' => $id, 'totales' => $tot, 'message' => 'Presupuesto guardado.'];
+    }
+
+    /**
+     * Convierte lo que llega del navegador en partidas confiables.
+     *
+     * Cada partida se congela con su descripción, su precio y sus claves del
+     * SAT: si el catálogo cambia mañana, el presupuesto de hoy sigue diciendo
+     * lo que se ofreció.
+     */
+    private function normalizarPartidas(array $crudas): array {
+        $out = [];
+        foreach ($crudas as $c) {
+            if (!is_array($c)) continue;
+
+            $servicioId = (int)($c['servicio_id'] ?? 0);
+            $base = [];
+            if ($servicioId > 0) {
+                $s = $this->pdo->prepare("SELECT * FROM pres_servicios WHERE id = ?");
+                $s->execute([$servicioId]);
+                $base = $s->fetch(PDO::FETCH_ASSOC) ?: [];
+            }
+
+            $desc = trim((string)($c['descripcion'] ?? '')) ?: (string)($base['nombre'] ?? '');
+            if ($desc === '') continue;
+
+            $cant   = $this->cantidad($c['cantidad'] ?? 1);
+            $precio = array_key_exists('precio_unitario', $c)
+                ? $this->dinero($c['precio_unitario'])
+                : $this->dinero($base['precio'] ?? 0);
+            if ($cant <= 0) $cant = 1;
+
+            $descPct = $this->porcentaje($c['descuento_pct'] ?? 0);
+            $iva     = array_key_exists('tasa_iva', $c)
+                ? $this->tasa($c['tasa_iva'])
+                : $this->tasa($base['tasa_iva'] ?? self::IVA_DEFAULT);
+
+            $importe = round($cant * $precio * (1 - $descPct / 100), 2);
+
+            $out[] = [
+                'servicio_id'     => $servicioId > 0 ? $servicioId : null,
+                'clave'           => trim((string)($c['clave'] ?? ($base['clave'] ?? ''))),
+                'descripcion'     => mb_substr($desc, 0, 300),
+                'alcance'         => trim((string)($c['alcance'] ?? ($base['alcance'] ?? ''))),
+                'normas'          => trim((string)($c['normas'] ?? ($base['normas'] ?? ''))),
+                'unidad'          => trim((string)($c['unidad'] ?? ($base['unidad'] ?? ''))) ?: 'Servicio',
+                'cantidad'        => $cant,
+                'precio_unitario' => $precio,
+                'descuento_pct'   => $descPct,
+                'tasa_iva'        => $iva,
+                'importe'         => $importe,
+                'clave_prodserv'  => trim((string)($c['clave_prodserv'] ?? ($base['clave_prodserv'] ?? ''))),
+                'clave_unidad'    => trim((string)($c['clave_unidad'] ?? ($base['clave_unidad'] ?? ''))),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Suma el presupuesto.
+     *
+     * El descuento global se reparte proporcionalmente entre las partidas antes
+     * de calcular el IVA, porque cada partida puede llevar tasa distinta: bajar
+     * el total en bloque y luego aplicar un 16% plano daría un impuesto que no
+     * corresponde a ninguna de las dos bases.
+     */
+    private function calcularTotales(array $partidas, float $descuentoGlobal): array {
+        $subtotal = 0.0;
+        foreach ($partidas as $d) $subtotal += $d['importe'];
+        $subtotal = round($subtotal, 2);
+
+        $descuentoGlobal = min($descuentoGlobal, $subtotal);
+        $factor = $subtotal > 0 ? (1 - $descuentoGlobal / $subtotal) : 1.0;
+
+        $iva = 0.0;
+        foreach ($partidas as $d) {
+            $iva += round($d['importe'] * $factor * ($d['tasa_iva'] / 100), 2);
+        }
+        $iva = round($iva, 2);
+
+        $base = round($subtotal - $descuentoGlobal, 2);
+        return [
+            'subtotal'  => $subtotal,
+            'descuento' => round($descuentoGlobal, 2),
+            'base'      => $base,
+            'iva'       => $iva,
+            'total'     => round($base + $iva, 2),
+        ];
+    }
+
+    public function cambiarEstado(int $id, string $estado): array {
+        $estado = strtoupper(trim($estado));
+        if (!in_array($estado, self::ESTADOS, true)) {
+            return ['status' => 'error', 'message' => 'Estado no reconocido.'];
+        }
+        // FACTURADO no se pone a mano: lo escribe el timbrado cuando la factura
+        // existe de verdad. Marcarlo aquí dejaría un presupuesto bloqueado
+        // apuntando a un CFDI que nadie emitió.
+        if ($estado === 'FACTURADO') {
+            return ['status' => 'error',
+                'message' => 'El estado Facturado lo asigna el sistema al emitir la factura.'];
+        }
+        $s = $this->pdo->prepare("SELECT estado FROM pres_presupuestos WHERE id = ?");
+        $s->execute([$id]);
+        $actual = (string)($s->fetchColumn() ?: '');
+        if ($actual === '') return ['status' => 'error', 'message' => 'Presupuesto no encontrado.'];
+        if ($actual === 'FACTURADO') {
+            return ['status' => 'error', 'message' => 'Un presupuesto facturado ya no cambia de estado.'];
+        }
+        $this->pdo->prepare("UPDATE pres_presupuestos SET estado = ? WHERE id = ?")->execute([$estado, $id]);
+        return ['status' => 'ok', 'message' => 'Estado actualizado.'];
+    }
+
+    public function eliminar(int $id, string $usuario): array {
+        if ($id <= 0) return ['status' => 'error', 'message' => 'Presupuesto no válido.'];
+        $s = $this->pdo->prepare("SELECT folio, estado FROM pres_presupuestos WHERE id = ?");
+        $s->execute([$id]);
+        $p = $s->fetch(PDO::FETCH_ASSOC);
+        if (!$p) return ['status' => 'error', 'message' => 'Presupuesto no encontrado.'];
+        if ($p['estado'] === 'FACTURADO') {
+            return ['status' => 'error', 'message' => 'No se puede borrar un presupuesto facturado.'];
+        }
+        $this->pdo->beginTransaction();
+        try {
+            $this->pdo->prepare("DELETE FROM pres_partidas   WHERE presupuesto_id = ?")->execute([$id]);
+            $this->pdo->prepare("DELETE FROM pres_propuestas WHERE presupuesto_id = ?")->execute([$id]);
+            $this->pdo->prepare("DELETE FROM pres_presupuestos WHERE id = ?")->execute([$id]);
+            $this->pdo->commit();
+        } catch (\Throwable $e) {
+            $this->pdo->rollBack();
+            error_log('[Presupuestos] eliminar: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudo eliminar el presupuesto.'];
+        }
+        error_log('[Presupuestos] ' . $usuario . ' eliminó ' . $p['folio']);
+        return ['status' => 'ok', 'message' => 'Presupuesto eliminado.'];
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  DOCUMENTOS
+    // ══════════════════════════════════════════════════════════
+
+    private function esc(?string $s): string {
+        return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+    }
+
+    private function num(float $n): string {
+        return number_format($n, 2, '.', ',');
+    }
+
+    /**
+     * El armazón de todo documento que sale de este módulo.
+     *
+     * Encabezado, logotipos, colores y pie viven aquí y sólo aquí: es lo que
+     * hace que el presupuesto y la propuesta se vean como la misma casa, y lo
+     * que impide que un texto generado decida por su cuenta cómo se ve AVBA.
+     */
+    private function documentoHtml(string $titulo, string $cuerpo, array $pre): string {
+        $folio  = $this->esc((string)$pre['folio']);
+        $fecha  = date('d/m/Y', strtotime((string)$pre['fecha']));
+        $vence  = date('d/m/Y', strtotime((string)$pre['fecha'] . ' +' . (int)$pre['vigencia_dias'] . ' days'));
+        $cli    = $this->esc((string)$pre['cliente_nombre']);
+        $aten   = $this->esc((string)($pre['atencion'] ?? ''));
+        $lugar  = $this->esc((string)($pre['lugar_servicio'] ?? ''));
+
+        return '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><style>
+  @page { margin: 18mm 14mm 20mm 14mm; }
+  body { font-family: dejavusans, sans-serif; font-size: 9.6pt; color: #23262F; line-height: 1.55; }
+  .enc { border-bottom: 2.5pt solid #0C447C; padding-bottom: 8pt; margin-bottom: 14pt; }
+  .enc td { vertical-align: middle; }
+  .marca { font-size: 7.4pt; color: #6B7280; line-height: 1.4; }
+  .doc-tit { font-size: 16pt; font-weight: bold; color: #0C447C; letter-spacing: .4pt; }
+  .doc-folio { font-size: 9pt; color: #B8860B; font-weight: bold; }
+  .ficha { width: 100%; border-collapse: collapse; margin-bottom: 14pt; }
+  .ficha td { border: .5pt solid #D8DCE4; padding: 5pt 7pt; font-size: 8.8pt; }
+  .ficha .et { background: #F2F5F9; color: #4A5162; width: 21%; font-weight: bold; }
+  h2.p-titulo { font-size: 11pt; color: #0C447C; border-left: 3.5pt solid #B8860B;
+                padding: 2pt 0 2pt 7pt; margin: 15pt 0 7pt; text-transform: uppercase;
+                letter-spacing: .3pt; }
+  h3 { font-size: 9.6pt; color: #1B2A6B; margin: 10pt 0 4pt; }
+  p { margin: 0 0 7pt; text-align: justify; }
+  ul, ol { margin: 0 0 8pt 14pt; padding: 0; }
+  li { margin-bottom: 3pt; }
+  .p-nota { background: #F2F5F9; border-left: 3pt solid #0C447C; padding: 7pt 10pt;
+            font-size: 8.6pt; color: #4A5162; margin: 8pt 0; }
+  .p-destacado { background: #FBF4E2; border-left: 3pt solid #B8860B; padding: 7pt 10pt;
+                 font-size: 8.8pt; margin: 8pt 0; }
+  table.p-tabla, table.imp { width: 100%; border-collapse: collapse; margin: 8pt 0 10pt; }
+  table.p-tabla th, table.imp th { background: #0C447C; color: #fff; font-size: 8.2pt;
+              padding: 5pt 6pt; text-align: left; }
+  table.p-tabla td, table.imp td { border-bottom: .5pt solid #DFE3EA; padding: 5pt 6pt;
+              font-size: 8.6pt; vertical-align: top; }
+  .der { text-align: right; }
+  .tot td { padding: 4pt 6pt; font-size: 9pt; border: none; }
+  .tot .lab { text-align: right; color: #4A5162; }
+  .tot .granTotal { background: #0C447C; color: #fff; font-weight: bold; font-size: 10.5pt; }
+  .firma { margin-top: 26pt; }
+  .firma .linea { border-top: .8pt solid #23262F; width: 210pt; padding-top: 4pt;
+                  font-size: 8.4pt; color: #4A5162; }
+  .pie { margin-top: 18pt; border-top: .5pt solid #D8DCE4; padding-top: 6pt;
+         font-size: 7.2pt; color: #8A90A0; text-align: center; }
+</style></head><body>
+
+<table class="enc" width="100%"><tr>
+  <td width="26%"><img src="assets/logos/avba.png" style="height:44pt"></td>
+  <td width="40%" class="marca">
+    AVBA Inspections · Unidad de Verificación<br>
+    Acreditación <strong>UVNMX 057</strong><br>
+    Cobertura en todo México y en el extranjero
+  </td>
+  <td width="34%" align="right">
+    <div class="doc-tit">' . $this->esc($titulo) . '</div>
+    <div class="doc-folio">' . $folio . '</div>
+  </td>
+</tr></table>
+
+<table class="ficha">
+  <tr><td class="et">Cliente</td><td>' . $cli . '</td>
+      <td class="et">Fecha</td><td>' . $fecha . '</td></tr>
+  <tr><td class="et">Atención</td><td>' . ($aten !== '' ? $aten : '—') . '</td>
+      <td class="et">Vigencia</td><td>Hasta el ' . $vence . '</td></tr>
+  <tr><td class="et">Lugar del servicio</td><td colspan="3">' . ($lugar !== '' ? $lugar : 'Por definir con el cliente') . '</td></tr>
+</table>
+
+' . $cuerpo . '
+
+<div class="pie">
+  AVBA Inspections · Unidad de Verificación acreditada UVNMX 057 ·
+  Documento generado el ' . date('d/m/Y H:i') . ' · ' . $folio . '
+</div>
+</body></html>';
+    }
+
+    /** Tabla de importes. La escribe PHP siempre: los números no se delegan. */
+    private function bloqueEconomico(array $pre, array $partidas): string {
+        $mon = $this->esc((string)$pre['moneda']);
+        $h = '<h2 class="p-titulo">Propuesta económica</h2>
+<table class="imp">
+  <tr><th width="6%">#</th><th width="46%">Concepto</th><th width="9%">Unidad</th>
+      <th width="9%" class="der">Cant.</th><th width="15%" class="der">P. unitario</th>
+      <th width="15%" class="der">Importe</th></tr>';
+        foreach ($partidas as $i => $d) {
+            $desc = $this->esc((string)$d['descripcion']);
+            if (trim((string)$d['clave']) !== '') {
+                $desc = '<strong>' . $this->esc((string)$d['clave']) . '</strong> — ' . $desc;
+            }
+            if ((float)$d['descuento_pct'] > 0) {
+                $desc .= '<br><span style="font-size:7.8pt;color:#8A6A0B">Descuento aplicado '
+                       . $this->num((float)$d['descuento_pct']) . '%</span>';
+            }
+            $h .= '<tr>'
+                . '<td>' . ($i + 1) . '</td>'
+                . '<td>' . $desc . '</td>'
+                . '<td>' . $this->esc((string)$d['unidad']) . '</td>'
+                . '<td class="der">' . $this->num((float)$d['cantidad']) . '</td>'
+                . '<td class="der">$' . $this->num((float)$d['precio_unitario']) . '</td>'
+                . '<td class="der">$' . $this->num((float)$d['importe']) . '</td>'
+                . '</tr>';
+        }
+        $h .= '</table>';
+
+        $desc = (float)$pre['descuento'];
+        $h .= '<table class="tot" width="100%">'
+            . '<tr><td class="lab" width="72%">Subtotal</td><td class="der" width="28%">$'
+            . $this->num((float)$pre['subtotal']) . ' ' . $mon . '</td></tr>';
+        if ($desc > 0) {
+            $h .= '<tr><td class="lab">Descuento</td><td class="der">− $' . $this->num($desc) . '</td></tr>';
+        }
+        $h .= '<tr><td class="lab">IVA</td><td class="der">$' . $this->num((float)$pre['iva']) . '</td></tr>'
+            . '<tr><td class="lab granTotal">TOTAL</td><td class="der granTotal">$'
+            . $this->num((float)$pre['total']) . ' ' . $mon . '</td></tr></table>';
+
+        return $h;
+    }
+
+    private function bloqueCondiciones(array $pre): string {
+        $cond = trim((string)($pre['condiciones'] ?? '')) ?: $this->cfg('condiciones');
+        $h = '';
+        if ($cond !== '') {
+            $h .= '<h2 class="p-titulo">Condiciones comerciales</h2><ul>';
+            foreach (preg_split('/\R/', $cond) as $l) {
+                $l = trim($l);
+                if ($l !== '') $h .= '<li>' . $this->esc($l) . '</li>';
+            }
+            $h .= '</ul>';
+        }
+        $notas = trim((string)($pre['notas'] ?? ''));
+        if ($notas !== '') {
+            $h .= '<div class="p-nota">' . nl2br($this->esc($notas)) . '</div>';
+        }
+        $h .= '<div class="firma"><div class="linea">'
+            . 'AVBA Inspections · ' . $this->esc((string)($pre['usuario'] ?? 'Área Comercial'))
+            . '</div></div>';
+        return $h;
+    }
+
+    /** Escribe el PDF y devuelve su ruta relativa (uploads/...). */
+    private function aPdf(string $html, string $folio, string $sufijo): string {
+        if (!class_exists('\\Mpdf\\Mpdf')) {
+            $autoload = __DIR__ . '/../vendor/autoload.php';
+            if (file_exists($autoload)) require_once $autoload;
+        }
+        if (!class_exists('\\Mpdf\\Mpdf')) {
+            throw new \RuntimeException('mPDF no disponible. Verifica vendor/autoload.php.');
+        }
+        $dir = UPLOAD_DIR . 'reportes/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+        $mpdf = new \Mpdf\Mpdf([
+            'mode'         => 'utf-8',
+            'format'       => 'A4',
+            'dpi'          => 96,
+            'default_font' => 'dejavusans',
+            'tempDir'      => sys_get_temp_dir() . '/mpdf',
+        ]);
+        $mpdf->SetBasePath(__DIR__ . '/../');
+        $mpdf->SetHTMLFooter('<div style="text-align:right;font-size:7pt;color:#9AA0AE">'
+            . 'Página {PAGENO} de {nbpg}</div>');
+
+        $prev = (int)ini_get('pcre.backtrack_limit');
+        ini_set('pcre.backtrack_limit', 10000000);
+        $mpdf->WriteHTML($html);
+        ini_set('pcre.backtrack_limit', $prev);
+
+        $nombre = $sufijo . '_' . preg_replace('/[^A-Za-z0-9\-]/', '', $folio) . '_' . date('Ymd_His') . '.pdf';
+        $mpdf->Output($dir . $nombre, 'F');
+        return 'uploads/reportes/' . $nombre;
+    }
+
+    private function urlAbs(string $rel): string {
+        if ($rel === '') return '';
+        if (preg_match('#^https?://#i', $rel)) return $rel;
+        return rtrim(SITE_URL, '/') . '/' . ltrim($rel, '/');
+    }
+
+    /** PDF del presupuesto: la oferta escueta, sin narrativa. */
+    public function pdfPresupuesto(int $id): array {
+        $d = $this->detalle($id);
+        if (($d['status'] ?? '') !== 'ok') return $d;
+        $pre = $d['presupuesto'];
+        if (!$pre['partidas']) return ['status' => 'error', 'message' => 'El presupuesto no tiene partidas.'];
+
+        $cuerpo = $this->bloqueEconomico($pre, $pre['partidas']) . $this->bloqueCondiciones($pre);
+        try {
+            $rel = $this->aPdf($this->documentoHtml('PRESUPUESTO', $cuerpo, $pre), (string)$pre['folio'], 'PRESUPUESTO');
+        } catch (\Throwable $e) {
+            error_log('[Presupuestos] pdfPresupuesto: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudo generar el PDF: ' . $e->getMessage()];
+        }
+        $this->pdo->prepare("UPDATE pres_presupuestos SET pdf_url = ? WHERE id = ?")->execute([$rel, $id]);
+        return ['status' => 'ok', 'url' => $this->urlAbs($rel), 'message' => 'Presupuesto generado.'];
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  PROPUESTA TÉCNICO-ECONÓMICA (redactada con IA)
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Etiquetas que sobreviven al filtro. Todo lo demás se va.
+     *
+     * El texto lo escribe un modelo y termina en un PDF que se manda al
+     * cliente. No se trata de desconfiar del modelo, sino de que la salida es
+     * contenido no verificado entrando a un documento con nuestro membrete:
+     * un <script>, un <style> o una <img> a un servidor ajeno no tienen nada
+     * que hacer ahí, y el diseño ya lo pone PHP.
+     */
+    private const TAGS_PERMITIDOS = '<h2><h3><h4><p><ul><ol><li><strong><b><em><i><br>'
+                                  . '<table><thead><tbody><tr><th><td><div><span>';
+
+    private function sanitizarHtml(string $html): string {
+        // Fuera bloques completos: strip_tags dejaría el contenido de <style>
+        // y <script> como texto suelto en medio del documento.
+        $html = preg_replace('#<(script|style|iframe|object|embed|head|title)\b[^>]*>.*?</\1>#is', '', $html);
+        $html = preg_replace('#<(script|style|iframe|object|embed|link|meta|img|base|form|input)\b[^>]*/?>#i', '', $html);
+        $html = strip_tags($html, self::TAGS_PERMITIDOS);
+
+        // De los atributos sólo sobrevive class, y sólo con las clases del
+        // armazón. Así no entran estilos en línea, ni eventos onclick, ni href.
+        $html = preg_replace_callback('#<([a-z0-9]+)\b([^>]*)>#i', function ($m) {
+            $tag = strtolower($m[1]);
+            if (preg_match('/\bclass\s*=\s*"([^"]*)"/i', $m[2], $c)) {
+                $ok = array_values(array_intersect(
+                    preg_split('/\s+/', trim($c[1])),
+                    ['p-titulo', 'p-tabla', 'p-nota', 'p-destacado', 'der']
+                ));
+                if ($ok) return '<' . $tag . ' class="' . implode(' ', $ok) . '">';
+            }
+            return '<' . $tag . '>';
+        }, $html);
+
+        return trim($html);
+    }
+
+    /** Las instrucciones fijas: quiénes somos, qué normas usamos, cómo se escribe. */
+    private function systemPrompt(): string {
+        return
+"Eres el redactor técnico-comercial de AVBA Inspections. Escribes propuestas técnico-económicas
+para clientes industriales en México.
+
+QUIÉNES SOMOS
+" . $this->cfg('perfil_empresa') . "
+
+NORMAS QUE MANEJAMOS
+" . $this->cfg('normas') . "
+
+CÓMO ESCRIBIMOS
+" . $this->cfg('instrucciones_ia') . "
+
+QUÉ DEBES ENTREGAR
+Solo el cuerpo técnico de la propuesta, en HTML, con estas cinco secciones y en este orden:
+
+  <h2 class=\"p-titulo\">Presentación</h2>      — dos párrafos: quiénes somos y qué se ofrece a ESTE cliente.
+  <h2 class=\"p-titulo\">Alcance del servicio</h2> — un <h3> por cada partida, con lo que incluye.
+  <h2 class=\"p-titulo\">Metodología</h2>        — cómo se ejecuta, en lista ordenada por etapas.
+  <h2 class=\"p-titulo\">Normas aplicables</h2>  — lista; SOLO las que apliquen a las partidas de esta propuesta.
+  <h2 class=\"p-titulo\">Entregables</h2>        — lista de documentos que recibe el cliente.
+
+REGLAS DE SALIDA — sin excepción
+1. Devuelve HTML y nada más. Ni explicaciones, ni bloques de código, ni ``` de apertura o cierre.
+2. Prohibido: <html>, <head>, <body>, <style>, <script>, <img>, atributos style= y cualquier
+   color, tipografía o tamaño. El diseño ya está puesto; tú solo aportas el texto.
+3. Etiquetas permitidas: h2, h3, h4, p, ul, ol, li, strong, em, br, table, tr, th, td, div, span.
+   Las únicas clases permitidas son: p-titulo, p-tabla, p-nota, p-destacado.
+4. NO escribas precios, importes, subtotales, totales, IVA ni condiciones de pago. La sección
+   económica y las condiciones comerciales las agrega el sistema después, con las cifras reales.
+   Si inventas un número, la propuesta saldría contradiciéndose a sí misma.
+5. No prometas que el equipo va a aprobar: el dictamen depende de lo que se encuentre en campo.
+6. No cites normas, acreditaciones ni alcances que no aparezcan arriba o en los datos del cliente.
+7. Escribe en español de México. Sin emojis. Sin superlativos publicitarios.";
+    }
+
+    /** El encargo concreto: este cliente, estas partidas. */
+    private function userPrompt(array $pre): string {
+        $t  = "PROPUESTA PARA:\n";
+        $t .= "- Cliente: " . $pre['cliente_nombre'] . "\n";
+        if (trim((string)($pre['atencion'] ?? '')) !== '')       $t .= "- Atención: " . $pre['atencion'] . "\n";
+        if (trim((string)($pre['lugar_servicio'] ?? '')) !== '') $t .= "- Lugar del servicio: " . $pre['lugar_servicio'] . "\n";
+        $t .= "- Folio: " . $pre['folio'] . "\n";
+        $t .= "- Fecha: " . date('d/m/Y', strtotime((string)$pre['fecha'])) . "\n\n";
+
+        $t .= "PARTIDAS CONTRATADAS (" . count($pre['partidas']) . "):\n";
+        foreach ($pre['partidas'] as $i => $d) {
+            $t .= "\n" . ($i + 1) . ". " . $d['descripcion'] . "\n";
+            $t .= "   Cantidad: " . rtrim(rtrim(number_format((float)$d['cantidad'], 2, '.', ''), '0'), '.')
+                . " " . $d['unidad'] . "\n";
+            if (trim((string)$d['alcance']) !== '') $t .= "   Alcance registrado: " . $d['alcance'] . "\n";
+            if (trim((string)$d['normas'])  !== '') $t .= "   Normas de esta partida: " . $d['normas'] . "\n";
+            if ($d['servicio_id']) {
+                $s = $this->pdo->prepare("SELECT descripcion, entregables FROM pres_servicios WHERE id = ?");
+                $s->execute([(int)$d['servicio_id']]);
+                if ($cat = $s->fetch(PDO::FETCH_ASSOC)) {
+                    if (trim((string)$cat['descripcion']) !== '') $t .= "   Descripción del catálogo: " . $cat['descripcion'] . "\n";
+                    if (trim((string)$cat['entregables']) !== '') $t .= "   Entregables: " . $cat['entregables'] . "\n";
+                }
+            }
+        }
+
+        if (trim((string)($pre['notas'] ?? '')) !== '') {
+            $t .= "\nNOTAS INTERNAS SOBRE ESTE TRABAJO (úsalas como contexto, no las copies literal):\n"
+                . $pre['notas'] . "\n";
+        }
+        $t .= "\nRedacta ahora las cinco secciones. Solo HTML.";
+        return $t;
+    }
+
+    /**
+     * Genera la propuesta y la guarda como una versión más.
+     *
+     * No se sobrescribe la anterior: si la nueva redacción sale peor, el
+     * comercial todavía tiene a mano la que ya le gustaba.
+     */
+    public function generarPropuesta(int $id, string $usuario): array {
+        $d = $this->detalle($id);
+        if (($d['status'] ?? '') !== 'ok') return $d;
+        $pre = $d['presupuesto'];
+        if (!$pre['partidas']) {
+            return ['status' => 'error', 'message' => 'Agrega partidas antes de generar la propuesta.'];
+        }
+
+        $ia = new ClaudeIA();
+        if (!$ia->disponible()) {
+            return ['status' => 'error',
+                'message' => 'La generación con IA no está configurada en el servidor (falta CLAUDE_API_KEY en config/config.php).'];
+        }
+
+        // Redactar toma su tiempo; sin esto PHP corta a la mitad y el usuario
+        // solo ve "Error de conexión".
+        @set_time_limit(360);
+
+        $r = $ia->mensaje($this->systemPrompt(), $this->userPrompt($pre));
+        if (($r['status'] ?? '') !== 'ok') return $r;
+
+        // A veces el texto llega envuelto en una valla de código a pesar de
+        // pedirle que no lo haga. Quitarla es más barato que reintentar.
+        $bruto = preg_replace('/^\s*```(?:html)?\s*|\s*```\s*$/i', '', (string)$r['texto']);
+        $tecnico = $this->sanitizarHtml($bruto);
+        if ($tecnico === '') {
+            return ['status' => 'error', 'message' => 'La respuesta del modelo quedó vacía tras el filtrado.'];
+        }
+
+        $cuerpo = $tecnico
+                . $this->bloqueEconomico($pre, $pre['partidas'])
+                . $this->bloqueCondiciones($pre);
+        $html   = $this->documentoHtml('PROPUESTA TÉCNICO-ECONÓMICA', $cuerpo, $pre);
+
+        try {
+            $rel = $this->aPdf($html, (string)$pre['folio'], 'PROPUESTA');
+        } catch (\Throwable $e) {
+            error_log('[Presupuestos] generarPropuesta pdf: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'La propuesta se redactó pero no se pudo generar el PDF: ' . $e->getMessage()];
+        }
+
+        $this->pdo->prepare(
+            "INSERT INTO pres_propuestas (presupuesto_id, html, pdf_url, modelo, tokens_in, tokens_out, usuario)
+             VALUES (?,?,?,?,?,?,?)"
+        )->execute([
+            $id, $html, $rel, (string)($r['modelo'] ?? ''),
+            (int)($r['uso']['entrada'] ?? 0), (int)($r['uso']['salida'] ?? 0), $usuario,
+        ]);
+
+        return [
+            'status'  => 'ok',
+            'id'      => (int)$this->pdo->lastInsertId(),
+            'url'     => $this->urlAbs($rel),
+            'modelo'  => (string)($r['modelo'] ?? ''),
+            'uso'     => $r['uso'] ?? [],
+            'message' => 'Propuesta generada.',
+        ];
+    }
+
+    /** Devuelve el HTML de una versión para verla en pantalla antes de enviarla. */
+    public function verPropuesta(int $propuestaId): array {
+        $s = $this->pdo->prepare("SELECT * FROM pres_propuestas WHERE id = ?");
+        $s->execute([$propuestaId]);
+        $r = $s->fetch(PDO::FETCH_ASSOC);
+        if (!$r) return ['status' => 'error', 'message' => 'Propuesta no encontrada.'];
+        $r['pdf_url'] = $this->urlAbs((string)$r['pdf_url']);
+        return ['status' => 'ok', 'propuesta' => $r];
+    }
+
+    public function eliminarPropuesta(int $propuestaId): array {
+        $s = $this->pdo->prepare("SELECT pdf_url FROM pres_propuestas WHERE id = ?");
+        $s->execute([$propuestaId]);
+        $rel = (string)($s->fetchColumn() ?: '');
+        if ($rel === '') return ['status' => 'error', 'message' => 'Propuesta no encontrada.'];
+        $abs = $this->rutaAbsoluta($rel);
+        if ($abs !== '' && is_file($abs)) @unlink($abs);
+        $this->pdo->prepare("DELETE FROM pres_propuestas WHERE id = ?")->execute([$propuestaId]);
+        return ['status' => 'ok', 'message' => 'Versión eliminada.'];
+    }
+
+    /**
+     * Ruta en disco de un archivo de uploads.
+     *
+     * UPLOAD_DIR ya termina en uploads/, y lo guardado empieza con uploads/.
+     * Concatenar a lo bruto daba uploads/uploads/… y el borrado no encontraba
+     * nada. Además se comprueba que el resultado siga dentro de la carpeta,
+     * para que un valor manipulado no alcance archivos de más arriba.
+     */
+    private function rutaAbsoluta(string $rel): string {
+        $rel = ltrim(preg_replace('#^https?://[^/]+/#i', '', $rel), '/');
+        $rel = preg_replace('#^uploads/#', '', $rel);
+        $abs = realpath(UPLOAD_DIR . $rel);
+        $raiz = realpath(UPLOAD_DIR);
+        if ($abs === false || $raiz === false || !str_starts_with($abs, $raiz)) return '';
+        return $abs;
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  ENVÍO AL CLIENTE
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Manda al cliente el presupuesto y, si existe, la última propuesta.
+     *
+     * Al enviarse pasa a ENVIADO — pero sólo desde BORRADOR: reenviar un
+     * presupuesto ya aceptado no debe retroceder su estado.
+     */
+    public function enviar(int $id, string $correo, string $usuario, bool $incluirPropuesta = true): array {
+        $d = $this->detalle($id);
+        if (($d['status'] ?? '') !== 'ok') return $d;
+        $pre = $d['presupuesto'];
+
+        $correo = trim($correo) !== '' ? trim($correo) : (string)$pre['cliente_correo'];
+        $destinos = array_values(array_filter(
+            array_map('trim', explode(',', $correo)),
+            fn($a) => filter_var($a, FILTER_VALIDATE_EMAIL)
+        ));
+        if (!$destinos) return ['status' => 'error', 'message' => 'No hay un correo válido de destino.'];
+
+        $adjuntos = [];
+
+        $pdf = $this->pdfPresupuesto($id);
+        if (($pdf['status'] ?? '') !== 'ok') return $pdf;
+        $abs = $this->rutaAbsoluta((string)$pdf['url']);
+        if ($abs !== '') $adjuntos[$abs] = 'Presupuesto_' . $pre['folio'] . '.pdf';
+
+        if ($incluirPropuesta && !empty($pre['propuestas'])) {
+            $ultima = $pre['propuestas'][0];
+            $absP = $this->rutaAbsoluta((string)$ultima['pdf_url']);
+            if ($absP !== '') $adjuntos[$absP] = 'Propuesta_' . $pre['folio'] . '.pdf';
+        }
+        if (!$adjuntos) return ['status' => 'error', 'message' => 'No hay documentos que enviar.'];
+
+        try {
+            $this->enviarCorreo($destinos, $pre, $adjuntos);
+        } catch (\Throwable $e) {
+            error_log('[Presupuestos] enviar: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudo enviar el correo: ' . $e->getMessage()];
+        }
+
+        $this->pdo->prepare(
+            "UPDATE pres_presupuestos
+                SET enviado_at = NOW(), estado = CASE WHEN estado = 'BORRADOR' THEN 'ENVIADO' ELSE estado END
+              WHERE id = ?"
+        )->execute([$id]);
+
+        return ['status' => 'ok',
+            'message' => 'Enviado a ' . implode(', ', $destinos) . '.',
+            'adjuntos' => array_values($adjuntos)];
+    }
+
+    private function enviarCorreo(array $destinos, array $pre, array $adjuntos): void {
+        if (!class_exists('\\PHPMailer\\PHPMailer\\PHPMailer')) {
+            $autoload = __DIR__ . '/../vendor/autoload.php';
+            if (file_exists($autoload)) require_once $autoload;
+        }
+        if (!class_exists('\\PHPMailer\\PHPMailer\\PHPMailer')) {
+            throw new \RuntimeException('PHPMailer no disponible.');
+        }
+
+        $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
+        configurarMailer($mail, $this->pdo);
+        foreach ($destinos as $a) $mail->addAddress($a);
+
+        $folio = $this->esc((string)$pre['folio']);
+        $vence = date('d/m/Y', strtotime((string)$pre['fecha'] . ' +' . (int)$pre['vigencia_dias'] . ' days'));
+
+        $mail->Subject = 'Propuesta de servicios AVBA — ' . $pre['folio'];
+        $mail->isHTML(true);
+
+        $cuerpo = '
+      <p style="font-size:15px;color:#1a1a2e;margin:0 0 12px">Estimado(a) <strong>'
+        . $this->esc((string)($pre['atencion'] ?: $pre['cliente_nombre'])) . '</strong>,</p>
+      <p style="font-size:14px;color:#5a6072;line-height:1.7;margin:0 0 20px">
+        Adjuntamos la propuesta de servicios de inspección y certificación solicitada.
+        Quedamos atentos a cualquier ajuste que requiera antes de programar el servicio.
+      </p>
+      <div style="background:#E6F1FB;border-radius:8px;padding:14px 18px;margin-bottom:20px">
+        <p style="font-size:13px;color:#0C447C;margin:0"><strong>Folio:</strong> ' . $folio . '</p>
+        <p style="font-size:13px;color:#0C447C;margin:6px 0 0"><strong>Total:</strong> $'
+        . $this->num((float)$pre['total']) . ' ' . $this->esc((string)$pre['moneda']) . ' (IVA incluido)</p>
+        <p style="font-size:12px;color:#1B2A6B;margin:8px 0 0">
+          Esta oferta es válida hasta el ' . $vence . '.
+        </p>
+      </div>';
+
+        $mail->Body = function_exists('plantillaCorreoHtml')
+            ? plantillaCorreoHtml($this->pdo, $cuerpo)
+            : $cuerpo;
+
+        foreach ($adjuntos as $ruta => $nombre) $mail->addAttachment($ruta, $nombre);
+        $mail->send();
+    }
+}

@@ -74,6 +74,21 @@ define('GEMINI_API_KEY', '');
 // cambiarse a 'gemini-2.5-pro'.
 define('GEMINI_MODEL', '');
 
+// ── IA para propuestas técnico-económicas (Anthropic / Claude) ──
+// Clave de la API de Claude (https://console.anthropic.com/settings/keys).
+// Sin ella, el módulo de presupuestos sigue funcionando: se pueden capturar
+// servicios, clientes y ofertas, y sale el PDF del presupuesto. Lo único que
+// queda deshabilitado es la redacción automática de la propuesta.
+define('CLAUDE_API_KEY', '');
+
+// Modelo a usar. Vacío = claude-opus-5, el recomendado para redactar.
+define('CLAUDE_MODEL', '');
+
+// Cuánto se le pide que piense: low | medium | high | xhigh | max.
+// Vacío = high. En hosting compartido, si la petición se corta por el límite
+// de ejecución de PHP, bajarlo a 'medium' acorta la espera.
+define('CLAUDE_EFFORT', '');
+
 // ── Entorno ───────────────────────────────────────────────
 define('APP_ENV', 'production');
 

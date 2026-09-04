@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Presupuestos y propuestas · AVBA</title>
+<link rel="icon" href="assets/logos/avba_icono.png">
+<style>
+:root{--azul:#185FA5;--azul-dark:#0C447C;--azul-light:#E6F1FB;--verde:#3B6D11;--verde-light:#EAF3DE;--ambar:#854F0B;--ambar-light:#FAEEDA;--rojo:#A32D2D;--rojo-light:#FCEBEB;--gris-bg:#f4f7fb;--borde:#dfe5ef;--texto:#1a1a2e;--texto-sub:#5a6072;--texto-hint:#9299a8;--blanco:#fff;}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:hidden;max-width:100%}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg)}
+.header{background:var(--azul-dark);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:60px;box-shadow:0 2px 12px rgba(12,68,124,.3);position:sticky;top:0;z-index:50}
+.hdr-l{display:flex;align-items:center;gap:10px}
+.hdr-t{font-size:15px;font-weight:600;color:#fff}.hdr-s{font-size:11px;color:rgba(255,255,255,.6)}
+.btn-logout{padding:6px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.1);color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+.wrap{max-width:1000px;margin:0 auto;padding:20px 16px 60px}
+.tabs{display:flex;gap:4px;background:var(--blanco);border-radius:12px;padding:6px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 10px rgba(0,0,0,.04);margin-bottom:18px;overflow-x:auto}
+.tab-btn{flex:1;padding:9px 14px;border-radius:8px;border:none;background:transparent;font-size:13px;font-weight:600;color:var(--texto-sub);cursor:pointer;white-space:nowrap}
+.tab-btn.active{background:var(--azul);color:#fff}
+.tab-btn:disabled{opacity:.5;cursor:not-allowed}
+.tab-panel{display:none}.tab-panel.active{display:block}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+@media(max-width:640px){.stats{grid-template-columns:repeat(2,1fr)}}
+.stat{background:var(--blanco);border-radius:12px;padding:14px 16px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 10px rgba(0,0,0,.04)}
+.stat-n{font-size:24px;font-weight:700}.stat-l{font-size:12px;color:var(--texto-sub);margin-top:2px}
+.sec-hdr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.btn-prim{padding:9px 16px;border-radius:9px;border:none;background:var(--azul);color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+.btn-prim:hover{background:var(--azul-dark)}
+.btn-sec{padding:8px 12px;border-radius:8px;border:1.5px solid var(--borde);background:var(--blanco);color:var(--texto-sub);font-size:12px;font-weight:600;cursor:pointer}
+.btn-del{padding:8px 10px;border-radius:8px;border:1.5px solid var(--rojo);background:var(--rojo-light);color:var(--rojo);font-size:12px;font-weight:600;cursor:pointer}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.card{background:var(--blanco);border-radius:14px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 12px rgba(0,0,0,.05);overflow:hidden}
+.card-top{padding:14px 16px;border-bottom:1px solid var(--borde);display:flex;gap:10px;align-items:flex-start}
+.card-ico{width:40px;height:40px;border-radius:10px;background:var(--azul-light);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.card-nombre{font-size:14px;font-weight:700;color:var(--texto)}
+.card-sub{font-size:12px;color:var(--texto-sub);margin-top:2px}
+.card-body{padding:12px 16px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.chip{font-size:11px;background:var(--gris-bg);border:1px solid var(--borde);border-radius:20px;padding:3px 9px;color:var(--texto-sub)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.b-ok{background:var(--verde-light);color:var(--verde)}.b-warn{background:var(--ambar-light);color:var(--ambar)}.b-bad{background:var(--rojo-light);color:var(--rojo)}.b-off{background:#f0f0f0;color:#888}
+.card-foot{padding:10px 14px 14px;display:flex;gap:6px;flex-wrap:wrap}
+.empty{text-align:center;padding:44px 20px;color:var(--texto-hint)}
+.empty-t{font-size:15px;font-weight:600}.empty-s{font-size:13px;margin-top:4px}
+.loading{text-align:center;padding:34px;color:var(--texto-hint)}
+.spin{width:20px;height:20px;border:2px solid var(--borde);border-top-color:var(--azul);border-radius:50%;display:inline-block;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px;opacity:0;pointer-events:none;transition:opacity .2s}
+.overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--blanco);border-radius:14px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);padding:22px 22px 18px}
+.modal-hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.modal-title{font-size:16px;font-weight:700;color:var(--texto)}
+.modal-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--texto-hint)}
+.frow{margin-bottom:10px}.fgrid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.flabel{font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:4px}
+.finput{width:100%;padding:9px 11px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;color:var(--texto);outline:none;background:var(--blanco)}
+.finput:focus{border-color:var(--azul)}
+.fact{display:flex;gap:8px;justify-content:flex-end;margin-top:14px}
+.msec{font-size:12px;font-weight:700;color:var(--azul-dark);margin:12px 0 6px;border-bottom:1px solid var(--borde);padding-bottom:4px}
+.doc-row{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border:1px solid var(--borde);border-radius:9px;margin-bottom:8px}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:20px;font-size:13px;font-weight:600;z-index:9999;opacity:0;pointer-events:none;transition:opacity .25s;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}
+.toast.show{opacity:1}
+/* ── Añadidos propios de esta pantalla ─────────────────── */
+.modal.ancho{max-width:920px}
+.tabla{width:100%;border-collapse:collapse;font-size:12.5px}
+.tabla th{background:var(--gris-bg);color:var(--texto-sub);font-size:11px;text-transform:uppercase;
+          letter-spacing:.3px;padding:7px 8px;text-align:left;border-bottom:1px solid var(--borde)}
+.tabla td{padding:6px 8px;border-bottom:1px solid var(--borde);vertical-align:top}
+.tabla input,.tabla select{width:100%;padding:6px 7px;border:1.5px solid var(--borde);border-radius:6px;
+          font-size:12.5px;outline:none;background:var(--blanco);color:var(--texto)}
+.tabla input:focus,.tabla select:focus{border-color:var(--azul)}
+.tabla .der{text-align:right}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--borde);border-radius:10px;margin-bottom:10px}
+.tbl-wrap .tabla{min-width:720px}
+.btn-x{border:none;background:var(--rojo-light);color:var(--rojo);border-radius:6px;width:26px;height:26px;
+       font-size:14px;font-weight:700;cursor:pointer;line-height:1}
+.totales{margin-left:auto;width:280px;font-size:13px}
+.totales div{display:flex;justify-content:space-between;padding:4px 0}
+.totales .gran{border-top:2px solid var(--azul-dark);margin-top:6px;padding-top:8px;
+       font-size:16px;font-weight:700;color:var(--azul-dark)}
+.fhint{font-size:11px;color:var(--texto-hint);margin-top:3px;line-height:1.45}
+.aviso{background:var(--ambar-light);border-left:3px solid var(--ambar);color:var(--ambar);
+       padding:9px 12px;border-radius:8px;font-size:12px;margin-bottom:12px;line-height:1.5}
+.filtros{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.filtros .finput{width:auto;flex:1;min-width:170px}
+.prop-item{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 10px;
+       border:1px solid var(--borde);border-radius:8px;margin-bottom:6px;font-size:12px}
+.ia-espera{display:flex;gap:10px;align-items:center;background:var(--azul-light);color:var(--azul-dark);
+       padding:11px 14px;border-radius:10px;font-size:12.5px;margin-bottom:12px}
+textarea.finput{resize:vertical;min-height:80px;font-family:inherit;line-height:1.55}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="hdr-l">
+    <img src="assets/logos/avba_icono.png" alt="AVBA" style="height:34px;width:34px;border-radius:8px;background:#fff;padding:3px">
+    <div><div class="hdr-t">Presupuestos y propuestas</div>
+         <div class="hdr-s">AVBA · Servicios, precios y clientes</div></div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <span class="hdr-s" id="hdr-user"></span>
+    <button class="btn-logout" onclick="cerrarSesion()">Salir</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="tabs">
+    <button class="tab-btn active" onclick="verTab('pres',this)">📄 Presupuestos</button>
+    <button class="tab-btn" onclick="verTab('serv',this)">🧾 Catálogo de servicios</button>
+    <button class="tab-btn" onclick="verTab('cli',this)">🏢 Clientes</button>
+    <button class="tab-btn" onclick="verTab('cfg',this)">✍️ Plantilla de la propuesta</button>
+  </div>
+
+  <!-- ══════════ PRESUPUESTOS ══════════ -->
+  <div id="tab-pres" class="tab-panel active">
+    <div class="stats">
+      <div class="stat"><div class="stat-n" id="s-borr" style="color:var(--texto-sub)">—</div><div class="stat-l">Borradores</div></div>
+      <div class="stat"><div class="stat-n" id="s-env"  style="color:var(--azul)">—</div><div class="stat-l">Enviados</div></div>
+      <div class="stat"><div class="stat-n" id="s-acep" style="color:var(--verde)">—</div><div class="stat-l">Aceptados</div></div>
+      <div class="stat"><div class="stat-n" id="s-venc" style="color:var(--ambar)">—</div><div class="stat-l">Vencidos</div></div>
+    </div>
+    <div class="sec-hdr">
+      <div><h2 style="margin:0;font-size:18px;color:var(--azul-dark)">Presupuestos</h2>
+        <p style="margin:3px 0 0;font-size:13px;color:var(--texto-sub)">Del catálogo al PDF, y de ahí a la propuesta técnico-económica.</p></div>
+      <button class="btn-prim" onclick="abrirPres(null)">+ Nuevo presupuesto</button>
+    </div>
+    <div class="filtros">
+      <select class="finput" id="f-estado" onchange="cargarPres()">
+        <option value="">Todos los estados</option>
+      </select>
+      <input class="finput" id="f-busca" placeholder="Buscar por folio o cliente…" oninput="debounce(cargarPres)">
+    </div>
+    <div id="pres-lista"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+
+  <!-- ══════════ CATÁLOGO ══════════ -->
+  <div id="tab-serv" class="tab-panel">
+    <div class="sec-hdr">
+      <div><h2 style="margin:0;font-size:18px;color:var(--azul-dark)">Catálogo de servicios</h2>
+        <p style="margin:3px 0 0;font-size:13px;color:var(--texto-sub)">Lo que vendemos, con su precio y sus claves del SAT.</p></div>
+      <button class="btn-prim" onclick="abrirServ(null)">+ Nuevo servicio</button>
+    </div>
+    <div id="serv-lista"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+
+  <!-- ══════════ CLIENTES ══════════ -->
+  <div id="tab-cli" class="tab-panel">
+    <div class="sec-hdr">
+      <div><h2 style="margin:0;font-size:18px;color:var(--azul-dark)">Clientes</h2>
+        <p style="margin:3px 0 0;font-size:13px;color:var(--texto-sub)">Con sus datos fiscales, para poder facturar sin volver a preguntarlos.</p></div>
+      <button class="btn-prim" onclick="abrirCli(null)">+ Nuevo cliente</button>
+    </div>
+    <input class="finput" id="f-cli" placeholder="Buscar por nombre, razón social o RFC…" oninput="debounce(cargarCli)" style="margin-bottom:14px">
+    <div id="cli-lista"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+
+  <!-- ══════════ PLANTILLA / PROMPT ══════════ -->
+  <div id="tab-cfg" class="tab-panel">
+    <div class="sec-hdr">
+      <div><h2 style="margin:0;font-size:18px;color:var(--azul-dark)">Plantilla de la propuesta</h2>
+        <p style="margin:3px 0 0;font-size:13px;color:var(--texto-sub)">Lo que el sistema le dice a la IA antes de redactar. Se aplica a todas las propuestas.</p></div>
+    </div>
+    <div class="card" style="padding:18px">
+      <div class="frow">
+        <label class="flabel">Quiénes somos</label>
+        <textarea class="finput" id="c-perfil" rows="5"></textarea>
+        <div class="fhint">El párrafo de presentación. Acreditación, servicios y cobertura.</div>
+      </div>
+      <div class="frow">
+        <label class="flabel">Normas que manejamos</label>
+        <textarea class="finput" id="c-normas" rows="7"></textarea>
+        <div class="fhint">Una por renglón. La IA sólo puede citar normas de esta lista: así no se inventa ninguna.</div>
+      </div>
+      <div class="frow">
+        <label class="flabel">Condiciones comerciales</label>
+        <textarea class="finput" id="c-cond" rows="5"></textarea>
+        <div class="fhint">Una por renglón. Va tal cual al pie de cada presupuesto; la IA no la toca.</div>
+      </div>
+      <div class="frow">
+        <label class="flabel">Cómo queremos que escriba</label>
+        <textarea class="finput" id="c-instr" rows="5"></textarea>
+        <div class="fhint">Tono, cuidados y lo que no debe prometer.</div>
+      </div>
+      <div class="fact"><button class="btn-prim" onclick="guardarCfg()">Guardar plantilla</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL: PRESUPUESTO ══════════ -->
+<div class="overlay" id="m-pres">
+  <div class="modal ancho">
+    <div class="modal-hdr">
+      <div class="modal-title" id="mp-title">Nuevo presupuesto</div>
+      <button class="modal-close" onclick="cerrar('m-pres')">✕</button>
+    </div>
+    <input type="hidden" id="mp-id">
+
+    <div class="msec">Cliente y datos generales</div>
+    <div class="fgrid2">
+      <div class="frow">
+        <label class="flabel">Cliente *</label>
+        <select class="finput" id="mp-cliente" onchange="clienteElegido()"></select>
+        <div class="fhint" id="mp-cli-hint"></div>
+      </div>
+      <div class="frow"><label class="flabel">Atención a</label>
+        <input class="finput" id="mp-atencion" placeholder="Nombre del contacto"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Correo de envío</label>
+        <input class="finput" id="mp-correo" type="email" placeholder="cliente@empresa.com"></div>
+      <div class="frow"><label class="flabel">Lugar del servicio</label>
+        <input class="finput" id="mp-lugar" placeholder="Planta, ciudad"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Fecha</label>
+        <input class="finput" id="mp-fecha" type="date"></div>
+      <div class="frow"><label class="flabel">Vigencia (días)</label>
+        <input class="finput" id="mp-vigencia" type="number" min="1" max="365" value="15"></div>
+    </div>
+
+    <div class="msec">Partidas</div>
+    <div class="frow">
+      <select class="finput" id="mp-add" onchange="agregarDelCatalogo(this)">
+        <option value="">+ Agregar servicio del catálogo…</option>
+      </select>
+      <div class="fhint">Al agregarlo se copia su precio y su alcance. Puedes cambiarlos aquí sin tocar el catálogo.</div>
+    </div>
+    <div class="tbl-wrap">
+      <table class="tabla">
+        <thead><tr>
+          <th style="width:34%">Concepto</th><th style="width:11%">Unidad</th>
+          <th style="width:11%" class="der">Cant.</th><th style="width:15%" class="der">P. unitario</th>
+          <th style="width:9%" class="der">Desc.%</th><th style="width:9%" class="der">IVA%</th>
+          <th style="width:13%" class="der">Importe</th><th style="width:5%"></th>
+        </tr></thead>
+        <tbody id="mp-partidas"></tbody>
+      </table>
+    </div>
+    <button class="btn-sec" onclick="agregarPartida()">+ Partida libre</button>
+
+    <div class="totales" style="margin-top:14px">
+      <div><span>Subtotal</span><span id="t-sub">$0.00</span></div>
+      <div><span>Descuento</span>
+        <input class="finput" id="mp-descuento" type="number" min="0" step="0.01" value="0"
+               style="width:110px;text-align:right;padding:4px 7px" oninput="recalcular()"></div>
+      <div><span>IVA</span><span id="t-iva">$0.00</span></div>
+      <div class="gran"><span>TOTAL</span><span id="t-total">$0.00</span></div>
+    </div>
+    <div class="fhint" style="text-align:right">Cifras de referencia. El servidor las recalcula al guardar.</div>
+
+    <div class="msec">Condiciones y notas</div>
+    <div class="frow"><label class="flabel">Condiciones comerciales</label>
+      <textarea class="finput" id="mp-condiciones" rows="4"></textarea>
+      <div class="fhint">Una por renglón. Si lo dejas vacío se usan las de la plantilla.</div></div>
+    <div class="frow"><label class="flabel">Notas internas</label>
+      <textarea class="finput" id="mp-notas" rows="3"></textarea>
+      <div class="fhint">Contexto para la IA al redactar la propuesta. No se copia literal al documento.</div></div>
+
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrar('m-pres')">Cancelar</button>
+      <button class="btn-prim" id="mp-guardar" onclick="guardarPres()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL: SERVICIO ══════════ -->
+<div class="overlay" id="m-serv">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="ms-title">Nuevo servicio</div>
+      <button class="modal-close" onclick="cerrar('m-serv')">✕</button>
+    </div>
+    <input type="hidden" id="ms-id">
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Nombre *</label><input class="finput" id="ms-nombre"></div>
+      <div class="frow"><label class="flabel">Clave</label><input class="finput" id="ms-clave" placeholder="Se genera sola">
+        <div class="fhint">Identifica al servicio en el presupuesto y en la factura.</div></div>
+    </div>
+    <div class="frow"><label class="flabel">Descripción comercial</label>
+      <textarea class="finput" id="ms-desc" rows="2"></textarea></div>
+    <div class="frow"><label class="flabel">Alcance técnico</label>
+      <textarea class="finput" id="ms-alcance" rows="3"></textarea>
+      <div class="fhint">Qué incluye el servicio. Es la materia prima de la propuesta técnica.</div></div>
+    <div class="frow"><label class="flabel">Normas aplicables</label>
+      <input class="finput" id="ms-normas" placeholder="NOM-006-STPS-2014, ASME B30.5"></div>
+    <div class="frow"><label class="flabel">Entregables</label>
+      <textarea class="finput" id="ms-entregables" rows="2" placeholder="Dictamen, certificado, placa con QR"></textarea></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Unidad</label><input class="finput" id="ms-unidad" value="Servicio"></div>
+      <div class="frow"><label class="flabel">Precio</label><input class="finput" id="ms-precio" type="number" min="0" step="0.01" value="0"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Moneda</label>
+        <select class="finput" id="ms-moneda"><option>MXN</option><option>USD</option><option>EUR</option></select></div>
+      <div class="frow"><label class="flabel">IVA %</label><input class="finput" id="ms-iva" type="number" min="0" max="100" step="0.01" value="16"></div>
+    </div>
+    <div class="msec">Claves del SAT (para facturar)</div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Clave ProdServ</label><input class="finput" id="ms-prodserv" placeholder="81101500"></div>
+      <div class="frow"><label class="flabel">Clave de unidad</label><input class="finput" id="ms-cunidad" placeholder="E48"></div>
+    </div>
+    <div class="fhint">Búscalas en el catálogo del SAT. Se pueden dejar vacías ahora y completarlas antes de facturar.</div>
+    <div class="frow" style="margin-top:10px">
+      <label class="flabel"><input type="checkbox" id="ms-activo" checked> Activo (aparece al armar presupuestos)</label>
+    </div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrar('m-serv')">Cancelar</button>
+      <button class="btn-prim" onclick="guardarServ()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════ MODAL: CLIENTE ══════════ -->
+<div class="overlay" id="m-cli">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="mc-title">Nuevo cliente</div>
+      <button class="modal-close" onclick="cerrar('m-cli')">✕</button>
+    </div>
+    <input type="hidden" id="mc-id">
+    <div class="frow"><label class="flabel">Nombre comercial *</label><input class="finput" id="mc-nombre"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Contacto</label><input class="finput" id="mc-contacto"></div>
+      <div class="frow"><label class="flabel">Teléfono</label><input class="finput" id="mc-tel"></div>
+    </div>
+    <div class="frow"><label class="flabel">Correo</label><input class="finput" id="mc-correo" type="email"></div>
+
+    <div class="msec">Datos fiscales</div>
+    <div class="aviso">El SAT exige que la razón social, el RFC, el código postal y el régimen coincidan
+      exactamente con su constancia de situación fiscal. Pídesela al cliente: un solo carácter distinto
+      hace que el timbrado se rechace.</div>
+    <div class="frow"><label class="flabel">Razón social</label><input class="finput" id="mc-razon"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">RFC</label><input class="finput" id="mc-rfc" maxlength="13" style="text-transform:uppercase"></div>
+      <div class="frow"><label class="flabel">C.P. fiscal</label><input class="finput" id="mc-cp" maxlength="5"></div>
+    </div>
+    <div class="frow"><label class="flabel">Régimen fiscal</label><select class="finput" id="mc-regimen"></select></div>
+    <div class="frow"><label class="flabel">Uso del CFDI</label><select class="finput" id="mc-uso"></select></div>
+    <div class="frow"><label class="flabel">Dirección</label><input class="finput" id="mc-dir"></div>
+    <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="mc-notas" rows="2"></textarea></div>
+    <div class="frow"><label class="flabel"><input type="checkbox" id="mc-activo" checked> Activo</label></div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrar('m-cli')">Cancelar</button>
+      <button class="btn-prim" onclick="guardarCli()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'api/index.php';
+const _origFetch = window.fetch.bind(window);
+const _sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
+if (!_sesion.token) location.href = 'login.html';
+if (!['ADMINISTRATIVO','ADMIN'].includes(_sesion.rol)) { localStorage.removeItem('avba_session'); location.href = 'login.html'; }
+document.getElementById('hdr-user').textContent = _sesion.nombre || _sesion.usuario || '';
+
+window.fetch = function(url, opts = {}) {
+  const t = _sesion.token || '';
+  const isApi = typeof url === 'string' && url.includes('api/index.php');
+  if (isApi) {
+    if (!opts.method || opts.method.toUpperCase() === 'GET') {
+      opts.headers = Object.assign({}, opts.headers || {}, {'Authorization':'Bearer '+t,'X-Token':t});
+    } else if (!(opts.body instanceof FormData)) {
+      try { const b = JSON.parse(opts.body||'{}'); if(!b.token) b.token=t; opts.body=JSON.stringify(b); } catch(_){}
+    }
+    return _origFetch(url, opts).then(r => { if (r.status===401){localStorage.removeItem('avba_session');setTimeout(()=>location.href='login.html',40);} return r; });
+  }
+  return _origFetch(url, opts);
+};
+
+function cerrarSesion(){ localStorage.removeItem('avba_session'); location.href='login.html'; }
+function esc(s){ return (s==null?'':String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+let _toastT;
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove('show'),3200); }
+function verTab(id,btn){ document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.getElementById('tab-'+id).classList.add('active'); btn.classList.add('active'); }
+function cerrar(id){ document.getElementById(id).classList.remove('open'); }
+function abrir(id){ document.getElementById(id).classList.add('open'); }
+let _deb; function debounce(fn){ clearTimeout(_deb); _deb=setTimeout(fn,300); }
+const money = n => '$' + (Number(n)||0).toLocaleString('es-MX',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+async function post(action, body){
+  const r = await fetch(API+'?action='+action, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify(Object.assign({action}, body||{}))
+  });
+  return r.json();
+}
+async function get(action, params){
+  const q = new URLSearchParams(Object.assign({action}, params||{})).toString();
+  const r = await fetch(API+'?'+q);
+  return r.json();
+}
+
+// ══════════ ESTADO EN MEMORIA ══════════
+let _servicios = [], _clientes = [], _config = {}, _regimenes = {}, _usos = {}, _partidas = [];
+
+// ══════════ CONFIGURACIÓN / PLANTILLA ══════════
+async function cargarCfg(){
+  const d = await get('PRES_CONFIG');
+  if (d.status !== 'ok') { toast(d.message||'No se pudo leer la plantilla.'); return; }
+  _config = d.config || {}; _regimenes = d.regimenes || {}; _usos = d.usos_cfdi || {};
+  document.getElementById('c-perfil').value = _config.perfil_empresa   || '';
+  document.getElementById('c-normas').value = _config.normas           || '';
+  document.getElementById('c-cond').value   = _config.condiciones      || '';
+  document.getElementById('c-instr').value  = _config.instrucciones_ia || '';
+
+  const reg = document.getElementById('mc-regimen');
+  reg.innerHTML = '<option value="">— Selecciona —</option>' +
+    Object.entries(_regimenes).map(([k,v])=>`<option value="${esc(k)}">${esc(k)} · ${esc(v)}</option>`).join('');
+  const uso = document.getElementById('mc-uso');
+  uso.innerHTML = Object.entries(_usos).map(([k,v])=>`<option value="${esc(k)}">${esc(k)} · ${esc(v)}</option>`).join('');
+}
+async function guardarCfg(){
+  const d = await post('PRES_GUARDAR_CONFIG', {
+    perfil_empresa:   document.getElementById('c-perfil').value,
+    normas:           document.getElementById('c-normas').value,
+    condiciones:      document.getElementById('c-cond').value,
+    instrucciones_ia: document.getElementById('c-instr').value,
+  });
+  toast(d.message || 'Guardado.');
+  if (d.status === 'ok') cargarCfg();
+}
+
+// ══════════ CATÁLOGO DE SERVICIOS ══════════
+async function cargarServ(){
+  const cont = document.getElementById('serv-lista');
+  cont.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  const d = await get('PRES_SERVICIOS');
+  if (d.status !== 'ok') { cont.innerHTML = `<p class="empty">${esc(d.message||'Error.')}</p>`; return; }
+  _servicios = d.servicios || [];
+  llenarSelectorServicios();
+
+  if (!_servicios.length) {
+    cont.innerHTML = `<div class="empty"><div class="empty-t">Todavía no hay servicios</div>
+      <div class="empty-s">Da de alta lo que vendes: nombre, alcance y precio. Después se arma un presupuesto en segundos.</div></div>`;
+    return;
+  }
+  cont.innerHTML = '<div class="cards">' + _servicios.map(s => `
+    <div class="card">
+      <div class="card-top">
+        <div class="card-ico">🧾</div>
+        <div style="flex:1;min-width:0">
+          <div class="card-nombre">${esc(s.nombre)}</div>
+          <div class="card-sub">${esc(s.clave)} · ${money(s.precio)} ${esc(s.moneda)} / ${esc(s.unidad)}</div>
+        </div>
+        <span class="badge ${Number(s.activo)? 'b-ok':'b-off'}">${Number(s.activo)?'Activo':'Inactivo'}</span>
+      </div>
+      <div class="card-body">
+        ${s.descripcion ? `<p style="font-size:12.5px;color:var(--texto-sub);line-height:1.55">${esc(s.descripcion)}</p>` : ''}
+        <div class="chips" style="margin-top:8px">
+          ${s.normas ? `<span class="chip">${esc(s.normas)}</span>` : ''}
+          <span class="chip">IVA ${esc(s.tasa_iva)}%</span>
+          ${s.clave_prodserv ? `<span class="chip">SAT ${esc(s.clave_prodserv)}</span>`
+                             : `<span class="chip" style="color:var(--ambar)">Sin clave SAT</span>`}
+        </div>
+      </div>
+      <div class="card-foot">
+        <button class="btn-sec" onclick="abrirServ(${s.id})">Editar</button>
+        <button class="btn-del" onclick="borrarServ(${s.id})">Eliminar</button>
+      </div>
+    </div>`).join('') + '</div>';
+}
+
+function abrirServ(id){
+  const s = id ? _servicios.find(x=>Number(x.id)===Number(id)) : null;
+  document.getElementById('ms-title').textContent = s ? 'Editar servicio' : 'Nuevo servicio';
+  document.getElementById('ms-id').value      = s ? s.id : '';
+  document.getElementById('ms-nombre').value  = s ? s.nombre : '';
+  document.getElementById('ms-clave').value   = s ? s.clave : '';
+  document.getElementById('ms-desc').value    = s ? (s.descripcion||'') : '';
+  document.getElementById('ms-alcance').value = s ? (s.alcance||'') : '';
+  document.getElementById('ms-normas').value  = s ? (s.normas||'') : '';
+  document.getElementById('ms-entregables').value = s ? (s.entregables||'') : '';
+  document.getElementById('ms-unidad').value  = s ? s.unidad : 'Servicio';
+  document.getElementById('ms-precio').value  = s ? s.precio : 0;
+  document.getElementById('ms-moneda').value  = s ? s.moneda : 'MXN';
+  document.getElementById('ms-iva').value     = s ? s.tasa_iva : 16;
+  document.getElementById('ms-prodserv').value= s ? (s.clave_prodserv||'') : '';
+  document.getElementById('ms-cunidad').value = s ? (s.clave_unidad||'') : '';
+  document.getElementById('ms-activo').checked= s ? !!Number(s.activo) : true;
+  abrir('m-serv');
+}
+async function guardarServ(){
+  const d = await post('PRES_GUARDAR_SERVICIO', {
+    id: document.getElementById('ms-id').value || 0,
+    nombre: document.getElementById('ms-nombre').value,
+    clave: document.getElementById('ms-clave').value,
+    descripcion: document.getElementById('ms-desc').value,
+    alcance: document.getElementById('ms-alcance').value,
+    normas: document.getElementById('ms-normas').value,
+    entregables: document.getElementById('ms-entregables').value,
+    unidad: document.getElementById('ms-unidad').value,
+    precio: document.getElementById('ms-precio').value,
+    moneda: document.getElementById('ms-moneda').value,
+    tasa_iva: document.getElementById('ms-iva').value,
+    clave_prodserv: document.getElementById('ms-prodserv').value,
+    clave_unidad: document.getElementById('ms-cunidad').value,
+    activo: document.getElementById('ms-activo').checked ? 1 : 0,
+  });
+  toast(d.message || 'Guardado.');
+  if (d.status === 'ok') { cerrar('m-serv'); cargarServ(); }
+}
+async function borrarServ(id){
+  if (!confirm('¿Eliminar este servicio del catálogo?\n\nLos presupuestos que ya lo usan no cambian: cada partida guarda su propia copia.')) return;
+  const d = await post('PRES_ELIMINAR_SERVICIO', {id});
+  toast(d.message || 'Listo.');
+  if (d.status === 'ok') cargarServ();
+}
+
+// ══════════ CLIENTES ══════════
+async function cargarCli(){
+  const cont = document.getElementById('cli-lista');
+  cont.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  const d = await get('PRES_CLIENTES', {q: document.getElementById('f-cli').value});
+  if (d.status !== 'ok') { cont.innerHTML = `<p class="empty">${esc(d.message||'Error.')}</p>`; return; }
+  _clientes = d.clientes || [];
+  llenarSelectorClientes();
+
+  if (!_clientes.length) {
+    cont.innerHTML = `<div class="empty"><div class="empty-t">Sin clientes todavía</div>
+      <div class="empty-s">Agrega uno con su constancia de situación fiscal a la mano.</div></div>`;
+    return;
+  }
+  cont.innerHTML = '<div class="cards">' + _clientes.map(c => {
+    const falta = c.falta_fiscal || [];
+    return `
+    <div class="card">
+      <div class="card-top">
+        <div class="card-ico">🏢</div>
+        <div style="flex:1;min-width:0">
+          <div class="card-nombre">${esc(c.nombre_comercial)}</div>
+          <div class="card-sub">${esc(c.rfc || 'Sin RFC')}${c.contacto ? ' · ' + esc(c.contacto) : ''}</div>
+        </div>
+        <span class="badge ${falta.length ? 'b-warn' : 'b-ok'}">
+          ${falta.length ? 'Falta dato fiscal' : 'Listo para facturar'}</span>
+      </div>
+      <div class="card-body">
+        ${c.razon_social ? `<div style="font-size:12.5px;color:var(--texto-sub)">${esc(c.razon_social)}</div>` : ''}
+        ${c.correo ? `<div style="font-size:12.5px;color:var(--texto-sub);margin-top:3px">${esc(c.correo)}</div>` : ''}
+        ${falta.length ? `<div class="aviso" style="margin-top:9px;margin-bottom:0">Falta: ${esc(falta.join(', '))}.</div>` : ''}
+      </div>
+      <div class="card-foot">
+        <button class="btn-sec" onclick="abrirCli(${c.id})">Editar</button>
+        <button class="btn-del" onclick="borrarCli(${c.id})">Eliminar</button>
+      </div>
+    </div>`; }).join('') + '</div>';
+}
+
+function abrirCli(id){
+  const c = id ? _clientes.find(x=>Number(x.id)===Number(id)) : null;
+  document.getElementById('mc-title').textContent = c ? 'Editar cliente' : 'Nuevo cliente';
+  document.getElementById('mc-id').value       = c ? c.id : '';
+  document.getElementById('mc-nombre').value   = c ? c.nombre_comercial : '';
+  document.getElementById('mc-contacto').value = c ? (c.contacto||'') : '';
+  document.getElementById('mc-tel').value      = c ? (c.telefono||'') : '';
+  document.getElementById('mc-correo').value   = c ? (c.correo||'') : '';
+  document.getElementById('mc-razon').value    = c ? (c.razon_social||'') : '';
+  document.getElementById('mc-rfc').value      = c ? (c.rfc||'') : '';
+  document.getElementById('mc-cp').value       = c ? (c.cp_fiscal||'') : '';
+  document.getElementById('mc-regimen').value  = c ? (c.regimen_fiscal||'') : '';
+  document.getElementById('mc-uso').value      = c ? (c.uso_cfdi||'G03') : 'G03';
+  document.getElementById('mc-dir').value      = c ? (c.direccion||'') : '';
+  document.getElementById('mc-notas').value    = c ? (c.notas||'') : '';
+  document.getElementById('mc-activo').checked = c ? !!Number(c.activo) : true;
+  abrir('m-cli');
+}
+async function guardarCli(){
+  const d = await post('PRES_GUARDAR_CLIENTE', {
+    id: document.getElementById('mc-id').value || 0,
+    nombre_comercial: document.getElementById('mc-nombre').value,
+    contacto: document.getElementById('mc-contacto').value,
+    telefono: document.getElementById('mc-tel').value,
+    correo: document.getElementById('mc-correo').value,
+    razon_social: document.getElementById('mc-razon').value,
+    rfc: document.getElementById('mc-rfc').value,
+    cp_fiscal: document.getElementById('mc-cp').value,
+    regimen_fiscal: document.getElementById('mc-regimen').value,
+    uso_cfdi: document.getElementById('mc-uso').value,
+    direccion: document.getElementById('mc-dir').value,
+    notas: document.getElementById('mc-notas').value,
+    activo: document.getElementById('mc-activo').checked ? 1 : 0,
+  });
+  toast(d.message || 'Guardado.');
+  if (d.status === 'ok') { cerrar('m-cli'); cargarCli(); }
+}
+async function borrarCli(id){
+  if (!confirm('¿Eliminar este cliente?')) return;
+  const d = await post('PRES_ELIMINAR_CLIENTE', {id});
+  toast(d.message || 'Listo.');
+  if (d.status === 'ok') cargarCli();
+}
+
+function llenarSelectorClientes(){
+  const sel = document.getElementById('mp-cliente');
+  const actual = sel.value;
+  sel.innerHTML = '<option value="">— Selecciona un cliente —</option>' +
+    _clientes.filter(c=>Number(c.activo))
+      .map(c=>`<option value="${c.id}">${esc(c.nombre_comercial)}</option>`).join('');
+  if (actual) sel.value = actual;
+}
+function llenarSelectorServicios(){
+  const sel = document.getElementById('mp-add');
+  sel.innerHTML = '<option value="">+ Agregar servicio del catálogo…</option>' +
+    _servicios.filter(s=>Number(s.activo))
+      .map(s=>`<option value="${s.id}">${esc(s.nombre)} — ${money(s.precio)}</option>`).join('');
+}
+function clienteElegido(){
+  const c = _clientes.find(x=>String(x.id)===document.getElementById('mp-cliente').value);
+  const hint = document.getElementById('mp-cli-hint');
+  if (!c) { hint.textContent = ''; return; }
+  if (!document.getElementById('mp-correo').value)   document.getElementById('mp-correo').value   = c.correo || '';
+  if (!document.getElementById('mp-atencion').value) document.getElementById('mp-atencion').value = c.contacto || '';
+  const falta = c.falta_fiscal || [];
+  hint.innerHTML = falta.length
+    ? `<span style="color:var(--ambar)">Para facturarle falta: ${esc(falta.join(', '))}. El presupuesto sí se puede emitir.</span>`
+    : '<span style="color:var(--verde)">Datos fiscales completos.</span>';
+}
+
+// ══════════ PRESUPUESTOS ══════════
+async function cargarPres(){
+  const cont = document.getElementById('pres-lista');
+  cont.innerHTML = '<div class="loading"><span class="spin"></span></div>';
+  const d = await get('PRES_LISTAR', {
+    estado: document.getElementById('f-estado').value,
+    q: document.getElementById('f-busca').value,
+  });
+  if (d.status !== 'ok') { cont.innerHTML = `<p class="empty">${esc(d.message||'Error.')}</p>`; return; }
+
+  const sel = document.getElementById('f-estado');
+  if (sel.options.length <= 1 && d.estados) {
+    sel.innerHTML = '<option value="">Todos los estados</option>' +
+      d.estados.map(e=>`<option value="${e}">${e.charAt(0)+e.slice(1).toLowerCase()}</option>`).join('');
+  }
+
+  const lista = d.presupuestos || [];
+  const n = e => lista.filter(p=>p.estado===e).length;
+  document.getElementById('s-borr').textContent = n('BORRADOR');
+  document.getElementById('s-env').textContent  = n('ENVIADO');
+  document.getElementById('s-acep').textContent = n('ACEPTADO');
+  document.getElementById('s-venc').textContent = lista.filter(p=>p.vencido).length;
+
+  if (!lista.length) {
+    cont.innerHTML = `<div class="empty"><div class="empty-t">Ningún presupuesto todavía</div>
+      <div class="empty-s">Da de alta un cliente y un par de servicios, y el primero sale en un minuto.</div></div>`;
+    return;
+  }
+
+  const color = {BORRADOR:'b-off', ENVIADO:'b-warn', ACEPTADO:'b-ok',
+                 RECHAZADO:'b-bad', FACTURADO:'b-ok', CANCELADO:'b-bad'};
+  cont.innerHTML = '<div class="cards">' + lista.map(p => `
+    <div class="card">
+      <div class="card-top">
+        <div class="card-ico">📄</div>
+        <div style="flex:1;min-width:0">
+          <div class="card-nombre">${esc(p.cliente_nombre)}</div>
+          <div class="card-sub">${esc(p.folio)} · ${esc(p.fecha)}</div>
+        </div>
+        <span class="badge ${color[p.estado]||'b-off'}">${esc(p.estado)}</span>
+      </div>
+      <div class="card-body">
+        <div style="font-size:19px;font-weight:700;color:var(--azul-dark)">${money(p.total)} <span style="font-size:12px;color:var(--texto-sub)">${esc(p.moneda)}</span></div>
+        <div class="chips" style="margin-top:8px">
+          <span class="chip">${p.partidas} partida(s)</span>
+          ${Number(p.propuestas) ? `<span class="chip">${p.propuestas} propuesta(s)</span>` : ''}
+          ${p.vencido ? '<span class="chip" style="color:var(--rojo)">Vencido el '+esc(p.vence_el)+'</span>'
+                      : '<span class="chip">Vence '+esc(p.vence_el)+'</span>'}
+          ${p.enviado_at ? '<span class="chip">Enviado</span>' : ''}
+        </div>
+      </div>
+      <div class="card-foot">
+        <button class="btn-sec" onclick="abrirPres(${p.id})">Abrir</button>
+        <button class="btn-sec" onclick="pdfPres(${p.id})">PDF</button>
+        <button class="btn-sec" onclick="generarPropuesta(${p.id})">✨ Propuesta</button>
+        <button class="btn-sec" onclick="enviarPres(${p.id},'${esc(p.cliente_correo||'')}')">Enviar</button>
+        ${p.estado!=='FACTURADO' ? `<button class="btn-sec" onclick="cambiarEstado(${p.id})">Estado</button>
+        <button class="btn-del" onclick="borrarPres(${p.id})">Eliminar</button>` : ''}
+      </div>
+    </div>`).join('') + '</div>';
+}
+
+// ── Editor de partidas ────────────────────────────────────
+// Las filas se dibujan sólo al agregar, quitar o cargar. Redibujarlas en cada
+// tecla mataría el cursor a media palabra; para los números basta con
+// actualizar el importe y los totales sin tocar el HTML de los campos.
+function renderPartidas(){
+  const tb = document.getElementById('mp-partidas');
+  if (!_partidas.length) {
+    tb.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--texto-hint);padding:18px">Sin partidas. Agrega una del catálogo o una partida libre.</td></tr>';
+    recalcular(); return;
+  }
+  tb.innerHTML = _partidas.map((d,i) => `
+    <tr data-i="${i}">
+      <td><input value="${esc(d.descripcion)}" oninput="campo(${i},'descripcion',this.value)"></td>
+      <td><input value="${esc(d.unidad)}" oninput="campo(${i},'unidad',this.value)"></td>
+      <td><input type="number" min="0" step="0.01" class="der" value="${d.cantidad}" oninput="campo(${i},'cantidad',this.value)"></td>
+      <td><input type="number" min="0" step="0.01" class="der" value="${d.precio_unitario}" oninput="campo(${i},'precio_unitario',this.value)"></td>
+      <td><input type="number" min="0" max="100" step="0.01" class="der" value="${d.descuento_pct}" oninput="campo(${i},'descuento_pct',this.value)"></td>
+      <td><input type="number" min="0" max="100" step="0.01" class="der" value="${d.tasa_iva}" oninput="campo(${i},'tasa_iva',this.value)"></td>
+      <td class="der" id="imp-${i}">${money(d.importe)}</td>
+      <td><button class="btn-x" onclick="quitarPartida(${i})" title="Quitar">×</button></td>
+    </tr>`).join('');
+  recalcular();
+}
+function campo(i, k, v){
+  _partidas[i][k] = (k==='descripcion'||k==='unidad') ? v : (parseFloat(v)||0);
+  recalcular();
+}
+function recalcular(){
+  let sub = 0;
+  _partidas.forEach((d,i) => {
+    d.importe = Math.round(d.cantidad * d.precio_unitario * (1 - d.descuento_pct/100) * 100)/100;
+    sub += d.importe;
+    const c = document.getElementById('imp-'+i);
+    if (c) c.textContent = money(d.importe);
+  });
+  sub = Math.round(sub*100)/100;
+  const descGlobal = Math.min(parseFloat(document.getElementById('mp-descuento').value)||0, sub);
+  const factor = sub > 0 ? (1 - descGlobal/sub) : 1;
+  let iva = 0;
+  _partidas.forEach(d => { iva += Math.round(d.importe * factor * (d.tasa_iva/100) * 100)/100; });
+  iva = Math.round(iva*100)/100;
+  document.getElementById('t-sub').textContent   = money(sub);
+  document.getElementById('t-iva').textContent   = money(iva);
+  document.getElementById('t-total').textContent = money(Math.round((sub - descGlobal + iva)*100)/100);
+}
+function agregarDelCatalogo(sel){
+  const s = _servicios.find(x=>String(x.id)===sel.value);
+  sel.value = '';
+  if (!s) return;
+  _partidas.push({
+    servicio_id: Number(s.id), clave: s.clave, descripcion: s.nombre,
+    alcance: s.alcance||'', normas: s.normas||'', unidad: s.unidad,
+    cantidad: 1, precio_unitario: Number(s.precio), descuento_pct: 0,
+    tasa_iva: Number(s.tasa_iva), importe: Number(s.precio),
+    clave_prodserv: s.clave_prodserv||'', clave_unidad: s.clave_unidad||'',
+  });
+  renderPartidas();
+}
+function agregarPartida(){
+  _partidas.push({servicio_id:null, clave:'', descripcion:'', alcance:'', normas:'',
+    unidad:'Servicio', cantidad:1, precio_unitario:0, descuento_pct:0, tasa_iva:16,
+    importe:0, clave_prodserv:'', clave_unidad:''});
+  renderPartidas();
+}
+function quitarPartida(i){ _partidas.splice(i,1); renderPartidas(); }
+
+// ── Alta / edición ────────────────────────────────────────
+async function abrirPres(id){
+  document.getElementById('mp-title').textContent = id ? 'Presupuesto' : 'Nuevo presupuesto';
+  document.getElementById('mp-id').value = id || '';
+  _partidas = [];
+
+  if (!id) {
+    document.getElementById('mp-cliente').value = '';
+    ['mp-atencion','mp-correo','mp-lugar','mp-condiciones','mp-notas'].forEach(k=>document.getElementById(k).value='');
+    document.getElementById('mp-fecha').value = new Date().toISOString().slice(0,10);
+    document.getElementById('mp-vigencia').value = 15;
+    document.getElementById('mp-descuento').value = 0;
+    document.getElementById('mp-cli-hint').textContent = '';
+    document.getElementById('mp-guardar').disabled = false;
+    renderPartidas(); abrir('m-pres'); return;
+  }
+
+  const d = await get('PRES_DETALLE', {id});
+  if (d.status !== 'ok') { toast(d.message||'No se pudo abrir.'); return; }
+  const p = d.presupuesto;
+  document.getElementById('mp-title').textContent = p.folio + ' · ' + p.estado;
+  document.getElementById('mp-cliente').value    = p.cliente_pres_id || '';
+  document.getElementById('mp-atencion').value   = p.atencion || '';
+  document.getElementById('mp-correo').value     = p.cliente_correo || '';
+  document.getElementById('mp-lugar').value      = p.lugar_servicio || '';
+  document.getElementById('mp-fecha').value      = p.fecha;
+  document.getElementById('mp-vigencia').value   = p.vigencia_dias;
+  document.getElementById('mp-descuento').value  = p.descuento;
+  document.getElementById('mp-condiciones').value= p.condiciones || '';
+  document.getElementById('mp-notas').value      = p.notas || '';
+  _partidas = (p.partidas||[]).map(d => ({
+    servicio_id: d.servicio_id ? Number(d.servicio_id) : null,
+    clave: d.clave||'', descripcion: d.descripcion, alcance: d.alcance||'', normas: d.normas||'',
+    unidad: d.unidad, cantidad: Number(d.cantidad), precio_unitario: Number(d.precio_unitario),
+    descuento_pct: Number(d.descuento_pct), tasa_iva: Number(d.tasa_iva),
+    importe: Number(d.importe), clave_prodserv: d.clave_prodserv||'', clave_unidad: d.clave_unidad||'',
+  }));
+  // Un presupuesto facturado sostiene un CFDI: se puede ver, no editar.
+  document.getElementById('mp-guardar').disabled = (p.estado === 'FACTURADO');
+  clienteElegido();
+  renderPartidas();
+  abrir('m-pres');
+}
+
+async function guardarPres(){
+  const btn = document.getElementById('mp-guardar');
+  btn.disabled = true;
+  const d = await post('PRES_GUARDAR', {
+    id: document.getElementById('mp-id').value || 0,
+    cliente_pres_id: document.getElementById('mp-cliente').value || 0,
+    atencion: document.getElementById('mp-atencion').value,
+    cliente_correo: document.getElementById('mp-correo').value,
+    lugar_servicio: document.getElementById('mp-lugar').value,
+    fecha: document.getElementById('mp-fecha').value,
+    vigencia_dias: document.getElementById('mp-vigencia').value,
+    descuento: document.getElementById('mp-descuento').value,
+    condiciones: document.getElementById('mp-condiciones').value,
+    notas: document.getElementById('mp-notas').value,
+    partidas: _partidas,
+  });
+  btn.disabled = false;
+  toast(d.message || 'Guardado.');
+  if (d.status === 'ok') { cerrar('m-pres'); cargarPres(); }
+}
+
+async function pdfPres(id){
+  toast('Generando PDF…');
+  const d = await post('PRES_PDF', {id});
+  if (d.status !== 'ok') { toast(d.message||'No se pudo generar.'); return; }
+  window.open(d.url, '_blank');
+}
+
+async function generarPropuesta(id){
+  if (!confirm('Se va a redactar la propuesta técnico-económica con IA.\n\nTarda entre 30 segundos y dos minutos. Las versiones anteriores se conservan.')) return;
+  toast('Redactando la propuesta… no cierres esta pestaña.');
+  const d = await post('PRES_GENERAR_PROPUESTA', {id});
+  if (d.status !== 'ok') { toast(d.message || 'No se pudo generar.'); return; }
+  toast('Propuesta lista.');
+  window.open(d.url, '_blank');
+  cargarPres();
+}
+
+async function enviarPres(id, correoSug){
+  const correo = prompt('Enviar el presupuesto y la última propuesta a:', correoSug || '');
+  if (correo === null) return;
+  toast('Enviando…');
+  const d = await post('PRES_ENVIAR', {id, correo, incluir_propuesta: 1});
+  toast(d.message || 'Listo.');
+  if (d.status === 'ok') cargarPres();
+}
+
+async function cambiarEstado(id){
+  const e = prompt('Nuevo estado: BORRADOR, ENVIADO, ACEPTADO, RECHAZADO o CANCELADO');
+  if (!e) return;
+  const d = await post('PRES_ESTADO', {id, estado: e.toUpperCase().trim()});
+  toast(d.message || 'Listo.');
+  if (d.status === 'ok') cargarPres();
+}
+
+async function borrarPres(id){
+  if (!confirm('¿Eliminar este presupuesto y sus propuestas?')) return;
+  const d = await post('PRES_ELIMINAR', {id});
+  toast(d.message || 'Listo.');
+  if (d.status === 'ok') cargarPres();
+}
+
+// ══════════ ARRANQUE ══════════
+document.querySelectorAll('.overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
+});
+(async () => {
+  await cargarCfg();
+  await cargarServ();
+  await cargarCli();
+  await cargarPres();
+})();
+</script>
+</body>
+</html>
