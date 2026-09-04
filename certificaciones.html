@@ -3104,6 +3104,8 @@ function renderCursosCert(grupos) {
         <button class="btn-ver" style="font-size:11px;background:#e8f0ff;border-color:#1a5fd6;color:#0d3a8f"
                 onclick="prevCredencialesLote(${i})">🪪 Credenciales</button>
         <button class="btn-ver" style="font-size:11px;background:#fff8e1;border-color:#c8a000;color:#7a5900"
+                onclick="listaAsistenciaSesion(${i})">📋 Asistencia</button>
+        <button class="btn-ver" style="font-size:11px;background:#fff8e1;border-color:#c8a000;color:#7a5900"
                 onclick="imprimirLoteDocPersonal(${i},'dc3')">🖨 DC-3</button>
         <button class="btn-ver" style="font-size:11px;background:#fff8e1;border-color:#c8a000;color:#7a5900"
                 onclick="imprimirLoteDocPersonal(${i},'diploma')">🖨 Diploma</button>
@@ -3133,6 +3135,14 @@ function abrirCursoCert(idx) {
               onclick="cerrarPcDet();abrirEnviarSesionPer(${idx},'diploma')">Diploma</button>
       <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
               onclick="cerrarPcDet();abrirEnviarSesionPer(${idx},'certificado')">Cert</button>
+    </div>
+    <div style="padding:10px 0 12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;border-bottom:2px solid var(--borde);margin-bottom:4px">
+      <span style="font-size:12px;color:var(--texto-sub);margin-right:4px">Lista de asistencia:</span>
+      <button class="btn-ver" style="font-size:11px" onclick="marcarAsistencia(true)">Todos</button>
+      <button class="btn-ver" style="font-size:11px" onclick="marcarAsistencia(false)">Ninguno</button>
+      <button class="btn-ver" style="font-size:11px;background:#fff8e1;border-color:#c8a000;color:#7a5900"
+              onclick="listaAsistenciaSel()">📋 Generar lista</button>
+      <span id="asis-cuenta" style="font-size:11px;color:var(--texto-hint)"></span>
     </div>`;
 
   let html = g.participantes.map(p => {
@@ -3140,9 +3150,13 @@ function abrirCursoCert(idx) {
     return `
     <div style="padding:12px 0;border-bottom:1px solid var(--borde)">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
-        <div>
-          <div style="font-weight:600;font-size:13px">${escH(p.nombre_completo||'—')}</div>
-          <div style="font-size:11px;color:var(--texto-hint);margin-top:2px">${escH(p.curp||'')} ${p.ocupacion_nombre ? '· ' + escH(p.ocupacion_nombre) : ''}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <input type="checkbox" class="asis-chk" value="${p.id}" checked
+                 onchange="contarAsistencia()" style="width:16px;height:16px;cursor:pointer;flex:none">
+          <div>
+            <div style="font-weight:600;font-size:13px">${escH(p.nombre_completo||'—')}</div>
+            <div style="font-size:11px;color:var(--texto-hint);margin-top:2px">${escH(p.curp||'')} ${p.ocupacion_nombre ? '· ' + escH(p.ocupacion_nombre) : ''}</div>
+          </div>
         </div>
         ${emitido ? `<span class="badge b-env" style="font-size:10px">Emitido</span>` :
                     `<span class="badge b-apro" style="font-size:10px">Aprobado</span>`}
@@ -3190,6 +3204,53 @@ function abrirCursoCert(idx) {
   if (!html) html = `<div style="text-align:center;padding:24px;color:var(--texto-hint)">Sin participantes.</div>`;
   document.getElementById('pc-det-body').innerHTML = btnEnvio + html;
   document.getElementById('overlay-pc-det').classList.add('open');
+  contarAsistencia();
+}
+
+// ── Lista de asistencia ───────────────────────────────────────
+function marcarAsistencia(valor) {
+  document.querySelectorAll('.asis-chk').forEach(c => { c.checked = valor; });
+  contarAsistencia();
+}
+
+function contarAsistencia() {
+  const cont = document.getElementById('asis-cuenta');
+  if (!cont) return;
+  const n = document.querySelectorAll('.asis-chk:checked').length;
+  const t = document.querySelectorAll('.asis-chk').length;
+  cont.textContent = `${n} de ${t} seleccionado${n !== 1 ? 's' : ''}`;
+}
+
+// Desde el renglón de la sesión: la lista completa, sin abrir el detalle.
+async function listaAsistenciaSesion(idx) {
+  const g = window._cursosCertGrupos?.[idx];
+  if (!g) return;
+  await _listaAsistencia(g.participantes.map(p => p.id));
+}
+
+async function listaAsistenciaSel() {
+  const ids = [...document.querySelectorAll('.asis-chk:checked')].map(c => Number(c.value));
+  if (!ids.length) { mostrarToast('Selecciona al menos un participante.', 'err'); return; }
+  await _listaAsistencia(ids);
+}
+
+async function _listaAsistencia(ids) {
+  if (!ids.length) { mostrarToast('No hay participantes en esta sesión.', 'err'); return; }
+  mostrarToast(`Generando lista (${ids.length} participante${ids.length !== 1 ? 's' : ''})…`, 'info');
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'LISTA_ASISTENCIA_PERSONAL', payload: { ids } })
+    });
+    const data = await res.json();
+    if (data.status === 'success' && data.url) {
+      _pdfAbrir(data.url, 'Lista de asistencia');
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo generar'), 'err');
+    }
+  } catch(e) { mostrarToast('Error de conexión', 'err'); }
 }
 
 function cerrarPcDet() {

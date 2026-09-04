@@ -1761,6 +1761,11 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($personal->subirDocumentoManualPersonal($_POST, $_FILES['archivo'] ?? [], $usr['usuario']));
 
+        case 'LISTA_ASISTENCIA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CERTIFICACIONES','ADMIN'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($personal->listaAsistencia($payload, $usr['usuario']));
+
         case 'GENERAR_CREDENCIALES_LOTE':
             $usr = validarToken($pdo, $token);
             if (!$usr || $usr['rol'] !== 'CERTIFICACIONES') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

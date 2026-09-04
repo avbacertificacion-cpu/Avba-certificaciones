@@ -1675,6 +1675,163 @@ class Personal {
         return ['status' => 'success', 'message' => ucfirst($tipo) . ' reemplazado correctamente.', 'url' => $rel];
     }
 
+    /**
+     * Lista de asistencia de una sesión, con los participantes que se elijan.
+     *
+     * No es un documento acreditable y no pretende serlo: sirve para cotejar
+     * quién estuvo, y por eso lleva columna de firma. Lo que sí lleva es
+     * membrete de AVBA y el registro de quién la generó y cuándo, porque una
+     * hoja suelta sin origen no comprueba nada.
+     *
+     * A diferencia de las constancias, aquí no se exige que el participante
+     * esté aprobado por Calidad: la asistencia es un hecho del día del curso y
+     * ocurre antes de que Calidad revise nada.
+     */
+    public function listaAsistencia(array $payload, string $usuario): array {
+        $ids = array_values(array_filter(array_map('intval', $payload['ids'] ?? []), fn($v) => $v > 0));
+        if (!$ids) return ['status' => 'error', 'message' => 'No seleccionaste participantes.'];
+        if (count($ids) > 200) return ['status' => 'error', 'message' => 'Demasiados participantes en una sola lista.'];
+
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT p.id, p.nombre_completo, p.curp, p.puesto, p.empresa_nombre,
+                        p.fecha_curso, p.control,
+                        c.nombre AS curso_nombre, c.duracion_horas, c.area_tematica,
+                        o.nombre AS ocupacion_nombre
+                   FROM participantes_cursos p
+                   LEFT JOIN cursos c ON c.id = p.curso_id
+                   LEFT JOIN ocupaciones_especificas o ON o.id = p.ocupacion_id
+                  WHERE p.id IN ($marcas)
+                  ORDER BY p.nombre_completo"
+            );
+            $st->execute($ids);
+            $filas = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) {
+            error_log('[Personal] listaAsistencia: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudieron leer los participantes.'];
+        }
+        if (!$filas) return ['status' => 'error', 'message' => 'No se encontraron esos participantes.'];
+
+        $folio = 'LA-' . date('Ymd-His');
+        $html  = $this->htmlListaAsistencia($filas, $usuario, $folio);
+
+        try {
+            $url = $this->htmlToPdfMpdf($html, $folio, 'ASIST', 'Letter');
+        } catch (\Throwable $e) {
+            error_log('[Personal] listaAsistencia pdf: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'Error generando el PDF: ' . $e->getMessage()];
+        }
+        return ['status' => 'success', 'url' => $url, 'total' => count($filas)];
+    }
+
+    /** El documento en sí. Separado para poder revisarlo sin generar el PDF. */
+    private function htmlListaAsistencia(array $filas, string $usuario, string $folio): string {
+        // El encabezado sale de lo que TODOS comparten. Si en la selección hay
+        // dos cursos o dos fechas, decirlo es más honesto que imprimir el del
+        // primero y que la hoja afirme algo que no es.
+        $comun = function (string $col) use ($filas): string {
+            $v = array_values(array_unique(array_map(
+                fn($f) => trim((string)($f[$col] ?? '')), $filas
+            )));
+            $v = array_values(array_filter($v, fn($x) => $x !== ''));
+            if (!$v)              return '—';
+            if (count($v) === 1)  return $v[0];
+            return 'Varios (' . count($v) . ')';
+        };
+
+        $esc     = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+        $curso   = $esc($comun('curso_nombre'));
+        $empresa = $esc($comun('empresa_nombre'));
+        $area    = $esc($comun('area_tematica'));
+
+        $fechaCruda = $comun('fecha_curso');
+        $fechaTxt   = ($fechaCruda !== '—' && !str_starts_with($fechaCruda, 'Varios'))
+            ? date('d/m/Y', strtotime($fechaCruda)) : $fechaCruda;
+
+        $horas    = $comun('duracion_horas');
+        $horasTxt = (is_numeric($horas) && (float)$horas > 0) ? rtrim(rtrim(number_format((float)$horas, 1, '.', ''), '0'), '.') . ' h' : '—';
+
+        $logoB64 = $this->assetB64('logos/avba.png');
+        $logoImg = $logoB64 ? "<img src=\"{$logoB64}\" style=\"height:52px;width:auto;\">" : '<b>AVBA</b>';
+        $acred   = $esc(defined('NO_ACREDITACION') ? NO_ACREDITACION : 'UVNMX 057');
+        $emitida = date('d/m/Y H:i');
+        $quien   = $esc($usuario !== '' ? $usuario : '—');
+        $total   = count($filas);
+
+        $renglones = '';
+        foreach ($filas as $i => $f) {
+            $puesto = trim((string)($f['ocupacion_nombre'] ?? '')) ?: trim((string)($f['puesto'] ?? ''));
+            $renglones .= '<tr>'
+                . '<td class="c">' . ($i + 1) . '</td>'
+                . '<td>' . $esc(mb_strtoupper(trim((string)$f['nombre_completo']), 'UTF-8')) . '</td>'
+                . '<td class="c mono">' . $esc(mb_strtoupper(trim((string)($f['curp'] ?? '')), 'UTF-8') ?: '—') . '</td>'
+                . '<td>' . $esc($puesto ?: '—') . '</td>'
+                . '<td class="firma"></td>'
+                . '</tr>';
+        }
+
+        $html = <<<HTML
+<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><style>
+@page { margin: 14mm 12mm; }
+* { margin:0; padding:0; }
+body { font-family: dejavusans, Arial, sans-serif; font-size: 9pt; color:#12263f; }
+.hdr { border-bottom: 2.5pt solid #0d3a8f; padding-bottom: 5mm; margin-bottom: 5mm; }
+.hdr td { vertical-align: middle; }
+.tit { font-size: 15pt; font-weight: bold; color:#0d3a8f; letter-spacing:.5px; }
+.sub { font-size: 7.5pt; color:#5a7291; margin-top:1mm; }
+.datos { width:100%; border-collapse:collapse; margin-bottom:4mm; }
+.datos td { padding:1.6mm 2mm; font-size:8.5pt; border:0.4pt solid #cfdaea; }
+.datos .et { background:#eef3fa; font-weight:bold; color:#0d3a8f; width:20%; }
+table.lista { width:100%; border-collapse:collapse; }
+table.lista th { background:#0d3a8f; color:#fff; font-size:8pt; padding:2.2mm 1.5mm;
+                 border:0.4pt solid #0d3a8f; text-align:left; }
+/* El renglón va holgado a propósito: en esta hoja se firma a mano. */
+table.lista td { border:0.4pt solid #b9c9de; padding:4.2mm 1.5mm; font-size:8.5pt; }
+table.lista tr:nth-child(even) td { background:#f6f9fd; }
+.c { text-align:center; }
+.mono { font-size:7.5pt; letter-spacing:.2px; }
+.firma { border-bottom:0.4pt solid #7f93ad !important; }
+.pie { margin-top:7mm; font-size:7pt; color:#5a7291; border-top:0.6pt solid #cfdaea; padding-top:3mm; }
+.aviso { margin-top:2mm; font-size:6.8pt; color:#7a8ca3; }
+</style></head><body>
+
+<table class="hdr" width="100%"><tr>
+  <td width="26%">{$logoImg}</td>
+  <td style="text-align:right">
+    <div class="tit">LISTA DE ASISTENCIA</div>
+    <div class="sub">AVBA INSPECTIONS &middot; Unidad de Verificación {$acred}</div>
+    <div class="sub">Folio {$folio}</div>
+  </td>
+</tr></table>
+
+<table class="datos">
+  <tr><td class="et">Curso</td><td colspan="3">{$curso}</td></tr>
+  <tr><td class="et">Empresa</td><td width="46%">{$empresa}</td>
+      <td class="et" width="14%">Fecha</td><td>{$fechaTxt}</td></tr>
+  <tr><td class="et">Área temática</td><td>{$area}</td>
+      <td class="et">Duración</td><td>{$horasTxt}</td></tr>
+</table>
+
+<table class="lista">
+  <tr><th width="6%" class="c">#</th><th width="36%">Nombre</th>
+      <th width="19%" class="c">CURP</th><th width="18%">Puesto / ocupación</th>
+      <th width="21%">Firma</th></tr>
+  {$renglones}
+</table>
+
+<div class="pie">
+  {$total} participante(s) en la lista. Generada por <b>{$quien}</b> el {$emitida}.
+  <div class="aviso">Documento de control interno para comprobación de asistencia.
+    No sustituye la constancia DC-3 ni ningún documento acreditable.</div>
+</div>
+
+</body></html>
+HTML;
+
+        return $html;
+    }
+
     public function generarCredencialesLote(array $payload, string $usuario): array {
         $ids = array_filter(array_map('intval', $payload['ids'] ?? []), fn($v) => $v > 0);
         if (!$ids) return ['status' => 'error', 'message' => 'Sin participantes.'];
