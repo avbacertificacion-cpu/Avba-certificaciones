@@ -127,8 +127,25 @@ $optUnidad  = opcionesCatalogo(catClaveUnidad());
     .ver-sat .col-sat{display:table-cell}
     /* Con tantas columnas, la tabla se desborda y se recorre en horizontal:
        si se dejara encoger, las cifras del negocio quedan ilegibles. */
-    .items{min-width:1040px}
-    .items.ver-sat{min-width:1400px}
+    .items{min-width:1074px}
+    .items.ver-sat{min-width:1434px}
+    .items td.sel,.items th:first-child{text-align:center}
+    .items .i-sel{width:auto;cursor:pointer}
+    /* Una partida fuera de la selección se atenúa, pero sigue ahí: la
+       cotización se guarda y se imprime completa. */
+    .items tr.fuera{opacity:.4}
+    .sel-bar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;background:#f1f5fb;
+             border:2px solid #dbe3f7;border-radius:10px;padding:9px 12px;margin-bottom:10px}
+    .sel-bar .sel-et{font-size:12px;font-weight:700;color:#475569}
+    /* width:auto para que no herede el 100% de los selects del formulario
+       y quepa en la misma línea que el rótulo y los botones. */
+    .sel-bar select{width:auto;min-width:210px;max-width:330px;padding:8px 10px;
+                    border:2px solid #e0e0ff;border-radius:8px;font-size:13px;background:#fff}
+    .sel-bar select:focus{outline:none;border-color:#667eea}
+    .sel-info{font-size:12px;color:#64748b}
+    .tot-cab{font-size:12px;font-weight:700;color:#92400e;background:#fef3c7;border-radius:8px 8px 0 0;
+             padding:8px 12px;margin-top:6px;display:none}
+    .tot-cab.visible{display:block}
     @media(max-width:800px){ .grid4,.grid2{grid-template-columns:1fr} }
 
 </style>
@@ -244,9 +261,22 @@ $optUnidad  = opcionesCatalogo(catClaveUnidad());
 
         <div class="fg">
             <label>Partidas</label>
+
+            <div class="sel-bar">
+                <span class="sel-et">Ver totales de</span>
+                <select id="k-filtroProv" onchange="filtrarPorProveedor()">
+                    <option value="">Todas las partidas</option>
+                </select>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="marcarTodas(true)">Marcar todas</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="marcarTodas(false)">Ninguna</button>
+                <span class="sel-info" id="sel-info"></span>
+            </div>
+
             <div style="overflow-x:auto">
             <table class="items">
                 <thead><tr>
+                    <th style="width:34px" title="Partidas incluidas en los totales">
+                        <input type="checkbox" id="selTodas" onclick="marcarTodas(this.checked)" checked></th>
                     <th style="min-width:135px">Proveedor (a quién se lo pedí)</th>
                     <th style="min-width:150px">Producto del proveedor</th>
                     <th style="min-width:165px">Descripción para el cliente</th>
@@ -272,6 +302,7 @@ $optUnidad  = opcionesCatalogo(catClaveUnidad());
             </div>
         </div>
 
+        <div class="tot-cab" id="tot-cab"></div>
         <div class="tot">
             <div><span>Costo total</span><b id="t-costo">$0.00</b></div>
             <div><span>Subtotal (sin IVA)</span><b id="t-venta">$0.00</b></div>
@@ -434,6 +465,7 @@ function nueva() {
     ponerFiscales({});
     document.getElementById('k-pct').value = pctPorDefecto();
     document.getElementById('items').innerHTML = '';
+    document.getElementById('k-filtroProv').value = '';
     document.getElementById('btnImprimir').style.display = 'none';
     document.getElementById('btnInterna').style.display = 'none';
     document.getElementById('btnDocs').style.display = 'none';
@@ -465,6 +497,7 @@ async function editar(id) {
     document.getElementById('btnDocs').style.display = '';
 
     document.getElementById('items').innerHTML = '';
+    document.getElementById('k-filtroProv').value = '';
     (c.items || []).forEach(it => agregarFila(it));
     if (!(c.items || []).length) agregarFila();
     aplicarPorcentaje();   // pinta la nota; los precios guardados quedan intactos
@@ -512,6 +545,7 @@ function agregarFila(it) {
     const opts = '<option value="">—</option>' +
         proveedores.map(p => `<option value="${p.id}"${String(p.id) === String(it.proveedor_id || '') ? ' selected' : ''}>${esc(p.nombre)}</option>`).join('');
     tr.innerHTML = `
+        <td class="sel"><input type="checkbox" class="i-sel" checked onchange="recalcular()"></td>
         <td><select class="i-prov" onchange="cambioProveedor(this)">${opts}</select></td>
         <td><select class="i-cat" onchange="desdeCatalogo(this)"></select></td>
         <td><input type="text" class="i-desc" value="${esc(it.descripcion || '')}" placeholder="Ej: Recarga extintor PQS 9 kg"></td>
@@ -530,7 +564,7 @@ function agregarFila(it) {
         </td>
         <td class="col-dinero ro i-importe">$0.00</td>
         <td class="ro i-util">$0.00</td>
-        <td><button type="button" class="del" onclick="this.closest('tr').remove();recalcular()">✕</button></td>`;
+        <td><button type="button" class="del" onclick="quitarFila(this)">✕</button></td>`;
     document.getElementById('items').appendChild(tr);
 
     // Una partida que ya traía precio guardado se respeta tal cual
@@ -540,6 +574,7 @@ function agregarFila(it) {
     // Si la partida vino del catálogo, se deja seleccionado su producto
     if (it.catalogo_id) tr.querySelector('.i-cat').value = it.catalogo_id;
     aplicarPorcentajeFila(tr);   // una partida nueva ya nace con su precio calculado
+    refrescarFiltroProveedores();
     recalcular();
 }
 
@@ -567,6 +602,7 @@ function llenarProductos(tr) {
 
 function cambioProveedor(sel) {
     llenarProductos(sel.closest('tr'));
+    refrescarFiltroProveedores();
 }
 
 /** Al elegir un producto se traen su descripción, unidad y costo del proveedor. */
@@ -653,6 +689,54 @@ function aplicarPorcentaje(forzar) {
     recalcular();
 }
 
+// ── Aislar partidas para ver sus totales ────────────────────────────────────
+// Es sólo una lupa: la cotización se guarda y se imprime completa, sin importar
+// qué esté marcado. Sirve para responder "¿cuánto de esto es del proveedor X?"
+
+/** Rellena el filtro con los proveedores que de verdad aparecen en las partidas. */
+function refrescarFiltroProveedores() {
+    const sel = document.getElementById('k-filtroProv');
+    const previo = sel.value;
+    const usados = new Map();
+    let hayLibres = false;
+    document.querySelectorAll('#items tr').forEach(tr => {
+        const id = tr.querySelector('.i-prov').value;
+        if (!id) { hayLibres = true; return; }
+        const p = proveedores.find(x => String(x.id) === id);
+        if (p) usados.set(String(p.id), p.nombre);
+    });
+
+    sel.innerHTML = '<option value="">Todas las partidas</option>'
+        + [...usados].map(([id, nom]) => `<option value="${id}">${esc(nom)}</option>`).join('')
+        + (hayLibres ? '<option value="__sin">— Sin proveedor —</option>' : '');
+    // Si el proveedor que estaba elegido sigue estando, se conserva
+    sel.value = [...sel.options].some(o => o.value === previo) ? previo : '';
+}
+
+/** Marca sólo las partidas del proveedor elegido (o todas). */
+function filtrarPorProveedor() {
+    const elegido = document.getElementById('k-filtroProv').value;
+    document.querySelectorAll('#items tr').forEach(tr => {
+        const prov = tr.querySelector('.i-prov').value;
+        const entra = !elegido || (elegido === '__sin' ? !prov : prov === elegido);
+        tr.querySelector('.i-sel').checked = entra;
+    });
+    recalcular();
+}
+
+function marcarTodas(marcar) {
+    document.querySelectorAll('#items .i-sel').forEach(c => { c.checked = marcar; });
+    // Marcar a mano deja de corresponder a un proveedor concreto
+    document.getElementById('k-filtroProv').value = '';
+    recalcular();
+}
+
+function quitarFila(btn) {
+    btn.closest('tr').remove();
+    refrescarFiltroProveedores();
+    recalcular();
+}
+
 function leerItems() {
     return Array.from(document.querySelectorAll('#items tr')).map(tr => ({
         descripcion:     tr.querySelector('.i-desc').value.trim(),
@@ -670,15 +754,24 @@ function leerItems() {
 }
 
 function recalcular() {
-    let costo = 0, venta = 0, iva = 0;
+    let costo = 0, venta = 0, iva = 0;          // sólo lo marcado
+    let ventaTodo = 0, filas = 0, marcadas = 0; // el total real de la cotización
     document.querySelectorAll('#items tr').forEach(tr => {
         const cant = parseFloat(tr.querySelector('.i-cant').value) || 0;
         const cu   = parseFloat(tr.querySelector('.i-costo').value) || 0;
         const pu   = parseFloat(tr.querySelector('.i-precio').value) || 0;
         const sc = cant * cu, sv = cant * pu, u = sv - sc;
-        costo += sc; venta += sv;
-        // El IVA no es ingreso: se suma aparte y nunca entra en la utilidad
-        iva += sv * ((parseFloat(tr.querySelector('.i-iva').value) || 0) / 100);
+
+        filas++;
+        ventaTodo += sv;
+        const dentro = tr.querySelector('.i-sel').checked;
+        tr.classList.toggle('fuera', !dentro);
+        if (dentro) {
+            marcadas++;
+            costo += sc; venta += sv;
+            // El IVA no es ingreso: se suma aparte y nunca entra en la utilidad
+            iva += sv * ((parseFloat(tr.querySelector('.i-iva').value) || 0) / 100);
+        }
         const eUtil = tr.querySelector('.i-util'), ePct = tr.querySelector('.i-pct');
         tr.querySelector('.i-importe').textContent = money(sv);
         eUtil.textContent = money(u);
@@ -697,6 +790,20 @@ function recalcular() {
     document.getElementById('t-ganancia').textContent = (costo > 0 ? (util / costo * 100).toFixed(1) : '0.0') + '%';
     document.getElementById('t-iva').textContent   = money(iva);
     document.getElementById('t-total').textContent = money(venta + iva);
+
+    // Aviso cuando lo que se ve no es la cotización completa
+    const cab = document.getElementById('tot-cab');
+    const parcial = marcadas !== filas;
+    cab.classList.toggle('visible', parcial);
+    if (parcial) {
+        const prov = document.getElementById('k-filtroProv');
+        const de = prov.value ? ` (${esc(prov.options[prov.selectedIndex].text)})` : '';
+        cab.textContent = `Totales de ${marcadas} de ${filas} partidas${de}. `
+            + `La cotización completa suma ${money(ventaTodo)} sin IVA y se guarda e imprime entera.`;
+    }
+    document.getElementById('selTodas').checked = filas > 0 && marcadas === filas;
+    document.getElementById('sel-info').textContent =
+        filas ? `${marcadas} de ${filas} partidas incluidas` : '';
 }
 
 async function guardarCot() {
