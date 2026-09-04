@@ -87,7 +87,6 @@ body{
 .e-publico{background:#E7F3E8;color:#2C6B33}
 .e-acceso{background:var(--azul-light);color:var(--azul-dark)}
 .e-pronto{background:#F1F1F4;color:#7A7F8C}
-.e-externo{background:#FAEEDA;color:#854F0B}
 .ir{font-size:13px;font-weight:700;color:var(--azul)}
 .tile:hover .ir{color:var(--oro)}
 
@@ -161,9 +160,6 @@ body{
      · acceso  → pide credenciales
      · pronto  → todavía no existe; se muestra apagada y sin enlace, porque
                  un enlace a una página que no está es peor que no ponerla.
-     · externo → no es nuestra: es el sitio de un proveedor. Se marca como tal
-                 y abre en otra pestaña, para que nadie la confunda con un
-                 sistema de AVBA ni pierda lo que tenía abierto.
    ═══════════════════════════════════════════════════════════ */
 const PLATAFORMAS = [
   {
@@ -199,14 +195,6 @@ const PLATAFORMAS = [
     icono:  '<path d="M9 8h6v13H9z"/><path d="M12 8V5"/><path d="M12 5h3.5a1.5 1.5 0 010 3H14"/><path d="M9 12h6"/>',
   },
   {
-    titulo: 'Facturación electrónica',
-    url:    'https://sifo.com.mx/facturacion-electronica.php',
-    urlTxt: 'sifo.com.mx',
-    estado: 'externo',
-    desc:   'Emisión y consulta de comprobantes fiscales en SIFO, nuestro proveedor de facturación.',
-    icono:  '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9.5 8h5M9.5 12h5M9.5 16h3"/>',
-  },
-  {
     titulo: 'Venta de Grúas',
     url:    'ventagruas/',
     urlTxt: 'gestion.avba.com.mx · ventagruas',
@@ -220,20 +208,16 @@ const ETIQUETA = {
   publico: ['e-publico', 'Público'],
   acceso:  ['e-acceso',  'Requiere acceso'],
   pronto:  ['e-pronto',  'Próximamente'],
-  externo: ['e-externo', 'Proveedor externo'],
 };
 
 function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 document.getElementById('grid').innerHTML = PLATAFORMAS.map(p => {
   const [cls, txt] = ETIQUETA[p.estado] || ETIQUETA.acceso;
-  const pronto  = p.estado === 'pronto';
-  const externo = p.estado === 'externo';
+  const pronto = p.estado === 'pronto';
   // Sin href cuando no está publicada: así no se puede pulsar ni el teclado la
   // enfoca, en vez de llevar a una página que no existe.
-  const abre = pronto
-    ? '<div class="tile pronto">'
-    : `<a class="tile" href="${esc(p.url)}"${externo ? ' target="_blank" rel="noopener noreferrer"' : ''}>`;
+  const abre = pronto ? '<div class="tile pronto">' : `<a class="tile" href="${esc(p.url)}">`;
   const cierra = pronto ? '</div>' : '</a>';
   return `${abre}
     <div class="tile-top">
@@ -247,7 +231,7 @@ document.getElementById('grid').innerHTML = PLATAFORMAS.map(p => {
     <p>${esc(p.desc)}</p>
     <div class="tile-pie">
       <span class="etq ${cls}">${txt}</span>
-      ${pronto ? '' : `<span class="ir">${externo ? 'Abrir ↗' : 'Entrar →'}</span>`}
+      ${pronto ? '' : '<span class="ir">Entrar →</span>'}
     </div>
   ${cierra}`;
 }).join('');
