@@ -55,7 +55,43 @@ $nombre = $_SESSION['nombre'];
     .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:8px}
     .empty{text-align:center;padding:50px 20px;color:#94a3b8}.empty .ic{font-size:52px;margin-bottom:10px}
     .msg{font-size:13px;font-weight:600;margin-bottom:12px}
-    @media(max-width:700px){ .row2{grid-template-columns:1fr} }
+    /* La tabla nunca debe estirar la página: si no cabe, se recorre dentro
+       de su tarjeta. Sin esto el teléfono aleja el zoom y todo queda diminuto. */
+    .tabla-env{overflow-x:auto}
+
+    @media(max-width:760px){
+        .row2{grid-template-columns:1fr}
+        .container{padding:16px 12px}
+        h2{font-size:20px}
+        .toolbar{flex-direction:column;align-items:stretch}
+        .toolbar input,.toolbar select,.toolbar .btn{width:100%}
+
+        /* Cada renglón se lee como una ficha: el encabezado de la tabla
+           desaparece y cada dato lleva su rótulo al lado. */
+        .tabla-env{overflow-x:visible}
+        .tabla thead{display:none}
+        .tabla,.tabla tbody,.tabla tr,.tabla td{display:block;width:100%}
+        .tabla tr{border:1px solid #e6ecf8;border-radius:12px;padding:10px 13px;margin-bottom:11px;background:#fff}
+        .tabla td{border:none;padding:6px 0;display:flex;justify-content:space-between;
+                  align-items:baseline;gap:14px;text-align:right}
+        .tabla td::before{content:attr(data-et);font-size:11px;font-weight:700;color:#64748b;
+                          text-transform:uppercase;text-align:left;flex-shrink:0}
+        .tabla td.td-titulo{font-weight:700;font-size:15px;padding-bottom:9px;margin-bottom:4px;
+                            border-bottom:1px solid #f1f5f9;display:block;text-align:left}
+        .tabla td.td-titulo::before{display:block;margin-bottom:3px}
+        .tabla td.acciones{justify-content:flex-end;gap:8px;padding-top:10px;margin-top:5px;
+                           border-top:1px solid #f1f5f9}
+        .tabla td.acciones::before{display:none}
+        .tabla td.acciones .btn{flex:1;text-align:center;padding:10px}
+        /* Un emoji suelto en un botón ancho no dice qué hace: en el teléfono
+           se le añade la palabra. */
+        .tabla td.acciones .btn-warning::after{content:' Editar'}
+        .tabla td.acciones .btn-danger::after{content:' Eliminar'}
+
+        /* Los formularios ocupan la pantalla completa: más sitio para escribir */
+        .modal-ov{padding:0;align-items:stretch}
+        .modal{border-radius:0;min-height:100vh;max-width:none;padding:18px 14px}
+    }
 </style>
 </head>
 <body>
@@ -176,18 +212,18 @@ function renderProv() {
     const data = proveedores.filter(p => !q || (p.nombre + ' ' + (p.contacto||'')).toLowerCase().includes(q));
     const c = document.getElementById('tablaProv');
     if (!data.length) { c.innerHTML = '<div class="empty"><div class="ic">🏭</div><p>Sin proveedores todavía.</p></div>'; return; }
-    c.innerHTML = `<table>
+    c.innerHTML = `<div class="tabla-env"><table class="tabla">
         <thead><tr><th>Proveedor</th><th>Contacto</th><th>Teléfono</th><th>Email</th><th class="n">Precios</th><th></th></tr></thead>
         <tbody>${data.map(p => `<tr>
-            <td style="font-weight:600">${esc(p.nombre)}</td>
-            <td>${esc(p.contacto || '—')}</td>
-            <td>${esc(p.telefono || '—')}</td>
-            <td>${esc(p.email || '—')}</td>
-            <td class="n">${p.productos}</td>
-            <td style="white-space:nowrap;text-align:right">
+            <td data-et="Proveedor" class="td-titulo">${esc(p.nombre)}</td>
+            <td data-et="Contacto">${esc(p.contacto || '—')}</td>
+            <td data-et="Teléfono">${esc(p.telefono || '—')}</td>
+            <td data-et="Email">${esc(p.email || '—')}</td>
+            <td data-et="Precios" class="n">${p.productos}</td>
+            <td class="acciones">
                 <button class="btn btn-warning btn-sm" onclick='editarProv(${JSON.stringify(p)})'>✏️</button>
                 <button class="btn btn-danger btn-sm" onclick="borrarProv(${p.id})">🗑️</button>
-            </td></tr>`).join('')}</tbody></table>`;
+            </td></tr>`).join('')}</tbody></table></div>`;
 }
 
 function abrirProv() {
@@ -239,17 +275,17 @@ function renderCat() {
         (!fp || String(c.proveedor_id) === fp));
     const cont = document.getElementById('tablaCat');
     if (!data.length) { cont.innerHTML = '<div class="empty"><div class="ic">🏷️</div><p>Sin precios registrados.</p></div>'; return; }
-    cont.innerHTML = `<table>
+    cont.innerHTML = `<div class="tabla-env"><table class="tabla">
         <thead><tr><th>Descripción</th><th>Proveedor</th><th>Unidad</th><th class="n">Costo</th><th></th></tr></thead>
         <tbody>${data.map(c => `<tr>
-            <td style="font-weight:600">${esc(c.descripcion)}</td>
-            <td>${esc(c.proveedor_nombre || '—')}</td>
-            <td>${esc(c.unidad || '—')}</td>
-            <td class="n" style="font-weight:700">${money(c.costo)}</td>
-            <td style="white-space:nowrap;text-align:right">
+            <td data-et="Descripción" class="td-titulo">${esc(c.descripcion)}</td>
+            <td data-et="Proveedor">${esc(c.proveedor_nombre || '—')}</td>
+            <td data-et="Unidad">${esc(c.unidad || '—')}</td>
+            <td data-et="Costo" class="n" style="font-weight:700">${money(c.costo)}</td>
+            <td class="acciones">
                 <button class="btn btn-warning btn-sm" onclick='editarPrecio(${JSON.stringify(c)})'>✏️</button>
                 <button class="btn btn-danger btn-sm" onclick="borrarPrecio(${c.id})">🗑️</button>
-            </td></tr>`).join('')}</tbody></table>`;
+            </td></tr>`).join('')}</tbody></table></div>`;
 }
 
 function abrirPrecio() {
