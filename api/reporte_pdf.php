@@ -179,32 +179,72 @@ foreach ($extintores as $ext) {
     $filas[] = ['tipo' => 'extintor', 'ext' => $ext];
 }
 
-// Dividir en páginas de máximo 26 extintores por página
-// (cabe con holgura en una hoja carta horizontal, evitando desbordes al imprimir)
+// ─── Reparto de filas por hoja ───────────────────────────────────────────────
+// Cada bloque debe caber en UNA hoja: lleva su propio encabezado, su firma y su
+// "Hoja X de Y". Se reparte por altura y no por número de filas, porque contar
+// filas ignora las de sección y no todas las filas miden lo mismo; con un tope
+// fijo los bloques se pasaban de largo y el navegador metía sus propios saltos,
+// que era lo que descuadraba el PDF.
+//
+// Medido sobre una hoja carta apaisada con márgenes de 8 mm (756 px útiles):
+// encabezado 156 + cabecera de tabla 63 + firma 40 = 259 px fijos por hoja.
+// Las constantes salen de medir el reporte montado a su tamaño real de hoja
+// (996 x 756 px: carta apaisada con márgenes de 8 mm), no de estimarlas.
+// Una fila con inspección mide 27 px —las casillas la hacen más alta que el
+// texto—, una sin inspección o de sección 19. Los caracteres por línea salen
+// del ancho fijo que les da el <colgroup> de la tabla, así que son estables:
+// 269 px para ubicación y 158 px para observaciones.
+const ALTO_FILAS_POR_HOJA   = 468;   // 497 reales, menos una fila de holgura:
+                                     // si las fuentes miden algo distinto en otro
+                                     // equipo, la hoja sigue cabiendo.
+const ALTO_FILA_INSPECCION  = 27;
+const ALTO_FILA_SIN_INSPEC  = 19;
+const ALTO_FILA_SECCION     = 19;
+const ALTO_LINEA_EXTRA      = 8;     // lo que crece la fila por cada línea de más
+const CARACTERES_UBICACION  = 38;    // columna de 269 px a 7.5 pt
+const CARACTERES_OBSERVACIONES = 23; // columna de 158 px a 7 pt
+
+/** Cuánto ocupa una fila. Ubicación y observaciones pueden partirse en varias líneas. */
+function altoDeFila(array $fila): int {
+    if ($fila['tipo'] === 'seccion') return ALTO_FILA_SECCION;
+
+    $ext  = $fila['ext'];
+    $insp = $ext['inspeccion'] ?? null;
+    $alto = $insp ? ALTO_FILA_INSPECCION : ALTO_FILA_SIN_INSPEC;
+
+    // Sólo estas dos celdas llevan texto libre; el resto son datos cortos.
+    $lineas = max(
+        1,
+        (int) ceil(mb_strlen((string) ($ext['ubicacion'] ?? '')) / CARACTERES_UBICACION),
+        (int) ceil(mb_strlen((string) ($insp['observaciones'] ?? '')) / CARACTERES_OBSERVACIONES)
+    );
+
+    return $alto + ($lineas - 1) * ALTO_LINEA_EXTRA;
+}
+
 $paginas = [];
 $pagina_actual = [];
-$extintores_en_pagina = 0;
-$seccion_actual_pag = null;
+$alto_acumulado = 0;
 
-foreach ($filas as $fila) {
-    // Si es una nueva sección y ya hay extintores, reinicia la página
-    if ($fila['tipo'] === 'seccion' && $extintores_en_pagina >= 22) {
+foreach ($filas as $i => $fila) {
+    $alto = altoDeFila($fila);
+
+    // Una sección al final de la hoja dejaría su título huérfano, sin ningún
+    // extintor debajo. Para saberlo hay que mirar la fila que viene y medirla:
+    // reservar el alto de una fila cualquiera no basta, porque la siguiente
+    // puede ser alta si trae una observación larga.
+    $altoSiguiente = isset($filas[$i + 1]) ? altoDeFila($filas[$i + 1]) : 0;
+    $esSeccionApretada = ($fila['tipo'] === 'seccion')
+        && ($alto_acumulado + $alto + $altoSiguiente > ALTO_FILAS_POR_HOJA);
+
+    if ($pagina_actual && ($alto_acumulado + $alto > ALTO_FILAS_POR_HOJA || $esSeccionApretada)) {
         $paginas[] = $pagina_actual;
         $pagina_actual = [];
-        $extintores_en_pagina = 0;
-    }
-
-    // Si es un extintor, contar
-    if ($fila['tipo'] === 'extintor') {
-        if ($extintores_en_pagina >= 26) {
-            $paginas[] = $pagina_actual;
-            $pagina_actual = [];
-            $extintores_en_pagina = 0;
-        }
-        $extintores_en_pagina++;
+        $alto_acumulado = 0;
     }
 
     $pagina_actual[] = $fila;
+    $alto_acumulado += $alto;
 }
 
 if (!empty($pagina_actual)) {
@@ -310,15 +350,16 @@ if (!$logo_html) {
         .leg-po  { background:#cce5ff; color:#004085; font-weight:bold; text-align:center; }
 
         /* ─── Tabla principal ─── */
-        .main-table { width:100%; border-collapse:collapse; font-size:7.5pt; }
+        .main-table { width:100%; border-collapse:collapse; font-size:7.5pt;
+                      table-layout:fixed; }
         .main-table th, .main-table td {
             border: 1px solid #666;
             padding: 2px 3px;
             text-align: center;
             vertical-align: middle;
         }
-        .main-table td.td-area { text-align:left; max-width:200px; }
-        .main-table td.td-obs  { text-align:left; font-size:7pt; }
+        .main-table td.td-area { text-align:left; word-break:break-word; }
+        .main-table td.td-obs  { text-align:left; font-size:7pt; word-break:break-word; }
 
         .th-dark  { background:#4a4a4a; color:#fff; font-size:7.5pt; padding:3px; }
         .th-desc  { background:#2c2c2c; color:#fff; font-size:6pt; font-weight:normal;
@@ -348,8 +389,14 @@ if (!$logo_html) {
             body { font-size: 7.5pt; padding:0 !important; background:#fff !important; }
             /* Sin margen para no generar páginas casi en blanco entre hojas */
             .page-block { margin:0 !important; padding:0 !important;
-                          box-shadow:none !important; page-break-after: always; }
-            .page-block:last-child { page-break-after: auto; }
+                          box-shadow:none !important; }
+            /* Cada hoja empieza en página nueva, salvo la primera.
+               Va "antes" y no "después" a propósito: si un bloque llegara a
+               pasarse de largo, sólo se lleva una página extra él mismo, y la
+               hoja siguiente vuelve a empezar limpia arriba. Con el salto
+               "después", el desbordo y el salto forzado se sumaban y el
+               documento entero se descuadraba. */
+            .page-block + .page-block { page-break-before: always; }
             /* Evitar que una fila se parta a la mitad entre páginas */
             .main-table tr { page-break-inside: avoid; }
         }
@@ -440,6 +487,19 @@ if (!$logo_html) {
 
     <!-- ── TABLA ──────────────────────────────────────────────────────────── -->
     <table class="main-table">
+        <?php /* El reparto va explícito: con el ancho automático cada hoja
+                 calculaba sus columnas según su propio contenido y no
+                 coincidían entre páginas. Suma 100%. */ ?>
+        <colgroup>
+            <col style="width:3.4%">   <!-- No -->
+            <col style="width:27%">    <!-- Área / ubicación -->
+            <col style="width:6%">     <!-- Tipo -->
+            <col style="width:5.5%">   <!-- Capacidad -->
+            <col style="width:5.5%">   <!-- PH -->
+            <col style="width:5.5%">   <!-- Recarga -->
+            <?php for ($c = 0; $c < 12; $c++): ?><col style="width:2.6%"><?php endfor; ?>
+            <col style="width:15.9%">  <!-- Observaciones -->
+        </colgroup>
         <thead>
             <tr>
                 <th class="th-dark" rowspan="3" style="width:24px">No</th>
