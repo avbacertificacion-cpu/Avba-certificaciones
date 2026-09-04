@@ -43,6 +43,7 @@ require_once __DIR__ . '/ClienteEnvios.php';
 require_once __DIR__ . '/Contabilidad.php';
 require_once __DIR__ . '/MaterialControl.php';
 require_once __DIR__ . '/ClaudeIA.php';
+require_once __DIR__ . '/Facturapi.php';
 require_once __DIR__ . '/Presupuestos.php';
 
 // ── Headers de seguridad ──────────────────────────────────
@@ -469,6 +470,11 @@ if ($method === 'GET') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($presup->detalle((int)($_GET['id'] ?? 0)));
+
+        case 'PRES_FACTURACION_INFO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->facturacionInfo());
 
         case 'PRES_VER_PROPUESTA':
             $usr = validarToken($pdo, $token);
@@ -1146,6 +1152,31 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($presup->eliminarPropuesta((int)($payload['id'] ?? 0)));
+
+        case 'PRES_FACTURAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->facturar(
+                (int)($payload['id'] ?? 0),
+                ['forma_pago' => (string)($payload['forma_pago'] ?? ''), 'metodo_pago' => (string)($payload['metodo_pago'] ?? '')],
+                $usr['nombre'] ?? $usr['usuario'] ?? 'Sistema'
+            ));
+
+        case 'PRES_ENVIAR_FACTURA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->enviarFactura((int)($payload['id'] ?? 0), (string)($payload['correo'] ?? '')));
+
+        // Cancelar ante el SAT es irreversible: sólo ADMIN.
+        case 'PRES_CANCELAR_FACTURA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'Solo un administrador puede cancelar una factura.'], 401);
+            respuesta($presup->cancelarFactura(
+                (int)($payload['id'] ?? 0),
+                (string)($payload['motivo'] ?? ''),
+                (string)($payload['sustitucion'] ?? ''),
+                $usr['nombre'] ?? $usr['usuario'] ?? 'Sistema'
+            ));
 
         case 'PRES_ENVIAR':
             $usr = validarToken($pdo, $token);

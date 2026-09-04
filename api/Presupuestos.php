@@ -175,7 +175,16 @@ class Presupuestos {
                   notas          TEXT NULL,
                   pdf_url        VARCHAR(300) NULL,
                   enviado_at     DATETIME NULL,
+                  forma_pago     VARCHAR(3) NOT NULL DEFAULT '03',
+                  metodo_pago    VARCHAR(3) NOT NULL DEFAULT 'PUE',
+                  factura_id     VARCHAR(40) NULL,
                   factura_uuid   VARCHAR(50) NULL,
+                  factura_serie  VARCHAR(25) NULL,
+                  factura_fecha  DATETIME NULL,
+                  factura_modo   VARCHAR(12) NULL,
+                  factura_total  DECIMAL(14,2) NULL,
+                  factura_estado VARCHAR(15) NULL,
+                  factura_cancelada_at DATETIME NULL,
                   factura_pdf    VARCHAR(300) NULL,
                   factura_xml    VARCHAR(300) NULL,
                   usuario        VARCHAR(120) NULL,
@@ -228,6 +237,26 @@ class Presupuestos {
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
         } catch (\Throwable $e) { error_log('[Presupuestos] migrar propuestas: ' . $e->getMessage()); }
+
+        // Las bases que ya tenían el módulo antes de la facturación necesitan
+        // las columnas nuevas. Cada una en su propio try: en MariaDB vieja,
+        // IF NOT EXISTS no existe y la sentencia falla —queremos que falle
+        // sola, sin arrastrar a las demás ni tumbar el constructor.
+        foreach ([
+            "forma_pago     VARCHAR(3) NOT NULL DEFAULT '03'",
+            "metodo_pago    VARCHAR(3) NOT NULL DEFAULT 'PUE'",
+            'factura_id     VARCHAR(40) NULL',
+            'factura_serie  VARCHAR(25) NULL',
+            'factura_fecha  DATETIME NULL',
+            'factura_modo   VARCHAR(12) NULL',
+            'factura_total  DECIMAL(14,2) NULL',
+            'factura_estado VARCHAR(15) NULL',
+            'factura_cancelada_at DATETIME NULL',
+        ] as $col) {
+            try {
+                $this->pdo->exec("ALTER TABLE pres_presupuestos ADD COLUMN IF NOT EXISTS $col");
+            } catch (\Throwable $e) { /* ya existe, o el motor no lo soporta */ }
+        }
 
         $this->sembrarConfig();
     }
@@ -1428,5 +1457,302 @@ REGLAS DE SALIDA — sin excepción
 
         foreach ($adjuntos as $ruta => $nombre) $mail->addAttachment($ruta, $nombre);
         $mail->send();
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  FACTURACIÓN (CFDI 4.0 vía Facturapi)
+    // ══════════════════════════════════════════════════════════
+
+    /**
+     * Revisa que el presupuesto pueda convertirse en CFDI, ANTES de llamar al PAC.
+     *
+     * Se hace aquí y no allá por una razón práctica: Facturapi cobra el timbre
+     * y el SAT registra el intento. Un rechazo por un dato que teníamos a la
+     * vista —un RFC vacío, una partida sin clave del SAT— es un error que se
+     * puede señalar en la pantalla, con el nombre del campo, en vez de
+     * devolver un mensaje del PAC que nadie sabe dónde corregir.
+     *
+     * @return string[] Lista de problemas. Vacía significa que se puede timbrar.
+     */
+    public function problemasParaFacturar(array $pre): array {
+        $p = [];
+
+        if (($pre['estado'] ?? '') === 'FACTURADO')  $p[] = 'El presupuesto ya está facturado.';
+        if (($pre['estado'] ?? '') === 'CANCELADO')  $p[] = 'El presupuesto está cancelado.';
+        if (empty($pre['partidas']))                 $p[] = 'El presupuesto no tiene partidas.';
+        if ((float)($pre['total'] ?? 0) <= 0)        $p[] = 'El total del presupuesto es cero.';
+
+        $cli = $pre['cliente'] ?? null;
+        if (!$cli) {
+            $p[] = 'El presupuesto no está ligado a un cliente del catálogo, así que no hay datos fiscales.';
+        } else {
+            foreach ($this->faltaFiscal($cli) as $f) {
+                $p[] = 'Al cliente le falta su ' . $f . '.';
+            }
+        }
+
+        foreach (($pre['partidas'] ?? []) as $i => $d) {
+            $n = $i + 1;
+            if (trim((string)$d['clave_prodserv']) === '') {
+                $p[] = "La partida {$n} (" . $d['descripcion'] . ") no tiene clave ProdServ del SAT.";
+            }
+            if (trim((string)$d['clave_unidad']) === '') {
+                $p[] = "La partida {$n} (" . $d['descripcion'] . ") no tiene clave de unidad del SAT.";
+            }
+        }
+        return $p;
+    }
+
+    /**
+     * Arma el cuerpo del CFDI a partir del presupuesto.
+     *
+     * El descuento global del presupuesto se reparte entre las partidas, porque
+     * el CFDI no tiene un descuento a nivel comprobante: sólo por concepto. El
+     * sobrante del redondeo se le carga a la última partida, para que la suma
+     * de los descuentos sea exactamente la que se le ofreció al cliente y la
+     * factura no difiera del presupuesto por unos centavos.
+     */
+    private function payloadFactura(array $pre, string $formaPago, string $metodoPago): array {
+        $cli = $pre['cliente'];
+
+        $subtotal = 0.0;
+        foreach ($pre['partidas'] as $d) $subtotal += (float)$d['importe'];
+
+        $descGlobal = (float)$pre['descuento'];
+        $repartido  = 0.0;
+        $ultimo     = count($pre['partidas']) - 1;
+
+        $items = [];
+        foreach ($pre['partidas'] as $i => $d) {
+            $cant   = (float)$d['cantidad'];
+            $precio = (float)$d['precio_unitario'];
+            $bruto  = round($cant * $precio, 2);
+            $descLinea = round($bruto - (float)$d['importe'], 2);
+
+            if ($descGlobal > 0 && $subtotal > 0) {
+                if ($i === $ultimo) {
+                    $parte = round($descGlobal - $repartido, 2);
+                } else {
+                    $parte = round($descGlobal * ((float)$d['importe'] / $subtotal), 2);
+                    $repartido += $parte;
+                }
+                $descLinea = round($descLinea + $parte, 2);
+            }
+
+            $tasa = (float)$d['tasa_iva'];
+            // Tasa 0 se manda sin impuestos: el CFDI lo toma como exento. Los
+            // servicios de AVBA van todos al 16%, así que esto es la excepción.
+            $impuestos = $tasa > 0
+                ? [['type' => 'IVA', 'rate' => round($tasa / 100, 6), 'factor' => 'Tasa', 'withholding' => false]]
+                : [];
+
+            $items[] = [
+                'quantity' => $cant,
+                'discount' => max(0, $descLinea),
+                'product'  => [
+                    'description'  => mb_substr((string)$d['descripcion'], 0, 1000),
+                    'product_key'  => (string)$d['clave_prodserv'],
+                    'unit_key'     => (string)$d['clave_unidad'],
+                    'unit_name'    => (string)$d['unidad'],
+                    'price'        => $precio,
+                    'tax_included' => false,
+                    'taxes'        => $impuestos,
+                ],
+            ];
+        }
+
+        $cuerpo = [
+            'customer' => [
+                'legal_name' => (string)$cli['razon_social'],
+                'tax_id'     => strtoupper((string)$cli['rfc']),
+                'tax_system' => (string)$cli['regimen_fiscal'],
+                'address'    => ['zip' => (string)$cli['cp_fiscal'], 'country' => 'MEX'],
+            ],
+            'items'          => $items,
+            'use'            => (string)($cli['uso_cfdi'] ?: 'G03'),
+            'payment_form'   => $formaPago,
+            'payment_method' => $metodoPago,
+            // Deja el folio del presupuesto escrito en el CFDI: al conciliar
+            // meses después, la factura dice sola de dónde vino.
+            'external_id'    => (string)$pre['folio'],
+            'conditions'     => mb_substr(trim((string)($pre['condiciones'] ?? '')), 0, 1000),
+        ];
+
+        if (strtoupper((string)$pre['moneda']) !== 'MXN') {
+            $cuerpo['currency'] = strtoupper((string)$pre['moneda']);
+            $cuerpo['exchange'] = (float)$pre['tipo_cambio'];
+        }
+        return $cuerpo;
+    }
+
+    /**
+     * Timbra el CFDI y guarda el XML y el PDF junto al presupuesto.
+     *
+     * El XML se descarga y se archiva en el servidor a propósito: es el
+     * documento fiscal, el que vale ante el SAT, y no debe depender de que la
+     * cuenta de Facturapi siga viva dentro de cinco años.
+     */
+    public function facturar(int $id, array $opciones, string $usuario): array {
+        $d = $this->detalle($id);
+        if (($d['status'] ?? '') !== 'ok') return $d;
+        $pre = $d['presupuesto'];
+
+        $problemas = $this->problemasParaFacturar($pre);
+        if ($problemas) {
+            return ['status' => 'error', 'message' => 'Falta información para facturar.', 'problemas' => $problemas];
+        }
+
+        $api = new Facturapi();
+        if (!$api->disponible()) {
+            return ['status' => 'error',
+                'message' => 'La facturación no está configurada en el servidor (falta FACTURAPI_KEY en config/config.php).'];
+        }
+
+        $formaPago  = (string)($opciones['forma_pago'] ?? $pre['forma_pago'] ?? '03');
+        $metodoPago = strtoupper((string)($opciones['metodo_pago'] ?? $pre['metodo_pago'] ?? 'PUE'));
+        if (!isset(Facturapi::FORMAS_PAGO[$formaPago]))   $formaPago  = '03';
+        if (!isset(Facturapi::METODOS_PAGO[$metodoPago])) $metodoPago = 'PUE';
+
+        @set_time_limit(180);
+        $r = $api->crearFactura($this->payloadFactura($pre, $formaPago, $metodoPago));
+        if (($r['status'] ?? '') !== 'ok') return $r;
+
+        $f = $r['datos'];
+        $facturaId = (string)($f['id'] ?? '');
+        if ($facturaId === '') {
+            error_log('[Presupuestos] facturar: respuesta sin id — ' . json_encode($f));
+            return ['status' => 'error', 'message' => 'Facturapi no devolvió el identificador de la factura.'];
+        }
+
+        // Si el total del CFDI no coincide con el del presupuesto, algo se
+        // torció al repartir descuentos o redondear. Se avisa en vez de dejar
+        // pasar en silencio una factura que dice otra cifra que la oferta.
+        $aviso = '';
+        $totalCfdi = (float)($f['total'] ?? 0);
+        if ($totalCfdi > 0 && abs($totalCfdi - (float)$pre['total']) > 1.0) {
+            $aviso = 'Atención: la factura quedó en $' . $this->num($totalCfdi)
+                   . ' y el presupuesto decía $' . $this->num((float)$pre['total']) . '. Revísala.';
+            error_log('[Presupuestos] facturar: descuadre ' . $pre['folio'] . " {$totalCfdi} vs {$pre['total']}");
+        }
+
+        $pdfRel = $this->archivarFactura($api, $facturaId, (string)$pre['folio'], 'pdf');
+        $xmlRel = $this->archivarFactura($api, $facturaId, (string)$pre['folio'], 'xml');
+
+        $serie = trim(((string)($f['series'] ?? '')) . ' ' . ((string)($f['folio_number'] ?? '')));
+
+        $this->pdo->prepare(
+            "UPDATE pres_presupuestos SET
+                estado = 'FACTURADO', forma_pago = ?, metodo_pago = ?,
+                factura_id = ?, factura_uuid = ?, factura_serie = ?, factura_fecha = ?,
+                factura_modo = ?, factura_total = ?, factura_estado = ?,
+                factura_pdf = ?, factura_xml = ?
+              WHERE id = ?"
+        )->execute([
+            $formaPago, $metodoPago, $facturaId, (string)($f['uuid'] ?? ''), $serie,
+            date('Y-m-d H:i:s'), $api->modo(), $totalCfdi, (string)($f['status'] ?? 'valid'),
+            $pdfRel, $xmlRel, $id,
+        ]);
+
+        error_log('[Presupuestos] ' . $usuario . ' facturó ' . $pre['folio']
+                . ' → UUID ' . ($f['uuid'] ?? '?') . ' (' . $api->modo() . ')');
+
+        $msg = $api->esPruebas()
+            ? 'Factura de PRUEBA generada: no tiene validez ante el SAT.'
+            : 'Factura timbrada correctamente.';
+
+        return [
+            'status'  => 'ok',
+            'uuid'    => (string)($f['uuid'] ?? ''),
+            'modo'    => $api->modo(),
+            'total'   => $totalCfdi,
+            'pdf'     => $pdfRel !== '' ? $this->urlAbs($pdfRel) : '',
+            'xml'     => $xmlRel !== '' ? $this->urlAbs($xmlRel) : '',
+            'aviso'   => $aviso,
+            'message' => $msg . ($aviso !== '' ? ' ' . $aviso : ''),
+        ];
+    }
+
+    /** Descarga un archivo del CFDI y lo deja en uploads/facturas/. */
+    private function archivarFactura(Facturapi $api, string $facturaId, string $folio, string $tipo): string {
+        $r = $api->descargar($facturaId, $tipo);
+        if (($r['status'] ?? '') !== 'ok') {
+            // Que falle la descarga no invalida la factura: ya está timbrada y
+            // se puede bajar después. Se anota y se sigue.
+            error_log('[Presupuestos] archivarFactura ' . $tipo . ': ' . ($r['message'] ?? ''));
+            return '';
+        }
+        $dir = UPLOAD_DIR . 'facturas/';
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        $nombre = 'CFDI_' . preg_replace('/[^A-Za-z0-9\-]/', '', $folio) . '_' . date('Ymd_His') . '.' . $tipo;
+        if (@file_put_contents($dir . $nombre, $r['bytes']) === false) {
+            error_log('[Presupuestos] archivarFactura: no se pudo escribir ' . $dir . $nombre);
+            return '';
+        }
+        return 'uploads/facturas/' . $nombre;
+    }
+
+    /** Manda el CFDI al cliente desde Facturapi, con XML y PDF adjuntos. */
+    public function enviarFactura(int $id, string $correo): array {
+        $d = $this->detalle($id);
+        if (($d['status'] ?? '') !== 'ok') return $d;
+        $pre = $d['presupuesto'];
+        if (trim((string)($pre['factura_id'] ?? '')) === '') {
+            return ['status' => 'error', 'message' => 'Este presupuesto todavía no tiene factura.'];
+        }
+        $correo = trim($correo) !== '' ? trim($correo) : (string)$pre['cliente_correo'];
+        $destinos = array_values(array_filter(
+            array_map('trim', explode(',', $correo)),
+            fn($a) => filter_var($a, FILTER_VALIDATE_EMAIL)
+        ));
+        if (!$destinos) return ['status' => 'error', 'message' => 'No hay un correo válido de destino.'];
+
+        $r = (new Facturapi())->enviarPorCorreo((string)$pre['factura_id'], $destinos);
+        if (($r['status'] ?? '') !== 'ok') return $r;
+        return ['status' => 'ok', 'message' => 'Factura enviada a ' . implode(', ', $destinos) . '.'];
+    }
+
+    /**
+     * Cancela el CFDI ante el SAT.
+     *
+     * El presupuesto NO vuelve a BORRADOR: pasa a CANCELADO y ahí se queda. Una
+     * factura cancelada dejó rastro en el SAT, y devolver el presupuesto a
+     * edición dejaría un documento fiscal apuntando a cifras que ya cambiaron.
+     * Si hay que rehacer el trabajo, se hace un presupuesto nuevo.
+     */
+    public function cancelarFactura(int $id, string $motivo, string $sustitucion, string $usuario): array {
+        $d = $this->detalle($id);
+        if (($d['status'] ?? '') !== 'ok') return $d;
+        $pre = $d['presupuesto'];
+
+        $facturaId = trim((string)($pre['factura_id'] ?? ''));
+        if ($facturaId === '') return ['status' => 'error', 'message' => 'Este presupuesto no tiene factura que cancelar.'];
+        if (($pre['factura_estado'] ?? '') === 'canceled') {
+            return ['status' => 'error', 'message' => 'Esa factura ya está cancelada.'];
+        }
+
+        $r = (new Facturapi())->cancelar($facturaId, trim($motivo), trim($sustitucion));
+        if (($r['status'] ?? '') !== 'ok') return $r;
+
+        $this->pdo->prepare(
+            "UPDATE pres_presupuestos
+                SET estado = 'CANCELADO', factura_estado = 'canceled', factura_cancelada_at = NOW()
+              WHERE id = ?"
+        )->execute([$id]);
+
+        error_log('[Presupuestos] ' . $usuario . ' canceló la factura de ' . $pre['folio'] . ' (motivo ' . $motivo . ')');
+        return ['status' => 'ok', 'message' => 'Factura cancelada ante el SAT.'];
+    }
+
+    /** Catálogos y estado del servicio, para que la pantalla sepa qué ofrecer. */
+    public function facturacionInfo(): array {
+        $api = new Facturapi();
+        return [
+            'status'        => 'ok',
+            'disponible'    => $api->disponible(),
+            'modo'          => $api->disponible() ? $api->modo() : '',
+            'formas_pago'   => Facturapi::FORMAS_PAGO,
+            'metodos_pago'  => Facturapi::METODOS_PAGO,
+            'motivos'       => Facturapi::MOTIVOS,
+        ];
     }
 }

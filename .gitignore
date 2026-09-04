@@ -15,10 +15,12 @@ uploads/plantillas/*
 uploads/personal/*
 uploads/accesorios/*
 uploads/participantes/*
+uploads/facturas/*
 !uploads/certificados/.gitkeep
 !uploads/evidencias/.gitkeep
 !uploads/reportes/.gitkeep
 !uploads/plantillas/.gitkeep
+!uploads/facturas/.gitkeep
 
 # ── Archivos de instalación/deploy ───────────────────────
 install.php

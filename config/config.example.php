@@ -89,6 +89,17 @@ define('CLAUDE_MODEL', '');
 // de ejecución de PHP, bajarlo a 'medium' acorta la espera.
 define('CLAUDE_EFFORT', '');
 
+// ── Facturación electrónica (Facturapi) ──────────────────
+// Llave secreta de Facturapi (https://dashboard.facturapi.io → Llaves de API).
+//   sk_test_…  → modo de pruebas: la factura se genera pero NO se timbra ante
+//                el SAT y no tiene validez fiscal. Sirve para probar todo.
+//   sk_live_…  → producción: timbra de verdad y consume un timbre.
+// El sistema deduce el modo del prefijo de la llave, así que cambiar de
+// pruebas a producción es cambiar esta línea y nada más.
+// Sin llave, el módulo de presupuestos sigue funcionando completo; sólo queda
+// apagado el botón de facturar.
+define('FACTURAPI_KEY', '');
+
 // ── Entorno ───────────────────────────────────────────────
 define('APP_ENV', 'production');
 

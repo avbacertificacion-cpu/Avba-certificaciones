@@ -208,6 +208,7 @@ foreach ([
     'CLAUDE_API_KEY'     => '',
     'CLAUDE_MODEL'       => '',
     'CLAUDE_EFFORT'      => '',
+    'FACTURAPI_KEY'      => '',
     'APP_ENV'            => 'production',
 ] as $constante => $valor) {
     if (!defined($constante)) define($constante, $valor);

@@ -127,6 +127,7 @@ textarea.finput{resize:vertical;min-height:80px;font-family:inherit;line-height:
         <p style="margin:3px 0 0;font-size:13px;color:var(--texto-sub)">Del catálogo al PDF, y de ahí a la propuesta técnico-económica.</p></div>
       <button class="btn-prim" onclick="abrirPres(null)">+ Nuevo presupuesto</button>
     </div>
+    <div id="banner-modo"></div>
     <div class="filtros">
       <select class="finput" id="f-estado" onchange="cargarPres()">
         <option value="">Todos los estados</option>
@@ -349,6 +350,32 @@ textarea.finput{resize:vertical;min-height:80px;font-family:inherit;line-height:
   </div>
 </div>
 
+<!-- ══════════ MODAL: FACTURAR ══════════ -->
+<div class="overlay" id="m-fact">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="mf-title">Emitir factura</div>
+      <button class="modal-close" onclick="cerrar('m-fact')">✕</button>
+    </div>
+    <input type="hidden" id="mf-id">
+    <div id="mf-modo"></div>
+    <div id="mf-problemas"></div>
+    <div id="mf-form">
+      <div class="frow"><label class="flabel">Forma de pago</label>
+        <select class="finput" id="mf-forma"></select>
+        <div class="fhint">Cómo te pagó el cliente. Si aún no paga, usa “Por definir”.</div></div>
+      <div class="frow"><label class="flabel">Método de pago</label>
+        <select class="finput" id="mf-metodo"></select>
+        <div class="fhint">PUE si ya está pagada; PPD si se pagará después o en parcialidades.</div></div>
+      <div class="aviso" id="mf-resumen"></div>
+    </div>
+    <div class="fact">
+      <button class="btn-sec" onclick="cerrar('m-fact')">Cancelar</button>
+      <button class="btn-prim" id="mf-btn" onclick="confirmarFacturar()">Timbrar factura</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -398,6 +425,8 @@ async function get(action, params){
 
 // ══════════ ESTADO EN MEMORIA ══════════
 let _servicios = [], _clientes = [], _config = {}, _regimenes = {}, _usos = {}, _partidas = [];
+let _fact = { disponible:false, modo:'', formas_pago:{}, metodos_pago:{}, motivos:{} };
+const esAdmin = _sesion.rol === 'ADMIN';
 
 // ══════════ CONFIGURACIÓN / PLANTILLA ══════════
 async function cargarCfg(){
@@ -672,12 +701,26 @@ async function cargarPres(){
           ${p.enviado_at ? '<span class="chip">Enviado</span>' : ''}
         </div>
       </div>
+      ${p.factura_uuid ? `<div class="card-body" style="border-top:1px solid var(--borde);padding-top:10px">
+        <div style="font-size:11px;color:var(--texto-sub);font-weight:600">
+          ${p.factura_estado === 'canceled' ? '🚫 CFDI CANCELADO' : '🧾 CFDI timbrado'}
+          ${p.factura_modo === 'pruebas' ? '<span class="chip" style="color:var(--ambar)">PRUEBA · sin validez fiscal</span>' : ''}
+        </div>
+        <div style="font-size:10.5px;color:var(--texto-hint);word-break:break-all;margin-top:3px">${esc(p.factura_uuid)}</div>
+        <div class="card-foot" style="padding:8px 0 0">
+          ${p.factura_pdf ? `<a class="btn-sec" style="text-decoration:none" href="${esc(p.factura_pdf)}" target="_blank" rel="noopener">PDF CFDI</a>` : ''}
+          ${p.factura_xml ? `<a class="btn-sec" style="text-decoration:none" href="${esc(p.factura_xml)}" target="_blank" rel="noopener">XML</a>` : ''}
+          ${p.factura_estado !== 'canceled' ? `<button class="btn-sec" onclick="enviarFactura(${p.id},'${esc(p.cliente_correo||'')}')">Enviar CFDI</button>` : ''}
+          ${(p.factura_estado !== 'canceled' && esAdmin) ? `<button class="btn-del" onclick="cancelarFactura(${p.id})">Cancelar CFDI</button>` : ''}
+        </div>
+      </div>` : ''}
       <div class="card-foot">
         <button class="btn-sec" onclick="abrirPres(${p.id})">Abrir</button>
         <button class="btn-sec" onclick="pdfPres(${p.id})">PDF</button>
         <button class="btn-sec" onclick="generarPropuesta(${p.id})">✨ Propuesta</button>
         <button class="btn-sec" onclick="enviarPres(${p.id},'${esc(p.cliente_correo||'')}')">Enviar</button>
-        ${p.estado!=='FACTURADO' ? `<button class="btn-sec" onclick="cambiarEstado(${p.id})">Estado</button>
+        ${(p.estado!=='FACTURADO' && p.estado!=='CANCELADO') ? `<button class="btn-prim" onclick="abrirFacturar(${p.id})">🧾 Facturar</button>
+        <button class="btn-sec" onclick="cambiarEstado(${p.id})">Estado</button>
         <button class="btn-del" onclick="borrarPres(${p.id})">Eliminar</button>` : ''}
       </div>
     </div>`).join('') + '</div>';
@@ -855,12 +898,135 @@ async function borrarPres(id){
   if (d.status === 'ok') cargarPres();
 }
 
+// ══════════ FACTURACIÓN ══════════
+async function cargarFacturacion(){
+  const d = await get('PRES_FACTURACION_INFO');
+  if (d.status !== 'ok') return;
+  _fact = d;
+  const b = document.getElementById('banner-modo');
+  if (!d.disponible) {
+    b.innerHTML = `<div class="aviso">La facturación no está configurada en el servidor. Todo lo demás funciona;
+      sólo el botón de facturar queda apagado hasta que se agregue <strong>FACTURAPI_KEY</strong> a config/config.php.</div>`;
+  } else if (d.modo === 'pruebas') {
+    b.innerHTML = `<div class="aviso"><strong>Modo de pruebas.</strong> Las facturas se generan pero
+      <strong>no se timbran ante el SAT</strong> y no tienen validez fiscal. Sirven para revisar el flujo completo.
+      Al cambiar la llave por la de producción (<code>sk_live_…</code>), este aviso desaparece.</div>`;
+  } else { b.innerHTML = ''; }
+
+  const opc = o => Object.entries(o).map(([k,v])=>`<option value="${esc(k)}">${esc(k)} · ${esc(v)}</option>`).join('');
+  document.getElementById('mf-forma').innerHTML  = opc(d.formas_pago  || {});
+  document.getElementById('mf-metodo').innerHTML = opc(d.metodos_pago || {});
+  document.getElementById('mf-forma').value = '03';
+  document.getElementById('mf-metodo').value = 'PUE';
+}
+
+/**
+ * Antes de abrir el formulario se revisa el presupuesto: si le falta el RFC del
+ * cliente o la clave del SAT de una partida, se dice aquí, con el dato exacto.
+ * Descubrirlo al timbrar cuesta un timbre y deja un rechazo registrado.
+ */
+async function abrirFacturar(id){
+  document.getElementById('mf-id').value = id;
+  document.getElementById('mf-problemas').innerHTML = '';
+  document.getElementById('mf-resumen').innerHTML = '';
+  document.getElementById('mf-modo').innerHTML = '';
+  document.getElementById('mf-form').style.display = 'none';
+  document.getElementById('mf-btn').style.display = 'none';
+  abrir('m-fact');
+
+  if (!_fact.disponible) {
+    document.getElementById('mf-problemas').innerHTML =
+      `<div class="aviso">Falta configurar <strong>FACTURAPI_KEY</strong> en el servidor.</div>`;
+    return;
+  }
+
+  const d = await get('PRES_DETALLE', {id});
+  if (d.status !== 'ok') { document.getElementById('mf-problemas').innerHTML = `<div class="aviso">${esc(d.message)}</div>`; return; }
+  const p = d.presupuesto;
+  document.getElementById('mf-title').textContent = 'Facturar ' + p.folio;
+
+  const faltan = [];
+  const cli = p.cliente;
+  if (!cli) faltan.push('El presupuesto no está ligado a un cliente del catálogo, así que no hay datos fiscales.');
+  else (cli.falta_fiscal || []).forEach(f => faltan.push('Al cliente le falta su ' + f + '.'));
+  (p.partidas || []).forEach((it, i) => {
+    if (!String(it.clave_prodserv || '').trim()) faltan.push(`La partida ${i+1} (${it.descripcion}) no tiene clave ProdServ del SAT.`);
+    if (!String(it.clave_unidad   || '').trim()) faltan.push(`La partida ${i+1} (${it.descripcion}) no tiene clave de unidad del SAT.`);
+  });
+
+  if (faltan.length) {
+    document.getElementById('mf-problemas').innerHTML =
+      `<div class="aviso"><strong>Falta información para facturar:</strong><ul style="margin:6px 0 0 16px">`
+      + faltan.map(f=>`<li>${esc(f)}</li>`).join('') + `</ul></div>`;
+    return;
+  }
+
+  if (_fact.modo === 'pruebas') {
+    document.getElementById('mf-modo').innerHTML =
+      `<div class="aviso">Modo de <strong>pruebas</strong>: esta factura no se timbrará ante el SAT.</div>`;
+  }
+  document.getElementById('mf-resumen').innerHTML =
+    `<strong>${esc(cli.razon_social)}</strong> · ${esc(cli.rfc)}<br>`
+    + `Régimen ${esc(cli.regimen_fiscal)} · Uso ${esc(cli.uso_cfdi)} · CP ${esc(cli.cp_fiscal)}<br>`
+    + `Total a facturar: <strong>${money(p.total)} ${esc(p.moneda)}</strong>`;
+  document.getElementById('mf-form').style.display = '';
+  document.getElementById('mf-btn').style.display = '';
+}
+
+async function confirmarFacturar(){
+  const btn = document.getElementById('mf-btn');
+  const id = document.getElementById('mf-id').value;
+  if (_fact.modo === 'produccion' &&
+      !confirm('Se va a timbrar la factura ANTE EL SAT.\n\nUna vez emitida sólo se puede cancelar, y la cancelación queda registrada. ¿Continuar?')) return;
+  btn.disabled = true; btn.textContent = 'Timbrando…';
+  const d = await post('PRES_FACTURAR', {
+    id, forma_pago: document.getElementById('mf-forma').value,
+    metodo_pago: document.getElementById('mf-metodo').value,
+  });
+  btn.disabled = false; btn.textContent = 'Timbrar factura';
+  if (d.status !== 'ok') {
+    const extra = (d.problemas || []).map(x=>`<li>${esc(x)}</li>`).join('');
+    document.getElementById('mf-problemas').innerHTML =
+      `<div class="aviso"><strong>${esc(d.message||'No se pudo facturar.')}</strong>`
+      + (extra ? `<ul style="margin:6px 0 0 16px">${extra}</ul>` : '') + `</div>`;
+    return;
+  }
+  cerrar('m-fact');
+  toast(d.message || 'Factura emitida.');
+  if (d.pdf) window.open(d.pdf, '_blank');
+  cargarPres();
+}
+
+async function enviarFactura(id, correoSug){
+  const correo = prompt('Enviar el CFDI (XML y PDF) a:', correoSug || '');
+  if (correo === null) return;
+  toast('Enviando el CFDI…');
+  const d = await post('PRES_ENVIAR_FACTURA', {id, correo});
+  toast(d.message || 'Listo.');
+}
+
+async function cancelarFactura(id){
+  const motivos = Object.entries(_fact.motivos || {}).map(([k,v])=>`${k} — ${v}`).join('\n');
+  const motivo = prompt('Motivo de cancelación ante el SAT:\n\n' + motivos + '\n\nEscribe la clave (01, 02, 03 o 04):', '02');
+  if (!motivo) return;
+  let sust = '';
+  if (motivo.trim() === '01') {
+    sust = prompt('El motivo 01 exige el UUID de la factura que sustituye a ésta:', '') || '';
+    if (!sust.trim()) { toast('Sin ese UUID el SAT rechaza la cancelación.'); return; }
+  }
+  if (!confirm('Cancelar el CFDI ante el SAT es irreversible y queda registrado.\n\nEl presupuesto pasará a CANCELADO y no volverá a edición. ¿Continuar?')) return;
+  const d = await post('PRES_CANCELAR_FACTURA', {id, motivo: motivo.trim(), sustitucion: sust.trim()});
+  toast(d.message || 'Listo.');
+  if (d.status === 'ok') cargarPres();
+}
+
 // ══════════ ARRANQUE ══════════
 document.querySelectorAll('.overlay').forEach(o => {
   o.addEventListener('click', e => { if (e.target === o) o.classList.remove('open'); });
 });
 (async () => {
   await cargarCfg();
+  await cargarFacturacion();
   await cargarServ();
   await cargarCli();
   await cargarPres();
