@@ -1755,4 +1755,22 @@ REGLAS DE SALIDA — sin excepción
             'motivos'       => Facturapi::MOTIVOS,
         ];
     }
+
+    /**
+     * Busca en los catálogos del SAT a través de Facturapi.
+     *
+     * Vive aquí y no en la clase de facturación porque la pantalla que lo usa
+     * es la del catálogo de servicios: se buscan las claves al dar de alta el
+     * servicio, no al facturar. Para entonces ya deben estar puestas.
+     *
+     * @param string $tipo 'prodserv' | 'unidad'
+     */
+    public function buscarCatalogoSat(string $tipo, string $q): array {
+        $api = new Facturapi();
+        if (!$api->disponible()) {
+            return ['status' => 'error',
+                'message' => 'El buscador de claves del SAT necesita FACTURAPI_KEY. Puedes escribir la clave a mano.'];
+        }
+        return $tipo === 'unidad' ? $api->buscarUnidades($q) : $api->buscarProductos($q);
+    }
 }

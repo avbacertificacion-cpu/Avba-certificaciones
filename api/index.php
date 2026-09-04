@@ -471,6 +471,11 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($presup->detalle((int)($_GET['id'] ?? 0)));
 
+        case 'PRES_BUSCAR_SAT':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($presup->buscarCatalogoSat((string)($_GET['tipo'] ?? 'prodserv'), (string)($_GET['q'] ?? '')));
+
         case 'PRES_FACTURACION_INFO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

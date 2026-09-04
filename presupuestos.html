@@ -90,6 +90,14 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg)}
 .ia-espera{display:flex;gap:10px;align-items:center;background:var(--azul-light);color:var(--azul-dark);
        padding:11px 14px;border-radius:10px;font-size:12.5px;margin-bottom:12px}
 textarea.finput{resize:vertical;min-height:80px;font-family:inherit;line-height:1.55}
+.sat-res{margin-top:6px;max-height:190px;overflow-y:auto;border-radius:8px}
+.sat-res:not(:empty){border:1px solid var(--borde)}
+.sat-item{display:block;width:100%;text-align:left;border:none;background:var(--blanco);
+  border-bottom:1px solid var(--borde);padding:8px 10px;font-size:12.5px;cursor:pointer;color:var(--texto)}
+.sat-item:last-child{border-bottom:none}
+.sat-item:hover{background:var(--azul-light)}
+.sat-item b{color:var(--azul-dark);font-family:ui-monospace,monospace}
+.sat-msg{padding:8px 10px;font-size:12px;color:var(--texto-hint)}
 </style>
 </head>
 <body>
@@ -299,11 +307,28 @@ textarea.finput{resize:vertical;min-height:80px;font-family:inherit;line-height:
       <div class="frow"><label class="flabel">IVA %</label><input class="finput" id="ms-iva" type="number" min="0" max="100" step="0.01" value="16"></div>
     </div>
     <div class="msec">Claves del SAT (para facturar)</div>
-    <div class="fgrid2">
-      <div class="frow"><label class="flabel">Clave ProdServ</label><input class="finput" id="ms-prodserv" placeholder="81101500"></div>
-      <div class="frow"><label class="flabel">Clave de unidad</label><input class="finput" id="ms-cunidad" placeholder="E48"></div>
+    <div class="fhint" style="margin-bottom:8px">Sin estas dos claves el servicio se puede presupuestar, pero no facturar.
+      Búscalas escribiendo lo que haces; si ya las sabes, escríbelas directo en los campos.</div>
+
+    <div class="frow">
+      <label class="flabel">Buscar producto o servicio en el catálogo del SAT</label>
+      <input class="finput" id="ms-busca-prodserv" placeholder="Ej. inspección, grúa, servicios de ingeniería…"
+             oninput="buscarSatDeb('prodserv')" autocomplete="off">
+      <div class="sat-res" id="ms-res-prodserv"></div>
     </div>
-    <div class="fhint">Búscalas en el catálogo del SAT. Se pueden dejar vacías ahora y completarlas antes de facturar.</div>
+    <div class="frow">
+      <label class="flabel">Buscar unidad de medida</label>
+      <input class="finput" id="ms-busca-unidad" placeholder="Ej. servicio, pieza, equipo, hora…"
+             oninput="buscarSatDeb('unidad')" autocomplete="off">
+      <div class="sat-res" id="ms-res-unidad"></div>
+    </div>
+
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Clave ProdServ</label>
+        <input class="finput" id="ms-prodserv" placeholder="81101500"></div>
+      <div class="frow"><label class="flabel">Clave de unidad</label>
+        <input class="finput" id="ms-cunidad" placeholder="E48"></div>
+    </div>
     <div class="frow" style="margin-top:10px">
       <label class="flabel"><input type="checkbox" id="ms-activo" checked> Activo (aparece al armar presupuestos)</label>
     </div>
@@ -512,6 +537,7 @@ function abrirServ(id){
   document.getElementById('ms-prodserv').value= s ? (s.clave_prodserv||'') : '';
   document.getElementById('ms-cunidad').value = s ? (s.clave_unidad||'') : '';
   document.getElementById('ms-activo').checked= s ? !!Number(s.activo) : true;
+  limpiarBuscadoresSat();
   abrir('m-serv');
 }
 async function guardarServ(){
@@ -539,6 +565,64 @@ async function borrarServ(id){
   const d = await post('PRES_ELIMINAR_SERVICIO', {id});
   toast(d.message || 'Listo.');
   if (d.status === 'ok') cargarServ();
+}
+
+// ══════════ BUSCADOR DE CLAVES DEL SAT ══════════
+// Un temporizador por buscador: comparten uno solo y escribir en el segundo
+// cancelaría la búsqueda que el primero ya tenía en camino.
+const _satT = { prodserv: null, unidad: null };
+// La última petición lanzada por buscador. Las respuestas pueden llegar
+// desordenadas —una consulta corta contesta antes que la larga que la
+// siguió—, y sin esto la lista terminaría mostrando lo que ya no se buscó.
+const _satSeq = { prodserv: 0, unidad: 0 };
+
+function buscarSatDeb(tipo){
+  clearTimeout(_satT[tipo]);
+  _satT[tipo] = setTimeout(() => buscarSat(tipo), 350);
+}
+
+async function buscarSat(tipo){
+  const q    = document.getElementById('ms-busca-' + tipo).value.trim();
+  const caja = document.getElementById('ms-res-' + tipo);
+  if (q.length < 3) { caja.innerHTML = ''; return; }
+
+  const mio = ++_satSeq[tipo];
+  caja.innerHTML = '<div class="sat-msg">Buscando…</div>';
+  let d;
+  try { d = await get('PRES_BUSCAR_SAT', {tipo, q}); }
+  catch(_) { d = {status:'error', message:'No se pudo consultar el catálogo.'}; }
+  if (mio !== _satSeq[tipo]) return;   // llegó tarde: ya hay una búsqueda más nueva
+
+  if (d.status !== 'ok') {
+    caja.innerHTML = `<div class="sat-msg">${esc(d.message || 'No se pudo buscar.')}</div>`;
+    return;
+  }
+  const r = d.resultados || [];
+  if (!r.length) {
+    caja.innerHTML = '<div class="sat-msg">Sin resultados. Prueba con otra palabra, más general.</div>';
+    return;
+  }
+  const destino = tipo === 'unidad' ? 'ms-cunidad' : 'ms-prodserv';
+  caja.innerHTML = r.map(x =>
+    `<button type="button" class="sat-item" onclick="usarClaveSat('${esc(destino)}','${esc(x.clave)}','${esc(tipo)}')">`
+    + `<b>${esc(x.clave)}</b>${x.descripcion ? ' — ' + esc(x.descripcion) : ''}</button>`
+  ).join('');
+}
+
+function usarClaveSat(destino, clave, tipo){
+  document.getElementById(destino).value = clave;
+  document.getElementById('ms-res-' + tipo).innerHTML = '';
+  document.getElementById('ms-busca-' + tipo).value = '';
+  toast('Clave ' + clave + ' asignada.');
+}
+
+function limpiarBuscadoresSat(){
+  ['prodserv','unidad'].forEach(t => {
+    clearTimeout(_satT[t]);
+    _satSeq[t]++;                        // invalida cualquier respuesta en vuelo
+    document.getElementById('ms-busca-' + t).value = '';
+    document.getElementById('ms-res-' + t).innerHTML = '';
+  });
 }
 
 // ══════════ CLIENTES ══════════

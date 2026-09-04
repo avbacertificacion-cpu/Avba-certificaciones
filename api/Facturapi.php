@@ -120,6 +120,54 @@ class Facturapi {
     }
 
     // ══════════════════════════════════════════════════════════
+    //  CATÁLOGOS DEL SAT
+    // ══════════════════════════════════════════════════════════
+
+    /** GET /catalogs/products — busca una clave ProdServ por texto. */
+    public function buscarProductos(string $q): array {
+        return $this->buscarCatalogo('/catalogs/products', $q);
+    }
+
+    /** GET /catalogs/units — busca una clave de unidad por texto. */
+    public function buscarUnidades(string $q): array {
+        return $this->buscarCatalogo('/catalogs/units', $q);
+    }
+
+    private function buscarCatalogo(string $ruta, string $q): array {
+        $q = trim($q);
+        if (mb_strlen($q) < 3) {
+            return ['status' => 'error', 'message' => 'Escribe al menos tres letras para buscar.'];
+        }
+        $r = $this->llamar('GET', $ruta . '?' . http_build_query(['q' => $q, 'limit' => 25]));
+        if (($r['status'] ?? '') !== 'ok') return $r;
+        return ['status' => 'ok', 'resultados' => $this->normalizarCatalogo($r['datos'])];
+    }
+
+    /**
+     * Aplana la respuesta del catálogo a [clave, descripción].
+     *
+     * Se lee de forma tolerante —la lista puede venir suelta o dentro de
+     * "data", y la clave puede llamarse key, value o code— porque el SDK
+     * oficial declara estas dos respuestas como `any`, sin tipo que garantice
+     * la forma. Adivinar una sola y equivocarse dejaría el buscador devolviendo
+     * una lista vacía sin decir por qué; así, si el nombre del campo cambia, lo
+     * que se pierde es a lo sumo la descripción, no el resultado.
+     */
+    private function normalizarCatalogo(array $j): array {
+        $filas = $j['data'] ?? (array_is_list($j) ? $j : []);
+        $out = [];
+        foreach ($filas as $f) {
+            if (is_string($f)) { $out[] = ['clave' => $f, 'descripcion' => '']; continue; }
+            if (!is_array($f)) continue;
+            $clave = (string)($f['key'] ?? $f['value'] ?? $f['code'] ?? $f['id'] ?? '');
+            if ($clave === '') continue;
+            $desc  = (string)($f['description'] ?? $f['name'] ?? $f['label'] ?? $f['text'] ?? '');
+            $out[] = ['clave' => $clave, 'descripcion' => $desc];
+        }
+        return $out;
+    }
+
+    // ══════════════════════════════════════════════════════════
     //  TRANSPORTE
     // ══════════════════════════════════════════════════════════
 
