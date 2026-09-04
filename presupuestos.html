@@ -381,6 +381,14 @@ textarea.finput{resize:vertical;min-height:80px;font-family:inherit;line-height:
     <div class="aviso">El SAT exige que la razón social, el RFC, el código postal y el régimen coincidan
       exactamente con su constancia de situación fiscal. Pídesela al cliente: un solo carácter distinto
       hace que el timbrado se rechace.</div>
+    <div class="frow" style="background:var(--fondo-sub);border-radius:7px;padding:9px 10px">
+      <label class="flabel">Constancia de situación fiscal</label>
+      <input type="file" id="mc-csf" accept=".pdf,image/jpeg,image/png,image/webp"
+             style="font-size:12px" onchange="leerCsf()">
+      <div class="fhint" id="mc-csf-hint">Súbela y se llenan solos el RFC, la razón social,
+        el código postal y el régimen. Revisa lo que quede antes de guardar.</div>
+    </div>
+
     <div class="frow"><label class="flabel">Razón social</label><input class="finput" id="mc-razon"></div>
     <div class="fgrid2">
       <div class="frow"><label class="flabel">RFC</label><input class="finput" id="mc-rfc" maxlength="13" style="text-transform:uppercase"></div>
@@ -710,8 +718,70 @@ function abrirCli(id){
   document.getElementById('mc-dir').value      = c ? (c.direccion||'') : '';
   document.getElementById('mc-notas').value    = c ? (c.notas||'') : '';
   document.getElementById('mc-activo').checked = c ? !!Number(c.activo) : true;
+  // El lector se reinicia en cada apertura: dejar el archivo y el resultado del
+  // cliente anterior haría creer que esos datos son de éste.
+  document.getElementById('mc-csf').value = '';
+  document.getElementById('mc-csf-hint').innerHTML =
+    'Súbela y se llenan solos el RFC, la razón social, el código postal y el régimen. ' +
+    'Revisa lo que quede antes de guardar.';
   abrir('m-cli');
 }
+/**
+ * Lee la constancia y llena los campos fiscales.
+ *
+ * Llena, no guarda: lo leído queda en el formulario para que se revise contra
+ * la constancia y sea una persona quien apriete Guardar. Los campos que se
+ * llenaron se marcan un momento, para ver de un vistazo qué tocó y qué no.
+ */
+async function leerCsf(){
+  const inp  = document.getElementById('mc-csf');
+  const hint = document.getElementById('mc-csf-hint');
+  const f    = inp.files && inp.files[0];
+  if (!f) return;
+
+  hint.innerHTML = '<span class="spin"></span> Leyendo la constancia…';
+  const fd = new FormData();
+  fd.append('action', 'PRES_LEER_CSF');
+  // El envoltorio de fetch no toca los FormData, así que el token va aquí.
+  fd.append('token', _sesion.token || '');
+  fd.append('csf', f);
+
+  let d;
+  try {
+    const r = await fetch(API + '?action=PRES_LEER_CSF', {method:'POST', body: fd});
+    d = await r.json();
+  } catch(e) {
+    hint.innerHTML = '<span style="color:var(--rojo)">No se pudo enviar el archivo.</span>';
+    return;
+  }
+
+  if (d.status !== 'ok') {
+    hint.innerHTML = `<span style="color:var(--rojo)">${esc(d.message||'No se pudo leer.')}</span>`;
+    return;
+  }
+
+  const mapa = {rfc:'mc-rfc', razon_social:'mc-razon', cp_fiscal:'mc-cp',
+                regimen_fiscal:'mc-regimen', direccion:'mc-dir'};
+  const puestos = [];
+  Object.entries(mapa).forEach(([k, id]) => {
+    if (!d.campos || d.campos[k] === undefined) return;
+    const el = document.getElementById(id);
+    el.value = d.campos[k];
+    puestos.push(k);
+    el.style.transition = 'background .4s';
+    el.style.background = '#eaf7ee';
+    setTimeout(()=>{ el.style.background=''; }, 2500);
+  });
+
+  const faltan = d.no_leidos || [];
+  hint.innerHTML =
+    (puestos.length ? `<span style="color:var(--verde)">Se llenaron ${puestos.length} campo(s).</span> ` : '') +
+    (faltan.length
+      ? `<span style="color:var(--ambar)">No se pudo leer: ${esc(faltan.join(', '))}. Captúralo a mano.</span>`
+      : '<span style="color:var(--verde)">Revisa que coincida con la constancia y guarda.</span>');
+  inp.value = '';
+}
+
 async function guardarCli(){
   const d = await post('PRES_GUARDAR_CLIENTE', {
     id: document.getElementById('mc-id').value || 0,

@@ -53,7 +53,13 @@ class ClaudeIA {
      * @param string $usuario   El encargo concreto de esta llamada.
      * @return array{status:string, texto?:string, modelo?:string, uso?:array, message?:string}
      */
-    public function mensaje(string $system, string $usuario): array {
+    /**
+     * @param array $adjuntos Documentos que acompañan al texto. Cada uno:
+     *        ['tipo' => 'pdf'|'imagen', 'media_type' => …, 'datos' => base64].
+     *        Van ANTES del texto en el mensaje: es el orden que la API espera
+     *        para que el modelo lea primero el documento y luego la consigna.
+     */
+    public function mensaje(string $system, string $usuario, array $adjuntos = []): array {
         if (!$this->disponible()) {
             return ['status' => 'error',
                 'message' => 'La generación con IA no está configurada en el servidor (falta CLAUDE_API_KEY).'];
@@ -63,6 +69,24 @@ class ClaudeIA {
         }
         if (trim($usuario) === '') {
             return ['status' => 'error', 'message' => 'No hay nada que pedirle al modelo.'];
+        }
+
+        // Sin adjuntos el contenido es una cadena, como siempre. Con adjuntos
+        // hay que armar la lista de bloques.
+        $contenido = $usuario;
+        if ($adjuntos) {
+            $bloques = [];
+            foreach ($adjuntos as $a) {
+                $datos = (string)($a['datos'] ?? '');
+                $mt    = (string)($a['media_type'] ?? '');
+                if ($datos === '' || $mt === '') continue;
+                $bloques[] = [
+                    'type'   => (($a['tipo'] ?? '') === 'pdf') ? 'document' : 'image',
+                    'source' => ['type' => 'base64', 'media_type' => $mt, 'data' => $datos],
+                ];
+            }
+            $bloques[]  = ['type' => 'text', 'text' => $usuario];
+            $contenido  = $bloques;
         }
 
         $payload = [
@@ -79,7 +103,7 @@ class ClaudeIA {
             ]],
             'messages'   => [[
                 'role'    => 'user',
-                'content' => $usuario,
+                'content' => $contenido,
             ]],
         ];
 

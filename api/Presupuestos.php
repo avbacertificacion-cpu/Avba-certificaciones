@@ -680,6 +680,208 @@ class Presupuestos {
         return $falta;
     }
 
+    // ══════════════════════════════════════════════════════════
+    //  LECTURA DE LA CONSTANCIA DE SITUACIÓN FISCAL
+    // ══════════════════════════════════════════════════════════
+
+    /** Tipos que la API sabe leer, con su extensión para el mensaje de error. */
+    private const CSF_TIPOS = [
+        'application/pdf' => 'pdf',
+        'image/jpeg'      => 'imagen',
+        'image/png'       => 'imagen',
+        'image/webp'      => 'imagen',
+    ];
+
+    /** 10 MB. El límite de la API es mayor, pero un PDF sano no pesa esto. */
+    private const CSF_MAX_BYTES = 10485760;
+
+    /**
+     * Lee una constancia de situación fiscal y devuelve los campos que el SAT
+     * exige para timbrar.
+     *
+     * Dos reglas que definen esta función:
+     *
+     * 1. NO guarda nada. Devuelve los datos para que se revisen en pantalla y
+     *    sea una persona quien apriete Guardar. Un RFC mal leído que entra solo
+     *    al catálogo no se descubre hasta que el timbrado lo rechaza, con el
+     *    cliente esperando su factura.
+     *
+     * 2. Lo que el modelo devuelve se valida aquí contra las mismas reglas que
+     *    la captura a mano: el RFC contra su patrón, el CP contra cinco
+     *    dígitos, el régimen contra el catálogo del SAT. Lo que no pasa se
+     *    descarta y se reporta como no leído, en vez de colarse.
+     *
+     * El archivo tampoco se conserva: se lee, se manda y se descarta. Una
+     * constancia trae domicilio y datos personales del contribuyente; no hay
+     * razón para acumularlas en el servidor si lo que se quería eran cinco
+     * campos.
+     */
+    public function leerConstanciaFiscal(array $archivo): array {
+        $err = (int)($archivo['error'] ?? UPLOAD_ERR_NO_FILE);
+        if ($err === UPLOAD_ERR_NO_FILE) {
+            return ['status' => 'error', 'message' => 'No llegó ningún archivo.'];
+        }
+        if ($err === UPLOAD_ERR_INI_SIZE || $err === UPLOAD_ERR_FORM_SIZE) {
+            return ['status' => 'error', 'message' => 'El archivo excede el tamaño que admite el servidor.'];
+        }
+        if ($err !== UPLOAD_ERR_OK) {
+            return ['status' => 'error', 'message' => 'La subida del archivo falló. Intenta de nuevo.'];
+        }
+
+        $ruta = (string)($archivo['tmp_name'] ?? '');
+        if ($ruta === '' || !is_uploaded_file($ruta)) {
+            return ['status' => 'error', 'message' => 'Archivo no válido.'];
+        }
+        if (filesize($ruta) > self::CSF_MAX_BYTES) {
+            return ['status' => 'error', 'message' => 'La constancia pesa más de 10 MB. Sube el PDF original, no un escaneo grande.'];
+        }
+
+        // El tipo se decide leyendo el archivo, no por lo que diga el nombre ni
+        // el navegador: ese dato lo pone quien sube.
+        $mime = '';
+        if (function_exists('finfo_open') && ($fi = finfo_open(FILEINFO_MIME_TYPE))) {
+            $mime = (string)finfo_file($fi, $ruta);
+            finfo_close($fi);
+        }
+        if (!isset(self::CSF_TIPOS[$mime])) {
+            return ['status' => 'error',
+                'message' => 'La constancia debe ser PDF o una imagen (JPG, PNG o WEBP).'];
+        }
+
+        $bin = @file_get_contents($ruta);
+        if ($bin === false || $bin === '') {
+            return ['status' => 'error', 'message' => 'No se pudo leer el archivo.'];
+        }
+
+        $ia = new ClaudeIA();
+        if (!$ia->disponible()) {
+            return ['status' => 'error',
+                'message' => 'La lectura automática no está configurada en el servidor (falta CLAUDE_API_KEY). '
+                           . 'Puedes capturar los datos a mano.'];
+        }
+
+        $regimenes = [];
+        foreach (self::REGIMENES as $clave => $nombre) $regimenes[] = "$clave = $nombre";
+
+        $system = "Eres un asistente que lee Constancias de Situación Fiscal del SAT (México) y extrae "
+                . "los datos de identificación fiscal del contribuyente.\n\n"
+                . "Devuelve ÚNICAMENTE un objeto JSON, sin texto antes ni después y sin cercas de código, "
+                . "con exactamente estas claves:\n"
+                . "  rfc            — el RFC del contribuyente, 12 o 13 caracteres, sin espacios ni guiones.\n"
+                . "  razon_social   — para persona moral, la denominación o razón social TAL CUAL aparece, "
+                . "incluyendo el régimen de capital (S.A. DE C.V., S. DE R.L., etc.) si la constancia lo trae. "
+                . "Para persona física, el nombre completo: nombre y apellidos.\n"
+                . "  cp_fiscal      — el código postal del domicilio fiscal, 5 dígitos.\n"
+                . "  regimen_fiscal — la CLAVE numérica de tres dígitos del régimen. Si la constancia lista "
+                . "varios regímenes vigentes, elige el que corresponda a la actividad principal. Claves válidas:\n    "
+                . implode("\n    ", $regimenes) . "\n"
+                . "  direccion      — el domicilio fiscal en una sola línea (calle, número, colonia, "
+                . "municipio y estado).\n\n"
+                . "Reglas:\n"
+                . "- Copia los datos literalmente de la constancia. No corrijas ortografía, no completes "
+                . "abreviaturas y no deduzcas nada que no esté escrito.\n"
+                . "- Si un dato no aparece o no puedes leerlo con certeza, pon null en esa clave. "
+                . "Es preferible null a un dato inventado: con estos campos se timbran facturas.\n"
+                . "- Si el documento NO es una constancia de situación fiscal, devuelve "
+                . "{\"error\":\"no_es_csf\"}.";
+
+        $r = $ia->mensaje(
+            $system,
+            'Extrae los datos fiscales de esta constancia y devuélvelos como JSON.',
+            [[
+                'tipo'       => self::CSF_TIPOS[$mime],
+                'media_type' => $mime,
+                'datos'      => base64_encode($bin),
+            ]]
+        );
+        unset($bin);
+
+        if (($r['status'] ?? '') !== 'ok') return $r;
+
+        $datos = $this->jsonDeRespuesta((string)($r['texto'] ?? ''));
+        if ($datos === null) {
+            error_log('[Presupuestos] CSF: respuesta no interpretable');
+            return ['status' => 'error',
+                'message' => 'No se pudo interpretar la lectura. Captura los datos a mano.'];
+        }
+        if (($datos['error'] ?? '') === 'no_es_csf') {
+            return ['status' => 'error',
+                'message' => 'Ese documento no parece una constancia de situación fiscal.'];
+        }
+
+        return ['status' => 'ok'] + $this->validarDatosCsf($datos);
+    }
+
+    /**
+     * Saca el objeto JSON de la respuesta.
+     *
+     * Se pidió JSON puro, pero un modelo puede envolverlo en cercas de código o
+     * anteponer una frase. Recortar entre la primera llave y la última es más
+     * barato que fallar por una tilde de más.
+     */
+    private function jsonDeRespuesta(string $texto): ?array {
+        $t = trim($texto);
+        $t = preg_replace('/^```(?:json)?\s*|\s*```$/i', '', $t);
+        $ini = strpos($t, '{');
+        $fin = strrpos($t, '}');
+        if ($ini === false || $fin === false || $fin <= $ini) return null;
+        $j = json_decode(substr($t, $ini, $fin - $ini + 1), true);
+        return is_array($j) ? $j : null;
+    }
+
+    /**
+     * Filtra lo leído con las mismas reglas de la captura a mano. Lo que no
+     * pasa no se devuelve: se nombra como no leído para que se capture.
+     */
+    private function validarDatosCsf(array $d): array {
+        $campos = [];
+        $noLeidos = [];
+
+        // Al RFC leído por máquina se le exige además que la fecha exista. El
+        // patrón de siempre da por buena una cifra cualquiera, y un dígito mal
+        // reconocido —un 3 por un 8 en el mes— produce justo eso: un RFC con
+        // forma correcta y fecha imposible. Vale más pedirlo a mano.
+        $rfc = strtoupper(preg_replace('/[^A-Za-z0-9Ññ&]/', '', (string)($d['rfc'] ?? '')));
+        $rfcOk = $rfc !== '' && preg_match('/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/', $rfc);
+        if ($rfcOk) {
+            $f = substr($rfc, strlen($rfc) === 13 ? 4 : 3, 6);
+            $rfcOk = checkdate((int)substr($f, 2, 2), (int)substr($f, 4, 2), 2000 + (int)substr($f, 0, 2));
+        }
+        if ($rfcOk) $campos['rfc'] = $rfc;
+        else        $noLeidos[] = 'RFC';
+
+        $razon = trim(preg_replace('/\s+/', ' ', (string)($d['razon_social'] ?? '')));
+        if ($razon !== '') $campos['razon_social'] = mb_substr($razon, 0, 250);
+        else $noLeidos[] = 'razón social';
+
+        $cp = preg_replace('/\D/', '', (string)($d['cp_fiscal'] ?? ''));
+        if (preg_match('/^\d{5}$/', $cp)) $campos['cp_fiscal'] = $cp;
+        else $noLeidos[] = 'código postal fiscal';
+
+        // Puede venir la clave o el nombre del régimen; se aceptan las dos, pero
+        // sólo si corresponden a un régimen que el SAT reconoce.
+        $reg  = trim((string)($d['regimen_fiscal'] ?? ''));
+        $codigo = '';
+        if (isset(self::REGIMENES[$reg])) {
+            $codigo = $reg;
+        } elseif ($reg !== '') {
+            $norm = fn($s) => strtolower(trim(preg_replace('/\s+/', ' ',
+                strtr($s, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','Á'=>'a','É'=>'e','Í'=>'i','Ó'=>'o','Ú'=>'u']))));
+            // El casteo a cadena no es cosmético: PHP convierte a entero las
+            // claves numéricas del catálogo, y la columna guarda texto.
+            foreach (self::REGIMENES as $c => $n) {
+                if ($norm($n) === $norm($reg)) { $codigo = (string)$c; break; }
+            }
+        }
+        if ($codigo !== '') $campos['regimen_fiscal'] = $codigo;
+        else $noLeidos[] = 'régimen fiscal';
+
+        $dir = trim(preg_replace('/\s+/', ' ', (string)($d['direccion'] ?? '')));
+        if ($dir !== '') $campos['direccion'] = mb_substr($dir, 0, 300);
+
+        return ['campos' => $campos, 'no_leidos' => $noLeidos];
+    }
+
     public function guardarCliente(array $p): array {
         $id     = (int)($p['id'] ?? 0);
         $nombre = trim((string)($p['nombre_comercial'] ?? ''));
