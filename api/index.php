@@ -1639,7 +1639,10 @@ if ($method === 'POST') {
         case 'APROBAR_PARTICIPANTE':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($personal->aprobarParticipante((int)($payload['id'] ?? 0), $usr['usuario'], trim($payload['qr'] ?? '')));
+            respuesta($personal->aprobarParticipante(
+                (int)($payload['id'] ?? 0), $usr['usuario'], trim($payload['qr'] ?? ''),
+                !empty($payload['sustituir_personal'])
+            ));
 
         case 'APROBAR_SELECCIONADOS_PERSONAL':
             $usr = validarToken($pdo, $token);
@@ -1862,7 +1865,10 @@ if ($method === 'POST') {
         case 'APROBAR_SESION_ACC':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($accesorios->aprobarSesion((int)($payload['id'] ?? 0), $usr['usuario'], trim($payload['qr'] ?? '')));
+            respuesta($accesorios->aprobarSesion(
+                (int)($payload['id'] ?? 0), $usr['usuario'], trim($payload['qr'] ?? ''),
+                !empty($payload['sustituir_personal'])
+            ));
 
         case 'DEVOLVER_SESION_ACC':   // Calidad → Inspector
             $usr = validarToken($pdo, $token);

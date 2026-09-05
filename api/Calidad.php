@@ -68,9 +68,19 @@ class Calidad {
         $qrRow = $stmtQR->fetch();
 
         $qrYaEsDeEsteEquipo = $qrRow && $qrRow['usado'] && (int)$qrRow['equipo_id'] === $id;
-        if ($qrRow && $qrRow['usado'] && !$qrYaEsDeEsteEquipo)
-            return ['status' => 'error',
-                'message' => avisoQrOcupado($this->pdo, $qr, ['tabla' => 'equipos', 'id' => $id])];
+        $avisoSustitucion = '';
+        if ($qrRow && $qrRow['usado'] && !$qrYaEsDeEsteEquipo) {
+            $excepto = ['tabla' => 'equipos', 'id' => $id];
+            // Con autorización expresa, el personal cede el código: la etiqueta
+            // ya está pegada en el equipo y la de la persona se puede recalcular.
+            if (!empty($payload['sustituir_personal'])) {
+                $sus = sustituirQrDePersonal($this->pdo, $qr, $usuario);
+                if (!$sus['ok']) return ['status' => 'error', 'message' => $sus['message']];
+                $avisoSustitucion = ' ' . $sus['message'];
+            } else {
+                return respuestaQrOcupado($this->pdo, $qr, $excepto);
+            }
+        }
 
         $estadoAnterior = $row['estado'];
         $nuevoEstado    = 'APROBADO CALIDAD';
@@ -94,7 +104,8 @@ class Calidad {
         registrarHistorial($this->pdo, $usuario, $id, 'estado', $estadoAnterior, $nuevoEstado);
         registrarHistorial($this->pdo, $usuario, $id, 'qr_codigo', $row['qr_codigo'] ?? null, $qr);
 
-        return ['status' => 'success', 'message' => 'Inspección aprobada y QR asignado correctamente.'];
+        return ['status' => 'success',
+            'message' => 'Inspección aprobada y QR asignado correctamente.' . $avisoSustitucion];
     }
 
     // ── Cambiar el inspector que firma la inspección ───────

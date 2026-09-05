@@ -602,7 +602,7 @@ class Accesorios {
     }
 
     // ── Aprobar sesión → APROBADO_CALIDAD ────────────────
-    public function aprobarSesion(int $id, string $usuario, string $qr): array {
+    public function aprobarSesion(int $id, string $usuario, string $qr, bool $sustituir = false): array {
         $this->ensureAccSesionesColumns();
         $chk = $this->pdo->prepare("SELECT id, cliente, control, qr_codigo, estatus FROM accesorios_sesiones WHERE id = ?");
         $chk->execute([$id]);
@@ -627,9 +627,17 @@ class Accesorios {
         $qrRow = $stmtQR->fetch();
 
         $mismoQr = ($sesion['qr_codigo'] === $qr);
-        if ($qrRow && $qrRow['usado'] && !$mismoQr)
-            return ['status' => 'error',
-                'message' => avisoQrOcupado($this->pdo, $qr, ['tabla' => 'accesorios_sesiones', 'id' => $id])];
+        $avisoSustitucion = '';
+        if ($qrRow && $qrRow['usado'] && !$mismoQr) {
+            $excepto = ['tabla' => 'accesorios_sesiones', 'id' => $id];
+            if ($sustituir) {
+                $sus = sustituirQrDePersonal($this->pdo, $qr, $usuario);
+                if (!$sus['ok']) return ['status' => 'error', 'message' => $sus['message']];
+                $avisoSustitucion = ' ' . $sus['message'];
+            } else {
+                return respuestaQrOcupado($this->pdo, $qr, $excepto);
+            }
+        }
 
         // Generar control si la sesión no lo tiene (registros previos a migration_009)
         if (empty($sesion['control'])) {

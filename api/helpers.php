@@ -562,6 +562,106 @@ function duenoDelQR(PDO $pdo, string $qr, array $excepto = []): ?array {
 }
 
 /**
+ * Le quita el código a un registro de personal y le asigna otro de su serie.
+ *
+ * Existe para un caso concreto: una placa ya pegada en un equipo —o en una
+ * pieza— que resulta estar también en una persona. El adhesivo no se despega
+ * sin dañarlo; el código de la persona sí se puede cambiar. Así que cede el
+ * personal, y sólo el personal: si quien tiene el código es un equipo, un
+ * arnés o un accesorio, esta función no hace nada. Detrás de esos hay una
+ * etiqueta física que nadie va a ir a cambiar.
+ *
+ * El código nuevo sale de la serie que le toca al personal, no del primero
+ * libre que haya: las series son la forma en que el sistema distingue de un
+ * vistazo qué tipo de registro es cada placa.
+ *
+ * No toca los documentos ni el estado del participante. Si ya tenía papeles
+ * emitidos, quedan apuntando a un código que dejó de ser suyo, y eso se avisa
+ * en el mensaje para que se decida qué hacer; el sistema no lo decide solo.
+ */
+function sustituirQrDePersonal(PDO $pdo, string $qr, string $usuario): array {
+    $qr = trim($qr);
+    if ($qr === '') return ['ok' => false, 'message' => 'Falta el código.'];
+
+    try {
+        $st = $pdo->prepare(
+            "SELECT id, nombre_completo, control, estatus
+               FROM participantes_cursos WHERE qr_codigo = ? LIMIT 1"
+        );
+        $st->execute([$qr]);
+        $p = $st->fetch(PDO::FETCH_ASSOC);
+    } catch (\Throwable $e) {
+        error_log('[sustituirQrDePersonal] ' . $e->getMessage());
+        return ['ok' => false, 'message' => 'No se pudo consultar el registro de personal.'];
+    }
+
+    if (!$p) {
+        return ['ok' => false,
+            'message' => 'Ese código no lo tiene un registro de personal, así que no se puede sustituir. '
+                       . 'Detrás de un equipo, un arnés o un accesorio hay una etiqueta física.'];
+    }
+
+    $nuevo = siguienteQrSerie($pdo, QR_PREFIJO_PERSONAL);
+    if ($nuevo === '' || $nuevo === $qr) {
+        return ['ok' => false, 'message' => 'No hay códigos disponibles en la serie de personal.'];
+    }
+    // El siguiente de la serie sale del banco, pero se comprueba igual: si por
+    // lo que sea ya estuviera puesto en algún registro, cambiaríamos un choque
+    // por otro.
+    if (duenoDelQR($pdo, $nuevo) !== null) {
+        return ['ok' => false,
+            'message' => 'El siguiente código de la serie de personal ya está en uso. Revisa el banco de placas.'];
+    }
+
+    try {
+        $pdo->prepare("UPDATE participantes_cursos SET qr_codigo = ? WHERE id = ?")
+            ->execute([$nuevo, (int)$p['id']]);
+        qrRegistrarUsado($pdo, $nuevo);
+    } catch (\Throwable $e) {
+        error_log('[sustituirQrDePersonal] ' . $e->getMessage());
+        return ['ok' => false, 'message' => 'No se pudo reasignar el código del participante.'];
+    }
+
+    $quien  = trim((string)$p['nombre_completo']) ?: ('participante ' . $p['id']);
+    $folio  = trim((string)$p['control']);
+    $emitido = (string)($p['estatus'] ?? '') === 'EMITIDO';
+
+    error_log(sprintf('[QR] %s sustituyó %s: pasó de %s a %s (%s)',
+        $usuario, $quien, $qr, $nuevo, $folio !== '' ? $folio : 's/folio'));
+
+    $msg = "El código quedó libre: a $quien"
+         . ($folio !== '' ? " (folio $folio)" : '')
+         . " se le asignó el $nuevo.";
+    if ($emitido) {
+        $msg .= ' Ojo: sus documentos ya estaban emitidos con el código anterior, '
+              . 'así que hay que regenerarlos y reenviarlos.';
+    }
+
+    return ['ok' => true, 'message' => $msg, 'persona' => $quien,
+            'folio' => $folio, 'nuevo' => $nuevo, 'emitido' => $emitido];
+}
+
+/**
+ * La negativa por código ocupado, diciendo además si se puede sustituir.
+ *
+ * El frontend usa `sustituible` para ofrecer la casilla de autorización. Sólo
+ * se marca cuando el dueño es personal: es el único caso en que ceder el
+ * código no obliga a despegar una etiqueta.
+ */
+function respuestaQrOcupado(PDO $pdo, string $qr, array $excepto = []): array {
+    $d = duenoDelQR($pdo, $qr, $excepto);
+    $r = ['status' => 'error', 'message' => avisoQrOcupado($pdo, $qr, $excepto)];
+    if ($d && $d['modulo'] === 'Personal') {
+        $r['sustituible'] = true;
+        $r['ocupado_por'] = $d['quien'] . ($d['folio'] !== '' ? ' (folio ' . $d['folio'] . ')' : '');
+        $r['message']     = rtrim($r['message'], '.') . '. Puedes autorizar la sustitución: '
+                          . 'el código pasa a este registro y a ' . $d['quien']
+                          . ' se le asigna otro de la serie de personal.';
+    }
+    return $r;
+}
+
+/**
  * Los códigos QR que están puestos en más de un registro.
  *
  * Una placa duplicada no se anuncia sola: cada registro se ve bien por su

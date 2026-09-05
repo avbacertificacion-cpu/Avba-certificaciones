@@ -3220,11 +3220,32 @@ async function ejecutarAprobacion() {
       payload = { fila: filaActual, qr };
     }
 
-    const res  = await fetch(API, {
-      method: "POST",
-      body:   JSON.stringify({ action, payload })
-    });
-    const data = await res.json();
+    const enviar = async extra => {
+      const res = await fetch(API, {
+        method: "POST",
+        body:   JSON.stringify({ action, payload: Object.assign({}, payload, extra || {}) })
+      });
+      return res.json();
+    };
+
+    let data = await enviar();
+
+    /*
+     * El código ya lo tiene alguien más y es un registro de personal: se puede
+     * ceder, porque a una persona se le recalcula la placa y a un equipo hay que
+     * despegarle la etiqueta. No se hace solo — se pide autorización expresa, y
+     * se dice a quién se le va a quitar antes de preguntar.
+     */
+    if (data.status !== "success" && data.sustituible) {
+      const ok = confirm(
+        (data.message || '') + "\n\n" +
+        "¿Autorizas la sustitución?\n" +
+        "El código pasa a este registro y a " + (data.ocupado_por || 'esa persona') +
+        " se le asignará otro de la serie de personal."
+      );
+      if (!ok) return;
+      data = await enviar({ sustituir_personal: 1 });
+    }
 
     if (data.status === "success") {
       if (aproContext === 'equipo') {
@@ -3237,6 +3258,9 @@ async function ejecutarAprobacion() {
       document.getElementById("folio-val").textContent = data.folio || data.control || "—";
       document.getElementById("apro-paso-qr").style.display = "none";
       document.getElementById("apro-paso-ok").style.display  = "block";
+      // Si hubo sustitución, a alguien más le cambió su placa: eso no se puede
+      // quedar en un mensaje que se cierre solo.
+      if (data.message && /se le asign[oó]/i.test(data.message)) alert(data.message);
     } else {
       alert("Error al aprobar: " + (data.message || "Error desconocido"));
     }
@@ -7946,10 +7970,25 @@ async function aprobarArn(id) {
   if (qr === null) return;
   if (!qr.trim()) { mostrarToast('Indica el código QR.', 'err'); return; }
   try {
-    const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ action:'APROBAR_SESION_ARNES', payload:{ id, qr: qr.trim() } }) });
-    const d = await r.json();
-    if (d.status === 'success') { mostrarToast(d.message || 'Aprobada.', 'ok'); cerrarArnDet(); cargarSesionesArn(); }
+    const enviar = async sustituir => {
+      const r = await fetch(API, { method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ action:'APROBAR_SESION_ARNES',
+          payload:{ id, qr: qr.trim(), sustituir_personal: sustituir ? 1 : 0 } }) });
+      return r.json();
+    };
+    let d = await enviar(false);
+    // El código lo tiene una persona: se puede ceder, pero con autorización.
+    if (d.status !== 'success' && d.sustituible) {
+      const ok = confirm((d.message || '') + '\n\n¿Autorizas la sustitución?\n' +
+        'A ' + (d.ocupado_por || 'esa persona') + ' se le asignará otro código de su serie.');
+      if (!ok) return;
+      d = await enviar(true);
+    }
+    if (d.status === 'success') {
+      mostrarToast(d.message || 'Aprobada.', 'ok');
+      if (d.message && /se le asign[oó]/i.test(d.message)) alert(d.message);
+      cerrarArnDet(); cargarSesionesArn();
+    }
     else mostrarToast(d.message || 'No se pudo aprobar.', 'err');
   } catch(_) { mostrarToast('Error de red.', 'err'); }
 }

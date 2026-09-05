@@ -1063,9 +1063,16 @@ class Arneses {
             return ['status' => 'error', 'message' =>
                 'Los códigos QR de equipo empiezan con ' . QR_PREFIJO_EQUIPO . '. El código indicado no pertenece a esa serie.'];
         }
+        $avisoSustitucion = '';
         if (!$this->qrDisponible($qr, 0, $id)) {
-            return ['status' => 'error',
-                'message' => avisoQrOcupado($this->pdo, $qr, ['tabla' => 'arneses_sesiones', 'id' => $id])];
+            $excepto = ['tabla' => 'arneses_sesiones', 'id' => $id];
+            if (!empty($p['sustituir_personal'])) {
+                $sus = sustituirQrDePersonal($this->pdo, $qr, $usuario);
+                if (!$sus['ok']) return ['status' => 'error', 'message' => $sus['message']];
+                $avisoSustitucion = ' ' . $sus['message'];
+            } else {
+                return respuestaQrOcupado($this->pdo, $qr, $excepto);
+            }
         }
 
         $control = $ses['control'] ?: generarControl($this->pdo, $ses['cliente']);

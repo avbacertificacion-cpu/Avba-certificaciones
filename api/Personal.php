@@ -430,7 +430,7 @@ class Personal {
     }
 
     // ── Aprobar participante → APROBADO_CALIDAD ────────────
-    public function aprobarParticipante(int $id, string $usuario, string $qr = ''): array {
+    public function aprobarParticipante(int $id, string $usuario, string $qr = '', bool $sustituir = false): array {
         ensurePublicado($this->pdo);
         $this->ensureEstatusColumn();
         // Garantizar columna qr_codigo
@@ -443,6 +443,7 @@ class Personal {
         $p = $chk->fetch();
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
 
+        $avisoSustitucion = '';
         if (!$qr) {
             // Auto-asignar el siguiente libre de la serie de personal
             $qr = siguienteQrSerie($this->pdo, QR_PREFIJO_PERSONAL);
@@ -460,9 +461,16 @@ class Personal {
             $stmtQR = $this->pdo->prepare("SELECT usado FROM qr_codigos WHERE identificador = ?");
             $stmtQR->execute([$qr]);
             $qrRow = $stmtQR->fetch();
-            if ($qrRow && $qrRow['usado'] && !$mismoQr)
-                return ['status' => 'error',
-                    'message' => avisoQrOcupado($this->pdo, $qr, ['tabla' => 'participantes_cursos', 'id' => $id])];
+            if ($qrRow && $qrRow['usado'] && !$mismoQr) {
+                $excepto = ['tabla' => 'participantes_cursos', 'id' => $id];
+                if ($sustituir) {
+                    $sus = sustituirQrDePersonal($this->pdo, $qr, $usuario);
+                    if (!$sus['ok']) return ['status' => 'error', 'message' => $sus['message']];
+                    $avisoSustitucion = ' ' . $sus['message'];
+                } else {
+                    return respuestaQrOcupado($this->pdo, $qr, $excepto);
+                }
+            }
         }
 
         // Generar control si el participante no lo tiene (registros previos a migration_009)
@@ -483,7 +491,7 @@ class Personal {
 
         return [
             'status'  => 'success',
-            'message' => 'Participante aprobado y QR asignado automáticamente.',
+            'message' => 'Participante aprobado y QR asignado automáticamente.' . $avisoSustitucion,
             'qr'      => $qr,
         ];
     }
