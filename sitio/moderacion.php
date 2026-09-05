@@ -87,11 +87,11 @@ if ($autenticado && in_array($_POST['accion'] ?? '', ['aprobar', 'rechazar', 'el
         $accion = $_POST['accion'];
 
         if ($accion === 'eliminar') {
-            $st = pdo()->prepare('SELECT archivo FROM muro_publicaciones WHERE id = ?');
+            $st = pdo()->prepare('SELECT archivo, poster FROM muro_publicaciones WHERE id = ?');
             $st->execute([$id]);
-            $archivo = $st->fetchColumn();
-            if ($archivo && is_file(DIR_SUBIDAS . $archivo)) {
-                @unlink(DIR_SUBIDAS . $archivo);
+            $fila = $st->fetch() ?: [];
+            foreach ([$fila['archivo'] ?? null, $fila['poster'] ?? null] as $f) {
+                if ($f && is_file(DIR_SUBIDAS . $f)) { @unlink(DIR_SUBIDAS . $f); }
             }
             pdo()->prepare('DELETE FROM muro_publicaciones WHERE id = ?')->execute([$id]);
             $aviso = 'Publicación eliminada.';
@@ -150,7 +150,8 @@ if ($autenticado) {
   .tab{padding:9px 16px;border-radius:99px;border:1px solid var(--borde);background:var(--sup);color:var(--sub);text-decoration:none;font-size:14px;font-weight:600;}
   .tab.on{background:var(--marino);border-color:var(--marino);color:#fff;}
   .tarjeta{background:var(--sup);border:1px solid var(--borde);border-radius:14px;padding:18px;margin-bottom:16px;display:grid;grid-template-columns:220px 1fr;gap:18px;}
-  .tarjeta img{width:100%;border-radius:10px;display:block;background:#eef2f7;}
+  .tarjeta img,.tarjeta video{width:100%;border-radius:10px;display:block;background:#eef2f7;}
+  .etq-video{margin-top:6px;font-size:11.5px;font-weight:700;color:#0A5C9C;text-transform:uppercase;letter-spacing:.5px;}
   .meta{font-size:12.5px;color:var(--sub);margin-bottom:8px;}
   .nom{font-size:16px;font-weight:700;}
   .com{margin:10px 0 14px;white-space:pre-wrap;overflow-wrap:anywhere;}
@@ -206,10 +207,14 @@ if ($autenticado) {
     <?php foreach ($publicaciones as $p): ?>
       <div class="tarjeta">
         <div>
-          <?php if ($p['archivo'] && is_file(DIR_SUBIDAS . $p['archivo'])): ?>
+          <?php if (($p['tipo'] ?? 'imagen') === 'video' && $p['archivo'] && is_file(DIR_SUBIDAS . $p['archivo'])): ?>
+            <video src="uploads/muro/<?= e($p['archivo']) ?>" controls playsinline preload="metadata"
+                   <?= ($p['poster'] ?? '') && is_file(DIR_SUBIDAS . $p['poster']) ? 'poster="uploads/muro/' . e($p['poster']) . '"' : '' ?>></video>
+            <div class="etq-video">Video<?= !empty($p['duracion']) ? ' · ' . floor($p['duracion']/60) . ':' . str_pad((string)($p['duracion']%60), 2, '0', STR_PAD_LEFT) : '' ?></div>
+          <?php elseif ($p['archivo'] && is_file(DIR_SUBIDAS . $p['archivo'])): ?>
             <img src="uploads/muro/<?= e($p['archivo']) ?>" alt="Fotografía enviada por <?= e($p['nombre']) ?>" loading="lazy">
           <?php else: ?>
-            <div class="vacio" style="padding:28px 12px;font-size:13px;">Sin fotografía</div>
+            <div class="vacio" style="padding:28px 12px;font-size:13px;">Sin material</div>
           <?php endif; ?>
         </div>
         <div>

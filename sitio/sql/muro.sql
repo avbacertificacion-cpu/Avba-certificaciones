@@ -12,10 +12,16 @@ CREATE TABLE IF NOT EXISTS muro_publicaciones (
     empresa         VARCHAR(120)  NULL,
     comentario      TEXT          NOT NULL,
 
-    -- Imagen ya normalizada por el servidor (nombre generado, nunca el original)
+    -- Fotografía o video compartido
+    tipo            ENUM('imagen','video') NOT NULL DEFAULT 'imagen',
+
+    -- Archivo ya normalizado por el servidor (nombre generado, nunca el original)
     archivo         VARCHAR(120)  NULL,
+    -- Miniatura del video: se muestra en la galería sin descargar el video entero
+    poster          VARCHAR(120)  NULL,
     ancho           SMALLINT UNSIGNED NULL,
     alto            SMALLINT UNSIGNED NULL,
+    duracion        SMALLINT UNSIGNED NULL,
 
     -- Moderación
     estado          ENUM('pendiente','aprobado','rechazado') NOT NULL DEFAULT 'pendiente',

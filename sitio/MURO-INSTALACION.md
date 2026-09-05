@@ -147,3 +147,52 @@ Si tu archivo es SVG o tiene otro nombre, mándamelo y ajusto la referencia.
 
 Conviene revisar las condiciones de uso del símbolo que entrega la propia
 ema, porque suelen fijar reglas de tamaño, proporción y contexto.
+
+---
+
+# Videos en el muro
+
+El muro acepta fotografías y videos (MP4, WebM y MOV, el formato del iPhone).
+
+## Si ya tenías la tabla creada
+
+Ejecuta `sql/muro-video.sql` en phpMyAdmin: agrega las tres columnas que el
+video necesita. Si creas la tabla ahora desde cero con `muro.sql`, ya viene
+todo incluido y no hace falta.
+
+## Importante: el límite de subida del servidor
+
+Este es el punto que decide si los videos funcionan o no.
+
+Por omisión PHP acepta **2 MB por archivo**, y un video de celular pesa entre
+20 y 100 MB. Con las fotografías esto se resolvió comprimiéndolas en el
+navegador antes de enviarlas, pero **eso no es posible con video**: no hay
+forma razonable de recomprimirlo desde el navegador.
+
+Para que se puedan publicar videos hay que subir ese límite:
+
+1. hPanel → **Avanzado** → **Configuración de PHP** → pestaña **Opciones**
+2. Sube `upload_max_filesize` y `post_max_size` a **64M**
+3. Guarda
+
+El sitio se adapta solo: consulta el límite real del servidor y se lo muestra
+al visitante en el formulario ("hasta 64 MB"). Si alguien elige un video más
+pesado, se lo advierte **antes** de subirlo, en vez de dejarlo esperando para
+fallar al final.
+
+Mientras no subas el límite, los videos grandes seguirán rechazándose y solo
+pasarán los muy cortos.
+
+## Cómo se manejan los videos
+
+- **Miniatura automática.** El navegador toma un fotograma y lo envía como
+  imagen aparte. La galería muestra esa miniatura, así que la página no
+  descarga los videos hasta que alguien decide reproducir uno.
+- **Verificación del contenido.** Una fotografía se reconstruye desde cero, lo
+  que elimina cualquier cosa incrustada; con un video no se puede hacer eso,
+  así que se comprueba la firma binaria del archivo. Un script renombrado a
+  `.mp4` se rechaza, y el `.htaccess` de `uploads/` impide que se ejecute
+  nada dentro de esa carpeta.
+- **Límite propio de 60 MB**, además del que imponga el servidor.
+- En el panel de moderación puedes **ver el video completo antes de
+  aprobarlo**.

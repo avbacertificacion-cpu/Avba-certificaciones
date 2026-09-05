@@ -837,6 +837,33 @@
   .saludo-rol{font-size:12px;color:var(--texto-sub);overflow-wrap:anywhere;}
   .saludo-cta{width:100%;}
 
+  /* Distintivo de video */
+  .post-play{
+    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+    width:52px;height:52px;border-radius:50%;
+    background:rgba(3,14,30,.62);color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    pointer-events:none;transition:background .2s, transform .2s;
+  }
+  .post-play svg{width:24px;height:24px;margin-left:2px;}
+  .post-figura:hover .post-play,.tira-item:hover .post-play{background:var(--brand-ink);transform:translate(-50%,-50%) scale(1.06);}
+  .tira-play{width:40px;height:40px;}
+  .tira-play svg{width:18px;height:18px;}
+  .post-dur{
+    position:absolute;right:10px;bottom:10px;
+    background:rgba(3,14,30,.72);color:#fff;
+    font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:6px;
+    pointer-events:none;
+  }
+  .subir-prev{width:100%;max-height:230px;object-fit:contain;background:#0b1220;display:block;}
+  video.subir-prev{max-height:260px;}
+  #visor-video{
+    max-width:100%;max-height:78vh;width:auto;height:auto;
+    margin:0 auto;border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.6);
+    background:#000;display:block;
+  }
+  #visor-video[hidden]{display:none;}
+
   /* Visor a pantalla completa */
   .visor{position:fixed;inset:0;z-index:130;display:flex;align-items:center;justify-content:center;padding:24px;}
   .visor[hidden]{display:none;}
@@ -1568,7 +1595,7 @@
       <div class="section-head reveal">
         <span class="tag">Orgullo AVBA</span>
         <h2>Siéntete orgulloso de ser operador</h2>
-        <p>Detrás de cada maniobra segura hay alguien que la hizo bien. Comparte tu izaje, presume tu trabajo y forma parte del equipo de AVBA Inspections.</p>
+        <p>Detrás de cada maniobra segura hay alguien que la hizo bien. Comparte tu izaje en foto o video, presume tu trabajo y forma parte del equipo de AVBA Inspections.</p>
       </div>
 
       <div class="muro-cta reveal">
@@ -1621,6 +1648,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
       <img id="visor-img" alt="">
+      <video id="visor-video" controls playsinline preload="metadata" hidden></video>
       <div class="visor-pie" id="visor-pie"></div>
     </div>
   </div>
@@ -1634,7 +1662,7 @@
       </button>
 
       <h3 id="modal-titulo">Comparte tu izaje</h3>
-      <p class="modal-sub">Cuéntanos de esa maniobra y súbenos la foto. Publicamos después de revisarla.</p>
+      <p class="modal-sub">Cuéntanos de esa maniobra y súbenos la foto o el video. Publicamos después de revisarlo.</p>
 
       <form id="form-muro" novalidate>
         <div class="campo">
@@ -1661,20 +1689,21 @@
         </div>
 
         <div class="campo">
-          <label for="m-foto">Fotografía del izaje</label>
+          <label for="m-foto">Fotografía o video del izaje</label>
           <div class="subir" id="m-subir">
-            <input type="file" id="m-foto" name="foto" accept="image/jpeg,image/png,image/webp">
+            <input type="file" id="m-foto" name="foto" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm,video/quicktime">
             <div class="subir-txt" id="m-subir-txt">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M8 8l4-4 4 4"/><path d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16"/></svg>
-              <span>Toca para elegir una foto<br><small>JPG, PNG o WebP · hasta 8 MB</small></span>
+              <span>Toca para elegir una foto o video<br><small id="m-limites">JPG, PNG, WebP · MP4, WebM o MOV</small></span>
             </div>
             <img class="subir-prev" id="m-prev" alt="" hidden>
+            <video class="subir-prev" id="m-prev-video" playsinline muted controls hidden></video>
           </div>
         </div>
 
         <label class="consent">
           <input type="checkbox" id="m-consent" name="consentimiento" value="1" required>
-          <span>Autorizo a AVBA a publicar esta fotografía y mi comentario en su sitio y redes. Confirmo que aparezco en la imagen o cuento con el permiso de quienes aparecen, y que puedo compartir la maniobra del sitio donde fue tomada.</span>
+          <span>Autorizo a AVBA a publicar este material y mi comentario en su sitio y redes. Confirmo que aparezco en él o cuento con el permiso de quienes aparecen, y que puedo compartir la maniobra del sitio donde fue tomada.</span>
         </label>
 
         <!-- Trampa para bots: invisible para las personas -->
@@ -2031,6 +2060,10 @@
     d.textContent = t == null ? '' : String(t);
     return d.innerHTML;
   }
+  function minutos(seg){
+    var m = Math.floor(seg / 60), r = seg % 60;
+    return m + ':' + (r < 10 ? '0' : '') + r;
+  }
   function iniciales(nombre){
     var p = String(nombre || '?').trim().split(/\s+/);
     return ((p[0] || '?')[0] + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase();
@@ -2048,14 +2081,19 @@
       var alt = 'Izaje compartido por ' + escapar(p.nombre);
       var img = '';
       if (p.imagen) {
+        var esVid = p.tipo === 'video' && p.video;
         img = '<figure class="post-figura" data-ver="' + escapar(p.imagen) + '"'
+            +      (esVid ? ' data-video="' + escapar(p.video) + '"' : '')
             +      ' data-nombre="' + escapar(p.nombre) + '" data-rol="' + escapar(rol) + '"'
-            +      ' tabindex="0" role="button" aria-label="Ampliar fotografía de ' + escapar(p.nombre) + '">'
+            +      ' tabindex="0" role="button" aria-label="' + (esVid ? 'Reproducir video de ' : 'Ampliar fotografía de ') + escapar(p.nombre) + '">'
             +   '<img class="post-img" src="' + escapar(p.imagen) + '" alt="' + alt + '" loading="lazy"'
             +     (p.ancho && p.alto ? ' width="' + p.ancho + '" height="' + p.alto + '"' : '') + '>'
-            +   '<span class="post-lupa" aria-hidden="true">'
-            +     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M11 8v6M8 11h6"/></svg>'
-            +   '</span>'
+            +   (esVid
+                ? '<span class="post-play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>'
+                  + (p.duracion ? '<span class="post-dur">' + minutos(p.duracion) + '</span>' : '')
+                : '<span class="post-lupa" aria-hidden="true">'
+                  + '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5M11 8v6M8 11h6"/></svg>'
+                  + '</span>')
             + '</figure>';
       }
       return '<article class="post">' + img
@@ -2075,14 +2113,28 @@
   /* Visor: ver la fotografía completa en grande */
   var visor    = document.getElementById('visor');
   var visorImg = document.getElementById('visor-img');
+  var visorVideo = document.getElementById('visor-video');
   var visorPie = document.getElementById('visor-pie');
   var focoPrevio = null;
 
   function abrirVisor(fig){
     if (!visor) return;
     focoPrevio = fig;
-    visorImg.src = fig.getAttribute('data-ver');
-    visorImg.alt = 'Fotografía de ' + fig.getAttribute('data-nombre');
+    var video = fig.getAttribute('data-video');
+    if (video) {
+      visorImg.hidden = true;
+      visorImg.removeAttribute('src');
+      visorVideo.src = video;
+      visorVideo.hidden = false;
+      visorVideo.play().catch(function(){});   // si el navegador lo impide, quedan los controles
+    } else {
+      visorVideo.hidden = true;
+      visorVideo.pause();
+      visorVideo.removeAttribute('src');
+      visorImg.hidden = false;
+      visorImg.src = fig.getAttribute('data-ver');
+      visorImg.alt = 'Fotografía de ' + fig.getAttribute('data-nombre');
+    }
     var rol = fig.getAttribute('data-rol');
     visorPie.innerHTML = '<strong>' + escapar(fig.getAttribute('data-nombre')) + '</strong>'
                        + (rol ? escapar(rol) : '');
@@ -2095,6 +2147,7 @@
     if (!visor) return;
     visor.hidden = true;
     visorImg.removeAttribute('src');
+    if (visorVideo) { visorVideo.pause(); visorVideo.removeAttribute('src'); }
     document.body.style.overflow = '';
     if (focoPrevio) focoPrevio.focus();
   }
@@ -2131,10 +2184,14 @@
     function tarjeta(p, duplicada){
       var rol = [p.puesto, p.empresa].filter(Boolean).join(' · ');
       return '<figure class="tira-item' + (duplicada ? ' duplicada' : '') + '" data-ver="' + escapar(p.imagen) + '"'
+           +   (p.tipo === 'video' && p.video ? ' data-video="' + escapar(p.video) + '"' : '')
            +   ' data-nombre="' + escapar(p.nombre) + '" data-rol="' + escapar(rol) + '"'
            +   (duplicada ? ' aria-hidden="true"' : ' tabindex="0" role="button" aria-label="Ampliar fotografía de ' + escapar(p.nombre) + '"')
            + '>'
            +   '<img src="' + escapar(p.imagen) + '" alt="' + (duplicada ? '' : 'Izaje compartido por ' + escapar(p.nombre)) + '" loading="lazy">'
+           +   (p.tipo === 'video' && p.video
+                ? '<span class="post-play tira-play" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l11-6.5z"/></svg></span>'
+                : '')
            +   '<figcaption class="tira-pie">' + escapar(p.nombre) + '</figcaption>'
            + '</figure>';
     }
@@ -2155,6 +2212,14 @@
       .then(function(r){ return r.ok ? r.json() : Promise.reject(r.status); })
       .then(function(d){
         var lista = (d && d.publicaciones) || [];
+        if (d && d.limites && d.limites.video) {
+          limiteVideo = d.limites.video;
+          var lim = document.getElementById('m-limites');
+          if (lim) {
+            lim.textContent = 'JPG, PNG, WebP · MP4, WebM o MOV hasta '
+                            + Math.round(limiteVideo / 1048576) + ' MB';
+          }
+        }
         pintar(lista);
         pintarTira(lista);
       })
@@ -2253,11 +2318,16 @@
     coment.addEventListener('input', function(){ cuenta.textContent = coment.value.length; });
   }
 
-  /* Vista previa y compresión de la foto */
+  /* Vista previa, compresión de foto y miniatura de video */
   var foto = document.getElementById('m-foto');
   var prev = document.getElementById('m-prev');
+  var prevVideo = document.getElementById('m-prev-video');
   var subirTxt = document.getElementById('m-subir-txt');
-  var fotoLista = null;   // Blob ya comprimido que se enviará
+  var fotoLista = null;    // Blob ya comprimido que se enviará
+  var posterLista = null;  // Miniatura del video
+  var duracionVideo = null;
+  var esVideo = false;
+  var limiteVideo = 60 * 1024 * 1024;   // se ajusta con lo que informe el servidor
 
   /**
    * Reduce la fotografía en el propio navegador antes de subirla.
@@ -2292,19 +2362,88 @@
     });
   }
 
+  /**
+   * Toma un fotograma del video para usarlo como miniatura. Sin esto la
+   * galería tendría que descargar el video entero solo para mostrarlo.
+   */
+  function miniaturaDeVideo(archivo){
+    return new Promise(function(resolve, reject){
+      var url = URL.createObjectURL(archivo);
+      var v = document.createElement('video');
+      v.preload = 'metadata';
+      v.muted = true;
+      v.playsInline = true;
+      var listo = false;
+      var fallo = function(){ if (!listo) { URL.revokeObjectURL(url); reject(new Error('video')); } };
+      v.onerror = fallo;
+      setTimeout(fallo, 12000);
+      v.onloadedmetadata = function(){
+        // Un segundo dentro: el primer fotograma suele salir negro.
+        v.currentTime = Math.min(1, (v.duration || 2) / 2);
+      };
+      v.onseeked = function(){
+        try {
+          var escala = Math.min(1, 1600 / Math.max(v.videoWidth, v.videoHeight));
+          var lienzo = document.createElement('canvas');
+          lienzo.width  = Math.round(v.videoWidth  * escala);
+          lienzo.height = Math.round(v.videoHeight * escala);
+          lienzo.getContext('2d').drawImage(v, 0, 0, lienzo.width, lienzo.height);
+          lienzo.toBlob(function(blob){
+            listo = true;
+            URL.revokeObjectURL(url);
+            blob ? resolve({poster: blob, duracion: Math.round(v.duration || 0)})
+                 : reject(new Error('miniatura'));
+          }, 'image/jpeg', 0.82);
+        } catch (e) { fallo(); }
+      };
+      v.src = url;
+    });
+  }
+
   if (foto) {
     foto.addEventListener('change', function(){
       var f = foto.files && foto.files[0];
       if (!f) return;
-      fotoLista = null;
+      fotoLista = null; posterLista = null; duracionVideo = null;
+      esVideo = /^video\//.test(f.type) || /\.(mp4|webm|mov|m4v)$/i.test(f.name);
 
-      if (!/^image\/(jpeg|png|webp)$/.test(f.type)) {
-        mostrarMsg('Elige una imagen JPG, PNG o WebP.', 'err');
+      if (!esVideo && !/^image\/(jpeg|png|webp)$/.test(f.type)) {
+        mostrarMsg('Elige una imagen JPG, PNG o WebP, o un video MP4, WebM o MOV.', 'err');
         foto.value = '';
         return;
       }
 
       var url = URL.createObjectURL(f);
+
+      if (esVideo) {
+        if (f.size > limiteVideo) {
+          mostrarMsg('El video pesa ' + (f.size/1048576).toFixed(1) + ' MB y el máximo es '
+                     + Math.round(limiteVideo/1048576) + ' MB. Prueba con uno más corto.', 'err');
+          foto.value = ''; URL.revokeObjectURL(url);
+          return;
+        }
+        prev.hidden = true; prev.removeAttribute('src');
+        prevVideo.src = url;
+        prevVideo.hidden = false;
+        if (subirTxt) subirTxt.style.display = 'none';
+        mostrarMsg('Preparando el video…', 'ok');
+
+        miniaturaDeVideo(f)
+          .then(function(r){
+            posterLista = r.poster;
+            duracionVideo = r.duracion;
+            fotoLista = f;   // el video se envía tal cual
+            if (msg) msg.hidden = true;
+          })
+          .catch(function(){
+            // Sin miniatura se puede publicar igual: la galería usará un fondo.
+            fotoLista = f;
+            if (msg) msg.hidden = true;
+          });
+        return;
+      }
+
+      prevVideo.hidden = true; prevVideo.removeAttribute('src');
       prev.src = url;
       prev.hidden = false;
       if (subirTxt) subirTxt.style.display = 'none';
@@ -2350,8 +2489,12 @@
       boton.textContent = 'Enviando…';
 
       var datos = new FormData(form);
-      // Se sustituye el archivo original por la versión ya comprimida.
-      if (fotoLista) {
+      if (esVideo) {
+        // El video se envía tal cual, acompañado de su miniatura.
+        if (posterLista) { datos.set('poster', posterLista, 'poster.jpg'); }
+        if (duracionVideo) { datos.set('duracion', String(duracionVideo)); }
+      } else if (fotoLista) {
+        // Se sustituye la fotografía original por la versión ya comprimida.
         datos.set('foto', fotoLista, 'izaje.jpg');
       } else if (foto && foto.files.length && foto.files[0].size > 2 * 1024 * 1024) {
         // La compresión aún no terminó y el archivo es grande: mejor esperar
