@@ -834,6 +834,40 @@ function mostrarResultado(data) {
     return;
   }
 
+  // Un código en dos registros: no se puede afirmar a cuál corresponde, y
+  // adivinar sería lo peor que puede hacer un verificador. Se dice y se manda
+  // con AVBA, que es quien lo puede resolver.
+  if (data.conflicto) {
+    document.body.classList.add("bg-noenc");
+    const donde = {equipo:'un equipo', personal:'una persona', arnes:'un arnés',
+                   accesorio:'un accesorio'};
+    const lista = (data.coincide_en||[]).map(m=>donde[m]||m).join(' y ');
+    div.innerHTML = `
+      <div class="resultado res-noenc">
+        <div class="res-header">
+          <div class="res-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>
+            </svg>
+          </div>
+          <div class="res-title">CÓDIGO DUPLICADO</div>
+          <div class="res-sub">Este código está asignado a más de un registro</div>
+        </div>
+        <div class="res-body" style="text-align:center;padding-bottom:20px">
+          <p style="font-size:13px;color:rgba(255,255,255,0.5);line-height:1.7">
+            Aparece en ${lista||'más de un registro'}, así que no podemos confirmar
+            a cuál corresponde esta etiqueta.<br>
+            Contacta a AVBA para que lo aclare.
+          </p>
+          <a href="https://avba.com.mx" style="display:inline-block;margin-top:14px;padding:8px 20px;border-radius:20px;border:1px solid rgba(255,255,255,0.15);color:rgba(255,255,255,0.5);font-size:12px;text-decoration:none">
+            Contactar a AVBA
+          </a>
+        </div>
+      </div>`;
+    setTimeout(resetBg, 20000);
+    return;
+  }
+
   const d      = data.datos;
   const modulo = data.modulo || 'equipo';
 

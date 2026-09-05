@@ -7957,6 +7957,45 @@ async function aprobarArn(id) {
 /* La emisión y el envío corresponden a Certificaciones, igual que en grúas:
    Calidad aprueba y el expediente pasa al siguiente departamento. */
 
+/**
+ * Las placas que quedaron puestas en más de un registro.
+ *
+ * Se muestran arriba de todo y en rojo porque rompen la validación pública:
+ * quien escanea esa etiqueta puede acabar viendo el registro equivocado.
+ */
+function pintarQrDuplicados(dups) {
+  let caja = document.getElementById('qr-duplicados');
+  if (!caja) {
+    const tabla = document.getElementById('qr-tabla-body');
+    const donde = tabla ? tabla.closest('table')?.parentElement : null;
+    if (!donde || !donde.parentElement) return;
+    caja = document.createElement('div');
+    caja.id = 'qr-duplicados';
+    donde.parentElement.insertBefore(caja, donde);
+  }
+  if (!dups.length) { caja.innerHTML = ''; return; }
+
+  const esc = s => String(s ?? '').replace(/[&<>"']/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  caja.innerHTML = `
+    <div style="border:1px solid var(--rojo);background:var(--rojo-light);border-radius:9px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-weight:700;color:var(--rojo);font-size:13px;margin-bottom:3px">
+        ${dups.length} código(s) asignados a más de un registro</div>
+      <div style="font-size:11.5px;color:var(--texto-sub);margin-bottom:9px">
+        Quien escanee una de estas placas puede ver el registro equivocado.
+        Hay que dejar el código en uno solo y reasignar el otro.</div>
+      ${dups.map(d => `
+        <div style="background:#fff;border-radius:7px;padding:8px 10px;margin-top:7px">
+          <div style="font-family:monospace;font-size:13px;font-weight:700;letter-spacing:.04em">${esc(d.qr)}</div>
+          ${d.registros.map(r => `
+            <div style="font-size:11.5px;color:var(--texto-sub);margin-top:3px">
+              <b>${esc(r.modulo)}</b> · ${esc(r.quien)}${r.cliente ? ' · ' + esc(r.cliente) : ''}${r.folio ? ' · folio ' + esc(r.folio) : ''}
+            </div>`).join('')}
+        </div>`).join('')}
+    </div>`;
+}
+
 async function cargarInfoQR() {
   const filtro = document.getElementById('qr-filtro')?.value || 'todos';
   try {
@@ -7969,6 +8008,7 @@ async function cargarInfoQR() {
     document.getElementById('qr-stat-disp').textContent   = data.disponibles ?? '—';
     document.getElementById('qr-stat-used').textContent   = data.usados ?? '—';
     document.getElementById('qr-stat-ultimo').textContent = data.ultimo ?? '—';
+    pintarQrDuplicados(data.duplicados || []);
 
     // Tabla
     const tbody = document.getElementById('qr-tabla-body');

@@ -25,17 +25,41 @@ class ValidarQR {
 
         $esFolio = (bool) preg_match('/^\d{5}-\d{5}$/', $qrBuscado);
 
-        $result = $this->buscarEquipo($qrBuscado, $esFolio);
-        if ($result) return $result;
+        /*
+         * Se consultan los cuatro módulos, no el primero que conteste.
+         *
+         * Devolver la primera coincidencia parecía razonable mientras un código
+         * viviera en un solo lugar. Cuando no —una placa pegada en un equipo con
+         * el mismo número que la credencial de una persona— el orden de búsqueda
+         * decidía en silencio: el equipo iba primero, así que quien escaneaba la
+         * credencial veía una máquina, y nada avisaba del choque.
+         *
+         * Un verificador que ante la duda afirma es peor que uno que se calla.
+         * Si el código está en dos registros, se dice; que AVBA lo resuelva.
+         */
+        $encontrados = array_values(array_filter([
+            $this->buscarEquipo($qrBuscado, $esFolio),
+            $this->buscarAccesorio($qrBuscado, $esFolio),
+            $this->buscarArnes($qrBuscado, $esFolio),
+            $this->buscarPersonal($qrBuscado, $esFolio),
+        ]));
 
-        $result = $this->buscarAccesorio($qrBuscado, $esFolio);
-        if ($result) return $result;
-
-        $result = $this->buscarArnes($qrBuscado, $esFolio);
-        if ($result) return $result;
-
-        $result = $this->buscarPersonal($qrBuscado, $esFolio);
-        if ($result) return $result;
+        if (count($encontrados) > 1) {
+            $modulos = array_values(array_unique(array_map(
+                fn($r) => (string)($r['modulo'] ?? 'equipo'), $encontrados
+            )));
+            error_log('[ValidarQR] código duplicado: ' . $qrBuscado . ' en ' . implode(', ', $modulos));
+            return [
+                'status'     => 'ok',
+                'existe'     => true,
+                'conflicto'  => true,
+                'modulo'     => 'conflicto',
+                'vigente'    => false,
+                'coincide_en'=> $modulos,
+                'datos'      => ['titulo' => 'Código duplicado'],
+            ];
+        }
+        if ($encontrados) return $encontrados[0];
 
         // Las demás divisiones: quien escanea una placa no sabe —ni tiene por
         // qué saber— cómo está organizada la unidad por dentro. El certificado

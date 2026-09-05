@@ -562,6 +562,70 @@ function duenoDelQR(PDO $pdo, string $qr, array $excepto = []): ?array {
 }
 
 /**
+ * Los códigos QR que están puestos en más de un registro.
+ *
+ * Una placa duplicada no se anuncia sola: cada registro se ve bien por su
+ * lado, y el choque sólo aparece cuando alguien escanea y le sale lo que no
+ * es. Esta función los saca todos de una vez.
+ *
+ * @return array Lista de ['qr' => …, 'registros' => [ ['modulo','quien','folio','cliente'], … ]].
+ */
+function qrDuplicados(PDO $pdo): array {
+    $fuentes = [
+        ['Equipos', "SELECT qr_codigo AS qr, control, cliente,
+                            TRIM(CONCAT_WS(' ', maquinaria, marca, modelo)) AS quien
+                       FROM equipos WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''"],
+        ['Personal', "SELECT qr_codigo AS qr, control, empresa_nombre AS cliente,
+                             nombre_completo AS quien
+                        FROM participantes_cursos WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''"],
+        ['Arneses', "SELECT qr_codigo AS qr, control, cliente, 'Sesión de arneses' AS quien
+                       FROM arneses_sesiones WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''"],
+        ['Arneses', "SELECT i.qr_codigo AS qr, s.control, s.cliente,
+                            TRIM(CONCAT_WS(' ', i.id_arnes, i.marca)) AS quien
+                       FROM arneses_items i LEFT JOIN arneses_sesiones s ON s.id = i.sesion_id
+                      WHERE i.qr_codigo IS NOT NULL AND i.qr_codigo <> ''"],
+        ['Accesorios', "SELECT qr_codigo AS qr, control, cliente, 'Sesión de accesorios' AS quien
+                          FROM accesorios_sesiones WHERE qr_codigo IS NOT NULL AND qr_codigo <> ''"],
+        ['Accesorios', "SELECT a.qr_codigo AS qr, s.control, s.cliente,
+                               TRIM(CONCAT_WS(' ', a.id_accesorio, a.marca)) AS quien
+                          FROM accesorios_izaje a LEFT JOIN accesorios_sesiones s ON s.id = a.sesion_id
+                         WHERE a.qr_codigo IS NOT NULL AND a.qr_codigo <> ''"],
+    ];
+
+    $porCodigo = [];
+    foreach ($fuentes as [$modulo, $sql]) {
+        try {
+            foreach ($pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
+                $qr = trim((string)$r['qr']);
+                if ($qr === '') continue;
+                $porCodigo[$qr][] = [
+                    'modulo'  => $modulo,
+                    'quien'   => trim((string)($r['quien'] ?? '')) ?: 'Registro sin descripción',
+                    'folio'   => trim((string)($r['control'] ?? '')),
+                    'cliente' => trim((string)($r['cliente'] ?? '')),
+                ];
+            }
+        } catch (\Throwable $e) {
+            continue;   // tabla ausente en esta base
+        }
+    }
+
+    $out = [];
+    foreach ($porCodigo as $qr => $regs) {
+        // El casteo importa: PHP convierte a entero una clave numérica, y una
+        // placa es una cadena (puede traer ceros a la izquierda).
+        if (count($regs) > 1) $out[] = ['qr' => (string)$qr, 'registros' => $regs];
+    }
+    // Los choques entre módulos distintos son los que rompen la validación
+    // pública, así que van primero.
+    usort($out, function ($a, $b) {
+        $mods = fn($x) => count(array_unique(array_column($x['registros'], 'modulo')));
+        return ($mods($b) <=> $mods($a)) ?: strcmp($a['qr'], $b['qr']);
+    });
+    return $out;
+}
+
+/**
  * El aviso de QR ocupado, con el dueño cuando se puede averiguar.
  *
  * Si no se encuentra a nadie se devuelve el aviso de siempre: el código puede

@@ -280,6 +280,9 @@ class Calidad {
             'disponibles' => $disponibles,
             'ultimo'      => $ultimo ?: null,
             'codigos'     => $codigos,
+            // Una placa puesta en dos registros no se anuncia sola: cada uno se
+            // ve bien por su lado y el choque sólo sale cuando alguien escanea.
+            'duplicados'  => qrDuplicados($this->pdo),
         ];
     }
 
