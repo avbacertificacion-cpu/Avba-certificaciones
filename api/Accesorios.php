@@ -311,7 +311,7 @@ class Accesorios {
         if ($qrCodigo !== '' && !qrFormatoValido($qrCodigo))
             return ['status' => 'error', 'message' => qrMensajeFormato()];
         if ($qrCodigo !== '' && !$this->qrDisponible($qrCodigo))
-            return ['status' => 'error', 'message' => 'Ese QR ya está en uso.'];
+            return ['status' => 'error', 'message' => avisoQrOcupado($this->pdo, $qrCodigo)];
 
         // El orden sigue al último, no al total: si Calidad borró un renglón
         // intermedio, contar daría un número ya ocupado y dos accesorios
@@ -586,7 +586,8 @@ class Accesorios {
         if (!$row) return ['status' => 'error', 'message' => 'Accesorio no encontrado.'];
 
         if ($qrCodigo !== '' && $row['qr_codigo'] !== $qrCodigo && !$this->qrDisponible($qrCodigo, $id))
-            return ['status' => 'error', 'message' => 'El código QR ya está en uso en otro registro.'];
+            return ['status' => 'error',
+                'message' => avisoQrOcupado($this->pdo, $qrCodigo, ['tabla' => 'accesorios_izaje', 'id' => $id])];
 
         $this->pdo->prepare(
             "UPDATE accesorios_izaje
@@ -626,7 +627,9 @@ class Accesorios {
         $qrRow = $stmtQR->fetch();
 
         $mismoQr = ($sesion['qr_codigo'] === $qr);
-        if ($qrRow && $qrRow['usado'] && !$mismoQr) return ['status' => 'error', 'message' => 'Ese código QR ya está en uso por otro registro.'];
+        if ($qrRow && $qrRow['usado'] && !$mismoQr)
+            return ['status' => 'error',
+                'message' => avisoQrOcupado($this->pdo, $qr, ['tabla' => 'accesorios_sesiones', 'id' => $id])];
 
         // Generar control si la sesión no lo tiene (registros previos a migration_009)
         if (empty($sesion['control'])) {
@@ -793,7 +796,8 @@ class Accesorios {
             if (isset($vistos[$qr]))
                 return ['status' => 'error', 'message' => "El código $qr está repetido entre las copias."];
             if (!$this->qrDisponible($qr))
-                return ['status' => 'error', 'message' => "El código $qr ya está en uso."];
+                return ['status' => 'error',
+                    'message' => 'Copia ' . ($n + 1) . ': ' . avisoQrOcupado($this->pdo, $qr)];
             $vistos[$qr] = true;
         }
 
@@ -1573,7 +1577,8 @@ class Accesorios {
         if (!$row) return ['status' => 'error', 'message' => 'Accesorio no encontrado.'];
 
         if ($row['qr_codigo'] !== $qr && !$this->qrDisponible($qr, $id))
-            return ['status' => 'error', 'message' => 'El código QR ya está en uso en otro registro.'];
+            return ['status' => 'error',
+                'message' => avisoQrOcupado($this->pdo, $qr, ['tabla' => 'accesorios_izaje', 'id' => $id])];
 
         $this->pdo->prepare("UPDATE accesorios_izaje SET qr_codigo = ? WHERE id = ?")
             ->execute([$qr, $id]);

@@ -476,6 +476,111 @@ function qrRegistrarUsado(PDO $pdo, string $qr, ?int $equipoId = null): void {
 }
 
 /**
+ * A quién pertenece un código QR que ya está en uso.
+ *
+ * Cuando Calidad captura una placa y el sistema contesta "ese código ya está en
+ * uso", ahí se acaba la ayuda: hay que ir a buscar a mano en qué registro
+ * quedó, entre equipos, personal, arneses y accesorios. Esta función responde
+ * la pregunta que de verdad se está haciendo, que es de quién es.
+ *
+ * Se busca en las seis tablas que guardan un QR. Cada consulta va aislada: que
+ * una tabla falte —una base de división recién creada, un módulo que ahí no se
+ * usa— no puede impedir que las demás contesten.
+ *
+ * @param string $qr       El identificador capturado.
+ * @param array  $excepto  ['tabla' => 'equipos', 'id' => 12] para no reportar
+ *                         como ajeno el registro que se está editando.
+ * @return array|null      ['modulo','quien','folio','cliente'] o null si nadie lo tiene.
+ */
+function duenoDelQR(PDO $pdo, string $qr, array $excepto = []): ?array {
+    $qr = trim($qr);
+    if ($qr === '') return null;
+
+    $saltar = fn(string $tabla, $id) =>
+        ($excepto['tabla'] ?? '') === $tabla && (int)($excepto['id'] ?? 0) === (int)$id;
+
+    // Cada entrada: [tabla, SQL, cómo describir al dueño].
+    $fuentes = [
+        ['equipos',
+         "SELECT id, control, cliente, maquinaria, marca, modelo, serie
+            FROM equipos WHERE qr_codigo = ? LIMIT 1",
+         'Equipos',
+         fn($r) => trim(implode(' ', array_filter([$r['maquinaria'], $r['marca'], $r['modelo']])))
+                 . (trim((string)$r['serie']) !== '' ? ' · s/n ' . $r['serie'] : '')],
+
+        ['participantes_cursos',
+         "SELECT id, control, empresa_nombre AS cliente, nombre_completo
+            FROM participantes_cursos WHERE qr_codigo = ? LIMIT 1",
+         'Personal',
+         fn($r) => (string)$r['nombre_completo']],
+
+        ['arneses_sesiones',
+         "SELECT id, control, cliente FROM arneses_sesiones WHERE qr_codigo = ? LIMIT 1",
+         'Arneses',
+         fn($r) => 'Sesión de arneses'],
+
+        ['arneses_items',
+         "SELECT i.id, s.control, s.cliente, i.id_arnes, i.marca, i.serie
+            FROM arneses_items i LEFT JOIN arneses_sesiones s ON s.id = i.sesion_id
+           WHERE i.qr_codigo = ? LIMIT 1",
+         'Arneses',
+         fn($r) => trim(implode(' ', array_filter([$r['id_arnes'], $r['marca']])))
+                 . (trim((string)$r['serie']) !== '' ? ' · s/n ' . $r['serie'] : '')],
+
+        ['accesorios_sesiones',
+         "SELECT id, control, cliente FROM accesorios_sesiones WHERE qr_codigo = ? LIMIT 1",
+         'Accesorios',
+         fn($r) => 'Sesión de accesorios'],
+
+        ['accesorios_izaje',
+         "SELECT a.id, s.control, s.cliente, a.id_accesorio, a.marca, a.serie
+            FROM accesorios_izaje a LEFT JOIN accesorios_sesiones s ON s.id = a.sesion_id
+           WHERE a.qr_codigo = ? LIMIT 1",
+         'Accesorios',
+         fn($r) => trim(implode(' ', array_filter([$r['id_accesorio'], $r['marca']])))
+                 . (trim((string)$r['serie']) !== '' ? ' · s/n ' . $r['serie'] : '')],
+    ];
+
+    foreach ($fuentes as [$tabla, $sql, $modulo, $describir]) {
+        try {
+            $st = $pdo->prepare($sql);
+            $st->execute([$qr]);
+            $r = $st->fetch(PDO::FETCH_ASSOC);
+            if (!$r || $saltar($tabla, $r['id'] ?? 0)) continue;
+            return [
+                'modulo'  => $modulo,
+                'quien'   => trim((string)$describir($r)) ?: 'Registro sin descripción',
+                'folio'   => trim((string)($r['control'] ?? '')),
+                'cliente' => trim((string)($r['cliente'] ?? '')),
+            ];
+        } catch (\Throwable $e) {
+            // Tabla ausente o columna que aún no existe en esta base.
+            continue;
+        }
+    }
+    return null;
+}
+
+/**
+ * El aviso de QR ocupado, con el dueño cuando se puede averiguar.
+ *
+ * Si no se encuentra a nadie se devuelve el aviso de siempre: el código puede
+ * estar marcado como usado en el banco sin que ningún registro lo traiga
+ * todavía, y decir "no se sabe de quién" sería peor que no decir nada.
+ */
+function avisoQrOcupado(PDO $pdo, string $qr, array $excepto = []): string {
+    $d = duenoDelQR($pdo, $qr, $excepto);
+    if (!$d) return 'Ese código QR ya está en uso por otro registro.';
+
+    $partes = [$d['quien']];
+    if ($d['cliente'] !== '') $partes[] = 'de ' . $d['cliente'];
+    if ($d['folio']   !== '') $partes[] = '(folio ' . $d['folio'] . ')';
+
+    return 'Ese código QR ya está asignado a ' . implode(' ', $partes)
+         . ', en ' . $d['modulo'] . '. Usa una placa distinta.';
+}
+
+/**
  * Formatea una fecha a dd/MM/yyyy.
  */
 function formatFecha(?string $fecha): string {

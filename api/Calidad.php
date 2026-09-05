@@ -69,7 +69,8 @@ class Calidad {
 
         $qrYaEsDeEsteEquipo = $qrRow && $qrRow['usado'] && (int)$qrRow['equipo_id'] === $id;
         if ($qrRow && $qrRow['usado'] && !$qrYaEsDeEsteEquipo)
-            return ['status' => 'error', 'message' => 'Ese código QR ya está en uso por otro registro.'];
+            return ['status' => 'error',
+                'message' => avisoQrOcupado($this->pdo, $qr, ['tabla' => 'equipos', 'id' => $id])];
 
         $estadoAnterior = $row['estado'];
         $nuevoEstado    = 'APROBADO CALIDAD';

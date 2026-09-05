@@ -545,7 +545,7 @@ class Arneses {
                 'Los códigos QR de equipo empiezan con ' . QR_PREFIJO_EQUIPO . '. El código indicado no pertenece a esa serie.'];
         }
         if ($qrItem !== '' && !$this->qrDisponible($qrItem)) {
-            return ['status' => 'error', 'message' => "El código QR $qrItem ya está asignado a otro registro."];
+            return ['status' => 'error', 'message' => avisoQrOcupado($this->pdo, $qrItem)];
         }
 
         $up = fn($k) => mb_strtoupper(trim((string)($post[$k] ?? ''))) ?: null;
@@ -987,7 +987,8 @@ class Arneses {
                     'Los códigos QR de equipo empiezan con ' . QR_PREFIJO_EQUIPO . '. El código indicado no pertenece a esa serie.'];
             }
             if ($q !== '' && !$this->qrDisponible($q, $id)) {
-                return ['status' => 'error', 'message' => "El código QR $q ya está asignado a otro registro."];
+                return ['status' => 'error',
+                    'message' => avisoQrOcupado($this->pdo, $q, ['tabla' => 'arneses_items', 'id' => $id])];
             }
             $campos[] = "qr_codigo = ?"; $vals[] = $q ?: null;
             $qrPrevio = $this->pdo->prepare("SELECT qr_codigo FROM arneses_items WHERE id = ?");
@@ -1063,7 +1064,8 @@ class Arneses {
                 'Los códigos QR de equipo empiezan con ' . QR_PREFIJO_EQUIPO . '. El código indicado no pertenece a esa serie.'];
         }
         if (!$this->qrDisponible($qr, 0, $id)) {
-            return ['status' => 'error', 'message' => 'Ese código QR ya está asignado a otro registro.'];
+            return ['status' => 'error',
+                'message' => avisoQrOcupado($this->pdo, $qr, ['tabla' => 'arneses_sesiones', 'id' => $id])];
         }
 
         $control = $ses['control'] ?: generarControl($this->pdo, $ses['cliente']);

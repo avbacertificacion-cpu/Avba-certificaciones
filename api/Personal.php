@@ -461,7 +461,8 @@ class Personal {
             $stmtQR->execute([$qr]);
             $qrRow = $stmtQR->fetch();
             if ($qrRow && $qrRow['usado'] && !$mismoQr)
-                return ['status' => 'error', 'message' => 'Ese código QR ya está en uso por otro registro.'];
+                return ['status' => 'error',
+                    'message' => avisoQrOcupado($this->pdo, $qr, ['tabla' => 'participantes_cursos', 'id' => $id])];
         }
 
         // Generar control si el participante no lo tiene (registros previos a migration_009)
