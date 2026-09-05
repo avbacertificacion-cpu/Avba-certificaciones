@@ -1355,6 +1355,11 @@ if ($method === 'POST') {
             respuesta($insp->guardarInspeccion($payload, $usr['usuario']));
 
         // ── Calidad ──────────────────────────────────────
+        case 'SUBIR_EVIDENCIA_CALIDAD':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->subirEvidencia($_POST, $_FILES, $usr['usuario']));
+
         case 'VALIDAR_CALIDAD':
         case 'APROBAR_CALIDAD':
             $usr = validarToken($pdo, $token);

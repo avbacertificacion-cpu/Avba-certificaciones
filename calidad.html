@@ -2679,6 +2679,12 @@ function ver(fila) {
            Ver evidencia fotográfica
          </button>`
       : `<span style="font-size:12px;color:var(--texto-hint)">Sin evidencia adjunta</span>`}
+    <button class="link-doc" onclick="document.getElementById('ev-add-input').click()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 3v10M3 8h10"/></svg>
+      Agregar fotos
+    </button>
+    <input type="file" id="ev-add-input" accept="image/jpeg,image/png,image/webp" multiple
+           style="display:none" onchange="subirEvidenciaCalidad(${d.fila || d.id || 0}, this)">
     ${d.reporte_url
       ? `<a class="link-doc" href="${d.reporte_url}" target="_blank" rel="noopener">
            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 2h7l3 3v9H3V2z"/><path d="M10 2v3h3"/><path d="M5 7h6M5 10h4"/></svg>
@@ -7274,6 +7280,43 @@ async function abrirPreviewPersonal(tipo) {
   camposPdfPerTipo  = tipo;
   camposPdfPerLocal = JSON.parse(JSON.stringify(tpl.pdf_campos));
   await previsualizarPdfPersonal();
+}
+
+/**
+ * Agrega fotos a la evidencia del equipo desde Calidad.
+ *
+ * Agrega: lo que subió el inspector no se toca. Si la carpeta ya existía, las
+ * nuevas se suman; si no había, se crea y el equipo queda ligado a ella.
+ */
+async function subirEvidenciaCalidad(fila, input) {
+  const fotos = input.files;
+  if (!fotos || !fotos.length) return;
+
+  const fd = new FormData();
+  fd.append('action', 'SUBIR_EVIDENCIA_CALIDAD');
+  // El envoltorio de fetch no toca los FormData: el token va aquí.
+  fd.append('token', (JSON.parse(localStorage.getItem('avba_session') || '{}')).token || '');
+  fd.append('id', fila);
+  for (const f of fotos) fd.append('fotos[]', f);
+
+  mostrarToast(`Subiendo ${fotos.length} foto(s)…`, 'info');
+  input.value = '';
+  try {
+    const r = await fetch(API, { method: 'POST', body: fd });
+    const d = await r.json();
+    if (d.status === 'success') {
+      mostrarToast(d.message || 'Fotos agregadas.', 'ok');
+      // El registro en memoria se actualiza para que el botón de ver evidencia
+      // aparezca sin tener que recargar la lista completa.
+      const reg = datosGlobal.find(x => x.fila === fila);
+      if (reg && d.evidencia_url) reg.evidencia = d.evidencia_url;
+      if (typeof ver === 'function' && filaActual === fila) ver(fila);
+    } else {
+      mostrarToast(d.message || 'No se pudieron subir las fotos.', 'err');
+    }
+  } catch (e) {
+    mostrarToast('Error de red al subir las fotos.', 'err');
+  }
 }
 
 async function verEvidencia(url) {

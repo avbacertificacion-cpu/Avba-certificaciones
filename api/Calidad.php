@@ -265,6 +265,137 @@ class Calidad {
         return $stmt->fetch() ?: null;
     }
 
+    // ══════════════════════════════════════════════════════════
+    //  EVIDENCIA FOTOGRÁFICA
+    // ══════════════════════════════════════════════════════════
+
+    /** Lo que la API sabe recibir como foto. */
+    private const EV_TIPOS = ['image/jpeg', 'image/png', 'image/webp'];
+
+    /** 12 MB por foto. Una cámara de celular no pasa de ahí. */
+    private const EV_MAX_BYTES = 12582912;
+
+    /** Cuántas se admiten de una sola vez. */
+    private const EV_MAX_ARCHIVOS = 12;
+
+    /**
+     * Agrega fotos a la evidencia de un equipo desde Calidad.
+     *
+     * Se AGREGA, nunca se reemplaza. Las fotos del inspector son la evidencia
+     * de lo que se vio en campo el día de la inspección; lo que Calidad suma
+     * —un detalle que faltaba, la placa de datos que salió borrosa— se pone al
+     * lado, no encima.
+     *
+     * Por eso también van con su propio prefijo: en un expediente acreditado
+     * importa poder distinguir quién aportó cada imagen. Y ese prefijo empieza
+     * con "z" a propósito: el dictamen toma las primeras nueve fotos en orden
+     * alfabético, así que las de Calidad se ordenan al final y no desplazan a
+     * las del inspector.
+     */
+    public function subirEvidencia(array $post, array $files, string $usuario): array {
+        $id = (int)($post['id'] ?? $post['fila'] ?? 0);
+        if ($id <= 0) return ['status' => 'error', 'message' => 'ID de equipo requerido.'];
+
+        $eq = $this->obtenerEquipo($id);
+        if (!$eq) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+
+        // Normaliza la subida: el navegador manda un arreglo cuando el input es
+        // múltiple y un solo valor cuando no.
+        $entrada = $files['fotos'] ?? $files['foto'] ?? null;
+        if (!$entrada) return ['status' => 'error', 'message' => 'No llegó ninguna foto.'];
+        $lote = is_array($entrada['name'] ?? null)
+            ? array_map(fn($i) => [
+                'name'     => $entrada['name'][$i],
+                'type'     => $entrada['type'][$i]     ?? '',
+                'tmp_name' => $entrada['tmp_name'][$i] ?? '',
+                'error'    => $entrada['error'][$i]    ?? UPLOAD_ERR_NO_FILE,
+                'size'     => $entrada['size'][$i]     ?? 0,
+              ], array_keys($entrada['name']))
+            : [$entrada];
+
+        $lote = array_slice($lote, 0, self::EV_MAX_ARCHIVOS);
+
+        // ── Carpeta destino ───────────────────────────────────
+        // Si el equipo ya tiene una carpeta nuestra, se usa esa. Si su
+        // evidencia apunta a otro lado —una liga externa de las viejas— no se
+        // toca: se crea la carpeta local y a partir de ahí vive aquí.
+        $baseDir = rtrim(UPLOAD_DIR, '/') . '/evidencias/';
+        $carpeta = '';
+        $urlPrev = trim((string)($eq['evidencia_url'] ?? ''));
+        if ($urlPrev !== '') {
+            $rel = trim((string)parse_url($urlPrev, PHP_URL_PATH), '/');
+            $rel = basename($rel);
+            if ($rel !== '' && strpos($rel, '..') === false && is_dir($baseDir . $rel)) {
+                $carpeta = $rel;
+            }
+        }
+        if ($carpeta === '') {
+            // El folio de control identifica al equipo mejor que su id interno.
+            $base = preg_replace('/[^A-Za-z0-9_-]/', '', (string)($eq['control'] ?? '')) ?: ('eq' . $id);
+            $carpeta = $base;
+        }
+        $destino = $baseDir . $carpeta . '/';
+        if (!is_dir($destino) && !@mkdir($destino, 0755, true)) {
+            error_log('[Calidad] evidencia: no se pudo crear ' . $destino);
+            return ['status' => 'error', 'message' => 'No se pudo crear la carpeta de evidencia.'];
+        }
+
+        $guardadas = 0;
+        $rechazos  = [];
+        $sello     = date('Ymd_His');
+
+        foreach ($lote as $n => $f) {
+            $nombre = (string)($f['name'] ?? ('foto ' . ($n + 1)));
+            if ((int)($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                $rechazos[] = "$nombre: no llegó completa";
+                continue;
+            }
+            // El peso se revisa antes: una foto enorme merece que se le diga que
+            // pesa de más, no un "archivo no válido" que no explica nada. La
+            // guarda de is_uploaded_file sigue delante de cualquier escritura.
+            if ((int)($f['size'] ?? 0) > self::EV_MAX_BYTES) { $rechazos[] = "$nombre: pesa más de 12 MB"; continue; }
+            $tmp = (string)($f['tmp_name'] ?? '');
+            if ($tmp === '' || !is_uploaded_file($tmp)) { $rechazos[] = "$nombre: archivo no válido"; continue; }
+
+            // El tipo se decide leyendo el archivo, no por lo que diga el nombre.
+            $mime = '';
+            if (function_exists('finfo_open') && ($fi = finfo_open(FILEINFO_MIME_TYPE))) {
+                $mime = (string)finfo_file($fi, $tmp);
+                finfo_close($fi);
+            }
+            if (!in_array($mime, self::EV_TIPOS, true)) { $rechazos[] = "$nombre: no es una imagen"; continue; }
+
+            $salida = $destino . 'z_calidad_' . $sello . '_' . ($n + 1) . '.jpg';
+            // Se comprime como el resto de las imágenes del sistema: una foto de
+            // celular pesa varios MB y en el dictamen se ve igual.
+            $final = comprimirImagen($tmp, $salida, 1600, 1600, 78);
+            if ($final === false) {
+                if (!@move_uploaded_file($tmp, $salida)) { $rechazos[] = "$nombre: no se pudo guardar"; continue; }
+            }
+            $guardadas++;
+        }
+
+        if ($guardadas === 0) {
+            return ['status' => 'error',
+                'message' => 'No se guardó ninguna foto.' . ($rechazos ? ' ' . implode('; ', $rechazos) . '.' : '')];
+        }
+
+        // Si el equipo no tenía carpeta propia, ahora la tiene.
+        $urlCarpeta = rtrim(UPLOAD_URL, '/') . '/evidencias/' . $carpeta;
+        if ($urlPrev === '' || $urlPrev !== $urlCarpeta) {
+            $this->pdo->prepare("UPDATE equipos SET evidencia_url = ? WHERE id = ?")
+                      ->execute([$urlCarpeta, $id]);
+            registrarHistorial($this->pdo, $usuario, $id, 'evidencia_url', $urlPrev ?: null, $urlCarpeta);
+        }
+        error_log("[Calidad] $usuario agregó $guardadas foto(s) de evidencia al equipo $id");
+
+        $msg = $guardadas . ' foto(s) agregadas a la evidencia.';
+        if ($rechazos) $msg .= ' No se pudieron subir: ' . implode('; ', $rechazos) . '.';
+
+        return ['status' => 'success', 'message' => $msg,
+                'guardadas' => $guardadas, 'evidencia_url' => $urlCarpeta];
+    }
+
     // ── Listar info de códigos QR ──────────────────────────
     public function listarQrInfo(string $filtro = 'todos'): array {
         $this->ensureQrTable();
