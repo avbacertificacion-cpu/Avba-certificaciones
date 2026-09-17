@@ -92,6 +92,21 @@ $nombre = $_SESSION['nombre'];
     .ficha .hist .h{font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;margin-bottom:5px}
     .ficha .hist li{margin-bottom:3px;list-style:none}
 
+    /* Sugerencias de quién realizó el servicio */
+    .sug-caja{position:relative}
+    .sugerencias{display:none;position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;
+                 border:2px solid #667eea;border-top:none;border-radius:0 0 10px 10px;
+                 box-shadow:0 8px 20px rgba(30,41,59,.14);max-height:260px;overflow-y:auto}
+    .sugerencias.abierta{display:block}
+    .sug{padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;
+         align-items:baseline;gap:12px;border-bottom:1px solid #f1f5f9}
+    .sug:last-child{border-bottom:none}
+    .sug:hover,.sug.marcada{background:#eef2fb}
+    .sug .nom{font-weight:700;font-size:13px;color:#1e293b}
+    .sug .nom mark{background:#fde68a;color:inherit;padding:0 1px;border-radius:2px}
+    .sug .det{font-size:11px;color:#94a3b8;white-space:nowrap}
+    .sug.nueva .nom{color:#475569;font-weight:600}
+
     .chk{display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer;line-height:1.45}
     .chk input{width:auto;margin-top:3px}
 
@@ -179,15 +194,14 @@ $nombre = $_SESSION['nombre'];
             </div>
         </div>
 
-        <div class="grid2">
-            <div class="fg">
-                <label>¿Quién lo realizó? *</label>
-                <select id="k-quien" onchange="quienElegido()"></select>
-            </div>
-            <div class="fg" id="fgOtro" style="display:none">
-                <label>Nombre de quien lo realizó *</label>
-                <input type="text" id="k-quienOtro" placeholder="Taller, técnico o empresa" maxlength="150">
-            </div>
+        <div class="fg sug-caja">
+            <label>¿Quién lo realizó? *</label>
+            <input type="text" id="k-quien" maxlength="150" autocomplete="off"
+                   placeholder="Ej: Ing. Michel Ábalos — o el nombre del taller"
+                   oninput="buscarSugerencias()" onfocus="buscarSugerencias()"
+                   onkeydown="teclaSugerencia(event)">
+            <div class="sugerencias" id="sugerencias"></div>
+            <div class="hint">Escribe el nombre. Según teclees aparecerán los que ya hicieron mantenimientos antes.</div>
         </div>
 
         <div class="fg" id="fgRecarga" style="display:none">
@@ -235,7 +249,7 @@ $nombre = $_SESSION['nombre'];
 
 <script>
 const API = '../api/mantenimientos.php';
-let movimientos = [], empresas = [], extintores = [], responsables = {proveedores:[], otros:[]};
+let movimientos = [], empresas = [], extintores = [];
 
 const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
 const cerrar = id => document.getElementById(id).classList.remove('open');
@@ -260,12 +274,11 @@ function diasFuera(salida) {
 
 // ── Carga ───────────────────────────────────────────────────────────────────
 async function inicio() {
-    const [re, rr] = await Promise.all([
-        fetch('../api/usuarios.php?action=listar_empresas').then(r => r.json()).catch(() => ({})),
-        fetch(`${API}?action=responsables`).then(r => r.json()).catch(() => ({})),
-    ]);
+    // Las sugerencias se piden al escribir, no aquí: la lista puede crecer y
+    // no tiene sentido traerla entera para abrir la pantalla.
+    const re = await fetch('../api/usuarios.php?action=listar_empresas')
+        .then(r => r.json()).catch(() => ({}));
     empresas = re.success ? re.data : [];
-    responsables = rr.success ? rr.data : {proveedores:[], otros:[]};
 
     const opciones = '<option value="">Todas las plantas</option>' +
         empresas.map(e => `<option value="${e.id}">${esc(e.nombre)}</option>`).join('');
@@ -274,18 +287,80 @@ async function inicio() {
         '<option value="">— Elige la planta —</option>' +
         empresas.map(e => `<option value="${e.id}">${esc(e.nombre)}</option>`).join('');
 
-    llenarResponsables();
     cargar();
 }
 
-function llenarResponsables() {
-    const sel = document.getElementById('k-quien');
-    const provs = responsables.proveedores.map(p => `<option value="p${p.id}">${esc(p.nombre)}</option>`).join('');
-    const otros = (responsables.otros || []).map(n => `<option value="t${esc(n)}">${esc(n)}</option>`).join('');
-    sel.innerHTML = '<option value="">— Elige o escribe —</option>'
-        + (provs ? `<optgroup label="Proveedores">${provs}</optgroup>` : '')
-        + (otros ? `<optgroup label="Usados antes">${otros}</optgroup>` : '')
-        + '<option value="otro">✎ Otro (escribir)…</option>';
+// ── Sugerencias de quién realizó el servicio ────────────────────────────────
+// Se consulta al servidor según se teclea: la lista vive en la base, así que
+// funciona desde cualquier equipo y no sólo donde se escribió el nombre.
+let sugerencias = [], marcada = -1, peticionSug = 0;
+
+async function buscarSugerencias() {
+    const q = document.getElementById('k-quien').value.trim();
+    const mia = ++peticionSug;
+    const r = await fetch(`${API}?action=sugerir&q=${encodeURIComponent(q)}`)
+        .then(x => x.json()).catch(() => ({}));
+    if (mia !== peticionSug) return;          // llegó tarde: ya se tecleó más
+    sugerencias = r.success ? r.data : [];
+    marcada = -1;
+    pintarSugerencias(q);
+}
+
+/** Resalta dentro del nombre el trozo que se tecleó, para que se vea por qué coincide. */
+function resaltar(nombre, q) {
+    if (!q) return esc(nombre);
+    const sinAcentos = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    const i = sinAcentos(nombre).indexOf(sinAcentos(q));
+    if (i < 0) return esc(nombre);
+    return esc(nombre.slice(0, i)) + '<mark>' + esc(nombre.slice(i, i + q.length)) + '</mark>'
+         + esc(nombre.slice(i + q.length));
+}
+
+function pintarSugerencias(q) {
+    const caja = document.getElementById('sugerencias');
+    const escrito = document.getElementById('k-quien').value.trim();
+    // Si lo escrito no coincide con ninguna, se ofrece darlo de alta
+    const exacta = sugerencias.some(s => s.nombre.toLowerCase() === escrito.toLowerCase());
+    const filas = sugerencias.map((s, i) =>
+        `<div class="sug ${i === marcada ? 'marcada' : ''}" onmousedown="elegirSugerencia(${i})">
+            <span class="nom">${resaltar(s.nombre, q)}</span>
+            <span class="det">${esc(s.detalle)}</span>
+        </div>`).join('');
+    const nueva = (escrito && !exacta)
+        ? `<div class="sug nueva ${marcada === sugerencias.length ? 'marcada' : ''}" onmousedown="elegirSugerencia(${sugerencias.length})">
+             <span class="nom">✎ Usar “${esc(escrito)}”</span>
+             <span class="det">nombre nuevo</span>
+           </div>` : '';
+
+    caja.innerHTML = filas + nueva;
+    caja.classList.toggle('abierta', !!(filas || nueva));
+}
+
+function elegirSugerencia(i) {
+    if (i < sugerencias.length) document.getElementById('k-quien').value = sugerencias[i].nombre;
+    cerrarSugerencias();
+}
+
+function cerrarSugerencias() {
+    document.getElementById('sugerencias').classList.remove('abierta');
+    marcada = -1;
+}
+
+/** Flechas para recorrer, Enter para elegir, Escape para cerrar. */
+function teclaSugerencia(ev) {
+    const caja = document.getElementById('sugerencias');
+    if (!caja.classList.contains('abierta')) return;
+    const escrito = document.getElementById('k-quien').value.trim();
+    const exacta = sugerencias.some(s => s.nombre.toLowerCase() === escrito.toLowerCase());
+    const total = sugerencias.length + ((escrito && !exacta) ? 1 : 0);
+    if (!total) return;
+
+    if (ev.key === 'ArrowDown')      { ev.preventDefault(); marcada = (marcada + 1) % total; }
+    else if (ev.key === 'ArrowUp')   { ev.preventDefault(); marcada = (marcada - 1 + total) % total; }
+    else if (ev.key === 'Enter' && marcada >= 0) { ev.preventDefault(); elegirSugerencia(marcada); return; }
+    else if (ev.key === 'Escape')    { cerrarSugerencias(); return; }
+    else return;
+    pintarSugerencias(document.getElementById('k-quien').value.trim());
 }
 
 async function cargar() {
@@ -359,10 +434,9 @@ function nuevo() {
     document.getElementById('k-salida').value = hoy();
     document.getElementById('k-retorno').value = '';
     document.getElementById('k-quien').value = '';
-    document.getElementById('k-quienOtro').value = '';
     document.getElementById('k-notas').value = '';
     document.getElementById('k-actualizar').checked = true;
-    document.getElementById('fgOtro').style.display = 'none';
+    cerrarSugerencias();
     limpiarFicha();
     empresaElegida();
     tipoElegido();
@@ -386,31 +460,10 @@ async function editar(id) {
     document.getElementById('k-actualizar').checked = false;
 
     await empresaElegida(m.extintor_id);
-    ponerResponsable(m);
+    document.getElementById('k-quien').value = m.realizado_por || '';
+    cerrarSugerencias();
     tipoElegido();
     document.getElementById('modalMov').classList.add('open');
-}
-
-/** Deja elegido el proveedor o, si fue un nombre suelto, lo pone en el campo libre. */
-function ponerResponsable(m) {
-    const sel = document.getElementById('k-quien');
-    if (m.proveedor_id && [...sel.options].some(o => o.value === 'p' + m.proveedor_id)) {
-        sel.value = 'p' + m.proveedor_id;
-        document.getElementById('fgOtro').style.display = 'none';
-    } else if (m.realizado_por && [...sel.options].some(o => o.value === 't' + m.realizado_por)) {
-        sel.value = 't' + m.realizado_por;
-        document.getElementById('fgOtro').style.display = 'none';
-    } else {
-        sel.value = 'otro';
-        document.getElementById('fgOtro').style.display = '';
-        document.getElementById('k-quienOtro').value = m.realizado_por || '';
-    }
-}
-
-function quienElegido() {
-    const otro = document.getElementById('k-quien').value === 'otro';
-    document.getElementById('fgOtro').style.display = otro ? '' : 'none';
-    if (otro) document.getElementById('k-quienOtro').focus();
 }
 
 /** La casilla de actualizar la recarga sólo tiene sentido en recargas ya devueltas. */
@@ -492,7 +545,6 @@ async function extintorElegido() {
 
 // ── Guardar ─────────────────────────────────────────────────────────────────
 async function guardar() {
-    const quien = document.getElementById('k-quien').value;
     const cuerpo = {
         id:            parseInt(document.getElementById('k-id').value) || 0,
         extintor_id:   parseInt(document.getElementById('k-extintor').value) || 0,
@@ -501,9 +553,7 @@ async function guardar() {
         fecha_retorno: document.getElementById('k-retorno').value,
         notas:         document.getElementById('k-notas').value.trim(),
         actualizar_recarga: document.getElementById('k-actualizar').checked ? 1 : 0,
-        proveedor_id:  quien.startsWith('p') ? parseInt(quien.substring(1)) : 0,
-        realizado_por: quien === 'otro' ? document.getElementById('k-quienOtro').value.trim()
-                      : (quien.startsWith('t') ? quien.substring(1) : ''),
+        realizado_por: document.getElementById('k-quien').value.trim(),
     };
 
     if (!cuerpo.extintor_id) { aviso('Elige el extintor.', false); return; }
@@ -511,7 +561,7 @@ async function guardar() {
     if (cuerpo.fecha_retorno && cuerpo.fecha_retorno < cuerpo.fecha_salida) {
         aviso('La fecha de retorno no puede ser anterior a la de salida.', false); return;
     }
-    if (!cuerpo.proveedor_id && !cuerpo.realizado_por) { aviso('Indica quién realizó el servicio.', false); return; }
+    if (!cuerpo.realizado_por) { aviso('Indica quién realizó el servicio.', false); return; }
 
     const r = await fetch(`${API}?action=guardar`, {
         method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cuerpo)
@@ -520,8 +570,6 @@ async function guardar() {
     if (r.ok && d.success) {
         cerrar('modalMov');
         aviso('✓ Movimiento guardado', true);
-        const rr = await fetch(`${API}?action=responsables`).then(x => x.json()).catch(() => ({}));
-        if (rr.success) { responsables = rr.data; llenarResponsables(); }
         cargar();
     } else aviso(d.error || 'Error al guardar', false);
 }
@@ -564,6 +612,11 @@ async function borrar(id) {
 
 document.querySelectorAll('.modal-ov').forEach(m =>
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+
+// Un clic fuera del campo cierra las sugerencias
+document.addEventListener('click', e => {
+    if (!e.target.closest('.sug-caja')) cerrarSugerencias();
+});
 
 inicio();
 </script>

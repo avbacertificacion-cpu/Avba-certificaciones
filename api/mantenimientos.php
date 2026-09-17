@@ -34,6 +34,7 @@ switch ($_GET['action'] ?? '') {
     case 'registrar_retorno': registrarRetorno(); break;
     case 'eliminar':        eliminar();        break;
     case 'responsables':    responsables();    break;
+    case 'sugerir':         sugerir();         break;
     case 'resumen':         resumen();         break;
     default:
         http_response_code(400); echo json_encode(['error' => 'Acción no válida']);
@@ -59,6 +60,52 @@ function asegurarTablaMantenimientos($pdo) {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (Exception $e) { /* las acciones reportarán el error */ }
+
+    // Quiénes han hecho mantenimientos. Se guardan aparte —y no sólo dentro de
+    // cada movimiento— para poder sugerirlos al escribir: al teclear "M" salen
+    // los que ya trabajaron antes, y el mismo técnico no acaba registrado de
+    // tres formas distintas.
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS mantenimiento_responsables (
+                id         INT AUTO_INCREMENT PRIMARY KEY,
+                nombre     VARCHAR(150) NOT NULL,
+                veces      INT NOT NULL DEFAULT 0,
+                ultima_vez DATE DEFAULT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uk_responsable (nombre)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        // Los nombres ya capturados antes de existir esta tabla se recuperan,
+        // para no empezar la lista vacía.
+        $pdo->exec("
+            INSERT IGNORE INTO mantenimiento_responsables (nombre, veces, ultima_vez)
+            SELECT realizado_por, COUNT(*), MAX(fecha_salida)
+            FROM extintor_mantenimientos
+            WHERE realizado_por IS NOT NULL AND realizado_por <> ''
+            GROUP BY realizado_por
+        ");
+    } catch (Exception $e) { /* si falla, las sugerencias simplemente no aparecen */ }
+}
+
+/**
+ * Apunta a quien hizo el trabajo, o suma una vez más si ya estaba.
+ * El cotejamiento de la base ignora mayúsculas y acentos, así que
+ * "Michel Ábalos" y "MICHEL ABALOS" son la misma persona.
+ */
+function recordarResponsable(PDO $pdo, string $nombre, ?string $fecha): void {
+    $nombre = trim($nombre);
+    if ($nombre === '') return;
+    try {
+        $st = $pdo->prepare("
+            INSERT INTO mantenimiento_responsables (nombre, veces, ultima_vez)
+            VALUES (?, 1, ?)
+            ON DUPLICATE KEY UPDATE
+                veces = veces + 1,
+                ultima_vez = GREATEST(COALESCE(ultima_vez, '1900-01-01'), COALESCE(VALUES(ultima_vez), '1900-01-01'))
+        ");
+        $st->execute([mb_substr($nombre, 0, 150), $fecha]);
+    } catch (Exception $e) { /* no vale la pena romper el guardado por esto */ }
 }
 
 /** Los tres motivos por los que un extintor sale de la planta. */
@@ -178,21 +225,24 @@ function guardar() {
     $st->execute([$extId]);
     if (!$st->fetchColumn()) { http_response_code(400); echo json_encode(['error' => 'El extintor no existe']); return; }
 
-    // Quién lo atendió: un proveedor del catálogo o un nombre escrito a mano
-    $provId = intval($d['proveedor_id'] ?? 0) ?: null;
-    $quien  = trim($d['realizado_por'] ?? '');
-    if ($provId) {
-        $st = $pdo->prepare("SELECT nombre FROM proveedores WHERE id = ?");
-        $st->execute([$provId]);
-        $nombreProv = $st->fetchColumn();
-        if (!$nombreProv) { $provId = null; } else { $quien = $nombreProv; }
-    }
+    // Quién lo atendió: se escribe libremente —una persona con nombre y
+    // apellido, o una empresa—. Si lo escrito coincide con un proveedor del
+    // catálogo se deja además enlazado, para poder reportar por proveedor.
+    $quien = trim($d['realizado_por'] ?? '');
     if ($quien === '') {
         http_response_code(400); echo json_encode(['error' => 'Indica quién realizó el servicio']); return;
     }
+    $quien = mb_substr($quien, 0, 150);
+
+    $provId = null;
+    try {
+        $st = $pdo->prepare("SELECT id FROM proveedores WHERE nombre = ? LIMIT 1");
+        $st->execute([$quien]);
+        $provId = $st->fetchColumn() ?: null;
+    } catch (Exception $e) { $provId = null; }
 
     $notas = trim($d['notas'] ?? '') ?: null;
-    $campos = [$extId, $tipo, $salida, $retorno, $provId, mb_substr($quien, 0, 150), $notas];
+    $campos = [$extId, $tipo, $salida, $retorno, $provId, $quien, $notas];
 
     try {
         $pdo->beginTransaction();
@@ -218,6 +268,8 @@ function guardar() {
         if (!empty($d['actualizar_recarga']) && $tipo === 'recarga' && $retorno) {
             $pdo->prepare("UPDATE extintores SET fecha_recarga = ? WHERE id = ?")->execute([$retorno, $extId]);
         }
+
+        recordarResponsable($pdo, $quien, $salida);
 
         $pdo->commit();
         audit($uid, "Guardar mantenimiento #$id (extintor $extId, $tipo)", 'extintor_mantenimientos', $id);
@@ -269,27 +321,81 @@ function eliminar() {
 }
 
 /**
- * Para el desplegable de "quién lo realizó": los proveedores del catálogo y,
- * además, los nombres que ya se escribieron antes a mano, para reutilizarlos.
+ * Sugerencias para el campo "quién lo realizó", según lo que se va escribiendo.
+ *
+ * Busca en dos sitios: las personas que ya hicieron mantenimientos antes y los
+ * proveedores del catálogo, porque a veces quien atiende es un técnico con
+ * nombre y apellido y a veces la empresa entera.
+ *
+ * Ordena por utilidad, no alfabéticamente: primero los que empiezan por lo
+ * tecleado —escribir "MI" debe traer "MICHEL" antes que "TALLER MIGUEL"— y
+ * dentro de cada grupo, los que más veces han trabajado.
  */
+function sugerir() {
+    global $pdo;
+    $q = trim($_GET['q'] ?? '');
+    $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
+
+    $sugerencias = [];
+
+    try {
+        $sql = "SELECT nombre, veces, ultima_vez FROM mantenimiento_responsables";
+        $params = [];
+        if ($q !== '') { $sql .= " WHERE nombre LIKE ?"; $params[] = $like; }
+        $sql .= " ORDER BY veces DESC, nombre LIMIT 50";
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $sugerencias[] = [
+                'nombre' => $r['nombre'],
+                'origen' => 'persona',
+                'veces'  => (int) $r['veces'],
+                'detalle' => (int) $r['veces'] === 1 ? '1 mantenimiento' : $r['veces'] . ' mantenimientos',
+            ];
+        }
+    } catch (Exception $e) { /* sin tabla todavía, no hay personas que sugerir */ }
+
+    try {
+        $sql = "SELECT nombre FROM proveedores WHERE estado = 'activo'";
+        $params = [];
+        if ($q !== '') { $sql .= " AND nombre LIKE ?"; $params[] = $like; }
+        $sql .= " ORDER BY nombre LIMIT 25";
+        $st = $pdo->prepare($sql);
+        $st->execute($params);
+        $yaEstan = array_map(fn($s) => mb_strtolower($s['nombre']), $sugerencias);
+        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $nombre) {
+            if (in_array(mb_strtolower($nombre), $yaEstan, true)) continue;   // no repetir
+            $sugerencias[] = ['nombre' => $nombre, 'origen' => 'proveedor', 'veces' => 0,
+                              'detalle' => 'proveedor del catálogo'];
+        }
+    } catch (Exception $e) { /* sin catálogo de proveedores */ }
+
+    // Los que empiezan por lo tecleado van primero: es lo que uno espera al escribir
+    if ($q !== '') {
+        $qn = mb_strtolower($q);
+        usort($sugerencias, function ($a, $b) use ($qn) {
+            $ea = mb_strpos(mb_strtolower($a['nombre']), $qn) === 0 ? 0 : 1;
+            $eb = mb_strpos(mb_strtolower($b['nombre']), $qn) === 0 ? 0 : 1;
+            if ($ea !== $eb) return $ea - $eb;
+            if ($a['veces'] !== $b['veces']) return $b['veces'] - $a['veces'];
+            return strcmp($a['nombre'], $b['nombre']);
+        });
+    }
+
+    echo json_encode(['success' => true, 'data' => array_slice($sugerencias, 0, 12)]);
+}
+
+/** Listado completo de personas registradas (para la pantalla de administración). */
 function responsables() {
     global $pdo;
-    $proveedores = [];
+    $datos = [];
     try {
-        $proveedores = $pdo->query("SELECT id, nombre FROM proveedores WHERE estado='activo' ORDER BY nombre")
-                           ->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) { $proveedores = []; }
-
-    $sueltos = [];
-    try {
-        $sueltos = $pdo->query("
-            SELECT DISTINCT realizado_por FROM extintor_mantenimientos
-            WHERE proveedor_id IS NULL AND realizado_por IS NOT NULL AND realizado_por <> ''
-            ORDER BY realizado_por
-        ")->fetchAll(PDO::FETCH_COLUMN);
-    } catch (Exception $e) { $sueltos = []; }
-
-    echo json_encode(['success' => true, 'data' => ['proveedores' => $proveedores, 'otros' => $sueltos]]);
+        $datos = $pdo->query("
+            SELECT nombre, veces, ultima_vez FROM mantenimiento_responsables
+            ORDER BY veces DESC, nombre
+        ")->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) { $datos = []; }
+    echo json_encode(['success' => true, 'data' => $datos]);
 }
 
 // ─── Resumen para las tarjetas ───────────────────────────────────────────────
