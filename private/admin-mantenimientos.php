@@ -2,10 +2,11 @@
 /**
  * Mantenimiento de extintores (solo ADMIN).
  *
- * Lleva el registro de cada salida de un extintor —a mantenimiento, recarga o
- * garantía—: cuándo salió, cuándo volvió y quién lo atendió. Al elegir la
- * planta y el extintor se muestra su ficha, para capturar sabiendo qué se
- * tiene enfrente.
+ * El taller es nuestro: el extintor ENTRA al taller y luego se DEVUELVE al
+ * cliente. Un movimiento sin fecha de devolución es un extintor que todavía
+ * tenemos aquí.
+ *
+ * Los motivos del ingreso son un catálogo editable desde la propia pantalla.
  */
 require_once '../config/config.php';
 require_once '../config/modo-demo.php';
@@ -54,15 +55,17 @@ $nombre = $_SESSION['nombre'];
     th{padding:11px 9px;text-align:left;font-size:11px;color:#475569;font-weight:700;text-transform:uppercase}
     td{padding:11px 9px;font-size:13px;border-bottom:1px solid #f1f5f9}
     tbody tr:hover{background:#f8faff}
-    /* Los tres botones en un solo renglón; en el teléfono movil.css los reparte */
     td.acciones{white-space:nowrap;text-align:right}
 
     .badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block}
-    .b-mantenimiento{background:#dbeafe;color:#1d4ed8}
-    .b-recarga{background:#fef3c7;color:#92400e}
-    .b-garantia{background:#ede9fe;color:#6d28d9}
-    .b-fuera{background:#fee2e2;color:#b91c1c}
+    .b-motivo{background:#dbeafe;color:#1d4ed8}
+    .b-taller{background:#fee2e2;color:#b91c1c}
     .b-devuelto{background:#d1fae5;color:#047857}
+    .b-inactivo{background:#e2e8f0;color:#475569}
+    .dias{font-size:11px;color:#b91c1c;font-weight:700}
+    .cod-ext{background:none;border:none;padding:0;font:inherit;font-weight:700;color:#4f46e5;
+             cursor:pointer;text-align:left}
+    .cod-ext:hover{text-decoration:underline}
 
     .modal-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:100;
               align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
@@ -112,7 +115,8 @@ $nombre = $_SESSION['nombre'];
 
     .empty{text-align:center;padding:50px 20px;color:#94a3b8}.empty .ic{font-size:52px;margin-bottom:10px}
     .msg{font-size:13px;font-weight:600;margin-bottom:12px}
-    .dias{font-size:11px;color:#b91c1c;font-weight:700}
+    .aviso-filtro{background:#e0e7ff;color:#3730a3;border-radius:10px;padding:10px 14px;font-size:13px;
+                  margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;gap:12px}
 
     @media(max-width:760px){ .grid2,.grid3{grid-template-columns:1fr} }
 </style>
@@ -126,27 +130,24 @@ $nombre = $_SESSION['nombre'];
 
 <div class="container">
     <h2>🛠️ Mantenimiento de Extintores</h2>
-    <div class="sub">Qué extintor salió, por qué motivo, cuándo y quién lo atendió.</div>
+    <div class="sub">Qué extintor entró al taller, por qué motivo, cuándo y quién lo atendió.</div>
 
     <div class="kpis" id="kpis"></div>
     <div id="msg" class="msg"></div>
+    <div id="avisoFiltro"></div>
 
     <div class="card">
         <div class="toolbar">
             <select id="fEmpresa" onchange="cargar()"></select>
-            <select id="fTipo" onchange="render()">
-                <option value="">Todos los motivos</option>
-                <option value="mantenimiento">Mantenimiento</option>
-                <option value="recarga">Recarga</option>
-                <option value="garantia">Garantía</option>
-            </select>
+            <select id="fTipo" onchange="render()"></select>
             <select id="fEstado" onchange="render()">
-                <option value="">Fuera y devueltos</option>
-                <option value="fuera">Sólo los que siguen fuera</option>
+                <option value="">En taller y devueltos</option>
+                <option value="taller">Sólo los que siguen en el taller</option>
                 <option value="devuelto">Sólo los devueltos</option>
             </select>
             <input type="text" id="busca" placeholder="🔍 Buscar extintor o responsable…" oninput="render()">
-            <button class="btn btn-primary" onclick="nuevo()">＋ Registrar salida</button>
+            <button class="btn btn-primary" onclick="nuevo()">＋ Registrar entrada</button>
+            <button class="btn btn-ghost" onclick="abrirMotivos()">⚙️ Motivos</button>
         </div>
         <div id="tabla"></div>
     </div>
@@ -155,12 +156,12 @@ $nombre = $_SESSION['nombre'];
 <!-- ── Alta / edición ─────────────────────────────────────────────────────── -->
 <div class="modal-ov" id="modalMov">
     <div class="modal">
-        <h3 id="tituloMov">Registrar salida a mantenimiento</h3>
+        <h3 id="tituloMov">Registrar entrada al taller</h3>
         <input type="hidden" id="k-id">
 
         <div class="grid2">
             <div class="fg">
-                <label>Planta *</label>
+                <label>Planta del cliente *</label>
                 <select id="k-empresa" onchange="empresaElegida()"></select>
             </div>
             <div class="fg">
@@ -176,28 +177,24 @@ $nombre = $_SESSION['nombre'];
 
         <div class="grid3">
             <div class="fg">
-                <label>Motivo de la salida *</label>
-                <select id="k-tipo" onchange="tipoElegido()">
-                    <option value="mantenimiento">Mantenimiento</option>
-                    <option value="recarga">Recarga</option>
-                    <option value="garantia">Garantía</option>
-                </select>
+                <label>Motivo del ingreso *</label>
+                <select id="k-tipo" onchange="tipoElegido()"></select>
             </div>
             <div class="fg">
-                <label>Fecha en que salió *</label>
-                <input type="date" id="k-salida">
+                <label>Entró al taller *</label>
+                <input type="date" id="k-entrada">
             </div>
             <div class="fg">
-                <label>Fecha en que regresó</label>
-                <input type="date" id="k-retorno" onchange="tipoElegido()">
-                <div class="hint">Déjala vacía si todavía no regresa.</div>
+                <label>Devuelto al cliente</label>
+                <input type="date" id="k-devolucion" onchange="tipoElegido()">
+                <div class="hint">Déjala vacía si todavía lo tenemos.</div>
             </div>
         </div>
 
         <div class="fg sug-caja">
             <label>¿Quién lo realizó? *</label>
             <input type="text" id="k-quien" maxlength="150" autocomplete="off"
-                   placeholder="Ej: Ing. Michel Ábalos — o el nombre del taller"
+                   placeholder="Ej: Ing. Michel Ábalos"
                    oninput="buscarSugerencias()" onfocus="buscarSugerencias()"
                    onkeydown="teclaSugerencia(event)">
             <div class="sugerencias" id="sugerencias"></div>
@@ -207,14 +204,14 @@ $nombre = $_SESSION['nombre'];
         <div class="fg" id="fgRecarga" style="display:none">
             <label class="chk">
                 <input type="checkbox" id="k-actualizar">
-                Actualizar también la <b>fecha de recarga del extintor</b> con la fecha de retorno,
+                Actualizar también la <b>fecha de recarga del extintor</b> con la fecha de devolución,
                 para que su ficha no quede diciendo otra cosa.
             </label>
         </div>
 
         <div class="fg">
             <label>Notas</label>
-            <textarea id="k-notas" rows="2" placeholder="Qué se le hizo, número de folio del taller, costo…"></textarea>
+            <textarea id="k-notas" rows="2" placeholder="Qué se le hizo, número de folio, costo…"></textarea>
         </div>
 
         <div class="modal-actions">
@@ -224,32 +221,68 @@ $nombre = $_SESSION['nombre'];
     </div>
 </div>
 
-<!-- ── Registrar retorno ──────────────────────────────────────────────────── -->
-<div class="modal-ov" id="modalRet">
+<!-- ── Registrar devolución ───────────────────────────────────────────────── -->
+<div class="modal-ov" id="modalDev">
     <div class="modal" style="max-width:480px">
-        <h3>Registrar el regreso</h3>
-        <p style="font-size:13px;color:#475569;margin-bottom:14px" id="retDetalle"></p>
-        <input type="hidden" id="r-id">
+        <h3>Devolver al cliente</h3>
+        <p style="font-size:13px;color:#475569;margin-bottom:14px" id="devDetalle"></p>
+        <input type="hidden" id="d-id">
         <div class="fg">
-            <label>Fecha en que regresó *</label>
-            <input type="date" id="r-fecha">
+            <label>Fecha de devolución *</label>
+            <input type="date" id="d-fecha">
         </div>
-        <div class="fg" id="rRecarga" style="display:none">
+        <div class="fg" id="dRecarga" style="display:none">
             <label class="chk">
-                <input type="checkbox" id="r-actualizar" checked>
+                <input type="checkbox" id="d-actualizar" checked>
                 Actualizar la fecha de recarga del extintor con esta fecha.
             </label>
         </div>
         <div class="modal-actions">
-            <button class="btn btn-ghost" onclick="cerrar('modalRet')">Cancelar</button>
-            <button class="btn btn-ok" onclick="guardarRetorno()">Registrar regreso</button>
+            <button class="btn btn-ghost" onclick="cerrar('modalDev')">Cancelar</button>
+            <button class="btn btn-ok" onclick="guardarDevolucion()">Registrar devolución</button>
+        </div>
+    </div>
+</div>
+
+<!-- ── Catálogo de motivos ────────────────────────────────────────────────── -->
+<div class="modal-ov" id="modalMotivos">
+    <div class="modal" style="max-width:700px">
+        <h3>⚙️ Motivos de ingreso al taller</h3>
+        <p style="font-size:13px;color:#64748b;margin-bottom:16px">
+            Son los que aparecen al registrar una entrada. Puedes agregar los tuyos,
+            cambiarles el nombre o quitar los que no uses.
+        </p>
+        <div id="tablaMotivos"></div>
+
+        <div class="card" style="box-shadow:none;border:2px solid #e0e0ff;margin-top:16px;padding:16px">
+            <input type="hidden" id="t-id">
+            <div class="grid2">
+                <div class="fg" style="margin-bottom:8px">
+                    <label id="t-titulo">Nuevo motivo</label>
+                    <input type="text" id="t-nombre" maxlength="80" placeholder="Ej: Prueba hidrostática">
+                </div>
+                <div class="fg" style="margin-bottom:8px;display:flex;align-items:flex-end">
+                    <label class="chk">
+                        <input type="checkbox" id="t-recarga">
+                        Al devolverlo, ofrecer actualizar la <b>fecha de recarga</b> del extintor
+                    </label>
+                </div>
+            </div>
+            <div class="modal-actions" style="margin-top:8px">
+                <button class="btn btn-ghost btn-sm" id="t-cancelar" onclick="limpiarMotivo()" style="display:none">Cancelar edición</button>
+                <button class="btn btn-primary btn-sm" onclick="guardarMotivo()">Guardar motivo</button>
+            </div>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-ghost" onclick="cerrarMotivos()">Cerrar</button>
         </div>
     </div>
 </div>
 
 <script>
 const API = '../api/mantenimientos.php';
-let movimientos = [], empresas = [], extintores = [];
+let movimientos = [], empresas = [], extintores = [], motivos = [], filtroExtintor = null;
 
 const esc = s => { const d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; };
 const cerrar = id => document.getElementById(id).classList.remove('open');
@@ -257,134 +290,86 @@ const hoy = () => new Date().toISOString().substring(0,10);
 function aviso(t, ok) {
     const m = document.getElementById('msg');
     m.textContent = t; m.style.color = ok ? '#27ae60' : '#c0392b';
-    setTimeout(() => { m.textContent = ''; }, 4000);
+    setTimeout(() => { m.textContent = ''; }, 5000);
 }
 function fechaCorta(f) {
     if (!f) return '—';
     const p = String(f).substring(0,10).split('-');
     return p.length === 3 ? `${p[2]}/${p[1]}/${p[0]}` : f;
 }
-const ETIQUETA = {mantenimiento:'Mantenimiento', recarga:'Recarga', garantia:'Garantía'};
-
-/** Días que lleva fuera un extintor que aún no regresa. */
-function diasFuera(salida) {
-    const d = Math.floor((Date.now() - new Date(salida + 'T00:00:00')) / 86400000);
+/** Días que lleva el extintor en el taller. */
+function diasEnTaller(entrada) {
+    const d = Math.floor((Date.now() - new Date(entrada + 'T00:00:00')) / 86400000);
     return d > 0 ? d : 0;
 }
 
 // ── Carga ───────────────────────────────────────────────────────────────────
 async function inicio() {
-    // Las sugerencias se piden al escribir, no aquí: la lista puede crecer y
-    // no tiene sentido traerla entera para abrir la pantalla.
     const re = await fetch('../api/usuarios.php?action=listar_empresas')
         .then(r => r.json()).catch(() => ({}));
     empresas = re.success ? re.data : [];
-
-    const opciones = '<option value="">Todas las plantas</option>' +
+    document.getElementById('fEmpresa').innerHTML = '<option value="">Todas las plantas</option>' +
         empresas.map(e => `<option value="${e.id}">${esc(e.nombre)}</option>`).join('');
-    document.getElementById('fEmpresa').innerHTML = opciones;
-    document.getElementById('k-empresa').innerHTML =
-        '<option value="">— Elige la planta —</option>' +
+    document.getElementById('k-empresa').innerHTML = '<option value="">— Elige la planta —</option>' +
         empresas.map(e => `<option value="${e.id}">${esc(e.nombre)}</option>`).join('');
-
+    await cargarMotivos();
     cargar();
 }
 
-// ── Sugerencias de quién realizó el servicio ────────────────────────────────
-// Se consulta al servidor según se teclea: la lista vive en la base, así que
-// funciona desde cualquier equipo y no sólo donde se escribió el nombre.
-let sugerencias = [], marcada = -1, peticionSug = 0;
-
-async function buscarSugerencias() {
-    const q = document.getElementById('k-quien').value.trim();
-    const mia = ++peticionSug;
-    const r = await fetch(`${API}?action=sugerir&q=${encodeURIComponent(q)}`)
-        .then(x => x.json()).catch(() => ({}));
-    if (mia !== peticionSug) return;          // llegó tarde: ya se tecleó más
-    sugerencias = r.success ? r.data : [];
-    marcada = -1;
-    pintarSugerencias(q);
-}
-
-/** Resalta dentro del nombre el trozo que se tecleó, para que se vea por qué coincide. */
-function resaltar(nombre, q) {
-    if (!q) return esc(nombre);
-    const sinAcentos = t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    const i = sinAcentos(nombre).indexOf(sinAcentos(q));
-    if (i < 0) return esc(nombre);
-    return esc(nombre.slice(0, i)) + '<mark>' + esc(nombre.slice(i, i + q.length)) + '</mark>'
-         + esc(nombre.slice(i + q.length));
-}
-
-function pintarSugerencias(q) {
-    const caja = document.getElementById('sugerencias');
-    const escrito = document.getElementById('k-quien').value.trim();
-    // Si lo escrito no coincide con ninguna, se ofrece darlo de alta
-    const exacta = sugerencias.some(s => s.nombre.toLowerCase() === escrito.toLowerCase());
-    const filas = sugerencias.map((s, i) =>
-        `<div class="sug ${i === marcada ? 'marcada' : ''}" onmousedown="elegirSugerencia(${i})">
-            <span class="nom">${resaltar(s.nombre, q)}</span>
-            <span class="det">${esc(s.detalle)}</span>
-        </div>`).join('');
-    const nueva = (escrito && !exacta)
-        ? `<div class="sug nueva ${marcada === sugerencias.length ? 'marcada' : ''}" onmousedown="elegirSugerencia(${sugerencias.length})">
-             <span class="nom">✎ Usar “${esc(escrito)}”</span>
-             <span class="det">nombre nuevo</span>
-           </div>` : '';
-
-    caja.innerHTML = filas + nueva;
-    caja.classList.toggle('abierta', !!(filas || nueva));
-}
-
-function elegirSugerencia(i) {
-    if (i < sugerencias.length) document.getElementById('k-quien').value = sugerencias[i].nombre;
-    cerrarSugerencias();
-}
-
-function cerrarSugerencias() {
-    document.getElementById('sugerencias').classList.remove('abierta');
-    marcada = -1;
-}
-
-/** Flechas para recorrer, Enter para elegir, Escape para cerrar. */
-function teclaSugerencia(ev) {
-    const caja = document.getElementById('sugerencias');
-    if (!caja.classList.contains('abierta')) return;
-    const escrito = document.getElementById('k-quien').value.trim();
-    const exacta = sugerencias.some(s => s.nombre.toLowerCase() === escrito.toLowerCase());
-    const total = sugerencias.length + ((escrito && !exacta) ? 1 : 0);
-    if (!total) return;
-
-    if (ev.key === 'ArrowDown')      { ev.preventDefault(); marcada = (marcada + 1) % total; }
-    else if (ev.key === 'ArrowUp')   { ev.preventDefault(); marcada = (marcada - 1 + total) % total; }
-    else if (ev.key === 'Enter' && marcada >= 0) { ev.preventDefault(); elegirSugerencia(marcada); return; }
-    else if (ev.key === 'Escape')    { cerrarSugerencias(); return; }
-    else return;
-    pintarSugerencias(document.getElementById('k-quien').value.trim());
+async function cargarMotivos() {
+    const r = await fetch(`${API}?action=listar_tipos`).then(x => x.json()).catch(() => ({}));
+    motivos = r.success ? r.data : [];
+    document.getElementById('fTipo').innerHTML = '<option value="">Todos los motivos</option>' +
+        motivos.map(t => `<option value="${t.id}">${esc(t.nombre)}</option>`).join('');
+    document.getElementById('k-tipo').innerHTML = motivos.length
+        ? motivos.map(t => `<option value="${t.id}">${esc(t.nombre)}</option>`).join('')
+        : '<option value="">— Sin motivos: créalos en ⚙️ Motivos —</option>';
 }
 
 async function cargar() {
     const eid = document.getElementById('fEmpresa').value;
+    const q = new URLSearchParams();
+    if (eid) q.set('empresa_id', eid);
+    if (filtroExtintor) q.set('extintor_id', filtroExtintor.id);
+
     const [rm, rs] = await Promise.all([
-        fetch(`${API}?action=listar${eid ? '&empresa_id=' + eid : ''}`).then(r => r.json()).catch(() => ({})),
+        fetch(`${API}?action=listar&${q}`).then(r => r.json()).catch(() => ({})),
         fetch(`${API}?action=resumen${eid ? '&empresa_id=' + eid : ''}`).then(r => r.json()).catch(() => ({})),
     ]);
     movimientos = rm.success ? rm.data : [];
     pintarKpis(rs.success ? rs.data : null);
+    pintarAvisoFiltro();
     render();
 }
 
 function pintarKpis(r) {
     const c = document.getElementById('kpis');
     if (!r) { c.innerHTML = ''; return; }
+    const porMotivo = (r.por_motivo || []).map(m =>
+        `<div class="kpi pur"><div class="v">${m.n}</div><div class="l">${esc(m.nombre)}</div></div>`).join('');
     c.innerHTML = `
-        <div class="kpi warn"><div class="v">${r.fuera}</div><div class="l">Fuera ahora mismo</div></div>
+        <div class="kpi warn"><div class="v">${r.en_taller}</div><div class="l">En el taller ahora</div></div>
         <div class="kpi"><div class="v">${r.total}</div><div class="l">Movimientos registrados</div></div>
-        <div class="kpi ok"><div class="v">${r.mes}</div><div class="l">Salidas de este mes</div></div>
-        <div class="kpi"><div class="v">${r.mantenimiento}</div><div class="l">A mantenimiento</div></div>
-        <div class="kpi pur"><div class="v">${r.recarga}</div><div class="l">A recarga</div></div>
-        <div class="kpi pur"><div class="v">${r.garantia}</div><div class="l">A garantía</div></div>`;
+        <div class="kpi ok"><div class="v">${r.mes}</div><div class="l">Entradas de este mes</div></div>
+        ${porMotivo}`;
 }
+
+/** Cuando se está viendo el control de un solo extintor, se dice y se puede salir. */
+function pintarAvisoFiltro() {
+    const c = document.getElementById('avisoFiltro');
+    c.innerHTML = filtroExtintor
+        ? `<div class="aviso-filtro">
+             <span>Viendo el control del extintor <b>${esc(filtroExtintor.codigo)}</b>
+             — ${esc(filtroExtintor.empresa)}</span>
+             <button class="btn btn-ghost btn-sm" onclick="quitarFiltroExtintor()">Ver todos</button>
+           </div>` : '';
+}
+
+function verControlDe(id, codigo, empresa) {
+    filtroExtintor = {id, codigo, empresa};
+    cargar();
+}
+function quitarFiltroExtintor() { filtroExtintor = null; cargar(); }
 
 // ── Listado ─────────────────────────────────────────────────────────────────
 function render() {
@@ -393,32 +378,35 @@ function render() {
     const fe = document.getElementById('fEstado').value;
 
     const data = movimientos.filter(m =>
-        (!ft || m.tipo === ft) &&
-        (!fe || (fe === 'fuera' ? Number(m.sigue_fuera) === 1 : Number(m.sigue_fuera) === 0)) &&
-        (!q || (`${m.codigo_manual} ${m.ubicacion} ${m.realizado_por} ${m.empresa_nombre}`).toLowerCase().includes(q)));
+        (!ft || String(m.tipo_id) === ft) &&
+        (!fe || (fe === 'taller' ? Number(m.en_taller) === 1 : Number(m.en_taller) === 0)) &&
+        (!q || (`${m.codigo_manual} ${m.ubicacion} ${m.realizado_por} ${m.empresa_nombre} ${m.motivo || ''}`)
+                 .toLowerCase().includes(q)));
 
     const cont = document.getElementById('tabla');
     if (!data.length) {
-        cont.innerHTML = '<div class="empty"><div class="ic">🛠️</div><p>Sin movimientos registrados todavía. Usa “Registrar salida”.</p></div>';
+        cont.innerHTML = '<div class="empty"><div class="ic">🛠️</div><p>Sin movimientos todavía. Usa “Registrar entrada”.</p></div>';
         return;
     }
     cont.innerHTML = `<div class="tabla-env"><table class="tabla">
         <thead><tr>
-            <th>Extintor</th><th>Planta</th><th>Motivo</th><th>Salió</th>
-            <th>Regresó</th><th>Realizado por</th><th>Estado</th><th></th>
+            <th>Extintor</th><th>Planta</th><th>Motivo</th><th>Entró al taller</th>
+            <th>Devuelto</th><th>Realizado por</th><th>Estado</th><th></th>
         </tr></thead>
         <tbody>${data.map(m => `<tr>
-            <td data-et="Extintor" class="td-titulo">${esc(m.codigo_manual)}
+            <td data-et="Extintor" class="td-titulo">
+                <button class="cod-ext" onclick="verControlDe(${m.extintor_id},'${esc(m.codigo_manual)}','${esc(m.empresa_nombre)}')"
+                        title="Ver el control completo de este extintor">${esc(m.codigo_manual)}</button>
                 <div style="font-weight:400;font-size:12px;color:#64748b">${esc(m.ubicacion || '')}</div></td>
             <td data-et="Planta">${esc(m.empresa_nombre)}</td>
-            <td data-et="Motivo"><span class="badge b-${esc(m.tipo)}">${ETIQUETA[m.tipo] || esc(m.tipo)}</span></td>
-            <td data-et="Salió">${fechaCorta(m.fecha_salida)}</td>
-            <td data-et="Regresó">${m.fecha_retorno ? fechaCorta(m.fecha_retorno)
-                : `<span class="dias">${diasFuera(m.fecha_salida)} días fuera</span>`}</td>
+            <td data-et="Motivo"><span class="badge b-motivo">${esc(m.motivo || '—')}</span></td>
+            <td data-et="Entró al taller">${fechaCorta(m.fecha_entrada)}</td>
+            <td data-et="Devuelto">${m.fecha_devolucion ? fechaCorta(m.fecha_devolucion)
+                : `<span class="dias">${diasEnTaller(m.fecha_entrada)} días en taller</span>`}</td>
             <td data-et="Realizado por">${esc(m.realizado_por || '—')}</td>
-            <td data-et="Estado"><span class="badge ${Number(m.sigue_fuera) ? 'b-fuera' : 'b-devuelto'}">${Number(m.sigue_fuera) ? 'Fuera' : 'Devuelto'}</span></td>
+            <td data-et="Estado"><span class="badge ${Number(m.en_taller) ? 'b-taller' : 'b-devuelto'}">${Number(m.en_taller) ? 'En taller' : 'Devuelto'}</span></td>
             <td class="acciones">
-                ${Number(m.sigue_fuera) ? `<button class="btn btn-ok btn-sm" data-lbl="Regresó" onclick="abrirRetorno(${m.id})" title="Registrar el regreso">✅</button>` : ''}
+                ${Number(m.en_taller) ? `<button class="btn btn-ok btn-sm" data-lbl="Devolver" onclick="abrirDevolucion(${m.id})" title="Registrar la devolución">✅</button>` : ''}
                 <button class="btn btn-warning btn-sm" data-lbl="Editar" onclick="editar(${m.id})" title="Editar">✏️</button>
                 <button class="btn btn-danger btn-sm" data-lbl="Eliminar" onclick="borrar(${m.id})" title="Eliminar">🗑️</button>
             </td></tr>`).join('')}</tbody></table></div>`;
@@ -426,13 +414,14 @@ function render() {
 
 // ── Formulario ──────────────────────────────────────────────────────────────
 function nuevo() {
-    document.getElementById('tituloMov').textContent = 'Registrar salida a mantenimiento';
+    if (!motivos.length) { aviso('Primero crea al menos un motivo en ⚙️ Motivos.', false); return; }
+    document.getElementById('tituloMov').textContent = 'Registrar entrada al taller';
     document.getElementById('k-id').value = '';
     document.getElementById('k-empresa').value = document.getElementById('fEmpresa').value || '';
     document.getElementById('k-buscaExt').value = '';
-    document.getElementById('k-tipo').value = 'mantenimiento';
-    document.getElementById('k-salida').value = hoy();
-    document.getElementById('k-retorno').value = '';
+    document.getElementById('k-tipo').selectedIndex = 0;
+    document.getElementById('k-entrada').value = hoy();
+    document.getElementById('k-devolucion').value = '';
     document.getElementById('k-quien').value = '';
     document.getElementById('k-notas').value = '';
     document.getElementById('k-actualizar').checked = true;
@@ -453,24 +442,26 @@ async function editar(id) {
     document.getElementById('k-id').value = m.id;
     document.getElementById('k-empresa').value = m.empresa_id;
     document.getElementById('k-buscaExt').value = '';
-    document.getElementById('k-tipo').value = m.tipo;
-    document.getElementById('k-salida').value = (m.fecha_salida || '').substring(0,10);
-    document.getElementById('k-retorno').value = (m.fecha_retorno || '').substring(0,10);
+    document.getElementById('k-tipo').value = m.tipo_id || '';
+    document.getElementById('k-entrada').value = (m.fecha_entrada || '').substring(0,10);
+    document.getElementById('k-devolucion').value = (m.fecha_devolucion || '').substring(0,10);
+    document.getElementById('k-quien').value = m.realizado_por || '';
     document.getElementById('k-notas').value = m.notas || '';
     document.getElementById('k-actualizar').checked = false;
+    cerrarSugerencias();
 
     await empresaElegida(m.extintor_id);
-    document.getElementById('k-quien').value = m.realizado_por || '';
-    cerrarSugerencias();
     tipoElegido();
     document.getElementById('modalMov').classList.add('open');
 }
 
-/** La casilla de actualizar la recarga sólo tiene sentido en recargas ya devueltas. */
+/** La casilla de la recarga sólo aplica al motivo que lo pide y ya devuelto. */
 function tipoElegido() {
-    const esRecarga = document.getElementById('k-tipo').value === 'recarga';
-    const hayRetorno = !!document.getElementById('k-retorno').value;
-    document.getElementById('fgRecarga').style.display = (esRecarga && hayRetorno) ? '' : 'none';
+    const id = document.getElementById('k-tipo').value;
+    const motivo = motivos.find(t => String(t.id) === String(id));
+    const aplica = motivo && Number(motivo.actualiza_recarga) === 1;
+    const devuelto = !!document.getElementById('k-devolucion').value;
+    document.getElementById('fgRecarga').style.display = (aplica && devuelto) ? '' : 'none';
 }
 
 // ── Extintores de la planta elegida ─────────────────────────────────────────
@@ -515,7 +506,7 @@ async function extintorElegido() {
     if (!r.success) { limpiarFicha(); return; }
     const e = r.data;
 
-    const fuera = (e.historial || []).find(h => Number(h.sigue_fuera) === 1);
+    const enTaller = (e.historial || []).find(h => Number(h.en_taller) === 1);
     const hist = (e.historial || []).slice(0, 4);
 
     document.getElementById('ficha').innerHTML = `
@@ -533,33 +524,102 @@ async function extintorElegido() {
             <div class="dato"><span>Última inspección</span><b>${fechaCorta(e.ultima_inspeccion)}</b></div>
             <div class="dato"><span>Estado</span><b>${esc(e.estado || '—')}</b></div>
         </div>
-        ${fuera ? `<div class="hist" style="color:#b91c1c;font-weight:700">
-            ⚠️ Este extintor ya figura fuera desde el ${fechaCorta(fuera.fecha_salida)}
-            (${ETIQUETA[fuera.tipo] || fuera.tipo}, ${esc(fuera.realizado_por || 'sin responsable')}).
+        ${enTaller ? `<div class="hist" style="color:#b91c1c;font-weight:700">
+            ⚠️ Este extintor ya está en el taller desde el ${fechaCorta(enTaller.fecha_entrada)}
+            (${esc(enTaller.motivo || '')}, ${esc(enTaller.realizado_por || 'sin responsable')}).
         </div>` : ''}
         ${hist.length ? `<div class="hist"><div class="h">Movimientos anteriores</div>
-            <ul>${hist.map(h => `<li>• ${fechaCorta(h.fecha_salida)} — ${ETIQUETA[h.tipo] || esc(h.tipo)}
-                ${h.fecha_retorno ? `(regresó ${fechaCorta(h.fecha_retorno)})` : '<b>(sigue fuera)</b>'}
+            <ul>${hist.map(h => `<li>• ${fechaCorta(h.fecha_entrada)} — ${esc(h.motivo || '')}
+                ${h.fecha_devolucion ? `(devuelto ${fechaCorta(h.fecha_devolucion)})` : '<b>(sigue en el taller)</b>'}
                 · ${esc(h.realizado_por || '—')}</li>`).join('')}</ul></div>` : ''}`;
+}
+
+// ── Sugerencias de quién realizó el servicio ────────────────────────────────
+let sugerencias = [], marcada = -1, peticionSug = 0;
+
+async function buscarSugerencias() {
+    const q = document.getElementById('k-quien').value.trim();
+    const mia = ++peticionSug;
+    const r = await fetch(`${API}?action=sugerir&q=${encodeURIComponent(q)}`)
+        .then(x => x.json()).catch(() => ({}));
+    if (mia !== peticionSug) return;          // llegó tarde: ya se tecleó más
+    sugerencias = r.success ? r.data : [];
+    marcada = -1;
+    pintarSugerencias(q);
+}
+
+/** Resalta dentro del nombre el trozo tecleado, para que se vea por qué coincide. */
+function resaltar(nombre, q) {
+    if (!q) return esc(nombre);
+    const sinAcentos = t => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    const i = sinAcentos(nombre).indexOf(sinAcentos(q));
+    if (i < 0) return esc(nombre);
+    return esc(nombre.slice(0, i)) + '<mark>' + esc(nombre.slice(i, i + q.length)) + '</mark>'
+         + esc(nombre.slice(i + q.length));
+}
+
+function pintarSugerencias(q) {
+    const caja = document.getElementById('sugerencias');
+    const escrito = document.getElementById('k-quien').value.trim();
+    const exacta = sugerencias.some(s => s.nombre.toLowerCase() === escrito.toLowerCase());
+    const filas = sugerencias.map((s, i) =>
+        `<div class="sug ${i === marcada ? 'marcada' : ''}" onmousedown="elegirSugerencia(${i})">
+            <span class="nom">${resaltar(s.nombre, q)}</span>
+            <span class="det">${esc(s.detalle)}</span>
+        </div>`).join('');
+    const nueva = (escrito && !exacta)
+        ? `<div class="sug nueva ${marcada === sugerencias.length ? 'marcada' : ''}" onmousedown="elegirSugerencia(${sugerencias.length})">
+             <span class="nom">✎ Usar “${esc(escrito)}”</span>
+             <span class="det">nombre nuevo</span>
+           </div>` : '';
+
+    caja.innerHTML = filas + nueva;
+    caja.classList.toggle('abierta', !!(filas || nueva));
+}
+
+function elegirSugerencia(i) {
+    if (i < sugerencias.length) document.getElementById('k-quien').value = sugerencias[i].nombre;
+    cerrarSugerencias();
+}
+function cerrarSugerencias() {
+    document.getElementById('sugerencias').classList.remove('abierta');
+    marcada = -1;
+}
+
+function teclaSugerencia(ev) {
+    const caja = document.getElementById('sugerencias');
+    if (!caja.classList.contains('abierta')) return;
+    const escrito = document.getElementById('k-quien').value.trim();
+    const exacta = sugerencias.some(s => s.nombre.toLowerCase() === escrito.toLowerCase());
+    const total = sugerencias.length + ((escrito && !exacta) ? 1 : 0);
+    if (!total) return;
+
+    if (ev.key === 'ArrowDown')    { ev.preventDefault(); marcada = (marcada + 1) % total; }
+    else if (ev.key === 'ArrowUp') { ev.preventDefault(); marcada = (marcada - 1 + total) % total; }
+    else if (ev.key === 'Enter' && marcada >= 0) { ev.preventDefault(); elegirSugerencia(marcada); return; }
+    else if (ev.key === 'Escape')  { cerrarSugerencias(); return; }
+    else return;
+    pintarSugerencias(escrito);
 }
 
 // ── Guardar ─────────────────────────────────────────────────────────────────
 async function guardar() {
     const cuerpo = {
-        id:            parseInt(document.getElementById('k-id').value) || 0,
-        extintor_id:   parseInt(document.getElementById('k-extintor').value) || 0,
-        tipo:          document.getElementById('k-tipo').value,
-        fecha_salida:  document.getElementById('k-salida').value,
-        fecha_retorno: document.getElementById('k-retorno').value,
-        notas:         document.getElementById('k-notas').value.trim(),
+        id:               parseInt(document.getElementById('k-id').value) || 0,
+        extintor_id:      parseInt(document.getElementById('k-extintor').value) || 0,
+        tipo_id:          parseInt(document.getElementById('k-tipo').value) || 0,
+        fecha_entrada:    document.getElementById('k-entrada').value,
+        fecha_devolucion: document.getElementById('k-devolucion').value,
+        realizado_por:    document.getElementById('k-quien').value.trim(),
+        notas:            document.getElementById('k-notas').value.trim(),
         actualizar_recarga: document.getElementById('k-actualizar').checked ? 1 : 0,
-        realizado_por: document.getElementById('k-quien').value.trim(),
     };
 
-    if (!cuerpo.extintor_id) { aviso('Elige el extintor.', false); return; }
-    if (!cuerpo.fecha_salida) { aviso('Indica la fecha en que salió.', false); return; }
-    if (cuerpo.fecha_retorno && cuerpo.fecha_retorno < cuerpo.fecha_salida) {
-        aviso('La fecha de retorno no puede ser anterior a la de salida.', false); return;
+    if (!cuerpo.extintor_id)   { aviso('Elige el extintor.', false); return; }
+    if (!cuerpo.tipo_id)       { aviso('Elige el motivo del ingreso.', false); return; }
+    if (!cuerpo.fecha_entrada) { aviso('Indica la fecha en que entró al taller.', false); return; }
+    if (cuerpo.fecha_devolucion && cuerpo.fecha_devolucion < cuerpo.fecha_entrada) {
+        aviso('La fecha de devolución no puede ser anterior a la de entrada.', false); return;
     }
     if (!cuerpo.realizado_por) { aviso('Indica quién realizó el servicio.', false); return; }
 
@@ -567,39 +627,36 @@ async function guardar() {
         method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cuerpo)
     });
     const d = await r.json().catch(() => ({}));
-    if (r.ok && d.success) {
-        cerrar('modalMov');
-        aviso('✓ Movimiento guardado', true);
-        cargar();
-    } else aviso(d.error || 'Error al guardar', false);
+    if (r.ok && d.success) { cerrar('modalMov'); aviso('✓ Movimiento guardado', true); cargar(); }
+    else aviso(d.error || 'Error al guardar', false);
 }
 
-// ── Retorno ─────────────────────────────────────────────────────────────────
-function abrirRetorno(id) {
+// ── Devolución ──────────────────────────────────────────────────────────────
+function abrirDevolucion(id) {
     const m = movimientos.find(x => x.id === id);
     if (!m) return;
-    document.getElementById('r-id').value = id;
-    document.getElementById('r-fecha').value = hoy();
-    document.getElementById('retDetalle').innerHTML =
-        `<b>${esc(m.codigo_manual)}</b> — ${ETIQUETA[m.tipo] || esc(m.tipo)}, salió el ${fechaCorta(m.fecha_salida)}
-         (${diasFuera(m.fecha_salida)} días). Atendido por ${esc(m.realizado_por || '—')}.`;
-    document.getElementById('rRecarga').style.display = m.tipo === 'recarga' ? '' : 'none';
-    document.getElementById('modalRet').classList.add('open');
+    document.getElementById('d-id').value = id;
+    document.getElementById('d-fecha').value = hoy();
+    document.getElementById('devDetalle').innerHTML =
+        `<b>${esc(m.codigo_manual)}</b> — ${esc(m.motivo || '')}, entró el ${fechaCorta(m.fecha_entrada)}
+         (${diasEnTaller(m.fecha_entrada)} días en el taller). Atendido por ${esc(m.realizado_por || '—')}.`;
+    document.getElementById('dRecarga').style.display = Number(m.actualiza_recarga) === 1 ? '' : 'none';
+    document.getElementById('modalDev').classList.add('open');
 }
 
-async function guardarRetorno() {
+async function guardarDevolucion() {
     const cuerpo = {
-        id: parseInt(document.getElementById('r-id').value) || 0,
-        fecha_retorno: document.getElementById('r-fecha').value,
-        actualizar_recarga: document.getElementById('r-actualizar').checked ? 1 : 0,
+        id: parseInt(document.getElementById('d-id').value) || 0,
+        fecha_devolucion: document.getElementById('d-fecha').value,
+        actualizar_recarga: document.getElementById('d-actualizar').checked ? 1 : 0,
     };
-    if (!cuerpo.fecha_retorno) { aviso('Indica la fecha en que regresó.', false); return; }
-    const r = await fetch(`${API}?action=registrar_retorno`, {
+    if (!cuerpo.fecha_devolucion) { aviso('Indica la fecha de devolución.', false); return; }
+    const r = await fetch(`${API}?action=registrar_devolucion`, {
         method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cuerpo)
     });
     const d = await r.json().catch(() => ({}));
-    if (r.ok && d.success) { cerrar('modalRet'); aviso('✓ Regreso registrado', true); cargar(); }
-    else aviso(d.error || 'Error al registrar el regreso', false);
+    if (r.ok && d.success) { cerrar('modalDev'); aviso('✓ Devolución registrada', true); cargar(); }
+    else aviso(d.error || 'Error al registrar la devolución', false);
 }
 
 async function borrar(id) {
@@ -610,10 +667,99 @@ async function borrar(id) {
     else aviso(d.error || 'Error al eliminar', false);
 }
 
+// ── Catálogo de motivos ─────────────────────────────────────────────────────
+async function abrirMotivos() {
+    limpiarMotivo();
+    await pintarMotivos();
+    document.getElementById('modalMotivos').classList.add('open');
+}
+
+async function cerrarMotivos() {
+    cerrar('modalMotivos');
+    await cargarMotivos();   // los filtros y el formulario reflejan los cambios
+    cargar();
+}
+
+async function pintarMotivos() {
+    const r = await fetch(`${API}?action=listar_tipos&todos=1`).then(x => x.json()).catch(() => ({}));
+    const datos = r.success ? r.data : [];
+    const cont = document.getElementById('tablaMotivos');
+    if (!datos.length) {
+        cont.innerHTML = '<div class="empty" style="padding:24px"><p>Sin motivos. Crea el primero abajo.</p></div>';
+        return;
+    }
+    cont.innerHTML = `<div class="tabla-env"><table class="tabla">
+        <thead><tr><th>Motivo</th><th>Actualiza recarga</th><th>Usos</th><th>Estado</th><th></th></tr></thead>
+        <tbody>${datos.map(t => `<tr>
+            <td data-et="Motivo" class="td-titulo">${esc(t.nombre)}</td>
+            <td data-et="Actualiza recarga">${Number(t.actualiza_recarga) ? 'Sí' : 'No'}</td>
+            <td data-et="Usos">${t.usos}</td>
+            <td data-et="Estado">${t.estado === 'activo'
+                ? '<span class="badge b-devuelto">Activo</span>'
+                : '<span class="badge b-inactivo">Inactivo</span>'}</td>
+            <td class="acciones">
+                <button class="btn btn-warning btn-sm" data-lbl="Editar" onclick='editarMotivo(${JSON.stringify(t)})' title="Editar">✏️</button>
+                ${t.estado === 'activo'
+                    ? `<button class="btn btn-danger btn-sm" data-lbl="Quitar" onclick="borrarMotivo(${t.id})" title="Quitar">🗑️</button>`
+                    : `<button class="btn btn-ok btn-sm" data-lbl="Reactivar" onclick='reactivarMotivo(${JSON.stringify(t)})' title="Reactivar">↩️</button>`}
+            </td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function editarMotivo(t) {
+    document.getElementById('t-id').value = t.id;
+    document.getElementById('t-nombre').value = t.nombre;
+    document.getElementById('t-recarga').checked = Number(t.actualiza_recarga) === 1;
+    document.getElementById('t-titulo').textContent = 'Editando «' + t.nombre + '»';
+    document.getElementById('t-cancelar').style.display = '';
+    document.getElementById('t-nombre').focus();
+}
+
+function limpiarMotivo() {
+    document.getElementById('t-id').value = '';
+    document.getElementById('t-nombre').value = '';
+    document.getElementById('t-recarga').checked = false;
+    document.getElementById('t-titulo').textContent = 'Nuevo motivo';
+    document.getElementById('t-cancelar').style.display = 'none';
+}
+
+async function guardarMotivo() {
+    const cuerpo = {
+        id: parseInt(document.getElementById('t-id').value) || 0,
+        nombre: document.getElementById('t-nombre').value.trim(),
+        actualiza_recarga: document.getElementById('t-recarga').checked ? 1 : 0,
+    };
+    if (!cuerpo.nombre) { aviso('Escribe el nombre del motivo.', false); return; }
+    const r = await fetch(`${API}?action=guardar_tipo`, {
+        method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(cuerpo)
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success) { limpiarMotivo(); await pintarMotivos(); await cargarMotivos(); aviso('✓ Motivo guardado', true); }
+    else aviso(d.error || 'Error al guardar el motivo', false);
+}
+
+async function reactivarMotivo(t) {
+    const r = await fetch(`${API}?action=guardar_tipo`, {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({id: t.id, nombre: t.nombre, actualiza_recarga: t.actualiza_recarga, estado: 'activo'})
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success) { await pintarMotivos(); await cargarMotivos(); aviso('✓ Motivo reactivado', true); }
+    else aviso(d.error || 'Error al reactivar', false);
+}
+
+async function borrarMotivo(id) {
+    if (!confirm('¿Quitar este motivo de la lista?')) return;
+    const r = await fetch(`${API}?action=eliminar_tipo&id=${id}`);
+    const d = await r.json().catch(() => ({}));
+    if (r.ok && d.success) {
+        await pintarMotivos(); await cargarMotivos();
+        aviso(d.mensaje || '✓ Motivo quitado', true);
+    } else aviso(d.error || 'Error al quitar el motivo', false);
+}
+
 document.querySelectorAll('.modal-ov').forEach(m =>
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
 
-// Un clic fuera del campo cierra las sugerencias
 document.addEventListener('click', e => {
     if (!e.target.closest('.sug-caja')) cerrarSugerencias();
 });

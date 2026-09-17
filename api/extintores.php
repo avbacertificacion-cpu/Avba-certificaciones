@@ -62,7 +62,7 @@ function listar() {
     $where = $empresa_id ? 'WHERE e.empresa_id = :eid' : '';
     $params = $empresa_id ? [':eid' => $empresa_id] : [];
 
-    // Si el extintor está fuera a mantenimiento se dice aquí: el registro de
+    // Si el extintor está en el taller se dice aquí: el registro de
     // mantenimientos no sirve de nada si en el listado no se nota que falta.
     // La tabla la crea el módulo de mantenimiento la primera vez que se abre,
     // así que se consulta sólo si ya existe; en una instalación nueva el
@@ -70,12 +70,13 @@ function listar() {
     $colMant = '';
     if (hayTablaMantenimientos($pdo)) {
         $colMant = "
-            ,(SELECT m.tipo FROM extintor_mantenimientos m
-              WHERE m.extintor_id = e.id AND m.fecha_retorno IS NULL
-              ORDER BY m.fecha_salida DESC LIMIT 1) AS mantenimiento_tipo
-            ,(SELECT m.fecha_salida FROM extintor_mantenimientos m
-              WHERE m.extintor_id = e.id AND m.fecha_retorno IS NULL
-              ORDER BY m.fecha_salida DESC LIMIT 1) AS mantenimiento_desde
+            ,(SELECT t.nombre FROM extintor_mantenimientos m
+              LEFT JOIN mantenimiento_tipos t ON t.id = m.tipo_id
+              WHERE m.extintor_id = e.id AND m.fecha_devolucion IS NULL
+              ORDER BY m.fecha_entrada DESC LIMIT 1) AS mantenimiento_motivo
+            ,(SELECT m.fecha_entrada FROM extintor_mantenimientos m
+              WHERE m.extintor_id = e.id AND m.fecha_devolucion IS NULL
+              ORDER BY m.fecha_entrada DESC LIMIT 1) AS mantenimiento_desde
         ";
     }
 

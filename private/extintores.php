@@ -42,8 +42,8 @@ $es_admin = $rol === ROLE_ADMIN;
         .badge{display:inline-block;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:700}
         .badge-activo{background:#d4edda;color:#155724}
         .badge-inactivo{background:#e2e3e5;color:#383d41}
-        /* El extintor está físicamente fuera: se ve junto a su estado */
-        .badge-fuera{background:#fee2e2;color:#b91c1c;margin-left:5px;white-space:nowrap}
+        /* El extintor está en nuestro taller: se ve junto a su estado */
+        .badge-taller{background:#fee2e2;color:#b91c1c;margin-left:5px;white-space:nowrap}
         .badge-prestamo{background:#fff3cd;color:#856404}
         .tipo-tag{background:#e8ecff;color:#3a4db7;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600}
         .empty{text-align:center;padding:60px;color:#999}
@@ -303,7 +303,7 @@ function renderTabla(data) {
                 <td data-et="Prueba hidrostática">${isoADisplay(e.fecha_ph) || '—'}</td>
                 <td data-et="Última inspección">${e.ultima_inspeccion ? isoADisplay(e.ultima_inspeccion) : '<span style="color:#e74c3c">Sin inspección</span>'}</td>
                 <td data-et="Estado"><span class="badge badge-${e.estado}">${estadoLabel(e.estado)}</span>
-                    ${e.mantenimiento_tipo ? `<span class="badge badge-fuera" title="Registrado en Mantenimiento de Extintores">🛠️ ${MOTIVO[e.mantenimiento_tipo] || e.mantenimiento_tipo} desde ${isoADisplay(e.mantenimiento_desde)}</span>` : ''}</td>
+                    ${e.mantenimiento_desde ? `<span class="badge badge-taller" title="Registrado en Mantenimiento de Extintores">🛠️ En taller (${e.mantenimiento_motivo || 'sin motivo'}) desde ${isoADisplay(e.mantenimiento_desde)}</span>` : ''}</td>
                 <td class="acciones">
                     ${(!e.codigo_qr || esAdmin) ? `
                     <button class="btn btn-sm btn-primary" onclick="asignarOModificarQR(${e.id}, ${e.codigo_qr ? 'true' : 'false'})">
@@ -318,8 +318,6 @@ function renderTabla(data) {
         </tbody>
     </table></div>`;
 }
-
-const MOTIVO = {mantenimiento:'En mantenimiento', recarga:'En recarga', garantia:'En garantía'};
 
 function estadoLabel(s) {
     return {activo:'Activo', inactivo:'Inactivo', en_prestamo:'En préstamo'}[s] ?? s;

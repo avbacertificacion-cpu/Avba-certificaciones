@@ -1,15 +1,19 @@
 <?php
 /**
- * Mantenimientos de extintores (solo ADMIN).
+ * Mantenimiento de extintores (solo ADMIN).
  *
- * Registra cada vez que un extintor sale de la planta: a mantenimiento, a
- * recarga o a garantía. Guarda cuándo salió, cuándo volvió y quién lo atendió,
- * que puede ser un proveedor del catálogo o un nombre escrito a mano.
+ * El taller es nuestro: el extintor no "sale" a ningún lado, ENTRA al taller
+ * y más tarde se DEVUELVE al cliente. Por eso las fechas se llaman entrada y
+ * devolución, y un registro sin fecha de devolución es un extintor que sigue
+ * en el taller. El estado sale de ahí, no de una columna aparte que pudiera
+ * contradecir a las fechas.
  *
- * Un movimiento sin fecha de retorno es un extintor que sigue fuera: de ahí
- * sale el estado, no se guarda aparte para que no puedan contradecirse.
+ * Los motivos (mantenimiento, recarga, garantía…) son un catálogo editable:
+ * cada taller trabaja con los suyos y deben poder darse de alta sin tocar el
+ * código. Uno de ellos puede marcar "al devolver, actualiza la fecha de
+ * recarga del extintor", que es lo que antes estaba escrito a mano.
  *
- * La tabla se crea sola la primera vez (no requiere migración manual).
+ * Las tablas se crean solas la primera vez (no requiere migración manual).
  */
 require_once '../config/config.php';
 require_once '../config/mayusculas.php';
@@ -24,47 +28,118 @@ if ($rol !== ROLE_ADMIN) {
     http_response_code(403); echo json_encode(['error' => 'Sin permiso']); exit;
 }
 
-asegurarTablaMantenimientos($pdo);
+asegurarTablas($pdo);
 
 switch ($_GET['action'] ?? '') {
-    case 'listar':          listar();          break;
-    case 'obtener':         obtener();         break;
-    case 'extintor':        fichaExtintor();   break;
-    case 'guardar':         guardar();         break;
-    case 'registrar_retorno': registrarRetorno(); break;
-    case 'eliminar':        eliminar();        break;
-    case 'responsables':    responsables();    break;
-    case 'sugerir':         sugerir();         break;
-    case 'resumen':         resumen();         break;
+    case 'listar':             listar();            break;
+    case 'obtener':            obtener();           break;
+    case 'extintor':           fichaExtintor();     break;
+    case 'guardar':            guardar();           break;
+    case 'registrar_devolucion': registrarDevolucion(); break;
+    case 'eliminar':           eliminar();          break;
+    case 'sugerir':            sugerir();           break;
+    case 'responsables':       responsables();      break;
+    case 'resumen':            resumen();           break;
+    // Catálogo de motivos
+    case 'listar_tipos':       listarTipos();       break;
+    case 'guardar_tipo':       guardarTipo();       break;
+    case 'eliminar_tipo':      eliminarTipo();      break;
     default:
         http_response_code(400); echo json_encode(['error' => 'Acción no válida']);
 }
 
 // ─── Migración ligera ────────────────────────────────────────────────────────
-function asegurarTablaMantenimientos($pdo) {
+function columnaExiste(PDO $pdo, string $tabla, string $columna): bool {
+    try {
+        $st = $pdo->prepare("SHOW COLUMNS FROM `$tabla` LIKE ?");
+        $st->execute([$columna]);
+        return (bool) $st->fetch();
+    } catch (Exception $e) { return false; }
+}
+
+function asegurarTablas($pdo) {
+    // ── Catálogo de motivos ──
+    try {
+        $pdo->exec("
+            CREATE TABLE IF NOT EXISTS mantenimiento_tipos (
+                id                INT AUTO_INCREMENT PRIMARY KEY,
+                nombre            VARCHAR(80) NOT NULL,
+                actualiza_recarga TINYINT(1) NOT NULL DEFAULT 0,
+                orden             INT NOT NULL DEFAULT 0,
+                estado            VARCHAR(20) NOT NULL DEFAULT 'activo',
+                created_at        DATETIME DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE KEY uk_tipo_nombre (nombre)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        ");
+        // Los tres de siempre, sólo si el catálogo está vacío: a partir de ahí
+        // manda lo que el usuario tenga dado de alta.
+        $hay = (int) $pdo->query("SELECT COUNT(*) FROM mantenimiento_tipos")->fetchColumn();
+        if ($hay === 0) {
+            $ins = $pdo->prepare("INSERT INTO mantenimiento_tipos (nombre, actualiza_recarga, orden) VALUES (?,?,?)");
+            $ins->execute(['MANTENIMIENTO', 0, 1]);
+            $ins->execute(['RECARGA',       1, 2]);
+            $ins->execute(['GARANTÍA',      0, 3]);
+        }
+    } catch (Exception $e) { /* las acciones reportarán el error */ }
+
+    // ── Movimientos ──
     try {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS extintor_mantenimientos (
-                id            INT AUTO_INCREMENT PRIMARY KEY,
-                extintor_id   INT NOT NULL,
-                tipo          VARCHAR(20) NOT NULL,
-                fecha_salida  DATE NOT NULL,
-                fecha_retorno DATE DEFAULT NULL,
-                proveedor_id  INT DEFAULT NULL,
-                realizado_por VARCHAR(150) DEFAULT NULL,
-                notas         TEXT DEFAULT NULL,
-                creado_por    INT DEFAULT NULL,
-                created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                id               INT AUTO_INCREMENT PRIMARY KEY,
+                extintor_id      INT NOT NULL,
+                tipo_id          INT DEFAULT NULL,
+                fecha_entrada    DATE NOT NULL,
+                fecha_devolucion DATE DEFAULT NULL,
+                realizado_por    VARCHAR(150) DEFAULT NULL,
+                notas            TEXT DEFAULT NULL,
+                creado_por       INT DEFAULT NULL,
+                created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
                 KEY idx_mant_extintor (extintor_id),
-                KEY idx_mant_salida (fecha_salida)
+                KEY idx_mant_entrada (fecha_entrada)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
     } catch (Exception $e) { /* las acciones reportarán el error */ }
 
-    // Quiénes han hecho mantenimientos. Se guardan aparte —y no sólo dentro de
-    // cada movimiento— para poder sugerirlos al escribir: al teclear "M" salen
-    // los que ya trabajaron antes, y el mismo técnico no acaba registrado de
-    // tres formas distintas.
+    // ── De la versión anterior: se hablaba de salir de planta y volver ──
+    try {
+        if (columnaExiste($pdo, 'extintor_mantenimientos', 'fecha_salida')) {
+            $pdo->exec("ALTER TABLE extintor_mantenimientos CHANGE fecha_salida fecha_entrada DATE NOT NULL");
+        }
+        if (columnaExiste($pdo, 'extintor_mantenimientos', 'fecha_retorno')) {
+            $pdo->exec("ALTER TABLE extintor_mantenimientos CHANGE fecha_retorno fecha_devolucion DATE DEFAULT NULL");
+        }
+        if (!columnaExiste($pdo, 'extintor_mantenimientos', 'tipo_id')) {
+            $pdo->exec("ALTER TABLE extintor_mantenimientos ADD COLUMN tipo_id INT DEFAULT NULL");
+        }
+        // El motivo era texto fijo; ahora apunta al catálogo
+        if (columnaExiste($pdo, 'extintor_mantenimientos', 'tipo')) {
+            // Si algún movimiento antiguo traía un motivo que no está en el
+            // catálogo, se da de alta: ningún registro debe quedarse sin decir
+            // por qué entró el extintor.
+            $pdo->exec("
+                INSERT IGNORE INTO mantenimiento_tipos (nombre, actualiza_recarga, orden)
+                SELECT DISTINCT UPPER(m.tipo), 0,
+                       (SELECT COALESCE(MAX(orden),0) FROM mantenimiento_tipos) + 1
+                FROM extintor_mantenimientos m
+                WHERE m.tipo IS NOT NULL AND m.tipo <> ''
+                  AND NOT EXISTS (SELECT 1 FROM mantenimiento_tipos t WHERE t.nombre = UPPER(m.tipo))
+            ");
+            $pdo->exec("
+                UPDATE extintor_mantenimientos m
+                JOIN mantenimiento_tipos t ON t.nombre = UPPER(m.tipo)
+                SET m.tipo_id = t.id
+                WHERE m.tipo_id IS NULL AND m.tipo IS NOT NULL
+            ");
+            // Ya migrada, la columna vieja deja de ser obligatoria. Si siguiera
+            // siendo NOT NULL sin valor por defecto, cualquier alta nueva
+            // fallaría en las bases que vienen de la versión anterior. Se
+            // conserva —sin usarse— para no perder el texto original.
+            $pdo->exec("ALTER TABLE extintor_mantenimientos MODIFY tipo VARCHAR(20) NULL DEFAULT NULL");
+        }
+    } catch (Exception $e) { /* si la base no deja renombrar, las acciones lo dirán */ }
+
+    // ── Quiénes han hecho mantenimientos ──
     try {
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS mantenimiento_responsables (
@@ -76,16 +151,14 @@ function asegurarTablaMantenimientos($pdo) {
                 UNIQUE KEY uk_responsable (nombre)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
         ");
-        // Los nombres ya capturados antes de existir esta tabla se recuperan,
-        // para no empezar la lista vacía.
         $pdo->exec("
             INSERT IGNORE INTO mantenimiento_responsables (nombre, veces, ultima_vez)
-            SELECT realizado_por, COUNT(*), MAX(fecha_salida)
+            SELECT realizado_por, COUNT(*), MAX(fecha_entrada)
             FROM extintor_mantenimientos
             WHERE realizado_por IS NOT NULL AND realizado_por <> ''
             GROUP BY realizado_por
         ");
-    } catch (Exception $e) { /* si falla, las sugerencias simplemente no aparecen */ }
+    } catch (Exception $e) { /* sin esto, sólo faltan las sugerencias */ }
 }
 
 /**
@@ -108,11 +181,6 @@ function recordarResponsable(PDO $pdo, string $nombre, ?string $fecha): void {
     } catch (Exception $e) { /* no vale la pena romper el guardado por esto */ }
 }
 
-/** Los tres motivos por los que un extintor sale de la planta. */
-function tiposValidos(): array {
-    return ['mantenimiento', 'recarga', 'garantia'];
-}
-
 function fechaValida($v): ?string {
     $v = trim((string) $v);
     if ($v === '') return null;
@@ -120,7 +188,7 @@ function fechaValida($v): ?string {
     return ($d && $d->format('Y-m-d') === $v) ? $v : null;
 }
 
-/** SELECT común: el movimiento con los datos del extintor y su planta. */
+/** SELECT común: el movimiento con los datos del extintor, su planta y el motivo. */
 function sqlMovimiento(): string {
     return "
         SELECT m.*,
@@ -129,13 +197,14 @@ function sqlMovimiento(): string {
                te.nombre  AS tipo_extintor,
                emp.id     AS empresa_id,
                emp.nombre AS empresa_nombre,
-               p.nombre   AS proveedor_nombre,
-               (m.fecha_retorno IS NULL) AS sigue_fuera
+               mt.nombre  AS motivo,
+               mt.actualiza_recarga,
+               (m.fecha_devolucion IS NULL) AS en_taller
         FROM extintor_mantenimientos m
         JOIN extintores e   ON e.id = m.extintor_id
         JOIN empresas emp   ON emp.id = e.empresa_id
         LEFT JOIN tipos_extintores te ON te.id = e.tipo
-        LEFT JOIN proveedores p ON p.id = m.proveedor_id
+        LEFT JOIN mantenimiento_tipos mt ON mt.id = m.tipo_id
     ";
 }
 
@@ -147,16 +216,15 @@ function listar() {
 
     if ($eid = intval($_GET['empresa_id'] ?? 0)) { $where[] = 'e.empresa_id = ?'; $params[] = $eid; }
     if ($xid = intval($_GET['extintor_id'] ?? 0)) { $where[] = 'm.extintor_id = ?'; $params[] = $xid; }
-    $tipo = trim($_GET['tipo'] ?? '');
-    if (in_array($tipo, tiposValidos(), true)) { $where[] = 'm.tipo = ?'; $params[] = $tipo; }
+    if ($tid = intval($_GET['tipo_id'] ?? 0))     { $where[] = 'm.tipo_id = ?';    $params[] = $tid; }
 
-    // "fuera" = todavía no regresa; "devuelto" = ya regresó
+    // "taller" = todavía lo tenemos; "devuelto" = ya se entregó
     $estado = trim($_GET['estado'] ?? '');
-    if ($estado === 'fuera')    $where[] = 'm.fecha_retorno IS NULL';
-    if ($estado === 'devuelto') $where[] = 'm.fecha_retorno IS NOT NULL';
+    if ($estado === 'taller')   $where[] = 'm.fecha_devolucion IS NULL';
+    if ($estado === 'devuelto') $where[] = 'm.fecha_devolucion IS NOT NULL';
 
     $sql = sqlMovimiento() . ' WHERE ' . implode(' AND ', $where)
-         . ' ORDER BY m.fecha_salida DESC, m.id DESC LIMIT 500';
+         . ' ORDER BY m.fecha_entrada DESC, m.id DESC LIMIT 500';
     $st = $pdo->prepare($sql);
     $st->execute($params);
     echo json_encode(['success' => true, 'data' => $st->fetchAll(PDO::FETCH_ASSOC)]);
@@ -173,7 +241,7 @@ function obtener() {
     echo json_encode(['success' => true, 'data' => $m]);
 }
 
-// ─── Ficha del extintor + su historial ───────────────────────────────────────
+// ─── Ficha del extintor + su control completo ────────────────────────────────
 function fichaExtintor() {
     global $pdo;
     $id = intval($_GET['id'] ?? 0);
@@ -194,7 +262,7 @@ function fichaExtintor() {
     $ext = $st->fetch(PDO::FETCH_ASSOC);
     if (!$ext) { http_response_code(404); echo json_encode(['error' => 'Extintor no encontrado']); return; }
 
-    $st = $pdo->prepare(sqlMovimiento() . ' WHERE m.extintor_id = ? ORDER BY m.fecha_salida DESC, m.id DESC');
+    $st = $pdo->prepare(sqlMovimiento() . ' WHERE m.extintor_id = ? ORDER BY m.fecha_entrada DESC, m.id DESC');
     $st->execute([$id]);
     $ext['historial'] = $st->fetchAll(PDO::FETCH_ASSOC);
 
@@ -206,43 +274,36 @@ function guardar() {
     global $pdo, $uid;
     $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true)) ?: [];
 
-    $id      = intval($d['id'] ?? 0);
-    $extId   = intval($d['extintor_id'] ?? 0);
-    $tipo    = strtolower(trim($d['tipo'] ?? ''));
-    $salida  = fechaValida($d['fecha_salida'] ?? '');
-    $retorno = fechaValida($d['fecha_retorno'] ?? '');
+    $id        = intval($d['id'] ?? 0);
+    $extId     = intval($d['extintor_id'] ?? 0);
+    $tipoId    = intval($d['tipo_id'] ?? 0);
+    $entrada   = fechaValida($d['fecha_entrada'] ?? '');
+    $devuelto  = fechaValida($d['fecha_devolucion'] ?? '');
 
-    if (!$extId)  { http_response_code(400); echo json_encode(['error' => 'Elige el extintor']); return; }
-    if (!in_array($tipo, tiposValidos(), true)) {
-        http_response_code(400); echo json_encode(['error' => 'Elige el motivo: mantenimiento, recarga o garantía']); return;
-    }
-    if (!$salida) { http_response_code(400); echo json_encode(['error' => 'Indica la fecha en que salió']); return; }
-    if ($retorno && $retorno < $salida) {
-        http_response_code(400); echo json_encode(['error' => 'La fecha de retorno no puede ser anterior a la de salida']); return;
+    if (!$extId)   { http_response_code(400); echo json_encode(['error' => 'Elige el extintor']); return; }
+    if (!$entrada) { http_response_code(400); echo json_encode(['error' => 'Indica la fecha en que entró al taller']); return; }
+    if ($devuelto && $devuelto < $entrada) {
+        http_response_code(400);
+        echo json_encode(['error' => 'La fecha de devolución no puede ser anterior a la de entrada']);
+        return;
     }
 
     $st = $pdo->prepare("SELECT id FROM extintores WHERE id = ?");
     $st->execute([$extId]);
     if (!$st->fetchColumn()) { http_response_code(400); echo json_encode(['error' => 'El extintor no existe']); return; }
 
-    // Quién lo atendió: se escribe libremente —una persona con nombre y
-    // apellido, o una empresa—. Si lo escrito coincide con un proveedor del
-    // catálogo se deja además enlazado, para poder reportar por proveedor.
+    $st = $pdo->prepare("SELECT id, actualiza_recarga FROM mantenimiento_tipos WHERE id = ? AND estado = 'activo'");
+    $st->execute([$tipoId]);
+    $tipo = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$tipo) { http_response_code(400); echo json_encode(['error' => 'Elige el motivo del ingreso']); return; }
+
     $quien = trim($d['realizado_por'] ?? '');
     if ($quien === '') {
         http_response_code(400); echo json_encode(['error' => 'Indica quién realizó el servicio']); return;
     }
     $quien = mb_substr($quien, 0, 150);
-
-    $provId = null;
-    try {
-        $st = $pdo->prepare("SELECT id FROM proveedores WHERE nombre = ? LIMIT 1");
-        $st->execute([$quien]);
-        $provId = $st->fetchColumn() ?: null;
-    } catch (Exception $e) { $provId = null; }
-
     $notas = trim($d['notas'] ?? '') ?: null;
-    $campos = [$extId, $tipo, $salida, $retorno, $provId, $quien, $notas];
+    $campos = [$extId, $tipoId, $entrada, $devuelto, $quien, $notas];
 
     try {
         $pdo->beginTransaction();
@@ -250,29 +311,29 @@ function guardar() {
         if ($id) {
             $pdo->prepare("
                 UPDATE extintor_mantenimientos
-                SET extintor_id=?, tipo=?, fecha_salida=?, fecha_retorno=?, proveedor_id=?, realizado_por=?, notas=?
+                SET extintor_id=?, tipo_id=?, fecha_entrada=?, fecha_devolucion=?, realizado_por=?, notas=?
                 WHERE id=?
             ")->execute(array_merge($campos, [$id]));
         } else {
             $pdo->prepare("
                 INSERT INTO extintor_mantenimientos
-                    (extintor_id, tipo, fecha_salida, fecha_retorno, proveedor_id, realizado_por, notas, creado_por)
-                VALUES (?,?,?,?,?,?,?,?)
+                    (extintor_id, tipo_id, fecha_entrada, fecha_devolucion, realizado_por, notas, creado_por)
+                VALUES (?,?,?,?,?,?,?)
             ")->execute(array_merge($campos, [$uid]));
             $id = $pdo->lastInsertId();
         }
 
-        // Una recarga que ya regresó puede actualizar la fecha de recarga del
-        // extintor. Va marcado desde la pantalla: si no, el dato del extintor y
-        // el del movimiento acaban diciendo cosas distintas.
-        if (!empty($d['actualizar_recarga']) && $tipo === 'recarga' && $retorno) {
-            $pdo->prepare("UPDATE extintores SET fecha_recarga = ? WHERE id = ?")->execute([$retorno, $extId]);
+        // Un motivo marcado como "actualiza la recarga" puede llevar su fecha de
+        // devolución a la ficha del extintor. Va con casilla desde la pantalla:
+        // si no, el extintor y el movimiento acaban diciendo cosas distintas.
+        if (!empty($d['actualizar_recarga']) && (int) $tipo['actualiza_recarga'] === 1 && $devuelto) {
+            $pdo->prepare("UPDATE extintores SET fecha_recarga = ? WHERE id = ?")->execute([$devuelto, $extId]);
         }
 
-        recordarResponsable($pdo, $quien, $salida);
+        recordarResponsable($pdo, $quien, $entrada);
 
         $pdo->commit();
-        audit($uid, "Guardar mantenimiento #$id (extintor $extId, $tipo)", 'extintor_mantenimientos', $id);
+        audit($uid, "Guardar mantenimiento #$id (extintor $extId)", 'extintor_mantenimientos', $id);
         echo json_encode(['success' => true, 'id' => $id]);
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
@@ -280,34 +341,41 @@ function guardar() {
     }
 }
 
-/** Marca el regreso de un extintor sin tener que abrir el formulario completo. */
-function registrarRetorno() {
+/** Marca la devolución al cliente sin abrir el formulario completo. */
+function registrarDevolucion() {
     global $pdo, $uid;
     $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true)) ?: [];
-    $id      = intval($d['id'] ?? 0);
-    $retorno = fechaValida($d['fecha_retorno'] ?? '') ?? date('Y-m-d');
+    $id       = intval($d['id'] ?? 0);
+    $devuelto = fechaValida($d['fecha_devolucion'] ?? '') ?? date('Y-m-d');
     if (!$id) { http_response_code(400); echo json_encode(['error' => 'ID requerido']); return; }
 
-    $st = $pdo->prepare("SELECT extintor_id, tipo, fecha_salida FROM extintor_mantenimientos WHERE id = ?");
+    $st = $pdo->prepare("
+        SELECT m.extintor_id, m.fecha_entrada, mt.actualiza_recarga
+        FROM extintor_mantenimientos m
+        LEFT JOIN mantenimiento_tipos mt ON mt.id = m.tipo_id
+        WHERE m.id = ?
+    ");
     $st->execute([$id]);
     $mov = $st->fetch(PDO::FETCH_ASSOC);
     if (!$mov) { http_response_code(404); echo json_encode(['error' => 'Movimiento no encontrado']); return; }
-    if ($retorno < $mov['fecha_salida']) {
-        http_response_code(400); echo json_encode(['error' => 'La fecha de retorno no puede ser anterior a la de salida']); return;
+    if ($devuelto < $mov['fecha_entrada']) {
+        http_response_code(400);
+        echo json_encode(['error' => 'La fecha de devolución no puede ser anterior a la de entrada']);
+        return;
     }
 
     try {
         $pdo->beginTransaction();
-        $pdo->prepare("UPDATE extintor_mantenimientos SET fecha_retorno = ? WHERE id = ?")->execute([$retorno, $id]);
-        if (!empty($d['actualizar_recarga']) && $mov['tipo'] === 'recarga') {
-            $pdo->prepare("UPDATE extintores SET fecha_recarga = ? WHERE id = ?")->execute([$retorno, $mov['extintor_id']]);
+        $pdo->prepare("UPDATE extintor_mantenimientos SET fecha_devolucion = ? WHERE id = ?")->execute([$devuelto, $id]);
+        if (!empty($d['actualizar_recarga']) && (int) ($mov['actualiza_recarga'] ?? 0) === 1) {
+            $pdo->prepare("UPDATE extintores SET fecha_recarga = ? WHERE id = ?")->execute([$devuelto, $mov['extintor_id']]);
         }
         $pdo->commit();
-        audit($uid, "Registrar retorno del mantenimiento #$id", 'extintor_mantenimientos', $id);
+        audit($uid, "Registrar devolución del mantenimiento #$id", 'extintor_mantenimientos', $id);
         echo json_encode(['success' => true]);
     } catch (Exception $e) {
         if ($pdo->inTransaction()) $pdo->rollBack();
-        http_response_code(500); echo json_encode(['error' => 'No se pudo registrar el retorno: ' . $e->getMessage()]);
+        http_response_code(500); echo json_encode(['error' => 'No se pudo registrar la devolución: ' . $e->getMessage()]);
     }
 }
 
@@ -320,57 +388,125 @@ function eliminar() {
     echo json_encode(['success' => true]);
 }
 
+// ─── Catálogo de motivos ─────────────────────────────────────────────────────
+function listarTipos() {
+    global $pdo;
+    $incluirInactivos = !empty($_GET['todos']);
+    $sql = "
+        SELECT t.*, (SELECT COUNT(*) FROM extintor_mantenimientos m WHERE m.tipo_id = t.id) AS usos
+        FROM mantenimiento_tipos t
+    ";
+    if (!$incluirInactivos) $sql .= " WHERE t.estado = 'activo'";
+    $sql .= " ORDER BY t.orden, t.nombre";
+    try {
+        echo json_encode(['success' => true, 'data' => $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC)]);
+    } catch (Exception $e) {
+        echo json_encode(['success' => true, 'data' => []]);
+    }
+}
+
+function guardarTipo() {
+    global $pdo, $uid;
+    $d = entradaEnMayusculas(json_decode(file_get_contents('php://input'), true)) ?: [];
+    $id     = intval($d['id'] ?? 0);
+    $nombre = trim($d['nombre'] ?? '');
+    if ($nombre === '') { http_response_code(400); echo json_encode(['error' => 'Escribe el nombre del motivo']); return; }
+    $nombre = mb_substr($nombre, 0, 80);
+
+    $actualiza = !empty($d['actualiza_recarga']) ? 1 : 0;
+    $estado    = (($d['estado'] ?? 'activo') === 'inactivo') ? 'inactivo' : 'activo';
+    // El orden sólo cambia si lo mandan: editar el nombre de un motivo no debe
+    // moverlo de sitio en la lista.
+    $orden = array_key_exists('orden', $d) ? intval($d['orden']) : null;
+
+    try {
+        if ($id) {
+            if ($orden === null) {
+                $pdo->prepare("UPDATE mantenimiento_tipos SET nombre=?, actualiza_recarga=?, estado=? WHERE id=?")
+                    ->execute([$nombre, $actualiza, $estado, $id]);
+            } else {
+                $pdo->prepare("UPDATE mantenimiento_tipos SET nombre=?, actualiza_recarga=?, orden=?, estado=? WHERE id=?")
+                    ->execute([$nombre, $actualiza, $orden, $estado, $id]);
+            }
+        } else {
+            if (!$orden) {
+                $orden = 1 + (int) $pdo->query("SELECT COALESCE(MAX(orden),0) FROM mantenimiento_tipos")->fetchColumn();
+            }
+            $pdo->prepare("INSERT INTO mantenimiento_tipos (nombre, actualiza_recarga, orden, estado) VALUES (?,?,?,?)")
+                ->execute([$nombre, $actualiza, $orden, $estado]);
+            $id = $pdo->lastInsertId();
+        }
+        audit($uid, "Guardar motivo de mantenimiento «$nombre»", 'mantenimiento_tipos', $id);
+        echo json_encode(['success' => true, 'id' => $id]);
+    } catch (PDOException $e) {
+        if (($e->errorInfo[1] ?? null) == 1062) {
+            http_response_code(409); echo json_encode(['error' => "Ya existe un motivo llamado «$nombre»"]); return;
+        }
+        http_response_code(500); echo json_encode(['error' => 'No se pudo guardar el motivo: ' . $e->getMessage()]);
+    }
+}
+
 /**
- * Sugerencias para el campo "quién lo realizó", según lo que se va escribiendo.
- *
- * Busca en dos sitios: las personas que ya hicieron mantenimientos antes y los
- * proveedores del catálogo, porque a veces quien atiende es un técnico con
- * nombre y apellido y a veces la empresa entera.
+ * Un motivo que ya se usó no se borra: se desactiva. Borrarlo dejaría los
+ * movimientos históricos sin decir por qué entró el extintor.
+ */
+function eliminarTipo() {
+    global $pdo, $uid;
+    $id = intval($_GET['id'] ?? 0);
+    if (!$id) { http_response_code(400); echo json_encode(['error' => 'ID requerido']); return; }
+
+    $st = $pdo->prepare("SELECT COUNT(*) FROM extintor_mantenimientos WHERE tipo_id = ?");
+    $st->execute([$id]);
+    $usos = (int) $st->fetchColumn();
+
+    if ($usos > 0) {
+        $pdo->prepare("UPDATE mantenimiento_tipos SET estado='inactivo' WHERE id = ?")->execute([$id]);
+        audit($uid, "Desactivar motivo de mantenimiento #$id", 'mantenimiento_tipos', $id);
+        echo json_encode(['success' => true, 'desactivado' => true,
+            'mensaje' => "Ese motivo ya se usó en $usos movimiento(s), así que se desactivó en vez de borrarse: "
+                       . "deja de ofrecerse al capturar, pero el historial sigue diciendo por qué entró cada extintor."]);
+        return;
+    }
+
+    $pdo->prepare("DELETE FROM mantenimiento_tipos WHERE id = ?")->execute([$id]);
+    audit($uid, "Eliminar motivo de mantenimiento #$id", 'mantenimiento_tipos', $id);
+    echo json_encode(['success' => true, 'desactivado' => false]);
+}
+
+// ─── Quién realizó el servicio ───────────────────────────────────────────────
+/**
+ * Sugerencias según lo que se va escribiendo: sólo las personas que ya han
+ * hecho mantenimientos. No se mezclan los proveedores del catálogo de compras
+ * —son otra cosa: a quién le compramos, no quién hizo el trabajo—.
  *
  * Ordena por utilidad, no alfabéticamente: primero los que empiezan por lo
- * tecleado —escribir "MI" debe traer "MICHEL" antes que "TALLER MIGUEL"— y
- * dentro de cada grupo, los que más veces han trabajado.
+ * tecleado y, dentro de esos, los que más veces han trabajado.
  */
 function sugerir() {
     global $pdo;
     $q = trim($_GET['q'] ?? '');
-    $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
-
     $sugerencias = [];
 
     try {
-        $sql = "SELECT nombre, veces, ultima_vez FROM mantenimiento_responsables";
+        $sql = "SELECT nombre, veces FROM mantenimiento_responsables";
         $params = [];
-        if ($q !== '') { $sql .= " WHERE nombre LIKE ?"; $params[] = $like; }
-        $sql .= " ORDER BY veces DESC, nombre LIMIT 50";
+        if ($q !== '') {
+            $sql .= " WHERE nombre LIKE ?";
+            $params[] = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $q) . '%';
+        }
+        $sql .= " ORDER BY veces DESC, nombre LIMIT 40";
         $st = $pdo->prepare($sql);
         $st->execute($params);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $veces = (int) $r['veces'];
             $sugerencias[] = [
-                'nombre' => $r['nombre'],
-                'origen' => 'persona',
-                'veces'  => (int) $r['veces'],
-                'detalle' => (int) $r['veces'] === 1 ? '1 mantenimiento' : $r['veces'] . ' mantenimientos',
+                'nombre'  => $r['nombre'],
+                'veces'   => $veces,
+                'detalle' => $veces === 1 ? '1 mantenimiento' : "$veces mantenimientos",
             ];
         }
-    } catch (Exception $e) { /* sin tabla todavía, no hay personas que sugerir */ }
+    } catch (Exception $e) { /* sin tabla todavía, no hay a quién sugerir */ }
 
-    try {
-        $sql = "SELECT nombre FROM proveedores WHERE estado = 'activo'";
-        $params = [];
-        if ($q !== '') { $sql .= " AND nombre LIKE ?"; $params[] = $like; }
-        $sql .= " ORDER BY nombre LIMIT 25";
-        $st = $pdo->prepare($sql);
-        $st->execute($params);
-        $yaEstan = array_map(fn($s) => mb_strtolower($s['nombre']), $sugerencias);
-        foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $nombre) {
-            if (in_array(mb_strtolower($nombre), $yaEstan, true)) continue;   // no repetir
-            $sugerencias[] = ['nombre' => $nombre, 'origen' => 'proveedor', 'veces' => 0,
-                              'detalle' => 'proveedor del catálogo'];
-        }
-    } catch (Exception $e) { /* sin catálogo de proveedores */ }
-
-    // Los que empiezan por lo tecleado van primero: es lo que uno espera al escribir
     if ($q !== '') {
         $qn = mb_strtolower($q);
         usort($sugerencias, function ($a, $b) use ($qn) {
@@ -385,7 +521,6 @@ function sugerir() {
     echo json_encode(['success' => true, 'data' => array_slice($sugerencias, 0, 12)]);
 }
 
-/** Listado completo de personas registradas (para la pantalla de administración). */
 function responsables() {
     global $pdo;
     $datos = [];
@@ -409,15 +544,25 @@ function resumen() {
     };
     $base = "FROM extintor_mantenimientos m JOIN extintores e ON e.id = m.extintor_id WHERE 1=1$filtro";
 
-    $data = [
-        'fuera'         => $uno("SELECT COUNT(*) $base AND m.fecha_retorno IS NULL"),
-        'total'         => $uno("SELECT COUNT(*) $base"),
-        'mantenimiento' => $uno("SELECT COUNT(*) $base AND m.tipo = 'mantenimiento'"),
-        'recarga'       => $uno("SELECT COUNT(*) $base AND m.tipo = 'recarga'"),
-        'garantia'      => $uno("SELECT COUNT(*) $base AND m.tipo = 'garantia'"),
-        'mes'           => $uno("SELECT COUNT(*) $base AND m.fecha_salida >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"),
-    ];
-    echo json_encode(['success' => true, 'data' => $data]);
+    $porMotivo = [];
+    try {
+        $st = $pdo->query("
+            SELECT t.nombre, COUNT(m.id) AS n
+            FROM mantenimiento_tipos t
+            LEFT JOIN extintor_mantenimientos m ON m.tipo_id = t.id
+            LEFT JOIN extintores e ON e.id = m.extintor_id
+            WHERE t.estado = 'activo' " . ($eid ? " AND (e.empresa_id = $eid OR m.id IS NULL)" : "") . "
+            GROUP BY t.id, t.nombre ORDER BY t.orden, t.nombre
+        ");
+        $porMotivo = $st->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) { $porMotivo = []; }
+
+    echo json_encode(['success' => true, 'data' => [
+        'en_taller' => $uno("SELECT COUNT(*) $base AND m.fecha_devolucion IS NULL"),
+        'total'     => $uno("SELECT COUNT(*) $base"),
+        'mes'       => $uno("SELECT COUNT(*) $base AND m.fecha_entrada >= DATE_FORMAT(CURDATE(), '%Y-%m-01')"),
+        'por_motivo' => $porMotivo,
+    ]]);
 }
 
 // ─── Auditoría ───────────────────────────────────────────────────────────────
