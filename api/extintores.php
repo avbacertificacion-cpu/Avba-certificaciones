@@ -37,6 +37,18 @@ switch ($action) {
 }
 
 // ─── LISTAR ──────────────────────────────────────────────────────────────────
+/** ¿Ya existe el registro de mantenimientos? (se consulta una vez por petición) */
+function hayTablaMantenimientos(PDO $pdo): bool {
+    static $existe = null;
+    if ($existe !== null) return $existe;
+    try {
+        $existe = (bool) $pdo->query("SHOW TABLES LIKE 'extintor_mantenimientos'")->fetchColumn();
+    } catch (Exception $e) {
+        $existe = false;
+    }
+    return $existe;
+}
+
 function listar() {
     global $pdo, $rol, $uid;
 
@@ -50,6 +62,23 @@ function listar() {
     $where = $empresa_id ? 'WHERE e.empresa_id = :eid' : '';
     $params = $empresa_id ? [':eid' => $empresa_id] : [];
 
+    // Si el extintor está fuera a mantenimiento se dice aquí: el registro de
+    // mantenimientos no sirve de nada si en el listado no se nota que falta.
+    // La tabla la crea el módulo de mantenimiento la primera vez que se abre,
+    // así que se consulta sólo si ya existe; en una instalación nueva el
+    // listado tiene que seguir funcionando igual.
+    $colMant = '';
+    if (hayTablaMantenimientos($pdo)) {
+        $colMant = "
+            ,(SELECT m.tipo FROM extintor_mantenimientos m
+              WHERE m.extintor_id = e.id AND m.fecha_retorno IS NULL
+              ORDER BY m.fecha_salida DESC LIMIT 1) AS mantenimiento_tipo
+            ,(SELECT m.fecha_salida FROM extintor_mantenimientos m
+              WHERE m.extintor_id = e.id AND m.fecha_retorno IS NULL
+              ORDER BY m.fecha_salida DESC LIMIT 1) AS mantenimiento_desde
+        ";
+    }
+
     $stmt = $pdo->prepare("
         SELECT e.*,
                te.nombre AS tipo_nombre,
@@ -58,6 +87,7 @@ function listar() {
                (SELECT fecha FROM inspecciones
                 WHERE extintor_id = e.id
                 ORDER BY fecha DESC, hora DESC LIMIT 1) AS ultima_inspeccion
+               $colMant
         FROM extintores e
         JOIN tipos_extintores te ON te.id = e.tipo
         JOIN empresas  emp ON emp.id = e.empresa_id
