@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Evaluación — AVBA Inspections</title>
+<link rel="icon" href="icon-192.png">
+<style>
+  :root {
+    --azul:#0d3a8f; --azul-claro:#1a5fd6; --azul-bg:#eef3fb;
+    --verde:#1f8a4c; --verde-bg:#eaf7ee; --rojo:#c0392b; --rojo-bg:#fdecea;
+    --ambar:#b8860b; --ambar-bg:#fff8e1;
+    --texto:#1c2a3a; --sub:#5d7794; --hint:#8fa3bb;
+    --borde:#d7e2ef; --fondo:#f6f9fd; --tarjeta:#fff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+         background:var(--fondo); color:var(--texto); line-height:1.55;
+         padding:0 0 60px; }
+  .barra { background:var(--azul); color:#fff; padding:14px 18px; display:flex;
+           align-items:center; gap:12px; position:sticky; top:0; z-index:20; }
+  .barra img { height:28px; }
+  .barra .t { font-weight:700; font-size:15px; letter-spacing:.2px; }
+  .barra .s { font-size:11.5px; opacity:.8; }
+  .wrap { max-width:720px; margin:0 auto; padding:18px 16px; }
+  .card { background:var(--tarjeta); border:1px solid var(--borde); border-radius:12px;
+          padding:18px; margin-bottom:14px; }
+  h1 { font-size:18px; color:var(--azul); margin-bottom:6px; }
+  h2 { font-size:15px; color:var(--azul); margin:0 0 10px; }
+  p  { font-size:13.5px; color:var(--sub); margin-bottom:10px; }
+  label { display:block; font-size:12.5px; font-weight:600; margin-bottom:4px; }
+  .req::after { content:" *"; color:var(--rojo); }
+  input, select { width:100%; padding:10px 12px; border:1px solid var(--borde);
+                  border-radius:8px; font-size:14px; font-family:inherit; background:#fff; }
+  input:focus, select:focus { outline:none; border-color:var(--azul-claro); }
+  .campo { margin-bottom:12px; }
+  .hint { font-size:11.5px; color:var(--hint); margin-top:3px; }
+  .btn { display:inline-flex; align-items:center; justify-content:center; gap:8px;
+         background:var(--azul); color:#fff; border:none; border-radius:9px;
+         padding:13px 22px; font-size:15px; font-weight:600; cursor:pointer;
+         font-family:inherit; width:100%; }
+  .btn:disabled { opacity:.5; cursor:not-allowed; }
+  .btn-sec { background:#fff; color:var(--azul); border:1px solid var(--borde); }
+  .aviso { background:var(--ambar-bg); border-left:3px solid var(--ambar);
+           border-radius:7px; padding:11px 13px; font-size:12.5px; color:#7a5900;
+           margin-bottom:14px; }
+  .error { background:var(--rojo-bg); border-left:3px solid var(--rojo); border-radius:7px;
+           padding:11px 13px; font-size:13px; color:var(--rojo); margin-bottom:12px; }
+  /* Examen */
+  .cronometro { position:sticky; top:56px; z-index:15; background:var(--azul-bg);
+                border:1px solid var(--borde); border-radius:9px; padding:9px 13px;
+                display:flex; justify-content:space-between; align-items:center;
+                font-size:13px; font-weight:600; color:var(--azul); margin-bottom:12px; }
+  .cronometro.poco { background:var(--rojo-bg); color:var(--rojo); border-color:var(--rojo); }
+  .preg { background:var(--tarjeta); border:1px solid var(--borde); border-radius:11px;
+          padding:15px; margin-bottom:12px; }
+  .preg.sin { border-color:var(--ambar); }
+  .preg .n { font-size:11.5px; color:var(--hint); font-weight:700; letter-spacing:.5px;
+             text-transform:uppercase; margin-bottom:5px; }
+  .preg .q { font-size:14.5px; font-weight:600; margin-bottom:11px; line-height:1.45; }
+  .op { display:flex; gap:10px; align-items:flex-start; padding:10px 11px; border-radius:8px;
+        border:1px solid var(--borde); margin-bottom:7px; cursor:pointer; font-size:13.5px; }
+  .op:has(input:checked) { border-color:var(--azul-claro); background:var(--azul-bg); }
+  .op input { width:17px; height:17px; flex:none; margin-top:1px; accent-color:var(--azul); }
+  /* Resultado */
+  .res { text-align:center; padding:26px 18px; }
+  .res .icono { font-size:44px; margin-bottom:8px; }
+  .res .calif { font-size:44px; font-weight:800; line-height:1; margin:6px 0; }
+  .res.ok  .calif { color:var(--verde); }
+  .res.no  .calif { color:var(--rojo); }
+  .res .lbl { font-size:15px; font-weight:700; letter-spacing:.4px; text-transform:uppercase; }
+  .res.ok .lbl { color:var(--verde); }
+  .res.no .lbl { color:var(--rojo); }
+  .oculto { display:none !important; }
+  .spin { display:inline-block; width:15px; height:15px; border:2px solid rgba(255,255,255,.35);
+          border-top-color:#fff; border-radius:50%; animation:g .7s linear infinite; }
+  @keyframes g { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="barra">
+  <img src="assets/logos/avba.png" alt="AVBA" onerror="this.style.display='none'">
+  <div><div class="t">Evaluación de candidatos</div>
+       <div class="s">AVBA Inspections · Unidad de Verificación</div></div>
+</div>
+
+<div class="wrap">
+
+  <!-- ── Sin sesión ── -->
+  <div id="p-sin" class="card oculto">
+    <h1>Necesitas tu código de acceso</h1>
+    <p>Para presentar la evaluación, entra con el código que te compartió AVBA
+       (tiene la forma <strong>CUR-XXXXXX</strong>) y su contraseña.</p>
+    <button class="btn" onclick="location.href='login.html'">Ir a iniciar sesión</button>
+  </div>
+
+  <!-- ── Datos del candidato ── -->
+  <div id="p-datos" class="oculto">
+    <div class="card">
+      <h1 id="d-titulo">Evaluación</h1>
+      <p id="d-desc"></p>
+      <div class="aviso" id="d-reglas"></div>
+    </div>
+    <div class="card">
+      <h2>Tus datos</h2>
+      <p>Se usan para identificar tu evaluación. Captúralos como aparecen en tu identificación.</p>
+      <div id="d-error" class="error oculto"></div>
+      <div class="campo"><label class="req">Nombre completo</label>
+        <input id="f-nombre" autocomplete="name" placeholder="Nombre y apellidos"></div>
+      <div class="campo"><label>CURP</label>
+        <input id="f-curp" maxlength="18" style="text-transform:uppercase" autocomplete="off"
+               placeholder="18 caracteres">
+        <div class="hint">Opcional, pero es lo que permite identificarte sin confusión.</div></div>
+      <div class="campo"><label>Puesto</label>
+        <input id="f-puesto" placeholder="Ej. Operador de grúa torre"></div>
+      <div class="campo"><label>Empresa</label>
+        <input id="f-empresa" placeholder="Si aplica"></div>
+      <div class="campo"><label>Correo</label>
+        <input id="f-correo" type="email" autocomplete="email" placeholder="tucorreo@ejemplo.com"></div>
+      <div class="campo"><label>Teléfono</label>
+        <input id="f-tel" type="tel" autocomplete="tel" placeholder="10 dígitos"></div>
+      <button class="btn" id="b-iniciar" onclick="iniciar()">Comenzar la evaluación</button>
+    </div>
+  </div>
+
+  <!-- ── Examen ── -->
+  <div id="p-examen" class="oculto">
+    <div class="cronometro" id="crono">
+      <span id="crono-t">—</span>
+      <span id="crono-p">0 de 0 contestadas</span>
+    </div>
+    <div id="preguntas"></div>
+    <div class="card">
+      <div id="e-error" class="error oculto"></div>
+      <button class="btn" id="b-entregar" onclick="entregar()">Entregar evaluación</button>
+      <div class="hint" style="text-align:center;margin-top:8px">
+        Una vez entregada no se puede modificar.</div>
+    </div>
+  </div>
+
+  <!-- ── Resultado ── -->
+  <div id="p-fin" class="card oculto">
+    <div class="res" id="r-caja">
+      <div class="icono" id="r-icono"></div>
+      <div class="calif" id="r-calif"></div>
+      <div class="lbl" id="r-lbl"></div>
+      <p id="r-detalle" style="margin-top:12px"></p>
+      <p id="r-nota" style="font-size:12.5px"></p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = 'api/index.php';
+const _sesion = JSON.parse(localStorage.getItem('avba_session') || '{}');
+let _examen = null, _preguntas = [], _token = '', _restan = 0, _reloj = null, _entregando = false;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g,
+  c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const ver = (id, s = true) => $(id).classList.toggle('oculto', !s);
+
+/* El token del participante viaja en la cabecera, como en el resto del sistema. */
+async function api(action, payload, metodo = 'POST') {
+  const t = _sesion.token || '';
+  if (metodo === 'GET') {
+    const r = await fetch(`${API}?action=${action}`, { headers: {'X-Token': t, 'Authorization': 'Bearer ' + t} });
+    return r.json();
+  }
+  const r = await fetch(API, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ action, token: t, payload })
+  });
+  return r.json();
+}
+
+// ══════════ ARRANQUE ══════════
+(async () => {
+  if (!_sesion.token || _sesion.rol !== 'PARTICIPANTE') { ver('p-sin'); return; }
+
+  const d = await api('EXAMENES_DISPONIBLES', null, 'GET');
+  if (d.status !== 'success' || !(d.examenes || []).length) {
+    ver('p-sin');
+    $('p-sin').innerHTML = `<h1>No hay evaluaciones disponibles</h1>
+      <p>Tu código de acceso es válido, pero no hay ninguna evaluación activa en este momento.
+         Comunícate con AVBA.</p>`;
+    return;
+  }
+
+  // Con un solo examen activo no tiene caso preguntar cuál: se presenta ése.
+  _examen = d.examenes[0];
+  $('d-titulo').textContent = _examen.nombre;
+  $('d-desc').textContent   = _examen.descripcion || '';
+  $('d-reglas').innerHTML =
+    `<strong>${_examen.num_preguntas}</strong> preguntas · ` +
+    `tiempo: <strong>${Number(_examen.minutos) > 0 ? _examen.minutos + ' minutos' : 'sin límite'}</strong> · ` +
+    `calificación mínima para aprobar: <strong>${Number(_examen.calificacion_minima)}</strong>.<br>` +
+    `Esta evaluación es teórica y no sustituye la evaluación práctica ni constituye una certificación.`;
+  ver('p-datos');
+})();
+
+// ══════════ INICIAR ══════════
+async function iniciar() {
+  const b = $('b-iniciar');
+  const nombre = $('f-nombre').value.trim();
+  if (!nombre) { errDatos('Captura tu nombre completo.'); return; }
+
+  b.disabled = true; b.innerHTML = '<span class="spin"></span> Preparando…';
+  const d = await api('EXAMEN_INICIAR', {
+    examen_id: _examen.id,
+    nombre_completo: nombre,
+    curp:    $('f-curp').value.trim().toUpperCase(),
+    puesto:  $('f-puesto').value.trim(),
+    empresa_nombre: $('f-empresa').value.trim(),
+    correo:  $('f-correo').value.trim(),
+    telefono: $('f-tel').value.trim(),
+  });
+  b.disabled = false; b.textContent = 'Comenzar la evaluación';
+
+  if (d.status !== 'success') { errDatos(d.message || 'No se pudo iniciar.'); return; }
+
+  _token     = d.token;
+  _preguntas = d.preguntas;
+  pintarPreguntas();
+  ver('p-datos', false);
+  ver('p-examen');
+  window.scrollTo(0, 0);
+
+  if (Number(d.examen.minutos) > 0) arrancarReloj(Number(d.examen.minutos) * 60);
+  else $('crono-t').textContent = 'Sin límite de tiempo';
+
+  // Salirse a media evaluación cuesta el intento: vale la pena advertirlo.
+  window.addEventListener('beforeunload', avisarSalida);
+}
+
+function errDatos(m) { $('d-error').textContent = m; ver('d-error'); window.scrollTo(0,0); }
+function avisarSalida(e) { if (!_entregando) { e.preventDefault(); e.returnValue = ''; } }
+
+// ══════════ EXAMEN ══════════
+function pintarPreguntas() {
+  $('preguntas').innerHTML = _preguntas.map((p, i) => `
+    <div class="preg" id="preg-${p.id}">
+      <div class="n">Pregunta ${i + 1} de ${_preguntas.length}</div>
+      <div class="q">${esc(p.texto)}</div>
+      ${p.opciones.map(o => `
+        <label class="op">
+          <input type="radio" name="p${p.id}" value="${o.id}" onchange="contar()">
+          <span>${esc(o.texto)}</span>
+        </label>`).join('')}
+    </div>`).join('');
+  contar();
+}
+
+function contar() {
+  const n = _preguntas.filter(p => document.querySelector(`input[name="p${p.id}"]:checked`)).length;
+  $('crono-p').textContent = `${n} de ${_preguntas.length} contestadas`;
+}
+
+function arrancarReloj(segundos) {
+  _restan = segundos;
+  const pinta = () => {
+    const m = Math.floor(_restan / 60), s = _restan % 60;
+    $('crono-t').textContent = `Tiempo restante ${m}:${String(s).padStart(2, '0')}`;
+    $('crono').classList.toggle('poco', _restan <= 300);
+  };
+  pinta();
+  _reloj = setInterval(() => {
+    _restan--;
+    if (_restan <= 0) {
+      clearInterval(_reloj);
+      $('crono-t').textContent = 'Tiempo agotado';
+      // Se entrega sola con lo contestado: perder el examen por unos segundos
+      // sería castigar al candidato por algo que no controla.
+      entregar(true);
+      return;
+    }
+    pinta();
+  }, 1000);
+}
+
+// ══════════ ENTREGAR ══════════
+async function entregar(porTiempo = false) {
+  if (_entregando) return;
+
+  const respuestas = _preguntas.map(p => {
+    const sel = document.querySelector(`input[name="p${p.id}"]:checked`);
+    return { pregunta_id: p.id, opcion_id: sel ? Number(sel.value) : 0 };
+  });
+  const sin = respuestas.filter(r => !r.opcion_id).length;
+
+  if (!porTiempo && sin) {
+    _preguntas.forEach(p => {
+      const c = !document.querySelector(`input[name="p${p.id}"]:checked`);
+      $('preg-' + p.id).classList.toggle('sin', c);
+    });
+    if (!confirm(`Te faltan ${sin} pregunta(s) por contestar.\n\nLas no contestadas cuentan como incorrectas. ¿Entregar de todas formas?`)) {
+      const primera = _preguntas.find(p => !document.querySelector(`input[name="p${p.id}"]:checked`));
+      if (primera) $('preg-' + primera.id).scrollIntoView({behavior:'smooth', block:'center'});
+      return;
+    }
+  }
+
+  _entregando = true;
+  if (_reloj) clearInterval(_reloj);
+  window.removeEventListener('beforeunload', avisarSalida);
+
+  const b = $('b-entregar');
+  b.disabled = true; b.innerHTML = '<span class="spin"></span> Entregando…';
+
+  const d = await api('EXAMEN_ENVIAR', { token: _token, respuestas });
+  if (d.status !== 'success') {
+    _entregando = false;
+    b.disabled = false; b.textContent = 'Entregar evaluación';
+    $('e-error').textContent = d.message || 'No se pudo entregar. Intenta de nuevo.';
+    ver('e-error');
+    return;
+  }
+  mostrarResultado(d);
+}
+
+function mostrarResultado(d) {
+  ver('p-examen', false);
+  const caja = $('r-caja');
+  caja.className = 'res ' + (d.aprobado ? 'ok' : 'no');
+  $('r-icono').textContent = d.aprobado ? '✓' : '✕';
+  $('r-calif').textContent = Number(d.calificacion).toFixed(0);
+  $('r-lbl').textContent   = d.aprobado ? 'Aprobado' : 'No aprobado';
+  $('r-detalle').textContent =
+    `${d.aciertos} de ${d.total} respuestas correctas. Mínima para aprobar: ${Number(d.minima).toFixed(0)}.`;
+  $('r-nota').textContent = d.aprobado
+    ? 'Tu resultado quedó registrado. AVBA revisará tu caso y se pondrá en contacto contigo. '
+    + 'Esta evaluación es teórica: no constituye una certificación.'
+    : 'Tu resultado quedó registrado. Si deseas presentarla de nuevo, solicítalo a AVBA.';
+  ver('p-fin');
+  window.scrollTo(0, 0);
+}
+</script>
+</body>
+</html>

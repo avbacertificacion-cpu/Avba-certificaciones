@@ -36,6 +36,7 @@ require_once __DIR__ . '/ClienteSubusuarios.php';
 require_once __DIR__ . '/ClienteRH.php';
 require_once __DIR__ . '/PagosServicios.php';
 require_once __DIR__ . '/Anuncios.php';
+require_once __DIR__ . '/Examenes.php';
 require_once __DIR__ . '/VerificacionIA.php';
 require_once __DIR__ . '/Arneses.php';
 require_once __DIR__ . '/ClienteImpresion.php';
@@ -166,6 +167,7 @@ $cliSub         = new ClienteSubusuarios($pdo);  // su constructor migra usuario
 $cliRH          = new ClienteRH($pdo);
 $pagosServicios = new PagosServicios($pdo);
 $anuncios       = new Anuncios($pdo);
+$examenes       = new Examenes($pdo);
 $conta       = new Contabilidad($pdo);
 $material    = new MaterialControl($pdo);
 $presup      = new Presupuestos($pdo);
@@ -828,6 +830,26 @@ if ($method === 'GET') {
             respuesta($auth->getSesionInfo($sesion['id']));
         }
 
+        // Exámenes que puede presentar quien entró con una sesión de acceso
+        case 'EXAMENES_DISPONIBLES': {
+            $sesion = $auth->validarTokenParticipante($token);
+            if (!$sesion) respuesta(['status' => 'error', 'message' => 'Sesión expirada o cerrada.'], 401);
+            respuesta($examenes->disponibles());
+        }
+
+        // Resultados de exámenes (AVBA)
+        case 'EXAMEN_RESULTADOS': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($examenes->resultados($_GET));
+        }
+
+        case 'EXAMEN_DETALLE': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($examenes->detalle((int)($_GET['id'] ?? 0)));
+        }
+
         // Datos para portal de participante autenticado (lista de ya-registrados)
         case 'PARTICIPANTE_MIS_DATOS': {
             $sesion = $auth->validarTokenParticipante($token);
@@ -1355,6 +1377,20 @@ if ($method === 'POST') {
             respuesta($insp->guardarInspeccion($payload, $usr['usuario']));
 
         // ── Calidad ──────────────────────────────────────
+        // El candidato abre su examen. Entra con la sesión de acceso pública,
+        // igual que un participante de curso de independientes.
+        case 'EXAMEN_INICIAR': {
+            $sesion = $auth->validarTokenParticipante($token);
+            if (!$sesion) respuesta(['status' => 'error', 'message' => 'Sesión expirada o cerrada.'], 401);
+            respuesta($examenes->iniciar($payload, (int)$sesion['id'], $_SERVER['REMOTE_ADDR'] ?? ''));
+        }
+
+        // La entrega NO revalida la sesión de acceso: el token del intento es lo
+        // que identifica el examen, y un candidato que tardó más de dos horas en
+        // contestar no debe perder lo que ya respondió porque expiró su sesión.
+        case 'EXAMEN_ENVIAR':
+            respuesta($examenes->enviar($payload));
+
         case 'SUBIR_EVIDENCIA_CALIDAD':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
