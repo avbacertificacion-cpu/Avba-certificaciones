@@ -3121,6 +3121,7 @@ function renderCursosCert(grupos) {
 function abrirCursoCert(idx) {
   const g = window._cursosCertGrupos?.[idx];
   if (!g) return;
+  window._pcDetIdx = idx;
   document.getElementById('pc-det-curso').textContent = g.curso;
   document.getElementById('pc-det-info').textContent  = g.fecha + (g.empresa ? ' · ' + g.empresa : '') + ' · ' + g.participantes.length + ' participante' + (g.participantes.length !== 1 ? 's' : '');
 
@@ -3176,6 +3177,10 @@ function abrirCursoCert(idx) {
                 onclick="imprimirDocPersonal(${p.id},'diploma')">🖨 Diploma</button>
         <button class="btn-ver" style="font-size:11px;background:#fff8e1;border-color:#c8a000;color:#7a5900"
                 onclick="imprimirDocPersonal(${p.id},'certificado')">🖨 Cert</button>
+        <span style="font-size:10px;color:var(--texto-hint);align-self:center;margin-left:4px">🌐 En el portal:</span>
+        ${botonPublicar(p, 'DC3', p.pub_dc3)}
+        ${botonPublicar(p, 'DIPLOMA', p.pub_diploma)}
+        ${botonPublicar(p, 'CERTIFICADO', p.pub_certificado)}
         <span style="font-size:10px;color:var(--texto-hint);align-self:center;margin-left:4px">📎 Sustituir PDF:</span>
         <button class="btn-ver" style="font-size:11px;background:#f3f0ff;border-color:#7c5cff;color:#4b32c3"
                 onclick="subirDocManualPer(${p.id},'dc3')">DC-3</button>
@@ -3641,6 +3646,60 @@ async function imprimirLoteDocPersonal(idx, tipo) {
     } catch(e) { err++; }
   }
   mostrarToast(`${ok} doc(s) listos${err ? ', ' + err + ' error(es)' : ''}`, err ? 'err' : 'ok');
+}
+
+/**
+ * Interruptor de publicación de un documento en el portal del cliente.
+ *
+ * Verde = se ve en el portal. Gris = emitido pero oculto. Si el documento no
+ * existe todavía, no se ofrece el botón: no hay nada que publicar.
+ */
+function botonPublicar(p, tipo, estado) {
+  if (estado === null || estado === undefined) return '';
+  const pub = Number(estado) === 1;
+  const et  = { DC3:'DC-3', DIPLOMA:'Diploma', CERTIFICADO:'Cert' }[tipo];
+  const estilo = pub
+    ? 'background:var(--verde-light);border-color:var(--verde);color:var(--verde)'
+    : 'background:var(--gris-bg);border-color:var(--texto-hint);color:var(--texto-hint)';
+  return `<button class="btn-ver" style="font-size:11px;${estilo}"
+            title="${pub ? 'Se ve en el portal del cliente. Clic para ocultarlo.'
+                         : 'Oculto en el portal. Clic para publicarlo.'}"
+            onclick="publicarDoc(${p.id},'${tipo}',${pub ? 0 : 1},this)">
+            ${pub ? '👁' : '🚫'} ${et}</button>`;
+}
+
+async function publicarDoc(id, tipo, publicar, btn) {
+  const et = { DC3:'DC-3', DIPLOMA:'Diploma', CERTIFICADO:'Certificado' }[tipo];
+  if (!publicar && !confirm(
+      `¿Ocultar el ${et} del portal del cliente?\n\n` +
+      'El documento NO se borra: sigue emitido, conserva su folio y su código QR ' +
+      'sigue validando. Sólo deja de aparecer en el portal.')) return;
+
+  btn.disabled = true;
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const r = await fetch(API, {
+      method: 'POST', headers: {'Content-Type':'application/json','X-Token':tok},
+      body: JSON.stringify({ action:'PUBLICAR_DOC_PERSONAL',
+                             payload:{ id, tipo, publicado: publicar } })
+    });
+    const d = await r.json();
+    if (d.status === 'success') {
+      mostrarToast(d.message || 'Listo.', 'ok');
+      // Se refleja en memoria para que el botón cambie sin recargar la lista.
+      const reg = perCertData.find(x => Number(x.id) === Number(id));
+      if (reg) {
+        const campo = { DC3:'pub_dc3', DIPLOMA:'pub_diploma', CERTIFICADO:'pub_certificado' }[tipo];
+        reg[campo] = publicar;
+      }
+      if (typeof abrirCursoCert === 'function' && window._pcDetIdx !== undefined) {
+        abrirCursoCert(window._pcDetIdx);
+      }
+    } else {
+      mostrarToast(d.message || 'No se pudo cambiar.', 'err');
+      btn.disabled = false;
+    }
+  } catch(e) { mostrarToast('Error de red.', 'err'); btn.disabled = false; }
 }
 
 async function prevCredencialesLote(idx) {

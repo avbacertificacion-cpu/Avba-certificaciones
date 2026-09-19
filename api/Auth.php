@@ -811,9 +811,12 @@ class Auth {
                 "SELECT p.id, p.nombre_completo, p.control, p.empresa_nombre, p.qr_codigo,
                         DATE_FORMAT(p.fecha_curso, '%d/%m/%Y') AS fecha_curso,
                         c.nombre AS curso_nombre,
-                        MAX(CASE WHEN pd.tipo_doc='CERTIFICADO' THEN pd.url END) AS url_certificado,
-                        MAX(CASE WHEN pd.tipo_doc='DIPLOMA'     THEN pd.url END) AS url_diploma,
-                        MAX(CASE WHEN pd.tipo_doc='DC3'         THEN pd.url END) AS url_dc3
+                        -- Sólo lo publicado. Un documento despublicado sigue
+                        -- emitido y su QR sigue validando; simplemente deja de
+                        -- aparecer en el portal del cliente.
+                        MAX(CASE WHEN pd.tipo_doc='CERTIFICADO' AND COALESCE(pd.publicado,1)=1 THEN pd.url END) AS url_certificado,
+                        MAX(CASE WHEN pd.tipo_doc='DIPLOMA'     AND COALESCE(pd.publicado,1)=1 THEN pd.url END) AS url_diploma,
+                        MAX(CASE WHEN pd.tipo_doc='DC3'         AND COALESCE(pd.publicado,1)=1 THEN pd.url END) AS url_dc3
                  FROM participantes_cursos p
                  LEFT JOIN cursos c ON c.id = p.curso_id
                  LEFT JOIN participantes_documentos pd ON pd.participante_id = p.id

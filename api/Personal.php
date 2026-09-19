@@ -26,11 +26,85 @@ class Personal {
     //  PARTICIPANTES
     // ══════════════════════════════════════════════════════
 
+    /** Tipos de documento que llegan al portal del cliente. */
+    private const DOCS_PORTAL = ['DC3', 'DIPLOMA', 'CERTIFICADO'];
+
+    /**
+     * Publicación por documento.
+     *
+     * El valor por omisión es 1 a propósito: todo lo que ya se emitió está
+     * publicado hoy, y agregar la columna no debe esconderle documentos a
+     * ningún cliente de un día para otro.
+     */
+    private function ensurePublicadoDoc(): void {
+        try {
+            $this->pdo->exec(
+                "ALTER TABLE participantes_documentos
+                 ADD COLUMN IF NOT EXISTS publicado TINYINT NOT NULL DEFAULT 1"
+            );
+        } catch (\Throwable $e) { /* ya existe */ }
+    }
+
+    /**
+     * Publica o despublica UN documento de un participante en el portal.
+     *
+     * Se actúa sobre todas las filas de ese tipo, no sobre una: un documento
+     * regenerado deja varias, y si sólo se tocara la última el portal podría
+     * seguir mostrando una versión vieja que se quiso esconder.
+     *
+     * Esto NO borra nada. El documento sigue emitido, con su folio y su QR, y
+     * la validación pública lo sigue reconociendo: lo único que cambia es si
+     * el cliente lo ve en su portal.
+     */
+    public function publicarDocPersonal(array $p, string $usuario): array {
+        $id   = (int)($p['id'] ?? 0);
+        $tipo = strtoupper(trim((string)($p['tipo'] ?? '')));
+        $pub  = !empty($p['publicado']) ? 1 : 0;
+
+        if ($id <= 0) return ['status' => 'error', 'message' => 'Participante no válido.'];
+        if (!in_array($tipo, self::DOCS_PORTAL, true)) {
+            return ['status' => 'error', 'message' => 'Ese documento no se publica en el portal.'];
+        }
+        $this->ensurePublicadoDoc();
+
+        try {
+            $chk = $this->pdo->prepare(
+                "SELECT nombre_completo FROM participantes_cursos WHERE id = ?"
+            );
+            $chk->execute([$id]);
+            $nombre = $chk->fetchColumn();
+            if ($nombre === false) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+
+            $st = $this->pdo->prepare(
+                "UPDATE participantes_documentos SET publicado = ?
+                  WHERE participante_id = ? AND tipo_doc = ?"
+            );
+            $st->execute([$pub, $id, $tipo]);
+            if ($st->rowCount() === 0) {
+                return ['status' => 'error',
+                    'message' => 'Ese participante todavía no tiene ese documento emitido.'];
+            }
+        } catch (\Throwable $e) {
+            error_log('[Personal] publicarDocPersonal: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudo cambiar la publicación.'];
+        }
+
+        error_log(sprintf('[Portal] %s %s el %s de %s (id %d)',
+            $usuario, $pub ? 'publicó' : 'despublicó', $tipo, $nombre, $id));
+
+        $etiqueta = ['DC3' => 'DC-3', 'DIPLOMA' => 'Diploma', 'CERTIFICADO' => 'Certificado'][$tipo];
+        return ['status' => 'success', 'publicado' => $pub,
+            'message' => $pub
+                ? "El $etiqueta vuelve a verse en el portal del cliente."
+                : "El $etiqueta ya no se ve en el portal del cliente. El documento sigue emitido y su QR sigue validando."];
+    }
+
     public function listarParticipantes(array $filtros = []): array {
         // Garantizar columnas de workflow y datos antes de consultarlas
         $this->ensureEstatusColumn();
         $this->ensureParticipanteColumns();
         try { $this->pdo->exec("ALTER TABLE participantes_cursos ADD COLUMN IF NOT EXISTS control VARCHAR(30) NULL"); } catch (\Throwable $e) {}
+        $this->ensurePublicadoDoc();
         try { $this->pdo->exec("ALTER TABLE clientes ADD COLUMN IF NOT EXISTS correo_contacto VARCHAR(200) DEFAULT NULL"); } catch (\Throwable $e) {}
 
         $where  = ['1=1'];
@@ -70,7 +144,16 @@ class Personal {
                        p.fecha_registro,
                        p.usuario_registro,
                        COALESCE(ui.nombre, p.usuario_registro, '') AS instructor_nombre,
-                       COALESCE((SELECT cl.correo_contacto FROM clientes cl WHERE cl.nombre_cliente = p.empresa_nombre COLLATE utf8mb4_general_ci AND cl.correo_contacto IS NOT NULL AND cl.correo_contacto <> '' LIMIT 1),'') AS empresa_correo
+                       COALESCE((SELECT cl.correo_contacto FROM clientes cl WHERE cl.nombre_cliente = p.empresa_nombre COLLATE utf8mb4_general_ci AND cl.correo_contacto IS NOT NULL AND cl.correo_contacto <> '' LIMIT 1),'') AS empresa_correo,
+                       -- Qué documentos tiene y cuáles están publicados en el
+                       -- portal. NULL significa que ese documento no existe aún,
+                       -- que no es lo mismo que existir y estar despublicado.
+                       (SELECT MAX(d.publicado) FROM participantes_documentos d
+                         WHERE d.participante_id = p.id AND d.tipo_doc = 'DC3')         AS pub_dc3,
+                       (SELECT MAX(d.publicado) FROM participantes_documentos d
+                         WHERE d.participante_id = p.id AND d.tipo_doc = 'DIPLOMA')     AS pub_diploma,
+                       (SELECT MAX(d.publicado) FROM participantes_documentos d
+                         WHERE d.participante_id = p.id AND d.tipo_doc = 'CERTIFICADO') AS pub_certificado
                 FROM participantes_cursos p
                 LEFT JOIN cursos c ON c.id = p.curso_id
                 LEFT JOIN ocupaciones_especificas o ON o.id = p.ocupacion_id

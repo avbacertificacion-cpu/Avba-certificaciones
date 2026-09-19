@@ -175,7 +175,8 @@ class ClienteEnvios {
                         $quien = $r['nombre_completo'] ?: $r['control'];
                         $dc = $this->pdo->prepare(
                             "SELECT tipo_doc, url FROM participantes_documentos
-                             WHERE participante_id = ? ORDER BY fecha_generacion DESC"
+                             WHERE participante_id = ? AND COALESCE(publicado,1) = 1
+                             ORDER BY fecha_generacion DESC"
                         );
                         $dc->execute([$id]);
                         $vistos = [];
