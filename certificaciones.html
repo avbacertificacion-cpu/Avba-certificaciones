@@ -3162,6 +3162,7 @@ function abrirCursoCert(idx) {
         ${emitido ? `<span class="badge b-env" style="font-size:10px">Emitido</span>` :
                     `<span class="badge b-apro" style="font-size:10px">Aprobado</span>`}
       </div>
+      ${filaPublicacion(p)}
       <div style="display:flex;gap:5px;flex-wrap:wrap">
         <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                 onclick="prevDocPersonal(${p.id},'dc3')">👁 DC-3</button>
@@ -3177,10 +3178,6 @@ function abrirCursoCert(idx) {
                 onclick="imprimirDocPersonal(${p.id},'diploma')">🖨 Diploma</button>
         <button class="btn-ver" style="font-size:11px;background:#fff8e1;border-color:#c8a000;color:#7a5900"
                 onclick="imprimirDocPersonal(${p.id},'certificado')">🖨 Cert</button>
-        <span style="font-size:10px;color:var(--texto-hint);align-self:center;margin-left:4px">🌐 En el portal:</span>
-        ${botonPublicar(p, 'DC3', p.pub_dc3)}
-        ${botonPublicar(p, 'DIPLOMA', p.pub_diploma)}
-        ${botonPublicar(p, 'CERTIFICADO', p.pub_certificado)}
         <span style="font-size:10px;color:var(--texto-hint);align-self:center;margin-left:4px">📎 Sustituir PDF:</span>
         <button class="btn-ver" style="font-size:11px;background:#f3f0ff;border-color:#7c5cff;color:#4b32c3"
                 onclick="subirDocManualPer(${p.id},'dc3')">DC-3</button>
@@ -3649,23 +3646,43 @@ async function imprimirLoteDocPersonal(idx, tipo) {
 }
 
 /**
- * Interruptor de publicación de un documento en el portal del cliente.
+ * Franja de publicación en el portal del cliente.
  *
- * Verde = se ve en el portal. Gris = emitido pero oculto. Si el documento no
- * existe todavía, no se ofrece el botón: no hay nada que publicar.
+ * Va en su propio renglón, fuera del flex de los demás botones: metida ahí,
+ * la etiqueta se despegaba de sus botones al hacer salto de línea y quedaba
+ * describiendo a los de al lado.
+ *
+ * Tampoco usa el icono del ojo. En esta pantalla el ojo ya significa
+ * "previsualizar", y dos filas con el mismo icono y las mismas palabras, una
+ * encima de la otra, sólo se pueden confundir.
  */
-function botonPublicar(p, tipo, estado) {
-  if (estado === null || estado === undefined) return '';
-  const pub = Number(estado) === 1;
-  const et  = { DC3:'DC-3', DIPLOMA:'Diploma', CERTIFICADO:'Cert' }[tipo];
-  const estilo = pub
-    ? 'background:var(--verde-light);border-color:var(--verde);color:var(--verde)'
-    : 'background:var(--gris-bg);border-color:var(--texto-hint);color:var(--texto-hint)';
-  return `<button class="btn-ver" style="font-size:11px;${estilo}"
-            title="${pub ? 'Se ve en el portal del cliente. Clic para ocultarlo.'
-                         : 'Oculto en el portal. Clic para publicarlo.'}"
-            onclick="publicarDoc(${p.id},'${tipo}',${pub ? 0 : 1},this)">
-            ${pub ? '👁' : '🚫'} ${et}</button>`;
+function filaPublicacion(p) {
+  const botones = [
+    ['DC3', 'DC-3', p.pub_dc3],
+    ['DIPLOMA', 'Diploma', p.pub_diploma],
+    ['CERTIFICADO', 'Certificado', p.pub_certificado],
+  ].filter(([, , estado]) => estado !== null && estado !== undefined);
+
+  if (!botones.length) return '';
+
+  return `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;
+                background:var(--gris-bg);border-radius:8px;padding:7px 9px;margin-bottom:8px">
+      <span style="font-size:11px;font-weight:700;color:var(--texto-sub);letter-spacing:.3px">
+        VISIBLE EN EL PORTAL DEL CLIENTE
+      </span>
+      ${botones.map(([tipo, et, estado]) => {
+        const pub = Number(estado) === 1;
+        const estilo = pub
+          ? 'background:var(--verde-light);border-color:var(--verde);color:var(--verde);font-weight:600'
+          : 'background:#fff;border-color:var(--rojo);color:var(--rojo);text-decoration:line-through';
+        return `<button class="btn-ver" style="font-size:11.5px;${estilo}"
+                  title="${pub ? 'El cliente lo ve. Clic para ocultarlo.'
+                               : 'Oculto para el cliente. Clic para publicarlo.'}"
+                  onclick="publicarDoc(${p.id},'${tipo}',${pub ? 0 : 1},this)">
+                  ${pub ? '✓' : '✕'} ${et}</button>`;
+      }).join('')}
+    </div>`;
 }
 
 async function publicarDoc(id, tipo, publicar, btn) {
@@ -3684,20 +3701,22 @@ async function publicarDoc(id, tipo, publicar, btn) {
                              payload:{ id, tipo, publicado: publicar } })
     });
     const d = await r.json();
-    if (d.status === 'success') {
-      mostrarToast(d.message || 'Listo.', 'ok');
-      // Se refleja en memoria para que el botón cambie sin recargar la lista.
-      const reg = perCertData.find(x => Number(x.id) === Number(id));
-      if (reg) {
-        const campo = { DC3:'pub_dc3', DIPLOMA:'pub_diploma', CERTIFICADO:'pub_certificado' }[tipo];
-        reg[campo] = publicar;
-      }
-      if (typeof abrirCursoCert === 'function' && window._pcDetIdx !== undefined) {
-        abrirCursoCert(window._pcDetIdx);
-      }
-    } else {
+    if (d.status !== 'success') {
       mostrarToast(d.message || 'No se pudo cambiar.', 'err');
       btn.disabled = false;
+      return;
+    }
+    mostrarToast(d.message, 'ok');
+    // Se refleja en memoria y se repinta el detalle, para que el botón cambie
+    // de color sin tener que recargar toda la lista.
+    const campo = { DC3:'pub_dc3', DIPLOMA:'pub_diploma', CERTIFICADO:'pub_certificado' }[tipo];
+    const reg = perCertData.find(x => Number(x.id) === Number(id));
+    if (reg) reg[campo] = publicar;
+    if (window._pcDetIdx !== undefined) {
+      const g = window._cursosCertGrupos?.[window._pcDetIdx];
+      const enGrupo = g?.participantes?.find(x => Number(x.id) === Number(id));
+      if (enGrupo) enGrupo[campo] = publicar;
+      abrirCursoCert(window._pcDetIdx);
     }
   } catch(e) { mostrarToast('Error de red.', 'err'); btn.disabled = false; }
 }

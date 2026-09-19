@@ -37,12 +37,42 @@ class Personal {
      * ningún cliente de un día para otro.
      */
     private function ensurePublicadoDoc(): void {
+        static $lista = false;
+        if ($lista) return;
+
+        /*
+         * Se pregunta antes de agregar, en vez de confiar en IF NOT EXISTS:
+         * esa forma es de MariaDB y MySQL 8 la rechaza. Y esta columna no es
+         * opcional —el listado de participantes la consulta—, así que si no se
+         * creara, la pantalla entera de Certificaciones dejaría de cargar.
+         */
         try {
-            $this->pdo->exec(
-                "ALTER TABLE participantes_documentos
-                 ADD COLUMN IF NOT EXISTS publicado TINYINT NOT NULL DEFAULT 1"
+            $q = $this->pdo->prepare(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE()
+                    AND TABLE_NAME = 'participantes_documentos'
+                    AND COLUMN_NAME = 'publicado'"
             );
-        } catch (\Throwable $e) { /* ya existe */ }
+            $q->execute();
+            if ((int)$q->fetchColumn() === 0) {
+                $this->pdo->exec(
+                    "ALTER TABLE participantes_documentos
+                     ADD COLUMN publicado TINYINT NOT NULL DEFAULT 1"
+                );
+            }
+            $lista = true;
+        } catch (\Throwable $e) {
+            // Último recurso, por si information_schema no está disponible.
+            try {
+                $this->pdo->exec(
+                    "ALTER TABLE participantes_documentos
+                     ADD COLUMN publicado TINYINT NOT NULL DEFAULT 1"
+                );
+                $lista = true;
+            } catch (\Throwable $e2) {
+                error_log('[Personal] ensurePublicadoDoc: ' . $e2->getMessage());
+            }
+        }
     }
 
     /**
