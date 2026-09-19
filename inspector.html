@@ -1867,6 +1867,17 @@
           <input type="text" class="cur-input" id="ses-pwd"
                  placeholder="Ej: Curso2025" autocomplete="off">
         </div>
+        <div class="cur-field" style="margin-top:14px">
+          <label>Modalidad de la sesión <span class="req">*</span></label>
+          <select class="cur-input" id="ses-modalidad">
+            <option value="PRESENCIAL">Presencial — el grupo toma el curso con instructor</option>
+            <option value="EN_LINEA">En línea — el participante presenta evaluación por su cuenta</option>
+          </select>
+          <div style="font-size:11.5px;color:#8fa3bb;margin-top:5px">
+            La evaluación en línea sólo se despliega en las sesiones en línea.
+            En una sesión presencial el participante no la ve.
+          </div>
+        </div>
       </div>
     </div>
 
@@ -5050,6 +5061,7 @@ async function sesContinuar() {
           sesion_nombre:    nombreSesion,
           password:         pwd,
           fecha_curso:      fecha,
+          modalidad:        (document.getElementById('ses-modalidad')||{}).value || 'PRESENCIAL',
           curso_ids:        cursoIds,
           empresas:         curSesionEmpPreBuild,
         }

@@ -830,10 +830,15 @@ if ($method === 'GET') {
             respuesta($auth->getSesionInfo($sesion['id']));
         }
 
-        // Exámenes que puede presentar quien entró con una sesión de acceso
+        // Exámenes que puede presentar quien entró con una sesión de acceso.
+        // Una sesión presencial no despliega examen: el grupo está en el aula
+        // con su instructor y la evaluación es otra cosa.
         case 'EXAMENES_DISPONIBLES': {
             $sesion = $auth->validarTokenParticipante($token);
             if (!$sesion) respuesta(['status' => 'error', 'message' => 'Sesión expirada o cerrada.'], 401);
+            if (($sesion['modalidad'] ?? 'PRESENCIAL') !== 'EN_LINEA') {
+                respuesta(['status' => 'success', 'examenes' => [], 'modalidad' => 'PRESENCIAL']);
+            }
             respuesta($examenes->disponibles());
         }
 
@@ -1382,6 +1387,12 @@ if ($method === 'POST') {
         case 'EXAMEN_INICIAR': {
             $sesion = $auth->validarTokenParticipante($token);
             if (!$sesion) respuesta(['status' => 'error', 'message' => 'Sesión expirada o cerrada.'], 401);
+            // La pantalla ya no lo ofrece en una sesión presencial, pero la
+            // puerta se cierra aquí: esconder un botón no es una restricción.
+            if (($sesion['modalidad'] ?? 'PRESENCIAL') !== 'EN_LINEA') {
+                respuesta(['status' => 'error',
+                    'message' => 'Esta sesión es presencial y no tiene evaluación en línea.'], 403);
+            }
             respuesta($examenes->iniciar($payload, (int)$sesion['id'], $_SERVER['REMOTE_ADDR'] ?? ''));
         }
 

@@ -66,6 +66,19 @@ class Auth {
             // Añadir fecha_curso si la tabla ya existía sin esa columna
             try { $this->pdo->exec("ALTER TABLE curso_sesiones_acceso ADD COLUMN IF NOT EXISTS fecha_curso DATE NULL"); } catch (\PDOException $e) {}
 
+            /*
+             * Modalidad de la sesión. El valor por omisión es PRESENCIAL a
+             * propósito: todas las sesiones que ya existen son de curso
+             * presencial, y no deben empezar a ofrecer un examen en línea
+             * porque se agregó la columna.
+             */
+            try {
+                $this->pdo->exec(
+                    "ALTER TABLE curso_sesiones_acceso
+                     ADD COLUMN IF NOT EXISTS modalidad VARCHAR(12) NOT NULL DEFAULT 'PRESENCIAL'"
+                );
+            } catch (\PDOException $e) {}
+
             $this->pdo->exec("
                 CREATE TABLE IF NOT EXISTS sesion_acceso_participantes (
                   sesion_acceso_id INT NOT NULL,
@@ -129,11 +142,18 @@ class Auth {
         }
         if (!$identificador) return ['status' => 'error', 'message' => 'No se pudo generar identificador.'];
 
+        // Sólo una sesión en línea despliega examen. Cualquier valor que no
+        // sea EN_LINEA se trata como presencial: ante la duda, no se le pone
+        // un examen enfrente a un grupo que está en el aula.
+        $modalidad = strtoupper(trim((string)($payload['modalidad'] ?? '')));
+        if ($modalidad !== 'EN_LINEA') $modalidad = 'PRESENCIAL';
+
         $hash = password_hash($password, PASSWORD_BCRYPT);
         $this->pdo->prepare(
-            "INSERT INTO curso_sesiones_acceso (sesion_nombre, identificador, password_hash, inspector_id, fecha_curso)
-             VALUES (?, ?, ?, ?, ?)"
-        )->execute([$nombre, $identificador, $hash, $inspectorId, $fecha ?: null]);
+            "INSERT INTO curso_sesiones_acceso
+               (sesion_nombre, identificador, password_hash, inspector_id, fecha_curso, modalidad)
+             VALUES (?, ?, ?, ?, ?, ?)"
+        )->execute([$nombre, $identificador, $hash, $inspectorId, $fecha ?: null, $modalidad]);
 
         $sesionId = (int)$this->pdo->lastInsertId();
 
@@ -201,7 +221,8 @@ class Auth {
         $this->ensureParticipanteTables();
 
         $stmt = $this->pdo->prepare(
-            "SELECT sesion_nombre, fecha_curso FROM curso_sesiones_acceso WHERE id = ? AND activa = 1"
+            "SELECT sesion_nombre, fecha_curso, COALESCE(modalidad,'PRESENCIAL') AS modalidad
+               FROM curso_sesiones_acceso WHERE id = ? AND activa = 1"
         );
         $stmt->execute([$sesionId]);
         $sesion = $stmt->fetch();
@@ -275,7 +296,8 @@ class Auth {
     public function validarTokenParticipante(string $token): ?array {
         $this->ensureParticipanteTables();
         $stmt = $this->pdo->prepare(
-            "SELECT t.sesion_acceso_id, a.sesion_nombre, a.activa
+            "SELECT t.sesion_acceso_id, a.sesion_nombre, a.activa,
+                    COALESCE(a.modalidad,'PRESENCIAL') AS modalidad
              FROM sesion_acceso_tokens t
              JOIN curso_sesiones_acceso a ON a.id = t.sesion_acceso_id
              WHERE t.token = ? AND t.expires_at > NOW()"
@@ -287,6 +309,7 @@ class Auth {
             'id'            => (int)$row['sesion_acceso_id'],
             'rol'           => 'PARTICIPANTE',
             'sesion_nombre' => $row['sesion_nombre'],
+            'modalidad'     => (string)($row['modalidad'] ?? 'PRESENCIAL'),
         ];
     }
 
