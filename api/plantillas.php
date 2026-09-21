@@ -4,14 +4,25 @@ require_once '../config/mayusculas.php';
 
 header('Content-Type: application/json');
 
-// Verificar que es administrador
-if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
-    http_response_code(403);
-    echo json_encode(['error' => 'No autorizado']);
+if (!isset($_SESSION['usuario_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'No autenticado']);
     exit;
 }
 
 $action = $_GET['action'] ?? '';
+
+// Consultar las plantillas lo necesita también el inspector: su pantalla de
+// nuevo reporte elige una de la lista. Crearlas o modificarlas sigue siendo
+// cosa del administrador.
+$soloLectura = in_array($action, ['listar', 'obtener'], true);
+$permitidos  = $soloLectura ? [ROLE_ADMIN, ROLE_INSPECTOR] : [ROLE_ADMIN];
+
+if (!in_array($_SESSION['rol'], $permitidos, true)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'No autorizado']);
+    exit;
+}
 
 switch ($action) {
     case 'crear':
