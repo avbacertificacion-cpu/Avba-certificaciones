@@ -37,16 +37,35 @@ switch ($action) {
 }
 
 // ─── LISTAR ──────────────────────────────────────────────────────────────────
-/** ¿Ya existe el registro de mantenimientos? (se consulta una vez por petición) */
-function hayTablaMantenimientos(PDO $pdo): bool {
-    static $existe = null;
-    if ($existe !== null) return $existe;
+/**
+ * ¿El registro de mantenimientos está listo para consultarse?
+ *
+ * No basta con que exista la tabla de movimientos: la consulta también usa el
+ * catálogo de motivos y la columna `fecha_devolucion`, y ambos los crea el
+ * módulo de mantenimiento la primera vez que se abre. Comprobar sólo el nombre
+ * de una tabla dejaba el listado de extintores en blanco en cuanto la base
+ * venía de una versión anterior —la consulta fallaba entera—.
+ */
+function mantenimientosConsultable(PDO $pdo): bool {
+    static $listo = null;
+    if ($listo !== null) return $listo;
     try {
-        $existe = (bool) $pdo->query("SHOW TABLES LIKE 'extintor_mantenimientos'")->fetchColumn();
+        $tablas = ['extintor_mantenimientos', 'mantenimiento_tipos'];
+        foreach ($tablas as $t) {
+            $st = $pdo->prepare("SHOW TABLES LIKE ?");
+            $st->execute([$t]);
+            if (!$st->fetchColumn()) return $listo = false;
+        }
+        foreach (['fecha_devolucion', 'tipo_id'] as $c) {
+            $st = $pdo->prepare("SHOW COLUMNS FROM extintor_mantenimientos LIKE ?");
+            $st->execute([$c]);
+            if (!$st->fetch()) return $listo = false;
+        }
+        $listo = true;
     } catch (Exception $e) {
-        $existe = false;
+        $listo = false;
     }
-    return $existe;
+    return $listo;
 }
 
 function listar() {
@@ -68,7 +87,7 @@ function listar() {
     // así que se consulta sólo si ya existe; en una instalación nueva el
     // listado tiene que seguir funcionando igual.
     $colMant = '';
-    if (hayTablaMantenimientos($pdo)) {
+    if (mantenimientosConsultable($pdo)) {
         $colMant = "
             ,(SELECT t.nombre FROM extintor_mantenimientos m
               LEFT JOIN mantenimiento_tipos t ON t.id = m.tipo_id
@@ -80,25 +99,38 @@ function listar() {
         ";
     }
 
-    $stmt = $pdo->prepare("
-        SELECT e.*,
-               te.nombre AS tipo_nombre,
-               emp.nombre AS empresa_nombre,
-               u.nombre   AS creado_por_nombre,
-               (SELECT fecha FROM inspecciones
-                WHERE extintor_id = e.id
-                ORDER BY fecha DESC, hora DESC LIMIT 1) AS ultima_inspeccion
-               $colMant
-        FROM extintores e
-        JOIN tipos_extintores te ON te.id = e.tipo
-        JOIN empresas  emp ON emp.id = e.empresa_id
-        JOIN usuarios  u   ON u.id  = e.creado_por
-        $where
-        ORDER BY CAST(REPLACE(e.codigo_manual, 'EXT-', '') AS UNSIGNED) ASC
-    ");
-    $stmt->execute($params);
+    $consulta = function (string $extra) use ($pdo, $where, $params) {
+        $stmt = $pdo->prepare("
+            SELECT e.*,
+                   te.nombre AS tipo_nombre,
+                   emp.nombre AS empresa_nombre,
+                   u.nombre   AS creado_por_nombre,
+                   (SELECT fecha FROM inspecciones
+                    WHERE extintor_id = e.id
+                    ORDER BY fecha DESC, hora DESC LIMIT 1) AS ultima_inspeccion
+                   $extra
+            FROM extintores e
+            JOIN tipos_extintores te ON te.id = e.tipo
+            JOIN empresas  emp ON emp.id = e.empresa_id
+            JOIN usuarios  u   ON u.id  = e.creado_por
+            $where
+            ORDER BY CAST(REPLACE(e.codigo_manual, 'EXT-', '') AS UNSIGNED) ASC
+        ");
+        $stmt->execute($params);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    };
 
-    echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
+    // El dato de mantenimiento es un extra; el listado de extintores es lo
+    // principal y no puede quedarse vacío por él. Si algo del otro módulo no
+    // cuadra, se devuelve el listado sin ese dato en vez de no devolver nada.
+    try {
+        $datos = $consulta($colMant);
+    } catch (Exception $e) {
+        if ($colMant === '') throw $e;
+        $datos = $consulta('');
+    }
+
+    echo json_encode(['success' => true, 'data' => $datos]);
 }
 
 // ─── OBTENER UNO ─────────────────────────────────────────────────────────────
