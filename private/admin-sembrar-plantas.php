@@ -18,6 +18,7 @@ require_once '../config/roles-extra.php';
 require_once '../config/mayusculas.php';
 require_once '../config/modo-demo.php';
 require_once '../config/plantas-demo.php';
+require_once '../config/huella-demo.php';
 
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
     header('Location: ../public/login.html'); exit;
@@ -43,24 +44,6 @@ const TIPOS_ESTANDAR = [
     ['nombre' => 'CO2',            'descripcion' => 'Dióxido de Carbono'],
     ['nombre' => 'Agua a Presión', 'descripcion' => 'Agua a presión (Clase A)'],
     ['nombre' => 'Espuma AFFF',    'descripcion' => 'Espuma formadora de película acuosa'],
-];
-
-const SECCIONES = [
-    'corporativo' => ['Recepción', 'Piso 3', 'Piso 6', 'Cuarto de servidores', 'Cocineta', 'Sala de juntas'],
-    'industrial'  => ['Área de Proceso', 'Subestación Eléctrica', 'Almacén General', 'Comedor', 'Taller de Mantenimiento', 'Sala de Control', 'Patio de Tanques', 'Oficinas Administrativas'],
-    'eolico'      => ['Subestación', 'Casa de Control', 'Almacén de Refacciones', 'Oficinas', 'Base de Aerogenerador'],
-];
-
-const DETALLES_UBICACION = [
-    'Junto a la puerta principal', 'Pasillo central', 'Cerca del tablero eléctrico',
-    'Junto a la salida de emergencia', 'Área de trabajo', 'Pasillo de acceso',
-    'Junto a la escalera', 'Cerca del extintor de respaldo', 'A la entrada del área',
-];
-
-const CAPACIDADES = [
-    'corporativo' => [4.5, 6, 9],
-    'industrial'  => [4.5, 9, 12, 25, 50],
-    'eolico'      => [4.5, 9, 12, 25],
 ];
 
 /**
@@ -215,6 +198,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
         // La tabla de asignaciones se crea (si falta) ANTES de abrir la transacción:
         // un CREATE TABLE en MySQL hace commit implícito y rompería la transacción
         // si se ejecutara a la mitad.
+        // Queda anotado lo que se inserta, para que quitarlo después sea exacto
+        // y no haya que deducirlo. Igual que la de abajo, fuera de la transacción.
+        huellaAsegurarTabla($pdo);
+
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS gerente_empresas (
                 id INT AUTO_INCREMENT PRIMARY KEY, gerente_id INT NOT NULL, empresa_id INT NOT NULL,
@@ -254,6 +241,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                 $stmt->execute([$c['nombre']]);
                 $empresaId = $stmt->fetchColumn();
 
+                $empresaCreada = !$empresaId;
                 if (!$empresaId) {
                     $pdo->prepare("INSERT INTO empresas (nombre, domicilio, estado) VALUES (?,?,'activo')")
                         ->execute([aMayusculas($c['nombre']), aMayusculas($c['domicilio'])]);
@@ -339,6 +327,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                         INSERT INTO inspecciones
                             (extintor_id, inspector_id, fecha, hora, ser, mg, po, ph, sg, ps, ob, dan, pin, fn, gb, rv)
                     ", 16, $filasInsp);
+
+                    huellaRegistrar($pdo, [
+                        'empresa_id'     => $empresaId,
+                        'empresa_nombre' => $c['nombre'],
+                        'empresa_creada' => $empresaCreada,
+                        'ext_min'        => min($nuevosIds),
+                        'ext_max'        => max($nuevosIds),
+                        'extintores'     => $creados,
+                        'inspecciones'   => count($filasInsp),
+                        'sembrado_por'   => $uid,
+                    ]);
                 }
 
                 $resultados[] = [

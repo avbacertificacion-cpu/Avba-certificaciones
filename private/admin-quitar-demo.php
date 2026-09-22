@@ -1,23 +1,29 @@
 <?php
 /**
- * Retira del sistema real las plantas de demostración que hayan quedado de una
- * carga anterior (solo ADMIN).
+ * Retira lo que la siembra de demostración dejó en el sistema (solo ADMIN).
  *
- * Borra de verdad, así que está construida para no llevarse nada por delante:
- *  - Enseña primero, planta por planta, exactamente cuántos extintores,
- *    inspecciones, reportes y cotizaciones se irían con ella.
- *  - El administrador marca cuáles quitar. Los nombres de la lista son de
- *    centros de trabajo reales, así que alguno podría ser hoy un cliente de
- *    verdad: por eso se elige a mano y no se borra "todo lo que coincida".
- *  - Pide escribir una palabra de confirmación.
- *  - Borra dentro de una transacción; si algo falla, no queda nada a medias.
- *  - Los archivos subidos (fotos de reportes, documentos) se eliminan al
- *    final, ya con el borrado confirmado: el disco no se puede deshacer.
+ * La diferencia importante frente a "borrar las plantas de ejemplo": varios de
+ * esos catorce centros son clientes de verdad que YA tenían extintores,
+ * usuarios, reportes y cotizaciones antes de que se sembrara nada. A ellos la
+ * siembra sólo les agregó extintores de ejemplo con su historial de
+ * inspecciones. Esta pantalla quita exactamente eso y nada más:
+ *
+ *  - Se van los extintores sembrados (reconocidos uno por uno, ver
+ *    config/huella-demo.php) y las inspecciones que cuelgan de ellos.
+ *  - Se quedan los extintores que ya estaban, con su historial, y también los
+ *    reportes, las fotos, las cotizaciones, los documentos y los usuarios de
+ *    la planta: la siembra nunca creó nada de eso.
+ *  - La planta sólo se da de baja cuando al quitar lo sembrado no le queda
+ *    absolutamente nada propio; si le queda algo, la empresa se conserva.
+ *  - El usuario gerente de demostración se quita aparte, si se marca.
+ *
+ * Antes de confirmar se enseña, planta por planta, qué se va y qué se queda.
  */
 require_once '../config/config.php';
 require_once '../config/roles-extra.php';
 require_once '../config/modo-demo.php';
 require_once '../config/plantas-demo.php';
+require_once '../config/huella-demo.php';
 
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
     header('Location: ../public/login.html'); exit;
@@ -28,165 +34,129 @@ $uid = $_SESSION['usuario_id'];
 
 const PALABRA_CONFIRMACION = 'QUITAR';
 
-$DIR_REPORTES   = __DIR__ . '/../uploads/reportes/';
-$DIR_DOCUMENTOS = __DIR__ . '/../uploads/documentos/';
-
 $errorGeneral = null;
 $resultados   = null;
 $totalBorrado = [];
 
-/** ¿Existe esa tabla? Las de cotizaciones y fotos se crean al usarse. */
-function hayTabla(PDO $pdo, string $tabla): bool {
-    static $cache = [];
-    if (isset($cache[$tabla])) return $cache[$tabla];
-    try {
-        $st = $pdo->prepare("SHOW TABLES LIKE ?");
-        $st->execute([$tabla]);
-        $cache[$tabla] = (bool) $st->fetchColumn();
-    } catch (Exception $e) { $cache[$tabla] = false; }
-    return $cache[$tabla];
-}
-
-function contar(PDO $pdo, string $sql, array $params): int {
-    try { $st = $pdo->prepare($sql); $st->execute($params); return (int) $st->fetchColumn(); }
-    catch (Exception $e) { return 0; }
-}
-
-/** Todo lo que se iría con una empresa, contado antes de tocar nada. */
-function inventario(PDO $pdo, int $empresaId): array {
-    $inv = [
-        'extintores'   => contar($pdo, "SELECT COUNT(*) FROM extintores WHERE empresa_id = ?", [$empresaId]),
-        'inspecciones' => contar($pdo, "SELECT COUNT(*) FROM inspecciones WHERE extintor_id IN
-                                        (SELECT id FROM extintores WHERE empresa_id = ?)", [$empresaId]),
-        'reportes'     => contar($pdo, "SELECT COUNT(*) FROM reportes_mensuales WHERE empresa_id = ?", [$empresaId]),
-        'usuarios'     => contar($pdo, "SELECT COUNT(*) FROM usuarios WHERE empresa_id = ?", [$empresaId]),
-        'fotos'        => 0,
-        'cotizaciones' => 0,
-    ];
-    if (hayTabla($pdo, 'reporte_fotos')) {
-        $inv['fotos'] = contar($pdo, "SELECT COUNT(*) FROM reporte_fotos WHERE reporte_id IN
-                                      (SELECT id FROM reportes_mensuales WHERE empresa_id = ?)", [$empresaId]);
+/** Estado de cada centro de la lista: qué sembró la demo ahí y qué había ya. */
+function revisarCentros(PDO $pdo): array {
+    $preview = [];
+    foreach (centros() as $c) {
+        $st = $pdo->prepare("SELECT id, estado FROM empresas WHERE nombre = ?");
+        $st->execute([$c['nombre']]);
+        $emp = $st->fetch(PDO::FETCH_ASSOC);
+        $preview[] = [
+            'nombre'     => $c['nombre'],
+            'centro'     => $c,
+            'empresa_id' => $emp ? (int) $emp['id'] : null,
+            'estado'     => $emp['estado'] ?? null,
+            'huella'     => $emp ? huellaDeEmpresa($pdo, $c, (int) $emp['id']) : null,
+        ];
     }
-    if (hayTabla($pdo, 'cotizaciones')) {
-        $inv['cotizaciones'] = contar($pdo, "SELECT COUNT(*) FROM cotizaciones WHERE empresa_id = ?", [$empresaId]);
-    }
-    return $inv;
+    return $preview;
 }
 
-// ─── Estado actual de cada planta de la lista ────────────────────────────────
-$preview = [];
-foreach (centros() as $c) {
-    $st = $pdo->prepare("SELECT id, estado FROM empresas WHERE nombre = ?");
-    $st->execute([$c['nombre']]);
-    $emp = $st->fetch(PDO::FETCH_ASSOC);
-    $preview[] = [
-        'nombre'     => $c['nombre'],
-        'empresa_id' => $emp['id'] ?? null,
-        'estado'     => $emp['estado'] ?? null,
-        'inv'        => $emp ? inventario($pdo, (int) $emp['id']) : null,
-    ];
-}
-$encontradas = array_values(array_filter($preview, fn($p) => $p['empresa_id']));
+$preview = revisarCentros($pdo);
+// Sólo tiene sentido ofrecer las plantas donde la siembra dejó algo
+$conHuella = array_values(array_filter($preview, fn($p) => $p['huella'] && $p['huella']['extintores'] > 0));
+$presentes = array_values(array_filter($preview, fn($p) => $p['empresa_id']));
 
 // El gerente de demostración y a cuántas plantas sigue asignado
 $stGer = $pdo->prepare("SELECT id, nombre FROM usuarios WHERE username = ?");
 $stGer->execute([GERENTE_USERNAME]);
 $gerente = $stGer->fetch(PDO::FETCH_ASSOC);
-$gerentePlantas = ($gerente && hayTabla($pdo, 'gerente_empresas'))
-    ? contar($pdo, "SELECT COUNT(*) FROM gerente_empresas WHERE gerente_id = ?", [$gerente['id']])
+$gerentePlantas = ($gerente && huellaHayTablaSuelta($pdo, 'gerente_empresas'))
+    ? huellaContar($pdo, "SELECT COUNT(*) FROM gerente_empresas WHERE gerente_id = ?", [$gerente['id']])
     : 0;
 
 // ─── Borrado ─────────────────────────────────────────────────────────────────
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') === 'quitar') {
-    $elegidas = array_map('intval', (array) ($_POST['empresas'] ?? []));
-    $idsValidos = array_map(fn($p) => (int) $p['empresa_id'], $encontradas);
-    $elegidas = array_values(array_intersect($elegidas, $idsValidos));
+    $elegidas   = array_map('intval', (array) ($_POST['empresas'] ?? []));
+    $idsValidos = array_map(fn($p) => $p['empresa_id'], $conHuella);
+    $elegidas   = array_values(array_intersect($elegidas, $idsValidos));
     $quitarGerente = !empty($_POST['quitar_gerente']);
 
     if (strtoupper(trim($_POST['confirmacion'] ?? '')) !== PALABRA_CONFIRMACION) {
-        $errorGeneral = 'Escribe ' . PALABRA_CONFIRMACION . ' para confirmar el borrado.';
+        $errorGeneral = 'Escribe ' . PALABRA_CONFIRMACION . ' para confirmar.';
     } elseif (!$elegidas && !$quitarGerente) {
         $errorGeneral = 'No marcaste ninguna planta.';
     } else {
-        $archivos = [];   // se borran del disco hasta que la transacción cierre bien
         try {
             $pdo->beginTransaction();
             $resultados = [];
 
             foreach ($elegidas as $eid) {
-                $nombre = $pdo->prepare("SELECT nombre FROM empresas WHERE id = ?");
-                $nombre->execute([$eid]);
-                $nombreEmp = $nombre->fetchColumn();
-                $inv = inventario($pdo, $eid);
+                $p = null;
+                foreach ($conHuella as $c) if ($c['empresa_id'] === $eid) $p = $c;
+                if (!$p) continue;
 
-                // Fotos de los reportes: primero los nombres de archivo, luego las filas
-                if (hayTabla($pdo, 'reporte_fotos')) {
-                    $st = $pdo->prepare("SELECT archivo FROM reporte_fotos WHERE reporte_id IN
-                                         (SELECT id FROM reportes_mensuales WHERE empresa_id = ?)");
-                    $st->execute([$eid]);
-                    foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $a) $archivos[] = $DIR_REPORTES . basename($a);
-                    $pdo->prepare("DELETE FROM reporte_fotos WHERE reporte_id IN
-                                   (SELECT id FROM reportes_mensuales WHERE empresa_id = ?)")->execute([$eid]);
-                }
+                // Se vuelve a identificar dentro de la transacción: lo que se
+                // borra es lo que se acaba de comprobar, no lo que se vio al
+                // pintar la pantalla hace un rato.
+                $h   = huellaDeEmpresa($pdo, $p['centro'], $eid);
+                $ids = $h['ids'];
+                if (!$ids) continue;
 
-                // Cotizaciones de la planta, con sus partidas y documentos adjuntos
-                if (hayTabla($pdo, 'cotizaciones')) {
-                    $st = $pdo->prepare("SELECT id FROM cotizaciones WHERE empresa_id = ?");
-                    $st->execute([$eid]);
-                    $cots = $st->fetchAll(PDO::FETCH_COLUMN);
-                    foreach ($cots as $cid) {
-                        if (hayTabla($pdo, 'cotizacion_items')) {
-                            $pdo->prepare("DELETE FROM cotizacion_items WHERE cotizacion_id = ?")->execute([$cid]);
-                        }
-                        if (hayTabla($pdo, 'documentos')) {
-                            $sd = $pdo->prepare("SELECT archivo FROM documentos WHERE modulo = 'cotizacion' AND registro_id = ?");
-                            $sd->execute([$cid]);
-                            foreach ($sd->fetchAll(PDO::FETCH_COLUMN) as $a) $archivos[] = $DIR_DOCUMENTOS . basename($a);
-                            $pdo->prepare("DELETE FROM documentos WHERE modulo = 'cotizacion' AND registro_id = ?")->execute([$cid]);
-                        }
+                $marcas = implode(',', array_fill(0, count($ids), '?'));
+                $pdo->prepare("DELETE FROM inspecciones WHERE extintor_id IN ($marcas)")->execute($ids);
+                $pdo->prepare("DELETE FROM extintores WHERE id IN ($marcas)")->execute($ids);
+
+                // La empresa sólo se va si no le quedó nada propio
+                $empresaBorrada = false;
+                if ($h['borrar_empresa']) {
+                    if (huellaHayTablaSuelta($pdo, 'gerente_empresas')) {
+                        $pdo->prepare("DELETE FROM gerente_empresas WHERE empresa_id = ?")->execute([$eid]);
                     }
-                    $pdo->prepare("DELETE FROM cotizaciones WHERE empresa_id = ?")->execute([$eid]);
+                    $pdo->prepare("DELETE FROM empresas WHERE id = ?")->execute([$eid]);
+                    $empresaBorrada = true;
+                }
+                if (huellaHayTabla($pdo)) {
+                    $pdo->prepare("DELETE FROM demo_siembra WHERE empresa_id = ?")->execute([$eid]);
                 }
 
-                // Inspecciones antes que extintores: cuelgan de ellos
-                $pdo->prepare("DELETE FROM inspecciones WHERE extintor_id IN
-                               (SELECT id FROM extintores WHERE empresa_id = ?)")->execute([$eid]);
-                $pdo->prepare("DELETE FROM extintores WHERE empresa_id = ?")->execute([$eid]);
-                $pdo->prepare("DELETE FROM reportes_mensuales WHERE empresa_id = ?")->execute([$eid]);
-                if (hayTabla($pdo, 'gerente_empresas')) {
-                    $pdo->prepare("DELETE FROM gerente_empresas WHERE empresa_id = ?")->execute([$eid]);
-                }
-                // Usuarios cliente que sólo existían para esa planta
-                $pdo->prepare("DELETE FROM usuarios WHERE empresa_id = ?")->execute([$eid]);
-                $pdo->prepare("DELETE FROM empresas WHERE id = ?")->execute([$eid]);
-
-                $resultados[] = ['nombre' => $nombreEmp, 'inv' => $inv];
-                foreach ($inv as $k => $v) $totalBorrado[$k] = ($totalBorrado[$k] ?? 0) + $v;
+                $resultados[] = [
+                    'nombre'  => $p['nombre'],
+                    'huella'  => $h,
+                    'empresa' => $empresaBorrada,
+                ];
+                $totalBorrado['extintores']   = ($totalBorrado['extintores']   ?? 0) + $h['extintores'];
+                $totalBorrado['inspecciones'] = ($totalBorrado['inspecciones'] ?? 0) + $h['inspecciones'];
+                $totalBorrado['empresas']     = ($totalBorrado['empresas']     ?? 0) + ($empresaBorrada ? 1 : 0);
             }
 
             if ($quitarGerente && $gerente) {
-                if (hayTabla($pdo, 'gerente_empresas')) {
+                if (huellaHayTablaSuelta($pdo, 'gerente_empresas')) {
                     $pdo->prepare("DELETE FROM gerente_empresas WHERE gerente_id = ?")->execute([$gerente['id']]);
                 }
                 $pdo->prepare("DELETE FROM usuarios WHERE id = ?")->execute([$gerente['id']]);
             }
 
-            $st = $pdo->prepare("INSERT INTO auditoria (usuario_id,accion,tabla,registro_id,ip) VALUES (?,?,?,?,?)");
-            $st->execute([$uid, 'Quitar ' . count($elegidas) . ' plantas de demostración del sistema',
-                          'empresas', null, $_SERVER['REMOTE_ADDR'] ?? null]);
+            $pdo->prepare("INSERT INTO auditoria (usuario_id,accion,tabla,registro_id,ip) VALUES (?,?,?,?,?)")
+                ->execute([$uid,
+                    'Quitar lo sembrado por la demo en ' . count($resultados) . ' planta(s): '
+                    . ($totalBorrado['extintores'] ?? 0) . ' extintores',
+                    'extintores', null, $_SERVER['REMOTE_ADDR'] ?? null]);
 
             $pdo->commit();
-
-            // Ya sin vuelta atrás en la base: ahora sí, los archivos
-            foreach (array_unique($archivos) as $ruta) {
-                if (is_file($ruta)) @unlink($ruta);
-            }
+            $preview   = revisarCentros($pdo);
+            $conHuella = array_values(array_filter($preview, fn($p) => $p['huella'] && $p['huella']['extintores'] > 0));
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
-            $errorGeneral = 'No se pudo completar el borrado (no se quitó nada): ' . $e->getMessage();
+            $errorGeneral = 'No se pudo completar (no se quitó nada): ' . $e->getMessage();
             $resultados = null;
         }
     }
+}
+
+/** Resumen de una línea de lo que se queda en una planta. */
+function frasePropios(array $pr): string {
+    $partes = [];
+    foreach ([['extintores', 'extintor', 'extintores'], ['inspecciones', 'inspección', 'inspecciones'],
+              ['usuarios', 'usuario', 'usuarios'], ['reportes', 'reporte', 'reportes'],
+              ['cotizaciones', 'cotización', 'cotizaciones']] as [$k, $uno, $varios]) {
+        if (!empty($pr[$k])) $partes[] = $pr[$k] . ' ' . ($pr[$k] == 1 ? $uno : $varios);
+    }
+    return $partes ? implode(' · ', $partes) : '—';
 }
 ?>
 <!DOCTYPE html>
@@ -195,27 +165,31 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Quitar datos de demostración</title>
+<link rel="stylesheet" href="../public/assets/css/movil.css">
 <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Segoe UI',system-ui,sans-serif;background:#eef2fb;color:#1a2138}
     .navbar{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:16px 26px;
             display:flex;justify-content:space-between;align-items:center;box-shadow:0 4px 16px rgba(102,126,234,.2)}
     .navbar a{color:#fff;text-decoration:none;font-size:13px;opacity:.9}.navbar a:hover{opacity:1;text-decoration:underline}
-    .container{max-width:1060px;margin:0 auto;padding:26px 20px}
+    .container{max-width:1100px;margin:0 auto;padding:26px 20px}
     h2{font-size:24px;color:#1e293b}
     .sub{color:#64748b;font-size:13px;margin-bottom:20px}
     .card{background:#fff;border-radius:14px;padding:20px;box-shadow:0 4px 14px rgba(30,41,59,.08);margin-bottom:20px}
+    .tabla-env{overflow-x:auto}
     table{width:100%;border-collapse:collapse}
     thead{background:#f1f5fb}
     th{padding:10px 9px;text-align:left;font-size:11px;color:#475569;font-weight:700;text-transform:uppercase}
-    td{padding:10px 9px;font-size:13px;border-bottom:1px solid #f1f5f9}
+    td{padding:10px 9px;font-size:13px;border-bottom:1px solid #f1f5f9;vertical-align:top}
     td.n,th.n{text-align:right}
-    tbody tr:hover{background:#f8faff}
+    .se-va{color:#b91c1c;font-weight:700}
+    .se-queda{color:#047857}
+    .nota{font-size:11px;color:#64748b;display:block;margin-top:3px}
     .badge{padding:4px 10px;border-radius:20px;font-size:11px;font-weight:700;display:inline-block}
-    .b-hay{background:#fee2e2;color:#b91c1c}.b-no{background:#e2e8f0;color:#475569}
+    .b-baja{background:#fee2e2;color:#b91c1c}.b-queda{background:#d1fae5;color:#047857}
+    .b-exacto{background:#e0e7ff;color:#3730a3}.b-indicios{background:#fef3c7;color:#92400e}
     .btn{padding:11px 20px;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:14px}
     .btn-danger{background:#dc2626;color:#fff}.btn-danger:hover{background:#b91c1c}
-    .btn-danger:disabled{background:#fca5a5;cursor:not-allowed}
     .btn-ghost{background:#eef2fb;color:#475569;text-decoration:none;display:inline-block}
     .alerta{padding:14px 16px;border-radius:10px;font-size:13px;margin-bottom:18px;line-height:1.6}
     .a-err{background:#fee2e2;color:#b91c1c}
@@ -226,8 +200,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
     .fg label{display:block;font-size:12px;font-weight:700;color:#475569;margin-bottom:6px}
     .fg input[type=text]{width:220px;padding:10px;border:2px solid #e0e0ff;border-radius:8px;font-size:15px;
                          font-weight:700;letter-spacing:2px;text-transform:uppercase}
-    .chk{display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer}
+    .chk{display:flex;align-items:flex-start;gap:9px;font-size:13px;line-height:1.55;cursor:pointer}
+    .chk input{margin-top:3px;flex:none}
     .vacio{text-align:center;padding:44px 20px;color:#64748b}.vacio .ic{font-size:52px;margin-bottom:12px}
+    @media (max-width:760px){
+        .tabla thead{display:none}
+        .tabla tr{display:block;border:1px solid #e8ecf7;border-radius:10px;margin-bottom:10px;padding:8px}
+        .tabla td{display:flex;justify-content:space-between;gap:12px;border:0;padding:6px 4px;text-align:right}
+        .tabla td::before{content:attr(data-et);font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;text-align:left}
+        .tabla td.planta{display:block;text-align:left;border-bottom:1px solid #f1f5f9;padding-bottom:8px;margin-bottom:4px}
+        .tabla td.planta::before{content:none}
+        .tabla td.marca{display:block;text-align:left}
+        .tabla td.marca::before{content:none}
+    }
 </style>
 </head>
 <body>
@@ -239,7 +224,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
 
 <div class="container">
     <h2>🧹 Quitar datos de demostración</h2>
-    <div class="sub">Retira del sistema las plantas de ejemplo y todo lo que cuelga de ellas. La información real no se toca.</div>
+    <div class="sub">Se retiran únicamente los extintores que sembró la demostración y su historial. Lo que ya tenías se queda.</div>
 
     <?php if ($errorGeneral): ?>
         <div class="alerta a-err">⚠️ <?= htmlspecialchars($errorGeneral) ?></div>
@@ -247,18 +232,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
 
     <?php if ($resultados !== null): ?>
         <div class="card">
-            <div class="alerta a-ok">✓ Listo. Se quitaron <?= count($resultados) ?> planta(s) de demostración.</div>
-            <table>
-                <thead><tr><th>Planta</th><th class="n">Extintores</th><th class="n">Inspecciones</th>
-                <th class="n">Reportes</th><th class="n">Cotizaciones</th></tr></thead>
+            <div class="alerta a-ok">✓ Listo. Se limpiaron <?= count($resultados) ?> planta(s).</div>
+            <div class="tabla-env"><table class="tabla">
+                <thead><tr><th>Planta</th><th class="n">Extintores quitados</th>
+                <th class="n">Inspecciones quitadas</th><th>Lo que se conservó</th></tr></thead>
                 <tbody>
                 <?php foreach ($resultados as $r): ?>
                     <tr>
-                        <td><?= htmlspecialchars($r['nombre']) ?></td>
-                        <td class="n"><?= $r['inv']['extintores'] ?></td>
-                        <td class="n"><?= $r['inv']['inspecciones'] ?></td>
-                        <td class="n"><?= $r['inv']['reportes'] ?></td>
-                        <td class="n"><?= $r['inv']['cotizaciones'] ?></td>
+                        <td class="planta" data-et="Planta"><?= htmlspecialchars($r['nombre']) ?>
+                            <?php if ($r['empresa']): ?><span class="nota">La planta se dio de baja: no le quedaba nada propio.</span><?php endif; ?>
+                        </td>
+                        <td class="n" data-et="Extintores quitados"><?= $r['huella']['extintores'] ?></td>
+                        <td class="n" data-et="Inspecciones quitadas"><?= $r['huella']['inspecciones'] ?></td>
+                        <td data-et="Se conservó" class="se-queda"><?= htmlspecialchars(frasePropios($r['huella']['propios'])) ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
@@ -267,72 +253,98 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
                     <td>Total</td>
                     <td class="n"><?= $totalBorrado['extintores'] ?? 0 ?></td>
                     <td class="n"><?= $totalBorrado['inspecciones'] ?? 0 ?></td>
-                    <td class="n"><?= $totalBorrado['reportes'] ?? 0 ?></td>
-                    <td class="n"><?= $totalBorrado['cotizaciones'] ?? 0 ?></td>
+                    <td><?= (int) ($totalBorrado['empresas'] ?? 0) ?> planta(s) dadas de baja</td>
                 </tr></tfoot>
                 <?php endif; ?>
-            </table>
+            </table></div>
         </div>
         <a class="btn btn-ghost" href="admin-quitar-demo.php">Volver a revisar</a>
         <a class="btn btn-ghost" href="admin-dashboard.php">Ir al panel</a>
 
-    <?php elseif (!$encontradas && !$gerente): ?>
+    <?php elseif (!$conHuella && !$gerente): ?>
         <div class="card">
             <div class="vacio">
                 <div class="ic">✅</div>
-                <p><b>No hay datos de demostración en este sistema.</b></p>
-                <p style="margin-top:8px">Ninguna de las 14 plantas de ejemplo está dada de alta, y tampoco existe el usuario gerente de demostración.</p>
+                <p><b>No quedan datos de demostración en este sistema.</b></p>
+                <p style="margin-top:8px">
+                    <?php if ($presentes): ?>
+                        Hay <?= count($presentes) ?> planta(s) de la lista dadas de alta, pero ninguna
+                        conserva extintores sembrados: lo que tienen es información tuya.
+                    <?php else: ?>
+                        Ninguna de las 14 plantas de ejemplo está dada de alta, y tampoco existe el usuario gerente de demostración.
+                    <?php endif; ?>
+                </p>
             </div>
         </div>
 
     <?php else: ?>
-        <div class="alerta a-warn">
-            <b>Antes de marcar:</b> los nombres de esta lista son centros de trabajo reales, así que
-            alguno podría ser hoy un cliente de verdad. Revisa los números de cada renglón y marca
-            sólo las que efectivamente sean de la demostración. Lo que se quite no se puede recuperar.
+        <div class="alerta a-info">
+            <b>Qué se va y qué se queda.</b> De cada planta se quitan sólo los extintores que escribió
+            la siembra —se reconocen uno por uno— junto con sus inspecciones. Los extintores que
+            capturaste tú, y los reportes, fotos, cotizaciones, documentos y usuarios de la planta,
+            no se tocan: la siembra nunca creó nada de eso. Una planta sólo se da de baja si al
+            quitar lo sembrado no le queda nada propio.
         </div>
 
         <form method="post">
             <input type="hidden" name="accion" value="quitar">
 
-            <?php if ($encontradas): ?>
+            <?php if ($conHuella): ?>
             <div class="card">
-                <table>
+                <div class="tabla-env"><table class="tabla">
                     <thead><tr>
                         <th style="width:34px"><input type="checkbox" id="todas" onclick="marcarTodas(this)" checked></th>
-                        <th>Planta</th><th class="n">Extintores</th><th class="n">Inspecciones</th>
-                        <th class="n">Reportes</th><th class="n">Fotos</th><th class="n">Cotiz.</th>
-                        <th class="n">Usuarios</th><th>Estado</th>
+                        <th>Planta</th>
+                        <th class="n">Extintores<br>sembrados</th>
+                        <th class="n">Inspecciones<br>que se van</th>
+                        <th>Lo tuyo, que se queda</th>
+                        <th>La planta</th>
                     </tr></thead>
                     <tbody>
-                    <?php foreach ($preview as $p): ?>
-                        <?php if (!$p['empresa_id']) continue; ?>
+                    <?php foreach ($conHuella as $p): $h = $p['huella']; ?>
                         <tr>
-                            <td><input type="checkbox" class="cb" name="empresas[]" value="<?= $p['empresa_id'] ?>" checked></td>
-                            <td style="font-weight:600"><?= htmlspecialchars($p['nombre']) ?></td>
-                            <td class="n"><?= $p['inv']['extintores'] ?></td>
-                            <td class="n"><?= $p['inv']['inspecciones'] ?></td>
-                            <td class="n"><?= $p['inv']['reportes'] ?></td>
-                            <td class="n"><?= $p['inv']['fotos'] ?></td>
-                            <td class="n"><?= $p['inv']['cotizaciones'] ?></td>
-                            <td class="n"><?= $p['inv']['usuarios'] ?></td>
-                            <td style="color:#64748b;font-size:12px"><?= htmlspecialchars((string) $p['estado']) ?></td>
+                            <td class="marca" data-et=""><input type="checkbox" class="cb" name="empresas[]" value="<?= $p['empresa_id'] ?>" checked></td>
+                            <td class="planta" data-et="Planta" style="font-weight:600"><?= htmlspecialchars($p['nombre']) ?>
+                                <span class="nota">
+                                    <?php if ($h['origen'] === 'registro'): ?>
+                                        <span class="badge b-exacto">registrado</span> sembrada el <?= htmlspecialchars(substr((string) $h['sembrado_en'], 0, 10)) ?>
+                                    <?php else: ?>
+                                        <span class="badge b-indicios">por indicios</span> reconocidos por cómo los escribió la siembra
+                                    <?php endif; ?>
+                                </span>
+                            </td>
+                            <td class="n se-va" data-et="Extintores sembrados"><?= $h['extintores'] ?></td>
+                            <td class="n se-va" data-et="Inspecciones que se van"><?= $h['inspecciones'] ?></td>
+                            <td data-et="Se queda" class="se-queda"><?= htmlspecialchars(frasePropios($h['propios'])) ?></td>
+                            <td data-et="La planta">
+                                <?php if ($h['borrar_empresa']): ?>
+                                    <span class="badge b-baja">se da de baja</span>
+                                <?php else: ?>
+                                    <span class="badge b-queda">se conserva</span>
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
-                </table>
+                </table></div>
             </div>
             <?php else: ?>
-                <div class="alerta a-info">Ninguna de las 14 plantas de ejemplo está dada de alta en este sistema.</div>
+                <div class="alerta a-info">Ninguna planta conserva extintores sembrados por la demostración.</div>
             <?php endif; ?>
 
             <div class="card">
                 <?php if ($gerente): ?>
                     <label class="chk">
-                        <input type="checkbox" name="quitar_gerente" value="1" <?= $encontradas ? 'checked' : '' ?>>
-                        Quitar también el usuario gerente de demostración
-                        (<b><?= htmlspecialchars(GERENTE_USERNAME) ?></b>, asignado a <?= $gerentePlantas ?> planta(s))
+                        <input type="checkbox" name="quitar_gerente" value="1" <?= $conHuella ? 'checked' : '' ?>>
+                        <span>Quitar también el usuario gerente de demostración
+                        <b><?= htmlspecialchars(GERENTE_USERNAME) ?></b>, asignado a <?= $gerentePlantas ?> planta(s).</span>
                     </label>
+                    <?php if ($gerentePlantas > count($conHuella)): ?>
+                        <div class="alerta a-warn" style="margin:12px 0 0">
+                            Ese usuario está asignado a más plantas de las que sembró la demostración.
+                            Si lo estás usando como gerente de verdad, no lo marques.
+                        </div>
+                    <?php endif; ?>
                 <?php else: ?>
                     <div class="alerta a-info" style="margin:0">El usuario gerente de demostración no existe en este sistema.</div>
                 <?php endif; ?>
@@ -343,8 +355,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
                 </div>
 
                 <button type="submit" class="btn btn-danger"
-                        onclick="return confirm('Se quitarán las plantas marcadas y todo su historial. Esta acción no se puede deshacer. ¿Continuar?')">
-                    Quitar lo marcado
+                        onclick="return confirm('Se quitarán los extintores sembrados y su historial de las plantas marcadas. Esta acción no se puede deshacer. ¿Continuar?')">
+                    Quitar lo sembrado
                 </button>
                 <a class="btn btn-ghost" href="admin-dashboard.php" style="padding:11px 20px">Cancelar</a>
             </div>

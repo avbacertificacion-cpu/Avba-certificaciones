@@ -12,6 +12,41 @@
 /** Usuario gerente que se crea junto con las plantas de demostración. */
 const GERENTE_USERNAME = 'gerente.corporativo';
 
+/**
+ * El vocabulario con el que se inventan los extintores de ejemplo.
+ *
+ * Vive aquí por la misma razón que la lista de centros: el que siembra lo usa
+ * para inventar las filas y el que limpia lo usa para reconocerlas. Un extintor
+ * sembrado siempre queda con la ubicación formada como
+ * «SECCIÓN — DETALLE», con la sección y el detalle sacados de estas listas;
+ * esa forma es la huella que permite distinguirlo de uno capturado a mano.
+ */
+const SECCIONES = [
+    'corporativo' => ['Recepción', 'Piso 3', 'Piso 6', 'Cuarto de servidores', 'Cocineta', 'Sala de juntas'],
+    'industrial'  => ['Área de Proceso', 'Subestación Eléctrica', 'Almacén General', 'Comedor', 'Taller de Mantenimiento', 'Sala de Control', 'Patio de Tanques', 'Oficinas Administrativas'],
+    'eolico'      => ['Subestación', 'Casa de Control', 'Almacén de Refacciones', 'Oficinas', 'Base de Aerogenerador'],
+];
+
+const DETALLES_UBICACION = [
+    'Junto a la puerta principal', 'Pasillo central', 'Cerca del tablero eléctrico',
+    'Junto a la salida de emergencia', 'Área de trabajo', 'Pasillo de acceso',
+    'Junto a la escalera', 'Cerca del extintor de respaldo', 'A la entrada del área',
+];
+
+const CAPACIDADES = [
+    'corporativo' => [4.5, 6, 9],
+    'industrial'  => [4.5, 9, 12, 25, 50],
+    'eolico'      => [4.5, 9, 12, 25],
+];
+
+/** El centro de la lista que se llama así, o null si no es de la demostración. */
+function centroPorNombre(string $nombre): ?array {
+    foreach (centros() as $c) {
+        if (mb_strtolower($c['nombre']) === mb_strtolower($nombre)) return $c;
+    }
+    return null;
+}
+
 function centros(): array {
     return [
         ['nombre' => 'CCC Altamira III y VI',        'domicilio' => 'Boulevard de los Ríos Km 10.3, Puerto Industrial de Altamira, Col. Lomas del Real, C.P. 89600, Altamira, Tamaulipas', 'sabor' => 'industrial', 'grande' => true],
