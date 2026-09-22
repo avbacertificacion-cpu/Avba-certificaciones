@@ -1,6 +1,7 @@
 <?php
 require_once '../config/config.php';
 require_once '../config/mayusculas.php';
+require_once '../config/qr.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -242,13 +243,13 @@ function crear() {
         return;
     }
 
-    // QR es opcional — si se provee debe ser 11 dígitos únicos
+    // QR es opcional — si se provee debe ser numérico, del largo de la etiqueta, y único
     $codigo_qr = null;
     if (!empty($d['codigo_qr'])) {
         $codigo_qr = trim($d['codigo_qr']);
-        if (!preg_match('/^\d{11}$/', $codigo_qr)) {
+        if (!qrValido($codigo_qr)) {
             http_response_code(400);
-            echo json_encode(['error' => 'El código QR debe ser exactamente 11 dígitos numéricos']);
+            echo json_encode(['error' => qrMensajeFormato()]);
             return;
         }
         $stmt = $pdo->prepare("SELECT id FROM extintores WHERE codigo_qr = ?");
@@ -471,7 +472,9 @@ function obtenerQRDisponible() {
         }
 
         $proximo = (int)$row['proximo_qr'];
-        $qr = str_pad($proximo, 11, '0', STR_PAD_LEFT);
+        // Se rellena al largo por defecto, pero si el consecutivo ya creció por
+        // encima —porque se registró una etiqueta más larga— se respeta tal cual.
+        $qr = str_pad((string) $proximo, QR_LARGO_POR_DEFECTO, '0', STR_PAD_LEFT);
 
         $stmt = $pdo->prepare("SELECT COUNT(*) FROM extintores WHERE codigo_qr IS NOT NULL");
         $stmt->execute();
@@ -503,9 +506,9 @@ function asignarQR() {
 
     if (!$extintor_id) { http_response_code(400); echo json_encode(['error' => 'extintor_id requerido']); return; }
 
-    if (!preg_match('/^\d{11}$/', $codigo_qr)) {
+    if (!qrValido($codigo_qr)) {
         http_response_code(400);
-        echo json_encode(['error' => 'El código QR debe ser exactamente 11 dígitos numéricos']);
+        echo json_encode(['error' => qrMensajeFormato()]);
         return;
     }
 
@@ -584,9 +587,9 @@ function modificarQR() {
 
     if (!$extintor_id) { http_response_code(400); echo json_encode(['error' => 'extintor_id requerido']); return; }
 
-    if (!preg_match('/^\d{11}$/', $codigo_qr_nuevo)) {
+    if (!qrValido($codigo_qr_nuevo)) {
         http_response_code(400);
-        echo json_encode(['error' => 'El código QR debe ser exactamente 11 dígitos numéricos']);
+        echo json_encode(['error' => qrMensajeFormato()]);
         return;
     }
 
@@ -649,16 +652,31 @@ function registrarAsignacionQR($extintor_id, $anterior, $nuevo, $uid, $rol) {
 }
 
 // ─── HELPER: Actualizar secuencia QR ─────────────────────────────────────────
+/**
+ * Adelanta el consecutivo propio para que nunca vuelva a ofrecer un código ya
+ * usado.
+ *
+ * Sólo cuenta si la etiqueta pertenece a esa misma serie, y eso se reconoce por
+ * el número de dígitos. Las etiquetas que vienen impresas de fábrica son más
+ * largas y pertenecen a otra numeración: si se dejaran adelantar el consecutivo,
+ * registrar una sola —por ejemplo 4335261800022— lo saltaría a
+ * 4335261800023, y a partir de ahí el sistema ofrecería códigos que no
+ * corresponden a ninguna etiqueta física.
+ */
 function actualizarSecuenciaQR($codigo_qr, $uid) {
     global $pdo;
     try {
-        $num = (int)$codigo_qr;
+        $actual = (int) $pdo->query("SELECT proximo_qr FROM qr_secuencias WHERE id = 1")->fetchColumn();
+        $anchoSerie = max(QR_LARGO_POR_DEFECTO, strlen((string) $actual));
+
+        if (strlen((string) $codigo_qr) !== $anchoSerie) return;   // es de otra numeración
+
         $stmt = $pdo->prepare("
             UPDATE qr_secuencias
             SET proximo_qr = GREATEST(proximo_qr, ? + 1), actualizado_por = ?
             WHERE id = 1
         ");
-        $stmt->execute([$num, $uid]);
+        $stmt->execute([(int) $codigo_qr, $uid]);
     } catch (Exception $e) {
         error_log("QR sequence update failed: " . $e->getMessage());
     }

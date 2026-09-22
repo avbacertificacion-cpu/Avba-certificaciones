@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/qr.php';
 
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
     http_response_code(401); exit('No autorizado');
@@ -7,7 +8,12 @@ if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
 
 $primer   = preg_replace('/\D/', '', $_GET['primer']   ?? '1');
 $cantidad = max(1, min(500, intval($_GET['cantidad']   ?? 10)));
-$primer   = str_pad($primer ?: '1', 11, '0', STR_PAD_LEFT);
+// El largo lo manda el código con el que se empieza: si se teclea uno de 13
+// dígitos, toda la serie sale de 13. Si no se indica ninguno, el por defecto.
+$primer   = $primer ?: '1';
+$largo    = max(QR_LARGO_POR_DEFECTO, strlen($primer));
+$largo    = min($largo, QR_MAX_DIGITOS);
+$primer   = str_pad($primer, $largo, '0', STR_PAD_LEFT);
 $primerNum = (int)$primer;
 
 // Construir URL pública para QR codes
@@ -21,7 +27,7 @@ $baseURL = $protocol . '://' . $host . '/extintores/public/validar-extintor.html
 // Generar array de códigos QR
 $codigos = [];
 for ($i = 0; $i < $cantidad; $i++) {
-    $codigos[] = str_pad($primerNum + $i, 11, '0', STR_PAD_LEFT);
+    $codigos[] = str_pad((string) ($primerNum + $i), $largo, '0', STR_PAD_LEFT);
 }
 
 // Imagen de plantilla en base64

@@ -250,10 +250,10 @@ if ($empresa_inspeccion) {
                 <div id="scanner-asignar" style="display:none;width:100%;height:300px;border-radius:8px;overflow:hidden;margin-bottom:16px"></div>
                 <div style="text-align:center;margin:16px 0;color:#999">O</div>
                 <div class="form-group">
-                    <label>Ingresa Manual (11 dígitos)</label>
-                    <input type="text" id="input-qr-asignar" placeholder="00000000001" maxlength="11"
-                           pattern="[0-9]{11}" style="padding:12px;border:2px solid #ddd;border-radius:8px;font-size:16px;width:100%">
-                    <small style="color:#888;margin-top:8px;display:block">Los 11 dígitos del código QR</small>
+                    <label>Ingresa Manual (número de la etiqueta)</label>
+                    <input type="text" id="input-qr-asignar" placeholder="00000000001" maxlength="20"
+                           pattern="[0-9]{8,20}" style="padding:12px;border:2px solid #ddd;border-radius:8px;font-size:16px;width:100%">
+                    <small style="color:#888;margin-top:8px;display:block">El número impreso en la etiqueta, tal cual</small>
                 </div>
             </div>
             <div class="scanner-modal-buttons">
@@ -569,11 +569,11 @@ function _procesarQRInspeccion(decodedText) {
 
     // Extraer código: primero intenta extraer de URL ?qr=11dígitos
     let codigo = decodedText.trim();
-    const urlMatch = codigo.match(/[?&]qr=(\d{11})/);
+    const urlMatch = codigo.match(/[?&]qr=(\d{8,20})/);
     if (urlMatch) {
         codigo = urlMatch[1];
-    } else if (!/^\d{11}$/.test(codigo)) {
-        const digitMatch = codigo.match(/(\d{11})/);
+    } else if (!/^\d{8,20}$/.test(codigo)) {
+        const digitMatch = codigo.match(/(\d{8,20})/);
         if (digitMatch) codigo = digitMatch[1];
     }
 
@@ -676,14 +676,14 @@ function _arrancarCamaraAsignar() {
         (decodedText) => {
             // Extraer QR: primero intenta extraer de URL con formato ?qr=11dígitos
             let qr = null;
-            const urlMatch = decodedText.match(/[?&]qr=(\d{11})/);
+            const urlMatch = decodedText.match(/[?&]qr=(\d{8,20})/);
             if (urlMatch) {
                 qr = urlMatch[1];
-            } else if (/^\d{11}$/.test(decodedText)) {
+            } else if (/^\d{8,20}$/.test(decodedText)) {
                 qr = decodedText;
             }
 
-            if (qr && /^\d{11}$/.test(qr)) {
+            if (qr && /^\d{8,20}$/.test(qr)) {
                 document.getElementById('input-qr-asignar').value = qr;
                 detenerScannerAsignar();
                 alertDiv.innerHTML = '<div style="background:#d1fae5;color:#065f46;padding:12px;border-radius:6px">✓ QR detectado. Presiona "Asignar QR"</div>';
@@ -758,8 +758,8 @@ async function guardarAsignacionQR() {
         return;
     }
 
-    if (!/^\d{11}$/.test(qr)) {
-        alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">El QR debe ser exactamente 11 dígitos</div>';
+    if (!/^\d{8,20}$/.test(qr)) {
+        alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">El código QR debe ser numérico, de 8 a 20 dígitos</div>';
         return;
     }
 

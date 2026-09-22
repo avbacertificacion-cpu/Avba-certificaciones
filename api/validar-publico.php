@@ -52,7 +52,7 @@ try {
         exit;
     }
 
-    // Validación de longitud: máximo 50 caracteres (EXT-999 = 7 chars, QR = 11 digits)
+    // Validación de longitud: máximo 50 caracteres (EXT-999 = 7, el QR de la etiqueta hasta 20)
     if (strlen($codigo) > 50) {
         http_response_code(400);
         logApiAccess($ip, $endpoint, 400);

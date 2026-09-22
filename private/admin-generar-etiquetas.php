@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/qr.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
     header('Location: ../public/login.html'); exit;
 }
@@ -13,7 +14,7 @@ try {
     if ($row) $proximo_qr = (int)$row['proximo_qr'];
 } catch (Exception $e) {}
 
-$proximo_qr_fmt = str_pad($proximo_qr, 11, '0', STR_PAD_LEFT);
+$proximo_qr_fmt = str_pad((string) $proximo_qr, QR_LARGO_POR_DEFECTO, '0', STR_PAD_LEFT);
 
 // Contar QR ya asignados
 $total_asignados = 0;
@@ -68,17 +69,22 @@ try {
     <div class="info-box">
         <p>
             <strong>📊 Estado del Sistema de QR:</strong><br>
-            Los códigos QR son de <strong>11 dígitos consecutivos</strong>.
+            Los códigos son <strong>consecutivos</strong>, y el largo lo pone el primero que indiques:
+            si escribes uno de 13 dígitos, toda la serie sale de 13.
             Una vez generadas las etiquetas, los códigos quedan reservados en el sistema
             y deberán ser asignados a extintores.
+        </p>
+        <p style="margin-top:10px">
+            Las etiquetas que ya vienen impresas de fábrica <strong>no hace falta generarlas aquí</strong>:
+            su número se captura directamente al asignar el QR del extintor.
         </p>
     </div>
 
     <div class="card">
         <h2>📈 Estado Actual</h2>
-        <div class="stat"><span>Próximo QR disponible</span><span><?= $proximo_qr_fmt ?></span></div>
+        <div class="stat"><span>Próximo QR de nuestra serie</span><span><?= $proximo_qr_fmt ?></span></div>
         <div class="stat"><span>QR ya asignados a extintores</span><span><?= number_format($total_asignados) ?></span></div>
-        <div class="stat"><span>QR disponibles en secuencia</span><span><?= number_format(99999999999 - $proximo_qr + 1) ?></span></div>
+        <div class="stat"><span>QR disponibles en esa serie</span><span><?= number_format(((int) str_repeat('9', QR_LARGO_POR_DEFECTO)) - $proximo_qr + 1) ?></span></div>
     </div>
 
     <div class="card">
@@ -88,7 +94,7 @@ try {
             <div class="form-group">
                 <label>Primer QR a generar</label>
                 <input type="text" id="primer_qr" value="<?= $proximo_qr_fmt ?>"
-                       maxlength="11" pattern="[0-9]{11}" placeholder="00000000001">
+                       maxlength="<?= QR_MAX_DIGITOS ?>" pattern="<?= qrPatron() ?>" placeholder="00000000001">
                 <small>Se completará con ceros a la izquierda</small>
             </div>
             <div class="form-group">

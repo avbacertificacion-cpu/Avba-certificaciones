@@ -208,10 +208,10 @@ $es_admin = $rol === ROLE_ADMIN;
             <div id="scanner-asignar-admin" style="display:none;width:100%;height:300px;border-radius:8px;overflow:hidden;margin-bottom:16px"></div>
             <div style="text-align:center;margin:16px 0;color:#999">O</div>
             <div class="form-group">
-                <label>Ingresa Manual (11 dígitos)</label>
-                <input type="text" id="input-qr-admin" placeholder="00000000001" maxlength="11" pattern="[0-9]{11}"
+                <label>Ingresa Manual (número de la etiqueta)</label>
+                <input type="text" id="input-qr-admin" placeholder="00000000001" maxlength="20" pattern="[0-9]{8,20}"
                        style="padding:12px;border:2px solid #ddd;border-radius:8px;font-size:16px;width:100%">
-                <small style="color:#888;margin-top:8px;display:block">Los 11 dígitos del código QR</small>
+                <small style="color:#888;margin-top:8px;display:block">El número impreso en la etiqueta, tal cual</small>
             </div>
         </div>
         <div class="modal-actions">
@@ -586,15 +586,15 @@ async function iniciarScannerAsignarAdmin() {
             (decodedText) => {
                 // Extraer QR: primero intenta extraer de URL con formato ?qr=11dígitos
                 let qr = null;
-                const urlMatch = decodedText.match(/[?&]qr=(\d{11})/);
+                const urlMatch = decodedText.match(/[?&]qr=(\d{8,20})/);
                 if (urlMatch) {
                     qr = urlMatch[1];
-                } else if (/^\d{11}$/.test(decodedText)) {
-                    // Si es solo 11 dígitos, usar directamente
+                } else if (/^\d{8,20}$/.test(decodedText)) {
+                    // Si es sólo el número, usarlo directamente
                     qr = decodedText;
                 }
 
-                if (qr && /^\d{11}$/.test(qr)) {
+                if (qr && /^\d{8,20}$/.test(qr)) {
                     document.getElementById('input-qr-admin').value = qr;
                     detenerScannerAsignarAdmin();
                     alertDiv.innerHTML = '<div class="alert alert-success">✓ QR detectado. Presiona "Guardar QR"</div>';
@@ -631,8 +631,8 @@ async function guardarAsignacionQRAdmin() {
         return;
     }
 
-    if (!/^\d{11}$/.test(qr)) {
-        alertDiv.innerHTML = '<div class="alert alert-error">El QR debe ser exactamente 11 dígitos</div>';
+    if (!/^\d{8,20}$/.test(qr)) {
+        alertDiv.innerHTML = '<div class="alert alert-error">El código QR debe ser numérico, de 8 a 20 dígitos</div>';
         return;
     }
 
