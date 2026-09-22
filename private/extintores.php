@@ -655,10 +655,14 @@ async function guardarAsignacionQRAdmin() {
             return;
         }
 
-        // Actualizar datos
+        // El renglón cambia de inmediato con lo que ya sabemos. Recargar el
+        // catálogo completo tarda varios segundos cuando hay miles de
+        // extintores, y hasta entonces la pantalla seguía diciendo
+        // "Asignar QR" en un extintor que acababa de recibir el suyo.
         const ext = extintores.find(e => e.id === extintor_qr_id);
         if (ext) {
             ext.codigo_qr = es_modificar_qr ? data.codigo_qr_nuevo : qr;
+            filtrar();
         }
         cerrarModalAsignarQRAdmin();
         cargarExtintores();

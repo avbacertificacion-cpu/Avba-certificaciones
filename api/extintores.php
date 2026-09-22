@@ -3,6 +3,9 @@ require_once '../config/config.php';
 require_once '../config/mayusculas.php';
 require_once '../config/qr.php';
 header('Content-Type: application/json');
+// Respuestas con datos de una sesión: no deben guardarse en la caché del
+// navegador ni en la de ningún intermediario.
+header('Cache-Control: no-store');
 
 if (!isset($_SESSION['usuario_id'])) {
     http_response_code(401);
@@ -252,6 +255,7 @@ function crear() {
             echo json_encode(['error' => qrMensajeFormato()]);
             return;
         }
+        qrAsegurarColumnas($pdo);
         $stmt = $pdo->prepare("SELECT id FROM extintores WHERE codigo_qr = ?");
         $stmt->execute([$codigo_qr]);
         if ($stmt->fetch()) {
@@ -314,7 +318,7 @@ function crear() {
             echo json_encode(['error' => 'El código manual ya existe']);
         } else {
             http_response_code(500);
-            echo json_encode(['error' => 'Error al crear extintor']);
+            echo json_encode(['error' => detalleDeError($e, 'Error al crear extintor')]);
         }
     }
 }
@@ -512,6 +516,11 @@ function asignarQR() {
         return;
     }
 
+    // Las bases creadas antes de aceptar etiquetas largas traen la columna de 11
+    // caracteres. Se ensancha aquí, fuera de la transacción: un ALTER hace
+    // commit implícito y la rompería desde dentro.
+    qrAsegurarColumnas($pdo);
+
     try {
         $pdo->beginTransaction();
 
@@ -567,9 +576,8 @@ function asignarQR() {
         echo json_encode(['success' => true, 'codigo_qr' => $codigo_qr]);
     } catch (Exception $e) {
         $pdo->rollBack();
-        error_log("QR assignment error: " . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['error' => 'Error al asignar QR']);
+        echo json_encode(['error' => detalleDeError($e, 'Error al asignar QR')]);
     }
 }
 
@@ -592,6 +600,9 @@ function modificarQR() {
         echo json_encode(['error' => qrMensajeFormato()]);
         return;
     }
+
+    // Fuera de la transacción: el ALTER hace commit implícito (ver asignarQR)
+    qrAsegurarColumnas($pdo);
 
     try {
         $pdo->beginTransaction();
@@ -631,9 +642,8 @@ function modificarQR() {
         echo json_encode(['success' => true, 'codigo_qr_anterior' => $ext['codigo_qr'], 'codigo_qr_nuevo' => $codigo_qr_nuevo]);
     } catch (Exception $e) {
         $pdo->rollBack();
-        error_log("QR modification error: " . $e->getMessage());
         http_response_code(500);
-        echo json_encode(['error' => 'Error al modificar QR']);
+        echo json_encode(['error' => detalleDeError($e, 'Error al modificar QR')]);
     }
 }
 
@@ -649,6 +659,20 @@ function registrarAsignacionQR($extintor_id, $anterior, $nuevo, $uid, $rol) {
     } catch (Exception $e) {
         error_log("QR assignment audit failed: " . $e->getMessage());
     }
+}
+
+/**
+ * Mensaje para un fallo inesperado.
+ *
+ * Al administrador se le dice qué falló de verdad: es el dueño del sistema, y
+ * con un "Error al asignar QR" a secas no hay forma de saber qué pasó ni de
+ * reportarlo. A los demás roles se les deja el mensaje corto, que no cuenta
+ * nada de la base. En ambos casos queda en la bitácora del servidor.
+ */
+function detalleDeError(Exception $e, string $generico): string {
+    global $rol;
+    error_log("$generico: " . $e->getMessage());
+    return $rol === ROLE_ADMIN ? $generico . ' — ' . $e->getMessage() : $generico;
 }
 
 // ─── HELPER: Actualizar secuencia QR ─────────────────────────────────────────
