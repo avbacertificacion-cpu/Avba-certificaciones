@@ -10,6 +10,10 @@
  *
  *  - Se van los extintores sembrados (reconocidos uno por uno, ver
  *    config/huella-demo.php) y las inspecciones que cuelgan de ellos.
+ *  - Un extintor sembrado que ya pasó por el taller se queda: si lo diste de
+ *    alta en mantenimiento, lo estás usando como uno de verdad.
+ *  - Se va la asignación del gerente de demostración a esa planta, que también
+ *    la creó la siembra, aunque la planta se conserve.
  *  - Se quedan los extintores que ya estaban, con su historial, y también los
  *    reportes, las fotos, las cotizaciones, los documentos y los usuarios de
  *    la planta: la siembra nunca creó nada de eso.
@@ -58,7 +62,13 @@ function revisarCentros(PDO $pdo): array {
 
 $preview = revisarCentros($pdo);
 // Sólo tiene sentido ofrecer las plantas donde la siembra dejó algo
-$conHuella = array_values(array_filter($preview, fn($p) => $p['huella'] && $p['huella']['extintores'] > 0));
+// Accionable: la siembra dejó ahí algo que todavía se puede quitar.
+$dejoAlgo  = fn($p) => $p['huella'] && ($p['huella']['extintores'] > 0 || $p['huella']['gerente_id']);
+// Y aparte, aquellas donde lo único que queda de la siembra ya lo estás usando:
+// no hay nada que hacer, pero conviene decir por qué siguen ahí.
+$adoptadas = fn($p) => $p['huella'] && $p['huella']['extintores'] === 0 && $p['huella']['adoptados'] > 0;
+$conHuella = array_values(array_filter($preview, $dejoAlgo));
+$enUso     = array_values(array_filter($preview, $adoptadas));
 $presentes = array_values(array_filter($preview, fn($p) => $p['empresa_id']));
 
 // El gerente de demostración y a cuántas plantas sigue asignado
@@ -69,21 +79,37 @@ $gerentePlantas = ($gerente && huellaHayTablaSuelta($pdo, 'gerente_empresas'))
     ? huellaContar($pdo, "SELECT COUNT(*) FROM gerente_empresas WHERE gerente_id = ?", [$gerente['id']])
     : 0;
 
+// Tipos de extintor que dio de alta la siembra. Los que hoy están libres se
+// pueden quitar ya; los demás, sólo si al retirar lo sembrado se liberan.
+$tiposSueltos = huellaTiposSembrados($pdo);
+$tiposLibres  = array_values(array_filter($tiposSueltos, fn($t) => !$t['en_uso']));
+
+// ¿El usuario gerente lo creó la siembra? 'si' si quedó anotado que sí, 'no' si
+// quedó anotado que ya existía, 'quiza' cuando no hay registro (la siembra es
+// anterior a que se llevara). Un usuario que no creamos no se ofrece borrar.
+$gerenteOrigen = !huellaHayTabla($pdo) ? 'quiza' : (huellaGerenteEsNuestro($pdo) ? 'si' : 'no');
+
 // ─── Borrado ─────────────────────────────────────────────────────────────────
 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') === 'quitar') {
     $elegidas   = array_map('intval', (array) ($_POST['empresas'] ?? []));
     $idsValidos = array_map(fn($p) => $p['empresa_id'], $conHuella);
     $elegidas   = array_values(array_intersect($elegidas, $idsValidos));
-    $quitarGerente = !empty($_POST['quitar_gerente']);
+    // Si el registro dice que ese usuario ya existía, no se borra aunque venga marcado
+    $quitarGerente = !empty($_POST['quitar_gerente']) && $gerenteOrigen !== 'no';
 
     if (strtoupper(trim($_POST['confirmacion'] ?? '')) !== PALABRA_CONFIRMACION) {
         $errorGeneral = 'Escribe ' . PALABRA_CONFIRMACION . ' para confirmar.';
-    } elseif (!$elegidas && !$quitarGerente) {
+    } elseif (!$elegidas && !$quitarGerente && empty($_POST['quitar_tipos'])) {
         $errorGeneral = 'No marcaste ninguna planta.';
     } else {
         try {
             $pdo->beginTransaction();
             $resultados = [];
+
+            // Los tipos candidatos se anotan ANTES de empezar: el bucle va
+            // borrando los renglones del registro de la siembra, y es ese
+            // registro el que dice que los tipos los creó ella.
+            $tiposCandidatos = !empty($_POST['quitar_tipos']) ? huellaTiposSembrados($pdo) : [];
 
             foreach ($elegidas as $eid) {
                 $p = null;
@@ -95,11 +121,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
                 // pintar la pantalla hace un rato.
                 $h   = huellaDeEmpresa($pdo, $p['centro'], $eid);
                 $ids = $h['ids'];
-                if (!$ids) continue;
 
-                $marcas = implode(',', array_fill(0, count($ids), '?'));
-                $pdo->prepare("DELETE FROM inspecciones WHERE extintor_id IN ($marcas)")->execute($ids);
-                $pdo->prepare("DELETE FROM extintores WHERE id IN ($marcas)")->execute($ids);
+                if ($ids) {
+                    $marcas = implode(',', array_fill(0, count($ids), '?'));
+                    $pdo->prepare("DELETE FROM inspecciones WHERE extintor_id IN ($marcas)")->execute($ids);
+                    $pdo->prepare("DELETE FROM extintores WHERE id IN ($marcas)")->execute($ids);
+                }
+
+                // La asignación del gerente de demostración a esta planta la
+                // creó la siembra, así que se va aunque la planta se conserve.
+                if ($gerente && huellaHayTablaSuelta($pdo, 'gerente_empresas')) {
+                    $pdo->prepare("DELETE FROM gerente_empresas WHERE gerente_id = ? AND empresa_id = ?")
+                        ->execute([$gerente['id'], $eid]);
+                }
 
                 // La empresa sólo se va si no le quedó nada propio
                 $empresaBorrada = false;
@@ -124,6 +158,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
                 $totalBorrado['empresas']     = ($totalBorrado['empresas']     ?? 0) + ($empresaBorrada ? 1 : 0);
             }
 
+            // Ya sin los extintores sembrados se ve de verdad qué tipo quedó
+            // libre. El que siga puesto en algún extintor se queda.
+            foreach ($tiposCandidatos as $t) {
+                $enUso = huellaContar($pdo, "SELECT COUNT(*) FROM extintores WHERE tipo = ?", [$t['id']]);
+                if ($enUso) continue;
+                $pdo->prepare("DELETE FROM tipos_extintores WHERE id = ?")->execute([$t['id']]);
+                $totalBorrado['tipos'] = ($totalBorrado['tipos'] ?? 0) + 1;
+            }
+
             if ($quitarGerente && $gerente) {
                 if (huellaHayTablaSuelta($pdo, 'gerente_empresas')) {
                     $pdo->prepare("DELETE FROM gerente_empresas WHERE gerente_id = ?")->execute([$gerente['id']]);
@@ -138,8 +181,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
                     'extintores', null, $_SERVER['REMOTE_ADDR'] ?? null]);
 
             $pdo->commit();
-            $preview   = revisarCentros($pdo);
-            $conHuella = array_values(array_filter($preview, fn($p) => $p['huella'] && $p['huella']['extintores'] > 0));
+            $preview      = revisarCentros($pdo);
+            $tiposSueltos = huellaTiposSembrados($pdo);
+            $tiposLibres  = array_values(array_filter($tiposSueltos, fn($t) => !$t['en_uso']));
+            $conHuella    = array_values(array_filter($preview, $dejoAlgo));
+            $enUso        = array_values(array_filter($preview, $adoptadas));
         } catch (Exception $e) {
             if ($pdo->inTransaction()) $pdo->rollBack();
             $errorGeneral = 'No se pudo completar (no se quitó nada): ' . $e->getMessage();
@@ -153,7 +199,9 @@ function frasePropios(array $pr): string {
     $partes = [];
     foreach ([['extintores', 'extintor', 'extintores'], ['inspecciones', 'inspección', 'inspecciones'],
               ['usuarios', 'usuario', 'usuarios'], ['reportes', 'reporte', 'reportes'],
-              ['cotizaciones', 'cotización', 'cotizaciones']] as [$k, $uno, $varios]) {
+              ['cotizaciones', 'cotización', 'cotizaciones'],
+              ['plantillas', 'plantilla', 'plantillas'],
+              ['reportes_ins', 'reporte de inspección', 'reportes de inspección']] as [$k, $uno, $varios]) {
         if (!empty($pr[$k])) $partes[] = $pr[$k] . ' ' . ($pr[$k] == 1 ? $uno : $varios);
     }
     return $partes ? implode(' · ', $partes) : '—';
@@ -232,7 +280,9 @@ function frasePropios(array $pr): string {
 
     <?php if ($resultados !== null): ?>
         <div class="card">
-            <div class="alerta a-ok">✓ Listo. Se limpiaron <?= count($resultados) ?> planta(s).</div>
+            <div class="alerta a-ok">✓ Listo. Se limpiaron <?= count($resultados) ?> planta(s)<?php
+                if (!empty($totalBorrado['tipos'])) echo ' y se quitaron ' . (int) $totalBorrado['tipos'] . ' tipo(s) de extintor sin usar';
+            ?>.</div>
             <div class="tabla-env"><table class="tabla">
                 <thead><tr><th>Planta</th><th class="n">Extintores quitados</th>
                 <th class="n">Inspecciones quitadas</th><th>Lo que se conservó</th></tr></thead>
@@ -261,11 +311,19 @@ function frasePropios(array $pr): string {
         <a class="btn btn-ghost" href="admin-quitar-demo.php">Volver a revisar</a>
         <a class="btn btn-ghost" href="admin-dashboard.php">Ir al panel</a>
 
-    <?php elseif (!$conHuella && !$gerente): ?>
+    <?php elseif (!$conHuella && !$gerente && !$tiposLibres): ?>
         <div class="card">
             <div class="vacio">
                 <div class="ic">✅</div>
-                <p><b>No quedan datos de demostración en este sistema.</b></p>
+                <p><b>No queda nada de la demostración por quitar.</b></p>
+                <?php if ($enUso): ?>
+                <p style="margin-top:8px">
+                    En <?= count($enUso) ?> planta(s) sigue habiendo extintores que escribió la siembra,
+                    pero ya los diste de alta en el taller, así que los estás usando como propios y se
+                    quedan: <?= htmlspecialchars(implode(', ', array_column($enUso, 'nombre'))) ?>.
+                    Si alguno no te sirve, bórralo desde Gestionar Extintores.
+                </p>
+                <?php endif; ?>
                 <p style="margin-top:8px">
                     <?php if ($presentes): ?>
                         Hay <?= count($presentes) ?> planta(s) de la lista dadas de alta, pero ninguna
@@ -313,7 +371,13 @@ function frasePropios(array $pr): string {
                                     <?php endif; ?>
                                 </span>
                             </td>
-                            <td class="n se-va" data-et="Extintores sembrados"><?= $h['extintores'] ?></td>
+                            <td class="n se-va" data-et="Extintores sembrados"><?= $h['extintores'] ?>
+                                <?php if ($h['adoptados']): ?>
+                                    <span class="nota" style="text-align:right;color:#047857">
+                                        + <?= $h['adoptados'] ?> se quedan: ya pasaron por el taller
+                                    </span>
+                                <?php endif; ?>
+                            </td>
                             <td class="n se-va" data-et="Inspecciones que se van"><?= $h['inspecciones'] ?></td>
                             <td data-et="Se queda" class="se-queda"><?= htmlspecialchars(frasePropios($h['propios'])) ?></td>
                             <td data-et="La planta">
@@ -333,13 +397,25 @@ function frasePropios(array $pr): string {
             <?php endif; ?>
 
             <div class="card">
-                <?php if ($gerente): ?>
+                <?php if ($gerente && $gerenteOrigen === 'no'): ?>
+                    <div class="alerta a-info" style="margin:0">
+                        El usuario <b><?= htmlspecialchars(GERENTE_USERNAME) ?></b> ya existía antes de la
+                        demostración, así que no es nuestro para quitarlo: se queda. Lo único que se le
+                        retira son las plantas que le asignó la siembra.
+                    </div>
+                <?php elseif ($gerente): ?>
                     <label class="chk">
-                        <input type="checkbox" name="quitar_gerente" value="1" <?= $conHuella ? 'checked' : '' ?>>
+                        <input type="checkbox" name="quitar_gerente" value="1" <?= ($conHuella && $gerenteOrigen === 'si') ? 'checked' : '' ?>>
                         <span>Quitar también el usuario gerente de demostración
                         <b><?= htmlspecialchars(GERENTE_USERNAME) ?></b>, asignado a <?= $gerentePlantas ?> planta(s).</span>
                     </label>
-                    <?php if ($gerentePlantas > count($conHuella)): ?>
+                    <?php if ($gerenteOrigen === 'quiza'): ?>
+                        <div class="alerta a-warn" style="margin:12px 0 0">
+                            Esa cuenta la crea la siembra, pero de aquella no quedó registro, así que no
+                            puedo asegurarte que no existiera antes. Si la estás usando como gerente de
+                            verdad, déjala sin marcar: sus plantas de la demostración se le retiran igual.
+                        </div>
+                    <?php elseif ($gerentePlantas > count($conHuella)): ?>
                         <div class="alerta a-warn" style="margin:12px 0 0">
                             Ese usuario está asignado a más plantas de las que sembró la demostración.
                             Si lo estás usando como gerente de verdad, no lo marques.
@@ -347,6 +423,21 @@ function frasePropios(array $pr): string {
                     <?php endif; ?>
                 <?php else: ?>
                     <div class="alerta a-info" style="margin:0">El usuario gerente de demostración no existe en este sistema.</div>
+                <?php endif; ?>
+
+                <?php if ($tiposSueltos && ($conHuella || $tiposLibres)): ?>
+                    <?php $enUsoTipos = array_values(array_filter($tiposSueltos, fn($t) => $t['en_uso'])); ?>
+                    <label class="chk" style="margin-top:10px">
+                        <input type="checkbox" name="quitar_tipos" value="1">
+                        <span>Quitar también los tipos de extintor que dio de alta la siembra
+                        (<b><?= htmlspecialchars(implode(', ', array_column($tiposSueltos, 'nombre'))) ?></b>),
+                        siempre que al terminar no los use ningún extintor.
+                        <?php if ($enUsoTipos): ?>
+                            Hoy usas <b><?= htmlspecialchars(implode(', ', array_column($enUsoTipos, 'nombre'))) ?></b>
+                            en extintores tuyos; ése se queda pase lo que pase.
+                        <?php endif; ?>
+                        </span>
+                    </label>
                 <?php endif; ?>
 
                 <div class="fg">

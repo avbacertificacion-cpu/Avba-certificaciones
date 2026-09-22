@@ -21,6 +21,14 @@ const GERENTE_USERNAME = 'gerente.corporativo';
  * «SECCIÓN — DETALLE», con la sección y el detalle sacados de estas listas;
  * esa forma es la huella que permite distinguirlo de uno capturado a mano.
  */
+/** Los cuatro tipos que la siembra da de alta si el catálogo está vacío. */
+const TIPOS_ESTANDAR = [
+    ['nombre' => 'PQS',            'descripcion' => 'Polvo Químico Seco'],
+    ['nombre' => 'CO2',            'descripcion' => 'Dióxido de Carbono'],
+    ['nombre' => 'Agua a Presión', 'descripcion' => 'Agua a presión (Clase A)'],
+    ['nombre' => 'Espuma AFFF',    'descripcion' => 'Espuma formadora de película acuosa'],
+];
+
 const SECCIONES = [
     'corporativo' => ['Recepción', 'Piso 3', 'Piso 6', 'Cuarto de servidores', 'Cocineta', 'Sala de juntas'],
     'industrial'  => ['Área de Proceso', 'Subestación Eléctrica', 'Almacén General', 'Comedor', 'Taller de Mantenimiento', 'Sala de Control', 'Patio de Tanques', 'Oficinas Administrativas'],

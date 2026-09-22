@@ -39,13 +39,6 @@ if (!esModoDemo()) {
 
 const GERENTE_PASSWORD = 'Gerente2026!';
 
-const TIPOS_ESTANDAR = [
-    ['nombre' => 'PQS',            'descripcion' => 'Polvo Químico Seco'],
-    ['nombre' => 'CO2',            'descripcion' => 'Dióxido de Carbono'],
-    ['nombre' => 'Agua a Presión', 'descripcion' => 'Agua a presión (Clase A)'],
-    ['nombre' => 'Espuma AFFF',    'descripcion' => 'Espuma formadora de película acuosa'],
-];
-
 /**
  * Cuántos extintores debe tener cada planta. Todas rebasan los 100; el tamaño
  * sigue variando según el tipo de centro para que no queden todas iguales.
@@ -82,14 +75,18 @@ function insertarLote(PDO $pdo, string $sql, int $columnas, array $filas): void 
     }
 }
 
-/** Asegura que existan tipos de extintor activos; si no hay ninguno, crea los 4 estándar. */
+/**
+ * Asegura que existan tipos de extintor activos; si no hay ninguno, crea los 4
+ * estándar. Devuelve [tipos, ¿los creó esta siembra?]: hay que dejarlo anotado
+ * para que la limpieza sepa si esos tipos son suyos o ya estaban.
+ */
 function asegurarTipos(PDO $pdo): array {
     $tipos = $pdo->query("SELECT id, nombre FROM tipos_extintores WHERE estado = 'activo'")->fetchAll(PDO::FETCH_ASSOC);
-    if ($tipos) return $tipos;
+    if ($tipos) return [$tipos, false];
 
     $ins = $pdo->prepare("INSERT INTO tipos_extintores (nombre, descripcion, estado) VALUES (?,?,'activo')");
     foreach (TIPOS_ESTANDAR as $t) $ins->execute([aMayusculas($t['nombre']), aMayusculas($t['descripcion'])]);
-    return $pdo->query("SELECT id, nombre FROM tipos_extintores WHERE estado = 'activo'")->fetchAll(PDO::FETCH_ASSOC);
+    return [$pdo->query("SELECT id, nombre FROM tipos_extintores WHERE estado = 'activo'")->fetchAll(PDO::FETCH_ASSOC), true];
 }
 
 /** De la lista de tipos disponibles, prioriza los que coincidan con esos nombres; si ninguno coincide, usa todos. */
@@ -232,9 +229,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                 $gerenteId = $pdo->lastInsertId();
             }
 
-            $tipos = asegurarTipos($pdo);
+            [$tipos, $tiposCreados] = asegurarTipos($pdo);
+            $insGe = $pdo->prepare("INSERT IGNORE INTO gerente_empresas (gerente_id, empresa_id) VALUES (?,?)");
             $resultados = [];
-            $empresaIds = [];
 
             foreach (centros() as $c) {
                 $stmt = $pdo->prepare("SELECT id FROM empresas WHERE nombre = ?");
@@ -247,7 +244,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                         ->execute([aMayusculas($c['nombre']), aMayusculas($c['domicilio'])]);
                     $empresaId = $pdo->lastInsertId();
                 }
-                $empresaIds[] = $empresaId;
 
                 $stmt = $pdo->prepare("SELECT COUNT(*) FROM extintores WHERE empresa_id = ?");
                 $stmt->execute([$empresaId]);
@@ -259,6 +255,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                 $faltan = ($existentes >= $min) ? 0 : mt_rand($min, $max) - $existentes;
 
                 $creados = 0;
+                $rango   = null;
                 if ($faltan > 0) {
                     $tiposDisponibles = tiposPorSabor($tipos, $c['sabor']);
                     $secciones        = SECCIONES[$c['sabor']];
@@ -328,17 +325,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                             (extintor_id, inspector_id, fecha, hora, ser, mg, po, ph, sg, ps, ob, dan, pin, fn, gb, rv)
                     ", 16, $filasInsp);
 
-                    huellaRegistrar($pdo, [
-                        'empresa_id'     => $empresaId,
-                        'empresa_nombre' => $c['nombre'],
-                        'empresa_creada' => $empresaCreada,
-                        'ext_min'        => min($nuevosIds),
-                        'ext_max'        => max($nuevosIds),
-                        'extintores'     => $creados,
-                        'inspecciones'   => count($filasInsp),
-                        'sembrado_por'   => $uid,
-                    ]);
+                    $rango = [min($nuevosIds), max($nuevosIds), count($filasInsp)];
                 }
+
+                // El gerente se agrega a la planta sin tocar las que ya tuviera:
+                // si ese usuario existía con plantas a su cargo, no se le quitan.
+                $insGe->execute([$gerenteId, $empresaId]);
+                $asignada = $insGe->rowCount() > 0;
+
+                // Queda anotado lo de esta planta, aunque no se le haya agregado
+                // ningún extintor: la asignación del gerente también hay que
+                // poder deshacerla después.
+                huellaRegistrar($pdo, [
+                    'empresa_id'       => $empresaId,
+                    'empresa_nombre'   => $c['nombre'],
+                    'empresa_creada'   => $empresaCreada,
+                    'ext_min'          => $rango[0] ?? null,
+                    'ext_max'          => $rango[1] ?? null,
+                    'extintores'       => $creados,
+                    'inspecciones'     => $rango[2] ?? 0,
+                    'gerente_id'       => $gerenteId,
+                    'gerente_asignado' => $asignada,
+                    'gerente_creado'   => $gerenteNuevo,
+                    'tipos_creados'    => $tiposCreados,
+                    'sembrado_por'     => $uid,
+                ]);
 
                 $resultados[] = [
                     'nombre'     => $c['nombre'],
@@ -350,11 +361,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
                     'empresa_id' => $empresaId,
                 ];
             }
-
-            // Asignación del gerente a las 14 plantas
-            $pdo->prepare("DELETE FROM gerente_empresas WHERE gerente_id = ?")->execute([$gerenteId]);
-            $insGe = $pdo->prepare("INSERT INTO gerente_empresas (gerente_id, empresa_id) VALUES (?,?)");
-            foreach ($empresaIds as $eid) $insGe->execute([$gerenteId, $eid]);
 
             $stmt = $pdo->prepare("INSERT INTO auditoria (usuario_id,accion,tabla,registro_id,ip) VALUES (?,?,?,?,?)");
             $stmt->execute([$uid, 'Sembrar 14 plantas de demo + gerente corporativo', 'empresas', null, $_SERVER['REMOTE_ADDR'] ?? null]);
