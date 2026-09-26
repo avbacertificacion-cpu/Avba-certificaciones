@@ -1,0 +1,99 @@
+name: Deploy CH Construcciones
+
+on:
+  push:
+    branches:
+      - claude/ch-construcciones
+    # Sólo se despliega cuando cambia lo de este proyecto. Sin este filtro,
+    # cualquier commit en la rama dispararía una subida al servidor.
+    paths:
+      - 'chconstrucciones/**'
+      - '.github/workflows/deploy-chconstrucciones.yml'
+  # Permite relanzar el despliegue a mano desde la pestaña Actions, útil
+  # cuando el servidor no responde por un problema pasajero.
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # El SCP de Hostinger falla de forma intermitente con "dial tcp: i/o
+      # timeout" —la conexión no se establece, no es problema del contenido—.
+      # Se reintenta hasta tres veces con esperas crecientes en lugar de dar
+      # el despliegue por fallido al primer tropiezo.
+      #
+      # IMPORTANTE: sólo se sube el contenido de chconstrucciones/
+      # (strip_components: 1 quita ese primer segmento de la ruta) y el target
+      # apunta a su propia subcarpeta dentro de public_html. NUNCA a
+      # public_html a secas: ahí vive el sistema de certificaciones de AVBA en
+      # producción, y un despliegue mal apuntado lo sobrescribiría.
+      - name: Subir sitio por SCP (intento 1)
+        id: intento1
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "chconstrucciones/*"
+          strip_components: 1
+          overwrite: true
+          timeout: 60s
+          command_timeout: 10m
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/chconstrucciones"
+
+      - name: Esperar antes de reintentar
+        if: steps.intento1.outcome == 'failure'
+        run: sleep 20
+
+      - name: Subir sitio por SCP (intento 2)
+        id: intento2
+        if: steps.intento1.outcome == 'failure'
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "chconstrucciones/*"
+          strip_components: 1
+          overwrite: true
+          timeout: 60s
+          command_timeout: 10m
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/chconstrucciones"
+
+      - name: Esperar antes del último intento
+        if: steps.intento1.outcome == 'failure' && steps.intento2.outcome == 'failure'
+        run: sleep 40
+
+      # Último intento: sin continue-on-error, así que si éste también falla
+      # el job se marca como fallido y el error queda visible.
+      - name: Subir sitio por SCP (intento 3)
+        id: intento3
+        if: steps.intento1.outcome == 'failure' && steps.intento2.outcome == 'failure'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "chconstrucciones/*"
+          strip_components: 1
+          overwrite: true
+          timeout: 60s
+          command_timeout: 10m
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/chconstrucciones"
+
+      - name: Resultado
+        run: |
+          if [ "${{ steps.intento1.outcome }}" = "success" ]; then
+            echo "Desplegado al primer intento."
+          elif [ "${{ steps.intento2.outcome }}" = "success" ]; then
+            echo "Desplegado en el segundo intento (el primero se agotó por red)."
+          else
+            echo "Desplegado en el tercer intento (los dos anteriores se agotaron)."
+          fi
