@@ -143,6 +143,7 @@
       <div class="modulo"><b>Vencimientos</b><p>Licencias, fianzas, permisos y constancias con fecha de vencimiento. Avisos en el inicio de lo vencido y lo que vence en 30 días.</p></div>
       <div class="modulo"><b>Búsqueda</b><p>Un buscador que revisa obras, documentos, etiquetas, presupuestos y pies de foto.</p></div>
       <div class="modulo"><b>Actividad</b><p>Registro de cada subida, cambio de estado y eliminación: quién, qué y cuándo.</p></div>
+      <div class="modulo" style="grid-column:1/-1"><b>Archivo muerto</b><p>Catálogo de los documentos de obras terminadas (unos 20 TB) guardados en almacenamiento en frío, muy barato. Se buscan al instante por nombre, obra o carpeta; para abrirlos se hace una requisición que aprueba un coordinador, el sistema muestra cuánto falta (≈ 12 h estándar, ≈ 48 h económica) y avisa cuando están listos para descargar durante 7 días.</p></div>
     </div>
     <h3>Expediente estándar de cada obra</h3>
     <div class="tabla-wrap"><table>
@@ -208,6 +209,7 @@
       <li><b>Fotos reducidas</b> al subirlas (como en el demo), para que no llenen el disco.</li>
       <li><b>PDF</b> de reportes con la librería dompdf y <b>correos</b> con PHPMailer, dos librerías libres y muy usadas en PHP.</li>
       <li><b>Respaldos</b> programados de la base de datos y de los archivos.</li>
+      <li><b>Archivo muerto</b> en Amazon S3 Glacier Deep Archive: cerca de US$1 por TB al mes. Para 20 TB, unos US$20 al mes. Recuperar un archivo tarda de 12 a 48 horas y tiene un costo pequeño, por eso pasa por una requisición con aprobación.</li>
     </ul>
     <p class="nota"><b>Punto a vigilar: el espacio en disco.</b> Planos, PDF escaneados y fotos crecen rápido.
        Hay que revisar cuánto espacio tiene el plan de Hostinger y, si hace falta, guardar los archivos en un

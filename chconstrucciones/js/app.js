@@ -392,6 +392,7 @@ function shell(seccion, v) {
           ${enlace('#/inicio', 'inicio', 'Inicio', porVencer ? `<span class="cuenta" title="Documentos vencidos o por vencer">${porVencer}</span>` : '')}
           ${enlace('#/obras', 'obras', 'Obras')}
           ${enlace('#/buscar', 'buscar', 'Buscar')}
+          ${enlace('#/archivo', 'archivo', 'Archivo muerto', avisosArchivo() ? `<span class="cuenta" title="${esGestor() ? 'Requisiciones por aprobar' : 'Requisiciones listas para descargar'}">${avisosArchivo()}</span>` : '')}
           ${esGestor() ? enlace('#/actividad', 'actividad', 'Actividad') : ''}
           ${esAdmin() ? enlace('#/usuarios', 'usuarios', 'Usuarios') : ''}
         </nav>
@@ -1274,6 +1275,7 @@ function formUsuario(u) {
 
 // ── Mapa de acciones: data-accion="nombre" en el HTML → función ────
 const ACCIONES = {
+  ...ACCIONES_ARCHIVO, // definidas en archivo.js
   menu: (_ds, boton) => boton.setAttribute('aria-expanded', $('#cabecera').classList.toggle('abierta')),
   salir: () => { Store.cerrarSesion(); usuario = null; location.hash = ''; render(); },
   accesoRapido: (ds) => entrar(usuarioPor(ds.id)),
@@ -1390,6 +1392,7 @@ function render() {
     case 'obras': v = vistaObras(); break;
     case 'obra': v = vistaObra(partes[1], partes[2], partes[3], params); seccion = 'obras'; break;
     case 'buscar': v = vistaBuscar(params.get('q') || ''); break;
+    case 'archivo': v = vistaArchivo(partes, params); break;
     case 'usuarios': v = esAdmin() ? vistaUsuarios() : vistaNoEncontrada('Sólo el administrador gestiona usuarios.'); break;
     case 'actividad': v = esGestor() ? vistaActividad() : vistaNoEncontrada('No tienes acceso a esta sección.'); break;
     default: seccion = 'inicio'; v = vistaInicio();
