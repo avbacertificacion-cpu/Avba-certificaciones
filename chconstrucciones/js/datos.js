@@ -1,4 +1,4 @@
-/* CH Construcciones — Capa de datos del DEMO.
+/* CH Arquitectura y Construcción — Capa de datos del DEMO.
  *
  * En el demo todo vive en el navegador de quien lo usa:
  *   - La información (obras, usuarios, documentos...) en localStorage.
@@ -23,7 +23,7 @@ const CARPETAS = [
 ];
 
 const ROLES = {
-  admin:       { nombre: 'Administrador',        color: 'naranja', desc: 'Todo, incluida la gestión de usuarios.' },
+  admin:       { nombre: 'Administrador',        color: 'acento', desc: 'Todo, incluida la gestión de usuarios.' },
   coordinador: { nombre: 'Coordinador',          color: 'azul',    desc: 'Todas las obras: crea obras, aprueba y elimina documentos.' },
   residente:   { nombre: 'Residente de obra',    color: 'verde',   desc: 'Sólo sus obras asignadas: sube documentos, presupuestos y reportes.' },
   consulta:    { nombre: 'Consulta',             color: '',        desc: 'Sólo lectura de las obras asignadas.' },

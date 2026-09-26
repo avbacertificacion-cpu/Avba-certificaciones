@@ -1,4 +1,4 @@
-/* CH Construcciones — Aplicación del DEMO de gestión documental.
+/* CH Arquitectura y Construcción — Aplicación del DEMO de gestión documental.
  *
  * Cómo está organizado este archivo:
  *   1. Utilidades (formato de fechas, dinero, escapar texto).
@@ -98,7 +98,7 @@ const IC = {
   carpeta: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
 };
 
-const CLASE_OBRA = { 'Planeación': 'azul', 'En ejecución': 'naranja', 'Suspendida': 'rojo', 'Terminada': 'verde' };
+const CLASE_OBRA = { 'Planeación': 'azul', 'En ejecución': 'acento', 'Suspendida': 'rojo', 'Terminada': 'verde' };
 const CLASE_DOC = { 'Borrador': '', 'En revisión': 'ambar', 'Aprobado': 'verde', 'Obsoleto': 'rojo' };
 const CLASE_PRES = { 'Borrador': '', 'Enviado al cliente': 'azul', 'Aprobado': 'verde', 'Rechazado': 'rojo' };
 const chip = (texto, clase = '') => `<span class="chip ${clase}">${esc(texto)}</span>`;
@@ -341,7 +341,7 @@ function vacio(texto) {
 // ════════════════════════════════════════════════════════════════════
 function banner() {
   return `<div class="demo-banner no-imprimir"><span><b>DEMO</b> · Datos de ejemplo. Lo que agregues se guarda sólo en este navegador.</span>
-    <a href="propuesta.html" style="color:#ffb57a;font-weight:600">Ver la propuesta</a>
+    <a href="propuesta.html" style="color:var(--acento);font-weight:600">Ver la propuesta</a>
     <button type="button" data-accion="restablecer">Restablecer datos de ejemplo</button></div>`;
 }
 
@@ -351,8 +351,8 @@ function vistaLogin() {
       ${avatar(u, true)}<span><b>${esc(u.nombre)}</b><small>${esc(u.puesto)}</small></span>${chipRol(u.rol)}
     </button>`).join('');
   return `<div class="login"><div class="login-box">
-    <div class="login-marca"><div class="logo">CH</div><h1>CH Construcciones</h1><p>Gestión documental de obras</p></div>
     <form class="card" id="form-login" novalidate>
+      <div class="login-marca"><img class="login-logo" src="img/logo.png" alt="CH Arquitectura y Construcción, S.A. de C.V."><p>Gestión documental de obras</p></div>
       <div class="campo"><label for="l-email">Correo</label><input type="email" id="l-email" autocomplete="username" required></div>
       <div class="campo"><label for="l-pass">Contraseña</label><input type="password" id="l-pass" autocomplete="current-password" required></div>
       <div class="error oculto" role="alert"></div>
@@ -381,12 +381,12 @@ function shell(seccion, obraActiva, v) {
     `<a class="sb-item ${seccion === clave ? 'activo' : ''}" href="${href}">${icono}<span>${texto}</span>${extra}</a>`;
   const misObras = obrasVisibles().filter((o) => o.estado !== 'Terminada').map((o) =>
     `<a class="sb-item ${obraActiva === o.id ? 'activo' : ''}" href="#/obra/${esc(o.id)}" title="${esc(o.nombre)}">
-      <span style="width:17px;text-align:center;font-size:9px;color:#ffb57a">●</span>
+      <span style="width:17px;text-align:center;font-size:9px;color:var(--acento)">●</span>
       <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.nombre)}</span></a>`).join('');
   const porVencer = docsVisibles().filter((d) => { const v2 = vencimiento(d); return v2 && v2.dias <= 30; }).length;
   return `<div class="shell">
     <aside class="sidebar" id="sidebar">
-      <div class="sb-brand"><div class="logo">CH</div><div><div class="sb-brand-t">CH Construcciones</div><div class="sb-brand-s">Gestión documental</div></div></div>
+      <div class="sb-brand"><div class="logo"><img src="img/marca.png" alt="CH"></div><div><div class="sb-brand-t">CH Arquitectura</div><div class="sb-brand-s">y Construcción</div></div></div>
       <nav class="sb-nav">
         <div class="sb-sec">General</div>
         ${item('#/inicio', 'inicio', IC.inicio, 'Inicio', porVencer ? `<span class="cuenta" title="Documentos vencidos o por vencer">${porVencer}</span>` : '')}
@@ -708,7 +708,7 @@ function vistaReporte(o, reporteId) {
     sub: `${fmt.fecha(r.fecha)} · ${r.fotos.length} fotos`,
     acciones,
     html: `<div class="hoja">
-      <div class="hoja-enc"><div class="logo">CH</div><div><h2>Reporte fotográfico</h2><div style="font-size:12.5px;color:var(--texto-sub)">CH Construcciones</div></div>
+      <div class="hoja-enc"><img class="hoja-logo" src="img/marca.png" alt="CH Arquitectura y Construcción"><div><h2>Reporte fotográfico</h2><div style="font-size:12.5px;color:var(--texto-sub)">CH Arquitectura y Construcción, S.A. de C.V.</div></div>
         <div class="der"><b style="color:var(--texto)">${esc(r.periodo || '')}</b><br>${fmt.fecha(r.fecha)}</div></div>
       <div class="hoja-datos">
         <div><b>Obra</b>${esc(o.nombre)}</div><div><b>Clave</b>${esc(o.clave)}</div><div><b>Cliente</b>${esc(o.cliente)}</div>
@@ -1379,7 +1379,7 @@ function render() {
   const app = $('#app');
   cerrarModal();
   if (!usuario) {
-    document.title = 'CH Construcciones — Acceso';
+    document.title = 'CH Arquitectura y Construcción — Acceso';
     app.innerHTML = banner() + vistaLogin();
     montarLogin();
     return;
@@ -1397,7 +1397,7 @@ function render() {
     case 'actividad': v = esGestor() ? vistaActividad() : vistaNoEncontrada('No tienes acceso a esta sección.'); break;
     default: seccion = 'inicio'; v = vistaInicio();
   }
-  document.title = `${v.titulo} — CH Construcciones`;
+  document.title = `${v.titulo} — CH Arquitectura y Construcción`;
   app.innerHTML = banner() + shell(seccion, v.obraActiva, v);
   if (v.montar) v.montar();
   hidratarImagenes(app);
