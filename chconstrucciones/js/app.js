@@ -98,9 +98,9 @@ const IC = {
   carpeta: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
 };
 
-const CLASE_OBRA = { 'Planeación': 'azul', 'En ejecución': 'acento', 'Suspendida': 'rojo', 'Terminada': 'verde' };
-const CLASE_DOC = { 'Borrador': '', 'En revisión': 'ambar', 'Aprobado': 'verde', 'Obsoleto': 'rojo' };
-const CLASE_PRES = { 'Borrador': '', 'Enviado al cliente': 'azul', 'Aprobado': 'verde', 'Rechazado': 'rojo' };
+const CLASE_OBRA = { 'Planeación': 'info', 'En ejecución': 'marca', 'Suspendida': 'alerta', 'Terminada': 'ok' };
+const CLASE_DOC = { 'Borrador': '', 'En revisión': 'aviso', 'Aprobado': 'ok', 'Obsoleto': 'alerta' };
+const CLASE_PRES = { 'Borrador': '', 'Enviado al cliente': 'info', 'Aprobado': 'ok', 'Rechazado': 'alerta' };
 const chip = (texto, clase = '') => `<span class="chip ${clase}">${esc(texto)}</span>`;
 const chipRol = (rol) => chip(ROLES[rol]?.nombre || rol, ROLES[rol]?.color || '');
 
@@ -108,9 +108,9 @@ const chipRol = (rol) => chip(ROLES[rol]?.nombre || rol, ROLES[rol]?.color || ''
 function vencimiento(doc) {
   if (!doc.vence || doc.estado === 'Obsoleto') return null;
   const d = diasHasta(doc.vence);
-  if (d < 0) return { clase: 'rojo', texto: `Vencido hace ${-d} d`, dias: d };
-  if (d === 0) return { clase: 'rojo', texto: 'Vence hoy', dias: d };
-  if (d <= 30) return { clase: 'ambar', texto: `Vence en ${d} d`, dias: d };
+  if (d < 0) return { clase: 'alerta', texto: `Vencido hace ${-d} d`, dias: d };
+  if (d === 0) return { clase: 'alerta', texto: 'Vence hoy', dias: d };
+  if (d <= 30) return { clase: 'aviso', texto: `Vence en ${d} d`, dias: d };
   return { clase: '', texto: fmt.fecha(doc.vence), dias: d };
 }
 
@@ -340,9 +340,9 @@ function vacio(texto) {
 // 4. Vistas
 // ════════════════════════════════════════════════════════════════════
 function banner() {
-  return `<div class="demo-banner no-imprimir"><span><b>DEMO</b> · Datos de ejemplo. Lo que agregues se guarda sólo en este navegador.</span>
-    <a href="propuesta.html" style="color:var(--acento);font-weight:600">Ver la propuesta</a>
-    <button type="button" data-accion="restablecer">Restablecer datos de ejemplo</button></div>`;
+  return `<div class="aviso-demo no-imprimir"><span><b>DEMO</b> Datos de ejemplo. Lo que agregues se guarda sólo en este navegador.</span>
+    <a href="propuesta.html">Ver la propuesta</a>
+    <button type="button" data-accion="restablecer">Restablecer datos</button></div>`;
 }
 
 function vistaLogin() {
@@ -350,16 +350,19 @@ function vistaLogin() {
     <button type="button" class="acceso" data-accion="accesoRapido" data-id="${esc(u.id)}">
       ${avatar(u, true)}<span><b>${esc(u.nombre)}</b><small>${esc(u.puesto)}</small></span>${chipRol(u.rol)}
     </button>`).join('');
-  return `<div class="login"><div class="login-box">
-    <form class="card" id="form-login" novalidate>
-      <div class="login-marca"><img class="login-logo" src="img/logo.png" alt="CH Arquitectura y Construcción, S.A. de C.V."><p>Gestión documental de obras</p></div>
-      <div class="campo"><label for="l-email">Correo</label><input type="email" id="l-email" autocomplete="username" required></div>
-      <div class="campo"><label for="l-pass">Contraseña</label><input type="password" id="l-pass" autocomplete="current-password" required></div>
-      <div class="error oculto" role="alert"></div>
-      <button type="submit" class="btn primario" style="margin-top:6px">Entrar</button>
-    </form>
-    <div class="accesos"><p>Acceso rápido para probar cada rol (contraseña: <b>demo123</b>)</p>${accesos}</div>
-  </div></div>`;
+  return `<div class="login">
+    <div class="login-col">
+      <form class="login-caja" id="form-login" novalidate>
+        <img class="login-logo" src="img/logo.png" alt="CH Arquitectura y Construcción, S.A. de C.V.">
+        <h1 class="login-t">Gestión documental de obras</h1>
+        <div class="campo"><label for="l-email">Correo</label><input type="email" id="l-email" autocomplete="username" required></div>
+        <div class="campo"><label for="l-pass">Contraseña</label><input type="password" id="l-pass" autocomplete="current-password" required></div>
+        <div class="error oculto" role="alert"></div>
+        <button type="submit" class="btn primario ancho">Entrar</button>
+      </form>
+      <div class="accesos"><p>Acceso rápido para probar cada rol · contraseña <b>demo123</b></p>${accesos}</div>
+    </div>
+  </div>`;
 }
 function montarLogin() {
   const form = $('#form-login');
@@ -376,38 +379,34 @@ function montarLogin() {
   $('#l-email').focus();
 }
 
-function shell(seccion, obraActiva, v) {
-  const item = (href, clave, icono, texto, extra = '') =>
-    `<a class="sb-item ${seccion === clave ? 'activo' : ''}" href="${href}">${icono}<span>${texto}</span>${extra}</a>`;
-  const misObras = obrasVisibles().filter((o) => o.estado !== 'Terminada').map((o) =>
-    `<a class="sb-item ${obraActiva === o.id ? 'activo' : ''}" href="#/obra/${esc(o.id)}" title="${esc(o.nombre)}">
-      <span style="width:17px;text-align:center;font-size:9px;color:var(--acento)">●</span>
-      <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.nombre)}</span></a>`).join('');
-  const porVencer = docsVisibles().filter((d) => { const v2 = vencimiento(d); return v2 && v2.dias <= 30; }).length;
-  return `<div class="shell">
-    <aside class="sidebar" id="sidebar">
-      <div class="sb-brand"><div class="logo"><img src="img/marca.png" alt="CH"></div><div><div class="sb-brand-t">CH Arquitectura</div><div class="sb-brand-s">y Construcción</div></div></div>
-      <nav class="sb-nav">
-        <div class="sb-sec">General</div>
-        ${item('#/inicio', 'inicio', IC.inicio, 'Inicio', porVencer ? `<span class="cuenta" title="Documentos vencidos o por vencer">${porVencer}</span>` : '')}
-        ${item('#/obras', 'obras', IC.obras, 'Obras')}
-        ${item('#/buscar', 'buscar', IC.buscar, 'Buscar')}
-        ${esGestor() ? `<div class="sb-sec">Administración</div>
-          ${item('#/actividad', 'actividad', IC.actividad, 'Actividad')}
-          ${esAdmin() ? item('#/usuarios', 'usuarios', IC.usuarios, 'Usuarios') : ''}` : ''}
-        ${misObras ? `<div class="sb-sec">${esGestor() ? 'Obras activas' : 'Mis obras'}</div>${misObras}` : ''}
-      </nav>
-      <div class="sb-user">${avatar(usuario)}<div><div class="sb-user-t">${esc(usuario.nombre)}</div><div class="sb-user-s">${esc(ROLES[usuario.rol].nombre)}</div></div>
-        <button type="button" class="salir" data-accion="salir" title="Cerrar sesión" aria-label="Cerrar sesión">${IC.salir.replace('<svg', '<svg width="17" height="17"')}</button></div>
-    </aside>
-    <main class="main">
-      <header class="topbar">
-        <button type="button" class="menu-movil" data-accion="menu" aria-label="Abrir menú">${IC.menu.replace('<svg', '<svg width="22" height="22"')}</button>
-        <div>${v.migas ? `<div class="migas">${v.migas}</div>` : ''}<div class="topbar-t">${esc(v.titulo)}</div>${v.sub ? `<div class="topbar-s">${v.sub}</div>` : ''}</div>
-        <div class="acciones">${v.acciones || ''}</div>
-      </header>
-      <div class="contenido">${v.html}</div>
-    </main></div>`;
+// Estructura de todas las pantallas: cabecera con navegación horizontal,
+// franja negra con el título de la página y el contenido debajo.
+function shell(seccion, v) {
+  const enlace = (href, clave, texto, extra = '') =>
+    `<a class="nav-item ${seccion === clave ? 'activo' : ''}" href="${href}">${texto}${extra}</a>`;
+  const porVencer = docsVisibles().filter((d) => { const x = vencimiento(d); return x && x.dias <= 30; }).length;
+  return `<header class="cabecera no-imprimir" id="cabecera">
+      <div class="cab-fila">
+        <a class="cab-marca" href="#/inicio"><img src="img/marca.png" alt=""><span><b>CH</b><small>Arquitectura y Construcción</small></span></a>
+        <nav class="cab-nav" aria-label="Principal">
+          ${enlace('#/inicio', 'inicio', 'Inicio', porVencer ? `<span class="cuenta" title="Documentos vencidos o por vencer">${porVencer}</span>` : '')}
+          ${enlace('#/obras', 'obras', 'Obras')}
+          ${enlace('#/buscar', 'buscar', 'Buscar')}
+          ${esGestor() ? enlace('#/actividad', 'actividad', 'Actividad') : ''}
+          ${esAdmin() ? enlace('#/usuarios', 'usuarios', 'Usuarios') : ''}
+        </nav>
+        <div class="cab-usuario">${avatar(usuario)}<span class="cab-usuario-t"><b>${esc(usuario.nombre)}</b><small>${esc(ROLES[usuario.rol].nombre)}</small></span>
+          <button type="button" class="btn icono" data-accion="salir" title="Cerrar sesión" aria-label="Cerrar sesión">${IC.salir}</button></div>
+        <button type="button" class="btn icono cab-menu" data-accion="menu" aria-label="Abrir menú" aria-expanded="false">${IC.menu}</button>
+      </div>
+    </header>
+    <section class="titular">
+      <div class="titular-fila">
+        <div class="titular-texto">${v.migas ? `<div class="migas">${v.migas}</div>` : ''}<h1>${esc(v.titulo)}</h1>${v.sub ? `<div class="titular-sub">${v.sub}</div>` : ''}</div>
+        ${v.acciones ? `<div class="acciones">${v.acciones}</div>` : ''}
+      </div>
+    </section>
+    <main class="contenido">${v.html}</main>`;
 }
 
 function filaActividad(a, conObra = true) {
@@ -440,18 +439,18 @@ function vistaInicio() {
     <li class="clic" data-ir="#/obra/${esc(o.id)}" style="cursor:pointer"><div style="flex:1;min-width:0">
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="obra-clave">${esc(o.clave)}</span><b>${esc(o.nombre)}</b>${chip(o.estado, CLASE_OBRA[o.estado])}</div>
       <div style="margin-top:6px;max-width:360px">${barra(o.avance)}</div></div>
-      <div class="der"><small style="color:var(--texto-hint)">${docsDeObra(o.id).length} documentos</small></div></li>`).join('')}</ul>`
+      <div class="der"><small style="color:var(--tinta-3)">${docsDeObra(o.id).length} documentos</small></div></li>`).join('')}</ul>`
     : vacio('No tienes obras activas asignadas.');
 
   const listaVence = conVence.length ? `<ul class="lista-simple">${conVence.slice(0, 8).map(({ d, v }) => `
     <li style="cursor:pointer" data-accion="verDoc" data-id="${esc(d.id)}">${iconoExt(d.ext)}<div style="min-width:0"><b style="font-weight:600">${esc(d.nombre)}</b>
-      <div style="font-size:11.5px;color:var(--texto-hint)">${esc(obraPor(d.obraId)?.clave)} · ${esc(carpetaPor(d.carpeta)?.nombre)}</div></div>
+      <div style="font-size:11.5px;color:var(--tinta-3)">${esc(obraPor(d.obraId)?.clave)} · ${esc(carpetaPor(d.carpeta)?.nombre)}</div></div>
       <div class="der">${chip(v.texto, v.clase)}</div></li>`).join('')}</ul>`
     : vacio('Sin vencimientos en los próximos 30 días.');
 
   const listaRevision = enRevision.length ? `<ul class="lista-simple">${enRevision.slice(0, 6).map((d) => `
     <li style="cursor:pointer" data-accion="verDoc" data-id="${esc(d.id)}">${iconoExt(d.ext)}<div style="min-width:0"><b style="font-weight:600">${esc(d.nombre)}</b>
-      <div style="font-size:11.5px;color:var(--texto-hint)">${esc(obraPor(d.obraId)?.clave)} · subió ${esc(nombreUsuario(ultimaVersion(d).usuarioId))}</div></div></li>`).join('')}</ul>`
+      <div style="font-size:11.5px;color:var(--tinta-3)">${esc(obraPor(d.obraId)?.clave)} · subió ${esc(nombreUsuario(ultimaVersion(d).usuarioId))}</div></div></li>`).join('')}</ul>`
     : vacio('No hay documentos esperando revisión.');
 
   return {
@@ -572,7 +571,6 @@ function vistaObra(id, pestana = 'resumen', sub, params) {
   }
   return {
     titulo: o.nombre,
-    obraActiva: id,
     migas: `<a href="#/obras">Obras</a> / ${esc(o.clave)}`,
     sub: `${chip(o.estado, CLASE_OBRA[o.estado])} &nbsp;${[o.cliente, o.ubicacion].filter(Boolean).map(esc).join(' · ')}`,
     acciones,
@@ -599,12 +597,12 @@ function pestanaResumen(o, docs) {
           <div><dt>Monto de contrato</dt><dd>${fmt.moneda(o.monto)}</dd></div>
           <div><dt>Avance físico</dt><dd>${barra(o.avance)}</dd></div>
         </dl>
-        ${o.descripcion ? `<p style="margin-top:14px;color:var(--texto-sub);font-size:13px">${esc(o.descripcion)}</p>` : ''}
+        ${o.descripcion ? `<p style="margin-top:14px;color:var(--tinta-2);font-size:13px">${esc(o.descripcion)}</p>` : ''}
       </div></div>
       <div class="card"><div class="card-h"><span class="card-t">Expediente de obra</span><span class="card-s">${completas} de ${CARPETAS.length} carpetas con documentos</span></div>
         <ul class="lista-simple">${porCarpeta.map(({ c, n }) => `
           <li><a class="carpeta" style="flex:1;padding:0" href="#/obra/${esc(o.id)}/documentos/${c.id}">${IC.carpeta}<span>${esc(c.nombre)}</span></a>
-            <span class="der">${n ? `<b>${n}</b> <small style="color:var(--texto-hint)">doc.</small>` : '<small style="color:var(--texto-hint)">vacía</small>'}</span></li>`).join('')}</ul></div>
+            <span class="der">${n ? `<b>${n}</b> <small style="color:var(--tinta-3)">doc.</small>` : '<small style="color:var(--tinta-3)">vacía</small>'}</span></li>`).join('')}</ul></div>
     </div>
     <div>
       <div class="card"><div class="card-h"><span class="card-t">Vencimientos de la obra</span></div>
@@ -624,8 +622,8 @@ function filaDocumento(d, mostrarCarpeta) {
       <small>${mostrarCarpeta ? esc(carpetaPor(d.carpeta)?.nombre) + ' · ' : ''}${d.etiquetas.map((t) => `<span class="tag">${esc(t)}</span>`).join('')}</small></div></div></td>
     <td>${chip(d.estado, CLASE_DOC[d.estado])}</td>
     <td>v${ult.v}</td>
-    <td>${v ? chip(v.texto, v.clase) : '<span style="color:var(--texto-hint)">—</span>'}</td>
-    <td><div style="font-size:12.5px">${fmt.fecha(ult.fecha)}</div><small style="color:var(--texto-hint)">${esc(nombreUsuario(ult.usuarioId))}</small></td>
+    <td>${v ? chip(v.texto, v.clase) : '<span style="color:var(--tinta-3)">—</span>'}</td>
+    <td><div style="font-size:12.5px">${fmt.fecha(ult.fecha)}</div><small style="color:var(--tinta-3)">${esc(nombreUsuario(ult.usuarioId))}</small></td>
     <td class="acc"><button type="button" class="btn icono chico" data-accion="descargarDoc" data-id="${esc(d.id)}" title="Descargar" aria-label="Descargar">${IC.descargar}</button></td>
   </tr>`;
 }
@@ -703,13 +701,12 @@ function vistaReporte(o, reporteId) {
     ${esGestor() || r.usuarioId === usuario.id ? `<button class="btn peligro" data-accion="eliminarReporte" data-id="${esc(r.id)}">${IC.basura}Eliminar</button>` : ''}`;
   return {
     titulo: r.titulo,
-    obraActiva: o.id,
     migas: `<a href="#/obras">Obras</a> / <a href="#/obra/${esc(o.id)}/reportes">${esc(o.clave)}</a> / Reporte fotográfico`,
     sub: `${fmt.fecha(r.fecha)} · ${r.fotos.length} fotos`,
     acciones,
     html: `<div class="hoja">
-      <div class="hoja-enc"><img class="hoja-logo" src="img/marca.png" alt="CH Arquitectura y Construcción"><div><h2>Reporte fotográfico</h2><div style="font-size:12.5px;color:var(--texto-sub)">CH Arquitectura y Construcción, S.A. de C.V.</div></div>
-        <div class="der"><b style="color:var(--texto)">${esc(r.periodo || '')}</b><br>${fmt.fecha(r.fecha)}</div></div>
+      <div class="hoja-enc"><img class="hoja-logo" src="img/marca.png" alt="CH Arquitectura y Construcción"><div><h2>Reporte fotográfico</h2><div style="font-size:12.5px;color:var(--tinta-2)">CH Arquitectura y Construcción, S.A. de C.V.</div></div>
+        <div class="der"><b style="color:var(--tinta)">${esc(r.periodo || '')}</b><br>${fmt.fecha(r.fecha)}</div></div>
       <div class="hoja-datos">
         <div><b>Obra</b>${esc(o.nombre)}</div><div><b>Clave</b>${esc(o.clave)}</div><div><b>Cliente</b>${esc(o.cliente)}</div>
         <div><b>Ubicación</b>${esc(o.ubicacion)}</div><div><b>Elaboró</b>${esc(nombreUsuario(r.usuarioId))}</div><div><b>Avance físico</b>${Number(o.avance) || 0}%</div>
@@ -724,8 +721,8 @@ function vistaReporte(o, reporteId) {
 
 function pestanaEquipo(o, equipo) {
   const gestores = S().usuarios.filter((u) => esGestor(u) && u.activo);
-  const fila = (u, nota) => `<li>${avatar(u)}<div><b>${esc(u.nombre)}</b><div style="font-size:12px;color:var(--texto-hint)">${esc(u.puesto)} · ${esc(u.email)}</div></div>
-    <div class="der">${chipRol(u.rol)}${nota ? `<div style="font-size:11px;color:var(--texto-hint);margin-top:3px">${nota}</div>` : ''}</div></li>`;
+  const fila = (u, nota) => `<li>${avatar(u)}<div><b>${esc(u.nombre)}</b><div style="font-size:12px;color:var(--tinta-3)">${esc(u.puesto)} · ${esc(u.email)}</div></div>
+    <div class="der">${chipRol(u.rol)}${nota ? `<div style="font-size:11px;color:var(--tinta-3);margin-top:3px">${nota}</div>` : ''}</div></li>`;
   return `<div class="grid g-2">
     <div class="card"><div class="card-h"><span class="card-t">Personal asignado</span><span class="card-s">ve y trabaja esta obra</span></div>
       ${equipo.length ? `<ul class="lista-simple">${equipo.map((u) => fila(u, u.id === o.residenteId ? 'Residente responsable' : (u.activo ? '' : 'Desactivado'))).join('')}</ul>` : vacio('Nadie asignado todavía.')}</div>
@@ -750,8 +747,8 @@ function vistaBuscar(q) {
       seccion('Documentos', docs.length, `<div class="tabla-wrap"><table class="tabla"><tbody>${docs.map((d) => `<tr class="clic" data-accion="verDoc" data-id="${esc(d.id)}">
           <td><div class="doc-nombre">${iconoExt(d.ext)}<div><b>${esc(d.nombre)}</b><small>${esc(obraPor(d.obraId)?.clave)} · ${esc(carpetaPor(d.carpeta)?.nombre)}</small></div></div></td>
           <td>${chip(d.estado, CLASE_DOC[d.estado])}</td><td>v${ultimaVersion(d).v}</td></tr>`).join('')}</tbody></table></div>`) +
-      seccion('Presupuestos', pres.length, `<ul class="lista-simple">${pres.map((p) => `<li style="cursor:pointer" data-accion="verPresupuesto" data-id="${esc(p.id)}"><b>${esc(p.folio)}</b><span>${esc(p.concepto)}</span><span class="der">${fmt.moneda(p.monto)}<br><small style="color:var(--texto-hint)">${esc(obraPor(p.obraId)?.clave)}</small></span></li>`).join('')}</ul>`) +
-      seccion('Reportes fotográficos', reps.length, `<ul class="lista-simple">${reps.map((r) => `<li style="cursor:pointer" data-ir="#/obra/${esc(r.obraId)}/reportes/${esc(r.id)}">${IC.camara.replace('<svg', '<svg width="17" height="17"')}<b>${esc(r.titulo)}</b><span class="der"><small style="color:var(--texto-hint)">${esc(obraPor(r.obraId)?.clave)} · ${fmt.fecha(r.fecha)}</small></span></li>`).join('')}</ul>`);
+      seccion('Presupuestos', pres.length, `<ul class="lista-simple">${pres.map((p) => `<li style="cursor:pointer" data-accion="verPresupuesto" data-id="${esc(p.id)}"><b>${esc(p.folio)}</b><span>${esc(p.concepto)}</span><span class="der">${fmt.moneda(p.monto)}<br><small style="color:var(--tinta-3)">${esc(obraPor(p.obraId)?.clave)}</small></span></li>`).join('')}</ul>`) +
+      seccion('Reportes fotográficos', reps.length, `<ul class="lista-simple">${reps.map((r) => `<li style="cursor:pointer" data-ir="#/obra/${esc(r.obraId)}/reportes/${esc(r.id)}">${IC.camara.replace('<svg', '<svg width="17" height="17"')}<b>${esc(r.titulo)}</b><span class="der"><small style="color:var(--tinta-3)">${esc(obraPor(r.obraId)?.clave)} · ${fmt.fecha(r.fecha)}</small></span></li>`).join('')}</ul>`);
   }
   return {
     titulo: 'Buscar',
@@ -777,11 +774,11 @@ function vistaUsuarios() {
   const filas = S().usuarios.map((u) => `<tr class="clic" data-accion="editarUsuario" data-id="${esc(u.id)}">
     <td><div class="doc-nombre" style="min-width:200px">${avatar(u)}<div><b>${esc(u.nombre)}</b><small>${esc(u.email)}</small></div></div></td>
     <td>${esc(u.puesto)}</td><td>${chipRol(u.rol)}</td>
-    <td>${esGestor(u) ? '<span style="color:var(--texto-hint)">Todas</span>' : (u.obras.map((id) => esc(obraPor(id)?.clave || '')).filter(Boolean).join(', ') || '<span style="color:var(--texto-hint)">Ninguna</span>')}</td>
-    <td>${u.activo ? chip('Activo', 'verde') : chip('Inactivo', 'rojo')}</td>
+    <td>${esGestor(u) ? '<span style="color:var(--tinta-3)">Todas</span>' : (u.obras.map((id) => esc(obraPor(id)?.clave || '')).filter(Boolean).join(', ') || '<span style="color:var(--tinta-3)">Ninguna</span>')}</td>
+    <td>${u.activo ? chip('Activo', 'ok') : chip('Inactivo', 'alerta')}</td>
     <td class="acc"><button type="button" class="btn chico" data-accion="editarUsuario" data-id="${esc(u.id)}">${IC.lapiz}Editar</button></td></tr>`).join('');
-  const si = '<span style="color:var(--verde);font-weight:700">✓</span>';
-  const no = '<span style="color:var(--texto-hint)">—</span>';
+  const si = '<span style="color:var(--ok);font-weight:700">✓</span>';
+  const no = '<span style="color:var(--tinta-3)">—</span>';
   const matriz = [
     ['Ver obras', 'Todas', 'Todas', 'Asignadas', 'Asignadas'],
     ['Crear y editar obras', si, si, no, no],
@@ -857,7 +854,7 @@ function formObra(o) {
       <div class="fila"><div class="campo"><label>Monto de contrato (MXN)</label><input type="number" name="monto" min="0" step="0.01" value="${esc(o.monto)}"></div>
         <div class="campo"><label>Avance físico (%)</label><input type="number" name="avance" min="0" max="100" value="${esc(o.avance)}"></div></div>
       <div class="campo"><label>Descripción</label><textarea name="descripcion">${esc(o.descripcion)}</textarea></div>
-      ${nuevo ? '<div class="ayuda" style="font-size:12px;color:var(--texto-hint)">Al crearla se genera automáticamente el expediente con las 9 carpetas estándar.</div>' : ''}`,
+      ${nuevo ? '<div class="ayuda" style="font-size:12px;color:var(--tinta-3)">Al crearla se genera automáticamente el expediente con las 9 carpetas estándar.</div>' : ''}`,
     alEnviar: (f) => {
       const datos = {
         clave: valor(f, 'clave'), nombre: valor(f, 'nombre'), cliente: valor(f, 'cliente'), ubicacion: valor(f, 'ubicacion'),
@@ -898,9 +895,9 @@ function asignarEquipo(obraId) {
   modal({
     titulo: `Personal de ${o.clave}`,
     textoEnviar: 'Guardar asignación',
-    cuerpo: `<p style="font-size:13px;color:var(--texto-sub);margin-bottom:10px">Marca quién puede ver y trabajar esta obra. Administradores y coordinadores ya ven todas.</p>
+    cuerpo: `<p style="font-size:13px;color:var(--tinta-2);margin-bottom:10px">Marca quién puede ver y trabajar esta obra. Administradores y coordinadores ya ven todas.</p>
       <div class="checks">${candidatos.map((u) => `<label><input type="checkbox" name="u" value="${esc(u.id)}" ${u.obras.includes(obraId) ? 'checked' : ''}>
-        ${esc(u.nombre)} <small style="color:var(--texto-hint)">(${esc(ROLES[u.rol].nombre)})</small></label>`).join('') || 'No hay residentes ni usuarios de consulta.'}</div>`,
+        ${esc(u.nombre)} <small style="color:var(--tinta-3)">(${esc(ROLES[u.rol].nombre)})</small></label>`).join('') || 'No hay residentes ni usuarios de consulta.'}</div>`,
     alEnviar: (f) => {
       const marcados = new Set($$('input[name=u]:checked', f).map((i) => i.value));
       candidatos.forEach((u) => {
@@ -970,7 +967,7 @@ function verDoc(id) {
   const puedeEditar = gestor || (puedeSubir(d.obraId) && d.usuarioId === usuario.id);
   const versiones = d.versiones.slice().reverse().map((ver) => `<li><span class="v">v${ver.v}</span>
       <div style="flex:1;min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(ver.nombreArchivo)}</div>
-      <small style="color:var(--texto-hint)">${fmt.fecha(ver.fecha)} · ${esc(nombreUsuario(ver.usuarioId))} · ${fmt.tamano(ver.tamano)}${ver.nota ? ' · ' + esc(ver.nota) : ''}</small></div>
+      <small style="color:var(--tinta-3)">${fmt.fecha(ver.fecha)} · ${esc(nombreUsuario(ver.usuarioId))} · ${fmt.tamano(ver.tamano)}${ver.nota ? ' · ' + esc(ver.nota) : ''}</small></div>
       <button type="button" class="btn icono chico" data-accion="abrirVersion" data-doc="${esc(d.id)}" data-v="${ver.v}" data-modo="ver" title="Ver" aria-label="Ver versión ${ver.v}">${IC.ojo}</button>
       <button type="button" class="btn icono chico" data-accion="abrirVersion" data-doc="${esc(d.id)}" data-v="${ver.v}" data-modo="descargar" title="Descargar" aria-label="Descargar versión ${ver.v}">${IC.descargar}</button></li>`).join('');
   const form = modal({
@@ -978,7 +975,7 @@ function verDoc(id) {
     ancho: true,
     cuerpo: `
       <div style="display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap">${iconoExt(d.ext)}
-        <div><div style="font-size:12.5px;color:var(--texto-sub)"><a href="#/obra/${esc(o.id)}/documentos/${esc(d.carpeta)}" data-cerrar>${esc(o.clave)} · ${esc(carpetaPor(d.carpeta)?.nombre)}</a></div>
+        <div><div style="font-size:12.5px;color:var(--tinta-2)"><a href="#/obra/${esc(o.id)}/documentos/${esc(d.carpeta)}" data-cerrar>${esc(o.clave)} · ${esc(carpetaPor(d.carpeta)?.nombre)}</a></div>
         <div style="margin-top:4px;display:flex;gap:6px;flex-wrap:wrap">${chip(d.estado, CLASE_DOC[d.estado])}${v ? chip(v.texto, v.clase) : ''}</div></div>
         <div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">
           <button type="button" class="btn" data-accion="abrirVersion" data-doc="${esc(d.id)}" data-v="${ult.v}" data-modo="ver">${IC.ojo}Ver</button>
@@ -1044,7 +1041,7 @@ function formNuevaVersion(id) {
     textoEnviar: 'Subir versión',
     cuerpo: `${campoArchivos({ texto: 'Elige el archivo de la nueva versión' })}
       <div class="campo" style="margin-top:14px"><label>¿Qué cambió?</label><input type="text" name="nota" placeholder="Ej.: se corrigen cotas del eje 4"></div>
-      <div class="ayuda" style="font-size:12px;color:var(--texto-hint)">La versión anterior se conserva en el historial.${esGestor() ? '' : ' El documento pasa a «En revisión» hasta que un coordinador lo apruebe.'}</div>`,
+      <div class="ayuda" style="font-size:12px;color:var(--tinta-3)">La versión anterior se conserva en el historial.${esGestor() ? '' : ' El documento pasa a «En revisión» hasta que un coordinador lo apruebe.'}</div>`,
     alEnviar: async (f) => {
       const [archivo] = selector.obtener();
       if (!archivo) throw new Invalido('Elige el archivo.');
@@ -1234,11 +1231,11 @@ function formUsuario(u) {
         <div class="campo"><label>Contraseña ${nuevo ? '*' : ''}</label><input type="password" name="password" autocomplete="new-password" placeholder="${nuevo ? 'Mínimo 6 caracteres' : 'Déjala vacía para no cambiarla'}"></div></div>
       <div class="fila"><div class="campo"><label>Rol</label><select name="rol" ${esYo ? 'disabled' : ''}>${opciones(Object.entries(ROLES).map(([k, r]) => [k, r.nombre]), u.rol)}</select>
           <div class="ayuda" id="desc-rol">${esc(ROLES[u.rol].desc)}</div></div>
-        <div class="campo"><label>Estado</label><label style="display:flex;gap:8px;align-items:center;font-weight:400;color:var(--texto);margin-top:8px">
+        <div class="campo"><label>Estado</label><label style="display:flex;gap:8px;align-items:center;font-weight:400;color:var(--tinta);margin-top:8px">
           <input type="checkbox" name="activo" ${u.activo ? 'checked' : ''} ${esYo ? 'disabled' : ''}> Puede iniciar sesión</label></div></div>
       <div class="campo" id="campo-obras"><label>Obras asignadas</label>
         <div class="checks">${S().obras.map((o) => `<label><input type="checkbox" name="obra" value="${esc(o.id)}" ${u.obras.includes(o.id) ? 'checked' : ''}> ${esc(o.clave)} · ${esc(o.nombre)}</label>`).join('')}</div></div>
-      ${esYo ? '<div class="ayuda" style="font-size:12px;color:var(--texto-hint)">No puedes cambiar tu propio rol ni desactivarte.</div>' : ''}`,
+      ${esYo ? '<div class="ayuda" style="font-size:12px;color:var(--tinta-3)">No puedes cambiar tu propio rol ni desactivarte.</div>' : ''}`,
     alEnviar: (f) => {
       const datos = {
         nombre: valor(f, 'nombre'), puesto: valor(f, 'puesto'), email: valor(f, 'email').toLowerCase(),
@@ -1277,7 +1274,7 @@ function formUsuario(u) {
 
 // ── Mapa de acciones: data-accion="nombre" en el HTML → función ────
 const ACCIONES = {
-  menu: () => $('#sidebar')?.classList.toggle('abierto'),
+  menu: (_ds, boton) => boton.setAttribute('aria-expanded', $('#cabecera').classList.toggle('abierta')),
   salir: () => { Store.cerrarSesion(); usuario = null; location.hash = ''; render(); },
   accesoRapido: (ds) => entrar(usuarioPor(ds.id)),
   restablecer: () => confirmar('Restablecer datos de ejemplo',
@@ -1398,7 +1395,7 @@ function render() {
     default: seccion = 'inicio'; v = vistaInicio();
   }
   document.title = `${v.titulo} — CH Arquitectura y Construcción`;
-  app.innerHTML = banner() + shell(seccion, v.obraActiva, v);
+  app.innerHTML = banner() + shell(seccion, v);
   if (v.montar) v.montar();
   hidratarImagenes(app);
 }

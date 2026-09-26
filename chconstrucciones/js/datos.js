@@ -23,9 +23,9 @@ const CARPETAS = [
 ];
 
 const ROLES = {
-  admin:       { nombre: 'Administrador',        color: 'acento', desc: 'Todo, incluida la gestión de usuarios.' },
-  coordinador: { nombre: 'Coordinador',          color: 'azul',    desc: 'Todas las obras: crea obras, aprueba y elimina documentos.' },
-  residente:   { nombre: 'Residente de obra',    color: 'verde',   desc: 'Sólo sus obras asignadas: sube documentos, presupuestos y reportes.' },
+  admin:       { nombre: 'Administrador',        color: 'marca', desc: 'Todo, incluida la gestión de usuarios.' },
+  coordinador: { nombre: 'Coordinador',          color: 'info',    desc: 'Todas las obras: crea obras, aprueba y elimina documentos.' },
+  residente:   { nombre: 'Residente de obra',    color: 'ok',   desc: 'Sólo sus obras asignadas: sube documentos, presupuestos y reportes.' },
   consulta:    { nombre: 'Consulta',             color: '',        desc: 'Sólo lectura de las obras asignadas.' },
 };
 

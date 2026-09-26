@@ -6,61 +6,71 @@
 <meta name="robots" content="noindex">
 <title>Propuesta — Gestión documental CH Arquitectura y Construcción</title>
 <link rel="icon" type="image/png" href="img/marca.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700&display=swap">
 <style>
+  /* Misma identidad que el sistema: negro, grises y amarillo del logo C+H. */
   :root {
-    --negro:#1e1a1b; --acento:#eecd02; --acento-texto:#6b5a00; --acento-light:#fdf7d4;
-    --verde:#2f6b1b; --verde-light:#e9f4e1; --ambar:#8a5a07; --ambar-light:#fbf1db;
-    --fondo:#f4f6f9; --borde:#dfe4eb; --texto:#1b2430; --sub:#5a6474; --hint:#8f98a6; --blanco:#fff;
+    --tinta:#151314; --tinta-2:#4b484a; --tinta-3:#6f6c72; --gris-marca:#bebfc4;
+    --papel:#efefed; --superficie:#fff; --linea:#dcdcd8;
+    --amarillo:#eecd02; --amarillo-suave:#fbf5cc; --ok:#2d6a1e; --ok-suave:#e3f0da; --r:3px;
+    --fuente:'Barlow','Segoe UI',system-ui,sans-serif; --fuente-titulo:'Barlow Condensed','Arial Narrow','Barlow',sans-serif;
   }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif; background:var(--fondo); color:var(--texto); line-height:1.6; font-size:15px; }
-  .barra { background:var(--negro); color:#fff; padding:10px 16px; display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; font-size:13px; }
-  .barra a { color:var(--acento); font-weight:600; text-decoration:none; }
-  main { max-width:880px; margin:0 auto; padding:32px 16px 60px; }
-  .portada { background:var(--blanco); border:1px solid var(--borde); border-radius:14px; padding:32px; margin-bottom:24px; border-top:5px solid var(--acento); }
-  .logo { display:block; width:170px; max-width:60%; height:auto; margin-bottom:18px; }
-  .etq { font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--acento-texto); }
-  h1 { font-size:28px; line-height:1.2; letter-spacing:-.4px; margin:6px 0 10px; }
-  .portada p { color:var(--sub); }
-  .meta { display:flex; gap:22px; flex-wrap:wrap; margin-top:16px; font-size:13px; color:var(--sub); }
-  .meta b { color:var(--texto); }
-  section { background:var(--blanco); border:1px solid var(--borde); border-radius:14px; padding:26px 30px; margin-bottom:18px; }
-  h2 { font-size:19px; letter-spacing:-.2px; margin-bottom:12px; display:flex; gap:10px; align-items:baseline; }
-  h2 .n { color:var(--acento-texto); font-size:14px; font-weight:800; }
-  h3 { font-size:15px; margin:18px 0 6px; }
+  body { font-family:var(--fuente); background:var(--papel); color:var(--tinta); line-height:1.6; font-size:16px; }
+  .barra { background:var(--amarillo); color:var(--tinta); padding:8px 16px; display:flex; gap:14px; align-items:center; justify-content:center; flex-wrap:wrap; font-size:14px; }
+  .barra a { color:var(--tinta); font-weight:700; }
+  main { max-width:900px; margin:0 auto; padding:32px 16px 64px; }
+  .portada { background:var(--superficie); border-radius:var(--r); margin-bottom:24px; overflow:hidden; }
+  .portada-cuerpo { padding:32px 36px 28px; display:grid; grid-template-columns:170px minmax(0,1fr); gap:32px; align-items:center; }
+  .logo { display:block; width:100%; height:auto; }
+  .etq { font-family:var(--fuente-titulo); font-size:15px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; background:var(--tinta); color:var(--amarillo); display:inline-block; padding:1px 8px; }
+  h1 { font-family:var(--fuente-titulo); font-size:42px; font-weight:700; line-height:1.05; margin:10px 0 12px; }
+  .portada p { color:var(--tinta-2); }
+  .meta { background:var(--tinta); color:var(--gris-marca); border-top:5px solid var(--amarillo); padding:12px 36px; display:flex; gap:28px; flex-wrap:wrap; font-size:14px; }
+  .meta b { color:#fff; font-weight:600; }
+  section { background:var(--superficie); border-radius:var(--r); padding:28px 36px; margin-bottom:20px; }
+  h2 { font-family:var(--fuente-titulo); font-size:26px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; line-height:1.15; margin-bottom:14px; display:flex; gap:12px; align-items:center; }
+  h2 .n { background:var(--tinta); color:var(--amarillo); font-size:17px; min-width:36px; height:32px; display:inline-flex; align-items:center; justify-content:center; letter-spacing:.04em; }
+  h3 { font-family:var(--fuente-titulo); font-size:19px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; margin:22px 0 6px; }
   p + p { margin-top:10px; }
-  ul.lista { margin:8px 0 0 20px; }
-  ul.lista li { margin:4px 0; }
-  .nota { background:var(--acento-light); border-left:4px solid var(--acento); padding:12px 16px; border-radius:6px; font-size:14px; margin-top:14px; }
-  .tabla-wrap { overflow-x:auto; margin-top:10px; }
-  table { width:100%; border-collapse:collapse; font-size:13.5px; }
-  th { text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--hint); padding:8px 10px; border-bottom:2px solid var(--borde); white-space:nowrap; }
-  td { padding:9px 10px; border-bottom:1px solid var(--borde); vertical-align:top; }
-  .modulos { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:12px; }
-  .modulo { border:1px solid var(--borde); border-radius:10px; padding:14px 16px; }
-  .modulo b { display:block; margin-bottom:4px; }
-  .modulo p { font-size:13.5px; color:var(--sub); }
-  .fase { display:grid; grid-template-columns:44px minmax(0,1fr); gap:14px; padding:14px 0; border-bottom:1px solid var(--borde); }
+  ul.lista, ol.lista { margin:8px 0 0 22px; }
+  .lista li { margin:5px 0; }
+  .lista li::marker { color:var(--tinta-3); font-weight:700; }
+  .nota { background:var(--amarillo-suave); border-left:5px solid var(--amarillo); padding:12px 16px; font-size:15px; margin-top:16px; }
+  .tabla-wrap { overflow-x:auto; margin-top:12px; }
+  table { width:100%; border-collapse:collapse; font-size:14.5px; }
+  th { text-align:left; font-family:var(--fuente-titulo); font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--tinta-2); padding:8px 10px; border-bottom:2px solid var(--tinta); white-space:nowrap; }
+  td { padding:10px; border-bottom:1px solid var(--linea); vertical-align:top; }
+  .modulos { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin-top:14px; }
+  .modulo { border:1px solid var(--linea); border-left:5px solid var(--amarillo); padding:14px 16px; }
+  .modulo b { display:block; font-family:var(--fuente-titulo); font-size:19px; font-weight:700; margin-bottom:2px; }
+  .modulo p { font-size:14.5px; color:var(--tinta-2); }
+  .fase { display:grid; grid-template-columns:48px minmax(0,1fr); gap:16px; padding:16px 0; border-bottom:1px solid var(--linea); }
   .fase:last-child { border-bottom:none; }
-  .fase .num { width:36px; height:36px; border-radius:50%; background:var(--negro); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; }
-  .fase.hecha .num { background:var(--verde); }
-  .fase b { display:block; }
-  .fase p { font-size:14px; color:var(--sub); }
-  .chip { display:inline-block; font-size:11px; font-weight:700; border-radius:20px; padding:1px 9px; margin-left:6px; vertical-align:middle; }
-  .chip.verde { background:var(--verde-light); color:var(--verde); }
-  .chip.ambar { background:var(--ambar-light); color:var(--ambar); }
-  .preguntas li { margin:8px 0; }
-  code { background:#eef1f5; border-radius:4px; padding:1px 5px; font-size:13px; }
+  .fase .num { width:40px; height:40px; background:var(--tinta); color:#fff; display:flex; align-items:center; justify-content:center; font-family:var(--fuente-titulo); font-size:20px; font-weight:700; }
+  .fase.hecha .num { background:var(--amarillo); color:var(--tinta); }
+  .fase b { display:block; font-family:var(--fuente-titulo); font-size:19px; font-weight:700; }
+  .fase p { font-size:15px; color:var(--tinta-2); }
+  .chip { display:inline-block; font-family:var(--fuente-titulo); font-size:13px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; border-radius:2px; padding:1px 7px; margin-left:8px; vertical-align:middle; }
+  .chip.verde { background:var(--ok-suave); color:var(--ok); }
+  .preguntas li { margin:9px 0; }
+  code { background:#ececea; border-radius:2px; padding:1px 5px; font-size:14px; }
   @media (max-width:640px) {
-    .portada, section { padding:20px 18px; }
-    h1 { font-size:23px; }
+    .portada-cuerpo { grid-template-columns:minmax(0,1fr); padding:24px 20px; gap:16px; }
+    .logo { width:140px; }
+    .meta { padding:12px 20px; }
+    section { padding:22px 20px; }
+    h1 { font-size:34px; }
+    h2 { font-size:22px; }
     .modulos { grid-template-columns:minmax(0,1fr); }
   }
   @media print {
-    body { background:#fff; font-size:12.5px; }
+    body { background:#fff; font-size:13px; }
     .barra { display:none; }
     main { padding:0; max-width:none; }
-    section, .portada { border:none; padding:10px 0; break-inside:avoid-page; }
+    section, .portada { padding:10px 0; break-inside:avoid-page; }
   }
 </style>
 </head>
@@ -69,13 +79,17 @@
 <main>
 
   <div class="portada">
-    <img class="logo" src="img/logo.png" alt="CH Arquitectura y Construcción, S.A. de C.V.">
-    <div class="etq">Propuesta</div>
-    <h1>Sistema de gestión documental de obras</h1>
-    <p>Un solo lugar para el expediente de cada obra: contratos, planos, permisos, estimaciones,
-       presupuestos, bitácora, calidad, seguridad y reportes fotográficos, con control de quién ve
-       y quién sube cada documento.</p>
-    <div class="meta"><span><b>Cliente:</b> CH Arquitectura y Construcción, S.A. de C.V.</span><span><b>Versión:</b> 2 · borrador para revisión</span><span><b>Demo:</b> gestion.avba.com.mx/chconstrucciones</span></div>
+    <div class="portada-cuerpo">
+      <img class="logo" src="img/logo.png" alt="CH Arquitectura y Construcción, S.A. de C.V.">
+      <div>
+        <span class="etq">Propuesta</span>
+        <h1>Sistema de gestión documental de obras</h1>
+        <p>Un solo lugar para el expediente de cada obra: contratos, planos, permisos, estimaciones,
+           presupuestos, bitácora, calidad, seguridad y reportes fotográficos, con control de quién ve
+           y quién sube cada documento.</p>
+      </div>
+    </div>
+    <div class="meta"><span><b>Cliente</b> · CH Arquitectura y Construcción, S.A. de C.V.</span><span><b>Versión</b> · 3, borrador para revisión</span></div>
   </div>
 
   <section>
@@ -185,14 +199,14 @@
 
   <section>
     <h2><span class="n">06</span>Cómo se construye la versión real</h2>
-    <p>Se usaría la misma tecnología que el sistema de certificaciones de AVBA, que ya funciona en este
-       servidor (Hostinger): <b>PHP 8 + MySQL</b>. Así no hay que contratar nada nuevo y el mantenimiento es el mismo.</p>
+    <p>Se propone <b>PHP 8 + MySQL</b>: es la combinación que el hosting contratado (Hostinger) ya ofrece
+       sin costo adicional, está muy probada y es fácil de mantener y de respaldar.</p>
     <ul class="lista">
-      <li><b>Base de datos propia</b> para CH Arquitectura y Construcción, separada de la de AVBA.</li>
+      <li><b>Base de datos exclusiva</b> para el sistema de CH Arquitectura y Construcción.</li>
       <li><b>Archivos fuera del acceso público</b>: nadie puede descargar un documento adivinando su dirección; cada descarga pasa por PHP, que revisa la sesión y los permisos.</li>
       <li><b>Tablas principales</b>: <code>usuarios</code>, <code>obras</code>, <code>usuario_obra</code>, <code>documentos</code>, <code>documento_versiones</code>, <code>presupuestos</code>, <code>reportes</code>, <code>reporte_fotos</code>, <code>actividad</code>. El demo ya usa esta misma estructura.</li>
       <li><b>Fotos reducidas</b> al subirlas (como en el demo), para que no llenen el disco.</li>
-      <li><b>PDF</b> de reportes con la librería dompdf y <b>correos</b> con PHPMailer, las mismas que usa AVBA.</li>
+      <li><b>PDF</b> de reportes con la librería dompdf y <b>correos</b> con PHPMailer, dos librerías libres y muy usadas en PHP.</li>
       <li><b>Respaldos</b> programados de la base de datos y de los archivos.</li>
     </ul>
     <p class="nota"><b>Punto a vigilar: el espacio en disco.</b> Planos, PDF escaneados y fotos crecen rápido.
