@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Propuesta — Gestión documental CH Construcciones</title>
+<style>
+  :root {
+    --pizarra:#1f2a37; --naranja:#d9640f; --naranja-dark:#b4520b; --naranja-light:#fdf0e5;
+    --verde:#2f6b1b; --verde-light:#e9f4e1; --ambar:#8a5a07; --ambar-light:#fbf1db;
+    --fondo:#f4f6f9; --borde:#dfe4eb; --texto:#1b2430; --sub:#5a6474; --hint:#8f98a6; --blanco:#fff;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif; background:var(--fondo); color:var(--texto); line-height:1.6; font-size:15px; }
+  .barra { background:var(--pizarra); color:#fff; padding:10px 16px; display:flex; gap:12px; align-items:center; justify-content:center; flex-wrap:wrap; font-size:13px; }
+  .barra a { color:#ffb57a; font-weight:600; text-decoration:none; }
+  main { max-width:880px; margin:0 auto; padding:32px 16px 60px; }
+  .portada { background:var(--blanco); border:1px solid var(--borde); border-radius:14px; padding:32px; margin-bottom:24px; border-top:5px solid var(--naranja); }
+  .logo { width:48px; height:48px; border-radius:12px; background:var(--naranja); color:#fff; font-weight:800; display:flex; align-items:center; justify-content:center; font-size:18px; margin-bottom:14px; }
+  .etq { font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--naranja-dark); }
+  h1 { font-size:28px; line-height:1.2; letter-spacing:-.4px; margin:6px 0 10px; }
+  .portada p { color:var(--sub); }
+  .meta { display:flex; gap:22px; flex-wrap:wrap; margin-top:16px; font-size:13px; color:var(--sub); }
+  .meta b { color:var(--texto); }
+  section { background:var(--blanco); border:1px solid var(--borde); border-radius:14px; padding:26px 30px; margin-bottom:18px; }
+  h2 { font-size:19px; letter-spacing:-.2px; margin-bottom:12px; display:flex; gap:10px; align-items:baseline; }
+  h2 .n { color:var(--naranja); font-size:14px; font-weight:800; }
+  h3 { font-size:15px; margin:18px 0 6px; }
+  p + p { margin-top:10px; }
+  ul.lista { margin:8px 0 0 20px; }
+  ul.lista li { margin:4px 0; }
+  .nota { background:var(--naranja-light); border-left:4px solid var(--naranja); padding:12px 16px; border-radius:6px; font-size:14px; margin-top:14px; }
+  .tabla-wrap { overflow-x:auto; margin-top:10px; }
+  table { width:100%; border-collapse:collapse; font-size:13.5px; }
+  th { text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--hint); padding:8px 10px; border-bottom:2px solid var(--borde); white-space:nowrap; }
+  td { padding:9px 10px; border-bottom:1px solid var(--borde); vertical-align:top; }
+  .modulos { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin-top:12px; }
+  .modulo { border:1px solid var(--borde); border-radius:10px; padding:14px 16px; }
+  .modulo b { display:block; margin-bottom:4px; }
+  .modulo p { font-size:13.5px; color:var(--sub); }
+  .fase { display:grid; grid-template-columns:44px minmax(0,1fr); gap:14px; padding:14px 0; border-bottom:1px solid var(--borde); }
+  .fase:last-child { border-bottom:none; }
+  .fase .num { width:36px; height:36px; border-radius:50%; background:var(--pizarra); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:700; }
+  .fase.hecha .num { background:var(--verde); }
+  .fase b { display:block; }
+  .fase p { font-size:14px; color:var(--sub); }
+  .chip { display:inline-block; font-size:11px; font-weight:700; border-radius:20px; padding:1px 9px; margin-left:6px; vertical-align:middle; }
+  .chip.verde { background:var(--verde-light); color:var(--verde); }
+  .chip.ambar { background:var(--ambar-light); color:var(--ambar); }
+  .preguntas li { margin:8px 0; }
+  code { background:#eef1f5; border-radius:4px; padding:1px 5px; font-size:13px; }
+  @media (max-width:640px) {
+    .portada, section { padding:20px 18px; }
+    h1 { font-size:23px; }
+    .modulos { grid-template-columns:minmax(0,1fr); }
+  }
+  @media print {
+    body { background:#fff; font-size:12.5px; }
+    .barra { display:none; }
+    main { padding:0; max-width:none; }
+    section, .portada { border:none; padding:10px 0; break-inside:avoid-page; }
+  }
+</style>
+</head>
+<body>
+<div class="barra"><span>Propuesta del sistema de gestión documental</span><a href="./">Abrir el demo funcional →</a></div>
+<main>
+
+  <div class="portada">
+    <div class="logo">CH</div>
+    <div class="etq">Propuesta</div>
+    <h1>Sistema de gestión documental de obras</h1>
+    <p>Un solo lugar para el expediente de cada obra: contratos, planos, permisos, estimaciones,
+       presupuestos, bitácora, calidad, seguridad y reportes fotográficos, con control de quién ve
+       y quién sube cada documento.</p>
+    <div class="meta"><span><b>Cliente:</b> CH Construcciones</span><span><b>Versión:</b> 1 · borrador para revisión</span><span><b>Demo:</b> gestion.avba.com.mx/chconstrucciones</span></div>
+  </div>
+
+  <section>
+    <h2><span class="n">01</span>El problema que resuelve</h2>
+    <p>En una constructora la documentación de cada obra se genera en muchos lugares a la vez: la oficina
+       prepara contratos y presupuestos, el residente toma fotos y llena la bitácora en campo, el
+       laboratorio manda resultados y el municipio emite licencias con fecha de vencimiento.
+       Sin un sistema, todo eso termina repartido entre correos, WhatsApp, memorias USB y carpetas compartidas.</p>
+    <ul class="lista">
+      <li>No se sabe cuál es la <b>versión vigente</b> de un plano o de una estimación.</li>
+      <li>Una licencia o una fianza <b>vence</b> sin que nadie lo note.</li>
+      <li>Armar el <b>expediente</b> para una entrega, una auditoría o un finiquito toma días.</li>
+      <li>Cuando alguien deja la empresa, su información se va con su computadora.</li>
+      <li>No queda registro de <b>quién</b> subió, cambió o borró algo.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2><span class="n">02</span>Qué hacen los sistemas de este tipo</h2>
+    <p>Revisamos cómo resuelven la gestión documental las plataformas que se usan en la industria de la
+       construcción (por ejemplo Procore, Autodesk Construction Cloud, Oracle Aconex y Fieldwire) y el
+       concepto de <b>entorno común de datos</b> que propone la norma ISO 19650. Todas coinciden en siete prácticas:</p>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Práctica</th><th>Qué significa</th><th>Cómo la aplicamos</th></tr></thead>
+      <tbody>
+        <tr><td><b>Expediente por proyecto</b></td><td>Cada obra tiene la misma estructura de carpetas.</td><td>9 carpetas estándar que se crean solas con cada obra.</td></tr>
+        <tr><td><b>Control de versiones</b></td><td>Un documento conserva su historial; siempre se sabe cuál es la vigente.</td><td>“Nueva versión” guarda la anterior en el historial.</td></tr>
+        <tr><td><b>Estados de revisión</b></td><td>Lo que está en borrador no se confunde con lo aprobado. ISO 19650 usa “en proceso → compartido → publicado → archivado”.</td><td>Borrador → En revisión → Aprobado → Obsoleto.</td></tr>
+        <tr><td><b>Permisos por obra y por rol</b></td><td>Cada persona ve sólo lo que necesita.</td><td>4 roles y asignación de personal a cada obra.</td></tr>
+        <tr><td><b>Metadatos y búsqueda</b></td><td>Encontrar documentos por nombre, etiqueta u obra, no sólo navegando carpetas.</td><td>Etiquetas y buscador sin distinguir acentos ni mayúsculas.</td></tr>
+        <tr><td><b>Captura en campo</b></td><td>Fotos y reportes subidos desde el celular, en la obra.</td><td>Reportes fotográficos con pie de foto e impresión a PDF.</td></tr>
+        <tr><td><b>Trazabilidad</b></td><td>Registro de quién hizo qué y cuándo.</td><td>Bitácora de actividad del sistema.</td></tr>
+      </tbody></table></div>
+    <h3>Contexto en México</h3>
+    <p>La estructura de carpetas sigue cómo se integra un expediente de obra en México: contrato y fianzas,
+       estimaciones con sus números generadores, bitácora de obra, pruebas de laboratorio, programa de
+       seguridad (la norma de referencia es la NOM-031-STPS-2011 para construcción) y actas de entrega-recepción
+       y finiquito. Si la empresa participa en obra pública, ese expediente es además el que se revisa en una
+       auditoría. La bitácora oficial de obra pública federal se lleva en el sistema del gobierno (BESOP); aquí
+       se guardaría una copia como parte del expediente.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">03</span>Qué incluye el sistema</h2>
+    <div class="modulos">
+      <div class="modulo"><b>Usuarios y roles</b><p>El administrador da de alta al personal, asigna su rol y las obras a las que tiene acceso. Puede desactivar a alguien sin borrar su historial.</p></div>
+      <div class="modulo"><b>Obras</b><p>Alta de obras con clave, cliente, ubicación, residente, fechas, monto de contrato y avance. Filtros por estado.</p></div>
+      <div class="modulo"><b>Expediente documental</b><p>9 carpetas por obra. Subida de varios archivos a la vez, estados de revisión, etiquetas, historial de versiones.</p></div>
+      <div class="modulo"><b>Presupuestos</b><p>Presupuesto contratado, adicionales y extraordinarios con folio, monto, estado y archivo. Totales aprobados y en trámite.</p></div>
+      <div class="modulo"><b>Reportes fotográficos</b><p>El residente sube fotos desde el celular con su pie de foto. El reporte sale listo para imprimir o guardar en PDF con firmas.</p></div>
+      <div class="modulo"><b>Vencimientos</b><p>Licencias, fianzas, permisos y constancias con fecha de vencimiento. Avisos en el inicio de lo vencido y lo que vence en 30 días.</p></div>
+      <div class="modulo"><b>Búsqueda</b><p>Un buscador que revisa obras, documentos, etiquetas, presupuestos y pies de foto.</p></div>
+      <div class="modulo"><b>Actividad</b><p>Registro de cada subida, cambio de estado y eliminación: quién, qué y cuándo.</p></div>
+    </div>
+    <h3>Expediente estándar de cada obra</h3>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Carpeta</th><th>Contenido típico</th></tr></thead>
+      <tbody>
+        <tr><td>Contrato y legal</td><td>Contrato, fianzas, convenios modificatorios, actas.</td></tr>
+        <tr><td>Proyecto y planos</td><td>Planos arquitectónicos y estructurales, memorias de cálculo, especificaciones.</td></tr>
+        <tr><td>Permisos y licencias</td><td>Licencia de construcción, uso de suelo, impacto ambiental, protección civil.</td></tr>
+        <tr><td>Estimaciones y generadores</td><td>Estimaciones de obra, números generadores, croquis.</td></tr>
+        <tr><td>Bitácora de obra</td><td>Notas de bitácora, instrucciones de supervisión, órdenes de cambio.</td></tr>
+        <tr><td>Calidad y laboratorio</td><td>Pruebas de concreto y compactación, certificados de materiales.</td></tr>
+        <tr><td>Seguridad e higiene</td><td>Programa de seguridad, constancias DC-3, permisos de trabajo.</td></tr>
+        <tr><td>Informes y minutas</td><td>Informes de avance, minutas, correspondencia.</td></tr>
+        <tr><td>Entrega y cierre</td><td>Acta de entrega-recepción, finiquito, planos as-built, garantías.</td></tr>
+      </tbody></table></div>
+    <p class="nota">Esta lista es una propuesta inicial. Conviene revisarla con los ingenieros: si ustedes
+       ya usan otra forma de organizar el expediente, se ajusta antes de construir la versión real.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">04</span>Roles y permisos</h2>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Permiso</th><th>Administrador</th><th>Coordinador</th><th>Residente</th><th>Consulta</th></tr></thead>
+      <tbody>
+        <tr><td>Ver obras</td><td>Todas</td><td>Todas</td><td>Asignadas</td><td>Asignadas</td></tr>
+        <tr><td>Crear y editar obras</td><td>✓</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>Subir documentos, presupuestos y reportes</td><td>✓</td><td>✓</td><td>✓</td><td>—</td></tr>
+        <tr><td>Aprobar o marcar como obsoleto</td><td>✓</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>Eliminar documentos</td><td>✓</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>Ver la actividad de todo el sistema</td><td>✓</td><td>✓</td><td>—</td><td>—</td></tr>
+        <tr><td>Gestionar usuarios y asignaciones</td><td>✓</td><td>—</td><td>—</td><td>—</td></tr>
+      </tbody></table></div>
+    <p style="margin-top:12px">El rol <b>Consulta</b> sirve para administración, compras o un cliente que sólo
+       necesita revisar. Cuando un residente sube una nueva versión, el documento regresa a “En revisión”
+       hasta que un coordinador lo apruebe.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">05</span>El demo y la versión real</h2>
+    <p>El demo publicado sirve para <b>probar el flujo</b> con datos de ejemplo antes de invertir en la
+       versión definitiva. Todas las pantallas funcionan: se pueden crear obras, subir archivos reales,
+       hacer reportes con fotos, cambiar de usuario y ver cómo cambian los permisos.</p>
+    <div class="tabla-wrap"><table>
+      <thead><tr><th>Aspecto</th><th>Demo (hoy)</th><th>Versión real</th></tr></thead>
+      <tbody>
+        <tr><td>Dónde se guardan los datos</td><td>En el navegador de quien lo usa. Cada persona ve su propia copia.</td><td>Base de datos MySQL en el servidor, compartida por todos.</td></tr>
+        <tr><td>Archivos</td><td>En el navegador; se pierden si se borra el historial.</td><td>En el servidor, fuera de la carpeta pública, con respaldo.</td></tr>
+        <tr><td>Contraseñas</td><td>De ejemplo, visibles.</td><td>Cifradas (hash), con cambio y recuperación por correo.</td></tr>
+        <tr><td>Descargas</td><td>Directas.</td><td>El servidor revisa el permiso antes de entregar cada archivo.</td></tr>
+        <tr><td>Alertas de vencimiento</td><td>Sólo en pantalla.</td><td>También por correo, con días de anticipación configurables.</td></tr>
+        <tr><td>Reporte fotográfico</td><td>Se imprime desde el navegador.</td><td>PDF generado en el servidor con formato fijo.</td></tr>
+      </tbody></table></div>
+  </section>
+
+  <section>
+    <h2><span class="n">06</span>Cómo se construye la versión real</h2>
+    <p>Se usaría la misma tecnología que el sistema de certificaciones de AVBA, que ya funciona en este
+       servidor (Hostinger): <b>PHP 8 + MySQL</b>. Así no hay que contratar nada nuevo y el mantenimiento es el mismo.</p>
+    <ul class="lista">
+      <li><b>Base de datos propia</b> para CH Construcciones, separada de la de AVBA.</li>
+      <li><b>Archivos fuera del acceso público</b>: nadie puede descargar un documento adivinando su dirección; cada descarga pasa por PHP, que revisa la sesión y los permisos.</li>
+      <li><b>Tablas principales</b>: <code>usuarios</code>, <code>obras</code>, <code>usuario_obra</code>, <code>documentos</code>, <code>documento_versiones</code>, <code>presupuestos</code>, <code>reportes</code>, <code>reporte_fotos</code>, <code>actividad</code>. El demo ya usa esta misma estructura.</li>
+      <li><b>Fotos reducidas</b> al subirlas (como en el demo), para que no llenen el disco.</li>
+      <li><b>PDF</b> de reportes con la librería dompdf y <b>correos</b> con PHPMailer, las mismas que usa AVBA.</li>
+      <li><b>Respaldos</b> programados de la base de datos y de los archivos.</li>
+    </ul>
+    <p class="nota"><b>Punto a vigilar: el espacio en disco.</b> Planos, PDF escaneados y fotos crecen rápido.
+       Hay que revisar cuánto espacio tiene el plan de Hostinger y, si hace falta, guardar los archivos en un
+       almacenamiento externo más barato (por ejemplo, un bucket compatible con S3).</p>
+  </section>
+
+  <section>
+    <h2><span class="n">07</span>Plan por etapas</h2>
+    <div class="fase hecha"><span class="num">0</span><div><b>Demo funcional <span class="chip verde">Listo</span></b>
+      <p>Validar pantallas, carpetas, roles y flujo con los ingenieros. Anotar qué sobra y qué falta.</p></div></div>
+    <div class="fase"><span class="num">1</span><div><b>Base real: usuarios, obras y expediente</b>
+      <p>Base de datos, inicio de sesión seguro, administración de usuarios, alta de obras, subida y descarga de
+         documentos con versiones y estados, bitácora de actividad. Con esto ya se puede trabajar.</p></div></div>
+    <div class="fase"><span class="num">2</span><div><b>Presupuestos, reportes fotográficos y vencimientos</b>
+      <p>Presupuestos con archivo, reportes fotográficos con PDF, avisos de vencimiento por correo y buscador.</p></div></div>
+    <div class="fase"><span class="num">3</span><div><b>Mejoras en campo</b>
+      <p>Instalar el sistema como aplicación en el celular (PWA), fotos con fecha y ubicación, enlaces de solo
+         lectura para compartir un documento con el cliente o la supervisión.</p></div></div>
+    <p style="margin-top:12px">Cada etapa se publica y se prueba antes de pasar a la siguiente.</p>
+  </section>
+
+  <section>
+    <h2><span class="n">08</span>Decisiones pendientes</h2>
+    <ol class="preguntas lista">
+      <li><b>Carpetas:</b> ¿la lista de 9 carpetas refleja cómo trabajan, o hay que agregar, quitar o renombrar alguna?</li>
+      <li><b>Roles:</b> ¿son suficientes los 4 roles? Por ejemplo, ¿hace falta un rol para el cliente o para la supervisión externa?</li>
+      <li><b>Aprobación:</b> ¿quién aprueba los documentos en la práctica: el coordinador, la dirección, o depende del tipo?</li>
+      <li><b>Presupuestos:</b> ¿basta con guardar el archivo (Excel, Opus, PDF) y sus datos principales, o necesitan capturar partidas y conceptos dentro del sistema?</li>
+      <li><b>Volumen:</b> ¿cuántas obras al año y cuántas personas van a usarlo? Sirve para calcular espacio en disco.</li>
+      <li><b>Base de datos:</b> hay que crear una base MySQL nueva en el panel de Hostinger para CH Construcciones.</li>
+      <li><b>Imagen:</b> logo y colores de la empresa para aplicarlos al sistema y a los reportes en PDF.</li>
+      <li><b>Información existente:</b> ¿hay documentos de obras actuales que habría que migrar al arrancar?</li>
+    </ol>
+  </section>
+
+</main>
+</body>
+</html>

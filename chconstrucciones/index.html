@@ -3,37 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>CH Construcciones</title>
-<style>
-  :root { --tinta:#1c2a3a; --sub:#5d7794; --linea:#d7e2ef; --fondo:#f6f9fd; --acento:#0d3a8f; }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-         background:var(--fondo); color:var(--tinta); min-height:100vh;
-         display:flex; align-items:center; justify-content:center; padding:24px; }
-  .caja { background:#fff; border:1px solid var(--linea); border-radius:14px;
-          padding:40px 34px; max-width:520px; width:100%; }
-  .marca { font-size:12px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
-           color:var(--acento); margin-bottom:10px; }
-  h1 { font-size:26px; letter-spacing:-.3px; margin-bottom:10px; }
-  p { font-size:14.5px; color:var(--sub); line-height:1.65; margin-bottom:16px; }
-  .datos { border-top:1px solid var(--linea); padding-top:16px; margin-top:6px; }
-  .dato { display:flex; gap:10px; font-size:12.5px; padding:5px 0; }
-  .dato b { color:var(--tinta); min-width:92px; font-weight:600; }
-  .dato span { color:var(--sub); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
-</style>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#1f2a37">
+<title>CH Construcciones — Gestión documental</title>
+<link rel="stylesheet" href="css/app.css?v=1">
 </head>
 <body>
-  <div class="caja">
-    <div class="marca">CH Construcciones</div>
-    <h1>Proyecto inicializado</h1>
-    <p>Esta página confirma que el despliegue automático funciona: se subió sola
-       al servidor al hacer push a la rama del proyecto.</p>
-    <p>Reemplázala por el sitio real cuando empiece el desarrollo.</p>
-    <div class="datos">
-      <div class="dato"><b>Rama</b><span>claude/ch-construcciones</span></div>
-      <div class="dato"><b>Carpeta</b><span>/chconstrucciones/</span></div>
-      <div class="dato"><b>Despliegue</b><span>deploy-chconstrucciones.yml</span></div>
-    </div>
-  </div>
+  <div id="app"></div>
+  <noscript><p style="padding:24px">Este sistema necesita JavaScript activado en el navegador.</p></noscript>
+  <script src="js/datos.js?v=1"></script>
+  <script src="js/app.js?v=1"></script>
 </body>
 </html>
