@@ -6086,35 +6086,61 @@ function izaCapturarFotoCallback(file) {
  * una eslinga no se parecen a las de un grillete.
  */
 /* ═══════════════════════════════════════════════════════════
-   UN SOLO CÓDIGO — grilletes
+   CÓDIGO COMPARTIDO ENTRE CAMPOS
    Un grillete no trae número de serie de fábrica: lo identifica la placa que
-   le pegamos, y ese número es a la vez su etiqueta interna y su QR. Se captura
-   una vez y los tres campos quedan iguales.
+   le pegamos, y ese número es a la vez su etiqueta interna y su QR.
+   Cada tipo define en el catálogo de Calidad cuáles de los tres campos
+   comparten valor. Hay piezas que traen serie del fabricante y aun así llevan
+   el mismo número en la etiqueta y en el QR: ahí sólo se copia entre esos dos
+   y la serie se captura aparte.
    ═══════════════════════════════════════════════════════════ */
-const IZA_ESPEJO = ['iza-id', 'iza-serie', 'iza-qr'];
+const IZA_CAMPOS_CODIGO = ['ETIQUETA', 'SERIE', 'QR'];
+const IZA_CAMPO_INPUT   = { ETIQUETA:'iza-id', SERIE:'iza-serie', QR:'iza-qr' };
+const IZA_CAMPO_NOMBRE  = { ETIQUETA:'ID', SERIE:'serie', QR:'QR' };
+
+function izaCamposEnPalabras(campos) {
+  const n = campos.map(c => IZA_CAMPO_NOMBRE[c]);
+  if (n.length <= 1) return n.join('');
+  return n.slice(0, -1).join(', ') + ' y ' + n[n.length - 1];
+}
 
 /* Lo decide el catálogo, no el nombre: el juego de poleas y la eslinga con
-   terminación en grillete llevan la palabra pero sí tienen serie propia. */
-function izaTipoCodigoUnico(tipoId) {
+   terminación en grillete llevan la palabra pero sí tienen serie propia.
+   Un campo solo no comparte con nadie, así que cuenta como ninguno. */
+function izaTipoCampos(tipoId) {
   const t = izaTipos.find(x => x.id == tipoId);
-  return !!t && +t.codigo_unico === 1;
+  if (!t) return [];
+  const dados = Array.isArray(t.campos_codigo)
+    ? t.campos_codigo.map(c => String(c || '').trim().toUpperCase())
+    : String(t.campos_codigo || '').split(',').map(c => c.trim().toUpperCase());
+  let campos = IZA_CAMPOS_CODIGO.filter(c => dados.includes(c));
+  // Un tipo guardado antes de esta pantalla trae codigo_unico = 1 y ningún
+  // campo: entonces son los tres.
+  if (!campos.length && +t.codigo_unico === 1) campos = IZA_CAMPOS_CODIGO.slice();
+  return campos.length >= 2 ? campos : [];
 }
 
-function izaEspejoActivo() {
-  return izaTipoCodigoUnico((document.getElementById('iza-tipo') || {}).value);
+function izaEspejoCampos() {
+  return izaTipoCampos((document.getElementById('iza-tipo') || {}).value);
 }
 
+function izaEspejoActivo()      { return izaEspejoCampos().length >= 2; }
+function izaEspejoQrCompartido(){ return izaEspejoCampos().includes('QR'); }
+
+/* Copia lo escrito a los demás campos compartidos. Los que no están en el
+   conjunto no se tocan: ahí puede haber una serie de fábrica. */
 function izaEspejo(origen) {
-  if (!izaEspejoActivo()) return;
-  IZA_ESPEJO.forEach(id => {
+  const ids = izaEspejoCampos().map(c => IZA_CAMPO_INPUT[c]);
+  if (ids.length < 2 || !ids.includes(origen.id)) { izaEspejoAviso(); return; }
+  ids.forEach(id => {
     const el = document.getElementById(id);
     if (el && el !== origen) el.value = origen.value;
   });
   izaEspejoAviso();
 }
 
-/* Copia el valor a los tres partiendo del QR: lo usan el escáner y el botón de
-   siguiente placa, que llenan el campo sin que nadie teclee. */
+/* Copia partiendo del QR: lo usan el escáner y el botón de siguiente placa,
+   que llenan el campo sin que nadie teclee. */
 function izaEspejoDesdeQr() {
   const qr = document.getElementById('iza-qr');
   if (qr) izaEspejo(qr);
@@ -6123,35 +6149,50 @@ function izaEspejoDesdeQr() {
 function izaEspejoAviso() {
   const avi = document.getElementById('iza-espejo-aviso');
   if (!avi) return;
-  if (!izaEspejoActivo()) { avi.style.display = 'none'; return; }
+  const campos = izaEspejoCampos();
+  if (campos.length < 2) { avi.style.display = 'none'; return; }
+
+  const palabras = izaCamposEnPalabras(campos);
+  const aparte   = IZA_CAMPOS_CODIGO.filter(c => !campos.includes(c));
+  const sueltos  = aparte.length ? ' La ' + izaCamposEnPalabras(aparte) + ' se captura aparte.' : '';
+  avi.style.display = '';
+
+  if (!campos.includes('QR')) {
+    // Sin el QR en el conjunto no hay nada que validar: el valor compartido
+    // puede ser cualquier texto.
+    avi.style.background = '#e8f1fb';
+    avi.style.color      = '#0C447C';
+    avi.innerHTML = 'En este tipo, <b>' + escHtmlIza(palabras) + '</b> llevan el mismo código.' + escHtmlIza(sueltos);
+    return;
+  }
 
   const v = (document.getElementById('iza-qr').value || '').trim();
   const sirve = /^\d{9,10}$/.test(v);
   const mal   = v !== '' && !sirve;
-  avi.style.display = '';
+  const otros = campos.filter(c => c !== 'QR');
   avi.style.background = mal ? '#fff4e0' : '#e8f1fb';
   avi.style.color      = mal ? '#8a5200' : '#0C447C';
   avi.innerHTML = v === ''
-    ? 'Este tipo lleva <b>un solo código</b>: el que captures aquí queda también como ID y como serie.'
+    ? 'En este tipo, <b>' + escHtmlIza(palabras) + '</b> llevan el mismo código: el que captures aquí queda también en los demás.' + escHtmlIza(sueltos)
     : sirve
-      ? '✓ El mismo código en el ID, la serie y el QR.'
-      : '⚠ Se guardará como ID y serie, pero no como código QR: la placa lleva 9 o 10 dígitos.';
+      ? '✓ El mismo código en ' + escHtmlIza(palabras) + '.' + escHtmlIza(sueltos)
+      : '⚠ Se guardará como ' + escHtmlIza(izaCamposEnPalabras(otros)) + ', pero no como código QR: la placa lleva 9 o 10 dígitos.';
 }
 
 /* Al cambiar el tipo se ajusta el modo sin pisar lo capturado: sólo se unifica
-   si los tres venían iguales o si sólo uno traía valor. */
+   si los campos compartidos venían iguales o si sólo uno traía valor. */
 function izaEspejoAlCambiarTipo() {
-  if (!izaEspejoActivo()) { izaEspejoAviso(); return; }
-  const vals = IZA_ESPEJO.map(id => (document.getElementById(id).value || '').trim());
-  const conValor = vals.filter(Boolean);
+  const ids = izaEspejoCampos().map(c => IZA_CAMPO_INPUT[c]);
+  if (ids.length < 2) { izaEspejoAviso(); return; }
+  const conValor = ids.map(id => (document.getElementById(id).value || '').trim()).filter(Boolean);
   if (conValor.length && new Set(conValor.map(v => v.toUpperCase())).size <= 1) {
-    IZA_ESPEJO.forEach(id => { document.getElementById(id).value = conValor[0]; });
+    ids.forEach(id => { document.getElementById(id).value = conValor[0]; });
   }
   izaEspejoAviso();
 }
 
-/* El QR sólo admite dígitos. Si el código no los tiene, se manda vacío y el
-   código sobrevive en el ID y la serie. */
+/* El QR sólo admite dígitos. Si el código compartido no los tiene, se manda
+   vacío y el código sobrevive en los demás campos del conjunto. */
 function izaEspejoQrParaGuardar() {
   const v = (document.getElementById('iza-qr').value || '').trim();
   return /^\d{9,10}$/.test(v) ? v : '';
@@ -6214,9 +6255,9 @@ function izaEscribirForm(d) {
   set('iza-componentes', d.componentes);
   set('iza-serie', '');
   set('iza-qr',    '');
-  // En los tipos de un solo código el ID es el código de la pieza, no un dato
-  // del modelo: heredarlo dejaría a la siguiente con el de la anterior.
-  if (izaEspejoActivo()) set('iza-id', '');
+  // Cuando el ID comparte código, es el código de la pieza y no un dato del
+  // modelo: heredarlo dejaría a la siguiente con el de la anterior.
+  if (izaEspejoCampos().includes('ETIQUETA')) set('iza-id', '');
   izaEstado(d.estado || 'CUMPLE');
   izaEspejoAviso();
   izaFotos = [];
@@ -6254,7 +6295,16 @@ function izaDuplicar(i) {
    pieza es la placa que le pegamos, así que se capturan de corrido.
    ═══════════════════════════════════════════════════════════ */
 let izaClonIdx = -1;
-let izaClonUnico = false;   // el tipo del original lleva un solo código
+let izaClonCampos = [];     // campos que comparten código en el tipo del original
+
+function izaClonComparte(c) { return izaClonCampos.includes(c); }
+function izaClonHayCompartido() { return izaClonCampos.length >= 2; }
+
+/* Cómo se llama el campo compartido en el renglón de cada copia. */
+function izaClonEtiquetaCodigo() {
+  return izaClonCampos.length === 3 ? 'Código de la pieza'
+                                    : izaCamposEnPalabras(izaClonCampos);
+}
 
 function izaClonar(i) {
   const a = izaAccesorios[i];
@@ -6262,22 +6312,25 @@ function izaClonar(i) {
   izaClonIdx = i;
 
   const d = a.datos || {};
-  izaClonUnico = izaTipoCodigoUnico(d.tipo);
+  izaClonCampos = izaTipoCampos(d.tipo);
   const linea = (et, v) => v ? `<div><b>${et}:</b> ${escHtmlIza(v)}</div>` : '';
   document.getElementById('iza-clon-sub').textContent = a.tipo_nombre || 'Accesorio';
   document.getElementById('iza-clon-resumen').innerHTML =
     linea('Tipo', a.tipo_nombre) + linea('Marca', d.marca) + linea('Modelo', d.modelo) +
     linea('Capacidad', d.capacidad) + linea('Medidas', d.medidas) +
-    (izaClonUnico ? '' : linea('ID', d.id_acc)) + linea('Estado', d.estado || a.estado) +
-    (izaClonUnico
-      ? `<div style="margin-top:6px;color:var(--azul-dark)"><b>Un solo código por pieza:</b> el que captures queda también como ID y como serie.</div>`
+    (izaClonComparte('ETIQUETA') ? '' : linea('ID', d.id_acc)) +
+    linea('Estado', d.estado || a.estado) +
+    (izaClonHayCompartido()
+      ? `<div style="margin-top:6px;color:var(--azul-dark)"><b>Un código para ${escHtmlIza(izaCamposEnPalabras(izaClonCampos))}:</b> el que captures queda en esos campos.</div>`
       : `<div style="margin-top:6px;color:var(--texto-hint)">Las copias heredan todo esto. Sólo captura lo que cambia en cada pieza.</div>`);
 
   document.getElementById('iza-clon-n').value      = 3;
   document.getElementById('iza-clon-fotos').checked = true;
   document.getElementById('iza-clon-ids').checked   = false;
   // Con un solo código no hay ID aparte que cambiar.
-  document.getElementById('iza-clon-ids').closest('label').style.display = izaClonUnico ? 'none' : 'flex';
+  // Si el ID comparte código, no hay un ID aparte que cambiar.
+  document.getElementById('iza-clon-ids').closest('label').style.display =
+    izaClonComparte('ETIQUETA') ? 'none' : 'flex';
   document.getElementById('iza-clon-error').textContent = '';
   document.getElementById('iza-clon-filas').innerHTML = '';
   izaClonarFilas(true);
@@ -6301,26 +6354,34 @@ function escHtmlIza(v) {
   return String(v == null ? '' : v).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 }
 
+/* Un renglón por copia, con un campo por cada valor independiente: el código
+   compartido se captura una vez y el servidor lo reparte entre los campos que
+   el tipo tenga marcados; los que no comparten llevan su propio campo. */
 function izaClonarFilaHtml(k, conId, p = {}) {
-  // En los tipos de un solo código —los grilletes— la serie y el ID son ese
-  // mismo código, así que se captura una vez y el servidor lo reparte.
-  if (izaClonUnico) {
-    return `
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:7px">
-      <div style="flex:0 0 22px;font-size:12px;font-weight:700;color:var(--texto-hint);text-align:right">${k + 1}</div>
-      <input type="text" class="iza-clon-qr" placeholder="Código de la pieza" value="${escHtmlIza(p.qr)}"
-             maxlength="10" inputmode="numeric" style="flex:1;min-width:0;letter-spacing:1px;margin:0">
-    </div>`;
+  const campos = [];
+  if (izaClonHayCompartido()) {
+    // Si el QR está en el conjunto el valor suele ser una placa, así que se
+    // ofrece el teclado numérico; si no, puede ser cualquier texto.
+    const num = izaClonComparte('QR') ? 'maxlength="10" inputmode="numeric"' : '';
+    campos.push(`<input type="text" class="iza-clon-cod" placeholder="${escHtmlIza(izaClonEtiquetaCodigo())}"
+             value="${escHtmlIza(p.cod)}" ${num} style="flex:1.4;min-width:0;letter-spacing:1px;margin:0">`);
+  }
+  if (!izaClonComparte('QR')) {
+    campos.push(`<input type="text" class="iza-clon-qr" placeholder="Código QR" value="${escHtmlIza(p.qr)}"
+             maxlength="10" inputmode="numeric" style="flex:1.4;min-width:0;letter-spacing:1px;margin:0">`);
+  }
+  if (!izaClonComparte('SERIE')) {
+    campos.push(`<input type="text" class="iza-clon-serie" placeholder="Serie (opcional)" value="${escHtmlIza(p.serie)}"
+             style="flex:1;min-width:0;margin:0">`);
+  }
+  if (conId && !izaClonComparte('ETIQUETA')) {
+    campos.push(`<input type="text" class="iza-clon-id" placeholder="ID" value="${escHtmlIza(p.id)}"
+             style="flex:.8;min-width:0;margin:0">`);
   }
   return `
     <div style="display:flex;gap:6px;align-items:center;margin-bottom:7px">
       <div style="flex:0 0 22px;font-size:12px;font-weight:700;color:var(--texto-hint);text-align:right">${k + 1}</div>
-      <input type="text" class="iza-clon-qr" placeholder="Código QR" value="${escHtmlIza(p.qr)}"
-             maxlength="10" inputmode="numeric" style="flex:1.4;min-width:0;letter-spacing:1px;margin:0">
-      <input type="text" class="iza-clon-serie" placeholder="Serie (opcional)" value="${escHtmlIza(p.serie)}"
-             style="flex:1;min-width:0;margin:0">
-      ${conId ? `<input type="text" class="iza-clon-id" placeholder="ID" value="${escHtmlIza(p.id)}"
-             style="flex:.8;min-width:0;margin:0">` : ''}
+      ${campos.join('\n      ')}
     </div>`;
 }
 
@@ -6361,15 +6422,18 @@ function izaClonarCantidad() {
 }
 
 function izaClonarLeer() {
+  const cods   = [...document.querySelectorAll('.iza-clon-cod')];
   const qrs    = [...document.querySelectorAll('.iza-clon-qr')];
   const series = [...document.querySelectorAll('.iza-clon-serie')];
   const ids    = [...document.querySelectorAll('.iza-clon-id')];
-  // Sólo se quitan las letras cuando el campo es de veras un QR. En los tipos
-  // de un solo código puede llevarlas, y limpiarlas convertía "G-9" en "9".
-  return qrs.map((q, k) => ({
-    qr:    izaClonUnico ? (q.value || '').trim() : (q.value || '').replace(/\D/g, ''),
+  const n = Math.max(cods.length, qrs.length, series.length, ids.length);
+  // Las letras sólo se quitan del campo que es de veras un QR. El código
+  // compartido puede llevarlas, y limpiarlas convertía "G-9" en "9".
+  return Array.from({ length: n }, (_, k) => ({
+    cod:   (cods[k]?.value   || '').trim(),
+    qr:    (qrs[k]?.value    || '').replace(/\D/g, ''),
     serie: (series[k]?.value || '').trim(),
-    id:    (ids[k]?.value || '').trim(),
+    id:    (ids[k]?.value    || '').trim(),
   }));
 }
 
@@ -6377,8 +6441,12 @@ function izaClonarLeer() {
    renglones vacíos, sin pisar las que ya se escanearon a mano. */
 async function izaClonarAutollenar() {
   const btn = document.getElementById('iza-clon-auto');
+  // El banco reparte placas: van al campo que acaba siendo el QR, que es el
+  // compartido cuando el QR está en el conjunto y el suyo cuando no.
+  const clase = izaClonComparte('QR') ? '.iza-clon-cod' : '.iza-clon-qr';
   const filas = izaClonarLeer();
-  const faltan = filas.filter(f => !f.qr).length;
+  const placa = f => izaClonComparte('QR') ? f.cod : f.qr;
+  const faltan = filas.filter(f => !placa(f)).length;
   if (!faltan) { mostrarToast('Todas las copias ya tienen código.', 'ok'); return; }
 
   btn.disabled = true;
@@ -6391,9 +6459,9 @@ async function izaClonarAutollenar() {
     if (d.status !== 'success') { mostrarToast(d.message || 'No hay placas libres.', 'err'); return; }
 
     // Las que ya trae otra copia en pantalla no se vuelven a repartir.
-    const usados = new Set(filas.map(f => f.qr).filter(Boolean));
+    const usados = new Set(filas.map(placa).filter(Boolean));
     const libres = (d.qrs || []).filter(q => !usados.has(q));
-    const campos = [...document.querySelectorAll('.iza-clon-qr')];
+    const campos = [...document.querySelectorAll(clase)];
     campos.forEach(c => { if (!c.value.trim() && libres.length) c.value = libres.shift(); });
     if (d.faltan > 0) mostrarToast(d.message, 'err');
   } catch (e) {
@@ -6404,6 +6472,27 @@ async function izaClonarAutollenar() {
   }
 }
 
+/**
+ * Coloca lo capturado en los tres campos que espera el servidor.
+ *
+ * El valor compartido se manda una sola vez y el servidor lo reparte entre los
+ * campos que el tipo tenga marcados. Va al QR cuando tiene forma de placa —ahí
+ * sólo caben 9 o 10 dígitos— y si no, al primer campo del conjunto que lo
+ * admita. Los campos que no comparten viajan con su propio valor.
+ */
+function izaClonRepartir(filas) {
+  const esPlaca = v => /^\d{9,10}$/.test(v);
+  const compQr  = izaClonComparte('QR');
+  const enQr    = f => compQr && esPlaca(f.cod);
+  return {
+    qrs: filas.map(f => compQr ? (enQr(f) ? f.cod : '') : f.qr),
+    series: filas.map(f => izaClonComparte('SERIE') ? (enQr(f) ? '' : f.cod) : f.serie),
+    // Si el código ya viaja en el QR o en la serie, el servidor lo copia aquí.
+    ids: filas.map(f => !izaClonComparte('ETIQUETA') ? f.id
+                      : (enQr(f) || izaClonComparte('SERIE')) ? '' : f.cod),
+  };
+}
+
 async function izaClonarGuardar() {
   const a = izaAccesorios[izaClonIdx];
   if (!a) return;
@@ -6412,29 +6501,33 @@ async function izaClonarGuardar() {
   err.textContent = '';
 
   // Se avisa aquí de lo que el servidor rechazaría, para no perder el viaje.
-  const esPlaca = v => /^\d{9,10}$/.test(v);
-  if (!izaClonUnico) {
+  const esPlaca  = v => /^\d{9,10}$/.test(v);
+  const compQr   = izaClonComparte('QR');
+  // El campo propio de QR siempre tiene que ser una placa; el compartido puede
+  // no serlo, y entonces el código sobrevive en los demás campos del conjunto.
+  if (!compQr) {
     const malos = filas.filter(f => f.qr && !esPlaca(f.qr));
     if (malos.length) { err.textContent = 'Los códigos deben tener 9 o 10 dígitos, tal como vienen impresos en la placa.'; return; }
   }
-  const codigos = filas.map(f => f.qr).filter(Boolean);
+  // Lo que identifica cada copia: el código compartido si lo hay, o su QR.
+  const identidad = f => izaClonHayCompartido() ? f.cod : f.qr;
+  const codigos = filas.map(identidad).filter(Boolean);
   if (new Set(codigos).size !== codigos.length) { err.textContent = 'Hay un código repetido entre las copias.'; return; }
 
-  // Con un solo código, lo que no tenga forma de placa se manda como ID y
-  // serie: en el QR sólo caben 9 o 10 dígitos y el servidor lo rechazaría.
-  const qrs    = filas.map(f => (izaClonUnico && !esPlaca(f.qr)) ? '' : f.qr);
-  const series = izaClonUnico ? filas.map(f => (esPlaca(f.qr) ? '' : f.qr)) : filas.map(f => f.serie);
-  const ids    = izaClonUnico ? series.slice() : filas.map(f => f.id);
+  const { qrs, series, ids } = izaClonRepartir(filas);
 
   const sinCodigo = filas.length - codigos.length;
   if (sinCodigo && !confirm(
       `${sinCodigo} de ${filas.length} copia(s) quedarían sin código.\n\n` +
       `Sin placa no se les puede emitir certificado individual; Calidad tendría que asignarlo después.\n\n¿Continuar así?`)) return;
 
-  const sinPlaca = izaClonUnico ? filas.filter(f => f.qr && !esPlaca(f.qr)).length : 0;
+  // Sólo se avisa si el QR está en el conjunto: es el único caso en que un
+  // código sin forma de placa deja a la copia sin QR.
+  const sinPlaca = compQr ? filas.filter(f => f.cod && !esPlaca(f.cod)).length : 0;
+  const otros    = izaCamposEnPalabras(izaClonCampos.filter(c => c !== 'QR'));
   if (sinPlaca && !confirm(
       `${sinPlaca} código(s) no tienen forma de placa (9 o 10 dígitos).\n\n` +
-      `Se guardarán como ID y serie, pero esas copias quedarán sin código QR.\n\n¿Continuar?`)) return;
+      `Se guardarán como ${otros}, pero esas copias quedarán sin código QR.\n\n¿Continuar?`)) return;
 
   const btn = document.getElementById('iza-clon-btn');
   btn.disabled = true;
@@ -6493,9 +6586,9 @@ async function izaGuardar(repetir = false) {
   }
   fTipo.classList.remove('has-error');
 
-  // En los tipos de un solo código el valor puede no ser una placa: entonces
-  // se guarda como ID y serie, y el aviso ya lo explicó.
-  const espejo = izaEspejoActivo();
+  // Cuando el QR comparte código con otro campo, el valor puede no ser una
+  // placa: entonces se guarda en los demás campos, y el aviso ya lo explicó.
+  const espejo = izaEspejoQrCompartido();
   const qrVal = espejo
     ? izaEspejoQrParaGuardar()
     : (document.getElementById('iza-qr')?.value || '').replace(/\D/g,'');

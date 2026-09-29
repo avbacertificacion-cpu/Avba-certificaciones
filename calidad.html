@@ -1864,16 +1864,33 @@
         </select>
       </div>
       <div class="form-group" style="margin-bottom:20px">
-        <label style="display:flex;gap:8px;align-items:flex-start;cursor:pointer">
-          <input type="checkbox" id="acc-tipo-codigo-unico" style="width:16px;height:16px;margin-top:2px;flex-shrink:0">
-          <span style="font-size:12.5px;color:var(--texto)">
-            <b>Etiqueta, serie y QR son el mismo código</b>
-            <span style="display:block;font-size:11px;color:var(--texto-hint);margin-top:2px;font-weight:400">
-              Para piezas sin serie de fábrica, como los grilletes: lo que las identifica es la placa
-              que les pegamos. Al capturar cualquiera de los tres, los otros dos se llenan solos.
-            </span>
-          </span>
+        <label style="font-size:12px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:3px">
+          Campos que comparten el mismo código
         </label>
+        <div style="font-size:11px;color:var(--texto-hint);margin-bottom:8px;line-height:1.45">
+          Marque los campos que en este tipo llevan el mismo valor. Al capturar uno, los demás
+          marcados se llenan solos. Los que no estén marcados se capturan por separado.<br>
+          Ejemplo: un grillete sin serie de fábrica comparte los tres; una eslinga con serie del
+          fabricante comparte etiqueta y QR, y la serie va aparte.
+        </div>
+        <div style="display:grid;gap:6px;border:1.5px solid var(--borde);border-radius:8px;padding:10px 12px">
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:12.5px;color:var(--texto)">
+            <input type="checkbox" id="acc-tipo-campo-etiqueta" value="ETIQUETA"
+                   onchange="accTipoCamposAviso()" style="width:16px;height:16px;flex-shrink:0">
+            Etiqueta <span style="color:var(--texto-hint);font-size:11px">(ID del accesorio)</span>
+          </label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:12.5px;color:var(--texto)">
+            <input type="checkbox" id="acc-tipo-campo-serie" value="SERIE"
+                   onchange="accTipoCamposAviso()" style="width:16px;height:16px;flex-shrink:0">
+            Número de serie
+          </label>
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-size:12.5px;color:var(--texto)">
+            <input type="checkbox" id="acc-tipo-campo-qr" value="QR"
+                   onchange="accTipoCamposAviso()" style="width:16px;height:16px;flex-shrink:0">
+            Código QR <span style="color:var(--texto-hint);font-size:11px">(9 o 10 dígitos)</span>
+          </label>
+        </div>
+        <div id="acc-tipo-campos-aviso" style="font-size:11.5px;margin-top:7px;padding:7px 10px;border-radius:7px;display:none"></div>
       </div>
     </div>
     <div class="modal-footer" style="justify-content:flex-end;gap:8px">
@@ -3891,8 +3908,8 @@ function renderAccTipos() {
   tbody.innerHTML = accTiposData.map(t => `
     <tr>
       <td style="font-weight:500">${t.nombre}
-        ${+t.codigo_unico === 1 ? `<span title="La etiqueta, la serie y el QR son el mismo código"
-            style="margin-left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--azul-light);color:var(--azul-dark)">1 código</span>` : ''}
+        ${accCamposDe(t).length >= 2 ? `<span title="Comparten el mismo código: ${escH(accCamposEnPalabras(accCamposDe(t)))}"
+            style="margin-left:6px;font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;background:var(--azul-light);color:var(--azul-dark)">${escH(accCamposCorto(accCamposDe(t)))}</span>` : ''}
       </td>
       <td style="text-align:center">
         <span style="font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;
@@ -3910,11 +3927,88 @@ function renderAccTipos() {
     </tr>`).join('');
 }
 
+/* ═══════════════════════════════════════════════════════════
+   QUÉ CAMPOS COMPARTEN CÓDIGO
+   Antes era un sí/no para los tres juntos. Ahora es un conjunto: una eslinga
+   puede traer serie del fabricante y aun así llevar el mismo número en la
+   etiqueta y en el QR. Un solo campo marcado no comparte con nadie, así que
+   cuenta como ninguno.
+   ═══════════════════════════════════════════════════════════ */
+const ACC_CAMPOS_CODIGO   = ['ETIQUETA', 'SERIE', 'QR'];
+const ACC_CAMPOS_NOMBRES  = { ETIQUETA:'etiqueta', SERIE:'serie', QR:'QR' };
+const ACC_CAMPOS_CASILLAS = { ETIQUETA:'acc-tipo-campo-etiqueta',
+                              SERIE:'acc-tipo-campo-serie',
+                              QR:'acc-tipo-campo-qr' };
+
+/* Deja el conjunto en el orden de siempre y descarta lo que no reconozca. */
+function accCamposNormalizar(v) {
+  const dado = Array.isArray(v) ? v : String(v || '').split(',');
+  const alta = dado.map(x => String(x || '').trim().toUpperCase());
+  return ACC_CAMPOS_CODIGO.filter(c => alta.includes(c));
+}
+
+/* Un tipo guardado antes de esta pantalla trae codigo_unico = 1 y ningún
+   campo: entonces son los tres. */
+function accCamposDe(t) {
+  if (!t) return [];
+  const campos = accCamposNormalizar(t.campos_codigo);
+  if (campos.length) return campos;
+  return +t.codigo_unico === 1 ? ACC_CAMPOS_CODIGO.slice() : [];
+}
+
+function accCamposEnPalabras(campos) {
+  const n = campos.map(c => ACC_CAMPOS_NOMBRES[c]);
+  if (n.length <= 1) return n.join('');
+  return n.slice(0, -1).join(', ') + ' y ' + n[n.length - 1];
+}
+
+/* Texto del distintivo en la tabla: "1 código" cuando son los tres, y la
+   combinación cuando es parcial, para no tener que abrir el tipo. */
+function accCamposCorto(campos) {
+  if (campos.length === 3) return '1 código';
+  return campos.map(c => c === 'ETIQUETA' ? 'Etiqueta' : c === 'SERIE' ? 'Serie' : 'QR').join(' = ');
+}
+
+function accTipoCamposMarcar(campos) {
+  ACC_CAMPOS_CODIGO.forEach(c => {
+    const el = document.getElementById(ACC_CAMPOS_CASILLAS[c]);
+    if (el) el.checked = campos.includes(c);
+  });
+}
+
+function accTipoCamposMarcados() {
+  return ACC_CAMPOS_CODIGO.filter(c => document.getElementById(ACC_CAMPOS_CASILLAS[c])?.checked);
+}
+
+function accTipoCamposAviso() {
+  const avi = document.getElementById('acc-tipo-campos-aviso');
+  if (!avi) return;
+  const campos = accTipoCamposMarcados();
+
+  if (campos.length === 0) {
+    avi.style.display = 'none';
+    return;
+  }
+  avi.style.display = '';
+  if (campos.length === 1) {
+    avi.innerHTML = '⚠ Un campo solo no comparte con nadie. Marque al menos dos, o deje todos sin marcar ' +
+                    'para capturar los tres por separado.';
+    avi.style.background = '#fff4e0';
+    avi.style.color      = '#8a5200';
+    return;
+  }
+  const sueltos = ACC_CAMPOS_CODIGO.filter(c => !campos.includes(c));
+  avi.innerHTML = 'Compartirán el mismo código: <b>' + escH(accCamposEnPalabras(campos)) + '</b>.' +
+    (sueltos.length ? ' Se captura por separado: <b>' + escH(accCamposEnPalabras(sueltos)) + '</b>.' : '');
+  avi.style.background = 'var(--azul-light)';
+  avi.style.color      = 'var(--azul-dark)';
+}
+
 function abrirModalAccTipo(id) {
   document.getElementById('acc-tipo-id').value    = id || '';
   document.getElementById('acc-tipo-nombre').value = '';
   document.getElementById('acc-tipo-activo').value = '1';
-  document.getElementById('acc-tipo-codigo-unico').checked = false;
+  accTipoCamposMarcar([]);
   document.getElementById('acc-tipo-modal-titulo').textContent = id ? 'Editar tipo de accesorio' : 'Nuevo tipo de accesorio';
 
   if (id) {
@@ -3922,9 +4016,10 @@ function abrirModalAccTipo(id) {
     if (t) {
       document.getElementById('acc-tipo-nombre').value = t.nombre;
       document.getElementById('acc-tipo-activo').value = String(t.activo);
-      document.getElementById('acc-tipo-codigo-unico').checked = +t.codigo_unico === 1;
+      accTipoCamposMarcar(accCamposDe(t));
     }
   }
+  accTipoCamposAviso();
 
   document.getElementById('overlay-acc-tipo').style.display = 'flex';
   setTimeout(() => document.getElementById('acc-tipo-nombre').focus(), 100);
@@ -3941,11 +4036,11 @@ async function guardarAccTipo() {
 
   if (!nombre) { alert('El nombre es obligatorio.'); return; }
 
-  const unico   = document.getElementById('acc-tipo-codigo-unico').checked ? 1 : 0;
+  const campos  = accTipoCamposMarcados();
   const action  = id ? 'EDITAR_TIPO_ACCESORIO' : 'CREAR_TIPO_ACCESORIO';
   const payload = id
-    ? { id: parseInt(id), nombre, activo: parseInt(activo), codigo_unico: unico }
-    : { nombre, codigo_unico: unico };
+    ? { id: parseInt(id), nombre, activo: parseInt(activo), campos_codigo: campos }
+    : { nombre, campos_codigo: campos };
 
   try {
     const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
@@ -4409,9 +4504,9 @@ async function guardarAccNuevo() {
   const v = id => (document.getElementById(id) || {}).value || '';
   const tipo = v('acc-n-tipo');
   if (!tipo) { mostrarToast('Selecciona el tipo de accesorio.', 'err'); return; }
-  // En los tipos de un solo código el valor puede no ser una placa: entonces
-  // se guarda sólo como etiqueta y serie, y el aviso ya lo explicó.
-  const espejo = accEspejoActivo('nuevo');
+  // Cuando el QR comparte código con otro campo, el valor puede no ser una
+  // placa: entonces se guarda sólo en los demás campos, y el aviso ya lo dijo.
+  const espejo = accEspejoQrCompartido('nuevo');
   const qr = espejo ? accEspejoQrParaGuardar('nuevo') : v('acc-n-qr').replace(/\D/g,'');
   if (!espejo && qr && (qr.length < 9 || qr.length > 10)) { mostrarToast('El código debe tener 9 o 10 dígitos, como viene impreso en la placa.', 'err'); return; }
 
@@ -4697,11 +4792,14 @@ function cerrarEditAcc() {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   UN SOLO CÓDIGO
+   CÓDIGO COMPARTIDO ENTRE CAMPOS
    Un grillete no trae número de serie de fábrica: lo identifica la placa que
    le pegamos, y ese número es a la vez su etiqueta interna y su QR.
-   Capturarlo tres veces sólo abre la puerta a que los tres queden distintos y
-   el certificado no cuadre con la pieza.
+   Capturarlo tres veces sólo abre la puerta a que queden distintos y el
+   certificado no cuadre con la pieza.
+   Cada tipo define en el catálogo cuáles de los tres comparten valor: una
+   eslinga con serie del fabricante comparte etiqueta y QR, y la serie va
+   aparte. Aquí sólo se copia entre los campos que ese tipo tenga marcados.
    ═══════════════════════════════════════════════════════════ */
 /* Los dos formularios de Calidad que capturan accesorios. */
 const ACC_ESPEJO_FORMS = {
@@ -4714,22 +4812,40 @@ const ACC_ESPEJO_FORMS = {
 /* Lo decide el catálogo, no el nombre: hay tipos que llevan "grillete" en el
    nombre —el juego de poleas, la eslinga con terminación en grillete— y ésos
    sí tienen serie propia. */
-function accTipoCodigoUnico(tipoId) {
-  const t = accTiposData.find(x => x.id == tipoId);
-  return !!t && +t.codigo_unico === 1;
+function accTipoCampos(tipoId) {
+  const campos = accCamposDe(accTiposData.find(x => x.id == tipoId));
+  // Un campo solo no comparte con nadie: no hay espejo que activar.
+  return campos.length >= 2 ? campos : [];
 }
 
-function accEspejoActivo(form) {
+/* Devuelve los campos que se copian entre sí en este formulario. */
+function accEspejoCampos(form) {
   const f = ACC_ESPEJO_FORMS[form];
-  return !!f && accTipoCodigoUnico(document.getElementById(f.tipo)?.value);
+  return f ? accTipoCampos(document.getElementById(f.tipo)?.value) : [];
 }
 
-/* Copia lo escrito a los otros dos campos. */
+function accEspejoActivo(form) { return accEspejoCampos(form).length >= 2; }
+
+/* ¿El QR es uno de los campos compartidos? Si no lo es, se captura y se valida
+   como cualquier otro QR: no lo toca el espejo. */
+function accEspejoQrCompartido(form) { return accEspejoCampos(form).includes('QR'); }
+
+/* Los input del formulario que corresponden a los campos compartidos. */
+function accEspejoInputs(form) {
+  const f = ACC_ESPEJO_FORMS[form];
+  const por = { ETIQUETA: f.id, SERIE: f.serie, QR: f.qr };
+  return accEspejoCampos(form).map(c => por[c]);
+}
+
+/* Copia lo escrito a los demás campos compartidos. Los que no están en el
+   conjunto no se tocan: ahí puede haber una serie de fábrica capturada a mano. */
 function accEspejo(origen, form) {
-  if (!accEspejoActivo(form)) return;
-  const f = ACC_ESPEJO_FORMS[form];
+  const ids = accEspejoInputs(form);
+  // Escribir en un campo que no comparte —la serie de fábrica, por ejemplo— no
+  // arrastra a los demás.
+  if (ids.length < 2 || !ids.includes(origen.id)) { accEspejoAviso(form); return; }
   const valor = origen.value;
-  [f.id, f.serie, f.qr].forEach(id => {
+  ids.forEach(id => {
     const el = document.getElementById(id);
     if (el && el !== origen) el.value = valor;
   });
@@ -4742,38 +4858,52 @@ function accEspejoAviso(form) {
   const f   = ACC_ESPEJO_FORMS[form];
   const avi = f && document.getElementById(f.aviso);
   if (!avi) return;
-  if (!accEspejoActivo(form)) { avi.style.display = 'none'; return; }
+  const campos = accEspejoCampos(form);
+  if (campos.length < 2) { avi.style.display = 'none'; return; }
+
+  const palabras = accCamposEnPalabras(campos);
+  const aparte   = ACC_CAMPOS_CODIGO.filter(c => !campos.includes(c));
+  const sueltos  = aparte.length ? ' La ' + accCamposEnPalabras(aparte) + ' se captura aparte.' : '';
+  avi.style.display = '';
+
+  if (!campos.includes('QR')) {
+    // Sin el QR en el conjunto no hay nada que validar: el valor compartido
+    // puede ser cualquier texto.
+    avi.innerHTML = 'En este tipo, <b>' + escH(palabras) + '</b> llevan el mismo código: al capturar uno, el otro se llena solo.' + escH(sueltos);
+    avi.style.background = 'var(--azul-light)';
+    avi.style.color      = 'var(--azul-dark)';
+    return;
+  }
 
   const v = (document.getElementById(f.qr).value || '').trim();
   const sirve = /^\d{9,10}$/.test(v);
-  avi.style.display = '';
+  const otros = campos.filter(c => c !== 'QR');
   avi.innerHTML = v === ''
-    ? 'Este tipo lleva <b>un solo código</b>: al capturar la etiqueta, la serie o el QR, los otros dos se llenan solos.'
+    ? 'En este tipo, <b>' + escH(palabras) + '</b> llevan el mismo código: al capturar cualquiera, los demás se llenan solos.' + escH(sueltos)
     : sirve
-      ? '✓ El mismo código en la etiqueta, la serie y el QR.'
-      : '⚠ <b>' + escH(v) + '</b> se guardará como etiqueta y serie, pero no como código QR: la placa lleva 9 o 10 dígitos.';
+      ? '✓ El mismo código en ' + escH(palabras) + '.' + escH(sueltos)
+      : '⚠ <b>' + escH(v) + '</b> se guardará como ' + escH(accCamposEnPalabras(otros)) + ', pero no como código QR: la placa lleva 9 o 10 dígitos.';
   avi.style.background = (v !== '' && !sirve) ? '#fff4e0' : 'var(--azul-light)';
   avi.style.color      = (v !== '' && !sirve) ? '#8a5200' : 'var(--azul-dark)';
 }
 
 /* Al cambiar el tipo se ajusta el modo, sin pisar lo ya capturado: sólo se
-   unifica si los tres campos venían iguales o si sólo uno traía valor. */
+   unifica si los campos compartidos venían iguales o si sólo uno traía valor. */
 function accEspejoAlCambiarTipo(form) {
-  if (!accEspejoActivo(form)) { accEspejoAviso(form); return; }
-  const f = ACC_ESPEJO_FORMS[form];
-  const campos = [f.id, f.serie, f.qr];
-  const vals = campos.map(id => (document.getElementById(id).value || '').trim());
+  const ids = accEspejoInputs(form);
+  if (ids.length < 2) { accEspejoAviso(form); return; }
+  const vals = ids.map(id => (document.getElementById(id).value || '').trim());
   const conValor = vals.filter(Boolean);
   const iguales  = new Set(conValor.map(v => v.toUpperCase())).size <= 1;
   if (conValor.length && iguales) {
     const v = conValor[0];
-    campos.forEach(id => { document.getElementById(id).value = v; });
+    ids.forEach(id => { document.getElementById(id).value = v; });
   }
   accEspejoAviso(form);
 }
 
-/* El QR sólo admite dígitos. Si el código no los tiene, se guarda vacío y el
-   código sobrevive en la etiqueta y la serie. */
+/* El QR sólo admite dígitos. Si el código compartido no los tiene, se guarda
+   vacío y el código sobrevive en los demás campos del conjunto. */
 function accEspejoQrParaGuardar(form) {
   const v = (document.getElementById(ACC_ESPEJO_FORMS[form].qr).value || '').trim();
   return /^\d{9,10}$/.test(v) ? v : '';
@@ -4803,9 +4933,9 @@ async function guardarEditAcc() {
           medidas:      document.getElementById('edit-acc-medidas').value.trim(),
           componentes:  document.getElementById('edit-acc-componentes').value.trim(),
           estado:       document.getElementById('edit-acc-estado').value,
-          // En los tipos de un solo código el QR puede no tener forma de placa;
-          // ahí va vacío y el código se conserva en etiqueta y serie.
-          qr_codigo:    accEspejoActivo('edit')
+          // Cuando el QR comparte código, el valor puede no tener forma de placa;
+          // ahí va vacío y el código se conserva en los demás campos del conjunto.
+          qr_codigo:    accEspejoQrCompartido('edit')
                           ? accEspejoQrParaGuardar('edit')
                           : (document.getElementById('edit-acc-qr').value.replace(/\D/g,'') || ''),
         }

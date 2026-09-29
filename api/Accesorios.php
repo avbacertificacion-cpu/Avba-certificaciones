@@ -177,19 +177,63 @@ class Accesorios {
     // ── Catálogo de tipos (público autenticado) ────────────
     public function listarTipos(): array {
         $col  = $this->ensureTipoCodigoUnico() ? 'codigo_unico' : '0 AS codigo_unico';
+        $cmp  = $this->ensureTipoCodigoCampos() ? 'codigo_unico_campos' : "'' AS codigo_unico_campos";
         $rows = $this->pdo->query(
-            "SELECT id, nombre, $col FROM accesorios_tipos WHERE activo = 1 ORDER BY nombre"
+            "SELECT id, nombre, $col, $cmp FROM accesorios_tipos WHERE activo = 1 ORDER BY nombre"
         )->fetchAll();
-        return ['status' => 'success', 'data' => $rows];
+        return ['status' => 'success', 'data' => $this->conCampos($rows)];
+    }
+
+    /**
+     * Completa el conjunto de campos para las filas que vengan del modo viejo.
+     *
+     * Un tipo guardado antes de la columna trae codigo_unico = 1 y el conjunto
+     * vacío; la pantalla necesita ver los tres marcados, no ninguno.
+     */
+    private function conCampos(array $rows): array {
+        foreach ($rows as &$r) {
+            $campos = self::normalizarCampos((string)($r['codigo_unico_campos'] ?? ''));
+            if (!$campos && (int)($r['codigo_unico'] ?? 0) === 1) $campos = self::CAMPOS_CODIGO;
+            $r['campos_codigo'] = $campos;
+        }
+        unset($r);
+        return $rows;
     }
 
     // ── Catálogo de tipos (admin — incluye inactivos) ──────
     public function listarTiposAdmin(): array {
         $col  = $this->ensureTipoCodigoUnico() ? 'codigo_unico' : '0 AS codigo_unico';
+        $cmp  = $this->ensureTipoCodigoCampos() ? 'codigo_unico_campos' : "'' AS codigo_unico_campos";
         $rows = $this->pdo->query(
-            "SELECT id, nombre, activo, $col, fecha_creacion FROM accesorios_tipos ORDER BY nombre"
+            "SELECT id, nombre, activo, $col, $cmp, fecha_creacion FROM accesorios_tipos ORDER BY nombre"
         )->fetchAll();
-        return ['status' => 'success', 'data' => $rows];
+        return ['status' => 'success', 'data' => $this->conCampos($rows)];
+    }
+
+    /**
+     * Interpreta lo que manda la pantalla y devuelve [campos, codigo_unico].
+     *
+     * Acepta las dos formas: el conjunto nuevo y la casilla de siempre, porque
+     * la app móvil y cualquier integración vieja siguen mandando codigo_unico
+     * a secas y no deben romperse.
+     *
+     * codigo_unico se mantiene en 1 cuando hay dos o más campos compartidos:
+     * hay lugares que todavía lo leen, y dejarlo desfasado haría que un tipo
+     * se comportara distinto según quién lo consulte.
+     */
+    private function camposDesdePayload(array $payload, string $nombre): array {
+        if (array_key_exists('campos_codigo', $payload)) {
+            $campos = self::normalizarCampos($payload['campos_codigo']);
+        } elseif (array_key_exists('codigo_unico', $payload)) {
+            $campos = !empty($payload['codigo_unico']) ? self::CAMPOS_CODIGO : [];
+        } else {
+            // Sin instrucción: una familia sin serie de fábrica nace con los
+            // tres compartidos, que es como se comportaba antes.
+            $campos = self::esFamiliaCodigoUnico($nombre) ? self::CAMPOS_CODIGO : [];
+        }
+        // Una sola casilla no comparte con nadie.
+        if (count($campos) < 2) $campos = [];
+        return [$campos, $campos ? 1 : 0];
     }
 
     // ── Crear tipo ─────────────────────────────────────────
@@ -201,13 +245,13 @@ class Accesorios {
         $dup->execute([$nombre]);
         if ($dup->fetch()) return ['status' => 'error', 'message' => 'Ya existe un tipo con ese nombre.'];
 
-        // Si no se dice nada, un tipo nuevo de una familia de código único nace
-        // con la casilla puesta: son todos piezas sin serie de fábrica.
-        $unico = array_key_exists('codigo_unico', $payload)
-            ? (!empty($payload['codigo_unico']) ? 1 : 0)
-            : (self::esFamiliaCodigoUnico($nombre) ? 1 : 0);
+        [$campos, $unico] = $this->camposDesdePayload($payload, $nombre);
 
-        if ($this->ensureTipoCodigoUnico()) {
+        if ($this->ensureTipoCodigoCampos()) {
+            $this->pdo->prepare(
+                "INSERT INTO accesorios_tipos (nombre, codigo_unico, codigo_unico_campos) VALUES (?,?,?)"
+            )->execute([$nombre, $unico, implode(',', $campos)]);
+        } elseif ($this->ensureTipoCodigoUnico()) {
             $this->pdo->prepare("INSERT INTO accesorios_tipos (nombre, codigo_unico) VALUES (?,?)")
                 ->execute([$nombre, $unico]);
         } else {
@@ -227,9 +271,16 @@ class Accesorios {
         if ($dup->fetch()) return ['status' => 'error', 'message' => 'Ya existe otro tipo con ese nombre.'];
 
         $activo = isset($payload['activo']) ? (int)$payload['activo'] : 1;
-        if ($this->ensureTipoCodigoUnico()) {
+        [$campos, $unico] = $this->camposDesdePayload($payload, $nombre);
+
+        if ($this->ensureTipoCodigoCampos()) {
+            $this->pdo->prepare(
+                "UPDATE accesorios_tipos SET nombre = ?, activo = ?, codigo_unico = ?, codigo_unico_campos = ?
+                  WHERE id = ?"
+            )->execute([$nombre, $activo, $unico, implode(',', $campos), $id]);
+        } elseif ($this->ensureTipoCodigoUnico()) {
             $this->pdo->prepare("UPDATE accesorios_tipos SET nombre = ?, activo = ?, codigo_unico = ? WHERE id = ?")
-                ->execute([$nombre, $activo, !empty($payload['codigo_unico']) ? 1 : 0, $id]);
+                ->execute([$nombre, $activo, $unico, $id]);
         } else {
             $this->pdo->prepare("UPDATE accesorios_tipos SET nombre = ?, activo = ? WHERE id = ?")
                 ->execute([$nombre, $activo, $id]);
@@ -304,8 +355,10 @@ class Accesorios {
         // Grilletes y demás tipos de código único: etiqueta, serie y QR son el
         // mismo dato, se capture por donde se capture.
         $qrFueraDeFormato = false;
-        if ($this->tipoCodigoUnico($tipoId)) {
-            [$idAcc, $serie, $qrCodigo, $qrFueraDeFormato] = $this->unificarCodigos($idAcc, $serie, $qrCodigo);
+        $camposUnicos = $this->tipoCodigoCampos($tipoId);
+        if (count($camposUnicos) >= 2) {
+            [$idAcc, $serie, $qrCodigo, $qrFueraDeFormato] =
+                $this->unificarCodigos($idAcc, $serie, $qrCodigo, $camposUnicos);
         }
 
         if ($qrCodigo !== '' && !qrFormatoValido($qrCodigo))
@@ -573,8 +626,10 @@ class Accesorios {
         // mismo dato: se unifican aquí también, no sólo en pantalla, para que
         // no lleguen distintos por otra vía.
         $qrFueraDeFormato = false;
-        if ($this->tipoCodigoUnico($tipoId)) {
-            [$idAcc, $serie, $qrCodigo, $qrFueraDeFormato] = $this->unificarCodigos($idAcc, $serie, $qrCodigo);
+        $camposUnicos = $this->tipoCodigoCampos($tipoId);
+        if (count($camposUnicos) >= 2) {
+            [$idAcc, $serie, $qrCodigo, $qrFueraDeFormato] =
+                $this->unificarCodigos($idAcc, $serie, $qrCodigo, $camposUnicos);
         }
 
         if ($qrCodigo !== '' && !qrFormatoValido($qrCodigo))
@@ -821,8 +876,9 @@ class Accesorios {
 
         $copiarFotos = !empty($p['copiar_fotos']);
         // Un lote de grilletes es justo el caso: cada copia sólo cambia en su
-        // código, y ese código va en los tres campos.
-        $unico   = $this->tipoCodigoUnico($it['tipo_id'] ? (int)$it['tipo_id'] : null);
+        // código, y ese código va en los campos que el tipo tenga marcados.
+        $campos  = $this->tipoCodigoCampos($it['tipo_id'] ? (int)$it['tipo_id'] : null);
+        $unico   = count($campos) >= 2;
         $creados = [];
         $this->pdo->beginTransaction();
         try {
@@ -834,7 +890,7 @@ class Accesorios {
                     // Aquí la etiqueta heredada no cuenta: si contara, todas las
                     // copias sin código propio se llamarían igual que el original.
                     [$idAcc, $serie, $qr, ] = $this->unificarCodigos(
-                        mb_strtoupper($ids[$i] ?? ''), mb_strtoupper($series[$i] ?? ''), $qr
+                        mb_strtoupper($ids[$i] ?? ''), mb_strtoupper($series[$i] ?? ''), $qr, $campos
                     );
                     $serie = $serie ?: null;
                     $idAcc = $idAcc ?: (string)$it['id_accesorio'];
@@ -1444,7 +1500,89 @@ class Accesorios {
         return $this->codigoUnicoDisponible;
     }
 
-    /** ¿Este tipo comparte etiqueta, serie y QR? */
+    /** Los tres campos que pueden compartir código. */
+    public const CAMPOS_CODIGO = ['ETIQUETA', 'SERIE', 'QR'];
+
+    /**
+     * Deja lista la columna que dice CUÁLES campos comparten código.
+     *
+     * Antes era un sí/no: o los tres iguales, o los tres distintos. Resultó
+     * insuficiente —hay piezas cuya placa y QR son el mismo número pero que sí
+     * traen serie de fábrica—, así que ahora se guarda el conjunto.
+     *
+     * Se pregunta a information_schema en vez de usar IF NOT EXISTS: esa forma
+     * es de MariaDB y MySQL 8 la rechaza.
+     */
+    private function ensureTipoCodigoCampos(): bool {
+        static $ok = null;
+        if ($ok !== null) return $ok;
+        try {
+            $q = $this->pdo->prepare(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'accesorios_tipos'
+                    AND COLUMN_NAME = 'codigo_unico_campos'"
+            );
+            $q->execute();
+            if ((int)$q->fetchColumn() === 0) {
+                $this->pdo->exec(
+                    "ALTER TABLE accesorios_tipos
+                     ADD COLUMN codigo_unico_campos VARCHAR(40) NOT NULL DEFAULT ''"
+                );
+                // Lo que ya existía con la casilla puesta compartía los tres.
+                if ($this->ensureTipoCodigoUnico()) {
+                    $this->pdo->exec(
+                        "UPDATE accesorios_tipos SET codigo_unico_campos = 'ETIQUETA,SERIE,QR'
+                          WHERE codigo_unico = 1 AND codigo_unico_campos = ''"
+                    );
+                }
+            }
+            $ok = true;
+        } catch (\Throwable $e) {
+            error_log('[Accesorios] codigo_unico_campos no disponible: ' . $e->getMessage());
+            $ok = false;
+        }
+        return $ok;
+    }
+
+    /** Normaliza lo que llega del navegador a un conjunto válido y ordenado. */
+    private static function normalizarCampos($valor): array {
+        if (is_string($valor)) $valor = explode(',', $valor);
+        if (!is_array($valor)) return [];
+        $limpio = [];
+        foreach ($valor as $v) {
+            $v = strtoupper(trim((string)$v));
+            if (in_array($v, self::CAMPOS_CODIGO, true) && !in_array($v, $limpio, true)) {
+                $limpio[] = $v;
+            }
+        }
+        // Se guarda siempre en el mismo orden, para que dos tipos con la misma
+        // combinación se vean iguales en la base y en la pantalla.
+        return array_values(array_filter(self::CAMPOS_CODIGO, fn($c) => in_array($c, $limpio, true)));
+    }
+
+    /**
+     * Qué campos comparten código en este tipo.
+     *
+     * Un solo campo no comparte nada con nadie, así que devuelve vacío: exigir
+     * dos evita que una casilla suelta active el espejo y sobrescriba un dato
+     * que el capturista puso a propósito.
+     */
+    private function tipoCodigoCampos(?int $tipoId): array {
+        if (!$tipoId) return [];
+        if ($this->ensureTipoCodigoCampos()) {
+            try {
+                $st = $this->pdo->prepare("SELECT codigo_unico_campos FROM accesorios_tipos WHERE id = ?");
+                $st->execute([$tipoId]);
+                $campos = self::normalizarCampos((string)$st->fetchColumn());
+                if (count($campos) >= 2) return $campos;
+                if ($campos) return [];
+            } catch (\Throwable $e) { /* se cae al modo viejo */ }
+        }
+        // Base que aún no tiene la columna: vale el sí/no de siempre.
+        return $this->tipoCodigoUnico($tipoId) ? self::CAMPOS_CODIGO : [];
+    }
+
+    /** ¿Este tipo comparte etiqueta, serie y QR? (modo anterior) */
     private function tipoCodigoUnico(?int $tipoId): bool {
         if (!$tipoId || !$this->ensureTipoCodigoUnico()) return false;
         try {
@@ -1455,24 +1593,43 @@ class Accesorios {
     }
 
     /**
-     * Deja etiqueta, serie y QR con el mismo valor cuando el tipo así lo pide.
+     * Iguala el valor SÓLO de los campos que el tipo declara compartidos.
      *
-     * Manda el QR si viene, porque es el número impreso en la placa; si no, la
-     * serie, y en último término la etiqueta. Un valor que no tenga forma de
-     * placa se copia igual en etiqueta y serie, pero no en el QR: ahí sólo
-     * caben 9 o 10 dígitos y meter otra cosa rompería la validación pública.
+     * Los que no están en el conjunto se devuelven tal como llegaron: en un
+     * tipo donde la etiqueta y el QR son el mismo número pero la serie es la
+     * de fábrica, tocar la serie sería destruir un dato real.
      *
+     * Manda el QR si viene y está compartido, porque es el número impreso en
+     * la placa; si no, la serie, y en último término la etiqueta. Un valor que
+     * no tenga forma de placa se copia en etiqueta y serie, pero no en el QR:
+     * ahí sólo caben 9 o 10 dígitos y meter otra cosa rompería la validación
+     * pública.
+     *
+     * @param array $campos Subconjunto de CAMPOS_CODIGO. Con menos de dos no
+     *                      hay nada que unificar y todo se devuelve intacto.
      * @return array{0:string,1:string,2:string,3:bool} etiqueta, serie, qr, ¿el QR quedó fuera?
      */
-    private function unificarCodigos(string $idAcc, string $serie, string $qr): array {
-        $valor = $qr !== '' ? $qr : ($serie !== '' ? $serie : $idAcc);
-        if ($valor === '') return ['', '', '', false];
+    private function unificarCodigos(string $idAcc, string $serie, string $qr, array $campos = self::CAMPOS_CODIGO): array {
+        $campos = self::normalizarCampos($campos);
+        if (count($campos) < 2) return [$idAcc, $serie, $qr, false];
+
+        $comparte = fn(string $c) => in_array($c, $campos, true);
+
+        // El valor sale únicamente de los campos compartidos.
+        $valor = '';
+        foreach ([['QR', $qr], ['SERIE', $serie], ['ETIQUETA', $idAcc]] as [$campo, $v]) {
+            if ($comparte($campo) && $v !== '') { $valor = $v; break; }
+        }
+        if ($valor === '') return [$idAcc, $serie, $qr, false];
+
         $sirveDeQr = qrFormatoValido($valor);
+        $fuera     = $comparte('QR') && !$sirveDeQr;
+
         return [
-            mb_strtoupper($valor),
-            mb_strtoupper($valor),
-            $sirveDeQr ? $valor : '',
-            !$sirveDeQr,
+            $comparte('ETIQUETA') ? mb_strtoupper($valor) : $idAcc,
+            $comparte('SERIE')    ? mb_strtoupper($valor) : $serie,
+            $comparte('QR')       ? ($sirveDeQr ? $valor : '') : $qr,
+            $fuera,
         ];
     }
 
