@@ -1,7 +1,8 @@
 /* ==========================================================================
-   Panel principal: menú según el rol, navegación y pantalla de inicio.
-   Cada sección es una "ruta" (#inicio, #trabajadores, …) que se dibuja
-   dentro de <main id="contenido">.
+   Núcleo del panel: menú según el rol, navegación, utilidades comunes y la
+   pantalla de inicio. Cada sección vive en js/paginas/*.js y se registra
+   en RUTAS. Las direcciones son del tipo #ruta o #ruta/parametro
+   (p. ej. #trabajador/t5).
    ========================================================================== */
 
 const yo = usuarioActual();
@@ -19,36 +20,44 @@ const ICONOS = {
   medicamentos: '<rect x="1.5" y="5.5" width="13" height="5" rx="2.5" transform="rotate(-35 8 8)"/><path d="M6 5.2l3.8 5.5"/>',
   ambulancias:  '<path d="M1.5 11.5V5h8v6.5M9.5 7h3l2 2.5v2h-5"/><circle cx="4.5" cy="12" r="1.5"/><circle cx="11.5" cy="12" r="1.5"/><path d="M5.5 6.5v3M4 8h3"/>',
   reloj:        '<circle cx="8" cy="8" r="6.5"/><path d="M8 4v4l2.5 1.5"/>',
-  corazon:      '<path d="M8 14s-5.5-3.3-5.5-7.2A3 3 0 0 1 8 5a3 3 0 0 1 5.5 1.8C13.5 10.7 8 14 8 14z"/>',
+  mas:          '<path d="M8 3v10M3 8h10"/>',
+  editar:       '<path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z"/>',
+  imprimir:     '<path d="M4 6V2h8v4M4 12H2.5V7h11v5H12"/><rect x="4" y="10" width="8" height="4"/>',
+  volver:       '<path d="M10 3L5 8l5 5"/>',
+  entrada:      '<path d="M8 2v9M4.5 7.5L8 11l3.5-3.5M2.5 14h11"/>',
 };
-const icono = (n, extra = '') => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" ${extra}>${ICONOS[n]}</svg>`;
+const icono = (n, extra = '') => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" ${extra}>${ICONOS[n] || ''}</svg>`;
 
 /* --------------------------------------------------------------------------
-   Rutas. `etapa` indica en qué etapa del plan se construye cada sección;
-   las que aún no existen muestran una página de "próximamente".
+   Rutas. Las páginas completan `dibujar` desde su propio archivo.
+   `oculta` = no sale en el menú; `padre` = qué opción del menú se resalta.
    -------------------------------------------------------------------------- */
 const RUTAS = {
-  inicio:       { seccion: 'Principal', titulo: 'Inicio',               sub: 'Tu turno y resumen del día',                      roles: ['admin', 'paramedico', 'planta'], etapa: 1, dibujar: dibujarInicio },
-  tablero:      { seccion: 'Principal', titulo: 'Tablero',              sub: 'Indicadores y gráficas',                          roles: ['admin', 'planta'],              etapa: 5,
-                  pronto: 'Gráficas de consultas por día y por turno, evaluaciones de alto riesgo, motivos de consulta más frecuentes, trabajadores con alertas y medicamentos por agotarse.' },
-  consultas:    { seccion: 'Atención',  titulo: 'Consultas',            sub: 'Checklist digital de consulta',                   roles: ['admin', 'paramedico'],          etapa: 3,
-                  pronto: 'Consulta con checklist digital: signos vitales, motivo, exploración, diagnóstico y receta. Al guardar, los medicamentos entregados se descuentan del inventario.' },
-  altoriesgo:   { seccion: 'Atención',  titulo: 'Alto riesgo',          sub: 'Presión arterial antes de trabajos de alto riesgo', roles: ['admin', 'paramedico'],        etapa: 4,
-                  pronto: 'Registro de presión por trabajador antes de trabajar en alturas, espacios confinados, trabajo eléctrico, en caliente o izaje. El sistema dictamina Apto (<140/90), Revalorar (140/90–159/99) o No apto (≥160/100).' },
-  alertas:      { seccion: 'Atención',  titulo: 'Alertas de salud',     sub: 'Trabajadores propensos a enfermedades',           roles: ['admin', 'planta'],              etapa: 4,
-                  pronto: 'Alertas para valoración médica calculadas con el historial: posible hipertensión, posible diabetes, obesidad, riesgo cardiometabólico y padecimientos recurrentes. Cada alerta explica por qué salió.' },
-  trabajadores: { seccion: 'Registros', titulo: 'Trabajadores',         sub: 'Alta y expediente de los trabajadores de planta',  roles: ['admin', 'paramedico', 'planta'], etapa: 2,
-                  pronto: 'La planta da de alta a sus trabajadores. Cada uno tendrá expediente con antecedentes, alergias, historial de consultas y gráfica de su presión arterial.' },
-  paramedicos:  { seccion: 'Registros', titulo: 'Paramédicos',          sub: 'Alta de paramédicos, usuarios y contraseñas',     roles: ['admin'],                        etapa: 2,
-                  pronto: 'Alta de paramédicos con su usuario y contraseña, esquema de turno (8 h o 12 h) y ambulancia asignada.' },
-  medicamentos: { seccion: 'Registros', titulo: 'Medicamentos',         sub: 'Inventario y salidas',                            roles: ['admin', 'paramedico'],          etapa: 3,
-                  pronto: 'Existencias, entradas, caducidades y alerta de stock mínimo. Cada salida queda ligada a la consulta en la que se entregó.' },
-  ambulancias:  { seccion: 'Registros', titulo: 'Ambulancias',          sub: 'Unidades y asignaciones',                         roles: ['admin'],                        etapa: 5,
-                  pronto: 'Unidades con su estado (disponible, en servicio, mantenimiento) y qué paramédico la tiene asignada en cada turno.' },
+  inicio:       { seccion: 'Principal', titulo: 'Inicio',           sub: 'Tu turno y resumen del día',                         roles: ['admin', 'paramedico', 'planta'] },
+  tablero:      { seccion: 'Principal', titulo: 'Tablero',          sub: 'Indicadores y gráficas',                             roles: ['admin', 'planta'] },
+  consultas:    { seccion: 'Atención',  titulo: 'Consultas',        sub: 'Historial de consultas',                             roles: ['admin', 'paramedico'] },
+  'consulta-nueva': { oculta: true, padre: 'consultas', titulo: 'Nueva consulta', sub: 'Checklist digital de consulta',        roles: ['admin', 'paramedico'] },
+  consulta:     { oculta: true, padre: 'consultas', titulo: 'Detalle de consulta', sub: 'Constancia de atención',              roles: ['admin', 'paramedico'] },
+  altoriesgo:   { seccion: 'Atención',  titulo: 'Alto riesgo',      sub: 'Presión arterial antes de trabajos de alto riesgo',  roles: ['admin', 'paramedico'] },
+  alertas:      { seccion: 'Atención',  titulo: 'Alertas de salud', sub: 'Trabajadores propensos a enfermedades',              roles: ['admin', 'planta', 'paramedico'] },
+  trabajadores: { seccion: 'Registros', titulo: 'Trabajadores',     sub: 'Alta y expediente de los trabajadores de planta',    roles: ['admin', 'paramedico', 'planta'] },
+  trabajador:   { oculta: true, padre: 'trabajadores', titulo: 'Expediente', sub: 'Historial clínico del trabajador',          roles: ['admin', 'paramedico', 'planta'] },
+  paramedicos:  { seccion: 'Registros', titulo: 'Paramédicos',      sub: 'Alta de paramédicos, usuarios y contraseñas',        roles: ['admin'] },
+  medicamentos: { seccion: 'Registros', titulo: 'Medicamentos',     sub: 'Inventario, entradas y salidas',                     roles: ['admin', 'paramedico'] },
+  ambulancias:  { seccion: 'Registros', titulo: 'Ambulancias',      sub: 'Unidades, estado y asignaciones',                    roles: ['admin'] },
 };
 
+// ¿Quién puede hacer qué?
+const PERMISOS = {
+  editarTrabajadores: ['admin', 'planta'],
+  verClinico:         ['admin', 'paramedico'],   // diagnósticos, recetas, signos
+  atender:            ['admin', 'paramedico'],   // consultas y evaluaciones
+  administrar:        ['admin'],                 // inventario, paramédicos, ambulancias, límites
+};
+const puede = accion => PERMISOS[accion].includes(yo.rol);
+
 /* --------------------------------------------------------------------------
-   Arranque
+   Arranque y navegación
    -------------------------------------------------------------------------- */
 function iniciarApp() {
   document.getElementById('sb-nombre').textContent = yo.nombre;
@@ -80,65 +89,136 @@ function iniciarApp() {
   // El turno cambia con la hora: se refresca cada minuto
   setInterval(() => {
     pintarTurnoTopbar();
-    if (rutaActual() === 'inicio') dibujarInicio();
+    if (rutaActual().clave === 'inicio' && !document.querySelector('.modal-fondo')) dibujarInicio();
   }, 60000);
 }
 
 function rutaActual() {
-  const r = location.hash.replace('#', '');
-  return RUTAS[r] && RUTAS[r].roles.includes(yo.rol) ? r : 'inicio';
+  const [clave, ...resto] = location.hash.replace('#', '').split('/');
+  const param = decodeURIComponent(resto.join('/'));
+  if (RUTAS[clave] && RUTAS[clave].roles.includes(yo.rol)) return { clave, param };
+  return { clave: 'inicio', param: '' };
 }
+
+function ir(ruta) { location.hash = ruta; }
 
 function dibujarMenu() {
   let html = '', seccion = '';
   for (const [clave, r] of Object.entries(RUTAS)) {
-    if (!r.roles.includes(yo.rol)) continue;
+    if (r.oculta || !r.roles.includes(yo.rol)) continue;
     if (r.seccion !== seccion) { seccion = r.seccion; html += `<div class="sb-section">${seccion}</div>`; }
-    const pronto = r.dibujar ? '' : `<span class="sb-pronto">Etapa ${r.etapa}</span>`;
-    html += `<a class="sb-item" href="#${clave}" data-ruta="${clave}">${icono(clave)}${r.titulo}${pronto}</a>`;
+    html += `<a class="sb-item" href="#${clave}" data-ruta="${clave}">${icono(clave)}${r.titulo}</a>`;
   }
   document.getElementById('menu').innerHTML = html;
 }
 
+let graficas = [];
 function navegar() {
-  const clave = rutaActual();
+  const { clave, param } = rutaActual();
   const r = RUTAS[clave];
-  document.querySelectorAll('.sb-item[data-ruta]').forEach(a => a.classList.toggle('active', a.dataset.ruta === clave));
+  const menu = r.padre || clave;
+  document.querySelectorAll('.sb-item[data-ruta]').forEach(a => a.classList.toggle('active', a.dataset.ruta === menu));
   document.getElementById('topbar-t').textContent = r.titulo;
   document.getElementById('topbar-s').textContent = r.sub;
   document.title = `${r.titulo} — AVBA Servicio Médico`;
+  cerrarModal();
+  graficas.forEach(g => g.destroy());
+  graficas = [];
   pintarTurnoTopbar();
-  if (r.dibujar) r.dibujar();
-  else dibujarProximamente(clave, r);
+  r.dibujar(param);
   window.scrollTo(0, 0);
 }
 
+// Vuelve a dibujar la pantalla actual (después de guardar algo)
+function refrescar() { navegar(); }
+
 /* --------------------------------------------------------------------------
-   Turno en la barra superior
+   Turno y guardia
    -------------------------------------------------------------------------- */
+
+// Guardia del paramédico en el turno en curso (se crea al iniciar sesión)
+function guardiaActual(datos, usuario = yo) {
+  if (usuario.rol !== 'paramedico') return null;
+  const t = detectarTurno(new Date(), usuario.esquema);
+  let g = datos.guardias.find(x => x.usuarioId === usuario.id && x.fechaTurno === t.fechaTurno && x.turno === t.clave);
+  if (!g && usuario.id === yo.id) {
+    // Cambió el turno sin cerrar sesión: se abre la guardia del turno nuevo
+    registrarGuardia(datos, usuario);
+    g = datos.guardias.find(x => x.usuarioId === usuario.id && x.fechaTurno === t.fechaTurno && x.turno === t.clave);
+  }
+  return g || null;
+}
+
+// Ambulancia con la que se está trabajando ahora
+function ambulanciaActual(datos) {
+  const g = guardiaActual(datos);
+  return g ? g.ambulanciaId : (yo.ambulanciaId || null);
+}
+
+// Datos de turno que se guardan en cada consulta o evaluación
+function sellarTurno(fecha = new Date()) {
+  const t = detectarTurno(fecha, yo.esquema || '8h');
+  return { turno: t.clave, esquema: t.esquema, fechaTurno: t.fechaTurno };
+}
+
 function pintarTurnoTopbar() {
-  const t = detectarTurno(new Date(), yo.esquema || '8h');
   const datos = DB.leer();
-  const amb = yo.rol === 'paramedico' ? datos.ambulancias.find(a => a.id === yo.ambulanciaId) : null;
+  const t = detectarTurno(new Date(), yo.esquema || '8h');
+  const ambId = yo.rol === 'paramedico' ? ambulanciaActual(datos) : null;
+  const amb = datos.ambulancias.find(a => a.id === ambId);
   document.getElementById('topbar-turno').innerHTML =
     `${icono('reloj')}<span><span class="txt-largo">Turno </span><b>${esc(nombreTurno(t))}</b>` +
     `<span class="txt-largo"> · ${t.horario}</span>${amb ? ` · ${esc(amb.clave)}` : ''}</span>`;
 }
 
+// Paramédicos cuya guardia sigue en curso en este momento
+function paramedicosEnTurno(datos) {
+  const ahora = new Date();
+  return datos.guardias
+    .filter(g => {
+      const t = detectarTurno(ahora, g.esquema);
+      return t.clave === g.turno && t.fechaTurno === g.fechaTurno;
+    })
+    .map(g => ({ guardia: g, usuario: datos.usuarios.find(u => u.id === g.usuarioId) }))
+    .filter(p => p.usuario && p.usuario.activo);
+}
+
 /* --------------------------------------------------------------------------
    INICIO
    -------------------------------------------------------------------------- */
+RUTAS.inicio.dibujar = dibujarInicio;
+
 function dibujarInicio() {
   const datos = DB.leer();
   const c = document.getElementById('contenido');
-  c.innerHTML = yo.rol === 'paramedico' ? inicioParamedico(datos) : inicioGeneral(datos);
+  if (yo.rol === 'paramedico') {
+    c.innerHTML = inicioParamedico(datos);
+    const sel = document.getElementById('cambiar-amb');
+    if (sel) sel.onchange = () => {
+      const g = guardiaActual(datos);
+      if (!g) return;
+      g.ambulanciaId = sel.value || null;
+      DB.guardar(datos);
+      aviso('Ambulancia del turno actualizada');
+      refrescar();
+    };
+  } else {
+    c.innerHTML = inicioGeneral(datos);
+  }
 }
 
 function inicioParamedico(datos) {
   const t = detectarTurno(new Date(), yo.esquema);
-  const amb = datos.ambulancias.find(a => a.id === yo.ambulanciaId);
+  const g = guardiaActual(datos);
+  const amb = datos.ambulancias.find(a => a.id === (g ? g.ambulanciaId : yo.ambulanciaId));
   const companeros = paramedicosEnTurno(datos).filter(p => p.usuario.id !== yo.id);
-  const misGuardias = datos.guardias.filter(g => g.usuarioId === yo.id).slice(-6).reverse();
+  const misGuardias = datos.guardias.filter(x => x.usuarioId === yo.id).slice(-6).reverse();
+  const delTurno = x => x.paramedicoId === yo.id && x.fechaTurno === t.fechaTurno && x.turno === t.clave;
+  const consultasTurno = datos.consultas.filter(delTurno);
+  const evalTurno = datos.evaluaciones.filter(delTurno);
+  const opcionesAmb = datos.ambulancias
+    .filter(a => ['disponible', 'en_servicio'].includes(a.estado) || (amb && a.id === amb.id))
+    .map(a => `<option value="${a.id}" ${amb && a.id === amb.id ? 'selected' : ''}>${esc(a.clave)} · ${esc(a.tipo)}</option>`).join('');
 
   return `
     <section class="turno-hero">
@@ -150,31 +230,40 @@ function inicioParamedico(datos) {
       </div>
       <div class="turno-hero-datos">
         <div class="turno-dato"><div class="turno-dato-l">Ambulancia</div><div class="turno-dato-v">${amb ? esc(amb.clave) : 'Sin asignar'}</div></div>
-        <div class="turno-dato"><div class="turno-dato-l">Unidad</div><div class="turno-dato-v">${amb ? esc(amb.tipo) : '—'}</div></div>
-        <div class="turno-dato"><div class="turno-dato-l">Entrada</div><div class="turno-dato-v">${misGuardias[0] ? horaCorta(misGuardias[0].entrada) : '—'}</div></div>
+        <div class="turno-dato"><div class="turno-dato-l">Consultas</div><div class="turno-dato-v">${consultasTurno.length} este turno</div></div>
+        <div class="turno-dato"><div class="turno-dato-l">Alto riesgo</div><div class="turno-dato-v">${evalTurno.length} evaluaciones</div></div>
+        <div class="turno-dato"><div class="turno-dato-l">Entrada</div><div class="turno-dato-v">${g ? horaCorta(g.entrada) : '—'}</div></div>
       </div>
     </section>
 
     <div class="accesos" style="margin-bottom:16px">
-      ${acceso('consultas', 'c-azul', 'Nueva consulta', 'Checklist digital y receta')}
-      ${acceso('altoriesgo', 'c-ambar', 'Alto riesgo', 'Tomar presión antes de trabajar')}
-      ${acceso('trabajadores', 'c-verde', 'Trabajadores', 'Buscar expediente')}
-      ${acceso('medicamentos', 'c-morado', 'Medicamentos', 'Revisar existencias')}
+      ${acceso('#consulta-nueva', 'consultas', 'c-azul', 'Nueva consulta', 'Checklist digital y receta')}
+      ${acceso('#altoriesgo', 'altoriesgo', 'c-ambar', 'Alto riesgo', 'Tomar presión antes de trabajar')}
+      ${acceso('#trabajadores', 'trabajadores', 'c-verde', 'Trabajadores', 'Buscar expediente')}
+      ${acceso('#medicamentos', 'medicamentos', 'c-morado', 'Medicamentos', 'Revisar existencias')}
     </div>
 
     <div class="grid grid-2">
       <div class="card">
-        <div class="card-hdr"><div><div class="card-hdr-t">Compañeros en turno</div><div class="card-hdr-s">Paramédicos que ya iniciaron sesión en el turno en curso</div></div></div>
+        <div class="card-hdr"><div><div class="card-hdr-t">Ambulancia de este turno</div><div class="card-hdr-s">Si hoy te tocó otra unidad, cámbiala aquí</div></div></div>
+        <div class="field" style="margin-bottom:10px">
+          <select id="cambiar-amb"><option value="">Sin ambulancia</option>${opcionesAmb}</select>
+        </div>
+        <div class="card-hdr" style="margin:18px 0 10px"><div><div class="card-hdr-t">Compañeros en turno</div><div class="card-hdr-s">Paramédicos que ya iniciaron sesión en el turno en curso</div></div></div>
         ${tablaEnTurno(companeros, datos)}
       </div>
       <div class="card">
         <div class="card-hdr"><div><div class="card-hdr-t">Mis guardias recientes</div><div class="card-hdr-s">Se registran solas al iniciar sesión</div></div></div>
         <div class="tabla-wrap"><table>
-          <thead><tr><th>Fecha de turno</th><th>Turno</th><th>Entrada</th></tr></thead>
-          <tbody>${misGuardias.map(g => `<tr>
-            <td>${fechaLarga(g.fechaTurno)}</td>
-            <td><span class="badge badge-azul">${esc(nombreTurno(turnoPorClave(g.esquema, g.turno)))}</span></td>
-            <td class="nowrap">${horaCorta(g.entrada)}</td></tr>`).join('') || '<tr><td colspan="3" class="vacio">Sin guardias</td></tr>'}
+          <thead><tr><th>Fecha de turno</th><th>Turno</th><th>Unidad</th><th>Entrada</th></tr></thead>
+          <tbody>${misGuardias.map(x => {
+            const a = datos.ambulancias.find(y => y.id === x.ambulanciaId);
+            return `<tr>
+            <td>${fechaLarga(x.fechaTurno)}</td>
+            <td><span class="badge badge-azul">${esc(nombreTurno(turnoPorClave(x.esquema, x.turno)))}</span></td>
+            <td>${a ? esc(a.clave) : '—'}</td>
+            <td class="nowrap">${horaCorta(x.entrada)}</td></tr>`;
+          }).join('') || '<tr><td colspan="4" class="vacio">Sin guardias</td></tr>'}
           </tbody></table></div>
       </div>
     </div>`;
@@ -186,16 +275,22 @@ function inicioGeneral(datos) {
   const paramedicos = datos.usuarios.filter(u => u.rol === 'paramedico' && u.activo);
   const enTurno = paramedicosEnTurno(datos);
   const ambDisp = datos.ambulancias.filter(a => a.estado === 'disponible').length;
+  const hoy = fechaISO(new Date());
+  const consultasHoy = datos.consultas.filter(c => fechaISO(new Date(c.fecha)) === hoy).length;
+  const salud = evaluarTodos(datos);
+  const riesgoAlto = salud.filter(s => s.riesgo === 'alto').length;
+  const bajos = datos.medicamentos.filter(m => m.activo && m.stock <= m.minimo).length;
 
   const stats = yo.rol === 'admin' ? `
-      ${stat('trabajadores', 'c-azul', activos.length, 'Trabajadores activos')}
+      ${stat('consultas', 'c-azul', consultasHoy, 'Consultas hoy')}
+      ${stat('paramedicos', 'c-verde', `${enTurno.length}<span class="stat-de"> / ${paramedicos.length}</span>`, 'Paramédicos en turno')}
+      ${stat('ambulancias', 'c-morado', `${ambDisp}<span class="stat-de"> / ${datos.ambulancias.length}</span>`, 'Ambulancias disponibles')}
+      ${stat('alertas', 'c-rojo', riesgoAlto, 'Trabajadores en riesgo alto', '#alertas')}
+      ${stat('medicamentos', 'c-ambar', bajos, 'Medicamentos en mínimo', '#medicamentos')}` : `
+      ${stat('trabajadores', 'c-azul', activos.length, 'Trabajadores activos', '#trabajadores')}
       ${stat('altoriesgo', 'c-ambar', altoRiesgo, 'Hacen trabajos de alto riesgo')}
-      ${stat('paramedicos', 'c-verde', `${enTurno.length}<span style="font-size:14px;color:var(--texto-hint)"> / ${paramedicos.length}</span>`, 'Paramédicos en turno')}
-      ${stat('ambulancias', 'c-morado', `${ambDisp}<span style="font-size:14px;color:var(--texto-hint)"> / ${datos.ambulancias.length}</span>`, 'Ambulancias disponibles')}` : `
-      ${stat('trabajadores', 'c-azul', activos.length, 'Trabajadores activos')}
-      ${stat('altoriesgo', 'c-ambar', altoRiesgo, 'Hacen trabajos de alto riesgo')}
-      ${stat('paramedicos', 'c-verde', enTurno.length, 'Paramédicos en turno')}
-      ${stat('inicio', 'c-morado', new Set(activos.map(t => t.area)).size, 'Áreas de la planta')}`;
+      ${stat('consultas', 'c-verde', consultasHoy, 'Consultas hoy')}
+      ${stat('alertas', 'c-rojo', riesgoAlto, 'Trabajadores en riesgo alto', '#alertas')}`;
 
   const porTurno = {};
   activos.forEach(t => { porTurno[t.turno] = (porTurno[t.turno] || 0) + 1; });
@@ -216,14 +311,15 @@ function inicioGeneral(datos) {
     </div>
 
     <div class="card">
-      <div class="card-hdr"><div><div class="card-hdr-t">Trabajadores por turno</div><div class="card-hdr-s">${esc(datos.planta.nombre)} · ${esc(datos.planta.ubicacion)}</div></div></div>
+      <div class="card-hdr"><div><div class="card-hdr-t">Trabajadores por turno</div><div class="card-hdr-s">${esc(datos.planta.nombre)} · ${esc(datos.planta.ubicacion)}</div></div>
+        <a class="btn btn-borde" href="#tablero">${icono('tablero')}Ver tablero</a></div>
       <div class="tabla-wrap"><table>
-        <thead><tr><th>Turno</th><th>Horario</th><th>Esquema</th><th>Trabajadores</th></tr></thead>
-        <tbody>${Object.entries(TURNOS).flatMap(([esq, lista]) => lista.map(t => `<tr>
-          <td><b>${esc(nombreTurno({ ...t, esquema: esq }))}</b></td>
+        <thead><tr><th>Turno</th><th>Horario</th><th>Esquema</th><th class="derecha">Trabajadores</th></tr></thead>
+        <tbody>${listaTurnos().map(t => `<tr>
+          <td><b>${esc(nombreTurno(t))}</b></td>
           <td>${hh(t.inicio)} – ${hh(t.fin)}</td>
-          <td>${ESQUEMAS[esq]}</td>
-          <td>${porTurno[t.clave] || 0}</td></tr>`)).join('')}
+          <td>${ESQUEMAS[t.esquema]}</td>
+          <td class="derecha num">${porTurno[t.clave] || 0}</td></tr>`).join('')}
         </tbody></table></div>
     </div>`;
 }
@@ -231,19 +327,6 @@ function inicioGeneral(datos) {
 /* --------------------------------------------------------------------------
    Piezas reutilizables
    -------------------------------------------------------------------------- */
-
-// Guardias cuyo turno sigue en curso en este momento
-function paramedicosEnTurno(datos) {
-  const ahora = new Date();
-  return datos.guardias
-    .filter(g => {
-      const t = detectarTurno(ahora, g.esquema);
-      return t.clave === g.turno && t.fechaTurno === g.fechaTurno;
-    })
-    .map(g => ({ guardia: g, usuario: datos.usuarios.find(u => u.id === g.usuarioId) }))
-    .filter(p => p.usuario);
-}
-
 function tablaEnTurno(lista, datos) {
   if (!lista.length) return `<div class="vacio">Nadie más ha iniciado sesión en este turno.<br>
     <span style="font-size:12px">Prueba entrar como paramédico en otra pestaña y regresa aquí.</span></div>`;
@@ -276,41 +359,42 @@ function lineaTurnos(esquema) {
     <div class="linea-horas"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>`;
 }
 
-function dibujarProximamente(clave, r) {
-  document.getElementById('contenido').innerHTML = `
-    <div class="card pronto">
-      <div class="stat-icon c-azul">${icono(clave)}</div>
-      <span class="badge badge-azul" style="margin-bottom:12px">Etapa ${r.etapa} del plan</span>
-      <h2>${esc(r.titulo)}</h2>
-      <p>${esc(r.pronto)}</p>
-      <p style="color:var(--texto-hint);font-size:12.5px">Esta sección se construye en la etapa ${r.etapa}.</p>
-    </div>`;
+function stat(ic, color, valor, etiqueta, enlace) {
+  const dentro = `<div class="stat-icon ${color}">${icono(ic)}</div><div><div class="stat-n">${valor}</div><div class="stat-l">${etiqueta}</div></div>`;
+  return enlace ? `<a class="stat stat-link" href="${enlace}">${dentro}</a>` : `<div class="stat">${dentro}</div>`;
 }
 
-function stat(ic, color, valor, etiqueta) {
-  return `<div class="stat"><div class="stat-icon ${color}">${icono(ic)}</div><div><div class="stat-n">${valor}</div><div class="stat-l">${etiqueta}</div></div></div>`;
-}
-
-function acceso(ruta, color, titulo, texto) {
-  const r = RUTAS[ruta];
-  const pronto = r.dibujar ? '' : `<span class="badge badge-gris acceso-pronto">Etapa ${r.etapa}</span>`;
-  return `<a class="acceso" href="#${ruta}"><div class="stat-icon ${color}">${icono(ruta)}</div>${pronto}
+function acceso(enlace, ic, color, titulo, texto) {
+  return `<a class="acceso" href="${enlace}"><div class="stat-icon ${color}">${icono(ic)}</div>
     <div class="acceso-t">${titulo}</div><div class="acceso-s">${texto}</div></a>`;
 }
 
-function turnoPorClave(esquema, clave) {
-  const t = (TURNOS[esquema] || []).find(x => x.clave === clave) || { clave, nombre: clave };
-  return { ...t, esquema };
+function badge(texto, clase) { return `<span class="badge ${clase}">${esc(texto)}</span>`; }
+
+function opciones(lista, seleccion, vacio) {
+  // lista: [[valor, texto], ...]
+  return (vacio ? `<option value="">${esc(vacio)}</option>` : '') +
+    lista.map(([v, t]) => `<option value="${esc(v)}" ${String(v) === String(seleccion ?? '') ? 'selected' : ''}>${esc(t)}</option>`).join('');
 }
 
+function nombreCompleto(t) { return t ? `${t.nombre} ${t.apellidos}` : '—'; }
+function edad(fechaNac) {
+  const n = new Date(fechaNac + 'T12:00:00'), h = new Date();
+  let e = h.getFullYear() - n.getFullYear();
+  if (h < new Date(h.getFullYear(), n.getMonth(), n.getDate())) e--;
+  return e;
+}
 function iniciales(nombre) {
   return nombre.replace(/^(Dra?\.|Lic\.|Ing\.)\s*/, '').split(' ').slice(0, 2).map(p => p[0]).join('').toUpperCase();
 }
 function horaCorta(iso) { return new Date(iso).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }); }
+function fechaCorta(iso) { return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }); }
+function fechaHora(iso) { return `${new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' })} · ${horaCorta(iso)}`; }
 function fechaLarga(iso) {
   const [a, m, d] = iso.split('-').map(Number);
   return new Date(a, m - 1, d).toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' });
 }
+function numero(n) { return Number(n).toLocaleString('es-MX'); }
 
 let temporizadorAviso;
 function aviso(texto) {
@@ -321,4 +405,67 @@ function aviso(texto) {
   temporizadorAviso = setTimeout(() => t.classList.remove('visible'), 2600);
 }
 
-if (yo) iniciarApp();
+/* --------------------------------------------------------------------------
+   Ventana emergente con formulario.
+   onGuardar(valores, form) devuelve un texto de error para mantenerla
+   abierta, o nada para cerrarla.
+   -------------------------------------------------------------------------- */
+function abrirModal({ titulo, cuerpo, textoGuardar = 'Guardar', onGuardar, alAbrir }) {
+  cerrarModal();
+  const fondo = document.createElement('div');
+  fondo.className = 'modal-fondo';
+  fondo.innerHTML = `
+    <form class="modal" novalidate>
+      <div class="modal-hdr"><div class="modal-hdr-t">${esc(titulo)}</div><button type="button" class="btn-cerrar" aria-label="Cerrar">×</button></div>
+      <div class="modal-body"><div class="modal-error"></div>${cuerpo}</div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-borde" data-cancelar>Cancelar</button>
+        <button type="submit" class="btn btn-primario">${esc(textoGuardar)}</button>
+      </div>
+    </form>`;
+  document.body.appendChild(fondo);
+  const form = fondo.querySelector('form');
+  fondo.querySelector('.btn-cerrar').onclick = cerrarModal;
+  fondo.querySelector('[data-cancelar]').onclick = cerrarModal;
+  fondo.addEventListener('mousedown', e => { if (e.target === fondo) cerrarModal(); });
+  form.onsubmit = e => {
+    e.preventDefault();
+    const error = onGuardar(leerFormulario(form), form);
+    if (error) {
+      const caja = form.querySelector('.modal-error');
+      caja.textContent = error;
+      caja.classList.add('visible');
+      caja.scrollIntoView({ block: 'nearest' });
+    } else cerrarModal();
+  };
+  if (alAbrir) alAbrir(form);
+  const primero = form.querySelector('input:not([type=checkbox]), select, textarea');
+  if (primero) primero.focus();
+  return form;
+}
+function cerrarModal() { document.querySelectorAll('.modal-fondo').forEach(m => m.remove()); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+
+// Convierte un formulario en objeto. Los checkbox con el mismo name y
+// value se juntan en arreglo; los sueltos quedan como true/false.
+function leerFormulario(form) {
+  const v = {};
+  form.querySelectorAll('input, select, textarea').forEach(el => {
+    if (!el.name) return;
+    if (el.type === 'checkbox') {
+      if (el.value && el.value !== 'on') { (v[el.name] = v[el.name] || []); if (el.checked) v[el.name].push(el.value); }
+      else v[el.name] = el.checked;
+    } else if (el.type === 'number') v[el.name] = el.value === '' ? null : Number(el.value);
+    else v[el.name] = el.value.trim();
+  });
+  return v;
+}
+
+// Tabla escondida debajo de una gráfica (alternativa accesible)
+function tablaDeGrafica(id, encabezados, filas) {
+  return `<button class="ver-tabla" type="button" onclick="document.getElementById('${id}').classList.toggle('visible')">Ver datos en tabla</button>
+    <div class="tabla-oculta tabla-wrap" id="${id}"><table>
+      <thead><tr>${encabezados.map((h, i) => `<th class="${i ? 'derecha' : ''}">${esc(h)}</th>`).join('')}</tr></thead>
+      <tbody>${filas.map(f => `<tr>${f.map((c, i) => `<td class="${i ? 'derecha num' : ''}">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table></div>`;
+}
