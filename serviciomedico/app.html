@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AVBA — Servicio Médico</title>
+  <link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></svg>
+    </div>
+    <div>
+      <div class="sb-brand-t">AVBA</div>
+      <div class="sb-brand-s">Servicio Médico</div>
+    </div>
+  </div>
+
+  <nav id="menu"></nav>
+
+  <div class="sb-bottom">
+    <div class="sb-user">
+      <div class="sb-avatar" id="sb-avatar">—</div>
+      <div>
+        <div class="sb-user-t" id="sb-nombre">—</div>
+        <div class="sb-user-s" id="sb-rol">—</div>
+      </div>
+    </div>
+    <button class="btn-sb" id="btn-restablecer" style="display:none" title="Borra lo capturado y vuelve a los datos de ejemplo">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8a6 6 0 1 0 2-4.5M2 2v3h3"/></svg>
+      Restablecer demo
+    </button>
+    <button class="btn-sb" onclick="cerrarSesion()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3H3v10h3M11 5l3 3-3 3M14 8H7"/></svg>
+      Cerrar sesión
+    </button>
+  </div>
+</aside>
+<div class="velo" id="velo"></div>
+
+<div class="main">
+  <header class="topbar">
+    <div class="topbar-izq">
+      <button class="btn-menu" id="btn-menu" aria-label="Abrir menú">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 4h12M2 8h12M2 12h12"/></svg>
+      </button>
+      <div>
+        <div class="topbar-t" id="topbar-t">—</div>
+        <div class="topbar-s" id="topbar-s">—</div>
+      </div>
+    </div>
+    <div class="topbar-turno" id="topbar-turno"></div>
+  </header>
+
+  <main class="content" id="contenido"></main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/turnos.js"></script>
+<script src="js/datos.js"></script>
+<script src="js/sesion.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

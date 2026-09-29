@@ -1,39 +1,110 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Servicio Médico</title>
-<style>
-  :root { --tinta:#1c2a3a; --sub:#5d7794; --linea:#d7e2ef; --fondo:#f6f9fd; --acento:#0d3a8f; }
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
-         background:var(--fondo); color:var(--tinta); min-height:100vh;
-         display:flex; align-items:center; justify-content:center; padding:24px; }
-  .caja { background:#fff; border:1px solid var(--linea); border-radius:14px;
-          padding:40px 34px; max-width:520px; width:100%; }
-  .marca { font-size:12px; font-weight:700; letter-spacing:1.6px; text-transform:uppercase;
-           color:var(--acento); margin-bottom:10px; }
-  h1 { font-size:26px; letter-spacing:-.3px; margin-bottom:10px; }
-  p { font-size:14.5px; color:var(--sub); line-height:1.65; margin-bottom:16px; }
-  .datos { border-top:1px solid var(--linea); padding-top:16px; margin-top:6px; }
-  .dato { display:flex; gap:10px; font-size:12.5px; padding:5px 0; }
-  .dato b { color:var(--tinta); min-width:92px; font-weight:600; }
-  .dato span { color:var(--sub); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; }
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AVBA — Servicio Médico</title>
+  <link rel="stylesheet" href="css/estilos.css">
 </head>
-<body>
-  <div class="caja">
-    <div class="marca">Servicio Médico</div>
-    <h1>Proyecto inicializado</h1>
-    <p>Esta página confirma que el despliegue automático funciona: se subió sola
-       al servidor al hacer push a la rama del proyecto.</p>
-    <p>Reemplázala por el sitio real cuando empiece el desarrollo.</p>
-    <div class="datos">
-      <div class="dato"><b>Rama</b><span>claude/servicio-medico</span></div>
-      <div class="dato"><b>Carpeta</b><span>/serviciomedico/</span></div>
-      <div class="dato"><b>Despliegue</b><span>deploy-serviciomedico.yml</span></div>
+<body class="login-body">
+
+<div class="login-wrap">
+  <div class="login-brand">
+    <div class="brand-logo">
+      <!-- Cruz médica dentro del cuadro azul de AVBA -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+        <path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>
+      </svg>
+    </div>
+    <div class="brand-name">AVBA Servicio Médico</div>
+    <div class="brand-sub">Control de consultas, paramédicos y salud ocupacional</div>
+  </div>
+
+  <div class="login-card">
+    <div class="card-title">Iniciar sesión</div>
+    <div class="card-sub">Ingresa tus credenciales para continuar</div>
+
+    <div class="turno-chip">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6.5"/><path d="M8 4v4l2.5 1.5"/></svg>
+      <span id="turno-login">Detectando turno…</span>
+    </div>
+
+    <div class="error-box" id="error-box">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3M8 10v.5"/></svg>
+      <span>Usuario o contraseña incorrectos</span>
+    </div>
+
+    <form id="form-login" autocomplete="on">
+      <div class="field">
+        <label for="usuario">Usuario</label>
+        <div class="input-wrap">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 8a3 3 0 100-6 3 3 0 000 6zM2 14c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>
+          <input type="text" id="usuario" placeholder="Tu nombre de usuario" autocomplete="username" required>
+        </div>
+      </div>
+      <div class="field">
+        <label for="password">Contraseña</label>
+        <div class="input-wrap">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="7" width="10" height="8" rx="2"/><path d="M5 7V5a3 3 0 016 0v2"/></svg>
+          <input type="password" id="password" placeholder="Tu contraseña" autocomplete="current-password" required>
+        </div>
+      </div>
+      <button class="btn-login" type="submit">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3H3v10h10v-3M9 8h6M12 5l3 3-3 3"/></svg>
+        Entrar
+      </button>
+    </form>
+
+    <div class="demo-users">
+      <div class="demo-users-t">Usuarios de demostración</div>
+      <div id="lista-demo"></div>
     </div>
   </div>
+
+  <p class="aviso-demo">Versión demo: los datos se guardan sólo en este navegador.</p>
+</div>
+
+<script src="js/turnos.js"></script>
+<script src="js/datos.js"></script>
+<script src="js/sesion.js"></script>
+<script>
+  // Si ya hay sesión abierta, directo al panel
+  if (usuarioActual()) location.replace('app.html');
+
+  // Turno actual en los dos esquemas
+  function pintarTurno() {
+    const t8 = detectarTurno(new Date(), '8h');
+    const t12 = detectarTurno(new Date(), '12h');
+    document.getElementById('turno-login').innerHTML =
+      `Turno actual: <b>${t8.nombre}</b> (${t8.horario})<br>Turnos de 12 h: <b>${t12.nombre}</b> (${t12.horario})`;
+  }
+  pintarTurno();
+  setInterval(pintarTurno, 30000);
+
+  // Botones para entrar rápido con los usuarios de ejemplo
+  const lista = document.getElementById('lista-demo');
+  const demo = DB.leer().usuarios.filter(u => ['u_admin', 'u_planta', 'u_pm1', 'u_pm4'].includes(u.id));
+  demo.forEach(u => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'demo-user';
+    const detalle = u.rol === 'paramedico' ? `${ROLES[u.rol]} · ${ESQUEMAS[u.esquema]}` : ROLES[u.rol];
+    b.innerHTML = `<div><div class="demo-user-n">${esc(u.nombre)}</div><div class="demo-user-s">${esc(detalle)}</div></div>
+                   <code>${esc(u.usuario)} / ${esc(u.password)}</code>`;
+    b.onclick = () => {
+      document.getElementById('usuario').value = u.usuario;
+      document.getElementById('password').value = u.password;
+      document.getElementById('password').focus();
+    };
+    lista.appendChild(b);
+  });
+
+  document.getElementById('form-login').addEventListener('submit', e => {
+    e.preventDefault();
+    const u = iniciarSesion(document.getElementById('usuario').value, document.getElementById('password').value);
+    if (u) location.href = 'app.html';
+    else document.getElementById('error-box').classList.add('visible');
+  });
+</script>
 </body>
 </html>
