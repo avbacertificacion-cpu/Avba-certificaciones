@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Ayudas para las gráficas (Chart.js, incluida en js/vendor).
+   Ayudas para las gráficas (Chart.js, incluida en js/lib).
    Los colores de serie siguen un orden fijo y validado para daltonismo;
    los de estado (apto / revalorar / no apto) se reservan sólo para eso.
    ========================================================================== */
