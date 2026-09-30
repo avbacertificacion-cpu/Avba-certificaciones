@@ -711,12 +711,19 @@ class Auth {
         }
 
         // ── Accesorios ────────────────────────────────────
+        // Certificaciones puede retirar del portal un documento sin tocar los
+        // otros dos: el certificado puede estar disponible mientras el informe
+        // con no cumple se resuelve. Lo retirado no se borra, sólo deja de
+        // entregarse aquí.
         $accesorios = [];
         try {
+            $ocultosCol = columnaExiste($this->pdo, 'accesorios_sesiones', 'docs_ocultos')
+                ? 's.docs_ocultos' : "'' AS docs_ocultos";
             $stmt = $this->pdo->prepare(
                 "SELECT s.id, s.cliente, s.control,
                         DATE_FORMAT(s.fecha, '%d/%m/%Y') AS fecha,
                         s.qr_codigo, s.cert_url, s.informe_url, s.informe_cumple_url,
+                        $ocultosCol,
                         COUNT(a.id)             AS total,
                         SUM(a.estado='CUMPLE')  AS cumple,
                         SUM(a.estado!='CUMPLE') AS no_cumple
@@ -728,19 +735,29 @@ class Auth {
             );
             $stmt->execute([$like]);
             foreach ($stmt->fetchAll() as $r) {
+                $ocultos = array_filter(array_map('trim', explode(',', (string)($r['docs_ocultos'] ?? ''))));
+                $doc = fn(string $clave, string $col) => in_array($clave, $ocultos, true) ? '' : ($r[$col] ?? '');
+
+                $urls = [
+                    'cert_url'           => $doc('cert',    'cert_url'),
+                    'informe_url'        => $doc('informe', 'informe_url'),
+                    'informe_cumple_url' => $doc('cumple',  'informe_cumple_url'),
+                ];
+                // Si se retiraron todos los documentos que había, la sesión no
+                // se anuncia: una fila sin nada que descargar sólo confunde.
+                $habiaAlgo = ($r['cert_url'] ?? '') || ($r['informe_url'] ?? '') || ($r['informe_cumple_url'] ?? '');
+                if ($habiaAlgo && !array_filter($urls)) continue;
+
                 if (!$nombreCliente) $nombreCliente = $r['cliente'];
                 $accesorios[] = [
-                    'id'                 => (int)$r['id'],
-                    'folio'              => $r['control'],
-                    'fecha'              => $r['fecha'],
-                    'total'              => (int)$r['total'],
-                    'cumple'             => (int)$r['cumple'],
-                    'no_cumple'          => (int)$r['no_cumple'],
-                    'qr_url'             => $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '',
-                    'cert_url'           => $r['cert_url'] ?? '',
-                    'informe_url'        => $r['informe_url'] ?? '',
-                    'informe_cumple_url' => $r['informe_cumple_url'] ?? '',
-                ];
+                    'id'        => (int)$r['id'],
+                    'folio'     => $r['control'],
+                    'fecha'     => $r['fecha'],
+                    'total'     => (int)$r['total'],
+                    'cumple'    => (int)$r['cumple'],
+                    'no_cumple' => (int)$r['no_cumple'],
+                    'qr_url'    => $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '',
+                ] + $urls;
             }
         } catch (\PDOException $e) { /* tabla o columna aún no existe */ }
 

@@ -120,16 +120,24 @@ class ClienteEnvios {
                     break;
 
                 case 'accesorio':   // sesión de accesorios de izaje
+                    // Un documento retirado del portal tampoco se manda por
+                    // aquí: el cliente no puede reenviarse lo que ya no se le
+                    // está entregando.
+                    $col = columnaExiste($this->pdo, 'accesorios_sesiones', 'docs_ocultos')
+                        ? 'docs_ocultos' : "'' AS docs_ocultos";
                     $s = $this->pdo->prepare(
-                        "SELECT control, cert_url, informe_url, informe_cumple_url
+                        "SELECT control, cert_url, informe_url, informe_cumple_url, $col
                          FROM accesorios_sesiones WHERE id = ? AND control LIKE ?"
                     );
                     $s->execute([$id, $like]);
                     if ($r = $s->fetch(PDO::FETCH_ASSOC)) {
-                        $base = $this->etiqueta($r['control'], 'Accesorios');
-                        if ($r['cert_url'])           $out["Certificado $base"]     = $r['cert_url'];
-                        if ($r['informe_url'])        $out["Reporte $base"]         = $r['informe_url'];
-                        if ($r['informe_cumple_url']) $out["Reporte CUMPLE $base"]  = $r['informe_cumple_url'];
+                        $base    = $this->etiqueta($r['control'], 'Accesorios');
+                        $ocultos = array_filter(array_map('trim', explode(',', (string)($r['docs_ocultos'] ?? ''))));
+                        $visible = fn(string $clave, string $campo) =>
+                            !in_array($clave, $ocultos, true) && !empty($r[$campo]);
+                        if ($visible('cert',    'cert_url'))           $out["Certificado $base"]    = $r['cert_url'];
+                        if ($visible('informe', 'informe_url'))        $out["Reporte $base"]        = $r['informe_url'];
+                        if ($visible('cumple',  'informe_cumple_url')) $out["Reporte CUMPLE $base"] = $r['informe_cumple_url'];
                     }
                     break;
 

@@ -1969,6 +1969,29 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->emitirCertAcc((int)($payload['sesion_id'] ?? 0), $usr['usuario']));
 
+        // Deja el documento disponible en el portal del cliente sin enviar
+        // correo. tipo: cert | informe | cumple | todo.
+        case 'PUBLICAR_PORTAL_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->publicarPortalAcc(
+                (int)   ($payload['sesion_id'] ?? $payload['id'] ?? 0),
+                (string)($payload['tipo']      ?? 'todo'),
+                $usr['usuario']
+            ));
+
+        // Muestra o retira del portal un documento ya generado, sin tocar los
+        // otros dos y sin volver a generarlo.
+        case 'VISIBILIDAD_DOC_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->visibilidadDocAcc(
+                (int)   ($payload['sesion_id'] ?? $payload['id'] ?? 0),
+                (string)($payload['tipo']      ?? ''),
+                !empty($payload['visible']),
+                $usr['usuario']
+            ));
+
         case 'ENVIAR_CERT_ACC':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

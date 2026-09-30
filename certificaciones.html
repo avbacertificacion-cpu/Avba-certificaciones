@@ -2559,7 +2559,7 @@ function renderAccCert(data) {
       <td style="text-align:center;font-weight:700">${r.total||0}</td>
       <td style="text-align:center"><span class="badge b-apro" style="font-size:10px">${r.cumple||0}</span></td>
       <td style="text-align:center"><span class="badge b-vencido" style="font-size:10px">${r.no_cumple||0}</span></td>
-      <td style="text-align:center">${estatusCertBadge(r.estatus)}</td>
+      <td style="text-align:center">${estatusCertBadge(r.estatus)}${accChipPortal(r)}</td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
           <button class="btn-ver" style="font-size:11px" onclick="abrirAccCert(${r.id})">📋 Ver / Documentos</button>
@@ -2610,12 +2610,16 @@ async function abrirAccCert(sesionId) {
                       onclick="accVistaPrevia('informe',${sesionId},this)">👁 Ver</button>
               <button style="${btnBase}background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                       onclick="imprimirInformeAcc(${sesionId},this)">🖨 Imprimir</button>
+              <button style="${btnBase}background:#1a3a6b;border-color:#1a3a6b;color:#fff"
+                      title="Genera el documento y lo deja disponible en el portal del cliente, sin enviar correo"
+                      onclick="accPublicarPortal('informe',${sesionId},this)">🌐 Publicar</button>
               <button style="${btnBase}background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                       onclick="enviarInformeAcc(${sesionId})">✉ Enviar</button>
             </div>
             <input type="file" accept="application/pdf" title="Sustituir por un PDF propio"
                    style="font-size:10.5px;margin-top:6px;max-width:100%"
                    onchange="accSubirDoc(this,'informe',${sesionId})">
+            ${accTirillaPortal('informe', sesionId, (data.portal||{}).informe)}
           </div>
 
           <div style="background:var(--blanco);border:1px solid var(--borde);border-radius:7px;padding:10px">
@@ -2626,12 +2630,16 @@ async function abrirAccCert(sesionId) {
                       onclick="accVistaPrevia('cert',${sesionId},this)">👁 Ver</button>
               <button style="${btnBase}background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                       onclick="imprimirCertAcc(${sesionId},this)">🖨 Imprimir</button>
+              <button style="${btnBase}background:#1a3a6b;border-color:#1a3a6b;color:#fff"
+                      title="Genera el documento y lo deja disponible en el portal del cliente, sin enviar correo"
+                      onclick="accPublicarPortal('cert',${sesionId},this)">🌐 Publicar</button>
               <button style="${btnBase}background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                       onclick="enviarCertAcc(${sesionId})">✉ Enviar</button>
             </div>
             <input type="file" accept="application/pdf" title="Sustituir por un PDF propio"
                    style="font-size:10.5px;margin-top:6px;max-width:100%"
                    onchange="accSubirDoc(this,'cert',${sesionId})">
+            ${accTirillaPortal('cert', sesionId, (data.portal||{}).cert)}
           </div>
 
           <div style="background:var(--blanco);border:1px solid var(--borde);border-radius:7px;padding:10px">
@@ -2641,10 +2649,14 @@ async function abrirAccCert(sesionId) {
                       onclick="accVistaPrevia('cumple',${sesionId},this)">👁 Ver</button>
               <button style="${btnBase}background:var(--ambar-light);border-color:var(--ambar);color:var(--ambar)"
                       onclick="imprimirInformeCumple(${sesionId},this)">🖨 Imprimir</button>
+              <button style="${btnBase}background:#1a3a6b;border-color:#1a3a6b;color:#fff"
+                      title="Genera el documento y lo deja disponible en el portal del cliente, sin enviar correo"
+                      onclick="accPublicarPortal('cumple',${sesionId},this)">🌐 Publicar</button>
               <button style="${btnBase}background:var(--ambar-light);border-color:var(--ambar);color:var(--ambar)"
                       onclick="enviarInformeCumple(${sesionId})">✉ Enviar</button>
             </div>
             <div style="font-size:10.5px;color:var(--texto-hint);margin-top:6px">Extracto del informe: no admite PDF propio.</div>
+            ${accTirillaPortal('cumple', sesionId, (data.portal||{}).cumple)}
           </div>
 
         </div>
@@ -2656,7 +2668,10 @@ async function abrirAccCert(sesionId) {
           <span style="color:var(--texto-hint)">"Ver" sólo genera el documento para revisarlo: no lo publica ni lo envía.</span>
         </div>
 
-        <div style="margin-top:10px;text-align:right">
+        <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+          <button style="${btnBase}background:#fff;border-color:#1a3a6b;color:#1a3a6b;padding:7px 16px;font-size:12px"
+                  title="Deja los tres documentos disponibles en el portal del cliente, sin enviar correo"
+                  onclick="accPublicarPortal('todo',${sesionId},this)">🌐 Publicar los 3 en el portal</button>
           <button style="${btnBase}background:#1a3a6b;border-color:#1a3a6b;color:#fff;padding:7px 16px;font-size:12px"
                   onclick="enviarTodoAcc(${sesionId})">📨 Enviar los 3 documentos</button>
         </div>
@@ -2688,6 +2703,137 @@ async function abrirAccCert(sesionId) {
   } catch(e) {
     document.getElementById('acc-det-body').innerHTML =
       `<div style="text-align:center;padding:24px;color:var(--rojo)">Error: ${e.message}</div>`;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PUBLICAR EN EL PORTAL DEL CLIENTE — ACCESORIOS
+   Publicar y enviar son dos cosas distintas. Hay clientes que sólo consultan
+   su portal, y hay documentos que todavía no deben salir —un informe con no
+   cumple mientras se negocia el reemplazo— aunque el certificado sí.
+   Por eso cada documento se publica y se retira por su cuenta, y publicar no
+   manda ningún correo. Retirar no borra el archivo: deja de entregarse.
+   ═══════════════════════════════════════════════════════════ */
+/* Cuántos de los documentos generados ve el cliente. Se muestra sólo cuando
+   hay algo retirado: si todo está visible no hay nada que advertir. */
+function accChipPortal(r) {
+  const total   = parseInt(r.portal_total)   || 0;
+  const visible = parseInt(r.portal_visible) || 0;
+  if (!total || visible === total) return '';
+  const txt = visible ? `Portal: ${visible} de ${total}` : 'Fuera del portal';
+  return `<div style="margin-top:3px"><span title="Hay documentos retirados del portal del cliente"
+    style="font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:20px;background:var(--rojo-light);color:var(--rojo)">${txt}</span></div>`;
+}
+
+const ACC_DOC_NOMBRE = {
+  cert:    'el certificado',
+  informe: 'el informe completo',
+  cumple:  'el informe de aprobados',
+  todo:    'los tres documentos',
+};
+
+/* Dice qué ve hoy el cliente de este documento, y deja retirarlo o volver a
+   mostrarlo. Va en su propia tirilla y no reutiliza el 👁, que aquí significa
+   "abrir el PDF para revisarlo". */
+function accTirillaPortal(tipo, sesionId, est) {
+  const e = est || {};
+  const b = 'padding:3px 9px;border-radius:5px;border:1.5px solid;font-size:10.5px;font-weight:700;cursor:pointer;font-family:inherit;';
+  let estado = '', accion = '';
+
+  if (!e.generado) {
+    estado = `<span style="color:var(--texto-hint)">Todavía no publicado</span>`;
+  } else if (e.publicado) {
+    estado = `<span style="color:var(--verde);font-weight:700">● Visible</span>`;
+    accion = `<button style="${b}background:var(--blanco);border-color:var(--rojo);color:var(--rojo)"
+                onclick="accVisibilidadDoc('${tipo}',${sesionId},false,this)">✕ Retirar</button>`;
+  } else {
+    estado = `<span style="color:var(--rojo);font-weight:700">● Retirado</span>`;
+    accion = `<button style="${b}background:var(--blanco);border-color:var(--verde);color:var(--verde)"
+                onclick="accVisibilidadDoc('${tipo}',${sesionId},true,this)">✓ Mostrar</button>`;
+  }
+
+  return `<div id="acc-portal-${tipo}" style="margin-top:8px;padding-top:7px;border-top:1px dashed var(--borde)">
+      <div style="font-size:9px;font-weight:700;color:var(--texto-hint);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px">
+        En el portal del cliente</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:11px;min-height:22px">
+        ${estado}${accion}
+      </div>
+    </div>`;
+}
+
+/* Repinta las tres tirillas con lo que acaba de contestar el servidor, en vez
+   de recargar el detalle completo: así no se pierde el lugar donde iba quien
+   está revisando. */
+function accPintarPortal(sesionId, portal) {
+  if (!portal) return;
+  ['cert','informe','cumple'].forEach(t => {
+    const el = document.getElementById('acc-portal-' + t);
+    if (el) el.outerHTML = accTirillaPortal(t, sesionId, portal[t]);
+  });
+}
+
+/* Genera el documento y lo deja en el portal. Sin correo: es la vía para el
+   cliente que consulta su perfil y no espera un adjunto. */
+async function accPublicarPortal(tipo, sesionId, btn) {
+  const qué = ACC_DOC_NOMBRE[tipo] || 'el documento';
+  if (!confirm(`Se generará ${qué} y quedará disponible en el portal del cliente.\n\n` +
+               `NO se envía ningún correo.\n\n¿Continuar?`)) return;
+
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  mostrarToast('Publicando en el portal del cliente…', 'info');
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'PUBLICAR_PORTAL_ACC', payload: { sesion_id: sesionId, tipo } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast(data.message || 'Disponible en el portal del cliente.', 'ok');
+      accPintarPortal(sesionId, data.portal);
+      // Publicar emite el expediente, así que sale de la bandeja de pendientes.
+      accCertCargados = false;
+      cargarAccCert();
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo publicar'), 'err');
+    }
+  } catch(e) {
+    mostrarToast('Error de conexión', 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+}
+
+/* Retira del portal un documento ya publicado, o lo vuelve a mostrar, sin
+   tocar los otros dos. */
+async function accVisibilidadDoc(tipo, sesionId, visible, btn) {
+  const qué = ACC_DOC_NOMBRE[tipo] || 'el documento';
+  if (!visible && !confirm(`El cliente dejará de ver ${qué} en su portal.\n\n` +
+                           `El archivo no se borra: puedes volver a mostrarlo cuando quieras. ` +
+                           `Los otros documentos de esta sesión no se tocan.\n\n¿Continuar?`)) return;
+
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res  = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'VISIBILIDAD_DOC_ACC', payload: { sesion_id: sesionId, tipo, visible } })
+    });
+    const data = await res.json();
+    if (data.status === 'success') {
+      mostrarToast(data.message || 'Listo.', 'ok');
+      accPintarPortal(sesionId, data.portal);
+    } else {
+      mostrarToast('Error: ' + (data.message || 'No se pudo cambiar'), 'err');
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
+    }
+  } catch(e) {
+    mostrarToast('Error de conexión', 'err');
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
   }
 }
 

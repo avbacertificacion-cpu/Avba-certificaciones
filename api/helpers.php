@@ -215,6 +215,31 @@ foreach ([
 }
 
 /**
+ * ¿Existe esa columna? Se consulta una vez por columna y se recuerda.
+ *
+ * Sirve para armar consultas que deben seguir funcionando en una base donde la
+ * migración aún no corrió o falló por permisos. Nombrar la columna directamente
+ * en el SELECT haría fallar la consulta entera, y en el portal del cliente eso
+ * significa una sección en blanco en lugar de los documentos que ya tenía.
+ */
+function columnaExiste(PDO $pdo, string $tabla, string $columna): bool {
+    static $cache = [];
+    $clave = "$tabla.$columna";
+    if (isset($cache[$clave])) return $cache[$clave];
+    try {
+        $st = $pdo->prepare(
+            "SELECT COUNT(*) FROM information_schema.COLUMNS
+             WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
+        );
+        $st->execute([$tabla, $columna]);
+        $cache[$clave] = ((int)$st->fetchColumn()) > 0;
+    } catch (\Throwable $e) {
+        $cache[$clave] = false;
+    }
+    return $cache[$clave];
+}
+
+/**
  * Marca "publicado en el portal del cliente".
  *
  * El portal mostraba los registros filtrando por su estado de flujo

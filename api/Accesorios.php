@@ -532,11 +532,21 @@ class Accesorios {
         } else {
             $where = '';
         }
+        // Cuántos documentos ve el cliente, para no tener que abrir la sesión
+        // para descubrir que uno está retirado. Las columnas se nombran sólo si
+        // existen: en una base sin migrar la lista debe seguir cargando.
+        $cols = [];
+        foreach (['cert_url', 'informe_url', 'informe_cumple_url', 'docs_ocultos'] as $c) {
+            $cols[] = columnaExiste($this->pdo, 'accesorios_sesiones', $c)
+                ? "s.$c" : ($c === 'docs_ocultos' ? "'' AS docs_ocultos" : "NULL AS $c");
+        }
+        $extra = implode(', ', $cols);
         $rows = $this->pdo->query(
             "SELECT s.id, s.cliente, s.control, s.estatus,
                     DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha,
                     s.coordenadas, s.usuario,
                     DATE_FORMAT(s.fecha_registro,'%d/%m/%Y %H:%i') AS fecha_registro,
+                    {$extra},
                     COUNT(a.id)                                           AS total,
                     SUM(a.estado = 'CUMPLE')                              AS cumple,
                     SUM(a.estado = 'NO CUMPLE')                           AS no_cumple
@@ -546,6 +556,20 @@ class Accesorios {
              GROUP BY s.id
              ORDER BY s.fecha_registro DESC"
         )->fetchAll();
+
+        // Se resume aquí para que la pantalla no repita la regla: un documento
+        // cuenta como visible sólo si existe y no está retirado.
+        foreach ($rows as &$r) {
+            $ocultos = self::normalizarDocs((string)($r['docs_ocultos'] ?? ''));
+            $r['portal_total']   = 0;
+            $r['portal_visible'] = 0;
+            foreach (self::DOC_COLUMNA as $doc => $col) {
+                if (trim((string)($r[$col] ?? '')) === '') continue;
+                $r['portal_total']++;
+                if (!in_array($doc, $ocultos, true)) $r['portal_visible']++;
+            }
+        }
+        unset($r);
 
         return ['status' => 'success', 'data' => $rows];
     }
@@ -598,6 +622,9 @@ class Accesorios {
         unset($acc);
 
         $sesion['accesorios'] = $accesorios;
+        // Qué ve hoy el cliente de esta sesión. Se resuelve aparte y no en el
+        // SELECT: si la columna no existe, la pantalla debe seguir abriendo.
+        $sesion['portal'] = $this->estadoPortalAcc($id);
 
         return ['status' => 'success', 'data' => $sesion];
     }
@@ -1772,6 +1799,11 @@ class Accesorios {
             'cert_manual_url'   => "ALTER TABLE accesorios_sesiones ADD COLUMN cert_manual_url   VARCHAR(500) NULL",
             'informe_manual_url'=> "ALTER TABLE accesorios_sesiones ADD COLUMN informe_manual_url VARCHAR(500) NULL",
             'fecha_enviado'     => "ALTER TABLE accesorios_sesiones ADD COLUMN fecha_enviado     DATETIME NULL",
+            // Qué documentos de la sesión se retiraron del portal del cliente.
+            // Se guarda lo OCULTO, no lo visible: así una sesión emitida antes
+            // de esta columna llega con la lista vacía y sigue mostrando todo,
+            // que es lo que el cliente ya tenía.
+            'docs_ocultos'      => "ALTER TABLE accesorios_sesiones ADD COLUMN docs_ocultos      VARCHAR(40) NOT NULL DEFAULT ''",
         ];
         // Se atrapa Throwable, no sólo PDOException: esta clase se construye en
         // TODAS las peticiones, incluida la de iniciar sesión, así que un fallo
@@ -1943,6 +1975,205 @@ class Accesorios {
         $destino = $rutaDir . $nombre;
         $mpdf->Output($destino, 'F');
         return 'uploads/reportes/' . $nombre;
+    }
+
+    /* ═══════════════════════════════════════════════════════════
+       PUBLICACIÓN EN EL PORTAL DEL CLIENTE
+       Publicar y enviar son dos cosas distintas. Hay clientes que piden los
+       documentos por su portal y no por correo, y hay documentos que no deben
+       salir todavía —un informe con no cumple mientras se negocia el
+       reemplazo— aunque el certificado sí.
+       Por eso cada uno de los tres documentos de la sesión se publica y se
+       retira por separado, y publicar no manda ningún correo.
+       ═══════════════════════════════════════════════════════════ */
+
+    /** Los documentos de la sesión que el portal del cliente puede mostrar. */
+    public const DOCS_PORTAL = ['cert', 'informe', 'cumple'];
+
+    private const DOC_COLUMNA = [
+        'cert'    => 'cert_url',
+        'informe' => 'informe_url',
+        'cumple'  => 'informe_cumple_url',
+    ];
+    private const DOC_NOMBRE = [
+        'cert'    => 'certificado',
+        'informe' => 'informe completo',
+        'cumple'  => 'informe de aprobados',
+    ];
+
+    /** Deja la lista en el orden de siempre y descarta lo que no reconozca. */
+    private static function normalizarDocs($valor): array {
+        if (is_string($valor)) $valor = explode(',', $valor);
+        if (!is_array($valor)) return [];
+        $limpio = array_map(fn($v) => strtolower(trim((string)$v)), $valor);
+        return array_values(array_filter(self::DOCS_PORTAL, fn($d) => in_array($d, $limpio, true)));
+    }
+
+    /**
+     * Qué documentos de esta sesión están retirados del portal.
+     *
+     * Si la columna todavía no existe —la migración pudo fallar por permisos—
+     * devuelve vacío: nada oculto, que es cómo se comportaba el sistema antes.
+     */
+    public function docsOcultos(int $sesionId): array {
+        if (!$sesionId) return [];
+        try {
+            $st = $this->pdo->prepare("SELECT docs_ocultos FROM accesorios_sesiones WHERE id = ?");
+            $st->execute([$sesionId]);
+            return self::normalizarDocs((string)($st->fetchColumn() ?: ''));
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    private function guardarDocsOcultos(int $sesionId, array $docs): bool {
+        try {
+            $this->pdo->prepare("UPDATE accesorios_sesiones SET docs_ocultos = ? WHERE id = ?")
+                      ->execute([implode(',', self::normalizarDocs($docs)), $sesionId]);
+            return true;
+        } catch (\Throwable $e) {
+            error_log('[Accesorios] docs_ocultos: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /** Las URL que hoy tiene guardadas la sesión, por documento. */
+    private function urlsDocs(int $sesionId): array {
+        $out = ['cert' => '', 'informe' => '', 'cumple' => ''];
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT cert_url, informe_url, informe_cumple_url FROM accesorios_sesiones WHERE id = ?"
+            );
+            $st->execute([$sesionId]);
+            $r = $st->fetch() ?: [];
+            foreach (self::DOC_COLUMNA as $doc => $col) $out[$doc] = trim((string)($r[$col] ?? ''));
+        } catch (\Throwable $e) { /* sin columnas no hay nada publicado */ }
+        return $out;
+    }
+
+    /**
+     * Estado de publicación de los tres documentos, para pintarlo en pantalla.
+     * Un documento sin URL no está publicado aunque no esté en la lista de
+     * ocultos: todavía no existe.
+     */
+    public function estadoPortalAcc(int $sesionId): array {
+        $ocultos = $this->docsOcultos($sesionId);
+        $urls    = $this->urlsDocs($sesionId);
+        $out = [];
+        foreach (self::DOCS_PORTAL as $doc) {
+            $out[$doc] = [
+                'generado'  => $urls[$doc] !== '',
+                'publicado' => $urls[$doc] !== '' && !in_array($doc, $ocultos, true),
+                'url'       => $urls[$doc],
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Genera el documento y lo deja disponible en el portal del cliente, sin
+     * enviar correo. $tipo: 'cert' | 'informe' | 'cumple' | 'todo'.
+     */
+    public function publicarPortalAcc(int $sesionId, string $tipo, string $usuario): array {
+        if (!$sesionId) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+        $this->ensureAccSesionesColumns();
+        ensurePublicado($this->pdo);
+
+        $tipo    = strtolower(trim($tipo)) ?: 'todo';
+        $pedidos = $tipo === 'todo'
+            ? self::DOCS_PORTAL
+            : (in_array($tipo, self::DOCS_PORTAL, true) ? [$tipo] : []);
+        if (!$pedidos) return ['status' => 'error', 'message' => 'Documento no válido.'];
+
+        $det = $this->detalleSesion($sesionId);
+        if (($det['status'] ?? '') !== 'success') return $det;
+
+        $hechos = [];
+        $fallos = [];
+        foreach ($pedidos as $doc) {
+            $res = $this->docEfectivo($sesionId, $doc, $usuario);
+            if (($res['status'] ?? '') !== 'success') {
+                // Pidiendo uno solo, su error es el resultado. Publicando los
+                // tres se omite el que no se pueda: el informe de aprobados no
+                // existe cuando ningún accesorio cumple, y eso no es una falla.
+                if (count($pedidos) === 1) {
+                    return ['status' => 'error',
+                            'message' => 'No se pudo generar el ' . self::DOC_NOMBRE[$doc] . '. '
+                                       . ($res['message'] ?? '')];
+                }
+                $fallos[] = self::DOC_NOMBRE[$doc];
+                continue;
+            }
+            $this->pdo->prepare(
+                "UPDATE accesorios_sesiones SET `" . self::DOC_COLUMNA[$doc] . "` = ? WHERE id = ?"
+            )->execute([$res['url_pub'], $sesionId]);
+            $hechos[] = $doc;
+        }
+        if (!$hechos) {
+            return ['status' => 'error', 'message' => 'No se pudo generar ningún documento para publicar.'];
+        }
+
+        // Publicar es volver visible: lo que se publica sale de los ocultos.
+        $this->guardarDocsOcultos($sesionId, array_diff($this->docsOcultos($sesionId), $hechos));
+
+        $anterior = (string)($det['data']['estatus'] ?? '');
+        $this->pdo->prepare(
+            "UPDATE accesorios_sesiones SET estatus = 'EMITIDO', publicado = 1, motivo = NULL WHERE id = ?"
+        )->execute([$sesionId]);
+        if ($anterior !== 'EMITIDO') $this->historial($usuario, $sesionId, $anterior ?: null, 'EMITIDO');
+
+        $nombres = array_map(fn($d) => self::DOC_NOMBRE[$d], $hechos);
+        $msg = 'Ya está en el portal del cliente: ' . implode(' + ', $nombres) . '. No se envió correo.';
+        if ($fallos) $msg .= ' Quedó sin generar: ' . implode(', ', $fallos) . '.';
+
+        return ['status' => 'success', 'publicados' => $hechos,
+                'portal' => $this->estadoPortalAcc($sesionId), 'message' => $msg];
+    }
+
+    /**
+     * Muestra o retira del portal un documento ya generado, sin volver a
+     * generarlo y sin tocar los otros dos. Retirar no borra el archivo: si se
+     * vuelve a mostrar, el cliente ve el mismo documento que ya tenía.
+     */
+    public function visibilidadDocAcc(int $sesionId, string $tipo, bool $visible, string $usuario): array {
+        if (!$sesionId) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
+        $this->ensureAccSesionesColumns();
+
+        $tipo = strtolower(trim($tipo));
+        if (!in_array($tipo, self::DOCS_PORTAL, true)) {
+            return ['status' => 'error', 'message' => 'Documento no válido.'];
+        }
+
+        $chk = $this->pdo->prepare("SELECT id FROM accesorios_sesiones WHERE id = ?");
+        $chk->execute([$sesionId]);
+        if (!$chk->fetchColumn()) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+
+        $urls = $this->urlsDocs($sesionId);
+        if ($visible && $urls[$tipo] === '') {
+            return ['status' => 'error',
+                    'message' => 'El ' . self::DOC_NOMBRE[$tipo] . ' todavía no se ha generado. '
+                               . 'Usa "Publicar" para generarlo y mostrarlo.'];
+        }
+
+        $ocultos = $this->docsOcultos($sesionId);
+        $ocultos = $visible
+            ? array_diff($ocultos, [$tipo])
+            : array_merge($ocultos, [$tipo]);
+        if (!$this->guardarDocsOcultos($sesionId, $ocultos)) {
+            return ['status' => 'error', 'message' => 'No se pudo guardar la visibilidad.'];
+        }
+
+        $this->historial($usuario, $sesionId,
+            'portal:' . self::DOC_NOMBRE[$tipo], $visible ? 'visible' : 'oculto');
+
+        return [
+            'status'  => 'success',
+            'visible' => $visible,
+            'portal'  => $this->estadoPortalAcc($sesionId),
+            'message' => ucfirst(self::DOC_NOMBRE[$tipo])
+                       . ($visible ? ' visible en el portal del cliente.'
+                                   : ' retirado del portal del cliente.'),
+        ];
     }
 
     // ── Emitir certificado FPDI → genera PDF + EMITIDO ──────
