@@ -1863,7 +1863,7 @@ class Accesorios {
         $html = $this->htmlInforme($sesion, $folio);
 
         try {
-            $url = $this->htmlToPdfMpdf($html, $folio, 'INFORME_ACC');
+            $url = $this->htmlToPdfMpdf($html, $folio, 'INFORME_ACC', $this->pieFirmado($sesion, $folio));
         } catch (\Throwable $e) {
             return ['status' => 'error', 'message' => 'Error generando PDF: ' . $e->getMessage()];
         }
@@ -1940,7 +1940,11 @@ class Accesorios {
         return ['status' => 'success', 'url' => $url, 'folio' => $folio];
     }
 
-    private function htmlToPdfMpdf(string $html, string $folio, string $sufijo = 'CERT'): string {
+    /**
+     * @param string $pie HTML del pie que se repite en cada hoja. Vacío = sin
+     *                    pie, que es como se arma el certificado.
+     */
+    private function htmlToPdfMpdf(string $html, string $folio, string $sufijo = 'CERT', string $pie = ''): string {
         if (!class_exists('\\Mpdf\\Mpdf')) {
             $autoload = __DIR__ . '/../vendor/autoload.php';
             if (file_exists($autoload)) require_once $autoload;
@@ -1951,18 +1955,30 @@ class Accesorios {
         $rutaDir = UPLOAD_DIR . 'reportes/';
         if (!is_dir($rutaDir)) mkdir($rutaDir, 0755, true);
 
+        // Con pie firmado hay que reservarle espacio en TODAS las hojas: con
+        // margen inferior 0 el contenido llegaba al filo del papel —la firma
+        // salió a cinco milímetros del borde— y el pie no tenía dónde caber.
+        // El certificado no lleva pie: su plantilla trae su propio diseño y
+        // márgenes, y se sigue armando exactamente como antes.
+        $conPie = $pie !== '';
         $mpdf = new \Mpdf\Mpdf([
             'mode'          => 'utf-8',
             'format'        => 'A4',
             'margin_left'   => 0, 'margin_right'  => 0,
-            'margin_top'    => 0, 'margin_bottom' => 0,
-            'margin_header' => 0, 'margin_footer' => 0,
+            // mPDF coloca el pie por su borde SUPERIOR a margin_footer del filo
+            // y lo escribe hacia abajo: si margin_footer no alcanza para todo el
+            // pie, la firma se dibuja fuera de la hoja. 18mm cubren el pie
+            // firmado (unos 12mm) y dejan 6mm libres al filo. Medido, no a ojo.
+            'margin_top'    => $conPie ?  8 : 0,
+            'margin_bottom' => $conPie ? 27 : 0,
+            'margin_header' => 0,
+            'margin_footer' => $conPie ? 18 : 0,
             'dpi'           => 96,
             'default_font'  => 'dejavusans',
             'tempDir'       => sys_get_temp_dir() . '/mpdf',
         ]);
         $mpdf->SetBasePath(__DIR__ . '/../');
-        $mpdf->SetHTMLFooter('');
+        $mpdf->SetHTMLFooter($pie);
 
         $prevBacktrack = (int) ini_get('pcre.backtrack_limit');
         ini_set('pcre.backtrack_limit', 10000000);
@@ -2258,7 +2274,7 @@ class Accesorios {
         $html = $this->htmlInforme($sesion, $folio);
 
         try {
-            $url = $this->htmlToPdfMpdf($html, $folio, 'CUMPLE_ACC');
+            $url = $this->htmlToPdfMpdf($html, $folio, 'CUMPLE_ACC', $this->pieFirmado($sesion, $folio));
         } catch (\Throwable $e) {
             return ['status' => 'error', 'message' => 'Error generando PDF: ' . $e->getMessage()];
         }
@@ -2408,6 +2424,77 @@ class Accesorios {
     }
 
     // ── HTML del Informe de Integridad Operativa ───────────
+    /**
+     * Quién firma el documento y con qué imagen.
+     *
+     * Calidad puede designar al inspector firmante (inspector_usuario); si no lo
+     * hizo, firma quien capturó la inspección. Se resuelve por cuenta y no
+     * emparejando nombres, que cambian y se escriben distinto.
+     *
+     * @return array{0:string,1:string} [nombre, data URI de la firma o '']
+     */
+    private function firmanteDe(array $s): array {
+        $cuenta = trim((string)($s['inspector_usuario'] ?? '')) ?: (string)($s['usuario'] ?? '');
+        $nombre = trim((string)($s['inspector_firma'] ?? ''));
+        try {
+            if ($nombre === '' && $cuenta !== '') {
+                $st = $this->pdo->prepare("SELECT nombre FROM usuarios WHERE usuario = ? LIMIT 1");
+                $st->execute([$cuenta]);
+                $nombre = (string)($st->fetchColumn() ?: '');
+            }
+        } catch (\Throwable $ignored) {}
+        if ($nombre === '') $nombre = $cuenta;
+
+        // La firma pasa por FirmaInspector: resuelve la transparencia contra
+        // blanco antes de incrustarla. Sin ese paso, una firma recortada en PNG
+        // se incrusta como imagen negra + máscara y sale como recuadro negro.
+        return [$nombre, FirmaInspector::dataUri($this->pdo, $cuenta, $nombre)];
+    }
+
+    /**
+     * Pie firmado que mPDF repite al final de CADA hoja.
+     *
+     * Antes la firma y los datos del documento iban al final del flujo, así que
+     * caían donde alcanzara: con nueve accesorios se iban solas a una segunda
+     * hoja, y con ocho la firma quedaba a cinco milímetros del borde. Peor aún,
+     * la hoja de continuación no llevaba folio: una página suelta de un informe
+     * no se podía identificar.
+     *
+     * Repitiéndolo en todas las hojas se arreglan las dos cosas de raíz: ya no
+     * queda nada al final del documento que pueda desbordarse, y ninguna hoja
+     * viaja sin firma, sin folio y sin su número. Quitar, sustituir o agregar
+     * una hoja queda a la vista.
+     */
+    private function pieFirmado(array $s, string $folio): string {
+        $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+        [$nombre, $firmaB64] = $this->firmanteDe($s);
+
+        // Sin firma en el expediente queda la rúbrica en blanco sobre la línea:
+        // el documento no puede dejar de salir por eso.
+        // La altura va en mm: en el pie, px depende del dpi y mPDF lo mide mal.
+        $firma = $firmaB64
+            ? '<img src="' . $firmaB64 . '" style="height:7mm;width:auto">'
+            : '';
+
+        // Sin float ni tablas anidadas: mPDF mide mal la altura del pie cuando
+        // los lleva y lo dibuja fuera de la hoja. Una tabla de dos celdas y
+        // saltos de línea se mide bien.
+        return '<table width="100%" style="border-top:1.2pt solid #0C2D6B;border-collapse:collapse">
+  <tr>
+    <td width="56%" style="padding-top:4pt;font-size:6.8pt;color:#7a8494;vertical-align:top;line-height:1.45">
+      AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.<br>
+      Folio: <strong style="color:#5a6072">' . $esc($folio) . '</strong><br>
+      Generado: ' . $esc(date('d/m/Y H:i')) . '&nbsp;&nbsp;·&nbsp;&nbsp;P&aacute;gina {PAGENO} de {nbpg}
+    </td>
+    <td width="44%" style="padding-top:2pt;text-align:center;vertical-align:top">
+      ' . $firma . '<br>
+      <span style="font-size:7.5pt;color:#1a1a2e;font-weight:bold">' . $esc($nombre) . '</span><br>
+      <span style="font-size:6.5pt;color:#5a6072">Inspector responsable</span>
+    </td>
+  </tr>
+</table>';
+    }
+
     private function htmlInforme(array $s, string $folio): string {
         $esc = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
 
@@ -2415,34 +2502,13 @@ class Accesorios {
         $dir     = $esc($s['direccion'] ?? '');
         $fecha   = $esc($s['fecha'] ?? '');
 
-        // Inspector que firma: Calidad puede designarlo (inspector_usuario); si
-        // no lo hizo, firma quien capturó la inspección.
-        $cuenta          = trim((string)($s['inspector_usuario'] ?? '')) ?: (string)($s['usuario'] ?? '');
-        $nombreInspector = trim((string)($s['inspector_firma'] ?? ''));
-        try {
-            if ($nombreInspector === '' && $cuenta !== '') {
-                $st = $this->pdo->prepare("SELECT nombre FROM usuarios WHERE usuario = ? LIMIT 1");
-                $st->execute([$cuenta]);
-                $nombreInspector = (string)($st->fetchColumn() ?: '');
-            }
-        } catch (\Throwable $ignored) {}
-        if ($nombreInspector === '') $nombreInspector = $cuenta;
-
-        // La firma pasa por FirmaInspector: resuelve la transparencia contra
-        // blanco antes de incrustarla. Sin ese paso, una firma recortada en PNG
-        // se incrusta como imagen negra + máscara y sale como recuadro negro.
-        $firmaB64 = FirmaInspector::dataUri($this->pdo, $cuenta, $nombreInspector);
-        $usuario  = $esc($nombreInspector);
+        [$nombreInspector, ] = $this->firmanteDe($s);
+        $usuario = $esc($nombreInspector);
 
         $accs     = $s['accesorios'] ?? [];
         $total    = count($accs);
         $cumple   = count(array_filter($accs, fn($a) => strtoupper($a['estado'] ?? '') === 'CUMPLE'));
         $noCumple = $total - $cumple;
-
-        // Firma HTML
-        $firmaImg = $firmaB64
-            ? '<img src="' . $firmaB64 . '" style="height:48px;width:auto;margin-bottom:4px">'
-            : '<div style="height:48px"></div>';
 
         // Filas de accesorios
         $filas = '';
@@ -2504,8 +2570,15 @@ class Accesorios {
         return <<<HTML
 <!DOCTYPE html>
 <html lang="es">
-<head><meta charset="UTF-8"></head>
-<body style="font-family:DejaVu Sans,Arial,sans-serif;font-size:10pt;color:#1a1a2e;margin:0;padding:22px 28px;background:#fff">
+<head>
+<meta charset="UTF-8">
+<style>
+  /* Un renglón no se parte entre dos hojas: media descripción arriba y media
+     abajo hace ilegible el registro. */
+  tr { page-break-inside: avoid; }
+</style>
+</head>
+<body style="font-family:DejaVu Sans,Arial,sans-serif;font-size:10pt;color:#1a1a2e;margin:0;padding:0 28px;background:#fff">
 
 <!-- ══════════════════════════════════════════════════
      ENCABEZADO
@@ -2619,28 +2692,13 @@ class Accesorios {
     <td style="background:#0C2D6B;color:#fff;font-size:8pt;font-weight:bold;padding:4px 10px;letter-spacing:0.05em">REGISTRO DE ACCESORIOS INSPECCIONADOS</td>
   </tr>
 </table>
-<table style="width:100%;border-collapse:collapse;margin-bottom:12px">
-  <thead>
-    <tr style="background:#185FA5">
-      <th style="color:#fff;padding:6px 6px;font-size:8pt;border:1px solid #0C447C;text-align:center;width:8%">ID</th>
-      <th style="color:#fff;padding:6px 6px;font-size:8pt;border:1px solid #0C447C;text-align:left;width:15%">Tipo</th>
-      <th style="color:#fff;padding:6px 6px;font-size:8pt;border:1px solid #0C447C;text-align:left;width:12%">Marca</th>
-      <th style="color:#fff;padding:6px 6px;font-size:8pt;border:1px solid #0C447C;text-align:left;width:11%">Modelo</th>
-      <th style="color:#fff;padding:6px 6px;font-size:8pt;border:1px solid #0C447C;text-align:center;width:14%">No. Serie</th>
-      <th style="color:#fff;padding:6px 6px;font-size:8pt;border:1px solid #0C447C;text-align:center;width:12%">Capacidad</th>
-      <th style="color:#fff;padding:6px 6px;font-size:8pt;border:1px solid #0C447C;text-align:center;width:12%">Medidas</th>
-      <th style="color:#fff;padding:6px 6px;font-size:8pt;border:1px solid #0C447C;text-align:center;width:16%">Estado</th>
-    </tr>
-  </thead>
-  <tbody>
-    {$filas}
-  </tbody>
-</table>
 
-<!-- Leyenda -->
-<table style="width:100%;border-collapse:collapse;margin-bottom:20px">
+<!-- Leyenda. Va ANTES del registro a propósito: así el documento termina donde
+     termina la última fila y no queda nada que pueda desbordarse de hoja. Y si
+     el registro ocupa varias hojas, se lee antes de la primera fila. -->
+<table style="width:100%;border-collapse:collapse;margin-bottom:5px">
   <tr>
-    <td style="font-size:7.5pt;color:#5a6072;padding:4px 0">
+    <td style="font-size:7.5pt;color:#5a6072;padding:1px 0 3px">
       <strong>Leyenda:</strong>&nbsp;
       <span style="background:#d4edba;color:#2d5a0e;font-weight:bold;padding:1px 6px;border:1px solid #3B6D11">&nbsp;CUMPLE&nbsp;</span>
       &nbsp;Accesorio en condiciones seguras de operación.&nbsp;&nbsp;&nbsp;
@@ -2649,42 +2707,22 @@ class Accesorios {
     </td>
   </tr>
 </table>
-
-<!-- ══════════════════════════════════════════════════
-     FIRMA
-══════════════════════════════════════════════════ -->
-<table style="width:100%;border-collapse:collapse;margin-bottom:16px">
-  <tr>
-    <td style="width:50%;padding-right:16px;vertical-align:bottom;text-align:center">
-      <table style="width:100%;border-collapse:collapse">
-        <tr>
-          <td style="text-align:center;padding-bottom:4px">{$firmaImg}</td>
-        </tr>
-        <tr>
-          <td style="border-top:1.5px solid #1a1a2e;padding-top:5px;text-align:center;font-size:8.5pt;color:#1a1a2e;font-weight:bold">{$usuario}</td>
-        </tr>
-        <tr>
-          <td style="text-align:center;font-size:7.5pt;color:#5a6072;padding-top:2px">Inspector responsable</td>
-        </tr>
-      </table>
-    </td>
-    <td style="width:50%;padding-left:16px;vertical-align:bottom;text-align:center">
-    </td>
-  </tr>
-</table>
-
-<!-- ══════════════════════════════════════════════════
-     PIE DE PÁGINA
-══════════════════════════════════════════════════ -->
-<table style="width:100%;border-collapse:collapse;border-top:2px solid #0C2D6B;margin-top:8px">
-  <tr>
-    <td style="padding-top:6px;font-size:7pt;color:#9299a8;vertical-align:middle">
-      AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.&nbsp;&nbsp;·&nbsp;&nbsp;Generado: {$hoyHi}
-    </td>
-    <td style="padding-top:6px;font-size:7pt;color:#9299a8;text-align:right;vertical-align:middle">
-      Folio: <strong>{$folio}</strong>
-    </td>
-  </tr>
+<table style="width:100%;border-collapse:collapse;margin-bottom:12px">
+  <thead>
+    <tr style="background:#185FA5">
+      <th style="color:#fff;padding:5px 5px;font-size:8pt;border:1px solid #0C447C;text-align:center;width:11%">ID</th>
+      <th style="color:#fff;padding:5px 5px;font-size:8pt;border:1px solid #0C447C;text-align:left;width:24%">Tipo</th>
+      <th style="color:#fff;padding:5px 5px;font-size:8pt;border:1px solid #0C447C;text-align:left;width:13%">Marca</th>
+      <th style="color:#fff;padding:5px 5px;font-size:8pt;border:1px solid #0C447C;text-align:left;width:11%">Modelo</th>
+      <th style="color:#fff;padding:5px 5px;font-size:8pt;border:1px solid #0C447C;text-align:center;width:11%">No. Serie</th>
+      <th style="color:#fff;padding:5px 5px;font-size:8pt;border:1px solid #0C447C;text-align:center;width:10%">Capacidad</th>
+      <th style="color:#fff;padding:5px 5px;font-size:8pt;border:1px solid #0C447C;text-align:center;width:10%">Medidas</th>
+      <th style="color:#fff;padding:5px 5px;font-size:8pt;border:1px solid #0C447C;text-align:center;width:10%">Estado</th>
+    </tr>
+  </thead>
+  <tbody>
+    {$filas}
+  </tbody>
 </table>
 
 </body>
