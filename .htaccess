@@ -23,8 +23,18 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     # Política de permisos: deshabilitar acceso a cámara/micrófono desde el servidor
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
-    # Content Security Policy básica
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://unpkg.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://cdn.jsdelivr.net; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; img-src 'self' data: blob: https://*.openstreetmap.org https://*.tile.openstreetmap.org https://cdnjs.cloudflare.com; connect-src 'self'; worker-src 'self' blob: https://cdnjs.cloudflare.com; frame-src 'self' blob:; object-src 'self'"
+    # Content Security Policy — todo se sirve desde el propio dominio.
+    #
+    # Antes autorizaba unpkg, cdnjs, jsdelivr y Google Fonts, de cuando las
+    # librerías venían de fuera. Ya están todas en el proyecto (js/, lib/,
+    # assets/fonts/) y las teselas del mapa y la geocodificación pasan por
+    # tile.php y geocode.php, así que no queda nada que traer de terceros.
+    #
+    # Dejar esos dominios autorizados sin usarlos no es neutral: cualquier
+    # script inyectado en una página podría cargar código desde ellos y la
+    # política lo permitiría. Cerrarlo a 'self' es la mitad del trabajo de
+    # traer las librerías a local.
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' blob:; object-src 'self'"
     # Los PDFs no necesitan CSP (no son documentos ejecutables) y Chrome bloquea su visor
     # interno si object-src 'none' está presente en la respuesta del PDF
     <FilesMatch "\.pdf$">

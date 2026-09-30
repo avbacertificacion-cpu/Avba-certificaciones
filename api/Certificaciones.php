@@ -1143,7 +1143,14 @@ class Certificaciones {
             );
         }
 
-        // 1. Eliminar @import de Google Fonts (mPDF intenta la petición HTTP y falla, dejando PDF en blanco)
+        // 1. Quitar los @import de la hoja de estilos.
+        //    Las plantillas importan Inter y Montserrat, que ahora se sirven desde
+        //    assets/fonts/ y ya no desde Google —antes mPDF intentaba la petición
+        //    HTTP, fallaba y dejaba el PDF en blanco—. El @import se sigue quitando
+        //    porque mPDF no puede usar un woff2 de todos modos: el dictamen se
+        //    compone con su tipografía incrustada (DejaVu) y la importación sólo le
+        //    daría trabajo de más. Las tipografías locales son para la
+        //    previsualización en el navegador.
         $html = preg_replace('/@import\s+url\([^)]*\)\s*;?/i', '', $html);
 
         // 2. Corregir propiedades CSS no soportadas: overflow:hidden recorta a altura 0,

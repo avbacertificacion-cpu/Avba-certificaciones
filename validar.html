@@ -553,7 +553,45 @@ let bloqueadoHasta   = 0;
 let timerBloqueo     = null;
 let scannerActivo    = false;
 let html5QrCode      = null;
-let beepOk, beepErr;
+/* ═══════════════════════════════════════════════════════════
+   AVISO SONORO
+   Los dos pitidos venían de soundjay.com. Además de hacer que una página
+   nuestra dependiera de un tercero —y su licencia no permite alojar sus
+   archivos—, el sonido no llegaba cuando la red del cliente no alcanzaba ese
+   dominio, que es justo la red de una obra.
+   Se sintetizan en el navegador: no hay archivo que descargar ni petición que
+   falle. Dos tonos distintos para que se distingan sin mirar la pantalla: el
+   de válido sube, el de inválido baja.
+   ═══════════════════════════════════════════════════════════ */
+let audioCtx = null;
+
+/* El contexto se crea al primer toque del usuario: los navegadores no permiten
+   sonar antes de que alguien interactúe con la página. */
+function tono(frecuencias, duracion) {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!audioCtx) audioCtx = new AC();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    frecuencias.forEach((hz, i) => {
+      const t0  = audioCtx.currentTime + i * duracion;
+      const osc = audioCtx.createOscillator();
+      const vol = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(hz, t0);
+      // Entrada y salida suaves: un corte seco suena a chasquido.
+      vol.gain.setValueAtTime(0, t0);
+      vol.gain.linearRampToValueAtTime(0.22, t0 + 0.012);
+      vol.gain.exponentialRampToValueAtTime(0.0001, t0 + duracion);
+      osc.connect(vol).connect(audioCtx.destination);
+      osc.start(t0);
+      osc.stop(t0 + duracion);
+    });
+  } catch (e) { /* sin audio la validación se sigue viendo en pantalla */ }
+}
+
+const beepOk  = { play: () => tono([880, 1320], 0.11) };   // sube: vigente
+const beepErr = { play: () => tono([420, 260],  0.17) };   // baja: no vigente
 
 /* ═══════════════════════════════════════
    INIT
@@ -564,9 +602,6 @@ window.onload = function() {
   renderDots();
   verificarBloqueo();
   cargarAnuncios();
-
-  beepOk  = new Audio("https://www.soundjay.com/buttons/sounds/button-3.mp3");
-  beepErr = new Audio("https://www.soundjay.com/buttons/sounds/button-10.mp3");
 
   // Si viene con ?qr= en la URL (escaneado desde el documento físico),
   // pre-llenar el campo y enfocar directamente el captcha

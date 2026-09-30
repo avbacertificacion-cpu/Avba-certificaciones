@@ -40,7 +40,14 @@ unset($v);
 $html = file_get_contents($templatePath);
 $html = str_replace(array_keys($muestra), array_values($muestra), $html);
 
-// Inyectar reset de .page para que no haya sombra/margen de previsualización
+// La plantilla vive en la raíz del proyecto y usa rutas relativas —las
+// tipografías locales, el sello—, pero este archivo se sirve desde /api/, así
+// que sin <base> el navegador las buscaba en /api/assets/ y no las encontraba.
+// Va justo al abrir <head>: si se pusiera al final, el <style> con el @import de
+// las tipografías ya se habría resuelto contra la ruta equivocada.
+$html = preg_replace('/<head(\s[^>]*)?>/i', '$0' . "\n" . '<base href="../">', $html, 1);
+
+// Reset de .page para que no haya sombra ni margen de previsualización.
 $reset = '<style>
   body { margin:0; padding:0; background:#fff; }
   .page { box-shadow:none !important; margin:0 !important; }
