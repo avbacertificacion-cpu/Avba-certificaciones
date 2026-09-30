@@ -66,8 +66,12 @@ define('CONVERT_SERVICE_KEY', 'clave_secreta_fuerte_aqui');
 // ── Verificación de identidad con IA (opcional) ───────────
 // API key de Google Gemini (https://aistudio.google.com/apikey).
 // Permite que Calidad compare los datos capturados por el participante
-// contra su identificación oficial. Si se deja vacía, el botón de
-// verificación queda deshabilitado y todo se revisa a mano.
+// contra su identificación oficial, y lea de ella el nombre y la CURP.
+// Basta con ESTA o con CLAUDE_API_KEY: si están las dos se usa Gemini
+// —más rápido y económico para leer una credencial— y Claude queda como
+// respaldo si Gemini falla por cuota o por red. Si se dejan las dos
+// vacías, el botón de verificación queda deshabilitado y todo se revisa
+// a mano. Ya no se usa ningún servicio de OCR externo.
 define('GEMINI_API_KEY', '');
 // Modelo a usar (opcional). Si se deja vacío o no se define, se usa
 // 'gemini-2.5-flash' (rápido y económico). Para documentos difíciles puede

@@ -224,7 +224,10 @@ foreach ([
  */
 function columnaExiste(PDO $pdo, string $tabla, string $columna): bool {
     static $cache = [];
-    $clave = "$tabla.$columna";
+    // La conexión forma parte de la clave: dos conexiones pueden apuntar a bases
+    // distintas, y recordar la respuesta de una para la otra haría nombrar una
+    // columna que allí no existe, rompiendo la consulta entera.
+    $clave = spl_object_id($pdo) . "|$tabla.$columna";
     if (isset($cache[$clave])) return $cache[$clave];
     try {
         $st = $pdo->prepare(

@@ -5955,15 +5955,47 @@ function _verifIAHtml(v) {
     ilegible:    ['#92400e', '#fff8e1', '#f59e0b', '⚠ No se pudo leer el documento'],
   }[v.resultado] || ['#5a6072', '#f0f0f0', '#bbb', v.resultado];
   const [color, fondo, borde, etiqueta] = cfg;
-  const leido = [];
-  if (v.nombre_doc) leido.push(`Nombre en el documento: <strong>${escH(v.nombre_doc)}</strong>`);
-  if (v.curp_doc)   leido.push(`CURP en el documento: <strong style="font-family:monospace">${escH(v.curp_doc)}</strong>`);
+
+  /* Lo que el modelo leyó, con un botón para pasarlo al campo. Antes esto lo
+     intentaba un OCR externo y había que teclear el resultado; ahora se copia
+     de un clic, pero NUNCA solo: el revisor decide si el documento manda. */
+  const linea = (rotulo, valor, campo, mono) => {
+    if (!valor) return '';
+    const igual = (document.getElementById(campo)?.value || '').trim().toUpperCase()
+                === String(valor).trim().toUpperCase();
+    const boton = igual
+      ? `<span style="font-size:10px;color:var(--verde);font-weight:600">= al capturado</span>`
+      : `<button onclick="_verifUsar('${campo}', this.dataset.v)" data-v="${escH(valor)}"
+           style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;border:1.5px solid var(--azul);
+                  background:var(--blanco);color:var(--azul-dark);cursor:pointer;font-family:inherit">
+           Usar este</button>`;
+    return `<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:4px">
+      <span>${rotulo}: <strong${mono ? ' style="font-family:monospace"' : ''}>${escH(valor)}</strong></span>${boton}
+    </div>`;
+  };
+  const leido = linea('Nombre en el documento', v.nombre_doc, 'per-ocr-nombre-txt', false)
+              + linea('CURP en el documento',   v.curp_doc,   'per-ocr-curp-txt',   true);
+
   return `<div style="background:${fondo};border:1.5px solid ${borde};border-radius:9px;padding:10px 12px">
     <div style="font-size:12px;font-weight:700;color:${color}">${etiqueta}</div>
     ${v.detalle ? `<div style="font-size:11px;color:var(--texto-sub);margin-top:4px">${escH(v.detalle)}</div>` : ''}
-    ${leido.length ? `<div style="font-size:11px;color:var(--texto-sub);margin-top:5px;line-height:1.6">${leido.join('<br>')}</div>` : ''}
-    ${v.fecha ? `<div style="font-size:10px;color:var(--texto-hint);margin-top:5px">Verificado: ${escH(v.fecha)}</div>` : ''}
+    ${leido ? `<div style="font-size:11px;color:var(--texto-sub);margin-top:5px;line-height:1.6">${leido}</div>` : ''}
+    ${(v.fecha || v.motor) ? `<div style="font-size:10px;color:var(--texto-hint);margin-top:6px">
+        ${v.fecha ? 'Verificado: ' + escH(v.fecha) : ''}${(v.fecha && v.motor) ? ' · ' : ''}${v.motor ? 'Leído por ' + escH(v.motor) : ''}
+      </div>` : ''}
   </div>`;
+}
+
+/* Pasa al campo lo que leyó el modelo. Marca el campo un momento para que se
+   vea qué cambió: en esta pantalla hay seis campos y el cambio se pierde. */
+function _verifUsar(campo, valor) {
+  const el = document.getElementById(campo);
+  if (!el) return;
+  el.value = campo === 'per-ocr-curp-txt' ? String(valor).toUpperCase() : valor;
+  el.style.transition = 'background .35s';
+  el.style.background = '#fff7d6';
+  setTimeout(() => { el.style.background = ''; }, 900);
+  mostrarToast('Dato tomado del documento. Revísalo y guarda.', 'ok');
 }
 
 async function verificarIdentidadIA(id) {
