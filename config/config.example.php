@@ -43,8 +43,12 @@ define('DB_DIVISIONES', [
 
 // ── Seguridad ─────────────────────────────────────────────
 define('TOKEN_TTL', 28800);           // 8 horas en segundos
-define('LOGIN_MAX_INTENTOS', 5);      // bloquear tras N fallos
-define('LOGIN_BLOQUEO_MIN', 15);      // minutos de bloqueo
+define('LOGIN_MAX_INTENTOS', 5);      // empezar a esperar tras N fallos
+// Tope de la espera. No es lo que se espera siempre: la primera vez son 10
+// segundos y va creciendo (10s · 30s · 2min · 5min) hasta este tope, de modo
+// que a quien se equivocó le cuesta un tropiezo y a quien tantea contraseñas
+// cada ronda le cuesta más. Los fallos se olvidan tras 15 minutos de calma.
+define('LOGIN_BLOQUEO_MIN', 15);      // minutos: TOPE de la espera
 
 // ── CORS ──────────────────────────────────────────────────
 define('CORS_ORIGINS', 'https://mi-dominio.com,https://www.mi-dominio.com');

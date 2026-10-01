@@ -239,6 +239,8 @@ function togglePass() {
   }
 }
 
+const BTN_ENTRAR = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3H3v10h10v-3M9 8h6M12 5l3 3-3 3"/></svg> Entrar`;
+
 function mostrarError(msg) {
   const box = document.getElementById("error-box");
   document.getElementById("error-msg").textContent = msg;
@@ -247,6 +249,43 @@ function mostrarError(msg) {
 
 function ocultarError() {
   document.getElementById("error-box").classList.remove("show");
+  detenerEspera();
+}
+
+/* ═══════════════════════════════════════════════════════════
+   ESPERA TRAS VARIOS FALLOS
+   El servidor dice cuántos segundos faltan. En vez de dejar un aviso fijo que
+   no se sabe cuándo caduca —y que empuja a recargar la página a ver si ya—,
+   el botón se descuenta solo y vuelve a habilitarse al terminar.
+   ═══════════════════════════════════════════════════════════ */
+let _esperaTimer = null;
+
+function detenerEspera() {
+  if (_esperaTimer) { clearInterval(_esperaTimer); _esperaTimer = null; }
+}
+
+function iniciarEspera(segundos, mensaje) {
+  detenerEspera();
+  let restan = Math.max(1, Math.ceil(Number(segundos) || 0));
+  const btn = document.getElementById("btn-login");
+  const msg = document.getElementById("error-msg");
+
+  const pintar = () => {
+    btn.disabled  = true;
+    btn.innerHTML = `Espera ${restan}s`;
+    msg.textContent = `${mensaje} Podrás intentar de nuevo en ${restan} segundo${restan === 1 ? '' : 's'}.`;
+  };
+  pintar();
+
+  _esperaTimer = setInterval(() => {
+    restan--;
+    if (restan > 0) { pintar(); return; }
+    detenerEspera();
+    btn.disabled  = false;
+    btn.innerHTML = BTN_ENTRAR;
+    msg.textContent = 'Ya puedes intentar de nuevo.';
+    document.getElementById("password").focus();
+  }, 1000);
 }
 
 async function login() {
@@ -272,9 +311,16 @@ async function login() {
     const data  = JSON.parse(texto);
 
     if (data.status !== "success") {
-      mostrarError(data.message || "Error al iniciar sesión.");
-      btn.disabled = false;
-      btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3H3v10h10v-3M9 8h6M12 5l3 3-3 3"/></svg> Entrar`;
+      // Con espera, el aviso lo lleva la cuenta regresiva y el botón queda
+      // deshabilitado hasta que toque; sin ella, el error de siempre.
+      if (data.espera > 0) {
+        document.getElementById("error-box").classList.add("show");
+        iniciarEspera(data.espera, 'Demasiados intentos fallidos.');
+      } else {
+        mostrarError(data.message || "Error al iniciar sesión.");
+        btn.disabled = false;
+        btn.innerHTML = BTN_ENTRAR;
+      }
       return;
     }
 
@@ -298,7 +344,7 @@ async function login() {
     if (!destino) {
       mostrarError("Rol no reconocido: " + data.rol);
       btn.disabled = false;
-      btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3H3v10h10v-3M9 8h6M12 5l3 3-3 3"/></svg> Entrar`;
+      btn.innerHTML = BTN_ENTRAR;
       return;
     }
 
@@ -308,7 +354,7 @@ async function login() {
   } catch(e) {
     mostrarError("Error de conexión. Intenta de nuevo.");
     btn.disabled = false;
-    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 3H3v10h10v-3M9 8h6M12 5l3 3-3 3"/></svg> Entrar`;
+    btn.innerHTML = BTN_ENTRAR;
     console.error("login:", e);
   }
 }

@@ -347,12 +347,15 @@ class Auth {
         $blk->execute([$usuario]);
         $intento = $blk->fetch();
         if ($intento && $intento['bloqueado_hasta'] && $intento['bloqueado_hasta'] > date('Y-m-d H:i:s')) {
-            // La constante se lee con defined(), igual que en registrarIntento():
-            // si falta en la configuración del servidor, esta línea tumbaba el
-            // inicio de sesión justo de quien ya estaba bloqueado.
-            $restan = max(1, (int)ceil((strtotime($intento['bloqueado_hasta']) - time()) / 60));
-            return ['status' => 'error', 'message' =>
-                "Demasiados intentos fallidos. Espera $restan minuto(s) e intenta de nuevo."];
+            $restan = strtotime($intento['bloqueado_hasta']) - time();
+            // Se recorta a lo que marca la política actual. Así un bloqueo
+            // guardado con la regla anterior —quince minutos de golpe— no deja
+            // fuera un cuarto de hora a quien sólo escribió mal la contraseña:
+            // en cuanto se despliega este cambio, la espera pasa a ser la nueva.
+            $restan = max(1, min($restan, self::segundosDeBloqueo((int)$intento['intentos'])));
+            return ['status' => 'error',
+                'espera'  => $restan,
+                'message' => 'Demasiados intentos fallidos. ' . self::textoEspera($restan) . '.'];
         }
 
         try {
@@ -391,7 +394,15 @@ class Auth {
                 $partResult = $this->loginParticipante($usuario, $pass);
                 if ($partResult) return $partResult;
             }
-            $this->registrarIntento($usuario, $ip, false);
+            // Si este fallo es el que activa la espera, se dice aquí mismo. Antes
+            // había que volver a intentar para enterarse: el usuario veía
+            // "credenciales inválidas", pulsaba otra vez y recién entonces le
+            // aparecía el bloqueo.
+            $espera = $this->registrarIntento($usuario, $ip, false);
+            if ($espera > 0) {
+                return ['status' => 'error', 'espera' => $espera,
+                    'message' => 'Demasiados intentos fallidos. ' . self::textoEspera($espera) . '.'];
+            }
             return ['status' => 'error', 'message' => 'Credenciales inválidas.'];
         }
 
@@ -420,6 +431,41 @@ class Auth {
         ];
     }
 
+    /**
+     * Cuánto hay que esperar tras el enésimo fallo.
+     *
+     * Antes era un valor fijo de quince minutos. Castigaba igual a quien
+     * escribió mal su contraseña que a quien está tanteando, y en la práctica
+     * lo que hacía era dejar a la gente fuera de su propio sistema a media
+     * jornada.
+     *
+     * La espera ahora crece: los primeros fallos cuestan segundos, y sólo
+     * quien insiste llega a los minutos. Para una persona que se equivocó es
+     * un tropiezo; para quien prueba contraseñas en serie, cada ronda de cinco
+     * intentos le cuesta más que la anterior, que es lo que vuelve inviable
+     * tantear. El tope lo fija LOGIN_BLOQUEO_MIN.
+     */
+    private static function segundosDeBloqueo(int $intentos): int {
+        $max = defined('LOGIN_MAX_INTENTOS') ? (int)LOGIN_MAX_INTENTOS : 5;
+        $max = max(1, $max);
+        // Cuántos bloqueos lleva: el primero al llegar a $max fallos.
+        $ronda = max(1, $intentos - $max + 1);
+
+        $escalera = [10, 30, 120, 300, 900];   // 10s · 30s · 2min · 5min · 15min
+        $seg = $escalera[min($ronda, count($escalera)) - 1];
+
+        $topeMin = defined('LOGIN_BLOQUEO_MIN') ? (int)LOGIN_BLOQUEO_MIN : 15;
+        $tope    = max(5, $topeMin * 60);
+        return min($seg, $tope);
+    }
+
+    /** "Espera 10 segundos" / "Espera 2 minutos", sin decir "1 minuto(s)". */
+    private static function textoEspera(int $segundos): string {
+        if ($segundos < 60) return "Espera $segundos segundo" . ($segundos === 1 ? '' : 's');
+        $min = (int)ceil($segundos / 60);
+        return "Espera $min minuto" . ($min === 1 ? '' : 's');
+    }
+
     private function ensureLoginIntentosTable(): void {
         $this->pdo->exec("
             CREATE TABLE IF NOT EXISTS login_intentos (
@@ -433,21 +479,44 @@ class Auth {
         ");
     }
 
-    private function registrarIntento(string $usuario, string $ip, bool $exitoso): void {
+    /** Minutos de calma tras los cuales la cuenta de fallos vuelve a empezar. */
+    private const OLVIDO_MIN = 15;
+
+    /** @return int Segundos de espera que deja este intento; 0 si no bloquea. */
+    private function registrarIntento(string $usuario, string $ip, bool $exitoso): int {
         if ($exitoso) {
             $this->pdo->prepare("DELETE FROM login_intentos WHERE usuario = ?")->execute([$usuario]);
-            return;
+            return 0;
         }
-        $maxIntentos = defined('LOGIN_MAX_INTENTOS') ? LOGIN_MAX_INTENTOS : 5;
-        $bloqueoMin  = defined('LOGIN_BLOQUEO_MIN')  ? LOGIN_BLOQUEO_MIN  : 15;
+        $maxIntentos = defined('LOGIN_MAX_INTENTOS') ? (int)LOGIN_MAX_INTENTOS : 5;
+
+        // Los fallos se olvidan tras un rato sin intentos. Sin esto, la cuenta
+        // nunca bajaba: cuatro errores sueltos en semanas distintas dejaban a
+        // la persona a un tropiezo del bloqueo, sin que nada lo justificara.
+        // No se borra un bloqueo que siga vigente.
+        $this->pdo->prepare(
+            "DELETE FROM login_intentos
+              WHERE usuario = ?
+                AND (bloqueado_hasta IS NULL OR bloqueado_hasta < NOW())
+                AND ultima_vez < DATE_SUB(NOW(), INTERVAL " . self::OLVIDO_MIN . " MINUTE)"
+        )->execute([$usuario]);
+
+        // Cuántos fallos van a quedar tras este, para saber qué espera toca.
+        $st = $this->pdo->prepare("SELECT intentos FROM login_intentos WHERE usuario = ? LIMIT 1");
+        $st->execute([$usuario]);
+        $intentos = (int)($st->fetchColumn() ?: 0) + 1;
+
+        $segundos = $intentos >= $maxIntentos ? self::segundosDeBloqueo($intentos) : 0;
 
         $this->pdo->prepare("
             INSERT INTO login_intentos (usuario, intentos, bloqueado_hasta)
             VALUES (?, 1, NULL)
             ON DUPLICATE KEY UPDATE
               intentos        = intentos + 1,
-              bloqueado_hasta = IF(intentos + 1 >= ?, DATE_ADD(NOW(), INTERVAL ? MINUTE), NULL)
-        ")->execute([$usuario, $maxIntentos, $bloqueoMin]);
+              bloqueado_hasta = IF(? > 0, DATE_ADD(NOW(), INTERVAL ? SECOND), NULL)
+        ")->execute([$usuario, $segundos, $segundos]);
+
+        return $segundos;
     }
 
     // ── CREAR USUARIO ──────────────────────────────────────
