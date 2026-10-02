@@ -436,6 +436,12 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($avbaAdmin->detallePersonal((int)($_GET['id'] ?? 0)));
 
+        // Datos de AVBA como patrón: van en la DC-3 de cada empleado.
+        case 'CONFIG_AVBA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta(['status' => 'success', 'config' => $avbaAdmin->config()]);
+
         // ── Control de material en planta (ADMIN + ADMINISTRATIVO) ──
         case 'LISTAR_MATERIAL_VALES':
             $usr = validarToken($pdo, $token);
@@ -1194,6 +1200,60 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($avbaAdmin->eliminarPersonal((int)($payload['id'] ?? 0)));
+
+        case 'GUARDAR_CONFIG_AVBA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->guardarConfig($payload));
+
+        case 'SUBIR_FOTO_AVBA_PERSONAL':   // multipart
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->subirFotoPersonal($_POST, $_FILES));
+
+        // ── Capacitaciones del personal propio ──────────────
+        case 'GUARDAR_CAPACITACION_AVBA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->guardarCapacitacion($payload, $usr['usuario']));
+
+        case 'ELIMINAR_CAPACITACION_AVBA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->eliminarCapacitacion(
+                (int)($payload['id'] ?? 0), (int)($payload['personal_id'] ?? 0)
+            ));
+
+        // Camino 1: emitir aquí mismo.
+        case 'EMITIR_DOC_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->emitirDocumento(
+                (int)   ($payload['capacitacion_id'] ?? 0),
+                (int)   ($payload['personal_id']     ?? 0),
+                (string)($payload['tipo']            ?? ''),
+                $usr['usuario'],
+                $personal
+            ));
+
+        // Camino 2: mandarlo a la cola de Calidad.
+        case 'ENVIAR_CAPACITACION_CALIDAD':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->enviarACalidad(
+                (int)($payload['capacitacion_id'] ?? 0), (int)($payload['personal_id'] ?? 0)
+            ));
+
+        // ── Certificaciones internas con vigencia ───────────
+        case 'GUARDAR_CERT_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->guardarCertificacion($payload));
+
+        case 'ELIMINAR_CERT_AVBA_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','ADMINISTRATIVO'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($avbaAdmin->eliminarCertificacion((int)($payload['id'] ?? 0)));
 
         case 'SUBIR_DOC_AVBA_PERSONAL':
             $usr = validarToken($pdo, $token);

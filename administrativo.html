@@ -93,8 +93,11 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg)}
     </div>
     <div class="sec-hdr">
       <div><h2 style="margin:0;font-size:18px;color:var(--azul-dark)">Personal interno de AVBA</h2>
-        <p style="margin:3px 0 0;font-size:13px;color:var(--texto-sub)">Empleados y su documentación con control de vigencias.</p></div>
-      <button class="btn-prim" onclick="abrirModalPer(null)">+ Nuevo empleado</button>
+        <p style="margin:3px 0 0;font-size:13px;color:var(--texto-sub)">Expediente, capacitaciones y emisión de DC-3, certificados y credenciales.</p></div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button class="btn-sec" onclick="abrirModalCfg()" title="Razón social, RFC y representantes que van en la DC-3 de todo el personal">🏢 AVBA como patrón</button>
+        <button class="btn-prim" onclick="abrirModalPer(null)">+ Nuevo empleado</button>
+      </div>
     </div>
     <div id="per-lista"><div class="loading"><span class="spin"></span></div></div>
   </div>
@@ -148,7 +151,36 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg)}
       <div class="frow"><label class="flabel">Correo</label><input class="finput" id="per-correo" type="email"></div>
     </div>
     <div class="frow"><label class="flabel">Estatus</label><select class="finput" id="per-estado"><option>Activo</option><option>Baja</option><option>Licencia</option></select></div>
-    <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="per-notas" rows="2"></textarea></div>
+
+    <!-- Lo que exige la STPS para la DC-3. Va en el alta y no al emitir: así no
+         se descubre que falta la CURP con el documento ya a medio imprimir. -->
+    <div class="sec-hdr" style="margin:16px 0 8px">Datos para emitir documentos</div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">CURP <span style="color:var(--rojo)">*</span></label>
+        <input class="finput" id="per-curp" maxlength="18" placeholder="18 caracteres"
+               style="text-transform:uppercase;font-family:monospace"
+               oninput="this.value=this.value.toUpperCase();perRevisar()"></div>
+      <div class="frow"><label class="flabel">Ocupación específica <span style="color:var(--rojo)">*</span></label>
+        <select class="finput" id="per-ocupacion" onchange="perRevisar()"><option value="">—</option></select></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">RFC</label>
+        <input class="finput" id="per-rfc" maxlength="13" placeholder="13 caracteres"
+               style="text-transform:uppercase;font-family:monospace" oninput="this.value=this.value.toUpperCase()"></div>
+      <div class="frow"><label class="flabel">Fecha de nacimiento</label><input class="finput" id="per-nac" type="date"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Escolaridad</label>
+        <input class="finput" id="per-escolaridad" placeholder="Ej: Ingeniería mecánica"></div>
+      <div class="frow"><label class="flabel">Cuenta del sistema</label>
+        <input class="finput" id="per-cuenta" placeholder="usuario" style="text-transform:lowercase"
+               title="Con qué cuenta firma cuando imparte un curso: de ahí salen su firma y su registro STPS"></div>
+    </div>
+
+    <!-- Qué le falta, en vivo mientras se captura. -->
+    <div id="per-falta" style="display:none;font-size:12px;border-radius:8px;padding:9px 11px;margin-top:4px"></div>
+
+    <div class="frow" style="margin-top:10px"><label class="flabel">Notas</label><textarea class="finput" id="per-notas" rows="2"></textarea></div>
     <div class="fact"><button class="btn-sec" onclick="cerrarModalPer()">Cancelar</button><button class="btn-prim" onclick="guardarPer()">Guardar</button></div>
   </div>
 </div>
@@ -157,11 +189,92 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg)}
 <div class="overlay" id="modal-det">
   <div class="modal" style="max-width:640px">
     <div class="modal-hdr"><div class="modal-title" id="det-nombre">Documentos</div><button class="modal-close" onclick="cerrarModalDet()">✕</button></div>
+    <!-- Qué se le puede emitir hoy y qué lo está impidiendo. -->
+    <div id="det-estado" style="margin-bottom:12px"></div>
+
     <div class="sec-hdr" style="margin-bottom:8px">
-      <div class="msec" style="margin:0;border:none">Documentos y vigencias</div>
+      <div class="msec" style="margin:0;border:none">Capacitaciones · DC-3, diploma, certificado y credencial</div>
+      <button class="btn-sec" onclick="abrirModalCap(null)">+ Agregar capacitación</button>
+    </div>
+    <div id="det-caps" style="margin-bottom:16px"></div>
+
+    <div class="sec-hdr" style="margin-bottom:8px">
+      <div class="msec" style="margin:0;border:none">Certificaciones internas</div>
+      <button class="btn-sec" onclick="abrirModalCert(null)">+ Agregar certificación</button>
+    </div>
+    <div id="det-certs" style="margin-bottom:16px"></div>
+
+    <div class="sec-hdr" style="margin-bottom:8px">
+      <div class="msec" style="margin:0;border:none">Documentos escaneados y vigencias</div>
       <button class="btn-sec" onclick="abrirModalDoc(null)">+ Agregar documento</button>
     </div>
     <div id="det-docs"><div class="loading"><span class="spin"></span></div></div>
+  </div>
+</div>
+
+<!-- Modal capacitación -->
+<div class="overlay" id="modal-cap">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="modal-cap-title">Nueva capacitación</div><button class="modal-close" onclick="cerrarModalCap()">✕</button></div>
+    <input type="hidden" id="cap-id">
+    <div class="frow"><label class="flabel">Curso *</label>
+      <select class="finput" id="cap-curso"><option value="">—</option></select></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Fecha del curso *</label><input class="finput" id="cap-fecha" type="date"></div>
+      <div class="frow"><label class="flabel">Instructor (cuenta)</label>
+        <input class="finput" id="cap-instructor" placeholder="se usa la tuya si lo dejas vacío"
+               title="De esa cuenta salen la firma y el registro STPS que van en la DC-3"></div>
+    </div>
+    <div style="font-size:11.5px;color:var(--texto-sub);background:#f3f6fb;border-radius:8px;padding:8px 10px;margin-top:4px">
+      Al guardar se copian el nombre, la CURP, el puesto y la ocupación tal como están hoy en el
+      expediente, junto con los datos de AVBA como patrón. Cambiar mañana esos datos no reescribe
+      un documento ya emitido.
+    </div>
+    <div class="fact"><button class="btn-sec" onclick="cerrarModalCap()">Cancelar</button><button class="btn-prim" onclick="guardarCap()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- Modal certificación interna -->
+<div class="overlay" id="modal-cert">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title" id="modal-cert-title">Nueva certificación</div><button class="modal-close" onclick="cerrarModalCert()">✕</button></div>
+    <input type="hidden" id="cert-id">
+    <div class="frow"><label class="flabel">Certificación *</label>
+      <input class="finput" id="cert-nombre" placeholder="Ej: Inspector nivel II"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Norma o referencia</label><input class="finput" id="cert-norma" placeholder="Ej: ASNT SNT-TC-1A"></div>
+      <div class="frow"><label class="flabel">Nivel</label><input class="finput" id="cert-nivel" placeholder="Ej: II"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Folio</label><input class="finput" id="cert-folio"></div>
+      <div class="frow"><label class="flabel">Otorgada por</label><input class="finput" id="cert-por" placeholder="Organismo que la expide"></div>
+    </div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">Fecha de emisión</label><input class="finput" id="cert-emision" type="date"></div>
+      <div class="frow"><label class="flabel">Fecha de vencimiento</label><input class="finput" id="cert-vence" type="date"></div>
+    </div>
+    <div class="frow"><label class="flabel">Notas</label><textarea class="finput" id="cert-notas" rows="2"></textarea></div>
+    <div class="fact"><button class="btn-sec" onclick="cerrarModalCert()">Cancelar</button><button class="btn-prim" onclick="guardarCert()">Guardar</button></div>
+  </div>
+</div>
+
+<!-- Modal datos de AVBA como patrón -->
+<div class="overlay" id="modal-cfg">
+  <div class="modal">
+    <div class="modal-hdr"><div class="modal-title">AVBA como patrón</div><button class="modal-close" onclick="cerrarModalCfg()">✕</button></div>
+    <div style="font-size:12px;color:var(--texto-sub);background:#f3f6fb;border-radius:8px;padding:9px 11px;margin-bottom:12px">
+      Estos datos van en la DC-3 de <b>todo</b> el personal de AVBA. Se capturan una vez.
+    </div>
+    <div class="frow"><label class="flabel">Razón social *</label><input class="finput" id="cfg-razon"></div>
+    <div class="fgrid2">
+      <div class="frow"><label class="flabel">RFC *</label>
+        <input class="finput" id="cfg-rfc" maxlength="16" style="text-transform:uppercase;font-family:monospace"></div>
+      <div class="frow"><label class="flabel">Registro STPS (agente capacitador)</label><input class="finput" id="cfg-stps"></div>
+    </div>
+    <div class="frow"><label class="flabel">Representante legal *</label><input class="finput" id="cfg-rep"></div>
+    <div class="frow"><label class="flabel">Representante de los trabajadores *</label><input class="finput" id="cfg-reptrab"></div>
+    <div class="frow"><label class="flabel">Domicilio fiscal</label><input class="finput" id="cfg-domicilio"></div>
+    <div class="fact"><button class="btn-sec" onclick="cerrarModalCfg()">Cancelar</button><button class="btn-prim" onclick="guardarCfg()">Guardar</button></div>
   </div>
 </div>
 
@@ -328,6 +441,8 @@ function renderPersonal(){
           <span style="font-size:12px;color:var(--texto-sub)">📄 ${p.total_docs} doc${p.total_docs!==1?'s':''}</span>
           ${vigBadge(p)}
         </div>
+        ${(p.faltan&&p.faltan.length)?`<div style="margin-top:7px;font-size:11.5px;background:#fff8e1;color:#92400e;border-radius:7px;padding:6px 9px">
+          ⚠ Expediente incompleto: falta ${p.faltan.map(esc).join(', ')}</div>`:''}
       </div>
       <div class="card-foot">
         <button class="btn-prim" style="flex:1;font-size:12px;padding:8px" onclick="verDetalle(${p.id},'${esc(p.nombre).replace(/'/g,"\\'")}')">📁 Documentos</button>
@@ -336,11 +451,57 @@ function renderPersonal(){
       </div>
     </div>`).join('')+'</div>';
 }
+/* ═══════════════════════════════════════════════════════════
+   EXPEDIENTE COMPLETO
+   Una DC-3 necesita CURP y ocupación específica del trabajador, y los datos de
+   AVBA como patrón. Si eso se pide al emitir, el documento se queda a medias y
+   hay que volver a buscar a la persona. Por eso se pide en el alta y la
+   pantalla dice, mientras se captura, qué falta para cada documento.
+   ═══════════════════════════════════════════════════════════ */
+let _ocupaciones = [];
+
+async function cargarOcupaciones(){
+  if(_ocupaciones.length) return;
+  try{
+    const r=await fetch(API+'?action=LISTAR_OCUPACIONES'); const d=await r.json();
+    _ocupaciones = d.data || d.ocupaciones || [];
+  }catch(_){ _ocupaciones = []; }
+  const sel=document.getElementById('per-ocupacion');
+  if(sel) sel.innerHTML='<option value="">—</option>'+_ocupaciones
+    .map(o=>`<option value="${o.id}">${esc(o.nombre)}</option>`).join('');
+}
+
+/* Avisa en vivo qué le falta. Es una ayuda, no un candado: el expediente se
+   llena por partes y bloquear el guardado obligaría a tener todo a la mano. */
+function perRevisar(){
+  const caja=document.getElementById('per-falta');
+  if(!caja) return;
+  const falta=[];
+  if(!document.getElementById('per-curp').value.trim())      falta.push('CURP');
+  if(!document.getElementById('per-ocupacion').value)        falta.push('ocupación específica');
+  if(!document.getElementById('per-puesto').value.trim())    falta.push('puesto');
+  if(!falta.length){
+    caja.style.display=''; caja.style.background='#e8f5e9'; caja.style.color='#1b7a3d';
+    caja.innerHTML='✓ Con estos datos se le puede emitir DC-3, certificado y diploma.';
+    return;
+  }
+  caja.style.display=''; caja.style.background='#fff8e1'; caja.style.color='#92400e';
+  caja.innerHTML='Sin <b>'+falta.map(esc).join('</b>, <b>')+'</b> no se le podrá emitir la DC-3. '
+               + 'Se puede guardar así y completarlo después.';
+}
+
 function abrirModalPer(p){
+  cargarOcupaciones().then(()=>{ if(p) document.getElementById('per-ocupacion').value=p.ocupacion_id||''; });
   document.getElementById('modal-per-title').textContent=p?'Editar empleado':'Nuevo empleado';
   document.getElementById('per-id').value=p?p.id:'';
+  document.getElementById('per-curp').value=p?(p.curp||''):'';
+  document.getElementById('per-rfc').value=p?(p.rfc||''):'';
+  document.getElementById('per-nac').value=p?(p.fecha_nacimiento||''):'';
+  document.getElementById('per-escolaridad').value=p?(p.escolaridad||''):'';
+  document.getElementById('per-cuenta').value=p?(p.cuenta_usuario||''):'';
   document.getElementById('per-nombre').value=p?(p.nombre||''):'';
   document.getElementById('per-puesto').value=p?(p.puesto||''):'';
+  document.getElementById('per-puesto').oninput=perRevisar;
   document.getElementById('per-tipo').value=p?(p.tipo||''):'';
   document.getElementById('per-numemp').value=p?(p.num_empleado||''):'';
   document.getElementById('per-ingreso').value=p&&p.fecha_ingreso?p.fecha_ingreso.split('/').reverse().join('-'):'';
@@ -348,6 +509,7 @@ function abrirModalPer(p){
   document.getElementById('per-correo').value=p?(p.correo||''):'';
   document.getElementById('per-estado').value=p?(p.estado||'Activo'):'Activo';
   document.getElementById('per-notas').value=p?(p.notas||''):'';
+  perRevisar();
   document.getElementById('modal-per').classList.add('open');
 }
 function cerrarModalPer(){ document.getElementById('modal-per').classList.remove('open'); }
@@ -364,6 +526,12 @@ async function guardarPer(){
     correo:document.getElementById('per-correo').value.trim(),
     estado:document.getElementById('per-estado').value,
     notas:document.getElementById('per-notas').value.trim(),
+    curp:document.getElementById('per-curp').value.trim(),
+    ocupacion_id:+document.getElementById('per-ocupacion').value||0,
+    rfc:document.getElementById('per-rfc').value.trim(),
+    fecha_nacimiento:document.getElementById('per-nac').value,
+    escolaridad:document.getElementById('per-escolaridad').value.trim(),
+    cuenta_usuario:document.getElementById('per-cuenta').value.trim(),
   };
   try{
     const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'GUARDAR_AVBA_PERSONAL',payload:data})});
@@ -382,11 +550,237 @@ async function eliminarPer(id,nombre){
   }catch(_){ toast('Error de red.'); }
 }
 
+/* ═══════════════════════════════════════════════════════════
+   CAPACITACIONES Y CERTIFICACIONES DEL PERSONAL PROPIO
+   Una capacitación es lo que da pie a la DC-3, el diploma, el certificado y la
+   credencial. Desde aquí se emite en el momento o se manda a la cola de
+   Calidad, que es el mismo camino que siguen los participantes de clientes.
+   ═══════════════════════════════════════════════════════════ */
+let _cursos = [];
+let _detFaltantes = {};
+
+const DOC_NOMBRE = { dc3:'DC-3', diploma:'Diploma', certificado:'Certificado', credencial:'Credencial' };
+
+async function cargarCursos(){
+  if(_cursos.length) return;
+  try{
+    const r=await fetch(API+'?action=LISTAR_CURSOS'); const d=await r.json();
+    _cursos = d.data || d.cursos || [];
+  }catch(_){ _cursos=[]; }
+  const sel=document.getElementById('cap-curso');
+  if(sel) sel.innerHTML='<option value="">—</option>'+_cursos
+    .map(c=>`<option value="${c.id}">${esc(c.nombre)} · ${c.duracion_horas} h</option>`).join('');
+}
+
+/* Resumen de qué se le puede emitir. Lo que falta se dice por su nombre, no
+   con un "datos incompletos" que obliga a adivinar. */
+function renderEstado(f){
+  const cont=document.getElementById('det-estado');
+  if(!cont) return;
+  _detFaltantes = f || {};
+  const faltanConfig = (f?.dc3?.falta || []).some(x=>String(x).includes('AVBA')||String(x).includes('representante'));
+  cont.innerHTML = Object.keys(DOC_NOMBRE).map(k=>{
+    const e=(f||{})[k]||{puede:false,falta:['sin datos']};
+    return e.puede
+      ? `<span class="badge b-ok" style="margin:0 5px 5px 0">✔ ${DOC_NOMBRE[k]}</span>`
+      : `<span class="badge b-warn" style="margin:0 5px 5px 0" title="Falta: ${esc((e.falta||[]).join(', '))}">⚠ ${DOC_NOMBRE[k]}</span>`;
+  }).join('')
+  + (faltanConfig ? `<div style="margin-top:7px;font-size:11.5px;background:#fff8e1;color:#92400e;border-radius:7px;padding:7px 10px">
+       Faltan los datos de AVBA como patrón, que van en la DC-3 de todo el personal.
+       <button class="btn-sec" style="margin-left:6px;font-size:11px;padding:3px 9px" onclick="abrirModalCfg()">Capturarlos</button>
+     </div>` : '');
+}
+
+function renderCaps(caps){
+  const cont=document.getElementById('det-caps');
+  if(!caps.length){ cont.innerHTML='<div style="font-size:12.5px;color:var(--texto-sub);padding:10px 0">Sin capacitaciones registradas.</div>'; return; }
+  cont.innerHTML = caps.map(c=>{
+    const emitidos=(c.emitidos||[]).map(x=>x.toLowerCase());
+    const botones = Object.keys(DOC_NOMBRE).map(k=>{
+      const e=_detFaltantes[k]||{puede:true,falta:[]};
+      const ya=emitidos.includes(k);
+      return `<button class="btn-sec" style="font-size:11px;padding:4px 9px;${e.puede?'':'opacity:.5'}"
+        ${e.puede?'':`title="Falta: ${esc((e.falta||[]).join(', '))}"`}
+        onclick="emitirDoc(${c.id},'${k}')">${ya?'↻':'📄'} ${DOC_NOMBRE[k]}</button>`;
+    }).join('');
+    const enCola = ['PENDIENTE','APROBADO_CALIDAD','EMITIDO'].includes(c.estatus);
+    return `<div class="card" style="margin-bottom:9px">
+      <div class="card-body" style="padding:11px 13px">
+        <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap">
+          <div style="min-width:0">
+            <div style="font-weight:600;font-size:13px">${esc(c.curso||'—')}</div>
+            <div style="font-size:11.5px;color:var(--texto-sub)">${esc(c.fecha||'')}
+              ${c.duracion_horas?' · '+c.duracion_horas+' h':''}${c.control?' · '+esc(c.control):''}</div>
+          </div>
+          <span class="badge ${c.estatus==='EMITIDO'?'b-ok':(enCola?'b-warn':'b-off')}">${esc(c.estatus||'BORRADOR')}</span>
+        </div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:9px">${botones}</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:6px">
+          <button class="btn-sec" style="font-size:11px;padding:4px 9px" onclick='abrirModalCap(${JSON.stringify(c).replace(/'/g,"&#39;")})'>✏ Editar</button>
+          ${enCola?'':`<button class="btn-sec" style="font-size:11px;padding:4px 9px" onclick="enviarCalidad(${c.id})">→ Enviar a Calidad</button>`}
+          <button class="btn-del" style="font-size:11px;padding:4px 9px" onclick="eliminarCap(${c.id})">🗑</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderCerts(certs){
+  const cont=document.getElementById('det-certs');
+  if(!certs.length){ cont.innerHTML='<div style="font-size:12.5px;color:var(--texto-sub);padding:10px 0">Sin certificaciones internas.</div>'; return; }
+  const cfg={vigente:['b-ok','✔ Vigente'],por_vencer:['b-warn','⏰ Por vencer'],vencida:['b-bad','⚠ Vencida'],sin_vigencia:['b-off','Sin vigencia']};
+  cont.innerHTML = certs.map(c=>{
+    const [cls,txt]=cfg[c.estado]||cfg.sin_vigencia;
+    return `<div class="card" style="margin-bottom:8px"><div class="card-body" style="padding:10px 13px">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start;flex-wrap:wrap">
+        <div style="min-width:0">
+          <div style="font-weight:600;font-size:13px">${esc(c.nombre)}${c.nivel?' · nivel '+esc(c.nivel):''}</div>
+          <div style="font-size:11.5px;color:var(--texto-sub)">
+            ${c.norma?esc(c.norma)+' · ':''}${c.folio?'folio '+esc(c.folio):''}
+            ${c.emision?' · emitida '+esc(c.emision):''}${c.vence?' · vence '+esc(c.vence):''}</div>
+        </div>
+        <span class="badge ${cls}">${txt}</span>
+      </div>
+      <div style="display:flex;gap:5px;margin-top:8px">
+        <button class="btn-sec" style="font-size:11px;padding:4px 9px" onclick='abrirModalCert(${JSON.stringify(c).replace(/'/g,"&#39;")})'>✏ Editar</button>
+        <button class="btn-del" style="font-size:11px;padding:4px 9px" onclick="eliminarCert(${c.id})">🗑</button>
+      </div>
+    </div></div>`;
+  }).join('');
+}
+
+function abrirModalCap(c){
+  cargarCursos().then(()=>{ if(c) document.getElementById('cap-curso').value=c.curso_id||''; });
+  document.getElementById('modal-cap-title').textContent=c?'Editar capacitación':'Nueva capacitación';
+  document.getElementById('cap-id').value=c?c.id:'';
+  document.getElementById('cap-fecha').value=c?(c.fecha_iso||''):'';
+  document.getElementById('cap-instructor').value='';
+  document.getElementById('modal-cap').classList.add('open');
+}
+function cerrarModalCap(){ document.getElementById('modal-cap').classList.remove('open'); }
+
+async function guardarCap(){
+  const data={
+    id:+document.getElementById('cap-id').value||0,
+    personal_id:_detPid,
+    curso_id:+document.getElementById('cap-curso').value||0,
+    fecha_curso:document.getElementById('cap-fecha').value,
+    instructor:document.getElementById('cap-instructor').value.trim(),
+  };
+  if(!data.curso_id){ toast('Selecciona el curso.'); return; }
+  if(!data.fecha_curso){ toast('Indica la fecha del curso.'); return; }
+  await accionDet('GUARDAR_CAPACITACION_AVBA', data, 'Capacitación guardada.', cerrarModalCap);
+}
+
+async function eliminarCap(id){
+  if(!confirm('¿Eliminar esta capacitación y los documentos que se le hayan emitido?')) return;
+  await accionDet('ELIMINAR_CAPACITACION_AVBA', {id, personal_id:_detPid}, 'Capacitación eliminada.');
+}
+
+async function emitirDoc(capId, tipo){
+  toast('Generando '+DOC_NOMBRE[tipo]+'…');
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'EMITIR_DOC_AVBA_PERSONAL',
+        payload:{capacitacion_id:capId, personal_id:_detPid, tipo}})});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'No se pudo emitir.'); return; }
+    if(d.url) window.open(d.url,'_blank');
+    toast(DOC_NOMBRE[tipo]+' emitido.');
+    cargarDocs();
+  }catch(_){ toast('Error de red.'); }
+}
+
+async function enviarCalidad(capId){
+  if(!confirm('La capacitación pasará a la bandeja de Calidad para que la revisen y la emita Certificaciones.\n\n¿Continuar?')) return;
+  await accionDet('ENVIAR_CAPACITACION_CALIDAD', {capacitacion_id:capId, personal_id:_detPid}, 'Enviado a Calidad.');
+}
+
+function abrirModalCert(c){
+  document.getElementById('modal-cert-title').textContent=c?'Editar certificación':'Nueva certificación';
+  document.getElementById('cert-id').value=c?c.id:'';
+  document.getElementById('cert-nombre').value=c?(c.nombre||''):'';
+  document.getElementById('cert-norma').value=c?(c.norma||''):'';
+  document.getElementById('cert-nivel').value=c?(c.nivel||''):'';
+  document.getElementById('cert-folio').value=c?(c.folio||''):'';
+  document.getElementById('cert-por').value=c?(c.otorgada_por||''):'';
+  document.getElementById('cert-emision').value=c&&c.emision?c.emision.split('/').reverse().join('-'):'';
+  document.getElementById('cert-vence').value=c?(c.vence_iso||''):'';
+  document.getElementById('cert-notas').value=c?(c.notas||''):'';
+  document.getElementById('modal-cert').classList.add('open');
+}
+function cerrarModalCert(){ document.getElementById('modal-cert').classList.remove('open'); }
+
+async function guardarCert(){
+  const nombre=document.getElementById('cert-nombre').value.trim();
+  if(!nombre){ toast('El nombre de la certificación es obligatorio.'); return; }
+  await accionDet('GUARDAR_CERT_AVBA_PERSONAL', {
+    id:+document.getElementById('cert-id').value||0, personal_id:_detPid, nombre,
+    norma:document.getElementById('cert-norma').value.trim(),
+    nivel:document.getElementById('cert-nivel').value.trim(),
+    folio:document.getElementById('cert-folio').value.trim(),
+    otorgada_por:document.getElementById('cert-por').value.trim(),
+    fecha_emision:document.getElementById('cert-emision').value,
+    fecha_vence:document.getElementById('cert-vence').value,
+    notas:document.getElementById('cert-notas').value.trim(),
+  }, 'Certificación guardada.', cerrarModalCert);
+}
+
+async function eliminarCert(id){
+  if(!confirm('¿Eliminar esta certificación?')) return;
+  await accionDet('ELIMINAR_CERT_AVBA_PERSONAL', {id}, 'Certificación eliminada.');
+}
+
+/* Las acciones del expediente comparten envío, aviso y recarga. */
+async function accionDet(action, payload, exito, cerrar){
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action, payload})});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return false; }
+    if(cerrar) cerrar();
+    toast(exito); cargarDocs();
+    return true;
+  }catch(_){ toast('Error de red.'); return false; }
+}
+
+// ── AVBA como patrón ──
+function abrirModalCfg(){
+  fetch(API+'?action=CONFIG_AVBA').then(r=>r.json()).then(d=>{
+    const c=d.config||{};
+    document.getElementById('cfg-razon').value=c.razon_social||'';
+    document.getElementById('cfg-rfc').value=c.rfc||'';
+    document.getElementById('cfg-stps').value=c.registro_stps||'';
+    document.getElementById('cfg-rep').value=c.representante||'';
+    document.getElementById('cfg-reptrab').value=c.rep_trabajadores||'';
+    document.getElementById('cfg-domicilio').value=c.domicilio||'';
+  }).catch(()=>{});
+  document.getElementById('modal-cfg').classList.add('open');
+}
+function cerrarModalCfg(){ document.getElementById('modal-cfg').classList.remove('open'); }
+async function guardarCfg(){
+  try{
+    const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'GUARDAR_CONFIG_AVBA', payload:{
+        razon_social:document.getElementById('cfg-razon').value.trim(),
+        rfc:document.getElementById('cfg-rfc').value.trim(),
+        registro_stps:document.getElementById('cfg-stps').value.trim(),
+        representante:document.getElementById('cfg-rep').value.trim(),
+        rep_trabajadores:document.getElementById('cfg-reptrab').value.trim(),
+        domicilio:document.getElementById('cfg-domicilio').value.trim(),
+      }})});
+    const d=await r.json();
+    if(d.status!=='success'){ toast(d.message||'Error.'); return; }
+    cerrarModalCfg(); toast('Datos de AVBA guardados.');
+    if(_detPid) cargarDocs();
+  }catch(_){ toast('Error de red.'); }
+}
+
 // ── Documentos ──
 let _detPid=0;
 async function verDetalle(id,nombre){
   _detPid=id;
-  document.getElementById('det-nombre').textContent='Documentos — '+nombre;
+  document.getElementById('det-nombre').textContent='Expediente — '+nombre;
   document.getElementById('modal-det').classList.add('open');
   cargarDocs();
 }
@@ -396,6 +790,9 @@ async function cargarDocs(){
   try{
     const r=await fetch(API+'?action=DETALLE_AVBA_PERSONAL&id='+_detPid); const d=await r.json();
     if(d.status!=='success'){ cont.innerHTML=`<p style="color:var(--rojo)">${esc(d.message)}</p>`; return; }
+    renderEstado(d.faltantes);
+    renderCaps(d.capacitaciones||[]);
+    renderCerts(d.certificaciones||[]);
     renderDocs(d.docs||[]);
   }catch(_){ cont.innerHTML='<p style="color:var(--rojo)">Error de red.</p>'; }
 }

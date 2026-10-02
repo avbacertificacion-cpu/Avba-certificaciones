@@ -228,18 +228,24 @@ function columnaExiste(PDO $pdo, string $tabla, string $columna): bool {
     // distintas, y recordar la respuesta de una para la otra haría nombrar una
     // columna que allí no existe, rompiendo la consulta entera.
     $clave = spl_object_id($pdo) . "|$tabla.$columna";
-    if (isset($cache[$clave])) return $cache[$clave];
+    // Sólo se recuerda el "sí". Un "no" no se guarda porque es inestable: en la
+    // misma petición, una migración puede crear la columna un instante después,
+    // y recordar el "no" haría que el guardado posterior se saltara ese campo
+    // sin avisar a nadie. Un "sí", en cambio, no se vuelve falso: las columnas
+    // no desaparecen solas.
+    if (!empty($cache[$clave])) return true;
     try {
         $st = $pdo->prepare(
             "SELECT COUNT(*) FROM information_schema.COLUMNS
              WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?"
         );
         $st->execute([$tabla, $columna]);
-        $cache[$clave] = ((int)$st->fetchColumn()) > 0;
+        $hay = ((int)$st->fetchColumn()) > 0;
     } catch (\Throwable $e) {
-        $cache[$clave] = false;
+        return false;
     }
-    return $cache[$clave];
+    if ($hay) $cache[$clave] = true;
+    return $hay;
 }
 
 /**

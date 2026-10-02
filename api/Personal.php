@@ -199,6 +199,12 @@ class Personal {
     public function obtenerParticipante(int $id): ?array {
         $this->ensureMigration013Columns();
         $this->ensureTextoCertificadoColumn();
+        // Nombrar una columna que no exista rompe la consulta entera y deja sin
+        // abrir el detalle del participante, así que el respaldo propio sólo se
+        // pide cuando la columna ya está.
+        $repTrab = columnaExiste($this->pdo, 'participantes_cursos', 'empresa_rep_trabajadores')
+            ? "COALESCE(cl.representante_trabajadores COLLATE utf8mb4_general_ci, p.empresa_rep_trabajadores)"
+            : "cl.representante_trabajadores";
         $stmt = $this->pdo->prepare(
             "SELECT p.*,
                     c.nombre AS curso_nombre, c.duracion_horas, c.area_tematica,
@@ -213,7 +219,7 @@ class Personal {
                         cl.representante COLLATE utf8mb4_general_ci,
                         p.empresa_representante
                     ) AS empresa_representante,
-                    cl.representante_trabajadores AS empresa_rep_trabajadores
+                    {$repTrab} AS empresa_rep_trabajadores
              FROM participantes_cursos p
              LEFT JOIN cursos c ON c.id = p.curso_id
              LEFT JOIN ocupaciones_especificas o ON o.id = p.ocupacion_id
@@ -1130,6 +1136,29 @@ class Personal {
         try {
             $this->pdo->exec("ALTER TABLE participantes_cursos MODIFY curp VARCHAR(18) NULL");
         } catch (\Throwable $e) {}
+
+        // Estas dos van comprobando information_schema y no con ADD COLUMN IF
+        // NOT EXISTS como las de arriba: esa forma sólo existe en MariaDB y en
+        // MySQL 8 el ALTER entero falla en silencio, así que la columna nunca
+        // llegaría a crearse.
+        $extra = [
+            // Quién firma por los trabajadores. Hasta ahora salía sólo del
+            // catálogo de clientes, así que una empresa que no estuviera dada
+            // de alta ahí dejaba ese recuadro de la DC-3 en blanco.
+            'empresa_rep_trabajadores' => 'VARCHAR(200) NULL',
+            // Empleado de AVBA al que pertenece este registro, cuando la
+            // capacitación es de personal propio y no de un cliente.
+            'avba_personal_id'         => 'INT NULL',
+        ];
+        foreach ($extra as $col => $tipo) {
+            try {
+                if (!columnaExiste($this->pdo, 'participantes_cursos', $col)) {
+                    $this->pdo->exec("ALTER TABLE participantes_cursos ADD COLUMN `$col` $tipo");
+                }
+            } catch (\Throwable $e) {
+                error_log("[Personal] columna $col: " . $e->getMessage());
+            }
+        }
     }
 
     // ══════════════════════════════════════════════════════
