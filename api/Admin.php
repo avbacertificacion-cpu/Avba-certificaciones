@@ -19,6 +19,81 @@ class Admin {
     private const TIPOS_BASE = [
         'montacargas' => ['MONTACARGAS',  'dictamen_montacargas.html'],
         'grua_torre'  => ['GRÚA TORRE',   'dictamen_grua_torre.html'],
+        'grua_oruga'  => ['GRÚA ESTRUCTURAL SOBRE ORUGAS', 'dictamen_grua_oruga.html'],
+    ];
+
+    /**
+     * Secciones y puntos de revisión con los que nace un tipo.
+     *
+     * Un tipo sin checklist no sirve para nada: el inspector no tiene qué
+     * capturar y no hay reporte de inspección que emitir. Por eso el alta
+     * siembra también su lista, no sólo el nombre y la plantilla.
+     *
+     * Es un punto de partida: Calidad lo edita desde el panel como cualquier
+     * otro, y como la siembra se marca una sola vez, lo que ajusten no se
+     * repone.
+     */
+    private const CHECKLIST_BASE = [
+        'grua_oruga' => [
+            'secciones' => [
+                ['A', 'Estructura y tren de rodaje'],
+                ['B', 'Mecanismos de izaje y giro'],
+                ['C', 'Cables, poleas y accesorios de carga'],
+                ['D', 'Cabina, controles e instrumentos'],
+                ['E', 'Sistemas de seguridad'],
+                ['F', 'Motor y sistemas auxiliares'],
+                ['G', 'Documentación'],
+            ],
+            'items' => [
+                ['A', 'A-01', 'Secciones de pluma reticulada: celosía, cordones y diagonales sin deformación ni fisuras'],
+                ['A', 'A-02', 'Plumín (jib) y sus tirantes: estado, pasadores y seguros'],
+                ['A', 'A-03', 'Pasadores y seguros de unión entre secciones'],
+                ['A', 'A-04', 'Cadenas de oruga: tensado, eslabones, zapatas y pernos'],
+                ['A', 'A-05', 'Rodillos superiores e inferiores, rueda guía y rueda motriz'],
+                ['A', 'A-06', 'Bastidor, carro inferior y vigas laterales sin fisuras ni corrosión'],
+                ['A', 'A-07', 'Contrapeso: cantidad, sujeción y correspondencia con la tabla de capacidades'],
+                ['B', 'B-01', 'Corona de giro: juego, pernos de anclaje y engrasado'],
+                ['B', 'B-02', 'Piñón y reductor de giro: ruido, fugas y nivel de aceite'],
+                ['B', 'B-03', 'Tambores de izaje principal y auxiliar: ranurado y anclaje del cable'],
+                ['B', 'B-04', 'Frenos de izaje, giro y traslación: retención y ajuste'],
+                ['B', 'B-05', 'Mecanismo de abatimiento de pluma y su freno'],
+                ['B', 'B-06', 'Sistema hidráulico: mangueras, cilindros, fugas y presión'],
+                ['C', 'C-01', 'Cable de izaje: hilos rotos, aplastamiento, corrosión y lubricación'],
+                ['C', 'C-02', 'Cable de abatimiento y tirantes: estado y terminaciones'],
+                ['C', 'C-03', 'Poleas: gargantas, rodamientos y guardacables'],
+                ['C', 'C-04', 'Gancho principal: apertura, torsión, desgaste y seguro'],
+                ['C', 'C-05', 'Gancho auxiliar y bola de contrapeso'],
+                ['C', 'C-06', 'Grilletes, eslingas y accesorios de izaje del equipo'],
+                ['D', 'D-01', 'Acceso, asiento, cinturón y visibilidad desde la cabina'],
+                ['D', 'D-02', 'Palancas, pedales y mandos: identificación y retorno a neutral'],
+                ['D', 'D-03', 'Instrumentos: indicadores de ángulo, radio, longitud y carga'],
+                ['D', 'D-04', 'Nivel de burbuja o indicador de nivelación'],
+                ['D', 'D-05', 'Cristales, limpiaparabrisas, espejos y cámaras'],
+                ['E', 'E-01', 'Indicador y limitador de momento de carga (LMI): funcionamiento y calibración'],
+                ['E', 'E-02', 'Limitador de fin de carrera de izaje (anti two-block)'],
+                ['E', 'E-03', 'Paro de emergencia y bloqueo de mandos'],
+                ['E', 'E-04', 'Alarma de traslación, claxon y señalización acústica'],
+                ['E', 'E-05', 'Extintor vigente, botiquín y punto de anclaje para arnés'],
+                ['E', 'E-06', 'Tabla de capacidades legible y a bordo del equipo'],
+                ['E', 'E-07', 'Calcomanías de advertencia y señalización de seguridad'],
+                ['F', 'F-01', 'Motor: niveles, fugas, humos y ruidos anormales'],
+                ['F', 'F-02', 'Sistema eléctrico: batería, cableado y protecciones'],
+                ['F', 'F-03', 'Iluminación de trabajo y luces de posición'],
+                ['F', 'F-04', 'Sistema de combustible y filtros'],
+                ['G', 'G-01', 'Manual del operador y de mantenimiento a bordo'],
+                ['G', 'G-02', 'Bitácora de mantenimiento preventivo al día'],
+                ['G', 'G-03', 'Certificados vigentes de cables, ganchos y accesorios'],
+                ['G', 'G-04', 'Constancia de habilidades del operador'],
+            ],
+            // Lo que ampara la inspección y lo que se consulta de referencia.
+            'normas' => [
+                ['NOM-004-STPS-1999', 'acreditada'],
+                ['NOM-006-STPS-2014', 'acreditada'],
+                ['ASME B30.5',        'referencia'],
+                ['ASME B30.10',       'referencia'],
+                ['ASME B30.26',       'referencia'],
+            ],
+        ],
     ];
 
     public function __construct(PDO $pdo) {
@@ -72,11 +147,14 @@ class Admin {
                             "UPDATE maquinaria_tipos SET plantilla_dict_html = ? WHERE id = ?"
                         )->execute([$plantilla, $fila['id']]);
                     }
+                    $tipoId = (int)$fila['id'];
                 } else {
                     $this->pdo->prepare(
                         "INSERT INTO maquinaria_tipos (nombre, plantilla_dict_html) VALUES (?, ?)"
                     )->execute([$nombre, $plantilla]);
+                    $tipoId = (int)$this->pdo->lastInsertId();
                 }
+                $this->sembrarChecklist($clave, $tipoId);
                 $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")->execute([$clave]);
             } catch (\Throwable $e) {
                 error_log("[Admin] seedTiposMaquinaria ($clave): " . $e->getMessage());
@@ -85,6 +163,62 @@ class Admin {
     }
 
     // ── Listar tipos de equipo con sus secciones ───────────────
+    /**
+     * Secciones, puntos de revisión y normas con los que nace un tipo.
+     *
+     * Sólo se siembra lo que falte: si el tipo ya existía con su checklist
+     * capturado a mano, no se le agrega nada encima. Un fallo aquí no puede
+     * impedir el alta del tipo, que es lo importante.
+     */
+    private function sembrarChecklist(string $clave, int $tipoId): void {
+        $base = self::CHECKLIST_BASE[$clave] ?? null;
+        if (!$base || !$tipoId) return;
+
+        try {
+            $ya = $this->pdo->prepare("SELECT COUNT(*) FROM checklist_items WHERE maquinaria_tipo_id = ?");
+            $ya->execute([$tipoId]);
+            if ((int)$ya->fetchColumn() > 0) return;   // ya tiene lista propia
+        } catch (\Throwable $e) { return; }
+
+        try {
+            $sec = $this->pdo->prepare(
+                "INSERT IGNORE INTO checklist_secciones (maquinaria_tipo_id, codigo, nombre, orden)
+                 VALUES (?,?,?,?)"
+            );
+            foreach ($base['secciones'] as $i => [$codigo, $nombre]) {
+                $sec->execute([$tipoId, $codigo, $nombre, $i + 1]);
+            }
+
+            $it = $this->pdo->prepare(
+                "INSERT IGNORE INTO checklist_items (maquinaria_tipo_id, seccion, tag, descripcion, orden)
+                 VALUES (?,?,?,?,?)"
+            );
+            foreach ($base['items'] as $i => [$seccion, $tag, $descripcion]) {
+                $it->execute([$tipoId, $seccion, $tag, $descripcion, $i + 1]);
+            }
+        } catch (\Throwable $e) {
+            error_log("[Admin] sembrarChecklist ($clave): " . $e->getMessage());
+        }
+
+        // Las normas van aparte: su tabla pudo no existir en instalaciones viejas.
+        try {
+            $this->pdo->exec(
+                "ALTER TABLE maquinaria_normas
+                 ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) NOT NULL DEFAULT 'acreditada'"
+            );
+        } catch (\Throwable $e) { /* ya existe o no aplica */ }
+        try {
+            $n = $this->pdo->prepare(
+                "INSERT INTO maquinaria_normas (maquinaria_tipo_id, norma, tipo, orden) VALUES (?,?,?,?)"
+            );
+            foreach ($base['normas'] as $i => [$norma, $tipo]) {
+                $n->execute([$tipoId, $norma, $tipo, $i + 1]);
+            }
+        } catch (\Throwable $e) {
+            error_log("[Admin] sembrarNormas ($clave): " . $e->getMessage());
+        }
+    }
+
     public function listarTiposEquipo(): array {
         // Auto-aplicar migration_007 si las columnas PDF no existen todavía
         $this->ensureColumnsPdf();
@@ -763,7 +897,7 @@ class Admin {
             '', 'dictamen_preview.html', 'dictamen_montacargas.html',
             'dictamen_izaje.html', 'dictamen_ptem.html',
             'dictamen_grua_torre.html', 'dictamen_telehandler.html',
-            'dictamen_mewp.html',
+            'dictamen_mewp.html', 'dictamen_grua_oruga.html',
         ];
         if (!in_array($html, $allowed, true)) {
             return ['status' => 'error', 'message' => 'Plantilla HTML no válida.'];
