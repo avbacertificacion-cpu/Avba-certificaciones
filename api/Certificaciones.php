@@ -1194,6 +1194,60 @@ body { background:#fff!important; }
         return $campos;
     }
 
+    /**
+     * Ángulo y altura de una fila de prueba de carga, a partir del radio y la
+     * longitud capturados.
+     *
+     * El gancho principal cuelga de la punta de la pluma, que nace en el pivote:
+     * ahí el triángulo rectángulo se resuelve solo, con el radio de cateto y la
+     * pluma de hipotenusa.
+     *
+     * El gancho auxiliar NO. Su plumín va montado EN la punta de la pluma, así
+     * que su triángulo arranca de ahí y no del pivote. Tomar el radio completo
+     * como cateto daba una altura MENOR que la de la pluma, es decir un plumín
+     * colgando hacia abajo, que no existe.
+     *
+     * @param array $base Geometría del gancho principal; sólo la usa el auxiliar.
+     * @return array{angulo:?float, altura:?float} null en lo que no se pueda deducir.
+     */
+    private function geometriaPc(string $fila, float $radio, float $pluma, array $base = []): array {
+        if ($pluma <= 0) return ['angulo' => null, 'altura' => null];
+
+        if (strncmp($fila, 'aux', 3) !== 0) {
+            if ($radio < 0 || $radio > $pluma) return ['angulo' => null, 'altura' => null];
+            return [
+                'angulo' => rad2deg(acos($radio / $pluma)),
+                'altura' => sqrt(max(0, $pluma * $pluma - $radio * $radio)),
+            ];
+        }
+
+        // Auxiliar: hace falta saber dónde termina la pluma.
+        $rBase = (float)($base['radio']  ?? 0);
+        $hBase = (float)($base['altura'] ?? 0);
+        if ($rBase <= 0 || $hBase <= 0) return ['angulo' => null, 'altura' => null];
+
+        $tramo = abs($radio - $rBase);
+        if ($tramo > $pluma) return ['angulo' => null, 'altura' => null];
+        return [
+            'angulo' => rad2deg(acos($tramo / $pluma)),
+            'altura' => $hBase + sqrt(max(0, $pluma * $pluma - $tramo * $tramo)),
+        ];
+    }
+
+    /** Dónde termina la pluma: lo que el gancho auxiliar necesita de referencia. */
+    private function basePrincipal(array $pc): array {
+        foreach (['princ_con', 'princ_sin', 'con', 'sin'] as $k) {
+            $f = $pc[$k] ?? null;
+            if (!is_array($f)) continue;
+            $r = (float)($f['radio'] ?? 0);
+            $l = (float)($f['pluma'] ?? 0);
+            if ($r > 0 && $l >= $r) {
+                return ['radio' => $r, 'altura' => sqrt(max(0, $l * $l - $r * $r))];
+            }
+        }
+        return [];
+    }
+
     /** Mapea el texto (normalizado) de un encabezado de columna a su id de campo del JSON. */
     private function pcCampoDeEncabezado(string $t): string {
         if (strpos($t, 'resultado') !== false || strpos($t, 'result') !== false) return 'resultado';
@@ -1257,10 +1311,18 @@ body { background:#fff!important; }
         if (!empty($filas)) {
             // 3a. Extraer las columnas de datos del <thead> (se omite la 1ª, "Prueba").
             $colsCampos = $this->columnasPcTabla($html);
+            // El auxiliar se mide desde la punta de la pluma, así que necesita
+            // saber dónde quedó.
+            $basePri    = $this->basePrincipal($pc);
 
             $rowLabels = [
                 'sin' => 'Sin Carga', 'con' => 'Con Carga',
                 'trabajo' => 'Carga de Trabajo', 'sobrecarga' => 'Prueba de Sobrecarga',
+                // Grúa de celosía: una prueba por gancho.
+                'princ_sin' => 'Gancho principal · sin carga',
+                'princ_con' => 'Gancho principal · con carga',
+                'aux_sin'   => 'Gancho auxiliar · sin carga',
+                'aux_con'   => 'Gancho auxiliar · con carga',
             ];
             $tbodyHtml = "<tbody>\n";
             $rowIndex  = 0;
@@ -1273,6 +1335,7 @@ body { background:#fff!important; }
 
                 $rowRadio = (float)($datos['radio'] ?? 0);
                 $rowPluma = (float)($datos['pluma'] ?? 0);
+                $rowGeo   = $this->geometriaPc((string)$tipoFila, $rowRadio, $rowPluma, $basePri);
 
                 $tbodyHtml .= "<tr class=\"{$rowCls}\">\n";
                 $tbodyHtml .= "<td class=\"pc-td-desc\"><span class=\"pc-test-badge\">{$chk} " . $e($label) . "</span></td>\n";
@@ -1281,11 +1344,11 @@ body { background:#fff!important; }
                 $campos = !empty($colsCampos) ? $colsCampos : ['peso', 'radio', 'altura', 'resultado'];
                 foreach ($campos as $campo) {
                     $valor = trim((string)($datos[$campo] ?? ''));
-                    // Campos calculados a partir de radio/pluma cuando el inspector no los capturó
-                    if ($campo === 'angulo' && $valor === '' && $rowRadio > 0 && $rowPluma >= $rowRadio) {
-                        $valor = number_format(rad2deg(acos($rowRadio / $rowPluma)), 1);
-                    } elseif ($campo === 'altura' && $valor === '' && $rowPluma > 0) {
-                        $valor = number_format(sqrt(max(0, $rowPluma * $rowPluma - $rowRadio * $rowRadio)), 2);
+                    // Campos calculados cuando el inspector no los capturó
+                    if ($campo === 'angulo' && $valor === '' && $rowGeo['angulo'] !== null) {
+                        $valor = number_format($rowGeo['angulo'], 1);
+                    } elseif ($campo === 'altura' && $valor === '' && $rowGeo['altura'] !== null) {
+                        $valor = number_format($rowGeo['altura'], 2);
                     }
                     if ($campo === 'resultado') {
                         if ($valor === '') {
@@ -1319,8 +1382,42 @@ body { background:#fff!important; }
 
         // 4. Inyectar datos del diagrama de grúa (tokens {pc_crane_svg}, {pc_diag_*}, {pc_obs_*})
         if (strpos($html, '{pc_crane_svg}') !== false) {
+            // Dos ganchos: lo declara la plantilla, no el tipo de equipo. Así una
+            // plantilla nueva pide lo que necesita sin venir aquí a agregar su
+            // nombre a una lista.
+            $dosGanchos = strpos($html, '{pc_aux_radio}') !== false;
+
+            if ($dosGanchos) {
+                $basePri = $this->basePrincipal($pc);
+                $geo = function (string $clave, $fila) use ($basePri) {
+                    $fila  = is_array($fila) ? $fila : [];
+                    $radio = (float)($fila['radio'] ?? 0);
+                    $pluma = (float)($fila['pluma'] ?? 0);
+                    // Lo capturado manda; lo demás se deduce con la MISMA
+                    // geometría que usa la tabla, para que no se contradigan.
+                    $calc  = $this->geometriaPc($clave, $radio, $pluma, $basePri);
+                    return [
+                        'radio'  => $radio,
+                        'pluma'  => $pluma,
+                        'altura' => (float)($fila['altura'] ?? 0) ?: (float)($calc['altura'] ?? 0),
+                        'angulo' => (float)($fila['angulo'] ?? 0) ?: (float)($calc['angulo'] ?? 0),
+                    ];
+                };
+                $pri = $geo('princ_con', $pc['princ_con'] ?? $pc['princ_sin'] ?? $pc['con'] ?? $pc['sin'] ?? []);
+                $aux = $geo('aux_con',   $pc['aux_con']   ?? $pc['aux_sin']   ?? []);
+
+                $html = str_replace('{pc_crane_svg}', $this->buildCraneLatticeSvg($pri, $aux), $html);
+                foreach ([['pc_diag_', $pri], ['pc_obs_', $pri], ['pc_aux_', $aux]] as [$pref, $g]) {
+                    $hay = $g['radio'] > 0 || $g['altura'] > 0;
+                    $html = str_replace("{{$pref}radio}",  $hay ? number_format($g['radio'],  1) : 'NA', $html);
+                    $html = str_replace("{{$pref}pluma}",  $hay ? number_format($g['pluma'],  1) : 'NA', $html);
+                    $html = str_replace("{{$pref}angulo}", $hay ? number_format($g['angulo'], 1) : 'NA', $html);
+                    $html = str_replace("{{$pref}altura}", $hay ? number_format($g['altura'], 2) : 'NA', $html);
+                }
+            }
+
             // Usar la fila "con" carga; si no existe, usar la primera disponible
-            $diagRow = $pc['con'] ?? $pc['sin'] ?? reset($pc);
+            $diagRow = $dosGanchos ? null : ($pc['con'] ?? $pc['sin'] ?? reset($pc));
             if (is_array($diagRow)) {
                 $dRadio  = (float) ($diagRow['radio']  ?? 0);
                 $dPluma  = (float) ($diagRow['pluma']  ?? 0);
@@ -1487,6 +1584,152 @@ body { background:#fff!important; }
   <text text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#7a5500"><textPath href="#boom-path2" startOffset="45%">Pluma {$pF} m</textPath></text>
   <rect x="{$lbAngX}" y="{$lbAngY}" width="44" height="14" rx="3" fill="#fef3c7" transform="translate(-22,-10)"/>
   <text x="{$lbAngX}" y="{$lbAngY}" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="8.5" font-weight="800" fill="#92400e">&#945; = {$aF}&#176;</text>
+</svg>
+SVG;
+    }
+
+    /**
+     * Diagrama de la grúa estructural sobre orugas, al estilo de la pantalla del
+     * indicador de momento de carga que el operador ve en cabina.
+     *
+     * La pluma va dibujada como celosía —dos cordones y sus diagonales— porque
+     * es lo que distingue a esta máquina de una de pluma telescópica, y porque
+     * el inspector compara el documento contra esa pantalla.
+     *
+     * Dibuja los dos ganchos: el principal cuelga de la punta de la pluma y el
+     * auxiliar del plumín montado en ella. Sin prueba del auxiliar no se dibuja
+     * el plumín y queda el diagrama de un solo gancho.
+     */
+    private function buildCraneLatticeSvg(array $pri, array $aux = []): string {
+        $n = fn($v) => (float)($v ?? 0);
+        $rP = $n($pri['radio']);  $lP = $n($pri['pluma']);
+        $hP = $n($pri['altura']); $aP = $n($pri['angulo']);
+        $rA = $n($aux['radio'] ?? 0); $lA = $n($aux['pluma'] ?? 0); $hA = $n($aux['altura'] ?? 0);
+        $hayAux = ($rA > 0 && $hA > 0);
+
+        $W = 250; $H = 204; $gndY = 176;
+        $pivX = 66; $pivY = 152;
+
+        // La escala la fija el alcance mayor de los dos ganchos: así ninguno se
+        // sale del recuadro por mucho que suba el plumín.
+        // La franja derecha (78 px) es de la leyenda: el dibujo no la invade.
+        $escala = min(($W - $pivX - 86) / max($rP, $rA, 1.0), ($pivY - 30) / max($hP, $hA, 1.0));
+        $escala = max(min($escala, 14.0), 1.2);
+
+        $puntaX = round($pivX + $rP * $escala, 1);
+        $puntaY = round($pivY - $hP * $escala, 1);
+
+        // ── Pluma de celosía: dos cordones y sus diagonales ──
+        $dx = $puntaX - $pivX; $dy = $puntaY - $pivY;
+        $largo = max(sqrt($dx * $dx + $dy * $dy), 0.001);
+        $nx = -$dy / $largo; $ny = $dx / $largo;
+        $sep = 3.0;
+        $c1x1 = round($pivX + $nx * $sep, 1); $c1y1 = round($pivY + $ny * $sep, 1);
+        $c1x2 = round($puntaX + $nx * $sep, 1); $c1y2 = round($puntaY + $ny * $sep, 1);
+        $c2x1 = round($pivX - $nx * $sep, 1); $c2y1 = round($pivY - $ny * $sep, 1);
+        $c2x2 = round($puntaX - $nx * $sep, 1); $c2y2 = round($puntaY - $ny * $sep, 1);
+
+        $celosia = '';
+        $tramos = max(4, min(16, (int)round($largo / 10)));
+        for ($i = 0; $i < $tramos; $i++) {
+            $t0 = $i / $tramos; $t1 = ($i + 1) / $tramos;
+            $ax = round($pivX + $dx * $t0 + $nx * $sep, 1); $ay = round($pivY + $dy * $t0 + $ny * $sep, 1);
+            $bx = round($pivX + $dx * $t1 - $nx * $sep, 1); $by = round($pivY + $dy * $t1 - $ny * $sep, 1);
+            $cx = round($pivX + $dx * $t1 + $nx * $sep, 1); $cy = round($pivY + $dy * $t1 + $ny * $sep, 1);
+            $celosia .= "<line x1=\"$ax\" y1=\"$ay\" x2=\"$bx\" y2=\"$by\" stroke=\"#C49A28\" stroke-width=\".9\"/>"
+                     .  "<line x1=\"$bx\" y1=\"$by\" x2=\"$cx\" y2=\"$cy\" stroke=\"#C49A28\" stroke-width=\".9\"/>";
+        }
+
+        // ── Plumín y carga del gancho auxiliar ──
+        $plumin = '';
+        if ($hayAux) {
+            $auxX = round($pivX + $rA * $escala, 1);
+            $auxY = round($pivY - $hA * $escala, 1);
+            $colgY = $gndY - 18;
+            $plumin =
+              "<line x1=\"$puntaX\" y1=\"$puntaY\" x2=\"$auxX\" y2=\"$auxY\" stroke=\"#C49A28\" stroke-width=\"2.4\" stroke-linecap=\"round\"/>"
+            . "<circle cx=\"$auxX\" cy=\"$auxY\" r=\"2.4\" fill=\"#C49A28\"/>"
+            . "<line x1=\"$auxX\" y1=\"$auxY\" x2=\"$auxX\" y2=\"$colgY\" stroke=\"#64748b\" stroke-width=\".9\"/>"
+            . "<path d=\"M " . ($auxX - 4) . ",$colgY L " . ($auxX + 4) . ",$colgY L "
+            . ($auxX + 2.8) . "," . ($colgY + 6) . " L " . ($auxX - 2.8) . "," . ($colgY + 6) . " Z\" fill=\"#1e5fa8\"/>"
+            . "<text x=\"$auxX\" y=\"" . ($colgY - 3) . "\" text-anchor=\"middle\" font-family=\"Inter,Arial,sans-serif\" font-size=\"6.5\" font-weight=\"800\" fill=\"#1e5fa8\">AUX</text>";
+        }
+
+        // ── Carga del gancho principal ──
+        $cargaY = $gndY - 18;
+        $carga =
+          "<line x1=\"$puntaX\" y1=\"$puntaY\" x2=\"$puntaX\" y2=\"$cargaY\" stroke=\"#334155\" stroke-width=\"1.1\"/>"
+        . "<path d=\"M " . ($puntaX - 5) . ",$cargaY L " . ($puntaX + 5) . ",$cargaY L "
+        . ($puntaX + 3.5) . "," . ($cargaY + 7) . " L " . ($puntaX - 3.5) . "," . ($cargaY + 7) . " Z\" fill=\"#0B2545\"/>";
+
+        // ── Acotaciones: cada una en su franja para que no se encimen ──
+        $ang   = $aP > 0 ? $aP : ($rP > 0 && $lP >= $rP ? rad2deg(acos($rP / $lP)) : 0);
+        $arcR  = 24;
+        $arcEX = round($pivX + $arcR * cos(deg2rad($ang)), 1);
+        $arcEY = round($pivY - $arcR * sin(deg2rad($ang)), 1);
+
+        // Las cifras van en una columna fija a la derecha, no pegadas a cada
+        // cota: con una pluma empinada el dibujo sale angosto y los rótulos se
+        // encimaban unos sobre otros hasta volverse ilegibles.
+        $legX = $W - 76; $legY = 30;
+
+        $rF = number_format($rP, 1); $lF = number_format($lP, 1);
+        $hF = number_format($hP, 2); $aF = number_format($ang, 1);
+
+        return <<<SVG
+<svg viewBox="0 0 {$W} {$H}" xmlns="http://www.w3.org/2000/svg" style="width:222px;height:181px;display:block">
+  <rect x="0" y="0" width="{$W}" height="{$H}" fill="#f7fafd"/>
+  <line x1="4" y1="{$gndY}" x2="246" y2="{$gndY}" stroke="#94a3b8" stroke-width="2"/>
+  <rect x="4" y="{$gndY}" width="242" height="8" fill="#e2e8f0"/>
+
+  <rect x="12" y="164" width="78" height="12" rx="6" fill="#2d3748"/>
+  <rect x="16" y="167" width="70" height="6" rx="3" fill="#4a5568"/>
+  <circle cx="20" cy="170" r="3.4" fill="#1a202c"/><circle cx="82" cy="170" r="3.4" fill="#1a202c"/>
+  <line x1="26" y1="164" x2="26" y2="176" stroke="#1a202c" stroke-width="1"/>
+  <line x1="38" y1="164" x2="38" y2="176" stroke="#1a202c" stroke-width="1"/>
+  <line x1="50" y1="164" x2="50" y2="176" stroke="#1a202c" stroke-width="1"/>
+  <line x1="62" y1="164" x2="62" y2="176" stroke="#1a202c" stroke-width="1"/>
+  <line x1="74" y1="164" x2="74" y2="176" stroke="#1a202c" stroke-width="1"/>
+
+  <rect x="18" y="150" width="54" height="14" rx="2" fill="#134074"/>
+  <rect x="10" y="142" width="17" height="22" rx="2" fill="#0B2545"/>
+  <text x="18.5" y="156" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="5.5" font-weight="700" fill="#cbd5e1">CW</text>
+  <rect x="52" y="138" width="18" height="14" rx="2" fill="#1e5fa8"/>
+  <rect x="55" y="141" width="5" height="5" rx="1" fill="#90cdf4" opacity=".8"/>
+  <rect x="62" y="141" width="5" height="5" rx="1" fill="#90cdf4" opacity=".8"/>
+
+  <line x1="{$c1x1}" y1="{$c1y1}" x2="{$c1x2}" y2="{$c1y2}" stroke="#C49A28" stroke-width="1.9"/>
+  <line x1="{$c2x1}" y1="{$c2y1}" x2="{$c2x2}" y2="{$c2y2}" stroke="#C49A28" stroke-width="1.9"/>
+  {$celosia}
+  <circle cx="{$pivX}" cy="{$pivY}" r="4" fill="#C49A28"/>
+  <circle cx="{$pivX}" cy="{$pivY}" r="1.8" fill="#fff"/>
+  <circle cx="{$puntaX}" cy="{$puntaY}" r="2.8" fill="#C49A28"/>
+  {$plumin}
+  {$carga}
+
+  <line x1="{$pivX}" y1="{$gndY}" x2="{$puntaX}" y2="{$gndY}" stroke="#1e5fa8" stroke-width="1.3" stroke-dasharray="4,3"/>
+  <line x1="{$puntaX}" y1="{$gndY}" x2="{$puntaX}" y2="{$puntaY}" stroke="#1a7a4a" stroke-width="1.3" stroke-dasharray="4,3"/>
+  <path d="M {$pivX},{$gndY} A {$arcR},{$arcR} 0 0,0 {$arcEX},{$arcEY}" fill="none" stroke="#C49A28" stroke-width="1.4"/>
+
+  <rect x="{$legX}" y="{$legY}" width="70" height="92" rx="4" fill="#ffffff" stroke="#cdd8e3" stroke-width="1"/>
+  <rect x="{$legX}" y="{$legY}" width="70" height="15" rx="4" fill="#0B2545"/>
+  <text x="{$legX}" y="{$legY}" dx="35" dy="10.5" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7" font-weight="700" fill="#fff">GANCHO PRINCIPAL</text>
+
+  <rect x="{$legX}" y="{$legY}" width="5" height="5" rx="1" transform="translate(5,23)" fill="#1e5fa8"/>
+  <text x="{$legX}" y="{$legY}" dx="14" dy="27.5" font-family="Inter,Arial,sans-serif" font-size="6.5" fill="#64748b">Radio</text>
+  <text x="{$legX}" y="{$legY}" dx="66" dy="27.5" text-anchor="end" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1e5fa8">{$rF} m</text>
+
+  <rect x="{$legX}" y="{$legY}" width="5" height="5" rx="1" transform="translate(5,40)" fill="#C49A28"/>
+  <text x="{$legX}" y="{$legY}" dx="14" dy="44.5" font-family="Inter,Arial,sans-serif" font-size="6.5" fill="#64748b">Pluma</text>
+  <text x="{$legX}" y="{$legY}" dx="66" dy="44.5" text-anchor="end" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#7a5500">{$lF} m</text>
+
+  <rect x="{$legX}" y="{$legY}" width="5" height="5" rx="1" transform="translate(5,57)" fill="#f0c040"/>
+  <text x="{$legX}" y="{$legY}" dx="14" dy="61.5" font-family="Inter,Arial,sans-serif" font-size="6.5" fill="#64748b">&#193;ngulo</text>
+  <text x="{$legX}" y="{$legY}" dx="66" dy="61.5" text-anchor="end" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#92400e">{$aF}&#176;</text>
+
+  <rect x="{$legX}" y="{$legY}" width="5" height="5" rx="1" transform="translate(5,74)" fill="#1a7a4a"/>
+  <text x="{$legX}" y="{$legY}" dx="14" dy="78.5" font-family="Inter,Arial,sans-serif" font-size="6.5" fill="#64748b">Altura</text>
+  <text x="{$legX}" y="{$legY}" dx="66" dy="78.5" text-anchor="end" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1a7a4a">{$hF} m</text>
 </svg>
 SVG;
     }

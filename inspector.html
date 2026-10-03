@@ -3073,11 +3073,75 @@ let fotosData       = [];       // [{base64, mimeType, nombre}]
 let pruebaCargaData = {};
 let enviando        = false;
 
+/* ═══════════════════════════════════════════════════════════
+   GEOMETRÍA DE LA PRUEBA DE CARGA
+   El gancho principal cuelga de la punta de la pluma, que nace en el pivote: su
+   triángulo se resuelve con el radio de cateto y la pluma de hipotenusa.
+   El gancho auxiliar no: su plumín va montado EN la punta de la pluma, así que
+   su triángulo arranca de ahí. Tomar el radio completo como cateto daba una
+   altura menor que la de la pluma — un plumín colgando hacia abajo.
+   El servidor calcula lo mismo (Certificaciones::geometriaPc); si se cambia una
+   fórmula hay que cambiar la otra, o el documento diría algo distinto de lo que
+   el inspector vio al capturar.
+   ═══════════════════════════════════════════════════════════ */
+function pcGeometria(clave, radio, pluma, base) {
+  const nada = { angulo: null, altura: null };
+  if (!(pluma > 0)) return nada;
+
+  if (!String(clave).startsWith('aux')) {
+    if (radio < 0 || radio > pluma) return nada;
+    return {
+      angulo: Math.acos(radio / pluma) * 180 / Math.PI,
+      altura: Math.sqrt(Math.max(0, pluma * pluma - radio * radio)),
+    };
+  }
+  const rBase = (base && base.radio)  || 0;
+  const hBase = (base && base.altura) || 0;
+  if (!(rBase > 0) || !(hBase > 0)) return nada;      // sin la pluma no se puede deducir
+  const tramo = Math.abs(radio - rBase);
+  if (tramo > pluma) return nada;
+  return {
+    angulo: Math.acos(tramo / pluma) * 180 / Math.PI,
+    altura: hBase + Math.sqrt(Math.max(0, pluma * pluma - tramo * tramo)),
+  };
+}
+
+/* Dónde termina la pluma: lo que el auxiliar necesita de referencia. */
+function pcBasePrincipal() {
+  for (const k of ['princ_con', 'princ_sin', 'con', 'sin']) {
+    const r = parseFloat(document.getElementById(`pc_${k}_radio`)?.value || 0) || 0;
+    const l = parseFloat(document.getElementById(`pc_${k}_pluma`)?.value || 0) || 0;
+    if (r > 0 && l >= r) return { radio: r, altura: Math.sqrt(Math.max(0, l * l - r * r)) };
+  }
+  return {};
+}
+
 // Definición de campos de prueba de carga por plantilla
 const PC_TEMPLATES = {
   'dictamen_preview.html': {
     label: 'Grúa Móvil',
     rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
+    cols: [
+      { id:'peso',      label:'Peso de Prueba',      unit:'TON' },
+      { id:'radio',     label:'Radio de Operación',  unit:'m'   },
+      { id:'pluma',     label:'Long. de Pluma',       unit:'m'   },
+      { id:'angulo',    label:'Ángulo de Trabajo',    unit:'°',   type:'calculated' },
+      { id:'altura',    label:'Altura de Izaje',      unit:'m',   type:'calculated' },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  },
+  'dictamen_grua_oruga.html': {
+    label: 'Grúa Estructural sobre Orugas',
+    // Dos pruebas, una por gancho: el principal cuelga de la punta de la pluma
+    // y el auxiliar del plumín, con su propio radio, su propia longitud y su
+    // propio peso. Cada una lleva su fila sin carga, que es lo que demuestra
+    // que no quedó deformación permanente.
+    rows: [
+      { key:'princ_sin', label:'Gancho principal · sin carga' },
+      { key:'princ_con', label:'Gancho principal · con carga' },
+      { key:'aux_sin',   label:'Gancho auxiliar · sin carga'  },
+      { key:'aux_con',   label:'Gancho auxiliar · con carga'  },
+    ],
     cols: [
       { id:'peso',      label:'Peso de Prueba',      unit:'TON' },
       { id:'radio',     label:'Radio de Operación',  unit:'m'   },
@@ -4073,16 +4137,9 @@ function pcCalcular() {
     const campoAngulo = document.getElementById(`pc_${row.key}_angulo`);
     const campoAltura = document.getElementById(`pc_${row.key}_altura`);
 
-    if (campoAngulo && radio > 0 && pluma > 0 && radio <= pluma) {
-      // θ = arccos(radio / pluma) — radio es cateto adyacente, pluma es hipotenusa
-      const angRad = Math.acos(radio / pluma);
-      campoAngulo.value = (angRad * 180 / Math.PI).toFixed(1);
-    }
-    if (campoAltura && radio && pluma) {
-      // Altura: sqrt(pluma² - radio²) para un triángulo rectángulo
-      const altura = Math.sqrt(Math.max(0, pluma * pluma - radio * radio));
-      campoAltura.value = altura.toFixed(2);
-    }
+    const geo = pcGeometria(row.key, radio, pluma, pcBasePrincipal());
+    if (campoAngulo) campoAngulo.value = geo.angulo !== null ? geo.angulo.toFixed(1) : '';
+    if (campoAltura) campoAltura.value = geo.altura !== null ? geo.altura.toFixed(2) : '';
   });
 }
 
@@ -4104,6 +4161,7 @@ function pcGuardar() {
       result[f.id] = el ? el.value.trim() : '';
     });
   }
+  const base = pcBasePrincipal();
   tpl.rows.forEach(row => {
     // Leer radio y pluma para calcular campos derivados
     const radio = parseFloat(document.getElementById(`pc_${row.key}_radio`)?.value || 0) || 0;
@@ -4113,13 +4171,14 @@ function pcGuardar() {
     tpl.cols.forEach(c => {
       if (c.type === 'calculated') {
         // Calcular aquí directamente; no depender del valor del DOM
-        if (c.id === 'angulo' && radio > 0 && pluma >= radio) {
-          const val = (Math.acos(radio / pluma) * 180 / Math.PI).toFixed(1);
+        const geo = pcGeometria(row.key, radio, pluma, base);
+        if (c.id === 'angulo' && geo.angulo !== null) {
+          const val = geo.angulo.toFixed(1);
           result[row.key][c.id] = val;
           const el = document.getElementById(`pc_${row.key}_${c.id}`);
           if (el) el.value = val; // actualizar visual también
-        } else if (c.id === 'altura' && pluma > 0 && radio >= 0) {
-          const val = Math.sqrt(Math.max(0, pluma * pluma - radio * radio)).toFixed(2);
+        } else if (c.id === 'altura' && geo.altura !== null) {
+          const val = geo.altura.toFixed(2);
           result[row.key][c.id] = val;
           const el = document.getElementById(`pc_${row.key}_${c.id}`);
           if (el) el.value = val;

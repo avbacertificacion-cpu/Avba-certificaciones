@@ -450,15 +450,29 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
           </tr>
         </tbody>
       </table>
-      <table class="pc-diagram-row" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;background:linear-gradient(135deg,#f4f8ff,#e8f0fb);" cellpadding="0" cellspacing="0">
+      <table class="pc-diagram-row" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;background:linear-gradient(180deg,#fbfdff 0%,#f4f8fc 100%);">
         <tr>
-          <td rowspan="2" style="width:175px;padding:6px;border-right:1px solid #cdd8e3;vertical-align:middle;text-align:center;">{pc_crane_svg}</td>
-          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;border-right:1px solid #cdd8e3;"><div class="pc-diag-lbl">Radio de Operación <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">{pc_diag_radio}<span class="unit">m</span></div></td>
-          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;border-right:none;"><div class="pc-diag-lbl">Longitud de Pluma <span style="color:#a0adb8;font-style:italic">ingresado</span></div><div class="pc-diag-val">{pc_diag_pluma}<span class="unit">m</span></div></td>
+          <td rowspan="6" style="width:226px;padding:5px;border-right:1px solid #cdd8e3;vertical-align:middle;text-align:center;">{pc_crane_svg}</td>
+          <td colspan="2" style="background:#0B2545;color:#fff;font-size:7.5pt;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-bottom:1px solid #cdd8e3;">GANCHO PRINCIPAL</td>
         </tr>
         <tr>
-          <td class="pc-diag-cell" style="border-right:1px solid #cdd8e3;border-bottom:none;"><div class="pc-diag-lbl">Ángulo de Trabajo <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:#C49A28">{pc_diag_angulo}<span class="unit">°</span></div><div class="pc-diag-badge">✔ arccos(r / L)</div></td>
-          <td class="pc-diag-cell" style="border-right:none;border-bottom:none;"><div class="pc-diag-lbl">Altura de Izaje <span style="color:#a0adb8;font-style:italic">calculado</span></div><div class="pc-diag-val" style="color:#1a7a4a">{pc_diag_altura}<span class="unit">m</span></div><div class="pc-diag-badge">✔ √(L² − r²)</div></td>
+          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;border-right:1px solid #cdd8e3;"><div class="pc-diag-lbl">Radio de Operación</div><div class="pc-diag-val">{pc_diag_radio} m</div></td>
+          <td class="pc-diag-cell" style="width:50%;border-bottom:1px solid #cdd8e3;"><div class="pc-diag-lbl">Longitud de Pluma</div><div class="pc-diag-val">{pc_diag_pluma} m</div></td>
+        </tr>
+        <tr>
+          <td class="pc-diag-cell" style="border-bottom:1px solid #cdd8e3;border-right:1px solid #cdd8e3;"><div class="pc-diag-lbl">Ángulo de Trabajo</div><div class="pc-diag-val">{pc_diag_angulo}°</div></td>
+          <td class="pc-diag-cell" style="border-bottom:1px solid #cdd8e3;"><div class="pc-diag-lbl">Altura de Izaje</div><div class="pc-diag-val">{pc_diag_altura} m</div></td>
+        </tr>
+        <tr>
+          <td colspan="2" style="background:#1e5fa8;color:#fff;font-size:7.5pt;font-weight:700;letter-spacing:.04em;padding:3px 8px;border-bottom:1px solid #cdd8e3;">GANCHO AUXILIAR</td>
+        </tr>
+        <tr>
+          <td class="pc-diag-cell" style="border-bottom:1px solid #cdd8e3;border-right:1px solid #cdd8e3;"><div class="pc-diag-lbl">Radio de Operación</div><div class="pc-diag-val">{pc_aux_radio} m</div></td>
+          <td class="pc-diag-cell" style="border-bottom:1px solid #cdd8e3;"><div class="pc-diag-lbl">Longitud de Pluma</div><div class="pc-diag-val">{pc_aux_pluma} m</div></td>
+        </tr>
+        <tr>
+          <td class="pc-diag-cell" style="border-right:1px solid #cdd8e3;"><div class="pc-diag-lbl">Ángulo de Trabajo</div><div class="pc-diag-val">{pc_aux_angulo}°</div></td>
+          <td class="pc-diag-cell"><div class="pc-diag-lbl">Altura de Izaje</div><div class="pc-diag-val">{pc_aux_altura} m</div></td>
         </tr>
       </table>
       <div class="pc-obs-row">
