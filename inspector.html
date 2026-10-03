@@ -3075,45 +3075,25 @@ let enviando        = false;
 
 /* ═══════════════════════════════════════════════════════════
    GEOMETRÍA DE LA PRUEBA DE CARGA
-   El gancho principal cuelga de la punta de la pluma, que nace en el pivote: su
-   triángulo se resuelve con el radio de cateto y la pluma de hipotenusa.
-   El gancho auxiliar no: su plumín va montado EN la punta de la pluma, así que
-   su triángulo arranca de ahí. Tomar el radio completo como cateto daba una
-   altura menor que la de la pluma — un plumín colgando hacia abajo.
+   Misma cuenta para los cuatro renglones, principal y auxiliar: la pluma es la
+   hipotenusa y el radio el cateto horizontal, así que α = arccos(radio/pluma) y
+   h = raíz(pluma² − radio²).
+   El auxiliar se calculó un tiempo como si colgara de un plumín montado en la
+   punta de la pluma, sumándole la altura que ésta ya traía. Está mal para cómo
+   se mide en campo —el radio se toma desde el centro de giro y la longitud es
+   la de la MISMA pluma— y daba alturas mayores que la propia pluma: con 25 m de
+   pluma no se iza a 44 m.
    El servidor calcula lo mismo (Certificaciones::geometriaPc); si se cambia una
    fórmula hay que cambiar la otra, o el documento diría algo distinto de lo que
    el inspector vio al capturar.
    ═══════════════════════════════════════════════════════════ */
-function pcGeometria(clave, radio, pluma, base) {
-  const nada = { angulo: null, altura: null };
-  if (!(pluma > 0)) return nada;
-
-  if (!String(clave).startsWith('aux')) {
-    if (radio < 0 || radio > pluma) return nada;
-    return {
-      angulo: Math.acos(radio / pluma) * 180 / Math.PI,
-      altura: Math.sqrt(Math.max(0, pluma * pluma - radio * radio)),
-    };
-  }
-  const rBase = (base && base.radio)  || 0;
-  const hBase = (base && base.altura) || 0;
-  if (!(rBase > 0) || !(hBase > 0)) return nada;      // sin la pluma no se puede deducir
-  const tramo = Math.abs(radio - rBase);
-  if (tramo > pluma) return nada;
+function pcGeometria(radio, pluma) {
+  // El radio no puede pasar de la pluma: sería un triángulo imposible.
+  if (!(pluma > 0) || radio < 0 || radio > pluma) return { angulo: null, altura: null };
   return {
-    angulo: Math.acos(tramo / pluma) * 180 / Math.PI,
-    altura: hBase + Math.sqrt(Math.max(0, pluma * pluma - tramo * tramo)),
+    angulo: Math.acos(radio / pluma) * 180 / Math.PI,
+    altura: Math.sqrt(Math.max(0, pluma * pluma - radio * radio)),
   };
-}
-
-/* Dónde termina la pluma: lo que el auxiliar necesita de referencia. */
-function pcBasePrincipal() {
-  for (const k of ['princ_con', 'princ_sin', 'con', 'sin']) {
-    const r = parseFloat(document.getElementById(`pc_${k}_radio`)?.value || 0) || 0;
-    const l = parseFloat(document.getElementById(`pc_${k}_pluma`)?.value || 0) || 0;
-    if (r > 0 && l >= r) return { radio: r, altura: Math.sqrt(Math.max(0, l * l - r * r)) };
-  }
-  return {};
 }
 
 // Definición de campos de prueba de carga por plantilla
@@ -4137,7 +4117,7 @@ function pcCalcular() {
     const campoAngulo = document.getElementById(`pc_${row.key}_angulo`);
     const campoAltura = document.getElementById(`pc_${row.key}_altura`);
 
-    const geo = pcGeometria(row.key, radio, pluma, pcBasePrincipal());
+    const geo = pcGeometria(radio, pluma);
     if (campoAngulo) campoAngulo.value = geo.angulo !== null ? geo.angulo.toFixed(1) : '';
     if (campoAltura) campoAltura.value = geo.altura !== null ? geo.altura.toFixed(2) : '';
   });
@@ -4161,7 +4141,6 @@ function pcGuardar() {
       result[f.id] = el ? el.value.trim() : '';
     });
   }
-  const base = pcBasePrincipal();
   tpl.rows.forEach(row => {
     // Leer radio y pluma para calcular campos derivados
     const radio = parseFloat(document.getElementById(`pc_${row.key}_radio`)?.value || 0) || 0;
@@ -4171,7 +4150,7 @@ function pcGuardar() {
     tpl.cols.forEach(c => {
       if (c.type === 'calculated') {
         // Calcular aquí directamente; no depender del valor del DOM
-        const geo = pcGeometria(row.key, radio, pluma, base);
+        const geo = pcGeometria(radio, pluma);
         if (c.id === 'angulo' && geo.angulo !== null) {
           const val = geo.angulo.toFixed(1);
           result[row.key][c.id] = val;
