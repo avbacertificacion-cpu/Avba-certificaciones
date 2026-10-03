@@ -2994,12 +2994,24 @@ function _fechaDdmmToIso(v) {
   return m ? `${m[3]}-${m[2]}-${m[1]}` : "";
 }
 
+/* Parte un id "pc_<fila>_<campo>" en sus dos mitades.
+   La fila puede llevar guion bajo —princ_sin, aux_con en la grúa de orugas—, así
+   que el campo es SIEMPRE el último trozo y la fila es todo lo de en medio.
+   Tomando parts[1] como fila se truncaba "princ_sin" a "princ", y al guardar se
+   creaban filas inexistentes que luego salían impresas en el dictamen con todo
+   en NA. */
+function pcPartirId(id) {
+  const partes = id.split('_');
+  if (partes.length < 3) return null;
+  return { fila: partes.slice(1, -1).join('_'), campo: partes[partes.length - 1] };
+}
+
 /* Recalcular ángulo y altura al editar radio o pluma en prueba de carga */
 function pcCalidadRecalc() {
   const rowKeys = new Set();
   document.querySelectorAll('[id^="pc_"]').forEach(el => {
-    const parts = el.id.split('_');
-    if (parts.length >= 3) rowKeys.add(parts[1]);
+    const p = pcPartirId(el.id);
+    if (p) rowKeys.add(p.fila);
   });
   rowKeys.forEach(rk => {
     const radio = parseFloat(document.getElementById(`pc_${rk}_radio`)?.value || 0) || 0;
@@ -3060,13 +3072,10 @@ async function guardar() {
       const updates = { plantilla: pcPlantillaEl.value };
       // Campos por fila (id = pc_<fila>_<campo>)
       document.querySelectorAll('[id^="pc_"]').forEach(el => {
-        const parts = el.id.split('_');
-        if (parts.length >= 3) {
-          const rk = parts[1];
-          const fk = parts.slice(2).join('_');
-          if (!updates[rk]) updates[rk] = {};
-          updates[rk][fk] = (el.value || '').trim();
-        }
+        const p = pcPartirId(el.id);
+        if (!p) return;
+        if (!updates[p.fila]) updates[p.fila] = {};
+        updates[p.fila][p.campo] = (el.value || '').trim();
       });
       // Campos de captura única (id = pc-hdr_<campo>): CML, etc.
       const headerUpdates = {};

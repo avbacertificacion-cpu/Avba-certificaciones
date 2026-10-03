@@ -198,6 +198,15 @@ class Calidad {
 
                 foreach ($updates as $rowKey => $fields) {
                     if ($rowKey === 'plantilla' || $rowKey === '__header' || !is_array($fields)) continue;
+                    // Limpieza de las filas que dejó el analizador anterior: una
+                    // clave que es sólo el prefijo de otra —princ frente a
+                    // princ_sin— no es una prueba, es un resto.
+                    foreach (array_keys($pc) as $previa) {
+                        if (is_array($pc[$previa]) && $previa !== $rowKey
+                            && str_starts_with($rowKey, $previa . '_')) {
+                            unset($pc[$previa]);
+                        }
+                    }
                     if (!isset($pc[$rowKey]) || !is_array($pc[$rowKey])) $pc[$rowKey] = [];
 
                     // Guardar todos los campos enviados
