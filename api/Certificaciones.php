@@ -1353,10 +1353,11 @@ body { background:#fff!important; }
 
         // 4. Inyectar datos del diagrama de grúa (tokens {pc_crane_svg}, {pc_diag_*}, {pc_obs_*})
         if (strpos($html, '{pc_crane_svg}') !== false) {
-            // Dos ganchos: lo declara la plantilla, no el tipo de equipo. Así una
-            // plantilla nueva pide lo que necesita sin venir aquí a agregar su
-            // nombre a una lista.
-            $dosGanchos = strpos($html, '{pc_aux_radio}') !== false;
+            // Dos ganchos: lo dicen los datos capturados, no el tipo de equipo
+            // ni la plantilla. Si la inspección trae renglones de gancho
+            // principal y auxiliar, es una prueba de dos ganchos y punto.
+            $dosGanchos = isset($pc['princ_con']) || isset($pc['princ_sin'])
+                       || isset($pc['aux_con'])   || isset($pc['aux_sin']);
 
             if ($dosGanchos) {
                 $geo = function ($fila) {
@@ -1566,144 +1567,154 @@ SVG;
      * es lo que distingue a esta máquina de una de pluma telescópica, y porque
      * el inspector compara el documento contra esa pantalla.
      *
-     * Dibuja las dos pruebas. La del gancho auxiliar se hace con la MISMA
-     * pluma, abatida a otro ángulo, así que su posición se traza desde el
-     * pivote y en línea discontinua para no confundirla con la del principal.
-     * Sin prueba del auxiliar queda el diagrama de un solo gancho.
+     * Es una franja ancha y baja, con el dibujo a la izquierda y las cifras de
+     * los dos ganchos a la derecha. Antes esas cifras iban en celdas de tabla
+     * fuera del dibujo: ocupaban 158 pt de alto, empujaban el pie de la hoja a
+     * la siguiente y además repetían lo que la tabla de la prueba ya decía.
+     *
+     * La posición del gancho auxiliar es la MISMA pluma abatida a otro ángulo
+     * para esa prueba, así que se traza desde el pivote y en línea discontinua.
+     * Sin prueba del auxiliar, su leyenda sale en blanco.
      */
     private function buildCraneLatticeSvg(array $pri, array $aux = []): string {
-        $n = fn($v) => (float)($v ?? 0);
-        $rP = $n($pri['radio']);  $lP = $n($pri['pluma']);
-        $hP = $n($pri['altura']); $aP = $n($pri['angulo']);
-        $rA = $n($aux['radio'] ?? 0); $lA = $n($aux['pluma'] ?? 0); $hA = $n($aux['altura'] ?? 0);
-        $hayAux = ($rA > 0 && $hA > 0);
+        $v = fn($a, $k) => (float)($a[$k] ?? 0);
+        $rP = $v($pri, 'radio');  $lP = $v($pri, 'pluma');
+        $hP = $v($pri, 'altura'); $aP = $v($pri, 'angulo');
+        $rA = $v($aux, 'radio');  $lA = $v($aux, 'pluma');
+        $hA = $v($aux, 'altura'); $aA = $v($aux, 'angulo');
+        $hayAux = ($rA > 0 || $hA > 0);
 
-        $W = 250; $H = 204; $gndY = 176;
-        $pivX = 66; $pivY = 152;
+        $W = 560; $H = 120; $gndY = 104;
+        $pivX = 50; $pivY = 86;
+        $zonaDibujo = 250;                  // de ahí a la derecha van las leyendas
 
-        // La escala la fija el alcance mayor de los dos ganchos: así ninguno se
-        // sale del recuadro por mucho que suba el plumín.
-        // La franja derecha (78 px) es de la leyenda: el dibujo no la invade.
-        $escala = min(($W - $pivX - 86) / max($rP, $rA, 1.0), ($pivY - 30) / max($hP, $hA, 1.0));
-        $escala = max(min($escala, 14.0), 1.2);
+        $escala = min(($zonaDibujo - $pivX) / max($rP, $rA, 1.0), ($pivY - 12) / max($hP, $hA, 1.0));
+        $escala = max(min($escala, 9.0), 0.8);
 
         $puntaX = round($pivX + $rP * $escala, 1);
         $puntaY = round($pivY - $hP * $escala, 1);
 
-        // ── Pluma de celosía: dos cordones y sus diagonales ──
+        // ── Pluma de celosía ──
         $dx = $puntaX - $pivX; $dy = $puntaY - $pivY;
         $largo = max(sqrt($dx * $dx + $dy * $dy), 0.001);
         $nx = -$dy / $largo; $ny = $dx / $largo;
-        $sep = 3.0;
-        $c1x1 = round($pivX + $nx * $sep, 1); $c1y1 = round($pivY + $ny * $sep, 1);
-        $c1x2 = round($puntaX + $nx * $sep, 1); $c1y2 = round($puntaY + $ny * $sep, 1);
-        $c2x1 = round($pivX - $nx * $sep, 1); $c2y1 = round($pivY - $ny * $sep, 1);
-        $c2x2 = round($puntaX - $nx * $sep, 1); $c2y2 = round($puntaY - $ny * $sep, 1);
+        $sep = 2.6;
+        $c1 = sprintf('x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"',
+              $pivX + $nx * $sep, $pivY + $ny * $sep, $puntaX + $nx * $sep, $puntaY + $ny * $sep);
+        $c2 = sprintf('x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f"',
+              $pivX - $nx * $sep, $pivY - $ny * $sep, $puntaX - $nx * $sep, $puntaY - $ny * $sep);
 
         $celosia = '';
-        $tramos = max(4, min(16, (int)round($largo / 10)));
+        $tramos = max(4, min(14, (int)round($largo / 9)));
         for ($i = 0; $i < $tramos; $i++) {
             $t0 = $i / $tramos; $t1 = ($i + 1) / $tramos;
-            $ax = round($pivX + $dx * $t0 + $nx * $sep, 1); $ay = round($pivY + $dy * $t0 + $ny * $sep, 1);
-            $bx = round($pivX + $dx * $t1 - $nx * $sep, 1); $by = round($pivY + $dy * $t1 - $ny * $sep, 1);
-            $cx = round($pivX + $dx * $t1 + $nx * $sep, 1); $cy = round($pivY + $dy * $t1 + $ny * $sep, 1);
-            $celosia .= "<line x1=\"$ax\" y1=\"$ay\" x2=\"$bx\" y2=\"$by\" stroke=\"#C49A28\" stroke-width=\".9\"/>"
-                     .  "<line x1=\"$bx\" y1=\"$by\" x2=\"$cx\" y2=\"$cy\" stroke=\"#C49A28\" stroke-width=\".9\"/>";
+            $ax = $pivX + $dx * $t0 + $nx * $sep; $ay = $pivY + $dy * $t0 + $ny * $sep;
+            $bx = $pivX + $dx * $t1 - $nx * $sep; $by = $pivY + $dy * $t1 - $ny * $sep;
+            $cx = $pivX + $dx * $t1 + $nx * $sep; $cy = $pivY + $dy * $t1 + $ny * $sep;
+            $celosia .= sprintf('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#C49A28" stroke-width=".8"/>', $ax, $ay, $bx, $by)
+                     .  sprintf('<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#C49A28" stroke-width=".8"/>', $bx, $by, $cx, $cy);
         }
 
-        // ── Posición de la pluma en la prueba del gancho auxiliar ──
-        // No es un plumín aparte: es la MISMA pluma, abatida a otro ángulo para
-        // esa prueba. Por eso arranca del pivote y no de la punta, y va en trazo
-        // claro para distinguirla de la posición del gancho principal.
-        $plumin = '';
+        // ── Posición de la pluma en la prueba del auxiliar ──
+        $posAux = '';
         if ($hayAux) {
             $auxX = round($pivX + $rA * $escala, 1);
             $auxY = round($pivY - $hA * $escala, 1);
-            $colgY = $gndY - 18;
-            $plumin =
-              "<line x1=\"$pivX\" y1=\"$pivY\" x2=\"$auxX\" y2=\"$auxY\" stroke=\"#d9b65a\" stroke-width=\"2\" stroke-dasharray=\"5,3\" stroke-linecap=\"round\"/>"
-            . "<circle cx=\"$auxX\" cy=\"$auxY\" r=\"2.4\" fill=\"#d9b65a\"/>"
-            . "<line x1=\"$auxX\" y1=\"$auxY\" x2=\"$auxX\" y2=\"$colgY\" stroke=\"#94a3b8\" stroke-width=\".9\" stroke-dasharray=\"3,2\"/>"
-            . "<path d=\"M " . ($auxX - 4) . ",$colgY L " . ($auxX + 4) . ",$colgY L "
-            . ($auxX + 2.8) . "," . ($colgY + 6) . " L " . ($auxX - 2.8) . "," . ($colgY + 6) . " Z\" fill=\"#1e5fa8\"/>"
-            . "<text x=\"$auxX\" y=\"" . ($colgY - 3) . "\" text-anchor=\"middle\" font-family=\"Inter,Arial,sans-serif\" font-size=\"6.5\" font-weight=\"800\" fill=\"#1e5fa8\">AUX</text>";
+            $colgY = $gndY - 13;
+            $posAux = sprintf(
+                '<line x1="%d" y1="%d" x2="%.1f" y2="%.1f" stroke="#d9b65a" stroke-width="1.8" stroke-dasharray="5,3" stroke-linecap="round"/>'
+              . '<circle cx="%.1f" cy="%.1f" r="2.2" fill="#d9b65a"/>'
+              . '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%d" stroke="#94a3b8" stroke-width=".8" stroke-dasharray="3,2"/>'
+              . '<path d="M %.1f,%d L %.1f,%d L %.1f,%d L %.1f,%d Z" fill="#1e5fa8"/>'
+              . '<text x="%.1f" y="%d" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="6" font-weight="800" fill="#1e5fa8">AUX</text>',
+                $pivX, $pivY, $auxX, $auxY,
+                $auxX, $auxY,
+                $auxX, $auxY, $auxX, $colgY,
+                $auxX - 3.5, $colgY, $auxX + 3.5, $colgY, $auxX + 2.4, $colgY + 5, $auxX - 2.4, $colgY + 5,
+                $auxX, $colgY - 3
+            );
         }
 
-        // ── Carga del gancho principal ──
-        $cargaY = $gndY - 18;
-        $carga =
-          "<line x1=\"$puntaX\" y1=\"$puntaY\" x2=\"$puntaX\" y2=\"$cargaY\" stroke=\"#334155\" stroke-width=\"1.1\"/>"
-        . "<path d=\"M " . ($puntaX - 5) . ",$cargaY L " . ($puntaX + 5) . ",$cargaY L "
-        . ($puntaX + 3.5) . "," . ($cargaY + 7) . " L " . ($puntaX - 3.5) . "," . ($cargaY + 7) . " Z\" fill=\"#0B2545\"/>";
+        $cargaY = $gndY - 13;
+        $carga = sprintf(
+            '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%d" stroke="#334155" stroke-width="1"/>'
+          . '<path d="M %.1f,%d L %.1f,%d L %.1f,%d L %.1f,%d Z" fill="#0B2545"/>',
+            $puntaX, $puntaY, $puntaX, $cargaY,
+            $puntaX - 4.5, $cargaY, $puntaX + 4.5, $cargaY, $puntaX + 3, $cargaY + 6, $puntaX - 3, $cargaY + 6
+        );
 
-        // ── Acotaciones: cada una en su franja para que no se encimen ──
         $ang   = $aP > 0 ? $aP : ($rP > 0 && $lP >= $rP ? rad2deg(acos($rP / $lP)) : 0);
-        $arcR  = 24;
+        $arcR  = 18;
         $arcEX = round($pivX + $arcR * cos(deg2rad($ang)), 1);
         $arcEY = round($pivY - $arcR * sin(deg2rad($ang)), 1);
 
-        // Las cifras van en una columna fija a la derecha, no pegadas a cada
-        // cota: con una pluma empinada el dibujo sale angosto y los rótulos se
-        // encimaban unos sobre otros hasta volverse ilegibles.
-        $legX = $W - 76; $legY = 30;
-
-        $rF = number_format($rP, 1); $lF = number_format($lP, 1);
-        $hF = number_format($hP, 2); $aF = number_format($ang, 1);
+        // ── Leyendas, una por gancho ──
+        // Las medidas se muestran como se capturaron: 7.95 no debe salir como
+        // 8.0, porque el inspector compara contra lo que tecleó.
+        $med = function (float $n): string {
+            $t = rtrim(rtrim(number_format($n, 2, '.', ''), '0'), '.');
+            return ($t === '' ? '0' : $t) . ' m';
+        };
+        $leyenda = function (int $x, string $titulo, string $fondo, float $r, float $l, float $a, float $h, bool $hay) use ($med): string {
+            $filas = [
+                ['Radio de operación', $hay ? $med($r) : '—',                     '#1e5fa8'],
+                ['Longitud de pluma',  $hay ? $med($l) : '—',                     '#7a5500'],
+                ['Ángulo de trabajo',  $hay ? number_format($a, 1) . '°' : '—',   '#92400e'],
+                ['Altura de izaje',    $hay ? $med($h) : '—',                     '#1a7a4a'],
+            ];
+            $A = 134;   // ancho de la caja
+            $out = sprintf('<rect x="%d" y="6" width="%d" height="108" rx="4" fill="#fff" stroke="#cdd8e3" stroke-width="1"/>', $x, $A)
+                 . sprintf('<rect x="%d" y="6" width="%d" height="15" rx="4" fill="%s"/>', $x, $A, $fondo)
+                 . sprintf('<text x="%d" y="16.5" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="6.8" font-weight="700" fill="#fff">%s</text>', $x + $A / 2, $titulo);
+            $y = 33;
+            foreach ($filas as [$et, $val, $color]) {
+                $out .= sprintf('<rect x="%d" y="%d" width="4" height="4" rx="1" fill="%s"/>', $x + 8, $y - 4, $color)
+                      . sprintf('<text x="%d" y="%d" font-family="Inter,Arial,sans-serif" font-size="6.2" fill="#64748b">%s</text>', $x + 16, $y, $et)
+                      . sprintf('<text x="%d" y="%d" text-anchor="end" font-family="Inter,Arial,sans-serif" font-size="8" font-weight="700" fill="%s">%s</text>', $x + $A - 8, $y, $color, $val);
+                $y += 21;
+            }
+            return $out;
+        };
+        $legPri = $leyenda(272, 'GANCHO PRINCIPAL', '#0B2545', $rP, $lP, $ang, $hP, $rP > 0 || $hP > 0);
+        $legAux = $leyenda(416, 'GANCHO AUXILIAR',  '#1e5fa8', $rA, $lA, $aA, $hA, $hayAux);
 
         return <<<SVG
-<svg viewBox="0 0 {$W} {$H}" xmlns="http://www.w3.org/2000/svg" style="width:222px;height:181px;display:block">
+<svg width="185mm" height="39.6mm" viewBox="0 0 {$W} {$H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" style="display:block">
   <rect x="0" y="0" width="{$W}" height="{$H}" fill="#f7fafd"/>
-  <line x1="4" y1="{$gndY}" x2="246" y2="{$gndY}" stroke="#94a3b8" stroke-width="2"/>
-  <rect x="4" y="{$gndY}" width="242" height="8" fill="#e2e8f0"/>
+  <line x1="4" y1="{$gndY}" x2="258" y2="{$gndY}" stroke="#94a3b8" stroke-width="1.6"/>
+  <rect x="4" y="{$gndY}" width="254" height="6" fill="#e2e8f0"/>
 
-  <rect x="12" y="164" width="78" height="12" rx="6" fill="#2d3748"/>
-  <rect x="16" y="167" width="70" height="6" rx="3" fill="#4a5568"/>
-  <circle cx="20" cy="170" r="3.4" fill="#1a202c"/><circle cx="82" cy="170" r="3.4" fill="#1a202c"/>
-  <line x1="26" y1="164" x2="26" y2="176" stroke="#1a202c" stroke-width="1"/>
-  <line x1="38" y1="164" x2="38" y2="176" stroke="#1a202c" stroke-width="1"/>
-  <line x1="50" y1="164" x2="50" y2="176" stroke="#1a202c" stroke-width="1"/>
-  <line x1="62" y1="164" x2="62" y2="176" stroke="#1a202c" stroke-width="1"/>
-  <line x1="74" y1="164" x2="74" y2="176" stroke="#1a202c" stroke-width="1"/>
+  <rect x="8" y="94" width="62" height="10" rx="5" fill="#2d3748"/>
+  <rect x="11" y="96" width="56" height="5" rx="2.5" fill="#4a5568"/>
+  <circle cx="14" cy="99" r="2.8" fill="#1a202c"/><circle cx="64" cy="99" r="2.8" fill="#1a202c"/>
+  <line x1="20" y1="94" x2="20" y2="104" stroke="#1a202c" stroke-width=".8"/>
+  <line x1="30" y1="94" x2="30" y2="104" stroke="#1a202c" stroke-width=".8"/>
+  <line x1="40" y1="94" x2="40" y2="104" stroke="#1a202c" stroke-width=".8"/>
+  <line x1="50" y1="94" x2="50" y2="104" stroke="#1a202c" stroke-width=".8"/>
+  <line x1="60" y1="94" x2="60" y2="104" stroke="#1a202c" stroke-width=".8"/>
 
-  <rect x="18" y="150" width="54" height="14" rx="2" fill="#134074"/>
-  <rect x="10" y="142" width="17" height="22" rx="2" fill="#0B2545"/>
-  <text x="18.5" y="156" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="5.5" font-weight="700" fill="#cbd5e1">CW</text>
-  <rect x="52" y="138" width="18" height="14" rx="2" fill="#1e5fa8"/>
-  <rect x="55" y="141" width="5" height="5" rx="1" fill="#90cdf4" opacity=".8"/>
-  <rect x="62" y="141" width="5" height="5" rx="1" fill="#90cdf4" opacity=".8"/>
+  <rect x="12" y="82" width="44" height="12" rx="2" fill="#134074"/>
+  <rect x="5" y="75" width="15" height="19" rx="2" fill="#0B2545"/>
+  <text x="12.5" y="87" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="5" font-weight="700" fill="#cbd5e1">CW</text>
+  <rect x="40" y="74" width="15" height="12" rx="2" fill="#1e5fa8"/>
+  <rect x="43" y="77" width="4" height="4" rx="1" fill="#90cdf4" opacity=".8"/>
+  <rect x="49" y="77" width="4" height="4" rx="1" fill="#90cdf4" opacity=".8"/>
 
-  <line x1="{$c1x1}" y1="{$c1y1}" x2="{$c1x2}" y2="{$c1y2}" stroke="#C49A28" stroke-width="1.9"/>
-  <line x1="{$c2x1}" y1="{$c2y1}" x2="{$c2x2}" y2="{$c2y2}" stroke="#C49A28" stroke-width="1.9"/>
+  <line {$c1} stroke="#C49A28" stroke-width="1.7"/>
+  <line {$c2} stroke="#C49A28" stroke-width="1.7"/>
   {$celosia}
-  <circle cx="{$pivX}" cy="{$pivY}" r="4" fill="#C49A28"/>
-  <circle cx="{$pivX}" cy="{$pivY}" r="1.8" fill="#fff"/>
-  <circle cx="{$puntaX}" cy="{$puntaY}" r="2.8" fill="#C49A28"/>
-  {$plumin}
+  <circle cx="{$pivX}" cy="{$pivY}" r="3.4" fill="#C49A28"/>
+  <circle cx="{$pivX}" cy="{$pivY}" r="1.5" fill="#fff"/>
+  <circle cx="{$puntaX}" cy="{$puntaY}" r="2.5" fill="#C49A28"/>
+  {$posAux}
   {$carga}
 
-  <line x1="{$pivX}" y1="{$gndY}" x2="{$puntaX}" y2="{$gndY}" stroke="#1e5fa8" stroke-width="1.3" stroke-dasharray="4,3"/>
-  <line x1="{$puntaX}" y1="{$gndY}" x2="{$puntaX}" y2="{$puntaY}" stroke="#1a7a4a" stroke-width="1.3" stroke-dasharray="4,3"/>
-  <path d="M {$pivX},{$gndY} A {$arcR},{$arcR} 0 0,0 {$arcEX},{$arcEY}" fill="none" stroke="#C49A28" stroke-width="1.4"/>
+  <line x1="{$pivX}" y1="{$gndY}" x2="{$puntaX}" y2="{$gndY}" stroke="#1e5fa8" stroke-width="1.1" stroke-dasharray="4,3"/>
+  <line x1="{$puntaX}" y1="{$gndY}" x2="{$puntaX}" y2="{$puntaY}" stroke="#1a7a4a" stroke-width="1.1" stroke-dasharray="4,3"/>
+  <path d="M {$pivX},{$gndY} A {$arcR},{$arcR} 0 0,0 {$arcEX},{$arcEY}" fill="none" stroke="#C49A28" stroke-width="1.2"/>
 
-  <rect x="{$legX}" y="{$legY}" width="70" height="92" rx="4" fill="#ffffff" stroke="#cdd8e3" stroke-width="1"/>
-  <rect x="{$legX}" y="{$legY}" width="70" height="15" rx="4" fill="#0B2545"/>
-  <text x="{$legX}" y="{$legY}" dx="35" dy="10.5" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7" font-weight="700" fill="#fff">GANCHO PRINCIPAL</text>
-
-  <rect x="{$legX}" y="{$legY}" width="5" height="5" rx="1" transform="translate(5,23)" fill="#1e5fa8"/>
-  <text x="{$legX}" y="{$legY}" dx="14" dy="27.5" font-family="Inter,Arial,sans-serif" font-size="6.5" fill="#64748b">Radio</text>
-  <text x="{$legX}" y="{$legY}" dx="66" dy="27.5" text-anchor="end" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1e5fa8">{$rF} m</text>
-
-  <rect x="{$legX}" y="{$legY}" width="5" height="5" rx="1" transform="translate(5,40)" fill="#C49A28"/>
-  <text x="{$legX}" y="{$legY}" dx="14" dy="44.5" font-family="Inter,Arial,sans-serif" font-size="6.5" fill="#64748b">Pluma</text>
-  <text x="{$legX}" y="{$legY}" dx="66" dy="44.5" text-anchor="end" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#7a5500">{$lF} m</text>
-
-  <rect x="{$legX}" y="{$legY}" width="5" height="5" rx="1" transform="translate(5,57)" fill="#f0c040"/>
-  <text x="{$legX}" y="{$legY}" dx="14" dy="61.5" font-family="Inter,Arial,sans-serif" font-size="6.5" fill="#64748b">&#193;ngulo</text>
-  <text x="{$legX}" y="{$legY}" dx="66" dy="61.5" text-anchor="end" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#92400e">{$aF}&#176;</text>
-
-  <rect x="{$legX}" y="{$legY}" width="5" height="5" rx="1" transform="translate(5,74)" fill="#1a7a4a"/>
-  <text x="{$legX}" y="{$legY}" dx="14" dy="78.5" font-family="Inter,Arial,sans-serif" font-size="6.5" fill="#64748b">Altura</text>
-  <text x="{$legX}" y="{$legY}" dx="66" dy="78.5" text-anchor="end" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1a7a4a">{$hF} m</text>
+  {$legPri}
+  {$legAux}
 </svg>
 SVG;
     }
