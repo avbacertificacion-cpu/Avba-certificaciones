@@ -842,6 +842,14 @@ class Auth {
                     'capacidad' => $p['capacidad'] ?? '',
                     'estado'    => $p['estado'] ?? '',
                     'cert_url'  => $verPiezas ? (string)($p['cert_url'] ?? '') : '',
+                    // El folio va en el nombre del archivo, que lo pone siempre
+                    // el mismo generador: CERT_ACC_AVBA_<folio>_<fecha>.pdf. Se
+                    // saca de ahí para no guardar dos veces el mismo dato, y si
+                    // algún día cambia el nombre, la ficha se queda sin folio
+                    // pero el certificado se sigue abriendo igual.
+                    'cert_folio' => $verPiezas && preg_match(
+                        '/CERT_ACC_AVBA_(.+)_\d{8}_\d{6}\.pdf$/', (string)($p['cert_url'] ?? ''), $m
+                    ) ? $m[1] : '',
                     'qr_url'    => $p['qr_codigo'] ? urlQR($p['qr_codigo']) : '',
                 ], $stPiezasAcc->fetchAll());
 

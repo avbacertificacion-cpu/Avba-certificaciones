@@ -71,6 +71,51 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 .b-nocumple{background:var(--rojo-light);color:var(--rojo);}
 /* Accesorios cards */
 .acc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+
+/* ── Certificados por accesorio ─────────────────────────────────────────
+   Una inspección puede traer veinte piezas. Listadas dentro de la ficha de
+   la sesión no se leían: van en su propia ventana, una tarjeta por
+   certificado con lo que identifica a la pieza.
+   El prefijo cacc- es obligatorio: .cert-card ya existe más abajo para las
+   certificaciones de equipo y personal, y compartir nombre pisaba las dos. */
+.cacc-abrir{width:100%;margin-top:10px;padding:10px;border-radius:9px;border:1.5px solid var(--azul);
+  background:var(--azul-light);color:var(--azul-dark);font-size:12.5px;font-weight:700;cursor:pointer;
+  font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .15s;}
+.cacc-abrir:hover{background:var(--azul);color:var(--blanco);}
+.eq-modal.ancho{max-width:940px;}
+.cacc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(258px,1fr));gap:12px;}
+@media(max-width:560px){.cacc-grid{grid-template-columns:1fr;}}
+.cacc-card{display:block;padding:12px;border:1.5px solid var(--borde);border-radius:12px;
+  background:var(--blanco);text-decoration:none;color:inherit;font-family:inherit;cursor:pointer;
+  transition:border-color .15s,box-shadow .15s,transform .15s;}
+.cacc-card:hover{border-color:var(--azul);box-shadow:0 8px 20px rgba(12,68,124,.13);transform:translateY(-2px);}
+.cacc-card:focus-visible{outline:3px solid var(--azul);outline-offset:2px;}
+.cacc-top{display:flex;gap:11px;align-items:flex-start;}
+/* La miniatura no es el PDF: representa la hoja para reconocer la tarjeta de
+   un vistazo, sin descargar veinte documentos para ver cuál es cuál. */
+.cacc-mini{width:58px;flex-shrink:0;aspect-ratio:1/1.32;background:var(--blanco);
+  border:1px solid var(--borde);border-radius:5px;overflow:hidden;position:relative;
+  box-shadow:0 2px 7px rgba(0,0,0,.09);}
+.cacc-mini-hdr{background:var(--azul-dark);padding:4px 4px 3px;display:flex;align-items:center;gap:3px;}
+.cacc-mini-hdr img{height:9px;width:auto;filter:brightness(0) invert(1);}
+.cacc-mini-hdr span{font-size:3.6px;font-weight:800;color:var(--blanco);letter-spacing:.03em;line-height:1.2;}
+.cacc-mini-body{padding:4px;display:flex;flex-direction:column;gap:2.5px;}
+.cacc-mini-body i{display:block;height:2px;border-radius:1px;background:var(--borde);}
+.cacc-mini-body i.az{background:var(--azul);opacity:.55;}
+.cacc-mini-qr{position:absolute;right:4px;bottom:4px;width:13px;height:13px;border-radius:2px;
+  background:repeating-conic-gradient(var(--texto-sub) 0% 25%, var(--blanco) 0% 50%) 50%/3.5px 3.5px;}
+.cacc-info{flex:1;min-width:0;}
+.cacc-etq{font-size:14.5px;font-weight:800;color:var(--texto);line-height:1.2;word-break:break-word;}
+.cacc-tipo{font-size:11.5px;color:var(--texto-sub);margin-top:3px;line-height:1.35;}
+.cacc-dato{font-size:11px;color:var(--texto-hint);margin-top:1px;line-height:1.35;}
+.cacc-folio{font-size:9.5px;color:var(--texto-hint);margin-top:4px;word-break:break-all;letter-spacing:.02em;}
+.cacc-ver{margin-top:10px;padding:8px;border-radius:8px;background:var(--azul-light);color:var(--azul-dark);
+  font-size:12px;font-weight:700;text-align:center;}
+.cacc-card:hover .cacc-ver{background:var(--azul);color:var(--blanco);}
+.cacc-buscar{width:100%;padding:9px 12px;border:1.5px solid var(--borde);border-radius:9px;
+  font-size:13px;font-family:inherit;margin-bottom:13px;}
+.cacc-nota{margin-top:14px;padding:9px 12px;background:var(--gris-bg);border-radius:9px;
+  font-size:11.5px;color:var(--texto-sub);}
 .acc-card{background:var(--blanco);border-radius:12px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 10px rgba(0,0,0,.04);padding:16px 18px;}
 .acc-folio{font-family:monospace;font-size:11px;color:var(--texto-hint);margin-bottom:6px;}
 .acc-fecha{font-size:13px;font-weight:600;color:var(--texto);margin-bottom:10px;}
@@ -941,6 +986,24 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
       <button class="btn-sec" onclick="cerrarModalDoc()">Cancelar</button>
       <button class="btn-prim" onclick="guardarDoc()">Subir</button>
     </div>
+  </div>
+</div>
+
+<!-- Modal: certificados por accesorio de una sesión -->
+<div class="eq-overlay" id="modal-certs-acc">
+  <div class="eq-modal ancho">
+    <div class="eq-modal-hdr">
+      <div>
+        <div class="eq-modal-title">Certificados por accesorio</div>
+        <div id="certs-acc-sub" style="font-size:12px;color:var(--texto-sub);margin-top:3px"></div>
+      </div>
+      <button class="eq-modal-close" onclick="cerrarCertsAcc()">✕</button>
+    </div>
+    <input class="cacc-buscar" id="certs-acc-buscar" type="text"
+           placeholder="🔍 Filtrar por etiqueta, tipo, marca o serie…"
+           oninput="pintarCertsAcc()" style="display:none">
+    <div class="cacc-grid" id="certs-acc-grid"></div>
+    <div class="cacc-nota" id="certs-acc-nota" style="display:none"></div>
   </div>
 </div>
 
@@ -1850,8 +1913,14 @@ function renderArneses(data) {
   cont.innerHTML = html + '</div>';
 }
 
+// Las sesiones que se están mostrando, para que la galería de certificados
+// las consulte por id sin volver a pedirle los datos al servidor.
+let _accSesiones = {};
+
 function renderAccesorios(data) {
   const cont = document.getElementById('acc-cont');
+  _accSesiones = {};
+  (data || []).forEach(s => { _accSesiones[s.id] = s; });
   if (!data || !data.length) {
     cont.innerHTML = '<div class="empty"><div class="empty-t">Sin accesorios registrados</div><div class="empty-s">No hay sesiones de accesorios emitidas.</div></div>';
     return;
@@ -1864,23 +1933,12 @@ function renderAccesorios(data) {
     const repBtn     = ses.informe_url        ? `<a class="btn-doc btn-rep"  href="${ses.informe_url}"        target="_blank">📊 Reporte</a>`              : `<span class="btn-doc btn-rep dis">📊 Reporte</span>`;
     const cumpleBtn  = ses.informe_cumple_url ? `<a class="btn-doc btn-rep"  href="${ses.informe_cumple_url}" target="_blank">✔ Reporte CUMPLE</a>`        : '';
     const qrBtn      = ses.qr_url             ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(ses.qr_url)}')">🔗 QR</button>`   : `<span class="btn-doc btn-qr dis">🔗 QR</span>`;
-    // Cuando se emitió un certificado por accesorio, cada pieza se lista con el
-    // suyo: es el documento que acompaña a la eslinga cuando se entrega suelta.
+    // Una inspección puede traer veinte piezas: listarlas aquí dentro no se
+    // leía. El botón abre la galería, con una tarjeta por certificado.
     const conCert = (ses.piezas || []).filter(p => p.cert_url);
     const piezas  = !conCert.length ? '' : `
-      <div style="margin-top:10px;border-top:1px solid var(--borde);padding-top:8px">
-        <div style="font-size:11px;font-weight:700;color:var(--texto-sub);margin-bottom:4px">
-          Certificado por accesorio (${conCert.length})</div>
-        ${conCert.map(p => `
-          <div style="display:flex;align-items:center;gap:8px;padding:5px 0">
-            <div style="flex:1;min-width:0">
-              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(p.etiqueta || p.tipo || 'Accesorio')}</div>
-              <div style="font-size:11px;color:var(--texto-hint)">${escH([p.tipo, p.marca, p.serie && ('S/N ' + p.serie), p.capacidad].filter(Boolean).join(' · '))}</div>
-            </div>
-            <a class="btn-doc btn-cert" style="padding:3px 8px;font-size:10px"
-               href="${escH(p.cert_url)}" target="_blank">📄 Certificado</a>
-          </div>`).join('')}
-      </div>`;
+      <button class="cacc-abrir" onclick="abrirCertsAcc(${ses.id})">
+        📄 Ver los ${conCert.length} certificados por accesorio</button>`;
     html += `<div class="acc-card">
       <div class="acc-folio">${folio}</div>
       <div class="acc-fecha">${ses.fecha || '—'}</div>
@@ -1898,6 +1956,100 @@ function renderAccesorios(data) {
   });
   html += '</div>';
   cont.innerHTML = html;
+}
+
+/* ── Galería de certificados por accesorio ─────────────────────────────────
+   Cuando se emite un certificado por cada pieza, el cliente puede acabar con
+   veinte documentos de una sola inspección. Se abren en su propia ventana:
+   una tarjeta grande por certificado, con lo que identifica a la pieza, para
+   saber cuál se está abriendo sin tener que descargarlos todos. */
+let _certsAccSesion = null;
+
+function abrirCertsAcc(sesionId) {
+  const ses = _accSesiones[sesionId];
+  if (!ses) return;
+  _certsAccSesion = ses;
+  const conCert = (ses.piezas || []).filter(p => p.cert_url);
+  const folio   = ses.folio ? 'AB.' + ses.folio : '';
+
+  document.getElementById('certs-acc-sub').textContent =
+    [folio, ses.fecha, conCert.length + ' certificado' + (conCert.length !== 1 ? 's' : '')]
+      .filter(Boolean).join(' · ');
+
+  // El filtro sólo estorba con pocas tarjetas.
+  const buscar = document.getElementById('certs-acc-buscar');
+  buscar.value = '';
+  buscar.style.display = conCert.length > 8 ? '' : 'none';
+
+  // Las piezas sin certificado no se esconden en silencio: se dice cuántas son
+  // y por qué, que si no el cliente cuenta diez eslingas y ocho certificados.
+  const sinCert = (ses.piezas || []).length - conCert.length;
+  const nota = document.getElementById('certs-acc-nota');
+  if (sinCert > 0) {
+    const noAptas = (ses.piezas || []).filter(p => p.cert_url === '' && p.estado && p.estado !== 'CUMPLE').length;
+    nota.textContent = sinCert + ' accesorio' + (sinCert !== 1 ? 's' : '') + ' de esta inspección '
+      + (sinCert !== 1 ? 'no tienen' : 'no tiene') + ' certificado individual'
+      + (noAptas ? ' (' + noAptas + (noAptas !== 1 ? ' no aprobaron' : ' no aprobó')
+                 + ' la inspección).' : '.');
+    nota.style.display = '';
+  } else {
+    nota.style.display = 'none';
+  }
+
+  pintarCertsAcc();
+  document.getElementById('modal-certs-acc').classList.add('open');
+}
+
+function cerrarCertsAcc() {
+  document.getElementById('modal-certs-acc').classList.remove('open');
+  _certsAccSesion = null;
+}
+
+function pintarCertsAcc() {
+  const ses = _certsAccSesion;
+  if (!ses) return;
+  const q    = (document.getElementById('certs-acc-buscar').value || '').trim().toLowerCase();
+  const grid = document.getElementById('certs-acc-grid');
+
+  const lista = (ses.piezas || []).filter(p => p.cert_url).filter(p => !q ||
+    [p.etiqueta, p.tipo, p.marca, p.serie, p.capacidad, p.cert_folio]
+      .filter(Boolean).join(' ').toLowerCase().includes(q));
+
+  if (!lista.length) {
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;padding:26px;color:var(--texto-hint);font-size:13px">
+      Ningún certificado coincide con la búsqueda.</div>`;
+    return;
+  }
+
+  grid.innerHTML = lista.map(p => {
+    const detalle = [p.marca, p.serie && ('S/N ' + p.serie)].filter(Boolean).join(' · ');
+    const nombre  = p.etiqueta || p.tipo || 'Accesorio';
+    return `<a class="cacc-card" href="${escH(p.cert_url)}" target="_blank" rel="noopener"
+       title="Abrir el certificado de ${escH(nombre)}">
+      <div class="cacc-top">
+        <div class="cacc-mini" aria-hidden="true">
+          <div class="cacc-mini-hdr">
+            <img src="assets/logos/avba_icono.png" alt="">
+            <span>CERTIFICADO<br>DE INSPECCIÓN</span>
+          </div>
+          <div class="cacc-mini-body">
+            <i class="az" style="width:72%"></i>
+            <i style="width:88%"></i><i style="width:60%"></i><i style="width:80%"></i>
+            <i style="width:52%"></i><i style="width:74%"></i><i style="width:64%"></i>
+          </div>
+          <div class="cacc-mini-qr"></div>
+        </div>
+        <div class="cacc-info">
+          <div class="cacc-etq">${escH(nombre)}</div>
+          ${p.tipo && p.etiqueta ? `<div class="cacc-tipo">${escH(p.tipo)}</div>` : ''}
+          ${detalle     ? `<div class="cacc-dato">${escH(detalle)}</div>` : ''}
+          ${p.capacidad ? `<div class="cacc-dato">Capacidad ${escH(p.capacidad)}</div>` : ''}
+          ${p.cert_folio? `<div class="cacc-folio">${escH(p.cert_folio)}</div>` : ''}
+        </div>
+      </div>
+      <div class="cacc-ver">📄 Abrir certificado</div>
+    </a>`;
+  }).join('');
 }
 
 // ── Búsqueda de accesorios individuales ────────────────────────────────────
@@ -4810,7 +4962,7 @@ async function guardarPrefsNotif() {
 }
 
 // ── Close modals on overlay click ──────────────────────────────────────────
-['modal-eq','modal-doc','modal-hora','modal-cert-eq','modal-pers','modal-doc-pers','modal-edit-doc-pers','modal-cert-pers','modal-notif-prefs'].forEach(id => {
+['modal-eq','modal-doc','modal-hora','modal-cert-eq','modal-pers','modal-doc-pers','modal-edit-doc-pers','modal-cert-pers','modal-notif-prefs','modal-certs-acc'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });
