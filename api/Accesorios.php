@@ -2054,10 +2054,18 @@ class Accesorios {
     public function generarCertAccesorio(int $accId, string $usuario, bool $persistir = true): array {
         $this->ensureAccIzajeQrColumn();
 
+        // Columnas que pueden no existir en una base sin migrar: nombrarlas a
+        // secas dejaría sin emitir ningún certificado.
+        $colOcultos   = columnaExiste($this->pdo, 'accesorios_sesiones', 'docs_ocultos')
+            ? 's.docs_ocultos' : "'' AS docs_ocultos";
+        $colPublicado = columnaExiste($this->pdo, 'accesorios_sesiones', 'publicado')
+            ? 's.publicado' : "0 AS publicado";
+
         $st = $this->pdo->prepare(
             "SELECT a.*, COALESCE(t.nombre,'') AS tipo_nombre,
                     s.id AS sesion_id, s.cliente, s.control, s.estatus,
-                    DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha_fmt
+                    DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha_fmt,
+                    {$colOcultos}, {$colPublicado}
              FROM accesorios_izaje a
              LEFT JOIN accesorios_tipos t ON t.id = a.tipo_id
              LEFT JOIN accesorios_sesiones s ON s.id = a.sesion_id
@@ -2127,7 +2135,17 @@ class Accesorios {
                 error_log('[Accesorios] cert_url: ' . $ex->getMessage());
             }
         }
-        return ['status' => 'success', 'url' => $abs, 'folio' => $folio, 'id' => $accId];
+        $sesionVisible = ((string)($a['estatus'] ?? '') === 'EMITIDO') || (int)($a['publicado'] ?? 0) === 1;
+        $piezasVisibles = !in_array('piezas',
+            array_map('trim', explode(',', (string)($a['docs_ocultos'] ?? ''))), true);
+        $enPortal = $sesionVisible && $piezasVisibles;
+
+        return ['status' => 'success', 'url' => $abs, 'folio' => $folio, 'id' => $accId,
+                'en_portal' => $enPortal,
+                'message'   => 'Certificado ' . $folio . ' emitido. '
+                    . ($enPortal
+                        ? 'Ya está disponible en el portal del cliente.'
+                        : 'Todavía no se ve en el portal: usa "Emitir y publicar" para dejarlo disponible.')];
     }
 
     /**
@@ -2240,8 +2258,16 @@ class Accesorios {
        retira por separado, y publicar no manda ningún correo.
        ═══════════════════════════════════════════════════════════ */
 
-    /** Los documentos de la sesión que el portal del cliente puede mostrar. */
-    public const DOCS_PORTAL = ['cert', 'informe', 'cumple'];
+    /**
+     * Lo que el portal del cliente puede mostrar de una sesión.
+     *
+     * Los tres primeros son documentos de la sesión, cada uno en su columna.
+     * 'piezas' no es un documento sino el conjunto de certificados por
+     * accesorio: vive en cada pieza, no en la sesión, pero se publica y se
+     * retira igual que los demás, que es lo que se espera al manejarlo desde
+     * la misma pantalla.
+     */
+    public const DOCS_PORTAL = ['cert', 'informe', 'cumple', 'piezas'];
 
     /**
      * ¿Este accesorio pasó la inspección?
@@ -2263,6 +2289,7 @@ class Accesorios {
         'cert'    => 'certificado',
         'informe' => 'informe completo',
         'cumple'  => 'informe de aprobados',
+        'piezas'  => 'certificados por accesorio',
     ];
 
     /** Deja la lista en el orden de siempre y descarta lo que no reconozca. */
@@ -2315,21 +2342,40 @@ class Accesorios {
         return $out;
     }
 
+    /** Cuántas piezas de la sesión tienen ya su certificado individual. */
+    private function piezasCertificadas(int $sesionId): int {
+        if (!columnaExiste($this->pdo, 'accesorios_izaje', 'cert_url')) return 0;
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT COUNT(*) FROM accesorios_izaje
+                 WHERE sesion_id = ? AND cert_url IS NOT NULL AND cert_url <> ''"
+            );
+            $st->execute([$sesionId]);
+            return (int)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            return 0;
+        }
+    }
+
     /**
-     * Estado de publicación de los tres documentos, para pintarlo en pantalla.
+     * Estado de publicación de los documentos, para pintarlo en pantalla.
      * Un documento sin URL no está publicado aunque no esté en la lista de
      * ocultos: todavía no existe.
      */
     public function estadoPortalAcc(int $sesionId): array {
         $ocultos = $this->docsOcultos($sesionId);
         $urls    = $this->urlsDocs($sesionId);
+        $nPiezas = $this->piezasCertificadas($sesionId);
         $out = [];
         foreach (self::DOCS_PORTAL as $doc) {
+            // 'piezas' no tiene una URL: existe si alguna pieza ya tiene la suya.
+            $hay = $doc === 'piezas' ? $nPiezas > 0 : ($urls[$doc] ?? '') !== '';
             $out[$doc] = [
-                'generado'  => $urls[$doc] !== '',
-                'publicado' => $urls[$doc] !== '' && !in_array($doc, $ocultos, true),
-                'url'       => $urls[$doc],
+                'generado'  => $hay,
+                'publicado' => $hay && !in_array($doc, $ocultos, true),
+                'url'       => $doc === 'piezas' ? '' : ($urls[$doc] ?? ''),
             ];
+            if ($doc === 'piezas') $out[$doc]['n'] = $nPiezas;
         }
         return $out;
     }
@@ -2343,9 +2389,12 @@ class Accesorios {
         $this->ensureAccSesionesColumns();
         ensurePublicado($this->pdo);
 
-        $tipo    = strtolower(trim($tipo)) ?: 'todo';
+        $tipo = strtolower(trim($tipo)) ?: 'todo';
+        // 'todo' son los TRES documentos de la sesión. Los certificados por
+        // accesorio se piden aparte: son un PDF por pieza y el botón de los
+        // tres no debe ponerse a emitir veinte documentos sin que nadie lo pida.
         $pedidos = $tipo === 'todo'
-            ? self::DOCS_PORTAL
+            ? array_values(array_keys(self::DOC_COLUMNA))
             : (in_array($tipo, self::DOCS_PORTAL, true) ? [$tipo] : []);
         if (!$pedidos) return ['status' => 'error', 'message' => 'Documento no válido.'];
 
@@ -2355,6 +2404,19 @@ class Accesorios {
         $hechos = [];
         $fallos = [];
         foreach ($pedidos as $doc) {
+            // Los certificados por accesorio no son un documento de la sesión:
+            // se emite uno por pieza apta y se guardan en la pieza.
+            if ($doc === 'piezas') {
+                $res = $this->generarCertsAccesorios($sesionId, $usuario);
+                if (($res['status'] ?? '') !== 'success') {
+                    if (count($pedidos) === 1) return $res;
+                    $fallos[] = self::DOC_NOMBRE['piezas'];
+                    continue;
+                }
+                $hechos[] = $doc;
+                $detallePiezas = $res;
+                continue;
+            }
             $res = $this->docEfectivo($sesionId, $doc, $usuario);
             if (($res['status'] ?? '') !== 'success') {
                 // Pidiendo uno solo, su error es el resultado. Publicando los
@@ -2386,11 +2448,22 @@ class Accesorios {
         )->execute([$sesionId]);
         if ($anterior !== 'EMITIDO') $this->historial($usuario, $sesionId, $anterior ?: null, 'EMITIDO');
 
-        $nombres = array_map(fn($d) => self::DOC_NOMBRE[$d], $hechos);
+        $nombres = array_map(
+            fn($d) => $d === 'piezas' && isset($detallePiezas)
+                ? count($detallePiezas['emitidos']) . ' ' . self::DOC_NOMBRE['piezas']
+                : self::DOC_NOMBRE[$d],
+            $hechos
+        );
         $msg = 'Ya está en el portal del cliente: ' . implode(' + ', $nombres) . '. No se envió correo.';
         if ($fallos) $msg .= ' Quedó sin generar: ' . implode(', ', $fallos) . '.';
+        // Las piezas que se quedaron sin certificado se dicen por su nombre.
+        if (isset($detallePiezas) && $detallePiezas['fallos']) {
+            $msg .= ' Sin certificado: ' . implode('; ', array_map(
+                fn($f) => $f['id_accesorio'] . ' — ' . $f['message'], $detallePiezas['fallos'])) . '.';
+        }
 
         return ['status' => 'success', 'publicados' => $hechos,
+                'piezas' => $detallePiezas ?? null,
                 'portal' => $this->estadoPortalAcc($sesionId), 'message' => $msg];
     }
 
@@ -2412,11 +2485,17 @@ class Accesorios {
         $chk->execute([$sesionId]);
         if (!$chk->fetchColumn()) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
 
+        // 'piezas' son varios documentos: los mensajes concuerdan en plural.
+        $esPlural = $tipo === 'piezas';
         $urls = $this->urlsDocs($sesionId);
+        $urls['piezas'] = $this->piezasCertificadas($sesionId) > 0 ? 'sí' : '';
         if ($visible && $urls[$tipo] === '') {
             return ['status' => 'error',
-                    'message' => 'El ' . self::DOC_NOMBRE[$tipo] . ' todavía no se ha generado. '
-                               . 'Usa "Publicar" para generarlo y mostrarlo.'];
+                    'message' => $esPlural
+                        ? 'Todavía no se ha emitido ningún certificado por accesorio. '
+                        . 'Usa "Emitir y publicar" para emitirlos y mostrarlos.'
+                        : 'El ' . self::DOC_NOMBRE[$tipo] . ' todavía no se ha generado. '
+                        . 'Usa "Publicar" para generarlo y mostrarlo.'];
         }
 
         $ocultos = $this->docsOcultos($sesionId);
@@ -2434,9 +2513,9 @@ class Accesorios {
             'status'  => 'success',
             'visible' => $visible,
             'portal'  => $this->estadoPortalAcc($sesionId),
-            'message' => ucfirst(self::DOC_NOMBRE[$tipo])
-                       . ($visible ? ' visible en el portal del cliente.'
-                                   : ' retirado del portal del cliente.'),
+            'message' => ucfirst(self::DOC_NOMBRE[$tipo]) . ' '
+                       . ($visible ? ($esPlural ? 'visibles' : 'visible') . ' en el portal del cliente.'
+                                   : ($esPlural ? 'retirados' : 'retirado') . ' del portal del cliente.'),
         ];
     }
 

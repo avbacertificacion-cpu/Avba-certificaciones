@@ -1864,6 +1864,23 @@ function renderAccesorios(data) {
     const repBtn     = ses.informe_url        ? `<a class="btn-doc btn-rep"  href="${ses.informe_url}"        target="_blank">📊 Reporte</a>`              : `<span class="btn-doc btn-rep dis">📊 Reporte</span>`;
     const cumpleBtn  = ses.informe_cumple_url ? `<a class="btn-doc btn-rep"  href="${ses.informe_cumple_url}" target="_blank">✔ Reporte CUMPLE</a>`        : '';
     const qrBtn      = ses.qr_url             ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(ses.qr_url)}')">🔗 QR</button>`   : `<span class="btn-doc btn-qr dis">🔗 QR</span>`;
+    // Cuando se emitió un certificado por accesorio, cada pieza se lista con el
+    // suyo: es el documento que acompaña a la eslinga cuando se entrega suelta.
+    const conCert = (ses.piezas || []).filter(p => p.cert_url);
+    const piezas  = !conCert.length ? '' : `
+      <div style="margin-top:10px;border-top:1px solid var(--borde);padding-top:8px">
+        <div style="font-size:11px;font-weight:700;color:var(--texto-sub);margin-bottom:4px">
+          Certificado por accesorio (${conCert.length})</div>
+        ${conCert.map(p => `
+          <div style="display:flex;align-items:center;gap:8px;padding:5px 0">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escH(p.etiqueta || p.tipo || 'Accesorio')}</div>
+              <div style="font-size:11px;color:var(--texto-hint)">${escH([p.tipo, p.marca, p.serie && ('S/N ' + p.serie), p.capacidad].filter(Boolean).join(' · '))}</div>
+            </div>
+            <a class="btn-doc btn-cert" style="padding:3px 8px;font-size:10px"
+               href="${escH(p.cert_url)}" target="_blank">📄 Certificado</a>
+          </div>`).join('')}
+      </div>`;
     html += `<div class="acc-card">
       <div class="acc-folio">${folio}</div>
       <div class="acc-fecha">${ses.fecha || '—'}</div>
@@ -1876,6 +1893,7 @@ function renderAccesorios(data) {
       <div style="display:flex;gap:6px;flex-wrap:wrap">${certBtn}${repBtn}${cumpleBtn}${qrBtn}${
         btnEnviar('accesorio', ses.id, 'Enviar la sesión de accesorios',
                   `${folio} — certificado y reportes`)}</div>
+      ${piezas}
     </div>`;
   });
   html += '</div>';

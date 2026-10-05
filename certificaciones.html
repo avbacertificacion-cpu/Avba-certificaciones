@@ -2668,10 +2668,22 @@ async function abrirAccCert(sesionId) {
           <span style="color:var(--texto-hint)">"Ver" sólo genera el documento para revisarlo: no lo publica ni lo envía.</span>
         </div>
 
+        <div style="margin-top:12px;border:1px solid var(--borde);border-radius:9px;padding:10px 12px">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="flex:1;min-width:210px">
+              <div style="font-size:12px;font-weight:700">🏷 Certificado por accesorio</div>
+              <div style="font-size:10.5px;color:var(--texto-sub);margin-top:2px">
+                Uno por cada pieza apta, con su propio folio y su propio QR. Para cuando el cliente
+                entrega cada accesorio por separado.</div>
+            </div>
+            <button style="${btnBase}background:#fff;border-color:var(--verde);color:var(--verde);padding:7px 16px;font-size:12px"
+                    title="Emite uno por cada accesorio apto y los deja en el portal del cliente, sin enviar correo"
+                    onclick="accCertsIndividuales(${sesionId},this)">Emitir y publicar</button>
+          </div>
+          ${accTirillaPortal('piezas', sesionId, (data.portal||{}).piezas)}
+        </div>
+
         <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
-          <button style="${btnBase}background:#fff;border-color:var(--verde);color:var(--verde);padding:7px 16px;font-size:12px"
-                  title="Un certificado por cada accesorio apto, con su propio folio y su propio QR"
-                  onclick="accCertsIndividuales(${sesionId},this)">🏷 Certificado por accesorio</button>
           <button style="${btnBase}background:#fff;border-color:#1a3a6b;color:#1a3a6b;padding:7px 16px;font-size:12px"
                   title="Deja los tres documentos disponibles en el portal del cliente, sin enviar correo"
                   onclick="accPublicarPortal('todo',${sesionId},this)">🌐 Publicar los 3 en el portal</button>
@@ -2882,7 +2894,8 @@ async function accCertUno(accId, btn) {
     });
     const d = await res.json();
     if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo emitir.', 'err'); return; }
-    mostrarToast('Certificado ' + d.folio + ' emitido.', 'ok');
+    // El mensaje dice además si el cliente ya lo ve o si falta publicarlo.
+    mostrarToast(d.message || ('Certificado ' + d.folio + ' emitido.'), d.en_portal ? 'ok' : 'info');
     if (d.url) _pdfAbrir(d.url, 'Certificado ' + d.folio);
     abrirAccCert(currentAccSesionId);   // refrescar para que aparezca el enlace
   } catch(e) {
@@ -2894,7 +2907,8 @@ async function accCertUno(accId, btn) {
 
 async function accCertsIndividuales(sesionId, btn) {
   if (!confirm('Se emitirá un certificado por CADA accesorio apto de esta sesión, cada uno con su '
-             + 'propio folio y su propio QR.\n\nEl certificado del lote no se toca.\n\n¿Continuar?')) return;
+             + 'propio folio y su propio QR, y quedarán disponibles en el portal del cliente.\n\n'
+             + 'No se envía correo. El certificado del lote no se toca.\n\n¿Continuar?')) return;
   const orig = btn ? btn.textContent : '';
   if (btn) { btn.disabled = true; btn.textContent = 'Emitiendo…'; }
   mostrarToast('Emitiendo certificados…', 'info');
@@ -2903,13 +2917,14 @@ async function accCertsIndividuales(sesionId, btn) {
     const res = await fetch(API, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Token': tok },
-      body: JSON.stringify({ action: 'GENERAR_CERTS_ACCESORIOS', payload: { sesion_id: sesionId } })
+      body: JSON.stringify({ action: 'PUBLICAR_PORTAL_ACC', payload: { sesion_id: sesionId, tipo: 'piezas' } })
     });
     const d = await res.json();
     mostrarToast(d.message || 'Listo.', d.status === 'success' ? 'ok' : 'err');
     // Lo que no se pudo emitir se dice por su nombre, no con un "hubo errores".
-    if ((d.fallos || []).length) {
-      alert('No se emitieron:\n\n' + d.fallos.map(f => '· ' + f.id_accesorio + ': ' + f.message).join('\n'));
+    const fallos = (d.piezas || {}).fallos || d.fallos || [];
+    if (fallos.length) {
+      alert('No se emitieron:\n\n' + fallos.map(f => '· ' + f.id_accesorio + ': ' + f.message).join('\n'));
     }
     abrirAccCert(sesionId);
   } catch(e) {

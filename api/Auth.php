@@ -803,7 +803,23 @@ class Auth {
                  ORDER BY s.fecha DESC"
             );
             $stmt->execute([$like]);
-            foreach ($stmt->fetchAll() as $r) {
+            $filasAcc = $stmt->fetchAll();
+
+            // Las piezas de la sesión, con el certificado propio de cada una.
+            // Se piden aparte porque la consulta de arriba viene agrupada por
+            // sesión: ahí sólo caben los totales, no una fila por accesorio.
+            $colCertPieza = columnaExiste($this->pdo, 'accesorios_izaje', 'cert_url')
+                ? 'a.cert_url' : "'' AS cert_url";
+            $stPiezasAcc = $this->pdo->prepare(
+                "SELECT a.id, a.id_accesorio, a.marca, a.modelo, a.serie, a.capacidad,
+                        a.estado, a.qr_codigo, {$colCertPieza},
+                        COALESCE(t.nombre,'') AS tipo_nombre
+                 FROM accesorios_izaje a
+                 LEFT JOIN accesorios_tipos t ON t.id = a.tipo_id
+                 WHERE a.sesion_id = ? ORDER BY a.orden, a.id"
+            );
+
+            foreach ($filasAcc as $r) {
                 $ocultos = array_filter(array_map('trim', explode(',', (string)($r['docs_ocultos'] ?? ''))));
                 $doc = fn(string $clave, string $col) => in_array($clave, $ocultos, true) ? '' : ($r[$col] ?? '');
 
@@ -812,12 +828,33 @@ class Auth {
                     'informe_url'        => $doc('informe', 'informe_url'),
                     'informe_cumple_url' => $doc('cumple',  'informe_cumple_url'),
                 ];
+                // El certificado de la pieza sólo se ofrece si los certificados
+                // por accesorio están publicados, igual que los otros tres: si
+                // Certificaciones los retira, dejan de verse.
+                $verPiezas = !in_array('piezas', $ocultos, true);
+                $stPiezasAcc->execute([(int)$r['id']]);
+                $piezas = array_map(fn($p) => [
+                    'id'        => (int)$p['id'],
+                    'tipo'      => $p['tipo_nombre'],
+                    'etiqueta'  => $p['id_accesorio'] ?? '',
+                    'marca'     => trim(($p['marca'] ?? '') . ' ' . ($p['modelo'] ?? '')),
+                    'serie'     => $p['serie'] ?? '',
+                    'capacidad' => $p['capacidad'] ?? '',
+                    'estado'    => $p['estado'] ?? '',
+                    'cert_url'  => $verPiezas ? (string)($p['cert_url'] ?? '') : '',
+                    'qr_url'    => $p['qr_codigo'] ? urlQR($p['qr_codigo']) : '',
+                ], $stPiezasAcc->fetchAll());
+
+                $habiaAlgo = ($r['cert_url'] ?? '') || ($r['informe_url'] ?? '') || ($r['informe_cumple_url'] ?? '');
                 // Si se retiraron todos los documentos que había, la sesión no
                 // se anuncia: una fila sin nada que descargar sólo confunde.
-                $habiaAlgo = ($r['cert_url'] ?? '') || ($r['informe_url'] ?? '') || ($r['informe_cumple_url'] ?? '');
-                if ($habiaAlgo && !array_filter($urls)) continue;
+                // Salvo que sus piezas conserven certificado publicado: ahí el
+                // cliente sigue teniendo qué descargar.
+                $hayCertPieza = (bool)array_filter(array_column($piezas, 'cert_url'));
+                if ($habiaAlgo && !array_filter($urls) && !$hayCertPieza) continue;
 
                 if (!$nombreCliente) $nombreCliente = $r['cliente'];
+
                 $accesorios[] = [
                     'id'        => (int)$r['id'],
                     'folio'     => $r['control'],
@@ -826,6 +863,7 @@ class Auth {
                     'cumple'    => (int)$r['cumple'],
                     'no_cumple' => (int)$r['no_cumple'],
                     'qr_url'    => $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '',
+                    'piezas'    => $piezas,
                 ] + $urls;
             }
         } catch (\PDOException $e) { /* tabla o columna aún no existe */ }
