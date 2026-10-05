@@ -505,9 +505,16 @@ class Accesorios {
             $params[] = $idCliente . '-%';
         }
 
+        // El certificado propio de la pieza, cuando se emitió uno por accesorio.
+        // La columna puede no existir todavía: nombrarla a secas dejaría al
+        // cliente sin buscador de accesorios hasta que corra la migración.
+        $colCert = columnaExiste($this->pdo, 'accesorios_izaje', 'cert_url')
+            ? 'a.cert_url AS cert_pieza_url' : "'' AS cert_pieza_url";
+
         $stmt = $this->pdo->prepare(
             "SELECT a.id, a.id_accesorio, COALESCE(t.nombre,'') AS tipo_nombre,
                     a.marca, a.modelo, a.serie, a.capacidad, a.medidas, a.estado, a.qr_codigo,
+                    {$colCert},
                     s.id AS sesion_id, s.cliente, s.control, s.estatus,
                     DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha,
                     s.cert_url, s.informe_url, s.informe_cumple_url, s.qr_codigo AS sesion_qr
@@ -591,10 +598,14 @@ class Accesorios {
         $sesion = $chk->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
 
+        // cert_url puede no existir todavía: nombrarla a secas rompería la
+        // consulta y dejaría sin abrir el detalle de la sesión.
+        $colCert = columnaExiste($this->pdo, 'accesorios_izaje', 'cert_url')
+            ? 'a.cert_url' : "'' AS cert_url";
         $stmt = $this->pdo->prepare(
             "SELECT a.id, a.id_accesorio, a.tipo_id, t.nombre AS tipo_nombre,
                     a.marca, a.modelo, a.serie, a.capacidad, a.medidas,
-                    a.estado, a.orden, a.qr_codigo, a.componentes,
+                    a.estado, a.orden, a.qr_codigo, a.componentes, {$colCert},
                     COUNT(f.id) AS total_fotos
              FROM accesorios_izaje a
              LEFT JOIN accesorios_tipos t ON t.id = a.tipo_id
@@ -1670,6 +1681,17 @@ class Accesorios {
         ] as $sql) {
             try { $this->pdo->exec($sql); } catch (\Throwable $e) {}
         }
+        // Certificado propio de la pieza, cuando se emite uno por accesorio en
+        // vez de uno por lote. Va comprobando information_schema: ADD COLUMN IF
+        // NOT EXISTS sólo existe en MariaDB y en MySQL 8 el ALTER de arriba
+        // falla entero, así que la columna nunca llegaría a crearse.
+        try {
+            if (!columnaExiste($this->pdo, 'accesorios_izaje', 'cert_url')) {
+                $this->pdo->exec("ALTER TABLE accesorios_izaje ADD COLUMN cert_url VARCHAR(500) NULL");
+            }
+        } catch (\Throwable $e) {
+            error_log('[Accesorios] columna cert_url: ' . $e->getMessage());
+        }
     }
 
     private function qrDisponible(string $qr, int $excludeAccId = 0): bool {
@@ -1871,6 +1893,85 @@ class Accesorios {
     }
 
     // ── Generar certificado con mPDF (una página, HTML template) ──
+    /**
+     * El recuadro de ítems del certificado.
+     *
+     * Lo arma PHP y no la plantilla porque los dos modos dicen cosas distintas:
+     * el de lote resume cuántas piezas de cada tipo ampara, y el individual
+     * describe LA pieza. Dejar la plantilla con un rótulo fijo obligaba a meter
+     * la descripción de una pieza bajo el título "resumen de ítems".
+     */
+    private function bloqueItems(array $aptos, ?array $pieza = null): string {
+        $e = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+
+        if ($pieza === null) {
+            $cuenta = [];
+            foreach ($aptos as $a) {
+                $t = mb_convert_case(trim($a['tipo_nombre'] ?? ''), MB_CASE_TITLE, 'UTF-8') ?: 'Accesorio';
+                $cuenta[$t] = ($cuenta[$t] ?? 0) + 1;
+            }
+            arsort($cuenta);
+            $items = [];
+            foreach ($cuenta as $t => $n) $items[] = str_pad((string)$n, 2, '0', STR_PAD_LEFT) . ' ' . $t;
+            return '<div class="flabel">RESUMEN DE ÍTEMS INSPECCIONADOS - Summary of inspected items</div>'
+                 . '<div class="fval">' . $e(implode(', ', $items)) . '</div>';
+        }
+
+        // Individual: se enumeran los datos que identifican a la pieza, que es
+        // lo que el cliente coteja contra la placa.
+        $campos = [
+            'Tipo'              => $pieza['tipo_nombre'] ?? '',
+            'ID del accesorio'  => $pieza['id_accesorio'] ?? '',
+            'Marca'             => $pieza['marca'] ?? '',
+            'Modelo'            => $pieza['modelo'] ?? '',
+            'No. de serie'      => $pieza['serie'] ?? '',
+            'Capacidad'         => $pieza['capacidad'] ?? '',
+            'Medidas'           => $pieza['medidas'] ?? '',
+        ];
+        $filas = '';
+        $col   = 0;
+        foreach ($campos as $et => $val) {
+            $val = trim((string)$val);
+            if ($val === '') continue;
+            if ($col === 0) $filas .= '<tr>';
+            $filas .= '<td style="width:50%;vertical-align:top;padding:0 4mm 3mm 0;">'
+                    . '<div class="flabel">' . $e(mb_strtoupper($et, 'UTF-8')) . '</div>'
+                    . '<div class="fval">' . $e($val) . '</div></td>';
+            $col++;
+            if ($col === 2) { $filas .= '</tr>'; $col = 0; }
+        }
+        if ($col === 1) $filas .= '<td></td></tr>';
+
+        $comps = array_filter(array_map('trim', explode("\n", (string)($pieza['componentes'] ?? ''))));
+        $lista = $comps
+            ? '<div class="flabel" style="margin-top:2mm">SE COMPONE DE - Components</div>'
+            . '<div class="fval">' . $e(implode(' · ', $comps)) . '</div>'
+            : '';
+
+        return '<div class="flabel">ACCESORIO CERTIFICADO - Certified item</div>'
+             . '<table width="100%" cellpadding="0" cellspacing="0" style="margin-top:2mm">' . $filas . '</table>'
+             . $lista;
+    }
+
+    /**
+     * La redacción del cuerpo, en plural o en singular.
+     *
+     * El certificado de una sola eslinga decía "los accesorios descritos ... se
+     * encuentran aptas". Son las tres frases del cuerpo donde el documento
+     * nombra lo que ampara; el resto del texto sirve igual para los dos modos.
+     */
+    private function textosSujeto(bool $individual): array {
+        return $individual ? [
+            '{sujeto_descrito}' => 'el accesorio descrito en el presente documento fue inspeccionado',
+            '{sujeto_apto}'     => 'El accesorio de izaje inspeccionado se encuentra',
+            '{sujeto_danio}'    => 'al accesorio',
+        ] : [
+            '{sujeto_descrito}' => 'los accesorios descritos en el presente documento fueron inspeccionados',
+            '{sujeto_apto}'     => 'Los accesorios de izaje inspeccionados se encuentran',
+            '{sujeto_danio}'    => 'a los accesorios',
+        ];
+    }
+
     public function generarCertAcc(int $sesionId, string $usuario): array {
         $det = $this->detalleSesion($sesionId);
         if ($det['status'] !== 'success') return $det;
@@ -1898,19 +1999,6 @@ class Accesorios {
         // QR base64
         $qrB64 = qrDataUri(textoQR($qrCodigo), 300, 4);
 
-        // Agrupar accesorios por tipo y contar → "03 Grilletes, 02 Eslingas, 01 Cancamos"
-        $countsByType = [];
-        foreach ($aptos as $a) {
-            $tipo = mb_convert_case(trim($a['tipo_nombre'] ?? ''), MB_CASE_TITLE, 'UTF-8') ?: 'Accesorio';
-            $countsByType[$tipo] = ($countsByType[$tipo] ?? 0) + 1;
-        }
-        arsort($countsByType);
-        $itemsList = [];
-        foreach ($countsByType as $tipo => $cnt) {
-            $itemsList[] = str_pad((string)$cnt, 2, '0', STR_PAD_LEFT) . ' ' . $tipo;
-        }
-        $resumenItems = implode(', ', $itemsList);
-
         $folio = $sesion['control']
             ? 'AB.' . $sesion['control'] . '-' . date('Y') . 'MX'
             : 'ACC-' . str_pad((string)$sesionId, 5, '0', STR_PAD_LEFT);
@@ -1929,12 +2017,12 @@ class Accesorios {
         $map = [
             '{folio}'            => $e($folio),
             '{cliente}'          => $e(mb_strtoupper(trim($sesion['cliente'] ?? ''), 'UTF-8')),
-            '{resumen_items}'    => $e($resumenItems),
+            '{bloque_items}'     => $this->bloqueItems($aptos),
             '{fecha_inspeccion}' => $e($fechaStr),
             '{vigencia}'         => $e($vigencia),
             '{no_acreditacion}'  => $e($noAcreditacion),
             '{qr_imagen}'        => $qrB64 ?: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
-        ];
+        ] + $this->textosSujeto(count($aptos) === 1);
 
         $templatePath = __DIR__ . '/../certificado_accesorios_preview.html';
         if (!file_exists($templatePath))
@@ -1949,6 +2037,144 @@ class Accesorios {
         }
 
         return ['status' => 'success', 'url' => $url, 'folio' => $folio];
+    }
+
+    /**
+     * Certificado de UN accesorio.
+     *
+     * El de lote ampara la inspección completa en una hoja; éste ampara una
+     * pieza y lleva su propio folio, su propio QR y los datos con los que el
+     * cliente la coteja contra la placa. Es lo que piden quienes entregan cada
+     * eslinga a un frente distinto: el certificado viaja con la pieza.
+     *
+     * Misma plantilla que el de lote, para que los dos se vean igual.
+     *
+     * @param bool $persistir Guarda la URL en el accesorio. En falso sólo genera.
+     */
+    public function generarCertAccesorio(int $accId, string $usuario, bool $persistir = true): array {
+        $this->ensureAccIzajeQrColumn();
+
+        $st = $this->pdo->prepare(
+            "SELECT a.*, COALESCE(t.nombre,'') AS tipo_nombre,
+                    s.id AS sesion_id, s.cliente, s.control, s.estatus,
+                    DATE_FORMAT(s.fecha,'%d/%m/%Y') AS fecha_fmt
+             FROM accesorios_izaje a
+             LEFT JOIN accesorios_tipos t ON t.id = a.tipo_id
+             LEFT JOIN accesorios_sesiones s ON s.id = a.sesion_id
+             WHERE a.id = ?"
+        );
+        $st->execute([$accId]);
+        $a = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$a) return ['status' => 'error', 'message' => 'Accesorio no encontrado.'];
+
+        if (!self::esApto($a)) {
+            return ['status' => 'error', 'message' =>
+                'Este accesorio no resultó apto, así que no se le emite certificado. '
+              . 'Debe retirarse de servicio.'];
+        }
+        if (empty($a['control'])) {
+            return ['status' => 'error', 'message' =>
+                'La inspección todavía no tiene folio; debe aprobarse en Calidad primero.'];
+        }
+        // El QR es lo que lleva la placa pegada a la pieza: sin él, el
+        // certificado no se puede verificar contra el accesorio que ampara.
+        if (empty($a['qr_codigo'])) {
+            return ['status' => 'error', 'message' =>
+                'Este accesorio no tiene código QR asignado. Asígnalo en Calidad antes de certificarlo.'];
+        }
+
+        $folio = 'AB.' . $a['control'] . '-' . str_pad((string)$accId, 4, '0', STR_PAD_LEFT)
+               . '-' . date('Y') . 'MX';
+
+        $vigencia = '';
+        if (!empty($a['fecha_fmt'])) {
+            $fv = \DateTime::createFromFormat('d/m/Y', $a['fecha_fmt']);
+            if ($fv) { $fv->modify('+1 year'); $vigencia = $fv->format('d/m/Y'); }
+        }
+
+        $qrB64 = qrDataUri(textoQR($a['qr_codigo']), 300, 4);
+        $e = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+
+        $map = [
+            '{folio}'            => $e($folio),
+            '{cliente}'          => $e(mb_strtoupper(trim($a['cliente'] ?? ''), 'UTF-8')),
+            '{bloque_items}'     => $this->bloqueItems([], $a),
+            '{fecha_inspeccion}' => $e($a['fecha_fmt'] ?? ''),
+            '{vigencia}'         => $e($vigencia),
+            '{no_acreditacion}'  => $e(defined('NO_ACREDITACION') ? NO_ACREDITACION : 'UVNMX 057'),
+            '{qr_imagen}'        => $qrB64 ?: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
+        ] + $this->textosSujeto(true);
+
+        $plantilla = __DIR__ . '/../certificado_accesorios_preview.html';
+        if (!file_exists($plantilla))
+            return ['status' => 'error', 'message' => 'Plantilla HTML de certificado no encontrada.'];
+
+        try {
+            $url = $this->htmlToPdfMpdf(
+                str_replace(array_keys($map), array_values($map), file_get_contents($plantilla)),
+                $folio, 'CERT_ACC'
+            );
+        } catch (\Throwable $ex) {
+            return ['status' => 'error', 'message' => 'Error generando certificado: ' . $ex->getMessage()];
+        }
+
+        $abs = rtrim(SITE_URL, '/') . '/' . ltrim($url, '/');
+        if ($persistir) {
+            try {
+                $this->pdo->prepare("UPDATE accesorios_izaje SET cert_url = ? WHERE id = ?")
+                          ->execute([$abs, $accId]);
+            } catch (\Throwable $ex) {
+                error_log('[Accesorios] cert_url: ' . $ex->getMessage());
+            }
+        }
+        return ['status' => 'success', 'url' => $abs, 'folio' => $folio, 'id' => $accId];
+    }
+
+    /**
+     * Emite el certificado de cada accesorio apto de la sesión.
+     *
+     * Lo que falle no detiene a los demás: con veinte piezas, que una se quede
+     * sin QR no puede dejar sin certificado a las diecinueve restantes. Se
+     * devuelve qué se emitió y qué no, con su motivo.
+     */
+    public function generarCertsAccesorios(int $sesionId, string $usuario): array {
+        $det = $this->detalleSesion($sesionId);
+        if (($det['status'] ?? '') !== 'success') return $det;
+
+        $aptos = array_values(array_filter($det['data']['accesorios'] ?? [], fn($a) => self::esApto($a)));
+        if (!$aptos) {
+            return ['status' => 'error', 'message' =>
+                'Ningún accesorio de esta sesión resultó apto, así que no hay nada que certificar.'];
+        }
+
+        $emitidos = [];
+        $fallos   = [];
+        foreach ($aptos as $a) {
+            $r = $this->generarCertAccesorio((int)$a['id'], $usuario);
+            if (($r['status'] ?? '') === 'success') {
+                $emitidos[] = ['id' => (int)$a['id'], 'id_accesorio' => $a['id_accesorio'] ?? '',
+                               'folio' => $r['folio'], 'url' => $r['url']];
+            } else {
+                $fallos[] = ['id' => (int)$a['id'],
+                             'id_accesorio' => ($a['id_accesorio'] ?? '') ?: ('#' . $a['id']),
+                             'message' => $r['message'] ?? 'No se pudo emitir.'];
+            }
+        }
+
+        $msg = count($emitidos) . ' certificado(s) emitido(s)';
+        if ($fallos) {
+            $msg .= '. Sin emitir: ' . implode('; ', array_map(
+                fn($f) => $f['id_accesorio'] . ' — ' . $f['message'], $fallos));
+        } else {
+            $msg .= '.';
+        }
+
+        return [
+            'status'   => $emitidos ? 'success' : 'error',
+            'emitidos' => $emitidos,
+            'fallos'   => $fallos,
+            'message'  => $msg,
+        ];
     }
 
     /**

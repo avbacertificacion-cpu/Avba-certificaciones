@@ -2669,6 +2669,9 @@ async function abrirAccCert(sesionId) {
         </div>
 
         <div style="margin-top:10px;display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+          <button style="${btnBase}background:#fff;border-color:var(--verde);color:var(--verde);padding:7px 16px;font-size:12px"
+                  title="Un certificado por cada accesorio apto, con su propio folio y su propio QR"
+                  onclick="accCertsIndividuales(${sesionId},this)">🏷 Certificado por accesorio</button>
           <button style="${btnBase}background:#fff;border-color:#1a3a6b;color:#1a3a6b;padding:7px 16px;font-size:12px"
                   title="Deja los tres documentos disponibles en el portal del cliente, sin enviar correo"
                   onclick="accPublicarPortal('todo',${sesionId},this)">🌐 Publicar los 3 en el portal</button>
@@ -2696,6 +2699,7 @@ async function abrirAccCert(sesionId) {
             <div class="field"><label>Serie</label><input disabled value="${a.serie||'—'}"></div>
             <div class="field"><label>Capacidad</label><input disabled value="${a.capacidad||'—'}"></div>
           </div>
+          ${accCertFila(a)}
         </div>`;
       });
     }
@@ -2833,6 +2837,84 @@ async function accVisibilidadDoc(tipo, sesionId, visible, btn) {
     }
   } catch(e) {
     mostrarToast('Error de conexión', 'err');
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CERTIFICADO POR ACCESORIO
+   El de lote ampara la inspección completa en una hoja. Hay clientes que
+   entregan cada eslinga a un frente distinto y necesitan que el certificado
+   viaje con la pieza: ése lleva su propio folio y su propio QR.
+   Sólo se emite a los accesorios aptos, y sólo si tienen placa asignada: sin
+   QR el certificado no se puede verificar contra la pieza que ampara.
+   ═══════════════════════════════════════════════════════════ */
+function accCertFila(a) {
+  const apto = String(a.estado || '').trim().toUpperCase() === 'CUMPLE';
+  if (!apto) {
+    return `<div style="margin-top:8px;font-size:11.5px;color:var(--texto-sub);background:var(--gris-bg);border-radius:7px;padding:6px 10px">
+      Sin certificado: el accesorio no resultó apto.</div>`;
+  }
+  if (!a.qr_codigo) {
+    return `<div style="margin-top:8px;font-size:11.5px;background:#fff8e1;color:#92400e;border-radius:7px;padding:6px 10px">
+      ⚠ Sin código QR asignado. Asígnalo en Calidad para poder certificarlo por separado.</div>`;
+  }
+  const b = 'padding:4px 10px;border-radius:6px;border:1.5px solid;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;';
+  return `<div style="margin-top:8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap">
+    <span style="font-size:11.5px;color:var(--texto-sub)">Certificado individual</span>
+    ${a.cert_url
+      ? `<a href="${escH(a.cert_url)}" target="_blank" style="${b}background:var(--verde-light);border-color:var(--verde);color:var(--verde);text-decoration:none">✔ Emitido · ver</a>`
+      : `<span style="font-size:11px;color:var(--texto-hint)">todavía no emitido</span>`}
+    <button style="${b}background:var(--blanco);border-color:var(--verde);color:var(--verde)"
+            onclick="accCertUno(${a.id},this)">${a.cert_url ? '↻ Reemitir' : '🏷 Emitir'}</button>
+  </div>`;
+}
+
+async function accCertUno(accId, btn) {
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'GENERAR_CERT_ACCESORIO', payload: { id: accId } })
+    });
+    const d = await res.json();
+    if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo emitir.', 'err'); return; }
+    mostrarToast('Certificado ' + d.folio + ' emitido.', 'ok');
+    if (d.url) _pdfAbrir(d.url, 'Certificado ' + d.folio);
+    abrirAccCert(currentAccSesionId);   // refrescar para que aparezca el enlace
+  } catch(e) {
+    mostrarToast('Error de conexión', 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+}
+
+async function accCertsIndividuales(sesionId, btn) {
+  if (!confirm('Se emitirá un certificado por CADA accesorio apto de esta sesión, cada uno con su '
+             + 'propio folio y su propio QR.\n\nEl certificado del lote no se toca.\n\n¿Continuar?')) return;
+  const orig = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Emitiendo…'; }
+  mostrarToast('Emitiendo certificados…', 'info');
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  try {
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+      body: JSON.stringify({ action: 'GENERAR_CERTS_ACCESORIOS', payload: { sesion_id: sesionId } })
+    });
+    const d = await res.json();
+    mostrarToast(d.message || 'Listo.', d.status === 'success' ? 'ok' : 'err');
+    // Lo que no se pudo emitir se dice por su nombre, no con un "hubo errores".
+    if ((d.fallos || []).length) {
+      alert('No se emitieron:\n\n' + d.fallos.map(f => '· ' + f.id_accesorio + ': ' + f.message).join('\n'));
+    }
+    abrirAccCert(sesionId);
+  } catch(e) {
+    mostrarToast('Error de conexión', 'err');
+  } finally {
     if (btn) { btn.disabled = false; btn.textContent = orig; }
   }
 }

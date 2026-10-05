@@ -144,10 +144,16 @@ class ValidarQR {
         try {
             // Para códigos de 10 dígitos: buscar primero por QR individual del accesorio
             if (!$esFolio) {
+                // El certificado propio de la pieza, si se le emitió uno. La
+                // columna puede no existir todavía: nombrarla a secas rompería
+                // la validación pública entera.
+                $colCert = (function_exists('columnaExiste')
+                    && columnaExiste($this->pdo, 'accesorios_izaje', 'cert_url'))
+                    ? 'i.cert_url' : "'' AS cert_url";
                 $stmt = $this->pdo->prepare(
                     "SELECT i.id, i.id_accesorio, COALESCE(t.nombre,'') AS tipo_nombre,
                             i.marca, i.modelo, i.serie, i.capacidad, i.medidas, i.estado,
-                            s.cliente, s.fecha, s.estatus
+                            {$colCert}, s.cliente, s.fecha, s.estatus
                      FROM accesorios_izaje i
                      JOIN accesorios_sesiones s ON s.id = i.sesion_id
                      LEFT JOIN accesorios_tipos t ON t.id = i.tipo_id
@@ -174,6 +180,11 @@ class ValidarQR {
                             'medidas'      => $acc['medidas'],
                             'estado'       => $acc['estado'],
                             'cliente'      => $acc['cliente'],
+                            // Sólo se ofrece el certificado de una pieza APTA:
+                            // el de una rechazada no existe, y enlazar a uno
+                            // viejo haría pasar por vigente lo que no lo está.
+                            'cert_url'     => (mb_strtoupper(trim((string)$acc['estado']), 'UTF-8') === 'CUMPLE')
+                                ? (string)($acc['cert_url'] ?? '') : '',
                             'fecha'        => $acc['fecha']
                                 ? (new DateTime($acc['fecha']))->format('d/m/Y') : '',
                             'vencimiento'  => $v['vencimiento'],

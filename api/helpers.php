@@ -223,17 +223,24 @@ foreach ([
  * significa una sección en blanco en lugar de los documentos que ya tenía.
  */
 function columnaExiste(PDO $pdo, string $tabla, string $columna): bool {
-    static $cache = [];
     // La conexión forma parte de la clave: dos conexiones pueden apuntar a bases
     // distintas, y recordar la respuesta de una para la otra haría nombrar una
     // columna que allí no existe, rompiendo la consulta entera.
-    $clave = spl_object_id($pdo) . "|$tabla.$columna";
+    //
+    // Se indexa con WeakMap y no con spl_object_id() porque PHP REUTILIZA ese
+    // id en cuanto el objeto anterior se libera: una conexión nueva heredaba
+    // las respuestas de una ya cerrada, y con un "sí" prestado la migración se
+    // saltaba la columna que todavía no existía. El WeakMap suelta la entrada
+    // cuando se muere la conexión, así que no hay id que colisione.
+    static $cache = null;
+    if ($cache === null) $cache = new WeakMap();
+    $vistas = $cache[$pdo] ?? [];
     // Sólo se recuerda el "sí". Un "no" no se guarda porque es inestable: en la
     // misma petición, una migración puede crear la columna un instante después,
     // y recordar el "no" haría que el guardado posterior se saltara ese campo
     // sin avisar a nadie. Un "sí", en cambio, no se vuelve falso: las columnas
     // no desaparecen solas.
-    if (!empty($cache[$clave])) return true;
+    if (!empty($vistas["$tabla.$columna"])) return true;
     try {
         $st = $pdo->prepare(
             "SELECT COUNT(*) FROM information_schema.COLUMNS
@@ -244,7 +251,10 @@ function columnaExiste(PDO $pdo, string $tabla, string $columna): bool {
     } catch (\Throwable $e) {
         return false;
     }
-    if ($hay) $cache[$clave] = true;
+    if ($hay) {
+        $vistas["$tabla.$columna"] = true;
+        $cache[$pdo] = $vistas;
+    }
     return $hay;
 }
 

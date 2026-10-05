@@ -1026,6 +1026,12 @@ function mostrarResultado(data) {
         d.total     ? filaHTML("Total accesorios", d.total) : "",
         filaHTML("Inspeccionado el", d.fecha||"—"),
         d.vencimiento ? filaHTML("Válido hasta", d.vencimiento) : "",
+        // Certificado propio de la pieza, cuando se emitió uno por accesorio.
+        d.cert_url
+          ? `<div style="margin-top:10px"><a href="${esc(d.cert_url)}" target="_blank" rel="noopener"
+               style="display:inline-block;padding:9px 16px;border-radius:8px;background:#0B2545;color:#fff;
+                      text-decoration:none;font-size:14px;font-weight:600">📄 Ver certificado de este accesorio</a></div>`
+          : "",
       ].join('');
     }
     // equipo (default)
@@ -1084,6 +1090,14 @@ function mostrarResultado(data) {
       </div>`;
     setTimeout(resetBg, 30000);
   }
+}
+
+/* Escapa lo que va dentro de un atributo HTML. La página interpola valores que
+   vienen del servidor; en el texto una comilla sólo se ve mal, pero dentro de un
+   href permitiría salirse del atributo. */
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g,
+    c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function filaHTML(key, val) {

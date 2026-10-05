@@ -1927,9 +1927,13 @@ function renderBuscarAccCliente(data) {
       : a.estado === 'NO CUMPLE'
         ? `<span class="badge b-nocumple">✖ NO CUMPLE</span>`
         : `<span class="badge">${escQ(a.estado||'—')}</span>`;
-    const certBtn   = a.cert_url           ? `<a class="btn-doc btn-cert" href="${a.cert_url}"           target="_blank">📄 Certificado</a>`  : '';
-    const repBtn    = a.informe_url        ? `<a class="btn-doc btn-rep"  href="${a.informe_url}"        target="_blank">📊 Reporte</a>`       : '';
-    const cumpleBtn = a.informe_cumple_url ? `<a class="btn-doc btn-rep"  href="${a.informe_cumple_url}" target="_blank">✔ CUMPLE</a>`         : '';
+    // El de la pieza y el del lote son dos documentos distintos: cuando existen
+    // los dos se nombran para que el cliente sepa cuál está descargando.
+    const hayPieza  = !!a.cert_pieza_url;
+    const piezaBtn  = hayPieza            ? `<a class="btn-doc btn-cert" href="${escH(a.cert_pieza_url)}"     target="_blank">🏷 Cert. de esta pieza</a>` : '';
+    const certBtn   = a.cert_url           ? `<a class="btn-doc btn-cert" href="${escH(a.cert_url)}"           target="_blank">📄 ${hayPieza ? 'Cert. del lote' : 'Certificado'}</a>` : '';
+    const repBtn    = a.informe_url        ? `<a class="btn-doc btn-rep"  href="${escH(a.informe_url)}"        target="_blank">📊 Reporte</a>`       : '';
+    const cumpleBtn = a.informe_cumple_url ? `<a class="btn-doc btn-rep"  href="${escH(a.informe_cumple_url)}" target="_blank">✔ CUMPLE</a>`         : '';
     const qrBtn     = a.sesion_qr          ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(a.sesion_qr)}')">🔗 QR</button>` : '';
     const detalles  = [a.tipo_nombre, a.marca, a.modelo].filter(Boolean).join(' · ');
     html += `<div class="acc-card">
@@ -1940,7 +1944,7 @@ function renderBuscarAccCliente(data) {
       ${a.capacidad? `<div style="font-size:11px;color:var(--texto-hint)">Cap: ${escH(a.capacidad)}</div>` : ''}
       <div class="acc-badges" style="margin:8px 0">${estadoBadge}</div>
       <div class="acc-fecha">${escH(a.fecha||'—')}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${certBtn}${repBtn}${cumpleBtn}${qrBtn}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px">${piezaBtn}${certBtn}${repBtn}${cumpleBtn}${qrBtn}</div>
     </div>`;
   });
   html += '</div>';

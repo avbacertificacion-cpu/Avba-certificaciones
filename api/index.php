@@ -1973,6 +1973,19 @@ if ($method === 'POST') {
                 $usr['usuario']
             ));
 
+        // Certificado de UNA pieza: el cliente que entrega cada eslinga a un
+        // frente distinto necesita que el certificado viaje con la pieza.
+        case 'GENERAR_CERT_ACCESORIO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->generarCertAccesorio((int)($payload['id'] ?? 0), $usr['usuario']));
+
+        // Uno por cada accesorio apto de la sesión, de una sola pasada.
+        case 'GENERAR_CERTS_ACCESORIOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->generarCertsAccesorios((int)($payload['sesion_id'] ?? 0), $usr['usuario']));
+
         case 'ENVIAR_CERT_ACC':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

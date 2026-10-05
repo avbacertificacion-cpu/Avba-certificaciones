@@ -168,8 +168,7 @@
     <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
       <td colspan="2" style="vertical-align:top;padding-bottom:6mm;">
-        <div class="flabel">RESUMEN DE ÍTEMS INSPECCIONADOS - Summary of inspected items</div>
-        <div class="fval">{resumen_items}</div>
+        {bloque_items}
       </td>
     </tr>
     <tr>
@@ -193,7 +192,7 @@
     <table width="100%" cellpadding="0" cellspacing="0">
     <tr>
       <td style="padding-bottom:5mm;">
-        <div class="ctext"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong>, en su carácter de Unidad de Inspección Tipo A, acreditada por la Entidad Mexicana de Acreditación (EMA) bajo el número <strong>{no_acreditacion}</strong>, certifica que los accesorios descritos en el presente documento fueron inspeccionados conforme a los procedimientos técnicos internos y las normas aplicables vigentes.</div>
+        <div class="ctext"><strong>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</strong>, en su carácter de Unidad de Inspección Tipo A, acreditada por la Entidad Mexicana de Acreditación (EMA) bajo el número <strong>{no_acreditacion}</strong>, certifica que {sujeto_descrito} conforme a los procedimientos técnicos internos y las normas aplicables vigentes.</div>
       </td>
     </tr>
     <tr>
@@ -208,12 +207,12 @@
     </tr>
     <tr>
       <td style="padding-bottom:5mm;">
-        <div class="ctext seguras-block">Los accesorios de izaje inspeccionados se encuentran en condiciones <strong>APTAS para su operación</strong>, de conformidad con los criterios técnicos evaluados. La vigencia del presente certificado es hasta el <strong>{vigencia}</strong>.</div>
+        <div class="ctext seguras-block">{sujeto_apto} en condiciones <strong>APTAS para su operación</strong>, de conformidad con los criterios técnicos evaluados. La vigencia del presente certificado es hasta el <strong>{vigencia}</strong>.</div>
       </td>
     </tr>
     <tr>
       <td>
-        <div class="ctext italic-note"><em>Este certificado es válido únicamente para la configuración, estado y condiciones observadas durante la inspección. Cualquier modificación o daño posterior a los accesorios invalida el presente documento.</em></div>
+        <div class="ctext italic-note"><em>Este certificado es válido únicamente para la configuración, estado y condiciones observadas durante la inspección. Cualquier modificación o daño posterior {sujeto_danio} invalida el presente documento.</em></div>
       </td>
     </tr>
     </table>
