@@ -1958,7 +1958,12 @@ if ($method === 'POST') {
             respuesta($accesorios->publicarPortalAcc(
                 (int)   ($payload['sesion_id'] ?? $payload['id'] ?? 0),
                 (string)($payload['tipo']      ?? 'todo'),
-                $usr['usuario']
+                $usr['usuario'],
+                // Los certificados por accesorio se emiten por tandas: el
+                // navegador vuelve a llamar hasta terminar, diciendo cuáles ya
+                // fallaron para no reintentarlas en bucle.
+                ['reemitir' => !empty($payload['reemitir']),
+                 'omitir'   => (array)($payload['omitir'] ?? [])]
             ));
 
         // Muestra o retira del portal un documento ya generado, sin tocar los
@@ -1980,11 +1985,19 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->generarCertAccesorio((int)($payload['id'] ?? 0), $usr['usuario']));
 
-        // Uno por cada accesorio apto de la sesión, de una sola pasada.
+        // Uno por cada accesorio apto de la sesión, SIN publicarlos. Emite por
+        // tandas igual que PUBLICAR_PORTAL_ACC: la respuesta dice si quedó
+        // 'completado' y cuántas 'pendientes', y hay que volver a llamar
+        // pasando en 'omitir' las que ya fallaron, o no terminaría nunca.
         case 'GENERAR_CERTS_ACCESORIOS':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($accesorios->generarCertsAccesorios((int)($payload['sesion_id'] ?? 0), $usr['usuario']));
+            respuesta($accesorios->generarCertsAccesorios(
+                (int)($payload['sesion_id'] ?? 0),
+                $usr['usuario'],
+                !empty($payload['reemitir']),
+                (array)($payload['omitir'] ?? [])
+            ));
 
         case 'ENVIAR_CERT_ACC':
             $usr = validarToken($pdo, $token);

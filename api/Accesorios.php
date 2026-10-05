@@ -2148,14 +2148,31 @@ class Accesorios {
                         : 'Todavía no se ve en el portal: usa "Emitir y publicar" para dejarlo disponible.')];
     }
 
+    /** Segundos que se permite trabajar a una sola petición de emisión en lote. */
+    private const LOTE_SEGUNDOS = 20.0;
+
     /**
-     * Emite el certificado de cada accesorio apto de la sesión.
+     * Emite el certificado de cada accesorio apto de la sesión, por tandas.
+     *
+     * Veinte piezas son veinte PDF, y cada uno tarda sus segundos. Hacerlos
+     * todos en una sola petición se pasaba del tiempo máximo del servidor y la
+     * emisión se cortaba a la mitad, sin decir por dónde se había quedado.
+     *
+     * Así que cada petición trabaja un rato acotado y devuelve cuántas piezas
+     * faltan; quien llama vuelve a pedir hasta que no falte ninguna. Como lo ya
+     * emitido se salta, cada tanda avanza sobre lo anterior y se puede retomar
+     * aunque se caiga la conexión a media emisión.
      *
      * Lo que falle no detiene a los demás: con veinte piezas, que una se quede
-     * sin QR no puede dejar sin certificado a las diecinueve restantes. Se
-     * devuelve qué se emitió y qué no, con su motivo.
+     * sin QR no puede dejar sin certificado a las diecinueve restantes.
+     *
+     * @param bool  $reemitir Rehace también las que ya tienen certificado.
+     * @param array $omitir   Ids que ya fallaron antes. Sin esto, una pieza sin
+     *                        QR no se emite nunca, sigue contando como
+     *                        pendiente y las tandas no terminarían jamás.
      */
-    public function generarCertsAccesorios(int $sesionId, string $usuario): array {
+    public function generarCertsAccesorios(int $sesionId, string $usuario,
+                                           bool $reemitir = false, array $omitir = []): array {
         $det = $this->detalleSesion($sesionId);
         if (($det['status'] ?? '') !== 'success') return $det;
 
@@ -2165,9 +2182,27 @@ class Accesorios {
                 'Ningún accesorio de esta sesión resultó apto, así que no hay nada que certificar.'];
         }
 
+        $omitir = array_map('intval', $omitir);
+        $cola   = array_values(array_filter($aptos, fn($a) =>
+            !in_array((int)$a['id'], $omitir, true)
+            && ($reemitir || trim((string)($a['cert_url'] ?? '')) === '')
+        ));
+        $yaEmitidos = count($aptos) - count($cola) - count(array_intersect(
+            array_map(fn($a) => (int)$a['id'], $aptos), $omitir));
+
         $emitidos = [];
         $fallos   = [];
-        foreach ($aptos as $a) {
+        $inicio   = microtime(true);
+        foreach ($cola as $i => $a) {
+            // Se corta por tiempo, pero nunca antes de haber hecho una: si una
+            // sola pieza tarda más que la tanda entera, cortar antes de la
+            // primera dejaría al cliente pidiendo tandas que no avanzan nada.
+            if ($i > 0 && (microtime(true) - $inicio) >= self::LOTE_SEGUNDOS) break;
+
+            // Donde el servidor lo permita, cada pieza arranca con el reloj a
+            // cero; donde no, la tanda acotada es la que protege.
+            @set_time_limit(60);
+
             $r = $this->generarCertAccesorio((int)$a['id'], $usuario);
             if (($r['status'] ?? '') === 'success') {
                 $emitidos[] = ['id' => (int)$a['id'], 'id_accesorio' => $a['id_accesorio'] ?? '',
@@ -2179,19 +2214,34 @@ class Accesorios {
             }
         }
 
-        $msg = count($emitidos) . ' certificado(s) emitido(s)';
-        if ($fallos) {
-            $msg .= '. Sin emitir: ' . implode('; ', array_map(
-                fn($f) => $f['id_accesorio'] . ' — ' . $f['message'], $fallos));
+        $pendientes = count($cola) - count($emitidos) - count($fallos);
+        $completado = $pendientes <= 0;
+
+        if ($completado && !$emitidos && !$fallos) {
+            $msg = $yaEmitidos
+                ? 'Los ' . $yaEmitidos . ' certificados por accesorio ya estaban emitidos.'
+                : 'No había nada que emitir.';
         } else {
-            $msg .= '.';
+            $msg = count($emitidos) . ' certificado(s) emitido(s)';
+            if (!$completado) $msg .= ', faltan ' . $pendientes;
+            if ($fallos) {
+                $msg .= '. Sin emitir: ' . implode('; ', array_map(
+                    fn($f) => $f['id_accesorio'] . ' — ' . $f['message'], $fallos));
+            } else {
+                $msg .= '.';
+            }
         }
 
         return [
-            'status'   => $emitidos ? 'success' : 'error',
-            'emitidos' => $emitidos,
-            'fallos'   => $fallos,
-            'message'  => $msg,
+            // Una tanda que no emitió nada pero dejó todo hecho no es un error.
+            'status'      => ($emitidos || $completado) ? 'success' : 'error',
+            'emitidos'    => $emitidos,
+            'fallos'      => $fallos,
+            'pendientes'  => max(0, $pendientes),
+            'completado'  => $completado,
+            'total'       => count($aptos),
+            'ya_emitidos' => $yaEmitidos,
+            'message'     => $msg,
         ];
     }
 
@@ -2384,7 +2434,11 @@ class Accesorios {
      * Genera el documento y lo deja disponible en el portal del cliente, sin
      * enviar correo. $tipo: 'cert' | 'informe' | 'cumple' | 'todo'.
      */
-    public function publicarPortalAcc(int $sesionId, string $tipo, string $usuario): array {
+    /**
+     * @param array $opts Para 'piezas': 'reemitir' y 'omitir', que se pasan tal
+     *                    cual a la emisión por tandas.
+     */
+    public function publicarPortalAcc(int $sesionId, string $tipo, string $usuario, array $opts = []): array {
         if (!$sesionId) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
         $this->ensureAccSesionesColumns();
         ensurePublicado($this->pdo);
@@ -2407,7 +2461,11 @@ class Accesorios {
             // Los certificados por accesorio no son un documento de la sesión:
             // se emite uno por pieza apta y se guardan en la pieza.
             if ($doc === 'piezas') {
-                $res = $this->generarCertsAccesorios($sesionId, $usuario);
+                $res = $this->generarCertsAccesorios(
+                    $sesionId, $usuario,
+                    (bool)($opts['reemitir'] ?? false),
+                    (array)($opts['omitir'] ?? [])
+                );
                 if (($res['status'] ?? '') !== 'success') {
                     if (count($pedidos) === 1) return $res;
                     $fallos[] = self::DOC_NOMBRE['piezas'];
@@ -2455,6 +2513,11 @@ class Accesorios {
             $hechos
         );
         $msg = 'Ya está en el portal del cliente: ' . implode(' + ', $nombres) . '. No se envió correo.';
+        // Si la tanda se quedó a medias, se dice: lo emitido ya está visible y
+        // lo que falta sale en cuanto termine, no hay que volver a empezar.
+        if (isset($detallePiezas) && !$detallePiezas['completado']) {
+            $msg .= ' Faltan ' . $detallePiezas['pendientes'] . ' por emitir.';
+        }
         if ($fallos) $msg .= ' Quedó sin generar: ' . implode(', ', $fallos) . '.';
         // Las piezas que se quedaron sin certificado se dicen por su nombre.
         if (isset($detallePiezas) && $detallePiezas['fallos']) {
@@ -2463,7 +2526,9 @@ class Accesorios {
         }
 
         return ['status' => 'success', 'publicados' => $hechos,
-                'piezas' => $detallePiezas ?? null,
+                'piezas'     => $detallePiezas ?? null,
+                'completado' => $detallePiezas['completado'] ?? true,
+                'pendientes' => $detallePiezas['pendientes'] ?? 0,
                 'portal' => $this->estadoPortalAcc($sesionId), 'message' => $msg];
     }
 

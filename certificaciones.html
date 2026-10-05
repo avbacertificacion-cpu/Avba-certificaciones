@@ -2909,26 +2909,64 @@ async function accCertsIndividuales(sesionId, btn) {
   if (!confirm('Se emitirá un certificado por CADA accesorio apto de esta sesión, cada uno con su '
              + 'propio folio y su propio QR, y quedarán disponibles en el portal del cliente.\n\n'
              + 'No se envía correo. El certificado del lote no se toca.\n\n¿Continuar?')) return;
+
   const orig = btn ? btn.textContent : '';
-  if (btn) { btn.disabled = true; btn.textContent = 'Emitiendo…'; }
-  mostrarToast('Emitiendo certificados…', 'info');
+  if (btn) { btn.disabled = true; }
   const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+
+  // Cada PDF tarda sus segundos y veinte no caben en una sola petición: el
+  // servidor trabaja una tanda acotada y aquí se vuelve a pedir hasta acabar.
+  // Las que fallan se van acumulando en 'omitir' porque si no volverían a
+  // intentarse en cada tanda y esto no terminaría nunca.
+  const omitir = [];
+  let emitidos = 0, fallos = [], ultimo = null, vueltas = 0;
+
   try {
-    const res = await fetch(API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Token': tok },
-      body: JSON.stringify({ action: 'PUBLICAR_PORTAL_ACC', payload: { sesion_id: sesionId, tipo: 'piezas' } })
-    });
-    const d = await res.json();
-    mostrarToast(d.message || 'Listo.', d.status === 'success' ? 'ok' : 'err');
+    while (true) {
+      if (btn) btn.textContent = emitidos ? ('Emitiendo… ' + emitidos) : 'Emitiendo…';
+
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Token': tok },
+        body: JSON.stringify({ action: 'PUBLICAR_PORTAL_ACC',
+                               payload: { sesion_id: sesionId, tipo: 'piezas', omitir } })
+      });
+      const d = await res.json();
+      ultimo = d;
+
+      if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo emitir.', 'err'); break; }
+
+      const tanda = d.piezas || {};
+      emitidos += (tanda.emitidos || []).length;
+      (tanda.fallos || []).forEach(f => { fallos.push(f); omitir.push(f.id); });
+
+      if (d.completado !== false) break;
+
+      // Si una tanda no avanzó nada, seguir pidiendo sólo daría vueltas.
+      if (!(tanda.emitidos || []).length && !(tanda.fallos || []).length) {
+        mostrarToast('La emisión se detuvo sin avanzar. Vuelve a intentarlo.', 'err');
+        break;
+      }
+      if (++vueltas > 60) {          // tope de seguridad
+        mostrarToast('Se emitieron ' + emitidos + '. Vuelve a pulsar para continuar.', 'info');
+        break;
+      }
+      if (btn) btn.textContent = 'Emitiendo… ' + emitidos + ' de ' + (tanda.total || '?');
+    }
+
+    if (ultimo && ultimo.status === 'success') {
+      mostrarToast(emitidos
+        ? emitidos + ' certificado(s) emitido(s) y publicado(s) en el portal.'
+        : (ultimo.message || 'Listo.'), 'ok');
+    }
     // Lo que no se pudo emitir se dice por su nombre, no con un "hubo errores".
-    const fallos = (d.piezas || {}).fallos || d.fallos || [];
     if (fallos.length) {
       alert('No se emitieron:\n\n' + fallos.map(f => '· ' + f.id_accesorio + ': ' + f.message).join('\n'));
     }
     abrirAccCert(sesionId);
   } catch(e) {
-    mostrarToast('Error de conexión', 'err');
+    // Lo ya emitido quedó guardado: al volver a pulsar se retoma donde iba.
+    mostrarToast('Se interrumpió la conexión. Lo emitido se conservó; vuelve a pulsar para continuar.', 'err');
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = orig; }
   }
