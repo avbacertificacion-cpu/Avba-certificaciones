@@ -223,6 +223,16 @@ class ValidarQR {
                 'estado'       => $r['estado']       ?? '',
             ], $rows);
 
+            // Lo que se valida es el CERTIFICADO, y el certificado ampara sólo
+            // lo que pasó la inspección. Devolver las diez piezas de una sesión
+            // con ocho rechazadas hacía que la página pública dijera "Total
+            // accesorios: 10" bajo el título "Certificado", contradiciendo al
+            // propio informe. Las no aptas se cuentan aparte: callarlas sería
+            // hacer creer que esas piezas nunca se inspeccionaron.
+            $esApto  = fn($i) => mb_strtoupper(trim((string)($i['estado'] ?? '')), 'UTF-8') === 'CUMPLE';
+            $noAptos = count($items) - count(array_filter($items, $esApto));
+            $items   = array_values(array_filter($items, $esApto));
+
             $total   = count($items);
             $primero = $items[0] ?? [];
 
@@ -242,6 +252,7 @@ class ValidarQR {
                     'capacidad'   => $primero['capacidad'] ?? '',
                     'cliente'     => $sesion['cliente']    ?? '',
                     'total'       => $total,
+                    'no_aptos'    => $noAptos,
                     'items'       => $items,
                     'fecha'       => $sesion['fecha']
                         ? (new DateTime($sesion['fecha']))->format('d/m/Y') : '',

@@ -989,7 +989,14 @@ function mostrarResultado(data) {
       if (items.length) {
         const comun = [
           d.cliente ? filaHTML("Cliente", d.cliente) : "",
-          filaHTML("Total accesorios", d.total || items.length),
+          filaHTML("Accesorios amparados", d.total || items.length),
+          // Las que no pasaron se dicen, no se callan: omitirlas haría creer
+          // que esas piezas nunca se inspeccionaron.
+          (d.no_aptos > 0)
+            ? `<div style="margin:8px 0;padding:9px 11px;border-radius:8px;background:#fff8e1;color:#92400e;font-size:13px">
+                 En esta inspección ${d.no_aptos} accesorio${d.no_aptos===1?'':'s'} no resultó apto y
+                 ${d.no_aptos===1?'no está amparado':'no están amparados'} por este certificado.</div>`
+            : "",
           filaHTML("Inspeccionado el", d.fecha||"—"),
           d.vencimiento ? filaHTML("Válido hasta", d.vencimiento) : "",
         ].join('');

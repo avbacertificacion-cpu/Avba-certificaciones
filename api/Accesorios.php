@@ -1880,6 +1880,17 @@ class Accesorios {
         if (!$accs)
             return ['status' => 'error', 'message' => 'Esta sesión no tiene accesorios registrados.'];
 
+        // El certificado ampara lo que PASÓ la inspección. Contaba todos los
+        // accesorios de la sesión, así que una sesión de diez eslingas con ocho
+        // rechazadas salía certificando diez: el documento decía que estaban
+        // aptas piezas que el propio informe declaraba no aptas.
+        $aptos = array_values(array_filter($accs, fn($a) => self::esApto($a)));
+        if (!$aptos) {
+            return ['status' => 'error', 'message' =>
+                'Ningún accesorio de esta sesión resultó apto, así que no hay nada que certificar. '
+              . 'El informe de la inspección sí se puede emitir.'];
+        }
+
         $qrCodigo = $sesion['qr_codigo'] ?? '';
         if (!$qrCodigo)
             return ['status' => 'error', 'message' => 'La sesión no tiene código QR. Apruébala en Calidad primero.'];
@@ -1889,7 +1900,7 @@ class Accesorios {
 
         // Agrupar accesorios por tipo y contar → "03 Grilletes, 02 Eslingas, 01 Cancamos"
         $countsByType = [];
-        foreach ($accs as $a) {
+        foreach ($aptos as $a) {
             $tipo = mb_convert_case(trim($a['tipo_nombre'] ?? ''), MB_CASE_TITLE, 'UTF-8') ?: 'Accesorio';
             $countsByType[$tipo] = ($countsByType[$tipo] ?? 0) + 1;
         }
@@ -2005,6 +2016,17 @@ class Accesorios {
 
     /** Los documentos de la sesión que el portal del cliente puede mostrar. */
     public const DOCS_PORTAL = ['cert', 'informe', 'cumple'];
+
+    /**
+     * ¿Este accesorio pasó la inspección?
+     *
+     * La regla vive aquí y no repartida por el archivo: de ella depende qué se
+     * certifica, y basta que una copia se desvíe para que un documento ampare
+     * una pieza que otro declara no apta.
+     */
+    public static function esApto(array $a): bool {
+        return mb_strtoupper(trim((string)($a['estado'] ?? '')), 'UTF-8') === 'CUMPLE';
+    }
 
     private const DOC_COLUMNA = [
         'cert'    => 'cert_url',
@@ -2261,7 +2283,7 @@ class Accesorios {
 
         $sesion['accesorios'] = array_values(array_filter(
             $sesion['accesorios'] ?? [],
-            fn($a) => strtoupper($a['estado'] ?? '') === 'CUMPLE'
+            fn($a) => self::esApto($a)
         ));
 
         if (!$sesion['accesorios'])
@@ -2507,7 +2529,7 @@ class Accesorios {
 
         $accs     = $s['accesorios'] ?? [];
         $total    = count($accs);
-        $cumple   = count(array_filter($accs, fn($a) => strtoupper($a['estado'] ?? '') === 'CUMPLE'));
+        $cumple   = count(array_filter($accs, fn($a) => self::esApto($a)));
         $noCumple = $total - $cumple;
 
         // Filas de accesorios
