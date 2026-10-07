@@ -57,6 +57,7 @@ class Recomendaciones {
                foto_url       VARCHAR(500) NULL,
                estado         VARCHAR(20)  NOT NULL DEFAULT 'BORRADOR',
                creada_por     VARCHAR(120) NOT NULL,
+               capturada_por  VARCHAR(40)  NULL,
                aprobada_por   VARCHAR(120) NULL,
                aprobada_at    DATETIME     NULL,
                cerrada_por    VARCHAR(120) NULL,
@@ -110,6 +111,14 @@ class Recomendaciones {
             try { $this->pdo->exec($sql); }
             catch (\Throwable $e) { error_log('[Recomendaciones] migrate: ' . $e->getMessage()); }
         }
+        // Llegó después: las tablas pueden existir ya sin ella.
+        try {
+            if (!columnaExiste($this->pdo, 'recomendaciones', 'capturada_por')) {
+                $this->pdo->exec("ALTER TABLE recomendaciones ADD COLUMN capturada_por VARCHAR(40) NULL");
+            }
+        } catch (\Throwable $e) {
+            error_log('[Recomendaciones] columna capturada_por: ' . $e->getMessage());
+        }
     }
 
     private function anotar(int $recId, string $usuario, string $campo, ?string $antes, ?string $despues): void {
@@ -155,20 +164,30 @@ class Recomendaciones {
         return $n;
     }
 
+    /**
+     * @param string $capturadaPor Rol de quien la teclea, cuando no es el
+     *        inspector. Una inspección vieja —o una que se hizo antes de que
+     *        existiera este apartado— no tiene forma de recibir la
+     *        recomendación por el camino normal, así que Calidad puede
+     *        capturarla; pero el documento tiene que decir quién la escribió,
+     *        porque no es lo mismo que la dicte quien estuvo en el equipo.
+     */
     public function crear(string $origen, int $origenId, string $texto, string $prioridad,
-                          string $usuario, int $orden = 0): array {
+                          string $usuario, int $orden = 0, string $capturadaPor = ''): array {
         $texto = trim($texto);
         if ($texto === '')  return ['status' => 'error', 'message' => 'Escribe la recomendación.'];
         if (!$origenId)     return ['status' => 'error', 'message' => 'Falta el equipo.'];
 
         $this->pdo->prepare(
             "INSERT INTO recomendaciones
-               (origen, origen_id, texto, texto_original, prioridad, creada_por, orden)
-             VALUES (?,?,?,?,?,?,?)"
-        )->execute([$origen, $origenId, $texto, $texto, self::limpiarPrioridad($prioridad), $usuario, $orden]);
+               (origen, origen_id, texto, texto_original, prioridad, creada_por, capturada_por, orden)
+             VALUES (?,?,?,?,?,?,?,?)"
+        )->execute([$origen, $origenId, $texto, $texto, self::limpiarPrioridad($prioridad),
+                    $usuario, $capturadaPor ?: null, $orden]);
 
         $id = (int)$this->pdo->lastInsertId();
-        $this->anotar($id, $usuario, 'alta', null, $texto);
+        $this->anotar($id, $usuario, 'alta', null,
+                      $texto . ($capturadaPor ? "\n[capturada desde $capturadaPor]" : ''));
         return ['status' => 'success', 'id' => $id];
     }
 

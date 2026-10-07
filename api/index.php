@@ -2000,18 +2000,26 @@ if ($method === 'POST') {
                 (int)($payload['origen_id'] ?? $payload['equipo_id'] ?? 0)
             )]);
 
-        // Alta suelta. Las de una inspección entran con la inspección misma;
-        // ésta es para agregar una después, y la escribe el inspector.
+        /* Alta suelta. Las de una inspección entran con la inspección misma;
+           ésta es para agregar una después.
+           La escribe el inspector, pero Calidad y Certificaciones también
+           pueden capturarla: una inspección anterior a este apartado no tiene
+           ningún otro camino para recibirla, y el inspector ya no vuelve a
+           abrir ese registro. Cuando no la teclea el inspector queda anotado
+           quién lo hizo, en el registro y a la vista: no es lo mismo que la
+           dicte quien estuvo frente al equipo. */
         case 'CREAR_RECOMENDACION':
             $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','INSPECTOR']))
-                respuesta(['status' => 'error', 'message' => 'Sólo el inspector agrega recomendaciones.'], 401);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','INSPECTOR','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($recom->crear(
                 (string)($payload['origen'] ?? 'equipo'),
                 (int)($payload['origen_id'] ?? $payload['equipo_id'] ?? 0),
                 (string)($payload['texto'] ?? ''),
                 (string)($payload['prioridad'] ?? 'media'),
-                $usr['usuario']
+                $usr['usuario'],
+                0,
+                in_array($usr['rol'], ['CALIDAD','CERTIFICACIONES','ADMIN'], true) ? $usr['rol'] : ''
             ));
 
         // Ajuste de redacción. El texto original del inspector no se toca:

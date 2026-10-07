@@ -2848,7 +2848,7 @@ function ver(fila) {
 
   document.getElementById("overlay-det").classList.add("open");
   poblarInspectorSelect(d.inspector);
-  recomCalCargar(d.fila, editable);
+  recomCalCargar(d.fila, editable, d.estado === 'ENVIADO');
   // Sugerir empresas ya registradas al corregir el cliente
   try {
     const inp = document.getElementById('e-cliente');
@@ -2995,6 +2995,7 @@ async function eliminarPndCal(id, desc) {
    ═══════════════════════════════════════════════════════════════════════ */
 let _recomCalEquipo = 0;
 let _recomCalEditable = true;
+let _recomCalPublicado = false;
 
 const RECOM_COLOR = { alta: 'var(--rojo)', media: '#854F0B', sugerencia: 'var(--azul)' };
 const RECOM_ROTULO = { alta: 'PRIORIDAD ALTA', media: 'PRIORIDAD MEDIA', sugerencia: 'SUGERENCIA' };
@@ -3007,9 +3008,10 @@ const RECOM_ESTADO = {
   DESCARTADA: ['Descartada',             'var(--rojo)'],
 };
 
-async function recomCalCargar(equipoId, editable) {
-  _recomCalEquipo   = equipoId;
-  _recomCalEditable = editable !== false;
+async function recomCalCargar(equipoId, editable, publicado) {
+  _recomCalEquipo    = equipoId;
+  _recomCalEditable  = editable !== false;
+  _recomCalPublicado = !!publicado;
   const box = document.getElementById('recom-cal-box');
   if (!box) return;
   try {
@@ -3031,7 +3033,8 @@ function recomCalPintar(lista) {
   const vivas = lista.filter(r => r.estado !== 'DESCARTADA');
   if (!lista.length) {
     box.innerHTML = `<div style="font-size:12px;color:var(--texto-hint);padding:10px;
-      background:var(--gris-bg);border-radius:8px">El inspector no dejó recomendaciones.</div>`;
+      background:var(--gris-bg);border-radius:8px;margin-bottom:8px">
+      El inspector no dejó recomendaciones.</div>` + recomCalAlta();
     return;
   }
   const dis = _recomCalEditable ? '' : 'disabled';
@@ -3052,7 +3055,9 @@ function recomCalPintar(lista) {
         style="width:100%;padding:8px 9px;border:1.5px solid var(--borde);border-radius:7px;
                font-size:12.5px;font-family:inherit;resize:vertical">${esc(r.texto)}</textarea>
       <div style="font-size:10.5px;color:var(--texto-hint);margin-top:5px">
-        Escrita por ${esc(r.creada_por)}${r.editada
+        ${r.capturada_por
+          ? `<span style="color:#854F0B;font-weight:700">Capturada desde ${esc(r.capturada_por)}</span> por ${esc(r.creada_por)}`
+          : `Escrita por ${esc(r.creada_por)}`}${r.editada
           ? ` · <button onclick="recomCalOriginal(${r.id})" style="background:none;border:none;padding:0;
                color:var(--azul);font-size:10.5px;text-decoration:underline;cursor:pointer;font-family:inherit">
                ✎ redacción ajustada — ver original</button>`
@@ -3080,8 +3085,86 @@ function recomCalPintar(lista) {
       </div>`}
     </div>`;
   }).join('') + (vivas.some(r => r.estado === 'BORRADOR')
-    ? `<div style="font-size:11px;color:#854F0B;background:#FAEEDA;border-radius:7px;padding:7px 10px">
-         Hay recomendaciones sin revisar. Las que no apruebes no le llegarán al cliente.</div>` : '');
+    ? `<div style="font-size:11px;color:#854F0B;background:#FAEEDA;border-radius:7px;padding:7px 10px;margin-bottom:8px">
+         Hay recomendaciones sin revisar. Las que no apruebes no le llegarán al cliente.</div>` : '')
+    + recomCalAlta();
+}
+
+/* Alta desde Calidad.
+   Lo normal es que la escriba el inspector en campo. Pero una inspección
+   anterior a este apartado no tiene otro camino, y el inspector ya no vuelve
+   a abrir ese registro: por eso se puede capturar aquí, dejando anotado quién
+   lo hizo. */
+function recomCalAlta() {
+  if (!_recomCalEditable) return '';
+  return `
+    <div id="rc-alta-box"></div>
+    <button onclick="recomCalNueva()"
+      style="width:100%;padding:9px;border-radius:8px;border:1.5px dashed var(--azul);
+             background:#fff;color:var(--azul);font-size:12px;font-weight:700;cursor:pointer;
+             font-family:inherit">+ Capturar una recomendación</button>`;
+}
+
+function recomCalNueva() {
+  const box = document.getElementById('rc-alta-box');
+  if (!box || box.innerHTML) { if (box) box.innerHTML = ''; return; }
+  box.innerHTML = `
+    <div style="border:1.5px solid var(--azul);border-radius:9px;padding:11px 12px;margin-bottom:9px;background:#fff">
+      <div style="font-size:11px;color:#854F0B;background:#FAEEDA;border-radius:6px;
+                  padding:6px 9px;margin-bottom:8px;line-height:1.4">
+        Lo normal es que la escriba el inspector en campo. Si la capturas aquí,
+        <strong>quedará registrado que la escribió Calidad y no el inspector</strong>, y se verá así
+        en el historial.
+      </div>
+      ${_recomCalPublicado ? `
+        <div style="font-size:11px;color:#A32D2D;background:#FCEBEB;border-radius:6px;
+                    padding:6px 9px;margin-bottom:8px;line-height:1.4">
+          <strong>Este equipo ya tiene su documentación publicada.</strong> En cuanto la apruebes,
+          el cliente la verá en su portal de inmediato.
+        </div>` : ''}
+      <select id="rc-nueva-pri"
+        style="padding:6px 9px;border:1.5px solid var(--borde);border-radius:6px;
+               font-size:11.5px;font-family:inherit;margin-bottom:7px">
+        <option value="alta">PRIORIDAD ALTA</option>
+        <option value="media" selected>PRIORIDAD MEDIA</option>
+        <option value="sugerencia">SUGERENCIA</option>
+      </select>
+      <textarea id="rc-nueva-txt" rows="3"
+        placeholder="Ej: El extintor del área de operación está vencido desde agosto."
+        style="width:100%;padding:8px 9px;border:1.5px solid var(--borde);border-radius:7px;
+               font-size:12.5px;font-family:inherit;resize:vertical"></textarea>
+      <div style="display:flex;gap:7px;margin-top:8px">
+        <button onclick="recomCalGuardarNueva(this)"
+          style="padding:6px 12px;border-radius:7px;border:1.5px solid var(--azul);background:var(--azul);
+                 color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">Agregar</button>
+        <button onclick="document.getElementById('rc-alta-box').innerHTML=''"
+          style="padding:6px 12px;border-radius:7px;border:1.5px solid var(--borde);background:#fff;
+                 font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit">Cancelar</button>
+      </div>
+    </div>`;
+  document.getElementById('rc-nueva-txt').focus();
+}
+
+async function recomCalGuardarNueva(btn) {
+  const texto = (document.getElementById('rc-nueva-txt')?.value || '').trim();
+  const prioridad = document.getElementById('rc-nueva-pri')?.value || 'media';
+  if (!texto) { mostrarToast('Escribe la recomendación.', 'err'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'CREAR_RECOMENDACION',
+        payload: { origen: 'equipo', origen_id: _recomCalEquipo, texto, prioridad } })
+    });
+    const d = await res.json();
+    if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo agregar.', 'err'); return; }
+    mostrarToast('Agregada. Queda sin aprobar hasta que la revises.', 'ok');
+    recomCalCargar(_recomCalEquipo, _recomCalEditable, _recomCalPublicado);
+  } catch (e) {
+    mostrarToast('Error de conexión.', 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Agregar'; }
+  }
 }
 
 /** El hilo con el cliente, cuando lo hay. */
