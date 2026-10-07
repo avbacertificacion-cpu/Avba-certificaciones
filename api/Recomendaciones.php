@@ -480,6 +480,141 @@ class Recomendaciones {
         )->execute([$id, $tipo, mb_substr(trim($comentario), 0, 2000), $usuario]);
     }
 
+    // ── La hoja en PDF ────────────────────────────────────
+
+    /**
+     * La hoja de recomendaciones de un equipo.
+     *
+     * No es el dictamen ni lo sustituye, y el documento lo dice en su propio
+     * encabezado: quien lo reciba suelto tiene que poder saber qué es. Incluye
+     * el estado y lo que el cliente contestó, así que descargarla en diciembre
+     * sirve de constancia de seguimiento, no sólo de lo que se recomendó.
+     */
+    public function hojaPdf(int $equipoId, string $idCliente = ''): array {
+        $eq = $this->equipoDe($equipoId, $idCliente);
+        if (!$eq) return ['status' => 'error', 'message' => 'Equipo no encontrado.'];
+
+        $recs = array_values(array_filter(
+            $this->listar('equipo', $equipoId, false),
+            fn($r) => in_array($r['estado'], self::VISIBLES, true)
+        ));
+        if (!$recs) return ['status' => 'error', 'message' => 'Este equipo no tiene recomendaciones publicadas.'];
+
+        $e = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
+        $rotulo = ['alta' => 'PRIORIDAD ALTA', 'media' => 'PRIORIDAD MEDIA', 'sugerencia' => 'SUGERENCIA'];
+        $color  = ['alta' => '#A32D2D', 'media' => '#854F0B', 'sugerencia' => '#185FA5'];
+        $estado = ['APROBADA' => 'Sin atender', 'ENTERADO' => 'Enterado, pendiente',
+                   'ATENDIDA' => 'Atendida, en revisión', 'CERRADA' => 'Cerrada'];
+
+        $filas = '';
+        foreach ($recs as $i => $r) {
+            $hilo = '';
+            foreach ($r['respuestas'] as $x) {
+                $quien = ((int)$x['es_cliente'] === 1 ? 'Cliente' : 'AVBA') . ' · ' . $e($x['usuario']);
+                $nEv   = count($x['evidencias'] ?? []);
+                $hilo .= '<div style="margin-top:3mm;padding:2.5mm 3mm;background:#f4f7fb;border-radius:2mm">'
+                       . '<div style="font-size:7.5pt;font-weight:bold;color:#5a6072">' . $quien . '</div>'
+                       . ($x['comentario'] ? '<div style="font-size:9pt">' . $e($x['comentario']) . '</div>' : '')
+                       . ($nEv ? '<div style="font-size:7.5pt;color:#9299a8">' . $nEv
+                               . ' archivo(s) de evidencia en el portal</div>' : '')
+                       . '</div>';
+            }
+            $filas .= '<div style="border:0.4mm solid #dfe5ef;border-left:1.2mm solid '
+                   . ($color[$r['prioridad']] ?? '#185FA5') . ';border-radius:2mm;padding:3.5mm 4mm;margin-bottom:3.5mm">'
+                   . '<table width="100%"><tr>'
+                   . '<td style="font-size:7.5pt;font-weight:bold;color:' . ($color[$r['prioridad']] ?? '#185FA5') . '">'
+                   . ($rotulo[$r['prioridad']] ?? '') . '</td>'
+                   . '<td align="right" style="font-size:7.5pt;color:#5a6072">'
+                   . ($estado[$r['estado']] ?? '') . '</td></tr></table>'
+                   . '<div style="font-size:10pt;line-height:1.5;margin-top:1.5mm">' . $e($r['texto']) . '</div>'
+                   . $hilo . '</div>';
+        }
+
+        $html = '<html><head><meta charset="utf-8"><style>
+            body{font-family:dejavusans;color:#1a1a2e;}
+            /* Fondo claro: el logo de AVBA es azul marino y sobre la banda
+               oscura se perdía. */
+            .hdr{padding:7mm 8mm 4mm;border-bottom:1.5mm solid #0C447C;}
+            .hdr h1{font-size:15pt;margin:0;color:#0C447C;}
+            .hdr p{font-size:8.5pt;margin:1mm 0 0;color:#5a6072;}
+            .cuerpo{padding:6mm 8mm;}
+            .aviso{background:#E6F1FB;border:0.3mm solid #bcd9f2;border-radius:2mm;
+                   padding:3mm 4mm;font-size:8.5pt;color:#0b3c6b;margin-bottom:5mm;line-height:1.45;}
+            .datos{font-size:9pt;color:#5a6072;margin-bottom:5mm;}
+          </style></head><body>
+          <div class="hdr">
+            <table width="100%"><tr>
+              <td width="22%"><img src="assets/logos/avba.png" style="width:30mm"></td>
+              <td align="right">
+                <h1>Recomendaciones del inspector</h1>
+                <p>AVBA Inspections, Certifications and Maintenance SAS. de C.V.</p>
+              </td>
+            </tr></table>
+          </div>
+          <div class="cuerpo">
+            <div class="aviso"><b>Este documento no es un certificado ni un dictamen.</b><br>
+              Las recomendaciones que contiene <b>no forman parte del alcance de la
+              certificación</b>: son apuntes del inspector durante la visita. El resultado
+              del equipo es el que indica su dictamen de inspección.</div>
+            <div class="datos">
+              <b>' . $e($eq['cliente']) . '</b><br>
+              ' . $e($eq['maquinaria']) . ($eq['serie'] ? ' · S/N ' . $e($eq['serie']) : '') . '<br>
+              Folio AB.' . $e($eq['control']) . ' · Inspección del ' . $e($eq['fecha_fmt'] ?? '') . '
+            </div>' . $filas . '
+            <div style="font-size:7.5pt;color:#9299a8;margin-top:4mm">
+              Hoja generada el ' . date('d/m/Y') . '. El estado de cada recomendación y su
+              evidencia se consultan en el portal del cliente.</div>
+          </div></body></html>';
+
+        try {
+            $url = $this->aPdf($html, 'AB.' . ($eq['control'] ?: $equipoId));
+        } catch (\Throwable $ex) {
+            return ['status' => 'error', 'message' => 'No se pudo generar la hoja: ' . $ex->getMessage()];
+        }
+        return ['status' => 'success', 'url' => rtrim(SITE_URL, '/') . '/' . ltrim($url, '/')];
+    }
+
+    /** El equipo, comprobando que sea del cliente cuando lo pide un cliente. */
+    private function equipoDe(int $equipoId, string $idCliente): ?array {
+        $sql = "SELECT id, cliente, control, maquinaria, serie,
+                       DATE_FORMAT(fecha_inspeccion,'%d/%m/%Y') AS fecha_fmt
+                FROM equipos WHERE id = ?";
+        $par = [$equipoId];
+        if ($idCliente !== '') {
+            if (ctype_digit($idCliente)) $idCliente = str_pad($idCliente, 5, '0', STR_PAD_LEFT);
+            $sql .= " AND control LIKE ? AND (publicado = 1 OR estado = 'ENVIADO')";
+            $par[] = $idCliente . '-%';
+        }
+        $st = $this->pdo->prepare($sql);
+        $st->execute($par);
+        return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    private function aPdf(string $html, string $folio): string {
+        if (!class_exists('\\Mpdf\\Mpdf')) {
+            $autoload = __DIR__ . '/../vendor/autoload.php';
+            if (file_exists($autoload)) require_once $autoload;
+        }
+        if (!class_exists('\\Mpdf\\Mpdf'))
+            throw new \RuntimeException('mPDF no disponible.');
+
+        $dir = UPLOAD_DIR . 'reportes/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+        $mpdf = new \Mpdf\Mpdf([
+            'mode' => 'utf-8', 'format' => 'A4',
+            'margin_left' => 0, 'margin_right' => 0,
+            'margin_top' => 0, 'margin_bottom' => 10,
+            'default_font' => 'dejavusans',
+            'tempDir' => sys_get_temp_dir() . '/mpdf',
+        ]);
+        $mpdf->SetBasePath(__DIR__ . '/../');
+        $mpdf->WriteHTML($html);
+        $nombre = 'RECOM_AVBA_' . $folio . '_' . date('Ymd_His') . '.pdf';
+        $mpdf->Output($dir . $nombre, 'F');
+        return 'uploads/reportes/' . $nombre;
+    }
+
     public function historial(int $id): array {
         $st = $this->pdo->prepare(
             "SELECT usuario, campo, valor_anterior, valor_nuevo, created_at

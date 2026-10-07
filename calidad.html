@@ -2676,6 +2676,16 @@ function ver(fila) {
   </div>
   <div style="font-size:11px;color:var(--texto-hint)">Es quien firma el certificado y el dictamen de esta inspección.</div>`;
 
+  // Recomendaciones del inspector. Se piden aparte, al abrir el detalle: son
+  // una consulta más y no deben retrasar la apertura del registro.
+  body += `<div class="sec-label">Recomendaciones del inspector</div>
+  <div style="font-size:11px;color:var(--texto-hint);margin-bottom:8px">
+    Van <strong>fuera del reporte y del dictamen</strong>. Le llegan al cliente
+    cuando Certificaciones publique la documentación, no antes.
+    Puedes ajustar la redacción, pero el sentido debe seguir siendo el del inspector.
+  </div>
+  <div id="recom-cal-box"><div style="font-size:12px;color:var(--texto-hint)">Cargando…</div></div>`;
+
   // Ubicación
   body += `<div class="sec-label">Ubicación</div>
   <div class="field" style="margin-bottom:10px">
@@ -2838,6 +2848,7 @@ function ver(fila) {
 
   document.getElementById("overlay-det").classList.add("open");
   poblarInspectorSelect(d.inspector);
+  recomCalCargar(d.fila, editable);
   // Sugerir empresas ya registradas al corregir el cliente
   try {
     const inp = document.getElementById('e-cliente');
@@ -2972,6 +2983,199 @@ async function eliminarPndCal(id, desc) {
     cerrarDetPND();
     cargarPND();
   });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   RECOMENDACIONES DEL INSPECTOR
+   Las escribe el inspector; aquí se revisan. Calidad ajusta la REDACCIÓN
+   —precisa un término, corrige una palabra— pero el sentido es el suyo. Por
+   eso el texto original queda guardado y, si se edita, se puede comparar.
+   Aprobarlas NO se las manda al cliente: le llegan cuando Certificaciones
+   publique la documentación del equipo.
+   ═══════════════════════════════════════════════════════════════════════ */
+let _recomCalEquipo = 0;
+let _recomCalEditable = true;
+
+const RECOM_COLOR = { alta: 'var(--rojo)', media: '#854F0B', sugerencia: 'var(--azul)' };
+const RECOM_ROTULO = { alta: 'PRIORIDAD ALTA', media: 'PRIORIDAD MEDIA', sugerencia: 'SUGERENCIA' };
+const RECOM_ESTADO = {
+  BORRADOR:   ['Sin revisar',            'var(--texto-hint)'],
+  APROBADA:   ['Aprobada',               'var(--verde)'],
+  ENTERADO:   ['El cliente acusó recibo','#854F0B'],
+  ATENDIDA:   ['Atendida — revisar evidencia', '#854F0B'],
+  CERRADA:    ['Cerrada',                'var(--verde)'],
+  DESCARTADA: ['Descartada',             'var(--rojo)'],
+};
+
+async function recomCalCargar(equipoId, editable) {
+  _recomCalEquipo   = equipoId;
+  _recomCalEditable = editable !== false;
+  const box = document.getElementById('recom-cal-box');
+  if (!box) return;
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'LISTAR_RECOMENDACIONES',
+                             payload: { origen: 'equipo', origen_id: equipoId } })
+    });
+    const d = await res.json();
+    recomCalPintar(d.status === 'success' ? (d.data || []) : []);
+  } catch (e) {
+    box.innerHTML = `<div style="font-size:12px;color:var(--rojo)">No se pudieron cargar.</div>`;
+  }
+}
+
+function recomCalPintar(lista) {
+  const box = document.getElementById('recom-cal-box');
+  if (!box) return;
+  const vivas = lista.filter(r => r.estado !== 'DESCARTADA');
+  if (!lista.length) {
+    box.innerHTML = `<div style="font-size:12px;color:var(--texto-hint);padding:10px;
+      background:var(--gris-bg);border-radius:8px">El inspector no dejó recomendaciones.</div>`;
+    return;
+  }
+  const dis = _recomCalEditable ? '' : 'disabled';
+  box.innerHTML = lista.map(r => {
+    const [et, col] = RECOM_ESTADO[r.estado] || ['—', 'var(--texto-hint)'];
+    const apagada = r.estado === 'DESCARTADA';
+    return `<div style="border:1.5px solid var(--borde);border-left:4px solid ${RECOM_COLOR[r.prioridad] || 'var(--azul)'};
+         border-radius:9px;padding:11px 12px;margin-bottom:9px;${apagada ? 'opacity:.55' : ''}">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:7px">
+        <select id="rc-pri-${r.id}" ${dis || (apagada ? 'disabled' : '')}
+                style="padding:5px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:11.5px;font-family:inherit">
+          ${['alta','media','sugerencia'].map(p =>
+            `<option value="${p}"${p === r.prioridad ? ' selected' : ''}>${RECOM_ROTULO[p]}</option>`).join('')}
+        </select>
+        <span style="font-size:11px;font-weight:700;color:${col};margin-left:auto">● ${et}</span>
+      </div>
+      <textarea id="rc-txt-${r.id}" rows="2" ${dis || (apagada ? 'disabled' : '')}
+        style="width:100%;padding:8px 9px;border:1.5px solid var(--borde);border-radius:7px;
+               font-size:12.5px;font-family:inherit;resize:vertical">${esc(r.texto)}</textarea>
+      <div style="font-size:10.5px;color:var(--texto-hint);margin-top:5px">
+        Escrita por ${esc(r.creada_por)}${r.editada
+          ? ` · <button onclick="recomCalOriginal(${r.id})" style="background:none;border:none;padding:0;
+               color:var(--azul);font-size:10.5px;text-decoration:underline;cursor:pointer;font-family:inherit">
+               ✎ redacción ajustada — ver original</button>`
+          : ''}
+      </div>
+      ${recomCalHilo(r)}
+      ${apagada ? '' : `<div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:9px">
+        <button onclick="recomCalGuardar(${r.id})" ${dis}
+          style="padding:6px 12px;border-radius:7px;border:1.5px solid var(--borde);background:#fff;
+                 font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit">Guardar redacción</button>
+        ${r.estado === 'BORRADOR' ? `
+          <button onclick="recomCalAprobar(${r.id})" ${dis}
+            style="padding:6px 12px;border-radius:7px;border:1.5px solid var(--verde);background:var(--verde);
+                   color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">✓ Aprobar</button>
+          <button onclick="recomCalDescartar(${r.id})" ${dis}
+            style="padding:6px 12px;border-radius:7px;border:1.5px solid var(--rojo);background:#fff;
+                   color:var(--rojo);font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit">Descartar</button>` : ''}
+        ${r.estado === 'ATENDIDA' ? `
+          <button onclick="recomCalCerrar(${r.id})" ${dis}
+            style="padding:6px 12px;border-radius:7px;border:1.5px solid var(--verde);background:var(--verde);
+                   color:#fff;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit">✓ Cerrar</button>
+          <button onclick="recomCalReabrir(${r.id})" ${dis}
+            style="padding:6px 12px;border-radius:7px;border:1.5px solid #854F0B;background:#fff;
+                   color:#854F0B;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit">Devolver al cliente</button>` : ''}
+      </div>`}
+    </div>`;
+  }).join('') + (vivas.some(r => r.estado === 'BORRADOR')
+    ? `<div style="font-size:11px;color:#854F0B;background:#FAEEDA;border-radius:7px;padding:7px 10px">
+         Hay recomendaciones sin revisar. Las que no apruebes no le llegarán al cliente.</div>` : '');
+}
+
+/** El hilo con el cliente, cuando lo hay. */
+function recomCalHilo(r) {
+  if (!(r.respuestas || []).length) return '';
+  return `<div style="margin-top:9px;padding:8px 10px;background:var(--gris-bg);border-radius:8px">
+    ${r.respuestas.map(x => `
+      <div style="margin-bottom:6px">
+        <div style="font-size:10px;font-weight:800;color:var(--texto-sub);letter-spacing:.03em">
+          ${x.es_cliente == 1 ? 'CLIENTE' : 'AVBA'} · ${esc(x.usuario)}
+          ${x.tipo === 'enterado' ? ' · acuse' : x.tipo === 'atendida' ? ' · reporta atendida' : ''}</div>
+        ${x.comentario ? `<div style="font-size:12px;color:var(--texto);line-height:1.45">${esc(x.comentario)}</div>` : ''}
+        ${(x.evidencias || []).length ? `<div style="display:flex;gap:5px;margin-top:4px;flex-wrap:wrap">
+          ${x.evidencias.map(e => `<a href="${esc(e.url)}" target="_blank"
+             style="font-size:10.5px;padding:3px 8px;border-radius:5px;background:var(--azul-light);
+                    color:var(--azul);text-decoration:none">📎 ${esc(e.nombre || 'archivo')}</a>`).join('')}
+        </div>` : ''}
+      </div>`).join('')}
+  </div>`;
+}
+
+async function recomCalAccion(accion, id, extra = {}) {
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: accion, payload: { id, ...extra } })
+    });
+    const d = await res.json();
+    mostrarToast(d.message || (d.status === 'success' ? 'Listo.' : 'No se pudo.'),
+                 d.status === 'success' ? 'ok' : 'err');
+    if (d.status === 'success') recomCalCargar(_recomCalEquipo, _recomCalEditable);
+    return d;
+  } catch (e) {
+    mostrarToast('Error de conexión.', 'err');
+  }
+}
+
+function recomCalGuardar(id) {
+  const texto = (document.getElementById('rc-txt-' + id)?.value || '').trim();
+  const prioridad = document.getElementById('rc-pri-' + id)?.value || 'media';
+  if (!texto) { mostrarToast('El texto no puede quedar vacío.', 'err'); return; }
+  recomCalAccion('EDITAR_RECOMENDACION', id, { texto, prioridad });
+}
+
+function recomCalAprobar(id) {
+  // Se guarda primero lo que esté escrito: si Calidad ajustó la redacción y
+  // aprueba sin guardar, se publicaría el texto viejo.
+  const texto = (document.getElementById('rc-txt-' + id)?.value || '').trim();
+  const prioridad = document.getElementById('rc-pri-' + id)?.value || 'media';
+  if (!texto) { mostrarToast('El texto no puede quedar vacío.', 'err'); return; }
+  fetch(API, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'EDITAR_RECOMENDACION', payload: { id, texto, prioridad } })
+  }).then(() => recomCalAccion('APROBAR_RECOMENDACION', id))
+    .catch(() => mostrarToast('Error de conexión.', 'err'));
+}
+
+function recomCalDescartar(id) {
+  const motivo = prompt('¿Por qué se descarta? (queda en el historial)');
+  if (motivo === null) return;
+  recomCalAccion('DESCARTAR_RECOMENDACION', id, { motivo });
+}
+
+function recomCalCerrar(id) {
+  const c = prompt('Comentario de cierre (opcional):', '');
+  if (c === null) return;
+  recomCalAccion('CERRAR_RECOMENDACION', id, { comentario: c });
+}
+
+function recomCalReabrir(id) {
+  const motivo = prompt('¿Qué falta? El cliente lo verá:');
+  if (motivo === null) return;
+  if (!motivo.trim()) { mostrarToast('Explica qué falta.', 'err'); return; }
+  recomCalAccion('REABRIR_RECOMENDACION', id, { motivo });
+}
+
+/** Lo que escribió el inspector, para comparar con lo que quedó. */
+async function recomCalOriginal(id) {
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'HISTORIAL_RECOMENDACION', payload: { id } })
+    });
+    const d = await res.json();
+    const alta = (d.data || []).find(h => h.campo === 'alta');
+    const ediciones = (d.data || []).filter(h => h.campo === 'texto');
+    alert('REDACCIÓN DEL INSPECTOR:\n\n' + (alta?.valor_nuevo || '—')
+      + (ediciones.length
+          ? '\n\n── Ajustes ──\n' + ediciones.map(e =>
+              e.usuario + ' (' + (e.created_at || '').slice(0, 10) + '):\n' + e.valor_nuevo).join('\n\n')
+          : ''));
+  } catch (e) {
+    mostrarToast('No se pudo leer el historial.', 'err');
+  }
 }
 
 function cerrarDet() {

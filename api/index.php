@@ -2072,6 +2072,18 @@ if ($method === 'POST') {
                 (string)($usr['nombre'] ?? $usr['usuario'] ?? '')
             ));
 
+        // La hoja de recomendaciones. Al cliente se le acota a sus equipos; a
+        // AVBA no, porque ya pasó por el filtro de rol.
+        case 'HOJA_RECOMENDACIONES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            if (!in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES','CLIENTE']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($recom->hojaPdf(
+                (int)($payload['equipo_id'] ?? $_GET['equipo_id'] ?? 0),
+                $usr['rol'] === 'CLIENTE' ? resolveIdc($usr) : ''
+            ));
+
         case 'GENERAR_CERT_ACCESORIO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

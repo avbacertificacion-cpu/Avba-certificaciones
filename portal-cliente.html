@@ -72,6 +72,52 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 /* Accesorios cards */
 .acc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
 
+/* ── Recomendaciones del inspector ──────────────────────────────────────
+   Lo que el inspector vio y no pertenece al alcance de la certificación.
+   Se lee completo en pantalla: el PDF es para quien lo quiera imprimir, no
+   para enterarse. */
+.rec-abrir{width:100%;margin-top:10px;padding:10px;border-radius:9px;border:1.5px solid var(--ambar);
+  background:var(--ambar-light);color:var(--ambar);font-size:12.5px;font-weight:700;cursor:pointer;
+  font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .15s;}
+.rec-abrir:hover{background:var(--ambar);color:var(--blanco);}
+.rec-abrir.ok{border-color:var(--verde);background:var(--verde-light);color:var(--verde);}
+.rec-abrir.ok:hover{background:var(--verde);color:var(--blanco);}
+.rec-nota{display:flex;gap:10px;align-items:flex-start;background:var(--azul-light);
+  border:1px solid #bcd9f2;border-radius:10px;padding:11px 13px;margin-bottom:16px;}
+.rec-nota .ico{font-size:17px;line-height:1.2;flex-shrink:0;}
+.rec-nota p{font-size:12px;color:#0b3c6b;line-height:1.5;}
+.rec-item{border:1.5px solid var(--borde);border-radius:12px;padding:14px 15px;margin-bottom:12px;background:var(--blanco);}
+.rec-item.alta{border-left:4px solid var(--rojo);}
+.rec-item.media{border-left:4px solid var(--ambar);}
+.rec-item.sugerencia{border-left:4px solid var(--azul);}
+.rec-hdr{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
+.rec-pri{font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;letter-spacing:.03em;}
+.rec-pri.alta{background:var(--rojo-light);color:var(--rojo);}
+.rec-pri.media{background:var(--ambar-light);color:var(--ambar);}
+.rec-pri.sugerencia{background:var(--azul-light);color:var(--azul-dark);}
+.rec-estado{font-size:10.5px;font-weight:700;margin-left:auto;}
+.rec-texto{font-size:13.5px;color:var(--texto);line-height:1.55;}
+.rec-meta{font-size:11px;color:var(--texto-hint);margin-top:7px;}
+.rec-acc{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.rec-btn{padding:8px 14px;border-radius:8px;border:1.5px solid;font-size:12px;font-weight:700;
+  cursor:pointer;font-family:inherit;background:var(--blanco);}
+.rec-btn.pri{background:var(--verde);border-color:var(--verde);color:#fff;}
+.rec-btn.sec{border-color:var(--borde);color:var(--texto-sub);}
+.rec-hilo{margin-top:11px;padding:10px 12px;background:var(--gris-bg);border-radius:9px;}
+.rec-hilo-t{font-size:10.5px;font-weight:800;color:var(--texto-sub);letter-spacing:.04em;margin-bottom:5px;}
+.rec-hilo p{font-size:12px;color:var(--texto);line-height:1.5;}
+.rec-hilo .q{font-size:11px;color:var(--texto-hint);margin-top:4px;}
+.rec-evid{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap;}
+.rec-evid a{font-size:10.5px;padding:4px 9px;border-radius:6px;background:var(--azul-light);
+  color:var(--azul-dark);text-decoration:none;font-weight:600;}
+.rec-pie{margin-top:4px;padding-top:14px;border-top:1px solid var(--borde);display:flex;
+  justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
+.rec-pie span{font-size:11.5px;color:var(--texto-sub);}
+.rec-form{margin-top:10px;padding:11px 12px;background:var(--gris-bg);border-radius:9px;}
+.rec-form textarea{width:100%;padding:8px 10px;border:1.5px solid var(--borde);border-radius:8px;
+  font-size:12.5px;font-family:inherit;resize:vertical;}
+.rec-form input[type=file]{font-size:11.5px;margin-top:7px;width:100%;}
+
 /* ── Certificados por accesorio ─────────────────────────────────────────
    Una inspección puede traer veinte piezas. Listadas dentro de la ficha de
    la sesión no se leían: van en su propia ventana, una tarjeta por
@@ -989,6 +1035,34 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
   </div>
 </div>
 
+<!-- Modal: recomendaciones del inspector de un equipo -->
+<div class="eq-overlay" id="modal-recom">
+  <div class="eq-modal" style="max-width:720px">
+    <div class="eq-modal-hdr">
+      <div>
+        <div class="eq-modal-title">💬 Recomendaciones del inspector</div>
+        <div id="recom-sub" style="font-size:12px;color:var(--texto-sub);margin-top:3px"></div>
+      </div>
+      <button class="eq-modal-close" onclick="cerrarRecom()">✕</button>
+    </div>
+    <div class="rec-nota">
+      <div class="ico">ℹ️</div>
+      <p><b>Estas recomendaciones no forman parte del alcance de la certificación.</b>
+         El resultado del equipo es el que indica el dictamen. Son apuntes del inspector
+         durante la visita que pueden ayudarle a mantener el equipo y el área en mejores
+         condiciones.</p>
+    </div>
+    <div id="recom-lista-cli"></div>
+    <div class="rec-pie">
+      <span id="recom-resumen"></span>
+      <button class="rec-pdf" onclick="recomPdf()"
+        style="padding:9px 15px;border-radius:9px;border:1.5px solid var(--azul);background:var(--blanco);
+               color:var(--azul-dark);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">
+        📄 Descargar hoja de recomendaciones</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal: certificados por accesorio de una sesión -->
 <div class="eq-overlay" id="modal-certs-acc">
   <div class="eq-modal ancho">
@@ -1817,8 +1891,14 @@ function vigenciaBar(dias, vencimiento, vigente) {
 // ── Render Maquinaria ──────────────────────────────────────────────────────
 // PHP retorna: folio, maquinaria, marca, modelo, serie, id_equipo,
 //              fecha, vencimiento, dias, vigente, link_cert, link_dict, qr_url
+// Los equipos que se están mostrando, para que el panel de recomendaciones
+// los consulte por id sin volver a pedirle los datos al servidor.
+let _maqEquipos = {};
+
 function renderMaquinaria(data) {
   document.getElementById('maq-load').style.display = 'none';
+  _maqEquipos = {};
+  (data || []).forEach(e => { _maqEquipos[e.id] = e; });
   const cont = document.getElementById('maq-cont');
   if (!data || !data.length) {
     cont.innerHTML = '<div class="empty"><div class="empty-t">Sin maquinaria registrada</div><div class="empty-s">No hay equipos certificados asociados a esta cuenta.</div></div>';
@@ -1833,6 +1913,13 @@ function renderMaquinaria(data) {
     const certBtn  = eq.link_cert ? `<a class="btn-doc btn-cert" href="${eq.link_cert}" target="_blank">📄 Certificado</a>` : `<span class="btn-doc btn-cert dis">📄 Certificado</span>`;
     const dictBtn  = eq.link_dict ? `<a class="btn-doc btn-dict" href="${eq.link_dict}" target="_blank">📋 Dictamen</a>`    : `<span class="btn-doc btn-dict dis">📋 Dictamen</span>`;
     const qrBtn    = eq.qr_url    ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(eq.qr_url)}')">🔗 QR</button>` : `<span class="btn-doc btn-qr dis">🔗 QR</span>`;
+    // Las recomendaciones llegan con la documentación: si el equipo está en
+    // la lista, su documentación ya se publicó.
+    const recs    = eq.recomendaciones || [];
+    const abiertas = recs.filter(r => r.estado !== 'CERRADA').length;
+    const recBtn  = !recs.length ? '' :
+      `<button class="rec-abrir${abiertas ? '' : ' ok'}" onclick="abrirRecom(${eq.id})">
+         💬 Recomendaciones del inspector (${recs.length})${abiertas ? ` · ${abiertas} sin cerrar` : ' · al día'}</button>`;
     html += `<div class="card">
       <div class="card-top">
         <div class="card-icon">🔧</div>
@@ -1854,6 +1941,7 @@ function renderMaquinaria(data) {
           ? btnEnviar('equipo', eq.id, 'Enviar documentos del equipo',
                       `${eq.maquinaria || 'Equipo'}${eq.serie ? ' · S/N ' + eq.serie : ''} — certificado y dictamen`)
           : ''}</div>
+      ${recBtn}
     </div>`;
   });
   html += '</div>';
@@ -1956,6 +2044,151 @@ function renderAccesorios(data) {
   });
   html += '</div>';
   cont.innerHTML = html;
+}
+
+/* ── Recomendaciones del inspector ─────────────────────────────────────
+   Llegan con la documentación: si el equipo está aquí, su documentación ya
+   se publicó. El cliente puede acusar recibo y, por separado, reportar que
+   la atendió con evidencia — son dos cosas distintas. */
+let _recomEquipo = null;
+
+const RECOM_ROTULO_CLI = { alta: 'PRIORIDAD ALTA', media: 'PRIORIDAD MEDIA', sugerencia: 'SUGERENCIA' };
+const RECOM_ESTADO_CLI = {
+  APROBADA: ['Sin atender',                'var(--rojo)'],
+  ENTERADO: ['Enterado, pendiente',        'var(--ambar)'],
+  ATENDIDA: ['Atendida · en revisión por AVBA', 'var(--verde)'],
+  CERRADA:  ['Cerrada por AVBA',           'var(--verde)'],
+};
+
+function abrirRecom(equipoId) {
+  const eq = _maqEquipos[equipoId];
+  if (!eq) return;
+  _recomEquipo = eq;
+  const folio = eq.folio ? 'AB.' + eq.folio : '';
+  document.getElementById('recom-sub').textContent =
+    [folio, eq.maquinaria, eq.serie && ('S/N ' + eq.serie)].filter(Boolean).join(' · ');
+  pintarRecom();
+  document.getElementById('modal-recom').classList.add('open');
+}
+
+function cerrarRecom() {
+  document.getElementById('modal-recom').classList.remove('open');
+  _recomEquipo = null;
+}
+
+function pintarRecom() {
+  const eq = _recomEquipo;
+  if (!eq) return;
+  const lista = eq.recomendaciones || [];
+  const cont  = document.getElementById('recom-lista-cli');
+
+  cont.innerHTML = lista.map(r => {
+    const [et, col] = RECOM_ESTADO_CLI[r.estado] || ['—', 'var(--texto-hint)'];
+    const cerrada = r.estado === 'CERRADA';
+    return `<div class="rec-item ${escH(r.prioridad)}">
+      <div class="rec-hdr">
+        <span class="rec-pri ${escH(r.prioridad)}">${RECOM_ROTULO_CLI[r.prioridad] || ''}</span>
+        <span class="rec-estado" style="color:${col}">● ${et}</span>
+      </div>
+      <div class="rec-texto">${escH(r.texto)}</div>
+      <div class="rec-meta">Visita del ${escH(r.fecha || '—')}</div>
+      ${recomHilo(r)}
+      ${cerrada ? '' : `
+        <div class="rec-acc">
+          <button class="rec-btn pri" onclick="recomForm(${r.id},'atendida')">✓ Ya la atendí · adjuntar evidencia</button>
+          ${r.estado === 'APROBADA'
+            ? `<button class="rec-btn sec" onclick="recomForm(${r.id},'enterado')">Enterado</button>` : ''}
+        </div>
+        <div id="rec-form-${r.id}"></div>`}
+    </div>`;
+  }).join('');
+
+  const abiertas = lista.filter(r => r.estado !== 'CERRADA').length;
+  document.getElementById('recom-resumen').textContent =
+    lista.length + ' recomendaci' + (lista.length === 1 ? 'ón' : 'ones')
+    + (abiertas ? ' · ' + abiertas + ' sin cerrar' : ' · todas cerradas');
+}
+
+function recomHilo(r) {
+  if (!(r.respuestas || []).length) return '';
+  return r.respuestas.map(x => `
+    <div class="rec-hilo">
+      <div class="rec-hilo-t">${x.es_cliente == 1 ? 'SU RESPUESTA' : 'RESPUESTA DE AVBA'}</div>
+      ${x.comentario ? `<p>${escH(x.comentario)}</p>` : ''}
+      ${(x.evidencias || []).length ? `<div class="rec-evid">
+        ${x.evidencias.map(e => `<a href="${escH(e.url)}" target="_blank">📎 ${escH(e.nombre || 'archivo')}</a>`).join('')}
+      </div>` : ''}
+      <div class="q">${escH(x.usuario)}${x.created_at ? ' · ' + escH(String(x.created_at).slice(0, 10)) : ''}</div>
+    </div>`).join('');
+}
+
+/** El formulario de respuesta se abre bajo la recomendación, no en otra ventana. */
+function recomForm(id, tipo) {
+  const box = document.getElementById('rec-form-' + id);
+  if (!box) return;
+  if (box.innerHTML) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="rec-form">
+    <textarea id="rec-com-${id}" rows="2" placeholder="${tipo === 'atendida'
+      ? 'Cuéntenos qué se hizo…' : 'Comentario (opcional)'}"></textarea>
+    ${tipo === 'atendida'
+      ? `<input type="file" id="rec-file-${id}" multiple accept="image/*,.pdf">
+         <div style="font-size:10.5px;color:var(--texto-hint);margin-top:4px">
+           Fotos o PDF, hasta 6 archivos.</div>` : ''}
+    <div class="rec-acc">
+      <button class="rec-btn pri" onclick="recomEnviar(${id},'${tipo}',this)">Enviar</button>
+      <button class="rec-btn sec" onclick="document.getElementById('rec-form-${id}').innerHTML=''">Cancelar</button>
+    </div>
+  </div>`;
+}
+
+async function recomEnviar(id, tipo, btn) {
+  const com   = document.getElementById('rec-com-' + id);
+  const files = document.getElementById('rec-file-' + id);
+  const orig  = btn ? btn.textContent : '';
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+
+  // Va por multipart porque lleva archivos; el resto del portal usa JSON.
+  const fd = new FormData();
+  fd.append('action', 'RESPONDER_RECOMENDACION');
+  fd.append('id', id);
+  fd.append('tipo', tipo);
+  fd.append('comentario', com ? com.value : '');
+  if (files) [...files.files].slice(0, 6).forEach(f => fd.append('evidencia[]', f));
+
+  try {
+    const res = await fetch(API, { method: 'POST', body: fd });
+    const d   = await res.json();
+    if (d.status !== 'success') { toastPer(d.message || 'No se pudo enviar.'); return; }
+    toastPer(d.message || 'Enviado.');
+    // Se recarga del servidor para que el panel muestre el estado real.
+    await cargarDatos();
+    const eq = _maqEquipos[_recomEquipo?.id];
+    if (eq) { _recomEquipo = eq; pintarRecom(); } else { cerrarRecom(); }
+  } catch (e) {
+    toastPer('Error de conexión.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
+}
+
+async function recomPdf() {
+  const eq = _recomEquipo;
+  if (!eq) return;
+  // La ventana se abre ANTES de la espera: abrirla al volver la respuesta la
+  // bloquearía el navegador por no venir de un clic.
+  const w = window.open('', '_blank');
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'HOJA_RECOMENDACIONES', payload: { equipo_id: eq.id } })
+    });
+    const d = await res.json();
+    if (d.status === 'success' && d.url) { if (w) w.location = d.url; }
+    else { if (w) w.close(); toastPer(d.message || 'No se pudo generar la hoja.'); }
+  } catch (e) {
+    if (w) w.close();
+    toastPer('Error de conexión.');
+  }
 }
 
 /* ── Galería de certificados por accesorio ─────────────────────────────────
@@ -4962,7 +5195,7 @@ async function guardarPrefsNotif() {
 }
 
 // ── Close modals on overlay click ──────────────────────────────────────────
-['modal-eq','modal-doc','modal-hora','modal-cert-eq','modal-pers','modal-doc-pers','modal-edit-doc-pers','modal-cert-pers','modal-notif-prefs','modal-certs-acc'].forEach(id => {
+['modal-eq','modal-doc','modal-hora','modal-cert-eq','modal-pers','modal-doc-pers','modal-edit-doc-pers','modal-cert-pers','modal-notif-prefs','modal-certs-acc','modal-recom'].forEach(id => {
   const el = document.getElementById(id);
   if (el) el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
 });
