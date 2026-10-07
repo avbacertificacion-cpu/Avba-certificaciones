@@ -2021,6 +2021,18 @@ if ($method === 'POST') {
                 (int)($payload['registro_id'] ?? $payload['id'] ?? 0)
             ));
 
+        // Reenvía un documento ya mandado, a la misma dirección o a otra. El
+        // reenvío se anota como un envío más, apuntando al original.
+        case 'REENVIAR_CORREO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($envios->reenviar(
+                (int)($payload['id'] ?? 0),
+                (string)($payload['correo'] ?? ''),
+                $usr['usuario']
+            ));
+
         case 'USUARIOS_ENVIOS':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))

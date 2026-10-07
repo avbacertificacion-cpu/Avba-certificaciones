@@ -70,10 +70,10 @@
               <th>Cliente</th><th style="width:150px">Folio</th>
               <th>Destinatario</th><th>Documento</th>
               <th style="width:110px">Módulo</th><th style="width:110px">Enviado por</th>
-              <th style="width:90px">Resultado</th>
+              <th style="width:90px">Resultado</th><th style="width:95px"></th>
             </tr></thead>
             <tbody id="${p}-tb">
-              <tr><td colspan="8" style="text-align:center;padding:30px;color:var(--texto-hint)">Cargando…</td></tr>
+              <tr><td colspan="9" style="text-align:center;padding:30px;color:var(--texto-hint)">Cargando…</td></tr>
             </tbody>
           </table>
         </div>
@@ -93,7 +93,7 @@
     async function cargar(acumular) {
       const tb = $('tb');
       if (!acumular) { desplazamiento = 0; tb.innerHTML =
-        `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--texto-hint)">Cargando…</td></tr>`; }
+        `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--texto-hint)">Cargando…</td></tr>`; }
       try {
         const res = await fetch(api, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -101,7 +101,7 @@
         });
         const d = await res.json();
         if (d.status !== 'success') {
-          tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:26px;color:var(--rojo)">${esc(d.message || 'No se pudo cargar.')}</td></tr>`;
+          tb.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:26px;color:var(--rojo)">${esc(d.message || 'No se pudo cargar.')}</td></tr>`;
           return;
         }
         ultimoTotal = d.total || 0;
@@ -117,10 +117,13 @@
             <td style="font-size:11.5px;color:var(--texto-sub)">${esc(r.usuario || '—')}</td>
             <td>${r.ok
               ? '<span class="env-ok">✓ Enviado</span>'
-              : `<span class="env-no" title="${esc(r.error || '')}">✕ Falló</span>`}</td>
+              : `<span class="env-no" title="${esc(r.error || '')}">✕ Falló</span>`}
+              ${r.reenvio_de ? '<div class="env-re">reenvío</div>' : ''}</td>
+            <td><button class="env-btn sec env-reenv" data-id="${r.id}"
+                  data-correo="${esc(r.correo || '')}">↻ Reenviar</button></td>
           </tr>`).join('');
         if (acumular) tb.insertAdjacentHTML('beforeend', filas);
-        else tb.innerHTML = filas || `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--texto-hint)">No hay envíos que coincidan.</td></tr>`;
+        else tb.innerHTML = filas || `<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--texto-hint)">No hay envíos que coincidan.</td></tr>`;
 
         // Esta tabla sólo crece: se traen de 200 en 200 en vez de todo.
         const vistos = desplazamiento + (d.data || []).length;
@@ -128,8 +131,39 @@
           ? `<button class="env-btn sec" id="${p}-vermas">Ver más (${ultimoTotal - vistos} restantes)</button>` : '';
         const bm = $('vermas');
         if (bm) bm.onclick = () => { desplazamiento = vistos; cargar(true); };
+
+        tb.querySelectorAll('.env-reenv').forEach(b => { b.onclick = () => reenviar(b); });
       } catch (e) {
-        tb.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:26px;color:var(--rojo)">Error de conexión.</td></tr>`;
+        tb.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:26px;color:var(--rojo)">Error de conexión.</td></tr>`;
+      }
+    }
+
+    /**
+     * Reenvía ese documento. Se propone la dirección original porque el caso
+     * más común es reintentar lo que falló; cambiarla es lo que resuelve el
+     * "me lo mandaron al correo equivocado".
+     */
+    async function reenviar(btn) {
+      const id = btn.dataset.id;
+      const dest = prompt(
+        'Reenviar este documento a:\n\n'
+        + '(Se adjunta el mismo archivo. Varios correos, separados por coma.)',
+        btn.dataset.correo || '');
+      if (dest === null || !dest.trim()) return;
+      const orig = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Enviando…';
+      try {
+        const res = await fetch(api, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'REENVIAR_CORREO', payload: { id, correo: dest.trim() } })
+        });
+        const d = await res.json();
+        alert(d.message || (d.status === 'success' ? 'Reenviado.' : 'No se pudo reenviar.'));
+        if (d.status === 'success') cargar(false);   // el reenvío ya aparece arriba
+      } catch (e) {
+        alert('Error de conexión.');
+      } finally {
+        btn.disabled = false; btn.textContent = orig;
       }
     }
 

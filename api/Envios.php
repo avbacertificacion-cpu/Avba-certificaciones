@@ -45,6 +45,9 @@ class Envios {
             'asunto'   => "ALTER TABLE historico_envios ADD COLUMN asunto VARCHAR(255) NULL",
             'ok'       => "ALTER TABLE historico_envios ADD COLUMN ok TINYINT(1) NOT NULL DEFAULT 1",
             'error'    => "ALTER TABLE historico_envios ADD COLUMN error VARCHAR(500) NULL",
+            // De qué envío es reenvío. Deja la cadena completa: quién recibió
+            // el original, a quién se le reenvió después y por orden de quién.
+            'reenvio_de' => "ALTER TABLE historico_envios ADD COLUMN reenvio_de INT NULL",
         ];
         foreach ($nuevas as $col => $ddl) {
             try {
@@ -78,12 +81,13 @@ class Envios {
             ];
             // Las columnas nuevas pueden no existir si la migración no corrió:
             // en ese caso se guarda lo de siempre antes que perder el registro.
-            foreach (['modulo','registro_id','asunto','ok','error'] as $c) {
+            foreach (['modulo','registro_id','asunto','ok','error','reenvio_de'] as $c) {
                 if (!array_key_exists($c, $d)) continue;
                 if (!columnaExiste($pdo, 'historico_envios', $c)) continue;
                 $cols[] = $c;
-                $vals[] = $c === 'ok' ? (int)(bool)$d[$c]
-                        : ($c === 'registro_id' ? (int)$d[$c] : mb_substr((string)$d[$c], 0, 500));
+                $vals[] = in_array($c, ['ok'], true) ? (int)(bool)$d[$c]
+                        : (in_array($c, ['registro_id','reenvio_de'], true) ? (int)$d[$c]
+                        : mb_substr((string)$d[$c], 0, 500));
             }
             $pdo->prepare(
                 "INSERT INTO historico_envios (" . implode(',', $cols) . ")
@@ -98,6 +102,13 @@ class Envios {
     public static function anotarFallo(PDO $pdo, array $d, string $motivo): void {
         self::anotar($pdo, $d + ['ok' => 0, 'error' => $motivo]);
     }
+
+    /**
+     * Dónde buscar un documento ya emitido. El registro guarda sólo el nombre
+     * del archivo, no su ruta: se busca en las carpetas donde los módulos
+     * dejan lo que mandan.
+     */
+    private const CARPETAS = ['certificados/', 'reportes/', 'arneses/', 'personal/docs/', 'facturas/'];
 
     private const MODULOS = [
         'equipo'      => 'Maquinaria',
@@ -145,7 +156,9 @@ class Envios {
             $cols = "id, DATE_FORMAT(fecha_envio,'%d/%m/%Y %H:%i') AS fecha, cliente, control,
                      correo, archivo, usuario"
                   . ($hayModulo ? ", modulo, registro_id" : ", NULL AS modulo, NULL AS registro_id")
-                  . ($hayOk     ? ", ok, error"           : ", 1 AS ok, NULL AS error");
+                  . ($hayOk     ? ", ok, error"           : ", 1 AS ok, NULL AS error")
+                  . (columnaExiste($this->pdo, 'historico_envios', 'reenvio_de')
+                        ? ", reenvio_de" : ", NULL AS reenvio_de");
 
             $st = $this->pdo->prepare(
                 "SELECT $cols FROM historico_envios$sql ORDER BY fecha_envio DESC, id DESC LIMIT $lim OFFSET $off"
@@ -188,6 +201,103 @@ class Envios {
             error_log('[Envios] deRegistro: ' . $e->getMessage());
             return ['status' => 'success', 'data' => []];
         }
+    }
+
+    /**
+     * Reenvía un documento ya mandado, a la misma dirección o a otra.
+     *
+     * Se vuelve a adjuntar EL MISMO archivo, no se regenera: el reenvío debe
+     * entregar lo que el cliente ya tenía que haber recibido. Si el archivo ya
+     * no está en el servidor se dice claramente, en vez de mandar un correo
+     * vacío que parece correcto.
+     *
+     * El reenvío se anota como un envío más, apuntando al original: así queda
+     * la cadena completa de quién recibió qué y cuándo.
+     */
+    public function reenviar(int $id, string $correo, string $usuario): array {
+        $correo = trim($correo);
+        if ($correo === '')
+            return ['status' => 'error', 'message' => 'Indica a qué correo se reenvía.'];
+
+        // Admite varios separados por coma, como el resto del sistema.
+        $destinos = array_values(array_filter(array_map('trim', explode(',', $correo))));
+        foreach ($destinos as $d) {
+            if (!filter_var($d, FILTER_VALIDATE_EMAIL))
+                return ['status' => 'error', 'message' => 'Correo no válido: ' . $d];
+        }
+
+        $st = $this->pdo->prepare("SELECT * FROM historico_envios WHERE id = ?");
+        $st->execute([$id]);
+        $orig = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$orig) return ['status' => 'error', 'message' => 'Envío no encontrado.'];
+
+        [$rutas, $faltan] = $this->resolverArchivos((string)($orig['archivo'] ?? ''));
+        if (!$rutas) {
+            return ['status' => 'error', 'message' =>
+                'El documento ya no está en el servidor' . ($faltan ? ' (' . implode(', ', $faltan) . ')' : '')
+              . '. Vuelve a emitirlo desde su módulo para poder enviarlo.'];
+        }
+
+        if (!class_exists('PHPMailer\\PHPMailer\\PHPMailer')) {
+            $autoload = __DIR__ . '/../vendor/autoload.php';
+            if (file_exists($autoload)) require_once $autoload;
+        }
+        $clase = 'PHPMailer\\PHPMailer\\PHPMailer';
+        if (!class_exists($clase))
+            return ['status' => 'error', 'message' => 'PHPMailer no disponible en el servidor.'];
+
+        try {
+            $mail = new $clase(true);
+            configurarMailer($mail, $this->pdo);
+            foreach ($destinos as $d) $mail->addAddress($d);
+
+            $asunto = trim((string)($orig['asunto'] ?? '')) ?: 'Documento de inspección — AVBA Inspections';
+            $mail->Subject = $asunto;
+            $mail->isHTML(true);
+            $mail->Body = plantillaCorreoHtml($this->pdo,
+                '<p style="font-size:14px;color:#5a6072;line-height:1.7">Estimado/a,<br><br>'
+              . 'Le reenviamos la documentación'
+              . ($orig['cliente'] ? ' de <strong>' . htmlspecialchars((string)$orig['cliente']) . '</strong>' : '')
+              . ($orig['control'] ? ', folio <strong>' . htmlspecialchars((string)$orig['control']) . '</strong>' : '')
+              . '.</p>');
+            foreach ($rutas as $r) $mail->addAttachment($r, basename($r));
+
+            enviarYRegistrar($this->pdo, $mail, [
+                'cliente'     => $orig['cliente'] ?? null,
+                'control'     => $orig['control'] ?? null,
+                'usuario'     => $usuario,
+                'modulo'      => $orig['modulo'] ?? null,
+                'registro_id' => $orig['registro_id'] ?? null,
+                'reenvio_de'  => $id,
+            ]);
+        } catch (\Throwable $e) {
+            // El fallo ya quedó anotado por enviarYRegistrar.
+            return ['status' => 'error', 'message' => 'No se pudo reenviar: ' . $e->getMessage()];
+        }
+
+        $aviso = $faltan ? ' No se encontró: ' . implode(', ', $faltan) . '.' : '';
+        return ['status' => 'success',
+                'message' => 'Reenviado a ' . implode(', ', $destinos) . '.' . $aviso];
+    }
+
+    /**
+     * Busca cada archivo del registro en las carpetas de documentos.
+     * @return array{0:string[],1:string[]} [rutas encontradas, nombres que faltan]
+     */
+    private function resolverArchivos(string $lista): array {
+        $rutas = []; $faltan = [];
+        foreach (array_filter(array_map('trim', explode(',', $lista))) as $nombre) {
+            // Sólo el nombre: nadie debe poder pedir ../../config/config.php.
+            $nombre = basename($nombre);
+            if ($nombre === '') continue;
+            $hallado = null;
+            foreach (self::CARPETAS as $c) {
+                $ruta = rtrim(UPLOAD_DIR, '/') . '/' . $c . $nombre;
+                if (is_file($ruta)) { $hallado = $ruta; break; }
+            }
+            if ($hallado) $rutas[] = $hallado; else $faltan[] = $nombre;
+        }
+        return [$rutas, $faltan];
     }
 
     /** Quiénes han enviado, para el filtro por usuario. */
