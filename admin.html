@@ -257,6 +257,26 @@
     .env-btn.sec:hover { border-color:var(--azul); color:var(--azul); }
     .env-ok { font-size:10.5px; font-weight:700; color:var(--verde);
       background:var(--verde-light); border-radius:20px; padding:3px 9px; white-space:nowrap; }
+    /* ── Comprobación de servicios ──────────────────────────────────── */
+    .dg-card { border:1.5px solid var(--borde); border-radius:12px; padding:14px 16px;
+      margin-bottom:11px; background:#fff; display:flex; gap:13px; align-items:flex-start; }
+    .dg-card.ok      { border-left:4px solid var(--verde); }
+    .dg-card.aviso   { border-left:4px solid var(--ambar); }
+    .dg-card.error   { border-left:4px solid var(--rojo); }
+    .dg-card.apagado { border-left:4px solid var(--borde); }
+    .dg-card.probando{ border-left:4px solid var(--azul); }
+    .dg-ico { font-size:19px; line-height:1.2; flex-shrink:0; width:24px; text-align:center; }
+    .dg-cuerpo { flex:1; min-width:0; }
+    .dg-nombre { font-size:14px; font-weight:800; color:var(--texto); }
+    .dg-det { font-size:12.5px; color:var(--texto-sub); margin-top:3px; line-height:1.5; }
+    .dg-hacer { font-size:12px; color:#854F0B; background:#FAEEDA; border-radius:7px;
+      padding:7px 10px; margin-top:7px; line-height:1.45; }
+    .dg-ms { font-size:10.5px; color:var(--texto-hint); white-space:nowrap; }
+    .dg-re { padding:5px 11px; border-radius:7px; border:1.5px solid var(--borde);
+      background:#fff; color:var(--texto-sub); font-size:11px; font-weight:600;
+      cursor:pointer; font-family:inherit; white-space:nowrap; }
+    .dg-re:hover { border-color:var(--azul); color:var(--azul); }
+
     .env-re { font-size:9.5px; font-weight:700; color:var(--azul); margin-top:3px; }
     .env-no { font-size:10.5px; font-weight:700; color:var(--rojo);
       background:var(--rojo-light); border-radius:20px; padding:3px 9px; white-space:nowrap; cursor:help; }
@@ -341,6 +361,7 @@
     <button class="tab-a"        id="tab-btn-conta"    onclick="verTabAdmin('conta',this)">💰 Contabilidad</button>
     <button class="tab-a"        id="tab-btn-smtp"     onclick="verTabAdmin('smtp',this)">📧 Correo SMTP</button>
     <button class="tab-a"        id="tab-btn-envios"   onclick="verTabAdmin('envios',this)">📨 Envíos</button>
+    <button class="tab-a"        id="tab-btn-diag"     onclick="verTabAdmin('diag',this)">🩺 Servicios</button>
   </div>
 
   <!-- SECCIÓN: USUARIOS -->
@@ -545,6 +566,22 @@
         <button class="btn-sec" onclick="ctaCerrarMov()">Cancelar</button>
         <button class="btn-save" id="cta-mov-btn" onclick="ctaGuardarMov()" style="padding:9px 22px">Guardar</button>
       </div>
+    </div>
+  </div>
+
+  <div class="tab-sec" id="tab-sec-diag">
+    <div class="tabla-card" style="padding:16px 18px">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px">
+        <span class="tabla-title">Comprobación de servicios</span>
+        <span id="diag-fecha" style="font-size:11.5px;color:var(--texto-hint)"></span>
+        <button class="env-btn" style="margin-left:auto" onclick="diagProbar()">Probar todo</button>
+      </div>
+      <div style="font-size:12px;color:var(--texto-sub);margin-bottom:14px;line-height:1.5">
+        Cada prueba hace una llamada real al servicio. Son de sólo lectura:
+        <strong>no emiten documentos, no mandan correos a clientes ni gastan timbres</strong>.
+        Puedes repetirlas cuantas veces quieras.
+      </div>
+      <div id="diag-lista"></div>
     </div>
   </div>
 
@@ -1749,6 +1786,69 @@ async function ctaBorrarPeriodo(id) {
 }
 
 /* ── Tab admin switching ── */
+/* ═══════════════════════════════════════════════════════════════
+   COMPROBACIÓN DE SERVICIOS
+   Probar antes de confiar. Cada tarjeta dice en qué estado está el
+   servicio y, cuando algo falla, qué hacer al respecto — que es lo
+   que de verdad falta cuando sólo se ve "error 400".
+   ═══════════════════════════════════════════════════════════════ */
+const DIAG_ICO = { ok: '✅', aviso: '⚠️', error: '❌', apagado: '⚪', probando: '⏳' };
+
+async function diagProbar(servicio) {
+  const cont = document.getElementById('diag-lista');
+  if (!cont) return;
+  if (!servicio) {
+    cont.innerHTML = `<div class="dg-card probando"><div class="dg-ico">⏳</div>
+      <div class="dg-cuerpo"><div class="dg-nombre">Probando…</div>
+      <div class="dg-det">Llamando a cada servicio. Puede tardar unos segundos.</div></div></div>`;
+  }
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'PROBAR_SERVICIOS', payload: servicio ? { servicio } : {} })
+    });
+    const d = await res.json();
+    if (d.status !== 'success') {
+      cont.innerHTML = `<div class="dg-card error"><div class="dg-ico">❌</div>
+        <div class="dg-cuerpo"><div class="dg-nombre">No se pudo probar</div>
+        <div class="dg-det">${diagEsc(d.message || '')}</div></div></div>`;
+      return;
+    }
+    document.getElementById('diag-fecha').textContent = 'Última comprobación: ' + (d.fecha || '');
+    if (servicio) {
+      // Se reemplaza sólo esa tarjeta, para no perder el resto.
+      const nueva = diagTarjeta(d.data[0]);
+      const vieja = document.getElementById('dg-' + servicio);
+      if (vieja) vieja.outerHTML = nueva; else cont.innerHTML = nueva;
+    } else {
+      cont.innerHTML = d.data.map(diagTarjeta).join('');
+    }
+  } catch (e) {
+    cont.innerHTML = `<div class="dg-card error"><div class="dg-ico">❌</div>
+      <div class="dg-cuerpo"><div class="dg-nombre">Error de conexión</div>
+      <div class="dg-det">No se pudo hablar con el propio servidor.</div></div></div>`;
+  }
+}
+
+function diagTarjeta(s) {
+  return `<div class="dg-card ${diagEsc(s.estado)}" id="dg-${diagEsc(s.clave)}">
+    <div class="dg-ico">${DIAG_ICO[s.estado] || '•'}</div>
+    <div class="dg-cuerpo">
+      <div class="dg-nombre">${diagEsc(s.nombre)}</div>
+      <div class="dg-det">${diagEsc(s.detalle)}</div>
+      ${s.que_hacer ? `<div class="dg-hacer"><strong>Qué hacer:</strong> ${diagEsc(s.que_hacer)}</div>` : ''}
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+      ${s.ms != null ? `<span class="dg-ms">${s.ms} ms</span>` : ''}
+      <button class="dg-re" onclick="diagProbar('${diagEsc(s.clave)}')">Probar</button>
+    </div>
+  </div>`;
+}
+
+function diagEsc(t) {
+  return String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
 let _envios = null;
 
 function verTabAdmin(id, btn) {
@@ -1756,6 +1856,7 @@ function verTabAdmin(id, btn) {
   document.querySelectorAll('.tab-a').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-sec-' + id).classList.add('active');
   btn.classList.add('active');
+  if (id === 'diag')   diagProbar();
   if (id === 'envios') {
     if (!_envios) _envios = Envios.montar('envios-box', API);
     _envios.cargar();

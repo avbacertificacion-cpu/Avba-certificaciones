@@ -236,6 +236,32 @@ class VerificacionIA {
             : ($errores[0] ?? 'No se pudo leer la identificación.')];
     }
 
+    /**
+     * Qué salió mal, en términos de quien tiene que arreglarlo.
+     *
+     * Antes todo lo que no fuera 429 decía "no contestó (HTTP 400)", que
+     * suena a problema de red cuando casi siempre es la llave mal pegada en
+     * config.php. Quien lee ese mensaje tiene que saber si llamar al
+     * proveedor, esperar, o revisar su propia configuración.
+     */
+    public static function motivoGemini(int $code, string $cuerpo = '', string $cerr = ''): string {
+        // Gemini manda 400 con API_KEY_INVALID cuando la llave está mal
+        // escrita, y 403 cuando es válida pero no tiene permiso.
+        if ($code === 400 && stripos($cuerpo, 'API_KEY_INVALID') !== false)
+            return 'la clave GEMINI_API_KEY no es válida (revísala en config/config.php)';
+        switch ($code) {
+            case 0:   return 'no se pudo conectar' . ($cerr !== '' ? ': ' . $cerr : '');
+            case 400: return 'rechazó la petición (HTTP 400)';
+            case 401:
+            case 403: return 'rechazó la clave: no es válida, fue revocada o no tiene permiso';
+            case 404: return 'el modelo configurado en GEMINI_MODEL no existe';
+            case 429: return 'alcanzó su límite de uso (cuota agotada)';
+            case 500:
+            case 503: return 'el servicio está saturado; inténtalo en unos minutos';
+            default:  return 'no contestó (HTTP ' . $code . ')';
+        }
+    }
+
     /** @return array{0:?array,1:string} [datos, error] */
     protected function conGemini(string $prompt, string $mime, string $bytes): array {
         $payload = [
@@ -280,9 +306,7 @@ class VerificacionIA {
 
         if ($resp === false || $code !== 200) {
             error_log('[VerificacionIA] Gemini HTTP ' . $code . ' ' . $cerr . ' ' . substr((string)$resp, 0, 500));
-            return [null, $code === 429
-                ? 'alcanzó su límite de uso'
-                : 'no contestó (HTTP ' . $code . ')'];
+            return [null, self::motivoGemini($code, (string)$resp, $cerr)];
         }
 
         $data = json_decode((string)$resp, true);

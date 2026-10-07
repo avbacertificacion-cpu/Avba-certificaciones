@@ -40,6 +40,7 @@ require_once __DIR__ . '/Examenes.php';
 require_once __DIR__ . '/VerificacionIA.php';
 require_once __DIR__ . '/Recomendaciones.php';
 require_once __DIR__ . '/Envios.php';
+require_once __DIR__ . '/Diagnostico.php';
 require_once __DIR__ . '/Arneses.php';
 require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
@@ -160,6 +161,7 @@ $personal = new Personal($pdo);
 $accesorios     = new Accesorios($pdo);
 $recom          = new Recomendaciones($pdo);  // su constructor migra sus tablas
 $envios         = new Envios($pdo);          // bitácora de correos enviados
+$diag           = new Diagnostico($pdo);     // comprobación de servicios externos
 $pnd            = new Pnd($pdo);
 $cliEquipos     = new ClienteEquipos($pdo);
 $cliPersonal    = new ClientePersonal($pdo);
@@ -1993,6 +1995,18 @@ if ($method === 'POST') {
            ═══════════════════════════════════════════════════════════ */
 
         // Las de un equipo, para las pantallas de AVBA.
+        /* ═══════════ COMPROBACIÓN DE SERVICIOS ═══════════
+           Prueba de verdad cada integración antes de confiar en ella. Sólo
+           ADMIN: las respuestas dicen qué está configurado y qué contesta
+           cada servicio, y eso no tiene por qué verlo todo el mundo. */
+        case 'PROBAR_SERVICIOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN')
+                respuesta(['status' => 'error', 'message' => 'Sólo un administrador puede probar los servicios.'], 401);
+            respuesta(empty($payload['servicio'])
+                ? $diag->todo()
+                : $diag->uno((string)$payload['servicio']));
+
         /* ═══════════ BITÁCORA DE ENVÍOS POR CORREO ═══════════
            Qué se mandó, a quién, cuándo y quién lo envió. La tabla llevaba
            años llenándose sin que nadie pudiera consultarla. */
