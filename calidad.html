@@ -696,8 +696,23 @@
       cursor:pointer; font-family:inherit; }
     .tc-btn:hover { border-color:var(--azul); color:var(--azul); }
     .tc-btn.on { background:var(--azul); border-color:var(--azul); color:#fff; }
+    /* ── Bitácora de envíos ────────────────────────────────────────────── */
+    .env-lbl { display:block; font-size:10.5px; font-weight:700; color:var(--texto-sub);
+      text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px; }
+    .env-inp { width:100%; padding:7px 10px; border:1.5px solid var(--borde);
+      border-radius:7px; font-size:12.5px; font-family:inherit; background:#fff; color:var(--texto); }
+    .env-btn { padding:8px 15px; border-radius:8px; border:1.5px solid var(--azul);
+      background:var(--azul); color:#fff; font-size:12px; font-weight:700; cursor:pointer;
+      font-family:inherit; white-space:nowrap; }
+    .env-btn.sec { background:#fff; color:var(--texto-sub); border-color:var(--borde); }
+    .env-btn.sec:hover { border-color:var(--azul); color:var(--azul); }
+    .env-ok { font-size:10.5px; font-weight:700; color:var(--verde);
+      background:var(--verde-light); border-radius:20px; padding:3px 9px; white-space:nowrap; }
+    .env-no { font-size:10.5px; font-weight:700; color:var(--rojo);
+      background:var(--rojo-light); border-radius:20px; padding:3px 9px; white-space:nowrap; cursor:help; }
 </style>
   <script src="js/tabla-clientes.js"></script>
+  <script src="js/envios.js"></script>
 </head>
 <body>
 
@@ -733,6 +748,7 @@
   <button class="tab-btn"        id="sec-btn-qr"         onclick="verSeccion('qr')">🔢 Códigos QR</button>
   <button class="tab-btn"        id="sec-btn-pnd"        onclick="verSeccion('pnd')">🔬 PND</button>
   <button class="tab-btn"        id="sec-btn-auditorias" onclick="verSeccion('auditorias');cargarAuditorias()">📋 Auditorías</button>
+  <button class="tab-btn"        id="sec-btn-envios"     onclick="verSeccion('envios')">📧 Envíos</button>
 </div>
 
 <!-- sub-nav Accesorios -->
@@ -2317,6 +2333,10 @@
   </div>
 </div>
 
+<div id="sec-envios" class="wrap" style="display:none">
+  <div id="envios-box"></div>
+</div>
+
 <div id="sec-auditorias" class="wrap" style="display:none">
   <div id="aud-recordatorio" style="display:none;background:#fef3c7;border:1px solid #f59e0b;border-radius:10px;padding:12px 16px;margin-bottom:16px;color:#92400e;font-size:13px;font-weight:600"></div>
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
@@ -3692,8 +3712,10 @@ const TODOS_CONTENIDOS = [
   'sec-arneses',
 ];
 
+let _envios = null;
+
 function verSeccion(sec) {
-  ['maquinaria','accesorios','arneses','personal','catalogos','qr','pnd','auditorias'].forEach(s => {
+  ['maquinaria','accesorios','arneses','personal','catalogos','qr','pnd','auditorias','envios'].forEach(s => {
     const b = document.getElementById('sec-btn-' + s); if (b) b.classList.toggle('active', s === sec);
   });
   ['accesorios','personal','catalogos'].forEach(s => {
@@ -3705,6 +3727,10 @@ function verSeccion(sec) {
 
   if (sec === 'maquinaria') {
     document.getElementById('sec-maquinaria').style.display = '';
+  } else if (sec === 'envios') {
+    document.getElementById('sec-envios').style.display = '';
+    if (!_envios) _envios = Envios.montar('envios-box', API);
+    _envios.cargar();
   } else if (sec === 'accesorios') {
     document.getElementById('sub-nav-accesorios').style.display = '';
     verSubTab('accesorios', 'inspeccionados');

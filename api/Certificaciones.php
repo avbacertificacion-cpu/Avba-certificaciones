@@ -2972,7 +2972,8 @@ HTML;
             $mail->addAttachment($ruta, $nombre);
         }
 
-        $mail->send();
+        // Lo anota registrarEnvio() con el id del registro, que aquí no se tiene.
+        enviarYRegistrar($this->pdo, $mail, ['sin_bitacora' => true]);
     }
 
     private function plantillaCorreo(string $cliente, string $folio, string $tipoDocs, array $credenciales = []): string {
@@ -3027,17 +3028,18 @@ HTML;
         return plantillaCorreoHtml($this->pdo, $cuerpo);
     }
 
+    /** Anota el envío en la bitácora, con el módulo y el id del registro. */
     private function registrarEnvio(array $datos, string $archivo, string $usuario): void {
-        $this->pdo->prepare(
-            "INSERT INTO historico_envios (cliente, control, correo, archivo, usuario, equipo_id)
-             VALUES (?, ?, ?, ?, ?, ?)"
-        )->execute([
-            $datos['cliente']  ?? null,
-            $datos['control']  ?? null,
-            $datos['correo']   ?? null,
-            $archivo,
-            $usuario,
-            $datos['id']       ?? null,
+        Envios::anotar($this->pdo, [
+            'cliente'     => $datos['cliente'] ?? null,
+            'control'     => $datos['control'] ?? null,
+            'correo'      => $datos['correo']  ?? null,
+            'archivo'     => $archivo,
+            'usuario'     => $usuario,
+            'equipo_id'   => $datos['id'] ?? null,
+            'modulo'      => 'equipo',
+            'registro_id' => $datos['id'] ?? null,
+            'ok'          => 1,
         ]);
     }
 

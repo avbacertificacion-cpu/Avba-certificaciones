@@ -245,7 +245,22 @@
       background: none; border: none; cursor: pointer; color: var(--azul);
       font-size: 15px; line-height: 1; padding: 0;
     }
-  </style>
+      /* ── Bitácora de envíos ────────────────────────────────────────────── */
+    .env-lbl { display:block; font-size:10.5px; font-weight:700; color:var(--texto-sub);
+      text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px; }
+    .env-inp { width:100%; padding:7px 10px; border:1.5px solid var(--borde);
+      border-radius:7px; font-size:12.5px; font-family:inherit; background:#fff; color:var(--texto); }
+    .env-btn { padding:8px 15px; border-radius:8px; border:1.5px solid var(--azul);
+      background:var(--azul); color:#fff; font-size:12px; font-weight:700; cursor:pointer;
+      font-family:inherit; white-space:nowrap; }
+    .env-btn.sec { background:#fff; color:var(--texto-sub); border-color:var(--borde); }
+    .env-btn.sec:hover { border-color:var(--azul); color:var(--azul); }
+    .env-ok { font-size:10.5px; font-weight:700; color:var(--verde);
+      background:var(--verde-light); border-radius:20px; padding:3px 9px; white-space:nowrap; }
+    .env-no { font-size:10.5px; font-weight:700; color:var(--rojo);
+      background:var(--rojo-light); border-radius:20px; padding:3px 9px; white-space:nowrap; cursor:help; }
+</style>
+  <script src="js/envios.js"></script>
 </head>
 <body>
 
@@ -324,6 +339,7 @@
     <button class="tab-a"        id="tab-btn-ads"      onclick="verTabAdmin('ads',this)">📢 Publicidad</button>
     <button class="tab-a"        id="tab-btn-conta"    onclick="verTabAdmin('conta',this)">💰 Contabilidad</button>
     <button class="tab-a"        id="tab-btn-smtp"     onclick="verTabAdmin('smtp',this)">📧 Correo SMTP</button>
+    <button class="tab-a"        id="tab-btn-envios"   onclick="verTabAdmin('envios',this)">📨 Envíos</button>
   </div>
 
   <!-- SECCIÓN: USUARIOS -->
@@ -529,6 +545,10 @@
         <button class="btn-save" id="cta-mov-btn" onclick="ctaGuardarMov()" style="padding:9px 22px">Guardar</button>
       </div>
     </div>
+  </div>
+
+  <div class="tab-sec" id="tab-sec-envios">
+    <div id="envios-box"></div>
   </div>
 
   <div class="tab-sec" id="tab-sec-smtp">
@@ -1728,11 +1748,17 @@ async function ctaBorrarPeriodo(id) {
 }
 
 /* ── Tab admin switching ── */
+let _envios = null;
+
 function verTabAdmin(id, btn) {
   document.querySelectorAll('.tab-sec').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.tab-a').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-sec-' + id).classList.add('active');
   btn.classList.add('active');
+  if (id === 'envios') {
+    if (!_envios) _envios = Envios.montar('envios-box', API);
+    _envios.cargar();
+  }
   if (id === 'smtp')  cargarSmtp();
   if (id === 'pagos') cargarPagos();
   if (id === 'ads')   cargarAnuncios();

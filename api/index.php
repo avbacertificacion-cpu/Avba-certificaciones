@@ -39,6 +39,7 @@ require_once __DIR__ . '/Anuncios.php';
 require_once __DIR__ . '/Examenes.php';
 require_once __DIR__ . '/VerificacionIA.php';
 require_once __DIR__ . '/Recomendaciones.php';
+require_once __DIR__ . '/Envios.php';
 require_once __DIR__ . '/Arneses.php';
 require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
@@ -158,6 +159,7 @@ $avbaAdmin  = new AvbaAdmin($pdo);
 $personal = new Personal($pdo);
 $accesorios     = new Accesorios($pdo);
 $recom          = new Recomendaciones($pdo);  // su constructor migra sus tablas
+$envios         = new Envios($pdo);          // bitácora de correos enviados
 $pnd            = new Pnd($pdo);
 $cliEquipos     = new ClienteEquipos($pdo);
 $cliPersonal    = new ClientePersonal($pdo);
@@ -1991,6 +1993,40 @@ if ($method === 'POST') {
            ═══════════════════════════════════════════════════════════ */
 
         // Las de un equipo, para las pantallas de AVBA.
+        /* ═══════════ BITÁCORA DE ENVÍOS POR CORREO ═══════════
+           Qué se mandó, a quién, cuándo y quién lo envió. La tabla llevaba
+           años llenándose sin que nadie pudiera consultarla. */
+        case 'LISTAR_ENVIOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($envios->listar([
+                'q'        => (string)($payload['q']       ?? ''),
+                'desde'    => (string)($payload['desde']   ?? ''),
+                'hasta'    => (string)($payload['hasta']   ?? ''),
+                'usuario'  => (string)($payload['usuario'] ?? ''),
+                'modulo'   => (string)($payload['modulo']  ?? ''),
+                'ok'       => $payload['ok'] ?? '',
+                'limite'         => (int)($payload['limite'] ?? 200),
+                'desplazamiento' => (int)($payload['desplazamiento'] ?? 0),
+            ]));
+
+        // Los envíos de un registro, para su pestaña de historial.
+        case 'ENVIOS_DE_REGISTRO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($envios->deRegistro(
+                (string)($payload['modulo'] ?? 'equipo'),
+                (int)($payload['registro_id'] ?? $payload['id'] ?? 0)
+            ));
+
+        case 'USUARIOS_ENVIOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta(['status' => 'success', 'data' => $envios->usuarios()]);
+
         case 'LISTAR_RECOMENDACIONES':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES','INSPECTOR']))

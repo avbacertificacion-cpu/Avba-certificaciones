@@ -222,6 +222,60 @@ foreach ([
  * en el SELECT haría fallar la consulta entera, y en el portal del cliente eso
  * significa una sección en blanco en lugar de los documentos que ya tenía.
  */
+/**
+ * Envía el correo Y lo anota en la bitácora, incluido si falla.
+ *
+ * Antes cada módulo llamaba a $mail->send() a secas: un envío que reventaba
+ * no dejaba rastro, y de los que salían bien sólo dos módulos anotaban algo.
+ * Aquí se registra siempre, y lo que se puede se saca del propio mensaje
+ * —destinatarios, asunto, adjuntos— para que el que llama no tenga que
+ * repetirlo.
+ *
+ * El fallo se re-lanza: quien llama decide qué hacer con él. Lo único que
+ * esta función garantiza es que quede constancia.
+ *
+ * @param array $meta modulo, registro_id, usuario, cliente, control
+ */
+function enviarYRegistrar(PDO $pdo, $mail, array $meta = []): void {
+    $destinos = '';
+    $asunto   = '';
+    $archivo  = '';
+    try {
+        $destinos = implode(', ', array_map(fn($a) => $a[0] ?? '', $mail->getToAddresses()));
+        $asunto   = (string)($mail->Subject ?? '');
+        $adj      = method_exists($mail, 'getAttachments') ? $mail->getAttachments() : [];
+        $archivo  = implode(', ', array_map(fn($a) => $a[2] ?? '', $adj));
+    } catch (\Throwable $e) { /* si no se puede leer, se anota lo que haya */ }
+
+    $base = [
+        'cliente' => $meta['cliente'] ?? null,
+        'control' => $meta['control'] ?? null,
+        'correo'  => $destinos ?: ($meta['correo'] ?? ''),
+        'archivo' => $archivo,
+        'usuario' => $meta['usuario'] ?? '',
+        'asunto'  => $asunto,
+    ];
+    if (!empty($meta['modulo']))      $base['modulo'] = $meta['modulo'];
+    if (!empty($meta['registro_id'])) $base['registro_id'] = (int)$meta['registro_id'];
+    // Los de maquinaria se siguen guardando también en equipo_id, que es por
+    // donde los busca el historial de los registros viejos.
+    if (($meta['modulo'] ?? '') === 'equipo' && !empty($meta['registro_id']))
+        $base['equipo_id'] = (int)$meta['registro_id'];
+
+    // Algunos módulos anotan por su cuenta un instante después, porque tienen
+    // a mano el id del registro que aquí no se ve. Esos piden no duplicar,
+    // pero un FALLO se anota igual: si revienta, el otro registro nunca corre.
+    $soloFallo = !empty($meta['sin_bitacora']);
+
+    try {
+        $mail->send();
+    } catch (\Throwable $e) {
+        if (class_exists('Envios')) Envios::anotarFallo($pdo, $base, $e->getMessage());
+        throw $e;
+    }
+    if (!$soloFallo && class_exists('Envios')) Envios::anotar($pdo, $base + ['ok' => 1]);
+}
+
 function columnaExiste(PDO $pdo, string $tabla, string $columna): bool {
     // La conexión forma parte de la clave: dos conexiones pueden apuntar a bases
     // distintas, y recordar la respuesta de una para la otra haría nombrar una

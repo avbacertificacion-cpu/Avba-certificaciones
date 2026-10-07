@@ -492,8 +492,23 @@
       cursor:pointer; font-family:inherit; }
     .tc-btn:hover { border-color:var(--azul); color:var(--azul); }
     .tc-btn.on { background:var(--azul); border-color:var(--azul); color:#fff; }
+    /* ── Bitácora de envíos ────────────────────────────────────────────── */
+    .env-lbl { display:block; font-size:10.5px; font-weight:700; color:var(--texto-sub);
+      text-transform:uppercase; letter-spacing:.04em; margin-bottom:3px; }
+    .env-inp { width:100%; padding:7px 10px; border:1.5px solid var(--borde);
+      border-radius:7px; font-size:12.5px; font-family:inherit; background:#fff; color:var(--texto); }
+    .env-btn { padding:8px 15px; border-radius:8px; border:1.5px solid var(--azul);
+      background:var(--azul); color:#fff; font-size:12px; font-weight:700; cursor:pointer;
+      font-family:inherit; white-space:nowrap; }
+    .env-btn.sec { background:#fff; color:var(--texto-sub); border-color:var(--borde); }
+    .env-btn.sec:hover { border-color:var(--azul); color:var(--azul); }
+    .env-ok { font-size:10.5px; font-weight:700; color:var(--verde);
+      background:var(--verde-light); border-radius:20px; padding:3px 9px; white-space:nowrap; }
+    .env-no { font-size:10.5px; font-weight:700; color:var(--rojo);
+      background:var(--rojo-light); border-radius:20px; padding:3px 9px; white-space:nowrap; cursor:help; }
 </style>
   <script src="js/tabla-clientes.js"></script>
+  <script src="js/envios.js"></script>
 </head>
 <body>
 
@@ -525,10 +540,15 @@
   <button class="tab-btn" id="sec-btn-accesorios" onclick="verSeccion('accesorios')">🔗 Accesorios</button>
   <button class="tab-btn" id="sec-btn-arneses" onclick="verSeccion('arneses')">🦺 Arneses</button>
   <button class="tab-btn" id="sec-btn-personal" onclick="verSeccion('personal')">👤 Personal</button>
+  <button class="tab-btn" id="sec-btn-envios" onclick="verSeccion('envios')">📧 Envíos</button>
 </div>
 <div class="sub-nav" id="sub-nav-personal" style="display:none">
   <button class="sub-btn active" id="sub-btn-per-cursos" onclick="verSubTabCert('cursos')">Cursos impartidos</button>
   <button class="sub-btn" id="sub-btn-per-indep" onclick="verSubTabCert('independiente')">Independiente</button>
+</div>
+
+<div id="sec-envios" class="wrap" style="display:none">
+  <div id="envios-box"></div>
 </div>
 
 <div id="sec-maquinaria" class="wrap">
@@ -865,6 +885,8 @@
       <div class="tab-panel" id="panel-hist">
         <div class="sec-label">Historial de acciones</div>
         <div id="historial-lista"></div>
+        <div class="sec-label" style="margin-top:18px">Envíos por correo</div>
+        <div id="hist-envios"></div>
       </div>
 
     </div><!-- /modal-body -->
@@ -1673,6 +1695,38 @@ function abrirEnGoogleMaps() {
 /* ═══════════════════════════════
    HISTORIAL
 ═══════════════════════════════ */
+/**
+ * Los envíos de este registro, en su propia pestaña de historial.
+ *
+ * Lo de arriba son los hitos del registro, deducidos de sus propios campos.
+ * Esto es la bitácora de verdad: a qué correo salió cada documento, cuándo y
+ * quién lo mandó. Es lo que sirve cuando un cliente dice que no le llegó.
+ */
+async function pintarEnviosHist(d) {
+  const caja = document.getElementById('hist-envios');
+  if (!caja) return;
+  caja.innerHTML = `<div style="font-size:12px;color:var(--texto-hint)">Buscando envíos…</div>`;
+  const filas = await Envios.deRegistro(API, 'equipo', d.fila);
+  if (!filas.length) {
+    caja.innerHTML = `<div class="hist-empty">Sin envíos por correo registrados.</div>`;
+    return;
+  }
+  const e = Envios.esc;
+  caja.innerHTML = filas.map(x => `
+    <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-top:1px solid var(--borde)">
+      <span style="font-size:14px;line-height:1.2">${x.ok ? '📧' : '⚠️'}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12.5px;font-weight:600;color:var(--texto);word-break:break-all">
+          ${e(x.correo || 'sin destinatario')}</div>
+        <div style="font-size:11px;color:var(--texto-hint);word-break:break-all">
+          ${e(x.archivo || '—')}</div>
+        <div style="font-size:11px;color:var(--texto-hint)">
+          ${e(x.fecha)}${x.usuario ? ' · por ' + e(x.usuario) : ''}</div>
+        ${x.ok ? '' : `<div style="font-size:11px;color:var(--rojo);margin-top:2px">Falló: ${e(x.error || 'sin detalle')}</div>`}
+      </div>
+    </div>`).join('');
+}
+
 function renderHistorial(d) {
   const lista = document.getElementById("historial-lista");
   const eventos = [];
@@ -1686,6 +1740,10 @@ function renderHistorial(d) {
     lista.innerHTML = `<div class="hist-empty">Sin historial de acciones registrado.</div>`;
     return;
   }
+
+  // Los envíos reales se piden aparte y se agregan abajo: son una consulta
+  // más y no deben retrasar la apertura del detalle.
+  pintarEnviosHist(d);
 
   lista.innerHTML = eventos.reverse().map(e => `
     <div class="historial-item">
@@ -2219,7 +2277,8 @@ function mostrarToast(msg, tipo = "info") {
 /* ═══════════════════════════════
    NAVEGACIÓN POR SECCIONES
 ═══════════════════════════════ */
-const CERT_SECCIONES = ['sec-maquinaria','sec-accesorios','sec-arneses','sec-per-cursos','sec-per-indep'];
+let _envios = null;
+const CERT_SECCIONES = ['sec-maquinaria','sec-accesorios','sec-arneses','sec-per-cursos','sec-per-indep','sec-envios'];
 
 
 /* ═══ ARNESES Y LÍNEAS DE VIDA (emisión) ════════════════════════════════════
@@ -2450,13 +2509,18 @@ async function arncSubirDoc(input, tipo, sesionId, itemId) {
 function verSeccion(sec) {
   CERT_SECCIONES.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
   document.getElementById('sub-nav-personal').style.display = 'none';
-  ['maquinaria','accesorios','arneses','personal'].forEach(s => {
+  ['maquinaria','accesorios','arneses','personal','envios'].forEach(s => {
     document.getElementById('sec-btn-' + s)?.classList.remove('active');
   });
   document.getElementById('sec-btn-' + sec)?.classList.add('active');
 
   if (sec === 'maquinaria') {
     document.getElementById('sec-maquinaria').style.display = '';
+  } else if (sec === 'envios') {
+    document.getElementById('sec-envios').style.display = '';
+    // Se monta una sola vez; después sólo se recarga.
+    if (!_envios) _envios = Envios.montar('envios-box', API);
+    _envios.cargar();
   } else if (sec === 'accesorios') {
     document.getElementById('sec-accesorios').style.display = '';
     accCertCargados = false;

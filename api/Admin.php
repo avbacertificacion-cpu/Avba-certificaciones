@@ -866,7 +866,7 @@ class Admin {
             $mail->Subject = 'Prueba SMTP — AVBA Certificaciones';
             $mail->isHTML(true);
             $mail->Body    = '<p>Correo de prueba desde el panel de administración AVBA.</p>';
-            $mail->send();
+            enviarYRegistrar($this->pdo, $mail, []);
             return ['status' => 'success', 'message' => "Correo enviado a {$correo}. Config: {$info}"];
         } catch (\Exception $e) {
             return [

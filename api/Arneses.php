@@ -1968,25 +1968,22 @@ class Arneses {
             : $cuerpo;
 
         foreach ($adjuntos as $ruta => $nombre) $mail->addAttachment($ruta, $nombre);
-        $mail->send();
+        // Lo anota registrarEnvio() con el id del registro, que aquí no se tiene.
+        enviarYRegistrar($this->pdo, $mail, ['sin_bitacora' => true]);
     }
 
-    /** Deja constancia del envío en historico_envios, como en grúas. */
+    /** Deja constancia del envío en la bitácora, como en grúas. */
     private function registrarEnvio(array $ses, string $archivos, string $usuario): void {
-        try {
-            $this->pdo->prepare(
-                "INSERT INTO historico_envios (cliente, control, correo, archivo, usuario, equipo_id)
-                 VALUES (?, ?, ?, ?, ?, NULL)"
-            )->execute([
-                $ses['cliente'] ?? null,
-                $ses['control'] ?? null,
-                $ses['correo']  ?? null,
-                $archivos,
-                $usuario,
-            ]);
-        } catch (\Throwable $e) {
-            error_log('[Arneses] registrarEnvio: ' . $e->getMessage());
-        }
+        Envios::anotar($this->pdo, [
+            'cliente'     => $ses['cliente'] ?? null,
+            'control'     => $ses['control'] ?? null,
+            'correo'      => $ses['correo']  ?? null,
+            'archivo'     => $archivos,
+            'usuario'     => $usuario,
+            'modulo'      => 'arnes',
+            'registro_id' => $ses['id'] ?? null,
+            'ok'          => 1,
+        ]);
     }
 
     /**

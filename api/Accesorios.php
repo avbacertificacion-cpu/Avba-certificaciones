@@ -2628,7 +2628,7 @@ class Accesorios {
                 "<p style=\"font-size:14px;color:#5a6072;line-height:1.7\">Estimado/a,<br><br>Adjunto encontrará el <strong>certificado de inspección de accesorios de izaje</strong> para <strong>" . htmlspecialchars($cliente) . "</strong>.</p>"
             );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
-            $mail->send();
+            enviarYRegistrar($this->pdo, $mail, ['modulo' => 'accesorio', 'registro_id' => (int)$sesionId, 'usuario' => $usuario, 'cliente' => $cliente]);
 
             // Marcar como EMITIDO y guardar URL para el portal del cliente
             $certUrl = $doc['url_pub'];
@@ -2698,7 +2698,7 @@ class Accesorios {
                 "<p style=\"font-size:14px;color:#5a6072;line-height:1.7\">Estimado/a,<br><br>Adjunto encontrará el <strong>informe de integridad operativa</strong> de accesorios de izaje para <strong>" . htmlspecialchars($cliente) . "</strong>.</p>"
             );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
-            $mail->send();
+            enviarYRegistrar($this->pdo, $mail, ['modulo' => 'accesorio', 'registro_id' => (int)$sesionId, 'usuario' => $usuario, 'cliente' => $cliente]);
 
             // Marcar como EMITIDO y guardar URL para el portal del cliente
             $informeUrl = $doc['url_pub'];
@@ -2737,7 +2737,7 @@ class Accesorios {
                 "<p style=\"font-size:14px;color:#5a6072;line-height:1.7\">Estimado/a,<br><br>Adjunto encontrará el <strong>informe de accesorios aprobados (CUMPLE)</strong> para <strong>" . htmlspecialchars($cliente) . "</strong>.</p>"
             );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
-            $mail->send();
+            enviarYRegistrar($this->pdo, $mail, ['modulo' => 'accesorio', 'registro_id' => (int)$sesionId, 'usuario' => $usuario, 'cliente' => $cliente]);
 
             // Marcar como EMITIDO y guardar URL del informe CUMPLE (columna separada)
             $informeUrl = $doc['url_pub'];
@@ -2791,7 +2791,7 @@ class Accesorios {
             if ($tieneCumple) {
                 $mail->addAttachment($resCumple['abs'], basename($resCumple['abs']));
             }
-            $mail->send();
+            enviarYRegistrar($this->pdo, $mail, ['modulo' => 'accesorio', 'registro_id' => (int)$sesionId, 'usuario' => $usuario, 'cliente' => $cliente]);
 
             // Actualizar BD con URLs y marcar EMITIDO
             $this->pdo->prepare(

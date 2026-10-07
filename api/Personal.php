@@ -749,7 +749,7 @@ class Personal {
             foreach ($adjuntos as $adj) {
                 $mail->addAttachment($adj['path'], $adj['name']);
             }
-            $mail->send();
+            enviarYRegistrar($this->pdo, $mail, ['modulo' => 'personal', 'usuario' => $usuario]);
         } catch (\Exception $e) {
             return ['status' => 'error', 'message' => 'Error al enviar correo: ' . $e->getMessage()];
         }
@@ -1072,7 +1072,7 @@ class Personal {
             $mail->isHTML(true);
             $mail->Body    = $this->plantillaCorreoPersonal($nombre, 'DC-3, Diploma, Certificado y Credencial', $p['curso_nombre'] ?? '', $credenciales);
             foreach ($adjuntos as $a) $mail->addAttachment($a['ruta'], $a['nombre']);
-            $mail->send();
+            enviarYRegistrar($this->pdo, $mail, ['modulo' => 'personal', 'registro_id' => (int)$id, 'usuario' => $usuario]);
         } catch (\Exception $e) {
             return ['status' => 'error', 'message' => 'Error al enviar correo: ' . $e->getMessage()];
         }
@@ -2154,7 +2154,7 @@ HTML;
             $mail->isHTML(true);
             $mail->Body       = $this->plantillaCorreoPersonal($nombre, $tipoLabel, $p['curso_nombre'] ?? '', $credenciales);
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
-            $mail->send();
+            enviarYRegistrar($this->pdo, $mail, ['modulo' => 'personal', 'registro_id' => (int)$id, 'usuario' => $usuario]);
 
             $enviados = implode(', ', $lista);
             return ['status' => 'success', 'message' => "Documento enviado a {$enviados}."];

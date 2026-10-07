@@ -2110,7 +2110,7 @@ REGLAS DE SALIDA — sin excepción
             : $cuerpo;
 
         foreach ($adjuntos as $ruta => $nombre) $mail->addAttachment($ruta, $nombre);
-        $mail->send();
+        enviarYRegistrar($this->pdo, $mail, ['modulo' => 'presupuesto', 'control' => $folio]);
     }
 
     // ══════════════════════════════════════════════════════════
