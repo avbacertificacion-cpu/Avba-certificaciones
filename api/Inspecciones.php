@@ -166,6 +166,22 @@ class Inspecciones {
                 }
             }
 
+            // Recomendaciones del inspector: lo que vio en campo y no
+            // pertenece al alcance de lo que se certifica. No salen en el
+            // reporte ni en el dictamen; llegan al cliente cuando
+            // Certificaciones publica la documentación.
+            if (!empty($payload['recomendaciones']) && class_exists('Recomendaciones')) {
+                try {
+                    (new Recomendaciones($this->pdo))->guardarDeInspeccion(
+                        $equipoId, (array)$payload['recomendaciones'], $usuarioActual
+                    );
+                } catch (\Throwable $e) {
+                    // Una recomendación que falle no puede tirar la inspección:
+                    // el inspector está en campo y lo importante es el registro.
+                    error_log('[Inspecciones] recomendaciones: ' . $e->getMessage());
+                }
+            }
+
             // Historial
             registrarHistorial($this->pdo, $usuarioActual, $equipoId, 'estado', null, 'PENDIENTE', 'INSERT');
 

@@ -779,6 +779,19 @@ class Auth {
             ];
         }
 
+        // Recomendaciones del inspector, por equipo. Se piden una sola vez y
+        // se reparten abajo: pedirlas equipo por equipo serían N consultas
+        // para una pantalla que ya hace varias.
+        $recomPorEquipo = [];
+        if (class_exists('Recomendaciones')) {
+            try { $recomPorEquipo = (new Recomendaciones($this->pdo))->paraCliente($idCliente); }
+            catch (\Throwable $e) { error_log('[Auth] recomendaciones: ' . $e->getMessage()); }
+        }
+        foreach ($equipos as &$eq) {
+            $eq['recomendaciones'] = $recomPorEquipo[$eq['id']] ?? [];
+        }
+        unset($eq);
+
         // ── Accesorios ────────────────────────────────────
         // Certificaciones puede retirar del portal un documento sin tocar los
         // otros dos: el certificado puede estar disponible mientras el informe

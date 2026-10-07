@@ -38,6 +38,7 @@ require_once __DIR__ . '/PagosServicios.php';
 require_once __DIR__ . '/Anuncios.php';
 require_once __DIR__ . '/Examenes.php';
 require_once __DIR__ . '/VerificacionIA.php';
+require_once __DIR__ . '/Recomendaciones.php';
 require_once __DIR__ . '/Arneses.php';
 require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
@@ -156,6 +157,7 @@ $auditorias = new Auditorias($pdo);
 $avbaAdmin  = new AvbaAdmin($pdo);
 $personal = new Personal($pdo);
 $accesorios     = new Accesorios($pdo);
+$recom          = new Recomendaciones($pdo);  // su constructor migra sus tablas
 $pnd            = new Pnd($pdo);
 $cliEquipos     = new ClienteEquipos($pdo);
 $cliPersonal    = new ClientePersonal($pdo);
@@ -1980,6 +1982,96 @@ if ($method === 'POST') {
 
         // Certificado de UNA pieza: el cliente que entrega cada eslinga a un
         // frente distinto necesita que el certificado viaje con la pieza.
+        /* ═══════════════════════════════════════════════════════════
+           RECOMENDACIONES DEL INSPECTOR
+           Lo que el inspector ve en campo y no pertenece al alcance de la
+           certificación. Las escribe el inspector; Calidad, Certificaciones y
+           Admin ajustan la redacción y las aprueban; el cliente las ve cuando
+           Certificaciones publica la documentación, y responde desde su portal.
+           ═══════════════════════════════════════════════════════════ */
+
+        // Las de un equipo, para las pantallas de AVBA.
+        case 'LISTAR_RECOMENDACIONES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES','INSPECTOR']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta(['status' => 'success', 'data' => $recom->listar(
+                (string)($payload['origen'] ?? 'equipo'),
+                (int)($payload['origen_id'] ?? $payload['equipo_id'] ?? 0)
+            )]);
+
+        // Alta suelta. Las de una inspección entran con la inspección misma;
+        // ésta es para agregar una después, y la escribe el inspector.
+        case 'CREAR_RECOMENDACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','INSPECTOR']))
+                respuesta(['status' => 'error', 'message' => 'Sólo el inspector agrega recomendaciones.'], 401);
+            respuesta($recom->crear(
+                (string)($payload['origen'] ?? 'equipo'),
+                (int)($payload['origen_id'] ?? $payload['equipo_id'] ?? 0),
+                (string)($payload['texto'] ?? ''),
+                (string)($payload['prioridad'] ?? 'media'),
+                $usr['usuario']
+            ));
+
+        // Ajuste de redacción. El texto original del inspector no se toca:
+        // queda guardado aparte para poder comprobar que el sentido es el suyo.
+        case 'EDITAR_RECOMENDACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($recom->editar((int)($payload['id'] ?? 0), $payload, $usr['usuario']));
+
+        case 'APROBAR_RECOMENDACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($recom->aprobar((int)($payload['id'] ?? 0), $usr['usuario']));
+
+        case 'DESCARTAR_RECOMENDACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($recom->descartar((int)($payload['id'] ?? 0), $usr['usuario'],
+                                        (string)($payload['motivo'] ?? '')));
+
+        case 'CERRAR_RECOMENDACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($recom->cerrar((int)($payload['id'] ?? 0), $usr['usuario'],
+                                     (string)($payload['comentario'] ?? '')));
+
+        case 'REABRIR_RECOMENDACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($recom->reabrir((int)($payload['id'] ?? 0), $usr['usuario'],
+                                      (string)($payload['motivo'] ?? '')));
+
+        case 'HISTORIAL_RECOMENDACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta(['status' => 'success', 'data' => $recom->historial((int)($payload['id'] ?? 0))]);
+
+        // El cliente responde: acusa recibo o reporta que ya la atendió, con
+        // evidencia. Va por multipart, así que lee $_POST y $_FILES.
+        // Sólo la cuenta principal: los subusuarios no intervienen aquí.
+        case 'RESPONDER_RECOMENDACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error',
+                           'message' => 'Sólo la cuenta principal del cliente puede responder.'], 401);
+            respuesta($recom->responderCliente(
+                (int)($_POST['id'] ?? 0),
+                (string)($_POST['tipo'] ?? 'enterado'),
+                (string)($_POST['comentario'] ?? ''),
+                $_FILES,
+                resolveIdc($usr),
+                (string)($usr['nombre'] ?? $usr['usuario'] ?? '')
+            ));
+
         case 'GENERAR_CERT_ACCESORIO':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
