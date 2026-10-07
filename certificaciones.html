@@ -470,7 +470,30 @@
     }
     .sub-btn:hover { border-color: var(--azul); color: var(--azul); }
     .sub-btn.active { background: var(--azul); border-color: var(--azul); color: white; }
-  </style>
+      /* ── Tabla agrupada por cliente ────────────────────────────────────── */
+    .tc-th { cursor:pointer; user-select:none; white-space:nowrap; }
+    .tc-th:hover { background:rgba(0,0,0,.04); }
+    .tc-flecha { font-size:9px; opacity:.85; }
+    .tc-act { color:var(--azul); }
+    .tc-grupo { cursor:pointer; background:var(--gris-bg); }
+    .tc-grupo:hover { background:#eaf0f8; }
+    .tc-grupo td { padding:0 !important; border-bottom:1px solid var(--borde); }
+    .tc-grupo-in { display:flex; align-items:center; gap:10px; padding:11px 14px; }
+    .tc-chev { font-size:12px; color:var(--azul); width:12px; flex-shrink:0; }
+    .tc-nombre { font-weight:700; font-size:13.5px; color:var(--texto); }
+    .tc-cuenta { font-size:11px; font-weight:700; color:var(--azul-dark);
+      background:var(--azul-light); border-radius:20px; padding:2px 9px; }
+    .tc-resumen { margin-left:auto; font-size:11.5px; color:var(--texto-sub); }
+    .tc-abierto .tc-nombre { color:var(--azul-dark); }
+    .tc-fila td:first-child { padding-left:28px !important; }
+    .tc-barra { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+    .tc-btn { padding:5px 11px; border-radius:7px; border:1.5px solid var(--borde);
+      background:#fff; color:var(--texto-sub); font-size:11.5px; font-weight:600;
+      cursor:pointer; font-family:inherit; }
+    .tc-btn:hover { border-color:var(--azul); color:var(--azul); }
+    .tc-btn.on { background:var(--azul); border-color:var(--azul); color:#fff; }
+</style>
+  <script src="js/tabla-clientes.js"></script>
 </head>
 <body>
 
@@ -541,20 +564,18 @@
   <div class="tabla-card">
     <div class="tabla-header">
       <span class="tabla-title">Registros de certificación</span>
-      <span class="tabla-count" id="tabla-count">Cargando...</span>
+      <div class="tc-barra" style="margin-left:auto">
+        <button class="tc-btn on" id="btn-agrupar" onclick="alternarAgrupado()">👥 Por cliente</button>
+        <button class="tc-btn" onclick="tabla.abrirTodos()">Abrir todos</button>
+        <button class="tc-btn" onclick="tabla.cerrarTodos()">Cerrar todos</button>
+        <span class="tabla-count" id="tabla-count">Cargando...</span>
+      </div>
     </div>
     <div class="tabla-wrap">
       <table>
         <thead>
-          <tr>
-            <th>Cliente</th>
-            <th>Equipo / Serie</th>
-            <th>Folio</th>
-            <th>Fecha cert.</th>
-            <th>Vigencia</th>
-            <th>Estado</th>
-            <th></th>
-          </tr>
+          <!-- Lo arma js/tabla-clientes.js: lleva el estado de ordenamiento. -->
+          <tr id="tabla-head"></tr>
         </thead>
         <tbody id="tabla">
           <tr><td colspan="7" style="text-align:center;padding:36px;color:var(--texto-hint)"><span class="spin"></span>Cargando...</td></tr>
@@ -1237,27 +1258,48 @@ function actualizarStats(d) {
 /* ═══════════════════════════════
    RENDER TABLA
 ═══════════════════════════════ */
-function render(data) {
-  const tbody = document.getElementById("tabla");
-  document.getElementById("tabla-count").textContent = data.length + " registro" + (data.length !== 1 ? "s" : "");
+/* ═══════════════════════════════════════════════════════════════
+   TABLA: agrupada por cliente y ordenable por cualquier columna.
+   El filtrado, el detalle y las acciones no cambian; esto sólo
+   decide cómo se acomoda lo que ya llega.
+   ═══════════════════════════════════════════════════════════════ */
+const tabla = TablaClientes.crear({
+  tbody: 'tabla',
+  thead: 'tabla-head',
+  contador: 'tabla-count',
+  // Por fecha de certificación y de la más reciente a la más antigua, que es
+  // como se consulta esta pantalla.
+  orden: { campo: 'fecha', dir: 'desc' },
+  cols: [
+    { key: 'cliente',    label: 'Cliente',     tipo: 'texto' },
+    { key: 'maquinaria', label: 'Equipo / Serie', tipo: 'texto' },
+    { key: 'control',    label: 'Folio',       tipo: 'texto' },
+    { key: 'fecha',      label: 'Fecha cert.', tipo: 'fecha' },
+    // La vigencia no es un campo: se calcula de la fecha. Se ordena por los
+    // días que quedan, que es lo que de verdad se quiere comparar.
+    { key: 'vigencia',   label: 'Vigencia',    tipo: 'num',
+      valor: r => diasRestantes(r.fecha) },
+    { key: 'estado',     label: 'Estado',      tipo: 'texto' },
+  ],
+  resumen: filas => {
+    const pend = filas.filter(r => r.estado !== 'ENVIADO').length;
+    return pend ? pend + ' sin enviar' : 'todo enviado';
+  },
+  fila: filaCert,
+});
 
-  if (!data.length) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:36px;color:var(--texto-hint)">No hay registros que coincidan.</td></tr>`;
-    return;
+function filaCert(r, agrupado) {
+  const dias = diasRestantes(r.fecha);
+  const bc   = r.estado === "ENVIADO" ? "b-env" : "b-apro";
+  const lbl  = r.estado === "ENVIADO" ? "Enviado" : "Pendiente envío";
+  let diasBadge = "";
+  if (r.estado === "ENVIADO" && dias !== null) {
+    const cls = clasesDias(dias);
+    const txt = dias <= 0 ? "Vencido" : `${dias}d restantes`;
+    diasBadge = `<span class="dias-badge ${cls}">${txt}</span>`;
   }
-
-  tbody.innerHTML = data.map(r => {
-    const dias  = diasRestantes(r.fecha);
-    const bc    = r.estado === "ENVIADO" ? "b-env" : "b-apro";
-    const lbl   = r.estado === "ENVIADO" ? "Enviado" : "Pendiente envío";
-    let diasBadge = "";
-    if (r.estado === "ENVIADO" && dias !== null) {
-      const cls = clasesDias(dias);
-      const txt = dias <= 0 ? "Vencido" : `${dias}d restantes`;
-      diasBadge = `<span class="dias-badge ${cls}">${txt}</span>`;
-    }
-    return `<tr>
-      <td style="font-weight:600">${r.cliente || "—"}</td>
+  return `
+      <td style="font-weight:600">${agrupado ? "" : (r.cliente || "—")}</td>
       <td>
         <span style="color:var(--texto-sub);font-size:12px">${r.maquinaria || "—"}</span><br>
         <span style="font-size:11px;color:var(--texto-hint);font-family:monospace">${r.serie || "—"}</span>
@@ -1266,9 +1308,19 @@ function render(data) {
       <td style="color:var(--texto-sub);font-size:12px">${r.fecha || "—"}</td>
       <td>${diasBadge}</td>
       <td><span class="badge ${bc}">${lbl}</span></td>
-      <td><button class="btn-ver" onclick="ver(${r.fila})">Abrir</button></td>
-    </tr>`;
-  }).join("");
+      <td><button class="btn-ver" onclick="event.stopPropagation();ver(${r.fila})">Abrir</button></td>`;
+}
+
+function render(data) { tabla.render(data); }
+
+function alternarAgrupado() {
+  const agr = !tabla.estaAgrupado();
+  tabla.agrupar(agr);
+  document.getElementById('btn-agrupar').classList.toggle('on', agr);
+  // Abrir y cerrar sólo tienen sentido agrupado.
+  document.querySelectorAll('.tc-barra .tc-btn').forEach(b => {
+    if (/Abrir|Cerrar/.test(b.textContent)) b.style.display = agr ? '' : 'none';
+  });
 }
 
 /* ═══════════════════════════════
