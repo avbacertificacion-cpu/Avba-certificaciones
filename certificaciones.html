@@ -799,7 +799,7 @@
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5C5.5 1.5 3.5 3.5 3.5 6c0 3.5 4.5 8.5 4.5 8.5S12.5 9.5 12.5 6c0-2.5-2-4.5-4.5-4.5z"/><circle cx="8" cy="6" r="1.5"/></svg>
         Envío
       </div>
-      <div class="tab" onclick="cambiarTab('historial')" id="tab-hist">
+      <div class="tab" onclick="cambiarTab('hist')" id="tab-hist">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5L10 10"/></svg>
         Historial
       </div>
@@ -1594,12 +1594,19 @@ async function guardarCorreoCliente() {
    TABS
 ═══════════════════════════════ */
 function cambiarTab(tab) {
+  // Se comprueba ANTES de apagar nada. El botón de Historial llamaba con
+  // 'historial' cuando el panel se llama 'hist': los `?.` se tragaban el
+  // fallo, así que apagaba las cuatro pestañas y no encendía ninguna. El
+  // resultado era un recuadro en blanco, sin ningún error en la consola.
+  const panel = document.getElementById("panel-" + tab);
+  if (!panel) { console.warn('cambiarTab: no existe el panel "' + tab + '"'); return; }
+
   ["info","qr","envio","hist"].forEach(t => {
     document.getElementById("panel-" + t)?.classList.remove("active");
     document.getElementById("tab-"   + t)?.classList.remove("active");
   });
-  document.getElementById("panel-" + tab)?.classList.add("active");
-  document.getElementById("tab-"   + tab)?.classList.add("active");
+  panel.classList.add("active");
+  document.getElementById("tab-" + tab)?.classList.add("active");
 
   if (tab === "envio") initMapa();
 }
