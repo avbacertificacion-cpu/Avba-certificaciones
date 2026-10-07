@@ -150,17 +150,16 @@ class Diagnostico {
             $metodos = $m['supportedGenerationMethods'] ?? $m['supportedActions'] ?? [];
             if (!in_array('generateContent', (array)$metodos, true)) continue;
             $nombre = preg_replace('#^models/#', '', (string)($m['name'] ?? ''));
-            if ($nombre === '') continue;
+            // Se filtra con la MISMA regla que usa el sistema para elegir: si
+            // aquí se sugiriera uno que allá se descarta —un modelo de texto a
+            // voz, por ejemplo— se estaría recomendando algo que no funciona.
+            if ($nombre === '' || !VerificacionIA::sirveParaLeer($nombre)) continue;
             $utiles[] = $nombre;
         }
-        // Primero los "flash": son los que entran en la cuota gratuita y los
-        // que sirven para leer una placa o una credencial.
-        usort($utiles, function ($a, $b) {
-            $pa = str_contains($a, 'flash') ? 0 : 1;
-            $pb = str_contains($b, 'flash') ? 0 : 1;
-            return $pa === $pb ? strcmp($b, $a) : $pa - $pb;
-        });
-        return array_values(array_unique($utiles));
+        $utiles = array_values(array_unique($utiles));
+        usort($utiles, fn($a, $b) => VerificacionIA::prioridadModelo($a) <=> VerificacionIA::prioridadModelo($b)
+                                  ?: strcmp($a, $b));
+        return $utiles;
     }
 
     // ── Claude ────────────────────────────────────────────
@@ -219,6 +218,12 @@ class Diagnostico {
         if ($code === 401)
             return self::r('facturapi', $n, 'error', 'Rechazó la clave.',
                 'Revisa FACTURAPI_KEY. Ojo: la de pruebas y la de producción son distintas.', $ms);
+        if ($code === 402)
+            // La clave es buena: lo que falta es saldo. Decir "error de clave"
+            // mandaría a revisar config.php para nada.
+            return self::r('facturapi', $n, 'aviso',
+                'La clave es válida, pero la cuenta no tiene plan activo o se agotaron los timbres.',
+                'Entra a tu panel de Facturapi y revisa la suscripción. La facturación no funcionará hasta entonces.', $ms);
         if ($code === 0)
             return self::r('facturapi', $n, 'error', 'No se pudo conectar' . ($cerr ? ': ' . $cerr : '') . '.',
                 'Puede ser la red del servidor.', $ms);

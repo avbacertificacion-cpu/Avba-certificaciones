@@ -1841,8 +1841,10 @@ function diagTarjeta(s) {
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
       ${s.ms != null ? `<span class="dg-ms">${s.ms} ms</span>` : ''}
       <button class="dg-re" onclick="diagProbar('${diagEsc(s.clave)}')">Probar</button>
-      ${s.clave === 'gemini' && s.estado !== 'apagado'
-        ? `<button class="dg-re" onclick="diagModelos()">Ver modelos</button>` : ''}
+      ${s.clave === 'gemini' && s.estado !== 'apagado' ? `
+        <button class="dg-re" onclick="diagModelos()">Ver modelos</button>
+        <button class="dg-re" style="border-color:var(--verde);color:var(--verde)"
+                onclick="diagRepararModelo(this)">Elegir uno vigente</button>` : ''}
     </div>
   </div>`;
 }
@@ -1851,6 +1853,29 @@ function diagTarjeta(s) {
  * Los modelos que la clave puede usar hoy. Google retira nombres sin aviso,
  * así que la lista se pregunta en lugar de llevarla escrita en el código.
  */
+/**
+ * Busca un modelo vigente y lo deja guardado, sin tocar config.php.
+ * Diagnosticar sin poder arreglar obliga a entrar por FTP por algo que el
+ * sistema sabe resolver.
+ */
+async function diagRepararModelo(btn) {
+  const orig = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Buscando…';
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'REPARAR_MODELO_GEMINI', payload: {} })
+    });
+    const d = await res.json();
+    alert(d.message || (d.status === 'success' ? 'Listo.' : 'No se pudo.'));
+    if (d.status === 'success') diagProbar('gemini');
+  } catch (e) {
+    alert('Error de conexión.');
+  } finally {
+    btn.disabled = false; btn.textContent = orig;
+  }
+}
+
 async function diagModelos() {
   try {
     const res = await fetch(API, {

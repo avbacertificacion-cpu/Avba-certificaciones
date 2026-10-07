@@ -52,8 +52,65 @@ class VerificacionIA {
         return $guardado !== '' ? $guardado : self::MODELO_DEFAULT;
     }
 
+    /**
+     * ¿Sirve este modelo para lo que hacemos: leer texto e imágenes?
+     *
+     * La lista de Google trae de todo. Entre los "flash" vienen modelos de
+     * texto a voz (gemini-...-flash-tts), de generación de imágenes y de
+     * embeddings: elegir uno de ésos para leer una credencial falla, y el
+     * fallo aparece tarde y mal explicado.
+     *
+     * También se descartan los "preview" y "exp": cambian y desaparecen sin
+     * aviso, que es justo el problema que se está resolviendo.
+     */
+    public static function sirveParaLeer(string $nombre): bool {
+        foreach (['tts', 'audio', 'image-generation', 'imagen', 'embedding',
+                  'aqa', 'preview', '-exp'] as $malo) {
+            if (str_contains($nombre, $malo)) return false;
+        }
+        return true;
+    }
+
+    /**
+     * De mejor a peor, para elegir uno sin tener que adivinar versiones.
+     *
+     * Google publica alias "-latest" precisamente para que nadie fije un
+     * número de versión que mañana se retira. Son la primera opción.
+     */
+    public static function prioridadModelo(string $n): int {
+        if ($n === 'gemini-flash-latest')         return 0;
+        if (str_ends_with($n, '-flash-latest'))   return 1;
+        if (str_contains($n, 'flash') && str_contains($n, 'latest')) return 2;
+        if (str_contains($n, 'flash'))            return 3;
+        if (str_contains($n, 'latest'))           return 4;
+        return 5;
+    }
+
     /** El modelo que se usará de verdad. Lo consulta la pantalla de servicios. */
     public function modeloActivo(): string { return $this->modelo(); }
+
+    /**
+     * Busca un modelo vigente y lo deja guardado. Lo usa el botón de la
+     * pantalla de servicios: diagnosticar sin poder arreglar obliga a entrar
+     * por FTP a editar config.php por algo que el sistema sabe resolver.
+     */
+    public function repararModelo(): array {
+        if (!$this->hayGemini())
+            return ['status' => 'error', 'message' => 'No hay GEMINI_API_KEY configurada.'];
+        if (defined('GEMINI_MODEL') && trim((string)GEMINI_MODEL) !== '')
+            return ['status' => 'error', 'message' =>
+                'GEMINI_MODEL está fijado a mano en config/config.php. Déjalo vacío para que el '
+              . 'sistema elija uno vigente, o cámbialo por uno de la lista.'];
+
+        $nuevo = $this->descubrirModelo();
+        if ($nuevo === '')
+            return ['status' => 'error', 'message' =>
+                'Google no devolvió ningún modelo que sirva para leer documentos.'];
+
+        $this->guardarModelo($nuevo);
+        return ['status' => 'success', 'modelo' => $nuevo,
+                'message' => 'Ahora se usará ' . $nuevo . '.'];
+    }
 
     private function modeloGuardado(): string {
         try {
@@ -101,18 +158,18 @@ class VerificacionIA {
         if ($code !== 200) return '';
 
         $datos = json_decode((string)$resp, true);
-        $mejor = '';
+        $candidatos = [];
         foreach (($datos['models'] ?? []) as $m) {
             $metodos = $m['supportedGenerationMethods'] ?? $m['supportedActions'] ?? [];
             if (!in_array('generateContent', (array)$metodos, true)) continue;
             $nombre = preg_replace('#^models/#', '', (string)($m['name'] ?? ''));
-            if ($nombre === '') continue;
-            // Se descartan los de vista previa: cambian y desaparecen sin aviso.
-            if (str_contains($nombre, 'preview') || str_contains($nombre, 'exp')) continue;
-            if (str_contains($nombre, 'flash')) { $mejor = $nombre; break; }
-            if ($mejor === '') $mejor = $nombre;
+            if ($nombre === '' || !self::sirveParaLeer($nombre)) continue;
+            $candidatos[] = $nombre;
         }
-        return $mejor;
+        if (!$candidatos) return '';
+        usort($candidatos, fn($a, $b) => self::prioridadModelo($a) <=> self::prioridadModelo($b)
+                                      ?: strcmp($a, $b));
+        return $candidatos[0];
     }
 
     public function __construct(PDO $pdo) {

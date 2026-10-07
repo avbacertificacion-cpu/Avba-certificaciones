@@ -2007,6 +2007,14 @@ if ($method === 'POST') {
                 ? $diag->todo()
                 : $diag->uno((string)$payload['servicio']));
 
+        // Elige y guarda un modelo vigente. Diagnosticar sin poder arreglar
+        // obliga a entrar por FTP por algo que el sistema sabe resolver solo.
+        case 'REPARAR_MODELO_GEMINI':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN')
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta((new VerificacionIA($pdo))->repararModelo());
+
         // Qué modelos puede usar HOY esta clave. Google retira nombres, así
         // que la lista se pregunta en vez de llevarla escrita.
         case 'MODELOS_GEMINI':
