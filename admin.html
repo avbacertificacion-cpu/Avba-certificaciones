@@ -1841,8 +1841,32 @@ function diagTarjeta(s) {
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
       ${s.ms != null ? `<span class="dg-ms">${s.ms} ms</span>` : ''}
       <button class="dg-re" onclick="diagProbar('${diagEsc(s.clave)}')">Probar</button>
+      ${s.clave === 'gemini' && s.estado !== 'apagado'
+        ? `<button class="dg-re" onclick="diagModelos()">Ver modelos</button>` : ''}
     </div>
   </div>`;
+}
+
+/**
+ * Los modelos que la clave puede usar hoy. Google retira nombres sin aviso,
+ * así que la lista se pregunta en lugar de llevarla escrita en el código.
+ */
+async function diagModelos() {
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'MODELOS_GEMINI', payload: {} })
+    });
+    const d = await res.json();
+    const l = d.data || [];
+    alert(l.length
+      ? 'Modelos que tu clave puede usar ahora:\n\n' + l.join('\n')
+        + '\n\nPara fijar uno, ponlo en GEMINI_MODEL dentro de config/config.php.'
+        + '\nDejándolo vacío, el sistema elige uno vigente por su cuenta.'
+      : 'No se pudo obtener la lista. Revisa que la clave sea válida.');
+  } catch (e) {
+    alert('Error de conexión.');
+  }
 }
 
 function diagEsc(t) {

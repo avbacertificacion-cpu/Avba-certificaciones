@@ -33,9 +33,86 @@ class VerificacionIA {
     private const MODELO_DEFAULT = 'gemini-2.5-flash';
     private const ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/';
 
+    /**
+     * Qué modelo usar.
+     *
+     * Manda GEMINI_MODEL si está puesto: si alguien eligió uno a propósito,
+     * no se le cambia por detrás. Si no, se usa el que se haya descubierto y
+     * guardado; y si tampoco hay, el predeterminado.
+     *
+     * Hace falta porque Google RETIRA nombres de modelo. Tener uno escrito a
+     * fuego significa que el día que lo jubilen, la lectura de documentos deja
+     * de funcionar con un 404 aunque la clave esté perfecta — que es
+     * exactamente lo que pasó.
+     */
     protected function modelo(): string {
         $m = defined('GEMINI_MODEL') ? trim((string)GEMINI_MODEL) : '';
-        return $m !== '' ? $m : self::MODELO_DEFAULT;
+        if ($m !== '') return $m;
+        $guardado = $this->modeloGuardado();
+        return $guardado !== '' ? $guardado : self::MODELO_DEFAULT;
+    }
+
+    /** El modelo que se usará de verdad. Lo consulta la pantalla de servicios. */
+    public function modeloActivo(): string { return $this->modelo(); }
+
+    private function modeloGuardado(): string {
+        try {
+            $st = $this->pdo->prepare("SELECT valor FROM avba_config WHERE clave = 'gemini_modelo'");
+            $st->execute();
+            return trim((string)($st->fetchColumn() ?: ''));
+        } catch (\Throwable $e) {
+            return '';
+        }
+    }
+
+    protected function guardarModelo(string $modelo): void {
+        try {
+            $this->pdo->exec("CREATE TABLE IF NOT EXISTS avba_config (
+                clave VARCHAR(60) NOT NULL PRIMARY KEY, valor TEXT NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            $this->pdo->prepare(
+                "INSERT INTO avba_config (clave, valor) VALUES ('gemini_modelo', ?)
+                 ON DUPLICATE KEY UPDATE valor = VALUES(valor)"
+            )->execute([$modelo]);
+        } catch (\Throwable $e) {
+            error_log('[VerificacionIA] guardar modelo: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Busca un modelo que esta clave sí pueda usar.
+     *
+     * Se le pregunta a Google en vez de llevar una lista nuestra, que volvería
+     * a quedarse vieja. Se prefieren los "flash": son los de la cuota gratuita
+     * y sobran para leer una credencial o una placa.
+     */
+    protected function descubrirModelo(): string {
+        if (!$this->hayGemini()) return '';
+        $ch = curl_init('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200');
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => ['x-goog-api-key: ' . trim((string)GEMINI_API_KEY)],
+            CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_TIMEOUT        => 20,
+        ]);
+        $resp = curl_exec($ch);
+        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+        if ($code !== 200) return '';
+
+        $datos = json_decode((string)$resp, true);
+        $mejor = '';
+        foreach (($datos['models'] ?? []) as $m) {
+            $metodos = $m['supportedGenerationMethods'] ?? $m['supportedActions'] ?? [];
+            if (!in_array('generateContent', (array)$metodos, true)) continue;
+            $nombre = preg_replace('#^models/#', '', (string)($m['name'] ?? ''));
+            if ($nombre === '') continue;
+            // Se descartan los de vista previa: cambian y desaparecen sin aviso.
+            if (str_contains($nombre, 'preview') || str_contains($nombre, 'exp')) continue;
+            if (str_contains($nombre, 'flash')) { $mejor = $nombre; break; }
+            if ($mejor === '') $mejor = $nombre;
+        }
+        return $mejor;
     }
 
     public function __construct(PDO $pdo) {
@@ -263,7 +340,7 @@ class VerificacionIA {
     }
 
     /** @return array{0:?array,1:string} [datos, error] */
-    protected function conGemini(string $prompt, string $mime, string $bytes): array {
+    protected function conGemini(string $prompt, string $mime, string $bytes, bool $reintento = false): array {
         $payload = [
             'contents' => [[
                 'parts' => [
@@ -304,6 +381,17 @@ class VerificacionIA {
         $cerr = curl_error($ch);
         curl_close($ch);
 
+        if ($code === 404 && !$reintento) {
+            // El modelo ya no existe. Se busca uno vigente, se guarda para las
+            // próximas veces y se reintenta UNA vez: así un nombre retirado no
+            // deja el sistema parado hasta que alguien edite config.php.
+            $nuevo = $this->descubrirModelo();
+            if ($nuevo !== '' && $nuevo !== $this->modelo()) {
+                error_log('[VerificacionIA] modelo ' . $this->modelo() . ' no existe; se usa ' . $nuevo);
+                $this->guardarModelo($nuevo);
+                return $this->conGemini($prompt, $mime, $bytes, true);
+            }
+        }
         if ($resp === false || $code !== 200) {
             error_log('[VerificacionIA] Gemini HTTP ' . $code . ' ' . $cerr . ' ' . substr((string)$resp, 0, 500));
             return [null, self::motivoGemini($code, (string)$resp, $cerr)];

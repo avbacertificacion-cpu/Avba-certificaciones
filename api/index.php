@@ -2007,6 +2007,14 @@ if ($method === 'POST') {
                 ? $diag->todo()
                 : $diag->uno((string)$payload['servicio']));
 
+        // Qué modelos puede usar HOY esta clave. Google retira nombres, así
+        // que la lista se pregunta en vez de llevarla escrita.
+        case 'MODELOS_GEMINI':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN')
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta(['status' => 'success', 'data' => $diag->modelosGemini()]);
+
         /* ═══════════ BITÁCORA DE ENVÍOS POR CORREO ═══════════
            Qué se mandó, a quién, cuándo y quién lo envió. La tabla llevaba
            años llenándose sin que nadie pudiera consultarla. */

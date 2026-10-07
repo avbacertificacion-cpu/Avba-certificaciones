@@ -87,8 +87,9 @@ class Diagnostico {
         if (!function_exists('curl_init'))
             return self::r('gemini', $n, 'error', 'El servidor no tiene cURL.', 'Actívalo en hPanel.');
 
-        $modelo = defined('GEMINI_MODEL') && trim((string)GEMINI_MODEL) !== ''
-            ? trim((string)GEMINI_MODEL) : 'gemini-2.5-flash';
+        // El mismo modelo que usará la aplicación, incluido el que se haya
+        // descubierto solo: probar otro distinto no comprobaría nada.
+        $modelo = (new VerificacionIA($this->pdo))->modeloActivo();
 
         // Se le pide que conteste una palabra: la llamada más barata que
         // comprueba la llave, el modelo y la cuota de una sola vez.
@@ -103,13 +104,63 @@ class Diagnostico {
             return self::r('gemini', $n, 'ok', 'Responde correctamente con el modelo ' . $modelo . '.', '', $ms);
         }
         $motivo = VerificacionIA::motivoGemini($code, $resp, $cerr);
+
+        if ($code === 404) {
+            // 404 quiere decir que ese modelo no existe para esta clave. Los
+            // nombres cambian y los viejos se retiran, así que en vez de
+            // mandar a adivinar se pregunta a Google cuáles hay AHORA.
+            $hay = $this->modelosGemini();
+            $hacer = $hay
+                ? 'Pon uno de estos en GEMINI_MODEL dentro de config/config.php: '
+                  . implode(', ', array_slice($hay, 0, 6)) . '.'
+                : 'Revisa GEMINI_MODEL en config/config.php. No se pudo obtener la lista de modelos disponibles.';
+            return self::r('gemini', $n, 'error',
+                'El modelo "' . $modelo . '" no existe o no está disponible para tu clave.', $hacer, $ms);
+        }
+
         $hacer = $code === 429
             ? 'Es la cuota del día o del minuto. Espera y vuelve a probar; si se repite, revisa los límites de tu proyecto en Google AI Studio.'
-            : ($code === 404
-                ? 'Revisa GEMINI_MODEL en config/config.php, o déjalo vacío para usar el predeterminado.'
-                : 'Revisa que GEMINI_API_KEY esté bien pegada en config/config.php, sin espacios ni comillas de más.');
+            : 'Revisa que GEMINI_API_KEY esté bien pegada en config/config.php, sin espacios ni comillas de más.';
         return self::r('gemini', $n, $code === 429 ? 'aviso' : 'error',
                        'Gemini ' . $motivo . '.', $hacer, $ms);
+    }
+
+    /**
+     * Los modelos que ESTA clave puede usar hoy, según Google.
+     *
+     * Se filtran los que sirven para generar contenido: la lista trae también
+     * modelos de embeddings y de imagen, que no valen para lo que hacemos y
+     * sólo confundirían a quien tenga que elegir uno.
+     *
+     * @return string[] nombres cortos, listos para pegar en GEMINI_MODEL
+     */
+    public function modelosGemini(): array {
+        if (!self::definida('GEMINI_API_KEY')) return [];
+        [$code, $resp] = $this->http(
+            'https://generativelanguage.googleapis.com/v1beta/models?pageSize=200',
+            ['x-goog-api-key: ' . trim((string)GEMINI_API_KEY)]
+        );
+        if ($code !== 200) return [];
+
+        $datos = json_decode($resp, true);
+        if (!is_array($datos['models'] ?? null)) return [];
+
+        $utiles = [];
+        foreach ($datos['models'] as $m) {
+            $metodos = $m['supportedGenerationMethods'] ?? $m['supportedActions'] ?? [];
+            if (!in_array('generateContent', (array)$metodos, true)) continue;
+            $nombre = preg_replace('#^models/#', '', (string)($m['name'] ?? ''));
+            if ($nombre === '') continue;
+            $utiles[] = $nombre;
+        }
+        // Primero los "flash": son los que entran en la cuota gratuita y los
+        // que sirven para leer una placa o una credencial.
+        usort($utiles, function ($a, $b) {
+            $pa = str_contains($a, 'flash') ? 0 : 1;
+            $pb = str_contains($b, 'flash') ? 0 : 1;
+            return $pa === $pb ? strcmp($b, $a) : $pa - $pb;
+        });
+        return array_values(array_unique($utiles));
     }
 
     // ── Claude ────────────────────────────────────────────
