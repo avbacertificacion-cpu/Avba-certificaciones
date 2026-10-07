@@ -1915,11 +1915,7 @@ function renderMaquinaria(data) {
     const qrBtn    = eq.qr_url    ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(eq.qr_url)}')">🔗 QR</button>` : `<span class="btn-doc btn-qr dis">🔗 QR</span>`;
     // Las recomendaciones llegan con la documentación: si el equipo está en
     // la lista, su documentación ya se publicó.
-    const recs    = eq.recomendaciones || [];
-    const abiertas = recs.filter(r => r.estado !== 'CERRADA').length;
-    const recBtn  = !recs.length ? '' :
-      `<button class="rec-abrir${abiertas ? '' : ' ok'}" onclick="abrirRecom(${eq.id})">
-         💬 Recomendaciones del inspector (${recs.length})${abiertas ? ` · ${abiertas} sin cerrar` : ' · al día'}</button>`;
+    const recBtn = recomBoton('equipo', eq);
     html += `<div class="card">
       <div class="card-top">
         <div class="card-icon">🔧</div>
@@ -1996,6 +1992,7 @@ function renderArneses(data) {
         btnEnviar('arnes', ses.id, 'Enviar la inspección completa',
                   `${folio} — dictamen y los certificados de las ${ses.total || 0} piezas`)}</div>
       ${piezas}
+      ${recomBoton('arnes', ses)}
     </div>`;
   });
   cont.innerHTML = html + '</div>';
@@ -2040,6 +2037,7 @@ function renderAccesorios(data) {
         btnEnviar('accesorio', ses.id, 'Enviar la sesión de accesorios',
                   `${folio} — certificado y reportes`)}</div>
       ${piezas}
+      ${recomBoton('accesorio', ses)}
     </div>`;
   });
   html += '</div>';
@@ -2050,7 +2048,9 @@ function renderAccesorios(data) {
    Llegan con la documentación: si el equipo está aquí, su documentación ya
    se publicó. El cliente puede acusar recibo y, por separado, reportar que
    la atendió con evidencia — son dos cosas distintas. */
-let _recomEquipo = null;
+let _recomReg = null;          // el registro abierto, de cualquier módulo
+let _recomOrigen = 'equipo';
+const _recomCache = { equipo: {}, accesorio: {}, arnes: {}, pnd: {} };
 
 const RECOM_ROTULO_CLI = { alta: 'PRIORIDAD ALTA', media: 'PRIORIDAD MEDIA', sugerencia: 'SUGERENCIA' };
 const RECOM_ESTADO_CLI = {
@@ -2060,26 +2060,49 @@ const RECOM_ESTADO_CLI = {
   CERRADA:  ['Cerrada por AVBA',           'var(--verde)'],
 };
 
-function abrirRecom(equipoId) {
-  const eq = _maqEquipos[equipoId];
-  if (!eq) return;
-  _recomEquipo = eq;
-  const folio = eq.folio ? 'AB.' + eq.folio : '';
-  document.getElementById('recom-sub').textContent =
-    [folio, eq.maquinaria, eq.serie && ('S/N ' + eq.serie)].filter(Boolean).join(' · ');
+/**
+ * Abre el panel para un registro de cualquiera de los cuatro módulos.
+ * El subtítulo lo arma cada módulo a su manera: un equipo se nombra por su
+ * maquinaria y su serie, una sesión de accesorios por su folio y su fecha.
+ */
+function abrirRecom(origen, regId) {
+  const reg = (_recomCache[origen] || {})[regId];
+  if (!reg) return;
+  _recomReg = reg;
+  _recomOrigen = origen;
+  const folio = reg.folio ? 'AB.' + reg.folio : '';
+  const sub = {
+    equipo:    [folio, reg.maquinaria, reg.serie && ('S/N ' + reg.serie)],
+    accesorio: [folio, reg.fecha, (reg.total || 0) + ' accesorios'],
+    arnes:     [folio, reg.fecha, (reg.total || 0) + ' equipos'],
+    pnd:       [folio, reg.componente, reg.identificacion],
+  }[origen] || [folio];
+  document.getElementById('recom-sub').textContent = sub.filter(Boolean).join(' · ');
   pintarRecom();
   document.getElementById('modal-recom').classList.add('open');
 }
 
 function cerrarRecom() {
   document.getElementById('modal-recom').classList.remove('open');
-  _recomEquipo = null;
+  _recomReg = null;
+}
+
+/** El botón de la tarjeta. Igual en los cuatro módulos. */
+function recomBoton(origen, reg) {
+  const recs = reg.recomendaciones || [];
+  _recomCache[origen] = _recomCache[origen] || {};
+  _recomCache[origen][reg.id] = reg;
+  if (!recs.length) return '';
+  const abiertas = recs.filter(r => r.estado !== 'CERRADA').length;
+  return `<button class="rec-abrir${abiertas ? '' : ' ok'}" onclick="abrirRecom('${origen}',${reg.id})">
+      💬 Recomendaciones del inspector (${recs.length})${
+        abiertas ? ` · ${abiertas} sin cerrar` : ' · al día'}</button>`;
 }
 
 function pintarRecom() {
-  const eq = _recomEquipo;
-  if (!eq) return;
-  const lista = eq.recomendaciones || [];
+  const reg = _recomReg;
+  if (!reg) return;
+  const lista = reg.recomendaciones || [];
   const cont  = document.getElementById('recom-lista-cli');
 
   cont.innerHTML = lista.map(r => {
@@ -2162,8 +2185,8 @@ async function recomEnviar(id, tipo, btn) {
     toastPer(d.message || 'Enviado.');
     // Se recarga del servidor para que el panel muestre el estado real.
     await cargarDatos();
-    const eq = _maqEquipos[_recomEquipo?.id];
-    if (eq) { _recomEquipo = eq; pintarRecom(); } else { cerrarRecom(); }
+    const fresco = (_recomCache[_recomOrigen] || {})[_recomReg?.id];
+    if (fresco) { _recomReg = fresco; pintarRecom(); } else { cerrarRecom(); }
   } catch (e) {
     toastPer('Error de conexión.');
   } finally {
@@ -2172,15 +2195,16 @@ async function recomEnviar(id, tipo, btn) {
 }
 
 async function recomPdf() {
-  const eq = _recomEquipo;
-  if (!eq) return;
+  const reg = _recomReg;
+  if (!reg) return;
   // La ventana se abre ANTES de la espera: abrirla al volver la respuesta la
   // bloquearía el navegador por no venir de un clic.
   const w = window.open('', '_blank');
   try {
     const res = await fetch(API, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'HOJA_RECOMENDACIONES', payload: { equipo_id: eq.id } })
+      body: JSON.stringify({ action: 'HOJA_RECOMENDACIONES',
+                             payload: { registro_id: reg.id, origen: _recomOrigen } })
     });
     const d = await res.json();
     if (d.status === 'success' && d.url) { if (w) w.location = d.url; }
@@ -2424,6 +2448,7 @@ function renderPND(data) {
       ${r.identificacion ? `<div style="font-size:11px;color:var(--texto-hint);margin-bottom:10px">ID: ${r.identificacion}</div>` : ''}
       <div style="display:flex;gap:6px;flex-wrap:wrap">${repBtn}${
         r.reporte_url ? btnEnviar('pnd', r.id, 'Enviar reporte PND', `${folio} — ${r.componente || ''}`) : ''}</div>
+      ${recomBoton('pnd', r)}
     </div>`;
   });
   html += '</div>';

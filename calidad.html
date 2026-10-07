@@ -2848,7 +2848,7 @@ function ver(fila) {
 
   document.getElementById("overlay-det").classList.add("open");
   poblarInspectorSelect(d.inspector);
-  recomCalCargar(d.fila, editable, d.estado === 'ENVIADO');
+  recomCalCargar(d.fila, editable, d.estado === 'ENVIADO', 'equipo', 'recom-cal-box');
   // Sugerir empresas ya registradas al corregir el cliente
   try {
     const inp = document.getElementById('e-cliente');
@@ -2993,9 +2993,11 @@ async function eliminarPndCal(id, desc) {
    Aprobarlas NO se las manda al cliente: le llegan cuando Certificaciones
    publique la documentación del equipo.
    ═══════════════════════════════════════════════════════════════════════ */
-let _recomCalEquipo = 0;
+let _recomCalReg = 0;
+let _recomCalOrigen = 'equipo';
 let _recomCalEditable = true;
 let _recomCalPublicado = false;
+let _recomCalCaja = 'recom-cal-box';
 
 const RECOM_COLOR = { alta: 'var(--rojo)', media: '#854F0B', sugerencia: 'var(--azul)' };
 const RECOM_ROTULO = { alta: 'PRIORIDAD ALTA', media: 'PRIORIDAD MEDIA', sugerencia: 'SUGERENCIA' };
@@ -3008,17 +3010,23 @@ const RECOM_ESTADO = {
   DESCARTADA: ['Descartada',             'var(--rojo)'],
 };
 
-async function recomCalCargar(equipoId, editable, publicado) {
-  _recomCalEquipo    = equipoId;
+/**
+ * Carga el panel para un registro de cualquiera de los cuatro módulos.
+ * @param caja id del contenedor, porque cada pantalla tiene el suyo.
+ */
+async function recomCalCargar(regId, editable, publicado, origen = 'equipo', caja = 'recom-cal-box') {
+  _recomCalReg       = regId;
+  _recomCalOrigen    = origen;
   _recomCalEditable  = editable !== false;
   _recomCalPublicado = !!publicado;
-  const box = document.getElementById('recom-cal-box');
+  _recomCalCaja      = caja;
+  const box = document.getElementById(caja);
   if (!box) return;
   try {
     const res = await fetch(API, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'LISTAR_RECOMENDACIONES',
-                             payload: { origen: 'equipo', origen_id: equipoId } })
+                             payload: { origen, origen_id: regId } })
     });
     const d = await res.json();
     recomCalPintar(d.status === 'success' ? (d.data || []) : []);
@@ -3027,8 +3035,23 @@ async function recomCalCargar(equipoId, editable, publicado) {
   }
 }
 
+/**
+ * El bloque entero, para las pantallas que lo montan a mano (accesorios,
+ * arneses, PND). Devuelve el HTML del contenedor y lo llena en cuanto se
+ * inserte en el documento.
+ */
+function recomCalBloque(origen, regId, editable, publicado, caja) {
+  setTimeout(() => recomCalCargar(regId, editable, publicado, origen, caja), 0);
+  return `<div class="sec-label">Recomendaciones del inspector</div>
+    <div style="font-size:11px;color:var(--texto-hint);margin-bottom:8px">
+      Van <strong>fuera del reporte y del dictamen</strong>. Le llegan al cliente
+      cuando se publique la documentación, no antes.
+    </div>
+    <div id="${caja}"><div style="font-size:12px;color:var(--texto-hint)">Cargando…</div></div>`;
+}
+
 function recomCalPintar(lista) {
-  const box = document.getElementById('recom-cal-box');
+  const box = document.getElementById(_recomCalCaja);
   if (!box) return;
   const vivas = lista.filter(r => r.estado !== 'DESCARTADA');
   if (!lista.length) {
@@ -3154,12 +3177,12 @@ async function recomCalGuardarNueva(btn) {
     const res = await fetch(API, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'CREAR_RECOMENDACION',
-        payload: { origen: 'equipo', origen_id: _recomCalEquipo, texto, prioridad } })
+        payload: { origen: _recomCalOrigen, origen_id: _recomCalReg, texto, prioridad } })
     });
     const d = await res.json();
     if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo agregar.', 'err'); return; }
     mostrarToast('Agregada. Queda sin aprobar hasta que la revises.', 'ok');
-    recomCalCargar(_recomCalEquipo, _recomCalEditable, _recomCalPublicado);
+    recomCalCargar(_recomCalReg, _recomCalEditable, _recomCalPublicado, _recomCalOrigen, _recomCalCaja);
   } catch (e) {
     mostrarToast('Error de conexión.', 'err');
   } finally {
@@ -3195,7 +3218,8 @@ async function recomCalAccion(accion, id, extra = {}) {
     const d = await res.json();
     mostrarToast(d.message || (d.status === 'success' ? 'Listo.' : 'No se pudo.'),
                  d.status === 'success' ? 'ok' : 'err');
-    if (d.status === 'success') recomCalCargar(_recomCalEquipo, _recomCalEditable);
+    if (d.status === 'success')
+      recomCalCargar(_recomCalReg, _recomCalEditable, _recomCalPublicado, _recomCalOrigen, _recomCalCaja);
     return d;
   } catch (e) {
     mostrarToast('Error de conexión.', 'err');
@@ -4631,7 +4655,9 @@ async function abrirDetAccSesion(id) {
         </button>
       </div>` : '';
 
-    document.getElementById('acc-ses-body').innerHTML = cab + accsHtml + aprobarBtnHtml + bajaBtnHtml;
+    document.getElementById('acc-ses-body').innerHTML = cab + accsHtml
+      + recomCalBloque('accesorio', s.id, puedAprobar, s.estatus === 'EMITIDO', 'recom-cal-acc')
+      + aprobarBtnHtml + bajaBtnHtml;
     accPoblarInspectores(s.inspector_usuario || '', s.inspector_firma || s.usuario || '');
   } catch (e) {
     document.getElementById('acc-ses-body').innerHTML = `<div style="text-align:center;padding:32px;color:var(--rojo)">Error al cargar.</div>`;
@@ -7980,6 +8006,7 @@ function renderArnDet(d) {
               </div>`).join('')}</div>
           </details>` : ''}
       </div>`).join('') || '<div style="color:var(--texto-hint)">Sin piezas registradas.</div>'}
+    ${recomCalBloque('arnes', ses.id, !bloqueado, ses.estatus === 'EMITIDO', 'recom-cal-arn')}
   `;
 
   // RETORNADO entra aquí igual que en grúas: Certificaciones lo regresó y
@@ -8782,6 +8809,8 @@ function verPND(id) {
         <div style="font-size:13px;font-weight:600;color:var(--texto-sub);margin-bottom:6px">Evidencia fotográfica</div>
         <a href="${esc(d.evidencia_url)}" target="_blank" style="color:var(--azul);font-size:13px">Ver carpeta de evidencia</a>
       </div>` : ''}
+
+      <div>${recomCalBloque('pnd', d.id, true, d.estado === 'APROBADO', 'recom-cal-pnd')}</div>
 
     </div>`;
 

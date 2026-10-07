@@ -2797,6 +2797,7 @@
       <div id="iza-lista-items"></div>
 
       <button class="ses-agregar-btn" style="margin-top:4px" onclick="izaAgregarOtro()">+ Agregar otro accesorio</button>
+      <div id="recom-iza" style="margin-top:14px"></div>
       <button class="ses-finalizar-btn" id="iza-btn-finalizar" onclick="izaFinalizar()" disabled style="margin-top:10px">✓ Finalizar sesión</button>
     </div>
   </div>
@@ -2987,6 +2988,7 @@
         <div id="arn-lista-empty" style="text-align:center;padding:20px;color:var(--texto-sub);font-size:13px">
           Aún no has registrado equipos en esta inspección.
         </div>
+        <div id="recom-arn" style="margin-top:14px"></div>
         <div class="nav-btns" style="margin-top:14px">
           <button class="btn-ant" onclick="arnOtro()">+ Agregar otro</button>
           <button class="btn-sig" onclick="arnFinalizar()">✓ Finalizar</button>
@@ -4641,6 +4643,130 @@ function recomRestaurar(lista) {
   (lista || []).forEach(r => recomAgregar(r.texto || '', r.prioridad || 'media'));
 }
 
+/* ── Recomendaciones en sesiones de accesorios y arneses ───────────────
+   Aquí la sesión ya existe en la base en cuanto se crea, así que cada
+   recomendación se guarda en el momento en vez de viajar con el envío final.
+   Mientras nadie las revise se pueden borrar. */
+const RECOM_SES = { iza: { origen: 'accesorio', caja: 'recom-iza' },
+                    arn: { origen: 'arnes',     caja: 'recom-arn' } };
+
+async function recomSesCargar(cual, regId) {
+  const cfg = RECOM_SES[cual];
+  const box = document.getElementById(cfg.caja);
+  if (!box || !regId) return;
+  box.dataset.reg = regId;
+  box.dataset.cual = cual;
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },   // el token lo inyecta el interceptor
+      body: JSON.stringify({ action: 'LISTAR_RECOMENDACIONES',
+                             payload: { origen: cfg.origen, origen_id: regId } })
+    });
+    const d = await res.json();
+    recomSesPintar(cual, d.status === 'success' ? (d.data || []) : []);
+  } catch (e) {
+    box.innerHTML = '';
+  }
+}
+
+function recomSesPintar(cual, lista) {
+  const cfg = RECOM_SES[cual];
+  const box = document.getElementById(cfg.caja);
+  if (!box) return;
+  const col = { alta: '#A32D2D', media: '#854F0B', sugerencia: '#1e5fa8' };
+  box.innerHTML = `
+    <div class="card" style="margin:0">
+      <div class="card-title" style="font-size:13px">Recomendaciones para el cliente</div>
+      <div style="font-size:11px;color:var(--texto-hint);margin-bottom:8px;padding:8px;
+                  background:var(--gris-bg);border-left:3px solid var(--verde);border-radius:4px">
+        Lo que viste y conviene decirle, <strong>fuera del alcance de la certificación</strong>.
+        No sale en el reporte; le llega al cliente con su documentación.
+      </div>
+      ${lista.map(r => `
+        <div class="recom-fila" style="border-left-color:${col[r.prioridad] || '#1e5fa8'}">
+          <div style="display:flex;gap:8px;align-items:flex-start">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:9.5px;font-weight:800;color:${col[r.prioridad] || '#1e5fa8'};
+                          letter-spacing:.03em;margin-bottom:3px">${(r.prioridad || '').toUpperCase()}</div>
+              <div style="font-size:12.5px;line-height:1.45">${escIns(r.texto)}</div>
+            </div>
+            ${r.estado === 'BORRADOR'
+              ? `<button type="button" class="recom-del" title="Quitar"
+                   onclick="recomSesBorrar('${cual}',${r.id})">✕</button>`
+              : `<span style="font-size:9.5px;color:var(--verde);font-weight:700;white-space:nowrap">✓ enviada</span>`}
+          </div>
+        </div>`).join('')}
+      <button type="button" class="recom-add" onclick="recomSesNueva('${cual}')">+ Agregar recomendación</button>
+      <div id="${cfg.caja}-form"></div>
+    </div>`;
+}
+
+function escIns(t) {
+  return String(t ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+
+function recomSesNueva(cual) {
+  const cfg = RECOM_SES[cual];
+  const box = document.getElementById(cfg.caja + '-form');
+  if (!box || box.innerHTML) { if (box) box.innerHTML = ''; return; }
+  box.innerHTML = `
+    <div class="recom-fila" style="margin-top:8px">
+      <div class="recom-top">
+        <select class="recom-pri" id="${cfg.caja}-pri">
+          ${RECOM_PRIORIDADES.map(([v, t]) =>
+            `<option value="${v}"${v === 'media' ? ' selected' : ''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <textarea rows="2" id="${cfg.caja}-txt" oninput="recomCrecer(this)"
+        placeholder="Ej: Las eslingas se guardan a la intemperie."></textarea>
+      <div style="display:flex;gap:7px;margin-top:7px">
+        <button type="button" class="btn-sig" style="flex:1;padding:8px;font-size:12px"
+          onclick="recomSesGuardar('${cual}',this)">Agregar</button>
+        <button type="button" class="btn-ant" style="flex:1;padding:8px;font-size:12px"
+          onclick="document.getElementById('${cfg.caja}-form').innerHTML=''">Cancelar</button>
+      </div>
+    </div>`;
+  document.getElementById(cfg.caja + '-txt').focus();
+}
+
+async function recomSesGuardar(cual, btn) {
+  const cfg = RECOM_SES[cual];
+  const box = document.getElementById(cfg.caja);
+  const texto = (document.getElementById(cfg.caja + '-txt')?.value || '').trim();
+  const prioridad = document.getElementById(cfg.caja + '-pri')?.value || 'media';
+  if (!texto) { mostrarToast('Escribe la recomendación.', 'err'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },   // el token lo inyecta el interceptor
+      body: JSON.stringify({ action: 'CREAR_RECOMENDACION',
+        payload: { origen: cfg.origen, origen_id: box.dataset.reg, texto, prioridad } })
+    });
+    const d = await res.json();
+    if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo agregar.', 'err'); return; }
+    recomSesCargar(cual, box.dataset.reg);
+  } catch (e) {
+    mostrarToast('Error de conexión.', 'err');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Agregar'; }
+  }
+}
+
+async function recomSesBorrar(cual, id) {
+  const box = document.getElementById(RECOM_SES[cual].caja);
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },   // el token lo inyecta el interceptor
+      body: JSON.stringify({ action: 'ELIMINAR_RECOMENDACION', payload: { id } })
+    });
+    const d = await res.json();
+    if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo borrar.', 'err'); return; }
+    recomSesCargar(cual, box.dataset.reg);
+  } catch (e) {
+    mostrarToast('Error de conexión.', 'err');
+  }
+}
+
 function procesarFotosSeleccionadas() {
   const input   = document.getElementById("fotos-input");
   const archivos = Array.from(input.files);
@@ -6147,6 +6273,7 @@ async function izaContinuar() {
 
     if (data.status === 'success') {
       izaSesionId   = data.sesion_id;
+      recomSesCargar('iza', izaSesionId);
       izaSesionInfo = { cliente, fecha: document.getElementById('iza-fecha').value, coordenadas: coords, direccion };
 
       // Actualizar banner y lista
@@ -7075,6 +7202,7 @@ async function arnContinuar() {
     const d = await r.json();
     if (d.status !== 'success') { mostrarToast(d.message || 'No se pudo crear la inspección.', 'err'); return; }
     arnSesionId   = d.sesion_id;
+    recomSesCargar('arn', arnSesionId);
     arnSesionInfo = { cliente, direccion };
     document.getElementById('arn-banner-cliente').textContent = cliente;
     document.getElementById('arn-banner-sub').textContent = direccion || 'Equipo de protección contra caídas';
