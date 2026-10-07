@@ -820,6 +820,25 @@
     .cur-errmsg.show { display: block; }
     .cur-hint { font-size: 11px; color: var(--texto-hint); margin-top: 4px; }
 
+    /* ── Recomendaciones para el cliente ──────────────────────────────
+       Distintas de los comentarios internos: éstas las ve el cliente. */
+    .recom-fila { border:1.5px solid var(--borde); border-radius:10px; padding:10px 11px;
+      margin-bottom:9px; background:var(--blanco); }
+    .recom-fila.alta  { border-left:4px solid #A32D2D; }
+    .recom-fila.media { border-left:4px solid #854F0B; }
+    .recom-fila.sug   { border-left:4px solid var(--azul); }
+    .recom-top { display:flex; gap:8px; align-items:center; margin-bottom:7px; }
+    .recom-pri { flex:1; padding:7px 9px; border:1.5px solid var(--borde); border-radius:7px;
+      font-size:12.5px; font-family:inherit; background:var(--blanco); color:var(--texto); }
+    .recom-del { width:32px; height:32px; flex-shrink:0; border-radius:7px; border:1.5px solid var(--borde);
+      background:var(--blanco); color:#A32D2D; font-size:15px; cursor:pointer; font-family:inherit; }
+    .recom-fila textarea { width:100%; padding:8px 9px; border:1.5px solid var(--borde);
+      border-radius:7px; font-size:13px; font-family:inherit; resize:vertical; color:var(--texto); }
+    .recom-add { width:100%; margin-top:4px; padding:10px; border-radius:9px;
+      border:1.5px dashed var(--azul); background:var(--blanco); color:var(--azul);
+      font-size:13px; font-weight:700; cursor:pointer; font-family:inherit; }
+    .recom-add:hover { background:var(--azul-light); }
+
     /* OCR */
     .ocr-zone {
       border: 2px dashed var(--borde);
@@ -2540,6 +2559,26 @@
       <div class="field">
         <textarea id="comentarios" rows="3" placeholder="Observaciones adicionales, hallazgos relevantes o notas para el equipo de calidad..."></textarea>
       </div>
+      <div style="font-size:11px;color:var(--texto-hint);margin-top:4px">
+        Estos comentarios son internos: los lee Calidad, no el cliente.
+      </div>
+    </div>
+
+    <!-- RECOMENDACIONES PARA EL CLIENTE -->
+    <div class="card">
+      <div class="card-title">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 1.5l1.9 4 4.4.6-3.2 3.1.8 4.3L8 11.5l-3.9 2 .8-4.3L1.7 6.1l4.4-.6L8 1.5z"/></svg>
+        Recomendaciones para el cliente
+      </div>
+      <div style="font-size:11px;color:var(--texto-hint);margin-bottom:8px;padding:8px;background:var(--gris-bg);border-left:3px solid var(--verde);border-radius:4px;">
+        Lo que viste y conviene decirle, <strong>fuera del alcance de la certificación</strong>:
+        un extintor vencido, la bitácora que no estaba en la cabina, un cable que hoy cumple
+        pero conviene cambiar.<br>
+        <strong>No salen en el reporte ni en el dictamen.</strong> Le llegan al cliente a su
+        portal junto con su documentación, y podrá responderte ahí.
+      </div>
+      <div id="recom-lista"></div>
+      <button type="button" class="recom-add" onclick="recomAgregar()">+ Agregar recomendación</button>
     </div>
 
     <!-- RESUMEN -->
@@ -4538,6 +4577,70 @@ function renderFotosGrid() {
   if (resumenFotos) resumenFotos.textContent = fotosData.length + " de 9";
 }
 
+/* ── Recomendaciones para el cliente ───────────────────────────────────
+   Van fuera del reporte y del dictamen. La prioridad la pone el inspector,
+   que es quien estuvo ahí. Calidad podrá ajustar la redacción después, pero
+   el sentido es el que se escriba aquí. */
+const RECOM_PRIORIDADES = [
+  ['alta',       'Prioridad alta — conviene atenderla pronto'],
+  ['media',      'Prioridad media'],
+  ['sugerencia', 'Sugerencia — para tenerlo en cuenta'],
+];
+
+function recomAgregar(texto = '', prioridad = 'media') {
+  const cont = document.getElementById('recom-lista');
+  if (!cont) return;
+  const fila = document.createElement('div');
+  fila.className = 'recom-fila ' + (prioridad === 'sugerencia' ? 'sug' : prioridad);
+  fila.innerHTML = `
+    <div class="recom-top">
+      <select class="recom-pri" onchange="recomPintar(this)">
+        ${RECOM_PRIORIDADES.map(([v, t]) =>
+          `<option value="${v}"${v === prioridad ? ' selected' : ''}>${t}</option>`).join('')}
+      </select>
+      <button type="button" class="recom-del" title="Quitar esta recomendación"
+              onclick="this.closest('.recom-fila').remove(); guardarBorradorDebounced();">✕</button>
+    </div>
+    <textarea rows="2" oninput="recomCrecer(this); guardarBorradorDebounced()"
+      placeholder="Ej: El extintor del área de operación está vencido desde agosto."></textarea>`;
+  cont.appendChild(fila);
+  const ta = fila.querySelector('textarea');
+  ta.value = texto;
+  recomCrecer(ta);
+  if (!texto) ta.focus();
+  guardarBorradorDebounced();
+}
+
+/** El recuadro crece con el texto: en campo, a una mano, nadie va a estirarlo. */
+function recomCrecer(ta) {
+  if (!ta) return;
+  ta.style.height = 'auto';
+  ta.style.height = Math.max(ta.scrollHeight, 44) + 'px';
+}
+
+/** La franja de color sigue a la prioridad, para verlas de un vistazo. */
+function recomPintar(sel) {
+  const fila = sel.closest('.recom-fila');
+  if (!fila) return;
+  fila.className = 'recom-fila ' + (sel.value === 'sugerencia' ? 'sug' : sel.value);
+  guardarBorradorDebounced();
+}
+
+/** Lo que se manda. Los renglones sin texto se descartan aquí mismo. */
+function recomDatos() {
+  return [...document.querySelectorAll('#recom-lista .recom-fila')].map(f => ({
+    prioridad: f.querySelector('.recom-pri')?.value || 'media',
+    texto:     (f.querySelector('textarea')?.value || '').trim(),
+  })).filter(r => r.texto !== '');
+}
+
+function recomRestaurar(lista) {
+  const cont = document.getElementById('recom-lista');
+  if (!cont) return;
+  cont.innerHTML = '';
+  (lista || []).forEach(r => recomAgregar(r.texto || '', r.prioridad || 'media'));
+}
+
 function procesarFotosSeleccionadas() {
   const input   = document.getElementById("fotos-input");
   const archivos = Array.from(input.files);
@@ -4672,6 +4775,7 @@ async function enviarFormulario() {
         checklist: { ...respuestasCheck },
         prueba_carga: getPruebaCargaData(),
         horquillas: getHorquillasData(),
+        recomendaciones: recomDatos(),
         fotos: fotosData
       }
     };
@@ -4780,6 +4884,7 @@ async function guardarBorradorInspeccion() {
       dir_envio:     dirManual.env  || ''
     },
     checklist: { ...respuestasCheck },
+    recomendaciones: recomDatos(),
     prueba_carga: pruebaCargaData || {},
     horquillas: getHorquillasData(),
     horquillas_aplica: !!document.getElementById('horquilla_aplica')?.checked,
@@ -4875,6 +4980,10 @@ async function restaurarBorradorInspeccion(draft) {
   // Fotos
   fotosData = Array.isArray(draft.fotos) ? draft.fotos : [];
   renderFotosGrid();
+
+  // Recomendaciones: se recuperan con el resto del borrador. Si el inspector
+  // se quedó sin señal a media captura, lo que escribió no se pierde.
+  recomRestaurar(draft.recomendaciones);
 
   // Checklist: renderizar según maquinaria y luego marcar respuestas guardadas
   respuestasCheck = { ...(draft.checklist || {}) };
