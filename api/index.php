@@ -1997,7 +1997,8 @@ if ($method === 'POST') {
                 respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta(['status' => 'success', 'data' => $recom->listar(
                 (string)($payload['origen'] ?? 'equipo'),
-                (int)($payload['origen_id'] ?? $payload['equipo_id'] ?? 0)
+                (int)($payload['origen_id'] ?? $payload['equipo_id'] ?? 0),
+                $usr['rol'] !== 'INSPECTOR'   // al inspector no le interesan las descartadas
             )]);
 
         /* Alta suelta. Las de una inspección entran con la inspección misma;
@@ -2024,6 +2025,15 @@ if ($method === 'POST') {
 
         // Ajuste de redacción. El texto original del inspector no se toca:
         // queda guardado aparte para poder comprobar que el sentido es el suyo.
+        // Borrar la propia, mientras nadie la haya revisado. Una vez aprobada
+        // ya es parte de lo que se le dijo al cliente y se descarta, no se borra.
+        case 'ELIMINAR_RECOMENDACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','INSPECTOR','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($recom->eliminar((int)($payload['id'] ?? 0), $usr['usuario'],
+                                       $usr['rol'] === 'ADMIN'));
+
         case 'EDITAR_RECOMENDACION':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
@@ -2088,8 +2098,9 @@ if ($method === 'POST') {
             if (!in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES','CLIENTE']))
                 respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($recom->hojaPdf(
-                (int)($payload['equipo_id'] ?? $_GET['equipo_id'] ?? 0),
-                $usr['rol'] === 'CLIENTE' ? resolveIdc($usr) : ''
+                (int)($payload['registro_id'] ?? $payload['equipo_id'] ?? 0),
+                $usr['rol'] === 'CLIENTE' ? resolveIdc($usr) : '',
+                (string)($payload['origen'] ?? 'equipo')
             ));
 
         case 'GENERAR_CERT_ACCESORIO':

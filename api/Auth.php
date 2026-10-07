@@ -779,19 +779,6 @@ class Auth {
             ];
         }
 
-        // Recomendaciones del inspector, por equipo. Se piden una sola vez y
-        // se reparten abajo: pedirlas equipo por equipo serían N consultas
-        // para una pantalla que ya hace varias.
-        $recomPorEquipo = [];
-        if (class_exists('Recomendaciones')) {
-            try { $recomPorEquipo = (new Recomendaciones($this->pdo))->paraCliente($idCliente); }
-            catch (\Throwable $e) { error_log('[Auth] recomendaciones: ' . $e->getMessage()); }
-        }
-        foreach ($equipos as &$eq) {
-            $eq['recomendaciones'] = $recomPorEquipo[$eq['id']] ?? [];
-        }
-        unset($eq);
-
         // ── Accesorios ────────────────────────────────────
         // Certificaciones puede retirar del portal un documento sin tocar los
         // otros dos: el certificado puede estar disponible mientras el informe
@@ -1003,6 +990,9 @@ class Auth {
             foreach ($stmt->fetchAll() as $r) {
                 if (!$nombreCliente) $nombreCliente = $r['cliente'];
                 $pnd[] = [
+                    // El id hacía falta: sin él el portal no puede colgarle
+                    // sus recomendaciones ni pedir su hoja.
+                    'id'           => (int)$r['id'],
                     'folio'        => $r['control'],
                     'componente'   => $r['componente'],
                     'identificacion' => $r['identificacion'],
@@ -1019,6 +1009,27 @@ class Auth {
             $personal   = [];
             $pnd        = [];
             $arneses    = [];
+        }
+
+        // Recomendaciones del inspector. Se piden una sola vez, para los cuatro
+        // módulos, y se reparten aquí: pedirlas registro por registro serían
+        // decenas de consultas en una pantalla que ya hace varias.
+        if (class_exists('Recomendaciones')) {
+            try {
+                $recom = (new Recomendaciones($this->pdo))->paraCliente($idCliente);
+                $pegar = function (array &$lista, string $origen) use ($recom) {
+                    foreach ($lista as &$x) {
+                        $x['recomendaciones'] = $recom[$origen][(int)($x['id'] ?? 0)] ?? [];
+                    }
+                    unset($x);
+                };
+                $pegar($equipos,    'equipo');
+                $pegar($accesorios, 'accesorio');
+                $pegar($arneses,    'arnes');
+                $pegar($pnd,        'pnd');
+            } catch (\Throwable $e) {
+                error_log('[Auth] recomendaciones: ' . $e->getMessage());
+            }
         }
 
         return [

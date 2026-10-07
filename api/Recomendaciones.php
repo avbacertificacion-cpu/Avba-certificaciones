@@ -37,8 +37,59 @@ class Recomendaciones {
      */
     public const ESTADOS = ['BORRADOR','APROBADA','ENTERADO','ATENDIDA','CERRADA','DESCARTADA'];
 
-    /** Estados en los que el cliente puede verla, si su equipo está publicado. */
+    /** Estados en los que el cliente puede verla, si su registro está publicado. */
     private const VISIBLES = ['APROBADA','ENTERADO','ATENDIDA','CERRADA'];
+
+    /**
+     * De dónde cuelga cada recomendación y cuándo su registro está publicado.
+     *
+     * Las condiciones van calificadas con `t.` a propósito: se usan dentro de
+     * un JOIN contra `recomendaciones`, que tiene su propia columna `estado`,
+     * y sin calificar la consulta es ambigua y MySQL la rechaza entera.
+     *
+     * La condición de publicación de cada módulo se escribe UNA vez, aquí, y
+     * es la misma que usa el portal para decidir si enseña ese registro. Así
+     * una recomendación no puede adelantarse a su documentación en ninguno de
+     * los cuatro, y añadir un quinto módulo es añadir un renglón.
+     *
+     * 'desc' arma la descripción que va en la hoja en PDF, que es distinta en
+     * cada uno: un equipo se nombra por su maquinaria y su serie, una sesión
+     * de accesorios por cuántas piezas ampara.
+     */
+    private const ORIGENES = [
+        'equipo' => [
+            'tabla'  => 'equipos',
+            'pub'    => "(t.publicado = 1 OR t.estado = 'ENVIADO')",
+            'fecha'  => 'fecha_inspeccion',
+            'desc'   => "CONCAT(COALESCE(t.maquinaria,''), CASE WHEN t.serie IS NULL OR t.serie='' THEN '' ELSE CONCAT(' · S/N ', t.serie) END)",
+            'rotulo' => 'Equipo',
+        ],
+        'accesorio' => [
+            'tabla'  => 'accesorios_sesiones',
+            'pub'    => "(t.publicado = 1 OR t.estatus = 'EMITIDO')",
+            'fecha'  => 'fecha',
+            'desc'   => "'Accesorios de izaje'",
+            'rotulo' => 'Sesión de accesorios',
+        ],
+        'arnes' => [
+            'tabla'  => 'arneses_sesiones',
+            'pub'    => "(t.publicado = 1 OR t.estatus = 'EMITIDO')",
+            'fecha'  => 'fecha',
+            'desc'   => "'Arneses y líneas de vida'",
+            'rotulo' => 'Sesión de arneses',
+        ],
+        'pnd' => [
+            'tabla'  => 'pnd_inspecciones',
+            'pub'    => "(t.publicado = 1 OR t.estado = 'APROBADO')",
+            'fecha'  => 'fecha_inspeccion',
+            'desc'   => "CONCAT(COALESCE(t.componente,''), CASE WHEN t.identificacion IS NULL OR t.identificacion='' THEN '' ELSE CONCAT(' · ', t.identificacion) END)",
+            'rotulo' => 'Ensayo no destructivo',
+        ],
+    ];
+
+    public static function origenValido(string $o): bool {
+        return isset(self::ORIGENES[$o]);
+    }
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
@@ -146,14 +197,15 @@ class Recomendaciones {
      * deja renglones vacíos y eso no es un error que deba frenar el guardado
      * de la inspección entera.
      */
-    public function guardarDeInspeccion(int $equipoId, array $lista, string $usuario): int {
-        if (!$equipoId || !$lista) return 0;
+    public function guardarDeInspeccion(int $registroId, array $lista, string $usuario,
+                                        string $origen = 'equipo'): int {
+        if (!$registroId || !$lista || !self::origenValido($origen)) return 0;
         $n = 0;
         foreach (array_values($lista) as $i => $r) {
             $texto = trim((string)($r['texto'] ?? ''));
             if ($texto === '') continue;
             try {
-                $this->crear('equipo', $equipoId, $texto,
+                $this->crear($origen, $registroId, $texto,
                              self::limpiarPrioridad($r['prioridad'] ?? ''), $usuario, $i);
                 $n++;
             } catch (\Throwable $e) {
@@ -176,7 +228,9 @@ class Recomendaciones {
                           string $usuario, int $orden = 0, string $capturadaPor = ''): array {
         $texto = trim($texto);
         if ($texto === '')  return ['status' => 'error', 'message' => 'Escribe la recomendación.'];
-        if (!$origenId)     return ['status' => 'error', 'message' => 'Falta el equipo.'];
+        if (!$origenId)     return ['status' => 'error', 'message' => 'Falta el registro al que pertenece.'];
+        if (!self::origenValido($origen))
+            return ['status' => 'error', 'message' => 'Origen no válido.'];
 
         $this->pdo->prepare(
             "INSERT INTO recomendaciones
@@ -189,6 +243,27 @@ class Recomendaciones {
         $this->anotar($id, $usuario, 'alta', null,
                       $texto . ($capturadaPor ? "\n[capturada desde $capturadaPor]" : ''));
         return ['status' => 'success', 'id' => $id];
+    }
+
+    /**
+     * Borra una recomendación que todavía nadie revisó.
+     *
+     * Sólo en borrador y sólo quien la escribió: una vez aprobada ya forma
+     * parte de lo que se le dijo al cliente, y entonces se descarta —que deja
+     * rastro— en lugar de desaparecer.
+     */
+    public function eliminar(int $id, string $usuario, bool $esAdmin = false): array {
+        $r = $this->obtener($id);
+        if (!$r) return ['status' => 'error', 'message' => 'Recomendación no encontrada.'];
+        if ($r['estado'] !== 'BORRADOR')
+            return ['status' => 'error', 'message' =>
+                'Ya fue revisada: descártala desde Calidad en vez de borrarla.'];
+        if (!$esAdmin && $r['creada_por'] !== $usuario)
+            return ['status' => 'error', 'message' => 'Sólo quien la escribió puede borrarla.'];
+
+        $this->pdo->prepare("DELETE FROM recomendaciones_historial WHERE recomendacion_id = ?")->execute([$id]);
+        $this->pdo->prepare("DELETE FROM recomendaciones WHERE id = ?")->execute([$id]);
+        return ['status' => 'success', 'message' => 'Recomendación eliminada.'];
     }
 
     public function obtener(int $id): ?array {
@@ -311,44 +386,62 @@ class Recomendaciones {
      * agreguen después.
      */
     public function paraCliente(string $idCliente): array {
-        $idCliente = trim($idCliente);
+        $idCliente = self::normCliente($idCliente);
         if ($idCliente === '') return [];
-        if (ctype_digit($idCliente)) $idCliente = str_pad($idCliente, 5, '0', STR_PAD_LEFT);
+
+        $out = [];
+        foreach (array_keys(self::ORIGENES) as $origen) {
+            foreach ($this->paraClienteDe($origen, $idCliente) as $regId => $recs) {
+                $out[$origen][$regId] = $recs;
+            }
+        }
+        return $out;
+    }
+
+    private static function normCliente(string $id): string {
+        $id = trim($id);
+        if ($id === '') return '';
+        return ctype_digit($id) ? str_pad($id, 5, '0', STR_PAD_LEFT) : $id;
+    }
+
+    /** Las de un módulo. Si su tabla no existe todavía, devuelve vacío. */
+    private function paraClienteDe(string $origen, string $idCliente): array {
+        $cfg = self::ORIGENES[$origen] ?? null;
+        if (!$cfg) return [];
 
         $marcadores = implode(',', array_fill(0, count(self::VISIBLES), '?'));
         try {
             $st = $this->pdo->prepare(
                 "SELECT r.* FROM recomendaciones r
-                 JOIN equipos e ON e.id = r.origen_id AND r.origen = 'equipo'
-                 WHERE e.control LIKE ?
-                   AND (e.publicado = 1 OR e.estado = 'ENVIADO')
+                 JOIN `{$cfg['tabla']}` t ON t.id = r.origen_id
+                 WHERE r.origen = ? AND t.control LIKE ? AND {$cfg['pub']}
                    AND r.estado IN ($marcadores)
                  ORDER BY r.origen_id,
                           FIELD(r.prioridad,'alta','media','sugerencia'), r.orden, r.id"
             );
-            $st->execute(array_merge([$idCliente . '-%'], self::VISIBLES));
+            $st->execute(array_merge([$origen, $idCliente . '-%'], self::VISIBLES));
             $filas = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
         } catch (\Throwable $e) {
-            // El módulo puede no haberse usado todavía: el portal no se cae.
-            error_log('[Recomendaciones] paraCliente: ' . $e->getMessage());
+            // Un módulo que todavía no se ha usado no puede tumbar el portal.
+            error_log('[Recomendaciones] paraCliente ' . $origen . ': ' . $e->getMessage());
             return [];
         }
 
-        $porEquipo = [];
+        $porReg = [];
         foreach ($filas as $f) {
-            $porEquipo[(int)$f['origen_id']][] = [
-                'id'         => (int)$f['id'],
-                'texto'      => $f['texto'],
-                'prioridad'  => $f['prioridad'],
-                'estado'     => $f['estado'],
-                'foto_url'   => $f['foto_url'] ?? '',
+            $porReg[(int)$f['origen_id']][] = [
+                'id'        => (int)$f['id'],
+                'texto'     => $f['texto'],
+                'prioridad' => $f['prioridad'],
+                'estado'    => $f['estado'],
+                'foto_url'  => $f['foto_url'] ?? '',
                 // Al cliente no se le dice quién la redactó ni si Calidad la
-                // ajustó: eso es cocina interna. Se le dice qué y cuándo.
+                // ajustó o la capturó: eso es cocina interna.
                 'fecha'      => $f['created_at'] ? date('d/m/Y', strtotime($f['created_at'])) : '',
                 'respuestas' => $this->respuestasDe((int)$f['id']),
             ];
         }
-        return $porEquipo;
+        return $porReg;
     }
 
     /**
@@ -357,20 +450,28 @@ class Recomendaciones {
      * recomendación de otro con sólo adivinar el id.
      */
     private function esDelCliente(int $id, string $idCliente): ?array {
-        $idCliente = trim($idCliente);
+        $idCliente = self::normCliente($idCliente);
         if ($idCliente === '') return null;
-        if (ctype_digit($idCliente)) $idCliente = str_pad($idCliente, 5, '0', STR_PAD_LEFT);
+
+        $r = $this->obtener($id);
+        if (!$r) return null;
+        $cfg = self::ORIGENES[$r['origen']] ?? null;
+        if (!$cfg) return null;
 
         $marcadores = implode(',', array_fill(0, count(self::VISIBLES), '?'));
-        $st = $this->pdo->prepare(
-            "SELECT r.* FROM recomendaciones r
-             JOIN equipos e ON e.id = r.origen_id AND r.origen = 'equipo'
-             WHERE r.id = ? AND e.control LIKE ?
-               AND (e.publicado = 1 OR e.estado = 'ENVIADO')
-               AND r.estado IN ($marcadores)"
-        );
-        $st->execute(array_merge([$id, $idCliente . '-%'], self::VISIBLES));
-        return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT r.* FROM recomendaciones r
+                 JOIN `{$cfg['tabla']}` t ON t.id = r.origen_id
+                 WHERE r.id = ? AND r.origen = ? AND t.control LIKE ? AND {$cfg['pub']}
+                   AND r.estado IN ($marcadores)"
+            );
+            $st->execute(array_merge([$id, $r['origen'], $idCliente . '-%'], self::VISIBLES));
+            return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (\Throwable $e) {
+            error_log('[Recomendaciones] esDelCliente: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
@@ -509,15 +610,18 @@ class Recomendaciones {
      * el estado y lo que el cliente contestó, así que descargarla en diciembre
      * sirve de constancia de seguimiento, no sólo de lo que se recomendó.
      */
-    public function hojaPdf(int $equipoId, string $idCliente = ''): array {
-        $eq = $this->equipoDe($equipoId, $idCliente);
-        if (!$eq) return ['status' => 'error', 'message' => 'Equipo no encontrado.'];
+    public function hojaPdf(int $registroId, string $idCliente = '', string $origen = 'equipo'): array {
+        if (!self::origenValido($origen))
+            return ['status' => 'error', 'message' => 'Origen no válido.'];
+
+        $eq = $this->registroDe($origen, $registroId, $idCliente);
+        if (!$eq) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
         $recs = array_values(array_filter(
-            $this->listar('equipo', $equipoId, false),
+            $this->listar($origen, $registroId, false),
             fn($r) => in_array($r['estado'], self::VISIBLES, true)
         ));
-        if (!$recs) return ['status' => 'error', 'message' => 'Este equipo no tiene recomendaciones publicadas.'];
+        if (!$recs) return ['status' => 'error', 'message' => 'Este registro no tiene recomendaciones publicadas.'];
 
         $e = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
         $rotulo = ['alta' => 'PRIORIDAD ALTA', 'media' => 'PRIORIDAD MEDIA', 'sugerencia' => 'SUGERENCIA'];
@@ -577,7 +681,7 @@ class Recomendaciones {
               del equipo es el que indica su dictamen de inspección.</div>
             <div class="datos">
               <b>' . $e($eq['cliente']) . '</b><br>
-              ' . $e($eq['maquinaria']) . ($eq['serie'] ? ' · S/N ' . $e($eq['serie']) : '') . '<br>
+              ' . $e(self::ORIGENES[$origen]['rotulo']) . ': ' . $e($eq['descripcion']) . '<br>
               Folio AB.' . $e($eq['control']) . ' · Inspección del ' . $e($eq['fecha_fmt'] ?? '') . '
             </div>' . $filas . '
             <div style="font-size:7.5pt;color:#9299a8;margin-top:4mm">
@@ -586,27 +690,37 @@ class Recomendaciones {
           </div></body></html>';
 
         try {
-            $url = $this->aPdf($html, 'AB.' . ($eq['control'] ?: $equipoId));
+            $url = $this->aPdf($html, 'AB.' . ($eq['control'] ?: $registroId));
         } catch (\Throwable $ex) {
             return ['status' => 'error', 'message' => 'No se pudo generar la hoja: ' . $ex->getMessage()];
         }
         return ['status' => 'success', 'url' => rtrim(SITE_URL, '/') . '/' . ltrim($url, '/')];
     }
 
-    /** El equipo, comprobando que sea del cliente cuando lo pide un cliente. */
-    private function equipoDe(int $equipoId, string $idCliente): ?array {
-        $sql = "SELECT id, cliente, control, maquinaria, serie,
-                       DATE_FORMAT(fecha_inspeccion,'%d/%m/%Y') AS fecha_fmt
-                FROM equipos WHERE id = ?";
-        $par = [$equipoId];
+    /** El registro, comprobando que sea del cliente cuando lo pide un cliente. */
+    private function registroDe(string $origen, int $registroId, string $idCliente): ?array {
+        $cfg = self::ORIGENES[$origen] ?? null;
+        if (!$cfg) return null;
+
+        // El alias `t` no es cosmético: las condiciones de publicación vienen
+        // calificadas con él porque se comparten con las consultas con JOIN.
+        $sql = "SELECT t.id, t.cliente, t.control, {$cfg['desc']} AS descripcion,
+                       DATE_FORMAT(t.{$cfg['fecha']},'%d/%m/%Y') AS fecha_fmt
+                FROM `{$cfg['tabla']}` t WHERE t.id = ?";
+        $par = [$registroId];
+        $idCliente = self::normCliente($idCliente);
         if ($idCliente !== '') {
-            if (ctype_digit($idCliente)) $idCliente = str_pad($idCliente, 5, '0', STR_PAD_LEFT);
-            $sql .= " AND control LIKE ? AND (publicado = 1 OR estado = 'ENVIADO')";
+            $sql .= " AND t.control LIKE ? AND {$cfg['pub']}";
             $par[] = $idCliente . '-%';
         }
-        $st = $this->pdo->prepare($sql);
-        $st->execute($par);
-        return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        try {
+            $st = $this->pdo->prepare($sql);
+            $st->execute($par);
+            return $st->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (\Throwable $e) {
+            error_log('[Recomendaciones] registroDe ' . $origen . ': ' . $e->getMessage());
+            return null;
+        }
     }
 
     private function aPdf(string $html, string $folio): string {
