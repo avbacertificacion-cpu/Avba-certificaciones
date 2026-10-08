@@ -257,6 +257,30 @@
     .env-btn.sec:hover { border-color:var(--azul); color:var(--azul); }
     .env-ok { font-size:10.5px; font-weight:700; color:var(--verde);
       background:var(--verde-light); border-radius:20px; padding:3px 9px; white-space:nowrap; }
+    /* ── Banco de pruebas de lectura (provisional) ─────────────────── */
+    .pl-aviso { background:#FAEEDA; border:1px solid var(--ambar); border-radius:10px;
+      padding:10px 13px; font-size:12px; color:#854F0B; line-height:1.5; margin-bottom:14px; }
+    .pl-zona { border:2px dashed var(--borde); border-radius:12px; padding:22px;
+      text-align:center; cursor:pointer; transition:all .15s; background:#fff; }
+    .pl-zona:hover { border-color:var(--azul); background:var(--azul-light); }
+    .pl-zona.con { border-style:solid; border-color:var(--azul); background:var(--azul-light); }
+    .pl-minis { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:10px; }
+    .pl-minis img { width:92px; height:92px; object-fit:cover; border-radius:8px;
+      border:1.5px solid var(--borde); }
+    .pl-campo { display:flex; gap:10px; align-items:flex-start; padding:9px 0;
+      border-top:1px solid var(--borde); }
+    .pl-clave { width:150px; flex-shrink:0; font-size:11.5px; font-weight:700;
+      color:var(--texto-sub); text-transform:uppercase; letter-spacing:.03em; padding-top:2px; }
+    .pl-valor { flex:1; min-width:0; font-size:14px; font-weight:600; color:var(--texto);
+      word-break:break-word; }
+    .pl-vacio { color:var(--rojo); font-weight:600; font-size:13px; }
+    .pl-conf { font-size:10.5px; font-weight:700; padding:2px 8px; border-radius:20px;
+      white-space:nowrap; }
+    .pl-conf.alta  { background:var(--verde-light); color:var(--verde); }
+    .pl-conf.media { background:#FAEEDA; color:#854F0B; }
+    .pl-conf.baja  { background:var(--rojo-light); color:var(--rojo); }
+    .pl-leido { font-size:11px; color:var(--texto-hint); margin-top:2px; }
+
     /* ── Comprobación de servicios ──────────────────────────────────── */
     .dg-card { border:1.5px solid var(--borde); border-radius:12px; padding:14px 16px;
       margin-bottom:11px; background:#fff; display:flex; gap:13px; align-items:flex-start; }
@@ -362,6 +386,7 @@
     <button class="tab-a"        id="tab-btn-smtp"     onclick="verTabAdmin('smtp',this)">📧 Correo SMTP</button>
     <button class="tab-a"        id="tab-btn-envios"   onclick="verTabAdmin('envios',this)">📨 Envíos</button>
     <button class="tab-a"        id="tab-btn-diag"     onclick="verTabAdmin('diag',this)">🩺 Servicios</button>
+    <button class="tab-a"        id="tab-btn-lectura"  onclick="verTabAdmin('lectura',this)">🧪 Prueba de lectura</button>
   </div>
 
   <!-- SECCIÓN: USUARIOS -->
@@ -566,6 +591,60 @@
         <button class="btn-sec" onclick="ctaCerrarMov()">Cancelar</button>
         <button class="btn-save" id="cta-mov-btn" onclick="ctaGuardarMov()" style="padding:9px 22px">Guardar</button>
       </div>
+    </div>
+  </div>
+
+  <div class="tab-sec" id="tab-sec-lectura">
+    <div class="tabla-card" style="padding:16px 18px">
+      <div class="tabla-title" style="margin-bottom:10px">🧪 Prueba de lectura con IA</div>
+      <div class="pl-aviso">
+        <strong>Banco de pruebas provisional.</strong> Sirve para afinar los enunciados con
+        fotos reales antes de meter la lectura en los formularios del inspector.
+        <strong>No guarda nada ni toca ningún registro</strong>: sube una foto, mira qué saca,
+        y ya. Cada prueba consume cuota de Gemini.
+      </div>
+
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+        <div style="flex:1;min-width:280px">
+          <label class="env-lbl">Qué estás fotografiando</label>
+          <select id="pl-plantilla" class="env-inp" onchange="plCambiarPlantilla()"></select>
+          <div id="pl-campos-info" style="font-size:11.5px;color:var(--texto-hint);margin-top:6px;line-height:1.5"></div>
+
+          <details style="margin-top:12px">
+            <summary style="font-size:12px;color:var(--azul);cursor:pointer;font-weight:600">
+              Probar con campos a medida</summary>
+            <div style="margin-top:8px">
+              <label class="env-lbl">Qué es (contexto)</label>
+              <input id="pl-contexto" class="env-inp" placeholder="Ej: la placa de una grúa sobre orugas">
+              <label class="env-lbl" style="margin-top:8px">Campos, uno por línea · <code>clave: qué buscar</code></label>
+              <textarea id="pl-libres" class="env-inp" rows="5" style="resize:vertical;font-family:monospace;font-size:12px"
+                placeholder="marca: fabricante del equipo&#10;serie: número de serie"></textarea>
+              <div style="font-size:11px;color:var(--texto-hint);margin-top:4px">
+                Si escribes aquí, se ignora la plantilla de arriba.</div>
+            </div>
+          </details>
+        </div>
+
+        <div style="flex:1;min-width:280px">
+          <label class="env-lbl">Fotografías (hasta 3)</label>
+          <div class="pl-zona" id="pl-zona" onclick="document.getElementById('pl-file').click()">
+            <div id="pl-vacia">
+              <div style="font-size:30px;line-height:1">📷</div>
+              <div style="font-size:13px;font-weight:600;color:var(--azul);margin-top:5px">
+                Toca para elegir fotos</div>
+              <div style="font-size:11px;color:var(--texto-hint);margin-top:3px">
+                JPG, PNG o WEBP. Varias ayudan si la placa está sucia o a contraluz.</div>
+            </div>
+            <div class="pl-minis" id="pl-minis"></div>
+          </div>
+          <input type="file" id="pl-file" accept="image/*" multiple style="display:none"
+                 onchange="plElegirFotos(event)">
+          <button class="env-btn" id="pl-btn" style="width:100%;margin-top:10px"
+                  onclick="plProbar()">Leer con IA</button>
+        </div>
+      </div>
+
+      <div id="pl-resultado" style="margin-top:16px"></div>
     </div>
   </div>
 
@@ -1787,6 +1866,145 @@ async function ctaBorrarPeriodo(id) {
 
 /* ── Tab admin switching ── */
 /* ═══════════════════════════════════════════════════════════════
+   BANCO DE PRUEBAS DE LECTURA  (provisional)
+   Para afinar los enunciados con fotos reales antes de meter la
+   lectura en los formularios. No guarda nada.
+   ═══════════════════════════════════════════════════════════════ */
+let _plPlantillas = null;
+let _plFotos = [];           // {base64, mime, nombre}
+
+async function plIniciar() {
+  if (_plPlantillas) return;
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'PLANTILLAS_LECTURA', payload: {} })
+    });
+    const d = await res.json();
+    _plPlantillas = d.data || {};
+    const sel = document.getElementById('pl-plantilla');
+    sel.innerHTML = Object.entries(_plPlantillas)
+      .map(([k, v]) => `<option value="${k}">${diagEsc(v.nombre)}</option>`).join('');
+    plCambiarPlantilla();
+  } catch (e) {
+    document.getElementById('pl-campos-info').textContent = 'No se pudieron cargar las plantillas.';
+  }
+}
+
+function plCambiarPlantilla() {
+  const k = document.getElementById('pl-plantilla').value;
+  const p = (_plPlantillas || {})[k];
+  document.getElementById('pl-campos-info').innerHTML = p
+    ? 'Buscará: <strong>' + Object.keys(p.campos).map(diagEsc).join('</strong>, <strong>') + '</strong>.'
+    : '';
+}
+
+/**
+ * Las fotos se reducen en el navegador antes de subirlas: en campo se trabaja
+ * con datos móviles, y una foto de 12 MP tarda más en subir que lo que tarda
+ * la IA en leerla.
+ */
+function plElegirFotos(ev) {
+  const archivos = Array.from(ev.target.files || []).slice(0, 3);
+  _plFotos = [];
+  let hechas = 0;
+  archivos.forEach(f => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 1600;
+      let w = img.width, h = img.height;
+      if (w > MAX) { h = h * (MAX / w); w = MAX; }
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, 0, 0, w, h);
+      _plFotos.push({ base64: c.toDataURL('image/jpeg', 0.82), mime: 'image/jpeg', nombre: f.name });
+      if (++hechas === archivos.length) plPintarMinis();
+    };
+    img.onerror = () => { if (++hechas === archivos.length) plPintarMinis(); };
+    img.src = URL.createObjectURL(f);
+  });
+}
+
+function plPintarMinis() {
+  const z = document.getElementById('pl-zona');
+  document.getElementById('pl-vacia').style.display = _plFotos.length ? 'none' : '';
+  z.classList.toggle('con', _plFotos.length > 0);
+  document.getElementById('pl-minis').innerHTML =
+    _plFotos.map(f => `<img src="${f.base64}" alt="">`).join('');
+}
+
+async function plProbar() {
+  if (!_plFotos.length) { alert('Elige al menos una foto.'); return; }
+  const btn = document.getElementById('pl-btn');
+  const out = document.getElementById('pl-resultado');
+  btn.disabled = true; btn.textContent = 'Leyendo…';
+  out.innerHTML = `<div style="text-align:center;padding:24px;color:var(--texto-hint);font-size:13px">
+    <span class="spin"></span> La IA está mirando la foto…</div>`;
+
+  const fd = new FormData();
+  fd.append('action', 'PROBAR_LECTURA_IA');
+  fd.append('plantilla', document.getElementById('pl-plantilla').value);
+  fd.append('contexto', document.getElementById('pl-contexto').value || '');
+  fd.append('campos_libres', document.getElementById('pl-libres').value || '');
+  _plFotos.forEach((f, i) => fd.append('fotos[]', plABlob(f.base64), 'foto' + i + '.jpg'));
+
+  try {
+    const res = await fetch(API, { method: 'POST', body: fd });
+    const d = await res.json();
+    out.innerHTML = d.status === 'success' ? plPintar(d)
+      : `<div class="dg-card error"><div class="dg-ico">❌</div><div class="dg-cuerpo">
+           <div class="dg-nombre">No se pudo leer</div>
+           <div class="dg-det">${diagEsc(d.message || '')}</div></div></div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="dg-card error"><div class="dg-ico">❌</div><div class="dg-cuerpo">
+      <div class="dg-nombre">Error de conexión</div></div></div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Leer con IA';
+  }
+}
+
+function plABlob(dataUrl) {
+  const [cab, b64] = dataUrl.split(',');
+  const bin = atob(b64);
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return new Blob([buf], { type: (cab.match(/:(.*?);/) || [])[1] || 'image/jpeg' });
+}
+
+function plPintar(d) {
+  const campos = Object.entries(d.campos || {});
+  const leidos = campos.filter(([, v]) => v.valor !== '').length;
+  return `<div class="tabla-card" style="padding:14px 16px">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+      <span style="font-size:14px;font-weight:800">Lo que leyó</span>
+      <span style="font-size:11.5px;color:var(--texto-sub)">${leidos} de ${campos.length} campos</span>
+      <span style="margin-left:auto;font-size:11px;color:var(--texto-hint)">
+        ${diagEsc(d.motor || '')} · ${d.ms} ms</span>
+    </div>
+    <div style="font-size:11.5px;color:var(--texto-hint);margin-bottom:8px">
+      Los campos por debajo de ${Math.round((d.umbral || 0) * 100)}% de confianza se vacían a
+      propósito: un dato inventado es peor que uno en blanco.
+    </div>
+    ${campos.map(([k, v]) => {
+      const pct = Math.round((v.confianza || 0) * 100);
+      const cls = v.confianza >= 0.8 ? 'alta' : v.confianza >= 0.55 ? 'media' : 'baja';
+      return `<div class="pl-campo">
+        <div class="pl-clave">${diagEsc(k)}</div>
+        <div class="pl-valor">
+          ${v.valor
+            ? diagEsc(v.valor)
+            : `<span class="pl-vacio">— sin leer —</span>${
+                v.leido ? `<div class="pl-leido">Creyó ver "${diagEsc(v.leido)}", pero con poca confianza.</div>` : ''}`}
+        </div>
+        <span class="pl-conf ${cls}">${pct}%</span>
+      </div>`;
+    }).join('')}
+    ${d.notas ? `<div class="dg-hacer" style="margin-top:12px"><strong>Notas de la IA:</strong>
+      ${diagEsc(d.notas)}</div>` : ''}
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════
    COMPROBACIÓN DE SERVICIOS
    Probar antes de confiar. Cada tarjeta dice en qué estado está el
    servicio y, cuando algo falla, qué hacer al respecto — que es lo
@@ -1905,7 +2123,8 @@ function verTabAdmin(id, btn) {
   document.querySelectorAll('.tab-a').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-sec-' + id).classList.add('active');
   btn.classList.add('active');
-  if (id === 'diag')   diagProbar();
+  if (id === 'diag')    diagProbar();
+  if (id === 'lectura') plIniciar();
   if (id === 'envios') {
     if (!_envios) _envios = Envios.montar('envios-box', API);
     _envios.cargar();

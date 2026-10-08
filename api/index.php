@@ -41,6 +41,7 @@ require_once __DIR__ . '/VerificacionIA.php';
 require_once __DIR__ . '/Recomendaciones.php';
 require_once __DIR__ . '/Envios.php';
 require_once __DIR__ . '/Diagnostico.php';
+require_once __DIR__ . '/LectorIA.php';
 require_once __DIR__ . '/Arneses.php';
 require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
@@ -2006,6 +2007,60 @@ if ($method === 'POST') {
             respuesta(empty($payload['servicio'])
                 ? $diag->todo()
                 : $diag->uno((string)$payload['servicio']));
+
+        /* ═══════════ BANCO DE PRUEBAS DE LECTURA (provisional) ═══════════
+           Subir una foto y ver qué saca la IA, para afinar los enunciados con
+           fotos reales antes de meter esto en los formularios. No guarda nada
+           ni toca ningún registro. */
+        case 'PLANTILLAS_LECTURA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN')
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta(['status' => 'success', 'data' => LectorIA::plantillas()]);
+
+        case 'PROBAR_LECTURA_IA': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN')
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+
+            $plantillas = LectorIA::plantillas();
+            $cual   = (string)($_POST['plantilla'] ?? 'placa');
+            $campos = $plantillas[$cual]['campos']   ?? [];
+            $ctx    = $plantillas[$cual]['contexto'] ?? '';
+
+            // Campos a medida, para probar enunciados sin tocar código.
+            $libres = trim((string)($_POST['campos_libres'] ?? ''));
+            if ($libres !== '') {
+                $campos = [];
+                foreach (preg_split('/\r?\n/', $libres) as $linea) {
+                    $linea = trim($linea);
+                    if ($linea === '') continue;
+                    [$clave, $desc] = array_pad(explode(':', $linea, 2), 2, '');
+                    $clave = preg_replace('/[^a-z0-9_]/', '', strtolower(trim($clave)));
+                    if ($clave !== '') $campos[$clave] = trim($desc) ?: $clave;
+                }
+                $ctx = trim((string)($_POST['contexto'] ?? '')) ?: $ctx;
+            }
+            if (!$campos) respuesta(['status' => 'error', 'message' => 'No se indicó qué extraer.']);
+
+            // Hasta 3 fotos: una placa sucia no se lee de un tiro.
+            $imagenes = [];
+            $fs = $_FILES['fotos'] ?? [];
+            foreach ((array)($fs['tmp_name'] ?? []) as $i => $tmp) {
+                if (count($imagenes) >= 3) break;
+                if (!$tmp || ($fs['error'][$i] ?? 1) !== 0) continue;
+                $mime = (string)($fs['type'][$i] ?? 'image/jpeg');
+                if (!in_array($mime, ['image/jpeg','image/png','image/webp'], true)) continue;
+                $bytes = file_get_contents($tmp);
+                if ($bytes === false || strlen($bytes) > 8 * 1024 * 1024) continue;
+                $imagenes[] = ['mime' => $mime, 'bytes' => $bytes];
+            }
+            if (!$imagenes)
+                respuesta(['status' => 'error',
+                           'message' => 'No llegó ninguna imagen válida (JPG, PNG o WEBP, hasta 8 MB).']);
+
+            respuesta((new LectorIA($pdo))->leer($campos, $imagenes, $ctx));
+        }
 
         // Elige y guarda un modelo vigente. Diagnosticar sin poder arreglar
         // obliga a entrar por FTP por algo que el sistema sabe resolver solo.
