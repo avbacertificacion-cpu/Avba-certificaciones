@@ -1894,9 +1894,13 @@ async function plIniciar() {
 function plCambiarPlantilla() {
   const k = document.getElementById('pl-plantilla').value;
   const p = (_plPlantillas || {})[k];
-  document.getElementById('pl-campos-info').innerHTML = p
-    ? 'Buscará: <strong>' + Object.keys(p.campos).map(diagEsc).join('</strong>, <strong>') + '</strong>.'
-    : '';
+  // Algunas plantillas mandan dato personal a un tercero. El aviso sale al
+  // elegirlas, no enterrado en la documentación.
+  document.getElementById('pl-campos-info').innerHTML = !p ? '' :
+    'Buscará: <strong>' + Object.keys(p.campos).map(diagEsc).join('</strong>, <strong>') + '</strong>.'
+    + (p.aviso ? `<div style="margin-top:7px;padding:8px 10px;background:var(--rojo-light);
+         border-radius:7px;color:var(--rojo);font-size:11.5px;line-height:1.5">
+         ⚠️ ${diagEsc(p.aviso)}</div>` : '');
 }
 
 /**

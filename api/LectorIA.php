@@ -272,6 +272,16 @@ class LectorIA {
             'identificacion' => [
                 'nombre'   => 'Identificación oficial (INE, pasaporte, CURP)',
                 'contexto' => 'un documento oficial de identidad mexicano.',
+                // Esta plantilla lleva aviso porque manda DATO PERSONAL a un
+                // tercero. Los términos del nivel gratuito de Google dicen que
+                // el contenido enviado se usa para mejorar sus productos y que
+                // revisores humanos pueden leerlo; y piden expresamente no
+                // enviar información personal. Una placa de grúa no es dato de
+                // nadie; un INE sí, y está regulado por la LFPDPPP.
+                'aviso'    => 'Un INE es dato personal. En el nivel gratuito de Google, '
+                            . 'el contenido enviado puede ser revisado por personas y usado '
+                            . 'para entrenar sus modelos. Para pruebas usa tu propia '
+                            . 'identificación, no la de un cliente.',
                 'campos'   => [
                     'nombre'            => 'nombre completo de la persona',
                     'curp'              => 'CURP, 18 caracteres',
