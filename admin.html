@@ -947,7 +947,13 @@ const API = "api/index.php";
       const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
       const t = s.token || '';
       if (opts.method === 'POST') {
-        if (!(opts.body instanceof FormData)) {
+        if (opts.body instanceof FormData) {
+          // Con FormData el token no cabe en el cuerpo —no es JSON—, así que va
+          // en la cabecera. Sin esto la petición llega sin token, el servidor
+          // responde 401 y el interceptor cierra la sesión: subir un archivo te
+          // echaba fuera.
+          opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t, 'X-Token': t });
+        } else {
           try {
             const b = JSON.parse(opts.body || '{}');
             b.token = t;

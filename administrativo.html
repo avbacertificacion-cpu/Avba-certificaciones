@@ -380,7 +380,13 @@ window.fetch = function(url, opts = {}) {
   if (isApi) {
     if (!opts.method || opts.method.toUpperCase() === 'GET') {
       opts.headers = Object.assign({}, opts.headers || {}, {'Authorization':'Bearer '+t,'X-Token':t});
-    } else if (!(opts.body instanceof FormData)) {
+    } else if (opts.body instanceof FormData) {
+      // Con FormData el token no cabe en el cuerpo —no es JSON—, así que va
+      // en la cabecera. Sin esto la petición llega sin token, el servidor
+      // responde 401 y el interceptor cierra la sesión: subir un archivo te
+      // echaba fuera.
+      opts.headers = Object.assign({}, opts.headers || {}, { 'Authorization': 'Bearer ' + t, 'X-Token': t });
+    } else {
       try { const b = JSON.parse(opts.body||'{}'); if(!b.token) b.token=t; opts.body=JSON.stringify(b); } catch(_){}
     }
     return _origFetch(url, opts).then(r => { if (r.status===401){localStorage.removeItem('avba_session');setTimeout(()=>location.href='login.html',40);} return r; });
