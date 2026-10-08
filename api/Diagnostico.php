@@ -157,8 +157,7 @@ class Diagnostico {
             $utiles[] = $nombre;
         }
         $utiles = array_values(array_unique($utiles));
-        usort($utiles, fn($a, $b) => VerificacionIA::prioridadModelo($a) <=> VerificacionIA::prioridadModelo($b)
-                                  ?: strcmp($a, $b));
+        usort($utiles, fn($a, $b) => VerificacionIA::compararModelos($a, $b));
         return $utiles;
     }
 

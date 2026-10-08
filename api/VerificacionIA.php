@@ -64,10 +64,18 @@ class VerificacionIA {
      * aviso, que es justo el problema que se está resolviendo.
      */
     public static function sirveParaLeer(string $nombre): bool {
-        foreach (['tts', 'audio', 'image-generation', 'imagen', 'embedding',
-                  'aqa', 'preview', '-exp'] as $malo) {
+        // Voz, embeddings, preguntas-respuestas y experimentales.
+        foreach (['tts', 'audio', 'embedding', 'aqa', 'preview', '-exp'] as $malo) {
             if (str_contains($nombre, $malo)) return false;
         }
+        // Los que GENERAN imágenes: gemini-3.1-flash-image, gemini-2.5-flash-image.
+        // Se reconocen por el sufijo, no por la palabra suelta: 'image' a secas
+        // dejaría fuera a cualquier modelo que mañana la lleve en otro sitio,
+        // y 'image-generation' no atrapa a ninguno de los que Google publica.
+        // Leer una foto NO necesita un modelo de imagen: los flash normales ya
+        // ven; los '-image' son para dibujar, no para mirar.
+        if (str_ends_with($nombre, '-image') || str_contains($nombre, '-image-')) return false;
+        if (str_starts_with($nombre, 'imagen-')) return false;   // familia Imagen
         return true;
     }
 
@@ -84,6 +92,25 @@ class VerificacionIA {
         if (str_contains($n, 'flash'))            return 3;
         if (str_contains($n, 'latest'))           return 4;
         return 5;
+    }
+
+    /**
+     * Compara dos modelos: primero por prioridad, y a igualdad, el MÁS NUEVO.
+     *
+     * El desempate importa. Ordenando por nombre, 'gemini-2.5-flash' va antes
+     * que 'gemini-3.8-flash' —el 2 antes que el 3— y se acabaría eligiendo el
+     * más viejo el día que los alias '-latest' no estén.
+     */
+    public static function compararModelos(string $a, string $b): int {
+        $p = self::prioridadModelo($a) <=> self::prioridadModelo($b);
+        if ($p !== 0) return $p;
+        $v = self::versionModelo($b) <=> self::versionModelo($a);   // descendente
+        return $v !== 0 ? $v : strcmp($a, $b);
+    }
+
+    /** El número de versión del nombre, para poder compararlos. */
+    private static function versionModelo(string $n): float {
+        return preg_match('/gemini-(\d+(?:\.\d+)?)/', $n, $m) ? (float)$m[1] : 0.0;
     }
 
     /** El modelo que se usará de verdad. Lo consulta la pantalla de servicios. */
@@ -167,8 +194,7 @@ class VerificacionIA {
             $candidatos[] = $nombre;
         }
         if (!$candidatos) return '';
-        usort($candidatos, fn($a, $b) => self::prioridadModelo($a) <=> self::prioridadModelo($b)
-                                      ?: strcmp($a, $b));
+        usort($candidatos, fn($a, $b) => self::compararModelos($a, $b));
         return $candidatos[0];
     }
 
