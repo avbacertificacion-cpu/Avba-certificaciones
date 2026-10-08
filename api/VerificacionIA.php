@@ -416,8 +416,11 @@ class VerificacionIA {
             case 403: return 'rechazó la clave: no es válida, fue revocada o no tiene permiso';
             case 404: return 'el modelo configurado en GEMINI_MODEL no existe';
             case 429: return 'alcanzó su límite de uso (cuota agotada)';
-            case 500:
+            // 503 sí es congestión. 500 es un error interno suyo, que no
+            // siempre es carga: decir "saturado" manda a esperar a que pase
+            // algo que puede no tener nada que ver.
             case 503: return 'el servicio está saturado; inténtalo en unos minutos';
+            case 500: return 'devolvió un error interno';
             default:  return 'no contestó (HTTP ' . $code . ')';
         }
     }

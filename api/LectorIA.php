@@ -121,6 +121,17 @@ class LectorIA {
                 'responseMimeType' => 'application/json',
                 'responseSchema'   => $this->esquema($campos),
             ],
+            // Se bajan los umbrales de los filtros automáticos. Transcribir
+            // una placa o una credencial no tiene ningún riesgo que justifique
+            // un bloqueo, y los falsos positivos dejaban la lectura sin
+            // respuesta. Esto NO salta la política de Google —lo que su
+            // política prohíbe se sigue rechazando y se reporta como tal—;
+            // sólo evita que un clasificador automático se pase de celoso.
+            'safetySettings' => array_map(
+                fn($c) => ['category' => $c, 'threshold' => 'BLOCK_ONLY_HIGH'],
+                ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH',
+                 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT']
+            ),
         ];
 
         $ch = curl_init(self::ENDPOINT . rawurlencode($this->modelo()) . ':generateContent');
@@ -139,14 +150,63 @@ class LectorIA {
         curl_close($ch);
 
         if ($code !== 200) {
-            error_log('[LectorIA] Gemini HTTP ' . $code . ' ' . substr((string)$resp, 0, 400));
-            return [null, class_exists('VerificacionIA')
+            error_log('[LectorIA] Gemini HTTP ' . $code . ' ' . substr((string)$resp, 0, 600));
+            $motivo = class_exists('VerificacionIA')
                 ? VerificacionIA::motivoGemini($code, (string)$resp, $cerr)
-                : 'devolvió HTTP ' . $code];
+                : 'devolvió HTTP ' . $code;
+            // Lo que Google dice de su propio error. Sin esto, un rechazo por
+            // política de contenido se presenta como "el servicio está
+            // saturado", y uno se queda esperando a que se descongestione algo
+            // que no va a cambiar nunca.
+            $detalle = json_decode((string)$resp, true)['error']['message'] ?? '';
+            return [null, $motivo . ($detalle !== '' ? ' — ' . mb_substr($detalle, 0, 300) : '')];
         }
-        $txt = json_decode((string)$resp, true)['candidates'][0]['content']['parts'][0]['text'] ?? '';
+
+        $datos = json_decode((string)$resp, true);
+
+        // Gemini puede contestar 200 y aun así no haber respondido: cuando su
+        // política bloquea la petición devuelve el motivo aquí, sin candidatos.
+        // Tratarlo como "respuesta ilegible" escondía la causa.
+        $bloqueo = $datos['promptFeedback']['blockReason']
+                ?? $datos['candidates'][0]['finishReason'] ?? '';
+        if ($bloqueo !== '' && !in_array($bloqueo, ['STOP', 'MAX_TOKENS'], true)) {
+            error_log('[LectorIA] Gemini bloqueó: ' . $bloqueo . ' ' . substr((string)$resp, 0, 400));
+            return [null, self::motivoBloqueo((string)$bloqueo)];
+        }
+
+        $txt = $datos['candidates'][0]['content']['parts'][0]['text'] ?? '';
         $out = json_decode($txt, true);
-        return is_array($out) ? [$out, ''] : [null, 'devolvió algo que no se pudo interpretar'];
+        if (is_array($out)) return [$out, ''];
+
+        error_log('[LectorIA] Gemini no interpretable: ' . substr((string)$resp, 0, 400));
+        return [null, 'devolvió algo que no se pudo interpretar'];
+    }
+
+    /**
+     * Por qué Google se negó a contestar.
+     *
+     * Un bloqueo por política no es un fallo pasajero: reintentar no sirve.
+     * Importa distinguirlo porque con documentos de identidad es lo que suele
+     * pasar, y el mensaje genérico manda a esperar a que pase algo que no va
+     * a pasar.
+     */
+    private static function motivoBloqueo(string $razon): string {
+        switch (strtoupper($razon)) {
+            case 'SAFETY':
+                return 'Google bloqueó la petición por sus filtros de seguridad. '
+                     . 'Suele pasar con documentos de identidad: su política restringe '
+                     . 'extraer datos personales de identificaciones oficiales.';
+            case 'PROHIBITED_CONTENT':
+            case 'BLOCKLIST':
+                return 'Google rechazó el contenido por su política de uso. '
+                     . 'Con identificaciones oficiales es lo habitual.';
+            case 'RECITATION':
+                return 'Google bloqueó la respuesta por parecerse demasiado a material protegido.';
+            case 'IMAGE_SAFETY':
+                return 'Google bloqueó la imagen por sus filtros de contenido.';
+            default:
+                return 'Google no contestó. Motivo que da: ' . $razon . '.';
+        }
     }
 
     /** @return array{0:?array,1:string,2:string} */
