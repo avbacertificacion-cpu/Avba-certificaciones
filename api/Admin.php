@@ -20,6 +20,7 @@ class Admin {
         'montacargas' => ['MONTACARGAS',  'dictamen_montacargas.html'],
         'grua_torre'  => ['GRÚA TORRE',   'dictamen_grua_torre.html'],
         'grua_oruga'  => ['GRÚA ESTRUCTURAL SOBRE ORUGAS', 'dictamen_grua_oruga.html'],
+        'grua_portico' => ['GRÚA PÓRTICO', 'dictamen_grua_portico.html'],
     ];
 
     /**
@@ -92,6 +93,80 @@ class Admin {
                 ['ASME B30.5',        'referencia'],
                 ['ASME B30.10',       'referencia'],
                 ['ASME B30.26',       'referencia'],
+            ],
+        ],
+
+        /* Grúa pórtico: puente sobre dos patas que rueda por carriles, con un
+           carro que recorre el puente y un polipasto colgado de él. No tiene
+           pluma, ni radio, ni estabilizadores; lo que se revisa son la
+           estructura del puente, los caminos de rodadura y los tres
+           movimientos (traslación del pórtico, traslación del carro e izaje),
+           cada uno con su freno y su fin de carrera. */
+        'grua_portico' => [
+            'secciones' => [
+                ['A', 'Estructura del puente y patas'],
+                ['B', 'Carriles, testeros y traslación del pórtico'],
+                ['C', 'Carro y traslación transversal'],
+                ['D', 'Polipasto, cable y gancho'],
+                ['E', 'Sistema eléctrico y mandos'],
+                ['F', 'Dispositivos de seguridad'],
+                ['G', 'Documentación'],
+            ],
+            'items' => [
+                ['A', 'A-01', 'Viga principal: fisuras, abolladuras, corrosión y deformación permanente'],
+                ['A', 'A-02', 'Flecha del puente sin carga dentro de lo admisible'],
+                ['A', 'A-03', 'Uniones soldadas y empalmes: sin fisuras ni corrosión'],
+                ['A', 'A-04', 'Patas o columnas: verticalidad, anclajes y arriostramiento'],
+                ['A', 'A-05', 'Tornillería estructural: presencia, apriete y estado'],
+                ['A', 'A-06', 'Pintura y protección anticorrosiva'],
+                ['A', 'A-07', 'Placa de capacidad legible y a la vista desde el piso'],
+                ['B', 'B-01', 'Carriles: alineación, nivelación, desgaste y fijación a la base'],
+                ['B', 'B-02', 'Juntas de carril y holgura entre tramos'],
+                ['B', 'B-03', 'Ruedas de traslación: desgaste, pestañas y rodamientos'],
+                ['B', 'B-04', 'Testeros: estado estructural y paralelismo'],
+                ['B', 'B-05', 'Motorreductores de traslación: ruido, fugas y sujeción'],
+                ['B', 'B-06', 'Freno de traslación del pórtico: retención y ajuste'],
+                ['B', 'B-07', 'Topes de fin de recorrido y amortiguadores en ambos extremos'],
+                ['B', 'B-08', 'Mordazas o anclajes contra deslizamiento por viento, si aplica'],
+                ['C', 'C-01', 'Carro: bastidor, ruedas y guías sobre la viga'],
+                ['C', 'C-02', 'Motorreductor y freno de traslación del carro'],
+                ['C', 'C-03', 'Topes de fin de recorrido del carro en ambos extremos'],
+                ['C', 'C-04', 'Alimentación del carro: festón, carril conductor o carrete'],
+                ['D', 'D-01', 'Polipasto: carcasa, sujeción y ausencia de fugas'],
+                ['D', 'D-02', 'Cable o cadena de izaje: hilos rotos, desgaste, corrosión y lubricación'],
+                ['D', 'D-03', 'Enrollado en el tambor: ranurado, capas y anclaje del extremo'],
+                ['D', 'D-04', 'Poleas: gargantas, rodamientos y guardacables'],
+                ['D', 'D-05', 'Gancho: apertura, torsión, desgaste y seguro funcional'],
+                ['D', 'D-06', 'Freno de izaje: retención de la carga sin deslizamiento'],
+                ['D', 'D-07', 'Freno de emergencia o segundo freno de izaje, si aplica'],
+                ['E', 'E-01', 'Tablero eléctrico: protecciones, identificación y cierre'],
+                ['E', 'E-02', 'Puesta a tierra de estructura, carriles y equipos'],
+                ['E', 'E-03', 'Cableado y canalizaciones: estado y sujeción'],
+                ['E', 'E-04', 'Botonera o control remoto: identificación y retorno a cero'],
+                ['E', 'E-05', 'Paro de emergencia accesible y funcional'],
+                ['E', 'E-06', 'Interruptor principal con bloqueo para mantenimiento'],
+                ['F', 'F-01', 'Limitador de carga: funcionamiento y ajuste'],
+                ['F', 'F-02', 'Fin de carrera superior e inferior de izaje'],
+                ['F', 'F-03', 'Fines de carrera de traslación del puente y del carro'],
+                ['F', 'F-04', 'Alarma acústica de traslación y señalización luminosa'],
+                ['F', 'F-05', 'Protecciones de partes móviles: engranes, ejes y poleas'],
+                ['F', 'F-06', 'Accesos, escaleras, pasillos y barandales'],
+                ['F', 'F-07', 'Señalización de seguridad y delimitación del área de maniobra'],
+                ['G', 'G-01', 'Manual del operador y de mantenimiento disponible'],
+                ['G', 'G-02', 'Bitácora de mantenimiento preventivo al día'],
+                ['G', 'G-03', 'Certificados vigentes de cable, gancho y accesorios de izaje'],
+                ['G', 'G-04', 'Constancia de habilidades del operador'],
+                ['G', 'G-05', 'Registro de la última prueba de carga'],
+            ],
+            'normas' => [
+                ['NOM-004-STPS-1999', 'acreditada'],
+                ['NOM-006-STPS-2014', 'acreditada'],
+                // B30.2 es LA norma de puentes y pórticos; B30.16 cubre el
+                // polipasto y B30.26 los accesorios con los que se cuelga.
+                ['ASME B30.2',        'referencia'],
+                ['ASME B30.16',       'referencia'],
+                ['ASME B30.26',       'referencia'],
+                ['CMAA 74',           'referencia'],
             ],
         ],
     ];
@@ -898,6 +973,7 @@ class Admin {
             'dictamen_izaje.html', 'dictamen_ptem.html',
             'dictamen_grua_torre.html', 'dictamen_telehandler.html',
             'dictamen_mewp.html', 'dictamen_grua_oruga.html',
+            'dictamen_grua_portico.html',
         ];
         if (!in_array($html, $allowed, true)) {
             return ['status' => 'error', 'message' => 'Plantilla HTML no válida.'];

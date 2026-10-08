@@ -2555,12 +2555,25 @@ const PC_DEF = {
   'dictamen_ptem.html':        { label:'PTEM',              rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','altura','resultado'], calc:[] },
   'dictamen_telehandler.html': { label:'Telehandler',       rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','extension','altura','angulo','resultado'], calc:[] },
   'dictamen_mewp.html':        { label:'MEWP',              rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','altura','resultado'], calc:[] },
+  // Faltaba: sin entrada aquí se caía al respaldo, que deriva las columnas de
+  // lo que ya trae el dato. Un campo que el inspector dejó vacío no aparecía y
+  // Calidad no podía completarlo.
+  'dictamen_grua_oruga.html':  { label:'Grúa Estructural sobre Orugas',
+    rows:[{k:'princ_sin',l:'Gancho principal · sin carga'},{k:'princ_con',l:'Gancho principal · con carga'},
+          {k:'aux_sin',l:'Gancho auxiliar · sin carga'},{k:'aux_con',l:'Gancho auxiliar · con carga'}],
+    cols:['peso','radio','pluma','angulo','altura','resultado'], calc:['angulo','altura'] },
+  // Pórtico: sin pluma no hay radio ni ángulo. Se mide el claro y cuánto baja
+  // el puente con la carga.
+  'dictamen_grua_portico.html':{ label:'Grúa Pórtico',
+    rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}],
+    cols:['peso','luz','altura','flecha','resultado'], calc:[] },
 };
 const PC_LABELS = {
   peso:'Peso (TON)', radio:'Radio (m)', pluma:'Long. Pluma (m)',
   angulo:'Ángulo (°)', altura:'Altura (m)', resultado:'Resultado',
   duracion:'Duración (min)', inclin:'Inclinación (°)', estabilidad:'Estabilidad',
-  extension:'Extensión (m)', cml:'CML (ton)', prueba:'Carga Prueba (ton)', deformacion:'Deformación (mm)'
+  extension:'Extensión (m)', cml:'CML (ton)', prueba:'Carga Prueba (ton)', deformacion:'Deformación (mm)',
+  luz:'Claro (m)', flecha:'Flecha (mm)'
 };
 
 /* ═══════════════════════════════════════

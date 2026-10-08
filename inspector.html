@@ -3172,6 +3172,20 @@ const PC_TEMPLATES = {
       { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
     ]
   },
+  'dictamen_grua_portico.html': {
+    label: 'Grúa Pórtico',
+    // Un pórtico no tiene pluma: no hay radio ni ángulo que calcular. Lo que
+    // demuestra que aguanta es cuánto baja el puente con la carga (flecha) y
+    // que recupere al descargarlo, sobre un claro conocido.
+    rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
+    cols: [
+      { id:'peso',      label:'Peso de Prueba',   unit:'TON' },
+      { id:'luz',       label:'Claro del Puente', unit:'m'   },
+      { id:'altura',    label:'Altura de Izaje',  unit:'m'   },
+      { id:'flecha',    label:'Flecha Medida',    unit:'mm'  },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  },
   'dictamen_grua_torre.html': {
     label: 'Grúa Torre',
     rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],

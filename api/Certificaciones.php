@@ -1228,6 +1228,11 @@ body { background:#fff!important; }
         if (strpos($t, 'carga de prueba') !== false)                              return 'prueba';
         if (strpos($t, 'cml') !== false)                                          return 'cml';
         if (strpos($t, 'deforma') !== false)                                      return 'deformacion';
+        // Grúa pórtico: su prueba no tiene radio ni ángulo. Lo que se mide es
+        // cuánto baja el puente con la carga (flecha) y si recupera al
+        // descargarlo, sobre un claro conocido.
+        if (strpos($t, 'flecha') !== false)                                       return 'flecha';
+        if (strpos($t, 'claro') !== false || strpos($t, 'luz') !== false)         return 'luz';
         if (strpos($t, 'duracion') !== false)                                     return 'duracion';
         if (strpos($t, 'inclin') !== false)                                       return 'inclin';
         if (strpos($t, 'extensi') !== false)                                      return 'extension';
@@ -1289,7 +1294,8 @@ body { background:#fff!important; }
         // evita además que las ya guardadas se sigan imprimiendo con todo en NA.
         $campoConDato = function (array $f): bool {
             foreach (['peso','radio','pluma','angulo','altura','resultado',
-                      'duracion','deformacion','inclin','extension','cml','prueba'] as $c) {
+                      'duracion','deformacion','inclin','extension','cml','prueba',
+                      'flecha','luz'] as $c) {
                 if (trim((string)($f[$c] ?? '')) !== '') return true;
             }
             return false;
@@ -1461,6 +1467,28 @@ body { background:#fff!important; }
             $html = ($pAltura > 0)
                 ? str_replace('{pc_obs_altura}', number_format($pAltura, 1), $html)
                 : str_replace('{pc_obs_altura} m', 'NA', $html);
+        }
+
+        // 5b. Grúa pórtico: no hay geometría que calcular —sin pluma no hay
+        //     radio ni ángulo—. Lo que se cuenta en las observaciones es sobre
+        //     qué claro se probó, a qué altura y cuánto bajó el puente.
+        if (strpos($html, '{pc_obs_flecha}') !== false) {
+            $conCarga = is_array($pc['con'] ?? null) ? $pc['con'] : [];
+            $sinCarga = is_array($pc['sin'] ?? null) ? $pc['sin'] : [];
+            // El claro y la altura no cambian entre las dos pruebas: si la fila
+            // con carga no los trae, los de la fila sin carga valen igual.
+            $dato = function (string $campo) use ($conCarga, $sinCarga): string {
+                $v = trim((string)($conCarga[$campo] ?? ''));
+                return $v !== '' ? $v : trim((string)($sinCarga[$campo] ?? ''));
+            };
+            foreach (['luz' => 1, 'altura' => 2, 'flecha' => 0] as $campo => $dec) {
+                $v = $dato($campo);
+                $html = str_replace(
+                    '{pc_obs_' . $campo . '}',
+                    is_numeric($v) ? number_format((float)$v, $dec) : ($v !== '' ? $v : 'NA'),
+                    $html
+                );
+            }
         }
 
         // 6. Elementos de izaje: CML es la única propiedad capturada del elemento
