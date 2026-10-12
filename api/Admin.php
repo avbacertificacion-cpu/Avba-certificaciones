@@ -163,17 +163,18 @@ class Admin {
                 ['G', 'G-04', 'Constancia de habilidades del operador'],
                 ['G', 'G-05', 'Registro de la última prueba de carga'],
             ],
+            // El pórtico ampara sólo la 23814 (competencia del inspector) y la
+            // 17020 (la unidad); lo demás se cita como referencia.
             'normas' => [
-                ['NMX-GR-9927-1-IMNC-2019', 'acreditada'],
                 ['NMX-GR-23814-IMNC-2011',  'acreditada'],
                 ['NMX-EC-17020-IMNC-2014',  'acreditada'],
-                ['NOM-004-STPS-1999',       'acreditada'],
-                ['NOM-006-STPS-2014',       'acreditada'],
+                ['NMX-GR-9927-1-IMNC-2019', 'referencia'],
+                ['NOM-004-STPS-1999',       'referencia'],
+                ['NOM-006-STPS-2014',       'referencia'],
                 // B30.2 es LA norma de puentes y pórticos; B30.16 cubre el
                 // polipasto y B30.26 los accesorios con los que se cuelga.
                 ['ASME B30.2',              'referencia'],
                 ['ASME B30.16',             'referencia'],
-                ['ASME B30.26',             'referencia'],
                 ['CMAA 74',                 'referencia'],
             ],
         ],
@@ -195,15 +196,55 @@ class Admin {
         'NMX-GR-9927-1-IMNC-2019',
         'NMX-GR-23814-IMNC-2011',
     ];
-    /** Marca de aplicación: se corre una sola vez por instalación. */
-    private const SEED_NORMAS_EMA = 'normas_ema_25ui5073';
-    /** Tope por grupo, el mismo que respeta el panel de Calidad. */
-    private const MAX_NORMAS = 6;
+    /** Marcas de aplicación: cada paso se corre una sola vez por instalación. */
+    private const SEED_NORMAS_EMA     = 'normas_ema_25ui5073';
+    private const SEED_NORMAS_PORTICO = 'normas_portico_23814_17020';
+    private const SEED_CATALOGO       = 'catalogo_normas_v1';
+
+    /**
+     * Topes por grupo. Son de espacio, no de criterio: con siete normas
+     * acreditadas el bloque del certificado empuja el pie a una segunda página.
+     * Verificado renderizando con mPDF.
+     */
+    private const MAX_ACREDITADAS = 6;
+    private const MAX_REFERENCIA  = 8;
+
+    /**
+     * Catálogo con el que nace la instalación. Es el punto de partida de la
+     * lista que Calidad marca por tipo de equipo; desde el panel agrega las que
+     * falten y quita las que no use.
+     */
+    private const CATALOGO_NORMAS_BASE = [
+        ['NMX-EC-17020-IMNC-2014',  'Unidad de inspección — norma bajo la que la ema acreditó a AVBA'],
+        ['NMX-GR-23814-IMNC-2011',  'Grúas: requisitos de competencia para inspectores de grúas'],
+        ['NMX-GR-9927-1-IMNC-2019', 'Grúas — Inspecciones — Parte 1: Generalidades'],
+        ['NOM-004-STPS-1999',       'Sistemas de protección y dispositivos de seguridad en maquinaria'],
+        ['NOM-006-STPS-2014',       'Manejo y almacenamiento de materiales'],
+        ['NOM-009-STPS-2011',       'Trabajos en altura'],
+        ['NOM-031-STPS-2011',       'Construcción — condiciones de seguridad y salud'],
+        ['ASME B30.2',              'Puentes grúa y pórticos de viga simple o doble'],
+        ['ASME B30.3',              'Grúas torre'],
+        ['ASME B30.5',              'Grúas móviles y sobre orugas'],
+        ['ASME B30.9',              'Eslingas'],
+        ['ASME B30.10',             'Ganchos'],
+        ['ASME B30.16',             'Polipastos suspendidos y estacionarios'],
+        ['ASME B30.20',             'Dispositivos de sujeción bajo el gancho'],
+        ['ASME B30.23',             'Sistemas de elevación de personal'],
+        ['ASME B30.26',             'Accesorios de aparejo'],
+        ['CMAA 70',                 'Puentes grúa viajeros de viga doble'],
+        ['CMAA 74',                 'Puentes grúa viajeros de viga simple'],
+        ['ANSI/ITSDF B56.1',        'Montacargas de contrapeso'],
+        ['ANSI/ITSDF B56.6',        'Montacargas de terreno irregular y manipuladores telescópicos'],
+        ['ANSI A92.22',             'Plataformas de elevación — prácticas seguras de uso'],
+        ['ANSI A92.24',             'Plataformas de elevación — capacitación'],
+    ];
 
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
         $this->seedTiposMaquinaria();
         $this->sembrarNormasAcreditacion();
+        $this->ajustarNormasPortico();
+        $this->sembrarCatalogoNormas();
     }
 
     /**
@@ -253,9 +294,7 @@ class Admin {
                 $tipoId = (int)($t['id'] ?? 0);
                 if (!$tipoId) continue;
 
-                $deben = $this->esGrua((string)($t['nombre'] ?? ''))
-                    ? array_merge(self::NORMAS_GRUA, [self::NORMA_UNIDAD])
-                    : [self::NORMA_UNIDAD];
+                $deben = $this->normasQueDebe((string)($t['nombre'] ?? ''));
 
                 $leer->execute([$tipoId]);
                 $filas = $leer->fetchAll();
@@ -280,9 +319,9 @@ class Admin {
                         }
                         continue;   // ya está, con su redacción
                     }
-                    if ($acreditadas >= self::MAX_NORMAS) {
+                    if ($acreditadas >= self::MAX_ACREDITADAS) {
                         error_log("[Admin] normas ema: tipo $tipoId ya tiene "
-                            . self::MAX_NORMAS . " acreditadas, se omite $norma");
+                            . self::MAX_ACREDITADAS . " acreditadas, se omite $norma");
                         break;
                     }
                     $insertar->execute([$tipoId, $norma, ++$orden]);
@@ -295,6 +334,205 @@ class Admin {
         } catch (\Throwable $e) {
             error_log('[Admin] sembrarNormasAcreditacion: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Normas acreditadas que le corresponden a un tipo por su nombre.
+     *
+     * El pórtico ampara sólo la competencia del inspector y la norma de la
+     * unidad: la 9927-1 se cita ahí como referencia, no como alcance.
+     */
+    private function normasQueDebe(string $nombre): array {
+        if (!$this->esGrua($nombre))   return [self::NORMA_UNIDAD];
+        if ($this->esPortico($nombre)) return ['NMX-GR-23814-IMNC-2011', self::NORMA_UNIDAD];
+        return array_merge(self::NORMAS_GRUA, [self::NORMA_UNIDAD]);
+    }
+
+    /**
+     * Deja el pórtico con 23814 y 17020 como únicas acreditadas.
+     *
+     * Lo que sobra no se borra: baja a referencia, así sigue impreso en el
+     * documento y Calidad puede devolverlo desde el panel si hace falta. Corre
+     * una sola vez; después manda lo que Calidad haya decidido.
+     */
+    private function ajustarNormasPortico(): void {
+        try {
+            $st = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
+            $st->execute([self::SEED_NORMAS_PORTICO]);
+            if ($st->fetch()) return;
+        } catch (\Throwable $e) { return; }
+
+        try {
+            $quedan = ['23814', '17020'];
+            $tipos  = $this->pdo->query("SELECT id, nombre FROM maquinaria_tipos")->fetchAll();
+            $leer   = $this->pdo->prepare(
+                "SELECT id, norma FROM maquinaria_normas
+                 WHERE maquinaria_tipo_id = ? AND tipo <> 'referencia'"
+            );
+            $bajar  = $this->pdo->prepare(
+                "UPDATE maquinaria_normas SET tipo = 'referencia' WHERE id = ?"
+            );
+
+            foreach ($tipos as $t) {
+                if (!$this->esPortico((string)($t['nombre'] ?? ''))) continue;
+                $leer->execute([(int)$t['id']]);
+                foreach ($leer->fetchAll() as $f) {
+                    if (in_array($this->claveNorma((string)$f['norma']), $quedan, true)) continue;
+                    $bajar->execute([$f['id']]);
+                }
+            }
+
+            $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")
+                ->execute([self::SEED_NORMAS_PORTICO]);
+        } catch (\Throwable $e) {
+            error_log('[Admin] ajustarNormasPortico: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Da de alta el catálogo de normas que Calidad marca por tipo de equipo.
+     *
+     * Además del catálogo base recoge las normas que ya estén capturadas en
+     * algún tipo, para que la lista no omita ninguna de las que hoy se imprimen.
+     */
+    private function sembrarCatalogoNormas(): void {
+        try {
+            $this->pdo->exec(
+                "CREATE TABLE IF NOT EXISTS normas_catalogo (
+                   id          INT AUTO_INCREMENT PRIMARY KEY,
+                   norma       VARCHAR(300) NOT NULL,
+                   descripcion VARCHAR(300) NULL,
+                   creada      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                   UNIQUE KEY uq_norma (norma)
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            );
+        } catch (\Throwable $e) {
+            error_log('[Admin] catálogo de normas (tabla): ' . $e->getMessage());
+            return;
+        }
+
+        try {
+            $st = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
+            $st->execute([self::SEED_CATALOGO]);
+            if ($st->fetch()) return;
+        } catch (\Throwable $e) { return; }
+
+        try {
+            $ins = $this->pdo->prepare(
+                "INSERT INTO normas_catalogo (norma, descripcion) VALUES (?, ?)"
+            );
+            $ya = array_map(
+                'strtoupper',
+                $this->pdo->query("SELECT norma FROM normas_catalogo")->fetchAll(PDO::FETCH_COLUMN) ?: []
+            );
+
+            foreach (self::CATALOGO_NORMAS_BASE as [$norma, $desc]) {
+                if (in_array(strtoupper($norma), $ya, true)) continue;
+                $ins->execute([$norma, $desc]);
+                $ya[] = strtoupper($norma);
+            }
+
+            // Lo que ya esté en uso tiene que aparecer en la lista aunque no
+            // venga en el catálogo base.
+            $enUso = $this->pdo->query("SELECT DISTINCT norma FROM maquinaria_normas")
+                ->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            foreach ($enUso as $norma) {
+                $norma = trim((string)$norma);
+                if ($norma === '' || in_array(strtoupper($norma), $ya, true)) continue;
+                $ins->execute([$norma, null]);
+                $ya[] = strtoupper($norma);
+            }
+
+            $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")
+                ->execute([self::SEED_CATALOGO]);
+        } catch (\Throwable $e) {
+            error_log('[Admin] sembrarCatalogoNormas: ' . $e->getMessage());
+        }
+    }
+
+    // ── Catálogo de normas (ADMIN + CALIDAD) ───────────────────
+
+    /** Lista el catálogo con el número de tipos que usa cada norma. */
+    public function listarCatalogoNormas(): array {
+        try {
+            $filas = $this->pdo->query(
+                "SELECT c.id, c.norma, c.descripcion,
+                        (SELECT COUNT(DISTINCT n.maquinaria_tipo_id)
+                           FROM maquinaria_normas n WHERE n.norma = c.norma) AS en_uso
+                 FROM normas_catalogo c
+                 ORDER BY c.norma"
+            )->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            return ['status' => 'error', 'message' => 'No se pudo leer el catálogo de normas.'];
+        }
+        return [
+            'status' => 'success',
+            'data'   => $filas,
+            'topes'  => ['acreditadas' => self::MAX_ACREDITADAS, 'referencia' => self::MAX_REFERENCIA],
+        ];
+    }
+
+    /** Agrega una norma al catálogo para que quede disponible en todos los tipos. */
+    public function agregarNormaCatalogo(array $payload): array {
+        $norma = trim((string)($payload['norma'] ?? ''));
+        $desc  = trim((string)($payload['descripcion'] ?? ''));
+        if ($norma === '')            return ['status' => 'error', 'message' => 'Escribe la norma.'];
+        if (mb_strlen($norma) > 300)  return ['status' => 'error', 'message' => 'La norma es demasiado larga.'];
+
+        try {
+            $dup = $this->pdo->prepare("SELECT id FROM normas_catalogo WHERE UPPER(norma) = ?");
+            $dup->execute([mb_strtoupper($norma)]);
+            if ($dup->fetch()) return ['status' => 'error', 'message' => 'Esa norma ya está en el catálogo.'];
+
+            $this->pdo->prepare("INSERT INTO normas_catalogo (norma, descripcion) VALUES (?, ?)")
+                ->execute([$norma, $desc !== '' ? mb_substr($desc, 0, 300) : null]);
+        } catch (\Throwable $e) {
+            return ['status' => 'error', 'message' => 'No se pudo guardar la norma.'];
+        }
+        return ['status' => 'success', 'message' => 'Norma agregada al catálogo.'];
+    }
+
+    /**
+     * Quita una norma del catálogo.
+     *
+     * Si algún tipo la tiene marcada no se borra: se estaría quitando de la
+     * lista algo que hoy se imprime en certificados y dictámenes.
+     */
+    public function eliminarNormaCatalogo(array $payload): array {
+        $id = (int)($payload['id'] ?? 0);
+        if (!$id) return ['status' => 'error', 'message' => 'Falta la norma.'];
+
+        try {
+            $st = $this->pdo->prepare("SELECT norma FROM normas_catalogo WHERE id = ?");
+            $st->execute([$id]);
+            $norma = $st->fetchColumn();
+            if ($norma === false) return ['status' => 'error', 'message' => 'La norma ya no existe.'];
+
+            $uso = $this->pdo->prepare(
+                "SELECT t.nombre FROM maquinaria_normas n
+                 INNER JOIN maquinaria_tipos t ON t.id = n.maquinaria_tipo_id
+                 WHERE n.norma = ? ORDER BY t.nombre"
+            );
+            $uso->execute([$norma]);
+            $tipos = $uso->fetchAll(PDO::FETCH_COLUMN) ?: [];
+            if ($tipos) {
+                return ['status' => 'error', 'message' =>
+                    'No se puede quitar: la usan ' . implode(', ', array_unique($tipos))
+                    . '. Desmárcala de esos tipos primero.'];
+            }
+
+            $this->pdo->prepare("DELETE FROM normas_catalogo WHERE id = ?")->execute([$id]);
+        } catch (\Throwable $e) {
+            return ['status' => 'error', 'message' => 'No se pudo quitar la norma.'];
+        }
+        return ['status' => 'success', 'message' => 'Norma quitada del catálogo.'];
+    }
+
+    /** Si el tipo de equipo es un pórtico. */
+    private function esPortico(string $nombre): bool {
+        return str_contains(
+            strtoupper(strtr($nombre, ['Ó' => 'O', 'ó' => 'o'])), 'PORTICO'
+        );
     }
 
     /** Si el tipo de equipo es una grúa, sin depender del acento ni de mayúsculas. */
@@ -584,11 +822,11 @@ class Admin {
         if (array_key_exists('normas_acreditadas', $payload) || array_key_exists('normas_referencia', $payload)) {
             $acreditadas = array_slice(
                 array_filter(array_map('trim', $payload['normas_acreditadas'] ?? []), fn($n) => $n !== ''),
-                0, 6
+                0, self::MAX_ACREDITADAS
             );
             $referencia = array_slice(
                 array_filter(array_map('trim', $payload['normas_referencia'] ?? []), fn($n) => $n !== ''),
-                0, 6
+                0, self::MAX_REFERENCIA
             );
             foreach ($acreditadas as $i => $norma) {
                 $stmt->execute([$tipoId, $norma, 'acreditada', $i + 1]);
@@ -603,7 +841,7 @@ class Admin {
                 : (is_array($payload) && !isset($payload['normas_acreditadas']) ? $payload : []);
             $filtradas = array_slice(
                 array_filter(array_map('trim', $normas), fn($n) => $n !== ''),
-                0, 6
+                0, self::MAX_ACREDITADAS
             );
             foreach ($filtradas as $i => $norma) {
                 $stmt->execute([$tipoId, $norma, 'acreditada', $i + 1]);

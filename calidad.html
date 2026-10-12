@@ -878,34 +878,7 @@
                onkeydown="if(event.key==='Enter')crearTipo()">
       </div>
     </div>
-    <div style="margin-top:14px">
-      <!-- Normas Acreditadas -->
-      <div style="margin-bottom:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <label style="font-size:12px;font-weight:600;color:var(--azul)">
-            Normas Acreditadas
-          </label>
-          <button type="button" id="btn-add-acred-nuevo" onclick="nuevoAgregarNorma('acreditada')"
-                  style="font-size:11px;padding:3px 9px;border:1.5px solid var(--azul);
-                         border-radius:6px;background:var(--azul-light);color:var(--azul);
-                         cursor:pointer;font-weight:600">+ Agregar</button>
-        </div>
-        <div id="nuevo-normas-acred-list"></div>
-      </div>
-      <!-- Normas de Referencia -->
-      <div>
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-          <label style="font-size:12px;font-weight:600;color:var(--verde)">
-            Normas de Referencia
-          </label>
-          <button type="button" id="btn-add-ref-nuevo" onclick="nuevoAgregarNorma('referencia')"
-                  style="font-size:11px;padding:3px 9px;border:1.5px solid var(--verde);
-                         border-radius:6px;background:var(--verde-light);color:var(--verde);
-                         cursor:pointer;font-weight:600">+ Agregar</button>
-        </div>
-        <div id="nuevo-normas-ref-list"></div>
-      </div>
-    </div>
+    <div style="margin-top:14px" id="nuevo-normas-sel"></div>
     <div class="form-row" style="margin-top:14px">
       <button class="btn-save"    onclick="crearTipo()">Crear tipo</button>
       <button class="btn-cancel2" onclick="toggleFormNuevo()">Cancelar</button>
@@ -1979,32 +1952,7 @@
                       font-size:13px;color:var(--texto);outline:none"
                onkeydown="if(event.key==='Enter')guardarModalTipo()">
       </div>
-      <div>
-        <!-- Normas Acreditadas -->
-        <div style="margin-bottom:12px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <label style="font-size:12px;font-weight:600;color:var(--azul)">Normas Acreditadas</label>
-            <button type="button" onclick="modalAgregarNorma('acreditada')"
-                    style="font-size:11px;padding:3px 9px;border:1.5px solid var(--azul);
-                           border-radius:6px;background:var(--azul-light);color:var(--azul);
-                           cursor:pointer;font-weight:600">+ Agregar</button>
-          </div>
-          <div id="modal-normas-acred-list"></div>
-          <p id="modal-acred-vacio" style="font-size:11px;color:var(--texto-hint);margin:4px 0 0;display:none">Sin normas acreditadas</p>
-        </div>
-        <!-- Normas de Referencia -->
-        <div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-            <label style="font-size:12px;font-weight:600;color:var(--verde)">Normas de Referencia</label>
-            <button type="button" onclick="modalAgregarNorma('referencia')"
-                    style="font-size:11px;padding:3px 9px;border:1.5px solid var(--verde);
-                           border-radius:6px;background:var(--verde-light);color:var(--verde);
-                           cursor:pointer;font-weight:600">+ Agregar</button>
-          </div>
-          <div id="modal-normas-ref-list"></div>
-          <p id="modal-ref-vacio" style="font-size:11px;color:var(--texto-hint);margin:4px 0 0;display:none">Sin normas de referencia</p>
-        </div>
-      </div>
+      <div id="modal-normas-sel"></div>
     </div>
     <div class="modal-footer" style="justify-content:flex-end;gap:8px">
       <button class="btn-nc-cancel" onclick="cerrarModalTipo()">Cancelar</button>
@@ -6788,81 +6736,212 @@ async function cargarPlantillaActual() {
   } catch(e) { /* silencioso */ }
 }
 
-/* ── Formulario nuevo tipo ── */
-let nuevoNormasAcred = [];
-let nuevoNormasRef   = [];
+/* ── Selector de normas por tipo de equipo ──────────────────────────
+   Calidad marca, sobre un catálogo común, cuáles normas amparan la inspección
+   (acreditadas) y cuáles se citan como criterio técnico (referencia). Antes se
+   escribían a mano en cada tipo, lo que dejaba la misma norma con tres
+   redacciones distintas según quién la capturó.
 
-function toggleFormNuevo() {
+   Los topes son de espacio, no de criterio: verificado con mPDF, a la séptima
+   norma acreditada el bloque empuja el pie del certificado a una segunda
+   página. El backend aplica el mismo límite. */
+let catalogoNormas    = [];
+let topesNormas       = { acreditadas: 6, referencia: 8 };
+let catalogoCargado   = false;
+let selNormasNuevo    = {};          // norma -> 'acreditada' | 'referencia'
+let selNormasModal    = {};
+let filtroNormas      = { nuevo: "", modal: "" };
+let listaNormasPinta  = { nuevo: [], modal: [] };
+
+async function cargarCatalogoNormas(forzar) {
+  if (catalogoCargado && !forzar) return;
+  try {
+    const res  = await fetch(API, { method: "POST", body: JSON.stringify({ action: "LISTAR_CATALOGO_NORMAS" }) });
+    const data = await res.json();
+    if (data.status === "success") {
+      catalogoNormas  = data.data  || [];
+      topesNormas     = data.topes || topesNormas;
+      catalogoCargado = true;
+    }
+  } catch (e) { /* se queda con lo que ya tenga */ }
+}
+
+function selNormasDe(destino)  { return destino === 'modal' ? selNormasModal : selNormasNuevo; }
+function contNormasDe(destino) { return document.getElementById(destino === 'modal' ? 'modal-normas-sel' : 'nuevo-normas-sel'); }
+function cuentaNormas(destino, tipo) {
+  return Object.values(selNormasDe(destino)).filter(v => v === tipo).length;
+}
+
+function marcarNorma(destino, idx, tipo) {
+  const fila = (listaNormasPinta[destino] || [])[idx];
+  if (!fila) return;
+  const sel = selNormasDe(destino);
+
+  if (tipo && sel[fila.norma] !== tipo) {
+    const tope   = tipo === 'acreditada' ? topesNormas.acreditadas : topesNormas.referencia;
+    const nombre = tipo === 'acreditada' ? 'acreditadas' : 'de referencia';
+    if (cuentaNormas(destino, tipo) >= tope) {
+      alert(`Ya hay ${tope} normas ${nombre}, que es lo que cabe en el certificado sin que `
+          + `se pase a una segunda página.\n\nDesmarca alguna para poder poner ésta.`);
+      return;
+    }
+  }
+  if (tipo) sel[fila.norma] = tipo; else delete sel[fila.norma];
+  pintarFilasNormas(destino);
+}
+
+function renderSelectorNormas(destino) {
+  const cont = contNormasDe(destino);
+  if (!cont) return;
+  // El armazón se pinta una sola vez: si se rehiciera en cada tecleo, el
+  // buscador perdería el foco a la primera letra.
+  if (cont.dataset.listo !== "1") {
+    const inp = `width:100%;padding:7px 10px;border:1.5px solid var(--borde);border-radius:7px;
+                 font-size:12px;color:var(--texto);outline:none;background:var(--blanco)`;
+    cont.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;flex-wrap:wrap">
+        <label style="font-size:12px;font-weight:600;color:var(--texto)">Normas que se imprimen en el documento</label>
+        <span id="${destino}-normas-cuenta" style="font-size:11px;color:var(--texto-hint)"></span>
+      </div>
+      <input id="${destino}-normas-filtro" type="text" placeholder="Buscar norma…" style="${inp};margin-bottom:7px"
+             oninput="filtroNormas['${destino}']=this.value;pintarFilasNormas('${destino}')">
+      <div id="${destino}-normas-filas"
+           style="max-height:280px;overflow-y:auto;border:1.5px solid var(--borde);border-radius:8px;padding:5px"></div>
+      <div style="display:flex;gap:6px;margin-top:8px">
+        <input id="${destino}-norma-nueva" type="text" placeholder="¿Falta una norma? Agrégala al catálogo…" style="${inp};flex:1"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();agregarAlCatalogo('${destino}')}">
+        <button type="button" onclick="agregarAlCatalogo('${destino}')"
+                style="font-size:11px;padding:3px 11px;border:1.5px solid var(--azul);border-radius:7px;
+                       background:var(--azul-light);color:var(--azul);cursor:pointer;font-weight:600;flex-shrink:0">+ Catálogo</button>
+      </div>
+      <p style="font-size:10.5px;color:var(--texto-hint);margin:7px 0 0;line-height:1.5">
+        <strong style="color:var(--azul)">Acreditada</strong>: la inspección se ampara en ella ante la ema.
+        <strong style="color:var(--verde)">Referencia</strong>: se cita como criterio técnico.
+        Lo que elijas aquí es lo que sale impreso en los certificados y dictámenes de este tipo de equipo.
+      </p>`;
+    cont.dataset.listo = "1";
+  }
+  pintarFilasNormas(destino);
+}
+
+function pintarFilasNormas(destino) {
+  const caja = document.getElementById(`${destino}-normas-filas`);
+  if (!caja) return;
+  const sel = selNormasDe(destino);
+
+  // El catálogo manda, pero si un tipo trae una norma que no está en él se
+  // muestra igual: nunca se pierde de vista algo que hoy se está imprimiendo.
+  const lista = catalogoNormas.map(n => ({ ...n }));
+  Object.keys(sel).forEach(norma => {
+    if (!lista.some(n => n.norma === norma)) lista.push({ id: null, norma, descripcion: null, en_uso: 1 });
+  });
+  lista.sort((a, b) => a.norma.localeCompare(b.norma, 'es'));
+  listaNormasPinta[destino] = lista;
+
+  const q = (filtroNormas[destino] || "").trim().toLowerCase();
+  const visible = i => !q || lista[i].norma.toLowerCase().includes(q)
+                          || (lista[i].descripcion || "").toLowerCase().includes(q);
+
+  const boton = (destino, i, tipo, texto, activo, color) => `
+    <button type="button" onclick="marcarNorma('${destino}',${i},${tipo ? `'${tipo}'` : 'null'})"
+            style="padding:3px 9px;border:1.5px solid ${activo ? color : 'var(--borde)'};border-radius:6px;
+                   background:${activo ? color : 'var(--blanco)'};color:${activo ? '#fff' : 'var(--texto-hint)'};
+                   font-size:10.5px;font-weight:600;cursor:pointer;white-space:nowrap">${texto}</button>`;
+
+  const filas = lista.map((n, i) => {
+    if (!visible(i)) return "";
+    const v = sel[n.norma] || null;
+    const borrable = n.id && !v && !Number(n.en_uso || 0);
+    return `
+      <div style="display:flex;align-items:center;gap:9px;padding:6px 7px;border-radius:7px;
+                  background:${v ? 'var(--gris-bg,#f6f8fb)' : 'transparent'};margin-bottom:3px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:12px;font-weight:600;color:var(--texto)">${escH(n.norma)}</div>
+          ${n.descripcion ? `<div style="font-size:10.5px;color:var(--texto-hint);line-height:1.4">${escH(n.descripcion)}</div>` : ``}
+        </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          ${boton(destino, i, null,          '—',          !v,                  'var(--texto-hint)')}
+          ${boton(destino, i, 'acreditada',  'Acreditada', v === 'acreditada',  'var(--azul)')}
+          ${boton(destino, i, 'referencia',  'Referencia', v === 'referencia',  'var(--verde)')}
+        </div>
+        ${borrable ? `<button type="button" title="Quitar del catálogo" onclick="quitarDelCatalogo('${destino}',${n.id})"
+            style="width:22px;height:22px;border-radius:50%;background:var(--rojo-light);color:var(--rojo);
+                   border:1.5px solid var(--rojo);cursor:pointer;font-size:13px;line-height:1;flex-shrink:0">×</button>`
+          : `<span style="width:22px;flex-shrink:0"></span>`}
+      </div>`;
+  }).join("");
+
+  caja.innerHTML = filas ||
+    `<p style="font-size:11.5px;color:var(--texto-hint);padding:10px;text-align:center;margin:0">
+       ${q ? 'Ninguna norma coincide con la búsqueda.' : 'El catálogo está vacío.'}</p>`;
+
+  const nA = cuentaNormas(destino, 'acreditada');
+  const nR = cuentaNormas(destino, 'referencia');
+  const cnt = document.getElementById(`${destino}-normas-cuenta`);
+  if (cnt) {
+    const tope = (n, t) => `<strong style="color:${n >= t ? 'var(--rojo)' : 'inherit'}">${n}/${t}</strong>`;
+    cnt.innerHTML = `Acreditadas ${tope(nA, topesNormas.acreditadas)} · `
+                  + `Referencia ${tope(nR, topesNormas.referencia)}`;
+  }
+}
+
+async function agregarAlCatalogo(destino) {
+  const caja  = document.getElementById(`${destino}-norma-nueva`);
+  const norma = (caja?.value || "").trim();
+  if (!norma) { caja?.focus(); return; }
+
+  const res  = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({ action: "AGREGAR_NORMA_CATALOGO", payload: { norma } })
+  });
+  const data = await res.json();
+  if (data.status !== "success") { alert(data.message || "No se pudo agregar la norma."); return; }
+
+  caja.value = "";
+  await cargarCatalogoNormas(true);
+  // Queda a la vista y ya marcada: casi siempre se agrega para usarla aquí.
+  filtroNormas[destino] = norma;
+  const filtro = document.getElementById(`${destino}-normas-filtro`);
+  if (filtro) filtro.value = norma;
+  pintarFilasNormas(destino);
+}
+
+async function quitarDelCatalogo(destino, id) {
+  if (!confirm("¿Quitar esta norma del catálogo?\n\nDeja de ofrecerse para todos los tipos de equipo.")) return;
+  const res  = await fetch(API, {
+    method: "POST",
+    body: JSON.stringify({ action: "ELIMINAR_NORMA_CATALOGO", payload: { id } })
+  });
+  const data = await res.json();
+  if (data.status !== "success") { alert(data.message || "No se pudo quitar la norma."); return; }
+  await cargarCatalogoNormas(true);
+  pintarFilasNormas(destino);
+}
+
+/* ── Formulario nuevo tipo ── */
+async function toggleFormNuevo() {
   const f = document.getElementById("form-nuevo");
   f.classList.toggle("open");
   if (f.classList.contains("open")) {
     document.getElementById("nuevo-nombre").focus();
+    await cargarCatalogoNormas();
+    renderSelectorNormas("nuevo");
   } else {
-    nuevoNormasAcred = [];
-    nuevoNormasRef   = [];
-    renderNuevoNormas();
+    selNormasNuevo = {};
+    filtroNormas.nuevo = "";
+    const filtro = document.getElementById("nuevo-normas-filtro");
+    if (filtro) filtro.value = "";
+    pintarFilasNormas("nuevo");
     document.getElementById("nuevo-nombre").value = "";
   }
-}
-
-function renderNuevoNormasGroup(arr, listId, btnId, tipo) {
-  const brd   = tipo === 'acreditada' ? 'var(--azul)' : 'var(--verde)';
-  const list  = document.getElementById(listId);
-  if (!list) return;
-  list.innerHTML = arr.map((n, i) => `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-      <span style="font-size:11px;color:var(--texto-hint);min-width:14px;flex-shrink:0">${i+1}.</span>
-      <input type="text" value="${escH(n)}"
-             oninput="${tipo==='acreditada'?'nuevoNormasAcred':'nuevoNormasRef'}[${i}]=this.value"
-             placeholder="Ej: NOM-006-STPS-2014..."
-             style="flex:1;padding:7px 10px;border:1.5px solid var(--borde);border-radius:7px;
-                    font-size:12px;color:var(--texto);outline:none;background:var(--blanco)"
-             onfocus="this.style.borderColor='${brd}'"
-             onblur="this.style.borderColor='var(--borde)'">
-      <button onclick="nuevoRemoverNorma('${tipo}',${i})"
-              style="width:24px;height:24px;border-radius:50%;background:var(--rojo-light);
-                     color:var(--rojo);border:1.5px solid var(--rojo);cursor:pointer;
-                     font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
-    </div>`).join("");
-  const btn = document.getElementById(btnId);
-  if (btn) btn.style.display = arr.length >= 6 ? "none" : "";
-}
-
-function renderNuevoNormas() {
-  renderNuevoNormasGroup(nuevoNormasAcred, "nuevo-normas-acred-list", "btn-add-acred-nuevo", "acreditada");
-  renderNuevoNormasGroup(nuevoNormasRef,   "nuevo-normas-ref-list",   "btn-add-ref-nuevo",   "referencia");
-}
-
-function nuevoAgregarNorma(tipo) {
-  if (tipo === 'acreditada') {
-    if (nuevoNormasAcred.length >= 6) return;
-    nuevoNormasAcred.push("");
-    renderNuevoNormasGroup(nuevoNormasAcred, "nuevo-normas-acred-list", "btn-add-acred-nuevo", "acreditada");
-    const inputs = document.getElementById("nuevo-normas-acred-list").querySelectorAll("input");
-    if (inputs.length) inputs[inputs.length-1].focus();
-  } else {
-    if (nuevoNormasRef.length >= 6) return;
-    nuevoNormasRef.push("");
-    renderNuevoNormasGroup(nuevoNormasRef, "nuevo-normas-ref-list", "btn-add-ref-nuevo", "referencia");
-    const inputs = document.getElementById("nuevo-normas-ref-list").querySelectorAll("input");
-    if (inputs.length) inputs[inputs.length-1].focus();
-  }
-}
-
-function nuevoRemoverNorma(tipo, idx) {
-  if (tipo === 'acreditada') { nuevoNormasAcred.splice(idx,1); renderNuevoNormasGroup(nuevoNormasAcred,"nuevo-normas-acred-list","btn-add-acred-nuevo","acreditada"); }
-  else                       { nuevoNormasRef.splice(idx,1);   renderNuevoNormasGroup(nuevoNormasRef,"nuevo-normas-ref-list","btn-add-ref-nuevo","referencia"); }
 }
 
 async function crearTipo() {
   const nombre = document.getElementById("nuevo-nombre").value.trim();
   if (!nombre) { document.getElementById("nuevo-nombre").focus(); return; }
 
-  // Recoger normas por tipo
-  const inputsAcred = document.getElementById("nuevo-normas-acred-list").querySelectorAll("input");
-  const inputsRef   = document.getElementById("nuevo-normas-ref-list").querySelectorAll("input");
-  const normas_acreditadas = [...inputsAcred].map(i=>i.value.trim()).filter(v=>v);
-  const normas_referencia  = [...inputsRef].map(i=>i.value.trim()).filter(v=>v);
+  const normas_acreditadas = Object.keys(selNormasNuevo).filter(n => selNormasNuevo[n] === 'acreditada');
+  const normas_referencia  = Object.keys(selNormasNuevo).filter(n => selNormasNuevo[n] === 'referencia');
 
   const res  = await fetch(API, {
     method: "POST",
@@ -6871,9 +6950,7 @@ async function crearTipo() {
   const data = await res.json();
   if (data.status === "success") {
     document.getElementById("nuevo-nombre").value = "";
-    nuevoNormasAcred = [];
-    nuevoNormasRef   = [];
-    renderNuevoNormas();
+    selNormasNuevo = {};
     toggleFormNuevo();
     tiposCargados = false;
     cargarTipos();
@@ -7390,92 +7467,46 @@ async function guardarItem(tipoId, secCodigo) {
   }
 }
 /* ── Modal editar tipo (nombre + normas) ── */
-let tipoModalId     = null;
-let tipoModalNormasAcred = [];
-let tipoModalNormasRef   = [];
+let tipoModalId = null;
 
-function abrirModalTipo(tipoId) {
+async function abrirModalTipo(tipoId) {
   const t = tiposGlobal.find(x => x.id == tipoId);
   if (!t) return;
-  tipoModalId     = tipoId;
-  tipoModalNormasAcred = (t.normas||[]).filter(n=>n.tipo==='acreditada'||!n.tipo).map(n=>n.norma);
-  tipoModalNormasRef   = (t.normas||[]).filter(n=>n.tipo==='referencia').map(n=>n.norma);
+  tipoModalId = tipoId;
 
-  document.getElementById("tipo-modal-id").value    = tipoId;
+  selNormasModal = {};
+  (t.normas || []).forEach(n => {
+    selNormasModal[n.norma] = n.tipo === 'referencia' ? 'referencia' : 'acreditada';
+  });
+
+  document.getElementById("tipo-modal-id").value     = tipoId;
   document.getElementById("tipo-modal-nombre").value = t.nombre;
-  renderModalNormas();
 
   document.getElementById("overlay-tipo").style.display = "flex";
   document.getElementById("overlay-tipo").classList.add("open");
   setTimeout(() => document.getElementById("tipo-modal-nombre").focus(), 80);
+
+  filtroNormas.modal = "";
+  await cargarCatalogoNormas();
+  renderSelectorNormas("modal");
+  const filtro = document.getElementById("modal-normas-filtro");
+  if (filtro) filtro.value = "";
 }
 
 function cerrarModalTipo() {
   document.getElementById("overlay-tipo").style.display = "none";
   document.getElementById("overlay-tipo").classList.remove("open");
-  tipoModalId          = null;
-  tipoModalNormasAcred = [];
-  tipoModalNormasRef   = [];
+  tipoModalId    = null;
+  selNormasModal = {};
 }
 
-function renderModalNormasGroup(arr, listId, vacioId, tipo) {
-  const brd  = tipo === 'acreditada' ? 'var(--azul)' : 'var(--verde)';
-  const list = document.getElementById(listId);
-  if (!list) return;
-  list.innerHTML = arr.map((n, i) => `
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px">
-      <span style="font-size:11px;color:var(--texto-hint);min-width:14px;flex-shrink:0">${i+1}.</span>
-      <input type="text" value="${escH(n)}"
-             oninput="${tipo==='acreditada'?'tipoModalNormasAcred':'tipoModalNormasRef'}[${i}]=this.value"
-             placeholder="Ej: NOM-006-STPS-2014..."
-             style="flex:1;padding:7px 10px;border:1.5px solid var(--borde);border-radius:7px;
-                    font-size:12px;color:var(--texto);outline:none;background:var(--blanco)"
-             onfocus="this.style.borderColor='${brd}'"
-             onblur="this.style.borderColor='var(--borde)'">
-      <button onclick="modalRemoverNorma('${tipo}',${i})"
-              style="width:24px;height:24px;border-radius:50%;background:var(--rojo-light);
-                     color:var(--rojo);border:1.5px solid var(--rojo);cursor:pointer;
-                     font-size:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
-    </div>`).join("");
-  const vacio = document.getElementById(vacioId);
-  if (vacio) vacio.style.display = arr.length ? "none" : "block";
-}
-
-function renderModalNormas() {
-  renderModalNormasGroup(tipoModalNormasAcred, "modal-normas-acred-list", "modal-acred-vacio", "acreditada");
-  renderModalNormasGroup(tipoModalNormasRef,   "modal-normas-ref-list",   "modal-ref-vacio",   "referencia");
-}
-
-function modalAgregarNorma(tipo) {
-  if (tipo === 'acreditada') {
-    if (tipoModalNormasAcred.length >= 6) return;
-    tipoModalNormasAcred.push("");
-    renderModalNormasGroup(tipoModalNormasAcred, "modal-normas-acred-list", "modal-acred-vacio", "acreditada");
-    const inputs = document.getElementById("modal-normas-acred-list").querySelectorAll("input");
-    if (inputs.length) inputs[inputs.length-1].focus();
-  } else {
-    if (tipoModalNormasRef.length >= 6) return;
-    tipoModalNormasRef.push("");
-    renderModalNormasGroup(tipoModalNormasRef, "modal-normas-ref-list", "modal-ref-vacio", "referencia");
-    const inputs = document.getElementById("modal-normas-ref-list").querySelectorAll("input");
-    if (inputs.length) inputs[inputs.length-1].focus();
-  }
-}
-
-function modalRemoverNorma(tipo, idx) {
-  if (tipo === 'acreditada') { tipoModalNormasAcred.splice(idx,1); renderModalNormasGroup(tipoModalNormasAcred,"modal-normas-acred-list","modal-acred-vacio","acreditada"); }
-  else                       { tipoModalNormasRef.splice(idx,1);   renderModalNormasGroup(tipoModalNormasRef,"modal-normas-ref-list","modal-ref-vacio","referencia"); }
-}
 
 async function guardarModalTipo() {
   const nombre = document.getElementById("tipo-modal-nombre").value.trim();
   if (!nombre) { document.getElementById("tipo-modal-nombre").focus(); return; }
 
-  // Recoger normas por tipo
-  const iAcred = document.getElementById("modal-normas-acred-list").querySelectorAll("input");
-  const iRef   = document.getElementById("modal-normas-ref-list").querySelectorAll("input");
-  const normas_acreditadas = [...iAcred].map(i=>i.value.trim()).filter(v=>v);
-  const normas_referencia  = [...iRef].map(i=>i.value.trim()).filter(v=>v);
+  const normas_acreditadas = Object.keys(selNormasModal).filter(n => selNormasModal[n] === 'acreditada');
+  const normas_referencia  = Object.keys(selNormasModal).filter(n => selNormasModal[n] === 'referencia');
 
   const res  = await fetch(API, {
     method: "POST",

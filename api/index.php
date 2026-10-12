@@ -1536,6 +1536,22 @@ if ($method === 'POST') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cert->guardarEnvioCert($payload));
 
+        // ── Catálogo de normas (ADMIN + CALIDAD) ──────────
+        case 'LISTAR_CATALOGO_NORMAS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->listarCatalogoNormas());
+
+        case 'AGREGAR_NORMA_CATALOGO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->agregarNormaCatalogo($payload));
+
+        case 'ELIMINAR_NORMA_CATALOGO':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($admin->eliminarNormaCatalogo($payload));
+
         // ── Admin: tipos de equipo ────────────────────────
         case 'CREAR_TIPO_EQUIPO':
             $usr = validarToken($pdo, $token);
