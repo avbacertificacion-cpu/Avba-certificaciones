@@ -22,6 +22,7 @@ class Admin {
         'grua_oruga'  => ['GRÚA ESTRUCTURAL SOBRE ORUGAS', 'dictamen_grua_oruga.html'],
         'grua_portico' => ['GRÚA PÓRTICO', 'dictamen_grua_portico.html'],
         'canastilla'   => ['CANASTILLA ESTRUCTURAL', 'dictamen_canastilla.html'],
+        'canastilla_sp' => ['CANASTILLA ESTRUCTURAL SIN PUERTA', 'dictamen_canastilla_sin_puerta.html'],
     ];
 
     /**
@@ -245,6 +246,89 @@ class Admin {
             // La 23814 y la 17020 son el alcance acreditado; el resto se cita
             // como criterio técnico. B30.23 es la de izaje de personal y B30.20
             // la de dispositivos que cuelgan del gancho, que es lo que esto es.
+            'normas' => [
+                ['NMX-GR-23814-IMNC-2011',  'acreditada'],
+                ['NMX-EC-17020-IMNC-2014',  'acreditada'],
+                ['ASME B30.23',             'referencia'],
+                ['ASME B30.20',             'referencia'],
+                ['ASME B30.26',             'referencia'],
+                ['ASME B30.9',              'referencia'],
+                ['NOM-009-STPS-2011',       'referencia'],
+                ['NOM-004-STPS-1999',       'referencia'],
+            ],
+        ],
+
+        /* Canastilla sin puerta: el acceso es un hueco en el barandal, no una
+           puerta que cierre. Cambia lo que protege al ocupante.
+
+           En la de puerta, el cierre positivo es la barrera: mientras esté
+           cerrada, nadie se sale. Aquí esa barrera no existe, así que todo
+           recae en el arnés y en su anclaje, y el hueco mismo pasa a ser un
+           punto de revisión: su ancho, su rodapié, de qué lado queda y si se
+           puede entrar y salir sin desconectarse.
+
+           Lo demás —estructura, piso, suspensión, prueba de carga— se revisa
+           igual que en la de puerta. */
+        'canastilla_sp' => [
+            'secciones' => [
+                ['A', 'Estructura y piso'],
+                ['B', 'Barandal, rodapié y hueco de acceso'],
+                ['C', 'Puntos de izaje y bastidor de suspensión'],
+                ['D', 'Protección contra caídas'],
+                ['E', 'Señalización y placa de capacidad'],
+                ['F', 'Prueba de carga'],
+                ['G', 'Documentación'],
+            ],
+            'items' => [
+                ['A', 'A-01', 'Bastidor y largueros: fisuras, abolladuras o deformación permanente'],
+                ['A', 'A-02', 'Soldaduras: sin fisuras, poros ni socavación visible'],
+                ['A', 'A-03', 'Corrosión: sin pérdida de sección en elementos portantes'],
+                ['A', 'A-04', 'Piso de rejilla o lámina antiderrapante: completo, sin zonas flojas ni perforaciones'],
+                ['A', 'A-05', 'Fijación del piso al bastidor en todo su perímetro'],
+                ['A', 'A-06', 'Drenaje libre, para que el piso no acumule agua'],
+                ['A', 'A-07', 'Tornillería estructural: presencia, apriete y estado'],
+                ['A', 'A-08', 'Sin modificaciones ni reparaciones no autorizadas por el fabricante'],
+                ['B', 'B-01', 'Barandal superior a la altura de diseño, continuo salvo en el hueco de acceso'],
+                ['B', 'B-02', 'Barandal intermedio presente en todo el perímetro'],
+                ['B', 'B-03', 'Rodapié continuo, incluido el borde del hueco de acceso'],
+                ['B', 'B-04', 'Hueco de acceso: ancho dentro de lo indicado por el fabricante, sin ampliaciones hechas en campo'],
+                ['B', 'B-05', 'Cadena, barra o cable de cierre del hueco, si el diseño lo incluye: enganche en ambos extremos'],
+                ['B', 'B-06', 'Hueco de acceso señalizado y orientado de modo que no quede hacia el vacío durante la maniobra'],
+                ['B', 'B-07', 'Asidero junto al hueco para entrar y salir con las dos manos ocupadas'],
+                ['B', 'B-08', 'Sin bordes cortantes ni rebabas en el canto del hueco'],
+                ['B', 'B-09', 'Malla o cerramiento lateral íntegro en el resto del perímetro, si el diseño lo incluye'],
+                ['C', 'C-01', 'Oreja de izaje: ojo sin elongación, sin deformación ni fisuras'],
+                ['C', 'C-02', 'Soldadura de la oreja al bastidor de suspensión'],
+                ['C', 'C-03', 'Bastidor o yugo de suspensión: montantes, diagonales y sus soldaduras'],
+                ['C', 'C-04', 'Pasadores o pernos de pivote: estado, apriete y seguro'],
+                ['C', 'C-05', 'Juego en los pivotes dentro de lo admisible'],
+                ['C', 'C-06', 'Grillete de conexión al gancho: tipo, capacidad y seguro de pasador'],
+                ['C', 'C-07', 'Eslingas o cables del aparejo, cuando la suspensión es de varios ramales'],
+                ['C', 'C-08', 'Dispositivo antigiro o de orientación, si el diseño lo incluye'],
+                ['C', 'C-09', 'Sin carga, el conjunto cuelga a plomo y la canastilla queda nivelada'],
+                ['D', 'D-01', 'Puntos de anclaje para arnés, independientes de la estructura de izaje'],
+                ['D', 'D-02', 'Un anclaje por ocupante, al menos hasta el número máximo indicado en la placa'],
+                ['D', 'D-03', 'Anclajes identificados, sin deformación y sin corrosión'],
+                ['D', 'D-04', 'Los anclajes permiten permanecer conectado al entrar y al salir por el hueco'],
+                ['D', 'D-05', 'Longitud del conector tal que el ocupante no pueda salir por el hueco'],
+                ['D', 'D-06', 'Línea de vida o conector secundario al gancho, si aplica'],
+                ['E', 'E-01', 'Placa con capacidad nominal legible y fijada a la canastilla'],
+                ['E', 'E-02', 'Tara (peso propio) indicada en la placa'],
+                ['E', 'E-03', 'Número máximo de ocupantes indicado'],
+                ['E', 'E-04', 'Número de serie o identificación visible'],
+                ['E', 'E-05', 'Leyenda de uso exclusivo para izaje de personal'],
+                ['E', 'E-06', 'Leyenda de uso permanente de arnés, visible desde el hueco de acceso'],
+                ['F', 'F-01', 'Prueba de carga estática al 125% de la capacidad nominal'],
+                ['F', 'F-02', 'Carga distribuida sobre el piso durante la prueba'],
+                ['F', 'F-03', 'Sin deformación permanente al retirar la carga'],
+                ['F', 'F-04', 'Sin fisuras ni desprendimientos tras la prueba'],
+                ['F', 'F-05', 'Oreja de izaje y pivotes sin elongación ni juego nuevo tras la prueba'],
+                ['G', 'G-01', 'Memoria de cálculo o certificado estructural del fabricante'],
+                ['G', 'G-02', 'Manual de uso y de montaje de la suspensión'],
+                ['G', 'G-03', 'Registro de la última prueba de carga'],
+                ['G', 'G-04', 'Certificados vigentes de grilletes, eslingas y accesorios de la suspensión'],
+                ['G', 'G-05', 'Procedimiento de izaje de personal y plan de rescate'],
+            ],
             'normas' => [
                 ['NMX-GR-23814-IMNC-2011',  'acreditada'],
                 ['NMX-EC-17020-IMNC-2014',  'acreditada'],

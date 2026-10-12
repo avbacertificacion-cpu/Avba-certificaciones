@@ -3225,6 +3225,18 @@ const PC_TEMPLATES = {
       { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
     ]
   },
+  'dictamen_canastilla_sin_puerta.html': {
+    label: 'Canastilla estructural sin puerta',
+    headerFields: [
+      { id:'capacidad', label:'Capacidad nominal', unit:'kg' },
+    ],
+    rows: [{ key:'estatica', label:'Prueba de carga estática (125%)' }],
+    cols: [
+      { id:'duracion',    label:'Duración',               unit:'min' },
+      { id:'deformacion', label:'Deformación permanente', unit:'mm'  },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  },
   'dictamen_canastilla.html': {
     label: 'Canastilla estructural',
     // La capacidad nominal se captura una vez; la carga de prueba (125%) se
