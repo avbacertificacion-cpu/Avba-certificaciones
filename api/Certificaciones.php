@@ -2328,10 +2328,21 @@ SVG;
         $acred = array_filter($rows, fn($r) => ($r['tipo'] ?? 'acreditada') !== 'referencia');
         $ref   = array_filter($rows, fn($r) => ($r['tipo'] ?? '') === 'referencia');
 
-        $fmt = fn($arr) => implode(' · ', array_map(
-            fn($r) => htmlspecialchars($r['norma'], ENT_QUOTES, 'UTF-8'),
-            $arr
-        )) ?: '—';
+        // El renglón se parte donde quepa, y con claves como NMX-GR-9927-1-IMNC-2019
+        // partía a media norma ("NMX-GR-23814-" / "IMNC-2011"), que se lee como si
+        // fueran dos. Los guiones internos pasan a guion de no separación (U+2011,
+        // que DejaVu sí dibuja) para que el corte caiga siempre entre normas.
+        // white-space:nowrap no sirve: mPDF lo ignora en línea.
+        $fmt = function ($arr) {
+            $n = array_map(
+                fn($r) => str_replace(
+                    '-', "\u{2011}",
+                    htmlspecialchars($r['norma'], ENT_QUOTES, 'UTF-8')
+                ),
+                $arr
+            );
+            return $n ? implode(' · ', $n) : '—';
+        };
 
         return [$fmt($acred), $fmt($ref)];
     }

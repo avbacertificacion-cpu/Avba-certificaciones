@@ -87,12 +87,17 @@ class Admin {
                 ['G', 'G-04', 'Constancia de habilidades del operador'],
             ],
             // Lo que ampara la inspección y lo que se consulta de referencia.
+            // Las tres primeras son el alcance acreditado ante la ema; las NOM
+            // son obligación legal en México y se citan como tal.
             'normas' => [
-                ['NOM-004-STPS-1999', 'acreditada'],
-                ['NOM-006-STPS-2014', 'acreditada'],
-                ['ASME B30.5',        'referencia'],
-                ['ASME B30.10',       'referencia'],
-                ['ASME B30.26',       'referencia'],
+                ['NMX-GR-9927-1-IMNC-2019', 'acreditada'],
+                ['NMX-GR-23814-IMNC-2011',  'acreditada'],
+                ['NMX-EC-17020-IMNC-2014',  'acreditada'],
+                ['NOM-004-STPS-1999',       'acreditada'],
+                ['NOM-006-STPS-2014',       'acreditada'],
+                ['ASME B30.5',              'referencia'],
+                ['ASME B30.10',             'referencia'],
+                ['ASME B30.26',             'referencia'],
             ],
         ],
 
@@ -159,21 +164,154 @@ class Admin {
                 ['G', 'G-05', 'Registro de la última prueba de carga'],
             ],
             'normas' => [
-                ['NOM-004-STPS-1999', 'acreditada'],
-                ['NOM-006-STPS-2014', 'acreditada'],
+                ['NMX-GR-9927-1-IMNC-2019', 'acreditada'],
+                ['NMX-GR-23814-IMNC-2011',  'acreditada'],
+                ['NMX-EC-17020-IMNC-2014',  'acreditada'],
+                ['NOM-004-STPS-1999',       'acreditada'],
+                ['NOM-006-STPS-2014',       'acreditada'],
                 // B30.2 es LA norma de puentes y pórticos; B30.16 cubre el
                 // polipasto y B30.26 los accesorios con los que se cuelga.
-                ['ASME B30.2',        'referencia'],
-                ['ASME B30.16',       'referencia'],
-                ['ASME B30.26',       'referencia'],
-                ['CMAA 74',           'referencia'],
+                ['ASME B30.2',              'referencia'],
+                ['ASME B30.16',             'referencia'],
+                ['ASME B30.26',             'referencia'],
+                ['CMAA 74',                 'referencia'],
             ],
         ],
     ];
 
+    /**
+     * Alcance acreditado ante la ema — acreditación UVNMX 057, ref. 25UI5073.
+     *
+     * El anexo técnico acredita a AVBA como Unidad de Inspección Tipo A bajo la
+     * NMX-EC-17020, y para la materia "Verificación de Grúas" lista como norma o
+     * método la NMX-GR-9927-1 (inspecciones de grúas) y la NMX-GR-23814
+     * (competencia de inspectores de grúas).
+     *
+     * La 17020 es la norma de la unidad, no del equipo: aplica a todo lo que se
+     * emite. Las dos de grúas sólo donde el equipo es una grúa.
+     */
+    private const NORMA_UNIDAD = 'NMX-EC-17020-IMNC-2014';
+    private const NORMAS_GRUA  = [
+        'NMX-GR-9927-1-IMNC-2019',
+        'NMX-GR-23814-IMNC-2011',
+    ];
+    /** Marca de aplicación: se corre una sola vez por instalación. */
+    private const SEED_NORMAS_EMA = 'normas_ema_25ui5073';
+    /** Tope por grupo, el mismo que respeta el panel de Calidad. */
+    private const MAX_NORMAS = 6;
+
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
         $this->seedTiposMaquinaria();
+        $this->sembrarNormasAcreditacion();
+    }
+
+    /**
+     * Pone las normas del alcance acreditado en los tipos que ya existían.
+     *
+     * La siembra de tipos sólo corre al dar de alta uno nuevo, así que los tipos
+     * que ya están capturados nunca verían estas normas. Esto las agrega una
+     * sola vez y de forma aditiva: no borra ninguna norma existente, y lo que
+     * Calidad ajuste después no se repone.
+     *
+     * Si la norma ya está capturada como referencia, se promueve a acreditada en
+     * lugar de duplicarla: es la misma norma, cambia el renglón donde se imprime.
+     */
+    private function sembrarNormasAcreditacion(): void {
+        try {
+            $st = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
+            $st->execute([self::SEED_NORMAS_EMA]);
+            if ($st->fetch()) return;
+        } catch (\Throwable $e) {
+            // La tabla de marcas la crea seedTiposMaquinaria; si no está, no hay
+            // dónde registrar que esto ya corrió y se reintentaría cada petición.
+            return;
+        }
+
+        try {
+            $this->pdo->exec(
+                "ALTER TABLE maquinaria_normas
+                 ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) NOT NULL DEFAULT 'acreditada'"
+            );
+        } catch (\Throwable $e) { /* ya existe o no aplica */ }
+
+        try {
+            $tipos = $this->pdo->query("SELECT id, nombre FROM maquinaria_tipos")->fetchAll();
+
+            $leer     = $this->pdo->prepare(
+                "SELECT id, norma, tipo, orden FROM maquinaria_normas WHERE maquinaria_tipo_id = ?"
+            );
+            $promover = $this->pdo->prepare(
+                "UPDATE maquinaria_normas SET tipo = 'acreditada' WHERE id = ?"
+            );
+            $insertar = $this->pdo->prepare(
+                "INSERT INTO maquinaria_normas (maquinaria_tipo_id, norma, tipo, orden)
+                 VALUES (?, ?, 'acreditada', ?)"
+            );
+
+            foreach ($tipos as $t) {
+                $tipoId = (int)($t['id'] ?? 0);
+                if (!$tipoId) continue;
+
+                $deben = $this->esGrua((string)($t['nombre'] ?? ''))
+                    ? array_merge(self::NORMAS_GRUA, [self::NORMA_UNIDAD])
+                    : [self::NORMA_UNIDAD];
+
+                $leer->execute([$tipoId]);
+                $filas = $leer->fetchAll();
+
+                $porClave = [];
+                $acreditadas = 0;
+                $orden = 0;
+                foreach ($filas as $f) {
+                    $porClave[$this->claveNorma((string)$f['norma'])] = $f;
+                    if (($f['tipo'] ?? 'acreditada') !== 'referencia') $acreditadas++;
+                    $orden = max($orden, (int)($f['orden'] ?? 0));
+                }
+
+                foreach ($deben as $norma) {
+                    $clave = $this->claveNorma($norma);
+                    $ya    = $porClave[$clave] ?? null;
+
+                    if ($ya) {
+                        if (($ya['tipo'] ?? 'acreditada') === 'referencia') {
+                            $promover->execute([$ya['id']]);
+                            $acreditadas++;
+                        }
+                        continue;   // ya está, con su redacción
+                    }
+                    if ($acreditadas >= self::MAX_NORMAS) {
+                        error_log("[Admin] normas ema: tipo $tipoId ya tiene "
+                            . self::MAX_NORMAS . " acreditadas, se omite $norma");
+                        break;
+                    }
+                    $insertar->execute([$tipoId, $norma, ++$orden]);
+                    $acreditadas++;
+                }
+            }
+
+            $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")
+                ->execute([self::SEED_NORMAS_EMA]);
+        } catch (\Throwable $e) {
+            error_log('[Admin] sembrarNormasAcreditacion: ' . $e->getMessage());
+        }
+    }
+
+    /** Si el tipo de equipo es una grúa, sin depender del acento ni de mayúsculas. */
+    private function esGrua(string $nombre): bool {
+        $n = strtoupper(strtr($nombre, ['Ú' => 'U', 'ú' => 'u']));
+        return str_contains($n, 'GRUA');
+    }
+
+    /**
+     * Núcleo identificador de una norma, para no duplicar la que ya esté
+     * capturada con otra redacción ("ISO 9927-1:2013" y "NMX-GR-9927-1-IMNC-2019"
+     * son la misma). Se toma el primer grupo de 4 o 5 dígitos, que es el número
+     * de la norma; si no hay, se compara el texto sin separadores.
+     */
+    private function claveNorma(string $norma): string {
+        if (preg_match('/(\d{4,5})/', $norma, $m)) return $m[1];
+        return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $norma) ?? $norma);
     }
 
     /**
