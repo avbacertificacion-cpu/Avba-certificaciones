@@ -258,22 +258,24 @@ class Admin {
             ],
         ],
 
-        /* Canastilla sin puerta: el acceso es un hueco en el barandal, no una
-           puerta que cierre. Cambia lo que protege al ocupante.
+        /* Canastilla sin puerta: se ingresa por la parte superior, pasando por
+           encima del barandal. No hay hueco en el cerramiento ni puerta que
+           cierre, así que el perímetro se revisa continuo y cerrado, y lo que
+           importa del ingreso es el canto por donde se pasa y de dónde se
+           agarra uno al hacerlo.
 
-           En la de puerta, el cierre positivo es la barrera: mientras esté
-           cerrada, nadie se sale. Aquí esa barrera no existe, así que todo
-           recae en el arnés y en su anclaje, y el hueco mismo pasa a ser un
-           punto de revisión: su ancho, su rodapié, de qué lado queda y si se
-           puede entrar y salir sin desconectarse.
+           Tampoco lleva tornillería estructural: el cuerpo es soldado y lo
+           desmontable son los pernos de pivote con sus seguros, que es donde
+           cuelga la canastilla entera.
 
-           Lo demás —estructura, piso, suspensión, prueba de carga— se revisa
-           igual que en la de puerta. */
+           Sin puerta no hay barrera física: la protección del ocupante depende
+           del arnés, y por eso el anclaje tiene que permitir conectarse ANTES
+           de entrar y soltarse DESPUÉS de salir. */
         'canastilla_sp' => [
             'secciones' => [
                 ['A', 'Estructura y piso'],
-                ['B', 'Barandal, rodapié y hueco de acceso'],
-                ['C', 'Puntos de izaje y bastidor de suspensión'],
+                ['B', 'Barandal, cerramiento e ingreso superior'],
+                ['C', 'Izaje, bastidor de suspensión, pernos y seguros'],
                 ['D', 'Protección contra caídas'],
                 ['E', 'Señalización y placa de capacidad'],
                 ['F', 'Prueba de carga'],
@@ -283,50 +285,49 @@ class Admin {
                 ['A', 'A-01', 'Bastidor y largueros: fisuras, abolladuras o deformación permanente'],
                 ['A', 'A-02', 'Soldaduras: sin fisuras, poros ni socavación visible'],
                 ['A', 'A-03', 'Corrosión: sin pérdida de sección en elementos portantes'],
-                ['A', 'A-04', 'Piso de rejilla o lámina antiderrapante: completo, sin zonas flojas ni perforaciones'],
+                ['A', 'A-04', 'Piso de rejilla: completo, sin zonas flojas, perforaciones ni barras faltantes'],
                 ['A', 'A-05', 'Fijación del piso al bastidor en todo su perímetro'],
                 ['A', 'A-06', 'Drenaje libre, para que el piso no acumule agua'],
-                ['A', 'A-07', 'Tornillería estructural: presencia, apriete y estado'],
-                ['A', 'A-08', 'Sin modificaciones ni reparaciones no autorizadas por el fabricante'],
-                ['B', 'B-01', 'Barandal superior a la altura de diseño, continuo salvo en el hueco de acceso'],
+                ['A', 'A-07', 'Sin modificaciones ni reparaciones no autorizadas por el fabricante'],
+                ['B', 'B-01', 'Barandal superior continuo y cerrado en todo el perímetro, a la altura de diseño'],
                 ['B', 'B-02', 'Barandal intermedio presente en todo el perímetro'],
-                ['B', 'B-03', 'Rodapié continuo, incluido el borde del hueco de acceso'],
-                ['B', 'B-04', 'Hueco de acceso: ancho dentro de lo indicado por el fabricante, sin ampliaciones hechas en campo'],
-                ['B', 'B-05', 'Cadena, barra o cable de cierre del hueco, si el diseño lo incluye: enganche en ambos extremos'],
-                ['B', 'B-06', 'Hueco de acceso señalizado y orientado de modo que no quede hacia el vacío durante la maniobra'],
-                ['B', 'B-07', 'Asidero junto al hueco para entrar y salir con las dos manos ocupadas'],
-                ['B', 'B-08', 'Sin bordes cortantes ni rebabas en el canto del hueco'],
-                ['B', 'B-09', 'Malla o cerramiento lateral íntegro en el resto del perímetro, si el diseño lo incluye'],
+                ['B', 'B-03', 'Rodapié continuo, sin interrupciones'],
+                ['B', 'B-04', 'Cerramiento lateral —malla, rejilla o lámina— íntegro y bien sujeto'],
+                ['B', 'B-05', 'Canto superior por donde se ingresa: sin bordes cortantes ni rebabas'],
+                ['B', 'B-06', 'Asidero firme del que sostenerse al pasar por encima del barandal'],
+                ['B', 'B-07', 'Peldaño o apoyo de ingreso, si el diseño lo incluye: sin deformación ni desgaste del antiderrapante'],
+                ['B', 'B-08', 'Altura libre sobre el barandal suficiente para ingresar sin forzar la postura'],
                 ['C', 'C-01', 'Oreja de izaje: ojo sin elongación, sin deformación ni fisuras'],
                 ['C', 'C-02', 'Soldadura de la oreja al bastidor de suspensión'],
                 ['C', 'C-03', 'Bastidor o yugo de suspensión: montantes, diagonales y sus soldaduras'],
-                ['C', 'C-04', 'Pasadores o pernos de pivote: estado, apriete y seguro'],
-                ['C', 'C-05', 'Juego en los pivotes dentro de lo admisible'],
-                ['C', 'C-06', 'Grillete de conexión al gancho: tipo, capacidad y seguro de pasador'],
-                ['C', 'C-07', 'Eslingas o cables del aparejo, cuando la suspensión es de varios ramales'],
-                ['C', 'C-08', 'Dispositivo antigiro o de orientación, si el diseño lo incluye'],
-                ['C', 'C-09', 'Sin carga, el conjunto cuelga a plomo y la canastilla queda nivelada'],
+                ['C', 'C-04', 'Pernos de pivote: diámetro correcto, sin desgaste, deformación ni ovalamiento'],
+                ['C', 'C-05', 'Seguros de los pernos completos y en su lugar: chavetas, pernos de retención o tuerca con seguro'],
+                ['C', 'C-06', 'Barrenos de los pivotes sin ovalamiento ni elongación'],
+                ['C', 'C-07', 'Juego en los pivotes dentro de lo admisible'],
+                ['C', 'C-08', 'Grillete de conexión al gancho: tipo, capacidad y seguro de pasador'],
+                ['C', 'C-09', 'Dispositivo antigiro o de orientación, si el diseño lo incluye'],
+                ['C', 'C-10', 'Sin carga, el conjunto cuelga a plomo y la canastilla queda nivelada'],
                 ['D', 'D-01', 'Puntos de anclaje para arnés, independientes de la estructura de izaje'],
                 ['D', 'D-02', 'Un anclaje por ocupante, al menos hasta el número máximo indicado en la placa'],
                 ['D', 'D-03', 'Anclajes identificados, sin deformación y sin corrosión'],
-                ['D', 'D-04', 'Los anclajes permiten permanecer conectado al entrar y al salir por el hueco'],
-                ['D', 'D-05', 'Longitud del conector tal que el ocupante no pueda salir por el hueco'],
+                ['D', 'D-04', 'El anclaje se alcanza desde fuera: permite conectarse antes de entrar y soltarse después de salir'],
+                ['D', 'D-05', 'Longitud del conector tal que el ocupante quede retenido dentro de la canastilla'],
                 ['D', 'D-06', 'Línea de vida o conector secundario al gancho, si aplica'],
                 ['E', 'E-01', 'Placa con capacidad nominal legible y fijada a la canastilla'],
                 ['E', 'E-02', 'Tara (peso propio) indicada en la placa'],
                 ['E', 'E-03', 'Número máximo de ocupantes indicado'],
                 ['E', 'E-04', 'Número de serie o identificación visible'],
                 ['E', 'E-05', 'Leyenda de uso exclusivo para izaje de personal'],
-                ['E', 'E-06', 'Leyenda de uso permanente de arnés, visible desde el hueco de acceso'],
+                ['E', 'E-06', 'Leyenda de uso permanente de arnés, visible desde fuera antes de ingresar'],
                 ['F', 'F-01', 'Prueba de carga estática al 125% de la capacidad nominal'],
                 ['F', 'F-02', 'Carga distribuida sobre el piso durante la prueba'],
                 ['F', 'F-03', 'Sin deformación permanente al retirar la carga'],
                 ['F', 'F-04', 'Sin fisuras ni desprendimientos tras la prueba'],
-                ['F', 'F-05', 'Oreja de izaje y pivotes sin elongación ni juego nuevo tras la prueba'],
+                ['F', 'F-05', 'Oreja, pernos y barrenos de pivote sin elongación ni juego nuevo tras la prueba'],
                 ['G', 'G-01', 'Memoria de cálculo o certificado estructural del fabricante'],
                 ['G', 'G-02', 'Manual de uso y de montaje de la suspensión'],
                 ['G', 'G-03', 'Registro de la última prueba de carga'],
-                ['G', 'G-04', 'Certificados vigentes de grilletes, eslingas y accesorios de la suspensión'],
+                ['G', 'G-04', 'Certificados vigentes del grillete y accesorios de la suspensión'],
                 ['G', 'G-05', 'Procedimiento de izaje de personal y plan de rescate'],
             ],
             'normas' => [
@@ -362,6 +363,7 @@ class Admin {
     private const SEED_NORMAS_EMA     = 'normas_ema_25ui5073';
     private const SEED_NORMAS_PORTICO = 'normas_portico_23814_17020';
     private const SEED_CATALOGO       = 'catalogo_normas_v1';
+    private const SEED_CHECKLIST_CSP  = 'checklist_canastilla_sp_v2';
 
     /**
      * Topes por grupo. Son de espacio, no de criterio: con siete normas
@@ -407,6 +409,58 @@ class Admin {
         $this->sembrarNormasAcreditacion();
         $this->ajustarNormasPortico();
         $this->sembrarCatalogoNormas();
+        $this->corregirChecklistCanastillaSinPuerta();
+    }
+
+    /**
+     * Rehace el checklist de la canastilla sin puerta.
+     *
+     * La primera versión se sembró con puntos que ese equipo no tiene: hueco de
+     * acceso —se ingresa por encima del barandal, el perímetro va cerrado— y
+     * tornillería estructural, cuando el cuerpo es soldado y lo desmontable son
+     * los pernos de pivote con sus seguros.
+     *
+     * Sólo se rehace si la lista sigue siendo la que se sembró. La seña es el
+     * punto del hueco de acceso, que es justamente lo que no existe; si ya no
+     * está, alguien la editó y no se toca. Las normas no se tocan en ningún
+     * caso: van en su propia tabla y pueden traer ajustes de Calidad.
+     */
+    private function corregirChecklistCanastillaSinPuerta(): void {
+        try {
+            $st = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
+            $st->execute([self::SEED_CHECKLIST_CSP]);
+            if ($st->fetch()) return;
+        } catch (\Throwable $e) { return; }
+
+        try {
+            [$nombre] = self::TIPOS_BASE['canastilla_sp'];
+            $t = $this->pdo->prepare(
+                "SELECT id FROM maquinaria_tipos WHERE UPPER(TRIM(nombre)) = ? LIMIT 1"
+            );
+            $t->execute([$nombre]);
+            $tipoId = (int)($t->fetchColumn() ?: 0);
+
+            if ($tipoId) {
+                $seña = $this->pdo->prepare(
+                    "SELECT COUNT(*) FROM checklist_items
+                     WHERE maquinaria_tipo_id = ? AND descripcion LIKE '%hueco de acceso%'"
+                );
+                $seña->execute([$tipoId]);
+
+                if ((int)$seña->fetchColumn() > 0) {
+                    $this->pdo->prepare("DELETE FROM checklist_items     WHERE maquinaria_tipo_id = ?")->execute([$tipoId]);
+                    $this->pdo->prepare("DELETE FROM checklist_secciones WHERE maquinaria_tipo_id = ?")->execute([$tipoId]);
+                    $this->sembrarSeccionesItems('canastilla_sp', $tipoId);
+                } else {
+                    error_log('[Admin] checklist canastilla sin puerta: ya no trae la lista sembrada, se respeta');
+                }
+            }
+
+            $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")
+                ->execute([self::SEED_CHECKLIST_CSP]);
+        } catch (\Throwable $e) {
+            error_log('[Admin] corregirChecklistCanastillaSinPuerta: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -784,6 +838,15 @@ class Admin {
      * impedir el alta del tipo, que es lo importante.
      */
     private function sembrarChecklist(string $clave, int $tipoId): void {
+        $this->sembrarSeccionesItems($clave, $tipoId);
+        $this->sembrarNormasTipo($clave, $tipoId);
+    }
+
+    /**
+     * Secciones y puntos de revisión. Aparte de las normas porque rehacer una
+     * lista no debe duplicar lo que Calidad tenga capturado en la otra tabla.
+     */
+    private function sembrarSeccionesItems(string $clave, int $tipoId): void {
         $base = self::CHECKLIST_BASE[$clave] ?? null;
         if (!$base || !$tipoId) return;
 
@@ -812,8 +875,13 @@ class Admin {
         } catch (\Throwable $e) {
             error_log("[Admin] sembrarChecklist ($clave): " . $e->getMessage());
         }
+    }
 
-        // Las normas van aparte: su tabla pudo no existir en instalaciones viejas.
+    /** Normas del tipo. Su tabla pudo no existir en instalaciones viejas. */
+    private function sembrarNormasTipo(string $clave, int $tipoId): void {
+        $base = self::CHECKLIST_BASE[$clave] ?? null;
+        if (!$base || !$tipoId) return;
+
         try {
             $this->pdo->exec(
                 "ALTER TABLE maquinaria_normas
