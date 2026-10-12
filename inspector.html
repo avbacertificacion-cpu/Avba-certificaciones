@@ -3225,6 +3225,22 @@ const PC_TEMPLATES = {
       { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
     ]
   },
+  'dictamen_canastilla.html': {
+    label: 'Canastilla estructural',
+    // La capacidad nominal se captura una vez; la carga de prueba (125%) se
+    // deriva en el dictamen, no se le pide al inspector. Una sola fila: la
+    // prueba es estática y lo que importa es si la estructura recupera al
+    // descargarla, no cuánto baja mientras está cargada.
+    headerFields: [
+      { id:'capacidad', label:'Capacidad nominal', unit:'kg' },
+    ],
+    rows: [{ key:'estatica', label:'Prueba de carga estática (125%)' }],
+    cols: [
+      { id:'duracion',    label:'Duración',               unit:'min' },
+      { id:'deformacion', label:'Deformación permanente', unit:'mm'  },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  },
   'dictamen_ptem.html': {
     label: 'PTEM',
     platformSelect: true,

@@ -1227,6 +1227,7 @@ body { background:#fff!important; }
     private function pcCampoDeEncabezado(string $t): string {
         if (strpos($t, 'resultado') !== false || strpos($t, 'result') !== false) return 'resultado';
         if (strpos($t, 'carga de prueba') !== false)                              return 'prueba';
+        if (strpos($t, 'capacidad') !== false)                                    return 'capacidad';
         if (strpos($t, 'cml') !== false)                                          return 'cml';
         if (strpos($t, 'deforma') !== false)                                      return 'deformacion';
         // Grúa pórtico: su prueba no tiene radio ni ángulo. Lo que se mide es
@@ -1296,7 +1297,7 @@ body { background:#fff!important; }
         $campoConDato = function (array $f): bool {
             foreach (['peso','radio','pluma','angulo','altura','resultado',
                       'duracion','deformacion','inclin','extension','cml','prueba',
-                      'flecha','luz'] as $c) {
+                      'flecha','luz','capacidad'] as $c) {
                 if (trim((string)($f[$c] ?? '')) !== '') return true;
             }
             return false;
@@ -1309,6 +1310,8 @@ body { background:#fff!important; }
             $rowLabels = [
                 'sin' => 'Sin Carga', 'con' => 'Con Carga',
                 'trabajo' => 'Carga de Trabajo', 'sobrecarga' => 'Prueba de Sobrecarga',
+                // Canastilla: una sola prueba, estática, al 125%.
+                'estatica' => 'Prueba de carga estática (125%)',
                 // Grúa de celosía: una prueba por gancho.
                 'princ_sin' => 'Gancho principal · sin carga',
                 'princ_con' => 'Gancho principal · con carga',
@@ -1522,6 +1525,31 @@ body { background:#fff!important; }
             $html = str_replace('{pc_izaje_prueba}',      $prueba !== '' ? number_format((float)$prueba, 2) : 'NA', $html);
             $html = str_replace('{pc_izaje_duracion}',    $duracion    !== '' ? $e($duracion)    : 'NA', $html);
             $html = str_replace('{pc_izaje_deformacion}', $deformacion !== '' ? $e($deformacion) : 'NA', $html);
+        }
+
+        // 5c. Canastilla estructural: la prueba es estática y la carga es el
+        //     125% de la capacidad nominal, no el doble como en un accesorio de
+        //     izaje. Lo que se mide al descargar es la deformación PERMANENTE:
+        //     si la estructura no recupera, no se repara, se retira.
+        if (strpos($html, '{pc_canastilla_capacidad}') !== false) {
+            $fila = [];
+            foreach (['estatica', 'prueba', 'con', 'trabajo'] as $k) {
+                if (is_array($pc[$k] ?? null)) { $fila = $pc[$k]; break; }
+            }
+
+            $cap = trim((string)($pc['capacidad'] ?? ''));
+            if ($cap === '') $cap = trim((string)($fila['capacidad'] ?? ''));
+
+            $carga = (is_numeric($cap) && (float)$cap > 0) ? (string)((float)$cap * 1.25) : '';
+            if ($carga === '') $carga = trim((string)($fila['prueba'] ?? ''));
+
+            $duracion    = trim((string)($fila['duracion']    ?? ''));
+            $deformacion = trim((string)($fila['deformacion'] ?? ''));
+
+            $html = str_replace('{pc_canastilla_capacidad}',  $cap   !== '' ? number_format((float)$cap, 0)   : 'NA', $html);
+            $html = str_replace('{pc_canastilla_prueba}',     $carga !== '' ? number_format((float)$carga, 0) : 'NA', $html);
+            $html = str_replace('{pc_canastilla_duracion}',    $duracion    !== '' ? $e($duracion)    : 'NA', $html);
+            $html = str_replace('{pc_canastilla_deformacion}', $deformacion !== '' ? $e($deformacion) : 'NA', $html);
         }
 
         return $html;

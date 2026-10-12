@@ -21,6 +21,7 @@ class Admin {
         'grua_torre'  => ['GRÚA TORRE',   'dictamen_grua_torre.html'],
         'grua_oruga'  => ['GRÚA ESTRUCTURAL SOBRE ORUGAS', 'dictamen_grua_oruga.html'],
         'grua_portico' => ['GRÚA PÓRTICO', 'dictamen_grua_portico.html'],
+        'canastilla'   => ['CANASTILLA ESTRUCTURAL', 'dictamen_canastilla.html'],
     ];
 
     /**
@@ -176,6 +177,83 @@ class Admin {
                 ['ASME B30.2',              'referencia'],
                 ['ASME B30.16',             'referencia'],
                 ['CMAA 74',                 'referencia'],
+            ],
+        ],
+
+        /* Canastilla estructural: la plataforma que se cuelga del gancho para
+           subir personal. No es un equipo que opere por sí mismo —no tiene
+           motor, mandos ni movimientos propios—, así que lo que se revisa es la
+           estructura, de qué cuelga, y lo que impide que alguien se caiga.
+
+           El izaje de personal es una maniobra excepcional: sólo procede cuando
+           no hay un medio de acceso más seguro. Por eso la lista carga hacia la
+           protección contra caídas y hacia la prueba de carga, que es lo que
+           acredita que la estructura aguanta. */
+        'canastilla' => [
+            'secciones' => [
+                ['A', 'Estructura y piso'],
+                ['B', 'Barandal, rodapié y acceso'],
+                ['C', 'Puntos de suspensión y aparejo'],
+                ['D', 'Protección contra caídas'],
+                ['E', 'Señalización y placa de capacidad'],
+                ['F', 'Prueba de carga'],
+                ['G', 'Documentación'],
+            ],
+            'items' => [
+                ['A', 'A-01', 'Bastidor y largueros: fisuras, abolladuras o deformación permanente'],
+                ['A', 'A-02', 'Soldaduras: sin fisuras, poros ni socavación visible'],
+                ['A', 'A-03', 'Corrosión: sin pérdida de sección en elementos portantes'],
+                ['A', 'A-04', 'Piso antiderrapante completo, sin perforaciones ni zonas flojas'],
+                ['A', 'A-05', 'Drenaje del piso libre, para que no acumule agua'],
+                ['A', 'A-06', 'Tornillería estructural: presencia, apriete y estado'],
+                ['A', 'A-07', 'Sin modificaciones ni reparaciones no autorizadas por el fabricante'],
+                ['B', 'B-01', 'Barandal superior a la altura de diseño, continuo y sin deformación'],
+                ['B', 'B-02', 'Barandal intermedio presente en todo el perímetro'],
+                ['B', 'B-03', 'Rodapié en todo el perímetro, a la altura de diseño'],
+                ['B', 'B-04', 'Malla o cerramiento lateral íntegro, si el diseño lo incluye'],
+                ['B', 'B-05', 'Puerta de acceso: abre hacia adentro y no deja hueco al cerrar'],
+                ['B', 'B-06', 'Cierre positivo de la puerta: no se abre por sí solo ni por golpe'],
+                ['B', 'B-07', 'Sin bordes cortantes ni rebabas en zonas de contacto'],
+                ['C', 'C-01', 'Orejas o puntos de izaje: sin deformación, elongación ni fisuras'],
+                ['C', 'C-02', 'Desgaste del ojo de izaje dentro de lo admisible'],
+                ['C', 'C-03', 'Grilletes del aparejo: tipo, capacidad y seguro de pasador'],
+                ['C', 'C-04', 'Eslingas o cables del aparejo: estado, marcado y vigencia'],
+                ['C', 'C-05', 'Anillo maestro o argolla de reunión: estado y capacidad'],
+                ['C', 'C-06', 'Ángulo de las ramas dentro de lo previsto por el fabricante'],
+                ['C', 'C-07', 'Dispositivo antigiro o de estabilización, si el diseño lo incluye'],
+                ['D', 'D-01', 'Puntos de anclaje para arnés, independientes de la estructura de izaje'],
+                ['D', 'D-02', 'Cantidad de anclajes suficiente para el número máximo de ocupantes'],
+                ['D', 'D-03', 'Anclajes identificados y sin deformación'],
+                ['D', 'D-04', 'Línea de vida o conector secundario al gancho, si aplica'],
+                ['E', 'E-01', 'Placa con capacidad nominal legible y fijada a la canastilla'],
+                ['E', 'E-02', 'Tara (peso propio) indicada en la placa'],
+                ['E', 'E-03', 'Número máximo de ocupantes indicado'],
+                ['E', 'E-04', 'Número de serie o identificación visible'],
+                ['E', 'E-05', 'Leyenda de uso exclusivo para izaje de personal'],
+                ['E', 'E-06', 'Señalización de uso obligatorio de arnés'],
+                ['F', 'F-01', 'Prueba de carga estática al 125% de la capacidad nominal'],
+                ['F', 'F-02', 'Carga distribuida sobre el piso durante la prueba'],
+                ['F', 'F-03', 'Sin deformación permanente al retirar la carga'],
+                ['F', 'F-04', 'Sin fisuras ni desprendimientos tras la prueba'],
+                ['F', 'F-05', 'Puntos de izaje y aparejo sin elongación tras la prueba'],
+                ['G', 'G-01', 'Memoria de cálculo o certificado estructural del fabricante'],
+                ['G', 'G-02', 'Manual de uso y de montaje del aparejo'],
+                ['G', 'G-03', 'Registro de la última prueba de carga'],
+                ['G', 'G-04', 'Certificados vigentes de grilletes, eslingas y accesorios del aparejo'],
+                ['G', 'G-05', 'Procedimiento de izaje de personal y plan de rescate'],
+            ],
+            // La 23814 y la 17020 son el alcance acreditado; el resto se cita
+            // como criterio técnico. B30.23 es la de izaje de personal y B30.20
+            // la de dispositivos que cuelgan del gancho, que es lo que esto es.
+            'normas' => [
+                ['NMX-GR-23814-IMNC-2011',  'acreditada'],
+                ['NMX-EC-17020-IMNC-2014',  'acreditada'],
+                ['ASME B30.23',             'referencia'],
+                ['ASME B30.20',             'referencia'],
+                ['ASME B30.26',             'referencia'],
+                ['ASME B30.9',              'referencia'],
+                ['NOM-009-STPS-2011',       'referencia'],
+                ['NOM-004-STPS-1999',       'referencia'],
             ],
         ],
     ];
