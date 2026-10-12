@@ -736,12 +736,23 @@ class Auth {
         $like = $idCliente . '-%';
 
         // ── Equipos ──────────────────────────────────────
+        // Un equipo NO CONFORME con su dictamen publicado también se enseña:
+        // el cliente necesita el documento que dice qué hay que corregir. Las
+        // columnas pueden no existir todavía en una base sin migrar.
+        $colNc = columnaExiste($this->pdo, 'equipos', 'dictamen_nc_url')
+            ? 'dictamen_nc_url' : "'' AS dictamen_nc_url";
+        $colNcPub = columnaExiste($this->pdo, 'equipos', 'nc_publicado')
+            ? 'nc_publicado' : '0 AS nc_publicado';
+        $condNc = columnaExiste($this->pdo, 'equipos', 'nc_publicado')
+            ? " OR (nc_publicado = 1 AND estado = 'NO CONFORME')" : '';
+
         $stmt = $this->pdo->prepare(
             "SELECT id, cliente, maquinaria, marca, modelo, serie, id_equipo,
                     DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
-                    control, estado, qr_codigo, certificado_url, dictamen_url
+                    control, estado, qr_codigo, certificado_url, dictamen_url,
+                    {$colNc}, {$colNcPub}
              FROM equipos
-             WHERE control LIKE ? AND (publicado = 1 OR estado = 'ENVIADO')
+             WHERE control LIKE ? AND (publicado = 1 OR estado = 'ENVIADO'{$condNc})
              ORDER BY fecha_inspeccion DESC"
         );
         $stmt->execute([$like]);
@@ -773,8 +784,13 @@ class Auth {
                 'vencimiento' => $vigencia['vencimiento'],
                 'dias'        => $vigencia['dias'],
                 'vigente'     => $vigencia['vigente'],
-                'link_cert'   => $r['certificado_url'],
-                'link_dict'   => $r['dictamen_url'],
+                // Un equipo no conforme no tiene certificado que ofrecer: lo
+                // que tiene es el dictamen que dice por qué no lo tiene.
+                'no_conforme' => $r['estado'] === 'NO CONFORME',
+                'link_cert'   => $r['estado'] === 'NO CONFORME' ? '' : $r['certificado_url'],
+                'link_dict'   => $r['estado'] === 'NO CONFORME' ? '' : $r['dictamen_url'],
+                'link_nc'     => ((int)($r['nc_publicado'] ?? 0) === 1)
+                    ? (string)($r['dictamen_nc_url'] ?? '') : '',
                 'qr_url'      => $r['qr_codigo'] ? urlQR($r['qr_codigo']) : '',
             ];
         }

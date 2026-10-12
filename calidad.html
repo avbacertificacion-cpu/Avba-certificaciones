@@ -674,7 +674,26 @@
     .toast.ok  { background: #22c55e; }
     .toast.err { background: #ef4444; }
     .toast svg { width: 16px; height: 16px; flex-shrink: 0; }
-      /* ── Tabla agrupada por cliente ────────────────────────────────────── */
+      /* ── No conformidades ────────────────────────────────────────────── */
+    .ncf { border:1.5px solid var(--borde); border-left:4px solid var(--rojo); border-radius:10px;
+      padding:11px 13px; margin-bottom:10px; background:#fff; }
+    .ncf.mayor { border-left-color:#854F0B; } .ncf.menor { border-left-color:var(--borde); }
+    .ncf-top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
+    .ncf-cod { font-size:13px; font-weight:800; color:var(--texto); }
+    .ncf-g { font-size:10px; font-weight:800; text-transform:uppercase; padding:2px 9px; border-radius:20px; }
+    .ncf-g.critica { background:var(--rojo); color:#fff; }
+    .ncf-g.mayor   { background:#FAEEDA; color:#854F0B; }
+    .ncf-g.menor   { background:var(--gris-bg); color:var(--texto-sub); }
+    .ncf-pt { font-size:11px; color:var(--texto-hint); }
+    .ncf-desc { font-size:13px; color:var(--texto); line-height:1.5; }
+    .ncf-acc { font-size:12.5px; color:var(--texto); line-height:1.5; background:#FAEEDA;
+      border-left:3px solid #C49A28; border-radius:0 7px 7px 0; padding:6px 10px; margin-top:7px; }
+    .ncf-fotos { display:flex; gap:6px; flex-wrap:wrap; margin-top:8px; }
+    .ncf-fotos img { width:74px; height:74px; object-fit:cover; border-radius:6px; border:1px solid var(--borde); }
+    .ncf-aviso { font-size:12px; background:var(--rojo-light); color:var(--rojo); border-radius:8px;
+      padding:9px 12px; margin-bottom:11px; line-height:1.45; }
+
+    /* ── Tabla agrupada por cliente ────────────────────────────────────── */
     .tc-th { cursor:pointer; user-select:none; white-space:nowrap; }
     .tc-th:hover { background:rgba(0,0,0,.04); }
     .tc-flecha { font-size:9px; opacity:.85; }
@@ -2762,6 +2781,13 @@ function ver(fila) {
   </div>
   <div style="font-size:11px;color:var(--texto-hint)">Es quien firma el certificado y el dictamen de esta inspección.</div>`;
 
+  // Dictamen de no conformidad. Sólo tiene sentido en un equipo rechazado:
+  // es lo único que Calidad publica, y sobre un equipo aprobado no aplica.
+  if (d.estado === 'NO CONFORME') {
+    body += `<div class="sec-label">Dictamen de no conformidad</div>
+      <div id="nc-box"><div style="font-size:12px;color:var(--texto-hint)">Cargando…</div></div>`;
+  }
+
   // Recomendaciones del inspector. Se piden aparte, al abrir el detalle: son
   // una consulta más y no deben retrasar la apertura del registro.
   body += `<div class="sec-label">Recomendaciones del inspector</div>
@@ -2935,6 +2961,7 @@ function ver(fila) {
   document.getElementById("overlay-det").classList.add("open");
   poblarInspectorSelect(d.inspector);
   recomCalCargar(d.fila, editable, d.estado === 'ENVIADO', 'equipo', 'recom-cal-box');
+  if (d.estado === 'NO CONFORME') ncCargar(d.fila);
   // Sugerir empresas ya registradas al corregir el cliente
   try {
     const inp = document.getElementById('e-cliente');
@@ -3069,6 +3096,181 @@ async function eliminarPndCal(id, desc) {
     cerrarDetPND();
     cargarPND();
   });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   DICTAMEN DE NO CONFORMIDAD
+   Lo único que Calidad publica en el portal del cliente, y sólo sobre
+   equipos rechazados. Cada hallazgo lleva qué se encontró, qué hay que
+   hacer y la foto que lo sustenta.
+   ═══════════════════════════════════════════════════════════════════════ */
+let _ncEquipo = 0;
+
+const NC_G = { critica: 'Crítica', mayor: 'Mayor', menor: 'Menor' };
+
+async function ncCargar(equipoId) {
+  _ncEquipo = equipoId;
+  const box = document.getElementById('nc-box');
+  if (!box) return;
+  try {
+    const [l, e] = await Promise.all([
+      ncApi('LISTAR_NO_CONFORMIDADES', { equipo_id: equipoId }),
+      ncApi('ESTADO_NO_CONFORMIDAD',   { equipo_id: equipoId }),
+    ]);
+    ncPintar(l.data || [], (e.data || {}));
+  } catch (err) {
+    box.innerHTML = `<div style="font-size:12px;color:var(--rojo)">No se pudo cargar.</div>`;
+  }
+}
+
+async function ncApi(action, payload) {
+  const res = await fetch(API, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, payload })
+  });
+  return res.json();
+}
+
+function ncPintar(lista, est) {
+  const box = document.getElementById('nc-box');
+  if (!box) return;
+  const pub = !!est.publicado;
+
+  box.innerHTML = `
+    <div class="ncf-aviso">
+      Este documento le dice al cliente <strong>qué se encontró y qué debe corregir</strong>.
+      No es un certificado y no ampara la operación del equipo.
+      ${pub ? '<br><strong>Ya está publicado.</strong> Para cambiar un hallazgo, corrígelo y vuelve a emitir el dictamen.' : ''}
+    </div>
+
+    ${lista.length ? lista.map(ncTarjeta).join('')
+      : `<div style="font-size:12px;color:var(--texto-hint);padding:10px;background:var(--gris-bg);
+           border-radius:8px;margin-bottom:10px">Todavía no hay hallazgos registrados.</div>`}
+
+    <div id="nc-form"></div>
+    <button class="tc-btn" style="width:100%;border-style:dashed;border-color:var(--rojo);color:var(--rojo)"
+            onclick="ncNuevo()">+ Agregar hallazgo</button>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:11px;
+                border-top:1px solid var(--borde);align-items:center">
+      <button class="tc-btn" onclick="ncEmitir(this)"
+        style="border-color:var(--azul);color:var(--azul)">${est.url ? '↻ Reemitir dictamen' : '📄 Emitir dictamen'}</button>
+      ${est.url ? `<a class="tc-btn" href="${esc(est.url)}" target="_blank"
+          style="text-decoration:none">Ver documento</a>` : ''}
+      ${est.url ? (pub
+        ? `<button class="tc-btn" onclick="ncPublicar(true,this)"
+             style="border-color:var(--rojo);color:var(--rojo)">✕ Retirar del portal</button>`
+        : `<button class="tc-btn on" onclick="ncPublicar(false,this)"
+             style="background:var(--verde);border-color:var(--verde);color:#fff">🌐 Publicar al cliente</button>`) : ''}
+      <span style="font-size:11.5px;color:${pub ? 'var(--verde)' : 'var(--texto-hint)'};margin-left:auto">
+        ${pub ? '● Visible para el cliente' + (est.publicado_at ? ' desde ' + esc(est.publicado_at) : '')
+              : (est.url ? '● Emitido, sin publicar' : '○ Sin emitir')}</span>
+    </div>`;
+}
+
+function ncTarjeta(h) {
+  return `<div class="ncf ${esc(h.gravedad)}">
+    <div class="ncf-top">
+      <span class="ncf-cod">${esc(h.codigo)}</span>
+      <span class="ncf-g ${esc(h.gravedad)}">${NC_G[h.gravedad] || h.gravedad}</span>
+      ${h.punto ? `<span class="ncf-pt">Punto ${esc(h.punto)}</span>` : ''}
+      <button class="tc-btn" style="margin-left:auto;border-color:var(--rojo);color:var(--rojo)"
+              onclick="ncBorrar(${h.id})">Quitar</button>
+    </div>
+    <div class="ncf-desc">${esc(h.descripcion)}</div>
+    <div class="ncf-acc"><strong>Acción requerida:</strong> ${esc(h.accion)}</div>
+    ${(h.fotos || []).length ? `<div class="ncf-fotos">${h.fotos.map(f =>
+      `<a href="${esc(f.url)}" target="_blank"><img src="${esc(f.url)}" alt=""></a>`).join('')}</div>` : ''}
+  </div>`;
+}
+
+function ncNuevo() {
+  const box = document.getElementById('nc-form');
+  if (!box || box.innerHTML) { if (box) box.innerHTML = ''; return; }
+  box.innerHTML = `
+    <div class="ncf" style="border-left-color:var(--azul)">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <select id="nc-grav" style="padding:6px 9px;border:1.5px solid var(--borde);border-radius:7px;
+          font-size:12px;font-family:inherit">
+          <option value="critica">Crítica — impide operar</option>
+          <option value="mayor" selected>Mayor</option>
+          <option value="menor">Menor</option>
+        </select>
+        <input id="nc-punto" placeholder="Punto del checklist (opcional)"
+          style="flex:1;min-width:150px;padding:6px 9px;border:1.5px solid var(--borde);
+                 border-radius:7px;font-size:12px;font-family:inherit">
+      </div>
+      <textarea id="nc-desc" rows="3" placeholder="Qué se encontró. Sea concreto: qué falla, dónde y cómo se detectó."
+        style="width:100%;padding:8px 10px;border:1.5px solid var(--borde);border-radius:7px;
+               font-size:12.5px;font-family:inherit;resize:vertical"></textarea>
+      <textarea id="nc-acc" rows="2" placeholder="Qué debe hacer el cliente para corregirlo."
+        style="width:100%;padding:8px 10px;border:1.5px solid var(--borde);border-radius:7px;
+               font-size:12.5px;font-family:inherit;resize:vertical;margin-top:7px"></textarea>
+      <div style="margin-top:8px">
+        <label style="font-size:11.5px;color:var(--texto-sub);font-weight:600">Fotografías (hasta 4)</label>
+        <input type="file" id="nc-fotos" multiple accept="image/*" style="display:block;font-size:12px;margin-top:4px">
+      </div>
+      <div style="display:flex;gap:7px;margin-top:10px">
+        <button class="tc-btn on" style="background:var(--azul);border-color:var(--azul);color:#fff"
+                onclick="ncGuardar(this)">Agregar</button>
+        <button class="tc-btn" onclick="document.getElementById('nc-form').innerHTML=''">Cancelar</button>
+      </div>
+    </div>`;
+  document.getElementById('nc-desc').focus();
+}
+
+async function ncGuardar(btn) {
+  const desc = (document.getElementById('nc-desc')?.value || '').trim();
+  const acc  = (document.getElementById('nc-acc')?.value  || '').trim();
+  if (!desc) { mostrarToast('Describe el hallazgo.', 'err'); return; }
+  if (!acc)  { mostrarToast('Indica qué debe corregirse.', 'err'); return; }
+
+  const fd = new FormData();
+  fd.append('action', 'AGREGAR_NO_CONFORMIDAD');
+  fd.append('equipo_id', _ncEquipo);
+  fd.append('gravedad', document.getElementById('nc-grav').value);
+  fd.append('punto', document.getElementById('nc-punto').value || '');
+  fd.append('descripcion', desc);
+  fd.append('accion', acc);
+  const fotos = document.getElementById('nc-fotos');
+  if (fotos) [...fotos.files].slice(0, 4).forEach(f => fd.append('fotos[]', f));
+
+  btn.disabled = true; btn.textContent = 'Guardando…';
+  try {
+    const res = await fetch(API, { method: 'POST', body: fd });
+    const d = await res.json();
+    mostrarToast(d.message || '', d.status === 'success' ? 'ok' : 'err');
+    if (d.status === 'success') ncCargar(_ncEquipo);
+  } catch (e) {
+    mostrarToast('Error de conexión.', 'err');
+  } finally { btn.disabled = false; btn.textContent = 'Agregar'; }
+}
+
+async function ncBorrar(id) {
+  if (!confirm('¿Quitar este hallazgo?')) return;
+  const d = await ncApi('ELIMINAR_NO_CONFORMIDAD', { id });
+  mostrarToast(d.message || '', d.status === 'success' ? 'ok' : 'err');
+  if (d.status === 'success') ncCargar(_ncEquipo);
+}
+
+async function ncEmitir(btn) {
+  btn.disabled = true; btn.textContent = 'Generando…';
+  try {
+    const d = await ncApi('EMITIR_DICTAMEN_NC', { equipo_id: _ncEquipo });
+    mostrarToast(d.message || '', d.status === 'success' ? 'ok' : 'err');
+    if (d.status === 'success') { if (d.url) window.open(d.url, '_blank'); ncCargar(_ncEquipo); }
+  } finally { btn.disabled = false; }
+}
+
+async function ncPublicar(retirar, btn) {
+  if (!retirar && !confirm('El cliente verá este dictamen en su portal, con los hallazgos y las fotos.\n\n'
+      + 'No se envía correo.\n\n¿Continuar?')) return;
+  btn.disabled = true;
+  try {
+    const d = await ncApi('PUBLICAR_DICTAMEN_NC', { equipo_id: _ncEquipo, retirar: retirar ? 1 : 0 });
+    mostrarToast(d.message || '', d.status === 'success' ? 'ok' : 'err');
+    if (d.status === 'success') ncCargar(_ncEquipo);
+  } finally { btn.disabled = false; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

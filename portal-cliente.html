@@ -76,6 +76,12 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
    Lo que el inspector vio y no pertenece al alcance de la certificación.
    Se lee completo en pantalla: el PDF es para quien lo quiera imprimir, no
    para enterarse. */
+.nc-card { border-left:4px solid var(--rojo) !important; }
+.nc-aviso { display:flex; gap:9px; align-items:flex-start; background:var(--rojo-light);
+  border-radius:9px; padding:9px 11px; margin:8px 0; }
+.nc-aviso .ico { font-size:16px; line-height:1.2; flex-shrink:0; }
+.nc-aviso p { font-size:11.5px; color:#7a1f1f; line-height:1.45; }
+.btn-nc { background:var(--rojo-light); border-color:var(--rojo); color:var(--rojo); }
 .rec-abrir{width:100%;margin-top:10px;padding:10px;border-radius:9px;border:1.5px solid var(--ambar);
   background:var(--ambar-light);color:var(--ambar);font-size:12.5px;font-weight:700;cursor:pointer;
   font-family:inherit;display:flex;align-items:center;justify-content:center;gap:7px;transition:all .15s;}
@@ -1914,17 +1920,27 @@ function renderMaquinaria(data) {
   document.getElementById('s-eq').textContent = data.length;
   let html = '<div class="cards-grid">';
   data.forEach(eq => {
-    const vigBadge = badgeVigencia(eq.vigente, eq.dias);
+    // Un equipo no conforme no tiene vigencia: decir "vence en 300 días"
+    // sería decirle al cliente que está certificado.
+    const noConf   = !!eq.no_conforme;
+    const vigBadge = noConf
+      ? '<span class="badge b-nocumple">✖ NO CONFORME</span>'
+      : badgeVigencia(eq.vigente, eq.dias);
     const folio = eq.folio ? 'AB.' + eq.folio + '-' + new Date().getFullYear() + 'MX' : '—';
-    const certBtn  = eq.link_cert ? `<a class="btn-doc btn-cert" href="${eq.link_cert}" target="_blank">📄 Certificado</a>` : `<span class="btn-doc btn-cert dis">📄 Certificado</span>`;
-    const dictBtn  = eq.link_dict ? `<a class="btn-doc btn-dict" href="${eq.link_dict}" target="_blank">📋 Dictamen</a>`    : `<span class="btn-doc btn-dict dis">📋 Dictamen</span>`;
+    // No ofrece certificado: ofrece el dictamen que explica por qué no lo
+    // tiene. Confundir uno con otro sería grave.
+    const certBtn  = noConf ? ''
+      : (eq.link_cert ? `<a class="btn-doc btn-cert" href="${escH(eq.link_cert)}" target="_blank">📄 Certificado</a>` : `<span class="btn-doc btn-cert dis">📄 Certificado</span>`);
+    const dictBtn  = noConf
+      ? (eq.link_nc ? `<a class="btn-doc btn-nc" href="${escH(eq.link_nc)}" target="_blank">⚠ Dictamen de no conformidad</a>` : '')
+      : (eq.link_dict ? `<a class="btn-doc btn-dict" href="${escH(eq.link_dict)}" target="_blank">📋 Dictamen</a>` : `<span class="btn-doc btn-dict dis">📋 Dictamen</span>`);
     const qrBtn    = eq.qr_url    ? `<button class="btn-doc btn-qr" onclick="verQR('${escQ(folio)}','${escQ(eq.qr_url)}')">🔗 QR</button>` : `<span class="btn-doc btn-qr dis">🔗 QR</span>`;
     // Las recomendaciones llegan con la documentación: si el equipo está en
     // la lista, su documentación ya se publicó.
     const recBtn = recomBoton('equipo', eq);
-    html += `<div class="card">
+    html += `<div class="card${noConf ? ' nc-card' : ''}">
       <div class="card-top">
-        <div class="card-icon">🔧</div>
+        <div class="card-icon">${noConf ? '⚠️' : '🔧'}</div>
         <div style="flex:1">
           <div class="card-folio">${folio}</div>
           <div class="card-nombre">${eq.maquinaria || '—'}</div>
@@ -1936,7 +1952,11 @@ function renderMaquinaria(data) {
         <div class="info-row"><span class="info-key">Marca / Modelo</span><span class="info-val">${eq.marca || '—'}${eq.modelo ? ' / ' + eq.modelo : ''}</span></div>
         <div class="info-row"><span class="info-key">No. Equipo</span><span class="info-val">${eq.id_equipo || '—'}</span></div>
         <div class="info-row"><span class="info-key">Fecha inspección</span><span class="info-val">${eq.fecha || '—'}</span></div>
-        ${vigenciaBar(eq.dias, eq.vencimiento, eq.vigente)}
+        ${noConf ? `<div class="nc-aviso"><div class="ico">⚠️</div><p>
+            <strong>Este equipo no cumplió la inspección.</strong> No cuenta con certificado y
+            no debe operarse hasta corregir los hallazgos. El dictamen detalla cuáles son y qué
+            hacer con cada uno.</p></div>`
+          : vigenciaBar(eq.dias, eq.vencimiento, eq.vigente)}
       </div>
       <div class="card-footer">${certBtn}${dictBtn}${qrBtn}${
         (eq.link_cert || eq.link_dict)

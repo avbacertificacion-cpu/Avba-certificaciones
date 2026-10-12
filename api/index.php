@@ -42,6 +42,7 @@ require_once __DIR__ . '/Recomendaciones.php';
 require_once __DIR__ . '/Envios.php';
 require_once __DIR__ . '/Diagnostico.php';
 require_once __DIR__ . '/LectorIA.php';
+require_once __DIR__ . '/NoConformidades.php';
 require_once __DIR__ . '/Arneses.php';
 require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
@@ -163,6 +164,7 @@ $accesorios     = new Accesorios($pdo);
 $recom          = new Recomendaciones($pdo);  // su constructor migra sus tablas
 $envios         = new Envios($pdo);          // bitácora de correos enviados
 $diag           = new Diagnostico($pdo);     // comprobación de servicios externos
+$noConf         = new NoConformidades($pdo); // su constructor migra sus tablas
 $pnd            = new Pnd($pdo);
 $cliEquipos     = new ClienteEquipos($pdo);
 $cliPersonal    = new ClientePersonal($pdo);
@@ -1996,6 +1998,61 @@ if ($method === 'POST') {
            ═══════════════════════════════════════════════════════════ */
 
         // Las de un equipo, para las pantallas de AVBA.
+        /* ═══════════ DICTAMEN DE NO CONFORMIDAD ═══════════
+           Lo emite y lo publica CALIDAD, y sólo sobre equipos NO CONFORMES.
+           Certificados y dictámenes de conformidad siguen siendo de
+           Certificaciones: aquí no hay ningún camino para publicarlos. */
+        case 'LISTAR_NO_CONFORMIDADES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($noConf->listar((int)($payload['equipo_id'] ?? 0)));
+
+        case 'ESTADO_NO_CONFORMIDAD':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($noConf->estado((int)($payload['equipo_id'] ?? 0)));
+
+        // Alta con fotos: va por multipart, así que lee $_POST y $_FILES.
+        case 'AGREGAR_NO_CONFORMIDAD':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD']))
+                respuesta(['status' => 'error', 'message' => 'Sólo Calidad dictamina no conformidades.'], 401);
+            respuesta($noConf->agregar($_POST, $_FILES, $usr['usuario']));
+
+        case 'EDITAR_NO_CONFORMIDAD':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($noConf->editar((int)($payload['id'] ?? 0), $payload, $usr['usuario']));
+
+        case 'ELIMINAR_NO_CONFORMIDAD':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($noConf->eliminar((int)($payload['id'] ?? 0), $usr['usuario']));
+
+        case 'ELIMINAR_FOTO_NO_CONFORMIDAD':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($noConf->eliminarFoto((int)($payload['id'] ?? 0), $usr['usuario']));
+
+        case 'EMITIR_DICTAMEN_NC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($noConf->emitir((int)($payload['equipo_id'] ?? 0), $usr['usuario']));
+
+        case 'PUBLICAR_DICTAMEN_NC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta(empty($payload['retirar'])
+                ? $noConf->publicar((int)($payload['equipo_id'] ?? 0), $usr['usuario'])
+                : $noConf->retirar((int)($payload['equipo_id'] ?? 0), $usr['usuario']));
+
         /* ═══════════ COMPROBACIÓN DE SERVICIOS ═══════════
            Prueba de verdad cada integración antes de confiar en ella. Sólo
            ADMIN: las respuestas dicen qué está configurado y qué contesta
