@@ -19,15 +19,6 @@
 class NoConformidades {
     private PDO $pdo;
 
-    /** Qué tan grave es el hallazgo. Ordena el documento y el color. */
-    public const GRAVEDADES = ['critica', 'mayor', 'menor'];
-
-    public const GRAVEDAD_NOMBRE = [
-        'critica' => 'Crítica',
-        'mayor'   => 'Mayor',
-        'menor'   => 'Menor',
-    ];
-
     private const MAX_FOTOS = 4;      // por hallazgo
 
     public function __construct(PDO $pdo) {
@@ -41,7 +32,9 @@ class NoConformidades {
                id          INT AUTO_INCREMENT PRIMARY KEY,
                equipo_id   INT          NOT NULL,
                codigo      VARCHAR(12)  NOT NULL,
-               gravedad    VARCHAR(10)  NOT NULL DEFAULT 'mayor',
+               -- Se dejó de usar: ahora un hallazgo es o no es, sin niveles.
+               -- La columna se conserva por si hay registros anteriores.
+               gravedad    VARCHAR(20)  NOT NULL DEFAULT 'no_conforme',
                punto       VARCHAR(20)  NULL,
                descripcion TEXT         NOT NULL,
                accion      TEXT         NULL,
@@ -100,18 +93,12 @@ class NoConformidades {
         return $eq['estado'] === 'NO CONFORME' ? $eq : null;
     }
 
-    private static function limpiarGravedad(?string $g): string {
-        $g = strtolower(trim((string)$g));
-        return in_array($g, self::GRAVEDADES, true) ? $g : 'mayor';
-    }
-
     // ── Hallazgos ─────────────────────────────────────────
 
     public function listar(int $equipoId): array {
         try {
             $st = $this->pdo->prepare(
-                "SELECT * FROM no_conformidades WHERE equipo_id = ?
-                 ORDER BY FIELD(gravedad,'critica','mayor','menor'), id"
+                "SELECT * FROM no_conformidades WHERE equipo_id = ? ORDER BY id"
             );
             $st->execute([$equipoId]);
             $filas = $st->fetchAll(PDO::FETCH_ASSOC) ?: [];
@@ -163,7 +150,7 @@ class NoConformidades {
                (equipo_id, codigo, gravedad, punto, descripcion, accion, creada_por)
              VALUES (?,?,?,?,?,?,?)"
         )->execute([
-            $equipoId, $codigo, self::limpiarGravedad($p['gravedad'] ?? ''),
+            $equipoId, $codigo, 'no_conforme',
             mb_substr(trim((string)($p['punto'] ?? '')), 0, 20) ?: null,
             $desc, $accion, $usuario,
         ]);
@@ -188,7 +175,6 @@ class NoConformidades {
             if ($v === '') return ['status' => 'error', 'message' => 'Ni la descripción ni la acción pueden quedar vacías.'];
             $sets[] = "$campo = ?"; $vals[] = $v;
         }
-        if (array_key_exists('gravedad', $p)) { $sets[] = 'gravedad = ?'; $vals[] = self::limpiarGravedad($p['gravedad']); }
         if (array_key_exists('punto', $p))    { $sets[] = 'punto = ?';    $vals[] = mb_substr(trim((string)$p['punto']), 0, 20) ?: null; }
         if (!$sets) return ['status' => 'success', 'message' => 'Sin cambios.'];
 
@@ -306,8 +292,8 @@ class NoConformidades {
             return ['status' => 'error', 'message' => 'Falta la plantilla del dictamen.'];
 
         $e = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
-        $cuenta = ['critica' => 0, 'mayor' => 0, 'menor' => 0];
-        foreach ($hallazgos as $h) $cuenta[$h['gravedad']] = ($cuenta[$h['gravedad']] ?? 0) + 1;
+        // Firma y número del inspector, de su ficha si la tiene.
+        [$firmaInspector, $numInspector] = $this->firmaDe((string)$eq['inspector']);
 
         $folio = $eq['control'] ? 'AB.' . $eq['control'] . '-NC-' . date('Y') . 'MX'
                                 : 'NC-' . str_pad((string)$equipoId, 5, '0', STR_PAD_LEFT);
@@ -325,19 +311,16 @@ class NoConformidades {
             '{fecha_inspeccion}'  => $e($eq['fecha_fmt']),
             '{fecha_emision}'     => date('d/m/Y'),
             '{nc_total}'          => (string)count($hallazgos),
-            '{nc_criticas}'       => (string)$cuenta['critica'],
-            '{nc_mayores}'        => (string)$cuenta['mayor'],
-            '{nc_menores}'        => (string)$cuenta['menor'],
             '{nc_motivo}'         => $e(trim((string)$eq['motivo'])) ?: 'No se registró un motivo general.',
             '{nc_hallazgos}'      => $this->bloqueHallazgos($hallazgos),
             '{normas_acreditadas}'=> $e($this->normas($equipoId, 'acreditada')),
             '{normas_referencia}' => $e($this->normas($equipoId, 'referencia')),
-            '{nombre_inspector}'  => $e($eq['inspector']),
-            '{numero_inspector}'  => '',
-            '{firma_inspector_img}'   => '',
-            '{nombre_responsable}'    => $e(defined('NOMBRE_RESPONSABLE') ? NOMBRE_RESPONSABLE : ''),
-            '{cargo_responsable}'     => 'Responsable de Calidad',
-            '{firma_responsable_img}' => '',
+            '{nombre_inspector}'  => $e($eq['inspector']) ?: '—',
+            // El número sólo se imprime si lo hay: un "Inspector No." suelto
+            // parece un dato que se perdió.
+            '{bloque_num_inspector}'  => $numInspector !== ''
+                ? '<div class="sig-detail">Inspector No. ' . $e($numInspector) . '</div>' : '',
+            '{firma_inspector_img}'   => $firmaInspector,
         ];
         $html = str_replace(array_keys($map), array_values($map),
                             file_get_contents($plantilla));
@@ -357,12 +340,42 @@ class NoConformidades {
                 'message' => 'Dictamen ' . $folio . ' generado con ' . count($hallazgos) . ' hallazgo(s).'];
     }
 
-    /** Un bloque por hallazgo, con su gravedad, su acción y sus fotos. */
+    /**
+     * La firma registrada del inspector y su número.
+     *
+     * Si no tiene firma cargada se deja el espacio en blanco para firmar a
+     * mano: es preferible a un documento que parece firmado y no lo está.
+     *
+     * @return array{0:string,1:string} [etiqueta img o vacío, número]
+     */
+    private function firmaDe(string $usuario): array {
+        $usuario = trim($usuario);
+        if ($usuario === '') return ['', ''];
+        foreach ([
+            "SELECT firma_url, numero FROM inspectores_firma WHERE usuario = ?",
+            "SELECT firma_url, numero_inspector AS numero FROM usuarios WHERE usuario = ? OR nombre = ?",
+        ] as $i => $sql) {
+            try {
+                $st = $this->pdo->prepare($sql);
+                $st->execute($i === 0 ? [$usuario] : [$usuario, $usuario]);
+                $r = $st->fetch(PDO::FETCH_ASSOC);
+                if (!$r) continue;
+                $img = trim((string)($r['firma_url'] ?? ''));
+                return [
+                    $img !== '' ? '<img src="' . htmlspecialchars($img, ENT_QUOTES, 'UTF-8')
+                                . '" style="max-height:52px;width:auto;">' : '',
+                    trim((string)($r['numero'] ?? '')),
+                ];
+            } catch (\Throwable $e) { /* esa tabla o columna no existe aquí */ }
+        }
+        return ['', ''];
+    }
+
+    /** Un bloque por hallazgo, con su acción y sus fotos. */
     private function bloqueHallazgos(array $hallazgos): string {
         $e = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
         $out = '';
         foreach ($hallazgos as $h) {
-            $g = $h['gravedad'];
             $fotos = '';
             if ($h['fotos']) {
                 // Dos por renglón: más pequeñas no se distingue el hallazgo,
@@ -380,8 +393,7 @@ class NoConformidades {
             }
             $out .= '<div class="nc-item">'
                   . '<div class="nc-head">'
-                  . '<span class="nc-cod">' . $e($h['codigo']) . '</span>&nbsp; '
-                  . '<span class="nc-grav nc-g-' . $e($g) . '">' . $e(self::GRAVEDAD_NOMBRE[$g] ?? $g) . '</span>'
+                  . '<span class="nc-cod">' . $e($h['codigo']) . '</span>'
                   . ($h['punto'] ? '&nbsp; <span class="nc-punto">Punto ' . $e($h['punto']) . '</span>' : '')
                   . '</div>'
                   . '<div class="nc-cuerpo">'

@@ -677,13 +677,8 @@
       /* ── No conformidades ────────────────────────────────────────────── */
     .ncf { border:1.5px solid var(--borde); border-left:4px solid var(--rojo); border-radius:10px;
       padding:11px 13px; margin-bottom:10px; background:#fff; }
-    .ncf.mayor { border-left-color:#854F0B; } .ncf.menor { border-left-color:var(--borde); }
     .ncf-top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:6px; }
     .ncf-cod { font-size:13px; font-weight:800; color:var(--texto); }
-    .ncf-g { font-size:10px; font-weight:800; text-transform:uppercase; padding:2px 9px; border-radius:20px; }
-    .ncf-g.critica { background:var(--rojo); color:#fff; }
-    .ncf-g.mayor   { background:#FAEEDA; color:#854F0B; }
-    .ncf-g.menor   { background:var(--gris-bg); color:var(--texto-sub); }
     .ncf-pt { font-size:11px; color:var(--texto-hint); }
     .ncf-desc { font-size:13px; color:var(--texto); line-height:1.5; }
     .ncf-acc { font-size:12.5px; color:var(--texto); line-height:1.5; background:#FAEEDA;
@@ -3106,8 +3101,6 @@ async function eliminarPndCal(id, desc) {
    ═══════════════════════════════════════════════════════════════════════ */
 let _ncEquipo = 0;
 
-const NC_G = { critica: 'Crítica', mayor: 'Mayor', menor: 'Menor' };
-
 async function ncCargar(equipoId) {
   _ncEquipo = equipoId;
   const box = document.getElementById('nc-box');
@@ -3169,10 +3162,9 @@ function ncPintar(lista, est) {
 }
 
 function ncTarjeta(h) {
-  return `<div class="ncf ${esc(h.gravedad)}">
+  return `<div class="ncf">
     <div class="ncf-top">
       <span class="ncf-cod">${esc(h.codigo)}</span>
-      <span class="ncf-g ${esc(h.gravedad)}">${NC_G[h.gravedad] || h.gravedad}</span>
       ${h.punto ? `<span class="ncf-pt">Punto ${esc(h.punto)}</span>` : ''}
       <button class="tc-btn" style="margin-left:auto;border-color:var(--rojo);color:var(--rojo)"
               onclick="ncBorrar(${h.id})">Quitar</button>
@@ -3189,17 +3181,9 @@ function ncNuevo() {
   if (!box || box.innerHTML) { if (box) box.innerHTML = ''; return; }
   box.innerHTML = `
     <div class="ncf" style="border-left-color:var(--azul)">
-      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-        <select id="nc-grav" style="padding:6px 9px;border:1.5px solid var(--borde);border-radius:7px;
-          font-size:12px;font-family:inherit">
-          <option value="critica">Crítica — impide operar</option>
-          <option value="mayor" selected>Mayor</option>
-          <option value="menor">Menor</option>
-        </select>
-        <input id="nc-punto" placeholder="Punto del checklist (opcional)"
-          style="flex:1;min-width:150px;padding:6px 9px;border:1.5px solid var(--borde);
-                 border-radius:7px;font-size:12px;font-family:inherit">
-      </div>
+      <input id="nc-punto" placeholder="Punto del checklist (opcional)"
+        style="width:100%;padding:6px 9px;border:1.5px solid var(--borde);
+               border-radius:7px;font-size:12px;font-family:inherit;margin-bottom:8px">
       <textarea id="nc-desc" rows="3" placeholder="Qué se encontró. Sea concreto: qué falla, dónde y cómo se detectó."
         style="width:100%;padding:8px 10px;border:1.5px solid var(--borde);border-radius:7px;
                font-size:12.5px;font-family:inherit;resize:vertical"></textarea>
@@ -3228,7 +3212,6 @@ async function ncGuardar(btn) {
   const fd = new FormData();
   fd.append('action', 'AGREGAR_NO_CONFORMIDAD');
   fd.append('equipo_id', _ncEquipo);
-  fd.append('gravedad', document.getElementById('nc-grav').value);
   fd.append('punto', document.getElementById('nc-punto').value || '');
   fd.append('descripcion', desc);
   fd.append('accion', acc);

@@ -260,14 +260,6 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     </div>
   </div>
 
-  <table class="nc-resumen">
-    <tr>
-      <td style="background:#FBEAEA"><div style="font-family:'Montserrat',sans-serif;font-size:16pt;font-weight:900;line-height:1.1;color:#A32D2D">{nc_criticas}</div><div>Críticas</div></td>
-      <td style="background:#FAEEDA"><div style="font-family:'Montserrat',sans-serif;font-size:16pt;font-weight:900;line-height:1.1;color:#854F0B">{nc_mayores}</div><div>Mayores</div></td>
-      <td style="background:#f4f7fb"><div style="font-family:'Montserrat',sans-serif;font-size:16pt;font-weight:900;line-height:1.1;color:#475569">{nc_menores}</div><div>Menores</div></td>
-      <td style="border-right:none;background:#0B2545;color:#fff"><div style="font-family:'Montserrat',sans-serif;font-size:16pt;font-weight:900;line-height:1.1;color:#fff">{nc_total}</div><div>Total</div></td>
-    </tr>
-  </table>
 
   <div class="sec-title">Motivo General del Rechazo <span style="font-size:7pt;font-weight:400;opacity:.6;margin-left:6px">· Reason for Rejection</span></div>
   <div class="sec-body" style="padding:8px 14px;font-size:9pt;line-height:1.5">{nc_motivo}</div>
@@ -280,8 +272,8 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
     Corrija cada hallazgo conforme a la acción indicada y conserve la evidencia de las
     correcciones. Cuando estén atendidos, solicite una <strong>reinspección</strong>: el
     certificado sólo se emite después de verificar en sitio que las no conformidades fueron
-    resueltas. <strong>El equipo no debe operar</strong> mientras subsistan las no conformidades
-    críticas.
+    resueltas. <strong>El equipo no debe operar</strong> mientras subsista cualquiera de las no
+    conformidades señaladas.
   </div>
 
   <table class="result-row" style="margin-top:6px;width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;background:#A32D2D;" cellpadding="0" cellspacing="0"><tr>
@@ -291,31 +283,23 @@ body{font-family:'Inter',Arial,sans-serif;font-size:9pt;background:#d0d8e4;color
       <span style="display:block;opacity:.7;font-size:6pt;letter-spacing:.3px;text-transform:uppercase;margin-top:3px;">Normas de Referencia</span>{normas_referencia}
     </td>
   </tr></table>
+  <!-- Firma el inspector y nadie más: él detectó los hallazgos y responde por
+       ellos. Calidad emite y publica el documento, pero lo dictaminado es lo
+       que él vio en el equipo.
+       Se usa la misma estructura de tablas anidadas que los demás dictámenes:
+       es la única con la que mPDF respeta el alto reservado para firmar. -->
   <table class="sig-row" style="width:100%;border-collapse:collapse;border:1px solid #cdd8e3;border-top:none;" cellpadding="0" cellspacing="0"><tr>
-    <td class="sig-cell" style="width:42%;border-right:1px solid #cdd8e3;">
-      <div class="sig-role">Inspector que realizó la inspección</div>
+    <td class="sig-cell" style="width:68%;border-right:1px solid #cdd8e3;">
+      <div class="sig-role">Inspector que detectó los hallazgos</div>
       <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>
         <td style="height:60px;text-align:center;vertical-align:middle;">{firma_inspector_img}</td>
       </tr></table>
-      <table width="72%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 auto 5px;"><tr>
-        <td style="border-bottom:1px solid #cdd8e3;height:0;font-size:0;line-height:0;">&nbsp;</td>
-      </tr></table>
+      <div style="width:60%;height:1px;background:#94a3b8;margin:0 auto 6px;font-size:0;line-height:0;">&nbsp;</div>
       <div class="sig-name">{nombre_inspector}</div>
-      <div class="sig-detail">Inspector No. {numero_inspector}</div>
+      {bloque_num_inspector}
     </td>
-    <td style="width:16%;text-align:center;vertical-align:middle;padding:6px 4px;border-right:1px solid #cdd8e3;">
-      <img src="assets/sellos/sello.png" style="max-width:90px;max-height:80px;width:auto;">
-    </td>
-    <td class="sig-cell" style="width:42%;border-right:none;">
-      <div class="sig-role">Aprobado Por</div>
-      <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;"><tr>
-        <td style="height:60px;text-align:center;vertical-align:middle;">{firma_responsable_img}</td>
-      </tr></table>
-      <table width="72%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 auto 5px;"><tr>
-        <td style="border-bottom:1px solid #cdd8e3;height:0;font-size:0;line-height:0;">&nbsp;</td>
-      </tr></table>
-      <div class="sig-name">{nombre_responsable}</div>
-      <div class="sig-detail">{cargo_responsable}</div>
+    <td style="width:32%;text-align:center;vertical-align:middle;padding:8px;">
+      <img src="assets/sellos/sello.png" style="max-width:88px;max-height:78px;width:auto;">
     </td>
   </tr></table>
   <table class="page-foot" style="margin-top:1px;width:100%;" cellpadding="0" cellspacing="0"><tr>
