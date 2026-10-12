@@ -2045,6 +2045,23 @@ if ($method === 'POST') {
                 respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($noConf->emitir((int)($payload['equipo_id'] ?? 0), $usr['usuario']));
 
+        // Sustituir el dictamen por un PDF propio. Va por multipart.
+        case 'SUSTITUIR_DICTAMEN_NC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($noConf->sustituir(
+                (int)($_POST['equipo_id'] ?? 0),
+                $_FILES['archivo'] ?? [],
+                $usr['usuario']
+            ));
+
+        case 'QUITAR_SUSTITUTO_NC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($noConf->quitarSustituto((int)($payload['equipo_id'] ?? 0), $usr['usuario']));
+
         case 'PUBLICAR_DICTAMEN_NC':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD']))

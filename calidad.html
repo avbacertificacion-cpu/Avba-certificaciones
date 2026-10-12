@@ -3147,9 +3147,9 @@ function ncPintar(lista, est) {
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:11px;
                 border-top:1px solid var(--borde);align-items:center">
       <button class="tc-btn" onclick="ncEmitir(this)"
-        style="border-color:var(--azul);color:var(--azul)">${est.url ? '↻ Reemitir dictamen' : '📄 Emitir dictamen'}</button>
+        style="border-color:var(--azul);color:var(--azul)">${est.generado ? '↻ Reemitir dictamen' : '📄 Emitir dictamen'}</button>
       ${est.url ? `<a class="tc-btn" href="${esc(est.url)}" target="_blank"
-          style="text-decoration:none">Ver documento</a>` : ''}
+          style="text-decoration:none">Ver el que verá el cliente</a>` : ''}
       ${est.url ? (pub
         ? `<button class="tc-btn" onclick="ncPublicar(true,this)"
              style="border-color:var(--rojo);color:var(--rojo)">✕ Retirar del portal</button>`
@@ -3157,7 +3157,30 @@ function ncPintar(lista, est) {
              style="background:var(--verde);border-color:var(--verde);color:#fff">🌐 Publicar al cliente</button>`) : ''}
       <span style="font-size:11.5px;color:${pub ? 'var(--verde)' : 'var(--texto-hint)'};margin-left:auto">
         ${pub ? '● Visible para el cliente' + (est.publicado_at ? ' desde ' + esc(est.publicado_at) : '')
-              : (est.url ? '● Emitido, sin publicar' : '○ Sin emitir')}</span>
+              : (est.url ? '● Listo, sin publicar' : '○ Sin emitir')}</span>
+    </div>
+
+    <!-- Sustituir el PDF. Hay dictámenes que se firman fuera del sistema o
+         llevan anexos que aquí no se arman. -->
+    <div style="margin-top:10px;padding:10px 12px;background:var(--gris-bg);border-radius:9px">
+      <div style="font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:5px">
+        Usar un PDF propio en lugar del generado</div>
+      ${est.es_manual ? `
+        <div style="font-size:12px;color:var(--texto);line-height:1.5;margin-bottom:7px">
+          <strong>Hay un PDF sustituido.</strong> Es el que se publica y el que ve el cliente;
+          el generado por el sistema sigue guardado debajo.
+        </div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap">
+          <a class="tc-btn" href="${esc(est.manual)}" target="_blank" style="text-decoration:none">Ver el PDF subido</a>
+          ${est.generado ? `<a class="tc-btn" href="${esc(est.generado)}" target="_blank"
+             style="text-decoration:none">Ver el generado</a>` : ''}
+          <button class="tc-btn" onclick="ncQuitarSustituto(this)"
+                  style="border-color:var(--rojo);color:var(--rojo)">Quitar el sustituto</button>
+        </div>`
+      : `<div style="font-size:11.5px;color:var(--texto-hint);margin-bottom:6px;line-height:1.45">
+           Sólo PDF, hasta 20 MB. Mientras haya uno subido, es el que se publica.</div>
+         <input type="file" id="nc-pdf" accept="application/pdf" style="font-size:12px;display:block">
+         <button class="tc-btn" style="margin-top:7px" onclick="ncSustituir(this)">Subir y usar este PDF</button>`}
     </div>`;
 }
 
@@ -3242,6 +3265,35 @@ async function ncEmitir(btn) {
     const d = await ncApi('EMITIR_DICTAMEN_NC', { equipo_id: _ncEquipo });
     mostrarToast(d.message || '', d.status === 'success' ? 'ok' : 'err');
     if (d.status === 'success') { if (d.url) window.open(d.url, '_blank'); ncCargar(_ncEquipo); }
+  } finally { btn.disabled = false; }
+}
+
+async function ncSustituir(btn) {
+  const f = document.getElementById('nc-pdf');
+  if (!f || !f.files.length) { mostrarToast('Elige un PDF.', 'err'); return; }
+  const fd = new FormData();
+  fd.append('action', 'SUSTITUIR_DICTAMEN_NC');
+  fd.append('equipo_id', _ncEquipo);
+  fd.append('archivo', f.files[0]);
+  btn.disabled = true; btn.textContent = 'Subiendo…';
+  try {
+    const res = await fetch(API, { method: 'POST', body: fd });
+    const d = await res.json();
+    mostrarToast(d.message || '', d.status === 'success' ? 'ok' : 'err');
+    if (d.status === 'success') ncCargar(_ncEquipo);
+  } catch (e) {
+    mostrarToast('Error de conexión.', 'err');
+  } finally { btn.disabled = false; btn.textContent = 'Subir y usar este PDF'; }
+}
+
+async function ncQuitarSustituto(btn) {
+  if (!confirm('Se volverá a publicar el dictamen generado por el sistema.\n\n'
+             + 'El PDF que subiste no se borra, sólo deja de usarse.\n\n¿Continuar?')) return;
+  btn.disabled = true;
+  try {
+    const d = await ncApi('QUITAR_SUSTITUTO_NC', { equipo_id: _ncEquipo });
+    mostrarToast(d.message || '', d.status === 'success' ? 'ok' : 'err');
+    if (d.status === 'success') ncCargar(_ncEquipo);
   } finally { btn.disabled = false; }
 }
 

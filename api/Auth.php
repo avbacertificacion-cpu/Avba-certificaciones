@@ -739,8 +739,12 @@ class Auth {
         // Un equipo NO CONFORME con su dictamen publicado también se enseña:
         // el cliente necesita el documento que dice qué hay que corregir. Las
         // columnas pueden no existir todavía en una base sin migrar.
-        $colNc = columnaExiste($this->pdo, 'equipos', 'dictamen_nc_url')
-            ? 'dictamen_nc_url' : "'' AS dictamen_nc_url";
+        // El sustituido a mano manda sobre el generado: es el que Calidad
+        // decidió que vale.
+        $colNc = columnaExiste($this->pdo, 'equipos', 'dictamen_nc_manual_url')
+            ? "COALESCE(NULLIF(dictamen_nc_manual_url,''), dictamen_nc_url) AS dictamen_nc_url"
+            : (columnaExiste($this->pdo, 'equipos', 'dictamen_nc_url')
+                ? 'dictamen_nc_url' : "'' AS dictamen_nc_url");
         $colNcPub = columnaExiste($this->pdo, 'equipos', 'nc_publicado')
             ? 'nc_publicado' : '0 AS nc_publicado';
         $condNc = columnaExiste($this->pdo, 'equipos', 'nc_publicado')

@@ -63,6 +63,10 @@ class NoConformidades {
             'dictamen_nc_url' => "ALTER TABLE equipos ADD COLUMN dictamen_nc_url VARCHAR(500) NULL",
             'nc_publicado'    => "ALTER TABLE equipos ADD COLUMN nc_publicado TINYINT(1) NOT NULL DEFAULT 0",
             'nc_publicado_at' => "ALTER TABLE equipos ADD COLUMN nc_publicado_at DATETIME NULL",
+            // PDF subido a mano que reemplaza al generado. Hay dictámenes que
+            // se firman fuera del sistema, o que llevan anexos que aquí no se
+            // arman; cuando existe, es el que ve el cliente.
+            'dictamen_nc_manual_url' => "ALTER TABLE equipos ADD COLUMN dictamen_nc_manual_url VARCHAR(500) NULL",
         ] as $col => $ddl) {
             try {
                 if (!columnaExiste($this->pdo, 'equipos', $col)) $this->pdo->exec($ddl);
@@ -453,6 +457,84 @@ class NoConformidades {
     // ── Publicación ───────────────────────────────────────
 
     /**
+     * El documento que vale: el sustituido a mano si lo hay, o el generado.
+     *
+     * Quien publica no tiene que saber cuál de los dos es: pregunta por el
+     * efectivo y recibe el que el cliente debe ver.
+     */
+    private function docEfectivo(int $equipoId): array {
+        $manual = '';
+        if (columnaExiste($this->pdo, 'equipos', 'dictamen_nc_manual_url')) {
+            $st = $this->pdo->prepare("SELECT dictamen_nc_manual_url FROM equipos WHERE id = ?");
+            $st->execute([$equipoId]);
+            $manual = trim((string)($st->fetchColumn() ?: ''));
+        }
+        if ($manual !== '') return ['url' => $manual, 'manual' => true];
+
+        $st = $this->pdo->prepare("SELECT dictamen_nc_url FROM equipos WHERE id = ?");
+        $st->execute([$equipoId]);
+        return ['url' => trim((string)($st->fetchColumn() ?: '')), 'manual' => false];
+    }
+
+    /**
+     * Sustituye el dictamen por un PDF propio.
+     *
+     * A veces el documento se firma fuera del sistema, o lleva anexos que aquí
+     * no se arman. Subirlo no borra el generado: lo tapa. Quitar el sustituto
+     * devuelve el original, que sigue ahí.
+     */
+    public function sustituir(int $equipoId, array $file, string $usuario): array {
+        if (!$this->equipoNoConforme($equipoId))
+            return ['status' => 'error', 'message' => 'El equipo no está marcado como NO CONFORME.'];
+
+        if (empty($file['tmp_name']) || ($file['error'] ?? 1) !== 0)
+            return ['status' => 'error', 'message' => 'No llegó ningún archivo.'];
+        if (strtolower(pathinfo((string)($file['name'] ?? ''), PATHINFO_EXTENSION)) !== 'pdf')
+            return ['status' => 'error', 'message' => 'El dictamen debe ser un PDF.'];
+        if (($file['size'] ?? 0) > 20 * 1024 * 1024)
+            return ['status' => 'error', 'message' => 'El PDF no debe pasar de 20 MB.'];
+
+        // Se comprueba que de verdad sea un PDF y no un archivo renombrado: lo
+        // que se suba acaba en el portal del cliente con el nombre de AVBA.
+        $cabecera = @file_get_contents($file['tmp_name'], false, null, 0, 5);
+        if ($cabecera !== '%PDF-')
+            return ['status' => 'error', 'message' => 'El archivo no es un PDF válido.'];
+
+        $dir = rtrim(UPLOAD_DIR, '/') . '/certificados/';
+        if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        $nombre = 'DICTAMEN_NC_MANUAL_' . $equipoId . '_' . date('Ymd_His') . '.pdf';
+        if (!move_uploaded_file($file['tmp_name'], $dir . $nombre))
+            return ['status' => 'error', 'message' => 'No se pudo guardar el PDF.'];
+
+        $url = rtrim(SITE_URL, '/') . '/uploads/certificados/' . $nombre;
+        $this->pdo->prepare("UPDATE equipos SET dictamen_nc_manual_url = ? WHERE id = ?")
+                  ->execute([$url, $equipoId]);
+        registrarHistorial($this->pdo, $usuario, $equipoId, 'dictamen_nc_manual', null, $nombre);
+
+        return ['status' => 'success', 'url' => $url, 'message' =>
+            'Dictamen sustituido. El cliente verá este PDF, no el generado.'];
+    }
+
+    /** Quita el sustituto. El generado vuelve a ser el que se publica. */
+    public function quitarSustituto(int $equipoId, string $usuario): array {
+        if (!columnaExiste($this->pdo, 'equipos', 'dictamen_nc_manual_url'))
+            return ['status' => 'success', 'message' => 'No había sustituto.'];
+
+        $st = $this->pdo->prepare("SELECT dictamen_nc_manual_url FROM equipos WHERE id = ?");
+        $st->execute([$equipoId]);
+        $previo = trim((string)($st->fetchColumn() ?: ''));
+
+        $this->pdo->prepare("UPDATE equipos SET dictamen_nc_manual_url = NULL WHERE id = ?")
+                  ->execute([$equipoId]);
+        registrarHistorial($this->pdo, $usuario, $equipoId, 'dictamen_nc_manual', $previo ?: null, null);
+
+        // El archivo no se borra: si el dictamen ya se publicó, el cliente pudo
+        // haberlo descargado y la liga quedaría rota en su historial.
+        return ['status' => 'success', 'message' =>
+            'Sustituto retirado. Vuelve a publicarse el dictamen generado por el sistema.'];
+    }
+
+    /**
      * Deja el dictamen disponible en el portal del cliente.
      *
      * Es lo ÚNICO que Calidad publica. No hay aquí ningún camino para
@@ -465,19 +547,18 @@ class NoConformidades {
         if (!$eq) return ['status' => 'error', 'message' =>
             'Sólo se publica el dictamen de un equipo NO CONFORME.'];
 
-        $st = $this->pdo->prepare("SELECT dictamen_nc_url FROM equipos WHERE id = ?");
-        $st->execute([$equipoId]);
-        $url = trim((string)$st->fetchColumn());
-        if ($url === '') return ['status' => 'error', 'message' =>
-            'Primero genera el dictamen; todavía no existe el documento que publicar.'];
+        $doc = $this->docEfectivo($equipoId);
+        if ($doc['url'] === '') return ['status' => 'error', 'message' =>
+            'Primero genera el dictamen o sube uno propio; todavía no existe el documento que publicar.'];
 
         $this->pdo->prepare(
             "UPDATE equipos SET nc_publicado = 1, nc_publicado_at = NOW() WHERE id = ?"
         )->execute([$equipoId]);
         registrarHistorial($this->pdo, $usuario, $equipoId, 'nc_publicado', '0', '1');
 
-        return ['status' => 'success', 'url' => $url,
-                'message' => 'El dictamen ya está en el portal del cliente. No se envió correo.'];
+        return ['status' => 'success', 'url' => $doc['url'], 'manual' => $doc['manual'],
+                'message' => 'El dictamen ya está en el portal del cliente'
+                           . ($doc['manual'] ? ' (el PDF que subiste)' : '') . '. No se envió correo.'];
     }
 
     /** Lo retira del portal. El documento no se borra: deja de entregarse. */
@@ -491,8 +572,10 @@ class NoConformidades {
 
     public function estado(int $equipoId): array {
         try {
+            $colM = columnaExiste($this->pdo, 'equipos', 'dictamen_nc_manual_url')
+                ? 'dictamen_nc_manual_url' : "'' AS dictamen_nc_manual_url";
             $st = $this->pdo->prepare(
-                "SELECT estado, dictamen_nc_url, nc_publicado,
+                "SELECT estado, dictamen_nc_url, {$colM}, nc_publicado,
                         DATE_FORMAT(nc_publicado_at,'%d/%m/%Y %H:%i') AS publicado_at
                  FROM equipos WHERE id = ?"
             );
@@ -500,9 +583,14 @@ class NoConformidades {
             $r = $st->fetch(PDO::FETCH_ASSOC) ?: [];
         } catch (\Throwable $e) { $r = []; }
 
+        $manual = trim((string)($r['dictamen_nc_manual_url'] ?? ''));
         return ['status' => 'success', 'data' => [
             'no_conforme' => ($r['estado'] ?? '') === 'NO CONFORME',
-            'url'         => $r['dictamen_nc_url'] ?? '',
+            'generado'    => $r['dictamen_nc_url'] ?? '',
+            'manual'      => $manual,
+            // Cuál verá el cliente. El sustituto manda sobre el generado.
+            'url'         => $manual !== '' ? $manual : ($r['dictamen_nc_url'] ?? ''),
+            'es_manual'   => $manual !== '',
             'publicado'   => (int)($r['nc_publicado'] ?? 0) === 1,
             'publicado_at'=> $r['publicado_at'] ?? '',
         ]];
