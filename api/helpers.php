@@ -202,6 +202,13 @@ foreach ([
     'LOGIN_BLOQUEO_MIN'  => 15,
     'TOKEN_TTL'          => 28800,
     'NO_ACREDITACION'    => '',
+    // Datos del anexo técnico de la acreditación. El diploma de la ema avisa
+    // que el certificado no tiene validez sin su anexo correspondiente, así
+    // que los documentos lo citan.
+    'ACREDITACION_REF'      => '25UI5073',
+    'ACREDITACION_TIPO'     => 'Tipo A',
+    'ACREDITACION_NORMA'    => 'NMX-EC-17020-IMNC-2014 (ISO/IEC 17020:2012)',
+    'ACREDITACION_VIGENTE'  => '28/01/2026',
     'CORS_ORIGINS'       => '',
     'GEMINI_API_KEY'     => '',
     'GEMINI_MODEL'       => '',
@@ -222,6 +229,59 @@ foreach ([
  * en el SELECT haría fallar la consulta entera, y en el portal del cliente eso
  * significa una sección en blanco en lugar de los documentos que ya tenía.
  */
+/**
+ * Una sola redacción del anexo de acreditación para todos los documentos.
+ *
+ * El diploma de la ema advierte que "el presente documento no tiene validez sin
+ * su anexo técnico correspondiente", de modo que el número de acreditación solo
+ * no basta: hay que decir cuál es el anexo, bajo qué norma y desde cuándo.
+ *
+ * Si el servidor no tiene las constantes, se devuelve lo que sí haya en lugar
+ * de una frase coja: vale más omitir el dato que afirmar uno vacío.
+ */
+function textoAnexoAcreditacion(): string {
+    $partes = [];
+
+    $tipo  = trim((string)(defined('ACREDITACION_TIPO')  ? ACREDITACION_TIPO  : ''));
+    $norma = trim((string)(defined('ACREDITACION_NORMA') ? ACREDITACION_NORMA : ''));
+    $num   = trim((string)(defined('NO_ACREDITACION')    ? NO_ACREDITACION    : ''));
+    $ref   = trim((string)(defined('ACREDITACION_REF')   ? ACREDITACION_REF   : ''));
+    $desde = trim((string)(defined('ACREDITACION_VIGENTE') ? ACREDITACION_VIGENTE : ''));
+
+    $cabeza = 'Unidad de Inspección' . ($tipo !== '' ? ' ' . $tipo : '')
+            . ' acreditada por la Entidad Mexicana de Acreditación (ema)';
+    if ($norma !== '') $cabeza .= ' conforme a ' . $norma;
+    $partes[] = $cabeza;
+
+    if ($num !== '')   $partes[] = 'Acreditación ' . $num;
+    if ($ref !== '')   $partes[] = 'Anexo técnico ' . $ref;
+    if ($desde !== '') $partes[] = 'vigente a partir del ' . $desde;
+
+    return implode(' · ', $partes) . '.';
+}
+
+/**
+ * El mismo anexo, pero como cláusula para intercalar en una frase.
+ *
+ * Los certificados ya dicen "en su carácter de Unidad de Inspección Tipo A,
+ * acreditada por la ema bajo el número X": ahí la forma completa repetiría todo
+ * eso. Va dentro del párrafo y no en el pie porque el pie no da de sí —el texto
+ * justificado absorbe la cláusula en el hueco de su última línea— y porque
+ * decir bajo qué anexo se certifica es parte de la certificación, no una nota.
+ */
+function textoAnexoClausula(): string {
+    $norma = trim((string)(defined('ACREDITACION_NORMA')   ? ACREDITACION_NORMA   : ''));
+    $ref   = trim((string)(defined('ACREDITACION_REF')     ? ACREDITACION_REF     : ''));
+    $desde = trim((string)(defined('ACREDITACION_VIGENTE') ? ACREDITACION_VIGENTE : ''));
+
+    $partes = [];
+    if ($norma !== '') $partes[] = 'conforme a la norma ' . $norma;
+    if ($ref !== '')   $partes[] = 'anexo técnico ' . $ref
+                                 . ($desde !== '' ? ' vigente a partir del ' . $desde : '');
+    if (!$partes) return '';
+    return implode(', ', $partes) . ',';
+}
+
 /**
  * Envía el correo Y lo anota en la bitácora, incluido si falla.
  *

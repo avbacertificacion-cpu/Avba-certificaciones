@@ -1258,6 +1258,8 @@ class Arneses {
         }
         $mapa['{folio}']           = $this->esc(formatoFolio((string)($campos['folio'] ?? '')));
         $mapa['{no_acreditacion}'] = $this->esc(defined('NO_ACREDITACION') ? NO_ACREDITACION : '');
+        $mapa['{anexo_acreditacion}'] = $this->esc(textoAnexoAcreditacion());
+        $mapa['{anexo_clausula}'] = $this->esc(textoAnexoClausula());
 
         $html = str_replace(array_keys($mapa), array_values($mapa), $html);
         // Cualquier marcador sobrante de la plantilla se limpia.

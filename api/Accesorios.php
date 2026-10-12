@@ -2021,6 +2021,8 @@ class Accesorios {
             '{fecha_inspeccion}' => $e($fechaStr),
             '{vigencia}'         => $e($vigencia),
             '{no_acreditacion}'  => $e($noAcreditacion),
+            '{anexo_acreditacion}' => $e(textoAnexoAcreditacion()),
+            '{anexo_clausula}'   => $e(textoAnexoClausula()),
             '{qr_imagen}'        => $qrB64 ?: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
         ] + $this->textosSujeto(count($aptos) === 1);
 
@@ -2110,6 +2112,8 @@ class Accesorios {
             '{fecha_inspeccion}' => $e($a['fecha_fmt'] ?? ''),
             '{vigencia}'         => $e($vigencia),
             '{no_acreditacion}'  => $e(defined('NO_ACREDITACION') ? NO_ACREDITACION : 'UVNMX 057'),
+            '{anexo_acreditacion}' => $e(textoAnexoAcreditacion()),
+            '{anexo_clausula}'   => $e(textoAnexoClausula()),
             '{qr_imagen}'        => $qrB64 ?: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
         ] + $this->textosSujeto(true);
 

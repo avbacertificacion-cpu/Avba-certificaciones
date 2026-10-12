@@ -63,6 +63,15 @@ define('UPLOAD_URL', 'uploads/');
 // ── Datos de la Unidad de Inspección ──────────────────────
 define('NO_ACREDITACION', 'UVNMX 057');  // Número de registro oficial
 
+// Anexo técnico de la acreditación. El diploma de la ema advierte que el
+// certificado no tiene validez sin su anexo correspondiente, así que los
+// documentos lo citan. Si cambia la vigencia o se renueva la acreditación,
+// es el único lugar que hay que tocar.
+define('ACREDITACION_REF',     '25UI5073');
+define('ACREDITACION_TIPO',    'Tipo A');
+define('ACREDITACION_NORMA',   'NMX-EC-17020-IMNC-2014 (ISO/IEC 17020:2012)');
+define('ACREDITACION_VIGENTE', '28/01/2026');
+
 // ── Microservicio de conversión (opcional) ────────────────
 define('CONVERT_SERVICE_URL', 'https://mi-vps.com/convert.php');
 define('CONVERT_SERVICE_KEY', 'clave_secreta_fuerte_aqui');

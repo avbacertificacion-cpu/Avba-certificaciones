@@ -1105,6 +1105,7 @@ class Certificaciones {
             '{horquilla_cg}'         => $e($horquillas['centro_gravedad'] ?? ''),
             '{{normas_acreditadas}}' => $normasAcredHtml,
             '{{normas_referencia}}'  => $normasRefHtml,
+            '{anexo_acreditacion}'   => $e(textoAnexoAcreditacion()),
         ];
 
         $html = file_get_contents($templatePath);
@@ -2383,6 +2384,8 @@ SVG;
         $map = [
             '{folio}'           => $e(formatoFolio($d['control'] ?? '')),
             '{no_acreditacion}' => $e($noAcreditacion),
+            '{anexo_acreditacion}' => $e(textoAnexoAcreditacion()),
+            '{anexo_clausula}'  => $e(textoAnexoClausula()),
             '{qr_imagen}'       => $qrB64,
         ];
 

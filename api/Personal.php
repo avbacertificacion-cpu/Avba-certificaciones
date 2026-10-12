@@ -3602,6 +3602,8 @@ HTML;
             '{fecha_capacitacion}' => $e(!empty($p['fecha_curso']) ? date('d/m/Y', strtotime($p['fecha_curso'])) : ''),
             '{acreditado_como}'    => $acreditado,
             '{no_acreditacion}'    => $e($noAcreditacion),
+            '{anexo_acreditacion}' => $e(textoAnexoAcreditacion()),
+            '{anexo_clausula}'     => $e(textoAnexoClausula()),
             '{qr_imagen}'          => $qrB64 ?: $qrPlaceholder,
         ];
 

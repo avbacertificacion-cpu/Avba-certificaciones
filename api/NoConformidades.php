@@ -325,6 +325,7 @@ class NoConformidades {
             '{bloque_num_inspector}'  => $numInspector !== ''
                 ? '<div class="sig-detail">Inspector No. ' . $e($numInspector) . '</div>' : '',
             '{firma_inspector_img}'   => $firmaInspector,
+            '{anexo_acreditacion}'    => $e(textoAnexoAcreditacion()),
         ];
         $html = str_replace(array_keys($map), array_values($map),
                             file_get_contents($plantilla));
@@ -420,7 +421,12 @@ class NoConformidades {
                  WHERE e.id = ? AND n.tipo = ? ORDER BY n.orden"
             );
             $st->execute([$equipoId, $tipo]);
-            return implode(' · ', array_column($st->fetchAll(PDO::FETCH_ASSOC) ?: [], 'norma'));
+            // Guion de no separación: si no, el renglón parte en medio de una
+            // clave ("NMX-GR-23814-" / "IMNC-2011") y se lee como dos normas.
+            return implode(' · ', array_map(
+                fn($n) => str_replace('-', "\u{2011}", (string)$n),
+                array_column($st->fetchAll(PDO::FETCH_ASSOC) ?: [], 'norma')
+            ));
         } catch (\Throwable $e) {
             return '';
         }
