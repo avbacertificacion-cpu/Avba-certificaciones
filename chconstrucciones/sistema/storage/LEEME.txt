@@ -1,0 +1,5 @@
+Carpeta de datos del sistema. NO borrar.
+- archivos/        documentos (si el almacenamiento es local)
+- archivo-muerto/  archivo muerto (si es local)
+- .instalado       marca de instalación terminada
+- .secreto         llave interna de esta instalación

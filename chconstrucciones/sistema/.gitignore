@@ -1,0 +1,7 @@
+# La configuración real tiene contraseñas: sólo vive en el servidor.
+config/config.php
+# Datos guardados por el sistema (archivos, marcas de instalación, llaves).
+storage/*
+!storage/.htaccess
+!storage/.gitkeep
+!storage/LEEME.txt

@@ -1,0 +1,133 @@
+name: Deploy CH Construcciones (servidor nuevo)
+
+# Sistema real (PHP + MySQL) de CH en su propio servidor de Hostinger.
+# Sólo se ejecuta a mano: Actions → "Deploy CH Construcciones (servidor nuevo)"
+# → Run workflow → escribir DESPLEGAR. Nunca corre solo con un push, así un
+# cambio a medias no llega al sistema que ya usa la empresa.
+#
+# Usa secretos PROPIOS (CHC_*), distintos de los del servidor de AVBA:
+#   CHC_SSH_HOST, CHC_SSH_PORT, CHC_SSH_USERNAME, CHC_SSH_PASSWORD
+#   CHC_RUTA_DESTINO   carpeta del sitio en el servidor nuevo, por ejemplo
+#                      /home/u123456789/domains/dominio-de-ch.com/public_html
+# Guía completa: chconstrucciones/sistema/docs/MIGRACION.md
+on:
+  workflow_dispatch:
+    inputs:
+      confirmar:
+        description: 'Escribe DESPLEGAR para subir el sistema al servidor nuevo de CH'
+        required: true
+        default: ''
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Candados antes de subir nada. El más importante: este flujo NUNCA debe
+      # apuntar al servidor de AVBA (ahí vive el sistema de certificaciones en
+      # producción). Si los datos del servidor nuevo coinciden con los de AVBA,
+      # o la ruta menciona su dominio, se detiene sin tocar nada.
+      - name: Revisar destino
+        env:
+          CONFIRMAR: ${{ inputs.confirmar }}
+          HOST_NUEVO: ${{ secrets.CHC_SSH_HOST }}
+          USUARIO_NUEVO: ${{ secrets.CHC_SSH_USERNAME }}
+          RUTA: ${{ secrets.CHC_RUTA_DESTINO }}
+          HOST_AVBA: ${{ secrets.SSH_HOST }}
+          USUARIO_AVBA: ${{ secrets.SSH_USERNAME }}
+        run: |
+          if [ "$CONFIRMAR" != "DESPLEGAR" ]; then
+            echo "::error::Para desplegar escribe DESPLEGAR en el campo de confirmación."; exit 1
+          fi
+          if [ -z "$HOST_NUEVO" ] || [ -z "$USUARIO_NUEVO" ] || [ -z "$RUTA" ]; then
+            echo "::error::Faltan secretos: CHC_SSH_HOST, CHC_SSH_USERNAME o CHC_RUTA_DESTINO."; exit 1
+          fi
+          if [ "$HOST_NUEVO" = "$HOST_AVBA" ] && [ "$USUARIO_NUEVO" = "$USUARIO_AVBA" ]; then
+            echo "::error::Los datos de conexión son los del servidor de AVBA. Este flujo es sólo para el servidor nuevo de CH."; exit 1
+          fi
+          case "$RUTA" in
+            /*) ;;
+            *) echo "::error::CHC_RUTA_DESTINO debe ser una ruta completa que empiece con /"; exit 1 ;;
+          esac
+          case "$RUTA" in
+            *gestion.avba.com.mx*) echo "::error::CHC_RUTA_DESTINO apunta al sitio de AVBA (gestion.avba.com.mx)."; exit 1 ;;
+          esac
+          echo "Destino revisado."
+
+      - uses: actions/checkout@v4
+
+      # Sólo se sube el contenido de chconstrucciones/sistema/ (strip_components: 2
+      # quita esos dos niveles). El .htaccess de la raíz se nombra aparte para
+      # asegurar que viaje. En el servidor NO se borra nada: config/config.php
+      # y storage/ (que no están en GitHub) se conservan.
+      #
+      # El SCP de Hostinger a veces falla al conectar ("dial tcp: i/o timeout");
+      # se reintenta hasta tres veces, igual que en el despliegue del demo.
+      - name: Subir sistema por SCP (intento 1)
+        id: intento1
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.CHC_SSH_HOST }}
+          port: ${{ secrets.CHC_SSH_PORT }}
+          username: ${{ secrets.CHC_SSH_USERNAME }}
+          password: ${{ secrets.CHC_SSH_PASSWORD }}
+          source: "chconstrucciones/sistema/*,chconstrucciones/sistema/.htaccess"
+          strip_components: 2
+          overwrite: true
+          timeout: 60s
+          command_timeout: 10m
+          target: ${{ secrets.CHC_RUTA_DESTINO }}
+
+      - name: Esperar antes de reintentar
+        if: steps.intento1.outcome == 'failure'
+        run: sleep 20
+
+      - name: Subir sistema por SCP (intento 2)
+        id: intento2
+        if: steps.intento1.outcome == 'failure'
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.CHC_SSH_HOST }}
+          port: ${{ secrets.CHC_SSH_PORT }}
+          username: ${{ secrets.CHC_SSH_USERNAME }}
+          password: ${{ secrets.CHC_SSH_PASSWORD }}
+          source: "chconstrucciones/sistema/*,chconstrucciones/sistema/.htaccess"
+          strip_components: 2
+          overwrite: true
+          timeout: 60s
+          command_timeout: 10m
+          target: ${{ secrets.CHC_RUTA_DESTINO }}
+
+      - name: Esperar antes del último intento
+        if: steps.intento1.outcome == 'failure' && steps.intento2.outcome == 'failure'
+        run: sleep 40
+
+      # Último intento: sin continue-on-error, así que si también falla el job
+      # se marca como fallido y el error queda visible.
+      - name: Subir sistema por SCP (intento 3)
+        id: intento3
+        if: steps.intento1.outcome == 'failure' && steps.intento2.outcome == 'failure'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.CHC_SSH_HOST }}
+          port: ${{ secrets.CHC_SSH_PORT }}
+          username: ${{ secrets.CHC_SSH_USERNAME }}
+          password: ${{ secrets.CHC_SSH_PASSWORD }}
+          source: "chconstrucciones/sistema/*,chconstrucciones/sistema/.htaccess"
+          strip_components: 2
+          overwrite: true
+          timeout: 60s
+          command_timeout: 10m
+          target: ${{ secrets.CHC_RUTA_DESTINO }}
+
+      - name: Resultado
+        run: |
+          if [ "${{ steps.intento1.outcome }}" = "success" ]; then
+            echo "Desplegado al primer intento."
+          elif [ "${{ steps.intento2.outcome }}" = "success" ]; then
+            echo "Desplegado en el segundo intento (el primero se agotó por red)."
+          else
+            echo "Desplegado en el tercer intento (los dos anteriores se agotaron)."
+          fi
+          echo "Si es la primera vez: crea config/config.php en el servidor y abre instalar.php (ver docs/MIGRACION.md)."
