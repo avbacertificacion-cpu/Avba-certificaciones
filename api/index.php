@@ -1309,6 +1309,31 @@ if ($method === 'POST') {
             respuesta($personal->participanteAutoGuardar($payload, $sesion['id']));
         }
 
+        // ── Multi-rol ─────────────────────────────────────
+        // Cambiar de módulo no pide rol: cualquier sesión válida puede pedirlo,
+        // y Auth rechaza el destino si la cuenta no lo tiene asignado. Quien
+        // tiene un solo rol sólo puede "cambiar" al que ya trae.
+        case 'CAMBIAR_ROL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auth->cambiarRol($usr, (string)($payload['rol'] ?? '')));
+
+        // Qué roles tiene la sesión y con cuál está trabajando.
+        case 'MIS_ROLES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta([
+                'status'   => 'success',
+                'rol'      => $usr['rol'],
+                'rol_base' => $usr['rol_base'] ?? $usr['rol'],
+                'roles'    => $usr['roles'] ?? [$usr['rol']],
+            ]);
+
+        case 'BITACORA_ROLES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auth->bitacoraRoles($payload));
+
         case 'CREAR_USUARIO':
             $usr = validarToken($pdo, $token);
             if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

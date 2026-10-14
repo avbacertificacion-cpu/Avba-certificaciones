@@ -11,6 +11,7 @@ class Auth {
         $this->pdo = $pdo;
         $this->ensureFirmaColumn();
         $this->ensureRolAdministrativo();
+        $this->ensureMultiRol();
     }
 
     /**
@@ -39,6 +40,118 @@ class Auth {
     private function rolesValidos(): array {
         $base = defined('ROLES_VALIDOS') ? ROLES_VALIDOS : ['ADMIN','INSPECTOR','CALIDAD','CERTIFICACIONES','CLIENTE'];
         return array_values(array_unique(array_merge($base, ['ADMINISTRATIVO'])));
+    }
+
+    /**
+     * Roles que una misma persona puede acumular y entre los que puede cambiar.
+     *
+     * CLIENTE y PARTICIPANTE quedan fuera a propósito: no son otro módulo del
+     * mismo sistema, son gente de fuera mirando sus propios documentos. Una
+     * cuenta de personal que pudiera volverse CLIENTE entraría al portal de
+     * cualquier empresa, y eso no es un permiso, es otra frontera.
+     */
+    public function rolesConmutables(): array {
+        return array_values(array_diff($this->rolesValidos(), ['CLIENTE', 'PARTICIPANTE']));
+    }
+
+    /**
+     * Todos los roles de una cuenta: el principal más los adicionales.
+     *
+     * El principal va siempre primero y nunca se pierde, de modo que una lista
+     * de adicionales vacía, corrupta o con un rol que ya no existe deja a la
+     * persona exactamente donde estaba.
+     */
+    public function rolesDe(array $row): array {
+        $principal = strtoupper(trim((string)($row['rol'] ?? '')));
+        $roles     = $principal !== '' ? [$principal] : [];
+
+        $extra = trim((string)($row['roles_extra'] ?? ''));
+        if ($extra !== '') {
+            $validos = $this->rolesConmutables();
+            foreach (explode(',', $extra) as $r) {
+                $r = strtoupper(trim($r));
+                // El principal puede ser CLIENTE; los adicionales nunca.
+                if ($r !== '' && in_array($r, $validos, true) && !in_array($r, $roles, true)) {
+                    $roles[] = $r;
+                }
+            }
+        }
+        return $roles;
+    }
+
+    /**
+     * Convierte lo que llega del panel en la cadena que se guarda.
+     *
+     * Devuelve null —no cadena vacía— cuando no queda ninguno, para que la
+     * columna diga "sin roles adicionales" y no "una lista vacía". El rol
+     * principal se descarta si viene repetido: ya lo tiene por otro lado.
+     */
+    private function normalizarRolesExtra($valor, string $principal): ?string {
+        if (is_string($valor)) $valor = $valor === '' ? [] : explode(',', $valor);
+        if (!is_array($valor)) return null;
+
+        $validos = $this->rolesConmutables();
+        $fuera   = [];
+        foreach ($valor as $r) {
+            $r = strtoupper(trim((string)$r));
+            if ($r === '' || $r === strtoupper($principal)) continue;
+            if (!in_array($r, $validos, true)) continue;
+            if (!in_array($r, $fuera, true)) $fuera[] = $r;
+        }
+        return $fuera ? implode(',', $fuera) : null;
+    }
+
+    /** Columnas del multi-rol y la bitácora de cambios. */
+    private function ensureMultiRol(): void {
+        foreach ([
+            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS roles_extra VARCHAR(200) NULL",
+            "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS rol_activo  VARCHAR(30)  NULL",
+        ] as $ddl) {
+            try { $this->pdo->exec($ddl); } catch (\Throwable $e) { /* ya existe */ }
+        }
+        try {
+            $this->pdo->exec(
+                "CREATE TABLE IF NOT EXISTS bitacora_roles (
+                   id         INT AUTO_INCREMENT PRIMARY KEY,
+                   usuario_id INT          NULL,
+                   usuario    VARCHAR(50)  NOT NULL,
+                   nombre     VARCHAR(150) NULL,
+                   rol_desde  VARCHAR(30)  NULL,
+                   rol_hacia  VARCHAR(30)  NOT NULL,
+                   evento     VARCHAR(20)  NOT NULL DEFAULT 'cambio',
+                   ip         VARCHAR(45)  NULL,
+                   fecha      DATETIME     DEFAULT CURRENT_TIMESTAMP,
+                   INDEX idx_usuario (usuario),
+                   INDEX idx_fecha (fecha)
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            );
+        } catch (\Throwable $e) {
+            error_log('[Auth] bitacora_roles: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Deja constancia de con qué rol entró alguien y cuándo.
+     *
+     * Los módulos ya registran QUIÉN hace cada cosa; lo que faltaba era con qué
+     * sombrero. Nunca puede tumbar el cambio de rol: si no se puede anotar, se
+     * anota en el log del servidor y se sigue.
+     */
+    private function anotarRol(array $row, ?string $desde, string $hacia, string $evento): void {
+        try {
+            $this->pdo->prepare(
+                "INSERT INTO bitacora_roles (usuario_id, usuario, nombre, rol_desde, rol_hacia, evento, ip)
+                 VALUES (?,?,?,?,?,?,?)"
+            )->execute([
+                (int)($row['id'] ?? 0) ?: null,
+                mb_substr((string)($row['usuario'] ?? ''), 0, 50),
+                mb_substr((string)($row['nombre']  ?? ''), 0, 150) ?: null,
+                $desde, $hacia, $evento,
+                mb_substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45) ?: null,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[Auth] anotarRol: ' . $e->getMessage());
+        }
     }
 
     private function ensureFirmaColumn(): void {
@@ -361,7 +474,8 @@ class Auth {
         try {
             $stmt = $this->pdo->prepare(
                 "SELECT id, usuario, password_hash, rol, nombre, id_cliente, activo,
-                        usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh
+                        usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh,
+                        roles_extra
                  FROM usuarios WHERE usuario = ?"
             );
             $stmt->execute([$usuario]);
@@ -411,14 +525,30 @@ class Auth {
         // Generar token y guardarlo
         $token   = generarToken();
         $expires = date('Y-m-d H:i:s', time() + TOKEN_TTL);
-        $this->pdo->prepare(
-            "UPDATE usuarios SET session_token = ?, token_expires = ?, ultimo_acceso = NOW() WHERE id = ?"
-        )->execute([$token, $expires, $row['id']]);
+
+        // Cada sesión empieza con el rol principal. Si no se reiniciara, quien
+        // cerró sesión trabajando como CERTIFICACIONES volvería a entrar ahí sin
+        // haberlo pedido, y el rol con el que trabaja dejaría de ser una
+        // decisión suya.
+        $roles = $this->rolesDe($row);
+        try {
+            $this->pdo->prepare(
+                "UPDATE usuarios SET session_token = ?, token_expires = ?, ultimo_acceso = NOW(),
+                                     rol_activo = ? WHERE id = ?"
+            )->execute([$token, $expires, $row['rol'], $row['id']]);
+        } catch (\Throwable $e) {
+            // La columna puede no existir todavía: el acceso no se detiene por eso.
+            $this->pdo->prepare(
+                "UPDATE usuarios SET session_token = ?, token_expires = ?, ultimo_acceso = NOW() WHERE id = ?"
+            )->execute([$token, $expires, $row['id']]);
+        }
+        if (count($roles) > 1) $this->anotarRol($row, null, (string)$row['rol'], 'ingreso');
 
         $esSub = !empty($row['usuario_padre_id']);
         return [
             'status'        => 'success',
             'rol'           => $row['rol'],
+            'roles'         => $roles,
             'nombre'        => $row['nombre'],
             'usuario'       => $usuario,
             'id_cliente'    => $row['id_cliente'] ?? '',
@@ -546,10 +676,23 @@ class Auth {
 
         $registroStps = trim($payload['registro_stps'] ?? '');
         $hash = password_hash($password, PASSWORD_BCRYPT);
-        $this->pdo->prepare(
-            "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo, registro_stps)
-             VALUES (?, ?, ?, ?, ?, 1, ?)"
-        )->execute([$usuario, $hash, $rol, $nombre, $idCliente ?: null, $registroStps ?: null]);
+        // Una cuenta de cliente no acumula roles del personal: es otra frontera.
+        $extra = $rol === 'CLIENTE' ? null
+               : $this->normalizarRolesExtra($payload['roles_extra'] ?? [], $rol);
+        try {
+            $this->pdo->prepare(
+                "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo, registro_stps, roles_extra)
+                 VALUES (?, ?, ?, ?, ?, 1, ?, ?)"
+            )->execute([$usuario, $hash, $rol, $nombre, $idCliente ?: null, $registroStps ?: null, $extra]);
+        } catch (\Throwable $e) {
+            // La columna puede no existir todavía: vale más dar de alta la
+            // cuenta sin sus roles adicionales que no darla de alta.
+            $this->pdo->prepare(
+                "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo, registro_stps)
+                 VALUES (?, ?, ?, ?, ?, 1, ?)"
+            )->execute([$usuario, $hash, $rol, $nombre, $idCliente ?: null, $registroStps ?: null]);
+            error_log('[Auth] crearUsuario roles_extra: ' . $e->getMessage());
+        }
 
         return ['status' => 'success', 'message' => 'Usuario creado correctamente.'];
     }
@@ -568,6 +711,10 @@ class Auth {
         }
         $row = $stmt->fetch();
         if (!$row) return ['status' => 'error', 'message' => 'Usuario no encontrado.'];
+
+        $actual = $this->pdo->prepare("SELECT rol FROM usuarios WHERE id = ?");
+        $actual->execute([$row['id']]);
+        $rolActual = (string)($actual->fetchColumn() ?: '');
 
         $sets   = [];
         $params = [];
@@ -598,6 +745,18 @@ class Auth {
             $sets[] = 'registro_stps = ?';
             $params[] = trim($payload['registro_stps']) ?: null;
         }
+        if (array_key_exists('roles_extra', $payload)) {
+            // Contra el rol que quede, no contra el que tenía: si en la misma
+            // edición se le cambia el principal, el adicional repetido sobra.
+            $rolFinal = isset($payload['rol']) ? strtoupper(trim($payload['rol'])) : $rolActual;
+            $sets[]   = 'roles_extra = ?';
+            $params[] = $rolFinal === 'CLIENTE' ? null
+                      : $this->normalizarRolesExtra($payload['roles_extra'], $rolFinal);
+            // El rol en uso tiene que seguir siendo uno de los suyos. Sin esto,
+            // quitarle un rol adicional dejaría trabajando en ese módulo a quien
+            // ya lo tuviera puesto hasta que cerrara sesión.
+            $sets[]   = 'rol_activo = NULL';
+        }
 
         if (empty($sets)) return ['status' => 'success', 'message' => 'Sin cambios.'];
 
@@ -606,6 +765,82 @@ class Auth {
         $this->pdo->prepare($sql)->execute($params);
 
         return ['status' => 'success', 'message' => 'Usuario actualizado.'];
+    }
+
+    /**
+     * Cambia el rol con el que la sesión está trabajando.
+     *
+     * No da permisos: sólo elige cuál de los que la cuenta YA tiene está en uso.
+     * Un rol que no esté en su lista se rechaza, de modo que manipular la
+     * petición no sirve de nada.
+     */
+    public function cambiarRol(array $usr, string $destino): array {
+        $destino = strtoupper(trim($destino));
+        if ($destino === '') return ['status' => 'error', 'message' => 'Indica el módulo.'];
+
+        $st = $this->pdo->prepare(
+            "SELECT id, usuario, nombre, rol, roles_extra, rol_activo FROM usuarios WHERE id = ?"
+        );
+        $st->execute([(int)($usr['id'] ?? 0)]);
+        $row = $st->fetch();
+        if (!$row) return ['status' => 'error', 'message' => 'Sesión no válida.'];
+
+        $roles = $this->rolesDe($row);
+        if (!in_array($destino, $roles, true)) {
+            return ['status' => 'error', 'message' => 'Tu cuenta no tiene acceso a ese módulo.'];
+        }
+
+        $desde = (string)($row['rol_activo'] ?: $row['rol']);
+        if ($desde !== $destino) {
+            $this->pdo->prepare("UPDATE usuarios SET rol_activo = ? WHERE id = ?")
+                ->execute([$destino, $row['id']]);
+            $this->anotarRol($row, $desde, $destino, 'cambio');
+        }
+
+        return [
+            'status'  => 'success',
+            'rol'     => $destino,
+            'roles'   => $roles,
+            'message' => 'Ahora trabajas como ' . $destino . '.',
+        ];
+    }
+
+    /**
+     * Bitácora de con qué rol ha entrado cada quien.
+     *
+     * Responde la pregunta que el registro de cada módulo no contesta: los
+     * módulos guardan QUIÉN hizo cada cosa, esto guarda con qué sombrero.
+     */
+    public function bitacoraRoles(array $filtros = []): array {
+        $where  = [];
+        $params = [];
+
+        $u = trim((string)($filtros['usuario'] ?? ''));
+        if ($u !== '') { $where[] = 'usuario LIKE ?'; $params[] = '%' . $u . '%'; }
+
+        $r = strtoupper(trim((string)($filtros['rol'] ?? '')));
+        if ($r !== '') { $where[] = 'rol_hacia = ?'; $params[] = $r; }
+
+        $desde = trim((string)($filtros['desde'] ?? ''));
+        if ($desde !== '') { $where[] = 'fecha >= ?'; $params[] = $desde . ' 00:00:00'; }
+
+        $hasta = trim((string)($filtros['hasta'] ?? ''));
+        if ($hasta !== '') { $where[] = 'fecha <= ?'; $params[] = $hasta . ' 23:59:59'; }
+
+        $limite = min(500, max(1, (int)($filtros['limite'] ?? 100)));
+        $sql = "SELECT id, usuario, nombre, rol_desde, rol_hacia, evento, ip,
+                       DATE_FORMAT(fecha, '%d/%m/%Y %H:%i') AS fecha_fmt
+                FROM bitacora_roles"
+             . ($where ? ' WHERE ' . implode(' AND ', $where) : '')
+             . " ORDER BY fecha DESC, id DESC LIMIT " . $limite;
+
+        try {
+            $st = $this->pdo->prepare($sql);
+            $st->execute($params);
+            return ['status' => 'success', 'data' => $st->fetchAll(PDO::FETCH_ASSOC)];
+        } catch (\Throwable $e) {
+            return ['status' => 'error', 'message' => 'No se pudo leer la bitácora de accesos.'];
+        }
     }
 
     // ── DESACTIVAR USUARIO ─────────────────────────────────
@@ -625,14 +860,19 @@ class Auth {
 
     // ── LISTAR USUARIOS ────────────────────────────────────
     public function listarUsuarios(): array {
-        $stmt = $this->pdo->query(
-            "SELECT id, usuario, rol, nombre, id_cliente, activo,
-                    DATE_FORMAT(fecha_alta, '%d/%m/%Y %H:%i') AS fecha_alta,
-                    DATE_FORMAT(ultimo_acceso, '%d/%m/%Y %H:%i') AS ultimo_acceso,
-                    firma_imagen,
-                    COALESCE(registro_stps,'') AS registro_stps
-             FROM usuarios ORDER BY id"
-        );
+        $base = "SELECT id, usuario, rol, nombre, id_cliente, activo,
+                        DATE_FORMAT(fecha_alta, '%d/%m/%Y %H:%i') AS fecha_alta,
+                        DATE_FORMAT(ultimo_acceso, '%d/%m/%Y %H:%i') AS ultimo_acceso,
+                        firma_imagen,
+                        COALESCE(registro_stps,'') AS registro_stps";
+        try {
+            $stmt = $this->pdo->query($base . ", COALESCE(roles_extra,'') AS roles_extra
+                                       FROM usuarios ORDER BY id");
+        } catch (\Throwable $e) {
+            // Si la migración no corrió, la lista de usuarios no puede quedarse
+            // en blanco: se devuelve sin la columna nueva.
+            $stmt = $this->pdo->query($base . " FROM usuarios ORDER BY id");
+        }
         $rows = $stmt->fetchAll();
         foreach ($rows as &$r) {
             $r['firma_url'] = ($r['firma_imagen'] ?? null)

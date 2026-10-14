@@ -329,6 +329,10 @@ async function login() {
       usuario:       data.usuario,
       nombre:        data.nombre,
       rol:           data.rol,
+      // Los módulos a los que entra esta cuenta. La sesión siempre arranca en
+      // el principal; el selector de cada página ofrece los demás, y vuelve a
+      // preguntárselos al servidor antes de mostrarlos.
+      roles:         data.roles || [data.rol],
       // De qué división es la cuenta. Sólo informativo: el servidor lo resuelve
       // solo en cada petición, según en qué base valió el token.
       division:      data.division || 'principal',

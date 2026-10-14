@@ -399,7 +399,10 @@
           <div class="panel-title">Usuarios del sistema</div>
           <div class="panel-sub">ADMIN · CALIDAD · CERTIFICACIONES · INSPECTOR</div>
         </div>
-        <button class="btn-primary" onclick="abrirCrear('interno')">+ Nuevo usuario</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn-edit" onclick="abrirAccesos()">Historial de accesos</button>
+          <button class="btn-primary" onclick="abrirCrear('interno')">+ Nuevo usuario</button>
+        </div>
       </div>
       <div class="table-scroll">
         <table>
@@ -755,6 +758,41 @@
 </div><!-- /wrap -->
 
 
+<!-- ══ MODAL HISTORIAL DE ACCESOS ══ -->
+<!-- Los módulos ya registran QUIÉN hizo cada cosa. Esto contesta lo otro:
+     con qué módulo entró, y cuándo cambió de uno a otro. -->
+<div class="overlay" id="overlay-accesos" style="display:none" onclick="if(event.target===this)cerrarAccesos()">
+  <div class="modal" style="max-width:860px">
+    <div class="modal-title">Historial de accesos por módulo</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <input type="text" id="acc-usuario" placeholder="Usuario"
+             style="flex:1;min-width:140px;padding:8px 11px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+      <select id="acc-rol" style="padding:8px 11px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+        <option value="">Todos los módulos</option>
+        <option value="ADMIN">ADMIN</option>
+        <option value="INSPECTOR">INSPECTOR</option>
+        <option value="CALIDAD">CALIDAD</option>
+        <option value="CERTIFICACIONES">CERTIFICACIONES</option>
+        <option value="ADMINISTRATIVO">ADMINISTRATIVO</option>
+      </select>
+      <input type="date" id="acc-desde" title="Desde"
+             style="padding:8px 11px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+      <input type="date" id="acc-hasta" title="Hasta"
+             style="padding:8px 11px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+      <button class="btn-primary" onclick="cargarAccesos()">Buscar</button>
+    </div>
+    <div class="table-scroll" style="max-height:52vh">
+      <table>
+        <thead><tr><th>Fecha</th><th>Usuario</th><th>Entró a</th><th>Venía de</th><th>IP</th></tr></thead>
+        <tbody id="acc-tbody"><tr><td colspan="5" style="text-align:center;padding:18px">Cargando…</td></tr></tbody>
+      </table>
+    </div>
+    <div class="modal-actions" style="justify-content:flex-end;margin-top:12px">
+      <button class="btn-cancel" onclick="cerrarAccesos()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL CREAR/EDITAR USUARIO ══ -->
 <div class="overlay" id="overlay-usr">
   <div class="modal">
@@ -788,6 +826,15 @@
         <option value="ADMINISTRATIVO">ADMINISTRATIVO</option>
         <option value="ADMIN">ADMIN</option>
       </select>
+    </div>
+
+    <!-- Módulos adicionales: la misma cuenta entra a más de un módulo -->
+    <div class="field" id="campo-roles-extra">
+      <label>Módulos adicionales</label>
+      <div id="usr-roles-extra" style="display:flex;flex-wrap:wrap;gap:7px"></div>
+      <div class="hint">La cuenta entra a estos módulos además del suyo, con el mismo usuario y
+        contraseña, y elige con cuál trabaja desde cada pantalla. Queda registrado en el historial
+        de accesos con qué módulo entró y cuándo.</div>
     </div>
 
     <!-- Empresas cliente (multi-select) -->
@@ -1097,12 +1144,21 @@ function actualizarStats(internos, clientes) {
   document.getElementById("s-roles").textContent     = [...new Set(internos.map(u => u.rol))].length;
 }
 
-function rolBadge(rol) {
+function rolBadge(rol, extra) {
   const cls = {
     ADMIN:'b-admin', CALIDAD:'b-cal',
     INSPECTOR:'b-insp', CERTIFICACIONES:'b-cert', CLIENTE:'b-cliente'
   };
-  return `<span class="badge ${cls[rol] || ''}">${esc(rol)}</span>`;
+  let html = `<span class="badge ${cls[rol] || ''}">${esc(rol)}</span>`;
+  // Los módulos adicionales se ven en la propia lista: si no, para saber quién
+  // entra a dónde habría que abrir cada cuenta de una en una.
+  const otros = String(extra || "").split(",").filter(Boolean);
+  if (otros.length) {
+    html += otros.map(r =>
+      `<span class="badge ${cls[r.trim()] || ''}" style="opacity:.62;margin-left:3px"
+             title="Módulo adicional">+${esc(r.trim())}</span>`).join("");
+  }
+  return html;
 }
 
 function estadoBadge(activo) {
@@ -1147,7 +1203,7 @@ function renderInternos(data) {
     <tr>
       <td><strong>${esc(u.usuario)}</strong></td>
       <td>${esc(u.nombre || '—')}</td>
-      <td>${rolBadge(u.rol)}</td>
+      <td>${rolBadge(u.rol, u.roles_extra)}</td>
       <td>${estadoBadge(u.activo)}</td>
       <td style="color:var(--texto-hint);font-size:11.5px">${esc(u.ultimo_acceso || '—')}</td>
       ${firmaTd(u)}
@@ -1205,14 +1261,97 @@ function abrirCrear(tipo) {
   document.getElementById("campo-rol").style.display         = esCliente ? "none" : "";
   document.getElementById("campo-id-cliente").style.display  = esCliente ? "" : "none";
   document.getElementById("campo-stps").style.display        = "none";
+  document.getElementById("campo-roles-extra").style.display = esCliente ? "none" : "";
+  pintarRolesExtra([], "");
 
   // Show STPS field when role changes to INSPECTOR
   document.getElementById("usr-rol").onchange = function() {
     document.getElementById("campo-stps").style.display = this.value === "INSPECTOR" ? "" : "none";
+    sincronizarRolesExtra();
   };
 
   document.getElementById("overlay-usr").classList.add("open");
   setTimeout(() => document.getElementById("usr-usuario").focus(), 150);
+}
+
+/* ── Historial de accesos por módulo ── */
+function abrirAccesos() {
+  document.getElementById("overlay-accesos").style.display = "flex";
+  document.getElementById("overlay-accesos").classList.add("open");
+  cargarAccesos();
+}
+function cerrarAccesos() {
+  document.getElementById("overlay-accesos").style.display = "none";
+  document.getElementById("overlay-accesos").classList.remove("open");
+}
+
+async function cargarAccesos() {
+  const cuerpo = document.getElementById("acc-tbody");
+  cuerpo.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:18px">Cargando…</td></tr>`;
+  const payload = {
+    usuario: document.getElementById("acc-usuario").value.trim(),
+    rol:     document.getElementById("acc-rol").value,
+    desde:   document.getElementById("acc-desde").value,
+    hasta:   document.getElementById("acc-hasta").value,
+  };
+  try {
+    const res  = await fetch(API, { method:"POST", body: JSON.stringify({ action:"BITACORA_ROLES", payload }) });
+    const data = await res.json();
+    if (data.status !== "success") {
+      cuerpo.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:18px">${esc(data.message || "No se pudo leer el historial.")}</td></tr>`;
+      return;
+    }
+    const filas = data.data || [];
+    if (!filas.length) {
+      cuerpo.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:18px;color:var(--texto-hint)">
+        Sin accesos registrados con esos filtros.</td></tr>`;
+      return;
+    }
+    cuerpo.innerHTML = filas.map(f => `
+      <tr>
+        <td style="white-space:nowrap">${esc(f.fecha_fmt || "")}</td>
+        <td>${esc(f.nombre || f.usuario || "")}<div style="font-size:11px;color:var(--texto-hint)">${esc(f.usuario || "")}</div></td>
+        <td>${rolBadge(f.rol_hacia)}</td>
+        <td>${f.evento === "ingreso"
+              ? `<span style="font-size:11px;color:var(--texto-hint)">Inicio de sesión</span>`
+              : rolBadge(f.rol_desde || "—")}</td>
+        <td style="font-size:11px;color:var(--texto-hint)">${esc(f.ip || "")}</td>
+      </tr>`).join("");
+  } catch (e) {
+    cuerpo.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:18px">Error de conexión.</td></tr>`;
+  }
+}
+
+/* ── Módulos adicionales ──
+   Una cuenta puede entrar a más de un módulo con el mismo usuario. Aquí se
+   marcan; el que ya es su rol principal no se ofrece, porque ya lo tiene, y
+   CLIENTE no aparece nunca: no es otro módulo de la casa, es el portal de una
+   empresa de fuera. */
+const MODULOS_EXTRA = ['INSPECTOR','CALIDAD','CERTIFICACIONES','ADMINISTRATIVO','ADMIN'];
+
+function pintarRolesExtra(seleccion, principal) {
+  const caja = document.getElementById("usr-roles-extra");
+  if (!caja) return;
+  const marcados = (seleccion || []).map(r => String(r).toUpperCase());
+  caja.innerHTML = MODULOS_EXTRA
+    .filter(r => r !== principal)
+    .map(r => `
+      <label style="display:flex;align-items:center;gap:6px;padding:6px 11px;border:1.5px solid var(--borde);
+                    border-radius:99px;font-size:12px;cursor:pointer;user-select:none">
+        <input type="checkbox" value="${r}" ${marcados.includes(r) ? 'checked' : ''}
+               style="margin:0;cursor:pointer"> ${r}
+      </label>`).join("") ||
+    `<span class="hint" style="margin:0">Esta cuenta ya tiene el único módulo que puede usar.</span>`;
+}
+
+function rolesExtraSeleccionados() {
+  return [...document.querySelectorAll("#usr-roles-extra input:checked")].map(i => i.value);
+}
+
+/* El rol principal cambia: se repintan las opciones para no ofrecerlo dos
+   veces, conservando lo que ya estaba marcado. */
+function sincronizarRolesExtra() {
+  pintarRolesExtra(rolesExtraSeleccionados(), document.getElementById("usr-rol").value);
 }
 
 /* ── Abrir modal editar ── */
@@ -1240,10 +1379,13 @@ function abrirEditar(id) {
   document.getElementById("campo-rol").style.display         = esCliente ? "none" : "";
   document.getElementById("campo-id-cliente").style.display  = esCliente ? "" : "none";
   document.getElementById("campo-stps").style.display        = u.rol === "INSPECTOR" ? "" : "none";
+  document.getElementById("campo-roles-extra").style.display = esCliente ? "none" : "";
+  pintarRolesExtra((u.roles_extra || "").split(",").filter(Boolean), u.rol);
 
   // Show STPS field when role changes to INSPECTOR
   document.getElementById("usr-rol").onchange = function() {
     document.getElementById("campo-stps").style.display = this.value === "INSPECTOR" ? "" : "none";
+    sincronizarRolesExtra();
   };
 
   document.getElementById("overlay-usr").classList.add("open");
@@ -1274,17 +1416,22 @@ async function guardarUsuario() {
   if (password && password.length < 6)  { alert("La contraseña debe tener al menos 6 caracteres."); return; }
 
   const registroStps = document.getElementById("usr-stps").value.trim();
+  // Se manda siempre en las cuentas internas, también vacío: así desmarcar
+  // todos los módulos se guarda como lo que es, en vez de dejar los anteriores.
+  const rolesExtra   = esCliente ? [] : rolesExtraSeleccionados();
   const action  = modoEdicion ? "EDITAR_USUARIO" : "CREAR_USUARIO";
   const payload = modoEdicion
     ? {
         id: parseInt(id), nombre, rol, activo,
         ...(password                  ? { password }               : {}),
         ...(esCliente                 ? { id_cliente: idCliente }  : {}),
+        ...(esCliente                 ? {} : { roles_extra: rolesExtra }),
         ...(rol === 'INSPECTOR'       ? { registro_stps: registroStps } : {})
       }
     : {
         usuario, nombre, password, rol,
         ...(esCliente                 ? { id_cliente: idCliente }  : {}),
+        ...(esCliente                 ? {} : { roles_extra: rolesExtra }),
         ...(rol === 'INSPECTOR'       ? { registro_stps: registroStps } : {})
       };
 
@@ -2598,5 +2745,6 @@ async function probarSmtp() {
 }
 
 </script>
+<script src="js/cambio-rol.js"></script>
 </body>
 </html>

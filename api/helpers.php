@@ -946,13 +946,14 @@ function validarToken(PDO $pdo, ?string $token): ?array {
 
     try {
         $stmt = $pdo->prepare(
-            "SELECT id, usuario, rol, nombre, id_cliente, usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh
+            "SELECT id, usuario, rol, nombre, id_cliente, usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh,
+                    roles_extra, rol_activo
              FROM usuarios
              WHERE session_token = ? AND activo = 1 AND token_expires > NOW()"
         );
         $stmt->execute([$token]);
     } catch (\PDOException $e) {
-        // Compatibilidad: columnas de sub-usuario aún no migradas
+        // Compatibilidad: columnas de sub-usuario o de multi-rol aún no migradas
         $stmt = $pdo->prepare(
             "SELECT id, usuario, rol, nombre, id_cliente
              FROM usuarios
@@ -960,7 +961,57 @@ function validarToken(PDO $pdo, ?string $token): ?array {
         );
         $stmt->execute([$token]);
     }
-    return $stmt->fetch() ?: null;
+    $usr = $stmt->fetch();
+    return $usr ? resolverRolActivo($usr) : null;
+}
+
+/**
+ * Deja en 'rol' el rol con el que la sesión está trabajando.
+ *
+ * Una cuenta puede tener varios roles —el inspector que además entra a Calidad
+ * y a Certificaciones—, y en vez de repasar los cientos de permisos que ya
+ * comparan contra 'rol', se cambia lo que 'rol' contiene. Cada permiso sigue
+ * preguntando lo mismo y la respuesta pasa a depender del sombrero puesto.
+ *
+ * El rol activo se valida SIEMPRE contra la lista de la cuenta en este momento:
+ * si Admin le quitó el rol adicional, la sesión que lo tuviera puesto vuelve
+ * sola a su rol principal sin esperar a que cierre sesión.
+ *
+ * Se agregan 'rol_base' (el principal, el que nadie puede quitarle) y 'roles'
+ * (todos los que puede usar), para quien necesite el panorama completo.
+ */
+function resolverRolActivo(array $usr): array {
+    $principal = strtoupper(trim((string)($usr['rol'] ?? '')));
+    $roles     = $principal !== '' ? [$principal] : [];
+
+    // Una cuenta de cliente no acumula nada, venga lo que venga en la columna.
+    // El alta ya lo impide, pero esto no puede depender de que la única vía de
+    // escritura sea el panel: un registro tocado a mano en la base no debe
+    // poder convertir a un cliente en ADMIN.
+    $deFuera = in_array($principal, ['CLIENTE', 'PARTICIPANTE'], true);
+
+    $extra = $deFuera ? '' : trim((string)($usr['roles_extra'] ?? ''));
+    if ($extra !== '') {
+        // CLIENTE y PARTICIPANTE no se acumulan: no son otro módulo de la casa,
+        // son gente de fuera viendo sus propios documentos.
+        $permitidos = array_diff(
+            defined('ROLES_VALIDOS') ? ROLES_VALIDOS : ['ADMIN','INSPECTOR','CALIDAD','CERTIFICACIONES','ADMINISTRATIVO'],
+            ['CLIENTE', 'PARTICIPANTE']
+        );
+        $permitidos = array_merge($permitidos, ['ADMINISTRATIVO']);
+        foreach (explode(',', $extra) as $r) {
+            $r = strtoupper(trim($r));
+            if ($r !== '' && in_array($r, $permitidos, true) && !in_array($r, $roles, true)) {
+                $roles[] = $r;
+            }
+        }
+    }
+
+    $activo = strtoupper(trim((string)($usr['rol_activo'] ?? '')));
+    $usr['rol_base'] = $principal;
+    $usr['roles']    = $roles;
+    $usr['rol']      = in_array($activo, $roles, true) ? $activo : $principal;
+    return $usr;
 }
 
 /**
