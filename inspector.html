@@ -4108,6 +4108,14 @@ async function cargarMaquinaria() {
 /* ════════════════════════════════════════
    PRUEBA DE CARGA
 ════════════════════════════════════════ */
+/* Para meter un valor guardado dentro de value="…". escHtmlInsp no escapa
+   comillas, y aquí una comilla en el dato rompería el atributo. */
+function pcAttr(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 function renderPruebaCarga() {
   const sel    = document.getElementById("maquinaria");
   const opt    = sel.options[sel.selectedIndex];
@@ -4126,9 +4134,19 @@ function renderPruebaCarga() {
     return;
   }
 
+  /* Lo capturado se vuelve a pintar en los campos.
+     Sin esto, volver al paso 5 —al regresar a revisar el checklist o los datos
+     del equipo— repintaba la tabla en blanco y el pcGuardar() del final leía
+     ese blanco y borraba la prueba de carga ya capturada.
+     Si lo guardado es de OTRA plantilla, no se restaura: son columnas y filas
+     distintas, y arrastrarlas sería mezclar la prueba de un equipo con la de
+     otro. */
+  const previo = (pruebaCargaData && (!pruebaCargaData.plantilla || pruebaCargaData.plantilla === dictHtml))
+    ? pruebaCargaData : {};
+
   let html = `<div style="font-size:12px;color:var(--texto-sub);margin-bottom:12px">Plantilla: <strong>${tpl.label}</strong></div>`;
   if (tpl.platformSelect) {
-    const tp = (pruebaCargaData && pruebaCargaData.tipo_plataforma) || '';
+    const tp = previo.tipo_plataforma || '';
     html += `<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
       <label style="font-size:12px;font-weight:600;color:var(--texto-sub)">Tipo de Plataforma</label>
       <select id="pc-tipo-plataforma" onchange="pcGuardar()" style="padding:7px 10px;border:1.5px solid var(--borde);border-radius:6px;font-size:13px;background:#fff;min-width:200px">
@@ -4142,7 +4160,7 @@ function renderPruebaCarga() {
   if (tpl.headerFields && tpl.headerFields.length) {
     html += `<div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap;padding:10px 12px;background:var(--gris-bg);border-radius:8px">`;
     tpl.headerFields.forEach(f => {
-      const val = (pruebaCargaData && pruebaCargaData[f.id]) || '';
+      const val = pcAttr(previo[f.id] || '');
       html += `<div style="display:flex;align-items:center;gap:6px">
         <label style="font-size:12px;font-weight:600;color:var(--texto-sub);white-space:nowrap">${f.label}${f.unit ? ' ('+f.unit+')' : ''}</label>
         <input type="text" id="pc-header-${f.id}" value="${val}" oninput="pcGuardar()" style="width:95px;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:13px;text-align:center">
@@ -4163,16 +4181,20 @@ function renderPruebaCarga() {
     html += `<tr style="background:${bg}">`;
     html += `<td style="padding:8px 10px;font-weight:600;font-size:12px;border:1px solid var(--borde);white-space:nowrap">${row.label}</td>`;
     tpl.cols.forEach(c => {
-      const fid = `pc_${row.key}_${c.id}`;
+      const fid   = `pc_${row.key}_${c.id}`;
+      const dato  = (previo[row.key] || {})[c.id];
+      const valor = pcAttr(dato == null ? '' : dato);
       if (c.type === 'select') {
         html += `<td style="padding:5px 6px;border:1px solid var(--borde)"><select id="${fid}" style="width:100%;padding:5px 6px;border:1px solid var(--borde);border-radius:5px;font-size:12px;background:#fff" onchange="pcGuardar()">`;
         html += `<option value="">—</option>`;
-        c.options.forEach(op => { html += `<option>${op}</option>`; });
+        c.options.forEach(op => {
+          html += `<option${op === dato ? ' selected' : ''}>${op}</option>`;
+        });
         html += `</select></td>`;
       } else if (c.type === 'calculated') {
-        html += `<td style="padding:5px 6px;border:1px solid var(--borde)"><input type="text" id="${fid}" placeholder="(cálculo)" style="width:100%;padding:5px 7px;border:1px solid var(--borde);border-radius:5px;font-size:12px;text-align:center;background:#f5f5f5;cursor:not-allowed" readonly></td>`;
+        html += `<td style="padding:5px 6px;border:1px solid var(--borde)"><input type="text" id="${fid}" value="${valor}" placeholder="(cálculo)" style="width:100%;padding:5px 7px;border:1px solid var(--borde);border-radius:5px;font-size:12px;text-align:center;background:#f5f5f5;cursor:not-allowed" readonly></td>`;
       } else {
-        html += `<td style="padding:5px 6px;border:1px solid var(--borde)"><input type="text" id="${fid}" placeholder="—" style="width:100%;padding:5px 7px;border:1px solid var(--borde);border-radius:5px;font-size:12px;text-align:center" oninput="pcGuardar()"></td>`;
+        html += `<td style="padding:5px 6px;border:1px solid var(--borde)"><input type="text" id="${fid}" value="${valor}" placeholder="—" style="width:100%;padding:5px 7px;border:1px solid var(--borde);border-radius:5px;font-size:12px;text-align:center" oninput="pcGuardar()"></td>`;
       }
     });
     html += `</tr>`;
@@ -5165,27 +5187,12 @@ async function restaurarBorradorInspeccion(draft) {
   });
   actualizarCheckStats();
 
-  // Prueba de carga: renderizar formulario y luego rellenar valores guardados
+  // Prueba de carga: renderPruebaCarga ya pinta los valores guardados, así que
+  // basta con dejárselos puestos. Antes se repetía aquí el relleno campo por
+  // campo; eran dos copias de la misma lógica y sólo ésta estaba completa, que
+  // es por lo que el borrador restauraba bien y volver al paso 5 no.
   pruebaCargaData = draft.prueba_carga || {};
   renderPruebaCarga();
-  const selMaq = document.getElementById("maquinaria");
-  const optMaq = selMaq?.options[selMaq.selectedIndex];
-  const dictHtml = optMaq ? (optMaq.dataset.dictHtml || '') : '';
-  const tpl = PC_TEMPLATES[dictHtml];
-  if (tpl) {
-    (tpl.headerFields || []).forEach(f => {
-      const el = document.getElementById(`pc-header-${f.id}`);
-      if (el && pruebaCargaData[f.id] != null) el.value = pruebaCargaData[f.id];
-    });
-    tpl.rows.forEach(row => {
-      tpl.cols.forEach(c => {
-        const el = document.getElementById(`pc_${row.key}_${c.id}`);
-        const val = pruebaCargaData[row.key]?.[c.id];
-        if (el && val != null) el.value = val;
-      });
-    });
-    pcGuardar();
-  }
 
   toggleHorquillasSection();
   irA(draft.paso || 1);
