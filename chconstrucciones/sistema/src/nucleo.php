@@ -13,6 +13,9 @@ function configuracion(): ?array
     static $c = false;
     if ($c === false) {
         $archivo = RAIZ . '/config/config.php';
+        // PHP guarda en caché los archivos ya leídos (opcache) y en el hosting puede
+        // tardar en notar que config.php cambió. Si se editó, se lee la versión nueva.
+        if (function_exists('opcache_invalidate')) @opcache_invalidate($archivo, false);
         $c = is_file($archivo) ? require $archivo : null;
     }
     return $c;
