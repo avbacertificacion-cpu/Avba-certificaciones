@@ -203,19 +203,98 @@
     return { cargar };
   }
 
-  /** Lo que el cliente ya subió de cada registro pedido. */
+  /**
+   * La documentación que el cliente tenía cargada al momento de solicitar.
+   *
+   * Se abre en un panel propio y no en un aviso de texto porque lo que hace
+   * falta no es saber que existe un INE: es poder abrirlo. De cada documento se
+   * ofrece la copia que quedó guardada con la solicitud —esa no desaparece si
+   * el cliente da de baja a la persona— y, si no se pudo copiar, el archivo
+   * vivo del cliente con el motivo a la vista.
+   */
   async function verDocumentos(id, api) {
     const d = await pedirApi(api, 'SOLCERT_DOCS', { id });
     if (d.status !== 'success') { alert(d.message || 'No se pudo leer la documentación.'); return; }
 
-    const texto = (d.items || []).map(i => {
-      const docs = i.documentos || [];
-      if (!docs.length) return `• ${i.nombre}\n    SIN DOCUMENTOS CARGADOS`;
-      return `• ${i.nombre}\n` + docs.map(x =>
-        `    – ${x.nombre}${x.vigencia ? ' (vence ' + x.vigencia + ')' : ''}` +
-        (Number(x.vencido) ? '  ⚠ VENCIDO' : '')).join('\n');
-    }).join('\n\n');
-    alert('Documentación cargada por el cliente\n\n' + (texto || 'Sin registros.'));
+    const caja = document.createElement('div');
+    caja.id = 'sc-docs-overlay';
+    caja.innerHTML =
+      '<div class="sc-docs-fondo"></div>' +
+      '<div class="sc-docs-modal">' +
+        '<div class="sc-docs-hdr">' +
+          '<div><strong>Documentación de respaldo</strong>' +
+            '<div class="sc-docs-sub">' + esc(d.folio || '') + ' · ' + (d.total || 0) +
+            ' documento(s) guardados al solicitar</div></div>' +
+          '<button type="button" class="sc-docs-x" aria-label="Cerrar">×</button>' +
+        '</div>' +
+        '<div class="sc-docs-cuerpo">' + (d.items || []).map(fichaItem).join('') + '</div>' +
+      '</div>';
+
+    const css = document.createElement('style');
+    css.textContent =
+      '#sc-docs-overlay{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center}' +
+      '.sc-docs-fondo{position:absolute;inset:0;background:rgba(11,37,69,.55)}' +
+      '.sc-docs-modal{position:relative;background:#fff;border-radius:13px;width:min(760px,92vw);' +
+        'max-height:86vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(11,37,69,.35)}' +
+      '.sc-docs-hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;' +
+        'padding:16px 18px;border-bottom:1.5px solid #e4e9f0}' +
+      '.sc-docs-sub{font-size:11.5px;color:#7a8494;margin-top:3px;font-weight:400}' +
+      '.sc-docs-x{border:none;background:none;font-size:26px;line-height:1;color:#7a8494;cursor:pointer;padding:0 4px}' +
+      '.sc-docs-cuerpo{overflow-y:auto;padding:14px 18px 18px}' +
+      '.sc-item{border:1.5px solid #e4e9f0;border-radius:10px;margin-bottom:11px;overflow:hidden}' +
+      '.sc-item-h{background:#f6f8fb;padding:9px 12px;font-size:13px}' +
+      '.sc-doc{display:flex;align-items:center;gap:10px;padding:9px 12px;border-top:1px solid #eef1f5;font-size:12.5px}' +
+      '.sc-doc a{color:#185FA5;font-weight:600;text-decoration:none;white-space:nowrap}' +
+      '.sc-doc a:hover{text-decoration:underline}' +
+      '.sc-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:99px;white-space:nowrap}' +
+      '.sc-vacio{padding:12px;font-size:12.5px;color:#c0392b;background:#fdecea}';
+
+    document.head.appendChild(css);
+    document.body.appendChild(caja);
+    const cerrar = () => { caja.remove(); css.remove(); };
+    caja.querySelector('.sc-docs-x').addEventListener('click', cerrar);
+    caja.querySelector('.sc-docs-fondo').addEventListener('click', cerrar);
+    document.addEventListener('keydown', function esc2(e) {
+      if (e.key === 'Escape') { cerrar(); document.removeEventListener('keydown', esc2); }
+    });
+  }
+
+  function fichaItem(i) {
+    const docs = i.documentos || [];
+    const cab =
+      '<div class="sc-item-h"><strong>' + esc(i.nombre) + '</strong>' +
+      (i.ocupacion ? ' <span class="sc-tag" style="background:#e8f1fb;color:#1e5fa8">' + esc(i.ocupacion) + '</span>' : '') +
+      (i.curp ? '<div style="font-size:11px;color:#7a8494;margin-top:2px">CURP: ' + esc(i.curp) + '</div>' : '') +
+      '</div>';
+
+    if (!docs.length) {
+      return '<div class="sc-item">' + cab +
+             '<div class="sc-vacio">Sin documentación cargada. Pídesela al cliente antes de programar.</div></div>';
+    }
+    return '<div class="sc-item">' + cab + docs.map(fila).join('') + '</div>';
+  }
+
+  function fila(x) {
+    const enlace = x.copia_url || x.archivo_url;
+    const propia = !!x.copia_url;
+    const etq = x.origen === 'certificacion'
+      ? '<span class="sc-tag" style="background:#e9f7ef;color:#2e9e5b">Certificación</span>'
+      : '<span class="sc-tag" style="background:#f1f3f5;color:#7a8494">' + esc(x.tipo_doc || 'Documento') + '</span>';
+    return '<div class="sc-doc">' +
+      etq +
+      '<div style="flex:1;min-width:0">' +
+        '<div style="font-weight:600;color:#0B2545">' + esc(x.nombre) + '</div>' +
+        '<div style="font-size:11px;color:#7a8494">' +
+          (x.vigencia ? 'Vigencia ' + esc(x.vigencia) : 'Sin vigencia registrada') +
+          (Number(x.vencido) ? ' · <strong style="color:#c0392b">VENCIDO al solicitar</strong>' : '') +
+          (x.nota ? ' · <span style="color:#b8860b">' + esc(x.nota) + '</span>' : '') +
+        '</div>' +
+      '</div>' +
+      (enlace
+        ? '<a href="' + esc(enlace) + '" target="_blank" rel="noopener">' +
+          (propia ? 'Abrir copia' : 'Abrir del cliente') + '</a>'
+        : '<span style="color:#c0392b;font-size:11.5px;white-space:nowrap">Sin archivo</span>') +
+      '</div>';
   }
 
   global.SolicitudesCert = { montarBandeja, verDocumentos, pastilla, esc, ESTADOS };

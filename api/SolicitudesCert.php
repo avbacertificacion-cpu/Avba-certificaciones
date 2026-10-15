@@ -155,6 +155,30 @@ class SolicitudesCert {
                   KEY idx_sol (solicitud_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
+            /* Copia de la documentación tal como estaba al solicitar.
+               No basta con apuntar al archivo del cliente: si da de baja a la
+               persona o borra el documento, nos quedamos sin el soporte de una
+               certificación que ya emitimos. Esto guarda el qué (nombre, tipo,
+               vigencia) y una copia del archivo. */
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS cliente_solicitudes_cert_doc (
+                  id           INT AUTO_INCREMENT PRIMARY KEY,
+                  solicitud_id INT          NOT NULL,
+                  item_id      INT          NOT NULL,
+                  origen       VARCHAR(20)  NOT NULL DEFAULT 'documento',
+                  tipo_doc     VARCHAR(80)  NULL,
+                  nombre       VARCHAR(250) NOT NULL,
+                  archivo_url  VARCHAR(500) NULL,
+                  copia_url    VARCHAR(500) NULL,
+                  vigencia     DATE         NULL,
+                  vencido      TINYINT(1)   NOT NULL DEFAULT 0,
+                  bytes        INT          NULL,
+                  nota         VARCHAR(200) NULL,
+                  created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                  KEY idx_sol (solicitud_id),
+                  KEY idx_item (item_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
             // Para instalaciones donde la tabla nació sin la columna.
             try {
                 $this->pdo->exec("ALTER TABLE cliente_solicitudes_cert_item
@@ -286,8 +310,12 @@ class SolicitudesCert {
             return ['status' => 'error', 'message' => 'No se pudo registrar la solicitud.'];
         }
 
-        return ['status' => 'success', 'folio' => $folio, 'id' => $solId,
-                'message' => 'Solicitud ' . $folio . ' enviada. Calidad la revisará.'];
+        $docs = $this->copiarDocumentacion($solId, $folio, $tipo);
+
+        return ['status' => 'success', 'folio' => $folio, 'id' => $solId, 'documentos' => $docs,
+                'message' => 'Solicitud ' . $folio . ' enviada'
+                    . ($docs ? ' con ' . $docs . ' documento(s) de respaldo' : '')
+                    . '. Calidad la revisará.'];
     }
 
     /**
@@ -318,6 +346,148 @@ class SolicitudesCert {
             error_log('[SolicitudesCert] leerOrigen: ' . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * Guarda, junto con la solicitud, la documentación que el cliente tiene
+     * cargada de cada persona o equipo pedido.
+     *
+     * Dos cosas, no una: el registro de qué documentos había —con su vigencia y
+     * si ya estaban vencidos al momento de pedir— y una COPIA del archivo. Lo
+     * segundo es lo que convierte esto en soporte: el cliente puede dar de baja
+     * al operador mañana, y la constancia de con qué se le certificó tiene que
+     * seguir siendo nuestra.
+     *
+     * Nunca tumba la solicitud. Un documento que no se pueda copiar se anota
+     * con el motivo y se sigue: vale más una solicitud con un faltante señalado
+     * que ninguna solicitud.
+     *
+     * @return int cuántos documentos quedaron registrados
+     */
+    private function copiarDocumentacion(int $solId, string $folio, string $tipo): int {
+        try {
+            $it = $this->pdo->prepare(
+                "SELECT id, origen_id FROM cliente_solicitudes_cert_item WHERE solicitud_id = ?"
+            );
+            $it->execute([$solId]);
+            $items = $it->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        } catch (\Throwable $e) { return 0; }
+        if (!$items) return 0;
+
+        // De personal interesan sus documentos Y sus certificaciones previas:
+        // unos acreditan quién es, otras qué sabe hacer.
+        $fuentes = $tipo === 'personal'
+            ? [
+                ['documento',    'cliente_personal_docs', 'personal_id', 'tipo_doc', 'nombre',    'vigencia'],
+                ['certificacion','cliente_personal_cert', 'personal_id', 'entidad',  'tipo_cert', 'fecha_vigencia'],
+              ]
+            : [
+                ['documento',    'cliente_equipos_docs',  'equipo_id',   'tipo_doc', 'nombre',    'vigencia'],
+                ['certificacion','cliente_equipos_cert',  'equipo_id',   'folio',    'tipo_cert', 'fecha_vigencia'],
+              ];
+
+        $destinoDir = rtrim(UPLOAD_DIR, '/') . '/solicitudes/' . preg_replace('/[^A-Za-z0-9_\-]/', '_', $folio) . '/';
+        $guardar = $this->pdo->prepare(
+            "INSERT INTO cliente_solicitudes_cert_doc
+               (solicitud_id, item_id, origen, tipo_doc, nombre, archivo_url, copia_url, vigencia, vencido, bytes, nota)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+        );
+        $hoy = date('Y-m-d');
+        $n   = 0;
+
+        foreach ($items as $item) {
+            $origenId = (int)($item['origen_id'] ?? 0);
+            if (!$origenId) continue;
+
+            foreach ($fuentes as [$clase, $tabla, $col, $colTipo, $colNombre, $colVig]) {
+                try {
+                    $q = $this->pdo->prepare(
+                        "SELECT `$colTipo` AS tipo_doc, `$colNombre` AS nombre, archivo_url, `$colVig` AS vigencia
+                         FROM `$tabla` WHERE `$col` = ? ORDER BY id"
+                    );
+                    $q->execute([$origenId]);
+                    $filas = $q->fetchAll(PDO::FETCH_ASSOC) ?: [];
+                } catch (\Throwable $e) { continue; }
+
+                foreach ($filas as $d) {
+                    $vig = trim((string)($d['vigencia'] ?? ''));
+                    [$copia, $bytes, $nota] = $this->copiarArchivo((string)($d['archivo_url'] ?? ''), $destinoDir);
+                    try {
+                        $guardar->execute([
+                            $solId, (int)$item['id'], $clase,
+                            mb_substr((string)($d['tipo_doc'] ?? ''), 0, 80) ?: null,
+                            mb_substr((string)($d['nombre'] ?? 'Documento'), 0, 250),
+                            mb_substr((string)($d['archivo_url'] ?? ''), 0, 500) ?: null,
+                            $copia,
+                            $vig !== '' ? $vig : null,
+                            ($vig !== '' && $vig < $hoy) ? 1 : 0,
+                            $bytes, $nota,
+                        ]);
+                        $n++;
+                    } catch (\Throwable $e) {
+                        error_log('[SolicitudesCert] guardar doc: ' . $e->getMessage());
+                    }
+                }
+            }
+        }
+        return $n;
+    }
+
+    /** Tope por archivo. Un documento de identidad no pesa esto; algo mayor es otra cosa. */
+    private const MAX_COPIA_BYTES = 15728640;   // 15 MB
+
+    /**
+     * Copia un archivo del cliente a la carpeta de la solicitud.
+     *
+     * @return array{0:?string,1:?int,2:?string} ruta de la copia, tamaño y, si no se pudo, el motivo
+     */
+    private function copiarArchivo(string $url, string $destinoDir): array {
+        $url = trim($url);
+        if ($url === '') return [null, null, 'El cliente no adjuntó archivo'];
+
+        $origen = $this->rutaFisica($url);
+        if ($origen === null) return [null, null, 'No se encontró el archivo'];
+
+        $bytes = @filesize($origen) ?: 0;
+        if ($bytes > self::MAX_COPIA_BYTES) {
+            return [null, $bytes, 'Archivo demasiado grande para copiar'];
+        }
+
+        try {
+            if (!is_dir($destinoDir) && !@mkdir($destinoDir, 0755, true) && !is_dir($destinoDir)) {
+                return [null, $bytes, 'No se pudo crear la carpeta de respaldo'];
+            }
+            // El nombre lleva un prefijo único: dos personas pueden tener su INE
+            // con el mismo nombre de archivo y una no debe pisar a la otra.
+            $base = preg_replace('/[^A-Za-z0-9_\-\.]/', '_', basename($url));
+            $destino = $destinoDir . substr(md5($url), 0, 8) . '_' . $base;
+            if (!@copy($origen, $destino)) return [null, $bytes, 'No se pudo copiar el archivo'];
+        } catch (\Throwable $e) {
+            return [null, $bytes, 'No se pudo copiar el archivo'];
+        }
+
+        return [UPLOAD_URL . 'solicitudes/' . basename(rtrim($destinoDir, '/')) . '/' . basename($destino), $bytes, null];
+    }
+
+    /**
+     * Dónde vive de verdad un archivo cuyo archivo_url guardado es una ruta web.
+     *
+     * Se guarda con el prefijo "uploads/", que ya es la propia carpeta de subidas,
+     * así que concatenarlo a secas da una ruta con "uploads/uploads/". Se prueban
+     * las dos formas antes de darlo por perdido.
+     */
+    private function rutaFisica(string $url): ?string {
+        $base = rtrim(UPLOAD_DIR, '/') . '/';
+        $rel  = ltrim($url, '/');
+        $pref = ltrim(UPLOAD_URL, '/');
+        foreach ([
+            $base . ($pref !== '' && str_starts_with($rel, $pref) ? substr($rel, strlen($pref)) : $rel),
+            $base . $rel,
+            $rel,
+        ] as $cand) {
+            if ($cand !== '' && is_file($cand)) return $cand;
+        }
+        return null;
     }
 
     private function fecha($v): ?string {
@@ -539,35 +709,46 @@ class SolicitudesCert {
      * programar, en vez de que el inspector se entere en planta de que falta.
      */
     public function documentos(int $solicitudId): array {
-        $st = $this->pdo->prepare("SELECT tipo, id_cliente FROM cliente_solicitudes_cert WHERE id = ?");
+        $st = $this->pdo->prepare(
+            "SELECT folio, tipo, id_cliente FROM cliente_solicitudes_cert WHERE id = ?"
+        );
         $st->execute([$solicitudId]);
         $sol = $st->fetch(PDO::FETCH_ASSOC);
         if (!$sol) return ['status' => 'error', 'message' => 'Solicitud no encontrada.'];
 
         $it = $this->pdo->prepare(
-            "SELECT id, origen_id, nombre, detalle, curp, ocupacion FROM cliente_solicitudes_cert_item
-             WHERE solicitud_id = ? ORDER BY id"
+            "SELECT id, origen_id, nombre, detalle, curp, ocupacion
+             FROM cliente_solicitudes_cert_item WHERE solicitud_id = ? ORDER BY id"
         );
         $it->execute([$solicitudId]);
         $items = $it->fetchAll(PDO::FETCH_ASSOC) ?: [];
 
-        $tabla = $sol['tipo'] === 'personal' ? 'cliente_personal_docs' : 'cliente_equipos_docs';
-        $col   = $sol['tipo'] === 'personal' ? 'personal_id'           : 'equipo_id';
-
-        foreach ($items as &$i) {
-            $i['documentos'] = [];
-            if (!$i['origen_id']) continue;
-            try {
-                $d = $this->pdo->prepare(
-                    "SELECT tipo_doc, nombre, archivo_url,
-                            DATE_FORMAT(vigencia,'%d/%m/%Y') AS vigencia,
-                            (vigencia IS NOT NULL AND vigencia < CURDATE()) AS vencido
-                     FROM $tabla WHERE $col = ? ORDER BY tipo_doc, nombre"
-                );
-                $d->execute([(int)$i['origen_id']]);
-                $i['documentos'] = $d->fetchAll(PDO::FETCH_ASSOC) ?: [];
-            } catch (\Throwable $e) { /* el registro pudo borrarse: se deja sin documentos */ }
+        /* Se lee el respaldo guardado al solicitar, no lo que el cliente tenga
+           hoy. Es la diferencia entre "esto es lo que nos presentó" y "esto es
+           lo que tiene ahora", y para sostener un certificado emitido sirve lo
+           primero. */
+        $porItem = [];
+        try {
+            $d = $this->pdo->prepare(
+                "SELECT item_id, origen, tipo_doc, nombre, archivo_url, copia_url,
+                        DATE_FORMAT(vigencia,'%d/%m/%Y') AS vigencia, vencido, bytes, nota
+                 FROM cliente_solicitudes_cert_doc WHERE solicitud_id = ? ORDER BY item_id, origen, id"
+            );
+            $d->execute([$solicitudId]);
+            foreach ($d->fetchAll(PDO::FETCH_ASSOC) ?: [] as $r) {
+                $porItem[(int)$r['item_id']][] = $r;
+            }
+        } catch (\Throwable $e) {
+            error_log('[SolicitudesCert] documentos: ' . $e->getMessage());
         }
-        return ['status' => 'success', 'tipo' => $sol['tipo'], 'items' => $items];
+
+        $total = 0;
+        foreach ($items as &$i) {
+            $i['documentos'] = $porItem[(int)$i['id']] ?? [];
+            $total += count($i['documentos']);
+        }
+
+        return ['status' => 'success', 'tipo' => $sol['tipo'], 'folio' => $sol['folio'],
+                'total' => $total, 'items' => $items];
     }
 }
