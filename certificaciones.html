@@ -3453,7 +3453,13 @@ async function cargarPerCursosCert() {
 
 function agruparCursosCert(data) {
   const map = {};
-  data.filter(p => p.empresa_nombre).forEach(p => {
+  /* Se agrupa igual que Calidad, incluidos los participantes sin empresa.
+     Antes se descartaba a quien no la trae, así que una sesión de personal sin
+     empresa se aprobaba en Calidad y aquí no aparecía nunca: la pantalla decía
+     "sin participantes aprobados" sobre gente que sí lo estaba. El envío ya
+     contempla la sesión sin empresa —busca por empresa nula—, era sólo este
+     filtro el que la escondía. */
+  data.forEach(p => {
     const key = (p.curso_nombre||'') + '|' + (p.fecha_curso||'') + '|' + (p.empresa_nombre||'');
     if (!map[key]) map[key] = {
       curso:          p.curso_nombre  || '—',
@@ -3485,9 +3491,12 @@ function limpiarPerCursosCert() {
 
 function renderCursosCert(grupos) {
   const tbody = document.getElementById('pc-tabla');
-  document.getElementById('pc-count').textContent = grupos.length + ' sesión' + (grupos.length !== 1 ? 'es' : '');
+  document.getElementById('pc-count').textContent =
+    grupos.length + (grupos.length === 1 ? ' sesión' : ' sesiones');
   if (!grupos.length) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin participantes aprobados por Calidad.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">
+      Sin participantes aprobados por Calidad.<br>
+      <span style="font-size:12px">Si acabas de aprobarlos, vuelve a abrir esta pestaña para recargar.</span></td></tr>`;
     return;
   }
   tbody.innerHTML = grupos.map((g, i) => {
