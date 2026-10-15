@@ -907,6 +907,14 @@ if ($method === 'GET') {
                 respuesta(['status' => 'error', 'message' => 'Sólo la cuenta principal puede solicitar certificaciones.'], 401);
             respuesta($solCert->crear($payload, resolveIdc($usr), $usr['nombre'] ?? $usr['usuario']));
 
+        // El cliente agrega al catálogo lo que no encuentre. Queda para todos;
+        // Calidad lo revisa después en Catálogos → Ocupaciones.
+        case 'SOLCERT_AGREGAR_OCUPACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','CALIDAD','ADMIN']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($solCert->agregarOcupacion($payload));
+
         case 'SOLCERT_MIS':
             $usr = validarToken($pdo, $token);
             if (!$usr || $usr['rol'] !== 'CLIENTE') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

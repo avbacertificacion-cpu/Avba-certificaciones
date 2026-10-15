@@ -47,23 +47,48 @@ class SolicitudesCert {
      * si está vacío: donde ya haya una lista curada, no se toca.
      */
     private const OCUPACIONES_BASE = [
-        // Operación de equipos
+        // ── Operación de equipos de izaje ──
         'Operador de grúa viajera (puente grúa)',
         'Operador de grúa pórtico',
         'Operador de grúa móvil',
+        'Operador de grúa articulada (hidráulica tipo HIAB)',
         'Operador de grúa torre',
         'Operador de grúa sobre orugas',
+        'Operador de polipasto y malacate',
+        'Operador de grúa de pedestal',
+        // ── Equipo de carga y maniobra ──
         'Operador de montacargas',
+        'Operador de montacargas de terreno irregular',
         'Operador de manipulador telescópico (telehandler)',
         'Operador de plataforma de elevación (MEWP)',
-        // Maniobras
+        'Operador de plataforma de tijera',
+        'Operador de plataforma articulada',
+        'Operador de patín hidráulico y transpaleta',
+        'Operador de gato hidráulico y equipo de empuje',
+        // ── Maniobras ──
         'Maniobrista (rigger)',
+        'Maniobrista especializado en izajes críticos',
         'Señalero de maniobras',
         'Supervisor de maniobras',
-        // Seguridad y verificación
+        'Coordinador de izaje',
+        'Planeador de maniobras de izaje',
+        'Amarrador de carga (estrobador)',
+        // ── Seguridad ──
         'Trabajos en altura',
+        'Persona competente en protección contra caídas',
+        'Rescate en alturas',
+        'Trabajos en espacios confinados',
+        'Supervisor de seguridad en maniobras',
+        // ── Inspección y verificación ──
         'Inspector de accesorios de izaje',
         'Inspector de arneses y líneas de vida',
+        'Inspector de cables de acero',
+        'Inspector de eslingas y estrobos',
+        'Inspector de ganchos y grilletes',
+        // ── Mantenimiento ──
+        'Mantenimiento de equipos de izaje',
+        'Mantenimiento de montacargas',
+        'Técnico en pruebas no destructivas (PND)',
     ];
 
     public function __construct(PDO $pdo) {
@@ -199,6 +224,14 @@ class SolicitudesCert {
                         'Indica qué certificación necesita ' . $f['nombre']
                         . ' (operador de grúa, maniobrista, supervisor…).'];
                 }
+                // La CURP va impresa en el certificado: sin ella no hay documento
+                // que emitir. Normalmente viene de la ficha y no se pide aquí.
+                $curpFicha = trim((string)($f['curp'] ?? ''));
+                $curpForm  = strtoupper(preg_replace('/\s+/', '', (string)($curps[$f['id']] ?? '')));
+                if ($curpFicha === '' && !preg_match('/^[A-Z0-9]{18}$/', $curpForm)) {
+                    return ['status' => 'error', 'message' =>
+                        'Falta la CURP de ' . $f['nombre'] . ' (18 caracteres).'];
+                }
             }
         }
 
@@ -226,7 +259,19 @@ class SolicitudesCert {
                  VALUES (?,?,?,?,?,?)"
             );
             foreach ($filas as $f) {
-                $curp = strtoupper(trim((string)($curps[$f['id']] ?? '')));
+                /* La CURP de la ficha manda. Sólo si la persona todavía no la
+                   tiene se toma la que se escribió aquí, y se guarda en su
+                   ficha para no volver a pedirla en la próxima solicitud. */
+                $curp = strtoupper(trim((string)($f['curp'] ?? '')));
+                if ($curp === '') {
+                    $curp = strtoupper(preg_replace('/\s+/', '', (string)($curps[$f['id']] ?? '')));
+                    if ($tipo === 'personal' && preg_match('/^[A-Z0-9]{18}$/', $curp)) {
+                        try {
+                            $this->pdo->prepare("UPDATE cliente_personal SET curp = ? WHERE id = ? AND id_cliente = ?")
+                                ->execute([$curp, (int)$f['id'], $idCliente]);
+                        } catch (\Throwable $e) { /* la columna puede faltar: no detiene la solicitud */ }
+                    }
+                }
                 $ocup = trim((string)($ocupas[$f['id']] ?? ''));
                 $ins->execute([
                     $solId, (int)$f['id'],
@@ -253,7 +298,7 @@ class SolicitudesCert {
     private function leerOrigen(string $tipo, array $ids, string $idCliente): array {
         $in = implode(',', array_fill(0, count($ids), '?'));
         $sql = $tipo === 'personal'
-            ? "SELECT id, nombre,
+            ? "SELECT id, nombre, COALESCE(curp,'') AS curp,
                       CONCAT_WS(' · ', NULLIF(puesto,''), NULLIF(numero_empleado,'')) AS detalle
                FROM cliente_personal WHERE id_cliente = ? AND id IN ($in)"
             : "SELECT id, nombre,
@@ -267,6 +312,7 @@ class SolicitudesCert {
                 'id'      => (int)$r['id'],
                 'nombre'  => (string)$r['nombre'],
                 'detalle' => (string)($r['detalle'] ?? ''),
+                'curp'    => (string)($r['curp'] ?? ''),
             ], $st->fetchAll(PDO::FETCH_ASSOC) ?: []);
         } catch (\Throwable $e) {
             error_log('[SolicitudesCert] leerOrigen: ' . $e->getMessage());
@@ -277,6 +323,59 @@ class SolicitudesCert {
     private function fecha($v): ?string {
         $v = trim((string)$v);
         return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : null;
+    }
+
+    /**
+     * El cliente agrega al catálogo una certificación que no estaba.
+     *
+     * Queda disponible para todos, que es lo pedido: si un cliente necesita algo
+     * que no teníamos contemplado, la siguiente empresa que lo necesite ya lo
+     * encuentra. Se marca su origen para que Calidad pueda revisar después qué
+     * entró por esta vía y depurarlo.
+     *
+     * No se duplica lo que ya existe aunque venga con otras mayúsculas o
+     * espacios: sin eso, "maniobrista" y "Maniobrista " acabarían siendo dos
+     * renglones distintos en una lista que se imprime en un certificado.
+     */
+    public function agregarOcupacion(array $payload): array {
+        $nombre = trim(preg_replace('/\s+/', ' ', (string)($payload['nombre'] ?? '')));
+        if ($nombre === '')            return ['status' => 'error', 'message' => 'Escribe la certificación.'];
+        if (mb_strlen($nombre) < 4)    return ['status' => 'error', 'message' => 'Escribe el nombre completo de la certificación.'];
+        if (mb_strlen($nombre) > 150)  return ['status' => 'error', 'message' => 'El nombre es demasiado largo.'];
+
+        try {
+            $this->pdo->exec("ALTER TABLE ocupaciones_especificas ADD COLUMN IF NOT EXISTS origen VARCHAR(20) NULL");
+        } catch (\Throwable $e) { /* ya existe o no aplica */ }
+
+        try {
+            $dup = $this->pdo->prepare(
+                "SELECT nombre, activo FROM ocupaciones_especificas
+                 WHERE UPPER(TRIM(nombre)) = ? LIMIT 1"
+            );
+            $dup->execute([mb_strtoupper($nombre)]);
+            $ya = $dup->fetch(PDO::FETCH_ASSOC);
+            if ($ya) {
+                // Si existía pero estaba dada de baja, se reactiva: la necesitan.
+                if (!(int)($ya['activo'] ?? 1)) {
+                    $this->pdo->prepare("UPDATE ocupaciones_especificas SET activo = 1 WHERE UPPER(TRIM(nombre)) = ?")
+                        ->execute([mb_strtoupper($nombre)]);
+                }
+                return ['status' => 'success', 'nombre' => $ya['nombre'],
+                        'message' => 'Esa certificación ya estaba en la lista.'];
+            }
+
+            try {
+                $this->pdo->prepare("INSERT INTO ocupaciones_especificas (nombre, activo, origen) VALUES (?,1,'cliente')")
+                    ->execute([$nombre]);
+            } catch (\Throwable $e) {
+                $this->pdo->prepare("INSERT INTO ocupaciones_especificas (nombre, activo) VALUES (?,1)")
+                    ->execute([$nombre]);
+            }
+        } catch (\Throwable $e) {
+            error_log('[SolicitudesCert] agregarOcupacion: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudo agregar la certificación.'];
+        }
+        return ['status' => 'success', 'nombre' => $nombre, 'message' => 'Certificación agregada a la lista.'];
     }
 
     /** Las solicitudes de una empresa, con sus renglones. */

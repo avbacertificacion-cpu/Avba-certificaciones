@@ -24,6 +24,7 @@ class ClientePersonal {
                   puesto          VARCHAR(100) NULL,
                   departamento    VARCHAR(100) NULL,
                   numero_empleado VARCHAR(50)  NULL,
+                  curp            VARCHAR(18)  NULL,
                   fecha_ingreso   DATE         NULL,
                   telefono        VARCHAR(30)  NULL,
                   notas           TEXT         NULL,
@@ -71,6 +72,12 @@ class ClientePersonal {
                   KEY idx_cli (id_cliente)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
+            /* La CURP se capturaba al pedir la certificación, de modo que el
+               cliente la escribía una vez por cada solicitud. Va en la ficha de
+               la persona: se escribe una vez y de ahí se toma siempre. */
+            try {
+                $this->pdo->exec("ALTER TABLE cliente_personal ADD COLUMN IF NOT EXISTS curp VARCHAR(18) NULL");
+            } catch (\PDOException $e) { /* ya existe */ }
         } catch (\PDOException $e) {
             error_log('[ClientePersonal] migrate: ' . $e->getMessage());
         }
@@ -109,7 +116,7 @@ class ClientePersonal {
 
         [$frag, $fragParams] = $this->restro($soloIds, 'p.id');
         $stmt = $this->pdo->prepare("
-            SELECT p.id, p.nombre, p.puesto, p.departamento, p.numero_empleado,
+            SELECT p.id, p.nombre, p.puesto, p.departamento, p.numero_empleado, p.curp,
                    DATE_FORMAT(p.fecha_ingreso,'%d/%m/%Y') AS fecha_ingreso,
                    p.telefono, p.notas, p.estado,
                    DATE_FORMAT(p.created_at,'%d/%m/%Y') AS fecha_registro,
@@ -122,7 +129,7 @@ class ClientePersonal {
             LEFT JOIN cliente_personal_docs d ON d.personal_id = p.id
             LEFT JOIN cliente_personal_cert c ON c.personal_id = p.id
             WHERE p.id_cliente = ?$frag
-            GROUP BY p.id, p.nombre, p.puesto, p.departamento, p.numero_empleado,
+            GROUP BY p.id, p.nombre, p.puesto, p.departamento, p.numero_empleado, p.curp,
                      p.fecha_ingreso, p.telefono, p.notas, p.estado, p.created_at
             ORDER BY p.nombre
         ");
@@ -134,6 +141,7 @@ class ClientePersonal {
             'puesto'          => $r['puesto']          ?? '',
             'departamento'    => $r['departamento']    ?? '',
             'numero_empleado' => $r['numero_empleado'] ?? '',
+            'curp'            => $r['curp']            ?? '',
             'fecha_ingreso'   => $r['fecha_ingreso']   ?? '',
             'telefono'        => $r['telefono']        ?? '',
             'notas'           => $r['notas']           ?? '',
@@ -155,6 +163,11 @@ class ClientePersonal {
         $puesto    = trim($data['puesto']          ?? '');
         $dpto      = trim($data['departamento']    ?? '');
         $numEmp    = trim($data['numero_empleado'] ?? '');
+        // Va en mayúsculas sin espacios: es como se imprime y como se compara.
+        $curp      = strtoupper(preg_replace('/\s+/', '', trim($data['curp'] ?? '')));
+        if ($curp !== '' && !preg_match('/^[A-Z0-9]{18}$/', $curp)) {
+            return ['status' => 'error', 'message' => 'La CURP debe tener 18 caracteres.'];
+        }
         $tel       = trim($data['telefono']        ?? '');
         $notas     = trim($data['notas']           ?? '');
         $estado    = trim($data['estado']          ?? 'Activo');
@@ -165,13 +178,13 @@ class ClientePersonal {
         if ($id) {
             if (!$this->ownPersonal($id, $idCliente)) return ['status' => 'error', 'message' => 'Empleado no encontrado.'];
             $this->pdo->prepare(
-                "UPDATE cliente_personal SET nombre=?,puesto=?,departamento=?,numero_empleado=?,fecha_ingreso=?,telefono=?,notas=?,estado=? WHERE id=?"
-            )->execute([$nombre, $puesto, $dpto, $numEmp, $ingresoDb, $tel, $notas, $estado, $id]);
+                "UPDATE cliente_personal SET nombre=?,puesto=?,departamento=?,numero_empleado=?,curp=?,fecha_ingreso=?,telefono=?,notas=?,estado=? WHERE id=?"
+            )->execute([$nombre, $puesto, $dpto, $numEmp, $curp ?: null, $ingresoDb, $tel, $notas, $estado, $id]);
         } else {
             $this->pdo->prepare(
-                "INSERT INTO cliente_personal (id_cliente,nombre,puesto,departamento,numero_empleado,fecha_ingreso,telefono,notas,estado)
-                 VALUES (?,?,?,?,?,?,?,?,?)"
-            )->execute([$idCliente, $nombre, $puesto, $dpto, $numEmp, $ingresoDb, $tel, $notas, $estado]);
+                "INSERT INTO cliente_personal (id_cliente,nombre,puesto,departamento,numero_empleado,curp,fecha_ingreso,telefono,notas,estado)
+                 VALUES (?,?,?,?,?,?,?,?,?,?)"
+            )->execute([$idCliente, $nombre, $puesto, $dpto, $numEmp, $curp ?: null, $ingresoDb, $tel, $notas, $estado]);
             $id = (int)$this->pdo->lastInsertId();
         }
         return ['status' => 'success', 'id' => $id];

@@ -1322,6 +1322,11 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
     <input type="hidden" id="pers-id">
     <p class="eq-msec">Identificación</p>
     <div class="frow"><label class="flabel">Nombre completo *</label><input class="finput" id="pers-nombre" placeholder="Ej: Juan González Martínez"></div>
+    <!-- La CURP vive aquí, en la ficha de la persona. Antes se pedía al solicitar
+         la certificación, de modo que había que escribirla una vez por solicitud. -->
+    <div class="frow"><label class="flabel">CURP</label>
+      <input class="finput" id="pers-curp" maxlength="18" placeholder="18 caracteres — se imprime en el certificado"
+             style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/\s/g,'')"></div>
     <div class="fgrid2">
       <div class="frow"><label class="flabel">No. Empleado</label><input class="finput" id="pers-numempl" placeholder="EMP-001"></div>
       <div class="frow"><label class="flabel">Estado</label>
@@ -1974,11 +1979,22 @@ function pintarSolCertLista() {
                  `<option${o === solCertOcupas[r.id] ? ' selected' : ''}>${escH(o)}</option>`).join('')}
              </select>
            </label>
-           <label style="font-size:11.5px;color:#667">CURP
-             <input type="text" value="${escH(solCertCurps[r.id] || '')}" placeholder="18 caracteres"
-                    maxlength="18" oninput="solCertCurps[${r.id}]=this.value.toUpperCase();this.value=this.value.toUpperCase()"
-                    style="display:block;margin-top:3px;width:215px;padding:6px 9px;border:1.5px solid #dde4ec;border-radius:7px;font-size:12px;text-transform:uppercase">
-           </label>
+           <button type="button" onclick="agregarOcupacionSolCert(${r.id})"
+                   style="align-self:flex-end;margin-bottom:1px;padding:6px 12px;border-radius:7px;
+                          border:1.5px solid #185FA5;background:#eef4fb;color:#185FA5;
+                          font-size:11.5px;font-weight:600;cursor:pointer">+ No está en la lista</button>
+           ${r.curp
+             ? `<label style="font-size:11.5px;color:#667">CURP
+                  <span style="display:block;margin-top:5px;font-size:12px;font-weight:600;color:#0d2244;
+                               letter-spacing:.3px">${escH(r.curp)}
+                    <span style="font-weight:400;color:#2e9e5b"> ✓ ya registrada</span></span>
+                </label>`
+             : `<label style="font-size:11.5px;color:#667">CURP <span style="color:#c0392b">— falta en su ficha</span>
+                  <input type="text" value="${escH(solCertCurps[r.id] || '')}" placeholder="18 caracteres"
+                         maxlength="18" oninput="solCertCurps[${r.id}]=this.value.toUpperCase().replace(/\\s/g,'');this.value=solCertCurps[${r.id}]"
+                         style="display:block;margin-top:3px;width:215px;padding:6px 9px;border:1.5px solid #e8a33d;border-radius:7px;font-size:12px;text-transform:uppercase">
+                  <span style="display:block;font-size:10.5px;color:#667;margin-top:2px">Se guardará en su ficha.</span>
+                </label>`}
          </div>` : '';
     return `
       <label style="display:block;padding:9px 11px;border-bottom:1px solid #eef1f5;cursor:pointer;
@@ -2007,6 +2023,23 @@ function actualizarContadorSolCert() {
   const n = solCertElegidos.size;
   document.getElementById('solcert-contador').textContent =
     n ? `— ${n} seleccionado${n === 1 ? '' : 's'}` : '';
+}
+
+/* Si la certificación que necesitan no está, la agregan y queda en la lista
+   para todos. Calidad la revisa después desde Catálogos → Ocupaciones. */
+async function agregarOcupacionSolCert(personaId) {
+  const nombre = prompt('¿Qué certificación necesitas?\n\nQuedará disponible en la lista.');
+  if (nombre === null) return;
+  try {
+    const res = await fetch(API, { method:'POST',
+      body: JSON.stringify({ action:'SOLCERT_AGREGAR_OCUPACION', payload:{ nombre } }) });
+    const d = await res.json();
+    if (d.status !== 'success') { alert(d.message || 'No se pudo agregar.'); return; }
+    solCertOcupaCat = null;
+    await cargarOcupacionesSolCert();
+    solCertOcupas[personaId] = d.nombre;   // queda elegida para quien la pidió
+    pintarSolCertLista();
+  } catch (e) { alert('Error de conexión.'); }
 }
 
 async function enviarSolCert() {
@@ -4465,6 +4498,7 @@ function abrirModalPers(per) {
   document.getElementById('pers-id').value        = per ? per.id             : '';
   document.getElementById('pers-nombre').value    = per ? (per.nombre    || '') : '';
   document.getElementById('pers-numempl').value   = per ? (per.numero_empleado || '') : '';
+  document.getElementById('pers-curp').value      = per ? (per.curp || '') : '';
   document.getElementById('pers-estado').value    = per ? (per.estado    || 'Activo') : 'Activo';
   document.getElementById('pers-puesto').value    = per ? (per.puesto    || '') : '';
   document.getElementById('pers-dpto').value      = per ? (per.departamento || '') : '';
@@ -4488,6 +4522,7 @@ async function guardarPers() {
     puesto:          document.getElementById('pers-puesto').value.trim(),
     departamento:    document.getElementById('pers-dpto').value,
     numero_empleado: document.getElementById('pers-numempl').value.trim(),
+    curp:            document.getElementById('pers-curp').value.trim(),
     fecha_ingreso:   document.getElementById('pers-ingreso').value,
     telefono:        document.getElementById('pers-tel').value.trim(),
     notas:           document.getElementById('pers-notas').value.trim(),
