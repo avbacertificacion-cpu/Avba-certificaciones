@@ -898,54 +898,6 @@ if ($method === 'GET') {
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($arneses->siguienteQr());
 
-        // ── Solicitudes de certificación ──────────────────
-        // Las pide la cuenta principal del cliente: un sub-usuario captura y
-        // documenta, pero pedir el servicio compromete a la empresa.
-        case 'SOLCERT_CREAR':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
-                respuesta(['status' => 'error', 'message' => 'Sólo la cuenta principal puede solicitar certificaciones.'], 401);
-            respuesta($solCert->crear($payload, resolveIdc($usr), $usr['nombre'] ?? $usr['usuario']));
-
-        // El cliente agrega al catálogo lo que no encuentre. Queda para todos;
-        // Calidad lo revisa después en Catálogos → Ocupaciones.
-        case 'SOLCERT_AGREGAR_OCUPACION':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['CLIENTE','CALIDAD','ADMIN']))
-                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($solCert->agregarOcupacion($payload));
-
-        case 'SOLCERT_MIS':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || $usr['rol'] !== 'CLIENTE') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($solCert->misSolicitudes(resolveIdc($usr)));
-
-        case 'SOLCERT_CANCELAR':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
-                respuesta(['status' => 'error', 'message' => 'Sólo la cuenta principal puede cancelar.'], 401);
-            respuesta($solCert->cancelar((int)($payload['id'] ?? 0), resolveIdc($usr)));
-
-        // Las recibe Calidad, que es quien ya revisa documentación y aprueba el
-        // dictamen. Certificaciones y Admin las ven para dar seguimiento.
-        case 'SOLCERT_BANDEJA':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['CALIDAD','ADMIN','CERTIFICACIONES']))
-                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($solCert->bandeja($payload));
-
-        case 'SOLCERT_DOCS':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['CALIDAD','ADMIN','CERTIFICACIONES']))
-                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($solCert->documentos((int)($payload['id'] ?? ($_GET['id'] ?? 0))));
-
-        case 'SOLCERT_ACTUALIZAR':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['CALIDAD','ADMIN']))
-                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($solCert->actualizar($payload, $usr['usuario']));
-
         // ── Portal cliente: equipos ───────────────────────
         case 'GET_MI_PERSONAL':
             $usr = validarToken($pdo, $token);
@@ -1358,6 +1310,54 @@ if ($method === 'POST') {
             if (!$sesion) respuesta(['status' => 'error', 'message' => 'Sesión expirada o cerrada.'], 401);
             respuesta($personal->participanteAutoGuardar($payload, $sesion['id']));
         }
+
+        // ── Solicitudes de certificación ──────────────────
+        // Las pide la cuenta principal del cliente: un sub-usuario captura y
+        // documenta, pero pedir el servicio compromete a la empresa.
+        case 'SOLCERT_CREAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'Sólo la cuenta principal puede solicitar certificaciones.'], 401);
+            respuesta($solCert->crear($payload, resolveIdc($usr), $usr['nombre'] ?? $usr['usuario']));
+
+        // El cliente agrega al catálogo lo que no encuentre. Queda para todos;
+        // Calidad lo revisa después en Catálogos → Ocupaciones.
+        case 'SOLCERT_AGREGAR_OCUPACION':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CLIENTE','CALIDAD','ADMIN']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($solCert->agregarOcupacion($payload));
+
+        case 'SOLCERT_MIS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($solCert->misSolicitudes(resolveIdc($usr)));
+
+        case 'SOLCERT_CANCELAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'CLIENTE' || !empty($usr['usuario_padre_id']))
+                respuesta(['status' => 'error', 'message' => 'Sólo la cuenta principal puede cancelar.'], 401);
+            respuesta($solCert->cancelar((int)($payload['id'] ?? 0), resolveIdc($usr)));
+
+        // Las recibe Calidad, que es quien ya revisa documentación y aprueba el
+        // dictamen. Certificaciones y Admin las ven para dar seguimiento.
+        case 'SOLCERT_BANDEJA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CALIDAD','ADMIN','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($solCert->bandeja($payload));
+
+        case 'SOLCERT_DOCS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CALIDAD','ADMIN','CERTIFICACIONES']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($solCert->documentos((int)($payload['id'] ?? ($_GET['id'] ?? 0))));
+
+        case 'SOLCERT_ACTUALIZAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['CALIDAD','ADMIN']))
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($solCert->actualizar($payload, $usr['usuario']));
 
         // ── Multi-rol ─────────────────────────────────────
         // Cambiar de módulo no pide rol: cualquier sesión válida puede pedirlo,
