@@ -728,6 +728,7 @@
 </style>
   <script src="js/tabla-clientes.js"></script>
   <script src="js/envios.js"></script>
+  <script src="js/solicitudes-cert.js"></script>
 </head>
 <body>
 
@@ -763,6 +764,7 @@
   <button class="tab-btn"        id="sec-btn-qr"         onclick="verSeccion('qr')">🔢 Códigos QR</button>
   <button class="tab-btn"        id="sec-btn-pnd"        onclick="verSeccion('pnd')">🔬 PND</button>
   <button class="tab-btn"        id="sec-btn-auditorias" onclick="verSeccion('auditorias');cargarAuditorias()">📋 Auditorías</button>
+  <button class="tab-btn"        id="sec-btn-solicitudes" onclick="verSeccion('solicitudes')">📥 Solicitudes</button>
   <button class="tab-btn"        id="sec-btn-envios"     onclick="verSeccion('envios')">📧 Envíos</button>
 </div>
 
@@ -2294,6 +2296,19 @@
       <button class="btn-guardar" id="arn-n-btn" onclick="guardarArnNuevo()">Guardar equipo</button>
     </div>
   </div>
+</div>
+
+<!-- Solicitudes de certificación que manda el cliente desde su portal.
+     Llegan aquí porque Calidad ya es quien revisa documentación y aprueba el
+     dictamen: el inspector la recibe cuando se le programa, con papeles ya
+     verificados. -->
+<div id="sec-solicitudes" class="wrap" style="display:none">
+  <div class="top-bar">
+    <h2>Solicitudes de certificación</h2>
+    <p style="margin:4px 0 0;font-size:13px;color:var(--texto-hint)">
+      Las envían los clientes desde su portal, con su personal y equipos ya documentados.</p>
+  </div>
+  <div id="solicitudes-box"></div>
 </div>
 
 <div id="sec-envios" class="wrap" style="display:none">
@@ -3915,12 +3930,14 @@ const TODOS_CONTENIDOS = [
   'sec-pnd',
   'sec-auditorias',
   'sec-arneses',
+  'sec-solicitudes',
 ];
 
 let _envios = null;
+let _solicitudes = null;
 
 function verSeccion(sec) {
-  ['maquinaria','accesorios','arneses','personal','catalogos','qr','pnd','auditorias','envios'].forEach(s => {
+  ['maquinaria','accesorios','arneses','personal','catalogos','qr','pnd','auditorias','solicitudes','envios'].forEach(s => {
     const b = document.getElementById('sec-btn-' + s); if (b) b.classList.toggle('active', s === sec);
   });
   ['accesorios','personal','catalogos'].forEach(s => {
@@ -3932,6 +3949,10 @@ function verSeccion(sec) {
 
   if (sec === 'maquinaria') {
     document.getElementById('sec-maquinaria').style.display = '';
+  } else if (sec === 'solicitudes') {
+    document.getElementById('sec-solicitudes').style.display = '';
+    if (!_solicitudes) _solicitudes = SolicitudesCert.montarBandeja('solicitudes-box', API);
+    else _solicitudes.cargar();
   } else if (sec === 'envios') {
     document.getElementById('sec-envios').style.display = '';
     if (!_envios) _envios = Envios.montar('envios-box', API);

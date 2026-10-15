@@ -526,6 +526,7 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
         <button class="tab-btn" id="tabbtn-equipos" onclick="verTab('equipos',this);cargarEquiposCli()">⚙ Mis Equipos<span class="tab-notif" id="tab-notif-eq" style="display:none"></span></button>
         <button class="tab-btn" id="tabbtn-personal-cli" onclick="verTab('personal-cli',this);cargarPersonalCli();cargarAlertasVencimiento()">👥 Mi Personal<span class="tab-notif" id="tab-notif-per" style="display:none"></span></button>
         <button class="tab-btn" id="tabbtn-rh" onclick="verTab('rh',this);cargarRH()">🕒 RH / Asistencia<span class="tab-notif" id="tab-notif-rh" style="display:none"></span></button>
+        <button class="tab-btn" id="tabbtn-solcert" onclick="verTab('solcert',this);abrirSolCert()">📑 Solicitar certificación</button>
         <button class="tab-btn" id="tabbtn-solicitudes" style="display:none" onclick="verTab('solicitudes',this);cargarSolicitudes()">🧾 Solicitudes</button>
         <button class="tab-btn" id="tabbtn-mantenimiento" style="display:none" onclick="verTab('mantenimiento',this);cargarMantenimientos()">🔧 Mantenimiento</button>
         <button class="tab-btn" id="tabbtn-proveedores" onclick="verTab('proveedores',this);cargarProveedores()">🏭 Proveedores</button>
@@ -535,6 +536,67 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
       </div>
     </div>
 
+  </div>
+
+  <!-- Solicitar certificación ────────────────────────────────────────────
+       El personal y los equipos ya están capturados aquí con su documentación;
+       esto sólo los manda a Calidad para que proceda la certificación. -->
+  <div id="tab-solcert" class="tab-panel">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px">
+      <div>
+        <h2 style="margin:0;font-size:18px;color:#0d2244">📑 Solicitar certificación</h2>
+        <p style="margin:4px 0 0;font-size:13px;color:#667">
+          Elige de tu personal o de tus equipos y la solicitud llega a Calidad con su documentación.</p>
+      </div>
+      <button class="btn-prim" onclick="verMisSolCert()">Mis solicitudes</button>
+    </div>
+
+    <div id="solcert-form">
+      <div style="display:flex;gap:8px;margin-bottom:14px">
+        <button class="btn-prim" id="solcert-tab-personal" onclick="solCertTipo('personal')">👷 Personal</button>
+        <button class="btn-sec"  id="solcert-tab-equipo"   onclick="solCertTipo('equipo')">🏗️ Equipos</button>
+      </div>
+
+      <div style="background:#fff;border:1.5px solid #dde4ec;border-radius:11px;padding:14px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:#0d2244;margin-bottom:9px">
+          1 · ¿Qué quieres certificar? <span id="solcert-contador" style="font-weight:400;color:#667"></span>
+        </div>
+        <input type="text" id="solcert-buscar" placeholder="Buscar…" oninput="pintarSolCertLista()"
+               style="width:100%;padding:9px 12px;border:1.5px solid #dde4ec;border-radius:8px;font-size:13px;margin-bottom:10px">
+        <div id="solcert-lista" style="max-height:290px;overflow-y:auto;border:1px solid #eef1f5;border-radius:8px"></div>
+      </div>
+
+      <div style="background:#fff;border:1.5px solid #dde4ec;border-radius:11px;padding:14px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:#0d2244;margin-bottom:10px">2 · Datos del servicio</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:11px">
+          <div><label style="font-size:12px;color:#667">Servicio</label>
+            <input type="text" id="solcert-servicio" placeholder="Ej: Certificación de operador"
+                   style="width:100%;padding:8px 11px;border:1.5px solid #dde4ec;border-radius:8px;font-size:13px"></div>
+          <div><label style="font-size:12px;color:#667">Fecha deseada</label>
+            <input type="date" id="solcert-fecha"
+                   style="width:100%;padding:8px 11px;border:1.5px solid #dde4ec;border-radius:8px;font-size:13px"></div>
+          <div><label style="font-size:12px;color:#667">Sede o planta</label>
+            <input type="text" id="solcert-sede"
+                   style="width:100%;padding:8px 11px;border:1.5px solid #dde4ec;border-radius:8px;font-size:13px"></div>
+          <div><label style="font-size:12px;color:#667">Contacto en sitio</label>
+            <input type="text" id="solcert-contacto"
+                   style="width:100%;padding:8px 11px;border:1.5px solid #dde4ec;border-radius:8px;font-size:13px"></div>
+          <div><label style="font-size:12px;color:#667">Teléfono</label>
+            <input type="text" id="solcert-tel"
+                   style="width:100%;padding:8px 11px;border:1.5px solid #dde4ec;border-radius:8px;font-size:13px"></div>
+        </div>
+        <div style="margin-top:11px"><label style="font-size:12px;color:#667">Notas</label>
+          <textarea id="solcert-notas" rows="2" placeholder="Horarios, accesos, lo que debamos saber"
+                    style="width:100%;padding:8px 11px;border:1.5px solid #dde4ec;border-radius:8px;font-size:13px;resize:vertical"></textarea></div>
+      </div>
+
+      <button class="btn-prim" onclick="enviarSolCert()" style="padding:11px 24px">Enviar a Calidad</button>
+    </div>
+
+    <div id="solcert-mis" style="display:none">
+      <button class="btn-sec" onclick="volverSolCertForm()" style="margin-bottom:12px">← Nueva solicitud</button>
+      <div id="solcert-mis-lista"></div>
+    </div>
   </div>
 
   <div id="tab-maq" class="tab-panel active">
@@ -1815,6 +1877,187 @@ function verTab(id, btn) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + id).classList.add('active');
   btn.classList.add('active');
+}
+
+/* ── Solicitud de certificación ─────────────────────────────────────────────
+   El personal y los equipos ya viven aquí con su documentación; esto arma la
+   solicitud a partir de lo que ya está capturado, en vez de volver a pedir los
+   mismos datos. Lo que se manda es una lista de ids: el servidor resuelve los
+   nombres y comprueba que cada registro sea de esta empresa. */
+let solCertTipoActual = 'personal';
+let solCertCatalogo   = { personal: null, equipo: null };
+let solCertElegidos   = new Set();
+let solCertCurps      = {};
+
+function abrirSolCert() {
+  volverSolCertForm();
+  solCertTipo(solCertTipoActual);
+}
+
+function volverSolCertForm() {
+  document.getElementById('solcert-form').style.display = '';
+  document.getElementById('solcert-mis').style.display  = 'none';
+}
+
+async function solCertTipo(tipo) {
+  solCertTipoActual = tipo;
+  solCertElegidos = new Set();
+  solCertCurps = {};
+  document.getElementById('solcert-tab-personal').className = tipo === 'personal' ? 'btn-prim' : 'btn-sec';
+  document.getElementById('solcert-tab-equipo').className   = tipo === 'equipo'   ? 'btn-prim' : 'btn-sec';
+  document.getElementById('solcert-buscar').value = '';
+  document.getElementById('solcert-lista').innerHTML =
+    `<p style="padding:18px;text-align:center;color:#667;font-size:13px">Cargando…</p>`;
+
+  if (!solCertCatalogo[tipo]) {
+    const accion = tipo === 'personal' ? 'GET_MI_PERSONAL' : 'GET_MIS_EQUIPOS';
+    try {
+      const res = await fetch(API, { method:'POST', body: JSON.stringify({ action: accion }) });
+      const d   = await res.json();
+      solCertCatalogo[tipo] = tipo === 'personal' ? (d.personal || []) : (d.equipos || []);
+    } catch (e) { solCertCatalogo[tipo] = []; }
+  }
+  pintarSolCertLista();
+}
+
+function solCertRotulo(r) {
+  if (solCertTipoActual === 'personal') {
+    return { titulo: r.nombre || '', detalle: [r.puesto, r.numero_empleado].filter(Boolean).join(' · ') };
+  }
+  return { titulo: r.nombre || '', detalle: [r.tipo, r.marca, r.modelo, r.serie, r.capacidad].filter(Boolean).join(' · ') };
+}
+
+function pintarSolCertLista() {
+  const caja  = document.getElementById('solcert-lista');
+  const q     = (document.getElementById('solcert-buscar').value || '').trim().toLowerCase();
+  const filas = (solCertCatalogo[solCertTipoActual] || []).filter(r => {
+    if (!q) return true;
+    const { titulo, detalle } = solCertRotulo(r);
+    return (titulo + ' ' + detalle).toLowerCase().includes(q);
+  });
+
+  if (!filas.length) {
+    caja.innerHTML = `<p style="padding:18px;text-align:center;color:#667;font-size:13px">
+      ${q ? 'Nada coincide con la búsqueda.' : 'Todavía no tienes registros capturados en esta sección.'}</p>`;
+    actualizarContadorSolCert();
+    return;
+  }
+
+  caja.innerHTML = filas.map(r => {
+    const { titulo, detalle } = solCertRotulo(r);
+    const marcado = solCertElegidos.has(r.id);
+    // La CURP se pide sólo en personal: el certificado la lleva y la ficha del
+    // portal no la guarda.
+    const curp = solCertTipoActual === 'personal' && marcado
+      ? `<div style="margin-top:7px;padding-left:26px">
+           <input type="text" value="${escH(solCertCurps[r.id] || '')}" placeholder="CURP (para el certificado)"
+                  maxlength="18" oninput="solCertCurps[${r.id}]=this.value.toUpperCase();this.value=this.value.toUpperCase()"
+                  style="width:230px;padding:6px 9px;border:1.5px solid #dde4ec;border-radius:7px;font-size:12px;text-transform:uppercase">
+         </div>` : '';
+    return `
+      <label style="display:block;padding:9px 11px;border-bottom:1px solid #eef1f5;cursor:pointer;
+                    background:${marcado ? '#f2f8ff' : '#fff'}">
+        <span style="display:flex;align-items:flex-start;gap:9px">
+          <input type="checkbox" ${marcado ? 'checked' : ''} onchange="alternarSolCert(${r.id}, this.checked)"
+                 style="margin-top:3px;cursor:pointer">
+          <span style="flex:1;min-width:0">
+            <span style="display:block;font-size:13px;font-weight:600;color:#0d2244">${escH(titulo)}</span>
+            ${detalle ? `<span style="display:block;font-size:11.5px;color:#667">${escH(detalle)}</span>` : ''}
+          </span>
+        </span>
+        ${curp}
+      </label>`;
+  }).join('');
+  actualizarContadorSolCert();
+}
+
+function alternarSolCert(id, marcado) {
+  if (marcado) solCertElegidos.add(id); else { solCertElegidos.delete(id); delete solCertCurps[id]; }
+  pintarSolCertLista();
+}
+
+function actualizarContadorSolCert() {
+  const n = solCertElegidos.size;
+  document.getElementById('solcert-contador').textContent =
+    n ? `— ${n} seleccionado${n === 1 ? '' : 's'}` : '';
+}
+
+async function enviarSolCert() {
+  if (!solCertElegidos.size) { alert('Selecciona al menos un registro.'); return; }
+  const payload = {
+    tipo: solCertTipoActual,
+    ids:  [...solCertElegidos],
+    curps: solCertCurps,
+    servicio:        document.getElementById('solcert-servicio').value.trim(),
+    fecha_deseada:   document.getElementById('solcert-fecha').value,
+    sede:            document.getElementById('solcert-sede').value.trim(),
+    contacto_nombre: document.getElementById('solcert-contacto').value.trim(),
+    contacto_tel:    document.getElementById('solcert-tel').value.trim(),
+    notas:           document.getElementById('solcert-notas').value.trim(),
+  };
+  try {
+    const res = await fetch(API, { method:'POST', body: JSON.stringify({ action:'SOLCERT_CREAR', payload }) });
+    const d   = await res.json();
+    if (d.status !== 'success') { alert(d.message || 'No se pudo enviar la solicitud.'); return; }
+    alert(d.message);
+    solCertElegidos = new Set();
+    solCertCurps = {};
+    ['servicio','fecha','sede','contacto','tel','notas'].forEach(k => {
+      const el = document.getElementById('solcert-' + k); if (el) el.value = '';
+    });
+    verMisSolCert();
+  } catch (e) { alert('Error de conexión.'); }
+}
+
+async function verMisSolCert() {
+  document.getElementById('solcert-form').style.display = 'none';
+  document.getElementById('solcert-mis').style.display  = '';
+  const caja = document.getElementById('solcert-mis-lista');
+  caja.innerHTML = `<p style="padding:22px;text-align:center;color:#667">Cargando…</p>`;
+
+  const res = await fetch(API, { method:'POST', body: JSON.stringify({ action:'SOLCERT_MIS' }) });
+  const d   = await res.json();
+  if (d.status !== 'success') {
+    caja.innerHTML = `<p style="padding:22px;text-align:center;color:#c0392b">${escH(d.message || 'No se pudo cargar.')}</p>`;
+    return;
+  }
+  if (!(d.data || []).length) {
+    caja.innerHTML = `<p style="padding:30px;text-align:center;color:#667;font-size:14px">
+      Todavía no has enviado solicitudes.</p>`;
+    return;
+  }
+  caja.innerHTML = d.data.map(s => `
+    <div style="border:1.5px solid #dde4ec;border-radius:11px;padding:13px 15px;margin-bottom:10px;background:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px">
+        <div>
+          <strong style="font-size:14px;color:#0d2244">${escH(s.folio)}</strong>
+          <span style="font-size:12px;color:#667"> · ${s.tipo === 'personal' ? '👷 Personal' : '🏗️ Equipos'}
+            · ${s.total_items} registro(s)</span>
+        </div>
+        ${SolicitudesCert.pastilla(s.estado)}
+      </div>
+      <div style="font-size:12px;color:#667;margin-bottom:7px">
+        Enviada el ${escH(s.fecha)}${s.servicio ? ' · ' + escH(s.servicio) : ''}
+        ${s.programada_para ? ` · <strong style="color:#2e9e5b">Programada para el ${escH(s.programada_para)}</strong>` : ''}
+        ${s.inspector ? ' · Inspector: ' + escH(s.inspector) : ''}
+      </div>
+      <div style="font-size:12.5px;color:#0d2244">
+        ${(s.items || []).map(i => escH(i.nombre)).join(' · ')}
+      </div>
+      ${s.motivo ? `<div style="margin-top:9px;padding:8px 11px;background:#fdecea;border-left:3px solid #c0392b;
+                        border-radius:5px;font-size:12.5px"><strong>Calidad indica:</strong> ${escH(s.motivo)}</div>` : ''}
+      ${['ENVIADA','EN_REVISION'].includes(s.estado)
+        ? `<button class="btn-sec" style="margin-top:10px;font-size:12px;padding:6px 13px"
+                   onclick="cancelarSolCert(${s.id}, '${escQ(s.folio)}')">Cancelar solicitud</button>` : ''}
+    </div>`).join('');
+}
+
+async function cancelarSolCert(id, folio) {
+  if (!confirm(`¿Cancelar la solicitud ${folio}?`)) return;
+  const res = await fetch(API, { method:'POST', body: JSON.stringify({ action:'SOLCERT_CANCELAR', payload:{ id } }) });
+  const d   = await res.json();
+  alert(d.message || (d.status === 'success' ? 'Cancelada.' : 'No se pudo cancelar.'));
+  if (d.status === 'success') verMisSolCert();
 }
 
 // ── QR modal ───────────────────────────────────────────────────────────────
@@ -5491,5 +5734,6 @@ async function guardarAsignacion() {
   } catch(_) { toastEq('Error al guardar la asignación.'); }
 }
 </script>
+<script src="js/solicitudes-cert.js"></script>
 </body>
 </html>
