@@ -36,3 +36,6 @@ Thumbs.db
 *.swp
 *.swo
 *~
+
+# El manual para clientes se genera y se envía a mano; no se publica con el sitio.
+Manual_Solicitar_Certificacion_AVBA.pdf

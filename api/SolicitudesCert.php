@@ -39,9 +39,50 @@ class SolicitudesCert {
     /** Lo que el cliente todavía puede cancelar. Una vez programada, ya se movió gente. */
     public const CANCELABLES = ['ENVIADA', 'EN_REVISION'];
 
+    /**
+     * Con qué se puede certificar a una persona.
+     *
+     * Es el mismo catálogo que Calidad administra en Catálogos → Ocupaciones y
+     * que se imprime como "acreditado como" en el certificado. Se siembra sólo
+     * si está vacío: donde ya haya una lista curada, no se toca.
+     */
+    private const OCUPACIONES_BASE = [
+        // Operación de equipos
+        'Operador de grúa viajera (puente grúa)',
+        'Operador de grúa pórtico',
+        'Operador de grúa móvil',
+        'Operador de grúa torre',
+        'Operador de grúa sobre orugas',
+        'Operador de montacargas',
+        'Operador de manipulador telescópico (telehandler)',
+        'Operador de plataforma de elevación (MEWP)',
+        // Maniobras
+        'Maniobrista (rigger)',
+        'Señalero de maniobras',
+        'Supervisor de maniobras',
+        // Seguridad y verificación
+        'Trabajos en altura',
+        'Inspector de accesorios de izaje',
+        'Inspector de arneses y líneas de vida',
+    ];
+
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
         $this->migrate();
+        $this->sembrarOcupaciones();
+    }
+
+    /** Da de alta el catálogo base la primera vez, para que no nazca vacío. */
+    private function sembrarOcupaciones(): void {
+        try {
+            $n = (int)$this->pdo->query("SELECT COUNT(*) FROM ocupaciones_especificas")->fetchColumn();
+            if ($n > 0) return;   // ya hay lista: es de Calidad, no se toca
+            $ins = $this->pdo->prepare("INSERT INTO ocupaciones_especificas (nombre) VALUES (?)");
+            foreach (self::OCUPACIONES_BASE as $o) $ins->execute([$o]);
+        } catch (\Throwable $e) {
+            // La tabla puede no existir todavía en una instalación nueva.
+            error_log('[SolicitudesCert] sembrarOcupaciones: ' . $e->getMessage());
+        }
     }
 
     private function migrate(): void {
@@ -82,12 +123,18 @@ class SolicitudesCert {
                   nombre       VARCHAR(250) NOT NULL,
                   detalle      VARCHAR(400) NULL,
                   curp         VARCHAR(20)  NULL,
+                  ocupacion    VARCHAR(150) NULL,
                   estado       VARCHAR(20)  NOT NULL DEFAULT 'PENDIENTE',
                   avba_ref_id  INT          NULL,
                   notas        TEXT         NULL,
                   KEY idx_sol (solicitud_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
             ");
+            // Para instalaciones donde la tabla nació sin la columna.
+            try {
+                $this->pdo->exec("ALTER TABLE cliente_solicitudes_cert_item
+                                  ADD COLUMN IF NOT EXISTS ocupacion VARCHAR(150) NULL");
+            } catch (\Throwable $e) { /* ya existe */ }
         } catch (\Throwable $e) {
             error_log('[SolicitudesCert] migrate: ' . $e->getMessage());
         }
@@ -140,6 +187,20 @@ class SolicitudesCert {
         if (!$filas) return ['status' => 'error', 'message' => 'No se encontraron esos registros en tu empresa.'];
 
         $curps = is_array($payload['curps'] ?? null) ? $payload['curps'] : [];
+        /* Qué se certifica a cada quien: operador de grúa, maniobrista,
+           supervisor… Es lo que acaba impreso como "acreditado como" en el
+           certificado, así que sin eso la solicitud no dice qué se pide. En
+           equipos no aplica: lo define el propio tipo de equipo. */
+        $ocupas = is_array($payload['ocupaciones'] ?? null) ? $payload['ocupaciones'] : [];
+        if ($tipo === 'personal') {
+            foreach ($filas as $f) {
+                if (trim((string)($ocupas[$f['id']] ?? '')) === '') {
+                    return ['status' => 'error', 'message' =>
+                        'Indica qué certificación necesita ' . $f['nombre']
+                        . ' (operador de grúa, maniobrista, supervisor…).'];
+                }
+            }
+        }
 
         $folio = $this->siguienteFolio($idCliente);
         try {
@@ -161,16 +222,18 @@ class SolicitudesCert {
             $solId = (int)$this->pdo->lastInsertId();
 
             $ins = $this->pdo->prepare(
-                "INSERT INTO cliente_solicitudes_cert_item (solicitud_id, origen_id, nombre, detalle, curp)
-                 VALUES (?,?,?,?,?)"
+                "INSERT INTO cliente_solicitudes_cert_item (solicitud_id, origen_id, nombre, detalle, curp, ocupacion)
+                 VALUES (?,?,?,?,?,?)"
             );
             foreach ($filas as $f) {
                 $curp = strtoupper(trim((string)($curps[$f['id']] ?? '')));
+                $ocup = trim((string)($ocupas[$f['id']] ?? ''));
                 $ins->execute([
                     $solId, (int)$f['id'],
                     mb_substr($f['nombre'], 0, 250),
                     mb_substr($f['detalle'], 0, 400) ?: null,
                     $curp !== '' ? mb_substr($curp, 0, 20) : null,
+                    $ocup !== '' ? mb_substr($ocup, 0, 150) : null,
                 ]);
             }
         } catch (\Throwable $e) {
@@ -298,7 +361,7 @@ class SolicitudesCert {
         $in  = implode(',', array_fill(0, count($ids), '?'));
         try {
             $it = $this->pdo->prepare(
-                "SELECT id, solicitud_id, origen_id, nombre, detalle, curp, estado, avba_ref_id, notas
+                "SELECT id, solicitud_id, origen_id, nombre, detalle, curp, ocupacion, estado, avba_ref_id, notas
                  FROM cliente_solicitudes_cert_item WHERE solicitud_id IN ($in) ORDER BY id"
             );
             $it->execute($ids);
@@ -383,7 +446,7 @@ class SolicitudesCert {
         if (!$sol) return ['status' => 'error', 'message' => 'Solicitud no encontrada.'];
 
         $it = $this->pdo->prepare(
-            "SELECT id, origen_id, nombre, detalle, curp FROM cliente_solicitudes_cert_item
+            "SELECT id, origen_id, nombre, detalle, curp, ocupacion FROM cliente_solicitudes_cert_item
              WHERE solicitud_id = ? ORDER BY id"
         );
         $it->execute([$solicitudId]);

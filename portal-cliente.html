@@ -1888,6 +1888,8 @@ let solCertTipoActual = 'personal';
 let solCertCatalogo   = { personal: null, equipo: null };
 let solCertElegidos   = new Set();
 let solCertCurps      = {};
+let solCertOcupas     = {};
+let solCertOcupaCat   = null;   // catálogo de AVBA: operador de grúa, maniobrista…
 
 function abrirSolCert() {
   volverSolCertForm();
@@ -1899,10 +1901,24 @@ function volverSolCertForm() {
   document.getElementById('solcert-mis').style.display  = 'none';
 }
 
+/* Las certificaciones que AVBA emite. Es el mismo catálogo que se imprime como
+   "acreditado como" en el certificado, así que el cliente elige de ahí en vez
+   de escribirlo y que luego no coincida. */
+async function cargarOcupacionesSolCert() {
+  if (solCertOcupaCat) return;
+  try {
+    const res = await fetch(API + '?action=LISTAR_OCUPACIONES');
+    const d   = await res.json();
+    solCertOcupaCat = (Array.isArray(d) ? d : (d.data || [])).map(o => o.nombre).filter(Boolean);
+  } catch (e) { solCertOcupaCat = []; }
+}
+
 async function solCertTipo(tipo) {
   solCertTipoActual = tipo;
   solCertElegidos = new Set();
   solCertCurps = {};
+  solCertOcupas = {};
+  if (tipo === 'personal') await cargarOcupacionesSolCert();
   document.getElementById('solcert-tab-personal').className = tipo === 'personal' ? 'btn-prim' : 'btn-sec';
   document.getElementById('solcert-tab-equipo').className   = tipo === 'equipo'   ? 'btn-prim' : 'btn-sec';
   document.getElementById('solcert-buscar').value = '';
@@ -1948,11 +1964,21 @@ function pintarSolCertLista() {
     const marcado = solCertElegidos.has(r.id);
     // La CURP se pide sólo en personal: el certificado la lleva y la ficha del
     // portal no la guarda.
-    const curp = solCertTipoActual === 'personal' && marcado
-      ? `<div style="margin-top:7px;padding-left:26px">
-           <input type="text" value="${escH(solCertCurps[r.id] || '')}" placeholder="CURP (para el certificado)"
-                  maxlength="18" oninput="solCertCurps[${r.id}]=this.value.toUpperCase();this.value=this.value.toUpperCase()"
-                  style="width:230px;padding:6px 9px;border:1.5px solid #dde4ec;border-radius:7px;font-size:12px;text-transform:uppercase">
+    const extra = solCertTipoActual === 'personal' && marcado
+      ? `<div style="margin-top:8px;padding-left:26px;display:flex;gap:9px;flex-wrap:wrap;align-items:center">
+           <label style="font-size:11.5px;color:#667">Certificar como
+             <select onchange="solCertOcupas[${r.id}]=this.value;pintarSolCertLista()"
+                     style="display:block;margin-top:3px;min-width:210px;padding:6px 9px;border:1.5px solid ${solCertOcupas[r.id] ? '#dde4ec' : '#e8a33d'};border-radius:7px;font-size:12px;background:#fff">
+               <option value="">— Elige la certificación —</option>
+               ${(solCertOcupaCat || []).map(o =>
+                 `<option${o === solCertOcupas[r.id] ? ' selected' : ''}>${escH(o)}</option>`).join('')}
+             </select>
+           </label>
+           <label style="font-size:11.5px;color:#667">CURP
+             <input type="text" value="${escH(solCertCurps[r.id] || '')}" placeholder="18 caracteres"
+                    maxlength="18" oninput="solCertCurps[${r.id}]=this.value.toUpperCase();this.value=this.value.toUpperCase()"
+                    style="display:block;margin-top:3px;width:215px;padding:6px 9px;border:1.5px solid #dde4ec;border-radius:7px;font-size:12px;text-transform:uppercase">
+           </label>
          </div>` : '';
     return `
       <label style="display:block;padding:9px 11px;border-bottom:1px solid #eef1f5;cursor:pointer;
@@ -1965,14 +1991,15 @@ function pintarSolCertLista() {
             ${detalle ? `<span style="display:block;font-size:11.5px;color:#667">${escH(detalle)}</span>` : ''}
           </span>
         </span>
-        ${curp}
+        ${extra}
       </label>`;
   }).join('');
   actualizarContadorSolCert();
 }
 
 function alternarSolCert(id, marcado) {
-  if (marcado) solCertElegidos.add(id); else { solCertElegidos.delete(id); delete solCertCurps[id]; }
+  if (marcado) solCertElegidos.add(id);
+  else { solCertElegidos.delete(id); delete solCertCurps[id]; delete solCertOcupas[id]; }
   pintarSolCertLista();
 }
 
@@ -1984,10 +2011,15 @@ function actualizarContadorSolCert() {
 
 async function enviarSolCert() {
   if (!solCertElegidos.size) { alert('Selecciona al menos un registro.'); return; }
+  if (solCertTipoActual === 'personal') {
+    const sin = [...solCertElegidos].filter(id => !solCertOcupas[id]);
+    if (sin.length) { alert('Falta indicar qué certificación necesita cada persona seleccionada.'); return; }
+  }
   const payload = {
     tipo: solCertTipoActual,
     ids:  [...solCertElegidos],
     curps: solCertCurps,
+    ocupaciones: solCertOcupas,
     servicio:        document.getElementById('solcert-servicio').value.trim(),
     fecha_deseada:   document.getElementById('solcert-fecha').value,
     sede:            document.getElementById('solcert-sede').value.trim(),
@@ -2002,6 +2034,7 @@ async function enviarSolCert() {
     alert(d.message);
     solCertElegidos = new Set();
     solCertCurps = {};
+    solCertOcupas = {};
     ['servicio','fecha','sede','contacto','tel','notas'].forEach(k => {
       const el = document.getElementById('solcert-' + k); if (el) el.value = '';
     });
@@ -2042,7 +2075,8 @@ async function verMisSolCert() {
         ${s.inspector ? ' · Inspector: ' + escH(s.inspector) : ''}
       </div>
       <div style="font-size:12.5px;color:#0d2244">
-        ${(s.items || []).map(i => escH(i.nombre)).join(' · ')}
+        ${(s.items || []).map(i =>
+          escH(i.nombre) + (i.ocupacion ? ` <span style="color:#667">(${escH(i.ocupacion)})</span>` : '')).join(' · ')}
       </div>
       ${s.motivo ? `<div style="margin-top:9px;padding:8px 11px;background:#fdecea;border-left:3px solid #c0392b;
                         border-radius:5px;font-size:12.5px"><strong>Calidad indica:</strong> ${escH(s.motivo)}</div>` : ''}

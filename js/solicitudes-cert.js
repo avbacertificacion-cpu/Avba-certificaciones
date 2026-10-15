@@ -156,6 +156,8 @@
             <div style="padding:8px 11px;${n ? 'border-top:1px solid #eef1f5' : ''}">
               <strong>${esc(i.nombre)}</strong>
               ${i.detalle ? `<span style="color:var(--texto-hint,#7a8494)"> · ${esc(i.detalle)}</span>` : ''}
+              ${i.ocupacion ? `<span style="display:inline-block;margin-left:7px;padding:2px 9px;border-radius:99px;
+                     background:#e8f1fb;color:#1e5fa8;font-size:11px;font-weight:700">${esc(i.ocupacion)}</span>` : ''}
               ${i.curp ? `<div style="font-size:11px;color:var(--texto-hint,#7a8494)">CURP: ${esc(i.curp)}</div>` : ''}
             </div>`).join('')}
         </div>
