@@ -699,6 +699,10 @@
 <!-- ══ SECCIÓN: PERSONAL CURSOS ══ -->
 <div id="sec-per-cursos" class="wrap" style="display:none">
 
+  <p style="margin:0 0 12px;font-size:12.5px;color:var(--texto-hint)">
+    Sesiones aprobadas por Calidad, agrupadas por curso, fecha y empresa.
+    Entra en <strong>Ver</strong> para trabajar a cada participante por separado.</p>
+
   <div class="filtros-card">
     <input id="pc-fBuscar" placeholder="Buscar curso o empresa...">
     <input id="pc-fFecha"  placeholder="Fecha..." style="max-width:200px">
@@ -734,6 +738,10 @@
 
 <!-- ══ SECCIÓN: PERSONAL INDEPENDIENTE ══ -->
 <div id="sec-per-indep" class="wrap" style="display:none">
+
+  <p style="margin:0 0 12px;font-size:12.5px;color:var(--texto-hint)">
+    Personas certificadas por su cuenta, sin empresa y sin sesión.
+    Las de un curso aparecen agrupadas en <strong>Cursos</strong>.</p>
 
   <div class="filtros-card">
     <input id="pi-fNombre" placeholder="Nombre o CURP...">
@@ -3459,7 +3467,9 @@ function agruparCursosCert(data) {
      "sin participantes aprobados" sobre gente que sí lo estaba. El envío ya
      contempla la sesión sin empresa —busca por empresa nula—, era sólo este
      filtro el que la escondía. */
-  data.forEach(p => {
+  // Fuera los que van en Independiente, para que cada quien salga en una sola
+  // pestaña y el total de las dos sea el total de aprobados.
+  data.filter(p => !esIndependienteCert(p, data)).forEach(p => {
     const key = (p.curso_nombre||'') + '|' + (p.fecha_curso||'') + '|' + (p.empresa_nombre||'');
     if (!map[key]) map[key] = {
       curso:          p.curso_nombre  || '—',
@@ -3875,17 +3885,40 @@ async function cargarPerIndepCert() {
     if (!Array.isArray(data)) throw new Error('Respuesta inválida');
     perCertData     = data;
     perCertCargados = true;
-    renderIndepCert(data);
+    renderIndepCert(soloIndependientesCert(data));
   } catch(e) {
     document.getElementById('pi-tabla').innerHTML =
       `<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--rojo)">Error: ${e.message}</td></tr>`;
   }
 }
 
+/* Quién va en cada pestaña.
+   Antes "Independiente" listaba a TODOS los aprobados, de modo que una sesión
+   aprobada en Calidad volvía a aparecer aquí persona por persona: parecía que
+   se hubiera deshecho en individuos. Ahora las dos pestañas se reparten el
+   total sin solaparse.
+
+   Es independiente quien no trae empresa Y está solo en su curso y fecha. Si
+   trae empresa, por poca gente que sea, es una sesión de esa empresa y va en
+   Cursos, donde está el envío a la empresa; y dentro de la sesión se puede
+   trabajar a cada quien por separado igual que aquí. */
+function esIndependienteCert(p, data) {
+  if (p.empresa_nombre) return false;
+  const mismos = data.filter(x =>
+    (x.curso_nombre || '') === (p.curso_nombre || '') &&
+    (x.fecha_curso  || '') === (p.fecha_curso  || '') &&
+    !x.empresa_nombre);
+  return mismos.length <= 1;
+}
+
+function soloIndependientesCert(data) {
+  return data.filter(p => esIndependienteCert(p, data));
+}
+
 function filtrarPerIndepCert() {
   const nom = document.getElementById('pi-fNombre').value.toLowerCase();
   const cur = document.getElementById('pi-fCurso').value.toLowerCase();
-  renderIndepCert(perCertData.filter(p =>
+  renderIndepCert(soloIndependientesCert(perCertData).filter(p =>
     (!nom || (p.nombre_completo||'').toLowerCase().includes(nom) || (p.curp||'').toLowerCase().includes(nom)) &&
     (!cur || (p.curso_nombre  ||'').toLowerCase().includes(cur))
   ));
@@ -3894,7 +3927,7 @@ function filtrarPerIndepCert() {
 function limpiarPerIndepCert() {
   document.getElementById('pi-fNombre').value = '';
   document.getElementById('pi-fCurso').value  = '';
-  renderIndepCert(perCertData);
+  renderIndepCert(soloIndependientesCert(perCertData));
 }
 
 function renderIndepCert(data) {
