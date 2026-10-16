@@ -219,7 +219,21 @@ class Personal {
                         cl.representante COLLATE utf8mb4_general_ci,
                         p.empresa_representante
                     ) AS empresa_representante,
-                    {$repTrab} AS empresa_rep_trabajadores
+                    {$repTrab} AS empresa_rep_trabajadores,
+                    /* El DC-3 lleva impresos RFC y domicilio de la empresa.
+                       Se caía a lo que el participante trajera capturado, que
+                       al registrarlo desde inspector queda vacío: ahora se
+                       toman del catálogo de empresas cuando ahí estén, igual
+                       que ya se hacía con los representantes. NULLIF para que
+                       una celda vacía no gane a lo capturado a mano. */
+                    COALESCE(
+                        NULLIF(cl.rfc COLLATE utf8mb4_general_ci, ''),
+                        p.empresa_rfc
+                    ) AS empresa_rfc,
+                    COALESCE(
+                        NULLIF(cl.direccion COLLATE utf8mb4_general_ci, ''),
+                        p.empresa_direccion
+                    ) AS empresa_direccion
              FROM participantes_cursos p
              LEFT JOIN cursos c ON c.id = p.curso_id
              LEFT JOIN ocupaciones_especificas o ON o.id = p.ocupacion_id

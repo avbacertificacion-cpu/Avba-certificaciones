@@ -3971,11 +3971,14 @@ window.onload = function () {
     document.getElementById('cliente-id'),
     { dropdownId: 'drop-cliente' }
   );
-  // Autocomplete empresa en formulario de participante (inspector agrega manualmente)
+  // Autocomplete empresa en formulario de participante (inspector agrega manualmente).
+  // Al elegir una empresa ya registrada se traen sus datos fiscales: el DC-3
+  // los lleva impresos y se quedaban en blanco porque aquí sólo se copiaba el
+  // nombre, aunque el buscador ya devuelve todo lo demás.
   initEmpresaSearch(
     document.getElementById('cur-empresa'),
     document.getElementById('cur-empresa-id'),
-    { dropdownId: 'drop-cur-empresa' }
+    { dropdownId: 'drop-cur-empresa', onSelect: curEmpresaElegida }
   );
 
   // Botón volver a Admin si el rol es ADMIN
@@ -5760,6 +5763,20 @@ async function sesConfirmarAgregarEmpresa() {
 }
 
 // ── Preparar formulario según modo ────────
+/* Datos de la empresa elegida del catálogo.
+   Sólo se escribe lo que la empresa tenga registrado: si en el catálogo falta
+   un dato, se respeta lo que el inspector haya escrito a mano en vez de
+   borrárselo. */
+function curEmpresaElegida(emp) {
+  if (!emp) return;
+  [['cur-rfc', emp.rfc],
+   ['cur-representante', emp.representante],
+   ['cur-direccion-empresa', emp.direccion]].forEach(([id, valor]) => {
+    const el = document.getElementById(id);
+    if (el && valor) el.value = valor;
+  });
+}
+
 function curPrepararForm(modo) {
   const badge     = document.getElementById('cur-modo-badge');
   const lockInfo  = document.getElementById('ses-locked-info');
