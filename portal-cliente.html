@@ -1089,6 +1089,9 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
           <option value="seguro">Seguro</option>
           <option value="tabla_carga">Tabla de carga</option>
           <option value="manual">Manual</option>
+          <option value="factura">Factura</option>
+          <option value="poliza">Póliza / Garantía</option>
+          <option value="tenencia">Tenencia / Verificación</option>
           <option value="otro">Otro</option>
         </select>
       </div>
@@ -1521,6 +1524,11 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
           <option value="dc3">DC-3</option>
           <option value="ine">INE</option>
           <option value="nss">NSS</option>
+          <option value="imss">IMSS — alta o pago</option>
+          <option value="infonavit">Infonavit</option>
+          <option value="sindical">Cuota sindical</option>
+          <option value="contrato">Contrato</option>
+          <option value="curp_doc">CURP</option>
           <option value="otro">Otro</option>
         </select>
       </div>
@@ -1575,6 +1583,11 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
           <option value="dc3">DC-3</option>
           <option value="ine">INE</option>
           <option value="nss">NSS</option>
+          <option value="imss">IMSS — alta o pago</option>
+          <option value="infonavit">Infonavit</option>
+          <option value="sindical">Cuota sindical</option>
+          <option value="contrato">Contrato</option>
+          <option value="curp_doc">CURP</option>
           <option value="otro">Otro</option>
         </select>
       </div>
@@ -3338,8 +3351,10 @@ function limpiarFiltrosEq() {
   aplicarFiltrosEq();
 }
 
-const TIPO_DOC_LABELS = { bitacora:'Bitácora', seguro:'Seguro', tabla_carga:'Tabla de carga', manual:'Manual', otro:'Otro' };
-const TIPO_DOC_ICONS  = { bitacora:'📒', seguro:'🛡', tabla_carga:'📊', manual:'📗', otro:'📎' };
+const TIPO_DOC_LABELS = { bitacora:'Bitácora', seguro:'Seguro', tabla_carga:'Tabla de carga', manual:'Manual',
+                          factura:'Factura', poliza:'Póliza / Garantía', tenencia:'Tenencia / Verificación', otro:'Otro' };
+const TIPO_DOC_ICONS  = { bitacora:'📒', seguro:'🛡', tabla_carga:'📊', manual:'📗',
+                          factura:'🧾', poliza:'📘', tenencia:'🚦', otro:'📎' };
 
 function renderListaEq(equipos) {
   const cont = document.getElementById('eq-cont');
@@ -3482,14 +3497,15 @@ function renderDetInfo(eq) {
 
 // ── Documentos ─────────────────────────────────────────────────────────────
 function renderSubDocs(docs, equipoId) {
-  const DOC_IC = {bitacora:'di-bit', seguro:'di-seg', tabla_carga:'di-tab', manual:'di-man', otro:'di-ot'};
+  const DOC_IC = {bitacora:'di-bit', seguro:'di-seg', tabla_carga:'di-tab', manual:'di-man',
+                  factura:'di-ot', poliza:'di-seg', tenencia:'di-ot', otro:'di-ot'};
   const cont = document.getElementById('eq-sub-docs');
   let html = `<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
     <div style="font-size:13px;font-weight:700;color:var(--texto)">Documentos <span style="color:var(--texto-hint)">(${docs.length})</span></div>
     ${_puedeEditar ? `<button class="btn-prim" onclick="abrirModalDoc(${equipoId})">+ Subir</button>` : ''}
   </div>`;
   if (!docs.length) {
-    html += '<div class="empty"><div class="empty-t">Sin documentos</div><div class="empty-s">Sube bitácoras, seguros, tablas de carga y más.</div></div>';
+    html += '<div class="empty"><div class="empty-t">Sin documentos</div><div class="empty-s">Sube bitácoras, seguros, facturas, pólizas, tablas de carga y más.</div></div>';
   } else {
     html += '<div class="doc-grid">';
     docs.forEach(d => {
@@ -4232,8 +4248,11 @@ function aplicarFiltrosPer() {
   renderListaPer(f);
 }
 
-const TIPO_DOC_ICONS_PER = { licencia:'🪪', antidoping:'🧪', medico:'🏥', constancia:'📜', seguro:'🛡', dc3:'📋', ine:'🪪', nss:'🏥', otro:'📎' };
-const TIPO_DOC_LABELS_PER = { licencia:'Licencia', antidoping:'Antidoping', medico:'Examen médico', constancia:'Constancia', seguro:'Seguro', dc3:'DC-3', ine:'INE', nss:'NSS', otro:'Otro' };
+const TIPO_DOC_ICONS_PER = { licencia:'🪪', antidoping:'🧪', medico:'🏥', constancia:'📜', seguro:'🛡', dc3:'📋',
+                             ine:'🪪', nss:'🏥', imss:'🏥', infonavit:'🏠', sindical:'🤝', contrato:'📄', curp_doc:'🪪', otro:'📎' };
+const TIPO_DOC_LABELS_PER = { licencia:'Licencia', antidoping:'Antidoping', medico:'Examen médico', constancia:'Constancia',
+                              seguro:'Seguro', dc3:'DC-3', ine:'INE', nss:'NSS', imss:'IMSS', infonavit:'Infonavit',
+                              sindical:'Cuota sindical', contrato:'Contrato', curp_doc:'CURP', otro:'Otro' };
 
 function renderListaPer(personas) {
   const cont = document.getElementById('per-cli-cont');
