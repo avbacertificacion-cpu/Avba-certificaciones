@@ -25,12 +25,43 @@ $hash = '';
 $aviso = '';
 $fuerza = null;
 $salt = '';
+$guardado = false;
+
+$rutaConfig = __DIR__ . '/config/config.php';
+$configExiste = is_file($rutaConfig);
+$contenidoConfig = $configExiste ? (string)@file_get_contents($rutaConfig) : '';
+
+// ¿Ya hay una contraseña real puesta? Si la hay, para cambiarla habrá que
+// escribir la actual: si no, cualquiera que abra esta página podría sustituirla.
+$yaConfigurada = $configExiste
+    && preg_match("/define\s*\(\s*'MURO_ADMIN_HASH'\s*,\s*'(\\\$2[aby]\\\$[^']+)'/", $contenidoConfig) === 1;
+$hashActual = '';
+if ($yaConfigurada) {
+    preg_match("/define\s*\(\s*'MURO_ADMIN_HASH'\s*,\s*'([^']+)'/", $contenidoConfig, $m);
+    $hashActual = $m[1] ?? '';
+}
+
+/** Reemplaza una constante en config.php conservando el resto del archivo. */
+function ponerConstante(string $texto, string $nombre, string $valor): string {
+    $linea = "define('{$nombre}', '{$valor}');";
+    $patron = "/define\s*\(\s*'" . preg_quote($nombre, '/') . "'\s*,\s*'[^']*'\s*\)\s*;/";
+    if (preg_match($patron, $texto)) {
+        // Con preg_replace, un hash bcrypt como $2y$12$... se interpretaría
+        // como referencias a grupos capturados y se perdería. El callback
+        // devuelve el texto literal.
+        return (string)preg_replace_callback($patron, static fn() => $linea, $texto, 1);
+    }
+    return rtrim($texto) . "\n" . $linea . "\n";
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $clave = (string)($_POST['clave'] ?? '');
+    $clave  = (string)($_POST['clave'] ?? '');
+    $actual = (string)($_POST['actual'] ?? '');
 
-    if (mb_strlen($clave) < 10) {
-        $aviso = 'Usa al menos 10 caracteres. Esta contraseña protege lo que se publica en tu sitio.';
+    if ($yaConfigurada && !password_verify($actual, $hashActual)) {
+        $aviso = 'La contraseña actual no es correcta. Si la olvidaste, edita config.php a mano o pide ayuda.';
+    } elseif (mb_strlen($clave) < 8) {
+        $aviso = 'Usa al menos 8 caracteres. Esta contraseña protege lo que se publica en tu sitio.';
     } else {
         $hash = password_hash($clave, PASSWORD_DEFAULT);
         // Cadena aleatoria para IP_SALT. No hay que recordarla: el sistema
@@ -45,16 +76,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (preg_match('/\d/', $clave))         { $puntos++; }
         if (preg_match('/[^\p{L}\p{N}]/u', $clave)) { $puntos++; }
         $fuerza = $puntos;
+
+        // Se intenta escribir config.php directamente: así no hay que editar
+        // archivos a mano. Si no se puede, queda la línea para copiar.
+        if ($configExiste && is_writable($rutaConfig)) {
+            $nuevo = ponerConstante($contenidoConfig, 'MURO_ADMIN_HASH', $hash);
+            // El salt solo se crea si aún no hay uno válido: cambiarlo
+            // reiniciaría los contadores del límite diario sin necesidad.
+            if (!preg_match("/define\s*\(\s*'IP_SALT'\s*,\s*'(?!CAMBIAR)[^']{16,}'/", $nuevo)) {
+                $nuevo = ponerConstante($nuevo, 'IP_SALT', $salt);
+            }
+            $copia = $rutaConfig . '.bak';
+            @copy($rutaConfig, $copia);
+            if (@file_put_contents($rutaConfig, $nuevo) !== false) {
+                $guardado = true;
+            }
+        }
     }
 }
 
-$yaConfigurada = false;
-$rutaConfig = __DIR__ . '/config/config.php';
-if (is_file($rutaConfig)) {
-    $contenido = (string)@file_get_contents($rutaConfig);
-    $yaConfigurada = str_contains($contenido, 'MURO_ADMIN_HASH')
-        && !str_contains($contenido, 'CAMBIAR_pega_aqui_el_hash');
-}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -107,11 +147,16 @@ if (is_file($rutaConfig)) {
 
 <div class="env">
 
-  <?php if ($yaConfigurada && !$hash): ?>
+  <?php if ($guardado): ?>
     <div class="ok">
-      Ya tienes una contraseña configurada. Si la recuerdas, no necesitas hacer nada:
-      entra directo al <a href="moderacion.php">panel de moderación</a>.
-      Usa esta página solo si quieres cambiarla.
+      <strong>Listo, la contraseña quedó guardada.</strong><br>
+      Ya puedes entrar al <a href="moderacion.php">panel de moderación</a> con la contraseña que acabas de elegir.
+      No hace falta editar ningún archivo.
+    </div>
+  <?php elseif ($yaConfigurada && !$hash): ?>
+    <div class="ok">
+      Ya tienes una contraseña configurada. Para cambiarla, escribe la actual y la nueva.
+      Si la recuerdas y no quieres cambiarla, entra directo al <a href="moderacion.php">panel de moderación</a>.
     </div>
   <?php endif; ?>
 
@@ -126,10 +171,15 @@ if (is_file($rutaConfig)) {
     <?php if ($aviso): ?><div class="aviso"><?= htmlspecialchars($aviso) ?></div><?php endif; ?>
 
     <form method="post" autocomplete="off">
-      <label for="clave">Contraseña que quieres usar</label>
-      <input type="text" id="clave" name="clave" required minlength="10"
+      <?php if ($yaConfigurada): ?>
+        <label for="actual">Contraseña actual</label>
+        <input type="text" id="actual" name="actual" required
+               placeholder="La que usas hoy para entrar al panel" style="margin-bottom:18px;">
+      <?php endif; ?>
+      <label for="clave">Contraseña <?= $yaConfigurada ? 'nueva' : 'que quieres usar' ?></label>
+      <input type="text" id="clave" name="clave" required minlength="8"
              placeholder="Por ejemplo: Gruas-Altamira-2026!" autofocus>
-      <p class="pista">Mínimo 10 caracteres. Se muestra en pantalla para que la copies bien: asegúrate de que nadie más la vea.</p>
+      <p class="pista">Mínimo 8 caracteres. Se muestra en pantalla para que la copies bien: asegúrate de que nadie más la vea.</p>
       <button type="submit">Generar</button>
     </form>
 
@@ -146,9 +196,37 @@ if (is_file($rutaConfig)) {
     <?php endif; ?>
   </div>
 
-  <?php if ($hash): ?>
+  <?php if ($hash && $guardado): ?>
     <div class="caja">
-      <h1>Ya está. Ahora pega estas dos líneas</h1>
+      <h1>Guardado</h1>
+      <p class="intro">
+        La contraseña quedó escrita en el archivo de configuración del sitio. No tienes
+        que copiar ni pegar nada. Entra al <a href="moderacion.php">panel de moderación</a>
+        con la contraseña que elegiste.
+      </p>
+      <?php if ($fuerza !== null): ?>
+        <div class="fuerza">
+          <?php for ($i = 1; $i <= 5; $i++): ?>
+            <span class="barrita <?= $i <= $fuerza ? 'on' : '' ?>"></span>
+          <?php endfor; ?>
+        </div>
+        <p class="pista">Robustez: <?= ['muy baja','baja','aceptable','buena','muy buena','excelente'][$fuerza] ?>.</p>
+      <?php endif; ?>
+    </div>
+
+    <div class="peligro">
+      <strong>Último paso, importante:</strong> ahora que ya puedes entrar al panel,
+      borra del servidor este archivo (<code>generar-clave.php</code>).
+      Mientras siga publicado, cualquiera que conozca tu contraseña actual podría cambiarla desde aquí.
+    </div>
+
+  <?php elseif ($hash): ?>
+    <div class="caja">
+      <h1>No pude guardarlo solo: pega estas dos líneas</h1>
+      <p class="intro">
+        El archivo <code>config/config.php</code> no existe o no tiene permisos de escritura,
+        así que hay que ponerlo a mano.
+      </p>
       <div class="resultado">
         <button class="copiar" type="button" onclick="copiar(this)">Copiar</button>
         <code id="linea">define('MURO_ADMIN_HASH', '<?= htmlspecialchars($hash) ?>');
