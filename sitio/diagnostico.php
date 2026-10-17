@@ -108,6 +108,22 @@ if ($acceso) {
                 $pruebas[] = prueba('Tabla muro_publicaciones', false, 'La tabla no existe.',
                     'Ejecuta el contenido de sql/muro.sql en phpMyAdmin.');
             }
+
+            // Columnas que el soporte de video necesita
+            if ($existe) {
+                $faltanCols = [];
+                foreach (['tipo', 'poster', 'duracion'] as $c) {
+                    $hay = $pdo->query("SHOW COLUMNS FROM muro_publicaciones LIKE " . $pdo->quote($c))->fetchAll();
+                    if (!$hay) { $faltanCols[] = $c; }
+                }
+                $pruebas[] = prueba(
+                    'Soporte de video en la tabla',
+                    !$faltanCols,
+                    $faltanCols ? 'Faltan las columnas: ' . implode(', ', $faltanCols) . '. Las fotografías funcionan, los videos no.'
+                                : 'La tabla ya admite videos.',
+                    'Ejecuta el contenido de sql/muro-video.sql en phpMyAdmin.'
+                );
+            }
         } catch (PDOException $e) {
             $pruebas[] = prueba('Tabla muro_publicaciones', false, 'No se pudo consultar.',
                 'Ejecuta sql/muro.sql en phpMyAdmin.');
@@ -170,12 +186,16 @@ if ($acceso) {
         $v = trim($v); $u = strtolower(substr($v, -1)); $n = (int)$v;
         return match ($u) { 'g' => $n * 1073741824, 'm' => $n * 1048576, 'k' => $n * 1024, default => $n };
     };
-    $suficiente = $aBytes((string)$subidaMax) >= 8 * 1048576 && $aBytes((string)$postMax) >= 8 * 1048576;
+    $menor = min($aBytes((string)$subidaMax), $aBytes((string)$postMax));
+    $mb    = round($menor / 1048576, 1);
     $pruebas[] = prueba(
         'Tamaño máximo de subida',
-        $suficiente,
-        "El servidor acepta hasta $subidaMax por archivo (envío total: $postMax).",
-        'El muro pide 8 MB. Súbelo en hPanel → Configuración de PHP, o dile a Claude que baje el límite del formulario.'
+        $menor >= 32 * 1048576,
+        "El servidor acepta hasta {$mb} MB por envío (upload_max_filesize: $subidaMax, post_max_size: $postMax)."
+        . ($menor >= 32 * 1048576
+            ? ' Suficiente para videos de celular.'
+            : ' Las fotografías funcionan igual porque se comprimen en el navegador, pero un video de celular pesa entre 20 y 100 MB y no va a pasar.'),
+        'hPanel → Avanzado → Configuración de PHP → Opciones: sube upload_max_filesize y post_max_size a 64M.'
     );
 }
 

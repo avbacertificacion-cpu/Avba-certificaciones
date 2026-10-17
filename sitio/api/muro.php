@@ -187,6 +187,21 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     responder(['status' => 'error', 'message' => 'Método no permitido.'], 405);
 }
 
+// Cuando el envío supera post_max_size, PHP descarta todo el cuerpo: $_POST
+// y $_FILES llegan vacíos y sin marcar error. Sin esta comprobación el
+// visitante recibiría un "escribe tu nombre" que no tiene nada que ver.
+$largo = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+if ($largo > 0 && empty($_POST) && empty($_FILES)) {
+    $mb = round(limiteServidor() / 1048576, 1);
+    $envio = round($largo / 1048576, 1);
+    responder([
+        'status'  => 'error',
+        'codigo'  => 'excede_servidor',
+        'message' => "El archivo pesa {$envio} MB y este servidor solo acepta hasta {$mb} MB por envío. "
+                   . "Prueba con un video más corto, o pide que suban ese límite.",
+    ], 413);
+}
+
 // Trampa anti-bots: campo oculto que una persona nunca rellena.
 if (!empty($_POST['sitio_web'])) {
     responder(['status' => 'ok', 'message' => 'Recibido.']);   // silencioso a propósito
@@ -260,6 +275,22 @@ if (isset($_FILES['foto']) && $_FILES['foto']['error'] !== UPLOAD_ERR_NO_FILE) {
     // ── Video ────────────────────────────────────────────────
     if ($mimeVideo) {
         $tipoMedio = 'video';
+
+        // El soporte de video necesita columnas que las instalaciones
+        // anteriores no tienen. Sin ellas, mejor decirlo que fallar al final.
+        try {
+            $cols = $pdo->query("SHOW COLUMNS FROM muro_publicaciones LIKE 'tipo'")->fetchAll();
+        } catch (PDOException $e) {
+            $cols = [];
+        }
+        if (!$cols) {
+            responder([
+                'status'  => 'error',
+                'codigo'  => 'falta_migracion',
+                'message' => 'El muro todavía no admite videos. Falta aplicar una actualización '
+                           . 'en la base de datos (sql/muro-video.sql). Por ahora puedes publicar una fotografía.',
+            ], 503);
+        }
 
         if ($f['size'] > MAX_BYTES_VIDEO) {
             $mb = round(MAX_BYTES_VIDEO / 1048576);

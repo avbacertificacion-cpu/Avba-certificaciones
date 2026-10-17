@@ -2417,9 +2417,13 @@
 
       if (esVideo) {
         if (f.size > limiteVideo) {
-          mostrarMsg('El video pesa ' + (f.size/1048576).toFixed(1) + ' MB y el máximo es '
-                     + Math.round(limiteVideo/1048576) + ' MB. Prueba con uno más corto.', 'err');
+          var tope = Math.round(limiteVideo / 1048576);
+          mostrarMsg('Este video pesa ' + (f.size / 1048576).toFixed(1) + ' MB y el máximo admitido es '
+                     + tope + ' MB. Graba uno más corto o envía una fotografía.'
+                     + (tope <= 8 ? ' (El servidor todavía tiene un límite bajo para videos.)' : ''), 'err');
           foto.value = ''; URL.revokeObjectURL(url);
+          prevVideo.hidden = true; prev.hidden = true;
+          if (subirTxt) subirTxt.style.display = '';
           return;
         }
         prev.hidden = true; prev.removeAttribute('src');
@@ -2518,7 +2522,11 @@
           }
         })
         .catch(function(){
-          mostrarMsg('No se pudo enviar. Revisa tu conexión e inténtalo de nuevo.', 'err');
+          // Si el envío excede lo que acepta el servidor, la conexión se corta
+          // antes de que llegue una respuesta legible.
+          mostrarMsg(esVideo
+            ? 'El servidor cortó el envío: el video es demasiado pesado para este sitio. Prueba con uno más corto.'
+            : 'No se pudo enviar. Revisa tu conexión e inténtalo de nuevo.', 'err');
         })
         .finally(function(){
           boton.disabled = false;
