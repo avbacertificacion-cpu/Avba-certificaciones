@@ -4154,7 +4154,7 @@ async function cargarOcupaciones() {
 
 function renderOcupaciones() {
   const tbody = document.getElementById("tbody-ocupaciones");
-  document.getElementById("ocup-count").textContent = ocupData.length + " ocupación" + (ocupData.length !== 1 ? "es" : "");
+  document.getElementById("ocup-count").textContent = ocupData.length + (ocupData.length === 1 ? " ocupación" : " ocupaciones");
 
   if (!ocupData.length) {
     tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;padding:36px;color:var(--texto-hint)">
@@ -4786,7 +4786,7 @@ function estatusAccBadge(e) {
 
 function renderSesionesAcc(data) {
   const tbody = document.getElementById('tbody-acc-sesiones');
-  document.getElementById('acc-count').textContent = data.length + ' sesión' + (data.length!==1?'es':'');
+  document.getElementById('acc-count').textContent = data.length + (data.length === 1 ? ' sesión' : ' sesiones');
   if (!data.length) {
     tbody.innerHTML = `<tr><td colspan="10" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin registros</td></tr>`;
     document.getElementById('fus-barra-acc')?.remove();
@@ -5640,7 +5640,7 @@ let _calSesiones = [];
 function renderCursosSesiones(lista) {
   _calSesiones = lista;
   const tbody = document.getElementById('tbody-per-cursos');
-  document.getElementById('per-cursos-count').textContent = lista.length + ' sesión' + (lista.length!==1?'es':'');
+  document.getElementById('per-cursos-count').textContent = lista.length + (lista.length === 1 ? ' sesión' : ' sesiones');
   if (!lista.length) {
     tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin sesiones registradas</td></tr>`;
     return;
@@ -7086,7 +7086,7 @@ function renderTipoCard(t) {
     <div class="tipo-card-hdr" onclick="toggleTipo(${t.id})">
       <div style="flex:1;min-width:0">
         <div class="tipo-nombre">${esc(t.nombre)}</div>
-        <div class="tipo-meta">${nSecs} sección${nSecs!==1?'es':''} · ${nItems} ítem${nItems!==1?'s':''} · ${nNormas} norma${nNormas!==1?'s':''}</div>
+        <div class="tipo-meta">${nSecs} ${nSecs === 1 ? 'sección' : 'secciones'} · ${nItems} ítem${nItems!==1?'s':''} · ${nNormas} norma${nNormas!==1?'s':''}</div>
       </div>
       <div style="display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">
         <button class="btn-add-item" style="font-size:12px" onclick="abrirModalTipo(${t.id})">✏ Editar</button>

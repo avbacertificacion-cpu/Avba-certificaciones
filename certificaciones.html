@@ -2332,7 +2332,7 @@ function renderArnCert() {
   document.getElementById('arnc-total').textContent  = porEmitir;
   document.getElementById('arnc-piezas').textContent = piezas;
   document.getElementById('arnc-aptos').textContent  = aptos;
-  document.getElementById('arnc-count').textContent  = tot + ' inspección' + (tot!==1?'es':'');
+  document.getElementById('arnc-count').textContent  = tot + (tot === 1 ? ' inspección' : ' inspecciones');
 
   if (!tot) {
     cont.innerHTML = '<div style="text-align:center;padding:30px;color:var(--texto-hint)">No hay inspecciones de arneses en Certificaciones.</div>';
@@ -2683,7 +2683,7 @@ function estatusCertBadge(e) {
 
 function renderAccCert(data) {
   const tbody = document.getElementById('acc-cert-tabla');
-  document.getElementById('acc-cert-count').textContent = data.length + ' sesión' + (data.length !== 1 ? 'es' : '');
+  document.getElementById('acc-cert-count').textContent = data.length + (data.length === 1 ? ' sesión' : ' sesiones');
   if (!data.length) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:36px;color:var(--texto-hint)">Sin sesiones aprobadas por Calidad.</td></tr>`;
     return;

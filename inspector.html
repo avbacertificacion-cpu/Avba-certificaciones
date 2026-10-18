@@ -3765,7 +3765,7 @@ const ESTADO_BADGE = {
 function renderHistorial(lista) {
   const cont = document.getElementById('hist-lista');
   const ctr  = document.getElementById('hist-contador');
-  ctr.textContent = `${lista.length} inspección${lista.length !== 1 ? 'es' : ''}`;
+  ctr.textContent = `${lista.length} ${lista.length === 1 ? 'inspección' : 'inspecciones'}`;
 
   if (lista.length === 0) {
     cont.innerHTML = `

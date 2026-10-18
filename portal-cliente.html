@@ -2857,7 +2857,7 @@ function renderAlertas(data, contId) {
     html += `<div class="eq-alert eq-alert-warn">
       <div class="eq-alert-ico">⚠</div>
       <div class="eq-alert-body">
-        <div class="eq-alert-txt">${certs.vencidas} certificación${certs.vencidas!==1?'es':''} vencida${certs.vencidas!==1?'s':''}</div>
+        <div class="eq-alert-txt">${certs.vencidas} ${certs.vencidas === 1 ? 'certificación' : 'certificaciones'} vencida${certs.vencidas!==1?'s':''}</div>
         <div class="eq-alert-sub">Revisa y renueva las certificaciones vencidas lo antes posible para cumplir la normativa.</div>
       </div>
     </div>`;
@@ -2866,7 +2866,7 @@ function renderAlertas(data, contId) {
     html += `<div class="eq-alert eq-alert-caution" style="border-radius:12px;padding:13px 18px;margin-bottom:8px;display:flex;align-items:center;gap:12px;">
       <div class="eq-alert-ico">⏰</div>
       <div class="eq-alert-body">
-        <div class="eq-alert-txt">${certs.por_vencer} certificación${certs.por_vencer!==1?'es':''} por vencer en los próximos 30 días</div>
+        <div class="eq-alert-txt">${certs.por_vencer} ${certs.por_vencer === 1 ? 'certificación' : 'certificaciones'} por vencer en los próximos 30 días</div>
         <div class="eq-alert-sub">Programa la renovación con anticipación para evitar interrupciones.</div>
       </div>
     </div>`;
