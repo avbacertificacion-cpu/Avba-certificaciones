@@ -28,7 +28,10 @@
       --sombra:     0 2px 16px rgba(0,0,0,0.07);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { overflow-x: hidden; max-width: 100%; }
+    /* clip y no sólo hidden: con hidden el body se vuelve contenedor de
+       desplazamiento y el encabezado dejaba de quedarse fijo arriba al bajar.
+       hidden queda de respaldo para Safari anterior a la 16. */
+    html, body { overflow-x: hidden; overflow-x: clip; max-width: 100%; }
     body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--gris-bg); min-height: 100vh; }
 
     /* ── HEADER ── */
