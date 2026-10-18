@@ -79,6 +79,23 @@
     .acceso-btn:hover { border-color: var(--azul); color: var(--azul); background: var(--azul-light); }
     .acceso-btn .ico { font-size: 14px; }
 
+    /* En teléfono el título no cabía junto al usuario y al botón de salir, y
+       los ocho accesos ocupaban cinco renglones antes de llegar al panel. */
+    @media (max-width: 600px) {
+      .header { padding: 0 14px; gap: 10px; }
+      .header-text { min-width: 0; }
+      .header-text .t { font-size: 14px; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .header-text .s { display: none; }
+      .btn-logout { padding: 8px 12px; white-space: nowrap; }
+      .accesos {
+        flex-wrap: nowrap; overflow-x: auto; padding: 8px 14px;
+        scrollbar-width: none; -webkit-overflow-scrolling: touch;
+      }
+      .accesos::-webkit-scrollbar { display: none; }
+      .acceso-btn { flex: 0 0 auto; white-space: nowrap; }
+    }
+    @media (max-width: 480px) { .header-user { display: none; } }
+
     /* ── WRAP ── */
     .wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px 48px; }
     /* ── Tabs ── */
@@ -86,18 +103,32 @@
     .tab-a { flex:1; padding:9px 14px; border-radius:8px; border:none; background:transparent; font-size:13px; font-weight:600; color:var(--texto-sub); cursor:pointer; transition:all .15s; }
     .tab-a.active { background:var(--azul-dark); color:#fff; }
     .tab-a:hover:not(.active) { background:var(--gris-bg); }
+    /* En tablet las ocho pestañas no caben en un renglón: repartidas a partes
+       iguales, "Prueba de lectura" se partía en tres líneas con el ícono
+       encima. Mejor que bajen a un segundo renglón con su ancho natural. (En
+       teléfono css/movil.css las vuelve un renglón que se desliza.) */
+    @media (min-width: 769px) and (max-width: 1100px) {
+      .tabs-admin { flex-wrap: wrap; }
+      .tab-a { flex: 1 1 auto; white-space: nowrap; }
+    }
     .tab-sec { display:none; }
     .tab-sec.active { display:block; }
 
     /* ── STATS ── */
     .stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 22px; }
-    @media(max-width:700px) { .stats { grid-template-columns: repeat(2,1fr); } }
+    /* Cinco tarjetas en dos columnas eran tres renglones antes del panel. */
+    @media(max-width:700px) { .stats { grid-template-columns: repeat(3,1fr); } }
     .stat {
       background: var(--blanco); border-radius: var(--radio);
       border: 1px solid rgba(0,0,0,0.05); padding: 14px 16px; box-shadow: var(--sombra);
     }
     .stat-n { font-size: 24px; font-weight: 700; }
     .stat-l { font-size: 11px; color: var(--texto-sub); margin-top: 2px; }
+    @media(max-width:600px) {
+      .stats { gap: 8px; margin-bottom: 16px; }
+      .stat { padding: 10px 12px; }
+      .stat-n { font-size: 20px; }
+    }
 
     /* ── PANEL ── */
     .panel {
@@ -145,6 +176,20 @@
     tr:hover td { background: #fafbff; }
     .td-actions { display: flex; gap: 5px; }
     .table-scroll { overflow-x: auto; }
+    /* La bitácora de Envíos (js/envios.js) usa las clases de tabla de Calidad
+       y Certificaciones, que aquí no existían: salía sin tarjeta y en
+       teléfono la tabla se cortaba a la derecha sin poder deslizarla. */
+    .tabla-card {
+      background: var(--blanco); border-radius: var(--radio-lg);
+      border: 1px solid rgba(0,0,0,0.05); box-shadow: var(--sombra); overflow: hidden;
+    }
+    .tabla-header {
+      padding: 14px 18px; border-bottom: 1px solid var(--borde);
+      display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .tabla-title { font-size: 14px; font-weight: 600; color: var(--texto); }
+    .tabla-count { font-size: 12px; color: var(--texto-hint); }
+    .tabla-wrap  { overflow-x: auto; }
 
     /* ── BADGES ── */
     .badge {
@@ -306,6 +351,7 @@
       background:var(--rojo-light); border-radius:20px; padding:3px 9px; white-space:nowrap; cursor:help; }
 </style>
   <script src="js/envios.js"></script>
+  <link rel="stylesheet" href="css/movil.css">
 </head>
 <body>
 
@@ -2328,8 +2374,8 @@ function renderAnuncios() {
         <div style="font-size:13px;font-weight:600;color:var(--texto);margin-bottom:2px">${esc(a.titulo||'Sin título')}</div>
         ${a.enlace?`<div style="font-size:11px;color:var(--azul);word-break:break-all;margin-bottom:8px">${esc(a.enlace)}</div>`:'<div style="font-size:11px;color:var(--texto-hint);margin-bottom:8px">Sin enlace</div>'}
         <div style="display:flex;gap:6px">
-          <button onclick="toggleAnuncio(${a.id},${a.activo?0:1})" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--borde);background:var(--blanco);color:var(--texto-sub);font-size:11px;font-weight:600;cursor:pointer">${a.activo?'Desactivar':'Activar'}</button>
-          <button onclick="eliminarAnuncio(${a.id})" style="padding:6px 10px;border-radius:6px;border:1px solid var(--rojo);background:var(--rojo-light,#fdecea);color:var(--rojo);font-size:11px;font-weight:600;cursor:pointer">🗑</button>
+          <button class="tactil" onclick="toggleAnuncio(${a.id},${a.activo?0:1})" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--borde);background:var(--blanco);color:var(--texto-sub);font-size:11px;font-weight:600;cursor:pointer">${a.activo?'Desactivar':'Activar'}</button>
+          <button class="tactil" onclick="eliminarAnuncio(${a.id})" style="padding:6px 10px;border-radius:6px;border:1px solid var(--rojo);background:var(--rojo-light,#fdecea);color:var(--rojo);font-size:11px;font-weight:600;cursor:pointer">🗑</button>
         </div>
       </div>
     </div>`).join('');
@@ -2471,7 +2517,7 @@ function renderPagos() {
           ${p.estado_venc!=='pagado' ? `<button onclick="marcarPagado(${p.id})" title="Registrar pago" style="background:#e8f5e9;border:1px solid #43a047;color:#1b5e20;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">✓ Pagar</button>` : ''}
           <button onclick="abrirDocsServicio(${p.id},'${pgEsc(p.concepto).replace(/'/g,'')}')" title="Documentos" style="background:#eef2ff;border:1px solid #c7d2fe;color:#3730a3;border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">📎 Docs</button>
           <button onclick="abrirPago(${p.id})" style="background:var(--azul-light,#e8f1fb);border:none;color:var(--azul);border-radius:6px;padding:5px 10px;font-size:11px;font-weight:600;cursor:pointer">Editar</button>
-          <button onclick="eliminarPago(${p.id},'${pgEsc(p.concepto).replace(/'/g,'')}')" style="background:var(--rojo-light,#fdecea);border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;cursor:pointer">🗑</button>
+          <button class="tactil" onclick="eliminarPago(${p.id},'${pgEsc(p.concepto).replace(/'/g,'')}')" style="background:var(--rojo-light,#fdecea);border:1px solid var(--rojo);color:var(--rojo);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:600;cursor:pointer">🗑</button>
         </div>
       </td>
     </tr>`;
@@ -2746,5 +2792,6 @@ async function probarSmtp() {
 
 </script>
 <script src="js/cambio-rol.js"></script>
+<script src="js/movil.js"></script>
 </body>
 </html>

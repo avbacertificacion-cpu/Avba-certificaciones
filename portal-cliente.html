@@ -23,7 +23,8 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 .hdr-empresa-sel{padding:5px 28px 5px 10px;border-radius:7px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font-size:12px;font-weight:600;cursor:pointer;outline:none;max-width:200px;appearance:auto;}
 .wrap{max-width:1000px;margin:0 auto;padding:20px 16px 60px;}
 /* Stats */
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px;}
+/* Son cuatro tarjetas: en tres columnas "Reportes PND" quedaba sola abajo. */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;}
 @media(max-width:500px){.stats{grid-template-columns:1fr 1fr;}}
 .stat{background:var(--blanco);border-radius:12px;padding:14px 16px;border:1px solid rgba(0,0,0,.05);box-shadow:0 2px 10px rgba(0,0,0,.04);}
 .stat-n{font-size:24px;font-weight:700;}
@@ -374,6 +375,16 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--gris-bg);}
 .tab-card-body{padding:8px;display:flex;flex-direction:column;gap:2px;}
 .tab-card-body .tab-btn{flex:none;text-align:left;white-space:nowrap;font-size:12.5px;padding:9px 12px;}
 @media(max-width:640px){.tab-cards-grid{grid-template-columns:1fr;}}
+/* En teléfono el menú era una lista de un solo botón por renglón, más alta que
+   la pantalla. En dos columnas se ve casi completo y cada botón es del tamaño
+   de un dedo; js/movil.js lleva al contenido al tocar y ofrece volver. */
+@media(max-width:640px){
+  .tab-card-body{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+  .tab-card-body .tab-btn{white-space:normal;line-height:1.25;min-height:44px;display:flex;align-items:center;padding:8px 10px;}
+  .tab-card-body .tab-btn.active{box-shadow:0 2px 8px rgba(12,68,124,.25);}
+  .stat{padding:10px 12px;}
+  .stat-n{font-size:20px;}
+}
 /* ── mantener scrollable la barra legacy si aún existe ─────── */
 .tabs{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;}
 .tab-btn{white-space:nowrap;}
@@ -469,6 +480,7 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
 .asig-item input{width:auto;flex-shrink:0}
 .asig-item .asig-sub{font-size:11px;color:#9aa}
 </style>
+<link rel="stylesheet" href="css/movil.css">
 </head>
 <body>
 <div class="header">
@@ -5823,5 +5835,6 @@ async function guardarAsignacion() {
 }
 </script>
 <script src="js/solicitudes-cert.js"></script>
+<script src="js/movil.js"></script>
 </body>
 </html>

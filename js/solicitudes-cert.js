@@ -64,7 +64,7 @@
         </select>
         <input type="text" id="${contenedorId}-cliente" placeholder="Empresa"
                style="padding:8px 11px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px;min-width:150px">
-        <button type="button" id="${contenedorId}-btn" style="padding:8px 16px;border-radius:8px;border:none;
+        <button type="button" id="${contenedorId}-btn" class="tactil" style="padding:8px 16px;border-radius:8px;border:none;
                 background:var(--azul,#185FA5);color:#fff;font-size:13px;font-weight:600;cursor:pointer">Buscar</button>
       </div>
       <div id="${contenedorId}-lista"></div>`;

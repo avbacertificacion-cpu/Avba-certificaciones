@@ -92,11 +92,17 @@
     #reader { width: 100% !important; }
     #reader video { border-radius: 12px; }
     #reader img { display: none !important; }
+    /* Con la cámara apagada el lector vacío ocupaba el ancho completo y
+       empujaba el aviso de "Toca para activar" contra la orilla izquierda. */
+    .scanner-wrap:not(.activo) #reader { display: none; }
 
+    /* Todo el recuadro responde al toque, no sólo el botón de la esquina. */
     .scanner-placeholder {
-      display: flex; flex-direction: column; align-items: center;
-      padding: 28px 20px; gap: 8px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      align-self: stretch; flex: 1; min-height: 160px;
+      padding: 28px 20px 52px; gap: 8px; text-align: center;
     }
+    .scanner-placeholder:focus-visible { outline: 2px solid #00c6ff; outline-offset: -4px; border-radius: 12px; }
     .scanner-placeholder svg { width: 38px; height: 38px; color: rgba(255,255,255,0.25); }
     .scanner-placeholder span { font-size: 12px; color: rgba(255,255,255,0.35); }
 
@@ -125,6 +131,18 @@
     .btn-camara:hover { background: rgba(0,0,0,0.8); color: white; }
     .btn-camara svg { width: 12px; height: 12px; }
     .btn-camara.activo { background: rgba(200,0,0,0.6); border-color: rgba(255,0,0,0.3); }
+    @media (pointer: coarse) {
+      .btn-camara { padding: 10px 16px; font-size: 13px; min-height: 40px; }
+      .btn-camara svg { width: 14px; height: 14px; }
+    }
+
+    /* En teléfono el logo ocupaba casi media pantalla y el recuadro para
+       validar quedaba abajo del pliegue. */
+    @media (max-width: 480px) {
+      .brand { margin-bottom: 18px; }
+      .brand-logo { padding: 10px 16px; border-radius: 14px; }
+      .brand-logo img { width: 132px; }
+    }
 
     /* ── DIVIDER ── */
     .divider {
@@ -154,6 +172,9 @@
       background: white;
     }
     .inp.err { box-shadow: 0 0 0 2.5px var(--rojo); }
+    /* El ejemplo de folio no cabía y se cortaba a la mitad del código. */
+    .inp::placeholder { font-size: 13px; letter-spacing: 0; font-weight: 500; }
+    @media (max-width: 400px) { .inp::placeholder { font-size: 12px; } }
 
     /* ── CAPTCHA ── */
     .captcha-section { margin-bottom: 12px; }
@@ -401,6 +422,7 @@
     .page-footer a { color: rgba(255,255,255,0.35); text-decoration: none; }
     .page-footer a:hover { color: rgba(255,255,255,0.6); }
   </style>
+  <link rel="stylesheet" href="css/movil.css">
 </head>
 <body class="bg-neutro">
 
@@ -420,7 +442,9 @@
   <!-- SCANNER -->
   <div class="scanner-wrap" id="scanner-wrap">
     <div class="scan-line" id="scan-line"></div>
-    <div class="scanner-placeholder" id="scanner-placeholder">
+    <div class="scanner-placeholder" id="scanner-placeholder" role="button" tabindex="0"
+         aria-label="Activar la cámara para escanear el código QR"
+         onclick="iniciarCamara()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();iniciarCamara();}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
         <rect x="3" y="3" width="7" height="7"/>
         <rect x="14" y="3" width="7" height="7"/>
@@ -1154,6 +1178,7 @@ function esMovil() {
 }
 
 async function toggleCamara() {
+  if (camaraArrancando) return;
   if (scannerActivo) {
     await detenerCamara();
   } else {
@@ -1161,7 +1186,15 @@ async function toggleCamara() {
   }
 }
 
+let camaraArrancando = false;
 async function iniciarCamara() {
+  // La cámara tarda en abrir: un segundo toque mientras tanto abría otra.
+  if (scannerActivo || camaraArrancando) return;
+  camaraArrancando = true;
+  try { await abrirCamara(); } finally { camaraArrancando = false; }
+}
+
+async function abrirCamara() {
   const placeholder = document.getElementById("scanner-placeholder");
   const btnCam      = document.getElementById("btn-camara");
   const wrap        = document.getElementById("scanner-wrap");
@@ -1258,5 +1291,6 @@ async function detenerCamara() {
      }
 ═══════════════════════════════════════ */
 </script>
+<script src="js/movil.js"></script>
 </body>
 </html>

@@ -85,14 +85,21 @@
     }
     .field input.error { border-color: var(--rojo); box-shadow: 0 0 0 3px rgba(163,45,45,0.1); }
 
-    /* Mostrar/ocultar contraseña */
+    /* Mostrar/ocultar contraseña.
+       El ojo heredaba la regla de los íconos del campo (absoluto, a 12 px de
+       la izquierda y sin recibir clics): quedaba fuera de un botón de 4 px de
+       ancho y tocarlo no hacía nada, ni en teléfono ni en computadora. */
     .toggle-pass {
-      position: absolute; right: 12px; top: 50%;
+      position: absolute; right: 4px; top: 50%;
       transform: translateY(-50%);
+      width: 36px; height: 36px; padding: 0; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
       cursor: pointer; color: var(--texto-sub);
-      background: none; border: none; padding: 2px;
+      background: none; border: none;
     }
-    .toggle-pass svg { width: 16px; height: 16px; }
+    .toggle-pass:hover { color: var(--azul); }
+    .toggle-pass svg { position: static; transform: none; width: 16px; height: 16px; }
+    .field input#password { padding-right: 44px; }
 
     /* Error */
     .error-box {
@@ -140,6 +147,7 @@
       font-size: 12px; color: var(--texto-sub);
     }
   </style>
+  <link rel="stylesheet" href="css/movil.css">
 </head>
 <body>
 
@@ -388,5 +396,6 @@ if ("serviceWorker" in navigator) {
   });
 }
 </script>
+<script src="js/movil.js"></script>
 </body>
 </html>

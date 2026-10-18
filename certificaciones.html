@@ -49,6 +49,14 @@
       #hdr-user-cert { display: none; }
       .btn-hdr { padding: 7px 10px; font-size: 11px; }
     }
+    /* En teléfono los botones del encabezado dejaban el título en
+       "Certific…": Actualizar queda sólo con su ícono y Cerrar sesión, Salir. */
+    .solo-movil { display: none; }
+    @media (max-width: 480px) {
+      .btn-hdr-txt, .solo-pc { display: none; }
+      .solo-movil { display: inline; }
+      .btn-hdr { justify-content: center; min-width: 40px; }
+    }
     .logo {
       width: 36px; height: 36px; border-radius: 50%;
       background: rgba(255,255,255,0.15);
@@ -105,7 +113,8 @@
 
     /* ── STATS ── */
     .stats { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 16px; }
-    @media (max-width:700px) { .stats { grid-template-columns: repeat(2,1fr); } }
+    /* Cinco tarjetas en dos columnas eran tres renglones antes de la tabla. */
+    @media (max-width:700px) { .stats { grid-template-columns: repeat(3,1fr); } }
     .stat {
       background: var(--blanco); border-radius: var(--radio);
       border: 1px solid rgba(0,0,0,0.05);
@@ -113,6 +122,11 @@
     }
     .stat-n { font-size: 24px; font-weight: 600; }
     .stat-l { font-size: 11px; color: var(--texto-sub); margin-top: 2px; }
+    @media (max-width:600px) {
+      .stats { gap: 8px; }
+      .stat { padding: 10px 12px; }
+      .stat-n { font-size: 20px; }
+    }
 
     /* ── FILTROS ── */
     .filtros-card {
@@ -510,6 +524,7 @@
 </style>
   <script src="js/tabla-clientes.js"></script>
   <script src="js/envios.js"></script>
+  <link rel="stylesheet" href="css/movil.css">
 </head>
 <body>
 
@@ -522,15 +537,15 @@
   </div>
   <div class="hdr-actions">
     <span id="hdr-user-cert" style="font-size:12px;color:rgba(255,255,255,0.7);margin-right:4px"></span>
-    <button class="btn-hdr" onclick="cargar()">
+    <button class="btn-hdr" onclick="cargar()" title="Actualizar" aria-label="Actualizar">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2 8a6 6 0 1010.5-4M14 2v4h-4"/></svg>
-      Actualizar
+      <span class="btn-hdr-txt">Actualizar</span>
     </button>
     <button id="btn-volver-admin-cert" class="btn-hdr" onclick="location.href='admin.html'" style="display:none">
       ← Admin
     </button>
     <button class="btn-hdr" onclick="localStorage.removeItem('avba_session');location.href='login.html'">
-      Cerrar sesión
+      <span class="solo-pc">Cerrar sesión</span><span class="solo-movil">Salir</span>
     </button>
   </div>
 </div>
@@ -4386,5 +4401,6 @@ async function verEvidencia(url) {
 </div>
 
 <script src="js/cambio-rol.js"></script>
+<script src="js/movil.js"></script>
 </body>
 </html>
