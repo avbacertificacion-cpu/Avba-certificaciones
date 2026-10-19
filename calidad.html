@@ -2558,13 +2558,25 @@ const PC_DEF = {
   'dictamen_grua_portico.html':{ label:'Grúa Pórtico',
     rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}],
     cols:['peso','luz','altura','flecha','resultado'], calc:[] },
+  // Una sola prueba, estática: en la canastilla al 125% fijo; en la oreja de
+  // carga el factor se captura (vacío = 125%).
+  'dictamen_canastilla.html':  { label:'Canastilla estructural',
+    rows:[{k:'estatica',l:'Prueba de carga estática (125%)'}],
+    cols:['duracion','deformacion','resultado'], calc:[], headerFields:['capacidad'] },
+  'dictamen_canastilla_sin_puerta.html': { label:'Canastilla estructural sin puerta',
+    rows:[{k:'estatica',l:'Prueba de carga estática (125%)'}],
+    cols:['duracion','deformacion','resultado'], calc:[], headerFields:['capacidad'] },
+  'dictamen_oreja_carga.html': { label:'Oreja de carga',
+    rows:[{k:'prueba_estatica',l:'Prueba de carga estática'}],
+    cols:['duracion','deformacion','resultado'], calc:[], headerFields:['capacidad','factor'] },
 };
 const PC_LABELS = {
   peso:'Peso (TON)', radio:'Radio (m)', pluma:'Long. Pluma (m)',
   angulo:'Ángulo (°)', altura:'Altura (m)', resultado:'Resultado',
   duracion:'Duración (min)', inclin:'Inclinación (°)', estabilidad:'Estabilidad',
   extension:'Extensión (m)', cml:'CML (ton)', prueba:'Carga Prueba (ton)', deformacion:'Deformación (mm)',
-  luz:'Claro (m)', flecha:'Flecha (mm)'
+  luz:'Claro (m)', flecha:'Flecha (mm)',
+  capacidad:'Capacidad nominal (kg)', factor:'Factor de prueba (%) · vacío = 125'
 };
 
 /* ═══════════════════════════════════════
@@ -7144,6 +7156,12 @@ function renderTipoCard(t) {
           <option value="dictamen_ptem.html"        ${t.plantilla_dict_html==='dictamen_ptem.html'        ? 'selected' : ''}>PTEM — Plataforma de Elevación Móvil</option>
           <option value="dictamen_grua_torre.html"  ${t.plantilla_dict_html==='dictamen_grua_torre.html'  ? 'selected' : ''}>Grúa Torre</option>
           <option value="dictamen_telehandler.html" ${t.plantilla_dict_html==='dictamen_telehandler.html' ? 'selected' : ''}>Telehandler</option>
+          <option value="dictamen_mewp.html"        ${t.plantilla_dict_html==='dictamen_mewp.html'        ? 'selected' : ''}>MEWP — Plataforma de Elevación</option>
+          <option value="dictamen_grua_oruga.html"  ${t.plantilla_dict_html==='dictamen_grua_oruga.html'  ? 'selected' : ''}>Grúa Estructural sobre Orugas</option>
+          <option value="dictamen_grua_portico.html" ${t.plantilla_dict_html==='dictamen_grua_portico.html' ? 'selected' : ''}>Grúa Pórtico</option>
+          <option value="dictamen_canastilla.html"  ${t.plantilla_dict_html==='dictamen_canastilla.html'  ? 'selected' : ''}>Canastilla Estructural</option>
+          <option value="dictamen_canastilla_sin_puerta.html" ${t.plantilla_dict_html==='dictamen_canastilla_sin_puerta.html' ? 'selected' : ''}>Canastilla Estructural sin Puerta</option>
+          <option value="dictamen_oreja_carga.html" ${t.plantilla_dict_html==='dictamen_oreja_carga.html' ? 'selected' : ''}>Oreja de Carga</option>
         </select>
         <div style="font-size:11px;color:var(--texto-hint);margin-top:5px">Define el formato del dictamen para el inspector de este tipo de equipo</div>
       </div>

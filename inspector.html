@@ -3257,6 +3257,22 @@ const PC_TEMPLATES = {
       { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
     ]
   },
+  'dictamen_oreja_carga.html': {
+    label: 'Oreja de carga',
+    // Prueba estática, como la canastilla, pero el factor se captura: 125% es
+    // lo habitual y es lo que vale si se deja vacío; el plano o el cliente
+    // pueden pedir otro. La carga de prueba se calcula en el dictamen.
+    headerFields: [
+      { id:'capacidad', label:'Capacidad nominal', unit:'kg' },
+      { id:'factor',    label:'Factor de prueba',  unit:'%', placeholder:'125' },
+    ],
+    rows: [{ key:'prueba_estatica', label:'Prueba de carga estática' }],
+    cols: [
+      { id:'duracion',    label:'Duración',               unit:'min' },
+      { id:'deformacion', label:'Deformación permanente', unit:'mm'  },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  },
   'dictamen_ptem.html': {
     label: 'PTEM',
     platformSelect: true,
@@ -4170,7 +4186,7 @@ function renderPruebaCarga() {
       const val = pcAttr(previo[f.id] || '');
       html += `<div style="display:flex;align-items:center;gap:6px">
         <label style="font-size:12px;font-weight:600;color:var(--texto-sub);white-space:nowrap">${f.label}${f.unit ? ' ('+f.unit+')' : ''}</label>
-        <input type="text" id="pc-header-${f.id}" value="${val}" oninput="pcGuardar()" style="width:95px;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:13px;text-align:center">
+        <input type="text" id="pc-header-${f.id}" value="${val}" placeholder="${f.placeholder || ''}" oninput="pcGuardar()" style="width:95px;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:13px;text-align:center">
       </div>`;
     });
     html += `<span style="font-size:11px;color:var(--texto-hint)">valor único, no se repite por fila</span></div>`;
@@ -4186,7 +4202,9 @@ function renderPruebaCarga() {
   tpl.rows.forEach((row, ri) => {
     const bg = ri % 2 === 0 ? 'var(--gris-bg)' : '#fff';
     html += `<tr style="background:${bg}">`;
-    html += `<td style="padding:8px 10px;font-weight:600;font-size:12px;border:1px solid var(--borde);white-space:nowrap">${row.label}</td>`;
+    // La etiqueta puede partirse en dos renglones: sin partir, en teléfono
+    // empujaba las columnas de captura fuera de la pantalla.
+    html += `<td style="padding:8px 10px;font-weight:600;font-size:12px;border:1px solid var(--borde);min-width:96px;line-height:1.3">${row.label}</td>`;
     tpl.cols.forEach(c => {
       const fid   = `pc_${row.key}_${c.id}`;
       const dato  = (previo[row.key] || {})[c.id];

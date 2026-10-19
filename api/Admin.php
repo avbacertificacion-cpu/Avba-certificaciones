@@ -23,6 +23,7 @@ class Admin {
         'grua_portico' => ['GRÚA PÓRTICO', 'dictamen_grua_portico.html'],
         'canastilla'   => ['CANASTILLA ESTRUCTURAL', 'dictamen_canastilla.html'],
         'canastilla_sp' => ['CANASTILLA ESTRUCTURAL SIN PUERTA', 'dictamen_canastilla_sin_puerta.html'],
+        'oreja_carga'   => ['OREJA DE CARGA', 'dictamen_oreja_carga.html'],
     ];
 
     /**
@@ -341,6 +342,81 @@ class Admin {
                 ['NOM-004-STPS-1999',       'referencia'],
             ],
         ],
+
+        /* Oreja de carga: la placa con un ojo, soldada o atornillada a un equipo
+           o a una estructura, de la que se iza con un grillete. No tiene partes
+           móviles: lo que decide si sirve es que la placa no se haya deformado
+           ni agrietado, que el ojo no se haya alargado y que la unión a la
+           estructura aguante.
+
+           Por eso la lista carga hacia lo que no se ve a simple vista —las
+           fisuras en la soldadura y en el contorno del ojo, que se buscan con
+           líquidos penetrantes— y hacia la dirección de la carga: una oreja
+           diseñada para tirar en su plano falla con mucho menos si se le jala
+           de lado.
+
+           Las hay soldadas y atornilladas, así que la sección de la unión trae
+           los puntos de ambas: en cada inspección se marcan como no aplicables
+           los que no correspondan. */
+        'oreja_carga' => [
+            'secciones' => [
+                ['A', 'Identificación y marcado'],
+                ['B', 'Placa de la oreja'],
+                ['C', 'Ojo de izaje'],
+                ['D', 'Unión a la estructura: soldadura o tornillería'],
+                ['E', 'Orientación y compatibilidad con el aparejo'],
+                ['F', 'Prueba de carga'],
+                ['G', 'Documentación'],
+            ],
+            'items' => [
+                ['A', 'A-01', 'Capacidad de carga de trabajo marcada en la oreja, legible y permanente (estampado o placa)'],
+                ['A', 'A-02', 'Número de serie o de identificación marcado y legible'],
+                ['A', 'A-03', 'Espesor de placa, diámetro del ojo y material corresponden con el plano o la memoria de cálculo'],
+                ['B', 'B-01', 'Sin fisuras, en especial en el contorno del ojo y en la transición hacia la base'],
+                ['B', 'B-02', 'Sin deformación: doblez, torsión ni pandeo fuera del plano'],
+                ['B', 'B-03', 'Sin pérdida de espesor por corrosión, picaduras o desgaste'],
+                ['B', 'B-04', 'Sin muescas, golpes, cortes ni quemaduras de arco'],
+                ['B', 'B-05', 'Sin barrenos, cortes, calentamientos ni reparaciones no autorizadas'],
+                ['C', 'C-01', 'Ojo sin elongación ni ovalamiento: diámetro medido en dos direcciones'],
+                ['C', 'C-02', 'Desgaste del ojo dentro de lo admisible por el plano o la memoria de cálculo'],
+                ['C', 'C-03', 'Bordes del ojo sin rebabas, filos ni muescas que dañen el perno del grillete'],
+                ['C', 'C-04', 'Holgura entre el ojo y el perno del grillete adecuada, sin juego excesivo'],
+                ['C', 'C-05', 'Placas de refuerzo del ojo íntegras y bien unidas, si el diseño las incluye'],
+                ['D', 'D-01', 'Soldadura completa en todo su perímetro, sin interrupciones'],
+                ['D', 'D-02', 'Soldadura sin fisuras, poros, socavación ni falta de fusión visibles'],
+                ['D', 'D-03', 'Líquidos penetrantes o partículas magnéticas en soldadura y contorno del ojo: sin indicaciones relevantes'],
+                ['D', 'D-04', 'Tornillería de la base completa, del grado especificado, apretada y con tuerca de seguridad'],
+                ['D', 'D-05', 'Barrenos de la base sin elongación ni fisuras; base asentada sin holgura'],
+                ['D', 'D-06', 'Estructura donde va montada sin fisuras ni deformación alrededor de la unión'],
+                ['E', 'E-01', 'Oreja alineada con la dirección de la carga: no trabaja con carga lateral fuera de su plano'],
+                ['E', 'E-02', 'Ángulo de la eslinga dentro de lo previsto en el diseño'],
+                ['E', 'E-03', 'Grillete compatible en tamaño y capacidad, sin rozar con la estructura'],
+                ['E', 'E-04', 'Espacio libre suficiente para conectar y desconectar el grillete'],
+                ['F', 'F-01', 'Prueba de carga estática con el factor especificado (125% de la capacidad nominal, salvo otra indicación del diseño)'],
+                ['F', 'F-02', 'Carga aplicada en la dirección de diseño de la oreja'],
+                ['F', 'F-03', 'Sin deformación permanente al retirar la carga'],
+                ['F', 'F-04', 'Sin fisuras ni indicaciones en la revisión posterior a la prueba'],
+                ['G', 'G-01', 'Plano o memoria de cálculo de la oreja: capacidad, material y espesor'],
+                ['G', 'G-02', 'Certificado de calidad del material de la placa'],
+                ['G', 'G-03', 'Procedimiento de soldadura y calificación del soldador, si es soldada'],
+                ['G', 'G-04', 'Registro de la última prueba de carga y de las pruebas no destructivas'],
+            ],
+            // Las acreditadas, como en la canastilla: es otro dispositivo de
+            // izaje que se inspecciona con el mismo alcance. De referencia,
+            // B30.20 (lo que va bajo el gancho) y BTH-1 (con qué se diseña una
+            // oreja), B30.26 por el grillete, y para la soldadura su código
+            // y el método de líquidos penetrantes.
+            'normas' => [
+                ['NMX-GR-23814-IMNC-2011',  'acreditada'],
+                ['NMX-EC-17020-IMNC-2014',  'acreditada'],
+                ['ASME B30.20',             'referencia'],
+                ['ASME BTH-1',              'referencia'],
+                ['ASME B30.26',             'referencia'],
+                ['AWS D1.1/D1.1M',          'referencia'],
+                ['ASTM E165/E165M',         'referencia'],
+                ['NOM-006-STPS-2014',       'referencia'],
+            ],
+        ],
     ];
 
     /**
@@ -364,6 +440,7 @@ class Admin {
     private const SEED_NORMAS_PORTICO = 'normas_portico_23814_17020';
     private const SEED_CATALOGO       = 'catalogo_normas_v1';
     private const SEED_CHECKLIST_CSP  = 'checklist_canastilla_sp_v2';
+    private const SEED_CATALOGO_V2    = 'catalogo_normas_v2';
 
     /**
      * Topes por grupo. Son de espacio, no de criterio: con siete normas
@@ -403,13 +480,62 @@ class Admin {
         ['ANSI A92.24',             'Plataformas de elevación — capacitación'],
     ];
 
+    /**
+     * Normas que se sumaron al catálogo después de la primera siembra, con las
+     * orejas de carga. Van aparte porque la siembra original no se vuelve a
+     * correr: reponer la lista completa devolvería las que Calidad ya quitó.
+     */
+    private const CATALOGO_NORMAS_V2 = [
+        ['ASME BTH-1',      'Diseño de dispositivos de izaje bajo el gancho (orejas, vigas, yugos)'],
+        ['AWS D1.1/D1.1M',  'Código de soldadura estructural — acero'],
+        ['ASTM E165/E165M', 'Inspección por líquidos penetrantes'],
+        ['ASTM E709',       'Inspección por partículas magnéticas'],
+    ];
+
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
         $this->seedTiposMaquinaria();
         $this->sembrarNormasAcreditacion();
         $this->ajustarNormasPortico();
         $this->sembrarCatalogoNormas();
+        $this->ampliarCatalogoNormas();
         $this->corregirChecklistCanastillaSinPuerta();
+    }
+
+    /**
+     * Agrega al catálogo las normas de CATALOGO_NORMAS_V2, una sola vez. Las
+     * que ya estén no se duplican; si entraron sin descripción —en una
+     * instalación nueva las recoge la primera siembra porque ya las usa la
+     * oreja de carga—, se les pone la suya.
+     */
+    private function ampliarCatalogoNormas(): void {
+        try {
+            $st = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
+            $st->execute([self::SEED_CATALOGO_V2]);
+            if ($st->fetch()) return;
+
+            $ya = array_map(
+                'strtoupper',
+                $this->pdo->query("SELECT norma FROM normas_catalogo")->fetchAll(PDO::FETCH_COLUMN) ?: []
+            );
+            $ins = $this->pdo->prepare("INSERT INTO normas_catalogo (norma, descripcion) VALUES (?, ?)");
+            $des = $this->pdo->prepare(
+                "UPDATE normas_catalogo SET descripcion = ?
+                 WHERE UPPER(norma) = ? AND (descripcion IS NULL OR descripcion = '')"
+            );
+            foreach (self::CATALOGO_NORMAS_V2 as [$norma, $desc]) {
+                if (in_array(strtoupper($norma), $ya, true)) {
+                    $des->execute([$desc, strtoupper($norma)]);
+                    continue;
+                }
+                $ins->execute([$norma, $desc]);
+            }
+
+            $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")
+                ->execute([self::SEED_CATALOGO_V2]);
+        } catch (\Throwable $e) {
+            error_log('[Admin] ampliarCatalogoNormas: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -1580,6 +1706,10 @@ class Admin {
             'dictamen_grua_torre.html', 'dictamen_telehandler.html',
             'dictamen_mewp.html', 'dictamen_grua_oruga.html',
             'dictamen_grua_portico.html',
+            // Faltaban: la siembra se las asigna a sus tipos, pero si Calidad
+            // cambiaba la plantilla ya no podía regresarla.
+            'dictamen_canastilla.html', 'dictamen_canastilla_sin_puerta.html',
+            'dictamen_oreja_carga.html',
         ];
         if (!in_array($html, $allowed, true)) {
             return ['status' => 'error', 'message' => 'Plantilla HTML no válida.'];

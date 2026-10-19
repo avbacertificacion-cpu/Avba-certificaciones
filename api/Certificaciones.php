@@ -1071,7 +1071,7 @@ class Certificaciones {
         $pruebaCargaHtml = '';
         if (!empty($d['prueba_carga'])) {
             $pcTok = json_decode($d['prueba_carga'], true) ?? [];
-            if ($this->pruebasCargaCapturadas($pcTok) >= 2) {
+            if ($this->pruebaCargaSuficiente($pcTok)) {
                 $pruebaCargaHtml = $this->buildPruebaCargaHtml($pcTok);
             }
         }
@@ -1119,7 +1119,7 @@ class Certificaciones {
         // La prueba de carga se resuelve antes que las fotos: si la sección no va,
         // la evidencia dispone del hueco que deja.
         $pcDatos = !empty($d['prueba_carga']) ? (json_decode($d['prueba_carga'], true) ?? []) : [];
-        $hayPc   = $this->pruebasCargaCapturadas($pcDatos) >= 2;
+        $hayPc   = $this->pruebaCargaSuficiente($pcDatos);
         $html = $this->inyectarFotosDictamen($html, $d['evidencia_url'] ?? '', $hayPc);
 
         // Prueba de carga: primero se decide si la sección va o no, y sólo
@@ -1312,6 +1312,8 @@ body { background:#fff!important; }
                 'trabajo' => 'Carga de Trabajo', 'sobrecarga' => 'Prueba de Sobrecarga',
                 // Canastilla: una sola prueba, estática, al 125%.
                 'estatica' => 'Prueba de carga estática (125%)',
+                // Oreja de carga: también estática, pero el factor se captura.
+                'prueba_estatica' => 'Prueba de carga estática',
                 // Grúa de celosía: una prueba por gancho.
                 'princ_sin' => 'Gancho principal · sin carga',
                 'princ_con' => 'Gancho principal · con carga',
@@ -1527,32 +1529,61 @@ body { background:#fff!important; }
             $html = str_replace('{pc_izaje_deformacion}', $deformacion !== '' ? $e($deformacion) : 'NA', $html);
         }
 
-        // 5c. Canastilla estructural: la prueba es estática y la carga es el
-        //     125% de la capacidad nominal, no el doble como en un accesorio de
-        //     izaje. Lo que se mide al descargar es la deformación PERMANENTE:
-        //     si la estructura no recupera, no se repara, se retira.
-        if (strpos($html, '{pc_canastilla_capacidad}') !== false) {
+        // 5c. Prueba estática sobre la capacidad nominal: canastilla y oreja de
+        //     carga. La carga de prueba se deriva de la capacidad capturada, no
+        //     la teclea el inspector, y lo que se mide al descargar es la
+        //     deformación PERMANENTE: si la estructura no recupera, no se
+        //     repara, se retira.
+        //
+        //     En la canastilla el factor es fijo, 125%, como pide el izaje de
+        //     personal. En la oreja se captura: 125% es lo habitual para lo que
+        //     va bajo el gancho, pero el plano o el cliente pueden pedir otro.
+        foreach (['pc_canastilla' => 125.0, 'pc_oreja' => null] as $pref => $factorFijo) {
+            if (strpos($html, '{' . $pref . '_capacidad}') === false) continue;
+
             $fila = [];
-            foreach (['estatica', 'prueba', 'con', 'trabajo'] as $k) {
+            foreach (['estatica', 'prueba_estatica', 'prueba', 'con', 'trabajo'] as $k) {
                 if (is_array($pc[$k] ?? null)) { $fila = $pc[$k]; break; }
             }
 
             $cap = trim((string)($pc['capacidad'] ?? ''));
             if ($cap === '') $cap = trim((string)($fila['capacidad'] ?? ''));
+            // "1,000 kg" es mil: sin esto se leía como 1 y la prueba salía en 1.
+            $capNum = preg_replace('/(\s|,|kgs?\.?$)/i', '', $cap);
+            if ($capNum !== '' && is_numeric($capNum)) $cap = $capNum;
 
-            $carga = (is_numeric($cap) && (float)$cap > 0) ? (string)((float)$cap * 1.25) : '';
+            $factor = $factorFijo ?? $this->factorPruebaEstatica($pc['factor'] ?? '');
+
+            $carga = (is_numeric($cap) && (float)$cap > 0) ? (string)((float)$cap * $factor / 100) : '';
             if ($carga === '') $carga = trim((string)($fila['prueba'] ?? ''));
 
             $duracion    = trim((string)($fila['duracion']    ?? ''));
             $deformacion = trim((string)($fila['deformacion'] ?? ''));
 
-            $html = str_replace('{pc_canastilla_capacidad}',  $cap   !== '' ? number_format((float)$cap, 0)   : 'NA', $html);
-            $html = str_replace('{pc_canastilla_prueba}',     $carga !== '' ? number_format((float)$carga, 0) : 'NA', $html);
-            $html = str_replace('{pc_canastilla_duracion}',    $duracion    !== '' ? $e($duracion)    : 'NA', $html);
-            $html = str_replace('{pc_canastilla_deformacion}', $deformacion !== '' ? $e($deformacion) : 'NA', $html);
+            $html = str_replace('{' . $pref . '_capacidad}',   $cap   !== '' && is_numeric($cap)   ? number_format((float)$cap, 0)   : ($cap !== '' ? $e($cap) : 'NA'), $html);
+            $html = str_replace('{' . $pref . '_prueba}',      $carga !== '' && is_numeric($carga) ? number_format((float)$carga, 0) : ($carga !== '' ? $e($carga) : 'NA'), $html);
+            $html = str_replace('{' . $pref . '_factor}',      rtrim(rtrim(number_format($factor, 1, '.', ''), '0'), '.'), $html);
+            $html = str_replace('{' . $pref . '_duracion}',    $duracion    !== '' ? $e($duracion)    : 'NA', $html);
+            $html = str_replace('{' . $pref . '_deformacion}', $deformacion !== '' ? $e($deformacion) : 'NA', $html);
         }
 
         return $html;
+    }
+
+    /**
+     * Factor de la prueba estática de la oreja de carga, en porcentaje.
+     *
+     * Vacío o fuera de lo razonable vale 125: menos del 100% no es prueba de
+     * carga, y más de 400% es casi seguro un error de captura (alguien que
+     * escribió la carga en vez del porcentaje). Admite "150 %" o "1.5": un
+     * factor menor de 10 se toma como multiplicador.
+     */
+    private function factorPruebaEstatica($valor): float {
+        $t = str_replace(['%', ','], ['', '.'], trim((string)$valor));
+        if ($t === '' || !is_numeric($t)) return 125.0;
+        $f = (float)$t;
+        if ($f > 0 && $f < 10) $f *= 100;
+        return ($f >= 100 && $f <= 400) ? $f : 125.0;
     }
 
     /** Genera el SVG de diagrama de grúa con coordenadas calculadas a partir de los valores reales. */
@@ -2224,7 +2255,9 @@ SVG;
      * "respondió correctamente en ambas pruebas realizadas".
      *
      * Se exigen las dos: una prueba a medias no sostiene el dictamen, y media
-     * tabla oficial es peor que ninguna.
+     * tabla oficial es peor que ninguna. Donde la plantilla trae una sola
+     * prueba —la estática de las canastillas y de las orejas de carga— basta
+     * esa (ver pruebaCargaSuficiente).
      *
      * Las normas acreditadas y de referencia viven dentro de la franja de
      * resultado de esta misma sección, y tienen que salir siempre. Por eso la
@@ -2242,7 +2275,7 @@ SVG;
         $marcas   = ['<!--BLOQUE_PRUEBA_CARGA-->', '<!--/BLOQUE_PRUEBA_CARGA-->'];
         $respaldo = ['<!--BLOQUE_NORMAS_SIN_PC-->', '<!--/BLOQUE_NORMAS_SIN_PC-->'];
 
-        if ($this->pruebasCargaCapturadas($pc) >= 2) {
+        if ($this->pruebaCargaSuficiente($pc)) {
             // Se conserva la sección y se va el respaldo. Las marcas no tienen
             // por qué viajar dentro del documento que recibe el cliente.
             $html = preg_replace('/<!--BLOQUE_NORMAS_SIN_PC-->.*?<!--\/BLOQUE_NORMAS_SIN_PC-->/s', '', $html) ?? $html;
@@ -2323,6 +2356,29 @@ SVG;
             }
         }
         return $hechas;
+    }
+
+    /**
+     * Si la prueba de carga está completa como para imprimirse.
+     *
+     * Se piden dos pruebas —sin y con carga, de trabajo y de sobrecarga—, y
+     * en la grúa de celosía, que trae cuatro renglones, siguen bastando dos.
+     * Pero hay plantillas de una sola prueba: la estática de las
+     * canastillas y de las orejas de carga. Con "dos" fijo, esa prueba nunca
+     * se imprimía aunque estuviera capturada completa, y el dictamen salía
+     * con la franja de "capacidades validadas por memoria de cálculo" en su
+     * lugar.
+     *
+     * Las filas se cuentan sobre lo que guardó el formulario, que siempre trae
+     * todas las de su plantilla, llenas o no.
+     */
+    private function pruebaCargaSuficiente(array $pc): bool {
+        $filas = 0;
+        foreach ($pc as $clave => $fila) {
+            if (is_array($fila) && $clave !== 'plantilla') $filas++;
+        }
+        if ($filas === 0) return false;
+        return $this->pruebasCargaCapturadas($pc) >= min(2, $filas);
     }
 
     private function recortarBloqueHorquillas(string $html, array $d): string {
