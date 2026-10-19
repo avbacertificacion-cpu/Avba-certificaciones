@@ -74,25 +74,28 @@ class Accesorios {
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
         $this->seedTipos();
-        $this->precargarOrejasMichelle();
+        $this->precargarOrejasMichel();
     }
 
     /**
      * Precarga única, pedida por la dirección: diez orejas de carga iguales
-     * —placa de 1/4", ojo de 2", 500 kg— que inspeccionó Michelle y de las que
-     * no hay más datos. Le quedan como sesión por enviar: al entrar ve el aviso,
-     * pone cliente y lugar, revisa las piezas y la manda a Calidad.
+     * —placa de 1/4", ojo de 2", 500 kg— que inspeccionó Michel y de las que
+     * no hay más datos. Le quedan como sesión por enviar en su cuenta de
+     * inspector: al entrar ve el aviso, pone cliente y lugar, revisa las piezas
+     * y la manda a Calidad.
      *
      * Cada oreja lleva un mismo número como etiqueta, serie y QR, y los diez
      * números son consecutivos. Se toman del banco de placas cuando hay diez
      * seguidas libres; si no, se numeran después de la más alta del banco, para
      * no chocar con placas ya impresas.
      *
-     * Corre una sola vez por base. Si la cuenta de Michelle no aparece, o hay
+     * Corre una sola vez por base. Si la cuenta de Michel no aparece, o hay
      * más de una que podría ser, no hace nada y vuelve a intentar en la
      * siguiente petición: es preferible a cargarle la sesión a otra persona.
      */
     private const PRECARGA_OREJAS = [
+        // La marca conserva la grafía con que se publicó primero: cambiarla
+        // haría que la precarga corriera otra vez donde ya se aplicó.
         'clave'     => 'precarga_orejas_michelle',
         'busca'     => 'MICHEL',
         'piezas'    => 10,
@@ -101,7 +104,7 @@ class Accesorios {
         'medidas'   => 'ESPESOR 1/4" · DIÁMETRO 2"',
     ];
 
-    private function precargarOrejasMichelle(): void {
+    private function precargarOrejasMichel(): void {
         $cfg = self::PRECARGA_OREJAS;
         try {
             $ya = $this->pdo->prepare("SELECT 1 FROM accesorios_tipos_seed WHERE clave = ?");
@@ -146,23 +149,28 @@ class Accesorios {
                 . $codigos[0] . '–' . end($codigos));
         } catch (\Throwable $e) {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
-            error_log('[Accesorios] precargarOrejasMichelle: ' . $e->getMessage());
+            error_log('[Accesorios] precargarOrejasMichel: ' . $e->getMessage());
         }
     }
 
     /**
-     * La cuenta activa de inspector cuyo nombre o usuario contiene $busca.
-     * Null si no hay ninguna o si hay más de una que podría ser: ante la duda
-     * no se adivina. Con dos, gana la que tiene Inspector como rol principal.
+     * La cuenta activa de inspector que lleva $busca como palabra completa en
+     * su nombre o en su usuario: "Michel García" o "michel.g" sí, "Michelle"
+     * no. Null si no hay ninguna o si hay más de una que podría ser: ante la
+     * duda no se adivina. Con dos, gana la que tiene Inspector como rol
+     * principal.
      */
     private function inspectorPorNombre(string $busca): ?string {
         $st = $this->pdo->prepare(
             "SELECT * FROM usuarios WHERE UPPER(nombre) LIKE ? OR UPPER(usuario) LIKE ?"
         );
         $st->execute(['%' . $busca . '%', '%' . $busca . '%']);
+        $palabra = '/(^|[^\p{L}])' . preg_quote($busca, '/') . '($|[^\p{L}])/u';
         $principal = []; $adicional = [];
         foreach ($st->fetchAll() as $u) {
             if (isset($u['activo']) && (int)$u['activo'] === 0) continue;
+            if (!preg_match($palabra, mb_strtoupper((string)($u['nombre'] ?? '')))
+                && !preg_match($palabra, mb_strtoupper((string)($u['usuario'] ?? '')))) continue;
             $rol   = strtoupper(trim((string)($u['rol'] ?? '')));
             $extra = array_map('trim', explode(',', strtoupper((string)($u['roles_extra'] ?? ''))));
             if ($rol === 'INSPECTOR')                  $principal[] = (string)$u['usuario'];
