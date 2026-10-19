@@ -16,7 +16,15 @@ class Accesorios {
     private PDO $pdo;
 
     /** Estatus en los que la sesión todavía admite cambios del inspector. */
-    private const ABIERTOS = ['PENDIENTE', 'DEVUELTO', 'RETORNADO', ''];
+    private const ABIERTOS = ['PENDIENTE', 'DEVUELTO', 'RETORNADO', '', self::BORRADOR];
+
+    /**
+     * Sesión preparada de antemano para un inspector: ya trae las piezas, pero
+     * le falta lo que sólo él puede poner —cliente y lugar— y que la mande.
+     * Mientras siga así no existe para Calidad ni para el buscador: no aparece
+     * en sus listas hasta que el inspector la envía y pasa a PENDIENTE.
+     */
+    private const BORRADOR = 'BORRADOR';
 
     /**
      * Conjuntos que se inspeccionan y se dictaminan como una sola pieza, con su
@@ -29,6 +37,9 @@ class Accesorios {
     private const TIPOS_BASE = [
         'juego_poleas'      => 'JUEGO DE POLEAS CON GRILLETE',
         'eslinga_cable_gri' => 'ESLINGA DE CABLE DE ACERO CON TERMINACIÓN EN GRILLETE',
+        // No es un conjunto, pero va aquí por lo mismo: debe existir. Las orejas
+        // se inspeccionan por lote, como los grilletes.
+        'oreja_carga'       => 'OREJA DE CARGA',
     ];
 
     /**
@@ -44,7 +55,7 @@ class Accesorios {
      * tocar las anteriores, de modo que lo que Calidad haya desmarcado a mano
      * se respeta.
      */
-    private const PREFIJOS_CODIGO_UNICO = ['GRILLETE', 'SOPORTE DE IZAJE'];
+    private const PREFIJOS_CODIGO_UNICO = ['GRILLETE', 'SOPORTE DE IZAJE', 'OREJA DE CARGA'];
 
     /** Marca de siembra de cada familia, para aplicarla una sola vez. */
     private static function claveSiembra(string $prefijo): string {
@@ -63,6 +74,161 @@ class Accesorios {
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
         $this->seedTipos();
+        $this->precargarOrejasMichelle();
+    }
+
+    /**
+     * Precarga única, pedida por la dirección: diez orejas de carga iguales
+     * —placa de 1/4", ojo de 2", 500 kg— que inspeccionó Michelle y de las que
+     * no hay más datos. Le quedan como sesión por enviar: al entrar ve el aviso,
+     * pone cliente y lugar, revisa las piezas y la manda a Calidad.
+     *
+     * Cada oreja lleva un mismo número como etiqueta, serie y QR, y los diez
+     * números son consecutivos. Se toman del banco de placas cuando hay diez
+     * seguidas libres; si no, se numeran después de la más alta del banco, para
+     * no chocar con placas ya impresas.
+     *
+     * Corre una sola vez por base. Si la cuenta de Michelle no aparece, o hay
+     * más de una que podría ser, no hace nada y vuelve a intentar en la
+     * siguiente petición: es preferible a cargarle la sesión a otra persona.
+     */
+    private const PRECARGA_OREJAS = [
+        'clave'     => 'precarga_orejas_michelle',
+        'busca'     => 'MICHEL',
+        'piezas'    => 10,
+        'tipo'      => 'OREJA DE CARGA',
+        'capacidad' => '500 KG',
+        'medidas'   => 'ESPESOR 1/4" · DIÁMETRO 2"',
+    ];
+
+    private function precargarOrejasMichelle(): void {
+        $cfg = self::PRECARGA_OREJAS;
+        try {
+            $ya = $this->pdo->prepare("SELECT 1 FROM accesorios_tipos_seed WHERE clave = ?");
+            $ya->execute([$cfg['clave']]);
+            if ($ya->fetch()) return;
+
+            $usuario = $this->inspectorPorNombre($cfg['busca']);
+            if ($usuario === null) return;
+
+            $t = $this->pdo->prepare("SELECT id FROM accesorios_tipos WHERE UPPER(TRIM(nombre)) = ? LIMIT 1");
+            $t->execute([$cfg['tipo']]);
+            $tipoId = (int)($t->fetchColumn() ?: 0);
+            if (!$tipoId) return;
+
+            $this->ensureAccSesionesColumns();
+            $this->ensureAccIzajeQrColumn();
+            $codigos = $this->codigosConsecutivos($cfg['piezas']);
+            if (count($codigos) !== $cfg['piezas']) return;
+
+            $this->pdo->beginTransaction();
+            $this->pdo->prepare(
+                "INSERT INTO accesorios_sesiones (cliente, fecha, coordenadas, direccion, usuario, control, estatus)
+                 VALUES ('', ?, '', '', ?, '', ?)"
+            )->execute([date('Y-m-d'), $usuario, self::BORRADOR]);
+            $sesionId = (int)$this->pdo->lastInsertId();
+
+            $ins = $this->pdo->prepare(
+                "INSERT INTO accesorios_izaje
+                 (sesion_id, id_accesorio, tipo_id, marca, modelo, serie, capacidad, medidas, estado, orden, qr_codigo)
+                 VALUES (?, ?, ?, '', '', ?, ?, ?, 'CUMPLE', ?, ?)"
+            );
+            foreach ($codigos as $i => $codigo) {
+                $ins->execute([$sesionId, $codigo, $tipoId, $codigo, $cfg['capacidad'], $cfg['medidas'], $i + 1, $codigo]);
+            }
+            $this->pdo->prepare("INSERT INTO accesorios_tipos_seed (clave) VALUES (?)")->execute([$cfg['clave']]);
+            $this->pdo->commit();
+
+            // Fuera de la transacción: registrar la placa como usada no debe
+            // poder deshacer la sesión si el banco falla.
+            foreach ($codigos as $codigo) $this->ocuparQr($codigo);
+            error_log("[Accesorios] precarga de orejas: sesión $sesionId para $usuario, códigos "
+                . $codigos[0] . '–' . end($codigos));
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            error_log('[Accesorios] precargarOrejasMichelle: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * La cuenta activa de inspector cuyo nombre o usuario contiene $busca.
+     * Null si no hay ninguna o si hay más de una que podría ser: ante la duda
+     * no se adivina. Con dos, gana la que tiene Inspector como rol principal.
+     */
+    private function inspectorPorNombre(string $busca): ?string {
+        $st = $this->pdo->prepare(
+            "SELECT * FROM usuarios WHERE UPPER(nombre) LIKE ? OR UPPER(usuario) LIKE ?"
+        );
+        $st->execute(['%' . $busca . '%', '%' . $busca . '%']);
+        $principal = []; $adicional = [];
+        foreach ($st->fetchAll() as $u) {
+            if (isset($u['activo']) && (int)$u['activo'] === 0) continue;
+            $rol   = strtoupper(trim((string)($u['rol'] ?? '')));
+            $extra = array_map('trim', explode(',', strtoupper((string)($u['roles_extra'] ?? ''))));
+            if ($rol === 'INSPECTOR')                  $principal[] = (string)$u['usuario'];
+            elseif (in_array('INSPECTOR', $extra, true)) $adicional[] = (string)$u['usuario'];
+        }
+        if (count($principal) === 1) return $principal[0];
+        if (!$principal && count($adicional) === 1) return $adicional[0];
+        if ($principal || $adicional) {
+            error_log("[Accesorios] precarga: más de una cuenta de inspector con '$busca', no se adivina");
+        }
+        return null;
+    }
+
+    /**
+     * $n números consecutivos, libres en todo el sistema, para usar como
+     * etiqueta, serie y QR de un lote.
+     *
+     * Primero el banco de placas: la primera racha de $n seguidas sin usar.
+     * Si no la hay, se numera a continuación del número más alto conocido de
+     * diez dígitos —en el banco o ya asignado—, saltando cualquiera ocupado.
+     */
+    private function codigosConsecutivos(int $n): array {
+        $banco = [];
+        try {
+            $st = $this->pdo->query(
+                "SELECT identificador FROM qr_codigos WHERE usado = 0
+                 ORDER BY LENGTH(identificador), CAST(identificador AS UNSIGNED) LIMIT 500"
+            );
+            $banco = $st ? $st->fetchAll(PDO::FETCH_COLUMN) : [];
+        } catch (\Throwable $e) { /* sin banco: se numera aparte */ }
+
+        $racha = [];
+        foreach ($banco as $id) {
+            $id = trim((string)$id);
+            if (!qrFormatoValido($id) || str_starts_with($id, QR_PREFIJO_PERSONAL) || !$this->qrDisponible($id)) {
+                $racha = []; continue;
+            }
+            $previo = end($racha);
+            if ($previo !== false && (strlen($previo) !== strlen($id) || (int)$id !== (int)$previo + 1)) $racha = [];
+            $racha[] = $id;
+            if (count($racha) === $n) return $racha;
+        }
+
+        // Sin racha en el banco: después del más alto de diez dígitos.
+        $max = 0;
+        foreach ([
+            "SELECT identificador AS c FROM qr_codigos",
+            "SELECT qr_codigo AS c FROM accesorios_izaje WHERE qr_codigo IS NOT NULL",
+        ] as $sql) {
+            try {
+                foreach ($this->pdo->query($sql)->fetchAll(PDO::FETCH_COLUMN) as $c) {
+                    $c = trim((string)$c);
+                    if (strlen($c) === 10 && ctype_digit($c) && !str_starts_with($c, QR_PREFIJO_PERSONAL)) {
+                        $max = max($max, (int)$c);
+                    }
+                }
+            } catch (\Throwable $e) { /* tabla ausente */ }
+        }
+        $siguiente = $max > 0 ? $max + 1 : 1000000001;
+        $racha = [];
+        for ($i = 0; $i < 1000 && count($racha) < $n; $i++, $siguiente++) {
+            $c = str_pad((string)$siguiente, 10, '0', STR_PAD_LEFT);
+            if (str_starts_with($c, QR_PREFIJO_PERSONAL) || !$this->qrDisponible($c)) { $racha = []; continue; }
+            $racha[] = $c;
+        }
+        return count($racha) === $n ? $racha : [];
     }
 
     /**
@@ -460,6 +626,68 @@ class Accesorios {
         ];
     }
 
+    // ── Sesión preparada: el inspector la completa y la envía ──
+
+    /** La sesión, si es un borrador de este inspector; null si no. */
+    private function borradorDe(int $id, string $usuario): ?array {
+        $this->ensureAccSesionesColumns();
+        $st = $this->pdo->prepare("SELECT id, cliente, control, estatus, usuario FROM accesorios_sesiones WHERE id = ?");
+        $st->execute([$id]);
+        $s = $st->fetch();
+        if (!$s || (string)$s['estatus'] !== self::BORRADOR) return null;
+        if (strcasecmp((string)$s['usuario'], $usuario) !== 0) return null;
+        return $s;
+    }
+
+    /**
+     * Cliente, fecha y lugar de una sesión preparada: lo que la precarga no
+     * puede saber y el inspector pone al abrirla.
+     */
+    public function completarSesionPreparada(array $p, string $usuario): array {
+        $id = (int)($p['sesion_id'] ?? 0);
+        if (!$this->borradorDe($id, $usuario)) {
+            return ['status' => 'error', 'message' => 'La sesión ya no está por enviar o no es tuya.'];
+        }
+        $cliente = mb_strtoupper(trim((string)($p['cliente'] ?? '')));
+        if ($cliente === '') return ['status' => 'error', 'message' => 'El cliente es requerido.'];
+
+        $fecha = $this->fechaIso($p['fecha'] ?? '') ?: date('Y-m-d');
+        $this->pdo->prepare(
+            "UPDATE accesorios_sesiones SET cliente = ?, fecha = ?, coordenadas = ?, direccion = ? WHERE id = ?"
+        )->execute([
+            $cliente, $fecha,
+            trim((string)($p['coordenadas'] ?? '')),
+            mb_strtoupper(trim((string)($p['direccion'] ?? ''))),
+            $id,
+        ]);
+        return ['status' => 'success'];
+    }
+
+    /**
+     * El inspector manda a Calidad la sesión preparada. Aquí nace su folio: se
+     * arma con el cliente, que la precarga no conocía, y armarlo antes habría
+     * dado de alta un cliente sin nombre.
+     */
+    public function enviarSesionPreparada(int $id, string $usuario): array {
+        $s = $this->borradorDe($id, $usuario);
+        if (!$s) return ['status' => 'error', 'message' => 'La sesión ya no está por enviar o no es tuya.'];
+        if (trim((string)$s['cliente']) === '') {
+            return ['status' => 'error', 'message' => 'Falta el cliente de la sesión.'];
+        }
+        $n = $this->pdo->prepare("SELECT COUNT(*) FROM accesorios_izaje WHERE sesion_id = ?");
+        $n->execute([$id]);
+        if ((int)$n->fetchColumn() === 0) {
+            return ['status' => 'error', 'message' => 'La sesión no tiene accesorios.'];
+        }
+
+        $control = trim((string)$s['control']) !== '' ? (string)$s['control'] : generarControl($this->pdo, (string)$s['cliente']);
+        $this->pdo->prepare(
+            "UPDATE accesorios_sesiones SET estatus = 'PENDIENTE', control = ? WHERE id = ? AND estatus = ?"
+        )->execute([$control, $id, self::BORRADOR]);
+        $this->historial($usuario, $id, self::BORRADOR, 'PENDIENTE');
+        return ['status' => 'success', 'control' => $control, 'message' => 'Sesión enviada a Calidad.'];
+    }
+
     // ── Mis sesiones de accesorios (filtradas por inspector) ──
     public function getMisSesiones(string $usuario): array {
         $this->ensureEstatusColumn('accesorios_sesiones');
@@ -499,6 +727,7 @@ class Accesorios {
         } elseif ($filtroEstatus) {
             $where .= " AND s.estatus = " . $this->pdo->quote($filtroEstatus);
         }
+        $where .= " AND s.estatus <> '" . self::BORRADOR . "'";
 
         if ($idCliente) {
             $where   .= " AND s.control LIKE ?";
@@ -537,7 +766,8 @@ class Accesorios {
         } elseif ($soloEstatus) {
             $where = "WHERE s.estatus = " . $this->pdo->quote($soloEstatus);
         } else {
-            $where = '';
+            // Lo que el inspector todavía no envía no le toca a Calidad.
+            $where = "WHERE s.estatus <> '" . self::BORRADOR . "'";
         }
         // Cuántos documentos ve el cliente, para no tener que abrir la sesión
         // para descubrir que uno está retirado. Las columnas se nombran sólo si

@@ -673,6 +673,9 @@
     }
     .offline-banner.pendiente { background: #FEF3C7; color: #78350F; border: 1px solid #F0C040; }
     .offline-banner.pendiente button { background: #78350F; color: #fff; }
+    /* Sesión de accesorios preparada de antemano, por enviar a Calidad. */
+    .offline-banner.preparada { background: #E6F1FB; color: #0C447C; border: 1px solid #85B7EB; }
+    .offline-banner.preparada button { background: #185FA5; color: #fff; }
     .offline-banner.borrador  { background: #E6F1FB; color: #0C447C; border: 1px solid #A9CCEE; }
     .offline-banner.borrador button.ob-continuar { background: #185FA5; color: #fff; }
     .offline-banner.borrador button.ob-descartar { background: transparent; color: #0C447C; border: 1px solid #A9CCEE; margin-left: 6px; }
@@ -1053,6 +1056,13 @@
     }
     .cur-exito-titulo { font-size: 18px; font-weight: 700; color: var(--texto); margin-bottom: 6px; }
     .cur-exito-sub    { font-size: 13px; color: var(--texto-sub); margin-bottom: 22px; }
+    /* Botones de la pantalla final de accesorios y arneses: no tenían estilo
+       y salían como botones grises del navegador, uno junto al otro. */
+    .cur-nuevo-btn {
+      display: block; width: 100%; max-width: 280px; margin: 0 auto;
+      padding: 12px 20px; min-height: 44px; border: none; border-radius: var(--radio);
+      background: var(--azul); color: #fff; font-size: 14px; font-weight: 600; cursor: pointer;
+    }
 
     /* ── Submenu: selección de modo ── */
     .cur-submenu-wrap { max-width: 560px; margin: 0 auto; padding: 20px 16px 60px; }
@@ -1473,6 +1483,15 @@
       Se guardó en este dispositivo y se enviará sola en cuanto haya conexión.
     </div>
     <button onclick="reintentarPendientesAhora()">Reintentar ahora</button>
+  </div>
+
+  <div class="offline-banner preparada" id="banner-preparadas">
+    <div class="ob-ico">📋</div>
+    <div class="ob-txt">
+      <b id="banner-preparadas-txt">Tienes una sesión de accesorios por enviar</b>
+      Las piezas ya están capturadas: pon el cliente, revísalas y mándala a Calidad.
+    </div>
+    <button onclick="abrirSesionPreparada()">Abrir</button>
   </div>
 
   <div class="menu-grid">
@@ -2640,6 +2659,10 @@
           Datos de la sesión
         </div>
 
+        <div id="iza-preparadas" style="display:none;margin-bottom:14px"></div>
+        <div id="iza-preparada-aviso" style="display:none;margin-bottom:14px;padding:10px 12px;border-radius:8px;
+             background:#E6F1FB;border:1px solid #85B7EB;color:#0C447C;font-size:12.5px;line-height:1.45"></div>
+
         <div class="field" id="iza-f-cliente">
           <label>Cliente <span class="req">*</span></label>
           <div style="position:relative">
@@ -2809,7 +2832,10 @@
   <!-- Pantalla 4: Éxito -->
   <div id="iza-screen-exito" style="display:none">
     <div class="iza-wrap" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:55vh">
-      <div class="cur-exito">
+      <!-- display:block: .cur-exito nace oculta (la de cursos se muestra desde JS)
+           y aquí nadie la mostraba, así que al finalizar la pantalla salía en
+           blanco, sin el informe ni los botones para seguir. -->
+      <div class="cur-exito" style="display:block">
         <div class="cur-exito-icon">✓</div>
         <div class="cur-exito-titulo">Sesión finalizada</div>
         <div class="cur-exito-sub" id="iza-exito-sub">Accesorios registrados correctamente.</div>
@@ -3368,7 +3394,7 @@ function abrirModulo(modulo) {
     document.getElementById('pantalla-accesorios').style.display = 'block';
     document.getElementById('header-title').textContent = 'Accesorios de Izaje';
     document.getElementById('header-sub').textContent = 'Registro de accesorios inspeccionados';
-    izaIniciar();
+    izaIniciando = izaIniciar();
 
   } else if (modulo === 'arneses') {
     document.getElementById('pantalla-arneses').style.display = 'block';
@@ -3390,6 +3416,7 @@ function volverMenu() {
   document.getElementById('btn-volver-menu').style.display = 'none';
   document.getElementById('btn-logout').style.display = 'flex';
   actualizarBadgePendientes();
+  revisarSesionesPreparadas();
 }
 
 /* ════════════════════════════════════════
@@ -3495,6 +3522,8 @@ function renderMisAccesorios() {
       ? `<span class="badge-estado badge-APROBADO">Aprobado</span>`
       : s.estatus === 'FINALIZADO'
       ? `<span class="badge-estado badge-CONFORME">Finalizado</span>`
+      : s.estatus === 'BORRADOR'
+      ? `<span class="badge-estado badge-PENDIENTE">Por enviar</span>`
       : `<span class="badge-estado badge-PENDIENTE">${s.estatus || 'Pendiente'}</span>`;
     return `
     <div class="hist-card" onclick="abrirDetalleAccesorio(${i})">
@@ -4012,6 +4041,7 @@ window.onload = function () {
 
   actualizarBadgePendientes();
   _iniciarReintentoAutomatico();
+  revisarSesionesPreparadas();
 };
 
 /* ════════════════════════════════════════
@@ -6244,6 +6274,9 @@ function izaMostrar(cual) {
   IZA_SCREENS.forEach(id => {
     document.getElementById(id).style.display = id === target ? 'block' : 'none';
   });
+  // Cada pantalla empieza arriba: al terminar una lista larga, la de éxito
+  // quedaba fuera de la vista y parecía que no había pasado nada.
+  window.scrollTo(0, 0);
 }
 
 // ── Inicializar módulo ────────────────────────────────
@@ -6275,6 +6308,11 @@ async function izaIniciar() {
   izaAccesorios = [];
   izaFotos      = [];
   izaEstadoVal  = 'CUMPLE';
+  izaBorrador   = false;
+  document.getElementById('iza-preparada-aviso').style.display = 'none';
+  document.getElementById('iza-btn-finalizar').textContent = '✓ Finalizar sesión';
+  document.querySelector('#iza-screen-datos .btn-sig').textContent = 'Continuar — Registrar accesorios →';
+  izaPintarPreparadas();
 
   // Limpiar campo cliente e inicializar autocomplete
   document.getElementById('iza-cliente').value    = '';
@@ -6340,6 +6378,37 @@ async function izaContinuar() {
 
   const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
   const btn = document.querySelector('#iza-screen-datos .btn-sig');
+
+  // Sesión preparada: ya existe con sus piezas; sólo le faltan cliente y lugar.
+  if (izaBorrador && izaSesionId) {
+    btn.disabled = true;
+    try {
+      const res = await fetch(WEB_APP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (s.token || '') },
+        body: JSON.stringify({ action: 'COMPLETAR_SESION_ACC', payload: {
+          sesion_id: izaSesionId, cliente, fecha: document.getElementById('iza-fecha').value,
+          coordenadas: coords, direccion } })
+      });
+      const data = await res.json();
+      if (data.status !== 'success') { mostrarToast('Error: ' + (data.message || 'No se pudo guardar.'), 'err'); return; }
+      izaSesionInfo = { cliente: cliente.toUpperCase(), fecha: document.getElementById('iza-fecha').value, coordenadas: coords, direccion };
+      recomSesCargar('iza', izaSesionId);
+      document.getElementById('iza-banner-cliente').textContent = izaSesionInfo.cliente;
+      document.getElementById('iza-banner-fecha').textContent   = izaSesionInfo.fecha;
+      document.getElementById('iza-lista-cliente').textContent  = izaSesionInfo.cliente;
+      document.getElementById('iza-btn-volver-lista').style.display = 'block';
+      izaRenderLista();
+      izaMostrar('lista');
+      mostrarToast('Revisa las piezas y, si todo está bien, envía la sesión a Calidad.', 'ok');
+    } catch (e) {
+      mostrarToast('Error de conexión. Intenta de nuevo.', 'err');
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
+
   btn.disabled    = true;
   btn.textContent = 'Creando sesión…';
 
@@ -7116,12 +7185,35 @@ function izaLimpiarForm() {
 // ── Finalizar sesión ──────────────────────────────────
 async function izaFinalizar() {
   const n   = izaAccesorios.length;
+  const eraBorrador = izaBorrador;
   const btn = document.getElementById('iza-btn-finalizar');
   btn.disabled = true;
   btn.textContent = 'Generando informe…';
 
   const sub = document.getElementById('iza-exito-sub');
   sub.textContent = `${n} accesorio${n !== 1 ? 's' : ''} de "${izaSesionInfo?.cliente || ''}" registrado${n !== 1 ? 's' : ''} correctamente.`;
+
+  // Sesión preparada: hasta aquí Calidad no la veía. Enviarla es lo que la
+  // pone en su lista; si falla, no se sigue como si se hubiera enviado.
+  if (izaBorrador) {
+    try {
+      const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
+      const res = await fetch(WEB_APP_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Token': s.token || '' },
+        body:    JSON.stringify({ action: 'ENVIAR_SESION_ACC', payload: { sesion_id: izaSesionId } })
+      });
+      const data = await res.json();
+      if (data.status !== 'success') throw new Error(data.message || 'No se pudo enviar.');
+      izaBorrador = false;
+      sub.textContent = `${n} accesorio${n !== 1 ? 's' : ''} de "${izaSesionInfo?.cliente || ''}" enviado${n !== 1 ? 's' : ''} a Calidad. Folio ${data.control || ''}.`;
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = '✓ Enviar a Calidad';
+      mostrarToast('No se envió: ' + e.message, 'err');
+      return;
+    }
+  }
 
   // Generar informe PDF automáticamente
   try {
@@ -7143,11 +7235,117 @@ async function izaFinalizar() {
   btn.disabled = false;
   btn.textContent = '✓ Finalizar sesión';
   izaMostrar('exito');
-  mostrarToast(`Sesión finalizada. ${n} accesorio${n !== 1 ? 's' : ''} registrado${n !== 1 ? 's' : ''} correctamente.`, 'ok');
+  revisarSesionesPreparadas();
+  mostrarToast(eraBorrador
+    ? `Sesión enviada a Calidad: ${n} accesorio${n !== 1 ? 's' : ''}.`
+    : `Sesión finalizada. ${n} accesorio${n !== 1 ? 's' : ''} registrado${n !== 1 ? 's' : ''} correctamente.`, 'ok');
+}
+
+// ── Sesión preparada de antemano ──────────────────────
+// Calidad o la dirección pueden dejarle al inspector una sesión con las piezas
+// ya capturadas (estatus BORRADOR). Él pone cliente y lugar, las revisa y la
+// envía; hasta entonces no aparece en Calidad.
+let izaBorrador   = false;
+let izaPreparadas = [];
+let izaIniciando  = null;
+
+async function izaLeerPreparadas() {
+  try {
+    const s    = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res  = await fetch(`${WEB_APP_URL}?action=GET_MIS_ACCESORIOS`, { headers: { 'X-Token': s.token || '' } });
+    const data = await res.json();
+    izaPreparadas = (data.status === 'success' && Array.isArray(data.data))
+      ? data.data.filter(x => x.estatus === 'BORRADOR') : [];
+  } catch (e) { izaPreparadas = []; }
+  return izaPreparadas;
+}
+
+const izaPiezasTxt = n => `${n} ${n === 1 ? 'pieza' : 'piezas'}`;
+
+async function revisarSesionesPreparadas() {
+  const banner = document.getElementById('banner-preparadas');
+  if (!banner) return;
+  const lista = await izaLeerPreparadas();
+  if (!lista.length) { banner.classList.remove('show'); return; }
+  const piezas = lista.reduce((t, x) => t + (parseInt(x.total) || 0), 0);
+  document.getElementById('banner-preparadas-txt').textContent = lista.length === 1
+    ? `Tienes una sesión de accesorios por enviar · ${izaPiezasTxt(piezas)}`
+    : `Tienes ${lista.length} sesiones de accesorios por enviar · ${izaPiezasTxt(piezas)}`;
+  banner.classList.add('show');
+}
+
+async function izaPintarPreparadas() {
+  const caja = document.getElementById('iza-preparadas');
+  if (!caja) return;
+  const lista = await izaLeerPreparadas();
+  if (!lista.length || izaBorrador) { caja.style.display = 'none'; caja.innerHTML = ''; return; }
+  caja.innerHTML = lista.map(x => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;
+                background:#E6F1FB;border:1px solid #85B7EB;color:#0C447C;margin-bottom:6px">
+      <div style="flex:1;min-width:0;font-size:12.5px;line-height:1.4">
+        <strong>Sesión preparada por enviar</strong><br>
+        ${izaPiezasTxt(parseInt(x.total) || 0)}${x.cliente ? ' · ' + escHtmlIza(x.cliente) : ''} · ${escHtmlIza(x.fecha_registro || x.fecha || '')}
+      </div>
+      <button type="button" onclick="izaCargarPreparada(${parseInt(x.id)})"
+              style="padding:9px 14px;border:none;border-radius:7px;background:#185FA5;color:#fff;
+                     font-size:12.5px;font-weight:600;cursor:pointer;min-height:40px;flex-shrink:0">Abrir</button>
+    </div>`).join('');
+  caja.style.display = 'block';
+}
+
+/** Desde el aviso del menú: abre Accesorios y carga la sesión. */
+async function abrirSesionPreparada(id) {
+  id = id || (izaPreparadas[0] && izaPreparadas[0].id);
+  if (!id) return;
+  abrirModulo('accesorios');
+  if (izaIniciando) await izaIniciando;
+  await izaCargarPreparada(id);
+}
+
+async function izaCargarPreparada(id) {
+  const s = JSON.parse(localStorage.getItem('avba_session') || '{}');
+  try {
+    const res  = await fetch(`${WEB_APP_URL}?action=DETALLE_SESION_ACCESORIOS&id=${id}`, { headers: { 'X-Token': s.token || '' } });
+    const data = await res.json();
+    if (data.status !== 'success' || data.data.estatus !== 'BORRADOR') {
+      mostrarToast('Esa sesión ya no está por enviar.', 'err');
+      izaPintarPreparadas();
+      return;
+    }
+    const d = data.data;
+    izaSesionId   = parseInt(d.id);
+    izaBorrador   = true;
+    izaAccesorios = (d.accesorios || []).map(a => ({
+      id:          a.id,
+      tipo_nombre: a.tipo_nombre || 'Accesorio',
+      marca:       a.marca || '',
+      serie:       a.serie || '',
+      estado:      a.estado,
+      qr_codigo:   a.qr_codigo || '',
+      datos: { tipo: String(a.tipo_id || ''), id_acc: a.id_accesorio || '', marca: a.marca || '',
+               modelo: a.modelo || '', capacidad: a.capacidad || '', medidas: a.medidas || '',
+               componentes: a.componentes || '', estado: a.estado },
+    }));
+    document.getElementById('iza-cliente').value = d.cliente || '';
+    document.getElementById('iza-preparadas').style.display = 'none';
+    const tipos = [...new Set(izaAccesorios.map(a => a.tipo_nombre))].join(', ');
+    const aviso = document.getElementById('iza-preparada-aviso');
+    aviso.innerHTML = `<strong>Sesión preparada:</strong> ${izaPiezasTxt(izaAccesorios.length)} ya capturadas (${escHtmlIza(tipos)}). `
+                    + `Pon el cliente y el lugar de la inspección y continúa para revisarlas y enviarlas a Calidad.`;
+    aviso.style.display = 'block';
+    document.getElementById('iza-btn-finalizar').textContent = '✓ Enviar a Calidad';
+    document.querySelector('#iza-screen-datos .btn-sig').textContent = 'Continuar — Revisar piezas →';
+    izaMostrar('datos');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    document.getElementById('iza-cliente').focus();
+  } catch (e) {
+    mostrarToast('No se pudo abrir la sesión. Revisa la conexión.', 'err');
+  }
 }
 
 // ── Nueva sesión ──────────────────────────────────────
 function izaNuevo() {
+  izaBorrador   = false;
   izaSesionId   = null;
   izaSesionInfo = null;
   izaAccesorios = [];

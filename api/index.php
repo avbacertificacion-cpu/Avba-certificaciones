@@ -1975,6 +1975,17 @@ if ($method === 'POST') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($accesorios->eliminarAccesorio($payload, true, $usr['usuario']));
 
+        // Sesión preparada de antemano: sólo su inspector la completa y la manda.
+        case 'COMPLETAR_SESION_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->completarSesionPreparada($payload, $usr['usuario']));
+
+        case 'ENVIAR_SESION_ACC':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($accesorios->enviarSesionPreparada((int)($payload['sesion_id'] ?? 0), $usr['usuario']));
+
         case 'GUARDAR_DATOS_SESION_ACC':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
