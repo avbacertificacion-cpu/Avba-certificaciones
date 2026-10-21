@@ -24,6 +24,7 @@ class Admin {
         'canastilla'   => ['CANASTILLA ESTRUCTURAL', 'dictamen_canastilla.html'],
         'canastilla_sp' => ['CANASTILLA ESTRUCTURAL SIN PUERTA', 'dictamen_canastilla_sin_puerta.html'],
         'oreja_carga'   => ['OREJA DE CARGA', 'dictamen_oreja_carga.html'],
+        'grua_camion'   => ['GRÚA HIDRÁULICA SOBRE CAMIÓN', 'dictamen_preview.html'],
     ];
 
     /**
@@ -414,6 +415,104 @@ class Admin {
                 ['ASME B30.26',             'referencia'],
                 ['AWS D1.1/D1.1M',          'referencia'],
                 ['ASTM E165/E165M',         'referencia'],
+                ['NOM-006-STPS-2014',       'referencia'],
+            ],
+        ],
+
+        /* Grúa hidráulica montada sobre camión (boom truck): la pluma
+           telescópica con su winche va sobre el bastidor de un camión, que
+           además es quien la transporta y la sostiene.
+
+           Por eso la lista revisa dos equipos en uno: la grúa —pluma,
+           hidráulico, cable y gancho— y lo que la mantiene de pie, que son los
+           estabilizadores y el chasis donde está anclada. La capacidad depende
+           del radio, así que la tabla de cargas y los dispositivos que avisan
+           al acercarse al límite (LMAP/LMI y anti-doble bloqueo) pesan tanto
+           como la estructura.
+
+           Es la plantilla de dictamen de grúa móvil: su prueba de carga se
+           mide con peso, radio y longitud de pluma. */
+        'grua_camion' => [
+            'secciones' => [
+                ['A', 'Documentación y placas'],
+                ['B', 'Chasis, base y estabilizadores'],
+                ['C', 'Pluma y estructura'],
+                ['D', 'Sistema hidráulico'],
+                ['E', 'Cable, poleas y gancho'],
+                ['F', 'Controles y dispositivos de seguridad'],
+                ['G', 'Prueba de carga'],
+            ],
+            'items' => [
+                ['A', 'A-01', 'Manual de operación y mantenimiento a bordo de la unidad'],
+                ['A', 'A-02', 'Tabla de capacidades completa y legible, correspondiente a la configuración'],
+                ['A', 'A-03', 'Placa de datos del fabricante legible: modelo, número de serie y capacidad'],
+                ['A', 'A-04', 'Diagrama de alcance y notas de operación legibles'],
+                ['A', 'A-05', 'Bitácora de mantenimiento e inspecciones previas'],
+                ['A', 'A-06', 'Registro de la última prueba de carga'],
+                ['A', 'A-07', 'Certificados vigentes de los accesorios de izaje que acompañan al equipo'],
+                ['B', 'B-01', 'Chasis y bastidor auxiliar: sin fisuras, deformación ni corrosión con pérdida de sección'],
+                ['B', 'B-02', 'Tornillería de anclaje de la base al chasis: completa, del grado correcto y con apriete'],
+                ['B', 'B-03', 'Corona de giro: juego dentro de lo admisible, tornillería completa y engrasada'],
+                ['B', 'B-04', 'Reductor y freno de giro: sin fugas, retiene la carga'],
+                ['B', 'B-05', 'Vigas y gatos de los estabilizadores: sin deformación, fugas ni desgaste'],
+                ['B', 'B-06', 'Zapatas o bases de apoyo completas y en condición'],
+                ['B', 'B-07', 'Pasadores y seguros de los estabilizadores en su lugar'],
+                ['B', 'B-08', 'Indicador de nivel presente y legible'],
+                ['B', 'B-09', 'Llantas, suspensión y frenos del camión en condición de servicio'],
+                ['C', 'C-01', 'Secciones telescópicas: sin abolladuras, pandeo ni fisuras'],
+                ['C', 'C-02', 'Almohadillas de deslizamiento y guías: desgaste dentro de lo admisible'],
+                ['C', 'C-03', 'Pasadores y bujes del pie de pluma: sin desgaste ni ovalamiento'],
+                ['C', 'C-04', 'Soldaduras estructurales sin fisuras visibles'],
+                ['C', 'C-05', 'Cilindro de elevación: vástago sin rayado, anclajes íntegros y sin deriva'],
+                ['C', 'C-06', 'Cilindro telescópico y sus cables o cadenas de extensión: tensión y estado'],
+                ['C', 'C-07', 'Punta de pluma: poleas, guardacables y pasadores'],
+                ['C', 'C-08', 'Plumín (jib): montaje, pasadores, seguros y sujeción cuando va estibado'],
+                ['D', 'D-01', 'Bomba y toma de fuerza: sin ruido anormal ni fugas'],
+                ['D', 'D-02', 'Mangueras y conexiones sin fugas, roce ni abrasión'],
+                ['D', 'D-03', 'Nivel y condición del aceite hidráulico'],
+                ['D', 'D-04', 'Filtros dentro de su periodo de servicio'],
+                ['D', 'D-05', 'Presiones de trabajo conforme a la placa: winche, pluma y giro'],
+                ['D', 'D-06', 'Válvulas de retención en los cilindros: la carga no baja sola'],
+                ['D', 'D-07', 'Depósito, respiradero y enfriador en condición'],
+                ['E', 'E-01', 'Cable de acero: hilos rotos, aplastamiento, corrosión y deformación dentro del criterio de retiro'],
+                ['E', 'E-02', 'Anclaje del cable al tambor y mínimo tres vueltas muertas'],
+                ['E', 'E-03', 'Enrollado parejo en el tambor, sin cruces ni montado de capas'],
+                ['E', 'E-04', 'Winche: freno y trinquete retienen la carga; reductor sin fugas'],
+                ['E', 'E-05', 'Poleas: canal sin desgaste, giro libre y guardacables en su lugar'],
+                ['E', 'E-06', 'Gancho principal: apertura de garganta, torsión y desgaste dentro de lo admisible'],
+                ['E', 'E-07', 'Seguro del gancho presente y funcional'],
+                ['E', 'E-08', 'Motón o bola de contrapeso: sin fisuras, giro libre y capacidad marcada'],
+                ['F', 'F-01', 'Puestos de mando: palancas identificadas, con retorno a neutro y sin juego excesivo'],
+                ['F', 'F-02', 'Control remoto, si lo tiene: funcionamiento y paro de emergencia'],
+                ['F', 'F-03', 'LMAP o indicador de momento de carga: enciende, se calibra y bloquea al llegar al límite'],
+                ['F', 'F-04', 'Dispositivo anti-doble bloqueo funcional'],
+                ['F', 'F-05', 'Indicadores de ángulo, longitud de pluma y radio legibles y correctos'],
+                ['F', 'F-06', 'Paro de emergencia accesible y funcional'],
+                ['F', 'F-07', 'Alarma audible de maniobra y señalización'],
+                ['F', 'F-08', 'Calcomanías de seguridad completas y legibles, incluida la de riesgo de electrocución'],
+                ['F', 'F-09', 'Guardas de partes móviles en su lugar'],
+                ['F', 'F-10', 'Accesos, escalones y pasamanos antiderrapantes'],
+                ['F', 'F-11', 'Extintor vigente a bordo'],
+                ['G', 'G-01', 'Prueba sin carga: movimientos suaves en toda la trayectoria'],
+                ['G', 'G-02', 'Prueba con carga conforme a la tabla de capacidades para el radio de prueba'],
+                ['G', 'G-03', 'Sosteniendo la carga, el cilindro de elevación y el winche no derivan'],
+                ['G', 'G-04', 'Estabilidad: sin levantamiento de estabilizadores ni asentamiento del terreno'],
+                ['G', 'G-05', 'Frenos de giro y de winche retienen la carga'],
+                ['G', 'G-06', 'Sin fugas, ruidos ni vibraciones anormales durante la prueba'],
+                ['G', 'G-07', 'El LMAP responde y bloquea al acercarse al límite'],
+            ],
+            // Es grúa, así que ampara el alcance completo: 9927-1 y 23814 de
+            // grúas, y la 17020 de la unidad. De referencia, la B30.5 que la
+            // propia placa del equipo declara cumplir, y las del aparejo.
+            'normas' => [
+                ['NMX-GR-9927-1-IMNC-2019', 'acreditada'],
+                ['NMX-GR-23814-IMNC-2011',  'acreditada'],
+                ['NMX-EC-17020-IMNC-2014',  'acreditada'],
+                ['ASME B30.5',              'referencia'],
+                ['ASME B30.10',             'referencia'],
+                ['ASME B30.9',              'referencia'],
+                ['ASME B30.26',             'referencia'],
+                ['NOM-004-STPS-1999',       'referencia'],
                 ['NOM-006-STPS-2014',       'referencia'],
             ],
         ],

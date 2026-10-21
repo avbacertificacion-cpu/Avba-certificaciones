@@ -437,6 +437,49 @@ function qrFormatoValido(string $qr): bool {
     return (bool)preg_match('/^\d{' . QR_LONGITUD_MIN . ',' . QR_LONGITUD_MAX . '}$/', trim($qr));
 }
 
+/**
+ * La cuenta activa de inspector que lleva $busca como palabra completa en su
+ * nombre o en su usuario: con "MICHEL", "Michel García" o "michel.g" sí,
+ * "Michelle" no.
+ *
+ * Devuelve null si no hay ninguna o si hay más de una que podría ser: una
+ * precarga que se equivoca de persona es peor que una que no se aplica y se
+ * reintenta. Cuando hay varias, gana la que tiene Inspector como rol principal
+ * sobre la que sólo lo tiene como rol adicional.
+ */
+function cuentaInspectorPorNombre(PDO $pdo, string $busca): ?string {
+    try {
+        $st = $pdo->prepare(
+            "SELECT * FROM usuarios WHERE UPPER(nombre) LIKE ? OR UPPER(usuario) LIKE ?"
+        );
+        $st->execute(['%' . $busca . '%', '%' . $busca . '%']);
+        $filas = $st->fetchAll();
+    } catch (\Throwable $e) {
+        return null;
+    }
+
+    $palabra   = '/(^|[^\p{L}])' . preg_quote($busca, '/') . '($|[^\p{L}])/u';
+    $principal = [];
+    $adicional = [];
+    foreach ($filas as $u) {
+        if (isset($u['activo']) && (int)$u['activo'] === 0) continue;
+        if (!preg_match($palabra, mb_strtoupper((string)($u['nombre'] ?? '')))
+            && !preg_match($palabra, mb_strtoupper((string)($u['usuario'] ?? '')))) continue;
+
+        $rol   = strtoupper(trim((string)($u['rol'] ?? '')));
+        $extra = array_map('trim', explode(',', strtoupper((string)($u['roles_extra'] ?? ''))));
+        if ($rol === 'INSPECTOR')                    $principal[] = (string)$u['usuario'];
+        elseif (in_array('INSPECTOR', $extra, true)) $adicional[] = (string)$u['usuario'];
+    }
+
+    if (count($principal) === 1) return $principal[0];
+    if (!$principal && count($adicional) === 1) return $adicional[0];
+    if ($principal || $adicional) {
+        error_log("[precarga] más de una cuenta de inspector con '$busca', no se adivina");
+    }
+    return null;
+}
+
 /** Mensaje único para cuando el formato no cuadra. */
 function qrMensajeFormato(): string {
     return 'El código QR debe tener ' . QR_LONGITUD_MIN . ' o ' . QR_LONGITUD_MAX . ' dígitos, tal como viene impreso en la placa.';

@@ -1485,6 +1485,15 @@
     <button onclick="reintentarPendientesAhora()">Reintentar ahora</button>
   </div>
 
+  <div class="offline-banner preparada" id="banner-insp-preparada">
+    <div class="ob-ico">📋</div>
+    <div class="ob-txt">
+      <b id="banner-insp-preparada-txt">Tienes una inspección preparada</b>
+      Los datos del equipo y las fotos ya están cargados: confirma el cliente, levanta el checklist y la prueba de carga.
+    </div>
+    <button onclick="abrirInspeccionPreparada()">Abrir</button>
+  </div>
+
   <div class="offline-banner preparada" id="banner-preparadas">
     <div class="ob-ico">📋</div>
     <div class="ob-txt">
@@ -2347,6 +2356,9 @@
         Información del equipo
       </div>
 
+      <div id="insp-preparada-aviso" style="display:none;margin-bottom:14px;padding:10px 12px;border-radius:8px;
+           background:#E6F1FB;border:1px solid #85B7EB;color:#0C447C;font-size:12.5px;line-height:1.5"></div>
+
       <div class="field" id="f-cliente">
         <label>Cliente <span class="req">*</span></label>
         <div style="position:relative">
@@ -3141,6 +3153,7 @@ let pendingMapPos   = { insp: null, env: null }; // posición seleccionada antes
 let buscarDirInited = { insp: false, env: false }; // evita doble-binding del buscador
 let respuestasCheck = {};
 let fotosData       = [];       // [{base64, mimeType, nombre}]
+let inspeccionPreparadaId = null;  // id del borrador que se está completando
 let pruebaCargaData = {};
 let enviando        = false;
 
@@ -3417,6 +3430,7 @@ function volverMenu() {
   document.getElementById('btn-logout').style.display = 'flex';
   actualizarBadgePendientes();
   revisarSesionesPreparadas();
+  revisarInspeccionPreparada();
 }
 
 /* ════════════════════════════════════════
@@ -3809,6 +3823,8 @@ const ESTADO_BADGE = {
   'APROBADO CALIDAD': ['badge-APROBADO',   'Aprobado Calidad'],
   'RECHAZADO':        ['badge-NOCONFORME', 'Rechazado'],
   'ENVIADO':          ['badge-ENVIADO',    'Enviado'],
+  // Preparada de antemano: todavía no se manda a Calidad.
+  'BORRADOR':         ['badge-PENDIENTE',  'Por enviar'],
 };
 
 function renderHistorial(lista) {
@@ -4042,6 +4058,7 @@ window.onload = function () {
   actualizarBadgePendientes();
   _iniciarReintentoAutomatico();
   revisarSesionesPreparadas();
+  revisarInspeccionPreparada();
 };
 
 /* ════════════════════════════════════════
@@ -4922,6 +4939,10 @@ function eliminarFoto(e, idx) {
 /* ════════════════════════════════════════
    RESUMEN
 ════════════════════════════════════════ */
+/* Los correos se leen con obtenerEmails(): desde que se admite más de uno, el
+   campo único #email_cliente ya no existe, y pedirle .value a un elemento que
+   no está tiraba el resumen entero. El paso 6 se quedaba con el recuadro vacío
+   y, de paso, no se guardaba el borrador al llegar ahí. */
 function renderResumen() {
   const c  = v => v || "<span style='color:var(--texto-hint)'>—</span>";
   const nc = Object.values(respuestasCheck).filter(v => v === "NC").length;
@@ -4943,7 +4964,7 @@ function renderResumen() {
     <div class="resumen-item"><span class="resumen-key">No. de serie</span><span class="resumen-val">${c(document.getElementById("serie").value)}</span></div>
     <div class="resumen-item"><span class="resumen-key">ID del equipo</span><span class="resumen-val">${c(document.getElementById("id_cliente").value)}</span></div>
     <div class="resumen-item"><span class="resumen-key">Capacidad</span><span class="resumen-val">${c(document.getElementById("capacidad").value)}</span></div>
-    <div class="resumen-item"><span class="resumen-key">Correo</span><span class="resumen-val">${c(document.getElementById("email_cliente").value)}</span></div>
+    <div class="resumen-item"><span class="resumen-key">Correo</span><span class="resumen-val">${c(obtenerEmails().split(',').join(', '))}</span></div>
     <div class="resumen-item"><span class="resumen-key">Fecha</span><span class="resumen-val">${document.getElementById("fecha").value}</span></div>
     <div class="resumen-item"><span class="resumen-key">Fotos</span><span class="resumen-val" id="resumen-fotos-val">${fotosData.length} de 9</span></div>
     <div class="resumen-item"><span class="resumen-key">Resultado</span><span class="resumen-val">${semaforo}</span></div>
@@ -5021,7 +5042,9 @@ async function enviarFormulario() {
         prueba_carga: getPruebaCargaData(),
         horquillas: getHorquillasData(),
         recomendaciones: recomDatos(),
-        fotos: fotosData
+        fotos: fotosData,
+        // Al guardarse, el servidor da por enviada la inspección preparada.
+        borrador_id: inspeccionPreparadaId || 0
       }
     };
 
@@ -5050,6 +5073,9 @@ async function enviarFormulario() {
         folioEl.style.display = 'block';
       }
       await AvbaOffline.borrarBorrador('inspeccion');
+      // La preparada ya se mandó: el servidor borró su borrador.
+      inspeccionPreparadaId = null;
+      revisarInspeccionPreparada();
     } else {
       throw new Error(resultado.message || "Error desconocido del servidor");
     }
@@ -5060,6 +5086,9 @@ async function enviarFormulario() {
     if (payload && esFalloDeRed(err)) {
       await AvbaOffline.encolar('inspeccion', WEB_APP_URL, payload);
       await AvbaOffline.borrarBorrador('inspeccion'); // ya está a salvo en la cola
+      // Va en la cola con su borrador_id: cuando salga, el servidor cierra el
+      // borrador. Aquí ya no se vuelve a usar.
+      inspeccionPreparadaId = null;
       enviando = false;
       mostrarInspeccionEncolada();
       actualizarBadgePendientes();
@@ -5169,7 +5198,7 @@ async function descartarBorrador() {
   window._borradorPendiente = null;
 }
 
-async function restaurarBorradorInspeccion(draft) {
+async function restaurarBorradorInspeccion(draft, mensaje) {
   const info = draft.info || {};
   document.getElementById('cliente').value      = info.cliente || '';
   document.getElementById('cliente-id').value   = info.cliente_id || '';
@@ -5251,7 +5280,99 @@ async function restaurarBorradorInspeccion(draft) {
 
   toggleHorquillasSection();
   irA(draft.paso || 1);
-  mostrarToast('Inspección restaurada — continúa donde te quedaste.', 'ok');
+  mostrarToast(mensaje || 'Inspección restaurada — continúa donde te quedaste.', 'ok');
+}
+
+/* ════════════════════════════════════════
+   INSPECCIÓN PREPARADA DE ANTEMANO
+   Calidad o la dirección pueden dejarle al inspector una inspección con los
+   datos del equipo y las fotos ya cargados. Él confirma el cliente y el lugar,
+   levanta el checklist y la prueba de carga, y la envía como cualquier otra:
+   al guardarse nace su folio y el borrador desaparece.
+════════════════════════════════════════ */
+let inspPreparada = null;   // la que está esperando, tal como la manda el servidor
+
+async function leerInspeccionPreparada() {
+  try {
+    const s    = JSON.parse(localStorage.getItem('avba_session') || '{}');
+    const res  = await fetch(`${WEB_APP_URL}?action=MI_INSPECCION_PREPARADA`, { headers: { 'X-Token': s.token || '' } });
+    const data = await res.json();
+    inspPreparada = (data.status === 'success' && data.data) ? data.data : null;
+  } catch (e) { inspPreparada = null; }
+  return inspPreparada;
+}
+
+async function revisarInspeccionPreparada() {
+  const banner = document.getElementById('banner-insp-preparada');
+  if (!banner) return;
+  const prep = await leerInspeccionPreparada();
+  if (!prep) { banner.classList.remove('show'); return; }
+  const equipo = [prep.maquinaria, prep.marca, prep.modelo].filter(Boolean).join(' · ');
+  document.getElementById('banner-insp-preparada-txt').textContent =
+    'Tienes una inspección preparada' + (equipo ? ' · ' + equipo : '');
+  banner.classList.add('show');
+}
+
+/** Baja una foto del servidor y la deja como la que toma la cámara. */
+function fotoDesdeUrl(url) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const MAX = 1400;
+        let w = img.width, h = img.height;
+        if (w > MAX) { h = h * (MAX / w); w = MAX; }
+        const lienzo = document.createElement('canvas');
+        lienzo.width = w; lienzo.height = h;
+        lienzo.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve({ base64: lienzo.toDataURL('image/jpeg', 0.75).split(',')[1],
+                  mimeType: 'image/jpeg', nombre: url.split('/').pop() });
+      } catch (e) { resolve(null); }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+async function abrirInspeccionPreparada() {
+  const prep = inspPreparada || await leerInspeccionPreparada();
+  if (!prep) { mostrarToast('Ya no hay ninguna inspección preparada.', 'err'); return; }
+
+  abrirModulo('inspeccion');
+  mostrarToast('Cargando la inspección preparada…', 'info');
+
+  // Las fotos ya están en el servidor; se bajan y se tratan como las que toma
+  // la cámara, para que el envío siga siendo exactamente el de siempre.
+  const fotos = (await Promise.all((prep.fotos || []).map(fotoDesdeUrl))).filter(Boolean);
+
+  await restaurarBorradorInspeccion({
+    paso: 1,
+    info: {
+      cliente:    prep.cliente    || '',
+      maquinaria: prep.maquinaria || '',
+      marca:      prep.marca      || '',
+      modelo:     prep.modelo     || '',
+      serie:      prep.serie      || '',
+      id_cliente: prep.id_equipo  || '',
+      capacidad:  prep.capacidad  || '',
+      emails:     prep.correo ? [prep.correo] : [],
+      dir_insp:   prep.direccion  || '',
+    },
+    checklist: {}, prueba_carga: {}, recomendaciones: [], fotos,
+  }, 'Inspección preparada cargada. Confirma el cliente y continúa.');
+
+  inspeccionPreparadaId = prep.id;
+  // El aviso del borrador guardado en el teléfono sobra: lo que se acaba de
+  // cargar es otra cosa y tener los dos a la vez sólo confunde.
+  document.getElementById('banner-borrador')?.classList.remove('show');
+  const aviso = document.getElementById('insp-preparada-aviso');
+  if (aviso) {
+    aviso.innerHTML = '<strong>Inspección preparada.</strong> '
+      + escIns(prep.nota || 'Revisa los datos del equipo, confirma el cliente y el lugar, y levanta el checklist y la prueba de carga.')
+      + (fotos.length ? ' <strong>' + fotos.length + (fotos.length === 1 ? ' foto ya cargada' : ' fotos ya cargadas') + '</strong> en el paso 6.' : '');
+    aviso.style.display = 'block';
+  }
 }
 
 /* ════════════════════════════════════════

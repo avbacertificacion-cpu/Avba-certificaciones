@@ -574,6 +574,12 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($insp->getTodasInspecciones());
 
+        // Inspección preparada de antemano, a la espera de su inspector.
+        case 'MI_INSPECCION_PREPARADA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($insp->inspeccionPreparada($usr['usuario']));
+
         case 'GET_MIS_ACCESORIOS':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

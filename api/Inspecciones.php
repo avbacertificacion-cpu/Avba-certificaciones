@@ -12,8 +12,183 @@ require_once __DIR__ . '/ReporteInspeccion.php';
 class Inspecciones {
     private PDO $pdo;
 
+    /**
+     * Inspección preparada de antemano para un inspector: ya trae los datos del
+     * equipo y las fotos, pero le falta lo que sólo él puede poner —ubicación,
+     * checklist y prueba de carga— y mandarla.
+     *
+     * Mientras siga así no existe para nadie más: las consultas de Calidad,
+     * Certificaciones, auditorías y portal del cliente nombran los estatus que
+     * sí ven, y BORRADOR no es ninguno. La única que la muestra es la del
+     * historial del propio inspector.
+     */
+    private const BORRADOR = 'BORRADOR';
+
+    /**
+     * Precarga única, pedida por la dirección: la grúa hidráulica sobre camión
+     * que inspeccionó Michel, con lo que se alcanza a leer en las fotos de su
+     * placa de datos y de su tabla de capacidades.
+     *
+     * Las fotos viajan en el repositorio y se dejan tal cual: cuando él envía
+     * la inspección, el guardado de siempre las sube a su carpeta y este
+     * borrador se borra, de modo que lo que queda registrado es una inspección
+     * normal, sin rastro de haber venido precargada.
+     */
+    private const PRECARGA_GRUA = [
+        'clave'      => 'precarga_grua_ac18_michel',
+        'busca'      => 'MICHEL',
+        'fotos'      => 'assets/precarga/grua_ac18_70/',
+        'maquinaria' => 'GRÚA HIDRÁULICA SOBRE CAMIÓN',
+        'cliente'    => 'FALOMIR',
+        'marca'      => 'ALTEC',
+        'modelo'     => 'AC18-70B',
+        'serie'      => '0507EP0120',
+        'id_equipo'  => 'CF-1676-A',
+        'capacidad'  => '18 TON (36,000 LB)',
+        'nota'       => 'Datos tomados de la placa y de la tabla de capacidades: '
+                      . 'Altec AC18‑70B, serie 0507EP0120, 18 ton (36,000 lb), pluma de 70 ft. '
+                      . 'Presiones máximas de placa: winche 2,800 PSI · pluma 3,500 PSI · giro 1,500 PSI. '
+                      . 'Montada en Peterbilt, placas CF‑1676‑A, unidad 03. Cumple ASME B30.5 y trae LMAP. '
+                      . 'Confirma el cliente y la ubicación, levanta el checklist y la prueba de carga.',
+    ];
+
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
+        $this->precargarGruaMichel();
+    }
+
+    /**
+     * Deja la inspección preparada, una sola vez por base.
+     *
+     * Si la cuenta de Michel no aparece —o hay más de una que podría ser— o el
+     * tipo de equipo todavía no está sembrado, no hace nada y no se marca: en
+     * la primera petición de una instalación nueva esta clase se construye
+     * antes que Admin, así que el tipo aún no existe y conviene reintentarlo en
+     * la siguiente.
+     */
+    private function precargarGruaMichel(): void {
+        $cfg = self::PRECARGA_GRUA;
+        try {
+            $this->pdo->exec(
+                "CREATE TABLE IF NOT EXISTS maquinaria_tipos_seed (
+                   clave    VARCHAR(40) NOT NULL PRIMARY KEY,
+                   aplicado TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+            );
+            $ya = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
+            $ya->execute([$cfg['clave']]);
+            if ($ya->fetch()) return;
+
+            $usuario = cuentaInspectorPorNombre($this->pdo, $cfg['busca']);
+            if ($usuario === null) return;
+
+            $t = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos WHERE UPPER(TRIM(nombre)) = ? LIMIT 1");
+            $t->execute([$cfg['maquinaria']]);
+            if (!$t->fetchColumn()) return;
+
+            if (!is_dir(__DIR__ . '/../' . $cfg['fotos'])) {
+                error_log('[Inspecciones] precarga: no están las fotos en ' . $cfg['fotos']);
+                return;
+            }
+
+            $this->ensureNotaBorrador();
+            $cols = "cliente, maquinaria, marca, modelo, serie, id_equipo, capacidad,
+                     fecha_inspeccion, evidencia_url, estado, inspector";
+            $vals = "?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?";
+            $args = [
+                $cfg['cliente'], $cfg['maquinaria'], $cfg['marca'], $cfg['modelo'], $cfg['serie'],
+                $cfg['id_equipo'], $cfg['capacidad'], date('Y-m-d'), $cfg['fotos'], self::BORRADOR, $usuario,
+            ];
+            if ($this->tieneNotaBorrador()) {
+                $cols .= ", nota_borrador";
+                $vals .= ", ?";
+                $args[] = $cfg['nota'];
+            }
+            $this->pdo->prepare("INSERT INTO equipos ($cols) VALUES ($vals)")->execute($args);
+
+            $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")->execute([$cfg['clave']]);
+            error_log('[Inspecciones] precarga de grúa: inspección preparada para ' . $usuario);
+        } catch (\Throwable $e) {
+            error_log('[Inspecciones] precargarGruaMichel: ' . $e->getMessage());
+        }
+    }
+
+    /** Nota que la precarga le deja al inspector. Sólo la usan los borradores. */
+    private function ensureNotaBorrador(): void {
+        try {
+            if (!columnaExiste($this->pdo, 'equipos', 'nota_borrador')) {
+                $this->pdo->exec("ALTER TABLE equipos ADD COLUMN nota_borrador TEXT NULL");
+            }
+        } catch (\Throwable $e) {
+            error_log('[Inspecciones] columna nota_borrador: ' . $e->getMessage());
+        }
+    }
+
+    private function tieneNotaBorrador(): bool {
+        try { return columnaExiste($this->pdo, 'equipos', 'nota_borrador'); }
+        catch (\Throwable $e) { return false; }
+    }
+
+    /**
+     * La inspección preparada que espera a este inspector, con sus fotos, o
+     * null si no tiene ninguna. Se entregan las URL de las fotos, no su
+     * contenido: el navegador las baja como cualquier imagen.
+     */
+    public function inspeccionPreparada(string $usuario): array {
+        $nota = $this->tieneNotaBorrador() ? 'nota_borrador AS nota' : "'' AS nota";
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT id, cliente, maquinaria, marca, modelo, serie, id_equipo, capacidad,
+                        correo, direccion, coords_inspeccion, evidencia_url, {$nota},
+                        DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha
+                 FROM equipos
+                 WHERE inspector = ? AND estado = ?
+                 ORDER BY id LIMIT 1"
+            );
+            $st->execute([$usuario, self::BORRADOR]);
+            $fila = $st->fetch();
+        } catch (\Throwable $e) {
+            error_log('[Inspecciones] inspeccionPreparada: ' . $e->getMessage());
+            return ['status' => 'success', 'data' => null];
+        }
+        if (!$fila) return ['status' => 'success', 'data' => null];
+
+        $fila['fotos'] = $this->fotosDeCarpeta((string)$fila['evidencia_url']);
+        return ['status' => 'success', 'data' => $fila];
+    }
+
+    /** URL de las imágenes que hay en una carpeta de evidencia, en orden. */
+    private function fotosDeCarpeta(string $url): array {
+        $url = trim($url);
+        if ($url === '') return [];
+        $dir = str_starts_with($url, UPLOAD_URL)
+            ? UPLOAD_DIR . substr($url, strlen(UPLOAD_URL))
+            : __DIR__ . '/../' . $url;
+        $dir = rtrim($dir, '/') . '/';
+        if (!is_dir($dir)) return [];
+
+        $fotos = [];
+        foreach (glob($dir . '*.{jpg,jpeg,png,webp,JPG,JPEG,PNG,WEBP}', GLOB_BRACE) ?: [] as $ruta) {
+            $fotos[] = rtrim($url, '/') . '/' . basename($ruta);
+        }
+        sort($fotos);
+        return $fotos;
+    }
+
+    /**
+     * Da por enviada la inspección preparada: una vez guardada como inspección
+     * normal —con su folio y sus fotos en su propia carpeta— el borrador ya no
+     * tiene nada que aportar. Sólo se borra el del propio inspector.
+     */
+    private function cerrarBorrador(int $id, string $usuario): void {
+        if ($id <= 0) return;
+        try {
+            $this->pdo->prepare(
+                "DELETE FROM equipos WHERE id = ? AND inspector = ? AND estado = ?"
+            )->execute([$id, $usuario, self::BORRADOR]);
+        } catch (\Throwable $e) {
+            error_log('[Inspecciones] cerrarBorrador: ' . $e->getMessage());
+        }
     }
 
     // ── Opciones de maquinaria ─────────────────────────────
@@ -184,6 +359,11 @@ class Inspecciones {
 
             // Historial
             registrarHistorial($this->pdo, $usuarioActual, $equipoId, 'estado', null, 'PENDIENTE', 'INSERT');
+
+            // La inspección preparada ya cumplió: lo guardado es una inspección
+            // normal, con su folio y sus fotos. Se borra después de insertar,
+            // para que un fallo a medias no deje al inspector sin las dos.
+            $this->cerrarBorrador((int)($payload['borrador_id'] ?? 0), $usuarioActual);
 
             // Generar reporte PDF de inspección
             $reporte     = ReporteInspeccion::generar($this->pdo, $equipoId, $usuarioActual);

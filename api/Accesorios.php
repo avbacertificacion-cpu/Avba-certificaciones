@@ -111,7 +111,7 @@ class Accesorios {
             $ya->execute([$cfg['clave']]);
             if ($ya->fetch()) return;
 
-            $usuario = $this->inspectorPorNombre($cfg['busca']);
+            $usuario = cuentaInspectorPorNombre($this->pdo, $cfg['busca']);
             if ($usuario === null) return;
 
             $t = $this->pdo->prepare("SELECT id FROM accesorios_tipos WHERE UPPER(TRIM(nombre)) = ? LIMIT 1");
@@ -151,37 +151,6 @@ class Accesorios {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             error_log('[Accesorios] precargarOrejasMichel: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * La cuenta activa de inspector que lleva $busca como palabra completa en
-     * su nombre o en su usuario: "Michel García" o "michel.g" sí, "Michelle"
-     * no. Null si no hay ninguna o si hay más de una que podría ser: ante la
-     * duda no se adivina. Con dos, gana la que tiene Inspector como rol
-     * principal.
-     */
-    private function inspectorPorNombre(string $busca): ?string {
-        $st = $this->pdo->prepare(
-            "SELECT * FROM usuarios WHERE UPPER(nombre) LIKE ? OR UPPER(usuario) LIKE ?"
-        );
-        $st->execute(['%' . $busca . '%', '%' . $busca . '%']);
-        $palabra = '/(^|[^\p{L}])' . preg_quote($busca, '/') . '($|[^\p{L}])/u';
-        $principal = []; $adicional = [];
-        foreach ($st->fetchAll() as $u) {
-            if (isset($u['activo']) && (int)$u['activo'] === 0) continue;
-            if (!preg_match($palabra, mb_strtoupper((string)($u['nombre'] ?? '')))
-                && !preg_match($palabra, mb_strtoupper((string)($u['usuario'] ?? '')))) continue;
-            $rol   = strtoupper(trim((string)($u['rol'] ?? '')));
-            $extra = array_map('trim', explode(',', strtoupper((string)($u['roles_extra'] ?? ''))));
-            if ($rol === 'INSPECTOR')                  $principal[] = (string)$u['usuario'];
-            elseif (in_array('INSPECTOR', $extra, true)) $adicional[] = (string)$u['usuario'];
-        }
-        if (count($principal) === 1) return $principal[0];
-        if (!$principal && count($adicional) === 1) return $adicional[0];
-        if ($principal || $adicional) {
-            error_log("[Accesorios] precarga: más de una cuenta de inspector con '$busca', no se adivina");
-        }
-        return null;
     }
 
     /**
