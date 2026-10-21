@@ -2,9 +2,22 @@ DirectoryIndex index.html
 Options -Indexes
 
 <IfModule mod_headers.c>
+  # El HTML nunca se guarda en caché: los cambios deben verse al recargar.
   <FilesMatch "\.html$">
     Header set Cache-Control "no-cache, no-store, must-revalidate"
     Header set Pragma "no-cache"
     Header set Expires "0"
+  </FilesMatch>
+
+  # La hoja de estilos y los scripts sí se guardan, pero el navegador
+  # pregunta antes de usarlos: así un despliegue nuevo no queda con el
+  # diseño anterior pegado en caché.
+  <FilesMatch "\.(css|js)$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
+
+  # Logotipos e imágenes del sitio cambian muy poco: se guardan un mes.
+  <FilesMatch "\.(png|jpe?g|gif|webp|svg|ico|woff2?)$">
+    Header set Cache-Control "public, max-age=2592000"
   </FilesMatch>
 </IfModule>

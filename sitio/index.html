@@ -276,903 +276,7 @@
 }
 </script>
 
-<style>
-  :root{
-    /* Colores tomados del logo oficial AVBA */
-    --marino:#003C78;
-    --marino-900:#00294F;
-    --brand-ink:#003C78;
-    --azul:#0A5C9C;
-    --cian:#0084C0;
-    --acento:#4DA3FF;
-    --verde:#009060;
-    --verde-claro:#22C55E;
-    --ambar:#F59E0B;
-    --rojo:#E1483C;
-
-    --azul-light:#E6F1FB;
-    --verde-light:#E4F6EE;
-    --cian-light:#E2F2FA;
-    --rojo-light:#FCECEA;
-    --ambar-light:#FEF3E2;
-
-    --texto:#12233D;
-    --texto-sub:#5A6880;
-    --gris-bg:#F4F7FB;
-    --superficie:#ffffff;
-    --superficie-2:#FAFCFE;
-    --borde:#DDE5EF;
-
-    --hero-a:#001E3D;
-    --hero-b:#0A3C6E;
-
-    --radio:18px;
-    --radio-sm:12px;
-    --sombra-sm:0 1px 3px rgba(0,42,84,.06), 0 4px 12px rgba(0,42,84,.06);
-    --sombra:0 2px 6px rgba(0,42,84,.06), 0 12px 32px rgba(0,42,84,.09);
-    --sombra-lg:0 8px 20px rgba(0,42,84,.10), 0 24px 56px rgba(0,42,84,.16);
-    --max:1180px;
-  }
-
-  :root[data-theme="dark"]{
-    --brand-ink:#7CBEF2;
-    --texto:#E9F0FA;
-    --texto-sub:#A3B2C9;
-    --gris-bg:#080F1C;
-    --superficie:#0F1A2C;
-    --superficie-2:#132135;
-    --borde:#22334F;
-    --azul-light:#122744;
-    --verde-light:#0D2B22;
-    --cian-light:#0C2537;
-    --rojo-light:#2E1614;
-    --ambar-light:#2C2110;
-    --sombra-sm:0 1px 3px rgba(0,0,0,.3);
-    --sombra:0 2px 8px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.3);
-    --sombra-lg:0 12px 32px rgba(0,0,0,.45);
-  }
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]){
-      --brand-ink:#7CBEF2;
-      --texto:#E9F0FA;
-      --texto-sub:#A3B2C9;
-      --gris-bg:#080F1C;
-      --superficie:#0F1A2C;
-      --superficie-2:#132135;
-      --borde:#22334F;
-      --azul-light:#122744;
-      --verde-light:#0D2B22;
-      --cian-light:#0C2537;
-      --rojo-light:#2E1614;
-      --ambar-light:#2C2110;
-      --sombra-sm:0 1px 3px rgba(0,0,0,.3);
-      --sombra:0 2px 8px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.3);
-      --sombra-lg:0 12px 32px rgba(0,0,0,.45);
-    }
-  }
-
-  *{box-sizing:border-box;}
-  html,body{overflow-x:hidden;max-width:100%;}
-  html{scroll-behavior:smooth;scroll-padding-top:88px;}
-  body{
-    margin:0;
-    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;
-    background:var(--gris-bg);
-    color:var(--texto);
-    line-height:1.6;
-    -webkit-font-smoothing:antialiased;
-    text-rendering:optimizeLegibility;
-  }
-  img,svg{max-width:100%;display:block;}
-  a{color:inherit;text-decoration:none;}
-  h1,h2,h3,h4{line-height:1.18;letter-spacing:-.022em;margin:0;}
-  p{margin:0;}
-  .container{width:100%;max-width:var(--max);margin:0 auto;padding:0 24px;}
-  .skip{position:absolute;left:-9999px;}
-  .skip:focus{left:16px;top:16px;z-index:200;background:var(--superficie);padding:14px 20px;border-radius:10px;box-shadow:var(--sombra);font-weight:700;}
-  :focus-visible{outline:3px solid var(--cian);outline-offset:3px;border-radius:6px;}
-
-  /* ═══ Header ═══════════════════════════════ */
-  .site-header{
-    position:sticky;top:0;z-index:60;
-    background:var(--superficie);
-    border-bottom:1px solid transparent;
-    transition:box-shadow .2s, border-color .2s;
-  }
-  .site-header.scrolled{border-bottom-color:var(--borde);box-shadow:0 4px 20px rgba(0,42,84,.07);}
-  .site-header .container{display:flex;align-items:center;justify-content:space-between;gap:20px;height:80px;}
-
-  .brand{display:flex;align-items:center;flex-shrink:0;min-height:44px;}
-  .brand img{height:46px;width:auto;}
-  .brand .brand-alt{display:none;}
-
-  nav.main-nav{display:flex;align-items:center;gap:6px;margin-left:auto;}
-  nav.main-nav a{
-    position:relative;font-size:14.5px;font-weight:600;color:var(--texto-sub);
-    padding:9px 14px;border-radius:9px;transition:color .16s, background .16s;
-  }
-  nav.main-nav a:hover{color:var(--brand-ink);background:var(--azul-light);}
-
-  .header-actions{display:flex;align-items:center;gap:10px;flex-shrink:0;}
-
-  .btn{
-    display:inline-flex;align-items:center;justify-content:center;gap:9px;
-    padding:12px 22px;border-radius:11px;font-weight:700;font-size:14.5px;
-    border:1.5px solid transparent;cursor:pointer;white-space:nowrap;
-    font-family:inherit;
-    transition:transform .14s cubic-bezier(.2,.8,.3,1), box-shadow .18s, background .18s, border-color .18s, color .18s;
-  }
-  .btn svg{width:17px;height:17px;flex-shrink:0;}
-  .btn:hover{transform:translateY(-2px);}
-  .btn:active{transform:translateY(0);}
-  .btn-primary{background:linear-gradient(135deg,var(--azul),var(--marino));color:#fff;box-shadow:0 6px 18px rgba(0,60,120,.28);}
-  .btn-primary:hover{box-shadow:0 12px 28px rgba(0,60,120,.4);}
-  .btn-outline{background:transparent;border-color:var(--borde);color:var(--texto);}
-  .btn-outline:hover{border-color:var(--azul);color:var(--azul);background:var(--azul-light);}
-  .btn-light{background:#fff;color:var(--marino);box-shadow:0 6px 20px rgba(0,0,0,.18);}
-  .btn-ghost-light{background:rgba(255,255,255,.1);color:#fff;border-color:rgba(255,255,255,.32);}
-  .btn-ghost-light:hover{background:rgba(255,255,255,.2);border-color:rgba(255,255,255,.5);}
-  .btn-sm{padding:10px 15px;font-size:13.5px;min-height:40px;}
-
-  .icon-btn{
-    width:44px;height:44px;min-width:44px;min-height:44px;border-radius:11px;border:1.5px solid var(--borde);
-    background:transparent;color:var(--texto-sub);display:flex;align-items:center;justify-content:center;
-    cursor:pointer;flex-shrink:0;transition:border-color .16s,color .16s,background .16s;
-  }
-  .icon-btn:hover{border-color:var(--azul);color:var(--azul);background:var(--azul-light);}
-  .icon-btn svg{width:19px;height:19px;}
-  .theme-toggle .i-moon{display:none;}
-  :root[data-theme="dark"] .theme-toggle .i-sun{display:none;}
-  :root[data-theme="dark"] .theme-toggle .i-moon{display:block;}
-  @media (prefers-color-scheme: dark){
-    :root:not([data-theme="light"]) .theme-toggle .i-sun{display:none;}
-    :root:not([data-theme="light"]) .theme-toggle .i-moon{display:block;}
-    :root:not([data-theme="light"]) .brand .brand-main{display:none;}
-    :root:not([data-theme="light"]) .brand .brand-alt{display:block;}
-  }
-  :root[data-theme="dark"] .brand .brand-main{display:none;}
-  :root[data-theme="dark"] .brand .brand-alt{display:block;}
-  .menu-toggle{display:none;}
-
-  /* ═══ Hero ═════════════════════════════════ */
-  .hero{
-    position:relative;isolation:isolate;color:#fff;
-    padding:84px 0 92px;
-    background:
-      radial-gradient(900px 480px at 12% -5%, rgba(0,132,192,.35) 0%, transparent 62%),
-      radial-gradient(700px 420px at 92% 8%, rgba(0,144,96,.22) 0%, transparent 60%),
-      linear-gradient(155deg,var(--hero-a) 0%, var(--hero-b) 100%);
-  }
-  .hero::before{
-    content:"";position:absolute;inset:0;z-index:-1;
-    background-image:radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px);
-    background-size:28px 28px;
-    -webkit-mask-image:linear-gradient(180deg,rgba(0,0,0,.85),transparent 78%);
-    mask-image:linear-gradient(180deg,rgba(0,0,0,.85),transparent 78%);
-  }
-  .hero-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:56px;align-items:center;}
-
-  .eyebrow{
-    display:inline-flex;align-items:center;gap:9px;
-    background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.22);
-    padding:7px 16px;border-radius:99px;font-size:12.5px;font-weight:700;
-    letter-spacing:.5px;text-transform:uppercase;color:#CFE3FF;margin-bottom:24px;
-  }
-  .eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--verde-claro);box-shadow:0 0 0 4px rgba(34,197,94,.22);}
-  .hero h1{font-size:clamp(32px,4.6vw,52px);font-weight:800;margin-bottom:20px;}
-  .hero h1 .hl{
-    background:linear-gradient(100deg,var(--acento),#7FE3B4);
-    -webkit-background-clip:text;background-clip:text;color:transparent;
-  }
-  .hero-lema{
-    font-size:clamp(16px,1.9vw,20px);font-weight:600;font-style:italic;
-    color:#8FE3C0;margin:16px 0 18px;padding-left:16px;
-    border-left:3px solid rgba(143,227,192,.5);max-width:46ch;
-  }
-  .hero .lead{font-size:17.5px;color:#C2D5EE;max-width:54ch;margin-bottom:34px;}
-  .hero-ctas{display:flex;flex-wrap:wrap;gap:13px;margin-bottom:44px;}
-  .hero-stats{display:grid;grid-template-columns:repeat(3,auto);gap:14px 32px;justify-content:start;}
-  .hero-stats div{padding-left:15px;border-left:2.5px solid rgba(77,163,255,.55);}
-  .hero-stats strong{display:block;font-size:14.5px;font-weight:700;color:#fff;}
-  .hero-stats span{font-size:12.5px;color:#8FA6C6;}
-
-  .hero-brand-card{
-    background:rgba(255,255,255,.97);
-    border-radius:24px;padding:34px 30px;text-align:center;
-    box-shadow:0 24px 60px rgba(0,15,35,.4);
-  }
-  .hero-brand-card img{width:min(230px,80%);height:auto;margin:0 auto 22px;}
-  .hero-brand-card .tag{
-    font-size:11px;font-weight:800;letter-spacing:1.1px;text-transform:uppercase;
-    color:#0A5C9C;background:#E6F1FB;padding:6px 14px;border-radius:99px;display:inline-block;margin-bottom:18px;
-  }
-  .hero-brand-card ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:9px;text-align:left;}
-  .hero-brand-card li{display:flex;align-items:center;gap:10px;font-size:13.5px;font-weight:600;color:#12233D;}
-  .hero-brand-card li svg{width:18px;height:18px;color:var(--verde);flex-shrink:0;}
-
-  /* ── Barra de credibilidad ────────────────── */
-  .credibilidad{
-    background:var(--superficie);border-bottom:1px solid var(--borde);
-    padding:22px 0;
-  }
-  .cred-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;}
-  .cred{display:flex;align-items:center;gap:12px;justify-content:center;text-align:left;}
-  .cred svg{width:24px;height:24px;color:var(--brand-ink);flex-shrink:0;}
-  .cred span{font-size:13.5px;color:var(--texto-sub);line-height:1.35;}
-  .cred strong{display:block;font-weight:700;color:var(--texto);}
-
-  /* ── Tira de izajes ───────────────────────── */
-  .tira{background:var(--superficie);padding:26px 0 28px;border-bottom:1px solid var(--borde);}
-  .tira[hidden]{display:none;}
-  .tira-cabecera{
-    display:flex;align-items:flex-end;justify-content:space-between;gap:20px;
-    flex-wrap:wrap;margin-bottom:18px;
-  }
-  .tira-tag{
-    display:inline-block;font-size:11.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
-    color:var(--brand-ink);background:var(--azul-light);padding:5px 13px;border-radius:99px;margin-bottom:9px;
-  }
-  .tira-cabecera h2{font-size:clamp(18px,2vw,22px);font-weight:800;}
-  .tira-link{
-    display:inline-flex;align-items:center;gap:8px;flex-shrink:0;
-    font-size:14px;font-weight:700;color:var(--brand-ink);padding:8px 0;min-height:40px;
-  }
-  .tira-link svg{width:16px;height:16px;transition:transform .22s;}
-  .tira-link:hover svg{transform:translateX(4px);}
-
-  /* El marco recorta la pista y difumina los extremos, para que las
-     fotografías entren y salgan sin un corte brusco. */
-  .tira-marco{
-    position:relative;overflow:hidden;
-    -webkit-mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
-    mask-image:linear-gradient(90deg,transparent,#000 6%,#000 94%,transparent);
-  }
-  .tira-pista{
-    display:flex;gap:16px;width:max-content;
-    animation:desfile 46s linear infinite;
-  }
-  .tira-marco:hover .tira-pista,
-  .tira-marco:focus-within .tira-pista{animation-play-state:paused;}
-  @keyframes desfile{
-    from{transform:translateX(0);}
-    /* La mitad, porque la secuencia va duplicada: el salto es invisible. */
-    to{transform:translateX(-50%);}
-  }
-  .tira-item{
-    position:relative;flex-shrink:0;width:216px;height:142px;
-    border-radius:14px;overflow:hidden;cursor:zoom-in;
-    background:var(--azul-light);border:1px solid var(--borde);
-    transition:transform .25s cubic-bezier(.2,.8,.3,1), box-shadow .25s;
-  }
-  .tira-item:hover{transform:translateY(-4px);box-shadow:var(--sombra);}
-  .tira-item img{width:100%;height:100%;object-fit:cover;display:block;}
-  .tira-pie{
-    position:absolute;left:0;right:0;bottom:0;padding:22px 12px 9px;
-    background:linear-gradient(transparent,rgba(3,14,30,.82));
-    color:#fff;font-size:12px;font-weight:700;
-    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  }
-  @media (prefers-reduced-motion: reduce){
-    .tira-pista{animation:none;}
-    .tira-marco{overflow-x:auto;}
-  }
-  /* Sin puntero fino (móvil y tabletas) no hay forma de pausar el desfile,
-     así que la tira se desliza con el dedo: más predecible al tocar. */
-  @media (hover: none){
-    .tira-pista{animation:none;width:auto;}
-    .tira-marco{
-      overflow-x:auto;scroll-snap-type:x mandatory;
-      -webkit-overflow-scrolling:touch;scrollbar-width:none;
-    }
-    .tira-marco::-webkit-scrollbar{display:none;}
-    .tira-item{scroll-snap-align:start;}
-    .tira-item.duplicada{display:none;}
-  }
-
-  /* ── Acreditación ─────────────────────────── */
-  .acreditacion{
-    background:linear-gradient(135deg,var(--azul-light),var(--superficie) 68%);
-    border-bottom:1px solid var(--borde);padding:44px 0;
-  }
-  .acred-caja{display:flex;align-items:center;gap:38px;flex-wrap:wrap;justify-content:center;}
-  .acred-sello{
-    flex-shrink:0;background:#fff;border-radius:16px;padding:20px 26px;
-    box-shadow:var(--sombra-sm);border:1px solid var(--borde);
-    display:flex;align-items:center;justify-content:center;
-  }
-  .acred-sello[hidden]{display:none;}
-  .acred-sello img{width:auto;height:auto;max-width:230px;max-height:120px;}
-  .acred-texto{flex:1;min-width:280px;max-width:620px;}
-  .acred-tag{
-    display:inline-block;font-size:12px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
-    color:var(--brand-ink);margin-bottom:10px;
-  }
-  .acred-texto h2{font-size:clamp(21px,2.6vw,29px);font-weight:800;margin-bottom:12px;}
-  .acred-texto p{font-size:15.5px;color:var(--texto-sub);}
-  .acred-folio{
-    display:inline-flex;align-items:center;gap:8px;margin-top:14px;
-    font-size:13.5px;font-weight:700;color:var(--texto);
-    background:var(--superficie);border:1px solid var(--borde);
-    padding:8px 16px;border-radius:99px;
-  }
-  .acred-folio svg{width:16px;height:16px;color:var(--verde);}
-
-  /* ═══ Secciones ════════════════════════════ */
-  .section{padding:96px 0;}
-  .section-alt{background:var(--superficie);}
-  .section-head{max-width:680px;margin:0 auto 56px;text-align:center;}
-  .section-head.left{margin-left:0;text-align:left;}
-  .tag{
-    display:inline-block;font-size:12px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
-    color:var(--brand-ink);background:var(--azul-light);padding:6px 15px;border-radius:99px;margin-bottom:16px;
-  }
-  .section-head h2{font-size:clamp(27px,3.4vw,40px);font-weight:800;margin-bottom:14px;}
-  .section-head p{color:var(--texto-sub);font-size:16.5px;}
-
-  /* ── Servicios (prioridad) ────────────────── */
-  .servicios-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(272px,1fr));gap:22px;}
-  .servicio{
-    position:relative;overflow:hidden;
-    background:var(--superficie);border:1px solid var(--borde);border-radius:var(--radio);
-    padding:32px 28px;box-shadow:var(--sombra-sm);
-    transition:transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s, border-color .22s;
-  }
-  .servicio::before{
-    content:"";position:absolute;top:0;left:0;right:0;height:4px;
-    background:linear-gradient(90deg,var(--c1),var(--c2));
-    transform:scaleX(0);transform-origin:left;transition:transform .3s cubic-bezier(.2,.8,.3,1);
-  }
-  .servicio:hover{transform:translateY(-6px);box-shadow:var(--sombra-lg);border-color:transparent;}
-  .servicio:hover::before{transform:scaleX(1);}
-  .servicio.destacado{
-    grid-column:span 2;
-    background:linear-gradient(150deg,var(--azul-light),var(--superficie) 62%);
-    border-color:rgba(10,92,156,.28);
-  }
-  .servicio.destacado::before{transform:scaleX(1);}
-  .s-icon{
-    width:54px;height:54px;border-radius:15px;display:flex;align-items:center;justify-content:center;
-    margin-bottom:20px;background:var(--bg);color:var(--c1);
-  }
-  .s-icon svg{width:27px;height:27px;}
-  .servicio h3{font-size:18.5px;font-weight:700;margin-bottom:10px;}
-  .servicio > p{font-size:14.5px;color:var(--texto-sub);margin-bottom:18px;}
-  .s-list{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px;}
-  .s-list li{
-    font-size:12.5px;font-weight:600;color:var(--texto-sub);
-    background:var(--superficie-2);border:1px solid var(--borde);
-    padding:5px 11px;border-radius:8px;
-  }
-  .servicio.destacado .s-list{flex-direction:column;flex-wrap:nowrap;}
-  .servicio.destacado .s-list li{
-    display:flex;align-items:center;gap:10px;background:transparent;border:none;padding:0;
-    font-size:14px;font-weight:600;color:var(--texto);
-  }
-  .servicio.destacado .s-list li::before{
-    content:"";width:18px;height:18px;flex-shrink:0;border-radius:50%;
-    background:var(--c1) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/12px no-repeat;
-  }
-
-  /* ── Divisiones ───────────────────────────── */
-  .divisiones{background:var(--superficie-2);}
-  .div-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(258px,1fr));gap:22px;}
-  .division{
-    position:relative;display:flex;flex-direction:column;overflow:hidden;
-    background:var(--superficie);border:1px solid var(--borde);border-radius:var(--radio);
-    padding:30px 26px 26px;box-shadow:var(--sombra-sm);
-    transition:transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s, border-color .22s;
-  }
-  .division::after{
-    content:"";position:absolute;inset:0 0 auto;height:5px;background:var(--c1);
-  }
-  .division:hover{transform:translateY(-6px);box-shadow:var(--sombra-lg);border-color:var(--c1);}
-  .d-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:20px;}
-  .d-icon{
-    width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;
-    background:var(--bg);color:var(--c1);
-  }
-  .d-icon svg{width:28px;height:28px;}
-  .d-badge{
-    font-size:10.5px;font-weight:800;letter-spacing:.7px;text-transform:uppercase;
-    padding:5px 11px;border-radius:99px;background:var(--bg);color:var(--c1);
-  }
-  .division h3{font-size:18px;font-weight:700;margin-bottom:9px;}
-  .division p{font-size:14px;color:var(--texto-sub);flex-grow:1;margin-bottom:20px;}
-  .d-go{
-    display:inline-flex;align-items:center;gap:8px;
-    font-size:14px;font-weight:700;color:var(--c1);
-  }
-  .d-go svg{width:16px;height:16px;transition:transform .22s;}
-  .division:hover .d-go svg{transform:translate(3px,-3px);}
-
-  /* ── Nosotros ─────────────────────────────── */
-  .about-grid{display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:center;}
-  .about-copy h2{font-size:clamp(26px,3.2vw,36px);font-weight:800;margin-bottom:18px;}
-  .about-copy p{color:var(--texto-sub);font-size:16px;margin-bottom:16px;}
-  .about-points{list-style:none;margin:28px 0 0;padding:0;display:flex;flex-direction:column;gap:16px;}
-  .about-points li{display:flex;gap:14px;align-items:flex-start;font-size:15px;}
-  .about-points .chk{
-    width:24px;height:24px;border-radius:8px;flex-shrink:0;margin-top:1px;
-    background:var(--verde-light);color:var(--verde);
-    display:flex;align-items:center;justify-content:center;
-  }
-  .about-points .chk svg{width:15px;height:15px;}
-  .about-points strong{font-weight:700;color:var(--texto);}
-  .about-points li > span:last-child{color:var(--texto-sub);}
-  .about-visual{
-    background:linear-gradient(158deg,var(--azul-light),var(--superficie) 70%);
-    border:1px solid var(--borde);border-radius:24px;padding:36px 30px;
-    box-shadow:var(--sombra-sm);
-  }
-  .about-visual .logo-wrap{
-    background:#fff;border-radius:16px;padding:22px;margin-bottom:22px;
-    box-shadow:var(--sombra-sm);display:flex;justify-content:center;
-  }
-  .about-visual .logo-wrap img{width:min(200px,72%);height:auto;}
-  .minis{display:grid;grid-template-columns:1fr 1fr;gap:13px;}
-  .mini{
-    background:var(--superficie);border:1px solid var(--borde);border-radius:13px;
-    padding:17px 14px;text-align:center;
-  }
-  .mini svg{width:24px;height:24px;color:var(--brand-ink);margin:0 auto 9px;}
-  .mini strong{display:block;font-size:13px;font-weight:700;line-height:1.35;}
-
-  /* ── Cobertura ────────────────────────────── */
-  .cobertura{
-    color:#fff;text-align:center;
-    background:
-      radial-gradient(760px 420px at 50% -10%, rgba(0,132,192,.32) 0%, transparent 64%),
-      linear-gradient(160deg,var(--hero-a),var(--hero-b));
-  }
-  .cobertura .tag{background:rgba(255,255,255,.13);color:#CFE3FF;}
-  .cobertura h2{font-size:clamp(27px,3.4vw,40px);font-weight:800;margin-bottom:14px;}
-  .cobertura .lead{color:#BFD2EC;font-size:16.5px;max-width:60ch;margin:0 auto;}
-  .radar{max-width:440px;margin:44px auto 0;}
-  .radar svg{width:100%;height:auto;}
-  .radar .pulse{animation:pulse 3s ease-out infinite;transform-origin:100px 60px;}
-  .radar .pulse:nth-child(2){animation-delay:1s;}
-  .radar .pulse:nth-child(3){animation-delay:2s;}
-  @keyframes pulse{
-    0%{transform:scale(.35);opacity:0;}
-    18%{opacity:.75;}
-    100%{transform:scale(1);opacity:0;}
-  }
-  .regiones{display:flex;flex-wrap:wrap;justify-content:center;gap:11px;margin-top:38px;}
-  .regiones span{
-    background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.2);
-    padding:9px 18px;border-radius:99px;font-size:13.5px;font-weight:600;color:#E4EEFC;
-  }
-
-  /* ── Muro de operadores ───────────────────── */
-  .muro-seccion{background:var(--superficie-2);}
-  .muro-cta{
-    display:flex;align-items:center;justify-content:center;gap:16px;
-    flex-wrap:wrap;margin-bottom:40px;
-  }
-  .muro-nota{font-size:13.5px;color:var(--texto-sub);}
-
-  /* Columnas tipo mosaico: cada fotografía conserva su forma real,
-     ya sea vertical, horizontal o cuadrada, sin recortes. */
-  .muro-galeria{columns:3;column-gap:20px;}
-  .muro-cargando{
-    text-align:center;color:var(--texto-sub);font-size:14.5px;padding:34px 0;
-  }
-  .post{
-    background:var(--superficie);border:1px solid var(--borde);border-radius:var(--radio);
-    overflow:hidden;box-shadow:var(--sombra-sm);
-    break-inside:avoid;-webkit-column-break-inside:avoid;
-    margin:0 0 20px;display:flex;flex-direction:column;
-    transition:transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s;
-  }
-  .post:hover{transform:translateY(-4px);box-shadow:var(--sombra);}
-  .post-figura{
-    margin:0;position:relative;cursor:zoom-in;background:var(--azul-light);
-    display:block;line-height:0;
-  }
-  .post-img{
-    width:100%;height:auto;display:block;
-    /* Una foto muy alargada no debe adueñarse de la columna. */
-    max-height:520px;object-fit:contain;
-  }
-  .post-lupa{
-    position:absolute;right:10px;bottom:10px;width:34px;height:34px;border-radius:50%;
-    background:rgba(3,14,30,.62);color:#fff;display:flex;align-items:center;justify-content:center;
-    opacity:0;transition:opacity .2s;pointer-events:none;
-  }
-  .post-lupa svg{width:17px;height:17px;}
-  .post:hover .post-lupa{opacity:1;}
-  .post-cuerpo{padding:18px 20px 20px;display:flex;flex-direction:column;gap:10px;flex-grow:1;}
-  .post-com{font-size:14.5px;color:var(--texto);overflow-wrap:anywhere;flex-grow:1;}
-  .post-pie{display:flex;align-items:center;gap:11px;padding-top:12px;border-top:1px solid var(--borde);}
-  .post-ini{
-    width:38px;height:38px;border-radius:50%;flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,var(--azul),var(--marino));
-    color:#fff;font-weight:800;font-size:14px;
-  }
-  .post-quien{display:flex;flex-direction:column;min-width:0;}
-  .post-nombre{font-size:14px;font-weight:700;color:var(--texto);}
-  .post-rol{font-size:12.5px;color:var(--texto-sub);overflow-wrap:anywhere;}
-
-  /* ── Ventana de bienvenida ────────────────── */
-  .saludo{
-    position:fixed;right:26px;bottom:26px;z-index:110;width:330px;max-width:calc(100vw - 36px);
-    background:var(--superficie);border:1px solid var(--borde);border-radius:18px;
-    box-shadow:var(--sombra-lg);overflow:hidden;
-    transform:translateY(18px);opacity:0;
-    transition:opacity .38s ease, transform .38s cubic-bezier(.2,.8,.3,1);
-  }
-  .saludo[hidden]{display:none;}
-  .saludo.visible{opacity:1;transform:none;}
-  .saludo-x{
-    position:absolute;top:10px;right:10px;z-index:2;width:32px;height:32px;border:0;border-radius:50%;
-    background:rgba(3,14,30,.5);color:#fff;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;
-  }
-  .saludo-x:hover{background:rgba(3,14,30,.72);}
-  .saludo-x svg{width:15px;height:15px;}
-  .saludo-cabecera{padding:16px 18px 12px;}
-  .saludo-tag{
-    display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;
-    color:var(--brand-ink);background:var(--azul-light);padding:4px 11px;border-radius:99px;margin-bottom:8px;
-  }
-  .saludo-titulo{font-size:14.5px;font-weight:700;color:var(--texto);}
-  .saludo-img{
-    width:100%;height:auto;max-height:230px;object-fit:cover;object-position:center;
-    display:block;background:var(--azul-light);
-  }
-  .saludo-cuerpo{padding:16px 18px 18px;}
-  .saludo-com{
-    font-size:13.5px;color:var(--texto-sub);margin-bottom:14px;
-    display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
-  }
-  .saludo-quien{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
-  .saludo-ini{
-    width:34px;height:34px;border-radius:50%;flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;
-    background:linear-gradient(135deg,var(--azul),var(--marino));color:#fff;font-weight:800;font-size:13px;
-  }
-  .saludo-datos{display:flex;flex-direction:column;min-width:0;}
-  .saludo-nombre{font-size:13.5px;font-weight:700;color:var(--texto);}
-  .saludo-rol{font-size:12px;color:var(--texto-sub);overflow-wrap:anywhere;}
-  .saludo-cta{width:100%;}
-
-  /* Distintivo de video */
-  .post-play{
-    position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-    width:52px;height:52px;border-radius:50%;
-    background:rgba(3,14,30,.62);color:#fff;
-    display:flex;align-items:center;justify-content:center;
-    pointer-events:none;transition:background .2s, transform .2s;
-  }
-  .post-play svg{width:24px;height:24px;margin-left:2px;}
-  .post-figura:hover .post-play,.tira-item:hover .post-play{background:var(--brand-ink);transform:translate(-50%,-50%) scale(1.06);}
-  .tira-play{width:40px;height:40px;}
-  .tira-play svg{width:18px;height:18px;}
-  .post-dur{
-    position:absolute;right:10px;bottom:10px;
-    background:rgba(3,14,30,.72);color:#fff;
-    font-size:11.5px;font-weight:700;padding:3px 8px;border-radius:6px;
-    pointer-events:none;
-  }
-  .subir-prev{width:100%;max-height:230px;object-fit:contain;background:#0b1220;display:block;}
-  video.subir-prev{max-height:260px;}
-  #visor-video{
-    max-width:100%;max-height:78vh;width:auto;height:auto;
-    margin:0 auto;border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.6);
-    background:#000;display:block;
-  }
-  #visor-video[hidden]{display:none;}
-
-  /* Visor a pantalla completa */
-  .visor{position:fixed;inset:0;z-index:130;display:flex;align-items:center;justify-content:center;padding:24px;}
-  .visor[hidden]{display:none;}
-  .visor-fondo{position:absolute;inset:0;background:rgba(3,10,22,.92);}
-  .visor-caja{position:relative;max-width:1100px;width:100%;text-align:center;}
-  .visor img{
-    max-width:100%;max-height:78vh;width:auto;height:auto;
-    margin:0 auto;border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.6);
-  }
-  .visor-pie{margin-top:16px;color:#DCE7F7;font-size:14.5px;}
-  .visor-pie strong{display:block;font-size:15px;color:#fff;margin-bottom:2px;}
-  .visor-x{
-    position:absolute;top:-52px;right:0;width:44px;height:44px;border:0;border-radius:50%;
-    background:rgba(255,255,255,.14);color:#fff;cursor:pointer;
-    display:flex;align-items:center;justify-content:center;
-  }
-  .visor-x:hover{background:rgba(255,255,255,.26);}
-  .visor-x svg{width:20px;height:20px;}
-
-  .muro-vacio{
-    text-align:center;padding:56px 24px;color:var(--texto-sub);
-    background:var(--superficie);border:1px dashed var(--borde);border-radius:var(--radio);
-  }
-  .muro-vacio svg{width:44px;height:44px;margin:0 auto 16px;color:var(--brand-ink);opacity:.55;}
-  .muro-vacio p{font-size:15px;}
-
-  /* ── Ventana del formulario ───────────────── */
-  .modal{position:fixed;inset:0;z-index:120;display:flex;align-items:center;justify-content:center;padding:20px;}
-  .modal[hidden]{display:none;}
-  .modal-fondo{position:absolute;inset:0;background:rgba(3,14,30,.62);backdrop-filter:blur(3px);}
-  .modal-caja{
-    position:relative;background:var(--superficie);border-radius:20px;
-    width:100%;max-width:540px;max-height:90vh;overflow-y:auto;
-    padding:32px 30px;box-shadow:var(--sombra-lg);
-  }
-  .modal-x{
-    position:absolute;top:14px;right:14px;width:40px;height:40px;
-    border:0;background:transparent;color:var(--texto-sub);cursor:pointer;
-    border-radius:10px;display:flex;align-items:center;justify-content:center;
-  }
-  .modal-x:hover{background:var(--azul-light);color:var(--brand-ink);}
-  .modal-x svg{width:19px;height:19px;}
-  .modal-caja h3{font-size:21px;font-weight:800;margin-bottom:6px;}
-  .modal-sub{font-size:14px;color:var(--texto-sub);margin-bottom:22px;}
-
-  .campo{margin-bottom:16px;position:relative;}
-  .campo-fila{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-  .campo label{display:block;font-size:13px;font-weight:700;color:var(--texto);margin-bottom:6px;}
-  .campo label span{color:var(--rojo);}
-  .campo input[type=text],.campo textarea{
-    width:100%;padding:12px 14px;font-family:inherit;font-size:15px;
-    color:var(--texto);background:var(--superficie);
-    border:1.5px solid var(--borde);border-radius:10px;resize:vertical;
-  }
-  .campo input[type=text]:focus,.campo textarea:focus{border-color:var(--brand-ink);outline:none;}
-  .contador{position:absolute;right:2px;bottom:-17px;font-size:11.5px;color:var(--texto-sub);}
-
-  .subir{position:relative;border:2px dashed var(--borde);border-radius:12px;overflow:hidden;background:var(--superficie-2);}
-  .subir:hover{border-color:var(--brand-ink);}
-  .subir input[type=file]{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;}
-  .subir-txt{
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
-    padding:26px 16px;text-align:center;color:var(--texto-sub);font-size:14px;pointer-events:none;
-  }
-  .subir-txt svg{width:26px;height:26px;color:var(--brand-ink);}
-  .subir-txt small{font-size:12px;opacity:.8;}
-  .subir-prev{width:100%;max-height:230px;object-fit:contain;background:#0b1220;display:block;}
-
-  .consent{
-    display:flex;gap:11px;align-items:flex-start;margin:20px 0;
-    font-size:13px;color:var(--texto-sub);line-height:1.5;cursor:pointer;
-  }
-  .consent input{width:19px;height:19px;flex-shrink:0;margin-top:1px;accent-color:var(--azul);cursor:pointer;}
-
-  #m-trampa{position:absolute;left:-9999px;width:1px;height:1px;opacity:0;}
-
-  .form-msg{padding:12px 15px;border-radius:10px;font-size:13.5px;margin-bottom:16px;}
-  .form-msg.err{background:var(--rojo-light);color:#8C2318;border:1px solid rgba(225,72,60,.32);}
-  .form-msg.ok{background:var(--verde-light);color:#0B5033;border:1px solid rgba(0,144,96,.3);}
-  #m-enviar{width:100%;}
-  #m-enviar[disabled]{opacity:.6;cursor:progress;}
-
-  /* ── Preguntas frecuentes ─────────────────── */
-  .faq{max-width:840px;margin:0 auto;display:flex;flex-direction:column;gap:12px;}
-  .faq-item{
-    background:var(--superficie);border:1px solid var(--borde);border-radius:var(--radio-sm);
-    box-shadow:var(--sombra-sm);overflow:hidden;transition:border-color .18s, box-shadow .18s;
-  }
-  .faq-item[open]{border-color:var(--brand-ink);box-shadow:var(--sombra);}
-  .faq-item summary{
-    display:flex;align-items:center;justify-content:space-between;gap:16px;
-    padding:20px 22px;cursor:pointer;list-style:none;
-    font-size:16px;font-weight:700;color:var(--texto);min-height:44px;
-  }
-  .faq-item summary::-webkit-details-marker{display:none;}
-  .faq-item summary:hover{color:var(--brand-ink);}
-  .faq-mas{
-    position:relative;width:20px;height:20px;flex-shrink:0;
-  }
-  .faq-mas::before,.faq-mas::after{
-    content:"";position:absolute;background:var(--brand-ink);border-radius:2px;
-    transition:transform .22s cubic-bezier(.2,.8,.3,1);
-  }
-  .faq-mas::before{top:9px;left:2px;width:16px;height:2.4px;}
-  .faq-mas::after{top:2px;left:8.8px;width:2.4px;height:16px;}
-  .faq-item[open] .faq-mas::after{transform:rotate(90deg);}
-  .faq-cuerpo{padding:0 22px 22px;}
-  .faq-cuerpo p{font-size:15px;color:var(--texto-sub);}
-  .faq-cuerpo a{color:var(--brand-ink);font-weight:700;text-decoration:underline;}
-
-  /* ── Contacto ─────────────────────────────── */
-  .contact-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));gap:22px;max-width:920px;margin:0 auto;}
-  .contact-card{
-    background:var(--superficie);border:1px solid var(--borde);border-radius:var(--radio);
-    padding:32px 26px;text-align:center;box-shadow:var(--sombra-sm);
-    transition:transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s;
-  }
-  .contact-card:hover{transform:translateY(-5px);box-shadow:var(--sombra);}
-  .c-icon{
-    width:54px;height:54px;border-radius:16px;margin:0 auto 18px;
-    display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--c1);
-  }
-  .c-icon svg{width:26px;height:26px;}
-  .contact-card h3{font-size:16px;font-weight:700;margin-bottom:7px;}
-  .contact-card p{font-size:14px;color:var(--texto-sub);margin-bottom:20px;}
-
-  /* Correos por área */
-  .correos-grid{
-    display:grid;grid-template-columns:1fr 1fr;gap:20px;
-    max-width:920px;margin:0 auto 24px;
-  }
-  .correo-bloque{
-    display:flex;align-items:center;gap:16px;padding:22px 24px;min-height:44px;
-    background:linear-gradient(135deg,var(--bg),var(--superficie) 74%);
-    border:1px solid var(--borde);border-radius:var(--radio);
-    box-shadow:var(--sombra-sm);
-    transition:transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s, border-color .22s;
-  }
-  .correo-bloque:hover{transform:translateY(-4px);box-shadow:var(--sombra);border-color:var(--c1);}
-  .correo-icono{
-    width:52px;height:52px;border-radius:15px;flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;
-    background:var(--superficie);color:var(--c1);box-shadow:var(--sombra-sm);
-  }
-  .correo-icono svg{width:25px;height:25px;}
-  .correo-texto{display:flex;flex-direction:column;gap:2px;flex-grow:1;min-width:0;}
-  .correo-area{font-size:11px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:var(--c1);}
-  .correo-texto strong{font-size:15.5px;font-weight:700;letter-spacing:-.2px;color:var(--texto);word-break:break-word;}
-  .correo-cta{
-    display:inline-flex;align-items:center;gap:7px;flex-shrink:0;
-    font-size:0;color:var(--c1);
-  }
-  .correo-cta svg{width:19px;height:19px;transition:transform .22s;}
-  .correo-bloque:hover .correo-cta svg{transform:translateX(4px);}
-
-  /* Zonas de atención */
-  .zona{
-    background:var(--superficie);border:1px solid var(--borde);border-radius:var(--radio);
-    padding:28px 24px;box-shadow:var(--sombra-sm);text-align:center;
-    transition:transform .22s cubic-bezier(.2,.8,.3,1), box-shadow .22s, border-color .22s;
-  }
-  .zona:hover{transform:translateY(-5px);box-shadow:var(--sombra);border-color:var(--c1);}
-  .z-head{display:flex;align-items:center;justify-content:center;gap:11px;margin-bottom:14px;}
-  .z-pin{
-    width:42px;height:42px;border-radius:13px;flex-shrink:0;
-    display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--c1);
-  }
-  .z-pin svg{width:22px;height:22px;}
-  .zona h3{font-size:17px;font-weight:700;}
-  .z-tel{
-    display:inline-block;font-size:19px;font-weight:800;letter-spacing:-.4px;
-    color:var(--c1);margin-bottom:14px;padding:6px 4px;min-height:44px;
-  }
-  .z-tel:hover{text-decoration:underline;}
-  .z-acciones{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;}
-  .btn-wa{background:#25D366;color:#0A2E17;box-shadow:0 6px 16px rgba(37,211,102,.3);}
-  .btn-wa:hover{background:#1FBE5A;box-shadow:0 10px 24px rgba(37,211,102,.42);}
-
-  .sedes{
-    display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:12px;
-    max-width:920px;margin:34px auto 0;padding-top:26px;border-top:1px solid var(--borde);
-  }
-  .sedes-label{
-    font-size:11.5px;font-weight:800;letter-spacing:.9px;text-transform:uppercase;color:var(--texto-sub);
-  }
-  .sedes-lista{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;}
-  .sedes-lista span{
-    font-size:13.5px;font-weight:600;color:var(--texto);
-    background:var(--superficie-2);border:1px solid var(--borde);
-    padding:7px 15px;border-radius:99px;
-  }
-
-  /* ── Cierre / CTA ─────────────────────────── */
-  .cta-final{
-    color:#fff;padding:84px 0;
-    background:
-      radial-gradient(700px 380px at 78% 0%, rgba(0,144,96,.28) 0%, transparent 62%),
-      radial-gradient(760px 420px at 12% 100%, rgba(0,132,192,.32) 0%, transparent 64%),
-      linear-gradient(150deg,var(--hero-a),var(--hero-b));
-  }
-  .cta-inner{max-width:760px;text-align:center;}
-  .cta-final h2{font-size:clamp(25px,3.2vw,38px);font-weight:800;margin-bottom:16px;}
-  .cta-final h2 .hl{
-    background:linear-gradient(100deg,var(--acento),#7FE3B4);
-    -webkit-background-clip:text;background-clip:text;color:transparent;
-  }
-  .cta-final p{color:#C2D5EE;font-size:16.5px;margin-bottom:30px;}
-  .cta-botones{display:flex;flex-wrap:wrap;gap:13px;justify-content:center;}
-
-  /* ── Footer ───────────────────────────────── */
-  .site-footer{background:var(--hero-a);color:#9EB0CA;padding:60px 0 30px;}
-  .footer-grid{
-    display:grid;grid-template-columns:1.5fr 1fr 1fr 1.2fr;gap:40px;
-    padding-bottom:36px;border-bottom:1px solid rgba(255,255,255,.11);
-  }
-  .footer-brand img{width:180px;height:auto;margin-bottom:18px;}
-  .footer-brand p{font-size:14px;color:#8397B5;max-width:38ch;}
-  .footer-col h4{font-size:11.5px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;color:#7488AA;margin-bottom:16px;}
-  .footer-col ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;}
-  .footer-col a{display:inline-block;font-size:14px;color:#C0CDE2;padding:9px 0;transition:color .16s;}
-  .footer-col a:hover{color:#fff;}
-  .footer-bottom{
-    display:flex;flex-wrap:wrap;justify-content:space-between;gap:12px;
-    padding-top:26px;font-size:12.5px;color:#7488AA;
-  }
-
-  /* ── Animación de entrada ─────────────────── */
-  .reveal{opacity:0;transform:translateY(22px);transition:opacity .6s ease, transform .6s cubic-bezier(.2,.8,.3,1);}
-  .reveal.in{opacity:1;transform:none;}
-  @media (prefers-reduced-motion: reduce){
-    *{animation:none !important;transition:none !important;scroll-behavior:auto !important;}
-    .reveal{opacity:1;transform:none;}
-  }
-
-  /* ═══ Responsive ═══════════════════════════ */
-  @media (max-width:980px){
-    .hero-grid{grid-template-columns:1fr;gap:44px;}
-    .hero-brand-card{max-width:400px;margin:0 auto;}
-    .about-grid{grid-template-columns:1fr;gap:44px;}
-    .about-visual{order:-1;max-width:460px;margin:0 auto;}
-    .servicio.destacado{grid-column:span 1;}
-    .footer-grid{grid-template-columns:1fr 1fr;}
-    .footer-brand{grid-column:1 / -1;}
-  }
-  @media (max-width:900px){
-    .cred-grid{grid-template-columns:repeat(2,1fr);gap:20px 14px;}
-    .correos-grid{grid-template-columns:1fr;}
-    .muro-galeria{columns:2;}
-  }
-  @media (max-width:820px){
-    nav.main-nav{
-      position:fixed;inset:80px 0 0;background:var(--superficie);
-      flex-direction:column;align-items:stretch;gap:0;
-      padding:20px 24px;overflow-y:auto;margin-left:0;
-      transform:translateX(100%);transition:transform .26s cubic-bezier(.2,.8,.3,1);
-      z-index:59;
-    }
-    nav.main-nav.open{transform:translateX(0);}
-    nav.main-nav a{padding:16px 4px;border-bottom:1px solid var(--borde);border-radius:0;font-size:16px;}
-    .menu-toggle{display:flex;}
-    .header-cta{display:none;}
-    .hero{padding:60px 0 66px;}
-    .section{padding:70px 0;}
-    .hero-stats{grid-template-columns:1fr;gap:12px;}
-  }
-  @media (max-width:520px){
-    .container{padding:0 18px;}
-    .site-header .container{height:70px;}
-    .brand img{height:38px;}
-    html{scroll-padding-top:78px;}
-    nav.main-nav{inset:70px 0 0;}
-    .hero-ctas{flex-direction:column;align-items:stretch;}
-    .hero-ctas .btn{width:100%;}
-    .servicio,.division,.zona{padding:26px 22px;}
-    .tira{padding:30px 0 34px;}
-    .tira-item{width:190px;height:132px;}
-    .tira-cabecera{margin-bottom:16px;}
-    .saludo{
-      right:10px;left:10px;bottom:10px;width:auto;max-width:none;
-      display:flex;align-items:stretch;gap:0;border-radius:14px;
-    }
-    .saludo-cabecera{display:none;}
-    .saludo-img{width:104px;height:auto;min-height:100%;max-height:none;flex-shrink:0;}
-    .saludo-cuerpo{padding:12px 14px;flex:1;min-width:0;}
-    .saludo-com{-webkit-line-clamp:2;font-size:12.5px;margin-bottom:10px;}
-    .saludo-quien{margin-bottom:10px;}
-    .saludo-ini{width:28px;height:28px;font-size:11.5px;}
-    .saludo-nombre{font-size:12.5px;}
-    .saludo-rol{font-size:11px;}
-    .saludo-cta{font-size:12.5px;padding:8px 12px;min-height:38px;}
-    .saludo-x{width:28px;height:28px;top:6px;right:6px;}
-    .acred-caja{flex-direction:column;text-align:center;gap:24px;}
-    .acreditacion{padding:34px 0;}
-    .muro-galeria{columns:1;}
-    .post-img{max-height:none;}
-    .visor{padding:16px;}
-    .visor-x{top:auto;bottom:-52px;right:50%;transform:translateX(50%);}
-    .correo-bloque{padding:20px;gap:14px;}
-    .correo-texto strong{font-size:14px;}
-    .cred-grid{grid-template-columns:1fr;gap:14px;}
-    .cred{justify-content:flex-start;}
-    .z-acciones{flex-direction:column;}
-    .z-acciones .btn{width:100%;}
-    .cta-botones{flex-direction:column;}
-    .cta-botones .btn{width:100%;}
-    .footer-grid{grid-template-columns:1fr;gap:32px;}
-    .footer-bottom{flex-direction:column;}
-  }
-</style>
+<link rel="stylesheet" href="assets/estilos.css">
 <noscript><style>.reveal{opacity:1 !important;transform:none !important;}</style></noscript>
 </head>
 <body>
@@ -1188,6 +292,7 @@
 
     <nav class="main-nav" id="nav" aria-label="Navegación principal">
       <a href="#servicios">Servicios</a>
+      <a href="#mantenimiento">Mantenimiento</a>
       <a href="#divisiones">Divisiones</a>
       <a href="#nosotros">Nosotros</a>
       <a href="#cobertura">Cobertura</a>
@@ -1346,15 +451,18 @@
           </ul>
         </article>
 
-        <article class="servicio reveal" style="--c1:var(--verde);--c2:var(--verde-claro);--bg:var(--verde-light);">
+        <article class="servicio reveal t-verde" style="--c1:var(--verde);--c2:var(--verde-claro);--bg:var(--verde-light);">
           <div class="s-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 1 5.4-5.4Z"/></svg>
           </div>
-          <h3>Mantenimiento de equipos</h3>
-          <p>El mantenimiento correctivo cuesta producción; el preventivo cuesta una visita programada. Tú decides cuál pagas.</p>
+          <h3>Mantenimiento de grúas y equipo industrial</h3>
+          <p>El mantenimiento correctivo cuesta producción; el preventivo cuesta una visita programada. Tú decides cuál pagas. Atendemos grúas torre, hidráulicas, móviles e industriales, montacargas, telehandlers, plataformas y movimiento de tierra.</p>
           <ul class="s-list">
             <li>Preventivo y correctivo</li><li>Componentes críticos</li><li>Cierre de hallazgos</li><li>Rutinas programadas</li>
           </ul>
+          <a class="fam-go" style="margin-top:16px;" href="mantenimiento.html">Ver equipos que atendemos
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+          </a>
         </article>
 
         <article class="servicio reveal" style="--c1:var(--ambar);--c2:#FBBF24;--bg:var(--ambar-light);">
@@ -1423,6 +531,232 @@
           </ul>
         </article>
 
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ MANTENIMIENTO ══════════════════════ -->
+  <section class="section mant" id="mantenimiento">
+    <div class="container">
+      <div class="section-head reveal">
+        <span class="tag">Mantenimiento</span>
+        <h2>Mantenemos grúas y equipo industrial de todo tipo</h2>
+        <p>Grúas torre, hidráulicas, móviles e industriales, montacargas, telehandlers, plataformas de elevación y maquinaria de movimiento de tierra. Preventivo programado, correctivo y cierre de hallazgos, con el mismo equipo técnico que inspecciona bajo nuestra acreditación ante la ema.</p>
+      </div>
+
+      <div class="fam-grid">
+
+        <a class="familia reveal t-marino" href="mantenimiento.html#gruas-torre">
+          <div class="fam-fig">
+            <span class="fam-cuenta">4 tipos</span>
+            <svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M56 104h34"/>
+              <path d="M66 104V36M80 104V36"/>
+              <path d="M66 90l14-18M80 90L66 72M66 66l14-18M80 66L66 48"/>
+              <path d="M26 36h120"/>
+              <path d="M73 36V14"/>
+              <path d="M73 14 34 36M73 14l62 22"/>
+              <path d="M28 30h16v12H28z"/>
+              <path d="M112 36v20"/>
+              <path d="M105 56h14v9h-14z"/>
+            </svg>
+          </div>
+          <div class="fam-cuerpo">
+            <h3>Grúas torre</h3>
+            <p>El equipo que detiene una obra entera cuando falla. Rutinas en sitio sin desmontar, con registro para la bitácora.</p>
+            <ul class="chips">
+              <li>Pluma horizontal</li><li>Pluma abatible</li><li>Autodesplegables</li><li>Grúas de obra</li>
+            </ul>
+            <span class="fam-go">Ver mantenimiento
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+            </span>
+          </div>
+        </a>
+
+        <a class="familia reveal t-azul" href="mantenimiento.html#gruas-moviles">
+          <div class="fam-fig">
+            <span class="fam-cuenta">6 tipos</span>
+            <svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 100h136"/>
+              <path d="M22 86V70h24l9-12h26v28H22z"/>
+              <circle cx="38" cy="90" r="8"/><circle cx="62" cy="90" r="8"/><circle cx="86" cy="90" r="8"/>
+              <path d="M16 74v16M104 74v16"/>
+              <path d="M67 61 125 19M72 68l58-42M67 61l5 7M125 19l5 7"/>
+              <path d="M128 24v16"/>
+              <path d="M122 40h12v9h-12z"/>
+            </svg>
+          </div>
+          <div class="fam-cuerpo">
+            <h3>Grúas móviles e hidráulicas</h3>
+            <p>Sistemas hidráulicos, cables, frenos y estabilizadores. Donde se concentran las fallas que dejan la unidad parada.</p>
+            <ul class="chips">
+              <li>Todo terreno</li><li>Rough terrain</li><li>Sobre orugas</li><li>Sobre camión</li><li>Articuladas</li><li>Carry deck</li>
+            </ul>
+            <span class="fam-go">Ver mantenimiento
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+            </span>
+          </div>
+        </a>
+
+        <a class="familia reveal t-cian" href="mantenimiento.html#gruas-industriales">
+          <div class="fam-fig">
+            <span class="fam-cuenta">5 tipos</span>
+            <svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 26h136"/>
+              <path d="M26 26v74M134 26v74"/>
+              <path d="M12 100h136"/>
+              <path d="M26 48h108"/>
+              <path d="M70 38h20v10H70z"/>
+              <path d="M80 48v22"/>
+              <path d="M73 70h14v10H73z"/>
+            </svg>
+          </div>
+          <div class="fam-cuerpo">
+            <h3>Grúas industriales fijas</h3>
+            <p>Viajeras, pórticos y monorrieles de planta. Mantenimiento que no espera al paro de producción.</p>
+            <ul class="chips">
+              <li>Viajeras (puente)</li><li>Pórtico</li><li>Semipórtico</li><li>Monorriel</li><li>Pluma de columna y pared</li>
+            </ul>
+            <span class="fam-go">Ver mantenimiento
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+            </span>
+          </div>
+        </a>
+
+        <a class="familia reveal t-verde" href="mantenimiento.html#polipastos">
+          <div class="fam-fig">
+            <span class="fam-cuenta">7 tipos</span>
+            <svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 20h120"/>
+              <path d="M62 20v8M98 20v8"/>
+              <path d="M54 28h52v26H54z"/>
+              <path d="M66 38h12M82 38h12"/>
+              <path d="M80 54v14"/>
+              <path d="M68 68h24v10H68z"/>
+              <path d="M80 78v6"/>
+              <path d="M80 84c-9 0-14 6-14 13 0 6 5 10 11 10s10-4 10-10v-5"/>
+            </svg>
+          </div>
+          <div class="fam-cuerpo">
+            <h3>Polipastos y accesorios de izaje</h3>
+            <p>Lo que sostiene la carga. Revisión, reparación y reemplazo de componentes que no admiten improvisación.</p>
+            <ul class="chips">
+              <li>Polipastos eléctricos</li><li>De cadena y palanca</li><li>Neumáticos</li><li>Malacates</li><li>Eslingas y estrobos</li><li>Grilletes y ganchos</li><li>Balancines</li>
+            </ul>
+            <span class="fam-go">Ver mantenimiento
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+            </span>
+          </div>
+        </a>
+
+        <a class="familia reveal t-ambar" href="mantenimiento.html#montacargas">
+          <div class="fam-fig">
+            <span class="fam-cuenta">8 tipos</span>
+            <svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 100h136"/>
+              <path d="M40 22v64M50 22v64"/>
+              <path d="M45 80H16M16 80v-7"/>
+              <path d="M18 50h26v30H18z"/>
+              <path d="M58 24h46"/>
+              <path d="M58 24v14M104 24v26"/>
+              <path d="M56 88V60h16l6-10h26v38"/>
+              <circle cx="70" cy="90" r="9"/><circle cx="104" cy="92" r="7"/>
+            </svg>
+          </div>
+          <div class="fam-cuerpo">
+            <h3>Montacargas y manejo de materiales</h3>
+            <p>El equipo que más horas acumula y el primero que se descuida. Rutinas por horómetro, no por calendario.</p>
+            <ul class="chips">
+              <li>De combustión (GLP y diésel)</li><li>Eléctricos</li><li>Apiladores</li><li>Patines hidráulicos</li><li>Reach trucks</li><li>Order pickers</li><li>Mesas elevadoras</li><li>Niveladores de andén</li>
+            </ul>
+            <span class="fam-go">Ver mantenimiento
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+            </span>
+          </div>
+        </a>
+
+        <a class="familia reveal t-cian" href="mantenimiento.html#plataformas">
+          <div class="fam-fig">
+            <span class="fam-cuenta">5 tipos</span>
+            <svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 100h136"/>
+              <path d="M44 92h58V80H44z"/>
+              <circle cx="56" cy="96" r="5"/><circle cx="92" cy="96" r="5"/>
+              <path d="M50 80l46-24M96 80 50 56"/>
+              <path d="M50 56l46-24M96 56 50 32"/>
+              <path d="M38 32h70"/>
+              <path d="M38 32V16M108 32V16M38 16h70"/>
+            </svg>
+          </div>
+          <div class="fam-cuerpo">
+            <h3>Telehandlers y elevación de personal</h3>
+            <p>Aquí arriba va gente. El mantenimiento no es un trámite: es la diferencia entre una jornada normal y un accidente.</p>
+            <ul class="chips">
+              <li>Manipuladores telescópicos</li><li>Plataformas de tijera</li><li>Brazo articulado</li><li>Telescópicas</li><li>Mástil vertical</li>
+            </ul>
+            <span class="fam-go">Ver mantenimiento
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+            </span>
+          </div>
+        </a>
+
+        <a class="familia reveal t-marino" href="mantenimiento.html#movimiento-tierra">
+          <div class="fam-fig">
+            <span class="fam-cuenta">8 tipos</span>
+            <svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M18 82h74a9 9 0 0 1 0 18H18a9 9 0 0 1 0-18Z"/>
+              <circle cx="34" cy="91" r="4"/><circle cx="76" cy="91" r="4"/>
+              <path d="M32 82V58h40v24"/>
+              <path d="M40 58V46h22v12"/>
+              <path d="M68 62 104 34"/>
+              <path d="M104 34 118 66"/>
+              <path d="M112 70l10 16 18-10-6-14z"/>
+            </svg>
+          </div>
+          <div class="fam-cuerpo">
+            <h3>Maquinaria de movimiento de tierra</h3>
+            <p>Trenes de rodaje, mandos finales e hidráulicos. Mantenimiento programado para que la máquina esté el día que se ocupa.</p>
+            <ul class="chips">
+              <li>Excavadoras</li><li>Miniexcavadoras</li><li>Retroexcavadoras</li><li>Cargadores frontales</li><li>Minicargadores</li><li>Bulldozers</li><li>Motoconformadoras</li><li>Compactadores</li>
+            </ul>
+            <span class="fam-go">Ver mantenimiento
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+            </span>
+          </div>
+        </a>
+
+        <a class="familia reveal t-verde" href="mantenimiento.html#equipo-industrial">
+          <div class="fam-fig">
+            <span class="fam-cuenta">7 tipos</span>
+            <svg viewBox="0 0 160 110" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 94h120"/>
+              <circle cx="56" cy="54" r="18"/><circle cx="56" cy="54" r="7"/>
+              <path d="M56 32v-8M56 76v8M34 54h-8M78 54h8M40 38l-6-6M72 70l6 6M40 70l-6 6M72 38l6-6"/>
+              <path d="M94 48h42v34H94z"/>
+              <path d="M102 48V36h16v12"/>
+              <path d="M136 58h8M136 72h8"/>
+            </svg>
+          </div>
+          <div class="fam-cuerpo">
+            <h3>Equipo industrial de planta</h3>
+            <p>Lo que mueve la operación cuando la grúa está quieta. Un solo proveedor para todo el equipo del sitio.</p>
+            <ul class="chips">
+              <li>Compresores</li><li>Generadores</li><li>Motores eléctricos</li><li>Reductores</li><li>Sistemas hidráulicos</li><li>Neumáticos</li><li>Bandas transportadoras</li>
+            </ul>
+            <span class="fam-go">Ver mantenimiento
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+            </span>
+          </div>
+        </a>
+
+      </div>
+
+      <div class="mant-pie reveal">
+        <p>¿No ves tu equipo en la lista? <strong>Atendemos prácticamente cualquier equipo industrial, de elevación y de movimiento de tierra.</strong> Dinos qué tienes y te decimos cómo lo mantenemos.</p>
+        <a class="btn btn-primary" href="mantenimiento.html">
+          Ver el catálogo completo
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
       </div>
     </div>
   </section>
@@ -1937,7 +1271,7 @@
         <ul>
           <li><a href="#servicios">Inspección y certificación</a></li>
           <li><a href="#servicios">Pruebas de carga</a></li>
-          <li><a href="#servicios">Mantenimiento</a></li>
+          <li><a href="mantenimiento.html">Mantenimiento de equipos</a></li>
           <li><a href="#servicios">Capacitación y DC-3</a></li>
           <li><a href="#servicios">Pruebas no destructivas</a></li>
           <li><a href="#servicios">Pruebas cinemáticas</a></li>
@@ -2363,10 +1697,6 @@
   }
 
   /**
-   * Toma un fotograma del video para usarlo como miniatura. Sin esto la
-   * galería tendría que descargar el video entero solo para mostrarlo.
-   */
-  /**
    * Recomprime el video dentro del navegador antes de enviarlo.
    *
    * Los videos de celular llegan en 4K y pesan decenas o cientos de MB, muy
@@ -2502,6 +1832,10 @@
     });
   }
 
+  /**
+   * Toma un fotograma del video para usarlo como miniatura. Sin esto la
+   * galería tendría que descargar el video entero solo para mostrarlo.
+   */
   function miniaturaDeVideo(archivo){
     return new Promise(function(resolve, reject){
       var url = URL.createObjectURL(archivo);
