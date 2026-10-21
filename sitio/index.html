@@ -2366,6 +2366,142 @@
    * Toma un fotograma del video para usarlo como miniatura. Sin esto la
    * galería tendría que descargar el video entero solo para mostrarlo.
    */
+  /**
+   * Recomprime el video dentro del navegador antes de enviarlo.
+   *
+   * Los videos de celular llegan en 4K y pesan decenas o cientos de MB, muy
+   * por encima de lo que acepta un hosting compartido. Aquí se repinta el
+   * video en un lienzo a menor resolución y se vuelve a grabar junto con su
+   * audio, de modo que lo que se sube es una versión ligera. El proceso corre
+   * a la velocidad de reproducción, así que avisa de su avance.
+   *
+   * Si el navegador no puede hacerlo, se resuelve con null y el llamador
+   * decide qué hacer con el archivo original.
+   */
+  function comprimirVideo(archivo, alProgresar, objetivoBytes){
+    return new Promise(function(resolve){
+      if (typeof MediaRecorder === 'undefined' || !HTMLCanvasElement.prototype.captureStream) {
+        return resolve(null);
+      }
+
+      var url = URL.createObjectURL(archivo);
+      var v = document.createElement('video');
+      v.preload = 'auto';
+      v.muted = true;            // necesario para que el navegador deje reproducir
+      v.playsInline = true;
+      v.src = url;
+
+      var terminado = false;
+      function rendirse(){
+        if (terminado) return;
+        terminado = true;
+        try { v.pause(); } catch (e) {}
+        URL.revokeObjectURL(url);
+        resolve(null);
+      }
+      v.onerror = rendirse;
+
+      // Algunos videos (sobre todo los grabados dentro del navegador) no traen
+      // la duración en la cabecera: se fuerza buscando muy lejos para que el
+      // navegador la resuelva.
+      function conDuracion(seguir){
+        var d = v.duration;
+        if (isFinite(d) && d > 0) { return seguir(d); }
+        var resuelto = false;
+        v.onseeked = function(){
+          if (resuelto) return;
+          resuelto = true;
+          v.onseeked = null;
+          var d2 = v.duration;
+          try { v.currentTime = 0; } catch (e) {}
+          seguir(isFinite(d2) && d2 > 0 ? d2 : 0);
+        };
+        setTimeout(function(){ if (!resuelto) { resuelto = true; v.onseeked = null; seguir(0); } }, 8000);
+        try { v.currentTime = 1e101; } catch (e) { seguir(0); }
+      }
+
+      v.onloadedmetadata = function(){ conDuracion(arrancar); };
+
+      function arrancar(dur){
+        // El bitrate se calcula para que el archivo quepa en lo que acepta el
+        // servidor: de poco sirve optimizar si el resultado también se rechaza.
+        var bits = 1200000;
+        if (objetivoBytes > 0 && dur > 0) {
+          bits = Math.floor(objetivoBytes * 8 * 0.80 / dur);   // 20% de margen (audio y contenedor)
+          bits = Math.max(250000, Math.min(2500000, bits));
+        }
+
+        // Con poco bitrate conviene bajar también la resolución: menos píxeles
+        // mal codificados se ven mejor que muchos.
+        var lado = bits < 600000 ? 640 : (bits < 1100000 ? 854 : 1280);
+        var escala = Math.min(1, lado / Math.max(v.videoWidth, v.videoHeight));
+        var w = Math.round(v.videoWidth  * escala / 2) * 2;   // pares: algunos codificadores lo exigen
+        var h = Math.round(v.videoHeight * escala / 2) * 2;
+        if (!w || !h) { return rendirse(); }
+
+        var lienzo = document.createElement('canvas');
+        lienzo.width = w; lienzo.height = h;
+        var ctx = lienzo.getContext('2d');
+
+        var salida;
+        try {
+          salida = lienzo.captureStream(30);
+        } catch (e) { return rendirse(); }
+
+        // Se arrastra el audio original, si el navegador lo permite.
+        try {
+          if (v.captureStream) {
+            var fuente = v.captureStream();
+            (fuente.getAudioTracks() || []).forEach(function(t){ salida.addTrack(t); });
+          }
+        } catch (e) { /* queda sin audio, pero el video se sube igual */ }
+
+        var tipos = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+        var tipo = null;
+        for (var i = 0; i < tipos.length; i++) {
+          if (MediaRecorder.isTypeSupported(tipos[i])) { tipo = tipos[i]; break; }
+        }
+        if (!tipo) { return rendirse(); }
+
+        var grabadora, trozos = [];
+        try {
+          grabadora = new MediaRecorder(salida, {mimeType: tipo, videoBitsPerSecond: bits, audioBitsPerSecond: 64000});
+        } catch (e) { return rendirse(); }
+
+        grabadora.ondataavailable = function(ev){ if (ev.data && ev.data.size) trozos.push(ev.data); };
+        grabadora.onerror = rendirse;
+        grabadora.onstop = function(){
+          if (terminado) return;
+          terminado = true;
+          URL.revokeObjectURL(url);
+          var blob = new Blob(trozos, {type: 'video/webm'});
+          resolve(blob.size > 0 ? blob : null);
+        };
+
+        var pintar = function(){
+          if (terminado || v.paused || v.ended) return;
+          ctx.drawImage(v, 0, 0, w, h);
+          if (alProgresar && dur) { alProgresar(Math.min(99, Math.round(v.currentTime / dur * 100))); }
+          requestAnimationFrame(pintar);
+        };
+
+        v.onended = function(){
+          try { grabadora.stop(); } catch (e) { rendirse(); }
+        };
+
+        // Tope de seguridad: si algo se atasca, no dejar al visitante esperando.
+        setTimeout(function(){
+          if (!terminado) { try { grabadora.stop(); } catch (e) { rendirse(); } }
+        }, dur > 0 ? Math.min(10 * 60 * 1000, (dur + 25) * 1000) : 10 * 60 * 1000);
+
+        v.play().then(function(){
+          try { grabadora.start(1000); } catch (e) { return rendirse(); }
+          pintar();
+        }).catch(rendirse);
+      }
+    });
+  }
+
   function miniaturaDeVideo(archivo){
     return new Promise(function(resolve, reject){
       var url = URL.createObjectURL(archivo);
@@ -2383,7 +2519,9 @@
       };
       v.onseeked = function(){
         try {
-          var escala = Math.min(1, 1600 / Math.max(v.videoWidth, v.videoHeight));
+          // La miniatura solo se usa como portada en la galería: 1000 px
+          // bastan y así el envío deja más cupo para el video.
+          var escala = Math.min(1, 1000 / Math.max(v.videoWidth, v.videoHeight));
           var lienzo = document.createElement('canvas');
           lienzo.width  = Math.round(v.videoWidth  * escala);
           lienzo.height = Math.round(v.videoHeight * escala);
@@ -2391,9 +2529,9 @@
           lienzo.toBlob(function(blob){
             listo = true;
             URL.revokeObjectURL(url);
-            blob ? resolve({poster: blob, duracion: Math.round(v.duration || 0)})
+            blob ? resolve({poster: blob, duracion: isFinite(v.duration) ? Math.round(v.duration) : 0})
                  : reject(new Error('miniatura'));
-          }, 'image/jpeg', 0.82);
+          }, 'image/jpeg', 0.74);
         } catch (e) { fallo(); }
       };
       v.src = url;
@@ -2416,33 +2554,78 @@
       var url = URL.createObjectURL(f);
 
       if (esVideo) {
-        if (f.size > limiteVideo) {
-          var tope = Math.round(limiteVideo / 1048576);
-          mostrarMsg('Este video pesa ' + (f.size / 1048576).toFixed(1) + ' MB y el máximo admitido es '
-                     + tope + ' MB. Graba uno más corto o envía una fotografía.'
-                     + (tope <= 8 ? ' (El servidor todavía tiene un límite bajo para videos.)' : ''), 'err');
-          foto.value = ''; URL.revokeObjectURL(url);
-          prevVideo.hidden = true; prev.hidden = true;
-          if (subirTxt) subirTxt.style.display = '';
-          return;
-        }
         prev.hidden = true; prev.removeAttribute('src');
         prevVideo.src = url;
         prevVideo.hidden = false;
         if (subirTxt) subirTxt.style.display = 'none';
-        mostrarMsg('Preparando el video…', 'ok');
+
+        var boton = document.getElementById('m-enviar');
+        var pesa  = (f.size / 1048576).toFixed(1);
+
+        // Mientras se prepara, no se puede enviar: aún no hay nada que mandar.
+        if (boton) { boton.disabled = true; boton.textContent = 'Preparando video…'; }
+        mostrarMsg('Preparando el video (' + pesa + ' MB)… puede tardar un poco.', 'ok');
 
         miniaturaDeVideo(f)
-          .then(function(r){
-            posterLista = r.poster;
-            duracionVideo = r.duracion;
-            fotoLista = f;   // el video se envía tal cual
-            if (msg) msg.hidden = true;
+          .then(function(r){ posterLista = r.poster; duracionVideo = r.duracion; })
+          .catch(function(){ /* sin miniatura se publica igual */ })
+          .then(function(){
+            // El envío lleva además la miniatura y los campos del formulario:
+            // el video solo puede ocupar lo que sobra del límite del servidor.
+            var cupo = limiteVideo - (posterLista ? posterLista.size : 0) - 96 * 1024;
+            if (cupo < 200 * 1024) { cupo = Math.floor(limiteVideo * 0.7); }
+
+            // Si ya cabe de sobra, se sube tal cual y se ahorra la espera.
+            if (f.size <= cupo) {
+              fotoLista = f;
+              if (msg) msg.hidden = true;
+              if (boton) { boton.disabled = false; boton.textContent = 'Enviar publicación'; }
+              return;
+            }
+            var espera = duracionVideo ? ' (unos ' + Math.max(1, Math.round(duracionVideo / 60)) + ' min)' : '';
+            var aviso = function(etiqueta){
+              return function(pct){
+                mostrarMsg('Optimizando el video para que pueda publicarse' + espera + '… ' + pct + ' %' + etiqueta, 'ok');
+              };
+            };
+            mostrarMsg('Optimizando el video para que pueda publicarse' + espera + '… 0 %', 'ok');
+
+            // Un codificador puede excederse del bitrate pedido. Si el primer
+            // intento no cabe, se repite con un objetivo corregido por el
+            // resultado real: dos pasadas bastan para acertar.
+            return comprimirVideo(f, aviso(''), cupo).then(function(blob){
+              if (!blob || blob.size <= cupo) { return blob; }
+              var objetivo = Math.floor(cupo * (cupo / blob.size) * 0.85);
+              return comprimirVideo(f, aviso(' (segundo ajuste)'), objetivo).then(function(b2){
+                if (!b2) { return blob; }
+                return b2.size < blob.size ? b2 : blob;
+              });
+            }).then(function(blob){
+              if (blob && blob.size < f.size) {
+                fotoLista = blob;
+                var antes = pesa, ahora = (blob.size / 1048576).toFixed(1);
+                if (blob.size > cupo) {
+                  fotoLista = null;
+                  mostrarMsg('Aun optimizado, el video pesa ' + ahora + ' MB y este sitio admite hasta '
+                             + (cupo / 1048576).toFixed(1) + ' MB por envío. Prueba con un fragmento más corto.', 'err');
+                } else {
+                  mostrarMsg('Video listo: de ' + antes + ' MB a ' + ahora + ' MB. Ya puedes enviarlo.', 'ok');
+                }
+              } else {
+                // El navegador no pudo optimizarlo: se intenta con el original.
+                fotoLista = f;
+                if (f.size > cupo) {
+                  fotoLista = null;
+                  mostrarMsg('Este video pesa ' + pesa + ' MB y este navegador no puede reducirlo. '
+                             + 'El máximo es ' + (cupo / 1048576).toFixed(1) + ' MB: prueba con uno más corto.', 'err');
+                } else {
+                  if (msg) msg.hidden = true;
+                }
+              }
+            });
           })
-          .catch(function(){
-            // Sin miniatura se puede publicar igual: la galería usará un fondo.
-            fotoLista = f;
-            if (msg) msg.hidden = true;
+          .then(function(){
+            if (boton) { boton.disabled = false; boton.textContent = 'Enviar publicación'; }
           });
         return;
       }
@@ -2494,7 +2677,13 @@
 
       var datos = new FormData(form);
       if (esVideo) {
-        // El video se envía tal cual, acompañado de su miniatura.
+        if (!fotoLista) {
+          boton.disabled = false; boton.textContent = 'Enviar publicación';
+          return mostrarMsg('El video aún se está preparando, o no se pudo optimizar. Espera un momento.', 'err');
+        }
+        // Se envía la versión optimizada, con su miniatura.
+        datos.set('foto', fotoLista,
+          (foto.files[0] && fotoLista === foto.files[0]) ? foto.files[0].name : 'izaje.webm');
         if (posterLista) { datos.set('poster', posterLista, 'poster.jpg'); }
         if (duracionVideo) { datos.set('duracion', String(duracionVideo)); }
       } else if (fotoLista) {
@@ -2514,7 +2703,9 @@
           if (res.ok && res.d.status === 'ok') {
             form.reset();
             if (prev) { prev.hidden = true; prev.removeAttribute('src'); }
+            if (prevVideo) { prevVideo.hidden = true; prevVideo.removeAttribute('src'); }
             if (subirTxt) subirTxt.style.display = '';
+            fotoLista = null; posterLista = null; duracionVideo = 0; esVideo = false;
             if (cuenta) cuenta.textContent = '0';
             mostrarMsg(res.d.message || 'Publicación enviada. La revisaremos antes de publicarla.', 'ok');
           } else {
