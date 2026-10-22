@@ -478,7 +478,16 @@ function formularioInspeccion(ext) {
 
 // ── Marcar todos los items como OK ───────────────────────────────────────────
 function marcarTodosOK() {
+    // El renglón de préstamo se respeta cuando el extintor ya está prestado:
+    // ponerle OK le quitaría la marca PO del mes sin que nadie se dé cuenta, y
+    // ese es justo el dato que hace que el reporte diga que hubo un prestado.
+    const prestado = extActual && extActual.estado === 'en_prestamo';
     ['ser','mg','po','ph','sg','ps','ob','dan','pin','fn','gb','rv'].forEach(key => {
+        if (key === 'po' && prestado) {
+            const po = document.getElementById('po-PO');
+            if (po) po.checked = true;
+            return;
+        }
         const radio = document.getElementById(`${key}-OK`);
         if (radio) radio.checked = true;
     });
@@ -525,6 +534,18 @@ async function guardarInspeccion() {
         observaciones:   document.getElementById('obs-insp').value   || null,
     };
 
+    // Si el extintor está prestado y esta vez no se marca PO, puede ser que el
+    // original ya regresó… o que se usó «Marcar todos OK» sin fijarse. Se
+    // pregunta: devolverlo solo, sin avisar, dejaría extintores prestados
+    // marcados como si estuvieran en su sitio.
+    if (extActual.estado === 'en_prestamo' && body.po !== 'PO') {
+        body.regreso_original = confirm(
+            'Este extintor está marcado como EN PRÉSTAMO y esta vez no marcaste PO.\n\n' +
+            '¿Ya regresó el extintor original a su lugar?\n\n' +
+            'Aceptar: vuelve a Activo y se cierra su entrada al taller.\n' +
+            'Cancelar: sigue en préstamo.');
+    }
+
     const r = await fetch('../api/inspecciones.php?action=guardar', {
         method: 'POST',
         headers: {'Content-Type':'application/json'},
@@ -533,7 +554,18 @@ async function guardarInspeccion() {
     const d = await r.json();
 
     if (d.success) {
-        showAlert('✅ Inspección guardada correctamente', 'success');
+        // Se dice lo que se hizo de más: cambiar el estado de un extintor y
+        // meterlo al taller no debe pasar a espaldas de quien lo provocó.
+        let extra = '';
+        if (d.estado === 'en_prestamo') {
+            extra = ' · Extintor marcado EN PRÉSTAMO';
+            if (d.taller === 'abierto')   extra += ' y registrado como entrada al taller';
+            if (d.taller === 'ya_estaba') extra += ' (ya tenía una entrada al taller abierta)';
+        } else if (d.estado === 'activo') {
+            extra = ' · Extintor de vuelta como ACTIVO';
+            if (d.taller === 'cerrado') extra += ' y cerrada su entrada al taller';
+        }
+        showAlert('✅ Inspección guardada correctamente' + extra, 'success');
         document.getElementById('contenido').innerHTML = '';
         document.getElementById('codigo-input').value = '';
         extActual = null;

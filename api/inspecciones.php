@@ -1,6 +1,7 @@
 <?php
 require_once '../config/config.php';
 require_once '../config/mayusculas.php';
+require_once '../config/taller.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -345,7 +346,17 @@ function guardar() {
             audit($uid, "Crear inspección extintor #{$d['extintor_id']}", 'inspecciones', $id);
         }
 
-        echo json_encode(['success' => true, 'id' => $id]);
+        // ── Lo que arrastra el renglón de préstamo ──
+        $extId   = intval($d['extintor_id']);
+        $esPO    = (($d['po'] ?? null) === 'PO');
+        $consecuencias = ['estado' => null, 'taller' => null];
+        if ($esPO) {
+            $consecuencias = aplicarPrestamo($pdo, $extId, $d['fecha'], $uid);
+        } elseif (!empty($d['regreso_original'])) {
+            $consecuencias = aplicarRegreso($pdo, $extId, $d['fecha'], $uid);
+        }
+
+        echo json_encode(['success' => true, 'id' => $id] + $consecuencias);
     } catch (Exception $e) {
         http_response_code(500);
         echo json_encode(['error' => 'Error al guardar inspección']);
@@ -421,6 +432,122 @@ function obtener() {
 }
 
 // ─── HELPER ──────────────────────────────────────────────────────────────────
+/**
+ * Lo que arrastra marcar PO en una inspección.
+ *
+ * Marcar «PO – Extintor en préstamo» quiere decir que el extintor se retira de
+ * su lugar y queda uno prestado cubriéndolo. Eso son dos cosas más, aparte de
+ * la inspección: el extintor pasa a estado «En préstamo» —que es lo que hace
+ * que el reporte del mes lo marque y que salga así en los listados— y entra al
+ * taller, para que quede constancia de cuándo salió y a quién se le entregó.
+ *
+ * Antes había que capturar las dos a mano en otras dos pantallas, y en la
+ * práctica se olvidaban.
+ *
+ * Es repetible: guardar la misma inspección dos veces no abre dos entradas al
+ * taller, porque sólo abre una si no hay ninguna sin devolver.
+ */
+function aplicarPrestamo(PDO $pdo, int $extintorId, string $fecha, int $uid): array {
+    $hecho = ['estado' => null, 'taller' => null];
+
+    $st = $pdo->prepare("SELECT estado FROM extintores WHERE id = ?");
+    $st->execute([$extintorId]);
+    $antes = $st->fetchColumn();
+    if ($antes === false) return $hecho;
+
+    if ($antes !== 'en_prestamo') {
+        $pdo->prepare("UPDATE extintores SET estado = 'en_prestamo' WHERE id = ?")->execute([$extintorId]);
+        audit($uid, "Extintor #$extintorId a «en préstamo» al marcarse PO (estaba «$antes»)", 'extintores', $extintorId);
+        $hecho['estado'] = 'en_prestamo';
+    }
+
+    // Las tablas del taller se crean la primera vez que se usan. Va aquí, fuera
+    // de cualquier transacción: un CREATE TABLE hace commit implícito.
+    try {
+        asegurarTablas($pdo);
+
+        $st = $pdo->prepare("SELECT id FROM extintor_mantenimientos
+                             WHERE extintor_id = ? AND fecha_devolucion IS NULL LIMIT 1");
+        $st->execute([$extintorId]);
+        if ($st->fetchColumn()) {
+            $hecho['taller'] = 'ya_estaba';
+            return $hecho;
+        }
+
+        // El motivo estándar. Si alguien lo borró del catálogo, se repone.
+        $st = $pdo->query("SELECT id FROM mantenimiento_tipos WHERE nombre = 'MANTENIMIENTO' LIMIT 1");
+        $tipoId = $st->fetchColumn();
+        if (!$tipoId) {
+            $pdo->prepare("INSERT INTO mantenimiento_tipos (nombre, actualiza_recarga, orden) VALUES ('MANTENIMIENTO', 0, 1)")
+                ->execute();
+            $tipoId = $pdo->lastInsertId();
+        }
+
+        $quien = aMayusculas(trim($_SESSION['nombre'] ?? '')) ?: 'INSPECTOR';
+        $pdo->prepare("
+            INSERT INTO extintor_mantenimientos
+                (extintor_id, tipo_id, fecha_entrada, realizado_por, notas, creado_por)
+            VALUES (?,?,?,?,?,?)
+        ")->execute([$extintorId, $tipoId, $fecha, $quien,
+                     'Entró al taller al marcarse PO en la inspección del ' . $fecha . '.', $uid]);
+        recordarResponsable($pdo, $quien, $fecha);
+        $hecho['taller'] = 'abierto';
+    } catch (Exception $e) {
+        // El taller es un extra: si falla, la inspección y el estado ya quedaron
+        error_log('No se pudo abrir la entrada al taller: ' . $e->getMessage());
+        $hecho['taller'] = 'error';
+    }
+    return $hecho;
+}
+
+/**
+ * El camino de vuelta: el extintor original regresó a su sitio.
+ *
+ * Sólo se ejecuta cuando el inspector lo confirma en la pantalla. No se deduce
+ * de que el renglón PO venga sin marcar, porque el botón «Marcar todos OK»
+ * pone OK en los doce renglones y devolvería a su lugar extintores que siguen
+ * prestados sin que nadie se entere.
+ */
+function aplicarRegreso(PDO $pdo, int $extintorId, string $fecha, int $uid): array {
+    $hecho = ['estado' => null, 'taller' => null];
+
+    $st = $pdo->prepare("SELECT estado FROM extintores WHERE id = ?");
+    $st->execute([$extintorId]);
+    if ($st->fetchColumn() !== 'en_prestamo') return $hecho;
+
+    $pdo->prepare("UPDATE extintores SET estado = 'activo' WHERE id = ?")->execute([$extintorId]);
+    audit($uid, "Extintor #$extintorId regresa a «activo»: el original volvió a su lugar", 'extintores', $extintorId);
+    $hecho['estado'] = 'activo';
+
+    try {
+        if (!tablaTallerExiste($pdo)) return $hecho;
+        $st = $pdo->prepare("SELECT id, fecha_entrada FROM extintor_mantenimientos
+                             WHERE extintor_id = ? AND fecha_devolucion IS NULL
+                             ORDER BY fecha_entrada DESC LIMIT 1");
+        $st->execute([$extintorId]);
+        $mov = $st->fetch(PDO::FETCH_ASSOC);
+        if ($mov) {
+            // La devolución no puede ser anterior a la entrada
+            $devuelto = ($fecha < $mov['fecha_entrada']) ? $mov['fecha_entrada'] : $fecha;
+            $pdo->prepare("UPDATE extintor_mantenimientos SET fecha_devolucion = ? WHERE id = ?")
+                ->execute([$devuelto, $mov['id']]);
+            $hecho['taller'] = 'cerrado';
+        }
+    } catch (Exception $e) {
+        error_log('No se pudo cerrar la entrada al taller: ' . $e->getMessage());
+    }
+    return $hecho;
+}
+
+/** ¿Ya existe el registro del taller? Si nunca se ha usado, no hay nada que cerrar. */
+function tablaTallerExiste(PDO $pdo): bool {
+    try {
+        $st = $pdo->prepare("SHOW TABLES LIKE ?");
+        $st->execute(['extintor_mantenimientos']);
+        return (bool) $st->fetchColumn();
+    } catch (Exception $e) { return false; }
+}
+
 function audit($uid, $accion, $tabla, $rid) {
     global $pdo;
     try {
