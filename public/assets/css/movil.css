@@ -22,13 +22,59 @@
  *   </table></div>
  *
  * `td-titulo` es el dato que encabeza la ficha; `acciones` es la fila de
- * botones, que va al pie y sin rótulo.
+ * botones, que va al pie y sin rótulo; `chk` es una casilla del checklist de
+ * inspección, que se agrupa en fichas pequeñas en vez de ocupar un renglón
+ * cada una.
  */
 
 .tabla-env { overflow-x: auto; }
+/* Las pantallas anteriores a esta hoja envuelven con `table-wrapper`;
+   vale lo mismo, así no hay que renombrar nada para que dejen de recortar. */
+.table-wrapper { overflow-x: auto; }
 
 @media (max-width: 760px) {
     .container { padding-left: 12px; padding-right: 12px; }
+
+    /* La barra superior es un flex con el título a un lado y los enlaces al
+       otro. En 390px el título baja de renglón y los enlaces se le enciman.
+       Apilada, cada cosa tiene su sitio. */
+    .navbar {
+        flex-direction: column; align-items: stretch; gap: 9px;
+        padding: 12px 14px !important; text-align: left;
+    }
+    .navbar h1, .navbar h2 { font-size: 18px; line-height: 1.25; }
+    .navbar > div, .navbar-right, .navbar-left {
+        display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px;
+    }
+    .navbar a, .navbar span { margin-left: 0 !important; font-size: 13px; }
+
+    /* Nada más ancho que la pantalla: una imagen, un <pre> o una tabla suelta
+       bastan para que el navegador aleje el zoom de TODA la página. */
+    img, canvas, pre, iframe, video { max-width: 100% !important; height: auto; }
+    pre { overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+
+    /* Al tocar un campo, iOS acerca el zoom si la letra mide menos de 16px y
+       luego no lo devuelve. Con 16px no lo hace. Va forzado porque casi todas
+       las pantallas fijan 13 o 14px en sus propias barras de filtros, y eso
+       gana por especificidad a una regla de elemento. */
+    input, select, textarea { font-size: 16px !important; }
+
+    /* Rótulos y distintivos de 9, 10 u 11 píxeles: en un monitor se leen de
+       cerca, en la mano no. Doce es el piso. */
+    .card-label, .card-tipo-badge, .estado-badge, .inspeccion-badge,
+    .stat-label, .kpi-label, .hint, .doc-hint, .th-nota, .nota, .fecha-hint,
+    small, .badge, .chip, figcaption { font-size: 12px !important; }
+
+    /* Un dedo no acierta en 24px. Lo que se toca mide al menos 44. */
+    button, .btn, select, input[type="submit"], input[type="button"],
+    a.btn, .acciones a { min-height: 44px; }
+    input[type="text"], input[type="number"], input[type="date"], input[type="time"],
+    input[type="search"], input[type="email"], input[type="password"], input[type="tel"],
+    select, textarea { min-height: 44px; padding: 10px 12px; }
+    /* La casilla en sí se ve de 24px, pero lo que responde al dedo es el
+       renglón entero: por eso la celda que la contiene se deja alta. */
+    input[type="checkbox"], input[type="radio"] { width: 24px; height: 24px; }
+    .tabla td.td-sel, td:has(> input[type="checkbox"]) { min-height: 44px; align-items: center; }
 
     /* Indicadores de dos en dos: apilados dejaban el contenido fuera de vista */
     /* minmax(0,1fr) y no 1fr: una pista `1fr` nunca baja de su min-content, así
@@ -61,6 +107,11 @@
         content: attr(data-et); font-size: 11px; font-weight: 700; color: #64748b;
         text-transform: uppercase; text-align: left; flex-shrink: 0;
     }
+    /* En el teléfono no hay letra de 9 ni de 10: o se lee, o no sirve de nada.
+       Los campos quedan fuera: si bajan de 16px, iOS acerca el zoom al tocarlos. */
+    .tabla td, .tabla td *:not(input):not(select):not(textarea) { font-size: 13px; }
+    .tabla td .badge, .tabla td code { font-size: 12px; }
+    .tabla td input, .tabla td select, .tabla td textarea { font-size: 16px !important; }
     /* El dato que encabeza la ficha ocupa su propio renglón */
     .tabla td.td-titulo {
         display: block; text-align: left; font-weight: 800; font-size: 16px;
@@ -79,13 +130,49 @@
        donde el icono basta porque el botón es pequeño y tiene title. */
     .tabla td.acciones [data-lbl]::after { content: ' ' attr(data-lbl); }
 
+    /* Lo que en pantalla ancha se recorta con puntos suspensivos, en la ficha
+       se lee entero: ahí sí hay sitio para que baje de renglón. */
+    .tabla td.td-obs { max-width: none !important; white-space: normal !important;
+                       overflow: visible !important; text-overflow: clip !important; }
+
+    /* El formulario de inspección se llena de pie, con una mano y guantes: las
+       cuatro respuestas ocupan el ancho completo y se tocan sin apuntar. */
+    .tabla td.td-radios { display: block; width: 100%; padding: 2px 0 0; }
+    /* En una ficha que es una pregunta, rotular «Elemento» trece veces estorba:
+       el propio texto ya dice qué se está calificando. */
+    .tabla tr:has(.td-radios) td.td-titulo::before { display: none; }
+    .tabla td.td-radios::before { display: none; }
+    .tabla td.td-radios .radio-group { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .tabla td.td-radios .radio-group label {
+        padding: 13px 4px !important; font-size: 15px !important; text-align: center;
+        border-radius: 9px !important; min-height: 46px; display: flex;
+        align-items: center; justify-content: center;
+    }
+
+    /* El checklist de inspección son doce columnas de OK/NC. Como renglones
+       sueltos serían doce líneas por ficha; agrupadas en casillas pequeñas se
+       leen de un vistazo y caben tres o cuatro por línea. */
+    .tabla td.chk {
+        display: inline-flex; flex-direction: column; align-items: center;
+        width: auto; min-width: 54px; gap: 3px; padding: 6px 4px; text-align: center;
+    }
+    .tabla td.chk::before { font-size: 9px; letter-spacing: .3px; }
+    .tabla tr > td.chk:first-of-type { margin-top: 4px; }
+
     /* Los gráficos se dimensionan solos y pueden pedir más ancho del que hay
        mientras se dibujan; acotarlos evita que ensanchen la página. */
     canvas { max-width: 100% !important; }
 
     /* Los formularios ocupan la pantalla: es donde más se escribe */
-    .modal-ov, .modal-overlay { padding: 0; align-items: stretch; }
-    .modal { border-radius: 0; min-height: 100vh; max-height: none; max-width: none; padding: 18px 14px; }
+    /* Varias pantallas traen su propio `max-width` para el teléfono en una
+       media query propia, que por orden de cascada gana a esta hoja. Aquí se
+       fuerza, porque en 390px esos 40px de margen a cada lado no sobran: son
+       el 10% del ancho útil del formulario. */
+    .modal-ov, .modal-overlay { padding: 0 !important; align-items: stretch; }
+    .modal, .modal-content {
+        border-radius: 0 !important; min-height: 100vh; max-height: none !important;
+        max-width: none !important; width: 100% !important; padding: 18px 14px !important;
+    }
     .modal-actions { flex-direction: column-reverse; }
     .modal-actions .btn { width: 100%; }
 }

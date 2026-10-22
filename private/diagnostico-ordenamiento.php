@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <title>Diagnóstico de Ordenamiento - Reportes</title>
     <style>
         body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
@@ -78,8 +79,8 @@
             }
 
             let html = '<h2>Extintores de la Empresa</h2>';
-            html += '<table>';
-            html += '<tr><th>ID</th><th>Código</th><th>Sección</th><th>Estado</th><th>Tipo</th></tr>';
+            html += '<div class="tabla-env"><table class="tabla">';
+            html += '<thead><tr><th>ID</th><th>Código</th><th>Sección</th><th>Estado</th><th>Tipo</th></tr></thead>';
 
             const extintores = data.data.filter(e => e.estado === 'activo');
 
@@ -100,15 +101,15 @@
 
                 const colorClass = numero < ultimoNumero ? 'red' : '';
                 html += `<tr>
-                    <td>${ext.id}</td>
-                    <td><strong>${codigo}</strong></td>
-                    <td>${ext.seccion || 'Sin sección'}</td>
-                    <td>${ext.estado}</td>
-                    <td>${ext.tipo_nombre}</td>
+                    <td data-et="ID">${ext.id}</td>
+                    <td data-et="Código" class="td-titulo"><strong>${codigo}</strong></td>
+                    <td data-et="Sección">${ext.seccion || 'Sin sección'}</td>
+                    <td data-et="Estado">${ext.estado}</td>
+                    <td data-et="Tipo">${ext.tipo_nombre}</td>
                 </tr>`;
             });
 
-            html += '</table>';
+            html += '</table></div>';
 
             if (ordenCorrecto || extintores.length <= 1) {
                 html = '<p class="green">✅ Los extintores están ordenados correctamente</p>' + html;

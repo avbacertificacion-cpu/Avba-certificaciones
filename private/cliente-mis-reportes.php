@@ -13,6 +13,7 @@ $nombre_usuario = $_SESSION['nombre'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <title>Mis Reportes - Gestión de Extintores</title>
     <style>
         * {
@@ -142,7 +143,7 @@ $nombre_usuario = $_SESSION['nombre'];
             }
 
             const html = `
-                <table>
+                <div class="tabla-env"><table class="tabla">
                     <thead>
                         <tr>
                             <th>Número de Reporte</th>
@@ -155,18 +156,18 @@ $nombre_usuario = $_SESSION['nombre'];
                     <tbody>
                         ${reportes.map(r => `
                             <tr>
-                                <td><strong>${r.numero_reporte}</strong></td>
-                                <td>${r.plantilla_nombre}</td>
-                                <td>${r.empresa_nombre}</td>
-                                <td>${new Date(r.fecha_creacion).toLocaleDateString('es-MX')}</td>
-                                <td>
+                                <td data-et="Número de Reporte" class="td-titulo"><strong>${r.numero_reporte}</strong></td>
+                                <td data-et="Plantilla">${r.plantilla_nombre}</td>
+                                <td data-et="Empresa">${r.empresa_nombre}</td>
+                                <td data-et="Fecha">${new Date(r.fecha_creacion).toLocaleDateString('es-MX')}</td>
+                                <td class="acciones">
                                     <button class="btn" onclick="verReporte(${r.id})">Ver Reporte</button>
                                     <button class="btn" onclick="descargarPDF(${r.id})">Descargar PDF</button>
                                 </td>
                             </tr>
                         `).join('')}
                     </tbody>
-                </table>
+                </table></div>
             `;
             container.innerHTML = html;
         }

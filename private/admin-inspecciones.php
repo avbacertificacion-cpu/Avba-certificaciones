@@ -10,6 +10,7 @@ $nombre = $_SESSION['nombre'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <title>Historial de Inspecciones</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
@@ -179,30 +180,30 @@ function render(data) {
     }
 
     c.innerHTML = `
-    <table>
+    <div class="tabla-env"><table class="tabla">
         <thead><tr>
             <th><input type="checkbox" id="chkAll" onclick="toggleAllInsp(this)" title="Seleccionar todas"></th>
-            <th>📅 Fecha</th><th>📍 Código</th><th>🏢 Ubicación</th><th>🏭 Empresa</th><th>👤 Inspector</th>
+            <th>📍 Código</th><th>📅 Fecha</th><th>🏢 Ubicación</th><th>🏭 Empresa</th><th>👤 Inspector</th>
             <th>SÑ</th><th>MG</th><th>PO</th><th>PH</th><th>SG</th>
             <th>PS</th><th>OB</th><th>DÑ</th><th>PI</th><th>Observaciones</th>
         </tr></thead>
         <tbody>
         ${data.map(i => `<tr>
-            <td><input type="checkbox" class="chk-insp" value="${i.id}"></td>
-            <td><strong>${sanitize(i.fecha)} ${sanitize(i.hora.substring(0,5))}</strong></td>
-            <td>${sanitize(i.codigo_manual)}</td>
-            <td>${sanitize(i.ubicacion)}</td>
-            <td>${sanitize(i.empresa_nombre)}</td>
-            <td>${sanitize(i.inspector_nombre)}</td>
-            <td>${badge(i.ser)}</td><td>${badge(i.mg)}</td>
-            <td>${badge(i.po)}</td><td>${badge(i.ph)}</td>
-            <td>${badge(i.sg)}</td><td>${badge(i.ps)}</td>
-            <td>${badge(i.ob)}</td><td>${badge(i.dan)}</td>
-            <td>${badge(i.pin)}</td>
-            <td title="${sanitize(i.observaciones || '')}">${sanitize((i.observaciones || '').substring(0, 30))}${(i.observaciones && i.observaciones.length > 30) ? '...' : ''}</td>
+            <td data-et="Seleccionar" class="td-sel"><input type="checkbox" class="chk-insp" value="${i.id}"></td>
+            <td data-et="Código" class="td-titulo">${sanitize(i.codigo_manual)}</td>
+            <td data-et="Fecha"><strong>${sanitize(i.fecha)} ${sanitize(i.hora.substring(0,5))}</strong></td>
+            <td data-et="Ubicación">${sanitize(i.ubicacion)}</td>
+            <td data-et="Empresa">${sanitize(i.empresa_nombre)}</td>
+            <td data-et="Inspector">${sanitize(i.inspector_nombre)}</td>
+            <td data-et="SÑ" class="chk">${badge(i.ser)}</td><td data-et="MG" class="chk">${badge(i.mg)}</td>
+            <td data-et="PO" class="chk">${badge(i.po)}</td><td data-et="PH" class="chk">${badge(i.ph)}</td>
+            <td data-et="SG" class="chk">${badge(i.sg)}</td><td data-et="PS" class="chk">${badge(i.ps)}</td>
+            <td data-et="OB" class="chk">${badge(i.ob)}</td><td data-et="DÑ" class="chk">${badge(i.dan)}</td>
+            <td data-et="PI" class="chk">${badge(i.pin)}</td>
+            <td data-et="Observaciones" class="td-obs" title="${sanitize(i.observaciones || '')}">${sanitize((i.observaciones || '').substring(0, 30))}${(i.observaciones && i.observaciones.length > 30) ? '...' : ''}</td>
         </tr>`).join('')}
         </tbody>
-    </table>`;
+    </table></div>`;
 }
 
 function sanitize(str) {

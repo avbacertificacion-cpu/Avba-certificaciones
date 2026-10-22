@@ -10,6 +10,7 @@ $nombre = $_SESSION['nombre'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <title>Gestión de Usuarios</title>
     <style>
@@ -302,26 +303,26 @@ function render(data) {
     }
 
     c.innerHTML = `
-    <table>
+    <div class="tabla-env"><table class="tabla">
         <thead><tr>
             <th>Nombre</th><th>Usuario</th><th>Rol</th><th>Empresa</th><th>Estado</th><th style="text-align:right">Acciones</th>
         </tr></thead>
         <tbody>
         ${data.map(u => `<tr>
-            <td><strong>${sanitize(u.nombre)}</strong></td>
-            <td><code style="background:#f0f0f0;padding:2px 6px;border-radius:4px;font-size:12px">${sanitize(u.username)}</code></td>
-            <td><span class="badge b-${sanitize(u.rol)}">${rolLabel(u.rol)}</span></td>
-            <td>${sanitize(u.empresa_nombre || '—')}</td>
-            <td><span class="badge b-${sanitize(u.estado)}">${estadoLabel(u.estado)}</span></td>
-            <td style="text-align:right">
+            <td data-et="Nombre" class="td-titulo"><strong>${sanitize(u.nombre)}</strong></td>
+            <td data-et="Usuario"><code style="background:#f0f0f0;padding:2px 6px;border-radius:4px;font-size:12px">${sanitize(u.username)}</code></td>
+            <td data-et="Rol"><span class="badge b-${sanitize(u.rol)}">${rolLabel(u.rol)}</span></td>
+            <td data-et="Empresa">${sanitize(u.empresa_nombre || '—')}</td>
+            <td data-et="Estado"><span class="badge b-${sanitize(u.estado)}">${estadoLabel(u.estado)}</span></td>
+            <td class="acciones" style="text-align:right">
                 <div class="actions-cell">
                     <button class="btn btn-sm btn-warning" onclick="editarUsuario(${parseInt(u.id)})" title="Editar usuario">✏️ Editar</button>
-                    <button class="btn btn-sm btn-danger" onclick="eliminarUsuario(${parseInt(u.id)})" title="Desactivar usuario">🗑️</button>
+                    <button class="btn btn-sm btn-danger" data-lbl="Desactivar" onclick="eliminarUsuario(${parseInt(u.id)})" title="Desactivar usuario">🗑️</button>
                 </div>
             </td>
         </tr>`).join('')}
         </tbody>
-    </table>`;
+    </table></div>`;
 }
 
 function sanitize(str) {

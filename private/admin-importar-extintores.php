@@ -10,6 +10,7 @@ $nombre = $_SESSION['nombre'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <title>Importar Extintores</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
@@ -142,7 +143,7 @@ $nombre = $_SESSION['nombre'];
             </div>
         </div>
 
-        <table class="preview-table">
+        <div class="tabla-env"><table class="preview-table tabla">
             <thead>
                 <tr>
                     <th style="width:30px">#</th>
@@ -154,7 +155,7 @@ $nombre = $_SESSION['nombre'];
                 </tr>
             </thead>
             <tbody id="previewTable"></tbody>
-        </table>
+        </table></div>
 
         <div class="actions">
             <button class="btn btn-warning" onclick="resetForm()">❌ Cancelar</button>
@@ -308,7 +309,11 @@ function mostrarPreview(datos, validos, errores, warnings) {
     tbody.innerHTML = datos.map(f => {
         const status = f.errores.length > 0 ? 'error' : 'ok';
         const clase = status === 'error' ? 'row-error' : '';
-        return `<tr class="${clase}"><td>${f.num}</td><td><strong>${f.codigo_manual}</strong></td><td>${f.ubicacion}</td><td>${f.tipo}</td><td>${f.empresa_id}</td><td><span class="status-badge status-${status}">${status === 'error' ? '❌ Error' : '✅ OK'}</span></td></tr>`;
+        return `<tr class="${clase}"><td data-et="#">${f.num}</td>`
+             + `<td data-et="Código" class="td-titulo"><strong>${f.codigo_manual}</strong></td>`
+             + `<td data-et="Ubicación">${f.ubicacion}</td><td data-et="Tipo">${f.tipo}</td>`
+             + `<td data-et="Empresa">${f.empresa_id}</td>`
+             + `<td data-et="Estado"><span class="status-badge status-${status}">${status === 'error' ? '❌ Error' : '✅ OK'}</span></td></tr>`;
     }).join('');
 
     document.getElementById('btnConfirmar').style.display = validos.length > 0 ? 'inline-flex' : 'none';

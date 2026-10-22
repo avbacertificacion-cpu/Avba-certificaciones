@@ -109,6 +109,7 @@ $json_vig = json_encode([(int)($vig['vigentes']??0),(int)($vig['sin_registro']??
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="../public/assets/css/movil.css">
 <title><?= htmlspecialchars($empresa['nombre']) ?> – Gerente</title>
 <script src="../public/assets/js/chart.umd.min.js"></script>
 <style>
@@ -175,7 +176,7 @@ $json_vig = json_encode([(int)($vig['vigentes']??0),(int)($vig['sin_registro']??
 
     <div class="table-card">
         <h3>Extintores (<?= count($extintores) ?>)</h3>
-        <table>
+        <div class="tabla-env"><table class="tabla">
             <thead><tr>
                 <th>Código</th><th>Sección</th><th>Ubicación</th><th>Tipo</th><th>Cap.</th>
                 <th>Recarga</th><th>PH</th><th>Últ. inspección</th><th>Estado</th>
@@ -185,19 +186,19 @@ $json_vig = json_encode([(int)($vig['vigentes']??0),(int)($vig['sin_registro']??
                 <tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:30px">Sin extintores registrados.</td></tr>
             <?php else: foreach ($extintores as $e): ?>
                 <tr>
-                    <td style="font-family:monospace;font-weight:600"><?= htmlspecialchars($e['codigo_manual']) ?></td>
-                    <td><?= htmlspecialchars($e['seccion'] ?: '—') ?></td>
-                    <td><?= htmlspecialchars($e['ubicacion']) ?></td>
-                    <td><?= htmlspecialchars($e['tipo_nombre']) ?></td>
-                    <td><?= htmlspecialchars($e['capacidad'] ?: '—') ?></td>
-                    <td><?= $fmt($e['fecha_recarga']) ?></td>
-                    <td><?= $fmt($e['fecha_ph']) ?></td>
-                    <td><?= $e['ultima_inspeccion'] ? $fmt($e['ultima_inspeccion']) : '<span style="color:#dc2626">Sin inspección</span>' ?></td>
-                    <td><span class="badge b-<?= htmlspecialchars($e['estado']) ?>"><?= htmlspecialchars(ucfirst(str_replace('_',' ',$e['estado']))) ?></span></td>
+                    <td data-et="Código" class="td-titulo" style="font-family:monospace;font-weight:600"><?= htmlspecialchars($e['codigo_manual']) ?></td>
+                    <td data-et="Sección"><?= htmlspecialchars($e['seccion'] ?: '—') ?></td>
+                    <td data-et="Ubicación"><?= htmlspecialchars($e['ubicacion']) ?></td>
+                    <td data-et="Tipo"><?= htmlspecialchars($e['tipo_nombre']) ?></td>
+                    <td data-et="Cap."><?= htmlspecialchars($e['capacidad'] ?: '—') ?></td>
+                    <td data-et="Recarga"><?= $fmt($e['fecha_recarga']) ?></td>
+                    <td data-et="PH"><?= $fmt($e['fecha_ph']) ?></td>
+                    <td data-et="Últ. inspección"><?= $e['ultima_inspeccion'] ? $fmt($e['ultima_inspeccion']) : '<span style="color:#dc2626">Sin inspección</span>' ?></td>
+                    <td data-et="Estado"><span class="badge b-<?= htmlspecialchars($e['estado']) ?>"><?= htmlspecialchars(ucfirst(str_replace('_',' ',$e['estado']))) ?></span></td>
                 </tr>
             <?php endforeach; endif; ?>
             </tbody>
-        </table>
+        </table></div>
     </div>
 </div>
 

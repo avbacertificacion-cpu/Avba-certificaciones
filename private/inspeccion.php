@@ -43,6 +43,7 @@ if ($empresa_inspeccion) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <title>Inspección de Extintor</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
@@ -416,8 +417,8 @@ function formularioInspeccion(ext) {
 
     const filas = items.map(it => `
         <tr>
-            <td>${it.label}</td>
-            <td>
+            <td data-et="Elemento" class="td-titulo">${it.label}</td>
+            <td data-et="Resultado" class="td-radios">
                 <div class="radio-group">
                     ${['OK','NC','NA','PO'].map(v => `
                         <input type="radio" name="${it.key}" id="${it.key}-${v}" value="${v}">
@@ -446,10 +447,10 @@ function formularioInspeccion(ext) {
             </button>
         </div>
 
-        <table>
+        <div class="tabla-env"><table class="tabla">
             <thead><tr><th>Elemento</th><th>Resultado</th></tr></thead>
             <tbody>${filas}</tbody>
-        </table>
+        </table></div>
 
         <h3 style="margin-top:24px;margin-bottom:12px">📅 Fecha de Inspección</h3>
         <div style="max-width:250px">

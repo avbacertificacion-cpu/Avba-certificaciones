@@ -363,7 +363,7 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
     <!-- Tables -->
     <div class="table-card">
         <h3>📋 Top 5 Empresas por Inspecciones (Este Mes)</h3>
-        <table>
+        <div class="tabla-env"><table class="tabla">
             <thead>
                 <tr>
                     <th>Empresa</th>
@@ -376,13 +376,13 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
                     $estado = $emp['inspecciones'] > 5 ? 'success' : ($emp['inspecciones'] > 2 ? 'warning' : 'danger');
                 ?>
                 <tr>
-                    <td><strong><?= htmlspecialchars($emp['nombre']) ?></strong></td>
-                    <td><?= $emp['inspecciones'] ?> inspecciones</td>
-                    <td><span class="badge badge-<?= $estado ?>"><?= $emp['inspecciones'] > 5 ? '✅ Bueno' : ($emp['inspecciones'] > 2 ? '⚠️ Regular' : '❌ Bajo') ?></span></td>
+                    <td data-et="Empresa" class="td-titulo"><strong><?= htmlspecialchars($emp['nombre']) ?></strong></td>
+                    <td data-et="Inspecciones"><?= $emp['inspecciones'] ?> inspecciones</td>
+                    <td data-et="Estado"><span class="badge badge-<?= $estado ?>"><?= $emp['inspecciones'] > 5 ? '✅ Bueno' : ($emp['inspecciones'] > 2 ? '⚠️ Regular' : '❌ Bajo') ?></span></td>
                 </tr>
                 <?php endforeach; ?>
             </tbody>
-        </table>
+        </table></div>
     </div>
 
     <!-- Menu Items -->

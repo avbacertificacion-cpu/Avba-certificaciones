@@ -71,6 +71,7 @@ $usuarios = $pdo->query("SELECT id, nombre, username, rol, estado FROM usuarios 
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="../public/assets/css/movil.css">
 <title>Reparar base de datos</title>
 <style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -104,16 +105,16 @@ $usuarios = $pdo->query("SELECT id, nombre, username, rol, estado FROM usuarios 
     <?php endforeach; ?>
 
     <div class="card">
-        <table>
+        <div class="tabla-env"><table class="tabla">
             <thead><tr><th>Nombre</th><th>Usuario</th><th>Rol actual</th><th>Estado</th><th>Corregir rol</th></tr></thead>
             <tbody>
             <?php foreach ($usuarios as $u): ?>
                 <tr>
-                    <td><?= htmlspecialchars($u['nombre']) ?></td>
-                    <td style="font-family:monospace"><?= htmlspecialchars($u['username']) ?></td>
-                    <td><?= $u['rol'] === '' ? '<span class="empty-rol">(vacío)</span>' : htmlspecialchars($u['rol']) ?></td>
-                    <td><?= htmlspecialchars($u['estado']) ?></td>
-                    <td>
+                    <td data-et="Nombre" class="td-titulo"><?= htmlspecialchars($u['nombre']) ?></td>
+                    <td data-et="Usuario" style="font-family:monospace"><?= htmlspecialchars($u['username']) ?></td>
+                    <td data-et="Rol actual"><?= $u['rol'] === '' ? '<span class="empty-rol">(vacío)</span>' : htmlspecialchars($u['rol']) ?></td>
+                    <td data-et="Estado"><?= htmlspecialchars($u['estado']) ?></td>
+                    <td data-et="Corregir rol">
                         <form method="post">
                             <input type="hidden" name="usuario_id" value="<?= (int)$u['id'] ?>">
                             <select name="nuevo_rol">
@@ -127,7 +128,7 @@ $usuarios = $pdo->query("SELECT id, nombre, username, rol, estado FROM usuarios 
                 </tr>
             <?php endforeach; ?>
             </tbody>
-        </table>
+        </table></div>
     </div>
 
     <p style="color:#94a3b8;font-size:12px;margin-top:16px">

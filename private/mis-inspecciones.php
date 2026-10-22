@@ -11,6 +11,7 @@ $uid    = $_SESSION['usuario_id'];
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <title>Mis Inspecciones</title>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
@@ -30,6 +31,9 @@ $uid    = $_SESSION['usuario_id'];
         .na{background:#e2e3e5;color:#383d41}
         .po{background:#fff3cd;color:#856404}
         .empty{text-align:center;padding:50px;color:#999}
+        /* En pantalla ancha las observaciones se recortan para que la tabla no
+           crezca; en el teléfono la ficha las muestra completas (movil.css). */
+        .td-obs{max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     </style>
 </head>
 <body>
@@ -84,28 +88,28 @@ function render(rows) {
         c.innerHTML = '<div class="empty">No hay inspecciones para mostrar</div>'; return;
     }
     c.innerHTML = `
-    <table>
+    <div class="tabla-env"><table class="tabla">
         <thead><tr>
-            <th>Fecha</th><th>Código</th><th>Ubicación</th><th>Empresa</th>
+            <th>Código</th><th>Fecha</th><th>Ubicación</th><th>Empresa</th>
             <th>SER</th><th>MG</th><th>PO</th><th>PH</th><th>SG</th>
             <th>PS</th><th>OB</th><th>DAÑ</th><th>PIN</th>
             <th>Observaciones</th>
         </tr></thead>
         <tbody>
         ${rows.map(r => `<tr>
-            <td>${r.fecha} ${r.hora.substring(0,5)}</td>
-            <td><strong>${r.codigo_manual}</strong></td>
-            <td>${r.ubicacion}</td>
-            <td>${r.empresa_nombre}</td>
-            <td>${badge(r.ser)}</td><td>${badge(r.mg)}</td>
-            <td>${badge(r.po)}</td><td>${badge(r.ph)}</td>
-            <td>${badge(r.sg)}</td><td>${badge(r.ps)}</td>
-            <td>${badge(r.ob)}</td><td>${badge(r.dan)}</td>
-            <td>${badge(r.pin)}</td>
-            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.observaciones||'—'}</td>
+            <td data-et="Código" class="td-titulo"><strong>${r.codigo_manual}</strong></td>
+            <td data-et="Fecha">${r.fecha} ${r.hora.substring(0,5)}</td>
+            <td data-et="Ubicación">${r.ubicacion}</td>
+            <td data-et="Empresa">${r.empresa_nombre}</td>
+            <td data-et="SER" class="chk">${badge(r.ser)}</td><td data-et="MG" class="chk">${badge(r.mg)}</td>
+            <td data-et="PO" class="chk">${badge(r.po)}</td><td data-et="PH" class="chk">${badge(r.ph)}</td>
+            <td data-et="SG" class="chk">${badge(r.sg)}</td><td data-et="PS" class="chk">${badge(r.ps)}</td>
+            <td data-et="OB" class="chk">${badge(r.ob)}</td><td data-et="DAÑ" class="chk">${badge(r.dan)}</td>
+            <td data-et="PIN" class="chk">${badge(r.pin)}</td>
+            <td data-et="Observaciones" class="td-obs">${r.observaciones||'—'}</td>
         </tr>`).join('')}
         </tbody>
-    </table>`;
+    </table></div>`;
 }
 
 // Mes actual por defecto

@@ -113,6 +113,7 @@ $json_pie = json_encode([$inspeccionados_mes, $total_extintores - $inspeccionado
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../public/assets/css/movil.css">
     <title>Dashboard de Inspección – Cliente</title>
     <script src="../public/assets/js/chart.umd.min.js"></script>
     <style>
@@ -306,7 +307,7 @@ $json_pie = json_encode([$inspeccionados_mes, $total_extintores - $inspeccionado
     <div class="chart-card" style="margin-bottom:32px">
         <h3>📅 Próximos Vencimientos (Vigencia PH)</h3>
         <div style="overflow-x:auto">
-            <table style="width:100%;font-size:13px;border-collapse:collapse">
+            <div class="tabla-env"><table class="tabla" style="width:100%;font-size:13px;border-collapse:collapse">
                 <thead>
                     <tr style="background:#f9fafb;border-bottom:2px solid #e5e7eb">
                         <th style="padding:12px;text-align:left;font-weight:700">Equipo</th>
@@ -321,14 +322,14 @@ $json_pie = json_encode([$inspeccionados_mes, $total_extintores - $inspeccionado
                         $color = $dias < 0 ? '#e74c3c' : ($dias < 7 ? '#f39c12' : '#3498db');
                     ?>
                     <tr style="border-bottom:1px solid #e5e7eb;hover:background:#f9fafb">
-                        <td style="padding:12px;color:#333"><?= htmlspecialchars($v['codigo_manual']) ?></td>
-                        <td style="padding:12px;color:#666"><?= htmlspecialchars($v['ubicacion']) ?></td>
-                        <td style="padding:12px;text-align:center;color:#333"><?= date('d/m/Y', strtotime($v['fecha_ph'])) ?></td>
-                        <td style="padding:12px;text-align:center"><span style="background:<?= $color ?>;color:#fff;padding:4px 10px;border-radius:6px;font-weight:700;font-size:12px"><?= $dias < 0 ? 'VENCIDO' : "$dias días" ?></span></td>
+                        <td data-et="Equipo" class="td-titulo" style="padding:12px;color:#333"><?= htmlspecialchars($v['codigo_manual']) ?></td>
+                        <td data-et="Ubicación" style="padding:12px;color:#666"><?= htmlspecialchars($v['ubicacion']) ?></td>
+                        <td data-et="Vencimiento" style="padding:12px;color:#333"><?= date('d/m/Y', strtotime($v['fecha_ph'])) ?></td>
+                        <td data-et="Días" style="padding:12px"><span style="background:<?= $color ?>;color:#fff;padding:4px 10px;border-radius:6px;font-weight:700;font-size:12px"><?= $dias < 0 ? 'VENCIDO' : "$dias días" ?></span></td>
                     </tr>
                     <?php endforeach; ?>
                 </tbody>
-            </table>
+            </table></div>
         </div>
     </div>
     <?php endif; ?>

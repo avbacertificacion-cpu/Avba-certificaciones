@@ -135,6 +135,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="../public/assets/css/movil.css">
 <title>Convertir a mayúsculas</title>
 <style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -186,16 +187,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
         <div class="card">
             <div class="alerta a-ok">✓ Listo. Se convirtieron <?= number_format($totalCambiado) ?> registro(s).</div>
             <?php if ($resultados): ?>
-                <table>
+                <div class="tabla-env"><table class="tabla">
                     <thead><tr><th>Tabla</th><th>Columna</th><th class="n">Convertidos</th></tr></thead>
                     <tbody>
                     <?php foreach ($resultados as $r): ?>
-                        <tr><td><?= htmlspecialchars($r['tabla']) ?></td>
-                            <td><?= htmlspecialchars($r['columna']) ?></td>
-                            <td class="n"><?= number_format($r['cambiadas']) ?></td></tr>
+                        <tr><td data-et="Tabla" class="td-titulo"><?= htmlspecialchars($r['tabla']) ?></td>
+                            <td data-et="Columna"><?= htmlspecialchars($r['columna']) ?></td>
+                            <td data-et="Convertidos" class="n"><?= number_format($r['cambiadas']) ?></td></tr>
                     <?php endforeach; ?>
                     </tbody>
-                </table>
+                </table></div>
             <?php else: ?>
                 <p style="font-size:13px;color:#64748b">No había nada pendiente.</p>
             <?php endif; ?>
@@ -220,21 +221,22 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && ($_POST['accion'] ?? '') ==
         </div>
 
         <div class="card">
-            <table>
+            <div class="tabla-env"><table class="tabla">
                 <thead><tr><th>Tabla</th><th>Columna</th><th class="n">Por convertir</th></tr></thead>
                 <tbody>
                 <?php foreach ($preview as $p): ?>
                     <tr>
-                        <td><?= htmlspecialchars($p['tabla']) ?></td>
-                        <td><?= htmlspecialchars($p['columna']) ?></td>
-                        <td class="n <?= $p['pendientes'] ? '' : 'cero' ?>"><?= number_format($p['pendientes']) ?></td>
+                        <td data-et="Tabla" class="td-titulo"><?= htmlspecialchars($p['tabla']) ?></td>
+                        <td data-et="Columna"><?= htmlspecialchars($p['columna']) ?></td>
+                        <td data-et="Por convertir" class="n <?= $p['pendientes'] ? '' : 'cero' ?>"><?= number_format($p['pendientes']) ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
                 <tfoot><tr style="font-weight:800;background:#f8faff">
-                    <td colspan="2">Total</td><td class="n"><?= number_format($totalPendiente) ?></td>
+                    <td colspan="2" data-et="Total" class="td-titulo">Total</td>
+                    <td data-et="Por convertir" class="n"><?= number_format($totalPendiente) ?></td>
                 </tr></tfoot>
-            </table>
+            </table></div>
         </div>
 
         <div class="card">

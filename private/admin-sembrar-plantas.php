@@ -381,6 +381,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="../public/assets/css/movil.css">
 <title>Sembrar Plantas de Demo</title>
 <style>
     *{margin:0;padding:0;box-sizing:border-box}
@@ -432,19 +433,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
     <?php if ($resultados): ?>
         <div class="card">
             <h3 style="margin-bottom:12px">✓ Resultado</h3>
-            <table>
+            <div class="tabla-env"><table class="tabla">
                 <thead><tr><th>Planta</th><th>Estado</th><th class="n">Nuevos</th><th class="n">Total</th></tr></thead>
                 <tbody>
                 <?php foreach ($resultados as $r): ?>
                     <tr>
-                        <td><?= htmlspecialchars($r['nombre']) ?></td>
-                        <td><span class="badge <?= $r['creados'] > 0 ? 'b-ok' : 'b-existe' ?>"><?= htmlspecialchars($r['estado']) ?></span></td>
-                        <td class="n"><?= $r['creados'] ?></td>
-                        <td class="n" style="font-weight:700"><?= $r['total'] ?></td>
+                        <td data-et="Planta" class="td-titulo"><?= htmlspecialchars($r['nombre']) ?></td>
+                        <td data-et="Estado"><span class="badge <?= $r['creados'] > 0 ? 'b-ok' : 'b-existe' ?>"><?= htmlspecialchars($r['estado']) ?></span></td>
+                        <td data-et="Nuevos" class="n"><?= $r['creados'] ?></td>
+                        <td data-et="Total" class="n" style="font-weight:700"><?= $r['total'] ?></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
-            </table>
+            </table></div></div>
 
             <?php if ($gerenteInfo): ?>
                 <div class="creds">
@@ -462,14 +463,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['accion'] ?? '') === 'sembr
 
     <?php else: ?>
         <div class="card">
-            <table>
+            <div class="tabla-env"><table class="tabla">
                 <thead><tr><th>Centro de trabajo</th><th>Domicilio</th><th>Estado</th></tr></thead>
                 <tbody>
                 <?php foreach ($preview as $p): ?>
                     <tr>
-                        <td style="font-weight:600"><?= htmlspecialchars($p['nombre']) ?></td>
-                        <td style="color:#64748b"><?= htmlspecialchars($p['domicilio']) ?></td>
-                        <td>
+                        <td data-et="Centro de trabajo" class="td-titulo" style="font-weight:600"><?= htmlspecialchars($p['nombre']) ?></td>
+                        <td data-et="Domicilio" style="color:#64748b"><?= htmlspecialchars($p['domicilio']) ?></td>
+                        <td data-et="Estado">
                             <?php if (!$p['empresa_id']): ?>
                                 <span class="badge b-crear">se creará con <?= htmlspecialchars($p['meta']) ?> extintores</span>
                             <?php elseif (!$p['completa']): ?>

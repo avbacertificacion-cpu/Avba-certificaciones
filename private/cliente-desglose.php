@@ -44,6 +44,7 @@ $json_tipos_cant = json_encode(array_map('intval', array_column($por_tipo, 'cant
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="../public/assets/css/movil.css">
 <title>Desglose de mis extintores</title>
 <script src="../public/assets/js/chart.umd.min.js"></script>
 <style>
@@ -110,20 +111,20 @@ $json_tipos_cant = json_encode(array_map('intval', array_column($por_tipo, 'cant
             </div>
             <div class="card">
                 <h3>Desglose por tipo y capacidad</h3>
-                <table>
+                <div class="tabla-env"><table class="tabla">
                     <thead><tr><th>Tipo</th><th>Capacidad</th><th class="n">Cantidad</th><th class="n">%</th></tr></thead>
                     <tbody>
                     <?php foreach ($por_tipo as $t): $pct = $total>0 ? round($t['cantidad']/$total*100) : 0; ?>
                         <tr>
-                            <td><?= htmlspecialchars($t['tipo']) ?></td>
-                            <td><?= htmlspecialchars($t['capacidad']) ?></td>
-                            <td class="n"><?= (int)$t['cantidad'] ?></td>
-                            <td class="n"><?= $pct ?>%</td>
+                            <td data-et="Tipo" class="td-titulo"><?= htmlspecialchars($t['tipo']) ?></td>
+                            <td data-et="Capacidad"><?= htmlspecialchars($t['capacidad']) ?></td>
+                            <td data-et="Cantidad" class="n"><?= (int)$t['cantidad'] ?></td>
+                            <td data-et="%" class="n"><?= $pct ?>%</td>
                         </tr>
                     <?php endforeach; ?>
                     </tbody>
-                    <tfoot><tr><td colspan="2">Total</td><td class="n"><?= $total ?></td><td class="n">100%</td></tr></tfoot>
-                </table>
+                    <tfoot><tr><td colspan="2" data-et="Total" class="td-titulo">Total</td><td data-et="Cantidad" class="n"><?= $total ?></td><td data-et="%" class="n">100%</td></tr></tfoot>
+                </table></div>
             </div>
         </div>
     <?php endif; ?>
