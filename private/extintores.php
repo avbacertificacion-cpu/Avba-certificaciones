@@ -222,8 +222,8 @@ $es_admin = $rol === ROLE_ADMIN;
 </div>
 
 <!-- QR Generator & Scanner libraries (CDN) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="../public/assets/js/qrcode.min.js"></script>
+<script src="../public/assets/js/html5-qrcode.min.js"></script>
 <script>
 let extintores = [];
 let empresas   = [];
@@ -570,6 +570,12 @@ function cerrarModalAsignarQRAdmin() {
 async function iniciarScannerAsignarAdmin() {
     const scanDiv = document.getElementById('scanner-asignar-admin');
     const alertDiv = document.getElementById('asignar-qr-alert-admin');
+
+    // Sin la librería el botón no hacía nada, sin decir por qué
+    if (typeof Html5Qrcode === 'undefined') {
+        alertDiv.innerHTML = '<div class="alert alert-error">El lector de códigos no se cargó. Revisa la conexión y recarga la página; mientras tanto puedes escribir el código a mano.</div>';
+        return;
+    }
 
     if (scanDiv.style.display === 'block') {
         detenerScannerAsignarAdmin();

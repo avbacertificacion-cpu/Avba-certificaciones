@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="assets/css/movil.css">
     <title>Validar Extintor - AVBA</title>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="assets/js/html5-qrcode.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -388,6 +388,10 @@
         }
 
         function iniciarScanner() {
+            if (typeof Html5Qrcode === 'undefined') {
+                mostrarError('El lector de códigos no se cargó. Revisa la conexión y recarga la página; mientras tanto puedes escribir el código a mano.');
+                return;
+            }
             scannerActive = true;
             btnScanner.textContent = '❌ Cerrar Scanner';
             scannerDiv.classList.add('active');

@@ -45,7 +45,7 @@ if ($empresa_inspeccion) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../public/assets/css/movil.css">
     <title>Inspección de Extintor</title>
-    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="../public/assets/js/html5-qrcode.min.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box}
         body{font-family:'Segoe UI',sans-serif;background:#f4f6fb}
@@ -584,6 +584,13 @@ function _procesarQRInspeccion(decodedText) {
 }
 
 function _iniciarCamaraInspeccion() {
+    // Si la librería no está, el botón no hacía nada y parecía que el sistema
+    // se había quedado colgado. Mejor decirlo.
+    if (typeof Html5Qrcode === 'undefined') {
+        showAlert('El lector de códigos no se cargó. Revisa la conexión y recarga la página; mientras tanto puedes escribir el código a mano.', 'error');
+        cerrarScannerQR();
+        return;
+    }
     qrScanner = new Html5Qrcode('scanner');
     return qrScanner.start(
         { facingMode: 'environment' },
@@ -670,6 +677,10 @@ let _asignarOrientacion = null;
 
 function _arrancarCamaraAsignar() {
     const alertDiv = document.getElementById('asignar-qr-alert');
+    if (typeof Html5Qrcode === 'undefined') {
+        alertDiv.innerHTML = '<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:6px">El lector de códigos no se cargó. Revisa la conexión y recarga la página; mientras tanto puedes escribir el código a mano.</div>';
+        return;
+    }
     scannerAsignar = new Html5Qrcode('scanner-asignar');
     return scannerAsignar.start(
         { facingMode: 'environment' },
