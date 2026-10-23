@@ -6,6 +6,10 @@
  * material (en distintos estados) y reportes de mantenimiento con fotos y
  * PDF reales — para que el portal de cliente se vea completamente activo.
  *
+ * NO SE PUBLICA en el servidor: el despliegue lo excluye a propósito, para
+ * no dejarlo accesible desde internet. Si lo necesitas, súbelo a mano por
+ * hPanel y bórralo en cuanto termines.
+ *
  * USO: php setup_demo.php   (o abrir desde navegador con ?secret=avba_setup_2025)
  * Es seguro volver a ejecutarlo: limpia los datos demo previos antes de
  * recrearlos (usuarios/equipos/proveedores/etc. de otros clientes no se tocan).

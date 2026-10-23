@@ -11,6 +11,10 @@
  * Esta página construye las clases una por una y reporta exactamente cuál falla
  * y con qué mensaje, archivo y línea.
  *
+ * NO SE PUBLICA en el servidor: el despliegue lo excluye a propósito, para
+ * no dejarlo accesible desde internet. Si lo necesitas, súbelo a mano por
+ * hPanel y bórralo en cuanto termines.
+ *
  *   /diagnostico_arranque.php?secret=CLAVE
  *
  * No modifica nada. BORRAR DEL SERVIDOR cuando termine el diagnóstico.

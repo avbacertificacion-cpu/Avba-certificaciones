@@ -6,6 +6,10 @@
  * qué librerías hay, si las carpetas existen y se pueden escribir, si el
  * archivo se crea realmente y si el servidor lo entrega por HTTP.
  *
+ * NO SE PUBLICA en el servidor: el despliegue lo excluye a propósito, para
+ * no dejarlo accesible desde internet. Si lo necesitas, súbelo a mano por
+ * hPanel y bórralo en cuanto termines.
+ *
  * USO: https://gestion.avba.com.mx/diagnostico_pdf.php?secret=avba_diag_2026
  * BORRAR este archivo del servidor después de revisarlo.
  */

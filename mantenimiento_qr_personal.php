@@ -8,6 +8,10 @@
  * a la nueva nomenclatura: serie 7, reiniciando el conteo desde el primer
  * número libre de la serie.
  *
+ * NO SE PUBLICA en el servidor: el despliegue lo excluye a propósito, para
+ * no dejarlo accesible desde internet. Si lo necesitas, súbelo a mano por
+ * hPanel y bórralo en cuanto termines.
+ *
  * Uso (desde el navegador, con la cuenta de administración a mano):
  *
  *   1. SIMULACIÓN — no toca nada, sólo muestra qué cambiaría:
