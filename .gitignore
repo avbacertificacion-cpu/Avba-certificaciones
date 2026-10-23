@@ -10,3 +10,8 @@ uploads/evidencias/
 
 # Archivos de instalación
 install.php
+
+# Conector de correo para Claude (archivos que genera en el servidor)
+mcp/config.php
+mcp/.envios.json
+mcp/.intentos.json
