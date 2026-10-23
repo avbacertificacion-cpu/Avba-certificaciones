@@ -28,6 +28,19 @@ $nombre = $_SESSION['nombre'];
         .page-header h2{font-size:28px;color:#333;margin-bottom:8px}
         .page-header p{color:#888;font-size:14px}
 
+        .vistas{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+        .tab{flex:1 1 200px;padding:13px 16px;border:2px solid #e0e0ff;background:#fff;border-radius:10px;
+             font-size:14px;font-weight:700;color:#64748b;cursor:pointer;transition:.15s}
+        .tab:hover{border-color:#c7d2fe}
+        .tab.activa{background:#667eea;border-color:#667eea;color:#fff}
+        .resumen-faltan{background:#fff;border-radius:12px;padding:16px 18px;margin-bottom:18px;
+                        box-shadow:0 2px 8px rgba(30,41,59,.08);font-size:14px;line-height:1.7}
+        .resumen-faltan .cifra{font-size:26px;font-weight:800;color:#b91c1c}
+        .resumen-faltan .planta{display:flex;justify-content:space-between;gap:16px;padding:7px 0;
+                                border-top:1px solid #f1f5f9}
+        .resumen-faltan .planta b{color:#b91c1c}
+        .b-taller{background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700}
+        .nunca{color:#b91c1c;font-weight:700}
         .toolbar{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:24px}
         @media(min-width:768px){.toolbar{grid-template-columns:1fr 1fr 1fr}}
 
@@ -90,6 +103,11 @@ $nombre = $_SESSION['nombre'];
         <p>Revisa todas las inspecciones realizadas por los inspectores</p>
     </div>
 
+    <div class="vistas">
+        <button id="tabHechas" class="tab activa" onclick="cambiarVista('hechas')">✅ Inspecciones realizadas</button>
+        <button id="tabFaltan" class="tab" onclick="cambiarVista('faltan')">⏳ Faltan por inspeccionar</button>
+    </div>
+
     <div class="toolbar">
         <input type="month" id="filtroMes" onchange="cargar()" title="Filtrar por mes y año">
         <input type="text" id="filtroCodigo" placeholder="🔍 Buscar código o ubicación…" oninput="filtrar()" title="Búsqueda en tiempo real">
@@ -118,6 +136,8 @@ $nombre = $_SESSION['nombre'];
         <span class="fecha-hint">Marca las casillas en la tabla y elige la fecha destino. Útil para mover inspecciones al mes correcto en el cierre.</span>
     </div>
 
+    <div id="resumenFaltan" class="resumen-faltan" style="display:none"></div>
+
     <div class="table-wrapper">
         <div id="tabla"></div>
     </div>
@@ -126,9 +146,28 @@ $nombre = $_SESSION['nombre'];
 <script>
 let inspecciones = [];
 let inspectores = new Set();
+let vista = 'hechas';          // 'hechas' = lo inspeccionado · 'faltan' = lo pendiente
+let faltantes = [];
+let resumenFaltan = null;
+
+// ── Cambiar entre lo hecho y lo que falta ─────────────────────────────────────
+function cambiarVista(cual) {
+    vista = cual;
+    document.getElementById('tabHechas').classList.toggle('activa', cual === 'hechas');
+    document.getElementById('tabFaltan').classList.toggle('activa', cual === 'faltan');
+    // El filtro por inspector no aplica a lo que nadie ha inspeccionado todavía
+    const fi = document.getElementById('filtroInspector');
+    fi.disabled = (cual === 'faltan');
+    fi.style.opacity = (cual === 'faltan') ? .45 : 1;
+    document.getElementById('resumenFaltan').style.display = (cual === 'faltan') ? 'block' : 'none';
+    document.getElementById('filtroCodigo').placeholder = (cual === 'faltan')
+        ? '🔍 Buscar código, área o planta…' : '🔍 Buscar código o ubicación…';
+    cargar();
+}
 
 // ── Cargar ────────────────────────────────────────────────────────────────────
 async function cargar() {
+    if (vista === 'faltan') return cargarFaltantes();
     const mes = document.getElementById('filtroMes').value;
     let url = '../api/inspecciones.php?action=listar';
     if (mes) {
@@ -155,14 +194,97 @@ async function cargar() {
     filtrar();
 }
 
+// ── Lo que falta por inspeccionar en el mes ───────────────────────────────────
+async function cargarFaltantes() {
+    const mes = document.getElementById('filtroMes').value;
+    const r = await fetch('../api/inspecciones.php?action=pendientes'
+                          + (mes ? `&mes=${encodeURIComponent(mes)}` : ''));
+    const d = await r.json();
+    faltantes     = d.success ? d.data : [];
+    resumenFaltan = d.success ? d.resumen : null;
+    pintarResumen(d.mes);
+    filtrar();
+}
+
+function pintarResumen(mes) {
+    const caja = document.getElementById('resumenFaltan');
+    if (!resumenFaltan) { caja.innerHTML = ''; return; }
+    const { total, faltan, inspeccionados, en_taller } = resumenFaltan;
+    const pct = total ? Math.round(inspeccionados / total * 100) : 0;
+
+    // Cuántos faltan en cada planta: es como se reparte el trabajo
+    const porPlanta = {};
+    faltantes.forEach(x => porPlanta[x.empresa_nombre] = (porPlanta[x.empresa_nombre] || 0) + 1);
+    const plantas = Object.entries(porPlanta).sort((a, b) => b[1] - a[1]);
+
+    caja.innerHTML = faltan === 0
+        ? `<div><span class="cifra" style="color:#047857">✓ 0</span> extintores pendientes en ${mes}.
+             Los ${total} activos ya tienen inspección este mes.</div>`
+        : `<div><span class="cifra">${faltan}</span> extintor(es) sin inspección en ${mes},
+             de ${total} activos · ${inspeccionados} ya inspeccionados (${pct}%)
+             ${en_taller ? `· <span class="b-taller">${en_taller} en el taller</span>` : ''}</div>
+           ${plantas.map(([p, n]) => `<div class="planta"><span>${p}</span><b>${n}</b></div>`).join('')}`;
+}
+
 function filtrar() {
     const q = document.getElementById('filtroCodigo').value.toLowerCase();
     const insp = document.getElementById('filtroInspector').value;
+
+    if (vista === 'faltan') {
+        return renderFaltantes(faltantes.filter(x =>
+            !q || (x.codigo_manual || '').toLowerCase().includes(q)
+               || (x.ubicacion || '').toLowerCase().includes(q)
+               || (x.seccion || '').toLowerCase().includes(q)
+               || (x.empresa_nombre || '').toLowerCase().includes(q)));
+    }
 
     render(inspecciones.filter(x =>
         (!q || x.codigo_manual.toLowerCase().includes(q) || x.ubicacion.toLowerCase().includes(q)) &&
         (!insp || x.inspector_nombre === insp)
     ));
+}
+
+// ── Render de lo que falta ────────────────────────────────────────────────────
+function renderFaltantes(data) {
+    const c = document.getElementById('tabla');
+    if (!data.length) {
+        c.innerHTML = '<div class="empty"><div class="empty-icon">✅</div>'
+                    + '<p>No falta ningún extintor por inspeccionar en este mes.</p></div>';
+        return;
+    }
+    // Los días transcurridos sólo se dicen si la fecha ya pasó: al consultar un
+    // mes cerrado, la última inspección registrada puede ser posterior a ese
+    // mes, y «hace -29 días» no significa nada.
+    const dias = f => {
+        if (!f) return null;
+        const n = Math.round((Date.now() - new Date(f + 'T00:00:00')) / 86400000);
+        return n > 0 ? n : null;
+    };
+    c.innerHTML = `
+    <div class="tabla-env"><table class="tabla">
+        <thead><tr>
+            <th>Código</th><th>Planta</th><th>Área</th><th>Ubicación</th>
+            <th>Tipo</th><th>Cap.</th><th>Última inspección</th><th>Situación</th>
+        </tr></thead>
+        <tbody>
+        ${data.map(x => {
+            const d = dias(x.ultima_inspeccion);
+            return `<tr>
+            <td data-et="Código" class="td-titulo"><strong>${sanitize(x.codigo_manual || '—')}</strong></td>
+            <td data-et="Planta">${sanitize(x.empresa_nombre)}</td>
+            <td data-et="Área">${sanitize(x.seccion || '—')}</td>
+            <td data-et="Ubicación">${sanitize(x.ubicacion || '—')}</td>
+            <td data-et="Tipo">${sanitize(x.tipo_nombre || '—')}</td>
+            <td data-et="Cap.">${sanitize(x.capacidad || '—')}</td>
+            <td data-et="Última inspección">${x.ultima_inspeccion
+                ? `${sanitize(x.ultima_inspeccion)}${d !== null ? ` <small>(hace ${d} días)</small>` : ''}`
+                : '<span class="nunca">Nunca inspeccionado</span>'}</td>
+            <td data-et="Situación">${x.taller_desde
+                ? `<span class="b-taller">🛠️ En taller (${sanitize(x.taller_motivo || 'sin motivo')}) desde ${sanitize(x.taller_desde)}</span>`
+                : 'Pendiente'}</td>
+        </tr>`; }).join('')}
+        </tbody>
+    </table></div>`;
 }
 
 // ── Render ────────────────────────────────────────────────────────────────────
