@@ -42,3 +42,8 @@ Manual_Solicitar_Certificacion_AVBA.pdf
 
 # Manual comercial del portal; se genera y se entrega a mano.
 Portal_Clientes_AVBA.pdf
+
+# Conector de correo para Claude (archivos que genera en el servidor)
+mcp/config.php
+mcp/.envios.json
+mcp/.intentos.json
