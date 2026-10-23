@@ -5298,6 +5298,7 @@ async function leerInspeccionPreparada() {
     const res  = await fetch(`${WEB_APP_URL}?action=MI_INSPECCION_PREPARADA`, { headers: { 'X-Token': s.token || '' } });
     const data = await res.json();
     inspPreparada = (data.status === 'success' && data.data) ? data.data : null;
+    if (inspPreparada) inspPreparada.pendientes = data.pendientes || 1;
   } catch (e) { inspPreparada = null; }
   return inspPreparada;
 }
@@ -5308,8 +5309,10 @@ async function revisarInspeccionPreparada() {
   const prep = await leerInspeccionPreparada();
   if (!prep) { banner.classList.remove('show'); return; }
   const equipo = [prep.maquinaria, prep.marca, prep.modelo].filter(Boolean).join(' · ');
-  document.getElementById('banner-insp-preparada-txt').textContent =
-    'Tienes una inspección preparada' + (equipo ? ' · ' + equipo : '');
+  const n = prep.pendientes || 1;
+  document.getElementById('banner-insp-preparada-txt').textContent = n > 1
+    ? `Tienes ${n} inspecciones preparadas` + (equipo ? ' · empiezas por ' + equipo : '')
+    : 'Tienes una inspección preparada' + (equipo ? ' · ' + equipo : '');
   banner.classList.add('show');
 }
 
@@ -5359,7 +5362,8 @@ async function abrirInspeccionPreparada() {
       emails:     prep.correo ? [prep.correo] : [],
       dir_insp:   prep.direccion  || '',
     },
-    checklist: {}, prueba_carga: {}, recomendaciones: [], fotos,
+    // La prueba de carga puede venir llena desde la precarga; si no, vacía.
+    checklist: {}, prueba_carga: prep.prueba_carga || {}, recomendaciones: [], fotos,
   }, 'Inspección preparada cargada. Confirma el cliente y continúa.');
 
   inspeccionPreparadaId = prep.id;
@@ -5368,9 +5372,12 @@ async function abrirInspeccionPreparada() {
   document.getElementById('banner-borrador')?.classList.remove('show');
   const aviso = document.getElementById('insp-preparada-aviso');
   if (aviso) {
+    const masTarde = (prep.pendientes || 1) > 1
+      ? ' <strong>Al enviarla te aparecerá la siguiente.</strong>' : '';
     aviso.innerHTML = '<strong>Inspección preparada.</strong> '
       + escIns(prep.nota || 'Revisa los datos del equipo, confirma el cliente y el lugar, y levanta el checklist y la prueba de carga.')
-      + (fotos.length ? ' <strong>' + fotos.length + (fotos.length === 1 ? ' foto ya cargada' : ' fotos ya cargadas') + '</strong> en el paso 6.' : '');
+      + (fotos.length ? ' <strong>' + fotos.length + (fotos.length === 1 ? ' foto ya cargada' : ' fotos ya cargadas') + '</strong> en el paso 6.' : '')
+      + masTarde;
     aviso.style.display = 'block';
   }
 }

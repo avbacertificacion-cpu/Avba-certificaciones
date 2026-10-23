@@ -34,7 +34,9 @@ class Inspecciones {
      * borrador se borra, de modo que lo que queda registrado es una inspección
      * normal, sin rastro de haber venido precargada.
      */
-    private const PRECARGA_GRUA = [
+    private const PRECARGAS = [self::PRECARGA_GRUA_AC18, self::PRECARGA_GRUA_TC4792];
+
+    private const PRECARGA_GRUA_AC18 = [
         'clave'      => 'precarga_grua_ac18_michel',
         'busca'      => 'MICHEL',
         'fotos'      => 'assets/precarga/grua_ac18_70/',
@@ -52,9 +54,53 @@ class Inspecciones {
                       . 'Confirma el cliente y la ubicación, levanta el checklist y la prueba de carga.',
     ];
 
+    /**
+     * Segunda grúa de Falomir: la Simon-RO sobre Peterbilt, unidad 04.
+     *
+     * Ésta sí trae la prueba de carga precargada, con dos renglones tomados de
+     * su propia tabla de capacidades:
+     *
+     *   Sin carga — la configuración máxima: pluma de 92 ft (28.04 m) a 80 ft
+     *   (24.38 m) de radio, que es hasta donde llega la tabla.
+     *
+     *   Con carga — 71 ft (21.64 m) de pluma a 50 ft (15.24 m) de radio. Ahí la
+     *   tabla marca 45° y 3,725 lb, así que 1.5 t de prueba son el 88.8% de lo
+     *   permitido: carga redonda, fácil de armar, y dentro del 80–90% pedido.
+     *
+     * Los campos van en metros porque así los pide la pantalla; el ángulo y la
+     * altura los recalcula el sistema a partir del radio y la pluma.
+     */
+    private const PRECARGA_GRUA_TC4792 = [
+        'clave'      => 'precarga_grua_tc4792_michel',
+        'busca'      => 'MICHEL',
+        'fotos'      => 'assets/precarga/grua_tc4792/',
+        'maquinaria' => 'GRÚA HIDRÁULICA SOBRE CAMIÓN',
+        'cliente'    => 'FALOMIR',
+        'marca'      => 'SIMON-RO',
+        'modelo'     => 'TC-4792',
+        'serie'      => '4900297431',
+        'id_equipo'  => '04',
+        'capacidad'  => '47,000 LB (21.3 TON)',
+        'prueba_carga' => [
+            'plantilla' => 'dictamen_preview.html',
+            'sin' => ['peso' => '0',   'radio' => '24.38', 'pluma' => '28.04',
+                      'angulo' => '29.6', 'altura' => '13.85', 'resultado' => ''],
+            'con' => ['peso' => '1.5', 'radio' => '15.24', 'pluma' => '21.64',
+                      'angulo' => '45.2', 'altura' => '15.36', 'resultado' => ''],
+        ],
+        'nota'       => 'Datos de la placa y de la tabla de capacidades: Simon‑RO TC‑4792, '
+                      . 'serie 4900297431, capacidad máxima 47,000 lb (21.3 t) a 5 ft de radio con pluma de 29 ft. '
+                      . 'Pluma de 29 a 92 ft. Montada en Peterbilt, unidad 04. '
+                      . 'La prueba de carga ya viene llena: SIN CARGA en la configuración máxima '
+                      . '—pluma 92 ft (28.04 m) a 80 ft (24.38 m) de radio— y CON CARGA a 71 ft '
+                      . '(21.64 m) de pluma y 50 ft (15.24 m) de radio, donde la tabla marca 45° y 3,725 lb: '
+                      . 'las 1.5 t de prueba son el 88.8% de ese valor. Los campos van en metros. '
+                      . 'Coteja los números contra la tabla del equipo antes de la maniobra y marca tú el resultado.',
+    ];
+
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
-        $this->precargarGruaMichel();
+        $this->precargarInspecciones();
     }
 
     /**
@@ -66,8 +112,11 @@ class Inspecciones {
      * antes que Admin, así que el tipo aún no existe y conviene reintentarlo en
      * la siguiente.
      */
-    private function precargarGruaMichel(): void {
-        $cfg = self::PRECARGA_GRUA;
+    private function precargarInspecciones(): void {
+        foreach (self::PRECARGAS as $cfg) $this->precargarUna($cfg);
+    }
+
+    private function precargarUna(array $cfg): void {
         try {
             $this->pdo->exec(
                 "CREATE TABLE IF NOT EXISTS maquinaria_tipos_seed (
@@ -99,6 +148,13 @@ class Inspecciones {
                 $cfg['cliente'], $cfg['maquinaria'], $cfg['marca'], $cfg['modelo'], $cfg['serie'],
                 $cfg['id_equipo'], $cfg['capacidad'], date('Y-m-d'), $cfg['fotos'], self::BORRADOR, $usuario,
             ];
+            if (!empty($cfg['prueba_carga'])) {
+                try { $this->pdo->exec("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS prueba_carga JSON NULL"); }
+                catch (\Throwable $e) { /* ya existe o el motor no lo admite */ }
+                $cols .= ", prueba_carga";
+                $vals .= ", ?";
+                $args[] = json_encode($cfg['prueba_carga'], JSON_UNESCAPED_UNICODE);
+            }
             if ($this->tieneNotaBorrador()) {
                 $cols .= ", nota_borrador";
                 $vals .= ", ?";
@@ -107,9 +163,9 @@ class Inspecciones {
             $this->pdo->prepare("INSERT INTO equipos ($cols) VALUES ($vals)")->execute($args);
 
             $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")->execute([$cfg['clave']]);
-            error_log('[Inspecciones] precarga de grúa: inspección preparada para ' . $usuario);
+            error_log('[Inspecciones] precarga ' . $cfg['clave'] . ': inspección preparada para ' . $usuario);
         } catch (\Throwable $e) {
-            error_log('[Inspecciones] precargarGruaMichel: ' . $e->getMessage());
+            error_log('[Inspecciones] precarga ' . ($cfg['clave'] ?? '?') . ': ' . $e->getMessage());
         }
     }
 
@@ -139,7 +195,7 @@ class Inspecciones {
         try {
             $st = $this->pdo->prepare(
                 "SELECT id, cliente, maquinaria, marca, modelo, serie, id_equipo, capacidad,
-                        correo, direccion, coords_inspeccion, evidencia_url, {$nota},
+                        correo, direccion, coords_inspeccion, evidencia_url, prueba_carga, {$nota},
                         DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha
                  FROM equipos
                  WHERE inspector = ? AND estado = ?
@@ -154,7 +210,18 @@ class Inspecciones {
         if (!$fila) return ['status' => 'success', 'data' => null];
 
         $fila['fotos'] = $this->fotosDeCarpeta((string)$fila['evidencia_url']);
-        return ['status' => 'success', 'data' => $fila];
+        $fila['prueba_carga'] = !empty($fila['prueba_carga'])
+            ? (json_decode((string)$fila['prueba_carga'], true) ?: null) : null;
+
+        // Cuántas esperan en total: con más de una, el aviso lo dice y el
+        // inspector no se queda pensando que sólo había ésta.
+        try {
+            $c = $this->pdo->prepare("SELECT COUNT(*) FROM equipos WHERE inspector = ? AND estado = ?");
+            $c->execute([$usuario, self::BORRADOR]);
+            $pendientes = (int)$c->fetchColumn();
+        } catch (\Throwable $e) { $pendientes = 1; }
+
+        return ['status' => 'success', 'data' => $fila, 'pendientes' => $pendientes];
     }
 
     /** URL de las imágenes que hay en una carpeta de evidencia, en orden. */
