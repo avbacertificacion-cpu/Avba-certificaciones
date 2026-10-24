@@ -152,4 +152,11 @@ function fechaValida($v): ?string {
     return ($d && $d->format('Y-m-d') === $v) ? $v : null;
 }
 
-/** SELECT común: el movimiento con los datos del extintor, su planta y el motivo. */
+/** ¿Ya existe el registro del taller? Si nunca se ha usado, no hay nada que cerrar. */
+function tablaTallerExiste(PDO $pdo): bool {
+    try {
+        $st = $pdo->prepare("SHOW TABLES LIKE ?");
+        $st->execute(['extintor_mantenimientos']);
+        return (bool) $st->fetchColumn();
+    } catch (Exception $e) { return false; }
+}

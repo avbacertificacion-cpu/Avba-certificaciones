@@ -2,6 +2,7 @@
 require_once '../config/config.php';
 require_once '../config/mayusculas.php';
 require_once '../config/taller.php';
+require_once '../config/pendientes.php';
 header('Content-Type: application/json');
 
 if (!isset($_SESSION['usuario_id'])) {
@@ -540,25 +541,13 @@ function aplicarRegreso(PDO $pdo, int $extintorId, string $fecha, int $uid): arr
     return $hecho;
 }
 
-/** ¿Ya existe el registro del taller? Si nunca se ha usado, no hay nada que cerrar. */
-function tablaTallerExiste(PDO $pdo): bool {
-    try {
-        $st = $pdo->prepare("SHOW TABLES LIKE ?");
-        $st->execute(['extintor_mantenimientos']);
-        return (bool) $st->fetchColumn();
-    } catch (Exception $e) { return false; }
-}
 
 /**
  * Lo que falta por inspeccionar en un mes.
  *
- * El historial contesta «qué se hizo»; esto contesta lo contrario, que es lo
- * que sirve para repartir trabajo: qué extintores no tienen inspección en el
- * mes, de qué planta son y desde cuándo no se tocan.
- *
- * Fuera quedan los dados de baja (inactivo), que ya no se inspeccionan. Los
- * que están en el taller sí salen —se deben, y el total tiene que cuadrar—
- * pero marcados, porque no se pueden inspeccionar mientras no regresen.
+ * La consulta vive en config/pendientes.php porque el PDF descargable usa
+ * exactamente la misma: dos definiciones de «lo que falta» acabarían dando
+ * números distintos.
  */
 function pendientes() {
     global $pdo, $rol;
@@ -567,77 +556,15 @@ function pendientes() {
         http_response_code(403); echo json_encode(['error' => 'Sin permiso']); return;
     }
 
-    // Mes pedido como AAAA-MM; si no viene o viene mal, el mes en curso
-    $pedido = trim($_GET['mes'] ?? '');
-    if (preg_match('/^(\d{4})-(\d{2})$/', $pedido, $m)) {
-        $anio = (int) $m[1];
-        $mes  = (int) $m[2];
-    } else {
-        $anio = (int) date('Y');
-        $mes  = (int) date('n');
-    }
-    if ($mes < 1 || $mes > 12) { $anio = (int) date('Y'); $mes = (int) date('n'); }
+    [$mes, $anio] = mesPedido($_GET['mes'] ?? null);
+    $empresaId    = intval($_GET['empresa_id'] ?? 0);
 
-    $empresaId = intval($_GET['empresa_id'] ?? 0);
-    $filtroEmp = $empresaId ? ' AND e.empresa_id = ?' : '';
-
-    $params = [$mes, $anio];
-    if ($empresaId) $params[] = $empresaId;
-
-    $stmt = $pdo->prepare("
-        SELECT e.id, e.codigo_manual, e.codigo_qr, e.empresa_id, e.seccion, e.ubicacion,
-               e.capacidad, e.estado, te.nombre AS tipo_nombre, emp.nombre AS empresa_nombre,
-               (SELECT MAX(x.fecha) FROM inspecciones x WHERE x.extintor_id = e.id) AS ultima_inspeccion
-        FROM extintores e
-        JOIN tipos_extintores te ON te.id = e.tipo
-        JOIN empresas emp        ON emp.id = e.empresa_id
-        LEFT JOIN inspecciones i ON i.extintor_id = e.id
-                                AND MONTH(i.fecha) = ? AND YEAR(i.fecha) = ?
-        WHERE e.estado <> 'inactivo' AND i.id IS NULL $filtroEmp
-        GROUP BY e.id
-        ORDER BY emp.nombre ASC,
-                 CAST(REPLACE(REPLACE(UPPER(e.codigo_manual), 'EXT-', ''), '-', '') AS UNSIGNED) ASC
-    ");
-    $stmt->execute($params);
-    $faltan = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-    // Quiénes están en el taller, para marcarlos. Si el módulo nunca se ha
-    // usado la tabla no existe y simplemente no se marca ninguno.
-    $enTaller = [];
-    if ($faltan && tablaTallerExiste($pdo)) {
-        try {
-            $ids = array_column($faltan, 'id');
-            $marcas = implode(',', array_fill(0, count($ids), '?'));
-            $st = $pdo->prepare("
-                SELECT m.extintor_id, m.fecha_entrada, t.nombre AS motivo
-                FROM extintor_mantenimientos m
-                LEFT JOIN mantenimiento_tipos t ON t.id = m.tipo_id
-                WHERE m.fecha_devolucion IS NULL AND m.extintor_id IN ($marcas)
-            ");
-            $st->execute($ids);
-            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $enTaller[$r['extintor_id']] = $r;
-        } catch (Exception $e) { /* sin el dato del taller la lista sigue sirviendo */ }
-    }
-    foreach ($faltan as &$f) {
-        $f['taller_desde']  = $enTaller[$f['id']]['fecha_entrada'] ?? null;
-        $f['taller_motivo'] = $enTaller[$f['id']]['motivo'] ?? null;
-    }
-    unset($f);
-
-    // Para que la pantalla pueda decir «faltan 37 de 241» sin volver a contar
-    $pTotal = [];
-    $sqlTotal = "SELECT COUNT(*) FROM extintores e WHERE e.estado <> 'inactivo'";
-    if ($empresaId) { $sqlTotal .= ' AND e.empresa_id = ?'; $pTotal[] = $empresaId; }
-    $st = $pdo->prepare($sqlTotal);
-    $st->execute($pTotal);
-    $total = (int) $st->fetchColumn();
+    $faltan = extintoresPendientes($pdo, $mes, $anio, $empresaId);
 
     echo json_encode([
         'success' => true,
         'mes'     => sprintf('%04d-%02d', $anio, $mes),
-        'resumen' => ['total' => $total, 'faltan' => count($faltan),
-                      'inspeccionados' => $total - count($faltan),
-                      'en_taller' => count($enTaller)],
+        'resumen' => resumenPendientes($pdo, $faltan, $empresaId),
         'data'    => $faltan,
     ]);
 }

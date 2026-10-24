@@ -40,9 +40,14 @@ $nombre = $_SESSION['nombre'];
                                 border-top:1px solid #f1f5f9}
         .resumen-faltan .planta b{color:#b91c1c}
         .b-taller{background:#fef3c7;color:#92400e;padding:3px 8px;border-radius:10px;font-size:11px;font-weight:700}
+        .acciones-faltan{margin:-6px 0 18px}
+        .btn-pdf{padding:12px 20px;border:none;border-radius:9px;background:#667eea;color:#fff;
+                 font-weight:700;font-size:14px;cursor:pointer}
+        .btn-pdf:hover{background:#5568d3}
         .nunca{color:#b91c1c;font-weight:700}
         .toolbar{display:grid;grid-template-columns:1fr;gap:12px;margin-bottom:24px}
-        @media(min-width:768px){.toolbar{grid-template-columns:1fr 1fr 1fr}}
+        @media(min-width:768px){.toolbar{grid-template-columns:1fr 1fr}}
+        @media(min-width:1100px){.toolbar{grid-template-columns:1fr 1.4fr 1fr 1fr}}
 
         .toolbar input,.toolbar select{padding:12px 14px;border:2px solid #e0e0ff;border-radius:8px;font-size:14px;background:#fff;transition:.2s;width:100%}
         .toolbar input:focus,.toolbar select:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,.1)}
@@ -111,6 +116,9 @@ $nombre = $_SESSION['nombre'];
     <div class="toolbar">
         <input type="month" id="filtroMes" onchange="cargar()" title="Filtrar por mes y año">
         <input type="text" id="filtroCodigo" placeholder="🔍 Buscar código o ubicación…" oninput="filtrar()" title="Búsqueda en tiempo real">
+        <select id="filtroEmpresa" onchange="cargar()" title="Filtrar por planta">
+            <option value="">🏭 Todas las plantas</option>
+        </select>
         <select id="filtroInspector" onchange="cargar()" title="Filtrar por inspector">
             <option value="">📋 Todos los inspectores</option>
         </select>
@@ -137,6 +145,9 @@ $nombre = $_SESSION['nombre'];
     </div>
 
     <div id="resumenFaltan" class="resumen-faltan" style="display:none"></div>
+    <div id="accionesFaltan" class="acciones-faltan" style="display:none">
+        <button class="btn-pdf" onclick="descargarFaltantes()">📄 Descargar PDF de los pendientes</button>
+    </div>
 
     <div class="table-wrapper">
         <div id="tabla"></div>
@@ -160,6 +171,7 @@ function cambiarVista(cual) {
     fi.disabled = (cual === 'faltan');
     fi.style.opacity = (cual === 'faltan') ? .45 : 1;
     document.getElementById('resumenFaltan').style.display = (cual === 'faltan') ? 'block' : 'none';
+    document.getElementById('accionesFaltan').style.display = (cual === 'faltan') ? 'block' : 'none';
     document.getElementById('filtroCodigo').placeholder = (cual === 'faltan')
         ? '🔍 Buscar código, área o planta…' : '🔍 Buscar código o ubicación…';
     cargar();
@@ -169,11 +181,13 @@ function cambiarVista(cual) {
 async function cargar() {
     if (vista === 'faltan') return cargarFaltantes();
     const mes = document.getElementById('filtroMes').value;
+    const emp = document.getElementById('filtroEmpresa').value;
     let url = '../api/inspecciones.php?action=listar';
     if (mes) {
         const [anio, m] = mes.split('-');
         url += `&mes=${m}&anio=${anio}`;
     }
+    if (emp) url += `&empresa_id=${encodeURIComponent(emp)}`;
 
     const r = await fetch(url);
     const d = await r.json();
@@ -197,13 +211,25 @@ async function cargar() {
 // ── Lo que falta por inspeccionar en el mes ───────────────────────────────────
 async function cargarFaltantes() {
     const mes = document.getElementById('filtroMes').value;
+    const emp = document.getElementById('filtroEmpresa').value;
     const r = await fetch('../api/inspecciones.php?action=pendientes'
-                          + (mes ? `&mes=${encodeURIComponent(mes)}` : ''));
+                          + (mes ? `&mes=${encodeURIComponent(mes)}` : '')
+                          + (emp ? `&empresa_id=${encodeURIComponent(emp)}` : ''));
     const d = await r.json();
     faltantes     = d.success ? d.data : [];
     resumenFaltan = d.success ? d.resumen : null;
     pintarResumen(d.mes);
     filtrar();
+}
+
+// Se abre con los mismos filtros que está viendo: mismo mes, misma planta
+function descargarFaltantes() {
+    const mes = document.getElementById('filtroMes').value;
+    const emp = document.getElementById('filtroEmpresa').value;
+    const q = [];
+    if (mes) q.push('mes=' + encodeURIComponent(mes));
+    if (emp) q.push('empresa_id=' + encodeURIComponent(emp));
+    window.open('../api/pendientes_pdf.php' + (q.length ? '?' + q.join('&') : ''), '_blank');
 }
 
 function pintarResumen(mes) {
@@ -377,9 +403,11 @@ async function cargarEmpresasPlanta() {
         const r = await fetch('../api/usuarios.php?action=listar_empresas');
         const d = await r.json();
         if (d.success) {
-            const sel = document.getElementById('plantaEmpresa');
-            sel.innerHTML = '<option value="">Selecciona planta…</option>' +
-                d.data.map(e => `<option value="${e.id}">${sanitize(e.nombre)}</option>`).join('');
+            const opciones = d.data.map(e => `<option value="${e.id}">${sanitize(e.nombre)}</option>`).join('');
+            document.getElementById('plantaEmpresa').innerHTML =
+                '<option value="">Selecciona planta…</option>' + opciones;
+            document.getElementById('filtroEmpresa').innerHTML =
+                '<option value="">🏭 Todas las plantas</option>' + opciones;
         }
     } catch (e) { console.error('Error cargar empresas:', e); }
 }
