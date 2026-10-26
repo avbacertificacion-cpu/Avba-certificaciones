@@ -22,7 +22,10 @@ $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
            (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
 $protocol = $isHttps ? 'https' : 'http';
 $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-$baseURL = $protocol . '://' . $host . '/extintores/public/validar-extintor.html';
+// Dirección corta (ver q.php): lleva a la misma página de validación, pero
+// con 23 letras menos el QR baja de 41×41 a 33×33 cuadritos y se lee mucho
+// más fácil. Conserva el ?qr= para que los lectores del sistema la entiendan.
+$baseURL = $protocol . '://' . $host . '/extintores/q.php';
 
 // Generar array de códigos QR
 $codigos = [];
