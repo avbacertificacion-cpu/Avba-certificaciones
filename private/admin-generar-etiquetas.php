@@ -100,8 +100,8 @@ try {
             </div>
             <div class="form-group">
                 <label>Cantidad de etiquetas</label>
-                <input type="number" id="cantidad" value="160" min="1" max="5000" placeholder="160">
-                <small>Máximo 5000. Se distribuirán automáticamente en el PDF.</small>
+                <input type="number" id="cantidad" value="160" min="1" max="500" placeholder="160">
+                <small>Máximo 500 por tanda (84 hojas de 6). Para más, genera otra tanda empezando donde terminó ésta.</small>
             </div>
         </div>
 
@@ -121,15 +121,28 @@ try {
 const primerQRInput = document.getElementById('primer_qr');
 const cantidadInput = document.getElementById('cantidad');
 
-function actualizarPreview() {
-    let primer = primerQRInput.value.trim().padStart(11, '0').slice(0, 11);
-    const cant = parseInt(cantidadInput.value) || 1;
-    const primerNum = parseInt(primer) || 1;
-    const ultimoNum = primerNum + cant - 1;
+// El largo lo pone el primer código: 11 dígitos para la serie propia, 13 si
+// se arranca con una etiqueta de fábrica. Antes se recortaba a 11 para la
+// vista previa y se rechazaba al generar, así que una serie de 13 dígitos no
+// se podía sacar desde aquí.
+const LARGO_MIN = <?= QR_LARGO_POR_DEFECTO ?>;
+const LARGO_MAX = <?= QR_MAX_DIGITOS ?>;
+const POR_HOJA  = 6;
 
-    document.getElementById('desde').textContent = String(primerNum).padStart(11, '0');
-    document.getElementById('hasta').textContent = String(ultimoNum).padStart(11, '0');
-    document.getElementById('hojas').textContent = Math.ceil(cant / 6);
+function normalizar(texto) {
+    const d = (texto || '').replace(/\D/g, '');
+    const largo = Math.min(LARGO_MAX, Math.max(LARGO_MIN, d.length));
+    return (d || '1').padStart(largo, '0');
+}
+
+function actualizarPreview() {
+    const primer = normalizar(primerQRInput.value.trim());
+    const cant = Math.max(1, parseInt(cantidadInput.value) || 1);
+    const ultimo = String(BigInt(primer) + BigInt(cant - 1)).padStart(primer.length, '0');
+
+    document.getElementById('desde').textContent = primer;
+    document.getElementById('hasta').textContent = ultimo;
+    document.getElementById('hojas').textContent = Math.ceil(cant / POR_HOJA);
 }
 
 primerQRInput.addEventListener('input', actualizarPreview);
@@ -137,22 +150,23 @@ cantidadInput.addEventListener('input', actualizarPreview);
 actualizarPreview();
 
 function generarPDF() {
-    let primer = primerQRInput.value.trim();
+    const crudo = primerQRInput.value.trim();
     const cant = parseInt(cantidadInput.value) || 1;
 
-    if (!/^\d{1,11}$/.test(primer.replace(/^0+/, '') || '0')) {
-        alert('El primer QR debe ser numérico.');
+    if (crudo && !/^\d+$/.test(crudo)) {
+        alert('El primer código debe ser sólo números.');
         return;
     }
-
-    primer = primer.padStart(11, '0');
-
+    if (crudo.replace(/^0+/, '').length > LARGO_MAX) {
+        alert('El primer código no puede tener más de ' + LARGO_MAX + ' dígitos.');
+        return;
+    }
     if (cant < 1 || cant > 500) {
         alert('La cantidad debe estar entre 1 y 500.');
         return;
     }
 
-    // Abrir página de impresión
+    const primer = normalizar(crudo);
     window.open(`../api/etiquetas-qr-pdf.php?primer=${primer}&cantidad=${cant}`, '_blank');
 }
 </script>
