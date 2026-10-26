@@ -2,13 +2,15 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
 
+// Es pública, así que no dice la versión de PHP ni la ruta del archivo en el
+// disco (en el hosting esa ruta incluye el nombre de la cuenta). Lo que sirve
+// para diagnosticar las reglas de reescritura —la dirección pedida, el script
+// que respondió— sigue aquí.
 $diagnostics = [
     'timestamp' => date('Y-m-d H:i:s'),
-    'php_version' => phpversion(),
     'server' => [
         'HTTP_HOST' => $_SERVER['HTTP_HOST'] ?? 'not set',
         'SCRIPT_NAME' => $_SERVER['SCRIPT_NAME'] ?? 'not set',
-        'SCRIPT_FILENAME' => $_SERVER['SCRIPT_FILENAME'] ?? 'not set',
         'REQUEST_URI' => $_SERVER['REQUEST_URI'] ?? 'not set',
         'REQUEST_METHOD' => $_SERVER['REQUEST_METHOD'] ?? 'not set',
         'HTTPS' => $_SERVER['HTTPS'] ?? 'not set',

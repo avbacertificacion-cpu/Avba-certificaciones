@@ -350,7 +350,7 @@ function mostrarExtintor(ext) {
                 </div>
                 <div class="info-item">
                     <div class="label">Tipo</div>
-                    <div class="value">${ext.tipo}</div>
+                    <div class="value">${ext.tipo_nombre || ext.tipo}</div>
                 </div>
                 <div class="info-item">
                     <div class="label">Capacidad</div>
@@ -366,7 +366,7 @@ function mostrarExtintor(ext) {
                 </div>
                 <div class="info-item">
                     <div class="label">Estado</div>
-                    <div class="value">${ext.estado}</div>
+                    <div class="value">${({activo:'Activo', inactivo:'Inactivo', en_prestamo:'En préstamo'})[ext.estado] || ext.estado}</div>
                 </div>
                 <div class="info-item">
                     <div class="label">Código QR</div>

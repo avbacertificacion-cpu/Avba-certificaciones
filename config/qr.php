@@ -70,3 +70,19 @@ function qrAsegurarColumnas(PDO $pdo): void {
         }
     }
 }
+
+/**
+ * Dirección base que llevan los QR impresos.
+ *
+ * Una etiqueta pegada no se puede corregir, así que su dirección no puede
+ * depender de por dónde entró quien la imprimió. Antes se armaba con el
+ * dominio de la petición: abrir el generador desde el dominio temporal del
+ * hosting, desde «www.» o desde una IP dejaba esa tanda apuntando ahí para
+ * siempre, y si el servidor no avisaba que iba por HTTPS salía con http://.
+ *
+ * Si algún día el sistema cambia de dominio, se define QR_URL_BASE en
+ * config/config.php y no hay que tocar el código.
+ */
+function qrDireccionBase(): string {
+    return defined('QR_URL_BASE') ? rtrim((string) QR_URL_BASE, '/') : 'https://gestion.avba.com.mx/extintores';
+}

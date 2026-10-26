@@ -16,16 +16,10 @@ $largo    = min($largo, QR_MAX_DIGITOS);
 $primer   = str_pad($primer, $largo, '0', STR_PAD_LEFT);
 $primerNum = (int)$primer;
 
-// Construir URL pública para QR codes
-// Detectar si es local o producción y construir URL correcta
-$isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ||
-           (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https');
-$protocol = $isHttps ? 'https' : 'http';
-$host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-// Dirección corta (ver q.php): lleva a la misma página de validación, pero
-// con 23 letras menos el QR baja de 41×41 a 33×33 cuadritos y se lee mucho
-// más fácil. Conserva el ?qr= para que los lectores del sistema la entiendan.
-$baseURL = $protocol . '://' . $host . '/extintores/q.php';
+// Dirección que lleva cada QR: la corta (ver q.php), sobre el dominio fijo
+// del sistema (ver qrDireccionBase en config/qr.php). Lleva a la misma página
+// de validación; con 23 letras menos el QR baja de 41×41 a 33×33 cuadritos.
+$baseURL = qrDireccionBase() . '/q.php';
 
 // Generar array de códigos QR
 $codigos = [];

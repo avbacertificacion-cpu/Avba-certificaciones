@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="assets/css/movil.css">
+    <!-- Rutas absolutas: esta página también se sirve en /extintores/?qr=…
+         (regla del .htaccess para etiquetas antiguas), y desde ahí una ruta
+         relativa buscaba los archivos en /extintores/assets/, que no existe. -->
+    <link rel="stylesheet" href="/extintores/public/assets/css/movil.css">
     <title>Validar Extintor - AVBA</title>
-    <script src="assets/js/html5-qrcode.min.js"></script>
+    <script src="/extintores/public/assets/js/html5-qrcode.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
