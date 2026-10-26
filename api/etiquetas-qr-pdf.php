@@ -52,7 +52,7 @@ const COD_ANCHO = 860;
 const COD_CENTRO_Y = 1366;        // entre la barra verde (termina en 1291) y el pie (empieza en 1438)
 const COD_LETRA_MAX = 116;        // con esto los dígitos miden ~84 px, el 58 % de la franja
 
-$porPagina = 6;   // 3 columnas × 2 filas, como en el diseño
+$porPagina = 9;   // 3 columnas × 3 filas: la hoja de siempre
 $paginas   = array_chunk($codigos, $porPagina);
 
 /**
@@ -104,31 +104,42 @@ $h = fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
         .aviso     { width: 100%; background: #fee2e2; color: #991b1b; border-radius: 8px;
                      padding: 10px 14px; font-size: 13px; display: none; }
 
-        /* Hoja: tres columnas por dos filas. Caben en carta y en A4. */
-        .page { width: 21cm; min-height: 27cm; background: #fff; margin: 0 auto 22px;
-                padding: 0.8cm 0; box-shadow: 0 3px 14px rgba(0,0,0,.18); }
-        .etiquetas-grid { display: grid; grid-template-columns: repeat(3, 6.2cm);
-                          column-gap: 0.3cm; row-gap: 0.45cm; justify-content: center; }
+        /* La hoja reproduce la que imprimía el generador original, medida
+           sobre su PDF: 3 × 3 etiquetas de 5.08 × 7.39 cm, con 0.28 cm entre
+           ellas, centradas en un A4 y empezando a 1.26 cm del borde superior.
 
-        /* La etiqueta conserva la proporción de su plantilla, 2:3: así ni el
-           logo ni los íconos se deforman. */
-        .etiqueta { width: 6.2cm; height: 9.3cm; break-inside: avoid; page-break-inside: avoid; }
+           El original declaraba 5.5 × 8 cm, pero su hoja medía 21 cm de
+           ancho más los márgenes, más que el área imprimible del A4, y Chrome
+           la reducía sola al 92.4 % al imprimir. Ése es el tamaño que salió
+           en papel y el que ya se usa en planta, así que aquí se escribe tal
+           cual (5.5, 8 y 0.3 por 0.924) en lugar de depender de que el
+           navegador encoja la página. */
+        .page { width: 21cm; min-height: 29.7cm; background: #fff; margin: 0 auto 22px;
+                padding: 1.262cm 0 0; box-shadow: 0 3px 14px rgba(0,0,0,.18); }
+        .etiquetas-grid { display: grid; grid-template-columns: repeat(3, 5.081cm);
+                          gap: 0.277cm; justify-content: center; }
+        .etiqueta { width: 5.081cm; height: 7.391cm; break-inside: avoid; page-break-inside: avoid; }
         .etiqueta svg { width: 100%; height: 100%; display: block; }
 
-        @page { margin: 8mm; }
+        @page { size: A4 portrait; margin: 8mm; }
         @media print {
             body { background: #fff; }
             .btn-bar { display: none; }
-            .page { width: auto; min-height: 0; margin: 0; padding: 0; box-shadow: none;
+            /* Dentro del margen de 8 mm: lo que falta para llegar a 1.262 cm */
+            .page { width: auto; min-height: 0; margin: 0; padding: 0.462cm 0 0; box-shadow: none;
                     page-break-after: always; break-after: page; }
             .page:last-child { page-break-after: auto; break-after: auto; }
             * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         }
-        @media (max-width: 760px) {
+        /* Sólo en PANTALLA. Al imprimir, Chrome evalúa las media queries con
+           el ancho de la hoja —carta deja 755 px útiles—, y sin «screen» esta
+           regla de teléfono se aplicaba también al PDF: dos columnas de
+           9.5 × 14.3 cm, dos etiquetas por hoja. */
+        @media screen and (max-width: 760px) {
             .page { width: 100%; min-height: 0; padding: 12px 0; }
             .etiquetas-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px;
                               padding: 0 12px; }
-            .etiqueta { width: 100%; height: auto; aspect-ratio: 2 / 3; }
+            .etiqueta { width: 100%; height: auto; aspect-ratio: 5.081 / 7.391; }
             .btn-bar button { flex: 1; min-height: 44px; }
         }
     </style>
@@ -150,7 +161,7 @@ $h = fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
     <div class="etiquetas-grid">
     <?php foreach ($pag as $codigo): $f = letraCodigo($codigo); ?>
         <div class="etiqueta">
-            <svg viewBox="0 0 <?= ANCHO_PL ?> <?= ALTO_PL ?>" xmlns="http://www.w3.org/2000/svg"
+            <svg viewBox="0 0 <?= ANCHO_PL ?> <?= ALTO_PL ?>" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"
                  role="img" aria-label="Etiqueta <?= $h($codigo) ?>">
                 <?php if ($hayPlantilla): ?>
                 <image href="<?= $h($plantillaURL) ?>" x="0" y="0"

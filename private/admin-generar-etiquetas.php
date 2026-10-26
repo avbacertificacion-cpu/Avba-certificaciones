@@ -101,7 +101,7 @@ try {
             <div class="form-group">
                 <label>Cantidad de etiquetas</label>
                 <input type="number" id="cantidad" value="160" min="1" max="500" placeholder="160">
-                <small>Máximo 500 por tanda (84 hojas de 6). Para más, genera otra tanda empezando donde terminó ésta.</small>
+                <small>Máximo 500 por tanda (56 hojas de 9). Para más, genera otra tanda empezando donde terminó ésta.</small>
             </div>
         </div>
 
@@ -127,7 +127,7 @@ const cantidadInput = document.getElementById('cantidad');
 // se podía sacar desde aquí.
 const LARGO_MIN = <?= QR_LARGO_POR_DEFECTO ?>;
 const LARGO_MAX = <?= QR_MAX_DIGITOS ?>;
-const POR_HOJA  = 6;
+const POR_HOJA  = 9;   // 3 × 3, igual que la hoja impresa
 
 function normalizar(texto) {
     const d = (texto || '').replace(/\D/g, '');
