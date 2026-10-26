@@ -399,7 +399,11 @@
             qrScanner = new Html5Qrcode('scanner');
             qrScanner.start(
                 { facingMode: 'environment' },
-                { fps: 10, qrbox: 250 },
+                { fps: 10,
+                  // El lector sólo analiza lo que cae dentro de este recuadro: casi todo el
+                  // visor, para que lea aunque el QR no quede centrado o se acerque mucho.
+                  qrbox: (vw, vh) => ({ width: Math.max(160, Math.floor(vw * 0.92)),
+                                        height: Math.max(160, Math.floor(vh * 0.92)) }) },
                 (decodedText) => {
                     console.log('QR detectado:', decodedText);
 

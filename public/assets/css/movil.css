@@ -163,6 +163,16 @@
        mientras se dibujan; acotarlos evita que ensanchen la página. */
     canvas { max-width: 100% !important; }
 
+    /* La ventana de la cámara, a pantalla completa. El lector decodifica la
+       imagen a la escala con que se ve, así que cada píxel de ancho del visor
+       es resolución para leer el QR: con los márgenes de antes el visor medía
+       311 px en un teléfono de 390; así mide 366. */
+    .scanner-modal { padding: 0 !important; align-items: stretch !important; }
+    .scanner-modal-content {
+        width: 100% !important; max-width: none !important; max-height: 100vh !important;
+        min-height: 100vh; border-radius: 0 !important; padding: 12px !important;
+    }
+
     /* Los formularios ocupan la pantalla: es donde más se escribe */
     /* Varias pantallas traen su propio `max-width` para el teléfono en una
        media query propia, que por orden de cascada gana a esta hoja. Aquí se

@@ -145,7 +145,12 @@ if ($empresa_inspeccion) {
         .scanner-modal-header{font-size:20px;font-weight:700;color:#333;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center}
         .scanner-modal-close{background:none;border:none;font-size:28px;cursor:pointer;color:#999}
         .scanner-modal-close:hover{color:#333}
-        #scanner{width:100%;height:min(400px,60vh);border-radius:8px;overflow:hidden;margin-bottom:16px}
+        /* El visor toma la altura del video. Con una altura fija mayor que la
+           del video, el recuadro guía se dibujaba sobre todo el contenedor y
+           quedaba hasta 84 px más abajo que lo que el lector analiza: quien
+           centraba el QR en la guía lo dejaba al borde de la imagen. */
+        #scanner,#scanner-asignar{width:100%;height:auto;border-radius:8px;overflow:hidden;margin-bottom:16px;background:#111}
+        #scanner:empty,#scanner-asignar:empty{min-height:200px}
         .scanner-modal-buttons{display:flex;gap:12px}
         .scanner-modal-buttons button{flex:1;padding:12px;border:none;border-radius:8px;font-weight:700;cursor:pointer}
     </style>
@@ -248,7 +253,7 @@ if ($empresa_inspeccion) {
                         📱 Escanear QR Impreso
                     </button>
                 </div>
-                <div id="scanner-asignar" style="display:none;width:100%;height:300px;border-radius:8px;overflow:hidden;margin-bottom:16px"></div>
+                <div id="scanner-asignar" style="display:none"></div>
                 <div style="text-align:center;margin:16px 0;color:#999">O</div>
                 <div class="form-group">
                     <label>Ingresa Manual (número de la etiqueta)</label>
@@ -588,8 +593,12 @@ let _qrOrientacion = null;
 
 // Recuadro de escaneo adaptable al tamaño real del video.
 // Evita que el recuadro quede más ancho que el video al girar a vertical.
+// El lector sólo analiza lo que cae dentro de este recuadro. Al 75 % del visor,
+// cuando el inspector acercaba el teléfono el QR se salía de él y ya no se
+// leía; al 90 % cabe aunque se acerque. La nitidez no cambia: depende de lo
+// ancho que se vea el visor, no del tamaño del recuadro.
 function qrboxResponsivo(vw, vh) {
-    const lado = Math.max(160, Math.floor(Math.min(vw, vh) * 0.75));
+    const lado = Math.max(160, Math.floor(Math.min(vw, vh) * 0.9));
     return { width: lado, height: lado };
 }
 

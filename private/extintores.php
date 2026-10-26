@@ -205,7 +205,8 @@ $es_admin = $rol === ROLE_ADMIN;
                     📱 Escanear QR Impreso
                 </button>
             </div>
-            <div id="scanner-asignar-admin" style="display:none;width:100%;height:300px;border-radius:8px;overflow:hidden;margin-bottom:16px"></div>
+            <!-- Altura automática: con 300 px fijos el recuadro guía no coincidía con el video -->
+            <div id="scanner-asignar-admin" style="display:none;width:100%;border-radius:8px;overflow:hidden;margin-bottom:16px;background:#111"></div>
             <div style="text-align:center;margin:16px 0;color:#999">O</div>
             <div class="form-group">
                 <label>Ingresa Manual (número de la etiqueta)</label>
@@ -588,7 +589,11 @@ async function iniciarScannerAsignarAdmin() {
         scannerAsignarAdmin = new Html5Qrcode('scanner-asignar-admin');
         await scannerAsignarAdmin.start(
             { facingMode: 'environment' },
-            { fps: 10, qrbox: 250 },
+            { fps: 10,
+                  // El lector sólo analiza lo que cae dentro de este recuadro: casi todo el
+                  // visor, para que lea aunque el QR no quede centrado o se acerque mucho.
+                  qrbox: (vw, vh) => ({ width: Math.max(160, Math.floor(vw * 0.92)),
+                                        height: Math.max(160, Math.floor(vh * 0.92)) }) },
             (decodedText) => {
                 // Extraer QR: primero intenta extraer de URL con formato ?qr=11dígitos
                 let qr = null;
