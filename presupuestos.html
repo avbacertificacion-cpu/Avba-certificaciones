@@ -1250,10 +1250,24 @@ async function cargarFacturacion(){
   } else { b.innerHTML = ''; }
 
   const opc = o => Object.entries(o).map(([k,v])=>`<option value="${esc(k)}">${esc(k)} · ${esc(v)}</option>`).join('');
-  document.getElementById('mf-forma').innerHTML  = opc(d.formas_pago  || {});
-  document.getElementById('mf-metodo').innerHTML = opc(d.metodos_pago || {});
-  document.getElementById('mf-forma').value = '03';
-  document.getElementById('mf-metodo').value = 'PUE';
+  const forma  = document.getElementById('mf-forma');
+  const metodo = document.getElementById('mf-metodo');
+  forma.innerHTML  = opc(d.formas_pago  || {});
+  metodo.innerHTML = opc(d.metodos_pago || {});
+  forma.value  = '03';
+  metodo.value = 'PUE';
+
+  /* El SAT exige la forma de pago 99 ("Por definir") cuando el pago es en
+     parcialidades, y la rechaza cuando es en una sola exhibición: en PPD el
+     dinero no ha llegado y la forma real se declara después, en el complemento
+     de pago. Las dos combinaciones malas salen con el error CFDI40105, que
+     llega como un código y no dice dónde se arregla. Se amarran los campos para
+     que no se pueda ni elegir una imposible; el servidor lo revisa otra vez. */
+  metodo.onchange = () => {
+    if (metodo.value === 'PPD') forma.value = '99';
+    else if (forma.value === '99') forma.value = '03';
+  };
+  forma.onchange = () => { metodo.value = forma.value === '99' ? 'PPD' : 'PUE'; };
 }
 
 /**

@@ -186,6 +186,7 @@ class Presupuestos {
                   factura_total  DECIMAL(14,2) NULL,
                   factura_estado VARCHAR(15) NULL,
                   factura_cancelada_at DATETIME NULL,
+                  factura_intento_at DATETIME NULL,
                   factura_pdf    VARCHAR(300) NULL,
                   factura_xml    VARCHAR(300) NULL,
                   usuario        VARCHAR(120) NULL,
@@ -288,6 +289,7 @@ class Presupuestos {
             'factura_total  DECIMAL(14,2) NULL',
             'factura_estado VARCHAR(15) NULL',
             'factura_cancelada_at DATETIME NULL',
+            'factura_intento_at DATETIME NULL',
         ] as $col) {
             try {
                 $this->pdo->exec("ALTER TABLE pres_presupuestos ADD COLUMN IF NOT EXISTS $col");
@@ -2263,20 +2265,34 @@ REGLAS DE SALIDA — sin excepción
         if (!isset(TimbradoBase::FORMAS_PAGO[$formaPago]))   $formaPago  = '03';
         if (!isset(TimbradoBase::METODOS_PAGO[$metodoPago])) $metodoPago = 'PUE';
 
+        [$formaPago, $metodoPago, $correccion] = $this->emparejarPago($formaPago, $metodoPago);
+
+        // Apartar el presupuesto antes de llamar al PAC, no después.
+        if (!$this->reservarParaTimbrar($id)) {
+            return ['status' => 'error',
+                'message' => 'Esta factura ya se está timbrando en este momento. '
+                           . 'Espera a que termine y actualiza la pantalla antes de volver a intentarlo.'];
+        }
+
         @set_time_limit(180);
         $f = $api->crearFactura($this->payloadFactura($pre, $formaPago, $metodoPago));
-        if (($f['status'] ?? '') !== 'ok') return $f;
+        if (($f['status'] ?? '') !== 'ok') {
+            // No se timbró nada: se suelta la reserva para que puedan corregir
+            // el dato que falló y reintentar en el momento, sin esperar.
+            $this->liberarReserva($id);
+            return $f;
+        }
 
         $facturaId = (string)$f['id'];
 
         // Si el total del CFDI no coincide con el del presupuesto, algo se
         // torció al repartir descuentos o redondear. Se avisa en vez de dejar
         // pasar en silencio una factura que dice otra cifra que la oferta.
-        $aviso = '';
+        $aviso = $correccion;
         $totalCfdi = (float)($f['total'] ?? 0);
         if ($totalCfdi > 0 && abs($totalCfdi - (float)$pre['total']) > 1.0) {
-            $aviso = 'Atención: la factura quedó en $' . $this->num($totalCfdi)
-                   . ' y el presupuesto decía $' . $this->num((float)$pre['total']) . '. Revísala.';
+            $aviso = trim($aviso . ' Atención: la factura quedó en $' . $this->num($totalCfdi)
+                   . ' y el presupuesto decía $' . $this->num((float)$pre['total']) . '. Revísala.');
             error_log('[Presupuestos] facturar: descuadre ' . $pre['folio'] . " {$totalCfdi} vs {$pre['total']}");
         }
 
@@ -2316,12 +2332,85 @@ REGLAS DE SALIDA — sin excepción
         ];
     }
 
+    /**
+     * El SAT no acepta cualquier combinación de método y forma de pago.
+     *
+     * En parcialidades (PPD) la forma de pago tiene que ser 99, "Por definir":
+     * el dinero todavía no llegó, y la forma real se declara después, en el
+     * complemento de pago. Al revés también se rechaza: un pago en una sola
+     * exhibición no puede decir "por definir". Cualquiera de las dos sale con
+     * el error CFDI40105, que llega como un código y no dice dónde se arregla.
+     *
+     * Se corrige aquí, y se avisa en la respuesta. La alternativa era rechazar
+     * el timbrado y mandar a la persona a adivinar qué combinación sí vale,
+     * cuando sólo hay una posible para lo que ya eligió.
+     *
+     * @return array{0:string,1:string,2:string} forma, método y qué se corrigió
+     */
+    private function emparejarPago(string $forma, string $metodo): array {
+        if ($metodo === 'PPD' && $forma !== '99') {
+            return ['99', 'PPD', 'La forma de pago se puso en 99 (Por definir): '
+                                . 'el SAT lo exige cuando el pago es en parcialidades.'];
+        }
+        if ($metodo !== 'PPD' && $forma === '99') {
+            return ['99', 'PPD', 'El método de pago se puso en PPD (parcialidades): '
+                                . 'el SAT no acepta "Por definir" en un pago de una sola exhibición.'];
+        }
+        return [$forma, $metodo, ''];
+    }
+
+    /**
+     * Aparta el presupuesto antes de llamar al proveedor.
+     *
+     * Entre revisar el estado y guardar el resultado pueden pasar dos minutos:
+     * el timbrado va al PAC y de ahí al SAT. En esa ventana, un segundo intento
+     * —otra pestaña, un reintento después de que el navegador se cansó de
+     * esperar— pasaría la misma revisión y timbraría un segundo CFDI. Serían
+     * dos folios gastados y dos comprobantes ante el SAT para un solo
+     * presupuesto, y el que llegara tarde dejaría al otro huérfano: emitido,
+     * cobrado e invisible desde aquí.
+     *
+     * La reserva caduca a los cinco minutos, para que un proceso que se murió a
+     * la mitad no deje el presupuesto trabado para siempre.
+     */
+    private function reservarParaTimbrar(int $id): bool {
+        try {
+            $st = $this->pdo->prepare(
+                "UPDATE pres_presupuestos
+                    SET factura_intento_at = NOW()
+                  WHERE id = ?
+                    AND estado <> 'FACTURADO'
+                    AND (factura_intento_at IS NULL
+                         OR factura_intento_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE))"
+            );
+            $st->execute([$id]);
+            return $st->rowCount() === 1;
+        } catch (\Throwable $e) {
+            // Si la columna no existe porque la migración no corrió, no se
+            // bloquea la facturación: se pierde el candado, no el servicio.
+            error_log('[Presupuestos] reservarParaTimbrar: ' . $e->getMessage());
+            return true;
+        }
+    }
+
+    /** Suelta la reserva cuando el timbrado no llegó a buen término. */
+    private function liberarReserva(int $id): void {
+        try {
+            $this->pdo->prepare("UPDATE pres_presupuestos SET factura_intento_at = NULL WHERE id = ?")
+                      ->execute([$id]);
+        } catch (\Throwable $e) { /* caduca sola a los cinco minutos */ }
+    }
+
     /** Descarga un archivo del CFDI y lo deja en uploads/facturas/. */
     private function archivarFactura(Timbrado $api, string $facturaId, string $folio, string $tipo): string {
         $r = $api->descargar($facturaId, $tipo);
+        // Un segundo intento: a esta altura la factura ya está timbrada y
+        // cobrada, y el archivo que no se guarde hay que ir a buscarlo a mano
+        // al portal del proveedor. Un tropiezo de red no merece ese trabajo.
+        if (($r['status'] ?? '') !== 'ok') $r = $api->descargar($facturaId, $tipo);
         if (($r['status'] ?? '') !== 'ok') {
             // Que falle la descarga no invalida la factura: ya está timbrada y
-            // se puede bajar después. Se anota y se sigue.
+            // se puede bajar después del portal del proveedor. Se anota y se sigue.
             error_log('[Presupuestos] archivarFactura ' . $tipo . ': ' . ($r['message'] ?? ''));
             return '';
         }
@@ -2349,6 +2438,11 @@ REGLAS DE SALIDA — sin excepción
             fn($a) => filter_var($a, FILTER_VALIDATE_EMAIL)
         ));
         if (!$destinos) return ['status' => 'error', 'message' => 'No hay un correo válido de destino.'];
+
+        // Cada destinatario es una llamada aparte, y cada llamada puede tardar.
+        // Sin esta holgura, PHP corta a la mitad de la lista y nadie sabe a
+        // quién sí le llegó.
+        @set_time_limit(60 + 60 * count($destinos));
 
         // El mensaje lo arma el proveedor: cuando son varios destinatarios
         // puede haber salido a unos y no a otros, y eso hay que decirlo.

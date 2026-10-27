@@ -229,7 +229,10 @@ class Facturama extends TimbradoBase {
         $moneda = strtoupper((string)($factura['moneda'] ?? 'MXN'));
         $cuerpo['Currency'] = $moneda !== '' ? $moneda : 'MXN';
         if ($cuerpo['Currency'] !== 'MXN') {
-            $cuerpo['ExchangeRate'] = (float)($factura['tipo_cambio'] ?? 1);
+            // El campo se llama así y no ExchangeRate, que es el del complemento
+            // de pago. Un nombre que Facturama no conoce no da error: lo ignora,
+            // y la factura en dólares saldría sin tipo de cambio.
+            $cuerpo['CurrencyExchangeRate'] = (float)($factura['tipo_cambio'] ?? 1);
         }
 
         $cond = trim((string)($factura['condiciones'] ?? ''));
