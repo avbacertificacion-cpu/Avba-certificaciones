@@ -2,12 +2,19 @@
 /**
  * AVBA Certificaciones — Timbrado de CFDI 4.0 con Facturapi.
  *
+ * Fue el primer proveedor del sistema. Hoy el que timbra es Facturama, que con
+ * el volumen de AVBA cuesta menos de la mitad, pero esta clase se queda y tiene
+ * que seguir funcionando: una factura sólo se puede cancelar, descargar y
+ * reenviar con quien la timbró, y todas las emitidas hasta el cambio son de
+ * aquí. Cada presupuesto guarda en factura_proveedor con quién se timbró y de
+ * ahí sale a quién se le habla.
+ *
+ * Para volver a timbrar con Facturapi basta poner FACTURA_PROVEEDOR='facturapi'
+ * en config/config.php; no hay nada que cambiar en el código.
+ *
  * Habla con https://www.facturapi.io/v2 por cURL directo. El SDK oficial de
  * PHP existe, pero exige Composer y Guzzle, y el despliegue de este proyecto
- * sube archivos por SCP sin correr `composer install` en el servidor: una
- * dependencia nueva llegaría al repositorio y no a Hostinger, y el módulo
- * fallaría en producción sin fallar aquí. Se sigue el mismo camino que
- * VerificacionIA y ClaudeIA.
+ * sube archivos por SCP sin correr `composer install` en el servidor.
  *
  * Autenticación: Basic con la llave como usuario y contraseña vacía
  * —Authorization: Basic base64("sk_...:")—, tal como lo arma el SDK oficial.
@@ -16,32 +23,14 @@
  * .gitignore y el workflow la borra antes de subir, así que nunca viaja.
  */
 
-class Facturapi {
+class Facturapi extends TimbradoBase {
 
     private const BASE = 'https://www.facturapi.io/v2';
 
-    /** Motivos de cancelación del SAT. */
-    public const MOTIVOS = [
-        '01' => 'Comprobante emitido con errores, con relación',
-        '02' => 'Comprobante emitido con errores, sin relación',
-        '03' => 'No se llevó a cabo la operación',
-        '04' => 'Operación nominativa relacionada en una factura global',
-    ];
-
-    /** Formas de pago más usadas. El catálogo del SAT es más largo. */
-    public const FORMAS_PAGO = [
-        '01' => 'Efectivo',
-        '02' => 'Cheque nominativo',
-        '03' => 'Transferencia electrónica de fondos',
-        '04' => 'Tarjeta de crédito',
-        '28' => 'Tarjeta de débito',
-        '99' => 'Por definir',
-    ];
-
-    public const METODOS_PAGO = [
-        'PUE' => 'Pago en una sola exhibición',
-        'PPD' => 'Pago en parcialidades o diferido',
-    ];
+    public function nombre(): string      { return 'facturapi'; }
+    protected function etiqueta(): string { return 'Facturapi'; }
+    protected function queFalta(): string { return 'FACTURAPI_KEY'; }
+    protected function base(): string     { return self::BASE; }
 
     public function disponible(): bool {
         return $this->llave() !== '';
@@ -49,6 +38,10 @@ class Facturapi {
 
     private function llave(): string {
         return defined('FACTURAPI_KEY') ? trim((string)FACTURAPI_KEY) : '';
+    }
+
+    protected function autorizacion(): string {
+        return 'Basic ' . base64_encode($this->llave() . ':');
     }
 
     /**
@@ -63,17 +56,97 @@ class Facturapi {
         return str_starts_with($this->llave(), 'sk_test') ? 'pruebas' : 'produccion';
     }
 
-    public function esPruebas(): bool {
-        return $this->modo() === 'pruebas';
-    }
-
     // ══════════════════════════════════════════════════════════
     //  OPERACIONES
     // ══════════════════════════════════════════════════════════
 
     /** POST /invoices — crea y timbra el CFDI. */
-    public function crearFactura(array $payload): array {
-        return $this->llamar('POST', '/invoices', $payload);
+    public function crearFactura(array $factura): array {
+        $cuerpo = $this->cuerpoCfdi($factura);
+        if (isset($cuerpo['status'])) return $cuerpo;
+
+        $r = $this->llamar('POST', '/invoices', $cuerpo);
+        if (($r['status'] ?? '') !== 'ok') return $r;
+
+        $f  = $r['datos'];
+        $id = (string)($f['id'] ?? '');
+        if ($id === '') {
+            error_log('[Facturapi] crearFactura: respuesta sin id — ' . json_encode($f));
+            return ['status' => 'error',
+                'message' => 'Facturapi no devolvió el identificador de la factura.'];
+        }
+
+        return [
+            'status' => 'ok',
+            'id'     => $id,
+            'uuid'   => (string)($f['uuid'] ?? ''),
+            'serie'  => trim(((string)($f['series'] ?? '')) . ' ' . ((string)($f['folio_number'] ?? ''))),
+            'total'  => (float)($f['total'] ?? 0),
+            'estado' => strtolower((string)($f['status'] ?? 'valid')),
+        ];
+    }
+
+    /**
+     * Traduce la factura de AVBA al cuerpo que espera Facturapi.
+     *
+     * Aquí sólo se manda el precio unitario y la tasa: Facturapi calcula el
+     * importe y el impuesto de cada partida. Por eso no se le pasan las cifras
+     * ya resueltas que sí necesita Facturama.
+     */
+    private function cuerpoCfdi(array $factura): array {
+        $cli = $factura['cliente'] ?? [];
+        $partidas = $factura['partidas'] ?? [];
+        if (!$partidas) {
+            return ['status' => 'error', 'message' => 'La factura no tiene partidas.'];
+        }
+
+        $items = [];
+        foreach ($partidas as $d) {
+            $tasa = (float)($d['tasa_iva'] ?? 0);
+            // Tasa 0 se manda sin impuestos: el CFDI lo toma como no objeto de
+            // impuesto. Los servicios de AVBA van todos al 16%.
+            $impuestos = $tasa > 0
+                ? [['type' => 'IVA', 'rate' => round($tasa / 100, 6), 'factor' => 'Tasa', 'withholding' => false]]
+                : [];
+
+            $items[] = [
+                'quantity' => (float)($d['cantidad'] ?? 0),
+                'discount' => max(0, round((float)($d['descuento'] ?? 0), 2)),
+                'product'  => [
+                    'description'  => mb_substr((string)($d['descripcion'] ?? ''), 0, 1000),
+                    'product_key'  => (string)($d['clave_prodserv'] ?? ''),
+                    'unit_key'     => (string)($d['clave_unidad'] ?? ''),
+                    'unit_name'    => (string)($d['unidad'] ?? ''),
+                    'price'        => (float)($d['precio_unitario'] ?? 0),
+                    'tax_included' => false,
+                    'taxes'        => $impuestos,
+                ],
+            ];
+        }
+
+        $cuerpo = [
+            'customer' => [
+                'legal_name' => (string)($cli['razon_social'] ?? ''),
+                'tax_id'     => strtoupper(trim((string)($cli['rfc'] ?? ''))),
+                'tax_system' => (string)($cli['regimen_fiscal'] ?? ''),
+                'address'    => ['zip' => (string)($cli['cp_fiscal'] ?? ''), 'country' => 'MEX'],
+            ],
+            'items'          => $items,
+            'use'            => (string)(($cli['uso_cfdi'] ?? '') ?: 'G03'),
+            'payment_form'   => (string)($factura['forma_pago'] ?? '03'),
+            'payment_method' => (string)($factura['metodo_pago'] ?? 'PUE'),
+            // Deja el folio del presupuesto escrito en el CFDI: al conciliar
+            // meses después, la factura dice sola de dónde vino.
+            'external_id'    => (string)($factura['referencia'] ?? ''),
+            'conditions'     => mb_substr(trim((string)($factura['condiciones'] ?? '')), 0, 1000),
+        ];
+
+        $moneda = strtoupper((string)($factura['moneda'] ?? 'MXN'));
+        if ($moneda !== '' && $moneda !== 'MXN') {
+            $cuerpo['currency'] = $moneda;
+            $cuerpo['exchange'] = (float)($factura['tipo_cambio'] ?? 1);
+        }
+        return $cuerpo;
     }
 
     /** GET /invoices/{id} */
@@ -83,15 +156,8 @@ class Facturapi {
 
     /** DELETE /invoices/{id}?motive=…&substitution=… */
     public function cancelar(string $id, string $motivo, string $sustitucion = ''): array {
-        if (!isset(self::MOTIVOS[$motivo])) {
-            return ['status' => 'error', 'message' => 'Motivo de cancelación no reconocido.'];
-        }
-        // El motivo 01 sustituye una factura por otra, así que el SAT exige
-        // el UUID de la que la reemplaza. Sin él la cancelación se rechaza.
-        if ($motivo === '01' && trim($sustitucion) === '') {
-            return ['status' => 'error',
-                'message' => 'El motivo 01 exige el UUID de la factura que sustituye a ésta.'];
-        }
+        if ($mal = $this->motivoInvalido($motivo, $sustitucion)) return $mal;
+
         $q = ['motive' => $motivo];
         if (trim($sustitucion) !== '') $q['substitution'] = trim($sustitucion);
         return $this->llamar('DELETE', '/invoices/' . rawurlencode($id) . '?' . http_build_query($q));
@@ -99,19 +165,25 @@ class Facturapi {
 
     /** POST /invoices/{id}/email — lo manda Facturapi, con XML y PDF adjuntos. */
     public function enviarPorCorreo(string $id, array $correos): array {
-        return $this->llamar('POST', '/invoices/' . rawurlencode($id) . '/email',
-            ['email' => array_values($correos)]);
+        $correos = array_values(array_filter(array_map('trim', $correos),
+            fn($c) => filter_var($c, FILTER_VALIDATE_EMAIL)));
+        if (!$correos) return ['status' => 'error', 'message' => 'No hay un correo válido de destino.'];
+
+        $r = $this->llamar('POST', '/invoices/' . rawurlencode($id) . '/email', ['email' => $correos]);
+        if (($r['status'] ?? '') !== 'ok') return $r;
+        return ['status' => 'ok', 'enviados' => $correos,
+            'message' => 'Factura enviada a ' . implode(', ', $correos) . '.'];
     }
 
     /**
-     * Descarga el PDF o el XML. Devuelve bytes, no JSON.
+     * Descarga el PDF o el XML. Facturapi los entrega como archivo, no en JSON.
      * @param string $tipo 'pdf' | 'xml' | 'zip'
      */
     public function descargar(string $id, string $tipo): array {
         if (!in_array($tipo, ['pdf', 'xml', 'zip'], true)) {
             return ['status' => 'error', 'message' => 'Tipo de archivo no válido.'];
         }
-        $r = $this->peticion('GET', '/invoices/' . rawurlencode($id) . '/' . $tipo, null, true);
+        $r = $this->peticion('GET', '/invoices/' . rawurlencode($id) . '/' . $tipo, null, '*/*');
         if (($r['status'] ?? '') !== 'ok') return $r;
         if (($r['bytes'] ?? '') === '') {
             return ['status' => 'error', 'message' => 'Facturapi devolvió un archivo vacío.'];
@@ -134,10 +206,9 @@ class Facturapi {
     }
 
     private function buscarCatalogo(string $ruta, string $q): array {
-        $q = trim($q);
-        if (mb_strlen($q) < 3) {
-            return ['status' => 'error', 'message' => 'Escribe al menos tres letras para buscar.'];
-        }
+        $q = $this->textoBuscable($q);
+        if ($q === '') return $this->faltanLetras();
+
         $r = $this->llamar('GET', $ruta . '?' . http_build_query(['q' => $q, 'limit' => 25]));
         if (($r['status'] ?? '') !== 'ok') return $r;
         return ['status' => 'ok', 'resultados' => $this->normalizarCatalogo($r['datos'])];
@@ -168,72 +239,12 @@ class Facturapi {
     }
 
     // ══════════════════════════════════════════════════════════
-    //  TRANSPORTE
+    //  ERRORES
     // ══════════════════════════════════════════════════════════
 
-    /** Envoltura que espera JSON de vuelta. */
-    private function llamar(string $metodo, string $ruta, ?array $cuerpo = null): array {
-        $r = $this->peticion($metodo, $ruta, $cuerpo, false);
-        if (($r['status'] ?? '') !== 'ok') return $r;
-        $j = json_decode((string)$r['bytes'], true);
-        if (!is_array($j)) {
-            error_log('[Facturapi] respuesta no-JSON: ' . substr((string)$r['bytes'], 0, 400));
-            return ['status' => 'error', 'message' => 'Facturapi respondió algo inesperado.'];
-        }
-        return ['status' => 'ok', 'datos' => $j];
-    }
-
-    private function peticion(string $metodo, string $ruta, ?array $cuerpo, bool $binario): array {
-        if (!$this->disponible()) {
-            return ['status' => 'error',
-                'message' => 'La facturación no está configurada en el servidor (falta FACTURAPI_KEY).'];
-        }
-        if (!function_exists('curl_init')) {
-            return ['status' => 'error', 'message' => 'El servidor no tiene cURL disponible.'];
-        }
-
-        $cabeceras = [
-            'Authorization: Basic ' . base64_encode($this->llave() . ':'),
-            'Accept: ' . ($binario ? '*/*' : 'application/json'),
-            'User-Agent: avba-certificaciones',
-        ];
-
-        $ch = curl_init(self::BASE . $ruta);
-        $opts = [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_CUSTOMREQUEST  => $metodo,
-            CURLOPT_HTTPHEADER     => $cabeceras,
-            CURLOPT_CONNECTTIMEOUT => 15,
-            // El timbrado pasa por el PAC y por el SAT; 120 s es holgado pero
-            // no eterno. Cortar antes deja la duda de si la factura se emitió.
-            CURLOPT_TIMEOUT        => 120,
-        ];
-        if ($cuerpo !== null) {
-            $opts[CURLOPT_POSTFIELDS] = json_encode($cuerpo, JSON_UNESCAPED_UNICODE);
-            $cabeceras[] = 'Content-Type: application/json';
-            $opts[CURLOPT_HTTPHEADER] = $cabeceras;
-        }
-        curl_setopt_array($ch, $opts);
-
-        $resp = curl_exec($ch);
-        $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $cerr = curl_error($ch);
-        curl_close($ch);
-
-        if ($resp === false) {
-            error_log('[Facturapi] cURL ' . $metodo . ' ' . $ruta . ': ' . $cerr);
-            return ['status' => 'error',
-                'message' => 'No se pudo contactar a Facturapi. Revisa la conexión del servidor.'];
-        }
-
-        if ($code < 200 || $code >= 300) {
-            $j = json_decode((string)$resp, true);
-            $det = is_array($j) ? trim((string)($j['message'] ?? '')) : '';
-            error_log('[Facturapi] HTTP ' . $code . ' ' . $ruta . ': ' . substr((string)$resp, 0, 500));
-            return ['status' => 'error', 'message' => $this->mensajeDeError($code, $det), 'http' => $code];
-        }
-
-        return ['status' => 'ok', 'bytes' => (string)$resp];
+    protected function detalleDeError(string $cuerpo): string {
+        $j = json_decode($cuerpo, true);
+        return is_array($j) ? mb_substr(trim((string)($j['message'] ?? '')), 0, 600) : '';
     }
 
     /**
@@ -243,7 +254,7 @@ class Facturapi {
      * exactamente qué campo del CFDI está mal, y esconderlo obligaría a leer
      * los registros del servidor para algo que el usuario puede corregir solo.
      */
-    private function mensajeDeError(int $code, string $detalle): string {
+    protected function mensajeDeError(int $code, string $detalle): string {
         switch ($code) {
             case 400:
             case 422:

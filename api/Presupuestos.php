@@ -178,6 +178,7 @@ class Presupuestos {
                   forma_pago     VARCHAR(3) NOT NULL DEFAULT '03',
                   metodo_pago    VARCHAR(3) NOT NULL DEFAULT 'PUE',
                   factura_id     VARCHAR(40) NULL,
+                  factura_proveedor VARCHAR(12) NULL,
                   factura_uuid   VARCHAR(50) NULL,
                   factura_serie  VARCHAR(25) NULL,
                   factura_fecha  DATETIME NULL,
@@ -280,6 +281,7 @@ class Presupuestos {
             "forma_pago     VARCHAR(3) NOT NULL DEFAULT '03'",
             "metodo_pago    VARCHAR(3) NOT NULL DEFAULT 'PUE'",
             'factura_id     VARCHAR(40) NULL',
+            'factura_proveedor VARCHAR(12) NULL',
             'factura_serie  VARCHAR(25) NULL',
             'factura_fecha  DATETIME NULL',
             'factura_modo   VARCHAR(12) NULL',
@@ -2114,13 +2116,13 @@ REGLAS DE SALIDA — sin excepción
     }
 
     // ══════════════════════════════════════════════════════════
-    //  FACTURACIÓN (CFDI 4.0 vía Facturapi)
+    //  FACTURACIÓN (CFDI 4.0; el proveedor se elige en config/config.php)
     // ══════════════════════════════════════════════════════════
 
     /**
      * Revisa que el presupuesto pueda convertirse en CFDI, ANTES de llamar al PAC.
      *
-     * Se hace aquí y no allá por una razón práctica: Facturapi cobra el timbre
+     * Se hace aquí y no allá por una razón práctica: el proveedor cobra el timbre
      * y el SAT registra el intento. Un rechazo por un dato que teníamos a la
      * vista —un RFC vacío, una partida sin clave del SAT— es un error que se
      * puede señalar en la pantalla, con el nombre del campo, en vez de
@@ -2158,7 +2160,11 @@ REGLAS DE SALIDA — sin excepción
     }
 
     /**
-     * Arma el cuerpo del CFDI a partir del presupuesto.
+     * Arma la factura a partir del presupuesto, en el idioma de AVBA.
+     *
+     * Lo que sale de aquí no es el cuerpo de ningún proveedor: es la estructura
+     * que describe la interfaz Timbrado, y cada proveedor la traduce a lo suyo.
+     * Así esta clase no cambia si mañana se timbra con otro.
      *
      * El descuento global del presupuesto se reparte entre las partidas, porque
      * el CFDI no tiene un descuento a nivel comprobante: sólo por concepto. El
@@ -2176,7 +2182,7 @@ REGLAS DE SALIDA — sin excepción
         $repartido  = 0.0;
         $ultimo     = count($pre['partidas']) - 1;
 
-        $items = [];
+        $partidas = [];
         foreach ($pre['partidas'] as $i => $d) {
             $cant   = (float)$d['cantidad'];
             $precio = (float)$d['precio_unitario'];
@@ -2193,50 +2199,38 @@ REGLAS DE SALIDA — sin excepción
                 $descLinea = round($descLinea + $parte, 2);
             }
 
-            $tasa = (float)$d['tasa_iva'];
-            // Tasa 0 se manda sin impuestos: el CFDI lo toma como exento. Los
-            // servicios de AVBA van todos al 16%, así que esto es la excepción.
-            $impuestos = $tasa > 0
-                ? [['type' => 'IVA', 'rate' => round($tasa / 100, 6), 'factor' => 'Tasa', 'withholding' => false]]
-                : [];
-
-            $items[] = [
-                'quantity' => $cant,
-                'discount' => max(0, $descLinea),
-                'product'  => [
-                    'description'  => mb_substr((string)$d['descripcion'], 0, 1000),
-                    'product_key'  => (string)$d['clave_prodserv'],
-                    'unit_key'     => (string)$d['clave_unidad'],
-                    'unit_name'    => (string)$d['unidad'],
-                    'price'        => $precio,
-                    'tax_included' => false,
-                    'taxes'        => $impuestos,
-                ],
+            $partidas[] = [
+                'clave_prodserv'  => (string)$d['clave_prodserv'],
+                'clave_unidad'    => (string)$d['clave_unidad'],
+                'unidad'          => (string)$d['unidad'],
+                'descripcion'     => mb_substr((string)$d['descripcion'], 0, 1000),
+                'clave_interna'   => (string)($d['clave'] ?? ''),
+                'cantidad'        => $cant,
+                'precio_unitario' => $precio,
+                'importe_bruto'   => $bruto,
+                'descuento'       => max(0, $descLinea),
+                'tasa_iva'        => (float)$d['tasa_iva'],
             ];
         }
 
-        $cuerpo = [
-            'customer' => [
-                'legal_name' => (string)$cli['razon_social'],
-                'tax_id'     => strtoupper((string)$cli['rfc']),
-                'tax_system' => (string)$cli['regimen_fiscal'],
-                'address'    => ['zip' => (string)$cli['cp_fiscal'], 'country' => 'MEX'],
+        return [
+            'cliente' => [
+                'razon_social'   => (string)$cli['razon_social'],
+                'rfc'            => strtoupper((string)$cli['rfc']),
+                'regimen_fiscal' => (string)$cli['regimen_fiscal'],
+                'cp_fiscal'      => (string)$cli['cp_fiscal'],
+                'uso_cfdi'       => (string)($cli['uso_cfdi'] ?: 'G03'),
             ],
-            'items'          => $items,
-            'use'            => (string)($cli['uso_cfdi'] ?: 'G03'),
-            'payment_form'   => $formaPago,
-            'payment_method' => $metodoPago,
-            // Deja el folio del presupuesto escrito en el CFDI: al conciliar
-            // meses después, la factura dice sola de dónde vino.
-            'external_id'    => (string)$pre['folio'],
-            'conditions'     => mb_substr(trim((string)($pre['condiciones'] ?? '')), 0, 1000),
+            'forma_pago'  => $formaPago,
+            'metodo_pago' => $metodoPago,
+            'moneda'      => strtoupper((string)$pre['moneda']),
+            'tipo_cambio' => (float)$pre['tipo_cambio'],
+            'condiciones' => trim((string)($pre['condiciones'] ?? '')),
+            // El folio del presupuesto viaja en el CFDI: al conciliar meses
+            // después, la factura dice sola de dónde vino.
+            'referencia'  => (string)$pre['folio'],
+            'partidas'    => $partidas,
         ];
-
-        if (strtoupper((string)$pre['moneda']) !== 'MXN') {
-            $cuerpo['currency'] = strtoupper((string)$pre['moneda']);
-            $cuerpo['exchange'] = (float)$pre['tipo_cambio'];
-        }
-        return $cuerpo;
     }
 
     /**
@@ -2244,7 +2238,7 @@ REGLAS DE SALIDA — sin excepción
      *
      * El XML se descarga y se archiva en el servidor a propósito: es el
      * documento fiscal, el que vale ante el SAT, y no debe depender de que la
-     * cuenta de Facturapi siga viva dentro de cinco años.
+     * cuenta del proveedor siga viva dentro de cinco años.
      */
     public function facturar(int $id, array $opciones, string $usuario): array {
         $d = $this->detalle($id);
@@ -2256,27 +2250,24 @@ REGLAS DE SALIDA — sin excepción
             return ['status' => 'error', 'message' => 'Falta información para facturar.', 'problemas' => $problemas];
         }
 
-        $api = new Facturapi();
+        // Se timbra con el proveedor configurado hoy. Las facturas ya emitidas
+        // se quedan con el suyo: eso lo resuelve timbradorDe().
+        $api = TimbradoBase::elegir();
         if (!$api->disponible()) {
             return ['status' => 'error',
-                'message' => 'La facturación no está configurada en el servidor (falta FACTURAPI_KEY en config/config.php).'];
+                'message' => 'La facturación no está configurada en el servidor. Revisa config/config.php.'];
         }
 
         $formaPago  = (string)($opciones['forma_pago'] ?? $pre['forma_pago'] ?? '03');
         $metodoPago = strtoupper((string)($opciones['metodo_pago'] ?? $pre['metodo_pago'] ?? 'PUE'));
-        if (!isset(Facturapi::FORMAS_PAGO[$formaPago]))   $formaPago  = '03';
-        if (!isset(Facturapi::METODOS_PAGO[$metodoPago])) $metodoPago = 'PUE';
+        if (!isset(TimbradoBase::FORMAS_PAGO[$formaPago]))   $formaPago  = '03';
+        if (!isset(TimbradoBase::METODOS_PAGO[$metodoPago])) $metodoPago = 'PUE';
 
         @set_time_limit(180);
-        $r = $api->crearFactura($this->payloadFactura($pre, $formaPago, $metodoPago));
-        if (($r['status'] ?? '') !== 'ok') return $r;
+        $f = $api->crearFactura($this->payloadFactura($pre, $formaPago, $metodoPago));
+        if (($f['status'] ?? '') !== 'ok') return $f;
 
-        $f = $r['datos'];
-        $facturaId = (string)($f['id'] ?? '');
-        if ($facturaId === '') {
-            error_log('[Presupuestos] facturar: respuesta sin id — ' . json_encode($f));
-            return ['status' => 'error', 'message' => 'Facturapi no devolvió el identificador de la factura.'];
-        }
+        $facturaId = (string)$f['id'];
 
         // Si el total del CFDI no coincide con el del presupuesto, algo se
         // torció al repartir descuentos o redondear. Se avisa en vez de dejar
@@ -2292,23 +2283,22 @@ REGLAS DE SALIDA — sin excepción
         $pdfRel = $this->archivarFactura($api, $facturaId, (string)$pre['folio'], 'pdf');
         $xmlRel = $this->archivarFactura($api, $facturaId, (string)$pre['folio'], 'xml');
 
-        $serie = trim(((string)($f['series'] ?? '')) . ' ' . ((string)($f['folio_number'] ?? '')));
-
         $this->pdo->prepare(
             "UPDATE pres_presupuestos SET
                 estado = 'FACTURADO', forma_pago = ?, metodo_pago = ?,
-                factura_id = ?, factura_uuid = ?, factura_serie = ?, factura_fecha = ?,
-                factura_modo = ?, factura_total = ?, factura_estado = ?,
+                factura_id = ?, factura_proveedor = ?, factura_uuid = ?, factura_serie = ?,
+                factura_fecha = ?, factura_modo = ?, factura_total = ?, factura_estado = ?,
                 factura_pdf = ?, factura_xml = ?
               WHERE id = ?"
         )->execute([
-            $formaPago, $metodoPago, $facturaId, (string)($f['uuid'] ?? ''), $serie,
-            date('Y-m-d H:i:s'), $api->modo(), $totalCfdi, (string)($f['status'] ?? 'valid'),
-            $pdfRel, $xmlRel, $id,
+            $formaPago, $metodoPago, $facturaId, $api->nombre(), (string)$f['uuid'],
+            (string)$f['serie'], date('Y-m-d H:i:s'), $api->modo(), $totalCfdi,
+            (string)$f['estado'], $pdfRel, $xmlRel, $id,
         ]);
 
         error_log('[Presupuestos] ' . $usuario . ' facturó ' . $pre['folio']
-                . ' → UUID ' . ($f['uuid'] ?? '?') . ' (' . $api->modo() . ')');
+                . ' → UUID ' . ($f['uuid'] !== '' ? $f['uuid'] : '?')
+                . ' (' . $api->nombre() . ', ' . $api->modo() . ')');
 
         $msg = $api->esPruebas()
             ? 'Factura de PRUEBA generada: no tiene validez ante el SAT.'
@@ -2316,7 +2306,7 @@ REGLAS DE SALIDA — sin excepción
 
         return [
             'status'  => 'ok',
-            'uuid'    => (string)($f['uuid'] ?? ''),
+            'uuid'    => (string)$f['uuid'],
             'modo'    => $api->modo(),
             'total'   => $totalCfdi,
             'pdf'     => $pdfRel !== '' ? $this->urlAbs($pdfRel) : '',
@@ -2327,7 +2317,7 @@ REGLAS DE SALIDA — sin excepción
     }
 
     /** Descarga un archivo del CFDI y lo deja en uploads/facturas/. */
-    private function archivarFactura(Facturapi $api, string $facturaId, string $folio, string $tipo): string {
+    private function archivarFactura(Timbrado $api, string $facturaId, string $folio, string $tipo): string {
         $r = $api->descargar($facturaId, $tipo);
         if (($r['status'] ?? '') !== 'ok') {
             // Que falle la descarga no invalida la factura: ya está timbrada y
@@ -2345,7 +2335,7 @@ REGLAS DE SALIDA — sin excepción
         return 'uploads/facturas/' . $nombre;
     }
 
-    /** Manda el CFDI al cliente desde Facturapi, con XML y PDF adjuntos. */
+    /** Manda el CFDI al cliente desde el proveedor, con XML y PDF adjuntos. */
     public function enviarFactura(int $id, string $correo): array {
         $d = $this->detalle($id);
         if (($d['status'] ?? '') !== 'ok') return $d;
@@ -2360,9 +2350,9 @@ REGLAS DE SALIDA — sin excepción
         ));
         if (!$destinos) return ['status' => 'error', 'message' => 'No hay un correo válido de destino.'];
 
-        $r = (new Facturapi())->enviarPorCorreo((string)$pre['factura_id'], $destinos);
-        if (($r['status'] ?? '') !== 'ok') return $r;
-        return ['status' => 'ok', 'message' => 'Factura enviada a ' . implode(', ', $destinos) . '.'];
+        // El mensaje lo arma el proveedor: cuando son varios destinatarios
+        // puede haber salido a unos y no a otros, y eso hay que decirlo.
+        return $this->timbradorDe($pre)->enviarPorCorreo((string)$pre['factura_id'], $destinos);
     }
 
     /**
@@ -2384,7 +2374,7 @@ REGLAS DE SALIDA — sin excepción
             return ['status' => 'error', 'message' => 'Esa factura ya está cancelada.'];
         }
 
-        $r = (new Facturapi())->cancelar($facturaId, trim($motivo), trim($sustitucion));
+        $r = $this->timbradorDe($pre)->cancelar($facturaId, trim($motivo), trim($sustitucion));
         if (($r['status'] ?? '') !== 'ok') return $r;
 
         $this->pdo->prepare(
@@ -2397,21 +2387,35 @@ REGLAS DE SALIDA — sin excepción
         return ['status' => 'ok', 'message' => 'Factura cancelada ante el SAT.'];
     }
 
+    /**
+     * El proveedor con el que se timbró esta factura, no el de hoy.
+     *
+     * Importa al cancelar, al reenviar y al descargar: una factura sólo existe
+     * para quien la emitió. Las que se timbraron antes de que existiera la
+     * columna son todas de Facturapi, que era el único proveedor entonces, y
+     * por eso ése es el valor que se supone cuando el dato viene vacío.
+     */
+    private function timbradorDe(array $pre): Timbrado {
+        $quien = trim((string)($pre['factura_proveedor'] ?? ''));
+        return TimbradoBase::elegir($quien !== '' ? $quien : 'facturapi');
+    }
+
     /** Catálogos y estado del servicio, para que la pantalla sepa qué ofrecer. */
     public function facturacionInfo(): array {
-        $api = new Facturapi();
+        $api = TimbradoBase::elegir();
         return [
             'status'        => 'ok',
             'disponible'    => $api->disponible(),
+            'proveedor'     => $api->nombre(),
             'modo'          => $api->disponible() ? $api->modo() : '',
-            'formas_pago'   => Facturapi::FORMAS_PAGO,
-            'metodos_pago'  => Facturapi::METODOS_PAGO,
-            'motivos'       => Facturapi::MOTIVOS,
+            'formas_pago'   => TimbradoBase::FORMAS_PAGO,
+            'metodos_pago'  => TimbradoBase::METODOS_PAGO,
+            'motivos'       => TimbradoBase::MOTIVOS,
         ];
     }
 
     /**
-     * Busca en los catálogos del SAT a través de Facturapi.
+     * Busca en los catálogos del SAT a través del proveedor de timbrado.
      *
      * Vive aquí y no en la clase de facturación porque la pantalla que lo usa
      * es la del catálogo de servicios: se buscan las claves al dar de alta el
@@ -2420,10 +2424,11 @@ REGLAS DE SALIDA — sin excepción
      * @param string $tipo 'prodserv' | 'unidad'
      */
     public function buscarCatalogoSat(string $tipo, string $q): array {
-        $api = new Facturapi();
+        $api = TimbradoBase::elegir();
         if (!$api->disponible()) {
             return ['status' => 'error',
-                'message' => 'El buscador de claves del SAT necesita FACTURAPI_KEY. Puedes escribir la clave a mano.'];
+                'message' => 'El buscador de claves del SAT necesita que la facturación esté '
+                           . 'configurada en el servidor. Puedes escribir la clave a mano.'];
         }
         return $tipo === 'unidad' ? $api->buscarUnidades($q) : $api->buscarProductos($q);
     }

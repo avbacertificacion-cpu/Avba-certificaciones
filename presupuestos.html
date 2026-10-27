@@ -1221,6 +1221,21 @@ async function borrarPres(id){
 }
 
 // ══════════ FACTURACIÓN ══════════
+
+// Quién timbra se decide en config/config.php, así que los avisos de "falta
+// configurar" y "cómo salir de pruebas" cambian según el proveedor. Si llega
+// uno que esta pantalla no conoce, se habla en general en vez de mentir.
+function queFalta(proveedor){
+  if (proveedor === 'facturama') return 'FACTURAMA_USER y FACTURAMA_PASS';
+  if (proveedor === 'facturapi') return 'FACTURAPI_KEY';
+  return 'la facturación';
+}
+function aProduccion(proveedor){
+  if (proveedor === 'facturama') return 'FACTURAMA_MODO a "produccion" con la cuenta de producción';
+  if (proveedor === 'facturapi') return 'la llave a la de producción (sk_live_…)';
+  return 'a la configuración de producción';
+}
+
 async function cargarFacturacion(){
   const d = await get('PRES_FACTURACION_INFO');
   if (d.status !== 'ok') return;
@@ -1228,11 +1243,12 @@ async function cargarFacturacion(){
   const b = document.getElementById('banner-modo');
   if (!d.disponible) {
     b.innerHTML = `<div class="aviso">La facturación no está configurada en el servidor. Todo lo demás funciona;
-      sólo el botón de facturar queda apagado hasta que se agregue <strong>FACTURAPI_KEY</strong> a config/config.php.</div>`;
+      sólo el botón de facturar queda apagado hasta que se agregue <strong>${esc(queFalta(d.proveedor))}</strong>
+      a config/config.php.</div>`;
   } else if (d.modo === 'pruebas') {
     b.innerHTML = `<div class="aviso"><strong>Modo de pruebas.</strong> Las facturas se generan pero
       <strong>no se timbran ante el SAT</strong> y no tienen validez fiscal. Sirven para revisar el flujo completo.
-      Al cambiar la llave por la de producción (<code>sk_live_…</code>), este aviso desaparece.</div>`;
+      Al pasar ${esc(aProduccion(d.proveedor))}, este aviso desaparece.</div>`;
   } else { b.innerHTML = ''; }
 
   const opc = o => Object.entries(o).map(([k,v])=>`<option value="${esc(k)}">${esc(k)} · ${esc(v)}</option>`).join('');
@@ -1258,7 +1274,7 @@ async function abrirFacturar(id){
 
   if (!_fact.disponible) {
     document.getElementById('mf-problemas').innerHTML =
-      `<div class="aviso">Falta configurar <strong>FACTURAPI_KEY</strong> en el servidor.</div>`;
+      `<div class="aviso">Falta configurar <strong>${esc(queFalta(_fact.proveedor))}</strong> en el servidor.</div>`;
     return;
   }
 

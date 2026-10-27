@@ -106,15 +106,48 @@ define('CLAUDE_MODEL', '');
 // de ejecución de PHP, bajarlo a 'medium' acorta la espera.
 define('CLAUDE_EFFORT', '');
 
-// ── Facturación electrónica (Facturapi) ──────────────────
-// Llave secreta de Facturapi (https://dashboard.facturapi.io → Llaves de API).
+// ── Facturación electrónica (CFDI 4.0) ───────────────────
+// Quién timbra: 'facturama' o 'facturapi'.
+//
+// AVBA timbra con Facturama: cobra la API una vez al año más $0.50 por folio,
+// mientras Facturapi cobra $299 al mes más el timbre. Con unas 100 facturas
+// mensuales la diferencia es de unos $2,000 al año.
+//
+// Cambiar este valor cambia con quién se timbra de aquí en adelante. Las
+// facturas ya emitidas NO se tocan: cada una recordó con quién salió y se
+// cancela, se reenvía y se descarga con ése. Por eso las credenciales de
+// Facturapi se dejan puestas aunque ya no se timbre con él.
+define('FACTURA_PROVEEDOR', 'facturama');
+
+// ── Facturama (https://facturama.mx) ──
+// Usuario y contraseña de la CUENTA de Facturama, no una llave de API.
+// Los dos ambientes son cuentas distintas y no comparten credenciales:
+//   pruebas    → se registra en https://dev.facturama.mx/api/registro
+//   produccion → se registra en https://app.facturama.mx/api/registro
+define('FACTURAMA_USER', '');
+define('FACTURAMA_PASS', '');
+
+// 'pruebas' o 'produccion'. En pruebas se habla con apisandbox.facturama.mx:
+// la factura se genera pero NO vale ante el SAT y no gasta folio. Cualquier
+// otro valor se toma como 'pruebas', a propósito: equivocarse hacia pruebas no
+// cuesta nada y equivocarse hacia producción emite un CFDI real.
+define('FACTURAMA_MODO', 'pruebas');
+
+// Código postal de cinco dígitos del lugar de expedición. Tiene que ser el de
+// una sucursal dada de alta en el Perfil Fiscal de Facturama; si no coincide,
+// el SAT rechaza el comprobante. Facturama lo exige en cada factura.
+define('FACTURAMA_CP_EXPEDICION', '');
+
+// ── Facturapi (https://facturapi.io) ──
+// Llave secreta (dashboard.facturapi.io → Llaves de API).
 //   sk_test_…  → modo de pruebas: la factura se genera pero NO se timbra ante
-//                el SAT y no tiene validez fiscal. Sirve para probar todo.
+//                el SAT y no tiene validez fiscal.
 //   sk_live_…  → producción: timbra de verdad y consume un timbre.
-// El sistema deduce el modo del prefijo de la llave, así que cambiar de
-// pruebas a producción es cambiar esta línea y nada más.
-// Sin llave, el módulo de presupuestos sigue funcionando completo; sólo queda
-// apagado el botón de facturar.
+// Aquí el modo se deduce del prefijo de la llave, no hace falta interruptor.
+// Se conserva para las facturas que Facturapi timbró en su momento.
+//
+// Sin ninguna de las dos configuraciones, el módulo de presupuestos sigue
+// funcionando completo; sólo queda apagado el botón de facturar.
 define('FACTURAPI_KEY', '');
 
 // ── Entorno ───────────────────────────────────────────────

@@ -50,7 +50,10 @@ require_once __DIR__ . '/ClienteEnvios.php';
 require_once __DIR__ . '/Contabilidad.php';
 require_once __DIR__ . '/MaterialControl.php';
 require_once __DIR__ . '/ClaudeIA.php';
+// El contrato va primero: Facturapi y Facturama lo extienden.
+require_once __DIR__ . '/Timbrado.php';
 require_once __DIR__ . '/Facturapi.php';
+require_once __DIR__ . '/Facturama.php';
 require_once __DIR__ . '/Presupuestos.php';
 
 // ── Headers de seguridad ──────────────────────────────────

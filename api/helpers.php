@@ -215,6 +215,11 @@ foreach ([
     'CLAUDE_API_KEY'     => '',
     'CLAUDE_MODEL'       => '',
     'CLAUDE_EFFORT'      => '',
+    'FACTURA_PROVEEDOR'  => 'facturama',
+    'FACTURAMA_USER'     => '',
+    'FACTURAMA_PASS'     => '',
+    'FACTURAMA_MODO'     => 'pruebas',
+    'FACTURAMA_CP_EXPEDICION' => '',
     'FACTURAPI_KEY'      => '',
     'APP_ENV'            => 'production',
 ] as $constante => $valor) {
