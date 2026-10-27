@@ -114,8 +114,13 @@ jobs:
             rm -f setup_demo.php mantenimiento_qr_personal.php
             rm -f test_cert.php test_cert_datos.php test_dictamen.php
             rm -f generar_cert_web.php generar_dictamen_web.php generar_dictamen.php
+            # Clases retiradas del sistema. Nadie las incluye ya, pero un .php
+            # suelto en api/ sigue siendo accesible desde fuera.
+            rm -f api/Facturapi.php
             echo "PHP que queda en la raíz del sitio:"
             ls -1 *.php
+            echo "Clases retiradas que siguieran en api/:"
+            ls -1 api/Facturapi.php 2>/dev/null || echo "  ninguna"
 
       - name: Resultado del despliegue
         run: |
