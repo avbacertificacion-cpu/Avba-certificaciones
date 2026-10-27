@@ -36,7 +36,7 @@ $stmt = $pdo->prepare("
     WHERE empresa_id = ? AND estado != 'inactivo'
     AND fecha_ph IS NOT NULL
     AND fecha_ph <= DATE_ADD(CURDATE(), INTERVAL 15 DAY)
-    AND fecha_ph > CURDATE()
+    AND fecha_ph >= CURDATE()
 ");
 $stmt->execute([$empresa_id]);
 $proximos_vencer = $stmt->fetchColumn();

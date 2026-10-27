@@ -46,30 +46,8 @@ function extintoresPendientes(PDO $pdo, int $mes, int $anio, int $empresaId = 0)
     $stmt->execute($params);
     $faltan = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Cuáles de ésos están en el taller. Si el módulo nunca se ha usado la
-    // tabla no existe y simplemente no se marca ninguno.
-    $enTaller = [];
-    if ($faltan && tablaTallerExiste($pdo)) {
-        try {
-            $ids    = array_column($faltan, 'id');
-            $marcas = implode(',', array_fill(0, count($ids), '?'));
-            $st = $pdo->prepare("
-                SELECT m.extintor_id, m.fecha_entrada, t.nombre AS motivo
-                FROM extintor_mantenimientos m
-                LEFT JOIN mantenimiento_tipos t ON t.id = m.tipo_id
-                WHERE m.fecha_devolucion IS NULL AND m.extintor_id IN ($marcas)
-            ");
-            $st->execute($ids);
-            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $enTaller[$r['extintor_id']] = $r;
-        } catch (Exception $e) { /* sin ese dato la lista sigue sirviendo */ }
-    }
-    foreach ($faltan as &$f) {
-        $f['taller_desde']  = $enTaller[$f['id']]['fecha_entrada'] ?? null;
-        $f['taller_motivo'] = $enTaller[$f['id']]['motivo'] ?? null;
-    }
-    unset($f);
-
-    return $faltan;
+    // Los que están en el taller se devuelven igual, pero marcados
+    return marcarEnTaller($pdo, $faltan);
 }
 
 /** Cuántos son, de cuántos, para poder decir «faltan 37 de 241». */

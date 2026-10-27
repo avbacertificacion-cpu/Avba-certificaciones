@@ -46,7 +46,7 @@ $stmt = $pdo->query("
     SELECT COUNT(*) FROM extintores
     WHERE estado != 'inactivo' AND fecha_ph IS NOT NULL
     AND fecha_ph <= DATE_ADD(CURDATE(), INTERVAL 15 DAY)
-    AND fecha_ph > CURDATE()
+    AND fecha_ph >= CURDATE()
 ");
 $proximos_vencer = $stmt->fetchColumn();
 
@@ -297,7 +297,8 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
             <div class="kpi-subtext">Este mes</div>
         </div>
 
-        <div class="kpi-card <?= $vencidos > 0 ? 'danger' : 'success' ?>">
+        <div class="kpi-card <?= $vencidos > 0 ? 'danger' : 'success' ?>" style="cursor:pointer"
+             onclick="window.location.href='admin-vencimientos.php?rango=vencidos&concepto=ph'" title="Ver el reporte de vencimientos">
             <div class="kpi-label">🚨 Vencimientos</div>
             <div class="kpi-value <?= $vencidos > 0 ? 'danger' : 'success' ?>"><?= $vencidos + $proximos_vencer ?></div>
             <div class="kpi-subtext"><?= $vencidos ?> vencidos, <?= $proximos_vencer ?> próximos</div>
@@ -428,6 +429,11 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
                 <div class="menu-item-icon">📋</div>
                 <h3>Registro de Inspecciones</h3>
                 <p><?= $inspecciones_mes ?> este mes</p>
+            </div>
+            <div class="menu-item" onclick="window.location.href='admin-vencimientos.php'">
+                <div class="menu-item-icon">⏰</div>
+                <h3>Vencimientos</h3>
+                <p>Vencidos y por vencer en 15 y 30 días</p>
             </div>
             <div class="menu-item" onclick="window.location.href='admin-generar-etiquetas.php'">
                 <div class="menu-item-icon">🏷️</div>

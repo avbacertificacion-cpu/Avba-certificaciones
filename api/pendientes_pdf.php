@@ -118,7 +118,7 @@ $h = fn($v) => htmlspecialchars((string) $v, ENT_QUOTES, 'UTF-8');
         tr { break-inside:avoid; page-break-inside:avoid; }
         thead { display:table-header-group; }
     }
-    @media (max-width:760px) {
+    @media screen and (max-width:760px) {
         body { padding:10px; }
         .hoja { padding:14px; }
         .cabecera { flex-direction:column; align-items:flex-start; gap:10px; }

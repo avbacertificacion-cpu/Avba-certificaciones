@@ -160,3 +160,34 @@ function tablaTallerExiste(PDO $pdo): bool {
         return (bool) $st->fetchColumn();
     } catch (Exception $e) { return false; }
 }
+
+/**
+ * Marca cuáles de una lista de extintores están ahora en el taller, con
+ * taller_desde y taller_motivo. Lo usan las listas que dicen qué atender
+ * —lo que falta por inspeccionar, lo que está por vencer—, porque un extintor
+ * que ya está en el taller ya se está atendiendo.
+ */
+function marcarEnTaller(PDO $pdo, array $filas): array {
+    $enTaller = [];
+    // Si el módulo nunca se ha usado la tabla no existe y no se marca ninguno.
+    if ($filas && tablaTallerExiste($pdo)) {
+        try {
+            $ids    = array_column($filas, 'id');
+            $marcas = implode(',', array_fill(0, count($ids), '?'));
+            $st = $pdo->prepare("
+                SELECT m.extintor_id, m.fecha_entrada, t.nombre AS motivo
+                FROM extintor_mantenimientos m
+                LEFT JOIN mantenimiento_tipos t ON t.id = m.tipo_id
+                WHERE m.fecha_devolucion IS NULL AND m.extintor_id IN ($marcas)
+            ");
+            $st->execute($ids);
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $enTaller[$r['extintor_id']] = $r;
+        } catch (Exception $e) { /* sin ese dato la lista sigue sirviendo */ }
+    }
+    foreach ($filas as &$f) {
+        $f['taller_desde']  = $enTaller[$f['id']]['fecha_entrada'] ?? null;
+        $f['taller_motivo'] = $enTaller[$f['id']]['motivo'] ?? null;
+    }
+    unset($f);
+    return $filas;
+}
