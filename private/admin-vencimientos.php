@@ -129,7 +129,8 @@ $empresaInicial  = intval($_GET['empresa_id'] ?? 0);
     <div id="resumen" class="resumen"></div>
     <div class="acciones">
         <button class="btn-pdf" onclick="descargarPDF()">📄 Descargar PDF</button>
-        <span class="nota">Recarga: vence un año después de la última. Prueba hidrostática: la fecha de vigencia registrada.
+        <span class="nota">Servicio anual: vence 12 meses después de la última recarga o mantenimiento (lo más reciente
+            entre la ficha y el taller; las garantías no cuentan). Prueba hidrostática: la fecha de vigencia registrada.
             «30 días» incluye los de 15.</span>
     </div>
 
@@ -275,7 +276,9 @@ function pintarTabla(data) {
             <td data-et="Ubicación">${sanitize(x.ubicacion || '—')}</td>
             <td data-et="Tipo">${sanitize(x.tipo_nombre || '—')}</td>
             <td data-et="Cap.">${sanitize(x.capacidad || '—')}</td>
-            <td data-et="Qué vence">${x.vencimientos.map(v => `<span class="vence">${sanitize(v.nombre)}: ${fecha(v.fecha)}
+            <td data-et="Qué vence">${x.vencimientos.map(v => `<span class="vence">${v.desde
+                    ? `${sanitize(v.nombre)} del ${fecha(v.desde)} · vence ${fecha(v.fecha)}`
+                    : `${sanitize(v.nombre)}: vence ${fecha(v.fecha)}`}
                 <span class="dias ${clase(v.dias)}">${textoDias(v.dias)}</span></span>`).join('')}</td>
             <td data-et="Situación">${x.taller_desde
                 ? `<span class="b-taller">🛠️ En taller (${sanitize(x.taller_motivo || 'sin motivo')}) desde ${fecha(x.taller_desde)}</span>`

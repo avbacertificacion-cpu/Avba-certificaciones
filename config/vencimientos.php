@@ -6,9 +6,13 @@
  * usan —la pantalla de Vencimientos y el PDF que se descarga de ella— y las
  * dos tienen que dar los mismos números.
  *
- * Qué vence, con las reglas que ya usa el resto del sistema:
- *  - La recarga, un año después de fecha_recarga. Es la misma cuenta de la
- *    gráfica «a mantenimiento» del panel.
+ * Qué vence:
+ *  - El servicio anual: 12 meses después del último servicio del equipo,
+ *    que es lo más reciente entre la fecha de recarga de su ficha y la
+ *    devolución de su último paso por el taller (recarga, mantenimiento o
+ *    cualquier otro motivo, salvo garantía, que es una reparación y no un
+ *    servicio). Un mantenimiento cuenta aunque al registrarlo no se haya
+ *    marcado «actualiza la recarga».
  *  - La prueba hidrostática, en fecha_ph tal como está capturada: el panel
  *    del administrador, el del cliente y el del gerente ya la tratan como la
  *    fecha en que vence.
@@ -30,11 +34,10 @@ const VENCE_RANGOS = [
     '30'       => 'Próximos 30 días',
 ];
 const VENCE_CONCEPTOS = [
-    'todos'   => 'Recarga y prueba hidrostática',
-    'recarga' => 'Recarga anual',
+    'todos'   => 'Todo: servicio anual y prueba hidrostática',
+    'recarga' => 'Recarga o mantenimiento (12 meses)',
     'ph'      => 'Prueba hidrostática',
 ];
-const VENCE_NOMBRE = ['recarga' => 'Recarga', 'ph' => 'Prueba hidrostática'];
 
 function rangoPedido(?string $v): string {
     $v = (string) $v;
@@ -52,37 +55,102 @@ function enRango(int $dias, string $rango): bool {
     return $dias >= 0 && $dias <= (int) $rango;
 }
 
+/** Días de $desde a $hasta: negativo si $hasta ya pasó. */
+function diasEntre(string $desde, string $hasta): int {
+    $d = (new DateTime($desde))->diff(new DateTime($hasta));
+    return $d->invert ? -$d->days : $d->days;
+}
+
+/**
+ * El último servicio de cada extintor que pasó por el taller: la devolución
+ * más reciente que ya ocurrió, sin contar garantías. extintor_id => [fecha, motivo].
+ */
+function ultimosServiciosTaller(PDO $pdo, string $hoy, int $empresaId): array {
+    if (!tablaTallerExiste($pdo)) return [];
+    try {
+        $filtro = $empresaId ? ' AND e.empresa_id = ?' : '';
+        $st = $pdo->prepare("
+            SELECT m.extintor_id, m.fecha_devolucion, t.nombre AS motivo
+            FROM extintor_mantenimientos m
+            JOIN extintores e              ON e.id = m.extintor_id
+            LEFT JOIN mantenimiento_tipos t ON t.id = m.tipo_id
+            WHERE m.fecha_devolucion IS NOT NULL AND m.fecha_devolucion <= ?
+              AND (t.nombre IS NULL OR t.nombre NOT LIKE '%GARANT%') $filtro
+            ORDER BY m.fecha_devolucion ASC, m.id ASC
+        ");
+        $st->execute($empresaId ? [$hoy, $empresaId] : [$hoy]);
+        $ultimo = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {   // en orden: se queda el más reciente
+            $ultimo[$r['extintor_id']] = ['fecha' => $r['fecha_devolucion'], 'motivo' => $r['motivo']];
+        }
+        return $ultimo;
+    } catch (Exception $e) {
+        return [];   // sin el taller, el servicio anual se cuenta con la ficha
+    }
+}
+
 /**
  * Cada vencimiento hasta 30 días adelante —incluidos todos los ya pasados—,
  * de los extintores activos, uno por fila: un extintor puede traer dos.
  */
 function vencimientosHasta30(PDO $pdo, string $concepto, int $empresaId): array {
+    // «Hoy» lo dice la base, como en los paneles, para que todos cuenten igual
+    $hoy    = (string) $pdo->query("SELECT CURDATE()")->fetchColumn();
     $filtro = $empresaId ? ' AND e.empresa_id = ?' : '';
-    // Una fecha en ceros o de antes de 1900 es un dato mal capturado, no un vencimiento
-    $partes = [];
-    $params = [];
-    if ($concepto !== 'ph') {
-        $partes[] = "SELECT e.id AS extintor_id, 'recarga' AS concepto,
-                            DATE_ADD(e.fecha_recarga, INTERVAL 1 YEAR) AS vence
-                     FROM extintores e
-                     WHERE e.estado <> 'inactivo' AND e.fecha_recarga > '1900-01-01' $filtro";
-        if ($empresaId) $params[] = $empresaId;
-    }
-    if ($concepto !== 'recarga') {
-        $partes[] = "SELECT e.id AS extintor_id, 'ph' AS concepto, e.fecha_ph AS vence
-                     FROM extintores e
-                     WHERE e.estado <> 'inactivo' AND e.fecha_ph > '1900-01-01' $filtro";
-        if ($empresaId) $params[] = $empresaId;
-    }
-
     $st = $pdo->prepare("
-        SELECT v.extintor_id, v.concepto, v.vence, DATEDIFF(v.vence, CURDATE()) AS dias
-        FROM (" . implode(' UNION ALL ', $partes) . ") v
-        WHERE v.vence <= DATE_ADD(CURDATE(), INTERVAL 30 DAY)
-        ORDER BY v.vence ASC
+        SELECT e.id, e.fecha_recarga, e.fecha_ph
+        FROM extintores e
+        WHERE e.estado <> 'inactivo' $filtro
     ");
-    $st->execute($params);
-    return $st->fetchAll(PDO::FETCH_ASSOC);
+    $st->execute($empresaId ? [$empresaId] : []);
+    $extintores = $st->fetchAll(PDO::FETCH_ASSOC);
+    $taller = $concepto !== 'ph' ? ultimosServiciosTaller($pdo, $hoy, $empresaId) : [];
+
+    // Una fecha en ceros o de antes de 1900 es un dato mal capturado, no un vencimiento
+    $valida = fn($f) => $f && $f > '1900-01-01';
+
+    $salida = [];
+    foreach ($extintores as $e) {
+        if ($concepto !== 'ph') {
+            $base = null;
+            if ($valida($e['fecha_recarga'])) {
+                $base = ['fecha' => $e['fecha_recarga'], 'nombre' => 'Recarga'];
+            }
+            $t = $taller[$e['id']] ?? null;
+            if ($t && (!$base || $t['fecha'] > $base['fecha'])) {
+                $motivo = mb_strtolower(trim((string) $t['motivo']), 'UTF-8');
+                $base = ['fecha' => $t['fecha'], 'nombre' => $motivo !== '' ? mb_strtoupper(mb_substr($motivo, 0, 1)) . mb_substr($motivo, 1) : 'Mantenimiento'];
+            }
+            if ($base) {
+                $vence = (new DateTime($base['fecha']))->modify('+12 months')->format('Y-m-d');
+                $dias  = diasEntre($hoy, $vence);
+                if ($dias <= 30) {
+                    $salida[] = ['extintor_id' => $e['id'], 'concepto' => 'recarga', 'nombre' => $base['nombre'],
+                                 'desde' => $base['fecha'], 'fecha' => $vence, 'dias' => $dias];
+                }
+            }
+        }
+        if ($concepto !== 'recarga' && $valida($e['fecha_ph'])) {
+            $dias = diasEntre($hoy, $e['fecha_ph']);
+            if ($dias <= 30) {
+                $salida[] = ['extintor_id' => $e['id'], 'concepto' => 'ph', 'nombre' => 'Prueba hidrostática',
+                             'desde' => null, 'fecha' => $e['fecha_ph'], 'dias' => $dias];
+            }
+        }
+    }
+    usort($salida, fn($a, $b) => $a['dias'] <=> $b['dias']);
+    return $salida;
+}
+
+/** Cuántos extintores caen en cada corte; lo que muestra el panel. */
+function conteoPorVencer(PDO $pdo, string $concepto = 'todos', int $empresaId = 0): array {
+    $conteo = array_fill_keys(array_keys(VENCE_RANGOS), []);
+    foreach (vencimientosHasta30($pdo, $concepto, $empresaId) as $v) {
+        foreach (array_keys(VENCE_RANGOS) as $r) {
+            if (enRango($v['dias'], (string) $r)) $conteo[$r][$v['extintor_id']] = true;
+        }
+    }
+    return array_map('count', $conteo);
 }
 
 /**
@@ -96,15 +164,13 @@ function extintoresPorVencer(PDO $pdo, string $rango, string $concepto, int $emp
     $conteo = array_fill_keys(array_keys(VENCE_RANGOS), []);
     $vencen = [];   // extintor_id => [vencimientos del corte pedido]
     foreach ($todos as $v) {
-        $dias = (int) $v['dias'];
+        $id = $v['extintor_id'];
         foreach (array_keys(VENCE_RANGOS) as $r) {
-            if (enRango($dias, (string) $r)) $conteo[$r][$v['extintor_id']] = true;
+            if (enRango($v['dias'], (string) $r)) $conteo[$r][$id] = true;
         }
-        if (enRango($dias, $rango)) {
-            $vencen[$v['extintor_id']][] = ['concepto' => $v['concepto'],
-                                            'nombre'   => VENCE_NOMBRE[$v['concepto']],
-                                            'fecha'    => $v['vence'],
-                                            'dias'     => $dias];
+        if (enRango($v['dias'], $rango)) {
+            unset($v['extintor_id']);
+            $vencen[$id][] = $v;
         }
     }
     $conteo = array_map('count', $conteo);

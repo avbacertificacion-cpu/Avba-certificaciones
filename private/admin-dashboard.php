@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/vencimientos.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_ADMIN) {
     header('Location: ../public/login.html'); exit;
 }
@@ -41,21 +42,12 @@ $stmt = $pdo->prepare("
 $stmt->execute([$mes_actual, $anio_actual]);
 $sin_inspeccionar = $stmt->fetchColumn();
 
-// Extintores con vigencia próxima a vencer
-$stmt = $pdo->query("
-    SELECT COUNT(*) FROM extintores
-    WHERE estado != 'inactivo' AND fecha_ph IS NOT NULL
-    AND fecha_ph <= DATE_ADD(CURDATE(), INTERVAL 15 DAY)
-    AND fecha_ph >= CURDATE()
-");
-$proximos_vencer = $stmt->fetchColumn();
-
-// Extintores vencidos
-$stmt = $pdo->query("
-    SELECT COUNT(*) FROM extintores
-    WHERE estado != 'inactivo' AND fecha_ph IS NOT NULL AND fecha_ph < CURDATE()
-");
-$vencidos = $stmt->fetchColumn();
+// Vencidos y por vencer en 15 días, con la misma regla que el reporte de
+// Vencimientos (config/vencimientos.php): prueba hidrostática, o 12 meses
+// desde la última recarga o mantenimiento.
+$conteo_vencimientos = conteoPorVencer($pdo);
+$vencidos        = $conteo_vencimientos['vencidos'];
+$proximos_vencer = $conteo_vencimientos['15'];
 
 // Reportes publicados este mes
 $stmt = $pdo->prepare("
@@ -298,7 +290,7 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
         </div>
 
         <div class="kpi-card <?= $vencidos > 0 ? 'danger' : 'success' ?>" style="cursor:pointer"
-             onclick="window.location.href='admin-vencimientos.php?rango=vencidos&concepto=ph'" title="Ver el reporte de vencimientos">
+             onclick="window.location.href='admin-vencimientos.php?rango=vencidos'" title="Ver el reporte de vencimientos">
             <div class="kpi-label">🚨 Vencimientos</div>
             <div class="kpi-value <?= $vencidos > 0 ? 'danger' : 'success' ?>"><?= $vencidos + $proximos_vencer ?></div>
             <div class="kpi-subtext"><?= $vencidos ?> vencidos, <?= $proximos_vencer ?> próximos</div>

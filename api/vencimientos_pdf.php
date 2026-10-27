@@ -174,7 +174,7 @@ $vacio  = $rango === 'vencidos' ? 'No hay extintores vencidos' : 'No vence ning�
                 <th>Ubicación</th>
                 <th style="width:80px">Tipo</th>
                 <th class="c" style="width:36px">Cap.</th>
-                <th style="width:150px">Qué vence</th>
+                <th style="width:165px">Qué vence</th>
                 <th style="width:82px">Situación</th>
             </tr></thead>
             <tbody>
@@ -188,7 +188,8 @@ $vacio  = $rango === 'vencidos' ? 'No hay extintores vencidos' : 'No vence ning�
                     <td class="c" data-et="Cap."><?= $h($f['capacidad'] ?: '—') ?></td>
                     <td data-et="Qué vence">
                         <?php foreach ($f['vencimientos'] as $v): ?>
-                            <span class="vence"><?= $h($v['nombre']) ?>: <?= $fecha($v['fecha']) ?>
+                            <span class="vence"><?php if ($v['desde']): ?><?= $h($v['nombre']) ?> del <?= $fecha($v['desde']) ?>,
+                                vence <?= $fecha($v['fecha']) ?><?php else: ?><?= $h($v['nombre']) ?>: vence <?= $fecha($v['fecha']) ?><?php endif; ?>
                                 <small class="<?= $clase($v['dias']) ?>"><?= $h(textoDias($v['dias'])) ?></small></span>
                         <?php endforeach; ?>
                     </td>
@@ -208,7 +209,7 @@ $vacio  = $rango === 'vencidos' ? 'No hay extintores vencidos' : 'No vence ning�
     <?php endforeach; endif; ?>
 
     <div class="pie">
-        <span>AVBA · Recarga: un año después de la última · Prueba hidrostática: fecha de vigencia registrada</span>
+        <span>AVBA · Servicio anual: 12 meses después de la última recarga o mantenimiento · Prueba hidrostática: fecha de vigencia registrada</span>
         <span>«15 días» y «30 días» cuentan desde hoy; los de 15 también están en 30.</span>
     </div>
 </div>
