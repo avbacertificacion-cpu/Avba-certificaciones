@@ -220,7 +220,6 @@ foreach ([
     'FACTURAMA_PASS'     => '',
     'FACTURAMA_MODO'     => 'pruebas',
     'FACTURAMA_CP_EXPEDICION' => '',
-    'FACTURAPI_KEY'      => '',
     'APP_ENV'            => 'production',
 ] as $constante => $valor) {
     if (!defined($constante)) define($constante, $valor);

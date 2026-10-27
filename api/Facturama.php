@@ -61,11 +61,11 @@ class Facturama extends TimbradoBase {
     /**
      * Pruebas o producción.
      *
-     * Aquí sí hace falta un interruptor: en Facturama el ambiente está en el
-     * servidor al que se le habla, no en la credencial, así que no hay prefijo
-     * que delate el modo como pasaba con Facturapi. Por eso el valor que falta
-     * o no se entiende cae en 'pruebas': equivocarse hacia pruebas no cuesta
-     * nada, y equivocarse hacia producción emite un CFDI real ante el SAT.
+     * El ambiente está en el servidor al que se le habla, no en la credencial:
+     * no hay nada en el usuario ni en la contraseña que delate si lo que sale
+     * es una factura real, y por eso hace falta este interruptor. Un valor que
+     * falta o no se entiende cae en 'pruebas': equivocarse hacia pruebas no
+     * cuesta nada, y equivocarse hacia producción emite un CFDI ante el SAT.
      */
     public function modo(): string {
         $m = defined('FACTURAMA_MODO') ? strtolower(trim((string)FACTURAMA_MODO)) : '';
@@ -150,9 +150,8 @@ class Facturama extends TimbradoBase {
     /**
      * Traduce la factura de AVBA al CFDI 4.0 que espera Facturama.
      *
-     * La diferencia de fondo con Facturapi: allá se mandaba el precio y el
-     * proveedor calculaba el impuesto; aquí hay que mandar ya resueltos el
-     * importe, la base, el impuesto y el total de cada partida. Se calculan con
+     * Facturama no calcula nada: hay que mandarle ya resueltos el importe, la
+     * base, el impuesto y el total de cada partida. Se calculan con
      * los mismos redondeos que usa calcularTotales() del presupuesto —a dos
      * decimales, partida por partida— para que la factura diga exactamente la
      * cifra que se le ofreció al cliente y no unos centavos más.
@@ -198,8 +197,8 @@ class Facturama extends TimbradoBase {
                 ]];
                 $item['Total'] = round($base + $iva, 2);
             } else {
-                // Tasa 0 va sin impuestos, igual que iba a Facturapi, y eso en
-                // CFDI 4.0 se declara con TaxObject 01: no objeto de impuesto.
+                // Tasa 0 va sin impuestos, y eso en CFDI 4.0 se declara con
+                // TaxObject 01: no objeto de impuesto.
                 $item['TaxObject'] = '01';
                 $item['Total']     = $base;
             }

@@ -25,7 +25,7 @@ class Diagnostico {
         return ['status' => 'success', 'data' => [
             $this->gemini(),
             $this->claude(),
-            $this->facturapi(),
+            $this->facturama(),
             $this->smtp(),
             $this->baseDatos(),
             $this->almacenamiento(),
@@ -33,7 +33,7 @@ class Diagnostico {
     }
 
     public function uno(string $cual): array {
-        $m = ['gemini','claude','facturapi','smtp','basedatos','almacenamiento'];
+        $m = ['gemini','claude','facturama','smtp','basedatos','almacenamiento'];
         $cual = strtolower(trim($cual));
         if (!in_array($cual, $m, true))
             return ['status' => 'error', 'message' => 'Servicio desconocido.'];
@@ -199,34 +199,57 @@ class Diagnostico {
             'Si se repite, revisa el estado del servicio.', $ms);
     }
 
-    // ── Facturapi ─────────────────────────────────────────
-    public function facturapi(): array {
-        $n = 'Facturapi (facturación)';
-        if (!self::definida('FACTURAPI_KEY'))
-            return self::r('facturapi', $n, 'apagado', 'No configurado.',
-                'Agrega FACTURAPI_KEY en config/config.php. Sin ella no se pueden timbrar facturas.');
+    // ── Facturama ─────────────────────────────────────────
+    public function facturama(): array {
+        $n = 'Facturama (facturación)';
+        if (!self::definida('FACTURAMA_USER') || !self::definida('FACTURAMA_PASS'))
+            return self::r('facturama', $n, 'apagado', 'No configurado.',
+                'Agrega FACTURAMA_USER y FACTURAMA_PASS en config/config.php. '
+              . 'Sin ellos no se pueden timbrar facturas.');
 
-        // Se listan clientes con límite 1: lectura pura, no gasta timbres.
+        // El ambiente lo decide el servidor al que se le habla, así que la
+        // prueba tiene que ir al mismo que usaría una factura de verdad.
+        $pruebas = !defined('FACTURAMA_MODO')
+                || strtolower(trim((string)FACTURAMA_MODO)) !== 'produccion';
+        $host = $pruebas ? 'https://apisandbox.facturama.mx' : 'https://api.facturama.mx';
+
+        // Se consulta el plan de la cuenta: lectura pura, no gasta folios.
         [$code, $resp, $cerr, $ms] = $this->http(
-            'https://www.facturapi.io/v2/customers?limit=1',
-            ['Authorization: Basic ' . base64_encode(trim((string)FACTURAPI_KEY) . ':')]
+            $host . '/api/suscriptionPlan/',
+            ['Authorization: Basic ' . base64_encode(
+                trim((string)FACTURAMA_USER) . ':' . (string)FACTURAMA_PASS)]
         );
 
-        if ($code === 200)
-            return self::r('facturapi', $n, 'ok', 'Responde correctamente.', '', $ms);
+        if ($code === 200) {
+            // Responde, pero sin el CP de expedición el timbrado se rechaza en
+            // la primera factura. Más vale decirlo aquí que descubrirlo ahí.
+            if (!self::definida('FACTURAMA_CP_EXPEDICION'))
+                return self::r('facturama', $n, 'aviso',
+                    'Responde correctamente, pero falta el lugar de expedición.',
+                    'Agrega FACTURAMA_CP_EXPEDICION con el código postal de tu sucursal '
+                  . 'en Facturama. Sin él el SAT rechaza el comprobante.', $ms);
+            return self::r('facturama', $n, 'ok',
+                'Responde correctamente.' . ($pruebas
+                    ? ' Está en modo de pruebas: las facturas no valen ante el SAT.' : ''),
+                $pruebas ? 'Cuando termines de probar, pon FACTURAMA_MODO en "produccion" '
+                         . 'con las credenciales de la cuenta de producción.' : '', $ms);
+        }
         if ($code === 401)
-            return self::r('facturapi', $n, 'error', 'Rechazó la clave.',
-                'Revisa FACTURAPI_KEY. Ojo: la de pruebas y la de producción son distintas.', $ms);
-        if ($code === 402)
-            // La clave es buena: lo que falta es saldo. Decir "error de clave"
-            // mandaría a revisar config.php para nada.
-            return self::r('facturapi', $n, 'aviso',
-                'La clave es válida, pero la cuenta no tiene plan activo o se agotaron los timbres.',
-                'Entra a tu panel de Facturapi y revisa la suscripción. La facturación no funcionará hasta entonces.', $ms);
+            return self::r('facturama', $n, 'error', 'Rechazó el usuario o la contraseña.',
+                'Revisa FACTURAMA_USER y FACTURAMA_PASS. Ojo: la cuenta de pruebas y la de '
+              . 'producción son distintas y no comparten credenciales.', $ms);
+        if ($code === 402 || $code === 403)
+            // Las credenciales son buenas: lo que falta es plan o folios. Decir
+            // "error de contraseña" mandaría a revisar config.php para nada.
+            return self::r('facturama', $n, 'aviso',
+                'Las credenciales son válidas, pero la cuenta no tiene plan activo o se '
+              . 'agotaron los folios.',
+                'Entra a tu panel de Facturama y revisa la suscripción de la API y los folios '
+              . 'disponibles. La facturación no funcionará hasta entonces.', $ms);
         if ($code === 0)
-            return self::r('facturapi', $n, 'error', 'No se pudo conectar' . ($cerr ? ': ' . $cerr : '') . '.',
+            return self::r('facturama', $n, 'error', 'No se pudo conectar' . ($cerr ? ': ' . $cerr : '') . '.',
                 'Puede ser la red del servidor.', $ms);
-        return self::r('facturapi', $n, 'error', 'Devolvió HTTP ' . $code . '.', '', $ms);
+        return self::r('facturama', $n, 'error', 'Devolvió HTTP ' . $code . '.', '', $ms);
     }
 
     // ── Correo saliente ───────────────────────────────────

@@ -2391,13 +2391,12 @@ REGLAS DE SALIDA — sin excepción
      * El proveedor con el que se timbró esta factura, no el de hoy.
      *
      * Importa al cancelar, al reenviar y al descargar: una factura sólo existe
-     * para quien la emitió. Las que se timbraron antes de que existiera la
-     * columna son todas de Facturapi, que era el único proveedor entonces, y
-     * por eso ése es el valor que se supone cuando el dato viene vacío.
+     * para quien la emitió. Hoy hay un solo proveedor y esto siempre devuelve
+     * el mismo, pero el día que se cambie, las facturas de antes seguirán
+     * yendo a quien las hizo sin tocar una línea de aquí.
      */
     private function timbradorDe(array $pre): Timbrado {
-        $quien = trim((string)($pre['factura_proveedor'] ?? ''));
-        return TimbradoBase::elegir($quien !== '' ? $quien : 'facturapi');
+        return TimbradoBase::elegir((string)($pre['factura_proveedor'] ?? ''));
     }
 
     /** Catálogos y estado del servicio, para que la pantalla sepa qué ofrecer. */

@@ -2,21 +2,23 @@
 /**
  * AVBA Certificaciones — Timbrado de CFDI 4.0: contrato y transporte.
  *
- * El sistema nació timbrando con Facturapi, que cobra $299 al mes más el
- * timbre. Con el volumen de AVBA —unas 100 facturas al mes— la mensualidad es
- * casi todo el gasto, así que se cambió a Facturama, que cobra la API una vez
- * al año y $0.50 por folio. El que paga por timbre no debe decidirse en el
- * código: se elige en config/config.php con FACTURA_PROVEEDOR.
+ * AVBA timbra con Facturama: cobra la API una vez al año más $0.50 por folio,
+ * que con unas 100 facturas al mes sale en unos $2,250 anuales. Los que cobran
+ * mensualidad salían al doble, porque con este volumen la mensualidad es casi
+ * todo el gasto.
  *
- * Facturapi NO se retira. Una factura sólo se puede cancelar, descargar y
- * reenviar con quien la timbró, y las que ya están emitidas son suyas. Por eso
- * cada presupuesto guarda en factura_proveedor con quién se timbró, y de ahí
- * sale el proveedor al que se le habla después, no de la configuración de hoy.
+ * Quién timbra no está en el código, está en config/config.php. Lo que entra y
+ * lo que sale de estas clases está en el idioma de AVBA, no en el de ningún
+ * proveedor: una factura es la del método crearFactura() de abajo, y la
+ * respuesta siempre trae las mismas llaves. Así quien llama no sabe —ni tiene
+ * que saber— con quién está hablando, y agregar otro PAC es escribir una clase
+ * como Facturama y anotarla en PROVEEDORES.
  *
- * Lo que entra y lo que sale de estas clases está en el idioma de AVBA, no en
- * el de ningún proveedor: una factura es la del método crearFactura() de abajo,
- * y la respuesta siempre trae las mismas llaves. Así quien llama no sabe —ni
- * tiene que saber— con quién está hablando.
+ * Cada presupuesto guarda además en factura_proveedor con quién se timbró el
+ * suyo. Hoy sólo hay uno y el dato parece de sobra, pero una factura sólo se
+ * puede cancelar, descargar y reenviar con quien la emitió: el día que se
+ * cambie de proveedor, las anteriores tienen que seguir yendo al que las hizo,
+ * y para entonces ya no habría forma de saber cuál fue.
  */
 
 /**
@@ -121,23 +123,31 @@ abstract class TimbradoBase implements Timbrado {
         'PPD' => 'Pago en parcialidades o diferido',
     ];
 
-    /** Proveedores que el sistema sabe manejar. */
-    public const PROVEEDORES = ['facturama', 'facturapi'];
+    /**
+     * Proveedores que el sistema sabe manejar: el nombre que se guarda en
+     * factura_proveedor y la clase que lo atiende. Aquí se da de alta uno nuevo.
+     */
+    public const PROVEEDORES = ['facturama' => Facturama::class];
+
+    /** Con cuál se timbra por omisión cuando el config no dice nada. */
+    public const PREDETERMINADO = 'facturama';
 
     /**
      * Devuelve el proveedor pedido, o el configurado si no se pide ninguno.
      *
-     * Un nombre desconocido cae en el configurado en vez de reventar: la
-     * alternativa sería que una fila con el dato sucio tumbara la pantalla de
-     * presupuestos completa, cuando lo único que estorba es una factura.
+     * Un nombre desconocido —el de un proveedor retirado, o un dato sucio en la
+     * base— cae en el predeterminado en vez de reventar: la alternativa sería
+     * que una sola fila tumbara la pantalla de presupuestos completa, cuando lo
+     * único que estorba es una factura.
      */
     public static function elegir(?string $cual = null): Timbrado {
         $cual = strtolower(trim((string)$cual));
-        if (!in_array($cual, self::PROVEEDORES, true)) {
+        if (!isset(self::PROVEEDORES[$cual])) {
             $cual = defined('FACTURA_PROVEEDOR')
-                ? strtolower(trim((string)FACTURA_PROVEEDOR)) : 'facturama';
+                ? strtolower(trim((string)FACTURA_PROVEEDOR)) : '';
         }
-        return $cual === 'facturapi' ? new Facturapi() : new Facturama();
+        $clase = self::PROVEEDORES[$cual] ?? self::PROVEEDORES[self::PREDETERMINADO];
+        return new $clase();
     }
 
     public function esPruebas(): bool {

@@ -1227,12 +1227,10 @@ async function borrarPres(id){
 // uno que esta pantalla no conoce, se habla en general en vez de mentir.
 function queFalta(proveedor){
   if (proveedor === 'facturama') return 'FACTURAMA_USER y FACTURAMA_PASS';
-  if (proveedor === 'facturapi') return 'FACTURAPI_KEY';
   return 'la facturación';
 }
 function aProduccion(proveedor){
   if (proveedor === 'facturama') return 'FACTURAMA_MODO a "produccion" con la cuenta de producción';
-  if (proveedor === 'facturapi') return 'la llave a la de producción (sk_live_…)';
   return 'a la configuración de producción';
 }
 

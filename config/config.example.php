@@ -107,16 +107,14 @@ define('CLAUDE_MODEL', '');
 define('CLAUDE_EFFORT', '');
 
 // ── Facturación electrónica (CFDI 4.0) ───────────────────
-// Quién timbra: 'facturama' o 'facturapi'.
+// Quién timbra. Hoy el único que el sistema sabe manejar es 'facturama': cobra
+// la API una vez al año más $0.50 por folio, unos $2,250 anuales con las ~100
+// facturas mensuales de AVBA.
 //
-// AVBA timbra con Facturama: cobra la API una vez al año más $0.50 por folio,
-// mientras Facturapi cobra $299 al mes más el timbre. Con unas 100 facturas
-// mensuales la diferencia es de unos $2,000 al año.
-//
-// Cambiar este valor cambia con quién se timbra de aquí en adelante. Las
-// facturas ya emitidas NO se tocan: cada una recordó con quién salió y se
-// cancela, se reenvía y se descarga con ése. Por eso las credenciales de
-// Facturapi se dejan puestas aunque ya no se timbre con él.
+// Cambiar este valor cambiaría con quién se timbra de aquí en adelante, sin
+// tocar las facturas ya emitidas: cada una recuerda con quién salió, y sólo se
+// puede cancelar, reenviar y descargar con ése. Para dar de alta otro PAC hay
+// que escribir su clase y anotarla en PROVEEDORES, en api/Timbrado.php.
 define('FACTURA_PROVEEDOR', 'facturama');
 
 // ── Facturama (https://facturama.mx) ──
@@ -136,19 +134,10 @@ define('FACTURAMA_MODO', 'pruebas');
 // Código postal de cinco dígitos del lugar de expedición. Tiene que ser el de
 // una sucursal dada de alta en el Perfil Fiscal de Facturama; si no coincide,
 // el SAT rechaza el comprobante. Facturama lo exige en cada factura.
-define('FACTURAMA_CP_EXPEDICION', '');
-
-// ── Facturapi (https://facturapi.io) ──
-// Llave secreta (dashboard.facturapi.io → Llaves de API).
-//   sk_test_…  → modo de pruebas: la factura se genera pero NO se timbra ante
-//                el SAT y no tiene validez fiscal.
-//   sk_live_…  → producción: timbra de verdad y consume un timbre.
-// Aquí el modo se deduce del prefijo de la llave, no hace falta interruptor.
-// Se conserva para las facturas que Facturapi timbró en su momento.
 //
-// Sin ninguna de las dos configuraciones, el módulo de presupuestos sigue
-// funcionando completo; sólo queda apagado el botón de facturar.
-define('FACTURAPI_KEY', '');
+// Sin esta configuración el módulo de presupuestos sigue funcionando completo;
+// sólo queda apagado el botón de facturar.
+define('FACTURAMA_CP_EXPEDICION', '');
 
 // ── Entorno ───────────────────────────────────────────────
 define('APP_ENV', 'production');
