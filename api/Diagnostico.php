@@ -221,13 +221,27 @@ class Diagnostico {
         );
 
         if ($code === 200) {
-            // Responde, pero sin el CP de expedición el timbrado se rechaza en
-            // la primera factura. Más vale decirlo aquí que descubrirlo ahí.
-            if (!self::definida('FACTURAMA_CP_EXPEDICION'))
+            // Las credenciales sirven. Falta que el lugar de expedición sea de
+            // verdad una sucursal del Perfil Fiscal: si no lo es, el SAT
+            // rechaza el comprobante, y eso se descubriría en la primera
+            // factura con un error que no dice dónde se arregla.
+            $cps = $this->sucursalesFacturama($host);
+            $cp  = self::definida('FACTURAMA_CP_EXPEDICION')
+                 ? trim((string)FACTURAMA_CP_EXPEDICION) : '';
+
+            if ($cp === '')
                 return self::r('facturama', $n, 'aviso',
                     'Responde correctamente, pero falta el lugar de expedición.',
-                    'Agrega FACTURAMA_CP_EXPEDICION con el código postal de tu sucursal '
-                  . 'en Facturama. Sin él el SAT rechaza el comprobante.', $ms);
+                    'Agrega FACTURAMA_CP_EXPEDICION en config/config.php con el código postal '
+                  . 'de una sucursal de tu Perfil Fiscal.' . self::listaCps($cps), $ms);
+
+            if (is_array($cps) && $cps && !in_array($cp, $cps, true))
+                return self::r('facturama', $n, 'aviso',
+                    'Responde correctamente, pero el CP ' . $cp . ' no corresponde a ninguna '
+                  . 'sucursal registrada.',
+                    'El SAT rechaza el comprobante cuando el lugar de expedición no es una '
+                  . 'sucursal del Perfil Fiscal.' . self::listaCps($cps), $ms);
+
             return self::r('facturama', $n, 'ok',
                 'Responde correctamente.' . ($pruebas
                     ? ' Está en modo de pruebas: las facturas no valen ante el SAT.' : ''),
@@ -250,6 +264,54 @@ class Diagnostico {
             return self::r('facturama', $n, 'error', 'No se pudo conectar' . ($cerr ? ': ' . $cerr : '') . '.',
                 'Puede ser la red del servidor.', $ms);
         return self::r('facturama', $n, 'error', 'Devolvió HTTP ' . $code . '.', '', $ms);
+    }
+
+    /**
+     * Los códigos postales de las sucursales del Perfil Fiscal de Facturama.
+     *
+     * Se consultan para poder decir, cuando el lugar de expedición no cuadra,
+     * cuáles sí valen. Sin esto el aviso sería "ese CP está mal" y habría que
+     * ir a buscar los buenos al panel del proveedor.
+     *
+     * Devuelve null si no se pudo consultar: es un lujo del mensaje, no una
+     * razón para marcar error donde no lo hay.
+     */
+    private function sucursalesFacturama(string $host): ?array {
+        [$code, $resp] = $this->http($host . '/api/BranchOffice',
+            ['Authorization: Basic ' . base64_encode(
+                trim((string)FACTURAMA_USER) . ':' . (string)FACTURAMA_PASS)]);
+        return $code === 200 ? self::cpsDeRespuesta($resp) : null;
+    }
+
+    /**
+     * Saca los códigos postales del listado de sucursales.
+     *
+     * Se lee de forma tolerante —la lista puede venir suelta o dentro de Data,
+     * y el CP dentro de Address o en la raíz— porque esta respuesta no está
+     * tipada en ningún SDK. Lo que no sea un CP de cinco dígitos se descarta:
+     * más vale un aviso sin la lista que una lista inventada.
+     */
+    private static function cpsDeRespuesta(string $json): ?array {
+        $j = json_decode($json, true);
+        if (!is_array($j)) return null;
+
+        $filas = array_is_list($j) ? $j : ($j['Data'] ?? $j['data'] ?? []);
+        if (!is_array($filas)) return null;
+
+        $cps = [];
+        foreach ($filas as $f) {
+            if (!is_array($f)) continue;
+            $z = trim((string)($f['Address']['ZipCode'] ?? $f['ZipCode'] ?? ''));
+            if (preg_match('/^\d{5}$/', $z) && !in_array($z, $cps, true)) $cps[] = $z;
+        }
+        return $cps;
+    }
+
+    private static function listaCps(?array $cps): string {
+        if (!is_array($cps)) return '';
+        if (!$cps) return ' Todavía no hay ninguna sucursal dada de alta en Facturama: '
+                        . 'crea una primero, en su Perfil Fiscal.';
+        return ' Los códigos postales registrados hoy son: ' . implode(', ', $cps) . '.';
     }
 
     // ── Correo saliente ───────────────────────────────────
