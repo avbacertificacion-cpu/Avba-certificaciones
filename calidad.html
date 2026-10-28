@@ -2346,8 +2346,16 @@
         <div style="font-size:12px;color:#667;margin-top:2px">Genera el formato UI_INFORME lleno con las inspecciones del periodo.</div>
       </div>
       <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
-        <div><label style="font-size:11px;color:#667;display:block">Desde</label><input type="date" id="inf-desde" style="padding:7px;border:1px solid var(--borde);border-radius:7px"></div>
-        <div><label style="font-size:11px;color:#667;display:block">Hasta</label><input type="date" id="inf-hasta" style="padding:7px;border:1px solid var(--borde);border-radius:7px"></div>
+        <div><label style="font-size:11px;color:#667;display:block">Año</label>
+          <input type="number" id="inf-anio" style="padding:7px;border:1px solid var(--borde);border-radius:7px;width:84px" onchange="infPeriodo()"></div>
+        <div><label style="font-size:11px;color:#667;display:block">Bimestre</label>
+          <select id="inf-bim" style="padding:7px;border:1px solid var(--borde);border-radius:7px" onchange="infPeriodo()">
+            <option value="1">B1 · Ene–Feb</option><option value="2">B2 · Mar–Abr</option>
+            <option value="3">B3 · May–Jun</option><option value="4">B4 · Jul–Ago</option>
+            <option value="5">B5 · Sep–Oct</option><option value="6">B6 · Nov–Dic</option>
+            <option value="">Fechas a mano</option></select></div>
+        <div><label style="font-size:11px;color:#667;display:block">Desde</label><input type="date" id="inf-desde" style="padding:7px;border:1px solid var(--borde);border-radius:7px" onchange="infManual()"></div>
+        <div><label style="font-size:11px;color:#667;display:block">Hasta</label><input type="date" id="inf-hasta" style="padding:7px;border:1px solid var(--borde);border-radius:7px" onchange="infManual()"></div>
         <button class="btn-save" id="inf-btn" style="padding:8px 16px" onclick="generarInformeInsp()">Generar Excel</button>
       </div>
     </div>
@@ -9401,6 +9409,14 @@ async function cargarAuditorias() {
     } else { rec.style.display = 'none'; }
     renderAuditorias(d.auditorias||[]);
   } catch(_) { cont.innerHTML = '<p style="color:#b91c1c;text-align:center;padding:20px">Error de red.</p>'; }
+  // El bimestre en curso, por si sólo se quiere darle a Generar. Se pone una
+  // sola vez: si ya se eligió otro periodo, no se le mueve debajo de la mano.
+  const anioInf = document.getElementById('inf-anio');
+  if (anioInf && !anioInf.value) {
+    anioInf.value = new Date().getFullYear();
+    document.getElementById('inf-bim').value = Math.ceil((new Date().getMonth()+1)/2);
+    infPeriodo();
+  }
   cargarInformesInsp();
 }
 
@@ -9488,6 +9504,40 @@ async function guardarAud() {
     cerrarModalAud(); mostrarToast('Auditoría generada.', 'ok'); cargarAuditorias();
   } catch(_) { mostrarToast('Error de red.', 'err'); }
   finally { btn.disabled = false; btn.textContent = 'Generar auditoría'; }
+}
+
+/* ══ El periodo del informe ══
+   El bimestre pone las dos fechas por sí solo. Antes había que escribirlas a
+   mano cada vez, y equivocarse en un día deja una inspección fuera del informe
+   —o contada dos veces entre dos periodos—, que es justo lo que no puede pasar
+   en lo que se le entrega a la ema. Las fechas sueltas se quedan para los
+   rangos que no son bimestres: se eligen con la opción "Fechas a mano". */
+function infPeriodo() {
+  const bim  = document.getElementById('inf-bim').value;
+  const anio = parseInt(document.getElementById('inf-anio').value, 10);
+  if (!bim || !anio) return;                       // a mano: no se toca nada
+  const primerMes = (bim - 1) * 2;                 // 0, 2, 4, 6, 8, 10
+  const ini = new Date(anio, primerMes, 1);
+  const fin = new Date(anio, primerMes + 2, 0);    // día 0 del siguiente = último del anterior
+  const iso = f => `${f.getFullYear()}-${String(f.getMonth()+1).padStart(2,'0')}-${String(f.getDate()).padStart(2,'0')}`;
+  document.getElementById('inf-desde').value = iso(ini);
+  document.getElementById('inf-hasta').value = iso(fin);
+}
+
+/* Si alguien mueve una fecha a mano, el bimestre deja de describir lo que dicen
+   las cajas: se pasa a "Fechas a mano" para no mentir sobre el periodo. */
+function infManual() {
+  const sel = document.getElementById('inf-bim');
+  if (sel.value === '') return;
+  const desde = document.getElementById('inf-desde').value;
+  const hasta = document.getElementById('inf-hasta').value;
+  infPeriodo();
+  if (document.getElementById('inf-desde').value !== desde
+   || document.getElementById('inf-hasta').value !== hasta) {
+    document.getElementById('inf-desde').value = desde;
+    document.getElementById('inf-hasta').value = hasta;
+    sel.value = '';
+  }
 }
 
 async function generarInformeInsp() {
