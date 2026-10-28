@@ -2345,7 +2345,8 @@
         <div style="font-weight:700;color:#0d2244;font-size:14px">📊 Informe de inspecciones (Excel)</div>
         <div style="font-size:12px;color:#667;margin-top:2px">Genera el formato UI_INFORME lleno con las inspecciones del periodo.
           Oprime <strong>Ver equipos</strong>, marca las que van y genera: el archivo lleva exactamente ésas.
-          Sólo se listan las del alcance acreditado: <strong>grúas sobre camión y sobre neumáticos</strong>.</div>
+          Sólo se listan las del alcance acreditado: <strong>grúas sobre camión y sobre neumáticos</strong>.
+          De cada trimestre se guarda un solo archivo: el último que generes reemplaza al anterior.</div>
       </div>
       <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
         <div style="flex:1;min-width:220px"><label style="font-size:11px;color:#667;display:block">Responsable de la información (columna A)</label>
@@ -9612,6 +9613,7 @@ function infResumen(incluidos, omitidos) {
    reportar todo —una inspección repetida, una que se va a corregir—, así que
    cada renglón se puede desmarcar. */
 let _infEquipos = [];
+let _infPrevio  = null;   // el informe que ya existe para el periodo, si lo hay
 
 /* El nombre que va en la columna A del formato de la ema. Se recuerda en el
    navegador para no teclearlo cada trimestre, pero sigue siendo editable: si
@@ -9696,6 +9698,7 @@ async function verEquiposAlcance() {
   }
   try {
     _infEquipos = res.datos.equipos || [];
+    _infPrevio  = res.datos.previo || null;
     renderEquiposAlcance();
     infResumen(res.datos.incluidos, res.datos.omitidos);
   } catch (e) {
@@ -9738,8 +9741,20 @@ function renderEquiposAlcance() {
     </tr>`;
   }).join('');
 
+  /* De cada trimestre se guarda un solo archivo. Si ya hay uno, generar otro lo
+     reemplaza, así que marcar sólo "las que faltan" dejaría fuera a las que ya
+     iban. Se dice aquí, antes de marcar, no después de generar. */
+  const aviso = _infPrevio ? `
+    <div style="background:#fff8f0;border-bottom:1px solid #f0d8bc;padding:9px 12px;font-size:12px;color:#92400e;line-height:1.5">
+      Ya hay un informe de este periodo (${_infPrevio.total} grúa${_infPrevio.total==1?'':'s'},
+      generado el ${esc2(_infPrevio.generado)}). De cada trimestre se guarda uno solo:
+      <strong>si generas otro, el anterior se borra</strong>. Marca todas las grúas que van en el
+      trimestre, no sólo las que falten.
+    </div>` : '';
+
   cont.innerHTML = `
     <div style="background:#fff;border:1px solid #c3d9f3;border-radius:9px;overflow:hidden">
+      ${aviso}
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;background:#f3f8ff;flex-wrap:wrap">
         <div style="font-size:12px;font-weight:700;color:#0d2244">Grúas del alcance en el periodo
           <span id="inf-cuenta" style="font-weight:600;color:#667"></span></div>
@@ -9830,7 +9845,8 @@ async function generarInformeInsp() {
     }
     const d = res.datos;
     const periodo = (d.anio && d.trimestre) ? ` para T${d.trimestre} ${d.anio}` : '';
-    mostrarToast(`Informe generado${periodo} (${d.total} grúa${d.total==1?'':'s'}).`, 'ok');
+    const reemplazo = d.reemplazados > 0 ? ', reemplaza al anterior' : '';
+    mostrarToast(`Informe generado${periodo} (${d.total} grúa${d.total==1?'':'s'}${reemplazo}).`, 'ok');
     infError('');
     infResumen(d.incluidos, d.omitidos);
 

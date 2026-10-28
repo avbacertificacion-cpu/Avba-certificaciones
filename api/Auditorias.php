@@ -432,9 +432,17 @@ class Auditorias {
         }
 
         [$anio, $trimestre] = self::trimestreDe($desdeDb, $hastaDb);
+        $previos = $this->informePrevio($desdeDb, $hastaDb, $anio, $trimestre);
+
         return ['status' => 'success', 'equipos' => $equipos,
                 'incluidos' => $p['incluidos'], 'omitidos' => $p['omitidos'],
-                'anio' => $anio, 'trimestre' => $trimestre];
+                'anio' => $anio, 'trimestre' => $trimestre,
+                // Para avisar que generar otro reemplaza al que ya está.
+                'previo' => $previos ? [
+                    'total'    => (int)$previos[0]['total'],
+                    'generado' => (string)$previos[0]['generado'],
+                    'cuantos'  => count($previos),
+                ] : null];
     }
 
     /** Folio del dictamen: AB.<control>-<año>MX */
@@ -578,16 +586,32 @@ class Auditorias {
 
         $dir = rtrim(UPLOAD_DIR, '/') . '/auditorias/';
         if (!is_dir($dir)) mkdir($dir, 0755, true);
-        $nombre = 'Informe_Inspecciones_' . date('Ymd_His') . '.xlsx';
+
+        [$anioT, $trimestre] = self::trimestreDe($desdeDb, $hastaDb);
+
+        // El periodo va en el nombre: en la carpeta de descargas, "T3_2026"
+        // dice de un vistazo cuál es, y "20261028_143022" no dice nada.
+        $etiqueta = ($anioT !== null && $trimestre !== null)
+            ? 'T' . $trimestre . '_' . $anioT
+            : str_replace('-', '', $desdeDb) . '_a_' . str_replace('-', '', $hastaDb);
+        $nombre  = 'Informe_Inspecciones_' . $etiqueta . '_' . date('Ymd_His') . '.xlsx';
         $destAbs = $dir . $nombre;
 
         if (!$this->llenarPlantillaXlsx($plantilla, $destAbs, $data)) {
             return ['status' => 'error', 'message' => 'No se pudo generar el archivo Excel.'];
         }
+
+        /* De cada periodo se guarda un solo informe: el que se entrega. Los
+           anteriores se borran aquí, con su archivo y su detalle, y nótese que
+           es DESPUÉS de haber escrito el nuevo: si la generación hubiera
+           fallado, lo que había sigue en su lugar. Quedarse sin ninguno la
+           víspera de la entrega sería peor que conservar el viejo. */
+        $reemplazados = $this->borrarInformesPrevios(
+            $this->informePrevio($desdeDb, $hastaDb, $anioT, $trimestre), $dir, $destAbs);
+
         // Registrar el informe en el historial, con su trimestre y con el
         // detalle de qué equipos llevó: sin el detalle no hay forma de saber
         // después si una inspección quedó sin declarar.
-        [$anioT, $trimestre] = self::trimestreDe($desdeDb, $hastaDb);
         $informeId = 0;
         try {
             $this->pdo->prepare(
@@ -626,10 +650,77 @@ class Auditorias {
             'filename'  => $nombre,
             'anio'      => $anioT,
             'trimestre' => $trimestre,
+            'reemplazados' => $reemplazados,
             'incluidos' => $incluidos,
             'omitidos'  => $omitidos,
             'b64'       => $bytes !== false ? base64_encode($bytes) : '',
         ];
+    }
+
+    /**
+     * El informe que ya existe para este periodo, si lo hay.
+     *
+     * De cada trimestre se guarda uno solo: el que se entrega. Tener dos
+     * versiones del mismo periodo es la forma más fácil de subir la que no era.
+     *
+     * Se busca por trimestre cuando el rango es uno; para un rango libre, por
+     * sus fechas exactas, que es lo que lo identifica.
+     */
+    private function informePrevio(string $desdeDb, string $hastaDb, ?int $anio, ?int $trimestre): array {
+        try {
+            if ($anio !== null && $trimestre !== null) {
+                $s = $this->pdo->prepare(
+                    "SELECT id, archivo, total, DATE_FORMAT(created_at,'%d/%m/%Y %H:%i') AS generado
+                       FROM informes_inspecciones WHERE anio = ? AND trimestre = ? ORDER BY id ASC");
+                $s->execute([$anio, $trimestre]);
+            } else {
+                $s = $this->pdo->prepare(
+                    "SELECT id, archivo, total, DATE_FORMAT(created_at,'%d/%m/%Y %H:%i') AS generado
+                       FROM informes_inspecciones
+                      WHERE desde = ? AND hasta = ? AND anio IS NULL ORDER BY id ASC");
+                $s->execute([$desdeDb, $hastaDb]);
+            }
+            return $s->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log('[Auditorias] informePrevio: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Borra los informes anteriores de un periodo, con su archivo y su detalle.
+     *
+     * Se llama DESPUÉS de haber escrito el archivo nuevo, nunca antes: si algo
+     * falla al generarlo, lo que había se queda. Es preferible tener el informe
+     * viejo a quedarse sin ninguno la víspera de la entrega.
+     *
+     * El nombre del archivo se reconstruye con basename sobre la carpeta de
+     * informes, así que un valor manipulado en la base no puede hacer que se
+     * borre algo fuera de ahí.
+     *
+     * $recienEscrito no se borra nunca. Dos informes del mismo periodo
+     * generados dentro del mismo segundo caen en el mismo nombre de archivo:
+     * el segundo sobrescribe al primero —que es lo correcto, el contenido ya es
+     * el nuevo— y sin esta guarda, borrar "el anterior" se llevaría el archivo
+     * recién hecho y el informe quedaría registrado sin nada que descargar.
+     */
+    private function borrarInformesPrevios(array $previos, string $dir, string $recienEscrito = ''): int {
+        $borrados = 0;
+        foreach ($previos as $p) {
+            $id = (int)$p['id'];
+            $archivo = $dir . basename((string)($p['archivo'] ?? ''));
+            if ($archivo !== $recienEscrito && is_file($archivo) && !@unlink($archivo)) {
+                error_log('[Auditorias] no se pudo borrar ' . $archivo);
+            }
+            try {
+                $this->pdo->prepare("DELETE FROM informes_inspecciones_detalle WHERE informe_id = ?")->execute([$id]);
+                $this->pdo->prepare("DELETE FROM informes_inspecciones WHERE id = ?")->execute([$id]);
+                $borrados++;
+            } catch (\PDOException $e) {
+                error_log('[Auditorias] borrar informe ' . $id . ': ' . $e->getMessage());
+            }
+        }
+        return $borrados;
     }
 
     /**
