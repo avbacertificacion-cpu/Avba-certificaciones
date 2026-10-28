@@ -2362,6 +2362,7 @@
       </div>
     </div>
     <div id="inf-limite" style="margin-top:10px;font-size:12px"></div>
+    <div id="inf-error" style="margin-top:10px;display:none"></div>
     <div id="inf-equipos" style="margin-top:12px"></div>
     <div id="inf-resumen" style="margin-top:12px;display:none"></div>
     <div id="inf-lista" style="margin-top:12px"></div>
@@ -9768,13 +9769,16 @@ async function generarInformeInsp() {
     return;
   }
 
-  btn.disabled = true; btn.textContent = 'Generando…';
+  btn.disabled = true; btn.textContent = 'Generando…'; infError('');
   try {
     const res = await _infPedir(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({action:'GENERAR_INFORME_INSPECCIONES',
                             payload:{desde, hasta, equipos: elegidos}}) });
     if (!res.ok) {
       mostrarToast(res.error, 'err');
+      // Y también fijo en la pantalla: un aviso que se desvanece no se alcanza
+      // a leer, y menos a copiar para pedir ayuda con él.
+      infError(res.error);
       // Cuando no hubo nada en alcance pero sí inspecciones de otros tipos, se
       // deja a la vista: así se distingue "no se trabajó" de "no es reportable".
       if (res.datos) infResumen(null, res.datos.omitidos);
@@ -9783,15 +9787,37 @@ async function generarInformeInsp() {
     const d = res.datos;
     const periodo = (d.anio && d.trimestre) ? ` para T${d.trimestre} ${d.anio}` : '';
     mostrarToast(`Informe generado${periodo} (${d.total} grúa${d.total==1?'':'s'}).`, 'ok');
+    infError('');
     infResumen(d.incluidos, d.omitidos);
-    // La lista se recarga para que las grúas recién entregadas queden marcadas
-    // como ya reportadas, y no se vuelvan a mandar sin querer.
-    if (document.querySelectorAll('.inf-chk').length) verEquiposAlcance();
+
+    /* El orden de estas cuatro líneas importa, y me costó un susto averiguarlo.
+       descargarInformeGuardado() baja el archivo navegando a descargar.php, y
+       una navegación ABORTA cualquier petición que vaya en vuelo. Antes la
+       recarga de la lista salía justo antes de la descarga y sin esperarla: la
+       mataba la navegación, la petición abortada se leía como falla de red, y
+       encima de la tabla aparecía "Error de red." aunque el informe se hubiera
+       generado perfectamente. Primero se termina todo lo que habla con el
+       servidor, y hasta el final se dispara la descarga. */
+    if (document.querySelectorAll('.inf-chk').length) await verEquiposAlcance();
+    await cargarInformesInsp();
+
     if (d.id) descargarInformeGuardado(d.id);
     else if (d.b64) _descargarBlobXlsx(d.b64, d.filename || 'Informe_Inspecciones.xlsx');
-    cargarInformesInsp();
-  } catch (e) { mostrarToast('No se pudo generar: ' + (e && e.message ? e.message : e), 'err'); }
+  } catch (e) {
+    const t = 'No se pudo generar: ' + (e && e.message ? e.message : e);
+    mostrarToast(t, 'err'); infError(t);
+  }
   finally { btn.disabled = false; infContar(); }
+}
+
+/** El último error al generar, fijo en pantalla hasta el siguiente intento. */
+function infError(texto) {
+  const caja = document.getElementById('inf-error');
+  if (!caja) return;
+  caja.style.display = texto ? '' : 'none';
+  caja.innerHTML = texto
+    ? `<div style="background:#fcebeb;border:1px solid #f0c0c0;border-radius:8px;padding:9px 11px;`
+      + `font-size:12px;color:#b91c1c;line-height:1.5">${esc2(texto)}</div>` : '';
 }
 
 /* Descarga un xlsx a partir de su contenido base64 (Blob) — respaldo */
