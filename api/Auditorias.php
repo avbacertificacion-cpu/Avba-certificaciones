@@ -203,8 +203,58 @@ class Auditorias {
     // ════════════════════════════════════════════════════════
 
     /**
+     * El alcance acreditado que se le reporta a la ema.
+     *
+     * AVBA inspecciona más cosas de las que tiene acreditadas, y a la ema sólo
+     * le corresponden las grúas montadas sobre camión y sobre neumáticos. Meter
+     * de más es reportar fuera de alcance; meter de menos es omitir trabajo que
+     * sí hay que declarar. Por eso el informe filtra, y de paso dice qué dejó
+     * fuera: una omisión silenciosa es lo peor que puede pasarle a un entregable
+     * ante la autoridad.
+     *
+     * Se compara por nombre porque equipos.maquinaria guarda el nombre del tipo,
+     * no su id. Cada patrón se busca dentro del nombre ya normalizado, así que
+     * 'CAMION' encuentra "GRÚA HIDRÁULICA SOBRE CAMIÓN" y 'NEUMATICO' encuentra
+     * tanto "SOBRE NEUMÁTICOS" como "SOBRE NEUMÁTICO".
+     */
+    private const ALCANCE_EMA = ['CAMION', 'NEUMATICO'];
+
+    /**
+     * Sin acentos, sin mayúsculas y sin espacios de más.
+     *
+     * Los nombres de los tipos los escribe una persona en el panel: "Grúa sobre
+     * neumáticos", "GRUA SOBRE NEUMATICOS" y "grúa  sobre  neumáticos" son el
+     * mismo tipo y las tres tienen que entrar al informe.
+     */
+    private static function normalizar(string $s): string {
+        $s = mb_strtoupper(trim($s), 'UTF-8');
+        $s = strtr($s, ['Á'=>'A','É'=>'E','Í'=>'I','Ó'=>'O','Ú'=>'U','Ü'=>'U','Ñ'=>'N']);
+        return preg_replace('/\s+/', ' ', $s);
+    }
+
+    /**
+     * ¿Este tipo de equipo va en el informe de la ema?
+     *
+     * Tiene que ser una grúa Y estar montada sobre camión o sobre neumáticos.
+     * Se exigen las dos cosas para que un día que alguien dé de alta, por
+     * ejemplo, un montacargas sobre neumáticos, no se cuele al informe.
+     */
+    private static function enAlcanceEma(string $maquinaria): bool {
+        $n = self::normalizar($maquinaria);
+        if (strpos($n, 'GRUA') === false) return false;
+        foreach (self::ALCANCE_EMA as $patron) {
+            if (strpos($n, $patron) !== false) return true;
+        }
+        return false;
+    }
+
+    /**
      * Genera el Excel de informe de inspecciones (formato UI_INFORME_001)
      * lleno con las inspecciones en el rango de fechas indicado.
+     *
+     * Sólo entran los equipos del alcance acreditado. El formato de la plantilla
+     * no se toca: se copia el archivo tal cual y sólo se le agregan renglones de
+     * datos, así que lo que se descarga es el mismo formato que pide la ema.
      */
     public function generarInforme(string $desde, string $hasta, string $responsable): array {
         $desdeDb = $desde ? date('Y-m-d', strtotime(str_replace('/', '-', $desde))) : date('Y-01-01');
@@ -212,7 +262,7 @@ class Auditorias {
 
         try {
             $s = $this->pdo->prepare("
-                SELECT e.id_equipo, e.cliente, e.direccion, e.control, e.estado,
+                SELECT e.id_equipo, e.cliente, e.direccion, e.control, e.estado, e.maquinaria,
                        COALESCE(NULLIF(u.nombre,''), e.inspector) AS inspector,
                        DATE_FORMAT(e.fecha_inspeccion,'%d/%m/%Y') AS fecha,
                        TIME_FORMAT(e.marca_temporal,'%H:%i') AS hora
@@ -229,9 +279,38 @@ class Auditorias {
         }
         if (!$rows) return ['status' => 'error', 'message' => 'No hay inspecciones en el rango seleccionado.'];
 
+        // Se aparta lo que no es del alcance acreditado, contando por tipo para
+        // poder decirlo después. Quien firma el informe tiene que poder ver que
+        // lo que falta es lo que debía faltar.
+        $incluidos = [];
+        $omitidos  = [];
+        $enAlcance = [];
+        foreach ($rows as $r) {
+            $tipo = trim((string)($r['maquinaria'] ?? ''));
+            $clave = $tipo !== '' ? $tipo : '(sin tipo)';
+            if (self::enAlcanceEma($tipo)) {
+                $enAlcance[] = $r;
+                $incluidos[$clave] = ($incluidos[$clave] ?? 0) + 1;
+            } else {
+                $omitidos[$clave] = ($omitidos[$clave] ?? 0) + 1;
+            }
+        }
+        arsort($incluidos);
+        arsort($omitidos);
+
+        if (!$enAlcance) {
+            $fuera = [];
+            foreach ($omitidos as $t => $n) $fuera[] = $t . ' (' . $n . ')';
+            return ['status' => 'error',
+                'message' => 'En ese periodo no hay inspecciones del alcance acreditado '
+                           . '(grúas sobre camión o sobre neumáticos).'
+                           . ($fuera ? ' Sí hay, fuera de alcance: ' . implode(', ', $fuera) . '.' : ''),
+                'omitidos' => $omitidos];
+        }
+
         // Mapear cada inspección al orden de columnas de la plantilla (A..J)
         $data = [];
-        foreach ($rows as $r) {
+        foreach ($enAlcance as $r) {
             // G — Número de dictamen: folio completo AB.<control>-<año>MX
             $ctrl  = trim((string)($r['control'] ?? ''));
             $anio  = substr((string)($r['fecha'] ?? ''), -4);
@@ -283,11 +362,13 @@ class Auditorias {
         // fiable en móvil) y también el contenido en base64 como respaldo.
         $bytes = @file_get_contents($destAbs);
         return [
-            'status'   => 'success',
-            'total'    => count($data),
-            'id'       => $informeId,
-            'filename' => $nombre,
-            'b64'      => $bytes !== false ? base64_encode($bytes) : '',
+            'status'    => 'success',
+            'total'     => count($data),
+            'id'        => $informeId,
+            'filename'  => $nombre,
+            'incluidos' => $incluidos,
+            'omitidos'  => $omitidos,
+            'b64'       => $bytes !== false ? base64_encode($bytes) : '',
         ];
     }
 

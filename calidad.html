@@ -2343,7 +2343,8 @@
     <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
       <div>
         <div style="font-weight:700;color:#0d2244;font-size:14px">📊 Informe de inspecciones (Excel)</div>
-        <div style="font-size:12px;color:#667;margin-top:2px">Genera el formato UI_INFORME lleno con las inspecciones del periodo.</div>
+        <div style="font-size:12px;color:#667;margin-top:2px">Genera el formato UI_INFORME lleno con las inspecciones del periodo.
+          Sólo entran las del alcance acreditado: <strong>grúas sobre camión y sobre neumáticos</strong>.</div>
       </div>
       <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
         <div><label style="font-size:11px;color:#667;display:block">Año</label>
@@ -2359,6 +2360,7 @@
         <button class="btn-save" id="inf-btn" style="padding:8px 16px" onclick="generarInformeInsp()">Generar Excel</button>
       </div>
     </div>
+    <div id="inf-resumen" style="margin-top:12px;display:none"></div>
     <div id="inf-lista" style="margin-top:12px"></div>
   </div>
 
@@ -9540,6 +9542,24 @@ function infManual() {
   }
 }
 
+/* Qué entró al informe y qué se quedó fuera.
+   El informe va a la ema, y quien lo firma tiene que poder ver que lo que falta
+   es lo que debía faltar. Un informe corto sin explicación se parece demasiado a
+   un informe incompleto. */
+function infResumen(incluidos, omitidos) {
+  const caja = document.getElementById('inf-resumen');
+  const filas = o => Object.entries(o || {}).map(([t, n]) => `${esc2(t)} · ${n}`);
+  const si = filas(incluidos), no = filas(omitidos);
+  if (!si.length && !no.length) { caja.style.display = 'none'; return; }
+  caja.style.display = '';
+  caja.innerHTML =
+    `<div style="background:#fff;border:1px solid #c3d9f3;border-radius:9px;padding:10px 12px;font-size:12px">`
+    + (si.length ? `<div style="color:#166534"><strong>En el informe:</strong> ${si.join(' · ')}</div>` : '')
+    + (no.length ? `<div style="color:#92400e;margin-top:${si.length?'6px':'0'}">`
+                 + `<strong>Fuera de alcance, no se reportan:</strong> ${no.join(' · ')}</div>` : '')
+    + `</div>`;
+}
+
 async function generarInformeInsp() {
   const desde = document.getElementById('inf-desde').value;
   const hasta = document.getElementById('inf-hasta').value;
@@ -9547,8 +9567,15 @@ async function generarInformeInsp() {
   try {
     const r = await _audFetch(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'GENERAR_INFORME_INSPECCIONES', payload:{desde, hasta}}) });
     const d = await r.json();
-    if (d.status !== 'success') { mostrarToast(d.message||'Error.', 'err'); return; }
+    if (d.status !== 'success') {
+      mostrarToast(d.message||'Error.', 'err');
+      // Cuando no hubo nada en alcance pero sí inspecciones de otros tipos, se
+      // deja a la vista: así se distingue "no se trabajó" de "no es reportable".
+      infResumen(null, d.omitidos);
+      return;
+    }
     mostrarToast(`Informe generado (${d.total} inspecciones).`, 'ok');
+    infResumen(d.incluidos, d.omitidos);
     if (d.id) descargarInformeGuardado(d.id);
     else if (d.b64) _descargarBlobXlsx(d.b64, d.filename || 'Informe_Inspecciones.xlsx');
     cargarInformesInsp();
