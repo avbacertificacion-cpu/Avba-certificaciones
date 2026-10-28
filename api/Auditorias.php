@@ -423,6 +423,7 @@ class Auditorias {
                 'serie'      => (string)($r['serie'] ?? ''),
                 'fecha'      => (string)($r['fecha'] ?? ''),
                 'hora'       => (string)($r['hora'] ?? ''),
+                'solicitud'  => self::numeroSolicitud($r),
                 'dictamen'   => $dictamen,
                 'resultado'  => self::resultadoDe($r),
                 'inspector'  => $inspector,
@@ -443,6 +444,19 @@ class Auditorias {
                     'generado' => (string)$previos[0]['generado'],
                     'cuantos'  => count($previos),
                 ] : null];
+    }
+
+    /**
+     * El número con el que AVBA registró el servicio: columna B.
+     *
+     * Es el folio de control —cliente más consecutivo, 45155-1024—, que es lo
+     * que identifica la solicitud de inspección. Antes aquí iba id_equipo, que
+     * es el número económico del equipo: identifica la grúa, no el servicio, y
+     * dos inspecciones de la misma grúa en el año habrían salido con el mismo
+     * "número de solicitud".
+     */
+    private static function numeroSolicitud(array $r): string {
+        return trim((string)($r['control'] ?? ''));
     }
 
     /** Folio del dictamen: AB.<control>-<año>MX */
@@ -474,6 +488,7 @@ class Auditorias {
         }
         if (trim($inspector) === '')  $faltas[] = 'sin nombre del inspector';
         if (trim($dictamen) === '')   $faltas[] = 'sin número de dictamen';
+        if (self::numeroSolicitud($r) === '') $faltas[] = 'sin número de solicitud';
         if (trim((string)($r['cliente'] ?? '')) === '')   $faltas[] = 'sin razón social';
         if (trim((string)($r['direccion'] ?? '')) === '') $faltas[] = 'sin domicilio';
         return $faltas;
@@ -569,7 +584,7 @@ class Auditorias {
         foreach ($enAlcance as $r) {
             $data[] = [
                 $responsable,                    // A Nombre de la persona responsable de la información
-                (string)($r['id_equipo'] ?? ''), // B Número de solicitud
+                self::numeroSolicitud($r),       // B Número de solicitud
                 (string)($r['cliente'] ?? ''),   // C Razón social
                 (string)($r['direccion'] ?? ''), // D Domicilio de la inspección
                 (string)($r['fecha'] ?? ''),     // E Fecha de inspección

@@ -9732,6 +9732,7 @@ function renderEquiposAlcance() {
       <td style="padding:7px 6px;font-size:12px">${esc2(e.fecha)}<div style="color:#8a93a8;font-size:11px">${esc2(e.hora||'')}</div></td>
       <td style="padding:7px 6px;font-size:12px">${esc2(e.cliente)}</td>
       <td style="padding:7px 6px;font-size:12px">${esc2(e.maquinaria)}<div style="color:#8a93a8;font-size:11px">${esc2(e.marca||'')} ${esc2(e.serie?('· '+e.serie):'')}</div></td>
+      <td style="padding:7px 6px;font-size:11px;font-family:monospace">${esc2(e.solicitud||'—')}</td>
       <td style="padding:7px 6px;font-size:11px;font-family:monospace">${esc2(e.dictamen||'—')}</td>
       <td style="padding:7px 6px;font-size:11px;font-weight:700;color:${e.resultado==='NO CONFORME'?'#b91c1c':'#166534'}">${esc2(e.resultado)}</td>
       <td style="padding:7px 6px;font-size:11px;color:#8a93a8">${esc2(e.inspector||'')}</td>
@@ -9768,7 +9769,8 @@ function renderEquiposAlcance() {
           <thead><tr style="background:#fafcff;font-size:11px;color:#667;text-align:left">
             <th style="padding:7px 6px;width:34px"></th><th style="padding:7px 6px">Fecha</th>
             <th style="padding:7px 6px">Cliente</th><th style="padding:7px 6px">Equipo</th>
-            <th style="padding:7px 6px">Dictamen</th><th style="padding:7px 6px">Resultado</th>
+            <th style="padding:7px 6px">Solicitud</th><th style="padding:7px 6px">Dictamen</th>
+            <th style="padding:7px 6px">Resultado</th>
             <th style="padding:7px 6px">Inspector</th><th style="padding:7px 6px"></th>
           </tr></thead>
           <tbody>${filas}</tbody>
