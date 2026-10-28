@@ -44,6 +44,8 @@ class Auditorias {
                   id          INT AUTO_INCREMENT PRIMARY KEY,
                   desde       DATE NULL,
                   hasta       DATE NULL,
+                  anio        INT  NULL,
+                  trimestre   TINYINT NULL,
                   total       INT  NOT NULL DEFAULT 0,
                   responsable VARCHAR(200) NULL,
                   archivo     VARCHAR(300) NOT NULL,
@@ -52,6 +54,34 @@ class Auditorias {
             ");
         } catch (\PDOException $e) {
             error_log('[Auditorias] migrate informes: ' . $e->getMessage());
+        }
+
+        // Bases que ya tenían el módulo antes del trimestre. Cada una en su
+        // propio try: en MariaDB vieja IF NOT EXISTS no existe y la sentencia
+        // falla; queremos que falle sola, sin arrastrar a las demás.
+        foreach (['anio INT NULL', 'trimestre TINYINT NULL'] as $col) {
+            try { $this->pdo->exec("ALTER TABLE informes_inspecciones ADD COLUMN IF NOT EXISTS $col"); }
+            catch (\Throwable $e) { /* ya existe, o el motor no lo soporta */ }
+        }
+
+        /* Qué llevó cada informe, renglón por renglón.
+           Sin esto el historial dice cuántos equipos se reportaron, pero no
+           cuáles, y entonces no hay forma de saber si una inspección quedó sin
+           declarar o se declaró dos veces en trimestres distintos. Ante la ema
+           eso no se puede contestar con la memoria de nadie. */
+        try {
+            $this->pdo->exec("
+                CREATE TABLE IF NOT EXISTS informes_inspecciones_detalle (
+                  id         INT AUTO_INCREMENT PRIMARY KEY,
+                  informe_id INT NOT NULL,
+                  equipo_id  INT NOT NULL,
+                  control    VARCHAR(20) NULL,
+                  UNIQUE KEY uk_informe_equipo (informe_id, equipo_id),
+                  KEY idx_equipo (equipo_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+            ");
+        } catch (\PDOException $e) {
+            error_log('[Auditorias] migrate detalle informes: ' . $e->getMessage());
         }
     }
 
@@ -248,55 +278,195 @@ class Auditorias {
         return false;
     }
 
+    /** Normaliza una fecha de la pantalla al formato de la base. */
+    private static function fechaDb(string $f, string $siVacia): string {
+        return $f !== '' ? date('Y-m-d', strtotime(str_replace('/', '-', $f))) : $siVacia;
+    }
+
     /**
-     * Genera el Excel de informe de inspecciones (formato UI_INFORME_001)
-     * lleno con las inspecciones en el rango de fechas indicado.
+     * Las inspecciones cerradas de un periodo, con su tipo de equipo.
      *
-     * Sólo entran los equipos del alcance acreditado. El formato de la plantilla
-     * no se toca: se copia el archivo tal cual y sólo se le agregan renglones de
-     * datos, así que lo que se descarga es el mismo formato que pide la ema.
+     * La usan el listado de la pantalla y la generación del Excel, a propósito:
+     * si cada uno armara su consulta, un día enseñarían cosas distintas y el
+     * archivo entregado no sería el que se revisó antes de entregarlo.
      */
-    public function generarInforme(string $desde, string $hasta, string $responsable): array {
-        $desdeDb = $desde ? date('Y-m-d', strtotime(str_replace('/', '-', $desde))) : date('Y-01-01');
-        $hastaDb = $hasta ? date('Y-m-d', strtotime(str_replace('/', '-', $hasta))) : date('Y-m-d');
+    private function inspeccionesDelPeriodo(string $desdeDb, string $hastaDb): array {
+        $s = $this->pdo->prepare("
+            SELECT e.id AS equipo_id, e.id_equipo, e.cliente, e.direccion, e.control,
+                   e.estado, e.maquinaria, e.marca, e.modelo, e.serie,
+                   COALESCE(NULLIF(u.nombre,''), e.inspector) AS inspector,
+                   DATE_FORMAT(e.fecha_inspeccion,'%d/%m/%Y') AS fecha,
+                   TIME_FORMAT(e.marca_temporal,'%H:%i') AS hora
+            FROM equipos e
+            LEFT JOIN usuarios u ON u.usuario COLLATE utf8mb4_general_ci = e.inspector
+            WHERE e.fecha_inspeccion BETWEEN ? AND ?
+              AND e.estado IN ('CONFORME','NO CONFORME','ENVIADO','APROBADO CALIDAD','RETORNADO','RECHAZADO')
+            ORDER BY e.fecha_inspeccion ASC, e.id ASC
+        ");
+        $s->execute([$desdeDb, $hastaDb]);
+        return $s->fetchAll(PDO::FETCH_ASSOC);
+    }
 
-        try {
-            $s = $this->pdo->prepare("
-                SELECT e.id_equipo, e.cliente, e.direccion, e.control, e.estado, e.maquinaria,
-                       COALESCE(NULLIF(u.nombre,''), e.inspector) AS inspector,
-                       DATE_FORMAT(e.fecha_inspeccion,'%d/%m/%Y') AS fecha,
-                       TIME_FORMAT(e.marca_temporal,'%H:%i') AS hora
-                FROM equipos e
-                LEFT JOIN usuarios u ON u.usuario COLLATE utf8mb4_general_ci = e.inspector
-                WHERE e.fecha_inspeccion BETWEEN ? AND ?
-                  AND e.estado IN ('CONFORME','NO CONFORME','ENVIADO','APROBADO CALIDAD','RETORNADO','RECHAZADO')
-                ORDER BY e.fecha_inspeccion ASC, e.id ASC
-            ");
-            $s->execute([$desdeDb, $hastaDb]);
-            $rows = $s->fetchAll(PDO::FETCH_ASSOC);
-        } catch (\PDOException $e) {
-            return ['status' => 'error', 'message' => 'Error al leer inspecciones: ' . $e->getMessage()];
-        }
-        if (!$rows) return ['status' => 'error', 'message' => 'No hay inspecciones en el rango seleccionado.'];
-
-        // Se aparta lo que no es del alcance acreditado, contando por tipo para
-        // poder decirlo después. Quien firma el informe tiene que poder ver que
-        // lo que falta es lo que debía faltar.
-        $incluidos = [];
-        $omitidos  = [];
-        $enAlcance = [];
+    /** Separa lo del alcance acreditado de lo que no, contando por tipo. */
+    private function partirPorAlcance(array $rows): array {
+        $dentro = []; $incluidos = []; $omitidos = [];
         foreach ($rows as $r) {
-            $tipo = trim((string)($r['maquinaria'] ?? ''));
+            $tipo  = trim((string)($r['maquinaria'] ?? ''));
             $clave = $tipo !== '' ? $tipo : '(sin tipo)';
             if (self::enAlcanceEma($tipo)) {
-                $enAlcance[] = $r;
+                $dentro[] = $r;
                 $incluidos[$clave] = ($incluidos[$clave] ?? 0) + 1;
             } else {
                 $omitidos[$clave] = ($omitidos[$clave] ?? 0) + 1;
             }
         }
-        arsort($incluidos);
-        arsort($omitidos);
+        arsort($incluidos); arsort($omitidos);
+        return ['dentro' => $dentro, 'incluidos' => $incluidos, 'omitidos' => $omitidos];
+    }
+
+    /**
+     * En qué informes anteriores salió ya cada equipo.
+     *
+     * Se consulta para poder avisarlo en el listado. Repetir un equipo en dos
+     * trimestres no está prohibido —una grúa se puede inspeccionar dos veces al
+     * año—, pero repetir la MISMA inspección sí es un error, y es de los que no
+     * se notan al revisar el Excel.
+     *
+     * @return array equipo_id => [['anio'=>, 'trimestre'=>, 'generado'=>], …]
+     */
+    private function reportadosAntes(array $equipoIds): array {
+        if (!$equipoIds) return [];
+        $hueco = implode(',', array_fill(0, count($equipoIds), '?'));
+        try {
+            $s = $this->pdo->prepare("
+                SELECT d.equipo_id, i.id AS informe_id, i.anio, i.trimestre,
+                       DATE_FORMAT(i.created_at,'%d/%m/%Y') AS generado
+                FROM informes_inspecciones_detalle d
+                INNER JOIN informes_inspecciones i ON i.id = d.informe_id
+                WHERE d.equipo_id IN ($hueco)
+                ORDER BY i.id ASC
+            ");
+            $s->execute(array_values($equipoIds));
+        } catch (\PDOException $e) {
+            error_log('[Auditorias] reportadosAntes: ' . $e->getMessage());
+            return [];
+        }
+        $out = [];
+        foreach ($s->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $out[(int)$r['equipo_id']][] = [
+                'informe_id' => (int)$r['informe_id'],
+                'anio'       => $r['anio'] !== null ? (int)$r['anio'] : null,
+                'trimestre'  => $r['trimestre'] !== null ? (int)$r['trimestre'] : null,
+                'generado'   => (string)$r['generado'],
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Si el rango es exactamente un trimestre, cuál. Si no, nulo.
+     *
+     * Se guarda para que el historial pueda decir "T3 2026" en vez de dos
+     * fechas, que es como lo pide la ema y como lo piensa quien lo entrega.
+     */
+    private static function trimestreDe(string $desdeDb, string $hastaDb): array {
+        $d = strtotime($desdeDb); $h = strtotime($hastaDb);
+        if (!$d || !$h) return [null, null];
+        $anio = (int)date('Y', $d);
+        if ((int)date('Y', $h) !== $anio) return [null, null];
+        $mi = (int)date('n', $d); $mf = (int)date('n', $h);
+        if ((int)date('j', $d) !== 1 || $mi % 3 !== 1) return [null, null];
+        if ($mf !== $mi + 2 || (int)date('j', $h) !== (int)date('t', $h)) return [null, null];
+        return [$anio, intdiv($mi, 3) + 1];
+    }
+
+    /**
+     * Las grúas del alcance que caen en el periodo, para elegir cuáles entran.
+     *
+     * Enseñarlas antes de generar el archivo no es un lujo: el informe va a la
+     * autoridad y quien lo firma tiene que ver qué va dentro, no enterarse al
+     * abrir el Excel.
+     */
+    public function equiposAlcance(string $desde, string $hasta): array {
+        $desdeDb = self::fechaDb($desde, date('Y-01-01'));
+        $hastaDb = self::fechaDb($hasta, date('Y-m-d'));
+
+        try {
+            $rows = $this->inspeccionesDelPeriodo($desdeDb, $hastaDb);
+        } catch (\PDOException $e) {
+            return ['status' => 'error', 'message' => 'Error al leer inspecciones: ' . $e->getMessage()];
+        }
+
+        $p = $this->partirPorAlcance($rows);
+        $ya = $this->reportadosAntes(array_column($p['dentro'], 'equipo_id'));
+
+        $equipos = [];
+        foreach ($p['dentro'] as $r) {
+            $id = (int)$r['equipo_id'];
+            $equipos[] = [
+                'equipo_id'  => $id,
+                'id_equipo'  => (string)($r['id_equipo'] ?? ''),
+                'cliente'    => (string)($r['cliente'] ?? ''),
+                'maquinaria' => (string)($r['maquinaria'] ?? ''),
+                'marca'      => trim(((string)($r['marca'] ?? '')) . ' ' . ((string)($r['modelo'] ?? ''))),
+                'serie'      => (string)($r['serie'] ?? ''),
+                'fecha'      => (string)($r['fecha'] ?? ''),
+                'hora'       => (string)($r['hora'] ?? ''),
+                'dictamen'   => self::folioDictamen($r),
+                'resultado'  => self::resultadoDe($r),
+                'inspector'  => (string)($r['inspector'] ?? ''),
+                'reportado'  => $ya[$id] ?? [],
+            ];
+        }
+
+        [$anio, $trimestre] = self::trimestreDe($desdeDb, $hastaDb);
+        return ['status' => 'success', 'equipos' => $equipos,
+                'incluidos' => $p['incluidos'], 'omitidos' => $p['omitidos'],
+                'anio' => $anio, 'trimestre' => $trimestre];
+    }
+
+    /** Folio del dictamen: AB.<control>-<año>MX */
+    private static function folioDictamen(array $r): string {
+        $ctrl = trim((string)($r['control'] ?? ''));
+        if ($ctrl === '') return '';
+        $anio = substr((string)($r['fecha'] ?? ''), -4);
+        if (!preg_match('/^\d{4}$/', $anio)) $anio = date('Y');
+        return 'AB.' . $ctrl . '-' . $anio . 'MX';
+    }
+
+    /** El resultado, normalizado a los dos valores que acepta el formato. */
+    private static function resultadoDe(array $r): string {
+        $estado = strtoupper(trim((string)($r['estado'] ?? '')));
+        return in_array($estado, ['NO CONFORME', 'RECHAZADO'], true) ? 'NO CONFORME' : 'CONFORME';
+    }
+
+    /**
+     * Genera el Excel de informe de inspecciones (formato UI_INFORME_001)
+     * lleno con las inspecciones en el rango de fechas indicado.
+     *
+     * Sólo entran los equipos del alcance acreditado, y de ésos, los que se
+     * hayan elegido en la pantalla. El formato de la plantilla no se toca: se
+     * copia el archivo tal cual y sólo se le agregan renglones de datos, así que
+     * lo que se descarga es el mismo formato que pide la ema.
+     *
+     * @param int[] $soloIds Equipos elegidos. Vacío = todos los del alcance.
+     */
+    public function generarInforme(string $desde, string $hasta, string $responsable,
+                                   array $soloIds = []): array {
+        $desdeDb = self::fechaDb($desde, date('Y-01-01'));
+        $hastaDb = self::fechaDb($hasta, date('Y-m-d'));
+
+        try {
+            $rows = $this->inspeccionesDelPeriodo($desdeDb, $hastaDb);
+        } catch (\PDOException $e) {
+            return ['status' => 'error', 'message' => 'Error al leer inspecciones: ' . $e->getMessage()];
+        }
+        if (!$rows) return ['status' => 'error', 'message' => 'No hay inspecciones en el rango seleccionado.'];
+
+        $p = $this->partirPorAlcance($rows);
+        $incluidos = $p['incluidos'];
+        $omitidos  = $p['omitidos'];
+        $enAlcance = $p['dentro'];
 
         if (!$enAlcance) {
             $fuera = [];
@@ -308,28 +478,40 @@ class Auditorias {
                 'omitidos' => $omitidos];
         }
 
+        // La elección de la pantalla. Se filtra contra lo que de verdad está en
+        // alcance y en el periodo: un id que llegue de fuera de esa lista no
+        // entra, venga de donde venga.
+        if ($soloIds) {
+            $pedidos = array_flip(array_map('intval', $soloIds));
+            $elegidos = array_values(array_filter($enAlcance,
+                fn($r) => isset($pedidos[(int)$r['equipo_id']])));
+            if (!$elegidos) {
+                return ['status' => 'error',
+                    'message' => 'Ninguno de los equipos elegidos está en el periodo y en el alcance. '
+                               . 'Vuelve a cargar la lista.'];
+            }
+            // Lo que no se eligió también se cuenta, para poder decirlo después.
+            $incluidos = [];
+            foreach ($elegidos as $r) {
+                $t = trim((string)($r['maquinaria'] ?? '')) ?: '(sin tipo)';
+                $incluidos[$t] = ($incluidos[$t] ?? 0) + 1;
+            }
+            arsort($incluidos);
+            $enAlcance = $elegidos;
+        }
+
         // Mapear cada inspección al orden de columnas de la plantilla (A..J)
         $data = [];
         foreach ($enAlcance as $r) {
-            // G — Número de dictamen: folio completo AB.<control>-<año>MX
-            $ctrl  = trim((string)($r['control'] ?? ''));
-            $anio  = substr((string)($r['fecha'] ?? ''), -4);
-            if (!preg_match('/^\d{4}$/', $anio)) $anio = date('Y');
-            $folio = $ctrl !== '' ? ('AB.' . $ctrl . '-' . $anio . 'MX') : '';
-
-            // H — Resultado: normalizar a CONFORME / NO CONFORME
-            $estado    = strtoupper(trim((string)($r['estado'] ?? '')));
-            $resultado = in_array($estado, ['NO CONFORME', 'RECHAZADO'], true) ? 'NO CONFORME' : 'CONFORME';
-
             $data[] = [
-                $responsable,                 // A Nombre de la persona responsable de la información
+                $responsable,                    // A Nombre de la persona responsable de la información
                 (string)($r['id_equipo'] ?? ''), // B Número de solicitud
                 (string)($r['cliente'] ?? ''),   // C Razón social
                 (string)($r['direccion'] ?? ''), // D Domicilio de la inspección
                 (string)($r['fecha'] ?? ''),     // E Fecha de inspección
                 (string)($r['hora'] ?? ''),      // F Hora de inicio
-                $folio,                          // G Número de dictamen
-                $resultado,                      // H Resultado de la inspección
+                self::folioDictamen($r),         // G Número de dictamen
+                self::resultadoDe($r),           // H Resultado de la inspección
                 (string)($r['inspector'] ?? ''), // I Inspector(es)
                 '',                              // J Persona(s) de apoyo (manual)
             ];
@@ -346,16 +528,36 @@ class Auditorias {
         if (!$this->llenarPlantillaXlsx($plantilla, $destAbs, $data)) {
             return ['status' => 'error', 'message' => 'No se pudo generar el archivo Excel.'];
         }
-        // Registrar el informe en el historial
+        // Registrar el informe en el historial, con su trimestre y con el
+        // detalle de qué equipos llevó: sin el detalle no hay forma de saber
+        // después si una inspección quedó sin declarar.
+        [$anioT, $trimestre] = self::trimestreDe($desdeDb, $hastaDb);
         $informeId = 0;
         try {
             $this->pdo->prepare(
-                "INSERT INTO informes_inspecciones (desde, hasta, total, responsable, archivo)
-                 VALUES (?,?,?,?,?)"
-            )->execute([$desdeDb, $hastaDb, count($data), $responsable, 'uploads/auditorias/' . $nombre]);
+                "INSERT INTO informes_inspecciones (desde, hasta, anio, trimestre, total, responsable, archivo)
+                 VALUES (?,?,?,?,?,?,?)"
+            )->execute([$desdeDb, $hastaDb, $anioT, $trimestre, count($data),
+                        $responsable, 'uploads/auditorias/' . $nombre]);
             $informeId = (int)$this->pdo->lastInsertId();
         } catch (\PDOException $e) {
             error_log('[Auditorias] registrar informe: ' . $e->getMessage());
+        }
+
+        if ($informeId > 0) {
+            try {
+                $d = $this->pdo->prepare(
+                    "INSERT IGNORE INTO informes_inspecciones_detalle (informe_id, equipo_id, control)
+                     VALUES (?,?,?)"
+                );
+                foreach ($enAlcance as $r) {
+                    $d->execute([$informeId, (int)$r['equipo_id'], (string)($r['control'] ?? '')]);
+                }
+            } catch (\PDOException $e) {
+                // El archivo ya está generado y registrado; perder el detalle
+                // empobrece el historial pero no invalida el informe.
+                error_log('[Auditorias] detalle del informe: ' . $e->getMessage());
+            }
         }
 
         // Se devuelve el id (para descargar por navegación vía descargar.php,
@@ -366,17 +568,24 @@ class Auditorias {
             'total'     => count($data),
             'id'        => $informeId,
             'filename'  => $nombre,
+            'anio'      => $anioT,
+            'trimestre' => $trimestre,
             'incluidos' => $incluidos,
             'omitidos'  => $omitidos,
             'b64'       => $bytes !== false ? base64_encode($bytes) : '',
         ];
     }
 
-    /** Lista el historial de informes de inspecciones generados. */
+    /**
+     * El historial de informes entregados.
+     *
+     * Cada uno con su trimestre, para poder leerlo como lo pide la ema —"T3
+     * 2026"— y no como dos fechas sueltas.
+     */
     public function listarInformes(): array {
         try {
             $rows = $this->pdo->query(
-                "SELECT id, total, archivo,
+                "SELECT id, total, archivo, anio, trimestre,
                         DATE_FORMAT(desde,'%d/%m/%Y') AS desde,
                         DATE_FORMAT(hasta,'%d/%m/%Y') AS hasta,
                         DATE_FORMAT(created_at,'%d/%m/%Y %H:%i') AS generado
@@ -386,7 +595,50 @@ class Auditorias {
         } catch (\PDOException $e) {
             return ['status' => 'success', 'data' => []];
         }
+        foreach ($rows as &$r) {
+            $r['periodo'] = ($r['anio'] && $r['trimestre'])
+                ? ('T' . (int)$r['trimestre'] . ' ' . (int)$r['anio'] . ' · ' . self::MESES_TRI[(int)$r['trimestre']])
+                : ($r['desde'] . ' – ' . $r['hasta']);
+        }
+        unset($r);
         return ['status' => 'success', 'data' => $rows];
+    }
+
+    /** Los meses de cada trimestre, para rotular el historial. */
+    private const MESES_TRI = [1 => 'Ene–Mar', 2 => 'Abr–Jun', 3 => 'Jul–Sep', 4 => 'Oct–Dic'];
+
+    /**
+     * Qué equipos llevó un informe ya entregado.
+     *
+     * Es la pregunta que no se podía contestar antes: el historial decía cuántos
+     * eran, no cuáles. Ante la ema, "creo que sí lo reportamos" no es respuesta.
+     */
+    public function detalleInforme(int $id): array {
+        if ($id <= 0) return ['status' => 'error', 'message' => 'Informe no válido.'];
+        try {
+            $s = $this->pdo->prepare("
+                SELECT d.equipo_id, d.control,
+                       e.id_equipo, e.cliente, e.maquinaria, e.marca, e.modelo, e.serie,
+                       DATE_FORMAT(e.fecha_inspeccion,'%d/%m/%Y') AS fecha
+                FROM informes_inspecciones_detalle d
+                LEFT JOIN equipos e ON e.id = d.equipo_id
+                WHERE d.informe_id = ?
+                ORDER BY e.fecha_inspeccion ASC, d.id ASC
+            ");
+            $s->execute([$id]);
+            $filas = $s->fetchAll(PDO::FETCH_ASSOC);
+        } catch (\PDOException $e) {
+            error_log('[Auditorias] detalleInforme: ' . $e->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudo leer el detalle del informe.'];
+        }
+        foreach ($filas as &$f) {
+            $f['equipo'] = trim(((string)($f['marca'] ?? '')) . ' ' . ((string)($f['modelo'] ?? '')));
+            // Un informe de hace dos años puede apuntar a un equipo que ya se
+            // borró: se dice, en vez de enseñar un renglón en blanco.
+            if ($f['id_equipo'] === null) $f['id_equipo'] = '(el equipo ya no está en el sistema)';
+        }
+        unset($f);
+        return ['status' => 'success', 'data' => $filas];
     }
 
     /** Devuelve un informe guardado en base64 para descargarlo de nuevo. */

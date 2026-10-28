@@ -2356,10 +2356,12 @@
             <option value="">Fechas a mano</option></select></div>
         <div><label style="font-size:11px;color:#667;display:block">Desde</label><input type="date" id="inf-desde" style="padding:7px;border:1px solid var(--borde);border-radius:7px" onchange="infManual()"></div>
         <div><label style="font-size:11px;color:#667;display:block">Hasta</label><input type="date" id="inf-hasta" style="padding:7px;border:1px solid var(--borde);border-radius:7px" onchange="infManual()"></div>
+        <button class="btn-sec" id="inf-ver" style="padding:8px 16px;border:1.5px solid var(--azul);background:var(--azul-light);color:var(--azul);border-radius:7px;font-weight:600;cursor:pointer" onclick="verEquiposAlcance()">Ver equipos</button>
         <button class="btn-save" id="inf-btn" style="padding:8px 16px" onclick="generarInformeInsp()">Generar Excel</button>
       </div>
     </div>
     <div id="inf-limite" style="margin-top:10px;font-size:12px"></div>
+    <div id="inf-equipos" style="margin-top:12px"></div>
     <div id="inf-resumen" style="margin-top:12px;display:none"></div>
     <div id="inf-lista" style="margin-top:12px"></div>
   </div>
@@ -9596,12 +9598,120 @@ function infResumen(incluidos, omitidos) {
     + `</div>`;
 }
 
+/* ══ Las grúas del periodo, para elegir cuáles entran ══
+   El informe va a la autoridad: quien lo firma tiene que ver qué lleva dentro
+   antes de generarlo, no enterarse al abrir el Excel. Y a veces no toca
+   reportar todo —una inspección repetida, una que se va a corregir—, así que
+   cada renglón se puede desmarcar. */
+let _infEquipos = [];
+
+async function verEquiposAlcance() {
+  const desde = document.getElementById('inf-desde').value;
+  const hasta = document.getElementById('inf-hasta').value;
+  const cont = document.getElementById('inf-equipos');
+  const btn  = document.getElementById('inf-ver');
+  if (!desde || !hasta) { mostrarToast('Elige primero el periodo.', 'err'); return; }
+  btn.disabled = true; btn.textContent = 'Cargando…';
+  cont.innerHTML = '<div style="font-size:12px;color:#7a8398;padding:8px 0">Buscando las grúas del periodo…</div>';
+  try {
+    const r = await _audFetch(`${_AUD_API}?action=EQUIPOS_ALCANCE_EMA&desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`);
+    const d = await r.json();
+    if (d.status !== 'success') { cont.innerHTML = `<div class="aviso">${esc2(d.message||'Error.')}</div>`; return; }
+    _infEquipos = d.equipos || [];
+    renderEquiposAlcance();
+    infResumen(d.incluidos, d.omitidos);
+  } catch(_) {
+    cont.innerHTML = '<div style="color:#b91c1c;font-size:12px;padding:8px 0">Error de red.</div>';
+  } finally { btn.disabled = false; btn.textContent = 'Ver equipos'; }
+}
+
+function renderEquiposAlcance() {
+  const cont = document.getElementById('inf-equipos');
+  if (!_infEquipos.length) {
+    cont.innerHTML = '<div style="font-size:12px;color:#92400e;padding:8px 0">'
+      + 'No hay grúas del alcance acreditado en este periodo.</div>';
+    return;
+  }
+  const filas = _infEquipos.map((e, i) => {
+    // Avisar de lo ya entregado. Una grúa se puede inspeccionar dos veces al
+    // año y entrar en dos informes; repetir la MISMA inspección es un error que
+    // no se nota revisando el Excel, así que se dice aquí.
+    const rep = (e.reportado || []).map(x => x.anio && x.trimestre
+      ? `T${x.trimestre} ${x.anio}` : x.generado).join(', ');
+    return `
+    <tr style="border-top:1px solid #e3ebf7">
+      <td style="padding:7px 6px"><input type="checkbox" class="inf-chk" data-i="${i}" ${rep?'':'checked'}
+          style="width:17px;height:17px;cursor:pointer" onchange="infContar()"></td>
+      <td style="padding:7px 6px;font-size:12px">${esc2(e.fecha)}<div style="color:#8a93a8;font-size:11px">${esc2(e.hora||'')}</div></td>
+      <td style="padding:7px 6px;font-size:12px">${esc2(e.cliente)}</td>
+      <td style="padding:7px 6px;font-size:12px">${esc2(e.maquinaria)}<div style="color:#8a93a8;font-size:11px">${esc2(e.marca||'')} ${esc2(e.serie?('· '+e.serie):'')}</div></td>
+      <td style="padding:7px 6px;font-size:11px;font-family:monospace">${esc2(e.dictamen||'—')}</td>
+      <td style="padding:7px 6px;font-size:11px;font-weight:700;color:${e.resultado==='NO CONFORME'?'#b91c1c':'#166534'}">${esc2(e.resultado)}</td>
+      <td style="padding:7px 6px;font-size:11px;color:#8a93a8">${esc2(e.inspector||'')}</td>
+      <td style="padding:7px 6px;font-size:11px">${rep
+        ? `<span style="color:#92400e;font-weight:600">ya reportado · ${esc2(rep)}</span>` : ''}</td>
+    </tr>`;
+  }).join('');
+
+  cont.innerHTML = `
+    <div style="background:#fff;border:1px solid #c3d9f3;border-radius:9px;overflow:hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;background:#f3f8ff;flex-wrap:wrap">
+        <div style="font-size:12px;font-weight:700;color:#0d2244">Grúas del alcance en el periodo
+          <span id="inf-cuenta" style="font-weight:600;color:#667"></span></div>
+        <div style="display:flex;gap:6px">
+          <button onclick="infMarcar(true)" class="tactil" style="padding:5px 11px;border:1px solid #c3d9f3;background:#fff;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Marcar todas</button>
+          <button onclick="infMarcar(false)" class="tactil" style="padding:5px 11px;border:1px solid #c3d9f3;background:#fff;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">Desmarcar</button>
+        </div>
+      </div>
+      <div class="table-scroll" style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;min-width:820px">
+          <thead><tr style="background:#fafcff;font-size:11px;color:#667;text-align:left">
+            <th style="padding:7px 6px;width:34px"></th><th style="padding:7px 6px">Fecha</th>
+            <th style="padding:7px 6px">Cliente</th><th style="padding:7px 6px">Equipo</th>
+            <th style="padding:7px 6px">Dictamen</th><th style="padding:7px 6px">Resultado</th>
+            <th style="padding:7px 6px">Inspector</th><th style="padding:7px 6px"></th>
+          </tr></thead>
+          <tbody>${filas}</tbody>
+        </table>
+      </div>
+    </div>`;
+  infContar();
+}
+
+function infMarcar(v) {
+  document.querySelectorAll('.inf-chk').forEach(c => { c.checked = v; });
+  infContar();
+}
+
+function infContar() {
+  const n = document.querySelectorAll('.inf-chk:checked').length;
+  const c = document.getElementById('inf-cuenta');
+  if (c) c.textContent = `· ${n} de ${_infEquipos.length} seleccionada${n===1?'':'s'}`;
+}
+
+/** Los equipos marcados. Vacío = no se cargó la lista, y entonces van todos. */
+function infSeleccionados() {
+  return Array.from(document.querySelectorAll('.inf-chk:checked'))
+    .map(c => (_infEquipos[+c.dataset.i] || {}).equipo_id)
+    .filter(Boolean);
+}
+
 async function generarInformeInsp() {
   const desde = document.getElementById('inf-desde').value;
   const hasta = document.getElementById('inf-hasta').value;
   const btn = document.getElementById('inf-btn'); btn.disabled = true; btn.textContent = 'Generando…';
   try {
-    const r = await _audFetch(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({action:'GENERAR_INFORME_INSPECCIONES', payload:{desde, hasta}}) });
+    // Si la lista está cargada, manda lo marcado. Si no se abrió, van todas las
+    // del alcance: el comportamiento de siempre.
+    const hayLista = document.querySelectorAll('.inf-chk').length > 0;
+    const elegidos = infSeleccionados();
+    if (hayLista && !elegidos.length) {
+      mostrarToast('No hay ninguna grúa marcada.', 'err');
+      btn.disabled = false; btn.textContent = 'Generar Excel'; return;
+    }
+    const r = await _audFetch(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({action:'GENERAR_INFORME_INSPECCIONES',
+                            payload:{desde, hasta, equipos: hayLista ? elegidos : []}}) });
     const d = await r.json();
     if (d.status !== 'success') {
       mostrarToast(d.message||'Error.', 'err');
@@ -9610,8 +9720,12 @@ async function generarInformeInsp() {
       infResumen(null, d.omitidos);
       return;
     }
-    mostrarToast(`Informe generado (${d.total} inspecciones).`, 'ok');
+    const periodo = (d.anio && d.trimestre) ? ` para T${d.trimestre} ${d.anio}` : '';
+    mostrarToast(`Informe generado${periodo} (${d.total} grúa${d.total==1?'':'s'}).`, 'ok');
     infResumen(d.incluidos, d.omitidos);
+    // La lista se recarga para que las grúas recién entregadas queden marcadas
+    // como ya reportadas, y no se vuelvan a mandar sin querer.
+    if (document.querySelectorAll('.inf-chk').length) verEquiposAlcance();
     if (d.id) descargarInformeGuardado(d.id);
     else if (d.b64) _descargarBlobXlsx(d.b64, d.filename || 'Informe_Inspecciones.xlsx');
     cargarInformesInsp();
@@ -9644,17 +9758,51 @@ async function cargarInformesInsp() {
     const lista = (d && d.data) ? d.data : [];
     if (!lista.length) { cont.innerHTML = ''; return; }
     cont.innerHTML =
-      `<div style="font-size:12px;font-weight:700;color:#0d2244;margin:4px 0 6px">Informes generados</div>` +
+      `<div style="font-size:12px;font-weight:700;color:#0d2244;margin:4px 0 6px">Informes entregados a la ema</div>` +
       lista.map(x => `
-        <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid #dbe6f5">
-          <div style="flex:1;min-width:0">
-            <div style="font-size:12px;font-weight:600;color:#1a2a44">Periodo ${x.desde||'—'} – ${x.hasta||'—'} · ${x.total} inspección${x.total==1?'':'es'}</div>
-            <div style="font-size:11px;color:#7a8398">Generado: ${x.generado||''}</div>
+        <div style="padding:7px 0;border-top:1px solid #dbe6f5">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;color:#1a2a44">${esc2(x.periodo||'—')} · ${x.total} grúa${x.total==1?'':'s'}</div>
+              <div style="font-size:11px;color:#7a8398">Generado: ${esc2(x.generado||'')}</div>
+            </div>
+            <button onclick="verDetalleInforme(${x.id})" class="tactil"
+              style="padding:5px 12px;background:#fff;color:var(--azul);border:1px solid #c3d9f3;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">Qué llevó</button>
+            <button onclick="descargarInformeGuardado(${x.id})" class="tactil"
+              style="padding:5px 12px;background:#1b7a3d;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">Descargar</button>
           </div>
-          <button onclick="descargarInformeGuardado(${x.id})"
-            style="padding:5px 12px;background:#1b7a3d;color:#fff;border:none;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap">Descargar</button>
+          <div id="inf-det-${x.id}" style="display:none;margin-top:6px"></div>
         </div>`).join('');
   } catch(_) { /* silencioso */ }
+}
+
+/* Qué llevó un informe ya entregado.
+   El historial decía cuántas grúas, no cuáles, y ante la ema "creo que sí lo
+   reportamos" no es una respuesta. Se abre y se cierra debajo del renglón, sin
+   sacar a nadie de la pantalla. */
+async function verDetalleInforme(id) {
+  const caja = document.getElementById('inf-det-' + id);
+  if (!caja) return;
+  if (caja.style.display !== 'none') { caja.style.display = 'none'; return; }
+  caja.style.display = '';
+  caja.innerHTML = '<div style="font-size:11px;color:#7a8398">Cargando…</div>';
+  try {
+    const r = await _audFetch(`${_AUD_API}?action=DETALLE_INFORME_INSPECCIONES&id=${id}`);
+    const d = await r.json();
+    const filas = (d && d.data) ? d.data : [];
+    if (d.status !== 'success') { caja.innerHTML = `<div class="aviso">${esc2(d.message||'Error.')}</div>`; return; }
+    if (!filas.length) {
+      caja.innerHTML = '<div style="font-size:11px;color:#92400e">Este informe se generó antes de que se '
+                     + 'guardara el detalle, así que no hay registro de qué grúas llevó. Se puede ver en el Excel.</div>';
+      return;
+    }
+    caja.innerHTML = `<div style="background:#fafcff;border:1px solid #e3ebf7;border-radius:7px;padding:8px 10px">`
+      + filas.map(f => `<div style="font-size:11px;color:#44506b;padding:2px 0">`
+          + `${esc2(f.fecha||'')} · <strong>${esc2(f.cliente||'')}</strong> · ${esc2(f.maquinaria||'')}`
+          + `${f.equipo ? ' · ' + esc2(f.equipo) : ''}`
+          + `${f.control ? ` · <span style="font-family:monospace">${esc2(f.control)}</span>` : ''}</div>`).join('')
+      + `</div>`;
+  } catch(_) { caja.innerHTML = '<div style="font-size:11px;color:#b91c1c">Error de red.</div>'; }
 }
 
 function descargarInformeGuardado(id) {

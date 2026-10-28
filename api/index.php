@@ -565,6 +565,19 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($auditorias->listarInformes());
 
+        // Las grúas del alcance acreditado que caen en un periodo, para elegir
+        // cuáles entran al informe antes de generarlo.
+        case 'EQUIPOS_ALCANCE_EMA':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auditorias->equiposAlcance((string)($_GET['desde'] ?? ''), (string)($_GET['hasta'] ?? '')));
+
+        // Qué equipos llevó un informe ya entregado.
+        case 'DETALLE_INFORME_INSPECCIONES':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auditorias->detalleInforme((int)($_GET['id'] ?? 0)));
+
         // Inspector: historial propio
         case 'GET_MIS_INSPECCIONES':
             $usr = validarToken($pdo, $token);
@@ -1030,7 +1043,9 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             $resp = trim($payload['responsable'] ?? ($usr['nombre'] ?? 'Calidad'));
-            respuesta($auditorias->generarInforme(trim($payload['desde'] ?? ''), trim($payload['hasta'] ?? ''), $resp));
+            $elegidos = is_array($payload['equipos'] ?? null) ? $payload['equipos'] : [];
+            respuesta($auditorias->generarInforme(trim($payload['desde'] ?? ''), trim($payload['hasta'] ?? ''),
+                                                  $resp, $elegidos));
         }
 
         case 'DESCARGAR_INFORME_INSPECCIONES':
