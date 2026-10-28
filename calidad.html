@@ -2344,7 +2344,8 @@
       <div>
         <div style="font-weight:700;color:#0d2244;font-size:14px">📊 Informe de inspecciones (Excel)</div>
         <div style="font-size:12px;color:#667;margin-top:2px">Genera el formato UI_INFORME lleno con las inspecciones del periodo.
-          Sólo entran las del alcance acreditado: <strong>grúas sobre camión y sobre neumáticos</strong>.</div>
+          Oprime <strong>Ver equipos</strong>, marca las que van y genera: el archivo lleva exactamente ésas.
+          Sólo se listan las del alcance acreditado: <strong>grúas sobre camión y sobre neumáticos</strong>.</div>
       </div>
       <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
         <div><label style="font-size:11px;color:#667;display:block">Año</label>
@@ -9613,6 +9614,7 @@ async function verEquiposAlcance() {
   if (!desde || !hasta) { mostrarToast('Elige primero el periodo.', 'err'); return; }
   btn.disabled = true; btn.textContent = 'Cargando…';
   cont.innerHTML = '<div style="font-size:12px;color:#7a8398;padding:8px 0">Buscando las grúas del periodo…</div>';
+  _infEquipos = []; infContar();
   try {
     const r = await _audFetch(`${_AUD_API}?action=EQUIPOS_ALCANCE_EMA&desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`);
     const d = await r.json();
@@ -9630,6 +9632,7 @@ function renderEquiposAlcance() {
   if (!_infEquipos.length) {
     cont.innerHTML = '<div style="font-size:12px;color:#92400e;padding:8px 0">'
       + 'No hay grúas del alcance acreditado en este periodo.</div>';
+    infContar();
     return;
   }
   const filas = _infEquipos.map((e, i) => {
@@ -9640,7 +9643,7 @@ function renderEquiposAlcance() {
       ? `T${x.trimestre} ${x.anio}` : x.generado).join(', ');
     return `
     <tr style="border-top:1px solid #e3ebf7">
-      <td style="padding:7px 6px"><input type="checkbox" class="inf-chk" data-i="${i}" ${rep?'':'checked'}
+      <td style="padding:7px 6px"><input type="checkbox" class="inf-chk" data-i="${i}"
           style="width:17px;height:17px;cursor:pointer" onchange="infContar()"></td>
       <td style="padding:7px 6px;font-size:12px">${esc2(e.fecha)}<div style="color:#8a93a8;font-size:11px">${esc2(e.hora||'')}</div></td>
       <td style="padding:7px 6px;font-size:12px">${esc2(e.cliente)}</td>
@@ -9683,10 +9686,19 @@ function infMarcar(v) {
   infContar();
 }
 
+/* El botón dice siempre cuántas lleva, y no se deja oprimir con cero.
+   La idea es que no quede duda de qué va en el archivo: lo que está marcado,
+   ni una más. */
 function infContar() {
   const n = document.querySelectorAll('.inf-chk:checked').length;
   const c = document.getElementById('inf-cuenta');
   if (c) c.textContent = `· ${n} de ${_infEquipos.length} seleccionada${n===1?'':'s'}`;
+  const btn = document.getElementById('inf-btn');
+  if (!btn) return;
+  btn.disabled = n === 0;
+  btn.style.opacity = n === 0 ? '.5' : '';
+  btn.style.cursor  = n === 0 ? 'not-allowed' : '';
+  btn.textContent = n === 0 ? 'Generar Excel' : `Generar Excel (${n})`;
 }
 
 /** Los equipos marcados. Vacío = no se cargó la lista, y entonces van todos. */
@@ -9699,19 +9711,24 @@ function infSeleccionados() {
 async function generarInformeInsp() {
   const desde = document.getElementById('inf-desde').value;
   const hasta = document.getElementById('inf-hasta').value;
-  const btn = document.getElementById('inf-btn'); btn.disabled = true; btn.textContent = 'Generando…';
+  const btn = document.getElementById('inf-btn');
+
+  // El archivo lleva lo que se marcó, y nada más. Sin lista abierta no se
+  // genera: antes, oprimir sin abrirla mandaba todo el periodo, y ésa es
+  // justamente la confusión que no puede haber en un documento que se entrega.
+  const elegidos = infSeleccionados();
+  if (!elegidos.length) {
+    mostrarToast(document.querySelectorAll('.inf-chk').length
+      ? 'Marca las grúas que quieres incluir.'
+      : 'Primero oprime "Ver equipos" y marca las que van en el informe.', 'err');
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = 'Generando…';
   try {
-    // Si la lista está cargada, manda lo marcado. Si no se abrió, van todas las
-    // del alcance: el comportamiento de siempre.
-    const hayLista = document.querySelectorAll('.inf-chk').length > 0;
-    const elegidos = infSeleccionados();
-    if (hayLista && !elegidos.length) {
-      mostrarToast('No hay ninguna grúa marcada.', 'err');
-      btn.disabled = false; btn.textContent = 'Generar Excel'; return;
-    }
     const r = await _audFetch(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({action:'GENERAR_INFORME_INSPECCIONES',
-                            payload:{desde, hasta, equipos: hayLista ? elegidos : []}}) });
+                            payload:{desde, hasta, equipos: elegidos}}) });
     const d = await r.json();
     if (d.status !== 'success') {
       mostrarToast(d.message||'Error.', 'err');
@@ -9730,7 +9747,7 @@ async function generarInformeInsp() {
     else if (d.b64) _descargarBlobXlsx(d.b64, d.filename || 'Informe_Inspecciones.xlsx');
     cargarInformesInsp();
   } catch(_) { mostrarToast('Error de red.', 'err'); }
-  finally { btn.disabled = false; btn.textContent = 'Generar Excel'; }
+  finally { btn.disabled = false; infContar(); }
 }
 
 /* Descarga un xlsx a partir de su contenido base64 (Blob) — respaldo */

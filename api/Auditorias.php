@@ -444,15 +444,26 @@ class Auditorias {
      * Genera el Excel de informe de inspecciones (formato UI_INFORME_001)
      * lleno con las inspecciones en el rango de fechas indicado.
      *
-     * Sólo entran los equipos del alcance acreditado, y de ésos, los que se
-     * hayan elegido en la pantalla. El formato de la plantilla no se toca: se
-     * copia el archivo tal cual y sólo se le agregan renglones de datos, así que
-     * lo que se descarga es el mismo formato que pide la ema.
+     * El archivo lleva exactamente los equipos que se eligieron, ni uno más.
+     * La lista es obligatoria a propósito: generar "todo lo del periodo" sin que
+     * nadie lo haya mirado es justo la confusión que no puede haber en un
+     * documento que se entrega a la autoridad. Para incluirlos todos está el
+     * botón de marcar todas, que es una decisión tomada y no una omisión.
      *
-     * @param int[] $soloIds Equipos elegidos. Vacío = todos los del alcance.
+     * De lo elegido, además, sólo pasa lo que de verdad está en el periodo y en
+     * el alcance acreditado. El formato de la plantilla no se toca: se copia el
+     * archivo tal cual y sólo se le agregan renglones, así que lo que se
+     * descarga es el mismo formato que pide la ema.
+     *
+     * @param int[] $soloIds Equipos elegidos en la pantalla. Obligatorio.
      */
     public function generarInforme(string $desde, string $hasta, string $responsable,
                                    array $soloIds = []): array {
+        if (!$soloIds) {
+            return ['status' => 'error',
+                'message' => 'Elige en la pantalla cuáles grúas van en el informe. '
+                           . 'Oprime "Ver equipos", marca las que correspondan y vuelve a generar.'];
+        }
         $desdeDb = self::fechaDb($desde, date('Y-01-01'));
         $hastaDb = self::fechaDb($hasta, date('Y-m-d'));
 
@@ -478,27 +489,27 @@ class Auditorias {
                 'omitidos' => $omitidos];
         }
 
-        // La elección de la pantalla. Se filtra contra lo que de verdad está en
-        // alcance y en el periodo: un id que llegue de fuera de esa lista no
+        // La elección de la pantalla, filtrada contra lo que de verdad está en el
+        // periodo y en el alcance: un id que llegue de fuera de esa lista no
         // entra, venga de donde venga.
-        if ($soloIds) {
-            $pedidos = array_flip(array_map('intval', $soloIds));
-            $elegidos = array_values(array_filter($enAlcance,
-                fn($r) => isset($pedidos[(int)$r['equipo_id']])));
-            if (!$elegidos) {
-                return ['status' => 'error',
-                    'message' => 'Ninguno de los equipos elegidos está en el periodo y en el alcance. '
-                               . 'Vuelve a cargar la lista.'];
-            }
-            // Lo que no se eligió también se cuenta, para poder decirlo después.
-            $incluidos = [];
-            foreach ($elegidos as $r) {
-                $t = trim((string)($r['maquinaria'] ?? '')) ?: '(sin tipo)';
-                $incluidos[$t] = ($incluidos[$t] ?? 0) + 1;
-            }
-            arsort($incluidos);
-            $enAlcance = $elegidos;
+        $pedidos  = array_flip(array_map('intval', $soloIds));
+        $elegidos = array_values(array_filter($enAlcance,
+            fn($r) => isset($pedidos[(int)$r['equipo_id']])));
+        if (!$elegidos) {
+            return ['status' => 'error',
+                'message' => 'Ninguna de las grúas elegidas está en el periodo y en el alcance. '
+                           . 'Vuelve a oprimir "Ver equipos" y marca de nuevo.'];
         }
+
+        // Se recuenta sobre lo elegido, no sobre todo el periodo: el resumen
+        // tiene que describir el archivo que salió.
+        $incluidos = [];
+        foreach ($elegidos as $r) {
+            $t = trim((string)($r['maquinaria'] ?? '')) ?: '(sin tipo)';
+            $incluidos[$t] = ($incluidos[$t] ?? 0) + 1;
+        }
+        arsort($incluidos);
+        $enAlcance = $elegidos;
 
         // Mapear cada inspección al orden de columnas de la plantilla (A..J)
         $data = [];
