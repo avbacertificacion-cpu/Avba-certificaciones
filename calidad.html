@@ -9616,7 +9616,13 @@ let _infEquipos = [];
 /* El nombre que va en la columna A del formato de la ema. Se recuerda en el
    navegador para no teclearlo cada trimestre, pero sigue siendo editable: si
    cambia la persona encargada, se escribe una vez y queda. */
-const _INF_RESP_POR_OMISION = 'Jocelyn Martínez Juárez';
+const _INF_RESP_POR_OMISION = 'Yoselin Martínez Juárez';
+
+/* Nombres que este campo trajo de origen antes y estaban mal escritos. Si el
+   navegador guardó uno de ésos, se corrige solo: va en la columna A de un
+   documento que se entrega a la autoridad, y un nombre mal escrito ahí se
+   queda en el dispositivo de quien lo abrió primero. */
+const _INF_RESP_CORREGIR = ['Jocelyn Martínez Juárez'];
 
 function infResponsable() {
   const c = document.getElementById('inf-responsable');
@@ -9632,6 +9638,7 @@ function infCargarResponsable() {
   if (!c || c.value) return;
   let guardado = '';
   try { guardado = localStorage.getItem('avba_inf_responsable') || ''; } catch (e) {}
+  if (_INF_RESP_CORREGIR.includes(guardado)) { guardado = ''; infGuardarResponsable(); }
   c.value = guardado || _INF_RESP_POR_OMISION;
 }
 
