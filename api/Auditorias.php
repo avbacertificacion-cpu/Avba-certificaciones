@@ -388,15 +388,24 @@ class Auditorias {
      * abrir el Excel.
      */
     public function equiposAlcance(string $desde, string $hasta): array {
+        try {
+            return $this->equiposAlcanceInterno($desde, $hasta);
+        } catch (\Throwable $e) {
+            // Cualquier tropiezo aquí tiene que salir como JSON con su causa.
+            // Si se deja escapar, PHP contesta una página de error y la pantalla
+            // sólo puede decir "algo falló", que no se arregla con nada.
+            error_log('[Auditorias] equiposAlcance: ' . $e->getMessage()
+                    . ' en ' . $e->getFile() . ':' . $e->getLine());
+            return ['status' => 'error',
+                'message' => 'No se pudo armar la lista de grúas: ' . $e->getMessage()];
+        }
+    }
+
+    private function equiposAlcanceInterno(string $desde, string $hasta): array {
         $desdeDb = self::fechaDb($desde, date('Y-01-01'));
         $hastaDb = self::fechaDb($hasta, date('Y-m-d'));
 
-        try {
-            $rows = $this->inspeccionesDelPeriodo($desdeDb, $hastaDb);
-        } catch (\PDOException $e) {
-            return ['status' => 'error', 'message' => 'Error al leer inspecciones: ' . $e->getMessage()];
-        }
-
+        $rows = $this->inspeccionesDelPeriodo($desdeDb, $hastaDb);
         $p = $this->partirPorAlcance($rows);
         $ya = $this->reportadosAntes(array_column($p['dentro'], 'equipo_id'));
 
@@ -459,6 +468,18 @@ class Auditorias {
      */
     public function generarInforme(string $desde, string $hasta, string $responsable,
                                    array $soloIds = []): array {
+        try {
+            return $this->generarInformeInterno($desde, $hasta, $responsable, $soloIds);
+        } catch (\Throwable $e) {
+            error_log('[Auditorias] generarInforme: ' . $e->getMessage()
+                    . ' en ' . $e->getFile() . ':' . $e->getLine());
+            return ['status' => 'error',
+                'message' => 'No se pudo generar el informe: ' . $e->getMessage()];
+        }
+    }
+
+    private function generarInformeInterno(string $desde, string $hasta, string $responsable,
+                                           array $soloIds): array {
         if (!$soloIds) {
             return ['status' => 'error',
                 'message' => 'Elige en la pantalla cuáles grúas van en el informe. '
@@ -467,11 +488,7 @@ class Auditorias {
         $desdeDb = self::fechaDb($desde, date('Y-01-01'));
         $hastaDb = self::fechaDb($hasta, date('Y-m-d'));
 
-        try {
-            $rows = $this->inspeccionesDelPeriodo($desdeDb, $hastaDb);
-        } catch (\PDOException $e) {
-            return ['status' => 'error', 'message' => 'Error al leer inspecciones: ' . $e->getMessage()];
-        }
+        $rows = $this->inspeccionesDelPeriodo($desdeDb, $hastaDb);
         if (!$rows) return ['status' => 'error', 'message' => 'No hay inspecciones en el rango seleccionado.'];
 
         $p = $this->partirPorAlcance($rows);

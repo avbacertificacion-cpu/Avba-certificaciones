@@ -9425,6 +9425,8 @@ async function cargarAuditorias() {
     document.getElementById('inf-tri').value = enCurso === 1 ? 4 : enCurso - 1;
     infPeriodo();
   }
+  // Sin lista cargada no hay nada marcado: el botón nace apagado.
+  infContar();
   cargarInformesInsp();
 }
 
@@ -9589,7 +9591,7 @@ function infResumen(incluidos, omitidos) {
   const caja = document.getElementById('inf-resumen');
   const filas = o => Object.entries(o || {}).map(([t, n]) => `${esc2(t)} · ${n}`);
   const si = filas(incluidos), no = filas(omitidos);
-  if (!si.length && !no.length) { caja.style.display = 'none'; return; }
+  if (!si.length && !no.length) { caja.style.display = 'none'; caja.innerHTML = ''; return; }
   caja.style.display = '';
   caja.innerHTML =
     `<div style="background:#fff;border:1px solid #c3d9f3;border-radius:9px;padding:10px 12px;font-size:12px">`
@@ -9606,6 +9608,37 @@ function infResumen(incluidos, omitidos) {
    cada renglón se puede desmarcar. */
 let _infEquipos = [];
 
+/* Pide al servidor y, si algo sale mal, dice QUÉ salió mal.
+   "Error de red." tapaba por igual un 500 del servidor, una sesión caída y un
+   teléfono sin señal, y las tres se arreglan en lugares distintos. En una
+   pantalla con la que se le entrega a la ema, un mensaje que no distingue hace
+   perder la tarde. Devuelve {ok, datos, error}. */
+async function _infPedir(url, opts) {
+  let r;
+  try {
+    r = await _audFetch(url, opts);
+  } catch (e) {
+    return { ok:false, error:'No se pudo contactar al servidor. Revisa la conexión del dispositivo.' };
+  }
+  let texto = '';
+  try { texto = await r.text(); } catch (e) { texto = ''; }
+
+  try {
+    const d = JSON.parse(texto);
+    if (d && d.status === 'success') return { ok:true, datos:d };
+    return { ok:false, datos:d, error:(d && d.message) ? d.message : `El servidor respondió ${r.status}.` };
+  } catch (e) {
+    // No vino JSON: casi siempre un error de PHP, que llega como página. Se
+    // enseña el principio, que es donde viene el archivo y la línea.
+    if (r.status === 401 || r.status === 403) {
+      return { ok:false, error:'La sesión expiró. Vuelve a entrar al sistema.' };
+    }
+    const pista = (texto || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220);
+    return { ok:false, error:`El servidor respondió ${r.status} sin datos.`
+                           + (pista ? ` Dice: ${pista}` : ' La respuesta llegó vacía.') };
+  }
+}
+
 async function verEquiposAlcance() {
   const desde = document.getElementById('inf-desde').value;
   const hasta = document.getElementById('inf-hasta').value;
@@ -9614,17 +9647,28 @@ async function verEquiposAlcance() {
   if (!desde || !hasta) { mostrarToast('Elige primero el periodo.', 'err'); return; }
   btn.disabled = true; btn.textContent = 'Cargando…';
   cont.innerHTML = '<div style="font-size:12px;color:#7a8398;padding:8px 0">Buscando las grúas del periodo…</div>';
-  _infEquipos = []; infContar();
+  // El resumen anterior se limpia antes de pedir: si la llamada falla, dejarlo
+  // puesto haría creer que describe lo que hay ahora en pantalla.
+  _infEquipos = []; infContar(); infResumen(null, null);
+
+  const res = await _infPedir(`${_AUD_API}?action=EQUIPOS_ALCANCE_EMA`
+    + `&desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`);
+  btn.disabled = false; btn.textContent = 'Ver equipos';
+
+  if (!res.ok) {
+    cont.innerHTML = `<div style="color:#b91c1c;font-size:12px;padding:8px 0;line-height:1.5">`
+                   + `${esc2(res.error)}</div>`;
+    return;
+  }
   try {
-    const r = await _audFetch(`${_AUD_API}?action=EQUIPOS_ALCANCE_EMA&desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`);
-    const d = await r.json();
-    if (d.status !== 'success') { cont.innerHTML = `<div class="aviso">${esc2(d.message||'Error.')}</div>`; return; }
-    _infEquipos = d.equipos || [];
+    _infEquipos = res.datos.equipos || [];
     renderEquiposAlcance();
-    infResumen(d.incluidos, d.omitidos);
-  } catch(_) {
-    cont.innerHTML = '<div style="color:#b91c1c;font-size:12px;padding:8px 0">Error de red.</div>';
-  } finally { btn.disabled = false; btn.textContent = 'Ver equipos'; }
+    infResumen(res.datos.incluidos, res.datos.omitidos);
+  } catch (e) {
+    // Si lo que falla es pintar la tabla, decirlo así y no culpar a la red.
+    cont.innerHTML = `<div style="color:#b91c1c;font-size:12px;padding:8px 0">`
+                   + `No se pudo mostrar la lista: ${esc2(e && e.message ? e.message : e)}</div>`;
+  }
 }
 
 function renderEquiposAlcance() {
@@ -9726,17 +9770,17 @@ async function generarInformeInsp() {
 
   btn.disabled = true; btn.textContent = 'Generando…';
   try {
-    const r = await _audFetch(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'},
+    const res = await _infPedir(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({action:'GENERAR_INFORME_INSPECCIONES',
                             payload:{desde, hasta, equipos: elegidos}}) });
-    const d = await r.json();
-    if (d.status !== 'success') {
-      mostrarToast(d.message||'Error.', 'err');
+    if (!res.ok) {
+      mostrarToast(res.error, 'err');
       // Cuando no hubo nada en alcance pero sí inspecciones de otros tipos, se
       // deja a la vista: así se distingue "no se trabajó" de "no es reportable".
-      infResumen(null, d.omitidos);
+      if (res.datos) infResumen(null, res.datos.omitidos);
       return;
     }
+    const d = res.datos;
     const periodo = (d.anio && d.trimestre) ? ` para T${d.trimestre} ${d.anio}` : '';
     mostrarToast(`Informe generado${periodo} (${d.total} grúa${d.total==1?'':'s'}).`, 'ok');
     infResumen(d.incluidos, d.omitidos);
@@ -9746,7 +9790,7 @@ async function generarInformeInsp() {
     if (d.id) descargarInformeGuardado(d.id);
     else if (d.b64) _descargarBlobXlsx(d.b64, d.filename || 'Informe_Inspecciones.xlsx');
     cargarInformesInsp();
-  } catch(_) { mostrarToast('Error de red.', 'err'); }
+  } catch (e) { mostrarToast('No se pudo generar: ' + (e && e.message ? e.message : e), 'err'); }
   finally { btn.disabled = false; infContar(); }
 }
 
@@ -9804,10 +9848,9 @@ async function verDetalleInforme(id) {
   caja.style.display = '';
   caja.innerHTML = '<div style="font-size:11px;color:#7a8398">Cargando…</div>';
   try {
-    const r = await _audFetch(`${_AUD_API}?action=DETALLE_INFORME_INSPECCIONES&id=${id}`);
-    const d = await r.json();
-    const filas = (d && d.data) ? d.data : [];
-    if (d.status !== 'success') { caja.innerHTML = `<div class="aviso">${esc2(d.message||'Error.')}</div>`; return; }
+    const res = await _infPedir(`${_AUD_API}?action=DETALLE_INFORME_INSPECCIONES&id=${id}`);
+    if (!res.ok) { caja.innerHTML = `<div style="font-size:11px;color:#b91c1c">${esc2(res.error)}</div>`; return; }
+    const filas = res.datos.data || [];
     if (!filas.length) {
       caja.innerHTML = '<div style="font-size:11px;color:#92400e">Este informe se generó antes de que se '
                      + 'guardara el detalle, así que no hay registro de qué grúas llevó. Se puede ver en el Excel.</div>';
@@ -9819,7 +9862,8 @@ async function verDetalleInforme(id) {
           + `${f.equipo ? ' · ' + esc2(f.equipo) : ''}`
           + `${f.control ? ` · <span style="font-family:monospace">${esc2(f.control)}</span>` : ''}</div>`).join('')
       + `</div>`;
-  } catch(_) { caja.innerHTML = '<div style="font-size:11px;color:#b91c1c">Error de red.</div>'; }
+  } catch (e) { caja.innerHTML = `<div style="font-size:11px;color:#b91c1c">No se pudo mostrar: `
+                               + `${esc2(e && e.message ? e.message : e)}</div>`; }
 }
 
 function descargarInformeGuardado(id) {
