@@ -412,6 +412,8 @@ class Auditorias {
         $equipos = [];
         foreach ($p['dentro'] as $r) {
             $id = (int)$r['equipo_id'];
+            $dictamen  = self::folioDictamen($r);
+            $inspector = (string)($r['inspector'] ?? '');
             $equipos[] = [
                 'equipo_id'  => $id,
                 'id_equipo'  => (string)($r['id_equipo'] ?? ''),
@@ -421,10 +423,11 @@ class Auditorias {
                 'serie'      => (string)($r['serie'] ?? ''),
                 'fecha'      => (string)($r['fecha'] ?? ''),
                 'hora'       => (string)($r['hora'] ?? ''),
-                'dictamen'   => self::folioDictamen($r),
+                'dictamen'   => $dictamen,
                 'resultado'  => self::resultadoDe($r),
-                'inspector'  => (string)($r['inspector'] ?? ''),
+                'inspector'  => $inspector,
                 'reportado'  => $ya[$id] ?? [],
+                'faltas'     => self::faltasParaEma($r, $dictamen, $inspector),
             ];
         }
 
@@ -441,6 +444,31 @@ class Auditorias {
         $anio = substr((string)($r['fecha'] ?? ''), -4);
         if (!preg_match('/^\d{4}$/', $anio)) $anio = date('Y');
         return 'AB.' . $ctrl . '-' . $anio . 'MX';
+    }
+
+    /**
+     * Lo que el portal de la ema rechazaría de este renglón.
+     *
+     * Su validador exige la fecha como dd/mm/aaaa, la hora como hh:mm y el
+     * nombre completo del inspector acreditado. Descubrirlo al subir el archivo
+     * significa corregir en el Excel a mano y volver a empezar; aquí se ve antes
+     * de generarlo, cuando todavía se puede arreglar en el sistema.
+     *
+     * @return string[] Vacío si el renglón va bien.
+     */
+    private static function faltasParaEma(array $r, string $dictamen, string $inspector): array {
+        $faltas = [];
+        if (!preg_match('/^\d{2}\/\d{2}\/\d{4}$/', (string)($r['fecha'] ?? ''))) {
+            $faltas[] = 'sin fecha de inspección';
+        }
+        if (!preg_match('/^\d{2}:\d{2}$/', (string)($r['hora'] ?? ''))) {
+            $faltas[] = 'sin hora de inicio';
+        }
+        if (trim($inspector) === '')  $faltas[] = 'sin nombre del inspector';
+        if (trim($dictamen) === '')   $faltas[] = 'sin número de dictamen';
+        if (trim((string)($r['cliente'] ?? '')) === '')   $faltas[] = 'sin razón social';
+        if (trim((string)($r['direccion'] ?? '')) === '') $faltas[] = 'sin domicilio';
+        return $faltas;
     }
 
     /** El resultado, normalizado a los dos valores que acepta el formato. */

@@ -2348,6 +2348,9 @@
           Sólo se listan las del alcance acreditado: <strong>grúas sobre camión y sobre neumáticos</strong>.</div>
       </div>
       <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+        <div style="flex:1;min-width:220px"><label style="font-size:11px;color:#667;display:block">Responsable de la información (columna A)</label>
+          <input type="text" id="inf-responsable" style="padding:7px;border:1px solid var(--borde);border-radius:7px;width:100%"
+                 placeholder="Nombre completo" onchange="infGuardarResponsable()"></div>
         <div><label style="font-size:11px;color:#667;display:block">Año</label>
           <input type="number" id="inf-anio" style="padding:7px;border:1px solid var(--borde);border-radius:7px;width:84px" onchange="infPeriodo()"></div>
         <div><label style="font-size:11px;color:#667;display:block">Trimestre</label>
@@ -9426,6 +9429,7 @@ async function cargarAuditorias() {
     document.getElementById('inf-tri').value = enCurso === 1 ? 4 : enCurso - 1;
     infPeriodo();
   }
+  infCargarResponsable();
   // Sin lista cargada no hay nada marcado: el botón nace apagado.
   infContar();
   cargarInformesInsp();
@@ -9609,6 +9613,28 @@ function infResumen(incluidos, omitidos) {
    cada renglón se puede desmarcar. */
 let _infEquipos = [];
 
+/* El nombre que va en la columna A del formato de la ema. Se recuerda en el
+   navegador para no teclearlo cada trimestre, pero sigue siendo editable: si
+   cambia la persona encargada, se escribe una vez y queda. */
+const _INF_RESP_POR_OMISION = 'Jocelyn Martínez Juárez';
+
+function infResponsable() {
+  const c = document.getElementById('inf-responsable');
+  return c ? c.value.trim() : '';
+}
+
+function infGuardarResponsable() {
+  try { localStorage.setItem('avba_inf_responsable', infResponsable()); } catch (e) {}
+}
+
+function infCargarResponsable() {
+  const c = document.getElementById('inf-responsable');
+  if (!c || c.value) return;
+  let guardado = '';
+  try { guardado = localStorage.getItem('avba_inf_responsable') || ''; } catch (e) {}
+  c.value = guardado || _INF_RESP_POR_OMISION;
+}
+
 /* Pide al servidor y, si algo sale mal, dice QUÉ salió mal.
    "Error de red." tapaba por igual un 500 del servidor, una sesión caída y un
    teléfono sin señal, y las tres se arreglan en lugares distintos. En una
@@ -9686,8 +9712,11 @@ function renderEquiposAlcance() {
     // no se nota revisando el Excel, así que se dice aquí.
     const rep = (e.reportado || []).map(x => x.anio && x.trimestre
       ? `T${x.trimestre} ${x.anio}` : x.generado).join(', ');
+    // Lo que el portal de la ema rechazaría. Se marca el renglón entero, para
+    // que se note sin tener que leer la última columna.
+    const faltas = e.faltas || [];
     return `
-    <tr style="border-top:1px solid #e3ebf7">
+    <tr style="border-top:1px solid #e3ebf7${faltas.length?';background:#fff8f0':''}">
       <td style="padding:7px 6px"><input type="checkbox" class="inf-chk" data-i="${i}"
           style="width:17px;height:17px;cursor:pointer" onchange="infContar()"></td>
       <td style="padding:7px 6px;font-size:12px">${esc2(e.fecha)}<div style="color:#8a93a8;font-size:11px">${esc2(e.hora||'')}</div></td>
@@ -9696,8 +9725,9 @@ function renderEquiposAlcance() {
       <td style="padding:7px 6px;font-size:11px;font-family:monospace">${esc2(e.dictamen||'—')}</td>
       <td style="padding:7px 6px;font-size:11px;font-weight:700;color:${e.resultado==='NO CONFORME'?'#b91c1c':'#166534'}">${esc2(e.resultado)}</td>
       <td style="padding:7px 6px;font-size:11px;color:#8a93a8">${esc2(e.inspector||'')}</td>
-      <td style="padding:7px 6px;font-size:11px">${rep
-        ? `<span style="color:#92400e;font-weight:600">ya reportado · ${esc2(rep)}</span>` : ''}</td>
+      <td style="padding:7px 6px;font-size:11px">${
+        (faltas.length ? `<div style="color:#b91c1c;font-weight:600">⚠ ${esc2(faltas.join(', '))}</div>` : '')
+      + (rep ? `<div style="color:#92400e;font-weight:600">ya reportado · ${esc2(rep)}</div>` : '')}</td>
     </tr>`;
   }).join('');
 
@@ -9769,11 +9799,18 @@ async function generarInformeInsp() {
     return;
   }
 
+  const responsable = infResponsable();
+  if (!responsable) {
+    mostrarToast('Escribe el nombre de la persona responsable de la información.', 'err');
+    document.getElementById('inf-responsable').focus();
+    return;
+  }
+
   btn.disabled = true; btn.textContent = 'Generando…'; infError('');
   try {
     const res = await _infPedir(_AUD_API, { method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({action:'GENERAR_INFORME_INSPECCIONES',
-                            payload:{desde, hasta, equipos: elegidos}}) });
+                            payload:{desde, hasta, equipos: elegidos, responsable}}) });
     if (!res.ok) {
       mostrarToast(res.error, 'err');
       // Y también fijo en la pantalla: un aviso que se desvanece no se alcanza
