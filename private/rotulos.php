@@ -69,15 +69,29 @@ $volver  = $esAdmin ? 'admin-dashboard.php' : 'inspector-dashboard.php';
         .fab{position:fixed;right:18px;bottom:calc(18px + env(safe-area-inset-bottom));z-index:600;background:#16a34a;color:#fff;border:none;border-radius:30px;padding:16px 22px;font-size:16px;font-weight:800;box-shadow:0 8px 22px rgba(22,163,74,.35);cursor:pointer}
         .fab:disabled{background:#94a3b8;box-shadow:none}
 
-        /* Ventanas: a pantalla completa en el teléfono */
-        .modal{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1000;display:none;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 12px}
-        .modal.abierta{display:flex}
+        /* Ventanas: a pantalla completa en el teléfono.
+           Se llaman «ventana» y no «modal»: movil.css le da a .modal (que en
+           las demás pantallas es la caja del formulario) min-height:100vh y
+           relleno forzado. Aquí la ventana es el fondo que se desplaza, y con
+           esa regla quedaba más alta que la pantalla visible: el pie se iba
+           debajo de la barra del navegador y al deslizar brincaba. */
+        .ventana{position:fixed;top:0;left:0;right:0;bottom:0;height:100%;background:rgba(15,23,42,.55);z-index:1000;display:none;
+                 align-items:flex-start;justify-content:center;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:24px 12px}
+        .ventana.abierta{display:flex}
+        /* Mientras hay una ventana abierta, la página de atrás no se mueve */
+        body.bloqueado{overflow:hidden;position:fixed;left:0;right:0;width:100%}
+        body.bloqueado .fab{display:none}
+        button,label.btn,.chip,.vista,.punto{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
         .caja{background:#fff;border-radius:14px;width:100%;max-width:640px;padding:18px;position:relative}
+        /* Guardar / Cancelar siempre a la vista, al pie de la ventana */
+        .pie-fijo{position:sticky;bottom:0;z-index:5;background:#fff;margin:4px -18px -18px;padding:12px 18px calc(12px + env(safe-area-inset-bottom));
+                  border-top:1px solid #e2e8f0;box-shadow:0 -6px 14px rgba(15,23,42,.06);border-radius:0 0 14px 14px}
         .caja h2{font-size:19px;margin-bottom:12px;padding-right:44px}
         .cerrar{position:absolute;top:10px;right:10px;width:40px;height:40px;border-radius:50%;border:none;background:#f1f5f9;font-size:20px;cursor:pointer}
         @media(max-width:640px){
-            .modal{padding:0}
-            .caja{border-radius:0;min-height:100vh;padding:16px 14px calc(24px + env(safe-area-inset-bottom))}
+            .ventana{padding:0}
+            .caja{border-radius:0;min-height:100%;padding:16px 14px 0}
+            .pie-fijo{margin:4px -14px 0;padding:12px 14px calc(12px + env(safe-area-inset-bottom));border-radius:0}
         }
         .seccion{border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px}
         .seccion h3{font-size:14px;color:#334155;margin-bottom:8px}
@@ -97,10 +111,13 @@ $volver  = $esAdmin ? 'admin-dashboard.php' : 'inspector-dashboard.php';
         .fila-btn{display:flex;gap:8px;flex-wrap:wrap}
         .fila-btn .btn{flex:1 1 140px}
 
-        .gps{background:#f8fafc;border-radius:10px;padding:12px;font-size:14px}
+        /* Alto fijo: se actualiza cada segundo mientras afina y, si cambiara
+           de alto, movería todo lo de abajo justo cuando se va a tocar */
+        .gps{background:#f8fafc;border-radius:10px;padding:12px;font-size:14px;min-height:150px}
         .gps .estado{font-weight:800;font-size:16px}
         .gps .coord{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#475569;margin-top:4px;word-break:break-all}
-        .gps .consejo{font-size:12px;color:#64748b;margin-top:6px;line-height:1.45}
+        /* Siempre tres renglones de alto, diga lo que diga: así no cambia de alto */
+        .gps .consejo{font-size:12px;color:#64748b;margin-top:6px;line-height:1.45;min-height:4.35em}
         .p-buena{color:#15803d}.p-regular{color:#b45309}.p-mala{color:#b91c1c}
         .barra-p{height:8px;background:#e2e8f0;border-radius:6px;overflow:hidden;margin-top:8px}
         .barra-p div{height:100%;width:0;transition:width .4s}
@@ -169,7 +186,7 @@ $volver  = $esAdmin ? 'admin-dashboard.php' : 'inspector-dashboard.php';
 <button class="fab" id="fab" onclick="abrirNuevo()" disabled>＋ Nuevo punto</button>
 
 <!-- Alta / edición -->
-<div class="modal" id="mForm">
+<div class="ventana" id="mForm">
     <div class="caja">
         <button class="cerrar" onclick="cerrarForm()" aria-label="Cerrar">✕</button>
         <h2 id="fTitulo">Nuevo punto</h2>
@@ -179,7 +196,7 @@ $volver  = $esAdmin ? 'admin-dashboard.php' : 'inspector-dashboard.php';
             <div class="gps" id="gpsCaja"></div>
             <div class="fila-btn" style="margin-top:8px">
                 <button class="btn btn-g" id="btnGps" onclick="iniciarGps()">📡 Tomar ubicación</button>
-                <button class="btn btn-v" id="btnFijar" onclick="fijarGps()" style="display:none">✓ Usar esta ubicación</button>
+                <button class="btn btn-v" id="btnFijar" onclick="fijarGps()" disabled>✓ Usar esta ubicación</button>
             </div>
         </div>
 
@@ -208,11 +225,11 @@ $volver  = $esAdmin ? 'admin-dashboard.php' : 'inspector-dashboard.php';
                 </datalist></div>
             <div class="campo"><label for="fUbicacion">¿Dónde exactamente?</label>
                 <input id="fUbicacion" maxlength="255" placeholder="Ej. Nave 2, columna C-4, junto al tablero" autocomplete="off"></div>
-            <div class="campo" id="fCampoComentario"><label for="fComentario">Comentarios</label>
+            <div class="campo" id="fCampoComentario" style="margin-bottom:14px"><label for="fComentario">Comentarios</label>
                 <textarea id="fComentario" maxlength="2000" placeholder="Altura, numeración, qué tapa, quién autorizó…"></textarea></div>
         </div>
 
-        <div class="fila-btn">
+        <div class="fila-btn pie-fijo">
             <button class="btn btn-g" onclick="cerrarForm()">Cancelar</button>
             <button class="btn btn-v" id="btnGuardar" onclick="guardarForm()">💾 Guardar punto</button>
         </div>
@@ -220,7 +237,7 @@ $volver  = $esAdmin ? 'admin-dashboard.php' : 'inspector-dashboard.php';
 </div>
 
 <!-- Detalle -->
-<div class="modal" id="mDetalle">
+<div class="ventana" id="mDetalle">
     <div class="caja">
         <button class="cerrar" onclick="cerrarDetalle()" aria-label="Cerrar">✕</button>
         <div id="detalle"></div>
@@ -597,7 +614,11 @@ function calidad(m) {
 function pintarGps(msg) {
     const caja = document.getElementById('gpsCaja');
     const g = gps.fija || gps.mejor;
-    if (msg) { caja.innerHTML = msg; return; }
+    if (msg) { caja.innerHTML = msg; gps.pintado = null; return; }
+    // Sólo se vuelve a dibujar si cambió algo que se ve
+    const firma = g ? `${!!gps.fija}|${Math.round(g.precision)}|${g.lat.toFixed(6)}|${g.lng.toFixed(6)}` : 'nada';
+    if (firma === gps.pintado) return;
+    gps.pintado = firma;
     if (!g) {
         caja.innerHTML = '<div class="estado">Sin ubicación</div><div class="consejo">Toca «Tomar ubicación» parado donde va el rótulo.</div>';
         return;
@@ -607,7 +628,7 @@ function pintarGps(msg) {
         <div class="coord">${g.lat.toFixed(6)}, ${g.lng.toFixed(6)}</div>
         <div class="barra-p"><div style="width:${pct}%;background:${color}"></div></div>
         <div class="consejo">${g.precision > 25
-            ? 'Precisión baja: si puedes, espera unos segundos o acércate a una puerta o ventana. Dentro de naves el GPS puede errar bastante; las fotos serán la referencia.'
+            ? 'Precisión baja: espera unos segundos o acércate a una puerta. Dentro de naves las fotos serán la referencia.'
             : (gps.fija ? 'Se guardará con esta posición.' : 'Espera a que baje el ± o toca «Usar esta ubicación».')}</div>`;
 }
 
@@ -615,15 +636,17 @@ function iniciarGps() {
     if (!navigator.geolocation) { pintarGps('<div class="estado p-mala">Este navegador no da ubicación.</div>'); return; }
     if (!window.isSecureContext) { pintarGps('<div class="estado p-mala">La ubicación sólo funciona entrando al sistema con https://</div>'); return; }
     detenerGps();
-    gps.mejor = null; gps.fija = null;
+    gps.mejor = null; gps.fija = null; gps.pintado = null;
     form.gpsNuevo = true;
+    document.getElementById('btnFijar').disabled = true;
     pintarGps('<div class="estado">📡 Buscando señal GPS…</div><div class="consejo">La primera vez el teléfono pide permiso para usar tu ubicación: acéptalo.</div>');
     document.getElementById('btnGps').textContent = '🔄 Volver a tomar';
     gps.vigia = navigator.geolocation.watchPosition(pos => {
         const l = { lat: pos.coords.latitude, lng: pos.coords.longitude, precision: pos.coords.accuracy };
         if (!gps.mejor || l.precision <= gps.mejor.precision) gps.mejor = l;
-        document.getElementById('btnFijar').style.display = '';
+        document.getElementById('btnFijar').disabled = false;
         pintarGps();
+        guardarBorrador();
         if (gps.mejor.precision <= 5) fijarGps();   // ya no va a mejorar
     }, err => {
         const msg = err.code === 1
@@ -637,8 +660,9 @@ function fijarGps() {
     if (!gps.mejor) return;
     gps.fija = gps.mejor;
     detenerGps();
-    document.getElementById('btnFijar').style.display = 'none';
+    document.getElementById('btnFijar').disabled = true;
     pintarGps();
+    guardarBorrador();
 }
 function detenerGps() {
     if (gps.vigia !== null) navigator.geolocation.clearWatch(gps.vigia);
@@ -646,21 +670,119 @@ function detenerGps() {
     gps.vigia = null;
 }
 
+// ─── Ventanas ────────────────────────────────────────────────────────────────
+// Con una ventana abierta, la página de atrás se fija en su lugar: si no, al
+// deslizar dentro del formulario el teléfono movía las dos a la vez.
+let scrollAntes = 0;
+function abrirVentana(id) {
+    const v = document.getElementById(id);
+    if (!document.body.classList.contains('bloqueado')) {
+        scrollAntes = window.scrollY;
+        document.body.style.top = `-${scrollAntes}px`;
+        document.body.classList.add('bloqueado');
+    }
+    v.classList.add('abierta');
+    v.scrollTop = 0;
+}
+function cerrarVentana(id) {
+    document.getElementById(id).classList.remove('abierta');
+    if (!document.querySelector('.ventana.abierta')) {
+        document.body.classList.remove('bloqueado');
+        document.body.style.top = '';
+        window.scrollTo(0, scrollAntes);
+    }
+}
+
+// ─── Borrador del punto que se está capturando ──────────────────────────────
+// En Android, al abrir la cámara el navegador queda en segundo plano y a veces
+// el teléfono lo recarga al volver: el formulario se perdía. Mientras se
+// captura, todo (datos, GPS y fotos) se va guardando en el teléfono, y al
+// volver a abrir la pantalla se recupera.
+const Borrador = {
+    async db() {
+        if (this._db !== undefined) return this._db;
+        this._db = await new Promise(ok => {
+            try {
+                const r = indexedDB.open('avba-rotulos-borrador', 1);
+                r.onupgradeneeded = () => r.result.createObjectStore('b');
+                r.onsuccess = () => ok(r.result);
+                r.onerror = () => ok(null);
+            } catch (e) { ok(null); }
+        });
+        return this._db;
+    },
+    async op(modo, fn) {
+        const db = await this.db(); if (!db) return null;
+        return await new Promise(ok => {
+            try {
+                const t = db.transaction('b', modo); const r = fn(t.objectStore('b'));
+                t.oncomplete = () => ok(r ? r.result : null); t.onerror = () => ok(null);
+            } catch (e) { ok(null); }
+        });
+    },
+    poner(v) { return this.op('readwrite', s => s.put(v, 'actual')); },
+    leer()   { return this.op('readonly',  s => s.get('actual')); },
+    borrar() { return this.op('readwrite', s => s.delete('actual')); },
+};
+let tBorrador = null;
+function guardarBorrador() {
+    if (form.id || !document.getElementById('mForm').classList.contains('abierta')) return;   // sólo altas
+    clearTimeout(tBorrador);
+    tBorrador = setTimeout(() => Borrador.poner({
+        empresa_id: form.empresa_id,
+        numero: document.getElementById('fNumero').value,
+        rotulo: document.getElementById('fRotulo').value,
+        ubicacion: document.getElementById('fUbicacion').value,
+        comentario: document.getElementById('fComentario').value,
+        gps: gps.fija || gps.mejor || null, gpsFija: !!gps.fija,
+        fotos: form.fotos.map(f => ({ uuid: f.uuid, blob: f.blob })),
+        guardado: Date.now(),
+    }), 300);
+}
+['fNumero', 'fRotulo', 'fUbicacion', 'fComentario'].forEach(id =>
+    document.getElementById(id).addEventListener('input', guardarBorrador));
+
+async function recuperarBorrador() {
+    const b = await Borrador.leer();
+    if (!b || !b.empresa_id || Date.now() - b.guardado > 3 * 864e5) { if (b) Borrador.borrar(); return; }
+    const sel = document.getElementById('planta');
+    if (![...sel.options].some(o => o.value === String(b.empresa_id))) return;
+    if (sel.value !== String(b.empresa_id)) { sel.value = String(b.empresa_id); await cambiarPlanta(); }
+    abrirNuevo(b);
+    avisar('Recuperé el punto que estabas capturando.', 4500);
+}
+
 // ─── Alta / edición ──────────────────────────────────────────────────────────
 let form = { id: null, fotos: [], gpsNuevo: false };
 
-function abrirNuevo() {
+function abrirNuevo(borrador) {
     if (!plantaActual()) return;
-    form = { id: null, fotos: [], gpsNuevo: false };
+    form = { id: null, fotos: [], gpsNuevo: false, empresa_id: plantaActual() };
     document.getElementById('fTitulo').textContent = 'Nuevo punto';
     document.getElementById('fSecFotos').style.display = '';
     document.getElementById('fCampoComentario').style.display = '';
     document.getElementById('fPaso').textContent = '3.';
     ['fNumero', 'fRotulo', 'fUbicacion', 'fComentario'].forEach(i => document.getElementById(i).value = '');
     document.getElementById('fRotulo').value = localStorage.getItem('rotulos.ultimoRotulo') || 'EXTINTOR';
+    if (borrador) {
+        ['numero', 'rotulo', 'ubicacion', 'comentario'].forEach(k =>
+            document.getElementById('f' + k[0].toUpperCase() + k.slice(1)).value = borrador[k] || '');
+        form.fotos = (borrador.fotos || []).map(f => ({ uuid: f.uuid, blob: f.blob, url: URL.createObjectURL(f.blob) }));
+    }
     pintarFotosForm();
-    document.getElementById('mForm').classList.add('abierta');
-    iniciarGps();
+    abrirVentana('mForm');
+    if (borrador && borrador.gps) {
+        // La ubicación que ya se había tomado; si no estaba fijada, se sigue afinando
+        detenerGps();
+        gps.mejor = borrador.gps; gps.fija = borrador.gpsFija ? borrador.gps : null; gps.pintado = null;
+        form.gpsNuevo = true;
+        document.getElementById('btnGps').textContent = '🔄 Volver a tomar';
+        document.getElementById('btnFijar').disabled = !!gps.fija;
+        pintarGps();
+    } else {
+        iniciarGps();
+    }
+    if (borrador) return;
     // Numeración sugerida: la siguiente de la planta, con el mismo formato
     // que la más alta (tras «T-902» va «T-903»; tras «007», «008»)
     const sig = siguienteNumero(todosLosPuntos().map(p => p.numero));
@@ -691,16 +813,22 @@ function abrirEdicion(p) {
     gps.mejor = null;
     gps.fija = p.lat !== null ? { lat: Number(p.lat), lng: Number(p.lng), precision: Number(p.precision_m || 0) } : null;
     document.getElementById('btnGps').textContent = p.lat !== null ? '🔄 Volver a tomar aquí' : '📡 Tomar ubicación';
-    document.getElementById('btnFijar').style.display = 'none';
+    document.getElementById('btnFijar').disabled = true;
+    gps.pintado = null;
     pintarGps(gps.fija ? null : undefined);
     if (gps.fija) document.querySelector('#gpsCaja .consejo').textContent = 'Es la posición guardada. Si estás parado en el lugar correcto, puedes volver a tomarla.';
     cerrarDetalle(true);
-    document.getElementById('mForm').classList.add('abierta');
+    abrirVentana('mForm');
 }
 
-function cerrarForm() {
+function cerrarForm(guardado) {
+    if (!form.id && !guardado && (form.fotos.length || document.getElementById('fUbicacion').value.trim()
+            || document.getElementById('fComentario').value.trim())
+        && !confirm('¿Descartar este punto? Se perderán las fotos y lo que escribiste.')) return;
     detenerGps();
-    document.getElementById('mForm').classList.remove('abierta');
+    clearTimeout(tBorrador);
+    if (!form.id) Borrador.borrar();
+    cerrarVentana('mForm');
 }
 
 async function agregarFotosForm(input) {
@@ -712,13 +840,14 @@ async function agregarFotosForm(input) {
         } catch (e) { avisar('No se pudo leer una de las fotos.'); }
     }
     pintarFotosForm();
+    guardarBorrador();
 }
 function pintarFotosForm() {
     document.getElementById('fFotos').innerHTML = form.fotos.map((f, i) =>
         `<div class="foto" style="background-image:url('${f.url}')"><button class="quitar" onclick="quitarFotoForm(${i})" aria-label="Quitar">✕</button></div>`).join('')
         || '<div style="grid-column:1/-1;color:#94a3b8;font-size:13px">Toma una o varias fotos: de cerca y de lejos, para que se vea el lugar y la referencia.</div>';
 }
-function quitarFotoForm(i) { URL.revokeObjectURL(form.fotos[i].url); form.fotos.splice(i, 1); pintarFotosForm(); }
+function quitarFotoForm(i) { URL.revokeObjectURL(form.fotos[i].url); form.fotos.splice(i, 1); pintarFotosForm(); guardarBorrador(); }
 
 async function guardarForm() {
     const g = gps.fija || gps.mejor;
@@ -737,16 +866,16 @@ async function guardarForm() {
         if (form.id) {
             datos.id = form.id;
             await api('guardar', { datos });
-            cerrarForm(); avisar('✓ Cambios guardados');
+            cerrarForm(true); avisar('✓ Cambios guardados');
             await cargar(); abrirDetalle(form.id);
         } else {
-            datos.empresa_id = plantaActual();
+            datos.empresa_id = form.empresa_id;
             datos.comentario = document.getElementById('fComentario').value.trim();
             datos.cliente_uuid = uuid();
             // Primero al teléfono, luego al servidor: si no hay señal no se pierde
             await encolar({ tipo: 'punto', datos, fotos: form.fotos.map(f => ({ uuid: f.uuid, blob: f.blob })) });
             form.fotos.forEach(f => URL.revokeObjectURL(f.url));
-            cerrarForm(); pintar();
+            cerrarForm(true); pintar();
             avisar('Guardado. Subiendo…');
             await sincronizar();
             if ((await Cola.todas()).some(o => o.datos && o.datos.cliente_uuid === datos.cliente_uuid)) {
@@ -774,7 +903,7 @@ function verLocal(id) {
             <button class="btn btn-p" onclick="cerrarDetalle();sincronizar(true)">⬆️ Intentar subir ahora</button>
             <button class="btn btn-r" onclick="descartarLocal(${JSON.stringify(op.id)})">Descartar</button>
         </div>`;
-    document.getElementById('mDetalle').classList.add('abierta');
+    abrirVentana('mDetalle');
 }
 async function descartarLocal(id) {
     if (!confirm('¿Descartar este punto? Se borrará del teléfono con sus fotos y no se podrá recuperar.')) return;
@@ -850,7 +979,7 @@ async function abrirDetalle(id) {
         <p style="font-size:12px;color:#94a3b8;margin-top:12px">Marcado por ${esc(p.creado_por_nombre || '—')} el ${fechaHora(p.created_at)}
             ${p.colocado_at ? ` · colocado ${fechaHora(p.colocado_at)} por ${esc(p.colocado_por_nombre || '—')}` : ''}</p>`;
 
-    document.getElementById('mDetalle').classList.add('abierta');
+    abrirVentana('mDetalle');
     if (gpsOk) {
         if (typeof L !== 'undefined') {
             if (mapaPunto) { mapaPunto.remove(); mapaPunto = null; }
@@ -896,7 +1025,7 @@ function seguirDistancia(lat, lng, prec) {
 function cerrarDetalle(conservarActual) {
     if (vigiaDetalle !== null) { navigator.geolocation.clearWatch(vigiaDetalle); vigiaDetalle = null; }
     if (mapaPunto) { mapaPunto.remove(); mapaPunto = null; }
-    document.getElementById('mDetalle').classList.remove('abierta');
+    cerrarVentana('mDetalle');
     if (!conservarActual) actual = null;
 }
 
@@ -979,6 +1108,7 @@ function imprimir() {
 (async () => {
     await cargarPlantas();
     await cargar();
+    await recuperarBorrador();
     sincronizar();
 })();
 </script>
