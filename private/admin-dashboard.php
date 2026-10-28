@@ -427,6 +427,11 @@ $porcentaje_inspecccion = $total_extintores > 0 ? round(($inspecciones_mes / $to
                 <h3>Vencimientos</h3>
                 <p>Vencidos y por vencer en 15 y 30 días</p>
             </div>
+            <div class="menu-item" onclick="window.location.href='rotulos.php'">
+                <div class="menu-item-icon">📍</div>
+                <h3>Rótulos (GPS y fotos)</h3>
+                <p>Dónde va cada rótulo en planta</p>
+            </div>
             <div class="menu-item" onclick="window.location.href='admin-generar-etiquetas.php'">
                 <div class="menu-item-icon">🏷️</div>
                 <h3>Generar Etiquetas QR</h3>

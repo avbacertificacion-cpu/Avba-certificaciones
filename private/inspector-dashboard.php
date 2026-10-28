@@ -89,6 +89,11 @@ try {
             <h3>Extintores</h3>
             <p>Agregar, editar o eliminar extintores</p>
         </div>
+        <div class="menu-item" onclick="go('rotulos.php')">
+            <div class="icon">📍</div>
+            <h3>Rótulos</h3>
+            <p>Dónde va cada rótulo: GPS, fotos y comentarios</p>
+        </div>
         <div class="menu-item" onclick="go('mis-inspecciones.php')">
             <div class="icon">📂</div>
             <h3>Mis Inspecciones</h3>

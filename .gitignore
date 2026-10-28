@@ -16,3 +16,7 @@ uploads/documentos/*
 
 # Archivos de instalación
 install.php
+
+uploads/rotulos/*
+!uploads/rotulos/.htaccess
+!uploads/rotulos/index.html
