@@ -564,14 +564,77 @@ function pintar() {
 }
 
 // ─── Mapa ────────────────────────────────────────────────────────────────────
+// ─── Fondos del mapa, con respaldo ───────────────────────────────────────────
+// El satélite de Esri no tiene imagen en todas partes a la máxima cercanía
+// (con un solo punto el mapa se acerca hasta ahí) y algunas redes bloquean un
+// servidor u otro. Si las imágenes de un fondo no llegan, se pasa solo al
+// siguiente; si no llega ninguno, se dice en vez de dejar el mapa en gris.
+const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
+const FONDOS = {
+    satelite: [
+        { url: ESRI, maxNativeZoom: 18, attribution: 'Imágenes © Esri' },
+        // Más lejos hay imagen casi en todo México; se amplía para acercar
+        { url: ESRI, maxNativeZoom: 16, attribution: 'Imágenes © Esri' },
+    ],
+    calles: [
+        { url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png', maxNativeZoom: 19, attribution: '© OpenStreetMap' },
+        { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', subdomains: ['a', 'b', 'c', 'd'],
+          maxNativeZoom: 19, attribution: '© OpenStreetMap © CARTO' },
+    ],
+};
+
+/** Una capa de fondo que cambia sola de fuente si la actual no carga. */
+function capaFondo(tipo, alAgotarse) {
+    const lista = FONDOS[tipo];
+    let i = 0, porZoom = {};
+    const capa = L.tileLayer(lista[0].url, Object.assign({ maxZoom: 20 }, lista[0]));
+    const cuenta = z => (porZoom[z] = porZoom[z] || { ok: 0, mal: 0 });
+    // Cada imagen sabe de qué fuente salió: las respuestas tardías de una
+    // fuente ya descartada no cuentan contra la nueva
+    capa.createTile = function (coords, listo) {
+        const t = L.TileLayer.prototype.createTile.call(this, coords, listo); t._fuente = i; return t;
+    };
+    capa.on('tileload', e => { if (e.tile._fuente === i) { cuenta(e.coords.z).ok++; capa.fallo = false; } });
+    capa.on('tileerror', e => {
+        if (e.tile._fuente !== i) return;
+        const c = cuenta(e.coords.z); c.mal++;
+        // Varias fallas a esta cercanía y ninguna imagen: esta fuente no sirve aquí
+        if (c.ok === 0 && c.mal >= 3) siguiente();
+    });
+    function siguiente() {
+        if (++i >= lista.length) { capa.fallo = true; if (alAgotarse) alAgotarse(capa); return; }
+        const m = capa._map, antes = capa.options.attribution;
+        porZoom = {};
+        Object.assign(capa.options, lista[i]);
+        capa.setUrl(lista[i].url, true);
+        // Quitar y volver a poner la capa hace que recalcule a qué cercanía
+        // pedir las imágenes con el nuevo máximo; con sólo cambiar la
+        // dirección las seguiría pidiendo a la cercanía que no existe.
+        if (m) {
+            m.removeLayer(capa); capa.addTo(m);
+            if (m.attributionControl) m.attributionControl.removeAttribution(antes).addAttribution(lista[i].attribution);
+        }
+    }
+    capa.tipo = tipo;
+    return capa;
+}
+
+function avisoMapa(texto) {
+    const a = document.getElementById('avisoMapa');
+    a.textContent = texto || 'Si el mapa no se ve, el teléfono no tiene datos en este momento; los puntos y las fotos siguen guardándose.';
+    a.style.color = texto ? '#b45309' : '';
+}
+
 function prepararMapa() {
     if (mapa || typeof L === 'undefined') return;
     mapa = L.map('mapa', { zoomControl: true }).setView([23.6, -102.5], 5);
     // Satélite primero: dentro de una planta se reconocen los edificios, no las calles
-    const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-        { maxZoom: 20, maxNativeZoom: 19, attribution: 'Imágenes © Esri' });
-    const calles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-        { maxZoom: 20, maxNativeZoom: 19, attribution: '© OpenStreetMap' });
+    const calles = capaFondo('calles', () => avisoMapa('No se pudo cargar ningún fondo del mapa (revisa los datos o la red). Los puntos sí se muestran en su posición.'));
+    const sat = capaFondo('satelite', capa => {
+        if (!mapa.hasLayer(capa)) return;
+        mapa.removeLayer(capa); calles.addTo(mapa);
+        avisoMapa('No cargó la vista de satélite aquí; se muestra el mapa de calles.');
+    });
     sat.addTo(mapa);
     L.control.layers({ 'Satélite': sat, 'Mapa': calles }).addTo(mapa);
     capaPuntos = L.layerGroup().addTo(mapa);
@@ -596,7 +659,7 @@ function pintarMapa(encuadrar) {
         L.marker(ll, { icon: icono }).addTo(capaPuntos)
             .on('click', () => p.local ? verLocal(p.local.id) : abrirDetalle(p.id));
     });
-    if (encuadrar && conGps.length) mapa.fitBounds(L.latLngBounds(conGps.map(p => [Number(p.lat), Number(p.lng)])).pad(0.3), { maxZoom: 19 });
+    if (encuadrar && conGps.length) mapa.fitBounds(L.latLngBounds(conGps.map(p => [Number(p.lat), Number(p.lng)])).pad(0.3), { maxZoom: 18 });
 }
 
 // ─── GPS ─────────────────────────────────────────────────────────────────────
@@ -984,8 +1047,9 @@ async function abrirDetalle(id) {
         if (typeof L !== 'undefined') {
             if (mapaPunto) { mapaPunto.remove(); mapaPunto = null; }
             const ll = [Number(p.lat), Number(p.lng)];
-            mapaPunto = L.map('mapaPunto', { zoomControl: false, attributionControl: false }).setView(ll, 19);
-            L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom: 20, maxNativeZoom: 19 }).addTo(mapaPunto);
+            mapaPunto = L.map('mapaPunto', { zoomControl: false, attributionControl: false }).setView(ll, 18);
+            const callesP = capaFondo('calles');
+            capaFondo('satelite', capa => { if (mapaPunto) { mapaPunto.removeLayer(capa); callesP.addTo(mapaPunto); } }).addTo(mapaPunto);
             if (p.precision_m) L.circle(ll, { radius: Number(p.precision_m), color: '#ea580c', weight: 1, fillOpacity: .1 }).addTo(mapaPunto);
             L.marker(ll, { icon: L.divIcon({ className: '', html: `<span class="num-mapa">${esc(p.numero || '•')}</span>`, iconSize: null }) }).addTo(mapaPunto);
         }
