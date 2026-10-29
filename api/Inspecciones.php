@@ -34,7 +34,8 @@ class Inspecciones {
      * borrador se borra, de modo que lo que queda registrado es una inspección
      * normal, sin rastro de haber venido precargada.
      */
-    private const PRECARGAS = [self::PRECARGA_GRUA_AC18, self::PRECARGA_GRUA_TC4792];
+    private const PRECARGAS = [self::PRECARGA_GRUA_AC18, self::PRECARGA_GRUA_TC4792,
+                                self::PRECARGA_CAN_260523, self::PRECARGA_CAN_120320];
 
     private const PRECARGA_GRUA_AC18 = [
         'clave'      => 'precarga_grua_ac18_michel',
@@ -70,6 +71,69 @@ class Inspecciones {
      * Los campos van en metros porque así los pide la pantalla; el ángulo y la
      * altura los recalcula el sistema a partir del radio y la pluma.
      */
+    /* Dos canastillas estructurales de CIS Rentals, leídas de sus placas.
+       Son gemelas: mismo fabricante, mismas medidas, misma capacidad y el mismo
+       sistema de suspensión; sólo cambian la fecha de fabricación y el número de
+       serie. Van por separado porque son dos equipos distintos y cada uno lleva
+       su propio dictamen.
+
+       Las dos ya traen etiqueta de validación de AVBA pegada, así que son
+       reinspecciones: los códigos van en la nota y NO en el registro. Ponerlos
+       aquí arriesgaba dejar dos registros con el mismo código si el equipo ya
+       estaba dado de alta de la vez anterior, y un código repetido es
+       justamente lo que la pantalla de validación marca como conflicto. Que el
+       inspector confirme la placa y la asigne por el camino normal, que sí
+       revisa de quién es. */
+    private const PRECARGA_CAN_260523 = [
+        'clave'      => 'precarga_can_mic260523_marcos',
+        'busca'      => 'MARCOS',
+        'fotos'      => 'assets/precarga/canastilla_mic260523/',
+        'maquinaria' => 'CANASTILLA ESTRUCTURAL',
+        'cliente'    => 'CIS RENTALS & CONSTRUCTION',
+        'marca'      => 'MYMIC LIFTING PRODUCTS',
+        'modelo'     => '',
+        'serie'      => 'MIC-260523-002',
+        'id_equipo'  => '',
+        'capacidad'  => '335 KG (2 PERSONAS)',
+        'nota'       => 'Datos tomados de la placa del equipo: MyMic Lifting Products, '
+                      . 'propiedad de CIS Rentals & Construction, fabricada el 26.05.23, '
+                      . 'serie MIC-260523-002. Dimensiones 1.00 × 1.80 × 1.90 m. '
+                      . 'Capacidad 335 kg y máximo 2 personas. Peso propio 228 kg. '
+                      . 'Suspensión: grillete Crosby G2130 de 3/4". '
+                      . 'Diseñada y construida conforme a ASME B30.23. '
+                      . 'Ya trae etiqueta de validación de AVBA con el código 4352617978: '
+                      . 'confírmalo contra la etiqueta física antes de asignarlo, porque el '
+                      . 'equipo puede venir de una inspección anterior. '
+                      . 'Faltan el número económico y el modelo, que no vienen en la placa. '
+                      . 'La prueba de carga no viene llena: el 125% de 335 kg son 418.75 kg, '
+                      . 'pero el dato lo capturas tú con lo que de veras se haya montado.',
+    ];
+
+    private const PRECARGA_CAN_120320 = [
+        'clave'      => 'precarga_can_mic120320_marcos',
+        'busca'      => 'MARCOS',
+        'fotos'      => 'assets/precarga/canastilla_mic120320/',
+        'maquinaria' => 'CANASTILLA ESTRUCTURAL',
+        'cliente'    => 'CIS RENTALS & CONSTRUCTION',
+        'marca'      => 'MYMIC LIFTING PRODUCTS',
+        'modelo'     => '',
+        'serie'      => 'MIC-120320-001',
+        'id_equipo'  => '',
+        'capacidad'  => '335 KG (2 PERSONAS)',
+        'nota'       => 'Datos tomados de la placa del equipo: MyMic Lifting Products, '
+                      . 'propiedad de CIS Rentals & Construction, fabricada el 12.03.20, '
+                      . 'serie MIC-120320-001. Dimensiones 1.00 × 1.80 × 1.90 m. '
+                      . 'Capacidad 335 kg y máximo 2 personas. Peso propio 228 kg. '
+                      . 'Suspensión: grillete Crosby G2130 de 3/4". '
+                      . 'Diseñada y construida conforme a ASME B30.23. '
+                      . 'Ya trae etiqueta de validación de AVBA con el código 4352617961: '
+                      . 'confírmalo contra la etiqueta física antes de asignarlo, porque el '
+                      . 'equipo puede venir de una inspección anterior. '
+                      . 'Faltan el número económico y el modelo, que no vienen en la placa. '
+                      . 'La prueba de carga no viene llena: el 125% de 335 kg son 418.75 kg, '
+                      . 'pero el dato lo capturas tú con lo que de veras se haya montado.',
+    ];
+
     private const PRECARGA_GRUA_TC4792 = [
         'clave'      => 'precarga_grua_tc4792_michel',
         'busca'      => 'MICHEL',
