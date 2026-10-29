@@ -65,9 +65,10 @@ if ($tipo === 'expediente') {
 if (!in_array($usr['rol'], ['ADMIN', 'CALIDAD'], true)) fallo(401, 'No autorizado.');
 if ($tipo !== 'informe' || $id <= 0) fallo(400, 'Solicitud inválida.');
 
-$stmt = $pdo->prepare("SELECT archivo FROM informes_inspecciones WHERE id = ?");
+$stmt = $pdo->prepare("SELECT archivo, anio, trimestre FROM informes_inspecciones WHERE id = ?");
 $stmt->execute([$id]);
-$rel = (string)($stmt->fetchColumn() ?: '');
+$fila = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+$rel  = (string)($fila['archivo'] ?? '');
 if ($rel === '') fallo(404, 'Informe no encontrado.');
 
 // Seguridad: sólo permitir rutas dentro de uploads/ y con extensión esperada
@@ -78,7 +79,14 @@ if (strpos($rel, '..') !== false || strncmp($rel, 'uploads/', 8) !== 0) {
 $abs = __DIR__ . '/' . $rel;
 if (!is_file($abs)) fallo(404, 'El archivo ya no está disponible en el servidor.');
 
-$nombre = basename($abs);
+/* El archivo se guarda con un nombre único —periodo y marca de tiempo—, pero
+   se entrega con la nomenclatura de la ema: UI_INFORME_003.xlsx para el T3.
+   Un rango libre no tiene esa nomenclatura y conserva su nombre descriptivo. */
+require_once __DIR__ . '/api/Auditorias.php';
+$nombre = Auditorias::nombreEma(
+    isset($fila['anio'])      && $fila['anio']      !== null ? (int)$fila['anio']      : null,
+    isset($fila['trimestre']) && $fila['trimestre'] !== null ? (int)$fila['trimestre'] : null
+) ?: basename($abs);
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="' . $nombre . '"');
 header('Content-Length: ' . filesize($abs));

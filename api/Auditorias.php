@@ -467,6 +467,26 @@ class Auditorias {
         return trim((string)($r['control'] ?? ''));
     }
 
+    /**
+     * El nombre con el que se descarga el informe, en la nomenclatura de la ema.
+     *
+     * Su plantilla es UI_INFORME_001 y el número corresponde al trimestre, así
+     * que el de Jul–Sep se entrega como UI_INFORME_003.xlsx.
+     *
+     * No es el nombre con el que se guarda en el servidor: ahí hace falta uno
+     * único, porque el T3 de 2027 se llamaría igual que el de 2026 y lo
+     * pisaría. El archivo guardado lleva periodo y marca de tiempo; éste es
+     * sólo el de la descarga.
+     *
+     * Para un rango libre devuelve cadena vacía: esa nomenclatura es de las
+     * entregas trimestrales, y ponerle un número de trimestre a un rango que no
+     * lo es sería decir que es algo que no es.
+     */
+    public static function nombreEma(?int $anio, ?int $trimestre): string {
+        if ($anio === null || $trimestre === null) return '';
+        return 'UI_INFORME_' . str_pad((string)$trimestre, 3, '0', STR_PAD_LEFT) . '.xlsx';
+    }
+
     /** Folio del dictamen: AB.<control>-<año>MX */
     private static function folioDictamen(array $r): string {
         $ctrl = trim((string)($r['control'] ?? ''));
@@ -670,7 +690,10 @@ class Auditorias {
             'status'    => 'success',
             'total'     => count($data),
             'id'        => $informeId,
-            'filename'  => $nombre,
+            // Dos nombres distintos, dichos por separado para que no se confundan:
+            // con cuál se entrega, y cuál es el archivo guardado en el servidor.
+            'filename'  => self::nombreEma($anioT, $trimestre) ?: $nombre,
+            'archivo'   => $nombre,
             'anio'      => $anioT,
             'trimestre' => $trimestre,
             'reemplazados' => $reemplazados,
@@ -813,9 +836,10 @@ class Auditorias {
 
     /** Devuelve un informe guardado en base64 para descargarlo de nuevo. */
     public function descargarInforme(int $id): array {
-        $stmt = $this->pdo->prepare("SELECT archivo FROM informes_inspecciones WHERE id = ?");
+        $stmt = $this->pdo->prepare("SELECT archivo, anio, trimestre FROM informes_inspecciones WHERE id = ?");
         $stmt->execute([$id]);
-        $rel = (string)($stmt->fetchColumn() ?: '');
+        $fila = $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $rel  = (string)($fila['archivo'] ?? '');
         if ($rel === '') return ['status' => 'error', 'message' => 'Informe no encontrado.'];
 
         $abs = dirname(__DIR__) . '/' . ltrim($rel, '/');
@@ -824,9 +848,13 @@ class Auditorias {
         $bytes = @file_get_contents($abs);
         if ($bytes === false) return ['status' => 'error', 'message' => 'No se pudo leer el archivo.'];
 
+        $ema = self::nombreEma(
+            isset($fila['anio']) && $fila['anio'] !== null ? (int)$fila['anio'] : null,
+            isset($fila['trimestre']) && $fila['trimestre'] !== null ? (int)$fila['trimestre'] : null);
+
         return [
             'status'   => 'success',
-            'filename' => basename($abs),
+            'filename' => $ema ?: basename($abs),
             'b64'      => base64_encode($bytes),
         ];
     }
