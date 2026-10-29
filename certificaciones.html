@@ -846,6 +846,19 @@
           <div class="field"><label>Fecha certif.</label><input id="d-fecha"      disabled></div>
           <div class="field"><label>Capacidad</label>    <input id="d-capacidad"  disabled></div>
         </div>
+        <!-- La hora que la ema pide en su columna F. Es editable porque hasta
+             ahora se reportaba la hora en que se guardó el registro, no la de
+             inicio de la inspección, y hay que poder corregirla. -->
+        <div class="field" style="margin-top:8px">
+          <label>Hora de inicio de la inspección
+            <span style="font-weight:400;color:var(--texto-hint)">(24 h, hh:mm — es la que va al informe de la ema)</span></label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input type="time" id="d-hora" style="padding:8px;border:1.5px solid var(--borde);border-radius:8px;font-size:13px">
+            <button id="d-hora-guardar" onclick="guardarHoraInspeccion()"
+              style="padding:9px 14px;border-radius:8px;border:none;background:var(--azul);color:#fff;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap">Guardar</button>
+            <span id="d-hora-nota" style="font-size:11px;color:var(--texto-hint)"></span>
+          </div>
+        </div>
         <div class="field" style="margin-top:8px">
           <label>Correo(s) del cliente <span style="font-weight:400;color:var(--texto-hint)">(Enter o coma para agregar más)</span></label>
           <div style="display:flex;gap:8px;align-items:flex-start">
@@ -1440,6 +1453,11 @@ function ver(fila) {
   document.getElementById("d-fecha").value      = d.fecha      || "";
   document.getElementById("d-capacidad").value  = d.capacidad  || "";
   document.getElementById("d-direccion").value  = d.direccion  || "";
+  document.getElementById("d-hora").value       = d.hora       || "";
+  // Se distingue la hora capturada de la que se suple con la marca del
+  // registro: si no se dice, parece un dato bueno y nadie lo corrige.
+  document.getElementById("d-hora-nota").textContent = d.hora_capturada
+    ? "" : "Sin capturar: se está usando la hora en que se guardó el registro.";
 
   // Links documentos — siempre regeneran con la plantilla actual
   document.getElementById("docs-links").innerHTML = `
@@ -1586,6 +1604,45 @@ function _detCorreoAddChip(email) {
 function _detCorreoRemoveChip(span, email) {
   _detCorreos = _detCorreos.filter(c => c !== email);
   span.parentElement.remove();
+}
+
+/* Corrige la hora de inicio de la inspección de un registro ya certificado.
+   Va por ACTUALIZAR_CALIDAD, que es el camino que ya deja constancia del cambio
+   en el Historial del equipo: quién lo tocó, cuándo, y de qué a qué. Un dato que
+   se entrega a la ema no debería poder cambiar sin rastro. */
+async function guardarHoraInspeccion() {
+  if (!registroActual) return;
+  const hora = document.getElementById("d-hora").value;   // "" o "HH:MM"
+  const btn  = document.getElementById("d-hora-guardar");
+  btn.disabled = true;
+  const textoOriginal = btn.textContent;
+  btn.textContent = "Guardando…";
+  try {
+    const res = await fetch(API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "ACTUALIZAR_CALIDAD", payload: { fila: registroActual.fila, hora } })
+    });
+    const data = await res.json();
+    if (data.status === "success") {
+      // Se refresca lo que tiene la pantalla en memoria para que el registro no
+      // siga mostrando la hora vieja hasta que alguien recargue.
+      registroActual.hora = hora;
+      registroActual.hora_capturada = hora;
+      const d = datosGlobal.find(x => x.fila === registroActual.fila);
+      if (d) { d.hora = hora; d.hora_capturada = hora; }
+      document.getElementById("d-hora-nota").textContent = hora
+        ? "" : "Sin capturar: se está usando la hora en que se guardó el registro.";
+      mostrarToast(hora ? "Hora de inspección actualizada." : "Hora borrada: vuelve a usarse la del registro.", "ok");
+    } else {
+      mostrarToast(data.message || "No se pudo guardar la hora.", "err");
+    }
+  } catch (e) {
+    mostrarToast("Error de conexión al guardar la hora.", "err");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = textoOriginal;
+  }
 }
 
 async function guardarCorreoCliente() {

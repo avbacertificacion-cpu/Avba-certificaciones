@@ -291,12 +291,20 @@ class Auditorias {
      * archivo entregado no sería el que se revisó antes de entregarlo.
      */
     private function inspeccionesDelPeriodo(string $desdeDb, string $hastaDb): array {
+        /* La hora capturada manda; si no hay, la marca del registro, como
+           siempre. Se comprueba que la columna exista porque en una base donde
+           la migración todavía no corrió, nombrarla rompería la consulta entera
+           —y con ella la pantalla— en vez de dar una hora menos exacta. */
+        $horaCol = columnaExiste($this->pdo, 'equipos', 'hora_inspeccion')
+            ? 'COALESCE(e.hora_inspeccion, e.marca_temporal)'
+            : 'e.marca_temporal';
+
         $s = $this->pdo->prepare("
             SELECT e.id AS equipo_id, e.id_equipo, e.cliente, e.direccion, e.control,
                    e.estado, e.maquinaria, e.marca, e.modelo, e.serie,
                    COALESCE(NULLIF(u.nombre,''), e.inspector) AS inspector,
                    DATE_FORMAT(e.fecha_inspeccion,'%d/%m/%Y') AS fecha,
-                   TIME_FORMAT(e.marca_temporal,'%H:%i') AS hora
+                   TIME_FORMAT({$horaCol},'%H:%i') AS hora
             FROM equipos e
             LEFT JOIN usuarios u ON u.usuario COLLATE utf8mb4_general_ci = e.inspector
             WHERE e.fecha_inspeccion BETWEEN ? AND ?

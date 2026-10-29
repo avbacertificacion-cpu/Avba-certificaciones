@@ -25,6 +25,28 @@ class Certificaciones {
     public function __construct(PDO $pdo) {
         $this->pdo = $pdo;
         $this->ensureColumnasManual();
+        $this->ensureHoraInspeccion();
+    }
+
+    /**
+     * Hora de inicio de la inspección: la columna F del informe de la ema.
+     *
+     * Hasta ahora se reportaba marca_temporal, que es cuándo se GUARDÓ el
+     * registro. El inspector captura al terminar —a veces horas después, a
+     * veces al día siguiente—, así que esa hora casi nunca era la de inicio.
+     *
+     * Va en columna propia y no encima de marca_temporal, que es el sello del
+     * registro y además ordena los listados: corregirla ahí movería el registro
+     * de lugar en todas las pantallas y falsearía el sello. Vacía significa
+     * "no se capturó", y entonces se sigue usando la marca, como siempre.
+     *
+     * Se crea en un constructor que corre en cada petición, para que las tres
+     * pantallas que la leen la encuentren siempre.
+     */
+    private function ensureHoraInspeccion(): void {
+        try {
+            $this->pdo->exec("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS hora_inspeccion TIME NULL");
+        } catch (\Throwable $e) { /* columna ya existe o motor sin IF NOT EXISTS */ }
     }
 
     /** Columnas para el reemplazo manual del PDF (certificado/dictamen). */
@@ -111,6 +133,8 @@ class Certificaciones {
                     DATE_FORMAT(marca_temporal, '%d/%m/%Y %H:%i') AS marca_temporal,
                     cliente, maquinaria, marca, modelo, serie, id_equipo,
                     DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
+                    TIME_FORMAT(COALESCE(hora_inspeccion, marca_temporal), '%H:%i') AS hora,
+                    TIME_FORMAT(hora_inspeccion, '%H:%i') AS hora_capturada,
                     correo, control,
                     DATE_FORMAT(fecha_enviado, '%d/%m/%Y %H:%i') AS enviado,
                     evidencia_url AS evidencia, direccion, capacidad, estado, motivo,

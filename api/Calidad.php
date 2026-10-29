@@ -168,6 +168,29 @@ class Calidad {
             registrarHistorial($this->pdo, $usuario, $id, 'fecha_inspeccion', $row['fecha_inspeccion'] ?? null, $fechaDb);
         }
 
+        /* Hora de inicio de la inspección: la columna F del informe de la ema.
+           Se guarda en columna propia porque marca_temporal es el sello de
+           cuándo se guardó el registro y además ordena los listados: corregirla
+           ahí movería el registro de lugar en todas las pantallas y falsearía
+           el sello. Una cadena vacía borra la corrección y devuelve el
+           comportamiento de antes, que es usar la marca. */
+        if (array_key_exists('hora', $payload) && columnaExiste($this->pdo, 'equipos', 'hora_inspeccion')) {
+            $horaRaw = trim((string)$payload['hora']);
+            $horaDb  = null;
+            if ($horaRaw !== '') {
+                if (!preg_match('/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/', $horaRaw, $m)) {
+                    return ['status' => 'error',
+                        'message' => 'Hora inválida. Usa el formato de 24 horas, hh:mm '
+                                   . '(por ejemplo 08:30 o 14:05).'];
+                }
+                $horaDb = $m[1] . ':' . $m[2] . ':00';
+            }
+            $sets[]   = '`hora_inspeccion` = ?';
+            $params[] = $horaDb;
+            registrarHistorial($this->pdo, $usuario, $id, 'hora_inspeccion',
+                               $row['hora_inspeccion'] ?? null, $horaDb);
+        }
+
         // QR manual
         if (!empty($payload['qr_codigo'])) {
             $sets[]  = '`qr_codigo` = ?';
