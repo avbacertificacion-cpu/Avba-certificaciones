@@ -2790,7 +2790,7 @@
           <label>Código QR <span style="font-size:11px;color:var(--texto-hint)">(9 o 10 dígitos, como en la placa)</span></label>
           <div style="display:flex;gap:8px;align-items:center">
             <input type="text" id="iza-qr" placeholder="Escanear o ingresar manualmente" oninput="izaEspejo(this)"
-                   maxlength="10" inputmode="numeric" pattern="\d{9,10}" style="flex:1;letter-spacing:2px">
+                   maxlength="10" inputmode="numeric" pattern="\d{6,10}" style="flex:1;letter-spacing:2px">
             <button type="button" onclick="izaEscanearQR()" title="Escanear con cámara"
                     style="padding:9px 13px;background:var(--azul);color:#fff;border:none;border-radius:var(--radio);cursor:pointer;font-size:15px;line-height:1">📷</button>
             <button type="button" onclick="izaSugerirQR()" title="Siguiente QR disponible"
@@ -6730,7 +6730,7 @@ function izaEspejoAviso() {
   }
 
   const v = (document.getElementById('iza-qr').value || '').trim();
-  const sirve = /^\d{9,10}$/.test(v);
+  const sirve = /^\d{6,10}$/.test(v);
   const mal   = v !== '' && !sirve;
   const otros = campos.filter(c => c !== 'QR');
   avi.style.background = mal ? '#fff4e0' : '#e8f1fb';
@@ -6758,7 +6758,7 @@ function izaEspejoAlCambiarTipo() {
    vacío y el código sobrevive en los demás campos del conjunto. */
 function izaEspejoQrParaGuardar() {
   const v = (document.getElementById('iza-qr').value || '').trim();
-  return /^\d{9,10}$/.test(v) ? v : '';
+  return /^\d{6,10}$/.test(v) ? v : '';
 }
 
 async function izaCargarSugerencias() {
@@ -7044,7 +7044,7 @@ async function izaClonarAutollenar() {
  * admita. Los campos que no comparten viajan con su propio valor.
  */
 function izaClonRepartir(filas) {
-  const esPlaca = v => /^\d{9,10}$/.test(v);
+  const esPlaca = v => /^\d{6,10}$/.test(v);
   const compQr  = izaClonComparte('QR');
   const enQr    = f => compQr && esPlaca(f.cod);
   return {
@@ -7064,7 +7064,7 @@ async function izaClonarGuardar() {
   err.textContent = '';
 
   // Se avisa aquí de lo que el servidor rechazaría, para no perder el viaje.
-  const esPlaca  = v => /^\d{9,10}$/.test(v);
+  const esPlaca  = v => /^\d{6,10}$/.test(v);
   const compQr   = izaClonComparte('QR');
   // El campo propio de QR siempre tiene que ser una placa; el compartido puede
   // no serlo, y entonces el código sobrevive en los demás campos del conjunto.

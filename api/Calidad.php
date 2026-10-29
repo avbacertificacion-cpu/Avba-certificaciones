@@ -471,9 +471,10 @@ class Calidad {
         if (!qrFormatoValido($hasta)) {
             return ['status' => 'error', 'message' => qrMensajeFormato()];
         }
-        // Las placas conviven en dos longitudes (10 dígitos maquinaria y
-        // personal, 9 el lote nuevo de accesorios). Un lote se genera dentro de
-        // UNA longitud: mezclarlas produciría códigos que no existen impresos.
+        // Las placas conviven en varias longitudes (10 maquinaria y personal,
+        // 9 el lote anterior de accesorios, 6 las placas grabadas de aluminio).
+        // Un lote se genera dentro de UNA longitud: mezclarlas produciría
+        // códigos que no existen impresos.
         $digitos = strlen($hasta);
 
         $desdeRaw = trim($payload['desde'] ?? '');
@@ -502,10 +503,16 @@ class Calidad {
         }
         $hastaInt = (int) $hasta;
 
-        // El rango no puede cambiar de longitud a mitad de camino.
-        if (strlen((string)$desde) !== $digitos) {
+        /* El rango tiene que caber en los dígitos del lote.
+           Antes se exigía que coincidiera EXACTAMENTE, comparando la longitud
+           del número ya convertido a entero. Con las series que no empiezan en
+           cero daba igual, pero una placa grabada como 012871 vale 12871 como
+           número: cinco dígitos contra seis, y el lote se rechazaba con un
+           mensaje que mandaba a cambiar algo que estaba bien. Lo que importa es
+           que no se pase, porque los ceros de adelante los pone el relleno. */
+        if (strlen((string)$desde) > $digitos || strlen((string)$hastaInt) > $digitos) {
             return ['status' => 'error', 'message' =>
-                "El rango se sale de los $digitos dígitos. Indica el número inicial con \"Iniciar en\"."];
+                "El rango se sale de los $digitos dígitos del lote. Revisa el número inicial y el final."];
         }
 
         if ($hastaInt < $desde) {

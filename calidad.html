@@ -5540,7 +5540,7 @@ function accEspejoAviso(form) {
   }
 
   const v = (document.getElementById(f.qr).value || '').trim();
-  const sirve = /^\d{9,10}$/.test(v);
+  const sirve = /^\d{6,10}$/.test(v);
   const otros = campos.filter(c => c !== 'QR');
   avi.innerHTML = v === ''
     ? 'En este tipo, <b>' + escH(palabras) + '</b> llevan el mismo código: al capturar cualquiera, los demás se llenan solos.' + escH(sueltos)
@@ -5570,7 +5570,7 @@ function accEspejoAlCambiarTipo(form) {
    vacío y el código sobrevive en los demás campos del conjunto. */
 function accEspejoQrParaGuardar(form) {
   const v = (document.getElementById(ACC_ESPEJO_FORMS[form].qr).value || '').trim();
-  return /^\d{9,10}$/.test(v) ? v : '';
+  return /^\d{6,10}$/.test(v) ? v : '';
 }
 
 

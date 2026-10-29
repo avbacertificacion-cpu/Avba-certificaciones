@@ -427,16 +427,22 @@ const QR_PREFIJO_PERSONAL = '7';
 /**
  * Longitud admitida de un código impreso en placa.
  *
- * Las placas de maquinaria y personal traen 10 dígitos; el lote nuevo de
- * accesorios trae 9. Se acepta lo que venga impreso y NUNCA se rellena ni se
- * recorta: quien valida teclea lo que ve en la placa, así que el código
- * guardado tiene que ser el mismo carácter por carácter. No hay riesgo de
- * choque entre lotes porque distinta longitud es distinto código.
+ * Conviven varias series: maquinaria y personal traen 10 dígitos, el lote
+ * anterior de accesorios 9, y las placas grabadas de aluminio 6.
+ *
+ * Se acepta lo que venga impreso y NUNCA se rellena ni se recorta: quien valida
+ * teclea lo que ve en la placa, así que el código guardado tiene que ser el
+ * mismo carácter por carácter —012871 no es 12871—. No hay riesgo de choque
+ * entre lotes porque distinta longitud es distinto código.
+ *
+ * El rango es de longitudes, no una lista de las tres que hoy existen: un lote
+ * nuevo de 7 u 8 dígitos entra sin tocar código. Teclear de menos no afecta a
+ * nadie: el código simplemente no aparece.
  */
-const QR_LONGITUD_MIN = 9;
+const QR_LONGITUD_MIN = 6;
 const QR_LONGITUD_MAX = 10;
 
-/** ¿Tiene forma de código de placa (sólo dígitos, 9 o 10)? */
+/** ¿Tiene forma de código de placa (sólo dígitos, entre 6 y 10)? */
 function qrFormatoValido(string $qr): bool {
     return (bool)preg_match('/^\d{' . QR_LONGITUD_MIN . ',' . QR_LONGITUD_MAX . '}$/', trim($qr));
 }
@@ -486,7 +492,8 @@ function cuentaInspectorPorNombre(PDO $pdo, string $busca): ?string {
 
 /** Mensaje único para cuando el formato no cuadra. */
 function qrMensajeFormato(): string {
-    return 'El código QR debe tener ' . QR_LONGITUD_MIN . ' o ' . QR_LONGITUD_MAX . ' dígitos, tal como viene impreso en la placa.';
+    return 'El código debe tener entre ' . QR_LONGITUD_MIN . ' y ' . QR_LONGITUD_MAX
+         . ' dígitos, tal como viene impreso en la placa (con sus ceros de adelante).';
 }
 
 /** ¿El código pertenece a la serie indicada? */
