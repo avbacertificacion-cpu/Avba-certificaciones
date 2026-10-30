@@ -119,6 +119,22 @@ class Accesorios {
             'desde'     => '012801',
             'hasta'     => '012835',
         ],
+        [
+            // Mismo trabajo y numeración seguida, así que entra en la MISMA
+            // sesión: una visita es una sesión, con un informe y un juego de
+            // certificados. 'continua' dice a cuál sumarse, nombrando una placa
+            // que ya está dentro.
+            'clave'     => 'precarga_grilletes_012836_012839',
+            'busca'     => 'MARCOS',
+            'continua'  => '012801',
+            'tipo'      => 'GRILLETE',
+            'marca'     => 'CROSBY',
+            'modelo'    => 'PERNO, TUERCA Y CHAVETA',
+            'capacidad' => '35 TON',
+            'medidas'   => '2"',
+            'desde'     => '012836',
+            'hasta'     => '012839',
+        ],
     ];
 
     private const PRECARGA_OREJAS = [
@@ -175,12 +191,22 @@ class Accesorios {
             $this->ensureAccSesionesColumns();
             $this->ensureAccIzajeQrColumn();
 
+            // Si el lote continúa a otro, se suma a su sesión en vez de abrir
+            // una nueva: un mismo trabajo no debe quedar partido en dos
+            // sesiones, porque serían dos informes de una sola visita.
+            $sesionId = !empty($cfg['continua'])
+                ? $this->sesionBorradorDe((string)$cfg['continua'], $usuario) : 0;
+            $orden    = $sesionId ? $this->ultimoOrden($sesionId) : 0;
+
             $this->pdo->beginTransaction();
-            $this->pdo->prepare(
-                "INSERT INTO accesorios_sesiones (cliente, fecha, coordenadas, direccion, usuario, control, estatus)
-                 VALUES ('', ?, '', '', ?, '', ?)"
-            )->execute([date('Y-m-d'), $usuario, self::BORRADOR]);
-            $sesionId = (int)$this->pdo->lastInsertId();
+            if (!$sesionId) {
+                $this->pdo->prepare(
+                    "INSERT INTO accesorios_sesiones (cliente, fecha, coordenadas, direccion, usuario, control, estatus)
+                     VALUES ('', ?, '', '', ?, '', ?)"
+                )->execute([date('Y-m-d'), $usuario, self::BORRADOR]);
+                $sesionId = (int)$this->pdo->lastInsertId();
+                $orden    = 0;
+            }
 
             $ins = $this->pdo->prepare(
                 "INSERT INTO accesorios_izaje
@@ -191,7 +217,7 @@ class Accesorios {
                 // El número de la placa hace de identificador y de serie: es lo
                 // único que trae grabado la pieza.
                 $ins->execute([$sesionId, $codigo, $tipoId, $cfg['marca'], $cfg['modelo'],
-                               $codigo, $cfg['capacidad'], $cfg['medidas'], $i + 1, $codigo]);
+                               $codigo, $cfg['capacidad'], $cfg['medidas'], $orden + $i + 1, $codigo]);
             }
             $this->pdo->prepare("INSERT INTO accesorios_tipos_seed (clave) VALUES (?)")->execute([$cfg['clave']]);
             $this->pdo->commit();
@@ -204,6 +230,39 @@ class Accesorios {
             if ($this->pdo->inTransaction()) $this->pdo->rollBack();
             error_log("[Accesorios] lote " . ($cfg['clave'] ?? '?') . ': ' . $e->getMessage());
         }
+    }
+
+    /**
+     * La sesión preparada que contiene esa placa, si sigue siendo del inspector.
+     *
+     * Se busca por una pieza y no por un identificador de sesión guardado
+     * aparte, porque la placa es el dato que no cambia. Sólo vale si la sesión
+     * sigue en BORRADOR: una vez enviada a Calidad ya no se le agregan piezas
+     * por detrás, que sería modificar lo que alguien ya revisó.
+     */
+    private function sesionBorradorDe(string $codigo, string $usuario): int {
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT s.id FROM accesorios_izaje i
+                   INNER JOIN accesorios_sesiones s ON s.id = i.sesion_id
+                  WHERE i.qr_codigo = ? AND s.estatus = ? AND s.usuario = ?
+                  LIMIT 1"
+            );
+            $st->execute([trim($codigo), self::BORRADOR, $usuario]);
+            return (int)($st->fetchColumn() ?: 0);
+        } catch (\Throwable $e) {
+            error_log('[Accesorios] sesionBorradorDe: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /** El último número de orden de una sesión, para seguir contando desde ahí. */
+    private function ultimoOrden(int $sesionId): int {
+        try {
+            $st = $this->pdo->prepare("SELECT MAX(orden) FROM accesorios_izaje WHERE sesion_id = ?");
+            $st->execute([$sesionId]);
+            return (int)($st->fetchColumn() ?: 0);
+        } catch (\Throwable $e) { return 0; }
     }
 
     /**
