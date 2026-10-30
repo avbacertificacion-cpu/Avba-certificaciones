@@ -75,6 +75,7 @@ class Accesorios {
         $this->pdo = $pdo;
         $this->seedTipos();
         $this->precargarOrejasMichel();
+        $this->precargarLotesAcc();
     }
 
     /**
@@ -93,6 +94,33 @@ class Accesorios {
      * más de una que podría ser, no hace nada y vuelve a intentar en la
      * siguiente petición: es preferible a cargarle la sesión a otra persona.
      */
+    /**
+     * Lotes de accesorios cuyas placas YA están grabadas y numeradas.
+     *
+     * A diferencia de la precarga de orejas, que tomaba la primera racha libre
+     * del banco, aquí los códigos vienen dados: son las placas de aluminio que
+     * ya están puestas en las piezas, así que el rango manda y no se negocia.
+     * Si alguno estuviera ocupado por otro registro, el lote entero no se crea:
+     * un código repetido es lo que la pantalla de validación marca como
+     * conflicto, y vale más no tener la sesión que tenerla mal.
+     *
+     * Para agregar el siguiente lote basta otro renglón aquí. La clave es lo
+     * que impide que se repita: una vez aplicada, no vuelve a correr.
+     */
+    private const PRECARGAS_ACC = [
+        [
+            'clave'     => 'precarga_grilletes_012801_012835',
+            'busca'     => 'MARCOS',
+            'tipo'      => 'GRILLETE',
+            'marca'     => 'CROSBY',
+            'modelo'    => 'PERNO ROSCADO',
+            'capacidad' => '3 1/4 TON',
+            'medidas'   => '5/8"',
+            'desde'     => '012801',
+            'hasta'     => '012835',
+        ],
+    ];
+
     private const PRECARGA_OREJAS = [
         // La marca conserva la grafía con que se publicó primero: cambiarla
         // haría que la precarga corriera otra vez donde ya se aplicó.
@@ -103,6 +131,129 @@ class Accesorios {
         'capacidad' => '500 KG',
         'medidas'   => 'ESPESOR 1/4" · DIÁMETRO 2"',
     ];
+
+    /** Cada lote de PRECARGAS_ACC, una sola vez. */
+    private function precargarLotesAcc(): void {
+        foreach (self::PRECARGAS_ACC as $cfg) $this->precargarLoteAcc($cfg);
+    }
+
+    /**
+     * Prepara una sesión de accesorios con los códigos ya grabados en placa.
+     *
+     * Queda en BORRADOR, que Calidad no ve: es del inspector hasta que él la
+     * revisa y la manda. Las piezas entran marcadas como CUMPLE porque es lo
+     * normal en un lote nuevo, pero eso es una suposición y el inspector tiene
+     * que confirmarla pieza por pieza antes de enviar.
+     */
+    private function precargarLoteAcc(array $cfg): void {
+        try {
+            $ya = $this->pdo->prepare("SELECT 1 FROM accesorios_tipos_seed WHERE clave = ?");
+            $ya->execute([$cfg['clave']]);
+            if ($ya->fetch()) return;
+
+            $usuario = cuentaInspectorPorNombre($this->pdo, $cfg['busca']);
+            if ($usuario === null) return;
+
+            $tipoId = $this->tipoAccesorioPara($cfg['tipo']);
+            if (!$tipoId) return;
+
+            $codigos = self::rangoCodigos($cfg['desde'], $cfg['hasta']);
+            if (!$codigos) {
+                error_log("[Accesorios] lote {$cfg['clave']}: el rango no es válido");
+                return;
+            }
+
+            // Todos o ninguno. Un lote a medias deja piezas sin placa y obliga a
+            // adivinar cuáles faltaron.
+            foreach ($codigos as $c) {
+                if (!$this->qrDisponible($c)) {
+                    error_log("[Accesorios] lote {$cfg['clave']}: el código $c ya está ocupado, no se crea nada");
+                    return;
+                }
+            }
+
+            $this->ensureAccSesionesColumns();
+            $this->ensureAccIzajeQrColumn();
+
+            $this->pdo->beginTransaction();
+            $this->pdo->prepare(
+                "INSERT INTO accesorios_sesiones (cliente, fecha, coordenadas, direccion, usuario, control, estatus)
+                 VALUES ('', ?, '', '', ?, '', ?)"
+            )->execute([date('Y-m-d'), $usuario, self::BORRADOR]);
+            $sesionId = (int)$this->pdo->lastInsertId();
+
+            $ins = $this->pdo->prepare(
+                "INSERT INTO accesorios_izaje
+                 (sesion_id, id_accesorio, tipo_id, marca, modelo, serie, capacidad, medidas, estado, orden, qr_codigo)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'CUMPLE', ?, ?)"
+            );
+            foreach ($codigos as $i => $codigo) {
+                // El número de la placa hace de identificador y de serie: es lo
+                // único que trae grabado la pieza.
+                $ins->execute([$sesionId, $codigo, $tipoId, $cfg['marca'], $cfg['modelo'],
+                               $codigo, $cfg['capacidad'], $cfg['medidas'], $i + 1, $codigo]);
+            }
+            $this->pdo->prepare("INSERT INTO accesorios_tipos_seed (clave) VALUES (?)")->execute([$cfg['clave']]);
+            $this->pdo->commit();
+
+            // Fuera de la transacción: que el banco falle no debe deshacer la sesión.
+            foreach ($codigos as $codigo) $this->ocuparQr($codigo);
+            error_log("[Accesorios] lote {$cfg['clave']}: sesión $sesionId para $usuario, "
+                . count($codigos) . ' piezas, ' . $codigos[0] . '–' . end($codigos));
+        } catch (\Throwable $e) {
+            if ($this->pdo->inTransaction()) $this->pdo->rollBack();
+            error_log("[Accesorios] lote " . ($cfg['clave'] ?? '?') . ': ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * El id del tipo de accesorio, tolerante con cómo esté escrito.
+     *
+     * Se busca primero el nombre exacto y luego cualquiera que empiece igual:
+     * "GRILLETE" encuentra también "GRILLETE DE PERNO ROSCADO" si así lo dieron
+     * de alta. Si no existe ninguno, se crea con el nombre de la configuración,
+     * porque sin tipo no hay sesión que valga.
+     */
+    private function tipoAccesorioPara(string $nombre): int {
+        $nombre = mb_strtoupper(trim($nombre));
+        try {
+            $st = $this->pdo->prepare("SELECT id FROM accesorios_tipos WHERE UPPER(TRIM(nombre)) = ? LIMIT 1");
+            $st->execute([$nombre]);
+            $id = (int)($st->fetchColumn() ?: 0);
+            if ($id) return $id;
+
+            $st = $this->pdo->prepare(
+                "SELECT id FROM accesorios_tipos WHERE UPPER(TRIM(nombre)) LIKE ? ORDER BY id LIMIT 1");
+            $st->execute([$nombre . '%']);
+            $id = (int)($st->fetchColumn() ?: 0);
+            if ($id) return $id;
+
+            $this->pdo->prepare("INSERT INTO accesorios_tipos (nombre) VALUES (?)")->execute([$nombre]);
+            return (int)$this->pdo->lastInsertId();
+        } catch (\Throwable $e) {
+            error_log('[Accesorios] tipoAccesorioPara: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Los códigos de un rango, conservando los ceros de adelante.
+     *
+     * 012801 a 012835 son treinta y cinco placas, no veintiocho mil: se cuenta
+     * por el número pero se escribe con el ancho impreso, porque 012801 y 12801
+     * no son la misma placa.
+     */
+    private static function rangoCodigos(string $desde, string $hasta): array {
+        $desde = trim($desde); $hasta = trim($hasta);
+        if (!ctype_digit($desde) || !ctype_digit($hasta)) return [];
+        if (strlen($desde) !== strlen($hasta)) return [];   // dos series distintas
+        $a = (int)$desde; $b = (int)$hasta;
+        if ($b < $a || ($b - $a) > 999) return [];          // tope de cordura
+        $ancho = strlen($desde);
+        $out = [];
+        for ($n = $a; $n <= $b; $n++) $out[] = str_pad((string)$n, $ancho, '0', STR_PAD_LEFT);
+        return $out;
+    }
 
     private function precargarOrejasMichel(): void {
         $cfg = self::PRECARGA_OREJAS;
