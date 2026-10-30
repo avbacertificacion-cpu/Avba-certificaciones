@@ -169,3 +169,40 @@
   .tabla-header > .tabla-title { flex: 1 0 100%; }
   .tabla-header > .tc-barra { margin-left: 0 !important; gap: 8px; }
 }
+
+
+/* ── 7. Modales: una sola zona que se desliza, no dos ──────────────────
+   En Calidad y Certificaciones el modal se arma así:
+
+       .overlay   ← se desliza (overflow-y: auto)
+         .modal
+           .modal-hdr
+           .modal-tabs
+           .modal-body    ← TAMBIÉN se desliza, topado a 55vh
+           .modal-footer  ← aquí viven los botones
+
+   En computadora no estorba, pero en teléfono el modal mide más que la
+   pantalla —882 px contra 844 en uno de 390×844— y entonces hay que deslizar
+   el overlay para llegar a los botones. El problema es que el cuerpo ocupa casi
+   toda la pantalla y se lleva el gesto: tiene 469 px propios que recorrer antes
+   de ceder, y al overlay le quedan 78. El dedo casi siempre cae sobre el
+   cuerpo, así que el modal no se mueve y el pie no se alcanza. Se siente como
+   si la ventana se hubiera trabado; cerrarla y volver a abrirla "lo arregla"
+   porque reinicia las posiciones y el siguiente gesto cae distinto.
+
+   En iOS es peor que en esta cuenta: ahí vh se mide contra la pantalla con la
+   barra del navegador escondida, así que 55vh sale más alto de lo que se ve.
+
+   La cura es quitar la de adentro: en teléfono y tablet el cuerpo deja de
+   tener tope y de deslizarse, y el modal entero se recorre con el overlay. Un
+   solo lugar donde deslizar, que es como la gente espera que funcione. */
+@media (max-width: 1024px) {
+  .overlay {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;   /* que no arrastre la página de atrás */
+  }
+  .modal-body {
+    max-height: none !important;
+    overflow: visible !important;
+  }
+}
