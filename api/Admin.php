@@ -432,6 +432,129 @@ class Admin {
 
            Es la plantilla de dictamen de grúa móvil: su prueba de carga se
            mide con peso, radio y longitud de pluma. */
+        /* Grúa torre. Hasta ahora heredaba la lista genérica del esquema
+           —pintura, soldadura, corrosión—, que sirve para cualquier fierro y
+           no pregunta por nada de lo que de verdad falla en una torre: el
+           lastre, el arriostramiento, la corona de giro o los limitadores.
+
+           Está escrita para pluma horizontal, que es lo que se va a revisar.
+           Los puntos de la cúspide y sus tirantes llevan "si el diseño la
+           incluye" a propósito: las Comansa son Flat-Top, sin cúspide, y un
+           reactivo que no aplica obliga a inventar una respuesta. Para las
+           abatibles habría que agregar los suyos. */
+        'grua_torre' => [
+            'secciones' => [
+                ['A', 'Documentación, placas y configuración'],
+                ['B', 'Cimentación, lastre y anclaje'],
+                ['C', 'Torre, arriostramiento y jaula de trepado'],
+                ['D', 'Corona de giro, contrapluma y maquinaria'],
+                ['E', 'Pluma, carro y punta'],
+                ['F', 'Cables, poleas y gancho'],
+                ['G', 'Dispositivos de seguridad y limitadores'],
+                ['H', 'Cabina, mandos e instalación eléctrica'],
+                ['I', 'Prueba de carga'],
+            ],
+            'items' => [
+                ['A', 'A-01', 'Manual de operación y de montaje del fabricante, disponible en obra'],
+                ['A', 'A-02', 'Tabla de cargas correspondiente a la longitud de pluma instalada, legible y a la vista del operador'],
+                ['A', 'A-03', 'Placa de datos del fabricante: marca, modelo, número de serie y año'],
+                ['A', 'A-04', 'Configuración instalada documentada: longitud de pluma, altura bajo gancho y número de tramos de torre'],
+                ['A', 'A-05', 'Acta o reporte de montaje firmado por personal competente'],
+                ['A', 'A-06', 'Memoria de cálculo o aprobación de la cimentación y del arriostramiento, cuando aplique'],
+                ['A', 'A-07', 'Bitácora de mantenimiento e inspecciones previas'],
+                ['A', 'A-08', 'Certificados vigentes de los elementos de izaje que acompañan a la grúa'],
+
+                ['B', 'B-01', 'Cimentación sin grietas, asentamientos ni desplazamiento visible'],
+                ['B', 'B-02', 'Pernos o anclas de la base: completos, sin corrosión y con el apriete indicado'],
+                ['B', 'B-03', 'Bloques de lastre de base completos, íntegros e identificados conforme al manual'],
+                ['B', 'B-04', 'Acomodo del lastre según el diagrama del fabricante, sin piezas de más ni de menos'],
+                ['B', 'B-05', 'Sujeción del lastre que impida su desplazamiento'],
+                ['B', 'B-06', 'Verticalidad de la torre dentro de la tolerancia del fabricante'],
+                ['B', 'B-07', 'Drenaje del área, sin encharcamiento ni socavación al pie de la base'],
+                ['B', 'B-08', 'Área de la base delimitada y libre de almacenamiento o maniobra ajena'],
+
+                ['C', 'C-01', 'Tramos de torre sin deformación, grietas ni corrosión que comprometan la sección'],
+                ['C', 'C-02', 'Uniones entre tramos: tornillos o pasadores completos, con su seguro y el apriete indicado'],
+                ['C', 'C-03', 'Soldaduras de los tramos sin fisuras visibles'],
+                ['C', 'C-04', 'Arriostramientos a la estructura instalados en los niveles y con los elementos del cálculo'],
+                ['C', 'C-05', 'Anclajes del arriostramiento a la obra sin deformación ni holgura'],
+                ['C', 'C-06', 'Jaula de trepado y su cilindro sin fugas, deformación ni daño en guías'],
+                ['C', 'C-07', 'Escalera, descansos y línea de vida de la torre completos y en condición'],
+                ['C', 'C-08', 'Protecciones y guardas de la escalera conforme al diseño'],
+
+                ['D', 'D-01', 'Corona de giro: tornillería completa, con apriete y sin holgura anormal'],
+                ['D', 'D-02', 'Juego de la corona dentro de lo que indica el fabricante'],
+                ['D', 'D-03', 'Engrase de corona y piñón, sin contaminación ni falta'],
+                ['D', 'D-04', 'Motorreductor de giro y su freno, sin fuga ni ruido anormal'],
+                ['D', 'D-05', 'Contrapluma sin deformación, con sus tirantes y pasadores asegurados'],
+                ['D', 'D-06', 'Bloques de contrapeso completos, identificados y colocados según el diagrama'],
+                ['D', 'D-07', 'Malacate de elevación: tambor, enrollado y freno en condición'],
+                ['D', 'D-08', 'Barandales y pisos de la contrapluma completos y antiderrapantes'],
+                ['D', 'D-09', 'Cúspide y sus tirantes sin deformación ni cables dañados, si el diseño la incluye'],
+
+                ['E', 'E-01', 'Tramos de pluma sin deformación, grietas ni corrosión'],
+                ['E', 'E-02', 'Uniones de pluma: pasadores y seguros completos'],
+                ['E', 'E-03', 'Tirantes de pluma sin hilos rotos, dobleces ni corrosión, si el diseño los incluye'],
+                ['E', 'E-04', 'Carro de la pluma: ruedas, guías y topes en condición'],
+                ['E', 'E-05', 'Topes de fin de recorrido del carro, en ambos extremos'],
+                ['E', 'E-06', 'Cable del carro sin daño y con la tensión indicada'],
+                ['E', 'E-07', 'Pasarela y línea de vida de la pluma completas'],
+                ['E', 'E-08', 'Punta de pluma, poleas y sus guardacables en condición'],
+
+                ['F', 'F-01', 'Cable de izaje sin hilos rotos, aplastamiento, nidos ni corrosión que ameriten retiro'],
+                ['F', 'F-02', 'Diámetro del cable dentro de la tolerancia de retiro'],
+                ['F', 'F-03', 'Terminación del cable y anclaje al tambor conforme al manual'],
+                ['F', 'F-04', 'Vueltas de seguridad en el tambor con el gancho en su punto más bajo'],
+                ['F', 'F-05', 'Poleas sin desgaste en garganta, con rodamiento libre y guardacables'],
+                ['F', 'F-06', 'Gancho sin deformación, grietas ni apertura fuera de tolerancia'],
+                ['F', 'F-07', 'Seguro del gancho completo y funcional'],
+                ['F', 'F-08', 'Rótula del gancho con giro libre y sin juego anormal'],
+                ['F', 'F-09', 'Motón y su identificación de capacidad legibles'],
+
+                ['G', 'G-01', 'Limitador de carga máxima: presente y con prueba de funcionamiento'],
+                ['G', 'G-02', 'Limitador de momento: presente y con prueba de funcionamiento'],
+                ['G', 'G-03', 'Finales de carrera de elevación, superior e inferior'],
+                ['G', 'G-04', 'Finales de carrera del carro, hacia dentro y hacia fuera'],
+                ['G', 'G-05', 'Limitador de giro, cuando el diseño lo requiera'],
+                ['G', 'G-06', 'Anemómetro en servicio, con lectura visible para el operador'],
+                ['G', 'G-07', 'Freno de giro y puesta en veleta operables'],
+                ['G', 'G-08', 'Paro de emergencia accesible y funcional'],
+                ['G', 'G-09', 'Señalización luminosa de obstáculo y balizamiento, cuando apliquen'],
+                ['G', 'G-10', 'Alarma sonora de maniobra audible en el área de trabajo'],
+
+                ['H', 'H-01', 'Cabina: cristales, limpiaparabrisas, asiento y acceso en condición'],
+                ['H', 'H-02', 'Mandos identificados, con retorno a neutro y sin juego anormal'],
+                ['H', 'H-03', 'Indicadores de carga, radio y altura visibles desde el puesto de mando'],
+                ['H', 'H-04', 'Tablero eléctrico cerrado, identificado y sin humedad'],
+                ['H', 'H-05', 'Cableado sin daño en aislamiento ni empalmes improvisados'],
+                ['H', 'H-06', 'Puesta a tierra de la estructura, con continuidad verificada'],
+                ['H', 'H-07', 'Protecciones eléctricas y paro general accesibles'],
+                ['H', 'H-08', 'Extintor vigente y accesible en la cabina'],
+
+                ['I', 'I-01', 'Prueba sin carga: recorrido de los movimientos en todo su rango, sin ruido ni atoramiento'],
+                ['I', 'I-02', 'Prueba con carga a radio definido, conforme a la tabla de cargas del fabricante'],
+                ['I', 'I-03', 'Frenado de elevación sin deslizamiento perceptible con la carga suspendida'],
+                ['I', 'I-04', 'Frenado de giro y de traslación del carro sin deslizamiento'],
+                ['I', 'I-05', 'Estructura sin deformación permanente después de la prueba'],
+                ['I', 'I-06', 'Disparo de los limitadores dentro de lo indicado por el fabricante'],
+            ],
+            /* Las tres acreditadas son las del alcance que dio la ema y no
+               cambian por tipo de equipo. Las de referencia sí: aquí van las
+               que hablan de grúa torre, que es lo que distingue a este dictamen
+               del de una grúa móvil. */
+            'normas' => [
+                ['NMX-GR-9927-1-IMNC-2019', 'acreditada'],
+                ['NMX-GR-23814-IMNC-2011',  'acreditada'],
+                ['NMX-EC-17020-IMNC-2014',  'acreditada'],
+                ['ISO 9927-3:2019',         'referencia'],
+                ['ASME B30.3',              'referencia'],
+                ['ASME B30.9',              'referencia'],
+                ['ASME B30.26',             'referencia'],
+                ['NOM-004-STPS-1999',       'referencia'],
+                ['NOM-009-STPS-2011',       'referencia'],
+            ],
+        ],
+
         'grua_camion' => [
             'secciones' => [
                 ['A', 'Documentación y placas'],
@@ -540,6 +663,7 @@ class Admin {
     private const SEED_CATALOGO       = 'catalogo_normas_v1';
     private const SEED_CHECKLIST_CSP  = 'checklist_canastilla_sp_v2';
     private const SEED_CATALOGO_V2    = 'catalogo_normas_v2';
+    private const SEED_CATALOGO_V3    = 'catalogo_normas_v3_torre';
 
     /**
      * Topes por grupo. Son de espacio, no de criterio: con siete normas
@@ -584,6 +708,21 @@ class Admin {
      * orejas de carga. Van aparte porque la siembra original no se vuelve a
      * correr: reponer la lista completa devolvería las que Calidad ya quitó.
      */
+    /**
+     * Normas de referencia propias de grúa torre.
+     *
+     * Las acreditadas no cambian —son las tres del alcance que dio la ema— y
+     * éstas entran al catálogo de referencia, que es de donde Calidad escoge
+     * las que cita cada dictamen. La 9927-1 que ya estaba cubre las
+     * generalidades de inspección; la parte 3 es la que habla de grúas torre y
+     * se usa junto con ella.
+     */
+    private const CATALOGO_NORMAS_V3 = [
+        ['ISO 9927-3:2019', 'Grúas — Inspecciones — Parte 3: Grúas torre'],
+        ['ASME B30.3',      'Grúas torre: instalación, operación, inspección y mantenimiento'],
+        ['EN 14439',        'Grúas torre — requisitos de seguridad para el diseño'],
+    ];
+
     private const CATALOGO_NORMAS_V2 = [
         ['ASME BTH-1',      'Diseño de dispositivos de izaje bajo el gancho (orejas, vigas, yugos)'],
         ['AWS D1.1/D1.1M',  'Código de soldadura estructural — acero'],
@@ -608,9 +747,21 @@ class Admin {
      * oreja de carga—, se les pone la suya.
      */
     private function ampliarCatalogoNormas(): void {
+        $this->agregarAlCatalogo(self::SEED_CATALOGO_V2, self::CATALOGO_NORMAS_V2);
+        $this->agregarAlCatalogo(self::SEED_CATALOGO_V3, self::CATALOGO_NORMAS_V3);
+    }
+
+    /**
+     * Agrega al catálogo una tanda de normas, una sola vez.
+     *
+     * Las que ya estén no se duplican; si entraron sin descripción, se les
+     * completa. La marca es por tanda: así una ampliación nueva no vuelve a
+     * correr las anteriores ni se las salta.
+     */
+    private function agregarAlCatalogo(string $marca, array $normas): void {
         try {
             $st = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
-            $st->execute([self::SEED_CATALOGO_V2]);
+            $st->execute([$marca]);
             if ($st->fetch()) return;
 
             $ya = array_map(
@@ -622,7 +773,7 @@ class Admin {
                 "UPDATE normas_catalogo SET descripcion = ?
                  WHERE UPPER(norma) = ? AND (descripcion IS NULL OR descripcion = '')"
             );
-            foreach (self::CATALOGO_NORMAS_V2 as [$norma, $desc]) {
+            foreach ($normas as [$norma, $desc]) {
                 if (in_array(strtoupper($norma), $ya, true)) {
                     $des->execute([$desc, strtoupper($norma)]);
                     continue;
@@ -631,9 +782,9 @@ class Admin {
             }
 
             $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")
-                ->execute([self::SEED_CATALOGO_V2]);
+                ->execute([$marca]);
         } catch (\Throwable $e) {
-            error_log('[Admin] ampliarCatalogoNormas: ' . $e->getMessage());
+            error_log("[Admin] agregarAlCatalogo ($marca): " . $e->getMessage());
         }
     }
 
@@ -989,7 +1140,17 @@ class Admin {
      * de la norma; si no hay, se compara el texto sin separadores.
      */
     private function claveNorma(string $norma): string {
-        if (preg_match('/(\d{4,5})/', $norma, $m)) return $m[1];
+        /* El número de parte forma parte de la identidad de la norma.
+           Antes sólo se tomaba la primera corrida de cuatro o cinco dígitos, y
+           entonces la NMX-GR-9927-1 (generalidades, que SÍ está en el alcance
+           acreditado) y la ISO 9927-3 (grúas torre, que es de referencia)
+           daban la misma clave: 9927. El sistema las tenía por la misma norma y
+           promovía la de referencia a acreditada, con lo que el dictamen
+           declaraba dentro del alcance algo que la ema no acreditó. Eso no es
+           un detalle de catálogo: es afirmar de más en un documento firmado. */
+        if (preg_match('/(\d{4,5})(?:\s*-\s*(\d{1,2}))?/', $norma, $m)) {
+            return $m[1] . (isset($m[2]) && $m[2] !== '' ? '-' . $m[2] : '');
+        }
         return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $norma) ?? $norma);
     }
 

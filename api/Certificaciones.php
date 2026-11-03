@@ -1236,7 +1236,21 @@ body { background:#fff!important; }
      *
      * @return array{angulo:?float, altura:?float} null en lo que no se pueda deducir.
      */
-    private function geometriaPc(float $radio, float $pluma): array {
+    private static function plumaHorizontal(string $plantilla): bool {
+        return in_array(trim($plantilla), ['dictamen_grua_torre.html'], true);
+    }
+
+    private function geometriaPc(float $radio, float $pluma, string $plantilla = ''): array {
+        /* En una grúa torre la pluma NO se inclina: el carro corre por ella y la
+           altura bajo gancho la da la torre, no el triángulo. Deducirla con
+           Pitágoras —correcto en una grúa móvil— aquí da un número sin
+           significado físico: con 50 m de pluma y el carro a 40 m salían 30 m de
+           altura, que no es ni la torre ni nada. Y como el campo estaba marcado
+           de sólo lectura, el inspector no podía corregirlo: ese número llegaba
+           impreso al dictamen del cliente. */
+        if (self::plumaHorizontal($plantilla)) {
+            return ['angulo' => null, 'altura' => null];
+        }
         // El radio no puede pasar de la pluma: sería un triángulo imposible.
         if ($pluma <= 0 || $radio < 0 || $radio > $pluma) {
             return ['angulo' => null, 'altura' => null];
@@ -1276,6 +1290,8 @@ body { background:#fff!important; }
      */
     private function inyectarPruebaCargaDictamen(string $html, array $pc, array $d): string {
         $e   = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
+        // Se guarda antes de descartarla: decide si la pluma se inclina o no.
+        $plantillaPc = (string)($pc['plantilla'] ?? '');
         unset($pc['plantilla']);
 
         // 1. Corregir celda "Equipo Inspeccionado" — puede ser hardcoded en algunas plantillas
@@ -1355,7 +1371,7 @@ body { background:#fff!important; }
 
                 $rowRadio = (float)($datos['radio'] ?? 0);
                 $rowPluma = (float)($datos['pluma'] ?? 0);
-                $rowGeo   = $this->geometriaPc($rowRadio, $rowPluma);
+                $rowGeo   = $this->geometriaPc($rowRadio, $rowPluma, $plantillaPc);
 
                 $tbodyHtml .= "<tr class=\"{$rowCls}\">\n";
                 $tbodyHtml .= "<td class=\"pc-td-desc\"><span class=\"pc-test-badge\">{$chk} " . $e($label) . "</span></td>\n";
@@ -1409,13 +1425,13 @@ body { background:#fff!important; }
                        || isset($pc['aux_con'])   || isset($pc['aux_sin']);
 
             if ($dosGanchos) {
-                $geo = function ($fila) {
+                $geo = function ($fila) use ($plantillaPc) {
                     $fila  = is_array($fila) ? $fila : [];
                     $radio = (float)($fila['radio'] ?? 0);
                     $pluma = (float)($fila['pluma'] ?? 0);
                     // Lo capturado manda; lo demás se deduce con la MISMA
                     // geometría que usa la tabla, para que no se contradigan.
-                    $calc  = $this->geometriaPc($radio, $pluma);
+                    $calc  = $this->geometriaPc($radio, $pluma, $plantillaPc);
                     return [
                         'radio'  => $radio,
                         'pluma'  => $pluma,

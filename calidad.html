@@ -2558,7 +2558,7 @@ const canManageInstructor = _sesRol === 'ADMIN' || _sesRol === 'CALIDAD';
    headerFields = campos de captura única (no por fila), p. ej. CML en izaje */
 const PC_DEF = {
   'dictamen_preview.html':     { label:'Grúa Móvil',        rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','pluma','angulo','altura','resultado'], calc:['angulo','altura'] },
-  'dictamen_grua_torre.html':  { label:'Grúa Torre',        rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','pluma','altura','resultado'], calc:['altura'] },
+  'dictamen_grua_torre.html':  { label:'Grúa Torre',        rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','pluma','altura','resultado'], calc:[] },
   'dictamen_montacargas.html': { label:'Montacargas',       rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','altura','duracion','inclin','resultado'], calc:[] },
   'dictamen_izaje.html':       { label:'Elemento de Izaje', rows:[{k:'trabajo',l:'Carga de Trabajo'},{k:'sobrecarga',l:'Prueba de Sobrecarga'}], cols:['duracion','deformacion','resultado'], calc:[], headerFields:['cml'] },
   'dictamen_ptem.html':        { label:'PTEM',              rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','altura','resultado'], calc:[] },
