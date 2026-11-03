@@ -3229,14 +3229,33 @@ const PC_TEMPLATES = {
       { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
     ]
   },
+  // Pluma horizontal: flat-top, punta de martillo y autodesplegable. El carro
+  // corre por la pluma, así que no hay ángulo de trabajo, y la altura bajo
+  // gancho la da la torre: se mide, no se deduce.
   'dictamen_grua_torre.html': {
-    label: 'Grúa Torre',
+    label: 'Grúa Torre · pluma horizontal',
     rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
     cols: [
       { id:'peso',      label:'Peso de Prueba',      unit:'TON' },
       { id:'radio',     label:'Radio de Operación',  unit:'m'   },
       { id:'pluma',     label:'Long. de Pluma',       unit:'m'   },
       { id:'altura',    label:'Altura bajo gancho',   unit:'m'   },
+      { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
+    ]
+  },
+  // Pluma abatible: el radio se cambia con el ángulo, así que el ángulo es un
+  // dato de la prueba. Se lee del indicador de la grúa; no sale de arccos(r/L),
+  // porque el pie de pluma está en lo alto de la torre y esa cuenta daría la
+  // altura sobre el pie, no sobre el piso.
+  'dictamen_grua_torre_abatible.html': {
+    label: 'Grúa Torre de Pluma Abatible',
+    rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
+    cols: [
+      { id:'peso',      label:'Peso de Prueba',       unit:'TON' },
+      { id:'radio',     label:'Radio de Operación',   unit:'m'   },
+      { id:'pluma',     label:'Long. de Pluma',        unit:'m'   },
+      { id:'angulo',    label:'Ángulo de Pluma',       unit:'°'   },
+      { id:'altura',    label:'Altura bajo gancho',    unit:'m'   },
       { id:'resultado', label:'Resultado', type:'select', options:['CONFORME','NO CONFORME'] }
     ]
   },

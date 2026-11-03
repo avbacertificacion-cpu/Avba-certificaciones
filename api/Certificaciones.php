@@ -1236,8 +1236,24 @@ body { background:#fff!important; }
      *
      * @return array{angulo:?float, altura:?float} null en lo que no se pueda deducir.
      */
-    private static function plumaHorizontal(string $plantilla): bool {
-        return in_array(trim($plantilla), ['dictamen_grua_torre.html'], true);
+    /**
+     * Las plantillas de grúa torre. En ninguna de las dos se deduce la
+     * geometría de la pluma, por razones distintas:
+     *
+     *   pluma horizontal — no hay triángulo: el carro corre por la pluma y la
+     *     altura bajo gancho la da la torre.
+     *   pluma abatible — el triángulo existe, pero su vértice está en lo alto
+     *     de la torre: la hipotenusa da cuánto SUBE la punta sobre el pie de
+     *     pluma, no la altura del gancho sobre el piso. Y el ángulo lo marca el
+     *     propio indicador de la grúa, que es de donde lo toma el inspector.
+     */
+    private const PLANTILLAS_TORRE = [
+        'dictamen_grua_torre.html',
+        'dictamen_grua_torre_abatible.html',
+    ];
+
+    private static function esGruaTorre(string $plantilla): bool {
+        return in_array(trim($plantilla), self::PLANTILLAS_TORRE, true);
     }
 
     private function geometriaPc(float $radio, float $pluma, string $plantilla = ''): array {
@@ -1248,7 +1264,7 @@ body { background:#fff!important; }
            altura, que no es ni la torre ni nada. Y como el campo estaba marcado
            de sólo lectura, el inspector no podía corregirlo: ese número llegaba
            impreso al dictamen del cliente. */
-        if (self::plumaHorizontal($plantilla)) {
+        if (self::esGruaTorre($plantilla)) {
             return ['angulo' => null, 'altura' => null];
         }
         // El radio no puede pasar de la pluma: sería un triángulo imposible.
@@ -1277,8 +1293,12 @@ body { background:#fff!important; }
         if (strpos($t, 'inclin') !== false)                                       return 'inclin';
         if (strpos($t, 'extensi') !== false)                                      return 'extension';
         if (strpos($t, 'peso') !== false)                                         return 'peso';
-        if (strpos($t, 'pluma') !== false || strpos($t, 'longitud') !== false)    return 'pluma';
+        /* El ángulo antes que la pluma: "Ángulo de Pluma" —como se llama en la
+           grúa torre abatible— lleva las dos palabras, y al preguntar primero
+           por "pluma" esa columna imprimía la longitud de la pluma en lugar del
+           ángulo. La longitud salía dos veces y el ángulo, nunca. */
         if (strpos($t, 'angulo') !== false)                                       return 'angulo';
+        if (strpos($t, 'pluma') !== false || strpos($t, 'longitud') !== false)    return 'pluma';
         if (strpos($t, 'radio') !== false)                                        return 'radio';
         if (strpos($t, 'altura') !== false)                                       return 'altura';
         return '';
@@ -1458,19 +1478,41 @@ body { background:#fff!important; }
                 $dRadio  = (float) ($diagRow['radio']  ?? 0);
                 $dPluma  = (float) ($diagRow['pluma']  ?? 0);
                 $dAltura = (float) ($diagRow['altura'] ?? 0);
-                $dAngulo = $dRadio > 0 && $dPluma > 0 && $dRadio <= $dPluma
-                    ? round(rad2deg(acos($dRadio / $dPluma)), 1)
-                    : (float) ($diagRow['angulo'] ?? 0);
+                $dAngulo = (float) ($diagRow['angulo'] ?? 0);
 
-                $html = str_replace('{pc_crane_svg}',    $this->buildCraneSvg($dRadio, $dPluma, $dAltura, $dAngulo), $html);
+                /* Lo medido manda; lo que falte se deduce con la MISMA
+                   geometría que usa la tabla, para que el dibujo y las cifras
+                   no se contradigan. En grúa torre no se deduce nada: aquí
+                   antes se volvía a sacar el ángulo con arccos(r/L) sin pasar
+                   por geometriaPc, así que el dictamen seguía imprimiendo —y
+                   dibujando— el ángulo de una pluma que no se inclina. */
+                $calc = $this->geometriaPc($dRadio, $dPluma, $plantillaPc);
+                if (!$dAngulo) $dAngulo = (float) ($calc['angulo'] ?? 0);
+                if (!$dAltura) $dAltura = (float) ($calc['altura'] ?? 0);
+
+                $svg = self::esGruaTorre($plantillaPc)
+                    ? $this->buildTowerCraneSvg($dRadio, $dPluma, $dAltura, $dAngulo)
+                    : $this->buildCraneSvg($dRadio, $dPluma, $dAltura, $dAngulo);
+
+                $html = str_replace('{pc_crane_svg}',    $svg, $html);
                 $html = str_replace('{pc_diag_radio}',   number_format($dRadio,  1), $html);
                 $html = str_replace('{pc_diag_pluma}',   number_format($dPluma,  1), $html);
-                $html = str_replace('{pc_diag_angulo}',  number_format($dAngulo, 1), $html);
                 $html = str_replace('{pc_diag_altura}',  number_format($dAltura, 2), $html);
                 $html = str_replace('{pc_obs_radio}',    number_format($dRadio,  1), $html);
                 $html = str_replace('{pc_obs_pluma}',    number_format($dPluma,  1), $html);
-                $html = str_replace('{pc_obs_angulo}',   number_format($dAngulo, 1), $html);
                 $html = str_replace('{pc_obs_altura}',   number_format($dAltura, 2), $html);
+
+                /* El ángulo sin capturar no se imprime como 0.0°: en la pluma
+                   abatible es un dato de la prueba, y un cero se leería como
+                   pluma horizontal. */
+                if ($dAngulo > 0) {
+                    $html = str_replace('{pc_diag_angulo}', number_format($dAngulo, 1), $html);
+                    $html = str_replace('{pc_obs_angulo}',  number_format($dAngulo, 1), $html);
+                } else {
+                    $html = str_replace('{pc_diag_angulo}<span class="unit">°</span>', 'NA', $html);
+                    $html = str_replace('{pc_obs_angulo}°', 'NA', $html);
+                    $html = str_replace(['{pc_diag_angulo}', '{pc_obs_angulo}'], 'NA', $html);
+                }
             }
         }
 
@@ -1696,6 +1738,144 @@ body { background:#fff!important; }
   <text text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#7a5500"><textPath href="#boom-path2" startOffset="45%">Pluma {$pF} m</textPath></text>
   <rect x="{$lbAngX}" y="{$lbAngY}" width="44" height="14" rx="3" fill="#fef3c7" transform="translate(-22,-10)"/>
   <text x="{$lbAngX}" y="{$lbAngY}" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="8.5" font-weight="800" fill="#92400e">&#945; = {$aF}&#176;</text>
+</svg>
+SVG;
+    }
+
+    /**
+     * Diagrama de la grúa torre: torre, contrapluma con contrapesos y pluma.
+     *
+     * Hasta ahora el dictamen de grúa torre usaba el diagrama de la grúa
+     * móvil: un camión con sus llantas y una pluma apoyada en el suelo,
+     * inclinada al ángulo que salía de arccos(r/L). No es la máquina que se
+     * inspeccionó ni la geometría que tiene.
+     *
+     * Con ángulo se dibuja la pluma abatible subida a ese ángulo; sin ángulo,
+     * horizontal con su carro en el radio de la prueba. En las dos, la altura
+     * acotada es la del gancho sobre el piso —lo que se midió—, no la que
+     * salga de ninguna cuenta.
+     */
+    private function buildTowerCraneSvg(float $radio, float $pluma, float $altura, float $angulo = 0.0): string {
+        $gndY   = 123.0;          // el piso
+        $ejeX   = 34.0;           // eje de giro de la torre
+        $topMin = 22.0;           // techo del dibujo
+        $dispW  = 150.0 - $ejeX;
+        $dispH  = $gndY - $topMin;
+
+        $abatible = $angulo > 0 && $angulo < 90;
+        $sen = $abatible ? sin(deg2rad($angulo)) : 0.0;
+
+        /* El dibujo se arma desde lo que se midió: el radio al que estaba el
+           gancho y la altura a la que estaba. Nada se deduce. */
+        $ancho  = max($radio, $abatible ? $radio : $pluma);
+        $escala = $ancho > 0 && $altura > 0
+            ? min($dispW / $ancho, ($dispH - 10) / $altura)
+            : ($ancho > 0 ? $dispW / $ancho : 2.0);
+        $escala = max(min($escala, 9.0), 0.3);
+
+        // Sin altura medida el dibujo queda proporcionado, pero no se acota:
+        // una cifra inventada en un dictamen es peor que una cifra ausente.
+        $hayAltura = $altura > 0;
+        $hPx  = $hayAltura ? min($altura * $escala, $dispH - 10) : $dispH * 0.70;
+        $gchY = round($gndY - $hPx, 1);     // el gancho
+        $gchX = round(min($ejeX + $radio * $escala, 164.0), 1);
+        $tipY = round($gchY - 7, 1);        // de donde cuelga
+
+        /* En la abatible el gancho cuelga de la punta, y el pie de pluma —la
+           cima de la torre— queda MÁS ABAJO que la punta, tanto como sube la
+           pluma a ese ángulo. En la horizontal, punta y pie están al mismo
+           nivel y lo que se mueve es el carro. */
+        $topY = $abatible
+            ? round(min($tipY + $pluma * $sen * $escala, $gndY - 18), 1)
+            : $tipY;
+        $puntaX = $abatible ? $gchX : round(min($ejeX + $pluma * $escala, 176.0), 1);
+        $puntaY = $abatible ? $tipY : $topY;
+        $carroX = $abatible ? $gchX : round(min($gchX, $puntaX), 1);
+
+        $contraX = round(max($ejeX - 26, 6), 1);
+        $torreIzq = $ejeX - 5; $torreDer = $ejeX + 5;
+        $torreH  = round($gndY - $topY, 1);
+
+        $rF = number_format($radio,  1);
+        $pF = number_format($pluma,  1);
+        $hF = number_format($altura, 2);
+        $aF = number_format($angulo, 1);
+
+        // Celosía de la torre: unas cruces, que es lo que se reconoce de lejos.
+        $celosia = '';
+        for ($y = $gndY - 8; $y > $topY + 5; $y -= 9) {
+            $y2 = max($y - 9, $topY + 5);
+            $celosia .= sprintf(
+                '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#1e5fa8" stroke-width=".7" opacity=".55"/>'
+              . '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#1e5fa8" stroke-width=".7" opacity=".55"/>',
+                $torreIzq, $y, $torreDer, $y2, $torreDer, $y, $torreIzq, $y2
+            );
+        }
+
+        // El ángulo se traza sobre la pluma ya dibujada, para que el arco cierre
+        // justo en ella; la cifra es la que leyó el inspector.
+        $arco = '';
+        if ($abatible) {
+            $dx = max($puntaX - $ejeX, 0.1); $dy = max($topY - $puntaY, 0.0);
+            $lg = sqrt($dx * $dx + $dy * $dy);
+            $r  = 15;
+            $arco = sprintf(
+                '<path d="M %.1f,%.1f A %d,%d 0 0,0 %.1f,%.1f" fill="#C49A28" opacity=".13"/>'
+              . '<path d="M %.1f,%.1f A %d,%d 0 0,0 %.1f,%.1f" fill="none" stroke="#C49A28" stroke-width="1.4"/>'
+              . '<rect x="%.1f" y="%.1f" width="42" height="13" rx="3" fill="#fef3c7"/>'
+              . '<text x="%.1f" y="%.1f" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="8" font-weight="800" fill="#92400e">&#945; = %s&#176;</text>',
+                $ejeX + $r, $topY, $r, $r, $ejeX + $r * $dx / $lg, $topY - $r * $dy / $lg,
+                $ejeX + $r, $topY, $r, $r, $ejeX + $r * $dx / $lg, $topY - $r * $dy / $lg,
+                $ejeX + 16, $topY + 3, $ejeX + 37, $topY + 12, $aF
+            );
+        }
+
+        $acotAltX = round(min($gchX + 11, 168.0), 1);
+        $lbAltY   = round(($gchY + $gndY) / 2, 1);
+        // La leyenda va del lado donde quepa: a la derecha de la cota si hay
+        // margen, y si no a la izquierda, que es lo que pasa con las plumas
+        // largas. Encimada sobre el dibujo no se lee.
+        $lbAltX = $acotAltX + 58 <= 178 ? $acotAltX + 4 : $acotAltX - 58;
+        $acotAltura = $hayAltura ? sprintf(
+            '<line x1="%.1f" y1="%.1f" x2="%.1f" y2="%.1f" stroke="#1a7a4a" stroke-width="1.6" stroke-dasharray="5,3"/>'
+          . '<rect x="%.1f" y="%.1f" width="54" height="13" rx="3" fill="#dcfce7"/>'
+          . '<text x="%.1f" y="%.1f" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1a7a4a">h = %s m</text>',
+            $acotAltX, $gchY, $acotAltX, $gndY,
+            max($lbAltX, 2.0), $lbAltY - 7,
+            max($lbAltX + 27, 29.0), $lbAltY + 2, $hF
+        ) : '';
+
+        // El carro sólo existe en la pluma horizontal.
+        $carro = $abatible ? '' : sprintf(
+            '<rect x="%.1f" y="%.1f" width="11" height="5" rx="1.5" fill="#0B2545"/>',
+            $carroX - 5.5, $topY - 2.5
+        );
+
+        $lbRadX = round(($ejeX + $gchX) / 2, 1);
+
+        return <<<SVG
+<svg viewBox="0 0 180 140" xmlns="http://www.w3.org/2000/svg" style="width:163px;height:127px;display:block">
+  <defs><path id="jib-path" d="M {$ejeX},{$topY} L {$puntaX},{$puntaY}"/></defs>
+  <line x1="2" y1="{$gndY}" x2="178" y2="{$gndY}" stroke="#cdd8e3" stroke-width="2.5"/>
+  <rect x="2" y="{$gndY}" width="176" height="10" fill="#e8edf3"/>
+  <rect x="{$contraX}" y="{$gndY}" width="54" height="6" rx="1" fill="#94a3b8"/>
+  <rect x="{$torreIzq}" y="{$topY}" width="10" height="{$torreH}" fill="none" stroke="#1e5fa8" stroke-width="1.6"/>
+  {$celosia}
+  <line x1="{$contraX}" y1="{$topY}" x2="{$ejeX}" y2="{$topY}" stroke="#134074" stroke-width="2.6" stroke-linecap="round"/>
+  <rect x="{$contraX}" y="{$topY}" width="13" height="9" rx="1.5" fill="#0B2545"/>
+  <line x1="{$ejeX}" y1="{$topY}" x2="{$puntaX}" y2="{$puntaY}" stroke="#C49A28" stroke-width="3.4" stroke-linecap="round"/>
+  <line x1="{$ejeX}" y1="{$topY}" x2="{$puntaX}" y2="{$puntaY}" stroke="#e8c547" stroke-width="1.1" stroke-linecap="round" opacity=".6"/>
+  {$carro}
+  <line x1="{$gchX}" y1="{$tipY}" x2="{$gchX}" y2="{$gchY}" stroke="#475569" stroke-width="1"/>
+  <path d="M {$gchX},{$gchY} q 3.2,3.2 0,5.4" fill="none" stroke="#0B2545" stroke-width="1.7"/>
+  <circle cx="{$ejeX}" cy="{$topY}" r="3.2" fill="#C49A28"/>
+  <line x1="{$ejeX}" y1="{$gndY}" x2="{$gchX}" y2="{$gndY}" stroke="#1e5fa8" stroke-width="1.8" stroke-dasharray="5,3"/>
+  <line x1="{$gchX}" y1="{$gchY}" x2="{$gchX}" y2="{$gndY}" stroke="#1e5fa8" stroke-width=".8" stroke-dasharray="3,3" opacity=".45"/>
+  <rect x="{$lbRadX}" y="{$gndY}" width="52" height="12" rx="3" fill="#dbeafe" transform="translate(-26,3)"/>
+  <text x="{$lbRadX}" y="{$gndY}" dy="12" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#1e5fa8">Radio = {$rF} m</text>
+  {$acotAltura}
+  <text text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="7.5" font-weight="700" fill="#7a5500" dy="-3"><textPath href="#jib-path" startOffset="50%">Pluma {$pF} m</textPath></text>
+  {$arco}
 </svg>
 SVG;
     }

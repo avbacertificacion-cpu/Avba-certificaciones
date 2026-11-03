@@ -2558,7 +2558,15 @@ const canManageInstructor = _sesRol === 'ADMIN' || _sesRol === 'CALIDAD';
    headerFields = campos de captura única (no por fila), p. ej. CML en izaje */
 const PC_DEF = {
   'dictamen_preview.html':     { label:'Grúa Móvil',        rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','pluma','angulo','altura','resultado'], calc:['angulo','altura'] },
-  'dictamen_grua_torre.html':  { label:'Grúa Torre',        rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','pluma','altura','resultado'], calc:[] },
+  // Pluma horizontal —flat-top, punta de martillo, autodesplegable—: el carro
+  // corre por la pluma, no hay ángulo, y la altura bajo gancho se mide.
+  'dictamen_grua_torre.html':  { label:'Grúa Torre · pluma horizontal', rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}],
+    cols:['peso','radio','pluma','altura','resultado'], calc:[], labels:{altura:'Altura bajo gancho (m)'} },
+  // Pluma abatible: el ángulo es dato de la prueba y lo lee el inspector
+  // del indicador de la grúa. No se calcula: ver geometriaPc en el servidor.
+  'dictamen_grua_torre_abatible.html': { label:'Grúa Torre de Pluma Abatible', rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}],
+    cols:['peso','radio','pluma','angulo','altura','resultado'], calc:[],
+    labels:{angulo:'Ángulo de pluma (°)', altura:'Altura bajo gancho (m)'} },
   'dictamen_montacargas.html': { label:'Montacargas',       rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','altura','duracion','inclin','resultado'], calc:[] },
   'dictamen_izaje.html':       { label:'Elemento de Izaje', rows:[{k:'trabajo',l:'Carga de Trabajo'},{k:'sobrecarga',l:'Prueba de Sobrecarga'}], cols:['duracion','deformacion','resultado'], calc:[], headerFields:['cml'] },
   'dictamen_ptem.html':        { label:'PTEM',              rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}], cols:['peso','radio','altura','resultado'], calc:[] },
@@ -2588,6 +2596,12 @@ const PC_DEF = {
     rows:[{k:'prueba_estatica',l:'Prueba de carga estática'}],
     cols:['duracion','deformacion','resultado'], calc:[], headerFields:['capacidad','factor'] },
 };
+/* La misma columna no se llama igual en todos los equipos: "altura" es altura
+   de izaje en una grúa móvil y altura bajo gancho en una torre. La plantilla
+   puede traer su propio nombre; si no, se usa el general. */
+function etiquetaPc(def, k) {
+  return (def && def.labels && def.labels[k]) || PC_LABELS[k] || k;
+}
 const PC_LABELS = {
   peso:'Peso (TON)', radio:'Radio (m)', pluma:'Long. Pluma (m)',
   angulo:'Ángulo (°)', altura:'Altura (m)', resultado:'Resultado',
@@ -2859,10 +2873,10 @@ function ver(fila) {
       headerFields.forEach(k => {
         const val = pcData[k] ?? '';
         if (editable) {
-          body += `<div style="font-size:12px"><label style="display:block;color:var(--texto-sub);margin-bottom:2px">${PC_LABELS[k] || k}</label>
+          body += `<div style="font-size:12px"><label style="display:block;color:var(--texto-sub);margin-bottom:2px">${etiquetaPc(def, k)}</label>
             <input type="text" id="pc-hdr_${k}" value="${esc(val)}" style="${inpBase};min-width:110px" oninput="pcCalidadRecalc()"></div>`;
         } else {
-          body += `<div style="font-size:12px"><strong style="color:var(--texto)">${PC_LABELS[k] || k}:</strong> ${esc(val) || '—'}</div>`;
+          body += `<div style="font-size:12px"><strong style="color:var(--texto)">${etiquetaPc(def, k)}:</strong> ${esc(val) || '—'}</div>`;
         }
       });
       body += `</div>`;
@@ -2872,7 +2886,7 @@ function ver(fila) {
     body += `<thead><tr>`;
     body += `<th style="${thStyle};text-align:left;padding-left:10px">Prueba</th>`;
     fieldKeys.forEach(fk => {
-      body += `<th style="${thStyle}">${PC_LABELS[fk] || fk}</th>`;
+      body += `<th style="${thStyle}">${etiquetaPc(def, fk)}</th>`;
     });
     body += `</tr></thead><tbody>`;
 
@@ -7172,7 +7186,8 @@ function renderTipoCard(t) {
           <option value="dictamen_montacargas.html" ${t.plantilla_dict_html==='dictamen_montacargas.html' ? 'selected' : ''}>Montacargas</option>
           <option value="dictamen_izaje.html"       ${t.plantilla_dict_html==='dictamen_izaje.html'       ? 'selected' : ''}>Elemento de Izaje / Separador de Carga</option>
           <option value="dictamen_ptem.html"        ${t.plantilla_dict_html==='dictamen_ptem.html'        ? 'selected' : ''}>PTEM — Plataforma de Elevación Móvil</option>
-          <option value="dictamen_grua_torre.html"  ${t.plantilla_dict_html==='dictamen_grua_torre.html'  ? 'selected' : ''}>Grúa Torre</option>
+          <option value="dictamen_grua_torre.html"  ${t.plantilla_dict_html==='dictamen_grua_torre.html'  ? 'selected' : ''}>Grúa Torre · pluma horizontal</option>
+          <option value="dictamen_grua_torre_abatible.html" ${t.plantilla_dict_html==='dictamen_grua_torre_abatible.html' ? 'selected' : ''}>Grúa Torre de Pluma Abatible</option>
           <option value="dictamen_telehandler.html" ${t.plantilla_dict_html==='dictamen_telehandler.html' ? 'selected' : ''}>Telehandler</option>
           <option value="dictamen_mewp.html"        ${t.plantilla_dict_html==='dictamen_mewp.html'        ? 'selected' : ''}>MEWP — Plataforma de Elevación</option>
           <option value="dictamen_grua_oruga.html"  ${t.plantilla_dict_html==='dictamen_grua_oruga.html'  ? 'selected' : ''}>Grúa Estructural sobre Orugas</option>

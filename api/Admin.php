@@ -25,6 +25,21 @@ class Admin {
         'canastilla_sp' => ['CANASTILLA ESTRUCTURAL SIN PUERTA', 'dictamen_canastilla_sin_puerta.html'],
         'oreja_carga'   => ['OREJA DE CARGA', 'dictamen_oreja_carga.html'],
         'grua_camion'   => ['GRÚA HIDRÁULICA SOBRE CAMIÓN', 'dictamen_preview.html'],
+
+        /* Grúa torre, por tipo de pluma y por forma de montaje.
+           "Grúa torre" no es un equipo: es una familia. La pluma horizontal
+           con cúspide y tirantes (punta de martillo) y la misma sin cúspide
+           (flat-top) se revisan casi igual; la de pluma abatible no comparte
+           ni el carro ni los limitadores de recorrido, y la autodesplegable
+           no tiene arriostramiento ni jaula de trepado pero sí
+           estabilizadores, mástil plegable y mando a distancia.
+           Cada una se selecciona como su propio tipo de equipo y de ahí sale
+           todo: su lista de revisión, su prueba de carga y su dictamen.
+           El tipo "GRÚA TORRE" a secas se queda para lo ya capturado. */
+        'grua_torre_flattop'  => ['GRÚA TORRE FLAT-TOP',          'dictamen_grua_torre.html'],
+        'grua_torre_martillo' => ['GRÚA TORRE PUNTA DE MARTILLO', 'dictamen_grua_torre.html'],
+        'grua_torre_abatible' => ['GRÚA TORRE DE PLUMA ABATIBLE', 'dictamen_grua_torre_abatible.html'],
+        'grua_torre_automont' => ['GRÚA TORRE AUTODESPLEGABLE',   'dictamen_grua_torre.html'],
     ];
 
     /**
@@ -437,11 +452,14 @@ class Admin {
            no pregunta por nada de lo que de verdad falla en una torre: el
            lastre, el arriostramiento, la corona de giro o los limitadores.
 
-           Está escrita para pluma horizontal, que es lo que se va a revisar.
-           Los puntos de la cúspide y sus tirantes llevan "si el diseño la
-           incluye" a propósito: las Comansa son Flat-Top, sin cúspide, y un
-           reactivo que no aplica obliga a inventar una respuesta. Para las
-           abatibles habría que agregar los suyos. */
+           Es la lista común de la familia: está escrita para pluma
+           horizontal y deja los puntos de la cúspide y sus tirantes como "si
+           el diseño la incluye", porque este tipo a secas no dice de qué grúa
+           torre se trata.
+
+           Sobre ella se componen las cuatro variantes que sí lo dicen —ver
+           TORRE_VARIANTES—, y ahí esos reactivos se afirman o se quitan. Este
+           tipo se queda para lo ya capturado antes de que existieran. */
         'grua_torre' => [
             'secciones' => [
                 ['A', 'Documentación, placas y configuración'],
@@ -642,6 +660,177 @@ class Admin {
     ];
 
     /**
+     * Las variantes de grúa torre, cada una contra la lista de "grua_torre".
+     *
+     * Las cuatro comparten el 80%: la torre, la corona, el cable de izaje, el
+     * gancho, el anemómetro, la instalación eléctrica. Lo que cambia es poco
+     * pero decide si el reactivo tiene sentido o no:
+     *
+     *   flat-top      — sin cúspide ni tirantes: la pluma es autoportante.
+     *   punta martillo — con cúspide y tirantes, y hay que revisarlos de veras.
+     *   pluma abatible — no tiene carro: el radio se cambia subiendo y bajando
+     *                    la pluma, así que lo que manda es el malacate de
+     *                    abatimiento, su cable y los límites de ángulo.
+     *   autodesplegable — no se arriostra ni trepa: se despliega sola sobre sus
+     *                    estabilizadores y casi siempre se opera por radio.
+     *
+     * Por eso cada variante dice qué quita, qué reescribe y qué agrega, en vez
+     * de repetir las nueve secciones cuatro veces. Un reactivo que no aplica
+     * obliga al inspector a inventar una respuesta, y uno redactado "si el
+     * diseño lo incluye" cuando el diseño SÍ lo incluye deja la puerta abierta
+     * a no revisarlo.
+     *
+     * Las etiquetas (A-01, A-02, …) se renumeran al componer: cada variante
+     * tiene su propia lista y sus propias respuestas, y no se comparan entre
+     * tipos.
+     */
+    private const TORRE_VARIANTES = [
+
+        'grua_torre_flattop' => [
+            'secciones' => ['E' => 'Pluma autoportante, carro y punta'],
+            // Sin cúspide no hay tirantes de pluma: la celosía se sostiene sola.
+            'quitar'    => ['D-09', 'E-03'],
+            'agregar'   => [
+                ['A', 'Configuración flat-top confirmada contra el manual: pluma autoportante unida directamente a la corona'],
+                ['D', 'Unión directa de pluma y contrapluma a la corona de giro: bulones, pasadores y seguros completos y con el apriete indicado'],
+                ['E', 'Articulación del pie de pluma: pasadores, bujes y seguros sin desgaste ni ovalamiento'],
+                ['E', 'Celosía de la pluma —cordones, diagonales y montantes— sin fisuras ni deformación, al ser autoportante'],
+            ],
+        ],
+
+        'grua_torre_martillo' => [
+            'secciones' => ['D' => 'Corona de giro, cúspide, contrapluma y maquinaria'],
+            // Aquí la cúspide y los tirantes existen: el reactivo se afirma.
+            'cambiar'   => [
+                'D-09' => 'Cúspide o torreta sin deformación, grietas ni corrosión, con su tornillería y pasadores completos',
+                'E-03' => 'Tirantes de pluma sin hilos rotos, dobleces, destorcido ni corrosión, con sus terminaciones y pasadores asegurados',
+            ],
+            'agregar'   => [
+                ['A', 'Configuración punta de martillo confirmada contra el manual: cúspide y tirantes conforme al despiece'],
+                ['D', 'Tirantes de contrapluma completos, sin deformación y con sus pasadores asegurados'],
+                ['D', 'Anclajes y poleas de los tirantes en la cúspide, sin desgaste ni juego anormal'],
+                ['E', 'Articulación del pie de pluma: pasadores, bujes y seguros sin desgaste ni ovalamiento'],
+            ],
+        ],
+
+        'grua_torre_abatible' => [
+            'secciones' => [
+                'E' => 'Pluma abatible, abatimiento y punta',
+                'F' => 'Cables de izaje y abatimiento, poleas y gancho',
+            ],
+            /* No hay carro: el radio se cambia con el ángulo de la pluma. Los
+               reactivos del carro y sus finales de carrera no aplican, y el
+               frenado que importa es el del abatimiento. */
+            'quitar'    => ['E-04', 'E-05', 'E-06', 'G-04', 'I-04'],
+            'cambiar'   => [
+                'D-09' => 'Cúspide o caballete de abatimiento sin deformación, grietas ni corrosión, con su tornillería completa',
+                'E-03' => 'Bielas, bridas y tirantes de unión entre tramos de pluma, sin deformación ni fisuras',
+                'A-02' => 'Tabla de cargas por radio o por ángulo de la pluma instalada, legible y a la vista del operador',
+            ],
+            'agregar'   => [
+                ['A', 'Radio mínimo y radio máximo de trabajo de la configuración instalada, documentados'],
+                ['D', 'Malacate de abatimiento: tambor, enrollado, reductor y anclaje sin daño ni fuga'],
+                ['D', 'Freno del malacate de abatimiento: retiene la pluma con carga suspendida, sin deslizamiento'],
+                ['D', 'Trinquete o retención mecánica del abatimiento, cuando el diseño la incluye'],
+                ['E', 'Articulación del pie de pluma: pasadores, bujes y seguros sin desgaste ni ovalamiento'],
+                ['E', 'Topes mecánicos de ángulo máximo, que impiden el vuelco de la pluma hacia atrás'],
+                ['E', 'Poleas de abatimiento en la punta de pluma y en la cúspide: gargantas, rodamientos y guardacables'],
+                ['E', 'Indicador de ángulo de pluma presente, legible y coincidente con el ángulo real'],
+                ['F', 'Cable de abatimiento: hilos rotos, aplastamiento, destorcido y corrosión dentro del criterio de retiro'],
+                ['F', 'Terminación y anclaje del cable de abatimiento al tambor, con sus vueltas de seguridad'],
+                ['G', 'Limitador de ángulo máximo de pluma —radio mínimo— con prueba de funcionamiento'],
+                ['G', 'Limitador de ángulo mínimo de pluma —radio máximo— con prueba de funcionamiento'],
+                ['G', 'Posición de fuera de servicio de la pluma conforme al manual, para la puesta en veleta'],
+                ['I', 'Frenado del abatimiento con la carga suspendida, sin descenso de la pluma'],
+                ['I', 'Prueba con carga en el radio mínimo y en el radio máximo de la configuración'],
+            ],
+        ],
+
+        'grua_torre_automont' => [
+            'secciones' => [
+                'B' => 'Base, estabilizadores y lastre',
+                'C' => 'Torre plegable, despliegue y accesos',
+                'H' => 'Puesto de mando, mando a distancia e instalación eléctrica',
+            ],
+            /* No se arriostra a la obra ni trepa con jaula: llega plegada, se
+               despliega sobre sus propios estabilizadores y se queda a su
+               altura. Sin cúspide, y casi siempre sin cabina. */
+            'quitar'    => ['C-04', 'C-05', 'C-06', 'D-09'],
+            'cambiar'   => [
+                'A-06' => 'Memoria de cálculo o constancia de la capacidad del terreno o la losa donde se apoya',
+                'C-07' => 'Escalera, descansos y línea de vida de la torre completos, cuando el diseño los incluye',
+                'C-08' => 'Protecciones y guardas de la escalera conforme al diseño, cuando la lleva',
+                'H-01' => 'Puesto de mando —cabina o botonera— cuando el diseño lo incluye: acceso, visibilidad y condición',
+                'E-03' => 'Tirantes de pluma al cabezal del mástil, sin hilos rotos ni destorcido, cuando el diseño los incluye',
+            ],
+            'agregar'   => [
+                ['A', 'Configuración autodesplegable confirmada contra el manual: secuencia de despliegue y de plegado'],
+                ['B', 'Estabilizadores desplegados en toda su carrera, con pasadores colocados y calzados sobre apoyo firme'],
+                ['B', 'Gatos de nivelación apoyados por completo, sin fuga ni deriva en el cilindro'],
+                ['B', 'Nivelación de la base verificada con el nivel del propio equipo, dentro de la tolerancia del fabricante'],
+                ['B', 'Ruedas o ejes de transporte retirados, bloqueados o descargados conforme al manual'],
+                ['C', 'Articulaciones de torre y pluma plegables: pasadores y seguros de despliegue completos y asegurados'],
+                ['C', 'Cilindro o malacate de despliegue del mástil: sin fuga, sin deriva y con su válvula de retención'],
+                ['C', 'Cables y tirantes de despliegue sin hilos rotos, destorcido ni corrosión'],
+                ['C', 'Inclinación del mástil, cuando el diseño la permite: pasadores y topes en la posición declarada'],
+                ['H', 'Mando a distancia: paro de emergencia propio, estado de batería y sujeción al operador'],
+                ['H', 'La pérdida de señal o el apagado del mando detienen todos los movimientos'],
+                ['H', 'Acometida eléctrica: toma, cable, protección diferencial y puesta a tierra en condición'],
+            ],
+        ],
+    ];
+
+    /**
+     * La lista de una variante de grúa torre, compuesta sobre la de grua_torre.
+     *
+     * Devuelve null si la clave no es una variante, para que el sembrado siga
+     * leyendo CHECKLIST_BASE como siempre.
+     *
+     * Las etiquetas se renumeran por sección en el orden final, así que quitar
+     * un reactivo no deja un hueco en la numeración del dictamen.
+     */
+    private static function checklistTorre(string $clave): ?array {
+        $v = self::TORRE_VARIANTES[$clave] ?? null;
+        if (!$v) return null;
+
+        $base    = self::CHECKLIST_BASE['grua_torre'];
+        $quitar  = $v['quitar']  ?? [];
+        $cambiar = $v['cambiar'] ?? [];
+
+        $porSeccion = [];
+        foreach ($base['items'] as [$seccion, $tag, $descripcion]) {
+            if (in_array($tag, $quitar, true)) continue;
+            $porSeccion[$seccion][] = $cambiar[$tag] ?? $descripcion;
+        }
+        foreach ($v['agregar'] ?? [] as [$seccion, $descripcion]) {
+            $porSeccion[$seccion][] = $descripcion;
+        }
+
+        $secciones = [];
+        foreach ($base['secciones'] as [$codigo, $nombre]) {
+            $secciones[] = [$codigo, $v['secciones'][$codigo] ?? $nombre];
+        }
+
+        $items = [];
+        foreach ($secciones as [$codigo, ]) {
+            foreach ($porSeccion[$codigo] ?? [] as $i => $descripcion) {
+                $items[] = [$codigo, sprintf('%s-%02d', $codigo, $i + 1), $descripcion];
+            }
+        }
+
+        return [
+            'secciones' => $secciones,
+            'items'     => $items,
+            'normas'    => $v['normas'] ?? $base['normas'],
+        ];
+    }
+
+    /** Lo que se siembra para una clave: su lista propia o la de su variante. */
+    private static function baseChecklist(string $clave): ?array {
+        return self::CHECKLIST_BASE[$clave] ?? self::checklistTorre($clave);
+    }
+
+    /**
      * Alcance acreditado ante la ema — acreditación UVNMX 057, ref. 25UI5073.
      *
      * El anexo técnico acredita a AVBA como Unidad de Inspección Tipo A bajo la
@@ -662,6 +851,7 @@ class Admin {
     private const SEED_NORMAS_PORTICO = 'normas_portico_23814_17020';
     private const SEED_CATALOGO       = 'catalogo_normas_v1';
     private const SEED_CHECKLIST_CSP  = 'checklist_canastilla_sp_v2';
+    private const SEED_CHECKLIST_TORRE = 'checklist_grua_torre_v1';
     private const SEED_CATALOGO_V2    = 'catalogo_normas_v2';
     private const SEED_CATALOGO_V3    = 'catalogo_normas_v3_torre';
 
@@ -738,6 +928,7 @@ class Admin {
         $this->sembrarCatalogoNormas();
         $this->ampliarCatalogoNormas();
         $this->corregirChecklistCanastillaSinPuerta();
+        $this->completarChecklistGruaTorre();
     }
 
     /**
@@ -1233,7 +1424,7 @@ class Admin {
      * lista no debe duplicar lo que Calidad tenga capturado en la otra tabla.
      */
     private function sembrarSeccionesItems(string $clave, int $tipoId): void {
-        $base = self::CHECKLIST_BASE[$clave] ?? null;
+        $base = self::baseChecklist($clave);
         if (!$base || !$tipoId) return;
 
         try {
@@ -1263,10 +1454,24 @@ class Admin {
         }
     }
 
-    /** Normas del tipo. Su tabla pudo no existir en instalaciones viejas. */
+    /**
+     * Normas del tipo, de forma aditiva.
+     *
+     * El tipo puede no ser nuevo: pudo existir desde antes con sus normas
+     * capturadas a mano, o haberlas recibido de sembrarNormasAcreditacion. Así
+     * que aquí sólo se agrega lo que falte, y sin pasarse de los renglones que
+     * el dictamen imprime.
+     *
+     * Dos redacciones de la misma norma —la NMX-GR-9927-1 y la ISO 9927-1, o
+     * la misma con y sin año— cuentan como una: lo decide claveNorma. Antes se
+     * insertaba a ciegas y un tipo ya poblado terminaba con la misma norma dos
+     * veces y con más acreditadas de las que caben.
+     *
+     * Su tabla pudo no existir en instalaciones viejas.
+     */
     private function sembrarNormasTipo(string $clave, int $tipoId): void {
-        $base = self::CHECKLIST_BASE[$clave] ?? null;
-        if (!$base || !$tipoId) return;
+        $base = self::baseChecklist($clave);
+        if (!$base || !$tipoId || empty($base['normas'])) return;
 
         try {
             $this->pdo->exec(
@@ -1274,15 +1479,78 @@ class Admin {
                  ADD COLUMN IF NOT EXISTS tipo VARCHAR(20) NOT NULL DEFAULT 'acreditada'"
             );
         } catch (\Throwable $e) { /* ya existe o no aplica */ }
+
         try {
+            $st = $this->pdo->prepare(
+                "SELECT norma, tipo FROM maquinaria_normas WHERE maquinaria_tipo_id = ?"
+            );
+            $st->execute([$tipoId]);
+            $previas = $st->fetchAll();
+
+            $claves = [];
+            $cuenta = ['acreditada' => 0, 'referencia' => 0];
+            foreach ($previas as $f) {
+                $claves[$this->claveNorma((string)$f['norma'])] = true;
+                $t = (($f['tipo'] ?? 'acreditada') === 'referencia') ? 'referencia' : 'acreditada';
+                $cuenta[$t]++;
+            }
+
+            $orden = count($previas);
             $n = $this->pdo->prepare(
                 "INSERT INTO maquinaria_normas (maquinaria_tipo_id, norma, tipo, orden) VALUES (?,?,?,?)"
             );
-            foreach ($base['normas'] as $i => [$norma, $tipo]) {
-                $n->execute([$tipoId, $norma, $tipo, $i + 1]);
+            foreach ($base['normas'] as [$norma, $tipo]) {
+                $tipo  = $tipo === 'referencia' ? 'referencia' : 'acreditada';
+                $clave = $this->claveNorma($norma);
+                if (isset($claves[$clave])) continue;
+                $tope = $tipo === 'referencia' ? self::MAX_REFERENCIA : self::MAX_ACREDITADAS;
+                if ($cuenta[$tipo] >= $tope) continue;
+                $n->execute([$tipoId, $norma, $tipo, ++$orden]);
+                $claves[$clave] = true;
+                $cuenta[$tipo]++;
             }
         } catch (\Throwable $e) {
             error_log("[Admin] sembrarNormas ($clave): " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Pone la lista y las normas de GRÚA TORRE, que se habían quedado fuera.
+     *
+     * El tipo se dio de alta en agosto de 2026, así que su marca de sembrado ya
+     * existe en el servidor y el alta no vuelve a correr para él. La lista de
+     * 74 reactivos que se le escribió después nunca habría llegado: el tipo
+     * seguiría heredando la lista genérica del esquema.
+     *
+     * Esto la siembra una sola vez, y sólo si sigue sin lista propia. Si
+     * Calidad ya le capturó una, se respeta —de eso se encarga
+     * sembrarSeccionesItems—. Los cuatro tipos por variante no lo necesitan:
+     * nacen con su marca limpia.
+     */
+    private function completarChecklistGruaTorre(): void {
+        try {
+            $st = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
+            $st->execute([self::SEED_CHECKLIST_TORRE]);
+            if ($st->fetch()) return;
+        } catch (\Throwable $e) {
+            // La tabla de marcas la crea seedTiposMaquinaria. Sin ella no hay
+            // dónde anotar que esto ya corrió, y se repetiría en cada petición.
+            return;
+        }
+
+        try {
+            [$nombre] = self::TIPOS_BASE['grua_torre'];
+            $t = $this->pdo->prepare(
+                "SELECT id FROM maquinaria_tipos WHERE UPPER(TRIM(nombre)) = ? LIMIT 1"
+            );
+            $t->execute([$nombre]);
+            $tipoId = (int)($t->fetchColumn() ?: 0);
+            if ($tipoId) $this->sembrarChecklist('grua_torre', $tipoId);
+
+            $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")
+                ->execute([self::SEED_CHECKLIST_TORRE]);
+        } catch (\Throwable $e) {
+            error_log('[Admin] completarChecklistGruaTorre: ' . $e->getMessage());
         }
     }
 
@@ -1963,7 +2231,8 @@ class Admin {
         $allowed = [
             '', 'dictamen_preview.html', 'dictamen_montacargas.html',
             'dictamen_izaje.html', 'dictamen_ptem.html',
-            'dictamen_grua_torre.html', 'dictamen_telehandler.html',
+            'dictamen_grua_torre.html', 'dictamen_grua_torre_abatible.html',
+            'dictamen_telehandler.html',
             'dictamen_mewp.html', 'dictamen_grua_oruga.html',
             'dictamen_grua_portico.html',
             // Faltaban: la siembra se las asigna a sus tipos, pero si Calidad
