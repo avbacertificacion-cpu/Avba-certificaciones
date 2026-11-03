@@ -702,9 +702,13 @@ function qrRegistrarUsado(PDO $pdo, string $qr, ?int $equipoId = null): void {
  * @param string $qr       El identificador capturado.
  * @param array  $excepto  ['tabla' => 'equipos', 'id' => 12] para no reportar
  *                         como ajeno el registro que se está editando.
+ * @param array|null $fallas  Devuelve las tablas que no se pudieron consultar.
+ *                         Importa para qrHuerfano: "nadie lo trae" no significa
+ *                         lo mismo si media tabla no contestó.
  * @return array|null      ['modulo','quien','folio','cliente'] o null si nadie lo tiene.
  */
-function duenoDelQR(PDO $pdo, string $qr, array $excepto = []): ?array {
+function duenoDelQR(PDO $pdo, string $qr, array $excepto = [], ?array &$fallas = null): ?array {
+    $fallas = [];
     $qr = trim($qr);
     if ($qr === '') return null;
 
@@ -767,10 +771,33 @@ function duenoDelQR(PDO $pdo, string $qr, array $excepto = []): ?array {
             ];
         } catch (\Throwable $e) {
             // Tabla ausente o columna que aún no existe en esta base.
+            $fallas[] = $tabla;
             continue;
         }
     }
     return null;
+}
+
+/**
+ * Una placa que el banco da por ocupada y que ningún registro trae.
+ *
+ * Pasa cuando un registro suelta su código por un camino que no lo devolvió al
+ * banco. La marca se queda ocupando una placa que de verdad está libre, y al
+ * intentar asignarla el sistema se niega sin poder decir de quién es: ése es
+ * exactamente el aviso genérico "ya está en uso por otro registro", que no
+ * nombra a nadie porque no hay nadie.
+ *
+ * Se contesta que sí SÓLO si las seis tablas se pudieron consultar y ninguna
+ * lo trae. Si alguna falla, se contesta que no: ante la duda la placa se queda
+ * ocupada. Liberar de más sería acabar con el mismo número en dos registros, y
+ * eso es justo lo que rompe la validación pública.
+ */
+function qrHuerfano(PDO $pdo, string $qr, array $excepto = []): bool {
+    $qr = trim($qr);
+    if ($qr === '') return false;
+    $fallas = [];
+    $dueno  = duenoDelQR($pdo, $qr, $excepto, $fallas);
+    return $dueno === null && $fallas === [];
 }
 
 /**

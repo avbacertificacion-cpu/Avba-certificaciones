@@ -803,9 +803,15 @@ class Arneses {
             if (trim((string)$s->fetchColumn()) === $qr) return true;
         }
 
+        /* El banco dice "usada", pero eso sólo pesa si algún registro la trae
+           de verdad. Una marca huérfana —de un registro que soltó su código
+           sin devolverlo al banco— dejaba bloqueada una placa libre. */
         $r = $this->pdo->prepare("SELECT id FROM qr_codigos WHERE identificador = ? AND usado = 1");
         $r->execute([$qr]);
-        if ($r->fetch()) return false;
+        if ($r->fetch()
+            && !qrHuerfano($this->pdo, $qr, ['tabla' => 'arneses_items', 'id' => $excluirItem])) {
+            return false;
+        }
 
         foreach (['equipos', 'participantes_cursos', 'accesorios_sesiones', 'accesorios_izaje', 'arneses_sesiones'] as $tabla) {
             try {

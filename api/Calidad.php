@@ -71,9 +71,23 @@ class Calidad {
         $avisoSustitucion = '';
         if ($qrRow && $qrRow['usado'] && !$qrYaEsDeEsteEquipo) {
             $excepto = ['tabla' => 'equipos', 'id' => $id];
+
+            /* La marca del banco no basta para negarse. Un registro que soltó
+               su código por un camino que no lo devolvió al banco deja la placa
+               marcada como usada sin que nadie la traiga: ahí el sistema se
+               negaba y ni siquiera podía decir de quién era, porque no era de
+               nadie. Si ninguna de las seis tablas lo trae, la placa está
+               libre y se sigue; al aprobar, qrRegistrarUsado reescribe el
+               renglón del banco a nombre de este equipo. */
+            if (qrHuerfano($this->pdo, $qr, $excepto)) {
+                error_log("[QR] $usuario asignó $qr al equipo $id: el banco lo tenía "
+                        . 'como usado pero ningún registro lo traía.');
+                $avisoSustitucion = ' El código figuraba como ocupado en el banco de placas '
+                                  . 'sin pertenecer a ningún registro; quedó a nombre de este equipo.';
+            }
             // Con autorización expresa, el personal cede el código: la etiqueta
             // ya está pegada en el equipo y la de la persona se puede recalcular.
-            if (!empty($payload['sustituir_personal'])) {
+            elseif (!empty($payload['sustituir_personal'])) {
                 $sus = sustituirQrDePersonal($this->pdo, $qr, $usuario);
                 if (!$sus['ok']) return ['status' => 'error', 'message' => $sus['message']];
                 $avisoSustitucion = ' ' . $sus['message'];

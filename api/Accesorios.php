@@ -2112,10 +2112,16 @@ class Accesorios {
     }
 
     private function qrDisponible(string $qr, int $excludeAccId = 0): bool {
-        // qr_codigos pool: if marked used by someone else
+        /* El banco dice "usada", pero eso sólo pesa si algún registro la trae
+           de verdad. Una marca huérfana —de un registro que soltó su código
+           sin devolverlo al banco— dejaba bloqueada una placa libre, y el
+           aviso no podía nombrar a ningún dueño porque no lo había. */
         $r = $this->pdo->prepare("SELECT id FROM qr_codigos WHERE identificador = ? AND usado = 1");
         $r->execute([$qr]);
-        if ($r->fetch()) return false;
+        if ($r->fetch()
+            && !qrHuerfano($this->pdo, $qr, ['tabla' => 'accesorios_izaje', 'id' => $excludeAccId])) {
+            return false;
+        }
 
         // equipos
         $r = $this->pdo->prepare("SELECT id FROM equipos WHERE qr_codigo = ? LIMIT 1");
