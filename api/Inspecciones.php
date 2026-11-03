@@ -35,7 +35,8 @@ class Inspecciones {
      * normal, sin rastro de haber venido precargada.
      */
     private const PRECARGAS = [self::PRECARGA_GRUA_AC18, self::PRECARGA_GRUA_TC4792,
-                                self::PRECARGA_CAN_260523, self::PRECARGA_CAN_120320];
+                                self::PRECARGA_CAN_260523, self::PRECARGA_CAN_120320,
+                                self::PRECARGA_TORRE_21LC1050];
 
     private const PRECARGA_GRUA_AC18 = [
         'clave'      => 'precarga_grua_ac18_michel',
@@ -132,6 +133,41 @@ class Inspecciones {
                       . 'Faltan el número económico y el modelo, que no vienen en la placa. '
                       . 'La prueba de carga no viene llena: el 125% de 335 kg son 418.75 kg, '
                       . 'pero el dato lo capturas tú con lo que de veras se haya montado.',
+    ];
+
+    /* Grúa torre Comansa 21LC1050, serie 17202, para Marcos.
+       De la placa sólo se toman marca, modelo y serie, que es lo que pidió la
+       dirección; el resto lo levanta él en campo.
+
+       El tipo es FLAT-TOP porque la serie 21LC de Comansa lo es: pluma
+       horizontal sin cúspide ni tirantes. De ahí sale su lista de revisión.
+
+       La capacidad se deja en blanco a propósito. El 21LC1050 se fabrica en
+       tres versiones —25, 37.5 y 50 toneladas— y la placa no dice cuál es, así
+       que ponerla aquí sería adivinar un dato que acaba impreso en el
+       certificado. Sale de la tabla de cargas que está a bordo. */
+    private const PRECARGA_TORRE_21LC1050 = [
+        'clave'      => 'precarga_torre_21lc1050_marcos',
+        'busca'      => 'MARCOS',
+        'fotos'      => 'assets/precarga/grua_torre_21lc1050/',
+        'maquinaria' => 'GRÚA TORRE FLAT-TOP',
+        'cliente'    => '',
+        'marca'      => 'COMANSA',
+        'modelo'     => '21LC1050',
+        'serie'      => '17202',
+        'id_equipo'  => '',
+        'capacidad'  => '',
+        'nota'       => 'De la placa sólo van marca, modelo y serie: Comansa 21LC1050, '
+                      . 'serie 17202 (placa 1408P30636). Falta todo lo demás y lo pones tú: '
+                      . 'CLIENTE, dirección de la obra y número económico. '
+                      . 'La CAPACIDAD no viene: el 21LC1050 se fabrica en versiones de 25, '
+                      . '37.5 y 50 toneladas y la placa no dice cuál es — tómala de la tabla '
+                      . 'de cargas que está a bordo, junto con la longitud de pluma y la '
+                      . 'altura bajo gancho de la configuración instalada. '
+                      . 'Es una flat-top: pluma horizontal, sin cúspide ni tirantes de pluma. '
+                      . 'En la prueba de carga la altura bajo gancho se mide, no se calcula. '
+                      . 'La calcomanía de abajo de la placa no se alcanza a leer completa; '
+                      . 'si es de una verificación anterior, fotografíala entera.',
     ];
 
     private const PRECARGA_GRUA_TC4792 = [
