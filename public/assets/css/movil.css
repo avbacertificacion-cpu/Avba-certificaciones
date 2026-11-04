@@ -178,11 +178,22 @@
        media query propia, que por orden de cascada gana a esta hoja. Aquí se
        fuerza, porque en 390px esos 40px de margen a cada lado no sobran: son
        el 10% del ancho útil del formulario. */
-    .modal-ov, .modal-overlay { padding: 0 !important; align-items: stretch; }
+    /* La caja ocupa al menos toda la pantalla y puede medir más, así que lo que
+       se desplaza con el dedo es el fondo oscuro que la contiene. Sin esto el
+       fondo no se desplazaba: el gesto se iba a la página de atrás, y de un
+       formulario largo quedaban fuera de alcance el principio (centrado, se
+       salía por arriba) y el botón de guardar. */
+    .modal-ov, .modal-overlay {
+        padding: 0 !important; align-items: flex-start !important;
+        overflow-y: auto !important; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    }
     .modal, .modal-content {
-        border-radius: 0 !important; min-height: 100vh; max-height: none !important;
+        border-radius: 0 !important; min-height: 100%; max-height: none !important;
         max-width: none !important; width: 100% !important; padding: 18px 14px !important;
     }
+    /* Y mientras hay una abierta, la página de atrás se queda quieta */
+    html:has(.modal-ov.open), html:has(.modal-overlay.open),
+    body:has(.modal-ov.open), body:has(.modal-overlay.open) { overflow: hidden; }
     .modal-actions { flex-direction: column-reverse; }
     .modal-actions .btn { width: 100%; }
 }
