@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/vista-cliente.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_CLIENTE) {
     header('Location: ../public/login.html'); exit;
 }
@@ -78,6 +79,7 @@ $json_tipos_cant = json_encode(array_map('intval', array_column($por_tipo, 'cant
 </style>
 </head>
 <body>
+<?php barraVistaCliente(); ?>
 <div class="navbar">
     <a href="cliente-dashboard.php">← Mi panel</a>
     <span style="font-size:13px">👤 <?= htmlspecialchars($nombre) ?></span>

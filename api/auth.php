@@ -46,6 +46,8 @@ function handleLogin() {
             $_SESSION['nombre'] = $usuario['nombre'];
             $_SESSION['rol'] = $usuario['rol'];
             $_SESSION['empresa_id'] = $usuario['empresa_id'];
+            // Un inicio de sesión nuevo deja atrás cualquier vista de cliente
+            unset($_SESSION['vista_cliente']);
 
             // Registrar en auditoría
             registrarAuditoria($usuario['id'], 'Login exitoso', 'usuarios', $usuario['id']);
@@ -66,6 +68,14 @@ function handleLogin() {
 }
 
 function handleLogout() {
+    // Si el administrador está viendo como cliente, salir de esa vista no
+    // cierra su sesión: lo regresa a admin
+    require_once __DIR__ . '/../config/vista-cliente.php';
+    if (salirVistaCliente()) {
+        registrarAuditoria($_SESSION['usuario_id'], 'Salir de la vista de cliente', 'usuarios', $_SESSION['usuario_id']);
+        echo json_encode(['success' => true, 'volver' => '../private/admin-empresas.php']);
+        return;
+    }
     if (isset($_SESSION['usuario_id'])) {
         registrarAuditoria($_SESSION['usuario_id'], 'Logout', 'usuarios', $_SESSION['usuario_id']);
     }

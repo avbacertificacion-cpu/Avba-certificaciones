@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/vista-cliente.php';
 
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_CLIENTE) {
     header('Location: ../public/login.html');
@@ -106,6 +107,7 @@ $nombre_usuario = $_SESSION['nombre'];
     </style>
 </head>
 <body>
+<?php barraVistaCliente(); ?>
     <div class="navbar">
         <h1>🔥 Mis Reportes de Inspección</h1>
         <div>

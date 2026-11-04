@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/vista-cliente.php';
 require_once '../config/empresa-config.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_CLIENTE) {
     header('Location: ../public/login.html'); exit;
@@ -117,6 +118,7 @@ $prestamo_como_mant = empresaPrestamoComoMantenimiento($pdo, $empresa_id);
     </style>
 </head>
 <body>
+<?php barraVistaCliente(); ?>
 
 <div class="navbar">
     <h1>🧯 Mis Extintores</h1>

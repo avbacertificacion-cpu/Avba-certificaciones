@@ -1,5 +1,6 @@
 <?php
 require_once '../config/config.php';
+require_once '../config/vista-cliente.php';
 require_once '../config/empresa-config.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_CLIENTE) {
     header('Location: ../public/login.html'); exit;
@@ -197,6 +198,7 @@ $json_pie = json_encode([$inspeccionados_mes, $total_extintores - $inspeccionado
     </style>
 </head>
 <body>
+<?php barraVistaCliente(); ?>
 
 <!-- Navbar -->
 <div class="navbar">
@@ -416,8 +418,10 @@ new Chart(barCtx, {
 })();
 
 function logout() {
+    // En la vista de cliente del administrador, «cerrar sesión» lo regresa a admin
     fetch('../api/auth.php?action=logout', {method:'POST'})
-        .then(() => window.location.href = '../public/login.html');
+        .then(r => r.json()).catch(() => ({}))
+        .then(d => window.location.href = (d && d.volver) || '../public/login.html');
 }
 </script>
 

@@ -252,6 +252,7 @@ function render(data) {
                 ${Number(e.prestamo_como_mantenimiento) === 1 ? `<p style="margin-top:8px"><span style="display:inline-block;background:#ede9fe;color:#5b21b6;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700">🛠️ Préstamo se muestra como mantenimiento</span></p>` : ''}
             </div>
             <div class="empresa-actions">
+                <button class="btn btn-sm btn-primary" onclick="verComoCliente(${parseInt(e.id)})" title="Ver exactamente lo que ve el cliente de esta planta">👁️ Ver como cliente</button>
                 <button class="btn btn-sm btn-warning" onclick="editarEmpresa(${parseInt(e.id)})" title="Editar empresa">✏️ Editar</button>
                 <button class="btn btn-sm btn-danger" onclick="eliminarEmpresa(${parseInt(e.id)})" title="Eliminar empresa">🗑️</button>
             </div>
@@ -414,6 +415,19 @@ function showAlert(msg, tipo) {
     const icon = tipo === 'success' ? '✓' : '✕';
     b.innerHTML = `<div class="alert alert-${tipo}"><span class="alert-icon">${icon}</span><span>${msg}</span></div>`;
     setTimeout(() => b.innerHTML = '', 5000);
+}
+
+// Entra a las pantallas del cliente de esta planta, con su mismo acceso.
+// Para regresar: la barra de abajo («Volver a admin») o «Cerrar sesión».
+async function verComoCliente(id) {
+    try {
+        const r = await fetch('../api/vista-cliente.php?action=entrar', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ empresa_id: id }),
+        });
+        const d = await r.json();
+        if (d.success) { window.location.href = d.ir; return; }
+        alert(d.error || 'No se pudo abrir la vista de cliente.');
+    } catch (e) { alert('Error de conexión: ' + e.message); }
 }
 
 function modalAlert(msg, tipo) {
