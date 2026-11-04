@@ -96,7 +96,11 @@
         'border-radius:7px;font-size:13px;color:#0B2545;cursor:pointer;font-weight:500}' +
       '.avba-rol-op:hover{background:#eef3f9}' +
       '.avba-rol-pie{font-size:10px;color:#7a8494;padding:7px 10px 4px;border-top:1px solid #eef1f5;margin-top:4px;line-height:1.4}' +
-      '@media print{#avba-cambio-rol{display:none}}';
+      '@media print{#avba-cambio-rol{display:none}}' +
+      // Con una ventana abierta se esconde: en teléfono quedaba encima de los
+      // últimos botones del modal —tapaba la mitad de "Retornar a calidad"— y
+      // ahí no sirve, porque cambiar de módulo cerraría lo que se está viendo.
+      'body:has(.overlay.open) #avba-cambio-rol{display:none}';
 
     document.head.appendChild(css);
     document.body.appendChild(caja);

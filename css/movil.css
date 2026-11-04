@@ -198,11 +198,31 @@
    solo lugar donde deslizar, que es como la gente espera que funcione. */
 @media (max-width: 1024px) {
   .overlay {
-    -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;   /* que no arrastre la página de atrás */
+    /* El último botón no queda pegado al borde de la pantalla: ahí el
+       navegador del iPhone usa los toques para sacar su barra. */
+    padding-bottom: calc(48px + env(safe-area-inset-bottom, 0px));
   }
   .modal-body {
     max-height: none !important;
     overflow: visible !important;
+  }
+
+  /* Con una ventana abierta, la página de atrás se queda quieta.
+
+     Antes también se deslizaba —141 px con el teléfono de lado— y quedaban
+     dos zonas peleando por el mismo dedo: el overlay y la página. En el
+     iPhone eso hace que el scroll se trabe al girar el teléfono y que un
+     toque llegue a un lugar que ya no está donde se ve. Con la ficha de un
+     registro ya enviado, ese lugar puede ser uno de los correos del cliente,
+     y el navegador abre "Crear correo".
+
+     Aquí también vivía -webkit-overflow-scrolling: touch. Desde iOS 13 el
+     deslizamiento con inercia es el comportamiento normal y la propiedad ya
+     no hace falta; lo único que aportaba era una capa de scroll aparte, que
+     es justo la que se desacomoda con esos toques. */
+  html:has(.overlay.open),
+  body:has(.overlay.open) {
+    overflow: hidden;
   }
 }

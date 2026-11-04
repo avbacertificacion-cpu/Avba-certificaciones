@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Que el navegador del iPhone no convierta correos, teléfonos ni
+       direcciones en enlaces: la página ya pone los suyos donde hacen falta. -->
+  <meta name="format-detection" content="telephone=no, email=no, address=no">
   <title>Certificaciones — AVBA</title>
   <link rel="stylesheet" href="js/leaflet/leaflet.css"/>
   <script src="js/leaflet/leaflet.js"></script>
@@ -1585,10 +1588,24 @@ function _detCorreoInit(correoStr) {
   };
 }
 
+/* Un correo escrito como texto en la página, el navegador del iPhone lo
+   detecta solo y lo vuelve tocable: al tocarlo abre "Crear correo con…".
+   Pasaba en la ficha de los registros ya enviados, que son los que traen los
+   correos del cliente a la vista. Con un espacio de ancho cero después de la
+   arroba se ve igual pero ya no tiene forma de correo para el detector.
+
+   Es sólo para MOSTRAR: el dato que se guarda y se manda sigue siendo el
+   correo tal cual, que vive en _detCorreos y en el registro. */
+function correoVisible(s) {
+  return String(s == null ? '' : s).replace(/@/g, '@​');
+}
+
 function _detCorreoRenderChip(email) {
   const chip = document.createElement("div");
   chip.style.cssText = "display:inline-flex;align-items:center;gap:4px;background:#e8f0fe;color:#1a56db;border-radius:20px;padding:2px 10px 2px 10px;font-size:12px;max-width:100%;";
-  chip.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px">${email}</span><span onclick="_detCorreoRemoveChip(this,'${email}')" style="cursor:pointer;font-size:14px;line-height:1;color:#1a56db;margin-left:2px">×</span>`;
+  chip.innerHTML = `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px"></span><span onclick="_detCorreoRemoveChip(this,'${email}')" style="cursor:pointer;font-size:14px;line-height:1;color:#1a56db;margin-left:2px">×</span>`;
+  chip.firstElementChild.textContent = correoVisible(email);
+  chip.firstElementChild.title = email;
   document.getElementById("d-correo-chips").appendChild(chip);
 }
 
@@ -1814,7 +1831,7 @@ async function pintarEnviosHist(d) {
       <span style="font-size:14px;line-height:1.2">${x.ok ? '📧' : '⚠️'}</span>
       <div style="flex:1;min-width:0">
         <div style="font-size:12.5px;font-weight:600;color:var(--texto);word-break:break-all">
-          ${e(x.correo || 'sin destinatario')}</div>
+          ${e(correoVisible(x.correo || 'sin destinatario'))}</div>
         <div style="font-size:11px;color:var(--texto-hint);word-break:break-all">
           ${e(x.archivo || '—')}</div>
         <div style="font-size:11px;color:var(--texto-hint)">
@@ -2238,21 +2255,21 @@ function confirmarAccion(accion) {
       color: "#185FA5", bg: "#E6F1FB",
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#185FA5" stroke-width="2"><path d="M4 4h16v12H4V4zm0 0l8 8 8-8"/></svg>`,
       titulo: "Enviar certificado",
-      sub: `Se generará el PDF del certificado y se enviará al correo <strong>${d.correo || "del cliente"}</strong>. La URL se guardará en la columna T.`,
+      sub: `Se generará el PDF del certificado y se enviará al correo <strong>${d.correo ? correoVisible(d.correo) : "del cliente"}</strong>. La URL se guardará en la columna T.`,
       btnColor: "#185FA5", btnLabel: "Enviar certificado"
     },
     ENVIAR_DICT: {
       color: "#854F0B", bg: "#FAEEDA",
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#854F0B" stroke-width="2"><path d="M4 4h16v12H4V4zm0 0l8 8 8-8"/></svg>`,
       titulo: "Enviar dictamen",
-      sub: `Se generará el PDF del dictamen y se enviará al correo <strong>${d.correo || "del cliente"}</strong>. La URL se guardará en el registro.`,
+      sub: `Se generará el PDF del dictamen y se enviará al correo <strong>${d.correo ? correoVisible(d.correo) : "del cliente"}</strong>. La URL se guardará en el registro.`,
       btnColor: "#854F0B", btnLabel: "Enviar dictamen"
     },
     ENVIAR_TODO: {
       color: "#0C447C", bg: "#E6F1FB",
       icon: `<svg viewBox="0 0 24 24" fill="none" stroke="#0C447C" stroke-width="2"><path d="M4 4h16v12H4V4zm0 0l8 8 8-8"/></svg>`,
       titulo: "Enviar certificado y dictamen",
-      sub: `Se generarán ambos PDFs y se enviarán al correo <strong>${d.correo || "del cliente"}</strong>. Las URLs se guardarán en columnas T y U.`,
+      sub: `Se generarán ambos PDFs y se enviarán al correo <strong>${d.correo ? correoVisible(d.correo) : "del cliente"}</strong>. Las URLs se guardarán en columnas T y U.`,
       btnColor: "#0C447C", btnLabel: "Enviar todo"
     },
     RECHAZAR: {
