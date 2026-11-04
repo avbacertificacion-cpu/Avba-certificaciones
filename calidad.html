@@ -6252,6 +6252,12 @@ async function abrirDetPer(id) {
               })()}
             </select>
           </label>
+          <label style="font-size:11px;font-weight:600;color:var(--texto-sub)">Fecha del curso
+            <input id="per-info-fecha" type="date"
+              value="${/^\d{4}-\d{2}-\d{2}/.test(p.fecha_curso||'') ? escH(String(p.fecha_curso).slice(0,10)) : ''}"
+              style="margin-top:3px;display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:1.5px solid var(--borde);border-radius:7px;font-size:12px">
+            <span style="font-weight:400;font-size:10px;color:var(--texto-hint)">Sale en el DC-3, el diploma y el certificado</span>
+          </label>
           <div><span style="font-size:11px;font-weight:600;color:var(--texto-sub);display:block;margin-bottom:3px">Ocupación</span>
             <span style="font-size:12px">${escH(p.ocupacion_nombre||'—')}</span>
           </div>
@@ -6741,6 +6747,10 @@ async function guardarInfoPer(id) {
   }
   const payload = { id, nombre_completo: nombre, curp, puesto, telefono, correo, capacidad, capacidad_na };
   if (curso_id > 0) payload.curso_id = curso_id;
+  // La fecha del curso: si se borró el campo no se manda, para no dejar al
+  // participante sin fecha por accidente.
+  const fechaCurso = (document.getElementById('per-info-fecha')?.value || '').trim();
+  if (fechaCurso) payload.fecha_curso = fechaCurso;
   try {
     const res  = await fetch(API, {
       method:  'POST',

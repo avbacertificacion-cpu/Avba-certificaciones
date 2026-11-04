@@ -980,6 +980,27 @@ class Personal {
             $sets[]   = "`curso_id` = ?";
             $params[] = $cursoId;
         }
+        /* Fecha del curso. Hasta ahora no había forma de corregirla: un
+           participante retornado a Calidad con la fecha equivocada se quedaba
+           con ella, y la fecha sale impresa en el DC-3, el diploma y el
+           certificado. Se acepta dd/mm/aaaa o aaaa-mm-dd y debe ser una fecha
+           que exista: 31/02 no pasa. */
+        if (array_key_exists('fecha_curso', $payload)) {
+            $fecha = $this->parseFecha(trim((string)($payload['fecha_curso'] ?? '')));
+            [$a, $m, $d] = $fecha ? array_map('intval', explode('-', $fecha)) : [0, 0, 0];
+            if (!$fecha || !checkdate($m, $d, $a)) {
+                return ['status' => 'error', 'message' => 'La fecha del curso no es válida.'];
+            }
+            $ant = $this->pdo->prepare("SELECT fecha_curso FROM participantes_cursos WHERE id = ?");
+            $ant->execute([$id]);
+            $anterior = (string)$ant->fetchColumn();
+            if (substr($anterior, 0, 10) !== $fecha) {
+                $sets[]   = "`fecha_curso` = ?";
+                $params[] = $fecha;
+                error_log("[Personal] $usuario cambió la fecha del curso del participante $id: "
+                        . ($anterior ?: 'sin fecha') . " → $fecha");
+            }
+        }
         // capacidad_na es booleano, manejo separado
         if (array_key_exists('capacidad_na', $payload)) {
             $sets[]   = "`capacidad_na` = ?";
