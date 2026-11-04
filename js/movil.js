@@ -127,10 +127,60 @@
     }, { rootMargin: '-' + tapa + 'px 0px 0px 0px' }).observe(menu);
   }
 
+  /* ── 5. Ir a las acciones de una ficha ──
+     En Certificaciones y Calidad las acciones de un registro van al pie de la
+     ficha, debajo de toda la información. En teléfono eso queda varias
+     pantallas abajo —en Maquinaria empiezan en el pixel 1192 de una pantalla
+     de 844— y no hay nada que avise que ahí hay botones: había que ir a
+     buscarlos. Este atajo aparece mientras el pie no se ve y lleva a él. */
+  function atajoAcciones() {
+    const overlays = document.querySelectorAll('.overlay');
+    if (!overlays.length) return;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'avba-ir-acciones';
+    b.innerHTML = 'Acciones <span aria-hidden="true">↓</span>';
+    document.body.appendChild(b);
+
+    // El pie de la ficha que está hasta arriba. Si encima hay otra ventana —la
+    // de confirmar, por ejemplo— ésa manda y el atajo se esconde.
+    function pieActual() {
+      const abiertos = [...document.querySelectorAll('.overlay.open')];
+      const arriba = abiertos[abiertos.length - 1];
+      if (!arriba) return null;
+      const pie = arriba.querySelector('.modal-footer');
+      return pie && visible(pie) && pie.querySelector('button') ? pie : null;
+    }
+
+    let pendiente = false;
+    function revisar() {
+      if (pendiente) return;
+      pendiente = true;
+      requestAnimationFrame(() => {
+        pendiente = false;
+        const pie = pieActual();
+        const lejos = !!pie && pie.getBoundingClientRect().top > window.innerHeight - 90;
+        b.classList.toggle('avba-ir-acciones--ver', lejos);
+      });
+    }
+
+    b.addEventListener('click', () => {
+      const pie = pieActual();
+      if (pie) pie.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    // El scroll del overlay no sube hasta el documento, pero sí se ve en la
+    // fase de captura.
+    document.addEventListener('scroll', revisar, { capture: true, passive: true });
+    window.addEventListener('resize', revisar, { passive: true });
+    const obs = new MutationObserver(revisar);
+    overlays.forEach(o => obs.observe(o, { attributes: true, attributeFilter: ['class'] }));
+  }
+
   function arrancar() {
     prepararBarras();
     envolver();
     botonMenu();
+    atajoAcciones();
     document.querySelectorAll(BARRAS).forEach(centrarActiva);
     // Barras que se agregan después al documento. Sólo se buscan las nuevas,
     // sin medir nada: esto corre seguido mientras se mueve un mapa.

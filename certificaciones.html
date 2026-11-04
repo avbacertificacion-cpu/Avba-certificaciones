@@ -378,7 +378,25 @@
     }
     .footer-label { font-size: 10px; font-weight: 700; color: var(--texto-hint); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
     .acciones-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    @media (max-width:480px) { .acciones-grid { grid-template-columns: 1fr; } }
+    /* En teléfono las acciones eran una columna de once botones de 36 px:
+       527 px de lista que empezaba debajo de la pantalla, y "Retornar a
+       calidad" hasta el fondo. Ahora van en dos columnas, con los botones a
+       44 px —lo mínimo para el dedo— y el texto que se acomoda en dos
+       renglones si no cabe. Los que van solos a todo el ancho son los que
+       cierran el trámite: enviar todo, habilitar en el portal, y retornar o
+       eliminar, que además quedan separados para no tocarlos por error. */
+    @media (max-width:480px) {
+      .acciones-grid { grid-template-columns: 1fr 1fr; gap: 8px; }
+      .acciones-grid .btn-accion {
+        min-height: 44px; padding: 8px 10px; white-space: normal;
+        line-height: 1.25; text-align: center;
+      }
+      .acciones-grid .btn-enviar-todo,
+      .acciones-grid .btn-publicar,
+      .acciones-grid .btn-rechazar,
+      .acciones-grid .btn-eliminar { grid-column: 1 / -1; }
+      .acciones-grid .btn-rechazar { margin-top: 8px; }
+    }
 
     .btn-accion {
       padding: 10px 14px; border-radius: 8px;
@@ -1949,7 +1967,7 @@ function renderAcciones(d) {
   if (isAdminCert) {
     acciones.push({
       label: "Eliminar registro",
-      clase: "btn-accion",
+      clase: "btn-accion btn-eliminar",
       icon: `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 4h10M6 4V2h4v2M5 4v9h6V4H5zm2 2v5m2-5v5"/></svg>`,
       fn: `eliminarEquipoCert(${d.fila},'${(d.cliente||'').replace(/'/g,'')}')`
     });

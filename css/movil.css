@@ -160,6 +160,45 @@
 @media print { .avba-ir-menu { display: none !important; } }
 
 
+/* ── 5b. Botón para ir a las acciones de una ficha ─────────────────────
+   Lo crea js/movil.js. Aparece abajo al centro mientras el pie de la ficha
+   —donde están los botones de acción— no se ve, y lleva a él. */
+.avba-ir-acciones { display: none; }
+@media (max-width: 1024px) {
+  .avba-ir-acciones {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    position: fixed;
+    left: 50%;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    z-index: 950;                 /* encima de la ficha (overlay: 200) */
+    min-height: 44px;
+    padding: 0 20px;
+    border: none;
+    border-radius: 22px;
+    background: #0C447C;
+    color: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1;
+    box-shadow: 0 4px 14px rgba(12, 68, 124, .35);
+    cursor: pointer;
+    opacity: 0;
+    transform: translate(-50%, 12px);
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+  }
+  .avba-ir-acciones--ver {
+    opacity: 1;
+    transform: translate(-50%, 0);
+    pointer-events: auto;
+  }
+}
+@media print { .avba-ir-acciones { display: none !important; } }
+
+
 /* ── 6. Encabezado de las tablas de registros ──────────────────────────
    En Calidad y Certificaciones el título se apretaba en tres renglones junto
    a los botones de "Por cliente / Abrir todos / Cerrar todos". En teléfono
