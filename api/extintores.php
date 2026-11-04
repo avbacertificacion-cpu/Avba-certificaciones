@@ -2,6 +2,8 @@
 require_once '../config/config.php';
 require_once '../config/mayusculas.php';
 require_once '../config/qr.php';
+require_once '../config/roles-extra.php';
+require_once '../config/empresa-config.php';
 header('Content-Type: application/json');
 // Respuestas con datos de una sesión: no deben guardarse en la caché del
 // navegador ni en la de ningún intermediario.
@@ -132,6 +134,16 @@ function listar() {
     } catch (Exception $e) {
         if ($colMant === '') throw $e;
         $datos = $consulta('');
+    }
+
+    // Lo que ve el cliente: en las plantas con la opción encendida, el
+    // préstamo se le muestra como mantenimiento (ver config/empresa-config.php)
+    if (in_array($rol, [ROLE_CLIENTE, ROLE_GERENTE], true)) {
+        $comoMant = array_flip(empresasPrestamoComoMantenimiento($pdo));
+        foreach ($datos as &$x) {
+            $x['estado'] = estadoParaCliente($x['estado'], isset($comoMant[(int) $x['empresa_id']]));
+        }
+        unset($x);
     }
 
     echo json_encode(['success' => true, 'data' => $datos]);

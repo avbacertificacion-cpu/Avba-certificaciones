@@ -10,6 +10,7 @@ $nombre = $_SESSION['nombre'];
 // Crea la columna de preferencia la primera vez que un admin entra aquí
 asegurarColumnaAlertas($pdo);
 asegurarColumnaFotos($pdo);
+asegurarColumnaPrestamo($pdo);
 asegurarColumnasFiscales($pdo);
 ?>
 <!DOCTYPE html>
@@ -195,6 +196,18 @@ asegurarColumnasFiscales($pdo);
             </small>
         </div>
 
+        <div class="form-group" style="background:#f7f9fc;border:1.5px solid #e0e0ff;border-radius:8px;padding:14px">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin:0">
+                <input type="checkbox" id="e-prestamo" style="width:18px;height:18px;cursor:pointer">
+                <span>Mostrar al cliente los extintores en préstamo como «en mantenimiento»</span>
+            </label>
+            <small style="margin-top:8px;display:block">
+                Si lo activas, en el reporte, en el listado del cliente, en la página del QR y
+                en el panel del gerente de esta planta, un extintor en préstamo aparecerá como
+                «en mantenimiento». Tú y los inspectores lo siguen viendo como préstamo.
+            </small>
+        </div>
+
         <div class="modal-actions">
             <button class="btn btn-warning" onclick="cerrarModal()">Cancelar</button>
             <button class="btn btn-primary" onclick="guardarEmpresa()">Guardar empresa</button>
@@ -236,6 +249,7 @@ function render(data) {
                 ${e.domicilio ? `<p><strong>Domicilio</strong> ${sanitize(e.domicilio)}</p>` : ''}
                 ${Number(e.mostrar_alertas) === 0 ? `<p style="margin-top:8px"><span style="display:inline-block;background:#fef3c7;color:#92400e;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700">🔕 Alertas ocultas al cliente</span></p>` : ''}
                 ${Number(e.requiere_fotos) === 1 ? `<p style="margin-top:8px"><span style="display:inline-block;background:#dbeafe;color:#1d4ed8;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700">📷 Pide fotos en el reporte</span></p>` : ''}
+                ${Number(e.prestamo_como_mantenimiento) === 1 ? `<p style="margin-top:8px"><span style="display:inline-block;background:#ede9fe;color:#5b21b6;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:700">🛠️ Préstamo se muestra como mantenimiento</span></p>` : ''}
             </div>
             <div class="empresa-actions">
                 <button class="btn btn-sm btn-warning" onclick="editarEmpresa(${parseInt(e.id)})" title="Editar empresa">✏️ Editar</button>
@@ -279,6 +293,7 @@ function editarEmpresa(id) {
     // Sin dato guardado se asume activado (comportamiento por defecto)
     document.getElementById('e-alertas').checked = (e.mostrar_alertas === undefined) || Number(e.mostrar_alertas) === 1;
     document.getElementById('e-fotos').checked = Number(e.requiere_fotos) === 1;
+    document.getElementById('e-prestamo').checked = Number(e.prestamo_como_mantenimiento) === 1;
     document.getElementById('modalEmpresa').classList.add('open');
 }
 
@@ -294,6 +309,7 @@ function limpiarModal() {
     document.getElementById('e-domicilio').value = '';
     document.getElementById('e-alertas').checked = true;
     document.getElementById('e-fotos').checked = false;
+    document.getElementById('e-prestamo').checked = false;
     document.getElementById('modal-alert').innerHTML = '';
 }
 
@@ -336,6 +352,7 @@ async function guardarEmpresa() {
             domicilio: document.getElementById('e-domicilio').value.trim() || null,
             mostrar_alertas: document.getElementById('e-alertas').checked ? 1 : 0,
             requiere_fotos:  document.getElementById('e-fotos').checked ? 1 : 0,
+            prestamo_como_mantenimiento: document.getElementById('e-prestamo').checked ? 1 : 0,
             regimen_fiscal:  document.getElementById('e-regimen').value || null,
             cp:              document.getElementById('e-cp').value.trim() || null,
         };

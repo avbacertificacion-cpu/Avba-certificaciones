@@ -1,6 +1,7 @@
 <?php
 require_once '../config/config.php';
 require_once '../config/roles-extra.php';
+require_once '../config/empresa-config.php';
 if (!isset($_SESSION['usuario_id']) || $_SESSION['rol'] !== ROLE_GERENTE) {
     header('Location: ../public/login.html'); exit;
 }
@@ -20,6 +21,9 @@ $stmt = $pdo->prepare("SELECT nombre, domicilio FROM empresas WHERE id = ?");
 $stmt->execute([$empresa_id]);
 $empresa = $stmt->fetch(PDO::FETCH_ASSOC);
 if (!$empresa) { header('Location: gerente-dashboard.php'); exit; }
+
+// Si el admin lo pidió para esta planta, el préstamo se muestra como mantenimiento
+$prestamo_como_mant = empresaPrestamoComoMantenimiento($pdo, $empresa_id);
 
 $mes_actual = (int) date('n');
 $anio_actual = (int) date('Y');
@@ -144,6 +148,7 @@ $json_vig = json_encode([(int)($vig['vigentes']??0),(int)($vig['sin_registro']??
     .badge{padding:3px 8px;border-radius:6px;font-size:10px;font-weight:700}
     .b-activo{background:#dcfce7;color:#166534}.b-inactivo{background:#f3f4f6;color:#4b5563}
     .b-en_prestamo{background:#fef3c7;color:#92400e}
+    .b-en_mantenimiento{background:#ede9fe;color:#5b21b6}
     @media(max-width:600px){.container{padding:18px 12px}.charts{grid-template-columns:1fr}}
 </style>
 </head>
@@ -184,7 +189,7 @@ $json_vig = json_encode([(int)($vig['vigentes']??0),(int)($vig['sin_registro']??
             <tbody>
             <?php if (!$extintores): ?>
                 <tr><td colspan="9" style="text-align:center;color:#94a3b8;padding:30px">Sin extintores registrados.</td></tr>
-            <?php else: foreach ($extintores as $e): ?>
+            <?php else: foreach ($extintores as $e): $est = estadoParaCliente($e['estado'], $prestamo_como_mant); ?>
                 <tr>
                     <td data-et="Código" class="td-titulo" style="font-family:monospace;font-weight:600"><?= htmlspecialchars($e['codigo_manual']) ?></td>
                     <td data-et="Sección"><?= htmlspecialchars($e['seccion'] ?: '—') ?></td>
@@ -194,7 +199,7 @@ $json_vig = json_encode([(int)($vig['vigentes']??0),(int)($vig['sin_registro']??
                     <td data-et="Recarga"><?= $fmt($e['fecha_recarga']) ?></td>
                     <td data-et="PH"><?= $fmt($e['fecha_ph']) ?></td>
                     <td data-et="Últ. inspección"><?= $e['ultima_inspeccion'] ? $fmt($e['ultima_inspeccion']) : '<span style="color:#dc2626">Sin inspección</span>' ?></td>
-                    <td data-et="Estado"><span class="badge b-<?= htmlspecialchars($e['estado']) ?>"><?= htmlspecialchars(ucfirst(str_replace('_',' ',$e['estado']))) ?></span></td>
+                    <td data-et="Estado"><span class="badge b-<?= htmlspecialchars($est) ?>"><?= htmlspecialchars(nombreEstado($est)) ?></span></td>
                 </tr>
             <?php endforeach; endif; ?>
             </tbody>

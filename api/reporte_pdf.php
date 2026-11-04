@@ -2,6 +2,7 @@
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
 require_once '../config/config.php';
+require_once '../config/empresa-config.php';
 
 if (!isset($_SESSION['usuario_id'])) {
     http_response_code(401); exit('No autenticado');
@@ -32,6 +33,11 @@ if ($rol === ROLE_CLIENTE) {
         exit('Sin permiso');
     }
 }
+
+// El reporte es del cliente: si el admin lo pidió para esta planta, la marca
+// PO se explica como mantenimiento y no como préstamo
+$texto_po = empresaPrestamoComoMantenimiento($pdo, $reporte['empresa_id'])
+          ? 'Extintor en mantenimiento' : 'Extintor en préstamo';
 
 // ─── Extintores agrupados por sección ────────────────────────────────────────
 // Ordenar secciones por el número de extintor más bajo que contienen,
@@ -480,7 +486,7 @@ if (!$logo_html) {
                 <tr><td class="leg-ok">OK</td><td>Cumple con la NOM-002-STPS</td></tr>
                 <tr><td class="leg-na">NA</td><td>No Aplica</td></tr>
                 <tr><td class="leg-nc">NC</td><td>No cumple con la NOM-002-STPS</td></tr>
-                <tr><td class="leg-po">PO</td><td>Extintor en préstamo</td></tr>
+                <tr><td class="leg-po">PO</td><td><?= $texto_po ?></td></tr>
             </table>
         </div>
     </div>
@@ -512,7 +518,7 @@ if (!$logo_html) {
             </tr>
             <tr>
                 <th class="th-desc" colspan="12">
-                    SEÑ-Señalamiento y soporte, MG-Manguera, PO Extintor de prestado, PH- Prueba hidrostática,
+                    SEÑ-Señalamiento y soporte, MG-Manguera, PO <?= $texto_po ?>, PH- Prueba hidrostática,
                     SG-Seguro (pasador y cincho), PS-Presión, OB- Obstruido, DAÑ-Daño, PIN-Pintura y etiqueta,
                     FN-Funda, GB-Gabinete, RV-Recarga vigente
                 </th>

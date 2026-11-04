@@ -52,11 +52,12 @@ function listarEmpresas() {
     // sobrescribirían con valores vacíos).
     $colAlertas = empresaTieneColumnaAlertas($pdo) ? 'mostrar_alertas' : '1 AS mostrar_alertas';
     $colFotos   = empresaTieneColumnaFotos($pdo)   ? 'requiere_fotos'  : '0 AS requiere_fotos';
+    $colPrest   = empresaTieneColumnaPrestamo($pdo) ? 'prestamo_como_mantenimiento' : '0 AS prestamo_como_mantenimiento';
     // Régimen y C.P. sólo si ya existen: precargan los datos fiscales al cotizar
     $colFiscal  = columnasFiscalesEmpresa($pdo);
     $colFiscal  = $colFiscal ? ', ' . implode(', ', $colFiscal) : '';
     $stmt = $pdo->query("
-        SELECT id, nombre, rfc, domicilio, telefono, email, contacto, $colAlertas, $colFotos $colFiscal
+        SELECT id, nombre, rfc, domicilio, telefono, email, contacto, $colAlertas, $colFotos, $colPrest $colFiscal
         FROM empresas WHERE estado='activo' ORDER BY nombre
     ");
     echo json_encode(['success' => true, 'data' => $stmt->fetchAll(PDO::FETCH_ASSOC)]);
@@ -259,6 +260,11 @@ function crearEmpresa() {
     $tieneFotos    = empresaTieneColumnaFotos($pdo);
     $requiereFotos = array_key_exists('requiere_fotos', $d) ? (int) !empty($d['requiere_fotos']) : 0;
 
+    // Préstamos que el cliente ve como «en mantenimiento» (por defecto: apagado)
+    asegurarColumnaPrestamo($pdo);
+    $tienePrestamo = empresaTieneColumnaPrestamo($pdo);
+    $prestamoMant  = array_key_exists('prestamo_como_mantenimiento', $d) ? (int) !empty($d['prestamo_como_mantenimiento']) : 0;
+
     // Datos fiscales que precargan el presupuesto
     asegurarColumnasFiscales($pdo);
     $fiscales = columnasFiscalesEmpresa($pdo);
@@ -275,6 +281,7 @@ function crearEmpresa() {
     ];
     if ($tieneAlertas) { $columnas[] = 'mostrar_alertas'; $valores[] = $mostrarAlertas; }
     if ($tieneFotos)   { $columnas[] = 'requiere_fotos';  $valores[] = $requiereFotos; }
+    if ($tienePrestamo) { $columnas[] = 'prestamo_como_mantenimiento'; $valores[] = $prestamoMant; }
     foreach ($fiscales as $c) { $columnas[] = $c; $valores[] = trim($d[$c] ?? '') ?: null; }
 
     if ($id) {

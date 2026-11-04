@@ -9,6 +9,8 @@ $empresa_id = $_SESSION['empresa_id'];
 
 // El admin puede ocultar toda la información de vencimientos para esta empresa
 $mostrar_alertas = empresaMuestraAlertas($pdo, $empresa_id);
+// Si el admin lo pidió para esta planta, el préstamo se le muestra como mantenimiento
+$prestamo_como_mant = empresaPrestamoComoMantenimiento($pdo, $empresa_id);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -77,7 +79,8 @@ $mostrar_alertas = empresaMuestraAlertas($pdo, $empresa_id);
         .estado-badge{display:inline-block;padding:4px 8px;border-radius:4px;font-size:10px;font-weight:700}
         .estado-activo{background:#d4edda;color:#155724}
         .estado-inactivo{background:#e2e3e5;color:#383d41}
-        .estado-prestamo{background:#d1ecf1;color:#0c5460}
+        <?php if (!$prestamo_como_mant): ?>.estado-en_prestamo{background:#d1ecf1;color:#0c5460}<?php endif; ?>
+        .estado-en_mantenimiento{background:#ede9fe;color:#5b21b6}
 
         /* Modal */
         .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100;justify-content:center;align-items:center;padding:16px}
@@ -135,7 +138,11 @@ $mostrar_alertas = empresaMuestraAlertas($pdo, $empresa_id);
             <option value="">Todos los estados</option>
             <option value="activo">Activo</option>
             <option value="inactivo">Inactivo</option>
+            <?php if ($prestamo_como_mant): ?>
+            <option value="en_mantenimiento">En mantenimiento</option>
+            <?php else: ?>
             <option value="en_prestamo">En Préstamo</option>
+            <?php endif; ?>
         </select>
     </div>
 
@@ -153,6 +160,12 @@ $mostrar_alertas = empresaMuestraAlertas($pdo, $empresa_id);
 </div>
 
 <script>
+<?php /* En las plantas con la opción, el servidor ya manda «en_mantenimiento»
+         y aquí no se nombra el otro estado ni en el código de la página. */ ?>
+const NOMBRE_ESTADO = <?= json_encode(['activo' => 'ACTIVO', 'inactivo' => 'INACTIVO', 'en_mantenimiento' => 'EN MANTENIMIENTO']
+    + ($prestamo_como_mant ? [] : ['en_prestamo' => 'EN PRÉSTAMO']), JSON_UNESCAPED_UNICODE) ?>;
+const nombreEstado = e => NOMBRE_ESTADO[e] || String(e || '').replace(/_/g, ' ').toUpperCase();
+
 let extintores = [];
 let kpis = {};
 // Configurado por el admin: si está en false se oculta toda la info de vencimientos
@@ -295,7 +308,7 @@ function renderizar() {
                         <div class="card-codigo">${e.codigo_manual}</div>
                         <div class="card-tipo-badge">${e.tipo_nombre}</div>
                     </div>
-                    <span class="estado-badge estado-${e.estado}">${e.estado.toUpperCase()}</span>
+                    <span class="estado-badge estado-${e.estado}">${nombreEstado(e.estado)}</span>
                 </div>
                 <div class="card-body">
                     <div class="ubicacion-box">📍 ${e.ubicacion}</div>
@@ -367,7 +380,7 @@ function abrirDetalle(id) {
                 </div>
                 <div class="modal-item">
                     <label>Estado</label>
-                    <value><span class="estado-badge estado-${ext.estado}">${ext.estado.toUpperCase()}</span></value>
+                    <value><span class="estado-badge estado-${ext.estado}">${nombreEstado(ext.estado)}</span></value>
                 </div>
             </div>
             ${ext.seccion ? `<div class="modal-row full"><div class="modal-item"><label>Sección / Edificio</label><value>${ext.seccion}</value></div></div>` : ''}

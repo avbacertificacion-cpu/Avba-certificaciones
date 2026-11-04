@@ -77,6 +77,50 @@ function empresaRequiereFotos(PDO $pdo, $empresa_id): bool {
     return empresaPreferencia($pdo, $empresa_id, 'requiere_fotos', false);
 }
 
+// ─── Préstamos mostrados al cliente como mantenimiento (por defecto: no) ────
+/**
+ * Hay clientes a los que no se les dice que un extintor está en préstamo: para
+ * ellos el equipo está «en mantenimiento». Con la opción encendida en su
+ * planta, todo lo que ve el cliente —su listado, el reporte mensual, la página
+ * que abre el QR y el panel del gerente— dice «en mantenimiento» donde el
+ * sistema guarda «en préstamo». Es sólo cómo se muestra: el estado guardado no
+ * cambia, y el administrador y los inspectores siguen viendo el préstamo.
+ */
+function asegurarColumnaPrestamo(PDO $pdo): void {
+    asegurarColumnaEmpresa($pdo, 'prestamo_como_mantenimiento', 'TINYINT(1) NOT NULL DEFAULT 0');
+}
+
+function empresaTieneColumnaPrestamo(PDO $pdo, bool $revisarDeNuevo = false): bool {
+    return empresaTieneColumna($pdo, 'prestamo_como_mantenimiento', $revisarDeNuevo);
+}
+
+/** ¿A esta planta se le muestran los préstamos como mantenimiento? */
+function empresaPrestamoComoMantenimiento(PDO $pdo, $empresa_id): bool {
+    return empresaPreferencia($pdo, $empresa_id, 'prestamo_como_mantenimiento', false);
+}
+
+/** Las plantas que tienen la opción encendida, para listados de varias. */
+function empresasPrestamoComoMantenimiento(PDO $pdo): array {
+    if (!empresaTieneColumnaPrestamo($pdo)) return [];
+    try {
+        return array_map('intval', $pdo->query("SELECT id FROM empresas WHERE prestamo_como_mantenimiento = 1")
+                                         ->fetchAll(PDO::FETCH_COLUMN));
+    } catch (Exception $e) {
+        return [];
+    }
+}
+
+/** El estado tal como lo ve el cliente. «en_mantenimiento» nunca se guarda. */
+function estadoParaCliente(?string $estado, bool $prestamoComoMantenimiento): ?string {
+    return ($prestamoComoMantenimiento && $estado === 'en_prestamo') ? 'en_mantenimiento' : $estado;
+}
+
+/** Nombre del estado para mostrar. */
+function nombreEstado(?string $estado): string {
+    return ['activo' => 'Activo', 'inactivo' => 'Inactivo', 'en_prestamo' => 'En préstamo',
+            'en_mantenimiento' => 'En mantenimiento'][$estado] ?? ucfirst(str_replace('_', ' ', (string) $estado));
+}
+
 // ─── Datos fiscales del cliente (para el presupuesto) ────────────────────────
 /**
  * Régimen fiscal y código postal del cliente. Sirven para precargar el

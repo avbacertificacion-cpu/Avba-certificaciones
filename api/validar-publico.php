@@ -21,6 +21,7 @@ try {
 
     require_once $configFile;
     require_once $ratelimitFile;
+    require_once dirname(__FILE__) . '/../config/empresa-config.php';
 
     header('Content-Type: application/json; charset=utf-8');
     header('Access-Control-Allow-Origin: *');
@@ -64,7 +65,7 @@ try {
     $codigo = htmlspecialchars($codigo, ENT_QUOTES, 'UTF-8');
 
     $stmt = $pdo->prepare("
-        SELECT e.id, e.codigo_qr, e.codigo_manual, e.ubicacion, e.tipo, e.capacidad,
+        SELECT e.id, e.empresa_id, e.codigo_qr, e.codigo_manual, e.ubicacion, e.tipo, e.capacidad,
                e.seccion, e.estado, e.observaciones, te.nombre AS tipo_nombre,
                emp.nombre AS empresa_nombre, emp.domicilio AS empresa_domicilio,
                u.nombre AS creado_por_nombre
@@ -104,7 +105,9 @@ try {
         'capacidad' => $extintor['capacidad'],
         'ubicacion' => $extintor['ubicacion'],
         'seccion' => $extintor['seccion'],
-        'estado' => $extintor['estado'],
+        // Esta página la ve el cliente: con la opción de su planta, el
+        // préstamo se muestra como mantenimiento
+        'estado' => estadoParaCliente($extintor['estado'], empresaPrestamoComoMantenimiento($pdo, $extintor['empresa_id'])),
         'empresa' => $extintor['empresa_nombre'],
         'observaciones' => $extintor['observaciones'],
         'inspecciones' => $inspecciones
