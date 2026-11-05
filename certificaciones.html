@@ -3676,6 +3676,9 @@ function abrirCursoCert(idx) {
               onclick="cerrarPcDet();abrirEnviarSesionPer(${idx},'diploma')">Diploma</button>
       <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
               onclick="cerrarPcDet();abrirEnviarSesionPer(${idx},'certificado')">Cert</button>
+      <button class="btn-ver" style="font-size:11px;background:#E6F1FB;border-color:#0C447C;color:#0C447C"
+              title="Emite DC-3, diploma y certificado de toda la sesión y los deja en el portal del cliente, sin enviar correo"
+              onclick="publicarPortalSesionPer(${idx},this)">🌐 Publicar en portal (sin correo)</button>
     </div>
     <div style="padding:10px 0 12px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;border-bottom:2px solid var(--borde);margin-bottom:4px">
       <span style="font-size:12px;color:var(--texto-sub);margin-right:4px">Lista de asistencia:</span>
@@ -3734,6 +3737,9 @@ function abrirCursoCert(idx) {
                 onclick="emitirDocPersonal(${p.id},'diploma',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir Diploma</button>
         <button class="btn-ver" style="font-size:11px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                 onclick="emitirDocPersonal(${p.id},'certificado',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir Cert</button>` : ''}
+        <button class="btn-ver" style="font-size:11px;background:#E6F1FB;border-color:#0C447C;color:#0C447C"
+                title="Emite DC-3, diploma y certificado y los deja en el portal del cliente, sin enviar correo"
+                onclick="publicarPortalPer([${p.id}],this)">🌐 ${emitido ? 'Publicar en portal' : 'Publicar en portal (sin correo)'}</button>
         <button class="btn-ver" style="font-size:11px;background:var(--verde);border-color:var(--verde);color:#fff"
                 onclick="abrirEnviarTodosPer(${p.id},'${(p.nombre_completo||'').replace(/'/g,'')}','${(p.correo||'').replace(/'/g,'')}')">✉ Enviar todo</button>
         <button class="btn-ver" style="font-size:11px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
@@ -4082,6 +4088,9 @@ function renderIndepCert(data) {
                   onclick="emitirDocPersonal(${p.id},'diploma',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir Diploma</button>
           <button class="btn-ver" style="font-size:10px;background:var(--verde-light);border-color:var(--verde);color:var(--verde)"
                   onclick="emitirDocPersonal(${p.id},'certificado',this,'${(p.correo||'').replace(/'/g,'')}')">Emitir Cert</button>` : ''}
+          <button class="btn-ver" style="font-size:10px;background:#E6F1FB;border-color:#0C447C;color:#0C447C"
+                  title="Emite DC-3, diploma y certificado y los deja en el portal del cliente, sin enviar correo"
+                  onclick="publicarPortalPer([${p.id}],this).then(()=>cargarPerIndepCert())">🌐 Portal</button>
           <button class="btn-ver" style="font-size:10px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
                   onclick="devolverParticipante(${p.id})">↩</button>
           ${isAdminCert ? `<button class="btn-ver" style="font-size:10px;background:var(--rojo-light);border-color:var(--rojo);color:var(--rojo)"
@@ -4246,6 +4255,49 @@ function filaPublicacion(p) {
                   ${pub ? '✓' : '✕'} ${et}</button>`;
       }).join('')}
     </div>`;
+}
+
+/* Publicar en el portal del cliente sin enviar correo, como "Habilitar en
+   portal" de Maquinaria. Va participante por participante: cada uno son tres
+   PDF y de golpe toparía con el tiempo límite del servidor. */
+async function publicarPortalPer(ids, btn) {
+  ids = (ids || []).filter(Boolean);
+  if (!ids.length) { mostrarToast('No hay participantes aprobados que publicar.', 'err'); return; }
+  const quien = ids.length === 1 ? 'este participante' : `los ${ids.length} participantes`;
+  if (!confirm(`¿Emitir el DC-3, el diploma y el certificado de ${quien} y dejarlos en el portal del cliente?\n\nNo se enviará ningún correo.`)) return;
+  const tok = (JSON.parse(localStorage.getItem('avba_session')||'{}')).token || '';
+  const orig = btn ? btn.textContent : '';
+  if (btn) btn.disabled = true;
+  let ok = 0; const fallos = [];
+  for (let i = 0; i < ids.length; i++) {
+    if (btn) btn.textContent = `Publicando ${i + 1} de ${ids.length}…`;
+    try {
+      const r = await fetch(API, { method: 'POST', headers: {'Content-Type':'application/json','X-Token':tok},
+        body: JSON.stringify({ action: 'PUBLICAR_PORTAL_PERSONAL', payload: { id: ids[i] } }) });
+      const d = await r.json();
+      if (d.status === 'success') ok++; else fallos.push(d.message || ('id ' + ids[i]));
+    } catch (e) { fallos.push('Error de red (id ' + ids[i] + ')'); }
+  }
+  if (btn) { btn.disabled = false; btn.textContent = orig; }
+  mostrarToast(`${ok} de ${ids.length} publicado(s) en el portal del cliente.`, fallos.length ? 'err' : 'ok');
+  if (fallos.length) alert('No se pudieron publicar:\n\n• ' + fallos.join('\n• '));
+  if (!ok) return;
+  // Se refleja en memoria y se repinta el detalle abierto: recargar la lista
+  // reordena las sesiones y el índice del detalle podría apuntar a otra.
+  const publicados = new Set(ids.map(Number));
+  const marcar = x => { if (publicados.has(Number(x.id))) { x.estatus = 'EMITIDO'; x.pub_dc3 = 1; x.pub_diploma = 1; x.pub_certificado = 1; } };
+  (perCertData || []).forEach(marcar);
+  const g = window._cursosCertGrupos?.[window._pcDetIdx];
+  if (g) { g.participantes.forEach(marcar); abrirCursoCert(window._pcDetIdx); }
+}
+
+function publicarPortalSesionPer(idx, btn) {
+  const g = window._cursosCertGrupos?.[idx];
+  if (!g) return;
+  const ids = g.participantes
+    .filter(p => p.estatus === 'APROBADO_CALIDAD' || p.estatus === 'EMITIDO')
+    .map(p => p.id);
+  publicarPortalPer(ids, btn);
 }
 
 async function publicarDoc(id, tipo, publicar, btn) {

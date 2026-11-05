@@ -1490,6 +1490,12 @@ if ($method === 'POST') {
         case 'EXAMEN_ENVIAR':
             respuesta($examenes->enviar($payload));
 
+        case 'PUBLICAR_PORTAL_PERSONAL':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            @set_time_limit(120);
+            respuesta($personal->publicarPortalPersonal((int)($payload['id'] ?? 0), $usr['usuario']));
+
         case 'PUBLICAR_DOC_PERSONAL':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

@@ -129,6 +129,67 @@ class Personal {
                 : "El $etiqueta ya no se ve en el portal del cliente. El documento sigue emitido y su QR sigue validando."];
     }
 
+    /**
+     * Emite los documentos de un participante y los deja en el portal del
+     * cliente, SIN enviar correo.
+
+     * Maquinaria, accesorios y arneses ya tenían este camino ("Habilitar en
+     * portal", "Publicar en el portal", "Solo publicar en portal"); personal
+     * no: la única forma de emitir era mandando correo, y los interruptores de
+     * publicación sólo aparecían cuando el documento ya existía.
+     *
+     * Va de uno en uno —cada participante son tres PDF— y la pantalla recorre
+     * la sesión con avance, para no topar con el tiempo límite del servidor.
+     *
+     * Si el participante viene de Calidad (APROBADO_CALIDAD) los documentos se
+     * generan de nuevo: pudo haber cambiado algo, como la fecha del curso. Si
+     * ya estaba EMITIDO, se publica lo que ya tenía, sin regenerarlo. Un PDF
+     * subido a mano siempre manda.
+     */
+    public function publicarPortalPersonal(int $id, string $usuario): array {
+        if ($id <= 0) return ['status' => 'error', 'message' => 'Participante no válido.'];
+        $this->ensureEstatusColumn();
+        $this->ensurePublicadoDoc();
+
+        $st = $this->pdo->prepare("SELECT nombre_completo, estatus FROM participantes_cursos WHERE id = ?");
+        $st->execute([$id]);
+        $p = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
+        $estatus = (string)($p['estatus'] ?? '');
+        if (!in_array($estatus, ['APROBADO_CALIDAD', 'EMITIDO'], true)) {
+            return ['status' => 'error', 'message' => 'Sólo se publica lo que Calidad ya aprobó.'];
+        }
+
+        $hay = $this->pdo->prepare(
+            "SELECT COUNT(*) FROM participantes_documentos WHERE participante_id = ? AND tipo_doc = ?");
+        $faltan = [];
+        foreach (array_map('strtolower', self::DOCS_PORTAL) as $tipo) {
+            if ($this->docManualPersonal($id, $tipo) !== '') continue;   // el manual ya tiene su renglón
+            $hay->execute([$id, strtoupper($tipo)]);
+            $existe = (int)$hay->fetchColumn() > 0;
+            if ($estatus === 'EMITIDO' && $existe) continue;
+            $gen = $this->generarDocumento($id, $tipo, $usuario);
+            if (($gen['status'] ?? '') !== 'success') $faltan[] = strtoupper($tipo);
+        }
+        if (count($faltan) === count(self::DOCS_PORTAL)) {
+            return ['status' => 'error', 'message' => 'No se pudo generar ningún documento de ' . $p['nombre_completo'] . '.'];
+        }
+
+        $in = implode(',', array_fill(0, count(self::DOCS_PORTAL), '?'));
+        $this->pdo->prepare("UPDATE participantes_documentos SET publicado = 1
+                              WHERE participante_id = ? AND tipo_doc IN ($in)")
+                  ->execute(array_merge([$id], self::DOCS_PORTAL));
+        $this->pdo->prepare("UPDATE participantes_cursos SET estatus = 'EMITIDO', publicado = 1 WHERE id = ?")
+                  ->execute([$id]);
+
+        error_log(sprintf('[Portal] %s publicó sin correo los documentos de %s (id %d)%s',
+            $usuario, $p['nombre_completo'], $id, $faltan ? '; faltaron ' . implode(', ', $faltan) : ''));
+
+        $msg = 'Documentos de ' . $p['nombre_completo'] . ' disponibles en el portal del cliente.';
+        if ($faltan) $msg .= ' No se pudo generar: ' . implode(', ', $faltan) . '.';
+        return ['status' => 'success', 'message' => $msg, 'faltan' => $faltan];
+    }
+
     public function listarParticipantes(array $filtros = []): array {
         // Garantizar columnas de workflow y datos antes de consultarlas
         $this->ensureEstatusColumn();
