@@ -135,6 +135,72 @@ class Accesorios {
             'desde'     => '012836',
             'hasta'     => '012839',
         ],
+        [
+            // Los seis grilletes de 8.5 t van en la MISMA sesión que los 39
+            // anteriores: un certificado para todos los grilletes del trabajo.
+            'clave'     => 'precarga_grilletes_012840_012845',
+            'busca'     => 'MARCOS',
+            'continua'  => '012801',
+            'tipo'      => 'GRILLETE',
+            'marca'     => 'CROSBY',
+            'modelo'    => 'PERNO, TUERCA Y CHAVETA',
+            'capacidad' => '8.5 TON',
+            'medidas'   => '1"',
+            'desde'     => '012840',
+            'hasta'     => '012845',
+        ],
+        [
+            /* Eslingas planas: sesión propia, su propio certificado. A
+               diferencia de los grilletes, cada pieza trae serie de fábrica
+               impresa en la etiqueta, distinta de la placa; van una por una.
+               Sólo se certifica el amarre vertical. */
+            'clave'     => 'precarga_eslingas_planas_012846_012860',
+            'busca'     => 'MARCOS',
+            'tipo'      => ['ESLINGA PLANA SINTÉTICA', 'ESLINGA PLANA', 'ESLINGA DE BANDA'],
+            'marca'     => "AMERICAN RIGGER'S SUPPLY",
+            'modelo'    => 'EE1-902',
+            'capacidad' => '1.45 TON (3,200 LB) VERTICAL',
+            'medidas'   => '2" X 6 FT',
+            'desde'     => '012846',
+            'hasta'     => '012860',
+            'series'    => [
+                '012846' => '278601-006', '012847' => '274746-020', '012848' => '274746-053', '012849' => '274746-009',
+                '012850' => '274746-029', '012851' => '297218-003', '012852' => '278601-007', '012853' => '274746-056',
+                '012854' => '274746-007', '012855' => '274746-027', '012856' => '278601-016', '012857' => '274746-005',
+                '012858' => '274746-054', '012859' => '274746-018', '012860' => '274746-025',
+            ],
+        ],
+        [
+            /* Eslingas redondas Tuffy: sesión propia. La serie es el número
+               con guion escrito a mano en la etiqueta —el otro número, 146391
+               o 1494456, es el pedido y se repite—. Se confirmaron una por una
+               contra las fotos. La 012898 es otra pieza: etiqueta impresa
+               nueva, 6 ft en lugar de 12. */
+            'clave'     => 'precarga_eslingas_redondas_012861_012898',
+            'busca'     => 'MARCOS',
+            'tipo'      => ['ESLINGA REDONDA SINTÉTICA', 'ESLINGA REDONDA'],
+            'marca'     => 'TUFFY',
+            'modelo'    => 'FG0600 RS1',
+            'capacidad' => '1.18 TON (2,600 LB) VERTICAL',
+            'medidas'   => '12 FT · MORADA',
+            'desde'     => '012861',
+            'hasta'     => '012898',
+            'series'    => [
+                '012861' => '149-003', '012862' => '149-009', '012863' => '146-029', '012864' => '149-018',
+                '012865' => '149-027', '012866' => '149-004', '012867' => '149-006', '012868' => '149-033',
+                '012869' => '146-028', '012870' => '149-002', '012871' => '149-025', '012872' => '149-010',
+                '012873' => '149-012', '012874' => '149-005-02', '012875' => '149-032', '012876' => '149-022',
+                '012877' => '149-017', '012878' => '149-014', '012879' => '149-005-01', '012880' => '149-026',
+                '012881' => '149-021', '012882' => '149-035', '012883' => '149-011', '012884' => '146-007',
+                '012885' => '149-031', '012886' => '149-007', '012887' => '149-015', '012888' => '149-008',
+                '012889' => '149-023', '012890' => '146-010', '012891' => '149-001', '012892' => '149-034',
+                '012893' => '149-016', '012894' => '149-019', '012895' => '146-033', '012896' => '149-020',
+                '012897' => '149-024', '012898' => 'HST-00633449-013',
+            ],
+            'piezas'    => [
+                '012898' => ['modelo' => 'FG0600 TFG01', 'medidas' => '6 FT · MORADA'],
+            ],
+        ],
     ];
 
     private const PRECARGA_OREJAS = [
@@ -170,13 +236,26 @@ class Accesorios {
             $usuario = cuentaInspectorPorNombre($this->pdo, $cfg['busca']);
             if ($usuario === null) return;
 
-            $tipoId = $this->tipoAccesorioPara($cfg['tipo']);
+            $tipoId = $this->tipoAccesorioDeLote($cfg['tipo']);
             if (!$tipoId) return;
 
             $codigos = self::rangoCodigos($cfg['desde'], $cfg['hasta']);
             if (!$codigos) {
                 error_log("[Accesorios] lote {$cfg['clave']}: el rango no es válido");
                 return;
+            }
+
+            /* Series de fábrica, una por placa. Si el lote las trae, tienen que
+               venir TODAS y ser distintas: una pieza sin serie, o dos con la
+               misma, saldrían así en el certificado. Mejor no crear nada. */
+            $series = $cfg['series'] ?? null;
+            if ($series !== null) {
+                $faltan = array_diff($codigos, array_keys($series));
+                $vals   = array_map('strval', array_values($series));
+                if ($faltan || count($series) !== count($codigos) || count(array_unique($vals)) !== count($vals)) {
+                    error_log("[Accesorios] lote {$cfg['clave']}: las series no cuadran con las placas, no se crea nada");
+                    return;
+                }
             }
 
             // Todos o ninguno. Un lote a medias deja piezas sin placa y obliga a
@@ -214,10 +293,13 @@ class Accesorios {
                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'CUMPLE', ?, ?)"
             );
             foreach ($codigos as $i => $codigo) {
-                // El número de la placa hace de identificador y de serie: es lo
-                // único que trae grabado la pieza.
-                $ins->execute([$sesionId, $codigo, $tipoId, $cfg['marca'], $cfg['modelo'],
-                               $codigo, $cfg['capacidad'], $cfg['medidas'], $orden + $i + 1, $codigo]);
+                // Sin series de fábrica, el número de la placa hace de
+                // identificador y de serie: es lo único que trae la pieza.
+                $serie = $series !== null ? (string)$series[$codigo] : $codigo;
+                $p     = $cfg['piezas'][$codigo] ?? [];
+                $ins->execute([$sesionId, $codigo, $tipoId, $cfg['marca'], $p['modelo'] ?? $cfg['modelo'],
+                               $serie, $p['capacidad'] ?? $cfg['capacidad'], $p['medidas'] ?? $cfg['medidas'],
+                               $orden + $i + 1, $codigo]);
             }
             $this->pdo->prepare("INSERT INTO accesorios_tipos_seed (clave) VALUES (?)")->execute([$cfg['clave']]);
             $this->pdo->commit();
@@ -273,6 +355,32 @@ class Accesorios {
      * de alta. Si no existe ninguno, se crea con el nombre de la configuración,
      * porque sin tipo no hay sesión que valga.
      */
+    /**
+     * El tipo de un lote, que puede darse con nombres alternativos.
+     *
+     * El catálogo lo edita Calidad y no se sabe cómo nombró cada familia: la
+     * eslinga plana puede estar como "ESLINGA PLANA" o "ESLINGA DE BANDA". Se
+     * usa la primera que exista con ese nombre exacto; si ninguna existe, se
+     * sigue el camino de siempre con la primera. Por prefijo no se busca aquí:
+     * "ESLINGA" a secas encontraría la de cable con grillete.
+     */
+    private function tipoAccesorioDeLote(string|array $tipo): int {
+        $opciones = (array)$tipo;
+        if (count($opciones) > 1) {
+            try {
+                $st = $this->pdo->prepare("SELECT id FROM accesorios_tipos WHERE UPPER(TRIM(nombre)) = ? LIMIT 1");
+                foreach ($opciones as $o) {
+                    $st->execute([mb_strtoupper(trim($o))]);
+                    $id = (int)($st->fetchColumn() ?: 0);
+                    if ($id) return $id;
+                }
+            } catch (\Throwable $e) {
+                error_log('[Accesorios] tipoAccesorioDeLote: ' . $e->getMessage());
+            }
+        }
+        return $this->tipoAccesorioPara((string)$opciones[0]);
+    }
+
     private function tipoAccesorioPara(string $nombre): int {
         $nombre = mb_strtoupper(trim($nombre));
         try {
