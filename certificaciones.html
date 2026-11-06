@@ -548,6 +548,7 @@
 </style>
   <script src="js/tabla-clientes.js"></script>
   <script src="js/envios.js"></script>
+  <script src="js/control-documentos.js"></script>
   <link rel="stylesheet" href="css/movil.css">
 </head>
 <body>
@@ -856,6 +857,8 @@
 
       <!-- TAB INFO -->
       <div class="tab-panel active" id="panel-info">
+        <!-- Lo que tiene el cliente frente a lo que hay hoy (js/control-documentos.js) -->
+        <div id="ctl-docs-eq"></div>
         <div class="sec-label">Datos del equipo</div>
         <div class="grid2">
           <div class="field"><label>Cliente</label>    <input id="d-cliente"    disabled></div>
@@ -1372,7 +1375,9 @@ const tabla = TablaClientes.crear({
   ],
   resumen: filas => {
     const pend = filas.filter(r => r.estado !== 'ENVIADO').length;
-    return pend ? pend + ' sin enviar' : 'todo enviado';
+    // Con el grupo cerrado no se ven las filas: la marca va también aquí.
+    return (pend ? pend + ' sin enviar' : 'todo enviado')
+      + (window.CtlDocs ? CtlDocs.marca('equipo', filas.map(r => r.fila)) : '');
   },
   fila: filaCert,
 });
@@ -1396,7 +1401,7 @@ function filaCert(r, agrupado) {
       <td><span style="font-family:monospace;font-size:12px;font-weight:600;color:var(--azul-dark)">${formatoFolio(r.control)}</span></td>
       <td style="color:var(--texto-sub);font-size:12px">${r.fecha || "—"}</td>
       <td>${diasBadge}</td>
-      <td><span class="badge ${bc}">${lbl}</span></td>
+      <td><span class="badge ${bc}">${lbl}</span>${window.CtlDocs ? CtlDocs.marca('equipo', r.fila) : ''}</td>
       <td><button class="btn-ver" onclick="event.stopPropagation();ver(${r.fila})">Abrir</button></td>`;
 }
 
@@ -1462,6 +1467,13 @@ function ver(fila) {
     estadoHtml += ` <span class="dias-badge ${cls}" style="font-size:10px">${txt}</span>`;
   }
   document.getElementById("m-estado").innerHTML = estadoHtml;
+
+  // Control de documentos: ¿lo emitido y lo enviado sigue diciendo lo mismo?
+  const ctlEq = document.getElementById("ctl-docs-eq");
+  if (ctlEq) {
+    ctlEq.innerHTML = "";
+    if (window.CtlDocs) CtlDocs.caja("equipo", d.fila, ctlEq, { compacto: d.estado !== "ENVIADO" });
+  }
 
   // Tab INFO
   document.getElementById("d-cliente").value    = d.cliente    || "";
@@ -2807,7 +2819,7 @@ function renderAccCert(data) {
       <td style="text-align:center;font-weight:700">${r.total||0}</td>
       <td style="text-align:center"><span class="badge b-apro" style="font-size:10px">${r.cumple||0}</span></td>
       <td style="text-align:center"><span class="badge b-vencido" style="font-size:10px">${r.no_cumple||0}</span></td>
-      <td style="text-align:center">${estatusCertBadge(r.estatus)}${accChipPortal(r)}</td>
+      <td style="text-align:center">${estatusCertBadge(r.estatus)}${accChipPortal(r)}${window.CtlDocs ? CtlDocs.marca('accesorio', r.id) : ''}</td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end">
           <button class="btn-ver" style="font-size:11px" onclick="abrirAccCert(${r.id})">📋 Ver / Documentos</button>
@@ -2940,7 +2952,8 @@ async function abrirAccCert(sesionId) {
         </div>
       </div>`;
 
-    let html = docSection;
+    // Arriba de todo, la comparativa: lo que tiene el cliente frente a lo de hoy.
+    let html = '<div id="ctl-docs-acc"></div>' + docSection;
     if (!data.accesorios || !data.accesorios.length) {
       html += `<div style="text-align:center;padding:24px;color:var(--texto-hint)">Sin accesorios registrados.</div>`;
     } else {
@@ -2964,6 +2977,7 @@ async function abrirAccCert(sesionId) {
       });
     }
     document.getElementById('acc-det-body').innerHTML = html;
+    if (window.CtlDocs) CtlDocs.caja('accesorio', sesionId, document.getElementById('ctl-docs-acc'));
   } catch(e) {
     document.getElementById('acc-det-body').innerHTML =
       `<div style="text-align:center;padding:24px;color:var(--rojo)">Error: ${e.message}</div>`;
@@ -3629,6 +3643,7 @@ function renderCursosCert(grupos) {
     <td style="text-align:center">
       <span class="badge b-apro" style="font-size:11px">${total} participante${total!==1?'s':''}</span>
       ${emitidos ? `<span class="badge b-env" style="font-size:10px;margin-left:4px">${emitidos} emitido${emitidos!==1?'s':''}</span>` : ''}
+      ${window.CtlDocs ? CtlDocs.marca('personal', g.participantes.map(p => p.id)) : ''}
     </td>
     <td style="text-align:right">
       <div style="display:flex;gap:5px;justify-content:flex-end;flex-wrap:wrap">
@@ -3706,6 +3721,7 @@ function abrirCursoCert(idx) {
                     `<span class="badge b-apro" style="font-size:10px">Aprobado</span>`}
       </div>
       ${filaPublicacion(p)}
+      <div class="ctl-docs-per" data-id="${p.id}"></div>
       <div style="display:flex;gap:5px;flex-wrap:wrap">
         <button class="btn-ver" style="font-size:11px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"
                 onclick="prevDocPersonal(${p.id},'dc3')">👁 DC-3</button>
@@ -3753,6 +3769,7 @@ function abrirCursoCert(idx) {
   document.getElementById('pc-det-body').innerHTML = btnEnvio + html;
   document.getElementById('overlay-pc-det').classList.add('open');
   contarAsistencia();
+  if (window.CtlDocs) CtlDocs.cajasPersonal(document.getElementById('pc-det-body'));
 }
 
 // ── Lista de asistencia ───────────────────────────────────────
@@ -4064,7 +4081,7 @@ function renderIndepCert(data) {
       <td style="font-size:12px;color:var(--texto-sub)">${p.fecha_curso||'—'}</td>
       <td style="text-align:center">${emitido
         ? `<span class="badge b-env" style="font-size:10px">Emitido</span>`
-        : `<span class="badge b-apro" style="font-size:10px">Aprobado</span>`}</td>
+        : `<span class="badge b-apro" style="font-size:10px">Aprobado</span>`}${window.CtlDocs ? CtlDocs.marca('personal', p.id) : ''}</td>
       <td>
         <div style="display:flex;gap:4px;flex-wrap:wrap">
           <button class="btn-ver" style="font-size:10px;background:var(--azul-light);border-color:var(--azul);color:var(--azul-dark)"

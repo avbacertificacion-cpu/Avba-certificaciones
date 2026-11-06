@@ -15,6 +15,7 @@ require_once __DIR__ . '/helpers.php';
 // medio camino. Si este archivo no llegó, el sistema debe seguir en pie con
 // una sola división, no caerse entero por un require.
 if (is_file(__DIR__ . '/Divisiones.php')) require_once __DIR__ . '/Divisiones.php';
+require_once __DIR__ . '/Huella.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Inspecciones.php';
 require_once __DIR__ . '/Calidad.php';
@@ -1567,12 +1568,12 @@ if ($method === 'POST') {
         case 'IMPRIMIR_PDF_CERT':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cert->imprimirPDF((int)($payload['id'] ?? $payload['fila'] ?? 0), 'cert'));
+            respuesta($cert->imprimirPDF((int)($payload['id'] ?? $payload['fila'] ?? 0), 'cert', false, $usr['usuario']));
 
         case 'IMPRIMIR_PDF_DICT':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cert->imprimirPDF((int)($payload['id'] ?? $payload['fila'] ?? 0), 'dict'));
+            respuesta($cert->imprimirPDF((int)($payload['id'] ?? $payload['fila'] ?? 0), 'dict', false, $usr['usuario']));
 
         case 'IMPRIMIR_CERT_SIN_SELLOS':
             $usr = validarToken($pdo, $token);
@@ -1597,12 +1598,37 @@ if ($method === 'POST') {
         case 'GENERAR_PDF_WORD_CERT':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cert->generarPdfDesdeWord((int)($payload['id'] ?? $payload['fila'] ?? 0), 'cert'));
+            respuesta($cert->generarPdfDesdeWord((int)($payload['id'] ?? $payload['fila'] ?? 0), 'cert', $usr['usuario']));
 
         case 'GENERAR_PDF_WORD_DICT':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cert->generarPdfDesdeWord((int)($payload['id'] ?? $payload['fila'] ?? 0), 'dict'));
+            respuesta($cert->generarPdfDesdeWord((int)($payload['id'] ?? $payload['fila'] ?? 0), 'dict', $usr['usuario']));
+
+        // ── Control de documentos: lo emitido y lo enviado contra lo de hoy ──
+        // Por cada documento, con qué datos se generó el PDF vigente y con
+        // cuáles salió el último correo, frente a lo que hay hoy en la base.
+        case 'ESTADO_DOCUMENTOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $modDoc = (string)($payload['modulo'] ?? '');
+            if (is_array($payload['ids'] ?? null)) {
+                // Varios a la vez: los participantes de una sesión de Personal.
+                $estados = [];
+                foreach (array_slice(array_unique(array_map('intval', $payload['ids'])), 0, 200) as $idDoc) {
+                    $e = Huella::estado($pdo, $modDoc, $idDoc);
+                    if (($e['status'] ?? '') === 'success') $estados[$idDoc] = $e;
+                }
+                respuesta(['status' => 'success', 'estados' => $estados]);
+            }
+            respuesta(Huella::estado($pdo, $modDoc, (int)($payload['id'] ?? 0)));
+
+        // Todo lo que ya no coincide, de maquinaria, accesorios y personal.
+        case 'ALERTAS_DOCUMENTOS':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            @set_time_limit(90);
+            respuesta(Huella::alertas($pdo));
 
         case 'GENERAR_CERT_ENVIAR':
             $usr = validarToken($pdo, $token);
@@ -1627,7 +1653,7 @@ if ($method === 'POST') {
         case 'SUBIR_DOC_MANUAL_CERT':   // multipart: reemplazo manual de PDF (cert/dict)
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cert->subirDocumentoManual($_POST, $_FILES['archivo'] ?? []));
+            respuesta($cert->subirDocumentoManual($_POST, $_FILES['archivo'] ?? [], $usr['usuario']));
 
         case 'RECHAZAR_CERTIFICACION':
             $usr = validarToken($pdo, $token);
@@ -2033,7 +2059,7 @@ if ($method === 'POST') {
         case 'SUBIR_DOC_MANUAL_ACC':  // multipart
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($accesorios->subirDocumentoManualAcc($_POST, $_FILES['archivo'] ?? []));
+            respuesta($accesorios->subirDocumentoManualAcc(array_merge($_POST, ['_usuario' => $usr['usuario']]), $_FILES['archivo'] ?? []));
 
         case 'ASIGNAR_QR_ACCESORIO':
             $usr = validarToken($pdo, $token);

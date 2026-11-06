@@ -167,7 +167,11 @@ class Personal {
             if ($this->docManualPersonal($id, $tipo) !== '') continue;   // el manual ya tiene su renglón
             $hay->execute([$id, strtoupper($tipo)]);
             $existe = (int)$hay->fetchColumn() > 0;
-            if ($estatus === 'EMITIDO' && $existe) continue;
+            // Ya emitido: se publica lo que tenía, salvo que el registro haya
+            // cambiado desde que se generó; publicar ese PDF sería dejarle al
+            // cliente datos que ya no son.
+            if ($estatus === 'EMITIDO' && $existe
+                && !(class_exists('Huella') && Huella::vigenteAlDia($this->pdo, 'personal', $id, strtoupper($tipo)) === false)) continue;
             $gen = $this->generarDocumento($id, $tipo, $usuario);
             if (($gen['status'] ?? '') !== 'success') $faltan[] = strtoupper($tipo);
         }
@@ -340,6 +344,51 @@ class Personal {
         }
 
         return $row;
+    }
+
+    /**
+     * Los datos que imprimen DC-3, diploma, certificado y credencial, de varios
+     * participantes en una sola consulta. Es con lo que el control de
+     * documentos (Huella) compara lo emitido contra lo de hoy, así que toma los
+     * datos de la misma manera que obtenerParticipante: representantes y RFC
+     * del catálogo de empresas cuando ahí estén. Si cambia aquella consulta,
+     * hay que cambiar ésta.
+     *
+     * @return array [id => fila]
+     */
+    public function datosHuella(array $ids): array {
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        if (!$ids) return [];
+        static $listo = false;
+        if (!$listo) { $this->ensureMigration013Columns(); $listo = true; }
+
+        $repTrab = columnaExiste($this->pdo, 'participantes_cursos', 'empresa_rep_trabajadores')
+            ? "COALESCE(cl.representante_trabajadores COLLATE utf8mb4_general_ci, p.empresa_rep_trabajadores)"
+            : "cl.representante_trabajadores";
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $st = $this->pdo->prepare(
+            "SELECT p.id, p.nombre_completo, p.curp, p.puesto, p.capacidad, p.capacidad_na,
+                    p.control, p.qr_codigo, p.fecha_curso, p.empresa_nombre,
+                    c.nombre AS curso_nombre, c.duracion_horas, c.area_tematica,
+                    o.nombre AS ocupacion_nombre,
+                    u.nombre AS instructor_nombre,
+                    u.registro_stps AS instructor_stps,
+                    COALESCE(cl.representante COLLATE utf8mb4_general_ci, p.empresa_representante) AS empresa_representante,
+                    {$repTrab} AS empresa_rep_trabajadores,
+                    COALESCE(NULLIF(cl.rfc COLLATE utf8mb4_general_ci, ''), p.empresa_rfc) AS empresa_rfc
+             FROM participantes_cursos p
+             LEFT JOIN cursos c ON c.id = p.curso_id
+             LEFT JOIN ocupaciones_especificas o ON o.id = p.ocupacion_id
+             LEFT JOIN usuarios u ON u.usuario COLLATE utf8mb4_general_ci = p.usuario_registro
+             LEFT JOIN clientes cl ON UPPER(TRIM(cl.nombre_cliente COLLATE utf8mb4_general_ci)) = UPPER(TRIM(p.empresa_nombre))
+             WHERE p.id IN ($in)"
+        );
+        $st->execute($ids);
+        $out = [];
+        // Con dos empresas del mismo nombre en el catálogo, la primera; igual
+        // que obtenerParticipante, que se queda con el primer renglón.
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) $out[(int)$r['id']] ??= $r;
+        return $out;
     }
 
     /**
@@ -771,7 +820,8 @@ class Personal {
                     $ruta = realpath(str_replace(UPLOAD_URL, UPLOAD_DIR, $urlDoc));
                     if ($ruta) {
                         $safe  = preg_replace('/[^A-Za-z0-9_\-]/', '_', $p['nombre_completo'] ?? 'doc');
-                        $adjuntos[] = ['path' => $ruta, 'name' => strtoupper($t) . '_' . $safe . '.pdf'];
+                        $adjuntos[] = ['path' => $ruta, 'name' => strtoupper($t) . '_' . $safe . '.pdf',
+                                       'id' => (int)$p['id'], 'tipo' => strtoupper($t)];
                     }
                 } else {
                     $errores[] = ($p['nombre_completo'] ?? 'N/A') . ' · ' . $t;
@@ -827,6 +877,9 @@ class Personal {
             enviarYRegistrar($this->pdo, $mail, ['modulo' => 'personal', 'usuario' => $usuario]);
         } catch (\Exception $e) {
             return ['status' => 'error', 'message' => 'Error al enviar correo: ' . $e->getMessage()];
+        }
+        if (class_exists('Huella')) {
+            foreach ($adjuntos as $adj) Huella::enviado($this->pdo, 'personal', $adj['id'], $adj['tipo'], $usuario, $correo);
         }
 
         $msg = "Correo enviado a {$correo} con " . count($participantes) . " participante(s).";
@@ -1142,7 +1195,7 @@ class Personal {
             $real  = realpath($ruta);
             $rup   = realpath(UPLOAD_DIR);
             if ($real && $rup && strncmp($real, $rup, strlen($rup)) === 0) {
-                $adjuntos[] = ['ruta' => $ruta, 'nombre' => basename($ruta)];
+                $adjuntos[] = ['ruta' => $ruta, 'nombre' => basename($ruta), 'tipo' => $tipo];
             } else {
                 $faltantes[] = $label;
             }
@@ -1169,6 +1222,11 @@ class Personal {
             $mail->Body    = $this->plantillaCorreoPersonal($nombre, 'DC-3, Diploma, Certificado y Credencial', $p['curso_nombre'] ?? '', $credenciales);
             foreach ($adjuntos as $a) $mail->addAttachment($a['ruta'], $a['nombre']);
             enviarYRegistrar($this->pdo, $mail, ['modulo' => 'personal', 'registro_id' => (int)$id, 'usuario' => $usuario]);
+            if (class_exists('Huella')) {
+                foreach ($adjuntos as $a) {
+                    Huella::enviado($this->pdo, 'personal', $id, strtoupper($a['tipo']), $usuario, implode(', ', $lista));
+                }
+            }
         } catch (\Exception $e) {
             return ['status' => 'error', 'message' => 'Error al enviar correo: ' . $e->getMessage()];
         }
@@ -1804,7 +1862,12 @@ class Personal {
 
         // Si hay un PDF reemplazado manualmente para este documento, ese manda
         $manual = $this->docManualPersonal($id, $tipo);
-        if ($manual !== '') return ['status' => 'success', 'url' => $manual];
+        if ($manual !== '') {
+            if (!$sinSellos && class_exists('Huella')) {
+                Huella::emitido($this->pdo, 'personal', $id, strtoupper($tipo), $usuario, $manual, 'manual', true);
+            }
+            return ['status' => 'success', 'url' => $manual];
+        }
 
         if (!class_exists('Dompdf\Dompdf')) {
             return ['status' => 'error', 'message' => 'Dompdf no disponible. Instala las dependencias del proyecto.'];
@@ -1838,10 +1901,21 @@ class Personal {
             return ['status' => 'error', 'message' => 'Error generando documento: ' . $e->getMessage()];
         }
 
+        // La versión sin sellos es para imprimir sobre papel membretado: no es
+        // el documento del participante. Se anotaba igual que la buena, y como
+        // el último generado es el que se envía y el que ve el cliente, después
+        // de imprimirla se mandaba y se publicaba la versión sin sellos.
+        if ($sinSellos) return ['status' => 'success', 'url' => $url];
+
         $this->pdo->prepare(
             "INSERT INTO participantes_documentos (participante_id, tipo_doc, url, generado_por)
              VALUES (?, ?, ?, ?)"
         )->execute([$id, strtoupper($tipo), $url, $usuario]);
+
+        // Con qué datos quedó: es el que se enviará y el que verá el cliente.
+        if (class_exists('Huella')) {
+            Huella::emitido($this->pdo, 'personal', $id, strtoupper($tipo), $usuario, $url);
+        }
 
         return ['status' => 'success', 'url' => $url];
     }
@@ -1918,6 +1992,12 @@ class Personal {
             "INSERT INTO participantes_documentos (participante_id, tipo_doc, url, generado_por)
              VALUES (?, ?, ?, ?)"
         )->execute([$id, strtoupper($tipo), $rel, $usuario]);
+
+        // Con qué datos estaba el registro al subirlo: si después cambian, el
+        // control avisa que este PDF quedó atrás (no lo puede regenerar).
+        if (class_exists('Huella')) {
+            Huella::emitido($this->pdo, 'personal', $id, strtoupper($tipo), $usuario, $rel, 'manual');
+        }
 
         return ['status' => 'success', 'message' => ucfirst($tipo) . ' reemplazado correctamente.', 'url' => $rel];
     }
@@ -2226,6 +2306,15 @@ HTML;
             $doc = $stmt->fetch();
             if (!$doc) return ['status' => 'error', 'message' => 'Genera el documento primero antes de enviarlo.'];
             $urlDoc = $doc['url'];
+
+            // Si el registro cambió desde que se generó (Calidad corrigió la
+            // fecha del curso, la CURP…), mandar ese PDF sería mandar datos
+            // viejos: se genera de nuevo con los de hoy.
+            if (class_exists('Huella')
+                && Huella::vigenteAlDia($this->pdo, 'personal', $id, strtoupper($tipo)) === false) {
+                $gen = $this->generarDocumento($id, $tipo, $usuario);
+                if (($gen['status'] ?? '') === 'success' && !empty($gen['url'])) $urlDoc = $gen['url'];
+            }
         }
 
         // Convertir URL a ruta local y validar path traversal
@@ -2251,6 +2340,9 @@ HTML;
             $mail->Body       = $this->plantillaCorreoPersonal($nombre, $tipoLabel, $p['curso_nombre'] ?? '', $credenciales);
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             enviarYRegistrar($this->pdo, $mail, ['modulo' => 'personal', 'registro_id' => (int)$id, 'usuario' => $usuario]);
+            if (class_exists('Huella')) {
+                Huella::enviado($this->pdo, 'personal', $id, strtoupper($tipo), $usuario, implode(', ', $lista));
+            }
 
             $enviados = implode(', ', $lista);
             return ['status' => 'success', 'message' => "Documento enviado a {$enviados}."];

@@ -1656,6 +1656,10 @@ class Accesorios {
                 $manual = trim((string)($s->fetchColumn() ?: ''));
                 $abs    = $this->rutaLocalAcc($manual);
                 if ($abs !== '') {
+                    // Se anotó al subirlo; sólo si es de antes del control se anota ahora.
+                    if (class_exists('Huella')) {
+                        Huella::emitido($this->pdo, 'accesorio', $sesionId, $tipo, $usuario, $manual, 'manual', true);
+                    }
                     return ['status' => 'success', 'url_pub' => $manual, 'abs' => $abs, 'manual' => true];
                 }
             } catch (\Throwable $e) {}
@@ -1672,6 +1676,11 @@ class Accesorios {
         $r['abs']       = __DIR__ . '/../' . $rel;
         $r['url_pub']   = rtrim(SITE_URL, '/') . '/' . $rel;
         $r['manual']    = false;
+        // Con qué datos salió este PDF: es el que se guarda para el portal y el
+        // que se adjunta. Si después alguien toca la sesión, el control lo nota.
+        if (class_exists('Huella')) {
+            Huella::emitido($this->pdo, 'accesorio', $sesionId, $tipo, $usuario, $r['url_pub']);
+        }
         return $r;
     }
 
@@ -1714,6 +1723,9 @@ class Accesorios {
         $abs = rtrim(SITE_URL, '/') . '/uploads/reportes/' . $nombre;
         $col = $tipo === 'cert' ? 'cert_manual_url' : 'informe_manual_url';
         $this->pdo->prepare("UPDATE accesorios_sesiones SET `$col` = ? WHERE id = ?")->execute([$abs, $sesionId]);
+        if (class_exists('Huella')) {
+            Huella::emitido($this->pdo, 'accesorio', $sesionId, $tipo, (string)($p['_usuario'] ?? ''), $abs, 'manual');
+        }
 
         return [
             'status'  => 'success',
@@ -2669,6 +2681,9 @@ class Accesorios {
             } catch (\Throwable $ex) {
                 error_log('[Accesorios] cert_url: ' . $ex->getMessage());
             }
+            if (class_exists('Huella')) {
+                Huella::emitido($this->pdo, 'accesorio', (int)($a['sesion_id'] ?? 0), 'pieza:' . $accId, $usuario, $abs);
+            }
         }
         $sesionVisible = ((string)($a['estatus'] ?? '') === 'EMITIDO') || (int)($a['publicado'] ?? 0) === 1;
         $piezasVisibles = !in_array('piezas',
@@ -3164,6 +3179,7 @@ class Accesorios {
             );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             enviarYRegistrar($this->pdo, $mail, ['modulo' => 'accesorio', 'registro_id' => (int)$sesionId, 'usuario' => $usuario, 'cliente' => $cliente]);
+            if (class_exists('Huella')) Huella::enviado($this->pdo, 'accesorio', $sesionId, 'cert', $usuario, $correo);
 
             // Marcar como EMITIDO y guardar URL para el portal del cliente
             $certUrl = $doc['url_pub'];
@@ -3234,6 +3250,7 @@ class Accesorios {
             );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             enviarYRegistrar($this->pdo, $mail, ['modulo' => 'accesorio', 'registro_id' => (int)$sesionId, 'usuario' => $usuario, 'cliente' => $cliente]);
+            if (class_exists('Huella')) Huella::enviado($this->pdo, 'accesorio', $sesionId, 'informe', $usuario, $correo);
 
             // Marcar como EMITIDO y guardar URL para el portal del cliente
             $informeUrl = $doc['url_pub'];
@@ -3273,6 +3290,7 @@ class Accesorios {
             );
             $mail->addAttachment($rutaArchivo, basename($rutaArchivo));
             enviarYRegistrar($this->pdo, $mail, ['modulo' => 'accesorio', 'registro_id' => (int)$sesionId, 'usuario' => $usuario, 'cliente' => $cliente]);
+            if (class_exists('Huella')) Huella::enviado($this->pdo, 'accesorio', $sesionId, 'cumple', $usuario, $correo);
 
             // Marcar como EMITIDO y guardar URL del informe CUMPLE (columna separada)
             $informeUrl = $doc['url_pub'];
@@ -3327,6 +3345,11 @@ class Accesorios {
                 $mail->addAttachment($resCumple['abs'], basename($resCumple['abs']));
             }
             enviarYRegistrar($this->pdo, $mail, ['modulo' => 'accesorio', 'registro_id' => (int)$sesionId, 'usuario' => $usuario, 'cliente' => $cliente]);
+            if (class_exists('Huella')) {
+                foreach ($tieneCumple ? ['cert', 'informe', 'cumple'] : ['cert', 'informe'] as $t) {
+                    Huella::enviado($this->pdo, 'accesorio', $sesionId, $t, $usuario, $correo);
+                }
+            }
 
             // Actualizar BD con URLs y marcar EMITIDO
             $this->pdo->prepare(

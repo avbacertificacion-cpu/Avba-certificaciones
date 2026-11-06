@@ -63,7 +63,7 @@ class Certificaciones {
      * archivo subido por Certificaciones. El archivo pasa a ser el que ve el
      * cliente y el que se adjunta al enviar. $tipo: 'cert' | 'dict'.
      */
-    public function subirDocumentoManual(array $payload, array $file): array {
+    public function subirDocumentoManual(array $payload, array $file, string $usuario = ''): array {
         $id   = (int)($payload['id'] ?? $payload['fila'] ?? 0);
         $tipo = ($payload['tipo'] ?? '') === 'dict' ? 'dict' : 'cert';
         if (!$id) return ['status' => 'error', 'message' => 'ID de equipo requerido.'];
@@ -104,6 +104,12 @@ class Certificaciones {
         } else {
             $this->pdo->prepare("UPDATE equipos SET {$colMan} = ? WHERE id = ?")
                 ->execute([$rel, $id]);
+        }
+        // Con qué datos estaba el registro al subirlo: si después cambian, el
+        // control avisa que este PDF quedó atrás (no se puede regenerar).
+        if (class_exists('Huella')) {
+            Huella::emitido($this->pdo, 'equipo', $id, $tipo === 'dict' ? 'dictamen' : 'certificado',
+                            $usuario, $urlAbs, 'manual');
         }
 
         return [
@@ -155,7 +161,7 @@ class Certificaciones {
     }
 
     // ── Imprimir / previsualizar documento ────────────────
-    public function imprimirPDF(int $id, string $tipo, bool $sinSellos = false): array {
+    public function imprimirPDF(int $id, string $tipo, bool $sinSellos = false, string $usuario = ''): array {
         $datos = $this->obtenerDatosEquipo($id);
         if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
 
@@ -163,6 +169,8 @@ class Certificaciones {
             $tipoPDF = ($tipo === 'dict') ? 'dictamen' : 'certificado';
             $rutaPdf = $this->resolverPdf($tipoPDF, $datos, $sinSellos);
             $urlPdf  = UPLOAD_URL . 'certificados/' . basename($rutaPdf);
+
+            if (!$sinSellos) $this->anotarSiEsElVigente($id, $tipo, $urlPdf, $usuario);
 
             return ['status' => 'success', 'url' => $urlPdf, 'docx' => false];
         } catch (Exception $e) {
@@ -191,7 +199,36 @@ class Certificaciones {
     // Estrategia 2: Plantilla HTML (certificado o dictamen) con mPDF
     // Estrategia 3: Microservicio VPS (LibreOffice + qpdf, plantilla Word)
     // Estrategia 4: Fallback PHPWord → mPDF (PHP puro, plantilla Word)
-    public function generarPdfDesdeWord(int $id, string $tipo): array {
+    public function generarPdfDesdeWord(int $id, string $tipo, string $usuario = ''): array {
+        $r = $this->generarPdfDesdeWordSinAnotar($id, $tipo);
+        if (($r['status'] ?? '') === 'success' && empty($r['docx'])) {
+            $this->anotarSiEsElVigente($id, $tipo, (string)($r['url'] ?? ''), $usuario);
+        }
+        return $r;
+    }
+
+    /**
+     * Ver o imprimir un documento lo vuelve a generar, y el PDF con sellos se
+     * escribe con el mismo nombre que el que está en el portal: si es ese, el
+     * cliente ya tiene la versión de hoy, y así queda anotado en el control de
+     * documentos. Un PDF subido a mano no se toca: ése no se regenera.
+     */
+    private function anotarSiEsElVigente(int $id, string $tipo, string $url, string $usuario): void {
+        if (!class_exists('Huella') || $url === '') return;
+        $esDict = $tipo === 'dict';
+        if ($this->pdfManual($id, $esDict ? 'dict' : 'cert') !== '') return;
+        try {
+            $st = $this->pdo->prepare("SELECT " . ($esDict ? 'dictamen_url' : 'certificado_url') . " FROM equipos WHERE id = ?");
+            $st->execute([$id]);
+            $vigente = (string)($st->fetchColumn() ?: '');
+        } catch (\Throwable $e) { return; }
+        $nombre = fn($u) => basename((string)(parse_url($u, PHP_URL_PATH) ?: $u));
+        if ($vigente !== '' && $nombre($vigente) === $nombre($url)) {
+            Huella::emitido($this->pdo, 'equipo', $id, $esDict ? 'dictamen' : 'certificado', $usuario, $vigente);
+        }
+    }
+
+    private function generarPdfDesdeWordSinAnotar(int $id, string $tipo): array {
         // Si hay un PDF reemplazado manualmente, ese manda
         $manual = $this->pdfManual($id, $tipo === 'dict' ? 'dict' : 'cert');
         if ($manual !== '') {
@@ -304,7 +341,7 @@ class Certificaciones {
         try {
             $folio = $datos['control'] ?? $id;
 
-            $rutaCert   = $this->resolverPdfEnvio('certificado', $id, $datos);
+            $rutaCert   = $this->resolverPdfEnvio('certificado', $id, $datos, $usuario);
             $nombreCert = basename($rutaCert);
             $urlCert    = UPLOAD_URL . 'certificados/' . $nombreCert;
 
@@ -314,6 +351,7 @@ class Certificaciones {
             }
 
             $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'certificado', [$rutaCert => $nombreCert], $credenciales);
+            if (class_exists('Huella')) Huella::enviado($this->pdo, 'equipo', $id, 'certificado', $usuario, $correo);
 
             $this->pdo->prepare(
                 "UPDATE equipos SET certificado_url = ?, estado = 'ENVIADO', publicado = 1, fecha_enviado = NOW() WHERE id = ?"
@@ -343,11 +381,11 @@ class Certificaciones {
         try {
             $folio = $datos['control'] ?? $id;
 
-            $rutaCert   = $this->resolverPdfEnvio('certificado', $id, $datos);
+            $rutaCert   = $this->resolverPdfEnvio('certificado', $id, $datos, $usuario);
             $nombreCert = basename($rutaCert);
             $urlCert    = UPLOAD_URL . 'certificados/' . $nombreCert;
 
-            $rutaDict   = $this->resolverPdfEnvio('dictamen', $id, $datos);
+            $rutaDict   = $this->resolverPdfEnvio('dictamen', $id, $datos, $usuario);
             $nombreDict = basename($rutaDict);
             $urlDict    = UPLOAD_URL . 'certificados/' . $nombreDict;
 
@@ -360,6 +398,10 @@ class Certificaciones {
                 $rutaCert => $nombreCert,
                 $rutaDict => $nombreDict,
             ], $credenciales);
+            if (class_exists('Huella')) {
+                Huella::enviado($this->pdo, 'equipo', $id, 'certificado', $usuario, $correo);
+                Huella::enviado($this->pdo, 'equipo', $id, 'dictamen', $usuario, $correo);
+            }
 
             $this->pdo->prepare(
                 "UPDATE equipos
@@ -391,7 +433,7 @@ class Certificaciones {
         try {
             $folio = $datos['control'] ?? $id;
 
-            $rutaDict   = $this->resolverPdfEnvio('dictamen', $id, $datos);
+            $rutaDict   = $this->resolverPdfEnvio('dictamen', $id, $datos, $usuario);
             $nombreDict = basename($rutaDict);
             $urlDict    = UPLOAD_URL . 'certificados/' . $nombreDict;
 
@@ -401,6 +443,7 @@ class Certificaciones {
             }
 
             $this->enviarCorreo($correo, $datos['cliente'], formatoFolio((string)$folio), 'dictamen', [$rutaDict => $nombreDict], $credenciales);
+            if (class_exists('Huella')) Huella::enviado($this->pdo, 'equipo', $id, 'dictamen', $usuario, $correo);
 
             $this->pdo->prepare(
                 "UPDATE equipos SET dictamen_url = ?, estado = 'ENVIADO', publicado = 1, fecha_enviado = NOW() WHERE id = ?"
@@ -438,7 +481,7 @@ class Certificaciones {
 
         if ($tipo === 'cert' || $tipo === 'todo') {
             try {
-                $ruta = $this->resolverPdfEnvio('certificado', $id, $datos);
+                $ruta = $this->resolverPdfEnvio('certificado', $id, $datos, $usuario);
                 $sets[]   = 'certificado_url = ?';
                 $params[] = UPLOAD_URL . 'certificados/' . basename($ruta);
                 $hechos[] = 'certificado';
@@ -449,7 +492,7 @@ class Certificaciones {
         }
         if ($tipo === 'dict' || $tipo === 'todo') {
             try {
-                $ruta = $this->resolverPdfEnvio('dictamen', $id, $datos);
+                $ruta = $this->resolverPdfEnvio('dictamen', $id, $datos, $usuario);
                 $sets[]   = 'dictamen_url = ?';
                 $params[] = UPLOAD_URL . 'certificados/' . basename($ruta);
                 $hechos[] = 'dictamen';
@@ -2808,12 +2851,20 @@ SVG;
      * $tipo acepta 'certificado'|'cert' para certificado, 'dictamen'|'dict' para dictamen.
      * Devuelve la ruta local al PDF generado.
      */
-    private function resolverPdfEnvio(string $tipo, int $id, array $datos): string {
+    private function resolverPdfEnvio(string $tipo, int $id, array $datos, string $usuario = ''): string {
         $esDict = in_array($tipo, ['dict', 'dictamen'], true);
+        $doc    = $esDict ? 'dictamen' : 'certificado';
 
         // Si hay un PDF reemplazado manualmente, adjuntar ese en lugar de regenerar
         $manual = $this->pdfManual($id, $esDict ? 'dict' : 'cert');
-        if ($manual !== '') return $manual;
+        if ($manual !== '') {
+            // Se anotó al subirlo; sólo si es de antes del control se anota ahora.
+            if (class_exists('Huella')) {
+                Huella::emitido($this->pdo, 'equipo', $id, $doc, $usuario,
+                    UPLOAD_URL . 'certificados/' . basename($manual), 'manual', true);
+            }
+            return $manual;
+        }
 
         $tipoTemplate = $esDict ? 'dict'      : 'certificado';
         $tipoHtml     = $esDict ? 'dictamen'  : 'certificado';
@@ -2822,9 +2873,15 @@ SVG;
         $resultado = $this->generarPdfDesdeTemplatePdf($id, $tipoTemplate);
         if ($resultado['status'] === 'success') {
             $folio = $datos['control'] ?? (string)$id;
-            return UPLOAD_DIR . 'certificados/' . $sufijo . '_PDF_' . $folio . '.pdf';
+            $ruta  = UPLOAD_DIR . 'certificados/' . $sufijo . '_PDF_' . $folio . '.pdf';
+        } else {
+            $ruta = $this->resolverPdf($tipoHtml, $datos);
         }
-        return $this->resolverPdf($tipoHtml, $datos);
+        // Con qué datos salió: este PDF es el que queda en el portal y el que se adjunta.
+        if (class_exists('Huella')) {
+            Huella::emitido($this->pdo, 'equipo', $id, $doc, $usuario, UPLOAD_URL . 'certificados/' . basename($ruta));
+        }
+        return $ruta;
     }
 
     /**
