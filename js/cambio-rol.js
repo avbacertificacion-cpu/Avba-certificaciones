@@ -100,7 +100,7 @@
       // Con una ventana abierta se esconde: en teléfono quedaba encima de los
       // últimos botones del modal —tapaba la mitad de "Retornar a calidad"— y
       // ahí no sirve, porque cambiar de módulo cerraría lo que se está viendo.
-      'body:has(.overlay.open) #avba-cambio-rol{display:none}';
+      'html.avba-ventana-abierta #avba-cambio-rol{display:none}';
 
     document.head.appendChild(css);
     document.body.appendChild(caja);

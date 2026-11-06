@@ -259,9 +259,67 @@
      Aquí también vivía -webkit-overflow-scrolling: touch. Desde iOS 13 el
      deslizamiento con inercia es el comportamiento normal y la propiedad ya
      no hace falta; lo único que aportaba era una capa de scroll aparte, que
-     es justo la que se desacomoda con esos toques. */
-  html:has(.overlay.open),
-  body:has(.overlay.open) {
-    overflow: hidden;
+     es justo la que se desacomoda con esos toques.
+
+     El bloqueo ahora lo pone js/movil.js con la clase avba-ventana-abierta
+     (sección 8), en todos los tamaños y para todas las ventanas, no sólo
+     las que llevan la clase .overlay. */
+}
+
+
+/* ── 8. Cualquier ventana abierta, en cualquier pantalla ───────────────
+   js/movil.js marca <html> con avba-ventana-abierta mientras haya una
+   ventana emergente a la vista, la abra quien la abra: con la clase .open,
+   con display por estilo o creada al vuelo. Antes el bloqueo sólo
+   reconocía .overlay.open, así que el portal del cliente, el inspector y
+   todas las pantallas en computadora dejaban moverse la página de atrás.
+
+   En computadora, scrollbar-gutter guarda el lugar de la barra: sin él, al
+   esconderla la página brincaba unos pixeles a la derecha cada vez que se
+   abre una ventana. */
+html { scrollbar-gutter: stable; }
+html.avba-ventana-abierta,
+html.avba-ventana-abierta body { overflow: hidden !important; }
+html.avba-ventana-abierta #avba-cambio-rol,
+html.avba-ventana-abierta .avba-ir-menu { display: none !important; }
+
+/* Botón de cerrar: 44 px para el dedo sin cambiar cómo se ve. Los de las
+   ventanas medían de 12 a 35 px y había que atinarles. js/movil.js los
+   marca y calcula cuánto agrandar cada uno. */
+@media (max-width: 1024px), (pointer: coarse) {
+  .avba-cerrar-rel { position: relative; }
+  .avba-cerrar::after {
+    content: '';
+    position: absolute;
+    inset: calc(var(--avba-cerrar-extra, 8px) * -1);
   }
+}
+
+/* Botones secundarios dentro de las ventanas ("Seleccionar todo",
+   "Ninguno", "Agregar hallazgo") medían 29 px: se tocaba el de al lado. */
+@media (max-width: 1024px), (pointer: coarse) {
+  /* :where() deja la regla sin peso: si la pantalla ya pidió más —las
+     acciones de la ficha van a 44 px—, gana la pantalla. */
+  :where(.overlay .modal) button:where(:not(.avba-cerrar):not(.modal-close)) { min-height: 36px; }
+}
+
+/* En computadora, la ficha con encabezado, cuerpo y pie: una sola zona que
+   se desliza —el cuerpo— y el pie con los botones siempre a la vista.
+   Antes el cuerpo se topaba en 55vh y, si la ficha medía más que la
+   pantalla, también se deslizaba el fondo oscuro: dos barras, y los botones
+   de acción podían quedar abajo de la pantalla. En teléfono no se toca: ahí
+   el pie es demasiado alto para dejarlo fijo (sección 7). */
+@media (min-width: 1025px) {
+  .overlay > .modal:has(> .modal-body) {
+    max-height: calc(100vh - 64px);   /* el overlay deja hasta 24 px arriba y abajo */
+    display: flex;
+    flex-direction: column;
+  }
+  .overlay > .modal:has(> .modal-body) > .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow-y: auto;
+  }
+  .overlay > .modal:has(> .modal-body) > :not(.modal-body) { flex-shrink: 0; }
 }

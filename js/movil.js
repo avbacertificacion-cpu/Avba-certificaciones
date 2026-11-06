@@ -176,11 +176,87 @@
     overlays.forEach(o => obs.observe(o, { attributes: true, attributeFilter: ['class'] }));
   }
 
+  /* ── 6. Ventanas emergentes: saber cuándo hay una abierta ──
+     Cada pantalla abre sus ventanas a su manera —clase .open, display por
+     estilo, elementos creados al vuelo— y por eso el bloqueo de la página de
+     atrás sólo funcionaba con algunas. Aquí se mira lo que de verdad se ve:
+     un elemento fijo que cubre casi toda la pantalla y que por nombre es una
+     ventana. Mientras haya uno, <html> lleva avba-ventana-abierta
+     (css/movil.css, sección 8). */
+  const NOMBRE_VENTANA = /overlay|modal|backdrop|^ov-/i;
+  const tacto = () => window.matchMedia('(max-width: 1024px), (pointer: coarse)').matches;
+
+  function ventanasAbiertas() {
+    const out = [];
+    document.querySelectorAll('[id*="overlay"],[id*="modal"],[id^="ov-"],[class*="overlay"],[class*="modal"]').forEach(e => {
+      if (e.id && e.id.startsWith('avba-')) return;
+      const nombre = (e.id || '') + ' ' + (typeof e.className === 'string' ? e.className : '');
+      if (!NOMBRE_VENTANA.test(nombre)) return;
+      const s = getComputedStyle(e);
+      // pointer-events: none es como Admin, Administrativo y Presupuestos
+      // dan por cerrada una ventana: la dejan en display:flex y la apagan
+      // con opacidad, que se desvanece en .2 s. Mirando sólo la opacidad,
+      // al cerrar todavía se veía "abierta" y la página se quedaba trabada.
+      // La opacidad no se mira: al abrir con transición arranca en 0 y la
+      // ventana ya está ahí; una invisible que sí recibe toques sería otro
+      // defecto, no una ventana cerrada.
+      if (s.position !== 'fixed' || s.display === 'none' || s.visibility === 'hidden'
+          || s.pointerEvents === 'none') return;
+      const r = e.getBoundingClientRect();
+      if (r.width < window.innerWidth * 0.85 || r.height < window.innerHeight * 0.85) return;
+      out.push(e);
+    });
+    return out;
+  }
+
+  /* El botón de cerrar de cada ventana, agrandado para el dedo. Se busca
+     por lo que es —una ×— y no por una clase, porque cada pantalla le puso
+     la suya o ninguna. */
+  function agrandarCerrar(ventana) {
+    if (!tacto()) return;
+    ventana.querySelectorAll('button, span[onclick], a[onclick], div[onclick]').forEach(b => {
+      if (b.classList.contains('avba-cerrar')) return;
+      const t = (b.textContent || '').trim();
+      const nombre = (b.className && typeof b.className === 'string' ? b.className : '') + ' ' + (b.id || '');
+      if (!/^(×|✕|✖|x)$/i.test(t) && !/(^|[-_ ])(close|cerrar)([-_ ]|$)/i.test(nombre)) return;
+      const r = b.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const extra = Math.max(4, Math.ceil((44 - Math.min(r.width, r.height)) / 2));
+      b.style.setProperty('--avba-cerrar-extra', extra + 'px');
+      b.classList.add('avba-cerrar');
+      if (getComputedStyle(b).position === 'static') b.classList.add('avba-cerrar-rel');
+    });
+  }
+
+  function vigilarVentanas() {
+    let pendiente = false;
+    const revisar = () => {
+      if (pendiente) return;
+      pendiente = true;
+      requestAnimationFrame(() => {
+        pendiente = false;
+        const abiertas = ventanasAbiertas();
+        document.documentElement.classList.toggle('avba-ventana-abierta', abiertas.length > 0);
+        abiertas.forEach(agrandarCerrar);
+      });
+    };
+    new MutationObserver(revisar).observe(document.body, {
+      subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'],
+    });
+    window.addEventListener('resize', revisar, { passive: true });
+    // Las que se abren o cierran con una transición terminan de cambiar sin
+    // tocar ningún atributo: se vuelve a mirar cuando acaba.
+    document.addEventListener('transitionend', revisar, true);
+    document.addEventListener('animationend', revisar, true);
+    revisar();
+  }
+
   function arrancar() {
     prepararBarras();
     envolver();
     botonMenu();
     atajoAcciones();
+    vigilarVentanas();
     document.querySelectorAll(BARRAS).forEach(centrarActiva);
     // Barras que se agregan después al documento. Sólo se buscan las nuevas,
     // sin medir nada: esto corre seguido mientras se mueve un mapa.
