@@ -391,9 +391,10 @@ class Inspecciones {
             $fotos     = $payload['fotos']     ?? [];
 
             // Campos requeridos — todo en mayúsculas antes de guardar
-            $cliente    = strtoupper(trim($info['cliente']    ?? ''));
-            $serie      = strtoupper(trim($info['serie']      ?? ''));
-            $maquinaria = strtoupper(trim($info['maquinaria'] ?? ''));
+            // mayusculas(): strtoupper() dejaba en minúscula acentos y eñes.
+            $cliente    = mayusculas($info['cliente']    ?? '');
+            $serie      = mayusculas($info['serie']      ?? '');
+            $maquinaria = mayusculas($info['maquinaria'] ?? '');
 
             if (!$cliente || !$serie || !$maquinaria) {
                 return ['status' => 'error', 'message' => 'cliente, serie y maquinaria son requeridos.'];
@@ -443,10 +444,10 @@ class Inspecciones {
             if (!empty($payload['horquillas'])) {
                 $h = $payload['horquillas'];
                 $horquillasJson = json_encode([
-                    'marca'          => strtoupper(trim($h['marca']          ?? '')),
-                    'serie'          => strtoupper(trim($h['serie']          ?? '')),
-                    'capacidad'      => strtoupper(trim($h['capacidad']      ?? '')),
-                    'centro_gravedad' => strtoupper(trim($h['centro_gravedad'] ?? '')),
+                    'marca'          => mayusculas($h['marca']          ?? ''),
+                    'serie'          => mayusculas($h['serie']          ?? ''),
+                    'capacidad'      => mayusculas($h['capacidad']      ?? ''),
+                    'centro_gravedad' => mayusculas($h['centro_gravedad'] ?? ''),
                 ], JSON_UNESCAPED_UNICODE);
             }
 
@@ -458,15 +459,17 @@ class Inspecciones {
                   horquillas)
                  VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?, ?, ?)"
             );
-            $u = fn($v) => $v !== null && $v !== '' ? strtoupper(trim($v)) : null;
+            $u = fn($v) => $v !== null && $v !== '' ? mayusculas($v) : null;
 
             $coordsInsp = trim($info['coords_insp']  ?? '');
             $coordsEnv  = trim($info['coords_envio'] ?? '');
 
             // Si el inspector seleccionó del buscador, usar ese texto directamente.
             // Solo reverse-geocodificar cuando el pin fue arrastrado sin buscar.
-            $dirInspManual = strtoupper(trim($info['dir_insp_manual']  ?? ''));
-            $dirEnvManual  = strtoupper(trim($info['dir_envio_manual'] ?? ''));
+            // Con el formato de los documentos: mayúsculas con acentos, sin la
+            // "Región …" del mapa y el código postal como "C.P. 45659".
+            $dirInspManual = formatoDireccion($info['dir_insp_manual']  ?? '');
+            $dirEnvManual  = formatoDireccion($info['dir_envio_manual'] ?? '');
 
             $dirInsp = $dirInspManual ?: ($this->geocodificarCoordenadas($coordsInsp) ?: null);
             $dirEnv  = $dirEnvManual  ?: ($this->geocodificarCoordenadas($coordsEnv)  ?: null);
@@ -663,9 +666,9 @@ class Inspecciones {
         $json = @file_get_contents($url, false, $ctx);
         if ($json) {
             $data = json_decode($json, true);
-            if (!empty($data['display_name'])) return strtoupper($data['display_name']);
+            if (!empty($data['display_name'])) return formatoDireccion($data['display_name']);
         }
-        return strtoupper("{$lat}, {$lng}");
+        return "{$lat}, {$lng}";
     }
 
     // Normaliza lista de correos separados por coma: minúsculas, sin espacios, válidos

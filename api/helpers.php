@@ -226,6 +226,79 @@ foreach ([
 }
 
 /**
+ * Mayúsculas que respetan acentos y eñes.
+ *
+ * strtoupper() trabaja byte por byte: convierte la "a" pero deja la "á" y la
+ * "ñ" en minúscula. Así salían en los certificados direcciones como
+ * "TLAJOMULCO DE ZúñIGA, REGIóN CENTRO, MéXICO". Todo texto que se guarda en
+ * mayúsculas pasa por aquí.
+ */
+function mayusculas($v): string {
+    return mb_strtoupper(trim((string)($v ?? '')), 'UTF-8');
+}
+
+/**
+ * Repara un texto que ya pasó por strtoupper(): está todo en mayúsculas salvo
+ * letras acentuadas. Lo escrito a propósito con mayúsculas y minúsculas
+ * ("Av. Juárez") tiene minúsculas sin acento y no se toca.
+ */
+function repararMayusculas($v): string {
+    $s = (string)($v ?? '');
+    if ($s === '' || preg_match('/[a-z]/', $s) || !preg_match('/\p{Ll}/u', $s)) return $s;
+    return mb_strtoupper($s, 'UTF-8');
+}
+
+/**
+ * Una dirección como debe verse en los documentos:
+ *
+ *   "Circuito Logística Aeropuerto, El Refugio, Tlajomulco de Zúñiga,
+ *    Región Centro, Jalisco, 45659, México"
+ *   → "CIRCUITO LOGÍSTICA AEROPUERTO, EL REFUGIO, TLAJOMULCO DE ZÚÑIGA,
+ *      JALISCO, C.P. 45659, MÉXICO"
+ *
+ * Mayúsculas con acentos, partes separadas por ", ", sin la "Región …"
+ * administrativa que agrega el mapa (no es parte de ninguna dirección postal),
+ * con el código postal como "C.P. 45659" y sin partes repetidas.
+ */
+function formatoDireccion($v): string {
+    $s = preg_replace('/\s+/u', ' ', mayusculas($v)) ?? '';
+    if ($s === '') return '';
+    $partes = [];
+    foreach (preg_split('/\s*[,;]\s*/u', $s) ?: [] as $p) {
+        $p = trim($p);
+        if ($p === '') continue;
+        if (preg_match('/^REGI[OÓ]N\s/u', $p)) continue;
+        if (preg_match('/^(?:C\.?\s?P\.?:?\s*)?(\d{5})$/u', $p, $m)) $p = 'C.P. ' . $m[1];
+        else $p = preg_replace('/\bC\.?\s?P\.?:?\s*(\d{5})\b/u', 'C.P. $1', $p) ?? $p;
+        if ($partes && end($partes) === $p) continue;
+        $partes[] = $p;
+    }
+    return implode(', ', $partes);
+}
+
+/**
+ * La dirección para imprimirla: con su formato y con "C.P." pegado a su
+ * número (espacio que no se parte), para que el renglón no corte entre
+ * "C.P." y "45659". Sólo para documentos; lo que se guarda lleva espacio
+ * normal, para que las búsquedas lo encuentren.
+ */
+function direccionImprimible($v): string {
+    return str_replace('C.P. ', "C.P.\u{00A0}", formatoDireccion($v));
+}
+
+/**
+ * Número de acreditación ante la ema para los documentos.
+ *
+ * Sale de NO_ACREDITACION en config/config.php. Si el servidor no la trae
+ * —o la trae vacía— los certificados decían "acreditada por la ema bajo el
+ * número , conforme a…": se usa el número de AVBA en lugar de dejar el hueco.
+ */
+function numeroAcreditacion(): string {
+    $n = trim((string)(defined('NO_ACREDITACION') ? NO_ACREDITACION : ''));
+    return $n !== '' ? $n : 'UVNMX 057';
+}
+
+/**
  * ¿Existe esa columna? Se consulta una vez por columna y se recuerda.
  *
  * Sirve para armar consultas que deben seguir funcionando en una base donde la
@@ -248,7 +321,7 @@ function textoAnexoAcreditacion(): string {
 
     $tipo  = trim((string)(defined('ACREDITACION_TIPO')  ? ACREDITACION_TIPO  : ''));
     $norma = trim((string)(defined('ACREDITACION_NORMA') ? ACREDITACION_NORMA : ''));
-    $num   = trim((string)(defined('NO_ACREDITACION')    ? NO_ACREDITACION    : ''));
+    $num   = numeroAcreditacion();
     $ref   = trim((string)(defined('ACREDITACION_REF')   ? ACREDITACION_REF   : ''));
     $desde = trim((string)(defined('ACREDITACION_VIGENTE') ? ACREDITACION_VIGENTE : ''));
 

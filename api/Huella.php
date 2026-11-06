@@ -30,7 +30,7 @@
 class Huella {
 
     /** Sube cuando cambia lo que se compara, para no confiar en huellas viejas. */
-    private const VERSION = 1;
+    private const VERSION = 2;   // 2: mayúsculas y formato de dirección no cuentan
 
     /**
      * Lo que imprime cada documento. 'campos' => '*' es el registro completo.
@@ -499,7 +499,7 @@ class Huella {
         foreach (array_keys($ca + $cb) as $k) {
             $va = (string)($ca[$k] ?? '');
             $vb = (string)($cb[$k] ?? '');
-            if ($va !== $vb) $out[] = self::renglon($k, $va, $vb);
+            if (self::canon($k, $va) !== self::canon($k, $vb)) $out[] = self::renglon($k, $va, $vb);
         }
 
         $la = $antes['listas'] ?? [];
@@ -526,7 +526,7 @@ class Huella {
                     if (str_starts_with((string)$c, '_')) continue;
                     $va = (string)($item[$c] ?? '');
                     $vb = (string)($ib[$k][$c] ?? '');
-                    if ($va !== $vb) $partes[] = self::renglon((string)$c, $va, $vb);
+                    if (self::canon((string)$c, $va) !== self::canon((string)$c, $vb)) $partes[] = self::renglon((string)$c, $va, $vb);
                 }
                 if (!$partes) continue;
                 $titulo = $nombre === 'Pieza'
@@ -677,6 +677,10 @@ class Huella {
                 if ($pa !== null && $f['gen_huella'] !== $hActual) {
                     $gen = $necesita ? (json_decode((string)($f['gen_resumen'] ?? ''), true) ?: null) : null;
                     $cambios = $gen ? self::diferencias(self::proyectar($gen, $spec), $pa) : [];
+                    // Sólo cambió la forma (mayúsculas, formato de la dirección) o
+                    // la huella es de una versión anterior: se pone al día para no
+                    // volver a abrir el resumen la próxima vez.
+                    if ($gen && !$cambios && $hActual !== null) self::sanar($pdo, (int)$f['id'], 'gen_huella', $hActual);
                 }
                 if ($necesita && !empty($f['gen_resumen'])) $gens[$tipo] = json_decode((string)$f['gen_resumen'], true) ?: null;
                 $d['emitido'] = [
@@ -694,6 +698,7 @@ class Huella {
                 if ($pa !== null && $f['env_huella'] !== $hActual) {
                     $env = $necesita ? (json_decode((string)($f['env_resumen'] ?? ''), true) ?: null) : null;
                     $cambios = $env ? self::diferencias(self::proyectar($env, $spec), $pa) : [];
+                    if ($env && !$cambios && $hActual !== null) self::sanar($pdo, (int)$f['id'], 'env_huella', $hActual);
                 }
                 $d['enviado'] = [
                     'at'      => self::fechaHora($f['env_at']),
@@ -1101,9 +1106,43 @@ class Huella {
         return array_map([self::class, 'ordenar'], $v);
     }
 
-    /** Huella de un resumen; lo que empieza con _ es sólo para leer y no cuenta. */
+    /**
+     * Huella de un resumen; lo que empieza con _ es sólo para leer y no cuenta,
+     * y los textos van en su forma canónica (ver canon()).
+     */
     public static function hash(array $r): string {
-        return hash('sha256', self::VERSION . '|' . json_encode(self::sinEtiquetas(self::ordenar($r)), JSON_UNESCAPED_UNICODE));
+        return hash('sha256', self::VERSION . '|' . json_encode(self::canonizar(self::sinEtiquetas(self::ordenar($r))), JSON_UNESCAPED_UNICODE));
+    }
+
+    /**
+     * Cómo se compara un dato: en mayúsculas, y la dirección con su formato.
+     * "Tlajomulco de Zúñiga" y "TLAJOMULCO DE ZúñIGA" dicen lo mismo; corregir
+     * las mayúsculas o el formato de una dirección no cambia lo que el
+     * documento afirma y no debe pedir que se reemita.
+     */
+    private static function canon(string $campo, string $v): string {
+        if (str_starts_with($v, '#')) return $v;
+        if (($campo === 'Domicilio' || $campo === 'Dirección') && function_exists('formatoDireccion')) return formatoDireccion($v);
+        return mb_strtoupper($v, 'UTF-8');
+    }
+
+    private static function canonizar(array $r): array {
+        foreach ($r['campos'] ?? [] as $k => $v) $r['campos'][$k] = self::canon((string)$k, (string)$v);
+        foreach ($r['listas'] ?? [] as $n => $items) {
+            foreach ($items as $clave => $item) {
+                if (!is_array($item)) continue;
+                foreach ($item as $c => $v) {
+                    if (is_string($v)) $r['listas'][$n][$clave][$c] = self::canon((string)$c, $v);
+                }
+            }
+        }
+        return $r;
+    }
+
+    private static function sanar(PDO $pdo, int $id, string $col, string $hash): void {
+        if (!in_array($col, ['gen_huella', 'env_huella'], true)) return;
+        try { $pdo->prepare("UPDATE documentos_huella SET $col = ? WHERE id = ?")->execute([$hash, $id]); }
+        catch (\Throwable $e) { /* se intentará la próxima vez */ }
     }
 
     private static function sinEtiquetas($v) {

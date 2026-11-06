@@ -540,7 +540,8 @@ class Personal {
             $fotoPersonaUrl = $r['url'];
         }
 
-        $u = fn($v) => strtoupper(trim($v ?? '')) ?: null;
+        // mayusculas(): strtoupper() dejaba en minúscula acentos y eñes.
+        $u = fn($v) => mayusculas($v) ?: null;
 
         $campos = [
             'nombre_completo'       => $u($payload['nombre_completo']    ?? ''),
@@ -553,7 +554,7 @@ class Personal {
             'correo'                => strtolower(trim($payload['correo'] ?? '')) ?: null,
             'empresa_nombre'        => $u($payload['empresa_nombre']        ?? ''),
             'empresa_rfc'           => strtoupper(trim($payload['empresa_rfc'] ?? '')) ?: null,
-            'empresa_direccion'     => $u($payload['empresa_direccion']     ?? ''),
+            'empresa_direccion'     => formatoDireccion($payload['empresa_direccion'] ?? '') ?: null,
             'empresa_representante' => $u($payload['empresa_representante'] ?? ''),
             'curso_id'              => $cursoId,
             'fecha_curso'           => $fechaCurso,
@@ -1006,7 +1007,7 @@ class Personal {
                 }
                 if (array_key_exists('empresa_direccion', $payload)) {
                     $cSets[]   = 'direccion = ?';
-                    $cParams[] = $payload['empresa_direccion'] === '' ? null : trim($payload['empresa_direccion']);
+                    $cParams[] = $payload['empresa_direccion'] === '' ? null : formatoDireccion($payload['empresa_direccion']);
                 }
                 if (array_key_exists('empresa_rep_trabajadores', $payload)) {
                     $cSets[]   = 'representante_trabajadores = ?';
@@ -1508,13 +1509,13 @@ class Personal {
         } catch (\Throwable $e) {}
 
         $id      = (int)($payload['id'] ?? 0);
-        $nombre  = strtoupper(trim($payload['nombre_cliente'] ?? ''));
+        $nombre  = mayusculas($payload['nombre_cliente'] ?? '');
         if (!$nombre) return ['status' => 'error', 'message' => 'El nombre de la empresa es obligatorio.'];
 
         $rfc     = strtoupper(preg_replace('/[^A-Z0-9&Ñ]/iu', '', $payload['rfc'] ?? '')) ?: null;
-        $rep     = strtoupper(trim($payload['representante'] ?? '')) ?: null;
-        $repTrab = strtoupper(trim($payload['representante_trabajadores'] ?? '')) ?: null;
-        $dir     = strtoupper(trim($payload['direccion'] ?? '')) ?: null;
+        $rep     = mayusculas($payload['representante'] ?? '') ?: null;
+        $repTrab = mayusculas($payload['representante_trabajadores'] ?? '') ?: null;
+        $dir     = formatoDireccion($payload['direccion'] ?? '') ?: null;
         $correo  = strtolower(trim($payload['correo_contacto'] ?? '')) ?: null;
 
         $logo = null;
@@ -1532,8 +1533,8 @@ class Personal {
             // dejaría el nombre viejo copiado en los registros ya existentes.
             // Si hay registros vinculados se exige usar el renombrado, que
             // propaga el cambio a todos los módulos.
-            if ($exRow && strtoupper(trim((string)$exRow['nombre_cliente'])) !== $nombre) {
-                $anterior = strtoupper(trim((string)$exRow['nombre_cliente']));
+            if ($exRow && mayusculas($exRow['nombre_cliente']) !== $nombre) {
+                $anterior = mayusculas($exRow['nombre_cliente']);
                 foreach ($this->refsEmpresaExistentes() as [$tabla, $col, $etiqueta]) {
                     try {
                         $s = $this->pdo->prepare("SELECT COUNT(*) FROM `$tabla` WHERE UPPER(TRIM(`$col`)) = ?");
@@ -1601,7 +1602,7 @@ class Personal {
         $row = $chk->fetch();
         if (!$row) return ['status' => 'error', 'message' => 'Empresa no encontrada.'];
 
-        $nombre = strtoupper(trim((string)$row['nombre_cliente']));
+        $nombre = mayusculas($row['nombre_cliente']);
         foreach ($this->refsEmpresaExistentes() as [$tabla, $col, $etiqueta]) {
             try {
                 $s = $this->pdo->prepare("SELECT COUNT(*) FROM `$tabla` WHERE UPPER(TRIM(`$col`)) = ?");
@@ -1659,7 +1660,7 @@ class Personal {
      */
     public function renombrarEmpresa(array $payload): array {
         $id      = (int)($payload['id'] ?? 0);
-        $nuevo   = strtoupper(trim((string)($payload['nombre_nuevo'] ?? '')));
+        $nuevo   = mayusculas($payload['nombre_nuevo'] ?? '');
         $aplicar = !empty($payload['aplicar']);
 
         if (!$id)             return ['status' => 'error', 'message' => 'Empresa no válida.'];
@@ -1673,7 +1674,7 @@ class Personal {
         if (!$emp) return ['status' => 'error', 'message' => 'Empresa no encontrada.'];
 
         $actual  = (string)$emp['nombre_cliente'];
-        $anterior = strtoupper(trim($actual));
+        $anterior = mayusculas($actual);
         if ($anterior === $nuevo)
             return ['status' => 'error', 'message' => 'El nombre nuevo es igual al actual.'];
 
@@ -2081,7 +2082,7 @@ class Personal {
 
         $logoB64 = $this->assetB64('logos/avba.png');
         $logoImg = $logoB64 ? "<img src=\"{$logoB64}\" style=\"height:52px;width:auto;\">" : '<b>AVBA</b>';
-        $acred   = $esc(defined('NO_ACREDITACION') ? NO_ACREDITACION : 'UVNMX 057');
+        $acred   = $esc(numeroAcreditacion());
         $emitida = date('d/m/Y H:i');
         $quien   = $esc($usuario !== '' ? $usuario : '—');
         $total   = count($filas);
@@ -3772,7 +3773,7 @@ HTML;
             'UTF-8'
         ));
 
-        $noAcreditacion = defined('NO_ACREDITACION') ? NO_ACREDITACION : 'UVNMX 057';
+        $noAcreditacion = numeroAcreditacion();
 
         // Blank 1×1 GIF as QR placeholder (avoids broken-image icon)
         $qrPlaceholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';

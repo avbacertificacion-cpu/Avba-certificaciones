@@ -760,6 +760,14 @@ class Certificaciones {
         $datos = $stmt->fetch();
         if (!$datos) return null;
 
+        // Textos como deben imprimirse, aunque se hayan guardado antes de
+        // corregir las mayúsculas: "ZúñIGA" → "ZÚÑIGA", y la dirección con su
+        // formato ("…, JALISCO, C.P. 45659, MÉXICO").
+        foreach (['cliente','maquinaria','marca','modelo','serie','id_equipo','capacidad'] as $c) {
+            if (isset($datos[$c]) && is_string($datos[$c])) $datos[$c] = repararMayusculas($datos[$c]);
+        }
+        if (!empty($datos['direccion'])) $datos['direccion'] = direccionImprimible($datos['direccion']);
+
         // Formatear fecha
         if ($datos['fecha_inspeccion']) {
             $datos['fecha_fmt'] = (new DateTime($datos['fecha_inspeccion']))->format('d/m/Y');
@@ -2725,7 +2733,7 @@ SVG;
             } catch (\Exception $ex) {}
         }
 
-        $noAcreditacion = defined('NO_ACREDITACION') ? NO_ACREDITACION : 'UVNMX 057';
+        $noAcreditacion = numeroAcreditacion();
 
         // Mapa común + campos específicos por tipo
         $map = [
@@ -3343,7 +3351,7 @@ HTML;
         $this->pdo->prepare(
             "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo)
              VALUES (?, ?, 'CLIENTE', ?, ?, 1)"
-        )->execute([$usuario, $hash, strtoupper($clienteNombre), $idCliente ?: null]);
+        )->execute([$usuario, $hash, mayusculas($clienteNombre), $idCliente ?: null]);
 
         return ['usuario' => $usuario, 'password' => $password, 'es_nuevo' => true];
     }

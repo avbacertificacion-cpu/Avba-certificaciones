@@ -760,10 +760,10 @@ class Accesorios {
 
     // ── Crear sesión (cliente + ubicación + fecha) ─────────
     public function crearSesion(array $payload, string $usuario): array {
-        $cliente = strtoupper(trim($payload['cliente'] ?? ''));
+        $cliente = mayusculas($payload['cliente'] ?? '');
         $fecha   = trim($payload['fecha']   ?? '');  // DD/MM/YYYY
         $coords  = trim($payload['coordenadas'] ?? '');
-        $dir     = strtoupper(trim($payload['direccion'] ?? ''));
+        $dir     = formatoDireccion($payload['direccion'] ?? '');
 
         if (!$cliente) return ['status' => 'error', 'message' => 'El cliente es requerido.'];
         if (!$fecha)   return ['status' => 'error', 'message' => 'La fecha es requerida.'];
@@ -810,8 +810,8 @@ class Accesorios {
             ? $post['estado'] : 'CUMPLE';
 
         $qrCodigo = trim($post['qr_codigo'] ?? '');
-        $idAcc    = strtoupper(trim($post['id_accesorio'] ?? ''));
-        $serie    = strtoupper(trim($post['serie']        ?? ''));
+        $idAcc    = mayusculas($post['id_accesorio'] ?? '');
+        $serie    = mayusculas($post['serie']        ?? '');
 
         // Grilletes y demás tipos de código único: etiqueta, serie y QR son el
         // mismo dato, se capture por donde se capture.
@@ -842,11 +842,11 @@ class Accesorios {
             $sesionId,
             $idAcc,
             $tipoId,
-            strtoupper(trim($post['marca']    ?? '')),
-            strtoupper(trim($post['modelo']   ?? '')),
+            mayusculas($post['marca']    ?? ''),
+            mayusculas($post['modelo']   ?? ''),
             $serie,
-            strtoupper(trim($post['capacidad']?? '')),
-            strtoupper(trim($post['medidas']  ?? '')),
+            mayusculas($post['capacidad']?? ''),
+            mayusculas($post['medidas']  ?? ''),
             $estado,
             $orden,
             $qrCodigo ?: null,
@@ -952,7 +952,7 @@ class Accesorios {
         )->execute([
             $cliente, $fecha,
             trim((string)($p['coordenadas'] ?? '')),
-            mb_strtoupper(trim((string)($p['direccion'] ?? ''))),
+            formatoDireccion($p['direccion'] ?? ''),
             $id,
         ]);
         return ['status' => 'success'];
@@ -1123,6 +1123,11 @@ class Accesorios {
         $sesion = $chk->fetch();
         if (!$sesion) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
 
+        // Como debe imprimirse, aunque se haya guardado antes de corregir las
+        // mayúsculas con acento y el formato de la dirección.
+        $sesion['cliente'] = repararMayusculas($sesion['cliente'] ?? '');
+        if (!empty($sesion['direccion'])) $sesion['direccion'] = direccionImprimible($sesion['direccion']);
+
         // cert_url puede no existir todavía: nombrarla a secas rompería la
         // consulta y dejaría sin abrir el detalle de la sesión.
         $colCert = columnaExiste($this->pdo, 'accesorios_izaje', 'cert_url')
@@ -1170,12 +1175,12 @@ class Accesorios {
         $this->ensureAccIzajeQrColumn();
         $id        = (int)($payload['id']           ?? 0);
         $tipoId    = (int)($payload['tipo_id']       ?? 0) ?: null;
-        $idAcc     = strtoupper(trim($payload['id_accesorio']   ?? ''));
-        $marca     = strtoupper(trim($payload['marca']          ?? ''));
-        $modelo    = strtoupper(trim($payload['modelo']         ?? ''));
-        $serie     = strtoupper(trim($payload['serie']          ?? ''));
-        $capacidad = strtoupper(trim($payload['capacidad']      ?? ''));
-        $medidas   = strtoupper(trim($payload['medidas']        ?? ''));
+        $idAcc     = mayusculas($payload['id_accesorio']   ?? '');
+        $marca     = mayusculas($payload['marca']          ?? '');
+        $modelo    = mayusculas($payload['modelo']         ?? '');
+        $serie     = mayusculas($payload['serie']          ?? '');
+        $capacidad = mayusculas($payload['capacidad']      ?? '');
+        $medidas   = mayusculas($payload['medidas']        ?? '');
         $estado    = trim($payload['estado']         ?? '');
         $qrCodigo  = trim($payload['qr_codigo']      ?? '');
         $comps     = $this->normalizarComponentes($payload['componentes'] ?? '');
@@ -1331,7 +1336,7 @@ class Accesorios {
 
         $mapa = [
             'cliente'           => fn($v) => mb_strtoupper(trim((string)$v)) ?: null,
-            'direccion'         => fn($v) => mb_strtoupper(trim((string)$v)) ?: null,
+            'direccion'         => fn($v) => formatoDireccion($v) ?: null,
             'coordenadas'       => fn($v) => trim((string)$v) ?: null,
             'correo'            => fn($v) => trim((string)$v) ?: null,
             'inspector_firma'   => fn($v) => trim((string)$v) ?: null,
@@ -2554,7 +2559,7 @@ class Accesorios {
             if ($fv) { $fv->modify('+1 year'); $vigencia = $fv->format('d/m/Y'); }
         }
 
-        $noAcreditacion = defined('NO_ACREDITACION') ? NO_ACREDITACION : 'UVNMX 057';
+        $noAcreditacion = numeroAcreditacion();
         $e = fn($s) => htmlspecialchars((string)($s ?? ''), ENT_QUOTES, 'UTF-8');
 
         $map = [
@@ -2654,7 +2659,7 @@ class Accesorios {
             '{bloque_items}'     => $this->bloqueItems([], $a),
             '{fecha_inspeccion}' => $e($a['fecha_fmt'] ?? ''),
             '{vigencia}'         => $e($vigencia),
-            '{no_acreditacion}'  => $e(defined('NO_ACREDITACION') ? NO_ACREDITACION : 'UVNMX 057'),
+            '{no_acreditacion}'  => $e(numeroAcreditacion()),
             '{anexo_acreditacion}' => $e(textoAnexoAcreditacion()),
             '{anexo_clausula}'   => $e(textoAnexoClausula()),
             '{qr_imagen}'        => $qrB64 ?: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7',
@@ -3512,7 +3517,7 @@ class Accesorios {
             $logoTag = '<img src="data:image/png;base64,' . $b64 . '" style="height:56px;width:auto">';
         }
 
-        $noAcred    = defined('NO_ACREDITACION') ? $esc(NO_ACREDITACION) : '';
+        $noAcred    = $esc(numeroAcreditacion());
         $noAcredDiv = $noAcred ? '<div style="font-size:8pt;color:#185FA5;margin-top:2pt">Unidad de Inspecci&#243;n acreditada &middot; ' . $noAcred . '</div>' : '';
         $hoy        = $esc(date('d/m/Y'));
         $hoyHi      = $esc(date('d/m/Y H:i'));

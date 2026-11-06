@@ -489,7 +489,7 @@ class Arneses {
         ")->execute([
             mb_strtoupper($cliente), date('Y-m-d', strtotime(str_replace('/', '-', $fecha))),
             trim((string)($p['coordenadas'] ?? '')) ?: null,
-            trim((string)($p['direccion'] ?? '')) ?: null,
+            formatoDireccion($p['direccion'] ?? '') ?: null,
             trim((string)($p['correo'] ?? '')) ?: null,
             $usuario,
         ]);
@@ -894,6 +894,9 @@ class Arneses {
         $s->execute([$id]);
         $ses = $s->fetch(PDO::FETCH_ASSOC);
         if (!$ses) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
+        // Como debe imprimirse: mayúsculas con acento y la dirección con su formato.
+        $ses['cliente'] = repararMayusculas($ses['cliente'] ?? '');
+        if (!empty($ses['direccion'])) $ses['direccion'] = direccionImprimible($ses['direccion']);
 
         $it = $this->pdo->prepare("
             SELECT i.*, COALESCE(t.nombre,'') AS tipo_nombre,
@@ -1143,7 +1146,7 @@ class Arneses {
 
         $mapa = [
             'cliente'         => fn($v) => mb_strtoupper(trim((string)$v)) ?: null,
-            'direccion'       => fn($v) => trim((string)$v) ?: null,
+            'direccion'       => fn($v) => formatoDireccion($v) ?: null,
             'correo'          => fn($v) => trim((string)$v) ?: null,
             'inspector_firma' => fn($v) => trim((string)$v) ?: null,
             'inspector_usuario' => fn($v) => trim((string)$v) ?: null,
@@ -1263,7 +1266,7 @@ class Arneses {
             $mapa['{' . $clave . '}'] = $this->esc($valor === '' || $valor === null ? '—' : $valor);
         }
         $mapa['{folio}']           = $this->esc(formatoFolio((string)($campos['folio'] ?? '')));
-        $mapa['{no_acreditacion}'] = $this->esc(defined('NO_ACREDITACION') ? NO_ACREDITACION : '');
+        $mapa['{no_acreditacion}'] = $this->esc(numeroAcreditacion());
         $mapa['{anexo_acreditacion}'] = $this->esc(textoAnexoAcreditacion());
         $mapa['{anexo_clausula}'] = $this->esc(textoAnexoClausula());
 
@@ -1389,7 +1392,7 @@ class Arneses {
         $img   = $logo
             ? '<img src="' . $logo . '" style="height:34px">'
             : '<div class="hdr-t">AVBA Inspections</div>';
-        $acred = defined('NO_ACREDITACION') ? (string)NO_ACREDITACION : '';
+        $acred = numeroAcreditacion();
         $sub   = $subtitulo ?: 'Equipo de protección personal contra caídas';
 
         return '

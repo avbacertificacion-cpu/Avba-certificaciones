@@ -157,11 +157,19 @@ class Calidad {
         $sets    = [];
         $params  = [];
 
+        // Lo que sale en el certificado se guarda como en la captura del
+        // inspector: en mayúsculas (con acentos) y la dirección con su formato.
+        $mayus = ['cliente','maquinaria','marca','modelo','serie','capacidad','id_equipo'];
         foreach ($campos as $campo) {
             if (array_key_exists($campo, $payload)) {
+                $valor = $payload[$campo];
+                if (is_string($valor)) {
+                    if ($campo === 'direccion')            $valor = formatoDireccion($valor);
+                    elseif (in_array($campo, $mayus, true)) $valor = mayusculas($valor);
+                }
                 $sets[]  = "`{$campo}` = ?";
-                $params[] = $payload[$campo] === '' ? null : $payload[$campo];
-                registrarHistorial($this->pdo, $usuario, $id, $campo, $row[$campo] ?? null, $payload[$campo]);
+                $params[] = $valor === '' ? null : $valor;
+                registrarHistorial($this->pdo, $usuario, $id, $campo, $row[$campo] ?? null, $valor);
             }
         }
 
