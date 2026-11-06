@@ -30,7 +30,7 @@
 class Huella {
 
     /** Sube cuando cambia lo que se compara, para no confiar en huellas viejas. */
-    private const VERSION = 2;   // 2: mayúsculas y formato de dirección no cuentan
+    private const VERSION = 3;   // 3: texto estándar (mayúsculas, acentos, símbolos) no cuenta como cambio
 
     /**
      * Lo que imprime cada documento. 'campos' => '*' es el registro completo.
@@ -478,7 +478,7 @@ class Huella {
         $cuenta = [];
         foreach ($piezas as $p) {
             if (($p['Estado'] ?? '') !== 'CUMPLE') continue;
-            $t = mb_convert_case($p['Tipo'] ?? '', MB_CASE_TITLE, 'UTF-8') ?: 'Accesorio';
+            $t = (function_exists('textoEstandar') ? textoEstandar($p['Tipo'] ?? '') : mb_strtoupper($p['Tipo'] ?? '', 'UTF-8')) ?: 'ACCESORIO';
             $cuenta[$t] = ($cuenta[$t] ?? 0) + 1;
         }
         ksort($cuenta, SORT_STRING);
@@ -1115,15 +1115,15 @@ class Huella {
     }
 
     /**
-     * Cómo se compara un dato: en mayúsculas, y la dirección con su formato.
-     * "Tlajomulco de Zúñiga" y "TLAJOMULCO DE ZúñIGA" dicen lo mismo; corregir
-     * las mayúsculas o el formato de una dirección no cambia lo que el
-     * documento afirma y no debe pedir que se reemita.
+     * Cómo se compara un dato: en texto estándar (mayúsculas, sin acentos ni
+     * símbolos), y la dirección con su formato. "Tlajomulco de Zúñiga" y
+     * "TLAJOMULCO DE ZUÑIGA" dicen lo mismo: estandarizar el texto no cambia
+     * lo que el documento afirma y no debe pedir que se reemita.
      */
     private static function canon(string $campo, string $v): string {
         if (str_starts_with($v, '#')) return $v;
         if (($campo === 'Domicilio' || $campo === 'Dirección') && function_exists('formatoDireccion')) return formatoDireccion($v);
-        return mb_strtoupper($v, 'UTF-8');
+        return function_exists('textoEstandar') ? textoEstandar($v) : mb_strtoupper($v, 'UTF-8');
     }
 
     private static function canonizar(array $r): array {

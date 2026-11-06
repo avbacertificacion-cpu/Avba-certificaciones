@@ -57,7 +57,7 @@ class Pnd {
     // ── Registrar nueva inspección PND ─────────────────────
     public function nueva(array $payload, string $usuario): array {
         try {
-            $cliente = mayusculas($payload['cliente'] ?? 'CLIENTE');
+            $cliente = textoEstandar($payload['cliente'] ?? 'CLIENTE');
             $control = generarControl($this->pdo, $cliente);
             $fotos       = $payload['fotos'] ?? [];
             $evidenciaUrl = '';

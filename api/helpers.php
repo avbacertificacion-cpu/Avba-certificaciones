@@ -226,26 +226,58 @@ foreach ([
 }
 
 /**
- * Mayúsculas que respetan acentos y eñes.
+ * El texto como se guarda y se imprime en AVBA: en mayúsculas, sin acentos ni
+ * símbolos, para que no dé problemas en documentos, búsquedas ni en otros
+ * sistemas a los que llegue.
  *
- * strtoupper() trabaja byte por byte: convierte la "a" pero deja la "á" y la
- * "ñ" en minúscula. Así salían en los certificados direcciones como
- * "TLAJOMULCO DE ZúñIGA, REGIóN CENTRO, MéXICO". Todo texto que se guarda en
- * mayúsculas pasa por aquí.
+ *   "María José O'Neil"            → "MARIA JOSE ONEIL"
+ *   "Construcciones Peña & Hijos"  → "CONSTRUCCIONES PEÑA Y HIJOS"
+ *   "2\" x 6'"                     → "2 IN X 6 FT"
+ *   "1.45 TON (3,200 LB)"          → "1.45 TON 3,200 LB"
+ *
+ * Se quedan: letras A-Z, la Ñ, números, espacios y . , / - _ (los guiones y
+ * el punto están en series, modelos y capacidades; quitarlos cambiaría el
+ * dato). Las comillas de pulgada y pie después de un número pasan a IN y FT
+ * para no perder la medida; "&" pasa a "Y". Los saltos de renglón se
+ * conservan (la lista de componentes va uno por renglón).
+ *
+ * strtoupper() no sirve para esto: trabaja byte por byte y dejaba "ZúñIGA".
  */
-function mayusculas($v): string {
-    return mb_strtoupper(trim((string)($v ?? '')), 'UTF-8');
-}
-
-/**
- * Repara un texto que ya pasó por strtoupper(): está todo en mayúsculas salvo
- * letras acentuadas. Lo escrito a propósito con mayúsculas y minúsculas
- * ("Av. Juárez") tiene minúsculas sin acento y no se toca.
- */
-function repararMayusculas($v): string {
-    $s = (string)($v ?? '');
-    if ($s === '' || preg_match('/[a-z]/', $s) || !preg_match('/\p{Ll}/u', $s)) return $s;
-    return mb_strtoupper($s, 'UTF-8');
+function textoEstandar($v, bool $esDireccion = false): string {
+    $s = mb_strtoupper(trim((string)($v ?? '')), 'UTF-8');
+    if ($s === '') return '';
+    $s = str_replace(["\r\n", "\r"], "\n", $s);
+    // Cualquier guion tipográfico (–, —, ‑, −) es un guion normal.
+    $s = preg_replace('/[\x{2010}-\x{2015}\x{2212}]/u', '-', $s);
+    // Medidas: 2" → 2 IN, 6' → 6 FT (también con comillas tipográficas).
+    $s = preg_replace('/(\d)\s*(?:"|\'\'|\x{201D}|\x{2033})/u', '$1 IN', $s);
+    $s = preg_replace('/(\d)\s*(?:\'|\x{2019}|\x{2032})/u', '$1 FT', $s);
+    if ($esDireccion) {
+        // "N° 120", "#120" → "NO. 120"
+        $s = preg_replace('/\bN\s*[°º]\s*/u', 'NO. ', $s);
+        $s = preg_replace('/#\s*/u', 'NO. ', $s);
+    }
+    $s = str_replace('&', ' Y ', $s);
+    $s = str_replace('@', ' A ', $s);   // "5 TON @ 3 M" → "5 TON A 3 M"
+    // Acentos fuera; la Ñ se queda.
+    $s = strtr($s, [
+        'Á' => 'A', 'À' => 'A', 'Â' => 'A', 'Ä' => 'A', 'Ã' => 'A', 'Å' => 'A',
+        'É' => 'E', 'È' => 'E', 'Ê' => 'E', 'Ë' => 'E',
+        'Í' => 'I', 'Ì' => 'I', 'Î' => 'I', 'Ï' => 'I',
+        'Ó' => 'O', 'Ò' => 'O', 'Ô' => 'O', 'Ö' => 'O', 'Õ' => 'O',
+        'Ú' => 'U', 'Ù' => 'U', 'Û' => 'U', 'Ü' => 'U',
+        'Ç' => 'C', 'Ý' => 'Y',
+    ]);
+    // Comillas y apóstrofos se quitan sin dejar hueco (O'NEIL → ONEIL).
+    $s = preg_replace('/[\'"`´\x{2018}\x{2019}\x{201C}\x{201D}]/u', '', $s);
+    // Todo lo demás que no sea letra, número, Ñ, espacio o . , / - _ → espacio.
+    $s = preg_replace('/[^A-Z0-9Ñ .,\/\-_\n]/u', ' ', $s);
+    $s = preg_replace('/[ \t]+/', ' ', $s);
+    $s = preg_replace('/ *\n */', "\n", $s);
+    $s = preg_replace('/\n{2,}/', "\n", $s);
+    $s = preg_replace('/ +,/', ',', $s);
+    $s = preg_replace('/,{2,}/', ',', $s);
+    return trim($s, " \n");
 }
 
 /**
@@ -253,23 +285,23 @@ function repararMayusculas($v): string {
  *
  *   "Circuito Logística Aeropuerto, El Refugio, Tlajomulco de Zúñiga,
  *    Región Centro, Jalisco, 45659, México"
- *   → "CIRCUITO LOGÍSTICA AEROPUERTO, EL REFUGIO, TLAJOMULCO DE ZÚÑIGA,
- *      JALISCO, C.P. 45659, MÉXICO"
+ *   → "CIRCUITO LOGISTICA AEROPUERTO, EL REFUGIO, TLAJOMULCO DE ZUÑIGA,
+ *      JALISCO, C.P. 45659, MEXICO"
  *
- * Mayúsculas con acentos, partes separadas por ", ", sin la "Región …"
+ * El texto estándar, partes separadas por ", ", sin la "Región …"
  * administrativa que agrega el mapa (no es parte de ninguna dirección postal),
  * con el código postal como "C.P. 45659" y sin partes repetidas.
  */
 function formatoDireccion($v): string {
-    $s = preg_replace('/\s+/u', ' ', mayusculas($v)) ?? '';
+    $s = textoEstandar(str_replace([';', "\n"], ',', (string)($v ?? '')), true);
     if ($s === '') return '';
     $partes = [];
-    foreach (preg_split('/\s*[,;]\s*/u', $s) ?: [] as $p) {
+    foreach (preg_split('/\s*,\s*/', $s) ?: [] as $p) {
         $p = trim($p);
         if ($p === '') continue;
-        if (preg_match('/^REGI[OÓ]N\s/u', $p)) continue;
-        if (preg_match('/^(?:C\.?\s?P\.?:?\s*)?(\d{5})$/u', $p, $m)) $p = 'C.P. ' . $m[1];
-        else $p = preg_replace('/\bC\.?\s?P\.?:?\s*(\d{5})\b/u', 'C.P. $1', $p) ?? $p;
+        if (preg_match('/^REGION\s/', $p)) continue;
+        if (preg_match('/^(?:C\.?\s?P\.?\s*)?(\d{5})$/', $p, $m)) $p = 'C.P. ' . $m[1];
+        else $p = preg_replace('/\bC\.?\s?P\.?\s*(\d{5})\b/', 'C.P. $1', $p) ?? $p;
         if ($partes && end($partes) === $p) continue;
         $partes[] = $p;
     }
@@ -284,6 +316,103 @@ function formatoDireccion($v): string {
  */
 function direccionImprimible($v): string {
     return str_replace('C.P. ', "C.P.\u{00A0}", formatoDireccion($v));
+}
+
+/**
+ * Pasa UNA VEZ al texto estándar lo que ya estaba guardado: acentos en
+ * minúscula de strtoupper() ("ZúñIGA"), acentos y símbolos en general, y
+ * direcciones con el formato crudo del mapa.
+ *
+ * Se anota en avba_migraciones para no repetirse; si algo falla a medias se
+ * borra la anota y se reintenta en la siguiente petición (es idempotente:
+ * pasar dos veces un texto estándar no lo cambia). Cada división tiene su
+ * base, así que corre una vez en cada una.
+ *
+ * No toca catálogos (tipos de maquinaria, de accesorio, cursos: con esos
+ * nombres se buscan plantillas y checklists), ni correos, CURP, RFC, folios,
+ * códigos QR o claves de norma.
+ */
+function repararTextosGuardados(PDO $pdo): void {
+    $clave = 'texto_estandar_2026_11';
+    $fila  = null;
+    try {
+        $st = $pdo->prepare("SELECT aplicada_at, detalle, aplicada_at < (NOW() - INTERVAL 10 MINUTE) AS vieja
+                             FROM avba_migraciones WHERE clave = ?");
+        $st->execute([$clave]);
+        $fila = $st->fetch(PDO::FETCH_ASSOC) ?: null;
+    } catch (\Throwable $e) {
+        try {
+            $pdo->exec("CREATE TABLE IF NOT EXISTS avba_migraciones (
+                clave       VARCHAR(80) NOT NULL PRIMARY KEY,
+                aplicada_at DATETIME    NULL,
+                detalle     TEXT        NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (\Throwable $e2) { return; }
+    }
+    if ($fila && $fila['detalle'] !== null) return;          // ya se hizo
+    try {
+        if (!$fila) {
+            // Se aparta antes de empezar: dos peticiones a la vez no la corren dos veces.
+            $pdo->prepare("INSERT INTO avba_migraciones (clave, aplicada_at) VALUES (?, NOW())")->execute([$clave]);
+        } elseif ((int)$fila['vieja'] === 1) {
+            // Apartada hace más de 10 minutos y sin terminar: el servidor cortó
+            // aquella petición. Se retoma (lo ya convertido no vuelve a cambiar).
+            $up = $pdo->prepare("UPDATE avba_migraciones SET aplicada_at = NOW() WHERE clave = ? AND aplicada_at = ?");
+            $up->execute([$clave, $fila['aplicada_at']]);
+            if ($up->rowCount() !== 1) return;
+        } else {
+            return;                                             // otra petición la está haciendo
+        }
+    } catch (\Throwable $e) { return; }
+    @ignore_user_abort(true);
+
+    $D = 'dir'; $T = 'texto';
+    $tablas = [
+        'equipos'              => ['direccion' => $D, 'envio_direccion' => $D, 'cliente' => $T, 'marca' => $T,
+                                   'modelo' => $T, 'serie' => $T, 'id_equipo' => $T, 'capacidad' => $T],
+        'accesorios_sesiones'  => ['direccion' => $D, 'cliente' => $T],
+        'accesorios_izaje'     => ['id_accesorio' => $T, 'marca' => $T, 'modelo' => $T, 'serie' => $T,
+                                   'capacidad' => $T, 'medidas' => $T, 'componentes' => $T],
+        'arneses_sesiones'     => ['direccion' => $D, 'cliente' => $T],
+        'arneses_items'        => ['id_arnes' => $T, 'marca' => $T, 'modelo' => $T, 'serie' => $T,
+                                   'talla' => $T, 'longitud' => $T],
+        'participantes_cursos' => ['nombre_completo' => $T, 'puesto' => $T, 'capacidad' => $T,
+                                   'empresa_nombre' => $T, 'empresa_direccion' => $D,
+                                   'empresa_representante' => $T, 'empresa_rep_trabajadores' => $T],
+        'clientes'             => ['nombre_cliente' => $T, 'direccion' => $D, 'representante' => $T,
+                                   'representante_trabajadores' => $T],
+        'pnd_inspecciones'     => ['cliente' => $T],
+    ];
+    @set_time_limit(300);
+    $cambios = [];
+    try {
+        foreach ($tablas as $tabla => $cols) {
+            foreach ($cols as $col => $modo) {
+                if (!columnaExiste($pdo, $tabla, $col)) continue;
+                try {
+                    $rows = $pdo->query("SELECT id, `$col` AS v FROM `$tabla` WHERE `$col` IS NOT NULL AND `$col` <> ''")
+                                ->fetchAll(PDO::FETCH_ASSOC);
+                } catch (\Throwable $e) { continue; }
+                $up = $pdo->prepare("UPDATE `$tabla` SET `$col` = ? WHERE id = ?");
+                $n = 0;
+                foreach ($rows as $r) {
+                    $v     = (string)$r['v'];
+                    $nuevo = $modo === $D ? formatoDireccion($v) : textoEstandar($v);
+                    if ($nuevo === '' || $nuevo === $v) continue;
+                    // Un nombre de empresa que ya exista escrito en estándar
+                    // choca con la llave única: ése se queda como estaba.
+                    try { $up->execute([$nuevo, (int)$r['id']]); $n++; } catch (\Throwable $e) {}
+                }
+                if ($n) $cambios[] = "$tabla.$col: $n";
+            }
+        }
+        $pdo->prepare("UPDATE avba_migraciones SET detalle = ? WHERE clave = ?")
+            ->execute([mb_substr(implode('; ', $cambios) ?: 'sin cambios', 0, 60000), $clave]);
+        if ($cambios) error_log('[Texto estándar] ' . implode('; ', $cambios));
+    } catch (\Throwable $e) {
+        error_log('[Texto estándar] interrumpido: ' . $e->getMessage());
+        try { $pdo->prepare("DELETE FROM avba_migraciones WHERE clave = ?")->execute([$clave]); } catch (\Throwable $e2) {}
+    }
 }
 
 /**

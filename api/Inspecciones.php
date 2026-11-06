@@ -391,10 +391,12 @@ class Inspecciones {
             $fotos     = $payload['fotos']     ?? [];
 
             // Campos requeridos — todo en mayúsculas antes de guardar
-            // mayusculas(): strtoupper() dejaba en minúscula acentos y eñes.
-            $cliente    = mayusculas($info['cliente']    ?? '');
-            $serie      = mayusculas($info['serie']      ?? '');
-            $maquinaria = mayusculas($info['maquinaria'] ?? '');
+            // textoEstandar(): mayúsculas sin acentos ni símbolos (strtoupper()
+            // dejaba "ZúñIGA"). El tipo de maquinaria es el nombre del catálogo
+            // —con él se buscan plantilla, checklist y normas—: sólo mayúsculas.
+            $cliente    = textoEstandar($info['cliente']    ?? '');
+            $serie      = textoEstandar($info['serie']      ?? '');
+            $maquinaria = mb_strtoupper(trim($info['maquinaria'] ?? ''), 'UTF-8');
 
             if (!$cliente || !$serie || !$maquinaria) {
                 return ['status' => 'error', 'message' => 'cliente, serie y maquinaria son requeridos.'];
@@ -444,10 +446,10 @@ class Inspecciones {
             if (!empty($payload['horquillas'])) {
                 $h = $payload['horquillas'];
                 $horquillasJson = json_encode([
-                    'marca'          => mayusculas($h['marca']          ?? ''),
-                    'serie'          => mayusculas($h['serie']          ?? ''),
-                    'capacidad'      => mayusculas($h['capacidad']      ?? ''),
-                    'centro_gravedad' => mayusculas($h['centro_gravedad'] ?? ''),
+                    'marca'          => textoEstandar($h['marca']          ?? ''),
+                    'serie'          => textoEstandar($h['serie']          ?? ''),
+                    'capacidad'      => textoEstandar($h['capacidad']      ?? ''),
+                    'centro_gravedad' => textoEstandar($h['centro_gravedad'] ?? ''),
                 ], JSON_UNESCAPED_UNICODE);
             }
 
@@ -459,7 +461,7 @@ class Inspecciones {
                   horquillas)
                  VALUES (NOW(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PENDIENTE', ?, ?, ?, ?, ?)"
             );
-            $u = fn($v) => $v !== null && $v !== '' ? mayusculas($v) : null;
+            $u = fn($v) => $v !== null && $v !== '' ? textoEstandar($v) : null;
 
             $coordsInsp = trim($info['coords_insp']  ?? '');
             $coordsEnv  = trim($info['coords_envio'] ?? '');

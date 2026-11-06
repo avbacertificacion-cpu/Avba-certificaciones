@@ -154,6 +154,10 @@ $sesion   = resolverSesion($conexiones, $token);
 $division = $sesion['division'] ?? 'principal';
 $pdo      = $sesion['pdo'] ?? Database::getConnection();
 
+// Una sola vez por base: lo guardado pasa al texto estándar (mayúsculas, sin
+// acentos ni símbolos) y las direcciones a su formato. Ver helpers.php.
+repararTextosGuardados($pdo);
+
 // ── Módulos ───────────────────────────────────────────────
 $auth     = new Auth($pdo);
 $insp     = new Inspecciones($pdo);

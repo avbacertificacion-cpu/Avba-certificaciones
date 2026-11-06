@@ -740,7 +740,7 @@ class Certificaciones {
             'folio'      => $datos['control']     ? 'AB.' . $datos['control'] . '-' . date('Y') . 'MX' : '',
             'cliente'    => $datos['cliente']     ?? '',
             'domicilio'  => $datos['direccion']   ?? '',
-            'maquinaria' => $datos['maquinaria']  ?? '',
+            'maquinaria' => textoEstandar($datos['maquinaria'] ?? ''),
             'marca'      => $datos['marca']       ?? '',
             'modelo'     => $datos['modelo']      ?? '',
             'serie'      => $datos['serie']       ?? '',
@@ -760,11 +760,12 @@ class Certificaciones {
         $datos = $stmt->fetch();
         if (!$datos) return null;
 
-        // Textos como deben imprimirse, aunque se hayan guardado antes de
-        // corregir las mayúsculas: "ZúñIGA" → "ZÚÑIGA", y la dirección con su
-        // formato ("…, JALISCO, C.P. 45659, MÉXICO").
-        foreach (['cliente','maquinaria','marca','modelo','serie','id_equipo','capacidad'] as $c) {
-            if (isset($datos[$c]) && is_string($datos[$c])) $datos[$c] = repararMayusculas($datos[$c]);
+        // Textos como deben imprimirse, aunque se hayan guardado antes del
+        // texto estándar: "ZúñIGA" → "ZUÑIGA", y la dirección con su formato
+        // ("…, JALISCO, C.P. 45659, MEXICO"). La maquinaria no: con ese nombre
+        // se buscan plantilla, checklist y normas en el catálogo.
+        foreach (['cliente','marca','modelo','serie','id_equipo','capacidad'] as $c) {
+            if (isset($datos[$c]) && is_string($datos[$c])) $datos[$c] = textoEstandar($datos[$c]);
         }
         if (!empty($datos['direccion'])) $datos['direccion'] = direccionImprimible($datos['direccion']);
 
@@ -864,7 +865,7 @@ class Certificaciones {
             'folio'      => formatoFolio($datos['control']   ?? ''),
             'cliente'    => $datos['cliente']    ?? '',
             'domicilio'  => $datos['direccion']  ?? '',
-            'maquinaria' => $datos['maquinaria'] ?? '',
+            'maquinaria' => textoEstandar($datos['maquinaria'] ?? ''),
             'marca'      => $datos['marca']      ?? '',
             'modelo'     => $datos['modelo']     ?? '',
             'serie'      => $datos['serie']      ?? '',
@@ -1157,7 +1158,7 @@ class Certificaciones {
             '{folio}'             => $folio,
             '{cliente}'           => $e($d['cliente']    ?? ''),
             '{domicilio}'         => $e($d['direccion']  ?? ''),
-            '{tipo_maquinaria}'   => $e($d['maquinaria'] ?? ''),
+            '{tipo_maquinaria}'   => $e(textoEstandar($d['maquinaria'] ?? '')),
             '{capacidad}'         => $e($d['capacidad']  ?? ''),
             '{marca}'             => $e($d['marca']       ?? ''),
             '{modelo}'            => $e($d['modelo']      ?? ''),
@@ -1366,7 +1367,7 @@ body { background:#fff!important; }
         unset($pc['plantilla']);
 
         // 1. Corregir celda "Equipo Inspeccionado" — puede ser hardcoded en algunas plantillas
-        $equipoStr = $e(($d['maquinaria'] ?? '') . ' · ' . ($d['marca'] ?? '') . ' ' . ($d['modelo'] ?? ''));
+        $equipoStr = $e(textoEstandar($d['maquinaria'] ?? '') . ' · ' . ($d['marca'] ?? '') . ' ' . ($d['modelo'] ?? ''));
         $html = preg_replace(
             '/<div class="pc-equip-val">Equipo Inspeccionado:[^<]*<\/div>/',
             '<div class="pc-equip-val">' . $equipoStr . '</div>',
@@ -2765,7 +2766,7 @@ SVG;
             $map += [
                 '{cliente}'           => $e($d['cliente']    ?? ''),
                 '{domicilio}'         => $e($d['direccion']  ?? ''),
-                '{tipo_maquinaria}'   => $e($d['maquinaria'] ?? ''),
+                '{tipo_maquinaria}'   => $e(textoEstandar($d['maquinaria'] ?? '')),
                 '{capacidad}'         => $e($d['capacidad']  ?? ''),
                 '{marca}'             => $e($d['marca']       ?? ''),
                 '{modelo}'            => $e($d['modelo']      ?? ''),
@@ -2968,7 +2969,7 @@ SVG;
 
         $folio     = $e(formatoFolio($d['control'] ?? ''));
         $cliente   = $e($d['cliente']    ?? '');
-        $maq       = $e($d['maquinaria'] ?? '');
+        $maq       = $e(textoEstandar($d['maquinaria'] ?? ''));
         $marca     = $e($d['marca']      ?? '');
         $modelo    = $e($d['modelo']     ?? '');
         $serie     = $e($d['serie']      ?? '');
@@ -3126,7 +3127,7 @@ HTML;
 
         $folio     = $e(formatoFolio($d['control'] ?? ''));
         $cliente   = $e($d['cliente']    ?? '');
-        $maq       = $e($d['maquinaria'] ?? '');
+        $maq       = $e(textoEstandar($d['maquinaria'] ?? ''));
         $marca     = $e($d['marca']      ?? '');
         $modelo    = $e($d['modelo']     ?? '');
         $serie     = $e($d['serie']      ?? '');
@@ -3351,7 +3352,7 @@ HTML;
         $this->pdo->prepare(
             "INSERT INTO usuarios (usuario, password_hash, rol, nombre, id_cliente, activo)
              VALUES (?, ?, 'CLIENTE', ?, ?, 1)"
-        )->execute([$usuario, $hash, mayusculas($clienteNombre), $idCliente ?: null]);
+        )->execute([$usuario, $hash, textoEstandar($clienteNombre), $idCliente ?: null]);
 
         return ['usuario' => $usuario, 'password' => $password, 'es_nuevo' => true];
     }

@@ -310,6 +310,17 @@ class Personal {
         $row = $stmt->fetch();
         if (!$row) return null;
 
+        // Lo que se imprime en DC-3, diploma, certificado y credencial va en
+        // texto estándar —mayúsculas, sin acentos ni símbolos— aunque se haya
+        // capturado o guardado de otra forma. Los catálogos (curso, ocupación)
+        // no se tocan en la base; sólo como salen aquí.
+        foreach (['nombre_completo', 'puesto', 'capacidad', 'empresa_nombre', 'empresa_representante',
+                  'empresa_rep_trabajadores', 'instructor_nombre', 'curso_nombre', 'ocupacion_nombre',
+                  'area_tematica'] as $c) {
+            if (isset($row[$c]) && is_string($row[$c])) $row[$c] = textoEstandar($row[$c]);
+        }
+        if (!empty($row['empresa_direccion'])) $row['empresa_direccion'] = direccionImprimible($row['empresa_direccion']);
+
         // Documentos generados
         $stmt2 = $this->pdo->prepare(
             "SELECT tipo_doc, url, DATE_FORMAT(fecha_generacion,'%d/%m/%Y') AS fecha
@@ -540,8 +551,8 @@ class Personal {
             $fotoPersonaUrl = $r['url'];
         }
 
-        // mayusculas(): strtoupper() dejaba en minúscula acentos y eñes.
-        $u = fn($v) => mayusculas($v) ?: null;
+        // Texto estándar: mayúsculas sin acentos ni símbolos (strtoupper() dejaba "ZúñIGA").
+        $u = fn($v) => textoEstandar($v) ?: null;
 
         $campos = [
             'nombre_completo'       => $u($payload['nombre_completo']    ?? ''),
@@ -1509,12 +1520,12 @@ class Personal {
         } catch (\Throwable $e) {}
 
         $id      = (int)($payload['id'] ?? 0);
-        $nombre  = mayusculas($payload['nombre_cliente'] ?? '');
+        $nombre  = textoEstandar($payload['nombre_cliente'] ?? '');
         if (!$nombre) return ['status' => 'error', 'message' => 'El nombre de la empresa es obligatorio.'];
 
         $rfc     = strtoupper(preg_replace('/[^A-Z0-9&Ñ]/iu', '', $payload['rfc'] ?? '')) ?: null;
-        $rep     = mayusculas($payload['representante'] ?? '') ?: null;
-        $repTrab = mayusculas($payload['representante_trabajadores'] ?? '') ?: null;
+        $rep     = textoEstandar($payload['representante'] ?? '') ?: null;
+        $repTrab = textoEstandar($payload['representante_trabajadores'] ?? '') ?: null;
         $dir     = formatoDireccion($payload['direccion'] ?? '') ?: null;
         $correo  = strtolower(trim($payload['correo_contacto'] ?? '')) ?: null;
 
@@ -1533,8 +1544,8 @@ class Personal {
             // dejaría el nombre viejo copiado en los registros ya existentes.
             // Si hay registros vinculados se exige usar el renombrado, que
             // propaga el cambio a todos los módulos.
-            if ($exRow && mayusculas($exRow['nombre_cliente']) !== $nombre) {
-                $anterior = mayusculas($exRow['nombre_cliente']);
+            if ($exRow && textoEstandar($exRow['nombre_cliente']) !== $nombre) {
+                $anterior = textoEstandar($exRow['nombre_cliente']);
                 foreach ($this->refsEmpresaExistentes() as [$tabla, $col, $etiqueta]) {
                     try {
                         $s = $this->pdo->prepare("SELECT COUNT(*) FROM `$tabla` WHERE UPPER(TRIM(`$col`)) = ?");
@@ -1602,7 +1613,7 @@ class Personal {
         $row = $chk->fetch();
         if (!$row) return ['status' => 'error', 'message' => 'Empresa no encontrada.'];
 
-        $nombre = mayusculas($row['nombre_cliente']);
+        $nombre = textoEstandar($row['nombre_cliente']);
         foreach ($this->refsEmpresaExistentes() as [$tabla, $col, $etiqueta]) {
             try {
                 $s = $this->pdo->prepare("SELECT COUNT(*) FROM `$tabla` WHERE UPPER(TRIM(`$col`)) = ?");
@@ -1660,7 +1671,7 @@ class Personal {
      */
     public function renombrarEmpresa(array $payload): array {
         $id      = (int)($payload['id'] ?? 0);
-        $nuevo   = mayusculas($payload['nombre_nuevo'] ?? '');
+        $nuevo   = textoEstandar($payload['nombre_nuevo'] ?? '');
         $aplicar = !empty($payload['aplicar']);
 
         if (!$id)             return ['status' => 'error', 'message' => 'Empresa no válida.'];
@@ -1674,7 +1685,7 @@ class Personal {
         if (!$emp) return ['status' => 'error', 'message' => 'Empresa no encontrada.'];
 
         $actual  = (string)$emp['nombre_cliente'];
-        $anterior = mayusculas($actual);
+        $anterior = textoEstandar($actual);
         if ($anterior === $nuevo)
             return ['status' => 'error', 'message' => 'El nombre nuevo es igual al actual.'];
 

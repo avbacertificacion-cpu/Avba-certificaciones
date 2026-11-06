@@ -487,7 +487,7 @@ class Arneses {
             INSERT INTO arneses_sesiones (cliente, fecha, coordenadas, direccion, correo, usuario, estatus)
             VALUES (?,?,?,?,?,?, 'PENDIENTE')
         ")->execute([
-            mb_strtoupper($cliente), date('Y-m-d', strtotime(str_replace('/', '-', $fecha))),
+            textoEstandar($cliente), date('Y-m-d', strtotime(str_replace('/', '-', $fecha))),
             trim((string)($p['coordenadas'] ?? '')) ?: null,
             formatoDireccion($p['direccion'] ?? '') ?: null,
             trim((string)($p['correo'] ?? '')) ?: null,
@@ -548,7 +548,7 @@ class Arneses {
             return ['status' => 'error', 'message' => avisoQrOcupado($this->pdo, $qrItem)];
         }
 
-        $up = fn($k) => mb_strtoupper(trim((string)($post[$k] ?? ''))) ?: null;
+        $up = fn($k) => textoEstandar($post[$k] ?? '') ?: null;
 
         $orden = (int)$this->pdo->query("SELECT COALESCE(MAX(orden),0) FROM arneses_items WHERE sesion_id = " . $sesionId)->fetchColumn();
 
@@ -559,7 +559,8 @@ class Arneses {
             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
         ")->execute([
             $sesionId, $tipoId, $up('id_arnes'), $up('marca'), $up('modelo'), $up('serie'),
-            $up('talla'), $up('norma'), $up('longitud'),
+            // La norma es una clave ("EN 361:2002"): sólo mayúsculas, sin quitarle nada.
+            $up('talla'), mb_strtoupper(trim((string)($post['norma'] ?? '')), 'UTF-8') ?: null, $up('longitud'),
             $fFab, $fRetiro, $vigencia, $resultado,
             trim((string)($post['observaciones'] ?? '')) ?: null,
             $qrItem ?: null,
@@ -720,7 +721,7 @@ class Arneses {
 
         $creados = [];
         for ($i = 0; $i < $copias; $i++) {
-            $serie = mb_strtoupper(trim((string)($series[$i] ?? ''))) ?: null;
+            $serie = textoEstandar($series[$i] ?? '') ?: null;
             $insItem->execute([
                 $sesionId, $it['tipo_id'], $it['id_arnes'], $it['marca'], $it['modelo'], $serie,
                 $it['talla'], $it['norma'], $it['longitud'],
@@ -895,7 +896,7 @@ class Arneses {
         $ses = $s->fetch(PDO::FETCH_ASSOC);
         if (!$ses) return ['status' => 'error', 'message' => 'Sesión no encontrada.'];
         // Como debe imprimirse: mayúsculas con acento y la dirección con su formato.
-        $ses['cliente'] = repararMayusculas($ses['cliente'] ?? '');
+        $ses['cliente'] = textoEstandar($ses['cliente'] ?? '');
         if (!empty($ses['direccion'])) $ses['direccion'] = direccionImprimible($ses['direccion']);
 
         $it = $this->pdo->prepare("
@@ -956,7 +957,10 @@ class Arneses {
         $campos = [];
         $vals   = [];
         foreach (['id_arnes','marca','modelo','serie','talla','norma','longitud'] as $c) {
-            if (array_key_exists($c, $p)) { $campos[] = "$c = ?"; $vals[] = mb_strtoupper(trim((string)$p[$c])) ?: null; }
+            if (!array_key_exists($c, $p)) continue;
+            $campos[] = "$c = ?";
+            // La norma es una clave ("EN 361:2002"): sólo mayúsculas, sin quitarle nada.
+            $vals[] = ($c === 'norma' ? mb_strtoupper(trim((string)$p[$c]), 'UTF-8') : textoEstandar($p[$c])) ?: null;
         }
         if (array_key_exists('observaciones', $p)) { $campos[] = "observaciones = ?"; $vals[] = trim((string)$p['observaciones']) ?: null; }
         if (array_key_exists('tipo_id', $p) && (int)$p['tipo_id']) { $campos[] = "tipo_id = ?"; $vals[] = (int)$p['tipo_id']; }
@@ -1145,7 +1149,7 @@ class Arneses {
         if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
 
         $mapa = [
-            'cliente'         => fn($v) => mb_strtoupper(trim((string)$v)) ?: null,
+            'cliente'         => fn($v) => textoEstandar($v) ?: null,
             'direccion'       => fn($v) => formatoDireccion($v) ?: null,
             'correo'          => fn($v) => trim((string)$v) ?: null,
             'inspector_firma' => fn($v) => trim((string)$v) ?: null,

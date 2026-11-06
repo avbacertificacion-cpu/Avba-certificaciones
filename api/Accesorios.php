@@ -760,7 +760,7 @@ class Accesorios {
 
     // ── Crear sesión (cliente + ubicación + fecha) ─────────
     public function crearSesion(array $payload, string $usuario): array {
-        $cliente = mayusculas($payload['cliente'] ?? '');
+        $cliente = textoEstandar($payload['cliente'] ?? '');
         $fecha   = trim($payload['fecha']   ?? '');  // DD/MM/YYYY
         $coords  = trim($payload['coordenadas'] ?? '');
         $dir     = formatoDireccion($payload['direccion'] ?? '');
@@ -810,8 +810,8 @@ class Accesorios {
             ? $post['estado'] : 'CUMPLE';
 
         $qrCodigo = trim($post['qr_codigo'] ?? '');
-        $idAcc    = mayusculas($post['id_accesorio'] ?? '');
-        $serie    = mayusculas($post['serie']        ?? '');
+        $idAcc    = textoEstandar($post['id_accesorio'] ?? '');
+        $serie    = textoEstandar($post['serie']        ?? '');
 
         // Grilletes y demás tipos de código único: etiqueta, serie y QR son el
         // mismo dato, se capture por donde se capture.
@@ -842,11 +842,11 @@ class Accesorios {
             $sesionId,
             $idAcc,
             $tipoId,
-            mayusculas($post['marca']    ?? ''),
-            mayusculas($post['modelo']   ?? ''),
+            textoEstandar($post['marca']    ?? ''),
+            textoEstandar($post['modelo']   ?? ''),
             $serie,
-            mayusculas($post['capacidad']?? ''),
-            mayusculas($post['medidas']  ?? ''),
+            textoEstandar($post['capacidad']?? ''),
+            textoEstandar($post['medidas']  ?? ''),
             $estado,
             $orden,
             $qrCodigo ?: null,
@@ -943,7 +943,7 @@ class Accesorios {
         if (!$this->borradorDe($id, $usuario)) {
             return ['status' => 'error', 'message' => 'La sesión ya no está por enviar o no es tuya.'];
         }
-        $cliente = mb_strtoupper(trim((string)($p['cliente'] ?? '')));
+        $cliente = textoEstandar($p['cliente'] ?? '');
         if ($cliente === '') return ['status' => 'error', 'message' => 'El cliente es requerido.'];
 
         $fecha = $this->fechaIso($p['fecha'] ?? '') ?: date('Y-m-d');
@@ -1125,7 +1125,7 @@ class Accesorios {
 
         // Como debe imprimirse, aunque se haya guardado antes de corregir las
         // mayúsculas con acento y el formato de la dirección.
-        $sesion['cliente'] = repararMayusculas($sesion['cliente'] ?? '');
+        $sesion['cliente'] = textoEstandar($sesion['cliente'] ?? '');
         if (!empty($sesion['direccion'])) $sesion['direccion'] = direccionImprimible($sesion['direccion']);
 
         // cert_url puede no existir todavía: nombrarla a secas rompería la
@@ -1159,6 +1159,10 @@ class Accesorios {
         }
         foreach ($accesorios as &$acc) {
             $acc['fotos'] = $fotoMap[$acc['id']] ?? [];
+            // Como se imprime: texto estándar aunque se haya guardado distinto.
+            foreach (['tipo_nombre', 'id_accesorio', 'marca', 'modelo', 'serie', 'capacidad', 'medidas', 'componentes'] as $c) {
+                if (isset($acc[$c]) && is_string($acc[$c])) $acc[$c] = textoEstandar($acc[$c]);
+            }
         }
         unset($acc);
 
@@ -1175,12 +1179,12 @@ class Accesorios {
         $this->ensureAccIzajeQrColumn();
         $id        = (int)($payload['id']           ?? 0);
         $tipoId    = (int)($payload['tipo_id']       ?? 0) ?: null;
-        $idAcc     = mayusculas($payload['id_accesorio']   ?? '');
-        $marca     = mayusculas($payload['marca']          ?? '');
-        $modelo    = mayusculas($payload['modelo']         ?? '');
-        $serie     = mayusculas($payload['serie']          ?? '');
-        $capacidad = mayusculas($payload['capacidad']      ?? '');
-        $medidas   = mayusculas($payload['medidas']        ?? '');
+        $idAcc     = textoEstandar($payload['id_accesorio']   ?? '');
+        $marca     = textoEstandar($payload['marca']          ?? '');
+        $modelo    = textoEstandar($payload['modelo']         ?? '');
+        $serie     = textoEstandar($payload['serie']          ?? '');
+        $capacidad = textoEstandar($payload['capacidad']      ?? '');
+        $medidas   = textoEstandar($payload['medidas']        ?? '');
         $estado    = trim($payload['estado']         ?? '');
         $qrCodigo  = trim($payload['qr_codigo']      ?? '');
         $comps     = $this->normalizarComponentes($payload['componentes'] ?? '');
@@ -1335,7 +1339,7 @@ class Accesorios {
         if (!$id) return ['status' => 'error', 'message' => 'Sesión no indicada.'];
 
         $mapa = [
-            'cliente'           => fn($v) => mb_strtoupper(trim((string)$v)) ?: null,
+            'cliente'           => fn($v) => textoEstandar($v) ?: null,
             'direccion'         => fn($v) => formatoDireccion($v) ?: null,
             'coordenadas'       => fn($v) => trim((string)$v) ?: null,
             'correo'            => fn($v) => trim((string)$v) ?: null,
@@ -2455,7 +2459,7 @@ class Accesorios {
         if ($pieza === null) {
             $cuenta = [];
             foreach ($aptos as $a) {
-                $t = mb_convert_case(trim($a['tipo_nombre'] ?? ''), MB_CASE_TITLE, 'UTF-8') ?: 'Accesorio';
+                $t = textoEstandar($a['tipo_nombre'] ?? '') ?: 'ACCESORIO';
                 $cuenta[$t] = ($cuenta[$t] ?? 0) + 1;
             }
             arsort($cuenta);
@@ -2468,13 +2472,13 @@ class Accesorios {
         // Individual: se enumeran los datos que identifican a la pieza, que es
         // lo que el cliente coteja contra la placa.
         $campos = [
-            'Tipo'              => $pieza['tipo_nombre'] ?? '',
-            'ID del accesorio'  => $pieza['id_accesorio'] ?? '',
-            'Marca'             => $pieza['marca'] ?? '',
-            'Modelo'            => $pieza['modelo'] ?? '',
-            'No. de serie'      => $pieza['serie'] ?? '',
-            'Capacidad'         => $pieza['capacidad'] ?? '',
-            'Medidas'           => $pieza['medidas'] ?? '',
+            'Tipo'              => textoEstandar($pieza['tipo_nombre'] ?? ''),
+            'ID del accesorio'  => textoEstandar($pieza['id_accesorio'] ?? ''),
+            'Marca'             => textoEstandar($pieza['marca'] ?? ''),
+            'Modelo'            => textoEstandar($pieza['modelo'] ?? ''),
+            'No. de serie'      => textoEstandar($pieza['serie'] ?? ''),
+            'Capacidad'         => textoEstandar($pieza['capacidad'] ?? ''),
+            'Medidas'           => textoEstandar($pieza['medidas'] ?? ''),
         ];
         $filas = '';
         $col   = 0;
@@ -2490,7 +2494,7 @@ class Accesorios {
         }
         if ($col === 1) $filas .= '<td></td></tr>';
 
-        $comps = array_filter(array_map('trim', explode("\n", (string)($pieza['componentes'] ?? ''))));
+        $comps = array_filter(array_map('trim', explode("\n", textoEstandar($pieza['componentes'] ?? ''))));
         $lista = $comps
             ? '<div class="flabel" style="margin-top:2mm">SE COMPONE DE - Components</div>'
             . '<div class="fval">' . $e(implode(' · ', $comps)) . '</div>'
