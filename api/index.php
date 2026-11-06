@@ -1897,7 +1897,8 @@ if ($method === 'POST') {
                 (int)($payload['id'] ?? 0),
                 $correosTodos,
                 $usr['usuario'],
-                !empty($payload['enviar_credenciales'])
+                !empty($payload['enviar_credenciales']),
+                is_array($payload['tipos'] ?? null) ? $payload['tipos'] : null
             ));
 
         case 'GUARDAR_CURSO':

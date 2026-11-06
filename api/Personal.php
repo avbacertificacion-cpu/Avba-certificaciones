@@ -809,13 +809,17 @@ class Personal {
         if (empty($participantes))
             return ['status' => 'error', 'message' => 'Sin participantes aprobados en esta sesión.'];
 
-        // Determinar tipos de documentos a generar
-        $tipos = match($tipo) {
-            'dc3'          => ['dc3'],
-            'diploma'      => ['diploma'],
-            'certificado'  => ['certificado'],
-            default        => ['dc3', 'diploma', 'certificado'],
-        };
+        // Qué documentos van: los que se marcaron en las casillas; si no
+        // llegan (versión anterior de la pantalla), el tipo de siempre.
+        $tipos = self::tiposElegidos($payload['tipos'] ?? null);
+        if (!$tipos) {
+            $tipos = match($tipo) {
+                'dc3'          => ['dc3'],
+                'diploma'      => ['diploma'],
+                'certificado'  => ['certificado'],
+                default        => ['dc3', 'diploma', 'certificado'],
+            };
+        }
 
         // Generar documentos y recopilar adjuntos
         $adjuntos = [];
@@ -875,7 +879,9 @@ class Personal {
         if (!class_exists('PHPMailer\PHPMailer\PHPMailer'))
             return ['status' => 'error', 'message' => 'Servicio de correo no disponible.'];
 
-        $tipoLabel = ['dc3' => 'Constancias DC-3', 'diploma' => 'Diplomas', 'certificado' => 'Certificados', 'todo' => 'Documentos de capacitación'][$tipo] ?? 'Documentos';
+        $tipoLabel = count($tipos) === 1
+            ? (['dc3' => 'Constancias DC-3', 'diploma' => 'Diplomas', 'certificado' => 'Certificados', 'credencial' => 'Credenciales'][$tipos[0]] ?? 'Documentos')
+            : 'Documentos de capacitación';
         try {
             $mail = new PHPMailer(true);
             configurarMailer($mail, $this->pdo);
@@ -1174,7 +1180,18 @@ class Personal {
      * y Certificado — y los envía TODOS en un solo correo con sus adjuntos.
      * Registra el/los correo(s) en el directorio para autocompletado futuro.
      */
-    public function enviarTodosDocumentosPersonal(int $id, string|array $correoDestino, string $usuario, bool $enviarCredenciales = false): array {
+    /**
+     * Los documentos marcados en las casillas, validados y en orden fijo.
+     * [] si no se mandó lista (quien llama decide el valor de siempre).
+     */
+    private static function tiposElegidos($lista): array {
+        if (!is_array($lista)) return [];
+        $lista = array_map(fn($t) => strtolower(trim((string)$t)), $lista);
+        return array_values(array_filter(['dc3', 'diploma', 'certificado', 'credencial'],
+                                         fn($t) => in_array($t, $lista, true)));
+    }
+
+    public function enviarTodosDocumentosPersonal(int $id, string|array $correoDestino, string $usuario, bool $enviarCredenciales = false, ?array $soloTipos = null): array {
         $this->ensureEstatusColumn();
         $p = $this->obtenerParticipante($id);
         if (!$p) return ['status' => 'error', 'message' => 'Participante no encontrado.'];
@@ -1193,6 +1210,12 @@ class Personal {
         // (los documentos que se "ven"); las versiones de impresión son el
         // mismo PDF, no un adjunto aparte.
         $tipos     = ['dc3' => 'Constancia DC-3', 'diploma' => 'Diploma', 'certificado' => 'Certificado', 'credencial' => 'Credencial'];
+        // Sólo los que se marcaron; sin lista, los cuatro como siempre.
+        if ($soloTipos !== null) {
+            $elegidos = self::tiposElegidos($soloTipos);
+            if (!$elegidos) return ['status' => 'error', 'message' => 'Marca al menos un documento para enviar.'];
+            $tipos = array_intersect_key($tipos, array_flip($elegidos));
+        }
         $adjuntos  = [];
         $faltantes = [];
         foreach ($tipos as $tipo => $label) {
@@ -1231,7 +1254,11 @@ class Personal {
             foreach ($lista as $e) $mail->addAddress($e);
             $mail->Subject = 'Documentos de Capacitación — AVBA Inspections';
             $mail->isHTML(true);
-            $mail->Body    = $this->plantillaCorreoPersonal($nombre, 'DC-3, Diploma, Certificado y Credencial', $p['curso_nombre'] ?? '', $credenciales);
+            $nombresDocs = array_values(array_map(fn($l) => str_replace('Constancia ', '', $l), $tipos));
+            $listaDocs   = count($nombresDocs) > 1
+                ? implode(', ', array_slice($nombresDocs, 0, -1)) . ' y ' . end($nombresDocs)
+                : ($nombresDocs[0] ?? 'Documentos');
+            $mail->Body    = $this->plantillaCorreoPersonal($nombre, $listaDocs, $p['curso_nombre'] ?? '', $credenciales);
             foreach ($adjuntos as $a) $mail->addAttachment($a['ruta'], $a['nombre']);
             enviarYRegistrar($this->pdo, $mail, ['modulo' => 'personal', 'registro_id' => (int)$id, 'usuario' => $usuario]);
             if (class_exists('Huella')) {
