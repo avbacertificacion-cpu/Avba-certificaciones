@@ -174,8 +174,7 @@ class Inspecciones {
        Como la 21LC1050: de la placa sólo van marca, modelo y serie. La
        dirección agregó la configuración instalada —pluma de 50 m y 50 m de
        altura—, que no está en la placa y va en la nota para que la confirme
-       en campo. La capacidad se queda en blanco por lo mismo que la otra: la
-       placa no la dice y sale de la tabla de cargas a bordo. */
+       en campo. La capacidad, 48 toneladas, también la dio la dirección. */
     private const PRECARGA_TORRE_21LC660 = [
         'clave'      => 'precarga_torre_21lc660_marcos',
         'busca'      => 'MARCOS',
@@ -186,13 +185,13 @@ class Inspecciones {
         'modelo'     => '21LC660',
         'serie'      => '16734',
         'id_equipo'  => '',
-        'capacidad'  => '',
+        'capacidad'  => '48 TON',
         'nota'       => 'De la placa van marca, modelo y serie: Linden Comansa 21LC660, '
                       . 'serie 16734 (placa 1408P30636). Configuración que indicó la dirección: '
                       . 'PLUMA DE 50 M y 50 M DE ALTURA — confírmala en campo, no viene en la placa. '
                       . 'Faltan y los pones tú: CLIENTE, dirección de la obra y número económico. '
-                      . 'La CAPACIDAD no viene en la placa: tómala de la tabla de cargas a bordo '
-                      . 'para la pluma de 50 m (carga máxima y carga en punta). '
+                      . 'CAPACIDAD: 48 TON, también indicada por la dirección; cotéjala contra '
+                      . 'la tabla de cargas a bordo (carga máxima y carga en punta con pluma de 50 m). '
                       . 'Es una flat-top: pluma horizontal, sin cúspide ni tirantes de pluma. '
                       . 'En la prueba de carga la altura bajo gancho se mide, no se calcula.',
     ];
@@ -241,6 +240,34 @@ class Inspecciones {
      */
     private function precargarInspecciones(): void {
         foreach (self::PRECARGAS as $cfg) $this->precargarUna($cfg);
+        $this->completarPrecarga21LC660();
+    }
+
+    /**
+     * La 21LC660 se publicó primero sin capacidad y pudo haberse creado así
+     * en el perfil de Marcos antes de que llegara el dato (48 t). Si el
+     * borrador sigue esperando y sin capacidad, se completa, junto con su
+     * nota. Si Marcos ya la envió, no se toca: lo que capturó él manda.
+     */
+    private function completarPrecarga21LC660(): void {
+        $cfg = self::PRECARGA_TORRE_21LC660;
+        try {
+            $ya = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
+            $ya->execute(['precarga_torre_21lc660_capacidad']);
+            if ($ya->fetch()) return;
+            $nota = $this->tieneNotaBorrador() ? ', nota_borrador = ?' : '';
+            $args = [$cfg['capacidad']];
+            if ($nota) $args[] = $cfg['nota'];
+            $args = array_merge($args, [self::BORRADOR, $cfg['modelo'], $cfg['serie']]);
+            $this->pdo->prepare(
+                "UPDATE equipos SET capacidad = ?{$nota}
+                 WHERE estado = ? AND modelo = ? AND serie = ? AND (capacidad IS NULL OR capacidad = '')"
+            )->execute($args);
+            $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")
+                      ->execute(['precarga_torre_21lc660_capacidad']);
+        } catch (\Throwable $e) {
+            error_log('[Inspecciones] capacidad 21LC660: ' . $e->getMessage());
+        }
     }
 
     private function precargarUna(array $cfg): void {
