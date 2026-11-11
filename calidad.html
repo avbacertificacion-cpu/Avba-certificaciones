@@ -9910,6 +9910,7 @@ function renderEquiposAlcance() {
       <td style="padding:7px 6px;font-size:11px;font-family:monospace">${esc2(e.dictamen||'—')}</td>
       <td style="padding:7px 6px;font-size:11px;font-weight:700;color:${e.resultado==='NO CONFORME'?'#b91c1c':'#166534'}">${esc2(e.resultado)}</td>
       <td style="padding:7px 6px;font-size:11px;color:#8a93a8">${esc2(e.inspector||'')}</td>
+      <td style="padding:7px 6px">${audDocsCelda(e, i)}</td>
       <td style="padding:7px 6px;font-size:11px">${
         (faltas.length ? `<div style="color:#b91c1c;font-weight:600">⚠ ${esc2(faltas.join(', '))}</div>` : '')
       + (rep ? `<div style="color:#92400e;font-weight:600">ya reportado · ${esc2(rep)}</div>` : '')}</td>
@@ -9939,19 +9940,111 @@ function renderEquiposAlcance() {
         </div>
       </div>
       <div class="table-scroll" style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;min-width:820px">
+        <table style="width:100%;border-collapse:collapse;min-width:1040px">
           <thead><tr style="background:#fafcff;font-size:11px;color:#667;text-align:left">
             <th style="padding:7px 6px;width:34px"></th><th style="padding:7px 6px">Fecha</th>
             <th style="padding:7px 6px">Cliente</th><th style="padding:7px 6px">Equipo</th>
             <th style="padding:7px 6px">Solicitud</th><th style="padding:7px 6px">Dictamen</th>
             <th style="padding:7px 6px">Resultado</th>
-            <th style="padding:7px 6px">Inspector</th><th style="padding:7px 6px"></th>
+            <th style="padding:7px 6px">Inspector</th><th style="padding:7px 6px">Documentación entregada</th><th style="padding:7px 6px"></th>
           </tr></thead>
           <tbody>${filas}</tbody>
         </table>
       </div>
     </div>`;
   infContar();
+}
+
+/* ═══ Expediente de cada grúa: lo que se le entregó al cliente ═══
+   Certificado, dictamen (y el de no conformidad), reporte de inspección,
+   evidencia fotográfica, documentos adicionales y los correos con que se le
+   mandó. En la lista, una muestra; en "Expediente", todo. */
+const _AUD_DOC_CORTO = { 'Certificado': 'Cert.', 'Dictamen': 'Dict.', 'Dictamen de no conformidad': 'Dict. NC', 'Reporte de inspección': 'Reporte' };
+function audDocsCelda(e, i) {
+  const x = e.expediente || {};
+  const chip = (txt, url, color) => `<a href="${esc2(url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()"
+      style="display:inline-block;margin:0 4px 4px 0;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;text-decoration:none;
+             background:${color[0]};color:${color[1]};border:1px solid ${color[2]}">${esc2(txt)}</a>`;
+  const docs = (x.documentos || []).map(d => chip(_AUD_DOC_CORTO[d.tipo] || d.tipo, d.url,
+      d.tipo.includes('no conformidad') ? ['#fdecea','#b42318','#f3b4ae'] : ['#eaf3fb','#0c447c','#b9d3ee'])).join('');
+  const fotos = x.fotos ? `<span style="display:inline-block;margin:0 4px 4px 0;font-size:11px;color:#425">📷 ${x.fotos}</span>`
+              : x.evidencia_externa ? chip('📷 Carpeta', x.evidencia_externa, ['#f3f4f6','#374151','#d1d5db']) : '';
+  const adic  = x.adicionales ? `<span style="display:inline-block;margin:0 4px 4px 0;font-size:11px;color:#425">📎 ${x.adicionales}</span>` : '';
+  const envio = x.envios ? `<div style="font-size:10.5px;color:#166534">✉ Enviado ${esc2(x.ultimo_envio)}${x.envios > 1 ? ' · ' + x.envios + ' envíos' : ''}</div>`
+              : `<div style="font-size:10.5px;color:#92400e">Sin correo registrado</div>`;
+  const nada = !docs && !fotos && !adic ? '<span style="font-size:11px;color:#b42318">Sin documentos</span>' : '';
+  return `<div style="min-width:190px">${docs}${fotos}${adic}${nada}${envio}
+    <button type="button" class="tactil" onclick="event.stopPropagation();audAbrirExpediente(${e.equipo_id})"
+      style="margin-top:4px;padding:5px 10px;border:1px solid #0c447c;background:#fff;color:#0c447c;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer">📂 Expediente</button></div>`;
+}
+
+function audVentanaExpediente() {
+  let ov = document.getElementById('overlay-aud-exp');
+  if (ov) return ov;
+  ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.id = 'overlay-aud-exp';
+  ov.innerHTML = `<div class="modal" style="max-width:860px">
+      <div class="modal-hdr">
+        <div class="modal-hdr-l"><div class="m-avatar">📂</div>
+          <div><div class="m-title" id="aud-exp-tit">Expediente</div><div class="m-sub" id="aud-exp-sub"></div></div></div>
+        <button class="btn-close" type="button" onclick="audCerrarExpediente()">×</button>
+      </div>
+      <div class="modal-body" id="aud-exp-body"></div>
+    </div>`;
+  ov.addEventListener('click', ev => { if (ev.target === ov) audCerrarExpediente(); });
+  document.body.appendChild(ov);
+  return ov;
+}
+function audCerrarExpediente() { document.getElementById('overlay-aud-exp')?.classList.remove('open'); }
+
+async function audAbrirExpediente(id) {
+  const ov = audVentanaExpediente();
+  const body = document.getElementById('aud-exp-body');
+  document.getElementById('aud-exp-tit').textContent = 'Expediente';
+  document.getElementById('aud-exp-sub').textContent = '';
+  body.innerHTML = '<div style="padding:24px;text-align:center;color:#7a8398">Cargando expediente…</div>';
+  ov.classList.add('open');
+  const res = await _infPedir(`${_AUD_API}?action=EXPEDIENTE_GRUA_AUD&id=${encodeURIComponent(id)}`);
+  if (!res.ok) { body.innerHTML = `<div style="padding:20px;color:#b91c1c">${esc2(res.error)}</div>`; return; }
+  const x = res.datos.expediente;
+  document.getElementById('aud-exp-tit').textContent = x.cliente || 'Expediente';
+  document.getElementById('aud-exp-sub').textContent =
+    [x.control ? 'Folio ' + x.control : '', x.maquinaria, x.marca, x.serie ? 's/n ' + x.serie : '', x.estado].filter(Boolean).join(' · ');
+  const sec = t => `<div style="font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:#5070a0;margin:16px 0 8px">${t}</div>`;
+  const vacio = t => `<div style="font-size:12.5px;color:#8a93a8">${t}</div>`;
+  const doc = (nombre, url, extra) => `<a href="${esc2(url)}" target="_blank" rel="noopener"
+      style="display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid #d8e2ee;border-radius:9px;text-decoration:none;color:#0d2244;margin-bottom:6px;background:#fff">
+      <span style="font-size:18px">📄</span><span style="flex:1;min-width:0;font-weight:600;font-size:13px">${esc2(nombre)}${extra ? ` <span style="font-weight:400;color:#7a8398;font-size:11.5px">${esc2(extra)}</span>` : ''}</span>
+      <span style="font-size:12px;color:#185fa5;font-weight:600">Abrir ↗</span></a>`;
+
+  let h = sec('Documentos emitidos por AVBA');
+  h += x.documentos.length ? x.documentos.map(d => doc(d.tipo, d.url, d.manual ? 'PDF subido a mano' : '')).join('') : vacio('No hay documentos emitidos de esta inspección.');
+
+  h += sec(`Evidencia fotográfica${x.fotos.length ? ' · ' + x.fotos.length : ''}`);
+  if (x.fotos.length) {
+    h += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px">`
+       + x.fotos.map(f => `<a href="${esc2(f)}" target="_blank" rel="noopener" style="display:block;aspect-ratio:1/1;border-radius:8px;overflow:hidden;border:1px solid #d8e2ee;background:#f3f6fa">
+           <img src="${esc2(f)}" loading="lazy" alt="Foto de evidencia" style="width:100%;height:100%;object-fit:cover;display:block"></a>`).join('')
+       + `</div>`;
+  } else if (x.evidencia_externa) {
+    h += doc('Carpeta de evidencia', x.evidencia_externa, 'fuera del servidor');
+  } else {
+    h += vacio('No hay fotos de evidencia.');
+  }
+
+  h += sec(`Documentos adicionales${x.adicionales.length ? ' · ' + x.adicionales.length : ''}`);
+  h += x.adicionales.length ? x.adicionales.map(a => doc(a.nombre, a.url, a.origen === 'cliente' ? 'cargado por el cliente' : '')).join('')
+                            : vacio('No hay documentos adicionales.');
+
+  h += sec(`Enviado al cliente${x.envios.length ? ' · ' + x.envios.length : ''}`);
+  h += x.envios.length ? `<div style="border:1px solid #d8e2ee;border-radius:9px;overflow:hidden">` + x.envios.map((v, k) => `
+      <div style="padding:9px 12px;font-size:12.5px;${k ? 'border-top:1px solid #eef2f7;' : ''}background:#fff">
+        <div><b>${esc2(v.fecha)}</b> · ${esc2(v.correo || '—')}${v.ok ? '' : ' <span style="color:#b42318;font-weight:700">· falló</span>'}</div>
+        <div style="color:#5a6072;font-size:11.5px;margin-top:2px">${esc2((v.archivos || []).join(' · ') || 'sin adjuntos anotados')}${v.usuario ? ' · envió ' + esc2(v.usuario) : ''}</div>
+      </div>`).join('') + `</div>`
+    : vacio('No hay correos registrados para esta inspección (pudo publicarse sólo en el portal del cliente).');
+  body.innerHTML = h;
 }
 
 function infMarcar(v) {

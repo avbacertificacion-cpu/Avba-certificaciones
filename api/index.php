@@ -577,6 +577,12 @@ if ($method === 'GET') {
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($auditorias->equiposAlcance((string)($_GET['desde'] ?? ''), (string)($_GET['hasta'] ?? '')));
 
+        // Expediente de una grúa: lo que se le entregó al cliente.
+        case 'EXPEDIENTE_GRUA_AUD':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($auditorias->expedienteGrua((int)($_GET['id'] ?? 0)));
+
         // Qué equipos llevó un informe ya entregado.
         case 'DETALLE_INFORME_INSPECCIONES':
             $usr = validarToken($pdo, $token);

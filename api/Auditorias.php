@@ -417,6 +417,10 @@ class Auditorias {
         $p = $this->partirPorAlcance($rows);
         $ya = $this->reportadosAntes(array_column($p['dentro'], 'equipo_id'));
 
+        // Lo que se le entregó al cliente de cada grúa, para revisarlo aquí
+        // mismo: documentos, fotos, adicionales y correos.
+        $exp = $this->expedientes(array_map('intval', array_column($p['dentro'], 'equipo_id')));
+
         $equipos = [];
         foreach ($p['dentro'] as $r) {
             $id = (int)$r['equipo_id'];
@@ -437,6 +441,8 @@ class Auditorias {
                 'inspector'  => $inspector,
                 'reportado'  => $ya[$id] ?? [],
                 'faltas'     => self::faltasParaEma($r, $dictamen, $inspector),
+                'estado'     => (string)($r['estado'] ?? ''),
+                'expediente' => self::resumenExpediente($exp[$id] ?? null),
             ];
         }
 
@@ -452,6 +458,174 @@ class Auditorias {
                     'generado' => (string)$previos[0]['generado'],
                     'cuantos'  => count($previos),
                 ] : null];
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  EXPEDIENTE DE CADA GRÚA
+    //  Lo que se le entregó al cliente: certificado, dictamen (y el de no
+    //  conformidad), reporte de inspección, evidencia fotográfica, documentos
+    //  adicionales y los correos con que se le mandó. Para la auditoría: ver
+    //  cada grúa del informe con su documentación, sin ir a buscarla.
+    // ══════════════════════════════════════════════════════════
+
+    /** El expediente completo de una grúa, para la ventana de detalle. */
+    public function expedienteGrua(int $id): array {
+        try {
+            $e = $this->expedientes([$id])[$id] ?? null;
+            if (!$e) return ['status' => 'error', 'message' => 'Equipo no encontrado.'];
+            return ['status' => 'success', 'expediente' => $e];
+        } catch (\Throwable $ex) {
+            error_log('[Auditorias] expedienteGrua: ' . $ex->getMessage());
+            return ['status' => 'error', 'message' => 'No se pudo armar el expediente: ' . $ex->getMessage()];
+        }
+    }
+
+    /** Lo que cabe en el renglón de la lista: qué hay y cuántos. */
+    private static function resumenExpediente(?array $e): array {
+        if (!$e) return ['documentos' => [], 'fotos' => 0, 'evidencia_externa' => '', 'adicionales' => 0,
+                         'envios' => 0, 'ultimo_envio' => ''];
+        return [
+            'documentos'        => $e['documentos'],
+            'fotos'             => count($e['fotos']),
+            'evidencia_externa' => $e['evidencia_externa'],
+            'adicionales'       => count($e['adicionales']),
+            'envios'            => count($e['envios']),
+            'ultimo_envio'      => $e['envios'] ? $e['envios'][0]['fecha'] : '',
+        ];
+    }
+
+    /** @return array [equipo_id => expediente] */
+    private function expedientes(array $ids): array {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if (!$ids) return [];
+        $in = implode(',', array_fill(0, count($ids), '?'));
+        $st = $this->pdo->prepare("SELECT * FROM equipos WHERE id IN ($in)");
+        $st->execute($ids);
+        $out = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $id = (int)$r['id'];
+            $docs = [];
+            $agrega = function (string $tipo, ?string $url, bool $manual = false) use (&$docs) {
+                $url = trim((string)$url);
+                if ($url !== '') $docs[] = ['tipo' => $tipo, 'url' => $url, 'manual' => $manual];
+            };
+            // El que ve el cliente: el reemplazado a mano manda sobre el generado.
+            $certMan = trim((string)($r['cert_manual_url'] ?? ''));
+            $dictMan = trim((string)($r['dict_manual_url'] ?? ''));
+            $agrega('Certificado', $r['certificado_url'] ?? '', $certMan !== '' && str_contains((string)($r['certificado_url'] ?? ''), 'MANUAL'));
+            $agrega('Dictamen', $r['dictamen_url'] ?? '', $dictMan !== '' && str_contains((string)($r['dictamen_url'] ?? ''), 'MANUAL'));
+            $nc = trim((string)(($r['dictamen_nc_manual_url'] ?? '') ?: ($r['dictamen_nc_url'] ?? '')));
+            $agrega('Dictamen de no conformidad', $nc);
+            $agrega('Reporte de inspección', $r['reporte_url'] ?? '');
+
+            [$fotos, $externa] = $this->fotosEvidencia((string)($r['evidencia_url'] ?? ''));
+            $out[$id] = [
+                'equipo_id'         => $id,
+                'control'           => (string)($r['control'] ?? ''),
+                'cliente'           => (string)($r['cliente'] ?? ''),
+                'maquinaria'        => (string)($r['maquinaria'] ?? ''),
+                'marca'             => trim(($r['marca'] ?? '') . ' ' . ($r['modelo'] ?? '')),
+                'serie'             => (string)($r['serie'] ?? ''),
+                'estado'            => (string)($r['estado'] ?? ''),
+                'documentos'        => $docs,
+                'fotos'             => $fotos,
+                'evidencia_externa' => $externa,
+                'adicionales'       => [],
+                'envios'            => [],
+            ];
+        }
+        if (!$out) return [];
+        $ids = array_keys($out);
+        $in  = implode(',', array_fill(0, count($ids), '?'));
+
+        // Documentos adicionales: los que el cliente cargó en su portal para
+        // ese equipo (manuales, facturas, sus propias certificaciones).
+        try {
+            $st = $this->pdo->prepare("SELECT id, avba_equipo_id FROM cliente_equipos WHERE avba_equipo_id IN ($in)");
+            $st->execute($ids);
+            $liga = [];
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $c) $liga[(int)$c['id']] = (int)$c['avba_equipo_id'];
+            if ($liga) {
+                $inC = implode(',', array_fill(0, count($liga), '?'));
+                $d = $this->pdo->prepare("SELECT equipo_id, tipo_doc, nombre, archivo_url FROM cliente_equipos_docs
+                                          WHERE equipo_id IN ($inC) AND archivo_url IS NOT NULL AND archivo_url <> ''");
+                $d->execute(array_keys($liga));
+                foreach ($d->fetchAll(PDO::FETCH_ASSOC) as $x) {
+                    $out[$liga[(int)$x['equipo_id']]]['adicionales'][] = [
+                        'nombre' => (string)($x['nombre'] ?: 'Documento'), 'tipo' => (string)($x['tipo_doc'] ?? ''),
+                        'url' => (string)$x['archivo_url'], 'origen' => 'cliente'];
+                }
+                $c = $this->pdo->prepare("SELECT equipo_id, tipo_cert, folio, archivo_url FROM cliente_equipos_cert
+                                          WHERE equipo_id IN ($inC) AND archivo_url IS NOT NULL AND archivo_url <> ''");
+                $c->execute(array_keys($liga));
+                foreach ($c->fetchAll(PDO::FETCH_ASSOC) as $x) {
+                    $out[$liga[(int)$x['equipo_id']]]['adicionales'][] = [
+                        'nombre' => trim(($x['tipo_cert'] ?: 'Certificación') . ($x['folio'] ? ' ' . $x['folio'] : '')),
+                        'tipo' => 'certificacion', 'url' => (string)$x['archivo_url'], 'origen' => 'cliente'];
+                }
+            }
+        } catch (\Throwable $e) { /* el portal del cliente aún no tiene esas tablas */ }
+
+        // Los correos con que se le mandó, del más reciente al más antiguo.
+        try {
+            $conModulo = columnaExiste($this->pdo, 'historico_envios', 'registro_id');
+            $ok        = columnaExiste($this->pdo, 'historico_envios', 'ok') ? 'ok' : '1 AS ok';
+            $where = $conModulo ? "((modulo = 'equipo' AND registro_id IN ($in)) OR equipo_id IN ($in))" : "equipo_id IN ($in)";
+            $col   = $conModulo ? 'COALESCE(registro_id, equipo_id)' : 'equipo_id';
+            $st = $this->pdo->prepare("SELECT $col AS eid, fecha_envio, correo, archivo, usuario, $ok
+                                       FROM historico_envios WHERE $where ORDER BY fecha_envio DESC");
+            $st->execute($conModulo ? array_merge($ids, $ids) : $ids);
+            $vistos = [];
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $x) {
+                $eid = (int)$x['eid'];
+                if (!isset($out[$eid])) continue;
+                // El mismo correo puede quedar anotado dos veces (por módulo y por equipo).
+                $k = $eid . '|' . $x['fecha_envio'] . '|' . $x['correo'] . '|' . $x['archivo'];
+                if (isset($vistos[$k])) continue;
+                $vistos[$k] = true;
+                $t = strtotime((string)$x['fecha_envio']);
+                $out[$eid]['envios'][] = [
+                    'fecha'    => $t ? date('d/m/Y H:i', $t) : (string)$x['fecha_envio'],
+                    'correo'   => (string)($x['correo'] ?? ''),
+                    'archivos' => array_values(array_filter(array_map('trim', explode(',', (string)($x['archivo'] ?? ''))))),
+                    'usuario'  => (string)($x['usuario'] ?? ''),
+                    'ok'       => (int)$x['ok'] === 1,
+                ];
+            }
+        } catch (\Throwable $e) { /* sin bitácora de envíos */ }
+
+        return $out;
+    }
+
+    /**
+     * Las fotos de la carpeta de evidencia. Si la evidencia está fuera del
+     * servidor (una carpeta de Drive de los registros viejos), no se pueden
+     * listar: se devuelve el enlace para abrirla.
+     *
+     * @return array [fotos[], enlaceExterno]
+     */
+    private function fotosEvidencia(string $url): array {
+        $url = trim($url);
+        if ($url === '') return [[], ''];
+        $base = rtrim(parse_url(UPLOAD_URL, PHP_URL_PATH) ?: '/uploads/', '/') . '/';
+        $path = parse_url($url, PHP_URL_PATH) ?: $url;
+        $esNuestra = str_starts_with($url, UPLOAD_URL) || str_starts_with(ltrim($path, '/'), 'uploads/')
+                  || ($base !== '/' && str_starts_with($path, $base));
+        if (!$esNuestra) return [[], preg_match('#^https?://#i', $url) ? $url : ''];
+
+        if (str_starts_with($url, UPLOAD_URL)) $rel = substr($url, strlen(UPLOAD_URL));
+        elseif ($base !== '/' && str_starts_with($path, $base)) $rel = substr($path, strlen($base));
+        else $rel = substr(ltrim($path, '/'), strlen('uploads/'));
+        $rel = trim($rel, '/');
+        if ($rel === '' || str_contains($rel, '..')) return [[], ''];
+        $dir = rtrim(UPLOAD_DIR, '/') . '/' . $rel . '/';
+        if (!is_dir($dir)) return [[], ''];
+        $fotos = [];
+        foreach (glob($dir . '*.{jpg,jpeg,png,webp,JPG,JPEG,PNG,WEBP}', GLOB_BRACE) ?: [] as $f) {
+            $fotos[] = rtrim(UPLOAD_URL, '/') . '/' . $rel . '/' . basename($f);
+        }
+        sort($fotos);
+        return [$fotos, ''];
     }
 
     /**
