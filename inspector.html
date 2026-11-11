@@ -3234,6 +3234,11 @@ const PC_TEMPLATES = {
   // gancho la da la torre: se mide, no se deduce.
   'dictamen_grua_torre.html': {
     label: 'Grúa Torre · pluma horizontal',
+    // Dos alturas distintas: la de cada prueba (en la tabla) y la total bajo
+    // gancho con la grúa en posición cero, gancho arriba (la de la figura).
+    headerFields: [
+      { id:'altura_total', label:'Altura total bajo gancho (posición cero)', unit:'m' },
+    ],
     rows: [{ key:'sin', label:'Sin carga' }, { key:'con', label:'Con carga' }],
     cols: [
       { id:'peso',      label:'Peso de Prueba',      unit:'TON' },

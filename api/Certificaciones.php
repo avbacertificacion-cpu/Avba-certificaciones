@@ -1372,15 +1372,16 @@ body { background:#fff!important; }
            sacada por Pitágoras: su prueba se había capturado con la plantilla
            de grúa móvil, y el dibujo se escogía por esa. */
         if (self::esGruaTorre($plantillaDoc)) {
-            $deOtra = $plantillaPc !== $plantillaDoc;
             foreach ($pc as $k => $fila) {
                 if (!is_array($fila)) continue;
                 $r  = (float)($fila['radio'] ?? 0);
                 $l  = (float)($fila['pluma'] ?? 0);
-                // Capturada con la plantilla de grúa móvil, la altura y el
-                // ángulo los calculó el formulario con el triángulo de una
-                // pluma que se inclina: no son medidos y no significan nada aquí.
-                if ($deOtra && $l > 0 && $r >= 0 && $r <= $l) {
+                // Una altura que es exactamente √(pluma² − radio²) —y el ángulo
+                // arccos(radio/pluma)— no se midió: la calculó un formulario
+                // con el triángulo de grúa móvil (Calidad lo hacía al guardar,
+                // también en grúa torre). No significa nada aquí y no se
+                // imprime; con el carro en la punta daba altura 0.
+                if ($l > 0 && $r >= 0 && $r <= $l) {
                     $hCalc = sqrt($l * $l - $r * $r);
                     $aCalc = rad2deg(acos($r / $l));
                     if (isset($fila['altura']) && abs((float)$fila['altura'] - $hCalc) < 0.02) $pc[$k]['altura'] = '';
@@ -1569,8 +1570,18 @@ body { background:#fff!important; }
                 if (!$dAngulo) $dAngulo = (float) ($calc['angulo'] ?? 0);
                 if (!$dAltura) $dAltura = (float) ($calc['altura'] ?? 0);
 
+                /* Dos alturas distintas en la grúa torre de pluma horizontal:
+                   la de la tabla y la observación es a la que estaba el gancho
+                   en la prueba; la de la figura es la ALTURA TOTAL bajo gancho,
+                   con la grúa en posición cero (gancho arriba). Ésa se captura
+                   una vez, aparte (altura_total). */
+                $altDiag = $dAltura;
+                if ($plantillaPc === 'dictamen_grua_torre.html') {
+                    $altDiag = (float) str_replace(',', '.', (string) ($pc['altura_total'] ?? ''));
+                }
+
                 $svg = self::esGruaTorre($plantillaPc)
-                    ? $this->buildTowerCraneSvg($dRadio, $dPluma, $dAltura, $dAngulo)
+                    ? $this->buildTowerCraneSvg($dRadio, $dPluma, $altDiag, $dAngulo)
                     : $this->buildCraneSvg($dRadio, $dPluma, $dAltura, $dAngulo);
 
                 $html = str_replace('{pc_crane_svg}',    $svg, $html);
@@ -1579,12 +1590,15 @@ body { background:#fff!important; }
                    altura bajo gancho se mide; no hay de dónde deducirla. */
                 if ($dAltura <= 0) {
                     $html = preg_replace('/\s*(?:y\s+)?(?:una\s+)?altura bajo gancho de\s*<strong>\{pc_obs_altura\}\s*m<\/strong>/u', '', $html) ?? $html;
+                    $html = str_replace('{pc_obs_altura}', 'NA', $html);
+                }
+                if ($altDiag <= 0) {
                     $html = str_replace('{pc_diag_altura}<span class="unit">m</span>', 'NA', $html);
-                    $html = str_replace(['{pc_diag_altura}', '{pc_obs_altura}'], 'NA', $html);
+                    $html = str_replace('{pc_diag_altura}', 'NA', $html);
                 }
                 $html = str_replace('{pc_diag_radio}',   number_format($dRadio,  1), $html);
                 $html = str_replace('{pc_diag_pluma}',   number_format($dPluma,  1), $html);
-                $html = str_replace('{pc_diag_altura}',  number_format($dAltura, 2), $html);
+                $html = str_replace('{pc_diag_altura}',  number_format($altDiag, 2), $html);
                 $html = str_replace('{pc_obs_radio}',    number_format($dRadio,  1), $html);
                 $html = str_replace('{pc_obs_pluma}',    number_format($dPluma,  1), $html);
                 $html = str_replace('{pc_obs_altura}',   number_format($dAltura, 2), $html);

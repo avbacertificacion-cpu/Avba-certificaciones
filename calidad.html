@@ -2561,7 +2561,8 @@ const PC_DEF = {
   // Pluma horizontal —flat-top, punta de martillo, autodesplegable—: el carro
   // corre por la pluma, no hay ángulo, y la altura bajo gancho se mide.
   'dictamen_grua_torre.html':  { label:'Grúa Torre · pluma horizontal', rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}],
-    cols:['peso','radio','pluma','altura','resultado'], calc:[], labels:{altura:'Altura bajo gancho (m)'} },
+    cols:['peso','radio','pluma','altura','resultado'], calc:[], headerFields:['altura_total'],
+    labels:{altura:'Altura bajo gancho en la prueba (m)', altura_total:'Altura total bajo gancho · posición cero (m)'} },
   // Pluma abatible: el ángulo es dato de la prueba y lo lee el inspector
   // del indicador de la grúa. No se calcula: ver geometriaPc en el servidor.
   'dictamen_grua_torre_abatible.html': { label:'Grúa Torre de Pluma Abatible', rows:[{k:'sin',l:'Sin carga'},{k:'con',l:'Con carga'}],
@@ -2851,6 +2852,26 @@ function ver(fila) {
   // Prueba de carga
   const pcData = d.prueba_carga && typeof d.prueba_carga === 'object' ? d.prueba_carga : null;
   if (pcData && pcData.plantilla) {
+    /* Una grúa torre cuya prueba se capturó con la plantilla de grúa móvil
+       (pasó con una flat-top) se edita con la de grúa torre, que es con la que
+       se imprime el dictamen: sin ángulo, con altura medida y altura total. */
+    const maqN = String(d.maquinaria || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    if (/GRUA TORRE/.test(maqN) && !/^dictamen_grua_torre/.test(pcData.plantilla)) {
+      pcData.plantilla = /ABATIBLE/.test(maqN) ? 'dictamen_grua_torre_abatible.html' : 'dictamen_grua_torre.html';
+    }
+    // En grúa torre, una altura que es exactamente √(pluma² − radio²) —o el
+    // ángulo arccos(radio/pluma)— no se midió: la calculaba el guardado. Se
+    // deja vacía para capturar la medida real (con el carro en la punta daba 0).
+    if (/^dictamen_grua_torre/.test(pcData.plantilla)) {
+      Object.keys(pcData).forEach(k => {
+        const f = pcData[k];
+        if (!f || typeof f !== 'object') return;
+        const r = parseFloat(f.radio), l = parseFloat(f.pluma);
+        if (!(l > 0 && r >= 0 && r <= l)) return;
+        if (f.altura !== undefined && f.altura !== '' && Math.abs(parseFloat(f.altura) - Math.sqrt(l*l - r*r)) < 0.02) f.altura = '';
+        if (f.angulo !== undefined && f.angulo !== '' && Math.abs(parseFloat(f.angulo) - Math.acos(r / l) * 180 / Math.PI) < 0.15) f.angulo = '';
+      });
+    }
     const def    = PC_DEF[pcData.plantilla];
     const filas  = def ? def.rows
       : Object.keys(pcData).filter(k => k !== 'plantilla' && typeof pcData[k] === 'object').map(k => ({k, l: k}));

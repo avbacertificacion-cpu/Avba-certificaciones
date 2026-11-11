@@ -242,6 +242,13 @@ class Calidad {
                     }
                 }
 
+                // Grúa torre: la altura bajo gancho se MIDE en cada prueba y el
+                // ángulo, si lo hay (abatible), se lee del indicador. Aquí se
+                // recalculaban con el triángulo de grúa móvil y pisaban lo
+                // capturado: una flat-top con pluma de 50 m y carro a 32.6 m
+                // quedaba con 37.91 m y 49.3°, y a 50 m de radio con altura 0.
+                $esTorre    = str_starts_with((string)$pc['plantilla'], 'dictamen_grua_torre');
+                $esAbatible = $pc['plantilla'] === 'dictamen_grua_torre_abatible.html';
                 foreach ($updates as $rowKey => $fields) {
                     if ($rowKey === 'plantilla' || $rowKey === '__header' || !is_array($fields)) continue;
                     // Limpieza de las filas que dejó el analizador anterior: una
@@ -264,7 +271,11 @@ class Calidad {
                     // Recalcular ángulo/altura de grúa cuando aplican (radio y pluma)
                     $radio = (float)($pc[$rowKey]['radio'] ?? 0);
                     $pluma = (float)($pc[$rowKey]['pluma'] ?? 0);
-                    if ($radio > 0 && $pluma > 0 && $radio <= $pluma) {
+                    if ($esTorre) {
+                        $pc[$rowKey]['altura'] = is_scalar($fields['altura'] ?? null) ? trim((string)$fields['altura']) : '';
+                        $pc[$rowKey]['angulo'] = $esAbatible && is_scalar($fields['angulo'] ?? null)
+                            ? trim((string)$fields['angulo']) : '';
+                    } elseif ($radio > 0 && $pluma > 0 && $radio <= $pluma) {
                         $pc[$rowKey]['angulo'] = (string)round(acos($radio / $pluma) * 180 / M_PI, 1);
                         $pc[$rowKey]['altura'] = (string)round(sqrt($pluma * $pluma - $radio * $radio), 2);
                     } else {
