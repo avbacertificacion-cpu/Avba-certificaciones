@@ -311,7 +311,19 @@
     if (modulo === 'personal') {
       if (typeof verSeccion === 'function') verSeccion('personal');
       // La lista de sesiones se carga sola al entrar; se espera a que llegue.
+      // Si la sesión está en la otra pestaña (pendientes / enviados), se
+      // cambia a ésa: los avisos casi siempre son de algo ya enviado.
+      let probadas = 0;
       for (let i = 0; i < 40; i++) {
+        const gsAhora = window._cursosCertGrupos || [];
+        const cargado = typeof perCertCargados === 'undefined' || perCertCargados;
+        if (cargado && !gsAhora.some(g => (g.participantes || []).some(p => +p.id === +id))
+            && typeof bjPerCur !== 'undefined' && probadas < 2) {
+          bjPerCur.elegir(probadas === 0 ? 'env' : 'pend');
+          probadas++;
+          await new Promise(r => setTimeout(r, 150));
+          continue;
+        }
         const gs = window._cursosCertGrupos || [];
         const idx = gs.findIndex(g => (g.participantes || []).some(p => +p.id === +id));
         if (idx >= 0 && typeof abrirCursoCert === 'function' && (typeof perCertCargados === 'undefined' || perCertCargados)) {

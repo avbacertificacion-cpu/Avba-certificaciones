@@ -561,6 +561,7 @@
   <script src="js/tabla-clientes.js"></script>
   <script src="js/envios.js"></script>
   <script src="js/control-documentos.js"></script>
+  <script src="js/bandejas.js"></script>
   <link rel="stylesheet" href="css/movil.css">
 </head>
 <body>
@@ -624,10 +625,8 @@
     <input id="fSerie"      placeholder="Serie...">
     <input id="fFolio"      placeholder="Folio / Control...">
     <select id="fEstado">
-      <option value="">Todos los estados</option>
-      <option value="APROBADO CALIDAD">Aprobado — pendiente envío</option>
-      <option value="ENVIADO">Enviado</option>
-      <option value="VENCE_PRONTO">Por vencer</option>
+      <option value="">Todas las vigencias</option>
+      <option value="VENCE_PRONTO">Por vencer (30 días)</option>
     </select>
     <button class="btn-filtrar" onclick="filtrar()">Filtrar</button>
     <button class="btn-limpiar" onclick="limpiarFiltros()">Limpiar</button>
@@ -1423,7 +1422,25 @@ function filaCert(r, agrupado) {
       <td><button class="btn-ver" onclick="event.stopPropagation();ver(${r.fila})">Abrir</button></td>`;
 }
 
-function render(data) { tabla.render(data); }
+/* ═══ Bandejas: lo pendiente de enviar y lo ya enviado, en pestañas ═══ */
+const esEnviadoCert = e => ['ENVIADO', 'EMITIDO'].includes(String(e || '').toUpperCase());
+const TABS_CERT = (enviado, extra = {}) => [
+  { key: 'pend', label: 'Pendientes de enviar', corto: 'Pendientes', match: x => !enviado(x), ...extra.pend },
+  { key: 'env',  label: 'Enviados',             match: x =>  enviado(x), tono: 'ok' },
+];
+const bjEq  = Bandejas.montar({ id: 'cert-eq',  antesDe: '#sec-maquinaria .filtros-card',
+  tabs: TABS_CERT(r => esEnviadoCert(r.estado)), alCambiar: () => filtrar() });
+const bjAcc = Bandejas.montar({ id: 'cert-acc', antesDe: '#sec-accesorios .filtros-card',
+  tabs: TABS_CERT(r => esEnviadoCert(r.estatus)), alCambiar: () => filtrarAccCert() });
+const bjArn = Bandejas.montar({ id: 'cert-arn', antesDe: '#sec-arneses .tabla-card',
+  tabs: TABS_CERT(s => esEnviadoCert(s.estatus)), alCambiar: () => renderArnCert() });
+// Una sesión de personal está enviada cuando ya se emitió a todos sus participantes.
+const bjPerCur = Bandejas.montar({ id: 'cert-per-cur', antesDe: '#sec-per-cursos .filtros-card',
+  tabs: TABS_CERT(g => (g.participantes || []).every(p => esEnviadoCert(p.estatus))), alCambiar: () => filtrarPerCursosCert() });
+const bjPerInd = Bandejas.montar({ id: 'cert-per-ind', antesDe: '#sec-per-indep .filtros-card',
+  tabs: TABS_CERT(p => esEnviadoCert(p.estatus)), alCambiar: () => filtrarPerIndepCert() });
+
+function render(data) { bjEq.pintar(data); tabla.render(bjEq.filtrar(data)); }
 
 function alternarAgrupado() {
   const agr = !tabla.estaAgrupado();
@@ -2478,11 +2495,17 @@ function renderArnCert() {
   document.getElementById('arnc-aptos').textContent  = aptos;
   document.getElementById('arnc-count').textContent  = tot + (tot === 1 ? ' inspección' : ' inspecciones');
 
+  bjArn.pintar(_arncSesiones);
+  const lista = bjArn.filtrar(_arncSesiones);
   if (!tot) {
     cont.innerHTML = '<div style="text-align:center;padding:30px;color:var(--texto-hint)">No hay inspecciones de arneses en Certificaciones.</div>';
     return;
   }
-  cont.innerHTML = _arncSesiones.map(s => `
+  if (!lista.length) {
+    cont.innerHTML = '<div style="text-align:center;padding:30px;color:var(--texto-hint)">No hay inspecciones en esta pestaña.</div>';
+    return;
+  }
+  cont.innerHTML = lista.map(s => `
     <div style="border:1px solid var(--borde);border-radius:10px;padding:13px 15px;margin-bottom:10px;background:#fff">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:180px">
@@ -2826,6 +2849,8 @@ function estatusCertBadge(e) {
 }
 
 function renderAccCert(data) {
+  bjAcc.pintar(data);
+  data = bjAcc.filtrar(data);
   const tbody = document.getElementById('acc-cert-tabla');
   document.getElementById('acc-cert-count').textContent = data.length + (data.length === 1 ? ' sesión' : ' sesiones');
   if (!data.length) {
@@ -3646,6 +3671,8 @@ function limpiarPerCursosCert() {
 }
 
 function renderCursosCert(grupos) {
+  bjPerCur.pintar(grupos);
+  grupos = bjPerCur.filtrar(grupos);
   const tbody = document.getElementById('pc-tabla');
   document.getElementById('pc-count').textContent =
     grupos.length + (grupos.length === 1 ? ' sesión' : ' sesiones');
@@ -4098,7 +4125,8 @@ function limpiarPerIndepCert() {
 }
 
 function renderIndepCert(data) {
-  const indep = data.filter(p => !p.empresa_nombre);
+  bjPerInd.pintar(data.filter(p => !p.empresa_nombre));
+  const indep = bjPerInd.filtrar(data.filter(p => !p.empresa_nombre));
   const tbody = document.getElementById('pi-tabla');
   if (!tbody) return;
   document.getElementById('pi-count').textContent = indep.length + ' registro' + (indep.length !== 1 ? 's' : '');

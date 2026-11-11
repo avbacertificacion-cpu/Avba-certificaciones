@@ -750,6 +750,7 @@
   .qrx-msg { font-size:12px; margin-top:6px; }
 </style>
   <script src="js/tabla-clientes.js"></script>
+  <script src="js/bandejas.js"></script>
   <script src="js/envios.js"></script>
   <script src="js/solicitudes-cert.js"></script>
   <link rel="stylesheet" href="css/movil.css">
@@ -848,8 +849,8 @@
     <select id="fEstado">
       <option value="">Todos los estados</option>
       <option value="PENDIENTE">Pendiente</option>
+      <option value="RETORNADO">Retornado</option>
       <option value="NO CONFORME">No conforme</option>
-      <option value="APROBADO CALIDAD">Aprobado</option>
     </select>
     <button class="btn-filtrar" onclick="filtrar()">Filtrar</button>
     <button class="btn-limpiar" onclick="limpiarFiltros()">Limpiar</button>
@@ -2704,7 +2705,44 @@ function filaCalidad(r, agrupado) {
       <td><button class="btn-ver" onclick="event.stopPropagation();ver(${r.fila})">Ver detalle</button></td>`;
 }
 
-function render(data) { tabla.render(data); }
+/* ═══ Bandejas: lo pendiente o retornado, lo que trae observaciones o no
+   conformidades, y lo ya aprobado, en pestañas separadas ═══ */
+const _E = v => String(v || '').toUpperCase();
+const APROBADO_CAL = e => ['APROBADO CALIDAD', 'APROBADO_CALIDAD', 'EMITIDO', 'ENVIADO'].includes(_E(e));
+/* Clasificación de una sesión (accesorios, arneses) o de un participante:
+   retornado por Certificaciones → pendiente (hay que atenderlo); devuelto al
+   inspector o con piezas que no cumplen → observaciones; aprobado → aprobados. */
+function bandejaCal(estatus, noConformes) {
+  const e = _E(estatus);
+  if (APROBADO_CAL(e)) return 'apro';
+  if (e === 'RETORNADO') return 'pend';
+  if (['DEVUELTO', 'NO CONFORME', 'RECHAZADO', 'NO CUMPLE'].includes(e) || (+noConformes || 0) > 0) return 'obs';
+  return 'pend';
+}
+const TABS_CAL = clase => [
+  { key: 'pend', label: 'Pendientes y retornados',          corto: 'Pendientes',    match: x => clase(x) === 'pend' },
+  { key: 'obs',  label: 'Con observaciones / no conformes', corto: 'Observadas', match: x => clase(x) === 'obs', tono: 'alerta' },
+  { key: 'apro', label: 'Aprobados',                         match: x => clase(x) === 'apro', tono: 'ok' },
+];
+// Maquinaria: Calidad sólo lista lo que no ha aprobado, así que no lleva "Aprobados".
+const bjCalEq = Bandejas.montar({ id: 'cal-eq', antesDe: '#sec-maquinaria .filtros-card',
+  tabs: TABS_CAL(r => bandejaCal(r.estado, 0)).slice(0, 2), alCambiar: () => filtrar() });
+const bjCalAcc = Bandejas.montar({ id: 'cal-acc', antesDe: '#sec-acc-inspeccionados .filtros-card',
+  tabs: TABS_CAL(r => bandejaCal(r.estatus, r.no_cumple)), alCambiar: () => filtrarSesionesAcc() });
+const bjCalArn = Bandejas.montar({ id: 'cal-arn', antesDe: '#arn-cal-lista',
+  tabs: TABS_CAL(s => bandejaCal(s.estatus, s.no_aptos)), alCambiar: () => renderSesionesArn() });
+// Una sesión de personal: con alguien devuelto → observaciones; con alguien
+// por aprobar → pendientes; todos aprobados → aprobados.
+const claseSesionPer = g => {
+  const cs = (g.participantes || []).map(p => bandejaCal(p.estatus, 0));
+  return cs.includes('obs') ? 'obs' : cs.includes('pend') ? 'pend' : 'apro';
+};
+const bjCalPerCur = Bandejas.montar({ id: 'cal-per-cur', antesDe: '#sec-personal-cursos .filtros-card',
+  tabs: TABS_CAL(claseSesionPer), alCambiar: () => filtrarCursosSesiones() });
+const bjCalPerInd = Bandejas.montar({ id: 'cal-per-ind', antesDe: '#sec-personal-indep .filtros-card',
+  tabs: TABS_CAL(p => bandejaCal(p.estatus, 0)), alCambiar: () => filtrarIndep() });
+
+function render(data) { bjCalEq.pintar(data); tabla.render(bjCalEq.filtrar(data)); }
 
 function alternarAgrupado() {
   const agr = !tabla.estaAgrupado();
@@ -4942,6 +4980,8 @@ function estatusAccBadge(e) {
 }
 
 function renderSesionesAcc(data) {
+  bjCalAcc.pintar(data);
+  data = bjCalAcc.filtrar(data);
   const tbody = document.getElementById('tbody-acc-sesiones');
   document.getElementById('acc-count').textContent = data.length + (data.length === 1 ? ' sesión' : ' sesiones');
   if (!data.length) {
@@ -5795,6 +5835,8 @@ function filtrarCursosSesiones() {
 let _calSesiones = [];
 
 function renderCursosSesiones(lista) {
+  bjCalPerCur.pintar(lista);
+  lista = bjCalPerCur.filtrar(lista);
   _calSesiones = lista;
   const tbody = document.getElementById('tbody-per-cursos');
   document.getElementById('per-cursos-count').textContent = lista.length + (lista.length === 1 ? ' sesión' : ' sesiones');
@@ -5845,6 +5887,8 @@ function estatusPerBadge(e) {
 }
 
 function renderIndep(data) {
+  bjCalPerInd.pintar(data);
+  data = bjCalPerInd.filtrar(data);
   const tbody = document.getElementById('tbody-per-indep');
   document.getElementById('per-indep-count').textContent = data.length + ' participante' + (data.length!==1?'s':'');
   if (!data.length) {
@@ -8423,11 +8467,17 @@ function _arnBadge(est) {
 
 function renderSesionesArn() {
   const cont = document.getElementById('arn-cal-lista');
+  bjCalArn.pintar(_arnSesiones);
+  const lista = bjCalArn.filtrar(_arnSesiones);
   if (!_arnSesiones.length) {
     cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--texto-hint)">Sin inspecciones de arneses registradas.</div>';
     return;
   }
-  cont.innerHTML = fusionBarra('arn') + _arnSesiones.map(s => `
+  if (!lista.length) {
+    cont.innerHTML = '<div style="text-align:center;padding:40px;color:var(--texto-hint)">No hay inspecciones en esta pestaña.</div>';
+    return;
+  }
+  cont.innerHTML = fusionBarra('arn') + lista.map(s => `
     <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--borde);border-radius:10px;margin-bottom:8px;background:#fff">
       <input type="checkbox" class="fus-arn" value="${s.id}" data-cliente="${escH(s.cliente||'')}"
              onchange="fusionActualizar('arn')" onclick="event.stopPropagation()"
