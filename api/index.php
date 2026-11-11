@@ -383,21 +383,6 @@ if ($method === 'GET') {
             respuesta($insp->obtenerChecklistPorEquipo($_GET['equipo'] ?? ''));
 
         // Panel de Calidad
-        // QR adicionales de un equipo: cualquiera lleva a su validación.
-        case 'QR_EXTRA_LISTAR':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cal->listarQrExtra((int)($payload['equipo_id'] ?? 0)));
-        case 'QR_EXTRA_AGREGAR':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cal->agregarQrExtra((int)($payload['equipo_id'] ?? 0), (string)($payload['qr'] ?? ''),
-                                           (string)($payload['nota'] ?? ''), $usr['usuario']));
-        case 'QR_EXTRA_QUITAR':
-            $usr = validarToken($pdo, $token);
-            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cal->quitarQrExtra((int)($payload['id'] ?? 0), $usr['usuario']));
-
         case 'getDataCalidad':
         case 'GET_DATA_CALIDAD':
             $usr = validarToken($pdo, $token);
@@ -1623,6 +1608,21 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cert->generarPdfDesdeWord((int)($payload['id'] ?? $payload['fila'] ?? 0), 'dict', $usr['usuario']));
+
+        // QR adicionales de un equipo: cualquiera lleva a su validación.
+        case 'QR_EXTRA_LISTAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->listarQrExtra((int)($payload['equipo_id'] ?? 0)));
+        case 'QR_EXTRA_AGREGAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->agregarQrExtra((int)($payload['equipo_id'] ?? 0), (string)($payload['qr'] ?? ''),
+                                           (string)($payload['nota'] ?? ''), $usr['usuario']));
+        case 'QR_EXTRA_QUITAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->quitarQrExtra((int)($payload['id'] ?? 0), $usr['usuario']));
 
         // ── Control de documentos: lo emitido y lo enviado contra lo de hoy ──
         // Por cada documento, con qué datos se generó el PDF vigente y con
