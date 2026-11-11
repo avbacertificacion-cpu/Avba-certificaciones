@@ -16,6 +16,15 @@ on:
 # conexiones lo hace durante un rato: con esperas de 20 y 40 segundos los tres
 # intentos caían dentro del mismo mal momento y el despliegue se perdía entero.
 # Ya pasó una vez, y dejó el sistema con media versión subida.
+# Un despliegue a la vez, y siempre el más nuevo. Sin esto, cuando GitHub
+# tarda en arrancar los trabajos, dos publicaciones en cola podían correr al
+# revés: la vieja terminaba después y dejaba en el servidor la versión
+# anterior. Con el mismo grupo, un despliegue pendiente que queda atrás lo
+# reemplaza el más reciente; el que ya está subiendo archivos no se corta.
+concurrency:
+  group: deploy-hostinger
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
