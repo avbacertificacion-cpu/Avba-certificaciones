@@ -700,13 +700,23 @@ class Certificaciones {
 
                     if ($nombreCampo === 'qr_imagen') {
                         $qrCodigo = $valoresResueltos['qr_codigo'] ?? '';
+                        $qrCodigo2 = trim((string)($datos['qr_codigo_2'] ?? ''));
                         if ($qrCodigo) {
-                            $alto  = (float)($campo['alto'] ?? $ancho ?: 25);
-                            $qrTmp = sys_get_temp_dir() . '/avba_qr_' . uniqid() . '.png';
-                            $qrData = qrCodigoPngBytes($qrCodigo);
-                            if ($qrData) {
+                            $lado  = $ancho ?: 25;
+                            $alto  = (float)($campo['alto'] ?? $lado);
+                            // Con segundo QR los dos van en el mismo espacio,
+                            // lado a lado: no se encima nada de la plantilla.
+                            $codigos = $qrCodigo2 !== '' ? [$qrCodigo, $qrCodigo2] : [$qrCodigo];
+                            $n   = count($codigos);
+                            $sep = $n > 1 ? 1.5 : 0;
+                            $w   = ($lado - $sep * ($n - 1)) / $n;
+                            $h   = $n > 1 ? $w : $alto;
+                            foreach ($codigos as $i => $cod) {
+                                $qrData = qrCodigoPngBytes($cod);
+                                if (!$qrData) continue;
+                                $qrTmp = sys_get_temp_dir() . '/avba_qr_' . uniqid() . '.png';
                                 file_put_contents($qrTmp, $qrData);
-                                $pdf->Image($qrTmp, $x, $y, $ancho ?: 25, $alto);
+                                $pdf->Image($qrTmp, $x + $i * ($w + $sep), $y + ($n > 1 ? ($alto - $h) / 2 : 0), $w, $h);
                                 @unlink($qrTmp);
                             }
                         }
@@ -2873,6 +2883,7 @@ SVG;
 
         $html = file_get_contents($templatePath);
         $html = $this->recortarBloqueHorquillas($html, $d);
+        $html = $this->dosQrEnPlantilla($html, $d, $map);
         $html = str_replace(array_keys($map), array_values($map), $html);
 
         if ($sinSellos) {
@@ -2881,6 +2892,27 @@ SVG;
         }
 
         return $html;
+    }
+
+    /**
+     * Casos excepcionales: el equipo trae dos etiquetas y el certificado lleva
+     * los dos QR, uno junto al otro y cada uno con su número; cualquiera de los
+     * dos lleva a la misma validación. Con un solo QR la plantilla queda igual.
+     */
+    private function dosQrEnPlantilla(string $html, array $d, array &$map): string {
+        $qr1 = trim((string)($d['qr_codigo'] ?? ''));
+        $qr2 = trim((string)($d['qr_codigo_2'] ?? ''));
+        if ($qr2 === '' || $qr1 === '') return $html;
+        try { $b64 = $this->descargarQrB64($qr2); } catch (\Throwable $e) { return $html; }
+        $e    = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        $celda = fn(string $src, string $num) =>
+            '<td style="padding:0 1.2mm;text-align:center;vertical-align:top;">'
+          . '<img src="' . $src . '" width="66" height="66" style="display:block;margin:0 auto;border:1px solid #c0ccd8;">'
+          . '<div style="font-size:5.5pt;color:#5070a0;margin-top:0.6mm;letter-spacing:0.2px;">' . $e($num) . '</div></td>';
+        $doble = '<table style="margin:0 auto 1.5mm;border-collapse:collapse;"><tr>'
+               . $celda('{qr_imagen}', $qr1) . $celda('{qr_imagen_2}', $qr2) . '</tr></table>';
+        $map['{qr_imagen_2}'] = $b64;
+        return preg_replace('/<img\s+src="\{qr_imagen\}"[^>]*>/', $doble, $html, 1) ?? $html;
     }
 
     /**

@@ -2775,6 +2775,16 @@ function ver(fila) {
     <div class="field"><label>Capacidad</label>   <input id="e-capacidad" value="${esc(d.capacidad || '')}" ${dis}></div>
   </div>`;
 
+  // Código QR. En casos excepcionales el equipo trae dos etiquetas: el mismo
+  // certificado lleva los dos QR y cualquiera lleva a la misma validación.
+  body += `<div class="sec-label">Código QR</div>
+  <div class="grid2">
+    <div class="field"><label>QR principal</label><input value="${esc(d.qr_codigo || '')}" disabled placeholder="Se asigna al aprobar"></div>
+    <div class="field"><label>QR adicional <span style="font-weight:400;color:var(--texto-hint)">(opcional · casos excepcionales)</span></label>
+      <input id="e-qr2" value="${esc(d.qr_codigo_2 || '')}" maxlength="10" inputmode="numeric" placeholder="Segunda etiqueta del equipo" ${dis}></div>
+  </div>
+  <div style="font-size:11px;color:var(--texto-hint);margin:-4px 0 10px">Con QR adicional el certificado imprime los dos códigos y ambos llevan a la misma validación. Déjalo vacío si el equipo sólo tiene una etiqueta.</div>`;
+
   // Datos del cliente
   body += `<div class="sec-label">Cliente y contacto</div>
   <div class="grid2">
@@ -3741,6 +3751,9 @@ async function guardar() {
       direccion:  document.getElementById("e-direccion")?.value  || "",
       capacidad:  document.getElementById("e-capacidad")?.value  || "",
     };
+    // El segundo QR sólo viaja si el campo está en la ficha (vacío = quitarlo).
+    const qr2El = document.getElementById("e-qr2");
+    if (qr2El && !qr2El.disabled) payload.qr_codigo_2 = qr2El.value.trim();
 
     // Recoger cambios de prueba de carga si existe la sección
     const pcPlantillaEl = document.getElementById('pc-plantilla');

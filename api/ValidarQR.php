@@ -109,9 +109,11 @@ class ValidarQR {
             );
             $stmt->execute([$q]);
         } else {
+            // Cualquiera de sus dos QR lleva al mismo certificado.
+            $cond = columnaExiste($this->pdo, 'equipos', 'qr_codigo_2') ? '? IN (qr_codigo, qr_codigo_2)' : 'qr_codigo = ?';
             $stmt = $this->pdo->prepare(
                 "SELECT maquinaria, marca, modelo, serie, capacidad, fecha_inspeccion
-                 FROM equipos WHERE qr_codigo = ? LIMIT 1"
+                 FROM equipos WHERE {$cond} LIMIT 1"
             );
             $stmt->execute([$q]);
         }

@@ -13,6 +13,7 @@ class Calidad {
 
     // ── Obtener registros pendientes de revisión ───────────
     public function getDataCalidad(): array {
+        $qr2 = asegurarQr2Equipos($this->pdo) ? 'qr_codigo_2,' : "'' AS qr_codigo_2,";
         $stmt = $this->pdo->query(
             "SELECT id, id AS fila,
                     DATE_FORMAT(marca_temporal, '%d/%m/%Y %H:%i') AS marca_temporal,
@@ -20,7 +21,7 @@ class Calidad {
                     id_equipo,
                     DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
                     correo, control, evidencia_url AS evidencia, direccion, capacidad,
-                    disponibilidad, estado, motivo, qr_codigo,
+                    disponibilidad, estado, motivo, qr_codigo, {$qr2}
                     certificado_url AS link, dictamen_url AS dictamen,
                     envio_direccion AS envio, coordenadas_envio,
                     reporte_url, prueba_carga, inspector
@@ -145,6 +146,42 @@ class Calidad {
         return ['status' => 'success', 'message' => 'Inspector que firma actualizado: ' . ($insp['nombre'] ?? $inspector) . '.'];
     }
 
+    /**
+     * Asigna, cambia o quita el segundo QR de un equipo. Devuelve un error, o
+     * null si quedó bien (o no había nada que cambiar).
+     */
+    private function guardarQr2(int $id, string $qr2, array $row, string $usuario): ?array {
+        if (!asegurarQr2Equipos($this->pdo)) {
+            return ['status' => 'error', 'message' => 'No se pudo preparar el campo del segundo QR.'];
+        }
+        $qr2      = trim($qr2);
+        $anterior = trim((string)($row['qr_codigo_2'] ?? ''));
+        if ($qr2 === $anterior) return null;
+
+        if ($qr2 !== '') {
+            if (!qrFormatoValido($qr2)) return ['status' => 'error', 'message' => qrMensajeFormato()];
+            if ($qr2 === trim((string)($row['qr_codigo'] ?? ''))) {
+                return ['status' => 'error', 'message' => 'El segundo QR es el mismo que el principal.'];
+            }
+            // Que no lo traiga ningún otro registro (de ningún módulo).
+            $excepto = ['tabla' => 'equipos', 'id' => $id];
+            $fallas  = [];
+            if (duenoDelQR($this->pdo, $qr2, $excepto, $fallas) !== null) {
+                return respuestaQrOcupado($this->pdo, $qr2, $excepto);
+            }
+        }
+
+        $this->pdo->prepare("UPDATE equipos SET qr_codigo_2 = ? WHERE id = ?")
+                  ->execute([$qr2 !== '' ? $qr2 : null, $id]);
+        if ($anterior !== '') {
+            $this->pdo->prepare("UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?")
+                      ->execute([$anterior]);
+        }
+        if ($qr2 !== '') qrRegistrarUsado($this->pdo, $qr2, $id);
+        registrarHistorial($this->pdo, $usuario, $id, 'qr_codigo_2', $anterior ?: null, $qr2 ?: null);
+        return null;
+    }
+
     // ── Actualizar datos en calidad ────────────────────────
     public function actualizarCalidad(array $payload, string $usuario): array {
         $id = (int) ($payload['id'] ?? $payload['fila'] ?? 0);
@@ -212,6 +249,14 @@ class Calidad {
             $params[] = $horaDb;
             registrarHistorial($this->pdo, $usuario, $id, 'hora_inspeccion',
                                $row['hora_inspeccion'] ?? null, $horaDb);
+        }
+
+        // Segundo QR (casos excepcionales): el mismo certificado con dos
+        // códigos, y cualquiera de los dos lleva a la misma validación. Vacío
+        // lo quita y devuelve el código al banco.
+        if (array_key_exists('qr_codigo_2', $payload)) {
+            $r2 = $this->guardarQr2($id, (string)$payload['qr_codigo_2'], $row, $usuario);
+            if ($r2 !== null) return $r2;
         }
 
         // QR manual

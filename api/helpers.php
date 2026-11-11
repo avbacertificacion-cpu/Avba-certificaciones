@@ -442,6 +442,21 @@ function cuentaPrincipalCliente(PDO $pdo, string $idCliente): ?array {
 }
 
 /**
+ * Columna del segundo código QR de un equipo. En casos excepcionales un mismo
+ * certificado lleva dos QR (dos etiquetas en el equipo) y cualquiera de los
+ * dos lleva a la misma validación.
+ */
+function asegurarQr2Equipos(PDO $pdo): bool {
+    if (columnaExiste($pdo, 'equipos', 'qr_codigo_2')) return true;
+    try {
+        $pdo->exec("ALTER TABLE equipos ADD COLUMN qr_codigo_2 VARCHAR(20) NULL");
+    } catch (\Throwable $e) {
+        error_log('[QR2] columna: ' . $e->getMessage());
+    }
+    return columnaExiste($pdo, 'equipos', 'qr_codigo_2');
+}
+
+/**
  * Número de acreditación ante la ema para los documentos.
  *
  * Sale de NO_ACREDITACION en config/config.php. Si el servidor no la trae
@@ -943,11 +958,14 @@ function duenoDelQR(PDO $pdo, string $qr, array $excepto = [], ?array &$fallas =
     $saltar = fn(string $tabla, $id) =>
         ($excepto['tabla'] ?? '') === $tabla && (int)($excepto['id'] ?? 0) === (int)$id;
 
+    // El segundo QR de un equipo (casos excepcionales) también es suyo.
+    $condEquipo = columnaExiste($pdo, 'equipos', 'qr_codigo_2') ? '? IN (qr_codigo, qr_codigo_2)' : 'qr_codigo = ?';
+
     // Cada entrada: [tabla, SQL, cómo describir al dueño].
     $fuentes = [
         ['equipos',
          "SELECT id, control, cliente, maquinaria, marca, modelo, serie
-            FROM equipos WHERE qr_codigo = ? LIMIT 1",
+            FROM equipos WHERE {$condEquipo} LIMIT 1",
          'Equipos',
          fn($r) => trim(implode(' ', array_filter([$r['maquinaria'], $r['marca'], $r['modelo']])))
                  . (trim((string)$r['serie']) !== '' ? ' · s/n ' . $r['serie'] : '')],
