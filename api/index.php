@@ -384,10 +384,10 @@ if ($method === 'GET') {
 
         // Panel de Calidad
         // QR adicionales de un equipo: cualquiera lleva a su validación.
-        case 'QR_EXTRA_BUSCAR':
+        case 'QR_EXTRA_LISTAR':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($cal->buscarEquiposQr((string)($payload['q'] ?? '')));
+            respuesta($cal->listarQrExtra((int)($payload['equipo_id'] ?? 0)));
         case 'QR_EXTRA_AGREGAR':
             $usr = validarToken($pdo, $token);
             if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

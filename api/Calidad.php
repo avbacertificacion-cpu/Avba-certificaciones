@@ -151,25 +151,10 @@ class Calidad {
     //  sólo imprime el principal. Ver asegurarQrExtraEquipos().
     // ══════════════════════════════════════════════════════════
 
-    /** Equipos de cualquier estado, por folio, serie, QR (principal o adicional) o cliente. */
-    public function buscarEquiposQr(string $q): array {
-        $q = trim($q);
-        if (mb_strlen($q) < 3) return ['status' => 'success', 'data' => []];
-        $extra = asegurarQrExtraEquipos($this->pdo);
-        $like  = '%' . $q . '%';
-        $st = $this->pdo->prepare(
-            "SELECT e.id, e.control, e.cliente, e.maquinaria, e.marca, e.modelo, e.serie, e.qr_codigo, e.estado,
-                    e.fecha_inspeccion
-             FROM equipos e
-             WHERE e.control LIKE ? OR e.serie LIKE ? OR e.qr_codigo = ? OR e.cliente LIKE ?"
-            . ($extra ? " OR e.id IN (SELECT equipo_id FROM equipos_qr_extra WHERE qr = ?)" : '')
-            . " ORDER BY e.id DESC LIMIT 25"
-        );
-        $st->execute($extra ? [$like, $like, $q, $like, strtoupper($q)] : [$like, $like, $q, $like]);
-        $equipos = $st->fetchAll(PDO::FETCH_ASSOC);
-        foreach ($equipos as &$e) $e['qr_extra'] = $extra ? $this->qrExtraDe((int)$e['id']) : [];
-        unset($e);
-        return ['status' => 'success', 'data' => $equipos];
+    /** Los QR adicionales de un equipo, para su ficha. */
+    public function listarQrExtra(int $equipoId): array {
+        if (!asegurarQrExtraEquipos($this->pdo)) return ['status' => 'success', 'qr_extra' => []];
+        return ['status' => 'success', 'qr_extra' => $this->qrExtraDe($equipoId)];
     }
 
     private function qrExtraDe(int $equipoId): array {

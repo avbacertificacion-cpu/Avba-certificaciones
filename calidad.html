@@ -739,15 +739,7 @@
     .env-no { font-size:10.5px; font-weight:700; color:var(--rojo);
       background:var(--rojo-light); border-radius:20px; padding:3px 9px; white-space:nowrap; cursor:help; }
   /* QR adicionales de un equipo */
-  .qrx-card { background:#fff; border:1.5px solid var(--borde); border-radius:12px; padding:16px 18px; margin-bottom:22px; }
-  .qrx-tit  { font-weight:700; font-size:15px; color:var(--azul-dark); margin-bottom:4px; }
-  .qrx-sub  { font-size:12px; color:var(--texto-sub); line-height:1.55; margin-bottom:12px; }
-  .qrx-buscar { display:flex; gap:8px; flex-wrap:wrap; }
-  .qrx-buscar input { flex:1 1 240px; min-width:0; padding:10px 12px; border:1.5px solid var(--borde); border-radius:8px; font-size:14px; }
-  .qrx-buscar button, .qrx-add button { padding:10px 16px; border:none; border-radius:8px; background:var(--azul); color:#fff; font-weight:600; font-size:13px; cursor:pointer; min-height:42px; }
-  .qrx-eq   { border:1px solid var(--borde); border-radius:10px; padding:12px 14px; margin-top:12px; }
-  .qrx-eq-t { font-weight:700; font-size:13px; }
-  .qrx-eq-s { font-size:12px; color:var(--texto-sub); margin:2px 0 8px; }
+  .qrx-add button { padding:10px 16px; border:none; border-radius:8px; background:var(--azul); color:#fff; font-weight:600; font-size:13px; cursor:pointer; min-height:42px; }
   .qrx-chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
   .qrx-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:20px; font-family:monospace; font-size:13px; background:#eef3f9; border:1px solid #c9d6e6; }
   .qrx-chip.princ { background:#e8f5e9; border-color:#9ccc9f; }
@@ -1280,19 +1272,6 @@
 <!-- ══ SECCIÓN: CÓDIGOS QR ══ -->
 <div id="sec-qr" class="wrap" style="display:none">
 
-  <!-- QR adicionales de un equipo: documentos ya entregados con otro QR -->
-  <div class="qrx-card">
-    <div class="qrx-tit">QR adicionales de un equipo</div>
-    <div class="qrx-sub">Cuando el cliente ya tiene un documento de un equipo con otro QR (o un número), agrégalo aquí y
-      ese QR llevará a la validación del mismo equipo. Un equipo puede tener los que haga falta. Los documentos no
-      cambian: el certificado sigue imprimiendo sólo el QR principal.</div>
-    <div class="qrx-buscar">
-      <input id="qrx-q" type="search" placeholder="Busca el equipo: folio, serie, QR o cliente" autocomplete="off"
-             onkeydown="if(event.key==='Enter')qrxBuscar()">
-      <button type="button" onclick="qrxBuscar()">Buscar</button>
-    </div>
-    <div id="qrx-res"></div>
-  </div>
 
   <!-- Stats row -->
   <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px">
@@ -2807,6 +2786,12 @@ function ver(fila) {
     <div class="field"><label>Capacidad</label>   <input id="e-capacidad" value="${esc(d.capacidad || '')}" ${dis}></div>
   </div>`;
 
+  // Códigos QR del equipo: el principal (el que imprime el certificado) y los
+  // adicionales —documentos ya entregados con otro QR—, que llevan a la misma
+  // validación. Se agregan y quitan aquí mismo, sin tocar ningún documento.
+  body += `<div class="sec-label">Códigos QR</div>
+  <div id="qrx-ficha">${qrxFichaHtml({ id: d.fila, qr_codigo: d.qr_codigo, qr_extra: null })}</div>`;
+
 
 
   // Datos del cliente
@@ -3010,6 +2995,7 @@ function ver(fila) {
 
   body += `<div style="height:8px"></div>`;
   document.getElementById("modal-body").innerHTML = body;
+  qrxCargarFicha(d.fila);
 
   // ── Footer según estado ──
   let footer = "";
@@ -4056,36 +4042,26 @@ async function qrxPedir(action, payload) {
   const r = await fetch(API, { method: 'POST', body: JSON.stringify({ action, payload }) });
   return r.json();
 }
-async function qrxBuscar() {
-  const q = (document.getElementById('qrx-q').value || '').trim();
-  const box = document.getElementById('qrx-res');
-  if (q.length < 3) { box.innerHTML = '<div class="qrx-msg" style="color:var(--texto-hint)">Escribe al menos 3 caracteres.</div>'; return; }
-  box.innerHTML = '<div class="qrx-msg" style="color:var(--texto-hint)">Buscando…</div>';
-  try {
-    const d = await qrxPedir('QR_EXTRA_BUSCAR', { q });
-    if (d.status !== 'success') throw new Error(d.message || 'No se pudo buscar');
-    if (!d.data.length) { box.innerHTML = '<div class="qrx-msg" style="color:var(--texto-hint)">No se encontró ningún equipo.</div>'; return; }
-    box.innerHTML = d.data.map(qrxEquipoHtml).join('');
-  } catch (e) { box.innerHTML = `<div class="qrx-msg" style="color:var(--rojo)">${escH(e.message)}</div>`; }
-}
-function qrxEquipoHtml(e) {
-  const extras = (e.qr_extra || []).map(x => `<span class="qrx-chip" title="${escH((x.nota ? x.nota + ' · ' : '') + 'agregado por ' + (x.creado_por || '—'))}">${escH(x.qr)}
-      <button type="button" aria-label="Quitar ${escH(x.qr)}" onclick="qrxQuitar(${x.id}, ${e.id}, '${escH(x.qr)}')">×</button></span>`).join('');
-  return `<div class="qrx-eq" id="qrx-eq-${e.id}">
-    <div class="qrx-eq-t">${escH(e.control ? 'Folio ' + e.control : 'Sin folio')} · ${escH(e.cliente || '—')}</div>
-    <div class="qrx-eq-s">${escH([e.maquinaria, e.marca, e.modelo].filter(Boolean).join(' '))}${e.serie ? ' · s/n ' + escH(e.serie) : ''} · ${escH(e.estado || '')}</div>
-    <div class="qrx-chips">
+/** Bloque de la ficha: QR principal, adicionales (se cargan aparte) y alta. */
+function qrxFichaHtml(e) {
+  return `<div class="qrx-chips">
       <span class="qrx-chip princ">${escH(e.qr_codigo || 'sin QR')} <small>principal · el del certificado</small></span>
-      <span id="qrx-extras-${e.id}" style="display:contents">${extras}</span>
+      <span id="qrx-extras-${e.id}" style="display:contents">${e.qr_extra === null ? '<span class="qrx-msg" style="color:var(--texto-hint)">Cargando adicionales…</span>' : ''}</span>
     </div>
     <div class="qrx-add">
       <input id="qrx-nuevo-${e.id}" placeholder="QR o número adicional" maxlength="30" autocomplete="off"
-             onkeydown="if(event.key==='Enter')qrxAgregar(${e.id})">
+             onkeydown="if(event.key==='Enter'){event.preventDefault();qrxAgregar(${e.id})}">
       <input id="qrx-nota-${e.id}" placeholder="Nota (opcional)" maxlength="200">
-      <button type="button" onclick="qrxAgregar(${e.id})">Agregar</button>
+      <button type="button" onclick="qrxAgregar(${e.id})">Agregar QR</button>
     </div>
     <div class="qrx-msg" id="qrx-msg-${e.id}"></div>
-  </div>`;
+    <div style="font-size:11px;color:var(--texto-hint);margin-top:4px;line-height:1.5">Si el cliente ya tiene un documento de este equipo con otro QR (o un número), agrégalo y llevará a la misma validación. Puede tener los que haga falta. El certificado imprime sólo el principal.</div>`;
+}
+async function qrxCargarFicha(eqId) {
+  try {
+    const d = await qrxPedir('QR_EXTRA_LISTAR', { equipo_id: eqId });
+    if (d.status === 'success') qrxPintarExtras(eqId, d.qr_extra);
+  } catch (e) { qrxPintarExtras(eqId, []); }
 }
 function qrxPintarExtras(eqId, lista) {
   const el = document.getElementById('qrx-extras-' + eqId);
