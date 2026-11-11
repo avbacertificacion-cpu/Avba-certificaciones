@@ -1204,7 +1204,7 @@ class Certificaciones {
         // la plantilla, porque la inyección ni siquiera llegaba a ejecutarse.
         $html = $this->recortarBloquePruebaCarga($html, $pcDatos);
         if ($hayPc) {
-            $html = $this->inyectarPruebaCargaDictamen($html, $pcDatos, $d);
+            $html = $this->inyectarPruebaCargaDictamen($html, $pcDatos, $d, basename($archivo));
         }
 
         // Ajuste para mPDF:
@@ -1360,11 +1360,38 @@ body { background:#fff!important; }
      * Inyecta los datos del JSON prueba_carga en el header y tbody de pc-table,
      * y corrige el texto hardcodeado "Equipo Inspeccionado: ...".
      */
-    private function inyectarPruebaCargaDictamen(string $html, array $pc, array $d): string {
+    private function inyectarPruebaCargaDictamen(string $html, array $pc, array $d, string $plantillaDoc = ''): string {
         $e   = fn($s) => htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8');
         // Se guarda antes de descartarla: decide si la pluma se inclina o no.
         $plantillaPc = (string)($pc['plantilla'] ?? '');
         unset($pc['plantilla']);
+
+        /* Manda la plantilla del dictamen que se está imprimiendo, no la que
+           trae guardada la prueba. Una grúa torre flat-top salió dibujada como
+           grúa móvil, con la pluma inclinada a 49.3° y una "altura" de 37.91 m
+           sacada por Pitágoras: su prueba se había capturado con la plantilla
+           de grúa móvil, y el dibujo se escogía por esa. */
+        if (self::esGruaTorre($plantillaDoc)) {
+            $deOtra = $plantillaPc !== $plantillaDoc;
+            foreach ($pc as $k => $fila) {
+                if (!is_array($fila)) continue;
+                $r  = (float)($fila['radio'] ?? 0);
+                $l  = (float)($fila['pluma'] ?? 0);
+                // Capturada con la plantilla de grúa móvil, la altura y el
+                // ángulo los calculó el formulario con el triángulo de una
+                // pluma que se inclina: no son medidos y no significan nada aquí.
+                if ($deOtra && $l > 0 && $r >= 0 && $r <= $l) {
+                    $hCalc = sqrt($l * $l - $r * $r);
+                    $aCalc = rad2deg(acos($r / $l));
+                    if (isset($fila['altura']) && abs((float)$fila['altura'] - $hCalc) < 0.02) $pc[$k]['altura'] = '';
+                    if (isset($fila['angulo']) && abs((float)$fila['angulo'] - $aCalc) < 0.15) $pc[$k]['angulo'] = '';
+                }
+                // Pluma horizontal (flat-top, martillo, autodesplegable): no hay
+                // ángulo que reportar, venga de donde venga.
+                if ($plantillaDoc !== 'dictamen_grua_torre_abatible.html') $pc[$k]['angulo'] = '';
+            }
+            $plantillaPc = $plantillaDoc;
+        }
 
         // 1. Corregir celda "Equipo Inspeccionado" — puede ser hardcoded en algunas plantillas
         $equipoStr = $e(textoEstandar($d['maquinaria'] ?? '') . ' · ' . ($d['marca'] ?? '') . ' ' . ($d['modelo'] ?? ''));
@@ -1547,6 +1574,14 @@ body { background:#fff!important; }
                     : $this->buildCraneSvg($dRadio, $dPluma, $dAltura, $dAngulo);
 
                 $html = str_replace('{pc_crane_svg}',    $svg, $html);
+                /* Sin altura medida no se imprime "0.00 m": en la observación se
+                   quita la frase, y en el resto queda NA. En grúa torre la
+                   altura bajo gancho se mide; no hay de dónde deducirla. */
+                if ($dAltura <= 0) {
+                    $html = preg_replace('/\s*(?:y\s+)?(?:una\s+)?altura bajo gancho de\s*<strong>\{pc_obs_altura\}\s*m<\/strong>/u', '', $html) ?? $html;
+                    $html = str_replace('{pc_diag_altura}<span class="unit">m</span>', 'NA', $html);
+                    $html = str_replace(['{pc_diag_altura}', '{pc_obs_altura}'], 'NA', $html);
+                }
                 $html = str_replace('{pc_diag_radio}',   number_format($dRadio,  1), $html);
                 $html = str_replace('{pc_diag_pluma}',   number_format($dPluma,  1), $html);
                 $html = str_replace('{pc_diag_altura}',  number_format($dAltura, 2), $html);
