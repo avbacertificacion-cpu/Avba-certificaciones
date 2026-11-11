@@ -323,3 +323,17 @@ html.avba-ventana-abierta .avba-ir-menu { display: none !important; }
   }
   .overlay > .modal:has(> .modal-body) > :not(.modal-body) { flex-shrink: 0; }
 }
+
+/* ══ 9. Filas fijas de tres columnas, en teléfono una debajo de otra ══
+   Varias ventanas arman sus campos con una cuadrícula de tres columnas
+   escrita en línea (documentos de una sesión de accesorios, pagos en Admin,
+   la ficha de PND). En un teléfono no caben: el contenido se salía por la
+   derecha y no había forma de desplazarse hasta él sin girar el teléfono.
+   Se reconocen por su estilo en línea; las tiras de estadísticas (.stats)
+   tienen su propio acomodo y se dejan. */
+@media (max-width: 600px) {
+  [style*="grid-template-columns:1fr 1fr 1fr"]:not(.stats),
+  [style*="grid-template-columns: 1fr 1fr 1fr"]:not(.stats) {
+    grid-template-columns: 1fr !important;
+  }
+}
