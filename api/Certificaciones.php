@@ -3370,14 +3370,15 @@ HTML;
         for ($i = 0; $i < 10; $i++) $password .= $chars[random_int(0, strlen($chars) - 1)];
         $hash = password_hash($password, PASSWORD_BCRYPT);
 
-        // Si ya existe un usuario CLIENTE para este cliente, actualizar su contraseña
+        // La cuenta principal del cliente (nunca una secundaria). Si ya la
+        // usan, su contraseña NO se cambia: el correo recuerda el usuario y
+        // dice que siga con la de siempre. Sólo a una cuenta que nunca ha
+        // entrado se le pone contraseña nueva, para que la reciba funcionando.
         if ($idCliente) {
-            $stmt = $this->pdo->prepare(
-                "SELECT id, usuario FROM usuarios WHERE rol = 'CLIENTE' AND id_cliente = ? LIMIT 1"
-            );
-            $stmt->execute([$idCliente]);
-            $existing = $stmt->fetch();
-
+            $existing = cuentaPrincipalCliente($this->pdo, $idCliente);
+            if ($existing && $existing['usada']) {
+                return ['usuario' => $existing['usuario'], 'password' => '', 'es_nuevo' => false, 'conservada' => true];
+            }
             if ($existing) {
                 $this->pdo->prepare("UPDATE usuarios SET password_hash = ? WHERE id = ?")
                     ->execute([$hash, $existing['id']]);
@@ -3468,6 +3469,10 @@ HTML;
                 : 'Sus credenciales de acceso al portal de clientes AVBA:';
             $usr = htmlspecialchars($credenciales['usuario'] ?? '');
             $pwd = htmlspecialchars($credenciales['password'] ?? '');
+            if (!empty($credenciales['conservada'])) {
+                $textoTitulo = 'Su acceso al portal de clientes AVBA:';
+                $pwd = 'la que ya utiliza (no se cambió)';
+            }
             $url = htmlspecialchars($portalUrl);
             $credsHtml = "
       <div style=\"margin-top:20px;padding:16px 18px;background:#F0F7ED;border-left:4px solid #2e7d32;border-radius:4px\">

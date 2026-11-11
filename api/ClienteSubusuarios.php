@@ -170,6 +170,11 @@ class ClienteSubusuarios {
             $hash = password_hash($password, PASSWORD_BCRYPT);
             $this->pdo->prepare("UPDATE usuarios SET password_hash = ?, session_token = NULL WHERE id = ?")
                       ->execute([$hash, $subId]);
+            // Con contraseña nueva se levanta el bloqueo por intentos fallidos.
+            try {
+                $this->pdo->prepare("DELETE FROM login_intentos WHERE usuario = ?")
+                          ->execute([strtolower(trim((string)($sub['usuario'] ?? '')))]);
+            } catch (\Throwable $e) { /* la tabla aún no existe o el bloqueo vence solo */ }
         }
 
         return ['status' => 'success', 'message' => 'Sub-usuario actualizado.'];

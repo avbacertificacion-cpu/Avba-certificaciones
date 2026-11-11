@@ -416,6 +416,32 @@ function repararTextosGuardados(PDO $pdo): void {
 }
 
 /**
+ * La cuenta PRINCIPAL del portal de un cliente, o null.
+ *
+ * Al enviar documentos con "Incluir usuario y contraseña" se buscaba la
+ * primera cuenta CLIENTE con ese id_cliente —cualquiera, sin orden— y se le
+ * ponía una contraseña nueva. Así una cuenta secundaria que el cliente ya
+ * usaba (la de una persona de su equipo) amanecía con otra contraseña y quien
+ * la tenía quedaba fuera, bloqueado por intentos fallidos. Aquí sólo cuenta
+ * la principal (sin usuario_padre_id), y se dice si ya se ha usado.
+ *
+ * @return array{id:int, usuario:string, usada:bool}|null
+ */
+function cuentaPrincipalCliente(PDO $pdo, string $idCliente): ?array {
+    if (trim($idCliente) === '') return null;
+    $soloPrincipal = columnaExiste($pdo, 'usuarios', 'usuario_padre_id')
+        ? ' AND (usuario_padre_id IS NULL OR usuario_padre_id = 0)' : '';
+    $usada = columnaExiste($pdo, 'usuarios', 'ultimo_acceso') ? 'ultimo_acceso' : 'NULL AS ultimo_acceso';
+    $st = $pdo->prepare("SELECT id, usuario, {$usada} FROM usuarios
+                          WHERE rol = 'CLIENTE' AND id_cliente = ?{$soloPrincipal}
+                          ORDER BY id LIMIT 1");
+    $st->execute([$idCliente]);
+    $r = $st->fetch(PDO::FETCH_ASSOC);
+    if (!$r) return null;
+    return ['id' => (int)$r['id'], 'usuario' => (string)$r['usuario'], 'usada' => !empty($r['ultimo_acceso'])];
+}
+
+/**
  * Número de acreditación ante la ema para los documentos.
  *
  * Sale de NO_ACREDITACION en config/config.php. Si el servidor no la trae

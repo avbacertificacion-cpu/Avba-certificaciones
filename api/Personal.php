@@ -926,6 +926,10 @@ class Personal {
             $accion    = ($credenciales['es_nuevo'] ?? true)
                 ? 'Se ha creado su cuenta en el portal AVBA'
                 : 'Se ha actualizado su contraseña del portal AVBA';
+            if (!empty($credenciales['conservada'])) {
+                $accion   = 'Su acceso al portal AVBA';
+                $password = 'La que ya utiliza (no se cambió)';
+            }
             $cuerpo .= "
       <div style='margin-top:20px;padding:16px 18px;background:#F0F7ED;border-left:4px solid #2e7d32;border-radius:6px'>
         <p style='font-weight:700;color:#1b5e20;margin:0 0 10px;font-size:14px'>{$esc($accion)}</p>
@@ -2287,12 +2291,12 @@ HTML;
             $password .= $chars[random_int(0, strlen($chars) - 1)];
         }
 
-        // Verificar usuario existente
-        $stmt = $this->pdo->prepare(
-            "SELECT id, usuario FROM usuarios WHERE id_cliente = ? AND rol = 'CLIENTE' LIMIT 1"
-        );
-        $stmt->execute([$idCliente]);
-        $existing = $stmt->fetch();
+        // La cuenta principal del cliente (nunca una secundaria). Si ya la
+        // usan, su contraseña NO se cambia (ver cuentaPrincipalCliente).
+        $existing = cuentaPrincipalCliente($this->pdo, $idCliente);
+        if ($existing && $existing['usada']) {
+            return ['usuario' => $existing['usuario'], 'password' => '', 'es_nuevo' => false, 'conservada' => true];
+        }
 
         if ($existing) {
             $this->pdo->prepare("UPDATE usuarios SET password_hash = ? WHERE id = ?")
@@ -2406,6 +2410,10 @@ HTML;
             $accion    = ($credenciales['es_nuevo'] ?? true)
                 ? 'Se ha creado su cuenta en el portal AVBA'
                 : 'Se ha actualizado su contraseña del portal AVBA';
+            if (!empty($credenciales['conservada'])) {
+                $accion   = 'Su acceso al portal AVBA';
+                $password = 'La que ya utiliza (no se cambió)';
+            }
             $cuerpo .= "
       <div style=\"margin-top:20px;padding:16px 18px;background:#F0F7ED;border-left:4px solid #2e7d32;border-radius:6px\">
         <p style=\"font-weight:700;color:#1b5e20;margin:0 0 10px;font-size:14px\">{$esc($accion)}</p>

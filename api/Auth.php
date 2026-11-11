@@ -764,6 +764,21 @@ class Auth {
         $sql = "UPDATE usuarios SET " . implode(', ', $sets) . " WHERE id = ?";
         $this->pdo->prepare($sql)->execute($params);
 
+        // Con contraseña nueva, la cuenta deja de estar bloqueada por los
+        // intentos fallidos con la anterior: quien la tenía mal no tiene por
+        // qué esperar a que se le pase el castigo para entrar con la buena.
+        if (!empty($payload['password'])) {
+            try {
+                $u = $this->pdo->prepare("SELECT usuario FROM usuarios WHERE id = ?");
+                $u->execute([$row['id']]);
+                $nom = strtolower(trim((string)$u->fetchColumn()));
+                if ($nom !== '') {
+                    $this->ensureLoginIntentosTable();
+                    $this->pdo->prepare("DELETE FROM login_intentos WHERE usuario = ?")->execute([$nom]);
+                }
+            } catch (\Throwable $e) { /* el bloqueo vence solo */ }
+        }
+
         return ['status' => 'success', 'message' => 'Usuario actualizado.'];
     }
 
