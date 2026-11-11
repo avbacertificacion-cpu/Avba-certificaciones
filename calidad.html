@@ -2775,15 +2775,16 @@ function ver(fila) {
     <div class="field"><label>Capacidad</label>   <input id="e-capacidad" value="${esc(d.capacidad || '')}" ${dis}></div>
   </div>`;
 
-  // Código QR. En casos excepcionales el equipo trae dos etiquetas: el mismo
-  // certificado lleva los dos QR y cualquiera lleva a la misma validación.
+  // Código QR. Caso excepcional: el cliente ya tiene un documento anterior de
+  // esta misma inspección con otro QR. Ese código se registra aquí para que
+  // también lleve a esta validación; no se imprime en el documento nuevo.
   body += `<div class="sec-label">Código QR</div>
   <div class="grid2">
-    <div class="field"><label>QR principal</label><input value="${esc(d.qr_codigo || '')}" disabled placeholder="Se asigna al aprobar"></div>
-    <div class="field"><label>QR adicional <span style="font-weight:400;color:var(--texto-hint)">(opcional · casos excepcionales)</span></label>
-      <input id="e-qr2" value="${esc(d.qr_codigo_2 || '')}" maxlength="10" inputmode="numeric" placeholder="Segunda etiqueta del equipo" ${dis}></div>
+    <div class="field"><label>QR del certificado</label><input value="${esc(d.qr_codigo || '')}" disabled placeholder="Se asigna al aprobar"></div>
+    <div class="field"><label>QR de un documento ya entregado <span style="font-weight:400;color:var(--texto-hint)">(opcional)</span></label>
+      <input id="e-qr2" value="${esc(d.qr_codigo_2 || '')}" maxlength="10" inputmode="numeric" placeholder="QR del documento anterior" ${dis}></div>
   </div>
-  <div style="font-size:11px;color:var(--texto-hint);margin:-4px 0 10px">Con QR adicional el certificado imprime los dos códigos y ambos llevan a la misma validación. Déjalo vacío si el equipo sólo tiene una etiqueta.</div>`;
+  <div style="font-size:11px;color:var(--texto-hint);margin:-4px 0 10px">Sólo en casos excepcionales: si el cliente ya recibió un documento de esta inspección con otro QR, captúralo aquí y los dos documentos llevarán a la misma validación. El certificado nuevo imprime sólo su propio QR.</div>`;
 
   // Datos del cliente
   body += `<div class="sec-label">Cliente y contacto</div>

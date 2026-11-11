@@ -41,7 +41,7 @@ class Huella {
             'certificado' => [
                 'nombre' => 'Certificado',
                 'campos' => ['Cliente', 'Domicilio', 'Tipo de equipo', 'Marca', 'Modelo', 'Serie',
-                             'ID del equipo', 'Capacidad', 'Fecha de inspección', 'Folio', 'QR', 'QR adicional', 'Horquillas'],
+                             'ID del equipo', 'Capacidad', 'Fecha de inspección', 'Folio', 'QR', 'Horquillas'],
             ],
             'dictamen' => ['nombre' => 'Dictamen', 'campos' => '*', 'listas' => '*'],
         ],
@@ -327,7 +327,6 @@ class Huella {
                     'Hora de inspección'  => substr(self::txt($e['hora_inspeccion'] ?? ''), 0, 5),
                     'Folio'               => self::txt($e['control'] ?? ''),
                     'QR'                  => self::txt($e['qr_codigo'] ?? ''),
-                    'QR adicional'        => self::txt($e['qr_codigo_2'] ?? ''),
                     'Inspector'           => self::txt($e['inspector'] ?? ''),
                     'Prueba de carga'     => self::opaco($e['prueba_carga'] ?? ''),
                     'Horquillas'          => self::opaco($e['horquillas'] ?? ''),
