@@ -864,6 +864,10 @@
       <!-- TAB INFO -->
       <div class="tab-panel active" id="panel-info">
         <!-- Lo que tiene el cliente frente a lo que hay hoy (js/control-documentos.js) -->
+        <div id="aviso-sin-qr" style="display:none;margin:0 0 12px;padding:11px 14px;border-radius:9px;background:#fde8e8;border:1.5px solid #e9a3a3;color:#7a1f1f;font-size:13px;line-height:1.5">
+          <b>⚠ Este registro no tiene código QR asignado.</b> Sin QR el certificado y el dictamen no se pueden validar,
+          así que no se generan. Retórnalo a Calidad para que lo apruebe con su QR y después vuelve a generarlos.
+        </div>
         <div id="ctl-docs-eq"></div>
         <div class="sec-label">Datos del equipo</div>
         <div class="grid2">
@@ -1475,6 +1479,10 @@ function ver(fila) {
     estadoHtml += ` <span class="dias-badge ${cls}" style="font-size:10px">${txt}</span>`;
   }
   document.getElementById("m-estado").innerHTML = estadoHtml;
+
+  // Sin QR no hay documento que valga: se dice antes de intentar generarlo.
+  const avisoQr = document.getElementById("aviso-sin-qr");
+  if (avisoQr) avisoQr.style.display = String(d.qr_codigo || "").trim() ? "none" : "";
 
   // Control de documentos: ¿lo emitido y lo enviado sigue diciendo lo mismo?
   const ctlEq = document.getElementById("ctl-docs-eq");

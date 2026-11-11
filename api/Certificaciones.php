@@ -234,6 +234,8 @@ class Certificaciones {
         if ($manual !== '') {
             return ['status' => 'success', 'url' => UPLOAD_URL . 'certificados/' . basename($manual)];
         }
+        $sinQr = $this->avisoSinQr($id);
+        if ($sinQr !== null) return $sinQr;
         // Intentar primero con plantilla PDF si existe
         $resultado = $this->generarPdfDesdeTemplatePdf($id, $tipo);
         if ($resultado['status'] === 'success') return $resultado;
@@ -475,6 +477,13 @@ class Certificaciones {
 
         $tipo = in_array(($payload['tipo'] ?? 'todo'), ['cert','dict','todo'], true) ? $payload['tipo'] : 'todo';
 
+        // Sin QR no se publica nada que no sea un PDF subido a mano: el
+        // documento generado saldría sin con qué validarlo.
+        if (trim((string)($datos['qr_codigo'] ?? '')) === ''
+            && $this->pdfManual($id, 'cert') === '' && $this->pdfManual($id, 'dict') === '') {
+            return ['status' => 'error', 'message' => self::MSG_SIN_QR];
+        }
+
         $sets   = [];
         $params = [];
         $hechos = [];
@@ -574,9 +583,29 @@ class Certificaciones {
     // Carga la plantilla PDF como fondo, superpone los campos
     // del equipo en las coordenadas configuradas y protege el
     // resultado (solo impresión habilitada).
+    /** Mensaje para quien intenta generar un documento de un registro sin QR. */
+    private const MSG_SIN_QR = 'Este registro no tiene código QR asignado, y un certificado o dictamen sin QR '
+        . 'no se puede validar. Retórnalo a Calidad para que lo apruebe con su QR y vuelve a generarlo.';
+
+    /**
+     * Error si el equipo no tiene QR; null si lo tiene.
+     *
+     * Sin QR el documento salía igual, con el recuadro de "Escanea para
+     * validar" vacío —el ícono de imagen rota—, y volver a generarlo daba lo
+     * mismo: el dato que falta no se arregla regenerando.
+     */
+    private function avisoSinQr(int $id, ?array $datos = null): ?array {
+        $datos ??= $this->obtenerDatosEquipo($id);
+        if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+        return trim((string)($datos['qr_codigo'] ?? '')) === ''
+            ? ['status' => 'error', 'message' => self::MSG_SIN_QR, 'sin_qr' => true] : null;
+    }
+
     public function generarPdfDesdeTemplatePdf(int $id, string $tipo): array {
         $datos = $this->obtenerDatosEquipo($id);
         if (!$datos) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+        $sinQr = $this->avisoSinQr($id, $datos);
+        if ($sinQr !== null) return $sinQr;
 
         // Obtener plantilla PDF y campos configurados
         $stmt = $this->pdo->prepare(
@@ -989,6 +1018,7 @@ class Certificaciones {
     }
 
     private function resolverPdf(string $tipo, array $datos, bool $sinSellos = false, ?array $itemsPre = null): string {
+        if (trim((string)($datos['qr_codigo'] ?? '')) === '') throw new \RuntimeException(self::MSG_SIN_QR);
         // Asegurar que mPDF esté disponible
         if (!class_exists('\\Mpdf\\Mpdf') && file_exists(__DIR__ . '/../vendor/autoload.php')) {
             require_once __DIR__ . '/../vendor/autoload.php';
