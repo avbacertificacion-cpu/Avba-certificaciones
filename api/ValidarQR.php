@@ -109,13 +109,16 @@ class ValidarQR {
             );
             $stmt->execute([$q]);
         } else {
-            // Cualquiera de sus dos QR lleva al mismo certificado.
-            $cond = columnaExiste($this->pdo, 'equipos', 'qr_codigo_2') ? '? IN (qr_codigo, qr_codigo_2)' : 'qr_codigo = ?';
+            // El QR principal o cualquiera de sus QR adicionales (los de
+            // documentos ya entregados) lleva a la misma validación.
+            $extra = asegurarQrExtraEquipos($this->pdo);
             $stmt = $this->pdo->prepare(
                 "SELECT maquinaria, marca, modelo, serie, capacidad, fecha_inspeccion
-                 FROM equipos WHERE {$cond} LIMIT 1"
+                 FROM equipos WHERE qr_codigo = ?"
+                . ($extra ? " OR id IN (SELECT equipo_id FROM equipos_qr_extra WHERE qr = ?)" : '')
+                . " ORDER BY (qr_codigo = ?) DESC LIMIT 1"
             );
-            $stmt->execute([$q]);
+            $stmt->execute($extra ? [$q, $q, $q] : [$q, $q]);
         }
         $row = $stmt->fetch();
         if (!$row) return null;

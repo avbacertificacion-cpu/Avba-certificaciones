@@ -738,6 +738,24 @@
     .env-re { font-size:9.5px; font-weight:700; color:var(--azul); margin-top:3px; }
     .env-no { font-size:10.5px; font-weight:700; color:var(--rojo);
       background:var(--rojo-light); border-radius:20px; padding:3px 9px; white-space:nowrap; cursor:help; }
+  /* QR adicionales de un equipo */
+  .qrx-card { background:#fff; border:1.5px solid var(--borde); border-radius:12px; padding:16px 18px; margin-bottom:22px; }
+  .qrx-tit  { font-weight:700; font-size:15px; color:var(--azul-dark); margin-bottom:4px; }
+  .qrx-sub  { font-size:12px; color:var(--texto-sub); line-height:1.55; margin-bottom:12px; }
+  .qrx-buscar { display:flex; gap:8px; flex-wrap:wrap; }
+  .qrx-buscar input { flex:1 1 240px; min-width:0; padding:10px 12px; border:1.5px solid var(--borde); border-radius:8px; font-size:14px; }
+  .qrx-buscar button, .qrx-add button { padding:10px 16px; border:none; border-radius:8px; background:var(--azul); color:#fff; font-weight:600; font-size:13px; cursor:pointer; min-height:42px; }
+  .qrx-eq   { border:1px solid var(--borde); border-radius:10px; padding:12px 14px; margin-top:12px; }
+  .qrx-eq-t { font-weight:700; font-size:13px; }
+  .qrx-eq-s { font-size:12px; color:var(--texto-sub); margin:2px 0 8px; }
+  .qrx-chips { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; }
+  .qrx-chip { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border-radius:20px; font-family:monospace; font-size:13px; background:#eef3f9; border:1px solid #c9d6e6; }
+  .qrx-chip.princ { background:#e8f5e9; border-color:#9ccc9f; }
+  .qrx-chip small { font-family:inherit; font-size:10px; color:var(--texto-hint); }
+  .qrx-chip button { border:none; background:none; color:#b42318; font-size:16px; line-height:1; cursor:pointer; padding:0 2px; min-width:28px; min-height:28px; }
+  .qrx-add { display:flex; gap:8px; flex-wrap:wrap; }
+  .qrx-add input { flex:1 1 150px; min-width:0; padding:9px 11px; border:1.5px solid var(--borde); border-radius:8px; font-size:13px; }
+  .qrx-msg { font-size:12px; margin-top:6px; }
 </style>
   <script src="js/tabla-clientes.js"></script>
   <script src="js/envios.js"></script>
@@ -1261,6 +1279,20 @@
 
 <!-- ══ SECCIÓN: CÓDIGOS QR ══ -->
 <div id="sec-qr" class="wrap" style="display:none">
+
+  <!-- QR adicionales de un equipo: documentos ya entregados con otro QR -->
+  <div class="qrx-card">
+    <div class="qrx-tit">QR adicionales de un equipo</div>
+    <div class="qrx-sub">Cuando el cliente ya tiene un documento de un equipo con otro QR (o un número), agrégalo aquí y
+      ese QR llevará a la validación del mismo equipo. Un equipo puede tener los que haga falta. Los documentos no
+      cambian: el certificado sigue imprimiendo sólo el QR principal.</div>
+    <div class="qrx-buscar">
+      <input id="qrx-q" type="search" placeholder="Busca el equipo: folio, serie, QR o cliente" autocomplete="off"
+             onkeydown="if(event.key==='Enter')qrxBuscar()">
+      <button type="button" onclick="qrxBuscar()">Buscar</button>
+    </div>
+    <div id="qrx-res"></div>
+  </div>
 
   <!-- Stats row -->
   <div style="display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px">
@@ -2775,16 +2807,7 @@ function ver(fila) {
     <div class="field"><label>Capacidad</label>   <input id="e-capacidad" value="${esc(d.capacidad || '')}" ${dis}></div>
   </div>`;
 
-  // Código QR. Caso excepcional: el cliente ya tiene un documento anterior de
-  // esta misma inspección con otro QR. Ese código se registra aquí para que
-  // también lleve a esta validación; no se imprime en el documento nuevo.
-  body += `<div class="sec-label">Código QR</div>
-  <div class="grid2">
-    <div class="field"><label>QR del certificado</label><input value="${esc(d.qr_codigo || '')}" disabled placeholder="Se asigna al aprobar"></div>
-    <div class="field"><label>QR de un documento ya entregado <span style="font-weight:400;color:var(--texto-hint)">(opcional)</span></label>
-      <input id="e-qr2" value="${esc(d.qr_codigo_2 || '')}" maxlength="10" inputmode="numeric" placeholder="QR del documento anterior" ${dis}></div>
-  </div>
-  <div style="font-size:11px;color:var(--texto-hint);margin:-4px 0 10px">Sólo en casos excepcionales: si el cliente ya recibió un documento de esta inspección con otro QR, captúralo aquí y los dos documentos llevarán a la misma validación. El certificado nuevo imprime sólo su propio QR.</div>`;
+
 
   // Datos del cliente
   body += `<div class="sec-label">Cliente y contacto</div>
@@ -3752,9 +3775,6 @@ async function guardar() {
       direccion:  document.getElementById("e-direccion")?.value  || "",
       capacidad:  document.getElementById("e-capacidad")?.value  || "",
     };
-    // El segundo QR sólo viaja si el campo está en la ficha (vacío = quitarlo).
-    const qr2El = document.getElementById("e-qr2");
-    if (qr2El && !qr2El.disabled) payload.qr_codigo_2 = qr2El.value.trim();
 
     // Recoger cambios de prueba de carga si existe la sección
     const pcPlantillaEl = document.getElementById('pc-plantilla');
@@ -4028,6 +4048,74 @@ const TODOS_CONTENIDOS = [
 
 let _envios = null;
 let _solicitudes = null;
+
+/* ═══ QR adicionales de un equipo ═══════════════════════════════
+   Un documento ya entregado con otro QR (o un número) lleva a la
+   validación del mismo equipo. El certificado imprime sólo el principal. */
+async function qrxPedir(action, payload) {
+  const r = await fetch(API, { method: 'POST', body: JSON.stringify({ action, payload }) });
+  return r.json();
+}
+async function qrxBuscar() {
+  const q = (document.getElementById('qrx-q').value || '').trim();
+  const box = document.getElementById('qrx-res');
+  if (q.length < 3) { box.innerHTML = '<div class="qrx-msg" style="color:var(--texto-hint)">Escribe al menos 3 caracteres.</div>'; return; }
+  box.innerHTML = '<div class="qrx-msg" style="color:var(--texto-hint)">Buscando…</div>';
+  try {
+    const d = await qrxPedir('QR_EXTRA_BUSCAR', { q });
+    if (d.status !== 'success') throw new Error(d.message || 'No se pudo buscar');
+    if (!d.data.length) { box.innerHTML = '<div class="qrx-msg" style="color:var(--texto-hint)">No se encontró ningún equipo.</div>'; return; }
+    box.innerHTML = d.data.map(qrxEquipoHtml).join('');
+  } catch (e) { box.innerHTML = `<div class="qrx-msg" style="color:var(--rojo)">${escH(e.message)}</div>`; }
+}
+function qrxEquipoHtml(e) {
+  const extras = (e.qr_extra || []).map(x => `<span class="qrx-chip" title="${escH((x.nota ? x.nota + ' · ' : '') + 'agregado por ' + (x.creado_por || '—'))}">${escH(x.qr)}
+      <button type="button" aria-label="Quitar ${escH(x.qr)}" onclick="qrxQuitar(${x.id}, ${e.id}, '${escH(x.qr)}')">×</button></span>`).join('');
+  return `<div class="qrx-eq" id="qrx-eq-${e.id}">
+    <div class="qrx-eq-t">${escH(e.control ? 'Folio ' + e.control : 'Sin folio')} · ${escH(e.cliente || '—')}</div>
+    <div class="qrx-eq-s">${escH([e.maquinaria, e.marca, e.modelo].filter(Boolean).join(' '))}${e.serie ? ' · s/n ' + escH(e.serie) : ''} · ${escH(e.estado || '')}</div>
+    <div class="qrx-chips">
+      <span class="qrx-chip princ">${escH(e.qr_codigo || 'sin QR')} <small>principal · el del certificado</small></span>
+      <span id="qrx-extras-${e.id}" style="display:contents">${extras}</span>
+    </div>
+    <div class="qrx-add">
+      <input id="qrx-nuevo-${e.id}" placeholder="QR o número adicional" maxlength="30" autocomplete="off"
+             onkeydown="if(event.key==='Enter')qrxAgregar(${e.id})">
+      <input id="qrx-nota-${e.id}" placeholder="Nota (opcional)" maxlength="200">
+      <button type="button" onclick="qrxAgregar(${e.id})">Agregar</button>
+    </div>
+    <div class="qrx-msg" id="qrx-msg-${e.id}"></div>
+  </div>`;
+}
+function qrxPintarExtras(eqId, lista) {
+  const el = document.getElementById('qrx-extras-' + eqId);
+  if (el) el.innerHTML = (lista || []).map(x => `<span class="qrx-chip" title="${escH((x.nota ? x.nota + ' · ' : '') + 'agregado por ' + (x.creado_por || '—'))}">${escH(x.qr)}
+      <button type="button" aria-label="Quitar ${escH(x.qr)}" onclick="qrxQuitar(${x.id}, ${eqId}, '${escH(x.qr)}')">×</button></span>`).join('');
+}
+async function qrxAgregar(eqId) {
+  const inp = document.getElementById('qrx-nuevo-' + eqId), nota = document.getElementById('qrx-nota-' + eqId);
+  const msg = document.getElementById('qrx-msg-' + eqId);
+  const qr = (inp.value || '').trim();
+  if (!qr) { inp.focus(); return; }
+  msg.style.color = 'var(--texto-hint)'; msg.textContent = 'Guardando…';
+  try {
+    const d = await qrxPedir('QR_EXTRA_AGREGAR', { equipo_id: eqId, qr, nota: (nota.value || '').trim() });
+    if (d.status !== 'success') { msg.style.color = 'var(--rojo)'; msg.textContent = d.message || 'No se pudo agregar.'; return; }
+    qrxPintarExtras(eqId, d.qr_extra);
+    inp.value = ''; nota.value = '';
+    msg.style.color = 'var(--verde)'; msg.textContent = d.message;
+  } catch (e) { msg.style.color = 'var(--rojo)'; msg.textContent = 'Error de conexión.'; }
+}
+async function qrxQuitar(id, eqId, qr) {
+  if (!confirm('¿Quitar el QR ' + qr + '? Ese documento dejará de llevar a la validación de este equipo.')) return;
+  const msg = document.getElementById('qrx-msg-' + eqId);
+  try {
+    const d = await qrxPedir('QR_EXTRA_QUITAR', { id });
+    if (d.status !== 'success') { msg.style.color = 'var(--rojo)'; msg.textContent = d.message || 'No se pudo quitar.'; return; }
+    qrxPintarExtras(eqId, d.qr_extra);
+    msg.style.color = 'var(--texto-sub)'; msg.textContent = d.message;
+  } catch (e) { msg.style.color = 'var(--rojo)'; msg.textContent = 'Error de conexión.'; }
+}
 
 function verSeccion(sec) {
   ['maquinaria','accesorios','arneses','personal','catalogos','qr','pnd','auditorias','solicitudes','envios'].forEach(s => {

@@ -383,6 +383,21 @@ if ($method === 'GET') {
             respuesta($insp->obtenerChecklistPorEquipo($_GET['equipo'] ?? ''));
 
         // Panel de Calidad
+        // QR adicionales de un equipo: cualquiera lleva a su validación.
+        case 'QR_EXTRA_BUSCAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->buscarEquiposQr((string)($payload['q'] ?? '')));
+        case 'QR_EXTRA_AGREGAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->agregarQrExtra((int)($payload['equipo_id'] ?? 0), (string)($payload['qr'] ?? ''),
+                                           (string)($payload['nota'] ?? ''), $usr['usuario']));
+        case 'QR_EXTRA_QUITAR':
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD'])) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta($cal->quitarQrExtra((int)($payload['id'] ?? 0), $usr['usuario']));
+
         case 'getDataCalidad':
         case 'GET_DATA_CALIDAD':
             $usr = validarToken($pdo, $token);

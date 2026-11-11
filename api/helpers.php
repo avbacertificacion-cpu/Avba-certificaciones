@@ -442,18 +442,50 @@ function cuentaPrincipalCliente(PDO $pdo, string $idCliente): ?array {
 }
 
 /**
- * Columna del segundo código QR de un equipo. En casos excepcionales un mismo
- * certificado lleva dos QR (dos etiquetas en el equipo) y cualquiera de los
- * dos lleva a la misma validación.
+ * QR adicionales de un equipo.
+ *
+ * Caso real: el cliente ya entregó un certificado cuyo QR no quedó ligado al
+ * registro, y se le emitió otro. Los documentos ya están impresos: lo que se
+ * necesita es que cualquiera de sus QR lleve a la validación de ese equipo.
+ * Un equipo puede tener los que haga falta; el certificado sólo imprime el
+ * principal (equipos.qr_codigo). Los asigna Calidad.
  */
-function asegurarQr2Equipos(PDO $pdo): bool {
-    if (columnaExiste($pdo, 'equipos', 'qr_codigo_2')) return true;
+function asegurarQrExtraEquipos(PDO $pdo): bool {
+    static $listo = null;
+    if ($listo !== null && isset($listo[spl_object_id($pdo)])) return true;
     try {
-        $pdo->exec("ALTER TABLE equipos ADD COLUMN qr_codigo_2 VARCHAR(20) NULL");
+        $pdo->exec("CREATE TABLE IF NOT EXISTS equipos_qr_extra (
+            id         INT AUTO_INCREMENT PRIMARY KEY,
+            equipo_id  INT          NOT NULL,
+            qr         VARCHAR(30)  NOT NULL,
+            nota       VARCHAR(200) NULL,
+            creado_por VARCHAR(100) NULL,
+            creado_at  DATETIME     NULL,
+            UNIQUE KEY uq_qr (qr),
+            KEY idx_equipo (equipo_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // Lo que se alcanzó a capturar en la columna de la versión anterior.
+        if (columnaExiste($pdo, 'equipos', 'qr_codigo_2')) {
+            $rows = $pdo->query("SELECT id, qr_codigo_2 FROM equipos WHERE qr_codigo_2 IS NOT NULL AND qr_codigo_2 <> ''")->fetchAll(PDO::FETCH_ASSOC);
+            foreach ($rows as $r) {
+                try {
+                    $pdo->prepare("INSERT INTO equipos_qr_extra (equipo_id, qr, creado_at) VALUES (?, ?, NOW())")
+                        ->execute([(int)$r['id'], $r['qr_codigo_2']]);
+                } catch (\Throwable $e) { /* ya estaba */ }
+            }
+            $pdo->exec("UPDATE equipos SET qr_codigo_2 = NULL WHERE qr_codigo_2 IS NOT NULL");
+        }
+        $listo[spl_object_id($pdo)] = true;
+        return true;
     } catch (\Throwable $e) {
-        error_log('[QR2] columna: ' . $e->getMessage());
+        error_log('[QR extra] tabla: ' . $e->getMessage());
+        return false;
     }
-    return columnaExiste($pdo, 'equipos', 'qr_codigo_2');
+}
+
+/** Un QR adicional acepta los códigos de siempre y, por si el documento viejo traía otro formato, letras, números, - y _. */
+function qrExtraValido(string $qr): bool {
+    return (bool)preg_match('/^[A-Z0-9_-]{4,30}$/', $qr);
 }
 
 /**
@@ -958,8 +990,9 @@ function duenoDelQR(PDO $pdo, string $qr, array $excepto = [], ?array &$fallas =
     $saltar = fn(string $tabla, $id) =>
         ($excepto['tabla'] ?? '') === $tabla && (int)($excepto['id'] ?? 0) === (int)$id;
 
-    // El segundo QR de un equipo (casos excepcionales) también es suyo.
-    $condEquipo = columnaExiste($pdo, 'equipos', 'qr_codigo_2') ? '? IN (qr_codigo, qr_codigo_2)' : 'qr_codigo = ?';
+    // Los QR adicionales de un equipo también son suyos.
+    $condEquipo = asegurarQrExtraEquipos($pdo)
+        ? '(qr_codigo = ? OR id IN (SELECT equipo_id FROM equipos_qr_extra WHERE qr = ?))' : 'qr_codigo = ?';
 
     // Cada entrada: [tabla, SQL, cómo describir al dueño].
     $fuentes = [
@@ -1006,7 +1039,7 @@ function duenoDelQR(PDO $pdo, string $qr, array $excepto = [], ?array &$fallas =
     foreach ($fuentes as [$tabla, $sql, $modulo, $describir]) {
         try {
             $st = $pdo->prepare($sql);
-            $st->execute([$qr]);
+            $st->execute(array_fill(0, substr_count($sql, '?'), $qr));
             $r = $st->fetch(PDO::FETCH_ASSOC);
             if (!$r || $saltar($tabla, $r['id'] ?? 0)) continue;
             return [

@@ -13,7 +13,6 @@ class Calidad {
 
     // ── Obtener registros pendientes de revisión ───────────
     public function getDataCalidad(): array {
-        $qr2 = asegurarQr2Equipos($this->pdo) ? 'qr_codigo_2,' : "'' AS qr_codigo_2,";
         $stmt = $this->pdo->query(
             "SELECT id, id AS fila,
                     DATE_FORMAT(marca_temporal, '%d/%m/%Y %H:%i') AS marca_temporal,
@@ -21,7 +20,7 @@ class Calidad {
                     id_equipo,
                     DATE_FORMAT(fecha_inspeccion, '%d/%m/%Y') AS fecha,
                     correo, control, evidencia_url AS evidencia, direccion, capacidad,
-                    disponibilidad, estado, motivo, qr_codigo, {$qr2}
+                    disponibilidad, estado, motivo, qr_codigo,
                     certificado_url AS link, dictamen_url AS dictamen,
                     envio_direccion AS envio, coordenadas_envio,
                     reporte_url, prueba_carga, inspector
@@ -146,40 +145,76 @@ class Calidad {
         return ['status' => 'success', 'message' => 'Inspector que firma actualizado: ' . ($insp['nombre'] ?? $inspector) . '.'];
     }
 
-    /**
-     * Asigna, cambia o quita el segundo QR de un equipo. Devuelve un error, o
-     * null si quedó bien (o no había nada que cambiar).
-     */
-    private function guardarQr2(int $id, string $qr2, array $row, string $usuario): ?array {
-        if (!asegurarQr2Equipos($this->pdo)) {
-            return ['status' => 'error', 'message' => 'No se pudo preparar el campo del segundo QR.'];
-        }
-        $qr2      = trim($qr2);
-        $anterior = trim((string)($row['qr_codigo_2'] ?? ''));
-        if ($qr2 === $anterior) return null;
+    // ══════════════════════════════════════════════════════════
+    //  QR ADICIONALES DE UN EQUIPO
+    //  Cualquiera de ellos lleva a la validación del equipo; el certificado
+    //  sólo imprime el principal. Ver asegurarQrExtraEquipos().
+    // ══════════════════════════════════════════════════════════
 
-        if ($qr2 !== '') {
-            if (!qrFormatoValido($qr2)) return ['status' => 'error', 'message' => qrMensajeFormato()];
-            if ($qr2 === trim((string)($row['qr_codigo'] ?? ''))) {
-                return ['status' => 'error', 'message' => 'El segundo QR es el mismo que el principal.'];
-            }
-            // Que no lo traiga ningún otro registro (de ningún módulo).
-            $excepto = ['tabla' => 'equipos', 'id' => $id];
-            $fallas  = [];
-            if (duenoDelQR($this->pdo, $qr2, $excepto, $fallas) !== null) {
-                return respuestaQrOcupado($this->pdo, $qr2, $excepto);
-            }
-        }
+    /** Equipos de cualquier estado, por folio, serie, QR (principal o adicional) o cliente. */
+    public function buscarEquiposQr(string $q): array {
+        $q = trim($q);
+        if (mb_strlen($q) < 3) return ['status' => 'success', 'data' => []];
+        $extra = asegurarQrExtraEquipos($this->pdo);
+        $like  = '%' . $q . '%';
+        $st = $this->pdo->prepare(
+            "SELECT e.id, e.control, e.cliente, e.maquinaria, e.marca, e.modelo, e.serie, e.qr_codigo, e.estado,
+                    e.fecha_inspeccion
+             FROM equipos e
+             WHERE e.control LIKE ? OR e.serie LIKE ? OR e.qr_codigo = ? OR e.cliente LIKE ?"
+            . ($extra ? " OR e.id IN (SELECT equipo_id FROM equipos_qr_extra WHERE qr = ?)" : '')
+            . " ORDER BY e.id DESC LIMIT 25"
+        );
+        $st->execute($extra ? [$like, $like, $q, $like, strtoupper($q)] : [$like, $like, $q, $like]);
+        $equipos = $st->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($equipos as &$e) $e['qr_extra'] = $extra ? $this->qrExtraDe((int)$e['id']) : [];
+        unset($e);
+        return ['status' => 'success', 'data' => $equipos];
+    }
 
-        $this->pdo->prepare("UPDATE equipos SET qr_codigo_2 = ? WHERE id = ?")
-                  ->execute([$qr2 !== '' ? $qr2 : null, $id]);
-        if ($anterior !== '') {
-            $this->pdo->prepare("UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?")
-                      ->execute([$anterior]);
+    private function qrExtraDe(int $equipoId): array {
+        $st = $this->pdo->prepare("SELECT id, qr, nota, creado_por, creado_at FROM equipos_qr_extra WHERE equipo_id = ? ORDER BY id");
+        $st->execute([$equipoId]);
+        return $st->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function agregarQrExtra(int $equipoId, string $qr, string $nota, string $usuario): array {
+        if (!asegurarQrExtraEquipos($this->pdo)) return ['status' => 'error', 'message' => 'No se pudo preparar la tabla de QR adicionales.'];
+        $row = $this->obtenerEquipo($equipoId);
+        if (!$row) return ['status' => 'error', 'message' => 'Equipo no encontrado.'];
+        $qr = strtoupper(preg_replace('/\s+/', '', $qr));
+        if (!qrExtraValido($qr)) {
+            return ['status' => 'error', 'message' => 'Escribe el código del QR o el número: de 4 a 30 caracteres, sólo letras, números, guion y guion bajo.'];
         }
-        if ($qr2 !== '') qrRegistrarUsado($this->pdo, $qr2, $id);
-        registrarHistorial($this->pdo, $usuario, $id, 'qr_codigo_2', $anterior ?: null, $qr2 ?: null);
-        return null;
+        if ($qr === trim((string)($row['qr_codigo'] ?? ''))) {
+            return ['status' => 'error', 'message' => 'Ése ya es el QR principal de este equipo.'];
+        }
+        $excepto = ['tabla' => 'equipos', 'id' => $equipoId];
+        $fallas  = [];
+        $dueno   = duenoDelQR($this->pdo, $qr, $excepto, $fallas);
+        if ($dueno !== null) return respuestaQrOcupado($this->pdo, $qr, $excepto);
+        $ya = $this->pdo->prepare("SELECT 1 FROM equipos_qr_extra WHERE qr = ?");
+        $ya->execute([$qr]);
+        if ($ya->fetchColumn()) return ['status' => 'error', 'message' => 'Ese código ya está agregado a este equipo.'];
+
+        $this->pdo->prepare("INSERT INTO equipos_qr_extra (equipo_id, qr, nota, creado_por, creado_at) VALUES (?, ?, ?, ?, NOW())")
+                  ->execute([$equipoId, $qr, mb_substr(trim($nota), 0, 200) ?: null, $usuario]);
+        qrRegistrarUsado($this->pdo, $qr, $equipoId);
+        registrarHistorial($this->pdo, $usuario, $equipoId, 'qr_adicional', null, $qr, 'INSERT');
+        return ['status' => 'success', 'message' => "QR {$qr} agregado: ya lleva a la validación de este equipo.",
+                'qr_extra' => $this->qrExtraDe($equipoId)];
+    }
+
+    public function quitarQrExtra(int $id, string $usuario): array {
+        if (!asegurarQrExtraEquipos($this->pdo)) return ['status' => 'error', 'message' => 'No se pudo preparar la tabla de QR adicionales.'];
+        $st = $this->pdo->prepare("SELECT equipo_id, qr FROM equipos_qr_extra WHERE id = ?");
+        $st->execute([$id]);
+        $x = $st->fetch(PDO::FETCH_ASSOC);
+        if (!$x) return ['status' => 'error', 'message' => 'Ese QR adicional ya no existe.'];
+        $this->pdo->prepare("DELETE FROM equipos_qr_extra WHERE id = ?")->execute([$id]);
+        $this->pdo->prepare("UPDATE qr_codigos SET usado = 0, equipo_id = NULL WHERE identificador = ?")->execute([$x['qr']]);
+        registrarHistorial($this->pdo, $usuario, (int)$x['equipo_id'], 'qr_adicional', $x['qr'], null, 'DELETE');
+        return ['status' => 'success', 'message' => "QR {$x['qr']} quitado.", 'qr_extra' => $this->qrExtraDe((int)$x['equipo_id'])];
     }
 
     // ── Actualizar datos en calidad ────────────────────────
@@ -249,14 +284,6 @@ class Calidad {
             $params[] = $horaDb;
             registrarHistorial($this->pdo, $usuario, $id, 'hora_inspeccion',
                                $row['hora_inspeccion'] ?? null, $horaDb);
-        }
-
-        // Segundo QR (casos excepcionales): el mismo certificado con dos
-        // códigos, y cualquiera de los dos lleva a la misma validación. Vacío
-        // lo quita y devuelve el código al banco.
-        if (array_key_exists('qr_codigo_2', $payload)) {
-            $r2 = $this->guardarQr2($id, (string)$payload['qr_codigo_2'], $row, $usuario);
-            if ($r2 !== null) return $r2;
         }
 
         // QR manual
