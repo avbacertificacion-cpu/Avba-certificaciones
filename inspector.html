@@ -3932,10 +3932,19 @@ function abrirDetalleInspeccion(idx) {
     </div>
   </div>`;
 
-  // Documentos: evidencia fotográfica + reporte
-  if (r.evidencia_url || r.reporte_url) {
+  // Documentos: checklist completo (siempre), evidencia fotográfica y reporte
+  {
     html += `<div class="det-section"><div class="det-section-title">Documentos</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button type="button" onclick="verChecklistPdf(${Number(r.id)}, this)"
+         style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
+                background:var(--azul);border:1.5px solid var(--azul);border-radius:8px;
+                color:#fff;font-size:12px;font-weight:600;cursor:pointer;">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" style="width:14px;height:14px">
+          <path d="M3 2h7l3 3v9H3V2z"/><path d="M5.5 8l1.5 1.5L10.5 6"/><path d="M5 11.5h6"/>
+        </svg>
+        Checklist completo (PDF)
+      </button>`;
     if (r.evidencia_url) {
       html += `<button onclick="verEvidencia('${r.evidencia_url}')"
          style="display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
@@ -7946,6 +7955,32 @@ function arnNueva() {
 }
 
 /* ─── VISOR DE EVIDENCIA FOTOGRÁFICA ──────────────────────────────────────── */
+/* El reporte con TODO el checklist de la inspección, generado al momento con
+   los datos actuales (incluye lo que Calidad haya corregido). La pestaña se
+   abre antes de pedirlo: si se abre después de esperar la respuesta, el
+   navegador del teléfono la bloquea como ventana emergente. */
+async function verChecklistPdf(id, btn) {
+  if (!id) return;
+  const win = window.open('', '_blank');
+  if (win) win.document.write('<p style="font-family:sans-serif;padding:24px;color:#0B2545">Generando el reporte del checklist…</p>');
+  const txt = btn ? btn.innerHTML : '';
+  if (btn) { btn.disabled = true; btn.lastChild.textContent = ' Generando…'; }
+  try {
+    const res = await fetch(API, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },   // el token lo inyecta el interceptor
+      body: JSON.stringify({ action: 'REPORTE_CHECKLIST', payload: { id } })
+    });
+    const d = await res.json();
+    if (d.status !== 'success' || !d.url) throw new Error(d.message || 'No se pudo generar el reporte.');
+    if (win) win.location.href = d.url; else window.location.href = d.url;
+  } catch (e) {
+    if (win) win.close();
+    alert(e.message || 'No se pudo generar el reporte.');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = txt; }
+  }
+}
+
 async function verEvidencia(url) {
   document.getElementById('ov-evidencia').classList.add('open');
   document.getElementById('ev-lightbox').classList.remove('open');

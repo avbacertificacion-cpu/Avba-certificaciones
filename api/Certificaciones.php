@@ -1238,6 +1238,11 @@ class Certificaciones {
             $html = $this->inyectarPruebaCargaDictamen($html, $pcDatos, $d, basename($archivo));
         }
 
+        // Páginas técnicas por tipo de equipo: metodología y normas, criterios
+        // y checklist, seguridad en la operación, y el cierre con la validación.
+        if (!class_exists('DictamenAnexos')) require_once __DIR__ . '/DictamenAnexos.php';
+        $html = DictamenAnexos::insertar($this->pdo, $html, basename($archivo), $d, $items, $qrB64);
+
         // Ajuste para mPDF:
         // 0. Reparar tabla .hdr sin cerrar: algunas plantillas dejan el <td class="hdr-logos">
         //    y la tabla .hdr abiertos antes de .gold-bar (los navegadores lo toleran, pero

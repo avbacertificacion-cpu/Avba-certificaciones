@@ -45,6 +45,8 @@ require_once __DIR__ . '/Envios.php';
 require_once __DIR__ . '/Diagnostico.php';
 require_once __DIR__ . '/LectorIA.php';
 require_once __DIR__ . '/NoConformidades.php';
+require_once __DIR__ . '/DictamenAnexos.php';
+require_once __DIR__ . '/ReporteChecklist.php';
 require_once __DIR__ . '/Arneses.php';
 require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
@@ -1579,6 +1581,12 @@ if ($method === 'POST') {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cert->imprimirPDF((int)($payload['id'] ?? $payload['fila'] ?? 0), 'cert', false, $usr['usuario']));
+
+        // Inspector: el checklist completo de una inspección suya, en PDF.
+        case 'REPORTE_CHECKLIST':
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta((new ReporteChecklist($pdo))->generar((int)($payload['id'] ?? 0), $usr));
 
         case 'IMPRIMIR_PDF_DICT':
             $usr = validarToken($pdo, $token);
