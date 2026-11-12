@@ -1212,6 +1212,7 @@ class Certificaciones {
             '{{normas_acreditadas}}' => $normasAcredHtml,
             '{{normas_referencia}}'  => $normasRefHtml,
             '{anexo_acreditacion}'   => $e(textoAnexoAcreditacion()),
+            '{numero_acreditacion}'  => $e(numeroAcreditacion()),
         ];
 
         $html = file_get_contents($templatePath);
@@ -2491,7 +2492,7 @@ SVG;
 
         sort($archivos);
         $tope   = $conPruebaCarga ? 9   : 12;
-        $altura = $conPruebaCarga ? 120 : 155;
+        $altura = $conPruebaCarga ? 102 : 155;
         $archivos = array_slice($archivos, 0, $tope);
 
         // Convertir todas las fotos a base64
@@ -2884,6 +2885,29 @@ SVG;
     }
 
     /**
+     * Tipografías de la marca para mPDF: Inter (texto) y Montserrat (títulos),
+     * en TTF estático (mPDF no lee woff2 ni fuentes variables).
+     *
+     * Se registran con nombres propios —avbainter, avbamont— y no como "Inter"
+     * o "Montserrat": los certificados ya piden esas familias en su CSS y hoy
+     * salen en DejaVu. Con el mismo nombre cambiarían de tipografía sin que
+     * nadie lo pidiera; así sólo las usa la plantilla que las nombra.
+     */
+    public static function fuentesAvba(): array {
+        $dir = __DIR__ . '/../assets/fonts/ttf';
+        if (!is_dir($dir)) return [];
+        $cfg   = (new \Mpdf\Config\ConfigVariables())->getDefaults();
+        $fonts = (new \Mpdf\Config\FontVariables())->getDefaults();
+        return [
+            'fontDir'  => array_merge($cfg['fontDir'], [$dir]),
+            'fontdata' => $fonts['fontdata'] + [
+                'avbainter' => ['R' => 'inter-400.ttf', 'B' => 'inter-700.ttf'],
+                'avbamont'  => ['R' => 'montserrat-800.ttf', 'B' => 'montserrat-900.ttf'],
+            ],
+        ];
+    }
+
+    /**
      * Convierte HTML a PDF con mPDF (para plantillas CSS avanzadas como certificado_preview.html).
      * @return string  Ruta absoluta al .pdf generado
      */
@@ -2908,7 +2932,7 @@ SVG;
             'dpi'           => 96,
             'default_font'  => 'dejavusans',
             'tempDir'       => sys_get_temp_dir() . '/mpdf',
-        ];
+        ] + self::fuentesAvba();
 
         $mpdf = new \Mpdf\Mpdf($config);
         $mpdf->SetBasePath(__DIR__ . '/../');

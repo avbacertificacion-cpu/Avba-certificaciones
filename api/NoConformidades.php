@@ -447,7 +447,7 @@ class NoConformidades {
             'margin_left' => 0, 'margin_right' => 0, 'margin_top' => 0, 'margin_bottom' => 0,
             'default_font' => 'dejavusans',
             'tempDir' => sys_get_temp_dir() . '/mpdf',
-        ]);
+        ] + (method_exists('Certificaciones', 'fuentesAvba') ? \Certificaciones::fuentesAvba() : []));
         $mpdf->SetBasePath(__DIR__ . '/../');
         $prev = (int)ini_get('pcre.backtrack_limit');
         ini_set('pcre.backtrack_limit', 10000000);
