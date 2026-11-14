@@ -3756,6 +3756,15 @@ HTML;
             'default_font'  => 'dejavusans',
             'tempDir'       => sys_get_temp_dir() . '/mpdf',
         ];
+        // Tipografías de la marca (Inter y Montserrat) con nombres propios:
+        // sólo las usa el documento que las pide —hoy la DC-3—, así que el
+        // diploma, el certificado y la credencial salen igual que antes.
+        if (!class_exists('Certificaciones') && is_file(__DIR__ . '/Certificaciones.php')) {
+            require_once __DIR__ . '/Certificaciones.php';
+        }
+        if (method_exists('Certificaciones', 'fuentesAvba')) {
+            $config += \Certificaciones::fuentesAvba();
+        }
 
         $mpdf = new \Mpdf\Mpdf($config);
         $mpdf->SetBasePath(__DIR__ . '/../');
