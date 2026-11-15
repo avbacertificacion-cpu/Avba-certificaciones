@@ -821,6 +821,10 @@ class Personal {
             };
         }
 
+        // Se generan todos en esta misma petición (la DC-3 mide su anverso: ≈1 s por documento);
+        // el límite de 120 s del servidor no alcanzaría para una sesión grande.
+        @set_time_limit(60 + 5 * count($participantes) * count($tipos));
+
         // Generar documentos y recopilar adjuntos
         $adjuntos = [];
         $errores  = [];
@@ -2903,7 +2907,8 @@ HTML;
 
         $nombre    = $esc($up($p['nombre_completo'] ?? ''));
         $horas     = (float)($p['duracion_horas'] ?? 0);
-        $horasStr  = $horas > 0 ? number_format($horas, 0) . ' horas' : '';
+        // Con su decimal, como la DC-3 y la lista de participantes (4.5 → «4.5 horas», no «5»)
+        $horasStr  = $horas > 0 ? rtrim(rtrim(number_format($horas, 1, '.', ''), '0'), '.') . ' horas' : '';
         $area      = $esc(trim($p['area_tematica'] ?? ''));
         $folio     = $esc($p['control']
             ? 'AB.' . $p['control'] . '-' . date('Y') . 'MX'

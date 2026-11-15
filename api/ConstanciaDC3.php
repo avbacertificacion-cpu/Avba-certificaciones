@@ -10,17 +10,21 @@
  *  · Nombres bajo las firmas en MAYÚSCULAS y del mismo tamaño los tres; leyenda «Nombre y firma».
  *  · Ocupaciones una por renglón con sangría francesa (clave | denominación); si son muchas, en
  *    párrafo corrido separadas por «·». Las entradas vacías no dejan renglón en blanco.
- *  · RFC vacío: retícula 4-6-3 con guiones para llenarse a mano; RFC fuera de patrón: sus
- *    caracteres tal cual, completando 13 cajas.
- *  · Duración que no es un número entero: se escribe a tamaño de valor y sin «HORAS».
+ *  · RFC con Ñ y & (válidas para el SAT, y así se guardan en el catálogo de empresas). RFC vacío:
+ *    retícula 4-6-3 con guiones para llenarse a mano; fuera de patrón: sus caracteres tal cual,
+ *    completando 13 cajas.
+ *  · Duración con su decimal (4.5 h → «4.5», como en la lista de participantes; antes se truncaba
+ *    a «4» y un curso de media hora salía «0 HORAS»). Si no es numérica: a tamaño de valor, sin «HORAS».
  *  · Imágenes con su MIME real; GIF/WEBP/BMP se convierten a PNG conservando la transparencia
  *    (mPDF no lee una firma GIF/WEBP ni un logo JPEG etiquetado como PNG). La firma se re-entinta
- *    en azul tinta y el papel de una firma escaneada se vuelve transparente.
+ *    en azul tinta y el papel de una firma escaneada se vuelve transparente. Una firma vacía,
+ *    dañada o ilegible se cambia por la del director (con aviso en el log) en vez de una «X» roja.
+ *  · Logos SVG: se corrige la ruta antes de dársela a mPDF, que deforma los subtrayectos que se
+ *    abren sin cerrar el anterior (ver $repararSvg).
+ *  · QR de validación de 16 mm con zona blanca de 4 módulos (ISO/IEC 18004); sólo con datos al
+ *    límite de la base de datos baja hasta 12 mm, conservando los 4 módulos.
  *  · El anverso se MIDE con mPDF y se compacta sólo lo necesario para que quepa siempre en una
  *    hoja carta, con el pie a la misma altura; lo que sobra se le da al renglón de firmas.
- *
- * Igual que antes, a propósito: la duración se imprime entera ('4.5' → '4'); la fecha fin sí usa
- * el valor real.
  */
 final class ConstanciaDC3
 {
@@ -43,12 +47,16 @@ final class ConstanciaDC3
         $curp      = strtoupper(trim($p['curp'] ?? ''));
         $puesto    = $up($p['puesto'] ?? '');
         $empresa   = $up($p['empresa_nombre'] ?? '');
-        $rfcRaw    = strtoupper(preg_replace('/[^A-Z0-9]/i', '', $p['empresa_rfc'] ?? ''));
+        $rfcIn     = (string)($p['empresa_rfc'] ?? '');
+        // Mismo filtro con el que se guarda (Personal::guardarCliente): letras, dígitos, Ñ y &
+        $rfcRaw    = mb_strtoupper((string)(preg_replace('/[^A-Z0-9&Ñ]/iu', '', $rfcIn)
+                                            ?? preg_replace('/[^A-Z0-9]/i', '', $rfcIn)), 'UTF-8');
         $patron    = $up($p['empresa_representante'] ?? '');
         $repTrab   = $up($p['empresa_rep_trabajadores'] ?? '');
         $curso     = $up($p['curso_nombre'] ?? '');
         $horasVal  = (float)($p['duracion_horas'] ?? 0);
-        $horas     = $horasVal > 0 ? (string)(int)$horasVal : trim($p['duracion_horas'] ?? '');   // (int): ver encabezado
+        // Con su decimal (cursos.duracion_horas es DECIMAL(6,1)): 16.0 → «16», 4.5 → «4.5»
+        $horas     = $horasVal > 0 ? rtrim(rtrim(number_format($horasVal, 1, '.', ''), '0'), '.') : trim((string)($p['duracion_horas'] ?? ''));
         $area      = trim($p['area_tematica'] ?? '');
         $fechaYmd  = $p['fecha_curso'] ?? null;
 
@@ -75,7 +83,7 @@ final class ConstanciaDC3
 
         // RFC con guiones para mostrar (LLLL-YYMMDD-XXX)
         $rfcFmt = $rfcRaw;
-        if (preg_match('/^([A-Z]{3,4})(\d{6})([A-Z0-9]{2,3})$/', $rfcRaw, $m)) {
+        if (preg_match('/^([A-ZÑ&]{3,4})(\d{6})([A-Z0-9]{2,3})$/u', $rfcRaw, $m)) {
             $rfcFmt = $m[1] . '-' . $m[2] . '-' . $m[3];
         }
 
@@ -103,23 +111,98 @@ final class ConstanciaDC3
             $bytes = (float)$lim * ($u === 'g' ? 1073741824 : ($u === 'm' ? 1048576 : ($u === 'k' ? 1024 : 1)));
             return $w * $h * 5.0 + 24e6 < $bytes - memory_get_usage();
         };
+        // SVG para mPDF, cuyo dibujante (Svg::svgPath) tiene dos fallas con rutas válidas:
+        //  1. Sólo registra el inicio de un subtrayecto cuando el M/m va al principio de la ruta o
+        //     después de «z»: si un subtrayecto se abre sin cerrar el anterior, la siguiente «z» regresa
+        //     al punto equivocado y lo relativo que sigue se desplaza (un logo vectorizado sale como una
+        //     mancha). En una ruta con relleno y sin trazo, cerrar el subtrayecto abierto no cambia el
+        //     dibujo: se antepone «Z» a ese M/m y se pasa a absoluto. Con trazo no se toca.
+        //  2. No entiende las banderas de un arco escritas juntas («a20 20 0 1010 0», como las deja un
+        //     optimizador): el arco desaparece. Se reescriben separadas, con o sin trazo.
+        // Si la ruta no se entiende, se deja tal cual.
+        $repararSvg = function (string $svg): string {
+            $trazo = '/\bstroke\s*(?:=\s*["\']\s*|:\s*)(?!none\b|transparent\b)[^"\';\s]/i';
+            $sinRelleno = '/\bfill\s*(?:=\s*["\']\s*|:\s*)none\b/i';
+            $contenedores = preg_match_all('/<(?:svg|g|use|symbol)\b[^>]*>|<style\b[^>]*>.*?<\/style>/is', $svg, $mm) ? implode(' ', $mm[0]) : '';
+            $trazoHeredado = $contenedores !== '' && preg_match($trazo, $contenedores);
+            $num = '[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?';
+            $fmt = fn(float $n): string => rtrim(rtrim(sprintf('%.6F', $n), '0'), '.');
+            $paso = ['M' => 2, 'L' => 2, 'H' => 1, 'V' => 1, 'C' => 6, 'S' => 4, 'Q' => 4, 'T' => 2, 'A' => 7];
+            $ruta = function (string $d, bool $cerrar) use ($num, $fmt, $paso): ?string {
+                if (!preg_match_all('/([MZLHVCSQTAmzlhvcsqta])([^MZLHVCSQTAmzlhvcsqta]*)/', $d, $cmds, PREG_SET_ORDER)) return null;
+                [$out, $x, $y, $sx, $sy, $abierto, $cambio] = ['', 0.0, 0.0, 0.0, 0.0, false, false];
+                foreach ($cmds as [$todo, $c, $args]) {
+                    $U = strtoupper($c);
+                    $rel = $c !== $U;
+                    if ($U === 'Z') { [$x, $y, $abierto] = [$sx, $sy, false]; $out .= $todo; continue; }
+                    // Números; en un arco las dos banderas pueden ir pegadas («a1 1 0 011 1»)
+                    [$a, $pos, $i] = [[], 0, 0];
+                    while (preg_match(($U === 'A' && ($i % 7 === 3 || $i % 7 === 4)) ? '/\G[\s,]*([01])/' : '/\G[\s,]*(' . $num . ')/',
+                                      $args, $t, 0, $pos)) {
+                        $a[] = (float)$t[1];
+                        $pos += strlen($t[0]);
+                        $i++;
+                    }
+                    $k = $paso[$U];
+                    if (trim(substr($args, $pos), " \t\r\n,") !== '' || !$a || count($a) % $k !== 0) return null;
+                    if ($U === 'A') {
+                        $out .= $c . implode(' ', array_map($fmt, $a)) . ' ';
+                        $cambio = true;
+                    } elseif ($U === 'M' && $abierto && $cerrar) {
+                        $out .= 'Z M' . $fmt($a[0] + ($rel ? $x : 0)) . ' ' . $fmt($a[1] + ($rel ? $y : 0))
+                              . (count($a) > 2 ? ($rel ? ' l' : ' L') . implode(' ', array_map($fmt, array_slice($a, 2))) : '') . ' ';
+                        $cambio = true;
+                    } else {
+                        $out .= $todo;
+                    }
+                    for ($j = 0; $j < count($a); $j += $k) {
+                        $g = array_slice($a, $j, $k);
+                        [$nx, $ny] = match ($U) {
+                            'H' => [$g[0], $rel ? 0.0 : $y],
+                            'V' => [$rel ? 0.0 : $x, $g[0]],
+                            'C' => [$g[4], $g[5]],
+                            'S', 'Q' => [$g[2], $g[3]],
+                            'A' => [$g[5], $g[6]],
+                            default => [$g[0], $g[1]],          // M, L, T
+                        };
+                        [$x, $y] = $rel ? [$x + $nx, $y + $ny] : [$nx, $ny];
+                        if ($U === 'M' && $j === 0) [$sx, $sy] = [$x, $y];
+                    }
+                    $abierto = true;
+                }
+                return $cambio ? $out : null;
+            };
+            $res = preg_replace_callback('/<path\b[^>]*>/i', function ($el) use ($trazo, $sinRelleno, $ruta, $trazoHeredado) {
+                $cerrar = !$trazoHeredado && !preg_match($trazo, $el[0]) && !preg_match($sinRelleno, $el[0]);
+                return preg_replace_callback('/(\sd\s*=\s*)(["\'])(.*?)\2/s', function ($m) use ($ruta, $cerrar) {
+                    $nueva = $ruta($m[3], $cerrar);
+                    return $nueva === null ? $m[0] : $m[1] . $m[2] . $nueva . $m[2];
+                }, $el[0]) ?? $el[0];
+            }, $svg);
+            return $res ?? $svg;
+        };
         // Imagen → data URI que mPDF lee bien: PNG/JPEG/SVG con su MIME real; GIF, WEBP, BMP… → PNG con su
         // transparencia (mPDF pinta de negro el fondo transparente de un WEBP y no lee un GIF/WEBP/JPEG
         // con la etiqueta equivocada). Los mapas de bits de más de $maxLado px se reducen (cada pasada del
         // medidor los decodifica). '' si el contenido no es una imagen: mejor nada que una imagen rota.
-        $normalizar = function (string $uri, int $maxLado) use ($decodificar, $mimeDe, $memoriaGd): string {
+        $normalizar = function (string $uri, int $maxLado) use ($decodificar, $mimeDe, $memoriaGd, $repararSvg): string {
             if ($uri === '') return '';
             $bin = $decodificar($uri);
-            if ($bin === null) return $uri;                                   // ruta o URL: tal cual
+            if ($bin === null) {
+                return strncasecmp($uri, 'data:', 5) === 0 ? '' : $uri;     // data URI vacío: nada; ruta o URL: tal cual
+            }
             $mime = $mimeDe($bin);
             if ($mime === '') return '';
-            if ($mime === 'image/svg+xml') return 'data:image/svg+xml;base64,' . base64_encode($bin);
+            if ($mime === 'image/svg+xml') return 'data:image/svg+xml;base64,' . base64_encode($repararSvg($bin));
             $info   = @getimagesizefromstring($bin);
             $grande = $info && max($info[0], $info[1]) > $maxLado;
             $etiqueta = 'data:' . $mime . ';base64,' . base64_encode($bin);
-            if (($mime === 'image/png' || $mime === 'image/jpeg') && !$grande) return $etiqueta;
-            if (!function_exists('imagecreatefromstring') || !$info || !$memoriaGd($info[0], $info[1])
-                || !($src = @imagecreatefromstring($bin))) return $etiqueta;  // sin GD: al menos con su MIME real
+            $nativo = $mime === 'image/png' || $mime === 'image/jpeg';
+            // Sin GD (o sin memoria para decodificarla) no se puede revisar: va con su MIME real
+            if (!function_exists('imagecreatefromstring') || !$info || !$memoriaGd($info[0], $info[1])) return $etiqueta;
+            // Con GD: si no se puede decodificar (truncada, TIFF, PSD…), mPDF tampoco la leería → ''
+            if (!($src = @imagecreatefromstring($bin))) return '';
+            if ($nativo && !$grande) { imagedestroy($src); return $etiqueta; }
             if (!imageistruecolor($src)) imagepalettetotruecolor($src);
             [$w, $h] = [imagesx($src), imagesy($src)];
             $f  = min(1.0, $maxLado / max($w, $h));
@@ -135,7 +218,7 @@ final class ConstanciaDC3
             $jpg ? imagejpeg($im, null, 90) : imagepng($im, null, 9);
             $out = ob_get_clean();
             imagedestroy($im);
-            return $out ? 'data:image/' . ($jpg ? 'jpeg' : 'png') . ';base64,' . base64_encode($out) : $etiqueta;
+            return $out ? 'data:image/' . ($jpg ? 'jpeg' : 'png') . ';base64,' . base64_encode($out) : ($nativo ? $etiqueta : '');
         };
 
         $logoB64  = $asset('logos/avba.png');
@@ -144,7 +227,7 @@ final class ConstanciaDC3
         $instrFirmaB64 = '';
         if ($instrFirmaPath) {
             $absPath = $raiz . '/' . ltrim($instrFirmaPath, '/');
-            if (file_exists($absPath)) {
+            if (is_file($absPath)) {
                 $ext  = strtolower(pathinfo($absPath, PATHINFO_EXTENSION));
                 $mime = in_array($ext, ['jpg', 'jpeg']) ? 'image/jpeg' : 'image/png';       // como htmlDC3; $normalizar corrige
                 $instrFirmaB64 = $normalizar('data:' . $mime . ';base64,' . base64_encode(file_get_contents($absPath)), 1600);
@@ -244,7 +327,16 @@ final class ConstanciaDC3
             }
             return $png() ?: $uri;
         };
-        if ($instrFirmaB64) $instrFirmaB64 = $entintar($instrFirmaB64);
+        // En caché por proceso: la firma del director es la misma en todas las DC-3 de un envío
+        static $tintas = [];
+        if ($instrFirmaB64) {
+            $clave = md5($instrFirmaB64);
+            if (!isset($tintas[$clave])) {
+                if (count($tintas) >= 8) array_shift($tintas);
+                $tintas[$clave] = $entintar($instrFirmaB64);
+            }
+            $instrFirmaB64 = $tintas[$clave];
+        }
 
         // Proporción ancho/alto de una imagen (SVG: width/height o viewBox); null si no se puede saber
         $proporcion = function (string $uri) use ($decodificar): ?float {
@@ -469,9 +561,9 @@ final class ConstanciaDC3
         $sep = 'width:3.6mm;text-align:center;vertical-align:middle;font-family:avbainter;font-weight:bold;font-size:12pt;'
              . 'color:#134074;padding:0;border:none;';
         $boxes = function (string $str, int $pad = 0, bool $guiones = false) use ($box, $sep, $esc): string {
-            if ($pad) $str = str_pad($str, $pad);
+            if ($pad) $str .= str_repeat(' ', max(0, $pad - mb_strlen($str, 'UTF-8')));
             $out = '';
-            foreach (str_split($str) as $c) {
+            foreach (mb_str_split($str, 1, 'UTF-8') as $c) {
                 if ($guiones && $c === '-') { $out .= '<td style="' . $sep . '">-</td>'; continue; }
                 $out .= '<td style="' . $box . '">' . ($c !== ' ' ? $esc($c) : '&nbsp;') . '</td>';
             }
@@ -500,10 +592,10 @@ final class ConstanciaDC3
                  . '</tr></table>';
         };
 
-        $curpPad = str_pad($curp, 18);
+        $curpPad = $curp . str_repeat(' ', max(0, 18 - mb_strlen($curp, 'UTF-8')));
         // RFC: con patrón válido, en sus grupos (3|4)-6-3 con guion; vacío, la retícula 4-6-3 para
         // llenarse a mano; fuera de patrón, sus caracteres tal cual completando 13 cajas (máx. de un RFC).
-        $rfcCajas = $rfcRaw === '' ? '    -      -   ' : ($rfcFmt !== $rfcRaw ? $rfcFmt : str_pad($rfcRaw, 13));
+        $rfcCajas = $rfcRaw === '' ? '    -      -   ' : ($rfcFmt !== $rfcRaw ? $rfcFmt : $rfcRaw . str_repeat(' ', max(0, 13 - mb_strlen($rfcRaw, 'UTF-8'))));
 
         // Pie fijo (razón social, contacto y marca de cara)
         $pie = function (string $nombre, string $cara): string {
@@ -522,8 +614,8 @@ final class ConstanciaDC3
         $nomFirma = fn(string $n) =>
             '<table style="width:58mm;border-collapse:collapse;margin:0 auto;overflow:wrap"><tr><td class="nf" style="font-size:' . $sigFs . 'pt">'
             . $v($n) . '</td></tr></table>';
-        // Duración: número entero en grande con su unidad; cualquier otro texto, a tamaño de valor
-        $horasNum = preg_match('/^-?\d+$/', $horas) === 1;
+        // Duración: el número en grande con su unidad; cualquier otro texto, a tamaño de valor
+        $horasNum = preg_match('/^-?\d+(\.\d)?$/', $horas) === 1;
         $hyCurso = $sinGuion($curso, 184.0);
         $hyNombre = $sinGuion($nombre, 184.0);
         $hyPuesto = $sinGuion($puesto, 184.0);
@@ -564,16 +656,20 @@ final class ConstanciaDC3
 
             // Lado derecho de la banda: con QR, la validación en su ficha blanca; sin QR, el emisor
             // (mismo nombre que el encabezado) en una celda del mismo alto, así la banda no cambia.
-            $lq = $xn(14, 11);                         // lado del QR (mm)
-            $padQr = $xn(1.8, 1);
+            // QR de 16 mm (≈0.47 mm por módulo en la versión 4) y ficha blanca de 1.7 mm: con el medio
+            // módulo de margen de la imagen suman 4 módulos de zona blanca (ISO/IEC 18004). Sólo con datos
+            // al límite (etapa 3) baja hasta 12 mm, con la ficha a 1.3 mm: siguen siendo 4 módulos.
+            $lq = round(16 - 4 * $kz, 2);              // lado del QR (mm)
+            $fichaQr = round(1.7 - .4 * $kz, 2);
+            $padQr = $xn(1.4, .8);
             if ($qrB64) {
                 $heroDer = '<td class="hero-qt"><span class="hero-k">VALIDACIÓN</span><br>Escanee el código para<br>validar esta constancia</td>'
                          . '<td class="hero-qr" style="padding:' . $padQr . 'mm 4mm ' . $padQr . 'mm 0">'
                          . '<table style="border-collapse:collapse;margin-left:auto"><tr>'
-                         . '<td style="background:#ffffff;padding:1mm;border:none;border-bottom:.8mm solid #C9A84C">'
+                         . '<td style="background:#ffffff;padding:' . $fichaQr . 'mm;border:none;border-bottom:.8mm solid #C9A84C">'
                          . '<img src="' . $qrB64 . '" style="width:' . $lq . 'mm;height:' . $lq . 'mm" alt="QR"></td></tr></table></td>';
             } else {
-                $heroDer = '<td class="hero-qt" style="width:54mm;padding-right:5mm;height:' . number_format($lq + 2.8 + 2 * $padQr, 2, '.', '') . 'mm">'
+                $heroDer = '<td class="hero-qt" style="width:54mm;padding-right:5mm;height:' . number_format($lq + 2 * $fichaQr + .8 + 2 * $padQr, 2, '.', '') . 'mm">'
                          . '<span class="hero-k">EMITIDA POR</span><br>AVBA Inspections<br>www.avba.com.mx</td>';
             }
 
@@ -620,7 +716,7 @@ final class ConstanciaDC3
     .hero-s { font-family:avbamont; font-weight:normal; font-size:{$xpt(9.4, 8.6)}; color:#e3c97a; margin-top:.6mm; letter-spacing:.3px; }
     .hero-qt { width:33mm; text-align:right; font-size:7pt; font-weight:bold; color:#ffffff; line-height:1.4; padding:0 3mm 0 0; }
     .hero-k { color:#f3dd96; font-weight:bold; letter-spacing:.4px; }   /* oro claro: a 7 pt aguanta la fotocopia */
-    .hero-qr { width:19mm; text-align:right; }
+    .hero-qr { width:24mm; text-align:right; }
     /* Secciones */
     .sec { background:#0B2545; color:#ffffff; font-family:avbamont; font-weight:normal; font-size:8.4pt; letter-spacing:.7px;
            padding:{$mm(1.3, 1.05)} 3.6mm; border-left:1.8mm solid #C9A84C; margin-top:{$mm(2.3, 1.5)}; }
