@@ -123,8 +123,10 @@ final class ConstanciaDC3
         $repararSvg = function (string $svg): string {
             $trazo = '/\bstroke\s*(?:=\s*["\']\s*|:\s*)(?!none\b|transparent\b)[^"\';\s]/i';
             $sinRelleno = '/\bfill\s*(?:=\s*["\']\s*|:\s*)none\b/i';
-            $contenedores = preg_match_all('/<(?:svg|g|use|symbol)\b[^>]*>|<style\b[^>]*>.*?<\/style>/is', $svg, $mm) ? implode(' ', $mm[0]) : '';
-            $trazoHeredado = $contenedores !== '' && preg_match($trazo, $contenedores);
+            $etiqueta = '(?:[^>"\']|"[^"]*"|\'[^\']*\')*>';          // hasta «>», sin cortar dentro de comillas
+            $n = preg_match_all('/<(?:svg|g|a|use|symbol|switch)\b' . $etiqueta . '|<style\b[^>]*>.*?<\/style>/is', $svg, $mm);
+            // Si la búsqueda falla (p. ej. un <style> enorme agota pcre.backtrack_limit), se supone trazo
+            $trazoHeredado = $n === false || ($n > 0 && preg_match($trazo, implode(' ', $mm[0])));
             $num = '[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?';
             $fmt = fn(float $n): string => rtrim(rtrim(sprintf('%.6F', $n), '0'), '.');
             $paso = ['M' => 2, 'L' => 2, 'H' => 1, 'V' => 1, 'C' => 6, 'S' => 4, 'Q' => 4, 'T' => 2, 'A' => 7];
@@ -146,7 +148,14 @@ final class ConstanciaDC3
                     $k = $paso[$U];
                     if (trim(substr($args, $pos), " \t\r\n,") !== '' || !$a || count($a) % $k !== 0) return null;
                     if ($U === 'A') {
-                        $out .= $c . implode(' ', array_map($fmt, $a)) . ' ';
+                        // Radio 0 = recta (SVG F.6.2): mPDF dividiría entre rx²·ry² y fallaría. Los radios
+                        // llevan 12 decimales para que uno diminuto no se redondee a 0.
+                        for ($j = 0; $j < count($a); $j += 7) {
+                            [$rx, $ry] = array_map(fn($r) => rtrim(rtrim(sprintf('%.12F', abs($r)), '0'), '.'), [$a[$j], $a[$j + 1]]);
+                            $out .= ($rx === '0' || $ry === '0')
+                                ? ($rel ? 'l' : 'L') . $fmt($a[$j + 5]) . ' ' . $fmt($a[$j + 6]) . ' '
+                                : $c . $rx . ' ' . $ry . ' ' . implode(' ', array_map($fmt, array_slice($a, $j + 2, 5))) . ' ';
+                        }
                         $cambio = true;
                     } elseif ($U === 'M' && $abierto && $cerrar) {
                         $out .= 'Z M' . $fmt($a[0] + ($rel ? $x : 0)) . ' ' . $fmt($a[1] + ($rel ? $y : 0))
@@ -172,7 +181,7 @@ final class ConstanciaDC3
                 }
                 return $cambio ? $out : null;
             };
-            $res = preg_replace_callback('/<path\b[^>]*>/i', function ($el) use ($trazo, $sinRelleno, $ruta, $trazoHeredado) {
+            $res = preg_replace_callback('/<path\b' . $etiqueta . '/i', function ($el) use ($trazo, $sinRelleno, $ruta, $trazoHeredado) {
                 $cerrar = !$trazoHeredado && !preg_match($trazo, $el[0]) && !preg_match($sinRelleno, $el[0]);
                 return preg_replace_callback('/(\sd\s*=\s*)(["\'])(.*?)\2/s', function ($m) use ($ruta, $cerrar) {
                     $nueva = $ruta($m[3], $cerrar);
@@ -385,6 +394,11 @@ final class ConstanciaDC3
             $medidor = $medidores[$clave];
         }
         if ($medidor === null) $cfgMpdf = null;
+        // El anverso se mide en una hoja del mismo ancho y el doble de alta: así nada se corta y el
+        // sobrante (o el faltante) es exacto. En la hoja real, cuando el contenido se pasa, mPDF manda
+        // un bloque entero a la 2.ª hoja y el faltante medido sale exagerado (hasta 3.5 mm de más).
+        $altoHoja = $medidor ? (float)$medidor->h : 279.4;
+        $cfgMedir = $medidor ? ['format' => [(float)$medidor->w, 2 * $altoHoja]] + $cfgMpdf : null;
         $usarMedidor = $medidor !== null;
         // Ancho (mm) de un texto. Sin mPDF: promedio por carácter de mayúsculas (aprox. ±10 %; sólo
         // orienta el estimador, que en ese caso tampoco puede medir el anverso).
@@ -513,7 +527,7 @@ final class ConstanciaDC3
         // Firmas: el caso base es un renglón a 8.2 pt; cada renglón mide tamaño × 1.25
         $extraFirmas = $firLineas * $sigPt * 1.25 * 0.3528 - 8.2 * 1.25 * 0.3528;
         $ALTO_MIN = 15.6;   // alto mínimo del renglón de firmas (lo fijan la firma y el sello)
-        $HOLGURA  = 7.0;    // libre en el caso base con firmas al mínimo (8.8 mm, medido) menos 1.8 mm de seguridad
+        $HOLGURA  = 4.0;    // libre en el caso base con firmas al mínimo (4.2 mm sobre $LIBRE, medido con la banda del QR de 16 mm), menos un margen
         $AHORRO   = 20.0;   // lo que se recupera en la etapa 1 completa (medido)
         $AHORRO_X = 14.0;   // lo que se recupera en la etapa 2 completa sin contar los valores (medido: 14.6)
         $LIBRE    = 2.0;    // mm libres al pie del anverso tras medir (≈3 mm hasta el filete del pie)
@@ -530,21 +544,23 @@ final class ConstanciaDC3
             }
             [$s, $altoFirma] = [1 + min(1.0, $kx), $ALTO_MIN];
         }
-        // Medición real: espacio libre (mm) al pie del anverso con esta configuración; negativo si se pasa
-        // de hoja; null sin medidor. Usa la MISMA configuración y el mismo modo (CSS + body) que htmlToPdfMpdf.
-        $medir = function (string $html) use ($cfgMpdf, $usarMedidor): ?float {
-            if (!$usarMedidor || !$cfgMpdf) return null;
+        // Medición real: espacio libre (mm) al pie del anverso; negativo si se pasa de hoja; null sin
+        // medidor. Usa la MISMA configuración (salvo el alto de la hoja) y el mismo modo (CSS + body)
+        // que htmlToPdfMpdf.
+        $medir = function (string $html) use ($cfgMedir, $altoHoja, $usarMedidor): ?float {
+            if (!$usarMedidor || !$cfgMedir) return null;
             $prev = ini_get('pcre.backtrack_limit');
             try {
                 ini_set('pcre.backtrack_limit', '200000000');
-                $m = new \Mpdf\Mpdf($cfgMpdf);
+                $m = new \Mpdf\Mpdf($cfgMedir);
                 $m->SetHTMLFooter('');
                 $css  = preg_match('/<style[^>]*>(.*?)<\/style>/is', $html, $mm) ? $mm[1] : '';
                 $body = preg_match('/<body[^>]*>(.*)<\/body>/is', $html, $mm) ? $mm[1] : $html;
                 if ($css !== '') $m->WriteHTML($css, \Mpdf\HTMLParserMode::HEADER_CSS);
                 $m->WriteHTML($body, \Mpdf\HTMLParserMode::HTML_BODY);
-                $altoUtil = $m->h - $m->tMargin - $m->bMargin;
-                $libre = $m->page > 1 ? -(($m->page - 2) * $altoUtil + ($m->y - $m->tMargin)) : ($m->h - $m->bMargin) - $m->y;
+                // Alto ocupado por el contenido (si aun así pasara de la hoja doble, se suman sus hojas)
+                $ocupado = ($m->page - 1) * ($m->h - $m->tMargin - $m->bMargin) + ($m->y - $m->tMargin);
+                $libre = ($altoHoja - $m->tMargin - $m->bMargin) - $ocupado;
                 unset($m);
                 return $libre;
             } catch (\Throwable $e) {
@@ -875,7 +891,9 @@ final class ConstanciaDC3
             $pend = fn(float $x) => $x < 1 ? 20.0 : ($x < 2 ? 16.0 : 10.0);
             if ($sOk !== null && $sNo !== null) {
                 $t = ($LIBRE - $fNo) / max(1e-6, $fOk - $fNo);
-                $s = $sNo + min(0.85, max(0.15, $t)) * ($sOk - $sNo);
+                // El libre cambia a saltos (un valor que pasa a otro renglón): sin acercarse demasiado a
+                // un extremo del intervalo, que con un salto haría avanzar de a poco
+                $s = $sNo + min(0.75, max(0.25, $t)) * ($sOk - $sNo);
             } elseif ($sOk !== null) {
                 $s = max(0.0, $s - ($f - $LIBRE - 0.5) / $pend($s));
             } else {
