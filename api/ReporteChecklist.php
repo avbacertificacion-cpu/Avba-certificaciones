@@ -136,13 +136,15 @@ class ReporteChecklist {
 
         // Prueba de carga tal como se capturó
         $pc = json_decode((string)($eq['prueba_carga'] ?? ''), true) ?: [];
+        // Las plataformas de personal capturan el peso en kg; las demás, en toneladas
+        $pesoKg = in_array((string)($pc['plantilla'] ?? ''), ['dictamen_mewp.html', 'dictamen_ptem.html'], true);
         unset($pc['plantilla']);
         $filas = array_filter($pc, 'is_array');
         $cabecera = array_filter($pc, fn($v) => !is_array($v) && trim((string)$v) !== '');
         $hay = false;
         foreach ($filas as $f) foreach ($f as $v) if (!is_array($v) && trim((string)$v) !== '') $hay = true;
         if ($hay) {
-            $nom = ['peso' => 'Peso (TON)', 'radio' => 'Radio (m)', 'pluma' => 'Pluma (m)', 'angulo' => 'Ángulo (°)', 'altura' => 'Altura (m)',
+            $nom = ['peso' => $pesoKg ? 'Peso (kg)' : 'Peso (TON)', 'radio' => 'Radio (m)', 'pluma' => 'Pluma (m)', 'angulo' => 'Ángulo (°)', 'altura' => 'Altura (m)',
                     'resultado' => 'Resultado', 'duracion' => 'Duración (min)', 'deformacion' => 'Deformación', 'inclin' => 'Inclinación',
                     'extension' => 'Extensión (m)', 'flecha' => 'Flecha (mm)', 'luz' => 'Claro (m)', 'cml' => 'CML', 'prueba' => 'Carga de prueba',
                     'capacidad' => 'Capacidad', 'tipo_plataforma' => 'Tipo'];

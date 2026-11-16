@@ -690,9 +690,13 @@ class Admin {
             'secciones' => ['E' => 'Pluma autoportante, carro y punta'],
             // Sin cúspide no hay tirantes de pluma: la celosía se sostiene sola.
             'quitar'    => ['D-09', 'E-03'],
+            // Ni de contrapluma: también es autoportante.
+            'cambiar'   => [
+                'D-05' => 'Contrapluma sin deformación, con sus uniones, pasadores y seguros asegurados',
+            ],
             'agregar'   => [
-                ['A', 'Configuración flat-top confirmada contra el manual: pluma autoportante unida directamente a la corona'],
-                ['D', 'Unión directa de pluma y contrapluma a la corona de giro: bulones, pasadores y seguros completos y con el apriete indicado'],
+                ['A', 'Configuración flat-top confirmada contra el manual: pluma y contrapluma autoportantes, sin cúspide ni tirantes'],
+                ['D', 'Unión de pluma y contrapluma a la pieza de giro: bulones, pasadores y seguros completos y con el apriete indicado'],
                 ['E', 'Articulación del pie de pluma: pasadores, bujes y seguros sin desgaste ni ovalamiento'],
                 ['E', 'Celosía de la pluma —cordones, diagonales y montantes— sin fisuras ni deformación, al ser autoportante'],
             ],
@@ -758,6 +762,10 @@ class Admin {
             'quitar'    => ['C-04', 'C-05', 'C-06', 'D-09'],
             'cambiar'   => [
                 'A-06' => 'Memoria de cálculo o constancia de la capacidad del terreno o la losa donde se apoya',
+                'B-01' => 'Terreno o losa de apoyo sin grietas, asentamientos ni socavación bajo los estabilizadores',
+                'B-02' => 'Anclajes de la base, cuando el diseño los incluye: completos, sin corrosión y con el apriete indicado',
+                'D-05' => 'Contrapluma, cuando el diseño la incluye: sin deformación, con sus tirantes y pasadores asegurados',
+                'D-08' => 'Barandales y pisos de la contrapluma, cuando el diseño la incluye, completos y antiderrapantes',
                 'C-07' => 'Escalera, descansos y línea de vida de la torre completos, cuando el diseño los incluye',
                 'C-08' => 'Protecciones y guardas de la escalera conforme al diseño, cuando la lleva',
                 'H-01' => 'Puesto de mando —cabina o botonera— cuando el diseño lo incluye: acceso, visibilidad y condición',
@@ -852,6 +860,33 @@ class Admin {
     private const SEED_CATALOGO       = 'catalogo_normas_v1';
     private const SEED_CHECKLIST_CSP  = 'checklist_canastilla_sp_v2';
     private const SEED_CHECKLIST_TORRE = 'checklist_grua_torre_v1';
+    private const SEED_TORRE_TEXTOS_V2 = 'checklist_torre_textos_v2';
+
+    /**
+     * Redacciones corregidas de la lista de grúa torre, por tipo: [texto
+     * sembrado, texto nuevo]. Sólo se cambia el renglón que sigue diciendo
+     * exactamente lo sembrado; si Calidad ya lo editó, se respeta.
+     */
+    private const TORRE_TEXTOS_V2 = [
+        'grua_torre_flattop' => [
+            ['Contrapluma sin deformación, con sus tirantes y pasadores asegurados',
+             'Contrapluma sin deformación, con sus uniones, pasadores y seguros asegurados'],
+            ['Configuración flat-top confirmada contra el manual: pluma autoportante unida directamente a la corona',
+             'Configuración flat-top confirmada contra el manual: pluma y contrapluma autoportantes, sin cúspide ni tirantes'],
+            ['Unión directa de pluma y contrapluma a la corona de giro: bulones, pasadores y seguros completos y con el apriete indicado',
+             'Unión de pluma y contrapluma a la pieza de giro: bulones, pasadores y seguros completos y con el apriete indicado'],
+        ],
+        'grua_torre_automont' => [
+            ['Cimentación sin grietas, asentamientos ni desplazamiento visible',
+             'Terreno o losa de apoyo sin grietas, asentamientos ni socavación bajo los estabilizadores'],
+            ['Pernos o anclas de la base: completos, sin corrosión y con el apriete indicado',
+             'Anclajes de la base, cuando el diseño los incluye: completos, sin corrosión y con el apriete indicado'],
+            ['Contrapluma sin deformación, con sus tirantes y pasadores asegurados',
+             'Contrapluma, cuando el diseño la incluye: sin deformación, con sus tirantes y pasadores asegurados'],
+            ['Barandales y pisos de la contrapluma completos y antiderrapantes',
+             'Barandales y pisos de la contrapluma, cuando el diseño la incluye, completos y antiderrapantes'],
+        ],
+    ];
     private const SEED_CATALOGO_V2    = 'catalogo_normas_v2';
     private const SEED_CATALOGO_V3    = 'catalogo_normas_v3_torre';
 
@@ -929,6 +964,37 @@ class Admin {
         $this->ampliarCatalogoNormas();
         $this->corregirChecklistCanastillaSinPuerta();
         $this->completarChecklistGruaTorre();
+        $this->corregirTextosTorreV2();
+    }
+
+    /**
+     * Aplica TORRE_TEXTOS_V2 una sola vez a los tipos que ya existen en el
+     * servidor. Los que nazcan después ya se siembran con los textos nuevos.
+     */
+    private function corregirTextosTorreV2(): void {
+        try {
+            $st = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
+            $st->execute([self::SEED_TORRE_TEXTOS_V2]);
+            if ($st->fetch()) return;
+        } catch (\Throwable $e) { return; }
+
+        try {
+            $tipo = $this->pdo->prepare("SELECT id FROM maquinaria_tipos WHERE UPPER(TRIM(nombre)) = ? LIMIT 1");
+            $upd  = $this->pdo->prepare(
+                "UPDATE checklist_items SET descripcion = ? WHERE maquinaria_tipo_id = ? AND descripcion = ?"
+            );
+            foreach (self::TORRE_TEXTOS_V2 as $clave => $cambios) {
+                [$nombre] = self::TIPOS_BASE[$clave];
+                $tipo->execute([$nombre]);
+                $tipoId = (int)($tipo->fetchColumn() ?: 0);
+                if (!$tipoId) continue;
+                foreach ($cambios as [$antes, $despues]) $upd->execute([$despues, $tipoId, $antes]);
+            }
+            $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")
+                ->execute([self::SEED_TORRE_TEXTOS_V2]);
+        } catch (\Throwable $e) {
+            error_log('[Admin] corregirTextosTorreV2: ' . $e->getMessage());
+        }
     }
 
     /**

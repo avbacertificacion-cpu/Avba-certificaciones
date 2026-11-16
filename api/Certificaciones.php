@@ -1344,6 +1344,30 @@ body { background:#fff!important; }
         return in_array(trim($plantilla), self::PLANTILLAS_TORRE, true);
     }
 
+    /**
+     * Unidad de cada campo de la prueba de carga, la misma con la que lo
+     * captura el inspector (inspector.html, PC_TEMPLATES). El peso va en
+     * toneladas salvo en las plataformas de personal, que lo capturan en kg.
+     * Los campos que no están aquí (CML, capacidad, factor…) se imprimen tal cual.
+     */
+    private const PC_UNIDADES = [
+        'peso' => 'TON', 'radio' => 'm', 'pluma' => 'm', 'altura' => 'm', 'luz' => 'm',
+        'extension' => 'm', 'angulo' => '°', 'inclin' => '°', 'flecha' => 'mm',
+        'deformacion' => 'mm', 'duracion' => 'min',
+    ];
+    private const PC_UNIDADES_PLANTILLA = [
+        'dictamen_mewp.html' => ['peso' => 'kg'],
+        'dictamen_ptem.html' => ['peso' => 'kg'],
+    ];
+
+    /** Un valor numérico de la prueba de carga con su unidad; lo que ya trae unidad o es texto, tal cual. */
+    private static function conUnidadPc(string $valor, string $plantilla, string $campo): string {
+        $v = trim($valor);
+        $u = self::PC_UNIDADES_PLANTILLA[trim($plantilla)][$campo] ?? self::PC_UNIDADES[$campo] ?? '';
+        if ($u === '' || !preg_match('/^-?\d+(?:[.,]\d+)?$/', $v)) return $v;
+        return $u === '°' ? $v . '°' : $v . ' ' . $u;
+    }
+
     private function geometriaPc(float $radio, float $pluma, string $plantilla = ''): array {
         /* En una grúa torre la pluma NO se inclina: el carro corre por ella y la
            altura bajo gancho la da la torre, no el triángulo. Deducirla con
@@ -1412,16 +1436,27 @@ body { background:#fff!important; }
                 if (!is_array($fila)) continue;
                 $r  = (float)($fila['radio'] ?? 0);
                 $l  = (float)($fila['pluma'] ?? 0);
-                // Una altura que es exactamente √(pluma² − radio²) —y el ángulo
-                // arccos(radio/pluma)— no se midió: la calculó un formulario
-                // con el triángulo de grúa móvil (Calidad lo hacía al guardar,
-                // también en grúa torre). No significa nada aquí y no se
-                // imprime; con el carro en la punta daba altura 0.
-                if ($l > 0 && $r >= 0 && $r <= $l) {
+                /* Una fila cuya altura es exactamente √(pluma² − radio²) Y cuyo
+                   ángulo es arccos(radio/pluma) no se midió: la calculó un
+                   formulario con el triángulo de grúa móvil —el del inspector
+                   con la plantilla de grúa móvil, o Calidad al guardar, también
+                   en grúa torre—, y siempre calculaba las dos. No significa nada
+                   aquí y no se imprime; con el carro en la punta daba altura 0.
+                   Se exigen las DOS coincidencias. Antes bastaba una, y así se
+                   borraba lo que sí se capturó: la lectura del indicador de una
+                   pluma abatible coincide con arccos(r/L) cuando el pie de pluma
+                   está casi sobre el eje de giro —el dictamen salía con «NA» y
+                   «pluma abatida a NA»—, y la altura medida de una flat-top no
+                   trae ángulo. */
+                $alt = trim((string)($fila['altura'] ?? ''));
+                $ang = trim((string)($fila['angulo'] ?? ''));
+                if ($l > 0 && $r >= 0 && $r <= $l && is_numeric($alt) && is_numeric($ang)) {
                     $hCalc = sqrt($l * $l - $r * $r);
                     $aCalc = rad2deg(acos($r / $l));
-                    if (isset($fila['altura']) && abs((float)$fila['altura'] - $hCalc) < 0.02) $pc[$k]['altura'] = '';
-                    if (isset($fila['angulo']) && abs((float)$fila['angulo'] - $aCalc) < 0.15) $pc[$k]['angulo'] = '';
+                    if (abs((float)$alt - $hCalc) < 0.02 && abs((float)$ang - $aCalc) < 0.15) {
+                        $pc[$k]['altura'] = '';
+                        $pc[$k]['angulo'] = '';
+                    }
                 }
                 // Pluma horizontal (flat-top, martillo, autodesplegable): no hay
                 // ángulo que reportar, venga de donde venga.
@@ -1438,22 +1473,28 @@ body { background:#fff!important; }
             $html
         );
 
-        // 2. Inyectar peso de prueba en el header (primer valor "peso" del primer row del JSON)
+        // 2. Peso de prueba del encabezado (pc-header-strip): el de la prueba CON carga.
+        /* Antes se tomaba el primer peso no vacío, que es el de la fila «sin
+           carga»: «0». Y como "0" es falso en PHP, la celda no se reemplazaba y
+           el dictamen salía con el valor de ejemplo de la plantilla, «42.5 TON»,
+           fuera cual fuera la carga de prueba. Cuando sí se reemplazaba, salía
+           sin unidad. Ahora: el mayor peso capturado, con su unidad, y si no
+           hay ninguno, NA —nunca el ejemplo—. */
         $pesoPrueba = '';
+        $pesoMax    = 0.0;
         foreach ($pc as $rowData) {
-            if (is_array($rowData) && isset($rowData['peso']) && $rowData['peso'] !== '') {
-                $pesoPrueba = $e($rowData['peso']);
-                break;
-            }
+            if (!is_array($rowData)) continue;
+            $v = trim((string)($rowData['peso'] ?? ''));
+            $n = (float)str_replace(',', '.', $v);
+            if ($v !== '' && $n > $pesoMax) { $pesoMax = $n; $pesoPrueba = $v; }
         }
-        if ($pesoPrueba) {
-            // Reemplazar la celda Peso de Prueba del header (pc-header-strip)
-            $html = preg_replace(
-                '/(<div class="pc-equip-lbl">Peso de Prueba<\/div><div class="pc-equip-val">)[^<]*(<\/div>)/',
-                '${1}' . $pesoPrueba . '${2}',
-                $html
-            );
-        }
+        $pesoTxt = $pesoPrueba !== '' ? $e(self::conUnidadPc($pesoPrueba, $plantillaDoc ?: $plantillaPc, 'peso')) : 'NA';
+        // Con callback: lo capturado no se interpreta como referencia ($1, \1) del reemplazo
+        $html = preg_replace_callback(
+            '/(<div class="pc-equip-lbl">Peso de Prueba<\/div><div class="pc-equip-val">)[^<]*(<\/div>)/',
+            fn($m) => $m[1] . $pesoTxt . $m[2],
+            $html
+        ) ?? $html;
 
         // 3. Reemplazar el <tbody> de la pc-table con los datos reales del JSON.
         //    Se generan EXACTAMENTE las columnas que define el <thead> de la plantilla
@@ -1533,8 +1574,9 @@ body { background:#fff!important; }
                             $tbodyHtml .= "<td class=\"pc-td\">{$badge}</td>\n";
                         }
                     } else {
+                        // Con su unidad (5 → «5 TON», 32.6 → «32.6 m»), la misma con la que se capturó
                         $val = $valor !== ''
-                            ? $e($valor)
+                            ? $e(self::conUnidadPc($valor, $plantillaDoc ?: $plantillaPc, $campo))
                             : '<span style="color:#94a3b8;font-style:italic">NA</span>';
                         $tbodyHtml .= "<td class=\"pc-td\">{$val}</td>\n";
                     }
@@ -1647,6 +1689,8 @@ body { background:#fff!important; }
                     $html = str_replace('{pc_obs_angulo}',  number_format($dAngulo, 1), $html);
                 } else {
                     $html = str_replace('{pc_diag_angulo}<span class="unit">°</span>', 'NA', $html);
+                    // «con la pluma de 50 m abatida a NA —radio…» no dice nada: se quita la frase
+                    $html = preg_replace('/\s*abatida a\s*<strong>\{pc_obs_angulo\}°<\/strong>/u', '', $html) ?? $html;
                     $html = str_replace('{pc_obs_angulo}°', 'NA', $html);
                     $html = str_replace(['{pc_diag_angulo}', '{pc_obs_angulo}'], 'NA', $html);
                 }

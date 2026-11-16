@@ -40,6 +40,12 @@ class DictamenAnexos {
     public static function insertar(PDO $pdo, string $html, string $plantilla, array $d, array $items, string $qrB64): string {
         $perfil = self::PLANTILLA_PERFIL[basename($plantilla)] ?? null;
         if ($perfil === null) return $html;
+        /* La autodesplegable usa la plantilla de pluma horizontal, pero no es una
+           torre montada por tramos y arriostrada: se apoya en sus estabilizadores
+           y se despliega sola. Su descripción y sus criterios son otros. */
+        if ($perfil === 'grua_torre' && str_contains(textoEstandar((string)($d['maquinaria'] ?? '')), 'AUTODESPLEG')) {
+            $perfil = 'grua_torre_automont';
+        }
         $p = self::perfil($perfil);
         if (!$p) return $html;
 
@@ -79,8 +85,12 @@ class DictamenAnexos {
         ];
         $a .= '<table class="ax-etapas"><tr>';
         foreach ($etapas as $i => [$n, $t, $x]) {
-            $a .= '<td class="' . ($i === 4 ? 'ax-et-fin' : '') . '"><div class="ax-et-n">' . $n . '</div>'
-                . '<div class="ax-et-t">' . $t . '</div><div class="ax-et-x">' . $x . '</div></td>';
+            // Colores del último paso en línea: mPDF no aplica el selector descendiente
+            // «.ax-et-fin .ax-et-t» y el título salía azul marino sobre azul marino.
+            $fin = $i === 4;
+            $a .= '<td class="' . ($fin ? 'ax-et-fin' : '') . '"><div class="ax-et-n">' . $n . '</div>'
+                . '<div class="ax-et-t"' . ($fin ? ' style="color:#ffffff"' : '') . '>' . $t . '</div>'
+                . '<div class="ax-et-x"' . ($fin ? ' style="color:#c9d6e6"' : '') . '>' . $x . '</div></td>';
         }
         $a .= '</tr></table>';
 
@@ -94,13 +104,30 @@ class DictamenAnexos {
 
         $a .= self::titulo('Marco normativo', 'Standards');
         $a .= '<table class="ax-tab"><thead><tr><th style="width:30%">Norma / documento</th><th>Título</th><th style="width:19%">Aplicación</th></tr></thead><tbody>';
+        $catalogo = self::descripcionesCatalogo($pdo);
+        $listadas = [];
+        $filasN   = [];   // [clave (HTML), título (HTML), etiqueta (HTML)]
         foreach (self::normasEquipo($pdo, (string)($d['maquinaria'] ?? '')) as [$clave, $tipo]) {
-            $a .= '<tr><td class="ax-cl">' . $e($clave) . '</td><td>' . $e(self::tituloNorma($clave)) . '</td>'
-                . '<td><span class="ax-tag ' . ($tipo === 'referencia' ? 'ax-tag-r' : 'ax-tag-a') . '">'
-                . ($tipo === 'referencia' ? 'De referencia' : 'Acreditada') . '</span></td></tr>';
+            $listadas[self::claveNorma($clave)] = true;
+            $titulo = self::tituloNorma($clave)
+                ?: ($catalogo[self::claveNorma($clave)] ?? '')
+                ?: 'Norma aplicable al tipo de equipo.';
+            $filasN[] = [$e($clave), $e($titulo), '<span class="ax-tag ' . ($tipo === 'referencia' ? 'ax-tag-r' : 'ax-tag-a') . '">'
+                . ($tipo === 'referencia' ? 'De referencia' : 'Acreditada') . '</span>'];
         }
+        // Lo que ya está como acreditada o de referencia no se repite como consulta técnica
         foreach ($p['refs'] as [$clave, $titulo]) {
-            $a .= '<tr><td class="ax-cl">' . $clave . '</td><td>' . $titulo . '</td><td><span class="ax-tag ax-tag-c">Consulta técnica</span></td></tr>';
+            if (isset($listadas[self::claveNorma($clave)])) continue;
+            $filasN[] = [$clave, $titulo, '<span class="ax-tag ax-tag-c">Consulta técnica</span>'];
+        }
+        /* Con muchas normas la tabla empujaba la nota a una hoja casi en blanco:
+           los renglones se compactan según cuántos son (en línea: mPDF no
+           aplica bien las clases a celdas de una tabla con clase). */
+        $nF = count($filasN);
+        $td = $nF > 16 ? ' style="padding:.6mm 2.2mm;font-size:6.7pt;line-height:1.25"'
+            : ($nF > 10 ? ' style="padding:.9mm 2.2mm;font-size:7.1pt;line-height:1.3"' : '');
+        foreach ($filasN as [$cl, $tit, $tag]) {
+            $a .= '<tr><td class="ax-cl"' . $td . '>' . $cl . '</td><td' . $td . '>' . $tit . '</td><td' . $td . '>' . $tag . '</td></tr>';
         }
         $a .= '</tbody></table>'
             . '<div class="ax-nota">Las normas <b>acreditadas</b> definen el alcance de la acreditación de AVBA ante la EMA para este tipo de equipo. '
@@ -263,7 +290,36 @@ class DictamenAnexos {
         }
     }
 
-    /** Título de una norma conocida; las demás se dejan con su clave. */
+    /**
+     * Clave para comparar normas: sin espacios ni año. «NOM-009-STPS-2011» y
+     * «NOM-009-STPS», o «ISO 9927-3:2019» e «ISO 9927-3», son la misma.
+     */
+    private static function claveNorma(string $norma): string {
+        $k = strtoupper(preg_replace('/\s+/', '', $norma));
+        return preg_replace('/[-:\/](19|20)\d{2}$/', '', $k) ?? $k;
+    }
+
+    /** Descripciones del catálogo de normas que mantiene Calidad, por clave. */
+    private static function descripcionesCatalogo(PDO $pdo): array {
+        try {
+            $out = [];
+            foreach ($pdo->query("SELECT norma, descripcion FROM normas_catalogo")->fetchAll() as $r) {
+                $desc = trim((string)($r['descripcion'] ?? ''));
+                if ($desc !== '') $out[self::claveNorma((string)$r['norma'])] = rtrim($desc, '.') . '.';
+            }
+            return $out;
+        } catch (\Throwable $ex) {
+            return [];
+        }
+    }
+
+    /**
+     * Título de una norma conocida; '' si no se conoce.
+     *
+     * La clave tiene que coincidir completa: antes bastaba con que empezara
+     * igual, y «ASME B30.26» —accesorios de aparejo—, «B30.20» y «B30.23»
+     * salían con el título de la B30.2, «Grúas viajeras y grúas pórtico».
+     */
     private static function tituloNorma(string $clave): string {
         $k = strtoupper(preg_replace('/\s+/', ' ', $clave));
         $t = [
@@ -271,7 +327,17 @@ class DictamenAnexos {
             'NOM-004-STPS' => 'Sistemas de protección y dispositivos de seguridad en la maquinaria y equipo.',
             'NOM-009-STPS' => 'Condiciones de seguridad para realizar trabajos en altura.',
             'NMX-GR-23814' => 'Grúas — Requisitos de competencia para inspectores de grúas (ISO 23814).',
-            'NMX-GR-9927'  => 'Grúas — Inspecciones — Parte 1: Generalidades (ISO 9927-1).',
+            'NMX-GR-9927-1' => 'Grúas — Inspecciones — Parte 1: Generalidades (ISO 9927-1).',
+            'ISO 9927-1'   => 'Grúas — Inspecciones — Parte 1: Generalidades.',
+            'ISO 9927-3'   => 'Grúas — Inspecciones — Parte 3: Grúas torre.',
+            'EN 14439'     => 'Grúas — Grúas torre — Requisitos de seguridad.',
+            'NOM-031-STPS' => 'Construcción — Condiciones de seguridad y salud en el trabajo.',
+            'ASME BTH-1'   => 'Diseño de dispositivos de izaje bajo el gancho.',
+            'AWS D1.1'     => 'Código de soldadura estructural — Acero.',
+            'CMAA 70'      => 'Especificaciones para puentes grúa viajeros de viga doble.',
+            'CMAA 74'      => 'Especificaciones para puentes grúa viajeros de viga simple.',
+            'A92.24'       => 'Plataformas de elevación móviles de personal — Capacitación.',
+            'ISO 12480-1'  => 'Grúas — Uso seguro — Parte 1: Generalidades.',
             'NMX-EC-17020' => 'Requisitos para el funcionamiento de diferentes tipos de unidades de inspección (ISO/IEC 17020).',
             'ASME B30.2'   => 'Grúas viajeras y grúas pórtico.',
             'ASME B30.3'   => 'Grúas torre.',
@@ -292,9 +358,10 @@ class DictamenAnexos {
             'ISO 4309'     => 'Grúas — Cables de acero — Cuidado, mantenimiento, inspección y descarte.',
         ];
         foreach ($t as $pref => $tit) {
-            if (str_starts_with($k, $pref) || str_contains($k, $pref)) return $tit;
+            // La clave completa: no la sigue otra cifra (B30.2 no es B30.26) ni la precede una letra
+            if (preg_match('/(?:^|[^A-Z0-9])' . preg_quote($pref, '/') . '(?![0-9])/', $k)) return $tit;
         }
-        return 'Norma aplicable al tipo de equipo.';
+        return '';
     }
 
     // ── Contenido por tipo de equipo ────────────────────────────────────────
@@ -363,10 +430,11 @@ class DictamenAnexos {
                 ['ASME B30.3', 'Grúas torre — construcción, montaje, inspección, pruebas y operación.'],
                 ['EN 14439', 'Grúas — Grúas torre — Requisitos de seguridad.'],
                 ['NOM-009-STPS-2011', 'Trabajos en altura: ascenso, montaje y mantenimiento en la torre.'],
+                ['NOM-006-STPS-2014', 'Manejo y almacenamiento de materiales: condiciones de seguridad en grúas y equipo de izaje.'],
             ], $refsGrua),
             'criterios' => [
                 ['Torre, base y anclajes', 'Tramos de celosía, pernos de unión y su apriete, base, lastre y arriostramientos.', 'Fisura, perno flojo o faltante, corrosión con pérdida de sección.'],
-                ['Pluma, contrapluma y tirantes', 'Cordones, diagonales, uniones, tirantes y contrapesos.', 'Cordón doblado o abollado, unión dañada, contrapeso suelto.'],
+                ['Pluma y contrapluma', 'Cordones, diagonales, uniones, contrapesos y, cuando el diseño los incluye, cúspide y tirantes.', 'Cordón doblado o abollado, unión dañada, contrapeso suelto.'],
                 ['Carro, malacate y cable', 'Rodillos del carro, tambor, enrollado y estado del cable.', 'Hilos rotos sobre el límite de ISO 4309, enrollado irregular o freno deficiente.'],
                 ['Mecanismo de orientación', 'Corona de giro, piñón, motorreductores y freno de orientación.', 'Holgura excesiva, ruido anormal o freno que no retiene.'],
                 ['Limitadores', 'Carga máxima, momento, carrera del carro, altura de gancho, giro y anemómetro.', 'Cualquier limitador inoperante, puenteado o mal ajustado.'],
@@ -393,6 +461,18 @@ class DictamenAnexos {
             ]),
         ];
         $p['grua_torre'] = $torre;
+
+        $am = $torre;
+        $am['descripcion'] = 'Grúa torre autodesplegable: llega plegada sobre su propio chasis o eje de transporte y se despliega con sus '
+            . 'propios mecanismos sobre estabilizadores, sin arriostrarse a la obra ni trepar. Su capacidad disminuye con el radio '
+            . 'según la curva de carga del fabricante; el apoyo y la nivelación de la base, el lastre y la secuencia de despliegue '
+            . 'son parte de lo que se inspecciona.';
+        $am['criterios'][0] = ['Base, estabilizadores y lastre', 'Estabilizadores y gatos de nivelación, apoyos, nivelación de la base, lastre y su sujeción.',
+            'Estabilizador sin apoyo firme, gato con fuga o deriva, base fuera de nivel o lastre incompleto.'];
+        $am['criterios'][6] = ['Mando a distancia o cabina', 'Paro de emergencia, sentido de mandos rotulado y respuesta a la pérdida de señal.',
+            'Paro de emergencia inoperante, o mando que no detiene los movimientos al perder la señal.'];
+        $am['riesgos'][4] = ['Volteo por apoyo deficiente', 'Estabilizadores desplegados por completo y calzados sobre terreno o losa con capacidad verificada; base nivelada.'];
+        $p['grua_torre_automont'] = $am;
 
         $ab = $torre;
         $ab['descripcion'] = 'Grúa torre de pluma abatible (luffing), en la que la pluma se inclina para fijar el radio de trabajo en lugar de '
