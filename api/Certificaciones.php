@@ -1594,6 +1594,30 @@ body { background:#fff!important; }
             );
         }
 
+        // 3b. Una prueba marcada NO CONFORME no se presenta como aprobada.
+        /* La franja decía «✔ PRUEBA APROBADA» y la observación «respondió
+           correctamente en ambas pruebas… apto para operar» aunque la tabla, dos
+           renglones arriba, dijera NO CONFORME: son texto fijo de la plantilla.
+           Calidad confirma antes de aprobar un registro así; si lo aprueba, el
+           documento no se contradice. */
+        $pruebaNoConforme = false;
+        foreach ($filas as $f) {
+            if (is_array($f) && stripos((string)($f['resultado'] ?? ''), 'NO CONFORME') !== false) $pruebaNoConforme = true;
+        }
+        if ($pruebaNoConforme) {
+            $html = str_replace(
+                '<span class="pc-result-val">✔ PRUEBA APROBADA</span>',
+                '<span class="pc-result-val" style="color:#ff9c8f">✘ PRUEBA NO APROBADA</span>',
+                $html
+            );
+            $html = preg_replace(
+                '/(<div class="pc-obs-content">).*?(<\/div>)/s',
+                '${1}En la prueba de carga se registró un resultado <strong>NO CONFORME</strong>, como se indica en la tabla. '
+                . 'El equipo no debe operar en la condición probada hasta corregir la causa y repetir la prueba con resultado conforme.${2}',
+                $html, 1
+            ) ?? $html;
+        }
+
         // 4. Inyectar datos del diagrama de grúa (tokens {pc_crane_svg}, {pc_diag_*}, {pc_obs_*})
         if (strpos($html, '{pc_crane_svg}') !== false) {
             // Dos ganchos: lo dicen los datos capturados, no el tipo de equipo

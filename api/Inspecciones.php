@@ -415,7 +415,20 @@ class Inspecciones {
     // ── Opciones de maquinaria ─────────────────────────────
     public function obtenerOpcionesMaquinaria(): array {
         $stmt = $this->pdo->query("SELECT nombre, clave_drive AS idPlantilla, plantilla_dict_html FROM maquinaria_tipos ORDER BY id");
-        return $stmt->fetchAll();
+        $tipos = $stmt->fetchAll();
+        /* «GRÚA TORRE» a secas se quedó para lo ya capturado. Si ya existen sus
+           variantes (flat-top, punta de martillo, abatible, autodesplegable),
+           una inspección nueva se levanta con la que corresponde: cada una
+           tiene su propia lista y su propia prueba de carga. */
+        $norm = fn($n) => strtoupper(trim(strtr((string)$n, ['Ú' => 'U', 'ú' => 'U'])));
+        $hayVariantes = false;
+        foreach ($tipos as $t) {
+            if (str_starts_with($norm($t['nombre']), 'GRUA TORRE ')) { $hayVariantes = true; break; }
+        }
+        if ($hayVariantes) {
+            $tipos = array_values(array_filter($tipos, fn($t) => $norm($t['nombre']) !== 'GRUA TORRE'));
+        }
+        return $tipos;
     }
 
     // ── Checklist por tipo de equipo ───────────────────────
@@ -482,9 +495,23 @@ class Inspecciones {
             $pruebaCargaJson = null;
             if (!empty($payload['prueba_carga'])) {
                 $pc = $payload['prueba_carga'];
+                /* Grúa torre: la altura bajo gancho se MIDE y, en la abatible, el
+                   ángulo se lee del indicador. Aquí se recalculaban los dos con el
+                   triángulo de grúa móvil para TODAS las plantillas, y lo medido se
+                   perdía al enviar: una flat-top con pluma de 50 m y el carro a
+                   32.6 m quedaba con 37.91 m y 49.3°, y con el carro en la punta,
+                   con altura 0. Calidad ya no lo hace (Calidad::actualizarCalidad);
+                   aquí tampoco. En pluma horizontal no hay ángulo. */
+                $plantillaPc = (string)($pc['plantilla'] ?? '');
+                $esTorre     = str_starts_with($plantillaPc, 'dictamen_grua_torre');
+                $esAbatible  = $plantillaPc === 'dictamen_grua_torre_abatible.html';
                 // Recalcular ángulo server-side: arccos(radio/pluma) para cada fila
                 foreach ($pc as $key => &$row) {
                     if (!is_array($row)) continue;
+                    if ($esTorre) {
+                        if (!$esAbatible) $row['angulo'] = '';
+                        continue;
+                    }
                     $r = (float)($row['radio'] ?? 0);
                     $l = (float)($row['pluma'] ?? 0);
                     if ($r > 0 && $l >= $r) {
@@ -552,6 +579,21 @@ class Inspecciones {
             ]);
 
             $equipoId = (int) $this->pdo->lastInsertId();
+
+            /* Los comentarios del inspector: la pantalla promete que los lee
+               Calidad, pero no se guardaban en ningún lado. Son internos: no
+               salen en el dictamen ni en el portal. */
+            $comentarios = trim((string)($info['comentarios'] ?? ''));
+            if ($comentarios !== '') {
+                try { $this->pdo->exec("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS comentarios_inspector TEXT NULL"); }
+                catch (\Throwable $e) { /* ya existe o no aplica */ }
+                try {
+                    $this->pdo->prepare("UPDATE equipos SET comentarios_inspector = ? WHERE id = ?")
+                        ->execute([mb_substr($comentarios, 0, 4000), $equipoId]);
+                } catch (\Throwable $e) {
+                    error_log('[Inspecciones] comentarios_inspector: ' . $e->getMessage());
+                }
+            }
 
             // Guardar respuestas del checklist
             if (!empty($checklist)) {

@@ -151,24 +151,42 @@ class ReporteInspeccion {
 <thead><tr style='background:#d0d8e8;border:1px solid #999'>
   <th style='padding:5px;border-right:1px solid #999;text-align:left;font-weight:bold'>Tipo de Prueba</th>";
 
-        // Obtener nombres de columnas del primer row
-        if (!empty($pruebaCarga)) {
-            $primeraFila = reset($pruebaCarga);
-            foreach ($primeraFila as $col => $val) {
-                $html .= "<th style='padding:5px;border-right:1px solid #999;text-align:center;font-weight:bold'>{$col}</th>";
-            }
+        /* Sólo las filas son pruebas. Los datos de captura única —la altura
+           total bajo gancho de la grúa torre, el CML, la capacidad— son texto,
+           no filas: antes se tomaban los encabezados del primer elemento, que
+           en la grúa torre es «altura_total», y la tabla salía sin nombres de
+           columna y con una fila vacía. Van en un renglón al final de la tabla. */
+        $e     = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        $filas = array_filter($pruebaCarga, 'is_array');
+        $unicos = array_filter($pruebaCarga, fn($v) => !is_array($v) && trim((string)$v) !== '');
+        $nombres = ['peso' => 'Peso', 'radio' => 'Radio (m)', 'pluma' => 'Pluma (m)', 'angulo' => 'Ángulo (°)',
+                    'altura' => 'Altura (m)', 'resultado' => 'Resultado', 'duracion' => 'Duración (min)',
+                    'deformacion' => 'Deformación (mm)', 'inclin' => 'Inclinación (°)', 'extension' => 'Extensión (m)',
+                    'flecha' => 'Flecha (mm)', 'luz' => 'Claro (m)', 'altura_total' => 'Altura total bajo gancho (m)',
+                    'cml' => 'CML', 'capacidad' => 'Capacidad', 'factor' => 'Factor (%)', 'tipo_plataforma' => 'Tipo de plataforma'];
+        $nombres['peso'] = in_array($plantilla, ['dictamen_mewp.html', 'dictamen_ptem.html'], true) ? 'Peso (kg)' : 'Peso (TON)';
+        $cols = [];
+        foreach ($filas as $f) foreach ($f as $k => $v) if (!is_array($v) && !in_array($k, $cols, true)) $cols[] = $k;
+        foreach ($cols as $col) {
+            $html .= "<th style='padding:5px;border-right:1px solid #999;text-align:center;font-weight:bold'>" . $e($nombres[$col] ?? $col) . "</th>";
         }
 
         $html .= "</tr></thead><tbody>";
         $bg = 0;
-        foreach ($pruebaCarga as $tipoFila => $datos) {
+        foreach ($filas as $tipoFila => $datos) {
             $bgColor = ($bg++ % 2 === 0) ? '#f5f5f5' : '#fff';
             $html .= "<tr style='background:{$bgColor};border:1px solid #ccc'>
-  <td style='padding:4px 5px;border-right:1px solid #ccc;font-weight:600'>{$tipoFila}</td>";
-            foreach ($datos as $valor) {
-                $html .= "<td style='padding:4px 5px;border-right:1px solid #ccc;text-align:center'>{$valor}</td>";
+  <td style='padding:4px 5px;border-right:1px solid #ccc;font-weight:600'>" . $e($tipoFila) . "</td>";
+            foreach ($cols as $col) {
+                $valor = is_array($datos[$col] ?? null) ? '' : (string)($datos[$col] ?? '');
+                $html .= "<td style='padding:4px 5px;border-right:1px solid #ccc;text-align:center'>" . $e($valor) . "</td>";
             }
             $html .= "</tr>";
+        }
+        if ($unicos) {
+            $html .= "<tr><td colspan='" . (count($cols) + 1) . "' style='padding:4px 5px;border:1px solid #ccc'>";
+            foreach ($unicos as $k => $v) $html .= '<b>' . $e($nombres[$k] ?? $k) . ':</b> ' . $e($v) . ' &nbsp; ';
+            $html .= "</td></tr>";
         }
         $html .= "</tbody></table></div>";
         return $html;

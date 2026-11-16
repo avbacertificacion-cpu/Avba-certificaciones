@@ -13,6 +13,14 @@ class Calidad {
 
     // ── Obtener registros pendientes de revisión ───────────
     public function getDataCalidad(): array {
+        // Los comentarios del inspector se guardan desde que existe la columna.
+        // Si no se pudiera crear, la lista sale igual, sin ellos.
+        try { $this->pdo->exec("ALTER TABLE equipos ADD COLUMN IF NOT EXISTS comentarios_inspector TEXT NULL"); }
+        catch (\Throwable $e) { /* ya existe o no aplica */ }
+        $colComent = 'NULL AS comentarios_inspector';
+        try {
+            if ($this->pdo->query("SHOW COLUMNS FROM equipos LIKE 'comentarios_inspector'")->fetch()) $colComent = 'comentarios_inspector';
+        } catch (\Throwable $e) { /* sin SHOW COLUMNS: sin comentarios */ }
         $stmt = $this->pdo->query(
             "SELECT id, id AS fila,
                     DATE_FORMAT(marca_temporal, '%d/%m/%Y %H:%i') AS marca_temporal,
@@ -23,7 +31,15 @@ class Calidad {
                     disponibilidad, estado, motivo, qr_codigo,
                     certificado_url AS link, dictamen_url AS dictamen,
                     envio_direccion AS envio, coordenadas_envio,
-                    reporte_url, prueba_carga, inspector
+                    reporte_url, prueba_carga, inspector, {$colComent},
+                    -- Resumen del checklist para la revisión: lo que respondió el
+                    -- inspector y cuántos puntos tiene la lista de ese tipo
+                    (SELECT COUNT(*) FROM inspeccion_checklist ic WHERE ic.equipo_id = equipos.id AND ic.valor = 'C')  AS check_c,
+                    (SELECT COUNT(*) FROM inspeccion_checklist ic WHERE ic.equipo_id = equipos.id AND ic.valor = 'NC') AS check_nc,
+                    (SELECT COUNT(*) FROM inspeccion_checklist ic WHERE ic.equipo_id = equipos.id AND ic.valor = 'NA') AS check_na,
+                    (SELECT COUNT(*) FROM checklist_items ci
+                       INNER JOIN maquinaria_tipos mt ON mt.id = ci.maquinaria_tipo_id
+                     WHERE mt.nombre = equipos.maquinaria) AS check_puntos
              FROM equipos
              WHERE estado IN ('PENDIENTE', 'CONFORME', 'NO CONFORME', 'RECHAZADO', 'RETORNADO')
              ORDER BY marca_temporal DESC"
@@ -52,6 +68,18 @@ class Calidad {
 
         $row = $this->obtenerEquipo($id);
         if (!$row) return ['status' => 'error', 'message' => 'Registro no encontrado.'];
+
+        /* Aprobar emite un dictamen favorable («Satisfactoria · Operativo»). Lo
+           que lo contradiga —puntos no conformes, una prueba NO CONFORME, una
+           prueba que no se va a imprimir, la altura bajo gancho sin medir— se
+           le muestra a Calidad y se aprueba sólo si lo confirma. */
+        if (empty($payload['confirmar_hallazgos'])) {
+            $hallazgos = $this->hallazgosAprobacion($row);
+            if ($hallazgos) {
+                return ['status' => 'confirmar', 'hallazgos' => $hallazgos,
+                        'message' => 'Antes de aprobar, revisa lo siguiente:'];
+            }
+        }
 
         if (!qrEsDeSerie($qr, QR_PREFIJO_EQUIPO)) {
             return ['status' => 'error', 'message' =>
@@ -213,6 +241,11 @@ class Calidad {
         $campos  = ['cliente','maquinaria','marca','modelo','serie','capacidad','correo','id_equipo','estado','motivo','direccion'];
         $sets    = [];
         $params  = [];
+
+        if (array_key_exists('maquinaria', $payload)) {
+            $error = $this->validarCambioMaquinaria($row, trim((string)$payload['maquinaria']));
+            if ($error !== null) return ['status' => 'error', 'message' => $error];
+        }
 
         // Lo que sale en el certificado se guarda como en la captura del
         // inspector: texto estándar y la dirección con su formato. El tipo de
@@ -382,6 +415,130 @@ class Calidad {
     }
 
     // ── Auxiliar: obtener registro por id ──────────────────
+    /**
+     * El tipo de maquinaria es el nombre del catálogo: con él se buscan la
+     * plantilla, el checklist y las normas. Un nombre que no está en el
+     * catálogo deja el dictamen sin checklist, y cambiar a otro tipo con las
+     * respuestas ya capturadas las imprime junto a otras preguntas: las
+     * respuestas se guardan por etiqueta (E-03) y en cada tipo la misma
+     * etiqueta es otra pregunta. Devuelve el mensaje de error, o null.
+     */
+    private function validarCambioMaquinaria(array $row, string $nueva): ?string {
+        $actual = trim((string)($row['maquinaria'] ?? ''));
+        if ($nueva === '' || $nueva === $actual) return null;
+        try {
+            $t = $this->pdo->prepare("SELECT id FROM maquinaria_tipos WHERE nombre = ? LIMIT 1");
+            $t->execute([$nueva]);
+            $idNueva = (int)($t->fetchColumn() ?: 0);
+            if (!$idNueva) {
+                return "«{$nueva}» no es un tipo de equipo del catálogo. Escríbelo exactamente como aparece en "
+                     . 'Administración › Tipos de equipo; si no, el dictamen sale sin checklist.';
+            }
+            $r = $this->pdo->prepare("SELECT tag FROM inspeccion_checklist WHERE equipo_id = ? AND valor IS NOT NULL");
+            $r->execute([(int)$row['id']]);
+            $tags = $r->fetchAll(PDO::FETCH_COLUMN);
+            if (!$tags) return null;
+            // ¿Cada respuesta capturada es la misma pregunta en el tipo nuevo?
+            $q = $this->pdo->prepare(
+                "SELECT ci.tag, ci.descripcion FROM checklist_items ci
+                 INNER JOIN maquinaria_tipos mt ON mt.id = ci.maquinaria_tipo_id WHERE mt.nombre = ?"
+            );
+            $q->execute([$actual]);
+            $antes = array_column($q->fetchAll(PDO::FETCH_ASSOC), 'descripcion', 'tag');
+            $q->execute([$nueva]);
+            $despues = array_column($q->fetchAll(PDO::FETCH_ASSOC), 'descripcion', 'tag');
+            foreach ($tags as $tag) {
+                if (($antes[$tag] ?? null) !== ($despues[$tag] ?? null)) {
+                    return "El checklist se capturó para «{$actual}» y en «{$nueva}» las preguntas son otras: "
+                         . 'las respuestas quedarían junto a puntos que no se revisaron. Para cambiar el tipo, '
+                         . 'devuelve la inspección al inspector para que levante el checklist del tipo correcto.';
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[Calidad] validarCambioMaquinaria: ' . $e->getMessage());
+        }
+        return null;
+    }
+
+    /**
+     * Lo que contradice un dictamen favorable, en palabras, para confirmarlo
+     * antes de aprobar. Vacío si no hay nada que señalar.
+     */
+    private function hallazgosAprobacion(array $row): array {
+        $h = [];
+        $id = (int)$row['id'];
+        try {
+            $st = $this->pdo->prepare("SELECT valor, COUNT(*) n FROM inspeccion_checklist WHERE equipo_id = ? GROUP BY valor");
+            $st->execute([$id]);
+            $cuenta = ['C' => 0, 'NC' => 0, 'NA' => 0];
+            foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $f) {
+                if (isset($cuenta[$f['valor']])) $cuenta[$f['valor']] = (int)$f['n'];
+            }
+            $tp = $this->pdo->prepare(
+                "SELECT COUNT(*) FROM checklist_items ci INNER JOIN maquinaria_tipos mt ON mt.id = ci.maquinaria_tipo_id
+                 WHERE mt.nombre = ?"
+            );
+            $tp->execute([(string)($row['maquinaria'] ?? '')]);
+            $puntos = (int)$tp->fetchColumn();
+            if ($cuenta['NC'] > 0) {
+                $h[] = "El checklist tiene {$cuenta['NC']} punto" . ($cuenta['NC'] > 1 ? 's' : '') . ' NO CONFORME; '
+                     . 'el dictamen saldría «Satisfactoria · Operativo» y los listaría como no conformes.';
+            }
+            if ($puntos === 0) {
+                $h[] = '«' . ($row['maquinaria'] ?? '') . '» no tiene checklist en el catálogo: el dictamen saldría sin puntos de inspección.';
+            } else {
+                $sinResp = $puntos - array_sum($cuenta);
+                if ($sinResp > 0) {
+                    $h[] = "{$sinResp} de {$puntos} puntos del checklist no tienen respuesta: no aparecerán en el dictamen.";
+                }
+            }
+        } catch (\Throwable $e) { /* sin checklist: se revisa lo demás */ }
+
+        if (trim((string)($row['capacidad'] ?? '')) === '') {
+            $h[] = 'No tiene capacidad: sale en blanco en el dictamen y en el certificado.';
+        }
+
+        $pc = json_decode((string)($row['prueba_carga'] ?? ''), true) ?: [];
+        $plantilla = (string)($pc['plantilla'] ?? '');
+        $filas = array_filter($pc, 'is_array');
+        $conDato = array_filter($filas, function ($f) {
+            foreach ($f as $v) if (!is_array($v) && trim((string)$v) !== '') return true;
+            return false;
+        });
+        foreach ($conDato as $k => $f) {
+            if (stripos((string)($f['resultado'] ?? ''), 'NO CONFORME') !== false) {
+                $h[] = 'La prueba de carga «' . $k . '» está marcada NO CONFORME.';
+            }
+        }
+        $unaSola = in_array($plantilla, ['dictamen_canastilla.html', 'dictamen_canastilla_sin_puerta.html', 'dictamen_oreja_carga.html'], true);
+        if ($conDato && !$unaSola && count($conDato) < 2) {
+            $h[] = 'La prueba de carga sólo tiene una fila capturada: el dictamen saldrá sin la sección de prueba de carga.';
+        }
+        if (str_starts_with($plantilla, 'dictamen_grua_torre')) {
+            $con = $pc['con'] ?? [];
+            if (is_array($con) && $con && trim((string)($con['altura'] ?? '')) === '') {
+                $h[] = 'Grúa torre sin la altura bajo gancho medida en la prueba con carga.';
+            }
+            if ($plantilla === 'dictamen_grua_torre_abatible.html' && is_array($con) && $con
+                && trim((string)($con['angulo'] ?? '')) === '') {
+                $h[] = 'Pluma abatible sin el ángulo de pluma leído del indicador en la prueba con carga.';
+            }
+        }
+        // Peso de prueba contra la capacidad, cuando las dos están en toneladas
+        $cap = (string)($row['capacidad'] ?? '');
+        if (preg_match('/([\d.,]+)\s*(TON|T\b|TONELADAS)/i', $cap, $m)) {
+            // 47,000 (miles) o 25,5 (decimal con coma)
+            $capT = (float)(preg_match('/^\d{1,3}(,\d{3})+(\.\d+)?$/', $m[1]) ? str_replace(',', '', $m[1]) : str_replace(',', '.', $m[1]));
+            $pesoMax = 0.0;
+            foreach ($conDato as $f) $pesoMax = max($pesoMax, (float)str_replace(',', '.', (string)($f['peso'] ?? '')));
+            $enKg = in_array($plantilla, ['dictamen_mewp.html', 'dictamen_ptem.html'], true);
+            if (!$enKg && $capT > 0 && $pesoMax > $capT) {
+                $h[] = "El peso de prueba ({$pesoMax} TON) es mayor que la capacidad del equipo ({$cap}).";
+            }
+        }
+        return $h;
+    }
+
     private function obtenerEquipo(int $id): ?array {
         $stmt = $this->pdo->prepare("SELECT * FROM equipos WHERE id = ?");
         $stmt->execute([$id]);

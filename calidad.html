@@ -2824,6 +2824,25 @@ function ver(fila) {
     <div class="field"><label>Capacidad</label>   <input id="e-capacidad" value="${esc(d.capacidad || '')}" ${dis}></div>
   </div>`;
 
+  // Resumen del checklist y comentarios del inspector: lo que hay que ver
+  // antes de aprobar un dictamen favorable.
+  {
+    const c = +d.check_c || 0, nc = +d.check_nc || 0, na = +d.check_na || 0, pts = +d.check_puntos || 0;
+    const sin = Math.max(0, pts - c - nc - na);
+    const chip = (txt, bg, fg) => `<span style="display:inline-block;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600;background:${bg};color:${fg};margin:0 6px 6px 0">${txt}</span>`;
+    body += `<div class="sec-label">Checklist del inspector</div><div style="margin-bottom:6px">`
+      + (pts ? chip(`${pts} puntos`, '#eef2f8', '#134074') : chip('Sin checklist en el catálogo para este tipo', '#FDE8D8', '#A63D00'))
+      + chip(`${c} C`, '#e6f4ea', '#1e6b34')
+      + chip(`${nc} NC`, nc ? '#fdecea' : '#f3f4f6', nc ? '#b42318' : '#667085')
+      + chip(`${na} N/A`, '#f3f4f6', '#475467')
+      + (sin ? chip(`${sin} sin contestar`, '#fff4e5', '#a15c07') : '')
+      + `</div>`;
+    if (d.comentarios_inspector) {
+      body += `<div class="sec-label">Comentarios del inspector</div>
+      <div style="background:#fbf6e8;border-left:3px solid #C9A84C;padding:8px 10px;border-radius:6px;font-size:13px;white-space:pre-wrap;margin-bottom:6px">${esc(d.comentarios_inspector)}</div>`;
+    }
+  }
+
   // Códigos QR del equipo: el principal (el que imprime el certificado) y los
   // adicionales —documentos ya entregados con otro QR—, que llevan a la misma
   // validación. Se agregan y quitan aquí mismo, sin tocar ningún documento.
@@ -2916,17 +2935,22 @@ function ver(fila) {
     if (/GRUA TORRE/.test(maqN) && !/^dictamen_grua_torre/.test(pcData.plantilla)) {
       pcData.plantilla = /ABATIBLE/.test(maqN) ? 'dictamen_grua_torre_abatible.html' : 'dictamen_grua_torre.html';
     }
-    // En grúa torre, una altura que es exactamente √(pluma² − radio²) —o el
-    // ángulo arccos(radio/pluma)— no se midió: la calculaba el guardado. Se
-    // deja vacía para capturar la medida real (con el carro en la punta daba 0).
+    // En grúa torre, una fila cuya altura es exactamente √(pluma² − radio²) Y
+    // cuyo ángulo es arccos(radio/pluma) no se midió: la calculaba el guardado
+    // (siempre las dos). Se deja vacía para capturar la medida real. Se exigen
+    // las dos, igual que al imprimir el dictamen: una lectura del indicador de
+    // la abatible, o una altura medida, pueden coincidir solas por casualidad.
     if (/^dictamen_grua_torre/.test(pcData.plantilla)) {
       Object.keys(pcData).forEach(k => {
         const f = pcData[k];
         if (!f || typeof f !== 'object') return;
         const r = parseFloat(f.radio), l = parseFloat(f.pluma);
         if (!(l > 0 && r >= 0 && r <= l)) return;
-        if (f.altura !== undefined && f.altura !== '' && Math.abs(parseFloat(f.altura) - Math.sqrt(l*l - r*r)) < 0.02) f.altura = '';
-        if (f.angulo !== undefined && f.angulo !== '' && Math.abs(parseFloat(f.angulo) - Math.acos(r / l) * 180 / Math.PI) < 0.15) f.angulo = '';
+        const alt = parseFloat(f.altura), ang = parseFloat(f.angulo);
+        if (isNaN(alt) || isNaN(ang)) return;
+        if (Math.abs(alt - Math.sqrt(l*l - r*r)) < 0.02 && Math.abs(ang - Math.acos(r / l) * 180 / Math.PI) < 0.15) {
+          f.altura = ''; f.angulo = '';
+        }
       });
     }
     const def    = PC_DEF[pcData.plantilla];
@@ -3054,6 +3078,7 @@ function ver(fila) {
   document.getElementById("modal-footer").innerHTML = footer;
 
   document.getElementById("overlay-det").classList.add("open");
+  edicionInicial = editable ? JSON.stringify(payloadEdicion()) : null;
   poblarInspectorSelect(d.inspector);
   recomCalCargar(d.fila, editable, d.estado === 'ENVIADO', 'equipo', 'recom-cal-box');
   if (d.estado === 'NO CONFORME') ncCargar(d.fila);
@@ -3781,11 +3806,8 @@ function mostrarToast(msg, tipo = "info") {
 /* ═══════════════════════════════════════
    GUARDAR CAMBIOS
 ═══════════════════════════════════════ */
-async function guardar() {
-  if (guardando) return;
-  guardando = true;
-
-  try {
+/** Lo editable de la ficha, tal como lo manda «Guardar cambios». */
+function payloadEdicion() {
     const payload = {
       fila:       filaActual,
       cliente:    document.getElementById("e-cliente")?.value  || "",
@@ -3819,6 +3841,40 @@ async function guardar() {
       if (Object.keys(headerUpdates).length) updates.__header = headerUpdates;
       payload.prueba_carga_updates = updates;
     }
+    return payload;
+}
+
+let edicionInicial = null;   // payloadEdicion() al abrir la ficha
+
+/**
+ * Guarda lo editado sin cerrar la ficha. Lo usa «Aprobar registro»: aprobar
+ * mandaba sólo el QR y lo que Calidad había corregido —por ejemplo la altura
+ * bajo gancho medida— se perdía, porque un registro aprobado ya no se edita.
+ */
+async function guardarEdicionSiCambio() {
+  if (edicionInicial === null) return true;
+  const payload = payloadEdicion();
+  if (JSON.stringify(payload) === edicionInicial) return true;
+  const res  = await fetch(API, {
+    method:  "POST",
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ action: "ACTUALIZAR_CALIDAD", payload })
+  });
+  const data = await res.json();
+  if (data.status !== "success") {
+    alert("No se aprobó: los cambios no se pudieron guardar.\n\n" + (data.message || "Error desconocido"));
+    return false;
+  }
+  edicionInicial = JSON.stringify(payload);
+  return true;
+}
+
+async function guardar() {
+  if (guardando) return;
+  guardando = true;
+
+  try {
+    const payload = payloadEdicion();
 
     const res  = await fetch(API, {
       method:  "POST",
@@ -3984,6 +4040,7 @@ async function ejecutarAprobacion() {
     } else {
       action  = 'VALIDAR_CALIDAD';
       payload = { fila: filaActual, qr };
+      if (!(await guardarEdicionSiCambio())) return;
     }
 
     const enviar = async extra => {
@@ -3995,6 +4052,15 @@ async function ejecutarAprobacion() {
     };
 
     let data = await enviar();
+
+    // Lo que contradice un dictamen favorable se confirma antes de aprobar
+    if (data.status === "confirmar") {
+      const ok = confirm((data.message || "Antes de aprobar, revisa lo siguiente:") + "\n\n· "
+        + (data.hallazgos || []).join("\n· ")
+        + "\n\n¿Aprobar de todas formas? El dictamen se emitirá como «Satisfactoria · Operativo».");
+      if (!ok) return;
+      data = await enviar({ confirmar_hallazgos: true });
+    }
 
     /*
      * El código ya lo tiene alguien más y es un registro de personal: se puede

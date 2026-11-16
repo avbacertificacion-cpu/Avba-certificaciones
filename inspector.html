@@ -1964,7 +1964,7 @@
       </div>
       <div style="margin:0 auto 10px">
         <img id="ses-qr-img" src="" alt="QR" style="max-width:160px;border-radius:8px;border:2px solid var(--borde)"
-             onerror="qrManejarError()" onload="qrManejarCarga()">
+             onerror="window.qrManejarError && qrManejarError()" onload="window.qrManejarCarga && qrManejarCarga()">
         <div id="ses-qr-error" style="display:none;font-size:12px;color:var(--rojo,#A32D2D);margin-top:8px">
           No se pudo cargar el código QR (puede ser la conexión).
           <button type="button" onclick="qrReintentar()"
@@ -3154,6 +3154,7 @@ let buscarDirInited = { insp: false, env: false }; // evita doble-binding del bu
 let respuestasCheck = {};
 let fotosData       = [];       // [{base64, mimeType, nombre}]
 let inspeccionPreparadaId = null;  // id del borrador que se está completando
+let inspeccionPreparadaNota = '';  // su nota, para volver a mostrarla al reanudar
 let pruebaCargaData = {};
 let enviando        = false;
 
@@ -5108,6 +5109,7 @@ async function enviarFormulario() {
       await AvbaOffline.borrarBorrador('inspeccion');
       // La preparada ya se mandó: el servidor borró su borrador.
       inspeccionPreparadaId = null;
+      inspeccionPreparadaNota = '';
       revisarInspeccionPreparada();
     } else {
       throw new Error(resultado.message || "Error desconocido del servidor");
@@ -5122,6 +5124,7 @@ async function enviarFormulario() {
       // Va en la cola con su borrador_id: cuando salga, el servidor cierra el
       // borrador. Aquí ya no se vuelve a usar.
       inspeccionPreparadaId = null;
+      inspeccionPreparadaNota = '';
       enviando = false;
       mostrarInspeccionEncolada();
       actualizarBadgePendientes();
@@ -5195,6 +5198,9 @@ async function guardarBorradorInspeccion() {
     prueba_carga: pruebaCargaData || {},
     horquillas: getHorquillasData(),
     horquillas_aplica: !!document.getElementById('horquilla_aplica')?.checked,
+    // Si es una inspección preparada, su id: sin él, una recarga del teléfono
+    // la enviaba como nueva y la preparada volvía a aparecer (segundo folio).
+    preparada: inspeccionPreparadaId ? { id: inspeccionPreparadaId, nota: inspeccionPreparadaNota || '' } : null,
     fotos: fotosData
   };
 
@@ -5222,6 +5228,11 @@ async function continuarBorrador() {
   if (!draft) return;
   document.getElementById('banner-borrador').classList.remove('show');
   await restaurarBorradorInspeccion(draft);
+  if (draft.preparada && draft.preparada.id) {
+    inspeccionPreparadaId   = draft.preparada.id;
+    inspeccionPreparadaNota = draft.preparada.nota || '';
+    mostrarAvisoPreparada(inspeccionPreparadaNota, 0, 1);
+  }
 }
 
 async function descartarBorrador() {
@@ -5256,7 +5267,18 @@ async function restaurarBorradorInspeccion(draft, mensaje) {
 
   // Maquinaria: cargar catálogo si aún no está listo, luego seleccionar
   await cargarMaquinaria();
-  if (info.maquinaria) document.getElementById('maquinaria').value = info.maquinaria;
+  if (info.maquinaria) {
+    const selMaq = document.getElementById('maquinaria');
+    selMaq.value = info.maquinaria;
+    // Un borrador de antes puede traer un tipo que ya no se ofrece (p. ej.
+    // «GRÚA TORRE» a secas): se agrega para no perder su checklist.
+    if (selMaq.value !== info.maquinaria) {
+      const op = document.createElement('option');
+      op.value = op.textContent = info.maquinaria;
+      selMaq.appendChild(op);
+      selMaq.value = info.maquinaria;
+    }
+  }
 
   // Ubicación: pre-cargar coordenadas para cuando se inicialice el mapa
   if (info.coords_insp)  { pendingMapPos.insp = info.coords_insp; }
@@ -5292,9 +5314,14 @@ async function restaurarBorradorInspeccion(draft, mensaje) {
   // se quedó sin señal a media captura, lo que escribió no se pierde.
   recomRestaurar(draft.recomendaciones);
 
-  // Checklist: renderizar según maquinaria y luego marcar respuestas guardadas
-  respuestasCheck = { ...(draft.checklist || {}) };
+  // Checklist: renderizar según maquinaria y luego marcar respuestas guardadas.
+  // actualizarChecklist() deja respuestasCheck en {} —es lo correcto cuando el
+  // inspector cambia de equipo—, así que las guardadas se reponen DESPUÉS. Antes
+  // se asignaban antes y se perdían todas al reanudar, y el autoguardado dejaba
+  // el borrador del teléfono también vacío.
+  const respuestasGuardadas = { ...(draft.checklist || {}) };
   await actualizarChecklist();
+  respuestasCheck = respuestasGuardadas;
   document.querySelectorAll('.check-item').forEach(item => {
     const tag = item.dataset.tag;
     const val = respuestasCheck[tag];
@@ -5399,20 +5426,26 @@ async function abrirInspeccionPreparada() {
     checklist: {}, prueba_carga: prep.prueba_carga || {}, recomendaciones: [], fotos,
   }, 'Inspección preparada cargada. Confirma el cliente y continúa.');
 
-  inspeccionPreparadaId = prep.id;
+  inspeccionPreparadaId   = prep.id;
+  inspeccionPreparadaNota = prep.nota || '';
   // El aviso del borrador guardado en el teléfono sobra: lo que se acaba de
   // cargar es otra cosa y tener los dos a la vez sólo confunde.
   document.getElementById('banner-borrador')?.classList.remove('show');
+  mostrarAvisoPreparada(prep.nota, fotos.length, prep.pendientes || 1);
+  // Que el borrador del teléfono ya lleve el id de la preparada
+  guardarBorradorDebounced();
+}
+
+/** El aviso de la inspección preparada, con su nota (también al reanudarla). */
+function mostrarAvisoPreparada(nota, nFotos, pendientes) {
   const aviso = document.getElementById('insp-preparada-aviso');
-  if (aviso) {
-    const masTarde = (prep.pendientes || 1) > 1
-      ? ' <strong>Al enviarla te aparecerá la siguiente.</strong>' : '';
-    aviso.innerHTML = '<strong>Inspección preparada.</strong> '
-      + escIns(prep.nota || 'Revisa los datos del equipo, confirma el cliente y el lugar, y levanta el checklist y la prueba de carga.')
-      + (fotos.length ? ' <strong>' + fotos.length + (fotos.length === 1 ? ' foto ya cargada' : ' fotos ya cargadas') + '</strong> en el paso 6.' : '')
-      + masTarde;
-    aviso.style.display = 'block';
-  }
+  if (!aviso) return;
+  const masTarde = pendientes > 1 ? ' <strong>Al enviarla te aparecerá la siguiente.</strong>' : '';
+  aviso.innerHTML = '<strong>Inspección preparada.</strong> '
+    + escIns(nota || 'Revisa los datos del equipo, confirma el cliente y el lugar, y levanta el checklist y la prueba de carga.')
+    + (nFotos ? ' <strong>' + nFotos + (nFotos === 1 ? ' foto ya cargada' : ' fotos ya cargadas') + '</strong> en el paso 6.' : '')
+    + masTarde;
+  aviso.style.display = 'block';
 }
 
 /* ════════════════════════════════════════

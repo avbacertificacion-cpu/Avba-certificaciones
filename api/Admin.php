@@ -746,7 +746,9 @@ class Admin {
                 ['G', 'Limitador de ángulo mínimo de pluma —radio máximo— con prueba de funcionamiento'],
                 ['G', 'Posición de fuera de servicio de la pluma conforme al manual, para la puesta en veleta'],
                 ['I', 'Frenado del abatimiento con la carga suspendida, sin descenso de la pluma'],
-                ['I', 'Prueba con carga en el radio mínimo y en el radio máximo de la configuración'],
+                // La prueba con carga se captura una vez (radio, ángulo, altura); lo que
+                // se revisa en todo el rango es que la pluma abata con carga.
+                ['I', 'Abatimiento con carga entre el radio mínimo y el máximo de la configuración, sin sacudidas ni descenso de la pluma'],
             ],
         ],
 
@@ -861,6 +863,19 @@ class Admin {
     private const SEED_CHECKLIST_CSP  = 'checklist_canastilla_sp_v2';
     private const SEED_CHECKLIST_TORRE = 'checklist_grua_torre_v1';
     private const SEED_TORRE_TEXTOS_V2 = 'checklist_torre_textos_v2';
+    private const SEED_TORRE_TEXTOS_V3 = 'checklist_torre_textos_v3';
+
+    /**
+     * Segunda tanda: la pluma abatible pedía una prueba con carga «en el radio
+     * mínimo y en el radio máximo», y su formulario captura una sola prueba con
+     * carga. Se pregunta lo que sí se puede contestar en campo.
+     */
+    private const TORRE_TEXTOS_V3 = [
+        'grua_torre_abatible' => [
+            ['Prueba con carga en el radio mínimo y en el radio máximo de la configuración',
+             'Abatimiento con carga entre el radio mínimo y el máximo de la configuración, sin sacudidas ni descenso de la pluma'],
+        ],
+    ];
 
     /**
      * Redacciones corregidas de la lista de grúa torre, por tipo: [texto
@@ -964,17 +979,19 @@ class Admin {
         $this->ampliarCatalogoNormas();
         $this->corregirChecklistCanastillaSinPuerta();
         $this->completarChecklistGruaTorre();
-        $this->corregirTextosTorreV2();
+        $this->corregirTextosTorre(self::SEED_TORRE_TEXTOS_V2, self::TORRE_TEXTOS_V2);
+        $this->corregirTextosTorre(self::SEED_TORRE_TEXTOS_V3, self::TORRE_TEXTOS_V3);
     }
 
     /**
-     * Aplica TORRE_TEXTOS_V2 una sola vez a los tipos que ya existen en el
-     * servidor. Los que nazcan después ya se siembran con los textos nuevos.
+     * Aplica una tanda de redacciones corregidas, una sola vez, a los tipos que
+     * ya existen en el servidor. Los que nazcan después ya se siembran con los
+     * textos nuevos.
      */
-    private function corregirTextosTorreV2(): void {
+    private function corregirTextosTorre(string $marca, array $tanda): void {
         try {
             $st = $this->pdo->prepare("SELECT 1 FROM maquinaria_tipos_seed WHERE clave = ?");
-            $st->execute([self::SEED_TORRE_TEXTOS_V2]);
+            $st->execute([$marca]);
             if ($st->fetch()) return;
         } catch (\Throwable $e) { return; }
 
@@ -983,7 +1000,7 @@ class Admin {
             $upd  = $this->pdo->prepare(
                 "UPDATE checklist_items SET descripcion = ? WHERE maquinaria_tipo_id = ? AND descripcion = ?"
             );
-            foreach (self::TORRE_TEXTOS_V2 as $clave => $cambios) {
+            foreach ($tanda as $clave => $cambios) {
                 [$nombre] = self::TIPOS_BASE[$clave];
                 $tipo->execute([$nombre]);
                 $tipoId = (int)($tipo->fetchColumn() ?: 0);
@@ -991,9 +1008,9 @@ class Admin {
                 foreach ($cambios as [$antes, $despues]) $upd->execute([$despues, $tipoId, $antes]);
             }
             $this->pdo->prepare("INSERT INTO maquinaria_tipos_seed (clave) VALUES (?)")
-                ->execute([self::SEED_TORRE_TEXTOS_V2]);
+                ->execute([$marca]);
         } catch (\Throwable $e) {
-            error_log('[Admin] corregirTextosTorreV2: ' . $e->getMessage());
+            error_log("[Admin] corregirTextosTorre ($marca): " . $e->getMessage());
         }
     }
 
