@@ -36,7 +36,8 @@ class Inspecciones {
      */
     private const PRECARGAS = [self::PRECARGA_GRUA_AC18, self::PRECARGA_GRUA_TC4792,
                                 self::PRECARGA_CAN_260523, self::PRECARGA_CAN_120320,
-                                self::PRECARGA_TORRE_21LC1050, self::PRECARGA_TORRE_21LC660];
+                                self::PRECARGA_TORRE_21LC1050, self::PRECARGA_TORRE_21LC660,
+                                self::PRECARGA_TORRE_21LC550];
 
     private const PRECARGA_GRUA_AC18 = [
         'clave'      => 'precarga_grua_ac18_michel',
@@ -194,6 +195,33 @@ class Inspecciones {
                       . 'la tabla de cargas a bordo (carga máxima y carga en punta con pluma de 50 m). '
                       . 'Es una flat-top: pluma horizontal, sin cúspide ni tirantes de pluma. '
                       . 'En la prueba de carga la altura bajo gancho se mide, no se calcula.',
+    ];
+
+    /* Grúa torre Comansa 21LC550, serie 13273, para Marcos.
+       Datos que dio la dirección: marca, modelo, serie y configuración
+       instalada —torre de 33 m y pluma de 80 m—. Flat-top, como toda la serie
+       21LC. La capacidad se deja en blanco: sale de la tabla de cargas a
+       bordo, no se adivina. Sin fotos todavía: las toma él en campo. */
+    private const PRECARGA_TORRE_21LC550 = [
+        'clave'      => 'precarga_torre_21lc550_marcos',
+        'busca'      => 'MARCOS',
+        'fotos'      => 'assets/precarga/grua_torre_21lc550/',
+        'maquinaria' => 'GRÚA TORRE FLAT-TOP',
+        'cliente'    => '',
+        'marca'      => 'COMANSA',
+        'modelo'     => '21LC550',
+        'serie'      => '13273',
+        'id_equipo'  => '',
+        'capacidad'  => '',
+        'nota'       => 'Comansa 21LC550, serie 13273. Configuración que indicó la dirección: '
+                      . 'TORRE DE 33 M de altura y PLUMA DE 80 M — confírmala en campo contra la placa y el despiece. '
+                      . 'Faltan y los pones tú: CLIENTE, dirección de la obra y número económico. '
+                      . 'La CAPACIDAD no viene: tómala de la tabla de cargas a bordo para la pluma de 80 m '
+                      . '(carga máxima y carga en punta). '
+                      . 'Es una flat-top: pluma horizontal, sin cúspide ni tirantes de pluma. '
+                      . 'En la prueba de carga la altura bajo gancho se MIDE en cada prueba, y la altura total '
+                      . 'bajo gancho (posición cero) va en su campo; no se calcula. '
+                      . 'No hay fotos precargadas: tómalas todas en campo, incluida la placa.',
     ];
 
     private const PRECARGA_GRUA_TC4792 = [
