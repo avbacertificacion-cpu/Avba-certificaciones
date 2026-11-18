@@ -2689,6 +2689,28 @@
           <input type="text" id="iza-fecha" readonly>
         </div>
 
+        <!-- Kit de un equipo: los accesorios son los que trae una grúa determinada.
+             El certificado y el informe dicen a qué equipo pertenecen. -->
+        <div class="field" style="margin-top:4px">
+          <label style="display:flex;gap:8px;align-items:center;cursor:pointer;font-weight:600">
+            <input type="checkbox" id="iza-kit-on" onchange="izaKitToggle()" style="width:18px;height:18px">
+            Los accesorios pertenecen a un equipo (kit de una grúa)
+          </label>
+        </div>
+        <div id="iza-kit" style="display:none;margin:-4px 0 12px;padding:12px;border:1px solid #c8d4e8;border-radius:10px;background:#f5f8fc">
+          <div style="font-size:12px;color:var(--texto-sub);margin-bottom:8px;line-height:1.4">
+            El certificado y el informe dirán «Accesorios pertenecientes al equipo …». Los accesorios no necesitan QR propio: la sesión lleva uno solo.
+          </div>
+          <div class="field"><label>Tipo de equipo</label>
+            <input type="text" id="iza-kit-tipo" placeholder="Ej: Grúa hidráulica sobre camión" value="GRÚA"></div>
+          <div class="field"><label>Marca</label><input type="text" id="iza-kit-marca" placeholder="Ej: Altec"></div>
+          <div class="field"><label>Modelo</label><input type="text" id="iza-kit-modelo" placeholder="Ej: AC18-70B"></div>
+          <div class="field"><label>No. de serie del equipo <span class="req">*</span></label>
+            <input type="text" id="iza-kit-serie" placeholder="Ej: 0507EP0120">
+            <div class="errmsg">El número de serie del equipo es obligatorio en un kit</div></div>
+          <div class="field" style="margin-bottom:0"><label>No. económico</label><input type="text" id="iza-kit-id" placeholder="Opcional"></div>
+        </div>
+
         <div class="mapa-info">
           <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3.5L10 10"/></svg>
           <span>Arrastra el marcador al lugar exacto de inspección. El GPS se activa automáticamente.</span>
@@ -5448,6 +5470,19 @@ function mostrarAvisoPreparada(nota, nFotos, pendientes) {
   aviso.style.display = 'block';
 }
 
+/* Kit de un equipo en la sesión de accesorios */
+function izaKitToggle() {
+  const on = document.getElementById('iza-kit-on').checked;
+  document.getElementById('iza-kit').style.display = on ? 'block' : 'none';
+}
+/** Datos del equipo del kit para el servidor; vacío si no es un kit. */
+function izaKitDatos() {
+  if (!document.getElementById('iza-kit-on')?.checked) return {};
+  const v = id => (document.getElementById(id)?.value || '').trim();
+  return { equipo_tipo: v('iza-kit-tipo'), equipo_marca: v('iza-kit-marca'), equipo_modelo: v('iza-kit-modelo'),
+           equipo_serie: v('iza-kit-serie'), equipo_id: v('iza-kit-id') };
+}
+
 /* ════════════════════════════════════════
    COLA DE ENVÍOS PENDIENTES (auto-reintento)
 ════════════════════════════════════════ */
@@ -6512,6 +6547,12 @@ async function izaIniciar() {
   document.getElementById('iza-cliente').value    = '';
   document.getElementById('iza-cliente-id').value = '';
   document.getElementById('iza-f-cliente').classList.remove('has-error');
+  // Kit de un equipo: cada sesión nueva empieza sin él
+  document.getElementById('iza-kit-on').checked = false;
+  ['iza-kit-marca','iza-kit-modelo','iza-kit-serie','iza-kit-id'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('iza-kit-tipo').value = 'GRÚA';
+  document.getElementById('iza-kit-serie').closest('.field').classList.remove('has-error');
+  izaKitToggle();
   initEmpresaSearch(
     document.getElementById('iza-cliente'),
     document.getElementById('iza-cliente-id'),
@@ -6570,6 +6611,14 @@ async function izaContinuar() {
     } catch (_) {}
   }
 
+  if (document.getElementById('iza-kit-on')?.checked && !document.getElementById('iza-kit-serie').value.trim()) {
+    const f = document.getElementById('iza-kit-serie').closest('.field');
+    f.classList.add('has-error');
+    document.getElementById('iza-kit-serie').focus();
+    mostrarToast('Escribe el número de serie del equipo al que pertenecen los accesorios.', 'err');
+    return;
+  }
+
   const s   = JSON.parse(localStorage.getItem('avba_session') || '{}');
   const btn = document.querySelector('#iza-screen-datos .btn-sig');
 
@@ -6580,9 +6629,9 @@ async function izaContinuar() {
       const res = await fetch(WEB_APP_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (s.token || '') },
-        body: JSON.stringify({ action: 'COMPLETAR_SESION_ACC', payload: {
+        body: JSON.stringify({ action: 'COMPLETAR_SESION_ACC', payload: Object.assign({
           sesion_id: izaSesionId, cliente, fecha: document.getElementById('iza-fecha').value,
-          coordenadas: coords, direccion } })
+          coordenadas: coords, direccion }, izaKitDatos()) })
       });
       const data = await res.json();
       if (data.status !== 'success') { mostrarToast('Error: ' + (data.message || 'No se pudo guardar.'), 'err'); return; }
@@ -6612,12 +6661,12 @@ async function izaContinuar() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (s.token || '') },
       body: JSON.stringify({
         action:  'CREAR_SESION_ACCESORIOS',
-        payload: {
+        payload: Object.assign({
           cliente,
           fecha:       document.getElementById('iza-fecha').value,
           coordenadas: coords,
           direccion,
-        }
+        }, izaKitDatos())
       })
     });
     const data = await res.json();

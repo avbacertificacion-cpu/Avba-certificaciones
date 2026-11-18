@@ -2969,6 +2969,11 @@ async function abrirAccCert(sesionId) {
         </div>
 
         <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--texto-sub)">
+          ${(data.equipo_serie || data.equipo_marca || data.equipo_modelo)
+            ? `<span style="flex-basis:100%;background:#eef4fb;border:1px solid #c3d9f3;border-radius:6px;padding:6px 9px;color:#0C447C">
+                 🏗 Kit de equipo: accesorios pertenecientes a <strong>${escH([data.equipo_tipo || 'EQUIPO', [data.equipo_marca, data.equipo_modelo].filter(Boolean).join(' '),
+                 data.equipo_serie ? 'No. de serie ' + data.equipo_serie : '', data.equipo_id ? 'No. económico ' + data.equipo_id : ''].filter(Boolean).join(' · '))}</strong>.
+                 Se certifica con el certificado general (un solo QR).</span>` : ''}
           <span>✉ Correo del cliente: <strong>${data.correo ? escH(data.correo) : 'sin registrar'}</strong></span>
           <button style="${btnBase}background:var(--gris-bg);border-color:var(--borde);color:var(--texto)"
                   onclick="accEditarCorreo(${sesionId})">Editar</button>
@@ -3019,7 +3024,7 @@ async function abrirAccCert(sesionId) {
             <div class="field"><label>Serie</label><input disabled value="${a.serie||'—'}"></div>
             <div class="field"><label>Capacidad</label><input disabled value="${a.capacidad||'—'}"></div>
           </div>
-          ${accCertFila(a)}
+          ${accCertFila(a, !!(data.equipo_serie || data.equipo_marca || data.equipo_modelo))}
         </div>`;
       });
     }
@@ -3170,13 +3175,18 @@ async function accVisibilidadDoc(tipo, sesionId, visible, btn) {
    Sólo se emite a los accesorios aptos, y sólo si tienen placa asignada: sin
    QR el certificado no se puede verificar contra la pieza que ampara.
    ═══════════════════════════════════════════════════════════ */
-function accCertFila(a) {
+function accCertFila(a, esKit) {
   const apto = String(a.estado || '').trim().toUpperCase() === 'CUMPLE';
   if (!apto) {
     return `<div style="margin-top:8px;font-size:11.5px;color:var(--texto-sub);background:var(--gris-bg);border-radius:7px;padding:6px 10px">
       Sin certificado: el accesorio no resultó apto.</div>`;
   }
   if (!a.qr_codigo) {
+    // Kit de un equipo: las piezas no llevan QR propio, las ampara el certificado general
+    if (esKit) {
+      return `<div style="margin-top:8px;font-size:11.5px;color:var(--texto-sub);background:var(--gris-bg);border-radius:7px;padding:6px 10px">
+        Kit de equipo: esta pieza la ampara el certificado general de la sesión, con su QR.</div>`;
+    }
     return `<div style="margin-top:8px;font-size:11.5px;background:#fff8e1;color:#92400e;border-radius:7px;padding:6px 10px">
       ⚠ Sin código QR asignado. Asígnalo en Calidad para poder certificarlo por separado.</div>`;
   }

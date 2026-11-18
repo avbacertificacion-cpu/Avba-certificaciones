@@ -1014,6 +1014,7 @@ function mostrarResultado(data) {
       if (items.length) {
         const comun = [
           d.cliente ? filaHTML("Cliente", d.cliente) : "",
+          d.equipo_kit ? filaHTML("Accesorios del equipo", d.equipo_kit) : "",
           filaHTML("Accesorios amparados", d.total || items.length),
           // Las que no pasaron se dicen, no se callan: omitirlas haría creer
           // que esas piezas nunca se inspeccionaron.

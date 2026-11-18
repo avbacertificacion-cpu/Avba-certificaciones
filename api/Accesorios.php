@@ -779,8 +779,10 @@ class Accesorios {
             "INSERT INTO accesorios_sesiones (cliente, fecha, coordenadas, direccion, usuario, control)
              VALUES (?, ?, ?, ?, ?, ?)"
         )->execute([$cliente, $fecha, $coords, $dir, $usuario, $control]);
+        $sesionId = (int)$this->pdo->lastInsertId();
+        $this->guardarEquipoKit($sesionId, $payload);
 
-        return ['status' => 'success', 'sesion_id' => (int)$this->pdo->lastInsertId(), 'control' => $control];
+        return ['status' => 'success', 'sesion_id' => $sesionId, 'control' => $control];
     }
 
     // ── Guardar un accesorio (multipart) ───────────────────
@@ -955,7 +957,45 @@ class Accesorios {
             formatoDireccion($p['direccion'] ?? ''),
             $id,
         ]);
+        $this->guardarEquipoKit($id, $p);
         return ['status' => 'success'];
+    }
+
+    /** Campos del equipo al que pertenecen los accesorios (kit), como se capturan. */
+    private const CAMPOS_KIT = ['equipo_tipo', 'equipo_marca', 'equipo_modelo', 'equipo_serie', 'equipo_id'];
+
+    /** Guarda el equipo del kit si vienen sus datos; si no viene ninguno, no toca nada. */
+    private function guardarEquipoKit(int $sesionId, array $p): void {
+        if (!$sesionId || !array_intersect(self::CAMPOS_KIT, array_keys($p))) return;
+        $this->ensureAccSesionesColumns();
+        $sets = []; $vals = [];
+        foreach (self::CAMPOS_KIT as $c) {
+            if (!array_key_exists($c, $p)) continue;
+            $sets[] = "$c = ?";
+            $vals[] = textoEstandar((string)$p[$c]) ?: null;
+        }
+        $vals[] = $sesionId;
+        try {
+            $this->pdo->prepare("UPDATE accesorios_sesiones SET " . implode(', ', $sets) . " WHERE id = ?")->execute($vals);
+        } catch (\Throwable $e) {
+            error_log('[Accesorios] guardarEquipoKit: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * El equipo del kit en una línea: «GRÚA HIDRÁULICA · ALTEC AC18-70B · No. de
+     * serie 0507EP0120 · No. económico 04». Vacío si la sesión no es de un kit.
+     */
+    public static function textoEquipoKit(array $s): string {
+        $tipo   = trim((string)($s['equipo_tipo'] ?? ''));
+        $marca  = trim((string)($s['equipo_marca'] ?? '') . ' ' . (string)($s['equipo_modelo'] ?? ''));
+        $serie  = trim((string)($s['equipo_serie'] ?? ''));
+        $econ   = trim((string)($s['equipo_id'] ?? ''));
+        if ($tipo === '' && $marca === '' && $serie === '' && $econ === '') return '';
+        $partes = array_filter([$tipo ?: 'EQUIPO', $marca,
+                                $serie !== '' ? 'No. de serie ' . $serie : '',
+                                $econ  !== '' ? 'No. económico ' . $econ : '']);
+        return implode(' · ', $partes);
     }
 
     /**
@@ -1116,7 +1156,8 @@ class Accesorios {
                     coordenadas, direccion, usuario, qr_codigo,
                     correo, motivo, inspector_firma, inspector_usuario,
                     informe_url, cert_url, informe_cumple_url,
-                    cert_manual_url, informe_manual_url
+                    cert_manual_url, informe_manual_url,
+                    equipo_tipo, equipo_marca, equipo_modelo, equipo_serie, equipo_id
              FROM accesorios_sesiones WHERE id = ?"
         );
         $chk->execute([$id]);
@@ -1346,6 +1387,11 @@ class Accesorios {
             'inspector_firma'   => fn($v) => trim((string)$v) ?: null,
             'inspector_usuario' => fn($v) => trim((string)$v) ?: null,
             'fecha'             => fn($v) => $this->fechaIso($v),
+            'equipo_tipo'       => fn($v) => textoEstandar((string)$v) ?: null,
+            'equipo_marca'      => fn($v) => textoEstandar((string)$v) ?: null,
+            'equipo_modelo'     => fn($v) => textoEstandar((string)$v) ?: null,
+            'equipo_serie'      => fn($v) => textoEstandar((string)$v) ?: null,
+            'equipo_id'         => fn($v) => textoEstandar((string)$v) ?: null,
         ];
 
         $campos = []; $vals = [];
@@ -2378,6 +2424,13 @@ class Accesorios {
             // de esta columna llega con la lista vacía y sigue mostrando todo,
             // que es lo que el cliente ya tenía.
             'docs_ocultos'      => "ALTER TABLE accesorios_sesiones ADD COLUMN docs_ocultos      VARCHAR(40) NOT NULL DEFAULT ''",
+            // Kit de un equipo: los accesorios se inspeccionan como los que
+            // trae una grúa determinada, y el certificado y el informe lo dicen.
+            'equipo_tipo'       => "ALTER TABLE accesorios_sesiones ADD COLUMN equipo_tipo       VARCHAR(150) NULL",
+            'equipo_marca'      => "ALTER TABLE accesorios_sesiones ADD COLUMN equipo_marca      VARCHAR(150) NULL",
+            'equipo_modelo'     => "ALTER TABLE accesorios_sesiones ADD COLUMN equipo_modelo     VARCHAR(150) NULL",
+            'equipo_serie'      => "ALTER TABLE accesorios_sesiones ADD COLUMN equipo_serie      VARCHAR(150) NULL",
+            'equipo_id'         => "ALTER TABLE accesorios_sesiones ADD COLUMN equipo_id         VARCHAR(150) NULL",
         ];
         // Se atrapa Throwable, no sólo PDOException: esta clase se construye en
         // TODAS las peticiones, incluida la de iniciar sesión, así que un fallo
@@ -2453,6 +2506,16 @@ class Accesorios {
      * describe LA pieza. Dejar la plantilla con un rótulo fijo obligaba a meter
      * la descripción de una pieza bajo el título "resumen de ítems".
      */
+    /** «Accesorios pertenecientes al equipo …» en el certificado, si la sesión es de un kit. */
+    private function bloqueKit(array $sesion): string {
+        $kit = self::textoEquipoKit($sesion);
+        if ($kit === '') return '';
+        $e = fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8');
+        // Separado del resumen con un renglón: mPDF no respeta aquí margen ni relleno de un div
+        return '<br><div class="flabel">ACCESORIOS PERTENECIENTES AL EQUIPO - Accessories belonging to equipment</div>'
+             . '<div class="fval">' . $e($kit) . '</div>';
+    }
+
     private function bloqueItems(array $aptos, ?array $pieza = null): string {
         $e = fn($v) => htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8');
 
@@ -2569,7 +2632,7 @@ class Accesorios {
         $map = [
             '{folio}'            => $e($folio),
             '{cliente}'          => $e(mb_strtoupper(trim($sesion['cliente'] ?? ''), 'UTF-8')),
-            '{bloque_items}'     => $this->bloqueItems($aptos),
+            '{bloque_items}'     => $this->bloqueItems($aptos) . $this->bloqueKit($sesion),
             '{fecha_inspeccion}' => $e($fechaStr),
             '{vigencia}'         => $e($vigencia),
             '{no_acreditacion}'  => $e($noAcreditacion),
@@ -3460,6 +3523,10 @@ class Accesorios {
         $cliente = $esc($s['cliente'] ?? '');
         $dir     = $esc($s['direccion'] ?? '');
         $fecha   = $esc($s['fecha'] ?? '');
+        // Kit de un equipo: los accesorios son los de esa grúa
+        $kit     = self::textoEquipoKit($s);
+        $filaKit = $kit === '' ? '' : "\n  <tr>\n    <td style=\"background:#e8eef8;padding:4px 8px;border:1px solid #c8d4e8;font-size:7.5pt;font-weight:bold;color:#0C2D6B\">Accesorios del equipo</td>\n"
+                 . "    <td colspan=\"3\" style=\"background:#f7f9fd;padding:4px 8px;border:1px solid #c8d4e8;font-size:9pt;color:#1a1a2e\">" . $esc($kit) . "</td>\n  </tr>";
 
         [$nombreInspector, ] = $this->firmanteDe($s);
         $usuario = $esc($nombreInspector);
@@ -3585,7 +3652,7 @@ class Accesorios {
     <td style="background:#f7f9fd;padding:4px 8px;border:1px solid #c8d4e8;font-size:9pt;color:#1a1a2e">{$dir}</td>
     <td style="background:#e8eef8;padding:4px 8px;border:1px solid #c8d4e8;font-size:7.5pt;font-weight:bold;color:#0C2D6B">Inspector</td>
     <td style="background:#f7f9fd;padding:4px 8px;border:1px solid #c8d4e8;font-size:9pt;color:#1a1a2e">{$usuario}</td>
-  </tr>
+  </tr>{$filaKit}
 </table>
 
 <!-- ══════════════════════════════════════════════════

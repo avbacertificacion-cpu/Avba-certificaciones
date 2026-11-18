@@ -193,16 +193,19 @@ class ValidarQR {
             }
 
             // Fallback: buscar por QR o folio de sesión
+            // El equipo al que pertenecen (kit), si la base ya tiene esas columnas
+            $colsKit = columnaExiste($this->pdo, 'accesorios_sesiones', 'equipo_serie')
+                ? ', s.equipo_tipo, s.equipo_marca, s.equipo_modelo, s.equipo_serie, s.equipo_id' : '';
             if ($esFolio) {
                 $stmt = $this->pdo->prepare(
-                    "SELECT s.id, s.cliente, s.fecha, s.estatus
+                    "SELECT s.id, s.cliente, s.fecha, s.estatus{$colsKit}
                      FROM accesorios_sesiones s
                      WHERE s.control = ? AND s.estatus IN ('APROBADO_CALIDAD','EMITIDO') LIMIT 1"
                 );
                 $stmt->execute([$q]);
             } else {
                 $stmt = $this->pdo->prepare(
-                    "SELECT s.id, s.cliente, s.fecha, s.estatus
+                    "SELECT s.id, s.cliente, s.fecha, s.estatus{$colsKit}
                      FROM accesorios_sesiones s
                      WHERE s.qr_codigo = ? AND s.estatus IN ('APROBADO_CALIDAD','EMITIDO') LIMIT 1"
                 );
@@ -261,6 +264,7 @@ class ValidarQR {
                     'serie'       => $primero['serie']     ?? '',
                     'capacidad'   => $primero['capacidad'] ?? '',
                     'cliente'     => $sesion['cliente']    ?? '',
+                    'equipo_kit'  => class_exists('Accesorios') ? Accesorios::textoEquipoKit($sesion) : '',
                     'total'       => $total,
                     'no_aptos'    => $noAptos,
                     'items'       => $items,

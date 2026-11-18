@@ -5140,6 +5140,13 @@ async function abrirDetAccSesion(id) {
                    placeholder="Planta, patio o domicilio donde se realizó"
                    style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px">
             ${bloqueado ? '<span style="font-size:10.5px;color:var(--texto-hint)">Se corrige cuando quieras; aparecerá en los documentos la próxima vez que Certificaciones los emita.</span>' : ''}</label>
+          <!-- Kit de un equipo: a qué grúa pertenecen los accesorios. Vacío = sesión normal. -->
+          <div style="grid-column:1/-1;font-size:11px;font-weight:700;color:var(--texto-sub);margin-top:4px">
+            Equipo al que pertenecen los accesorios <span style="font-weight:400">(kit; déjalo vacío si no aplica)</span></div>
+          ${[['tipo','Tipo de equipo','Ej: Grúa hidráulica'],['marca','Marca',''],['modelo','Modelo',''],['serie','No. de serie',''],['id','No. económico','']].map(([c,l,ph]) =>
+            `<label style="font-size:11px;color:var(--texto-sub)">${l}
+              <input type="text" id="acc-ed-equipo_${c}" value="${escH(s['equipo_'+c]||'')}" placeholder="${ph}"
+                     style="width:100%;padding:6px 8px;border:1.5px solid var(--borde);border-radius:6px;font-size:12px"></label>`).join('')}
         </div>
         <button onclick="guardarDatosAcc(${s.id})"
                 style="margin-top:9px;padding:6px 14px;background:var(--azul);color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer">
@@ -5269,7 +5276,7 @@ async function guardarDatosAcc(id) {
     inspector_usuario: sel ? sel.value : '',
     inspector_firma:   op ? (op.dataset.nombre || '') : '',
   };
-  ['cliente','fecha','direccion'].forEach(c => {
+  ['cliente','fecha','direccion','equipo_tipo','equipo_marca','equipo_modelo','equipo_serie','equipo_id'].forEach(c => {
     const el = document.getElementById('acc-ed-' + c);
     if (el && !el.disabled) payload[c] = el.value.trim();
   });
