@@ -1282,9 +1282,36 @@ function renderClientes(data) {
       <td>${label}</td>
       <td>${estadoBadge(u.activo)}</td>
       <td style="color:var(--texto-hint);font-size:11.5px">${esc(u.ultimo_acceso || '—')}</td>
-      <td>${accionesTd(u)}</td>
+      <td>${u.activo == 1
+        ? `<button class="btn-edit" onclick="verPortalCliente(${u.id}, this)" title="Abre su portal en otra pestaña, tal como lo ve. Sólo consulta.">👁 Ver portal</button>`
+        : ''}${accionesTd(u)}</td>
     </tr>`;
   }).join('');
+}
+
+/**
+ * Abre el portal de una cuenta de cliente tal como la ve, en otra pestaña y de
+ * sólo consulta (el servidor bloquea los cambios). No se necesita su contraseña
+ * ni se le cierra su sesión; la vista dura una hora y queda registrada.
+ */
+async function verPortalCliente(id, btn) {
+  // La pestaña se abre antes de esperar al servidor: si no, el navegador la bloquea
+  const w = window.open('', '_blank');
+  if (btn) btn.disabled = true;
+  try {
+    const res  = await fetch(API, { method: "POST", body: JSON.stringify({ action: "ADMIN_VISTA_PORTAL", payload: { usuario_id: id } }) });
+    const data = await res.json();
+    if (data.status !== "success" || !data.sesion) throw new Error(data.message || "No se pudo abrir la vista.");
+    const json = JSON.stringify(data.sesion);
+    const b64  = btoa(unescape(encodeURIComponent(json))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    const url  = 'portal-cliente.html#vista=' + b64;
+    if (w) w.location.href = url; else window.open(url, '_blank');
+  } catch (e) {
+    if (w) w.close();
+    alert(e.message || "No se pudo abrir la vista.");
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 }
 
 /* ── Abrir modal crear ── */

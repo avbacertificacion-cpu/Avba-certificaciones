@@ -1304,6 +1304,18 @@ function calcularVigencia(?string $fechaCert): array {
 function validarToken(PDO $pdo, ?string $token): ?array {
     if (!$token) return null;
 
+    // Vista del portal desde Administración: entra como la cuenta del cliente,
+    // de sólo consulta (ver VistaPortal.php). Su token no es el del cliente.
+    if (str_starts_with($token, 'vista.')) {
+        if (!class_exists('VistaPortal')) require_once __DIR__ . '/VistaPortal.php';
+        $u = VistaPortal::usuarioDeToken($pdo, $token);
+        if (!$u) return null;
+        $admin = (string)$u['vista_admin'];
+        $u = resolverRolActivo($u);
+        $u['vista_admin'] = $admin;
+        return $u;
+    }
+
     try {
         $stmt = $pdo->prepare(
             "SELECT id, usuario, rol, nombre, id_cliente, usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh,

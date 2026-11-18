@@ -1779,6 +1779,63 @@ body.solo-lectura [onclick="abrirModalEq(null)"],body.solo-lectura [onclick="abr
   </div>
 </div>
 
+<script>
+/* ── Vista de administrador ─────────────────────────────────────────────
+   Administración abre el portal "como" una cuenta de cliente para ver
+   exactamente lo que tiene. La sesión de la vista llega en el #hash, se
+   guarda en sessionStorage (sólo esta pestaña) y sustituye a avba_session
+   sin tocar la de localStorage: la sesión del administrador sigue intacta en
+   sus otras pestañas. El servidor la trata como de sólo consulta. */
+(function () {
+  try {
+    const m = location.hash.match(/^#vista=([A-Za-z0-9_\-]+)/);
+    if (m) {
+      const b64  = m[1].replace(/-/g, '+').replace(/_/g, '/');
+      const json = decodeURIComponent(escape(atob(b64)));
+      JSON.parse(json);
+      sessionStorage.setItem('avba_vista', json);
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+  } catch (e) { /* hash inválido: se ignora */ }
+  const vista = sessionStorage.getItem('avba_vista');
+  if (!vista) return;
+  let datos = {};
+  try { datos = JSON.parse(vista); } catch (e) { sessionStorage.removeItem('avba_vista'); return; }
+  window.__AVBA_VISTA__ = datos;
+  const gi = Storage.prototype.getItem, si = Storage.prototype.setItem, ri = Storage.prototype.removeItem;
+  Storage.prototype.getItem = function (k) {
+    if (this === window.localStorage && k === 'avba_session') return gi.call(window.sessionStorage, 'avba_vista');
+    return gi.call(this, k);
+  };
+  Storage.prototype.setItem = function (k, v) {
+    if (this === window.localStorage && k === 'avba_session') return;   // la del admin no se pisa
+    return si.call(this, k, v);
+  };
+  Storage.prototype.removeItem = function (k) {
+    if (this === window.localStorage && k === 'avba_session') { ri.call(window.sessionStorage, 'avba_vista'); return; }
+    return ri.call(this, k);
+  };
+  window.cerrarVistaAdmin = function () {
+    ri.call(window.sessionStorage, 'avba_vista');
+    window.close();
+    setTimeout(function () { location.href = 'admin.html'; }, 150);
+  };
+  document.addEventListener('DOMContentLoaded', function () {
+    const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const vence = (datos.vista && datos.vista.expira) ? String(datos.vista.expira).slice(11, 16) : '';
+    const bar = document.createElement('div');
+    bar.id = 'vista-admin-bar';
+    bar.setAttribute('role', 'status');
+    bar.style.cssText = 'position:sticky;top:0;z-index:99999;background:#7a4b00;color:#fff;font:600 13px/1.4 system-ui,-apple-system,Segoe UI,sans-serif;'
+      + 'padding:9px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;box-shadow:0 2px 6px rgba(0,0,0,.18)';
+    bar.innerHTML = '<span>👁 Vista de administrador · Estás viendo el portal de <b>' + esc(datos.nombre || datos.usuario) + '</b>'
+      + ' (' + esc(datos.usuario) + ') tal como lo ve. <span style="font-weight:400">Sólo consulta: los cambios se bloquean.'
+      + (vence ? ' Vence a las ' + esc(vence) + '.' : '') + '</span></span>'
+      + '<button type="button" onclick="cerrarVistaAdmin()" style="background:#fff;color:#7a4b00;border:0;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer">Cerrar vista</button>';
+    document.body.insertBefore(bar, document.body.firstChild);
+  });
+})();
+</script>
 <script src="js/native-bridge.js"></script>
 <script src="js/chart/chart.umd.min.js"></script>
 <script>

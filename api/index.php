@@ -47,6 +47,7 @@ require_once __DIR__ . '/LectorIA.php';
 require_once __DIR__ . '/NoConformidades.php';
 require_once __DIR__ . '/DictamenAnexos.php';
 require_once __DIR__ . '/ReporteChecklist.php';
+require_once __DIR__ . '/VistaPortal.php';
 require_once __DIR__ . '/Arneses.php';
 require_once __DIR__ . '/ClienteImpresion.php';
 require_once __DIR__ . '/ClienteEnvios.php';
@@ -155,6 +156,13 @@ $conexiones = class_exists('Divisiones')
 $sesion   = resolverSesion($conexiones, $token);
 $division = $sesion['division'] ?? 'principal';
 $pdo      = $sesion['pdo'] ?? Database::getConnection();
+
+// Vista del portal desde Administración: sólo consulta. Lo que no sea lectura
+// se rechaza aquí, antes de llegar a cualquier módulo.
+if (!empty($sesion['usuario']['vista_admin']) && !VistaPortal::permitida((string)$action)) {
+    respuesta(['status' => 'error', 'vista' => true,
+               'message' => 'Vista de administrador: sólo consulta. Este cambio no se aplicó.'], 403);
+}
 
 // Una sola vez por base: lo guardado pasa al texto estándar (mayúsculas, sin
 // acentos ni símbolos) y las direcciones a su formato. Ver helpers.php.
@@ -1474,6 +1482,12 @@ if ($method === 'POST') {
             $idCliente = $alc['es_sub']
                 ? resolveIdc($usr)
                 : ($payload['id_cliente'] ?? resolveIdc($usr));
+            /* Una cuenta de cliente pedía cualquier id_cliente y recibía los datos
+               de esa empresa. Sólo las suyas; Admin y los internos, cualquiera. */
+            if ($usr['rol'] === 'CLIENTE') {
+                $propias = array_values(array_filter(array_map('trim', explode(',', (string)($usr['id_cliente'] ?? '')))));
+                if (!in_array(trim((string)$idCliente), $propias, true)) $idCliente = resolveIdc($usr);
+            }
             respuesta($auth->obtenerDatosCliente($idCliente, $alc['certificacion']));
 
         // ── Inspector ────────────────────────────────────
@@ -1583,6 +1597,14 @@ if ($method === 'POST') {
             respuesta($cert->imprimirPDF((int)($payload['id'] ?? $payload['fila'] ?? 0), 'cert', false, $usr['usuario']));
 
         // Inspector: el checklist completo de una inspección suya, en PDF.
+        case 'ADMIN_VISTA_PORTAL': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN' || !empty($usr['vista_admin'])) {
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            }
+            respuesta(VistaPortal::crear($pdo, (int)($payload['usuario_id'] ?? 0), (string)$usr['usuario']));
+        }
+
         case 'REPORTE_CHECKLIST':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
