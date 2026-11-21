@@ -15,6 +15,12 @@
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
+// La app móvil llama desde su propio origen (ver api/index.php)
+$origenApp = $_SERVER['HTTP_ORIGIN'] ?? '';
+if (in_array($origenApp, ['capacitor://localhost', 'https://localhost', 'ionic://localhost'], true)) {
+    header('Access-Control-Allow-Origin: ' . $origenApp);
+    header('Vary: Origin');
+}
 
 function pedirNominatim(string $url): string {
     if (!function_exists('curl_init')) return '';

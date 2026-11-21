@@ -122,11 +122,22 @@ const AvbaOffline = (() => {
       let enviados = 0;
       for (const item of items) {
         try {
+          // Con el token de la sesión de AHORA: el guardado pudo capturarse
+          // con uno que ya venció (en campo, sin señal, pasan horas).
+          let tk = '';
+          try { tk = (JSON.parse(localStorage.getItem('avba_session') || '{}') || {}).token || ''; } catch (_) {}
+          const cuerpo = Object.assign({}, item.body);
+          if (tk) cuerpo.token = tk;
           const resp = await fetch(item.url, {
             method:  'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body:    JSON.stringify(item.body)
+            headers: Object.assign({ 'Content-Type': 'text/plain' }, tk ? { 'Authorization': 'Bearer ' + tk, 'X-Token': tk } : {}),
+            body:    JSON.stringify(cuerpo)
           });
+          if (resp.status === 401) {
+            // Sesión vencida: se queda en la cola y se envía al volver a entrar
+            if (onItem) onItem(item, 'network', new Error('Sesión vencida'));
+            break;
+          }
           const data = await resp.json().catch(() => null);
           if (data && data.status === 'success') {
             await this.eliminarPendiente(item.id);

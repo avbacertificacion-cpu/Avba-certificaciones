@@ -80,6 +80,11 @@ header_remove('X-Powered-By');
 // CORS: solo orígenes explícitamente permitidos
 $requestOrigin = $_SERVER['HTTP_ORIGIN'] ?? '';
 $allowedOrigins = array_map('trim', explode(',', defined('CORS_ORIGINS') ? CORS_ORIGINS : ''));
+// La app móvil lleva sus pantallas dentro y llama a la API desde su propio
+// origen: capacitor://localhost en iOS, https://localhost en Android.
+$allowedOrigins = array_values(array_unique(array_filter(array_merge(
+    $allowedOrigins, ['capacitor://localhost', 'https://localhost', 'ionic://localhost']
+))));
 if ($requestOrigin && in_array($requestOrigin, $allowedOrigins, true)) {
     header('Access-Control-Allow-Origin: ' . $requestOrigin);
     header('Vary: Origin');
@@ -785,6 +790,23 @@ if ($method === 'GET') {
             respuesta($admin->getSmtpConfig());
 
         // Buscar empresa/cliente en la BD (para autocomplete inspector)
+        // Lista completa de clientes para que la app los busque sin señal
+        case 'CLIENTES_OFFLINE': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || !in_array($usr['rol'], ['ADMIN','CALIDAD','CERTIFICACIONES','INSPECTOR'], true)) {
+                respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            }
+            $rows = $pdo->query(
+                "SELECT nombre_cliente, primera_parte,
+                        COALESCE(rfc,'') AS rfc,
+                        COALESCE(representante,'') AS representante,
+                        COALESCE(direccion,'') AS direccion,
+                        COALESCE(representante_trabajadores,'') AS representante_trabajadores
+                 FROM clientes ORDER BY nombre_cliente"
+            )->fetchAll(PDO::FETCH_ASSOC);
+            respuesta(['status' => 'success', 'clientes' => $rows]);
+        }
+
         case 'BUSCAR_CLIENTE': {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);

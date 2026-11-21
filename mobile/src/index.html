@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0B2545">
+  <title>AVBA Certificaciones</title>
+  <style>
+    html,body{height:100%;margin:0}
+    body{background:linear-gradient(160deg,#0B2545,#134074);color:#fff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+      display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+    .logo{width:112px;height:112px;border-radius:26px;background:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+    .logo img{width:84px;height:84px;object-fit:contain}
+    p{font-size:13px;opacity:.8;margin-top:18px}
+  </style>
+</head>
+<body>
+  <div class="logo"><img src="assets/logos/avba_icono.png" alt="AVBA"></div>
+  <p>Cargando…</p>
+  <script>
+    /* Entrada de la app: con una sesión guardada se va directo a su pantalla
+       —con o sin señal—; si no, al inicio de sesión. Las mismas rutas que
+       usa login.html al entrar. */
+    (function () {
+      var DESTINOS = { ADMIN: 'admin.html', INSPECTOR: 'inspector.html', CALIDAD: 'calidad.html',
+        CERTIFICACIONES: 'certificaciones.html', ADMINISTRATIVO: 'administrativo.html',
+        CLIENTE: 'portal-cliente.html', PARTICIPANTE: 'participante.html' };
+      var s = {};
+      try { s = JSON.parse(localStorage.getItem('avba_session') || '{}') || {}; } catch (e) {}
+      var destino = (s.token && DESTINOS[s.rol]) || 'login.html';
+      if (s.token && DESTINOS[s.rol] && !navigator.onLine) { s.ts = Date.now(); localStorage.setItem('avba_session', JSON.stringify(s)); }
+      location.replace(destino);
+    })();
+  </script>
+</body>
+</html>

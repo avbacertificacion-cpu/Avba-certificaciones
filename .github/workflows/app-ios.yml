@@ -1,0 +1,152 @@
+name: App iOS
+
+# Compila la app de iOS en una Mac de GitHub (no hace falta tener Mac propia).
+#
+#   · Sin secretos: compila para el simulador, sólo para comprobar que todo
+#     arma bien.
+#   · Con los secretos de App Store Connect: firma la app (firma automática,
+#     Xcode crea certificado y perfil) y la sube a App Store Connect, de donde
+#     pasa a TestFlight y luego a revisión.
+#
+# Secretos (Settings → Secrets and variables → Actions):
+#   IOS_TEAM_ID      Team ID de la cuenta de Apple Developer (10 caracteres)
+#   ASC_KEY_ID       Key ID de la llave de API de App Store Connect
+#   ASC_ISSUER_ID    Issuer ID de esa llave
+#   ASC_KEY_P8       contenido del archivo AuthKey_XXXX.p8 (tal cual o en base64)
+# La llave de API debe tener el rol "Admin" para que Xcode pueda crear el
+# certificado de distribución en la nube.
+#
+# Sólo corre a mano o con una etiqueta app-v*: las Mac de GitHub consumen
+# minutos 10 veces más rápido que Linux.
+
+on:
+  workflow_dispatch:
+    inputs:
+      subir_a_app_store:
+        description: 'Subir a App Store Connect / TestFlight (requiere secretos)'
+        type: boolean
+        default: true
+  push:
+    tags:
+      - 'app-v*'
+
+concurrency:
+  group: app-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ios:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      TIENE_FIRMA: ${{ secrets.ASC_KEY_P8 != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.IOS_TEAM_ID != '' }}
+      PROYECTO: mobile/ios/App/App.xcodeproj
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Capacitor 8 pide Xcode 26 o más nuevo
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Dependencias, pantallas y sincronizar iOS
+        working-directory: mobile
+        run: |
+          npm ci
+          npm run sync:ios
+
+      - name: Compilar para el simulador (sin firma)
+        if: env.TIENE_FIRMA != 'true'
+        run: |
+          xcodebuild -project "$PROYECTO" -scheme App -configuration Release \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build
+          echo "::notice::Sin secretos de App Store Connect: sólo se comprobó que la app compila. Ver mobile/README.md, sección App Store."
+
+      - name: Llave de App Store Connect
+        if: env.TIENE_FIRMA == 'true'
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+        run: |
+          LLAVE="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          if printf '%s' "$ASC_KEY_P8" | grep -q "BEGIN PRIVATE KEY"; then
+            printf '%s\n' "$ASC_KEY_P8" > "$LLAVE"
+          else
+            printf '%s' "$ASC_KEY_P8" | base64 -d > "$LLAVE"
+          fi
+          echo "LLAVE_ASC=$LLAVE" >> "$GITHUB_ENV"
+
+      - name: Archivar (firmado)
+        if: env.TIENE_FIRMA == 'true'
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          # El número de compilación sube en cada corrida: App Store Connect
+          # no acepta dos compilaciones con el mismo número en una versión.
+          xcodebuild -project "$PROYECTO" -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/AVBA.xcarchive" \
+            DEVELOPMENT_TEAM="$IOS_TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$LLAVE_ASC" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            archive
+
+      - name: Exportar y subir a App Store Connect
+        if: env.TIENE_FIRMA == 'true'
+        env:
+          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          SUBIR: ${{ github.event_name == 'push' || inputs.subir_a_app_store }}
+        run: |
+          if [ "$SUBIR" = "true" ]; then DESTINO=upload; else DESTINO=export; fi
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>destination</key><string>${DESTINO}</string>
+            <key>teamID</key><string>${IOS_TEAM_ID}</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>uploadSymbols</key><true/>
+            <key>manageAppVersionAndBuildNumber</key><false/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -exportArchive \
+            -archivePath "$RUNNER_TEMP/AVBA.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/exportado" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$LLAVE_ASC" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+          if [ "$DESTINO" = "upload" ]; then
+            echo "::notice::Compilación $GITHUB_RUN_NUMBER subida a App Store Connect. Aparece en TestFlight en unos minutos, cuando Apple termine de procesarla."
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: env.TIENE_FIRMA == 'true'
+        with:
+          name: avba-ios-ipa
+          path: ${{ runner.temp }}/exportado/*.ipa
+          if-no-files-found: ignore
+          retention-days: 30
+
+      - name: Borrar la llave
+        if: always()
+        run: rm -f "$RUNNER_TEMP"/AuthKey_*.p8
