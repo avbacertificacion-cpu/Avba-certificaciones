@@ -1316,6 +1316,24 @@ function validarToken(PDO $pdo, ?string $token): ?array {
         return $u;
     }
 
+    // Sesión de un dispositivo (ver Auth::abrirSesion): cada teléfono,
+    // tablet o computadora tiene la suya, con su propio rol activo, y entrar en
+    // uno ya no cierra la de los demás.
+    try {
+        $st = $pdo->prepare(
+            "SELECT u.id, u.usuario, u.rol, u.nombre, u.id_cliente, u.usuario_padre_id, u.permiso_sub,
+                    u.permiso_mantenimiento, u.permiso_rh, u.roles_extra, s.rol_activo
+             FROM sesiones_usuario s
+             INNER JOIN usuarios u ON u.id = s.usuario_id
+             WHERE s.token = ? AND s.expira > ? AND u.activo = 1"
+        );
+        $st->execute([$token, date('Y-m-d H:i:s')]);
+        $usr = $st->fetch();
+        if ($usr) return resolverRolActivo($usr);
+    } catch (\Throwable $e) {
+        // Tabla todavía no creada o columnas sin migrar: se sigue como antes.
+    }
+
     try {
         $stmt = $pdo->prepare(
             "SELECT id, usuario, rol, nombre, id_cliente, usuario_padre_id, permiso_sub, permiso_mantenimiento, permiso_rh,

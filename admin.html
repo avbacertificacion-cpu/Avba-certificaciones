@@ -842,6 +842,27 @@
   </div>
 </div>
 
+<!-- ══ MODAL DISPOSITIVOS CON ACCESO SIN CONTRASEÑA ══ -->
+<div class="overlay" id="overlay-disp" style="display:none" onclick="if(event.target===this)cerrarDispositivos()">
+  <div class="modal" style="max-width:640px">
+    <div class="modal-title">Acceso con huella, rostro o Windows Hello · <span id="disp-cuenta" style="font-weight:500;color:var(--texto-sub)"></span></div>
+    <div style="font-size:12.5px;color:var(--texto-sub);margin:-10px 0 14px;line-height:1.5">
+      Dispositivos donde esta persona entra sin escribir su contraseña. Si perdió uno, quítalo aquí:
+      su contraseña sigue funcionando en todos lados.
+    </div>
+    <div class="table-scroll" style="max-height:50vh">
+      <table>
+        <thead><tr><th>Dispositivo</th><th>Activado</th><th>Último uso</th><th></th></tr></thead>
+        <tbody id="disp-tbody"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions" style="justify-content:space-between;margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn-danger" onclick="quitarDispositivo(0)">Quitar todos</button>
+      <button class="btn-cancel" onclick="cerrarDispositivos()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ MODAL CREAR/EDITAR USUARIO ══ -->
 <div class="overlay" id="overlay-usr">
   <div class="modal">
@@ -1217,8 +1238,12 @@ function estadoBadge(activo) {
 }
 
 function accionesTd(u) {
+  const nDisp = Number(u.dispositivos || 0);
   return `<div class="td-actions">
     <button class="btn-edit"   onclick="abrirEditar(${u.id})">Editar</button>
+    ${nDisp > 0
+      ? `<button class="btn-edit" onclick="verDispositivos(${u.id})" title="Dispositivos que entran a esta cuenta con huella, rostro o Windows Hello">🔐 ${nDisp}</button>`
+      : ''}
     ${u.activo == 1
       ? `<button class="btn-danger" onclick="desactivar(${u.id})">Desactivar</button>`
       : `<button class="btn-edit"   onclick="reactivar(${u.id})">Reactivar</button>`}
@@ -1565,6 +1590,68 @@ async function eliminarUsuario(id) {
   } catch {
     alert("Error de conexión.");
   }
+}
+
+/* ── Dispositivos con acceso por huella, rostro o Windows Hello ──
+   Cada persona los activa en su propio dispositivo después de entrar con
+   contraseña. Aquí se ven y se retiran, por ejemplo si perdió el teléfono. */
+let _dispUsuario = null;
+function verDispositivos(id) {
+  _dispUsuario = usuariosGlobal.find(x => x.id == id) || { id };
+  document.getElementById("disp-cuenta").textContent = _dispUsuario.usuario || '';
+  const ov = document.getElementById("overlay-disp");
+  ov.style.display = "flex"; ov.classList.add("open");
+  cargarDispositivos();
+}
+function cerrarDispositivos() {
+  const ov = document.getElementById("overlay-disp");
+  ov.style.display = "none"; ov.classList.remove("open");
+}
+function _dispFecha(f) {
+  if (!f) return '—';
+  const d = new Date(String(f).replace(' ', 'T'));
+  return isNaN(d) ? esc(f) : d.toLocaleString('es-MX', { dateStyle: 'medium', timeStyle: 'short' });
+}
+async function cargarDispositivos() {
+  const cuerpo = document.getElementById("disp-tbody");
+  cuerpo.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:18px">Cargando…</td></tr>`;
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    const res = await fetch(API, { method: "POST",
+      body: JSON.stringify({ action: "LISTAR_DISPOSITIVOS_USUARIO", token: s.token, payload: { usuario_id: _dispUsuario.id } }) });
+    const data = await res.json();
+    if (data.status !== "success") throw new Error(data.message || "");
+    const lista = data.dispositivos || [];
+    if (!lista.length) {
+      cuerpo.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:18px;color:var(--texto-sub)">Esta cuenta ya no tiene dispositivos con acceso sin contraseña.</td></tr>`;
+      return;
+    }
+    cuerpo.innerHTML = lista.map(d => `
+      <tr>
+        <td><strong>${esc(d.nombre || 'Dispositivo')}</strong><br>
+            <span style="font-size:11px;color:var(--texto-sub)">${d.tipo === 'app' ? 'App ' + esc(d.plataforma === 'ios' ? 'iPhone / iPad' : d.plataforma === 'android' ? 'Android' : '') : 'Navegador'}</span></td>
+        <td style="font-size:12px">${_dispFecha(d.creado)}</td>
+        <td style="font-size:12px">${_dispFecha(d.ultimo_uso)}</td>
+        <td><button class="btn-danger" onclick="quitarDispositivo(${Number(d.id)})">Quitar</button></td>
+      </tr>`).join('');
+  } catch (e) {
+    cuerpo.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:18px;color:var(--rojo)">No se pudo cargar. ${esc(e.message || '')}</td></tr>`;
+  }
+}
+async function quitarDispositivo(id) {
+  const todos = !id;
+  if (!confirm(todos
+      ? `¿Quitar el acceso con huella, rostro o Windows Hello en TODOS los dispositivos de "${_dispUsuario.usuario}"?\n\nPodrá seguir entrando con su contraseña y volver a activarlo.`
+      : '¿Quitar el acceso sin contraseña de este dispositivo?\n\nPodrá seguir entrando con su contraseña.')) return;
+  const s = JSON.parse(localStorage.getItem("avba_session") || "{}");
+  try {
+    const res = await fetch(API, { method: "POST",
+      body: JSON.stringify({ action: "QUITAR_DISPOSITIVO", token: s.token, payload: { usuario_id: _dispUsuario.id, id: id || 0 } }) });
+    const data = await res.json();
+    if (data.status !== "success") { alert(data.message || "No se pudo quitar."); return; }
+    await cargarDispositivos();
+    cargar();
+  } catch { alert("Error de conexión."); }
 }
 
 /* ── Firma del inspector ── */

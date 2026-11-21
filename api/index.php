@@ -17,6 +17,7 @@ require_once __DIR__ . '/helpers.php';
 if (is_file(__DIR__ . '/Divisiones.php')) require_once __DIR__ . '/Divisiones.php';
 require_once __DIR__ . '/Huella.php';
 require_once __DIR__ . '/Auth.php';
+require_once __DIR__ . '/Dispositivos.php';
 require_once __DIR__ . '/Inspecciones.php';
 require_once __DIR__ . '/Calidad.php';
 require_once __DIR__ . '/Certificaciones.php';
@@ -1140,6 +1141,56 @@ if ($method === 'POST') {
             respuesta($fallo ?? ['status' => 'error', 'message' => 'Credenciales inválidas.']);
         }
 
+        // ── Entrar con huella, rostro o Windows Hello (Dispositivos.php) ──
+        // Alta en el navegador (computadora, tablet, celular): pide sesión.
+        case 'PASSKEY_OPCIONES_REGISTRO':
+        case 'PASSKEY_REGISTRAR': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $disp = new Dispositivos($pdo);
+            respuesta($action === 'PASSKEY_REGISTRAR' ? $disp->registrar($usr, $payload) : $disp->opcionesRegistro($usr));
+        }
+
+        // Entrar en el navegador: todavía sin sesión.
+        case 'PASSKEY_OPCIONES_ACCESO':
+            respuesta((new Dispositivos($pdo))->opcionesAcceso($payload));
+
+        case 'PASSKEY_ACCEDER':
+        case 'APP_ACCEDER': {
+            $r = $action === 'APP_ACCEDER'
+                ? Dispositivos::verificarApp($payload, $conexiones)
+                : (new Dispositivos($pdo))->verificarAcceso($payload, $conexiones);
+            if (($r['status'] ?? '') !== 'success') respuesta($r);
+            $authDiv = new Auth($r['pdo']);
+            $fila = $authDiv->filaParaSesion((int)$r['usuario_id']);
+            if (!$fila) respuesta(['status' => 'error', 'message' => 'La cuenta no está activa.']);
+            $ses = $authDiv->abrirSesion($fila, $action === 'APP_ACCEDER' ? 'app' : 'passkey',
+                                         (string)($payload['dispositivo'] ?? $r['dispositivo'] ?? ''));
+            $ses['division'] = $r['division'];
+            respuesta($ses);
+        }
+
+        // Alta en la app: el teléfono recibe su credencial para el llavero.
+        case 'APP_REGISTRAR_DISPOSITIVO': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            respuesta((new Dispositivos($pdo))->registrarApp($usr, $payload));
+        }
+
+        case 'APP_OLVIDAR_DISPOSITIVO':
+            respuesta(Dispositivos::olvidarApp($payload, $conexiones));
+
+        // Administración: qué dispositivos entran sin contraseña a una cuenta.
+        case 'LISTAR_DISPOSITIVOS_USUARIO':
+        case 'QUITAR_DISPOSITIVO': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr || $usr['rol'] !== 'ADMIN') respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            $disp = new Dispositivos($pdo);
+            $uid = (int)($payload['usuario_id'] ?? $_GET['usuario_id'] ?? 0);
+            if ($uid <= 0) respuesta(['status' => 'error', 'message' => 'Cuenta no indicada.']);
+            respuesta($action === 'QUITAR_DISPOSITIVO' ? $disp->quitar($uid, (int)($payload['id'] ?? 0)) : $disp->listar($uid));
+        }
+
         // ── Control de material en planta (ADMIN + ADMINISTRATIVO) ──
         // ── Presupuestos (ADMIN + ADMINISTRATIVO) ────────────────
         case 'PRES_GUARDAR_CONFIG':
@@ -1432,7 +1483,7 @@ if ($method === 'POST') {
         case 'CAMBIAR_ROL':
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
-            respuesta($auth->cambiarRol($usr, (string)($payload['rol'] ?? '')));
+            respuesta($auth->cambiarRol($usr, (string)($payload['rol'] ?? ''), $token));
 
         // Qué roles tiene la sesión y con cuál está trabajando.
         case 'MIS_ROLES':

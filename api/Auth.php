@@ -521,7 +521,40 @@ class Auth {
         }
 
         $this->registrarIntento($usuario, $ip, true);
+        return $this->abrirSesion($row, 'contraseña', (string)($payload['dispositivo'] ?? ''));
+    }
 
+    /**
+     * La cuenta, con lo que hace falta para abrirle sesión, si está activa.
+     * La usa el acceso con huella, rostro o Windows Hello (Dispositivos.php),
+     * que ya comprobó la identidad por su lado.
+     */
+    public function filaParaSesion(int $id): ?array {
+        try {
+            $st = $this->pdo->prepare(
+                "SELECT id, usuario, rol, nombre, id_cliente, activo, usuario_padre_id, permiso_sub,
+                        permiso_mantenimiento, permiso_rh, roles_extra
+                 FROM usuarios WHERE id = ? AND activo = 1"
+            );
+            $st->execute([$id]);
+        } catch (\PDOException $e) {
+            $st = $this->pdo->prepare("SELECT id, usuario, rol, nombre, id_cliente, activo FROM usuarios WHERE id = ? AND activo = 1");
+            $st->execute([$id]);
+        }
+        $row = $st->fetch();
+        return $row ?: null;
+    }
+
+    /**
+     * Abre una sesión para la cuenta y devuelve lo que la pantalla guarda.
+     *
+     * Cada sesión queda además en sesiones_usuario, con su propio vencimiento.
+     * Antes la cuenta tenía un solo token: entrar en la computadora cerraba la
+     * sesión del teléfono, y lo que el inspector tenía por enviar desde campo
+     * se quedaba atorado. Ahora cada dispositivo conserva la suya.
+     */
+    public function abrirSesion(array $row, string $origen = 'contraseña', string $dispositivo = ''): array {
+        $usuario = strtolower(trim((string)$row['usuario']));
         // Generar token y guardarlo
         $token   = generarToken();
         $expires = date('Y-m-d H:i:s', time() + TOKEN_TTL);
@@ -543,6 +576,7 @@ class Auth {
             )->execute([$token, $expires, $row['id']]);
         }
         if (count($roles) > 1) $this->anotarRol($row, null, (string)$row['rol'], 'ingreso');
+        self::anotarSesion($this->pdo, $token, (int)$row['id'], $origen, $dispositivo, $expires, (string)$row['rol']);
 
         $esSub = !empty($row['usuario_padre_id']);
         return [
@@ -559,6 +593,54 @@ class Auth {
             // Cuenta principal: siempre ve RH. Sub-usuario: solo si se le dio el permiso.
             'permiso_rh'    => $esSub ? (int)($row['permiso_rh'] ?? 0) : 1,
         ];
+    }
+
+
+    /* ── Sesiones por dispositivo ─────────────────────────────── */
+    public static function asegurarTablaSesiones(PDO $pdo): void {
+        static $hecho = [];
+        $k = spl_object_id($pdo);
+        if (isset($hecho[$k])) return;
+        $pdo->exec(
+            "CREATE TABLE IF NOT EXISTS sesiones_usuario (
+               token       VARCHAR(100) NOT NULL PRIMARY KEY,
+               usuario_id  INT          NOT NULL,
+               origen      VARCHAR(20)  NOT NULL DEFAULT '',
+               dispositivo VARCHAR(120) NOT NULL DEFAULT '',
+               ip          VARCHAR(45)  NULL,
+               rol_activo  VARCHAR(30)  NULL,
+               creado      DATETIME     NOT NULL,
+               expira      DATETIME     NOT NULL,
+               KEY idx_usuario (usuario_id),
+               KEY idx_expira (expira)
+             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+        $hecho[$k] = true;
+    }
+
+    private static function anotarSesion(PDO $pdo, string $token, int $usuarioId, string $origen, string $dispositivo, string $expira, string $rol): void {
+        try {
+            self::asegurarTablaSesiones($pdo);
+            $pdo->prepare("DELETE FROM sesiones_usuario WHERE expira < ?")->execute([date('Y-m-d H:i:s')]);
+            $pdo->prepare(
+                "INSERT INTO sesiones_usuario (token, usuario_id, origen, dispositivo, ip, rol_activo, creado, expira) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            )->execute([$token, $usuarioId, mb_substr($origen, 0, 20), mb_substr(trim(strip_tags($dispositivo)), 0, 120),
+                        mb_substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45), $rol, date('Y-m-d H:i:s'), $expira]);
+        } catch (\Throwable $e) {
+            // Sin la tabla, la sesión sigue valiendo por usuarios.session_token.
+            error_log('[Auth] sesiones_usuario: ' . $e->getMessage());
+        }
+    }
+
+    /** Cierra todas las sesiones abiertas de la cuenta (contraseña nueva, baja). */
+    public static function cerrarSesiones(PDO $pdo, int $usuarioId): void {
+        try {
+            $pdo->prepare("UPDATE usuarios SET session_token = NULL WHERE id = ?")->execute([$usuarioId]);
+            self::asegurarTablaSesiones($pdo);
+            $pdo->prepare("DELETE FROM sesiones_usuario WHERE usuario_id = ?")->execute([$usuarioId]);
+        } catch (\Throwable $e) {
+            error_log('[Auth] cerrarSesiones: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -789,7 +871,7 @@ class Auth {
      * Un rol que no esté en su lista se rechaza, de modo que manipular la
      * petición no sirve de nada.
      */
-    public function cambiarRol(array $usr, string $destino): array {
+    public function cambiarRol(array $usr, string $destino, ?string $token = null): array {
         $destino = strtoupper(trim($destino));
         if ($destino === '') return ['status' => 'error', 'message' => 'Indica el módulo.'];
 
@@ -805,10 +887,18 @@ class Auth {
             return ['status' => 'error', 'message' => 'Tu cuenta no tiene acceso a ese módulo.'];
         }
 
-        $desde = (string)($row['rol_activo'] ?: $row['rol']);
+        // El rol de ESTA sesión: con varias abiertas (teléfono y computadora),
+        // cambiar de módulo en una no cambia la otra.
+        $desde = (string)($usr['rol'] ?? '') ?: (string)($row['rol_activo'] ?: $row['rol']);
         if ($desde !== $destino) {
             $this->pdo->prepare("UPDATE usuarios SET rol_activo = ? WHERE id = ?")
                 ->execute([$destino, $row['id']]);
+            if ($token) {
+                try {
+                    $this->pdo->prepare("UPDATE sesiones_usuario SET rol_activo = ? WHERE token = ? AND usuario_id = ?")
+                        ->execute([$destino, $token, $row['id']]);
+                } catch (\Throwable $e) { /* sin tabla de sesiones: vale el de la cuenta */ }
+            }
             $this->anotarRol($row, $desde, $destino, 'cambio');
         }
 
@@ -889,7 +979,10 @@ class Auth {
             $stmt = $this->pdo->query($base . " FROM usuarios ORDER BY id");
         }
         $rows = $stmt->fetchAll();
+        // Cuántos dispositivos entran a cada cuenta con huella, rostro o Windows Hello
+        $disp = class_exists('Dispositivos') ? (new Dispositivos($this->pdo))->conteos() : [];
         foreach ($rows as &$r) {
+            $r['dispositivos'] = $disp[(int)$r['id']] ?? 0;
             $r['firma_url'] = ($r['firma_imagen'] ?? null)
                 ? rtrim(SITE_URL, '/') . '/' . ltrim($r['firma_imagen'], '/')
                 : null;

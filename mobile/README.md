@@ -55,11 +55,38 @@ navegador no hace nada), y:
 La inspección de maquinaria conserva su propia cola (`js/offline-sync.js`),
 que ahora también envía con la sesión vigente.
 
+### Entrar con huella, rostro o Windows Hello
+
+Funciona igual en la app y en el navegador de cualquier dispositivo
+(`js/acceso-dispositivo.js` + `api/Dispositivos.php`):
+
+| Dónde | Qué usa |
+|---|---|
+| App Android | Huella o rostro del teléfono (Keystore protegido por biometría) |
+| App iPhone / iPad | Face ID o Touch ID (Keychain protegido por biometría) |
+| Navegador en Windows | Windows Hello (rostro, huella o PIN) |
+| Navegador en Mac | Touch ID |
+| Navegador en iPhone / iPad / Android | Face ID, Touch ID, huella o rostro |
+
+- La primera vez se entra con contraseña; enseguida se ofrece activarlo en
+  ese dispositivo («Ahora no» lo vuelve a ofrecer en 30 días).
+- En el navegador es una llave de acceso (passkey): la llave privada no sale
+  del dispositivo y el servidor sólo guarda la pública. En la app, una
+  credencial propia del teléfono guardada en el llavero, que sólo se lee con
+  huella o rostro.
+- En la app, al abrirla con sesión guardada se pide el sensor; sin señal, el
+  sensor recupera la última sesión del teléfono y se sigue trabajando.
+- La contraseña sigue funcionando siempre. En **Administración → Usuarios**,
+  el botón 🔐 de cada cuenta muestra sus dispositivos y permite quitarlos (por
+  ejemplo, si perdió el teléfono).
+- Cada dispositivo tiene su propia sesión: entrar en la computadora ya no
+  cierra la del teléfono, y cambiar de módulo en uno no cambia el otro.
+
 ### Qué funciona sin señal
 
 | Funciona sin señal | Necesita señal |
 |---|---|
-| Abrir la app y entrar con una sesión ya iniciada | **El primer inicio de sesión** en el teléfono |
+| Abrir la app y entrar con una sesión ya iniciada, o con huella / rostro | **El primer inicio de sesión** en el teléfono |
 | Inspección de maquinaria completa (checklist, fotos, firma, GPS) | Crear sesiones de curso (los participantes se registran en línea con el QR) |
 | Inspección de accesorios y de arneses: crear sesión, capturar, fotos, enviar | Aprobar, emitir y enviar en Calidad y Certificaciones |
 | Buscar clientes, ver catálogos y checklists | Ver o descargar los PDF (se abren en el navegador de la app) |
@@ -271,5 +298,6 @@ npm run icons && npx cap sync
 | Fotos | Adjuntar fotos ya tomadas | Al elegir una foto de la galería |
 | Ubicación (mientras se usa) | Registrar dónde se hizo la inspección | Al iniciar una inspección |
 | Notificaciones | Recordatorios de vencimientos en el portal del cliente | La primera vez que hay un vencimiento próximo |
+| Face ID / huella | Entrar sin escribir la contraseña, también sin señal | Al activar la entrada con huella o rostro |
 
 Los textos que ve el usuario están en español en `ios/App/App/Info.plist`.

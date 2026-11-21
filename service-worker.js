@@ -1,4 +1,4 @@
-const CACHE_NAME = "avba-app-v2";
+const CACHE_NAME = "avba-app-v3";
 
 const urlsToCache = [
 "/login.html",

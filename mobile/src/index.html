@@ -17,19 +17,40 @@
 <body>
   <div class="logo"><img src="assets/logos/avba_icono.png" alt="AVBA"></div>
   <p>Cargando…</p>
+  <script src="js/acceso-dispositivo.js"></script>
   <script>
     /* Entrada de la app: con una sesión guardada se va directo a su pantalla
        —con o sin señal—; si no, al inicio de sesión. Las mismas rutas que
-       usa login.html al entrar. */
+       usa login.html al entrar.
+
+       Con la entrada por huella o rostro activada, al abrir la app se pide
+       primero el sensor: el teléfono puede quedar en manos de otra persona y
+       ahí hay expedientes de clientes. Si se cancela, se va al inicio de
+       sesión (que vuelve a ofrecer el sensor, y la contraseña). */
     (function () {
       var DESTINOS = { ADMIN: 'admin.html', INSPECTOR: 'inspector.html', CALIDAD: 'calidad.html',
         CERTIFICACIONES: 'certificaciones.html', ADMINISTRATIVO: 'administrativo.html',
         CLIENTE: 'portal-cliente.html', PARTICIPANTE: 'participante.html' };
       var s = {};
       try { s = JSON.parse(localStorage.getItem('avba_session') || '{}') || {}; } catch (e) {}
-      var destino = (s.token && DESTINOS[s.rol]) || 'login.html';
-      if (s.token && DESTINOS[s.rol] && !navigator.onLine) { s.ts = Date.now(); localStorage.setItem('avba_session', JSON.stringify(s)); }
-      location.replace(destino);
+      var A = window.AVBAAcceso;
+      var bio = A && A.activado();
+      var conSesion = !!(s.token && DESTINOS[s.rol]);
+
+      function ir() {
+        if (!navigator.onLine) { s.ts = Date.now(); try { localStorage.setItem('avba_session', JSON.stringify(s)); } catch (e) {} }
+        location.replace(DESTINOS[s.rol]);
+      }
+      if (!conSesion) { location.replace(bio ? 'login.html?bio=1' : 'login.html'); return; }
+      if (!bio || bio.usuario !== s.usuario) { ir(); return; }
+
+      document.querySelector('p').textContent = 'Confirma que eres tú…';
+      A.disponible().then(function (info) {
+        if (!info.ok) { ir(); return; }          // sin sensor (lo quitaron): como antes
+        // Si lo cancela, al inicio de sesión sin volver a pedirlo: ahí tiene el
+        // botón del sensor y la contraseña.
+        return A.verificar('Entrar a AVBA').then(ir, function () { location.replace('login.html'); });
+      }).catch(ir);
     })();
   </script>
 </body>

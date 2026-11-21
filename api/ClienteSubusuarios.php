@@ -170,6 +170,8 @@ class ClienteSubusuarios {
             $hash = password_hash($password, PASSWORD_BCRYPT);
             $this->pdo->prepare("UPDATE usuarios SET password_hash = ?, session_token = NULL WHERE id = ?")
                       ->execute([$hash, $subId]);
+            // También las sesiones abiertas en sus otros dispositivos.
+            if (method_exists('Auth', 'cerrarSesiones')) Auth::cerrarSesiones($this->pdo, (int)$subId);
             // Con contraseña nueva se levanta el bloqueo por intentos fallidos.
             try {
                 $this->pdo->prepare("DELETE FROM login_intentos WHERE usuario = ?")
