@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Herramientas de izaje · AVBA</title>
+<meta name="description" content="Calculadoras y tablas de referencia para maniobras de izaje: tensión en eslingas, capacidades, grilletes, ángulos, porcentaje de carga y alcance de grúas.">
+<meta name="theme-color" content="#0B2545">
+<link rel="icon" href="assets/logos/avba.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<!--
+  AVBA — Herramientas de izaje (consulta libre, sin registro)
+
+  Todo se calcula en el propio dispositivo: no llama al servidor, así que en
+  la app funciona sin señal. Las tablas son valores de referencia publicados
+  por las normas y la industria; cada resultado lo dice, y el pie de página
+  recuerda que mandan la etiqueta del accesorio y la tabla de carga de la grúa.
+-->
+<style>
+  :root{
+    --azul:#185FA5; --azul-dark:#0C447C; --azul-light:#E6F1FB; --marino:#0B2545; --oro:#C49A28;
+    --texto:#1a1a2e; --texto-sub:#5a6072; --texto-hint:#8b91a0; --borde:#dfe5ef;
+    --gris-bg:#f0f4f9; --blanco:#fff;
+    --verde:#2F6B1E; --verde-light:#E8F3E1; --ambar:#8A5A00; --ambar-light:#FFF3D6;
+    --rojo:#A32D2D; --rojo-light:#FCEBEB;
+    --radio:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  html,body{overflow-x:hidden;overflow-x:clip}
+  body{font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;background:var(--gris-bg);color:var(--texto);
+       min-height:100vh;display:flex;flex-direction:column;-webkit-tap-highlight-color:transparent}
+  a{color:var(--azul)}
+
+  /* ── Barra superior ── */
+  .barra{position:sticky;top:0;z-index:20;color:#fff;
+    background:linear-gradient(160deg,var(--marino) 0%,var(--azul-dark) 100%);
+    padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:10px;
+    box-shadow:0 2px 12px rgba(11,37,69,.25)}
+  .barra .atras{width:40px;height:40px;border-radius:10px;border:0;background:rgba(255,255,255,.12);color:#fff;
+    display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+  .barra .atras svg{width:20px;height:20px}
+  .barra .titulos{flex:1;min-width:0}
+  .barra h1{font-size:16.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .barra .sub{font-size:11.5px;color:rgba(255,255,255,.75);margin-top:1px}
+  .barra .entrar{color:#fff;text-decoration:none;font-size:12.5px;font-weight:700;padding:9px 12px;border-radius:10px;
+    border:1px solid rgba(255,255,255,.35);white-space:nowrap}
+
+  main{flex:1;width:100%;max-width:1080px;margin:0 auto;padding:16px 16px 28px}
+
+  /* ── Inicio ── */
+  .intro{background:var(--blanco);border-radius:var(--radio);padding:16px 18px;margin-bottom:14px;
+    border:1px solid rgba(0,0,0,.05);box-shadow:0 3px 14px rgba(12,68,124,.06)}
+  .intro b{color:var(--azul-dark)}
+  .intro p{font-size:13.5px;color:var(--texto-sub);line-height:1.55}
+  .etiquetas{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .etq{font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;background:var(--azul-light);color:var(--azul-dark)}
+  .etq.v{background:var(--verde-light);color:var(--verde)}
+  .menu{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+  .herr{display:flex;gap:13px;align-items:flex-start;text-decoration:none;color:inherit;background:var(--blanco);
+    border-radius:var(--radio);padding:16px;border:1px solid rgba(0,0,0,.06);box-shadow:0 3px 14px rgba(12,68,124,.06);
+    transition:transform .15s,box-shadow .15s,border-color .15s;min-height:92px}
+  .herr:hover{transform:translateY(-2px);box-shadow:0 10px 26px rgba(12,68,124,.14);border-color:rgba(24,95,165,.3)}
+  .herr:active{transform:scale(.98)}
+  .herr .ico{width:44px;height:44px;border-radius:12px;background:var(--azul-light);color:var(--azul-dark);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .herr .ico svg{width:24px;height:24px}
+  .herr h3{font-size:15px;font-weight:800;line-height:1.25}
+  .herr p{font-size:12.5px;color:var(--texto-sub);line-height:1.45;margin-top:3px}
+
+  /* ── Vistas de cada herramienta ── */
+  .cab{margin:2px 0 12px}
+  .cab h2{font-size:19px;font-weight:800;color:var(--azul-dark)}
+  .cab p{font-size:13.5px;color:var(--texto-sub);margin-top:3px;line-height:1.5}
+  .dos{display:grid;grid-template-columns:1fr;gap:12px;align-items:start}
+  @media(min-width:860px){ .dos{grid-template-columns:minmax(0,1fr) minmax(0,1fr)} .res{position:sticky;top:78px} }
+  .tarjeta{background:var(--blanco);border-radius:var(--radio);padding:16px;border:1px solid rgba(0,0,0,.06);
+    box-shadow:0 3px 14px rgba(12,68,124,.06);min-width:0}
+  .campo{margin-bottom:14px}
+  .campo:last-child{margin-bottom:0}
+  .campo>label,.campo .lbl{display:block;font-size:12.5px;font-weight:700;color:var(--texto-sub);margin-bottom:6px}
+  .campo small,.ayuda{display:block;font-size:12px;color:var(--texto-hint);margin-top:5px;line-height:1.45}
+  .fila{display:flex;gap:8px;align-items:stretch}
+  .fila input{flex:1;min-width:0}
+  input[type=number],select{width:100%;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;font-size:15px;
+    color:var(--texto);background:var(--blanco);outline:none;font-family:inherit;min-height:46px}
+  input[type=number]:focus,select:focus{border-color:var(--azul);box-shadow:0 0 0 3px rgba(24,95,165,.12)}
+  .fila select{width:auto;flex:0 0 auto;max-width:46%}
+  .sufijo{display:flex;align-items:center;padding:0 12px;border:1.5px solid var(--borde);border-radius:10px;
+    color:var(--texto-sub);font-weight:700;background:#f7f9fc}
+  .seg{display:flex;flex-wrap:wrap;gap:6px}
+  .seg button{flex:1 1 auto;min-height:44px;padding:9px 12px;border:1.5px solid var(--borde);border-radius:10px;background:var(--blanco);
+    color:var(--texto);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+  .seg button[aria-pressed=true]{background:var(--azul);border-color:var(--azul);color:#fff}
+  .seg.chico{margin-top:8px}
+  .seg.chico button{min-height:38px;font-size:12.5px;padding:6px 10px}
+  .seg.num button{flex:1 1 0;font-size:17px;font-weight:800}
+  .check{display:flex;gap:10px;align-items:flex-start;font-size:13.5px;font-weight:600;cursor:pointer;padding:10px 12px;
+    border-radius:10px;background:#f7f9fc;border:1px solid var(--borde)}
+  .check input{width:20px;height:20px;margin-top:1px;flex-shrink:0;accent-color:var(--azul)}
+  .check small{display:block;font-weight:400;color:var(--texto-hint);margin-top:2px}
+  .rej{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  @media(max-width:380px){ .rej{grid-template-columns:1fr} }
+
+  /* ── Resultados ── */
+  .res h3{font-size:12.5px;font-weight:700;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.4px}
+  .grande{font-size:32px;font-weight:800;color:var(--azul-dark);line-height:1.15;margin-top:4px;overflow-wrap:anywhere}
+  .equiv{font-size:13px;color:var(--texto-sub);margin-top:2px}
+  .lista{list-style:none;margin-top:12px;border-top:1px solid var(--borde)}
+  .lista li{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--borde);font-size:13.5px}
+  .lista li span:first-child{color:var(--texto-sub)}
+  .lista li span:last-child{font-weight:700;text-align:right}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700;padding:6px 12px;border-radius:20px;margin-top:12px;line-height:1.35}
+  .pill.ok{background:var(--verde-light);color:var(--verde)}
+  .pill.aviso{background:var(--ambar-light);color:var(--ambar)}
+  .pill.mal{background:var(--rojo-light);color:var(--rojo)}
+  .nota{font-size:12.5px;color:var(--texto-sub);line-height:1.5;margin-top:10px;background:#f7f9fc;border-radius:10px;padding:10px 12px}
+  .formula{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px;color:var(--texto-sub);margin-top:10px;overflow-wrap:anywhere}
+  .dib{display:block;width:100%;max-width:340px;margin:12px auto 0;height:auto}
+  .par{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+  .par>div{background:#f7f9fc;border-radius:10px;padding:10px 12px}
+  .par b{display:block;font-size:12px;color:var(--texto-sub);margin-bottom:4px}
+  .par .v{font-size:18px;font-weight:800;color:var(--azul-dark)}
+  .par small{display:block;font-size:12px;color:var(--texto-sub);margin-top:2px}
+  .medidor{height:14px;border-radius:7px;background:#e8edf4;overflow:hidden;margin-top:12px;position:relative}
+  .medidor i{display:block;height:100%;border-radius:7px;transition:width .2s}
+  .marcas{display:flex;justify-content:space-between;font-size:11px;color:var(--texto-hint);margin-top:4px}
+
+  /* ── Tablas ── */
+  .tabla-env{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-top:10px;border:1px solid var(--borde);border-radius:10px}
+  table{width:100%;border-collapse:collapse;font-size:13px;min-width:420px}
+  th,td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--borde);white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  thead th{background:#f3f6fa;color:var(--texto-sub);font-size:11.5px;font-weight:700;position:sticky;top:0}
+  tbody tr:last-child td{border-bottom:0}
+  tr.sel td{background:var(--azul-light);font-weight:700}
+  .muestra{display:inline-block;width:14px;height:14px;border-radius:4px;vertical-align:-2px;margin-right:7px;border:1px solid rgba(0,0,0,.15)}
+  .bajo td{color:var(--rojo)}
+
+  /* ── Información ── */
+  details{background:var(--blanco);border-radius:var(--radio);border:1px solid rgba(0,0,0,.06);margin-bottom:10px;
+    box-shadow:0 3px 14px rgba(12,68,124,.05)}
+  summary{list-style:none;cursor:pointer;padding:14px 16px;font-weight:800;font-size:14.5px;color:var(--azul-dark);
+    display:flex;justify-content:space-between;align-items:center;gap:10px;min-height:50px}
+  summary::-webkit-details-marker{display:none}
+  summary::after{content:'+';font-size:20px;font-weight:600;color:var(--azul)}
+  details[open] summary::after{content:'–'}
+  .det{padding:0 16px 14px;font-size:13.5px;line-height:1.6;color:var(--texto)}
+  .det p{margin-bottom:8px}
+  .det ul{padding-left:18px;margin-bottom:8px}
+  .det li{margin-bottom:4px}
+  .det h4{font-size:13.5px;margin:10px 0 4px;color:var(--azul-dark)}
+
+  footer{background:var(--blanco);border-top:1px solid var(--borde);padding:18px 16px calc(22px + env(safe-area-inset-bottom));
+    text-align:center;font-size:12px;color:var(--texto-sub);line-height:1.55}
+  footer .aviso{max-width:720px;margin:0 auto 10px}
+  footer .cta{display:inline-block;margin-top:4px;font-weight:700;color:var(--azul-dark);background:var(--azul-light);
+    border-radius:20px;padding:7px 14px;text-decoration:none}
+  footer .links{margin-top:10px}
+  footer .links a{margin:0 8px}
+</style>
+<link rel="stylesheet" href="css/movil.css">
+</head>
+<body>
+
+<header class="barra">
+  <button class="atras" id="atras" type="button" aria-label="Regresar" hidden>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <div class="titulos">
+    <h1 id="titulo">Herramientas de izaje</h1>
+    <div class="sub">Consulta libre · sin registro · funciona sin señal</div>
+  </div>
+  <a class="entrar" id="entrar" href="login.html">Iniciar sesión</a>
+</header>
+
+<main>
+
+<!-- ════════════ INICIO ════════════ -->
+<section class="vista" id="v-inicio">
+  <div class="intro">
+    <p><b>Calculadoras y tablas para maniobras de izaje.</b> Calcula la tensión de tus eslingas, la capacidad según la forma de uso, el porcentaje de carga y el alcance de la grúa, y consulta capacidades de referencia y criterios de retiro.</p>
+    <div class="etiquetas"><span class="etq v">Gratis y sin registro</span><span class="etq">kg · t · lb · kN</span><span class="etq">Funciona sin señal en la app</span></div>
+  </div>
+  <div class="menu">
+    <a class="herr" href="#tension"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="4" r="1.8"/><path d="M12 6L5 15M12 6l7 9"/><rect x="3" y="15" width="18" height="5" rx="1"/></svg></div>
+      <div><h3>Tensión en eslingas</h3><p>Carga, número de ramales y ángulo: cuánto jala cada ramal.</p></div></a>
+    <a class="herr" href="#capacidad"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v10a5 5 0 0010 0V3"/><path d="M4 21h16"/></svg></div>
+      <div><h3>Capacidad según la forma de uso</h3><p>Vertical, ahorcado o canasta, con su ángulo.</p></div></a>
+    <a class="herr" href="#porcentaje"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20a8 8 0 1116 0"/><path d="M12 20l4-6"/><path d="M4 20h16"/></svg></div>
+      <div><h3>Porcentaje de carga de la grúa</h3><p>Carga + aparejos contra la capacidad de la tabla.</p></div></a>
+    <a class="herr" href="#alcance"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><rect x="4" y="15" width="6" height="4" rx="1"/><path d="M8 15L19 4"/><path d="M19 4v8"/><path d="M17.5 12h3"/></svg></div>
+      <div><h3>Alcance y altura de la grúa</h3><p>Radio, altura de gancho y largo de pluma necesario.</p></div></a>
+    <a class="herr" href="#peso"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8h12l2 12H4L6 8z"/><path d="M9 8a3 3 0 016 0"/></svg></div>
+      <div><h3>Peso de la carga</h3><p>Placas, bloques, cilindros y tubos por material.</p></div></a>
+    <a class="herr" href="#tablas"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18M9 4v16"/></svg></div>
+      <div><h3>Tablas de capacidades</h3><p>Grilletes, eslingas sintéticas, cadena, cable y ángulos.</p></div></a>
+    <a class="herr" href="#info"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg></div>
+      <div><h3>Eslingas, grilletes y buenas prácticas</h3><p>Tipos, formas de uso y qué revisar antes de izar.</p></div></a>
+    <a class="herr" href="#retiro"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3L12 3z"/><path d="M12 10v4M12 17v.5"/></svg></div>
+      <div><h3>Criterios de retiro</h3><p>Cuándo una eslinga o un grillete ya no se usa.</p></div></a>
+    <a class="herr" href="#unidades"><div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg></div>
+      <div><h3>Conversión de unidades</h3><p>kg, toneladas, libras, kN, metros, pies y pulgadas.</p></div></a>
+  </div>
+</section>
+
+<!-- ════════════ TENSIÓN EN ESLINGAS ════════════ -->
+<section class="vista" id="v-tension" data-titulo="Tensión en eslingas" hidden>
+  <div class="cab"><h2>Tensión en eslingas</h2><p>Cuánta fuerza recibe cada ramal según la carga, el número de ramales y el ángulo de trabajo.</p></div>
+  <div class="dos">
+    <div class="tarjeta" data-calc="tension">
+      <div class="campo"><label for="t-carga">Carga a izar</label>
+        <div class="fila"><input id="t-carga" type="number" inputmode="decimal" min="0" step="any" value="1000"><select id="t-carga-u" class="u-peso" aria-label="Unidad de la carga"></select></div>
+        <small>Todo lo que cuelga de las eslingas (incluye viga separadora o grilletes de la carga, si los hay).</small></div>
+      <div class="campo"><span class="lbl">Número de ramales</span>
+        <div class="seg num" id="t-ramales" role="radiogroup" aria-label="Número de ramales">
+          <button type="button" data-v="1">1</button><button type="button" data-v="2" aria-pressed="true">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button></div></div>
+      <div class="campo" id="t-modo-c"><span class="lbl">¿Qué conoces?</span>
+        <div class="seg" id="t-modo" role="radiogroup" aria-label="Dato conocido">
+          <button type="button" data-v="angulo" aria-pressed="true">El ángulo</button><button type="button" data-v="medidas">Las medidas</button><button type="button" data-v="cg" id="t-modo-cg">Centro de gravedad descentrado</button></div></div>
+
+      <div id="t-angulo-c">
+        <div class="campo"><label for="t-ang">Ángulo de trabajo</label>
+          <div class="fila"><input id="t-ang" type="number" inputmode="decimal" min="1" max="90" step="any" value="60"><span class="sufijo">°</span></div>
+          <div class="seg chico" id="t-ref" role="radiogroup" aria-label="Cómo se mide el ángulo">
+            <button type="button" data-v="h" aria-pressed="true">Desde la horizontal</button><button type="button" data-v="v">Desde la vertical</button></div>
+          <small>En EUA (ASME) el ángulo se mide desde la horizontal; en normas europeas (EN), desde la vertical. 60° desde la horizontal = 30° desde la vertical.</small></div>
+      </div>
+
+      <div id="t-medidas-c" hidden>
+        <div class="campo"><label for="t-L">Largo de cada ramal (del gancho al punto de sujeción)</label>
+          <div class="fila"><input id="t-L" type="number" inputmode="decimal" min="0" step="any" value="3"><select id="t-L-u" class="u-long" aria-label="Unidad"></select></div></div>
+        <div class="campo"><label for="t-D" id="t-D-l">Distancia entre los dos puntos de sujeción</label>
+          <div class="fila"><input id="t-D" type="number" inputmode="decimal" min="0" step="any" value="3"><select id="t-D-u" class="u-long" aria-label="Unidad"></select></div>
+          <small id="t-D-ayuda"></small></div>
+      </div>
+
+      <div id="t-cg-c" hidden>
+        <p class="ayuda" style="margin:0 0 10px">El gancho queda siempre sobre el centro de gravedad. Si los puntos de sujeción no están a la misma distancia de él, el ramal más cercano carga más.</p>
+        <div class="rej">
+          <div class="campo"><label for="t-d1">Distancia del centro de gravedad al punto 1</label><input id="t-d1" type="number" inputmode="decimal" min="0" step="any" value="1"></div>
+          <div class="campo"><label for="t-d2">Distancia del centro de gravedad al punto 2</label><input id="t-d2" type="number" inputmode="decimal" min="0" step="any" value="2"></div>
+        </div>
+        <div class="campo"><label for="t-h">Altura del gancho sobre los puntos de sujeción</label>
+          <div class="fila"><input id="t-h" type="number" inputmode="decimal" min="0" step="any" value="2"><select id="t-cg-u" class="u-long" aria-label="Unidad de las distancias"></select></div>
+          <small>Distancias horizontales, medidas en planta. La unidad aplica a las tres.</small></div>
+      </div>
+
+      <label class="check" id="t-cons-c" hidden><input type="checkbox" id="t-cons">
+        <span>Suponer que sólo 2 ramales cargan<small>Con cargas rígidas o ramales de distinto largo casi nunca cargan todos por igual. Por omisión, igual que ASME B30.9, una eslinga de 4 ramales se calcula como si cargaran 3.</small></span></label>
+    </div>
+    <div class="tarjeta res" id="t-res" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ════════════ CAPACIDAD SEGÚN FORMA DE USO ════════════ -->
+<section class="vista" id="v-capacidad" data-titulo="Capacidad según la forma de uso" hidden>
+  <div class="cab"><h2>Capacidad según la forma de uso</h2><p>La capacidad de la etiqueta es en vertical. Ahorcada o en canasta cambia: aquí ves cuánto.</p></div>
+  <div class="dos">
+    <div class="tarjeta" data-calc="capacidad">
+      <div class="campo"><span class="lbl">Tipo de eslinga</span>
+        <div class="seg" id="c-mat" role="radiogroup" aria-label="Tipo de eslinga">
+          <button type="button" data-v="cable" aria-pressed="true">Cable de acero</button><button type="button" data-v="cadena">Cadena de aleación</button><button type="button" data-v="sintetica">Sintética (plana o redonda)</button></div></div>
+      <div class="campo"><label for="c-wll">Capacidad en vertical (la de la etiqueta)</label>
+        <div class="fila"><input id="c-wll" type="number" inputmode="decimal" min="0" step="any" value="2000"><select id="c-wll-u" class="u-peso" aria-label="Unidad"></select></div></div>
+      <div class="campo"><span class="lbl">Forma de uso</span>
+        <div class="seg" id="c-forma" role="radiogroup" aria-label="Forma de uso">
+          <button type="button" data-v="vertical">Vertical</button><button type="button" data-v="ahorcado" aria-pressed="true">Ahorcado</button><button type="button" data-v="canasta">Canasta</button></div></div>
+      <div class="campo" id="c-ahorque-c"><label for="c-ahorque">Ángulo del ahorque</label>
+        <select id="c-ahorque">
+          <option value="1">120° a 180° (ahorque normal)</option><option value="0.87">90° a 119°</option>
+          <option value="0.74">60° a 89°</option><option value="0.62">30° a 59°</option><option value="0.49">0° a 29°</option>
+        </select>
+        <small>Ángulo que forma la eslinga al pasar por su propio ojo. Mientras más cerrado, menos capacidad (ASME B30.9).</small></div>
+      <div class="campo" id="c-canasta-c" hidden><label for="c-ang">Ángulo de los ramales, desde la horizontal</label>
+        <div class="fila"><input id="c-ang" type="number" inputmode="decimal" min="1" max="90" step="any" value="90"><span class="sufijo">°</span></div>
+        <small>90° = los dos lados verticales.</small></div>
+      <div class="campo"><label for="c-carga">Carga a izar (opcional)</label>
+        <div class="fila"><input id="c-carga" type="number" inputmode="decimal" min="0" step="any" placeholder="Para saber el % de uso"><select id="c-carga-u" class="u-peso" aria-label="Unidad"></select></div></div>
+    </div>
+    <div class="tarjeta res" id="c-res" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ════════════ PORCENTAJE DE CARGA DE LA GRÚA ════════════ -->
+<section class="vista" id="v-porcentaje" data-titulo="Porcentaje de carga" hidden>
+  <div class="cab"><h2>Porcentaje de carga de la grúa</h2><p>Todo lo que cuelga de la pluma cuenta como carga: el block, las eslingas, los grilletes y la viga separadora.</p></div>
+  <div class="dos">
+    <div class="tarjeta" data-calc="porcentaje">
+      <div class="campo"><label for="p-u">Unidad</label><select id="p-u" class="u-peso"></select></div>
+      <div class="campo"><label for="p-carga">Peso de la carga</label><input id="p-carga" type="number" inputmode="decimal" min="0" step="any" value="8000"></div>
+      <div class="rej">
+        <div class="campo"><label for="p-block">Block o bola del gancho</label><input id="p-block" type="number" inputmode="decimal" min="0" step="any" value="350"></div>
+        <div class="campo"><label for="p-apar">Eslingas, grilletes y viga</label><input id="p-apar" type="number" inputmode="decimal" min="0" step="any" value="150"></div>
+      </div>
+      <div class="campo"><label for="p-otras">Otras deducciones</label><input id="p-otras" type="number" inputmode="decimal" min="0" step="any" value="0">
+        <small>Las que indique la tabla de carga: plumín guardado o montado, cable de carga, etc.</small></div>
+      <div class="campo"><label for="p-cap">Capacidad de la tabla de carga</label><input id="p-cap" type="number" inputmode="decimal" min="0" step="any" value="12000">
+        <small>Para la configuración de la grúa y el radio más desfavorable de toda la maniobra. Si el radio cae entre dos renglones, usa el mayor.</small></div>
+    </div>
+    <div class="tarjeta res" id="p-res" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ════════════ ALCANCE Y ALTURA DE LA GRÚA ════════════ -->
+<section class="vista" id="v-alcance" data-titulo="Alcance y altura de la grúa" hidden>
+  <div class="cab"><h2>Alcance y altura de la grúa</h2><p>Geometría de una grúa de pluma: radio de operación, altura de la punta y largo de pluma necesario.</p></div>
+  <div class="dos">
+    <div class="tarjeta" data-calc="alcance">
+      <div class="campo"><span class="lbl">¿Qué quieres saber?</span>
+        <div class="seg" id="a-modo" role="radiogroup" aria-label="Cálculo">
+          <button type="button" data-v="tengo" aria-pressed="true">A dónde llego con mi pluma</button><button type="button" data-v="necesito">Qué pluma necesito</button></div></div>
+      <div class="campo"><label for="a-u">Unidad de longitud</label><select id="a-u" class="u-long"></select></div>
+      <div id="a-tengo-c">
+        <div class="rej">
+          <div class="campo"><label for="a-L">Largo de la pluma</label><input id="a-L" type="number" inputmode="decimal" min="0" step="any" value="30"></div>
+          <div class="campo"><label for="a-alfa">Ángulo de la pluma</label><div class="fila"><input id="a-alfa" type="number" inputmode="decimal" min="0" max="89" step="any" value="60"><span class="sufijo">°</span></div></div>
+        </div>
+      </div>
+      <div id="a-necesito-c" hidden>
+        <div class="rej">
+          <div class="campo"><label for="a-R">Radio al que se coloca la carga</label><input id="a-R" type="number" inputmode="decimal" min="0" step="any" value="15"></div>
+          <div class="campo"><label for="a-Hc">Altura donde se apoya la carga</label><input id="a-Hc" type="number" inputmode="decimal" min="0" step="any" value="10"></div>
+          <div class="campo"><label for="a-hl">Alto de la carga</label><input id="a-hl" type="number" inputmode="decimal" min="0" step="any" value="2"></div>
+          <div class="campo"><label for="a-ha">Alto del aparejo</label><input id="a-ha" type="number" inputmode="decimal" min="0" step="any" value="3"><small>Del gancho a la parte alta de la carga.</small></div>
+        </div>
+      </div>
+      <div class="rej">
+        <div class="campo"><label for="a-db">Punta de pluma a gancho</label><input id="a-db" type="number" inputmode="decimal" min="0" step="any" value="3"><small>Block más el margen para no tocar la punta.</small></div>
+        <div class="campo"><label for="a-h0">Altura del pie de pluma</label><input id="a-h0" type="number" inputmode="decimal" min="0" step="any" value="2"><small>Sobre el piso.</small></div>
+        <div class="campo"><label for="a-e">Pie de pluma al centro de giro</label><input id="a-e" type="number" inputmode="decimal" min="0" step="any" value="1"></div>
+      </div>
+      <small class="ayuda">Los últimos tres datos vienen en el diagrama de alcances del fabricante.</small>
+    </div>
+    <div class="tarjeta res" id="a-res" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ════════════ PESO DE LA CARGA ════════════ -->
+<section class="vista" id="v-peso" data-titulo="Peso de la carga" hidden>
+  <div class="cab"><h2>Peso de la carga</h2><p>Estimación del peso por material y medidas. Si el peso real se conoce (báscula, placa del equipo, documentos), úsalo.</p></div>
+  <div class="dos">
+    <div class="tarjeta" data-calc="peso">
+      <div class="campo"><label for="w-mat">Material</label>
+        <div class="fila"><select id="w-mat" style="flex:1;max-width:none"></select></div></div>
+      <div class="campo"><label for="w-dens">Densidad</label><div class="fila"><input id="w-dens" type="number" inputmode="decimal" min="0" step="any"><span class="sufijo">kg/m³</span></div></div>
+      <div class="campo"><span class="lbl">Forma</span>
+        <div class="seg" id="w-forma" role="radiogroup" aria-label="Forma">
+          <button type="button" data-v="placa" aria-pressed="true">Placa o bloque</button><button type="button" data-v="cilindro">Cilindro macizo</button><button type="button" data-v="tubo">Tubo</button></div></div>
+      <div id="w-placa-c">
+        <div class="campo"><label for="w-l">Largo</label><div class="fila"><input id="w-l" type="number" inputmode="decimal" min="0" step="any" value="2"><select id="w-l-u" class="u-long" data-def="m"></select></div></div>
+        <div class="campo"><label for="w-a">Ancho</label><div class="fila"><input id="w-a" type="number" inputmode="decimal" min="0" step="any" value="1"><select id="w-a-u" class="u-long" data-def="m"></select></div></div>
+        <div class="campo"><label for="w-e">Espesor o alto</label><div class="fila"><input id="w-e" type="number" inputmode="decimal" min="0" step="any" value="25"><select id="w-e-u" class="u-long" data-def="mm"></select></div></div>
+      </div>
+      <div id="w-cil-c" hidden>
+        <div class="campo"><label for="w-d">Diámetro exterior</label><div class="fila"><input id="w-d" type="number" inputmode="decimal" min="0" step="any" value="12"><select id="w-d-u" class="u-long" data-def="in"></select></div></div>
+        <div class="campo" id="w-t-c"><label for="w-t">Espesor de pared</label><div class="fila"><input id="w-t" type="number" inputmode="decimal" min="0" step="any" value="0.5"><select id="w-t-u" class="u-long" data-def="in"></select></div></div>
+        <div class="campo"><label for="w-lc">Largo</label><div class="fila"><input id="w-lc" type="number" inputmode="decimal" min="0" step="any" value="6"><select id="w-lc-u" class="u-long" data-def="m"></select></div></div>
+      </div>
+      <div class="campo"><label for="w-n">Número de piezas</label><input id="w-n" type="number" inputmode="numeric" min="1" step="1" value="1"></div>
+    </div>
+    <div class="tarjeta res" id="w-res" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- ════════════ TABLAS ════════════ -->
+<section class="vista" id="v-tablas" data-titulo="Tablas de capacidades" hidden>
+  <div class="cab"><h2>Tablas de capacidades</h2><p>Valores de referencia de la industria. <b>Siempre manda lo marcado en el accesorio:</b> si la etiqueta o el marcado no se lee, el accesorio no se usa.</p></div>
+  <div class="seg" id="tb-sel" role="tablist" aria-label="Tabla" style="margin-bottom:12px">
+    <button type="button" data-v="angulos" aria-pressed="true">Ángulos</button><button type="button" data-v="grilletes">Grilletes</button>
+    <button type="button" data-v="sinteticas">Sintéticas</button><button type="button" data-v="cadena">Cadena</button>
+    <button type="button" data-v="cable">Cable de acero</button><button type="button" data-v="ahorque">Ahorcado</button>
+  </div>
+  <div class="tarjeta" id="tb-cont"></div>
+</section>
+
+<!-- ════════════ INFORMACIÓN ════════════ -->
+<section class="vista" id="v-info" data-titulo="Eslingas, grilletes y buenas prácticas" hidden>
+  <div class="cab"><h2>Eslingas, grilletes y buenas prácticas</h2><p>Lo esencial para elegir y usar bien los accesorios de izaje.</p></div>
+
+  <details open><summary>Tipos de eslinga</summary><div class="det">
+    <h4>Cable de acero</h4>
+    <p>Resistente al calor moderado y a la abrasión; buena para cargas pesadas y aristas medianamente lisas. Se daña al doblarla sobre diámetros chicos: para usarla en canasta o ahorcada cuida la relación entre el diámetro del objeto y el del cable (D/d).</p>
+    <h4>Cadena de aleación (grado 80 o 100)</h4>
+    <p>La más resistente a la abrasión, al calor y a los cantos; se ajusta bien a la carga. Sólo cadena de aleación para izaje (grado 80 o mayor, con su etiqueta): nunca cadena de amarre o de ferretería.</p>
+    <h4>Sintética plana (banda) y redonda</h4>
+    <p>Ligeras, flexibles y no marcan la carga; ideales para superficies terminadas. Son las más vulnerables a cortes, aristas, calor y químicos: protégelas siempre con cantoneras o fundas en aristas. La capacidad se identifica por color (ver Tablas) y siempre por la etiqueta.</p>
+  </div></details>
+
+  <details><summary>Formas de uso (vertical, ahorcado, canasta)</summary><div class="det">
+    <ul>
+      <li><b>Vertical:</b> la eslinga trabaja recta entre el gancho y la carga. Es la capacidad de la etiqueta. Con un solo ramal la carga puede girar: usa una cuerda guía.</li>
+      <li><b>Ahorcado:</b> la eslinga rodea la carga y pasa por su propio ojo. Baja la capacidad (alrededor de 75 % a 80 % de la vertical) y más si el ahorque queda cerrado. No sujeta bien cargas lisas o sueltas.</li>
+      <li><b>Canasta:</b> la eslinga pasa por debajo de la carga y sus dos ojos van al gancho. Con los dos lados verticales llega al doble de la vertical; con ángulo, menos. La carga debe ir balanceada para que no se deslice.</li>
+      <li><b>Varios ramales (brida):</b> la tensión de cada ramal aumenta al abrir el ángulo. Usa la calculadora de tensión.</li>
+    </ul>
+  </div></details>
+
+  <details><summary>Grilletes: tipos y uso correcto</summary><div class="det">
+    <ul>
+      <li><b>Tipo ancla o lira (cuerpo redondeado):</b> admite varios ramales en el cuerpo y algo de carga lateral, con reducción de capacidad (ver Tablas).</li>
+      <li><b>Tipo cadena o recto (D):</b> para tiros en línea. Evita la carga lateral.</li>
+      <li><b>Perno roscado:</b> para maniobras temporales; el perno debe roscar hasta asentar por completo. Si puede girar durante la maniobra, usa perno con tuerca y chaveta.</li>
+      <li><b>Perno con tuerca y chaveta:</b> para instalaciones de larga duración o donde la carga pueda girar el perno.</li>
+    </ul>
+    <p>Nunca sustituyas el perno por un tornillo o una varilla, no lo sueldes ni lo calientes, y carga el grillete centrado en el cuerpo y en el perno (usa espaciadores si hace falta).</p>
+  </div></details>
+
+  <details><summary>Antes de cada izaje</summary><div class="det">
+    <ul>
+      <li>Conoce el peso real de la carga y la ubicación de su centro de gravedad.</li>
+      <li>Revisa cada accesorio antes de usarlo: etiqueta legible y sin daños (ver Criterios de retiro).</li>
+      <li>Mantén los ángulos de los ramales en 45° o más desde la horizontal; nunca menos de 30°.</li>
+      <li>Protege las eslingas de aristas vivas; no las anudes, no las tuerzas y no las arrastres.</li>
+      <li>Coloca el gancho sobre el centro de gravedad y prueba levantando unos centímetros antes de subir.</li>
+      <li>Calcula el porcentaje de carga de la grúa con todo lo que cuelga del gancho y respeta la tabla de carga.</li>
+      <li>Delimita el área; nadie debajo de la carga suspendida. Usa cuerdas guía y una sola persona dando señales.</li>
+      <li>Suspende la maniobra con viento fuerte, tormenta eléctrica o poca visibilidad, según lo indique el fabricante de la grúa.</li>
+    </ul>
+  </div></details>
+
+  <details><summary>Normas de referencia</summary><div class="det">
+    <ul>
+      <li><b>NOM-006-STPS-2014:</b> manejo y almacenamiento de materiales, condiciones de seguridad (México).</li>
+      <li><b>ASME B30.9:</b> eslingas (cable, cadena, sintéticas).</li>
+      <li><b>ASME B30.26:</b> herrajes de izaje (grilletes, eslabones, giratorios, tensores).</li>
+      <li><b>ASME B30.10:</b> ganchos.</li>
+      <li><b>ASME B30.5:</b> grúas móviles y de locomoción.</li>
+      <li><b>EN 1492-1 / EN 1492-2:</b> eslingas sintéticas planas y redondas (código de colores).</li>
+      <li><b>EN 818-4:</b> eslingas de cadena grado 8.</li>
+    </ul>
+  </div></details>
+</section>
+
+<!-- ════════════ CRITERIOS DE RETIRO ════════════ -->
+<section class="vista" id="v-retiro" data-titulo="Criterios de retiro" hidden>
+  <div class="cab"><h2>Criterios de retiro</h2><p>Si encuentras cualquiera de estas condiciones, el accesorio se retira de servicio hasta que una persona calificada lo evalúe. Referencia: ASME B30.9 y B30.26.</p></div>
+
+  <details open><summary>Eslinga de cable de acero</summary><div class="det"><ul>
+    <li>Etiqueta faltante o ilegible.</li>
+    <li>Alambres rotos: 10 alambres rotos distribuidos al azar en un paso del cable, o 5 alambres rotos en un mismo torón dentro de un paso.</li>
+    <li>Desgaste o raspadura severa localizada.</li>
+    <li>Cocas, aplastamiento, jaula de pájaro o cualquier daño que deforme la estructura del cable.</li>
+    <li>Señales de daño por calor.</li>
+    <li>Terminales, casquillos u ojos agrietados, deformados o desgastados.</li>
+    <li>Corrosión severa del cable o de los terminales.</li>
+  </ul></div></details>
+
+  <details><summary>Eslinga de cadena de aleación</summary><div class="det"><ul>
+    <li>Etiqueta faltante o ilegible.</li>
+    <li>Grietas o fracturas en cualquier eslabón o componente.</li>
+    <li>Desgaste, muescas o raspaduras que superen el máximo que indica el fabricante.</li>
+    <li>Eslabones estirados, doblados, torcidos o deformados.</li>
+    <li>Señales de daño por calor o salpicaduras de soldadura.</li>
+    <li>Picaduras o corrosión excesivas.</li>
+    <li>Ganchos con la garganta abierta o torcidos, o con el pestillo dañado o faltante (si lo lleva).</li>
+  </ul></div></details>
+
+  <details><summary>Eslinga sintética plana o redonda</summary><div class="det"><ul>
+    <li>Etiqueta faltante o ilegible.</li>
+    <li>Quemaduras por ácido o álcali; zonas derretidas, carbonizadas o con salpicaduras de soldadura.</li>
+    <li>Agujeros, cortes, desgarres o enganches.</li>
+    <li>Costuras rotas o desgastadas en los empalmes que soportan carga.</li>
+    <li>Desgaste abrasivo excesivo.</li>
+    <li>Nudos en cualquier parte de la eslinga.</li>
+    <li>Hilos de advertencia visibles (si la eslinga los tiene). En las redondas, núcleo expuesto por daño en la funda.</li>
+    <li>Decoloración, rigidez o fragilidad que indiquen daño químico o por rayos UV.</li>
+    <li>Herrajes picados, corroídos, agrietados, doblados o deformados.</li>
+  </ul></div></details>
+
+  <details><summary>Grilletes</summary><div class="det"><ul>
+    <li>Nombre del fabricante o capacidad faltantes o ilegibles.</li>
+    <li>Señales de daño por calor o de soldadura no autorizada.</li>
+    <li>Picaduras o corrosión excesivas.</li>
+    <li>Cuerpo o perno doblado, torcido, deformado, estirado, agrietado o roto.</li>
+    <li>Muescas o hendiduras excesivas.</li>
+    <li>Reducción de 10 % de la medida original o de catálogo en cualquier punto del cuerpo o del perno.</li>
+    <li>Perno que no asienta por completo, o roscas dañadas.</li>
+  </ul></div></details>
+</section>
+
+<!-- ════════════ CONVERSIÓN DE UNIDADES ════════════ -->
+<section class="vista" id="v-unidades" data-titulo="Conversión de unidades" hidden>
+  <div class="cab"><h2>Conversión de unidades</h2><p>Peso, fuerza y longitud.</p></div>
+  <div class="dos">
+    <div class="tarjeta" data-calc="unidades">
+      <div class="campo"><label for="u-p">Peso o fuerza</label>
+        <div class="fila"><input id="u-p" type="number" inputmode="decimal" step="any" value="1"><select id="u-p-u" class="u-peso" data-def="t" aria-label="Unidad"></select></div></div>
+      <div id="u-p-res"></div>
+      <div class="campo" style="margin-top:16px"><label for="u-l">Longitud</label>
+        <div class="fila"><input id="u-l" type="number" inputmode="decimal" step="any" value="1"><select id="u-l-u" class="u-long" data-def="ft" aria-label="Unidad"></select></div></div>
+      <div id="u-l-res"></div>
+    </div>
+    <div class="tarjeta">
+      <h3 style="font-size:12.5px;color:var(--texto-sub);text-transform:uppercase;letter-spacing:.4px">Equivalencias</h3>
+      <ul class="lista">
+        <li><span>1 tonelada métrica (t)</span><span>1,000 kg</span></li>
+        <li><span>1 tonelada corta (EUA)</span><span>2,000 lb · 907.2 kg</span></li>
+        <li><span>1 libra (lb)</span><span>0.4536 kg</span></li>
+        <li><span>1 kN</span><span>101.97 kg</span></li>
+        <li><span>1 pie (ft)</span><span>0.3048 m</span></li>
+        <li><span>1 pulgada (in)</span><span>25.4 mm</span></li>
+      </ul>
+      <p class="nota">En las etiquetas de origen estadounidense, «ton» suele ser tonelada corta (2,000 lb), un 9 % menos que la tonelada métrica.</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <p class="aviso"><b>Herramienta de consulta.</b> Los resultados son de referencia: no sustituyen el plan de izaje, la tabla de carga de la grúa ni la etiqueta o el marcado de cada accesorio, que siempre mandan. Ante cualquier duda, consulta a una persona calificada.</p>
+  <a class="cta" href="mailto:contacto@avba.com.mx?subject=Inspecci%C3%B3n%20de%20accesorios%20y%20equipos%20de%20izaje">¿Necesitas inspeccionar o certificar tus equipos y accesorios? contacto@avba.com.mx</a>
+  <div class="links"><a href="validar.html">Validar un certificado</a> · <a href="login.html">Iniciar sesión</a></div>
+  <div style="margin-top:8px;color:var(--texto-hint)">AVBA Inspections, Certifications and Maintenance S.A.S. de C.V.</div>
+</footer>
+
+<script src="js/destinos.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ═════════════ Unidades y formato ═════════════ */
+  var PESO = { kg: 1, t: 1000, lb: 0.45359237, st: 907.18474, kN: 101.971621 };   // → kg
+  var PESO_TXT = { kg: 'kg', t: 't', lb: 'lb', st: 'ton EUA', kN: 'kN' };
+  var LONG = { m: 1, cm: 0.01, mm: 0.001, ft: 0.3048, in: 0.0254 };               // → m
+  var LONG_TXT = { m: 'm', cm: 'cm', mm: 'mm', ft: 'ft', in: 'in' };
+  var NF = {};
+  function fmt(n, dec) {
+    if (!isFinite(n)) return '—';
+    var k = String(dec);
+    NF[k] = NF[k] || new Intl.NumberFormat('es-MX', { minimumFractionDigits: dec, maximumFractionDigits: dec });
+    return NF[k].format(n);
+  }
+  function decPeso(u, v) {
+    var a = Math.abs(v);
+    if (u === 'kg') return a >= 100 ? 0 : 1;
+    if (u === 'lb') return 0;
+    if (u === 'kN') return a >= 100 ? 1 : 2;
+    return a >= 100 ? 1 : (a >= 1 ? 2 : 3);           // t, ton EUA
+  }
+  function enUnidad(kg, u) { return kg / PESO[u]; }
+  function txtPeso(kg, u) { var v = enUnidad(kg, u); return fmt(v, decPeso(u, v)) + ' ' + PESO_TXT[u]; }
+  /* Principal en la unidad elegida y las demás debajo */
+  function bloquePeso(kg, u) {
+    var otras = ['kg', 't', 'lb', 'kN'].filter(function (x) { return x !== u; });
+    if (u === 'st') otras = ['kg', 't', 'lb'];
+    return '<div class="grande">' + txtPeso(kg, u) + '</div><div class="equiv">' +
+      otras.map(function (x) { return txtPeso(kg, x); }).join(' · ') + '</div>';
+  }
+  function txtLong(m, u) { var v = m / LONG[u]; return fmt(v, Math.abs(v) >= 100 ? 1 : 2) + ' ' + LONG_TXT[u]; }
+  function rad(g) { return g * Math.PI / 180; }
+  function grados(r) { return r * 180 / Math.PI; }
+
+  function valor(id) {
+    var el = $(id); if (!el) return NaN;
+    var v = parseFloat(String(el.value).replace(',', '.'));
+    return isFinite(v) ? v : NaN;
+  }
+  function kg(idValor, idUnidad) { return valor(idValor) * PESO[$(idUnidad).value]; }
+  function metros(idValor, idUnidad) { return valor(idValor) * LONG[$(idUnidad).value]; }
+
+  /* Unidad preferida (se recuerda en este dispositivo) */
+  function pref(k, def) { try { return localStorage.getItem('avba_herr_' + k) || def; } catch (e) { return def; } }
+  function guardarPref(k, v) { try { localStorage.setItem('avba_herr_' + k, v); } catch (e) {} }
+  document.querySelectorAll('select.u-peso').forEach(function (s) {
+    s.innerHTML = '<option value="kg">kg</option><option value="t">t (métrica)</option><option value="lb">lb</option><option value="st">ton EUA (2,000 lb)</option><option value="kN">kN</option>';
+    s.value = s.dataset.def || pref('peso', 'kg');
+    s.addEventListener('change', function () { if (!s.dataset.def) guardarPref('peso', s.value); });
+  });
+  document.querySelectorAll('select.u-long').forEach(function (s) {
+    s.innerHTML = '<option value="m">m</option><option value="cm">cm</option><option value="mm">mm</option><option value="ft">ft</option><option value="in">in</option>';
+    s.value = s.dataset.def || pref('long', 'm');
+    s.addEventListener('change', function () { if (!s.dataset.def) guardarPref('long', s.value); });
+  });
+
+  /* Botones de opción (segmentados) */
+  function seg(id) { var b = $(id).querySelector('button[aria-pressed=true]'); return b ? b.dataset.v : ''; }
+  function ponerSeg(id, v) {
+    $(id).querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === v ? 'true' : 'false'); });
+  }
+  document.querySelectorAll('.seg').forEach(function (g) {
+    g.querySelectorAll('button').forEach(function (b) {
+      if (!b.hasAttribute('aria-pressed')) b.setAttribute('aria-pressed', 'false');
+      b.addEventListener('click', function () { ponerSeg(g.id, b.dataset.v); recalcular(); });
+    });
+  });
+
+  function pill(tipo, txt) { return '<div class="pill ' + tipo + '">' + txt + '</div>'; }
+  function li(a, b) { return '<li><span>' + a + '</span><span>' + b + '</span></li>'; }
+  var SIN_DATOS = '<h3>Resultado</h3><p class="nota">Captura los datos para ver el resultado.</p>';
+
+  /* Estado del ángulo (desde la horizontal) */
+  function estadoAngulo(th) {
+    if (th < 30) return pill('mal', '⛔ Menos de 30° desde la horizontal: no se debe usar (ASME B30.9), salvo indicación del fabricante o de una persona calificada.');
+    if (th < 45) return pill('aviso', '⚠ Ángulo bajo: la tensión crece muy rápido. Procura 45° o más.');
+    if (th < 60) return pill('ok', '✓ Ángulo aceptable.');
+    return pill('ok', '✓ Ángulo recomendado (60° o más).');
+  }
+
+  /* ═════════════ Dibujos ═════════════ */
+  function dibujoRamales(n, th) {
+    var hx = 160, hy = 22, Lv = 104, s = n === 1 ? 0 : Lv * Math.cos(rad(th)), h = n === 1 ? Lv : Lv * Math.sin(rad(th));
+    if (s > 130) { var k = 130 / s; s *= k; h *= k; }
+    var y = hy + h, ancho = Math.max(s * 2 + 24, 70);
+    var svg = '<svg class="dib" viewBox="0 0 320 ' + Math.round(y + 44) + '" role="img" aria-label="Diagrama de la eslinga">';
+    svg += '<rect x="' + (hx - ancho / 2) + '" y="' + y + '" width="' + ancho + '" height="28" rx="4" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.5"/>';
+    if (n === 1) {
+      svg += '<line x1="' + hx + '" y1="' + hy + '" x2="' + hx + '" y2="' + y + '" stroke="#0C447C" stroke-width="3"/>';
+    } else {
+      if (n >= 3) {
+        var pts = n === 3 ? [[hx, y - 7]] : [[hx - s * 0.45, y - 7], [hx + s * 0.45, y - 7]];
+        pts.forEach(function (p) { svg += '<line x1="' + hx + '" y1="' + hy + '" x2="' + p[0] + '" y2="' + p[1] + '" stroke="#0C447C" stroke-width="2" stroke-dasharray="5 4" opacity=".55"/>'; });
+      }
+      svg += '<line x1="' + hx + '" y1="' + hy + '" x2="' + (hx - s) + '" y2="' + y + '" stroke="#0C447C" stroke-width="3"/>';
+      svg += '<line x1="' + hx + '" y1="' + hy + '" x2="' + (hx + s) + '" y2="' + y + '" stroke="#0C447C" stroke-width="3"/>';
+      // arco del ángulo en el punto derecho
+      var r = 26, px = hx + s, a0 = Math.PI, a1 = Math.PI + rad(th);
+      var x0 = px + r * Math.cos(a0), y0 = y + r * Math.sin(a0), x1 = px + r * Math.cos(a1), y1 = y + r * Math.sin(a1);
+      svg += '<line x1="' + (px - 40) + '" y1="' + y + '" x2="' + px + '" y2="' + y + '" stroke="#8b91a0" stroke-dasharray="3 3"/>';
+      svg += '<path d="M' + x0 + ' ' + y0 + ' A' + r + ' ' + r + ' 0 0 1 ' + x1 + ' ' + y1 + '" fill="none" stroke="#C49A28" stroke-width="2"/>';
+      svg += '<text x="' + (px - r - 34) + '" y="' + (y - 6) + '" font-size="12" font-weight="700" fill="#8A5A00">' + fmt(th, 0) + '°</text>';
+    }
+    svg += '<circle cx="' + hx + '" cy="' + hy + '" r="6" fill="none" stroke="#0B2545" stroke-width="3"/>';
+    svg += '<path d="M' + hx + ' ' + (hy - 6) + 'v-10" stroke="#0B2545" stroke-width="3"/>';
+    return svg + '</svg>';
+  }
+  function dibujoCG(d1, d2, h) {
+    // Se centra todo el claro (no el gancho): con distancias desiguales el
+    // gancho queda corrido, como en la maniobra real.
+    var hy = 22, k = Math.min(260 / (d1 + d2), 110 / h);
+    var x1 = (320 - (d1 + d2) * k) / 2, hx = x1 + d1 * k, x2 = hx + d2 * k, y = hy + h * k;
+    var svg = '<svg class="dib" viewBox="0 0 320 ' + Math.round(y + 50) + '" role="img" aria-label="Diagrama con centro de gravedad descentrado">';
+    svg += '<rect x="' + (x1 - 10) + '" y="' + y + '" width="' + (x2 - x1 + 20) + '" height="28" rx="4" fill="#E6F1FB" stroke="#185FA5" stroke-width="1.5"/>';
+    svg += '<line x1="' + hx + '" y1="' + hy + '" x2="' + x1 + '" y2="' + y + '" stroke="#0C447C" stroke-width="3"/>';
+    svg += '<line x1="' + hx + '" y1="' + hy + '" x2="' + x2 + '" y2="' + y + '" stroke="#0C447C" stroke-width="3"/>';
+    svg += '<line x1="' + hx + '" y1="' + hy + '" x2="' + hx + '" y2="' + (y + 14) + '" stroke="#C49A28" stroke-dasharray="4 3"/>';
+    svg += '<circle cx="' + hx + '" cy="' + (y + 14) + '" r="6" fill="#fff" stroke="#C49A28" stroke-width="2"/><path d="M' + (hx - 6) + ' ' + (y + 14) + 'h12M' + hx + ' ' + (y + 8) + 'v12" stroke="#C49A28" stroke-width="2"/>';
+    svg += '<text x="' + (x1 - 4) + '" y="' + (y + 44) + '" font-size="12" font-weight="700" fill="#0C447C">1</text><text x="' + (x2 - 4) + '" y="' + (y + 44) + '" font-size="12" font-weight="700" fill="#0C447C">2</text>';
+    svg += '<text x="' + (hx + 8) + '" y="' + (y + 44) + '" font-size="11" fill="#8A5A00">CG</text>';
+    svg += '<circle cx="' + hx + '" cy="' + hy + '" r="6" fill="none" stroke="#0B2545" stroke-width="3"/><path d="M' + hx + ' ' + (hy - 6) + 'v-10" stroke="#0B2545" stroke-width="3"/>';
+    return svg + '</svg>';
+  }
+  function dibujoGrua(R, Hp, h0, e, db, alfa) {
+    var W = 320, Hs = 200, piso = Hs - 26, xc = 34;
+    var k = Math.min((W - 70) / Math.max(R, 1), (piso - 20) / Math.max(Hp, 1));
+    var fx = xc + e * k, fy = piso - h0 * k;
+    var tx = xc + R * k, ty = piso - Hp * k;
+    var gy = ty + db * k;
+    var svg = '<svg class="dib" viewBox="0 0 ' + W + ' ' + Hs + '" role="img" aria-label="Geometría de la grúa">';
+    svg += '<line x1="6" y1="' + piso + '" x2="' + (W - 6) + '" y2="' + piso + '" stroke="#8b91a0" stroke-width="2"/>';
+    svg += '<rect x="' + (xc - 22) + '" y="' + (piso - 20) + '" width="48" height="16" rx="3" fill="#E6F1FB" stroke="#185FA5"/>';
+    svg += '<line x1="' + xc + '" y1="' + piso + '" x2="' + xc + '" y2="' + (piso - 26) + '" stroke="#8b91a0" stroke-dasharray="3 3"/>';
+    svg += '<line x1="' + fx + '" y1="' + fy + '" x2="' + tx + '" y2="' + ty + '" stroke="#0C447C" stroke-width="5" stroke-linecap="round"/>';
+    svg += '<line x1="' + tx + '" y1="' + ty + '" x2="' + tx + '" y2="' + gy + '" stroke="#0B2545" stroke-width="1.5"/>';
+    svg += '<circle cx="' + tx + '" cy="' + gy + '" r="4" fill="#0B2545"/>';
+    svg += '<line x1="' + xc + '" y1="' + (piso + 14) + '" x2="' + tx + '" y2="' + (piso + 14) + '" stroke="#C49A28" stroke-width="1.5"/>';
+    svg += '<text x="' + ((xc + tx) / 2 - 6) + '" y="' + (piso + 11) + '" font-size="11" font-weight="700" fill="#8A5A00">R</text>';
+    svg += '<line x1="' + (tx + 12) + '" y1="' + piso + '" x2="' + (tx + 12) + '" y2="' + ty + '" stroke="#C49A28" stroke-width="1.5"/>';
+    svg += '<text x="' + (tx + 16) + '" y="' + ((piso + ty) / 2) + '" font-size="11" font-weight="700" fill="#8A5A00">H</text>';
+    svg += '<text x="' + (fx + 18) + '" y="' + (fy - 6) + '" font-size="11" fill="#5a6072">' + fmt(alfa, 0) + '°</text>';
+    return svg + '</svg>';
+  }
+
+  /* ═════════════ 1. Tensión en eslingas ═════════════ */
+  function calcTension() {
+    var n = +seg('t-ramales') || 2;
+    var modo = seg('t-modo');
+    if (n !== 2 && modo === 'cg') { modo = 'angulo'; ponerSeg('t-modo', modo); }
+    $('t-modo-c').hidden = n === 1;
+    $('t-modo-cg').hidden = n !== 2;
+    $('t-angulo-c').hidden = n === 1 || modo !== 'angulo';
+    $('t-medidas-c').hidden = n === 1 || modo !== 'medidas';
+    $('t-cg-c').hidden = n !== 2 || modo !== 'cg';
+    $('t-cons-c').hidden = n < 3;
+    $('t-D-l').textContent = n === 2 ? 'Distancia entre los dos puntos de sujeción' : 'Distancia del centro (bajo el gancho) a cada punto de sujeción';
+    $('t-D-ayuda').textContent = n === 2 ? 'Distancia horizontal de un punto al otro.' : 'Distancia horizontal, en planta. En una carga rectangular con 4 ramales es la mitad de la diagonal.';
+
+    var u = $('t-carga-u').value, W = kg('t-carga', 't-carga-u');
+    var out = '';
+    if (!(W > 0)) { $('t-res').innerHTML = SIN_DATOS; return; }
+
+    if (n === 2 && modo === 'cg') {
+      var lu = $('t-cg-u').value, d1 = metros('t-d1', 't-cg-u'), d2 = metros('t-d2', 't-cg-u'), h = metros('t-h', 't-cg-u');
+      if (!(d1 > 0 && d2 > 0 && h > 0)) { $('t-res').innerHTML = SIN_DATOS; return; }
+      var L1 = Math.hypot(d1, h), L2 = Math.hypot(d2, h);
+      var th1 = grados(Math.atan2(h, d1)), th2 = grados(Math.atan2(h, d2));
+      var V1 = W * d2 / (d1 + d2), V2 = W * d1 / (d1 + d2);
+      var T1 = W * d2 * L1 / (h * (d1 + d2)), T2 = W * d1 * L2 / (h * (d1 + d2));
+      var Hf = W * d1 * d2 / (h * (d1 + d2));
+      var ramal = function (num, L, th, V, T) {
+        return '<div><b>Ramal ' + num + '</b><span class="v">' + txtPeso(T, u) + '</span>' +
+          '<small>Largo: ' + txtLong(L, lu) + '</small><small>Ángulo: ' + fmt(th, 1) + '° desde la horizontal</small>' +
+          '<small>Soporta ' + fmt(V / W * 100, 0) + ' % del peso (' + txtPeso(V, u) + ')</small></div>';
+      };
+      out = '<h3>Tensión en cada ramal</h3><div class="par">' + ramal(1, L1, th1, V1, T1) + ramal(2, L2, th2, V2, T2) + '</div>' +
+        '<ul class="lista">' + li('Capacidad mínima de cada ramal (vertical)', txtPeso(Math.max(T1, T2), u)) +
+        li('Fuerza horizontal en los puntos', txtPeso(Hf, u)) + '</ul>' +
+        estadoAngulo(Math.min(th1, th2)) +
+        '<p class="nota">Los largos son los que hacen que el gancho quede justo sobre el centro de gravedad. Con ramales de otro largo, la carga se inclina hasta acomodarse.</p>' +
+        dibujoCG(d1, d2, h) +
+        '<div class="formula">Parte vertical: V₁ = W·d₂/(d₁+d₂) · Tensión: T = V ÷ sen θ</div>';
+      $('t-res').innerHTML = out; return;
+    }
+
+    var th;
+    if (n === 1) th = 90;
+    else if (modo === 'medidas') {
+      var L = metros('t-L', 't-L-u'), D = metros('t-D', 't-D-u');
+      var s = n === 2 ? D / 2 : D;
+      if (!(L > 0) || !(s >= 0)) { $('t-res').innerHTML = SIN_DATOS; return; }
+      if (s >= L) { $('t-res').innerHTML = '<h3>Resultado</h3>' + pill('mal', 'Con esas medidas los ramales no alcanzan: la distancia horizontal es mayor que el largo del ramal.'); return; }
+      th = grados(Math.acos(s / L));
+    } else {
+      var a = valor('t-ang');
+      if (!(a > 0 && a <= 90)) { $('t-res').innerHTML = '<h3>Resultado</h3>' + pill('mal', 'El ángulo debe estar entre 1° y 90°.'); return; }
+      th = seg('t-ref') === 'v' ? 90 - a : a;
+      if (!(th > 0)) { $('t-res').innerHTML = '<h3>Resultado</h3>' + pill('mal', 'Con 90° desde la vertical los ramales quedarían horizontales: no hay forma de sostener la carga.'); return; }
+    }
+    var nEf = n === 1 ? 1 : (n === 2 ? 2 : ($('t-cons').checked ? 2 : 3));
+    var sen = Math.sin(rad(th)), factor = 1 / sen;
+    var T = W / (nEf * sen), Hf2 = T * Math.cos(rad(th));
+    out = '<h3>Tensión en cada ramal</h3>' + bloquePeso(T, u) + '<ul class="lista">';
+    if (n > 1) {
+      out += li('Ángulo', fmt(th, 1) + '° desde la horizontal · ' + fmt(90 - th, 1) + '° desde la vertical');
+      out += li('Factor de ángulo', fmt(factor, 3) + ' (' + (factor > 1.0005 ? '+' + fmt((factor - 1) * 100, 1) + ' % vs. vertical' : 'sin aumento') + ')');
+    }
+    out += li('Ramales que cargan (supuesto)', nEf + ' de ' + n);
+    if (n > 1) out += li('Fuerza horizontal en cada punto', txtPeso(Hf2, u));
+    out += li('Capacidad mínima de cada ramal (vertical)', txtPeso(T, u)) + '</ul>';
+    if (n > 1) out += estadoAngulo(th);
+    if (n === 1) out += '<p class="nota">Con un solo ramal la carga puede girar: usa una cuerda guía. El gancho debe quedar sobre el centro de gravedad.</p>';
+    if (n > 1) out += '<p class="nota">La fuerza horizontal aprieta la carga (o la viga separadora) hacia el centro. Los puntos de sujeción deben resistir la tensión en la dirección del ramal, no sólo en vertical.</p>';
+    out += dibujoRamales(n, th);
+    out += '<div class="formula">T = W ÷ (n × sen θ) = ' + txtPeso(W, u) + ' ÷ (' + nEf + ' × ' + fmt(sen, 3) + ')</div>';
+    $('t-res').innerHTML = out;
+  }
+
+  /* ═════════════ 2. Capacidad según forma de uso ═════════════ */
+  var AHORCADO = { cable: 0.75, cadena: 0.80, sintetica: 0.80 };
+  var MAT_TXT = { cable: 'cable de acero', cadena: 'cadena de aleación', sintetica: 'sintética' };
+  function calcCapacidad() {
+    var mat = seg('c-mat'), forma = seg('c-forma'), u = $('c-wll-u').value;
+    $('c-ahorque-c').hidden = forma !== 'ahorcado';
+    $('c-canasta-c').hidden = forma !== 'canasta';
+    var wll = kg('c-wll', 'c-wll-u');
+    if (!(wll > 0)) { $('c-res').innerHTML = SIN_DATOS; return; }
+    var f = 1, det = '', notas = [], estado = '';
+    if (forma === 'vertical') { f = 1; det = 'Vertical: 100 % de la etiqueta'; }
+    else if (forma === 'ahorcado') {
+      var aj = +$('c-ahorque').value;
+      f = AHORCADO[mat] * aj;
+      det = 'Ahorcado (' + MAT_TXT[mat] + '): ' + fmt(AHORCADO[mat] * 100, 0) + ' %' + (aj < 1 ? ' × ' + fmt(aj * 100, 0) + ' % por ahorque cerrado' : '');
+      notas.push('El ahorque no sujeta bien cargas lisas o sueltas. Si la etiqueta trae la capacidad «ahorcado», usa ese valor.');
+    } else {
+      var th = valor('c-ang');
+      if (!(th > 0 && th <= 90)) { $('c-res').innerHTML = '<h3>Resultado</h3>' + pill('mal', 'El ángulo debe estar entre 1° y 90°.'); return; }
+      f = 2 * Math.sin(rad(th));
+      det = 'Canasta: 2 × sen ' + fmt(th, 0) + '° = ' + fmt(f, 3);
+      estado = estadoAngulo(th);
+      if (mat === 'cable') notas.push('Para cable de acero en canasta, la capacidad supone que el objeto tiene al menos 25 veces el diámetro del cable (D/d ≥ 25). Con objetos más delgados la capacidad baja.');
+      notas.push('En canasta la carga debe ir balanceada: si se inclina, la eslinga puede deslizarse.');
+    }
+    var cap = wll * f;
+    var out = '<h3>Capacidad en esta forma de uso</h3>' + bloquePeso(cap, u) + '<ul class="lista">' + li('Factor', fmt(f, 3)) + li('Cómo se obtiene', det) + '</ul>';
+    var W = kg('c-carga', 'c-carga-u');
+    if (W > 0) {
+      var pct = W / cap * 100;
+      out += pct > 100 ? pill('mal', '⛔ La carga es ' + fmt(pct, 0) + ' % de la capacidad: excede lo permitido.')
+           : pct > 90 ? pill('aviso', '⚠ La carga usa el ' + fmt(pct, 0) + ' % de la capacidad.')
+           : pill('ok', '✓ La carga usa el ' + fmt(pct, 0) + ' % de la capacidad.');
+    }
+    out += estado;
+    if (mat === 'sintetica') notas.push('Protege la sintética en aristas con cantoneras o fundas: un canto vivo puede cortarla por debajo de su capacidad.');
+    notas.push('Factores de referencia (ASME B30.9). Si la etiqueta indica otra capacidad para esta forma de uso, manda la etiqueta.');
+    out += notas.map(function (t) { return '<p class="nota">' + t + '</p>'; }).join('');
+    $('c-res').innerHTML = out;
+  }
+
+  /* ═════════════ 3. Porcentaje de carga de la grúa ═════════════ */
+  function calcPorcentaje() {
+    var u = $('p-u').value, m = PESO[u];
+    var carga = valor('p-carga') * m, block = (valor('p-block') || 0) * m, apar = (valor('p-apar') || 0) * m,
+        otras = (valor('p-otras') || 0) * m, cap = valor('p-cap') * m;
+    if (!(carga > 0 && cap > 0)) { $('p-res').innerHTML = SIN_DATOS; return; }
+    var total = carga + block + apar + otras, pct = total / cap * 100, libre = cap - total;
+    var color = pct > 100 ? '#A32D2D' : pct > 90 ? '#C0392B' : pct > 75 ? '#C49A28' : '#2F6B1E';
+    var out = '<h3>Porcentaje de la capacidad</h3><div class="grande" style="color:' + color + '">' + fmt(pct, 1) + ' %</div>' +
+      '<div class="medidor"><i style="width:' + Math.min(pct, 100) + '%;background:' + color + '"></i></div>' +
+      '<div class="marcas"><span>0</span><span>75 %</span><span>90 %</span><span>100 %</span></div>' +
+      '<ul class="lista">' + li('Carga bruta (todo lo que cuelga)', txtPeso(total, u)) + li('Capacidad de la tabla', txtPeso(cap, u)) +
+      li(libre >= 0 ? 'Margen restante' : 'Exceso', txtPeso(Math.abs(libre), u)) + '</ul>';
+    if (pct > 100) out += pill('mal', '⛔ Excede la capacidad de la tabla: no se debe izar.');
+    else if (pct > 90) out += pill('mal', '⚠ Muy cerca del límite (más de 90 %). Revisa radio, configuración o una grúa mayor.');
+    else if (pct > 75) out += pill('aviso', '⚠ Más de 75 %: muchos procedimientos lo consideran izaje crítico y piden plan de izaje por escrito.');
+    else out += pill('ok', '✓ Dentro del 75 % de la capacidad.');
+    out += '<p class="nota">La capacidad de la tabla depende de la configuración (contrapeso, estabilizadores, largo de pluma, plumín) y del área de trabajo (sobre la parte trasera, los lados o el frente). Usa el radio mayor que alcanzará la carga, también al girar.</p>';
+    $('p-res').innerHTML = out;
+  }
+
+  /* ═════════════ 4. Alcance y altura de la grúa ═════════════ */
+  function calcAlcance() {
+    var modo = seg('a-modo'), lu = $('a-u').value, m = LONG[lu];
+    $('a-tengo-c').hidden = modo !== 'tengo';
+    $('a-necesito-c').hidden = modo !== 'necesito';
+    var db = (valor('a-db') || 0) * m, h0 = (valor('a-h0') || 0) * m, e = (valor('a-e') || 0) * m;
+    var out;
+    if (modo === 'tengo') {
+      var L = valor('a-L') * m, al = valor('a-alfa');
+      if (!(L > 0 && al >= 0 && al < 90)) { $('a-res').innerHTML = SIN_DATOS; return; }
+      var R = L * Math.cos(rad(al)) + e, Hp = L * Math.sin(rad(al)) + h0, Hg = Hp - db;
+      out = '<h3>Radio de operación</h3><div class="grande">' + txtLong(R, lu) + '</div>' +
+        '<div class="equiv">' + txtLong(R, lu === 'ft' ? 'm' : 'ft') + '</div><ul class="lista">' +
+        li('Altura de la punta de pluma', txtLong(Hp, lu)) + li('Altura máxima del gancho', txtLong(Hg, lu)) +
+        li('Proyección horizontal de la pluma', txtLong(L * Math.cos(rad(al)), lu)) + '</ul>' +
+        '<p class="nota">El radio se mide del centro de giro de la grúa a la vertical del gancho. Con la carga colgando, la pluma se flexiona y el radio real aumenta: confirma con el indicador de la grúa.</p>' +
+        dibujoGrua(R, Hp, h0, e, db, al) +
+        '<div class="formula">R = L·cos α + e · H = L·sen α + h₀</div>';
+    } else {
+      var Rn = valor('a-R') * m, Hc = (valor('a-Hc') || 0) * m, hl = (valor('a-hl') || 0) * m, ha = (valor('a-ha') || 0) * m;
+      if (!(Rn > e)) { $('a-res').innerHTML = Rn > 0 ? '<h3>Resultado</h3>' + pill('mal', 'El radio debe ser mayor que la distancia del pie de pluma al centro de giro.') : SIN_DATOS; return; }
+      var Hpn = Hc + hl + ha + db;
+      var dx = Rn - e, dy = Hpn - h0;
+      var Ln = Math.hypot(dx, dy), aln = grados(Math.atan2(dy, dx));
+      out = '<h3>Largo mínimo de pluma</h3><div class="grande">' + txtLong(Ln, lu) + '</div>' +
+        '<div class="equiv">' + txtLong(Ln, lu === 'ft' ? 'm' : 'ft') + '</div><ul class="lista">' +
+        li('Ángulo de la pluma', fmt(aln, 1) + '°') + li('Altura de la punta necesaria', txtLong(Hpn, lu)) +
+        li('Altura del gancho en la colocación', txtLong(Hpn - db, lu)) + '</ul>' +
+        (aln > 80 ? pill('aviso', '⚠ Ángulo de pluma muy alto: revisa el ángulo máximo que permite la tabla de carga.') : '') +
+        (aln < 0 ? pill('mal', 'La punta quedaría por debajo del pie de pluma: revisa los datos.') : '') +
+        '<p class="nota">Elige el largo de pluma disponible inmediato superior y vuelve a calcular el radio y la capacidad con la tabla de carga. Este cálculo no revisa choques de la pluma con la carga, edificios u otros obstáculos.</p>' +
+        dibujoGrua(Rn, Hpn, h0, e, db, aln) +
+        '<div class="formula">H punta = apoyo + alto de carga + aparejo + punta-gancho · L = √((R−e)² + (H−h₀)²)</div>';
+    }
+    $('a-res').innerHTML = out;
+  }
+
+  /* ═════════════ 5. Peso de la carga ═════════════ */
+  var MATERIALES = [
+    ['acero', 'Acero al carbono', 7850], ['inox', 'Acero inoxidable', 8000], ['fundido', 'Hierro fundido', 7200],
+    ['aluminio', 'Aluminio', 2700], ['cobre', 'Cobre', 8960], ['concreto', 'Concreto simple', 2400],
+    ['armado', 'Concreto armado', 2500], ['madera', 'Madera seca (promedio)', 650], ['agua', 'Agua', 1000],
+    ['vidrio', 'Vidrio', 2500], ['plomo', 'Plomo', 11340], ['otro', 'Otro (captura la densidad)', 1000],
+  ];
+  $('w-mat').innerHTML = MATERIALES.map(function (x) { return '<option value="' + x[0] + '">' + x[1] + '</option>'; }).join('');
+  function ponerDensidad() { var m = MATERIALES.filter(function (x) { return x[0] === $('w-mat').value; })[0]; if (m && m[0] !== 'otro') $('w-dens').value = m[2]; }
+  $('w-mat').addEventListener('change', function () { ponerDensidad(); recalcular(); });
+  ponerDensidad();
+  function calcPeso() {
+    var forma = seg('w-forma');
+    $('w-placa-c').hidden = forma !== 'placa';
+    $('w-cil-c').hidden = forma === 'placa';
+    $('w-t-c').hidden = forma !== 'tubo';
+    var dens = valor('w-dens'), n = Math.max(1, Math.round(valor('w-n') || 1));
+    var V, desc;
+    if (forma === 'placa') {
+      var l = metros('w-l', 'w-l-u'), a = metros('w-a', 'w-a-u'), e = metros('w-e', 'w-e-u');
+      V = l * a * e; desc = 'V = largo × ancho × espesor';
+    } else {
+      var D = metros('w-d', 'w-d-u'), Lc = metros('w-lc', 'w-lc-u');
+      if (forma === 'cilindro') { V = Math.PI / 4 * D * D * Lc; desc = 'V = π/4 × D² × largo'; }
+      else {
+        var t = metros('w-t', 'w-t-u');
+        if (t * 2 >= D) { $('w-res').innerHTML = '<h3>Resultado</h3>' + pill('mal', 'El espesor de pared no puede ser mayor que la mitad del diámetro.'); return; }
+        V = Math.PI / 4 * (D * D - Math.pow(D - 2 * t, 2)) * Lc; desc = 'V = π/4 × (D² − d²) × largo';
+      }
+    }
+    if (!(V > 0 && dens > 0)) { $('w-res').innerHTML = SIN_DATOS; return; }
+    var u = pref('peso', 'kg'), uno = V * dens;
+    $('w-res').innerHTML = '<h3>Peso ' + (n > 1 ? 'total (' + n + ' piezas)' : 'estimado') + '</h3>' + bloquePeso(uno * n, u) +
+      '<ul class="lista">' + li('Volumen por pieza', fmt(V, V < 1 ? 4 : 3) + ' m³') + li('Peso por pieza', txtPeso(uno, u)) + li('Densidad', fmt(dens, 0) + ' kg/m³') + '</ul>' +
+      '<p class="nota">Agrega lo que no está en el cálculo: accesorios, soldadura, recubrimientos, contenido (líquidos, material dentro) y empaque. Si hay incertidumbre, súmale un margen.</p>' +
+      '<div class="formula">' + desc + ' · Peso = V × densidad</div>';
+  }
+
+  /* ═════════════ 6. Tablas ═════════════ */
+  var GRILLETES = [  // pulgadas, capacidad (t métricas): grillete de acero al carbono, referencia de mercado
+    ['3/16', 0.33], ['1/4', 0.5], ['5/16', 0.75], ['3/8', 1], ['7/16', 1.5], ['1/2', 2], ['5/8', 3.25], ['3/4', 4.75],
+    ['7/8', 6.5], ['1', 8.5], ['1-1/8', 9.5], ['1-1/4', 12], ['1-3/8', 13.5], ['1-1/2', 17], ['1-3/4', 25], ['2', 35], ['2-1/2', 55], ['3', 85],
+  ];
+  var SINTETICAS = [  // EN 1492-1 / -2, capacidad en vertical (kg)
+    ['Violeta', '#7B4FA0', 1000], ['Verde', '#2E8B3E', 2000], ['Amarillo', '#F2C200', 3000], ['Gris', '#8E9196', 4000],
+    ['Rojo', '#D13A2F', 5000], ['Café', '#7A4A23', 6000], ['Azul', '#1F5FBF', 8000], ['Naranja', '#F08A1C', 10000],
+  ];
+  var CADENA = [  // grado 8, EN 818-4: capacidad de 1 ramal (t)
+    [6, 1.12], [7, 1.5], [8, 2.0], [10, 3.15], [13, 5.3], [16, 8.0], [18, 10.0], [20, 12.5], [22, 15.0], [26, 21.2], [32, 31.5],
+  ];
+  var CABLE = [  // 6x19 / 6x36 IWRC, acero EIPS, ojo con casquillo mecánico, factor de diseño 5:1 (ton EUA, vertical)
+    ['1/4', 6.4, 0.65], ['5/16', 7.9, 1.0], ['3/8', 9.5, 1.4], ['7/16', 11.1, 1.9], ['1/2', 12.7, 2.5], ['9/16', 14.3, 3.2],
+    ['5/8', 15.9, 3.9], ['3/4', 19.1, 5.6], ['7/8', 22.2, 7.6], ['1', 25.4, 9.8],
+  ];
+  var tablaGrillete = { i: 5, lat: 0 };
+  function tabla(cab, filas) {
+    return '<div class="tabla-env"><table><thead><tr>' + cab.map(function (c) { return '<th>' + c + '</th>'; }).join('') +
+      '</tr></thead><tbody>' + filas.join('') + '</tbody></table></div>';
+  }
+  function tr(celdas, cls) { return '<tr' + (cls ? ' class="' + cls + '"' : '') + '>' + celdas.map(function (c) { return '<td>' + c + '</td>'; }).join('') + '</tr>'; }
+  function kgTxt(kgv) { return fmt(kgv, 0) + ' kg'; }
+  function calcTablas() {
+    var t = seg('tb-sel'), h = '';
+    if (t === 'angulos') {
+      h = '<h3 style="font-size:15px;color:var(--azul-dark)">Factor de ángulo</h3><p class="ayuda">Cuánto aumenta la tensión de cada ramal respecto a colgar vertical. Ejemplo con 1,000 kg en 2 ramales.</p>' +
+        tabla(['Desde la horizontal', 'Desde la vertical', 'Factor', 'Tensión por ramal'], [90, 80, 75, 70, 65, 60, 55, 50, 45, 40, 35, 30, 25].map(function (a) {
+          var f = 1 / Math.sin(rad(a));
+          return tr([a + '°', (90 - a) + '°', fmt(f, 3), kgTxt(500 * f)], a < 30 ? 'bajo' : '');
+        })) + '<p class="nota">En rojo: menos de 30° desde la horizontal, no se debe usar. Con 30° cada ramal ya carga el doble que en vertical.</p>';
+    } else if (t === 'grilletes') {
+      var g = GRILLETES[tablaGrillete.i], red = [1, 0.7, 0.5][tablaGrillete.lat];
+      h = '<h3 style="font-size:15px;color:var(--azul-dark)">Grilletes de acero al carbono</h3>' +
+        '<div class="rej" style="margin-top:10px"><div class="campo"><label for="tb-g">Medida</label><select id="tb-g">' +
+        GRILLETES.map(function (x, i) { return '<option value="' + i + '"' + (i === tablaGrillete.i ? ' selected' : '') + '>' + x[0] + '"</option>'; }).join('') +
+        '</select></div><div class="campo"><span class="lbl">Ángulo de la carga lateral</span><div class="seg" id="tb-lat">' +
+        ['0° (en línea)', '45°', '90°'].map(function (x, i) { return '<button type="button" data-v="' + i + '" aria-pressed="' + (i === tablaGrillete.lat) + '">' + x + '</button>'; }).join('') +
+        '</div></div></div>' +
+        '<div class="grande">' + fmt(g[1] * red, g[1] * red < 1 ? 2 : (g[1] * red % 1 ? 2 : 0)) + ' t</div><div class="equiv">' + kgTxt(g[1] * red * 1000) + ' · ' + fmt(g[1] * red * 1000 / PESO.lb, 0) + ' lb' +
+        (red < 1 ? ' · ' + fmt(red * 100, 0) + ' % de ' + fmt(g[1], 2) + ' t' : '') + '</div>' +
+        tabla(['Medida', 'En línea', 'A 45° (70 %)', 'A 90° (50 %)'], GRILLETES.map(function (x, i) {
+          return tr([x[0] + '"', fmt(x[1], 2) + ' t', fmt(x[1] * 0.7, 2) + ' t', fmt(x[1] * 0.5, 2) + ' t'], i === tablaGrillete.i ? 'sel' : '');
+        })) +
+        '<p class="nota">Referencia común de grilletes tipo ancla de acero al carbono (perno roscado o con tuerca). La reducción por carga lateral aplica a grilletes tipo ancla; en los rectos (tipo cadena) evita la carga lateral. Los grilletes de aleación tienen otras capacidades: <b>usa siempre la capacidad marcada en el cuerpo</b>.</p>';
+    } else if (t === 'sinteticas') {
+      h = '<h3 style="font-size:15px;color:var(--azul-dark)">Eslingas sintéticas por color (EN 1492)</h3>' +
+        tabla(['Color', 'Vertical', 'Ahorcado (0.8)', 'Canasta vertical (2.0)', 'Canasta β 0–45° (1.4)', 'Canasta β 45–60° (1.0)'], SINTETICAS.map(function (x) {
+          return tr(['<span class="muestra" style="background:' + x[1] + '"></span>' + x[0], kgTxt(x[2]), kgTxt(x[2] * 0.8), kgTxt(x[2] * 2), kgTxt(x[2] * 1.4), kgTxt(x[2])]);
+        })) +
+        '<p class="nota">Código de colores de la norma europea, el más usado en México. β es el ángulo desde la vertical. Las eslingas de origen estadounidense usan otros colores y capacidades: <b>la etiqueta manda</b>. Por encima de 10 t suelen ser naranja: lee la etiqueta.</p>';
+    } else if (t === 'cadena') {
+      h = '<h3 style="font-size:15px;color:var(--azul-dark)">Cadena de aleación grado 8 (EN 818-4)</h3>' +
+        tabla(['Diámetro', '1 ramal', '2 ramales β 0–45°', '2 ramales β 45–60°', '3 y 4 ramales β 0–45°', '3 y 4 ramales β 45–60°'], CADENA.map(function (x) {
+          return tr([x[0] + ' mm', fmt(x[1], 2) + ' t', fmt(x[1] * 1.4, 2) + ' t', fmt(x[1], 2) + ' t', fmt(x[1] * 2.1, 2) + ' t', fmt(x[1] * 1.5, 2) + ' t']);
+        })) +
+        '<p class="nota">β es el ángulo desde la vertical (β 45° = 45° desde la horizontal). Ahorcada: 80 % de la capacidad. La cadena grado 10 tiene alrededor de 25 % más capacidad que la grado 8 del mismo diámetro: <b>usa la de la placa de identificación</b>.</p>';
+    } else if (t === 'cable') {
+      h = '<h3 style="font-size:15px;color:var(--azul-dark)">Eslinga de cable de acero</h3><p class="ayuda">6x19 o 6x36 con alma de acero (IWRC), acero EIPS, ojos con casquillo mecánico, factor de diseño 5:1.</p>' +
+        tabla(['Diámetro', 'Vertical', 'Ahorcado (≈75 %)', 'Canasta vertical (2.0)'], CABLE.map(function (x) {
+          var v = x[2] * PESO.st;
+          return tr([x[0] + '" (' + fmt(x[1], 1) + ' mm)', kgTxt(v) + ' · ' + fmt(x[2], 2) + ' ton EUA', kgTxt(v * 0.75), kgTxt(v * 2)]);
+        })) +
+        '<p class="nota">Valores de referencia para un solo ramal. Con ojos tejidos a mano o cable con alma de fibra la capacidad es menor. En canasta, el objeto debe tener al menos 25 veces el diámetro del cable (D/d ≥ 25). <b>Usa la capacidad de la etiqueta</b>.</p>';
+    } else {
+      h = '<h3 style="font-size:15px;color:var(--azul-dark)">Reducción por ángulo de ahorque (ASME B30.9)</h3>' +
+        tabla(['Ángulo del ahorque', 'Capacidad en ahorcado'], [['120° a 180°', '100 %'], ['90° a 119°', '87 %'], ['60° a 89°', '74 %'], ['30° a 59°', '62 %'], ['0° a 29°', '49 %']].map(function (x) { return tr(x); })) +
+        '<p class="nota">El porcentaje se aplica sobre la capacidad en ahorcado (no sobre la vertical). Ejemplo: una eslinga con 1,000 kg ahorcada y ahorque de 70° queda en 740 kg.</p>';
+    }
+    $('tb-cont').innerHTML = h;
+    var sg = $('tb-g');
+    if (sg) sg.addEventListener('change', function () { tablaGrillete.i = +sg.value; calcTablas(); });
+    var sl = $('tb-lat');
+    if (sl) sl.querySelectorAll('button').forEach(function (b) { b.addEventListener('click', function () { tablaGrillete.lat = +b.dataset.v; calcTablas(); }); });
+  }
+
+  /* ═════════════ 7. Unidades ═════════════ */
+  function calcUnidades() {
+    var p = valor('u-p') * PESO[$('u-p-u').value], l = valor('u-l') * LONG[$('u-l-u').value];
+    $('u-p-res').innerHTML = isFinite(p) ? '<ul class="lista">' + ['kg', 't', 'lb', 'st', 'kN'].map(function (x) { return li(PESO_TXT[x], txtPeso(p, x)); }).join('') + '</ul>' : '';
+    $('u-l-res').innerHTML = isFinite(l) ? '<ul class="lista">' + ['m', 'cm', 'mm', 'ft', 'in'].map(function (x) {
+      var v = l / LONG[x]; return li(LONG_TXT[x], fmt(v, Math.abs(v) >= 1000 ? 0 : (Math.abs(v) >= 10 ? 2 : 3)) + ' ' + LONG_TXT[x]);
+    }).join('') + '</ul>' : '';
+  }
+
+  /* ═════════════ Navegación ═════════════ */
+  var CALC = { tension: calcTension, capacidad: calcCapacidad, porcentaje: calcPorcentaje, alcance: calcAlcance,
+               peso: calcPeso, tablas: calcTablas, unidades: calcUnidades };
+  var actual = 'inicio';
+  function recalcular() { if (CALC[actual]) try { CALC[actual](); } catch (e) { console.error(e); } }
+  document.querySelectorAll('[data-calc]').forEach(function (c) {
+    c.addEventListener('input', recalcular);
+    c.addEventListener('change', recalcular);
+  });
+  $('tb-sel').addEventListener('click', function () { setTimeout(recalcular, 0); });
+
+  var vinoDelMenu = false;
+  function mostrar() {
+    var id = (location.hash || '').replace('#', '') || 'inicio';
+    if (!$('v-' + id)) id = 'inicio';
+    actual = id;
+    document.querySelectorAll('.vista').forEach(function (v) { v.hidden = v.id !== 'v-' + id; });
+    var v = $('v-' + id);
+    $('titulo').textContent = id === 'inicio' ? 'Herramientas de izaje' : (v.dataset.titulo || 'Herramientas de izaje');
+    document.title = (id === 'inicio' ? 'Herramientas de izaje' : v.dataset.titulo) + ' · AVBA';
+    $('atras').hidden = id === 'inicio';
+    recalcular();
+    window.scrollTo(0, 0);
+  }
+  document.querySelectorAll('.herr').forEach(function (a) { a.addEventListener('click', function () { vinoDelMenu = true; }); });
+  $('atras').addEventListener('click', function () {
+    if (vinoDelMenu) { vinoDelMenu = false; history.back(); }
+    else { location.hash = ''; }
+  });
+  window.addEventListener('hashchange', mostrar);
+
+  /* Con sesión abierta, el botón lleva a su panel en vez de al inicio de sesión */
+  try {
+    var s = JSON.parse(localStorage.getItem('avba_session') || '{}') || {};
+    var destino = s.token && window.AVBA_DESTINOS && window.AVBA_DESTINOS[s.rol];
+    if (destino) { $('entrar').href = destino; $('entrar').textContent = 'Mi panel'; }
+  } catch (e) {}
+
+  mostrar();
+})();
+</script>
+<script src="js/movil.js"></script>
+</body>
+</html>
