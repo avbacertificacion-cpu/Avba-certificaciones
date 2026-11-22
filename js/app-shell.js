@@ -28,6 +28,15 @@
  *     si el servidor ya no la reconoce, se pide iniciar sesión otra vez y lo
  *     pendiente se envía después, sin perderse.
  *
+ *  5. ACTUALIZACIÓN AUTOMÁTICA: cada despliegue del sitio publica también el
+ *     paquete de pantallas de la app (app-paquete/). La app lo descarga sola y
+ *     lo aplica la siguiente vez que se abre desde cerrada (o en el inicio de
+ *     sesión): nunca a media captura. Si la versión nueva no arranca, el
+ *     teléfono regresa solo a la anterior.
+ *
+ *  Lo que cada módulo hace sin señal se declara en js/app-sin-senal.js; este
+ *  archivo no se toca para agregar módulos.
+ *
  * En el navegador web (fuera de la app) este archivo no hace nada.
  * ══════════════════════════════════════════════════════════════════════════
  */
@@ -40,19 +49,43 @@
   if (!ES_APP || window.AVBAApp) return;
 
   var SERVIDOR = String(window.__AVBA_SERVIDOR__ || 'https://gestion.avba.com.mx').replace(/\/+$/, '') + '/';
-  var RUTAS_SERVIDOR = /^(?:\.\/|\/)?(api\/|uploads\/|descargar\.php|geocode\.php|tile\.php|qr\.php)/i;
   var TIEMPO_RED = 12000;   // ms: sin respuesta en este tiempo, se usa la copia guardada
 
   function plugin(n) { return (Cap && Cap.Plugins && Cap.Plugins[n]) || null; }
 
+  /* Qué trae este paquete de pantallas (lo escribe mobile/scripts/build-www.mjs
+     en js/app-paquete.js): versión y lista de archivos. */
+  var PAQ = window.__AVBA_PAQUETE__ || {};
+  var ARCHIVOS = null;
+  if (PAQ.archivos && PAQ.archivos.length) {
+    ARCHIVOS = {};
+    PAQ.archivos.forEach(function (a) { ARCHIVOS[a] = 1; });
+  }
+
+  /* Reglas de cada módulo sin señal (js/app-sin-senal.js) */
+  var REGLAS = window.AVBA_SIN_SENAL || {};
+  function lista(v) { return Array.isArray(v) ? v : []; }
+
   /* ── 1. Rutas al servidor ────────────────────────────────────────────── */
+  /* Va al servidor: la API, lo subido, cualquier .php (la app no trae PHP) y
+     cualquier archivo que no venga en el paquete —por ejemplo, la imagen de un
+     módulo nuevo que este teléfono todavía no descarga—. */
+  function vaAlServidor(ruta) {
+    var limpia = ruta.split(/[?#]/)[0];
+    if (/^(api|uploads)\//i.test(limpia) || /\.php$/i.test(limpia)) return true;
+    if (!ARCHIVOS || !limpia || limpia.slice(-1) === '/') return false;
+    try { limpia = decodeURIComponent(limpia); } catch (e) {}
+    return !ARCHIVOS[limpia];
+  }
   function aServidor(url) {
     if (typeof url !== 'string' || !url) return null;
     if (url.indexOf(SERVIDOR) === 0) return url;
     var origen = location.origin && location.origin !== 'null' ? location.origin + '/' : '';
     if (origen && url.indexOf(origen) === 0) url = url.slice(origen.length);
     if (/^[a-z][a-z0-9+.-]*:/i.test(url) || url.indexOf('//') === 0) return null;   // otro sitio o data:
-    return RUTAS_SERVIDOR.test(url) ? SERVIDOR + url.replace(/^\.?\//, '') : null;
+    if (url.charAt(0) === '#' || url.charAt(0) === '?') return null;                  // la misma pantalla
+    var ruta = url.replace(/^\.?\//, '');
+    return vaAlServidor(ruta) ? SERVIDOR + ruta : null;
   }
   function esApi(url) { return url.indexOf(SERVIDOR + 'api/index.php') === 0; }
 
@@ -69,15 +102,16 @@
     enLinea = v;
     pintarAvisos();
     oyentes.forEach(function (f) { try { f(v); } catch (e) {} });
-    if (v) { procesarSalida(); precargar(false); }
+    if (v) { procesarSalida(); precargar(false); setTimeout(function () { revisarActualizacion(false); }, 5000); }
   }
   window.addEventListener('online',  function () { cambiarConexion(true); });
   window.addEventListener('offline', function () { cambiarConexion(false); });
+  var tipoRed = '';                      // wifi | cellular | … (para no gastar datos de más)
   var Net = plugin('Network');
   if (Net) {
     try {
-      Net.getStatus().then(function (s) { cambiarConexion(!!s.connected); });
-      Net.addListener('networkStatusChange', function (s) { cambiarConexion(!!s.connected); });
+      Net.getStatus().then(function (s) { tipoRed = s.connectionType || ''; cambiarConexion(!!s.connected); });
+      Net.addListener('networkStatusChange', function (s) { tipoRed = s.connectionType || ''; cambiarConexion(!!s.connected); });
     } catch (e) {}
   }
 
@@ -161,17 +195,20 @@
   function respuestaJson(obj, extra) { return respuestaDe(JSON.stringify(obj), 'application/json', extra); }
 
   /* Lecturas que se mandan por POST (el portal pide así algunas consultas) */
+  var LEC_PREFIJOS = lista(REGLAS.lecturas && REGLAS.lecturas.prefijos);
+  if (!LEC_PREFIJOS.length) LEC_PREFIJOS = ['GET_', 'LISTAR_', 'DETALLE_', 'BUSCAR_', 'OBTENER_', 'SUGERENCIAS_'];
+  var LEC_ACCIONES = lista(REGLAS.lecturas && REGLAS.lecturas.acciones);
   function esLectura(accion) {
-    return /^(GET_|LISTAR_|DETALLE_|BUSCAR_|OBTENER_|SUGERENCIAS_)/.test(accion)
-        || ['SOLCERT_MIS', 'RH_SALUD', 'RH_POLITICAS', 'RH_INCIDENCIAS', 'MI_INSPECCION_PREPARADA',
-            'getMaquinaria', 'getChecklist'].indexOf(accion) >= 0;
+    accion = String(accion || '');
+    for (var i = 0; i < LEC_PREFIJOS.length; i++) if (accion.indexOf(LEC_PREFIJOS[i]) === 0) return true;
+    return LEC_ACCIONES.indexOf(accion) >= 0;
   }
 
   /* Búsqueda de clientes sin señal: sobre la lista completa precargada */
   function buscarClienteLocal(url) {
     var q = '';
     try { q = (new URL(url).searchParams.get('q') || '').trim(); } catch (e) {}
-    var norma = function (t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase(); };
+    var norma = function (t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase(); };
     return leerCopia(claveConsulta(SERVIDOR + 'api/index.php?action=CLIENTES_OFFLINE')).then(function (c) {
       var lista = [];
       try { lista = (JSON.parse(c ? c.texto : '{}').clientes) || []; } catch (e) {}
@@ -184,16 +221,10 @@
   /* ── 3. Bandeja de salida ────────────────────────────────────────────── */
   /* Qué devuelve el servidor al crear algo: de ahí sale el número real que
      sustituye al provisional. */
-  var CREA = {
-    CREAR_SESION_ACCESORIOS: 'sesion_id',
-    CREAR_SESION_ARNESES:    'sesion_id',
-    GUARDAR_ACCESORIO:       'id',
-    GUARDAR_ITEM_ARNES:      'item_id',
-    GUARDAR_PARTICIPANTE:    'id',
-    SESION_AGREGAR_EMPRESA:  'id',
-    CREAR_RECOMENDACION:     'id',
-  };
-  var SIN_NUMERO = ['COMPLETAR_SESION_ACC', 'ENVIAR_SESION_ACC', 'CERRAR_SESION_ACCESO', 'ELIMINAR_RECOMENDACION'];
+  var CREA = {};
+  var creaReglas = (REGLAS.bandeja && REGLAS.bandeja.crea) || {};
+  for (var kCrea in creaReglas) if (Object.prototype.hasOwnProperty.call(creaReglas, kCrea)) CREA[kCrea] = creaReglas[kCrea];
+  var SIN_NUMERO = lista(REGLAS.bandeja && REGLAS.bandeja.sinNumero);
   function vaABandeja(accion) {
     return CREA.hasOwnProperty(accion) || SIN_NUMERO.indexOf(accion) >= 0 || accion === 'DUPLICAR_ACCESORIO';
   }
@@ -567,8 +598,8 @@
     var s = sesion();
     if (!enLinea || !s.token) return Promise.resolve();
     var roles = [s.rol].concat(s.roles || []);
-    var esInsp = roles.indexOf('INSPECTOR') >= 0 || roles.indexOf('ADMIN') >= 0 || roles.indexOf('CALIDAD') >= 0;
-    if (!esInsp) return Promise.resolve();
+    var rolesPre = lista(REGLAS.precarga && REGLAS.precarga.roles);
+    if (!roles.some(function (r) { return rolesPre.indexOf(r) >= 0; })) return Promise.resolve();
     var marca = 'avba_precarga_' + (s.usuario || '');
     var ultima = +(localStorage.getItem(marca) || 0);
     if (!forzar && Date.now() - ultima < PRECARGA_CADA) return Promise.resolve();
@@ -580,8 +611,7 @@
     var serie = function (urls) {
       return urls.reduce(function (p, u) { return p.then(function () { return json(u); }); }, Promise.resolve());
     };
-    return serie([api + 'CLIENTES_OFFLINE', api + 'LISTAR_CURSOS', api + 'LISTAR_OCUPACIONES',
-                  api + 'GET_MIS_INSPECCIONES', api + 'GET_MIS_ACCESORIOS', api + 'GET_MIS_CURSOS', api + 'MI_INSPECCION_PREPARADA'])
+    return serie(lista(REGLAS.precarga && REGLAS.precarga.consultas).map(function (a) { return api + a; }))
       .then(function () { return json(api + 'getMaquinaria'); })
       .then(function (tipos) {
         return serie((Array.isArray(tipos) ? tipos : []).map(function (t) { return api + 'getChecklist&equipo=' + encodeURIComponent(t.nombre); }));
@@ -701,18 +731,107 @@
     });
   }
 
+  /* ── 5. Actualización automática de pantallas ────────────────────────── */
+  /* El servidor publica en cada despliegue el paquete de pantallas
+     (app-paquete/paquete.zip) y su ficha (acción APP_VERSION). La app:
+       · revisa con señal: cada 30 min en wifi, cada 6 h con datos;
+       · descarga sola, verificando la huella SHA-256 del paquete;
+       · lo aplica al abrir la app desde cerrada o en el inicio de sesión, nunca
+         a media captura (por eso no se usa el «aplicar al pasar a segundo
+         plano» del plugin: en Android abrir la cámara cuenta como eso);
+       · si la versión nueva no arranca (no llega a avisar que está lista), el
+         plugin regresa a la anterior y esa versión no se vuelve a intentar.
+     Si el paquete pide una app más nueva (plugin o permiso nuevo), no se
+     aplica: se avisa que hay versión nueva en la tienda. */
+  var Upd = plugin('CapacitorUpdater');
+  var CLAVE_PEND = 'avba_paquete_pendiente', CLAVE_REV = 'avba_paquete_revisado',
+      CLAVE_FALLO = 'avba_paquete_intento', CLAVE_TIENDA = 'avba_paquete_tienda';
+  function leerLS(k) { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } }
+  function guardarLS(k, v) { try { v === null ? localStorage.removeItem(k) : localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+
+  // Esta versión arrancó: el plugin deja de contar para regresar a la anterior.
+  if (Upd) { try { Upd.notifyAppReady(); } catch (e) {} }
+  (function () {
+    var intento = leerLS(CLAVE_FALLO);
+    if (intento && intento.version === PAQ.version) guardarLS(CLAVE_FALLO, null);   // se aplicó bien
+  })();
+
+  function numVersion(v) { return String(v || '0').split(/[^0-9]+/).filter(Boolean).slice(0, 3).map(Number); }
+  function alMenos(a, b) {           // ¿la versión a es igual o mayor que b?
+    var x = numVersion(a), y = numVersion(b);
+    for (var i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); }
+    return true;
+  }
+  function esMasNueva(ficha) { return !!(ficha && ficha.armado && (!PAQ.armado || ficha.armado > PAQ.armado)); }
+
+  var revisando = null;
+  function revisarActualizacion(forzar) {
+    if (!Upd || !enLinea || revisando) return revisando || Promise.resolve(null);
+    var ahora = Date.now(), ult = +(localStorage.getItem(CLAVE_REV) || 0);
+    var cada = tipoRed === 'cellular' ? 6 * 3600e3 : 30 * 60e3;
+    if (!forzar && ahora - ult < cada) return Promise.resolve(null);
+    localStorage.setItem(CLAVE_REV, String(ahora));
+    revisando = window.fetch(SERVIDOR + 'api/index.php?action=APP_VERSION&_=' + ahora)
+      .then(function (r) { return r.json(); })
+      .then(function (f) {
+        if (!f || f.status !== 'success' || !f.version || !f.archivo || !esMasNueva(f)) return null;
+        var pend = leerLS(CLAVE_PEND), fallo = leerLS(CLAVE_FALLO);
+        if (pend && pend.version === f.version) return pend;                 // ya descargada
+        if (fallo && fallo.version === f.version) return null;               // ya falló una vez aquí
+        return Upd.current().then(function (c) {
+          if (f.nativoMinimo && c && c.native && !alMenos(c.native, f.nativoMinimo)) {
+            if (localStorage.getItem(CLAVE_TIENDA) !== f.version) {
+              localStorage.setItem(CLAVE_TIENDA, f.version);
+              aviso('Hay una versión nueva de AVBA en la tienda. Actualízala para ver lo más reciente.');
+            }
+            return null;
+          }
+          return Upd.download({
+            url: SERVIDOR + 'app-paquete/' + encodeURIComponent(f.archivo) + '?v=' + encodeURIComponent(f.version),
+            version: f.version,
+            checksum: f.sha256 || undefined,
+          }).then(function (b) {
+            if (pend && pend.id && pend.id !== b.id) Upd.delete({ id: pend.id }).catch(function () {});
+            var nuevo = { id: b.id, version: f.version, armado: f.armado };
+            guardarLS(CLAVE_PEND, nuevo);
+            return nuevo;
+          });
+        });
+      })
+      .catch(function () { return null; })
+      .then(function (r) { revisando = null; return r; });
+    return revisando;
+  }
+
+  /* Aplica la versión descargada. Recarga la app: sólo se llama al abrirla
+     (mobile/src/index.html) o en el inicio de sesión, donde no hay nada a medias. */
+  function aplicarActualizacion() {
+    var p = leerLS(CLAVE_PEND);
+    if (!Upd || !p || !p.id) return Promise.resolve(false);
+    guardarLS(CLAVE_PEND, null);
+    if (!esMasNueva(p)) return Promise.resolve(false);                       // ya es la que corre
+    guardarLS(CLAVE_FALLO, { version: p.version, fecha: Date.now() });       // se borra si arranca bien
+    return Promise.race([
+      Upd.set({ id: p.id }).then(function () { return true; }, function () { guardarLS(CLAVE_FALLO, null); return false; }),
+      new Promise(function (ok) { setTimeout(function () { ok(false); }, 5000); }),
+    ]);
+  }
+
   /* ── Arranque ────────────────────────────────────────────────────────── */
   document.addEventListener('DOMContentLoaded', function () {
     pintarAvisos();
     corregirArbol(document.body);
     cargarEstado().then(function () { if (enLinea) procesarSalida(); });
     setTimeout(function () { precargar(false); }, 2500);
+    // En el inicio de sesión no hay nada a medias: buen momento para aplicar
+    if (/\/login\.html$/.test(location.pathname) && !/[?&]sesion=/.test(location.search)) aplicarActualizacion();
+    setTimeout(function () { revisarActualizacion(false); }, 10000);
   });
   var App = plugin('App');
   if (App && App.addListener) {
     try {
       App.addListener('appStateChange', function (s) {
-        if (s.isActive) { renovarSesionSinSenal(); if (enLinea) procesarSalida(); }
+        if (s.isActive) { renovarSesionSinSenal(); if (enLinea) procesarSalida(); revisarActualizacion(false); }
       });
     } catch (e) {}
   }
@@ -728,5 +847,8 @@
     precargar: function () { return precargar(true); },
     abrirExterno: abrirExterno,
     rutaServidor: aServidor,
+    version: PAQ.version || '',
+    revisarActualizacion: function () { return revisarActualizacion(true); },
+    aplicarActualizacion: aplicarActualizacion,
   };
 })();

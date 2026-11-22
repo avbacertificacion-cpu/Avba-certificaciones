@@ -6,7 +6,9 @@
     "androidScheme": "https",
     "iosScheme": "capacitor",
     "hostname": "localhost",
-    "allowNavigation": ["gestion.avba.com.mx"]
+    "allowNavigation": [
+      "gestion.avba.com.mx"
+    ]
   },
   "android": {
     "allowMixedContent": false,
@@ -37,6 +39,15 @@
     },
     "CapacitorHttp": {
       "enabled": false
+    },
+    "CapacitorUpdater": {
+      "autoUpdate": false,
+      "statsUrl": "",
+      "appReadyTimeout": 15000,
+      "responseTimeout": 60,
+      "autoDeleteFailed": true,
+      "autoDeletePrevious": true,
+      "resetWhenUpdate": true
     }
   }
 }

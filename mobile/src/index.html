@@ -17,6 +17,10 @@
 <body>
   <div class="logo"><img src="assets/logos/avba_icono.png" alt="AVBA"></div>
   <p>Cargando…</p>
+  <script src="js/app-paquete.js"></script>
+  <script src="js/app-sin-senal.js"></script>
+  <script src="js/app-shell.js"></script>
+  <script src="js/destinos.js"></script>
   <script src="js/acceso-dispositivo.js"></script>
   <script>
     /* Entrada de la app: con una sesión guardada se va directo a su pantalla
@@ -28,9 +32,7 @@
        ahí hay expedientes de clientes. Si se cancela, se va al inicio de
        sesión (que vuelve a ofrecer el sensor, y la contraseña). */
     (function () {
-      var DESTINOS = { ADMIN: 'admin.html', INSPECTOR: 'inspector.html', CALIDAD: 'calidad.html',
-        CERTIFICACIONES: 'certificaciones.html', ADMINISTRATIVO: 'administrativo.html',
-        CLIENTE: 'portal-cliente.html', PARTICIPANTE: 'participante.html' };
+      var DESTINOS = window.AVBA_DESTINOS || {};
       var s = {};
       try { s = JSON.parse(localStorage.getItem('avba_session') || '{}') || {}; } catch (e) {}
       var A = window.AVBAAcceso;
@@ -41,16 +43,29 @@
         if (!navigator.onLine) { s.ts = Date.now(); try { localStorage.setItem('avba_session', JSON.stringify(s)); } catch (e) {} }
         location.replace(DESTINOS[s.rol]);
       }
-      if (!conSesion) { location.replace(bio ? 'login.html?bio=1' : 'login.html'); return; }
-      if (!bio || bio.usuario !== s.usuario) { ir(); return; }
+      function seguir() {
+        if (!conSesion) { location.replace(bio ? 'login.html?bio=1' : 'login.html'); return; }
+        if (!bio || bio.usuario !== s.usuario) { ir(); return; }
 
-      document.querySelector('p').textContent = 'Confirma que eres tú…';
-      A.disponible().then(function (info) {
-        if (!info.ok) { ir(); return; }          // sin sensor (lo quitaron): como antes
-        // Si lo cancela, al inicio de sesión sin volver a pedirlo: ahí tiene el
-        // botón del sensor y la contraseña.
-        return A.verificar('Entrar a AVBA').then(ir, function () { location.replace('login.html'); });
-      }).catch(ir);
+        document.querySelector('p').textContent = 'Confirma que eres tú…';
+        A.disponible().then(function (info) {
+          if (!info.ok) { ir(); return; }          // sin sensor (lo quitaron): como antes
+          // Si lo cancela, al inicio de sesión sin volver a pedirlo: ahí tiene el
+          // botón del sensor y la contraseña.
+          return A.verificar('Entrar a AVBA').then(ir, function () { location.replace('login.html'); });
+        }).catch(ir);
+      }
+
+      // Al abrir la app desde cerrada no hay nada a medias: si ya se descargó
+      // una versión nueva de las pantallas, se aplica aquí (la app se recarga
+      // con ella y vuelve a pasar por esta entrada).
+      var App = window.AVBAApp;
+      if (App && App.aplicarActualizacion) {
+        document.querySelector('p').textContent = 'Cargando…';
+        App.aplicarActualizacion().then(function (aplicada) { if (!aplicada) seguir(); }, seguir);
+      } else {
+        seguir();
+      }
     })();
   </script>
 </body>

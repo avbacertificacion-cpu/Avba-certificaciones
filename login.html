@@ -264,20 +264,13 @@
   </div>
 </div>
 
+<script src="js/destinos.js"></script>
 <script src="js/acceso-dispositivo.js"></script>
 <script>
 const API = "api/index.php";
 
-// Destinos por rol — ajusta las rutas según tu despliegue
-const DESTINOS = {
-  ADMIN:           "admin.html",
-  INSPECTOR:       "inspector.html",
-  CALIDAD:         "calidad.html",
-  CERTIFICACIONES: "certificaciones.html",
-  ADMINISTRATIVO:  "administrativo.html",
-  CLIENTE:         "portal-cliente.html",
-  PARTICIPANTE:    "participante.html"
-};
+// Pantalla de cada rol: js/destinos.js (la comparte la app)
+const DESTINOS = window.AVBA_DESTINOS || {};
 
 function focusPass() { document.getElementById("password").focus(); }
 

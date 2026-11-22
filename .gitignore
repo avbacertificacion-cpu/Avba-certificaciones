@@ -47,3 +47,6 @@ Portal_Clientes_AVBA.pdf
 mcp/config.php
 mcp/.envios.json
 mcp/.intentos.json
+
+# Paquete de actualización de la app: lo arma el despliegue (mobile/scripts/paquete-servidor.mjs)
+app-paquete/

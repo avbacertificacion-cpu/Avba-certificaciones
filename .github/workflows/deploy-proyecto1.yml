@@ -32,6 +32,17 @@ jobs:
       - name: Checkout del repo
         uses: actions/checkout@v4
 
+      # Paquete de pantallas para la app (actualización automática): las mismas
+      # pantallas que se publican, empaquetadas como van dentro de la app, en
+      # app-paquete/. Los teléfonos lo descargan solos. Si este paso fallara,
+      # el sitio se publica igual y la app sigue con la versión que tiene.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Paquete de la app
+        continue-on-error: true
+        run: node mobile/scripts/paquete-servidor.mjs app-paquete
+
       - name: Quitar archivos que no se deben subir
         run: |
           # Credenciales y metadatos del repositorio.

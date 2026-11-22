@@ -99,20 +99,80 @@ Funciona igual en la app y en el navegador de cualquier dispositivo
 
 ```
 mobile/
-├── src/index.html          Entrada: envía a la pantalla del rol con la sesión guardada
-├── scripts/build-www.mjs   Arma www/ con las pantallas del portal + app-shell.js
-├── www/                    (generada, no se versiona)
-├── assets/                 Ícono y splash fuente (1024 y 2732 px)
-├── android/                Proyecto de Android Studio (sí se versiona)
-├── ios/                    Proyecto de Xcode, con Swift Package Manager (sí se versiona)
+├── src/index.html              Entrada: aplica la actualización pendiente y envía a la pantalla del rol
+├── scripts/build-www.mjs       Arma www/ con las pantallas del portal + la capa de la app
+├── scripts/paquete-servidor.mjs Arma el paquete de actualización (lo corre cada despliegue)
+├── www/                        (generada, no se versiona)
+├── assets/                     Ícono y splash fuente (1024 y 2732 px)
+├── android/                    Proyecto de Android Studio (sí se versiona)
+├── ios/                        Proyecto de Xcode, con Swift Package Manager (sí se versiona)
 └── capacitor.config.json
 ```
 
-Las pantallas **no se duplican en git**: `npm run build` las copia del portal
-cada vez. Cuando se cambia una pantalla del portal, el cambio llega a la app
-en la **siguiente versión publicada en las tiendas**. El servidor sí se
-actualiza al momento, así que los cambios de la API deben seguir aceptando
-a las versiones anteriores de la app.
+Fuera de `mobile/`, en el sitio:
+
+| Archivo | Para qué |
+|---|---|
+| `js/app-shell.js` | La capa de la app: servidor, copias sin señal, bandeja de salida, actualización |
+| `js/app-sin-senal.js` | **Qué hace cada módulo sin señal** (el único que se toca al agregar módulos) |
+| `js/destinos.js` | Pantalla de cada rol al entrar (la comparten el login y la app) |
+| `js/acceso-dispositivo.js` | Entrar con huella, rostro o Windows Hello |
+
+---
+
+## 2.1 Actualización automática
+
+Cada despliegue del sitio arma también el paquete de pantallas de la app y lo
+publica en `https://gestion.avba.com.mx/app-paquete/` (`paquete.zip` y su ficha
+`ultima.json`, con la huella SHA-256). Los teléfonos:
+
+1. Revisan si hay versión nueva: al abrir, al volver al frente y al recuperar
+   la señal; como mucho cada 30 minutos en wifi y cada 6 horas con datos.
+2. La descargan solos (unos 2 MB) y verifican su huella.
+3. La aplican **la siguiente vez que se abre la app desde cerrada, o en el
+   inicio de sesión**. Nunca a media captura: en Android abrir la cámara manda
+   la app a segundo plano, así que aplicarla «al pasar a segundo plano» podría
+   recargar la pantalla a media inspección.
+4. Si la versión nueva no arranca, el teléfono regresa solo a la anterior y esa
+   versión no se vuelve a intentar.
+
+Lo capturado sin señal no se pierde al actualizar: vive en el teléfono, no en
+el paquete.
+
+Se usa el plugin `@capgo/capacitor-updater` (código abierto) **con el servidor
+propio**: sin suscripción y sin enviar estadísticas a terceros (`statsUrl: ""`).
+
+**Cuándo SÍ hay que publicar en las tiendas:** sólo si cambia algo del
+teléfono, es decir, un plugin nuevo (otro sensor, otra función nativa) o un
+permiso nuevo. En ese caso:
+
+1. Sube `avba.nativoMinimo` en `package.json` a la versión nueva de la app.
+2. Publica esa versión en las tiendas (sección 8).
+
+Los teléfonos con la app anterior no reciben pantallas que necesiten lo nuevo:
+ven el aviso «Hay una versión nueva de AVBA en la tienda». Así nunca les llega
+algo que su app no puede correr.
+
+El servidor se actualiza al momento y los teléfonos minutos u horas después,
+así que la API debe seguir aceptando lo que mandan las pantallas anteriores
+(sobre todo lo que quedó en la bandeja de salida de alguien sin señal).
+
+---
+
+## 2.2 Cómo agregar un módulo nuevo
+
+| Paso | ¿Hay que tocar la app? |
+|---|---|
+| Pantalla nueva (`algo.html` en la raíz) | No: entra sola al paquete. Las plantillas `dictamen_*`, `certificado_*` y `*_preview` se excluyen porque las arma el servidor |
+| Rol nuevo | Sólo `js/destinos.js` (lo usan el sitio y la app) |
+| PHP nuevo, imágenes en otras carpetas | No: todo `.php` y lo que no venga en el paquete se pide al servidor |
+| Que sus consultas sirvan sin señal | No, si se llaman `GET_…`, `LISTAR_…`, `DETALLE_…`, `BUSCAR_…`, `OBTENER_…` o `SUGERENCIAS_…`. Si no, anótalas en `js/app-sin-senal.js` |
+| Que se pueda **capturar** sin señal | Anota sus acciones en `js/app-sin-senal.js` (instrucciones dentro) |
+| Que el inspector lo tenga en campo sin abrirlo antes | Anota la consulta en `precarga` de `js/app-sin-senal.js` |
+| Usa una función nueva del teléfono | Sí: plugin, `nativoMinimo` y versión nueva en las tiendas (2.1) |
+
+Con eso, al publicar el módulo en el sitio como siempre, llega a los teléfonos
+solo.
 
 ---
 
@@ -268,7 +328,10 @@ Para probar en el navegador de la computadora sin teléfono:
 app se activa con `window.__AVBA_APP_PRUEBA__ = true` antes de cargar
 `app-shell.js`; para apuntar a otro servidor, usa `window.__AVBA_SERVIDOR__`.
 
-## 8. Publicar una versión nueva
+## 8. Publicar una versión nueva en las tiendas
+
+Sólo hace falta cuando cambia algo nativo (2.1); las pantallas se actualizan
+solas.
 
 1. Sube el número de versión en los tres lugares:
    - `package.json` → `"version"`
@@ -277,6 +340,8 @@ app se activa con `window.__AVBA_APP_PRUEBA__ = true` antes de cargar
 
    Los números internos (`versionCode` de Android y número de compilación de
    iOS) los sube solo GitHub Actions en cada corrida.
+   Si la versión nueva trae un plugin o permiso nuevo, sube también
+   `avba.nativoMinimo` en `package.json` (ver 2.1).
 2. Etiqueta y sube: `git tag app-v2.1.0 && git push origin app-v2.1.0`.
 3. Revisa la versión en pruebas internas y TestFlight, y pásala a producción.
 

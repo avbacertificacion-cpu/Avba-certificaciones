@@ -1141,6 +1141,18 @@ if ($method === 'POST') {
             respuesta($fallo ?? ['status' => 'error', 'message' => 'Credenciales inválidas.']);
         }
 
+        // ── App: qué versión de las pantallas está publicada ──────
+        // La arma el despliegue (mobile/scripts/paquete-servidor.mjs) en
+        // app-paquete/. La app la consulta para actualizarse sola. Pública:
+        // es la misma información que ya sirve el sitio.
+        case 'APP_VERSION': {
+            $f = dirname(__DIR__) . '/app-paquete/ultima.json';
+            $d = is_file($f) ? json_decode((string)file_get_contents($f), true) : null;
+            respuesta(is_array($d) && !empty($d['version'])
+                ? ['status' => 'success'] + $d
+                : ['status' => 'error', 'message' => 'No hay paquete de la app publicado.']);
+        }
+
         // ── Entrar con huella, rostro o Windows Hello (Dispositivos.php) ──
         // Alta en el navegador (computadora, tablet, celular): pide sesión.
         case 'PASSKEY_OPCIONES_REGISTRO':
