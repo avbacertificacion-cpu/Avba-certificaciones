@@ -53,7 +53,7 @@
 
 <div class="wrap">
 
-  <span class="updated">Última actualización: 25 de junio de 2026</span>
+  <span class="updated">Última actualización: 23 de noviembre de 2026</span>
 
   <div class="box">
     <p>
@@ -84,7 +84,10 @@
     <li><strong>Ubicación (opcional):</strong> coordenadas GPS al registrar una inspección de campo, si el inspector lo autoriza explícitamente. No se recopila ubicación en segundo plano.</li>
     <li><strong>Cámara (opcional):</strong> acceso a la cámara del dispositivo únicamente cuando el inspector pulsa el botón "📷 Cámara" para capturar evidencia. La app nunca accede a la cámara en segundo plano.</li>
     <li><strong>Notificaciones:</strong> si el usuario lo autoriza, la app envía notificaciones locales sobre vencimientos de documentos y certificaciones. No se usan notificaciones remotas (push).</li>
+    <li><strong>Huella, rostro o Windows Hello (opcional):</strong> si el usuario activa la entrada con la seguridad de su dispositivo, la verificación la hace el propio sistema del dispositivo (Face ID, Touch ID, huella, reconocimiento facial o Windows Hello). <strong>AVBA no recibe ni guarda datos biométricos</strong>: sólo registra una llave o credencial del dispositivo que permite iniciar sesión, y el nombre del dispositivo para que el usuario o el administrador puedan retirarla.</li>
+    <li><strong>Información guardada en el dispositivo:</strong> para trabajar sin señal, la app guarda en el teléfono copias de las consultas recientes y lo capturado que aún no se envía al servidor. Se envía en cuanto hay conexión y se mantiene sólo en ese dispositivo.</li>
   </ul>
+  <p>Las <strong>Herramientas de izaje</strong> (calculadoras y tablas de consulta libre) no requieren cuenta ni recopilan información: los cálculos se hacen en el dispositivo.</p>
 
   <!-- 3 -->
   <h2>3. Cómo usamos la información</h2>
@@ -105,7 +108,8 @@
     <li><strong>Cámara</strong> — para capturar fotos de documentos y evidencias de inspección. Se solicita solo cuando el usuario presiona el botón de cámara.</li>
     <li><strong>Galería / almacenamiento de fotos</strong> — para seleccionar imágenes existentes en el dispositivo.</li>
     <li><strong>Notificaciones locales</strong> — para alertar sobre documentos y certificaciones próximos a vencer. Solo se muestra el banner de permiso una vez.</li>
-    <li><strong>Internet</strong> — indispensable para conectarse al servidor y cargar la aplicación.</li>
+    <li><strong>Internet</strong> — para enviar y recibir información del servidor. Sin señal, la app sigue funcionando con lo guardado en el dispositivo y envía lo pendiente al volver la conexión.</li>
+    <li><strong>Face ID, Touch ID o huella</strong> — sólo si el usuario activa la entrada con la seguridad del dispositivo. La verificación la realiza el sistema operativo; la app no tiene acceso a los datos biométricos.</li>
     <li><strong>Ubicación</strong> (solo inspectores) — para registrar las coordenadas de la inspección. No se usa en segundo plano.</li>
   </ul>
   <p>Puedes revocar cualquier permiso en cualquier momento desde Configuración &gt; Aplicaciones &gt; AVBA Certificaciones en tu dispositivo.</p>
@@ -138,6 +142,7 @@
     <li><strong>Mapas (OpenStreetMap)</strong> — las teselas y la búsqueda de direcciones se obtienen a través de nuestro propio servidor; el dispositivo del usuario no se comunica directamente con servicios externos.</li>
     <li><strong>Verificación de identidad (Google Gemini)</strong> — cuando el personal de Calidad utiliza la función de verificación, se transmite a Google la <em>imagen de la identificación oficial</em> del participante junto con el nombre y la CURP que capturó, con la única finalidad de comparar ambos y detectar discrepancias. Estos datos <strong>sí son datos personales</strong>. La transmisión ocurre solo al ejecutar esa verificación de forma manual; no se realiza de manera automática ni continua, y el resultado que se conserva en nuestros sistemas es únicamente la conclusión de la comparación. Esta función puede deshabilitarse por completo.</li>
   </ul>
+  <p>Las actualizaciones de las pantallas de la app se descargan desde nuestro propio servidor, sin intermediarios.</p>
   <p>No integramos Google Analytics, Facebook SDK, ni ningún SDK de rastreo publicitario.</p>
 
   <!-- 8 -->

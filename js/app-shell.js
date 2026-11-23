@@ -633,8 +633,12 @@
   }
 
   /* ── Avisos en pantalla ──────────────────────────────────────────────── */
-  var estilos = '#avba-app-red{position:fixed;left:0;right:0;top:0;z-index:2147483000;background:#7a4b00;color:#fff;'
-    + 'font:600 12.5px/1.35 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:calc(6px + env(safe-area-inset-top)) 12px 6px;text-align:center;display:none}'
+  /* Aviso de «sin señal»: una píldora abajo a la izquierda. Antes era una
+     franja arriba y tapaba el encabezado de cada pantalla (regresar, Salir,
+     pestañas) justo cuando el inspector trabaja en campo sin señal. */
+  var estilos = '#avba-app-red{position:fixed;left:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:2147483000;background:#7a4b00;color:#fff;'
+    + 'font:700 12px/1.3 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding:8px 12px;border-radius:999px;display:none;'
+    + 'max-width:calc(100% - 190px);box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:none}'
     + '#avba-app-salida{position:fixed;right:12px;bottom:calc(12px + env(safe-area-inset-bottom));z-index:2147483000;display:none;'
     + 'background:#0B2545;color:#fff;border:0;border-radius:999px;padding:9px 14px;font:700 12.5px system-ui,-apple-system,Segoe UI,Roboto,sans-serif;'
     + 'box-shadow:0 4px 14px rgba(0,0,0,.25)}#avba-app-salida.err{background:#a32d2d}'
@@ -650,7 +654,8 @@
     if (nodos.red || !document.body) return;
     var st = document.createElement('style'); st.textContent = estilos; document.head.appendChild(st);
     nodos.red = document.createElement('div'); nodos.red.id = 'avba-app-red';
-    nodos.red.textContent = 'Sin conexión: puedes seguir trabajando; lo capturado se guarda en el teléfono.';
+    nodos.red.textContent = 'Sin señal · lo capturado se guarda en el teléfono';
+    nodos.red.title = 'Sin conexión: puedes seguir trabajando; lo capturado se guarda en el teléfono y se envía solo al volver la señal.';
     nodos.salida = document.createElement('button'); nodos.salida.id = 'avba-app-salida'; nodos.salida.type = 'button';
     nodos.salida.onclick = abrirPanel;
     nodos.toast = document.createElement('div'); nodos.toast.id = 'avba-app-toast';
@@ -665,6 +670,7 @@
     nodos.red.style.display = enLinea ? 'none' : 'block';
     var n = pendientes.total;
     nodos.salida.style.display = n ? 'block' : 'none';
+    nodos.red.style.maxWidth = n ? 'calc(100% - 190px)' : 'calc(100% - 24px)';   // junto al contador, o a lo ancho
     nodos.salida.className = pendientes.errores ? 'err' : '';
     nodos.salida.textContent = pendientes.errores
       ? '⚠ ' + pendientes.errores + ' con error · ' + n + ' en el teléfono'

@@ -1,23 +1,23 @@
 name: App iOS
 
-# Compila la app de iOS en una Mac de GitHub (no hace falta tener Mac propia).
+# Compila la app de iOS en una Mac de GitHub: no hace falta tener Mac propia.
 #
 #   · Sin secretos: compila para el simulador, sólo para comprobar que todo
 #     arma bien.
-#   · Con los secretos de App Store Connect: firma la app (firma automática,
-#     Xcode crea certificado y perfil) y la sube a App Store Connect, de donde
-#     pasa a TestFlight y luego a revisión.
+#   · Con los secretos: firma la app y la sube a App Store Connect, de donde
+#     pasa a TestFlight y a revisión. La firma la resuelven las herramientas
+#     de línea de comandos de Codemagic (codemagic-cli-tools, código abierto):
+#     con la llave de API de App Store Connect crean o reutilizan el
+#     certificado de distribución y el perfil, sin pasos manuales en una Mac.
 #
 # Secretos (Settings → Secrets and variables → Actions):
-#   IOS_TEAM_ID      Team ID de la cuenta de Apple Developer (10 caracteres)
-#   ASC_KEY_ID       Key ID de la llave de API de App Store Connect
-#   ASC_ISSUER_ID    Issuer ID de esa llave
-#   ASC_KEY_P8       contenido del archivo AuthKey_XXXX.p8 (tal cual o en base64)
-# La llave de API debe tener el rol "Admin" para que Xcode pueda crear el
-# certificado de distribución en la nube.
+#   ASC_ISSUER_ID         Issuer ID de la llave de API de App Store Connect
+#   ASC_KEY_ID            Key ID de esa llave
+#   ASC_KEY_P8            contenido del archivo AuthKey_XXXX.p8, tal cual
+#   IOS_CERT_PRIVATE_KEY  llave privada RSA (PEM) con la que se crea el
+#                         certificado de distribución; se genera una sola vez
 #
-# Sólo corre a mano o con una etiqueta app-v*: las Mac de GitHub consumen
-# minutos 10 veces más rápido que Linux.
+# Sólo corre a mano o con una etiqueta app-v*.
 
 on:
   workflow_dispatch:
@@ -39,8 +39,9 @@ jobs:
     runs-on: macos-latest
     timeout-minutes: 60
     env:
-      TIENE_FIRMA: ${{ secrets.ASC_KEY_P8 != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.IOS_TEAM_ID != '' }}
+      TIENE_FIRMA: ${{ secrets.ASC_KEY_P8 != '' && secrets.ASC_KEY_ID != '' && secrets.ASC_ISSUER_ID != '' && secrets.IOS_CERT_PRIVATE_KEY != '' }}
       PROYECTO: mobile/ios/App/App.xcodeproj
+      BUNDLE_ID: mx.com.avba.certificaciones
 
     steps:
       - uses: actions/checkout@v4
@@ -70,83 +71,53 @@ jobs:
             CODE_SIGNING_ALLOWED=NO build
           echo "::notice::Sin secretos de App Store Connect: sólo se comprobó que la app compila. Ver mobile/README.md, sección App Store."
 
-      - name: Llave de App Store Connect
+      - uses: actions/setup-python@v5
         if: env.TIENE_FIRMA == 'true'
-        env:
-          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-        run: |
-          LLAVE="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
-          if printf '%s' "$ASC_KEY_P8" | grep -q "BEGIN PRIVATE KEY"; then
-            printf '%s\n' "$ASC_KEY_P8" > "$LLAVE"
-          else
-            printf '%s' "$ASC_KEY_P8" | base64 -d > "$LLAVE"
-          fi
-          echo "LLAVE_ASC=$LLAVE" >> "$GITHUB_ENV"
+        with:
+          python-version: '3.12'
 
-      - name: Archivar (firmado)
+      - name: Firma (certificado y perfil desde App Store Connect)
         if: env.TIENE_FIRMA == 'true'
         env:
-          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+          CERTIFICATE_PRIVATE_KEY: ${{ secrets.IOS_CERT_PRIVATE_KEY }}
+        run: |
+          pip install --quiet codemagic-cli-tools
+          keychain initialize
+          # Reutiliza el certificado y el perfil si ya existen; si no, los crea
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE --strict-match-identifier --create
+          keychain add-certificates
+          xcode-project use-profiles --project "$PROYECTO"
+
+      - name: Compilar y empaquetar (.ipa)
+        if: env.TIENE_FIRMA == 'true'
         run: |
           # El número de compilación sube en cada corrida: App Store Connect
           # no acepta dos compilaciones con el mismo número en una versión.
-          xcodebuild -project "$PROYECTO" -scheme App -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/AVBA.xcarchive" \
-            DEVELOPMENT_TEAM="$IOS_TEAM_ID" CODE_SIGN_STYLE=Automatic \
-            CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$LLAVE_ASC" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
-            archive
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*;/CURRENT_PROJECT_VERSION = ${GITHUB_RUN_NUMBER};/g" "$PROYECTO/project.pbxproj"
+          xcode-project build-ipa --project "$PROYECTO" --scheme App --ipa-directory "$RUNNER_TEMP/ipa"
 
-      - name: Exportar y subir a App Store Connect
-        if: env.TIENE_FIRMA == 'true'
+      - name: Subir a App Store Connect (TestFlight)
+        if: env.TIENE_FIRMA == 'true' && (github.event_name == 'push' || inputs.subir_a_app_store)
         env:
-          IOS_TEAM_ID: ${{ secrets.IOS_TEAM_ID }}
-          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-          SUBIR: ${{ github.event_name == 'push' || inputs.subir_a_app_store }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          APP_STORE_CONNECT_KEY_IDENTIFIER: ${{ secrets.ASC_KEY_ID }}
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
         run: |
-          if [ "$SUBIR" = "true" ]; then DESTINO=upload; else DESTINO=export; fi
-          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key><string>app-store-connect</string>
-            <key>destination</key><string>${DESTINO}</string>
-            <key>teamID</key><string>${IOS_TEAM_ID}</string>
-            <key>signingStyle</key><string>automatic</string>
-            <key>uploadSymbols</key><true/>
-            <key>manageAppVersionAndBuildNumber</key><false/>
-          </dict>
-          </plist>
-          EOF
-          xcodebuild -exportArchive \
-            -archivePath "$RUNNER_TEMP/AVBA.xcarchive" \
-            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
-            -exportPath "$RUNNER_TEMP/exportado" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath "$LLAVE_ASC" \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
-          if [ "$DESTINO" = "upload" ]; then
-            echo "::notice::Compilación $GITHUB_RUN_NUMBER subida a App Store Connect. Aparece en TestFlight en unos minutos, cuando Apple termine de procesarla."
-          fi
+          app-store-connect publish --path "$RUNNER_TEMP"/ipa/*.ipa
+          echo "::notice::Compilación $GITHUB_RUN_NUMBER subida a App Store Connect. Aparece en TestFlight en cuanto Apple termine de procesarla (15 a 30 minutos)."
 
       - uses: actions/upload-artifact@v4
         if: env.TIENE_FIRMA == 'true'
         with:
           name: avba-ios-ipa
-          path: ${{ runner.temp }}/exportado/*.ipa
+          path: ${{ runner.temp }}/ipa/*.ipa
           if-no-files-found: ignore
           retention-days: 30
 
-      - name: Borrar la llave
-        if: always()
-        run: rm -f "$RUNNER_TEMP"/AuthKey_*.p8
+      - name: Limpiar el llavero
+        if: always() && env.TIENE_FIRMA == 'true'
+        run: keychain use-login || true

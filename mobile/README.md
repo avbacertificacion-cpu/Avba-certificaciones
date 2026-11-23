@@ -206,16 +206,21 @@ flujo y excluye la carpeta `mobile/`.
 | `ANDROID_KEY_ALIAS` | Android | Alias de la llave (p. ej. `avba`) |
 | `ANDROID_KEY_PASSWORD` | Android | Contraseña de la llave |
 | `PLAY_SERVICE_ACCOUNT_JSON` | Android, opcional | Cuenta de servicio con acceso a la app en Play Console |
-| `IOS_TEAM_ID` | iOS | developer.apple.com → Membership → Team ID |
 | `ASC_KEY_ID` | iOS | App Store Connect → Users and Access → Integrations → App Store Connect API |
 | `ASC_ISSUER_ID` | iOS | En esa misma pantalla, arriba |
 | `ASC_KEY_P8` | iOS | El archivo `AuthKey_XXXX.p8` que se descarga al crear la llave (pega el contenido tal cual) |
+| `IOS_CERT_PRIVATE_KEY` | iOS | Llave RSA (PEM) con la que se crea el certificado de distribución. Se genera una vez: `ssh-keygen -t rsa -b 2048 -m PEM -f ios_cert -q -N ""` (funciona en Windows) |
 
-La llave de App Store Connect debe tener el rol **Admin**: con ella Xcode
-crea solo el certificado de distribución y el perfil, sin que tengas que
-manejarlos tú.
+La firma de iOS la resuelven las herramientas de Codemagic
+(`codemagic-cli-tools`, código abierto) dentro de GitHub Actions: con la llave
+de API crean o reutilizan el certificado de distribución y el perfil. **No
+hace falta una Mac.** La llave de API necesita el rol **App Manager** (si al
+crear el certificado marca falta de permisos, usa **Admin**).
 
 ---
+
+Los textos, capturas e imágenes para las dos tiendas están en
+[`tienda/`](tienda/ficha-tiendas.md).
 
 ## 4. Publicar en Google Play
 
@@ -264,7 +269,7 @@ manejarlos tú.
    Certificaciones», idioma español (México), Bundle ID
    `mx.com.avba.certificaciones` (si no aparece en la lista, regístralo en
    developer.apple.com → Identifiers), SKU `avba-certificaciones`.
-3. Crea la **llave de API** (rol Admin), carga los 4 secretos de iOS en GitHub
+3. Crea la **llave de API** (rol App Manager), carga los 4 secretos de iOS en GitHub
    y corre **App iOS**. En unos 15 a 30 minutos la compilación aparece en
    **TestFlight**. Instálala en tu iPhone con la app TestFlight para probarla.
 4. Llena la ficha:
@@ -290,9 +295,10 @@ manejarlos tú.
 ## 6. Cuenta de prueba para los revisores
 
 Las dos tiendas exigen entrar a la app. Antes de enviar a revisión, crea desde
-Administración una cuenta de prueba (por ejemplo, un **inspector de prueba**
-con un par de inspecciones de ejemplo y un **cliente de prueba** con un
-certificado). No uses una cuenta real de un cliente. Puedes desactivarla
+Administración una **cuenta de cliente de prueba** de una empresa ficticia
+(«EMPRESA DEMO») con uno o dos certificados de ejemplo. No uses una cuenta
+real, y tampoco una de inspector: un inspector ve la lista completa de
+clientes. Las herramientas de izaje se revisan sin cuenta. Puedes desactivarla
 después de la aprobación y volver a activarla para cada nueva revisión.
 
 ---
