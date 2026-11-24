@@ -204,6 +204,7 @@
     .b-cal     { background: var(--azul-light);   color: var(--azul-dark); }
     .b-insp    { background: var(--ambar-light);  color: var(--ambar); }
     .b-cert    { background: var(--verde-light);  color: var(--verde); }
+    .b-acc     { background: #E8EDF4;             color: #3a4a60; }
     .b-cliente { background: #FFF3CD;             color: #856404; }
     .b-activo  { background: var(--verde-light);  color: var(--verde); }
     .b-inact   { background: #f0f0f0;             color: #888; }
@@ -898,7 +899,9 @@
         <option value="CERTIFICACIONES">CERTIFICACIONES</option>
         <option value="ADMINISTRATIVO">ADMINISTRATIVO</option>
         <option value="ADMIN">ADMIN</option>
+        <option value="ACCESOS">CONTROL DE ACCESOS (sólo fotos de entradas y salidas)</option>
       </select>
+      <div class="hint" id="hint-accesos" style="display:none">Cuenta para la caseta: sólo toma las fotos de entradas y salidas y ve sus propios registros del día. No ve el PDF, ni otros días, ni ningún otro módulo del sistema.</div>
     </div>
 
     <!-- Módulos adicionales: la misma cuenta entra a más de un módulo -->
@@ -1220,7 +1223,7 @@ function actualizarStats(internos, clientes) {
 function rolBadge(rol, extra) {
   const cls = {
     ADMIN:'b-admin', CALIDAD:'b-cal',
-    INSPECTOR:'b-insp', CERTIFICACIONES:'b-cert', CLIENTE:'b-cliente'
+    INSPECTOR:'b-insp', CERTIFICACIONES:'b-cert', CLIENTE:'b-cliente', ACCESOS:'b-acc'
   };
   let html = `<span class="badge ${cls[rol] || ''}">${esc(rol)}</span>`;
   // Los módulos adicionales se ven en la propia lista: si no, para saber quién
@@ -1436,6 +1439,10 @@ const MODULOS_EXTRA = ['INSPECTOR','CALIDAD','CERTIFICACIONES','ADMINISTRATIVO',
 function pintarRolesExtra(seleccion, principal) {
   const caja = document.getElementById("usr-roles-extra");
   if (!caja) return;
+  // La cuenta de caseta no entra a ningún otro módulo
+  const esCaseta = principal === 'ACCESOS';
+  document.getElementById("hint-accesos").style.display = esCaseta ? "" : "none";
+  if (esCaseta) { caja.innerHTML = '<span class="hint" style="margin:0">La cuenta de control de accesos no puede tener módulos adicionales.</span>'; return; }
   const marcados = (seleccion || []).map(r => String(r).toUpperCase());
   caja.innerHTML = MODULOS_EXTRA
     .filter(r => r !== principal)

@@ -1378,7 +1378,7 @@ function resolverRolActivo(array $usr): array {
     // El alta ya lo impide, pero esto no puede depender de que la única vía de
     // escritura sea el panel: un registro tocado a mano en la base no debe
     // poder convertir a un cliente en ADMIN.
-    $deFuera = in_array($principal, ['CLIENTE', 'PARTICIPANTE'], true);
+    $deFuera = in_array($principal, ['CLIENTE', 'PARTICIPANTE', 'ACCESOS'], true);
 
     $extra = $deFuera ? '' : trim((string)($usr['roles_extra'] ?? ''));
     if ($extra !== '') {

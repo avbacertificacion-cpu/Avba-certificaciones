@@ -29,6 +29,9 @@ $pdo = Database::getConnection();
 $usr = validarToken($pdo, $token);
 if (!$usr) fallo(401, 'No autorizado.');
 
+// La cuenta de caseta (rol ACCESOS) sólo puede ver las fotos que ella tomó.
+if (($usr['rol'] ?? '') === 'ACCESOS' && $tipo !== 'acceso_foto') fallo(403, 'No autorizado.');
+
 // ── Control de accesos: fotos de identificaciones y su PDF ───────────────
 // Son datos personales: la carpeta uploads/accesos/ está cerrada al acceso
 // directo y sólo se entregan aquí, con sesión de personal de AVBA.
@@ -36,7 +39,7 @@ if ($tipo === 'acceso_foto' || $tipo === 'accesos_pdf') {
     require_once __DIR__ . '/api/ControlAccesos.php';
     if (!ControlAccesos::permitido($usr)) fallo(403, 'No autorizado.');
     if ($tipo === 'acceso_foto') {
-        $abs = (new ControlAccesos($pdo))->rutaFoto($id, !empty($_GET['m']));
+        $abs = (new ControlAccesos($pdo))->rutaFoto($id, !empty($_GET['m']), $usr);
         if (!$abs) fallo(404, 'La foto ya no está disponible.');
         $mime = @mime_content_type($abs) ?: 'image/jpeg';
         header('Content-Type: ' . (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) ? $mime : 'image/jpeg'));

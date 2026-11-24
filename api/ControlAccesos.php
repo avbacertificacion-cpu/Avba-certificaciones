@@ -27,7 +27,7 @@ class ControlAccesos {
     private PDO $pdo;
 
     /** Quién puede usar el módulo (personal de AVBA, no clientes) */
-    public const ROLES = ['ADMIN', 'ADMINISTRATIVO', 'INSPECTOR', 'CALIDAD', 'CERTIFICACIONES'];
+    public const ROLES = ['ADMIN', 'ADMINISTRATIVO', 'INSPECTOR', 'CALIDAD', 'CERTIFICACIONES', 'ACCESOS'];
 
     private const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
     private const MESES = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
@@ -39,6 +39,14 @@ class ControlAccesos {
 
     public static function permitido(?array $usr): bool {
         return $usr && empty($usr['vista_admin']) && in_array((string)$usr['rol'], self::ROLES, true);
+    }
+
+    /**
+     * Cuenta de caseta (rol ACCESOS): sólo toma las fotos. Ve únicamente sus
+     * propios registros de hoy (para corregir un error) y no genera el PDF.
+     */
+    public static function esCaseta(?array $usr): bool {
+        return ($usr['rol'] ?? '') === 'ACCESOS';
     }
 
     /* ── Tabla y carpeta ────────────────────────────────────────────────── */
@@ -181,21 +189,26 @@ class ControlAccesos {
      */
     public function listar(array $p, array $usr): array {
         self::asegurarTabla($this->pdo);
-        $fecha = self::fechaValida($p['fecha'] ?? '');
-        $lugar = textoEstandar($p['lugar'] ?? '');
+        $caseta = self::esCaseta($usr);
+        $fecha = $caseta ? date('Y-m-d') : self::fechaValida($p['fecha'] ?? '');
+        $lugar = $caseta ? '' : textoEstandar($p['lugar'] ?? '');
         $limite = max(10, min(200, (int)($p['limite'] ?? 60)));
 
-        $donde = "fecha = ?" . ($lugar !== '' ? " AND lugar = ?" : '');
+        $donde = "fecha = ?" . ($lugar !== '' ? " AND lugar = ?" : '') . ($caseta ? " AND usuario = ?" : '');
         $args = $lugar !== '' ? [$fecha, $lugar] : [$fecha];
+        if ($caseta) $args[] = (string)$usr['usuario'];
 
         $tot = ['entrada' => 0, 'salida' => 0];
         $st = $this->pdo->prepare("SELECT tipo, COUNT(*) AS n FROM accesos_registros WHERE $donde GROUP BY tipo");
         $st->execute($args);
         foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $t) { if (isset($tot[$t['tipo']])) $tot[$t['tipo']] = (int)$t['n']; }
 
-        $st = $this->pdo->prepare("SELECT DISTINCT lugar FROM accesos_registros WHERE fecha = ? ORDER BY lugar");
-        $st->execute([$fecha]);
-        $lugares = $st->fetchAll(PDO::FETCH_COLUMN);
+        $lugares = [];
+        if (!$caseta) {
+            $st = $this->pdo->prepare("SELECT DISTINCT lugar FROM accesos_registros WHERE fecha = ? ORDER BY lugar");
+            $st->execute([$fecha]);
+            $lugares = $st->fetchAll(PDO::FETCH_COLUMN);
+        }
 
         // Página: lo anterior al último que ya tiene la pantalla
         $antesCap = (string)($p['antes_cap'] ?? '');
@@ -208,11 +221,12 @@ class ControlAccesos {
         }
         $num = "(SELECT COUNT(*) FROM accesos_registros b WHERE b.fecha = a.fecha AND b.tipo = a.tipo"
              . ($lugar !== '' ? " AND b.lugar = a.lugar" : '')
+             . ($caseta ? " AND b.usuario = a.usuario" : '')
              . " AND (b.capturado < a.capturado OR (b.capturado = a.capturado AND b.id <= a.id)))";
         $st = $this->pdo->prepare(
             "SELECT a.id, a.uid, a.tipo, a.capturado, a.lugar, a.nota, a.usuario, a.usuario_nombre, $num AS num
                FROM accesos_registros a
-              WHERE " . str_replace(['fecha', 'lugar'], ['a.fecha', 'a.lugar'], $donde) . "$pag
+              WHERE " . str_replace(['fecha', 'lugar', 'usuario'], ['a.fecha', 'a.lugar', 'a.usuario'], $donde) . "$pag
               ORDER BY a.capturado DESC, a.id DESC LIMIT " . ($limite + 1)
         );
         $st->execute($argsPag);
@@ -274,12 +288,13 @@ class ControlAccesos {
     }
 
     /** Ruta en disco de la foto de un registro (para descargar.php) */
-    public function rutaFoto(int $id, bool $mini): ?string {
+    public function rutaFoto(int $id, bool $mini, ?array $usr = null): ?string {
         self::asegurarTabla($this->pdo);
-        $st = $this->pdo->prepare("SELECT foto, foto_mini FROM accesos_registros WHERE id = ?");
+        $st = $this->pdo->prepare("SELECT foto, foto_mini, usuario FROM accesos_registros WHERE id = ?");
         $st->execute([$id]);
         $f = $st->fetch(PDO::FETCH_ASSOC);
         if (!$f) return null;
+        if (self::esCaseta($usr) && $f['usuario'] !== ($usr['usuario'] ?? null)) return null;   // sólo las suyas
         $rel = ($mini && $f['foto_mini'] !== '') ? $f['foto_mini'] : $f['foto'];
         if ($rel === '' || strpos($rel, '..') !== false) return null;
         $abs = self::carpeta() . $rel;
@@ -308,6 +323,7 @@ class ControlAccesos {
     public const FOTOS_POR_PDF = 150;
 
     public function generarPdf(array $p, array $usr): array {
+        if (self::esCaseta($usr)) return ['status' => 'error', 'message' => 'Esta cuenta sólo registra entradas y salidas.'];
         $fecha = self::fechaValida($p['fecha'] ?? '');
         $lugar = textoEstandar($p['lugar'] ?? '');
         $incluir = in_array($p['incluir'] ?? '', ['entrada', 'salida'], true) ? $p['incluir'] : 'ambos';

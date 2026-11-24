@@ -22,15 +22,20 @@ class Auth {
      * vez (solo si falta el valor).
      */
     private function ensureRolAdministrativo(): void {
+        // También ACCESOS (la cuenta de caseta del control de accesos). Se
+        // agregan los que falten conservando todos los que ya tiene el ENUM.
         try {
             $col = $this->pdo->query("SHOW COLUMNS FROM usuarios LIKE 'rol'")->fetch(PDO::FETCH_ASSOC);
-            $tipo = $col['Type'] ?? '';
-            if ($tipo && stripos($tipo, 'ADMINISTRATIVO') === false) {
-                $this->pdo->exec(
-                    "ALTER TABLE usuarios MODIFY `rol`
-                     ENUM('ADMIN','INSPECTOR','CALIDAD','CERTIFICACIONES','CLIENTE','ADMINISTRATIVO') NOT NULL"
-                );
-            }
+            $tipo = (string)($col['Type'] ?? '');
+            if (stripos($tipo, 'enum(') !== 0) return;          // no es ENUM: no hay nada que ampliar
+            preg_match_all("/'([^']*)'/", $tipo, $m);
+            $valores = $m[1] ?? [];
+            $faltan = array_values(array_diff(['ADMINISTRATIVO', 'ACCESOS'], $valores));
+            if (!$valores || !$faltan) return;
+            $lista = implode(',', array_map(fn($v) => $this->pdo->quote($v), array_merge($valores, $faltan)));
+            $nulo = (($col['Null'] ?? 'NO') === 'YES') ? 'NULL' : 'NOT NULL';
+            $def  = isset($col['Default']) && $col['Default'] !== null ? ' DEFAULT ' . $this->pdo->quote((string)$col['Default']) : '';
+            $this->pdo->exec("ALTER TABLE usuarios MODIFY `rol` ENUM($lista) $nulo$def");
         } catch (\Throwable $e) {
             error_log('[Auth] ensureRolAdministrativo: ' . $e->getMessage());
         }
@@ -39,7 +44,7 @@ class Auth {
     /** Roles válidos (constante de config + roles nuevos garantizados). */
     private function rolesValidos(): array {
         $base = defined('ROLES_VALIDOS') ? ROLES_VALIDOS : ['ADMIN','INSPECTOR','CALIDAD','CERTIFICACIONES','CLIENTE'];
-        return array_values(array_unique(array_merge($base, ['ADMINISTRATIVO'])));
+        return array_values(array_unique(array_merge($base, ['ADMINISTRATIVO', 'ACCESOS'])));
     }
 
     /**
@@ -51,7 +56,9 @@ class Auth {
      * cualquier empresa, y eso no es un permiso, es otra frontera.
      */
     public function rolesConmutables(): array {
-        return array_values(array_diff($this->rolesValidos(), ['CLIENTE', 'PARTICIPANTE']));
+        // ACCESOS tampoco: es la cuenta de la caseta, que sólo toma las fotos de
+        // entradas y salidas; nadie del personal necesita "cambiarse" a ella.
+        return array_values(array_diff($this->rolesValidos(), ['CLIENTE', 'PARTICIPANTE', 'ACCESOS']));
     }
 
     /**
@@ -64,6 +71,9 @@ class Auth {
     public function rolesDe(array $row): array {
         $principal = strtoupper(trim((string)($row['rol'] ?? '')));
         $roles     = $principal !== '' ? [$principal] : [];
+        // Cuentas de fuera y la de caseta no acumulan nada, diga lo que diga la
+        // columna (igual que resolverRolActivo en helpers.php).
+        if (in_array($principal, ['CLIENTE', 'PARTICIPANTE', 'ACCESOS'], true)) return $roles;
 
         $extra = trim((string)($row['roles_extra'] ?? ''));
         if ($extra !== '') {
@@ -759,7 +769,8 @@ class Auth {
         $registroStps = trim($payload['registro_stps'] ?? '');
         $hash = password_hash($password, PASSWORD_BCRYPT);
         // Una cuenta de cliente no acumula roles del personal: es otra frontera.
-        $extra = $rol === 'CLIENTE' ? null
+        // Tampoco la de control de accesos: sólo toma fotos en la caseta.
+        $extra = in_array($rol, ['CLIENTE', 'ACCESOS'], true) ? null
                : $this->normalizarRolesExtra($payload['roles_extra'] ?? [], $rol);
         try {
             $this->pdo->prepare(
@@ -832,7 +843,7 @@ class Auth {
             // edición se le cambia el principal, el adicional repetido sobra.
             $rolFinal = isset($payload['rol']) ? strtoupper(trim($payload['rol'])) : $rolActual;
             $sets[]   = 'roles_extra = ?';
-            $params[] = $rolFinal === 'CLIENTE' ? null
+            $params[] = in_array($rolFinal, ['CLIENTE', 'ACCESOS'], true) ? null
                       : $this->normalizarRolesExtra($payload['roles_extra'], $rolFinal);
             // El rol en uso tiene que seguir siendo uno de los suyos. Sin esto,
             // quitarle un rol adicional dejaría trabajando en ese módulo a quien

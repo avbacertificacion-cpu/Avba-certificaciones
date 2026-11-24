@@ -171,6 +171,16 @@ if (!empty($sesion['usuario']['vista_admin']) && !VistaPortal::permitida((string
                'message' => 'Vista de administrador: sólo consulta. Este cambio no se aplicó.'], 403);
 }
 
+// Cuenta de caseta (rol ACCESOS): sólo toma las fotos de entradas y salidas.
+// Todo lo demás se rechaza aquí, venga de la pantalla o de quien sea: así no
+// depende de que cada acción del sistema revise el rol por su cuenta.
+if (($sesion['usuario']['rol_base'] ?? '') === 'ACCESOS' && !in_array((string)$action, [
+        'ACCESO_REGISTRAR', 'LISTAR_ACCESOS', 'LISTAR_ACCESOS_LUGARES', 'ACCESO_ELIMINAR', 'ACCESOS_EXISTEN',
+        'PASSKEY_OPCIONES_REGISTRO', 'PASSKEY_REGISTRAR', 'APP_REGISTRAR_DISPOSITIVO', 'APP_VERSION',
+    ], true)) {
+    respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo puede registrar entradas y salidas.'], 403);
+}
+
 // Una sola vez por base: lo guardado pasa al texto estándar (mayúsculas, sin
 // acentos ni símbolos) y las direcciones a su formato. Ver helpers.php.
 repararTextosGuardados($pdo);

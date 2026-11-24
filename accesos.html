@@ -172,7 +172,7 @@
       <div class="campo"><label for="lugar">Punto de control</label>
         <input type="text" id="lugar" list="lugares" maxlength="120" placeholder="Ej. Quantum Energy · Caseta 1" autocomplete="off">
         <datalist id="lugares"></datalist></div>
-      <div class="campo" style="flex:0 1 180px"><label for="fecha">Día</label><input type="date" id="fecha"></div>
+      <div class="campo" id="campo-fecha" style="flex:0 1 180px"><label for="fecha">Día</label><input type="date" id="fecha"></div>
     </div>
     <small class="ayuda">Cada registro se guarda con el punto de control y la hora en que se toma la foto.</small>
   </div>
@@ -215,17 +215,17 @@
 
   <div class="tarjeta" id="tarjeta-lista">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <h2 style="margin:0">Registros del día</h2>
+      <h2 style="margin:0" id="tit-lista">Registros del día</h2>
       <div class="seg" id="filtro" role="radiogroup" aria-label="Filtrar">
         <button type="button" data-v="todos" aria-pressed="true">Todos</button><button type="button" data-v="entrada" aria-pressed="false">Entradas</button><button type="button" data-v="salida" aria-pressed="false">Salidas</button>
       </div>
     </div>
-    <label class="check" style="margin-top:8px"><input type="checkbox" id="solo-punto" checked> Sólo este punto de control</label>
+    <label class="check" id="campo-solo-punto" style="margin-top:8px"><input type="checkbox" id="solo-punto" checked> Sólo este punto de control</label>
     <ul class="lista" id="lista"></ul>
     <button class="btn sec ancho" type="button" id="btn-mas" hidden style="margin-top:8px">Ver anteriores</button>
   </div>
 
-  <div class="tarjeta">
+  <div class="tarjeta" id="tarjeta-pdf">
     <h2>PDF para analizar con Claude</h2>
     <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:10px">Las fotos de entradas y de salidas, cada una con su etiqueta (ENTRADA 001 · 08:15:32). Con más de 150 fotos se divide en partes, para que cada archivo quepa en lo que Claude analiza (100 hojas, 30 MB).</p>
     <span class="lbl">Incluir</span>
@@ -281,7 +281,7 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var API = 'api/index.php';
-  var ROLES = ['ADMIN', 'ADMINISTRATIVO', 'INSPECTOR', 'CALIDAD', 'CERTIFICACIONES'];
+  var ROLES = ['ADMIN', 'ADMINISTRATIVO', 'INSPECTOR', 'CALIDAD', 'CERTIFICACIONES', 'ACCESOS'];
   var CLAVE_LUGAR = 'avba_accesos_lugar', CLAVE_SEGUIR = 'avba_accesos_seguir', CLAVE_REVISAR = 'avba_accesos_revisar';
   var POR_PAGINA = 60;
 
@@ -297,6 +297,27 @@
   var destino = (window.AVBA_DESTINOS || {})[ses.rol];
   if (destino) $('atras').href = destino;
   $('sub-usuario').textContent = (ses.nombre || ses.usuario || '') + ' · entradas y salidas';
+
+  /* Cuenta de caseta (rol ACCESOS): sólo toma las fotos de entradas y
+     salidas. No ve el PDF ni las instrucciones para Claude, ni otros días;
+     la lista son sus propios registros de hoy, para corregir un error.
+     (El servidor aplica lo mismo: esto sólo ordena la pantalla.) */
+  var CASETA = ses.rol === 'ACCESOS';
+  if (CASETA) {
+    ['tarjeta-pdf', 'campo-fecha', 'campo-solo-punto'].forEach(function (id) { var el = document.getElementById(id); if (el) el.hidden = true; });
+    $('solo-punto').checked = false;                 // todos sus registros de hoy, de cualquier punto
+    var tl = document.getElementById('tit-lista'); if (tl) tl.textContent = 'Tus registros de hoy';
+    var a = $('atras');
+    a.href = 'login.html'; a.setAttribute('aria-label', 'Salir'); a.title = 'Salir';
+    a.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>';
+    a.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var pend = (typeof cola !== 'undefined' ? cola : []).filter(function (x) { return !x.error; }).length;
+      if (!confirm(pend ? 'Hay ' + pend + ' registro(s) por enviar: se enviarán cuando vuelvas a entrar en este equipo. ¿Salir?' : '¿Cerrar sesión?')) return;
+      try { localStorage.removeItem('avba_session'); } catch (e) {}
+      location.replace('login.html');
+    });
+  }
 
   /* ── Utilidades ── */
   function leer(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }

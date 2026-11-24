@@ -9,4 +9,5 @@ window.AVBA_DESTINOS = {
   ADMINISTRATIVO:  'administrativo.html',
   CLIENTE:         'portal-cliente.html',
   PARTICIPANTE:    'participante.html',
+  ACCESOS:         'accesos.html',      // cuenta de caseta: sólo entradas y salidas
 };
