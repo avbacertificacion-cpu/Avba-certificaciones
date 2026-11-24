@@ -15,8 +15,14 @@
     guardar. La hora es la del momento de la foto.
   · En la app funciona sin señal: el registro se guarda en el teléfono y se
     envía solo (js/app-sin-senal.js, ACCESO_REGISTRAR).
-  · El control del día: totales y la lista con foto, hora y quién registró.
-  · PDF del día con las fotos de entradas y salidas, etiquetadas, para
+  · El control es por TURNO, no por día: día 06:30–18:30 y noche
+    18:30–06:30. Una entrada cuenta para el turno que empieza (desde 2 h
+    antes) y una salida para el que termina (hasta 2 h después). Los
+    contadores siguen aunque se cierre la sesión y se reinician solos en el
+    cambio de turno. Administración puede ver turnos anteriores.
+  · Cada foto enviada se confirma con el servidor antes de borrarla del
+    equipo: si el servidor no la tiene, se queda marcada para reintentar.
+  · PDF del turno con las fotos de entradas y salidas, etiquetadas, para
     subirlo a Claude y cruzar los números de identificación.
   Servidor: api/ControlAccesos.php · fotos por descargar.php (con sesión).
 -->
@@ -46,7 +52,7 @@
   .fila{display:flex;gap:10px;flex-wrap:wrap}
   .fila>.campo{flex:1 1 180px}
   .campo label,.lbl{display:block;font-size:12.5px;font-weight:700;color:var(--texto-sub);margin-bottom:6px}
-  input[type=text],input[type=date],textarea{width:100%;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;
+  input[type=text],input[type=date],textarea,select{width:100%;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;
     font-size:15px;color:var(--texto);background:var(--blanco);outline:none;font-family:inherit;min-height:46px}
   textarea{min-height:64px;resize:vertical}
   input:focus,textarea:focus{border-color:var(--azul);box-shadow:0 0 0 3px rgba(24,95,165,.12)}
@@ -71,6 +77,21 @@
   .tot b{display:block;font-size:26px;font-weight:800;line-height:1.1}
   .tot span{font-size:11.5px;color:var(--texto-sub)}
   .tot.e b{color:var(--verde)} .tot.s b{color:var(--rojo)} .tot.d b{color:var(--azul-dark)}
+  /* Turno */
+  .nav-turno{display:flex;align-items:center;gap:10px;padding:10px}
+  .nav-turno .centro{flex:1;text-align:center;min-width:0}
+  .nav-turno .centro b{display:block;font-size:15px;color:var(--azul-dark)}
+  .nav-turno .centro span{display:block;font-size:12px;color:var(--texto-sub);margin-top:2px}
+  .flecha{width:44px;height:44px;border-radius:10px;border:1.5px solid var(--borde);background:#fff;color:var(--azul);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .flecha:disabled{opacity:.35;cursor:default}
+  .flecha svg{width:20px;height:20px}
+  .bloque-turno .totales{margin-bottom:0}
+  .bloque-turno{margin-bottom:12px}
+  .bt-tit{font-size:12.5px;color:var(--texto-sub);margin-bottom:6px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .bt-tit b{color:var(--texto)}
+  .bt-tit em{font-style:normal;font-size:11px;font-weight:800;padding:2px 8px;border-radius:20px;background:var(--azul-light);color:var(--azul-dark)}
+  .bt-tit em.sale{background:var(--ambar-light);color:var(--ambar)}
 
   .seg{display:flex;gap:6px;flex-wrap:wrap}
   .seg button{flex:1 1 auto;min-height:40px;padding:8px 12px;border:1.5px solid var(--borde);border-radius:10px;background:var(--blanco);
@@ -172,12 +193,12 @@
       <div class="campo"><label for="lugar">Punto de control</label>
         <input type="text" id="lugar" list="lugares" maxlength="120" placeholder="Ej. Quantum Energy · Caseta 1" autocomplete="off">
         <datalist id="lugares"></datalist></div>
-      <div class="campo" id="campo-fecha" style="flex:0 1 180px"><label for="fecha">Día</label><input type="date" id="fecha"></div>
     </div>
     <small class="ayuda">Cada registro se guarda con el punto de control y la hora en que se toma la foto.</small>
   </div>
 
-  <div class="aviso-dia" id="aviso-dia" hidden>Estás viendo otro día. Para registrar entradas y salidas, regresa a hoy.</div>
+  <div class="aviso-dia" id="aviso-dia" hidden>Estás viendo un turno anterior. Para registrar entradas y salidas, regresa al turno en curso.
+    <br><button class="btn sec" type="button" id="btn-curso" style="margin-top:8px">Ir al turno en curso</button></div>
 
   <div class="tarjeta" id="tarjeta-camara">
     <div id="cam-apagada">
@@ -207,27 +228,32 @@
   </div>
   <input type="file" id="archivo" accept="image/*" capture="environment" hidden>
 
-  <div class="totales">
-    <div class="tot e"><b id="t-ent">0</b><span>Entradas</span></div>
-    <div class="tot s"><b id="t-sal">0</b><span>Salidas</span></div>
-    <div class="tot d"><b id="t-dif">0</b><span>Diferencia</span></div>
+  <div class="tarjeta nav-turno" id="nav-turno">
+    <button type="button" class="flecha" id="t-ant" aria-label="Turno anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <div class="centro"><b id="t-nombre">Turno en curso</b><span id="t-sub"></span></div>
+    <button type="button" class="flecha" id="t-sig" aria-label="Turno siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
   </div>
+  <div id="totales"></div>
 
   <div class="tarjeta" id="tarjeta-lista">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <h2 style="margin:0" id="tit-lista">Registros del día</h2>
+      <h2 style="margin:0" id="tit-lista">Registros del turno</h2>
       <div class="seg" id="filtro" role="radiogroup" aria-label="Filtrar">
         <button type="button" data-v="todos" aria-pressed="true">Todos</button><button type="button" data-v="entrada" aria-pressed="false">Entradas</button><button type="button" data-v="salida" aria-pressed="false">Salidas</button>
       </div>
     </div>
     <label class="check" id="campo-solo-punto" style="margin-top:8px"><input type="checkbox" id="solo-punto" checked> Sólo este punto de control</label>
+    <div class="nota mal" id="err-lista" hidden></div>
     <ul class="lista" id="lista"></ul>
     <button class="btn sec ancho" type="button" id="btn-mas" hidden style="margin-top:8px">Ver anteriores</button>
   </div>
 
   <div class="tarjeta" id="tarjeta-pdf">
     <h2>PDF para analizar con Claude</h2>
-    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:10px">Las fotos de entradas y de salidas, cada una con su etiqueta (ENTRADA 001 · 08:15:32). Con más de 150 fotos se divide en partes, para que cada archivo quepa en lo que Claude analiza (100 hojas, 30 MB).</p>
+    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:10px">Las fotos de entradas y de salidas de un turno, cada una con su etiqueta (ENTRADA 001 · 24/11 06:15:32). Con más de 150 fotos se divide en partes, para que cada archivo quepa en lo que Claude analiza (100 hojas, 30 MB).</p>
+    <div class="campo" style="margin-bottom:10px"><label for="pdf-turno">Turno</label><select id="pdf-turno"></select>
+      <small class="ayuda">Un turno queda completo 2 horas después de su cambio, cuando ya salió su personal: el de día a las 20:30 y el de noche a las 08:30.</small></div>
+    <p class="nota" id="pdf-aviso" hidden style="margin:0 0 10px"></p>
     <span class="lbl">Incluir</span>
     <div class="seg" id="incluir" role="radiogroup" aria-label="Incluir en el PDF">
       <button type="button" data-v="ambos" aria-pressed="true">Entradas y salidas</button><button type="button" data-v="entrada" aria-pressed="false">Sólo entradas</button><button type="button" data-v="salida" aria-pressed="false">Sólo salidas</button>
@@ -237,10 +263,10 @@
     <div id="pdf-res"></div>
     <div class="partes" id="partes"></div>
     <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700;font-size:13.5px;color:var(--azul-dark)">Instrucciones para pedirle el análisis a Claude</summary>
-      <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-top:8px"><b>Si el día cabe en un solo PDF:</b> súbelo con estas instrucciones.</p>
+      <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-top:8px"><b>Si el turno cabe en un solo PDF:</b> súbelo con estas instrucciones.</p>
       <pre class="prompt" id="prompt"></pre>
       <button class="btn sec ancho" data-copiar="prompt" type="button" style="margin-top:8px">Copiar instrucciones (un PDF)</button>
-      <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-top:14px"><b>Si el día va en varias partes</b> (días grandes), en dos pasos, porque Claude no puede cruzar entradas y salidas que quedan en PDF distintos:</p>
+      <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-top:14px"><b>Si el turno va en varias partes</b> (turnos grandes), en dos pasos, porque Claude no puede cruzar entradas y salidas que quedan en PDF distintos:</p>
       <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-top:6px"><b>Paso 1.</b> Un chat por cada parte: sube el PDF con esto y guarda la lista que te devuelva.</p>
       <pre class="prompt" id="prompt-paso1"></pre>
       <button class="btn sec ancho" data-copiar="prompt-paso1" type="button" style="margin-top:8px">Copiar paso 1 (cada parte)</button>
@@ -299,14 +325,14 @@
   $('sub-usuario').textContent = (ses.nombre || ses.usuario || '') + ' · entradas y salidas';
 
   /* Cuenta de caseta (rol ACCESOS): sólo toma las fotos de entradas y
-     salidas. No ve el PDF ni las instrucciones para Claude, ni otros días;
-     la lista son sus propios registros de hoy, para corregir un error.
-     (El servidor aplica lo mismo: esto sólo ordena la pantalla.) */
+     salidas. No ve el PDF ni las instrucciones para Claude, ni turnos
+     anteriores; la lista son sus propios registros del turno en curso, para
+     corregir un error. (El servidor aplica lo mismo: esto sólo ordena la
+     pantalla.) */
   var CASETA = ses.rol === 'ACCESOS';
   if (CASETA) {
-    ['tarjeta-pdf', 'campo-fecha', 'campo-solo-punto'].forEach(function (id) { var el = document.getElementById(id); if (el) el.hidden = true; });
-    $('solo-punto').checked = false;                 // todos sus registros de hoy, de cualquier punto
-    var tl = document.getElementById('tit-lista'); if (tl) tl.textContent = 'Tus registros de hoy';
+    ['tarjeta-pdf', 'campo-solo-punto', 't-ant', 't-sig'].forEach(function (id) { var el = document.getElementById(id); if (el) el.hidden = true; });
+    $('solo-punto').checked = false;                 // todos sus registros del turno, de cualquier punto
     var a = $('atras');
     a.href = 'login.html'; a.setAttribute('aria-label', 'Salir'); a.title = 'Salir';
     a.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>';
@@ -337,6 +363,49 @@
       .join('Ñ').replace(/\s+/g, ' ').trim();
   }
   function numero(n) { return Number(n || 0).toLocaleString('es-MX'); }
+
+  /* ══ Turnos ══════════════════════════════════════════════════════════
+     Día 06:30–18:30 y noche 18:30–06:30 (igual que el servidor,
+     ControlAccesos::turnoDe). En el cambio de turno salen unos y entran
+     otros a la misma hora, así que no basta el reloj:
+       · una ENTRADA cuenta para el turno que empieza (desde 2 h antes);
+       · una SALIDA, para el que termina (hasta 2 h después).
+     Por eso de 04:30 a 08:30 y de 16:30 a 20:30 hay dos turnos en curso: el
+     que sale y el que entra. Una clave de turno es «2026-11-24-D» o
+     «2026-11-24-N» (la fecha del turno de noche es la del día en que empieza). */
+  var CAMBIO_DIA = 390, CAMBIO_NOCHE = 1110, MARGEN = 120;
+  function fechaDe(d) { return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
+  function sumarDias(f, n) { var d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() + n); return fechaDe(d); }
+  function turnoDe(tipo, cap) {
+    var f = cap.slice(0, 10), m = (+cap.slice(11, 13)) * 60 + (+cap.slice(14, 16));
+    var ini = tipo === 'salida' ? CAMBIO_DIA + MARGEN : CAMBIO_DIA - MARGEN;
+    var fin = tipo === 'salida' ? CAMBIO_NOCHE + MARGEN : CAMBIO_NOCHE - MARGEN;
+    if (m >= ini && m < fin) return f + '-D';
+    if (m >= fin) return f + '-N';
+    return sumarDias(f, -1) + '-N';
+  }
+  function turnoAnterior(k) { return k.slice(-1) === 'N' ? k.slice(0, 10) + '-D' : sumarDias(k.slice(0, 10), -1) + '-N'; }
+  function turnoSiguiente(k) { return k.slice(-1) === 'D' ? k.slice(0, 10) + '-N' : sumarDias(k.slice(0, 10), 1) + '-D'; }
+  function turnosEnCurso() {
+    var a = ahoraLocal(), e = turnoDe('entrada', a), s = turnoDe('salida', a);
+    return e === s ? [e] : [s, e].sort();           // el que sale primero
+  }
+  /* Hasta cuándo recibe registros (sus últimas salidas) */
+  function cierreTurno(k) { return k.slice(-1) === 'D' ? k.slice(0, 10) + ' 20:30:00' : sumarDias(k.slice(0, 10), 1) + ' 08:30:00'; }
+  function cerrado(k) { return ahoraLocal() >= cierreTurno(k); }
+  var vista = null;                                // null: el turno en curso; o la clave de uno anterior
+  function turnosVista() { return vista ? [vista] : turnosEnCurso(); }
+  function diaCorto(f) { var d = new Date(f + 'T12:00:00'); return d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }); }
+  function nombreTurno(k) { return k.slice(-1) === 'D' ? 'Turno de día' : 'Turno de noche'; }
+  function rangoTurno(k) {
+    var f = k.slice(0, 10);
+    return k.slice(-1) === 'D' ? diaCorto(f) + ' · 06:30 a 18:30' : diaCorto(f) + ' 18:30 a ' + diaCorto(sumarDias(f, 1)) + ' 06:30';
+  }
+  function turnoLargo(k) {                         // para las instrucciones a Claude
+    var f = k.slice(0, 10);
+    return k.slice(-1) === 'D' ? 'turno de día del ' + fechaLarga(f) + ' (06:30 a 18:30)'
+      : 'turno de noche del ' + fechaLarga(f) + ', 18:30, al ' + fechaLarga(sumarDias(f, 1)) + ', 06:30';
+  }
   function enLinea() { return window.AVBAApp ? AVBAApp.enLinea() : navigator.onLine !== false; }
   var tToast;
   function toast(t, err, deshacer) {
@@ -394,6 +463,7 @@
   function leerCola() {
     return tx('readonly', function (st) { return st.getAll(); }).then(function (r) {
       cola = (r || []).sort(function (a, b) { return a.capturado < b.capturado ? -1 : 1; });
+      cola.forEach(function (x) { if (!x.turno) x.turno = turnoDe(x.tipo, x.capturado); });
       pintarCola(); return cola;
     }).catch(function () { sinCola = true; cola = []; return cola; });
   }
@@ -401,6 +471,14 @@
   function quitarDeCola(uid) { return tx('readwrite', function (st) { return st.delete(uid); }).then(leerCola); }
 
   var enviando = null, espera = 0, tReintento = null, enviados = {};
+  /* ¿El servidor ya lo tiene guardado? Se le pregunta después de cada envío:
+     la foto sólo sale del equipo cuando el servidor confirma que la tiene. */
+  function confirmar(uids) {
+    return api('ACCESOS_EXISTEN', { uids: uids }).then(function (r) {
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'Sin confirmación');
+      return r.existen || {};
+    });
+  }
   /* Lo enviado en esta pantalla se sigue mostrando («Enviado») hasta que la
      lista del servidor lo traiga: nunca debe parecer que se borró. */
   var recienEnviados = [];
@@ -436,10 +514,17 @@
           if (!seguir) return false;
           return enviarUno(it).then(function (r) {
             if (r === 'ok') {
-              hubo++;
-              recienEnviados.push({ uid: it.uid, tipo: it.tipo, capturado: it.capturado, lugar: it.lugar, nota: it.nota, mini: it.mini, id: enviados[it.uid] });
-              recienEnviados = recienEnviados.slice(-50);
-              return quitarDeCola(it.uid).then(function () { return true; });
+              return confirmar([it.uid]).then(function (ya) {
+                if (!ya[it.uid]) {                                           // respondió, pero no lo tiene
+                  it.error = 'El servidor no confirmó que lo guardó. Toca Reintentar.';
+                  return ponerEnCola(it).then(function () { return true; });
+                }
+                hubo++;
+                enviados[it.uid] = ya[it.uid];
+                recienEnviados.push({ uid: it.uid, tipo: it.tipo, capturado: it.capturado, turno: it.turno, lugar: it.lugar, nota: it.nota, mini: it.mini, id: ya[it.uid] });
+                recienEnviados = recienEnviados.slice(-50);
+                return quitarDeCola(it.uid).then(function () { return true; });
+              }, function () { return false; });                             // sin confirmar: se queda y se reintenta (no duplica)
             }
             if (r === 'rechazo') return ponerEnCola(it).then(function () { return true; });
             if (r === 'sesion') { sesionVencida(); return false; }
@@ -476,7 +561,7 @@
 
   /* Guarda un registro: a la cola y de inmediato se puede tomar el siguiente */
   function registrar(tipo, blob, mini, capturado, nota) {
-    var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, lugar: normaLugar($('lugar').value),
+    var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, turno: turnoDe(tipo, capturado), lugar: normaLugar($('lugar').value),
                nota: nota || '', mini: mini, mime: 'image/jpeg', creado: Date.now() };
     var deshacer = function () {
       if (cola.some(function (x) { return x.uid === it.uid; })) { quitarDeCola(it.uid).then(pintarLista); toast('Registro descartado.'); return; }
@@ -490,7 +575,7 @@
       if (sinCola) {                               // sin almacenamiento local: se envía y se espera
         return enviarUno(it).then(function (r) {
           enviando = null;
-          if (r === 'ok') { toast(txt + '.', false, deshacer); cargar(true); }
+          if (r === 'ok') { recienEnviados.push({ uid: it.uid, tipo: it.tipo, capturado: it.capturado, turno: it.turno, lugar: it.lugar, nota: it.nota, mini: it.mini, id: enviados[it.uid] }); toast(txt + '.', false, deshacer); cargar(true); }
           else toast(r === 'sesion' ? 'Tu sesión venció.' : (it.error || 'Sin conexión: no se guardó. Inténtalo de nuevo.'), true);
         });
       }
@@ -501,18 +586,43 @@
     }).catch(function (e) { toast('No se pudo guardar: ' + (e.message || e), true); });
   }
 
-  /* ── Punto de control y día ── */
+  /* ── Punto de control y turno ── */
   $('lugar').value = leer(CLAVE_LUGAR, '') || '';
-  $('fecha').value = hoyLocal();
   $('lugar').addEventListener('change', function () { $('lugar').value = normaLugar($('lugar').value); guardar(CLAVE_LUGAR, $('lugar').value); cargar(true); armarPrompt(); limpiarPartes(); });
-  $('fecha').addEventListener('change', function () { if (!$('fecha').value) $('fecha').value = hoyLocal(); pintarDia(); cargar(true); armarPrompt(); limpiarPartes(); });
   $('solo-punto').addEventListener('change', function () { cargar(true); });
-  function esHoy() { return $('fecha').value === hoyLocal(); }
-  function pintarDia() {
-    $('aviso-dia').hidden = esHoy();
-    document.querySelectorAll('.cap').forEach(function (b) { b.disabled = !esHoy(); });
+  function pintarTurno() {
+    var ks = turnosVista();
+    if (vista) { $('t-nombre').textContent = nombreTurno(vista); $('t-sub').textContent = rangoTurno(vista); }
+    else if (ks.length > 1) {
+      $('t-nombre').textContent = 'Cambio de turno';
+      $('t-sub').textContent = 'Sale el ' + nombreTurno(ks[0]).slice(6) + ' y entra el ' + nombreTurno(ks[1]).slice(6);
+    } else { $('t-nombre').textContent = nombreTurno(ks[0]) + ' · en curso'; $('t-sub').textContent = rangoTurno(ks[0]); }
+    $('t-sig').disabled = !vista;
+    $('aviso-dia').hidden = !vista;
+    document.querySelectorAll('.cap').forEach(function (b) { b.disabled = !!vista; });
+    $('tit-lista').textContent = (CASETA ? 'Tus registros' : 'Registros') + (ks.length > 1 ? ' de los dos turnos' : ' del turno');
   }
-  pintarDia();
+  var firmaVista = '';
+  function cambioVista() {
+    firmaVista = turnosVista().join(',');
+    datos = { registros: [], totales: {}, mas: false };
+    pintarTurno(); pintarLista(); opcionesPdf(); cargar(true);
+  }
+  $('t-ant').onclick = function () { vista = turnoAnterior(turnosVista()[0]); cambioVista(); };
+  $('t-sig').onclick = function () {
+    if (!vista) return;
+    var sig = turnoSiguiente(vista);
+    vista = sig >= turnosEnCurso()[0] ? null : sig;
+    cambioVista();
+  };
+  $('btn-curso').onclick = function () { vista = null; cambioVista(); };
+  /* Cambio de turno: la pantalla pasa sola al turno nuevo */
+  setInterval(function () {
+    if (turnosVista().join(',') === firmaVista) return;
+    firmaVista = turnosVista().join(',');
+    pintarTurno(); pintarLista(); opcionesPdf();
+    if (enLinea()) cargar(true);
+  }, 15000);
   api('LISTAR_ACCESOS_LUGARES', {}, 'GET').then(function (r) {
     $('lugares').innerHTML = (r.lugares || []).map(function (l) { return '<option value="' + esc(l) + '">'; }).join('');
   }).catch(function () {});
@@ -662,67 +772,92 @@
     });
   };
 
-  /* ══ Lista del día ═══════════════════════════════════════════════════ */
-  var datos = { registros: [], totales: { entrada: 0, salida: 0 }, mas: false };
-  var cargando = false, tRecarga = null;
+  /* ══ Lista del turno ═════════════════════════════════════════════════
+     Los contadores y la lista vienen del servidor: siguen igual al salir y
+     volver a entrar, en este equipo o en otro, hasta el cambio de turno. */
+  var datos = { registros: [], totales: {}, mas: false };
+  var cargando = false, tRecarga = null, errLista = '', pedido = 0;
   function programarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(function () { cargar(true); }, 1200); }
   function consulta() {
-    var q = { fecha: $('fecha').value, limite: POR_PAGINA };
+    var q = { turnos: turnosVista().join(','), limite: POR_PAGINA };
     if ($('solo-punto').checked) q.lugar = normaLugar($('lugar').value);
     return q;
   }
   function cargar(reset) {
     if (cargando && !reset) return Promise.resolve();
     cargando = true;
-    var q = consulta();
+    var q = consulta(), mio = ++pedido;
     var previos = reset ? [] : datos.registros;
     if (!reset && previos.length) { var u = previos[previos.length - 1]; q.antes_cap = u.capturado; q.antes_id = u.id; }
     return api('LISTAR_ACCESOS', q, 'GET').then(function (r) {
-      if (r.status !== 'success') throw new Error(r.message || '');
+      if (mio !== pedido || q.turnos !== turnosVista().join(',')) return;   // llegó tarde: ya se pidió otra cosa
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'El servidor no respondió como se esperaba.');
       datos = { registros: previos.concat(r.registros || []), totales: r.totales || {}, mas: !!r.mas };
+      errLista = '';
       pintarLista();
-    }).catch(function () { pintarLista(); }).then(function () { cargando = false; });
+    }).catch(function (e) {
+      if (mio !== pedido) return;
+      errLista = enLinea() ? 'No se pudo actualizar la lista: ' + ((e && e.message) || 'error del servidor') + '. Lo capturado sigue guardado en este equipo.'
+                           : 'Sin señal: los contadores se actualizan al volver la señal. Lo capturado se guarda en este equipo.';
+      pintarLista();
+    }).then(function () { if (mio === pedido) cargando = false; });
   }
   $('btn-mas').onclick = function () { cargar(false); };
+  function visible(x) {
+    var ks = turnosVista(), l = normaLugar($('lugar').value), solo = $('solo-punto').checked;
+    return ks.indexOf(x.turno) >= 0 && (!solo || x.lugar === l);
+  }
   function enColaVisible() {
-    var f = $('fecha').value, l = normaLugar($('lugar').value), solo = $('solo-punto').checked;
-    return cola.filter(function (x) { return x.capturado.slice(0, 10) === f && (!solo || x.lugar === l); });
+    return cola.filter(function (x) { return x.error || visible(x); });     // lo rechazado siempre a la vista
   }
   function enviadosSinListar() {
-    var f = $('fecha').value, l = normaLugar($('lugar').value), solo = $('solo-punto').checked;
     var enLista = {}; (datos.registros || []).forEach(function (x) { enLista[x.uid] = 1; });
     recienEnviados = recienEnviados.filter(function (x) { return !enLista[x.uid]; });
-    return recienEnviados.filter(function (x) { return x.capturado.slice(0, 10) === f && (!solo || x.lugar === l); });
+    return recienEnviados.filter(visible);
+  }
+  function bloqueTurno(k, t, i, n) {
+    var etq = n > 1 ? (i === 0 ? '<em class="sale">Saliendo</em>' : '<em>Entrando</em>') : '';
+    return '<div class="bloque-turno">' +
+      (n > 1 ? '<div class="bt-tit"><b>' + nombreTurno(k) + '</b><span>' + esc(rangoTurno(k)) + '</span>' + etq + '</div>' : '') +
+      '<div class="totales"><div class="tot e"><b>' + numero(t.entrada) + '</b><span>Entradas</span></div>' +
+      '<div class="tot s"><b>' + numero(t.salida) + '</b><span>Salidas</span></div>' +
+      '<div class="tot d"><b>' + numero(t.entrada - t.salida) + '</b><span>Diferencia</span></div></div></div>';
   }
   function pintarLista() {
-    var filtro = seg('filtro'), pend = enColaVisible(), sueltos = enviadosSinListar();
-    var tot = { entrada: (datos.totales || {}).entrada || 0, salida: (datos.totales || {}).salida || 0 };
-    pend.forEach(function (x) { if (!x.error) tot[x.tipo]++; });
-    sueltos.forEach(function (x) { tot[x.tipo]++; });
-    $('t-ent').textContent = numero(tot.entrada); $('t-sal').textContent = numero(tot.salida); $('t-dif').textContent = numero(tot.entrada - tot.salida);
-    var vista = function (x) { return filtro === 'todos' || x.tipo === filtro; };
-    var html = pend.filter(vista).slice().reverse().map(function (x) {
+    var filtro = seg('filtro'), pend = enColaVisible(), sueltos = enviadosSinListar(), ks = turnosVista(), tot = {};
+    ks.forEach(function (k) { var t = (datos.totales || {})[k] || {}; tot[k] = { entrada: t.entrada || 0, salida: t.salida || 0 }; });
+    pend.forEach(function (x) { if (!x.error && tot[x.turno]) tot[x.turno][x.tipo]++; });
+    sueltos.forEach(function (x) { if (tot[x.turno]) tot[x.turno][x.tipo]++; });
+    $('totales').innerHTML = ks.map(function (k, i) { return bloqueTurno(k, tot[k], i, ks.length); }).join('');
+    $('err-lista').hidden = !errLista; $('err-lista').textContent = errLista;
+    var hora = function (x) {
+      var c = x.capturado || '';
+      return (x.turno && c.slice(0, 10) !== x.turno.slice(0, 10) ? c.slice(8, 10) + '/' + c.slice(5, 7) + ' ' : '') + c.slice(11, 19);
+    };
+    var deTurno = function (x) { return ks.length > 1 || ks.indexOf(x.turno) < 0 ? ' · ' + nombreTurno(x.turno) : ''; };
+    var porTipo = function (x) { return filtro === 'todos' || x.tipo === filtro; };
+    var html = pend.filter(porTipo).slice().reverse().map(function (x) {
       var estado = x.error ? '<span class="badge rech">No se aceptó</span>' : (enviando === x.uid ? '<span class="badge pend">Enviando…</span>' : '<span class="badge cola">En cola</span>');
       return '<li class="reg"><img alt="" src="' + esc(x.mini) + '"><div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' +
-        (x.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + '</span>' + esc(x.capturado.slice(11)) + ' ' + estado + '</div>' +
-        '<div class="l2">' + esc(x.lugar) + (x.nota ? ' · ' + esc(x.nota) : '') + (x.error ? '<br><span style="color:var(--rojo)">' + esc(x.error) + '</span>' : '') + '</div>' +
+        (x.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + '</span>' + esc(hora(x)) + ' ' + estado + '</div>' +
+        '<div class="l2">' + esc(x.lugar) + deTurno(x) + (x.nota ? ' · ' + esc(x.nota) : '') + (x.error ? '<br><span style="color:var(--rojo)">' + esc(x.error) + '</span>' : '') + '</div>' +
         (x.error ? '<div class="mini-acc"><button type="button" data-reintentar="' + esc(x.uid) + '">Reintentar</button><button type="button" data-descartar="' + esc(x.uid) + '">Descartar</button></div>' : '') +
         '</div></li>';
     }).join('');
-    html += sueltos.filter(vista).slice().reverse().map(function (x) {
+    html += sueltos.filter(porTipo).slice().reverse().map(function (x) {
       return '<li class="reg"><img alt="" src="' + esc(x.mini) + '"><div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' +
-        (x.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + '</span>' + esc(x.capturado.slice(11)) + ' <span class="badge entrada">Enviado ✓</span></div>' +
-        '<div class="l2">' + esc(x.lugar) + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div></li>';
+        (x.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + '</span>' + esc(hora(x)) + ' <span class="badge entrada">Enviado ✓</span></div>' +
+        '<div class="l2">' + esc(x.lugar) + deTurno(x) + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div></li>';
     }).join('');
-    html += (datos.registros || []).filter(vista).map(function (x) {
+    html += (datos.registros || []).filter(function (x) { return ks.indexOf(x.turno) >= 0; }).filter(porTipo).map(function (x) {
       var ent = x.tipo === 'entrada';
       return '<li class="reg"><img loading="lazy" alt="" data-id="' + x.id + '" src="' + esc(urlFoto(x.id, true)) + '" onerror="this.outerHTML=\'<div class=sinfoto>Foto sin señal</div>\'">' +
-        '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' + (ent ? 'ENTRADA ' : 'SALIDA ') + String(x.num).padStart(3, '0') + '</span>' + esc(x.hora) + '</div>' +
-        '<div class="l2">' + esc(x.lugar) + ' · ' + esc(x.nombre) + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div>' +
+        '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' + (ent ? 'ENTRADA ' : 'SALIDA ') + String(x.num).padStart(3, '0') + '</span>' + esc(hora(x)) + '</div>' +
+        '<div class="l2">' + esc(x.lugar) + ' · ' + esc(x.nombre) + deTurno(x) + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div>' +
         (x.puede_borrar ? '<button class="borrar" type="button" data-borrar="' + x.id + '" aria-label="Eliminar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>' : '') +
         '</li>';
     }).join('');
-    $('lista').innerHTML = html || '<li class="vacio">Sin registros' + (filtro !== 'todos' ? ' de este tipo' : '') + ' en este día.</li>';
+    $('lista').innerHTML = html || '<li class="vacio">Sin registros' + (filtro !== 'todos' ? ' de este tipo' : '') + ' en ' + (ks.length > 1 ? 'estos turnos' : 'este turno') + '.</li>';
     $('btn-mas').hidden = !datos.mas;
   }
   $('lista').addEventListener('click', function (ev) {
@@ -764,8 +899,27 @@
   }
   pintarBotonPdf();
   if (window.AVBAApp && AVBAApp.alCambiarConexion) AVBAApp.alCambiarConexion(function () { pintarBotonPdf(); if (enLinea()) { enviarCola(); cargar(true); } });
+  /* Turnos para el PDF: los en curso y los 8 anteriores. Se propone el
+     último que ya terminó (con sus salidas completas). */
+  function opcionesPdf() {
+    var ks = turnosEnCurso(), lista = ks.slice().reverse(), k = turnoAnterior(ks[0]), sel = $('pdf-turno'), antes = sel.value;
+    for (var i = 0; i < 8; i++) { lista.push(k); k = turnoAnterior(k); }
+    if (vista && lista.indexOf(vista) < 0) lista.push(vista);
+    sel.innerHTML = lista.map(function (x) {
+      return '<option value="' + x + '">' + esc(nombreTurno(x) + ' · ' + rangoTurno(x) + (cerrado(x) ? '' : ' (en curso)')) + '</option>';
+    }).join('');
+    sel.value = vista || (lista.indexOf(antes) >= 0 ? antes : turnoAnterior(ks[0]));
+    avisoPdf();
+  }
+  function avisoPdf() {
+    var k = $('pdf-turno').value, abierto = k && !cerrado(k);
+    $('pdf-aviso').hidden = !abierto;
+    if (abierto) $('pdf-aviso').textContent = 'Este turno sigue abierto: recibe salidas hasta las ' + cierreTurno(k).slice(11, 16) +
+      ' del ' + diaCorto(cierreTurno(k).slice(0, 10)) + '. El PDF tendrá sólo lo registrado hasta ahora.';
+  }
+  $('pdf-turno').addEventListener('change', function () { avisoPdf(); armarPrompt(); limpiarPartes(); });
   function pedirPdf() {
-    var q = { fecha: $('fecha').value, incluir: seg('incluir') };
+    var q = { turno: $('pdf-turno').value, incluir: seg('incluir') };
     if ($('pdf-punto').checked) q.lugar = normaLugar($('lugar').value);
     return q;
   }
@@ -780,7 +934,7 @@
       $('pdf-res').innerHTML = '<div class="nota ' + (r.paginas > 100 || mb > 30 ? 'mal' : 'ok') + '">' +
         (r.partes > 1 ? '<b>Parte ' + r.parte + ' de ' + r.partes + '</b> · ' : '') + numero(r.entradas) + ' entradas y ' + numero(r.salidas) + ' salidas · ' +
         r.paginas + ' página' + (r.paginas === 1 ? '' : 's') + ' · ' + mb.toFixed(1) + ' MB' +
-        (r.partes > 1 ? '<br>El día tiene ' + numero(r.total) + ' fotos: van en ' + r.partes + ' partes. Claude analiza cada parte por separado, así que no puede cruzar una entrada de una parte con la salida de otra.' : '') +
+        (r.partes > 1 ? '<br>El turno tiene ' + numero(r.total) + ' fotos: van en ' + r.partes + ' partes. Claude analiza cada parte por separado, así que no puede cruzar una entrada de una parte con la salida de otra.' : '') +
         '</div><a class="btn verde ancho" style="margin-top:8px" target="_blank" rel="noopener" href="' + esc(r.url + '&token=' + encodeURIComponent(token())) + '">Abrir PDF' + (r.partes > 1 ? ' (parte ' + r.parte + ')' : '') + '</a>';
       armarPrompt();
     }).catch(function (e) {
@@ -808,7 +962,7 @@
   function armarPrompt() {
     var inc = seg('incluir'), punto = $('pdf-punto').checked ? normaLugar($('lugar').value) : '';
     var secciones = inc === 'ambos' ? 'secciones de ENTRADAS y SALIDAS' : (inc === 'entrada' ? 'sólo la sección de ENTRADAS' : 'sólo la sección de SALIDAS');
-    var dia = fechaLarga($('fecha').value) + (punto ? ' en «' + punto + '»' : '');
+    var dia = turnoLargo($('pdf-turno').value || turnosEnCurso()[0]) + (punto ? ' en «' + punto + '»' : '');
     var numeroId = 'el número de identificación: en la INE, la clave de elector; en licencias, pasaportes y credenciales, su número o folio. Usa el mismo tipo de número para la misma identificación. No transcribas nombres, domicilios, fechas de nacimiento ni otros datos personales.';
     var faltantes = '   • Quién entró y no tiene salida registrada.\n' +
       '   • Quién salió sin entrada registrada.\n' +
@@ -816,22 +970,22 @@
       '   • Los números que aparecen más de una vez en entradas o en salidas.\n';
     $('prompt').textContent =
       'Te adjunto el PDF del control de accesos del ' + dia + '. Tiene ' + secciones + '.' +
-      ' Cada fotografía es una identificación (INE, licencia, pasaporte, credencial de empresa u otra) y lleva su etiqueta, por ejemplo «ENTRADA 001 · 08:15:32».\n\n' +
+      ' Cada fotografía es una identificación (INE, licencia, pasaporte, credencial de empresa u otra) y lleva su etiqueta, por ejemplo «ENTRADA 001 · 24/11 06:15:32» (tipo, número, día/mes y hora).\n\n' +
       '1. De cada fotografía extrae SOLO ' + numeroId + '\n' +
-      '2. Arma una tabla con: número de identificación, etiqueta y hora de entrada, etiqueta y hora de salida.\n' +
+      '2. Arma una tabla con: número de identificación, etiqueta, día y hora de entrada, etiqueta, día y hora de salida.\n' +
       '3. Debajo de la tabla indica todo lo que no cuadra:\n' + faltantes +
       '4. Al final, el total de entradas, de salidas y de personas distintas.';
     $('prompt-paso1').textContent =
-      'Te adjunto una parte del PDF del control de accesos del ' + dia + '. Cada fotografía es una identificación y lleva su etiqueta, por ejemplo «ENTRADA 001 · 08:15:32».\n\n' +
+      'Te adjunto una parte del PDF del control de accesos del ' + dia + '. Cada fotografía es una identificación y lleva su etiqueta, por ejemplo «ENTRADA 001 · 24/11 06:15:32» (tipo, número, día/mes y hora).\n\n' +
       'De cada fotografía extrae SOLO ' + numeroId + '\n\n' +
-      'Entrégame únicamente una lista en formato CSV, un renglón por fotografía y en el orden del PDF, con las columnas: tipo,numero_etiqueta,hora,numero_identificacion\n' +
-      'Ejemplo: ENTRADA,001,08:15:32,ABCD12345678\n' +
+      'Entrégame únicamente una lista en formato CSV, un renglón por fotografía y en el orden del PDF, con las columnas: tipo,numero_etiqueta,dia_hora,numero_identificacion\n' +
+      'Ejemplo: ENTRADA,001,24/11 06:15:32,ABCD12345678\n' +
       'Si el número no se lee o tienes duda, escribe ILEGIBLE en numero_identificacion. No agregues explicaciones antes ni después de la lista.';
     $('prompt-paso2').textContent =
       'Te paso, debajo de estas instrucciones, las listas CSV de todas las partes del control de accesos del ' + dia +
-      '. Cada renglón es: tipo,numero_etiqueta,hora,numero_identificacion.\n\n' +
+      '. Cada renglón es: tipo,numero_etiqueta,dia_hora,numero_identificacion.\n\n' +
       '1. Junta todas las listas y cruza las ENTRADAS con las SALIDAS por número de identificación.\n' +
-      '2. Arma una tabla con: número de identificación, etiqueta y hora de entrada, etiqueta y hora de salida.\n' +
+      '2. Arma una tabla con: número de identificación, etiqueta, día y hora de entrada, etiqueta, día y hora de salida.\n' +
       '3. Debajo de la tabla indica todo lo que no cuadra:\n' + faltantes +
       '4. Al final, el total de entradas, de salidas y de personas distintas.\n\n' +
       'Listas:\n';
@@ -862,7 +1016,9 @@
   }).then(function () { enviarCola(); });
   // Otros puntos registran al mismo tiempo: se actualiza solo
   setInterval(function () { if (!document.hidden && enLinea() && $('v-prev').hidden && !cargando) cargar(true); }, 30000);
-  cargar(true);
+  opcionesPdf(); armarPrompt();
+  firmaVista = turnosVista().join(',');
+  pintarTurno(); pintarLista(); cargar(true);
 })();
 </script>
 <script src="js/movil.js"></script>
