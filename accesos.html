@@ -237,8 +237,16 @@
     <div id="pdf-res"></div>
     <div class="partes" id="partes"></div>
     <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700;font-size:13.5px;color:var(--azul-dark)">Instrucciones para pedirle el análisis a Claude</summary>
+      <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-top:8px"><b>Si el día cabe en un solo PDF:</b> súbelo con estas instrucciones.</p>
       <pre class="prompt" id="prompt"></pre>
-      <button class="btn sec ancho" id="btn-copiar" type="button" style="margin-top:8px">Copiar instrucciones</button>
+      <button class="btn sec ancho" data-copiar="prompt" type="button" style="margin-top:8px">Copiar instrucciones (un PDF)</button>
+      <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-top:14px"><b>Si el día va en varias partes</b> (días grandes), en dos pasos, porque Claude no puede cruzar entradas y salidas que quedan en PDF distintos:</p>
+      <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-top:6px"><b>Paso 1.</b> Un chat por cada parte: sube el PDF con esto y guarda la lista que te devuelva.</p>
+      <pre class="prompt" id="prompt-paso1"></pre>
+      <button class="btn sec ancho" data-copiar="prompt-paso1" type="button" style="margin-top:8px">Copiar paso 1 (cada parte)</button>
+      <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-top:10px"><b>Paso 2.</b> En un chat nuevo, pega esto y debajo todas las listas del paso 1, una tras otra.</p>
+      <pre class="prompt" id="prompt-paso2"></pre>
+      <button class="btn sec ancho" data-copiar="prompt-paso2" type="button" style="margin-top:8px">Copiar paso 2 (cruce final)</button>
     </details>
   </div>
 </main>
@@ -759,31 +767,48 @@
   function armarPrompt() {
     var inc = seg('incluir'), punto = $('pdf-punto').checked ? normaLugar($('lugar').value) : '';
     var secciones = inc === 'ambos' ? 'secciones de ENTRADAS y SALIDAS' : (inc === 'entrada' ? 'sólo la sección de ENTRADAS' : 'sólo la sección de SALIDAS');
-    var parte = partes.total > 1 ? ' Es una de ' + partes.total + ' partes del día: analiza sólo lo que viene en este archivo.' : '';
-    $('prompt').textContent =
-      'Te adjunto el PDF del control de accesos del ' + fechaLarga($('fecha').value) + (punto ? ' en «' + punto + '»' : '') + '. Tiene ' + secciones + '.' + parte +
-      ' Cada fotografía es una identificación (INE, licencia, pasaporte, credencial de empresa u otra) y lleva su etiqueta, por ejemplo «ENTRADA 001 · 08:15:32».\n\n' +
-      '1. De cada fotografía extrae SOLO el número de identificación: en la INE, la clave de elector; en licencias, pasaportes y credenciales, su número o folio. Usa el mismo tipo de número para la misma identificación. No transcribas nombres, domicilios, fechas de nacimiento ni otros datos personales.\n' +
-      '2. Arma una tabla con: número de identificación, etiqueta y hora de entrada, etiqueta y hora de salida.\n' +
-      '3. Debajo de la tabla indica todo lo que no cuadra:\n' +
-      '   • Quién entró y no tiene salida registrada.\n' +
+    var dia = fechaLarga($('fecha').value) + (punto ? ' en «' + punto + '»' : '');
+    var numeroId = 'el número de identificación: en la INE, la clave de elector; en licencias, pasaportes y credenciales, su número o folio. Usa el mismo tipo de número para la misma identificación. No transcribas nombres, domicilios, fechas de nacimiento ni otros datos personales.';
+    var faltantes = '   • Quién entró y no tiene salida registrada.\n' +
       '   • Quién salió sin entrada registrada.\n' +
       '   • Las fotos donde el número no se lee o hay duda (con su etiqueta).\n' +
-      '   • Los números que aparecen más de una vez en entradas o en salidas.\n' +
+      '   • Los números que aparecen más de una vez en entradas o en salidas.\n';
+    $('prompt').textContent =
+      'Te adjunto el PDF del control de accesos del ' + dia + '. Tiene ' + secciones + '.' +
+      ' Cada fotografía es una identificación (INE, licencia, pasaporte, credencial de empresa u otra) y lleva su etiqueta, por ejemplo «ENTRADA 001 · 08:15:32».\n\n' +
+      '1. De cada fotografía extrae SOLO ' + numeroId + '\n' +
+      '2. Arma una tabla con: número de identificación, etiqueta y hora de entrada, etiqueta y hora de salida.\n' +
+      '3. Debajo de la tabla indica todo lo que no cuadra:\n' + faltantes +
       '4. Al final, el total de entradas, de salidas y de personas distintas.';
+    $('prompt-paso1').textContent =
+      'Te adjunto una parte del PDF del control de accesos del ' + dia + '. Cada fotografía es una identificación y lleva su etiqueta, por ejemplo «ENTRADA 001 · 08:15:32».\n\n' +
+      'De cada fotografía extrae SOLO ' + numeroId + '\n\n' +
+      'Entrégame únicamente una lista en formato CSV, un renglón por fotografía y en el orden del PDF, con las columnas: tipo,numero_etiqueta,hora,numero_identificacion\n' +
+      'Ejemplo: ENTRADA,001,08:15:32,ABCD12345678\n' +
+      'Si el número no se lee o tienes duda, escribe ILEGIBLE en numero_identificacion. No agregues explicaciones antes ni después de la lista.';
+    $('prompt-paso2').textContent =
+      'Te paso, debajo de estas instrucciones, las listas CSV de todas las partes del control de accesos del ' + dia +
+      '. Cada renglón es: tipo,numero_etiqueta,hora,numero_identificacion.\n\n' +
+      '1. Junta todas las listas y cruza las ENTRADAS con las SALIDAS por número de identificación.\n' +
+      '2. Arma una tabla con: número de identificación, etiqueta y hora de entrada, etiqueta y hora de salida.\n' +
+      '3. Debajo de la tabla indica todo lo que no cuadra:\n' + faltantes +
+      '4. Al final, el total de entradas, de salidas y de personas distintas.\n\n' +
+      'Listas:\n';
   }
   $('pdf-punto').addEventListener('change', function () { armarPrompt(); limpiarPartes(); });
   armarPrompt();
-  $('btn-copiar').onclick = function () {
-    var t = $('prompt').textContent;
-    (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(t) : Promise.reject())
-      .then(function () { toast('Instrucciones copiadas: pégalas en Claude junto con el PDF.'); })
-      .catch(function () {
-        var r = document.createRange(); r.selectNodeContents($('prompt'));
-        var s2 = getSelection(); s2.removeAllRanges(); s2.addRange(r);
-        toast('Selecciona y copia el texto de las instrucciones.');
-      });
-  };
+  document.querySelectorAll('[data-copiar]').forEach(function (b) {
+    b.onclick = function () {
+      var el = $(b.dataset.copiar), t = el.textContent;
+      (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(t) : Promise.reject())
+        .then(function () { toast('Instrucciones copiadas.'); })
+        .catch(function () {
+          var r = document.createRange(); r.selectNodeContents(el);
+          var s2 = getSelection(); s2.removeAllRanges(); s2.addRange(r);
+          toast('Selecciona y copia el texto de las instrucciones.');
+        });
+    };
+  });
 
   /* ── Arranque ── */
   // Lo que quedó en cola y el servidor ya tiene (se cortó la señal a medio envío) sale sin volver a subir la foto
