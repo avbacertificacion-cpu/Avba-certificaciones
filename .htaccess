@@ -50,6 +50,13 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
     <FilesMatch "\.html$">
         Header set Cache-Control "no-cache, must-revalidate"
     </FilesMatch>
+    # Lo mismo para scripts y estilos: con cada despliegue cambian junto con las
+    # páginas, y una copia vieja guardada en el navegador rompía la página
+    # nueva (p. ej. «Rol no reconocido» con js/destinos.js viejo). Revalidar
+    # cuesta poco: si no cambió, el servidor contesta 304 sin reenviarlo.
+    <FilesMatch "\.(js|css)$">
+        Header set Cache-Control "no-cache, must-revalidate"
+    </FilesMatch>
 </IfModule>
 
 # ── Deshabilitar listado de directorios ───────────────────

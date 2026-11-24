@@ -289,8 +289,14 @@
 <script>
 const API = "api/index.php";
 
-// Pantalla de cada rol: js/destinos.js (la comparte la app)
-const DESTINOS = window.AVBA_DESTINOS || {};
+// Pantalla de cada rol: js/destinos.js (la comparte la app). La lista de aquí
+// es el respaldo por si el navegador todavía tiene guardada una copia vieja de
+// ese archivo: lo que traiga js/destinos.js manda.
+const DESTINOS = Object.assign({
+  ADMIN: "admin.html", INSPECTOR: "inspector.html", CALIDAD: "calidad.html",
+  CERTIFICACIONES: "certificaciones.html", ADMINISTRATIVO: "administrativo.html",
+  CLIENTE: "portal-cliente.html", PARTICIPANTE: "participante.html", ACCESOS: "accesos.html"
+}, window.AVBA_DESTINOS || {});
 
 function focusPass() { document.getElementById("password").focus(); }
 
