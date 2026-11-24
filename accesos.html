@@ -401,6 +401,9 @@
   function quitarDeCola(uid) { return tx('readwrite', function (st) { return st.delete(uid); }).then(leerCola); }
 
   var enviando = null, espera = 0, tReintento = null, enviados = {};
+  /* Lo enviado en esta pantalla se sigue mostrando («Enviado») hasta que la
+     lista del servidor lo traiga: nunca debe parecer que se borró. */
+  var recienEnviados = [];
   function formulario(it) {
     var fd = new FormData();
     ['uid', 'tipo', 'capturado', 'lugar', 'nota'].forEach(function (k) { fd.append(k, it[k] || ''); });
@@ -432,7 +435,12 @@
         return p.then(function (seguir) {
           if (!seguir) return false;
           return enviarUno(it).then(function (r) {
-            if (r === 'ok') { hubo++; return quitarDeCola(it.uid).then(function () { return true; }); }
+            if (r === 'ok') {
+              hubo++;
+              recienEnviados.push({ uid: it.uid, tipo: it.tipo, capturado: it.capturado, lugar: it.lugar, nota: it.nota, mini: it.mini, id: enviados[it.uid] });
+              recienEnviados = recienEnviados.slice(-50);
+              return quitarDeCola(it.uid).then(function () { return true; });
+            }
             if (r === 'rechazo') return ponerEnCola(it).then(function () { return true; });
             if (r === 'sesion') { sesionVencida(); return false; }
             return false;                                                    // red: parar y reintentar
@@ -680,10 +688,17 @@
     var f = $('fecha').value, l = normaLugar($('lugar').value), solo = $('solo-punto').checked;
     return cola.filter(function (x) { return x.capturado.slice(0, 10) === f && (!solo || x.lugar === l); });
   }
+  function enviadosSinListar() {
+    var f = $('fecha').value, l = normaLugar($('lugar').value), solo = $('solo-punto').checked;
+    var enLista = {}; (datos.registros || []).forEach(function (x) { enLista[x.uid] = 1; });
+    recienEnviados = recienEnviados.filter(function (x) { return !enLista[x.uid]; });
+    return recienEnviados.filter(function (x) { return x.capturado.slice(0, 10) === f && (!solo || x.lugar === l); });
+  }
   function pintarLista() {
-    var filtro = seg('filtro'), pend = enColaVisible();
+    var filtro = seg('filtro'), pend = enColaVisible(), sueltos = enviadosSinListar();
     var tot = { entrada: (datos.totales || {}).entrada || 0, salida: (datos.totales || {}).salida || 0 };
     pend.forEach(function (x) { if (!x.error) tot[x.tipo]++; });
+    sueltos.forEach(function (x) { tot[x.tipo]++; });
     $('t-ent').textContent = numero(tot.entrada); $('t-sal').textContent = numero(tot.salida); $('t-dif').textContent = numero(tot.entrada - tot.salida);
     var vista = function (x) { return filtro === 'todos' || x.tipo === filtro; };
     var html = pend.filter(vista).slice().reverse().map(function (x) {
@@ -693,6 +708,11 @@
         '<div class="l2">' + esc(x.lugar) + (x.nota ? ' · ' + esc(x.nota) : '') + (x.error ? '<br><span style="color:var(--rojo)">' + esc(x.error) + '</span>' : '') + '</div>' +
         (x.error ? '<div class="mini-acc"><button type="button" data-reintentar="' + esc(x.uid) + '">Reintentar</button><button type="button" data-descartar="' + esc(x.uid) + '">Descartar</button></div>' : '') +
         '</div></li>';
+    }).join('');
+    html += sueltos.filter(vista).slice().reverse().map(function (x) {
+      return '<li class="reg"><img alt="" src="' + esc(x.mini) + '"><div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' +
+        (x.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + '</span>' + esc(x.capturado.slice(11)) + ' <span class="badge entrada">Enviado ✓</span></div>' +
+        '<div class="l2">' + esc(x.lugar) + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div></li>';
     }).join('');
     html += (datos.registros || []).filter(vista).map(function (x) {
       var ent = x.tipo === 'entrada';

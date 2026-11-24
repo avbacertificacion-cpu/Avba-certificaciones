@@ -176,6 +176,27 @@ class ControlAccesos {
         return $filas;
     }
 
+    /**
+     * «Hoy» de la cuenta de caseta: el día que dice su teléfono, siempre que
+     * esté a un día o menos del día del servidor. El servidor puede llevar
+     * otra zona horaria (UTC va 6 horas adelante de México): con su fecha, de
+     * noche la lista quedaba en el día siguiente y lo recién registrado
+     * desaparecía de la pantalla. El margen de un día no deja ver otros días.
+     */
+    private static function hoyCaseta(array $p): string {
+        $hoy = date('Y-m-d');
+        $f = (string)($p['fecha'] ?? '');
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $f) && abs(strtotime($f . ' 12:00:00') - strtotime($hoy . ' 12:00:00')) <= 86400) return $f;
+        return $hoy;
+    }
+
+    /** Un registro propio se puede borrar durante 18 horas (sin depender de zonas horarias) */
+    private const HORAS_PARA_BORRAR = 18;
+    private static function reciente(string $recibido): bool {
+        $t = strtotime($recibido);
+        return $t !== false && $t >= time() - self::HORAS_PARA_BORRAR * 3600;
+    }
+
     private static function fechaValida($v): string {
         $v = (string)$v;
         return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : date('Y-m-d');
@@ -190,7 +211,7 @@ class ControlAccesos {
     public function listar(array $p, array $usr): array {
         self::asegurarTabla($this->pdo);
         $caseta = self::esCaseta($usr);
-        $fecha = $caseta ? date('Y-m-d') : self::fechaValida($p['fecha'] ?? '');
+        $fecha = $caseta ? self::hoyCaseta($p) : self::fechaValida($p['fecha'] ?? '');
         $lugar = $caseta ? '' : textoEstandar($p['lugar'] ?? '');
         $limite = max(10, min(200, (int)($p['limite'] ?? 60)));
 
@@ -224,7 +245,7 @@ class ControlAccesos {
              . ($caseta ? " AND b.usuario = a.usuario" : '')
              . " AND (b.capturado < a.capturado OR (b.capturado = a.capturado AND b.id <= a.id)))";
         $st = $this->pdo->prepare(
-            "SELECT a.id, a.uid, a.tipo, a.capturado, a.lugar, a.nota, a.usuario, a.usuario_nombre, $num AS num
+            "SELECT a.id, a.uid, a.tipo, a.capturado, a.recibido, a.lugar, a.nota, a.usuario, a.usuario_nombre, $num AS num
                FROM accesos_registros a
               WHERE " . str_replace(['fecha', 'lugar', 'usuario'], ['a.fecha', 'a.lugar', 'a.usuario'], $donde) . "$pag
               ORDER BY a.capturado DESC, a.id DESC LIMIT " . ($limite + 1)
@@ -235,7 +256,6 @@ class ControlAccesos {
         $filas = array_slice($filas, 0, $limite);
 
         $esAdmin = ($usr['rol'] ?? '') === 'ADMIN';
-        $hoy = date('Y-m-d');
         $out = [];
         foreach ($filas as $f) {
             $out[] = [
@@ -243,7 +263,7 @@ class ControlAccesos {
                 'capturado' => $f['capturado'], 'hora' => substr((string)$f['capturado'], 11, 8),
                 'lugar' => $f['lugar'], 'nota' => $f['nota'],
                 'usuario' => $f['usuario'], 'nombre' => $f['usuario_nombre'] ?: $f['usuario'],
-                'puede_borrar' => $esAdmin || ($f['usuario'] === ($usr['usuario'] ?? null) && $fecha === $hoy),
+                'puede_borrar' => $esAdmin || ($f['usuario'] === ($usr['usuario'] ?? null) && self::reciente((string)$f['recibido'])),
             ];
         }
         return ['status' => 'success', 'fecha' => $fecha, 'registros' => $out, 'totales' => $tot,
@@ -277,8 +297,8 @@ class ControlAccesos {
         $f = $st->fetch(PDO::FETCH_ASSOC);
         if (!$f) return ['status' => 'success', 'message' => 'El registro ya no existía.'];
         $esAdmin = ($usr['rol'] ?? '') === 'ADMIN';
-        if (!$esAdmin && !($f['usuario'] === ($usr['usuario'] ?? null) && $f['fecha'] === date('Y-m-d'))) {
-            return ['status' => 'error', 'message' => 'Sólo quien lo registró (el mismo día) o Administración puede eliminarlo.'];
+        if (!$esAdmin && !($f['usuario'] === ($usr['usuario'] ?? null) && self::reciente((string)$f['recibido']))) {
+            return ['status' => 'error', 'message' => 'Sólo quien lo registró (en las primeras ' . self::HORAS_PARA_BORRAR . ' horas) o Administración puede eliminarlo.'];
         }
         foreach (['foto', 'foto_mini'] as $c) {
             if ($f[$c] !== '' && strpos($f[$c], '..') === false) @unlink(self::carpeta() . $f[$c]);
