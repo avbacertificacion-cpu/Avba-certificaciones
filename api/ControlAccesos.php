@@ -117,8 +117,10 @@ class ControlAccesos {
         $dir = self::carpeta() . $sub;
         if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return ['status' => 'error', 'message' => 'No se pudo guardar la foto en el servidor.'];
 
-        $foto = comprimirImagen($archivo['tmp_name'], $dir . $uid . '.jpg', 1600, 1600, 80);
-        $mini = comprimirImagen($archivo['tmp_name'], $dir . $uid . '_m.jpg', 360, 360, 70);
+        // Miles de fotos al día: 1400 px es de sobra para leer el número de
+        // una credencial que llena la foto, y cada una queda en ~150 KB.
+        $foto = comprimirImagen($archivo['tmp_name'], $dir . $uid . '.jpg', 1400, 1400, 76);
+        $mini = comprimirImagen($archivo['tmp_name'], $dir . $uid . '_m.jpg', 300, 300, 68);
         if (!$foto) {
             // Sin GD: se guarda tal cual llegó
             $ext = $info[2] === IMAGETYPE_PNG ? 'png' : ($info[2] === IMAGETYPE_WEBP ? 'webp' : 'jpg');
@@ -171,31 +173,77 @@ class ControlAccesos {
         return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) ? $v : date('Y-m-d');
     }
 
+    /**
+     * El control del día: totales y los registros más recientes (de N en N).
+     * En el pico de una planta son miles al día: no se manda todo cada vez.
+     * El número de cada registro (ENTRADA 015) es su lugar entre los de su
+     * tipo del día, igual que en el PDF.
+     */
     public function listar(array $p, array $usr): array {
+        self::asegurarTabla($this->pdo);
         $fecha = self::fechaValida($p['fecha'] ?? '');
         $lugar = textoEstandar($p['lugar'] ?? '');
-        $todos = $this->registrosDelDia($fecha);
-        $lugares = array_values(array_unique(array_column($todos, 'lugar')));
-        $filas = $lugar === '' ? $todos : array_values(array_filter($todos, fn($f) => $f['lugar'] === $lugar));
-        if ($lugar !== '') {   // numeración dentro del punto elegido, igual que su PDF
-            $num = ['entrada' => 0, 'salida' => 0];
-            foreach ($filas as &$f) { $f['num'] = ++$num[$f['tipo']]; }
-            unset($f);
+        $limite = max(10, min(200, (int)($p['limite'] ?? 60)));
+
+        $donde = "fecha = ?" . ($lugar !== '' ? " AND lugar = ?" : '');
+        $args = $lugar !== '' ? [$fecha, $lugar] : [$fecha];
+
+        $tot = ['entrada' => 0, 'salida' => 0];
+        $st = $this->pdo->prepare("SELECT tipo, COUNT(*) AS n FROM accesos_registros WHERE $donde GROUP BY tipo");
+        $st->execute($args);
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $t) { if (isset($tot[$t['tipo']])) $tot[$t['tipo']] = (int)$t['n']; }
+
+        $st = $this->pdo->prepare("SELECT DISTINCT lugar FROM accesos_registros WHERE fecha = ? ORDER BY lugar");
+        $st->execute([$fecha]);
+        $lugares = $st->fetchAll(PDO::FETCH_COLUMN);
+
+        // Página: lo anterior al último que ya tiene la pantalla
+        $antesCap = (string)($p['antes_cap'] ?? '');
+        $antesId = (int)($p['antes_id'] ?? 0);
+        $pag = '';
+        $argsPag = $args;
+        if ($antesId > 0 && preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $antesCap)) {
+            $pag = " AND (a.capturado < ? OR (a.capturado = ? AND a.id < ?))";
+            array_push($argsPag, $antesCap, $antesCap, $antesId);
         }
+        $num = "(SELECT COUNT(*) FROM accesos_registros b WHERE b.fecha = a.fecha AND b.tipo = a.tipo"
+             . ($lugar !== '' ? " AND b.lugar = a.lugar" : '')
+             . " AND (b.capturado < a.capturado OR (b.capturado = a.capturado AND b.id <= a.id)))";
+        $st = $this->pdo->prepare(
+            "SELECT a.id, a.uid, a.tipo, a.capturado, a.lugar, a.nota, a.usuario, a.usuario_nombre, $num AS num
+               FROM accesos_registros a
+              WHERE " . str_replace(['fecha', 'lugar'], ['a.fecha', 'a.lugar'], $donde) . "$pag
+              ORDER BY a.capturado DESC, a.id DESC LIMIT " . ($limite + 1)
+        );
+        $st->execute($argsPag);
+        $filas = $st->fetchAll(PDO::FETCH_ASSOC);
+        $hayMas = count($filas) > $limite;
+        $filas = array_slice($filas, 0, $limite);
+
         $esAdmin = ($usr['rol'] ?? '') === 'ADMIN';
         $hoy = date('Y-m-d');
-        $tot = ['entrada' => 0, 'salida' => 0];
         $out = [];
         foreach ($filas as $f) {
-            $tot[$f['tipo']]++;
             $out[] = [
                 'id' => (int)$f['id'], 'uid' => $f['uid'], 'tipo' => $f['tipo'], 'num' => (int)$f['num'],
-                'hora' => substr((string)$f['capturado'], 11, 8), 'lugar' => $f['lugar'], 'nota' => $f['nota'],
+                'capturado' => $f['capturado'], 'hora' => substr((string)$f['capturado'], 11, 8),
+                'lugar' => $f['lugar'], 'nota' => $f['nota'],
                 'usuario' => $f['usuario'], 'nombre' => $f['usuario_nombre'] ?: $f['usuario'],
                 'puede_borrar' => $esAdmin || ($f['usuario'] === ($usr['usuario'] ?? null) && $fecha === $hoy),
             ];
         }
-        return ['status' => 'success', 'fecha' => $fecha, 'registros' => $out, 'totales' => $tot, 'lugares' => $lugares];
+        return ['status' => 'success', 'fecha' => $fecha, 'registros' => $out, 'totales' => $tot,
+                'lugares' => $lugares, 'mas' => $hayMas];
+    }
+
+    /** ¿Ya llegaron al servidor? (la pantalla pregunta por lo que tiene en cola) */
+    public function existen(array $uids): array {
+        self::asegurarTabla($this->pdo);
+        $uids = array_values(array_filter(array_slice($uids, 0, 500), fn($u) => is_string($u) && preg_match('/^[A-Za-z0-9-]{8,64}$/', $u)));
+        if (!$uids) return ['status' => 'success', 'existen' => []];
+        $st = $this->pdo->prepare("SELECT uid, id FROM accesos_registros WHERE uid IN (" . implode(',', array_fill(0, count($uids), '?')) . ")");
+        $st->execute($uids);
+        return ['status' => 'success', 'existen' => $st->fetchAll(PDO::FETCH_KEY_PAIR)];
     }
 
     /** Puntos de control usados en los últimos 60 días (para elegir rápido) */
@@ -240,7 +288,7 @@ class ControlAccesos {
 
     /* ── PDF del día ────────────────────────────────────────────────────── */
     public static function rutaPdf(string $archivo): ?string {
-        if (!preg_match('/^ACCESOS_\d{4}-\d{2}-\d{2}_[A-Z0-9-]+_(ambos|entrada|salida)_\d+\.pdf$/', $archivo)) return null;
+        if (!preg_match('/^ACCESOS_\d{4}-\d{2}-\d{2}_[A-Z0-9-]+_(ambos|entrada|salida)(_p\d+)?_\d+\.pdf$/', $archivo)) return null;
         $abs = self::carpeta() . 'pdf/' . $archivo;
         return is_file($abs) ? $abs : null;
     }
@@ -251,28 +299,46 @@ class ControlAccesos {
     }
     private static function h($s): string { return htmlspecialchars((string)$s, ENT_QUOTES, 'UTF-8'); }
 
+    /**
+     * Fotos por PDF. Con 150 (unas 38 hojas y 12 a 15 MB) cada parte queda
+     * dentro de lo que Claude analiza de un archivo (100 hojas, 30 MB) y el
+     * servidor la arma sin pasar su tiempo límite. Un día de planta con miles
+     * de registros sale en varias partes.
+     */
+    public const FOTOS_POR_PDF = 150;
+
     public function generarPdf(array $p, array $usr): array {
         $fecha = self::fechaValida($p['fecha'] ?? '');
         $lugar = textoEstandar($p['lugar'] ?? '');
         $incluir = in_array($p['incluir'] ?? '', ['entrada', 'salida'], true) ? $p['incluir'] : 'ambos';
         $filas = $this->registrosDelDia($fecha, $lugar);
+        $totEnt = count(array_filter($filas, fn($f) => $f['tipo'] === 'entrada'));
+        $totSal = count($filas) - $totEnt;
         if ($incluir !== 'ambos') $filas = array_values(array_filter($filas, fn($f) => $f['tipo'] === $incluir));
         if (!$filas) return ['status' => 'error', 'message' => 'No hay registros de ese día para incluir en el PDF.'];
+
+        // Primero todas las entradas y luego las salidas, en partes de FOTOS_POR_PDF
+        usort($filas, fn($a, $b) => [$a['tipo'] === 'salida', $a['capturado'], $a['id']] <=> [$b['tipo'] === 'salida', $b['capturado'], $b['id']]);
+        $partes = (int)ceil(count($filas) / self::FOTOS_POR_PDF);
+        $parte = max(1, min($partes, (int)($p['parte'] ?? 1)));
+        $trozo = array_slice($filas, ($parte - 1) * self::FOTOS_POR_PDF, self::FOTOS_POR_PDF);
 
         if (!class_exists('Mpdf\Mpdf')) {
             $autoload = __DIR__ . '/../vendor/autoload.php';
             if (!is_file($autoload)) return ['status' => 'error', 'message' => 'No está instalado el generador de PDF.'];
             require_once $autoload;
         }
+        if (function_exists('set_time_limit')) @set_time_limit(240);
         self::protegerCarpeta();
         $tmp = self::carpeta() . 'tmp/' . bin2hex(random_bytes(6)) . '/';
         @mkdir($tmp, 0755, true);
         @mkdir(self::carpeta() . 'pdf', 0755, true);
 
         try {
-            $ent = array_values(array_filter($filas, fn($f) => $f['tipo'] === 'entrada'));
-            $sal = array_values(array_filter($filas, fn($f) => $f['tipo'] === 'salida'));
-            $html = $this->htmlPdf($fecha, $lugar, $incluir, $ent, $sal, $usr, $tmp);
+            $ent = array_values(array_filter($trozo, fn($f) => $f['tipo'] === 'entrada'));
+            $sal = array_values(array_filter($trozo, fn($f) => $f['tipo'] === 'salida'));
+            $info = ['parte' => $parte, 'partes' => $partes, 'tot_ent' => $totEnt, 'tot_sal' => $totSal];
+            $html = $this->htmlPdf($fecha, $lugar, $incluir, $ent, $sal, $usr, $tmp, $info);
 
             $mpdf = new \Mpdf\Mpdf([
                 'mode' => 'utf-8', 'format' => 'A4', 'orientation' => 'P',
@@ -282,14 +348,14 @@ class ControlAccesos {
                 // siguiente, en vez de encogerse.
                 'shrink_tables_to_fit' => 0,
             ]);
-            $mpdf->SetTitle('Control de accesos ' . $fecha . ($lugar !== '' ? ' - ' . $lugar : ''));
+            $mpdf->SetTitle('Control de accesos ' . $fecha . ($lugar !== '' ? ' - ' . $lugar : '') . ($partes > 1 ? " - parte $parte de $partes" : ''));
             $mpdf->SetAuthor('AVBA Certificaciones');
-            $mpdf->SetFooter('Control de accesos · ' . date('d/m/Y', strtotime($fecha)) . '||Página {PAGENO} de {nbpg}');
+            $mpdf->SetFooter('Control de accesos · ' . date('d/m/Y', strtotime($fecha)) . ($partes > 1 ? " · parte $parte de $partes" : '') . '||Página {PAGENO} de {nbpg}');
             $mpdf->WriteHTML($html);
 
             $slug = $lugar === '' ? 'TODOS' : trim(preg_replace('/[^A-Z0-9]+/', '-', $lugar), '-');
             $slug = substr($slug !== '' ? $slug : 'PUNTO', 0, 40);
-            $archivo = "ACCESOS_{$fecha}_{$slug}_{$incluir}_" . time() . '.pdf';
+            $archivo = "ACCESOS_{$fecha}_{$slug}_{$incluir}_p{$parte}_" . time() . '.pdf';
             $mpdf->Output(self::carpeta() . 'pdf/' . $archivo, 'F');
             $paginas = (int)$mpdf->page;
         } finally {
@@ -298,7 +364,8 @@ class ControlAccesos {
         }
         $bytes = (int)@filesize(self::carpeta() . 'pdf/' . $archivo);
         return ['status' => 'success', 'archivo' => $archivo, 'url' => 'descargar.php?tipo=accesos_pdf&f=' . rawurlencode($archivo),
-                'paginas' => $paginas, 'bytes' => $bytes, 'entradas' => count($ent), 'salidas' => count($sal)];
+                'paginas' => $paginas, 'bytes' => $bytes, 'entradas' => count($ent), 'salidas' => count($sal),
+                'parte' => $parte, 'partes' => $partes, 'total' => count($filas)];
     }
 
     /** Copia ligera de la foto para el PDF y su tamaño para caber en la celda */
@@ -313,10 +380,14 @@ class ControlAccesos {
         return [$ruta, round($info[0] * $k, 1), round($info[1] * $k, 1)];
     }
 
-    private function seccionPdf(string $titulo, string $color, string $etiqueta, array $filas, string $tmp, bool $conLugar): string {
+    private function seccionPdf(string $titulo, string $color, string $etiqueta, array $filas, string $tmp, bool $conLugar, int $totalTipo = 0): string {
+        $rango = count($filas) . ' registro' . (count($filas) === 1 ? '' : 's');
+        if ($filas && $totalTipo > count($filas)) {
+            $rango = 'del ' . $filas[0]['num'] . ' al ' . $filas[count($filas) - 1]['num'] . ' de ' . number_format($totalTipo);
+        }
         $h = '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:4mm"><tr>'
            . '<td style="background:' . $color . ';color:#fff;font-weight:bold;font-size:13pt;padding:3mm 4mm">' . self::h($titulo)
-           . ' &nbsp;·&nbsp; ' . count($filas) . ' registro' . (count($filas) === 1 ? '' : 's') . '</td></tr></table>';
+           . ' &nbsp;·&nbsp; ' . $rango . '</td></tr></table>';
         if (!$filas) return $h . '<p style="font-size:10pt;color:#5a6072">Sin registros.</p>';
         foreach (array_chunk($filas, 2) as $par) {
             $h .= '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;page-break-inside:avoid;margin-top:3mm"><tr>';
@@ -346,7 +417,7 @@ class ControlAccesos {
         return $h;
     }
 
-    private function htmlPdf(string $fecha, string $lugar, string $incluir, array $ent, array $sal, array $usr, string $tmp): string {
+    private function htmlPdf(string $fecha, string $lugar, string $incluir, array $ent, array $sal, array $usr, string $tmp, array $info): string {
         $logo = realpath(__DIR__ . '/../assets/logos/avba.png');
         $conLugar = $lugar === '';
         $h = '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>'
@@ -355,14 +426,16 @@ class ControlAccesos {
            . '<div style="font-size:11pt;color:#1a1a2e">' . self::h(ucfirst(self::fechaLarga($fecha))) . '</div></td></tr></table>'
            . '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:3mm;font-size:9.5pt">'
            . '<tr><td style="background:#f3f6fa;padding:2mm 3mm;width:44%"><b>Punto de control:</b> ' . self::h($lugar !== '' ? $lugar : 'Todos') . '</td>'
-           . '<td style="background:#f3f6fa;padding:2mm 3mm;width:15%"><b>Entradas:</b> ' . count($ent) . '</td>'
-           . '<td style="background:#f3f6fa;padding:2mm 3mm;width:15%"><b>Salidas:</b> ' . count($sal) . '</td>'
+           . '<td style="background:#f3f6fa;padding:2mm 3mm;width:15%"><b>Entradas:</b> ' . number_format($info['tot_ent']) . '</td>'
+           . '<td style="background:#f3f6fa;padding:2mm 3mm;width:15%"><b>Salidas:</b> ' . number_format($info['tot_sal']) . '</td>'
            . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Generado:</b> ' . date('d/m/Y H:i') . '</td></tr>'
            . '<tr><td colspan="4" style="padding:2mm 3mm;color:#5a6072;font-size:8.5pt">Cada fotografía lleva su etiqueta: tipo (ENTRADA o SALIDA), número consecutivo y hora de registro'
-           . ($conLugar ? ' y punto de control' : '') . '. Generado por ' . self::h($usr['nombre'] ?? $usr['usuario'] ?? '') . '.</td></tr></table>';
-        if ($incluir !== 'salida') $h .= $this->seccionPdf('ENTRADAS', '#2F6B1E', 'ENTRADA', $ent, $tmp, $conLugar);
-        if ($incluir === 'ambos') $h .= '<pagebreak />';
-        if ($incluir !== 'entrada') $h .= $this->seccionPdf('SALIDAS', '#A32D2D', 'SALIDA', $sal, $tmp, $conLugar);
+           . ($conLugar ? ' y punto de control' : '') . '. Generado por ' . self::h($usr['nombre'] ?? $usr['usuario'] ?? '') . '.'
+           . ($info['partes'] > 1 ? ' <b style="color:#0C447C">Parte ' . $info['parte'] . ' de ' . $info['partes'] . '.</b>' : '')
+           . '</td></tr></table>';
+        if ($ent) $h .= $this->seccionPdf('ENTRADAS', '#2F6B1E', 'ENTRADA', $ent, $tmp, $conLugar, $info['tot_ent']);
+        if ($ent && $sal) $h .= '<pagebreak />';
+        if ($sal) $h .= $this->seccionPdf('SALIDAS', '#A32D2D', 'SALIDA', $sal, $tmp, $conLugar, $info['tot_sal']);
         return $h;
     }
 }

@@ -124,6 +124,30 @@
   .toast.err{background:var(--rojo)}
   .spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:g .7s linear infinite}
   @keyframes g{to{transform:rotate(360deg)}}
+
+  /* Cámara continua dentro de la página */
+  .visor{position:relative;width:100%;height:min(64vw,440px);background:#0b1220;border-radius:14px;overflow:hidden;margin-bottom:10px}
+  .visor video{width:100%;height:100%;object-fit:cover;display:block}
+  .guia{position:absolute;left:50%;top:50%;width:86%;aspect-ratio:1.586;max-height:84%;transform:translate(-50%,-50%);
+    border:2.5px dashed rgba(255,255,255,.95);border-radius:12px;box-shadow:0 0 0 9999px rgba(0,0,0,.32);pointer-events:none}
+  .guia span{position:absolute;left:0;right:0;bottom:-26px;text-align:center;color:#fff;font-size:12px;font-weight:600;text-shadow:0 1px 2px #000}
+  .destello{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;transition:opacity .25s}
+  .destello.on{opacity:.85;transition:none}
+  .cam-ctrl{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .cam-ctrl .btn{min-height:40px;padding:8px 12px;font-size:13px}
+  .chip-cola{margin-left:auto;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;
+    padding:7px 11px;font-size:12px;font-weight:700;white-space:nowrap;cursor:pointer}
+  .chip-cola.err{background:#a32d2d;border-color:#a32d2d}
+  .banda{background:var(--rojo-light);color:var(--rojo);border-radius:12px;padding:12px 14px;margin-bottom:12px;font-size:13.5px;line-height:1.45}
+  .banda .btn{margin-top:8px}
+  .badge.cola{background:#e8edf4;color:#3a4a60}
+  .badge.rech{background:var(--rojo-light);color:var(--rojo)}
+  .mini-acc{display:flex;gap:6px;margin-top:6px}
+  .mini-acc button{border:1px solid var(--borde);background:#fff;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer}
+  .partes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}
+  .partes .btn{min-height:42px;font-size:13px;padding:8px 10px}
+  .toast button{margin-left:10px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;
+    padding:4px 10px;font-weight:700;cursor:pointer}
 </style>
 <link rel="stylesheet" href="css/movil.css">
 </head>
@@ -134,13 +158,19 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
   </a>
   <div><h1>Control de accesos</h1><div class="sub" id="sub-usuario"></div></div>
+  <button class="chip-cola" id="chip-cola" type="button" hidden></button>
 </header>
 
 <main>
+  <div class="banda" id="banda-sesion" hidden>
+    <b>Tu sesión venció.</b> Lo capturado sigue guardado en este equipo y se enviará en cuanto vuelvas a entrar.
+    <br><a class="btn prim" href="login.html?volver=accesos.html">Iniciar sesión</a>
+  </div>
+
   <div class="tarjeta">
     <div class="fila">
       <div class="campo"><label for="lugar">Punto de control</label>
-        <input type="text" id="lugar" list="lugares" maxlength="120" placeholder="Ej. Acceso principal, Obra Torre 5" autocomplete="off">
+        <input type="text" id="lugar" list="lugares" maxlength="120" placeholder="Ej. Quantum Energy · Caseta 1" autocomplete="off">
         <datalist id="lugares"></datalist></div>
       <div class="campo" style="flex:0 1 180px"><label for="fecha">Día</label><input type="date" id="fecha"></div>
     </div>
@@ -149,13 +179,31 @@
 
   <div class="aviso-dia" id="aviso-dia" hidden>Estás viendo otro día. Para registrar entradas y salidas, regresa a hoy.</div>
 
-  <div class="captura" id="captura">
-    <button class="cap ent" type="button" data-tipo="entrada">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
-      <b>ENTRADA</b><span>Foto de la identificación</span></button>
-    <button class="cap sal" type="button" data-tipo="salida">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
-      <b>SALIDA</b><span>Foto de la identificación</span></button>
+  <div class="tarjeta" id="tarjeta-camara">
+    <div id="cam-apagada">
+      <button class="btn prim ancho" type="button" id="btn-cam">Activar cámara continua (más rápido)</button>
+      <small class="ayuda">La cámara queda abierta en esta pantalla: acomodas la identificación y tocas ENTRADA o SALIDA. Sin cámara continua, cada botón abre la cámara del teléfono.</small>
+    </div>
+    <div id="cam-encendida" hidden>
+      <div class="visor" id="visor">
+        <video id="video" autoplay playsinline muted></video>
+        <div class="guia" id="guia"><span>Acomoda la identificación dentro del recuadro</span></div>
+        <div class="destello" id="destello"></div>
+      </div>
+      <div class="cam-ctrl">
+        <button class="btn sec" type="button" id="btn-linterna" hidden>Linterna</button>
+        <label class="check" style="margin:0"><input type="checkbox" id="revisar"> Revisar cada foto antes de guardar</label>
+        <button class="btn" type="button" id="btn-cam-off" style="margin-left:auto;color:var(--texto-sub);background:none">Cerrar cámara</button>
+      </div>
+    </div>
+    <div class="captura" id="captura" style="margin-bottom:0">
+      <button class="cap ent" type="button" data-tipo="entrada">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
+        <b>ENTRADA</b><span id="lbl-ent">Foto de la identificación</span></button>
+      <button class="cap sal" type="button" data-tipo="salida">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+        <b>SALIDA</b><span id="lbl-sal">Foto de la identificación</span></button>
+    </div>
   </div>
   <input type="file" id="archivo" accept="image/*" capture="environment" hidden>
 
@@ -165,7 +213,7 @@
     <div class="tot d"><b id="t-dif">0</b><span>Diferencia</span></div>
   </div>
 
-  <div class="tarjeta">
+  <div class="tarjeta" id="tarjeta-lista">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <h2 style="margin:0">Registros del día</h2>
       <div class="seg" id="filtro" role="radiogroup" aria-label="Filtrar">
@@ -174,11 +222,12 @@
     </div>
     <label class="check" style="margin-top:8px"><input type="checkbox" id="solo-punto" checked> Sólo este punto de control</label>
     <ul class="lista" id="lista"></ul>
+    <button class="btn sec ancho" type="button" id="btn-mas" hidden style="margin-top:8px">Ver anteriores</button>
   </div>
 
   <div class="tarjeta">
     <h2>PDF para analizar con Claude</h2>
-    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:10px">Las fotos de entradas y de salidas del día, cada una con su etiqueta (ENTRADA 001 · 08:15:32). Súbelo a Claude con las instrucciones de abajo para que extraiga los números de identificación y cruce entradas y salidas.</p>
+    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:10px">Las fotos de entradas y de salidas, cada una con su etiqueta (ENTRADA 001 · 08:15:32). Con más de 150 fotos se divide en partes, para que cada archivo quepa en lo que Claude analiza (100 hojas, 30 MB).</p>
     <span class="lbl">Incluir</span>
     <div class="seg" id="incluir" role="radiogroup" aria-label="Incluir en el PDF">
       <button type="button" data-v="ambos" aria-pressed="true">Entradas y salidas</button><button type="button" data-v="entrada" aria-pressed="false">Sólo entradas</button><button type="button" data-v="salida" aria-pressed="false">Sólo salidas</button>
@@ -186,6 +235,7 @@
     <label class="check"><input type="checkbox" id="pdf-punto" checked> Sólo el punto de control elegido</label>
     <button class="btn prim ancho" id="btn-pdf" type="button" style="margin-top:12px">Generar PDF</button>
     <div id="pdf-res"></div>
+    <div class="partes" id="partes"></div>
     <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700;font-size:13.5px;color:var(--azul-dark)">Instrucciones para pedirle el análisis a Claude</summary>
       <pre class="prompt" id="prompt"></pre>
       <button class="btn sec ancho" id="btn-copiar" type="button" style="margin-top:8px">Copiar instrucciones</button>
@@ -199,8 +249,8 @@
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span class="badge" id="prev-badge"></span><b id="prev-tit" style="font-size:15px"></b></div>
     <img class="prev" id="prev-img" alt="Foto de la identificación">
     <p class="nota" style="margin-top:10px">Revisa que el <b>número de la identificación</b> se lea completo y sin reflejos. Si no, repite la foto.</p>
-    <div class="campo" style="margin-top:10px"><label for="prev-nota">Nota (opcional)</label><input type="text" id="prev-nota" maxlength="200" placeholder="Ej. Visitante de proveedor, placas, área"></div>
-    <label class="check"><input type="checkbox" id="prev-seguir"> Al guardar, tomar la siguiente foto del mismo tipo</label>
+    <div class="campo" style="margin-top:10px"><label for="prev-nota">Nota (opcional)</label><input type="text" id="prev-nota" maxlength="200" placeholder="Ej. Contratista, área, placas"></div>
+    <label class="check" id="prev-seguir-c"><input type="checkbox" id="prev-seguir"> Al guardar, tomar la siguiente foto del mismo tipo</label>
     <div class="botones">
       <button class="btn sec" type="button" id="prev-repetir">Repetir foto</button>
       <button class="btn verde" type="button" id="prev-guardar">Guardar</button>
@@ -214,6 +264,8 @@
   <img class="grande-img" id="foto-grande" alt="Identificación"><div id="foto-pie" style="font-size:13px;color:var(--texto-sub);margin-top:8px;text-align:center"></div>
   <button class="btn sec ancho" type="button" id="foto-cerrar" style="margin-top:10px">Cerrar</button></div></div>
 
+<div class="toast" id="toast" hidden></div>
+
 <script src="js/destinos.js"></script>
 <script src="js/native-bridge.js"></script>
 <script>
@@ -222,70 +274,206 @@
   var $ = function (id) { return document.getElementById(id); };
   var API = 'api/index.php';
   var ROLES = ['ADMIN', 'ADMINISTRATIVO', 'INSPECTOR', 'CALIDAD', 'CERTIFICACIONES'];
-  var CLAVE_LUGAR = 'avba_accesos_lugar', CLAVE_PEND = 'avba_accesos_pendientes', CLAVE_SEGUIR = 'avba_accesos_seguir';
+  var CLAVE_LUGAR = 'avba_accesos_lugar', CLAVE_SEGUIR = 'avba_accesos_seguir', CLAVE_REVISAR = 'avba_accesos_revisar';
+  var POR_PAGINA = 60;
 
-  /* ── Sesión ── */
-  var ses = {};
-  try { ses = JSON.parse(localStorage.getItem('avba_session') || '{}') || {}; } catch (e) {}
-  if (!ses.token) { location.replace('login.html'); return; }
+  /* ── Sesión (se relee en cada envío: puede renovarse en otra pestaña) ── */
+  function sesion() { try { return JSON.parse(localStorage.getItem('avba_session') || '{}') || {}; } catch (e) { return {}; } }
+  var ses = sesion();
+  if (!ses.token) { location.replace('login.html?volver=accesos.html'); return; }
   if (ROLES.indexOf(ses.rol) < 0 && !(ses.roles || []).some(function (r) { return ROLES.indexOf(r) >= 0; })) {
     document.querySelector('main').innerHTML = '<div class="tarjeta"><p class="nota mal">Tu cuenta no tiene acceso al control de accesos.</p></div>';
     return;
   }
+  function token() { return sesion().token || ''; }
   var destino = (window.AVBA_DESTINOS || {})[ses.rol];
   if (destino) $('atras').href = destino;
   $('sub-usuario').textContent = (ses.nombre || ses.usuario || '') + ' · entradas y salidas';
 
+  /* ── Utilidades ── */
   function leer(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
   function guardar(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function dos(n) { return (n < 10 ? '0' : '') + n; }
   function hoyLocal() { var d = new Date(); return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
   function ahoraLocal() { var d = new Date(); return hoyLocal() + ' ' + dos(d.getHours()) + ':' + dos(d.getMinutes()) + ':' + dos(d.getSeconds()); }
-  function uid() {
+  function nuevoUid() {
     if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
     return 'a' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 8);
   }
+  var ACENTOS = new RegExp('[' + String.fromCharCode(0x300) + '-' + String.fromCharCode(0x36f) + ']', 'g');
   /* Como el servidor (textoEstandar): mayúsculas, sin acentos, la Ñ se queda */
   function normaLugar(t) {
-    return String(t || '').toUpperCase().replace(/\u00D1/g, '\u0001').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/\u0001/g, '\u00D1').replace(/\s+/g, ' ').trim();
+    return String(t || '').toUpperCase().split('Ñ').map(function (x) { return x.normalize('NFD').replace(ACENTOS, ''); })
+      .join('Ñ').replace(/\s+/g, ' ').trim();
   }
+  function numero(n) { return Number(n || 0).toLocaleString('es-MX'); }
   function enLinea() { return window.AVBAApp ? AVBAApp.enLinea() : navigator.onLine !== false; }
   var tToast;
-  function toast(t, err) {
-    var el = $('toast') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'toast', className: 'toast' }));
-    el.textContent = t; el.className = 'toast' + (err ? ' err' : ''); el.hidden = false;
-    clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 3200);
+  function toast(t, err, deshacer) {
+    var el = $('toast');
+    el.innerHTML = esc(t) + (deshacer ? '<button type="button">Deshacer</button>' : '');
+    el.className = 'toast' + (err ? ' err' : ''); el.hidden = false;
+    if (deshacer) el.querySelector('button').onclick = function () { el.hidden = true; deshacer(); };
+    clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, deshacer ? 6000 : 3200);
   }
   function api(accion, datos, metodo) {
-    var h = { Authorization: 'Bearer ' + ses.token };
-    var init;
+    var h = { Authorization: 'Bearer ' + token() }, init;
     if (metodo === 'GET') {
-      var q = new URLSearchParams(datos || {}); q.set('action', accion); q.set('token', ses.token);
+      var q = new URLSearchParams(datos || {}); q.set('action', accion); q.set('token', token());
       return fetch(API + '?' + q.toString(), { headers: h }).then(respuesta);
     }
-    if (datos instanceof FormData) { datos.append('action', accion); datos.append('token', ses.token); init = { method: 'POST', headers: h, body: datos }; }
-    else { h['Content-Type'] = 'application/json'; init = { method: 'POST', headers: h, body: JSON.stringify({ action: accion, token: ses.token, payload: datos || {} }) }; }
+    h['Content-Type'] = 'application/json';
+    init = { method: 'POST', headers: h, body: JSON.stringify({ action: accion, token: token(), payload: datos || {} }) };
     return fetch(API, init).then(respuesta);
   }
   function respuesta(r) {
-    if (r.status === 401) { localStorage.removeItem('avba_session'); location.replace('login.html'); throw new Error('Sesión vencida'); }
+    if (r.status === 401) { sesionVencida(); throw new Error('Tu sesión venció.'); }
     return r.json();
   }
-  function urlFoto(id, mini) { return 'descargar.php?tipo=acceso_foto&id=' + encodeURIComponent(id) + (mini ? '&m=1' : '') + '&token=' + encodeURIComponent(ses.token); }
+  function sesionVencida() { $('banda-sesion').hidden = false; }
+  function urlFoto(id, mini) { return 'descargar.php?tipo=acceso_foto&id=' + encodeURIComponent(id) + (mini ? '&m=1' : '') + '&token=' + encodeURIComponent(token()); }
+
+  /* ══ Cola en el equipo ═══════════════════════════════════════════════
+     Guardar es instantáneo: el registro (con su foto) queda en el equipo y se
+     envía en segundo plano, en orden. Si no hay señal o el servidor tarda, se
+     reintenta solo; nada se pierde aunque se cierre la página. Cada registro
+     lleva su identificador: un reenvío no duplica en el servidor. */
+  var dbProm = null;
+  function db() {
+    if (dbProm) return dbProm;
+    dbProm = new Promise(function (ok, mal) {
+      if (!window.indexedDB) { mal(new Error('sin IndexedDB')); return; }
+      var r = indexedDB.open('avba_accesos', 1);
+      r.onupgradeneeded = function () { r.result.createObjectStore('cola', { keyPath: 'uid' }); };
+      r.onsuccess = function () { ok(r.result); };
+      r.onerror = function () { mal(r.error); };
+    });
+    return dbProm;
+  }
+  function tx(modo, fn) {
+    return db().then(function (d) {
+      return new Promise(function (ok, mal) {
+        var t = d.transaction('cola', modo), st = t.objectStore('cola'), res, rq = fn(st);
+        if (rq) rq.onsuccess = function () { res = rq.result; };
+        t.oncomplete = function () { ok(res); }; t.onerror = t.onabort = function () { mal(t.error); };
+      });
+    });
+  }
+  var cola = [];                                   // copia en memoria para pintar
+  var sinCola = false;                             // navegador sin IndexedDB: envío directo
+  function leerCola() {
+    return tx('readonly', function (st) { return st.getAll(); }).then(function (r) {
+      cola = (r || []).sort(function (a, b) { return a.capturado < b.capturado ? -1 : 1; });
+      pintarCola(); return cola;
+    }).catch(function () { sinCola = true; cola = []; return cola; });
+  }
+  function ponerEnCola(it) { return tx('readwrite', function (st) { return st.put(it); }).then(leerCola); }
+  function quitarDeCola(uid) { return tx('readwrite', function (st) { return st.delete(uid); }).then(leerCola); }
+
+  var enviando = null, espera = 0, tReintento = null, enviados = {};
+  function formulario(it) {
+    var fd = new FormData();
+    ['uid', 'tipo', 'capturado', 'lugar', 'nota'].forEach(function (k) { fd.append(k, it[k] || ''); });
+    fd.append('foto', new Blob([it.datos], { type: it.mime || 'image/jpeg' }), it.uid + '.jpg');
+    fd.append('action', 'ACCESO_REGISTRAR'); fd.append('token', token());
+    return fd;
+  }
+  /* Envía uno. Devuelve 'ok' | 'red' (reintentar después) | 'sesion' | 'rechazo' */
+  function enviarUno(it) {
+    enviando = it.uid; pintarLista();
+    return fetch(API, { method: 'POST', headers: { Authorization: 'Bearer ' + token() }, body: formulario(it) })
+      .then(function (r) {
+        if (r.status === 401) return 'sesion';
+        if (r.status >= 500) return 'red';
+        return r.json().then(function (j) {
+          if (j.status === 'success') { enviados[it.uid] = j.id; return 'ok'; }
+          it.error = j.message || 'El servidor no lo aceptó.'; return 'rechazo';
+        }, function () { return 'red'; });
+      }, function () { return 'red'; });
+  }
+  function enviarCola() {
+    if (enviando || sinCola) return;
+    clearTimeout(tReintento);
+    leerCola().then(function (lista) {
+      var pend = lista.filter(function (x) { return !x.error; });
+      if (!pend.length) { enviando = null; return; }
+      var hubo = 0;
+      return pend.reduce(function (p, it) {
+        return p.then(function (seguir) {
+          if (!seguir) return false;
+          return enviarUno(it).then(function (r) {
+            if (r === 'ok') { hubo++; return quitarDeCola(it.uid).then(function () { return true; }); }
+            if (r === 'rechazo') return ponerEnCola(it).then(function () { return true; });
+            if (r === 'sesion') { sesionVencida(); return false; }
+            return false;                                                    // red: parar y reintentar
+          });
+        });
+      }, Promise.resolve(true)).then(function (todoBien) {
+        enviando = null;
+        if (hubo) { espera = 0; $('banda-sesion').hidden = true; programarRecarga(); }
+        if (todoBien === false || cola.some(function (x) { return !x.error; })) {
+          espera = Math.min(espera ? espera * 2 : 5000, 60000);
+          tReintento = setTimeout(enviarCola, espera);
+        }
+        pintarLista();
+      });
+    }).catch(function () { enviando = null; });
+  }
+  setInterval(function () { if (cola.length && !enviando) enviarCola(); }, 20000);
+  window.addEventListener('online', function () { espera = 0; enviarCola(); pintarBotonPdf(); cargar(true); });
+  window.addEventListener('offline', function () { pintarBotonPdf(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { enviarCola(); cargar(true); } });
+  window.addEventListener('beforeunload', function (e) {
+    if (cola.some(function (x) { return !x.error; })) { e.preventDefault(); e.returnValue = 'Hay registros por enviar.'; return e.returnValue; }
+  });
+
+  function pintarCola() {
+    var pend = cola.filter(function (x) { return !x.error; }).length, err = cola.length - pend;
+    var chip = $('chip-cola');
+    chip.hidden = !cola.length;
+    chip.className = 'chip-cola' + (err ? ' err' : '');
+    chip.textContent = err ? err + ' con error' + (pend ? ' · ' + pend + ' por enviar' : '') : '⇅ ' + pend + ' por enviar';
+  }
+  $('chip-cola').onclick = function () { $('tarjeta-lista').scrollIntoView({ behavior: 'smooth' }); };
+
+  /* Guarda un registro: a la cola y de inmediato se puede tomar el siguiente */
+  function registrar(tipo, blob, mini, capturado, nota) {
+    var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, lugar: normaLugar($('lugar').value),
+               nota: nota || '', mini: mini, mime: 'image/jpeg', creado: Date.now() };
+    var deshacer = function () {
+      if (cola.some(function (x) { return x.uid === it.uid; })) { quitarDeCola(it.uid).then(pintarLista); toast('Registro descartado.'); return; }
+      var id = enviados[it.uid];
+      if (!id) { toast('Ya no se puede deshacer desde aquí: búscalo en la lista.', true); return; }
+      api('ACCESO_ELIMINAR', { id: id }).then(function (r) { toast(r.message || 'Eliminado.'); cargar(true); });
+    };
+    var txt = (tipo === 'entrada' ? 'Entrada' : 'Salida') + ' ' + capturado.slice(11, 16) + ' guardada';
+    return blob.arrayBuffer().then(function (ab) {
+      it.datos = ab;
+      if (sinCola) {                               // sin almacenamiento local: se envía y se espera
+        return enviarUno(it).then(function (r) {
+          enviando = null;
+          if (r === 'ok') { toast(txt + '.', false, deshacer); cargar(true); }
+          else toast(r === 'sesion' ? 'Tu sesión venció.' : (it.error || 'Sin conexión: no se guardó. Inténtalo de nuevo.'), true);
+        });
+      }
+      return ponerEnCola(it).then(function () {
+        toast(txt + '.', false, deshacer);
+        pintarLista(); enviarCola();
+      });
+    }).catch(function (e) { toast('No se pudo guardar: ' + (e.message || e), true); });
+  }
 
   /* ── Punto de control y día ── */
-  $('lugar').value = leer(CLAVE_LUGAR, '') || 'ACCESO PRINCIPAL';
+  $('lugar').value = leer(CLAVE_LUGAR, '') || '';
   $('fecha').value = hoyLocal();
-  $('lugar').addEventListener('change', function () { $('lugar').value = normaLugar($('lugar').value); guardar(CLAVE_LUGAR, $('lugar').value); cargar(); armarPrompt(); });
-  $('fecha').addEventListener('change', function () { if (!$('fecha').value) $('fecha').value = hoyLocal(); pintarDia(); cargar(); armarPrompt(); });
-  $('solo-punto').addEventListener('change', function () { cargar(); });
+  $('lugar').addEventListener('change', function () { $('lugar').value = normaLugar($('lugar').value); guardar(CLAVE_LUGAR, $('lugar').value); cargar(true); armarPrompt(); limpiarPartes(); });
+  $('fecha').addEventListener('change', function () { if (!$('fecha').value) $('fecha').value = hoyLocal(); pintarDia(); cargar(true); armarPrompt(); limpiarPartes(); });
+  $('solo-punto').addEventListener('change', function () { cargar(true); });
   function esHoy() { return $('fecha').value === hoyLocal(); }
   function pintarDia() {
-    var hoy = esHoy();
-    $('aviso-dia').hidden = hoy;
-    document.querySelectorAll('.cap').forEach(function (b) { b.disabled = !hoy; });
+    $('aviso-dia').hidden = esHoy();
+    document.querySelectorAll('.cap').forEach(function (b) { b.disabled = !esHoy(); });
   }
   pintarDia();
   api('LISTAR_ACCESOS_LUGARES', {}, 'GET').then(function (r) {
@@ -299,26 +487,69 @@
       var b = ev.target.closest('button'); if (!b) return;
       g.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
       if (g.id === 'filtro') pintarLista();
-      if (g.id === 'incluir') armarPrompt();
+      if (g.id === 'incluir') { armarPrompt(); limpiarPartes(); }
     });
   });
 
-  /* ── Captura ── */
+  /* ══ Cámara continua (dentro de la página) ═══════════════════════════ */
+  var cam = { stream: null, track: null, torch: false };
+  var hayCamara = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  if (!hayCamara) $('cam-apagada').hidden = true;
+  $('revisar').checked = !!leer(CLAVE_REVISAR, false);
+  $('revisar').onchange = function () { guardar(CLAVE_REVISAR, $('revisar').checked); };
+  function abrirCamara() {
+    navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } } })
+      .then(function (st) {
+        cam.stream = st; cam.track = st.getVideoTracks()[0];
+        $('video').srcObject = st; $('video').play().catch(function () {});
+        $('cam-apagada').hidden = true; $('cam-encendida').hidden = false;
+        $('lbl-ent').textContent = $('lbl-sal').textContent = 'Tomar foto ahora';
+        var cap = cam.track.getCapabilities ? cam.track.getCapabilities() : {};
+        $('btn-linterna').hidden = !cap.torch;
+      })
+      .catch(function (e) {
+        toast(e && e.name === 'NotAllowedError' ? 'No se dio permiso de usar la cámara. Revisa los permisos del navegador.' : 'No se pudo abrir la cámara.', true);
+      });
+  }
+  function cerrarCamara() {
+    if (cam.stream) cam.stream.getTracks().forEach(function (t) { t.stop(); });
+    cam.stream = cam.track = null; cam.torch = false;
+    $('cam-encendida').hidden = true; $('cam-apagada').hidden = !hayCamara;
+    $('lbl-ent').textContent = $('lbl-sal').textContent = 'Foto de la identificación';
+  }
+  $('btn-cam').onclick = abrirCamara;
+  $('btn-cam-off').onclick = cerrarCamara;
+  $('btn-linterna').onclick = function () {
+    if (!cam.track) return;
+    cam.torch = !cam.torch;
+    cam.track.applyConstraints({ advanced: [{ torch: cam.torch }] }).catch(function () { cam.torch = false; });
+    $('btn-linterna').textContent = cam.torch ? 'Apagar linterna' : 'Linterna';
+  };
+  /* Toma el cuadro actual, recortado al recuadro guía (con margen) */
+  function fotoDelVideo() {
+    var v = $('video'), W = v.videoWidth, H = v.videoHeight;
+    if (!W || !H) return null;
+    var cont = $('visor').getBoundingClientRect(), g = $('guia').getBoundingClientRect();
+    var k = Math.max(cont.width / W, cont.height / H);                       // object-fit: cover
+    var offX = (cont.width - W * k) / 2, offY = (cont.height - H * k) / 2;
+    var mx = g.width * 0.07, my = g.height * 0.07;
+    var sx = Math.max(0, (g.left - cont.left - mx - offX) / k), sy = Math.max(0, (g.top - cont.top - my - offY) / k);
+    var sw = Math.min(W - sx, (g.width + 2 * mx) / k), sh = Math.min(H - sy, (g.height + 2 * my) / k);
+    var esc2 = Math.min(1, 1400 / Math.max(sw, sh));
+    var c = document.createElement('canvas');
+    c.width = Math.round(sw * esc2); c.height = Math.round(sh * esc2);
+    c.getContext('2d').drawImage(v, sx, sy, sw, sh, 0, 0, c.width, c.height);
+    return c;
+  }
+  function destello() {
+    var d = $('destello'); d.classList.add('on'); setTimeout(function () { d.classList.remove('on'); }, 60);
+    if (navigator.vibrate) try { navigator.vibrate(40); } catch (e) {}
+  }
+
+  /* ══ Captura ═════════════════════════════════════════════════════════ */
   var tipoActual = 'entrada', fotoActual = null;
-  function comprimir(blob, lado, calidad) {
-    return new Promise(function (ok, mal) {
-      var url = URL.createObjectURL(blob), img = new Image();
-      img.onload = function () {
-        var k = Math.min(1, lado / Math.max(img.naturalWidth, img.naturalHeight));
-        var c = document.createElement('canvas');
-        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        URL.revokeObjectURL(url);
-        c.toBlob(function (b) { b ? ok({ blob: b, canvas: c }) : mal(new Error('No se pudo procesar la foto.')); }, 'image/jpeg', calidad);
-      };
-      img.onerror = function () { URL.revokeObjectURL(url); mal(new Error('No se pudo leer la foto.')); };
-      img.src = url;
-    });
+  function aBlob(canvas, calidad) {
+    return new Promise(function (ok, mal) { canvas.toBlob(function (b) { b ? ok(b) : mal(new Error('No se pudo procesar la foto.')); }, 'image/jpeg', calidad); });
   }
   function miniatura(canvas) {
     var k = 160 / Math.max(canvas.width, canvas.height), c = document.createElement('canvas');
@@ -326,118 +557,147 @@
     c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
     return c.toDataURL('image/jpeg', 0.6);
   }
+  function canvasDeArchivo(blob) {
+    return new Promise(function (ok, mal) {
+      var url = URL.createObjectURL(blob), img = new Image();
+      img.onload = function () {
+        var k = Math.min(1, 1400 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url); ok(c);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); mal(new Error('No se pudo leer la foto.')); };
+      img.src = url;
+    });
+  }
   function capturar(tipo) {
     tipoActual = tipo;
-    if (!normaLugar($('lugar').value)) { toast('Escribe el punto de control.', true); $('lugar').focus(); return; }
-    if (window.AVBANative && AVBANative.esNativo && AVBANative.tomarFoto) {
+    if (!normaLugar($('lugar').value)) { toast('Escribe primero el punto de control.', true); $('lugar').focus(); return; }
+    if (cam.stream) {                                       // cámara continua
+      var c = fotoDelVideo();
+      if (!c) { toast('La cámara todavía no está lista.', true); return; }
+      destello();
+      var cuando = ahoraLocal();
+      aBlob(c, 0.8).then(function (b) {
+        if ($('revisar').checked) mostrarPrevia(b, miniatura(c), cuando, false);
+        else registrar(tipo, b, miniatura(c), cuando, '');
+      }).catch(function (e) { toast(e.message, true); });
+      return;
+    }
+    if (window.AVBANative && AVBANative.esNativo && AVBANative.tomarFoto) {      // app: cámara nativa
       AVBANative.tomarFoto({ quality: 85, source: 'CAMERA' }).then(function (dataUrl) {
-        if (!dataUrl) return;                                    // canceló
-        return fetch(dataUrl).then(function (r) { return r.blob(); }).then(procesar);
+        if (!dataUrl) return;
+        return fetch(dataUrl).then(function (r) { return r.blob(); }).then(desArchivo);
       }).catch(function (e) { toast(e.message || 'No se pudo usar la cámara.', true); });
       return;
     }
-    $('archivo').value = '';
-    $('archivo').click();
+    $('archivo').value = ''; $('archivo').click();                                // cámara del teléfono
   }
-  $('archivo').addEventListener('change', function () { var f = $('archivo').files[0]; if (f) procesar(f); });
+  function desArchivo(blob) {
+    var cuando = ahoraLocal();
+    return canvasDeArchivo(blob).then(function (c) {
+      return aBlob(c, 0.8).then(function (b) { mostrarPrevia(b, miniatura(c), cuando, true); });
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  $('archivo').addEventListener('change', function () { var f = $('archivo').files[0]; if (f) desArchivo(f); });
   document.querySelectorAll('.cap').forEach(function (b) { b.addEventListener('click', function () { capturar(b.dataset.tipo); }); });
 
-  function procesar(blob) {
-    return comprimir(blob, 1600, 0.82).then(function (r) {
-      fotoActual = { blob: r.blob, mini: miniatura(r.canvas), capturado: ahoraLocal() };
-      var ent = tipoActual === 'entrada';
-      $('prev-badge').className = 'badge ' + tipoActual; $('prev-badge').textContent = ent ? 'ENTRADA' : 'SALIDA';
-      $('prev-tit').textContent = fotoActual.capturado.slice(11, 16) + ' · ' + normaLugar($('lugar').value);
-      if ($('prev-img').src) URL.revokeObjectURL($('prev-img').src);
-      $('prev-img').src = URL.createObjectURL(r.blob);
-      $('prev-nota').value = '';
-      $('prev-seguir').checked = !!leer(CLAVE_SEGUIR, false);
-      $('v-prev').hidden = false;
-    }).catch(function (e) { toast(e.message, true); });
+  function mostrarPrevia(blob, mini, cuando, conSeguir) {
+    fotoActual = { blob: blob, mini: mini, capturado: cuando };
+    $('prev-badge').className = 'badge ' + tipoActual; $('prev-badge').textContent = tipoActual === 'entrada' ? 'ENTRADA' : 'SALIDA';
+    $('prev-tit').textContent = cuando.slice(11, 16) + ' · ' + normaLugar($('lugar').value);
+    if ($('prev-img').src) URL.revokeObjectURL($('prev-img').src);
+    $('prev-img').src = URL.createObjectURL(blob);
+    $('prev-nota').value = '';
+    $('prev-seguir-c').hidden = !conSeguir;
+    $('prev-seguir').checked = conSeguir && !!leer(CLAVE_SEGUIR, false);
+    $('v-prev').hidden = false;
   }
   $('prev-cancelar').onclick = function () { $('v-prev').hidden = true; fotoActual = null; };
   $('prev-repetir').onclick = function () { $('v-prev').hidden = true; capturar(tipoActual); };
   $('prev-seguir').onchange = function () { guardar(CLAVE_SEGUIR, $('prev-seguir').checked); };
   $('prev-guardar').onclick = function () {
     if (!fotoActual) return;
-    var reg = { uid: uid(), tipo: tipoActual, capturado: fotoActual.capturado, lugar: normaLugar($('lugar').value),
-                nota: $('prev-nota').value.trim(), mini: fotoActual.mini };
-    var fd = new FormData();
-    ['uid', 'tipo', 'capturado', 'lugar', 'nota'].forEach(function (k) { fd.append(k, reg[k]); });
-    fd.append('foto', fotoActual.blob, reg.uid + '.jpg');
-    var btn = $('prev-guardar'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Guardando…';
-    api('ACCESO_REGISTRAR', fd).then(function (r) {
-      if (r.status !== 'success') throw new Error(r.message || 'No se guardó.');
-      if (r.sin_senal) {                       // la app lo guardó en el teléfono
-        var p = leer(CLAVE_PEND, []); p.push(reg); guardar(CLAVE_PEND, p.slice(-300));
-        toast((reg.tipo === 'entrada' ? 'Entrada' : 'Salida') + ' guardada en el teléfono: se enviará al volver la señal.');
-      } else {
-        toast(r.message || 'Registrado.');
-      }
-      $('v-prev').hidden = true; fotoActual = null;
-      cargar();
-      if ($('prev-seguir').checked) setTimeout(function () { capturar(reg.tipo); }, 350);
-    }).catch(function (e) {
-      toast(enLinea() ? e.message : 'Sin conexión: no se guardó. Inténtalo con señal o desde la app.', true);
-    }).then(function () { btn.disabled = false; btn.textContent = 'Guardar'; });
+    var f = fotoActual, seguir = !$('prev-seguir-c').hidden && $('prev-seguir').checked;
+    $('v-prev').hidden = true; fotoActual = null;
+    registrar(tipoActual, f.blob, f.mini, f.capturado, $('prev-nota').value.trim()).then(function () {
+      if (seguir) setTimeout(function () { capturar(tipoActual); }, 300);
+    });
   };
 
-  /* ── Lista del día ── */
-  var datos = { registros: [], totales: { entrada: 0, salida: 0 } };
-  function cargar() {
-    var q = { fecha: $('fecha').value };
+  /* ══ Lista del día ═══════════════════════════════════════════════════ */
+  var datos = { registros: [], totales: { entrada: 0, salida: 0 }, mas: false };
+  var cargando = false, tRecarga = null;
+  function programarRecarga() { clearTimeout(tRecarga); tRecarga = setTimeout(function () { cargar(true); }, 1200); }
+  function consulta() {
+    var q = { fecha: $('fecha').value, limite: POR_PAGINA };
     if ($('solo-punto').checked) q.lugar = normaLugar($('lugar').value);
+    return q;
+  }
+  function cargar(reset) {
+    if (cargando && !reset) return Promise.resolve();
+    cargando = true;
+    var q = consulta();
+    var previos = reset ? [] : datos.registros;
+    if (!reset && previos.length) { var u = previos[previos.length - 1]; q.antes_cap = u.capturado; q.antes_id = u.id; }
     return api('LISTAR_ACCESOS', q, 'GET').then(function (r) {
       if (r.status !== 'success') throw new Error(r.message || '');
-      datos = r;
-      // Lo que ya llegó al servidor deja de estar pendiente en el teléfono
-      var ids = {}; (r.registros || []).forEach(function (x) { ids[x.uid] = 1; });
-      var p = leer(CLAVE_PEND, []).filter(function (x) { return !ids[x.uid]; });
-      guardar(CLAVE_PEND, p);
+      datos = { registros: previos.concat(r.registros || []), totales: r.totales || {}, mas: !!r.mas };
       pintarLista();
-    }).catch(function () { pintarLista(); });
+    }).catch(function () { pintarLista(); }).then(function () { cargando = false; });
   }
-  function pendientesVisibles() {
+  $('btn-mas').onclick = function () { cargar(false); };
+  function enColaVisible() {
     var f = $('fecha').value, l = normaLugar($('lugar').value), solo = $('solo-punto').checked;
-    return leer(CLAVE_PEND, []).filter(function (x) { return x.capturado.slice(0, 10) === f && (!solo || x.lugar === l); });
+    return cola.filter(function (x) { return x.capturado.slice(0, 10) === f && (!solo || x.lugar === l); });
   }
   function pintarLista() {
-    var filtro = seg('filtro');
-    var pend = pendientesVisibles();
+    var filtro = seg('filtro'), pend = enColaVisible();
     var tot = { entrada: (datos.totales || {}).entrada || 0, salida: (datos.totales || {}).salida || 0 };
-    pend.forEach(function (x) { tot[x.tipo]++; });
-    $('t-ent').textContent = tot.entrada; $('t-sal').textContent = tot.salida; $('t-dif').textContent = tot.entrada - tot.salida;
-    var items = (datos.registros || []).map(function (x) { return { srv: x, cuando: x.hora }; })
-      .concat(pend.map(function (x) { return { pend: x, cuando: x.capturado.slice(11) }; }))
-      .filter(function (it) { return filtro === 'todos' || (it.srv || it.pend).tipo === filtro; })
-      .sort(function (a, b) { return a.cuando < b.cuando ? 1 : -1; });       // lo más reciente arriba
-    if (!items.length) { $('lista').innerHTML = '<li class="vacio">Sin registros' + (filtro !== 'todos' ? ' de este tipo' : '') + ' en este día.</li>'; return; }
-    $('lista').innerHTML = items.map(function (it) {
-      var x = it.srv || it.pend, ent = x.tipo === 'entrada';
-      var foto = it.srv ? '<img loading="lazy" alt="" data-id="' + x.id + '" src="' + esc(urlFoto(x.id, true)) + '" onerror="this.outerHTML=\'<div class=sinfoto>Foto sin señal</div>\'">'
-                        : '<img alt="" src="' + esc(x.mini) + '">';
-      var etiqueta = it.srv ? (ent ? 'ENTRADA ' : 'SALIDA ') + String(x.num).padStart(3, '0') : (ent ? 'ENTRADA' : 'SALIDA');
-      return '<li class="reg">' + foto + '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' + etiqueta + '</span>' +
-        esc(it.cuando) + (it.pend ? ' <span class="badge pend">Por enviar</span>' : '') + '</div>' +
-        '<div class="l2">' + esc(x.lugar) + (it.srv ? ' · ' + esc(x.nombre) : '') + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div>' +
-        (it.srv && x.puede_borrar ? '<button class="borrar" type="button" data-borrar="' + x.id + '" aria-label="Eliminar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>' : '') +
+    pend.forEach(function (x) { if (!x.error) tot[x.tipo]++; });
+    $('t-ent').textContent = numero(tot.entrada); $('t-sal').textContent = numero(tot.salida); $('t-dif').textContent = numero(tot.entrada - tot.salida);
+    var vista = function (x) { return filtro === 'todos' || x.tipo === filtro; };
+    var html = pend.filter(vista).slice().reverse().map(function (x) {
+      var estado = x.error ? '<span class="badge rech">No se aceptó</span>' : (enviando === x.uid ? '<span class="badge pend">Enviando…</span>' : '<span class="badge cola">En cola</span>');
+      return '<li class="reg"><img alt="" src="' + esc(x.mini) + '"><div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' +
+        (x.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + '</span>' + esc(x.capturado.slice(11)) + ' ' + estado + '</div>' +
+        '<div class="l2">' + esc(x.lugar) + (x.nota ? ' · ' + esc(x.nota) : '') + (x.error ? '<br><span style="color:var(--rojo)">' + esc(x.error) + '</span>' : '') + '</div>' +
+        (x.error ? '<div class="mini-acc"><button type="button" data-reintentar="' + esc(x.uid) + '">Reintentar</button><button type="button" data-descartar="' + esc(x.uid) + '">Descartar</button></div>' : '') +
+        '</div></li>';
+    }).join('');
+    html += (datos.registros || []).filter(vista).map(function (x) {
+      var ent = x.tipo === 'entrada';
+      return '<li class="reg"><img loading="lazy" alt="" data-id="' + x.id + '" src="' + esc(urlFoto(x.id, true)) + '" onerror="this.outerHTML=\'<div class=sinfoto>Foto sin señal</div>\'">' +
+        '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' + (ent ? 'ENTRADA ' : 'SALIDA ') + String(x.num).padStart(3, '0') + '</span>' + esc(x.hora) + '</div>' +
+        '<div class="l2">' + esc(x.lugar) + ' · ' + esc(x.nombre) + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div>' +
+        (x.puede_borrar ? '<button class="borrar" type="button" data-borrar="' + x.id + '" aria-label="Eliminar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>' : '') +
         '</li>';
     }).join('');
+    $('lista').innerHTML = html || '<li class="vacio">Sin registros' + (filtro !== 'todos' ? ' de este tipo' : '') + ' en este día.</li>';
+    $('btn-mas').hidden = !datos.mas;
   }
   $('lista').addEventListener('click', function (ev) {
-    var b = ev.target.closest('[data-borrar]');
-    if (b) {
+    var t;
+    if ((t = ev.target.closest('[data-reintentar]'))) {
+      var it = cola.filter(function (x) { return x.uid === t.dataset.reintentar; })[0];
+      if (it) { delete it.error; ponerEnCola(it).then(function () { espera = 0; enviarCola(); }); }
+      return;
+    }
+    if ((t = ev.target.closest('[data-descartar]'))) {
+      if (confirm('¿Descartar este registro? Su foto se borra de este equipo.')) quitarDeCola(t.dataset.descartar).then(pintarLista);
+      return;
+    }
+    if ((t = ev.target.closest('[data-borrar]'))) {
       if (!enLinea()) { toast('Para eliminar se necesita señal.', true); return; }
       if (!confirm('¿Eliminar este registro y su foto?')) return;
-      api('ACCESO_ELIMINAR', { id: +b.dataset.borrar }).then(function (r) {
-        if (r.status !== 'success') throw new Error(r.message); toast(r.message); cargar();
+      api('ACCESO_ELIMINAR', { id: +t.dataset.borrar }).then(function (r) {
+        if (r.status !== 'success') throw new Error(r.message); toast(r.message); cargar(true);
       }).catch(function (e) { toast(e.message || 'No se pudo eliminar.', true); });
       return;
     }
-    var img = ev.target.closest('img[data-id]');
-    if (img) {
-      var x = (datos.registros || []).filter(function (r) { return String(r.id) === img.dataset.id; })[0] || {};
-      $('foto-grande').src = urlFoto(img.dataset.id, false);
+    if ((t = ev.target.closest('img[data-id]'))) {
+      var x = (datos.registros || []).filter(function (r) { return String(r.id) === t.dataset.id; })[0] || {};
+      $('foto-grande').src = urlFoto(t.dataset.id, false);
       $('foto-pie').textContent = (x.tipo === 'entrada' ? 'ENTRADA ' : 'SALIDA ') + String(x.num || '').padStart(3, '0') + ' · ' + (x.hora || '') + ' · ' + (x.lugar || '');
       $('v-foto').hidden = false;
     }
@@ -445,34 +705,51 @@
   $('foto-cerrar').onclick = function () { $('v-foto').hidden = true; $('foto-grande').removeAttribute('src'); };
   $('v-foto').addEventListener('click', function (ev) { if (ev.target === $('v-foto')) $('foto-cerrar').onclick(); });
 
-  /* ── PDF ── */
+  /* ══ PDF por partes ═══════════════════════════════════════════════════ */
+  var partes = { total: 0, hechas: {} };
+  function limpiarPartes() { partes = { total: 0, hechas: {} }; $('partes').innerHTML = ''; $('pdf-res').innerHTML = ''; }
   function pintarBotonPdf() {
     var ok = enLinea();
     $('btn-pdf').disabled = !ok;
     $('btn-pdf').textContent = ok ? 'Generar PDF' : 'Se necesita señal para generar el PDF';
   }
   pintarBotonPdf();
-  if (window.AVBAApp && AVBAApp.alCambiarConexion) AVBAApp.alCambiarConexion(function () { pintarBotonPdf(); if (enLinea()) cargar(); });
-  window.addEventListener('online', function () { pintarBotonPdf(); cargar(); });
-  window.addEventListener('offline', pintarBotonPdf);
-  $('btn-pdf').onclick = function () {
-    var b = $('btn-pdf'); b.disabled = true; b.innerHTML = '<span class="spin"></span> Generando PDF…';
+  if (window.AVBAApp && AVBAApp.alCambiarConexion) AVBAApp.alCambiarConexion(function () { pintarBotonPdf(); if (enLinea()) { enviarCola(); cargar(true); } });
+  function pedirPdf() {
     var q = { fecha: $('fecha').value, incluir: seg('incluir') };
     if ($('pdf-punto').checked) q.lugar = normaLugar($('lugar').value);
-    $('pdf-res').innerHTML = '';
-    api('ACCESOS_PDF', q).then(function (r) {
+    return q;
+  }
+  function generarParte(n, boton) {
+    var q = pedirPdf(); q.parte = n;
+    var antes = boton.innerHTML; boton.disabled = true; boton.innerHTML = '<span class="spin"></span> Parte ' + n + '…';
+    return api('ACCESOS_PDF', q).then(function (r) {
       if (r.status !== 'success') throw new Error(r.message || 'No se pudo generar el PDF.');
-      var mb = r.bytes / 1048576, url = r.url + '&token=' + encodeURIComponent(ses.token);
-      var avisos = [];
-      if (r.paginas > 100) avisos.push('Tiene ' + r.paginas + ' páginas: Claude analiza las imágenes de hasta 100 páginas por PDF. Genera entradas y salidas por separado.');
-      if (mb > 30) avisos.push('Pesa ' + mb.toFixed(1) + ' MB: el límite para subir un archivo a Claude es de unos 30 MB. Genera entradas y salidas por separado.');
-      $('pdf-res').innerHTML = '<div class="nota ' + (avisos.length ? 'mal' : 'ok') + '">PDF listo: ' + r.entradas + ' entradas y ' + r.salidas + ' salidas · ' +
-        r.paginas + ' página' + (r.paginas === 1 ? '' : 's') + ' · ' + mb.toFixed(1) + ' MB' + (avisos.length ? '<br>' + avisos.join('<br>') : '') + '</div>' +
-        '<a class="btn verde ancho" style="margin-top:8px" target="_blank" rel="noopener" href="' + esc(url) + '">Abrir PDF</a>';
+      partes.total = r.partes; partes.hechas[n] = r;
+      pintarPartes();
+      var mb = r.bytes / 1048576;
+      $('pdf-res').innerHTML = '<div class="nota ' + (r.paginas > 100 || mb > 30 ? 'mal' : 'ok') + '">' +
+        (r.partes > 1 ? '<b>Parte ' + r.parte + ' de ' + r.partes + '</b> · ' : '') + numero(r.entradas) + ' entradas y ' + numero(r.salidas) + ' salidas · ' +
+        r.paginas + ' página' + (r.paginas === 1 ? '' : 's') + ' · ' + mb.toFixed(1) + ' MB' +
+        (r.partes > 1 ? '<br>El día tiene ' + numero(r.total) + ' fotos: van en ' + r.partes + ' partes. Claude analiza cada parte por separado, así que no puede cruzar una entrada de una parte con la salida de otra.' : '') +
+        '</div><a class="btn verde ancho" style="margin-top:8px" target="_blank" rel="noopener" href="' + esc(r.url + '&token=' + encodeURIComponent(token())) + '">Abrir PDF' + (r.partes > 1 ? ' (parte ' + r.parte + ')' : '') + '</a>';
+      armarPrompt();
     }).catch(function (e) {
       $('pdf-res').innerHTML = '<div class="nota mal">' + esc(e.message) + '</div>';
-    }).then(pintarBotonPdf);
-  };
+    }).then(function () { boton.disabled = false; boton.innerHTML = antes; pintarBotonPdf(); });
+  }
+  function pintarPartes() {
+    if (partes.total < 2) { $('partes').innerHTML = ''; return; }
+    var h = '';
+    for (var n = 1; n <= partes.total; n++) {
+      var r = partes.hechas[n];
+      h += r ? '<a class="btn verde" target="_blank" rel="noopener" href="' + esc(r.url + '&token=' + encodeURIComponent(token())) + '">Abrir parte ' + n + '</a>'
+             : '<button class="btn sec" type="button" data-parte="' + n + '">Generar parte ' + n + '</button>';
+    }
+    $('partes').innerHTML = h;
+  }
+  $('partes').addEventListener('click', function (ev) { var b = ev.target.closest('[data-parte]'); if (b) generarParte(+b.dataset.parte, b); });
+  $('btn-pdf').onclick = function () { limpiarPartes(); generarParte(1, $('btn-pdf')); };
 
   /* ── Instrucciones para Claude ── */
   function fechaLarga(f) {
@@ -481,20 +758,21 @@
   }
   function armarPrompt() {
     var inc = seg('incluir'), punto = $('pdf-punto').checked ? normaLugar($('lugar').value) : '';
-    var secciones = inc === 'ambos' ? 'dos secciones, ENTRADAS y SALIDAS' : (inc === 'entrada' ? 'sólo la sección de ENTRADAS' : 'sólo la sección de SALIDAS');
+    var secciones = inc === 'ambos' ? 'secciones de ENTRADAS y SALIDAS' : (inc === 'entrada' ? 'sólo la sección de ENTRADAS' : 'sólo la sección de SALIDAS');
+    var parte = partes.total > 1 ? ' Es una de ' + partes.total + ' partes del día: analiza sólo lo que viene en este archivo.' : '';
     $('prompt').textContent =
-      'Te adjunto el PDF del control de accesos del ' + fechaLarga($('fecha').value) + (punto ? ' en «' + punto + '»' : '') + '. Tiene ' + secciones +
-      '. Cada fotografía es una identificación (INE, licencia, pasaporte, credencial de empresa u otra) y lleva su etiqueta, por ejemplo «ENTRADA 001 · 08:15:32».\n\n' +
+      'Te adjunto el PDF del control de accesos del ' + fechaLarga($('fecha').value) + (punto ? ' en «' + punto + '»' : '') + '. Tiene ' + secciones + '.' + parte +
+      ' Cada fotografía es una identificación (INE, licencia, pasaporte, credencial de empresa u otra) y lleva su etiqueta, por ejemplo «ENTRADA 001 · 08:15:32».\n\n' +
       '1. De cada fotografía extrae SOLO el número de identificación: en la INE, la clave de elector; en licencias, pasaportes y credenciales, su número o folio. Usa el mismo tipo de número para la misma identificación. No transcribas nombres, domicilios, fechas de nacimiento ni otros datos personales.\n' +
       '2. Arma una tabla con: número de identificación, etiqueta y hora de entrada, etiqueta y hora de salida.\n' +
-      '3. Debajo de la tabla indica:\n' +
+      '3. Debajo de la tabla indica todo lo que no cuadra:\n' +
       '   • Quién entró y no tiene salida registrada.\n' +
       '   • Quién salió sin entrada registrada.\n' +
       '   • Las fotos donde el número no se lee o hay duda (con su etiqueta).\n' +
       '   • Los números que aparecen más de una vez en entradas o en salidas.\n' +
       '4. Al final, el total de entradas, de salidas y de personas distintas.';
   }
-  $('pdf-punto').addEventListener('change', armarPrompt);
+  $('pdf-punto').addEventListener('change', function () { armarPrompt(); limpiarPartes(); });
   armarPrompt();
   $('btn-copiar').onclick = function () {
     var t = $('prompt').textContent;
@@ -502,14 +780,23 @@
       .then(function () { toast('Instrucciones copiadas: pégalas en Claude junto con el PDF.'); })
       .catch(function () {
         var r = document.createRange(); r.selectNodeContents($('prompt'));
-        var s = getSelection(); s.removeAllRanges(); s.addRange(r);
+        var s2 = getSelection(); s2.removeAllRanges(); s2.addRange(r);
         toast('Selecciona y copia el texto de las instrucciones.');
       });
   };
 
-  /* Otros puntos de control registran al mismo tiempo: se actualiza solo */
-  setInterval(function () { if (!document.hidden && enLinea() && $('v-prev').hidden) cargar(); }, 30000);
-  cargar();
+  /* ── Arranque ── */
+  // Lo que quedó en cola y el servidor ya tiene (se cortó la señal a medio envío) sale sin volver a subir la foto
+  leerCola().then(function (c) {
+    if (!c.length) return;
+    return api('ACCESOS_EXISTEN', { uids: c.map(function (x) { return x.uid; }) }).then(function (r) {
+      var ya = r.existen || {};
+      return Promise.all(c.filter(function (x) { return ya[x.uid]; }).map(function (x) { return quitarDeCola(x.uid); }));
+    }).catch(function () {});
+  }).then(function () { enviarCola(); });
+  // Otros puntos registran al mismo tiempo: se actualiza solo
+  setInterval(function () { if (!document.hidden && enLinea() && $('v-prev').hidden && !cargando) cargar(true); }, 30000);
+  cargar(true);
 })();
 </script>
 <script src="js/movil.js"></script>

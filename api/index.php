@@ -1149,6 +1149,7 @@ if ($method === 'POST') {
         case 'LISTAR_ACCESOS':
         case 'LISTAR_ACCESOS_LUGARES':
         case 'ACCESO_ELIMINAR':
+        case 'ACCESOS_EXISTEN':
         case 'ACCESOS_PDF': {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -1160,6 +1161,7 @@ if ($method === 'POST') {
                 case 'LISTAR_ACCESOS':         respuesta($ca->listar($datos, $usr));
                 case 'LISTAR_ACCESOS_LUGARES': respuesta($ca->lugares());
                 case 'ACCESO_ELIMINAR':        respuesta($ca->eliminar((int)($datos['id'] ?? 0), $usr));
+                case 'ACCESOS_EXISTEN':        respuesta($ca->existen((array)($datos['uids'] ?? [])));
                 default:                       respuesta($ca->generarPdf($datos, $usr));
             }
         }

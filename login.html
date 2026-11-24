@@ -424,8 +424,10 @@ async function completarAcceso(data, origen) {
     ts:            Date.now()
   };
 
-  // Redirigir según rol
-  const destino = DESTINOS[data.rol];
+  // Redirigir según rol, o de regreso a la pantalla que pidió entrar
+  // (login.html?volver=accesos.html). Sólo una página del propio sitio.
+  const volver = new URLSearchParams(location.search).get('volver') || '';
+  const destino = /^[a-z0-9_-]+\.html$/i.test(volver) && volver !== 'login.html' ? volver : DESTINOS[data.rol];
   if (!destino) {
     mostrarError("Rol no reconocido: " + data.rol);
     btn.disabled = false;
@@ -460,7 +462,8 @@ async function entrarConDispositivo() {
     if (data.sin_senal) {
       // Sin señal: el sensor confirmó a la persona y se sigue con la sesión
       // guardada en el teléfono. Lo capturado se envía al volver la señal.
-      const destino = DESTINOS[data.rol];
+      const volver = new URLSearchParams(location.search).get('volver') || '';
+      const destino = /^[a-z0-9_-]+\.html$/i.test(volver) && volver !== 'login.html' ? volver : DESTINOS[data.rol];
       data.ts = Date.now();
       delete data.sin_senal;
       localStorage.setItem("avba_session", JSON.stringify(data));
