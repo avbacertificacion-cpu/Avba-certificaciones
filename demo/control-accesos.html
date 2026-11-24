@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Panel de control de accesos (demo) · AVBA</title>
+<meta name="theme-color" content="#0B2545">
+<link rel="icon" href="../assets/logos/avba.png">
+<!--
+  AVBA — MAQUETA del panel del ADMINISTRADOR DE CONTROL DE ACCESOS
+
+  Demo con datos FICTICIOS, generados en el navegador (nada se guarda ni se
+  envía al servidor). Sirve para ver y discutir cómo funcionaría el módulo:
+
+    · Tablero con gráficas: ocupación, flujo por hora, empresas, horas,
+      incidencias, documentación.
+    · Puerta en vivo: se simula la lectura de la identificación, el sistema
+      reconoce a la persona y revisa veto, documentos, jornada, celular,
+      herramienta, vales y alcoholímetro. El guardia sólo ve el semáforo.
+    · Alertas: jornada (LFT reformada 2026), permanencia, descanso, vetos,
+      documentos y vales.
+    · Personas (perfil con horas, autorizaciones, documentos, vales,
+      incidencias y bitácora), Jornadas STPS, Incidencias y vetos,
+      Herramientas y vales, Reglas y roles.
+
+  Las cifras de la ley están en REGLAS / TABLA_LEY (ver la sección «Reglas»).
+-->
+<style>
+  :root{
+    --azul:#185FA5; --azul-dark:#0C447C; --azul-light:#E6F1FB; --marino:#0B2545;
+    --texto:#1a1a2e; --texto-sub:#5a6072; --texto-hint:#8b91a0; --borde:#dfe5ef;
+    --fondo:#f0f4f9; --blanco:#fff; --radio:14px;
+    /* Gráficas (paleta validada) */
+    --s1:#2a78d6; --s2:#eb6834;
+    /* Estados (siempre con ícono y texto) */
+    --bueno:#0ca30c; --aviso:#fab219; --grave:#ec835a; --critico:#d03b3b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  html,body{overflow-x:hidden;overflow-x:clip}
+  body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--fondo);color:var(--texto);
+       min-height:100vh;-webkit-tap-highlight-color:transparent;font-size:14px}
+  svg.i{width:18px;height:18px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  button{font-family:inherit}
+
+  /* ── Barra superior ── */
+  .top{position:sticky;top:0;z-index:40;color:#fff;background:linear-gradient(160deg,var(--marino),var(--azul-dark));
+    padding:calc(8px + env(safe-area-inset-top)) 16px 8px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 12px rgba(11,37,69,.25)}
+  .top img{height:30px;background:#fff;border-radius:6px;padding:3px 6px}
+  .top .t1{font-size:15.5px;font-weight:800;line-height:1.2}
+  .top .t2{font-size:11.5px;color:rgba(255,255,255,.78)}
+  .top .der{margin-left:auto;display:flex;align-items:center;gap:10px}
+  .reloj{font-size:12px;color:rgba(255,255,255,.85);text-align:right;line-height:1.3}
+  .reloj b{display:block;font-size:14px;color:#fff}
+  .campana{position:relative;width:40px;height:40px;border-radius:10px;border:0;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;
+    display:flex;align-items:center;justify-content:center}
+  .campana .n{position:absolute;top:-4px;right:-4px;background:var(--critico);color:#fff;font-size:10.5px;font-weight:800;border-radius:999px;
+    min-width:19px;height:19px;padding:0 5px;display:flex;align-items:center;justify-content:center;border:2px solid var(--marino)}
+  .quien{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border-radius:10px;padding:5px 10px 5px 5px}
+  .quien .av{width:30px;height:30px;font-size:11px}
+  .quien span{font-size:12px;line-height:1.2}
+  .cinta{background:#FFF3D6;color:#7a4f00;font-size:12.5px;padding:7px 16px;text-align:center;border-bottom:1px solid #f2dfb0}
+
+  /* ── Marco: menú + contenido ── */
+  .marco{display:grid;grid-template-columns:230px 1fr;min-height:calc(100vh - 90px)}
+  .menu{background:#fff;border-right:1px solid var(--borde);padding:12px 10px;position:sticky;top:56px;align-self:start;height:calc(100vh - 56px);overflow:auto}
+  .menu button{width:100%;display:flex;align-items:center;gap:10px;border:0;background:none;color:var(--texto-sub);font-size:14px;font-weight:600;
+    padding:10px 12px;border-radius:10px;cursor:pointer;text-align:left;margin-bottom:2px}
+  .menu button:hover{background:var(--fondo);color:var(--texto)}
+  .menu button[aria-current=page]{background:var(--azul-light);color:var(--azul-dark)}
+  .menu .cnt{margin-left:auto;font-size:11px;font-weight:800;border-radius:999px;padding:2px 7px;background:#fbe3e3;color:#8f1f1f}
+  .menu .sep{height:1px;background:var(--borde);margin:10px 4px}
+  .menu .pie{font-size:11.5px;color:var(--texto-hint);padding:6px 10px;line-height:1.5}
+  main{padding:18px 20px 60px;min-width:0}
+  .sec-tit{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .sec-tit h1{font-size:21px;font-weight:800;color:var(--marino)}
+  .sec-tit p{font-size:13px;color:var(--texto-sub);margin-top:3px}
+
+  /* ── Tarjetas y rejillas ── */
+  .card{background:#fff;border-radius:var(--radio);border:1px solid rgba(0,0,0,.06);box-shadow:0 3px 14px rgba(12,68,124,.05);padding:16px;min-width:0}
+  .card-tit{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+  .card-tit h2{font-size:14.5px;font-weight:800;color:var(--texto)}
+  .card-tit span{font-size:12px;color:var(--texto-hint)}
+  .rejilla{display:grid;gap:14px;margin-bottom:14px}
+  .g2{grid-template-columns:repeat(2,minmax(0,1fr))} .g3{grid-template-columns:repeat(3,minmax(0,1fr))} .g21{grid-template-columns:minmax(0,2fr) minmax(0,1fr)} .g12{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr)}
+  .lienzo{position:relative;height:250px}
+  .lienzo.bajo{height:210px} .lienzo.alto{height:330px}
+  .nota-graf{font-size:11.5px;color:var(--texto-hint);margin-top:8px;line-height:1.45}
+
+  /* ── Indicadores ── */
+  .kpis{display:grid;grid-template-columns:1.4fr repeat(5,1fr);gap:12px;margin-bottom:14px}
+  .kpi{background:#fff;border-radius:var(--radio);border:1px solid rgba(0,0,0,.06);padding:14px 16px;min-width:0}
+  .kpi .l{font-size:12px;color:var(--texto-sub);font-weight:600;display:flex;align-items:center;gap:6px}
+  .kpi .v{font-size:28px;font-weight:700;line-height:1.15;margin-top:4px;color:var(--texto)}
+  .kpi .s{font-size:11.5px;color:var(--texto-hint);margin-top:2px}
+  .kpi.hero{background:linear-gradient(160deg,var(--marino),var(--azul-dark));color:#fff;border:0}
+  .kpi.hero .l,.kpi.hero .s{color:rgba(255,255,255,.8)}
+  .kpi.hero .v{color:#fff;font-size:40px}
+  .kpi.click{cursor:pointer} .kpi.click:hover{box-shadow:0 4px 16px rgba(12,68,124,.12)}
+
+  /* ── Estados ── */
+  .st{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 9px 3px 7px;white-space:nowrap}
+  .st svg.i{width:14px;height:14px}
+  .st.critico{background:#fbe6e6;color:#8f1f1f} .st.critico svg{color:var(--critico)}
+  .st.grave{background:#fdeee6;color:#8a3a12} .st.grave svg{color:var(--grave)}
+  .st.aviso{background:#fff4d9;color:#7a4f00} .st.aviso svg{color:#c98500}
+  .st.bueno{background:#e6f5e6;color:#1d5e1d} .st.bueno svg{color:var(--bueno)}
+  .st.info{background:var(--azul-light);color:var(--azul-dark)}
+  .st.gris{background:#edf0f5;color:#4a5568}
+
+  /* ── Alertas ── */
+  .alertas{list-style:none}
+  .alertas.scroll{max-height:390px;overflow:auto;margin-right:-6px;padding-right:6px}
+  .alertas.scroll .al{flex-wrap:wrap} .alertas.scroll .al .acc{width:100%;justify-content:flex-start;padding-left:42px}
+  .al{display:flex;gap:10px;padding:10px 0;border-bottom:1px solid var(--borde);align-items:flex-start}
+  .al:last-child{border-bottom:0}
+  .al .ic{width:32px;height:32px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .al .ic.critico{background:#fbe6e6;color:var(--critico)} .al .ic.grave{background:#fdeee6;color:var(--grave)} .al .ic.aviso{background:#fff4d9;color:#c98500}
+  .al .tx{flex:1;min-width:0}
+  .al .tx b{font-size:13.5px} .al .tx .d{font-size:12.5px;color:var(--texto-sub);margin-top:2px;line-height:1.4}
+  .al .tx .m{font-size:11.5px;color:var(--texto-hint);margin-top:3px}
+  .al .acc{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
+
+  /* ── Botones y formularios ── */
+  .btn{border:0;border-radius:10px;padding:10px 14px;font-size:13.5px;font-weight:700;cursor:pointer;min-height:40px;
+    display:inline-flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;white-space:nowrap}
+  .btn.prim{background:var(--azul);color:#fff} .btn.prim:hover{background:var(--azul-dark)}
+  .btn.sec{background:#fff;color:var(--azul);border:1.5px solid var(--azul)}
+  .btn.verde{background:#2F6B1E;color:#fff} .btn.rojo{background:#A32D2D;color:#fff} .btn.ambar{background:#8A5A00;color:#fff}
+  .btn.peq{min-height:32px;padding:6px 10px;font-size:12.5px;border-radius:8px}
+  .btn.fant{background:none;color:var(--texto-sub);border:1px solid var(--borde)}
+  .btn:disabled{opacity:.45;cursor:default}
+  .lnk{border:0;background:none;color:var(--azul);font-weight:700;font-size:12.5px;cursor:pointer;padding:4px}
+  .campo label,.lbl{display:block;font-size:12px;font-weight:700;color:var(--texto-sub);margin-bottom:5px}
+  input[type=text],input[type=search],input[type=number],input[type=datetime-local],select,textarea{width:100%;padding:9px 11px;border:1.5px solid var(--borde);border-radius:10px;
+    font-size:14px;color:var(--texto);background:#fff;outline:none;font-family:inherit;min-height:40px}
+  textarea{min-height:70px;resize:vertical}
+  input:focus,select:focus,textarea:focus{border-color:var(--azul);box-shadow:0 0 0 3px rgba(24,95,165,.12)}
+  .filtros{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:flex-end}
+  .filtros>*{flex:1 1 170px}
+  .filtros>.ancho{flex:2 1 240px}
+
+  /* ── Tablas ── */
+  .tabla-env{overflow-x:auto;margin:0 -4px}
+  table.t{width:100%;border-collapse:collapse;font-size:13px}
+  table.t th{text-align:left;font-size:11.5px;color:var(--texto-hint);font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:8px 8px;border-bottom:1px solid var(--borde);white-space:nowrap}
+  table.t td{padding:9px 8px;border-bottom:1px solid #eef1f6;vertical-align:middle}
+  table.t tr:last-child td{border-bottom:0}
+  table.t tr.fila{cursor:pointer} table.t tr.fila:hover td{background:#f7f9fc}
+  table.t td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+  .pers{display:flex;align-items:center;gap:10px;min-width:200px}
+  .pers b{display:block;font-size:13.5px} .pers span{font-size:12px;color:var(--texto-hint)}
+  .av{width:36px;height:36px;border-radius:50%;background:#dbe7f5;color:var(--azul-dark);font-weight:800;font-size:12.5px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .av.vet{background:#fbe6e6;color:#8f1f1f}
+  .auts{display:flex;gap:4px}
+  .auts span{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;background:#f1f3f7;color:#c0c6d2}
+  .auts span.si{background:var(--azul-light);color:var(--azul-dark)}
+  .auts svg.i{width:15px;height:15px}
+  .medidor{width:120px}
+  .medidor .barra{height:8px;border-radius:4px;background:#e3edf9;overflow:hidden}
+  .medidor .barra i{display:block;height:100%;border-radius:4px}
+  .medidor small{font-size:11.5px;color:var(--texto-sub);font-variant-numeric:tabular-nums}
+  .mas{margin-top:10px;width:100%}
+
+  /* ── Puerta en vivo ── */
+  .puerta{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:start}
+  .sim-bot{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .sim-bot .btn{flex:1 1 160px}
+  .credencial{border-radius:14px;padding:28px 14px 14px;background:linear-gradient(135deg,#eef2f7,#dfe7f1);border:1px solid #cfd9e6;display:flex;gap:14px;align-items:center;position:relative;overflow:hidden}
+  .credencial .foto{width:74px;height:90px;border-radius:8px;background:#c4d2e3;color:#3b4f6b;font-weight:800;font-size:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .credencial .dat{font-size:12px;color:#3b4f6b;line-height:1.5;min-width:0}
+  .credencial .dat b{display:block;font-size:15px;color:#1a2b44}
+  .credencial .tipo{position:absolute;top:10px;right:12px;font-size:10.5px;font-weight:800;letter-spacing:.5px;color:#5a6b85}
+  .credencial .scan{position:absolute;left:0;right:0;height:3px;background:rgba(24,95,165,.55);box-shadow:0 0 12px rgba(24,95,165,.8);top:0;animation:scan 1.1s ease-in-out}
+  @keyframes scan{from{top:0}to{top:100%}}
+  .ident{margin-top:10px;font-size:13px;padding:10px 12px;border-radius:10px;background:var(--azul-light);color:var(--azul-dark);line-height:1.45}
+  .checks{list-style:none;margin-top:12px}
+  .checks li{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--borde);align-items:flex-start}
+  .checks li:last-child{border-bottom:0}
+  .checks .ic{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .checks .ic.ok{background:#e6f5e6;color:var(--bueno)} .checks .ic.critico{background:#fbe6e6;color:var(--critico)}
+  .checks .ic.aviso{background:#fff4d9;color:#c98500} .checks .ic.grave{background:#fdeee6;color:var(--grave)} .checks .ic.info{background:var(--azul-light);color:var(--azul)}
+  .checks .ic svg.i{width:15px;height:15px}
+  .checks b{font-size:13px} .checks p{font-size:12.5px;color:var(--texto-sub);margin-top:1px;line-height:1.4}
+  .checks label{display:flex;gap:6px;align-items:center;font-size:12.5px;margin-top:5px;color:var(--texto)}
+  .veredicto{margin-top:12px;border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:center;font-weight:800;font-size:15px}
+  .veredicto.pasa{background:#e6f5e6;color:#1d5e1d} .veredicto.obs{background:#fff4d9;color:#7a4f00}
+  .veredicto.nopasa{background:#fbe6e6;color:#8f1f1f} .veredicto.esp{background:var(--azul-light);color:var(--azul-dark)}
+  .veredicto small{display:block;font-weight:600;font-size:12.5px;margin-top:2px}
+  .acciones{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+  .acciones .btn{flex:1 1 170px}
+  .telefono{width:230px;margin:0 auto;border-radius:30px;background:#111;padding:10px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .telefono .pant{border-radius:22px;background:#f0f4f9;min-height:330px;overflow:hidden;display:flex;flex-direction:column}
+  .telefono .bar{background:var(--marino);color:#fff;font-size:11px;font-weight:700;padding:10px 12px}
+  .telefono .sem{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:14px;gap:6px}
+  .telefono .sem b{font-size:30px;letter-spacing:1px}
+  .telefono .sem span{font-size:12px;font-weight:600}
+  .telefono .sem.pasa{background:#2F6B1E;color:#fff} .telefono .sem.nopasa{background:#A32D2D;color:#fff}
+  .telefono .sem.esp{background:#8A5A00;color:#fff} .telefono .sem.prueba{background:var(--azul-dark);color:#fff} .telefono .sem.vacio{color:var(--texto-hint)}
+  .telefono ul{list-style:none;font-size:11.5px;padding:8px 10px;background:#fff}
+  .telefono li{padding:4px 0;display:flex;gap:6px;align-items:center}
+  .telefono .gbtn{display:flex;gap:6px;padding:8px;background:#fff}
+  .telefono .gbtn button{flex:1;border:0;border-radius:8px;padding:8px 4px;font-size:11.5px;font-weight:800;color:#fff;cursor:pointer}
+  .feed{list-style:none}
+  .feed li{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--borde);cursor:pointer}
+  .feed li:last-child{border-bottom:0}
+  .feed .hora{font-size:12px;color:var(--texto-hint);width:42px;flex-shrink:0;font-variant-numeric:tabular-nums}
+  .feed .tx{flex:1;min-width:0;font-size:13px}
+  .feed .tx span{display:block;font-size:11.5px;color:var(--texto-hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tipo-ev{font-size:10.5px;font-weight:800;border-radius:999px;padding:2px 7px}
+  .tipo-ev.e{background:#e3efe0;color:#2F6B1E} .tipo-ev.s{background:#f6e3e3;color:#A32D2D}
+
+  /* ── Perfil (panel lateral) y ventanas ── */
+  .velo{position:fixed;inset:0;background:rgba(11,37,69,.45);z-index:80}
+  .panel{position:fixed;top:0;right:0;bottom:0;width:min(560px,100%);background:#f6f8fb;z-index:90;overflow:auto;box-shadow:-8px 0 30px rgba(0,0,0,.2)}
+  .panel .cab{background:linear-gradient(160deg,var(--marino),var(--azul-dark));color:#fff;padding:calc(16px + env(safe-area-inset-top)) 18px 16px;display:flex;gap:12px;align-items:center;position:sticky;top:0;z-index:2}
+  .panel .cab .av{width:52px;height:52px;font-size:17px}
+  .panel .cab b{font-size:17px;display:block} .panel .cab span{font-size:12.5px;color:rgba(255,255,255,.82)}
+  .panel .cab .cerrar{margin-left:auto;align-self:flex-start;border:0;background:rgba(255,255,255,.15);color:#fff;width:36px;height:36px;border-radius:9px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .panel .cuerpo{padding:14px}
+  .panel .card{margin-bottom:12px}
+  .mini-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+  .mini-kpis div{background:#fff;border-radius:12px;padding:10px;border:1px solid rgba(0,0,0,.06)}
+  .mini-kpis b{display:block;font-size:19px} .mini-kpis span{font-size:11.5px;color:var(--texto-sub)}
+  .interr{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--borde)}
+  .interr:last-child{border-bottom:0}
+  .interr .tx{flex:1;font-size:13px} .interr .tx span{display:block;font-size:12px;color:var(--texto-hint)}
+  .switch{position:relative;width:44px;height:26px;flex-shrink:0}
+  .switch input{opacity:0;width:0;height:0}
+  .switch i{position:absolute;inset:0;background:#cfd6e2;border-radius:999px;cursor:pointer;transition:.15s}
+  .switch i:before{content:'';position:absolute;width:20px;height:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.15s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  .switch input:checked+i{background:var(--azul)} .switch input:checked+i:before{transform:translateX(18px)}
+  .lista-s{list-style:none}
+  .lista-s li{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--borde);font-size:13px}
+  .lista-s li:last-child{border-bottom:0}
+  .lista-s li .tx{flex:1;min-width:0} .lista-s li .tx span{display:block;font-size:12px;color:var(--texto-hint)}
+  .fondo{position:fixed;inset:0;z-index:120;background:rgba(11,37,69,.55);display:flex;align-items:center;justify-content:center;padding:14px}
+  .ventana{background:#fff;border-radius:16px;width:100%;max-width:560px;max-height:94vh;overflow:auto;padding:18px}
+  .ventana h3{font-size:16px;font-weight:800;margin-bottom:12px;color:var(--marino)}
+  .ventana .rej{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .ventana .rej .full{grid-column:1/-1}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));z-index:150;background:#1e6b34;color:#fff;
+    border-radius:12px;padding:11px 16px;font-weight:700;font-size:13.5px;max-width:92vw;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  .toast.err{background:#A32D2D}
+
+  /* ── Reglas y roles ── */
+  .reglas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .ley{font-size:12.5px;color:var(--texto-sub);line-height:1.55}
+  .ley b{color:var(--texto)}
+  table.ley-t{border-collapse:collapse;font-size:12.5px;margin-top:8px;width:100%}
+  table.ley-t td,table.ley-t th{border:1px solid var(--borde);padding:6px 8px;text-align:center}
+  table.ley-t th{background:#f5f7fa;font-size:11.5px}
+  table.ley-t tr.act td{background:var(--azul-light);font-weight:700}
+  .roles td,.roles th{vertical-align:top}
+  .roles td{font-size:12.5px;line-height:1.45}
+  .si-no{display:inline-flex;align-items:center;gap:4px;font-weight:700}
+  .si-no.si{color:#1d5e1d} .si-no.no{color:#8f1f1f}
+  .check-r{display:flex;gap:8px;align-items:flex-start;font-size:13px;margin-bottom:9px;color:var(--texto);line-height:1.4}
+  .check-r input{width:18px;height:18px;accent-color:var(--azul);flex-shrink:0;margin-top:1px}
+  .kpis.k4{grid-template-columns:repeat(4,1fr)} .kpis.k5{grid-template-columns:repeat(5,1fr)}
+  .fuentes{font-size:12px;color:var(--texto-hint);line-height:1.6}
+  .fuentes a{color:var(--azul)}
+
+  @media (max-width:1250px){ .kpis,.kpis.k5{grid-template-columns:repeat(3,minmax(0,1fr))} .g3{grid-template-columns:repeat(2,minmax(0,1fr))} }
+  @media (max-width:980px){
+    .marco{grid-template-columns:1fr}
+    .menu{position:sticky;top:56px;z-index:30;height:auto;display:flex;gap:4px;overflow-x:auto;padding:8px 10px;border-right:0;border-bottom:1px solid var(--borde)}
+    .menu button{width:auto;flex-shrink:0;padding:8px 11px;font-size:13px;margin:0}
+    .menu .sep,.menu .pie{display:none}
+    .g2,.g21,.g12,.puerta,.reglas{grid-template-columns:minmax(0,1fr)}
+    .quien span{display:none}
+  }
+  @media (max-width:640px){
+    main{padding:14px 12px 50px}
+    .top{padding-left:12px;padding-right:12px;gap:8px}
+    .top img{height:24px}
+    .top .t2,.reloj span{display:none}
+    .kpis,.kpis.k4,.kpis.k5{grid-template-columns:repeat(2,minmax(0,1fr))} .kpi.hero{grid-column:1/-1}
+    .g3{grid-template-columns:minmax(0,1fr)}
+    .kpi .v{font-size:24px} .kpi.hero .v{font-size:34px}
+    .lienzo{height:230px}
+    .ventana .rej{grid-template-columns:1fr}
+    .al{flex-wrap:wrap} .al .acc{width:100%;justify-content:flex-start;padding-left:42px}
+    .quien{display:none}
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-cel" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-herr" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></symbol>
+  <symbol id="i-pc" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></symbol>
+  <symbol id="i-auto" viewBox="0 0 24 24"><path d="M5 15v-4l2-5h10l2 5v4"/><path d="M3 15h18v4H3z"/><path d="M7 19v2M17 19v2"/></symbol>
+  <symbol id="i-cam" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></symbol>
+  <symbol id="i-alerta" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></symbol>
+  <symbol id="i-reloj" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-veto" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M5.6 5.6l12.8 12.8"/></symbol>
+  <symbol id="i-doc" viewBox="0 0 24 24"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-campana" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-entrada" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><path d="M10 17l5-5-5-5M15 12H3"/></symbol>
+  <symbol id="i-salida" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-tablero" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></symbol>
+  <symbol id="i-vale" viewBox="0 0 24 24"><path d="M3 7h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4z"/><path d="M9 7v10"/></symbol>
+  <symbol id="i-ajustes" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></symbol>
+  <symbol id="i-vivo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4"/></symbol>
+  <symbol id="i-grupo" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14a6 6 0 0 1 3.5 6"/></symbol>
+  <symbol id="i-copa" viewBox="0 0 24 24"><path d="M7 3h10l-1 7a4 4 0 0 1-8 0z"/><path d="M12 14v7M8 21h8"/></symbol>
+  <symbol id="i-cruz" viewBox="0 0 24 24"><path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/></symbol>
+</svg>
+
+<header class="top">
+  <img src="../assets/logos/avba.png" alt="AVBA">
+  <div><div class="t1">Control de accesos</div><div class="t2" id="t-planta">Planta Quantum Energy · Administración de accesos</div></div>
+  <div class="der">
+    <div class="reloj" id="reloj"></div>
+    <button class="campana" type="button" id="btn-campana" aria-label="Alertas"><svg class="i"><use href="#i-campana"/></svg><span class="n" id="n-alertas">0</span></button>
+    <div class="quien"><div class="av">AA</div><span><b>Admin. de accesos</b><br>rol nuevo · demo</span></div>
+  </div>
+</header>
+<div class="cinta"><b>MAQUETA</b> con datos ficticios generados en este navegador: personas, empresas e incidencias no son reales y nada se guarda.</div>
+
+<div class="marco">
+  <nav class="menu" id="menu" aria-label="Secciones">
+    <button type="button" data-sec="tablero" aria-current="page"><svg class="i"><use href="#i-tablero"/></svg>Tablero</button>
+    <button type="button" data-sec="puerta"><svg class="i"><use href="#i-vivo"/></svg>Puerta en vivo</button>
+    <button type="button" data-sec="alertas"><svg class="i"><use href="#i-alerta"/></svg>Alertas<span class="cnt" id="m-alertas"></span></button>
+    <button type="button" data-sec="personas"><svg class="i"><use href="#i-grupo"/></svg>Personas</button>
+    <button type="button" data-sec="jornadas"><svg class="i"><use href="#i-reloj"/></svg>Jornadas (STPS)</button>
+    <button type="button" data-sec="incidencias"><svg class="i"><use href="#i-escudo"/></svg>Incidencias y vetos</button>
+    <button type="button" data-sec="vales"><svg class="i"><use href="#i-vale"/></svg>Herramientas y vales</button>
+    <button type="button" data-sec="reglas"><svg class="i"><use href="#i-ajustes"/></svg>Reglas y roles</button>
+    <div class="sep"></div>
+    <div class="pie">El guardia de caseta no ve este panel: sólo toma la foto y ve el semáforo PASA / NO PASA.</div>
+  </nav>
+
+  <main id="main">
+
+    <!-- ═══ TABLERO ═══ -->
+    <section class="sec" id="sec-tablero">
+      <div class="sec-tit"><div><h1>Tablero</h1><p id="tab-sub"></p></div>
+        <button class="btn sec" type="button" data-ir="puerta"><svg class="i"><use href="#i-vivo"/></svg>Simular la puerta</button></div>
+      <div class="kpis" id="kpis"></div>
+      <div class="rejilla g21">
+        <div class="card"><div class="card-tit"><h2>Personas dentro de la planta</h2><span>Últimas 24 horas, cada 15 minutos</span></div>
+          <div class="lienzo"><canvas id="g-ocupacion" aria-label="Personas dentro de la planta en las últimas 24 horas"></canvas></div>
+          <p class="nota-graf">Los picos son los cambios de turno (06:30 y 18:30): por unos minutos están dentro el turno que sale y el que entra.</p></div>
+        <div class="card"><div class="card-tit"><h2>Alertas activas</h2><button class="lnk" type="button" data-ir="alertas">Ver todas</button></div>
+          <ul class="alertas scroll" id="alertas-top"></ul></div>
+      </div>
+      <div class="rejilla g2">
+        <div class="card"><div class="card-tit"><h2>Entradas y salidas por hora</h2><span>Últimas 24 horas</span></div>
+          <div class="lienzo"><canvas id="g-flujo"></canvas></div></div>
+        <div class="card"><div class="card-tit"><h2>Dentro ahora, por empresa</h2><span>Personas</span></div>
+          <div class="lienzo"><canvas id="g-empresas"></canvas></div></div>
+      </div>
+      <div class="rejilla g3">
+        <div class="card"><div class="card-tit"><h2>Horas en los últimos 7 días</h2><span>Personas</span></div>
+          <div class="lienzo bajo"><canvas id="g-horas"></canvas></div>
+          <p class="nota-graf" id="nota-horas"></p></div>
+        <div class="card"><div class="card-tit"><h2>Incidencias por tipo</h2><span>Últimos 90 días</span></div>
+          <div class="lienzo bajo"><canvas id="g-inc-tipo"></canvas></div></div>
+        <div class="card"><div class="card-tit"><h2>Documentación por empresa</h2><span>% de su personal</span></div>
+          <div class="lienzo bajo"><canvas id="g-docs"></canvas></div></div>
+      </div>
+      <div class="card"><div class="card-tit"><h2>Contratistas</h2><span>REPSE, personal y cumplimiento</span></div>
+        <div class="tabla-env"><table class="t" id="t-empresas"></table></div></div>
+    </section>
+
+    <!-- ═══ PUERTA EN VIVO ═══ -->
+    <section class="sec" id="sec-puerta" hidden>
+      <div class="sec-tit"><div><h1>Puerta en vivo</h1><p>Simula lo que pasa en la caseta: el guardia toma la foto de la identificación y el sistema reconoce a la persona y revisa todo en un segundo.</p></div></div>
+      <div class="puerta">
+        <div class="card">
+          <div class="sim-bot">
+            <button class="btn verde" type="button" id="sim-llega"><svg class="i"><use href="#i-entrada"/></svg>Llega alguien a la caseta</button>
+            <button class="btn rojo" type="button" id="sim-sale"><svg class="i"><use href="#i-salida"/></svg>Sale alguien de la planta</button>
+          </div>
+          <div class="filtros" style="margin-bottom:6px">
+            <div class="ancho"><label class="lbl" for="sim-elegir">O elige a una persona</label><select id="sim-elegir"></select></div>
+          </div>
+          <div id="sim"></div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:14px">
+            <div class="card-tit"><h2>Lo que ve el guardia</h2><span>Su teléfono, en la caseta</span></div>
+            <div class="telefono"><div class="pant" id="tel"></div></div>
+            <p class="nota-graf" style="text-align:center">Sin motivos ni historial: sólo PASA / NO PASA y qué hacer (resguardar celular, registrar herramienta, hacer la prueba).</p>
+          </div>
+          <div class="card"><div class="card-tit"><h2>Movimientos recientes</h2><span id="feed-sub"></span></div><ul class="feed" id="feed"></ul></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ ALERTAS ═══ -->
+    <section class="sec" id="sec-alertas" hidden>
+      <div class="sec-tit"><div><h1>Alertas</h1><p>Se calculan solas con cada entrada y salida. Al atenderlas quedan en el historial.</p></div></div>
+      <div class="filtros">
+        <div><label class="lbl" for="f-al-sev">Gravedad</label><select id="f-al-sev"><option value="">Todas</option><option value="critico">Críticas</option><option value="grave">Graves</option><option value="aviso">Avisos</option></select></div>
+        <div><label class="lbl" for="f-al-tipo">Tipo</label><select id="f-al-tipo"><option value="">Todos</option></select></div>
+      </div>
+      <div class="card"><ul class="alertas" id="alertas-todas"></ul></div>
+    </section>
+
+    <!-- ═══ PERSONAS ═══ -->
+    <section class="sec" id="sec-personas" hidden>
+      <div class="sec-tit"><div><h1>Personas</h1><p id="per-sub"></p></div></div>
+      <div class="filtros">
+        <div class="ancho"><label class="lbl" for="f-buscar">Buscar</label><input type="search" id="f-buscar" placeholder="Nombre, puesto o últimos dígitos de la identificación"></div>
+        <div><label class="lbl" for="f-emp">Empresa</label><select id="f-emp"><option value="">Todas</option></select></div>
+        <div><label class="lbl" for="f-est">Mostrar</label><select id="f-est">
+          <option value="">Todas</option><option value="dentro">Dentro ahora</option><option value="alertas">Con alertas</option>
+          <option value="vetado">Vetadas</option><option value="docs">Documentos vencidos</option><option value="extra">Con horas extra (7 días)</option></select></div>
+      </div>
+      <div class="card"><div class="tabla-env"><table class="t" id="t-personas"></table></div>
+        <button class="btn fant mas" type="button" id="per-mas" hidden>Ver más</button></div>
+    </section>
+
+    <!-- ═══ JORNADAS ═══ -->
+    <section class="sec" id="sec-jornadas" hidden>
+      <div class="sec-tit"><div><h1>Jornadas y horas extra (STPS)</h1><p id="jor-sub"></p></div></div>
+      <div class="kpis k5" id="jor-kpis"></div>
+      <div class="rejilla g12">
+        <div class="card"><div class="card-tit"><h2>Reglas que se aplican</h2><span id="jor-anio"></span></div><div class="ley" id="jor-ley"></div></div>
+        <div class="card"><div class="card-tit"><h2>Las 15 personas con más horas</h2><span>Últimos 7 días</span></div>
+          <div class="lienzo alto"><canvas id="g-jornada"></canvas></div></div>
+      </div>
+      <div class="card"><div class="card-tit"><h2>Alertas de jornada</h2><span>Permanencia, semana y descanso</span></div><ul class="alertas" id="jor-alertas"></ul></div>
+    </section>
+
+    <!-- ═══ INCIDENCIAS ═══ -->
+    <section class="sec" id="sec-incidencias" hidden>
+      <div class="sec-tit"><div><h1>Incidencias y vetos</h1><p>Lo que pasa con cada persona queda en su expediente y la puerta lo aplica en el siguiente acceso.</p></div>
+        <button class="btn prim" type="button" id="btn-nueva-inc"><svg class="i"><use href="#i-escudo"/></svg>Registrar incidencia</button></div>
+      <div class="kpis k4" id="inc-kpis"></div>
+      <div class="rejilla g2">
+        <div class="card"><div class="card-tit"><h2>Incidencias por mes y gravedad</h2><span>Últimos 6 meses</span></div><div class="lienzo"><canvas id="g-inc-mes"></canvas></div></div>
+        <div class="card"><div class="card-tit"><h2>Incidencias por empresa</h2><span>Últimos 90 días</span></div><div class="lienzo"><canvas id="g-inc-emp"></canvas></div></div>
+      </div>
+      <div class="filtros">
+        <div><label class="lbl" for="f-inc-tipo">Tipo</label><select id="f-inc-tipo"><option value="">Todos</option></select></div>
+        <div><label class="lbl" for="f-inc-vet">Mostrar</label><select id="f-inc-vet"><option value="">Todas</option><option value="veto">Sólo las que generaron veto</option><option value="seg">En seguimiento</option></select></div>
+      </div>
+      <div class="card"><div class="tabla-env"><table class="t" id="t-inc"></table></div></div>
+    </section>
+
+    <!-- ═══ HERRAMIENTAS Y VALES ═══ -->
+    <section class="sec" id="sec-vales" hidden>
+      <div class="sec-tit"><div><h1>Herramientas, celulares y vales</h1><p>Lo que entra debe salir: cada herramienta registrada a la entrada se revisa a la salida, y cada préstamo o salida de material lleva su vale.</p></div></div>
+      <div class="kpis k5" id="val-kpis"></div>
+      <div class="rejilla g2">
+        <div class="card"><div class="card-tit"><h2>Vales abiertos por antigüedad</h2><span>Días desde que se abrieron</span></div><div class="lienzo bajo"><canvas id="g-vales"></canvas></div></div>
+        <div class="card"><div class="card-tit"><h2>Autorizaciones vigentes</h2><span>Personas</span></div><div class="lienzo bajo"><canvas id="g-auts"></canvas></div></div>
+      </div>
+      <div class="filtros">
+        <div><label class="lbl" for="f-val">Mostrar</label><select id="f-val"><option value="abiertos">Abiertos</option><option value="vencidos">Vencidos</option><option value="">Todos</option></select></div>
+      </div>
+      <div class="card"><div class="tabla-env"><table class="t" id="t-vales"></table></div></div>
+    </section>
+
+    <!-- ═══ REGLAS Y ROLES ═══ -->
+    <section class="sec" id="sec-reglas" hidden>
+      <div class="sec-tit"><div><h1>Reglas y roles</h1><p>Lo que revisa la puerta, los topes de jornada y quién ve qué. Al cambiar una regla, las alertas se recalculan.</p></div></div>
+      <div class="reglas" style="margin-bottom:14px">
+        <div class="card"><div class="card-tit"><h2>Jornada</h2></div>
+          <div class="campo" style="margin-bottom:10px"><label for="r-anio">Topes de la LFT del año</label><select id="r-anio"></select></div>
+          <div class="campo" style="margin-bottom:10px"><label for="r-perm">Tope de permanencia continua (política de la planta), horas</label><input type="number" id="r-perm" min="8" max="16" step="0.5"></div>
+          <div class="campo"><label for="r-desc">Días seguidos permitidos antes de exigir descanso</label><input type="number" id="r-desc" min="5" max="13"></div></div>
+        <div class="card"><div class="card-tit"><h2>Revisión en la puerta</h2></div>
+          <label class="check-r"><input type="checkbox" id="r-docs"> Bloquear con documentos vencidos (inducción, examen médico, DC-3, IMSS)</label>
+          <label class="check-r"><input type="checkbox" id="r-cel"> Celular sólo con autorización (si no, se resguarda)</label>
+          <label class="check-r"><input type="checkbox" id="r-herr"> Registrar herramienta a la entrada y revisarla a la salida</label>
+          <div class="campo" style="margin-top:10px"><label for="r-alc">Prueba de alcoholímetro aleatoria, % de las entradas</label><input type="number" id="r-alc" min="0" max="100"></div></div>
+        <div class="card"><div class="card-tit"><h2>Vales</h2></div>
+          <div class="campo"><label for="r-vale">Un vale abierto genera alerta después de, días</label><input type="number" id="r-vale" min="1" max="30"></div>
+          <p class="nota-graf" style="margin-top:12px">Tipos de vale: ingreso de herramienta (se cierra al salir con ella), préstamo de equipo de planta (radio, detector de gases, arnés) y salida de material (requiere autorización).</p></div>
+      </div>
+      <div class="card" style="margin-bottom:14px"><div class="card-tit"><h2>Quién ve qué</h2><span>Tres perfiles separados</span></div>
+        <div class="tabla-env"><table class="t roles" id="t-roles"></table></div></div>
+      <div class="rejilla g2">
+        <div class="card"><div class="card-tit"><h2>Cómo reconocería a las personas</h2></div><div class="ley" id="como-funciona"></div></div>
+        <div class="card"><div class="card-tit"><h2>Base legal consultada</h2></div><div class="ley" id="base-legal"></div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- Perfil de una persona -->
+<div class="velo" id="velo" hidden></div>
+<aside class="panel" id="panel" hidden aria-modal="true" role="dialog"></aside>
+<!-- Ventanas -->
+<div class="fondo" id="modal" hidden><div class="ventana" id="modal-c" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="../js/chart/chart.umd.min.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var MIN = 60000, HORA = 3600000, DIA = 86400000;
+  function ahora() { return new Date(); }
+  function dos(n) { return (n < 10 ? '0' : '') + n; }
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function num(n) { return Number(n || 0).toLocaleString('es-MX'); }
+  function ico(id, cls) { return '<svg class="i' + (cls ? ' ' + cls : '') + '"><use href="#i-' + id + '"/></svg>'; }
+  function inicioDia(d) { var x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+  function sumarDias(d, n) { var x = new Date(d); x.setDate(x.getDate() + n); return x; }
+  function conHora(d, h, m) { var x = new Date(d); x.setHours(h, m || 0, 0, 0); return x; }
+  function hhmm(d) { return dos(d.getHours()) + ':' + dos(d.getMinutes()); }
+  function claveDia(d) { return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
+  function fechaCorta(d) { return d.toLocaleDateString('es-MX', { weekday: 'short', day: 'numeric', month: 'short' }); }
+  function fecha(d) { return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }); }
+  function cuando(d) { return claveDia(d) === claveDia(ahora()) ? 'hoy ' + hhmm(d) : (claveDia(d) === claveDia(sumarDias(ahora(), -1)) ? 'ayer ' + hhmm(d) : fechaCorta(d) + ' ' + hhmm(d)); }
+  function dur(ms) { var m = Math.max(0, Math.round(ms / MIN)), h = Math.floor(m / 60); return h + ' h ' + dos(m % 60) + ' min'; }
+  function fmtH(h) { return (Math.round(h * 10) / 10).toLocaleString('es-MX') + ' h'; }
+  function iniciales(n) { var p = n.split(' '); return (p[0][0] + (p[1] ? p[1][0] : '')).toUpperCase(); }
+  var tToast;
+  function toast(t, err) { var el = $('toast'); el.textContent = t; el.className = 'toast' + (err ? ' err' : ''); el.hidden = false; clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 3400); }
+
+  /* ══ Datos ficticios (con semilla: no cambian al recargar el mismo día) ══ */
+  var hoy0 = inicioDia(ahora());
+  var semilla = hoy0.getFullYear() * 1000 + hoy0.getMonth() * 40 + hoy0.getDate();
+  var rnd = (function (a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; })(semilla);
+  function entre(a, b) { return a + Math.floor(rnd() * (b - a + 1)); }
+  function elegir(arr) { return arr[Math.floor(rnd() * arr.length)]; }
+  function prob(p) { return rnd() < p; }
+  function mezclar(arr) { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(rnd() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+
+  var EMPRESAS = [
+    { id: 'MIG', nombre: 'Montajes Industriales del Golfo', corto: 'Montajes del Golfo', repse: 'Vigente', n: 40 },
+    { id: 'EBN', nombre: 'Eléctrica Bajío Norte', corto: 'Eléctrica Bajío', repse: 'Vigente', n: 28 },
+    { id: 'PTH', nombre: 'Pailería Técnica Huasteca', corto: 'Pailería Huasteca', repse: 'Vigente', n: 26 },
+    { id: 'CMO', nombre: 'Constructora Moctezuma', corto: 'Const. Moctezuma', repse: 'Vigente', n: 24 },
+    { id: 'AMS', nombre: 'Andamios y Maniobras Sierra', corto: 'Andamios Sierra', repse: 'Por vencer', n: 22 },
+    { id: 'LIA', nombre: 'Limpieza Industrial Alfa', corto: 'Limpieza Alfa', repse: 'Vencido', n: 18 },
+    { id: 'AVB', nombre: 'AVBA Inspecciones', corto: 'AVBA', repse: 'Vigente', n: 8 }
+  ];
+  var EMP = {}; EMPRESAS.forEach(function (e) { EMP[e.id] = e; });
+  var PUESTOS = {
+    MIG: ['Mecánico montador', 'Ayudante general', 'Operador de grúa', 'Maniobrista', 'Supervisor mecánico'],
+    EBN: ['Electricista', 'Ayudante de electricista', 'Técnico instrumentista', 'Supervisor eléctrico'],
+    PTH: ['Soldador', 'Pailero', 'Ayudante general', 'Supervisor de pailería'],
+    CMO: ['Albañil', 'Oficial fierrero', 'Ayudante general', 'Operador de retroexcavadora', 'Residente de obra'],
+    AMS: ['Andamiero', 'Maniobrista', 'Ayudante general', 'Supervisor de andamios'],
+    LIA: ['Auxiliar de limpieza', 'Operador de hidrolavadora', 'Supervisora de limpieza'],
+    AVB: ['Inspector de grúas', 'Inspector de accesorios', 'Supervisor de seguridad']
+  };
+  var CURSOS = {
+    altura: 'Trabajos en altura (NOM-009)', soldadura: 'Soldadura y corte (NOM-027)', electrica: 'Seguridad eléctrica (NOM-029)',
+    izaje: 'Manejo de materiales e izaje (NOM-006)', confinado: 'Espacios confinados (NOM-033)', loto: 'Bloqueo de energías (NOM-004)'
+  };
+  function cursosDe(puesto) {
+    if (/Soldador|Pailero/.test(puesto)) return ['soldadura', 'altura'];
+    if (/Electricista|instrumentista|eléctrico/.test(puesto)) return ['electrica', 'loto'];
+    if (/Andamiero|andamios/.test(puesto)) return ['altura'];
+    if (/Maniobrista|grúa|Inspector/.test(puesto)) return ['izaje', 'altura'];
+    if (/hidrolavadora/.test(puesto)) return ['confinado'];
+    if (/Supervisor|Residente/.test(puesto)) return ['altura'];
+    return [];
+  }
+  var NOM_H = ['José', 'Juan', 'Luis', 'Carlos', 'Miguel', 'Jorge', 'Francisco', 'Alejandro', 'Roberto', 'Fernando', 'Ricardo', 'Eduardo', 'Javier', 'Raúl', 'Arturo', 'Héctor', 'Manuel', 'Daniel', 'Sergio', 'Omar', 'Iván', 'Rubén', 'Marco Antonio', 'Jesús', 'Pedro', 'Alberto', 'Gerardo', 'Víctor', 'Hugo', 'Ramón', 'Ernesto', 'Ángel', 'Mario', 'Andrés', 'Felipe', 'Gustavo', 'Rodrigo', 'Óscar', 'Saúl', 'Adrián'];
+  var NOM_M = ['María', 'Guadalupe', 'Ana', 'Laura', 'Patricia', 'Verónica', 'Rosa', 'Leticia', 'Claudia', 'Gabriela', 'Alejandra', 'Mónica', 'Adriana', 'Diana', 'Sandra', 'Elizabeth', 'Karla', 'Brenda', 'Norma', 'Silvia'];
+  var APE = ['Hernández', 'García', 'Martínez', 'López', 'González', 'Pérez', 'Rodríguez', 'Sánchez', 'Ramírez', 'Cruz', 'Flores', 'Gómez', 'Morales', 'Vázquez', 'Reyes', 'Jiménez', 'Torres', 'Díaz', 'Gutiérrez', 'Ruiz', 'Mendoza', 'Aguilar', 'Ortiz', 'Moreno', 'Castillo', 'Romero', 'Álvarez', 'Méndez', 'Chávez', 'Rivera', 'Juárez', 'Ramos', 'Domínguez', 'Herrera', 'Medina', 'Castro', 'Vargas', 'Guzmán', 'Velázquez', 'Salazar', 'Rojas', 'Contreras', 'Luna', 'Ortega', 'Delgado', 'Estrada', 'Cervantes', 'Zamora', 'Montes', 'Ibarra'];
+  var HERR = ['Esmeriladora angular 4½"', 'Taladro rotomartillo', 'Juego de llaves combinadas', 'Multímetro digital', 'Pinza amperimétrica', 'Llave de impacto', 'Máquina de soldar portátil', 'Polipasto de cadena 1 t', 'Nivel láser', 'Juego de dados ½"', 'Detector de voltaje', 'Cortadora de disco', 'Torquímetro'];
+  var EQUIPO_PLANTA = ['Radio portátil', 'Detector de 4 gases', 'Arnés de planta', 'Candado de bloqueo', 'Lámpara antiexplosión'];
+  var MATERIAL = ['Retazos de tubería (chatarra)', 'Cable de cobre sobrante', 'Andamio de la contratista (12 piezas)', 'Bomba para reparación en taller externo'];
+  var CASETAS = ['Caseta 1 (principal)', 'Caseta 2 (contratistas)'];
+  var TIPO_ID = ['INE', 'INE', 'INE', 'INE', 'INE', 'INE', 'INE', 'Licencia de conducir', 'Licencia de conducir', 'Gafete de contratista', 'Pasaporte'];
+
+  var TIPOS_INC = {
+    EPP: { n: 'Incumplimiento de EPP', g: 'Baja', d: ['Sin lentes de seguridad en área de proceso.', 'Sin barbiquejo trabajando en altura.', 'Guantes inadecuados para la tarea.'] },
+    ACTO: { n: 'Acto inseguro', g: 'Media', d: ['Cruzó el área acordonada de una maniobra.', 'Retiró una guarda de protección.', 'Subió a andamio sin tarjeta de liberación.'] },
+    CASI: { n: 'Casi accidente', g: 'Media', d: ['Cayó una herramienta desde el nivel 3 del andamio; sin lesionados.', 'Resbalón por derrame de aceite; sin lesión.'] },
+    ACC: { n: 'Accidente con lesión', g: 'Alta', d: ['Golpe en la mano con llave de impacto; atendido en servicio médico.', 'Esguince de tobillo al bajar de la plataforma.', 'Quemadura leve en antebrazo durante corte.'] },
+    ALC: { n: 'Aliento alcohólico / alcoholímetro positivo', g: 'Alta', d: ['Alcoholímetro en caseta: 0.32 g/L.', 'Aliento alcohólico detectado por supervisión; prueba positiva.'] },
+    DRO: { n: 'Sospecha de consumo de drogas', g: 'Alta', d: ['Conducta errática reportada por supervisión; se negó a la prueba.'] },
+    RIN: { n: 'Riña o agresión', g: 'Alta', d: ['Discusión con agresión física en el comedor.'] },
+    ROB: { n: 'Sustracción de material o herramienta', g: 'Alta', d: ['Intentó sacar cable de cobre sin vale de salida.', 'No presentó a la salida herramienta registrada a la entrada.'] },
+    CEL: { n: 'Celular o cámara sin autorización', g: 'Baja', d: ['Tomó fotografías en área restringida.', 'Ingresó celular sin autorización (no lo resguardó).'] },
+    SUP: { n: 'Suplantación o documento falso', g: 'Alta', d: ['Presentó la identificación de otra persona.'] },
+    VET: { n: 'Intento de ingreso estando vetado', g: 'Alta', d: ['Intentó ingresar por Caseta 2 estando vetado.'] }
+  };
+  var CORTO_INC = { EPP: 'Sin EPP', ACTO: 'Acto inseguro', CASI: 'Casi accidente', ACC: 'Accidente', ALC: 'Alcohol', DRO: 'Drogas', RIN: 'Riña', ROB: 'Sustracción', CEL: 'Celular / cámara', SUP: 'Suplantación', VET: 'Intento estando vetado' };
+  var ACCIONES = ['Plática de seguridad', 'Amonestación por escrito', 'Suspensión 3 días', 'Suspensión 7 días', 'Veto 30 días', 'Veto 90 días', 'Veto permanente en esta planta', 'Veto en todas las plantas del cliente'];
+  var TIPO_VALE = { herr: 'Ingreso de herramienta', equipo: 'Préstamo de equipo de planta', mat: 'Salida de material' };
+
+  var PERSONAS = [], P = {}, INCIDENCIAS = [], VALES = [], INTENTOS = [], MOVS = [];
+
+  (function generar() {
+    var N = ahora(), hoy = inicioDia(N), n = 0, nInc = 0, nVale = 180;
+    EMPRESAS.forEach(function (e) {
+      for (var i = 0; i < e.n; i++) {
+        var mujer = prob(e.id === 'LIA' ? 0.55 : (e.id === 'AVB' ? 0.3 : 0.08));
+        var lista = PUESTOS[e.id], sup = i < (e.n > 20 ? 2 : 1);
+        var puesto = sup ? lista[lista.length - 1] : elegir(lista.slice(0, -1));
+        var r = rnd(), pat;
+        if (e.id === 'AVB') pat = { on: 5, off: 2, h: 10 };
+        else if (r < 0.58) pat = { on: 4, off: 3, h: 12 };
+        else if (r < 0.86) pat = { on: 5, off: 2, h: 10 };
+        else if (r < 0.94) pat = { on: 5, off: 2, h: 11 };
+        else if (r < 0.98) pat = { on: 6, off: 1, h: 12 };
+        else pat = { on: 30, off: 0, h: 11 };
+        var herrAut = !sup && e.id !== 'LIA' && prob(0.55);
+        var p = {
+          id: 'P' + String(++n).padStart(3, '0'),
+          nombre: (mujer ? elegir(NOM_M) : elegir(NOM_H)) + ' ' + elegir(APE) + ' ' + elegir(APE),
+          emp: e.id, puesto: puesto, sup: sup,
+          turno: e.id === 'AVB' ? 'D' : (prob(0.65) ? 'D' : 'N'),
+          pat: pat, fase: entre(0, pat.on + pat.off - 1),
+          idTipo: elegir(TIPO_ID), idNum: String(entre(1000, 9999)),
+          aut: { cel: sup || e.id === 'AVB' || prob(0.12), herr: herrAut, pc: (sup || e.id === 'AVB') && prob(0.7), auto: sup ? prob(0.6) : prob(0.04), cam: e.id === 'AVB' && prob(0.6) },
+          herr: herrAut ? mezclar(HERR).slice(0, entre(2, 4)) : [],
+          placas: '', estado: 'activo', veto: null, ints: [],
+          alta: sumarDias(hoy, -entre(20, 400)),
+          docs: {
+            induccion: sumarDias(hoy, prob(0.05) ? -entre(1, 20) : entre(5, 340)),
+            medico: sumarDias(hoy, prob(0.04) ? -entre(1, 15) : entre(3, 300)),
+            imss: (e.id === 'LIA' ? prob(0.3) : prob(0.03)) ? 'pendiente' : 'vigente',
+            dc3: cursosDe(puesto).map(function (c) { return { curso: CURSOS[c], vence: sumarDias(hoy, prob(0.05) ? -entre(1, 30) : entre(5, 360)), avba: prob(0.6) }; })
+          }
+        };
+        if (p.aut.auto) p.placas = String.fromCharCode(65 + entre(0, 25), 65 + entre(0, 25), 65 + entre(0, 25)) + '-' + entre(100, 999) + '-' + String.fromCharCode(65 + entre(0, 25));
+        // Turnos de los últimos 16 días
+        var ciclo = p.pat.on + p.pat.off;
+        for (var k = 16; k >= 0; k--) {
+          if ((p.fase + 1000 - k) % ciclo >= p.pat.on) continue;
+          var s = sumarDias(hoy, -k);
+          var base = p.turno === 'D' ? conHora(s, 6, 0) : conHora(s, 18, 0);
+          var ent = new Date(+base + entre(-25, 40) * MIN + entre(0, 59) * 1000 + (prob(0.04) ? entre(60, 150) * MIN : 0));
+          var mins = p.pat.h * 60 + entre(-25, 15) + (prob(0.05) ? entre(60, 180) : 0);
+          var sal = new Date(+ent + mins * MIN + entre(0, 59) * 1000);
+          if (ent > N) continue;
+          p.ints.push({ ent: ent, sal: sal > N ? null : sal, cE: CASETAS[prob(0.7) ? 0 : 1], cS: CASETAS[prob(0.7) ? 0 : 1], obs: '' });
+        }
+        PERSONAS.push(p); P[p.id] = p;
+      }
+    });
+
+    function nuevaInc(p, tipo, f, accion, extra) {
+      var t = TIPOS_INC[tipo];
+      var inc = { folio: 'INC-' + String(++nInc + 400).padStart(4, '0'), pid: p.id, tipo: tipo, grav: t.g, fecha: f, accion: accion,
+        desc: elegir(t.d), estado: (N - f) < 10 * DIA && prob(0.5) ? 'En seguimiento' : 'Cerrada', por: 'Admin. de accesos' };
+      if (extra) for (var k in extra) inc[k] = extra[k];
+      INCIDENCIAS.push(inc); return inc;
+    }
+    // Vetos (con su incidencia)
+    var candidatos = mezclar(PERSONAS.filter(function (p) { return !p.sup && p.emp !== 'AVB'; }));
+    var motivos = [['ALC', 'Veto 90 días'], ['ROB', 'Veto permanente en esta planta'], ['RIN', 'Veto en todas las plantas del cliente'], ['ALC', 'Veto 30 días'], ['SUP', 'Veto permanente en esta planta'], ['DRO', 'Veto 90 días']];
+    motivos.forEach(function (m, i) {
+      var p = candidatos[i], f = conHora(sumarDias(hoy, -entre(3, 40)), entre(6, 20), entre(0, 59));
+      var inc = nuevaInc(p, m[0], f, m[1]);
+      var dias = /30/.test(m[1]) ? 30 : (/90/.test(m[1]) ? 90 : 0);
+      p.estado = 'vetado';
+      p.veto = { desde: f, hasta: dias ? sumarDias(f, dias) : null, motivo: TIPOS_INC[m[0]].n, alcance: /todas/.test(m[1]) ? 'Todas las plantas del cliente' : 'Esta planta', folio: inc.folio };
+      p.ints = p.ints.filter(function (it) { return it.ent < f; });
+      if (p.ints.length && !p.ints[p.ints.length - 1].sal) p.ints[p.ints.length - 1].sal = new Date(+f + 20 * MIN);
+    });
+    // Dos intentos de ingreso estando vetado (últimas horas)
+    [0, 1].forEach(function (i) {
+      var p = candidatos[i], t = new Date(+N - entre(1, 30) * HORA - entre(0, 59) * MIN);
+      INTENTOS.push({ pid: p.id, t: t, caseta: CASETAS[1] });
+      nuevaInc(p, 'VET', t, 'Se negó el acceso', { estado: 'En seguimiento' });
+    });
+    // Incidencias de los últimos 6 meses
+    var pesos = ['EPP', 'EPP', 'EPP', 'EPP', 'ACTO', 'ACTO', 'ACTO', 'CASI', 'CASI', 'ACC', 'ACC', 'CEL', 'CEL', 'ALC', 'ROB'];
+    var activos = PERSONAS.filter(function (p) { return p.estado === 'activo'; });
+    for (var i = 0; i < 62; i++) {
+      var tipo = elegir(pesos), p = elegir(activos), f = conHora(sumarDias(hoy, -entre(0, 179)), entre(6, 22), entre(0, 59));
+      var acc = { EPP: 'Plática de seguridad', ACTO: 'Amonestación por escrito', CASI: 'Plática de seguridad', ACC: 'Plática de seguridad', CEL: 'Amonestación por escrito', ALC: 'Suspensión 7 días', ROB: 'Suspensión 3 días' }[tipo];
+      nuevaInc(p, tipo, f, acc, tipo === 'ACC' ? { incapacidad: entre(0, 6), st7: true } : null);
+    }
+    // Personas «doblando turno» y una por cumplir su tope
+    var libres = mezclar(activos.filter(function (p) { var u = p.ints[p.ints.length - 1]; return !u || u.sal; }));
+    [15.3, 13.4, 12.6, 11.6].forEach(function (h, i) {
+      var p = libres[i], ent = new Date(+N - h * HORA - entre(0, 9) * MIN);
+      p.ints = p.ints.filter(function (it) { return it.ent < new Date(+ent - 10 * HORA) && it.sal && it.sal < new Date(+ent - 8 * HORA); });
+      p.ints.push({ ent: ent, sal: null, cE: CASETAS[0], cS: '', obs: '' });
+    });
+    // Vales
+    function vale(p, tipo, items, abierto, cerrado, extra) {
+      var v = { folio: 'V-' + String(++nVale).padStart(4, '0'), pid: p.id, tipo: tipo, items: items, abierto: abierto, cerrado: cerrado || null };
+      if (extra) for (var k in extra) v[k] = extra[k];
+      VALES.push(v); return v;
+    }
+    PERSONAS.forEach(function (p) {
+      var u = p.ints[p.ints.length - 1];
+      if (p.aut.herr && u && !u.sal && prob(0.7)) vale(p, 'herr', p.herr.slice(), u.ent, null);
+      p.ints.slice(-6, -1).forEach(function (it) { if (p.aut.herr && it.sal && prob(0.15)) vale(p, 'herr', p.herr.slice(), it.ent, it.sal); });
+    });
+    mezclar(activos.filter(function (p) { return p.aut.herr; })).slice(0, 5).forEach(function (p) {
+      var u = p.ints.filter(function (it) { return it.sal; }).slice(-entre(2, 4))[0];
+      if (u) vale(p, 'herr', p.herr.slice(0, entre(1, p.herr.length)), u.ent, null, { nota: 'Salió sin presentar la herramienta' });
+    });
+    mezclar(activos).slice(0, 9).forEach(function (p, i) {
+      var ab = new Date(+N - (i < 5 ? entre(4, 9) : entre(0, 2)) * DIA - entre(0, 600) * MIN);
+      vale(p, 'equipo', [elegir(EQUIPO_PLANTA)], ab, i > 6 ? new Date(+ab + entre(2, 20) * HORA) : null);
+    });
+    mezclar(activos.filter(function (p) { return p.sup; })).slice(0, 7).forEach(function (p, i) {
+      var ab = new Date(+N - entre(0, 6) * DIA - entre(0, 600) * MIN);
+      vale(p, 'mat', [elegir(MATERIAL)], ab, i < 3 ? null : new Date(+ab + entre(1, 30) * HORA), { autoriza: i < 2 ? 'Pendiente de autorizar' : 'Autorizado por Mantenimiento' });
+    });
+  })();
+
+  /* ══ Reglas (LFT reformada, DOF 1 de mayo de 2026) ══════════════════════
+     Jornada ordinaria semanal y horas extra a pago doble por año (transitorios);
+     sobre eso, hasta 4 horas a la semana a pago triple (art. 68). */
+  var TABLA_LEY = { 2026: { ord: 48, dob: 9 }, 2027: { ord: 46, dob: 9 }, 2028: { ord: 44, dob: 10 }, 2029: { ord: 42, dob: 11 }, 2030: { ord: 40, dob: 12 } };
+  var anioAct = Math.min(2030, Math.max(2026, ahora().getFullYear()));
+  var REGLAS = { anio: anioAct, perm: 12, diasSeguidos: 6, vale: 3, alc: 10, docs: true, cel: true, herr: true };
+  function limites() { var t = TABLA_LEY[REGLAS.anio]; return { ord: t.ord, dob: t.dob, tri: 4, max: t.ord + t.dob + 4 }; }
+
+  /* ══ Cálculos por persona ══ */
+  var RELOJ = 0;
+  function stats(p) {
+    if (p._t === RELOJ && p._s) return p._s;
+    var N = ahora(), u = p.ints[p.ints.length - 1], dentro = !!(u && !u.sal);
+    var desde7 = +N - 7 * DIA, h7 = 0;
+    p.ints.forEach(function (it) { var a = Math.max(+it.ent, desde7), b = +(it.sal || N); if (b > a) h7 += b - a; });
+    h7 /= HORA;
+    var dias = {}; p.ints.forEach(function (it) { dias[claveDia(it.ent)] = 1; });
+    var d = inicioDia(N), seg = 0;
+    if (!dias[claveDia(d)]) d = sumarDias(d, -1);
+    while (dias[claveDia(d)]) { seg++; d = sumarDias(d, -1); }
+    var lim = limites();
+    var s = { dentro: dentro, desde: dentro ? u.ent : null, perm: dentro ? N - u.ent : 0, h7: h7, seguidos: seg, docs: docs(p),
+      ord: Math.min(h7, lim.ord), dob: Math.min(Math.max(h7 - lim.ord, 0), lim.dob), tri: Math.min(Math.max(h7 - lim.ord - lim.dob, 0), lim.tri),
+      exc: Math.max(h7 - lim.max, 0), ultima: u || null };
+    p._t = RELOJ; p._s = s;
+    return s;
+  }
+  function docs(p) {
+    var h = inicioDia(ahora()), lista = [];
+    function chk(nombre, vence, extra) { var d = Math.round((inicioDia(vence) - h) / DIA); lista.push({ nombre: nombre, vence: vence, dias: d, est: d < 0 ? 'vencido' : (d <= 15 ? 'porvencer' : 'ok'), extra: extra || '' }); }
+    chk('Inducción de seguridad de la planta', p.docs.induccion, 'Vigencia anual');
+    chk('Examen médico', p.docs.medico);
+    p.docs.dc3.forEach(function (c) { chk('DC-3 · ' + c.curso, c.vence, c.avba ? 'Emitida por AVBA: se valida sola' : 'Emitida por otro agente capacitador'); });
+    lista.push({ nombre: 'Alta en el IMSS y pago SUA del mes', est: p.docs.imss === 'vigente' ? 'ok' : 'vencido', extra: p.docs.imss === 'vigente' ? 'Comprobante del mes cargado por la contratista' : 'La contratista no ha cargado el comprobante del mes' });
+    var est = lista.some(function (x) { return x.est === 'vencido'; }) ? 'vencido' : (lista.some(function (x) { return x.est === 'porvencer'; }) ? 'porvencer' : 'ok');
+    return { est: est, lista: lista };
+  }
+  function valesAbiertos(p) { return VALES.filter(function (v) { return v.pid === p.id && !v.cerrado; }); }
+  function vetoVigente(p) { return p.estado === 'vetado' && (!p.veto.hasta || p.veto.hasta > ahora()); }
+
+  /* ══ Alertas ══ */
+  var ATENDIDAS = {};
+  function A(sev, tipo, p, texto, t, accion) { return { sev: sev, tipo: tipo, p: p, texto: texto, t: t || null, clave: sev + '|' + tipo + '|' + p.id, accion: accion || '' }; }
+  function alertas(incluirAtendidas) {
+    var out = [], N = ahora(), lim = limites(), R = REGLAS;
+    PERSONAS.forEach(function (p) {
+      var s = stats(p);
+      if (s.dentro) {
+        var h = s.perm / HORA;
+        if (h >= R.perm + 2) out.push(A('critico', 'Permanencia', p, 'Lleva ' + dur(s.perm) + ' dentro de la planta (entró ' + cuando(s.desde) + '). Tope de la planta: ' + R.perm + ' h.', s.desde));
+        else if (h >= R.perm) out.push(A('grave', 'Permanencia', p, 'Lleva ' + dur(s.perm) + ' dentro (entró ' + cuando(s.desde) + '). Ya pasó el tope de ' + R.perm + ' h.', s.desde));
+        else if (h >= R.perm - 0.75) out.push(A('aviso', 'Por cumplir su tope', p, 'Cumple ' + R.perm + ' h dentro en ' + dur(R.perm * HORA - s.perm) + '. Avisar a su supervisor para el relevo.', s.desde));
+        if (s.docs.est === 'vencido') out.push(A('grave', 'Documentos', p, 'Está dentro con documentos vencidos: ' + s.docs.lista.filter(function (x) { return x.est === 'vencido'; }).map(function (x) { return x.nombre; }).join(', ') + '.', s.desde));
+      }
+      if (p.estado !== 'vetado') {
+        if (s.h7 > lim.max) out.push(A('critico', 'Jornada semanal', p, fmtH(s.h7) + ' en 7 días: pasa el máximo legal de ' + lim.max + ' h (' + lim.ord + ' ordinarias + ' + lim.dob + ' extra dobles + ' + lim.tri + ' triples).', null));
+        else if (s.h7 > lim.ord + lim.dob) out.push(A('grave', 'Jornada semanal', p, fmtH(s.h7) + ' en 7 días: ya genera horas extra a pago triple (art. 68 LFT).', null));
+        if (s.seguidos > R.diasSeguidos) out.push(A('critico', 'Sin día de descanso', p, 'Lleva ' + s.seguidos + ' días seguidos trabajando. La LFT pide al menos un día de descanso por cada seis de trabajo (art. 69).', null));
+      }
+    });
+    INTENTOS.forEach(function (ev) {
+      if (N - ev.t < 48 * HORA) out.push(A('critico', 'Intento de ingreso vetado', P[ev.pid], 'Intentó entrar por ' + ev.caseta + ' (' + cuando(ev.t) + '). El guardia vio «NO PASA».' + (P[ev.pid].veto ? ' Vetado por: ' + P[ev.pid].veto.motivo.toLowerCase() + '.' : ''), ev.t));
+    });
+    VALES.forEach(function (v) {
+      if (!v.cerrado && N - v.abierto > R.vale * DIA) out.push(A('aviso', 'Vale sin cerrar', P[v.pid], 'Vale ' + v.folio + ' (' + TIPO_VALE[v.tipo].toLowerCase() + ': ' + v.items.join(', ') + ') abierto desde hace ' + Math.floor((N - v.abierto) / DIA) + ' días' + (v.nota ? ' · ' + v.nota.toLowerCase() : '') + '.', v.abierto));
+    });
+    var orden = { critico: 0, grave: 1, aviso: 2 };
+    out = out.filter(function (a) { return incluirAtendidas || !ATENDIDAS[a.clave]; });
+    out.sort(function (a, b) { return orden[a.sev] - orden[b.sev] || ((b.t || 0) - (a.t || 0)); });
+    return out;
+  }
+  var SEV = { critico: 'Crítica', grave: 'Grave', aviso: 'Aviso' };
+  function htmlAlerta(a) {
+    var p = a.p, e = EMP[p.emp];
+    return '<li class="al"><div class="ic ' + a.sev + '">' + ico(a.sev === 'aviso' ? 'reloj' : 'alerta') + '</div><div class="tx">' +
+      '<b>' + esc(a.tipo) + '</b> · <span class="st ' + a.sev + '">' + ico('alerta') + SEV[a.sev] + '</span>' +
+      '<div class="d">' + esc(a.texto) + '</div><div class="m">' + esc(p.nombre) + ' · ' + esc(e.corto) + ' · ' + esc(p.puesto) + '</div></div>' +
+      '<div class="acc"><button class="btn peq fant" type="button" data-persona="' + p.id + '">Ver persona</button>' +
+      '<button class="btn peq sec" type="button" data-atender="' + esc(a.clave) + '">Atendida</button></div></li>';
+  }
+
+  /* ══ Gráficas ══ */
+  var C = { s1: '#2a78d6', s2: '#eb6834', o1: '#86b6ef', o2: '#3987e5', o3: '#1c5cab', bueno: '#0ca30c', aviso: '#fab219', grave: '#ec835a', critico: '#d03b3b', grid: '#e1e0d9', tinta: '#52514e' };
+  if (window.Chart) {
+    Chart.defaults.font.family = "system-ui,-apple-system,'Segoe UI',Roboto,sans-serif";
+    Chart.defaults.font.size = 11.5;
+    Chart.defaults.color = C.tinta;
+    Chart.defaults.borderColor = C.grid;
+    Chart.defaults.maintainAspectRatio = false;
+    Chart.defaults.animation = false;
+    Chart.defaults.plugins.legend.labels.boxWidth = 10;
+    Chart.defaults.plugins.legend.labels.boxHeight = 10;
+    Chart.defaults.plugins.legend.labels.padding = 14;
+    Chart.defaults.plugins.tooltip.backgroundColor = '#0b2545';
+    Chart.defaults.plugins.tooltip.padding = 10;
+    Chart.defaults.plugins.tooltip.cornerRadius = 8;
+    Chart.defaults.plugins.tooltip.boxPadding = 4;
+    // Valor en la punta de cada barra (gráficas de una sola serie)
+    Chart.register({ id: 'valores', afterDatasetsDraw: function (ch, a, o) {
+      if (!o || !o.on) return;
+      var ctx = ch.ctx; ctx.save(); ctx.font = '600 11px system-ui,sans-serif'; ctx.fillStyle = C.tinta; ctx.textBaseline = 'middle';
+      ch.data.datasets.forEach(function (ds, i) {
+        var m = ch.getDatasetMeta(i); if (m.hidden) return;
+        m.data.forEach(function (el, j) {
+          var v = ds.data[j]; if (!v) return;
+          var t = o.fmt ? o.fmt(v) : num(v);
+          if (ch.options.indexAxis === 'y') { ctx.textAlign = 'left'; ctx.fillText(t, el.x + 6, el.y); }
+          else { ctx.textAlign = 'center'; ctx.fillText(t, el.x, el.y - 9); }
+        });
+      });
+      ctx.restore();
+    } });
+    // Línea de un tope (p. ej. 48 h o 12 h), con su leyenda
+    Chart.register({ id: 'topes', afterDatasetsDraw: function (ch, a, o) {
+      if (!o || !o.lineas) return;
+      var ctx = ch.ctx, ca = ch.chartArea; ctx.save(); ctx.lineWidth = 1.5; ctx.font = '700 10.5px system-ui,sans-serif';
+      o.lineas.forEach(function (l) {
+        ctx.strokeStyle = l.color; ctx.fillStyle = C.tinta; ctx.beginPath();
+        if (o.eje === 'x') { var x = ch.scales.x.getPixelForValue(l.v); ctx.moveTo(x, ca.top); ctx.lineTo(x, ca.bottom); ctx.stroke(); ctx.textAlign = 'center'; ctx.fillText(l.t, x, ca.top - 7); }
+        else { var y = ch.scales.y.getPixelForValue(l.v); ctx.moveTo(ca.left, y); ctx.lineTo(ca.right, y); ctx.stroke(); ctx.textAlign = 'right'; ctx.fillText(l.t, ca.right, y - 6); }
+      });
+      ctx.restore();
+    } });
+  }
+  var GRAF = {};
+  function grafica(id, cfg) {
+    if (!window.Chart) return;
+    if (GRAF[id]) GRAF[id].destroy();
+    GRAF[id] = new Chart($(id), cfg);
+  }
+  function ejes(extra) {
+    var o = { x: { grid: { display: false }, border: { color: '#c3c2b7' }, ticks: { color: '#898781' } },
+              y: { grid: { color: C.grid }, border: { display: false }, ticks: { color: '#898781', precision: 0 }, beginAtZero: true } };
+    if (extra) for (var k in extra) o[k] = Object.assign(o[k] || {}, extra[k]);
+    return o;
+  }
+  function barrasH(id, etiquetas, datos, color, fmt, max) {
+    grafica(id, { type: 'bar', data: { labels: etiquetas, datasets: [{ data: datos, backgroundColor: color || C.s1, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 18 }] },
+      options: { indexAxis: 'y', layout: { padding: { right: 34 } }, plugins: { legend: { display: false }, valores: { on: true, fmt: fmt } },
+        scales: { x: { grid: { color: C.grid }, border: { display: false }, ticks: { color: '#898781', precision: 0 }, beginAtZero: true, suggestedMax: max },
+                  y: { grid: { display: false }, border: { color: '#c3c2b7' }, ticks: { color: C.tinta } } } } });
+  }
+
+  /* ══ Navegación ══ */
+  var SEC = 'tablero';
+  function ir(sec) {
+    SEC = sec;
+    document.querySelectorAll('.sec').forEach(function (s) { s.hidden = s.id !== 'sec-' + sec; });
+    document.querySelectorAll('#menu button').forEach(function (b) { if (b.dataset.sec === sec) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
+    try { history.replaceState(null, '', '#' + sec); } catch (e) {}
+    window.scrollTo(0, 0);
+    pintar();
+  }
+  $('menu').addEventListener('click', function (ev) { var b = ev.target.closest('button[data-sec]'); if (b) ir(b.dataset.sec); });
+  document.addEventListener('click', function (ev) {
+    var t;
+    if ((t = ev.target.closest('[data-ir]'))) { if (t.dataset.filtro != null) { $('f-est').value = t.dataset.filtro; limitePer = 40; } ir(t.dataset.ir); return; }
+    if ((t = ev.target.closest('[data-persona]'))) { abrirPersona(t.dataset.persona); return; }
+    if ((t = ev.target.closest('[data-atender]'))) { ATENDIDAS[t.dataset.atender] = new Date(); toast('Alerta marcada como atendida (queda en el historial).'); pintar(); return; }
+  });
+  $('btn-campana').onclick = function () { ir('alertas'); };
+
+  function pintar() {
+    RELOJ++;
+    var N = ahora(), m = N.getHours() * 60 + N.getMinutes();
+    $('reloj').innerHTML = '<b>' + hhmm(N) + '</b><span>' + (m >= 390 && m < 1110 ? 'Turno de día' : 'Turno de noche') + ' · ' + fechaCorta(N) + '</span>';
+    var al = alertas(), crit = al.filter(function (a) { return a.sev === 'critico'; }).length;
+    $('n-alertas').textContent = al.length; $('n-alertas').hidden = !al.length;
+    $('m-alertas').textContent = crit ? crit + ' críticas' : ''; $('m-alertas').hidden = !crit;
+    ({ tablero: pintarTablero, puerta: pintarPuerta, alertas: pintarAlertas, personas: pintarPersonas, jornadas: pintarJornadas,
+       incidencias: pintarIncidencias, vales: pintarVales, reglas: pintarReglas })[SEC](al);
+  }
+
+  /* ══ TABLERO ══ */
+  function pintarTablero(al) {
+    var N = ahora(), dentro = PERSONAS.filter(function (p) { return stats(p).dentro; });
+    var hace24 = +N - DIA, ent24 = 0, sal24 = 0;
+    PERSONAS.forEach(function (p) { p.ints.forEach(function (it) { if (+it.ent >= hace24) ent24++; if (it.sal && +it.sal >= hace24) sal24++; }); });
+    var inc30 = INCIDENCIAS.filter(function (i) { return N - i.fecha < 30 * DIA; }).length;
+    var activos = PERSONAS.filter(function (p) { return p.estado === 'activo'; });
+    var alDia = activos.filter(function (p) { return stats(p).docs.est !== 'vencido'; }).length;
+    var crit = al.filter(function (a) { return a.sev === 'critico'; }).length, grav = al.filter(function (a) { return a.sev === 'grave'; }).length;
+    var vAb = VALES.filter(function (v) { return !v.cerrado; }), vVen = vAb.filter(function (v) { return N - v.abierto > REGLAS.vale * DIA; }).length;
+    var dD = dentro.filter(function (p) { return p.turno === 'D'; }).length;
+    $('tab-sub').textContent = 'Planta Quantum Energy · ' + num(PERSONAS.length) + ' personas registradas de ' + EMPRESAS.length + ' empresas · actualizado ' + hhmm(N);
+    $('kpis').innerHTML =
+      '<div class="kpi hero click" data-ir="personas" data-filtro="dentro"><div class="l">' + ico('grupo') + 'Dentro de la planta ahora</div><div class="v">' + num(dentro.length) + '</div><div class="s">Turno de día ' + dD + ' · turno de noche ' + (dentro.length - dD) + '</div></div>' +
+      '<div class="kpi"><div class="l">' + ico('entrada') + 'Entradas</div><div class="v">' + num(ent24) + '</div><div class="s">Últimas 24 h</div></div>' +
+      '<div class="kpi"><div class="l">' + ico('salida') + 'Salidas</div><div class="v">' + num(sal24) + '</div><div class="s">Últimas 24 h</div></div>' +
+      '<div class="kpi click" data-ir="alertas"><div class="l">' + ico('alerta') + 'Alertas</div><div class="v">' + num(al.length) + '</div><div class="s"><span class="st critico">' + ico('alerta') + crit + ' críticas</span> ' + grav + ' graves</div></div>' +
+      '<div class="kpi click" data-ir="incidencias"><div class="l">' + ico('escudo') + 'Incidencias</div><div class="v">' + num(inc30) + '</div><div class="s">Últimos 30 días · ' + PERSONAS.filter(vetoVigente).length + ' vetados</div></div>' +
+      '<div class="kpi click" data-ir="vales"><div class="l">' + ico('doc') + 'Documentación al día</div><div class="v">' + Math.round(alDia / activos.length * 100) + ' %</div><div class="s">' + vAb.length + ' vales abiertos · ' + vVen + ' vencidos</div></div>';
+    $('alertas-top').innerHTML = al.slice(0, 12).map(htmlAlerta).join('') || '<li class="al">Sin alertas.</li>';
+
+    // Ocupación cada 15 minutos
+    var et = [], ocup = [], t0 = Math.floor((+N - DIA) / (15 * MIN)) * 15 * MIN;
+    var ints = []; PERSONAS.forEach(function (p) { p.ints.forEach(function (it) { if (!it.sal || +it.sal > t0) ints.push([+it.ent, it.sal ? +it.sal : Infinity]); }); });
+    for (var t = t0; t <= +N; t += 15 * MIN) {
+      var c = 0; ints.forEach(function (x) { if (x[0] <= t && x[1] > t) c++; });
+      et.push(hhmm(new Date(t))); ocup.push(c);
+    }
+    grafica('g-ocupacion', { type: 'line', data: { labels: et, datasets: [{ label: 'Personas dentro', data: ocup, borderColor: C.s1, backgroundColor: 'rgba(42,120,214,.10)', fill: true, borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: 0.25 }] },
+      options: { interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false } }, scales: ejes({ x: { ticks: { color: '#898781', maxTicksLimit: 9, autoSkip: true, maxRotation: 0 } } }) } });
+
+    // Entradas y salidas por hora
+    var horas = [], ents = [], sals = [], h0 = Math.floor((+N - 23 * HORA) / HORA) * HORA;
+    for (var h = 0; h < 24; h++) { horas.push(dos(new Date(h0 + h * HORA).getHours()) + 'h'); ents.push(0); sals.push(0); }
+    PERSONAS.forEach(function (p) { p.ints.forEach(function (it) {
+      var i = Math.floor((+it.ent - h0) / HORA); if (i >= 0 && i < 24) ents[i]++;
+      if (it.sal) { var j = Math.floor((+it.sal - h0) / HORA); if (j >= 0 && j < 24) sals[j]++; }
+    }); });
+    grafica('g-flujo', { type: 'bar', data: { labels: horas, datasets: [
+      { label: 'Entradas', data: ents, backgroundColor: C.s1, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 12 },
+      { label: 'Salidas', data: sals, backgroundColor: C.s2, borderRadius: 4, borderSkipped: 'start', maxBarThickness: 12 }] },
+      options: { interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top', align: 'end' } }, scales: ejes({ x: { ticks: { color: '#898781', maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } } }) } });
+
+    // Dentro por empresa
+    var porEmp = EMPRESAS.map(function (e) { return { e: e, n: dentro.filter(function (p) { return p.emp === e.id; }).length }; }).sort(function (a, b) { return b.n - a.n; });
+    barrasH('g-empresas', porEmp.map(function (x) { return x.e.corto; }), porEmp.map(function (x) { return x.n; }));
+
+    // Horas en 7 días (escalones de la ley)
+    var lim = limites(), bins = [0, 0, 0, 0];
+    activos.forEach(function (p) { var h7 = stats(p).h7; if (h7 < 0.5) return; bins[h7 <= lim.ord ? 0 : (h7 <= lim.ord + lim.dob ? 1 : (h7 <= lim.max ? 2 : 3))]++; });
+    grafica('g-horas', { type: 'bar', data: { labels: ['Hasta ' + lim.ord + ' h', lim.ord + '–' + (lim.ord + lim.dob) + ' h', (lim.ord + lim.dob) + '–' + lim.max + ' h', 'Más de ' + lim.max + ' h'],
+      datasets: [{ data: bins, backgroundColor: [C.o1, C.o2, C.o3, C.critico], borderRadius: 4, borderSkipped: 'start', maxBarThickness: 40 }] },
+      options: { layout: { padding: { top: 16 } }, plugins: { legend: { display: false }, valores: { on: true } }, scales: ejes() } });
+    $('nota-horas').innerHTML = '<b>Jornada ordinaria</b> (hasta ' + lim.ord + ' h) · <b>extra a pago doble</b> · <b>extra a pago triple</b> · <b style="color:#8f1f1f">excede el máximo legal</b>. Topes de la LFT para ' + REGLAS.anio + '.';
+
+    // Incidencias por tipo (90 días)
+    var cuenta = {}; INCIDENCIAS.forEach(function (i) { if (N - i.fecha < 90 * DIA) cuenta[i.tipo] = (cuenta[i.tipo] || 0) + 1; });
+    var tipos = Object.keys(cuenta).sort(function (a, b) { return cuenta[b] - cuenta[a]; }).slice(0, 7);
+    barrasH('g-inc-tipo', tipos.map(function (k) { return CORTO_INC[k] || TIPOS_INC[k].n; }), tipos.map(function (k) { return cuenta[k]; }));
+
+    // Documentación por empresa (estado: vigente / por vencer / vencido)
+    var filas = EMPRESAS.map(function (e) {
+      var ps = activos.filter(function (p) { return p.emp === e.id; }), c = { ok: 0, porvencer: 0, vencido: 0 };
+      ps.forEach(function (p) { c[stats(p).docs.est]++; });
+      var t = ps.length || 1; return { e: e, ok: c.ok / t * 100, pv: c.porvencer / t * 100, v: c.vencido / t * 100, n: ps.length, cv: c.vencido };
+    });
+    var seg = function (l, k, col) { return { label: l, data: filas.map(function (f) { return Math.round(f[k]); }), backgroundColor: col, borderColor: '#fff', borderWidth: { right: 2 }, borderSkipped: false, maxBarThickness: 18 }; };
+    grafica('g-docs', { type: 'bar', data: { labels: filas.map(function (f) { return f.e.corto; }), datasets: [seg('Vigente', 'ok', C.bueno), seg('Por vencer', 'pv', C.aviso), seg('Vencido', 'v', C.critico)] },
+      options: { indexAxis: 'y', plugins: { legend: { position: 'top', align: 'start' }, tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + c.raw + ' %'; } } } },
+        scales: { x: { stacked: true, max: 100, grid: { color: C.grid }, border: { display: false }, ticks: { color: '#898781', callback: function (v) { return v + ' %'; } } }, y: { stacked: true, grid: { display: false }, ticks: { color: C.tinta } } } } });
+
+    // Tabla de contratistas
+    $('t-empresas').innerHTML = '<thead><tr><th>Empresa</th><th>REPSE</th><th class="num">Personas</th><th class="num">Dentro</th><th class="num">Horas 7 días</th><th class="num">Docs. vencidos</th><th class="num">Incidencias 90 d</th><th class="num">Vetados</th></tr></thead><tbody>' +
+      EMPRESAS.map(function (e, i) {
+        var ps = PERSONAS.filter(function (p) { return p.emp === e.id; });
+        var h = ps.reduce(function (s, p) { return s + stats(p).h7; }, 0);
+        var inc = INCIDENCIAS.filter(function (x) { return P[x.pid].emp === e.id && N - x.fecha < 90 * DIA; }).length;
+        var rep = e.repse === 'Vigente' ? '<span class="st bueno">' + ico('ok') + 'Vigente</span>' : (e.repse === 'Por vencer' ? '<span class="st aviso">' + ico('reloj') + 'Vence en 12 días</span>' : '<span class="st critico">' + ico('alerta') + 'Vencido</span>');
+        return '<tr><td><b>' + esc(e.nombre) + '</b></td><td>' + rep + '</td><td class="num">' + ps.length + '</td><td class="num">' + porEmp.filter(function (x) { return x.e === e; })[0].n + '</td><td class="num">' + num(Math.round(h)) + '</td><td class="num">' + filas[i].cv + '</td><td class="num">' + inc + '</td><td class="num">' + ps.filter(vetoVigente).length + '</td></tr>';
+      }).join('') + '</tbody>';
+  }
+
+  /* ══ ALERTAS ══ */
+  function pintarAlertas(al) {
+    var sel = $('f-al-tipo'), tipos = {}; alertas(true).forEach(function (a) { tipos[a.tipo] = 1; });
+    var antes = sel.value;
+    sel.innerHTML = '<option value="">Todos</option>' + Object.keys(tipos).sort().map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('');
+    sel.value = tipos[antes] ? antes : '';
+    var fs = $('f-al-sev').value, ft = sel.value;
+    var l = al.filter(function (a) { return (!fs || a.sev === fs) && (!ft || a.tipo === ft); });
+    var at = Object.keys(ATENDIDAS).length;
+    $('alertas-todas').innerHTML = (l.map(htmlAlerta).join('') || '<li class="al">Sin alertas con esos filtros.</li>') +
+      (at ? '<li class="al" style="color:var(--texto-hint);font-size:12.5px">' + at + ' alerta(s) atendida(s) en esta sesión: quedan en el historial de cada persona.</li>' : '');
+  }
+  $('f-al-sev').onchange = $('f-al-tipo').onchange = function () { pintar(); };
+
+  /* ══ PERSONAS ══ */
+  var limitePer = 40;
+  EMPRESAS.forEach(function (e) { $('f-emp').insertAdjacentHTML('beforeend', '<option value="' + e.id + '">' + esc(e.corto) + '</option>'); });
+  function medidor(h7) {
+    var lim = limites(), pct = Math.min(100, h7 / lim.max * 100);
+    var col = h7 <= lim.ord ? C.s1 : (h7 <= lim.ord + lim.dob ? '#c98500' : (h7 <= lim.max ? C.grave : C.critico));
+    return '<div class="medidor"><div class="barra"><i style="width:' + pct + '%;background:' + col + '"></i></div><small>' + fmtH(h7) + (h7 > lim.max ? ' · excede' : (h7 > lim.ord ? ' · extra' : '')) + '</small></div>';
+  }
+  function iconosAut(p) {
+    return '<div class="auts">' + [['cel', 'Celular'], ['herr', 'Herramienta'], ['pc', 'Equipo de cómputo'], ['auto', 'Vehículo'], ['cam', 'Cámara']].map(function (a) {
+      return '<span class="' + (p.aut[a[0]] ? 'si' : '') + '" title="' + a[1] + (p.aut[a[0]] ? ': autorizado' : ': no autorizado') + '">' + ico(a[0]) + '</span>';
+    }).join('') + '</div>';
+  }
+  function estadoPersona(p) {
+    var s = stats(p);
+    if (vetoVigente(p)) return '<span class="st critico">' + ico('veto') + 'Vetado</span>';
+    if (s.dentro) return '<span class="st bueno">' + ico('entrada') + 'Dentro · ' + hhmm(s.desde) + '</span>';
+    return '<span class="st gris">Fuera</span>';
+  }
+  function docBadge(est) {
+    return est === 'vencido' ? '<span class="st critico">' + ico('doc') + 'Vencidos</span>' : (est === 'porvencer' ? '<span class="st aviso">' + ico('doc') + 'Por vencer</span>' : '<span class="st bueno">' + ico('ok') + 'Al día</span>');
+  }
+  function pintarPersonas(al) {
+    var q = $('f-buscar').value.trim().toLowerCase(), fe = $('f-emp').value, fs = $('f-est').value, lim = limites();
+    var conAl = {}; al.forEach(function (a) { conAl[a.p.id] = (conAl[a.p.id] || 0) + 1; });
+    var l = PERSONAS.filter(function (p) {
+      var s = stats(p);
+      if (fe && p.emp !== fe) return false;
+      if (q && (p.nombre + ' ' + p.puesto + ' ' + p.idNum).toLowerCase().indexOf(q) < 0) return false;
+      if (fs === 'dentro' && !s.dentro) return false;
+      if (fs === 'alertas' && !conAl[p.id]) return false;
+      if (fs === 'vetado' && !vetoVigente(p)) return false;
+      if (fs === 'docs' && s.docs.est !== 'vencido') return false;
+      if (fs === 'extra' && s.h7 <= lim.ord) return false;
+      return true;
+    }).sort(function (a, b) { var sa = stats(a), sb = stats(b); return (sb.dentro - sa.dentro) || ((conAl[b.id] || 0) - (conAl[a.id] || 0)) || (sb.h7 - sa.h7); });
+    $('per-sub').textContent = l.length + ' de ' + PERSONAS.length + ' personas · toca una para ver su expediente';
+    $('t-personas').innerHTML = '<thead><tr><th>Persona</th><th>Empresa</th><th>Estado</th><th>Horas 7 días</th><th>Autorizaciones</th><th>Documentos</th><th class="num">Alertas</th></tr></thead><tbody>' +
+      l.slice(0, limitePer).map(function (p) {
+        var s = stats(p);
+        return '<tr class="fila" data-persona="' + p.id + '"><td><div class="pers"><div class="av' + (vetoVigente(p) ? ' vet' : '') + '">' + iniciales(p.nombre) + '</div><div><b>' + esc(p.nombre) + '</b><span>' + esc(p.puesto) + ' · ' + esc(p.idTipo) + ' ····' + p.idNum + '</span></div></div></td>' +
+          '<td>' + esc(EMP[p.emp].corto) + '</td><td>' + estadoPersona(p) + '</td><td>' + medidor(s.h7) + '</td><td>' + iconosAut(p) + '</td><td>' + docBadge(s.docs.est) + '</td>' +
+          '<td class="num">' + (conAl[p.id] ? '<span class="st grave">' + ico('alerta') + conAl[p.id] + '</span>' : '—') + '</td></tr>';
+      }).join('') + '</tbody>';
+    $('per-mas').hidden = l.length <= limitePer;
+  }
+  $('f-buscar').oninput = $('f-emp').onchange = $('f-est').onchange = function () { limitePer = 40; pintar(); };
+  $('per-mas').onclick = function () { limitePer += 40; pintar(); };
+
+  /* ══ JORNADAS ══ */
+  function pintarJornadas(al) {
+    var lim = limites(), act = PERSONAS.filter(function (p) { return p.estado === 'activo'; });
+    var conExtra = act.filter(function (p) { return stats(p).h7 > lim.ord; });
+    var dob = act.reduce(function (s, p) { return s + stats(p).dob; }, 0), tri = act.reduce(function (s, p) { return s + stats(p).tri; }, 0);
+    var exc = act.filter(function (p) { return stats(p).h7 > lim.max; }).length, sinD = act.filter(function (p) { return stats(p).seguidos > REGLAS.diasSeguidos; }).length;
+    var perm = act.filter(function (p) { return stats(p).dentro && stats(p).perm >= REGLAS.perm * HORA; }).length;
+    $('jor-sub').textContent = 'Horas calculadas con las entradas y salidas registradas en caseta, en los últimos 7 días.';
+    $('jor-kpis').innerHTML =
+      '<div class="kpi"><div class="l">' + ico('reloj') + 'Con horas extra</div><div class="v">' + conExtra.length + '</div><div class="s">personas · más de ' + lim.ord + ' h</div></div>' +
+      '<div class="kpi"><div class="l">Extra a pago doble</div><div class="v">' + num(Math.round(dob)) + ' h</div><div class="s">suma del personal</div></div>' +
+      '<div class="kpi"><div class="l">Extra a pago triple</div><div class="v">' + num(Math.round(tri)) + ' h</div><div class="s">art. 68 LFT</div></div>' +
+      '<div class="kpi click" data-ir="alertas"><div class="l">' + ico('alerta') + 'Exceden el máximo</div><div class="v">' + exc + '</div><div class="s"><span class="st critico">' + ico('alerta') + 'más de ' + lim.max + ' h</span></div></div>' +
+      '<div class="kpi"><div class="l">' + ico('alerta') + 'Sin descanso · permanencia</div><div class="v">' + sinD + ' · ' + perm + '</div><div class="s">más de ' + REGLAS.diasSeguidos + ' días seguidos · más de ' + REGLAS.perm + ' h dentro</div></div>';
+    $('jor-anio').textContent = 'LFT · topes de ' + REGLAS.anio;
+    $('jor-ley').innerHTML = textoLey();
+    var top = act.slice().sort(function (a, b) { return stats(b).h7 - stats(a).h7; }).slice(0, 15);
+    var ds = function (l, k, col) { return { label: l, data: top.map(function (p) { return Math.round(stats(p)[k] * 10) / 10; }), backgroundColor: col, borderColor: '#fff', borderWidth: { right: 2 }, borderSkipped: false, maxBarThickness: 16 }; };
+    grafica('g-jornada', { type: 'bar', data: { labels: top.map(function (p) { var n = p.nombre.split(' '); return n[0] + ' ' + n[1]; }),
+      datasets: [ds('Ordinarias', 'ord', C.o1), ds('Extra doble', 'dob', C.o2), ds('Extra triple', 'tri', C.o3), ds('Excede el máximo', 'exc', C.critico)] },
+      options: { indexAxis: 'y', layout: { padding: { top: 14 } }, interaction: { mode: 'index', axis: 'y', intersect: false },
+        plugins: { legend: { position: 'top', align: 'start' }, topes: { eje: 'x', lineas: [{ v: lim.ord, t: lim.ord + ' h', color: '#898781' }, { v: lim.max, t: 'máx. ' + lim.max + ' h', color: C.critico }] },
+          tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + fmtH(c.raw); } } } },
+        scales: { x: { stacked: true, grid: { color: C.grid }, border: { display: false }, ticks: { color: '#898781', callback: function (v) { return v + ' h'; } }, suggestedMax: lim.max + 8 },
+                  y: { stacked: true, grid: { display: false }, ticks: { color: C.tinta, font: { size: 11 } } } } } });
+    var aj = al.filter(function (a) { return /Permanencia|Jornada|descanso|tope/.test(a.tipo); });
+    $('jor-alertas').innerHTML = (aj.slice(0, 15).map(htmlAlerta).join('') || '<li class="al">Sin alertas de jornada.</li>') +
+      (aj.length > 15 ? '<li class="al"><button class="lnk" type="button" data-ir="alertas">Ver las ' + aj.length + ' alertas de jornada</button></li>' : '');
+  }
+  function textoLey() {
+    var lim = limites();
+    return '<p><b>Jornada diaria</b> (art. 61): 8 h diurna, 7 h nocturna, 7½ h mixta. En planta se trabaja en turnos de 12 h, así que parte de cada turno ya es tiempo extra.</p>' +
+      '<p style="margin-top:8px"><b>Semana ' + REGLAS.anio + '</b>: ' + lim.ord + ' h ordinarias; hasta <b>' + lim.dob + ' h extra a pago doble</b> y, sobre eso, hasta <b>4 h a pago triple</b> (art. 68). Máximo: <b>' + lim.max + ' h</b>. Menores de 18 años: sin horas extra.</p>' +
+      '<p style="margin-top:8px"><b>Descanso</b> (art. 69): al menos un día por cada seis de trabajo.</p>' +
+      '<table class="ley-t"><tr><th>Año</th><th>Semana ordinaria</th><th>Extra doble</th><th>Máximo con triples</th></tr>' +
+      Object.keys(TABLA_LEY).map(function (a) { var t = TABLA_LEY[a]; return '<tr' + (+a === REGLAS.anio ? ' class="act"' : '') + '><td>' + a + '</td><td>' + t.ord + ' h</td><td>' + t.dob + ' h</td><td>' + (t.ord + t.dob + 4) + ' h</td></tr>'; }).join('') + '</table>' +
+      '<p style="margin-top:8px"><b>Registro electrónico de la jornada</b> (art. 132, fr. XXXIV): obligatorio desde el 1 de enero de 2027. Este control de accesos puede ser ese registro.</p>' +
+      '<p class="nota-graf">Se cuenta el tiempo en planta (de la caseta de entrada a la de salida), en 7 días corridos. Cambia el año en «Reglas y roles» para ver cómo quedan las alertas con los topes de 2027 en adelante.</p>';
+  }
+
+  /* ══ INCIDENCIAS ══ */
+  Object.keys(TIPOS_INC).forEach(function (k) { $('f-inc-tipo').insertAdjacentHTML('beforeend', '<option value="' + k + '">' + esc(TIPOS_INC[k].n) + '</option>'); });
+  function pintarIncidencias() {
+    var N = ahora(), d90 = INCIDENCIAS.filter(function (i) { return N - i.fecha < 90 * DIA; });
+    $('inc-kpis').innerHTML =
+      '<div class="kpi click" data-ir="personas" data-filtro="vetado"><div class="l">' + ico('veto') + 'Vetados vigentes</div><div class="v">' + PERSONAS.filter(vetoVigente).length + '</div><div class="s">La puerta les niega el acceso</div></div>' +
+      '<div class="kpi"><div class="l">' + ico('cruz') + 'Accidentes</div><div class="v">' + d90.filter(function (i) { return i.tipo === 'ACC'; }).length + '</div><div class="s">90 días · aviso al IMSS (ST-7)</div></div>' +
+      '<div class="kpi"><div class="l">' + ico('copa') + 'Alcohol o drogas</div><div class="v">' + d90.filter(function (i) { return i.tipo === 'ALC' || i.tipo === 'DRO'; }).length + '</div><div class="s">90 días</div></div>' +
+      '<div class="kpi"><div class="l">' + ico('escudo') + 'Total de incidencias</div><div class="v">' + d90.length + '</div><div class="s">90 días · ' + INCIDENCIAS.filter(function (i) { return i.estado === 'En seguimiento'; }).length + ' en seguimiento</div></div>';
+    // Por mes y gravedad
+    var meses = [], base = new Date(N.getFullYear(), N.getMonth() - 5, 1);
+    for (var m = 0; m < 6; m++) meses.push(new Date(base.getFullYear(), base.getMonth() + m, 1));
+    var porG = { Baja: [0, 0, 0, 0, 0, 0], Media: [0, 0, 0, 0, 0, 0], Alta: [0, 0, 0, 0, 0, 0] };
+    INCIDENCIAS.forEach(function (i) { var k = (i.fecha.getFullYear() - base.getFullYear()) * 12 + i.fecha.getMonth() - base.getMonth(); if (k >= 0 && k < 6) porG[i.grav][k]++; });
+    var dsg = function (g, col) { return { label: 'Gravedad ' + g.toLowerCase(), data: porG[g], backgroundColor: col, borderColor: '#fff', borderWidth: { top: 2 }, borderSkipped: false, maxBarThickness: 28 }; };
+    grafica('g-inc-mes', { type: 'bar', data: { labels: meses.map(function (d) { return d.toLocaleDateString('es-MX', { month: 'short' }); }), datasets: [dsg('Baja', C.o1), dsg('Media', C.o2), dsg('Alta', C.o3)] },
+      options: { interaction: { mode: 'index', intersect: false }, plugins: { legend: { position: 'top', align: 'end' } }, scales: ejes({ x: { stacked: true }, y: { stacked: true } }) } });
+    var pe = EMPRESAS.map(function (e) { return { e: e, n: d90.filter(function (i) { return P[i.pid].emp === e.id; }).length }; }).sort(function (a, b) { return b.n - a.n; });
+    barrasH('g-inc-emp', pe.map(function (x) { return x.e.corto; }), pe.map(function (x) { return x.n; }));
+    var ft = $('f-inc-tipo').value, fv = $('f-inc-vet').value;
+    var l = INCIDENCIAS.filter(function (i) { return (!ft || i.tipo === ft) && (fv !== 'veto' || /Veto/.test(i.accion)) && (fv !== 'seg' || i.estado === 'En seguimiento'); })
+      .sort(function (a, b) { return b.fecha - a.fecha; }).slice(0, 80);
+    var gb = { Baja: 'gris', Media: 'aviso', Alta: 'critico' };
+    $('t-inc').innerHTML = '<thead><tr><th>Folio</th><th>Fecha</th><th>Persona</th><th>Tipo</th><th>Gravedad</th><th>Medida</th><th>Estado</th></tr></thead><tbody>' +
+      l.map(function (i) {
+        var p = P[i.pid];
+        return '<tr class="fila" data-persona="' + p.id + '"><td><b>' + i.folio + '</b></td><td>' + esc(cuando(i.fecha)) + '</td><td><div class="pers" style="min-width:170px"><div class="av' + (vetoVigente(p) ? ' vet' : '') + '">' + iniciales(p.nombre) + '</div><div><b>' + esc(p.nombre) + '</b><span>' + esc(EMP[p.emp].corto) + '</span></div></div></td>' +
+          '<td>' + esc(TIPOS_INC[i.tipo].n) + '<div style="font-size:12px;color:var(--texto-hint)">' + esc(i.desc) + (i.incapacidad != null ? ' · ' + i.incapacidad + ' días de incapacidad' : '') + '</div></td>' +
+          '<td><span class="st ' + gb[i.grav] + '">' + (i.grav === 'Alta' ? ico('alerta') : '') + esc(i.grav) + '</span></td><td>' + (/Veto/.test(i.accion) ? '<span class="st critico">' + ico('veto') + esc(i.accion) + '</span>' : esc(i.accion)) + '</td><td>' + esc(i.estado) + '</td></tr>';
+      }).join('') + '</tbody>';
+  }
+  $('f-inc-tipo').onchange = $('f-inc-vet').onchange = function () { pintar(); };
+  $('btn-nueva-inc').onclick = function () { formIncidencia(null); };
+
+  /* ══ VALES ══ */
+  function pintarVales() {
+    var N = ahora(), ab = VALES.filter(function (v) { return !v.cerrado; });
+    var ven = ab.filter(function (v) { return N - v.abierto > REGLAS.vale * DIA; });
+    var dentro = PERSONAS.filter(function (p) { return stats(p).dentro; });
+    var herrDentro = ab.filter(function (v) { return v.tipo === 'herr' && stats(P[v.pid]).dentro; }).reduce(function (s, v) { return s + v.items.length; }, 0);
+    $('val-kpis').innerHTML =
+      '<div class="kpi"><div class="l">' + ico('herr') + 'Herramientas dentro</div><div class="v">' + herrDentro + '</div><div class="s">registradas a la entrada</div></div>' +
+      '<div class="kpi"><div class="l">' + ico('vale') + 'Vales abiertos</div><div class="v">' + ab.length + '</div><div class="s">' + ab.filter(function (v) { return v.tipo === 'mat' && /Pendiente/.test(v.autoriza || ''); }).length + ' salidas de material por autorizar</div></div>' +
+      '<div class="kpi"><div class="l">' + ico('alerta') + 'Vales vencidos</div><div class="v">' + ven.length + '</div><div class="s"><span class="st aviso">' + ico('reloj') + 'más de ' + REGLAS.vale + ' días</span></div></div>' +
+      '<div class="kpi"><div class="l">' + ico('cel') + 'Celulares dentro</div><div class="v">' + dentro.filter(function (p) { return p.aut.cel; }).length + '</div><div class="s">autorizados · los demás se resguardan</div></div>' +
+      '<div class="kpi"><div class="l">' + ico('auto') + 'Vehículos dentro</div><div class="v">' + dentro.filter(function (p) { return p.aut.auto; }).length + '</div><div class="s">con placas registradas</div></div>';
+    var b = [0, 0, 0, 0]; ab.forEach(function (v) { var d = (N - v.abierto) / DIA; b[d < 1 ? 0 : (d < 3 ? 1 : (d < 7 ? 2 : 3))]++; });
+    grafica('g-vales', { type: 'bar', data: { labels: ['Menos de 1 día', '1 a 3 días', '3 a 7 días', 'Más de 7 días'], datasets: [{ data: b, backgroundColor: [C.o1, C.o2, C.o3, C.critico], borderRadius: 4, borderSkipped: 'start', maxBarThickness: 40 }] },
+      options: { layout: { padding: { top: 16 } }, plugins: { legend: { display: false }, valores: { on: true } }, scales: ejes() } });
+    var act = PERSONAS.filter(function (p) { return p.estado === 'activo'; });
+    var auts = [['cel', 'Celular'], ['herr', 'Herramienta'], ['pc', 'Equipo de cómputo'], ['auto', 'Vehículo'], ['cam', 'Cámara fotográfica']];
+    barrasH('g-auts', auts.map(function (a) { return a[1]; }), auts.map(function (a) { return act.filter(function (p) { return p.aut[a[0]]; }).length; }));
+    var f = $('f-val').value;
+    var l = VALES.filter(function (v) { return f === 'abiertos' ? !v.cerrado : (f === 'vencidos' ? (!v.cerrado && N - v.abierto > REGLAS.vale * DIA) : true); }).sort(function (a, b) { return b.abierto - a.abierto; });
+    $('t-vales').innerHTML = '<thead><tr><th>Folio</th><th>Tipo</th><th>Persona</th><th>Artículos</th><th>Abierto</th><th>Estado</th><th></th></tr></thead><tbody>' +
+      l.slice(0, 120).map(function (v) {
+        var p = P[v.pid], d = Math.floor((N - v.abierto) / DIA), vencido = !v.cerrado && N - v.abierto > REGLAS.vale * DIA;
+        var est = v.cerrado ? '<span class="st gris">Cerrado ' + esc(cuando(v.cerrado)) + '</span>' : (vencido ? '<span class="st aviso">' + ico('reloj') + 'Vencido · ' + d + ' días</span>' : '<span class="st info">Abierto</span>');
+        return '<tr><td><b>' + v.folio + '</b></td><td>' + esc(TIPO_VALE[v.tipo]) + (v.autoriza ? '<div style="font-size:12px;color:var(--texto-hint)">' + esc(v.autoriza) + '</div>' : '') + '</td>' +
+          '<td><button class="lnk" type="button" data-persona="' + p.id + '" style="padding:0;text-align:left">' + esc(p.nombre) + '</button><div style="font-size:12px;color:var(--texto-hint)">' + esc(EMP[p.emp].corto) + '</div></td>' +
+          '<td>' + esc(v.items.join(', ')) + (v.nota ? '<div style="font-size:12px;color:#8a3a12">' + esc(v.nota) + '</div>' : '') + '</td><td>' + esc(cuando(v.abierto)) + '</td><td>' + est + '</td>' +
+          '<td>' + (v.cerrado ? '' : '<button class="btn peq fant" type="button" data-cerrar-vale="' + v.folio + '">Cerrar</button>') + '</td></tr>';
+      }).join('') + '</tbody>';
+  }
+  $('f-val').onchange = function () { pintar(); };
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-cerrar-vale]'); if (!b) return;
+    VALES.forEach(function (v) { if (v.folio === b.dataset.cerrarVale) v.cerrado = new Date(); });
+    toast('Vale ' + b.dataset.cerrarVale + ' cerrado.'); pintar();
+    if (!$('panel').hidden && PANEL_P) abrirPersona(PANEL_P);
+  });
+
+  /* ══ REGLAS Y ROLES ══ */
+  Object.keys(TABLA_LEY).forEach(function (a) { $('r-anio').insertAdjacentHTML('beforeend', '<option value="' + a + '">' + a + ' · ' + TABLA_LEY[a].ord + ' h por semana</option>'); });
+  function pintarReglas() {
+    $('r-anio').value = REGLAS.anio; $('r-perm').value = REGLAS.perm; $('r-desc').value = REGLAS.diasSeguidos; $('r-vale').value = REGLAS.vale;
+    $('r-alc').value = REGLAS.alc; $('r-docs').checked = REGLAS.docs; $('r-cel').checked = REGLAS.cel; $('r-herr').checked = REGLAS.herr;
+    var si = '<span class="si-no si">' + ico('ok') + 'Sí</span>', no = '<span class="si-no no">' + ico('x') + 'No</span>';
+    var filas = [
+      ['Tomar la foto de la identificación (entrada y salida)', si, no, si],
+      ['Ver el semáforo PASA / NO PASA y qué hacer', si, si, si],
+      ['Ver el motivo de un NO PASA (veto, documentos, jornada)', no, si, si],
+      ['Horas trabajadas, alertas de la STPS y gráficas', no, si, si],
+      ['Autorizar celular, herramienta, vehículo, excepciones de jornada', no, si, si],
+      ['Registrar incidencias, vetar y levantar vetos', no, si, si],
+      ['Vales de herramienta, equipo y material', 'Sólo registrar lo que entra y sale', si, si],
+      ['PDF y análisis con Claude', no, si, si],
+      ['Crear plantas, cuentas de caseta y reglas', no, no, si]
+    ];
+    $('t-roles').innerHTML = '<thead><tr><th style="min-width:240px">Qué puede hacer</th><th>Guardia de caseta</th><th>Administrador de accesos (nuevo)</th><th>Administración AVBA</th></tr></thead><tbody>' +
+      filas.map(function (f) { return '<tr><td>' + f[0] + '</td><td>' + f[1] + '</td><td>' + f[2] + '</td><td>' + f[3] + '</td></tr>'; }).join('') + '</tbody>';
+    $('como-funciona').innerHTML =
+      '<p><b>1. Foto de la identificación (lo que ya tenemos).</b> El servidor lee el número de la identificación con IA y lo busca en el padrón. La primera vez se da de alta a la persona con su empresa y documentos; las siguientes, la reconoce sola.</p>' +
+      '<p style="margin-top:8px"><b>2. Gafete con código QR</b> (recomendado para el personal que entra a diario): se entrega al terminar la inducción. Se lee en un segundo, sin errores de lectura, y la foto de la INE queda para visitantes y casos dudosos.</p>' +
+      '<p style="margin-top:8px"><b>3. Rostro o huella:</b> posible, pero son datos biométricos (datos personales sensibles): piden consentimiento expreso y equipo dedicado. Lo dejaría para después.</p>' +
+      '<p style="margin-top:8px"><b>Las contratistas</b> cargan sus documentos (REPSE, SUA del mes, DC-3, examen médico) en su portal; las DC-3 que emite AVBA se validan solas.</p>';
+    $('base-legal').innerHTML =
+      '<p>Ley Federal del Trabajo con la reforma de reducción de jornada publicada el 1 de mayo de 2026: arts. 61 (jornada diaria), 66 y 68 (horas extra), 69 (descanso) y 132 fr. XXXIV (registro electrónico de jornada, desde 2027). Requisitos usuales de acceso de contratistas: alta IMSS y pago SUA, REPSE, constancias DC-3, inducción y examen médico.</p>' +
+      '<p class="fuentes" style="margin-top:8px">Antes de usar las cifras en producción hay que confirmarlas con el texto del DOF.</p>';
+  }
+  function cambiarRegla() {
+    REGLAS.anio = +$('r-anio').value; REGLAS.perm = Math.max(8, Math.min(16, +$('r-perm').value || 12)); REGLAS.diasSeguidos = Math.max(5, Math.min(13, +$('r-desc').value || 6));
+    REGLAS.vale = Math.max(1, +$('r-vale').value || 3); REGLAS.alc = Math.max(0, Math.min(100, +$('r-alc').value || 0));
+    REGLAS.docs = $('r-docs').checked; REGLAS.cel = $('r-cel').checked; REGLAS.herr = $('r-herr').checked;
+    toast('Reglas actualizadas: ' + alertas().length + ' alertas activas.');
+    pintar();
+  }
+  ['r-anio', 'r-perm', 'r-desc', 'r-vale', 'r-alc', 'r-docs', 'r-cel', 'r-herr'].forEach(function (id) { $(id).onchange = cambiarRegla; });
+
+  /* ══ PERFIL DE UNA PERSONA ══ */
+  var PANEL_P = null;
+  function abrirPersona(pid) {
+    var p = P[pid]; if (!p) return;
+    PANEL_P = pid; RELOJ++;
+    var s = stats(p), e = EMP[p.emp], N = ahora(), lim = limites();
+    var mis = alertas().filter(function (a) { return a.p === p; });
+    var incs = INCIDENCIAS.filter(function (i) { return i.pid === p.id; }).sort(function (a, b) { return b.fecha - a.fecha; });
+    var vales = VALES.filter(function (v) { return v.pid === p.id; }).sort(function (a, b) { return b.abierto - a.abierto; });
+    var h = '<div class="cab"><div class="av' + (vetoVigente(p) ? ' vet' : '') + '">' + iniciales(p.nombre) + '</div><div><b>' + esc(p.nombre) + '</b><span>' + esc(p.puesto) + ' · ' + esc(e.nombre) + '<br>' + esc(p.idTipo) + ' ····' + p.idNum + ' · turno de ' + (p.turno === 'D' ? 'día' : 'noche') + ' · alta ' + fecha(p.alta) + '</span></div>' +
+      '<button class="cerrar" type="button" id="cerrar-panel" aria-label="Cerrar">' + ico('x') + '</button></div><div class="cuerpo">';
+    if (vetoVigente(p)) h += '<div class="card" style="border:1.5px solid #e9b4b4;background:#fdf3f3"><div style="display:flex;gap:10px;align-items:flex-start"><span class="st critico">' + ico('veto') + 'VETADO</span><div style="font-size:13px;line-height:1.5"><b>' + esc(p.veto.motivo) + '</b><br>Desde ' + fecha(p.veto.desde) + (p.veto.hasta ? ' hasta ' + fecha(p.veto.hasta) : ' · permanente') + ' · ' + esc(p.veto.alcance) + ' · ' + p.veto.folio + '</div></div>' +
+      '<div class="acciones"><button class="btn sec peq" type="button" id="levantar-veto">Levantar veto</button></div></div>';
+    h += '<div class="mini-kpis"><div><b>' + (s.dentro ? dur(s.perm) : 'Fuera') + '</b><span>' + (s.dentro ? 'dentro desde ' + hhmm(s.desde) : (s.ultima && s.ultima.sal ? 'salió ' + cuando(s.ultima.sal) : 'sin registros')) + '</span></div>' +
+      '<div><b>' + fmtH(s.h7) + '</b><span>últimos 7 días' + (s.h7 > lim.ord ? ' · ' + fmtH(s.h7 - lim.ord) + ' extra' : '') + '</span></div><div><b>' + s.seguidos + '</b><span>días seguidos</span></div></div>';
+    if (mis.length) h += '<div class="card"><div class="card-tit"><h2>Alertas</h2></div><ul class="alertas">' + mis.map(function (a) { return '<li class="al"><div class="ic ' + a.sev + '">' + ico('alerta') + '</div><div class="tx"><b>' + esc(a.tipo) + '</b><div class="d">' + esc(a.texto) + '</div></div></li>'; }).join('') + '</ul></div>';
+    h += '<div class="card"><div class="card-tit"><h2>Horas en planta por día</h2><span>14 días · tope ' + REGLAS.perm + ' h</span></div><div class="lienzo bajo"><canvas id="g-persona"></canvas></div></div>';
+    h += '<div class="card"><div class="card-tit"><h2>Autorizaciones</h2><span>La puerta las aplica en la siguiente entrada</span></div>' +
+      [['cel', 'Celular', 'Si no, el guardia lo resguarda en casillero'], ['herr', 'Herramienta', p.herr.length ? p.herr.join(', ') : 'Lista de herramienta que puede ingresar'], ['pc', 'Equipo de cómputo', 'Laptop o tableta de trabajo'],
+       ['auto', 'Vehículo', p.placas ? 'Placas ' + p.placas : 'Estacionamiento interno'], ['cam', 'Cámara fotográfica', 'Sólo en áreas autorizadas']].map(function (a) {
+        return '<div class="interr">' + ico(a[0]) + '<div class="tx">' + a[1] + '<span>' + esc(a[2]) + '</span></div><label class="switch"><input type="checkbox" data-aut="' + a[0] + '"' + (p.aut[a[0]] ? ' checked' : '') + '><i></i></label></div>';
+      }).join('') + '</div>';
+    h += '<div class="card"><div class="card-tit"><h2>Documentos</h2>' + docBadge(s.docs.est) + '</div><ul class="lista-s">' + s.docs.lista.map(function (d) {
+      var b = d.est === 'vencido' ? '<span class="st critico">' + ico('alerta') + 'Vencido</span>' : (d.est === 'porvencer' ? '<span class="st aviso">' + ico('reloj') + 'Vence en ' + d.dias + ' d</span>' : '<span class="st bueno">' + ico('ok') + 'Vigente</span>');
+      return '<li>' + ico('doc') + '<div class="tx">' + esc(d.nombre) + '<span>' + (d.vence ? 'Vence ' + fecha(d.vence) + ' · ' : '') + esc(d.extra) + '</span></div>' + b + '</li>';
+    }).join('') + '</ul></div>';
+    h += '<div class="card"><div class="card-tit"><h2>Vales</h2><span>' + vales.filter(function (v) { return !v.cerrado; }).length + ' abiertos</span></div><ul class="lista-s">' + (vales.slice(0, 6).map(function (v) {
+      return '<li>' + ico('vale') + '<div class="tx">' + v.folio + ' · ' + esc(TIPO_VALE[v.tipo]) + '<span>' + esc(v.items.join(', ')) + ' · ' + esc(cuando(v.abierto)) + (v.nota ? ' · ' + esc(v.nota) : '') + '</span></div>' +
+        (v.cerrado ? '<span class="st gris">Cerrado</span>' : '<button class="btn peq fant" type="button" data-cerrar-vale="' + v.folio + '">Cerrar</button>') + '</li>';
+    }).join('') || '<li>Sin vales.</li>') + '</ul></div>';
+    h += '<div class="card"><div class="card-tit"><h2>Incidencias</h2><span>' + incs.length + ' en su expediente</span></div><ul class="lista-s">' + (incs.map(function (i) {
+      return '<li>' + ico(i.tipo === 'ACC' ? 'cruz' : (i.tipo === 'ALC' ? 'copa' : 'escudo')) + '<div class="tx">' + esc(TIPOS_INC[i.tipo].n) + '<span>' + i.folio + ' · ' + esc(cuando(i.fecha)) + ' · ' + esc(i.desc) + ' · ' + esc(i.accion) + '</span></div></li>';
+    }).join('') || '<li>Sin incidencias.</li>') + '</ul>' +
+      '<div class="acciones"><button class="btn sec" type="button" id="p-inc">' + ico('escudo') + 'Registrar incidencia</button>' + (vetoVigente(p) ? '' : '<button class="btn rojo" type="button" id="p-veto">' + ico('veto') + 'Vetar</button>') + '</div></div>';
+    h += '<div class="card"><div class="card-tit"><h2>Bitácora de accesos</h2><span>Últimos 10</span></div><ul class="lista-s">' + p.ints.slice(-10).reverse().map(function (it) {
+      var d = (it.sal || N) - it.ent;
+      return '<li>' + ico(it.sal ? 'salida' : 'entrada') + '<div class="tx">' + esc(fechaCorta(it.ent)) + ' · ' + hhmm(it.ent) + ' → ' + (it.sal ? hhmm(it.sal) + (claveDia(it.sal) !== claveDia(it.ent) ? ' (' + esc(fechaCorta(it.sal)) + ')' : '') : '<b>dentro</b>') +
+        '<span>' + esc(it.cE) + (it.obs ? ' · ' + esc(it.obs) : '') + '</span></div><b style="font-size:12.5px;' + (d > REGLAS.perm * HORA ? 'color:#8f1f1f' : '') + '">' + dur(d) + '</b></li>';
+    }).join('') + '</ul></div></div>';
+    $('panel').innerHTML = h; $('panel').hidden = false; $('velo').hidden = false; $('panel').scrollTop = 0;
+    // Horas por día (14 días)
+    var dias = [], hs = [];
+    for (var k = 13; k >= 0; k--) {
+      var d0 = inicioDia(sumarDias(N, -k)), tot = 0;
+      p.ints.forEach(function (it) { if (claveDia(it.ent) === claveDia(d0)) tot += ((it.sal || N) - it.ent) / HORA; });
+      dias.push(d0.toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }).replace('.', '')); hs.push(Math.round(tot * 10) / 10);
+    }
+    grafica('g-persona', { type: 'bar', data: { labels: dias, datasets: [{ label: 'Horas en planta', data: hs, backgroundColor: hs.map(function (v) { return v > REGLAS.perm ? C.critico : C.s1; }), borderRadius: 4, borderSkipped: 'start', maxBarThickness: 20 }] },
+      options: { layout: { padding: { top: 14 } }, plugins: { legend: { display: false }, topes: { eje: 'y', lineas: [{ v: REGLAS.perm, t: 'tope ' + REGLAS.perm + ' h', color: C.critico }] }, tooltip: { callbacks: { label: function (c) { return fmtH(c.raw); } } } },
+        scales: ejes({ y: { suggestedMax: 16, ticks: { color: '#898781', callback: function (v) { return v + ' h'; } } }, x: { ticks: { color: '#898781', maxRotation: 0, autoSkip: true, maxTicksLimit: 7 } } }) } });
+    $('cerrar-panel').onclick = cerrarPanel;
+    $('panel').querySelectorAll('[data-aut]').forEach(function (c) {
+      c.onchange = function () { p.aut[c.dataset.aut] = c.checked; toast((c.checked ? 'Autorizado: ' : 'Sin autorización: ') + c.closest('.interr').querySelector('.tx').firstChild.textContent + ' · ' + p.nombre.split(' ')[0]); pintar(); };
+    });
+    if ($('p-inc')) $('p-inc').onclick = function () { formIncidencia(p.id); };
+    if ($('p-veto')) $('p-veto').onclick = function () { formIncidencia(p.id, true); };
+    if ($('levantar-veto')) $('levantar-veto').onclick = function () {
+      if (!confirm('¿Levantar el veto de ' + p.nombre + '? Podrá volver a entrar.')) return;
+      p.estado = 'activo'; p.veto = null; toast('Veto levantado. Queda registrado en su expediente.'); abrirPersona(p.id); pintar();
+    };
+  }
+  function cerrarPanel() { $('panel').hidden = true; $('velo').hidden = true; PANEL_P = null; if (GRAF['g-persona']) { GRAF['g-persona'].destroy(); delete GRAF['g-persona']; } }
+  $('velo').onclick = cerrarPanel;
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { if (!$('modal').hidden) $('modal').hidden = true; else if (!$('panel').hidden) cerrarPanel(); } });
+
+  /* ══ Registrar incidencia / vetar ══ */
+  function formIncidencia(pid, vetar) {
+    var ops = PERSONAS.slice().sort(function (a, b) { return a.nombre.localeCompare(b.nombre); }).map(function (p) { return '<option value="' + p.id + '"' + (p.id === pid ? ' selected' : '') + '>' + esc(p.nombre) + ' · ' + esc(EMP[p.emp].corto) + '</option>'; }).join('');
+    var N = ahora(), local = N.getFullYear() + '-' + dos(N.getMonth() + 1) + '-' + dos(N.getDate()) + 'T' + hhmm(N);
+    $('modal-c').innerHTML = '<h3>' + (vetar ? 'Vetar a una persona' : 'Registrar incidencia') + '</h3><div class="rej">' +
+      '<div class="campo full"><label for="fi-p">Persona</label><select id="fi-p">' + ops + '</select></div>' +
+      '<div class="campo"><label for="fi-t">Tipo</label><select id="fi-t">' + Object.keys(TIPOS_INC).map(function (k) { return '<option value="' + k + '"' + (vetar && k === 'ALC' ? ' selected' : '') + '>' + esc(TIPOS_INC[k].n) + '</option>'; }).join('') + '</select></div>' +
+      '<div class="campo"><label for="fi-f">Fecha y hora</label><input type="datetime-local" id="fi-f" value="' + local + '"></div>' +
+      '<div class="campo"><label for="fi-a">Medida</label><select id="fi-a">' + ACCIONES.map(function (a) { return '<option' + (vetar && a === 'Veto 90 días' ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
+      '<div class="campo"><label for="fi-ev">Evidencia (foto o documento)</label><input type="file" id="fi-ev" accept="image/*,application/pdf" style="font-size:12.5px;padding-top:9px"></div>' +
+      '<div class="campo full"><label for="fi-d">Descripción</label><textarea id="fi-d" placeholder="Qué pasó, dónde y quién lo reportó"></textarea></div>' +
+      '<p class="nota-graf full">Un veto lo aplica la puerta en el siguiente intento de entrada: el guardia ve «NO PASA» sin el motivo y a ti te llega una alerta. Un accidente con lesión pide el aviso al IMSS (ST-7).</p></div>' +
+      '<div class="acciones"><button class="btn fant" type="button" id="fi-cancel">Cancelar</button><button class="btn ' + (vetar ? 'rojo' : 'prim') + '" type="button" id="fi-ok">' + (vetar ? 'Vetar' : 'Guardar incidencia') + '</button></div>';
+    $('modal').hidden = false;
+    $('fi-t').onchange = function () {
+      var g = TIPOS_INC[$('fi-t').value].g, a = $('fi-a');
+      if (!vetar) a.value = g === 'Alta' ? 'Suspensión 7 días' : (g === 'Media' ? 'Amonestación por escrito' : 'Plática de seguridad');
+    };
+    if (!vetar) $('fi-t').onchange();
+    $('fi-cancel').onclick = function () { $('modal').hidden = true; };
+    $('fi-ok').onclick = function () {
+      var p = P[$('fi-p').value], tipo = $('fi-t').value, acc = $('fi-a').value, f = new Date($('fi-f').value || Date.now());
+      var inc = { folio: 'INC-' + String(400 + INCIDENCIAS.length + 1).padStart(4, '0'), pid: p.id, tipo: tipo, grav: TIPOS_INC[tipo].g, fecha: f, accion: acc,
+        desc: $('fi-d').value.trim() || TIPOS_INC[tipo].d[0], estado: 'En seguimiento', por: 'Admin. de accesos' };
+      INCIDENCIAS.push(inc);
+      if (/Veto/.test(acc)) {
+        var dias = /30/.test(acc) ? 30 : (/90/.test(acc) ? 90 : 0);
+        p.estado = 'vetado'; p.veto = { desde: f, hasta: dias ? sumarDias(f, dias) : null, motivo: TIPOS_INC[tipo].n, alcance: /todas/.test(acc) ? 'Todas las plantas del cliente' : 'Esta planta', folio: inc.folio };
+      }
+      $('modal').hidden = true;
+      toast(inc.folio + ' registrada' + (/Veto/.test(acc) ? ' · ' + p.nombre.split(' ')[0] + ' queda vetado' : '') + '.');
+      pintar(); if (PANEL_P) abrirPersona(PANEL_P);
+    };
+  }
+  $('modal').addEventListener('click', function (ev) { if (ev.target === $('modal')) $('modal').hidden = true; });
+
+  /* ══ PUERTA EN VIVO (simulación) ══════════════════════════════════════ */
+  var SIM = null, GUION = ['ok', 'herr', 'cel', 'veto', 'vale', 'semana', 'doc', 'alcohol'], guionI = 0;
+  $('sim-elegir').innerHTML = '<option value="">— Elegir persona —</option>' + PERSONAS.slice().sort(function (a, b) { return a.nombre.localeCompare(b.nombre); })
+    .map(function (p) { return '<option value="' + p.id + '">' + esc(p.nombre) + ' · ' + esc(EMP[p.emp].corto) + '</option>'; }).join('');
+  function candidato(caso) {
+    RELOJ++;
+    var lim = limites(), fuera = PERSONAS.filter(function (p) { return !stats(p).dentro; });
+    var okBase = function (p) { return p.estado === 'activo' && stats(p).docs.est !== 'vencido'; };
+    var jornadaOk = function (p) { var s = stats(p); return s.seguidos < REGLAS.diasSeguidos && s.h7 + p.pat.h <= lim.max; };
+    var f = {
+      ok: function (p) { return okBase(p) && jornadaOk(p) && !valesAbiertos(p).length; },
+      herr: function (p) { return okBase(p) && jornadaOk(p) && p.aut.herr && !valesAbiertos(p).length; },
+      cel: function (p) { return okBase(p) && jornadaOk(p) && !p.aut.cel && !valesAbiertos(p).length && !p.aut.herr; },
+      veto: function (p) { return vetoVigente(p); },
+      vale: function (p) { return okBase(p) && jornadaOk(p) && valesAbiertos(p).length > 0; },
+      semana: function (p) { return okBase(p) && stats(p).h7 + p.pat.h > lim.max; },
+      doc: function (p) { return p.estado === 'activo' && stats(p).docs.est === 'vencido'; },
+      alcohol: function (p) { return okBase(p) && jornadaOk(p) && !valesAbiertos(p).length; }
+    }[caso];
+    var c = fuera.filter(f);
+    if (!c.length) c = fuera.filter(function (p) { return okBase(p) && jornadaOk(p); });
+    if (!c.length) c = fuera.filter(okBase);
+    return c[Math.floor(Math.random() * c.length)];
+  }
+  function revisarEntrada(p, caso) {
+    var s = stats(p), lim = limites(), ch = [], inst = [], res = 'pasa', N = ahora();
+    var peor = function (r) { var o = { pasa: 0, obs: 1, prueba: 2, esp: 3, nopasa: 4 }; if (o[r] > o[res]) res = r; };
+    if (vetoVigente(p)) {
+      ch.push({ s: 'critico', i: 'veto', t: 'Vetado', d: p.veto.motivo + ' · desde ' + fecha(p.veto.desde) + (p.veto.hasta ? ' hasta ' + fecha(p.veto.hasta) : ' · permanente') + ' · ' + p.veto.alcance + ' (' + p.veto.folio + ').' });
+      ch.push({ s: 'info', i: 'campana', t: 'Se te envía una alerta', d: 'El intento queda en su expediente y en Alertas.' });
+      return { ch: ch, inst: [], res: 'nopasa' };
+    }
+    s.docs.lista.forEach(function (d) {
+      if (d.est === 'vencido') { ch.push({ s: REGLAS.docs ? 'critico' : 'aviso', i: 'doc', t: d.nombre, d: d.vence ? 'Venció el ' + fecha(d.vence) + '.' : d.extra + '.' }); peor(REGLAS.docs ? 'nopasa' : 'obs'); }
+      else if (d.est === 'porvencer') ch.push({ s: 'aviso', i: 'doc', t: d.nombre, d: 'Vence en ' + d.dias + ' días: se avisa a la contratista.' });
+    });
+    if (!ch.some(function (x) { return x.i === 'doc'; })) ch.push({ s: 'ok', i: 'doc', t: 'Documentos al día', d: 'Inducción, examen médico, IMSS/SUA' + (p.docs.dc3.length ? ' y DC-3 (' + p.docs.dc3.map(function (c) { return c.curso.replace(/ \(.*/, ''); }).join(', ') + ')' : '') + '.' });
+    if (EMP[p.emp].repse !== 'Vigente') ch.push({ s: 'aviso', i: 'doc', t: 'REPSE de la contratista ' + (EMP[p.emp].repse === 'Vencido' ? 'vencido' : 'por vencer'), d: 'No detiene a la persona; se avisa a ' + EMP[p.emp].corto + '.' });
+    // Jornada
+    var hTurno = p.pat.h;
+    if (s.seguidos >= REGLAS.diasSeguidos) { ch.push({ s: 'grave', i: 'reloj', t: 'Sería su día ' + (s.seguidos + 1) + ' seguido', d: 'La LFT pide un día de descanso por cada seis de trabajo (art. 69). Requiere autorización.' }); peor('esp'); }
+    if (s.h7 + hTurno > lim.max) { ch.push({ s: 'grave', i: 'reloj', t: 'Excedería el máximo semanal', d: 'Lleva ' + fmtH(s.h7) + ' en 7 días; con este turno llegaría a ' + fmtH(s.h7 + hTurno) + ' (máximo ' + lim.max + ' h). Requiere autorización.' }); peor('esp'); }
+    else if (s.h7 + hTurno > lim.ord) ch.push({ s: 'aviso', i: 'reloj', t: 'Este turno genera horas extra', d: 'Lleva ' + fmtH(s.h7) + ' en 7 días; jornada ordinaria ' + lim.ord + ' h.' });
+    else ch.push({ s: 'ok', i: 'reloj', t: 'Jornada', d: 'Lleva ' + fmtH(s.h7) + ' en 7 días y ' + s.seguidos + ' día(s) seguidos.' });
+    // Celular
+    var traeCel = caso === 'cel' || (caso !== 'ok' && Math.random() < 0.6) || p.aut.cel;
+    if (traeCel) {
+      if (p.aut.cel) ch.push({ s: 'ok', i: 'cel', t: 'Celular autorizado', d: 'Puede ingresar con su celular.' });
+      else if (REGLAS.cel) { ch.push({ s: 'aviso', i: 'cel', t: 'Trae celular sin autorización', d: 'Se resguarda en casillero y se le entrega a la salida.' }); inst.push(['cel', 'Resguardar el celular en casillero']); peor('obs'); }
+    }
+    if (p.aut.herr && REGLAS.herr) { ch.push({ s: 'info', i: 'herr', t: 'Ingresa herramienta autorizada', d: 'Se abre un vale con lo que ingresa; a la salida se revisa que salga.', herr: p.herr }); inst.push(['herr', 'Registrar ' + p.herr.length + ' herramientas que ingresa']); }
+    if (p.aut.auto) { ch.push({ s: 'ok', i: 'auto', t: 'Vehículo autorizado', d: 'Placas ' + p.placas + '.' }); inst.push(['auto', 'Vehículo ' + p.placas + ': puede pasar']); }
+    valesAbiertos(p).forEach(function (v) { ch.push({ s: N - v.abierto > REGLAS.vale * DIA ? 'grave' : 'aviso', i: 'vale', t: 'Vale pendiente ' + v.folio, d: TIPO_VALE[v.tipo] + ': ' + v.items.join(', ') + ' · abierto ' + cuando(v.abierto) + (v.nota ? ' · ' + v.nota : '') + '.' }); peor('obs'); });
+    var incR = INCIDENCIAS.filter(function (i) { return i.pid === p.id && N - i.fecha < 90 * DIA; });
+    if (incR.length && !vetoVigente(p)) ch.push({ s: 'aviso', i: 'escudo', t: incR.length + ' incidencia(s) en 90 días', d: incR.map(function (i) { return TIPOS_INC[i.tipo].n.toLowerCase(); }).join(', ') + '.' });
+    var alc = res !== 'nopasa' && (caso === 'alcohol' || Math.random() * 100 < REGLAS.alc);
+    if (alc) { ch.push({ s: 'info', i: 'copa', t: 'Seleccionado para alcoholímetro aleatorio', d: 'El guardia hace la prueba y captura el resultado en su teléfono.' }); peor('prueba'); inst.unshift(['copa', 'Hacer prueba de alcoholímetro']); }
+    return { ch: ch, inst: inst, res: res };
+  }
+  function iniciarEntrada(p, caso) {
+    if (!p) { toast('No hay a quién simular con ese caso.', true); return; }
+    var r = revisarEntrada(p, caso);
+    SIM = { modo: 'entrada', p: p, r: r, caso: caso, t: ahora() };
+    pintarSim(true);
+  }
+  function iniciarSalida(p) {
+    RELOJ++;
+    if (!p) {
+      var dentro = PERSONAS.filter(function (x) { return stats(x).dentro; });
+      var conVale = dentro.filter(function (x) { return valesAbiertos(x).some(function (v) { return v.tipo === 'herr'; }); });
+      var pool = Math.random() < 0.6 && conVale.length ? conVale : dentro;
+      p = pool[Math.floor(Math.random() * pool.length)];
+    }
+    if (!p) { toast('No hay nadie dentro.', true); return; }
+    var s = stats(p), ch = [], inst = [];
+    ch.push({ s: s.perm > REGLAS.perm * HORA ? 'grave' : 'ok', i: 'reloj', t: 'Tiempo en planta: ' + dur(s.perm), d: 'Entró ' + cuando(s.desde) + '. ' + (s.perm > REGLAS.perm * HORA ? 'Pasó el tope de ' + REGLAS.perm + ' h: queda en su registro de jornada.' : 'Dentro del tope de ' + REGLAS.perm + ' h.') });
+    valesAbiertos(p).forEach(function (v) {
+      if (v.tipo === 'herr') { ch.push({ s: 'info', i: 'herr', t: 'Debe salir con lo que ingresó (' + v.folio + ')', d: 'Marca lo que el guardia ve salir:', vale: v }); inst.push(['herr', 'Revisar ' + v.items.length + ' herramientas']); }
+      else if (v.tipo === 'equipo') { ch.push({ s: 'aviso', i: 'vale', t: 'Debe devolver equipo de planta (' + v.folio + ')', d: v.items.join(', ') + '.', vale: v }); inst.push(['vale', 'Recibir: ' + v.items.join(', ')]); }
+      else ch.push({ s: /Pendiente/.test(v.autoriza || '') ? 'grave' : 'ok', i: 'vale', t: 'Salida de material ' + v.folio, d: v.items.join(', ') + ' · ' + (v.autoriza || '') + '.' });
+    });
+    if (!p.aut.cel) inst.push(['cel', 'Entregar el celular resguardado (si dejó)']);
+    SIM = { modo: 'salida', p: p, r: { ch: ch, inst: inst, res: 'pasa' }, t: ahora() };
+    pintarSim(true);
+  }
+  $('sim-llega').onclick = function () { var caso = GUION[guionI++ % GUION.length]; iniciarEntrada(candidato(caso), caso); };
+  $('sim-sale').onclick = function () { iniciarSalida(null); };
+  $('sim-elegir').onchange = function () {
+    var p = P[$('sim-elegir').value]; if (!p) return;
+    if (stats(p).dentro) iniciarSalida(p); else iniciarEntrada(p, '');
+    $('sim-elegir').value = '';
+  };
+  var VERED = {
+    pasa: ['pasa', 'ok', 'Acceso permitido', 'Todo en orden.'],
+    obs: ['obs', 'alerta', 'Permitido con observaciones', 'El guardia ve las instrucciones; tú, el detalle.'],
+    prueba: ['esp', 'copa', 'Pendiente: prueba de alcoholímetro', 'El guardia captura el resultado.'],
+    esp: ['obs', 'reloj', 'Requiere tu autorización', 'El guardia ve «ESPERA» hasta que autorices o niegues.'],
+    nopasa: ['nopasa', 'veto', 'Acceso negado', 'El guardia ve «NO PASA» sin el motivo.']
+  };
+  function pintarSim(animar) {
+    if (!SIM) {
+      $('sim').innerHTML = '<p class="nota-graf" style="font-size:13px;padding:30px 10px;text-align:center">Toca <b>Llega alguien a la caseta</b>: cada vez llega un caso distinto (todo en orden, con herramienta, celular sin autorización, vetado, vale pendiente, exceso de horas, documento vencido, alcoholímetro).</p>';
+      pintarTel(); return;
+    }
+    var p = SIM.p, r = SIM.r, e = EMP[p.emp], v = VERED[r.res], ent = SIM.modo === 'entrada';
+    var h = '<div class="credencial">' + (animar ? '<div class="scan"></div>' : '') + '<div class="foto">' + iniciales(p.nombre) + '</div><div class="dat"><span class="tipo">' + esc(p.idTipo.toUpperCase()) + ' · SIMULADA</span>' +
+      '<b>' + esc(p.nombre.toUpperCase()) + '</b>Número: •••• •••• ' + p.idNum + '<br>Foto tomada ' + hhmm(SIM.t) + ' · ' + (ent ? 'ENTRADA' : 'SALIDA') + ' · Caseta 1</div></div>' +
+      '<div class="ident">' + ico('ok') + ' <b>Identificado:</b> número ····' + p.idNum + ' leído de la foto → <b>' + esc(p.nombre) + '</b>, ' + esc(p.puesto) + ' de ' + esc(e.nombre) + '. Coincidencia con su registro: ' + (96 + Math.floor(Math.random() * 4)) + ' %.' +
+      ' <button class="lnk" type="button" data-persona="' + p.id + '">Ver expediente</button></div>';
+    h += '<ul class="checks">' + r.ch.map(function (c, ci) {
+      var extra = '';
+      if (c.herr) extra = c.herr.map(function (x) { return '<label><input type="checkbox" checked disabled> ' + esc(x) + '</label>'; }).join('');
+      if (c.vale && c.vale.tipo === 'herr') extra = c.vale.items.map(function (x, xi) { return '<label><input type="checkbox" checked data-sale="' + xi + '"> ' + esc(x) + '</label>'; }).join('');
+      if (c.vale && c.vale.tipo === 'equipo') extra = '<label><input type="checkbox" checked data-devuelto="1"> Devuelto</label>';
+      return '<li><span class="ic ' + (c.s === 'ok' ? 'ok' : c.s) + '">' + ico(c.s === 'ok' ? 'ok' : c.i) + '</span><div><b>' + esc(c.t) + '</b><p>' + esc(c.d) + '</p>' + extra + '</div></li>';
+    }).join('') + '</ul>';
+    if (ent) h += '<div class="veredicto ' + v[0] + '">' + ico(v[1]) + '<div>' + v[2] + '<small>' + v[3] + '</small></div></div>';
+    h += '<div class="acciones">';
+    if (!ent) h += '<button class="btn rojo" type="button" id="sim-ok">' + ico('salida') + 'Registrar salida</button>';
+    else if (r.res === 'pasa' || r.res === 'obs') h += '<button class="btn verde" type="button" id="sim-ok">' + ico('entrada') + 'Registrar entrada</button>';
+    else if (r.res === 'esp') h += '<button class="btn ambar" type="button" id="sim-aut">' + ico('ok') + 'Autorizar excepción y registrar</button><button class="btn fant" type="button" id="sim-neg">Negar el acceso</button>';
+    else if (r.res === 'prueba') h += '<span class="nota-graf" style="margin:0">Captura el resultado en el teléfono del guardia →</span>';
+    else h += '<button class="btn fant" type="button" id="sim-fin">Listo (queda registrado el intento)</button>';
+    h += '</div>';
+    $('sim').innerHTML = h;
+    pintarTel();
+    if ($('sim-ok')) $('sim-ok').onclick = ent ? function () { confirmarEntrada(''); } : confirmarSalida;
+    if ($('sim-aut')) $('sim-aut').onclick = function () { confirmarEntrada('Excepción de jornada autorizada por Admin. de accesos'); };
+    if ($('sim-neg')) $('sim-neg').onclick = function () { SIM.r.res = 'nopasa'; registrarIntento('Acceso negado por jornada'); };
+    if ($('sim-fin')) $('sim-fin').onclick = function () { if (SIM.registrado) { SIM = null; pintarSim(); pintar(); } else registrarIntento('Acceso negado'); };
+  }
+  function pintarTel() {
+    var hdr = '<div class="bar">Control de accesos · Caseta 1</div>';
+    if (!SIM) { $('tel').innerHTML = hdr + '<div class="sem vacio"><b>—</b><span>Esperando la siguiente foto</span></div>'; return; }
+    var r = SIM.r, p = SIM.p, ent = SIM.modo === 'entrada';
+    var sem = !ent ? ['pasa', 'SALIDA', 'Registrada al confirmar'] :
+      ({ pasa: ['pasa', 'PASA', ''], obs: ['pasa', 'PASA', 'Sigue las indicaciones'], prueba: ['prueba', 'PRUEBA', 'Alcoholímetro aleatorio'], esp: ['esp', 'ESPERA', 'El administrador está revisando'], nopasa: ['nopasa', 'NO PASA', 'Comunícate con el administrador de accesos'] })[r.res];
+    var h = hdr + '<div class="sem ' + sem[0] + '"><span>' + esc(p.nombre.split(' ')[0]) + ' · ' + esc(EMP[p.emp].corto) + '</span><b>' + sem[1] + '</b>' + (sem[2] ? '<span>' + esc(sem[2]) + '</span>' : '') + '</div>';
+    if (r.inst.length && r.res !== 'nopasa') h += '<ul>' + r.inst.map(function (x) { return '<li>' + ico(x[0]) + esc(x[1]) + '</li>'; }).join('') + '</ul>';
+    if (ent && r.res === 'prueba') h += '<div class="gbtn"><button type="button" style="background:#2F6B1E" id="alc-neg">Negativo</button><button type="button" style="background:#A32D2D" id="alc-pos">Positivo</button></div>';
+    $('tel').innerHTML = h;
+    if ($('alc-neg')) $('alc-neg').onclick = function () {
+      SIM.r.ch.push({ s: 'ok', i: 'copa', t: 'Alcoholímetro: negativo', d: '0.00 g/L a las ' + hhmm(ahora()) + '.' });
+      SIM.r.inst = SIM.r.inst.filter(function (x) { return x[0] !== 'copa'; });
+      SIM.r.res = SIM.r.ch.some(function (c) { return c.s === 'aviso' || c.s === 'grave'; }) ? 'obs' : 'pasa';
+      pintarSim(false);
+    };
+    if ($('alc-pos')) $('alc-pos').onclick = function () {
+      var inc = { folio: 'INC-' + String(400 + INCIDENCIAS.length + 1).padStart(4, '0'), pid: p.id, tipo: 'ALC', grav: 'Alta', fecha: ahora(), accion: 'Veto 30 días', desc: 'Alcoholímetro en caseta: 0.41 g/L.', estado: 'En seguimiento', por: 'Guardia Caseta 1' };
+      INCIDENCIAS.push(inc);
+      p.estado = 'vetado'; p.veto = { desde: ahora(), hasta: sumarDias(ahora(), 30), motivo: TIPOS_INC.ALC.n, alcance: 'Esta planta', folio: inc.folio };
+      SIM.r.ch.push({ s: 'critico', i: 'copa', t: 'Alcoholímetro: POSITIVO (0.41 g/L)', d: 'Se registró la incidencia ' + inc.folio + ' y un veto de 30 días (ajustable en su expediente).' });
+      SIM.r.inst = []; SIM.r.res = 'nopasa';
+      registrarIntento('Alcoholímetro positivo', true);
+      pintarSim(false); pintar();
+    };
+  }
+  function confirmarEntrada(obs) {
+    var p = SIM.p, t = ahora();
+    p.ints.push({ ent: t, sal: null, cE: CASETAS[0], cS: '', obs: obs || (SIM.r.inst.length ? SIM.r.inst.map(function (x) { return x[1]; }).join(' · ') : '') });
+    if (p.aut.herr && REGLAS.herr && p.herr.length) VALES.push({ folio: 'V-' + String(180 + VALES.length + 1).padStart(4, '0'), pid: p.id, tipo: 'herr', items: p.herr.slice(), abierto: t, cerrado: null });
+    MOVS.unshift({ t: t, p: p, tipo: 'e', res: obs ? 'Con autorización' : (SIM.r.res === 'obs' ? 'Con observaciones' : 'Permitido') });
+    toast('Entrada registrada: ' + p.nombre + ' · ' + hhmm(t));
+    SIM = null; pintarSim(); pintar();
+  }
+  function confirmarSalida() {
+    var p = SIM.p, t = ahora(), falta = [];
+    var u = p.ints[p.ints.length - 1]; u.sal = t; u.cS = CASETAS[0];
+    valesAbiertos(p).forEach(function (v) {
+      if (v.tipo === 'herr') {
+        var nodos = $('sim').querySelectorAll('[data-sale]');
+        var faltan = [].filter.call(nodos, function (c) { return !c.checked; }).map(function (c) { return v.items[+c.dataset.sale]; });
+        if (faltan.length) { falta = faltan; v.nota = 'Salió sin presentar: ' + faltan.join(', '); } else v.cerrado = t;
+      } else if (v.tipo === 'equipo') { var dv = $('sim').querySelector('[data-devuelto]'); if (!dv || dv.checked) v.cerrado = t; else v.nota = 'No devolvió el equipo'; }
+    });
+    MOVS.unshift({ t: t, p: p, tipo: 's', res: falta.length ? 'Sin herramienta' : 'Permitido' });
+    toast(falta.length ? 'Salida registrada con faltante: ' + falta.join(', ') + '. El vale queda abierto y genera alerta.' : 'Salida registrada: ' + p.nombre + ' · ' + dur(t - u.ent), !!falta.length);
+    SIM = null; pintarSim(); pintar();
+  }
+  function registrarIntento(motivo, quedarse) {
+    var p = SIM.p, t = ahora();
+    if (vetoVigente(p)) INTENTOS.push({ pid: p.id, t: t, caseta: CASETAS[0] });
+    MOVS.unshift({ t: t, p: p, tipo: 'e', res: 'Negado · ' + motivo });
+    if (quedarse) SIM.registrado = true;
+    else { toast('Intento registrado: ' + motivo + '.', true); SIM = null; pintarSim(); pintar(); }
+  }
+  function pintarPuerta() {
+    if (!$('sim').innerHTML) pintarSim();
+    var N = ahora(), ev = [];
+    PERSONAS.forEach(function (p) { p.ints.forEach(function (it) { if (N - it.ent < DIA) ev.push({ t: it.ent, p: p, tipo: 'e', res: '' }); if (it.sal && N - it.sal < DIA) ev.push({ t: it.sal, p: p, tipo: 's', res: '' }); }); });
+    INTENTOS.forEach(function (x) { ev.push({ t: x.t, p: P[x.pid], tipo: 'e', res: 'Negado · vetado' }); });
+    MOVS.forEach(function (m) { ev = ev.filter(function (x) { return !(x.p === m.p && +x.t === +m.t); }); ev.push(m); });
+    ev.sort(function (a, b) { return b.t - a.t; });
+    $('feed-sub').textContent = ev.length + ' en 24 h';
+    $('feed').innerHTML = ev.slice(0, 14).map(function (x) {
+      var neg = /Negado/.test(x.res), falta = /Sin herr/.test(x.res);
+      return '<li data-persona="' + x.p.id + '"><span class="hora">' + hhmm(x.t) + '</span><span class="tipo-ev ' + x.tipo + '">' + (x.tipo === 'e' ? 'ENTRADA' : 'SALIDA') + '</span><div class="tx">' + esc(x.p.nombre) +
+        '<span>' + esc(EMP[x.p.emp].corto) + (x.res ? ' · ' + esc(x.res) : '') + '</span></div>' + (neg ? '<span class="st critico">' + ico('veto') + 'No pasó</span>' : (falta ? '<span class="st aviso">' + ico('herr') + 'Faltante</span>' : '')) + '</li>';
+    }).join('');
+  }
+
+  /* ── Arranque ── */
+  var SECCIONES = ['tablero', 'puerta', 'alertas', 'personas', 'jornadas', 'incidencias', 'vales', 'reglas'];
+  window.addEventListener('hashchange', function () { var h = (location.hash || '').slice(1); if (SECCIONES.indexOf(h) >= 0 && h !== SEC) ir(h); });
+  var inicial = (location.hash || '').slice(1);
+  if (SECCIONES.indexOf(inicial) >= 0) ir(inicial); else pintar();
+  setInterval(function () { if ($('modal').hidden && !SIM) pintar(); }, 60000);
+})();
+</script>
+</body>
+</html>
