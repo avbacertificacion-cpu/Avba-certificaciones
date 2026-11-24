@@ -18,6 +18,7 @@ if (is_file(__DIR__ . '/Divisiones.php')) require_once __DIR__ . '/Divisiones.ph
 require_once __DIR__ . '/Huella.php';
 require_once __DIR__ . '/Auth.php';
 require_once __DIR__ . '/Dispositivos.php';
+require_once __DIR__ . '/ControlAccesos.php';
 require_once __DIR__ . '/Inspecciones.php';
 require_once __DIR__ . '/Calidad.php';
 require_once __DIR__ . '/Certificaciones.php';
@@ -1139,6 +1140,28 @@ if ($method === 'POST') {
                 if ($fallo === null) $fallo = $r;
             }
             respuesta($fallo ?? ['status' => 'error', 'message' => 'Credenciales inválidas.']);
+        }
+
+        // ── Control de accesos (ControlAccesos.php) ──────────────
+        // Personal de AVBA (no clientes). Registrar llega como multipart con la
+        // foto; en la app puede llegar tarde, desde la bandeja de salida.
+        case 'ACCESO_REGISTRAR':
+        case 'LISTAR_ACCESOS':
+        case 'LISTAR_ACCESOS_LUGARES':
+        case 'ACCESO_ELIMINAR':
+        case 'ACCESOS_PDF': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            if (!ControlAccesos::permitido($usr)) respuesta(['status' => 'error', 'message' => 'Tu cuenta no tiene acceso al control de accesos.'], 403);
+            $ca = new ControlAccesos($pdo);
+            $datos = $method === 'GET' ? $_GET : ($payload ?? []);
+            switch ($action) {
+                case 'ACCESO_REGISTRAR':       respuesta($ca->registrar($datos, $_FILES['foto'] ?? [], $usr));
+                case 'LISTAR_ACCESOS':         respuesta($ca->listar($datos, $usr));
+                case 'LISTAR_ACCESOS_LUGARES': respuesta($ca->lugares());
+                case 'ACCESO_ELIMINAR':        respuesta($ca->eliminar((int)($datos['id'] ?? 0), $usr));
+                default:                       respuesta($ca->generarPdf($datos, $usr));
+            }
         }
 
         // ── App: qué versión de las pantallas está publicada ──────

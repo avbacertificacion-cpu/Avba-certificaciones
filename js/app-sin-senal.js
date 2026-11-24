@@ -52,6 +52,8 @@ window.AVBA_SIN_SENAL = {
       SESION_AGREGAR_EMPRESA:  'id',
       // Recomendaciones
       CREAR_RECOMENDACION:     'id',
+      // Control de accesos (entradas y salidas con foto de la identificación)
+      ACCESO_REGISTRAR:        'id',
     },
     sinNumero: [
       'COMPLETAR_SESION_ACC', 'ENVIAR_SESION_ACC',   // accesorios

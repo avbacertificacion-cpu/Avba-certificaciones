@@ -29,6 +29,32 @@ $pdo = Database::getConnection();
 $usr = validarToken($pdo, $token);
 if (!$usr) fallo(401, 'No autorizado.');
 
+// ── Control de accesos: fotos de identificaciones y su PDF ───────────────
+// Son datos personales: la carpeta uploads/accesos/ está cerrada al acceso
+// directo y sólo se entregan aquí, con sesión de personal de AVBA.
+if ($tipo === 'acceso_foto' || $tipo === 'accesos_pdf') {
+    require_once __DIR__ . '/api/ControlAccesos.php';
+    if (!ControlAccesos::permitido($usr)) fallo(403, 'No autorizado.');
+    if ($tipo === 'acceso_foto') {
+        $abs = (new ControlAccesos($pdo))->rutaFoto($id, !empty($_GET['m']));
+        if (!$abs) fallo(404, 'La foto ya no está disponible.');
+        $mime = @mime_content_type($abs) ?: 'image/jpeg';
+        header('Content-Type: ' . (in_array($mime, ['image/jpeg', 'image/png', 'image/webp'], true) ? $mime : 'image/jpeg'));
+        header('Cache-Control: private, max-age=86400');
+    } else {
+        $archivo = basename((string)($_GET['f'] ?? ''));
+        $abs = ControlAccesos::rutaPdf($archivo);
+        if (!$abs) fallo(404, 'El PDF ya no está disponible. Vuelve a generarlo.');
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . $archivo . '"');
+        header('Cache-Control: no-store');
+    }
+    header('X-Content-Type-Options: nosniff');
+    header('Content-Length: ' . filesize($abs));
+    readfile($abs);
+    exit;
+}
+
 // ── Expediente combinado del portal del cliente ──────────────────────────
 // Se sirve por PHP y no como archivo estático porque Apache no entrega los
 // archivos recién creados bajo uploads/ en este hosting (mismo caso que el

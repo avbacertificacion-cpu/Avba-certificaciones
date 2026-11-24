@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Control de accesos · AVBA</title>
+<meta name="theme-color" content="#0B2545">
+<link rel="icon" href="assets/logos/avba.png">
+<link rel="manifest" href="manifest.json">
+<!--
+  AVBA — Control de accesos (entradas y salidas con foto de la identificación)
+
+  · Registrar: botón ENTRADA o SALIDA → foto de la identificación (cualquiera,
+    no sólo la INE) → vista previa para confirmar que se lee el número →
+    guardar. La hora es la del momento de la foto.
+  · En la app funciona sin señal: el registro se guarda en el teléfono y se
+    envía solo (js/app-sin-senal.js, ACCESO_REGISTRAR).
+  · El control del día: totales y la lista con foto, hora y quién registró.
+  · PDF del día con las fotos de entradas y salidas, etiquetadas, para
+    subirlo a Claude y cruzar los números de identificación.
+  Servidor: api/ControlAccesos.php · fotos por descargar.php (con sesión).
+-->
+<style>
+  :root{
+    --azul:#185FA5; --azul-dark:#0C447C; --azul-light:#E6F1FB; --marino:#0B2545;
+    --texto:#1a1a2e; --texto-sub:#5a6072; --texto-hint:#8b91a0; --borde:#dfe5ef;
+    --gris-bg:#f0f4f9; --blanco:#fff;
+    --verde:#2F6B1E; --verde-light:#E8F3E1; --ambar:#8A5A00; --ambar-light:#FFF3D6;
+    --rojo:#A32D2D; --rojo-light:#FCEBEB; --radio:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  html,body{overflow-x:hidden;overflow-x:clip}
+  body{font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;background:var(--gris-bg);color:var(--texto);
+       min-height:100vh;-webkit-tap-highlight-color:transparent}
+  .barra{position:sticky;top:0;z-index:20;color:#fff;background:linear-gradient(160deg,var(--marino),var(--azul-dark));
+    padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;align-items:center;gap:10px;box-shadow:0 2px 12px rgba(11,37,69,.25)}
+  .barra a.atras{width:40px;height:40px;border-radius:10px;background:rgba(255,255,255,.12);color:#fff;display:flex;
+    align-items:center;justify-content:center;flex-shrink:0;text-decoration:none}
+  .barra a.atras svg{width:20px;height:20px}
+  .barra h1{font-size:16.5px;font-weight:800}
+  .barra .sub{font-size:11.5px;color:rgba(255,255,255,.78);margin-top:1px}
+  main{max-width:900px;margin:0 auto;padding:14px 14px calc(90px + env(safe-area-inset-bottom))}
+  .tarjeta{background:var(--blanco);border-radius:var(--radio);padding:14px;border:1px solid rgba(0,0,0,.06);
+    box-shadow:0 3px 14px rgba(12,68,124,.06);margin-bottom:12px}
+  .fila{display:flex;gap:10px;flex-wrap:wrap}
+  .fila>.campo{flex:1 1 180px}
+  .campo label,.lbl{display:block;font-size:12.5px;font-weight:700;color:var(--texto-sub);margin-bottom:6px}
+  input[type=text],input[type=date],textarea{width:100%;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;
+    font-size:15px;color:var(--texto);background:var(--blanco);outline:none;font-family:inherit;min-height:46px}
+  textarea{min-height:64px;resize:vertical}
+  input:focus,textarea:focus{border-color:var(--azul);box-shadow:0 0 0 3px rgba(24,95,165,.12)}
+  small.ayuda{display:block;font-size:12px;color:var(--texto-hint);margin-top:5px;line-height:1.45}
+
+  /* Botones grandes de captura */
+  .captura{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+  .cap{border:0;border-radius:16px;color:#fff;cursor:pointer;padding:18px 10px;min-height:118px;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:6px;font-family:inherit;box-shadow:0 6px 18px rgba(0,0,0,.14);transition:transform .1s}
+  .cap:active{transform:scale(.97)}
+  .cap:disabled{opacity:.5;cursor:default}
+  .cap svg{width:38px;height:38px}
+  .cap b{font-size:19px;letter-spacing:.5px}
+  .cap span{font-size:12px;opacity:.9}
+  .cap.ent{background:linear-gradient(160deg,#3d8a27,var(--verde))}
+  .cap.sal{background:linear-gradient(160deg,#c0392b,var(--rojo))}
+  .aviso-dia{font-size:13px;color:var(--ambar);background:var(--ambar-light);border-radius:10px;padding:10px 12px;margin-bottom:12px}
+
+  /* Totales */
+  .totales{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+  .tot{background:var(--blanco);border-radius:var(--radio);padding:12px;text-align:center;border:1px solid rgba(0,0,0,.06)}
+  .tot b{display:block;font-size:26px;font-weight:800;line-height:1.1}
+  .tot span{font-size:11.5px;color:var(--texto-sub)}
+  .tot.e b{color:var(--verde)} .tot.s b{color:var(--rojo)} .tot.d b{color:var(--azul-dark)}
+
+  .seg{display:flex;gap:6px;flex-wrap:wrap}
+  .seg button{flex:1 1 auto;min-height:40px;padding:8px 12px;border:1.5px solid var(--borde);border-radius:10px;background:var(--blanco);
+    color:var(--texto);font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit}
+  .seg button[aria-pressed=true]{background:var(--azul);border-color:var(--azul);color:#fff}
+
+  /* Lista del día */
+  .lista{list-style:none;margin-top:10px}
+  .reg{display:flex;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--borde)}
+  .reg:last-child{border-bottom:0}
+  .reg img,.reg .sinfoto{width:64px;height:64px;border-radius:10px;object-fit:cover;background:#e8edf4;flex-shrink:0;cursor:zoom-in;border:1px solid var(--borde)}
+  .reg .sinfoto{display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--texto-hint);text-align:center;cursor:default}
+  .reg .info{flex:1;min-width:0}
+  .reg .l1{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;font-size:14px}
+  .reg .l2{font-size:12.5px;color:var(--texto-sub);margin-top:2px;overflow-wrap:anywhere}
+  .badge{font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px;letter-spacing:.3px}
+  .badge.entrada{background:var(--verde-light);color:var(--verde)}
+  .badge.salida{background:var(--rojo-light);color:var(--rojo)}
+  .badge.pend{background:var(--ambar-light);color:var(--ambar)}
+  .borrar{border:0;background:none;color:var(--texto-hint);cursor:pointer;padding:8px;border-radius:8px;flex-shrink:0}
+  .borrar:hover{color:var(--rojo);background:var(--rojo-light)}
+  .borrar svg{width:20px;height:20px}
+  .vacio{text-align:center;color:var(--texto-hint);font-size:13.5px;padding:22px 10px}
+
+  .btn{border:0;border-radius:10px;padding:12px 16px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;min-height:46px;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+  .btn.prim{background:var(--azul);color:#fff}
+  .btn.prim:disabled{opacity:.55;cursor:default}
+  .btn.sec{background:var(--blanco);color:var(--azul);border:1.5px solid var(--azul)}
+  .btn.verde{background:var(--verde);color:#fff}
+  .ancho{width:100%}
+  h2{font-size:15px;font-weight:800;color:var(--azul-dark);margin-bottom:8px}
+  .nota{font-size:12.5px;color:var(--texto-sub);line-height:1.5;margin-top:10px;background:#f7f9fc;border-radius:10px;padding:10px 12px}
+  .nota.mal{color:var(--rojo);background:var(--rojo-light)}
+  .nota.ok{color:var(--verde);background:var(--verde-light)}
+  pre.prompt{white-space:pre-wrap;font-family:inherit;font-size:12.5px;line-height:1.5;background:#f7f9fc;border:1px solid var(--borde);
+    border-radius:10px;padding:10px 12px;margin-top:8px;max-height:260px;overflow:auto}
+
+  /* Ventanas */
+  .fondo{position:fixed;inset:0;z-index:100;background:rgba(11,37,69,.6);display:flex;align-items:center;justify-content:center;padding:14px}
+  .ventana{background:var(--blanco);border-radius:16px;width:100%;max-width:520px;max-height:94vh;overflow:auto;padding:16px}
+  .ventana .prev{width:100%;max-height:52vh;object-fit:contain;border-radius:10px;background:#111;display:block}
+  .ventana .botones{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .ventana .botones .btn{flex:1 1 140px}
+  .check{display:flex;gap:8px;align-items:center;font-size:13px;margin-top:10px;color:var(--texto-sub)}
+  .check input{width:18px;height:18px;accent-color:var(--azul)}
+  .grande-img{max-width:100%;max-height:82vh;border-radius:10px;display:block;margin:0 auto}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));z-index:120;
+    background:#1e6b34;color:#fff;border-radius:12px;padding:11px 16px;font-weight:700;font-size:14px;max-width:90vw;text-align:center;
+    box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  .toast.err{background:var(--rojo)}
+  .spin{width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:g .7s linear infinite}
+  @keyframes g{to{transform:rotate(360deg)}}
+</style>
+<link rel="stylesheet" href="css/movil.css">
+</head>
+<body>
+
+<header class="barra">
+  <a class="atras" id="atras" href="login.html" aria-label="Regresar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>
+  </a>
+  <div><h1>Control de accesos</h1><div class="sub" id="sub-usuario"></div></div>
+</header>
+
+<main>
+  <div class="tarjeta">
+    <div class="fila">
+      <div class="campo"><label for="lugar">Punto de control</label>
+        <input type="text" id="lugar" list="lugares" maxlength="120" placeholder="Ej. Acceso principal, Obra Torre 5" autocomplete="off">
+        <datalist id="lugares"></datalist></div>
+      <div class="campo" style="flex:0 1 180px"><label for="fecha">Día</label><input type="date" id="fecha"></div>
+    </div>
+    <small class="ayuda">Cada registro se guarda con el punto de control y la hora en que se toma la foto.</small>
+  </div>
+
+  <div class="aviso-dia" id="aviso-dia" hidden>Estás viendo otro día. Para registrar entradas y salidas, regresa a hoy.</div>
+
+  <div class="captura" id="captura">
+    <button class="cap ent" type="button" data-tipo="entrada">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/></svg>
+      <b>ENTRADA</b><span>Foto de la identificación</span></button>
+    <button class="cap sal" type="button" data-tipo="salida">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+      <b>SALIDA</b><span>Foto de la identificación</span></button>
+  </div>
+  <input type="file" id="archivo" accept="image/*" capture="environment" hidden>
+
+  <div class="totales">
+    <div class="tot e"><b id="t-ent">0</b><span>Entradas</span></div>
+    <div class="tot s"><b id="t-sal">0</b><span>Salidas</span></div>
+    <div class="tot d"><b id="t-dif">0</b><span>Diferencia</span></div>
+  </div>
+
+  <div class="tarjeta">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <h2 style="margin:0">Registros del día</h2>
+      <div class="seg" id="filtro" role="radiogroup" aria-label="Filtrar">
+        <button type="button" data-v="todos" aria-pressed="true">Todos</button><button type="button" data-v="entrada" aria-pressed="false">Entradas</button><button type="button" data-v="salida" aria-pressed="false">Salidas</button>
+      </div>
+    </div>
+    <label class="check" style="margin-top:8px"><input type="checkbox" id="solo-punto" checked> Sólo este punto de control</label>
+    <ul class="lista" id="lista"></ul>
+  </div>
+
+  <div class="tarjeta">
+    <h2>PDF para analizar con Claude</h2>
+    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:10px">Las fotos de entradas y de salidas del día, cada una con su etiqueta (ENTRADA 001 · 08:15:32). Súbelo a Claude con las instrucciones de abajo para que extraiga los números de identificación y cruce entradas y salidas.</p>
+    <span class="lbl">Incluir</span>
+    <div class="seg" id="incluir" role="radiogroup" aria-label="Incluir en el PDF">
+      <button type="button" data-v="ambos" aria-pressed="true">Entradas y salidas</button><button type="button" data-v="entrada" aria-pressed="false">Sólo entradas</button><button type="button" data-v="salida" aria-pressed="false">Sólo salidas</button>
+    </div>
+    <label class="check"><input type="checkbox" id="pdf-punto" checked> Sólo el punto de control elegido</label>
+    <button class="btn prim ancho" id="btn-pdf" type="button" style="margin-top:12px">Generar PDF</button>
+    <div id="pdf-res"></div>
+    <details style="margin-top:12px"><summary style="cursor:pointer;font-weight:700;font-size:13.5px;color:var(--azul-dark)">Instrucciones para pedirle el análisis a Claude</summary>
+      <pre class="prompt" id="prompt"></pre>
+      <button class="btn sec ancho" id="btn-copiar" type="button" style="margin-top:8px">Copiar instrucciones</button>
+    </details>
+  </div>
+</main>
+
+<!-- Vista previa antes de guardar -->
+<div class="fondo" id="v-prev" hidden>
+  <div class="ventana" role="dialog" aria-modal="true" aria-labelledby="prev-tit">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><span class="badge" id="prev-badge"></span><b id="prev-tit" style="font-size:15px"></b></div>
+    <img class="prev" id="prev-img" alt="Foto de la identificación">
+    <p class="nota" style="margin-top:10px">Revisa que el <b>número de la identificación</b> se lea completo y sin reflejos. Si no, repite la foto.</p>
+    <div class="campo" style="margin-top:10px"><label for="prev-nota">Nota (opcional)</label><input type="text" id="prev-nota" maxlength="200" placeholder="Ej. Visitante de proveedor, placas, área"></div>
+    <label class="check"><input type="checkbox" id="prev-seguir"> Al guardar, tomar la siguiente foto del mismo tipo</label>
+    <div class="botones">
+      <button class="btn sec" type="button" id="prev-repetir">Repetir foto</button>
+      <button class="btn verde" type="button" id="prev-guardar">Guardar</button>
+    </div>
+    <button class="btn" type="button" id="prev-cancelar" style="width:100%;margin-top:6px;color:var(--texto-sub);background:none">Cancelar</button>
+  </div>
+</div>
+
+<!-- Foto en grande -->
+<div class="fondo" id="v-foto" hidden><div class="ventana" style="max-width:760px;padding:10px">
+  <img class="grande-img" id="foto-grande" alt="Identificación"><div id="foto-pie" style="font-size:13px;color:var(--texto-sub);margin-top:8px;text-align:center"></div>
+  <button class="btn sec ancho" type="button" id="foto-cerrar" style="margin-top:10px">Cerrar</button></div></div>
+
+<script src="js/destinos.js"></script>
+<script src="js/native-bridge.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var API = 'api/index.php';
+  var ROLES = ['ADMIN', 'ADMINISTRATIVO', 'INSPECTOR', 'CALIDAD', 'CERTIFICACIONES'];
+  var CLAVE_LUGAR = 'avba_accesos_lugar', CLAVE_PEND = 'avba_accesos_pendientes', CLAVE_SEGUIR = 'avba_accesos_seguir';
+
+  /* ── Sesión ── */
+  var ses = {};
+  try { ses = JSON.parse(localStorage.getItem('avba_session') || '{}') || {}; } catch (e) {}
+  if (!ses.token) { location.replace('login.html'); return; }
+  if (ROLES.indexOf(ses.rol) < 0 && !(ses.roles || []).some(function (r) { return ROLES.indexOf(r) >= 0; })) {
+    document.querySelector('main').innerHTML = '<div class="tarjeta"><p class="nota mal">Tu cuenta no tiene acceso al control de accesos.</p></div>';
+    return;
+  }
+  var destino = (window.AVBA_DESTINOS || {})[ses.rol];
+  if (destino) $('atras').href = destino;
+  $('sub-usuario').textContent = (ses.nombre || ses.usuario || '') + ' · entradas y salidas';
+
+  function leer(k, d) { try { var v = JSON.parse(localStorage.getItem(k) || 'null'); return v == null ? d : v; } catch (e) { return d; } }
+  function guardar(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function dos(n) { return (n < 10 ? '0' : '') + n; }
+  function hoyLocal() { var d = new Date(); return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
+  function ahoraLocal() { var d = new Date(); return hoyLocal() + ' ' + dos(d.getHours()) + ':' + dos(d.getMinutes()) + ':' + dos(d.getSeconds()); }
+  function uid() {
+    if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    return 'a' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 8);
+  }
+  /* Como el servidor (textoEstandar): mayúsculas, sin acentos, la Ñ se queda */
+  function normaLugar(t) {
+    return String(t || '').toUpperCase().replace(/\u00D1/g, '\u0001').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/\u0001/g, '\u00D1').replace(/\s+/g, ' ').trim();
+  }
+  function enLinea() { return window.AVBAApp ? AVBAApp.enLinea() : navigator.onLine !== false; }
+  var tToast;
+  function toast(t, err) {
+    var el = $('toast') || document.body.appendChild(Object.assign(document.createElement('div'), { id: 'toast', className: 'toast' }));
+    el.textContent = t; el.className = 'toast' + (err ? ' err' : ''); el.hidden = false;
+    clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 3200);
+  }
+  function api(accion, datos, metodo) {
+    var h = { Authorization: 'Bearer ' + ses.token };
+    var init;
+    if (metodo === 'GET') {
+      var q = new URLSearchParams(datos || {}); q.set('action', accion); q.set('token', ses.token);
+      return fetch(API + '?' + q.toString(), { headers: h }).then(respuesta);
+    }
+    if (datos instanceof FormData) { datos.append('action', accion); datos.append('token', ses.token); init = { method: 'POST', headers: h, body: datos }; }
+    else { h['Content-Type'] = 'application/json'; init = { method: 'POST', headers: h, body: JSON.stringify({ action: accion, token: ses.token, payload: datos || {} }) }; }
+    return fetch(API, init).then(respuesta);
+  }
+  function respuesta(r) {
+    if (r.status === 401) { localStorage.removeItem('avba_session'); location.replace('login.html'); throw new Error('Sesión vencida'); }
+    return r.json();
+  }
+  function urlFoto(id, mini) { return 'descargar.php?tipo=acceso_foto&id=' + encodeURIComponent(id) + (mini ? '&m=1' : '') + '&token=' + encodeURIComponent(ses.token); }
+
+  /* ── Punto de control y día ── */
+  $('lugar').value = leer(CLAVE_LUGAR, '') || 'ACCESO PRINCIPAL';
+  $('fecha').value = hoyLocal();
+  $('lugar').addEventListener('change', function () { $('lugar').value = normaLugar($('lugar').value); guardar(CLAVE_LUGAR, $('lugar').value); cargar(); armarPrompt(); });
+  $('fecha').addEventListener('change', function () { if (!$('fecha').value) $('fecha').value = hoyLocal(); pintarDia(); cargar(); armarPrompt(); });
+  $('solo-punto').addEventListener('change', function () { cargar(); });
+  function esHoy() { return $('fecha').value === hoyLocal(); }
+  function pintarDia() {
+    var hoy = esHoy();
+    $('aviso-dia').hidden = hoy;
+    document.querySelectorAll('.cap').forEach(function (b) { b.disabled = !hoy; });
+  }
+  pintarDia();
+  api('LISTAR_ACCESOS_LUGARES', {}, 'GET').then(function (r) {
+    $('lugares').innerHTML = (r.lugares || []).map(function (l) { return '<option value="' + esc(l) + '">'; }).join('');
+  }).catch(function () {});
+
+  /* ── Botones segmentados ── */
+  function seg(id) { var b = $(id).querySelector('button[aria-pressed=true]'); return b ? b.dataset.v : ''; }
+  document.querySelectorAll('.seg').forEach(function (g) {
+    g.addEventListener('click', function (ev) {
+      var b = ev.target.closest('button'); if (!b) return;
+      g.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      if (g.id === 'filtro') pintarLista();
+      if (g.id === 'incluir') armarPrompt();
+    });
+  });
+
+  /* ── Captura ── */
+  var tipoActual = 'entrada', fotoActual = null;
+  function comprimir(blob, lado, calidad) {
+    return new Promise(function (ok, mal) {
+      var url = URL.createObjectURL(blob), img = new Image();
+      img.onload = function () {
+        var k = Math.min(1, lado / Math.max(img.naturalWidth, img.naturalHeight));
+        var c = document.createElement('canvas');
+        c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        c.toBlob(function (b) { b ? ok({ blob: b, canvas: c }) : mal(new Error('No se pudo procesar la foto.')); }, 'image/jpeg', calidad);
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); mal(new Error('No se pudo leer la foto.')); };
+      img.src = url;
+    });
+  }
+  function miniatura(canvas) {
+    var k = 160 / Math.max(canvas.width, canvas.height), c = document.createElement('canvas');
+    c.width = Math.round(canvas.width * k); c.height = Math.round(canvas.height * k);
+    c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.6);
+  }
+  function capturar(tipo) {
+    tipoActual = tipo;
+    if (!normaLugar($('lugar').value)) { toast('Escribe el punto de control.', true); $('lugar').focus(); return; }
+    if (window.AVBANative && AVBANative.esNativo && AVBANative.tomarFoto) {
+      AVBANative.tomarFoto({ quality: 85, source: 'CAMERA' }).then(function (dataUrl) {
+        if (!dataUrl) return;                                    // canceló
+        return fetch(dataUrl).then(function (r) { return r.blob(); }).then(procesar);
+      }).catch(function (e) { toast(e.message || 'No se pudo usar la cámara.', true); });
+      return;
+    }
+    $('archivo').value = '';
+    $('archivo').click();
+  }
+  $('archivo').addEventListener('change', function () { var f = $('archivo').files[0]; if (f) procesar(f); });
+  document.querySelectorAll('.cap').forEach(function (b) { b.addEventListener('click', function () { capturar(b.dataset.tipo); }); });
+
+  function procesar(blob) {
+    return comprimir(blob, 1600, 0.82).then(function (r) {
+      fotoActual = { blob: r.blob, mini: miniatura(r.canvas), capturado: ahoraLocal() };
+      var ent = tipoActual === 'entrada';
+      $('prev-badge').className = 'badge ' + tipoActual; $('prev-badge').textContent = ent ? 'ENTRADA' : 'SALIDA';
+      $('prev-tit').textContent = fotoActual.capturado.slice(11, 16) + ' · ' + normaLugar($('lugar').value);
+      if ($('prev-img').src) URL.revokeObjectURL($('prev-img').src);
+      $('prev-img').src = URL.createObjectURL(r.blob);
+      $('prev-nota').value = '';
+      $('prev-seguir').checked = !!leer(CLAVE_SEGUIR, false);
+      $('v-prev').hidden = false;
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  $('prev-cancelar').onclick = function () { $('v-prev').hidden = true; fotoActual = null; };
+  $('prev-repetir').onclick = function () { $('v-prev').hidden = true; capturar(tipoActual); };
+  $('prev-seguir').onchange = function () { guardar(CLAVE_SEGUIR, $('prev-seguir').checked); };
+  $('prev-guardar').onclick = function () {
+    if (!fotoActual) return;
+    var reg = { uid: uid(), tipo: tipoActual, capturado: fotoActual.capturado, lugar: normaLugar($('lugar').value),
+                nota: $('prev-nota').value.trim(), mini: fotoActual.mini };
+    var fd = new FormData();
+    ['uid', 'tipo', 'capturado', 'lugar', 'nota'].forEach(function (k) { fd.append(k, reg[k]); });
+    fd.append('foto', fotoActual.blob, reg.uid + '.jpg');
+    var btn = $('prev-guardar'); btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Guardando…';
+    api('ACCESO_REGISTRAR', fd).then(function (r) {
+      if (r.status !== 'success') throw new Error(r.message || 'No se guardó.');
+      if (r.sin_senal) {                       // la app lo guardó en el teléfono
+        var p = leer(CLAVE_PEND, []); p.push(reg); guardar(CLAVE_PEND, p.slice(-300));
+        toast((reg.tipo === 'entrada' ? 'Entrada' : 'Salida') + ' guardada en el teléfono: se enviará al volver la señal.');
+      } else {
+        toast(r.message || 'Registrado.');
+      }
+      $('v-prev').hidden = true; fotoActual = null;
+      cargar();
+      if ($('prev-seguir').checked) setTimeout(function () { capturar(reg.tipo); }, 350);
+    }).catch(function (e) {
+      toast(enLinea() ? e.message : 'Sin conexión: no se guardó. Inténtalo con señal o desde la app.', true);
+    }).then(function () { btn.disabled = false; btn.textContent = 'Guardar'; });
+  };
+
+  /* ── Lista del día ── */
+  var datos = { registros: [], totales: { entrada: 0, salida: 0 } };
+  function cargar() {
+    var q = { fecha: $('fecha').value };
+    if ($('solo-punto').checked) q.lugar = normaLugar($('lugar').value);
+    return api('LISTAR_ACCESOS', q, 'GET').then(function (r) {
+      if (r.status !== 'success') throw new Error(r.message || '');
+      datos = r;
+      // Lo que ya llegó al servidor deja de estar pendiente en el teléfono
+      var ids = {}; (r.registros || []).forEach(function (x) { ids[x.uid] = 1; });
+      var p = leer(CLAVE_PEND, []).filter(function (x) { return !ids[x.uid]; });
+      guardar(CLAVE_PEND, p);
+      pintarLista();
+    }).catch(function () { pintarLista(); });
+  }
+  function pendientesVisibles() {
+    var f = $('fecha').value, l = normaLugar($('lugar').value), solo = $('solo-punto').checked;
+    return leer(CLAVE_PEND, []).filter(function (x) { return x.capturado.slice(0, 10) === f && (!solo || x.lugar === l); });
+  }
+  function pintarLista() {
+    var filtro = seg('filtro');
+    var pend = pendientesVisibles();
+    var tot = { entrada: (datos.totales || {}).entrada || 0, salida: (datos.totales || {}).salida || 0 };
+    pend.forEach(function (x) { tot[x.tipo]++; });
+    $('t-ent').textContent = tot.entrada; $('t-sal').textContent = tot.salida; $('t-dif').textContent = tot.entrada - tot.salida;
+    var items = (datos.registros || []).map(function (x) { return { srv: x, cuando: x.hora }; })
+      .concat(pend.map(function (x) { return { pend: x, cuando: x.capturado.slice(11) }; }))
+      .filter(function (it) { return filtro === 'todos' || (it.srv || it.pend).tipo === filtro; })
+      .sort(function (a, b) { return a.cuando < b.cuando ? 1 : -1; });       // lo más reciente arriba
+    if (!items.length) { $('lista').innerHTML = '<li class="vacio">Sin registros' + (filtro !== 'todos' ? ' de este tipo' : '') + ' en este día.</li>'; return; }
+    $('lista').innerHTML = items.map(function (it) {
+      var x = it.srv || it.pend, ent = x.tipo === 'entrada';
+      var foto = it.srv ? '<img loading="lazy" alt="" data-id="' + x.id + '" src="' + esc(urlFoto(x.id, true)) + '" onerror="this.outerHTML=\'<div class=sinfoto>Foto sin señal</div>\'">'
+                        : '<img alt="" src="' + esc(x.mini) + '">';
+      var etiqueta = it.srv ? (ent ? 'ENTRADA ' : 'SALIDA ') + String(x.num).padStart(3, '0') : (ent ? 'ENTRADA' : 'SALIDA');
+      return '<li class="reg">' + foto + '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' + etiqueta + '</span>' +
+        esc(it.cuando) + (it.pend ? ' <span class="badge pend">Por enviar</span>' : '') + '</div>' +
+        '<div class="l2">' + esc(x.lugar) + (it.srv ? ' · ' + esc(x.nombre) : '') + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div>' +
+        (it.srv && x.puede_borrar ? '<button class="borrar" type="button" data-borrar="' + x.id + '" aria-label="Eliminar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>' : '') +
+        '</li>';
+    }).join('');
+  }
+  $('lista').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-borrar]');
+    if (b) {
+      if (!enLinea()) { toast('Para eliminar se necesita señal.', true); return; }
+      if (!confirm('¿Eliminar este registro y su foto?')) return;
+      api('ACCESO_ELIMINAR', { id: +b.dataset.borrar }).then(function (r) {
+        if (r.status !== 'success') throw new Error(r.message); toast(r.message); cargar();
+      }).catch(function (e) { toast(e.message || 'No se pudo eliminar.', true); });
+      return;
+    }
+    var img = ev.target.closest('img[data-id]');
+    if (img) {
+      var x = (datos.registros || []).filter(function (r) { return String(r.id) === img.dataset.id; })[0] || {};
+      $('foto-grande').src = urlFoto(img.dataset.id, false);
+      $('foto-pie').textContent = (x.tipo === 'entrada' ? 'ENTRADA ' : 'SALIDA ') + String(x.num || '').padStart(3, '0') + ' · ' + (x.hora || '') + ' · ' + (x.lugar || '');
+      $('v-foto').hidden = false;
+    }
+  });
+  $('foto-cerrar').onclick = function () { $('v-foto').hidden = true; $('foto-grande').removeAttribute('src'); };
+  $('v-foto').addEventListener('click', function (ev) { if (ev.target === $('v-foto')) $('foto-cerrar').onclick(); });
+
+  /* ── PDF ── */
+  function pintarBotonPdf() {
+    var ok = enLinea();
+    $('btn-pdf').disabled = !ok;
+    $('btn-pdf').textContent = ok ? 'Generar PDF' : 'Se necesita señal para generar el PDF';
+  }
+  pintarBotonPdf();
+  if (window.AVBAApp && AVBAApp.alCambiarConexion) AVBAApp.alCambiarConexion(function () { pintarBotonPdf(); if (enLinea()) cargar(); });
+  window.addEventListener('online', function () { pintarBotonPdf(); cargar(); });
+  window.addEventListener('offline', pintarBotonPdf);
+  $('btn-pdf').onclick = function () {
+    var b = $('btn-pdf'); b.disabled = true; b.innerHTML = '<span class="spin"></span> Generando PDF…';
+    var q = { fecha: $('fecha').value, incluir: seg('incluir') };
+    if ($('pdf-punto').checked) q.lugar = normaLugar($('lugar').value);
+    $('pdf-res').innerHTML = '';
+    api('ACCESOS_PDF', q).then(function (r) {
+      if (r.status !== 'success') throw new Error(r.message || 'No se pudo generar el PDF.');
+      var mb = r.bytes / 1048576, url = r.url + '&token=' + encodeURIComponent(ses.token);
+      var avisos = [];
+      if (r.paginas > 100) avisos.push('Tiene ' + r.paginas + ' páginas: Claude analiza las imágenes de hasta 100 páginas por PDF. Genera entradas y salidas por separado.');
+      if (mb > 30) avisos.push('Pesa ' + mb.toFixed(1) + ' MB: el límite para subir un archivo a Claude es de unos 30 MB. Genera entradas y salidas por separado.');
+      $('pdf-res').innerHTML = '<div class="nota ' + (avisos.length ? 'mal' : 'ok') + '">PDF listo: ' + r.entradas + ' entradas y ' + r.salidas + ' salidas · ' +
+        r.paginas + ' página' + (r.paginas === 1 ? '' : 's') + ' · ' + mb.toFixed(1) + ' MB' + (avisos.length ? '<br>' + avisos.join('<br>') : '') + '</div>' +
+        '<a class="btn verde ancho" style="margin-top:8px" target="_blank" rel="noopener" href="' + esc(url) + '">Abrir PDF</a>';
+    }).catch(function (e) {
+      $('pdf-res').innerHTML = '<div class="nota mal">' + esc(e.message) + '</div>';
+    }).then(pintarBotonPdf);
+  };
+
+  /* ── Instrucciones para Claude ── */
+  function fechaLarga(f) {
+    var d = new Date(f + 'T12:00:00');
+    return isNaN(d) ? f : d.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }
+  function armarPrompt() {
+    var inc = seg('incluir'), punto = $('pdf-punto').checked ? normaLugar($('lugar').value) : '';
+    var secciones = inc === 'ambos' ? 'dos secciones, ENTRADAS y SALIDAS' : (inc === 'entrada' ? 'sólo la sección de ENTRADAS' : 'sólo la sección de SALIDAS');
+    $('prompt').textContent =
+      'Te adjunto el PDF del control de accesos del ' + fechaLarga($('fecha').value) + (punto ? ' en «' + punto + '»' : '') + '. Tiene ' + secciones +
+      '. Cada fotografía es una identificación (INE, licencia, pasaporte, credencial de empresa u otra) y lleva su etiqueta, por ejemplo «ENTRADA 001 · 08:15:32».\n\n' +
+      '1. De cada fotografía extrae SOLO el número de identificación: en la INE, la clave de elector; en licencias, pasaportes y credenciales, su número o folio. Usa el mismo tipo de número para la misma identificación. No transcribas nombres, domicilios, fechas de nacimiento ni otros datos personales.\n' +
+      '2. Arma una tabla con: número de identificación, etiqueta y hora de entrada, etiqueta y hora de salida.\n' +
+      '3. Debajo de la tabla indica:\n' +
+      '   • Quién entró y no tiene salida registrada.\n' +
+      '   • Quién salió sin entrada registrada.\n' +
+      '   • Las fotos donde el número no se lee o hay duda (con su etiqueta).\n' +
+      '   • Los números que aparecen más de una vez en entradas o en salidas.\n' +
+      '4. Al final, el total de entradas, de salidas y de personas distintas.';
+  }
+  $('pdf-punto').addEventListener('change', armarPrompt);
+  armarPrompt();
+  $('btn-copiar').onclick = function () {
+    var t = $('prompt').textContent;
+    (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(t) : Promise.reject())
+      .then(function () { toast('Instrucciones copiadas: pégalas en Claude junto con el PDF.'); })
+      .catch(function () {
+        var r = document.createRange(); r.selectNodeContents($('prompt'));
+        var s = getSelection(); s.removeAllRanges(); s.addRange(r);
+        toast('Selecciona y copia el texto de las instrucciones.');
+      });
+  };
+
+  /* Otros puntos de control registran al mismo tiempo: se actualiza solo */
+  setInterval(function () { if (!document.hidden && enLinea() && $('v-prev').hidden) cargar(); }, 30000);
+  cargar();
+})();
+</script>
+<script src="js/movil.js"></script>
+</body>
+</html>
