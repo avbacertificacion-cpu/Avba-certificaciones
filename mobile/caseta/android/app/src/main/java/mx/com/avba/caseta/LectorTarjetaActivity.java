@@ -4,8 +4,10 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
@@ -57,8 +59,15 @@ import com.google.mlkit.vision.text.TextRecognition;
 import com.google.mlkit.vision.text.TextRecognizer;
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions;
 
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -79,7 +88,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
     public static final String EXTRA_TITULO = "titulo", EXTRA_SUBTITULO = "subtitulo", EXTRA_SIMULAR = "simular",
             EXTRA_MIN = "minDigitos", EXTRA_MAX = "maxDigitos", EXTRA_LONGITUD = "longitud", EXTRA_PATRON = "patron",
             EXTRA_CLAVES = "claves", EXTRA_NO_NOMBRE = "noNombre", EXTRA_NO_CODIGO = "noCodigo", EXTRA_CONFIRMAR = "confirmar",
-            EXTRA_VERTICAL = "vertical";
+            EXTRA_VERTICAL = "vertical", EXTRA_FOTO = "foto";
 
     private static final int VERDE = Color.rgb(76, 175, 80), AMARILLO = Color.rgb(255, 202, 40), BLANCO = Color.WHITE;
 
@@ -101,11 +110,25 @@ public class LectorTarjetaActivity extends AppCompatActivity {
     private long inicio;
     private int lecturas = 0;
 
+    /* Foto de la credencial como evidencia: sale de la misma imagen de la cámara en la que se leyó
+       el ID (no hace falta otra foto ni más tiempo). Mientras se ve un ID se guarda su imagen (de
+       preferencia una en la que también se leyó el nombre); si no, una por segundo, que es la que
+       queda si el ID se escribe a mano. */
+    private boolean conFoto = true;
+    private volatile byte[] fotoReciente = null;
+    private volatile boolean leyoId = false, faltaFoto = false;
+    private volatile long fotoEn = 0;
+    private final Map<String, byte[]> fotoPorId = new HashMap<>();      // sólo en el hilo principal
+    private final Set<String> fotoConNombre = new HashSet<>();
+    private static final long CADA_FOTO_MS = 1000, FOTO_ID_MS = 250;
+
     @Override
     protected void onCreate(Bundle guardado) {
         super.onCreate(guardado);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         inicio = SystemClock.elapsedRealtime();
+        File[] viejas = carpetaEvidencia(this).listFiles();                 // por si alguna no se recogió
+        if (viejas != null) for (File f : viejas) if (System.currentTimeMillis() - f.lastModified() > 3600_000L) f.delete();
         leerReglas(getIntent());
         armarPantalla();
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
@@ -128,6 +151,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         if (noNombre != null && noNombre.length > 0) reglas.noNombre.addAll(AnalizadorTarjeta.Reglas.conjunto(noNombre));
         String[] noCodigo = i.getStringArrayExtra(EXTRA_NO_CODIGO);
         if (noCodigo != null && noCodigo.length > 0) reglas.noCodigo.addAll(AnalizadorTarjeta.Reglas.conjunto(noCodigo));
+        conFoto = i.getBooleanExtra(EXTRA_FOTO, true);
         int confirmar = Math.max(1, Math.min(6, i.getIntExtra(EXTRA_CONFIRMAR, 3)));
         estab = new AnalizadorTarjeta.Estabilizador(confirmar, Math.max(6, confirmar * 2));
     }
@@ -272,14 +296,21 @@ public class LectorTarjetaActivity extends AppCompatActivity {
     @OptIn(markerClass = ExperimentalGetImage.class)
     private void analizar(@NonNull ImageProxy imagen) {
         if (entregado || pausado || imagen.getImage() == null) { imagen.close(); return; }
+        byte[] foto = null;
+        long ahora = SystemClock.elapsedRealtime();
+        if (conFoto && ((leyoId && faltaFoto && ahora - fotoEn >= FOTO_ID_MS) || ahora - fotoEn >= CADA_FOTO_MS)) {
+            try { foto = jpeg(imagen); fotoEn = ahora; } catch (Throwable t) { foto = null; }
+        }
+        final byte[] f = foto;
         InputImage entrada = InputImage.fromMediaImage(imagen.getImage(), imagen.getImageInfo().getRotationDegrees());
         lector.process(entrada)
-                .addOnSuccessListener(ContextCompat.getMainExecutor(this), this::alLeer)
+                .addOnSuccessListener(ContextCompat.getMainExecutor(this), t -> alLeer(t, f))
                 .addOnCompleteListener(t -> imagen.close());
     }
 
-    private void alLeer(Text texto) {
+    private void alLeer(Text texto, byte[] foto) {
         if (entregado || pausado || isFinishing()) return;
+        if (foto != null) fotoReciente = foto;
         lecturas++;
         List<AnalizadorTarjeta.Linea> lineas = new ArrayList<>();
         for (Text.TextBlock bloque : texto.getTextBlocks()) {
@@ -291,6 +322,16 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         }
         if (!lineas.isEmpty()) ultimoTexto = AnalizadorTarjeta.unir(lineas);
         AnalizadorTarjeta.Lectura l = AnalizadorTarjeta.analizar(lineas, reglas);
+        if (foto != null && l.codigo != null) {                              // la credencial a la vista, con su ID legible
+            boolean conNombre = l.nombre != null;
+            if (!fotoPorId.containsKey(l.codigo) || (conNombre && !fotoConNombre.contains(l.codigo))) {
+                if (fotoPorId.size() >= 6 && !fotoPorId.containsKey(l.codigo)) { fotoPorId.clear(); fotoConNombre.clear(); }
+                fotoPorId.put(l.codigo, foto);
+                if (conNombre) fotoConNombre.add(l.codigo);
+            }
+        }
+        leyoId = l.codigo != null;
+        faltaFoto = l.codigo != null && !fotoConNombre.contains(l.codigo);
         AnalizadorTarjeta.Lectura ok = estab.agregar(l);
         if (confirmado == null && ok != null) { confirmado = ok; confirmadoEn = SystemClock.elapsedRealtime(); }
         if (confirmado != null) {
@@ -357,6 +398,10 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         datos.putExtra("simulado", simulado);
         datos.putExtra("lecturas", lecturas);
         datos.putExtra("ms", SystemClock.elapsedRealtime() - inicio);
+        if (conFoto && !simulado) {
+            String ruta = guardarFoto(fotoDe(codigo));
+            if (ruta != null) datos.putExtra("foto", ruta);
+        }
         setResult(RESULT_OK, datos);
         if (simulado) { finish(); return; }
         marco.color(VERDE);
@@ -364,6 +409,59 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         tEstado.setText("Leída: " + (nombre != null && !nombre.isEmpty() ? nombre + " · " : "") + "ID " + codigo);
         marco.performHapticFeedback(Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.CONFIRM : HapticFeedbackConstants.LONG_PRESS);
         marco.postDelayed(this::finish, 450);
+    }
+
+    /* ── Foto de evidencia ── */
+    static File carpetaEvidencia(android.content.Context c) {
+        File d = new File(c.getCacheDir(), "evidencia");
+        if (!d.isDirectory()) d.mkdirs();
+        return d;
+    }
+
+    private static String sinCeros(String c) {
+        String x = c == null ? "" : c.trim();
+        if (!x.matches("\\d+")) return x;
+        x = x.replaceFirst("^0+", "");
+        return x.isEmpty() ? "0" : x;
+    }
+
+    /** La imagen en la que se leyó ese ID (aunque se haya escrito a mano sin los ceros); si no hay, la más reciente. */
+    private byte[] fotoDe(String codigo) {
+        if (codigo != null) {
+            byte[] f = fotoPorId.get(codigo);
+            if (f != null) return f;
+            String k = sinCeros(codigo);
+            for (Map.Entry<String, byte[]> e : fotoPorId.entrySet()) if (sinCeros(e.getKey()).equals(k)) return e.getValue();
+        }
+        return fotoReciente;
+    }
+
+    /** La imagen de la cámara como JPEG de hasta 1440 px, derecha (como la ve el guardia). */
+    private static byte[] jpeg(ImageProxy img) {
+        Bitmap b = img.toBitmap();
+        int rot = img.getImageInfo().getRotationDegrees();
+        float k = Math.min(1f, 1440f / Math.max(b.getWidth(), b.getHeight()));
+        Matrix m = new Matrix();
+        if (k < 1f) m.postScale(k, k);
+        if (rot != 0) m.postRotate(rot);
+        Bitmap r = m.isIdentity() ? b : Bitmap.createBitmap(b, 0, 0, b.getWidth(), b.getHeight(), m, true);
+        ByteArrayOutputStream o = new ByteArrayOutputStream(220 * 1024);
+        r.compress(Bitmap.CompressFormat.JPEG, 80, o);
+        if (r != b) r.recycle();
+        b.recycle();
+        return o.toByteArray();
+    }
+
+    /** Se entrega por un archivo temporal (no cabe con seguridad en el resultado); el plugin lo lee y lo borra. */
+    private String guardarFoto(byte[] f) {
+        if (f == null || f.length == 0) return null;
+        try {
+            File a = new File(carpetaEvidencia(this), "credencial-" + System.currentTimeMillis() + ".jpg");
+            try (FileOutputStream o = new FileOutputStream(a)) { o.write(f); }
+            return a.getAbsolutePath();
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void terminarConError(String mensaje) {

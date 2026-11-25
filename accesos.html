@@ -212,6 +212,12 @@
   .hecho b{font-size:28px;font-weight:900;letter-spacing:.5px;margin-top:8px}
   .hecho .n{font-size:22px;font-weight:800;margin-top:16px;line-height:1.25;overflow-wrap:anywhere}
   .hecho .c{font-size:17px;margin-top:6px;opacity:.95}
+  .hecho .foto{width:auto;height:120px;max-width:70vw;object-fit:cover;border-radius:12px;border:3px solid rgba(255,255,255,.9);margin-top:14px;background:#0003}
+  .hecho .ev{font-size:13px;margin-top:6px;opacity:.9;font-weight:700}
+  #v-foto{z-index:110}
+  .mov-fotos{display:flex;gap:10px;margin-top:6px}
+  .mov-fotos figure{margin:0;text-align:center;font-size:11px;color:var(--texto-sub);font-weight:700}
+  .mov-fotos img{display:block;width:72px;height:96px;object-fit:cover;border-radius:8px;border:1px solid var(--borde);background:#e8edf4;cursor:zoom-in;margin-bottom:2px}
   input#lugar[readonly]{background:var(--azul-light);color:var(--azul-dark);font-weight:800;border-color:#cfe0f3}
   .punto{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 0;border-bottom:1px solid var(--borde)}
   .punto:last-child{border-bottom:0}
@@ -320,8 +326,8 @@
     <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:8px">De los registros hechos con la credencial: cada persona con su hora de entrada y de salida (se juntan por su ID, el número del recuadro azul).</p>
     <button class="btn verde ancho" id="btn-pdf-datos" type="button">Descargar PDF de entradas y salidas</button>
     <div id="pdf-datos-res"></div>
-    <h3 class="sub-pdf">Fotos de las identificaciones (para analizar con Claude)</h3>
-    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:10px">Las fotos de entradas y de salidas de un turno, cada una con su etiqueta (ENTRADA 001 · 24/11 06:15:32). Con más de 150 fotos se divide en partes, para que cada archivo quepa en lo que Claude analiza (100 hojas, 30 MB).</p>
+    <h3 class="sub-pdf">Fotos de las credenciales (evidencia)</h3>
+    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:10px">Las fotos de entradas y de salidas de un turno, cada una con su etiqueta (ENTRADA 001 · 24/11 06:15:32) y el ID y el nombre leídos. Con más de 150 fotos se divide en partes, para que cada archivo quepa en lo que Claude analiza (100 hojas, 30 MB).</p>
     <span class="lbl">Incluir</span>
     <div class="seg" id="incluir" role="radiogroup" aria-label="Incluir en el PDF">
       <button type="button" data-v="ambos" aria-pressed="true">Entradas y salidas</button><button type="button" data-v="entrada" aria-pressed="false">Sólo entradas</button><button type="button" data-v="salida" aria-pressed="false">Sólo salidas</button>
@@ -417,10 +423,10 @@
      internet (la imagen no sale del equipo) y el registro queda guardado al
      instante, sin foto. En el navegador sigue la foto de la identificación. */
   var LECTOR = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LectorTarjeta) || null;
-  var REGLAS_TARJETA = { minDigitos: 4, maxDigitos: 12, longitud: 0, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical' };
+  var REGLAS_TARJETA = { minDigitos: 4, maxDigitos: 12, longitud: 0, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical', foto: true };
   function mezclarReglas(g) {
     if (!g || typeof g !== 'object') return;
-    ['minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
+    ['minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion', 'foto'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
   }
   /* Equipo: cada punto de control trabaja en uno solo. Identificador propio de
      este teléfono o navegador (no cambia al cerrar sesión); el servidor liga
@@ -444,7 +450,7 @@
       if (j && j.status === 'success' && j.reglas) { mezclarReglas(j.reglas); try { localStorage.setItem('avba_tarjeta_reglas', JSON.stringify(j.reglas)); } catch (e) {} }
     }).catch(function () {});
     $('lbl-ent').textContent = $('lbl-sal').textContent = 'Leer tarjeta';
-    $('ayuda-lugar').textContent = 'Cada registro se guarda con el nombre y el ID de la credencial, el punto de control y la hora.';
+    $('ayuda-lugar').textContent = 'Cada registro se guarda con el nombre, el ID y la foto de la credencial (evidencia), el punto de control y la hora.';
     // Los PDF se abren fuera de la app (en el visor del teléfono)
     document.addEventListener('click', function (ev) {
       var a = ev.target.closest && ev.target.closest('a[href*="descargar.php"]');
@@ -763,8 +769,27 @@
     var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, turno: turnoDe(tipo, capturado), lugar: normaLugar($('lugar').value),
                nota: '', mini: '', codigo: codigo, persona: String(r.nombre || '').replace(/\s+/g, ' ').trim().slice(0, 150),
                origen: r.manual ? 'manual' : 'tarjeta', creado: Date.now() };
-    mostrarHecho(it);
-    return guardarRegistro(it).catch(function (e) { toast('No se pudo guardar: ' + (e.message || e), true); });
+    // La foto de la credencial que tomó el lector va con el registro como evidencia (también sin señal:
+    // queda en el equipo con el registro y se envía junto con él)
+    var foto = fotoDeLectura(r);
+    var listo = !foto ? Promise.resolve() : canvasDeArchivo(foto).then(function (c) {
+      it.mini = miniatura(c);
+      return foto.arrayBuffer();
+    }).then(function (ab) { it.datos = ab; it.mime = 'image/jpeg'; })
+      .catch(function () { delete it.mini; delete it.datos; });            // sin la foto, el registro se guarda igual
+    return listo.then(function () {
+      mostrarHecho(it);
+      return guardarRegistro(it);
+    }).catch(function (e) { toast('No se pudo guardar: ' + (e.message || e), true); });
+  }
+  /* La foto que tomó el lector de la app (base64) */
+  function fotoDeLectura(r) {
+    if (!r || !r.foto) return null;
+    try {
+      var bin = atob(String(r.foto)), arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      return arr.length ? new Blob([arr], { type: 'image/jpeg' }) : null;
+    } catch (e) { return null; }
   }
   var tHecho = null;
   function mostrarHecho(it) {
@@ -772,7 +797,8 @@
     el.className = 'hecho ' + it.tipo;
     el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>' +
       '<b>' + (ent ? 'ENTRADA' : 'SALIDA') + ' REGISTRADA</b><div class="n">' + esc(it.persona || 'Nombre no leído') + '</div>' +
-      '<div class="c">ID ' + esc(it.codigo) + ' · ' + esc(it.capturado.slice(11, 16)) + '</div>';
+      '<div class="c">ID ' + esc(it.codigo) + ' · ' + esc(it.capturado.slice(11, 16)) + '</div>' +
+      (it.mini ? '<img class="foto" alt="Foto de la credencial" src="' + esc(it.mini) + '"><div class="ev">Foto guardada como evidencia</div>' : '');
     el.hidden = false;
     if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {}
     clearTimeout(tHecho); tHecho = setTimeout(function () { el.hidden = true; }, 1500);
@@ -1250,7 +1276,8 @@
           '<div><span class="badge entrada">ENTRADA</span> ' + (m.entrada ? esc(cuando(m.entrada)) + ' · ' + esc(nombrePunto(m.lugar)) : '<i>sin entrada registrada</i>') + '</div>' +
           '<div><span class="badge salida">SALIDA</span> ' + (m.salida ? esc(cuando(m.salida)) + ' · ' + esc(nombrePunto(m.lugar_salida)) +
             (m.origen_salida === 'admin' ? ' <i>(registrada por Administración)</i>' : '') : '<i>' + (abierta ? 'sigue en planta' : 'sin salida registrada') + '</i>') + '</div>' +
-          (m.minutos != null ? '<div class="dur">' + duracion(m.minutos) + ' dentro</div>' : '') + '</li>';
+          (m.minutos != null ? '<div class="dur">' + duracion(m.minutos) + ' dentro</div>' : '') +
+          fotosMov(m) + '</li>';
       }).join('');
       $('per-salida').hidden = !(r.en_planta && ES_ADMIN);
     }).catch(function (e) {
@@ -1258,6 +1285,23 @@
       $('per-nombre').textContent = 'No se pudo consultar'; $('per-sub').textContent = (e && e.message) || '';
     });
   }
+  /* Fotos de la credencial (evidencia) de la entrada y de la salida; se agrandan al tocarlas */
+  function fotosMov(m) {
+    var f = [];
+    if (m.foto_entrada && m.id_entrada) f.push(['Entrada', m.id_entrada, 'ENTRADA ' + cuando(m.entrada) + ' · ' + nombrePunto(m.lugar)]);
+    if (m.foto_salida && m.id_salida) f.push(['Salida', m.id_salida, 'SALIDA ' + cuando(m.salida) + ' · ' + nombrePunto(m.lugar_salida)]);
+    return f.length ? '<div class="mov-fotos">' + f.map(function (x) {
+      return '<figure><img loading="lazy" alt="Foto de la credencial (' + x[0].toLowerCase() + ')" data-foto="' + x[1] + '" data-pie="' + esc(x[2]) + '" src="' +
+        esc(urlFoto(x[1], true)) + '" onerror="this.parentNode.remove()">' + x[0] + '</figure>';
+    }).join('') + '</div>' : '';
+  }
+  $('per-movs').addEventListener('click', function (ev) {
+    var t = ev.target.closest('img[data-foto]');
+    if (!t) return;
+    $('foto-grande').src = urlFoto(t.dataset.foto, false);
+    $('foto-pie').textContent = ($('per-id').textContent ? 'ID ' + $('per-id').textContent + ' · ' : '') + t.dataset.pie;
+    $('v-foto').hidden = false;
+  });
   $('per-salida').onclick = function () {
     var id = $('per-id').textContent, nom = $('per-nombre').textContent;
     if (!enLinea()) { toast('Para registrar la salida se necesita señal.', true); return; }
@@ -1420,7 +1464,7 @@
     guardar(CLAVE_LUGAR, p); guardar(CLAVE_PUNTO, p);
     $('sub-usuario').textContent = nombrePunto(p) + ' · ' + (ses.nombre || ses.usuario || '');
     $('ayuda-lugar').textContent = 'Tu punto de control (lo asigna Administración). ' +
-      (LECTOR ? 'Cada registro se guarda con el nombre y el ID de la credencial y la hora.' : 'Cada registro se guarda con la hora en que se toma la foto.');
+      (LECTOR ? 'Cada registro se guarda con el nombre, el ID y la foto de la credencial (evidencia) y la hora.' : 'Cada registro se guarda con la hora en que se toma la foto.');
   }
   function bloquear(msg) {
     bloqueado = !!msg;

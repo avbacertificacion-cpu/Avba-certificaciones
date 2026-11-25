@@ -772,13 +772,17 @@ class ControlAccesos {
             usort($regs, fn($a, $b) => [$a['capturado'], (int)$a['id']] <=> [$b['capturado'], (int)$b['id']]);
             $nombre = self::nombreMasLeido(array_column($regs, 'nombre'));
             $id = self::idMostrado(array_column($regs, 'codigo'));
-            $renglon = function (?array $e, ?array $s) use ($nombre, $id): array {
+            $conFoto = fn(?array $r): bool => $r !== null && (!empty($r['con_foto']) || (string)($r['foto'] ?? '') !== '');
+            $renglon = function (?array $e, ?array $s) use ($nombre, $id, $conFoto): array {
                 $min = ($e && $s) ? (int)round((strtotime($s['capturado']) - strtotime($e['capturado'])) / 60) : null;
                 return ['codigo' => $id, 'nombre' => $nombre,
                         'entrada' => $e ? (string)$e['capturado'] : '', 'salida' => $s ? (string)$s['capturado'] : '',
                         'minutos' => $min, 'lugar' => (string)($e['lugar'] ?? $s['lugar'] ?? ''),
                         'lugar_salida' => (string)($s['lugar'] ?? ''),
-                        'origen_salida' => (string)($s['origen'] ?? '')];
+                        'origen_salida' => (string)($s['origen'] ?? ''),
+                        // Foto de la credencial (evidencia) de cada lado
+                        'id_entrada' => $e ? (int)$e['id'] : null, 'foto_entrada' => $conFoto($e),
+                        'id_salida' => $s ? (int)$s['id'] : null, 'foto_salida' => $conFoto($s)];
             };
             $abierta = null;
             foreach ($regs as $r) {
@@ -817,7 +821,7 @@ class ControlAccesos {
         if (!self::conTarjeta($this->pdo)) return $base;
         $desde = date('Y-m-d H:i:s', $ahora - self::HORAS_EN_PLANTA * 3600);
         $st = $this->pdo->prepare(
-            "SELECT id, tipo, capturado, lugar, nombre, codigo, origen, usuario_nombre
+            "SELECT id, tipo, capturado, lugar, nombre, codigo, origen, usuario_nombre, (foto <> '') AS con_foto
                FROM accesos_registros
               WHERE codigo <> '' AND fecha >= ? AND capturado >= ?
               ORDER BY capturado, id"
@@ -838,6 +842,7 @@ class ControlAccesos {
                 'entrada' => (string)$ult['capturado'], 'lugar' => (string)$ult['lugar'],
                 'minutos' => $min, 'revisar' => $min > self::MINUTOS_REVISAR,
                 'caseta' => (string)$ult['usuario_nombre'], 'origen' => (string)$ult['origen'],
+                'registro' => (int)$ult['id'], 'con_foto' => (bool)$ult['con_foto'],
             ];
         }
         usort($out, fn($a, $b) => strcmp($b['entrada'], $a['entrada']));    // las entradas más recientes primero
@@ -856,7 +861,7 @@ class ControlAccesos {
         if (!self::conTarjeta($this->pdo)) return $base;
         $clave = self::claveId($raw);
         $st = $this->pdo->prepare(
-            "SELECT id, uid, tipo, capturado, lugar, nombre, codigo, origen, usuario_nombre
+            "SELECT id, uid, tipo, capturado, lugar, nombre, codigo, origen, usuario_nombre, (foto <> '') AS con_foto
                FROM accesos_registros
               WHERE fecha >= ? AND codigo <> '' AND (codigo = ? OR TRIM(LEADING '0' FROM codigo) = ?)
               ORDER BY capturado, id"
@@ -1026,7 +1031,11 @@ class ControlAccesos {
                 $lbl = '<b style="color:' . $color . '">' . $etiqueta . ' ' . str_pad((string)$f['num'], 3, '0', STR_PAD_LEFT) . '</b>'
                      . ' &nbsp;·&nbsp; ' . substr((string)$f['capturado'], 8, 2) . '/' . substr((string)$f['capturado'], 5, 2) . ' ' . substr((string)$f['capturado'], 11, 8)
                      . ($conLugar ? ' &nbsp;·&nbsp; ' . self::h($f['lugar']) : '');
-                $h .= '<td width="50%" style="padding:0 2mm;vertical-align:top;font-size:10pt">' . $lbl
+                $cred = (string)($f['codigo'] ?? '') !== ''
+                      ? '<br><span style="font-size:9.5pt"><b>ID ' . self::h($f['codigo']) . '</b>'
+                        . ((string)($f['nombre'] ?? '') !== '' ? ' &nbsp;·&nbsp; ' . self::h($f['nombre']) : '') . '</span>'
+                      : '';
+                $h .= '<td width="50%" style="padding:0 2mm;vertical-align:top;font-size:10pt">' . $lbl . $cred
                     . ($f['nota'] !== '' ? '<br><span style="font-size:8.5pt;color:#5a6072">' . self::h($f['nota']) . '</span>' : '') . '</td>';
             }
             // El alto del renglón es el de su foto más alta: las credenciales

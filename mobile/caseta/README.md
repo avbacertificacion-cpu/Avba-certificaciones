@@ -36,6 +36,13 @@ App AVBA Caseta ──abre──▶ gestion.avba.com.mx/accesos.html (cuenta de 
 - La imagen de la tarjeta **no sale del teléfono**: al servidor sólo llegan el
   nombre y el código (`api/ControlAccesos.php`, columnas `nombre`, `codigo` y
   `origen` = tarjeta | manual).
+- **Foto de la credencial como evidencia:** cada lectura guarda también la foto de
+  la credencial. Sale de la misma imagen de la cámara en la que se leyó el ID (de
+  preferencia una en la que también se leyó el nombre), así que no hace falta otra
+  foto ni más tiempo; si el ID se escribe a mano, va la imagen más reciente. Se
+  envía con el registro (sin señal queda en el teléfono con él) y en el servidor
+  se ve en la lista del turno, en las entradas y salidas de cada persona y en el
+  PDF con fotos (con el ID y el nombre). `foto: false` en las reglas la apaga.
 - **El ID es la llave de cada persona:** el número del recuadro azul de la
   credencial es único por persona. Se compara sin los ceros de la izquierda
   («00287» leído = «287» escrito a mano).
