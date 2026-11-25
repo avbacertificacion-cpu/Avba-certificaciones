@@ -43,14 +43,26 @@ App AVBA Caseta ──abre──▶ gestion.avba.com.mx/accesos.html (cuenta de 
 
 ## El lector
 
-- Descarta otros números de la tarjeta (teléfono, NSS, CURP, código postal,
-  fechas, año de vigencia) y corrige confusiones típicas (O→0, I→1, S→5, B→8).
-- El nombre puede venir en uno o en dos renglones; descarta la empresa, el
-  puesto y los letreros («QUANTUM», «ENERGY», «SUPERVISOR», «VIGENCIA»…).
+Está ajustado a la **credencial de acceso** (de pie): `ID:` en el recuadro azul,
+`NOMBRE:` (en uno o dos renglones), `EMPRESA:`, `CARGO:`, `NSS:`, `TIPO DE SANGRE:`,
+`ALERGIAS:` y abajo «CREDENCIAL DE ACCESO».
+
+- El código es el número del `ID:`. Descarta los demás números (NSS de 11 dígitos,
+  teléfono, CURP, código postal, fechas, año de vigencia) aunque el reconocimiento
+  lea la etiqueta y el dato por separado, y corrige confusiones típicas
+  (O→0, I→1, S→5, B→8; «ID:0O287» → 00287).
+- El nombre es lo que sigue a `NOMBRE:`; si continúa en el renglón de abajo
+  (alineado y sin otra etiqueta) se junta. Lo que va junto a `EMPRESA:`, `CARGO:`,
+  etc. nunca se toma como nombre; tampoco los letreros, oficios ni la marca de la
+  cámara impresa en la foto. Un número dentro de una palabra del nombre se lee
+  como letra («C0RONA» → CORONA).
+- Entre varias imágenes gana el nombre más leído; una lectura parcial (sólo el
+  primer renglón) cuenta a favor del nombre completo.
 - El código se da por bueno cuando sale igual en 3 de las últimas 6 imágenes;
   si el nombre tarda, espera hasta 1.5 s por él.
-- Recuadro del tamaño de la tarjeta, lo que va leyendo en vivo, tocar para
-  enfocar, linterna y **Escribir código** si no se lee.
+- Recuadro del tamaño de la credencial (de pie; `orientacion: "horizontal"` en
+  las reglas lo acuesta), lo que va leyendo en vivo, tocar para enfocar, linterna
+  y **Escribir código** si no se lee.
 
 ### Ajustar la lectura sin reinstalar la app
 
@@ -58,8 +70,8 @@ App AVBA Caseta ──abre──▶ gestion.avba.com.mx/accesos.html (cuenta de 
 `demo/tarjeta-reglas.json`: número de dígitos del código (`longitud`), un patrón
 propio (`patron`, expresión regular de Java; el código es su primer grupo),
 palabras que van junto al código (`claves`), palabras que no son parte de un
-nombre (`noNombre`), renglones cuyo número no es el código (`noCodigo`) y cuántas
-lecturas iguales se piden (`confirmar`).
+nombre (`noNombre`), renglones cuyo número no es el código (`noCodigo`), cuántas
+lecturas iguales se piden (`confirmar`) y la forma del recuadro (`orientacion`).
 
 Pruebas del analizador:
 `android/app/src/test/java/mx/com/avba/caseta/AnalizadorTarjetaTest.java` (corren

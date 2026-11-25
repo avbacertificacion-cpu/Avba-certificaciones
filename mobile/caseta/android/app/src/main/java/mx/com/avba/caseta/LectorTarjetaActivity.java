@@ -78,7 +78,8 @@ public class LectorTarjetaActivity extends AppCompatActivity {
 
     public static final String EXTRA_TITULO = "titulo", EXTRA_SUBTITULO = "subtitulo", EXTRA_SIMULAR = "simular",
             EXTRA_MIN = "minDigitos", EXTRA_MAX = "maxDigitos", EXTRA_LONGITUD = "longitud", EXTRA_PATRON = "patron",
-            EXTRA_CLAVES = "claves", EXTRA_NO_NOMBRE = "noNombre", EXTRA_NO_CODIGO = "noCodigo", EXTRA_CONFIRMAR = "confirmar";
+            EXTRA_CLAVES = "claves", EXTRA_NO_NOMBRE = "noNombre", EXTRA_NO_CODIGO = "noCodigo", EXTRA_CONFIRMAR = "confirmar",
+            EXTRA_VERTICAL = "vertical";
 
     private static final int VERDE = Color.rgb(76, 175, 80), AMARILLO = Color.rgb(255, 202, 40), BLANCO = Color.WHITE;
 
@@ -144,6 +145,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         raiz.addView(vista, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
         marco = new Marco(this);
+        marco.vertical = getIntent().getBooleanExtra(EXTRA_VERTICAL, true);     // la credencial de acceso va de pie
         raiz.addView(marco, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
         marco.setOnTouchListener((v, ev) -> {                       // tocar para enfocar
             if (ev.getAction() == MotionEvent.ACTION_UP && camara != null) {
@@ -378,11 +380,12 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         if (hilo != null) hilo.shutdown();
     }
 
-    /** Sombra alrededor de un recuadro del tamaño de una tarjeta (85.6 × 54 mm). */
+    /** Sombra alrededor de un recuadro del tamaño de una tarjeta (85.6 × 54 mm), de pie o acostada. */
     static final class Marco extends View {
         private final Paint sombra = new Paint(), borde = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF hueco = new RectF();
         private int arriba = 0, abajo = 0;
+        boolean vertical = true;
         Marco(android.content.Context c) {
             super(c);
             sombra.setColor(Color.argb(120, 0, 0, 0));
@@ -395,9 +398,15 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         @Override protected void onDraw(@NonNull Canvas c) {
             int w = getWidth(), h = getHeight();
             if (w == 0 || h == 0) return;
-            float ancho = w * 0.88f, alto = ancho / 1.586f;
-            float libreArriba = arriba, libreAbajo = h - abajo;
-            float centro = libreAbajo > libreArriba + alto ? (libreArriba + libreAbajo) / 2f : h / 2f;
+            float libreArriba = arriba, libreAbajo = h - abajo, libre = libreAbajo - libreArriba;
+            float ancho, alto;
+            if (vertical) {                    // credencial de pie: llena el espacio entre los textos y los botones
+                alto = Math.min(w * 0.64f * 1.586f, libre > 0 ? libre * 0.94f : h * 0.6f);   // ~11 cm: enfoca bien
+                ancho = alto / 1.586f;
+            } else {
+                ancho = w * 0.88f; alto = ancho / 1.586f;
+            }
+            float centro = libre > alto ? (libreArriba + libreAbajo) / 2f : h / 2f;
             hueco.set((w - ancho) / 2f, centro - alto / 2f, (w + ancho) / 2f, centro + alto / 2f);
             c.drawRect(0, 0, w, hueco.top, sombra);
             c.drawRect(0, hueco.bottom, w, h, sombra);

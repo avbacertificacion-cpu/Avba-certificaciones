@@ -75,7 +75,8 @@ public class LectorTarjetaPlugin extends Plugin {
     private void abrirLector(PluginCall call) {
         Intent i = new Intent(getContext(), LectorTarjetaActivity.class);
         i.putExtra(LectorTarjetaActivity.EXTRA_TITULO, call.getString("titulo", "Leer la tarjeta"));
-        i.putExtra(LectorTarjetaActivity.EXTRA_SUBTITULO, call.getString("subtitulo", "Acomoda la tarjeta dentro del recuadro. Se lee en este teléfono, sin internet."));
+        i.putExtra(LectorTarjetaActivity.EXTRA_SUBTITULO, call.getString("subtitulo", "Acomoda la credencial dentro del recuadro. Se lee en este teléfono, sin internet."));
+        i.putExtra(LectorTarjetaActivity.EXTRA_VERTICAL, !"horizontal".equalsIgnoreCase(call.getString("orientacion", "vertical")));
         i.putExtra(LectorTarjetaActivity.EXTRA_SIMULAR, Boolean.TRUE.equals(call.getBoolean("simular", false)));
         i.putExtra(LectorTarjetaActivity.EXTRA_MIN, entero(call, "minDigitos", 4));
         i.putExtra(LectorTarjetaActivity.EXTRA_MAX, entero(call, "maxDigitos", 12));

@@ -368,10 +368,10 @@
      internet (la imagen no sale del equipo) y el registro queda guardado al
      instante, sin foto. En el navegador sigue la foto de la identificación. */
   var LECTOR = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LectorTarjeta) || null;
-  var REGLAS_TARJETA = { minDigitos: 4, maxDigitos: 12, longitud: 0, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3 };
+  var REGLAS_TARJETA = { minDigitos: 4, maxDigitos: 12, longitud: 0, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3, orientacion: 'vertical' };
   function mezclarReglas(g) {
     if (!g || typeof g !== 'object') return;
-    ['minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
+    ['minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar', 'orientacion'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
   }
   /* Equipo: cada punto de control trabaja en uno solo. Identificador propio de
      este teléfono o navegador (no cambia al cerrar sesión); el servidor liga
@@ -696,7 +696,7 @@
     var o = {};
     for (var k in REGLAS_TARJETA) o[k] = REGLAS_TARJETA[k];
     o.titulo = (tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + ' · ' + normaLugar($('lugar').value);
-    o.subtitulo = 'Acomoda la tarjeta dentro del recuadro. Se lee en este teléfono, sin internet.';
+    o.subtitulo = 'Acomoda la credencial dentro del recuadro, sin reflejos. Se lee en este teléfono, sin internet.';
     o.simular = false;
     LECTOR.leer(o).then(function (r) {
       leyendoTarjeta = false;

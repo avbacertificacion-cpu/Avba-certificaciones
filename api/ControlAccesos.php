@@ -722,7 +722,9 @@ class ControlAccesos {
             if (($f['codigo'] ?? '') === '') continue;
             $porCodigo[$f['codigo']][] = $f;
         }
-        // El nombre de cada código: el que más veces se leyó (una mala lectura no lo cambia)
+        // El nombre de cada código: el que más veces se leyó (una mala lectura no lo cambia). Una lectura
+        // parcial («JUAN CARLOS», sin el segundo renglón) cuenta a favor del nombre completo que empieza
+        // igual («JUAN CARLOS PEREZ LOPEZ»); en empate gana el más completo y luego el primero leído.
         $nombreDe = [];
         foreach ($porCodigo as $cod => $regs) {
             $cuenta = [];
@@ -732,7 +734,11 @@ class ControlAccesos {
                 foreach ($regs as $i => $r) { $n = trim((string)$r['nombre']); if ($n !== '' && !isset($primero[$n])) $primero[$n] = $i; }
                 $mejor = ''; $veces = 0; $orden = PHP_INT_MAX;
                 foreach ($cuenta as $n => $c) {
-                    if ($c > $veces || ($c === $veces && $primero[$n] < $orden)) { $mejor = (string)$n; $veces = $c; $orden = $primero[$n]; }
+                    $n = (string)$n;
+                    foreach ($cuenta as $m => $cm) if (str_starts_with($n, (string)$m . ' ')) $c += $cm;
+                    $mejorQue = $c > $veces
+                        || ($c === $veces && (strlen($n) > strlen($mejor) || (strlen($n) === strlen($mejor) && $primero[$n] < $orden)));
+                    if ($mejorQue) { $mejor = $n; $veces = $c; $orden = $primero[$n]; }
                 }
                 $nombreDe[$cod] = $mejor;
             }
