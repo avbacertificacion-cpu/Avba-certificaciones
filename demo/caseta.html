@@ -50,11 +50,16 @@
   .barra .reloj{text-align:right;font-size:11px;color:rgba(255,255,255,.8);line-height:1.25}
   .barra .reloj b{display:block;font-size:15px;color:#fff}
   .barra .mas{width:40px;height:40px;border-radius:10px;border:0;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
-  .menu-pop{position:absolute;right:12px;top:calc(58px + env(safe-area-inset-top));background:#fff;color:var(--texto);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.2);
+  .menu-pop{position:fixed;right:12px;top:calc(58px + env(safe-area-inset-top));max-height:calc(100vh - 80px);overflow:auto;background:#fff;color:var(--texto);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.2);
     padding:6px;min-width:230px;z-index:30}
   .menu-pop a,.menu-pop button{display:block;width:100%;text-align:left;border:0;background:none;padding:11px 12px;border-radius:8px;font-size:14px;color:var(--texto);text-decoration:none;cursor:pointer}
   .menu-pop a:hover,.menu-pop button:hover{background:var(--fondo)}
+  .menu-pop .menu-sep{font-size:11px;font-weight:800;color:var(--texto-hint);text-transform:uppercase;letter-spacing:.4px;padding:10px 12px 4px;border-top:1px solid var(--borde);margin-top:4px}
+  .menu-pop #menu-casos button{padding:8px 12px;font-size:13.5px}
+  .menu-pop #menu-casos button[aria-current=true]{font-weight:800;color:var(--azul-dark);background:var(--azul-light)}
   .cinta{background:#FFF3D6;color:#7a4f00;font-size:12px;padding:6px 14px;text-align:center;border-bottom:1px solid #f2dfb0}
+  .sala-chip{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:800;border-radius:999px;padding:1px 8px;background:rgba(255,255,255,.16)}
+  .sala-chip.ok{background:#2F6B1E;color:#fff} .sala-chip.mal{background:#A32D2D;color:#fff}
 
   main{max-width:560px;margin:0 auto;padding:12px 12px calc(30px + env(safe-area-inset-bottom))}
   .cont{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
@@ -214,17 +219,20 @@
 
 <header class="barra">
   <img src="../assets/logos/avba.png" alt="AVBA">
-  <div><h1>Caseta 1</h1><div class="sub">Quantum Energy · Guardia</div></div>
+  <div><h1>Caseta 1</h1><div class="sub">Quantum Energy · Guardia<span id="sala-chip" hidden></span></div></div>
   <div class="der">
     <div class="reloj" id="reloj"></div>
     <button class="mas" type="button" id="btn-menu" aria-label="Más opciones"><svg class="i"><use href="#i-puntos"/></svg></button>
   </div>
 </header>
 <div class="menu-pop" id="menu-pop" hidden>
-  <a href="control-accesos.html" target="_blank" rel="noopener">Abrir el panel del administrador (demo)</a>
+  <a href="index.html">Portada de la demo</a>
+  <a href="control-accesos.html" target="_blank" rel="noopener">Abrir el panel del administrador</a>
   <button type="button" id="btn-reiniciar">Reiniciar la demo</button>
+  <div class="menu-sep">Siguiente ENTRADA (para la demo)</div>
+  <div id="menu-casos"></div>
 </div>
-<div class="cinta"><b>BETA · DEMO</b> con datos ficticios. Lo que registres aparece en el panel del administrador abierto en otra pestaña.</div>
+<div class="cinta" id="cinta"><b>DEMO</b> con datos ficticios. Lo que registres aparece en el panel del administrador abierto en otra pestaña.</div>
 
 <main>
   <div class="cont">
@@ -286,6 +294,8 @@
   function num(n) { return Number(n || 0).toLocaleString('es-MX'); }
   function fecha(d) { return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }); }
   function dur(ms) { var m = Math.max(0, Math.round(ms / MIN)), h = Math.floor(m / 60); return h + ' h ' + dos(m % 60) + ' min'; }
+  var MARCAS = new RegExp('[' + String.fromCharCode(0x300) + '-' + String.fromCharCode(0x36f) + ']', 'g');
+  function sinAcentos(t) { return String(t || '').normalize('NFD').replace(MARCAS, '').toLowerCase(); }
   function iniciales(n) { var p = n.split(' '); return (p[0][0] + (p[1] ? p[1][0] : '')).toUpperCase(); }
   var tToast;
   function toast(t, err) { var el = $('toast'); el.textContent = t; el.className = 'toast' + (err ? ' err' : ''); el.hidden = false; clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 3200); }
@@ -331,10 +341,23 @@
 
   /* ── Escanear ── */
   var GUION = ['ok', 'disp', 'cel', 'veto', 'herr', 'doc', 'semana', 'alcohol'], gi = 0, leyendo = false;
+  var NOMBRE_CASO = { ok: 'Todo en orden', disp: 'Con tableta o computadora', cel: 'Celular sin permiso', veto: 'Persona vetada', herr: 'Con herramienta', doc: 'Documento vencido', semana: 'Exceso de horas', alcohol: 'Alcoholímetro' };
+  function pintarCasos() {
+    $('menu-casos').innerHTML = GUION.map(function (c, i) {
+      return '<button type="button" data-caso="' + i + '"' + (i === gi % GUION.length ? ' aria-current="true"' : '') + '>' + (i + 1) + '. ' + NOMBRE_CASO[c] + '</button>';
+    }).join('');
+  }
+  $('menu-casos').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-caso]'); if (!b) return;
+    gi = +b.dataset.caso; pintarCasos(); $('menu-pop').hidden = true;
+    toast('La siguiente ENTRADA será: ' + NOMBRE_CASO[GUION[gi]].toLowerCase() + '.');
+  });
   function elegirSalida() {
+    var ult = D.MOVS.filter(function (m) { return m.tipo === 'e' && !/Negado/.test(m.res) && D.stats(m.p).dentro && D.valesAbiertos(m.p).some(function (v) { return v.tipo === 'herr'; }); })[0];
+    if (ult) return ult.p;
     var dentro = PERSONAS.filter(function (x) { return D.stats(x).dentro; });
     var conVale = dentro.filter(function (x) { return D.valesAbiertos(x).some(function (v) { return v.tipo === 'herr' || v.tipo === 'equipo'; }); });
-    var pool = Math.random() < 0.5 && conVale.length ? conVale : dentro;
+    var pool = conVale.length ? conVale : dentro;
     return pool[Math.floor(Math.random() * pool.length)];
   }
   function escanear(modo, p, caso) {
@@ -358,14 +381,15 @@
   var ACT = null;
   function abrir(modo, p, caso) {
     D.tick();
-    ACT = { modo: modo, p: p, caso: caso || '', t: ahora(), autorizado: false, esperando: false, alc: null, r: modo === 'entrada' ? D.revisar(p, caso ? 'g-' + caso : 'guardia') : null };
+    ACT = { modo: modo, p: p, caso: caso || '', t: ahora(), autorizado: false, negado: false, esperando: false, sol: null, alc: null, firma: firma(p),
+            r: modo === 'entrada' ? D.revisar(p, caso ? 'g-' + caso : 'guardia') : null };
     vib(modo === 'entrada' && ACT.r.res === 'nopasa' ? [80, 60, 80] : 30);
     pintarHoja();
     $('hoja').hidden = false; $('hoja').scrollTop = 0; document.body.classList.add('con-hoja');
   }
   function cerrarHoja() { $('hoja').hidden = true; document.body.classList.remove('con-hoja'); ACT = null; pintar(); }
   function resActual() {
-    if (ACT.alc === 'pos') return 'nopasa';
+    if (ACT.alc === 'pos' || ACT.negado) return 'nopasa';
     var r = ACT.r.res;
     if (r === 'prueba' && ACT.alc === 'neg') r = ACT.r.base;
     if (r === 'esp' && ACT.autorizado) r = 'pasa';
@@ -402,7 +426,7 @@
       obs: ['ok', 'ok', 'INGRESO CORRECTO', 'Puede pasar · tiene un pendiente'],
       prueba: ['prueba', 'copa', 'PRUEBA DE ALCOHOLÍMETRO', 'Le tocó al azar: haz la prueba antes de dejarlo pasar'],
       esp: ['esp', 'reloj', ACT.esperando ? 'ESPERANDO AUTORIZACIÓN' : 'ESPERA', ACT.esperando ? 'Se avisó al administrador de accesos' : 'Necesita autorización del administrador'],
-      nopasa: ['no', 'veto', 'NO PASA', ACT.alc === 'pos' ? 'Alcoholímetro positivo · se avisó al administrador' : ((r.motivos || [])[0] || 'No está autorizado para entrar')]
+      nopasa: ['no', 'veto', 'NO PASA', ACT.alc === 'pos' ? 'Alcoholímetro positivo · se avisó al administrador' : (ACT.negado ? 'El administrador de accesos negó la entrada' : ((r.motivos || [])[0] || 'No está autorizado para entrar'))]
     }[res];
     var hb = '<div class="banner ' + B[0] + '">' + ico(B[1]) + '<b id="res-tit">' + B[2] + '</b><span>' + esc(B[3]) + '</span></div><div class="cuerpo">';
     hb += cabeceraPersona(p);
@@ -437,7 +461,9 @@
     hb += '</div><div class="pie"><div class="in">';
     if (res === 'pasa' || res === 'obs') hb += '<button class="btn sec" type="button" data-acc="cancelar">Cancelar</button><button class="btn verde" type="button" data-acc="entrada">' + ico('entrada') + 'Registrar entrada</button>';
     else if (res === 'prueba') hb += '<button class="btn verde" type="button" data-acc="alc-neg">' + ico('ok') + 'Negativo</button><button class="btn rojo" type="button" data-acc="alc-pos">' + ico('x') + 'Positivo</button>';
-    else if (res === 'esp') hb += ACT.esperando ? '<button class="btn ambar" type="button" disabled><span class="spin"></span>Esperando al administrador…</button>'
+    else if (res === 'esp') hb += ACT.esperando
+      ? '<button class="btn ambar" type="button" disabled><span class="spin"></span>Esperando al administrador…</button>' +
+        (ACT.sinRespuesta ? '<button class="btn sec" type="button" data-acc="simular" style="flex:1 1 100%">¿Nadie con el panel abierto? Simular que autoriza</button>' : '')
       : '<button class="btn sec" type="button" data-acc="negar">No pasa</button><button class="btn ambar" type="button" data-acc="pedir">' + ico('reloj') + 'Pedir autorización</button>';
     else hb += '<button class="btn rojo" type="button" data-acc="intento">' + ico('ok') + 'Entendido (registrar intento)</button>';
     hb += '</div></div>';
@@ -467,7 +493,7 @@
       hb += '<h3>Debe salir con (' + v.folio + ')</h3><div class="lista-ck">' + v.items.map(function (x, i) { return '<label><input type="checkbox" data-sale="' + v.folio + '|' + i + '" checked> ' + esc(x) + '</label>'; }).join('') +
         '<small>Desmarca lo que no presente: queda como faltante y se avisa al administrador.</small></div>';
     });
-    equipo.forEach(function (v) { hb += '<h3>Debe devolver (' + v.folio + ')</h3><div class="lista-ck"><label><input type="checkbox" data-devuelto="1" checked> ' + esc(v.items.join(', ')) + '</label></div>'; });
+    equipo.forEach(function (v) { hb += '<h3>Debe devolver (' + v.folio + ')</h3><div class="lista-ck"><label><input type="checkbox" data-devuelto="' + v.folio + '" checked> ' + esc(v.items.join(', ')) + '</label></div>'; });
     hb += '</div><div class="pie"><div class="in"><button class="btn sec" type="button" data-acc="cancelar">Cancelar</button><button class="btn rojo" type="button" data-acc="salida">' + ico('salida') + 'Registrar salida</button></div></div>';
     return hb;
   }
@@ -484,48 +510,49 @@
     var p = ACT.p, t = ahora();
     if (a === 'cancelar') { cerrarHoja(); return; }
     if (a === 'entrada') {
-      var trae = [].filter.call($('hoja').querySelectorAll('[data-herr]'), function (c) { return c.checked; }).length;
+      var lleva = [].filter.call($('hoja').querySelectorAll('[data-herr]'), function (c) { return c.checked; }).map(function (c) { return p.herr[+c.dataset.herr]; });
       var res = resActual();
-      D.registrar({ k: 'ent', pid: p.id, t: +t, caseta: CASETA, herr: !!(p.aut.herr && D.REGLAS.herr && trae), quien: GUARDIA,
+      D.registrar({ k: 'ent', pid: p.id, t: +t, caseta: CASETA, herr: !!(p.aut.herr && D.REGLAS.herr && lleva.length), items: lleva, quien: GUARDIA,
         res: ACT.autorizado ? 'Con autorización' : (res === 'obs' ? 'Con indicaciones' : 'Permitido'),
         obs: ACT.alc === 'neg' ? 'Alcoholímetro negativo' : '' });
       cerrarHoja(); hecho('#2F6B1E', 'ok', 'ENTRADA REGISTRADA', p.nombre + ' · ' + hhmm(t));
       return;
     }
     if (a === 'salida') {
-      var falta = [], equipoNo = false;
+      var falta = [], nombres = [], noDev = [];
       $('hoja').querySelectorAll('[data-sale]').forEach(function (c) {
         if (c.checked) return;
         var x = c.dataset.sale.split('|'), v = D.VALES.filter(function (y) { return y.folio === x[0]; })[0];
-        if (v) falta.push(v.items[+x[1]]);
+        if (v) { falta.push(v.folio + ': ' + v.items[+x[1]]); nombres.push(v.items[+x[1]]); }
       });
-      var dv = $('hoja').querySelector('[data-devuelto]'); if (dv && !dv.checked) equipoNo = true;
+      $('hoja').querySelectorAll('[data-devuelto]').forEach(function (c) { if (!c.checked) noDev.push(c.dataset.devuelto); });
       var desde = D.stats(p).desde;
-      D.registrar({ k: 'sal', pid: p.id, t: +t, caseta: CASETA, falta: falta, equipoNo: equipoNo, quien: GUARDIA });
+      D.registrar({ k: 'sal', pid: p.id, t: +t, caseta: CASETA, falta: falta, noDevuelto: noDev, quien: GUARDIA });
       cerrarHoja();
-      if (falta.length || equipoNo) hecho('#8A5A00', 'alerta', 'SALIDA CON FALTANTE', (falta.length ? 'No presentó: ' + falta.join(', ') : 'No devolvió el equipo') + '. Se avisó al administrador.');
+      if (falta.length || noDev.length) hecho('#8A5A00', 'alerta', 'SALIDA CON FALTANTE', (nombres.length ? 'No presentó: ' + nombres.join(', ') : 'No devolvió el equipo prestado') + '. Se avisó al administrador.');
       else hecho('#A32D2D', 'salida', 'SALIDA REGISTRADA', p.nombre + ' · ' + dur(t - desde) + ' dentro');
       return;
     }
     if (a === 'alc-neg') { ACT.alc = 'neg'; pintarHoja(); return; }
     if (a === 'alc-pos') {
       ACT.alc = 'pos';
+      D.registrar({ k: 'int', pid: p.id, t: +t, caseta: CASETA, motivo: 'Alcoholímetro positivo', quien: GUARDIA });
+      ACT.intentoHecho = true;
       D.registrar({ k: 'inc', pid: p.id, tipo: 'ALC', accion: 'Veto 30 días', desc: 'Alcoholímetro en caseta: 0.41 g/L.', por: GUARDIA });
       pintarHoja(); return;
     }
     if (a === 'pedir') {
-      ACT.esperando = true; pintarHoja();
-      // En la demo, el administrador «responde» solo a los pocos segundos
-      setTimeout(function () {
-        if (!ACT || ACT.p !== p) return;
-        ACT.esperando = false; ACT.autorizado = true; pintarHoja(); vib(60);
-        toast('El administrador de accesos autorizó la entrada (en la demo se autoriza sola).');
-      }, 2800);
+      var op = { k: 'sol', pid: p.id, caseta: CASETA, quien: GUARDIA, motivo: (ACT.r.motivos || []).filter(function (m) { return /seguido|horas/.test(m); }).join(' · ') || 'Requiere autorización' };
+      D.registrar(op);
+      ACT.sol = op.u; ACT.esperando = true; ACT.sinRespuesta = false; pintarHoja();
+      // Si nadie responde (no hay panel abierto), se ofrece simular la respuesta
+      setTimeout(function () { if (ACT && ACT.sol === op.u && ACT.esperando) { ACT.sinRespuesta = true; pintarHoja(); } }, 12000);
       return;
     }
+    if (a === 'simular') { if (ACT.sol) D.registrar({ k: 'resp', sol: ACT.sol, ok: true, quien: 'Simulación' }); revisarSolicitud(); return; }
     if (a === 'negar' || a === 'intento') {
-      var motivo = ACT.alc === 'pos' ? 'Alcoholímetro positivo' : (a === 'negar' ? 'Sin autorización de jornada' : ((ACT.r.motivos || [])[0] || 'Acceso negado'));
-      D.registrar({ k: 'int', pid: p.id, t: +t, caseta: CASETA, motivo: motivo, quien: GUARDIA });
+      var motivo = ACT.alc === 'pos' ? 'Alcoholímetro positivo' : (ACT.negado ? 'El administrador negó la entrada' : (a === 'negar' ? 'Sin autorización de jornada' : ((ACT.r.motivos || [])[0] || 'Acceso negado')));
+      if (!ACT.intentoHecho) D.registrar({ k: 'int', pid: p.id, t: +t, caseta: CASETA, motivo: motivo, quien: GUARDIA });
       cerrarHoja(); hecho('#A32D2D', 'veto', 'NO PASA', 'Intento registrado · el administrador ya lo sabe');
     }
   }
@@ -534,8 +561,8 @@
   $('btn-buscar').onclick = function () { $('buscar').hidden = false; $('q').value = ''; buscar(); setTimeout(function () { $('q').focus(); }, 50); };
   $('cerrar-buscar').onclick = function () { $('buscar').hidden = true; };
   function buscar() {
-    var q = $('q').value.trim().toLowerCase();
-    var l = !q ? [] : PERSONAS.filter(function (p) { return (p.nombre + ' ' + p.idNum).toLowerCase().indexOf(q) >= 0; }).slice(0, 10);
+    var q = sinAcentos($('q').value.trim());
+    var l = !q ? [] : PERSONAS.filter(function (p) { return sinAcentos(p.nombre + ' ' + p.idNum).indexOf(q) >= 0; }).slice(0, 10);
     $('res-b').innerHTML = l.map(function (p) {
       var s = D.stats(p);
       var chip = D.vetoVigente(p) ? '<span class="chip no">Vetado</span>' : (s.dentro ? '<span class="chip ok">Dentro</span>' : '<span class="chip av" style="background:#edf0f5;color:#4a5568">Fuera</span>');
@@ -550,14 +577,39 @@
   };
 
   /* ── Menú ── */
-  $('btn-menu').onclick = function (ev) { ev.stopPropagation(); $('menu-pop').hidden = !$('menu-pop').hidden; };
+  $('btn-menu').onclick = function (ev) { ev.stopPropagation(); pintarCasos(); $('menu-pop').hidden = !$('menu-pop').hidden; };
   document.addEventListener('click', function (ev) { if (!ev.target.closest('#menu-pop')) $('menu-pop').hidden = true; });
-  $('btn-reiniciar').onclick = function () { if (confirm('¿Reiniciar la demo? Se borra lo registrado en este navegador.')) D.reiniciar(); };
+  $('btn-reiniciar').onclick = function () { if (confirm(D.sala ? '¿Reiniciar la demo? Se borra lo registrado en la sala ' + D.sala + ' y todos los equipos conectados vuelven al inicio.' : '¿Reiniciar la demo? Se borra lo registrado en este navegador.')) D.reiniciar(); };
+  /* Sala compartida con el panel (otro dispositivo) */
+  function pintarSala(estado) {
+    if (!D.sala) return;
+    var t = { conectado: 'en línea', conectando: 'conectando…', 'sin-conexion': 'sin conexión' }[estado] || estado;
+    $('sala-chip').hidden = false;
+    $('sala-chip').className = 'sala-chip ' + (estado === 'conectado' ? 'ok' : (estado === 'sin-conexion' ? 'mal' : ''));
+    $('sala-chip').textContent = 'Sala ' + D.sala + ' · ' + t;
+    $('cinta').innerHTML = '<b>DEMO</b> con datos ficticios. Conectada a la sala <b>' + D.sala + '</b>: lo que registres aparece en el panel del administrador' +
+      (estado === 'sin-conexion' ? ' en cuanto vuelva la conexión (se guarda en este celular).' : '.');
+  }
+  if (D.sala) { pintarSala(D.estadoSala()); D.alCambiarSala(pintarSala); }
+  D.alError(function () { toast('Un registro no se pudo compartir con la sala.', true); });
 
   /* Cambios desde el panel (otra pestaña): permisos, vetos, vales */
+  function firma(p) { return JSON.stringify(p.aut) + p.estado; }
+  function revisarSolicitud() {
+    if (!ACT || !ACT.sol) return false;
+    var s = D.SOLICITUDES.filter(function (x) { return x.u === ACT.sol; })[0];
+    if (!s || s.estado === 'pendiente' || !ACT.esperando) return false;
+    ACT.esperando = false; ACT.sinRespuesta = false;
+    if (s.estado === 'autorizada') { ACT.autorizado = true; toast('El administrador de accesos autorizó la entrada.'); }
+    else { ACT.negado = true; toast('El administrador de accesos negó la entrada.', true); }
+    vib([60, 40, 60]); pintarHoja();
+    return true;
+  }
   D.alCambiar(function () {
     pintar();
-    if (ACT && !$('hoja').hidden) {
+    if (revisarSolicitud()) return;
+    if (ACT && !$('hoja').hidden && firma(ACT.p) !== ACT.firma) {
+      ACT.firma = firma(ACT.p);
       if (ACT.modo === 'entrada') {
         // Se vuelve a revisar con los datos nuevos, sin volver a sortear el alcoholímetro
         var viejo = ACT.r.res, nuevo = D.revisar(ACT.p, ACT.caso ? 'g-' + ACT.caso : 'guardia');
@@ -566,7 +618,7 @@
         ACT.r = nuevo;
       }
       pintarHoja();
-      toast('El administrador actualizó los datos de esta persona.');
+      toast('El administrador actualizó los permisos de esta persona.');
     }
   });
 

@@ -6,16 +6,25 @@
      · demo/caseta.html           pantalla del guardia en campo
 
    Las personas, empresas, incidencias y vales se generan en el navegador con
-   una semilla del día (las dos pantallas ven los mismos). Lo que se registra
-   en la demo (entradas, salidas, vetos, permisos) se guarda sólo en este
-   navegador (localStorage) y se comparte entre las dos pantallas abiertas en
-   pestañas: el guardia registra una entrada y el panel la muestra al instante.
-   Nada se envía al servidor.
+   una semilla del día: cualquier dispositivo, a cualquier hora, genera los
+   mismos. Cada turno trae su hora planeada de entrada y salida, y quién está
+   dentro se calcula con la hora actual, así que la demo se mueve sola.
+   Lo que se registra en la demo (entradas, salidas, vetos, permisos,
+   solicitudes de autorización) se comparte:
+     · sin sala, entre las pestañas de este navegador (localStorage);
+     · con sala (?sala=CODIGO, desde demo/index.html), entre dispositivos,
+       a través de demo/sala.php.
+   Todo es ficticio; nada toca la base del sistema.
    ══════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
   var MIN = 60000, HORA = 3600000, DIA = 86400000;
   function ahora() { return new Date(); }
+  /* «Ahora» de la vista: si llegó una operación de un equipo con el reloj unos
+     segundos adelantado, se toma su hora para que se vea de inmediato (máx. 5 min). */
+  var ultimaOp = 0;
+  function ahoraVista() { return new Date(Math.max(Date.now(), ultimaOp)); }
+  function notarHora(op) { var t = +op.t || 0; if (t > ultimaOp && t - Date.now() < 5 * 60000) ultimaOp = t; }
   function dos(n) { return (n < 10 ? '0' : '') + n; }
   function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function num(n) { return Number(n || 0).toLocaleString('es-MX'); }
@@ -99,10 +108,38 @@
   var ACCIONES = ['Plática de seguridad', 'Amonestación por escrito', 'Suspensión 3 días', 'Suspensión 7 días', 'Veto 30 días', 'Veto 90 días', 'Veto permanente en esta planta', 'Veto en todas las plantas del cliente'];
   var TIPO_VALE = { herr: 'Ingreso de herramienta', equipo: 'Préstamo de equipo de planta', mat: 'Salida de material' };
 
-  var PERSONAS = [], P = {}, INCIDENCIAS = [], VALES = [], INTENTOS = [], MOVS = [];
+  var PERSONAS = [], P = {};
+  /* Lo que se ve en este momento: se recalcula con la hora (ver refrescar()).
+     Las pantallas guardan estas listas por referencia, así que se rellenan en su lugar. */
+  var INCIDENCIAS = [], VALES = [], INTENTOS = [], MOVS = [];
+  /* Solicitudes de autorización del guardia al administrador (p. ej. exceso de horas) */
+  var SOLICITUDES = [];
+  /* Todo lo planeado para el día, incluso lo que todavía no ocurre */
+  var T_INC = [], T_VALES = [], T_INT = [];
+  var nInc = 0, nVale = 180;
+
+  /* ══ Generación ══════════════════════════════════════════════════════
+     Todo sale de la semilla del día y de horas fijas del día, NUNCA de la hora
+     en que se abrió la página: la laptop y el celular (y cada recarga) generan
+     exactamente lo mismo. Cada turno trae su hora planeada de entrada y de
+     salida; quién está dentro se calcula con la hora actual, así que la demo
+     «vive»: la gente sale a su hora y el turno siguiente entra solo. */
+  function valeT(p, tipo, items, abierto, extra) {
+    var v = { folio: 'V-' + String(++nVale).padStart(4, '0'), pid: p.id, tipo: tipo, items: items, abierto: abierto,
+              it: null, cerradoPlan: null, cerradoReal: null, forzado: false, nota: '', cerrado: null };
+    if (extra) for (var k in extra) v[k] = extra[k];
+    T_VALES.push(v); return v;
+  }
+  function nuevaInc(p, tipo, f, accion, extra) {
+    var t = TIPOS_INC[tipo], d = elegir(t.d), seg = prob(0.5);
+    var inc = { folio: 'INC-' + String(++nInc + 400).padStart(4, '0'), pid: p.id, tipo: tipo, grav: t.g, fecha: f, accion: accion,
+      desc: d, estado: (hoy0 - f) < 10 * DIA && seg ? 'En seguimiento' : 'Cerrada', por: 'Admin. de accesos' };
+    if (extra) for (var k in extra) inc[k] = extra[k];
+    T_INC.push(inc); return inc;
+  }
 
   (function generar() {
-    var N = ahora(), hoy = inicioDia(N), n = 0, nInc = 0, nVale = 180;
+    var hoy = hoy0, n = 0;
     EMPRESAS.forEach(function (e) {
       for (var i = 0; i < e.n; i++) {
         var mujer = prob(e.id === 'LIA' ? 0.55 : (e.id === 'AVB' ? 0.3 : 0.08));
@@ -111,8 +148,8 @@
         var r = rnd(), pat;
         if (e.id === 'AVB') pat = { on: 5, off: 2, h: 10 };
         else if (r < 0.58) pat = { on: 4, off: 3, h: 12 };
-        else if (r < 0.86) pat = { on: 5, off: 2, h: 10 };
-        else if (r < 0.94) pat = { on: 5, off: 2, h: 11 };
+        else if (r < 0.88) pat = { on: 5, off: 2, h: 10 };
+        else if (r < 0.96) pat = { on: 5, off: 2, h: 11 };
         else if (r < 0.98) pat = { on: 6, off: 1, h: 12 };
         else pat = { on: 30, off: 0, h: 11 };
         var herrAut = !sup && e.id !== 'LIA' && prob(0.55);
@@ -123,19 +160,19 @@
           turno: e.id === 'AVB' ? 'D' : (prob(0.65) ? 'D' : 'N'),
           pat: pat, fase: entre(0, pat.on + pat.off - 1),
           idTipo: elegir(TIPO_ID), idNum: String(entre(1000, 9999)),
-          aut: { cel: sup || e.id === 'AVB' || prob(0.12), tab: (sup || e.id === 'AVB') ? prob(0.45) : prob(0.03), herr: herrAut, pc: (sup || e.id === 'AVB') && prob(0.7), auto: sup ? prob(0.6) : prob(0.04), cam: e.id === 'AVB' && prob(0.6) },
+          aut: { cel: sup || e.id === 'AVB' || prob(0.12), tab: (sup || e.id === 'AVB') ? prob(0.45) : prob(0.08), herr: herrAut, pc: (sup || e.id === 'AVB') && prob(0.7), auto: sup ? prob(0.6) : prob(0.04), cam: e.id === 'AVB' && prob(0.6) },
           herr: herrAut ? mezclar(HERR).slice(0, entre(2, 4)) : [],
-          placas: '', estado: 'activo', veto: null, ints: [],
+          placas: '', estado: 'activo', veto: null, plan: [], ints: [],
           alta: sumarDias(hoy, -entre(20, 400)),
           docs: {
-            induccion: sumarDias(hoy, prob(0.05) ? -entre(1, 20) : entre(5, 340)),
-            medico: sumarDias(hoy, prob(0.04) ? -entre(1, 15) : entre(3, 300)),
-            imss: (e.id === 'LIA' ? prob(0.3) : prob(0.03)) ? 'pendiente' : 'vigente',
-            dc3: cursosDe(puesto).map(function (c) { return { curso: CURSOS[c], vence: sumarDias(hoy, prob(0.05) ? -entre(1, 30) : entre(5, 360)), avba: prob(0.6) }; })
+            induccion: sumarDias(hoy, prob(0.03) ? -entre(1, 20) : entre(5, 340)),
+            medico: sumarDias(hoy, prob(0.025) ? -entre(1, 15) : entre(3, 300)),
+            imss: (e.id === 'LIA' ? prob(0.25) : prob(0.015)) ? 'pendiente' : 'vigente',
+            dc3: cursosDe(puesto).map(function (c) { return { curso: CURSOS[c], vence: sumarDias(hoy, prob(0.03) ? -entre(1, 30) : entre(5, 360)), avba: prob(0.6) }; })
           }
         };
         if (p.aut.auto) p.placas = String.fromCharCode(65 + entre(0, 25), 65 + entre(0, 25), 65 + entre(0, 25)) + '-' + entre(100, 999) + '-' + String.fromCharCode(65 + entre(0, 25));
-        // Turnos de los últimos 16 días
+        // Turnos de los últimos 16 días y los de hoy (aunque todavía no empiecen)
         var ciclo = p.pat.on + p.pat.off;
         for (var k = 16; k >= 0; k--) {
           if ((p.fase + 1000 - k) % ciclo >= p.pat.on) continue;
@@ -144,20 +181,13 @@
           var ent = new Date(+base + entre(-25, 40) * MIN + entre(0, 59) * 1000 + (prob(0.04) ? entre(60, 150) * MIN : 0));
           var mins = p.pat.h * 60 + entre(-25, 15) + (prob(0.05) ? entre(60, 180) : 0);
           var sal = new Date(+ent + mins * MIN + entre(0, 59) * 1000);
-          if (ent > N) continue;
-          p.ints.push({ ent: ent, sal: sal > N ? null : sal, cE: CASETAS[prob(0.7) ? 0 : 1], cS: CASETAS[prob(0.7) ? 0 : 1], obs: '' });
+          var cE = CASETAS[prob(0.7) ? 0 : 1], cS = CASETAS[prob(0.7) ? 0 : 1];
+          p.plan.push({ ent: ent, salPlan: sal, salReal: null, cE: cE, cS: cS, obs: '', cancel: false, manual: false });
         }
         PERSONAS.push(p); P[p.id] = p;
       }
     });
 
-    function nuevaInc(p, tipo, f, accion, extra) {
-      var t = TIPOS_INC[tipo];
-      var inc = { folio: 'INC-' + String(++nInc + 400).padStart(4, '0'), pid: p.id, tipo: tipo, grav: t.g, fecha: f, accion: accion,
-        desc: elegir(t.d), estado: (N - f) < 10 * DIA && prob(0.5) ? 'En seguimiento' : 'Cerrada', por: 'Admin. de accesos' };
-      if (extra) for (var k in extra) inc[k] = extra[k];
-      INCIDENCIAS.push(inc); return inc;
-    }
     // Vetos (con su incidencia)
     var candidatos = mezclar(PERSONAS.filter(function (p) { return !p.sup && p.emp !== 'AVB'; }));
     var motivos = [['ALC', 'Veto 90 días'], ['ROB', 'Veto permanente en esta planta'], ['RIN', 'Veto en todas las plantas del cliente'], ['ALC', 'Veto 30 días'], ['SUP', 'Veto permanente en esta planta'], ['DRO', 'Veto 90 días']];
@@ -167,54 +197,104 @@
       var dias = /30/.test(m[1]) ? 30 : (/90/.test(m[1]) ? 90 : 0);
       p.estado = 'vetado';
       p.veto = { desde: f, hasta: dias ? sumarDias(f, dias) : null, motivo: TIPOS_INC[m[0]].n, alcance: /todas/.test(m[1]) ? 'Todas las plantas del cliente' : 'Esta planta', folio: inc.folio };
-      p.ints = p.ints.filter(function (it) { return it.ent < f; });
-      if (p.ints.length && !p.ints[p.ints.length - 1].sal) p.ints[p.ints.length - 1].sal = new Date(+f + 20 * MIN);
+      p.plan = p.plan.filter(function (it) { return it.ent < f; });
+      var u = p.plan[p.plan.length - 1];
+      if (u && u.salPlan > f) u.salPlan = new Date(+f + 20 * MIN);
     });
-    // Dos intentos de ingreso estando vetado (últimas horas)
-    [0, 1].forEach(function (i) {
-      var p = candidatos[i], t = new Date(+N - entre(1, 30) * HORA - entre(0, 59) * MIN);
-      INTENTOS.push({ pid: p.id, t: t, caseta: CASETAS[1] });
+    // Intentos de ingreso estando vetado: ayer en la tarde, hoy temprano y hoy después de comer
+    [[0, -6.2], [1, 6.3], [0, 13.7]].forEach(function (x) {
+      var p = candidatos[x[0]], t = new Date(+hoy + x[1] * HORA + entre(0, 40) * MIN);
+      T_INT.push({ pid: p.id, t: t, caseta: CASETAS[1] });
       nuevaInc(p, 'VET', t, 'Se negó el acceso', { estado: 'En seguimiento' });
     });
     // Incidencias de los últimos 6 meses
     var pesos = ['EPP', 'EPP', 'EPP', 'EPP', 'ACTO', 'ACTO', 'ACTO', 'CASI', 'CASI', 'ACC', 'ACC', 'CEL', 'CEL', 'ALC', 'ROB'];
     var activos = PERSONAS.filter(function (p) { return p.estado === 'activo'; });
     for (var i = 0; i < 62; i++) {
-      var tipo = elegir(pesos), p = elegir(activos), f = conHora(sumarDias(hoy, -entre(0, 179)), entre(6, 22), entre(0, 59));
+      var tipo = elegir(pesos), p = elegir(activos), f = conHora(sumarDias(hoy, -entre(1, 179)), entre(6, 22), entre(0, 59));
       var acc = { EPP: 'Plática de seguridad', ACTO: 'Amonestación por escrito', CASI: 'Plática de seguridad', ACC: 'Plática de seguridad', CEL: 'Amonestación por escrito', ALC: 'Suspensión 7 días', ROB: 'Suspensión 3 días' }[tipo];
-      nuevaInc(p, tipo, f, acc, tipo === 'ACC' ? { incapacidad: entre(0, 6), st7: true } : null);
+      var inc = entre(0, 6);
+      nuevaInc(p, tipo, f, acc, tipo === 'ACC' ? { incapacidad: inc, st7: true } : null);
     }
-    // Personas «doblando turno» y una por cumplir su tope
-    var libres = mezclar(activos.filter(function (p) { var u = p.ints[p.ints.length - 1]; return !u || u.sal; }));
-    [15.3, 13.4, 12.6, 11.6].forEach(function (h, i) {
-      var p = libres[i], ent = new Date(+N - h * HORA - entre(0, 9) * MIN);
-      p.ints = p.ints.filter(function (it) { return it.ent < new Date(+ent - 10 * HORA) && it.sal && it.sal < new Date(+ent - 8 * HORA); });
-      p.ints.push({ ent: ent, sal: null, cE: CASETAS[0], cS: '', obs: '' });
+    /* Personas «doblando turno»: estancias de unas 15 h que empiezan cada 2 h,
+       desde ayer a las 08:00 hasta hoy a las 12:00. A cualquier hora del día
+       hay una o dos pasando su tope de permanencia y alguna por cumplirlo. */
+    // Se eligen entre quienes trabajan 5 días de 10 h, para que su semana no se dispare
+    var dobles = mezclar(activos.filter(function (p) { return !p.sup && p.emp !== 'AVB' && p.pat.on === 5 && p.pat.h === 10; })).slice(0, 15);
+    dobles.forEach(function (p, i) {
+      var ent = new Date(+hoy - 16 * HORA + i * 2 * HORA + entre(-20, 20) * MIN);
+      var sal = new Date(+ent + (15 * 60 + entre(0, 50)) * MIN);
+      p.plan = p.plan.filter(function (it) { return it.salPlan < new Date(+ent - 9 * HORA) || it.ent > new Date(+sal + 9 * HORA); });
+      p.plan.push({ ent: ent, salPlan: sal, salReal: null, cE: CASETAS[0], cS: CASETAS[0], obs: '', cancel: false, manual: false });
+      p.plan.sort(function (a, b) { return a.ent - b.ent; });
     });
-    // Vales
-    function vale(p, tipo, items, abierto, cerrado, extra) {
-      var v = { folio: 'V-' + String(++nVale).padStart(4, '0'), pid: p.id, tipo: tipo, items: items, abierto: abierto, cerrado: cerrado || null };
-      if (extra) for (var k in extra) v[k] = extra[k];
-      VALES.push(v); return v;
-    }
+    // Vales de herramienta de cada turno reciente (se cierran solos al salir)
     PERSONAS.forEach(function (p) {
-      var u = p.ints[p.ints.length - 1];
-      if (p.aut.herr && u && !u.sal && prob(0.7)) vale(p, 'herr', p.herr.slice(), u.ent, null);
-      p.ints.slice(-6, -1).forEach(function (it) { if (p.aut.herr && it.sal && prob(0.15)) vale(p, 'herr', p.herr.slice(), it.ent, it.sal); });
+      if (!p.aut.herr) return;
+      p.plan.forEach(function (it) {
+        var dif = (hoy - inicioDia(it.ent)) / DIA;
+        var toca = prob(0.6);
+        if (dif <= 3 && toca) valeT(p, 'herr', p.herr.slice(), it.ent, { it: it });
+      });
     });
+    // Herramienta que no se presentó a la salida (vales vencidos)
     mezclar(activos.filter(function (p) { return p.aut.herr; })).slice(0, 5).forEach(function (p) {
-      var u = p.ints.filter(function (it) { return it.sal; }).slice(-entre(2, 4))[0];
-      if (u) vale(p, 'herr', p.herr.slice(0, entre(1, p.herr.length)), u.ent, null, { nota: 'Salió sin presentar la herramienta' });
+      var hechos = p.plan.filter(function (it) { return it.salPlan < new Date(+hoy - DIA); });
+      var u = hechos.slice(-entre(2, 4))[0];
+      var cuantos = entre(1, Math.max(1, p.herr.length));
+      if (u) valeT(p, 'herr', p.herr.slice(0, cuantos), u.ent, { forzado: true, nota: 'Salió sin presentar la herramienta' });
     });
+    // Equipo de planta prestado
     mezclar(activos).slice(0, 9).forEach(function (p, i) {
-      var ab = new Date(+N - (i < 5 ? entre(4, 9) : entre(0, 2)) * DIA - entre(0, 600) * MIN);
-      vale(p, 'equipo', [elegir(EQUIPO_PLANTA)], ab, i > 6 ? new Date(+ab + entre(2, 20) * HORA) : null);
+      var dias = i < 5 ? entre(4, 9) : entre(1, 2);
+      var ab = new Date(+hoy - dias * DIA + entre(360, 1080) * MIN);
+      var cer = new Date(+ab + entre(2, 20) * HORA);
+      valeT(p, 'equipo', [elegir(EQUIPO_PLANTA)], ab, { cerradoPlan: i > 6 ? cer : null });
     });
+    // Salidas de material
     mezclar(activos.filter(function (p) { return p.sup; })).slice(0, 7).forEach(function (p, i) {
-      var ab = new Date(+N - entre(0, 6) * DIA - entre(0, 600) * MIN);
-      vale(p, 'mat', [elegir(MATERIAL)], ab, i < 3 ? null : new Date(+ab + entre(1, 30) * HORA), { autoriza: i < 2 ? 'Pendiente de autorizar' : 'Autorizado por Mantenimiento' });
+      var ab = new Date(+hoy - entre(1, 6) * DIA + entre(360, 1080) * MIN);
+      var cer = new Date(+ab + entre(1, 30) * HORA);
+      valeT(p, 'mat', [elegir(MATERIAL)], ab, { cerradoPlan: i < 3 ? null : cer, autoriza: i < 2 ? 'Pendiente de autorizar' : 'Autorizado por Mantenimiento' });
     });
   })();
+
+  /* ══ Lo que se ve a esta hora ══════════════════════════════════════════ */
+  function salidaDe(it, N) { if (it.salReal) return it.salReal; return it.salPlan && it.salPlan <= N ? it.salPlan : null; }
+  function cierreVale(v, N) {
+    if (v.cerradoReal) return v.cerradoReal <= N ? v.cerradoReal : null;
+    if (v.forzado) return null;
+    if (v.it) return salidaDe(v.it, N);
+    return v.cerradoPlan && v.cerradoPlan <= N ? v.cerradoPlan : null;
+  }
+  function itemDentro(p, t) {
+    var r = null;
+    p.plan.forEach(function (it) {
+      if (it.cancel || it.ent > t) return;
+      var s = it.salReal || it.salPlan;
+      if (!s || s > t) r = it;
+    });
+    return r;
+  }
+  function rellenar(arr, nuevos) { arr.length = 0; Array.prototype.push.apply(arr, nuevos); }
+  var vistaEn = 0;
+  function refrescar(forzar) {
+    var N = ahoraVista();
+    if (!forzar && Math.abs(N - vistaEn) < 1000) return;
+    vistaEn = +N;
+    PERSONAS.forEach(function (p) {
+      var v = [];
+      p.plan.forEach(function (it) {
+        if (it.cancel || it.ent > N) return;
+        v.push({ ent: it.ent, sal: salidaDe(it, N), cE: it.cE, cS: it.cS, obs: it.obs });
+      });
+      v.sort(function (a, b) { return a.ent - b.ent; });
+      p.ints = v;
+    });
+    rellenar(INCIDENCIAS, T_INC.filter(function (i) { return i.fecha <= N; }));
+    rellenar(INTENTOS, T_INT.filter(function (x) { return x.t <= N; }));
+    rellenar(VALES, T_VALES.filter(function (v) { return v.abierto <= N && !(v.it && v.it.cancel); }).map(function (v) { v.cerrado = cierreVale(v, N); return v; }));
+  }
 
   /* ══ Reglas (LFT reformada, DOF 1 de mayo de 2026) ══════════════════════
      Jornada ordinaria semanal y horas extra a pago doble por año (transitorios);
@@ -228,7 +308,8 @@
   var RELOJ = 0;
   function stats(p) {
     if (p._t === RELOJ && p._s) return p._s;
-    var N = ahora(), u = p.ints[p.ints.length - 1], dentro = !!(u && !u.sal);
+    refrescar(false);
+    var N = ahoraVista(), u = p.ints[p.ints.length - 1], dentro = !!(u && !u.sal);
     var desde7 = +N - 7 * DIA, h7 = 0;
     p.ints.forEach(function (it) { var a = Math.max(+it.ent, desde7), b = +(it.sal || N); if (b > a) h7 += b - a; });
     h7 /= HORA;
@@ -256,7 +337,7 @@
   function valesAbiertos(p) { return VALES.filter(function (v) { return v.pid === p.id && !v.cerrado; }); }
   function vetoVigente(p) { return p.estado === 'vetado' && (!p.veto.hasta || p.veto.hasta > ahora()); }
 
-  function tick() { RELOJ++; }
+  function tick() { RELOJ++; refrescar(true); }
 
   /* ══ Turnos (igual que accesos.html y ControlAccesos::turnoDe) ══
      Día 06:30–18:30, noche 18:30–06:30. Una entrada cuenta para el turno que
@@ -272,26 +353,36 @@
   function nombreTurno(k) { return k.slice(-1) === 'D' ? 'Turno de día' : 'Turno de noche'; }
 
   /* ══ Revisión en la puerta y casos de la simulación ══ */
+  /* Persona de cada caso del guion: no es al azar, sale de un orden fijo por
+     día y caso. En el ensayo y en la presentación aparece la misma; si ya
+     entró, la siguiente de la lista. */
+  function hash(t) { var h = 2166136261; for (var i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
   function candidato(caso) {
     tick();
     var lim = limites(), fuera = PERSONAS.filter(function (p) { return !stats(p).dentro; });
     var okBase = function (p) { return p.estado === 'activo' && stats(p).docs.est !== 'vencido'; };
     var jornadaOk = function (p) { var s = stats(p); return s.seguidos < REGLAS.diasSeguidos && s.h7 + p.pat.h <= lim.max; };
+    var limpio = function (p) { return okBase(p) && jornadaOk(p) && !valesAbiertos(p).length && stats(p).docs.est === 'ok'; };
+    var especial = function (p) { return p.aut.tab || p.aut.pc; };          // se reservan para el caso «tableta o computadora»
     var f = {
-      ok: function (p) { return okBase(p) && jornadaOk(p) && !valesAbiertos(p).length; },
-      herr: function (p) { return okBase(p) && jornadaOk(p) && p.aut.herr && !valesAbiertos(p).length; },
-      cel: function (p) { return okBase(p) && jornadaOk(p) && !p.aut.cel && !valesAbiertos(p).length && !p.aut.herr; },
+      ok: function (p) { return limpio(p) && !p.aut.herr && !especial(p) && EMP[p.emp].repse === 'Vigente'; },
+      herr: function (p) { return limpio(p) && p.aut.herr && p.herr.length > 0 && !especial(p); },
+      cel: function (p) { return limpio(p) && !p.aut.cel && !p.aut.herr && !especial(p) && p.emp !== 'AVB'; },
       veto: function (p) { return vetoVigente(p); },
       vale: function (p) { return okBase(p) && jornadaOk(p) && valesAbiertos(p).length > 0; },
-      semana: function (p) { return okBase(p) && stats(p).h7 + p.pat.h > lim.max; },
-      doc: function (p) { return p.estado === 'activo' && stats(p).docs.est === 'vencido'; },
-      alcohol: function (p) { return okBase(p) && jornadaOk(p) && !valesAbiertos(p).length; },
-      disp: function (p) { return okBase(p) && jornadaOk(p) && !valesAbiertos(p).length && (p.aut.tab || p.aut.pc); }
+      semana: function (p) { return okBase(p) && stats(p).h7 + p.pat.h > lim.max && p.emp !== 'AVB'; },
+      doc: function (p) { return p.estado === 'activo' && stats(p).docs.est === 'vencido' && p.emp !== 'AVB'; },
+      alcohol: function (p) { return limpio(p) && !especial(p) && p.emp !== 'AVB'; },
+      disp: function (p) { return okBase(p) && jornadaOk(p) && !valesAbiertos(p).length && especial(p); }
     }[caso];
-    var c = fuera.filter(f);
+    var rasgo = { disp: especial, herr: function (p) { return p.aut.herr && p.herr.length > 0; }, cel: function (p) { return !p.aut.cel; }, vale: function (p) { return valesAbiertos(p).length > 0; } }[caso];
+    var c = f ? fuera.filter(f) : [];
+    if (!c.length && rasgo) c = fuera.filter(function (p) { return okBase(p) && rasgo(p); });   // conserva lo que se quiere mostrar
     if (!c.length) c = fuera.filter(function (p) { return okBase(p) && jornadaOk(p); });
     if (!c.length) c = fuera.filter(okBase);
-    return c[Math.floor(Math.random() * c.length)];
+    if (!c.length) return null;
+    c.sort(function (a, b) { return hash(semilla + caso + a.id) - hash(semilla + caso + b.id); });
+    return c[0];
   }
   function revisarEntrada(p, caso) {
     caso = caso || '';
@@ -315,102 +406,267 @@
     else if (s.h7 + hTurno > lim.ord) ch.push({ s: 'aviso', i: 'reloj', t: 'Este turno genera horas extra', d: 'Lleva ' + fmtH(s.h7) + ' en 7 días; jornada ordinaria ' + lim.ord + ' h.' });
     else ch.push({ s: 'ok', i: 'reloj', t: 'Jornada', d: 'Lleva ' + fmtH(s.h7) + ' en 7 días y ' + s.seguidos + ' día(s) seguidos.' });
     // Celular
-    var traeCel = !guardia && (caso === 'cel' || (caso !== 'ok' && caso !== 'disp' && Math.random() < 0.6) || p.aut.cel);
+    var traeCel = !guardia && (caso === 'cel' || (caso === '' && Math.random() < 0.6) || p.aut.cel);
     var disp = [['tab', 'Tableta'], ['pc', 'Computadora'], ['cam', 'Cámara']].filter(function (x) { return p.aut[x[0]]; }).map(function (x) { return x[1]; });
     if (disp.length) ch.push({ s: 'ok', i: 'pc', t: 'Dispositivos autorizados', d: disp.join(', ') + '.' });
     if (traeCel) {
       if (p.aut.cel) ch.push({ s: 'ok', i: 'cel', t: 'Celular autorizado', d: 'Puede ingresar con su celular.' });
       else if (REGLAS.cel) { ch.push({ s: 'aviso', i: 'cel', t: 'Trae celular sin autorización', d: 'Se resguarda en casillero y se le entrega a la salida.' }); inst.push(['cel', 'Resguardar el celular en casillero']); peor('obs'); }
     }
-    if (p.aut.herr && REGLAS.herr) { ch.push({ s: 'info', i: 'herr', t: 'Ingresa herramienta autorizada', d: 'Se abre un vale con lo que ingresa; a la salida se revisa que salga.', herr: p.herr }); inst.push(['herr', 'Registrar ' + p.herr.length + ' herramientas que ingresa']); }
+    if (p.aut.herr && REGLAS.herr && p.herr.length) { ch.push({ s: 'info', i: 'herr', t: 'Ingresa herramienta autorizada', d: 'Se abre un vale con lo que ingresa; a la salida se revisa que salga.', herr: p.herr }); inst.push(['herr', 'Registrar ' + p.herr.length + ' herramientas que ingresa']); }
     if (p.aut.auto) { ch.push({ s: 'ok', i: 'auto', t: 'Vehículo autorizado', d: 'Placas ' + p.placas + '.' }); inst.push(['auto', 'Vehículo ' + p.placas + ': puede pasar']); }
     valesAbiertos(p).forEach(function (v) { ch.push({ s: N - v.abierto > REGLAS.vale * DIA ? 'grave' : 'aviso', i: 'vale', t: 'Vale pendiente ' + v.folio, d: TIPO_VALE[v.tipo] + ': ' + v.items.join(', ') + ' · abierto ' + cuando(v.abierto) + (v.nota ? ' · ' + v.nota : '') + '.' }); peor('obs'); });
     var incR = INCIDENCIAS.filter(function (i) { return i.pid === p.id && N - i.fecha < 90 * DIA; });
     if (incR.length && !vetoVigente(p)) ch.push({ s: 'aviso', i: 'escudo', t: incR.length + ' incidencia(s) en 90 días', d: incR.map(function (i) { return TIPOS_INC[i.tipo].n.toLowerCase(); }).join(', ') + '.' });
     var base = res;                                     // el resultado sin la prueba de alcoholímetro
-    var alc = res !== 'nopasa' && (caso === 'alcohol' || caso === 'g-alcohol' || (caso.indexOf('g-') !== 0 || caso === 'g-ok') && Math.random() * 100 < REGLAS.alc);
+    var azar = caso === 'guardia' || caso === '';         // en los casos del guion no se sortea
+    var alc = res !== 'nopasa' && (caso === 'alcohol' || caso === 'g-alcohol' || (azar && Math.random() * 100 < REGLAS.alc));
     if (alc) { ch.push({ s: 'info', i: 'copa', t: 'Seleccionado para alcoholímetro aleatorio', d: 'El guardia hace la prueba y captura el resultado en su teléfono.' }); peor('prueba'); inst.unshift(['copa', 'Hacer prueba de alcoholímetro']); }
     return { ch: ch, inst: inst, res: res, base: base, motivos: motivos };
   }
 
-  /* ══ Lo que se registra en la demo (compartido entre pestañas) ══ */
-  var CLAVE = 'avba_demo_accesos_' + semilla, OPS = [], aplicadas = 0, oyentes = [];
-  function leerOps() { try { var v = JSON.parse(localStorage.getItem(CLAVE) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return OPS; } }
-  function guardarOps() { try { localStorage.setItem(CLAVE, JSON.stringify(OPS)); } catch (e) {} }
-  function folioInc() { return 'INC-' + String(400 + INCIDENCIAS.length + 1).padStart(4, '0'); }
-  function folioVale() { return 'V-' + String(180 + VALES.length + 1).padStart(4, '0'); }
+  /* ══ Lo que se registra en la demo ═══════════════════════════════════
+     Cada operación (entrada, salida, intento, incidencia, permiso, veto, vale)
+     lleva un id y la hora en que ocurrió, y se aplica igual en cualquier
+     dispositivo, en el mismo orden.
+       · Sin sala: se guarda en este navegador (localStorage) y las pestañas
+         abiertas se sincronizan solas.
+       · Con sala (?sala=CODIGO, ver demo/index.html): demo/sala.php guarda las
+         operaciones y todos los dispositivos de la sala las reciben; así el
+         celular del guardia y la laptop del administrador ven lo mismo. */
+  function folioInc() { return 'INC-' + String(400 + (++nInc)).padStart(4, '0'); }
+  function folioVale() { return 'V-' + String(++nVale).padStart(4, '0'); }
   function aplicar(op) {
-    var p = P[op.pid], t = new Date(op.t), u;
-    if (op.k !== 'cv' && !p) return null;
+    var p = P[op.pid], t = new Date(op.t), it;
+    if (op.k !== 'cv' && op.k !== 'resp' && op.k !== 'reg' && op.k !== 'am' && !p) return null;
+    if (isNaN(t)) return null;
     switch (op.k) {
       case 'ent':                                           // entrada
-        u = p.ints[p.ints.length - 1];
-        if (u && !u.sal) return null;
-        p.ints.push({ ent: t, sal: null, cE: op.caseta || CASETAS[0], cS: '', obs: op.obs || '' });
-        if (op.herr && p.herr.length) VALES.push({ folio: folioVale(), pid: p.id, tipo: 'herr', items: p.herr.slice(), abierto: t, cerrado: null });
+        if (itemDentro(p, t)) return null;                  // ya estaba dentro
+        p.plan.forEach(function (x) { if (!x.manual && x.ent > t) x.cancel = true; });   // lo planeado después ya no ocurre
+        it = { ent: t, salPlan: null, salReal: null, cE: op.caseta || CASETAS[0], cS: '', obs: op.obs || '', cancel: false, manual: true };
+        p.plan.push(it);
+        var items = Array.isArray(op.items) && op.items.length ? p.herr.filter(function (h) { return op.items.indexOf(h) >= 0; }) : p.herr.slice();
+        if (op.herr && items.length) { var ex = { it: it }; if (op.folio) ex.folio = op.folio; valeT(p, 'herr', items, t, ex); }
         MOVS.unshift({ t: t, p: p, tipo: 'e', res: op.res || 'Permitido', caseta: op.caseta || CASETAS[0], quien: op.quien || '' });
         return true;
       case 'sal':                                           // salida
-        u = p.ints[p.ints.length - 1];
-        if (u && !u.sal) { u.sal = t; u.cS = op.caseta || CASETAS[0]; }
-        VALES.forEach(function (v) {
-          if (v.pid !== p.id || v.cerrado) return;
-          if (v.tipo === 'herr') { if (op.falta && op.falta.length) v.nota = 'Salió sin presentar: ' + op.falta.join(', '); else v.cerrado = t; }
-          else if (v.tipo === 'equipo') { if (op.equipoNo) v.nota = 'No devolvió el equipo'; else v.cerrado = t; }
+        it = itemDentro(p, t);
+        if (!it) return null;                               // ya estaba fuera
+        var faltan = {};                                    // «V-0231: Torquímetro» → por vale
+        (op.falta || []).forEach(function (x) { var m = /^(V-\d{4}): (.+)$/.exec(String(x)); if (m) (faltan[m[1]] = faltan[m[1]] || []).push(m[2]); });
+        var noDev = op.noDevuelto || [];
+        T_VALES.forEach(function (v) {
+          if (v.pid !== p.id || v.abierto > t || v.cerradoReal || (v.it && v.it.cancel) || (cierreVale(v, t) && !v.forzado)) return;
+          if (v.tipo === 'herr') {
+            if (faltan[v.folio]) { v.forzado = true; v.itemsOrig = v.itemsOrig || v.items; v.items = faltan[v.folio].slice(); v.nota = 'Salió sin presentar: ' + faltan[v.folio].join(', '); }
+            else v.cerradoReal = t;
+          } else if (v.tipo === 'equipo') {
+            if (noDev.indexOf(v.folio) >= 0) { v.forzado = true; v.nota = 'No devolvió el equipo'; }
+            else v.cerradoReal = t;
+          }
         });
-        MOVS.unshift({ t: t, p: p, tipo: 's', res: op.falta && op.falta.length ? 'Sin herramienta' : (op.res || 'Permitido'), caseta: op.caseta || CASETAS[0], quien: op.quien || '' });
+        if (it) { it.salReal = t; it.cS = op.caseta || CASETAS[0]; }        // después de revisar los vales
+        var hayFalta = Object.keys(faltan).length > 0 || noDev.length > 0;
+        MOVS.unshift({ t: t, p: p, tipo: 's', res: hayFalta ? 'Sin herramienta' : (op.res || 'Permitido'), caseta: op.caseta || CASETAS[0], quien: op.quien || '' });
         return true;
       case 'int':                                           // intento de entrada negado
-        if (vetoVigente(p)) INTENTOS.push({ pid: p.id, t: t, caseta: op.caseta || CASETAS[0] });
+        p.plan.forEach(function (x) { if (!x.manual && x.ent > t) x.cancel = true; });     // no entra sola más tarde
+        if (p.estado === 'vetado' && p.veto && +p.veto.desde < +t - MIN) T_INT.push({ pid: p.id, t: t, caseta: op.caseta || CASETAS[0] });
         MOVS.unshift({ t: t, p: p, tipo: 'e', res: 'Negado · ' + (op.motivo || 'acceso negado'), caseta: op.caseta || CASETAS[0], quien: op.quien || '' });
         return true;
       case 'inc':                                           // incidencia (y veto, si la medida lo es)
-        var inc = { folio: folioInc(), pid: p.id, tipo: op.tipo, grav: TIPOS_INC[op.tipo].g, fecha: t, accion: op.accion,
+        if (!TIPOS_INC[op.tipo]) return null;
+        var inc = { folio: op.folio || folioInc(), pid: p.id, tipo: op.tipo, grav: TIPOS_INC[op.tipo].g, fecha: t, accion: op.accion,
           desc: op.desc || TIPOS_INC[op.tipo].d[0], estado: 'En seguimiento', por: op.por || 'Admin. de accesos' };
-        INCIDENCIAS.push(inc);
-        if (/Veto/.test(op.accion)) {
+        T_INC.push(inc);
+        if (/Veto/.test(op.accion || '')) {
           var dias = /30/.test(op.accion) ? 30 : (/90/.test(op.accion) ? 90 : 0);
           p.estado = 'vetado';
           p.veto = { desde: t, hasta: dias ? sumarDias(t, dias) : null, motivo: TIPOS_INC[op.tipo].n, alcance: /todas/.test(op.accion) ? 'Todas las plantas del cliente' : 'Esta planta', folio: inc.folio };
+          p.plan.forEach(function (x) { if (!x.manual && x.ent > t) x.cancel = true; });   // un vetado no entra
         }
         return inc;
-      case 'aut': p.aut[op.c] = !!op.v; return true;        // permiso de dispositivo o herramienta
-      case 'lev': p.estado = 'activo'; p.veto = null; return true;   // levantar veto
-      case 'cv':                                            // cerrar vale
-        VALES.forEach(function (v) { if (v.folio === op.folio && !v.cerrado) v.cerrado = t; });
+      case 'aut':                                           // permiso de dispositivo o herramienta
+        if (!(op.c in p.aut)) return null;
+        p.aut[op.c] = !!op.v;
+        if (op.c === 'herr' && op.v && !p.herr.length) p.herr = ['Juego de llaves combinadas', 'Taladro rotomartillo'];
         return true;
+      case 'reg':                                           // reglas de la demo (se comparten y sobreviven a recargar)
+        var r = op.r || {};
+        ['anio', 'perm', 'diasSeguidos', 'vale', 'alc'].forEach(function (k) { if (typeof r[k] === 'number' && isFinite(r[k])) REGLAS[k] = r[k]; });
+        ['docs', 'cel', 'herr'].forEach(function (k) { if (typeof r[k] === 'boolean') REGLAS[k] = r[k]; });
+        if (!TABLA_LEY[REGLAS.anio]) REGLAS.anio = anioAct;
+        return true;
+      case 'am':                                            // autorizar una salida de material
+        T_VALES.forEach(function (v) { if (v.folio === op.folio && v.tipo === 'mat') v.autoriza = 'Autorizado por ' + (op.quien || 'Admin. de accesos'); });
+        return true;
+      case 'lev': p.estado = 'activo'; p.veto = null; return true;          // levantar veto
+      case 'cv':                                            // cerrar vale
+        T_VALES.forEach(function (v) { if (v.folio === op.folio && !v.cerradoReal) { v.cerradoReal = t; v.forzado = false; } });
+        return true;
+      case 'sol':                                           // el guardia pide autorización
+        var sol = { u: op.u, pid: p.id, p: p, t: t, motivo: op.motivo || 'Requiere autorización', caseta: op.caseta || CASETAS[0], quien: op.quien || '', estado: 'pendiente', resp: null };
+        SOLICITUDES.unshift(sol);
+        return sol;
+      case 'resp':                                          // el administrador responde
+        for (var i = 0; i < SOLICITUDES.length; i++) {
+          var x = SOLICITUDES[i];
+          if (x.u === op.sol && x.estado === 'pendiente') { x.estado = op.ok ? 'autorizada' : 'negada'; x.resp = { t: t, quien: op.quien || '' }; return x; }
+        }
+        return null;
     }
     return null;
   }
-  function sincronizar() {
-    var todas = leerOps();
-    if (todas.length < aplicadas) { location.reload(); return false; }     // se reinició la demo en otra pestaña
-    for (var i = aplicadas; i < todas.length; i++) aplicar(todas[i]);
-    var hubo = todas.length > aplicadas;
-    OPS = todas; aplicadas = todas.length;
+
+  var URL_SALA = 'sala.php';
+  var SALA = (function () {
+    var q = '', s = '';
+    try { q = (new URLSearchParams(location.search).get('sala') || '').toUpperCase(); } catch (e) {}
+    if (q === 'NO' || q === 'LOCAL') { try { localStorage.removeItem('avba_demo_sala'); } catch (e) {} return ''; }
+    if (/^[A-Z0-9]{4,10}$/.test(q)) { try { localStorage.setItem('avba_demo_sala', q); } catch (e) {} return q; }
+    try { s = localStorage.getItem('avba_demo_sala') || ''; } catch (e) {}
+    return /^[A-Z0-9]{4,10}$/.test(s) ? s : '';
+  })();
+  var CLAVE = 'avba_demo_accesos_' + semilla;                       // sin sala
+  var CLAVE_PEND = 'avba_demo_pend_' + SALA + '_' + semilla;        // con sala: lo que falta subir
+  var vistos = {}, oyentes = [], oyentesSala = [], oyentesError = [], aplicadasLocal = 0, opsMem = [];
+  var sala = { estado: SALA ? 'conectando' : 'local', n: 0, epoca: null };
+  function nuevoId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 9); }
+  function aplicarNueva(op) {
+    if (!op || !op.u || vistos[op.u]) return false;
+    vistos[op.u] = 1;
+    notarHora(op);
+    try { aplicar(op); } catch (e) { if (window.console) console.warn('[demo] operación ignorada', e); }
+    return true;
+  }
+  function avisar() { oyentes.forEach(function (f) { try { f(); } catch (x) { if (window.console) console.error(x); } }); }
+  function marcar(estado) {
+    if (sala.estado === estado) return;
+    sala.estado = estado;
+    oyentesSala.forEach(function (f) { try { f(estado); } catch (x) {} });
+  }
+
+  /* Sin sala: localStorage */
+  function leerLocal() { try { var v = JSON.parse(localStorage.getItem(CLAVE) || '[]'); return Array.isArray(v) ? v : null; } catch (e) { return null; } }
+  var lsOk = true;                                       // false si localStorage no guarda (lleno o bloqueado)
+  function sincronizarLocal() {
+    var todas = (lsOk && leerLocal()) || opsMem;
+    if (todas.length < aplicadasLocal) { if (lsOk) location.reload(); return false; }   // se reinició en otra pestaña
+    var hubo = false;
+    for (var i = aplicadasLocal; i < todas.length; i++) if (aplicarNueva(todas[i])) hubo = true;
+    aplicadasLocal = todas.length; opsMem = todas;
     if (hubo) tick();
     return hubo;
   }
+
+  /* Con sala: sala.php */
+  var pendientes = [], subiendo = false, consultando = false, tConsulta = null;
+  function leerPend() { try { var v = JSON.parse(localStorage.getItem(CLAVE_PEND) || '[]'); return Array.isArray(v) ? v : []; } catch (e) { return []; } }
+  function guardarPend() { try { localStorage.setItem(CLAVE_PEND, JSON.stringify(pendientes)); } catch (e) {} }
+  function subir() {
+    if (subiendo || !pendientes.length) return;
+    subiendo = true;
+    fetch(URL_SALA, { method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store',
+                      body: JSON.stringify({ sala: SALA, dia: semilla, op: pendientes[0] }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        subiendo = false;
+        if (j && j.error === 'invalida') {
+          var mala = pendientes.shift(); guardarPend();
+          oyentesError.forEach(function (f) { try { f(mala); } catch (x) {} });
+          subir();
+        } else if (j && j.ok) { pendientes.shift(); guardarPend(); marcar('conectado'); subir(); }
+        else marcar('sin-conexion');
+      })
+      .catch(function () { subiendo = false; marcar('sin-conexion'); });
+  }
+  function consultar() {
+    clearTimeout(tConsulta);
+    if (consultando) return;
+    consultando = true;
+    fetch(URL_SALA + '?sala=' + SALA + '&dia=' + semilla + '&desde=' + sala.n, { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (j) {
+        consultando = false;
+        if (!j || !j.ok) throw new Error('respuesta');
+        if (sala.epoca !== null && j.epoca !== sala.epoca) { pendientes = []; guardarPend(); location.reload(); return; }   // se reinició la sala
+        sala.epoca = j.epoca;
+        var hubo = false;
+        (j.ops || []).forEach(function (op) { if (aplicarNueva(op)) hubo = true; });
+        sala.n = j.total;
+        marcar('conectado');
+        if (hubo) { tick(); avisar(); }
+        subir();
+        programar();
+      })
+      .catch(function () { consultando = false; marcar('sin-conexion'); programar(); });
+  }
+  function programar() { clearTimeout(tConsulta); tConsulta = setTimeout(consultar, document.hidden ? 6000 : 1500); }
+
+  function folioLibre(pref, lista) {
+    for (var i = 0; i < 50; i++) {
+      var f = pref + (5000 + Math.floor(Math.random() * 4999));
+      if (!lista.some(function (x) { return x.folio === f; })) return f;
+    }
+    return pref + (5000 + Math.floor(Math.random() * 4999));
+  }
   function registrar(op) {
-    sincronizar();
+    op.u = op.u || nuevoId();
     op.t = op.t || Date.now();
-    OPS.push(op); aplicadas = OPS.length; guardarOps();
-    var r = aplicar(op); tick();
+    if (op.k === 'ent' && op.herr && !op.folio) op.folio = folioLibre('V-', T_VALES);
+    if (op.k === 'inc' && !op.folio) op.folio = folioLibre('INC-', T_INC);
+    var r;
+    if (SALA) {
+      vistos[op.u] = 1;
+      notarHora(op);
+      try { r = aplicar(op); } catch (e) { r = null; }
+      tick();
+      pendientes.push(op); guardarPend(); subir();
+    } else {
+      sincronizarLocal();
+      var todas = (lsOk && leerLocal()) || opsMem;
+      todas.push(op); opsMem = todas;
+      try { localStorage.setItem(CLAVE, JSON.stringify(todas)); } catch (e) { lsOk = false; }
+      aplicadasLocal = todas.length;
+      vistos[op.u] = 1;
+      notarHora(op);
+      try { r = aplicar(op); } catch (e) { r = null; }
+      tick();
+    }
     return r;
   }
-  window.addEventListener('storage', function (e) {
-    if (e.key !== CLAVE && e.key !== null) return;
-    if (sincronizar()) oyentes.forEach(function (f) { try { f(); } catch (x) {} });
-  });
-  sincronizar();
+  function reiniciar() {
+    if (!SALA) { try { localStorage.removeItem(CLAVE); } catch (e) {} location.reload(); return; }
+    pendientes = []; guardarPend();
+    fetch(URL_SALA, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sala: SALA, dia: semilla, accion: 'reiniciar' }) })
+      .catch(function () {}).then(function () { location.reload(); });
+  }
+
+  if (SALA) {
+    pendientes = leerPend();
+    pendientes.forEach(function (op) { aplicarNueva(op); });         // lo que no alcanzó a subirse
+    consultar();
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) consultar(); });
+  } else {
+    window.addEventListener('storage', function (e) {
+      if (e.key !== CLAVE && e.key !== null) return;
+      if (sincronizarLocal()) avisar();
+    });
+    sincronizarLocal();
+  }
+  refrescar(true);
+  function revisarDia() { if (claveDia(ahora()) !== claveDia(hoy0)) location.reload(); }
+  setInterval(revisarDia, 30000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) revisarDia(); });
 
   window.DEMO = {
     EMPRESAS: EMPRESAS, EMP: EMP, TIPOS_INC: TIPOS_INC, CORTO_INC: CORTO_INC, ACCIONES: ACCIONES, TIPO_VALE: TIPO_VALE, CASETAS: CASETAS,
-    PERSONAS: PERSONAS, P: P, INCIDENCIAS: INCIDENCIAS, VALES: VALES, INTENTOS: INTENTOS, MOVS: MOVS,
+    PERSONAS: PERSONAS, P: P, INCIDENCIAS: INCIDENCIAS, VALES: VALES, INTENTOS: INTENTOS, MOVS: MOVS, SOLICITUDES: SOLICITUDES,
     TABLA_LEY: TABLA_LEY, REGLAS: REGLAS, limites: limites, stats: stats, docs: docs, valesAbiertos: valesAbiertos, vetoVigente: vetoVigente,
     candidato: candidato, revisar: revisarEntrada, turnoDe: turnoDe, turnosEnCurso: turnosEnCurso, nombreTurno: nombreTurno,
-    tick: tick, registrar: registrar, alCambiar: function (f) { oyentes.push(f); },
-    reiniciar: function () { try { localStorage.removeItem(CLAVE); } catch (e) {} location.reload(); },
-    cuantos: function () { return OPS.length; }
+    tick: tick, registrar: registrar, alCambiar: function (f) { oyentes.push(f); }, reiniciar: reiniciar,
+    sala: SALA, estadoSala: function () { return sala.estado; }, alCambiarSala: function (f) { oyentesSala.push(f); }, alError: function (f) { oyentesError.push(f); },
+    semilla: semilla
   };
 })();

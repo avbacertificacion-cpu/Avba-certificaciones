@@ -62,6 +62,21 @@
   .quien span{font-size:12px;line-height:1.2}
   .cinta{background:#FFF3D6;color:#7a4f00;font-size:12.5px;padding:7px 16px;text-align:center;border-bottom:1px solid #f2dfb0;line-height:1.5}
   .cinta a{color:#7a4f00;font-weight:700}
+  .sala-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;border-radius:999px;padding:5px 11px;background:rgba(255,255,255,.14);color:#fff;white-space:nowrap}
+  .sala-chip i{width:8px;height:8px;border-radius:50%;background:#c3c2b7}
+  .sala-chip.ok i{background:#5fd35f} .sala-chip.mal i{background:#ff6b6b}
+  .solicitudes{position:fixed;top:100px;right:16px;z-index:95;display:flex;flex-direction:column;gap:10px;width:min(380px,calc(100vw - 32px));max-height:calc(100vh - 116px);overflow:auto;padding:2px}
+  body.con-panel .solicitudes{right:calc(min(560px,100%) + 16px)}
+  @media (max-width:980px){ body.con-panel .solicitudes{right:16px;top:auto;bottom:16px;max-height:45vh} }
+  .sol{background:#fff;border-radius:14px;box-shadow:0 12px 36px rgba(11,37,69,.28);border:2px solid #fab219;padding:14px}
+  .sol.nueva{animation:entra .25s ease-out}
+  @keyframes entra{from{transform:translateY(-8px);opacity:0}to{transform:none;opacity:1}}
+  .sol-t{display:flex;align-items:center;gap:8px;color:#7a4f00}
+  .sol-t b{font-size:14px} .sol-t span{margin-left:auto;font-size:12px;color:var(--texto-hint)}
+  .sol-p{display:flex;gap:10px;align-items:center;margin-top:10px}
+  .sol-p b{display:block;font-size:14px} .sol-p span{font-size:12px;color:var(--texto-sub)}
+  .sol p{font-size:13px;color:var(--texto-sub);margin-top:8px;line-height:1.45}
+  .sol-a{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap} .sol-a .btn{flex:1 1 auto}
   .cinta button{border:1px solid #d9b25c;background:#fff;color:#7a4f00;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;cursor:pointer;margin-left:6px}
 
   /* ── Marco: menú + contenido ── */
@@ -323,12 +338,14 @@
   <img src="../assets/logos/avba.png" alt="AVBA">
   <div><div class="t1">Control de accesos</div><div class="t2" id="t-planta">Planta Quantum Energy · Administración de accesos</div></div>
   <div class="der">
+    <span class="sala-chip" id="sala-chip" hidden></span>
     <div class="reloj" id="reloj"></div>
     <button class="campana" type="button" id="btn-campana" aria-label="Alertas"><svg class="i"><use href="#i-campana"/></svg><span class="n" id="n-alertas">0</span></button>
     <div class="quien"><div class="av">AA</div><span><b>Admin. de accesos</b><br>rol nuevo · demo</span></div>
   </div>
 </header>
-<div class="cinta"><b>MAQUETA</b> con datos ficticios: personas, empresas e incidencias no son reales. Lo que registres se guarda sólo en este navegador y se comparte con la <a href="caseta.html" target="_blank" rel="noopener">pantalla del guardia</a> abierta en otra pestaña. <button type="button" id="btn-reiniciar">Reiniciar demo</button></div>
+<div class="cinta"><span id="cinta-txt"><b>DEMO</b> con datos ficticios: personas, empresas e incidencias no son reales. Lo que registres se comparte con la <a href="caseta.html" target="_blank" rel="noopener">pantalla del guardia</a> abierta en otra pestaña; para usar dos equipos, entra desde la <a href="index.html">portada</a>.</span> <button type="button" id="btn-reiniciar">Reiniciar demo</button></div>
+<div class="solicitudes" id="solicitudes" aria-live="assertive"></div>
 
 <div class="marco">
   <nav class="menu" id="menu" aria-label="Secciones">
@@ -341,6 +358,7 @@
     <button type="button" data-sec="vales"><svg class="i"><use href="#i-vale"/></svg>Herramientas y vales</button>
     <button type="button" data-sec="reglas"><svg class="i"><use href="#i-ajustes"/></svg>Reglas y roles</button>
     <div class="sep"></div>
+    <a class="enlace-g" href="index.html"><svg class="i"><use href="#i-tablero"/></svg>Portada de la demo</a>
     <a class="enlace-g" href="caseta.html" target="_blank" rel="noopener"><svg class="i"><use href="#i-cel"/></svg>Pantalla del guardia ↗</a>
     <div class="pie">El guardia no ve este panel. En su pantalla ve si la persona pasa, si está vetada, si tiene documentos vencidos y qué dispositivos puede meter.</div>
   </nav>
@@ -387,6 +405,7 @@
             <button class="btn verde" type="button" id="sim-llega"><svg class="i"><use href="#i-entrada"/></svg>Llega alguien a la caseta</button>
             <button class="btn rojo" type="button" id="sim-sale"><svg class="i"><use href="#i-salida"/></svg>Sale alguien de la planta</button>
           </div>
+          <p class="nota-graf" id="sim-sig" style="margin:-4px 0 10px"></p>
           <div class="filtros" style="margin-bottom:6px">
             <div class="ancho"><label class="lbl" for="sim-elegir">O elige a una persona</label><select id="sim-elegir"></select></div>
           </div>
@@ -525,6 +544,8 @@
   function cuando(d) { return claveDia(d) === claveDia(ahora()) ? 'hoy ' + hhmm(d) : (claveDia(d) === claveDia(sumarDias(ahora(), -1)) ? 'ayer ' + hhmm(d) : fechaCorta(d) + ' ' + hhmm(d)); }
   function dur(ms) { var m = Math.max(0, Math.round(ms / MIN)), h = Math.floor(m / 60); return h + ' h ' + dos(m % 60) + ' min'; }
   function fmtH(h) { return (Math.round(h * 10) / 10).toLocaleString('es-MX') + ' h'; }
+  var MARCAS = new RegExp('[' + String.fromCharCode(0x300) + '-' + String.fromCharCode(0x36f) + ']', 'g');
+  function sinAcentos(t) { return String(t || '').normalize('NFD').replace(MARCAS, '').toLowerCase(); }
   function iniciales(n) { var p = n.split(' '); return (p[0][0] + (p[1] ? p[1][0] : '')).toUpperCase(); }
   var tToast;
   function toast(t, err) { var el = $('toast'); el.textContent = t; el.className = 'toast' + (err ? ' err' : ''); el.hidden = false; clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 3400); }
@@ -537,7 +558,7 @@
 
   /* ══ Alertas ══ */
   var ATENDIDAS = {};
-  function A(sev, tipo, p, texto, t, accion) { return { sev: sev, tipo: tipo, p: p, texto: texto, t: t || null, clave: sev + '|' + tipo + '|' + p.id, accion: accion || '' }; }
+  function A(sev, tipo, p, texto, t, accion) { return { sev: sev, tipo: tipo, p: p, texto: texto, t: t || null, clave: sev + '|' + tipo + '|' + p.id + (t ? '|' + (+t) : ''), accion: accion || '' }; }
   function alertas(incluirAtendidas) {
     var out = [], N = ahora(), lim = limites(), R = REGLAS;
     PERSONAS.forEach(function (p) {
@@ -559,7 +580,8 @@
       if (N - ev.t < 48 * HORA) out.push(A('critico', 'Intento de ingreso vetado', P[ev.pid], 'Intentó entrar por ' + ev.caseta + ' (' + cuando(ev.t) + '). El guardia vio «NO PASA».' + (P[ev.pid].veto ? ' Vetado por: ' + P[ev.pid].veto.motivo.toLowerCase() + '.' : ''), ev.t));
     });
     VALES.forEach(function (v) {
-      if (!v.cerrado && N - v.abierto > R.vale * DIA) out.push(A('aviso', 'Vale sin cerrar', P[v.pid], 'Vale ' + v.folio + ' (' + TIPO_VALE[v.tipo].toLowerCase() + ': ' + v.items.join(', ') + ') abierto desde hace ' + Math.floor((N - v.abierto) / DIA) + ' días' + (v.nota ? ' · ' + v.nota.toLowerCase() : '') + '.', v.abierto));
+      if (!v.cerrado && v.forzado && N - v.abierto <= R.vale * DIA) out.push(A('grave', 'Herramienta no presentada', P[v.pid], 'Vale ' + v.folio + ': ' + (v.nota || 'salió sin presentar lo registrado') + '.', v.abierto));
+      else if (!v.cerrado && N - v.abierto > R.vale * DIA) out.push(A('aviso', 'Vale sin cerrar', P[v.pid], 'Vale ' + v.folio + ' (' + TIPO_VALE[v.tipo].toLowerCase() + ': ' + v.items.join(', ') + ') abierto desde hace ' + Math.floor((N - v.abierto) / DIA) + ' días' + (v.nota ? ' · ' + v.nota.toLowerCase() : '') + '.', v.abierto));
     });
     var orden = { critico: 0, grave: 1, aviso: 2 };
     out = out.filter(function (a) { return incluirAtendidas || !ATENDIDAS[a.clave]; });
@@ -642,23 +664,33 @@
   var SEC = 'tablero';
   function ir(sec) {
     SEC = sec;
-    document.querySelectorAll('.sec').forEach(function (s) { s.hidden = s.id !== 'sec-' + sec; });
+    document.querySelectorAll('main > section.sec').forEach(function (s) { s.hidden = s.id !== 'sec-' + sec; });
     document.querySelectorAll('#menu button').forEach(function (b) { if (b.dataset.sec === sec) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current'); });
     try { history.replaceState(null, '', '#' + sec); } catch (e) {}
     window.scrollTo(0, 0);
     pintar();
   }
-  $('menu').addEventListener('click', function (ev) { var b = ev.target.closest('button[data-sec]'); if (b) ir(b.dataset.sec); });
+  $('menu').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button[data-sec]'); if (!b) return;
+    if (b.dataset.sec === 'personas') { $('f-est').value = ''; $('f-buscar').value = ''; $('f-emp').value = ''; limitePer = 40; }
+    if (b.dataset.sec === 'alertas') { $('f-al-sev').value = ''; $('f-al-tipo').value = ''; }
+    ir(b.dataset.sec);
+  });
   document.addEventListener('click', function (ev) {
     var t;
-    if ((t = ev.target.closest('[data-ir]'))) { if (t.dataset.filtro != null) { $('f-est').value = t.dataset.filtro; limitePer = 40; } ir(t.dataset.ir); return; }
+    if ((t = ev.target.closest('[data-ir]'))) {
+      if (t.dataset.filtro != null) { $('f-est').value = t.dataset.filtro; $('f-buscar').value = ''; $('f-emp').value = ''; limitePer = 40; }
+      if (t.dataset.ir === 'alertas') { $('f-al-sev').value = ''; filtroAl = t.dataset.filtroAl || ''; }
+      ir(t.dataset.ir); return;
+    }
     if ((t = ev.target.closest('[data-persona]'))) { abrirPersona(t.dataset.persona); return; }
-    if ((t = ev.target.closest('[data-atender]'))) { ATENDIDAS[t.dataset.atender] = new Date(); toast('Alerta marcada como atendida (queda en el historial).'); pintar(); return; }
+    if ((t = ev.target.closest('[data-atender]'))) { ATENDIDAS[t.dataset.atender] = new Date(); toast('Alerta marcada como atendida: sale de la lista.'); pintar(); return; }
   });
   $('btn-campana').onclick = function () { ir('alertas'); };
 
   function pintar() {
     D.tick();
+    revisarSimAbierta();
     var N = ahora(), m = N.getHours() * 60 + N.getMinutes();
     $('reloj').innerHTML = '<b>' + hhmm(N) + '</b><span>' + (m >= 390 && m < 1110 ? 'Turno de día' : 'Turno de noche') + ' · ' + fechaCorta(N) + '</span>';
     var al = alertas(), crit = al.filter(function (a) { return a.sev === 'critico'; }).length;
@@ -686,7 +718,7 @@
       '<div class="kpi"><div class="l">' + ico('salida') + 'Salidas</div><div class="v">' + num(sal24) + '</div><div class="s">Últimas 24 h</div></div>' +
       '<div class="kpi click" data-ir="alertas"><div class="l">' + ico('alerta') + 'Alertas</div><div class="v">' + num(al.length) + '</div><div class="s"><span class="st critico">' + ico('alerta') + crit + ' críticas</span> ' + grav + ' graves</div></div>' +
       '<div class="kpi click" data-ir="incidencias"><div class="l">' + ico('escudo') + 'Incidencias</div><div class="v">' + num(inc30) + '</div><div class="s">Últimos 30 días · ' + PERSONAS.filter(vetoVigente).length + ' vetados</div></div>' +
-      '<div class="kpi click" data-ir="vales"><div class="l">' + ico('doc') + 'Documentación al día</div><div class="v">' + Math.round(alDia / activos.length * 100) + ' %</div><div class="s">' + vAb.length + ' vales abiertos · ' + vVen + ' vencidos</div></div>';
+      '<div class="kpi click" data-ir="personas" data-filtro="docs"><div class="l">' + ico('doc') + 'Documentación al día</div><div class="v">' + Math.round(alDia / activos.length * 100) + ' %</div><div class="s">' + vAb.length + ' vales abiertos · ' + vVen + ' vencidos</div></div>';
     $('alertas-top').innerHTML = al.slice(0, 12).map(htmlAlerta).join('') || '<li class="al">Sin alertas.</li>';
 
     // Ocupación cada 15 minutos
@@ -751,16 +783,17 @@
   }
 
   /* ══ ALERTAS ══ */
+  var filtroAl = null;
   function pintarAlertas(al) {
     var sel = $('f-al-tipo'), tipos = {}; alertas(true).forEach(function (a) { tipos[a.tipo] = 1; });
-    var antes = sel.value;
-    sel.innerHTML = '<option value="">Todos</option>' + Object.keys(tipos).sort().map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('');
-    sel.value = tipos[antes] ? antes : '';
+    var antes = filtroAl !== null ? filtroAl : sel.value; filtroAl = null;
+    sel.innerHTML = '<option value="">Todos</option><option value="__jornada">Jornada (permanencia, semana, descanso)</option>' + Object.keys(tipos).sort().map(function (t) { return '<option>' + esc(t) + '</option>'; }).join('');
+    sel.value = (tipos[antes] || antes === '__jornada') ? antes : '';
     var fs = $('f-al-sev').value, ft = sel.value;
-    var l = al.filter(function (a) { return (!fs || a.sev === fs) && (!ft || a.tipo === ft); });
+    var l = al.filter(function (a) { return (!fs || a.sev === fs) && (!ft || (ft === '__jornada' ? /Permanencia|Jornada|descanso|tope/.test(a.tipo) : a.tipo === ft)); });
     var at = Object.keys(ATENDIDAS).length;
     $('alertas-todas').innerHTML = (l.map(htmlAlerta).join('') || '<li class="al">Sin alertas con esos filtros.</li>') +
-      (at ? '<li class="al" style="color:var(--texto-hint);font-size:12.5px">' + at + ' alerta(s) atendida(s) en esta sesión: quedan en el historial de cada persona.</li>' : '');
+      (at ? '<li class="al" style="color:var(--texto-hint);font-size:12.5px">' + at + (at === 1 ? ' alerta atendida' : ' alertas atendidas') + ' en esta sesión (ya no se muestran).</li>' : '');
   }
   $('f-al-sev').onchange = $('f-al-tipo').onchange = function () { pintar(); };
 
@@ -787,12 +820,12 @@
     return est === 'vencido' ? '<span class="st critico">' + ico('doc') + 'Vencidos</span>' : (est === 'porvencer' ? '<span class="st aviso">' + ico('doc') + 'Por vencer</span>' : '<span class="st bueno">' + ico('ok') + 'Al día</span>');
   }
   function pintarPersonas(al) {
-    var q = $('f-buscar').value.trim().toLowerCase(), fe = $('f-emp').value, fs = $('f-est').value, lim = limites();
+    var q = sinAcentos($('f-buscar').value.trim()), fe = $('f-emp').value, fs = $('f-est').value, lim = limites();
     var conAl = {}; al.forEach(function (a) { conAl[a.p.id] = (conAl[a.p.id] || 0) + 1; });
     var l = PERSONAS.filter(function (p) {
       var s = stats(p);
       if (fe && p.emp !== fe) return false;
-      if (q && (p.nombre + ' ' + p.puesto + ' ' + p.idNum).toLowerCase().indexOf(q) < 0) return false;
+      if (q && sinAcentos(p.nombre + ' ' + p.puesto + ' ' + p.idNum).indexOf(q) < 0) return false;
       if (fs === 'dentro' && !s.dentro) return false;
       if (fs === 'alertas' && !conAl[p.id]) return false;
       if (fs === 'vetado' && !vetoVigente(p)) return false;
@@ -840,7 +873,7 @@
                   y: { stacked: true, grid: { display: false }, ticks: { color: C.tinta, font: { size: 11 } } } } } });
     var aj = al.filter(function (a) { return /Permanencia|Jornada|descanso|tope/.test(a.tipo); });
     $('jor-alertas').innerHTML = (aj.slice(0, 15).map(htmlAlerta).join('') || '<li class="al">Sin alertas de jornada.</li>') +
-      (aj.length > 15 ? '<li class="al"><button class="lnk" type="button" data-ir="alertas">Ver las ' + aj.length + ' alertas de jornada</button></li>' : '');
+      (aj.length > 15 ? '<li class="al"><button class="lnk" type="button" data-ir="alertas" data-filtro-al="__jornada">Ver las ' + aj.length + ' alertas de jornada</button></li>' : '');
   }
   function textoLey() {
     var lim = limites();
@@ -914,11 +947,14 @@
         return '<tr><td><b>' + v.folio + '</b></td><td>' + esc(TIPO_VALE[v.tipo]) + (v.autoriza ? '<div style="font-size:12px;color:var(--texto-hint)">' + esc(v.autoriza) + '</div>' : '') + '</td>' +
           '<td><button class="lnk" type="button" data-persona="' + p.id + '" style="padding:0;text-align:left">' + esc(p.nombre) + '</button><div style="font-size:12px;color:var(--texto-hint)">' + esc(EMP[p.emp].corto) + '</div></td>' +
           '<td>' + esc(v.items.join(', ')) + (v.nota ? '<div style="font-size:12px;color:#8a3a12">' + esc(v.nota) + '</div>' : '') + '</td><td>' + esc(cuando(v.abierto)) + '</td><td>' + est + '</td>' +
-          '<td>' + (v.cerrado ? '' : '<button class="btn peq fant" type="button" data-cerrar-vale="' + v.folio + '">Cerrar</button>') + '</td></tr>';
+          '<td>' + (v.cerrado ? '' : (v.tipo === 'mat' && /Pendiente/.test(v.autoriza || '') ? '<button class="btn peq verde" type="button" data-autorizar-mat="' + v.folio + '">Autorizar</button> ' : '') +
+            '<button class="btn peq fant" type="button" data-cerrar-vale="' + v.folio + '">Cerrar</button>') + '</td></tr>';
       }).join('') + '</tbody>';
   }
   $('f-val').onchange = function () { pintar(); };
   document.addEventListener('click', function (ev) {
+    var m = ev.target.closest('[data-autorizar-mat]');
+    if (m) { D.registrar({ k: 'am', folio: m.dataset.autorizarMat, quien: 'Admin. de accesos' }); toast('Salida de material ' + m.dataset.autorizarMat + ' autorizada: el guardia lo verá a la salida.'); pintar(); return; }
     var b = ev.target.closest('[data-cerrar-vale]'); if (!b) return;
     D.registrar({ k: 'cv', folio: b.dataset.cerrarVale });
     toast('Vale ' + b.dataset.cerrarVale + ' cerrado.'); pintar();
@@ -928,8 +964,10 @@
   /* ══ REGLAS Y ROLES ══ */
   Object.keys(TABLA_LEY).forEach(function (a) { $('r-anio').insertAdjacentHTML('beforeend', '<option value="' + a + '">' + a + ' · ' + TABLA_LEY[a].ord + ' h por semana</option>'); });
   function pintarReglas() {
-    $('r-anio').value = REGLAS.anio; $('r-perm').value = REGLAS.perm; $('r-desc').value = REGLAS.diasSeguidos; $('r-vale').value = REGLAS.vale;
-    $('r-alc').value = REGLAS.alc; $('r-docs').checked = REGLAS.docs; $('r-cel').checked = REGLAS.cel; $('r-herr').checked = REGLAS.herr;
+    [['r-anio', REGLAS.anio], ['r-perm', REGLAS.perm], ['r-desc', REGLAS.diasSeguidos], ['r-vale', REGLAS.vale], ['r-alc', REGLAS.alc]].forEach(function (x) {
+      if (document.activeElement !== $(x[0])) $(x[0]).value = x[1];
+    });
+    $('r-docs').checked = REGLAS.docs; $('r-cel').checked = REGLAS.cel; $('r-herr').checked = REGLAS.herr;
     var si = '<span class="si-no si">' + ico('ok') + 'Sí</span>', no = '<span class="si-no no">' + ico('x') + 'No</span>';
     var filas = [
       ['Tomar la foto de la identificación (entrada y salida)', si, no, si],
@@ -956,10 +994,11 @@
       '<p class="fuentes" style="margin-top:8px">Antes de usar las cifras en producción hay que confirmarlas con el texto del DOF.</p>';
   }
   function cambiarRegla() {
-    REGLAS.anio = +$('r-anio').value; REGLAS.perm = Math.max(8, Math.min(16, +$('r-perm').value || 12)); REGLAS.diasSeguidos = Math.max(5, Math.min(13, +$('r-desc').value || 6));
-    REGLAS.vale = Math.max(1, +$('r-vale').value || 3); REGLAS.alc = Math.max(0, Math.min(100, +$('r-alc').value || 0));
-    REGLAS.docs = $('r-docs').checked; REGLAS.cel = $('r-cel').checked; REGLAS.herr = $('r-herr').checked;
-    toast('Reglas actualizadas: ' + alertas().length + ' alertas activas.');
+    D.registrar({ k: 'reg', r: {
+      anio: +$('r-anio').value, perm: Math.max(8, Math.min(16, +$('r-perm').value || 12)), diasSeguidos: Math.max(5, Math.min(13, +$('r-desc').value || 6)),
+      vale: Math.max(1, Math.min(30, +$('r-vale').value || 3)), alc: Math.max(0, Math.min(100, +$('r-alc').value || 0)),
+      docs: $('r-docs').checked, cel: $('r-cel').checked, herr: $('r-herr').checked } });
+    toast('Reglas actualizadas' + (D.sala ? ' (también en la caseta)' : '') + ': ' + alertas().length + ' alertas activas.');
     pintar();
   }
   ['r-anio', 'r-perm', 'r-desc', 'r-vale', 'r-alc', 'r-docs', 'r-cel', 'r-herr'].forEach(function (id) { $(id).onchange = cambiarRegla; });
@@ -968,6 +1007,7 @@
   var PANEL_P = null;
   function abrirPersona(pid) {
     var p = P[pid]; if (!p) return;
+    var mismo = PANEL_P === pid && !$('panel').hidden, y = $('panel').scrollTop;   // al refrescar el mismo perfil, no se pierde la posición
     PANEL_P = pid; D.tick();
     var s = stats(p), e = EMP[p.emp], N = ahora(), lim = limites();
     var mis = alertas().filter(function (a) { return a.p === p; });
@@ -1003,7 +1043,7 @@
       return '<li>' + ico(it.sal ? 'salida' : 'entrada') + '<div class="tx">' + esc(fechaCorta(it.ent)) + ' · ' + hhmm(it.ent) + ' → ' + (it.sal ? hhmm(it.sal) + (claveDia(it.sal) !== claveDia(it.ent) ? ' (' + esc(fechaCorta(it.sal)) + ')' : '') : '<b>dentro</b>') +
         '<span>' + esc(it.cE) + (it.obs ? ' · ' + esc(it.obs) : '') + '</span></div><b style="font-size:12.5px;' + (d > REGLAS.perm * HORA ? 'color:#8f1f1f' : '') + '">' + dur(d) + '</b></li>';
     }).join('') + '</ul></div></div>';
-    $('panel').innerHTML = h; $('panel').hidden = false; $('velo').hidden = false; $('panel').scrollTop = 0;
+    $('panel').innerHTML = h; $('panel').hidden = false; $('velo').hidden = false; document.body.classList.add('con-panel'); $('panel').scrollTop = mismo ? y : 0;
     // Horas por día (14 días)
     var dias = [], hs = [];
     for (var k = 13; k >= 0; k--) {
@@ -1025,7 +1065,7 @@
       D.registrar({ k: 'lev', pid: p.id }); toast('Veto levantado. Queda registrado en su expediente.'); abrirPersona(p.id); pintar();
     };
   }
-  function cerrarPanel() { $('panel').hidden = true; $('velo').hidden = true; PANEL_P = null; if (GRAF['g-persona']) { GRAF['g-persona'].destroy(); delete GRAF['g-persona']; } }
+  function cerrarPanel() { $('panel').hidden = true; $('velo').hidden = true; document.body.classList.remove('con-panel'); PANEL_P = null; if (GRAF['g-persona']) { GRAF['g-persona'].destroy(); delete GRAF['g-persona']; } }
   $('velo').onclick = cerrarPanel;
   document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') { if (!$('modal').hidden) $('modal').hidden = true; else if (!$('panel').hidden) cerrarPanel(); } });
 
@@ -1034,13 +1074,13 @@
     var ops = PERSONAS.slice().sort(function (a, b) { return a.nombre.localeCompare(b.nombre); }).map(function (p) { return '<option value="' + p.id + '"' + (p.id === pid ? ' selected' : '') + '>' + esc(p.nombre) + ' · ' + esc(EMP[p.emp].corto) + '</option>'; }).join('');
     var N = ahora(), local = N.getFullYear() + '-' + dos(N.getMonth() + 1) + '-' + dos(N.getDate()) + 'T' + hhmm(N);
     $('modal-c').innerHTML = '<h3>' + (vetar ? 'Vetar a una persona' : 'Registrar incidencia') + '</h3><div class="rej">' +
-      '<div class="campo full"><label for="fi-p">Persona</label><select id="fi-p">' + ops + '</select></div>' +
+      '<div class="campo full"><label for="fi-p">Persona</label><select id="fi-p"><option value="">— Elige a la persona —</option>' + ops + '</select></div>' +
       '<div class="campo"><label for="fi-t">Tipo</label><select id="fi-t">' + Object.keys(TIPOS_INC).map(function (k) { return '<option value="' + k + '"' + (vetar && k === 'ALC' ? ' selected' : '') + '>' + esc(TIPOS_INC[k].n) + '</option>'; }).join('') + '</select></div>' +
-      '<div class="campo"><label for="fi-f">Fecha y hora</label><input type="datetime-local" id="fi-f" value="' + local + '"></div>' +
+      '<div class="campo"><label for="fi-f">Fecha y hora</label><input type="datetime-local" id="fi-f" value="' + local + '" max="' + local + '"></div>' +
       '<div class="campo"><label for="fi-a">Medida</label><select id="fi-a">' + ACCIONES.map(function (a) { return '<option' + (vetar && a === 'Veto 90 días' ? ' selected' : '') + '>' + a + '</option>'; }).join('') + '</select></div>' +
       '<div class="campo"><label for="fi-ev">Evidencia (foto o documento)</label><input type="file" id="fi-ev" accept="image/*,application/pdf" style="font-size:12.5px;padding-top:9px"></div>' +
       '<div class="campo full"><label for="fi-d">Descripción</label><textarea id="fi-d" placeholder="Qué pasó, dónde y quién lo reportó"></textarea></div>' +
-      '<p class="nota-graf full">Un veto lo aplica la puerta en el siguiente intento de entrada: el guardia ve «NO PASA» sin el motivo y a ti te llega una alerta. Un accidente con lesión pide el aviso al IMSS (ST-7).</p></div>' +
+      '<p class="nota-graf full">Un veto lo aplica la puerta en el siguiente intento de entrada: el guardia ve «NO PASA» y que está vetado (sin el detalle) y a ti te llega una alerta. Un accidente con lesión pide el aviso al IMSS (ST-7).</p></div>' +
       '<div class="acciones"><button class="btn fant" type="button" id="fi-cancel">Cancelar</button><button class="btn ' + (vetar ? 'rojo' : 'prim') + '" type="button" id="fi-ok">' + (vetar ? 'Vetar' : 'Guardar incidencia') + '</button></div>';
     $('modal').hidden = false;
     $('fi-t').onchange = function () {
@@ -1051,6 +1091,8 @@
     $('fi-cancel').onclick = function () { $('modal').hidden = true; };
     $('fi-ok').onclick = function () {
       var p = P[$('fi-p').value], tipo = $('fi-t').value, acc = $('fi-a').value, f = new Date($('fi-f').value || Date.now());
+      if (!p) { toast('Elige a la persona.', true); $('fi-p').focus(); return; }
+      if (isNaN(f) || f > ahora()) f = ahora();
       var inc = D.registrar({ k: 'inc', pid: p.id, tipo: tipo, accion: acc, desc: $('fi-d').value.trim(), t: +f });
       $('modal').hidden = true;
       toast(inc.folio + ' registrada' + (/Veto/.test(acc) ? ' · ' + p.nombre.split(' ')[0] + ' queda vetado' : '') + '.');
@@ -1064,19 +1106,30 @@
   $('sim-elegir').innerHTML = '<option value="">— Elegir persona —</option>' + PERSONAS.slice().sort(function (a, b) { return a.nombre.localeCompare(b.nombre); })
     .map(function (p) { return '<option value="' + p.id + '">' + esc(p.nombre) + ' · ' + esc(EMP[p.emp].corto) + '</option>'; }).join('');
   var candidato = D.candidato, revisarEntrada = D.revisar;
+  function firmaP(p) { return JSON.stringify(p.aut) + p.estado + JSON.stringify(REGLAS); }
+  function revisarSimAbierta() {
+    if (!SIM || SIM.modo !== 'entrada' || SIM.registrado || firmaP(SIM.p) === SIM.firma) return;
+    var viejo = SIM.r.res, nuevo = revisarEntrada(SIM.p, SIM.caso);
+    if (nuevo.res === 'prueba' && viejo !== 'prueba') nuevo.res = nuevo.base;          // sin volver a sortear
+    if (viejo === 'prueba' && (nuevo.base === 'pasa' || nuevo.base === 'obs')) nuevo.res = 'prueba';
+    SIM.r = nuevo; SIM.firma = firmaP(SIM.p);
+    if (SEC === 'puerta') pintarSim(false);
+    toast('La puerta volvió a revisar a ' + SIM.p.nombre.split(' ')[0] + ' con los cambios.');
+  }
   function iniciarEntrada(p, caso) {
     if (!p) { toast('No hay a quién simular con ese caso.', true); return; }
     var r = revisarEntrada(p, caso);
-    SIM = { modo: 'entrada', p: p, r: r, caso: caso, t: ahora() };
+    SIM = { modo: 'entrada', p: p, r: r, caso: caso, t: ahora(), firma: firmaP(p) };
     pintarSim(true);
   }
   function iniciarSalida(p) {
     D.tick();
     if (!p) {
+      var ult = MOVS.filter(function (m) { return m.tipo === 'e' && !/Negado/.test(m.res) && stats(m.p).dentro && valesAbiertos(m.p).some(function (v) { return v.tipo === 'herr'; }); })[0];
       var dentro = PERSONAS.filter(function (x) { return stats(x).dentro; });
-      var conVale = dentro.filter(function (x) { return valesAbiertos(x).some(function (v) { return v.tipo === 'herr'; }); });
-      var pool = Math.random() < 0.6 && conVale.length ? conVale : dentro;
-      p = pool[Math.floor(Math.random() * pool.length)];
+      var conVale = dentro.filter(function (x) { return valesAbiertos(x).some(function (v) { return v.tipo === 'herr' || v.tipo === 'equipo'; }); });
+      var pool = conVale.length ? conVale : dentro;
+      p = ult ? ult.p : pool[Math.floor(Math.random() * pool.length)];
     }
     if (!p) { toast('No hay nadie dentro.', true); return; }
     var s = stats(p), ch = [], inst = [];
@@ -1090,7 +1143,10 @@
     SIM = { modo: 'salida', p: p, r: { ch: ch, inst: inst, res: 'pasa' }, t: ahora() };
     pintarSim(true);
   }
-  $('sim-llega').onclick = function () { var caso = GUION[guionI++ % GUION.length]; iniciarEntrada(candidato(caso), caso); };
+  var NOMBRE_CASO = { ok: 'todo en orden', herr: 'con herramienta', cel: 'celular sin permiso', veto: 'persona vetada', vale: 'vale pendiente', semana: 'exceso de horas', doc: 'documento vencido', alcohol: 'alcoholímetro' };
+  function pintarSiguiente() { var c = GUION[guionI % GUION.length]; $('sim-sig').textContent = 'Siguiente caso (' + ((guionI % GUION.length) + 1) + ' de ' + GUION.length + '): ' + NOMBRE_CASO[c] + '.'; }
+  $('sim-llega').onclick = function () { var caso = GUION[guionI++ % GUION.length]; iniciarEntrada(candidato(caso), caso); pintarSiguiente(); };
+  pintarSiguiente();
   $('sim-sale').onclick = function () { iniciarSalida(null); };
   $('sim-elegir').onchange = function () {
     var p = P[$('sim-elegir').value]; if (!p) return;
@@ -1117,8 +1173,8 @@
     h += '<ul class="checks">' + r.ch.map(function (c, ci) {
       var extra = '';
       if (c.herr) extra = c.herr.map(function (x) { return '<label><input type="checkbox" checked disabled> ' + esc(x) + '</label>'; }).join('');
-      if (c.vale && c.vale.tipo === 'herr') extra = c.vale.items.map(function (x, xi) { return '<label><input type="checkbox" checked data-sale="' + xi + '"> ' + esc(x) + '</label>'; }).join('');
-      if (c.vale && c.vale.tipo === 'equipo') extra = '<label><input type="checkbox" checked data-devuelto="1"> Devuelto</label>';
+      if (c.vale && c.vale.tipo === 'herr') extra = c.vale.items.map(function (x, xi) { return '<label><input type="checkbox" checked data-sale="' + c.vale.folio + '|' + xi + '"> ' + esc(x) + '</label>'; }).join('');
+      if (c.vale && c.vale.tipo === 'equipo') extra = '<label><input type="checkbox" checked data-devuelto="' + c.vale.folio + '"> Devuelto</label>';
       return '<li><span class="ic ' + (c.s === 'ok' ? 'ok' : c.s) + '">' + ico(c.s === 'ok' ? 'ok' : c.i) + '</span><div><b>' + esc(c.t) + '</b><p>' + esc(c.d) + '</p>' + extra + '</div></li>';
     }).join('') + '</ul>';
     if (ent) h += '<div class="veredicto ' + v[0] + '">' + ico(v[1]) + '<div>' + v[2] + '<small>' + v[3] + '</small></div></div>';
@@ -1134,7 +1190,7 @@
     if ($('sim-ok')) $('sim-ok').onclick = ent ? function () { confirmarEntrada(''); } : confirmarSalida;
     if ($('sim-aut')) $('sim-aut').onclick = function () { confirmarEntrada('Excepción de jornada autorizada por Admin. de accesos'); };
     if ($('sim-neg')) $('sim-neg').onclick = function () { SIM.r.res = 'nopasa'; registrarIntento('Acceso negado por jornada'); };
-    if ($('sim-fin')) $('sim-fin').onclick = function () { if (SIM.registrado) { SIM = null; pintarSim(); pintar(); } else registrarIntento('Acceso negado'); };
+    if ($('sim-fin')) $('sim-fin').onclick = function () { if (SIM.registrado) { SIM = null; pintarSim(); pintar(); } else registrarIntento((SIM.r.motivos || [])[0] || 'Acceso negado'); };
   }
   function pintarTel() {
     var hdr = '<div class="bar">Control de accesos · Caseta 1</div>';
@@ -1149,34 +1205,35 @@
     if ($('alc-neg')) $('alc-neg').onclick = function () {
       SIM.r.ch.push({ s: 'ok', i: 'copa', t: 'Alcoholímetro: negativo', d: '0.00 g/L a las ' + hhmm(ahora()) + '.' });
       SIM.r.inst = SIM.r.inst.filter(function (x) { return x[0] !== 'copa'; });
-      SIM.r.res = SIM.r.ch.some(function (c) { return c.s === 'aviso' || c.s === 'grave'; }) ? 'obs' : 'pasa';
+      SIM.r.res = SIM.r.base || 'pasa';
       pintarSim(false);
     };
     if ($('alc-pos')) $('alc-pos').onclick = function () {
+      registrarIntento('Alcoholímetro positivo', true);
       var inc = D.registrar({ k: 'inc', pid: p.id, tipo: 'ALC', accion: 'Veto 30 días', desc: 'Alcoholímetro en caseta: 0.41 g/L.', por: 'Guardia Caseta 1' });
       SIM.r.ch.push({ s: 'critico', i: 'copa', t: 'Alcoholímetro: POSITIVO (0.41 g/L)', d: 'Se registró la incidencia ' + inc.folio + ' y un veto de 30 días (ajustable en su expediente).' });
       SIM.r.inst = []; SIM.r.res = 'nopasa';
-      registrarIntento('Alcoholímetro positivo', true);
       pintarSim(false); pintar();
     };
   }
   function confirmarEntrada(obs) {
     var p = SIM.p, t = ahora();
     D.registrar({ k: 'ent', pid: p.id, t: +t, caseta: CASETAS[0], obs: obs || (SIM.r.inst.length ? SIM.r.inst.map(function (x) { return x[1]; }).join(' · ') : ''),
-      herr: !!(p.aut.herr && REGLAS.herr), res: obs ? 'Con autorización' : (SIM.r.res === 'obs' ? 'Con observaciones' : 'Permitido'), quien: 'Simulación del panel' });
+      herr: !!(p.aut.herr && REGLAS.herr && p.herr.length), items: p.herr.slice(), res: obs ? 'Con autorización' : (SIM.r.res === 'obs' ? 'Con observaciones' : 'Permitido'), quien: 'Simulación del panel' });
     toast('Entrada registrada: ' + p.nombre + ' · ' + hhmm(t));
     SIM = null; pintarSim(); pintar();
   }
   function confirmarSalida() {
-    var p = SIM.p, t = ahora(), falta = [], u = p.ints[p.ints.length - 1], equipoNo = false;
-    valesAbiertos(p).forEach(function (v) {
-      if (v.tipo === 'herr') {
-        var nodos = $('sim').querySelectorAll('[data-sale]');
-        falta = falta.concat([].filter.call(nodos, function (c) { return !c.checked; }).map(function (c) { return v.items[+c.dataset.sale]; }));
-      } else if (v.tipo === 'equipo') { var dv = $('sim').querySelector('[data-devuelto]'); if (dv && !dv.checked) equipoNo = true; }
+    var p = SIM.p, t = ahora(), falta = [], nombres = [], noDev = [], u = p.ints[p.ints.length - 1];
+    $('sim').querySelectorAll('[data-sale]').forEach(function (c) {
+      if (c.checked) return;
+      var x = c.dataset.sale.split('|'), v = VALES.filter(function (y) { return y.folio === x[0]; })[0];
+      if (v) { falta.push(v.folio + ': ' + v.items[+x[1]]); nombres.push(v.items[+x[1]]); }
     });
-    D.registrar({ k: 'sal', pid: p.id, t: +t, caseta: CASETAS[0], falta: falta, equipoNo: equipoNo, quien: 'Simulación del panel' });
-    toast(falta.length ? 'Salida registrada con faltante: ' + falta.join(', ') + '. El vale queda abierto y genera alerta.' : 'Salida registrada: ' + p.nombre + ' · ' + dur(t - u.ent), !!falta.length);
+    $('sim').querySelectorAll('[data-devuelto]').forEach(function (c) { if (!c.checked) noDev.push(c.dataset.devuelto); });
+    D.registrar({ k: 'sal', pid: p.id, t: +t, caseta: CASETAS[0], falta: falta, noDevuelto: noDev, quien: 'Simulación del panel' });
+    var conFalta = falta.length || noDev.length;
+    toast(conFalta ? 'Salida registrada con faltante' + (nombres.length ? ': ' + nombres.join(', ') : ' de equipo prestado') + '. El vale queda abierto y genera alerta.' : 'Salida registrada: ' + p.nombre + ' · ' + dur(t - u.ent), !!conFalta);
     SIM = null; pintarSim(); pintar();
   }
   function registrarIntento(motivo, quedarse) {
@@ -1200,19 +1257,69 @@
     }).join('');
   }
 
-  $('btn-reiniciar').onclick = function () { if (confirm('¿Reiniciar la demo? Se borra lo registrado en este navegador (en las dos pantallas).')) D.reiniciar(); };
+  $('btn-reiniciar').onclick = function () { if (confirm(D.sala ? '¿Reiniciar la demo? Se borra lo registrado en la sala ' + D.sala + ' y todos los equipos conectados vuelven al inicio.' : '¿Reiniciar la demo? Se borra lo registrado en este navegador (en las dos pantallas).')) D.reiniciar(); };
+  var movsVistos = MOVS.length;
   D.alCambiar(function () {
-    var m = MOVS[0];
-    if (m) toast((m.tipo === 'e' ? (/Negado/.test(m.res) ? 'No pasó: ' : 'Entrada: ') : 'Salida: ') + m.p.nombre + ' · ' + hhmm(m.t) + (m.quien ? ' · ' + m.quien : ''), /Negado|Sin herr/.test(m.res));
-    pintar(); if (PANEL_P) abrirPersona(PANEL_P);
+    if (MOVS.length > movsVistos) {
+      var m = MOVS[0];
+      toast((m.tipo === 'e' ? (/Negado/.test(m.res) ? 'No pasó: ' : 'Entrada: ') : 'Salida: ') + m.p.nombre + ' · ' + hhmm(m.t) + (m.quien ? ' · ' + m.quien : ''), /Negado|Sin herr/.test(m.res));
+    }
+    movsVistos = MOVS.length;
+    pintar(); pintarSolicitudes(); if (PANEL_P) abrirPersona(PANEL_P);
   });
+  /* Solicitudes de autorización del guardia: el administrador responde aquí */
+  var solIds = '', solListo = false, TITULO = document.title;
+  function pintarSolicitudes() {
+    var pend = D.SOLICITUDES.filter(function (x) { return x.estado === 'pendiente'; });
+    var ids = pend.map(function (x) { return x.u; }).join(',');
+    if (ids === solIds) return;                                     // sin cambios: no se vuelve a pintar
+    var antes = solIds.split(',');
+    var nuevas = pend.filter(function (x) { return antes.indexOf(x.u) < 0; });
+    solIds = ids;
+    document.title = (pend.length ? '(' + pend.length + ') ' : '') + TITULO;
+    if (nuevas.length && solListo) toast('Solicitud de autorización: ' + nuevas[0].p.nombre + ' (' + nuevas[0].caseta.replace(/ \(.*/, '') + ')');
+    $('solicitudes').innerHTML = pend.map(function (x) {
+      var p = x.p, e = EMP[p.emp];
+      return '<div class="sol' + (nuevas.indexOf(x) >= 0 ? ' nueva' : '') + '" role="alertdialog" aria-label="Solicitud de autorización de ' + esc(p.nombre) + '"><div class="sol-t">' + ico('reloj') + '<b>Solicitud de autorización</b><span>' + esc(x.caseta.replace(/ \(.*/, '')) + ' · ' + hhmm(x.t) + '</span></div>' +
+        '<div class="sol-p"><div class="av">' + iniciales(p.nombre) + '</div><div><b>' + esc(p.nombre) + '</b><span>' + esc(p.puesto) + ' · ' + esc(e.corto) + '</span></div></div>' +
+        '<p>' + esc(x.motivo) + '. Lleva ' + fmtH(stats(p).h7) + ' en 7 días.</p>' +
+        '<div class="sol-a"><button class="btn peq fant" type="button" data-persona="' + p.id + '">Ver expediente</button>' +
+        '<button class="btn peq rojo" type="button" data-sol="' + x.u + '" data-ok="0">Negar</button>' +
+        '<button class="btn peq verde" type="button" data-sol="' + x.u + '" data-ok="1">' + ico('ok') + 'Autorizar</button></div></div>';
+    }).join('');
+  }
+  $('solicitudes').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-sol]'); if (!b) return;
+    var ok = b.dataset.ok === '1';
+    var x = D.registrar({ k: 'resp', sol: b.dataset.sol, ok: ok, quien: 'Admin. de accesos' });
+    toast(ok ? 'Autorizado: el guardia ya lo ve en su pantalla.' : 'Entrada negada: el guardia ya lo ve en su pantalla.', !ok);
+    pintarSolicitudes(); pintar();
+  });
+  D.alError(function () { toast('Una operación no se pudo compartir con la sala.', true); });
+  /* Sala compartida con la caseta (otro dispositivo) */
+  function pintarSala(estado) {
+    if (!D.sala) return;
+    var t = { conectado: 'en línea', conectando: 'conectando…', 'sin-conexion': 'sin conexión' }[estado] || estado;
+    $('sala-chip').hidden = false;
+    $('sala-chip').className = 'sala-chip ' + (estado === 'conectado' ? 'ok' : (estado === 'sin-conexion' ? 'mal' : ''));
+    $('sala-chip').innerHTML = '<i></i>Sala ' + D.sala + ' · ' + t;
+  }
+  if (D.sala) {
+    pintarSala(D.estadoSala()); D.alCambiarSala(pintarSala);
+    $('cinta-txt').innerHTML = '<b>DEMO</b> con datos ficticios. Conectada a la sala <b>' + D.sala + '</b>: lo que registre el guardia en su celular aparece aquí al instante.';
+  }
+  pintarSolicitudes(); solListo = true;
 
   /* ── Arranque ── */
   var SECCIONES = ['tablero', 'puerta', 'alertas', 'personas', 'jornadas', 'incidencias', 'vales', 'reglas'];
   window.addEventListener('hashchange', function () { var h = (location.hash || '').slice(1); if (SECCIONES.indexOf(h) >= 0 && h !== SEC) ir(h); });
   var inicial = (location.hash || '').slice(1);
   if (SECCIONES.indexOf(inicial) >= 0) ir(inicial); else pintar();
-  setInterval(function () { if ($('modal').hidden && !SIM) pintar(); }, 60000);
+  setInterval(function () {
+    if (!$('modal').hidden) return;
+    pintar();
+    if (PANEL_P && !$('panel').hidden) abrirPersona(PANEL_P);
+  }, 60000);
 })();
 </script>
 </body>

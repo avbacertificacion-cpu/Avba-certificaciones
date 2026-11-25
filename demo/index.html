@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>Control de accesos · Demo · AVBA</title>
+<meta name="theme-color" content="#0B2545">
+<link rel="icon" href="../assets/logos/avba.png">
+<!--
+  AVBA — Portada de la DEMO de control de accesos.
+  Abre las dos pantallas y las conecta en una «sala» para presentar con dos
+  dispositivos (laptop con el panel del administrador y celular con la pantalla
+  del guardia): lo que se registra en uno aparece en el otro (demo/sala.php).
+  Incluye el guion sugerido de la presentación. Datos ficticios.
+-->
+<style>
+  :root{
+    --azul:#185FA5; --azul-dark:#0C447C; --azul-light:#E6F1FB; --marino:#0B2545;
+    --texto:#1a1a2e; --texto-sub:#5a6072; --texto-hint:#8b91a0; --borde:#dfe5ef; --fondo:#f0f4f9;
+    --verde:#2F6B1E; --verde-light:#E8F3E1; --ambar:#8A5A00; --ambar-light:#FFF3D6; --rojo:#A32D2D; --rojo-light:#FCEBEB;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  [hidden]{display:none!important}
+  html,body{overflow-x:hidden;overflow-x:clip}
+  body{font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;background:var(--fondo);color:var(--texto);font-size:15px;line-height:1.5;-webkit-tap-highlight-color:transparent}
+  svg.i{width:20px;height:20px;flex-shrink:0;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+  .top{color:#fff;background:linear-gradient(160deg,var(--marino),var(--azul-dark));padding:calc(12px + env(safe-area-inset-top)) 20px 12px;display:flex;align-items:center;gap:12px}
+  .top img{height:32px;background:#fff;border-radius:6px;padding:3px 6px}
+  .top b{font-size:16px;font-weight:800;display:block;line-height:1.2}
+  .top span{font-size:12px;color:rgba(255,255,255,.8)}
+  .hero{background:linear-gradient(160deg,var(--marino),var(--azul-dark));color:#fff;padding:26px 20px 64px;text-align:center}
+  .hero h1{font-size:clamp(24px,4vw,34px);font-weight:800;line-height:1.2}
+  .hero p{max-width:720px;margin:10px auto 0;color:rgba(255,255,255,.85);font-size:15.5px}
+  .hero .ficticio{display:inline-block;margin-top:14px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);border-radius:999px;padding:5px 14px;font-size:12.5px;font-weight:700}
+  main{max-width:1040px;margin:-44px auto 0;padding:0 16px 50px}
+  .card{background:#fff;border-radius:16px;border:1px solid rgba(0,0,0,.05);box-shadow:0 6px 24px rgba(12,68,124,.08);padding:20px;margin-bottom:16px}
+  .card h2{font-size:18px;font-weight:800;color:var(--marino);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .card h2 .chip{font-size:11.5px;font-weight:800;border-radius:999px;padding:3px 10px;background:var(--verde-light);color:var(--verde)}
+  .card .sub{color:var(--texto-sub);font-size:14px;margin-top:4px}
+  .dos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-top:16px}
+  .lado{border:1.5px solid var(--borde);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}
+  .lado h3{font-size:15px;font-weight:800;display:flex;align-items:center;gap:8px;color:var(--azul-dark)}
+  .lado p{font-size:13.5px;color:var(--texto-sub)}
+  .btn{border:0;border-radius:12px;padding:13px 16px;font-size:15px;font-weight:800;cursor:pointer;min-height:48px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;font-family:inherit}
+  .btn.prim{background:var(--azul);color:#fff} .btn.prim:hover{background:var(--azul-dark)}
+  .btn.verde{background:var(--verde);color:#fff}
+  .btn.sec{background:#fff;color:var(--azul);border:1.5px solid var(--azul)}
+  .btn.fant{background:none;color:var(--texto-sub);border:1px solid var(--borde);font-weight:700;font-size:13.5px;min-height:40px;padding:8px 12px}
+  .sala{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:14px;background:var(--azul-light);border-radius:14px;padding:12px 16px}
+  .sala .cod{font-size:30px;font-weight:900;letter-spacing:4px;color:var(--marino);font-variant-numeric:tabular-nums}
+  .sala .et{font-size:12px;font-weight:800;color:var(--azul-dark);text-transform:uppercase;letter-spacing:.5px}
+  .sala .acc{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .estado{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px}
+  .estado.ok{color:var(--verde)} .estado.mal{color:var(--rojo)} .estado.esp{color:var(--texto-sub)}
+  .qr{display:flex;gap:14px;align-items:center}
+  .qr img{width:150px;height:150px;border-radius:10px;border:1px solid var(--borde);background:#fff;flex-shrink:0}
+  .qr .url{font-size:12.5px;color:var(--texto-sub);word-break:break-all}
+  .qr .url b{color:var(--texto);font-size:13px}
+  ol.guion{list-style:none;counter-reset:paso;margin-top:12px}
+  ol.guion li{counter-increment:paso;display:grid;grid-template-columns:36px 1fr;gap:10px;padding:12px 0;border-bottom:1px solid var(--borde)}
+  ol.guion li:last-child{border-bottom:0}
+  ol.guion li:before{content:counter(paso);width:32px;height:32px;border-radius:50%;background:var(--azul);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px}
+  ol.guion b{display:block;font-size:14.5px}
+  ol.guion .q{font-size:13.5px;color:var(--texto-sub);margin-top:2px}
+  ol.guion .di{font-size:13.5px;margin-top:5px;background:#f7f9fc;border-left:3px solid var(--azul);border-radius:6px;padding:6px 10px;color:#2c3a4f}
+  ul.check{list-style:none;margin-top:10px}
+  ul.check li{display:flex;gap:10px;padding:6px 0;font-size:14px}
+  ul.check svg{color:var(--verde);margin-top:2px}
+  .aviso{margin-top:12px;background:var(--ambar-light);color:#6b4600;border-radius:12px;padding:10px 14px;font-size:13.5px;font-weight:600}
+  .pie{text-align:center;color:var(--texto-hint);font-size:12.5px;margin-top:20px}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));z-index:90;background:#1e6b34;color:#fff;border-radius:12px;padding:11px 16px;font-weight:700;font-size:14px;max-width:92vw;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  @media (max-width:760px){
+    .dos{grid-template-columns:minmax(0,1fr)}
+    .qr{flex-direction:column;align-items:flex-start}
+    .sala .acc{margin-left:0;width:100%}
+    .hero{padding-bottom:56px}
+  }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-pc" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></symbol>
+  <symbol id="i-cel" viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7"/></symbol>
+  <symbol id="i-alerta" viewBox="0 0 24 24"><path d="M12 3 2 20h20z"/><path d="M12 10v4M12 17h.01"/></symbol>
+  <symbol id="i-abrir" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+  <symbol id="i-tabs" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 9h18M8 5v4"/></symbol>
+</svg>
+
+<header class="top">
+  <img src="../assets/logos/avba.png" alt="AVBA">
+  <div><b>Control de accesos</b><span>Demostración</span></div>
+</header>
+
+<section class="hero">
+  <h1>Control de accesos para plantas industriales</h1>
+  <p>El guardia escanea la identificación y en un segundo sabe si la persona pasa, qué puede meter y qué debe revisar. El administrador ve todo en tiempo real: quién está dentro, horas trabajadas según la STPS, incidencias, vetos, herramientas y vales.</p>
+  <span class="ficticio">Demo con datos ficticios</span>
+</section>
+
+<main>
+  <section class="card">
+    <h2>Presentar con dos dispositivos <span class="chip">Recomendado</span></h2>
+    <p class="sub">El panel en la laptop (o el proyector) y la pantalla del guardia en un celular, conectados en la misma sala: lo que el guardia registra aparece en el panel al instante, y los permisos que cambia el administrador llegan al celular.</p>
+    <div class="sala">
+      <div><div class="et">Código de la sala</div><div class="cod" id="codigo">····</div></div>
+      <div class="estado esp" id="estado">Comprobando la conexión…</div>
+      <div class="acc">
+        <button class="btn fant" type="button" id="btn-nueva">Nueva sala</button>
+        <button class="btn fant" type="button" id="btn-reiniciar">Reiniciar la demo</button>
+      </div>
+    </div>
+    <p class="aviso" id="aviso-zona" hidden>Este equipo no está en la hora del centro de México. Para que la laptop y el celular muestren lo mismo, ajusta la zona horaria de los dos equipos a «Ciudad de México».</p>
+    <div class="dos">
+      <div class="lado">
+        <h3><svg class="i"><use href="#i-pc"/></svg>En esta laptop: panel del administrador</h3>
+        <p>Ábrelo en pantalla completa (F11) para el proyector.</p>
+        <a class="btn prim" id="ir-panel" href="control-accesos.html" target="_blank" rel="noopener"><svg class="i"><use href="#i-abrir"/></svg>Abrir el panel</a>
+      </div>
+      <div class="lado">
+        <h3><svg class="i"><use href="#i-cel"/></svg>En el celular: pantalla del guardia</h3>
+        <div class="qr">
+          <img id="qr" alt="Código QR para abrir la pantalla del guardia en el celular">
+          <div class="url">Escanéalo con la cámara del celular, o escribe:<br><b id="url-caseta"></b></div>
+        </div>
+        <a class="btn sec" id="ir-caseta" href="caseta.html" target="_blank" rel="noopener"><svg class="i"><use href="#i-abrir"/></svg>Abrirla en este equipo</a>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2><svg class="i"><use href="#i-tabs"/></svg>Con un solo equipo</h2>
+    <p class="sub">Si no hay internet en el celular: abre las dos pantallas en pestañas del mismo navegador. Lo que registres en una aparece en la otra.</p>
+    <div class="dos">
+      <a class="btn sec" href="control-accesos.html?sala=no" target="_blank" rel="noopener">Panel del administrador</a>
+      <a class="btn sec" href="caseta.html?sala=no" target="_blank" rel="noopener">Pantalla del guardia</a>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Guion sugerido · 15 minutos</h2>
+    <p class="sub">Cada vez que el guardia toca ENTRADA llega un caso distinto, en este orden: todo en orden, con tableta o computadora autorizada, celular sin permiso, persona vetada, con herramienta, documento vencido, exceso de horas y alcoholímetro. Si necesitas repetir o saltar un caso, elígelo en el menú ⋮ de la caseta («Siguiente ENTRADA»).</p>
+    <ol class="guion">
+      <li><div><b>Tablero (panel)</b><div class="q">Personas dentro ahora, entradas y salidas por hora, personal por empresa, horas de la semana y alertas.</div>
+        <div class="di">«Todo lo que pasa en la caseta, en un solo lugar y en tiempo real.»</div></div></li>
+      <li><div><b>Primera entrada (celular): ingreso correcto</b><div class="q">El guardia toca ENTRADA. Se ve el resultado en grande y qué puede meter la persona: celular, tableta, computadora, cámara, herramienta y vehículo.</div>
+        <div class="di">«El guardia no decide: el sistema le dice si pasa y qué debe revisar.»</div></div></li>
+      <li><div><b>Celular sin permiso y tableta autorizada</b><div class="q">Las siguientes entradas muestran las indicaciones de casillero y los permisos especiales.</div></div></li>
+      <li><div><b>Persona vetada: NO PASA</b><div class="q">El guardia ve que está vetada y hasta cuándo; en el panel suena la campana con la alerta del intento.</div>
+        <div class="di">«Un veto se aplica en todas las casetas al instante, aunque la persona intente por otra puerta.»</div></div></li>
+      <li><div><b>Herramienta y salida con faltante</b><div class="q">Registra la herramienta que ingresa. Luego toca SALIDA (sale esa misma persona), desmarca una herramienta y registra: queda el vale abierto y la alerta «Herramienta no presentada» en el panel.</div></div></li>
+      <li><div><b>Documento vencido</b><div class="q">NO PASA con el motivo: inducción, examen médico, DC-3 o IMSS vencido.</div></div></li>
+      <li><div><b>Exceso de horas: ESPERA</b><div class="q">El guardia pide autorización y el administrador la autoriza o la niega desde su panel.</div>
+        <div class="di">«La jornada se controla con las reglas de la Ley Federal del Trabajo reformada en 2026.»</div></div></li>
+      <li><div><b>Alcoholímetro aleatorio</b><div class="q">Captura «Positivo»: se registra la incidencia y el veto automáticamente.</div></div></li>
+      <li><div><b>Expediente de la persona (panel → Personas)</b><div class="q">Horas por día, permisos, documentos, vales, incidencias y bitácora. Quita o da el permiso de tableta y muéstralo en el celular.</div></div></li>
+      <li><div><b>Jornadas (STPS)</b><div class="q">Horas ordinarias, dobles, triples y quién excede el máximo. En «Reglas y roles» cambia el año a 2027 para ver el efecto de la reforma.</div>
+        <div class="di">«Desde 2027 el registro electrónico de la jornada es obligatorio; este control puede ser ese registro.»</div></div></li>
+      <li><div><b>Incidencias, vetos, herramientas y roles</b><div class="q">Registrar una incidencia o vetar; vales abiertos; y la tabla de quién ve qué: guardia, administrador de accesos y AVBA.</div></div></li>
+      <li><div><b>Cierre</b><div class="q">Siguientes pasos: gafete con QR para el personal diario, lectura del número de la identificación, carga de documentos por las contratistas y conexión con el sistema de AVBA.</div></div></li>
+    </ol>
+  </section>
+
+  <section class="card">
+    <h2>Antes de empezar</h2>
+    <ul class="check">
+      <li><svg class="i"><use href="#i-ok"/></svg>Internet en la laptop y en el celular (datos o Wi-Fi).</li>
+      <li><svg class="i"><use href="#i-ok"/></svg>Abre esta portada unos minutos antes, toca «Reiniciar la demo» y conecta los dos equipos (si ensayaste otro día, vuelve a escanear el QR).</li>
+      <li><svg class="i"><use href="#i-ok"/></svg>En el celular: brillo alto, modo no molestar y la pantalla del guardia ya abierta.</li>
+      <li><svg class="i"><use href="#i-ok"/></svg>En la laptop: el panel en pantalla completa (F11) y la sección «Tablero».</li>
+      <li><svg class="i"><use href="#i-ok"/></svg>Las personas, empresas e incidencias son ficticias; las cifras se mueven solas con la hora del día.</li>
+    </ul>
+  </section>
+  <p class="pie">AVBA · Inspecciones, certificaciones y mantenimiento</p>
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var LETRAS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  function nuevoCodigo() { var s = ''; for (var i = 0; i < 4; i++) s += LETRAS[Math.floor(Math.random() * LETRAS.length)]; return s; }
+  function leer() { try { return localStorage.getItem('avba_demo_sala') || ''; } catch (e) { return ''; } }
+  function guardar(c) { try { localStorage.setItem('avba_demo_sala', c); } catch (e) {} }
+  function semilla() { var d = new Date(); return d.getFullYear() * 1000 + d.getMonth() * 40 + d.getDate(); }
+  var tToast;
+  function toast(t) { var el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 3000); }
+
+  var codigo = leer();
+  if (!/^[A-Z0-9]{4,10}$/.test(codigo)) { codigo = nuevoCodigo(); guardar(codigo); }
+  function pintar() {
+    $('codigo').textContent = codigo;
+    $('ir-panel').href = 'control-accesos.html?sala=' + codigo;
+    $('ir-caseta').href = 'caseta.html?sala=' + codigo;
+    var url = new URL('caseta.html?sala=' + codigo, location.href);
+    $('url-caseta').textContent = url.host + url.pathname + url.search;
+    $('qr').src = 'sala.php?qr=caseta&sala=' + codigo;
+    comprobar();
+  }
+  function comprobar() {
+    var e = $('estado'); e.className = 'estado esp'; e.textContent = 'Comprobando la conexión…';
+    fetch('sala.php?sala=' + codigo + '&dia=' + semilla() + '&desde=0', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error(); return r.json(); })
+      .then(function (j) {
+        if (!j.ok) throw new Error();
+        e.className = 'estado ok';
+        e.innerHTML = '<svg class="i"><use href="#i-ok"/></svg>Sala lista' + (j.total ? ' · ' + j.total + ' movimientos registrados' : '');
+      })
+      .catch(function () {
+        e.className = 'estado mal';
+        e.innerHTML = '<svg class="i"><use href="#i-alerta"/></svg>Sin conexión con la sala: usa «Con un solo equipo»';
+      });
+  }
+  $('btn-nueva').onclick = function () { codigo = nuevoCodigo(); guardar(codigo); pintar(); toast('Sala nueva: ' + codigo + '. Vuelve a escanear el QR en el celular.'); };
+  $('btn-reiniciar').onclick = function () {
+    if (!confirm('¿Reiniciar la demo? Se borra todo lo registrado en la sala ' + codigo + ' y los equipos conectados vuelven al inicio.')) return;
+    fetch('sala.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sala: codigo, dia: semilla(), accion: 'reiniciar' }) })
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (!j.ok) throw new Error(); toast('Demo reiniciada en la sala ' + codigo + '.'); comprobar(); })
+      .catch(function () { toast('No se pudo reiniciar: revisa la conexión.'); });
+    try { localStorage.removeItem('avba_demo_accesos_' + semilla()); localStorage.removeItem('avba_demo_pend_' + codigo + '_' + semilla()); } catch (e) {}
+  };
+  pintar();
+  // Los turnos de la demo se calculan con la hora del equipo: los dos deben estar en la hora del centro de México
+  if (new Date().getTimezoneOffset() !== 360) $('aviso-zona').hidden = false;
+})();
+</script>
+</body>
+</html>
