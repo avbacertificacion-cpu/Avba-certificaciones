@@ -542,9 +542,14 @@
   }
   var cola = [];                                   // copia en memoria para pintar
   var sinCola = false;                             // navegador sin IndexedDB: envío directo
+  /* Cada registro guarda la cuenta que lo capturó: si en este equipo entra
+     otra cuenta (otro punto, Administración), lo pendiente de la primera no
+     se envía a nombre de la segunda; espera aquí a que esa cuenta vuelva. */
+  function cuentaActual() { return String(sesion().usuario || '').trim().toUpperCase(); }
+  function esDeEstaCuenta(x) { var c = cuentaActual(); return !x.cuenta || !c || x.cuenta === c; }
   function leerCola() {
     return tx('readonly', function (st) { return st.getAll(); }).then(function (r) {
-      cola = (r || []).sort(function (a, b) { return a.capturado < b.capturado ? -1 : 1; });
+      cola = (r || []).filter(esDeEstaCuenta).sort(function (a, b) { return a.capturado < b.capturado ? -1 : 1; });
       cola.forEach(function (x) { if (!x.turno) x.turno = turnoDe(x.tipo, x.capturado); });
       pintarCola(); return cola;
     }).catch(function () { sinCola = true; cola = []; return cola; });
@@ -582,12 +587,15 @@
         if (r.status >= 500) return 'red';
         return r.json().then(function (j) {
           if (j.status === 'success') { enviados[it.uid] = j.id; return 'ok'; }
+          // Falta de punto o equipo ocupado: no es culpa del registro. Se queda
+          // pendiente y sale solo cuando Administración lo resuelva.
+          if (/^(OTRO_EQUIPO|SIN_PUNTO|SIN_EQUIPO)$/.test(j.codigo || '')) { bloquear(j.message); return 'bloqueo'; }
           it.error = j.message || 'El servidor no lo aceptó.'; return 'rechazo';
         }, function () { return 'red'; });
       }, function () { return 'red'; });
   }
   function enviarCola() {
-    if (enviando || sinCola) return;
+    if (enviando || sinCola || bloqueado) return;   // bloqueado: se reanuda al quitarse el aviso
     clearTimeout(tReintento);
     leerCola().then(function (lista) {
       var pend = lista.filter(function (x) { return !x.error; });
@@ -665,11 +673,13 @@
       api('ACCESO_ELIMINAR', { id: id }).then(function (r) { toast(r.message || 'Eliminado.'); cargar(true); });
     };
     var txt = (it.tipo === 'entrada' ? 'Entrada' : 'Salida') + ' ' + it.capturado.slice(11, 16) + ' guardada' + (it.persona ? ': ' + it.persona : '');
+    it.cuenta = cuentaActual();
     if (sinCola) {                                 // sin almacenamiento local: se envía y se espera
       return enviarUno(it).then(function (r) {
         enviando = null;
         if (r === 'ok') { recienEnviados.push(resumen(it, enviados[it.uid])); toast(txt + '.', false, deshacer); cargar(true); }
-        else toast(r === 'sesion' ? 'Tu sesión venció.' : (it.error || 'Sin conexión: no se guardó. Inténtalo de nuevo.'), true);
+        else toast(r === 'sesion' ? 'Tu sesión venció.' : r === 'bloqueo' ? 'No se guardó: ' + $('banda-punto').textContent
+                 : (it.error || 'Sin conexión: no se guardó. Inténtalo de nuevo.'), true);
       });
     }
     return ponerEnCola(it).then(function () {
@@ -945,6 +955,10 @@
         bloquear(r.message); datos = { registros: [], totales: {}, mas: false }; errLista = ''; pintarLista(); return;
       }
       if (!r || r.status !== 'success') throw new Error((r && r.message) || 'El servidor no respondió como se esperaba.');
+      if (CASETA && r.punto) {                     // Administración asignó el punto o liberó el equipo: se sigue solo
+        if (r.punto !== $('lugar').value) fijarPunto(r.punto);
+        if (bloqueado) { bloquear(''); enviarCola(); }
+      }
       datos = { registros: previos.concat(r.registros || []), totales: r.totales || {}, mas: !!r.mas };
       errLista = '';
       pintarLista();
@@ -1208,7 +1222,7 @@
     var conocido = leer(CLAVE_PUNTO, '');
     if (conocido) fijarPunto(conocido); else $('lugar').value = '';       // sin señal al abrir: el último conocido
     api('ACCESOS_MI_PUNTO', {}, 'GET').then(function (r) {
-      if (r && r.status === 'success') { if (r.punto) fijarPunto(r.punto); bloquear(''); cargar(true); }
+      if (r && r.status === 'success') { if (r.punto) fijarPunto(r.punto); bloquear(''); enviarCola(); cargar(true); }
       else if (r) bloquear(r.message || 'No se pudo revisar tu punto de control.');
     }).catch(function () {});
   }
