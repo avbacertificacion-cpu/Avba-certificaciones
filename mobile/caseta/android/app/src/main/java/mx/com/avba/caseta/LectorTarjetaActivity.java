@@ -94,6 +94,9 @@ public class LectorTarjetaActivity extends AppCompatActivity {
     private AnalizadorTarjeta.Estabilizador estab;
     private volatile boolean entregado = false, pausado = false;
     private String ultimoTexto = "";
+    private AnalizadorTarjeta.Lectura confirmado = null;   // código ya seguro; se espera un momento por el nombre
+    private long confirmadoEn = 0;
+    private static final long ESPERA_NOMBRE_MS = 1500;
     private long inicio;
     private int lecturas = 0;
 
@@ -281,13 +284,26 @@ public class LectorTarjetaActivity extends AppCompatActivity {
             for (Text.Line ln : bloque.getLines()) {
                 Rect r = ln.getBoundingBox();
                 if (r == null) continue;
-                lineas.add(new AnalizadorTarjeta.Linea(ln.getText(), r.top, r.left, r.height()));
+                lineas.add(new AnalizadorTarjeta.Linea(ln.getText(), r.top, r.left, r.height(), r.width()));
             }
         }
         if (!lineas.isEmpty()) ultimoTexto = AnalizadorTarjeta.unir(lineas);
         AnalizadorTarjeta.Lectura l = AnalizadorTarjeta.analizar(lineas, reglas);
         AnalizadorTarjeta.Lectura ok = estab.agregar(l);
-        if (ok != null) { entregar(ok.codigo, ok.nombre, false, false); return; }
+        if (confirmado == null && ok != null) { confirmado = ok; confirmadoEn = SystemClock.elapsedRealtime(); }
+        if (confirmado != null) {
+            // El código ya es seguro: se entrega en cuanto hay nombre (o tras un momento sin él)
+            String nombre = estab.nombreProbable(confirmado.codigo);
+            if (nombre != null || SystemClock.elapsedRealtime() - confirmadoEn > ESPERA_NOMBRE_MS) {
+                entregar(confirmado.codigo, nombre, false, false);
+                return;
+            }
+            tEstado.setText("Código " + confirmado.codigo + " — falta leer el nombre…");
+            tEstado.setTextColor(AMARILLO);
+            marco.color(AMARILLO);
+            tTexto.setText(ultimoTexto.replace("\n", " · "));
+            return;
+        }
         // Lo que se va leyendo, para que el guardia sepa que sí está viendo la tarjeta
         if (l.codigo != null) {
             tEstado.setText("Código " + l.codigo + (l.nombre != null ? " · " + l.nombre : "") + " — confirmando…");

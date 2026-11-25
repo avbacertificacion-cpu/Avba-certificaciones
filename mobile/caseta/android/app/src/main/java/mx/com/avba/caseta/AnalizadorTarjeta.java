@@ -28,13 +28,14 @@ public final class AnalizadorTarjeta {
 
     private AnalizadorTarjeta() {}
 
-    /** Un renglón leído: texto, posición (arriba, izquierda) y alto en píxeles. */
+    /** Un renglón leído: texto, posición (arriba, izquierda), alto y ancho en píxeles. */
     public static final class Linea {
         public final String texto;
-        public final int arriba, izquierda, alto;
-        public Linea(String texto, int arriba, int izquierda, int alto) {
+        public final int arriba, izquierda, alto, ancho;
+        public Linea(String texto, int arriba, int izquierda, int alto) { this(texto, arriba, izquierda, alto, 0); }
+        public Linea(String texto, int arriba, int izquierda, int alto, int ancho) {
             this.texto = texto == null ? "" : texto;
-            this.arriba = arriba; this.izquierda = izquierda; this.alto = Math.max(1, alto);
+            this.arriba = arriba; this.izquierda = izquierda; this.alto = Math.max(1, alto); this.ancho = Math.max(0, ancho);
         }
     }
 
@@ -200,7 +201,33 @@ public final class AnalizadorTarjeta {
             if (nPal >= 3) p += 6;
             if (p > mejorN) { mejorN = p; mejorNombre = limpio; }
         }
+        // Nombre en dos renglones: «JUAN CARLOS» / «PÉREZ LÓPEZ» (mismo tamaño, uno debajo del otro)
+        for (int i = 0; i + 1 < orden.size(); i++) {
+            Linea a = orden.get(i), b = orden.get(i + 1);
+            if (!renglonDeNombre(a.texto) || !renglonDeNombre(b.texto)) continue;
+            int alto = Math.max(a.alto, b.alto);
+            if (Math.abs(a.alto - b.alto) > 0.3f * alto) continue;                      // otra letra: no es el mismo nombre
+            if (b.arriba - (a.arriba + a.alto) > 1.5f * alto) continue;                // muy separados
+            boolean alineados = Math.abs(a.izquierda - b.izquierda) < 2 * alto
+                    || (a.ancho > 0 && b.ancho > 0 && Math.abs((a.izquierda + a.ancho / 2) - (b.izquierda + b.ancho / 2)) < 2 * alto);
+            if (!alineados) continue;
+            String limpio = nombreValido(a.texto.trim() + " " + b.texto.trim(), r);
+            if (limpio == null || limpio.split(" ").length > 5) continue;
+            int p = Math.round(40f * (a.alto + b.alto) / 2f / altoMax) + 8;
+            if ((a.texto + b.texto).equals((a.texto + b.texto).toUpperCase(Locale.ROOT))) p += 6;
+            if (p > mejorN) { mejorN = p; mejorNombre = limpio; }
+        }
         return new Lectura(mejorCodigo, mejorNombre, mejorCodigo == null ? 0 : mejorPuntaje);
+    }
+
+    /** Un renglón de 1 a 3 palabras, sólo letras: puede ser parte de un nombre partido en dos. */
+    private static boolean renglonDeNombre(String t) {
+        String x = t == null ? "" : t.trim();
+        if (x.isEmpty() || x.matches(".*\\d.*") || x.contains(":")) return false;
+        String[] w = x.split("\\s+");
+        if (w.length > 3) return false;
+        for (String p : w) if (!p.matches("[\\p{L}][\\p{L}'.\\-]*")) return false;
+        return true;
     }
 
     private static boolean soloNumero(String linea, String codigo) {
@@ -255,11 +282,13 @@ public final class AnalizadorTarjeta {
         private final int necesarias, ventana;
         private final Deque<String> ultimas = new ArrayDeque<>();
         private final Map<String, Map<String, Integer>> nombres = new HashMap<>();
+        private final Map<String, Integer> nombresSueltos = new HashMap<>();   // nombres leídos aunque no saliera el código
         public Estabilizador(int necesarias, int ventana) { this.necesarias = Math.max(1, necesarias); this.ventana = Math.max(this.necesarias, ventana); }
 
         /** Agrega una lectura; regresa la confirmada o null si todavía no hay suficientes. */
         public Lectura agregar(Lectura l) {
             String c = l == null ? null : l.codigo;
+            if (l != null && l.nombre != null) nombresSueltos.put(l.nombre, nombresSueltos.getOrDefault(l.nombre, 0) + 1);
             ultimas.addLast(c == null ? "" : c);
             while (ultimas.size() > ventana) ultimas.removeFirst();
             if (c == null) return null;
@@ -280,6 +309,14 @@ public final class AnalizadorTarjeta {
             return mejor;
         }
         public int vecesDe(String c) { int v = 0; for (String x : ultimas) if (x.equals(c)) v++; return v; }
+        /** El nombre leído con ese código o, si nunca salieron juntos, el que más se ha leído. */
+        public String nombreProbable(String c) {
+            String n = nombreDe(c);
+            if (n != null) return n;
+            String mejor = null; int v = 0;
+            for (Map.Entry<String, Integer> e : nombresSueltos.entrySet()) if (e.getValue() > v) { v = e.getValue(); mejor = e.getKey(); }
+            return mejor;
+        }
     }
 
     /** Para pruebas y para el registro: el texto de los renglones en orden de lectura. */

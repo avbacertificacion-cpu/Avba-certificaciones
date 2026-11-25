@@ -69,6 +69,13 @@ public class AnalizadorTarjetaTest {
         ver(tarjeta("QUANTUM ENERGY", 60, "RAÚL PEÑA SOTO", 40, "QE-20481", 30, "4421234567", 20), rp, "20481", "Raúl Peña Soto");
     }
 
+    @Test public void nombreEnDosRenglones() {
+        ver(tarjeta("QUANTUM ENERGY", 60, "JUAN CARLOS", 40, "PÉREZ LÓPEZ", 40, "No. 4471", 28), new AnalizadorTarjeta.Reglas(), "4471", "Juan Carlos Pérez López");
+        ver(tarjeta("QUANTUM ENERGY", 60, "JUAN PÉREZ LÓPEZ", 40, "SUPERVISOR", 40, "Ficha 9921", 26), new AnalizadorTarjeta.Reglas(), "9921", "Juan Pérez López");
+        ver(tarjeta("QUANTUM", 60, "MARÍA FERNANDA", 42, "RÍOS", 42, "Empleado 55120", 26), new AnalizadorTarjeta.Reglas(), "55120", "María Fernanda Ríos");
+        ver(tarjeta("QUANTUM ENERGY", 60, "ANA LÓPEZ CRUZ", 40, "PLANTA SAN JUAN", 20, "No. 8080", 26), new AnalizadorTarjeta.Reglas(), "8080", "Ana López Cruz");
+    }
+
     @Test public void estabilizadorPideVariasLecturasIguales() {
         AnalizadorTarjeta.Estabilizador e = new AnalizadorTarjeta.Estabilizador(3, 6);
         assertNull(e.agregar(new AnalizadorTarjeta.Lectura("12345", "Juan Pérez", 50)));
@@ -78,5 +85,15 @@ public class AnalizadorTarjetaTest {
         AnalizadorTarjeta.Lectura ok = e.agregar(new AnalizadorTarjeta.Lectura("12345", "Juan Perez", 50));
         assertNotNull(ok);
         assertEquals("12345", ok.codigo);
+    }
+
+    @Test public void nombreLeidoSinElCodigoTambienCuenta() {
+        AnalizadorTarjeta.Estabilizador e = new AnalizadorTarjeta.Estabilizador(2, 6);
+        e.agregar(new AnalizadorTarjeta.Lectura(null, "Juan Pérez López", 0));
+        e.agregar(new AnalizadorTarjeta.Lectura("4471", null, 50));
+        AnalizadorTarjeta.Lectura ok = e.agregar(new AnalizadorTarjeta.Lectura("4471", null, 50));
+        assertNotNull(ok);
+        assertNull(ok.nombre);
+        assertEquals("Juan Pérez López", e.nombreProbable("4471"));
     }
 }
