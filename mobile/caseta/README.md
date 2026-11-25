@@ -6,7 +6,8 @@ la **salida** (nombre, código y hora) en el **control de accesos del sistema**.
 El análisis se hace en el perfil de administrador.
 
 - **App ID:** `mx.com.avba.caseta` · **Nombre:** AVBA Caseta
-- **Descarga (APK):** `https://gestion.avba.com.mx/demo/app/avba-caseta.apk`
+- **Descarga (APK):** `https://gestion.avba.com.mx/descargas/avba-caseta.apk` (también
+  queda una copia en `demo/app/` para el QR de la portada de la demo).
 - **Compilación:** `.github/workflows/app-caseta.yml` (cada cambio en `mobile/caseta/`)
 
 ## Cómo funciona
@@ -35,6 +36,17 @@ App AVBA Caseta ──abre──▶ gestion.avba.com.mx/accesos.html (cuenta de 
 - La imagen de la tarjeta **no sale del teléfono**: al servidor sólo llegan el
   nombre y el código (`api/ControlAccesos.php`, columnas `nombre`, `codigo` y
   `origen` = tarjeta | manual).
+- **El ID es la llave de cada persona:** el número del recuadro azul de la
+  credencial es único por persona. Se compara sin los ceros de la izquierda
+  («00287» leído = «287» escrito a mano).
+- **En planta** (administración, en Control de accesos → filtro «En planta»): una
+  persona por ID cuya última lectura de las últimas 48 h fue ENTRADA, en cualquier
+  punto; en cuanto registra su SALIDA (por cualquier punto) ya no aparece. Buscar
+  por ID o nombre, descargar para Excel, y marca a quien lleva más de 13 h dentro.
+- **Movimientos de un ID:** tocar a la persona (o su ID en la lista) muestra sus
+  entradas y salidas de los últimos 30 días. Administración puede **dar salida** a
+  quien salió sin pasar su credencial (queda marcada como registrada por
+  Administración).
 - **PDF de entradas y salidas** (administración, en Control de accesos → «PDF del
   turno»): junta la entrada y la salida de cada persona por su código; nombre,
   código, hora de entrada, hora de salida y tiempo dentro.
@@ -66,8 +78,8 @@ Está ajustado a la **credencial de acceso** (de pie): `ID:` en el recuadro azul
 
 ### Ajustar la lectura sin reinstalar la app
 
-`accesos.html` pide `demo/sala.php?tarjeta=1`, que entrega
-`demo/tarjeta-reglas.json`: número de dígitos del código (`longitud`), un patrón
+`accesos.html` pide `api/index.php?action=ACCESOS_TARJETA_REGLAS`, que entrega
+`api/accesos-tarjeta.json` (no depende de la demo; la demo lee el mismo archivo): número de dígitos del código (`longitud`), un patrón
 propio (`patron`, expresión regular de Java; el código es su primer grupo),
 palabras que van junto al código (`claves`), palabras que no son parte de un
 nombre (`noNombre`), renglones cuyo número no es el código (`noCodigo`), cuántas

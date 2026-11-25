@@ -371,7 +371,10 @@ class ControlAccesos {
         // Tarjeta leída en el teléfono: nombre y código, sin foto
         $codigo = strtoupper(substr((string)preg_replace('/[^0-9A-Za-z-]/', '', (string)($p['codigo'] ?? '')), 0, 32));
         $persona = $codigo !== '' ? mb_substr(textoEstandar($p['persona'] ?? ''), 0, 150) : '';
-        $origen = $codigo === '' ? 'foto' : (($p['origen'] ?? '') === 'manual' ? 'manual' : 'tarjeta');
+        $origenPedido = (string)($p['origen'] ?? '');
+        $origen = $codigo === '' ? 'foto'
+                : ($origenPedido === 'manual' ? 'manual'
+                : ($origenPedido === 'admin' && ($usr['rol'] ?? '') === 'ADMIN' ? 'admin' : 'tarjeta'));
         $conFoto = !empty($archivo['tmp_name']) && (int)($archivo['error'] ?? 1) === UPLOAD_ERR_OK;
         if (!$conFoto && $codigo === '') {
             return ['status' => 'error', 'message' => 'Falta la fotografía de la identificación o el código de la tarjeta.'];
@@ -716,45 +719,67 @@ class ControlAccesos {
        hora. Una entrada sin salida (o una salida sin entrada) queda en su
        propio renglón, marcada. Los registros con foto y sin código no se
        pueden juntar: sólo se cuentan (están en el PDF con fotos). */
-    public static function emparejar(array $filas): array {
-        $porCodigo = [];
-        foreach ($filas as $f) {
-            if (($f['codigo'] ?? '') === '') continue;
-            $porCodigo[$f['codigo']][] = $f;
+    /* ── El ID de la credencial: la llave de cada persona ─────────────────────
+       El número del recuadro azul es único para cada persona. Se compara sin los
+       ceros de la izquierda: «00287» (leído de la credencial) y «287» (escrito a
+       mano) son la misma persona. */
+    public static function claveId(string $c): string {
+        $c = strtoupper(trim($c));
+        if ($c !== '' && ctype_digit($c)) { $c = ltrim($c, '0'); return $c === '' ? '0' : $c; }
+        return $c;
+    }
+
+    /** El nombre más leído. Una lectura parcial («JUAN CARLOS», sin el segundo renglón) cuenta a favor del
+     *  nombre completo que empieza igual («JUAN CARLOS PEREZ LOPEZ»); en empate gana el más completo y luego
+     *  el primero leído. */
+    public static function nombreMasLeido(array $nombres): string {
+        $cuenta = []; $primero = [];
+        foreach (array_values($nombres) as $i => $n) {
+            $n = trim((string)$n);
+            if ($n === '') continue;
+            $cuenta[$n] = ($cuenta[$n] ?? 0) + 1;
+            if (!isset($primero[$n])) $primero[$n] = $i;
         }
-        // El nombre de cada código: el que más veces se leyó (una mala lectura no lo cambia). Una lectura
-        // parcial («JUAN CARLOS», sin el segundo renglón) cuenta a favor del nombre completo que empieza
-        // igual («JUAN CARLOS PEREZ LOPEZ»); en empate gana el más completo y luego el primero leído.
-        $nombreDe = [];
-        foreach ($porCodigo as $cod => $regs) {
-            $cuenta = [];
-            foreach ($regs as $r) { $n = trim((string)$r['nombre']); if ($n !== '') $cuenta[$n] = ($cuenta[$n] ?? 0) + 1; }
-            if ($cuenta) {
-                $primero = [];
-                foreach ($regs as $i => $r) { $n = trim((string)$r['nombre']); if ($n !== '' && !isset($primero[$n])) $primero[$n] = $i; }
-                $mejor = ''; $veces = 0; $orden = PHP_INT_MAX;
-                foreach ($cuenta as $n => $c) {
-                    $n = (string)$n;
-                    foreach ($cuenta as $m => $cm) if (str_starts_with($n, (string)$m . ' ')) $c += $cm;
-                    $mejorQue = $c > $veces
-                        || ($c === $veces && (strlen($n) > strlen($mejor) || (strlen($n) === strlen($mejor) && $primero[$n] < $orden)));
-                    if ($mejorQue) { $mejor = $n; $veces = $c; $orden = $primero[$n]; }
-                }
-                $nombreDe[$cod] = $mejor;
+        $mejor = ''; $veces = 0; $orden = PHP_INT_MAX;
+        foreach ($cuenta as $n => $c) {
+            $n = (string)$n;
+            foreach ($cuenta as $m => $cm) if (str_starts_with($n, (string)$m . ' ')) $c += $cm;
+            if ($c > $veces || ($c === $veces && (strlen($n) > strlen($mejor) || (strlen($n) === strlen($mejor) && $primero[$n] < $orden)))) {
+                $mejor = $n; $veces = $c; $orden = $primero[$n];
             }
         }
+        return $mejor;
+    }
+
+    /** Cómo se muestra el ID: la forma más leída (con sus ceros, «00287»); en empate, la más larga. */
+    private static function idMostrado(array $codigos): string {
+        $cuenta = [];
+        foreach ($codigos as $c) { $c = (string)$c; if ($c !== '') $cuenta[$c] = ($cuenta[$c] ?? 0) + 1; }
+        $mejor = ''; $v = 0;
+        foreach ($cuenta as $c => $n) { $c = (string)$c; if ($n > $v || ($n === $v && strlen($c) > strlen($mejor))) { $mejor = $c; $v = $n; } }
+        return $mejor;
+    }
+
+    /** Junta la entrada y la salida de cada persona (por su ID), en orden. */
+    public static function emparejar(array $filas): array {
+        $porId = [];
+        foreach ($filas as $f) {
+            if (($f['codigo'] ?? '') === '') continue;
+            $porId[self::claveId((string)$f['codigo'])][] = $f;
+        }
         $out = [];
-        $renglon = function (?array $e, ?array $s) use (&$nombreDe): array {
-            $nombre = $nombreDe[(string)($e['codigo'] ?? $s['codigo'])] ?? '';
-            if ($nombre === '') foreach ([$e, $s] as $x) if ($x && trim((string)$x['nombre']) !== '') { $nombre = (string)$x['nombre']; break; }
-            $min = ($e && $s) ? (int)round((strtotime($s['capturado']) - strtotime($e['capturado'])) / 60) : null;
-            return ['codigo' => (string)($e['codigo'] ?? $s['codigo']), 'nombre' => $nombre,
-                    'entrada' => $e ? (string)$e['capturado'] : '', 'salida' => $s ? (string)$s['capturado'] : '',
-                    'minutos' => $min, 'lugar' => (string)($e['lugar'] ?? $s['lugar'] ?? ''),
-                    'lugar_salida' => (string)($s['lugar'] ?? '')];
-        };
-        foreach ($porCodigo as $regs) {
+        foreach ($porId as $regs) {
             usort($regs, fn($a, $b) => [$a['capturado'], (int)$a['id']] <=> [$b['capturado'], (int)$b['id']]);
+            $nombre = self::nombreMasLeido(array_column($regs, 'nombre'));
+            $id = self::idMostrado(array_column($regs, 'codigo'));
+            $renglon = function (?array $e, ?array $s) use ($nombre, $id): array {
+                $min = ($e && $s) ? (int)round((strtotime($s['capturado']) - strtotime($e['capturado'])) / 60) : null;
+                return ['codigo' => $id, 'nombre' => $nombre,
+                        'entrada' => $e ? (string)$e['capturado'] : '', 'salida' => $s ? (string)$s['capturado'] : '',
+                        'minutos' => $min, 'lugar' => (string)($e['lugar'] ?? $s['lugar'] ?? ''),
+                        'lugar_salida' => (string)($s['lugar'] ?? ''),
+                        'origen_salida' => (string)($s['origen'] ?? '')];
+            };
             $abierta = null;
             foreach ($regs as $r) {
                 if ($r['tipo'] === 'entrada') {
@@ -769,6 +794,106 @@ class ControlAccesos {
         }
         usort($out, fn($a, $b) => [($a['entrada'] ?: $a['salida']), $a['codigo']] <=> [($b['entrada'] ?: $b['salida']), $b['codigo']]);
         return $out;
+    }
+
+    /* ── Administración: quién está en planta y los movimientos de cada ID ──── */
+
+    /** Horas hacia atrás que se revisan para saber quién sigue dentro. */
+    public const HORAS_EN_PLANTA = 48;
+    /** Más de esto dentro: probablemente salió sin pasar su credencial. */
+    public const MINUTOS_REVISAR = 13 * 60;
+
+    /**
+     * Quiénes están en planta: cada ID cuya última lectura (de las últimas 48 h, en cualquier
+     * punto) es una ENTRADA. Si ya registró su salida, aunque sea por otro punto, no aparece.
+     * Con «lugar», sólo los que entraron por ese punto.
+     */
+    public function enPlanta(array $p, array $usr): array {
+        if (self::esCaseta($usr)) return ['status' => 'error', 'message' => 'Esta cuenta sólo registra entradas y salidas.'];
+        self::asegurarTabla($this->pdo);
+        $ahora = time();
+        $base = ['status' => 'success', 'personas' => [], 'total' => 0, 'horas' => self::HORAS_EN_PLANTA,
+                 'ahora' => date('Y-m-d H:i:s', $ahora)];
+        if (!self::conTarjeta($this->pdo)) return $base;
+        $desde = date('Y-m-d H:i:s', $ahora - self::HORAS_EN_PLANTA * 3600);
+        $st = $this->pdo->prepare(
+            "SELECT id, tipo, capturado, lugar, nombre, codigo, origen, usuario_nombre
+               FROM accesos_registros
+              WHERE codigo <> '' AND fecha >= ? AND capturado >= ?
+              ORDER BY capturado, id"
+        );
+        $st->execute([substr($desde, 0, 10), $desde]);
+        $porId = [];
+        foreach ($st->fetchAll(PDO::FETCH_ASSOC) as $f) $porId[self::claveId((string)$f['codigo'])][] = $f;
+        $lugar = textoEstandar($p['lugar'] ?? '');
+        $out = [];
+        foreach ($porId as $regs) {
+            $ult = $regs[count($regs) - 1];
+            if ($ult['tipo'] !== 'entrada') continue;                     // ya salió
+            if ($lugar !== '' && $ult['lugar'] !== $lugar) continue;       // entró por otro punto
+            $min = max(0, (int)floor(($ahora - strtotime((string)$ult['capturado'])) / 60));
+            $out[] = [
+                'id' => self::idMostrado(array_column($regs, 'codigo')),
+                'nombre' => self::nombreMasLeido(array_column($regs, 'nombre')),
+                'entrada' => (string)$ult['capturado'], 'lugar' => (string)$ult['lugar'],
+                'minutos' => $min, 'revisar' => $min > self::MINUTOS_REVISAR,
+                'caseta' => (string)$ult['usuario_nombre'], 'origen' => (string)$ult['origen'],
+            ];
+        }
+        usort($out, fn($a, $b) => strcmp($b['entrada'], $a['entrada']));    // las entradas más recientes primero
+        return ['personas' => $out, 'total' => count($out)] + $base;
+    }
+
+    /** Los movimientos de un ID (por omisión, de los últimos 30 días): cada entrada con su salida. */
+    public function persona(array $p, array $usr): array {
+        if (self::esCaseta($usr)) return ['status' => 'error', 'message' => 'Esta cuenta sólo registra entradas y salidas.'];
+        self::asegurarTabla($this->pdo);
+        $raw = strtoupper(substr((string)preg_replace('/[^0-9A-Za-z-]/', '', (string)($p['id'] ?? '')), 0, 32));
+        if ($raw === '') return ['status' => 'error', 'message' => 'Escribe el número del ID.'];
+        $dias = max(1, min(180, (int)($p['dias'] ?? 30)));
+        $base = ['status' => 'success', 'id' => $raw, 'nombre' => '', 'movimientos' => [], 'en_planta' => false,
+                 'dias' => $dias, 'registros' => 0];
+        if (!self::conTarjeta($this->pdo)) return $base;
+        $clave = self::claveId($raw);
+        $st = $this->pdo->prepare(
+            "SELECT id, uid, tipo, capturado, lugar, nombre, codigo, origen, usuario_nombre
+               FROM accesos_registros
+              WHERE fecha >= ? AND codigo <> '' AND (codigo = ? OR TRIM(LEADING '0' FROM codigo) = ?)
+              ORDER BY capturado, id"
+        );
+        $st->execute([date('Y-m-d', time() - $dias * 86400), $raw, $clave]);
+        $filas = array_values(array_filter($st->fetchAll(PDO::FETCH_ASSOC), fn($f) => self::claveId((string)$f['codigo']) === $clave));
+        if (!$filas) return $base;
+        $movs = self::emparejar($filas);
+        usort($movs, fn($a, $b) => strcmp(($b['entrada'] ?: $b['salida']), ($a['entrada'] ?: $a['salida'])));   // lo más reciente primero
+        $ult = $filas[count($filas) - 1];
+        return ['id' => self::idMostrado(array_column($filas, 'codigo')), 'nombre' => self::nombreMasLeido(array_column($filas, 'nombre')),
+                'movimientos' => $movs, 'registros' => count($filas),
+                'en_planta' => $ult['tipo'] === 'entrada' && strtotime((string)$ult['capturado']) >= time() - self::HORAS_EN_PLANTA * 3600] + $base;
+    }
+
+    /** Administración registra la salida de alguien que salió sin pasar su credencial (queda marcada). */
+    public function darSalida(array $p, array $usr): array {
+        if (($usr['rol'] ?? '') !== 'ADMIN') return ['status' => 'error', 'message' => 'Sólo Administración registra salidas desde aquí.'];
+        $per = $this->persona(['id' => $p['id'] ?? '', 'dias' => 3], $usr);
+        if (($per['status'] ?? '') !== 'success') return $per;
+        if (empty($per['en_planta'])) return ['status' => 'error', 'message' => 'Ese ID ya no aparece en planta.'];
+        $r = $this->registrar([
+            'uid' => 'adm-' . bin2hex(random_bytes(12)), 'tipo' => 'salida', 'capturado' => date('Y-m-d H:i:s'),
+            'lugar' => 'ADMINISTRACION', 'nota' => 'Salida registrada por Administración',
+            'codigo' => $per['id'], 'persona' => $per['nombre'], 'origen' => 'admin',
+        ], [], $usr);
+        if (($r['status'] ?? '') === 'success') {
+            $r['message'] = 'Salida registrada: ' . ($per['nombre'] !== '' ? $per['nombre'] : 'ID ' . $per['id']) . ' ya no aparece en planta.';
+        }
+        return $r;
+    }
+
+    /** Reglas para leer la credencial: la app las pide al abrir y se ajustan aquí sin reinstalarla. */
+    public static function reglasTarjeta(): array {
+        $j = @file_get_contents(__DIR__ . '/accesos-tarjeta.json');
+        $r = is_string($j) ? json_decode($j, true) : null;
+        return ['status' => 'success', 'reglas' => is_array($r) ? $r : new \stdClass()];
     }
 
     public function generarPdfDatos(array $p, array $usr): array {
@@ -844,11 +969,11 @@ class ControlAccesos {
            . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Entradas:</b> ' . number_format($info['entradas']) . '</td>'
            . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Salidas:</b> ' . number_format($info['salidas']) . '</td>'
            . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Generado:</b> ' . date('d/m/Y H:i') . '</td></tr>'
-           . '<tr><td colspan="5" style="padding:2mm 3mm;color:#5a6072;font-size:8.5pt">Nombre y código leídos de la tarjeta de identificación en el teléfono de la caseta. '
-           . 'La entrada y la salida de cada persona se juntan por su código. Generado por ' . self::h($usr['nombre'] ?? $usr['usuario'] ?? '') . '.</td></tr></table>';
+           . '<tr><td colspan="5" style="padding:2mm 3mm;color:#5a6072;font-size:8.5pt">Nombre e ID leídos de la credencial de acceso en el teléfono de la caseta. '
+           . 'La entrada y la salida de cada persona se juntan por su ID (el número del recuadro azul). Generado por ' . self::h($usr['nombre'] ?? $usr['usuario'] ?? '') . '.</td></tr></table>';
         $th = 'background:#0C447C;color:#fff;font-weight:bold;padding:2mm 2mm;text-align:left;font-size:9pt';
         $h .= '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:4mm;font-size:9.5pt" repeat_header="1">'
-            . '<thead><tr><th style="' . $th . ';width:7mm">#</th><th style="' . $th . '">Nombre</th><th style="' . $th . '">Código</th>'
+            . '<thead><tr><th style="' . $th . ';width:7mm">#</th><th style="' . $th . '">Nombre</th><th style="' . $th . '">ID</th>'
             . '<th style="' . $th . '">Entrada</th><th style="' . $th . '">Salida</th><th style="' . $th . '">Tiempo dentro</th>'
             . ($conLugar ? '<th style="' . $th . '">Punto de control</th>' : '') . '</tr></thead><tbody>';
         foreach ($renglones as $i => $r) {

@@ -15,7 +15,7 @@
      GET  ?qr=apk                                → código QR para descargar la app
                                                    AVBA Caseta (Android)
      GET  ?tarjeta=1                             → reglas para leer la tarjeta de
-                                                   identificación (tarjeta-reglas.json)
+                                                   identificación (api/accesos-tarjeta.json)
 
    La app AVBA Caseta lleva la pantalla del guardia dentro y llama desde su
    propio origen (https://localhost en Android): se permite con CORS.
@@ -223,7 +223,7 @@ if (isset($_GET['qr'])) {
 
 /* ── Reglas para leer la tarjeta de identificación (se ajustan sin reinstalar la app) ── */
 if (isset($_GET['tarjeta'])) {
-    $j = @file_get_contents(__DIR__ . '/tarjeta-reglas.json');
+    $j = @file_get_contents(__DIR__ . '/../api/accesos-tarjeta.json');      // las mismas reglas que la app real
     $reglas = is_string($j) ? json_decode($j, true) : null;
     salir(['ok' => true, 'reglas' => is_array($reglas) ? $reglas : new stdClass()]);
 }

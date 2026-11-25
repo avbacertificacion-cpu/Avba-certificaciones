@@ -56,7 +56,7 @@
   .fila{display:flex;gap:10px;flex-wrap:wrap}
   .fila>.campo{flex:1 1 180px}
   .campo label,.lbl{display:block;font-size:12.5px;font-weight:700;color:var(--texto-sub);margin-bottom:6px}
-  input[type=text],input[type=date],textarea,select{width:100%;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;
+  input[type=text],input[type=date],input[type=search],textarea,select{width:100%;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;
     font-size:15px;color:var(--texto);background:var(--blanco);outline:none;font-family:inherit;min-height:46px}
   textarea{min-height:64px;resize:vertical}
   input:focus,textarea:focus{border-color:var(--azul);box-shadow:0 0 0 3px rgba(24,95,165,.12)}
@@ -119,6 +119,34 @@
   .borrar:hover{color:var(--rojo);background:var(--rojo-light)}
   .borrar svg{width:20px;height:20px}
   .vacio{text-align:center;color:var(--texto-hint);font-size:13.5px;padding:22px 10px}
+
+  /* En planta (administración): una persona por ID, el número del recuadro azul de su credencial */
+  .id-azul{display:inline-block;background:#1d5fa8;color:#fff;font-weight:800;font-size:15px;letter-spacing:.6px;border-radius:999px;
+    padding:6px 12px;min-width:76px;text-align:center;font-variant-numeric:tabular-nums;flex-shrink:0}
+  .planta-total{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:8px 0 10px}
+  .planta-total b{font-size:34px;line-height:1;color:var(--azul-dark);font-variant-numeric:tabular-nums}
+  .planta-total span{font-size:13.5px;color:var(--texto-sub);font-weight:600}
+  .planta-busca{display:flex;gap:8px}
+  .planta-busca input{flex:1;min-width:0}
+  .planta-busca .btn{min-height:46px;padding:8px 14px}
+  .reg.planta{cursor:pointer;border-radius:10px}
+  .reg.planta:hover,.reg.planta:focus{background:#f5f8fc;outline:none}
+  .reg.planta .nom{font-size:14.5px;overflow-wrap:anywhere}
+  .reg.planta .nom.sin{color:var(--texto-hint);font-weight:600}
+  .aviso-13{font-size:12px;color:var(--ambar);background:var(--ambar-light);font-weight:700;margin-top:5px;padding:4px 8px;border-radius:8px;display:inline-block}
+  .ver-id{border:0;background:none;padding:0;font:inherit;font-weight:800;color:var(--azul);text-decoration:underline;cursor:pointer;white-space:nowrap}
+  .per-cab{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .per-cab b{display:block;font-size:15.5px;color:var(--texto);overflow-wrap:anywhere}
+  .est{display:inline-block;margin-top:3px;font-size:11.5px;font-weight:800;padding:3px 8px;border-radius:20px}
+  .est.dentro{background:var(--verde-light);color:var(--verde)}
+  .est.fuera{background:#eef1f6;color:var(--texto-sub)}
+  .movs{list-style:none;margin-top:6px}
+  .mov{padding:10px 0;border-bottom:1px solid var(--borde);font-size:13.5px;line-height:1.7}
+  .mov:last-child{border-bottom:0}
+  .mov i{color:var(--texto-hint)}
+  .mov .dur{font-size:12.5px;color:var(--texto-sub);font-weight:700}
+  .btn.rojo{background:var(--rojo);color:#fff}
+  .btn.rojo:disabled{opacity:.55}
 
   .btn{border:0;border-radius:10px;padding:12px 16px;font-size:14.5px;font-weight:700;cursor:pointer;font-family:inherit;min-height:46px;
     display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
@@ -265,8 +293,16 @@
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <h2 style="margin:0" id="tit-lista">Registros del turno</h2>
       <div class="seg" id="filtro" role="radiogroup" aria-label="Filtrar">
-        <button type="button" data-v="todos" aria-pressed="true">Todos</button><button type="button" data-v="entrada" aria-pressed="false">Entradas</button><button type="button" data-v="salida" aria-pressed="false">Salidas</button>
+        <button type="button" data-v="todos" aria-pressed="true">Todos</button><button type="button" data-v="entrada" aria-pressed="false">Entradas</button><button type="button" data-v="salida" aria-pressed="false">Salidas</button><button type="button" data-v="planta" aria-pressed="false" id="f-planta" hidden>En planta</button>
       </div>
+    </div>
+    <div id="planta-cab" hidden>
+      <div class="planta-total"><b id="planta-n">…</b><span id="planta-txt">personas en planta ahora</span></div>
+      <div class="planta-busca">
+        <input type="search" id="planta-buscar" placeholder="Buscar por ID o nombre" autocomplete="off" aria-label="Buscar por ID o nombre">
+        <button class="btn sec" type="button" id="planta-csv" title="Descargar la lista para Excel">Excel</button>
+      </div>
+      <small class="ayuda">Una persona por ID (el número del recuadro azul de su credencial): su última lectura fue ENTRADA, en cualquier punto, en las últimas 48 h. En cuanto registra su SALIDA ya no aparece. Toca a alguien para ver sus entradas y salidas.</small>
     </div>
     <label class="check" id="campo-solo-punto" style="margin-top:8px"><input type="checkbox" id="solo-punto" checked> Sólo este punto de control</label>
     <div class="nota mal" id="err-lista" hidden></div>
@@ -280,8 +316,8 @@
       <small class="ayuda">Un turno queda completo 2 horas después de su cambio, cuando ya salió su personal: el de día a las 20:30 y el de noche a las 08:30.</small></div>
     <p class="nota" id="pdf-aviso" hidden style="margin:0 0 6px"></p>
     <label class="check" style="margin-top:4px"><input type="checkbox" id="pdf-punto" checked> Sólo el punto de control elegido</label>
-    <h3 class="sub-pdf">Entradas y salidas: nombre, código y hora</h3>
-    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:8px">De los registros hechos con la tarjeta: cada persona con su hora de entrada y de salida (se juntan por su código).</p>
+    <h3 class="sub-pdf">Entradas y salidas: nombre, ID y hora</h3>
+    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:8px">De los registros hechos con la credencial: cada persona con su hora de entrada y de salida (se juntan por su ID, el número del recuadro azul).</p>
     <button class="btn verde ancho" id="btn-pdf-datos" type="button">Descargar PDF de entradas y salidas</button>
     <div id="pdf-datos-res"></div>
     <h3 class="sub-pdf">Fotos de las identificaciones (para analizar con Claude)</h3>
@@ -334,6 +370,19 @@
 <div class="fondo" id="v-foto" hidden><div class="ventana" style="max-width:760px;padding:10px">
   <img class="grande-img" id="foto-grande" alt="Identificación"><div id="foto-pie" style="font-size:13px;color:var(--texto-sub);margin-top:8px;text-align:center"></div>
   <button class="btn sec ancho" type="button" id="foto-cerrar" style="margin-top:10px">Cerrar</button></div></div>
+
+<!-- Entradas y salidas de una persona (por su ID) -->
+<div class="fondo" id="v-persona" hidden>
+  <div class="ventana" role="dialog" aria-modal="true" aria-labelledby="per-nombre">
+    <div class="per-cab"><span class="id-azul" id="per-id"></span><div><b id="per-nombre"></b><span id="per-estado"></span></div></div>
+    <p class="ayuda" id="per-sub" style="font-size:12.5px;color:var(--texto-sub)"></p>
+    <ul class="movs" id="per-movs"></ul>
+    <div class="botones">
+      <button class="btn rojo" type="button" id="per-salida" hidden>Dar salida ahora</button>
+      <button class="btn sec" type="button" id="per-cerrar">Cerrar</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast" hidden></div>
 <div class="hecho" id="hecho" hidden role="status" aria-live="assertive"></div>
@@ -390,12 +439,12 @@
   })();
   if (LECTOR) {
     try { mezclarReglas(JSON.parse(localStorage.getItem('avba_tarjeta_reglas') || 'null')); } catch (e) {}
-    // Las reglas de la tarjeta se ajustan en el servidor (demo/tarjeta-reglas.json) sin reinstalar la app
-    fetch('demo/sala.php?tarjeta=1', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
-      if (j && j.ok && j.reglas) { mezclarReglas(j.reglas); try { localStorage.setItem('avba_tarjeta_reglas', JSON.stringify(j.reglas)); } catch (e) {} }
+    // Las reglas de la credencial se ajustan en el servidor (api/accesos-tarjeta.json) sin reinstalar la app
+    api('ACCESOS_TARJETA_REGLAS', {}, 'GET').then(function (j) {
+      if (j && j.status === 'success' && j.reglas) { mezclarReglas(j.reglas); try { localStorage.setItem('avba_tarjeta_reglas', JSON.stringify(j.reglas)); } catch (e) {} }
     }).catch(function () {});
     $('lbl-ent').textContent = $('lbl-sal').textContent = 'Leer tarjeta';
-    $('ayuda-lugar').textContent = 'Cada registro se guarda con el nombre y el código de la tarjeta, el punto de control y la hora.';
+    $('ayuda-lugar').textContent = 'Cada registro se guarda con el nombre y el ID de la credencial, el punto de control y la hora.';
     // Los PDF se abren fuera de la app (en el visor del teléfono)
     document.addEventListener('click', function (ev) {
       var a = ev.target.closest && ev.target.closest('a[href*="descargar.php"]');
@@ -709,7 +758,7 @@
   }
   function registrarTarjeta(tipo, r) {
     var codigo = String(r.codigo || '').replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
-    if (!codigo) { toast('No se leyó el código de la tarjeta. Inténtalo de nuevo o escríbelo.', true); return; }
+    if (!codigo) { toast('No se leyó el ID de la credencial. Inténtalo de nuevo o escríbelo.', true); return; }
     var capturado = ahoraLocal();
     var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, turno: turnoDe(tipo, capturado), lugar: normaLugar($('lugar').value),
                nota: '', mini: '', codigo: codigo, persona: String(r.nombre || '').replace(/\s+/g, ' ').trim().slice(0, 150),
@@ -723,7 +772,7 @@
     el.className = 'hecho ' + it.tipo;
     el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>' +
       '<b>' + (ent ? 'ENTRADA' : 'SALIDA') + ' REGISTRADA</b><div class="n">' + esc(it.persona || 'Nombre no leído') + '</div>' +
-      '<div class="c">Código ' + esc(it.codigo) + ' · ' + esc(it.capturado.slice(11, 16)) + '</div>';
+      '<div class="c">ID ' + esc(it.codigo) + ' · ' + esc(it.capturado.slice(11, 16)) + '</div>';
     el.hidden = false;
     if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {}
     clearTimeout(tHecho); tHecho = setTimeout(function () { el.hidden = true; }, 1500);
@@ -753,9 +802,9 @@
       $('t-sub').textContent = 'Sale el ' + nombreTurno(ks[0]).slice(6) + ' y entra el ' + nombreTurno(ks[1]).slice(6);
     } else { $('t-nombre').textContent = nombreTurno(ks[0]) + ' · en curso'; $('t-sub').textContent = rangoTurno(ks[0]); }
     $('t-sig').disabled = !vista;
-    $('aviso-dia').hidden = !vista;
+    $('aviso-dia').hidden = !vista || modoPlanta;
     document.querySelectorAll('.cap').forEach(function (b) { b.disabled = !!vista || bloqueado; });
-    $('tit-lista').textContent = (CASETA ? 'Tus registros' : 'Registros') + (ks.length > 1 ? ' de los dos turnos' : ' del turno');
+    if (!modoPlanta) $('tit-lista').textContent = (CASETA ? 'Tus registros' : 'Registros') + (ks.length > 1 ? ' de los dos turnos' : ' del turno');
   }
   var firmaVista = '';
   function cambioVista() {
@@ -788,7 +837,7 @@
     g.addEventListener('click', function (ev) {
       var b = ev.target.closest('button'); if (!b) return;
       g.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
-      if (g.id === 'filtro') pintarLista();
+      if (g.id === 'filtro') { if (b.dataset.v === 'planta') entrarPlanta(); else { salirPlanta(); pintarLista(); } }
       if (g.id === 'incluir') { armarPrompt(); limpiarPartes(); }
     });
   });
@@ -944,6 +993,7 @@
     return q;
   }
   function cargar(reset) {
+    if (modoPlanta) return cargarPlanta();
     if (cargando && !reset) return Promise.resolve();
     cargando = true;
     var q = consulta(), mio = ++pedido;
@@ -991,6 +1041,7 @@
       '<div class="tot d"><b>' + numero(t.entrada - t.salida) + '</b><span>Diferencia</span></div></div></div>';
   }
   function pintarLista() {
+    if (modoPlanta) { pintarPlanta(); return; }
     var filtro = seg('filtro'), pend = enColaVisible(), sueltos = enviadosSinListar(), ks = turnosVista(), tot = {};
     ks.forEach(function (k) { var t = (datos.totales || {})[k] || {}; tot[k] = { entrada: t.entrada || 0, salida: t.salida || 0 }; });
     pend.forEach(function (x) { if (!x.error && tot[x.turno]) tot[x.turno][x.tipo]++; });
@@ -1006,7 +1057,9 @@
     var ICO_TARJ = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 16a3.5 3.5 0 0 1 7 0M14 10h4M14 13h4"/></svg>';
     var cuadro = function (x, img) { return x.codigo && !img ? '<div class="tarj">' + ICO_TARJ + 'Tarjeta</div>' : img; };
     var persona = function (x) {
-      return x.codigo ? '<div class="persona' + (x.persona ? '' : ' sin') + '">' + esc(x.persona || 'Nombre no leído') + ' · <span>' + esc(x.codigo) + '</span></div>' : '';
+      var id = CASETA ? '<span>' + esc(x.codigo) + '</span>'
+                      : '<button type="button" class="ver-id" data-persona="' + esc(x.codigo) + '" title="Ver sus entradas y salidas">' + esc(x.codigo) + '</button>';
+      return x.codigo ? '<div class="persona' + (x.persona ? '' : ' sin') + '">' + esc(x.persona || 'Nombre no leído') + ' · ' + id + '</div>' : '';
     };
     var html = pend.filter(porTipo).slice().reverse().map(function (x) {
       var estado = x.error ? '<span class="badge rech">No se aceptó</span>' : (enviando === x.uid ? '<span class="badge pend">Enviando…</span>' : '<span class="badge cola">En cola</span>');
@@ -1035,6 +1088,7 @@
   }
   $('lista').addEventListener('click', function (ev) {
     var t;
+    if ((t = ev.target.closest('[data-persona]'))) { abrirPersona(t.dataset.persona); return; }
     if ((t = ev.target.closest('[data-reintentar]'))) {
       var it = cola.filter(function (x) { return x.uid === t.dataset.reintentar; })[0];
       if (it) { delete it.error; ponerEnCola(it).then(function () { espera = 0; enviarCola(); }); }
@@ -1062,6 +1116,162 @@
   $('foto-cerrar').onclick = function () { $('v-foto').hidden = true; $('foto-grande').removeAttribute('src'); };
   $('v-foto').addEventListener('click', function (ev) { if (ev.target === $('v-foto')) $('foto-cerrar').onclick(); });
 
+  /* ══ En planta (administración) ══════════════════════════════════════
+     Una persona por ID (el número del recuadro azul, único por persona): su
+     última lectura de las últimas 48 h fue ENTRADA, en cualquier punto. Si ya
+     registró su salida, aunque sea por otro punto, no aparece. Se actualiza
+     sola cada 30 s, como la lista. */
+  var modoPlanta = false, pedidoPlanta = 0, ES_ADMIN = ses.rol === 'ADMIN';
+  var planta = { personas: [], total: 0, cargado: false, err: '', recibido: 0 };
+  if (!CASETA) $('f-planta').hidden = false;
+  function entrarPlanta() {
+    modoPlanta = true;
+    ['nav-turno', 'totales', 'btn-mas', 'aviso-dia'].forEach(function (id) { $(id).hidden = true; });
+    $('planta-cab').hidden = false;
+    $('tit-lista').textContent = 'En planta ahora';
+    pintarPlanta(); cargarPlanta();
+  }
+  function salirPlanta() {
+    if (!modoPlanta) return;
+    modoPlanta = false;
+    $('nav-turno').hidden = false; $('totales').hidden = false; $('planta-cab').hidden = true;
+    errLista = ''; pintarTurno(); cargar(true);
+  }
+  function cargarPlanta() {
+    var mio = ++pedidoPlanta, q = {};                      // siempre gana lo último que se pidió (punto, filtro)
+    if ($('solo-punto').checked) q.lugar = normaLugar($('lugar').value);
+    return api('ACCESOS_EN_PLANTA', q, 'GET').then(function (r) {
+      if (mio !== pedidoPlanta) return;
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'El servidor no respondió como se esperaba.');
+      planta = { personas: r.personas || [], total: r.total || 0, cargado: true, err: '', recibido: Date.now(), lugar: q.lugar || '' };
+    }).catch(function (e) {
+      if (mio !== pedidoPlanta) return;
+      planta.err = enLinea() ? 'No se pudo actualizar quién está en planta: ' + ((e && e.message) || 'error del servidor') + '.'
+                             : 'Sin señal: la lista se actualiza al volver la señal.';
+    }).then(function () { if (mio === pedidoPlanta && modoPlanta) pintarPlanta(); });
+  }
+  function textoBusqueda(t) { return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim(); }
+  function claveId(t) { var x = String(t || '').trim().toUpperCase(); return /^\d+$/.test(x) ? (x.replace(/^0+/, '') || '0') : x; }
+  function duracion(min) {
+    min = Math.max(0, Math.round(min));
+    var h = Math.floor(min / 60), m = min % 60;
+    return h ? h + ' h' + (m ? ' ' + m + ' min' : '') : m + ' min';
+  }
+  var DIAS = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+  function cuando(c) {                                   // «06:10» si es de hoy; «mar 24/11 18:40» si no
+    if (!c) return '';
+    var hora = c.slice(11, 16);
+    if (c.slice(0, 10) === hoyLocal()) return hora;
+    var d = new Date(+c.slice(0, 4), +c.slice(5, 7) - 1, +c.slice(8, 10));
+    return DIAS[d.getDay()] + ' ' + c.slice(8, 10) + '/' + c.slice(5, 7) + ' ' + hora;
+  }
+  function filtroPlanta() {
+    var q = textoBusqueda($('planta-buscar').value);
+    if (!q) return planta.personas;
+    var digitos = /^\d+$/.test(q), k = claveId(q);
+    return planta.personas.filter(function (x) {
+      return digitos ? claveId(x.id).indexOf(k) === 0 : textoBusqueda(x.nombre).indexOf(q) >= 0 || textoBusqueda(x.id) === q;
+    });
+  }
+  function pintarPlanta() {
+    var lista = filtroPlanta(), q = $('planta-buscar').value.trim();
+    var extra = planta.recibido ? (Date.now() - planta.recibido) / 60000 : 0;
+    $('planta-n').textContent = planta.cargado ? numero(planta.total) : '…';
+    $('planta-txt').textContent = (planta.total === 1 ? 'persona' : 'personas') + ' en planta ahora' +
+      (planta.lugar ? ' (entraron por ' + nombrePunto(planta.lugar) + ')' : '') +
+      (q && planta.cargado ? ' · ' + numero(lista.length) + ' con «' + q + '»' : '');
+    $('err-lista').hidden = !planta.err; $('err-lista').textContent = planta.err;
+    var html = lista.map(function (x) {
+      return '<li class="reg planta" data-persona="' + esc(x.id) + '" tabindex="0" role="button" aria-label="Ver entradas y salidas de ' + esc(x.nombre || 'ID ' + x.id) + '">' +
+        '<span class="id-azul">' + esc(x.id) + '</span>' +
+        '<div class="info"><div class="l1 nom' + (x.nombre ? '' : ' sin') + '">' + esc(x.nombre || 'Nombre no leído') + '</div>' +
+        '<div class="l2">Entró ' + esc(cuando(x.entrada)) + ' · ' + esc(nombrePunto(x.lugar)) + ' · <b>' + duracion(x.minutos + extra) + '</b> dentro</div>' +
+        (x.revisar ? '<div class="aviso-13">Más de 13 h dentro: ¿salió sin pasar su credencial?</div>' : '') +
+        '</div></li>';
+    }).join('');
+    if (!html) {
+      if (!planta.cargado) html = planta.err ? '' : '<li class="vacio">Cargando…</li>';
+      else if (q) html = '<li class="vacio">Nadie en planta con «' + esc(q) + '».' + (/^\d+$/.test(q) ?
+        '<br><button class="btn sec" type="button" data-persona="' + esc(q) + '" style="margin-top:10px">Ver entradas y salidas del ID ' + esc(q) + '</button>' : '') + '</li>';
+      else html = '<li class="vacio">No hay nadie en planta' + (planta.lugar ? ' que haya entrado por ' + esc(nombrePunto(planta.lugar)) : '') + '.</li>';
+    }
+    $('lista').innerHTML = html;
+    $('btn-mas').hidden = true;
+  }
+  $('planta-buscar').addEventListener('input', function () { if (modoPlanta) pintarPlanta(); });
+  $('planta-buscar').addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter') return;
+    var l = filtroPlanta(), q = $('planta-buscar').value.trim();
+    if (l.length === 1) abrirPersona(l[0].id);
+    else if (!l.length && /^\d+$/.test(q)) abrirPersona(q);
+  });
+  $('lista').addEventListener('keydown', function (ev) {
+    var t = ev.target.closest && ev.target.closest('li[data-persona]');
+    if (t && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); abrirPersona(t.dataset.persona); }
+  });
+  /* Lista para Excel (CSV): el ID va como texto para que Excel no le quite los ceros */
+  $('planta-csv').onclick = function () {
+    var filas = filtroPlanta();
+    if (!filas.length) { toast('No hay nadie en la lista.', true); return; }
+    if (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()) { toast('Descarga el Excel desde la computadora (gestion.avba.com.mx).', true); return; }
+    var c = function (v) { v = String(v == null ? '' : v); return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var extra = planta.recibido ? Math.floor((Date.now() - planta.recibido) / 60000) : 0;
+    var csv = '﻿' + ['ID', 'Nombre', 'Entrada', 'Punto de entrada', 'Tiempo dentro', 'Minutos dentro', 'Revisar'].join(',') + '\r\n' +
+      filas.map(function (x) {
+        return [c('="' + x.id + '"'), c(x.nombre), c(x.entrada), c(nombrePunto(x.lugar)), c(duracion(x.minutos + extra)), x.minutos + extra,
+                x.revisar ? 'Más de 13 h dentro' : ''].join(',');
+      }).join('\r\n') + '\r\n';
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = 'en-planta-' + ahoraLocal().slice(0, 16).replace(/[: ]/g, '-') + '.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  };
+
+  /* Entradas y salidas de una persona, por su ID (últimos 30 días) */
+  var personaAbierta = '';
+  function abrirPersona(id) {
+    personaAbierta = String(id);
+    $('per-id').textContent = id; $('per-nombre').textContent = 'Buscando…';
+    $('per-estado').textContent = ''; $('per-estado').className = '';
+    $('per-sub').textContent = ''; $('per-movs').innerHTML = ''; $('per-salida').hidden = true;
+    $('v-persona').hidden = false;
+    api('ACCESOS_PERSONA', { id: id }, 'GET').then(function (r) {
+      if (personaAbierta !== String(id)) return;
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo consultar.');
+      var movs = r.movimientos || [];
+      $('per-id').textContent = r.id;
+      $('per-nombre').textContent = r.nombre || (r.registros ? 'Nombre no leído' : 'Sin registros');
+      if (r.registros) { $('per-estado').textContent = r.en_planta ? 'En planta' : 'Fuera de planta'; $('per-estado').className = 'est ' + (r.en_planta ? 'dentro' : 'fuera'); }
+      $('per-sub').textContent = r.registros ? 'Entradas y salidas de los últimos ' + r.dias + ' días.' : 'Este ID no tiene lecturas en los últimos ' + r.dias + ' días.';
+      $('per-movs').innerHTML = movs.map(function (m, i) {
+        var abierta = !m.salida && r.en_planta && i === 0;
+        return '<li class="mov">' +
+          '<div><span class="badge entrada">ENTRADA</span> ' + (m.entrada ? esc(cuando(m.entrada)) + ' · ' + esc(nombrePunto(m.lugar)) : '<i>sin entrada registrada</i>') + '</div>' +
+          '<div><span class="badge salida">SALIDA</span> ' + (m.salida ? esc(cuando(m.salida)) + ' · ' + esc(nombrePunto(m.lugar_salida)) +
+            (m.origen_salida === 'admin' ? ' <i>(registrada por Administración)</i>' : '') : '<i>' + (abierta ? 'sigue en planta' : 'sin salida registrada') + '</i>') + '</div>' +
+          (m.minutos != null ? '<div class="dur">' + duracion(m.minutos) + ' dentro</div>' : '') + '</li>';
+      }).join('');
+      $('per-salida').hidden = !(r.en_planta && ES_ADMIN);
+    }).catch(function (e) {
+      if (personaAbierta !== String(id)) return;
+      $('per-nombre').textContent = 'No se pudo consultar'; $('per-sub').textContent = (e && e.message) || '';
+    });
+  }
+  $('per-salida').onclick = function () {
+    var id = $('per-id').textContent, nom = $('per-nombre').textContent;
+    if (!enLinea()) { toast('Para registrar la salida se necesita señal.', true); return; }
+    if (!confirm('¿Registrar la SALIDA de ' + nom + ' (ID ' + id + ') en este momento?\nQueda marcada como registrada por Administración.')) return;
+    $('per-salida').disabled = true;
+    api('ACCESOS_DAR_SALIDA', { id: id }).then(function (r) {
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo registrar la salida.');
+      toast(r.message); abrirPersona(id); cargarPlanta(); if (!modoPlanta) cargar(true);
+    }).catch(function (e) { toast((e && e.message) || 'No se pudo registrar la salida.', true); })
+      .then(function () { $('per-salida').disabled = false; });
+  };
+  $('per-cerrar').onclick = function () { $('v-persona').hidden = true; personaAbierta = ''; };
+  $('v-persona').addEventListener('click', function (ev) { if (ev.target === $('v-persona')) $('per-cerrar').onclick(); });
+
   /* ══ PDF por partes ═══════════════════════════════════════════════════ */
   var partes = { total: 0, hechas: {} };
   function limpiarPartes() { partes = { total: 0, hechas: {} }; $('partes').innerHTML = ''; $('pdf-res').innerHTML = ''; }
@@ -1083,7 +1293,7 @@
       var avisos = [];
       if (r.sin_salida) avisos.push(numero(r.sin_salida) + ' sin salida');
       if (r.sin_entrada) avisos.push(numero(r.sin_entrada) + ' sin entrada');
-      if (r.sin_codigo) avisos.push(numero(r.sin_codigo) + ' con foto y sin código (van en el PDF con fotos)');
+      if (r.sin_codigo) avisos.push(numero(r.sin_codigo) + ' con foto y sin ID (van en el PDF con fotos)');
       $('pdf-datos-res').innerHTML = '<div class="nota ok">' + numero(r.personas) + ' persona' + (r.personas === 1 ? '' : 's') + ' · ' +
         numero(r.entradas) + ' entrada' + (r.entradas === 1 ? '' : 's') + ' · ' + numero(r.salidas) + ' salida' + (r.salidas === 1 ? '' : 's') +
         (avisos.length ? '<br>' + esc(avisos.join(' · ')) : '') + '</div>' +
@@ -1210,7 +1420,7 @@
     guardar(CLAVE_LUGAR, p); guardar(CLAVE_PUNTO, p);
     $('sub-usuario').textContent = nombrePunto(p) + ' · ' + (ses.nombre || ses.usuario || '');
     $('ayuda-lugar').textContent = 'Tu punto de control (lo asigna Administración). ' +
-      (LECTOR ? 'Cada registro se guarda con el nombre y el código de la tarjeta y la hora.' : 'Cada registro se guarda con la hora en que se toma la foto.');
+      (LECTOR ? 'Cada registro se guarda con el nombre y el ID de la credencial y la hora.' : 'Cada registro se guarda con la hora en que se toma la foto.');
   }
   function bloquear(msg) {
     bloqueado = !!msg;

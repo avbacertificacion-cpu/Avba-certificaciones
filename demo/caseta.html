@@ -434,7 +434,7 @@
   }
   if (APP) {
     try { mezclarReglas(JSON.parse(localStorage.getItem('avba_tarjeta_reglas') || 'null')); } catch (e) {}
-    // Las reglas de la tarjeta se ajustan en el servidor (demo/tarjeta-reglas.json) sin reinstalar la app
+    // Las reglas de la tarjeta se ajustan en el servidor (api/accesos-tarjeta.json) sin reinstalar la app
     fetch(APP.servidor + '/demo/sala.php?tarjeta=1', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
       if (j && j.ok && j.reglas) { mezclarReglas(j.reglas); try { localStorage.setItem('avba_tarjeta_reglas', JSON.stringify(j.reglas)); } catch (e) {} }
     }).catch(function () {});

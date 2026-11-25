@@ -170,7 +170,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         LinearLayout abajo = new LinearLayout(this);
         abajo.setOrientation(LinearLayout.VERTICAL);
         abajo.setBackgroundColor(Color.argb(190, 11, 37, 69));
-        tEstado = texto("Buscando el nombre y el código…", 17, true, BLANCO);
+        tEstado = texto("Buscando el nombre y el ID…", 17, true, BLANCO);
         tTexto = texto("", 12, false, Color.argb(190, 255, 255, 255));
         tTexto.setMaxLines(3);
         tTexto.setEllipsize(TextUtils.TruncateAt.END);
@@ -182,7 +182,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         fila.setPadding(0, dp(10), 0, 0);
         Button bCancelar = boton("Cancelar", Color.argb(60, 255, 255, 255));
         bCancelar.setOnClickListener(v -> { setResult(RESULT_CANCELED); finish(); });
-        Button bEscribir = boton("Escribir código", Color.argb(60, 255, 255, 255));
+        Button bEscribir = boton("Escribir ID", Color.argb(60, 255, 255, 255));
         bEscribir.setOnClickListener(v -> escribirCodigo());
         bLinterna = boton("Linterna", Color.argb(60, 255, 255, 255));
         bLinterna.setVisibility(View.GONE);
@@ -300,7 +300,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
                 entregar(confirmado.codigo, nombre, false, false);
                 return;
             }
-            tEstado.setText("Código " + confirmado.codigo + " — falta leer el nombre…");
+            tEstado.setText("ID " + confirmado.codigo + " — falta leer el nombre…");
             tEstado.setTextColor(AMARILLO);
             marco.color(AMARILLO);
             tTexto.setText(ultimoTexto.replace("\n", " · "));
@@ -308,15 +308,15 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         }
         // Lo que se va leyendo, para que el guardia sepa que sí está viendo la tarjeta
         if (l.codigo != null) {
-            tEstado.setText("Código " + l.codigo + (l.nombre != null ? " · " + l.nombre : "") + " — confirmando…");
+            tEstado.setText("ID " + l.codigo + (l.nombre != null ? " · " + l.nombre : "") + " — confirmando…");
             tEstado.setTextColor(AMARILLO);
             marco.color(AMARILLO);
         } else if (l.nombre != null) {
-            tEstado.setText(l.nombre + " — falta el código; acércala o enfoca");
+            tEstado.setText(l.nombre + " — falta el ID; acércala o enfoca");
             tEstado.setTextColor(BLANCO);
             marco.color(BLANCO);
         } else {
-            tEstado.setText(lineas.isEmpty() ? "Buscando el nombre y el código…" : "Acerca la tarjeta y mantenla quieta");
+            tEstado.setText(lineas.isEmpty() ? "Buscando el nombre y el ID…" : "Acerca la credencial y mantenla quieta");
             tEstado.setTextColor(BLANCO);
             marco.color(BLANCO);
         }
@@ -327,13 +327,13 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         pausado = true;
         EditText e = new EditText(this);
         e.setInputType(InputType.TYPE_CLASS_NUMBER);
-        e.setHint("Código de la tarjeta");
+        e.setHint("Número del ID");
         FrameLayout caja = new FrameLayout(this);
         caja.setPadding(dp(22), dp(6), dp(22), 0);
         caja.addView(e);
         AlertDialog d = new AlertDialog.Builder(this)
-                .setTitle("Escribir el código")
-                .setMessage("Si la tarjeta no se lee, escribe el número que trae.")
+                .setTitle("Escribir el ID")
+                .setMessage("Si la credencial no se lee, escribe el número del ID (el del recuadro azul).")
                 .setView(caja)
                 .setPositiveButton("Aceptar", (dlg, w) -> {
                     String c = e.getText().toString().replaceAll("\\D", "");
@@ -361,7 +361,7 @@ public class LectorTarjetaActivity extends AppCompatActivity {
         if (simulado) { finish(); return; }
         marco.color(VERDE);
         tEstado.setTextColor(VERDE);
-        tEstado.setText("Leída: " + (nombre != null && !nombre.isEmpty() ? nombre + " · " : "") + "código " + codigo);
+        tEstado.setText("Leída: " + (nombre != null && !nombre.isEmpty() ? nombre + " · " : "") + "ID " + codigo);
         marco.performHapticFeedback(Build.VERSION.SDK_INT >= 30 ? HapticFeedbackConstants.CONFIRM : HapticFeedbackConstants.LONG_PRESS);
         marco.postDelayed(this::finish, 450);
     }

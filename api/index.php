@@ -176,6 +176,7 @@ if (!empty($sesion['usuario']['vista_admin']) && !VistaPortal::permitida((string
 // depende de que cada acción del sistema revise el rol por su cuenta.
 if (($sesion['usuario']['rol_base'] ?? '') === 'ACCESOS' && !in_array((string)$action, [
         'ACCESO_REGISTRAR', 'LISTAR_ACCESOS', 'LISTAR_ACCESOS_LUGARES', 'ACCESO_ELIMINAR', 'ACCESOS_EXISTEN', 'ACCESOS_MI_PUNTO',
+        'ACCESOS_TARJETA_REGLAS',
         'PASSKEY_OPCIONES_REGISTRO', 'PASSKEY_REGISTRAR', 'APP_REGISTRAR_DISPOSITIVO', 'APP_VERSION',
     ], true)) {
     respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo puede registrar entradas y salidas.'], 403);
@@ -1075,6 +1076,9 @@ if ($method === 'GET') {
         case 'LISTAR_ACCESOS':
         case 'LISTAR_ACCESOS_LUGARES':
         case 'ACCESOS_MI_PUNTO':
+        case 'ACCESOS_EN_PLANTA':
+        case 'ACCESOS_PERSONA':
+        case 'ACCESOS_TARJETA_REGLAS':
         case 'ACCESOS_PUNTOS': {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -1084,6 +1088,9 @@ if ($method === 'GET') {
                 case 'LISTAR_ACCESOS':         respuesta($ca->listar($_GET, $usr));
                 case 'LISTAR_ACCESOS_LUGARES': respuesta($ca->lugares());
                 case 'ACCESOS_MI_PUNTO':       respuesta($ca->miPunto($_GET, $usr));
+                case 'ACCESOS_EN_PLANTA':      respuesta($ca->enPlanta($_GET, $usr));
+                case 'ACCESOS_PERSONA':        respuesta($ca->persona($_GET, $usr));
+                case 'ACCESOS_TARJETA_REGLAS': respuesta(ControlAccesos::reglasTarjeta());
                 default:                       respuesta($ca->puntos($usr));
             }
         }
@@ -1183,6 +1190,9 @@ if ($method === 'POST') {
         case 'ACCESOS_MI_PUNTO':
         case 'ACCESOS_PUNTOS':
         case 'ACCESOS_PUNTO_ASIGNAR':
+        case 'ACCESOS_EN_PLANTA':
+        case 'ACCESOS_PERSONA':
+        case 'ACCESOS_DAR_SALIDA':
         case 'ACCESOS_EQUIPO_LIBERAR': {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
@@ -1200,6 +1210,9 @@ if ($method === 'POST') {
                 case 'ACCESOS_PUNTOS':         respuesta($ca->puntos($usr));
                 case 'ACCESOS_PUNTO_ASIGNAR':  respuesta($ca->asignarPunto($datos, $usr));
                 case 'ACCESOS_EQUIPO_LIBERAR': respuesta($ca->liberarEquipo($datos, $usr));
+                case 'ACCESOS_EN_PLANTA':      respuesta($ca->enPlanta($datos, $usr));
+                case 'ACCESOS_PERSONA':        respuesta($ca->persona($datos, $usr));
+                case 'ACCESOS_DAR_SALIDA':     respuesta($ca->darSalida($datos, $usr));
                 default:                       respuesta($ca->generarPdf($datos, $usr));
             }
         }
