@@ -39,6 +39,7 @@
   function cuando(d) { return claveDia(d) === claveDia(ahora()) ? 'hoy ' + hhmm(d) : (claveDia(d) === claveDia(sumarDias(ahora(), -1)) ? 'ayer ' + hhmm(d) : fechaCorta(d) + ' ' + hhmm(d)); }
   function dur(ms) { var m = Math.max(0, Math.round(ms / MIN)), h = Math.floor(m / 60); return h + ' h ' + dos(m % 60) + ' min'; }
   function fmtH(h) { return (Math.round(h * 10) / 10).toLocaleString('es-MX') + ' h'; }
+  function pl(n, uno, varios) { return n + ' ' + (n === 1 ? uno : varios); }
   function iniciales(n) { var p = n.split(' '); return (p[0][0] + (p[1] ? p[1][0] : '')).toUpperCase(); }
 
   /* ══ Datos ficticios (con semilla: no cambian al recargar el mismo día) ══ */
@@ -96,7 +97,7 @@
     ACTO: { n: 'Acto inseguro', g: 'Media', d: ['Cruzó el área acordonada de una maniobra.', 'Retiró una guarda de protección.', 'Subió a andamio sin tarjeta de liberación.'] },
     CASI: { n: 'Casi accidente', g: 'Media', d: ['Cayó una herramienta desde el nivel 3 del andamio; sin lesionados.', 'Resbalón por derrame de aceite; sin lesión.'] },
     ACC: { n: 'Accidente con lesión', g: 'Alta', d: ['Golpe en la mano con llave de impacto; atendido en servicio médico.', 'Esguince de tobillo al bajar de la plataforma.', 'Quemadura leve en antebrazo durante corte.'] },
-    ALC: { n: 'Aliento alcohólico / alcoholímetro positivo', g: 'Alta', d: ['Alcoholímetro en caseta: 0.32 g/L.', 'Aliento alcohólico detectado por supervisión; prueba positiva.'] },
+    ALC: { n: 'Aliento alcohólico / alcoholímetro positivo', g: 'Alta', d: ['Alcoholímetro en caseta: 0.16 mg/L en aire espirado.', 'Aliento alcohólico detectado por supervisión; prueba positiva.'] },
     DRO: { n: 'Sospecha de consumo de drogas', g: 'Alta', d: ['Conducta errática reportada por supervisión; se negó a la prueba.'] },
     RIN: { n: 'Riña o agresión', g: 'Alta', d: ['Discusión con agresión física en el comedor.'] },
     ROB: { n: 'Sustracción de material o herramienta', g: 'Alta', d: ['Intentó sacar cable de cobre sin vale de salida.', 'No presentó a la salida herramienta registrada a la entrada.'] },
@@ -138,6 +139,20 @@
     T_INC.push(inc); return inc;
   }
 
+  /* Sin apellidos repetidos ni combinaciones que provoquen risa, y el puesto
+     en femenino cuando corresponde. No usa el azar: los datos no cambian. */
+  var FEM = [[/^Operador /, 'Operadora '], [/^Supervisor /, 'Supervisora '], [/^Inspector /, 'Inspectora '], [/^Técnico /, 'Técnica '],
+             [/^Mecánico montador$/, 'Mecánica montadora'], [/^Soldador$/, 'Soldadora'], [/^Pailero$/, 'Pailera'], [/^Andamiero$/, 'Andamiera'],
+             [/^Oficial fierrero$/, 'Oficial fierrera']];
+  function pulirNombre(p, mujer) {
+    var x = p.nombre.split(' '), n = x.length;
+    if (x[n - 1] === x[n - 2]) x[n - 1] = APE[(APE.indexOf(x[n - 2]) + 7) % APE.length];
+    if (x[0] === 'Mario' && x[n - 2] === 'Moreno') x[n - 2] = 'Morales';
+    p.nombre = x.join(' ');
+    p.mujer = mujer;
+    if (mujer) FEM.forEach(function (f) { p.puesto = p.puesto.replace(f[0], f[1]); });
+    else p.puesto = p.puesto.replace(/^Supervisora /, 'Supervisor ');
+  }
   (function generar() {
     var hoy = hoy0, n = 0;
     EMPRESAS.forEach(function (e) {
@@ -184,6 +199,7 @@
           var cE = CASETAS[prob(0.7) ? 0 : 1], cS = CASETAS[prob(0.7) ? 0 : 1];
           p.plan.push({ ent: ent, salPlan: sal, salReal: null, cE: cE, cS: cS, obs: '', cancel: false, manual: false });
         }
+        pulirNombre(p, mujer);
         PERSONAS.push(p); P[p.id] = p;
       }
     });
@@ -364,19 +380,29 @@
     var jornadaOk = function (p) { var s = stats(p); return s.seguidos < REGLAS.diasSeguidos && s.h7 + p.pat.h <= lim.max; };
     var limpio = function (p) { return okBase(p) && jornadaOk(p) && !valesAbiertos(p).length && stats(p).docs.est === 'ok'; };
     var especial = function (p) { return p.aut.tab || p.aut.pc; };          // se reservan para el caso «tableta o computadora»
-    var f = {
-      ok: function (p) { return limpio(p) && !p.aut.herr && !especial(p) && EMP[p.emp].repse === 'Vigente'; },
-      herr: function (p) { return limpio(p) && p.aut.herr && p.herr.length > 0 && !especial(p); },
-      cel: function (p) { return limpio(p) && !p.aut.cel && !p.aut.herr && !especial(p) && p.emp !== 'AVB'; },
-      veto: function (p) { return vetoVigente(p); },
-      vale: function (p) { return okBase(p) && jornadaOk(p) && valesAbiertos(p).length > 0; },
-      semana: function (p) { return okBase(p) && stats(p).h7 + p.pat.h > lim.max && p.emp !== 'AVB'; },
-      doc: function (p) { return p.estado === 'activo' && stats(p).docs.est === 'vencido' && p.emp !== 'AVB'; },
-      alcohol: function (p) { return limpio(p) && !especial(p) && p.emp !== 'AVB'; },
-      disp: function (p) { return okBase(p) && jornadaOk(p) && !valesAbiertos(p).length && especial(p); }
-    }[caso];
+    var sinHerr = function (p) { return !p.aut.herr; };
+    var sinAvba = function (p) { return p.emp !== 'AVB'; };              // AVBA no aparece en los casos negativos
+    var y = function () { var fs = arguments; return function (p) { for (var k = 0; k < fs.length; k++) if (!fs[k](p)) return false; return true; }; };
+    var ok = function (p) { return limpio(p) && sinHerr(p) && !especial(p) && EMP[p.emp].repse === 'Vigente'; };
+    var semana = function (p) { return okBase(p) && stats(p).h7 + p.pat.h > lim.max && sinAvba(p); };
+    var doc = function (p) { return p.estado === 'activo' && stats(p).docs.est === 'vencido' && sinAvba(p); };
+    var alc = function (p) { return limpio(p) && !especial(p) && sinAvba(p); };
+    var disp = function (p) { return okBase(p) && jornadaOk(p) && !valesAbiertos(p).length && especial(p); };
+    // Para cada caso, del filtro preferido al más amplio
+    var filtros = {
+      ok: [y(ok, function (p) { return p.aut.cel; }), ok],                 // de preferencia con celular autorizado (se ve en verde)
+      herr: [function (p) { return limpio(p) && p.aut.herr && p.herr.length > 0 && !especial(p); }],
+      cel: [function (p) { return limpio(p) && !p.aut.cel && sinHerr(p) && !especial(p) && sinAvba(p); }],
+      veto: [vetoVigente],
+      vale: [function (p) { return okBase(p) && jornadaOk(p) && valesAbiertos(p).length > 0; }],
+      semana: [y(semana, function (p) { return sinHerr(p) && stats(p).h7 <= lim.max; }), y(semana, sinHerr), semana],
+      doc: [y(doc, sinHerr), doc],
+      alcohol: [y(alc, sinHerr), alc],
+      disp: [y(disp, sinHerr), disp]
+    }[caso] || [];
     var rasgo = { disp: especial, herr: function (p) { return p.aut.herr && p.herr.length > 0; }, cel: function (p) { return !p.aut.cel; }, vale: function (p) { return valesAbiertos(p).length > 0; } }[caso];
-    var c = f ? fuera.filter(f) : [];
+    var c = [];
+    for (var k = 0; k < filtros.length && !c.length; k++) c = fuera.filter(filtros[k]);
     if (!c.length && rasgo) c = fuera.filter(function (p) { return okBase(p) && rasgo(p); });   // conserva lo que se quiere mostrar
     if (!c.length) c = fuera.filter(function (p) { return okBase(p) && jornadaOk(p); });
     if (!c.length) c = fuera.filter(okBase);
@@ -401,12 +427,12 @@
     if (EMP[p.emp].repse !== 'Vigente') ch.push({ s: 'aviso', i: 'doc', t: 'REPSE de la contratista ' + (EMP[p.emp].repse === 'Vencido' ? 'vencido' : 'por vencer'), d: 'No detiene a la persona; se avisa a ' + EMP[p.emp].corto + '.' });
     // Jornada
     var hTurno = p.pat.h;
-    if (s.seguidos >= REGLAS.diasSeguidos) { ch.push({ s: 'grave', i: 'reloj', t: 'Sería su día ' + (s.seguidos + 1) + ' seguido', d: 'La LFT pide un día de descanso por cada seis de trabajo (art. 69). Requiere autorización.' }); peor('esp'); motivos.push('Sería su día ' + (s.seguidos + 1) + ' seguido sin descanso'); }
-    if (s.h7 + hTurno > lim.max) { ch.push({ s: 'grave', i: 'reloj', t: 'Excedería el máximo semanal', d: 'Lleva ' + fmtH(s.h7) + ' en 7 días; con este turno llegaría a ' + fmtH(s.h7 + hTurno) + ' (máximo ' + lim.max + ' h). Requiere autorización.' }); peor('esp'); motivos.push('Pasaría el máximo de horas de la semana'); }
+    if (s.seguidos >= REGLAS.diasSeguidos) { ch.push({ s: 'grave', i: 'reloj', t: 'Sería su día ' + (s.seguidos + 1) + ' seguido', d: 'La LFT pide un día de descanso por cada seis de trabajo (art. 69). Requiere autorización.' }); peor('esp'); motivos.push('Sería su día ' + (s.seguidos + 1) + ' seguido sin descanso (la ley pide uno de cada seis)'); }
+    if (s.h7 + hTurno > lim.max) { ch.push({ s: 'grave', i: 'reloj', t: 'Excedería el máximo semanal', d: 'Lleva ' + fmtH(s.h7) + ' en 7 días; con este turno llegaría a ' + fmtH(s.h7 + hTurno) + ' (máximo ' + lim.max + ' h). Requiere autorización.' }); peor('esp'); motivos.push('Lleva ' + fmtH(s.h7) + ' en 7 días; con este turno de ' + hTurno + ' h llegaría a ' + fmtH(s.h7 + hTurno) + ' (máximo ' + lim.max + ' h)'); }
     else if (s.h7 + hTurno > lim.ord) ch.push({ s: 'aviso', i: 'reloj', t: 'Este turno genera horas extra', d: 'Lleva ' + fmtH(s.h7) + ' en 7 días; jornada ordinaria ' + lim.ord + ' h.' });
-    else ch.push({ s: 'ok', i: 'reloj', t: 'Jornada', d: 'Lleva ' + fmtH(s.h7) + ' en 7 días y ' + s.seguidos + ' día(s) seguidos.' });
+    else ch.push({ s: 'ok', i: 'reloj', t: 'Jornada', d: 'Lleva ' + fmtH(s.h7) + ' en 7 días y ' + pl(s.seguidos, 'día seguido', 'días seguidos') + '.' });
     // Celular
-    var traeCel = !guardia && (caso === 'cel' || (caso === '' && Math.random() < 0.6) || p.aut.cel);
+    var traeCel = caso === 'g-cel' || (!guardia && (caso === 'cel' || (caso === '' && Math.random() < 0.6) || p.aut.cel));
     var disp = [['tab', 'Tableta'], ['pc', 'Computadora'], ['cam', 'Cámara']].filter(function (x) { return p.aut[x[0]]; }).map(function (x) { return x[1]; });
     if (disp.length) ch.push({ s: 'ok', i: 'pc', t: 'Dispositivos autorizados', d: disp.join(', ') + '.' });
     if (traeCel) {
@@ -417,7 +443,7 @@
     if (p.aut.auto) { ch.push({ s: 'ok', i: 'auto', t: 'Vehículo autorizado', d: 'Placas ' + p.placas + '.' }); inst.push(['auto', 'Vehículo ' + p.placas + ': puede pasar']); }
     valesAbiertos(p).forEach(function (v) { ch.push({ s: N - v.abierto > REGLAS.vale * DIA ? 'grave' : 'aviso', i: 'vale', t: 'Vale pendiente ' + v.folio, d: TIPO_VALE[v.tipo] + ': ' + v.items.join(', ') + ' · abierto ' + cuando(v.abierto) + (v.nota ? ' · ' + v.nota : '') + '.' }); peor('obs'); });
     var incR = INCIDENCIAS.filter(function (i) { return i.pid === p.id && N - i.fecha < 90 * DIA; });
-    if (incR.length && !vetoVigente(p)) ch.push({ s: 'aviso', i: 'escudo', t: incR.length + ' incidencia(s) en 90 días', d: incR.map(function (i) { return TIPOS_INC[i.tipo].n.toLowerCase(); }).join(', ') + '.' });
+    if (incR.length && !vetoVigente(p)) ch.push({ s: 'aviso', i: 'escudo', t: pl(incR.length, 'incidencia', 'incidencias') + ' en 90 días', d: incR.map(function (i) { return TIPOS_INC[i.tipo].n.toLowerCase(); }).join(', ') + '.' });
     var base = res;                                     // el resultado sin la prueba de alcoholímetro
     var azar = caso === 'guardia' || caso === '';         // en los casos del guion no se sortea
     var alc = res !== 'nopasa' && (caso === 'alcohol' || caso === 'g-alcohol' || (azar && Math.random() * 100 < REGLAS.alc));
@@ -477,7 +503,7 @@
         return true;
       case 'inc':                                           // incidencia (y veto, si la medida lo es)
         if (!TIPOS_INC[op.tipo]) return null;
-        var inc = { folio: op.folio || folioInc(), pid: p.id, tipo: op.tipo, grav: TIPOS_INC[op.tipo].g, fecha: t, accion: op.accion,
+        var inc = { nueva: true, folio: op.folio || folioInc(), pid: p.id, tipo: op.tipo, grav: TIPOS_INC[op.tipo].g, fecha: t, accion: op.accion,
           desc: op.desc || TIPOS_INC[op.tipo].d[0], estado: 'En seguimiento', por: op.por || 'Admin. de accesos' };
         T_INC.push(inc);
         if (/Veto/.test(op.accion || '')) {
@@ -638,9 +664,10 @@
   }
   function reiniciar() {
     if (!SALA) { try { localStorage.removeItem(CLAVE); } catch (e) {} location.reload(); return; }
-    pendientes = []; guardarPend();
     fetch(URL_SALA, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sala: SALA, dia: semilla, accion: 'reiniciar' }) })
-      .catch(function () {}).then(function () { location.reload(); });
+      .then(function (r) { return r.json(); })
+      .then(function (j) { if (!j || !j.ok) throw new Error(); pendientes = []; guardarPend(); location.reload(); })
+      .catch(function () { alert('No se pudo reiniciar la sala ' + SALA + ': revisa la conexión e inténtalo de nuevo.'); });
   }
 
   if (SALA) {
@@ -666,6 +693,7 @@
     TABLA_LEY: TABLA_LEY, REGLAS: REGLAS, limites: limites, stats: stats, docs: docs, valesAbiertos: valesAbiertos, vetoVigente: vetoVigente,
     candidato: candidato, revisar: revisarEntrada, turnoDe: turnoDe, turnosEnCurso: turnosEnCurso, nombreTurno: nombreTurno,
     tick: tick, registrar: registrar, alCambiar: function (f) { oyentes.push(f); }, reiniciar: reiniciar,
+    hash: hash, pl: pl,
     sala: SALA, estadoSala: function () { return sala.estado; }, alCambiarSala: function (f) { oyentesSala.push(f); }, alError: function (f) { oyentesError.push(f); },
     semilla: semilla
   };

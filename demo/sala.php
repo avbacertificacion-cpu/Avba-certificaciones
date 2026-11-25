@@ -18,7 +18,8 @@
    ══════════════════════════════════════════════════════════════ */
 declare(strict_types=1);
 
-const MAX_OPS = 3000;
+const MAX_OPS = 1000;
+const MAX_SALAS = 300;                     // salas (archivos) a la vez; las de días anteriores se borran solas
 const MAX_CUERPO = 20000;
 $DIR = dirname(__DIR__) . '/uploads/demo-salas/';
 
@@ -220,6 +221,8 @@ if (mt_rand(1, 20) === 1) {
         if (is_string($f) && @filemtime($f) < time() - 3 * 86400) @unlink($f);
     }
 }
+// Tope de salas: una sala nueva sólo se crea si hay lugar
+if (!is_file($archivo) && count((array)glob($DIR . '*.json')) >= MAX_SALAS) salir(['ok' => false, 'error' => 'lleno'], 429);
 
 if (($cuerpo['accion'] ?? '') === 'reiniciar') {
     $datos = conSala($archivo, function (array $d) { return ['epoca' => (int)$d['epoca'] + 1, 'ops' => []]; });

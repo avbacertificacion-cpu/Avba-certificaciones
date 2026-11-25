@@ -29,7 +29,7 @@
 <style>
   :root{
     --azul:#185FA5; --azul-dark:#0C447C; --azul-light:#E6F1FB; --marino:#0B2545;
-    --texto:#1a1a2e; --texto-sub:#5a6072; --texto-hint:#8b91a0; --borde:#dfe5ef;
+    --texto:#1a1a2e; --texto-sub:#5a6072; --texto-hint:#5f6675; --borde:#dfe5ef;
     --fondo:#f0f4f9; --blanco:#fff; --radio:14px;
     /* Gráficas (paleta validada) */
     --s1:#2a78d6; --s2:#eb6834;
@@ -65,7 +65,7 @@
   .sala-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:800;border-radius:999px;padding:5px 11px;background:rgba(255,255,255,.14);color:#fff;white-space:nowrap}
   .sala-chip i{width:8px;height:8px;border-radius:50%;background:#c3c2b7}
   .sala-chip.ok i{background:#5fd35f} .sala-chip.mal i{background:#ff6b6b}
-  .solicitudes{position:fixed;top:100px;right:16px;z-index:95;display:flex;flex-direction:column;gap:10px;width:min(380px,calc(100vw - 32px));max-height:calc(100vh - 116px);overflow:auto;padding:2px}
+  .solicitudes{position:fixed;top:100px;right:16px;z-index:95;display:flex;flex-direction:column;gap:10px;width:min(350px,calc(100vw - 32px));max-height:calc(100vh - 116px);overflow:auto;padding:2px}
   body.con-panel .solicitudes{right:calc(min(560px,100%) + 16px)}
   @media (max-width:980px){ body.con-panel .solicitudes{right:16px;top:auto;bottom:16px;max-height:45vh} }
   .sol{background:#fff;border-radius:14px;box-shadow:0 12px 36px rgba(11,37,69,.28);border:2px solid #fab219;padding:14px}
@@ -105,14 +105,15 @@
   .g2{grid-template-columns:repeat(2,minmax(0,1fr))} .g3{grid-template-columns:repeat(3,minmax(0,1fr))} .g21{grid-template-columns:minmax(0,2fr) minmax(0,1fr)} .g12{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr)}
   .lienzo{position:relative;height:250px}
   .lienzo.bajo{height:210px} .lienzo.alto{height:330px}
-  .nota-graf{font-size:11.5px;color:var(--texto-hint);margin-top:8px;line-height:1.45}
+  .nota-graf{font-size:12.5px;color:var(--texto-hint);margin-top:8px;line-height:1.45}
 
   /* ── Indicadores ── */
   .kpis{display:grid;grid-template-columns:1.4fr repeat(5,1fr);gap:12px;margin-bottom:14px}
   .kpi{background:#fff;border-radius:var(--radio);border:1px solid rgba(0,0,0,.06);padding:14px 16px;min-width:0}
   .kpi .l{font-size:12px;color:var(--texto-sub);font-weight:600;display:flex;align-items:center;gap:6px}
   .kpi .v{font-size:28px;font-weight:700;line-height:1.15;margin-top:4px;color:var(--texto)}
-  .kpi .s{font-size:11.5px;color:var(--texto-hint);margin-top:2px}
+  .kpi .s{font-size:12.5px;color:var(--texto-hint);margin-top:2px}
+  .kpi .s .nw{white-space:nowrap}
   .kpi.hero{background:linear-gradient(160deg,var(--marino),var(--azul-dark));color:#fff;border:0}
   .kpi.hero .l,.kpi.hero .s{color:rgba(255,255,255,.8)}
   .kpi.hero .v{color:#fff;font-size:40px}
@@ -127,6 +128,7 @@
   .st.bueno{background:#e6f5e6;color:#1d5e1d} .st.bueno svg{color:var(--bueno)}
   .st.info{background:var(--azul-light);color:var(--azul-dark)}
   .st.gris{background:#edf0f5;color:#4a5568}
+  .st.nueva{background:#dcebfb;color:#0C447C}
 
   /* ── Alertas ── */
   .alertas{list-style:none}
@@ -138,7 +140,7 @@
   .al .ic.critico{background:#fbe6e6;color:var(--critico)} .al .ic.grave{background:#fdeee6;color:var(--grave)} .al .ic.aviso{background:#fff4d9;color:#c98500}
   .al .tx{flex:1;min-width:0}
   .al .tx b{font-size:13.5px} .al .tx .d{font-size:12.5px;color:var(--texto-sub);margin-top:2px;line-height:1.4}
-  .al .tx .m{font-size:11.5px;color:var(--texto-hint);margin-top:3px}
+  .al .tx .m{font-size:12.5px;color:var(--texto-hint);margin-top:3px}
   .al .acc{display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap;justify-content:flex-end}
 
   /* ── Botones y formularios ── */
@@ -163,7 +165,7 @@
   /* ── Tablas ── */
   .tabla-env{overflow-x:auto;margin:0 -4px}
   table.t{width:100%;border-collapse:collapse;font-size:13px}
-  table.t th{text-align:left;font-size:11.5px;color:var(--texto-hint);font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:8px 8px;border-bottom:1px solid var(--borde);white-space:nowrap}
+  table.t th{text-align:left;font-size:12px;color:var(--texto-hint);font-weight:700;text-transform:uppercase;letter-spacing:.3px;padding:8px 8px;border-bottom:1px solid var(--borde);white-space:nowrap}
   table.t td{padding:9px 8px;border-bottom:1px solid #eef1f6;vertical-align:middle}
   table.t tr:last-child td{border-bottom:0}
   table.t tr.fila{cursor:pointer} table.t tr.fila:hover td{background:#f7f9fc}
@@ -226,7 +228,15 @@
   .feed li:last-child{border-bottom:0}
   .feed .hora{font-size:12px;color:var(--texto-hint);width:42px;flex-shrink:0;font-variant-numeric:tabular-nums}
   .feed .tx{flex:1;min-width:0;font-size:13px}
-  .feed .tx span{display:block;font-size:11.5px;color:var(--texto-hint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .feed .tx span{display:block;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;font-size:12px;color:var(--texto-hint);overflow:hidden}
+  #t-inc td:first-child b, #t-vales td:first-child b{white-space:nowrap}
+  #sim .acciones{scroll-margin-bottom:18px}
+  .card.llena{display:flex;flex-direction:column} .card.llena .lienzo{flex:1 1 0;min-height:250px}
+  .hoy{margin-bottom:14px;padding:12px 16px;border-left:4px solid var(--azul)}
+  .hoy .card-tit{margin-bottom:4px} .hoy .card-tit h2{display:flex;align-items:center;gap:6px}
+  .hoy .feed{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 18px}
+  .hoy .feed li{border-bottom:0;padding:5px 0}
+  @media (max-width:980px){ .hoy .feed{grid-template-columns:minmax(0,1fr)} }
   .tipo-ev{font-size:10.5px;font-weight:800;border-radius:999px;padding:2px 7px}
   .tipo-ev.e{background:#e3efe0;color:#2F6B1E} .tipo-ev.s{background:#f6e3e3;color:#A32D2D}
 
@@ -260,7 +270,7 @@
   .ventana .rej{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .ventana .rej .full{grid-column:1/-1}
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));z-index:150;background:#1e6b34;color:#fff;
-    border-radius:12px;padding:11px 16px;font-weight:700;font-size:13.5px;max-width:92vw;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+    border-radius:12px;padding:11px 16px;font-weight:700;font-size:13.5px;max-width:92vw;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25);pointer-events:none}
   .toast.err{background:#A32D2D}
 
   /* ── Reglas y roles ── */
@@ -303,6 +313,7 @@
     .ventana .rej{grid-template-columns:1fr}
     .al{flex-wrap:wrap} .al .acc{width:100%;justify-content:flex-start;padding-left:42px}
     .quien{display:none}
+    .top .reloj{display:none} .campana{flex-shrink:0}
   }
 </style>
 </head>
@@ -341,7 +352,7 @@
     <span class="sala-chip" id="sala-chip" hidden></span>
     <div class="reloj" id="reloj"></div>
     <button class="campana" type="button" id="btn-campana" aria-label="Alertas"><svg class="i"><use href="#i-campana"/></svg><span class="n" id="n-alertas">0</span></button>
-    <div class="quien"><div class="av">AA</div><span><b>Admin. de accesos</b><br>rol nuevo · demo</span></div>
+    <div class="quien"><div class="av">AA</div><span><b>Administrador de accesos</b><br>Quantum Energy</span></div>
   </div>
 </header>
 <div class="cinta"><span id="cinta-txt"><b>DEMO</b> con datos ficticios: personas, empresas e incidencias no son reales. Lo que registres se comparte con la <a href="caseta.html" target="_blank" rel="noopener">pantalla del guardia</a> abierta en otra pestaña; para usar dos equipos, entra desde la <a href="index.html">portada</a>.</span> <button type="button" id="btn-reiniciar">Reiniciar demo</button></div>
@@ -369,11 +380,12 @@
     <section class="sec" id="sec-tablero">
       <div class="sec-tit"><div><h1>Tablero</h1><p id="tab-sub"></p></div>
         <button class="btn sec" type="button" data-ir="puerta"><svg class="i"><use href="#i-vivo"/></svg>Simular la puerta</button></div>
+      <div class="card hoy" id="hoy-caseta" hidden></div>
       <div class="kpis" id="kpis"></div>
       <div class="rejilla g21">
-        <div class="card"><div class="card-tit"><h2>Personas dentro de la planta</h2><span>Últimas 24 horas, cada 15 minutos</span></div>
+        <div class="card llena"><div class="card-tit"><h2>Personas dentro de la planta</h2><span>Últimas 24 horas, cada 15 minutos</span></div>
           <div class="lienzo"><canvas id="g-ocupacion" aria-label="Personas dentro de la planta en las últimas 24 horas"></canvas></div>
-          <p class="nota-graf">Los picos son los cambios de turno (06:30 y 18:30): por unos minutos están dentro el turno que sale y el que entra.</p></div>
+          <p class="nota-graf">Las bajadas antes de las 06:00 y de las 18:00 son el turno que ya salió; a las 06:30 y a las 18:30 entra el siguiente.</p></div>
         <div class="card"><div class="card-tit"><h2>Alertas activas</h2><button class="lnk" type="button" data-ir="alertas">Ver todas</button></div>
           <ul class="alertas scroll" id="alertas-top"></ul></div>
       </div>
@@ -494,7 +506,7 @@
       <div class="reglas" style="margin-bottom:14px">
         <div class="card"><div class="card-tit"><h2>Jornada</h2></div>
           <div class="campo" style="margin-bottom:10px"><label for="r-anio">Topes de la LFT del año</label><select id="r-anio"></select></div>
-          <div class="campo" style="margin-bottom:10px"><label for="r-perm">Tope de permanencia continua (política de la planta), horas</label><input type="number" id="r-perm" min="8" max="16" step="0.5"></div>
+          <div class="campo" style="margin-bottom:10px"><label for="r-perm">Tope de permanencia continua en horas (política de la planta)</label><input type="number" id="r-perm" min="8" max="16" step="0.5"></div>
           <div class="campo"><label for="r-desc">Días seguidos permitidos antes de exigir descanso</label><input type="number" id="r-desc" min="5" max="13"></div></div>
         <div class="card"><div class="card-tit"><h2>Revisión en la puerta</h2></div>
           <label class="check-r"><input type="checkbox" id="r-docs"> Bloquear con documentos vencidos (inducción, examen médico, DC-3, IMSS)</label>
@@ -502,13 +514,13 @@
           <label class="check-r"><input type="checkbox" id="r-herr"> Registrar herramienta a la entrada y revisarla a la salida</label>
           <div class="campo" style="margin-top:10px"><label for="r-alc">Prueba de alcoholímetro aleatoria, % de las entradas</label><input type="number" id="r-alc" min="0" max="100"></div></div>
         <div class="card"><div class="card-tit"><h2>Vales</h2></div>
-          <div class="campo"><label for="r-vale">Un vale abierto genera alerta después de, días</label><input type="number" id="r-vale" min="1" max="30"></div>
+          <div class="campo"><label for="r-vale">Días para que un vale abierto genere alerta</label><input type="number" id="r-vale" min="1" max="30"></div>
           <p class="nota-graf" style="margin-top:12px">Tipos de vale: ingreso de herramienta (se cierra al salir con ella), préstamo de equipo de planta (radio, detector de gases, arnés) y salida de material (requiere autorización).</p></div>
       </div>
       <div class="card" style="margin-bottom:14px"><div class="card-tit"><h2>Quién ve qué</h2><span>Tres perfiles separados</span></div>
         <div class="tabla-env"><table class="t roles" id="t-roles"></table></div></div>
       <div class="rejilla g2">
-        <div class="card"><div class="card-tit"><h2>Cómo reconocería a las personas</h2></div><div class="ley" id="como-funciona"></div></div>
+        <div class="card"><div class="card-tit"><h2>Cómo se reconoce a las personas</h2></div><div class="ley" id="como-funciona"></div></div>
         <div class="card"><div class="card-tit"><h2>Base legal consultada</h2></div><div class="ley" id="base-legal"></div></div>
       </div>
     </section>
@@ -554,7 +566,7 @@
   var D = window.DEMO;
   var EMPRESAS = D.EMPRESAS, EMP = D.EMP, TIPOS_INC = D.TIPOS_INC, CORTO_INC = D.CORTO_INC, ACCIONES = D.ACCIONES, TIPO_VALE = D.TIPO_VALE, CASETAS = D.CASETAS,
       PERSONAS = D.PERSONAS, P = D.P, INCIDENCIAS = D.INCIDENCIAS, VALES = D.VALES, INTENTOS = D.INTENTOS, MOVS = D.MOVS,
-      TABLA_LEY = D.TABLA_LEY, REGLAS = D.REGLAS, limites = D.limites, stats = D.stats, docs = D.docs, valesAbiertos = D.valesAbiertos, vetoVigente = D.vetoVigente;
+      TABLA_LEY = D.TABLA_LEY, REGLAS = D.REGLAS, limites = D.limites, stats = D.stats, docs = D.docs, valesAbiertos = D.valesAbiertos, vetoVigente = D.vetoVigente, pl = D.pl;
 
   /* ══ Alertas ══ */
   var ATENDIDAS = {};
@@ -577,22 +589,28 @@
       }
     });
     INTENTOS.forEach(function (ev) {
-      if (N - ev.t < 48 * HORA) out.push(A('critico', 'Intento de ingreso vetado', P[ev.pid], 'Intentó entrar por ' + ev.caseta + ' (' + cuando(ev.t) + '). El guardia vio «NO PASA».' + (P[ev.pid].veto ? ' Vetado por: ' + P[ev.pid].veto.motivo.toLowerCase() + '.' : ''), ev.t));
+      if (N - ev.t < 48 * HORA) out.push(A('critico', 'Intento de ingreso vetado', P[ev.pid], 'Intentó entrar por ' + ev.caseta + ', ' + cuando(ev.t) + '. El guardia vio «NO PASA».' + (P[ev.pid].veto ? ' Vetado por: ' + P[ev.pid].veto.motivo.toLowerCase() + '.' : ''), ev.t));
     });
     VALES.forEach(function (v) {
-      if (!v.cerrado && v.forzado && N - v.abierto <= R.vale * DIA) out.push(A('grave', 'Herramienta no presentada', P[v.pid], 'Vale ' + v.folio + ': ' + (v.nota || 'salió sin presentar lo registrado') + '.', v.abierto));
+      if (!v.cerrado && v.forzado && N - v.abierto <= R.vale * DIA) out.push(A('grave', 'Herramienta no presentada', P[v.pid], 'Vale ' + v.folio + ': ' + (v.nota || 'salió sin presentar lo registrado') + '.', (v.it && v.it.salReal) || v.abierto));
       else if (!v.cerrado && N - v.abierto > R.vale * DIA) out.push(A('aviso', 'Vale sin cerrar', P[v.pid], 'Vale ' + v.folio + ' (' + TIPO_VALE[v.tipo].toLowerCase() + ': ' + v.items.join(', ') + ') abierto desde hace ' + Math.floor((N - v.abierto) / DIA) + ' días' + (v.nota ? ' · ' + v.nota.toLowerCase() : '') + '.', v.abierto));
+    });
+    // Alcoholímetro o drogas registrados en la caseta durante la demo
+    INCIDENCIAS.forEach(function (i) {
+      if (!i.nueva || (i.tipo !== 'ALC' && i.tipo !== 'DRO') || N - i.fecha > 48 * HORA) return;
+      out.push(A('critico', i.tipo === 'ALC' ? 'Alcoholímetro positivo' : TIPOS_INC[i.tipo].n, P[i.pid], String(i.desc || '').replace(/\.$/, '') + '. Medida: ' + String(i.accion || '').toLowerCase() + ' (' + i.folio + ').', i.fecha));
     });
     var orden = { critico: 0, grave: 1, aviso: 2 };
     out = out.filter(function (a) { return incluirAtendidas || !ATENDIDAS[a.clave]; });
-    out.sort(function (a, b) { return orden[a.sev] - orden[b.sev] || ((b.t || 0) - (a.t || 0)); });
+    out.forEach(function (a) { a.nueva = !!a.t && +a.t > +N - 15 * MIN; });          // (otro equipo puede ir unos segundos adelantado)   // lo de los últimos 15 minutos va primero
+    out.sort(function (a, b) { return (b.nueva - a.nueva) || orden[a.sev] - orden[b.sev] || ((b.t || 0) - (a.t || 0)); });
     return out;
   }
   var SEV = { critico: 'Crítica', grave: 'Grave', aviso: 'Aviso' };
   function htmlAlerta(a) {
     var p = a.p, e = EMP[p.emp];
     return '<li class="al"><div class="ic ' + a.sev + '">' + ico(a.sev === 'aviso' ? 'reloj' : 'alerta') + '</div><div class="tx">' +
-      '<b>' + esc(a.tipo) + '</b> · <span class="st ' + a.sev + '">' + ico('alerta') + SEV[a.sev] + '</span>' +
+      '<b>' + esc(a.tipo) + '</b> · <span class="st ' + a.sev + '">' + ico('alerta') + SEV[a.sev] + '</span>' + (a.nueva ? ' <span class="st nueva">Nueva</span>' : '') +
       '<div class="d">' + esc(a.texto) + '</div><div class="m">' + esc(p.nombre) + ' · ' + esc(e.corto) + ' · ' + esc(p.puesto) + '</div></div>' +
       '<div class="acc"><button class="btn peq fant" type="button" data-persona="' + p.id + '">Ver persona</button>' +
       '<button class="btn peq sec" type="button" data-atender="' + esc(a.clave) + '">Atendida</button></div></li>';
@@ -695,7 +713,7 @@
     $('reloj').innerHTML = '<b>' + hhmm(N) + '</b><span>' + (m >= 390 && m < 1110 ? 'Turno de día' : 'Turno de noche') + ' · ' + fechaCorta(N) + '</span>';
     var al = alertas(), crit = al.filter(function (a) { return a.sev === 'critico'; }).length;
     $('n-alertas').textContent = al.length; $('n-alertas').hidden = !al.length;
-    $('m-alertas').textContent = crit ? crit + ' críticas' : ''; $('m-alertas').hidden = !crit;
+    $('m-alertas').textContent = crit ? pl(crit, 'crítica', 'críticas') : ''; $('m-alertas').hidden = !crit;
     ({ tablero: pintarTablero, puerta: pintarPuerta, alertas: pintarAlertas, personas: pintarPersonas, jornadas: pintarJornadas,
        incidencias: pintarIncidencias, vales: pintarVales, reglas: pintarReglas })[SEC](al);
   }
@@ -711,15 +729,26 @@
     var crit = al.filter(function (a) { return a.sev === 'critico'; }).length, grav = al.filter(function (a) { return a.sev === 'grave'; }).length;
     var vAb = VALES.filter(function (v) { return !v.cerrado; }), vVen = vAb.filter(function (v) { return N - v.abierto > REGLAS.vale * DIA; }).length;
     var dD = dentro.filter(function (p) { return p.turno === 'D'; }).length;
+    var dVen = activos.filter(function (p) { return stats(p).docs.est === 'vencido'; }).length, dPv = activos.filter(function (p) { return stats(p).docs.est === 'porvencer'; }).length;
     $('tab-sub').textContent = 'Planta Quantum Energy · ' + num(PERSONAS.length) + ' personas registradas de ' + EMPRESAS.length + ' empresas · actualizado ' + hhmm(N);
     $('kpis').innerHTML =
       '<div class="kpi hero click" data-ir="personas" data-filtro="dentro"><div class="l">' + ico('grupo') + 'Dentro de la planta ahora</div><div class="v">' + num(dentro.length) + '</div><div class="s">Turno de día ' + dD + ' · turno de noche ' + (dentro.length - dD) + '</div></div>' +
       '<div class="kpi"><div class="l">' + ico('entrada') + 'Entradas</div><div class="v">' + num(ent24) + '</div><div class="s">Últimas 24 h</div></div>' +
       '<div class="kpi"><div class="l">' + ico('salida') + 'Salidas</div><div class="v">' + num(sal24) + '</div><div class="s">Últimas 24 h</div></div>' +
-      '<div class="kpi click" data-ir="alertas"><div class="l">' + ico('alerta') + 'Alertas</div><div class="v">' + num(al.length) + '</div><div class="s"><span class="st critico">' + ico('alerta') + crit + ' críticas</span> ' + grav + ' graves</div></div>' +
+      '<div class="kpi click" data-ir="alertas"><div class="l">' + ico('alerta') + 'Alertas</div><div class="v">' + num(al.length) + '</div><div class="s"><span class="st critico">' + ico('alerta') + pl(crit, 'crítica', 'críticas') + '</span> <span class="nw">' + pl(grav, 'grave', 'graves') + '</span></div></div>' +
       '<div class="kpi click" data-ir="incidencias"><div class="l">' + ico('escudo') + 'Incidencias</div><div class="v">' + num(inc30) + '</div><div class="s">Últimos 30 días · ' + PERSONAS.filter(vetoVigente).length + ' vetados</div></div>' +
-      '<div class="kpi click" data-ir="personas" data-filtro="docs"><div class="l">' + ico('doc') + 'Documentación al día</div><div class="v">' + Math.round(alDia / activos.length * 100) + ' %</div><div class="s">' + vAb.length + ' vales abiertos · ' + vVen + ' vencidos</div></div>';
+      '<div class="kpi click" data-ir="personas" data-filtro="docs"><div class="l">' + ico('doc') + 'Documentación al día</div><div class="v">' + Math.round(alDia / activos.length * 100) + ' %</div><div class="s">' + dVen + ' con documentos vencidos · ' + dPv + ' por vencer</div></div>';
     $('alertas-top').innerHTML = al.slice(0, 12).map(htmlAlerta).join('') || '<li class="al">Sin alertas.</li>';
+    // Lo que se acaba de registrar en la caseta (durante la demo)
+    var hoyM = MOVS.filter(function (m) { return N - m.t < DIA; });
+    $('hoy-caseta').hidden = !hoyM.length;
+    if (hoyM.length) {
+      var cE = hoyM.filter(function (m) { return m.tipo === 'e' && !/Negado/.test(m.res); }).length, cS = hoyM.filter(function (m) { return m.tipo === 's'; }).length,
+          cN = hoyM.filter(function (m) { return /Negado/.test(m.res); }).length, cF = hoyM.filter(function (m) { return /Sin herr/.test(m.res); }).length;
+      $('hoy-caseta').innerHTML = '<div class="card-tit"><h2>' + ico('vivo') + 'Registrado en vivo en la caseta</h2><span>' +
+        [pl(cE, 'entrada', 'entradas'), pl(cS, 'salida', 'salidas'), cN ? cN + (cN === 1 ? ' no pasó' : ' no pasaron') : '', cF ? cF + ' con faltante' : ''].filter(Boolean).join(' · ') +
+        '</span></div><ul class="feed">' + hoyM.slice(0, 3).map(htmlMov).join('') + '</ul>';
+    }
 
     // Ocupación cada 15 minutos
     var et = [], ocup = [], t0 = Math.floor((+N - DIA) / (15 * MIN)) * 15 * MIN;
@@ -859,18 +888,18 @@
       '<div class="kpi"><div class="l">Extra a pago doble</div><div class="v">' + num(Math.round(dob)) + ' h</div><div class="s">suma del personal</div></div>' +
       '<div class="kpi"><div class="l">Extra a pago triple</div><div class="v">' + num(Math.round(tri)) + ' h</div><div class="s">art. 68 LFT</div></div>' +
       '<div class="kpi click" data-ir="alertas"><div class="l">' + ico('alerta') + 'Exceden el máximo</div><div class="v">' + exc + '</div><div class="s"><span class="st critico">' + ico('alerta') + 'más de ' + lim.max + ' h</span></div></div>' +
-      '<div class="kpi"><div class="l">' + ico('alerta') + 'Sin descanso · permanencia</div><div class="v">' + sinD + ' · ' + perm + '</div><div class="s">más de ' + REGLAS.diasSeguidos + ' días seguidos · más de ' + REGLAS.perm + ' h dentro</div></div>';
+      '<div class="kpi"><div class="l">' + ico('alerta') + 'Sin descanso · permanencia</div><div class="v">' + sinD + ' · ' + perm + '</div><div class="s">' + sinD + ' con más de ' + REGLAS.diasSeguidos + ' días seguidos · ' + perm + ' con más de ' + REGLAS.perm + ' h dentro</div></div>';
     $('jor-anio').textContent = 'LFT · topes de ' + REGLAS.anio;
     $('jor-ley').innerHTML = textoLey();
     var top = act.slice().sort(function (a, b) { return stats(b).h7 - stats(a).h7; }).slice(0, 15);
     var ds = function (l, k, col) { return { label: l, data: top.map(function (p) { return Math.round(stats(p)[k] * 10) / 10; }), backgroundColor: col, borderColor: '#fff', borderWidth: { right: 2 }, borderSkipped: false, maxBarThickness: 16 }; };
     grafica('g-jornada', { type: 'bar', data: { labels: top.map(function (p) { var n = p.nombre.split(' '); return n[0] + ' ' + n[1]; }),
       datasets: [ds('Ordinarias', 'ord', C.o1), ds('Extra doble', 'dob', C.o2), ds('Extra triple', 'tri', C.o3), ds('Excede el máximo', 'exc', C.critico)] },
-      options: { indexAxis: 'y', layout: { padding: { top: 14 } }, interaction: { mode: 'index', axis: 'y', intersect: false },
-        plugins: { legend: { position: 'top', align: 'start' }, topes: { eje: 'x', lineas: [{ v: lim.ord, t: lim.ord + ' h', color: '#898781' }, { v: lim.max, t: 'máx. ' + lim.max + ' h', color: C.critico }] },
+      options: { indexAxis: 'y', layout: { padding: { top: 24 } }, interaction: { mode: 'index', axis: 'y', intersect: false },
+        plugins: { legend: { position: 'bottom', align: 'start' }, topes: { eje: 'x', lineas: [{ v: lim.ord, t: lim.ord + ' h', color: '#898781' }, { v: lim.max, t: 'máx. ' + lim.max + ' h', color: C.critico }] },
           tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + fmtH(c.raw); } } } },
         scales: { x: { stacked: true, grid: { color: C.grid }, border: { display: false }, ticks: { color: '#898781', callback: function (v) { return v + ' h'; } }, suggestedMax: lim.max + 8 },
-                  y: { stacked: true, grid: { display: false }, ticks: { color: C.tinta, font: { size: 11 } } } } } });
+                  y: { stacked: true, grid: { display: false }, ticks: { color: C.tinta, font: { size: 11 }, autoSkip: false } } } } });
     var aj = al.filter(function (a) { return /Permanencia|Jornada|descanso|tope/.test(a.tipo); });
     $('jor-alertas').innerHTML = (aj.slice(0, 15).map(htmlAlerta).join('') || '<li class="al">Sin alertas de jornada.</li>') +
       (aj.length > 15 ? '<li class="al"><button class="lnk" type="button" data-ir="alertas" data-filtro-al="__jornada">Ver las ' + aj.length + ' alertas de jornada</button></li>' : '');
@@ -913,7 +942,7 @@
       l.map(function (i) {
         var p = P[i.pid];
         return '<tr class="fila" data-persona="' + p.id + '"><td><b>' + i.folio + '</b></td><td>' + esc(cuando(i.fecha)) + '</td><td><div class="pers" style="min-width:170px"><div class="av' + (vetoVigente(p) ? ' vet' : '') + '">' + iniciales(p.nombre) + '</div><div><b>' + esc(p.nombre) + '</b><span>' + esc(EMP[p.emp].corto) + '</span></div></div></td>' +
-          '<td>' + esc(TIPOS_INC[i.tipo].n) + '<div style="font-size:12px;color:var(--texto-hint)">' + esc(i.desc) + (i.incapacidad != null ? ' · ' + i.incapacidad + ' días de incapacidad' : '') + '</div></td>' +
+          '<td>' + esc(TIPOS_INC[i.tipo].n) + '<div style="font-size:12px;color:var(--texto-hint)">' + esc(i.desc) + (i.incapacidad ? ' · ' + pl(i.incapacidad, 'día', 'días') + ' de incapacidad' : (i.incapacidad === 0 ? ' · sin incapacidad' : '')) + '</div></td>' +
           '<td><span class="st ' + gb[i.grav] + '">' + (i.grav === 'Alta' ? ico('alerta') : '') + esc(i.grav) + '</span></td><td>' + (/Veto/.test(i.accion) ? '<span class="st critico">' + ico('veto') + esc(i.accion) + '</span>' : esc(i.accion)) + '</td><td>' + esc(i.estado) + '</td></tr>';
       }).join('') + '</tbody>';
   }
@@ -928,7 +957,7 @@
     var herrDentro = ab.filter(function (v) { return v.tipo === 'herr' && stats(P[v.pid]).dentro; }).reduce(function (s, v) { return s + v.items.length; }, 0);
     $('val-kpis').innerHTML =
       '<div class="kpi"><div class="l">' + ico('herr') + 'Herramientas dentro</div><div class="v">' + herrDentro + '</div><div class="s">registradas a la entrada</div></div>' +
-      '<div class="kpi"><div class="l">' + ico('vale') + 'Vales abiertos</div><div class="v">' + ab.length + '</div><div class="s">' + ab.filter(function (v) { return v.tipo === 'mat' && /Pendiente/.test(v.autoriza || ''); }).length + ' salidas de material por autorizar</div></div>' +
+      '<div class="kpi"><div class="l">' + ico('vale') + 'Vales abiertos</div><div class="v">' + ab.length + '</div><div class="s">' + pl(ab.filter(function (v) { return v.tipo === 'mat' && /Pendiente/.test(v.autoriza || ''); }).length, 'salida de material por autorizar', 'salidas de material por autorizar') + '</div></div>' +
       '<div class="kpi"><div class="l">' + ico('alerta') + 'Vales vencidos</div><div class="v">' + ven.length + '</div><div class="s"><span class="st aviso">' + ico('reloj') + 'más de ' + REGLAS.vale + ' días</span></div></div>' +
       '<div class="kpi"><div class="l">' + ico('cel') + 'Celulares dentro</div><div class="v">' + dentro.filter(function (p) { return p.aut.cel; }).length + '</div><div class="s">autorizados · los demás se resguardan</div></div>' +
       '<div class="kpi"><div class="l">' + ico('auto') + 'Vehículos dentro</div><div class="v">' + dentro.filter(function (p) { return p.aut.auto; }).length + '</div><div class="s">con placas registradas</div></div>';
@@ -954,7 +983,7 @@
   $('f-val').onchange = function () { pintar(); };
   document.addEventListener('click', function (ev) {
     var m = ev.target.closest('[data-autorizar-mat]');
-    if (m) { D.registrar({ k: 'am', folio: m.dataset.autorizarMat, quien: 'Admin. de accesos' }); toast('Salida de material ' + m.dataset.autorizarMat + ' autorizada: el guardia lo verá a la salida.'); pintar(); return; }
+    if (m) { D.registrar({ k: 'am', folio: m.dataset.autorizarMat, quien: 'Admin. de accesos' }); toast('Salida de material ' + m.dataset.autorizarMat + ' autorizada: el guardia la verá a la salida.'); pintar(); return; }
     var b = ev.target.closest('[data-cerrar-vale]'); if (!b) return;
     D.registrar({ k: 'cv', folio: b.dataset.cerrarVale });
     toast('Vale ' + b.dataset.cerrarVale + ' cerrado.'); pintar();
@@ -979,19 +1008,19 @@
       ['Autorizar celular, tableta, computadora, herramienta, vehículo y excepciones de jornada', no, si, si],
       ['Registrar incidencias, vetar y levantar vetos', no, si, si],
       ['Vales de herramienta, equipo y material', 'Sólo registrar lo que entra y sale', si, si],
-      ['PDF y análisis con Claude', no, si, si],
+      ['Reportes en PDF y análisis con IA', no, si, si],
       ['Crear plantas, cuentas de caseta y reglas', no, no, si]
     ];
-    $('t-roles').innerHTML = '<thead><tr><th style="min-width:240px">Qué puede hacer</th><th>Guardia de caseta</th><th>Administrador de accesos (nuevo)</th><th>Administración AVBA</th></tr></thead><tbody>' +
+    $('t-roles').innerHTML = '<thead><tr><th style="min-width:240px">Qué puede hacer</th><th>Guardia de caseta</th><th>Administrador de accesos de la planta</th><th>Administración AVBA</th></tr></thead><tbody>' +
       filas.map(function (f) { return '<tr><td>' + f[0] + '</td><td>' + f[1] + '</td><td>' + f[2] + '</td><td>' + f[3] + '</td></tr>'; }).join('') + '</tbody>';
     $('como-funciona').innerHTML =
-      '<p><b>1. Foto de la identificación (lo que ya tenemos).</b> El servidor lee el número de la identificación con IA y lo busca en el padrón. La primera vez se da de alta a la persona con su empresa y documentos; las siguientes, la reconoce sola.</p>' +
+      '<p><b>1. Foto de la identificación.</b> El servidor lee el número de la identificación con IA y lo busca en el padrón. La primera vez se da de alta a la persona con su empresa y documentos; las siguientes, la reconoce sola.</p>' +
       '<p style="margin-top:8px"><b>2. Gafete con código QR</b> (recomendado para el personal que entra a diario): se entrega al terminar la inducción. Se lee en un segundo, sin errores de lectura, y la foto de la INE queda para visitantes y casos dudosos.</p>' +
-      '<p style="margin-top:8px"><b>3. Rostro o huella:</b> posible, pero son datos biométricos (datos personales sensibles): piden consentimiento expreso y equipo dedicado. Lo dejaría para después.</p>' +
+      '<p style="margin-top:8px"><b>3. Rostro o huella:</b> posible, pero son datos biométricos (datos personales sensibles): piden consentimiento expreso y equipo dedicado. Se puede agregar en una segunda etapa.</p>' +
       '<p style="margin-top:8px"><b>Las contratistas</b> cargan sus documentos (REPSE, SUA del mes, DC-3, examen médico) en su portal; las DC-3 que emite AVBA se validan solas.</p>';
     $('base-legal').innerHTML =
-      '<p>Ley Federal del Trabajo con la reforma de reducción de jornada publicada el 1 de mayo de 2026: arts. 61 (jornada diaria), 66 y 68 (horas extra), 69 (descanso) y 132 fr. XXXIV (registro electrónico de jornada, desde 2027). Requisitos usuales de acceso de contratistas: alta IMSS y pago SUA, REPSE, constancias DC-3, inducción y examen médico.</p>' +
-      '<p class="fuentes" style="margin-top:8px">Antes de usar las cifras en producción hay que confirmarlas con el texto del DOF.</p>';
+      '<p>Ley Federal del Trabajo con la reforma de 2026 que reduce la jornada semanal de forma gradual: arts. 61 (jornada diaria), 66 y 68 (horas extra), 69 (descanso) y 132 fr. XXXIV (registro electrónico de jornada, a partir de 2027). Requisitos usuales de acceso de contratistas: alta IMSS y pago SUA, REPSE, constancias DC-3, inducción y examen médico.</p>' +
+      '<p class="fuentes" style="margin-top:8px">Cifras según la reforma a la LFT de 2026; se ajustan si cambia la ley.</p>';
   }
   function cambiarRegla() {
     D.registrar({ k: 'reg', r: {
@@ -1028,7 +1057,7 @@
       }).join('') + '</div>';
     h += '<div class="card"><div class="card-tit"><h2>Documentos</h2>' + docBadge(s.docs.est) + '</div><ul class="lista-s">' + s.docs.lista.map(function (d) {
       var b = d.est === 'vencido' ? '<span class="st critico">' + ico('alerta') + 'Vencido</span>' : (d.est === 'porvencer' ? '<span class="st aviso">' + ico('reloj') + 'Vence en ' + d.dias + ' d</span>' : '<span class="st bueno">' + ico('ok') + 'Vigente</span>');
-      return '<li>' + ico('doc') + '<div class="tx">' + esc(d.nombre) + '<span>' + (d.vence ? 'Vence ' + fecha(d.vence) + ' · ' : '') + esc(d.extra) + '</span></div>' + b + '</li>';
+      return '<li>' + ico('doc') + '<div class="tx">' + esc(d.nombre) + '<span>' + esc([d.vence ? 'Vence ' + fecha(d.vence) : '', d.extra].filter(Boolean).join(' · ')) + '</span></div>' + b + '</li>';
     }).join('') + '</ul></div>';
     h += '<div class="card"><div class="card-tit"><h2>Vales</h2><span>' + vales.filter(function (v) { return !v.cerrado; }).length + ' abiertos</span></div><ul class="lista-s">' + (vales.slice(0, 6).map(function (v) {
       return '<li>' + ico('vale') + '<div class="tx">' + v.folio + ' · ' + esc(TIPO_VALE[v.tipo]) + '<span>' + esc(v.items.join(', ')) + ' · ' + esc(cuando(v.abierto)) + (v.nota ? ' · ' + esc(v.nota) : '') + '</span></div>' +
@@ -1042,7 +1071,7 @@
       var d = (it.sal || N) - it.ent;
       return '<li>' + ico(it.sal ? 'salida' : 'entrada') + '<div class="tx">' + esc(fechaCorta(it.ent)) + ' · ' + hhmm(it.ent) + ' → ' + (it.sal ? hhmm(it.sal) + (claveDia(it.sal) !== claveDia(it.ent) ? ' (' + esc(fechaCorta(it.sal)) + ')' : '') : '<b>dentro</b>') +
         '<span>' + esc(it.cE) + (it.obs ? ' · ' + esc(it.obs) : '') + '</span></div><b style="font-size:12.5px;' + (d > REGLAS.perm * HORA ? 'color:#8f1f1f' : '') + '">' + dur(d) + '</b></li>';
-    }).join('') + '</ul></div></div>';
+    }).join('') + (p.ints.length ? '' : '<li>Sin accesos registrados' + (vetoVigente(p) ? ' (está vetado' + (p.mujer ? 'a' : 'o') + ')' : '') + '.</li>') + '</ul></div></div>';
     $('panel').innerHTML = h; $('panel').hidden = false; $('velo').hidden = false; document.body.classList.add('con-panel'); $('panel').scrollTop = mismo ? y : 0;
     // Horas por día (14 días)
     var dias = [], hs = [];
@@ -1095,14 +1124,14 @@
       if (isNaN(f) || f > ahora()) f = ahora();
       var inc = D.registrar({ k: 'inc', pid: p.id, tipo: tipo, accion: acc, desc: $('fi-d').value.trim(), t: +f });
       $('modal').hidden = true;
-      toast(inc.folio + ' registrada' + (/Veto/.test(acc) ? ' · ' + p.nombre.split(' ')[0] + ' queda vetado' : '') + '.');
+      toast(inc.folio + ' registrada' + (/Veto/.test(acc) ? ' · ' + p.nombre.split(' ')[0] + (p.mujer ? ' queda vetada' : ' queda vetado') : '') + '.');
       pintar(); if (PANEL_P) abrirPersona(PANEL_P);
     };
   }
   $('modal').addEventListener('click', function (ev) { if (ev.target === $('modal')) $('modal').hidden = true; });
 
   /* ══ PUERTA EN VIVO (simulación) ══════════════════════════════════════ */
-  var SIM = null, GUION = ['ok', 'herr', 'cel', 'veto', 'vale', 'semana', 'doc', 'alcohol'], guionI = 0;
+  var SIM = null, GUION = ['ok', 'disp', 'cel', 'veto', 'herr', 'doc', 'semana', 'alcohol'], guionI = 0;
   $('sim-elegir').innerHTML = '<option value="">— Elegir persona —</option>' + PERSONAS.slice().sort(function (a, b) { return a.nombre.localeCompare(b.nombre); })
     .map(function (p) { return '<option value="' + p.id + '">' + esc(p.nombre) + ' · ' + esc(EMP[p.emp].corto) + '</option>'; }).join('');
   var candidato = D.candidato, revisarEntrada = D.revisar;
@@ -1139,11 +1168,11 @@
       else if (v.tipo === 'equipo') { ch.push({ s: 'aviso', i: 'vale', t: 'Debe devolver equipo de planta (' + v.folio + ')', d: v.items.join(', ') + '.', vale: v }); inst.push(['vale', 'Recibir: ' + v.items.join(', ')]); }
       else ch.push({ s: /Pendiente/.test(v.autoriza || '') ? 'grave' : 'ok', i: 'vale', t: 'Salida de material ' + v.folio, d: v.items.join(', ') + ' · ' + (v.autoriza || '') + '.' });
     });
-    if (!p.aut.cel) inst.push(['cel', 'Entregar el celular resguardado (si dejó)']);
+    if (!p.aut.cel) inst.push(['cel', 'Entregar el celular resguardado (si lo dejó)']);
     SIM = { modo: 'salida', p: p, r: { ch: ch, inst: inst, res: 'pasa' }, t: ahora() };
     pintarSim(true);
   }
-  var NOMBRE_CASO = { ok: 'todo en orden', herr: 'con herramienta', cel: 'celular sin permiso', veto: 'persona vetada', vale: 'vale pendiente', semana: 'exceso de horas', doc: 'documento vencido', alcohol: 'alcoholímetro' };
+  var NOMBRE_CASO = { ok: 'todo en orden', disp: 'con tableta o computadora', herr: 'con herramienta', cel: 'celular sin permiso', veto: 'persona vetada', vale: 'vale pendiente', semana: 'exceso de horas', doc: 'documento vencido', alcohol: 'alcoholímetro' };
   function pintarSiguiente() { var c = GUION[guionI % GUION.length]; $('sim-sig').textContent = 'Siguiente caso (' + ((guionI % GUION.length) + 1) + ' de ' + GUION.length + '): ' + NOMBRE_CASO[c] + '.'; }
   $('sim-llega').onclick = function () { var caso = GUION[guionI++ % GUION.length]; iniciarEntrada(candidato(caso), caso); pintarSiguiente(); };
   pintarSiguiente();
@@ -1162,13 +1191,13 @@
   };
   function pintarSim(animar) {
     if (!SIM) {
-      $('sim').innerHTML = '<p class="nota-graf" style="font-size:13px;padding:30px 10px;text-align:center">Toca <b>Llega alguien a la caseta</b>: cada vez llega un caso distinto (todo en orden, con herramienta, celular sin autorización, vetado, vale pendiente, exceso de horas, documento vencido, alcoholímetro).</p>';
+      $('sim').innerHTML = '<p class="nota-graf" style="font-size:13px;padding:30px 10px;text-align:center">Toca <b>Llega alguien a la caseta</b>: cada vez llega un caso distinto, en el mismo orden que en el celular del guardia (todo en orden, con tableta o computadora, celular sin permiso, persona vetada, con herramienta, documento vencido, exceso de horas, alcoholímetro).</p>';
       pintarTel(); return;
     }
     var p = SIM.p, r = SIM.r, e = EMP[p.emp], v = VERED[r.res], ent = SIM.modo === 'entrada';
     var h = '<div class="credencial">' + (animar ? '<div class="scan"></div>' : '') + '<div class="foto">' + iniciales(p.nombre) + '</div><div class="dat"><span class="tipo">' + esc(p.idTipo.toUpperCase()) + ' · SIMULADA</span>' +
       '<b>' + esc(p.nombre.toUpperCase()) + '</b>Número: •••• •••• ' + p.idNum + '<br>Foto tomada ' + hhmm(SIM.t) + ' · ' + (ent ? 'ENTRADA' : 'SALIDA') + ' · Caseta 1</div></div>' +
-      '<div class="ident">' + ico('ok') + ' <b>Identificado:</b> número ····' + p.idNum + ' leído de la foto → <b>' + esc(p.nombre) + '</b>, ' + esc(p.puesto) + ' de ' + esc(e.nombre) + '. Coincidencia con su registro: ' + (96 + Math.floor(Math.random() * 4)) + ' %.' +
+      '<div class="ident">' + ico('ok') + ' <b>Identificado:</b> número ····' + p.idNum + ' leído de la foto → <b>' + esc(p.nombre) + '</b>, ' + esc(p.puesto) + ' de ' + esc(e.nombre) + '. Coincidencia con su registro: ' + (96 + (p.idNum.charCodeAt(2) % 4)) + '&nbsp;%.' +
       ' <button class="lnk" type="button" data-persona="' + p.id + '">Ver expediente</button></div>';
     h += '<ul class="checks">' + r.ch.map(function (c, ci) {
       var extra = '';
@@ -1191,6 +1220,8 @@
     if ($('sim-aut')) $('sim-aut').onclick = function () { confirmarEntrada('Excepción de jornada autorizada por Admin. de accesos'); };
     if ($('sim-neg')) $('sim-neg').onclick = function () { SIM.r.res = 'nopasa'; registrarIntento('Acceso negado por jornada'); };
     if ($('sim-fin')) $('sim-fin').onclick = function () { if (SIM.registrado) { SIM = null; pintarSim(); pintar(); } else registrarIntento((SIM.r.motivos || [])[0] || 'Acceso negado'); };
+    // Al terminar la animación, que se vean el veredicto y los botones sin tener que bajar
+    if (animar) setTimeout(function () { var a = document.querySelector('#sim .acciones'); if (a && SEC === 'puerta') a.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 1150);
   }
   function pintarTel() {
     var hdr = '<div class="bar">Control de accesos · Caseta 1</div>';
@@ -1203,15 +1234,15 @@
     if (ent && r.res === 'prueba') h += '<div class="gbtn"><button type="button" style="background:#2F6B1E" id="alc-neg">Negativo</button><button type="button" style="background:#A32D2D" id="alc-pos">Positivo</button></div>';
     $('tel').innerHTML = h;
     if ($('alc-neg')) $('alc-neg').onclick = function () {
-      SIM.r.ch.push({ s: 'ok', i: 'copa', t: 'Alcoholímetro: negativo', d: '0.00 g/L a las ' + hhmm(ahora()) + '.' });
+      SIM.r.ch.push({ s: 'ok', i: 'copa', t: 'Alcoholímetro: negativo', d: '0.00 mg/L a las ' + hhmm(ahora()) + '.' });
       SIM.r.inst = SIM.r.inst.filter(function (x) { return x[0] !== 'copa'; });
       SIM.r.res = SIM.r.base || 'pasa';
       pintarSim(false);
     };
     if ($('alc-pos')) $('alc-pos').onclick = function () {
       registrarIntento('Alcoholímetro positivo', true);
-      var inc = D.registrar({ k: 'inc', pid: p.id, tipo: 'ALC', accion: 'Veto 30 días', desc: 'Alcoholímetro en caseta: 0.41 g/L.', por: 'Guardia Caseta 1' });
-      SIM.r.ch.push({ s: 'critico', i: 'copa', t: 'Alcoholímetro: POSITIVO (0.41 g/L)', d: 'Se registró la incidencia ' + inc.folio + ' y un veto de 30 días (ajustable en su expediente).' });
+      var inc = D.registrar({ k: 'inc', pid: p.id, tipo: 'ALC', accion: 'Veto 30 días', desc: 'Alcoholímetro en caseta: 0.16 mg/L en aire espirado.', por: 'Guardia Caseta 1' });
+      SIM.r.ch.push({ s: 'critico', i: 'copa', t: 'Alcoholímetro: POSITIVO (0.16 mg/L)', d: 'Se registró la incidencia ' + inc.folio + ' y un veto de 30 días (ajustable en su expediente).' });
       SIM.r.inst = []; SIM.r.res = 'nopasa';
       pintarSim(false); pintar();
     };
@@ -1250,19 +1281,21 @@
     MOVS.forEach(function (m) { ev = ev.filter(function (x) { return !(x.p === m.p && +x.t === +m.t); }); ev.push(m); });
     ev.sort(function (a, b) { return b.t - a.t; });
     $('feed-sub').textContent = ev.length + ' en 24 h';
-    $('feed').innerHTML = ev.slice(0, 14).map(function (x) {
-      var neg = /Negado/.test(x.res), falta = /Sin herr/.test(x.res);
-      return '<li data-persona="' + x.p.id + '"><span class="hora">' + hhmm(x.t) + '</span><span class="tipo-ev ' + x.tipo + '">' + (x.tipo === 'e' ? 'ENTRADA' : 'SALIDA') + '</span><div class="tx">' + esc(x.p.nombre) +
-        '<span>' + esc(EMP[x.p.emp].corto) + (x.res ? ' · ' + esc(x.res) : '') + '</span></div>' + (neg ? '<span class="st critico">' + ico('veto') + 'No pasó</span>' : (falta ? '<span class="st aviso">' + ico('herr') + 'Faltante</span>' : '')) + '</li>';
-    }).join('');
+    $('feed').innerHTML = ev.slice(0, 14).map(htmlMov).join('');
+  }
+  function htmlMov(x) {
+    var neg = /Negado/.test(x.res), falta = /Sin herr/.test(x.res);
+    return '<li data-persona="' + x.p.id + '"><span class="hora">' + hhmm(x.t) + '</span><span class="tipo-ev ' + x.tipo + '">' + (x.tipo === 'e' ? 'ENTRADA' : 'SALIDA') + '</span><div class="tx">' + esc(x.p.nombre) +
+      '<span>' + esc(EMP[x.p.emp].corto) + (x.res ? ' · ' + esc(x.res) : '') + '</span></div>' + (neg ? '<span class="st critico">' + ico('veto') + 'No pasó</span>' : (falta ? '<span class="st aviso">' + ico('herr') + 'Faltante</span>' : '')) + '</li>';
   }
 
   $('btn-reiniciar').onclick = function () { if (confirm(D.sala ? '¿Reiniciar la demo? Se borra lo registrado en la sala ' + D.sala + ' y todos los equipos conectados vuelven al inicio.' : '¿Reiniciar la demo? Se borra lo registrado en este navegador (en las dos pantallas).')) D.reiniciar(); };
   var movsVistos = MOVS.length;
   D.alCambiar(function () {
-    if (MOVS.length > movsVistos) {
-      var m = MOVS[0];
-      toast((m.tipo === 'e' ? (/Negado/.test(m.res) ? 'No pasó: ' : 'Entrada: ') : 'Salida: ') + m.p.nombre + ' · ' + hhmm(m.t) + (m.quien ? ' · ' + m.quien : ''), /Negado|Sin herr/.test(m.res));
+    if (MOVS.length > movsVistos && Math.abs(Date.now() - MOVS[0].t) < 60000) {   // sólo lo reciente (no al recargar)
+      var m = MOVS[0], neg = /Negado/.test(m.res), falta = /Sin herr/.test(m.res), mot = neg ? (m.res.split(' · ')[1] || '') : '';
+      if (mot) mot = ' (' + mot.charAt(0).toLowerCase() + mot.slice(1) + ')';
+      toast((m.tipo === 'e' ? (neg ? 'No pasó' + mot + ': ' : 'Entrada: ') : (falta ? 'Salida con faltante: ' : 'Salida: ')) + m.p.nombre + ' · ' + hhmm(m.t) + (m.quien ? ' · ' + m.quien : ''), neg || falta);
     }
     movsVistos = MOVS.length;
     pintar(); pintarSolicitudes(); if (PANEL_P) abrirPersona(PANEL_P);
@@ -1275,6 +1308,10 @@
     if (ids === solIds) return;                                     // sin cambios: no se vuelve a pintar
     var antes = solIds.split(',');
     var nuevas = pend.filter(function (x) { return antes.indexOf(x.u) < 0; });
+    antes.forEach(function (u) {                                     // el guardia canceló una solicitud
+      var x = u && ids.split(',').indexOf(u) < 0 && D.SOLICITUDES.filter(function (y) { return y.u === u; })[0];
+      if (x && x.resp && /cancel/i.test(x.resp.quien || '') && solListo) toast('El guardia canceló la solicitud de ' + x.p.nombre + '.');
+    });
     solIds = ids;
     document.title = (pend.length ? '(' + pend.length + ') ' : '') + TITULO;
     if (nuevas.length && solListo) toast('Solicitud de autorización: ' + nuevas[0].p.nombre + ' (' + nuevas[0].caseta.replace(/ \(.*/, '') + ')');
@@ -1282,7 +1319,7 @@
       var p = x.p, e = EMP[p.emp];
       return '<div class="sol' + (nuevas.indexOf(x) >= 0 ? ' nueva' : '') + '" role="alertdialog" aria-label="Solicitud de autorización de ' + esc(p.nombre) + '"><div class="sol-t">' + ico('reloj') + '<b>Solicitud de autorización</b><span>' + esc(x.caseta.replace(/ \(.*/, '')) + ' · ' + hhmm(x.t) + '</span></div>' +
         '<div class="sol-p"><div class="av">' + iniciales(p.nombre) + '</div><div><b>' + esc(p.nombre) + '</b><span>' + esc(p.puesto) + ' · ' + esc(e.corto) + '</span></div></div>' +
-        '<p>' + esc(x.motivo) + '. Lleva ' + fmtH(stats(p).h7) + ' en 7 días.</p>' +
+        '<p>' + esc(x.motivo) + '.</p>' +
         '<div class="sol-a"><button class="btn peq fant" type="button" data-persona="' + p.id + '">Ver expediente</button>' +
         '<button class="btn peq rojo" type="button" data-sol="' + x.u + '" data-ok="0">Negar</button>' +
         '<button class="btn peq verde" type="button" data-sol="' + x.u + '" data-ok="1">' + ico('ok') + 'Autorizar</button></div></div>';

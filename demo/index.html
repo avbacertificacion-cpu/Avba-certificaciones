@@ -55,7 +55,8 @@
   .estado.ok{color:var(--verde)} .estado.mal{color:var(--rojo)} .estado.esp{color:var(--texto-sub)}
   .qr{display:flex;gap:14px;align-items:center}
   .qr img{width:150px;height:150px;border-radius:10px;border:1px solid var(--borde);background:#fff;flex-shrink:0}
-  .qr .url{font-size:12.5px;color:var(--texto-sub);word-break:break-all}
+  .qr .url{font-size:12.5px;color:var(--texto-sub);overflow-wrap:anywhere}
+  .qr .url .sala-url{white-space:nowrap}
   .qr .url b{color:var(--texto);font-size:13px}
   ol.guion{list-style:none;counter-reset:paso;margin-top:12px}
   ol.guion li{counter-increment:paso;display:grid;grid-template-columns:36px 1fr;gap:10px;padding:12px 0;border-bottom:1px solid var(--borde)}
@@ -70,6 +71,14 @@
   .aviso{margin-top:12px;background:var(--ambar-light);color:#6b4600;border-radius:12px;padding:10px 14px;font-size:13.5px;font-weight:600}
   .pie{text-align:center;color:var(--texto-hint);font-size:12.5px;margin-top:20px}
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));z-index:90;background:#1e6b34;color:#fff;border-radius:12px;padding:11px 16px;font-weight:700;font-size:14px;max-width:92vw;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  .solo-guion .no-guion{display:none!important}
+  .solo-guion main{margin-top:16px}
+  .lnk-guion{font-size:13px;font-weight:700;color:var(--azul);text-decoration:none;margin-left:auto}
+  @media print{
+    .no-guion,.hero,.toast,.lnk-guion{display:none!important}
+    body{background:#fff} main{margin:0 auto;padding:0} .card{box-shadow:none;border:0;padding:0 0 10px}
+    ol.guion li{break-inside:avoid}
+  }
   @media (max-width:760px){
     .dos{grid-template-columns:minmax(0,1fr)}
     .qr{flex-direction:column;align-items:flex-start}
@@ -93,14 +102,14 @@
   <div><b>Control de accesos</b><span>Demostración</span></div>
 </header>
 
-<section class="hero">
+<section class="hero no-guion">
   <h1>Control de accesos para plantas industriales</h1>
   <p>El guardia escanea la identificación y en un segundo sabe si la persona pasa, qué puede meter y qué debe revisar. El administrador ve todo en tiempo real: quién está dentro, horas trabajadas según la STPS, incidencias, vetos, herramientas y vales.</p>
   <span class="ficticio">Demo con datos ficticios</span>
 </section>
 
 <main>
-  <section class="card">
+  <section class="card no-guion">
     <h2>Presentar con dos dispositivos <span class="chip">Recomendado</span></h2>
     <p class="sub">El panel en la laptop (o el proyector) y la pantalla del guardia en un celular, conectados en la misma sala: lo que el guardia registra aparece en el panel al instante, y los permisos que cambia el administrador llegan al celular.</p>
     <div class="sala">
@@ -129,7 +138,7 @@
     </div>
   </section>
 
-  <section class="card">
+  <section class="card no-guion">
     <h2><svg class="i"><use href="#i-tabs"/></svg>Con un solo equipo</h2>
     <p class="sub">Si no hay internet en el celular: abre las dos pantallas en pestañas del mismo navegador. Lo que registres en una aparece en la otra.</p>
     <div class="dos">
@@ -139,36 +148,39 @@
   </section>
 
   <section class="card">
-    <h2>Guion sugerido · 15 minutos</h2>
-    <p class="sub">Cada vez que el guardia toca ENTRADA llega un caso distinto, en este orden: todo en orden, con tableta o computadora autorizada, celular sin permiso, persona vetada, con herramienta, documento vencido, exceso de horas y alcoholímetro. Si necesitas repetir o saltar un caso, elígelo en el menú ⋮ de la caseta («Siguiente ENTRADA»).</p>
+    <h2>Guion sugerido · 15 minutos <a class="lnk-guion" href="index.html?guion" target="_blank" rel="noopener">Abrir sólo el guion</a></h2>
+    <p class="sub">Cada vez que el guardia toca ENTRADA llega un caso distinto, en este orden: todo en orden, con tableta o computadora autorizada, celular sin permiso, persona vetada, con herramienta, documento vencido, exceso de horas y alcoholímetro. La primera SALIDA es la persona que acaba de entrar con herramienta; las siguientes alternan una salida sin pendientes, una con equipo prestado y una con material por autorizar. Si necesitas repetir o saltar un caso, elígelo en el menú ⋮ de la caseta («Siguiente ENTRADA» o «Siguiente SALIDA»).</p>
     <ol class="guion">
       <li><div><b>Tablero (panel)</b><div class="q">Personas dentro ahora, entradas y salidas por hora, personal por empresa, horas de la semana y alertas.</div>
         <div class="di">«Todo lo que pasa en la caseta, en un solo lugar y en tiempo real.»</div></div></li>
       <li><div><b>Primera entrada (celular): ingreso correcto</b><div class="q">El guardia toca ENTRADA. Se ve el resultado en grande y qué puede meter la persona: celular, tableta, computadora, cámara, herramienta y vehículo.</div>
         <div class="di">«El guardia no decide: el sistema le dice si pasa y qué debe revisar.»</div></div></li>
-      <li><div><b>Celular sin permiso y tableta autorizada</b><div class="q">Las siguientes entradas muestran las indicaciones de casillero y los permisos especiales.</div></div></li>
-      <li><div><b>Persona vetada: NO PASA</b><div class="q">El guardia ve que está vetada y hasta cuándo; en el panel suena la campana con la alerta del intento.</div>
+      <li><div><b>Tableta autorizada y celular sin permiso</b><div class="q">Caso 2: la tableta o la computadora aparece en verde como permiso especial. Caso 3: trae celular sin autorización; la caseta lo marca en ámbar y le indica al guardia resguardarlo en casillero.</div></div></li>
+      <li><div><b>Persona vetada: NO PASA</b><div class="q">El guardia ve NO PASA y que está vetada (temporal o permanente), sin el motivo. En el panel sube el contador de la campana y aparece arriba la alerta crítica del intento, marcada como «Nueva».</div>
         <div class="di">«Un veto se aplica en todas las casetas al instante, aunque la persona intente por otra puerta.»</div></div></li>
-      <li><div><b>Herramienta y salida con faltante</b><div class="q">Registra la herramienta que ingresa. Luego toca SALIDA (sale esa misma persona), desmarca una herramienta y registra: queda el vale abierto y la alerta «Herramienta no presentada» en el panel.</div></div></li>
+      <li><div><b>Herramienta y salida con faltante</b><div class="q">Registra la herramienta que ingresa. Luego toca SALIDA (sale esa misma persona), desmarca una herramienta y registra: queda el vale abierto y la alerta «Herramienta no presentada» al principio de Alertas (marcada como «Nueva») y en «Herramientas y vales».</div></div></li>
       <li><div><b>Documento vencido</b><div class="q">NO PASA con el motivo: inducción, examen médico, DC-3 o IMSS vencido.</div></div></li>
-      <li><div><b>Exceso de horas: ESPERA</b><div class="q">El guardia pide autorización y el administrador la autoriza o la niega desde su panel.</div>
+      <li><div><b>Exceso de horas: ESPERA</b><div class="q">El guardia pide autorización. En el panel aparece la tarjeta con las horas: cuántas lleva, a cuántas llegaría con este turno y el máximo legal. El administrador autoriza o niega y el celular cambia al instante.</div>
         <div class="di">«La jornada se controla con las reglas de la Ley Federal del Trabajo reformada en 2026.»</div></div></li>
-      <li><div><b>Alcoholímetro aleatorio</b><div class="q">Captura «Positivo»: se registra la incidencia y el veto automáticamente.</div></div></li>
-      <li><div><b>Expediente de la persona (panel → Personas)</b><div class="q">Horas por día, permisos, documentos, vales, incidencias y bitácora. Quita o da el permiso de tableta y muéstralo en el celular.</div></div></li>
-      <li><div><b>Jornadas (STPS)</b><div class="q">Horas ordinarias, dobles, triples y quién excede el máximo. En «Reglas y roles» cambia el año a 2027 para ver el efecto de la reforma.</div>
+      <li><div><b>Alcoholímetro aleatorio</b><div class="q">Captura «Positivo»: se registran el intento, la incidencia y el veto de 30 días, y en el panel aparece la alerta crítica «Alcoholímetro positivo».</div></div></li>
+      <li><div><b>Expediente de la persona (panel → Personas)</b><div class="q">Horas por día, permisos, documentos, vales, incidencias y bitácora. En el celular toca «No se lee: buscar» y abre a la misma persona (esté dentro o fuera, la hoja muestra sus permisos); luego, en el panel, quita o da el permiso de tableta: el celular cambia en un segundo.</div></div></li>
+      <li><div><b>Jornadas (STPS)</b><div class="q">Horas ordinarias, dobles, triples y quién excede el máximo. En «Reglas y roles» cambia el año a 2027 para ver el efecto de la reforma; al terminar, regrésalo a 2026.</div>
         <div class="di">«Desde 2027 el registro electrónico de la jornada es obligatorio; este control puede ser ese registro.»</div></div></li>
       <li><div><b>Incidencias, vetos, herramientas y roles</b><div class="q">Registrar una incidencia o vetar; vales abiertos; y la tabla de quién ve qué: guardia, administrador de accesos y AVBA.</div></div></li>
-      <li><div><b>Cierre</b><div class="q">Siguientes pasos: gafete con QR para el personal diario, lectura del número de la identificación, carga de documentos por las contratistas y conexión con el sistema de AVBA.</div></div></li>
+      <li><div><b>Cierre</b><div class="q">Siguientes pasos: gafete con QR para el personal diario, carga de documentos por las contratistas y conexión con el sistema de AVBA.</div></div></li>
     </ol>
   </section>
 
-  <section class="card">
+  <section class="card no-guion">
     <h2>Antes de empezar</h2>
     <ul class="check">
       <li><svg class="i"><use href="#i-ok"/></svg>Internet en la laptop y en el celular (datos o Wi-Fi).</li>
       <li><svg class="i"><use href="#i-ok"/></svg>Abre esta portada unos minutos antes, toca «Reiniciar la demo» y conecta los dos equipos (si ensayaste otro día, vuelve a escanear el QR).</li>
-      <li><svg class="i"><use href="#i-ok"/></svg>En el celular: brillo alto, modo no molestar y la pantalla del guardia ya abierta.</li>
+      <li><svg class="i"><use href="#i-ok"/></svg>En el celular: brillo alto, modo no molestar, bloqueo automático de pantalla desactivado (o en 10 minutos) y la pantalla del guardia ya abierta.</li>
+      <li><svg class="i"><use href="#i-ok"/></svg>Si el navegador ofrece traducir la página, elige «Nunca traducir español» en los dos equipos.</li>
       <li><svg class="i"><use href="#i-ok"/></svg>En la laptop: el panel en pantalla completa (F11) y la sección «Tablero».</li>
+      <li><svg class="i"><use href="#i-ok"/></svg>«Reiniciar la demo» deja todo como al inicio: sin movimientos, reglas originales y año 2026.</li>
+      <li><svg class="i"><use href="#i-ok"/></svg>Ten el guion a la mano: imprímelo o ábrelo en otro dispositivo con «Abrir sólo el guion».</li>
       <li><svg class="i"><use href="#i-ok"/></svg>Las personas, empresas e incidencias son ficticias; las cifras se mueven solas con la hora del día.</li>
     </ul>
   </section>
@@ -182,20 +194,25 @@
   var $ = function (id) { return document.getElementById(id); };
   var LETRAS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   function nuevoCodigo() { var s = ''; for (var i = 0; i < 4; i++) s += LETRAS[Math.floor(Math.random() * LETRAS.length)]; return s; }
-  function leer() { try { return localStorage.getItem('avba_demo_sala') || ''; } catch (e) { return ''; } }
-  function guardar(c) { try { localStorage.setItem('avba_demo_sala', c); } catch (e) {} }
+  // La portada guarda su propio código: abrir una pantalla con «?sala=no» no lo borra
+  function leer() { try { return localStorage.getItem('avba_demo_portada') || localStorage.getItem('avba_demo_sala') || ''; } catch (e) { return ''; } }
+  function guardar(c) { try { localStorage.setItem('avba_demo_portada', c); localStorage.setItem('avba_demo_sala', c); } catch (e) {} }
   function semilla() { var d = new Date(); return d.getFullYear() * 1000 + d.getMonth() * 40 + d.getDate(); }
   var tToast;
   function toast(t) { var el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 3000); }
 
+  // index.html?guion: sólo el guion (para imprimirlo o verlo en otro dispositivo)
+  if (/[?&]guion\b/.test(location.search)) { document.body.classList.add('solo-guion'); document.title = 'Guion · Demo de control de accesos · AVBA'; return; }
   var codigo = leer();
-  if (!/^[A-Z0-9]{4,10}$/.test(codigo)) { codigo = nuevoCodigo(); guardar(codigo); }
+  if (!/^[A-Z0-9]{4,10}$/.test(codigo)) codigo = nuevoCodigo();
+  guardar(codigo);
   function pintar() {
     $('codigo').textContent = codigo;
     $('ir-panel').href = 'control-accesos.html?sala=' + codigo;
     $('ir-caseta').href = 'caseta.html?sala=' + codigo;
     var url = new URL('caseta.html?sala=' + codigo, location.href);
-    $('url-caseta').textContent = url.host + url.pathname + url.search;
+    $('url-caseta').textContent = url.host + url.pathname;
+    var su = document.createElement('span'); su.className = 'sala-url'; su.textContent = url.search; $('url-caseta').appendChild(su);
     $('qr').src = 'sala.php?qr=caseta&sala=' + codigo;
     comprobar();
   }
@@ -206,7 +223,7 @@
       .then(function (j) {
         if (!j.ok) throw new Error();
         e.className = 'estado ok';
-        e.innerHTML = '<svg class="i"><use href="#i-ok"/></svg>Sala lista' + (j.total ? ' · ' + j.total + ' movimientos registrados' : '');
+        e.innerHTML = '<svg class="i"><use href="#i-ok"/></svg>Sala lista' + (j.total ? ' · ' + j.total + (j.total === 1 ? ' registro' : ' registros') : '');
       })
       .catch(function () {
         e.className = 'estado mal';
@@ -218,9 +235,12 @@
     if (!confirm('¿Reiniciar la demo? Se borra todo lo registrado en la sala ' + codigo + ' y los equipos conectados vuelven al inicio.')) return;
     fetch('sala.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sala: codigo, dia: semilla(), accion: 'reiniciar' }) })
       .then(function (r) { return r.json(); })
-      .then(function (j) { if (!j.ok) throw new Error(); toast('Demo reiniciada en la sala ' + codigo + '.'); comprobar(); })
+      .then(function (j) {
+        if (!j.ok) throw new Error();
+        try { localStorage.removeItem('avba_demo_accesos_' + semilla()); localStorage.removeItem('avba_demo_pend_' + codigo + '_' + semilla()); } catch (e) {}
+        toast('Demo reiniciada en la sala ' + codigo + '.'); comprobar();
+      })
       .catch(function () { toast('No se pudo reiniciar: revisa la conexión.'); });
-    try { localStorage.removeItem('avba_demo_accesos_' + semilla()); localStorage.removeItem('avba_demo_pend_' + codigo + '_' + semilla()); } catch (e) {}
   };
   pintar();
   // Los turnos de la demo se calculan con la hora del equipo: los dos deben estar en la hora del centro de México

@@ -47,16 +47,16 @@
   .barra h1{font-size:16.5px;font-weight:800;line-height:1.2}
   .barra .sub{font-size:11.5px;color:rgba(255,255,255,.78)}
   .barra .der{margin-left:auto;display:flex;align-items:center;gap:8px}
-  .barra .reloj{text-align:right;font-size:11px;color:rgba(255,255,255,.8);line-height:1.25}
+  .barra .reloj{text-align:right;font-size:11px;color:rgba(255,255,255,.8);line-height:1.25;white-space:nowrap}
   .barra .reloj b{display:block;font-size:15px;color:#fff}
-  .barra .mas{width:40px;height:40px;border-radius:10px;border:0;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .barra .mas{width:40px;height:40px;flex-shrink:0;border-radius:10px;border:0;background:rgba(255,255,255,.12);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center}
   .menu-pop{position:fixed;right:12px;top:calc(58px + env(safe-area-inset-top));max-height:calc(100vh - 80px);overflow:auto;background:#fff;color:var(--texto);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.2);
     padding:6px;min-width:230px;z-index:30}
   .menu-pop a,.menu-pop button{display:block;width:100%;text-align:left;border:0;background:none;padding:11px 12px;border-radius:8px;font-size:14px;color:var(--texto);text-decoration:none;cursor:pointer}
   .menu-pop a:hover,.menu-pop button:hover{background:var(--fondo)}
   .menu-pop .menu-sep{font-size:11px;font-weight:800;color:var(--texto-hint);text-transform:uppercase;letter-spacing:.4px;padding:10px 12px 4px;border-top:1px solid var(--borde);margin-top:4px}
-  .menu-pop #menu-casos button{padding:8px 12px;font-size:13.5px}
-  .menu-pop #menu-casos button[aria-current=true]{font-weight:800;color:var(--azul-dark);background:var(--azul-light)}
+  .menu-pop .menu-casos button{padding:10px 12px;min-height:42px;font-size:13.5px}
+  .menu-pop .menu-casos button[aria-current=true]{font-weight:800;color:var(--azul-dark);background:var(--azul-light)}
   .cinta{background:#FFF3D6;color:#7a4f00;font-size:12px;padding:6px 14px;text-align:center;border-bottom:1px solid #f2dfb0}
   .sala-chip{display:inline-block;margin-left:6px;font-size:10.5px;font-weight:800;border-radius:999px;padding:1px 8px;background:rgba(255,255,255,.16)}
   .sala-chip.ok{background:#2F6B1E;color:#fff} .sala-chip.mal{background:#A32D2D;color:#fff}
@@ -118,7 +118,7 @@
   body.con-hoja{overflow:hidden}
   .hoja{position:fixed;inset:0;z-index:50;background:var(--fondo);overflow:auto;display:flex;flex-direction:column}
   .hoja .cuerpo{max-width:560px;width:100%;margin:0 auto;padding:0 12px 16px;flex:1}
-  .hoja .pie{position:sticky;bottom:0;background:linear-gradient(to top,var(--fondo) 75%,rgba(240,244,249,0));padding:14px 12px calc(14px + env(safe-area-inset-bottom))}
+  .hoja .pie{position:sticky;bottom:0;background:var(--fondo);box-shadow:0 -12px 14px var(--fondo);padding:14px 12px calc(14px + env(safe-area-inset-bottom))}
   .hoja .pie .in{max-width:560px;margin:0 auto;display:flex;gap:8px;flex-wrap:wrap}
   .banner{color:#fff;padding:calc(18px + env(safe-area-inset-top)) 16px 18px;text-align:center}
   .banner svg.i{width:46px;height:46px;stroke-width:2.4}
@@ -150,7 +150,7 @@
   .disp .ic{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
   .disp .si .ic{background:var(--verde-light);color:var(--verde)} .disp .no .ic{background:#eceff4;color:#9aa3b2}
   .disp b{display:block;font-size:13.5px} .disp span{display:block;font-size:11.5px;font-weight:700;margin-top:1px}
-  .disp .si span{color:var(--verde)} .disp .no span{color:var(--rojo)}
+  .disp .si span{color:var(--verde)} .disp .no span{color:#6b7182}
   .indic{background:var(--ambar-light);border-radius:var(--radio);padding:12px;margin-top:10px;font-size:13.5px;line-height:1.45;color:#5c3d00}
   .indic b{display:block;margin-bottom:4px}
   .indic ul{list-style:none} .indic li{display:flex;gap:8px;align-items:flex-start;padding:3px 0}
@@ -164,6 +164,7 @@
   .btn.verde{background:var(--verde);color:#fff} .btn.rojo{background:var(--rojo);color:#fff} .btn.ambar{background:var(--ambar);color:#fff} .btn.azul{background:var(--azul);color:#fff}
   .btn.sec{background:#fff;color:var(--texto-sub);border:1.5px solid var(--borde);flex:0 1 130px}
   .btn:disabled{opacity:.6;cursor:default}
+  .btn.ambar:disabled{opacity:1;background:#a9823f}
   .spin{width:18px;height:18px;border:2.5px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:g .7s linear infinite}
   @keyframes g{to{transform:rotate(360deg)}}
   .aviso-dentro{background:#fff;border-radius:var(--radio);padding:12px;margin-bottom:10px;font-size:14px;display:flex;gap:10px;align-items:center;border:1px solid rgba(0,0,0,.05)}
@@ -186,7 +187,7 @@
   .hecho svg.i{width:80px;height:80px;stroke-width:2.6}
   .hecho b{font-size:28px;font-weight:900;margin-top:8px} .hecho span{font-size:15px;margin-top:6px;opacity:.95}
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));z-index:90;background:#1e6b34;color:#fff;border-radius:12px;
-    padding:11px 16px;font-weight:700;font-size:14px;max-width:92vw;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+    padding:11px 16px;font-weight:700;font-size:14px;max-width:92vw;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25);pointer-events:none}
   .toast.err{background:var(--rojo)}
 </style>
 </head>
@@ -230,7 +231,9 @@
   <a href="control-accesos.html" target="_blank" rel="noopener">Abrir el panel del administrador</a>
   <button type="button" id="btn-reiniciar">Reiniciar la demo</button>
   <div class="menu-sep">Siguiente ENTRADA (para la demo)</div>
-  <div id="menu-casos"></div>
+  <div id="menu-casos" class="menu-casos"></div>
+  <div class="menu-sep">Siguiente SALIDA (para la demo)</div>
+  <div id="menu-sal" class="menu-casos"></div>
 </div>
 <div class="cinta" id="cinta"><b>DEMO</b> con datos ficticios. Lo que registres aparece en el panel del administrador abierto en otra pestaña.</div>
 
@@ -293,20 +296,35 @@
   function ico(id) { return '<svg class="i"><use href="#i-' + id + '"/></svg>'; }
   function num(n) { return Number(n || 0).toLocaleString('es-MX'); }
   function fecha(d) { return d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' }); }
-  function dur(ms) { var m = Math.max(0, Math.round(ms / MIN)), h = Math.floor(m / 60); return h + ' h ' + dos(m % 60) + ' min'; }
+  function dur(ms) { if (ms < MIN) return 'menos de 1 min'; var m = Math.round(ms / MIN), h = Math.floor(m / 60); return h ? h + ' h ' + dos(m % 60) + ' min' : m + ' min'; }
   var MARCAS = new RegExp('[' + String.fromCharCode(0x300) + '-' + String.fromCharCode(0x36f) + ']', 'g');
   function sinAcentos(t) { return String(t || '').normalize('NFD').replace(MARCAS, '').toLowerCase(); }
   function iniciales(n) { var p = n.split(' '); return (p[0][0] + (p[1] ? p[1][0] : '')).toUpperCase(); }
   var tToast;
-  function toast(t, err) { var el = $('toast'); el.textContent = t; el.className = 'toast' + (err ? ' err' : ''); el.hidden = false; clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 3200); }
+  function toast(t, err) {
+    var el = $('toast'), pie = !$('hoja').hidden && $('hoja').querySelector('.pie');
+    el.textContent = t; el.className = 'toast' + (err ? ' err' : ''); el.style.bottom = pie ? (pie.offsetHeight + 8) + 'px' : ''; el.hidden = false; clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 3200); }
   function vib(ms) { if (navigator.vibrate) try { navigator.vibrate(ms); } catch (e) {} }
+  /* Que la pantalla del celular no se apague durante la demo */
+  var bloqueo = null;
+  function noApagar() {
+    if (bloqueo || !('wakeLock' in navigator) || document.visibilityState !== 'visible') return;
+    try { navigator.wakeLock.request('screen').then(function (l) { bloqueo = l; l.addEventListener('release', function () { bloqueo = null; }); }).catch(function () {}); } catch (e) {}
+  }
+  noApagar();
+  document.addEventListener('visibilitychange', noApagar);
+  document.addEventListener('click', noApagar, true);
 
   /* ── Encabezado, contadores y movimientos del turno ── */
   function enTurno(tipo, d) { return D.turnosEnCurso().indexOf(D.turnoDe(tipo, d)) >= 0; }
+  function pintarReloj() {
+    var ks = D.turnosEnCurso();
+    $('reloj').innerHTML = '<b>' + hhmm(ahora()) + '</b>' + (ks.length > 1 ? 'Cambio de turno' : D.nombreTurno(ks[0]));
+  }
   function pintar() {
     D.tick();
-    var N = ahora(), ks = D.turnosEnCurso();
-    $('reloj').innerHTML = '<b>' + hhmm(N) + '</b>' + (ks.length > 1 ? 'Cambio de turno' : D.nombreTurno(ks[0]));
+    pintarReloj();
+    var ks = D.turnosEnCurso();
     $('turno').textContent = ks.length > 1 ? 'Cambio de turno: salen los del turno anterior y entran los del siguiente.' : D.nombreTurno(ks[0]) + ' en curso';
     var dentro = 0, ent = 0, sal = 0, ev = [];
     PERSONAS.forEach(function (p) {
@@ -323,7 +341,7 @@
     $('n-movs').textContent = ev.length ? ev.length + ' en el turno' : '';
     $('movs').innerHTML = ev.slice(0, 25).map(function (x) {
       var chip = /Negado/.test(x.res) ? '<span class="chip no">No pasó</span>' : (/Sin herr/.test(x.res) ? '<span class="chip av">Faltante</span>'
-        : (/observ|autoriz|indicac/i.test(x.res) ? '<span class="chip av">Con indicaciones</span>' : '<span class="chip ok">Correcto</span>'));
+        : (/autoriz/i.test(x.res) ? '<span class="chip av">Autorizada</span>' : (/observ|indicac/i.test(x.res) ? '<span class="chip av">Con indicaciones</span>' : '<span class="chip ok">Correcto</span>')));
       return '<li><span class="h">' + hhmm(x.t) + '</span><span class="tag ' + x.tipo + '">' + (x.tipo === 'e' ? 'ENTRADA' : 'SALIDA') + '</span>' +
         '<div class="tx">' + esc(x.p.nombre) + '<span>' + esc(EMP[x.p.emp].corto) + '</span></div>' + chip + '</li>';
     }).join('') || '<li style="color:var(--texto-hint);font-size:13px">Sin movimientos en este turno.</li>';
@@ -342,9 +360,14 @@
   /* ── Escanear ── */
   var GUION = ['ok', 'disp', 'cel', 'veto', 'herr', 'doc', 'semana', 'alcohol'], gi = 0, leyendo = false;
   var NOMBRE_CASO = { ok: 'Todo en orden', disp: 'Con tableta o computadora', cel: 'Celular sin permiso', veto: 'Persona vetada', herr: 'Con herramienta', doc: 'Documento vencido', semana: 'Exceso de horas', alcohol: 'Alcoholímetro' };
+  var GUION_SAL = ['herr', 'limpia', 'equipo', 'mat'], si = 0;
+  var NOMBRE_SAL = { herr: 'Con herramienta (quien acaba de entrar)', limpia: 'Sin pendientes', equipo: 'Con equipo prestado', mat: 'Con material por autorizar' };
   function pintarCasos() {
     $('menu-casos').innerHTML = GUION.map(function (c, i) {
       return '<button type="button" data-caso="' + i + '"' + (i === gi % GUION.length ? ' aria-current="true"' : '') + '>' + (i + 1) + '. ' + NOMBRE_CASO[c] + '</button>';
+    }).join('');
+    $('menu-sal').innerHTML = GUION_SAL.map(function (c, i) {
+      return '<button type="button" data-sal="' + i + '"' + (i === si % GUION_SAL.length ? ' aria-current="true"' : '') + '>' + NOMBRE_SAL[c] + '</button>';
     }).join('');
   }
   $('menu-casos').addEventListener('click', function (ev) {
@@ -352,13 +375,25 @@
     gi = +b.dataset.caso; pintarCasos(); $('menu-pop').hidden = true;
     toast('La siguiente ENTRADA será: ' + NOMBRE_CASO[GUION[gi]].toLowerCase() + '.');
   });
-  function elegirSalida() {
-    var ult = D.MOVS.filter(function (m) { return m.tipo === 'e' && !/Negado/.test(m.res) && D.stats(m.p).dentro && D.valesAbiertos(m.p).some(function (v) { return v.tipo === 'herr'; }); })[0];
-    if (ult) return ult.p;
+  $('menu-sal').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-sal]'); if (!b) return;
+    si = +b.dataset.sal; pintarCasos(); $('menu-pop').hidden = true;
+    toast('La siguiente SALIDA será: ' + NOMBRE_SAL[GUION_SAL[si]].toLowerCase() + '.');
+  });
+  /* SALIDA: siempre las mismas personas en el mismo orden (como las ENTRADAS) */
+  function tieneVale(x, tipo) {
+    return D.valesAbiertos(x).some(function (v) { return v.tipo === tipo && (tipo !== 'mat' || /Pendiente/.test(v.autoriza || '')); });
+  }
+  function elegirSalida(caso) {
     var dentro = PERSONAS.filter(function (x) { return D.stats(x).dentro; });
-    var conVale = dentro.filter(function (x) { return D.valesAbiertos(x).some(function (v) { return v.tipo === 'herr' || v.tipo === 'equipo'; }); });
-    var pool = conVale.length ? conVale : dentro;
-    return pool[Math.floor(Math.random() * pool.length)];
+    if (!dentro.length) return null;
+    if (caso === 'herr') {
+      var ult = D.MOVS.filter(function (m) { return m.tipo === 'e' && !/Negado/.test(m.res) && D.stats(m.p).dentro && tieneVale(m.p, 'herr'); })[0];
+      if (ult) return ult.p;
+    }
+    var pool = caso === 'limpia' ? dentro.filter(function (x) { return !D.valesAbiertos(x).length; }) : dentro.filter(function (x) { return tieneVale(x, caso); });
+    if (!pool.length) pool = dentro;
+    return pool.sort(function (a, b) { return D.hash(D.semilla + 'sal' + a.id) - D.hash(D.semilla + 'sal' + b.id); })[0];
   }
   function escanear(modo, p, caso) {
     if (leyendo) return;
@@ -369,7 +404,7 @@
       $('visor').classList.remove('leyendo'); leyendo = false;
       if (!p) {
         if (modo === 'entrada') { caso = GUION[gi++ % GUION.length]; p = D.candidato(caso); }
-        else p = elegirSalida();
+        else p = elegirSalida(GUION_SAL[si++ % GUION_SAL.length]);
       }
       if (!p) { toast(modo === 'salida' ? 'No hay nadie dentro.' : 'No hay a quién simular.', true); return; }
       abrir(modo, p, caso);
@@ -384,6 +419,7 @@
     ACT = { modo: modo, p: p, caso: caso || '', t: ahora(), autorizado: false, negado: false, esperando: false, sol: null, alc: null, firma: firma(p),
             r: modo === 'entrada' ? D.revisar(p, caso ? 'g-' + caso : 'guardia') : null };
     vib(modo === 'entrada' && ACT.r.res === 'nopasa' ? [80, 60, 80] : 30);
+    $('buscar').hidden = true; clearTimeout(tToast); $('toast').hidden = true;
     pintarHoja();
     $('hoja').hidden = false; $('hoja').scrollTop = 0; document.body.classList.add('con-hoja');
   }
@@ -410,20 +446,25 @@
   function cabeceraPersona(p) {
     var s = D.stats(p), e = EMP[p.emp];
     return '<div class="persona"><div class="foto' + (D.vetoVigente(p) ? ' vet' : '') + '">' + iniciales(p.nombre) + '</div><div><b>' + esc(p.nombre) + '</b>' +
-      '<span>' + esc(p.puesto) + ' · ' + esc(e.nombre) + '</span><span>' + esc(p.idTipo) + ' ····' + p.idNum + ' · <span class="rec" style="display:inline">reconocido ' + (96 + (p.idNum.charCodeAt(2) % 4)) + ' %</span></span></div></div>';
+      '<span>' + esc(p.puesto) + ' · ' + esc(e.nombre) + '</span><span>' + esc(p.idTipo) + ' ····' + p.idNum + ' · <span class="rec" style="display:inline;white-space:nowrap">reconocido ' + (96 + (p.idNum.charCodeAt(2) % 4)) + '&nbsp;%</span></span></div></div>';
   }
   function pintarHoja() {
     var p = ACT.p, h = '';
     if (ACT.modo === 'entrada') h = hojaEntrada(p); else h = hojaSalida(p);
     $('hoja').innerHTML = h;
+    ACT.tPinta = Date.now();                    // evita que un doble toque caiga en el botón nuevo
     enlazarHoja();
   }
   function hojaEntrada(p) {
     var r = ACT.r, res = resActual(), s = D.stats(p), dl = s.docs.lista;
     var venc = dl.filter(function (d) { return d.est === 'vencido'; }), pv = dl.filter(function (d) { return d.est === 'porvencer'; });
+    var traeCel = (r.inst || []).some(function (x) { return x[0] === 'cel'; }), pend = [];
+    if (traeCel) pend.push('celular a casillero');
+    if (D.valesAbiertos(p).length) pend.push('vale pendiente');
+    if (venc.length) pend.push('documento vencido');
     var B = {
-      pasa: ['ok', 'ok', 'INGRESO CORRECTO', 'Puede pasar'],
-      obs: ['ok', 'ok', 'INGRESO CORRECTO', 'Puede pasar · tiene un pendiente'],
+      pasa: ['ok', 'ok', 'INGRESO CORRECTO', ACT.autorizado ? (ACT.simulado ? 'Autorización simulada (demo)' : 'Lo autorizó el administrador de accesos') : 'Puede pasar'],
+      obs: ['ok', 'ok', 'INGRESO CORRECTO', 'Puede pasar' + (pend.length ? ' · ' + pend.join(' y ') : ' · revisa las indicaciones')],
       prueba: ['prueba', 'copa', 'PRUEBA DE ALCOHOLÍMETRO', 'Le tocó al azar: haz la prueba antes de dejarlo pasar'],
       esp: ['esp', 'reloj', ACT.esperando ? 'ESPERANDO AUTORIZACIÓN' : 'ESPERA', ACT.esperando ? 'Se avisó al administrador de accesos' : 'Necesita autorización del administrador'],
       nopasa: ['no', 'veto', 'NO PASA', ACT.alc === 'pos' ? 'Alcoholímetro positivo · se avisó al administrador' : (ACT.negado ? 'El administrador de accesos negó la entrada' : ((r.motivos || [])[0] || 'No está autorizado para entrar'))]
@@ -433,42 +474,50 @@
     // Lo que el guardia necesita saber
     var est = '<ul class="estado">';
     var aut = res === 'pasa' || res === 'obs';
-    est += aut ? filaEstado('ok', 'escudo', 'Autorizado para entrar', ACT.autorizado ? 'Lo autorizó el administrador de accesos' : '', 'Sí')
+    est += aut ? filaEstado('ok', 'escudo', 'Autorizado para entrar', ACT.autorizado ? (ACT.simulado ? 'Autorización simulada (demo)' : 'Lo autorizó el administrador de accesos') : '', 'Sí')
       : (res === 'nopasa' ? filaEstado('no', 'veto', 'No autorizado para entrar', '', 'No')
       : filaEstado('av', 'reloj', res === 'prueba' ? 'Autorizado después de la prueba' : 'Pendiente de autorización', '', 'Espera'));
     if (D.vetoVigente(p)) est += filaEstado('no', 'veto', 'VETADO', (p.veto.hasta ? 'Hasta el ' + fecha(p.veto.hasta) : 'Permanente') + ' · ' + p.veto.alcance + '. El motivo lo tiene el administrador.', 'Sí');
     else est += filaEstado('ok', 'veto', 'Vetado', '', 'No');
     if (venc.length) venc.forEach(function (d) { est += filaEstado('no', 'doc', 'Documento vencido', d.nombre + (d.vence ? ' · venció el ' + fecha(d.vence) : ''), 'Vencido'); });
     else est += filaEstado(pv.length ? 'av' : 'ok', 'doc', 'Documentos', pv.length ? 'Vence pronto: ' + pv.map(function (d) { return d.nombre + ' (' + d.dias + ' días)'; }).join(', ') : 'Inducción, examen médico, IMSS y DC-3', pv.length ? 'Por vencer' : 'Al día');
-    (r.motivos || []).filter(function (m) { return /seguido|horas/.test(m); }).forEach(function (m) { est += filaEstado('av', 'reloj', 'Jornada', m, 'Autorizar'); });
+    if (traeCel) est += filaEstado('av', 'cel', 'Trae celular sin autorización', 'Resguárdalo en casillero y entrégale su ficha.', 'Casillero');
+    motivosJornada(r).forEach(function (m) {
+      est += ACT.autorizado ? filaEstado('ok', 'reloj', 'Jornada', m, 'Autorizada') : filaEstado('av', 'reloj', 'Jornada', m, 'Autorizar');
+    });
     D.valesAbiertos(p).forEach(function (v) { est += filaEstado('av', 'vale', 'Vale pendiente ' + v.folio, D.TIPO_VALE[v.tipo] + ': ' + v.items.join(', '), 'Pendiente'); });
     if (ACT.alc === 'neg') est += filaEstado('ok', 'copa', 'Alcoholímetro', 'Negativo · ' + hhmm(ahora()), '0.00');
-    if (ACT.alc === 'pos') est += filaEstado('no', 'copa', 'Alcoholímetro', 'Positivo · 0.41 g/L', 'Positivo');
+    if (ACT.alc === 'pos') est += filaEstado('no', 'copa', 'Alcoholímetro', 'Positivo · 0.16 mg/L en aire espirado · ' + hhmm(ahora()), 'Positivo');
     est += '</ul>';
     hb += est;
     if (res !== 'nopasa') {
       hb += '<h3>Puede entrar con</h3>' + dispositivos(p);
       var ind = [];
       var noAut = [['cel', 'celular'], ['tab', 'tableta'], ['pc', 'computadora'], ['cam', 'cámara']].filter(function (x) { return !p.aut[x[0]]; }).map(function (x) { return x[1]; });
-      if (noAut.length) ind.push(['cel', 'Si trae ' + lista(noAut) + ', se queda en casillero; entrégale su ficha.']);
+      if (traeCel) noAut = noAut.filter(function (x) { return x !== 'celular'; });
+      if (noAut.length) ind.push(['cel', 'Si trae ' + lista(noAut) + ', se queda en casillero' + (traeCel ? ' también.' : '; entrégale su ficha.')]);
       if (p.aut.herr && D.REGLAS.herr) ind.push(['herr', 'Registra abajo la herramienta que ingresa.']);
       if (p.aut.auto) ind.push(['auto', 'Vehículo autorizado: placas ' + p.placas + '.']);
       if (D.valesAbiertos(p).length) ind.push(['vale', 'Recuérdale su vale pendiente.']);
-      hb += '<div class="indic"><b>Indicaciones</b><ul>' + ind.map(function (x) { return '<li>' + ico(x[0]) + '<span>' + esc(x[1]) + '</span></li>'; }).join('') + '</ul></div>';
+      if (ind.length) hb += '<div class="indic"><b>Indicaciones</b><ul>' + ind.map(function (x) { return '<li>' + ico(x[0]) + '<span>' + esc(x[1]) + '</span></li>'; }).join('') + '</ul></div>';
       if (p.aut.herr && D.REGLAS.herr) hb += '<h3>Herramienta que ingresa</h3><div class="lista-ck">' + p.herr.map(function (x, i) { return '<label><input type="checkbox" data-herr="' + i + '" checked> ' + esc(x) + '</label>'; }).join('') +
         '<small>Desmarca lo que no trae. A la salida se revisa que salga lo mismo.</small></div>';
     }
     hb += '</div><div class="pie"><div class="in">';
     if (res === 'pasa' || res === 'obs') hb += '<button class="btn sec" type="button" data-acc="cancelar">Cancelar</button><button class="btn verde" type="button" data-acc="entrada">' + ico('entrada') + 'Registrar entrada</button>';
-    else if (res === 'prueba') hb += '<button class="btn verde" type="button" data-acc="alc-neg">' + ico('ok') + 'Negativo</button><button class="btn rojo" type="button" data-acc="alc-pos">' + ico('x') + 'Positivo</button>';
+    else if (res === 'prueba') hb += '<button class="btn sec" type="button" data-acc="cancelar" style="flex:1 1 100%;min-height:44px;padding:10px">Cancelar</button>' +
+      '<button class="btn verde" type="button" data-acc="alc-neg">' + ico('ok') + 'Negativo</button><button class="btn rojo" type="button" data-acc="alc-pos">' + ico('x') + 'Positivo</button>';
     else if (res === 'esp') hb += ACT.esperando
-      ? '<button class="btn ambar" type="button" disabled><span class="spin"></span>Esperando al administrador…</button>' +
-        (ACT.sinRespuesta ? '<button class="btn sec" type="button" data-acc="simular" style="flex:1 1 100%">¿Nadie con el panel abierto? Simular que autoriza</button>' : '')
-      : '<button class="btn sec" type="button" data-acc="negar">No pasa</button><button class="btn ambar" type="button" data-acc="pedir">' + ico('reloj') + 'Pedir autorización</button>';
-    else hb += '<button class="btn rojo" type="button" data-acc="intento">' + ico('ok') + 'Entendido (registrar intento)</button>';
+      ? '<button class="btn sec" type="button" data-acc="cancelar-sol">Cancelar</button><button class="btn ambar" type="button" disabled><span class="spin"></span>Esperando respuesta…</button>' +
+        (ACT.sinRespuesta ? '<button class="btn sec" type="button" data-acc="simular" style="flex:1 1 100%">' + (salaEnLinea() ? 'Autorizar desde aquí (demo)' : '¿Nadie con el panel abierto? Simular que autoriza') + '</button>' : '')
+      : '<button class="btn sec" type="button" data-acc="cancelar" style="flex:1 1 100%;min-height:44px;padding:10px">Cancelar</button>' +
+        '<button class="btn rojo" type="button" data-acc="negar">' + ico('x') + 'No pasa</button><button class="btn ambar" type="button" data-acc="pedir">' + ico('reloj') + 'Pedir autorización</button>';
+    else if (ACT.intentoHecho) hb += '<button class="btn rojo" type="button" data-acc="cerrar-int" style="flex:1">' + ico('ok') + 'Entendido</button>';
+    else hb += '<button class="btn sec" type="button" data-acc="cancelar">Cancelar</button><button class="btn rojo" type="button" data-acc="intento">' + ico('ok') + 'Entendido (registrar intento)</button>';
     hb += '</div></div>';
     return hb;
   }
+  function motivosJornada(r) { return (r.motivos || []).filter(function (m) { return /seguido|7 días|horas/.test(m); }); }
   function lista(a) { return a.length > 1 ? a.slice(0, -1).join(', ') + ' o ' + a[a.length - 1] : a[0]; }
   function hojaSalida(p) {
     var s = D.stats(p), vales = D.valesAbiertos(p), herr = vales.filter(function (v) { return v.tipo === 'herr'; }), equipo = vales.filter(function (v) { return v.tipo === 'equipo'; }), mat = vales.filter(function (v) { return v.tipo === 'mat'; });
@@ -479,21 +528,25 @@
         '<div class="pie"><div class="in"><button class="btn sec" type="button" data-acc="cancelar" style="flex:1">Cerrar</button></div></div>';
       return hb;
     }
-    var revisar = herr.length || equipo.length || mat.some(function (v) { return /Pendiente/.test(v.autoriza || ''); });
+    var matPend = mat.some(function (v) { return /Pendiente/.test(v.autoriza || ''); }), revisar = herr.length || equipo.length || matPend;
+    var subt = herr.length || equipo.length ? (herr.length && equipo.length ? 'Tiene herramienta y equipo registrados' : (herr.length ? 'Tiene herramienta registrada' : 'Tiene equipo prestado')) + (matPend ? ' y material sin autorizar' : '')
+      : (matPend ? 'Lleva material sin autorizar: no puede sacarlo' : 'Puede salir');
     hb = '<div class="banner ' + (revisar ? 'esp' : 'ok') + '">' + ico(revisar ? 'alerta' : 'ok') + '<b id="res-tit">' + (revisar ? 'REVISA ANTES DE QUE SALGA' : 'SALIDA CORRECTA') + '</b><span>' +
-      (revisar ? 'Tiene herramienta o equipo registrado' : 'Puede salir') + '</span></div><div class="cuerpo">' + cabeceraPersona(p);
-    hb += '<ul class="estado">' + filaEstado('ok', 'entrada', 'Entró a las ' + hhmm(s.desde), 'Lleva ' + dur(s.perm) + ' dentro', '');
+      esc(subt) + '</span></div><div class="cuerpo">' + cabeceraPersona(p);
+    hb += '<ul class="estado">' + filaEstado('ok', 'entrada', 'Entró a las ' + hhmm(s.desde), s.perm < MIN ? 'Acaba de entrar' : 'Lleva ' + dur(s.perm) + ' dentro', '');
     mat.forEach(function (v) {
       var pend = /Pendiente/.test(v.autoriza || '');
       hb += filaEstado(pend ? 'no' : 'ok', 'vale', pend ? 'Material SIN autorizar' : 'Material autorizado', v.items.join(', ') + ' · vale ' + v.folio + (pend ? ' · no puede sacarlo' : ''), pend ? 'No sale' : 'Sale');
     });
-    if (!p.aut.cel) hb += filaEstado('av', 'cel', 'Casillero', 'Si dejó celular, tableta o computadora, entrégaselos.', '');
+    var enCasillero = [['cel', 'celular'], ['tab', 'tableta'], ['pc', 'computadora']].filter(function (x) { return !p.aut[x[0]]; }).map(function (x) { return x[1]; });
+    if (enCasillero.length) hb += filaEstado('av', 'cel', 'Casillero', 'Si dejó ' + lista(enCasillero) + ' en casillero: recibe su ficha y entrégale lo que dejó.', '');
     hb += '</ul>';
     herr.forEach(function (v) {
       hb += '<h3>Debe salir con (' + v.folio + ')</h3><div class="lista-ck">' + v.items.map(function (x, i) { return '<label><input type="checkbox" data-sale="' + v.folio + '|' + i + '" checked> ' + esc(x) + '</label>'; }).join('') +
         '<small>Desmarca lo que no presente: queda como faltante y se avisa al administrador.</small></div>';
     });
     equipo.forEach(function (v) { hb += '<h3>Debe devolver (' + v.folio + ')</h3><div class="lista-ck"><label><input type="checkbox" data-devuelto="' + v.folio + '" checked> ' + esc(v.items.join(', ')) + '</label></div>'; });
+    hb += '<h3>Sus permisos</h3>' + dispositivos(p);
     hb += '</div><div class="pie"><div class="in"><button class="btn sec" type="button" data-acc="cancelar">Cancelar</button><button class="btn rojo" type="button" data-acc="salida">' + ico('salida') + 'Registrar salida</button></div></div>';
     return hb;
   }
@@ -506,16 +559,26 @@
     el.hidden = false; vib(60);
     setTimeout(function () { el.hidden = true; }, 1300);
   }
+  function salaEnLinea() { return !!D.sala && D.estadoSala() === 'conectado'; }
   function accion(a) {
+    if (!ACT || Date.now() - (ACT.tPinta || 0) < 400) return;     // doble toque: el segundo no cuenta
     var p = ACT.p, t = ahora();
-    if (a === 'cancelar') { cerrarHoja(); return; }
+    if (a === 'cancelar' || a === 'cerrar-int') { cerrarHoja(); return; }
+    if (a === 'cancelar-sol') {
+      if (ACT.sol && ACT.esperando) D.registrar({ k: 'resp', sol: ACT.sol, ok: false, quien: GUARDIA + ' (canceló)' });
+      cerrarHoja(); toast('Solicitud cancelada.');
+      return;
+    }
     if (a === 'entrada') {
       var lleva = [].filter.call($('hoja').querySelectorAll('[data-herr]'), function (c) { return c.checked; }).map(function (c) { return p.herr[+c.dataset.herr]; });
-      var res = resActual();
-      D.registrar({ k: 'ent', pid: p.id, t: +t, caseta: CASETA, herr: !!(p.aut.herr && D.REGLAS.herr && lleva.length), items: lleva, quien: GUARDIA,
+      var res = resActual(), ultSal = p.ints.reduce(function (m, it) { return it.sal && +it.sal > m ? +it.sal : m; }, 0);
+      t = new Date(Math.max(+t, ultSal + 1000));
+      var okE = D.registrar({ k: 'ent', pid: p.id, t: +t, caseta: CASETA, herr: !!(p.aut.herr && D.REGLAS.herr && lleva.length), items: lleva, quien: GUARDIA,
         res: ACT.autorizado ? 'Con autorización' : (res === 'obs' ? 'Con indicaciones' : 'Permitido'),
         obs: ACT.alc === 'neg' ? 'Alcoholímetro negativo' : '' });
-      cerrarHoja(); hecho('#2F6B1E', 'ok', 'ENTRADA REGISTRADA', p.nombre + ' · ' + hhmm(t));
+      cerrarHoja();
+      if (!okE) { toast('No se registró: ' + p.nombre + ' ya aparece dentro.', true); return; }
+      hecho('#2F6B1E', 'ok', 'ENTRADA REGISTRADA', p.nombre + ' · ' + hhmm(t));
       return;
     }
     if (a === 'salida') {
@@ -527,8 +590,10 @@
       });
       $('hoja').querySelectorAll('[data-devuelto]').forEach(function (c) { if (!c.checked) noDev.push(c.dataset.devuelto); });
       var desde = D.stats(p).desde;
-      D.registrar({ k: 'sal', pid: p.id, t: +t, caseta: CASETA, falta: falta, noDevuelto: noDev, quien: GUARDIA });
+      if (desde) t = new Date(Math.max(+t, +desde + 1000));      // por si el reloj de este equipo va atrasado
+      var okS = D.registrar({ k: 'sal', pid: p.id, t: +t, caseta: CASETA, falta: falta, noDevuelto: noDev, quien: GUARDIA });
       cerrarHoja();
+      if (!okS) { toast('No se registró: ' + p.nombre + ' ya aparece fuera.', true); return; }
       if (falta.length || noDev.length) hecho('#8A5A00', 'alerta', 'SALIDA CON FALTANTE', (nombres.length ? 'No presentó: ' + nombres.join(', ') : 'No devolvió el equipo prestado') + '. Se avisó al administrador.');
       else hecho('#A32D2D', 'salida', 'SALIDA REGISTRADA', p.nombre + ' · ' + dur(t - desde) + ' dentro');
       return;
@@ -538,15 +603,16 @@
       ACT.alc = 'pos';
       D.registrar({ k: 'int', pid: p.id, t: +t, caseta: CASETA, motivo: 'Alcoholímetro positivo', quien: GUARDIA });
       ACT.intentoHecho = true;
-      D.registrar({ k: 'inc', pid: p.id, tipo: 'ALC', accion: 'Veto 30 días', desc: 'Alcoholímetro en caseta: 0.41 g/L.', por: GUARDIA });
+      D.registrar({ k: 'inc', pid: p.id, tipo: 'ALC', accion: 'Veto 30 días', desc: 'Alcoholímetro en caseta: 0.16 mg/L en aire espirado.', por: GUARDIA });
+      ACT.firma = firma(p);                     // el cambio lo hizo el guardia, no el administrador
       pintarHoja(); return;
     }
     if (a === 'pedir') {
-      var op = { k: 'sol', pid: p.id, caseta: CASETA, quien: GUARDIA, motivo: (ACT.r.motivos || []).filter(function (m) { return /seguido|horas/.test(m); }).join(' · ') || 'Requiere autorización' };
+      var op = { k: 'sol', pid: p.id, caseta: CASETA, quien: GUARDIA, motivo: motivosJornada(ACT.r).join(' · ') || 'Requiere autorización' };
       D.registrar(op);
       ACT.sol = op.u; ACT.esperando = true; ACT.sinRespuesta = false; pintarHoja();
-      // Si nadie responde (no hay panel abierto), se ofrece simular la respuesta
-      setTimeout(function () { if (ACT && ACT.sol === op.u && ACT.esperando) { ACT.sinRespuesta = true; pintarHoja(); } }, 12000);
+      // Si nadie responde (no hay panel abierto), se ofrece simular la respuesta; con la sala en línea se espera más
+      setTimeout(function () { if (ACT && ACT.sol === op.u && ACT.esperando) { ACT.sinRespuesta = true; pintarHoja(); } }, salaEnLinea() ? 45000 : 12000);
       return;
     }
     if (a === 'simular') { if (ACT.sol) D.registrar({ k: 'resp', sol: ACT.sol, ok: true, quien: 'Simulación' }); revisarSolicitud(); return; }
@@ -558,7 +624,7 @@
   }
 
   /* ── Buscar a mano ── */
-  $('btn-buscar').onclick = function () { $('buscar').hidden = false; $('q').value = ''; buscar(); setTimeout(function () { $('q').focus(); }, 50); };
+  $('btn-buscar').onclick = function () { if (leyendo) return; $('buscar').hidden = false; $('q').value = ''; buscar(); setTimeout(function () { $('q').focus(); }, 50); };
   $('cerrar-buscar').onclick = function () { $('buscar').hidden = true; };
   function buscar() {
     var q = sinAcentos($('q').value.trim());
@@ -594,13 +660,18 @@
   D.alError(function () { toast('Un registro no se pudo compartir con la sala.', true); });
 
   /* Cambios desde el panel (otra pestaña): permisos, vetos, vales */
-  function firma(p) { return JSON.stringify(p.aut) + p.estado; }
+  function firma(p) {
+    return JSON.stringify(p.aut) + p.estado + JSON.stringify(D.valesAbiertos(p).map(function (v) { return [v.folio, v.autoriza || '', v.items.join('|')]; })) + JSON.stringify(D.REGLAS);
+  }
   function revisarSolicitud() {
     if (!ACT || !ACT.sol) return false;
     var s = D.SOLICITUDES.filter(function (x) { return x.u === ACT.sol; })[0];
     if (!s || s.estado === 'pendiente' || !ACT.esperando) return false;
     ACT.esperando = false; ACT.sinRespuesta = false;
-    if (s.estado === 'autorizada') { ACT.autorizado = true; toast('El administrador de accesos autorizó la entrada.'); }
+    if (s.estado === 'autorizada') {
+      ACT.autorizado = true; ACT.simulado = !!(s.resp && /Simulaci/.test(s.resp.quien));
+      toast(ACT.simulado ? 'Autorización simulada (demo).' : 'El administrador de accesos autorizó la entrada.');
+    }
     else { ACT.negado = true; toast('El administrador de accesos negó la entrada.', true); }
     vib([60, 40, 60]); pintarHoja();
     return true;
@@ -618,12 +689,13 @@
         ACT.r = nuevo;
       }
       pintarHoja();
-      toast('El administrador actualizó los permisos de esta persona.');
+      toast('El administrador actualizó a esta persona: revisa el resultado.');
     }
   });
 
   pintar();
   setInterval(function () { if ($('hoja').hidden) pintar(); }, 30000);
+  setInterval(pintarReloj, 5000);
 })();
 </script>
 </body>
