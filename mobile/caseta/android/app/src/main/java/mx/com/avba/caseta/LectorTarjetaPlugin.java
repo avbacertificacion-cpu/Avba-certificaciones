@@ -3,6 +3,7 @@ package mx.com.avba.caseta;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.net.Uri;
 
 import androidx.activity.result.ActivityResult;
 
@@ -24,6 +25,9 @@ import com.getcapacitor.annotation.PermissionCallback;
  * simular, minDigitos, maxDigitos, longitud, patron, claves, noNombre,
  * noCodigo, confirmar }) → { codigo, nombre, texto, manual, simulado, ms } o
  * { cancelado: true }. La lectura se hace en el teléfono (LectorTarjetaActivity).
+ *
+ * Capacitor.Plugins.LectorTarjeta.abrir({ url }) abre una dirección https fuera
+ * de la app (por ejemplo, el PDF de entradas y salidas en el visor del teléfono).
  */
 @CapacitorPlugin(
     name = "LectorTarjeta",
@@ -37,6 +41,20 @@ public class LectorTarjetaPlugin extends Plugin {
         r.put("disponible", true);
         r.put("local", true);
         call.resolve(r);
+    }
+
+    @PluginMethod
+    public void abrir(PluginCall call) {
+        String url = call.getString("url", "");
+        if (url == null || !url.matches("^https://[^\\s]+$")) { call.reject("Dirección no válida."); return; }
+        try {
+            Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+            i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            getContext().startActivity(i);
+            call.resolve();
+        } catch (Exception e) {
+            call.reject("No hay una app para abrirlo en este teléfono.");
+        }
     }
 
     @PluginMethod

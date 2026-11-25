@@ -3,7 +3,14 @@
    AVBA — Control de accesos
 
    Bitácora de entradas y salidas de un sitio con la fotografía de la
-   identificación de cada persona (cualquier identificación, no sólo la INE).
+   identificación de cada persona (cualquier identificación, no sólo la INE)
+   o con la TARJETA de identificación leída en el teléfono de la caseta.
+
+     · Con la app AVBA Caseta (mobile/caseta) el guardia lee la tarjeta: el
+       teléfono reconoce el nombre y el código sin internet y el registro
+       llega sin foto, sólo con nombre, código, tipo, hora y punto de control.
+     · El PDF de datos junta la entrada y la salida de cada persona por su
+       código: nombre, código, hora de entrada y hora de salida.
 
      · Registrar: tipo (entrada / salida), foto, punto de control y una
        nota opcional. La hora es la del dispositivo al tomar la foto: en la
@@ -70,9 +77,13 @@ class ControlAccesos {
                usuario_nombre VARCHAR(150) NOT NULL DEFAULT '',
                turno_fecha    DATE         NULL,
                turno          CHAR(1)      NULL,
+               nombre         VARCHAR(150) NOT NULL DEFAULT '',
+               codigo         VARCHAR(32)  NOT NULL DEFAULT '',
+               origen         VARCHAR(12)  NOT NULL DEFAULT 'foto',
                UNIQUE KEY uk_uid (uid),
                KEY idx_fecha (fecha),
-               KEY idx_turno (turno_fecha, turno)
+               KEY idx_turno (turno_fecha, turno),
+               KEY idx_codigo (codigo)
              ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
         // Tablas creadas antes de los turnos: se agregan las columnas y se
@@ -93,7 +104,30 @@ class ControlAccesos {
                 error_log('[ControlAccesos] turnos: ' . $e2->getMessage());
             }
         }
+        // Tablas creadas antes de la lectura de tarjetas: nombre, código y origen
+        // (foto | tarjeta | manual). Lo ya registrado queda como «foto».
+        try {
+            $pdo->query("SELECT codigo, nombre, origen FROM accesos_registros LIMIT 1");
+        } catch (\Throwable $e) {
+            try { $pdo->exec("ALTER TABLE accesos_registros ADD COLUMN nombre VARCHAR(150) NOT NULL DEFAULT ''"); } catch (\Throwable $e2) {}
+            try { $pdo->exec("ALTER TABLE accesos_registros ADD COLUMN codigo VARCHAR(32) NOT NULL DEFAULT ''"); } catch (\Throwable $e2) {}
+            try { $pdo->exec("ALTER TABLE accesos_registros ADD COLUMN origen VARCHAR(12) NOT NULL DEFAULT 'foto'"); } catch (\Throwable $e2) {}
+            try { $pdo->exec("CREATE INDEX idx_codigo ON accesos_registros (codigo)"); } catch (\Throwable $e2) {}
+        }
         $hecho[$k] = true;
+    }
+
+    /** ¿La tabla ya tiene nombre, código y origen? Si la migración no se pudo
+     *  aplicar, el módulo sigue trabajando como antes (sólo con fotos). */
+    private static array $conTarjeta = [];
+    public static function conTarjeta(PDO $pdo): bool {
+        self::asegurarTabla($pdo);
+        $k = spl_object_id($pdo);
+        if (!isset(self::$conTarjeta[$k])) {
+            try { $pdo->query("SELECT codigo, nombre, origen FROM accesos_registros LIMIT 1"); self::$conTarjeta[$k] = true; }
+            catch (\Throwable $e) { self::$conTarjeta[$k] = false; error_log('[ControlAccesos] sin columnas de tarjeta: ' . $e->getMessage()); }
+        }
+        return self::$conTarjeta[$k];
     }
 
     /* ── Turnos ─────────────────────────────────────────────────────────────
@@ -165,52 +199,75 @@ class ControlAccesos {
         $ya->execute([$uid]);
         if ($idYa = $ya->fetchColumn()) return ['status' => 'success', 'id' => (int)$idYa, 'duplicado' => true];
 
-        if (empty($archivo['tmp_name']) || (int)($archivo['error'] ?? 1) !== UPLOAD_ERR_OK) {
-            return ['status' => 'error', 'message' => 'Falta la fotografía de la identificación.'];
+        // Tarjeta leída en el teléfono: nombre y código, sin foto
+        $codigo = strtoupper(substr((string)preg_replace('/[^0-9A-Za-z-]/', '', (string)($p['codigo'] ?? '')), 0, 32));
+        $persona = $codigo !== '' ? mb_substr(textoEstandar($p['persona'] ?? ''), 0, 150) : '';
+        $origen = $codigo === '' ? 'foto' : (($p['origen'] ?? '') === 'manual' ? 'manual' : 'tarjeta');
+        $conFoto = !empty($archivo['tmp_name']) && (int)($archivo['error'] ?? 1) === UPLOAD_ERR_OK;
+        if (!$conFoto && $codigo === '') {
+            return ['status' => 'error', 'message' => 'Falta la fotografía de la identificación o el código de la tarjeta.'];
         }
-        if ((int)($archivo['size'] ?? 0) > 15 * 1048576) return ['status' => 'error', 'message' => 'La foto pesa demasiado (máximo 15 MB).'];
-        $info = @getimagesize($archivo['tmp_name']);
-        if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
-            return ['status' => 'error', 'message' => 'El archivo no es una foto válida (JPG, PNG o WEBP).'];
+        $tarjeta = self::conTarjeta($this->pdo);
+        if ($codigo !== '' && !$tarjeta && !$conFoto) {
+            return ['status' => 'error', 'message' => 'El servidor todavía no puede guardar tarjetas: avisa a AVBA.'];
+        }
+        $info = null;
+        if ($conFoto) {
+            if ((int)($archivo['size'] ?? 0) > 15 * 1048576) return ['status' => 'error', 'message' => 'La foto pesa demasiado (máximo 15 MB).'];
+            $info = @getimagesize($archivo['tmp_name']);
+            if (!$info || !in_array($info[2], [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_WEBP], true)) {
+                return ['status' => 'error', 'message' => 'El archivo no es una foto válida (JPG, PNG o WEBP).'];
+            }
         }
 
-        // La hora es la del dispositivo al tomar la foto (puede llegar después, sin señal)
+        // La hora es la del dispositivo al tomar la foto o leer la tarjeta (puede llegar después, sin señal)
         $cap = (string)($p['capturado'] ?? '');
         if (!preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $cap) || strtotime($cap) === false) $cap = date('Y-m-d H:i:s');
         $fecha = substr($cap, 0, 10);
 
-        self::protegerCarpeta();
-        $sub = 'fotos/' . substr($fecha, 0, 4) . '/' . substr($fecha, 5, 2) . '/';
-        $dir = self::carpeta() . $sub;
-        if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return ['status' => 'error', 'message' => 'No se pudo guardar la foto en el servidor.'];
+        $sub = ''; $foto = ''; $mini = '';
+        if ($conFoto) {
+            self::protegerCarpeta();
+            $sub = 'fotos/' . substr($fecha, 0, 4) . '/' . substr($fecha, 5, 2) . '/';
+            $dir = self::carpeta() . $sub;
+            if (!is_dir($dir) && !@mkdir($dir, 0755, true)) return ['status' => 'error', 'message' => 'No se pudo guardar la foto en el servidor.'];
 
-        // Miles de fotos al día: 1400 px es de sobra para leer el número de
-        // una credencial que llena la foto, y cada una queda en ~150 KB.
-        $foto = comprimirImagen($archivo['tmp_name'], $dir . $uid . '.jpg', 1400, 1400, 76);
-        $mini = comprimirImagen($archivo['tmp_name'], $dir . $uid . '_m.jpg', 300, 300, 68);
-        if (!$foto) {
-            // Sin GD: se guarda tal cual llegó
-            $ext = $info[2] === IMAGETYPE_PNG ? 'png' : ($info[2] === IMAGETYPE_WEBP ? 'webp' : 'jpg');
-            if (!@move_uploaded_file($archivo['tmp_name'], $dir . $uid . '.' . $ext)
-                && !@copy($archivo['tmp_name'], $dir . $uid . '.' . $ext)) {
-                return ['status' => 'error', 'message' => 'No se pudo guardar la foto en el servidor.'];
+            // Miles de fotos al día: 1400 px es de sobra para leer el número de
+            // una credencial que llena la foto, y cada una queda en ~150 KB.
+            $foto = comprimirImagen($archivo['tmp_name'], $dir . $uid . '.jpg', 1400, 1400, 76);
+            $mini = comprimirImagen($archivo['tmp_name'], $dir . $uid . '_m.jpg', 300, 300, 68);
+            if (!$foto) {
+                // Sin GD: se guarda tal cual llegó
+                $ext = $info[2] === IMAGETYPE_PNG ? 'png' : ($info[2] === IMAGETYPE_WEBP ? 'webp' : 'jpg');
+                if (!@move_uploaded_file($archivo['tmp_name'], $dir . $uid . '.' . $ext)
+                    && !@copy($archivo['tmp_name'], $dir . $uid . '.' . $ext)) {
+                    return ['status' => 'error', 'message' => 'No se pudo guardar la foto en el servidor.'];
+                }
+                $foto = $uid . '.' . $ext;
             }
-            $foto = $uid . '.' . $ext;
         }
 
         try {
             [$turnoFecha, $turno] = self::turnoDe($tipo, $cap);
-            $this->pdo->prepare(
-                "INSERT INTO accesos_registros (uid, tipo, fecha, capturado, recibido, lugar, nota, foto, foto_mini, usuario, usuario_nombre, turno_fecha, turno)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
-            )->execute([
+            $valores = [
                 $uid, $tipo, $fecha, $cap, date('Y-m-d H:i:s'),
                 mb_substr(textoEstandar($p['lugar'] ?? '') ?: 'SIN PUNTO DE CONTROL', 0, 120),
                 mb_substr(textoEstandar($p['nota'] ?? ''), 0, 255),
-                $sub . $foto, $mini ? $sub . $mini : '',
+                $foto !== '' ? $sub . $foto : '', $mini ? $sub . $mini : '',
                 mb_substr((string)($usr['usuario'] ?? ''), 0, 50), mb_substr((string)($usr['nombre'] ?? ''), 0, 150),
                 $turnoFecha, $turno,
-            ]);
+            ];
+            if ($tarjeta) {
+                $this->pdo->prepare(
+                    "INSERT INTO accesos_registros (uid, tipo, fecha, capturado, recibido, lugar, nota, foto, foto_mini, usuario, usuario_nombre, turno_fecha, turno, nombre, codigo, origen)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                )->execute(array_merge($valores, [$persona, $codigo, $origen]));
+            } else {
+                $this->pdo->prepare(
+                    "INSERT INTO accesos_registros (uid, tipo, fecha, capturado, recibido, lugar, nota, foto, foto_mini, usuario, usuario_nombre, turno_fecha, turno)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+                )->execute($valores);
+            }
         } catch (\PDOException $e) {
             // Dos envíos simultáneos del mismo registro: gana el primero
             $ya->execute([$uid]);
@@ -218,13 +275,15 @@ class ControlAccesos {
             throw $e;
         }
         return ['status' => 'success', 'id' => (int)$this->pdo->lastInsertId(), 'turno' => "$turnoFecha-$turno",
-                'message' => ($tipo === 'entrada' ? 'Entrada' : 'Salida') . ' registrada a las ' . substr($cap, 11, 5) . '.'];
+                'message' => ($tipo === 'entrada' ? 'Entrada' : 'Salida') . ' registrada a las ' . substr($cap, 11, 5) . '.'
+                             . ($persona !== '' ? ' ' . $persona . '.' : '')];
     }
 
     /* ── Control del día ────────────────────────────────────────────────── */
     private function registrosDelTurno(string $fecha, string $t, string $lugar = ''): array {
         self::asegurarTabla($this->pdo);
-        $sql = "SELECT id, uid, tipo, capturado, lugar, nota, foto, foto_mini, usuario, usuario_nombre
+        $cols = self::conTarjeta($this->pdo) ? 'nombre, codigo, origen' : "'' AS nombre, '' AS codigo, 'foto' AS origen";
+        $sql = "SELECT id, uid, tipo, capturado, lugar, nota, foto, foto_mini, usuario, usuario_nombre, $cols
                   FROM accesos_registros WHERE turno_fecha = ? AND turno = ?";
         $args = [$fecha, $t];
         if ($lugar !== '') { $sql .= " AND lugar = ?"; $args[] = $lugar; }
@@ -310,7 +369,8 @@ class ControlAccesos {
         $dondeA = preg_replace('/\b(turno_fecha|turno|lugar|usuario)\b/', 'a.$1', $donde);
         $st = $this->pdo->prepare(
             "SELECT a.id, a.uid, a.tipo, a.capturado, a.recibido, a.lugar, a.nota, a.usuario, a.usuario_nombre,
-                    a.turno_fecha, a.turno, $num AS num
+                    a.turno_fecha, a.turno, " . (self::conTarjeta($this->pdo) ? "a.nombre AS persona, a.codigo, a.origen" : "'' AS persona, '' AS codigo, 'foto' AS origen") . ",
+                    (a.foto <> '') AS con_foto, $num AS num
                FROM accesos_registros a
               WHERE $dondeA$pag
               ORDER BY a.capturado DESC, a.id DESC LIMIT " . ($limite + 1)
@@ -329,6 +389,8 @@ class ControlAccesos {
                 'capturado' => $f['capturado'], 'hora' => substr((string)$f['capturado'], 11, 8),
                 'lugar' => $f['lugar'], 'nota' => $f['nota'],
                 'usuario' => $f['usuario'], 'nombre' => $f['usuario_nombre'] ?: $f['usuario'],
+                'persona' => (string)$f['persona'], 'codigo' => (string)$f['codigo'], 'origen' => (string)$f['origen'],
+                'con_foto' => (bool)$f['con_foto'],
                 'puede_borrar' => $esAdmin || ($f['usuario'] === ($usr['usuario'] ?? null) && self::reciente((string)$f['recibido'])),
             ];
         }
@@ -390,7 +452,7 @@ class ControlAccesos {
 
     /* ── PDF del turno ────────────────────────────────────────────────────── */
     public static function rutaPdf(string $archivo): ?string {
-        if (!preg_match('/^ACCESOS_\d{4}-\d{2}-\d{2}(-[DN])?_[A-Z0-9-]+_(ambos|entrada|salida)(_p\d+)?_\d+\.pdf$/', $archivo)) return null;
+        if (!preg_match('/^ACCESOS_\d{4}-\d{2}-\d{2}(-[DN])?_[A-Z0-9-]+_(ambos|entrada|salida|datos)(_p\d+)?_\d+\.pdf$/', $archivo)) return null;
         $abs = self::carpeta() . 'pdf/' . $archivo;
         return is_file($abs) ? $abs : null;
     }
@@ -416,11 +478,12 @@ class ControlAccesos {
         [$fecha, $t] = $tk;
         $lugar = textoEstandar($p['lugar'] ?? '');
         $incluir = in_array($p['incluir'] ?? '', ['entrada', 'salida'], true) ? $p['incluir'] : 'ambos';
-        $filas = $this->registrosDelTurno($fecha, $t, $lugar);
+        // Las tarjetas leídas en el teléfono no traen foto: van en el PDF de datos
+        $filas = array_values(array_filter($this->registrosDelTurno($fecha, $t, $lugar), fn($f) => $f['foto'] !== ''));
         $totEnt = count(array_filter($filas, fn($f) => $f['tipo'] === 'entrada'));
         $totSal = count($filas) - $totEnt;
         if ($incluir !== 'ambos') $filas = array_values(array_filter($filas, fn($f) => $f['tipo'] === $incluir));
-        if (!$filas) return ['status' => 'error', 'message' => 'No hay registros de ese turno para incluir en el PDF.'];
+        if (!$filas) return ['status' => 'error', 'message' => 'No hay fotos de ese turno para incluir en el PDF. Los registros con tarjeta están en el PDF de datos.'];
 
         // Primero todas las entradas y luego las salidas, en partes de FOTOS_POR_PDF
         usort($filas, fn($a, $b) => [$a['tipo'] === 'salida', $a['capturado'], $a['id']] <=> [$b['tipo'] === 'salida', $b['capturado'], $b['id']]);
@@ -472,6 +535,146 @@ class ControlAccesos {
         return ['status' => 'success', 'archivo' => $archivo, 'url' => 'descargar.php?tipo=accesos_pdf&f=' . rawurlencode($archivo),
                 'paginas' => $paginas, 'bytes' => $bytes, 'entradas' => count($ent), 'salidas' => count($sal),
                 'parte' => $parte, 'partes' => $partes, 'total' => count($filas)];
+    }
+
+    /* ── PDF de datos: nombre, código, hora de entrada y de salida ─────────
+       Junta cada ENTRADA con la siguiente SALIDA del mismo código, en orden de
+       hora. Una entrada sin salida (o una salida sin entrada) queda en su
+       propio renglón, marcada. Los registros con foto y sin código no se
+       pueden juntar: sólo se cuentan (están en el PDF con fotos). */
+    public static function emparejar(array $filas): array {
+        $porCodigo = [];
+        foreach ($filas as $f) {
+            if (($f['codigo'] ?? '') === '') continue;
+            $porCodigo[$f['codigo']][] = $f;
+        }
+        $out = [];
+        $renglon = function (?array $e, ?array $s): array {
+            $nombre = '';
+            foreach ([$e, $s] as $x) if ($x && trim((string)$x['nombre']) !== '') { $nombre = (string)$x['nombre']; break; }
+            $min = ($e && $s) ? (int)round((strtotime($s['capturado']) - strtotime($e['capturado'])) / 60) : null;
+            return ['codigo' => (string)($e['codigo'] ?? $s['codigo']), 'nombre' => $nombre,
+                    'entrada' => $e ? (string)$e['capturado'] : '', 'salida' => $s ? (string)$s['capturado'] : '',
+                    'minutos' => $min, 'lugar' => (string)($e['lugar'] ?? $s['lugar'] ?? ''),
+                    'lugar_salida' => (string)($s['lugar'] ?? '')];
+        };
+        foreach ($porCodigo as $regs) {
+            usort($regs, fn($a, $b) => [$a['capturado'], (int)$a['id']] <=> [$b['capturado'], (int)$b['id']]);
+            $abierta = null;
+            foreach ($regs as $r) {
+                if ($r['tipo'] === 'entrada') {
+                    if ($abierta) $out[] = $renglon($abierta, null);          // entró otra vez sin salida
+                    $abierta = $r;
+                } else {
+                    $out[] = $renglon($abierta, $r);                          // con o sin entrada
+                    $abierta = null;
+                }
+            }
+            if ($abierta) $out[] = $renglon($abierta, null);
+        }
+        usort($out, fn($a, $b) => [($a['entrada'] ?: $a['salida']), $a['codigo']] <=> [($b['entrada'] ?: $b['salida']), $b['codigo']]);
+        return $out;
+    }
+
+    public function generarPdfDatos(array $p, array $usr): array {
+        if (self::esCaseta($usr)) return ['status' => 'error', 'message' => 'Esta cuenta sólo registra entradas y salidas.'];
+        $tk = self::claveTurno($p['turno'] ?? '');
+        if (!$tk) return ['status' => 'error', 'message' => 'Elige el turno.'];
+        [$fecha, $t] = $tk;
+        $lugar = textoEstandar($p['lugar'] ?? '');
+        $filas = $this->registrosDelTurno($fecha, $t, $lugar);
+        $renglones = self::emparejar($filas);
+        $sinCodigo = count(array_filter($filas, fn($f) => ($f['codigo'] ?? '') === ''));
+        if (!$renglones) {
+            return ['status' => 'error', 'message' => $filas
+                ? 'Ese turno sólo tiene registros con foto (sin código de tarjeta): usa el PDF con fotos.'
+                : 'No hay registros de ese turno.'];
+        }
+
+        if (!class_exists('Mpdf\Mpdf')) {
+            $autoload = __DIR__ . '/../vendor/autoload.php';
+            if (!is_file($autoload)) return ['status' => 'error', 'message' => 'No está instalado el generador de PDF.'];
+            require_once $autoload;
+        }
+        if (function_exists('set_time_limit')) @set_time_limit(120);
+        self::protegerCarpeta();
+        @mkdir(self::carpeta() . 'pdf', 0755, true);
+
+        $conFotoSinCodigo = $sinCodigo;
+        $personas = count(array_unique(array_map(fn($r) => $r['codigo'], $renglones)));
+        $info = [
+            'turno' => $t, 'personas' => $personas,
+            'entradas' => count(array_filter($renglones, fn($r) => $r['entrada'] !== '')),
+            'salidas' => count(array_filter($renglones, fn($r) => $r['salida'] !== '')),
+            'sin_salida' => count(array_filter($renglones, fn($r) => $r['entrada'] !== '' && $r['salida'] === '')),
+            'sin_entrada' => count(array_filter($renglones, fn($r) => $r['entrada'] === '')),
+            'sin_codigo' => $conFotoSinCodigo,
+        ];
+        $mpdf = new \Mpdf\Mpdf([
+            'mode' => 'utf-8', 'format' => 'A4', 'orientation' => 'P',
+            'margin_top' => 10, 'margin_bottom' => 14, 'margin_left' => 10, 'margin_right' => 10,
+            'margin_header' => 0, 'margin_footer' => 6,
+        ]);
+        $nomT = ($t === 'D' ? 'turno de día' : 'turno de noche') . ' ' . date('d/m/Y', strtotime($fecha));
+        $mpdf->SetTitle('Entradas y salidas ' . $nomT . ($lugar !== '' ? ' - ' . $lugar : ''));
+        $mpdf->SetAuthor('AVBA Certificaciones');
+        $mpdf->SetFooter('Control de accesos · entradas y salidas · ' . $nomT . '||Página {PAGENO} de {nbpg}');
+        $mpdf->WriteHTML($this->htmlPdfDatos($fecha, $lugar, $renglones, $usr, $info));
+
+        $slug = $lugar === '' ? 'TODOS' : trim(preg_replace('/[^A-Z0-9]+/', '-', $lugar), '-');
+        $slug = substr($slug !== '' ? $slug : 'PUNTO', 0, 40);
+        $archivo = "ACCESOS_{$fecha}-{$t}_{$slug}_datos_" . time() . '.pdf';
+        $mpdf->Output(self::carpeta() . 'pdf/' . $archivo, 'F');
+        return ['status' => 'success', 'archivo' => $archivo, 'url' => 'descargar.php?tipo=accesos_pdf&f=' . rawurlencode($archivo),
+                'paginas' => (int)$mpdf->page, 'bytes' => (int)@filesize(self::carpeta() . 'pdf/' . $archivo),
+                'renglones' => count($renglones)] + $info;
+    }
+
+    private static function horaCorta(string $cap, string $fechaTurno): string {
+        if ($cap === '') return '';
+        $dia = substr($cap, 0, 10) !== $fechaTurno ? substr($cap, 8, 2) . '/' . substr($cap, 5, 2) . ' ' : '';
+        return $dia . substr($cap, 11, 5);
+    }
+
+    private function htmlPdfDatos(string $fecha, string $lugar, array $renglones, array $usr, array $info): string {
+        $logo = realpath(__DIR__ . '/../assets/logos/avba.png');
+        $conLugar = $lugar === '';
+        $h = '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse"><tr>'
+           . '<td style="width:42mm;vertical-align:middle">' . ($logo ? '<img src="' . self::h($logo) . '" style="width:38mm">' : '') . '</td>'
+           . '<td style="vertical-align:middle;padding-left:4mm"><div style="font-size:17pt;font-weight:bold;color:#0C447C">CONTROL DE ACCESOS</div>'
+           . '<div style="font-size:11pt;color:#1a1a2e">Entradas y salidas · ' . self::h(self::nombreTurno($fecha, $info['turno'])) . '</div></td></tr></table>'
+           . '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:3mm;font-size:9.5pt">'
+           . '<tr><td style="background:#f3f6fa;padding:2mm 3mm;width:36%"><b>Punto de control:</b> ' . self::h($lugar !== '' ? $lugar : 'Todos') . '</td>'
+           . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Personas:</b> ' . number_format($info['personas']) . '</td>'
+           . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Entradas:</b> ' . number_format($info['entradas']) . '</td>'
+           . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Salidas:</b> ' . number_format($info['salidas']) . '</td>'
+           . '<td style="background:#f3f6fa;padding:2mm 3mm"><b>Generado:</b> ' . date('d/m/Y H:i') . '</td></tr>'
+           . '<tr><td colspan="5" style="padding:2mm 3mm;color:#5a6072;font-size:8.5pt">Nombre y código leídos de la tarjeta de identificación en el teléfono de la caseta. '
+           . 'La entrada y la salida de cada persona se juntan por su código. Generado por ' . self::h($usr['nombre'] ?? $usr['usuario'] ?? '') . '.</td></tr></table>';
+        $th = 'background:#0C447C;color:#fff;font-weight:bold;padding:2mm 2mm;text-align:left;font-size:9pt';
+        $h .= '<table width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;margin-top:4mm;font-size:9.5pt" repeat_header="1">'
+            . '<thead><tr><th style="' . $th . ';width:7mm">#</th><th style="' . $th . '">Nombre</th><th style="' . $th . '">Código</th>'
+            . '<th style="' . $th . '">Entrada</th><th style="' . $th . '">Salida</th><th style="' . $th . '">Tiempo dentro</th>'
+            . ($conLugar ? '<th style="' . $th . '">Punto de control</th>' : '') . '</tr></thead><tbody>';
+        foreach ($renglones as $i => $r) {
+            $fondo = $i % 2 ? '#ffffff' : '#f6f8fb';
+            $td = 'padding:1.8mm 2mm;border-bottom:0.2mm solid #dfe5ef;background:' . $fondo;
+            $tiempo = $r['minutos'] !== null ? intdiv(max(0, $r['minutos']), 60) . ' h ' . str_pad((string)(max(0, $r['minutos']) % 60), 2, '0', STR_PAD_LEFT) . ' min' : '';
+            $h .= '<tr><td style="' . $td . ';color:#5a6072">' . ($i + 1) . '</td>'
+                . '<td style="' . $td . '">' . ($r['nombre'] !== '' ? self::h($r['nombre']) : '<span style="color:#8b91a0">Sin nombre leído</span>') . '</td>'
+                . '<td style="' . $td . ';font-weight:bold">' . self::h($r['codigo']) . '</td>'
+                . '<td style="' . $td . '">' . ($r['entrada'] !== '' ? self::horaCorta($r['entrada'], $fecha) : '<span style="color:#A32D2D">Sin entrada</span>') . '</td>'
+                . '<td style="' . $td . '">' . ($r['salida'] !== '' ? self::horaCorta($r['salida'], $fecha) : '<span style="color:#8A5A00">Sin salida</span>') . '</td>'
+                . '<td style="' . $td . '">' . $tiempo . '</td>'
+                . ($conLugar ? '<td style="' . $td . ';font-size:8.5pt">' . self::h($r['lugar']) . '</td>' : '') . '</tr>';
+        }
+        $h .= '</tbody></table>';
+        $notas = [];
+        if ($info['sin_salida']) $notas[] = number_format($info['sin_salida']) . ' entrada' . ($info['sin_salida'] === 1 ? '' : 's') . ' sin salida registrada en este turno';
+        if ($info['sin_entrada']) $notas[] = number_format($info['sin_entrada']) . ' salida' . ($info['sin_entrada'] === 1 ? '' : 's') . ' sin entrada registrada en este turno';
+        if ($info['sin_codigo']) $notas[] = number_format($info['sin_codigo']) . ' registro' . ($info['sin_codigo'] === 1 ? '' : 's') . ' con foto y sin código (están en el PDF con fotos)';
+        if ($notas) $h .= '<p style="font-size:8.5pt;color:#5a6072;margin-top:3mm">' . self::h(implode(' · ', $notas)) . '.</p>';
+        return $h;
     }
 
     /** Copia ligera de la foto para el PDF y su tamaño para caber en la celda */

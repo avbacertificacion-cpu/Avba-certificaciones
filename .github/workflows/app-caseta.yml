@@ -2,7 +2,8 @@ name: App Caseta (Android)
 
 # Compila «AVBA Caseta» (mobile/caseta): la app del guardia que lee la tarjeta
 # de identificación en el propio teléfono (cámara + reconocimiento de texto sin
-# internet) y registra entradas y salidas en la pantalla del guardia.
+# internet) y registra entradas y salidas en el control de accesos del sistema
+# (abre gestion.avba.com.mx/accesos.html; las pantallas no van dentro de la app).
 #
 #   · APK de prueba, instalable directo en el teléfono (artefacto del flujo).
 #   · La misma APK se publica en el sitio para descargarla desde el celular:
@@ -19,8 +20,6 @@ on:
       - claude/continue-avba-project-bU5LX
     paths:
       - 'mobile/caseta/**'
-      - 'demo/caseta.html'
-      - 'demo/demo-datos.js'
       - '.github/workflows/app-caseta.yml'
 
 concurrency:

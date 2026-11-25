@@ -1154,13 +1154,15 @@ if ($method === 'POST') {
 
         // ── Control de accesos (ControlAccesos.php) ──────────────
         // Personal de AVBA (no clientes). Registrar llega como multipart con la
-        // foto; en la app puede llegar tarde, desde la bandeja de salida.
+        // foto, o sólo con el nombre y código de la tarjeta (app AVBA Caseta);
+        // en la app puede llegar tarde, desde la bandeja de salida.
         case 'ACCESO_REGISTRAR':
         case 'LISTAR_ACCESOS':
         case 'LISTAR_ACCESOS_LUGARES':
         case 'ACCESO_ELIMINAR':
         case 'ACCESOS_EXISTEN':
-        case 'ACCESOS_PDF': {
+        case 'ACCESOS_PDF':
+        case 'ACCESOS_PDF_DATOS': {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             if (!ControlAccesos::permitido($usr)) respuesta(['status' => 'error', 'message' => 'Tu cuenta no tiene acceso al control de accesos.'], 403);
@@ -1172,6 +1174,7 @@ if ($method === 'POST') {
                 case 'LISTAR_ACCESOS_LUGARES': respuesta($ca->lugares());
                 case 'ACCESO_ELIMINAR':        respuesta($ca->eliminar((int)($datos['id'] ?? 0), $usr));
                 case 'ACCESOS_EXISTEN':        respuesta($ca->existen((array)($datos['uids'] ?? [])));
+                case 'ACCESOS_PDF_DATOS':      respuesta($ca->generarPdfDatos($datos, $usr));
                 default:                       respuesta($ca->generarPdf($datos, $usr));
             }
         }

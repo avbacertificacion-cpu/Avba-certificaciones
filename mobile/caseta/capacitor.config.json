@@ -3,8 +3,10 @@
   "appName": "AVBA Caseta",
   "webDir": "www",
   "server": {
-    "androidScheme": "https",
-    "hostname": "localhost"
+    "url": "https://gestion.avba.com.mx",
+    "appStartPath": "/accesos.html",
+    "errorPath": "sin-conexion.html",
+    "androidScheme": "https"
   },
   "android": {
     "allowMixedContent": false,

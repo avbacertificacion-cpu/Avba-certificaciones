@@ -13,6 +13,10 @@
   · Registrar: botón ENTRADA o SALIDA → foto de la identificación (cualquiera,
     no sólo la INE) → vista previa para confirmar que se lee el número →
     guardar. La hora es la del momento de la foto.
+  · En la app AVBA Caseta (mobile/caseta) ENTRADA y SALIDA leen la TARJETA de
+    identificación: el teléfono reconoce el nombre y el código sin internet y
+    el registro queda guardado al instante, sin foto (nombre, código, hora).
+    El PDF de datos junta la entrada y la salida de cada persona por código.
   · En la app funciona sin señal: el registro se guarda en el teléfono y se
     envía solo (js/app-sin-senal.js, ACCESO_REGISTRAR).
   · El control es por TURNO, no por día: día 06:30–18:30 y noche
@@ -167,6 +171,20 @@
   .mini-acc button{border:1px solid var(--borde);background:#fff;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer}
   .partes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}
   .partes .btn{min-height:42px;font-size:13px;padding:8px 10px}
+  /* Tarjeta leída en el teléfono (app AVBA Caseta) */
+  .reg .tarj{width:64px;height:64px;border-radius:10px;background:var(--azul-light);color:var(--azul-dark);flex-shrink:0;border:1px solid #cfe0f3;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;text-align:center;line-height:1.15}
+  .reg .tarj svg{width:24px;height:24px;margin-bottom:3px}
+  .reg .persona{font-size:14px;font-weight:700;color:var(--texto);margin-top:3px;overflow-wrap:anywhere}
+  .reg .persona span{font-weight:800;color:var(--azul-dark);white-space:nowrap}
+  .reg .persona.sin{color:var(--texto-hint);font-weight:600}
+  .hecho{position:fixed;inset:0;z-index:130;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;text-align:center;padding:24px}
+  .hecho.entrada{background:var(--verde)} .hecho.salida{background:var(--rojo)}
+  .hecho svg{width:84px;height:84px}
+  .hecho b{font-size:28px;font-weight:900;letter-spacing:.5px;margin-top:8px}
+  .hecho .n{font-size:22px;font-weight:800;margin-top:16px;line-height:1.25;overflow-wrap:anywhere}
+  .hecho .c{font-size:17px;margin-top:6px;opacity:.95}
+  h3.sub-pdf{font-size:13.5px;font-weight:800;color:var(--texto);margin:16px 0 4px}
   .toast button{margin-left:10px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;
     padding:4px 10px;font-weight:700;cursor:pointer}
 </style>
@@ -194,7 +212,7 @@
         <input type="text" id="lugar" list="lugares" maxlength="120" placeholder="Ej. Quantum Energy · Caseta 1" autocomplete="off">
         <datalist id="lugares"></datalist></div>
     </div>
-    <small class="ayuda">Cada registro se guarda con el punto de control y la hora en que se toma la foto.</small>
+    <small class="ayuda" id="ayuda-lugar">Cada registro se guarda con el punto de control y la hora en que se toma la foto.</small>
   </div>
 
   <div class="aviso-dia" id="aviso-dia" hidden>Estás viendo un turno anterior. Para registrar entradas y salidas, regresa al turno en curso.
@@ -249,16 +267,21 @@
   </div>
 
   <div class="tarjeta" id="tarjeta-pdf">
-    <h2>PDF para analizar con Claude</h2>
-    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:10px">Las fotos de entradas y de salidas de un turno, cada una con su etiqueta (ENTRADA 001 · 24/11 06:15:32). Con más de 150 fotos se divide en partes, para que cada archivo quepa en lo que Claude analiza (100 hojas, 30 MB).</p>
-    <div class="campo" style="margin-bottom:10px"><label for="pdf-turno">Turno</label><select id="pdf-turno"></select>
+    <h2>PDF del turno</h2>
+    <div class="campo" style="margin-bottom:6px"><label for="pdf-turno">Turno</label><select id="pdf-turno"></select>
       <small class="ayuda">Un turno queda completo 2 horas después de su cambio, cuando ya salió su personal: el de día a las 20:30 y el de noche a las 08:30.</small></div>
-    <p class="nota" id="pdf-aviso" hidden style="margin:0 0 10px"></p>
+    <p class="nota" id="pdf-aviso" hidden style="margin:0 0 6px"></p>
+    <label class="check" style="margin-top:4px"><input type="checkbox" id="pdf-punto" checked> Sólo el punto de control elegido</label>
+    <h3 class="sub-pdf">Entradas y salidas: nombre, código y hora</h3>
+    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:8px">De los registros hechos con la tarjeta: cada persona con su hora de entrada y de salida (se juntan por su código).</p>
+    <button class="btn verde ancho" id="btn-pdf-datos" type="button">Descargar PDF de entradas y salidas</button>
+    <div id="pdf-datos-res"></div>
+    <h3 class="sub-pdf">Fotos de las identificaciones (para analizar con Claude)</h3>
+    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:10px">Las fotos de entradas y de salidas de un turno, cada una con su etiqueta (ENTRADA 001 · 24/11 06:15:32). Con más de 150 fotos se divide en partes, para que cada archivo quepa en lo que Claude analiza (100 hojas, 30 MB).</p>
     <span class="lbl">Incluir</span>
     <div class="seg" id="incluir" role="radiogroup" aria-label="Incluir en el PDF">
       <button type="button" data-v="ambos" aria-pressed="true">Entradas y salidas</button><button type="button" data-v="entrada" aria-pressed="false">Sólo entradas</button><button type="button" data-v="salida" aria-pressed="false">Sólo salidas</button>
     </div>
-    <label class="check"><input type="checkbox" id="pdf-punto" checked> Sólo el punto de control elegido</label>
     <button class="btn prim ancho" id="btn-pdf" type="button" style="margin-top:12px">Generar PDF</button>
     <div id="pdf-res"></div>
     <div class="partes" id="partes"></div>
@@ -299,6 +322,7 @@
   <button class="btn sec ancho" type="button" id="foto-cerrar" style="margin-top:10px">Cerrar</button></div></div>
 
 <div class="toast" id="toast" hidden></div>
+<div class="hecho" id="hecho" hidden role="status" aria-live="assertive"></div>
 
 <script src="js/destinos.js"></script>
 <script src="js/native-bridge.js"></script>
@@ -323,6 +347,34 @@
   var destino = (window.AVBA_DESTINOS || {})[ses.rol];
   if (destino) $('atras').href = destino;
   $('sub-usuario').textContent = (ses.nombre || ses.usuario || '') + ' · entradas y salidas';
+
+  /* ── App AVBA Caseta: la tarjeta se lee en el teléfono ──────────────────
+     Con el lector de la app (LectorTarjeta, nativo) ENTRADA y SALIDA leen la
+     tarjeta de identificación: el teléfono reconoce el nombre y el código sin
+     internet (la imagen no sale del equipo) y el registro queda guardado al
+     instante, sin foto. En el navegador sigue la foto de la identificación. */
+  var LECTOR = (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LectorTarjeta) || null;
+  var REGLAS_TARJETA = { minDigitos: 4, maxDigitos: 12, longitud: 0, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3 };
+  function mezclarReglas(g) {
+    if (!g || typeof g !== 'object') return;
+    ['minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
+  }
+  if (LECTOR) {
+    try { mezclarReglas(JSON.parse(localStorage.getItem('avba_tarjeta_reglas') || 'null')); } catch (e) {}
+    // Las reglas de la tarjeta se ajustan en el servidor (demo/tarjeta-reglas.json) sin reinstalar la app
+    fetch('demo/sala.php?tarjeta=1', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.ok && j.reglas) { mezclarReglas(j.reglas); try { localStorage.setItem('avba_tarjeta_reglas', JSON.stringify(j.reglas)); } catch (e) {} }
+    }).catch(function () {});
+    $('lbl-ent').textContent = $('lbl-sal').textContent = 'Leer tarjeta';
+    $('ayuda-lugar').textContent = 'Cada registro se guarda con el nombre y el código de la tarjeta, el punto de control y la hora.';
+    // Los PDF se abren fuera de la app (en el visor del teléfono)
+    document.addEventListener('click', function (ev) {
+      var a = ev.target.closest && ev.target.closest('a[href*="descargar.php"]');
+      if (!a || !LECTOR.abrir) return;
+      ev.preventDefault();
+      LECTOR.abrir({ url: new URL(a.getAttribute('href'), location.href).href }).catch(function () { location.href = a.href; });
+    }, true);
+  }
 
   /* Cuenta de caseta (rol ACCESOS): sólo toma las fotos de entradas y
      salidas. No ve el PDF ni las instrucciones para Claude, ni turnos
@@ -485,7 +537,8 @@
   function formulario(it) {
     var fd = new FormData();
     ['uid', 'tipo', 'capturado', 'lugar', 'nota'].forEach(function (k) { fd.append(k, it[k] || ''); });
-    fd.append('foto', new Blob([it.datos], { type: it.mime || 'image/jpeg' }), it.uid + '.jpg');
+    if (it.codigo) { fd.append('codigo', it.codigo); fd.append('persona', it.persona || ''); fd.append('origen', it.origen || 'tarjeta'); }
+    if (it.datos) fd.append('foto', new Blob([it.datos], { type: it.mime || 'image/jpeg' }), it.uid + '.jpg');
     fd.append('action', 'ACCESO_REGISTRAR'); fd.append('token', token());
     return fd;
   }
@@ -521,7 +574,7 @@
                 }
                 hubo++;
                 enviados[it.uid] = ya[it.uid];
-                recienEnviados.push({ uid: it.uid, tipo: it.tipo, capturado: it.capturado, turno: it.turno, lugar: it.lugar, nota: it.nota, mini: it.mini, id: ya[it.uid] });
+                recienEnviados.push(resumen(it, ya[it.uid]));
                 recienEnviados = recienEnviados.slice(-50);
                 return quitarDeCola(it.uid).then(function () { return true; });
               }, function () { return false; });                             // sin confirmar: se queda y se reintenta (no duplica)
@@ -560,31 +613,81 @@
   $('chip-cola').onclick = function () { $('tarjeta-lista').scrollIntoView({ behavior: 'smooth' }); };
 
   /* Guarda un registro: a la cola y de inmediato se puede tomar el siguiente */
+  function resumen(it, id) {
+    return { uid: it.uid, tipo: it.tipo, capturado: it.capturado, turno: it.turno, lugar: it.lugar, nota: it.nota, mini: it.mini, id: id,
+             codigo: it.codigo || '', persona: it.persona || '' };
+  }
   function registrar(tipo, blob, mini, capturado, nota) {
     var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, turno: turnoDe(tipo, capturado), lugar: normaLugar($('lugar').value),
                nota: nota || '', mini: mini, mime: 'image/jpeg', creado: Date.now() };
+    return blob.arrayBuffer().then(function (ab) {
+      it.datos = ab;
+      return guardarRegistro(it);
+    }).catch(function (e) { toast('No se pudo guardar: ' + (e.message || e), true); });
+  }
+  /* A la cola (sin señal se envía después) y de inmediato se puede registrar el siguiente */
+  function guardarRegistro(it) {
     var deshacer = function () {
       if (cola.some(function (x) { return x.uid === it.uid; })) { quitarDeCola(it.uid).then(pintarLista); toast('Registro descartado.'); return; }
       var id = enviados[it.uid];
       if (!id) { toast('Ya no se puede deshacer desde aquí: búscalo en la lista.', true); return; }
       api('ACCESO_ELIMINAR', { id: id }).then(function (r) { toast(r.message || 'Eliminado.'); cargar(true); });
     };
-    var txt = (tipo === 'entrada' ? 'Entrada' : 'Salida') + ' ' + capturado.slice(11, 16) + ' guardada';
-    return blob.arrayBuffer().then(function (ab) {
-      it.datos = ab;
-      if (sinCola) {                               // sin almacenamiento local: se envía y se espera
-        return enviarUno(it).then(function (r) {
-          enviando = null;
-          if (r === 'ok') { recienEnviados.push({ uid: it.uid, tipo: it.tipo, capturado: it.capturado, turno: it.turno, lugar: it.lugar, nota: it.nota, mini: it.mini, id: enviados[it.uid] }); toast(txt + '.', false, deshacer); cargar(true); }
-          else toast(r === 'sesion' ? 'Tu sesión venció.' : (it.error || 'Sin conexión: no se guardó. Inténtalo de nuevo.'), true);
-        });
-      }
-      return ponerEnCola(it).then(function () {
-        toast(txt + '.', false, deshacer);
-        pintarLista(); enviarCola();
+    var txt = (it.tipo === 'entrada' ? 'Entrada' : 'Salida') + ' ' + it.capturado.slice(11, 16) + ' guardada' + (it.persona ? ': ' + it.persona : '');
+    if (sinCola) {                                 // sin almacenamiento local: se envía y se espera
+      return enviarUno(it).then(function (r) {
+        enviando = null;
+        if (r === 'ok') { recienEnviados.push(resumen(it, enviados[it.uid])); toast(txt + '.', false, deshacer); cargar(true); }
+        else toast(r === 'sesion' ? 'Tu sesión venció.' : (it.error || 'Sin conexión: no se guardó. Inténtalo de nuevo.'), true);
       });
-    }).catch(function (e) { toast('No se pudo guardar: ' + (e.message || e), true); });
+    }
+    return ponerEnCola(it).then(function () {
+      toast(txt + '.', false, deshacer);
+      pintarLista(); enviarCola();
+    });
   }
+
+  /* ── Tarjeta: leer y registrar al instante ── */
+  var leyendoTarjeta = false;
+  function leerTarjeta(tipo) {
+    if (leyendoTarjeta) return;
+    leyendoTarjeta = true;
+    var o = {};
+    for (var k in REGLAS_TARJETA) o[k] = REGLAS_TARJETA[k];
+    o.titulo = (tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + ' · ' + normaLugar($('lugar').value);
+    o.subtitulo = 'Acomoda la tarjeta dentro del recuadro. Se lee en este teléfono, sin internet.';
+    o.simular = false;
+    LECTOR.leer(o).then(function (r) {
+      leyendoTarjeta = false;
+      if (!r || r.cancelado) { if (r && r.error) toast(r.error, true); return; }
+      registrarTarjeta(tipo, r);
+    }, function (e) {
+      leyendoTarjeta = false;
+      toast((e && e.message) || 'No se pudo abrir el lector de tarjetas.', true);
+    });
+  }
+  function registrarTarjeta(tipo, r) {
+    var codigo = String(r.codigo || '').replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 32);
+    if (!codigo) { toast('No se leyó el código de la tarjeta. Inténtalo de nuevo o escríbelo.', true); return; }
+    var capturado = ahoraLocal();
+    var it = { uid: nuevoUid(), tipo: tipo, capturado: capturado, turno: turnoDe(tipo, capturado), lugar: normaLugar($('lugar').value),
+               nota: '', mini: '', codigo: codigo, persona: String(r.nombre || '').replace(/\s+/g, ' ').trim().slice(0, 150),
+               origen: r.manual ? 'manual' : 'tarjeta', creado: Date.now() };
+    mostrarHecho(it);
+    return guardarRegistro(it).catch(function (e) { toast('No se pudo guardar: ' + (e.message || e), true); });
+  }
+  var tHecho = null;
+  function mostrarHecho(it) {
+    var el = $('hecho'), ent = it.tipo === 'entrada';
+    el.className = 'hecho ' + it.tipo;
+    el.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7"/></svg>' +
+      '<b>' + (ent ? 'ENTRADA' : 'SALIDA') + ' REGISTRADA</b><div class="n">' + esc(it.persona || 'Nombre no leído') + '</div>' +
+      '<div class="c">Código ' + esc(it.codigo) + ' · ' + esc(it.capturado.slice(11, 16)) + '</div>';
+    el.hidden = false;
+    if (navigator.vibrate) try { navigator.vibrate(60); } catch (e) {}
+    clearTimeout(tHecho); tHecho = setTimeout(function () { el.hidden = true; }, 1500);
+  }
+  $('hecho').onclick = function () { clearTimeout(tHecho); $('hecho').hidden = true; };
 
   /* ── Punto de control y turno ── */
   $('lugar').value = leer(CLAVE_LUGAR, '') || '';
@@ -640,7 +743,7 @@
 
   /* ══ Cámara continua (dentro de la página) ═══════════════════════════ */
   var cam = { stream: null, track: null, torch: false };
-  var hayCamara = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  var hayCamara = !LECTOR && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
   if (!hayCamara) $('cam-apagada').hidden = true;
   $('revisar').checked = !!leer(CLAVE_REVISAR, false);
   $('revisar').onchange = function () { guardar(CLAVE_REVISAR, $('revisar').checked); };
@@ -720,6 +823,7 @@
   function capturar(tipo) {
     tipoActual = tipo;
     if (!normaLugar($('lugar').value)) { toast('Escribe primero el punto de control.', true); $('lugar').focus(); return; }
+    if (LECTOR) { leerTarjeta(tipo); return; }              // app: lector de tarjetas
     if (cam.stream) {                                       // cámara continua
       var c = fotoDelVideo();
       if (!c) { toast('La cámara todavía no está lista.', true); return; }
@@ -836,23 +940,29 @@
     };
     var deTurno = function (x) { return ks.length > 1 || ks.indexOf(x.turno) < 0 ? ' · ' + nombreTurno(x.turno) : ''; };
     var porTipo = function (x) { return filtro === 'todos' || x.tipo === filtro; };
+    var ICO_TARJ = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 16a3.5 3.5 0 0 1 7 0M14 10h4M14 13h4"/></svg>';
+    var cuadro = function (x, img) { return x.codigo && !img ? '<div class="tarj">' + ICO_TARJ + 'Tarjeta</div>' : img; };
+    var persona = function (x) {
+      return x.codigo ? '<div class="persona' + (x.persona ? '' : ' sin') + '">' + esc(x.persona || 'Nombre no leído') + ' · <span>' + esc(x.codigo) + '</span></div>' : '';
+    };
     var html = pend.filter(porTipo).slice().reverse().map(function (x) {
       var estado = x.error ? '<span class="badge rech">No se aceptó</span>' : (enviando === x.uid ? '<span class="badge pend">Enviando…</span>' : '<span class="badge cola">En cola</span>');
-      return '<li class="reg"><img alt="" src="' + esc(x.mini) + '"><div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' +
-        (x.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + '</span>' + esc(hora(x)) + ' ' + estado + '</div>' +
+      return '<li class="reg">' + cuadro(x, x.mini ? '<img alt="" src="' + esc(x.mini) + '">' : '') + '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' +
+        (x.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + '</span>' + esc(hora(x)) + ' ' + estado + '</div>' + persona(x) +
         '<div class="l2">' + esc(x.lugar) + deTurno(x) + (x.nota ? ' · ' + esc(x.nota) : '') + (x.error ? '<br><span style="color:var(--rojo)">' + esc(x.error) + '</span>' : '') + '</div>' +
         (x.error ? '<div class="mini-acc"><button type="button" data-reintentar="' + esc(x.uid) + '">Reintentar</button><button type="button" data-descartar="' + esc(x.uid) + '">Descartar</button></div>' : '') +
         '</div></li>';
     }).join('');
     html += sueltos.filter(porTipo).slice().reverse().map(function (x) {
-      return '<li class="reg"><img alt="" src="' + esc(x.mini) + '"><div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' +
-        (x.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + '</span>' + esc(hora(x)) + ' <span class="badge entrada">Enviado ✓</span></div>' +
+      return '<li class="reg">' + cuadro(x, x.mini ? '<img alt="" src="' + esc(x.mini) + '">' : '') + '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' +
+        (x.tipo === 'entrada' ? 'ENTRADA' : 'SALIDA') + '</span>' + esc(hora(x)) + ' <span class="badge entrada">Enviado ✓</span></div>' + persona(x) +
         '<div class="l2">' + esc(x.lugar) + deTurno(x) + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div></li>';
     }).join('');
     html += (datos.registros || []).filter(function (x) { return ks.indexOf(x.turno) >= 0; }).filter(porTipo).map(function (x) {
       var ent = x.tipo === 'entrada';
-      return '<li class="reg"><img loading="lazy" alt="" data-id="' + x.id + '" src="' + esc(urlFoto(x.id, true)) + '" onerror="this.outerHTML=\'<div class=sinfoto>Foto sin señal</div>\'">' +
-        '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' + (ent ? 'ENTRADA ' : 'SALIDA ') + String(x.num).padStart(3, '0') + '</span>' + esc(hora(x)) + '</div>' +
+      var foto = x.con_foto === false ? '' : '<img loading="lazy" alt="" data-id="' + x.id + '" src="' + esc(urlFoto(x.id, true)) + '" onerror="this.outerHTML=\'<div class=sinfoto>Foto sin señal</div>\'">';
+      return '<li class="reg">' + cuadro(x, foto) +
+        '<div class="info"><div class="l1"><span class="badge ' + x.tipo + '">' + (ent ? 'ENTRADA ' : 'SALIDA ') + String(x.num).padStart(3, '0') + '</span>' + esc(hora(x)) + '</div>' + persona(x) +
         '<div class="l2">' + esc(x.lugar) + ' · ' + esc(x.nombre) + deTurno(x) + (x.nota ? ' · ' + esc(x.nota) : '') + '</div></div>' +
         (x.puede_borrar ? '<button class="borrar" type="button" data-borrar="' + x.id + '" aria-label="Eliminar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg></button>' : '') +
         '</li>';
@@ -896,7 +1006,29 @@
     var ok = enLinea();
     $('btn-pdf').disabled = !ok;
     $('btn-pdf').textContent = ok ? 'Generar PDF' : 'Se necesita señal para generar el PDF';
+    $('btn-pdf-datos').disabled = !ok;
+    $('btn-pdf-datos').textContent = ok ? 'Descargar PDF de entradas y salidas' : 'Se necesita señal para generar el PDF';
   }
+  $('btn-pdf-datos').onclick = function () {
+    var b = $('btn-pdf-datos'), q = { turno: $('pdf-turno').value };
+    if ($('pdf-punto').checked) q.lugar = normaLugar($('lugar').value);
+    b.disabled = true; b.innerHTML = '<span class="spin"></span> Generando…';
+    $('pdf-datos-res').innerHTML = '';
+    api('ACCESOS_PDF_DATOS', q).then(function (r) {
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo generar el PDF.');
+      var url = r.url + '&token=' + encodeURIComponent(token());
+      var avisos = [];
+      if (r.sin_salida) avisos.push(numero(r.sin_salida) + ' sin salida');
+      if (r.sin_entrada) avisos.push(numero(r.sin_entrada) + ' sin entrada');
+      if (r.sin_codigo) avisos.push(numero(r.sin_codigo) + ' con foto y sin código (van en el PDF con fotos)');
+      $('pdf-datos-res').innerHTML = '<div class="nota ok">' + numero(r.personas) + ' persona' + (r.personas === 1 ? '' : 's') + ' · ' +
+        numero(r.entradas) + ' entrada' + (r.entradas === 1 ? '' : 's') + ' · ' + numero(r.salidas) + ' salida' + (r.salidas === 1 ? '' : 's') +
+        (avisos.length ? '<br>' + esc(avisos.join(' · ')) : '') + '</div>' +
+        '<a class="btn verde ancho" style="margin-top:8px" target="_blank" rel="noopener" href="' + esc(url) + '">Abrir el PDF</a>';
+    }).catch(function (e) {
+      $('pdf-datos-res').innerHTML = '<div class="nota mal">' + esc(e.message || 'No se pudo generar el PDF.') + '</div>';
+    }).then(function () { pintarBotonPdf(); });
+  };
   pintarBotonPdf();
   if (window.AVBAApp && AVBAApp.alCambiarConexion) AVBAApp.alCambiarConexion(function () { pintarBotonPdf(); if (enLinea()) { enviarCola(); cargar(true); } });
   /* Turnos para el PDF: los en curso y los 8 anteriores. Se propone el
