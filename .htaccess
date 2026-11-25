@@ -1,93 +1,22 @@
 # ──────────────────────────────────────────────────────────
-#  AVBA Certificaciones — Configuración Apache raíz
+#  AVBA Control de Accesos — gestion.avba.com.mx/controlaccesos/
+#  (hereda las cabeceras de seguridad del .htaccess de la raíz del sitio)
 # ──────────────────────────────────────────────────────────
+DirectoryIndex index.html
+Options -Indexes
 
-# ── Página de inicio ──────────────────────────────────────
-# El portal es la entrada; login.html queda de respaldo por si el portal no
-# se subió todavía, para que la raíz nunca acabe en un listado de archivos.
-DirectoryIndex index.html login.html
-
-# ── Pasar Authorization header a PHP ─────────────────────
+# Pasar el encabezado Authorization (Bearer) a PHP
 RewriteEngine On
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
 
-# ── Cabeceras de seguridad HTTP ───────────────────────────
+# Las páginas se actualizan con cada despliegue: revalidar siempre
 <IfModule mod_headers.c>
-    # Evita que la app sea enmarcada en iframes (clickjacking)
-    Header always set X-Frame-Options "SAMEORIGIN"
-    # Evita sniffing de MIME type
-    Header always set X-Content-Type-Options "nosniff"
-    # Fuerza HTTPS por 1 año (activar solo cuando el sitio use HTTPS en producción)
-    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
-    # Controla la información de referrer
-    Header always set Referrer-Policy "strict-origin-when-cross-origin"
-    # Política de permisos: la cámara sólo para el propio sitio (la usan el
-    # lector de QR del inspector, el control de accesos y la caseta de la
-    # demo); micrófono deshabilitado.
-    Header always set Permissions-Policy "camera=(self), microphone=(), geolocation=(self)"
-    # Content Security Policy — todo se sirve desde el propio dominio.
-    #
-    # Antes autorizaba unpkg, cdnjs, jsdelivr y Google Fonts, de cuando las
-    # librerías venían de fuera. Ya están todas en el proyecto (js/, lib/,
-    # assets/fonts/) y las teselas del mapa y la geocodificación pasan por
-    # tile.php y geocode.php, así que no queda nada que traer de terceros.
-    #
-    # Dejar esos dominios autorizados sin usarlos no es neutral: cualquier
-    # script inyectado en una página podría cargar código desde ellos y la
-    # política lo permitiría. Cerrarlo a 'self' es la mitad del trabajo de
-    # traer las librerías a local.
-    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'self' blob:; object-src 'self'"
-    # Los PDFs no necesitan CSP (no son documentos ejecutables) y Chrome bloquea su visor
-    # interno si object-src 'none' está presente en la respuesta del PDF
-    <FilesMatch "\.pdf$">
-        Header always unset Content-Security-Policy
-    </FilesMatch>
-    # Eliminar header de versión del servidor
-    Header unset X-Powered-By
-    Header always unset X-Powered-By
-    # Las páginas HTML se actualizan con cada despliegue: forzar al navegador a
-    # revalidar siempre (sin esto, puede seguir mostrando una versión vieja de
-    # la página — con datos o funciones desactualizadas — hasta que el usuario
-    # limpie caché manualmente).
-    <FilesMatch "\.html$">
-        Header set Cache-Control "no-cache, must-revalidate"
-    </FilesMatch>
-    # Lo mismo para scripts y estilos: con cada despliegue cambian junto con las
-    # páginas, y una copia vieja guardada en el navegador rompía la página
-    # nueva (p. ej. «Rol no reconocido» con js/destinos.js viejo). Revalidar
-    # cuesta poco: si no cambió, el servidor contesta 304 sin reenviarlo.
-    <FilesMatch "\.(js|css)$">
-        Header set Cache-Control "no-cache, must-revalidate"
-    </FilesMatch>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache, must-revalidate"
+  </FilesMatch>
 </IfModule>
 
-# ── Deshabilitar listado de directorios ───────────────────
-Options -Indexes
-
-# ── Proteger archivos sensibles en la raíz ────────────────
-<FilesMatch "^(composer\.(json|lock)|\.env.*|\.gitignore|\.git.*)$">
-    Order Allow,Deny
-    Deny from all
+# Nada de esto se publica, pero por si acaso
+<FilesMatch "(^\.|\.(sql|md|lock|log|ini|sh|env)$|^composer\.json$)">
+  Require all denied
 </FilesMatch>
-
-# ── Tipos MIME ────────────────────────────────────────────
-<IfModule mod_mime.c>
-    AddType application/javascript .js
-    AddType text/css .css
-    AddType image/webp .webp
-</IfModule>
-
-# ── Cache para assets estáticos ───────────────────────────
-<IfModule mod_expires.c>
-    ExpiresActive On
-    ExpiresByType image/png "access plus 30 days"
-    ExpiresByType image/jpeg "access plus 30 days"
-    ExpiresByType image/webp "access plus 30 days"
-    ExpiresByType text/css "access plus 7 days"
-    ExpiresByType application/javascript "access plus 7 days"
-</IfModule>
-
-# ── Compresión GZIP ───────────────────────────────────────
-<IfModule mod_deflate.c>
-    AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json
-</IfModule>

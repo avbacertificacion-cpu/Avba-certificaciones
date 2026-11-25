@@ -12,7 +12,7 @@ android {
     namespace = "mx.com.avba.caseta"
     compileSdk = rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "mx.com.avba.caseta"
+        applicationId "mx.com.avba.controlaccesos"   // el paquete Java sigue siendo mx.com.avba.caseta
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode codigoVersion

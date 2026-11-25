@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">AVBA Certificaciones</string>
-    <string name="title_activity_main">AVBA Certificaciones</string>
-    <string name="package_name">mx.com.avba.certificaciones</string>
-    <string name="custom_url_scheme">mx.com.avba.certificaciones</string>
-</resources>

@@ -1,21 +1,13 @@
 {
-  "name": "avba/certificaciones",
-  "description": "Sistema de Gestión de Certificaciones AVBA — PHP + MySQL",
+  "name": "avba/control-accesos",
+  "description": "AVBA Control de Accesos — plataforma independiente (gestion.avba.com.mx/controlaccesos)",
   "type": "project",
   "require": {
     "php": ">=8.0",
-    "phpmailer/phpmailer": "^6.9",
-    "dompdf/dompdf": "^2.0",
-    "phpoffice/phpword": "^1.0",
-    "mpdf/mpdf": "^8.3",
-    "setasign/fpdf": "^1.8"
-  },
-  "autoload": {
-    "psr-4": {
-      "Avba\\": "src/"
-    }
+    "mpdf/mpdf": "^8.3"
   },
   "config": {
-    "optimize-autoloader": true
+    "optimize-autoloader": true,
+    "platform": { "php": "8.2" }
   }
 }

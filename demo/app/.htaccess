@@ -1,9 +1,0 @@
-# Descarga de la app AVBA Caseta (la sube .github/workflows/app-caseta.yml)
-Options -Indexes
-AddType application/vnd.android.package-archive .apk
-<IfModule mod_headers.c>
-  <FilesMatch "\.apk$">
-    Header set Content-Disposition "attachment; filename=avba-caseta.apk"
-    Header set Cache-Control "no-cache, must-revalidate"
-  </FilesMatch>
-</IfModule>

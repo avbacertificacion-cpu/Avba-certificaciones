@@ -1,30 +1,35 @@
-name: App Caseta (Android)
+name: App Control de Accesos (Android)
 
-# Compila «AVBA Caseta» (mobile/caseta): la app del guardia que lee la tarjeta
-# de identificación en el propio teléfono (cámara + reconocimiento de texto sin
-# internet) y registra entradas y salidas en el control de accesos del sistema
-# (abre gestion.avba.com.mx/accesos.html; las pantallas no van dentro de la app).
+# Compila «AVBA Control de Accesos» (mobile/caseta): la app del guardia que lee
+# la credencial en el propio teléfono (cámara + reconocimiento de texto sin
+# internet) y registra entradas y salidas en la plataforma de Control de Accesos
+# (abre gestion.avba.com.mx/controlaccesos/accesos.html; las pantallas no van
+# dentro de la app).
 #
 #   · APK de prueba, instalable directo en el teléfono (artefacto del flujo).
 #   · La misma APK se publica en el sitio para descargarla desde el celular:
-#     https://gestion.avba.com.mx/descargas/avba-caseta.apk (la de siempre;
-#     no depende de la demo). También queda en demo/app/ para el QR de la
-#     portada de la demo.
+#     https://gestion.avba.com.mx/controlaccesos/descargas/avba-control-accesos.apk
 #
-# La firma de prueba se guarda en la caché de GitHub para que cada versión se
-# instale encima de la anterior sin desinstalar.
+# Es OTRA app que «AVBA Caseta» (la del sistema principal): otro identificador
+# (mx.com.avba.controlaccesos) y su propia llave, así se instala junto a ella
+# mientras dura el cambio y nunca choca con su firma.
+#
+# Por ahora está APAGADO: la plataforma nueva todavía no funciona (falta la
+# fase 1 de docs/PLAN.md) y una app publicada abriría una pantalla sin servidor.
+# Se enciende descomentando el «push» de abajo. (El botón «Run workflow» de
+# GitHub sólo aparece para flujos que están en la rama por omisión, main.)
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - claude/continue-avba-project-bU5LX
-    paths:
-      - 'mobile/caseta/**'
-      - '.github/workflows/app-caseta.yml'
+  # push:
+  #   branches:
+  #     - claude/control-accesos
+  #   paths:
+  #     - 'mobile/caseta/**'
+  #     - '.github/workflows/app-caseta.yml'
 
 concurrency:
-  group: app-caseta-${{ github.ref }}
+  group: app-control-accesos-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -59,13 +64,13 @@ jobs:
         uses: actions/cache@v4
         with:
           path: mobile/caseta/firma-prueba.jks
-          key: avba-caseta-firma-prueba-v2
+          key: avba-control-accesos-firma-v1
 
       - name: Llave de prueba (crear si no existe)
         run: |
           if [ ! -f firma-prueba.jks ]; then
             keytool -genkeypair -keystore firma-prueba.jks -storepass android -alias androiddebugkey -keypass android \
-              -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=AVBA Caseta (prueba), O=AVBA, C=MX"
+              -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=AVBA Control de Accesos (prueba), O=AVBA, C=MX"
           fi
           echo "AVBA_FIRMA_PRUEBA=$PWD/firma-prueba.jks" >> "$GITHUB_ENV"
           keytool -list -keystore firma-prueba.jks -storepass android | grep -i "SHA-256\|SHA256" || true
@@ -87,18 +92,17 @@ jobs:
 
       - name: Preparar la descarga
         run: |
-          mkdir -p "$GITHUB_WORKSPACE/publicar/descargas" "$GITHUB_WORKSPACE/publicar/demo/app"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/publicar/descargas/avba-caseta.apk"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/publicar/demo/app/avba-caseta.apk"
-          ls -l "$GITHUB_WORKSPACE/publicar/descargas" "$GITHUB_WORKSPACE/publicar/demo/app"
+          mkdir -p "$GITHUB_WORKSPACE/publicar/descargas"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/publicar/descargas/avba-control-accesos.apk"
+          ls -l "$GITHUB_WORKSPACE/publicar/descargas"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: avba-caseta-apk
-          path: publicar/descargas/avba-caseta.apk
+          name: avba-control-accesos-apk
+          path: publicar/descargas/avba-control-accesos.apk
           retention-days: 30
 
-      # Hostinger a veces no acepta la conexión al primer intento (ver deploy-proyecto1.yml)
+      # Hostinger a veces no acepta la conexión al primer intento
       - name: Publicar la APK en el sitio (intento 1 de 2)
         id: scp1
         continue-on-error: true
@@ -108,9 +112,9 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USERNAME }}
           password: ${{ secrets.SSH_PASSWORD }}
-          source: "publicar/descargas/avba-caseta.apk,publicar/demo/app/avba-caseta.apk"
-          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html"
-          strip_components: 1
+          source: "publicar/descargas/avba-control-accesos.apk"
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/controlaccesos/descargas"
+          strip_components: 2
           overwrite: true
           timeout: 60s
 
@@ -126,8 +130,8 @@ jobs:
           port: ${{ secrets.SSH_PORT }}
           username: ${{ secrets.SSH_USERNAME }}
           password: ${{ secrets.SSH_PASSWORD }}
-          source: "publicar/descargas/avba-caseta.apk,publicar/demo/app/avba-caseta.apk"
-          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html"
-          strip_components: 1
+          source: "publicar/descargas/avba-control-accesos.apk"
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/controlaccesos/descargas"
+          strip_components: 2
           overwrite: true
           timeout: 60s

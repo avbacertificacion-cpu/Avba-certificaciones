@@ -1,52 +1,16 @@
-# ── Credenciales y configuración local ───────────────────
+# ── Credenciales: viven sólo en el servidor ──────────────
 config/config.php
 .env
 .env.*
 
-# ── Dependencias de Composer ──────────────────────────────
+# ── Dependencias de Composer (las instala el despliegue) ─
 vendor/
 
-# ── Uploads generados (mantener carpetas vacías con .gitkeep)
-uploads/certificados/*
-uploads/evidencias/*
-uploads/reportes/*
-uploads/firmas_procesadas/*
-uploads/plantillas/*
-uploads/personal/*
-uploads/accesorios/*
-uploads/participantes/*
-uploads/facturas/*
-!uploads/certificados/.gitkeep
-!uploads/evidencias/.gitkeep
-!uploads/reportes/.gitkeep
-!uploads/plantillas/.gitkeep
-!uploads/facturas/.gitkeep
+# ── Archivos que genera la plataforma ────────────────────
+uploads/accesos/*
+!uploads/accesos/.htaccess
+!uploads/accesos/index.html
+uploads/demo-salas/
 
-# ── Archivos de instalación/deploy ───────────────────────
-install.php
-deploy.php
-
-# ── Logs ──────────────────────────────────────────────────
+# ── Logs ─────────────────────────────────────────────────
 *.log
-error_log
-
-# ── Temporales del sistema ───────────────────────────────
-.DS_Store
-Thumbs.db
-*.swp
-*.swo
-*~
-
-# El manual para clientes se genera y se envía a mano; no se publica con el sitio.
-Manual_Solicitar_Certificacion_AVBA.pdf
-
-# Manual comercial del portal; se genera y se entrega a mano.
-Portal_Clientes_AVBA.pdf
-
-# Conector de correo para Claude (archivos que genera en el servidor)
-mcp/config.php
-mcp/.envios.json
-mcp/.intentos.json
-
-# Paquete de actualización de la app: lo arma el despliegue (mobile/scripts/paquete-servidor.mjs)
-app-paquete/

@@ -1,3 +1,0 @@
-# db/ — Scripts de migración, sin acceso web
-Order Allow,Deny
-Deny from all

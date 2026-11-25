@@ -1,0 +1,101 @@
+name: Deploy Control de Accesos a Hostinger
+
+# Publica la plataforma de Control de Accesos (la raíz de esta rama) en
+# gestion.avba.com.mx/controlaccesos/ — igual que Extintores en /extintores/:
+# misma cuenta de hosting, carpeta propia, base de datos propia.
+#
+# config/config.php NO se sube: vive sólo en el servidor
+# (public_html/controlaccesos/config/config.php) con los datos de la base
+# nueva. Se crea una vez a mano a partir de config/config.example.php.
+#
+# Por ahora está APAGADO: la plataforma todavía no funciona sola (falta la fase 1
+# de docs/PLAN.md: inicio de sesión propio y la base nueva). Se enciende
+# descomentando el «push» de abajo. (El botón «Run workflow» de GitHub sólo
+# aparece para flujos que están en la rama por omisión, main, así que no sirve
+# para esta rama.)
+#
+# El SCP a Hostinger a veces no conecta a la primera: se intenta hasta 3 veces,
+# con pausas de 1 y 3 minutos (ver deploy-proyecto1.yml del sistema principal).
+
+on:
+  workflow_dispatch:
+  # push:
+  #   branches:
+  #     - claude/control-accesos
+
+concurrency:
+  group: deploy-control-accesos
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del repo
+        uses: actions/checkout@v4
+
+      # mPDF para los PDF (composer.json / composer.lock de esta rama)
+      - name: Dependencias de PHP
+        run: composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
+      - name: Quitar lo que no se publica
+        run: |
+          # Credenciales y metadatos del repositorio
+          rm -rf .git .github .claude config
+          # Material de desarrollo: la app Android, el esquema de la base,
+          # pruebas y documentación
+          rm -rf mobile sql tests docs
+          rm -f CLAUDE.md README.md composer.json composer.lock
+
+      - name: Subir por SCP (intento 1 de 3)
+        id: scp1
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "."
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/controlaccesos"
+          strip_components: 0
+          overwrite: true
+          timeout: 60s
+
+      - name: Esperar antes del segundo intento
+        if: steps.scp1.outcome == 'failure'
+        run: sleep 60
+
+      - name: Subir por SCP (intento 2 de 3)
+        id: scp2
+        if: steps.scp1.outcome == 'failure'
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "."
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/controlaccesos"
+          strip_components: 0
+          overwrite: true
+          timeout: 60s
+
+      - name: Esperar antes del tercer intento
+        if: steps.scp1.outcome == 'failure' && steps.scp2.outcome == 'failure'
+        run: sleep 180
+
+      - name: Subir por SCP (intento 3 de 3)
+        if: steps.scp1.outcome == 'failure' && steps.scp2.outcome == 'failure'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "."
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/controlaccesos"
+          strip_components: 0
+          overwrite: true
+          timeout: 60s

@@ -1,19 +1,21 @@
-# AVBA Caseta — app del guardia (Android)
+# AVBA Control de Accesos — app del guardia (Android)
 
-App aparte de **AVBA Certificaciones** para el guardia de la caseta. Sólo
-**recolecta datos**: lee la tarjeta de identificación y registra la **entrada** o
-la **salida** (nombre, código y hora) en el **control de accesos del sistema**.
+App de la plataforma **Control de Accesos** (gestion.avba.com.mx/controlaccesos/)
+para el guardia de la caseta. **Recolecta datos**: lee la credencial de acceso y
+registra la **entrada** o la **salida** (nombre, ID, foto de la credencial y hora).
 El análisis se hace en el perfil de administrador.
 
-- **App ID:** `mx.com.avba.caseta` · **Nombre:** AVBA Caseta
-- **Descarga (APK):** `https://gestion.avba.com.mx/descargas/avba-caseta.apk` (también
-  queda una copia en `demo/app/` para el QR de la portada de la demo).
-- **Compilación:** `.github/workflows/app-caseta.yml` (cada cambio en `mobile/caseta/`)
+- **App ID:** `mx.com.avba.controlaccesos` · **Nombre:** AVBA Control de Accesos.
+  Es OTRA app que «AVBA Caseta» (la que abre el control de accesos del sistema
+  principal): se instala junto a ella mientras dura el cambio, con su propia
+  llave de firma. El paquete Java sigue siendo `mx.com.avba.caseta`.
+- **Descarga (APK):** `https://gestion.avba.com.mx/controlaccesos/descargas/avba-control-accesos.apk`
+- **Compilación:** `.github/workflows/app-caseta.yml` (apagada hasta la fase 1; ver docs/PLAN.md)
 
 ## Cómo funciona
 
 ```
-App AVBA Caseta ──abre──▶ gestion.avba.com.mx/accesos.html (cuenta de caseta)
+App ──abre──▶ gestion.avba.com.mx/controlaccesos/accesos.html (cuenta de caseta)
                              │ ENTRADA / SALIDA
                              ▼
                  LectorTarjeta (nativo, en el teléfono)
@@ -21,7 +23,7 @@ App AVBA Caseta ──abre──▶ gestion.avba.com.mx/accesos.html (cuenta de 
                    dentro de la app, sin internet) + AnalizadorTarjeta
                              │ { nombre, código }
                              ▼
-            registro: tipo, hora, punto de control, nombre, código (sin foto)
+            registro: tipo, hora, punto de control, nombre, ID y foto de la credencial
             → cola del teléfono (sin señal se envía después) → servidor
 ```
 

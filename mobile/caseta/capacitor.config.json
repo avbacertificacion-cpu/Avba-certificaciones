@@ -1,10 +1,10 @@
 {
-  "appId": "mx.com.avba.caseta",
-  "appName": "AVBA Caseta",
+  "appId": "mx.com.avba.controlaccesos",
+  "appName": "AVBA Control de Accesos",
   "webDir": "www",
   "server": {
     "url": "https://gestion.avba.com.mx",
-    "appStartPath": "/accesos.html",
+    "appStartPath": "/controlaccesos/accesos.html",
     "errorPath": "sin-conexion.html",
     "androidScheme": "https"
   },

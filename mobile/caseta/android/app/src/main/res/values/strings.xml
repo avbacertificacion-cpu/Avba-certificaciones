@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">AVBA Caseta</string>
-    <string name="title_activity_main">AVBA Caseta</string>
-    <string name="package_name">mx.com.avba.caseta</string>
-    <string name="custom_url_scheme">mx.com.avba.caseta</string>
+    <string name="app_name">AVBA Control de Accesos</string>
+    <string name="title_activity_main">AVBA Control de Accesos</string>
+    <string name="package_name">mx.com.avba.controlaccesos</string>
+    <string name="custom_url_scheme">mx.com.avba.controlaccesos</string>
 </resources>

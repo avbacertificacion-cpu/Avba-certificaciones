@@ -1,152 +1,37 @@
 <?php
 /**
- * AVBA Certificaciones — Plantilla de configuración
+ * AVBA Control de Accesos — Plantilla de configuración
  *
- * Copia este archivo a config.php y rellena con tus valores reales.
- * config.php está en .gitignore y NUNCA debe subirse al repositorio.
+ * Copia este archivo a config.php (en el servidor:
+ * public_html/controlaccesos/config/config.php) y rellénalo con los datos de la
+ * base PROPIA de Control de Accesos. config.php no se sube al repositorio ni
+ * lo publica el despliegue: vive sólo en el servidor.
  *
- * PASOS HOSTINGER:
- * 1. Panel → Bases de datos → MySQL → Crear BD y usuario
- * 2. Copiar host, nombre, usuario y contraseña en DB_* abajo
- * 3. Configurar tu dominio en CORS_ORIGINS
- * 4. Subir via FTP/File Manager al servidor
+ * PASOS HOSTINGER (una sola vez):
+ *   1. hPanel → Bases de datos → MySQL → crear la base (p. ej.
+ *      u218429682_controlaccesos) y su usuario con contraseña.
+ *   2. Copiar aquí host, nombre, usuario y contraseña.
+ *   3. Las tablas se crean solas al primer uso; sql/esquema-inicial.sql trae
+ *      el esquema por si se prefiere importarlo en phpMyAdmin.
+ *   4. Crear la primera cuenta ADMIN (ver docs/PLAN.md, fase 1).
  */
 
-// ── Base de datos ─────────────────────────────────────────
+// ── Base de datos propia de Control de Accesos ────────────
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'u123456_avba');
-define('DB_USER', 'u123456_avba');
+define('DB_NAME', 'u218429682_controlaccesos');
+define('DB_USER', 'u218429682_controlaccesos');
 define('DB_PASS', 'ContraseñaSegura123!');
 
-/*
- * ── Divisiones ────────────────────────────────────────────
- * Cada división lleva su propio expediente en su propia base, con el mismo
- * esquema y sus propias cuentas. La aplicación es la misma: elige la base
- * según en cuál vive la cuenta que entró.
- *
- * Para dar de alta una división:
- *   1. Crear la base en el panel del hosting, con el mismo usuario de MySQL.
- *   2. Importar en ella el esquema (las tablas se crean solas al primer uso,
- *      pero conviene partir de un respaldo de la principal SIN sus datos).
- *   3. Declararla aquí y crear ahí su primera cuenta ADMIN.
- *
- * Deja el arreglo vacío mientras haya una sola división.
- *
- * El banco de placas QR es independiente en cada base: cárgale a cada división
- * SU PROPIO lote de placas. Cargar el mismo lote en las dos haría que un mismo
- * número existiera dos veces, y al escanearlo aparecería sólo el primero que
- * se encuentre.
- */
-define('DB_DIVISIONES', [
-    // 'secundaria' => 'u123456_avba_div2',
-]);
+// ── Sesiones ──────────────────────────────────────────────
+define('TOKEN_TTL', 43200);            // 12 horas (un turno de caseta)
 
-// ── Seguridad ─────────────────────────────────────────────
-define('TOKEN_TTL', 28800);           // 8 horas en segundos
-define('LOGIN_MAX_INTENTOS', 5);      // empezar a esperar tras N fallos
-// Tope de la espera. No es lo que se espera siempre: la primera vez son 10
-// segundos y va creciendo (10s · 30s · 2min · 5min) hasta este tope, de modo
-// que a quien se equivocó le cuesta un tropiezo y a quien tantea contraseñas
-// cada ronda le cuesta más. Los fallos se olvidan tras 15 minutos de calma.
-define('LOGIN_BLOQUEO_MIN', 15);      // minutos: TOPE de la espera
+// ── Sitio ─────────────────────────────────────────────────
+define('SITE_URL', 'https://gestion.avba.com.mx/controlaccesos');
 
-// ── CORS ──────────────────────────────────────────────────
-define('CORS_ORIGINS', 'https://mi-dominio.com,https://www.mi-dominio.com');
-
-// ── URL pública del sitio (sin barra final) ───────────────
-define('SITE_URL', 'https://mi-dominio.com');
-
-// ── Rutas de uploads ──────────────────────────────────────
+// ── Archivos (fotos de credenciales, PDF) ─────────────────
+// Carpeta propia de la plataforma; uploads/accesos/.htaccess la protege y las
+// fotos se sirven sólo por descargar.php con sesión.
 define('UPLOAD_DIR', __DIR__ . '/../uploads/');
-define('UPLOAD_URL', 'uploads/');
 
-// ── Datos de la Unidad de Inspección ──────────────────────
-define('NO_ACREDITACION', 'UVNMX 057');  // Número de registro oficial
-
-// Anexo técnico de la acreditación. El diploma de la ema advierte que el
-// certificado no tiene validez sin su anexo correspondiente, así que los
-// documentos lo citan. Si cambia la vigencia o se renueva la acreditación,
-// es el único lugar que hay que tocar.
-define('ACREDITACION_REF',     '25UI5073');
-define('ACREDITACION_TIPO',    'Tipo A');
-define('ACREDITACION_NORMA',   'NMX-EC-17020-IMNC-2014 (ISO/IEC 17020:2012)');
-define('ACREDITACION_VIGENTE', '28/01/2026');
-
-// ── Microservicio de conversión (opcional) ────────────────
-define('CONVERT_SERVICE_URL', 'https://mi-vps.com/convert.php');
-define('CONVERT_SERVICE_KEY', 'clave_secreta_fuerte_aqui');
-
-// ── Verificación de identidad con IA (opcional) ───────────
-// API key de Google Gemini (https://aistudio.google.com/apikey).
-// Permite que Calidad compare los datos capturados por el participante
-// contra su identificación oficial, y lea de ella el nombre y la CURP.
-// Basta con ESTA o con CLAUDE_API_KEY: si están las dos se usa Gemini
-// —más rápido y económico para leer una credencial— y Claude queda como
-// respaldo si Gemini falla por cuota o por red. Si se dejan las dos
-// vacías, el botón de verificación queda deshabilitado y todo se revisa
-// a mano. Ya no se usa ningún servicio de OCR externo.
-define('GEMINI_API_KEY', '');
-// Modelo a usar (opcional). Si se deja vacío o no se define, se usa
-// 'gemini-2.5-flash' (rápido y económico). Para documentos difíciles puede
-// cambiarse a 'gemini-2.5-pro'.
-define('GEMINI_MODEL', '');
-
-// ── IA para propuestas técnico-económicas (Anthropic / Claude) ──
-// Clave de la API de Claude (https://console.anthropic.com/settings/keys).
-// Sin ella, el módulo de presupuestos sigue funcionando: se pueden capturar
-// servicios, clientes y ofertas, y sale el PDF del presupuesto. Lo único que
-// queda deshabilitado es la redacción automática de la propuesta.
-define('CLAUDE_API_KEY', '');
-
-// Modelo a usar. Vacío = claude-opus-5, el recomendado para redactar.
-define('CLAUDE_MODEL', '');
-
-// Cuánto se le pide que piense: low | medium | high | xhigh | max.
-// Vacío = high. En hosting compartido, si la petición se corta por el límite
-// de ejecución de PHP, bajarlo a 'medium' acorta la espera.
-define('CLAUDE_EFFORT', '');
-
-// ── Facturación electrónica (CFDI 4.0) ───────────────────
-// Quién timbra. Hoy el único que el sistema sabe manejar es 'facturama': cobra
-// la API una vez al año más $0.50 por folio, unos $2,250 anuales con las ~100
-// facturas mensuales de AVBA.
-//
-// Cambiar este valor cambiaría con quién se timbra de aquí en adelante, sin
-// tocar las facturas ya emitidas: cada una recuerda con quién salió, y sólo se
-// puede cancelar, reenviar y descargar con ése. Para dar de alta otro PAC hay
-// que escribir su clase y anotarla en PROVEEDORES, en api/Timbrado.php.
-define('FACTURA_PROVEEDOR', 'facturama');
-
-// ── Facturama (https://facturama.mx) ──
-// Usuario y contraseña de la CUENTA de Facturama, no una llave de API.
-// Los dos ambientes son cuentas distintas y no comparten credenciales:
-//   pruebas    → se registra en https://dev.facturama.mx/api/registro
-//   produccion → se registra en https://app.facturama.mx/api/registro
-define('FACTURAMA_USER', '');
-define('FACTURAMA_PASS', '');
-
-// 'pruebas' o 'produccion'. En pruebas se habla con apisandbox.facturama.mx:
-// la factura se genera pero NO vale ante el SAT y no gasta folio. Cualquier
-// otro valor se toma como 'pruebas', a propósito: equivocarse hacia pruebas no
-// cuesta nada y equivocarse hacia producción emite un CFDI real.
-define('FACTURAMA_MODO', 'pruebas');
-
-// Código postal de cinco dígitos del lugar de expedición. Tiene que ser el de
-// una sucursal dada de alta en el Perfil Fiscal de Facturama; si no coincide,
-// el SAT rechaza el comprobante. Facturama lo exige en cada factura.
-//
-// Sin esta configuración el módulo de presupuestos sigue funcionando completo;
-// sólo queda apagado el botón de facturar.
-define('FACTURAMA_CP_EXPEDICION', '');
-
-// ── Entorno ───────────────────────────────────────────────
-define('APP_ENV', 'production');
-
-if (APP_ENV === 'production') {
-    error_reporting(0);
-    ini_set('display_errors', '0');
-    ini_set('log_errors', '1');
-} else {
-    error_reporting(E_ALL);
-    ini_set('display_errors', '1');
-}
+// ── Zona horaria de la planta ─────────────────────────────
+date_default_timezone_set('America/Mexico_City');

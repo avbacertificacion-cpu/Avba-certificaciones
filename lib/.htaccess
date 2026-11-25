@@ -1,3 +1,0 @@
-# lib/ — Librerías PHP, sin acceso web directo
-Order Allow,Deny
-Deny from all

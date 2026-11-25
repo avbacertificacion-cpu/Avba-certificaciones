@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Arma mobile/caseta/www para la app «AVBA Caseta».
+ * Arma mobile/caseta/www para la app «AVBA Control de Accesos».
  *
- * La app abre el control de accesos del sistema (gestion.avba.com.mx/
- * accesos.html, ver capacitor.config.json → server.url): el guardia entra con
+ * La app abre la plataforma de Control de Accesos (gestion.avba.com.mx/
+ * controlaccesos/accesos.html, ver capacitor.config.json → server): el guardia entra con
  * su cuenta de caseta y cada entrada o salida queda en el sistema. La app sólo
  * agrega el lector de tarjetas (LectorTarjeta, nativo). Aquí van únicamente las
  * páginas locales: la de «sin conexión» (server.errorPath) y un index de
@@ -20,7 +20,8 @@ const RAIZ = join(APP, '..', '..');
 const WWW  = join(APP, 'www');
 const config = JSON.parse(readFileSync(join(APP, 'capacitor.config.json'), 'utf8'));
 const SERVIDOR = String(config.server && config.server.url || 'https://gestion.avba.com.mx').replace(/\/+$/, '');
-const INICIO = SERVIDOR + ((config.server && config.server.appStartPath) || '/accesos.html');
+const INICIO = SERVIDOR + ((config.server && config.server.appStartPath) || '/controlaccesos/accesos.html');
+const NOMBRE = config.appName || 'AVBA Control de Accesos';
 
 rmSync(WWW, { recursive: true, force: true });
 mkdirSync(join(WWW, 'assets', 'logos'), { recursive: true });
@@ -42,14 +43,14 @@ const pagina = (titulo, cuerpo) => `<!DOCTYPE html>
 `;
 
 // server.errorPath: se muestra si el control de accesos no carga (sin internet al abrir la app)
-writeFileSync(join(WWW, 'sin-conexion.html'), pagina('Sin conexión · AVBA Caseta',
+writeFileSync(join(WWW, 'sin-conexion.html'), pagina('Sin conexión · ' + NOMBRE,
   `<img src="assets/logos/avba.png" alt="AVBA"><h1>Sin conexión</h1>
 <p>Para abrir el control de accesos se necesita internet. Ya abierto, las entradas y salidas se guardan en el teléfono aunque se vaya la señal.</p>
 <a href="${INICIO}">Reintentar</a>`));
 
 // Respaldo: la app abre directo en el servidor (server.url)
-writeFileSync(join(WWW, 'index.html'), pagina('AVBA Caseta',
-  `<img src="assets/logos/avba.png" alt="AVBA"><h1>AVBA Caseta</h1><p>Abriendo el control de accesos…</p>
+writeFileSync(join(WWW, 'index.html'), pagina(NOMBRE,
+  `<img src="assets/logos/avba.png" alt="AVBA"><h1>${NOMBRE}</h1><p>Abriendo el control de accesos…</p>
 <script>location.replace(${JSON.stringify(INICIO)});</script>`));
 
-console.log('www listo · AVBA Caseta abre ' + INICIO);
+console.log('www listo · ' + NOMBRE + ' abre ' + INICIO);

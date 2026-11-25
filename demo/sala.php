@@ -201,7 +201,7 @@ if (isset($_GET['qr'])) {
     if ((!$sala && !$apk) || !preg_match('/^[A-Za-z0-9.\-]+(:\d+)?$/', $host)) { http_response_code(400); exit; }
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
     $ruta = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/demo/sala.php'))), '/');
-    $url = ($https ? 'https' : 'http') . '://' . $host . $ruta . '/' . ($apk ? 'app/avba-caseta.apk' : $destino . '?sala=' . $sala);
+    $url = ($https ? 'https' : 'http') . '://' . $host . $ruta . '/' . ($apk ? '../descargas/avba-control-accesos.apk' : $destino . '?sala=' . $sala);
     require_once dirname(__DIR__) . '/api/lib/qrcode.php';
     $qr = QRCode::getMinimumQRCode($url, QR_ERROR_CORRECT_LEVEL_M);
     $n = $qr->getModuleCount();
