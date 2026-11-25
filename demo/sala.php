@@ -12,6 +12,13 @@
      POST { sala, dia, accion: "reiniciar" }     → { ok, epoca }
      GET  ?qr=caseta&sala=ABCD                   → código QR (SVG) para abrir
                                                    la pantalla del guardia en el celular
+     GET  ?qr=apk                                → código QR para descargar la app
+                                                   AVBA Caseta (Android)
+     GET  ?tarjeta=1                             → reglas para leer la tarjeta de
+                                                   identificación (tarjeta-reglas.json)
+
+   La app AVBA Caseta lleva la pantalla del guardia dentro y llama desde su
+   propio origen (https://localhost en Android): se permite con CORS.
 
    Cada sala y día se guarda en uploads/demo-salas/<SALA>-<dia>.json (carpeta
    cerrada al acceso directo). Las salas de días anteriores se borran solas.
@@ -22,6 +29,17 @@ const MAX_OPS = 1000;
 const MAX_SALAS = 300;                     // salas (archivos) a la vez; las de días anteriores se borran solas
 const MAX_CUERPO = 20000;
 $DIR = dirname(__DIR__) . '/uploads/demo-salas/';
+
+// La app AVBA Caseta (mobile/caseta) llama desde su propio origen
+$origenApp = (string)($_SERVER['HTTP_ORIGIN'] ?? '');
+if (in_array($origenApp, ['https://localhost', 'capacitor://localhost'], true)) {
+    header('Access-Control-Allow-Origin: ' . $origenApp);
+    header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
+    header('Access-Control-Allow-Headers: Content-Type');
+    header('Access-Control-Max-Age: 600');
+    header('Vary: Origin');
+}
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') { http_response_code(204); exit; }
 
 function salir(array $d, int $code = 200): void {
     http_response_code($code);
@@ -49,7 +67,7 @@ function diaValido($v): string {
 function opValida($o): ?array {
     if (!is_array($o)) return null;
     $k = $o['k'] ?? '';
-    if (!in_array($k, ['ent', 'sal', 'int', 'inc', 'aut', 'lev', 'cv', 'sol', 'resp', 'reg', 'am'], true)) return null;
+    if (!in_array($k, ['ent', 'sal', 'int', 'inc', 'aut', 'lev', 'cv', 'sol', 'resp', 'reg', 'am', 'alta'], true)) return null;
     $u = is_string($o['u'] ?? null) ? $o['u'] : '';
     if (!preg_match('/^[a-z0-9]{6,24}$/', $u)) return null;
     $t = $o['t'] ?? null;
@@ -61,7 +79,8 @@ function opValida($o): ?array {
     $r = ['k' => $k, 'u' => $u, 't' => $t];
     if (!in_array($k, ['cv', 'resp', 'reg', 'am'], true)) {
         $pid = is_string($o['pid'] ?? null) ? $o['pid'] : '';
-        if (!preg_match('/^P\d{3}$/', $pid)) return null;
+        // P001…: personas de la demo · Q + código: tarjeta leída en la caseta
+        if (!preg_match('/^(P\d{3}|Q\d{1,16})$/', $pid) || ($k === 'alta' && $pid[0] !== 'Q')) return null;
         $r['pid'] = $pid;
     }
     foreach (['caseta' => 60, 'quien' => 60, 'res' => 60] as $c => $max) {
@@ -126,6 +145,14 @@ function opValida($o): ?array {
             $r['sol'] = $sol;
             $r['ok'] = !empty($o['ok']);
             break;
+        case 'alta':                                          // persona nueva (tarjeta leída en la caseta)
+            $cod = preg_replace('/\D/', '', is_scalar($o['codigo'] ?? null) ? (string)$o['codigo'] : '');
+            if ($cod === '' || strlen($cod) > 16 || 'Q' . $cod !== $r['pid']) return null;
+            $r['codigo'] = $cod;
+            $nom = texto($o['nombre'] ?? '', 80);
+            $r['nombre'] = preg_match("/^[\p{L} .'\-]{0,80}$/u", $nom) ? $nom : '';
+            $r['puesto'] = texto($o['puesto'] ?? '', 60);
+            break;
         case 'cv':
             $f = is_string($o['folio'] ?? null) ? $o['folio'] : '';
             if (!preg_match('/^V-\d{4}$/', $f)) return null;
@@ -167,13 +194,14 @@ function conSala(string $archivo, ?callable $cambio): array {
 
 /* ── Código QR para abrir la caseta (o el panel) en otro dispositivo ── */
 if (isset($_GET['qr'])) {
+    $apk = $_GET['qr'] === 'apk';
     $sala = salaValida($_GET['sala'] ?? '');
     $destino = ($_GET['qr'] === 'panel') ? 'control-accesos.html' : 'caseta.html';
     $host = (string)($_SERVER['HTTP_HOST'] ?? '');
-    if (!$sala || !preg_match('/^[A-Za-z0-9.\-]+(:\d+)?$/', $host)) { http_response_code(400); exit; }
+    if ((!$sala && !$apk) || !preg_match('/^[A-Za-z0-9.\-]+(:\d+)?$/', $host)) { http_response_code(400); exit; }
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
     $ruta = rtrim(str_replace('\\', '/', dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/demo/sala.php'))), '/');
-    $url = ($https ? 'https' : 'http') . '://' . $host . $ruta . '/' . $destino . '?sala=' . $sala;
+    $url = ($https ? 'https' : 'http') . '://' . $host . $ruta . '/' . ($apk ? 'app/avba-caseta.apk' : $destino . '?sala=' . $sala);
     require_once dirname(__DIR__) . '/api/lib/qrcode.php';
     $qr = QRCode::getMinimumQRCode($url, QR_ERROR_CORRECT_LEVEL_M);
     $n = $qr->getModuleCount();
@@ -191,6 +219,13 @@ if (isset($_GET['qr'])) {
     echo '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' . $lado . ' ' . $lado . '" shape-rendering="crispEdges">'
        . '<rect width="100%" height="100%" fill="#fff"/><path fill="#0B2545" d="' . $path . '"/></svg>';
     exit;
+}
+
+/* ── Reglas para leer la tarjeta de identificación (se ajustan sin reinstalar la app) ── */
+if (isset($_GET['tarjeta'])) {
+    $j = @file_get_contents(__DIR__ . '/tarjeta-reglas.json');
+    $reglas = is_string($j) ? json_decode($j, true) : null;
+    salir(['ok' => true, 'reglas' => is_array($reglas) ? $reglas : new stdClass()]);
 }
 
 /* ── Consultar la sala ── */

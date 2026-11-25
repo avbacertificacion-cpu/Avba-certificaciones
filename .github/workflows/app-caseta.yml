@@ -1,0 +1,120 @@
+name: App Caseta (Android)
+
+# Compila «AVBA Caseta» (mobile/caseta): la app del guardia que lee la tarjeta
+# de identificación en el propio teléfono (cámara + reconocimiento de texto sin
+# internet) y registra entradas y salidas en la pantalla del guardia.
+#
+#   · APK de prueba, instalable directo en el teléfono (artefacto del flujo).
+#   · La misma APK se publica en el sitio para descargarla desde el celular:
+#     https://gestion.avba.com.mx/demo/app/avba-caseta.apk (QR en la portada
+#     de la demo).
+#
+# La firma de prueba se guarda en la caché de GitHub para que cada versión se
+# instale encima de la anterior sin desinstalar.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - claude/continue-avba-project-bU5LX
+    paths:
+      - 'mobile/caseta/**'
+      - 'demo/caseta.html'
+      - 'demo/demo-datos.js'
+      - '.github/workflows/app-caseta.yml'
+
+concurrency:
+  group: app-caseta-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: mobile/caseta
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/caseta/package-lock.json
+
+      # Capacitor 8 pide JDK 21
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Firma de prueba fija (para actualizar sin desinstalar)
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: avba-caseta-firma-prueba-v1
+
+      - name: Dependencias
+        run: npm ci
+
+      - name: Armar la pantalla y sincronizar Android
+        run: npm run sync
+
+      - name: Número de versión
+        run: |
+          echo "AVBA_VERSION_CODE=$((100 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "versionCode: $((100 + GITHUB_RUN_NUMBER))"
+
+      - name: Pruebas del lector y APK
+        working-directory: mobile/caseta/android
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+
+      - name: Preparar la descarga
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/publicar/demo/app"
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/publicar/demo/app/avba-caseta.apk"
+          ls -l "$GITHUB_WORKSPACE/publicar/demo/app"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: avba-caseta-apk
+          path: publicar/demo/app/avba-caseta.apk
+          retention-days: 30
+
+      # Hostinger a veces no acepta la conexión al primer intento (ver deploy-proyecto1.yml)
+      - name: Publicar la APK en el sitio (intento 1 de 2)
+        id: scp1
+        continue-on-error: true
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "publicar/demo/app/avba-caseta.apk"
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/demo/app"
+          strip_components: 3
+          overwrite: true
+          timeout: 60s
+
+      - name: Esperar antes del segundo intento
+        if: steps.scp1.outcome == 'failure'
+        run: sleep 90
+
+      - name: Publicar la APK en el sitio (intento 2 de 2)
+        if: steps.scp1.outcome == 'failure'
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          source: "publicar/demo/app/avba-caseta.apk"
+          target: "/home/u218429682/domains/gestion.avba.com.mx/public_html/demo/app"
+          strip_components: 3
+          overwrite: true
+          timeout: 60s

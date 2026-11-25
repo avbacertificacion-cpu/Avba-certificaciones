@@ -61,6 +61,9 @@
     { id: 'AVB', nombre: 'AVBA Inspecciones', corto: 'AVBA', repse: 'Vigente', n: 8 }
   ];
   var EMP = {}; EMPRESAS.forEach(function (e) { EMP[e.id] = e; });
+  /* Personal de la planta que se registra al leer su tarjeta en la caseta (app AVBA Caseta).
+     No va en EMPRESAS: así no cambia la generación de los datos del día. */
+  EMP.QEN = { id: 'QEN', nombre: 'Quantum Energy', corto: 'Quantum Energy', repse: 'Vigente', n: 0 };
   var PUESTOS = {
     MIG: ['Mecánico montador', 'Ayudante general', 'Operador de grúa', 'Maniobrista', 'Supervisor mecánico'],
     EBN: ['Electricista', 'Ayudante de electricista', 'Técnico instrumentista', 'Supervisor eléctrico'],
@@ -375,7 +378,8 @@
   function hash(t) { var h = 2166136261; for (var i = 0; i < t.length; i++) { h ^= t.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
   function candidato(caso) {
     tick();
-    var lim = limites(), fuera = PERSONAS.filter(function (p) { return !stats(p).dentro; });
+    // Los casos del guion son personas de la demo, nunca alguien registrado con su tarjeta real
+    var lim = limites(), fuera = PERSONAS.filter(function (p) { return !p.tarjeta && !stats(p).dentro; });
     var okBase = function (p) { return p.estado === 'activo' && stats(p).docs.est !== 'vencido'; };
     var jornadaOk = function (p) { var s = stats(p); return s.seguidos < REGLAS.diasSeguidos && s.h7 + p.pat.h <= lim.max; };
     var limpio = function (p) { return okBase(p) && jornadaOk(p) && !valesAbiertos(p).length && stats(p).docs.est === 'ok'; };
@@ -464,7 +468,7 @@
   function folioVale() { return 'V-' + String(++nVale).padStart(4, '0'); }
   function aplicar(op) {
     var p = P[op.pid], t = new Date(op.t), it;
-    if (op.k !== 'cv' && op.k !== 'resp' && op.k !== 'reg' && op.k !== 'am' && !p) return null;
+    if (op.k !== 'cv' && op.k !== 'resp' && op.k !== 'reg' && op.k !== 'am' && op.k !== 'alta' && !p) return null;
     if (isNaN(t)) return null;
     switch (op.k) {
       case 'ent':                                           // entrada
@@ -527,6 +531,20 @@
       case 'am':                                            // autorizar una salida de material
         T_VALES.forEach(function (v) { if (v.folio === op.folio && v.tipo === 'mat') v.autoriza = 'Autorizado por ' + (op.quien || 'Admin. de accesos'); });
         return true;
+      case 'alta':                                          // persona nueva: tarjeta leída en la caseta
+        var cod = String(op.codigo || '').replace(/\D/g, '').slice(0, 16);
+        if (!cod || op.pid !== 'Q' + cod) return null;
+        if (P[op.pid]) return P[op.pid];
+        var nueva = {
+          id: op.pid, nombre: limpiarNombre(op.nombre) || 'Tarjeta ' + cod, emp: 'QEN', puesto: String(op.puesto || '').slice(0, 60) || 'Personal de planta',
+          sup: false, turno: t.getHours() >= 6 && t.getHours() < 18 ? 'D' : 'N', pat: { on: 5, off: 2, h: 9 }, fase: 0,
+          idTipo: 'Tarjeta Quantum', idNum: cod.slice(-4), codigo: cod, tarjeta: true,
+          aut: { cel: true, tab: false, herr: false, pc: false, auto: false, cam: false }, herr: [], placas: '',
+          estado: 'activo', veto: null, plan: [], ints: [], alta: t, mujer: false,
+          docs: { induccion: sumarDias(hoy0, 320), medico: sumarDias(hoy0, 250), imss: 'vigente', dc3: [] }
+        };
+        PERSONAS.push(nueva); P[nueva.id] = nueva;
+        return nueva;
       case 'lev': p.estado = 'activo'; p.veto = null; return true;          // levantar veto
       case 'cv':                                            // cerrar vale
         T_VALES.forEach(function (v) { if (v.folio === op.folio && !v.cerradoReal) { v.cerradoReal = t; v.forzado = false; } });
@@ -545,7 +563,19 @@
     return null;
   }
 
-  var URL_SALA = 'sala.php';
+  // Dentro de la app AVBA Caseta la pantalla no está en el servidor: app-config.js dice a dónde enviar
+  var URL_SALA = (window.AVBA_APP && window.AVBA_APP.urlSala) || 'sala.php';
+  function limpiarNombre(n) {
+    return String(n || '').replace(/[^A-Za-z' .\-\u00C0-\u024F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80);
+  }
+  /* Persona por el código de su tarjeta (lectura en la app de la caseta) */
+  function porCodigo(c) {
+    c = String(c || '').replace(/\D/g, '');
+    if (!c) return null;
+    if (P['Q' + c]) return P['Q' + c];
+    for (var i = 0; i < PERSONAS.length; i++) if (PERSONAS[i].codigo === c) return PERSONAS[i];
+    return null;
+  }
   var SALA = (function () {
     var q = '', s = '';
     try { q = (new URLSearchParams(location.search).get('sala') || '').toUpperCase(); } catch (e) {}
@@ -693,7 +723,7 @@
     TABLA_LEY: TABLA_LEY, REGLAS: REGLAS, limites: limites, stats: stats, docs: docs, valesAbiertos: valesAbiertos, vetoVigente: vetoVigente,
     candidato: candidato, revisar: revisarEntrada, turnoDe: turnoDe, turnosEnCurso: turnosEnCurso, nombreTurno: nombreTurno,
     tick: tick, registrar: registrar, alCambiar: function (f) { oyentes.push(f); }, reiniciar: reiniciar,
-    hash: hash, pl: pl,
+    hash: hash, pl: pl, porCodigo: porCodigo,
     sala: SALA, estadoSala: function () { return sala.estado; }, alCambiarSala: function (f) { oyentesSala.push(f); }, alError: function (f) { oyentesError.push(f); },
     semilla: semilla
   };

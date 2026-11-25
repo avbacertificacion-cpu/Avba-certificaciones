@@ -32,6 +32,7 @@ on:
       - claude/continue-avba-project-bU5LX
     paths:
       - 'mobile/**'
+      - '!mobile/caseta/**'      # la app del guardia se compila en app-caseta.yml
       - 'js/app-shell.js'
       - '.github/workflows/app-android.yml'
 

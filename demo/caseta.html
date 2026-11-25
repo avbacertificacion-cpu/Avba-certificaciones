@@ -189,6 +189,14 @@
   .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));z-index:90;background:#1e6b34;color:#fff;border-radius:12px;
     padding:11px 16px;font-weight:700;font-size:14px;max-width:92vw;text-align:center;box-shadow:0 6px 18px rgba(0,0,0,.25);pointer-events:none}
   .toast.err{background:var(--rojo)}
+  /* App AVBA Caseta: tarjeta leída en el teléfono */
+  .campos label{display:block;border-bottom:1px solid var(--borde);padding:10px 0;font-size:12.5px;font-weight:700;color:var(--texto-sub);cursor:default}
+  .campos input{display:block;width:100%;margin-top:5px;padding:11px 12px;border:1.5px solid var(--borde);border-radius:10px;font-size:16px;font-family:inherit;color:var(--texto)}
+  .campos input:focus{outline:none;border-color:var(--azul);box-shadow:0 0 0 3px rgba(24,95,165,.12)}
+  .leido{margin-top:10px;background:#fff;border-radius:var(--radio);border:1px solid rgba(0,0,0,.05);padding:10px 12px;font-size:12.5px;color:var(--texto-sub)}
+  .leido summary{cursor:pointer;font-weight:700}
+  .leido pre{white-space:pre-wrap;font-family:inherit;margin-top:6px;color:var(--texto)}
+  .cinta button{border:0;background:#8A5A00;color:#fff;border-radius:999px;padding:3px 10px;font-weight:800;font-size:12px;margin-left:6px;cursor:pointer}
 </style>
 </head>
 <body>
@@ -227,8 +235,9 @@
   </div>
 </header>
 <div class="menu-pop" id="menu-pop" hidden>
-  <a href="index.html">Portada de la demo</a>
-  <a href="control-accesos.html" target="_blank" rel="noopener">Abrir el panel del administrador</a>
+  <a href="index.html" id="lnk-portada">Portada de la demo</a>
+  <a href="control-accesos.html" id="lnk-panel" target="_blank" rel="noopener">Abrir el panel del administrador</a>
+  <button type="button" id="btn-sala" hidden>Conectar con el panel (código de sala)</button>
   <button type="button" id="btn-reiniciar">Reiniciar la demo</button>
   <div class="menu-sep">Siguiente ENTRADA (para la demo)</div>
   <div id="menu-casos" class="menu-casos"></div>
@@ -248,7 +257,7 @@
   <div class="visor" id="visor">
     <div class="ficha" id="ficha"><svg class="i"><use href="#i-gafete"/></svg></div>
     <video id="video" autoplay playsinline muted hidden></video>
-    <div class="guia"><span>Acomoda la identificación o el gafete con QR</span></div>
+    <div class="guia"><span id="guia-t">Acomoda la identificación o el gafete con QR</span></div>
     <div class="linea"></div>
     <div class="leyendo-t">Leyendo identificación…</div>
     <div class="destello" id="destello"></div>
@@ -410,13 +419,87 @@
       abrir(modo, p, caso);
     }, 900);
   }
-  document.querySelectorAll('.cap').forEach(function (b) { b.onclick = function () { escanear(b.dataset.modo); }; });
+  document.querySelectorAll('.cap').forEach(function (b) { b.onclick = function () { if (LECTOR) leerTarjeta(b.dataset.modo); else escanear(b.dataset.modo); }; });
+
+  /* ── App AVBA Caseta (Android): la tarjeta se lee en el propio teléfono ──
+     El lector (LectorTarjeta, nativo) reconoce el texto con el modelo que trae
+     la app, sin internet; la imagen no sale del teléfono. Aquí sólo llegan el
+     nombre y el código, y se buscan en el padrón. */
+  var APP = window.AVBA_APP || null;
+  var LECTOR = (APP && window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.LectorTarjeta) || null;
+  var REGLAS_TARJETA = { tarjeta: 'Quantum Energy', minDigitos: 4, maxDigitos: 12, longitud: 0, patron: '', claves: [], noNombre: ['QUANTUM', 'ENERGY'], noCodigo: [], confirmar: 3 };
+  function mezclarReglas(g) {
+    if (!g || typeof g !== 'object') return;
+    ['tarjeta', 'minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
+  }
+  if (APP) {
+    try { mezclarReglas(JSON.parse(localStorage.getItem('avba_tarjeta_reglas') || 'null')); } catch (e) {}
+    // Las reglas de la tarjeta se ajustan en el servidor (demo/tarjeta-reglas.json) sin reinstalar la app
+    fetch(APP.servidor + '/demo/sala.php?tarjeta=1', { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+      if (j && j.ok && j.reglas) { mezclarReglas(j.reglas); try { localStorage.setItem('avba_tarjeta_reglas', JSON.stringify(j.reglas)); } catch (e) {} }
+    }).catch(function () {});
+  }
+  function segundos(ms) { return Math.max(0.1, ms / 1000).toFixed(1) + ' s'; }
+  function leerTarjeta(modo) {
+    if (leyendo) return;
+    leyendo = true;
+    var o = {};
+    for (var k in REGLAS_TARJETA) o[k] = REGLAS_TARJETA[k];
+    o.titulo = (modo === 'entrada' ? 'ENTRADA' : 'SALIDA') + ' · Leer la tarjeta';
+    o.subtitulo = 'Acomoda la tarjeta de ' + (REGLAS_TARJETA.tarjeta || 'identificación') + ' dentro del recuadro. Se lee en este teléfono, sin internet.';
+    o.simular = true;
+    LECTOR.leer(o).then(function (r) {
+      leyendo = false;
+      if (!r || r.cancelado) { if (r && r.error) toast(r.error, true); return; }
+      if (r.simulado) { escanear(modo); return; }               // caso del guion de la demo
+      identificar(modo, r);
+    }, function (e) { leyendo = false; toast((e && e.message) || 'No se pudo abrir la cámara.', true); });
+  }
+  function identificar(modo, r) {
+    var L = { codigo: String(r.codigo || '').replace(/\D/g, ''), nombre: String(r.nombre || '').trim(), manual: !!r.manual, ms: +r.ms || 0, texto: String(r.texto || '') };
+    if (!L.codigo) { toast('No se leyó el código de la tarjeta.', true); return; }
+    var p = D.porCodigo(L.codigo);
+    if (!p) { abrirNueva(modo, L); return; }
+    var dentro = D.stats(p).dentro, m = dentro ? 'salida' : 'entrada';
+    abrir(m, p, 'tarjeta', L);
+    if (m !== modo) toast(dentro ? 'Ya estaba dentro: se muestra su SALIDA.' : 'No tiene entrada registrada: se muestra su ENTRADA.');
+  }
+  function abrirNueva(modo, L) {
+    D.tick();
+    ACT = { modo: 'nueva', modoPedido: modo, p: null, lectura: L, caso: 'tarjeta', t: ahora(), firma: '' };
+    vib(30);
+    $('buscar').hidden = true; clearTimeout(tToast); $('toast').hidden = true;
+    pintarHoja();
+    $('hoja').hidden = false; $('hoja').scrollTop = 0; document.body.classList.add('con-hoja');
+  }
+  function hojaNueva() {
+    var L = ACT.lectura, sal = ACT.modoPedido === 'salida', tj = REGLAS_TARJETA.tarjeta || 'identificación';
+    var hb = '<div class="banner prueba">' + ico('gafete') + '<b id="res-tit">TARJETA LEÍDA</b><span>' + (sal ? 'No tiene entrada registrada' : 'No está en el padrón de la planta') + '</span></div><div class="cuerpo">';
+    hb += '<div class="persona"><div class="foto">' + (L.nombre ? iniciales(L.nombre) : '?') + '</div><div><b>' + esc(L.nombre || 'Nombre no leído') + '</b>' +
+      '<span>Tarjeta ' + esc(tj) + ' · código ' + esc(L.codigo) + '</span><span class="rec" style="display:block">' +
+      (L.manual ? 'Código escrito a mano' : 'Leída en este teléfono, sin internet' + (L.ms ? ' · ' + segundos(L.ms) : '')) + '</span></div></div>';
+    if (sal) {
+      hb += '<ul class="estado">' + filaEstado('av', 'alerta', 'Sin entrada registrada', 'Esta tarjeta no está en el padrón ni tiene una entrada. Avísale al administrador de accesos.', '') + '</ul>';
+    } else {
+      hb += '<ul class="estado">' + filaEstado('av', 'alerta', 'No está en el padrón', 'Revisa que los datos coincidan con la tarjeta y dale de alta para revisar su acceso.', 'Nuevo') + '</ul>';
+      hb += '<h3>Datos de la tarjeta</h3><div class="lista-ck campos">' +
+        '<label for="n-nombre">Nombre<input id="n-nombre" type="text" value="' + esc(L.nombre) + '" maxlength="80" autocomplete="off" autocapitalize="words"></label>' +
+        '<label for="n-codigo">Código<input id="n-codigo" type="text" inputmode="numeric" value="' + esc(L.codigo) + '" maxlength="16" autocomplete="off"></label>' +
+        '<small>Corrige si algo no se leyó bien. En la demo queda como personal de planta con documentos al día.</small></div>';
+    }
+    if (L.texto) hb += '<details class="leido"><summary>Texto que se leyó de la tarjeta</summary><pre>' + esc(L.texto) + '</pre></details>';
+    hb += '</div><div class="pie"><div class="in">' + (sal
+      ? '<button class="btn sec" type="button" data-acc="cancelar" style="flex:1">Cerrar</button>'
+      : '<button class="btn sec" type="button" data-acc="cancelar">Cancelar</button><button class="btn verde" type="button" data-acc="alta">' + ico('ok') + 'Dar de alta</button>') +
+      '</div></div>';
+    return hb;
+  }
 
   /* ── Resultado ── */
   var ACT = null;
-  function abrir(modo, p, caso) {
+  function abrir(modo, p, caso, lectura) {
     D.tick();
-    ACT = { modo: modo, p: p, caso: caso || '', t: ahora(), autorizado: false, negado: false, esperando: false, sol: null, alc: null, firma: firma(p),
+    ACT = { modo: modo, p: p, caso: caso || '', lectura: lectura || null, t: ahora(), autorizado: false, negado: false, esperando: false, sol: null, alc: null, firma: firma(p),
             r: modo === 'entrada' ? D.revisar(p, caso ? 'g-' + caso : 'guardia') : null };
     vib(modo === 'entrada' && ACT.r.res === 'nopasa' ? [80, 60, 80] : 30);
     $('buscar').hidden = true; clearTimeout(tToast); $('toast').hidden = true;
@@ -444,13 +527,16 @@
     return '<li class="' + cls + '"><span class="ic">' + ico(icono) + '</span><div class="tx"><b>' + esc(titulo) + '</b>' + (detalle ? '<span>' + esc(detalle) + '</span>' : '') + '</div>' + (valor ? '<span class="val">' + esc(valor) + '</span>' : '') + '</li>';
   }
   function cabeceraPersona(p) {
-    var s = D.stats(p), e = EMP[p.emp];
+    var s = D.stats(p), e = EMP[p.emp], L = ACT && ACT.lectura;
+    var ident = p.tarjeta
+      ? 'Tarjeta ' + esc(REGLAS_TARJETA.tarjeta || 'Quantum Energy') + ' · código ' + esc(p.codigo) + (L ? ' · <span class="rec" style="display:inline">' + (L.manual ? 'código escrito a mano' : 'leída en este teléfono' + (L.ms ? ' (' + segundos(L.ms) + ')' : '')) + '</span>' : '')
+      : esc(p.idTipo) + ' ····' + p.idNum + ' · <span class="rec" style="display:inline;white-space:nowrap">reconocido ' + (96 + (p.idNum.charCodeAt(2) % 4)) + '&nbsp;%</span>';
     return '<div class="persona"><div class="foto' + (D.vetoVigente(p) ? ' vet' : '') + '">' + iniciales(p.nombre) + '</div><div><b>' + esc(p.nombre) + '</b>' +
-      '<span>' + esc(p.puesto) + ' · ' + esc(e.nombre) + '</span><span>' + esc(p.idTipo) + ' ····' + p.idNum + ' · <span class="rec" style="display:inline;white-space:nowrap">reconocido ' + (96 + (p.idNum.charCodeAt(2) % 4)) + '&nbsp;%</span></span></div></div>';
+      '<span>' + esc(p.puesto) + ' · ' + esc(e.nombre) + '</span><span>' + ident + '</span></div></div>';
   }
   function pintarHoja() {
     var p = ACT.p, h = '';
-    if (ACT.modo === 'entrada') h = hojaEntrada(p); else h = hojaSalida(p);
+    if (ACT.modo === 'entrada') h = hojaEntrada(p); else if (ACT.modo === 'nueva') h = hojaNueva(); else h = hojaSalida(p);
     $('hoja').innerHTML = h;
     ACT.tPinta = Date.now();                    // evita que un doble toque caiga en el botón nuevo
     enlazarHoja();
@@ -564,6 +650,17 @@
     if (!ACT || Date.now() - (ACT.tPinta || 0) < 400) return;     // doble toque: el segundo no cuenta
     var p = ACT.p, t = ahora();
     if (a === 'cancelar' || a === 'cerrar-int') { cerrarHoja(); return; }
+    if (a === 'alta') {
+      var nom = $('n-nombre').value.replace(/\s+/g, ' ').trim(), cod = $('n-codigo').value.replace(/\D/g, '');
+      if (!cod) { toast('Falta el código de la tarjeta.', true); $('n-codigo').focus(); return; }
+      if (!nom) { toast('Escribe el nombre como viene en la tarjeta.', true); $('n-nombre').focus(); return; }
+      var L = ACT.lectura, np = D.porCodigo(cod) || D.registrar({ k: 'alta', pid: 'Q' + cod, codigo: cod, nombre: nom, quien: GUARDIA });
+      if (!np) { toast('No se pudo dar de alta: revisa el código.', true); return; }
+      L.codigo = cod; L.nombre = nom;
+      abrir(D.stats(np).dentro ? 'salida' : 'entrada', np, 'tarjeta', L);
+      toast('Alta registrada: ' + np.nombre + '.');
+      return;
+    }
     if (a === 'cancelar-sol') {
       if (ACT.sol && ACT.esperando) D.registrar({ k: 'resp', sol: ACT.sol, ok: false, quien: GUARDIA + ' (canceló)' });
       cerrarHoja(); toast('Solicitud cancelada.');
@@ -657,6 +754,28 @@
       (estado === 'sin-conexion' ? ' en cuanto vuelva la conexión (se guarda en este celular).' : '.');
   }
   if (D.sala) { pintarSala(D.estadoSala()); D.alCambiarSala(pintarSala); }
+  function pedirSala() {
+    var c = prompt('Código de la sala (aparece en la portada de la demo, en la laptop). Déjalo vacío para usar la app sin el panel.', D.sala || '');
+    if (c === null) return;
+    c = c.trim().toUpperCase();
+    if (!c) { location.replace('caseta.html?sala=no'); return; }
+    if (!/^[A-Z0-9]{4,10}$/.test(c)) { toast('El código de la sala tiene 4 letras o números.', true); return; }
+    location.replace('caseta.html?sala=' + encodeURIComponent(c));
+  }
+  $('btn-sala').onclick = function () { $('menu-pop').hidden = true; pedirSala(); };
+  if (APP) {
+    $('lnk-portada').href = APP.servidor + '/demo/index.html';
+    $('lnk-panel').href = APP.servidor + '/demo/control-accesos.html' + (D.sala ? '?sala=' + D.sala : '');
+    $('lnk-portada').removeAttribute('target'); $('lnk-panel').removeAttribute('target');
+    $('btn-sala').hidden = false;
+    $('btn-cam').hidden = true;
+    $('guia-t').textContent = LECTOR ? 'Toca ENTRADA o SALIDA y acerca la tarjeta' : 'Acomoda la identificación';
+    if (LECTOR) document.querySelectorAll('.cap span').forEach(function (x) { x.textContent = 'Leer tarjeta'; });
+    if (!D.sala) {
+      $('cinta').innerHTML = '<b>App de la caseta</b> · las tarjetas se leen en este teléfono, sin internet. Sin conectar con el panel.<button type="button" id="cinta-sala">Conectar</button>';
+      $('cinta-sala').onclick = pedirSala;
+    }
+  }
   D.alError(function () { toast('Un registro no se pudo compartir con la sala.', true); });
 
   /* Cambios desde el panel (otra pestaña): permisos, vetos, vales */
@@ -679,7 +798,7 @@
   D.alCambiar(function () {
     pintar();
     if (revisarSolicitud()) return;
-    if (ACT && !$('hoja').hidden && firma(ACT.p) !== ACT.firma) {
+    if (ACT && ACT.p && !$('hoja').hidden && firma(ACT.p) !== ACT.firma) {
       ACT.firma = firma(ACT.p);
       if (ACT.modo === 'entrada') {
         // Se vuelve a revisar con los datos nuevos, sin volver a sortear el alcoholímetro

@@ -1,0 +1,18 @@
+{
+  "name": "avba-caseta-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "App de Android para el guardia de caseta: lee la tarjeta de identificación en el propio teléfono (sin internet) y registra entradas y salidas",
+  "scripts": {
+    "build": "node scripts/build-www.mjs",
+    "sync": "npm run build && cap sync android",
+    "open": "cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.6.2",
+    "@capacitor/core": "8.6.2"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "8.6.2"
+  }
+}

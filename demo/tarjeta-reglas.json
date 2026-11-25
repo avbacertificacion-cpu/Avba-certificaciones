@@ -1,0 +1,12 @@
+{
+  "_nota": "Reglas para leer la tarjeta de identificación con la app AVBA Caseta. La app las pide a sala.php?tarjeta=1 al abrir, así que se ajustan sin reinstalarla. longitud: dígitos exactos del código (0 = cualquiera entre minDigitos y maxDigitos). patron: expresión regular opcional (Java); el código es su primer grupo. claves: palabras que suelen ir junto al código. noNombre: palabras que NO forman parte de un nombre (empresa, puesto, letreros). noCodigo: palabras de los renglones cuyo número NO es el código (teléfono, NSS, fechas). confirmar: cuántas lecturas iguales se necesitan para darla por buena.",
+  "tarjeta": "Quantum Energy",
+  "minDigitos": 4,
+  "maxDigitos": 12,
+  "longitud": 0,
+  "patron": "",
+  "claves": [],
+  "noNombre": ["QUANTUM", "ENERGY"],
+  "noCodigo": [],
+  "confirmar": 3
+}

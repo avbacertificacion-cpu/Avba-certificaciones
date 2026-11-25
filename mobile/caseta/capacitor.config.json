@@ -1,0 +1,13 @@
+{
+  "appId": "mx.com.avba.caseta",
+  "appName": "AVBA Caseta",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https",
+    "hostname": "localhost"
+  },
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  }
+}
