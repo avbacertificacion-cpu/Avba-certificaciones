@@ -23,10 +23,15 @@ y con un reporte al usuario en español de qué quedó, qué se probó y qué fa
 
 ## Fase 1 — Que la plataforma funcione sola
 
+**Estado:** construida y probada en local (12 pruebas, `tests/referencia/correr.sh`);
+despliegues encendidos. Falta lo del usuario en hPanel y la prueba con la app en un
+teléfono.
+
 Lo que hace el usuario (una vez, en hPanel):
 1. Crear la base MySQL (p. ej. `u218429682_controlaccesos`) y su usuario.
 2. Crear en el servidor `public_html/controlaccesos/config/config.php` a partir de
-   `config/config.example.php` con esos datos (o pedir ayuda para hacerlo).
+   `config/config.example.php` con esos datos y una `CLAVE_INSTALACION` propia.
+3. Abrir `…/controlaccesos/login.html` y crear la primera cuenta ADMIN con esa clave.
 
 Lo que se construye:
 - `api/index.php`: enrutador propio, **sólo** sesión y control de accesos (las acciones
@@ -48,7 +53,8 @@ Lo que se construye:
 - `descargar.php`: fotos de credenciales y PDF, sólo con sesión.
 - Cuentas: pantalla para que ADMIN cree cuentas (una por punto de control para los
   guardias, administradores de planta), cambie contraseñas y las desactive.
-- Primera cuenta ADMIN: instalación que sólo funciona si no hay ninguna cuenta (o SQL).
+- Primera cuenta ADMIN: instalación que sólo funciona si no hay ninguna cuenta y con la
+  `CLAVE_INSTALACION` de `config.php` (la de la plantilla no vale).
 - `accesos.html`: claves de almacenamiento con prefijo **`ca_`** (ver CLAUDE.md,
   «mismo dominio»), rutas relativas a `/controlaccesos/`.
 - Adaptar `tests/referencia/` a la API propia y dejarlas corriendo.

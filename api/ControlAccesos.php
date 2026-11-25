@@ -33,8 +33,9 @@
 class ControlAccesos {
     private PDO $pdo;
 
-    /** Quién puede usar el módulo (personal de AVBA, no clientes) */
-    public const ROLES = ['ADMIN', 'ADMINISTRATIVO', 'INSPECTOR', 'CALIDAD', 'CERTIFICACIONES', 'ACCESOS'];
+    /** Los tres perfiles de la plataforma (ver Auth.php): Administración AVBA,
+     *  administrador de accesos de la planta y guardia de caseta. */
+    public const ROLES = ['ADMIN', 'PLANTA', 'ACCESOS'];
 
     private const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
     private const MESES = ['', 'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
@@ -45,7 +46,13 @@ class ControlAccesos {
     }
 
     public static function permitido(?array $usr): bool {
-        return $usr && empty($usr['vista_admin']) && in_array((string)$usr['rol'], self::ROLES, true);
+        return $usr && in_array((string)$usr['rol'], self::ROLES, true);
+    }
+
+    /** Administración AVBA o administrador de accesos de la planta: ven todo,
+     *  dan salida y liberan equipos. Sólo ADMIN asigna puntos y crea cuentas. */
+    public static function esGestor(?array $usr): bool {
+        return in_array((string)($usr['rol'] ?? ''), ['ADMIN', 'PLANTA'], true);
     }
 
     /** Puntos de control fijos de la planta. Cada uno tiene su propia cuenta de
@@ -198,7 +205,7 @@ class ControlAccesos {
             return ['ok' => false, 'error' => ['status' => 'error', 'codigo' => 'OTRO_EQUIPO', 'punto' => $f['punto'],
                     'message' => 'El ' . self::nombrePunto($f['punto']) . ' ya está en otro equipo'
                                . ($f['dispositivo_desc'] !== '' ? ' (' . $f['dispositivo_desc'] . ')' : '')
-                               . '. Para usarlo en éste, Administración debe liberarlo en Control de accesos → Puntos de control.']];
+                               . '. Para usarlo en éste, el administrador de accesos debe liberarlo en Control de accesos → Puntos de control.']];
         }
         if (!$f['ultimo_uso'] || strtotime((string)$f['ultimo_uso']) < time() - 60) {
             $this->pdo->prepare("UPDATE accesos_puntos SET ultimo_uso = ? WHERE punto = ?")->execute([date('Y-m-d H:i:s'), $f['punto']]);
@@ -239,7 +246,7 @@ class ControlAccesos {
         }
         return ['status' => 'success', 'puntos' => $out,
                 'cuentas' => array_map(fn($c) => ['usuario' => $c['usuario'], 'nombre' => $c['nombre'], 'activo' => (bool)$c['activo']], $cuentas),
-                'puede_editar' => ($usr['rol'] ?? '') === 'ADMIN'];
+                'puede_editar' => ($usr['rol'] ?? '') === 'ADMIN', 'puede_liberar' => self::esGestor($usr)];
     }
 
     /** Administración: qué cuenta de caseta trabaja en cada punto ('' = ninguna) */
@@ -278,7 +285,7 @@ class ControlAccesos {
 
     /** Administración: libera el equipo de un punto (el siguiente que entre queda ligado) */
     public function liberarEquipo(array $p, array $usr): array {
-        if (($usr['rol'] ?? '') !== 'ADMIN') return ['status' => 'error', 'message' => 'Sólo Administración libera los equipos.'];
+        if (!self::esGestor($usr)) return ['status' => 'error', 'message' => 'Sólo el administrador de accesos libera los equipos.'];
         if (!self::asegurarPuntos($this->pdo)) return ['status' => 'error', 'message' => 'No se pudieron preparar los puntos de control en el servidor.'];
         $punto = textoEstandar($p['punto'] ?? '');
         if (!in_array($punto, self::PUNTOS, true)) return ['status' => 'error', 'message' => 'Ese punto de control no existe.'];
@@ -374,7 +381,7 @@ class ControlAccesos {
         $origenPedido = (string)($p['origen'] ?? '');
         $origen = $codigo === '' ? 'foto'
                 : ($origenPedido === 'manual' ? 'manual'
-                : ($origenPedido === 'admin' && ($usr['rol'] ?? '') === 'ADMIN' ? 'admin' : 'tarjeta'));
+                : ($origenPedido === 'admin' && self::esGestor($usr) ? 'admin' : 'tarjeta'));
         $conFoto = !empty($archivo['tmp_name']) && (int)($archivo['error'] ?? 1) === UPLOAD_ERR_OK;
         if (!$conFoto && $codigo === '') {
             return ['status' => 'error', 'message' => 'Falta la fotografía de la identificación o el código de la tarjeta.'];
@@ -695,7 +702,7 @@ class ControlAccesos {
             ]);
             $nomT = ($t === 'D' ? 'turno de día' : 'turno de noche') . ' ' . date('d/m/Y', strtotime($fecha));
             $mpdf->SetTitle('Control de accesos ' . $nomT . ($lugar !== '' ? ' - ' . $lugar : '') . ($partes > 1 ? " - parte $parte de $partes" : ''));
-            $mpdf->SetAuthor('AVBA Certificaciones');
+            $mpdf->SetAuthor('AVBA Control de Accesos');
             $mpdf->SetFooter('Control de accesos · ' . $nomT . ($partes > 1 ? " · parte $parte de $partes" : '') . '||Página {PAGENO} de {nbpg}');
             $mpdf->WriteHTML($html);
 
@@ -879,13 +886,13 @@ class ControlAccesos {
 
     /** Administración registra la salida de alguien que salió sin pasar su credencial (queda marcada). */
     public function darSalida(array $p, array $usr): array {
-        if (($usr['rol'] ?? '') !== 'ADMIN') return ['status' => 'error', 'message' => 'Sólo Administración registra salidas desde aquí.'];
+        if (!self::esGestor($usr)) return ['status' => 'error', 'message' => 'Sólo el administrador de accesos registra salidas desde aquí.'];
         $per = $this->persona(['id' => $p['id'] ?? '', 'dias' => 3], $usr);
         if (($per['status'] ?? '') !== 'success') return $per;
         if (empty($per['en_planta'])) return ['status' => 'error', 'message' => 'Ese ID ya no aparece en planta.'];
         $r = $this->registrar([
             'uid' => 'adm-' . bin2hex(random_bytes(12)), 'tipo' => 'salida', 'capturado' => date('Y-m-d H:i:s'),
-            'lugar' => 'ADMINISTRACION', 'nota' => 'Salida registrada por Administración',
+            'lugar' => 'ADMINISTRACION', 'nota' => 'Salida registrada por ' . (($usr['rol'] ?? '') === 'ADMIN' ? 'Administración' : 'el administrador de accesos'),
             'codigo' => $per['id'], 'persona' => $per['nombre'], 'origen' => 'admin',
         ], [], $usr);
         if (($r['status'] ?? '') === 'success') {
@@ -942,7 +949,7 @@ class ControlAccesos {
         ]);
         $nomT = ($t === 'D' ? 'turno de día' : 'turno de noche') . ' ' . date('d/m/Y', strtotime($fecha));
         $mpdf->SetTitle('Entradas y salidas ' . $nomT . ($lugar !== '' ? ' - ' . $lugar : ''));
-        $mpdf->SetAuthor('AVBA Certificaciones');
+        $mpdf->SetAuthor('AVBA Control de Accesos');
         $mpdf->SetFooter('Control de accesos · entradas y salidas · ' . $nomT . '||Página {PAGENO} de {nbpg}');
         $mpdf->WriteHTML($this->htmlPdfDatos($fecha, $lugar, $renglones, $usr, $info));
 

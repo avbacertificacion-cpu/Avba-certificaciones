@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Iniciar sesión · Control de Accesos · AVBA</title>
+<link rel="icon" href="assets/logos/avba.png">
+<meta name="theme-color" content="#0B2545">
+<link rel="stylesheet" href="css/ca.css">
+<!--
+  Inicio de sesión de la plataforma Control de Accesos, con cuentas PROPIAS
+  (no son las del Sistema de Gestión). La sesión se guarda en ca_sesion.
+  Mientras la base no tenga ninguna cuenta, ofrece crear la primera de
+  Administración con la clave de instalación de config/config.php.
+-->
+</head>
+<body>
+<header class="cab">
+  <img src="assets/logos/avba.png" alt="AVBA">
+  <h1>Control de Accesos</h1>
+  <p>Entradas y salidas de la planta con la credencial de acceso</p>
+</header>
+<main>
+  <!-- Entrar -->
+  <form class="card" id="f-login" autocomplete="on" hidden>
+    <h2>Iniciar sesión</h2>
+    <p style="margin-bottom:14px">Con tu cuenta de Control de Accesos (guardia de caseta, administrador de la planta o Administración AVBA).</p>
+    <div class="aviso mal" id="err-login" hidden role="alert"></div>
+    <div class="campo"><label for="usuario">Usuario</label>
+      <input id="usuario" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required maxlength="50"></div>
+    <div class="campo"><label for="password">Contraseña</label>
+      <div class="pass"><input id="password" name="password" type="password" autocomplete="current-password" required>
+        <button type="button" data-ver="password" aria-label="Mostrar contraseña"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+    <button class="btn ancho" id="b-login" type="submit">Entrar</button>
+  </form>
+
+  <!-- Primera cuenta (sólo con la base vacía) -->
+  <form class="card" id="f-instalar" autocomplete="off" hidden>
+    <span class="etq">Instalación</span>
+    <h2 style="margin-top:8px">Crear la primera cuenta de Administración</h2>
+    <p style="margin-bottom:14px">La plataforma todavía no tiene cuentas. Escribe la <b>clave de instalación</b> que pusiste en <code>config/config.php</code> del servidor y los datos de tu cuenta. Después, desde «Cuentas», das de alta a los guardias y al administrador de la planta.</p>
+    <div class="aviso mal" id="err-instalar" hidden role="alert"></div>
+    <div class="aviso info" id="sin-clave" hidden>Falta una clave de instalación propia en <code>config/config.php</code> del servidor (CLAVE_INSTALACION, de al menos 8 caracteres y distinta a la de la plantilla). Agrégala y recarga esta página.</div>
+    <div class="campo"><label for="i-clave">Clave de instalación</label><input id="i-clave" type="password" autocomplete="off" required></div>
+    <div class="campo"><label for="i-nombre">Tu nombre</label><input id="i-nombre" maxlength="150" required></div>
+    <div class="campo"><label for="i-usuario">Usuario</label><input id="i-usuario" autocapitalize="none" spellcheck="false" maxlength="50" required>
+      <small>Minúsculas, números, punto o guion; sin espacios. Ej.: admin.avba</small></div>
+    <div class="campo"><label for="i-pass">Contraseña</label>
+      <div class="pass"><input id="i-pass" type="password" autocomplete="new-password" minlength="8" required>
+        <button type="button" data-ver="i-pass" aria-label="Mostrar contraseña"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+      <small>Al menos 8 caracteres.</small></div>
+    <div class="campo"><label for="i-pass2">Repite la contraseña</label><input id="i-pass2" type="password" autocomplete="new-password" required></div>
+    <button class="btn ancho" id="b-instalar" type="submit">Crear cuenta y entrar</button>
+  </form>
+
+  <div class="card" id="cargando"><p>Cargando…</p></div>
+  <p style="text-align:center;font-size:13px;margin-top:6px"><a href="index.html" style="color:var(--sub)">Inicio</a></p>
+</main>
+
+<script src="js/destinos.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var API = 'api/index.php', CLAVE = window.CA_SESION || 'ca_sesion';
+
+  function equipo() {
+    var ua = navigator.userAgent || '', m = /Android [\d.]+; ([^;)]+)/.exec(ua);
+    var app = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.LectorTarjeta ? 'App Control de Accesos · ' : '';
+    return app + (m ? 'Android · ' + m[1].replace(/ Build.*/, '').trim()
+      : (/iPhone|iPad/.test(ua) ? 'iPhone/iPad' : (/Windows/.test(ua) ? 'Computadora Windows' : (/Mac OS X/.test(ua) ? 'Mac' : 'Navegador'))));
+  }
+  function post(accion, payload) {
+    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: accion, payload: payload }) })
+      .then(function (r) { return r.json().catch(function () { throw new Error('El servidor no respondió bien (' + r.status + ').'); }); });
+  }
+  /* A dónde ir después de entrar: ?volver=accesos.html (sólo una página de aquí) o la de su perfil */
+  function destino(rol) {
+    var v = new URLSearchParams(location.search).get('volver') || '';
+    if (/^[a-z0-9_-]+\.html$/i.test(v) && v !== 'login.html') {
+      if (rol === 'ACCESOS' && v !== 'accesos.html') v = '';            // el guardia sólo usa accesos.html
+      if (v === 'cuentas.html' && rol !== 'ADMIN') v = '';
+      if (v) return v;
+    }
+    return (window.CA_DESTINOS || {})[rol] || 'index.html';
+  }
+  function entrar(r) {
+    try { localStorage.setItem(CLAVE, JSON.stringify({ token: r.token, usuario: r.usuario, nombre: r.nombre, rol: r.rol, expira: r.expira })); } catch (e) {}
+    location.replace(destino(r.rol));
+  }
+  function error(id, msg) { $(id).textContent = msg || ''; $(id).hidden = !msg; }
+
+  // Mostrar / ocultar contraseña
+  document.querySelectorAll('[data-ver]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var i = $(b.dataset.ver); i.type = i.type === 'password' ? 'text' : 'password';
+      b.setAttribute('aria-label', i.type === 'password' ? 'Mostrar contraseña' : 'Ocultar contraseña');
+    });
+  });
+
+  // Espera tras varios intentos fallidos: cuenta regresiva en el botón
+  var tEspera = null;
+  function esperar(seg) {
+    clearInterval(tEspera);
+    var b = $('b-login'), fin = Date.now() + seg * 1000;
+    function tic() {
+      var s = Math.ceil((fin - Date.now()) / 1000);
+      if (s <= 0) { clearInterval(tEspera); b.disabled = false; b.textContent = 'Entrar'; error('err-login', ''); return; }
+      b.disabled = true; b.textContent = 'Espera ' + s + ' s';
+    }
+    tic(); tEspera = setInterval(tic, 500);
+  }
+
+  $('f-login').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var b = $('b-login'); if (b.disabled) return;
+    error('err-login', ''); b.disabled = true; b.textContent = 'Entrando…';
+    post('LOGIN', { usuario: $('usuario').value.trim(), password: $('password').value, dispositivo_desc: equipo() }).then(function (r) {
+      if (r && r.status === 'success') { entrar(r); return; }
+      error('err-login', (r && r.message) || 'No se pudo entrar.');
+      b.disabled = false; b.textContent = 'Entrar';
+      if (r && r.espera > 0) esperar(r.espera);
+      $('password').select();
+    }).catch(function (e) {
+      error('err-login', navigator.onLine === false ? 'Sin conexión a internet.' : e.message || 'No se pudo conectar con el servidor.');
+      b.disabled = false; b.textContent = 'Entrar';
+    });
+  });
+
+  $('f-instalar').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    error('err-instalar', '');
+    if ($('i-pass').value !== $('i-pass2').value) { error('err-instalar', 'Las dos contraseñas no coinciden.'); return; }
+    var b = $('b-instalar'); b.disabled = true;
+    post('INSTALAR', { clave: $('i-clave').value, nombre: $('i-nombre').value, usuario: $('i-usuario').value.trim().toLowerCase(),
+                       password: $('i-pass').value, dispositivo_desc: equipo() }).then(function (r) {
+      if (r && r.status === 'success') { entrar(r); return; }
+      error('err-instalar', (r && r.message) || 'No se pudo crear la cuenta.'); b.disabled = false;
+    }).catch(function (e) { error('err-instalar', e.message || 'No se pudo conectar con el servidor.'); b.disabled = false; });
+  });
+
+  /* ¿Ya hay sesión? Se comprueba con el servidor antes de saltar */
+  var ses = null;
+  try { ses = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) {}
+  var revisar = ses && ses.token
+    ? fetch(API + '?action=SESION', { headers: { Authorization: 'Bearer ' + ses.token } }).then(function (r) { return r.json(); })
+        .then(function (r) { if (r && r.status === 'success') { location.replace(destino(r.rol)); return true; }
+                             try { localStorage.removeItem(CLAVE); } catch (e) {} return false; })
+        .catch(function () { return false; })
+    : Promise.resolve(false);
+
+  revisar.then(function (yaDentro) {
+    if (yaDentro) return;
+    return fetch(API + '?action=INSTALAR_ESTADO').then(function (r) { return r.json(); }).then(function (r) {
+      $('cargando').hidden = true;
+      if (r && r.status === 'success' && r.instalar) {
+        $('f-instalar').hidden = false; $('sin-clave').hidden = !!r.con_clave; $('b-instalar').disabled = !r.con_clave;
+        $('i-clave').focus();
+      } else {
+        $('f-login').hidden = false; $('usuario').focus();
+        if (r && r.status === 'error') error('err-login', r.message);
+      }
+    });
+  }).catch(function () {
+    $('cargando').hidden = true; $('f-login').hidden = false;
+    error('err-login', 'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.');
+  });
+})();
+</script>
+</body>
+</html>

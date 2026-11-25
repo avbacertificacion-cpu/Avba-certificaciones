@@ -8,7 +8,7 @@ const API = B + 'api/index.php';
 const D = __dirname + '/';
 let fallas = 0;
 const ok = (c, m) => { if (!c) fallas++; console.log((c ? 'OK   ' : 'FALLA') + ' ' + m); };
-const sql = q => execSync(`mariadb --default-character-set=utf8mb4 -N -B -uprueba -pprueba -h127.0.0.1 avba_prueba -e "${q}"`).toString().trim();
+const sql = q => execSync(`mariadb --default-character-set=utf8mb4 -N -B -uprueba -pprueba -h127.0.0.1 ca_prueba -e "${q}"`).toString().trim();
 const post = async (accion, tok, payload = {}) => (await fetch(API, {
   method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
   body: JSON.stringify({ action: accion, token: tok, payload })
@@ -19,7 +19,7 @@ const fila = cod => { const r = sql(`SELECT CONCAT_WS('|', origen, nombre, foto,
 async function equipo(b, sesion, conLector) {
   const ctx = await b.newContext({ timezoneId: 'America/Mexico_City', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await ctx.addInitScript(([s, conLector]) => {
-    if (!sessionStorage.getItem('ya')) { localStorage.setItem('avba_session', JSON.stringify(s)); sessionStorage.setItem('ya', '1'); }
+    if (!sessionStorage.getItem('ya')) { localStorage.setItem('ca_sesion', JSON.stringify(s)); sessionStorage.setItem('ya', '1'); }
     window.__lecturas = []; window.__opciones = [];
     if (conLector) window.Capacitor = { isNativePlatform: () => true, Plugins: { LectorTarjeta: {
       leer: (o) => { window.__opciones.push(o); return new Promise(r => setTimeout(() => r(window.__lecturas.shift() || { cancelado: true }), 150)); },
@@ -67,7 +67,7 @@ async function leer(p, lectura, tipo = 'ent') {
   await K.p.waitForTimeout(3500);
   let f = fila('00287');
   ok(f && f[0] === 'tarjeta' && f[1] === 'RAMIRO ESTEBAN VILLARREAL DUARTE' && /^fotos\//.test(f[2]) && /_m\.jpg$/.test(f[3]), 'en el servidor: nombre, ID y foto (' + (f || []).slice(2, 4).join(' · ') + ')');
-  const ruta = f ? D + 'api_prueba/uploads/accesos/' + f[2] : '';
+  const ruta = f ? D + '../../../uploads/accesos/' + f[2] : '';
   const dim = ruta && fs.existsSync(ruta) ? execSync(`php -r '$i=getimagesize("${ruta}"); echo $i[0]."x".$i[1];'`).toString() : '';
   ok(/^\d+x\d+$/.test(dim) && +dim.split('x')[1] > +dim.split('x')[0], 'la foto quedó guardada (de pie, ' + dim + ')');
   let lista = await K.p.$$eval('#lista li.reg', l => l.map(x => ({ t: x.innerText.replace(/\s+/g, ' '), img: !!x.querySelector('img') })));
@@ -124,12 +124,18 @@ async function leer(p, lectura, tipo = 'ent') {
   ok(!A.p.errores.length, 'sin errores de JavaScript (administración)');
 
   // ── PDF con fotos: cada foto con su ID y nombre ──
-  const turno = sql("SELECT CONCAT(turno_fecha,'-',turno) FROM accesos_registros WHERE codigo='00287'");
-  const pdf = await post('ACCESOS_PDF', 'tok-admin', { turno, incluir: 'ambos' });
-  ok(pdf.status === 'success', 'PDF con fotos del turno: ' + (pdf.message || pdf.status));
-  const rutaPdf = D + 'api_prueba/uploads/accesos/pdf/' + (pdf.archivo || (pdf.partes && pdf.partes[0] && pdf.partes[0].archivo) || '');
-  const texto = fs.existsSync(rutaPdf) ? execSync(`pdftotext -layout "${rutaPdf}" -`).toString() : '';
-  ok(/ID 00287/.test(texto) && /RAMIRO ESTEBAN VILLARREAL DUARTE/.test(texto) && /ID 412/.test(texto), 'en el PDF cada foto lleva el ID y el nombre');
+  // La entrada del 00287 y la salida del 412 pueden caer en turnos distintos según la hora
+  // a la que corre la prueba (una salida cuenta para el turno que termina): un PDF por turno.
+  const textoPdf = async (codigo) => {
+    const turno = sql(`SELECT CONCAT(turno_fecha,'-',turno) FROM accesos_registros WHERE codigo='${codigo}' LIMIT 1`);
+    const pdf = await post('ACCESOS_PDF', 'tok-admin', { turno, incluir: 'ambos' });
+    ok(pdf.status === 'success', 'PDF con fotos del turno ' + turno + ': ' + (pdf.message || pdf.status));
+    const ruta = D + '../../../uploads/accesos/pdf/' + (pdf.archivo || '');
+    return { ruta, texto: pdf.archivo && fs.existsSync(ruta) ? execSync(`pdftotext -layout "${ruta}" -`).toString() : '' };
+  };
+  const { ruta: rutaPdf, texto } = await textoPdf('00287');
+  const texto412 = (await textoPdf('412')).texto;
+  ok(/ID 00287/.test(texto) && /RAMIRO ESTEBAN VILLARREAL DUARTE/.test(texto) && /ID 412/.test(texto412), 'en el PDF cada foto lleva el ID y el nombre');
   if (fs.existsSync(rutaPdf)) execSync(`pdftoppm -r 50 -png -f 1 -l 1 "${rutaPdf}" "${D}evid_pdf"`);
   await b.close();
   console.log(fallas ? fallas + ' FALLAS' : 'TODO BIEN');

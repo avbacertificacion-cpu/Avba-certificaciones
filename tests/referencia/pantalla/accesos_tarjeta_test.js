@@ -1,7 +1,7 @@
 // Pantalla real de control de accesos (accesos.html) con el lector de la app simulado
 // y la API simulada (no toca ninguna base de datos).
 const { chromium } = require('playwright');
-const B = 'http://localhost:8793/';
+const B = 'http://localhost:8794/';
 const D = __dirname + '/';
 const ok = (c, m) => console.log((c ? 'OK   ' : 'FALLA') + ' ' + m);
 
@@ -53,8 +53,8 @@ async function pantalla(b, rol, conLector) {
   const estado = { acciones: [], registrados: [], ids: {}, abiertos: [] };
   const ctx = await b.newContext({ timezoneId: 'America/Mexico_City', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await ctx.addInitScript(([rol, conLector]) => {
-    localStorage.setItem('avba_session', JSON.stringify({ token: 'prueba', rol, usuario: rol === 'ACCESOS' ? 'caseta1' : 'admin', nombre: rol === 'ACCESOS' ? 'Caseta 1' : 'Administración' }));
-    localStorage.setItem('avba_accesos_lugar', JSON.stringify('QUANTUM ENERGY CASETA 1'));
+    localStorage.setItem('ca_sesion', JSON.stringify({ token: 'prueba', rol, usuario: rol === 'ACCESOS' ? 'caseta1' : 'admin', nombre: rol === 'ACCESOS' ? 'Caseta 1' : 'Administración' }));
+    localStorage.setItem('ca_accesos_lugar', JSON.stringify('QUANTUM ENERGY CASETA 1'));
     if (conLector) {
       window.__lecturas = []; window.__abiertos = []; window.__opciones = [];
       window.Capacitor = { isNativePlatform: () => true, Plugins: { LectorTarjeta: {
@@ -91,7 +91,7 @@ async function pantalla(b, rol, conLector) {
   ok(/name="dispositivo"\r\n\r\neq-/.test(estado.cuerpos[0] || ''), 'el registro lleva el identificador del equipo');
   const op = await p.evaluate(() => window.__opciones[0]);
   ok(op && op.orientacion === 'vertical' && /credencial/.test(op.subtitulo || ''), 'la cámara recibe la credencial de pie (orientacion: ' + (op && op.orientacion) + ')');
-  { const rs = (await (await fetch('http://localhost:8793/demo/sala.php?tarjeta=1')).json()).reglas || {};
+  { const rs = (await (await fetch('http://localhost:8794/demo/sala.php?tarjeta=1')).json()).reglas || {};
     ok(rs.orientacion === 'vertical' && rs.noNombre.includes('SOLUCIONES') && rs.noNombre.includes('AYUDANTE') && rs.noNombre.includes('THE'), 'el servidor entrega las reglas de la credencial (vertical; empresa, oficios y logotipos no son nombre)'); }
   ok(op && /ENTRADA · PUNTO DE CONTROL 1/.test(op.titulo) && op.simular === false && op.minDigitos === 4, 'opciones del lector: ' + op.titulo);
   // Salida con código escrito a mano

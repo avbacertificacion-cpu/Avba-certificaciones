@@ -2,8 +2,8 @@
 --  AVBA Control de Accesos — esquema inicial de la base PROPIA
 --  (p. ej. u218429682_controlaccesos; NO es la base del sistema principal)
 --
---  Las tablas de accesos las crea el código solo al primer uso
---  (ControlAccesos::asegurarTabla / asegurarPuntos). Este archivo sirve para
+--  Las tablas las crea el código solo al primer uso (Auth::asegurarTablas,
+--  ControlAccesos::asegurarTabla / asegurarPuntos). Este archivo sirve para
 --  importarlas de una vez en phpMyAdmin y como referencia del modelo.
 --
 --  Lo que hace falta para volver real la maqueta (empresas, personas,
@@ -41,6 +41,16 @@ CREATE TABLE IF NOT EXISTS sesiones_usuario (
   expira      DATETIME     NOT NULL,
   KEY idx_usuario (usuario_id),
   KEY idx_expira (expira)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- ── Intentos fallidos de inicio de sesión (la espera crece) ─────────
+CREATE TABLE IF NOT EXISTS login_intentos (
+  id              INT AUTO_INCREMENT PRIMARY KEY,
+  usuario         VARCHAR(50) NOT NULL,
+  intentos        TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  bloqueado_hasta DATETIME NULL,
+  ultima_vez      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_usuario (usuario)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- ── Entradas y salidas (una fila por lectura en la caseta) ──────────

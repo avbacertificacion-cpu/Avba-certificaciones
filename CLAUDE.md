@@ -37,7 +37,13 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 
 | Ruta | Qué es |
 |---|---|
-| `index.html` | Entrada de la plataforma (por ahora lleva a la maqueta). |
+| `index.html` | Entrada: sin sesión, «Iniciar sesión»; con sesión, el menú del perfil (Control de accesos, Cuentas, Mi contraseña, Maqueta). |
+| `login.html` | Inicio de sesión propio. Con la base vacía ofrece crear la primera cuenta ADMIN con la `CLAVE_INSTALACION` de `config.php`. |
+| `cuentas.html` | Cuentas (sólo ADMIN): alta, nombre, perfil, contraseña, desactivar. |
+| `descargar.php` | Fotos de credenciales y PDF, sólo con sesión (el guardia, sólo sus fotos). |
+| `api/index.php` | Enrutador propio: sesión, cuentas y las acciones de `accesos.html`. |
+| `api/Auth.php`, `api/helpers.php` | Cuentas, sesiones por equipo, límite de intentos; conexión a la base propia y utilidades. |
+| `js/destinos.js` | Pantalla de inicio de cada perfil y la clave de la sesión (`ca_sesion`). |
 | `accesos.html` | Módulo real que ya funcionaba en el Sistema de Gestión: pantalla del guardia (lee la credencial con la app, ENTRADA/SALIDA, cola sin señal, foto de evidencia) y del administrador (registros por turno, **En planta**, movimientos por ID, dar salida, PDF, puntos de control). |
 | `api/ControlAccesos.php` | Lógica del servidor del módulo (registros, turnos, puntos y equipos, en planta, PDF con mPDF). |
 | `api/accesos-tarjeta.json` | Reglas del lector de la credencial (se ajustan sin reinstalar la app). |
@@ -46,21 +52,21 @@ propia y cuentas propias**. La aplicación es esta rama; el sistema principal no
 | `mobile/caseta/` | App Android «AVBA Control de Accesos» (Capacitor): abre `accesos.html` y agrega el lector nativo de la credencial (CameraX + ML Kit sin internet, `AnalizadorTarjeta.java` con sus pruebas). |
 | `config/config.example.php` | Plantilla de la configuración (base propia). `config.php` vive sólo en el servidor. |
 | `sql/esquema-inicial.sql` | Tablas de la base propia (cuentas, sesiones, registros, puntos). |
-| `tests/referencia/` | Pruebas del módulo (PHP y pantalla con Playwright), escritas contra el API del sistema principal: documentan lo que hay que conservar; se adaptan en la fase 1. |
-| `.github/workflows/` | `deploy-control-accesos.yml` (publica en `/controlaccesos/`) y `app-caseta.yml` (compila y publica la app). **Los dos están apagados** hasta terminar la fase 1: se encienden descomentando su `push` (el botón «Run workflow» de GitHub no aparece para ramas que no son `main`). |
+| `tests/referencia/` | Pruebas (PHP, API y pantallas con Playwright) contra la API propia. Todas: `bash tests/referencia/correr.sh` (una: `… correr.sh pantalla/sesion`). |
+| `.github/workflows/` | `deploy-control-accesos.yml` (publica en `/controlaccesos/` en cada push a esta rama) y `app-caseta.yml` (compila y publica la app cuando cambia `mobile/caseta/`). **Encendidos** desde la fase 1. |
 
-**Lo que todavía no existe** (fase 1): `api/index.php` (enrutador), `api/helpers.php`,
-inicio de sesión propio (`login.html` y `api/Auth.php`), `descargar.php` (fotos y PDF)
-y la pantalla de cuentas. Sin eso, `accesos.html` no funciona en esta plataforma.
+**Perfiles** (`Auth::ROLES`): **ADMIN** (Administración AVBA: todo, cuentas y asignar
+puntos), **PLANTA** (administrador de accesos de la planta: registros, En planta, PDF,
+dar salida, liberar el equipo de un punto) y **ACCESOS** (guardia: sólo registra en su
+punto; el enrutador le rechaza todo lo demás).
 
 ## Cuidados importantes
 
 1. **Mismo dominio que el Sistema de Gestión.** El navegador comparte `localStorage`,
    IndexedDB y cookies entre `/` y `/controlaccesos/`. Todas las claves de esta
-   plataforma llevan el prefijo **`ca_`** (p. ej. `ca_sesion`). Hoy `accesos.html` usa
-   `avba_session`, `avba_accesos_*`, `avba_tarjeta_reglas` y la base IndexedDB
-   `avba_accesos`, que son del sistema principal: **renombrarlas en la fase 1**, o
-   iniciar sesión en una plataforma cerraría la de la otra. El service worker del
+   plataforma llevan el prefijo **`ca_`** (p. ej. `ca_sesion`). Ya renombradas en la fase 1:
+   `ca_sesion`, `ca_accesos_*`, `ca_tarjeta_reglas` y la base IndexedDB `ca_accesos`
+   (las `avba_*` son del sistema principal: no tocarlas). El service worker del
    sistema principal (alcance `/`) deja pasar lo que va a `/api/` y pide lo demás a la
    red; si esta plataforma necesita uno propio, registrarlo con alcance `/controlaccesos/`.
 2. **Dos apps distintas.** «AVBA Caseta» (`mx.com.avba.caseta`) abre el control de
@@ -84,6 +90,9 @@ y la pantalla de cuentas. Sin eso, `accesos.html` no funciona en esta plataforma
 
 ## Cómo probar
 
+- Todo junto: `bash tests/referencia/correr.sh` (crea la base `ca_prueba` en el MariaDB
+  local, un `config/config.php` de prueba si no hay, levanta `php -S localhost:8794` y
+  corre las pruebas con la base limpia antes de cada una).
 - Base local: MariaDB en `127.0.0.1` con una base de prueba creada desde
   `sql/esquema-inicial.sql` (nunca la del servidor).
 - Servidor local de PHP sólo en `localhost` (`php -S localhost:8794`) con un

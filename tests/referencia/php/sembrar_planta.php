@@ -5,7 +5,7 @@ date_default_timezone_set('America/Mexico_City');
 define('UPLOAD_DIR', __DIR__ . '/uploads/');
 require __DIR__ . '/../../../api/helpers.php';
 require __DIR__ . '/../../../api/ControlAccesos.php';
-$pdo = new PDO('mysql:host=127.0.0.1;dbname=avba_prueba;charset=utf8mb4', 'prueba', 'prueba', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+$pdo = new PDO('mysql:host=127.0.0.1;dbname=ca_prueba;charset=utf8mb4', 'prueba', 'prueba', [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
 ControlAccesos::asegurarTabla($pdo);
 $pdo->exec("DELETE FROM accesos_registros");
 $n = 0;

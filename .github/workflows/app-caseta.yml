@@ -14,19 +14,18 @@ name: App Control de Accesos (Android)
 # (mx.com.avba.controlaccesos) y su propia llave, así se instala junto a ella
 # mientras dura el cambio y nunca choca con su firma.
 #
-# Por ahora está APAGADO: la plataforma nueva todavía no funciona (falta la
-# fase 1 de docs/PLAN.md) y una app publicada abriría una pantalla sin servidor.
-# Se enciende descomentando el «push» de abajo. (El botón «Run workflow» de
-# GitHub sólo aparece para flujos que están en la rama por omisión, main.)
+# Encendido desde la fase 1 (docs/PLAN.md): compila cuando cambia mobile/caseta
+# o este archivo. (El botón «Run workflow» de GitHub sólo aparece para flujos
+# que están en la rama por omisión, main.)
 
 on:
   workflow_dispatch:
-  # push:
-  #   branches:
-  #     - claude/control-accesos
-  #   paths:
-  #     - 'mobile/caseta/**'
-  #     - '.github/workflows/app-caseta.yml'
+  push:
+    branches:
+      - claude/control-accesos
+    paths:
+      - 'mobile/caseta/**'
+      - '.github/workflows/app-caseta.yml'
 
 concurrency:
   group: app-control-accesos-${{ github.ref }}

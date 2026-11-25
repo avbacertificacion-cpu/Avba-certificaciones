@@ -5,46 +5,111 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Control de Accesos · AVBA</title>
 <link rel="icon" href="assets/logos/avba.png">
+<meta name="theme-color" content="#0B2545">
+<link rel="stylesheet" href="css/ca.css">
 <!--
   Entrada de la plataforma de Control de Accesos (gestion.avba.com.mx/controlaccesos/).
-  Mientras se construye la fase 1 (inicio de sesión propio y base nueva, ver
-  docs/PLAN.md) sólo lleva a la maqueta. Cuando la plataforma funcione, esta
-  página pasa a ser la entrada con «Iniciar sesión».
+  Sin sesión: «Iniciar sesión» y la maqueta. Con sesión: el menú del perfil
+  (el guardia de caseta va directo a accesos.html).
 -->
-<style>
-  :root{--azul:#185FA5;--azul-dark:#0C447C;--marino:#0B2545;--texto:#1a1a2e;--sub:#5a6072;--borde:#dfe5ef;--fondo:#f2f5f9}
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;background:var(--fondo);color:var(--texto);min-height:100vh}
-  header{background:linear-gradient(160deg,var(--marino),var(--azul-dark));color:#fff;padding:28px 20px 34px;text-align:center}
-  header img{width:110px;background:#fff;border-radius:14px;padding:8px 12px}
-  header h1{font-size:24px;margin-top:14px}
-  header p{opacity:.85;margin-top:6px;font-size:14.5px}
-  main{max-width:620px;margin:-18px auto 30px;padding:0 16px}
-  .card{background:#fff;border:1px solid var(--borde);border-radius:14px;padding:18px;margin-bottom:12px}
-  .card h2{font-size:16px;color:var(--azul-dark);margin-bottom:6px}
-  .card p{font-size:14px;color:var(--sub);line-height:1.5}
-  .btn{display:inline-block;margin-top:12px;background:var(--azul);color:#fff;text-decoration:none;font-weight:700;border-radius:10px;padding:11px 18px;font-size:14.5px}
-  .btn.sec{background:#fff;color:var(--azul);border:1.5px solid var(--azul)}
-  .etq{display:inline-block;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:20px;background:#FFF3D6;color:#8A5A00;margin-bottom:8px}
-</style>
 </head>
 <body>
-<header>
+<header class="cab">
   <img src="assets/logos/avba.png" alt="AVBA">
   <h1>Control de Accesos</h1>
-  <p>Entradas y salidas de la planta con la credencial de acceso</p>
+  <p id="saludo">Entradas y salidas de la planta con la credencial de acceso</p>
 </header>
 <main>
-  <div class="card">
-    <span class="etq">En construcción</span>
-    <h2>La plataforma se está armando</h2>
-    <p>Tendrá su propia base de datos y sus propias cuentas: guardias de caseta, administrador de accesos de la planta y Administración AVBA.</p>
+  <!-- Sin sesión -->
+  <div id="fuera">
+    <div class="card">
+      <h2>Entrar a la plataforma</h2>
+      <p>Guardias de caseta, administrador de accesos de la planta y Administración AVBA, cada quien con su cuenta.</p>
+      <a class="btn" href="login.html" style="margin-top:12px">Iniciar sesión</a>
+    </div>
+    <div class="card">
+      <h2>App para la caseta</h2>
+      <p>El guardia usa la app «AVBA Control de Accesos» en el teléfono: lee la credencial con la cámara, sin internet, y guarda la foto como evidencia.</p>
+      <a class="btn sec" href="descargas/avba-control-accesos.apk" style="margin-top:12px">Descargar la app (Android)</a>
+    </div>
   </div>
-  <div class="card">
-    <h2>Maqueta</h2>
-    <p>Cómo va a funcionar: panel del administrador, pantalla del guardia y la app que lee la credencial. Datos ficticios.</p>
-    <a class="btn" href="demo/">Ver la maqueta</a>
+
+  <!-- Con sesión -->
+  <div id="dentro" hidden>
+    <div class="mosaicos">
+      <a class="mosaico" href="accesos.html">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 7h6M9 11h6M9 15h3"/></svg>
+        <b>Control de accesos</b><span>Registros por turno, En planta, movimientos por ID, PDF y puntos de control.</span></a>
+      <a class="mosaico" href="cuentas.html" id="m-cuentas" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><path d="M17 8h5M19.5 5.5v5"/></svg>
+        <b>Cuentas</b><span>Guardias de caseta, administrador de la planta y Administración AVBA.</span></a>
+      <button class="mosaico" type="button" id="m-pass">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+        <b>Mi contraseña</b><span>Cambiarla. Se cierran tus sesiones en otros equipos.</span></button>
+      <a class="mosaico" href="demo/">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+        <b>Maqueta</b><span>Cómo va a quedar: personas, documentos, reglas, vales y jornadas. Datos ficticios.</span></a>
+    </div>
+
+    <form class="card" id="f-pass" hidden>
+      <h2>Cambiar mi contraseña</h2>
+      <div class="aviso" id="msg-pass" hidden role="status"></div>
+      <div class="campo"><label for="p-actual">Contraseña actual</label><input id="p-actual" type="password" autocomplete="current-password" required></div>
+      <div class="campo"><label for="p-nueva">Contraseña nueva</label><input id="p-nueva" type="password" autocomplete="new-password" minlength="8" required><small>Al menos 8 caracteres.</small></div>
+      <div class="campo"><label for="p-nueva2">Repite la nueva</label><input id="p-nueva2" type="password" autocomplete="new-password" required></div>
+      <div class="fila"><button class="btn" type="submit" id="b-pass">Guardar</button><button class="btn sec" type="button" id="b-pass-no">Cancelar</button></div>
+    </form>
+
+    <div style="text-align:center;margin-top:8px"><button class="btn peligro" type="button" id="b-salir">Cerrar sesión</button></div>
   </div>
 </main>
+
+<script src="js/destinos.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var API = 'api/index.php', CLAVE = window.CA_SESION || 'ca_sesion';
+  var NOMBRES = { ADMIN: 'Administración AVBA', PLANTA: 'Administrador de accesos de la planta', ACCESOS: 'Guardia de caseta' };
+  var ses = null;
+  try { ses = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) {}
+  function api(accion, payload) {
+    return fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + ses.token },
+                        body: JSON.stringify({ action: accion, payload: payload || {} }) }).then(function (r) { return r.json(); });
+  }
+  function fuera() { try { localStorage.removeItem(CLAVE); } catch (e) {} ses = null; $('dentro').hidden = true; $('fuera').hidden = false; }
+  function mostrar(s) {
+    if (s.rol === 'ACCESOS') { location.replace('accesos.html'); return; }
+    $('fuera').hidden = true; $('dentro').hidden = false;
+    $('saludo').textContent = (s.nombre || s.usuario) + ' · ' + (NOMBRES[s.rol] || s.rol);
+    $('m-cuentas').hidden = s.rol !== 'ADMIN';
+  }
+  if (ses && ses.token) {
+    mostrar(ses);                                  // al instante con lo guardado; el servidor lo confirma
+    fetch(API + '?action=SESION', { headers: { Authorization: 'Bearer ' + ses.token } }).then(function (r) { return r.json(); }).then(function (r) {
+      if (r && r.status === 'success') { ses.rol = r.rol; ses.nombre = r.nombre; try { localStorage.setItem(CLAVE, JSON.stringify(ses)); } catch (e) {} mostrar(ses); }
+      else if (r && r.codigo === 'SIN_SESION') fuera();
+    }).catch(function () {});
+  }
+
+  $('b-salir').addEventListener('click', function () {
+    var listo = function () { fuera(); location.replace('login.html'); };
+    api('LOGOUT').then(listo, listo);
+  });
+  $('m-pass').addEventListener('click', function () { $('f-pass').hidden = false; $('p-actual').focus(); });
+  $('b-pass-no').addEventListener('click', function () { $('f-pass').hidden = true; $('f-pass').reset(); $('msg-pass').hidden = true; });
+  $('f-pass').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var m = $('msg-pass');
+    function msg(t, bien) { m.textContent = t; m.className = 'aviso ' + (bien ? 'bien' : 'mal'); m.hidden = false; }
+    if ($('p-nueva').value !== $('p-nueva2').value) { msg('Las dos contraseñas nuevas no coinciden.'); return; }
+    $('b-pass').disabled = true;
+    api('CAMBIAR_MI_CONTRASENA', { actual: $('p-actual').value, nueva: $('p-nueva').value }).then(function (r) {
+      $('b-pass').disabled = false;
+      if (r && r.status === 'success') { msg(r.message, true); $('f-pass').reset(); } else msg((r && r.message) || 'No se pudo cambiar.');
+    }).catch(function () { $('b-pass').disabled = false; msg('No se pudo conectar con el servidor.'); });
+  });
+})();
+</script>
 </body>
 </html>

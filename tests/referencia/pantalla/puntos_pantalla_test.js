@@ -8,7 +8,7 @@ const ok = (c, m) => { if (!c) fallas++; console.log((c ? 'OK   ' : 'FALLA') + '
 async function equipo(b, sesion, conLector) {
   const ctx = await b.newContext({ timezoneId: 'America/Mexico_City', viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   await ctx.addInitScript(([s, conLector]) => {
-    if (!sessionStorage.getItem('ya')) { localStorage.setItem('avba_session', JSON.stringify(s)); localStorage.setItem('avba_accesos_lugar', JSON.stringify('CASETA 1')); sessionStorage.setItem('ya', '1'); }
+    if (!sessionStorage.getItem('ya')) { localStorage.setItem('ca_sesion', JSON.stringify(s)); localStorage.setItem('ca_accesos_lugar', JSON.stringify('CASETA 1')); sessionStorage.setItem('ya', '1'); }
     if (conLector) {
       window.__lecturas = JSON.parse(sessionStorage.getItem('lecturas') || '[]'); window.__abiertos = [];
       window.Capacitor = { isNativePlatform: () => true, Plugins: { LectorTarjeta: {
@@ -27,6 +27,11 @@ async function equipo(b, sesion, conLector) {
 const caseta2 = { token: 'tok-punto2', rol: 'ACCESOS', usuario: 'punto2', nombre: 'CASETA PUNTO 2' };
 
 (async () => {
+  // Estado inicial: la cuenta punto2 en el Punto 2, sin equipo ligado (Administración lo asigna)
+  const asignar = (punto, usuario) => fetch(B + 'api/index.php', { method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer tok-admin' },
+    body: JSON.stringify({ action: 'ACCESOS_PUNTO_ASIGNAR', payload: { punto, usuario } }) }).then(r => r.json());
+  ok((await asignar('PUNTO DE CONTROL 2', 'punto2')).status === 'success', 'preparación: punto2 en el Punto 2');
   const b = await chromium.launch();
   // ── Equipo A: el guardia del Punto 2 entra ──
   let A = await equipo(b, caseta2, true);
@@ -44,8 +49,8 @@ const caseta2 = { token: 'tok-punto2', rol: 'ACCESOS', usuario: 'punto2', nombre
   ok(/^2 Entradas/.test(tot.trim()) || /2 Entradas/.test(tot), 'contadores: ' + tot.slice(0, 60));
   await A.p.screenshot({ path: D + 'pt_caseta.png' });
   // Cerrar sesión y volver a entrar: no se pierde nada
-  await A.p.evaluate(() => { localStorage.removeItem('avba_session'); });
-  await A.p.evaluate((s) => localStorage.setItem('avba_session', JSON.stringify(s)), caseta2);
+  await A.p.evaluate(() => { localStorage.removeItem('ca_sesion'); });
+  await A.p.evaluate((s) => localStorage.setItem('ca_sesion', JSON.stringify(s)), caseta2);
   await A.p.reload(); await A.p.waitForTimeout(1800);
   lista = await A.p.$$eval('#lista li.reg', l => l.map(x => x.innerText.replace(/\s+/g, ' ')));
   ok(lista.length === 2 && (await A.p.inputValue('#lugar')) === 'PUNTO DE CONTROL 2', 'al volver a entrar sigue su avance: ' + lista.length + ' registros en ' + await A.p.inputValue('#lugar'));
@@ -62,7 +67,7 @@ const caseta2 = { token: 'tok-punto2', rol: 'ACCESOS', usuario: 'punto2', nombre
   const Adm = await equipo(b, { token: 'tok-admin', rol: 'ADMIN', usuario: 'admin', nombre: 'ADMINISTRACION' }, false);
   ok(await Adm.p.isVisible('#tarjeta-puntos'), 'administración ve «Puntos de control»');
   const filas = await Adm.p.$$eval('#puntos-lista .punto', l => l.map(x => x.innerText.replace(/\s+/g, ' ')));
-  ok(filas.length === 4 && /Punto de control 2.*Equipo: App AVBA Caseta/.test(filas[1]), 'Punto 2 con su equipo: ' + (filas[1] || '').slice(0, 110));
+  ok(filas.length === 4 && /Punto de control 2.*Equipo: App Control de Accesos/.test(filas[1]), 'Punto 2 con su equipo: ' + (filas[1] || '').slice(0, 110));
   const lugares = await Adm.p.$$eval('#lugares option', l => l.map(o => o.value));
   ok(['PUNTO DE CONTROL 1', 'PUNTO DE CONTROL 4'].every(x => lugares.includes(x)), 'el punto de control para filtrar ofrece los 4 puntos');
   await Adm.p.screenshot({ path: D + 'pt_admin.png', fullPage: true });

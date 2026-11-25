@@ -1,13 +1,11 @@
-/* AVBA — Pantalla de cada rol al entrar.
-   La usan el inicio de sesión (login.html) y la entrada de la app
-   (mobile/src/index.html). Un rol o módulo nuevo se agrega sólo aquí. */
-window.AVBA_DESTINOS = {
-  ADMIN:           'admin.html',
-  INSPECTOR:       'inspector.html',
-  CALIDAD:         'calidad.html',
-  CERTIFICACIONES: 'certificaciones.html',
-  ADMINISTRATIVO:  'administrativo.html',
-  CLIENTE:         'portal-cliente.html',
-  PARTICIPANTE:    'participante.html',
-  ACCESOS:         'accesos.html',      // cuenta de caseta: sólo entradas y salidas
+/* AVBA Control de Accesos — pantalla de inicio de cada perfil.
+   La usan el inicio de sesión (login.html) y el botón de regresar de
+   accesos.html. Un perfil nuevo se agrega sólo aquí (y en api/Auth.php). */
+window.CA_DESTINOS = {
+  ADMIN:   'index.html',     // Administración AVBA: inicio con Control de accesos y Cuentas
+  PLANTA:  'index.html',     // Administrador de accesos de la planta
+  ACCESOS: 'accesos.html',   // Guardia de caseta: directo a registrar entradas y salidas
 };
+/* Clave de la sesión en este navegador. Con prefijo ca_: la plataforma
+   comparte dominio con el Sistema de Gestión (que usa avba_session). */
+window.CA_SESION = 'ca_sesion';

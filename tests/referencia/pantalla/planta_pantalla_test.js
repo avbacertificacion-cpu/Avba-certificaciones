@@ -10,7 +10,7 @@ const ses = u => ({ token: 'tok-' + u, rol: u === 'admin' ? 'ADMIN' : 'ACCESOS',
 async function abrir(b, sesion, vista, lector) {
   const ctx = await b.newContext({ timezoneId: 'America/Mexico_City', viewport: vista, acceptDownloads: true, ...(vista.width < 500 ? { isMobile: true, hasTouch: true } : {}) });
   await ctx.addInitScript(([s, lector]) => {
-    if (!sessionStorage.getItem('ya')) { localStorage.setItem('avba_session', JSON.stringify(s)); sessionStorage.setItem('ya', '1'); }
+    if (!sessionStorage.getItem('ya')) { localStorage.setItem('ca_sesion', JSON.stringify(s)); sessionStorage.setItem('ya', '1'); }
     if (lector) window.Capacitor = { isNativePlatform: () => true, Plugins: { LectorTarjeta: { leer: () => Promise.resolve({ cancelado: true }), abrir: () => Promise.resolve({}) } } };
   }, [sesion, lector]);
   const p = await ctx.newPage();
@@ -63,7 +63,7 @@ const filas = p => p.$$eval('#lista li.planta', l => l.map(x => x.innerText.repl
   await A.p.screenshot({ path: D + 'planta_persona.png' });
   await A.p.click('#per-salida'); await A.p.waitForTimeout(1500);
   const v500b = await A.p.$eval('#v-persona', e => e.innerText.replace(/\s+/g, ' '));
-  ok(/Fuera de planta/.test(v500b) && /registrada por Administración/.test(v500b), 'tras dar salida: fuera de planta, marcada como de Administración');
+  ok(/Fuera de planta/.test(v500b) && /registrada por el administrador de accesos/.test(v500b), 'tras dar salida: fuera de planta, marcada como del administrador de accesos');
   await A.p.click('#per-cerrar'); await A.p.waitForTimeout(800);
   f = await filas(A.p);
   ok(f.length === 3 && !f.some(t => /00500/.test(t)) && (await A.p.textContent('#planta-n')) === '3', 'y ya no aparece en planta (quedan 3)');

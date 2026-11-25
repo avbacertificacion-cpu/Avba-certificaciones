@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Cuentas · Control de Accesos · AVBA</title>
+<link rel="icon" href="assets/logos/avba.png">
+<meta name="theme-color" content="#0B2545">
+<link rel="stylesheet" href="css/ca.css">
+<!--
+  Cuentas de la plataforma (sólo Administración AVBA): dar de alta guardias
+  de caseta (una cuenta por punto de control), administradores de la planta
+  y más cuentas de Administración; cambiar nombre, perfil o contraseña y
+  desactivarlas. El punto de cada cuenta de caseta se elige en
+  accesos.html → Puntos de control.
+-->
+</head>
+<body>
+<header class="barra">
+  <a class="atras" href="index.html" aria-label="Regresar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></a>
+  <div><h1>Cuentas</h1><div class="sub">Control de Accesos · Administración AVBA</div></div>
+</header>
+<main class="ancho">
+  <div class="card" id="sin-permiso" hidden><p class="aviso mal">Sólo Administración AVBA maneja las cuentas.</p><a class="btn sec" href="index.html">Regresar</a></div>
+
+  <div id="todo" hidden>
+    <div class="card">
+      <div class="fila" style="align-items:center;justify-content:space-between">
+        <div><h2 style="margin:0">Cuentas de la plataforma</h2>
+          <p style="font-size:13px">Una cuenta de caseta por punto de control; su punto se elige en <a href="accesos.html">Control de accesos → Puntos de control</a>.</p></div>
+        <button class="btn" type="button" id="b-nueva">+ Nueva cuenta</button>
+      </div>
+    </div>
+
+    <!-- Alta / edición -->
+    <form class="card" id="f-cuenta" hidden autocomplete="off">
+      <h2 id="f-tit">Nueva cuenta</h2>
+      <div class="aviso mal" id="f-err" hidden role="alert"></div>
+      <div class="fila">
+        <div class="campo"><label for="c-nombre">Nombre</label><input id="c-nombre" maxlength="150" required placeholder="Ej. Caseta punto 1"></div>
+        <div class="campo"><label for="c-usuario">Usuario</label><input id="c-usuario" maxlength="50" autocapitalize="none" spellcheck="false" required placeholder="Ej. punto1">
+          <small>Minúsculas, números, punto o guion; sin espacios. No se cambia después.</small></div>
+      </div>
+      <div class="fila">
+        <div class="campo"><label for="c-rol">Perfil</label>
+          <select id="c-rol" required>
+            <option value="ACCESOS">Guardia de caseta (sólo registra en su punto)</option>
+            <option value="PLANTA">Administrador de accesos de la planta</option>
+            <option value="ADMIN">Administración AVBA (todo, incluidas las cuentas)</option>
+          </select></div>
+        <div class="campo"><label for="c-pass" id="l-pass">Contraseña</label><input id="c-pass" type="text" autocomplete="new-password" minlength="8">
+          <small id="s-pass">Al menos 8 caracteres. Dísela a la persona en persona, no por mensaje.</small></div>
+      </div>
+      <div class="fila"><button class="btn" type="submit" id="b-guardar">Guardar</button><button class="btn sec" type="button" id="b-cancelar">Cancelar</button></div>
+    </form>
+
+    <div class="card"><div id="lista"><p>Cargando…</p></div></div>
+  </div>
+</main>
+<div class="toast" id="toast" hidden role="status"></div>
+
+<script src="js/destinos.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var API = 'api/index.php', CLAVE = window.CA_SESION || 'ca_sesion';
+  var ses = null;
+  try { ses = JSON.parse(localStorage.getItem(CLAVE) || 'null'); } catch (e) {}
+  if (!ses || !ses.token) { location.replace('login.html?volver=cuentas.html'); return; }
+  if (ses.rol !== 'ADMIN') { $('sin-permiso').hidden = false; return; }
+  $('todo').hidden = false;
+
+  var ROLES = { ADMIN: 'Administración AVBA', PLANTA: 'Administrador de la planta', ACCESOS: 'Guardia de caseta' };
+  var COLOR = { ADMIN: 'azul', PLANTA: 'verde', ACCESOS: '' };
+  var cuentas = [], editando = null;
+
+  function esc(t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function fecha(t) { return t ? t.slice(8, 10) + '/' + t.slice(5, 7) + '/' + t.slice(0, 4) + ' ' + t.slice(11, 16) : 'nunca'; }
+  var tToast;
+  function toast(t, err) { var el = $('toast'); el.textContent = t; el.className = 'toast' + (err ? ' err' : ''); el.hidden = false; clearTimeout(tToast); tToast = setTimeout(function () { el.hidden = true; }, 3500); }
+  function api(accion, payload, metodo) {
+    var h = { Authorization: 'Bearer ' + ses.token };
+    var p = metodo === 'GET'
+      ? fetch(API + '?action=' + accion, { headers: h })
+      : fetch(API, { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json' }, h), body: JSON.stringify({ action: accion, payload: payload || {} }) });
+    return p.then(function (r) {
+      if (r.status === 401) { location.replace('login.html?volver=cuentas.html'); throw new Error('Tu sesión venció.'); }
+      return r.json();
+    });
+  }
+
+  function cargar() {
+    return api('CUENTAS_LISTAR', null, 'GET').then(function (r) {
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudieron leer las cuentas.');
+      cuentas = r.cuentas || []; pintar();
+    }).catch(function (e) { $('lista').innerHTML = '<p class="aviso mal">' + esc(e.message) + '</p>'; });
+  }
+  function pintar() {
+    if (!cuentas.length) { $('lista').innerHTML = '<p>Sin cuentas.</p>'; return; }
+    $('lista').innerHTML = cuentas.map(function (c) {
+      var yo = c.usuario === ses.usuario;
+      return '<div class="cuenta' + (c.activo ? '' : ' inactiva') + '" data-id="' + c.id + '"><div class="datos">' +
+        '<b>' + esc(c.nombre) + '</b>' + (yo ? ' <span class="etq gris">tú</span>' : '') +
+        '<div class="u">' + esc(c.usuario) + '</div>' +
+        '<div class="m"><span class="etq ' + COLOR[c.rol] + '">' + esc(ROLES[c.rol] || c.rol) + '</span> ' +
+        (c.rol === 'ACCESOS' ? (c.punto ? '<span class="etq verde">' + esc(c.punto) + '</span> ' : '<span class="etq">Sin punto de control</span> ') : '') +
+        (c.activo ? '' : '<span class="etq gris">Desactivada</span> ') +
+        '· último acceso: ' + esc(fecha(c.ultimo_acceso)) + (c.sesiones ? ' · ' + c.sesiones + ' sesión' + (c.sesiones === 1 ? '' : 'es') + ' abierta' + (c.sesiones === 1 ? '' : 's') : '') + '</div></div>' +
+        '<div class="acc"><button class="btn sec chico" type="button" data-editar="' + c.id + '">Editar</button>' +
+        (yo ? '' : '<button class="btn ' + (c.activo ? 'peligro' : 'sec') + ' chico" type="button" data-activo="' + c.id + '">' + (c.activo ? 'Desactivar' : 'Activar') + '</button>') +
+        '</div></div>';
+    }).join('');
+  }
+
+  function abrir(c) {
+    editando = c || null;
+    $('f-cuenta').reset(); $('f-err').hidden = true; $('f-cuenta').hidden = false;
+    $('f-tit').textContent = c ? 'Editar «' + c.usuario + '»' : 'Nueva cuenta';
+    $('c-usuario').disabled = !!c; $('c-usuario').required = !c;
+    $('c-pass').required = !c;
+    $('l-pass').textContent = c ? 'Contraseña nueva (opcional)' : 'Contraseña';
+    $('s-pass').textContent = c ? 'Déjala vacía para no cambiarla. Si la cambias, se cierran sus sesiones abiertas.' : 'Al menos 8 caracteres. Dísela a la persona en persona, no por mensaje.';
+    if (c) { $('c-nombre').value = c.nombre; $('c-usuario').value = c.usuario; $('c-rol').value = c.rol; }
+    $('c-rol').disabled = !!(c && c.usuario === ses.usuario);      // no te quitas tu propio perfil
+    $('c-nombre').focus();
+    $('f-cuenta').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function cerrar() { $('f-cuenta').hidden = true; editando = null; }
+
+  $('b-nueva').addEventListener('click', function () { abrir(null); });
+  $('b-cancelar').addEventListener('click', cerrar);
+  $('f-cuenta').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var datos = { nombre: $('c-nombre').value };
+    if (!$('c-rol').disabled) datos.rol = $('c-rol').value;
+    if ($('c-pass').value) datos.password = $('c-pass').value;
+    var accion = 'CUENTA_CREAR';
+    if (editando) { accion = 'CUENTA_EDITAR'; datos.id = editando.id; }
+    else datos.usuario = $('c-usuario').value.trim().toLowerCase();
+    $('b-guardar').disabled = true;
+    api(accion, datos).then(function (r) {
+      $('b-guardar').disabled = false;
+      if (!r || r.status !== 'success') { $('f-err').textContent = (r && r.message) || 'No se pudo guardar.'; $('f-err').hidden = false; return; }
+      toast(r.message); cerrar(); cargar();
+    }).catch(function (e) { $('b-guardar').disabled = false; $('f-err').textContent = e.message; $('f-err').hidden = false; });
+  });
+  $('lista').addEventListener('click', function (ev) {
+    var b = ev.target.closest('button'); if (!b) return;
+    var c = cuentas.filter(function (x) { return String(x.id) === (b.dataset.editar || b.dataset.activo); })[0]; if (!c) return;
+    if (b.dataset.editar) { abrir(c); return; }
+    if (c.activo && !confirm('¿Desactivar la cuenta «' + c.usuario + '»? Ya no podrá entrar y se cierran sus sesiones abiertas. Sus registros se conservan.')) return;
+    b.disabled = true;
+    api('CUENTA_EDITAR', { id: c.id, activo: !c.activo }).then(function (r) {
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo cambiar.');
+      toast(c.activo ? 'Cuenta «' + c.usuario + '» desactivada.' : 'Cuenta «' + c.usuario + '» activada.'); cargar();
+    }).catch(function (e) { b.disabled = false; toast(e.message, true); });
+  });
+  cargar();
+})();
+</script>
+</body>
+</html>

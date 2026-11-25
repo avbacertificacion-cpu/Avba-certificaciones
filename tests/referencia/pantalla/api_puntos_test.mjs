@@ -28,7 +28,7 @@ ok(r.status === 'error', 'la caseta no puede asignarse un punto: ' + r.message);
 r = await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 1', usuario: 'punto1' });
 ok(r.status === 'success', 'admin asigna punto1 → Punto 1: ' + r.message);
 r = await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 2', usuario: 'punto2' });
-r = await get('ACCESOS_MI_PUNTO', 'tok-punto1', { dispositivo: EQ_A, dispositivo_desc: 'App AVBA Caseta · Android · SM-A145M' });
+r = await get('ACCESOS_MI_PUNTO', 'tok-punto1', { dispositivo: EQ_A, dispositivo_desc: 'App Control de Accesos · Android · SM-A145M' });
 ok(r.status === 'success' && r.punto === 'PUNTO DE CONTROL 1' && r.nombre_punto === 'Punto de control 1', 'al entrar: su punto y el equipo A queda ligado');
 r = await get('ACCESOS_MI_PUNTO', 'tok-punto1', { dispositivo: EQ_B });
 ok(r.status === 'error' && r.codigo === 'OTRO_EQUIPO' && /SM-A145M/.test(r.message), 'otro equipo con la misma cuenta: bloqueado («' + r.message + '»)');
@@ -76,7 +76,8 @@ r = await post('ACCESOS_PUNTO_ASIGNAR', 'tok-admin', { punto: 'PUNTO DE CONTROL 
 ok(r.status === 'error', 'sólo cuentas de control de accesos: ' + r.message);
 
 // PDF de datos: el nombre más leído (la salida leyó «Mexicana Nacionalidad»)
-r = await post('ACCESOS_PDF_DATOS', 'tok-admin', { turno: k });
+// Los registros son de las 09:0x: turno de día de hoy (no el que esté en curso al correr la prueba)
+r = await post('ACCESOS_PDF_DATOS', 'tok-admin', { turno: hoy + '-D' });
 ok(r.status === 'success' && r.personas === 1 && r.renglones === 1 && r.sin_salida === 0, 'PDF de datos: ' + JSON.stringify({ personas: r.personas, renglones: r.renglones, salidas: r.salidas, msg: r.message }));
 console.log(fallas ? fallas + ' FALLAS' : 'TODO BIEN');
 process.exit(fallas ? 1 : 0);

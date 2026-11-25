@@ -11,8 +11,8 @@ de datos propia y cuentas propias.
 
 ## Publicar
 
-- Sitio: `.github/workflows/deploy-control-accesos.yml` publica en cada push a esta rama
-  **cuando se encienda** (fase 1; hoy está apagado). `config/config.php` vive sólo en el
-  servidor (plantilla: `config/config.example.php`).
-- App: `.github/workflows/app-caseta.yml`, igual (apagado hasta la fase 1). Se descargará
-  de `gestion.avba.com.mx/controlaccesos/descargas/avba-control-accesos.apk`.
+- Sitio: `.github/workflows/deploy-control-accesos.yml` publica en cada push a esta rama.
+  `config/config.php` vive sólo en el servidor (plantilla: `config/config.example.php`).
+- App: `.github/workflows/app-caseta.yml` compila cuando cambia `mobile/caseta/` y la
+  publica en `gestion.avba.com.mx/controlaccesos/descargas/avba-control-accesos.apk`.
+- Pruebas locales: `bash tests/referencia/correr.sh`.

@@ -13,7 +13,7 @@
   · Registrar: botón ENTRADA o SALIDA → foto de la identificación (cualquiera,
     no sólo la INE) → vista previa para confirmar que se lee el número →
     guardar. La hora es la del momento de la foto.
-  · En la app AVBA Caseta (mobile/caseta) ENTRADA y SALIDA leen la TARJETA de
+  · En la app AVBA Control de Accesos (mobile/caseta) ENTRADA y SALIDA leen la TARJETA de
     identificación: el teléfono reconoce el nombre y el código sin internet y
     el registro queda guardado al instante, sin foto (nombre, código, hora).
     El PDF de datos junta la entrada y la salida de cada persona por código.
@@ -199,7 +199,7 @@
   .mini-acc button{border:1px solid var(--borde);background:#fff;border-radius:8px;padding:5px 9px;font-size:12px;font-weight:700;cursor:pointer}
   .partes{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px}
   .partes .btn{min-height:42px;font-size:13px;padding:8px 10px}
-  /* Tarjeta leída en el teléfono (app AVBA Caseta) */
+  /* Tarjeta leída en el teléfono (app AVBA Control de Accesos) */
   .reg .tarj{width:64px;height:64px;border-radius:10px;background:var(--azul-light);color:var(--azul-dark);flex-shrink:0;border:1px solid #cfe0f3;
     display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;text-align:center;line-height:1.15}
   .reg .tarj svg{width:24px;height:24px;margin-bottom:3px}
@@ -351,7 +351,7 @@
 
   <div class="tarjeta" id="tarjeta-puntos" hidden>
     <h2>Puntos de control</h2>
-    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:6px">Cada punto tiene su propia cuenta de caseta y trabaja en un solo equipo: el primero que entra con la cuenta queda ligado y cualquier otro queda bloqueado. Crea las cuentas en Administración → Usuarios con el rol «Control de accesos» y aquí elige cuál va en cada punto.</p>
+    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:6px">Cada punto tiene su propia cuenta de caseta y trabaja en un solo equipo: el primero que entra con la cuenta queda ligado y cualquier otro queda bloqueado. Administración AVBA crea las cuentas en <a href="cuentas.html">Cuentas</a> (perfil «Guardia de caseta») y aquí elige cuál va en cada punto.</p>
     <div id="puntos-lista"></div>
   </div>
 </main>
@@ -400,24 +400,24 @@
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var API = 'api/index.php';
-  var ROLES = ['ADMIN', 'ADMINISTRATIVO', 'INSPECTOR', 'CALIDAD', 'CERTIFICACIONES', 'ACCESOS'];
-  var CLAVE_LUGAR = 'avba_accesos_lugar', CLAVE_SEGUIR = 'avba_accesos_seguir', CLAVE_REVISAR = 'avba_accesos_revisar';
+  var ROLES = ['ADMIN', 'PLANTA', 'ACCESOS'];       // Administración AVBA, administrador de la planta, guardia de caseta
+  var CLAVE_LUGAR = 'ca_accesos_lugar', CLAVE_SEGUIR = 'ca_accesos_seguir', CLAVE_REVISAR = 'ca_accesos_revisar';
   var POR_PAGINA = 60;
 
   /* ── Sesión (se relee en cada envío: puede renovarse en otra pestaña) ── */
-  function sesion() { try { return JSON.parse(localStorage.getItem('avba_session') || '{}') || {}; } catch (e) { return {}; } }
+  function sesion() { try { return JSON.parse(localStorage.getItem('ca_sesion') || '{}') || {}; } catch (e) { return {}; } }
   var ses = sesion();
   if (!ses.token) { location.replace('login.html?volver=accesos.html'); return; }
-  if (ROLES.indexOf(ses.rol) < 0 && !(ses.roles || []).some(function (r) { return ROLES.indexOf(r) >= 0; })) {
+  if (ROLES.indexOf(ses.rol) < 0) {
     document.querySelector('main').innerHTML = '<div class="tarjeta"><p class="nota mal">Tu cuenta no tiene acceso al control de accesos.</p></div>';
     return;
   }
   function token() { return sesion().token || ''; }
-  var destino = (window.AVBA_DESTINOS || {})[ses.rol];
+  var destino = (window.CA_DESTINOS || {})[ses.rol];
   if (destino) $('atras').href = destino;
   $('sub-usuario').textContent = (ses.nombre || ses.usuario || '') + ' · entradas y salidas';
 
-  /* ── App AVBA Caseta: la tarjeta se lee en el teléfono ──────────────────
+  /* ── App AVBA Control de Accesos: la tarjeta se lee en el teléfono ──────────────────
      Con el lector de la app (LectorTarjeta, nativo) ENTRADA y SALIDA leen la
      tarjeta de identificación: el teléfono reconoce el nombre y el código sin
      internet (la imagen no sale del equipo) y el registro queda guardado al
@@ -433,21 +433,21 @@
      el punto al primer equipo que entra con la cuenta y rechaza cualquier otro. */
   var EQUIPO = (function () {
     var id = '';
-    try { id = JSON.parse(localStorage.getItem('avba_accesos_equipo') || '""') || ''; } catch (e) {}
+    try { id = JSON.parse(localStorage.getItem('ca_accesos_equipo') || '""') || ''; } catch (e) {}
     if (!/^[A-Za-z0-9-]{8,80}$/.test(id)) {
       id = 'eq-' + (window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12));
-      try { localStorage.setItem('avba_accesos_equipo', JSON.stringify(id)); } catch (e) {}
+      try { localStorage.setItem('ca_accesos_equipo', JSON.stringify(id)); } catch (e) {}
     }
     var ua = navigator.userAgent || '', m = /Android [\d.]+; ([^;)]+)/.exec(ua);
     var desc = m ? 'Android · ' + m[1].replace(/ Build.*/, '').trim()
                  : (/iPhone|iPad/.test(ua) ? 'iPhone/iPad' : (/Windows/.test(ua) ? 'Computadora Windows' : (/Mac OS X/.test(ua) ? 'Mac' : 'Navegador')));
-    return { id: id, desc: (LECTOR ? 'App AVBA Caseta · ' : '') + desc };
+    return { id: id, desc: (LECTOR ? 'App Control de Accesos · ' : '') + desc };
   })();
   if (LECTOR) {
-    try { mezclarReglas(JSON.parse(localStorage.getItem('avba_tarjeta_reglas') || 'null')); } catch (e) {}
+    try { mezclarReglas(JSON.parse(localStorage.getItem('ca_tarjeta_reglas') || 'null')); } catch (e) {}
     // Las reglas de la credencial se ajustan en el servidor (api/accesos-tarjeta.json) sin reinstalar la app
     api('ACCESOS_TARJETA_REGLAS', {}, 'GET').then(function (j) {
-      if (j && j.status === 'success' && j.reglas) { mezclarReglas(j.reglas); try { localStorage.setItem('avba_tarjeta_reglas', JSON.stringify(j.reglas)); } catch (e) {} }
+      if (j && j.status === 'success' && j.reglas) { mezclarReglas(j.reglas); try { localStorage.setItem('ca_tarjeta_reglas', JSON.stringify(j.reglas)); } catch (e) {} }
     }).catch(function () {});
     $('lbl-ent').textContent = $('lbl-sal').textContent = 'Leer tarjeta';
     $('ayuda-lugar').textContent = 'Cada registro se guarda con el nombre, el ID y la foto de la credencial (evidencia), el punto de control y la hora.';
@@ -476,7 +476,9 @@
       ev.preventDefault();
       var pend = (typeof cola !== 'undefined' ? cola : []).filter(function (x) { return !x.error; }).length;
       if (!confirm(pend ? 'Hay ' + pend + ' registro(s) por enviar: se enviarán cuando vuelvas a entrar en este equipo. ¿Salir?' : '¿Cerrar sesión?')) return;
-      try { localStorage.removeItem('avba_session'); } catch (e) {}
+      try { fetch(API, { method: 'POST', keepalive: true, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token() },
+                         body: JSON.stringify({ action: 'LOGOUT', payload: {} }) }).catch(function () {}); } catch (e) {}
+      try { localStorage.removeItem('ca_sesion'); } catch (e) {}
       location.replace('login.html');
     });
   }
@@ -579,7 +581,7 @@
     if (dbProm) return dbProm;
     dbProm = new Promise(function (ok, mal) {
       if (!window.indexedDB) { mal(new Error('sin IndexedDB')); return; }
-      var r = indexedDB.open('avba_accesos', 1);
+      var r = indexedDB.open('ca_accesos', 1);
       r.onupgradeneeded = function () { r.result.createObjectStore('cola', { keyPath: 'uid' }); };
       r.onsuccess = function () { ok(r.result); };
       r.onerror = function () { mal(r.error); };
@@ -1147,7 +1149,7 @@
      última lectura de las últimas 48 h fue ENTRADA, en cualquier punto. Si ya
      registró su salida, aunque sea por otro punto, no aparece. Se actualiza
      sola cada 30 s, como la lista. */
-  var modoPlanta = false, pedidoPlanta = 0, ES_ADMIN = ses.rol === 'ADMIN';
+  var modoPlanta = false, pedidoPlanta = 0, ES_GESTOR = ses.rol === 'ADMIN' || ses.rol === 'PLANTA';
   var planta = { personas: [], total: 0, cargado: false, err: '', recibido: 0 };
   if (!CASETA) $('f-planta').hidden = false;
   function entrarPlanta() {
@@ -1275,11 +1277,11 @@
         return '<li class="mov">' +
           '<div><span class="badge entrada">ENTRADA</span> ' + (m.entrada ? esc(cuando(m.entrada)) + ' · ' + esc(nombrePunto(m.lugar)) : '<i>sin entrada registrada</i>') + '</div>' +
           '<div><span class="badge salida">SALIDA</span> ' + (m.salida ? esc(cuando(m.salida)) + ' · ' + esc(nombrePunto(m.lugar_salida)) +
-            (m.origen_salida === 'admin' ? ' <i>(registrada por Administración)</i>' : '') : '<i>' + (abierta ? 'sigue en planta' : 'sin salida registrada') + '</i>') + '</div>' +
+            (m.origen_salida === 'admin' ? ' <i>(registrada por el administrador de accesos)</i>' : '') : '<i>' + (abierta ? 'sigue en planta' : 'sin salida registrada') + '</i>') + '</div>' +
           (m.minutos != null ? '<div class="dur">' + duracion(m.minutos) + ' dentro</div>' : '') +
           fotosMov(m) + '</li>';
       }).join('');
-      $('per-salida').hidden = !(r.en_planta && ES_ADMIN);
+      $('per-salida').hidden = !(r.en_planta && ES_GESTOR);
     }).catch(function (e) {
       if (personaAbierta !== String(id)) return;
       $('per-nombre').textContent = 'No se pudo consultar'; $('per-sub').textContent = (e && e.message) || '';
@@ -1305,7 +1307,7 @@
   $('per-salida').onclick = function () {
     var id = $('per-id').textContent, nom = $('per-nombre').textContent;
     if (!enLinea()) { toast('Para registrar la salida se necesita señal.', true); return; }
-    if (!confirm('¿Registrar la SALIDA de ' + nom + ' (ID ' + id + ') en este momento?\nQueda marcada como registrada por Administración.')) return;
+    if (!confirm('¿Registrar la SALIDA de ' + nom + ' (ID ' + id + ') en este momento?\nQueda marcada como registrada por el administrador de accesos.')) return;
     $('per-salida').disabled = true;
     api('ACCESOS_DAR_SALIDA', { id: id }).then(function (r) {
       if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo registrar la salida.');
@@ -1457,7 +1459,7 @@
   /* ── Cuenta de caseta: entra directo a SU punto de control ──
      El punto lo asigna Administración (no se elige aquí). Lo registrado se ve
      igual al salir y volver a entrar: la lista viene del servidor. */
-  var CLAVE_PUNTO = 'avba_accesos_mi_punto', bloqueado = false;
+  var CLAVE_PUNTO = 'ca_accesos_mi_punto', bloqueado = false;
   function nombrePunto(p) { var m = /^PUNTO DE CONTROL (\d+)$/.exec(p || ''); return m ? 'Punto de control ' + m[1] : (p || ''); }
   function fijarPunto(p) {
     $('lugar').value = p; $('lugar').readOnly = true;
@@ -1484,7 +1486,7 @@
   /* ── Administración: qué cuenta y qué equipo tiene cada punto ── */
   function fechaHoraCorta(t) { return t ? t.slice(8, 10) + '/' + t.slice(5, 7) + ' ' + t.slice(11, 16) : ''; }
   function cargarPuntos() {
-    if (ses.rol !== 'ADMIN') return;
+    if (ses.rol !== 'ADMIN' && ses.rol !== 'PLANTA') return;
     api('ACCESOS_PUNTOS', {}, 'GET').then(function (r) {
       if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudieron leer los puntos de control.');
       $('tarjeta-puntos').hidden = false;
@@ -1497,11 +1499,12 @@
         var eq = p.dispositivo
           ? '<span>Equipo: <b>' + esc(p.dispositivo_desc || 'sin descripción') + '</b> · desde ' + esc(fechaHoraCorta(p.ligado)) +
             (p.ultimo_uso ? ' · último uso ' + esc(fechaHoraCorta(p.ultimo_uso)) : '') + '</span>' +
-            '<button class="btn sec" type="button" data-liberar="' + esc(p.punto) + '">Liberar equipo</button>'
+            (r.puede_liberar ? '<button class="btn sec" type="button" data-liberar="' + esc(p.punto) + '">Liberar equipo</button>' : '')
           : '<span>' + (p.usuario ? 'Sin equipo: queda ligado el primero que entre con la cuenta.' : 'Sin cuenta asignada.') + '</span>';
-        return '<div class="punto"><b>' + esc(p.nombre) + '</b><select data-punto="' + esc(p.punto) + '" aria-label="Cuenta del ' + esc(p.nombre) + '">' + ops + '</select>' +
+        // Sólo Administración AVBA cambia la cuenta de un punto; el administrador de la planta la ve y libera el equipo
+        return '<div class="punto"><b>' + esc(p.nombre) + '</b><select data-punto="' + esc(p.punto) + '" aria-label="Cuenta del ' + esc(p.nombre) + '"' + (r.puede_editar ? '' : ' disabled') + '>' + ops + '</select>' +
           '<div class="eq">' + eq + '</div></div>';
-      }).join('') + (cuentas.length ? '' : '<p class="nota">Todavía no hay cuentas de caseta: créalas en Administración → Usuarios con el rol «Control de accesos».</p>');
+      }).join('') + (cuentas.length ? '' : '<p class="nota">Todavía no hay cuentas de caseta: ' + (r.puede_editar ? 'créalas en <a href="cuentas.html">Cuentas</a> con el perfil «Guardia de caseta».' : 'pide a Administración AVBA que las cree.') + '</p>');
     }).catch(function (e) {
       $('tarjeta-puntos').hidden = false;
       $('puntos-lista').innerHTML = '<p class="nota mal">' + esc(e.message) + '</p>';

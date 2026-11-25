@@ -3,13 +3,13 @@
 # ──────────────────────────────────────────────────────────
 
 # Denegar acceso directo a cualquier archivo PHP excepto los permitidos explícitamente
-<FilesMatch "^(?!index\.php$|preview_plantilla\.php$|plantilla_session\.php$).*\.php$">
+<FilesMatch "^(?!index\.php$).*\.php$">
     Order Allow,Deny
     Deny from all
 </FilesMatch>
 
-# Bloquear acceso a archivos de configuración y backups
-<FilesMatch "\.(bak|sql|log|ini|sh|env)$">
+# Bloquear acceso a archivos de configuración y backups (accesos-tarjeta.json lo entrega la API)
+<FilesMatch "\.(bak|sql|log|ini|sh|env|json)$">
     Order Allow,Deny
     Deny from all
 </FilesMatch>

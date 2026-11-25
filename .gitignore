@@ -14,3 +14,12 @@ uploads/demo-salas/
 
 # ── Logs ─────────────────────────────────────────────────
 *.log
+
+# ── Lo que generan las pruebas locales (tests/referencia/correr.sh) ─
+tests/referencia/**/*.png
+tests/referencia/**/*.pdf
+tests/referencia/**/*.jpg
+tests/referencia/**/*.csv
+tests/referencia/php/uploads/
+tests/referencia/php/uploads_lim/
+tests/referencia/php/prueba_accesos/

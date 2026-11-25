@@ -7,7 +7,7 @@ require __DIR__ . '/../../../api/helpers.php';
 require __DIR__ . '/../../../api/ControlAccesos.php';
 $fallas = 0;
 function ok($c, $m) { global $fallas; if (!$c) $fallas++; echo ($c ? "OK    " : "FALLA ") . $m . "\n"; }
-$pdo = new PDO('mysql:host=127.0.0.1;dbname=avba_prueba;charset=utf8mb4', 'prueba', 'prueba', [
+$pdo = new PDO('mysql:host=127.0.0.1;dbname=ca_prueba;charset=utf8mb4', 'prueba', 'prueba', [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC, PDO::ATTR_EMULATE_PREPARES => false]);
 ControlAccesos::asegurarTabla($pdo);
 $pdo->exec("DELETE FROM accesos_registros");
