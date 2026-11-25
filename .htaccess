@@ -21,8 +21,10 @@ RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
     # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
     # Controla la información de referrer
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
-    # Política de permisos: deshabilitar acceso a cámara/micrófono desde el servidor
-    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=(self)"
+    # Política de permisos: la cámara sólo para el propio sitio (la usan el
+    # lector de QR del inspector, el control de accesos y la caseta de la
+    # demo); micrófono deshabilitado.
+    Header always set Permissions-Policy "camera=(self), microphone=(), geolocation=(self)"
     # Content Security Policy — todo se sirve desde el propio dominio.
     #
     # Antes autorizaba unpkg, cdnjs, jsdelivr y Google Fonts, de cuando las
