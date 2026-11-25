@@ -52,11 +52,23 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Firma de prueba fija (para actualizar sin desinstalar)
+      # Llave de prueba fija: se crea la primera vez y se guarda en la caché de
+      # GitHub, así cada versión se instala encima de la anterior. No se sube al
+      # repositorio (*.jks está en .gitignore). Para Google Play se usaría otra.
+      - name: Llave de prueba (caché)
         uses: actions/cache@v4
         with:
-          path: ~/.android/debug.keystore
-          key: avba-caseta-firma-prueba-v1
+          path: mobile/caseta/firma-prueba.jks
+          key: avba-caseta-firma-prueba-v2
+
+      - name: Llave de prueba (crear si no existe)
+        run: |
+          if [ ! -f firma-prueba.jks ]; then
+            keytool -genkeypair -keystore firma-prueba.jks -storepass android -alias androiddebugkey -keypass android \
+              -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=AVBA Caseta (prueba), O=AVBA, C=MX"
+          fi
+          echo "AVBA_FIRMA_PRUEBA=$PWD/firma-prueba.jks" >> "$GITHUB_ENV"
+          keytool -list -keystore firma-prueba.jks -storepass android | grep -i "SHA-256\|SHA256" || true
 
       - name: Dependencias
         run: npm ci

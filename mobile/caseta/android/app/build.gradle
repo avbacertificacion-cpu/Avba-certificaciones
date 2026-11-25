@@ -1,8 +1,11 @@
 apply plugin: 'com.android.application'
 
 // Firma: si GitHub Actions trae una llave (variables AVBA_KEYSTORE_*), la versión
-// release sale firmada con ella. Sin llave sólo se usa la de prueba (debug).
+// release sale firmada con ella. La APK de prueba (debug) usa la llave de prueba
+// que guarda GitHub Actions (AVBA_FIRMA_PRUEBA): siempre la misma, así cada
+// versión se instala encima de la anterior sin desinstalar.
 def almacenFirma = System.getenv('AVBA_KEYSTORE_PATH')
+def firmaPrueba = System.getenv('AVBA_FIRMA_PRUEBA')
 def codigoVersion = (System.getenv('AVBA_VERSION_CODE') ?: '1').toInteger()
 
 android {
@@ -14,6 +17,8 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode codigoVersion
         versionName "1.0.0"
+        // Sólo celulares (ARM): sin las versiones para emuladores, la APK pesa la mitad
+        ndk { abiFilters 'arm64-v8a', 'armeabi-v7a' }
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -22,6 +27,14 @@ android {
         }
     }
     signingConfigs {
+        debug {
+            if (firmaPrueba && file(firmaPrueba).exists()) {
+                storeFile file(firmaPrueba)
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
         release {
             if (almacenFirma) {
                 storeFile file(almacenFirma)
