@@ -76,6 +76,12 @@ public class AnalizadorTarjetaTest {
         ver(tarjeta("QUANTUM ENERGY", 60, "ANA LÓPEZ CRUZ", 40, "PLANTA SAN JUAN", 20, "No. 8080", 26), new AnalizadorTarjeta.Reglas(), "8080", "Ana López Cruz");
     }
 
+    @Test public void letrerosDeIdentificacionNoSonNombre() {
+        ver(tarjeta("JOSE MARCOS GONZALEZ", 36, "NACIONALIDAD", 22, "MEXICANA", 30, "No. 18438930", 28), new AnalizadorTarjeta.Reglas(), "18438930", "Jose Marcos Gonzalez");
+        ver(tarjeta("MEXICANA NACIONALIDAD", 40, "Juan Pérez", 34, "ID 4471", 28), new AnalizadorTarjeta.Reglas(), "4471", "Juan Pérez");
+        ver(tarjeta("FECHA DE NACIMIENTO", 30, "DOMICILIO", 20, "LAURA SOTO RIOS", 30, "Folio 99120", 26), new AnalizadorTarjeta.Reglas(), "99120", "Laura Soto Rios");
+    }
+
     @Test public void estabilizadorPideVariasLecturasIguales() {
         AnalizadorTarjeta.Estabilizador e = new AnalizadorTarjeta.Estabilizador(3, 6);
         assertNull(e.agregar(new AnalizadorTarjeta.Lectura("12345", "Juan Pérez", 50)));

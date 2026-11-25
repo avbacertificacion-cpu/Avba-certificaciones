@@ -184,6 +184,13 @@
   .hecho b{font-size:28px;font-weight:900;letter-spacing:.5px;margin-top:8px}
   .hecho .n{font-size:22px;font-weight:800;margin-top:16px;line-height:1.25;overflow-wrap:anywhere}
   .hecho .c{font-size:17px;margin-top:6px;opacity:.95}
+  input#lugar[readonly]{background:var(--azul-light);color:var(--azul-dark);font-weight:800;border-color:#cfe0f3}
+  .punto{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:11px 0;border-bottom:1px solid var(--borde)}
+  .punto:last-child{border-bottom:0}
+  .punto b{min-width:150px;font-size:14px}
+  .punto select{flex:1 1 220px;width:auto}
+  .punto .eq{flex:1 1 100%;font-size:12.5px;color:var(--texto-sub);display:flex;gap:8px;align-items:center;flex-wrap:wrap;line-height:1.45}
+  .punto .eq .btn{min-height:34px;padding:6px 10px;font-size:12.5px}
   h3.sub-pdf{font-size:13.5px;font-weight:800;color:var(--texto);margin:16px 0 4px}
   .toast button{margin-left:10px;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;border-radius:8px;
     padding:4px 10px;font-weight:700;cursor:pointer}
@@ -201,6 +208,7 @@
 </header>
 
 <main>
+  <div class="banda" id="banda-punto" hidden role="alert"></div>
   <div class="banda" id="banda-sesion" hidden>
     <b>Tu sesión venció.</b> Lo capturado sigue guardado en este equipo y se enviará en cuanto vuelvas a entrar.
     <br><a class="btn prim" href="login.html?volver=accesos.html">Iniciar sesión</a>
@@ -298,6 +306,12 @@
       <button class="btn sec ancho" data-copiar="prompt-paso2" type="button" style="margin-top:8px">Copiar paso 2 (cruce final)</button>
     </details>
   </div>
+
+  <div class="tarjeta" id="tarjeta-puntos" hidden>
+    <h2>Puntos de control</h2>
+    <p class="ayuda" style="font-size:12.5px;color:var(--texto-sub);margin-bottom:6px">Cada punto tiene su propia cuenta de caseta y trabaja en un solo equipo: el primero que entra con la cuenta queda ligado y cualquier otro queda bloqueado. Crea las cuentas en Administración → Usuarios con el rol «Control de accesos» y aquí elige cuál va en cada punto.</p>
+    <div id="puntos-lista"></div>
+  </div>
 </main>
 
 <!-- Vista previa antes de guardar -->
@@ -359,6 +373,21 @@
     if (!g || typeof g !== 'object') return;
     ['minDigitos', 'maxDigitos', 'longitud', 'patron', 'claves', 'noNombre', 'noCodigo', 'confirmar'].forEach(function (k) { if (g[k] !== undefined && g[k] !== null) REGLAS_TARJETA[k] = g[k]; });
   }
+  /* Equipo: cada punto de control trabaja en uno solo. Identificador propio de
+     este teléfono o navegador (no cambia al cerrar sesión); el servidor liga
+     el punto al primer equipo que entra con la cuenta y rechaza cualquier otro. */
+  var EQUIPO = (function () {
+    var id = '';
+    try { id = JSON.parse(localStorage.getItem('avba_accesos_equipo') || '""') || ''; } catch (e) {}
+    if (!/^[A-Za-z0-9-]{8,80}$/.test(id)) {
+      id = 'eq-' + (window.crypto && crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12));
+      try { localStorage.setItem('avba_accesos_equipo', JSON.stringify(id)); } catch (e) {}
+    }
+    var ua = navigator.userAgent || '', m = /Android [\d.]+; ([^;)]+)/.exec(ua);
+    var desc = m ? 'Android · ' + m[1].replace(/ Build.*/, '').trim()
+                 : (/iPhone|iPad/.test(ua) ? 'iPhone/iPad' : (/Windows/.test(ua) ? 'Computadora Windows' : (/Mac OS X/.test(ua) ? 'Mac' : 'Navegador')));
+    return { id: id, desc: (LECTOR ? 'App AVBA Caseta · ' : '') + desc };
+  })();
   if (LECTOR) {
     try { mezclarReglas(JSON.parse(localStorage.getItem('avba_tarjeta_reglas') || 'null')); } catch (e) {}
     // Las reglas de la tarjeta se ajustan en el servidor (demo/tarjeta-reglas.json) sin reinstalar la app
@@ -469,6 +498,7 @@
   }
   function api(accion, datos, metodo) {
     var h = { Authorization: 'Bearer ' + token() }, init;
+    datos = Object.assign({ dispositivo: EQUIPO.id, dispositivo_desc: EQUIPO.desc }, datos || {});
     if (metodo === 'GET') {
       var q = new URLSearchParams(datos || {}); q.set('action', accion); q.set('token', token());
       return fetch(API + '?' + q.toString(), { headers: h }).then(respuesta);
@@ -538,6 +568,7 @@
     var fd = new FormData();
     ['uid', 'tipo', 'capturado', 'lugar', 'nota'].forEach(function (k) { fd.append(k, it[k] || ''); });
     if (it.codigo) { fd.append('codigo', it.codigo); fd.append('persona', it.persona || ''); fd.append('origen', it.origen || 'tarjeta'); }
+    fd.append('dispositivo', EQUIPO.id); fd.append('dispositivo_desc', EQUIPO.desc);
     if (it.datos) fd.append('foto', new Blob([it.datos], { type: it.mime || 'image/jpeg' }), it.uid + '.jpg');
     fd.append('action', 'ACCESO_REGISTRAR'); fd.append('token', token());
     return fd;
@@ -690,7 +721,18 @@
   $('hecho').onclick = function () { clearTimeout(tHecho); $('hecho').hidden = true; };
 
   /* ── Punto de control y turno ── */
-  $('lugar').value = leer(CLAVE_LUGAR, '') || '';
+  var PUNTOS_FIJOS = ['PUNTO DE CONTROL 1', 'PUNTO DE CONTROL 2', 'PUNTO DE CONTROL 3', 'PUNTO DE CONTROL 4'];
+  if (CASETA) $('lugar').value = leer(CLAVE_LUGAR, '') || '';
+  else {
+    var selPunto = document.createElement('select'), previo = leer(CLAVE_LUGAR, '');
+    selPunto.id = 'lugar';
+    selPunto.innerHTML = PUNTOS_FIJOS.map(function (p) { return '<option value="' + p + '">' + nombrePunto(p) + '</option>'; }).join('');
+    selPunto.value = PUNTOS_FIJOS.indexOf(previo) >= 0 ? previo : PUNTOS_FIJOS[0];
+    $('lugar').replaceWith(selPunto);
+    guardar(CLAVE_LUGAR, selPunto.value);
+    $('solo-punto').checked = false; $('pdf-punto').checked = false;              // de entrada, todos los puntos
+    $('ayuda-lugar').textContent = 'Los 4 puntos de control de la planta. Para ver sólo uno, elígelo y marca «Sólo este punto de control».';
+  }
   $('lugar').addEventListener('change', function () { $('lugar').value = normaLugar($('lugar').value); guardar(CLAVE_LUGAR, $('lugar').value); cargar(true); armarPrompt(); limpiarPartes(); });
   $('solo-punto').addEventListener('change', function () { cargar(true); });
   function pintarTurno() {
@@ -702,7 +744,7 @@
     } else { $('t-nombre').textContent = nombreTurno(ks[0]) + ' · en curso'; $('t-sub').textContent = rangoTurno(ks[0]); }
     $('t-sig').disabled = !vista;
     $('aviso-dia').hidden = !vista;
-    document.querySelectorAll('.cap').forEach(function (b) { b.disabled = !!vista; });
+    document.querySelectorAll('.cap').forEach(function (b) { b.disabled = !!vista || bloqueado; });
     $('tit-lista').textContent = (CASETA ? 'Tus registros' : 'Registros') + (ks.length > 1 ? ' de los dos turnos' : ' del turno');
   }
   var firmaVista = '';
@@ -822,7 +864,11 @@
   }
   function capturar(tipo) {
     tipoActual = tipo;
-    if (!normaLugar($('lugar').value)) { toast('Escribe primero el punto de control.', true); $('lugar').focus(); return; }
+    if (bloqueado) { toast($('banda-punto').textContent, true); return; }
+    if (!normaLugar($('lugar').value)) {
+      if (CASETA) { toast('Revisando tu punto de control… inténtalo en un momento.', true); return; }
+      toast('Escribe primero el punto de control.', true); $('lugar').focus(); return;
+    }
     if (LECTOR) { leerTarjeta(tipo); return; }              // app: lector de tarjetas
     if (cam.stream) {                                       // cámara continua
       var c = fotoDelVideo();
@@ -895,6 +941,9 @@
     if (!reset && previos.length) { var u = previos[previos.length - 1]; q.antes_cap = u.capturado; q.antes_id = u.id; }
     return api('LISTAR_ACCESOS', q, 'GET').then(function (r) {
       if (mio !== pedido || q.turnos !== turnosVista().join(',')) return;   // llegó tarde: ya se pidió otra cosa
+      if (r && /^(OTRO_EQUIPO|SIN_PUNTO|SIN_EQUIPO)$/.test(r.codigo || '')) {     // el aviso va arriba, una sola vez
+        bloquear(r.message); datos = { registros: [], totales: {}, mas: false }; errLista = ''; pintarLista(); return;
+      }
       if (!r || r.status !== 'success') throw new Error((r && r.message) || 'El servidor no respondió como se esperaba.');
       datos = { registros: previos.concat(r.registros || []), totales: r.totales || {}, mas: !!r.mas };
       errLista = '';
@@ -1136,6 +1185,77 @@
         });
     };
   });
+
+  /* ── Cuenta de caseta: entra directo a SU punto de control ──
+     El punto lo asigna Administración (no se elige aquí). Lo registrado se ve
+     igual al salir y volver a entrar: la lista viene del servidor. */
+  var CLAVE_PUNTO = 'avba_accesos_mi_punto', bloqueado = false;
+  function nombrePunto(p) { var m = /^PUNTO DE CONTROL (\d+)$/.exec(p || ''); return m ? 'Punto de control ' + m[1] : (p || ''); }
+  function fijarPunto(p) {
+    $('lugar').value = p; $('lugar').readOnly = true;
+    guardar(CLAVE_LUGAR, p); guardar(CLAVE_PUNTO, p);
+    $('sub-usuario').textContent = nombrePunto(p) + ' · ' + (ses.nombre || ses.usuario || '');
+    $('ayuda-lugar').textContent = 'Tu punto de control (lo asigna Administración). ' +
+      (LECTOR ? 'Cada registro se guarda con el nombre y el código de la tarjeta y la hora.' : 'Cada registro se guarda con la hora en que se toma la foto.');
+  }
+  function bloquear(msg) {
+    bloqueado = !!msg;
+    $('banda-punto').hidden = !msg; $('banda-punto').textContent = msg || '';
+    document.querySelectorAll('.cap').forEach(function (b) { b.disabled = bloqueado || !!vista; });
+  }
+  if (CASETA) {
+    $('lugar').readOnly = true; $('lugar').removeAttribute('list'); $('lugar').placeholder = 'Lo asigna Administración';
+    var conocido = leer(CLAVE_PUNTO, '');
+    if (conocido) fijarPunto(conocido); else $('lugar').value = '';       // sin señal al abrir: el último conocido
+    api('ACCESOS_MI_PUNTO', {}, 'GET').then(function (r) {
+      if (r && r.status === 'success') { if (r.punto) fijarPunto(r.punto); bloquear(''); cargar(true); }
+      else if (r) bloquear(r.message || 'No se pudo revisar tu punto de control.');
+    }).catch(function () {});
+  }
+
+  /* ── Administración: qué cuenta y qué equipo tiene cada punto ── */
+  function fechaHoraCorta(t) { return t ? t.slice(8, 10) + '/' + t.slice(5, 7) + ' ' + t.slice(11, 16) : ''; }
+  function cargarPuntos() {
+    if (ses.rol !== 'ADMIN') return;
+    api('ACCESOS_PUNTOS', {}, 'GET').then(function (r) {
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudieron leer los puntos de control.');
+      $('tarjeta-puntos').hidden = false;
+      var cuentas = r.cuentas || [];
+      $('puntos-lista').innerHTML = (r.puntos || []).map(function (p) {
+        var ops = '<option value="">Sin cuenta</option>' + cuentas.map(function (c) {
+          return '<option value="' + esc(c.usuario) + '"' + (c.usuario === p.usuario ? ' selected' : '') + '>' +
+            esc(c.usuario + (c.nombre ? ' · ' + c.nombre : '') + (c.activo ? '' : ' (inactiva)')) + '</option>';
+        }).join('');
+        var eq = p.dispositivo
+          ? '<span>Equipo: <b>' + esc(p.dispositivo_desc || 'sin descripción') + '</b> · desde ' + esc(fechaHoraCorta(p.ligado)) +
+            (p.ultimo_uso ? ' · último uso ' + esc(fechaHoraCorta(p.ultimo_uso)) : '') + '</span>' +
+            '<button class="btn sec" type="button" data-liberar="' + esc(p.punto) + '">Liberar equipo</button>'
+          : '<span>' + (p.usuario ? 'Sin equipo: queda ligado el primero que entre con la cuenta.' : 'Sin cuenta asignada.') + '</span>';
+        return '<div class="punto"><b>' + esc(p.nombre) + '</b><select data-punto="' + esc(p.punto) + '" aria-label="Cuenta del ' + esc(p.nombre) + '">' + ops + '</select>' +
+          '<div class="eq">' + eq + '</div></div>';
+      }).join('') + (cuentas.length ? '' : '<p class="nota">Todavía no hay cuentas de caseta: créalas en Administración → Usuarios con el rol «Control de accesos».</p>');
+    }).catch(function (e) {
+      $('tarjeta-puntos').hidden = false;
+      $('puntos-lista').innerHTML = '<p class="nota mal">' + esc(e.message) + '</p>';
+    });
+  }
+  $('puntos-lista').addEventListener('change', function (ev) {
+    var sel = ev.target.closest('select[data-punto]'); if (!sel) return;
+    sel.disabled = true;
+    api('ACCESOS_PUNTO_ASIGNAR', { punto: sel.dataset.punto, usuario: sel.value }).then(function (r) {
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo asignar la cuenta.');
+      toast(r.message); cargarPuntos();
+    }).catch(function (e) { toast(e.message, true); cargarPuntos(); });
+  });
+  $('puntos-lista').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-liberar]'); if (!b) return;
+    if (!confirm('¿Liberar el equipo del ' + nombrePunto(b.dataset.liberar) + '? El próximo equipo que entre con su cuenta quedará ligado.')) return;
+    api('ACCESOS_EQUIPO_LIBERAR', { punto: b.dataset.liberar }).then(function (r) {
+      if (!r || r.status !== 'success') throw new Error((r && r.message) || 'No se pudo liberar el equipo.');
+      toast(r.message); cargarPuntos();
+    }).catch(function (e) { toast(e.message, true); });
+  });
+  cargarPuntos();
 
   /* ── Arranque ── */
   // Lo que quedó en cola y el servidor ya tiene (se cortó la señal a medio envío) sale sin volver a subir la foto

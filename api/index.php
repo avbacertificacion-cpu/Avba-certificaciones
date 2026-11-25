@@ -175,7 +175,7 @@ if (!empty($sesion['usuario']['vista_admin']) && !VistaPortal::permitida((string
 // Todo lo demás se rechaza aquí, venga de la pantalla o de quien sea: así no
 // depende de que cada acción del sistema revise el rol por su cuenta.
 if (($sesion['usuario']['rol_base'] ?? '') === 'ACCESOS' && !in_array((string)$action, [
-        'ACCESO_REGISTRAR', 'LISTAR_ACCESOS', 'LISTAR_ACCESOS_LUGARES', 'ACCESO_ELIMINAR', 'ACCESOS_EXISTEN',
+        'ACCESO_REGISTRAR', 'LISTAR_ACCESOS', 'LISTAR_ACCESOS_LUGARES', 'ACCESO_ELIMINAR', 'ACCESOS_EXISTEN', 'ACCESOS_MI_PUNTO',
         'PASSKEY_OPCIONES_REGISTRO', 'PASSKEY_REGISTRAR', 'APP_REGISTRAR_DISPOSITIVO', 'APP_VERSION',
     ], true)) {
     respuesta(['status' => 'error', 'message' => 'Esta cuenta sólo puede registrar entradas y salidas.'], 403);
@@ -1071,6 +1071,23 @@ if ($method === 'GET') {
                 respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             respuesta($cliSub->obtenerAccesos((int)($_GET['id'] ?? 0), $usr));
 
+        // ── Control de accesos: consultas (la pantalla las pide por GET) ──
+        case 'LISTAR_ACCESOS':
+        case 'LISTAR_ACCESOS_LUGARES':
+        case 'ACCESOS_MI_PUNTO':
+        case 'ACCESOS_PUNTOS': {
+            $usr = validarToken($pdo, $token);
+            if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
+            if (!ControlAccesos::permitido($usr)) respuesta(['status' => 'error', 'message' => 'Tu cuenta no tiene acceso al control de accesos.'], 403);
+            $ca = new ControlAccesos($pdo);
+            switch ($action) {
+                case 'LISTAR_ACCESOS':         respuesta($ca->listar($_GET, $usr));
+                case 'LISTAR_ACCESOS_LUGARES': respuesta($ca->lugares());
+                case 'ACCESOS_MI_PUNTO':       respuesta($ca->miPunto($_GET, $usr));
+                default:                       respuesta($ca->puntos($usr));
+            }
+        }
+
         default:
             respuesta(['status' => 'error', 'message' => 'Acción no reconocida.'], 400);
     }
@@ -1162,7 +1179,11 @@ if ($method === 'POST') {
         case 'ACCESO_ELIMINAR':
         case 'ACCESOS_EXISTEN':
         case 'ACCESOS_PDF':
-        case 'ACCESOS_PDF_DATOS': {
+        case 'ACCESOS_PDF_DATOS':
+        case 'ACCESOS_MI_PUNTO':
+        case 'ACCESOS_PUNTOS':
+        case 'ACCESOS_PUNTO_ASIGNAR':
+        case 'ACCESOS_EQUIPO_LIBERAR': {
             $usr = validarToken($pdo, $token);
             if (!$usr) respuesta(['status' => 'error', 'message' => 'No autorizado.'], 401);
             if (!ControlAccesos::permitido($usr)) respuesta(['status' => 'error', 'message' => 'Tu cuenta no tiene acceso al control de accesos.'], 403);
@@ -1175,6 +1196,10 @@ if ($method === 'POST') {
                 case 'ACCESO_ELIMINAR':        respuesta($ca->eliminar((int)($datos['id'] ?? 0), $usr));
                 case 'ACCESOS_EXISTEN':        respuesta($ca->existen((array)($datos['uids'] ?? [])));
                 case 'ACCESOS_PDF_DATOS':      respuesta($ca->generarPdfDatos($datos, $usr));
+                case 'ACCESOS_MI_PUNTO':       respuesta($ca->miPunto($datos, $usr));
+                case 'ACCESOS_PUNTOS':         respuesta($ca->puntos($usr));
+                case 'ACCESOS_PUNTO_ASIGNAR':  respuesta($ca->asignarPunto($datos, $usr));
+                case 'ACCESOS_EQUIPO_LIBERAR': respuesta($ca->liberarEquipo($datos, $usr));
                 default:                       respuesta($ca->generarPdf($datos, $usr));
             }
         }
