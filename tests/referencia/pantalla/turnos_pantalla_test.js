@@ -39,6 +39,8 @@ const bloques = p => p.$$eval('.bloque-turno', l => l.map(x => x.innerText.repla
   await p.clock.setFixedTime(a('17:56:00'));
   await p.goto(B + 'accesos.html'); await p.waitForTimeout(1800);
   ok(/Cambio de turno/.test(await p.textContent('#t-nombre')), 'a las 17:56 la pantalla muestra el cambio de turno (día saliendo, noche entrando)');
+  const rangos = await bloques(p);
+  ok(/06:00 a 18:00/.test(rangos[0]) && /18:00 a .*06:00/.test(rangos[1]), 'horario de la planta en pantalla: día 06:00 a 18:00 y noche 18:00 a 06:00');
 
   // ── Con señal: entrada 17:57:26 y salida 17:58:02 ──
   await leer(p, '17:57:26', 'ent', '00601', 'Ramiro Esteban Villarreal Duarte');

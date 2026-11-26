@@ -18,7 +18,7 @@
      · Cada registro lleva un identificador del dispositivo (uid): si la app
        reenvía uno que el servidor ya tenía (se cortó la señal a medio
        envío), no se duplica.
-     · El control por TURNO (día 06:30–18:30, noche 18:30–06:30): lista con
+     · El control por TURNO (día 06:00–18:00, noche 18:00–06:00): lista con
        hora, foto y quién registró, y los totales de entradas y salidas.
      · El PDF del turno: las fotos de ENTRADAS y de SALIDAS, cada una con su
        etiqueta (ENTRADA 001 · 24/11 06:15:32), pensado para subirlo a Claude y
@@ -307,22 +307,22 @@ class ControlAccesos {
     }
 
     /* ── Turnos ─────────────────────────────────────────────────────────────
-       Día: 06:30 a 18:30. Noche: 18:30 a 06:30 del día siguiente (la fecha de
+       Día: 06:00 a 18:00. Noche: 18:00 a 06:00 del día siguiente (la fecha de
        un turno de noche es la del día en que empieza).
 
        En el cambio de turno salen unos y entran otros por la misma caseta, a
        la misma hora. Por eso el turno no se decide sólo por el reloj:
          · una ENTRADA cuenta para el turno que empieza: desde 2 horas antes
-           de su inicio (de 04:30 a 16:30 es el de día);
+           de su inicio (de 04:00 a 16:00 es el de día);
          · una SALIDA cuenta para el turno que termina: hasta 2 horas después
-           de su fin (de 08:30 a 20:30 es el de día).
+           de su fin (de 08:00 a 20:00 es el de día).
        Así las entradas de la mañana y las salidas de la tarde del personal de
        día quedan en el mismo turno, y las de la noche con su mañana.
        Además, la SALIDA de quien tiene su ENTRADA abierta (últimas 16 h) va al
        turno de esa entrada (turnoDeEntradaAbierta): el reloj sólo decide cuando
        no hay entrada con qué juntarla. */
-    public const CAMBIO_DIA   = 390;    // 06:30, en minutos
-    public const CAMBIO_NOCHE = 1110;   // 18:30
+    public const CAMBIO_DIA   = 360;    // 06:00, en minutos (cambio de turno de la planta)
+    public const CAMBIO_NOCHE = 1080;   // 18:00
     public const MARGEN       = 120;    // 2 horas
 
     /** @return array{0:string,1:string} [fecha del turno, 'D' | 'N'] */
@@ -342,9 +342,9 @@ class ControlAccesos {
     }
 
     public static function nombreTurno(string $fecha, string $t): string {
-        if ($t === 'D') return 'Turno de día · ' . self::fechaLarga($fecha) . ' (06:30 a 18:30)';
+        if ($t === 'D') return 'Turno de día · ' . self::fechaLarga($fecha) . ' (06:00 a 18:00)';
         $sig = date('Y-m-d', strtotime($fecha . ' 12:00:00 +1 day'));
-        return 'Turno de noche · ' . self::fechaLarga($fecha) . ' 18:30 al ' . self::fechaLarga($sig) . ' 06:30';
+        return 'Turno de noche · ' . self::fechaLarga($fecha) . ' 18:00 al ' . self::fechaLarga($sig) . ' 06:00';
     }
 
     /** uploads/accesos/ de la plataforma. Una ruta relativa en config.php (p. ej. 'uploads/') se toma
@@ -732,7 +732,7 @@ class ControlAccesos {
         $hecho[$k] = true;
     }
 
-    /** El turno de una incidencia es el del reloj (día 06:30–18:30, noche 18:30–06:30), sin margen. */
+    /** El turno de una incidencia es el del reloj (día 06:00–18:00, noche 18:00–06:00), sin margen. */
     public static function turnoReloj(string $capturado): array {
         $d = substr($capturado, 0, 10);
         $m = (int)substr($capturado, 11, 2) * 60 + (int)substr($capturado, 14, 2);

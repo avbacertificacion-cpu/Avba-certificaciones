@@ -385,7 +385,7 @@
       <div class="rejilla g21">
         <div class="card llena"><div class="card-tit"><h2>Personas dentro de la planta</h2><span>Últimas 24 horas, cada 15 minutos</span></div>
           <div class="lienzo"><canvas id="g-ocupacion" aria-label="Personas dentro de la planta en las últimas 24 horas"></canvas></div>
-          <p class="nota-graf">Las bajadas antes de las 06:00 y de las 18:00 son el turno que ya salió; a las 06:30 y a las 18:30 entra el siguiente.</p></div>
+          <p class="nota-graf">Las bajadas en las 06:00 y las 18:00 son el turno que sale; enseguida entra el siguiente.</p></div>
         <div class="card"><div class="card-tit"><h2>Alertas activas</h2><button class="lnk" type="button" data-ir="alertas">Ver todas</button></div>
           <ul class="alertas scroll" id="alertas-top"></ul></div>
       </div>
@@ -710,7 +710,7 @@
     D.tick();
     revisarSimAbierta();
     var N = ahora(), m = N.getHours() * 60 + N.getMinutes();
-    $('reloj').innerHTML = '<b>' + hhmm(N) + '</b><span>' + (m >= 390 && m < 1110 ? 'Turno de día' : 'Turno de noche') + ' · ' + fechaCorta(N) + '</span>';
+    $('reloj').innerHTML = '<b>' + hhmm(N) + '</b><span>' + (m >= 360 && m < 1080 ? 'Turno de día' : 'Turno de noche') + ' · ' + fechaCorta(N) + '</span>';
     var al = alertas(), crit = al.filter(function (a) { return a.sev === 'critico'; }).length;
     $('n-alertas').textContent = al.length; $('n-alertas').hidden = !al.length;
     $('m-alertas').textContent = crit ? pl(crit, 'crítica', 'críticas') : ''; $('m-alertas').hidden = !crit;

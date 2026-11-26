@@ -72,5 +72,17 @@ ok(count($p) === 1 && $p[0]['entrada'] === '2026-11-26 17:57:26' && $p[0]['salid
 $tot = $ca->listar(['turnos' => '2026-11-26-D,2026-11-26-N'], $admin)['totales'];
 ok($tot['2026-11-26-N']['entrada'] === 5 && $tot['2026-11-26-N']['salida'] === 4, 'contadores del turno de noche: ' . json_encode($tot['2026-11-26-N']));
 
+// 11) Horario de la planta: día 06:00–18:00 y noche 18:00–06:00 (margen de 2 h en cada cambio)
+$t = fn($tipo, $hora) => implode('-', ControlAccesos::turnoDe($tipo, "2026-11-26 $hora"));
+ok($t('entrada', '15:59:59') === '2026-11-26-D' && $t('entrada', '16:00:00') === '2026-11-26-N', 'entrada: hasta 15:59 es día; desde 16:00 (2 h antes de las 18:00) es noche');
+ok($t('entrada', '03:59:59') === '2026-11-25-N' && $t('entrada', '04:00:00') === '2026-11-26-D', 'entrada: hasta 03:59 es la noche anterior; desde 04:00 es día');
+ok($t('salida', '07:59:59') === '2026-11-25-N' && $t('salida', '08:00:00') === '2026-11-26-D', 'salida (sin entrada): hasta 07:59 es la noche anterior; desde 08:00 es día');
+ok($t('salida', '19:59:59') === '2026-11-26-D' && $t('salida', '20:00:00') === '2026-11-26-N', 'salida (sin entrada): hasta 19:59 es día; desde 20:00 es noche');
+$r = fn($hora) => implode('-', ControlAccesos::turnoReloj("2026-11-26 $hora"));
+ok($r('05:59:59') === '2026-11-25-N' && $r('06:00:00') === '2026-11-26-D' && $r('17:59:59') === '2026-11-26-D' && $r('18:00:00') === '2026-11-26-N',
+   'incidencias (reloj, sin margen): el cambio es a las 06:00 y a las 18:00');
+ok(str_contains(ControlAccesos::nombreTurno('2026-11-26', 'D'), '(06:00 a 18:00)') && str_contains(ControlAccesos::nombreTurno('2026-11-26', 'N'), '18:00 al'),
+   'el PDF dice «06:00 a 18:00»: ' . ControlAccesos::nombreTurno('2026-11-26', 'D'));
+
 echo $fallas ? "$fallas FALLAS\n" : "TODO BIEN\n";
 exit($fallas ? 1 : 0);

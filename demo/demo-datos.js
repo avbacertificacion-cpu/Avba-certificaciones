@@ -359,11 +359,11 @@
   function tick() { RELOJ++; refrescar(true); }
 
   /* ══ Turnos (igual que accesos.html y ControlAccesos::turnoDe) ══
-     Día 06:30–18:30, noche 18:30–06:30. Una entrada cuenta para el turno que
+     Día 06:00–18:00, noche 18:00–06:00. Una entrada cuenta para el turno que
      empieza (desde 2 h antes); una salida, para el que termina (hasta 2 h después). */
   function turnoDe(tipo, d) {
     var m = d.getHours() * 60 + d.getMinutes(), f = claveDia(d);
-    var ini = tipo === 'salida' ? 510 : 270, fin = tipo === 'salida' ? 1230 : 990;
+    var ini = tipo === 'salida' ? 480 : 240, fin = tipo === 'salida' ? 1200 : 960;
     if (m >= ini && m < fin) return f + '-D';
     if (m >= fin) return f + '-N';
     return claveDia(sumarDias(d, -1)) + '-N';

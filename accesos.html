@@ -19,8 +19,8 @@
     El PDF de datos junta la entrada y la salida de cada persona por código.
   · En la app funciona sin señal: el registro se guarda en el teléfono y se
     envía solo (js/app-sin-senal.js, ACCESO_REGISTRAR).
-  · El control es por TURNO, no por día: día 06:30–18:30 y noche
-    18:30–06:30. Una entrada cuenta para el turno que empieza (desde 2 h
+  · El control es por TURNO, no por día: día 06:00–18:00 y noche
+    18:00–06:00. Una entrada cuenta para el turno que empieza (desde 2 h
     antes) y una salida para el que termina (hasta 2 h después). Los
     contadores siguen aunque se cierre la sesión y se reinician solos en el
     cambio de turno. Administración puede ver turnos anteriores.
@@ -360,7 +360,7 @@
   <div class="tarjeta" id="tarjeta-pdf">
     <h2>PDF del turno</h2>
     <div class="campo" style="margin-bottom:6px"><label for="pdf-turno">Turno</label><select id="pdf-turno"></select>
-      <small class="ayuda">Un turno queda completo 2 horas después de su cambio, cuando ya salió su personal: el de día a las 20:30 y el de noche a las 08:30.</small></div>
+      <small class="ayuda">Un turno queda completo 2 horas después de su cambio, cuando ya salió su personal: el de día a las 20:00 y el de noche a las 08:00.</small></div>
     <p class="nota" id="pdf-aviso" hidden style="margin:0 0 6px"></p>
     <label class="check" style="margin-top:4px"><input type="checkbox" id="pdf-punto" checked> Sólo el punto de control elegido</label>
     <h3 class="sub-pdf">Entradas y salidas: nombre, ID y hora</h3>
@@ -573,15 +573,15 @@
   function numero(n) { return Number(n || 0).toLocaleString('es-MX'); }
 
   /* ══ Turnos ══════════════════════════════════════════════════════════
-     Día 06:30–18:30 y noche 18:30–06:30 (igual que el servidor,
+     Día 06:00–18:00 y noche 18:00–06:00 (igual que el servidor,
      ControlAccesos::turnoDe). En el cambio de turno salen unos y entran
      otros a la misma hora, así que no basta el reloj:
        · una ENTRADA cuenta para el turno que empieza (desde 2 h antes);
        · una SALIDA, para el que termina (hasta 2 h después).
-     Por eso de 04:30 a 08:30 y de 16:30 a 20:30 hay dos turnos en curso: el
+     Por eso de 04:00 a 08:00 y de 16:00 a 20:00 hay dos turnos en curso: el
      que sale y el que entra. Una clave de turno es «2026-11-24-D» o
      «2026-11-24-N» (la fecha del turno de noche es la del día en que empieza). */
-  var CAMBIO_DIA = 390, CAMBIO_NOCHE = 1110, MARGEN = 120;
+  var CAMBIO_DIA = 360, CAMBIO_NOCHE = 1080, MARGEN = 120;      // 06:00 y 18:00 (cambio de turno de la planta)
   function fechaDe(d) { return d.getFullYear() + '-' + dos(d.getMonth() + 1) + '-' + dos(d.getDate()); }
   function sumarDias(f, n) { var d = new Date(f + 'T12:00:00'); d.setDate(d.getDate() + n); return fechaDe(d); }
   function turnoDe(tipo, cap) {
@@ -616,7 +616,7 @@
     return e === s ? [e] : [s, e].sort();           // el que sale primero
   }
   /* Hasta cuándo recibe registros (sus últimas salidas) */
-  function cierreTurno(k) { return k.slice(-1) === 'D' ? k.slice(0, 10) + ' 20:30:00' : sumarDias(k.slice(0, 10), 1) + ' 08:30:00'; }
+  function cierreTurno(k) { return k.slice(-1) === 'D' ? k.slice(0, 10) + ' 20:00:00' : sumarDias(k.slice(0, 10), 1) + ' 08:00:00'; }
   function cerrado(k) { return ahoraLocal() >= cierreTurno(k); }
   var vista = null;                                // null: el turno en curso; o la clave de uno anterior
   function turnosVista() { return vista ? [vista] : turnosEnCurso(); }
@@ -624,12 +624,12 @@
   function nombreTurno(k) { return k.slice(-1) === 'D' ? 'Turno de día' : 'Turno de noche'; }
   function rangoTurno(k) {
     var f = k.slice(0, 10);
-    return k.slice(-1) === 'D' ? diaCorto(f) + ' · 06:30 a 18:30' : diaCorto(f) + ' 18:30 a ' + diaCorto(sumarDias(f, 1)) + ' 06:30';
+    return k.slice(-1) === 'D' ? diaCorto(f) + ' · 06:00 a 18:00' : diaCorto(f) + ' 18:00 a ' + diaCorto(sumarDias(f, 1)) + ' 06:00';
   }
   function turnoLargo(k) {                         // para las instrucciones a Claude
     var f = k.slice(0, 10);
-    return k.slice(-1) === 'D' ? 'turno de día del ' + fechaLarga(f) + ' (06:30 a 18:30)'
-      : 'turno de noche del ' + fechaLarga(f) + ', 18:30, al ' + fechaLarga(sumarDias(f, 1)) + ', 06:30';
+    return k.slice(-1) === 'D' ? 'turno de día del ' + fechaLarga(f) + ' (06:00 a 18:00)'
+      : 'turno de noche del ' + fechaLarga(f) + ', 18:00, al ' + fechaLarga(sumarDias(f, 1)) + ', 06:00';
   }
   function enLinea() { return window.AVBAApp ? AVBAApp.enLinea() : navigator.onLine !== false; }
   var tToast;

@@ -79,7 +79,7 @@ punto; el enrutador le rechaza todo lo demás).
    planta; se compara sin ceros, «00287» = «287»), **NOMBRE** en uno o dos renglones,
    EMPRESA, CARGO, **NSS de 11 dígitos (nunca es el ID)**, TIPO DE SANGRE, ALERGIAS y
    abajo «CREDENCIAL DE ACCESO». El lector ya está ajustado a ese formato.
-4. **Turnos:** día 06:30–18:30 y noche 18:30–06:30; una entrada cuenta para el turno
+4. **Turnos:** día 06:00–18:00 y noche 18:00–06:00 (horario de la planta); una entrada cuenta para el turno
    que empieza (desde 2 h antes) y una salida para el que termina (hasta 2 h después).
    **Pero** la salida de quien tiene su entrada abierta (su última lectura de las últimas
    16 h fue ENTRADA) va al turno de esa entrada (`turnoDeEntradaAbierta`, y en la pantalla
